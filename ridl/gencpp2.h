@@ -38,10 +38,16 @@ class CDeclInterfProxy2 :
     gint32 OutputROSSkel();
     gint32 OutputEventROSSkel( CMethodDecl* pmd );
     gint32 OutputAsyncROSSkel( CMethodDecl* pmd );
+
     gint32 OutputROS();
     gint32 OutputEventROS( CMethodDecl* pmd );
     gint32 OutputSyncROS( CMethodDecl* pmd );
     gint32 OutputAsyncROS( CMethodDecl* pmd );
+
+    gint32 OutputROSImpl();
+    gint32 OutputEventROSImpl( CMethodDecl* pmd );
+    gint32 OutputSyncROSImpl( CMethodDecl* pmd );
+    gint32 OutputAsyncROSImpl( CMethodDecl* pmd );
 };
 
 class CDeclInterfSvr2 :
@@ -55,17 +61,24 @@ class CDeclInterfSvr2 :
     {}
 
     gint32 OutputROS();
-    gint32 OutputROSSkel();
     gint32 OutputEventROS( CMethodDecl* pmd );
-    gint32 OutputSyncROSSkel( CMethodDecl* pmd );
     gint32 OutputSyncROS( CMethodDecl* pmd );
-    gint32 OutputAsyncROSSkel( CMethodDecl* pmd );
     gint32 OutputAsyncROS( CMethodDecl* pmd );
+
+    gint32 OutputROSImpl();
+    gint32 OutputEventROSImpl( CMethodDecl* pmd );
+    gint32 OutputSyncROSImpl( CMethodDecl* pmd );
+    gint32 OutputAsyncROSImpl( CMethodDecl* pmd );
+
+    gint32 OutputROSSkel();
+    gint32 OutputSyncROSSkel( CMethodDecl* pmd );
+    gint32 OutputAsyncROSSkel( CMethodDecl* pmd );
 };
 
 class CImplIfMethodSvr2 :
     public CImplIfMethodSvr
 {
+    stdstr m_strSvcName;
     public: 
     typedef CImplIfMethodSvr super;
     CImplIfMethodSvr2( CCppWriter* pWriter,
@@ -76,11 +89,21 @@ class CImplIfMethodSvr2 :
     gint32 OutputEventROS();
     gint32 OutputSyncROS();
     gint32 OutputAsyncROS();
+
+    gint32 OutputROSSkel();
+    gint32 OutputEventROSSkel();
+    gint32 OutputSyncROSSkel();
+    gint32 OutputAsyncROSSkel();
+    void SetSvcName( const stdstr& strName )
+    { m_strSvcName = strName; }
+    const stdstr& GetSvcName()
+    { return m_strSvcName; }
 };
 
 class CImplIfMethodProxy2 :
     public CImplIfMethodProxy
 {
+    stdstr m_strSvcName;
     public: 
     typedef CImplIfMethodProxy super;
     CImplIfMethodProxy2( CCppWriter* pWriter,
@@ -89,9 +112,17 @@ class CImplIfMethodProxy2 :
     {}
 
     gint32 OutputROSSkel();
+    gint32 OutputEventROSSkel();
+    gint32 OutputAsyncROSSkel();
+
     gint32 OutputROS();
     gint32 OutputEventROS();
     gint32 OutputAsyncROS();
+
+    void SetSvcName( const stdstr& strName )
+    { m_strSvcName = strName; }
+    const stdstr& GetSvcName()
+    { return m_strSvcName; }
 };
 
 class CDeclService2 :

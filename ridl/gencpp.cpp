@@ -314,8 +314,13 @@ gint32 CArgListUtils::GetArgsForCall(
             std::string strSig =
                 pNode->GetSignature();
 
-            if( strSig[ 0 ] == 'h' && bExpand )
-                strVarName += ".m_hStream";
+            if( strSig[ 0 ] == 'h' )
+            {
+                if( bExpand )
+                    strVarName += ".m_hStream";
+                else
+                    strVarName += "_h";
+            }
 
             vecArgs.push_back( strVarName );
         }
@@ -391,7 +396,7 @@ gint32 CArgListUtils::FindParentByClsid(
     EnumClsid iClsid,
     ObjPtr& pNode ) const
 {
-    CArgList* pinal = pArgList;
+    CAstNodeBase* pinal = pArgList;
     if( pinal == nullptr )
         return -EINVAL;
    
@@ -463,12 +468,12 @@ gint32 CMethodWriter::GenActParams(
     do{
         std::vector< std::string > vecArgs;
         ret = GetArgsForCall(
-            pArgList, vecArgs );
+            pArgList, vecArgs, bExpand );
         if( ERROR( ret ) )
             break;
 
         ret = GetArgsForCall(
-            pArgList2, vecArgs );
+            pArgList2, vecArgs, bExpand );
         if( ERROR( ret ) )
             break;
 

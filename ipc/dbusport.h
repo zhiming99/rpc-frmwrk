@@ -126,7 +126,7 @@ class CRpcBasePort : public CPort
     MatchMap m_mapEvtTable;
 
 
-	// the map for responst of the outgoing request IRPs 
+	// the map for responses of the outgoing request IRPs 
 	std::map< guint32, IrpPtr >     m_mapSerial2Resp;
 
     gint32 FindIrpForResp(

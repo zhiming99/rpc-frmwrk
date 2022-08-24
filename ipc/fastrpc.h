@@ -34,21 +34,30 @@
     _bProxy, CStreamProxyWrapper, CStreamServerWrapper>::type
 
 #define IFBASE( _bProxy ) std::conditional< \
-    _bProxy, CStreamProxyAsync, CStreamServerAsync>::type
+    _bProxy, CStreamProxySync, CStreamServerSync>::type
+
+#define STMBASE( _bProxy ) std::conditional< \
+    _bProxy, CStreamProxy, CStreamServer>::type
 
 #define IFBASE3( _bProxy ) std::conditional< \
     _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
 
 #define MAX_REQCHAN_PER_SESS 200
 
-namespace rpc{
+namespace rpcf
+{
 
-using SESS_INFO=std::pair< stdstr, stdstr >;
+struct SESS_INFO
+{
+    stdstr m_strSessHash;
+    stdstr m_strRouterPath;
+};
 
 template< bool bProxy >
 class CRpcStmChanBase :
-    public virtual IFBASE( bProxy ) 
+    public IFBASE( bProxy ) 
 {
+    protected:
     timespec m_tsStartTime;
 
     CSharedLock m_oSharedLock;
@@ -71,8 +80,8 @@ class CRpcStmChanBase :
     CSharedLock& GetSharedLock()
     { return m_oSharedLock; }
 
-    CRpcReqStreamBase( const IConfigDb* pCfg ) :
-        _MyVirtBase( pCfg ), super( pCfg )
+    CRpcStmChanBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ), super( pCfg )
     {
         clock_gettime(
             CLOCK_REALTIME, &m_tsStartTime );
@@ -86,25 +95,6 @@ class CRpcStmChanBase :
     {
         gint32 ret = 0;
         do{
-            CReadLock oLock( this->GetLock() );
-            auto itr =
-                m_mapStm2Sess.find( hStream );
-            if( itr == m_mapStm2Sess.end() )
-            {
-                ret = -ENOENT;
-                break;
-            }
-            strSess = itr.first;
-
-        }while( ret );
-        return ret;
-    }
-
-    gint32 GetSessInfo( HANDLE hStream,
-        SESS_INFO& stmInfo ) const
-    {
-        gint32 ret = 0;
-        do{
             CReadLock oLock( this->GetSharedLock() );
             auto itr =
                 m_mapStm2Sess.find( hStream );
@@ -113,70 +103,28 @@ class CRpcStmChanBase :
                 ret = -ENOENT;
                 break;
             }
-            stmInfo = *itr;
+            strSess = itr->second.m_strSessHash;
 
         }while( ret );
         return ret;
     }
 
-    gint32 AcceptNewStream(
-        IEventSink* pCallback,
-        IConfigDb* pDataDesc ) override
+    gint32 GetSessInfo( HANDLE hStream,
+        SESS_INFO& stmInfo )
     {
         gint32 ret = 0;
         do{
-            if( pDataDesc == nullptr )
+            CReadLock oLock( GetSharedLock() );
+            auto itr =
+                m_mapStm2Sess.find( hStream );
+            if( itr == m_mapStm2Sess.end() )
             {
-                ret = -EFAULT;
+                ret = -ENOENT;
                 break;
             }
-            ret = super::AcceptNewStream(
-                pCallback, pDataDesc );
-            if( ERROR( ret ) )
-                break;
+            stmInfo = itr->second;
 
-            CCfgOpener oDesc( pDataDesc );
-            ret = oCfg.GetPointer(
-                propTransCtx, ptctx );
-            if( ERROR( ret ) )
-                break;
-
-            stdstr strSess;
-            CCfgOpener oCtx( ptctx ); 
-            ret = oCtx.GetStrProp(
-                propSessHash, strSess );
-            if( ERROR( ret ) )
-                break;
-
-            stdstr strPath;
-            ret = oCtx.GetStrProp(
-                propRouterPath, strPath );
-            if( ERROR( ret ) )
-                break;
-                
-            CWriteLock oLock( this->GetSharedLock() );
-
-            auto itr = m_mapSessRefs.find(
-                strSess );
-
-            if( itr == m_mapSessRefs.end() )
-                m_mapSessRefs[ strSess ] = 1;
-            else
-            {
-                if( itr->second >=
-                    MAX_REQCHAN_PER_SESS )
-                {
-                    ret = -ERANGE;
-                    break;
-                }
-                itr->second++;
-            }
-
-            m_mapStm2Sess[ hStream ] =
-                    { strSess, strPath };
-
-        }while( 0 );
-
+        }while( ret );
         return ret;
     }
 
@@ -188,14 +136,45 @@ class CRpcStmChanBase :
             if( ERROR( ret ) )
                 break;
 
+            CfgPtr pDesc;
+            ret = this->GetDataDesc( hstm, pDesc );
+            if( ERROR( ret ) )
+                break;
+
+            IConfigDb* ptctx = nullptr;
+
+            CCfgOpener oDesc(
+                    ( IConfigDb* )pDesc );
+
+            ret = oDesc.GetPointer(
+                    propTransCtx, ptctx );
+            if( ERROR( ret ) )
+                break;
+
+            stdstr strSess, strPath;
+            CCfgOpener oCtx( ptctx );
+            ret = oCtx.GetStrProp(
+                propSessHash, strSess );
+            if( ERROR( ret ) )
+                break;
+            ret = oCtx.GetStrProp(
+                propRouterPath, strPath );
+            if( ERROR( ret ) )
+                break;
+
             CWriteLock oLock( this->GetSharedLock() );
 
             m_setStreams.insert( hstm );
 
             auto& msgElem =
-                    _mapMsgRead[ hstm ];
+                    m_mapMsgRead[ hstm ];
+            UNREFERENCED( msgElem );
             auto& bufElem =
                     m_mapBufReading[ hstm ];
+            UNREFERENCED( bufElem );
+
+            m_mapStm2Sess[ hstm ] =
+                    { strSess, strPath };
 
             oLock.Unlock();
 
@@ -227,7 +206,7 @@ class CRpcStmChanBase :
             CPort* pPdo = pPdoPort;
             CStdRMutex oPortLock( pPdo->GetLock() );
 
-            auto& msgElem = itr.second;
+            auto& msgElem = itr->second;
             auto& dwReqCount = msgElem.first;
             dwReqCount++;
 
@@ -239,7 +218,7 @@ class CRpcStmChanBase :
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pTask, this,
-                &CRpcReqStreamBase::DispatchData, 
+                &CRpcStmChanBase::DispatchData, 
                 hstm );
             
             if( ERROR( ret ) )
@@ -272,12 +251,12 @@ class CRpcStmChanBase :
 
             CWriteLock oLock( this->GetSharedLock() );
             auto itr =
-                m_mapStm2Sess.find( hStream );
+                m_mapStm2Sess.find( hstm );
             if( itr == m_mapStm2Sess.end() )
                 break;
 
-            auto itr2 =
-                m_mapSessRefs.find( itr->second );
+            auto itr2 = m_mapSessRefs.find(
+                itr->second.m_strSessHash );
 
             if( itr2 == m_mapSessRefs.end() )
             {
@@ -331,7 +310,7 @@ class CRpcStmChanBase :
                 ret = -EINVAL;
                 break;
             }
-            pIrpCtxPtr& pCtx = Irp->GetTopStack();
+            IrpCtxPtr& pCtx = pIrp->GetTopStack();
 
             pCtx->SetStatus( iRet );
             oIrpLock.Unlock();
@@ -374,11 +353,11 @@ class CRpcStmChanBase :
             if( ERROR( ret ) )
                 break;
 
-            oReqCtx.SetStrProp(
-                propRouterPath, si.second );
+            oReqCtx.SetStrProp( propRouterPath,
+                si.m_strRouterPath );
 
-            oReqCtx.SetStrProp(
-                propSessHash, si.first );
+            oReqCtx.SetStrProp( propSessHash,
+                si.m_strSessHash );
 
             oReqCtx.SetIntPtr( propStmHandle,
                 ( guint32* )hstm );
@@ -443,19 +422,19 @@ class CRpcStmChanBase :
             CPort* pPdo = pPdoPort;
             CStdRMutex oPortLock( pPdo->GetLock() );
 
-            auto& msgElem = itr.second;
+            auto& msgElem = itr->second;
             auto& msgQue = msgElem.second;
 
             BufPtr pBufReady;
-            auto itr =
+            auto itr1 =
                 m_mapBufReading.find( hstm );
-            if( itr == m_mapBufReading.end() )
+            if( itr1 == m_mapBufReading.end() )
             {
                 ret = -ENOENT;
                 break;
             }
             
-            BUFQUE queBuf = itr->second;
+            BUFQUE& queBuf = itr1->second;
             if( queBuf.empty() )
             {
                 guint32 dwSize = 0;
@@ -477,12 +456,12 @@ class CRpcStmChanBase :
                         break;
                     stdstr strSender = ":";
                     strSender +=
-                        std::to_string( hstm )
+                        std::to_string( hstm );
                     pMsg.SetSender( strSender );
                     DMsgPtr pNewMsg;
 
                     ret = BuildNewMsgToSvr(
-                        pMsg, pNewMsg );
+                        hstm, pMsg, pNewMsg );
                     if( ERROR( ret ) )
                         break;
                     msgQue.push_back( pNewMsg );
@@ -509,7 +488,7 @@ class CRpcStmChanBase :
                     sizeof( dwSize ) + pBuf->size();
                 if( dwPayload == dwSize )
                 {
-                    pHeadBuf->append(
+                    pHeadBuf->Append(
                         pBuf->ptr(), pBuf->size() );
 
                     DMsgPtr pMsg;
@@ -518,19 +497,19 @@ class CRpcStmChanBase :
                         break;
                     stdstr strSender = ":";
                     strSender +=
-                        std::to_string( hstm )
+                        std::to_string( hstm );
                     pMsg.SetSender( strSender );
                     DMsgPtr pNewMsg;
                     ret = BuildNewMsgToSvr(
-                        pMsg, pNewMsg );
+                        hstm, pMsg, pNewMsg );
                     if( ERROR( ret ) )
                         break;
                     msgQue.push_back( pNewMsg );
-                    queBuf.pop_front( hstm );
+                    queBuf.pop_front();
                 }
                 else if( dwPayload < dwSize )
                 {
-                    pHeadBuf->append(
+                    pHeadBuf->Append(
                         pBuf->ptr(), pBuf->size() );
                     ret = STATUS_MORE_PROCESS_NEEDED;
                 }
@@ -568,7 +547,7 @@ class CRpcStmChanBase :
             CPort* pPdo = pPdoPort;
             CStdRMutex oPortLock( pPdo->GetLock() );
 
-            auto& msgElem = itr.second;
+            auto& msgElem = itr->second;
             auto& msgQue = msgElem.second;
             auto& dwReqCount = msgElem.first;
 
@@ -605,7 +584,7 @@ class CRpcStmChanBase :
                 break;
 
             std::vector< DMsgPtr > vecMsgs;
-            CReadLock oLock( this->GetLock() );
+            CReadLock oLock( this->GetSharedLock() );
             if( this->GetState() != stateConnected )
             {
                 ret = ERROR_STATE;
@@ -619,20 +598,20 @@ class CRpcStmChanBase :
             CPort* pPdo = pPdoPort;
             CStdRMutex oPortLock( pPdo->GetLock() );
 
-            auto& msgElem = itr.second;
+            auto& msgElem = itr->second;
             auto& msgQue = msgElem.second;
             if( msgQue.empty() )
                 break;
 
             guint32 dwCount = ( gint32 )std::min(
                 ( guint32 )msgElem.first,
-                msgQue.size() );
+                ( guint32 )msgQue.size() );
 
             gint32 iCount = ( gint32 )dwCount;
             while( iCount > 0 )
             {
                 --iCount;
-                vecMsgs.push_back( msgQue.front() )
+                vecMsgs.push_back( msgQue.front() );
                 msgQue.pop_front();
             }
 
@@ -668,31 +647,10 @@ class CRpcStmChanBase :
         return ret;
     }
 
-    gint32 OnRmtSvrEvent(
-        EnumEventId iEvent,
-        IConfigDb* pEvtCtx,
-        HANDLE hPort ) override
-    {
-        gint32 ret = super::OnRmtSvrEvent(
-             iEvent, pEvtCtx, hPort );
-        if( ERROR( ret ) )
-            return ret;
-
-        if( IsServer() )
-            return ret;
-
-        if( iEvent == eventRmtSvrOnline )
-        {
-            return ret;
-        }
-
-        return ret;
-    }
-
     gint32 OnStartStopComplete(
         IEventSink* pCallback,
         IEventSink* pIoReq,
-        IConfigDb* pReqCtx );
+        IConfigDb* pReqCtx )
     {
         if( pIoReq == nullptr ||
             pReqCtx == nullptr )
@@ -730,7 +688,7 @@ class CRpcStmChanBase :
                 break;
             }
 
-            pIrpCtxPtr& pCtx =
+            IrpCtxPtr& pCtx =
                     pIrp->GetTopStack();
             if( ERROR( iRet ) )
             {
@@ -738,9 +696,12 @@ class CRpcStmChanBase :
             }
             else
             {
+                gint32* pRet = &iRet;
                 CCfgOpener oResp( pResp );
                 ret = oResp.GetIntProp(
-                    propReturnValue, iRet );
+                    propReturnValue,
+                    *( guint32* )pRet );
+
                 if( ERROR( ret ) )
                     pCtx->SetStatus( ret );
                 else
@@ -760,7 +721,7 @@ class CRpcStmChanBase :
 
             oIrpLock.Unlock();
 
-            auto pMgr = GetIoMgr();
+            auto pMgr = this->GetIoMgr();
             pMgr->CompleteIrp( pIrp );
 
         }while( 0 );
@@ -773,7 +734,7 @@ class CRpcStmChanBase :
     gint32 OnStartStmComplete(
         IEventSink* pCallback,
         IEventSink* pIoReq,
-        IConfigDb* pReqCtx );
+        IConfigDb* pReqCtx )
     {
         if( pIoReq == nullptr ||
             pReqCtx == nullptr )
@@ -812,7 +773,7 @@ class CRpcStmChanBase :
             }
 
             CCfgOpener oResp( pResp );
-            pIrpCtxPtr& pCtx =
+            IrpCtxPtr& pCtx =
                     pIrp->GetTopStack();
             if( ERROR( iRet ) )
             {
@@ -820,8 +781,10 @@ class CRpcStmChanBase :
             }
             else
             {
+                gint32* pRet = &iRet;
                 ret = oResp.GetIntProp(
-                    propReturnValue, iRet );
+                    propReturnValue,
+                    *( guint32* )pRet );
                 if( ERROR( ret ) )
                     pCtx->SetStatus( ret );
                 else
@@ -841,27 +804,27 @@ class CRpcStmChanBase :
                 else
                     pPort->SetStream( hstm );
             }
+            SetPreStopStep( pIrp, 1 );
             oIrpLock.Unlock();
 
-            auto pMgr = GetIoMgr();
+            auto pMgr = this->GetIoMgr();
             pMgr->CompleteIrp( pIrp );
 
         }while( 0 );
 
         return ret;
     }
-    
 };
 
 class CRpcStmChanCli :
-    public CRpcReqStreamBase< true >
+    public CRpcStmChanBase< true >
 {
     public:
     typedef CRpcStmChanBase< true > super;
     CRpcStmChanCli( const IConfigDb* pCfg )
         : super( pCfg )
     {}
-
+    void haha();
 };
 
 class CRpcStmChanSvr :
@@ -872,73 +835,74 @@ class CRpcStmChanSvr :
     CRpcStmChanSvr( const IConfigDb* pCfg )
         : super( pCfg )
     {}
+
+    gint32 AcceptNewStream(
+        IEventSink* pCallback,
+        IConfigDb* pDataDesc ) override;
 };
 
 template< bool bProxy >
-class CFastRpcSkelBase
-    public IFBASE2< bProxy >
+class CFastRpcSkelBase :
+    public IFBASE2( bProxy )
 {
-    InterfPtr m_pStreamIf;
+    InterfPtr m_pParent;
 
     public:
 
     typedef typename IFBASE2( bProxy ) super;
-    typedef super::super _MyVirtBase;
+    typedef typename super::super _MyVirtBase;
 
-    CFastRpcSkeltonBase(
+    CFastRpcSkelBase(
         const IConfigDb* pCfg ) :
         _MyVirtBase( pCfg ), super( pCfg )
-    {}
+    {
+        gint32 ret = 0;
+        do{
+            CCfgOpener oCfg( pCfg );
+            ObjPtr pObj;
+            ret = oCfg.GetObjPtr(
+                propParentPtr, pObj );
+            if( ERROR( ret ) )
+                break;
+            m_pParent = pObj;
 
-    InterfPtr GetStreamIf()
-    { return m_pStreamIf; }
+        }while( 0 );
 
-    void SetStreamIf( InterfPtr pIf )
-    { m_pStreamIf = pIf; }
+        return;
+    }
+
+    CRpcServices* GetStreamIf() override
+    { return m_pParent; }
+
+    InterfPtr& GetParentIf()
+    { return m_pParent; };
+
+    void SetParentIf( InterfPtr& pIf )
+    { return m_pParent = pIf; };
 };
 
-class CRpcSkelProxyState :
+class CFastRpcSkelProxyState :
     public CInterfaceState
 {
     public:
     typedef CInterfaceState super;
-    CRpcSkelProxyState ( const IConfigDb* pCfg )
+    CFastRpcSkelProxyState( const IConfigDb* pCfg )
         : super( pCfg )
-    { SetClassId( clsid( CRpcSkelProxyState ) ); }
-    gint32 SubscribeEvents();
+    { SetClassId( clsid( CFastRpcSkelProxyState ) ); }
+    gint32 SubscribeEvents()
+    { return 0; }
 };
 
-class CRpcSkelServerState :
+class CFastRpcSkelServerState :
     public CIfServerState
 {
     public:
     typedef CIfServerState super;
-    CRpcSkelProxyState ( const IConfigDb* pCfg )
+    CFastRpcSkelServerState( const IConfigDb* pCfg )
         : super( pCfg )
-    { SetClassId( clsid( CRpcSkelProxyState ) ); }
-    gint32 SubscribeEvents();
-};
-
-class CFastRpcServerState :
-    public CIfServerState
-{
-    public:
-    typedef CIfServerState super;
-    CFastRpcServerState ( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CFastRpcServerState ) ); }
-    gint32 SubscribeEvents();
-};
-
-class CFastRpcProxyState :
-    public CRemoteProxyState
-{
-    public:
-    typedef CRemoteProxyState super;
-    CFastRpcProxyState ( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CFastRpcProxyState ) ); }
-    gint32 SubscribeEvents();
+    { SetClassId( clsid( CFastRpcSkelServerState ) ); }
+    gint32 SubscribeEvents()
+    { return 0; }
 };
 
 class CFastRpcSkelProxyBase :
@@ -956,46 +920,112 @@ class CFastRpcSkelSvrBase :
 {
     public:
     typedef CFastRpcSkelBase< false > super;
-    CFastRpcSkelServerBase( const IConfigDb* pCfg )
+    CFastRpcSkelSvrBase( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
 };
 
-class CFastRpcServerBase :
-    public IFBASE3< false >
+class CFastRpcServerState :
+    public CIfServerState
 {
     public:
-    typedef IFBASE3< false > super;
+    typedef CIfServerState super;
+    CFastRpcServerState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CFastRpcServerState ) ); }
+
+    gint32 SubscribeEvents()
+    {
+        std::vector< EnumPropId > vecEvtToSubscribe =
+            { propRmtSvrEvent };
+        return SubscribeEventsInternal(
+            vecEvtToSubscribe );
+    }
+};
+
+class CFastRpcProxyState :
+    public CRemoteProxyState
+{
+    public:
+    typedef CRemoteProxyState super;
+    CFastRpcProxyState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CFastRpcProxyState ) ); }
+
+    gint32 SubscribeEvents()
+    {
+        std::vector< EnumPropId > vecEvtToSubscribe =
+            { propRmtSvrEvent };
+        return SubscribeEventsInternal(
+            vecEvtToSubscribe );
+    }
+
+};
+
+class CFastRpcServerBase :
+    public virtual IFBASE3( false )
+{
+    protected:
+    std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
+
+    public:
+    typedef IFBASE3( false ) super;
+    CFastRpcServerBase( const IConfigDb* pCfg ) :
+        super( pCfg ) 
+    {}
+
+    gint32 GetStmSkel(
+        HANDLE hstm, InterfPtr& pIf );
 
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
         IConfigDb* pEvtCtx,
         HANDLE hPort ) override;
 
-    gint32 OnPostStart(
-        IEventSink* pCallback ) override;
-
     gint32 OnPreStop(
         IEventSink* pCallback ) override;
+
+    virtual gint32 CreateStmSkel(
+        HANDLE hStream,
+        InterfPtr& pIf ) = 0;
+
+    gint32 CheckReqCtx(
+        IEventSink* pCallback,
+        DMsgPtr& pMsg ) override;
+
+    gint32 GetStream(
+        IEventSink* pCallback,
+        HANDLE& hStream );
+
+    gint32 OnStartSkelComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
 };
 
 class CFastRpcProxyBase :
-    public IFBASE3< true >
+    public virtual IFBASE3( true )
 {
-    InterfPtr m_pSkelImp;
-    public:
-    typedef IFBASE3< true > super;
+    InterfPtr m_pSkelObj;
 
-    gint32 OnRmtSvrEvent(
-        EnumEventId iEvent,
-        IConfigDb* pEvtCtx,
-        HANDLE hPort ) override;
+    public:
+    typedef IFBASE3( true ) super;
+
+    CFastRpcProxyBase( const IConfigDb* pCfg ):
+        super( pCfg ) 
+    {}
 
     gint32 OnPostStart(
         IEventSink* pCallback ) override;
 
     gint32 OnPreStop(
         IEventSink* pCallback ) override;
+
+    virtual gint32 CreateStmSkel(
+        InterfPtr& pIf ) = 0;
+
+    InterfPtr GetStmSkel() const
+    { return m_pSkelObj; }
 };
 
 DECLARE_AGGREGATED_SERVER(

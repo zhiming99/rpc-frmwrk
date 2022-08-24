@@ -138,7 +138,7 @@ gint32 CDeclInterfProxy2::OutputEventROSSkel(
         return -EINVAL;
 
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
         ObjPtr pArgs = pmd->GetInArgs();
         CCOUT<< "//RPC event handler '" << strName <<"'";
@@ -153,41 +153,50 @@ gint32 CDeclInterfProxy2::OutputEventROSSkel(
         if( dwCount > 0 )
         {
             GenFormInArgs( pArgs );
-            CCOUT << " ) = 0;";
+            CCOUT << " );";
         }
         else
-        {
-            CCOUT << ") = 0;";
-        }
-        INDENT_DOWNL;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pIf = GetStreamIf();" );
-        Wa( "if( pIf.IsEmpty() )" );
-        Wa( "    return -EFAULT;" );
-        Wa( "CRpcServices* pSvc = pIf;" );
-        Wa( "auto& pApi = dynamic_cast" );
-        CCOUT << "< I" << m_pNode->GetName() << "_SvrApi* >";
-        NEW_LINE;
-        CCOUT << "    ( pSvc );";
-        NEW_LINE;
-        Wa( "if( pApi == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "return pApi->" << strName << "(";
-        if( dwCount == 0 )
         {
             CCOUT << ");";
         }
-        else
-        {
+        INDENT_DOWNL;
+
+        if( pmd->IsSerialize() && dwCount > 0 )
+        { 
+            NEW_LINE;
+            // extra step the deserialize before
+            // calling event handler.
+            Wa( "//RPC event handler wrapper" );
+            CCOUT << "gint32 " << strName <<"Wrapper(";
             INDENT_UPL;
-            GenActParams( pArgs, false );
+            CCOUT << "IEventSink* pCallback, BufPtr& pBuf_ );";
+            INDENT_DOWN;
+        }
+        else if( dwCount == 0 )
+        {
+            NEW_LINE;
+            // extra step the deserialize before
+            // calling event handler.
+            Wa( "//RPC event handler wrapper" );
+            CCOUT << "gint32 " << strName
+                <<"Wrapper( IEventSink* pCallback );";
+        }
+        else if( !pmd->IsSerialize() )
+        {
+            NEW_LINE;
+            // extra step the deserialize before
+            // calling event handler.
+            Wa( "//RPC event handler wrapper" );
+            CCOUT << "gint32 " << strName
+                <<"Wrapper(";
+            INDENT_UPL;
+            CCOUT << "IEventSink* pCallback, ";
+            NEW_LINE;
+            GenFormInArgs( pArgs );
             CCOUT << " );";
             INDENT_DOWN;
         }
         NEW_LINE;
-        Wa( "return ret;" );
-        BLOCK_CLOSE;
 
     }while( 0 );
 
@@ -200,7 +209,7 @@ gint32 CDeclInterfProxy2::OutputAsyncROSSkel(
     if( pmd == nullptr )
         return -EINVAL;
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
@@ -283,7 +292,7 @@ gint32 CDeclInterfProxy2::OutputAsyncROSSkel(
             strDecl += ",";
             NEW_LINE;
             GenFormInArgs( pOutArgs );
-            CCOUT << " )";
+            CCOUT << " );";
             INDENT_DOWN;
         }
         else
@@ -291,41 +300,9 @@ gint32 CDeclInterfProxy2::OutputAsyncROSSkel(
             INDENT_UPL;
             CCOUT << "IConfigDb* context, ";
             NEW_LINE;
-            CCOUT << "gint32 iRet )";
+            CCOUT << "gint32 iRet );";
             INDENT_DOWN;
         }
-        NEW_LINE;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pIf = GetStreamIf();" );
-        Wa( "if( pIf.IsEmpty() )" );
-        Wa( "    return -EFAULT;" );
-        Wa( "CRpcServices* pSvc = pIf;" );
-        Wa( "auto& pApi = dynamic_cast" );
-        CCOUT << "< I" << m_pNode->GetName() << "_CliApi* >";
-        NEW_LINE;
-        CCOUT << "    ( pSvc );";
-        NEW_LINE;
-        Wa( "if( pApi == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "return pApi->" << strName << "(";
-        if( dwOutCount == 0 )
-        {
-            INDENT_UPL;
-            CCOUT << "pReqCtx_, iRet );";
-            INDENT_DOWN;
-        }
-        else
-        {
-            INDENT_UPL;
-            CCOUT << "pReqCtx_, iRet,";
-            NEW_LINE;
-            GenActParams( pOutArgs );
-            CCOUT << " );";
-            INDENT_DOWN;
-        }
-
-        BLOCK_CLOSE;
         NEW_LINE;
 
     }while( 0 );
@@ -397,17 +374,18 @@ gint32 CDeclInterfProxy2::OutputROS()
         CCOUT << "inline " << strSkel <<"* GetSkelPtr()";
         NEW_LINE;
         BLOCK_OPEN;
-        Wa( "auto& pCli = dynamic_cast" );
-        Wa( "< CFastRpcProxyBase* >( this )" );
+        CCOUT << "auto pCli = dynamic_cast"
+            << "< CFastRpcProxyBase* >( this );";
+        NEW_LINE;
         Wa( "if( pCli == nullptr )" );
         Wa( "    return nullptr;" );
         Wa( "InterfPtr pIf = pCli->GetStmSkel();" );
-        Wa( "if( pIf->IsEmpty() )" );
+        Wa( "if( pIf.IsEmpty() )" );
         Wa( "    return nullptr;" );
-        Wa( "auto& pSkel = dynamic_cast" );
-        CCOUT << "<" << strSkel << "*>(";
+        CCOUT << "auto pSkel = dynamic_cast"
+            << "<" << strSkel << "*>("
+            << "( CRpcServices* )pIf );";
         NEW_LINE;
-        Wa( "    ( CRpcServices* )pIf );" );
         CCOUT << "return pSkel;";
         BLOCK_CLOSE;
         NEW_LINE;
@@ -463,13 +441,13 @@ gint32 CDeclInterfProxy2::OutputEventROS(
         return -EINVAL;
 
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
         ObjPtr pArgs = pmd->GetInArgs();
         CCOUT<< "//RPC event handler '" << strName <<"'";
         NEW_LINE;
         std::string strDecl =
-            std::string( "gint32 " ) +
+            std::string( "virtual gint32 " ) +
             strName + "(";
         CCOUT << strDecl;
         guint32 dwCount = GetArgCount( pArgs );
@@ -478,11 +456,11 @@ gint32 CDeclInterfProxy2::OutputEventROS(
         if( dwCount > 0 )
         {
             GenFormInArgs( pArgs );
-            CCOUT << " );";
+            CCOUT << " ) = 0;";
         }
         else
         {
-            CCOUT << ");";
+            CCOUT << ") = 0;";
         }
         INDENT_DOWNL;
 
@@ -497,7 +475,7 @@ gint32 CDeclInterfProxy2::OutputSyncROS(
     if( pmd == nullptr )
         return -EINVAL;
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
@@ -543,13 +521,11 @@ gint32 CDeclInterfProxy2::OutputSyncROS(
         }
         BLOCK_OPEN;
 
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pSkel = GetSkelPtr(); " );
+        Wa( "auto pSkel = GetSkelPtr(); " );
         Wa( "if( pSkel == nullptr )" );
         Wa( "    return -EFAULT;" );
-        CCOUT << "pSkel->" << strName << "(";
-        NEW_LINE;
-        if( dwInCount == 0 )
+        CCOUT << "return pSkel->" << strName << "(";
+        if( dwCount == 0 )
         {
             CCOUT << ");";
         }
@@ -557,7 +533,7 @@ gint32 CDeclInterfProxy2::OutputSyncROS(
         {
             INDENT_UPL;
             GenActParams( pInArgs, pOutArgs, false );
-            CCOUT << " )";
+            CCOUT << " );";
             INDENT_DOWN;
         }
 
@@ -574,13 +550,14 @@ gint32 CDeclInterfProxy2::OutputAsyncROS(
     if( pmd == nullptr )
         return -EINVAL;
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
 
         guint32 dwInCount = GetArgCount( pInArgs );
         guint32 dwOutCount = GetArgCount( pOutArgs );
+        guint32 dwCount = dwInCount + dwOutCount;
 
         Wa( "//RPC Async Req Sender" );
         CCOUT << "gint32 " << strName << "( ";
@@ -609,36 +586,33 @@ gint32 CDeclInterfProxy2::OutputAsyncROS(
         }
 
         CCOUT << ")";
-        INDENT_DOWN;
+        INDENT_DOWNL;
         BLOCK_OPEN;
-        NEW_LINE;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pIf = GetSkelPtr()" );
-        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "auto pIf = GetSkelPtr();" );
+        Wa( "if( pIf == nullptr )" );
         Wa( "    return -EFAULT;" );
         Wa( "CRpcServices* pSvc = pIf;" );
-        Wa( "auto& pSkel = dynamic_cast" );
-        CCOUT << "< I" << m_pNode->GetName() << "_pImpl* >";
+        CCOUT << "auto pSkel = dynamic_cast"
+            << "< I" << m_pNode->GetName() << "_PImpl* >"
+            << "( pSvc );";
         NEW_LINE;
-        CCOUT << "    ( pSvc );";
-        NEW_LINE;
-        Wa( "if( pWrapper == nullptr )" );
+        Wa( "if( pSkel == nullptr )" );
         Wa( "    return -EFAULT;" );
-        CCOUT << "ret = pSkel->" << strName << "(";
-        if( dwOutCount == 0 )
+        CCOUT << "return pSkel->" << strName << "(";
+        if( dwCount == 0 )
         {
             INDENT_UPL;
-            CCOUT << "pReqCtx_, iRet );";
-            INDENT_DOWNL;
+            CCOUT << "context );";
+            INDENT_DOWN;
         }
         else
         {
             INDENT_UPL;
-            CCOUT << "pReqCtx_, iRet,";
+            CCOUT << "context,";
             NEW_LINE;
             GenActParams( pInArgs, pOutArgs, false );
-            CCOUT << " )";
-            INDENT_DOWNL;
+            CCOUT << " );";
+            INDENT_DOWN;
         }
         BLOCK_CLOSE;
         NEW_LINE;
@@ -647,7 +621,7 @@ gint32 CDeclInterfProxy2::OutputAsyncROS(
         Wa( "// RPC Async Req Callback" );
 
         std::string strDecl;
-        strDecl += "gint32 " + strName
+        strDecl += "virtual gint32 " + strName
             + "Callback" + "(";
         CCOUT << strDecl;
         strDecl += "IConfigDb* context, gint32 iRet";
@@ -668,10 +642,666 @@ gint32 CDeclInterfProxy2::OutputAsyncROS(
             INDENT_UPL;
             CCOUT << "IConfigDb* context, ";
             NEW_LINE;
-            CCOUT << "gint32 iRet );";
+            CCOUT << "gint32 iRet ) = 0;";
             INDENT_DOWN;
         }
         NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfProxy2::OutputROSImpl()
+{
+    gint32 ret = 0;
+    do{
+        std::string strName =
+            m_pNode->GetName();
+
+        ObjPtr pMethods =
+            m_pNode->GetMethodList();
+
+        CMethodDecls* pmds = pMethods;
+        guint32 i = 0;
+        pmds->GetCount();
+        guint32 dwCount = pmds->GetCount();
+        for( ; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( pmd->IsEvent() )
+            {
+                ret = OutputEventROSImpl( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else if( !pmd->IsAsyncp() )
+            {
+                ret = OutputSyncROSImpl( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else 
+            {
+                ret = OutputAsyncROSImpl( pmd );
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDeclInterfProxy2::OutputEventROSImpl(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+        ObjPtr pArgs = pmd->GetInArgs();
+        CCOUT<< "//RPC event handler '" << strName <<"'";
+        NEW_LINE;
+        std::string strDecl =
+            std::string( "gint32 " ) +
+            strName + "(";
+        CCOUT << strDecl;
+        guint32 dwCount = GetArgCount( pArgs );
+
+        INDENT_UPL;
+        if( dwCount > 0 )
+        {
+            GenFormInArgs( pArgs );
+            CCOUT << " ) override;";
+        }
+        else
+        {
+            CCOUT << ") override;";
+        }
+        INDENT_DOWNL;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfProxy2::OutputSyncROSImpl(
+    CMethodDecl* pmd )
+{ return STATUS_SUCCESS; }
+
+gint32 CDeclInterfProxy2::OutputAsyncROSImpl(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+        ObjPtr pInArgs = pmd->GetInArgs();
+        ObjPtr pOutArgs = pmd->GetOutArgs();
+
+        guint32 dwInCount = GetArgCount( pInArgs );
+        guint32 dwOutCount = GetArgCount( pOutArgs );
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "// RPC Async Req Callback" );
+
+        std::string strDecl;
+        strDecl += "gint32 " + strName
+            + "Callback" + "(";
+        CCOUT << strDecl;
+        strDecl += "IConfigDb* context, gint32 iRet";
+
+        if( dwOutCount > 0 )
+        {
+            INDENT_UPL;
+            CCOUT << "IConfigDb* context, ";
+            NEW_LINE;
+            CCOUT << "gint32 iRet,";
+            strDecl += ",";
+            GenFormInArgs( pOutArgs );
+            CCOUT << " ) override;";
+            INDENT_DOWN;
+        }
+        else
+        {
+            INDENT_UPL;
+            CCOUT << "IConfigDb* context, ";
+            NEW_LINE;
+            CCOUT << "gint32 iRet ) override;";
+            INDENT_DOWN;
+        }
+        NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfSvr2::OutputROS()
+{
+    gint32 ret = 0;
+    do{
+        std::string strName =
+            m_pNode->GetName();
+
+        AP( "class " ); 
+        std::string strClass = "I";
+        strClass += strName + "_SvrApi";
+
+        std::string strSkel = "I";
+        strSkel += strName + "_SImpl";
+
+        CCOUT << strClass;
+        std::string strBase =
+            "CAggInterfaceServer";
+        INDENT_UP;
+        NEW_LINE;
+        CCOUT<< ": public virtual " << strBase;
+        INDENT_DOWN;
+        NEW_LINE;
+        BLOCK_OPEN;
+
+        Wa( "public:" );
+        CCOUT << "typedef "
+            << strBase << " super;";
+        NEW_LINE;
+        CCOUT << strClass
+            << "( const IConfigDb* pCfg ) :";
+        INDENT_UP;
+        NEW_LINE;
+
+        CCOUT << "super( pCfg )";
+        NEW_LINE;
+        CCOUT << "{}";
+
+        INDENT_DOWN;
+        NEW_LINE;
+        CCOUT << "inline " << strSkel
+            << "* GetSkelPtr( HANDLE hstm )";
+        NEW_LINE;
+        BLOCK_OPEN;
+        CCOUT <<  "auto pSvr = dynamic_cast"
+          << "< CFastRpcServerBase* >( this );";
+        NEW_LINE;
+        Wa( "if( pSvr == nullptr )" );
+        Wa( "    return nullptr;" );
+        Wa( "InterfPtr pIf;" );
+        Wa( "gint32 ret = pSvr->GetStmSkel(" );
+        Wa( "    hstm, pIf );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return nullptr;" );
+        CCOUT << "auto pSkel = dynamic_cast" 
+            << "<" << strSkel << "*>("
+            << "( CRpcServices* )pIf );";
+        NEW_LINE;
+        CCOUT << "return pSkel;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+
+        ObjPtr pMethods =
+            m_pNode->GetMethodList();
+
+        CMethodDecls* pmds = pMethods;
+        guint32 i = 0;
+        pmds->GetCount();
+        guint32 dwCount = pmds->GetCount();
+        for( ; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( pmd->IsEvent() )
+            {
+                ret = OutputEventROS( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else if( !pmd->IsAsyncs() )
+            {
+                ret = OutputSyncROS( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else 
+            {
+                ret = OutputAsyncROS( pmd );
+            }
+            if( i + 1 < dwCount )
+                NEW_LINE;
+        }
+        BLOCK_CLOSE;
+        CCOUT << ";";
+        NEW_LINES( 2 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDeclInterfSvr2::OutputEventROS(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+        ObjPtr pArgs = pmd->GetInArgs();
+        Wa( "//RPC event sender" );
+        CCOUT << "gint32 " << strName << "(";
+        guint32 dwInCount = GetArgCount( pArgs );
+        if( dwInCount > 0 )
+        {
+            INDENT_UPL;
+            GenFormInArgs( pArgs );
+            CCOUT << " )";
+            INDENT_DOWN;
+        }
+        else
+        {
+            CCOUT << " )";
+        }
+
+        stdstr strIfName = m_pNode->GetName();
+
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "auto pSkel = GetSkelPtr( INVALID_HANDLE );" );
+        Wa( "if( pSkel == nullptr )" );
+        Wa( "    return -EFAULT;" );
+        CCOUT << "return pSkel->" << strName << "(";
+        if( dwInCount == 0 )
+        {
+            CCOUT << ");";
+        }
+        else
+        {
+            INDENT_UPL;
+            GenActParams( pArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+
+        BLOCK_CLOSE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfSvr2::OutputSyncROS(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+
+        ObjPtr pInArgs = pmd->GetInArgs();
+        ObjPtr pOutArgs = pmd->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Sync Req Handler" );
+        std::string strDecl =
+            std::string( "virtual gint32 " )
+            + strName + "(";
+        CCOUT << strDecl;
+        if( dwCount == 0 )
+        {
+            CCOUT << ") = 0;";
+        }
+        else
+        {
+            INDENT_UPL;
+            bool bComma = false;
+            if( dwInCount > 0 )
+            {
+                bComma = true;
+                GenFormInArgs( pInArgs );
+            }
+            if( dwOutCount > 0 )
+            {
+                if( bComma )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                GenFormOutArgs( pOutArgs );
+            }
+            CCOUT << " ) = 0;";
+            INDENT_DOWN;
+        }
+        NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfSvr2::OutputAsyncROS(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+        ObjPtr pInArgs = pmd->GetInArgs();
+        ObjPtr pOutArgs = pmd->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Async Req Cancel Handler" );
+        CCOUT << "virtual gint32 "
+            << "On" << strName << "Canceled(";
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_, gint32 iRet";
+        if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        CCOUT << " ) = 0;";
+        INDENT_DOWNL;
+
+        Wa( "//RPC Async Req Complete helper" );
+        Wa( "//Call this method when you have" );
+        Wa( "//finished the async operation" );
+        Wa( "//with all the return value set" );
+        Wa( "//or an error code" );
+
+        CCOUT << "gint32 " << strName
+            << "Complete" << "( ";
+
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_, "
+            << "gint32 iRet";
+
+        if( dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pOutArgs );
+        }
+        CCOUT << " )";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+        Wa( "do" );
+        BLOCK_OPEN;
+        Wa( "CCfgOpener oReqCtx( pReqCtx_ );" );
+        Wa( "IEventSink* pEvt = nullptr;" );
+        Wa( "ret = oReqCtx.GetPointer(" );
+        Wa( "    propEventSink, pEvt );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        CCOUT <<  "auto pSvr_ = dynamic_cast" 
+            << "<CFastRpcServerBase*>( this );";
+        NEW_LINE;
+        Wa( "HANDLE hstm = INVALID_HANDLE;" );
+        Wa( "ret = pSvr_->GetStream( pEvt, hstm );");
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        Wa( "auto pSkel = GetSkelPtr( hstm );" );
+        CCOUT << "pSkel->" << strName << "Complete(";
+        NEW_LINE;
+        if( dwOutCount == 0 )
+            Wa( "    pReqCtx_, iRet );" );
+        else
+        {
+            CCOUT << "    pReqCtx_, iRet,";
+            INDENT_UPL;
+            GenActParams( pOutArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "//RPC Async Req Handler" );
+        std::string strDecl =
+            std::string( "virtual gint32 " ) +
+            strName + "(";
+
+        CCOUT << strDecl;
+        strDecl += "IConfigDb* pReqCtx_";
+
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_";
+        if( dwCount > 0 )
+        {
+            strDecl += ",";
+            CCOUT << ",";
+        }
+
+        if( dwInCount > 0 )
+        {
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        if( dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormOutArgs( pOutArgs );
+        }
+        CCOUT << " ) = 0;";
+        INDENT_DOWNL;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfSvr2::OutputROSImpl()
+{
+    gint32 ret = 0;
+    do{
+        std::string strName =
+            m_pNode->GetName();
+
+        ObjPtr pMethods =
+            m_pNode->GetMethodList();
+
+        CMethodDecls* pmds = pMethods;
+        guint32 i = 0;
+        pmds->GetCount();
+        guint32 dwCount = pmds->GetCount();
+        for( ; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( pmd->IsEvent() )
+            {
+                ret = OutputEventROSImpl( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else if( pmd->IsAsyncs() )
+            {
+                ret = OutputAsyncROSImpl( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            else 
+            {
+                ret = OutputSyncROSImpl( pmd );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDeclInterfSvr2::OutputEventROSImpl(
+    CMethodDecl* pmd )
+{ return STATUS_SUCCESS; }
+
+gint32 CDeclInterfSvr2::OutputSyncROSImpl(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+
+        ObjPtr pInArgs = pmd->GetInArgs();
+        ObjPtr pOutArgs = pmd->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Sync Req Handler" );
+        std::string strDecl =
+            std::string( "gint32 " )
+            + strName + "(";
+        CCOUT << strDecl;
+        if( dwCount == 0 )
+        {
+            CCOUT << ") override;";
+        }
+        else
+        {
+            INDENT_UPL;
+            bool bComma = false;
+            if( dwInCount > 0 )
+            {
+                bComma = true;
+                GenFormInArgs( pInArgs );
+            }
+            if( dwOutCount > 0 )
+            {
+                if( bComma )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                GenFormOutArgs( pOutArgs );
+            }
+            CCOUT << " ) override;";
+            INDENT_DOWN;
+        }
+        NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CDeclInterfSvr2::OutputAsyncROSImpl(
+    CMethodDecl* pmd )
+{
+    if( pmd == nullptr )
+        return -EINVAL;
+    do{
+        std::string strName;
+        strName = pmd->GetName();
+        ObjPtr pInArgs = pmd->GetInArgs();
+        ObjPtr pOutArgs = pmd->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Async Req Cancel Handler" );
+        CCOUT << "gint32 "
+            << "On" << strName << "Canceled(";
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_, gint32 iRet";
+        if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        CCOUT << " ) override";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        CCOUT << "return STATUS_SUCCESS;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "//RPC Async Req Handler" );
+        std::string strDecl =
+            std::string( "gint32 " ) +
+            strName + "(";
+
+        CCOUT << strDecl;
+        strDecl += "IConfigDb* pReqCtx_";
+
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_";
+        if( dwCount > 0 )
+        {
+            strDecl += ",";
+            CCOUT << ",";
+        }
+
+        if( dwInCount > 0 )
+        {
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        if( dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormOutArgs( pOutArgs );
+        }
+        CCOUT << " ) override;";
+        INDENT_DOWNL;
 
     }while( 0 );
 
@@ -763,172 +1393,13 @@ gint32 CDeclInterfSvr2::OutputROSSkel()
     return ret;
 }
 
-gint32 CDeclInterfSvr2::OutputROS()
-{
-    gint32 ret = 0;
-    do{
-        std::string strName =
-            m_pNode->GetName();
-
-        AP( "class " ); 
-        std::string strClass = "I";
-        strClass += strName + "_SvrApi";
-
-        std::string strSkel = "I";
-        strSkel += strName + "_SImpl";
-
-        CCOUT << strClass;
-        std::string strBase =
-            "CAggInterfaceServer";
-        INDENT_UP;
-        NEW_LINE;
-        CCOUT<< ": public virtual " << strBase;
-        INDENT_DOWN;
-        NEW_LINE;
-        BLOCK_OPEN;
-
-        Wa( "public:" );
-        CCOUT << "typedef "
-            << strBase << " super;";
-        NEW_LINE;
-        CCOUT << strClass
-            << "( const IConfigDb* pCfg ) :";
-        INDENT_UP;
-        NEW_LINE;
-
-        CCOUT << "super( pCfg )";
-        NEW_LINE;
-        CCOUT << "{}";
-
-        INDENT_DOWN;
-        NEW_LINE;
-        CCOUT << "inline " << strSkel
-            << "* GetSkelPtr( HANDLE hstm )";
-        NEW_LINE;
-        BLOCK_OPEN;
-        Wa( "auto& pSvr = dynamic_cast" );
-        Wa( "< CFastRpcServerBase* >( this )" );
-        Wa( "if( pSvr == nullptr )" );
-        Wa( "    return nullptr;" );
-        Wa( "ret = pSvr->GetStmSkel(" );
-        Wa( "    hstm, pIf );" );
-        Wa( "if( ERROR( ret ) )" );
-        Wa( "    return nullptr;" );
-        Wa( "auto& pSkel = dynamic_cast" );
-        CCOUT << "<" << strSkel << "*>(";
-        NEW_LINE;
-        Wa( "    ( CRpcServices* )pIf );" );
-        CCOUT << "return pSkel;";
-        BLOCK_CLOSE;
-        NEW_LINE;
-
-
-        ObjPtr pMethods =
-            m_pNode->GetMethodList();
-
-        CMethodDecls* pmds = pMethods;
-        guint32 i = 0;
-        pmds->GetCount();
-        guint32 dwCount = pmds->GetCount();
-        for( ; i < dwCount; i++ )
-        {
-            ObjPtr pObj = pmds->GetChild( i );
-            CMethodDecl* pmd = pObj;
-            if( pmd == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            if( pmd->IsEvent() )
-            {
-                ret = OutputEventROS( pmd );
-                if( ERROR( ret ) )
-                    break;
-            }
-            else if( !pmd->IsAsyncs() )
-            {
-                ret = OutputSyncROS( pmd );
-                if( ERROR( ret ) )
-                    break;
-            }
-            else 
-            {
-                ret = OutputAsyncROS( pmd );
-            }
-            if( i + 1 < dwCount )
-                NEW_LINE;
-        }
-        BLOCK_CLOSE;
-        CCOUT << ";";
-        NEW_LINES( 2 );
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CDeclInterfSvr2::OutputEventROS(
-    CMethodDecl* pmd )
-{
-    if( pmd == nullptr )
-        return -EINVAL;
-
-    do{
-        std::string strName, strArgs;
-        strName = pmd->GetName();
-        ObjPtr pArgs = pmd->GetInArgs();
-        Wa( "//RPC event sender" );
-        CCOUT << "gint32 " << strName << "(";
-        guint32 dwInCount = GetArgCount( pArgs );
-        if( dwInCount > 0 )
-        {
-            INDENT_UPL;
-            GenFormInArgs( pArgs );
-            CCOUT << " )";
-            INDENT_DOWN;
-        }
-        else
-        {
-            CCOUT << " )";
-        }
-
-        stdstr strIfName = m_pNode->GetName();
-
-        NEW_LINE;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pSkel = GetSkelPtr(" );
-        Wa( "    INVALID_HANDLE ); " );
-        Wa( "if( pSkel == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "pSkel->" << strName << "(";
-        NEW_LINE;
-        if( dwInCount == 0 )
-        {
-            CCOUT << ");";
-        }
-        else
-        {
-            INDENT_UPL;
-            GenActParams( pArgs, false );
-            CCOUT << " )";
-            INDENT_DOWN;
-        }
-
-        BLOCK_CLOSE;
-
-    }while( 0 );
-
-    return STATUS_SUCCESS;
-}
-
 gint32 CDeclInterfSvr2::OutputSyncROSSkel(
     CMethodDecl* pmd )
 {
     if( pmd == nullptr )
         return -EINVAL;
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
 
         ObjPtr pInArgs = pmd->GetInArgs();
@@ -973,90 +1444,6 @@ gint32 CDeclInterfSvr2::OutputSyncROSSkel(
         CCOUT << strDecl;
         if( dwCount == 0 )
         {
-            CCOUT << ")";
-        }
-        else
-        {
-            INDENT_UPL;
-            bool bComma = false;
-            if( dwInCount > 0 )
-            {
-                bComma = true;
-                GenFormInArgs( pInArgs );
-            }
-            if( dwOutCount > 0 )
-            {
-                if( bComma )
-                {
-                    CCOUT << ",";
-                    NEW_LINE;
-                }
-                GenFormOutArgs( pOutArgs );
-            }
-            CCOUT << " )";
-            INDENT_DOWN;
-        }
-        NEW_LINE;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pIf = GetStreamIf();" );
-        Wa( "if( pIf.IsEmpty() )" );
-        Wa( "    return -EFAULT;" );
-        Wa( "CRpcServices* pSvc = pIf;" );
-        Wa( "auto& pApi = dynamic_cast" );
-        CCOUT << "    < I" << m_pNode->GetName() << "_SvrApi* >";
-        NEW_LINE;
-        CCOUT << "    ( pSvc );";
-        NEW_LINE;
-        Wa( "if( pApi == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "return pApi->" << strName << "(";
-        if( dwInCount == 0 )
-        {
-            CCOUT << ");";
-        }
-        else
-        {
-            INDENT_UPL;
-            GenActParams( pInArgs, pOutArgs, false );
-            CCOUT << " );";
-            INDENT_DOWN;
-        }
-        BLOCK_CLOSE;
-        NEW_LINE;
-
-    }while( 0 );
-
-    return STATUS_SUCCESS;
-}
-
-gint32 CDeclInterfSvr2::OutputSyncROS(
-    CMethodDecl* pmd )
-{
-    if( pmd == nullptr )
-        return -EINVAL;
-    do{
-        std::string strName, strArgs;
-        strName = pmd->GetName();
-
-        ObjPtr pInArgs = pmd->GetInArgs();
-        ObjPtr pOutArgs = pmd->GetOutArgs();
-
-        guint32 dwInCount =
-            GetArgCount( pInArgs );
-
-        guint32 dwOutCount =
-            GetArgCount( pOutArgs );
-
-        guint32 dwCount = dwInCount + dwOutCount;
-
-        Wa( "//RPC Sync Req Handler" );
-        std::string strDecl =
-            std::string( "gint32 " )
-            + strName + "(";
-        CCOUT << strDecl;
-        if( dwCount == 0 )
-        {
             CCOUT << ");";
         }
         else
@@ -1093,7 +1480,7 @@ gint32 CDeclInterfSvr2::OutputAsyncROSSkel(
     if( pmd == nullptr )
         return -EINVAL;
     do{
-        std::string strName, strArgs;
+        std::string strName;
         strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         ObjPtr pOutArgs = pmd->GetOutArgs();
@@ -1184,46 +1571,10 @@ gint32 CDeclInterfSvr2::OutputAsyncROSSkel(
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
-        CCOUT << " )";
+        CCOUT << " );";
         INDENT_DOWNL;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pIf = GetStreamIf();" );
-        Wa( "if( pIf.IsEmpty() )" );
-        Wa( "    return -EFAULT;" );
-        Wa( "CRpcServices* pSvc = pIf;" );
-        Wa( "auto& pApi = dynamic_cast" );
-        CCOUT << "    < I" << m_pNode->GetName() << "_SvrApi* >";
-        NEW_LINE;
-        CCOUT << "    ( pSvc );";
-        NEW_LINE;
-        Wa( "if( pApi == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "return pApi->On" << strName << "Canceled(";
-        if( dwInCount == 0 )
-        {
-            INDENT_UPL;
-            CCOUT << "pReqCtx_, iRet );";
-            INDENT_DOWN;
-        }
-        else
-        {
-            INDENT_UPL;
-            CCOUT << "pReqCtx_, iRet,";
-            GenActParams( pInArgs );
-            CCOUT << " );";
-            INDENT_DOWN;
-        }
-
-        BLOCK_CLOSE;
-        NEW_LINES( 2 );
 
         Wa( "//RPC Async Req Callback" );
-        Wa( "//Call this method when you have" );
-        Wa( "//finished the async operation" );
-        Wa( "//with all the return value set" );
-        Wa( "//or an error code" );
-
         CCOUT << "gint32 " << strName
             << "Complete" << "( ";
 
@@ -1237,169 +1588,8 @@ gint32 CDeclInterfSvr2::OutputAsyncROSSkel(
             NEW_LINE;
             GenFormInArgs( pOutArgs );
         }
-        CCOUT << " )";
+        CCOUT << " );";
         INDENT_DOWNL;
-        NEW_LINE;
-
-        Wa( "//RPC Async Req Handler" );
-        Wa( "//TODO: adding code to emit your async" );
-        Wa( "//operation, keep a copy of pCallback and" );
-        Wa( "//return STATUS_PENDING" );
-        std::string strDecl =
-            std::string( "gint32 " ) +
-            strName + "(";
-
-        CCOUT << strDecl;
-        strDecl += "IConfigDb* pReqCtx_";
-
-        INDENT_UPL;
-        CCOUT << "IConfigDb* pReqCtx_";
-        if( dwCount > 0 )
-        {
-            strDecl += ",";
-            CCOUT << ",";
-        }
-
-        if( dwInCount > 0 )
-        {
-            NEW_LINE;
-            GenFormInArgs( pInArgs );
-        }
-        if( dwOutCount > 0 )
-        {
-            CCOUT << ",";
-            NEW_LINE;
-            GenFormOutArgs( pOutArgs );
-        }
-        CCOUT << " )";
-        INDENT_DOWNL;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "auto& pIf = GetStreamIf();" );
-        Wa( "if( pIf.IsEmpty() )" );
-        Wa( "    return -EFAULT;" );
-        Wa( "CRpcServices* pSvc = pIf;" );
-        Wa( "auto& pApi = dynamic_cast" );
-        CCOUT << "< I" << m_pNode->GetName() << "_SvrApi* >";
-        NEW_LINE;
-        CCOUT << "    ( pSvc );";
-        NEW_LINE;
-        Wa( "if( pApi == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "return pApi->" << strName << "(";
-        if( dwInCount == 0 )
-        {
-            INDENT_UPL;
-            CCOUT << "pReqCtx_ );";
-            INDENT_DOWN;
-        }
-        else
-        {
-            INDENT_UPL;
-            CCOUT << "pReqCtx_,";
-            GenActParams( pInArgs, pOutArgs, false );
-            CCOUT << " );";
-            INDENT_DOWN;
-        }
-
-        BLOCK_CLOSE;
-
-    }while( 0 );
-
-    return STATUS_SUCCESS;
-}
-
-gint32 CDeclInterfSvr2::OutputAsyncROS(
-    CMethodDecl* pmd )
-{
-    if( pmd == nullptr )
-        return -EINVAL;
-    do{
-        std::string strName, strArgs;
-        strName = pmd->GetName();
-        ObjPtr pInArgs = pmd->GetInArgs();
-        ObjPtr pOutArgs = pmd->GetOutArgs();
-
-        guint32 dwInCount =
-            GetArgCount( pInArgs );
-
-        guint32 dwOutCount =
-            GetArgCount( pOutArgs );
-
-        guint32 dwCount = dwInCount + dwOutCount;
-
-        Wa( "//RPC Async Req Cancel Handler" );
-        CCOUT << "gint32 "
-            << "On" << strName << "Canceled(";
-        INDENT_UPL;
-        CCOUT << "IConfigDb* pReqCtx_, gint32 iRet";
-        if( dwInCount > 0 )
-        {
-            CCOUT << ",";
-            NEW_LINE;
-            GenFormInArgs( pInArgs );
-        }
-        CCOUT << " )";
-        INDENT_DOWNL;
-        BLOCK_OPEN;
-        Wa( "return STATUS_SUCCESS" );
-        BLOCK_CLOSE;
-        NEW_LINE;
-
-        Wa( "//RPC Async Req Complete helper" );
-        Wa( "//Call this method when you have" );
-        Wa( "//finished the async operation" );
-        Wa( "//with all the return value set" );
-        Wa( "//or an error code" );
-
-        CCOUT << "gint32 " << strName
-            << "Complete" << "( ";
-
-        INDENT_UPL;
-        CCOUT << "IConfigDb* pReqCtx_, "
-            << "gint32 iRet";
-
-        if( dwOutCount > 0 )
-        {
-            CCOUT << ",";
-            NEW_LINE;
-            GenFormInArgs( pOutArgs );
-        }
-        CCOUT << " )";
-        INDENT_DOWNL;
-        BLOCK_OPEN;
-        Wa( "gint32 ret = 0;" );
-        Wa( "do" );
-        BLOCK_OPEN;
-        Wa( "CCfgOpener oReqCtx( pReqCtx_ );" );
-        Wa( "IEventSink* pEvt = nullptr;" );
-        Wa( "ret = oReqCtx.GetPointer(" );
-        Wa( "    propEventSink, pEvt );" );
-        Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
-        Wa( "auto pSvr_ = dynamic_cast" );
-        Wa( "<CFastRpcServerBase*>( this )" );
-        Wa( "HANDLE hstm = INVALID_HANDLE;" );
-        Wa( "ret = pSvr_->GetStream( pEvt, hstm );");
-        Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
-        Wa( "auto pSkel = GetSkelPtr( hstm );" );
-        CCOUT << "pSkel->" << strName << "Complete(";
-        NEW_LINE;
-        if( dwOutCount == 0 )
-            Wa( "    pReqCtx_, iRet );" );
-        else
-        {
-            Wa( "    pReqCtx_, iRet, );" );
-            INDENT_UPL;
-            GenActParams( pOutArgs );
-            CCOUT << " );";
-            INDENT_DOWN;
-        }
-
-        BLOCK_CLOSE;
-        Wa( "while( 0 );" );
-        BLOCK_CLOSE;
         NEW_LINE;
 
         Wa( "//RPC Async Req Handler" );
@@ -1471,8 +1661,8 @@ gint32 CImplIfMethodSvr2::OutputEventROS()
 gint32 CImplIfMethodSvr2::OutputSyncROS()
 {
     gint32 ret = 0;
-    std::string strClass = "I";
-    strClass += m_pIf->GetName() + "_SvrApi";
+    std::string strClass = "C";
+    strClass += GetSvcName() + "_SvrImpl";
     std::string strMethod = m_pNode->GetName();
 
     ObjPtr pInArgs = m_pNode->GetInArgs();
@@ -1530,8 +1720,8 @@ gint32 CImplIfMethodSvr2::OutputSyncROS()
 gint32 CImplIfMethodSvr2::OutputAsyncROS()
 {
     gint32 ret = 0;
-    std::string strClass = "I";
-    strClass += m_pIf->GetName() + "_SvrApi";
+    std::string strClass = "C";
+    strClass += GetSvcName() + "_SvrImpl";
     std::string strMethod = m_pNode->GetName();
 
     ObjPtr pInArgs = m_pNode->GetInArgs();
@@ -1568,16 +1758,17 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
                 GenFormOutArgs( pOutArgs );
                 CCOUT << " ";
             }
-            CCOUT << ");";
+            CCOUT << ")";
         }
         else
             CCOUT << "IConfigDb* pContext )";
 
         INDENT_DOWNL;
         BLOCK_OPEN;
-        Wa( "// Async Req handler" );
+        Wa( "// Async Req Handler" );
         Wa( "// TODO: Emit an async operation here." );
-        CCOUT << "// And make sure to call '" << strMethod << "Complete'";
+        CCOUT << "// And make sure to call '"
+            << strMethod << "Complete'";
         NEW_LINE;
         Wa( "// when the service is done" );
         CCOUT << "return ERROR_NOT_IMPL;";
@@ -1589,8 +1780,428 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
     return ret;
 }
 
-gint32 CImplIfMethodProxy2::OutputROSSkel()
+gint32 CImplIfMethodSvr2::OutputROSSkel()
+{
+    gint32 ret = 0;
+
+    do{
+        NEW_LINE;
+
+        if( m_pNode->IsEvent() )
+        {
+            ret = OutputEvent();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputEventROSSkel();
+            break;
+        }
+        else if( m_pNode->IsAsyncs() )
+        {
+            ret = OutputAsync();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputAsyncROSSkel();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputAsyncCallback();
+        }
+        else
+        {
+            ret = OutputSync();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputSyncROSSkel();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplIfMethodSvr2::OutputEventROSSkel()
 { return 0; }
+
+gint32 CImplIfMethodSvr2::OutputSyncROSSkel()
+{
+    gint32 ret = 0;
+    do{
+        std::string strClass = "I";
+        strClass += m_pIf->GetName() + "_SImpl";
+
+        std::string strName;
+        strName = m_pNode->GetName();
+
+        ObjPtr pInArgs = m_pNode->GetInArgs();
+        ObjPtr pOutArgs = m_pNode->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Sync Req Handler" );
+        std::string strDecl =
+            std::string( "gint32 " )
+            + strClass + "::" + strName + "(";
+        CCOUT << strDecl;
+        if( dwCount == 0 )
+        {
+            CCOUT << ")";
+        }
+        else
+        {
+            INDENT_UPL;
+            bool bComma = false;
+            if( dwInCount > 0 )
+            {
+                bComma = true;
+                GenFormInArgs( pInArgs );
+            }
+            if( dwOutCount > 0 )
+            {
+                if( bComma )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                GenFormOutArgs( pOutArgs );
+            }
+            CCOUT << " )";
+            INDENT_DOWN;
+        }
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "auto& pIf = GetParentIf();" );
+        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "    return -EFAULT;" );
+        Wa( "CRpcServices* pSvc = pIf;" );
+        CCOUT << "auto pApi = dynamic_cast"
+            << "< I" << m_pIf->GetName() << "_SvrApi* >"
+            << "( pSvc );";
+        NEW_LINE;
+        Wa( "if( pApi == nullptr )" );
+        Wa( "    return -EFAULT;" );
+        CCOUT << "return pApi->" << strName << "(";
+        if( dwInCount == 0 )
+        {
+            CCOUT << ");";
+        }
+        else
+        {
+            INDENT_UPL;
+            GenActParams( pInArgs, pOutArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CImplIfMethodSvr2::OutputAsyncROSSkel()
+{
+    do{
+        std::string strClass = "I";
+        strClass += m_pIf->GetName() + "_SImpl";
+
+        std::string strName;
+        strName = m_pNode->GetName();
+        ObjPtr pInArgs = m_pNode->GetInArgs();
+        ObjPtr pOutArgs = m_pNode->GetOutArgs();
+
+        guint32 dwInCount =
+            GetArgCount( pInArgs );
+
+        guint32 dwOutCount =
+            GetArgCount( pOutArgs );
+
+        guint32 dwCount = dwInCount + dwOutCount;
+
+        Wa( "//RPC Async Req Cancel Handler" );
+        CCOUT << "gint32 " << strClass
+            << "::On" << strName << "Canceled(";
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_, gint32 iRet";
+        if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        CCOUT << " )";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        Wa( "auto& pIf = GetParentIf();" );
+        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "    return -EFAULT;" );
+        Wa( "CRpcServices* pSvc = pIf;" );
+        CCOUT << "auto pApi = dynamic_cast"
+            << "< I" << m_pIf->GetName() << "_SvrApi* >"
+            << "( pSvc );";
+        NEW_LINE;
+        Wa( "if( pApi == nullptr )" );
+        Wa( "    return -EFAULT;" );
+        CCOUT << "return pApi->On" << strName << "Canceled(";
+        if( dwInCount == 0 )
+        {
+            INDENT_UPL;
+            CCOUT << "pReqCtx_, iRet );";
+            INDENT_DOWN;
+        }
+        else
+        {
+            INDENT_UPL;
+            CCOUT << "pReqCtx_, iRet,";
+            GenActParams( pInArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "//RPC Async Req Handler" );
+        std::string strDecl =
+            std::string( "gint32 " ) +
+            strClass + "::" + strName + "(";
+
+        CCOUT << strDecl;
+        strDecl += "IConfigDb* pReqCtx_";
+
+        INDENT_UPL;
+        CCOUT << "IConfigDb* pReqCtx_";
+        if( dwCount > 0 )
+        {
+            strDecl += ",";
+            CCOUT << ",";
+        }
+
+        if( dwInCount > 0 )
+        {
+            NEW_LINE;
+            GenFormInArgs( pInArgs );
+        }
+        if( dwOutCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            GenFormOutArgs( pOutArgs );
+        }
+        CCOUT << " )";
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        Wa( "auto& pIf = GetParentIf();" );
+        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "    return -EFAULT;" );
+        Wa( "CRpcServices* pSvc = pIf;" );
+        CCOUT << "auto pApi = dynamic_cast"
+            << "< I" << m_pIf->GetName() << "_SvrApi* >"
+            << "( pSvc );";
+        NEW_LINE;
+        Wa( "if( pApi == nullptr )" );
+        Wa( "    return -EFAULT;" );
+        CCOUT << "return pApi->" << strName << "(";
+        if( dwInCount == 0 )
+        {
+            INDENT_UPL;
+            CCOUT << "pReqCtx_ );";
+            INDENT_DOWN;
+        }
+        else
+        {
+            INDENT_UPL;
+            CCOUT << "pReqCtx_,";
+            GenActParams( pInArgs, pOutArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CImplIfMethodProxy2::OutputROSSkel()
+{
+    gint32 ret = 0;
+
+    do{
+        NEW_LINE;
+
+        if( m_pNode->IsEvent() )
+        {
+            ret = OutputEvent();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputEventROSSkel();
+        }
+        else if( m_pNode->IsAsyncp() )
+        {
+            ret = OutputAsync();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputAsyncCbWrapper();
+            if( ERROR( ret ) )
+                break;
+            ret = OutputAsyncROSSkel();
+        }
+        else
+        {
+            ret = OutputSync();
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplIfMethodProxy2::OutputEventROSSkel()
+{
+    gint32 ret = 0;
+    do{
+        std::string strClass = "I";
+        strClass += m_pIf->GetName() + "_PImpl";
+        std::string strName;
+        strName = m_pNode->GetName();
+        ObjPtr pArgs = m_pNode->GetInArgs();
+        CCOUT<< "//RPC event handler '" << strName <<"'";
+        NEW_LINE;
+        std::string strDecl =
+            std::string( "gint32 " ) +
+            strClass + "::" + strName + "(";
+        CCOUT << strDecl;
+        guint32 dwCount = GetArgCount( pArgs );
+
+        INDENT_UPL;
+        if( dwCount > 0 )
+        {
+            GenFormInArgs( pArgs );
+            CCOUT << " )";
+        }
+        else
+        {
+            CCOUT << ")";
+        }
+        INDENT_DOWNL;
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+        Wa( "auto& pIf = GetParentIf();" );
+        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "    return -EFAULT;" );
+        Wa( "CRpcServices* pSvc = pIf;" );
+        CCOUT << "auto pApi = dynamic_cast"
+            << "< I" << m_pIf->GetName() << "_SvrApi* >"
+            << "( pSvc );";
+        NEW_LINE;
+        Wa( "if( pApi == nullptr )" );
+        Wa( "    return -EFAULT;" );
+        CCOUT << "return pApi->" << strName << "(";
+        if( dwCount == 0 )
+        {
+            CCOUT << ");";
+        }
+        else
+        {
+            INDENT_UPL;
+            GenActParams( pArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+        NEW_LINE;
+        Wa( "return ret;" );
+        BLOCK_CLOSE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CImplIfMethodProxy2::OutputAsyncROSSkel()
+{
+    do{
+        std::string strClass = "I";
+        strClass += m_pIf->GetName() + "_PImpl";
+        std::string strName;
+
+        strName = m_pNode->GetName();
+        ObjPtr pInArgs = m_pNode->GetInArgs();
+        ObjPtr pOutArgs = m_pNode->GetOutArgs();
+
+        guint32 dwInCount = GetArgCount( pInArgs );
+        guint32 dwOutCount = GetArgCount( pOutArgs );
+
+
+        std::string strDecl;
+        strDecl += "gint32 " + strClass + "::" +
+            strName + "Callback" + "(";
+        CCOUT << strDecl;
+        strDecl += "IConfigDb* context, gint32 iRet";
+
+        if( dwOutCount > 0 )
+        {
+            INDENT_UPL;
+            CCOUT << "IConfigDb* context, ";
+            NEW_LINE;
+            CCOUT << "gint32 iRet,";
+            strDecl += ",";
+            NEW_LINE;
+            GenFormInArgs( pOutArgs );
+            CCOUT << " )";
+            INDENT_DOWN;
+        }
+        else
+        {
+            INDENT_UPL;
+            CCOUT << "IConfigDb* context, ";
+            NEW_LINE;
+            CCOUT << "gint32 iRet )";
+            INDENT_DOWN;
+        }
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "auto& pIf = GetParentIf();" );
+        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "    return -EFAULT;" );
+        Wa( "CRpcServices* pSvc = pIf;" );
+        CCOUT << "auto pApi = dynamic_cast"
+            << "< I" << m_pIf->GetName() << "_CliApi* >"
+            << "( pSvc );";
+        NEW_LINE;
+        Wa( "if( pApi == nullptr )" );
+        Wa( "    return -EFAULT;" );
+        CCOUT << "return pApi->" << strName << "Callback(";
+        if( dwOutCount == 0 )
+        {
+            INDENT_UPL;
+            CCOUT << "context, iRet );";
+            INDENT_DOWN;
+        }
+        else
+        {
+            INDENT_UPL;
+            CCOUT << "context, iRet,";
+            NEW_LINE;
+            GenActParams( pOutArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+
+    return STATUS_SUCCESS;
+}
 
 gint32 CImplIfMethodProxy2::OutputROS()
 {
@@ -1619,8 +2230,8 @@ gint32 CImplIfMethodProxy2::OutputROS()
 gint32 CImplIfMethodProxy2::OutputEventROS()
 {
     gint32 ret = 0;
-    std::string strClass = "I";
-    strClass += m_pIf->GetName() + "_CliApi";
+    std::string strClass = "C";
+    strClass += GetSvcName() + "_CliImpl";
     std::string strMethod = m_pNode->GetName();
 
     ObjPtr pInArgs = m_pNode->GetInArgs();
@@ -1661,9 +2272,8 @@ gint32 CImplIfMethodProxy2::OutputEventROS()
 gint32 CImplIfMethodProxy2::OutputAsyncROS()
 {
     gint32 ret = 0;
-    std::string strClass = "I";
-    std::string strIfName = m_pIf->GetName();
-    strClass += strIfName + "_CliApi";
+    std::string strClass = "C";
+    strClass += GetSvcName() + "_CliImpl";
     std::string strMethod = m_pNode->GetName();
 
     ObjPtr pInArgs = m_pNode->GetInArgs();
@@ -1781,6 +2391,10 @@ gint32 CDeclService2::OutputROS( bool bServer )
 
         if( bServer )
         {
+            CCOUT << "#define Clsid_C" << strSvcName
+                << "_SvrBase    Clsid_Invalid";
+            NEW_LINE;
+            NEW_LINE;
             CCOUT << "DECLARE_AGGREGATED_SERVER(";
             INDENT_UP;
             NEW_LINE;
@@ -1808,6 +2422,10 @@ gint32 CDeclService2::OutputROS( bool bServer )
         }
         else
         {
+            CCOUT << "#define Clsid_C" << strSvcName
+                << "_CliBase    Clsid_Invalid";
+            NEW_LINE;
+            NEW_LINE;
             CCOUT << "DECLARE_AGGREGATED_PROXY(";
             INDENT_UP;
             NEW_LINE;
@@ -1928,7 +2546,7 @@ gint32 CDeclServiceImpl2::OutputROS()
                 << "( const IConfigDb* pCfg ) :";
             INDENT_UP;
             NEW_LINE;
-            CCOUT << "super::_MyVirtBase( pCfg ), "
+            CCOUT << "super::virtbase( pCfg ), "
                 << "super( pCfg )";
             INDENT_DOWN;
             NEW_LINE;
@@ -1948,7 +2566,23 @@ gint32 CDeclServiceImpl2::OutputROS()
             }
 
             Wa( "gint32 CreateStmSkel(" );
-            Wa( "    HANDLE hStream ) override;" );
+            Wa( "    InterfPtr& pIf ) override;" );
+
+            for( auto pifd : vecIfs )
+            {
+                if( IsServer() )
+                {
+                    CDeclInterfSvr2 odifs(
+                        pWriter, pifd );
+                    odifs.OutputROSImpl();
+                }
+                else
+                {
+                    CDeclInterfProxy2 odifp(
+                        pWriter, pifd );
+                    odifp.OutputROSImpl();
+                }
+            }
 
             BLOCK_CLOSE;
             CCOUT << ";";
@@ -1983,7 +2617,7 @@ gint32 CDeclServiceImpl2::OutputROS()
             << "( const IConfigDb* pCfg ) :";
         INDENT_UP;
         NEW_LINE;
-        CCOUT << "super::_MyVirtBase( pCfg ), "
+        CCOUT << "super::virtbase( pCfg ), "
             << "super( pCfg )";
         INDENT_DOWN;
         NEW_LINE;
@@ -2008,6 +2642,22 @@ gint32 CDeclServiceImpl2::OutputROS()
 
         Wa( "gint32 CreateStmSkel(" );
         Wa( "    HANDLE, InterfPtr& ) override;" );
+
+        for( auto pifd : vecIfs )
+        {
+            if( IsServer() )
+            {
+                CDeclInterfSvr2 odifs(
+                    pWriter, pifd );
+                odifs.OutputROSImpl();
+            }
+            else
+            {
+                CDeclInterfProxy2 odifp(
+                    pWriter, pifd );
+                odifp.OutputROSImpl();
+            }
+        }
 
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -2044,6 +2694,8 @@ gint32 CImplServiceImpl2::OutputROS()
         std::string strAppName = pStmts->GetName();
         Wa( "#include \"rpc.h\"" );
         Wa( "using namespace rpcf;" );
+        Wa( "#include \"stmport.h\"" );
+        Wa( "#include \"fastrpc.h\"" );
         CCOUT << "#include \""
             << strAppName << ".h\"" ;
         NEW_LINE;
@@ -2088,12 +2740,14 @@ gint32 CImplServiceImpl2::OutputROS()
                 {
                     CImplIfMethodSvr2 iims(
                         pWriter, pObj );
+                    iims.SetSvcName( strSvcName );
                     iims.OutputROS();
                 }
                 else
                 {
                     CImplIfMethodProxy2 iimp(
                         pWriter, pObj );
+                    iimp.SetSvcName( strSvcName );
                     iimp.OutputROS();
                 }
             }
@@ -2114,17 +2768,18 @@ gint32 CImplServiceImpl2::OutputROS()
             Wa( "oCfg[ propIsServer ] = true;" );
             Wa( "oCfg.SetIntPtr( propStmHandle," );
             Wa( "    ( guint32*& )hStream );" );
+            Wa( "oCfg.SetPointer( propParentPtr, this );" );
             Wa( "ret = CRpcServices::LoadObjDesc(" );
             CCOUT << "    \"./" << strAppName << "desc.json\",";
             NEW_LINE;
-            CCOUT << "    \"" << "C" << strSvcName << "_SvrSkel\",";
+            CCOUT << "    \"" << strSvcName << "_SvrSkel\",";
             NEW_LINE;
-            CCOUT << "    true, oCfg.GetCfg() )";
+            CCOUT << "    true, oCfg.GetCfg() );";
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "ret = pIf.NewObj(" );
-            CCOUT << "    clsid( C" << strSvcName << "_SvrSkel,";
+            CCOUT << "    clsid( C" << strSvcName << "_SvrSkel ),";
             NEW_LINE;
             CCOUT << "    oCfg.GetCfg() );";
             BLOCK_CLOSE;
@@ -2144,17 +2799,18 @@ gint32 CImplServiceImpl2::OutputROS()
             BLOCK_OPEN;
             Wa( "CCfgOpener oCfg;" );
             Wa( "oCfg[ propIsServer ] = false;" );
+            Wa( "oCfg.SetPointer( propParentPtr, this );" );
             Wa( "ret = CRpcServices::LoadObjDesc(" );
             CCOUT << "    \"./" << strAppName << "desc.json\",";
             NEW_LINE;
-            CCOUT << "    \"" << "C" << strSvcName << "_SvrSkel\",";
+            CCOUT << "    \"" << strSvcName << "_SvrSkel\",";
             NEW_LINE;
-            CCOUT << "    false, oCfg.GetCfg() )";
+            CCOUT << "    false, oCfg.GetCfg() );";
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "ret = pIf.NewObj(" );
-            CCOUT << "    clsid( C" << strSvcName << "_CliSkel,";
+            CCOUT << "    clsid( C" << strSvcName << "_CliSkel ),";
             NEW_LINE;
             CCOUT << "    oCfg.GetCfg() );";
             BLOCK_CLOSE;
@@ -2203,6 +2859,8 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( "#include \"rpc.h\"" );
             Wa( "#include \"proxy.h\"" );
             Wa( "using namespace rpcf;" );
+            Wa( "#include \"stmport.h\"" );
+            Wa( "#include \"fastrpc.h\"" );
             for( auto elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
@@ -2386,9 +3044,12 @@ gint32 CImplMainFunc2::OutputROS()
             NEW_LINE;
             Wa( " // set a must-have option for" );
             Wa( " // CDBusStreamBusPort" );
-            Wa( "g_pIoMgr->SetCmdLineOpt(" );
-            Wa( "    propIsServer, !bProxy );" );
-            Wa( "auto& oDrvMgr = g_pIoMgr->GetDrvMgr();" );
+            Wa( "auto pMgr = ( CIoManager* )g_pIoMgr;" );
+            Wa( "pMgr->SetCmdLineOpt(" );
+            CCOUT << "    propIsServer, "
+                 << ( bProxy ? "false" : "true" ) << " );";
+            NEW_LINE;
+            Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
             Wa( "ret = oDrvMgr.LoadDriver(" );
             Wa( "    \"CDBusStreamBusDrv\" );" );
             Wa( "if( ERROR( ret ) )" );
@@ -2864,10 +3525,22 @@ gint32 GenCppFileROS(
         Wa( "#include \"iftasks.h\"" );
 
         Wa( "using namespace rpcf;" );
+        Wa( "#include \"stmport.h\"" );
+        Wa( "#include \"fastrpc.h\"" );
         CCOUT << "#include \"" << strName << ".h\"";
         NEW_LINE;
         std::vector< ObjPtr > vecSvcs;
         pStmts->GetSvcDecls( vecSvcs );
+        NEW_LINE;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = elem;
+            stdstr strSvc = pSvc->GetName();
+            CCOUT << "#include \"" << strSvc << "cli.h\"";
+            NEW_LINE;
+            CCOUT << "#include \"" << strSvc << "svr.h\"";
+            NEW_LINE;
+        }
         NEW_LINE;
 
         if( bFuse )
@@ -2988,9 +3661,9 @@ gint32 GenCppFileROS(
                         }
                         else
                         {
-                            CImplIfMethodSvr oiims(
+                            CImplIfMethodSvr2 oiims(
                                 m_pWriter, pmd );
-                            ret = oiims.Output();
+                            ret = oiims.OutputROSSkel();
                             if( ERROR( ret ) )
                                 break;
                         }
