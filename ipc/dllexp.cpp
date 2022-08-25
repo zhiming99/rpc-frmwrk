@@ -44,6 +44,8 @@
 #include "prxyport.h"
 #include "fdodrv.h"
 #include "loopool.h"
+#include "stmport.h"
+#include "fastrpc.h"
 
 #include <dlfcn.h>
 
@@ -173,6 +175,15 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CProxyPdoConnectTask );
     INIT_MAP_ENTRYCFG( CProxyPdoDisconnectTask );
     INIT_MAP_ENTRYCFG( CRemoteProxyState );
+    INIT_MAP_ENTRYCFG( CFastRpcSkelProxyState );
+    INIT_MAP_ENTRYCFG( CFastRpcSkelServerState );
+    INIT_MAP_ENTRYCFG( CFastRpcProxyState );
+    INIT_MAP_ENTRYCFG( CFastRpcServerState );
+    INIT_MAP_ENTRYCFG( CRpcStreamChannelSvr );
+    INIT_MAP_ENTRYCFG( CRpcStreamChannelCli );
+    INIT_MAP_ENTRYCFG( CDBusStreamBusPort );
+    INIT_MAP_ENTRYCFG( CDBusStreamBusDrv );
+    INIT_MAP_ENTRYCFG( CDBusStreamPdo );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

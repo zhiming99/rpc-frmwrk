@@ -116,7 +116,7 @@ class CDBusStreamPdo :
 
     gint32 PreStop( IRP* pIrp ) override;
     gint32 PostStart( IRP* pIrp ) override;
-    gint32 OnPortStackReady( IRP* pIrp ) override;
+    gint32 OnPortStackBuilt( IRP* pIrp ) override;
 
     gint32 IsIfSvrOnline(
         const DMsgPtr& pMsg ) override;
@@ -182,7 +182,8 @@ class CDBusStreamBusPort :
     gint32 GetStreamPort(
         HANDLE hStream, PortPtr& pPort );
 
-    gint32 OnNewConnection( HANDLE hStream );
+    gint32 OnNewConnection(
+        HANDLE hStream, PortPtr& pPort );
 
     gint32 OnEvent(
         EnumEventId iEvent,

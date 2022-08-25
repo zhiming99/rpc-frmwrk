@@ -56,8 +56,7 @@
         {
             "ObjectName": "XXXX_SvrSkel",
             "BusName" : "DBusStreamBusPort_0",
-            "PortClass": "DBusStreamBusPort",
-            "PortId" : "0",
+            "PortClass": "DBusStreamPdo",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
             "Interfaces" :

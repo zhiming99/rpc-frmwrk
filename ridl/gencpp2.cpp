@@ -2765,6 +2765,8 @@ gint32 CImplServiceImpl2::OutputROS()
             CCOUT << "do";
             BLOCK_OPEN;
             Wa( "CCfgOpener oCfg;" );
+            Wa( "auto pMgr = this->GetIoMgr();" );
+            Wa( "oCfg[ propIoMgr ] = ObjPtr( pMgr );" );
             Wa( "oCfg[ propIsServer ] = true;" );
             Wa( "oCfg.SetIntPtr( propStmHandle," );
             Wa( "    ( guint32*& )hStream );" );
@@ -2798,6 +2800,8 @@ gint32 CImplServiceImpl2::OutputROS()
             CCOUT << "do";
             BLOCK_OPEN;
             Wa( "CCfgOpener oCfg;" );
+            Wa( "auto pMgr = this->GetIoMgr();" );
+            Wa( "oCfg[ propIoMgr ] = ObjPtr( pMgr );" );
             Wa( "oCfg[ propIsServer ] = false;" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
             Wa( "ret = CRpcServices::LoadObjDesc(" );
@@ -2891,10 +2895,10 @@ gint32 CImplMainFunc2::OutputROS()
             NEW_LINE;
 
             ObjPtr pRoot( m_pNode );
-            CImplClassFactory oicf(
+            CImplClassFactory2 oicf(
                 m_pWriter, pRoot, !bProxy );
 
-            ret = oicf.Output();
+            ret = oicf.OutputROS();
             if( ERROR( ret ) )
                 break;
 
@@ -3043,51 +3047,54 @@ gint32 CImplMainFunc2::OutputROS()
             INDENT_DOWNL;
             NEW_LINE;
             Wa( " // set a must-have option for" );
-            Wa( " // CDBusStreamBusPort" );
+            Wa( " // DBusStreamBusPort" );
             Wa( "auto pMgr = ( CIoManager* )g_pIoMgr;" );
             Wa( "pMgr->SetCmdLineOpt(" );
             CCOUT << "    propIsServer, "
                  << ( bProxy ? "false" : "true" ) << " );";
             NEW_LINE;
+            CCOUT << "stdstr strDesc= " << "\"./"
+                << g_strAppName << "desc.json\";";
+            NEW_LINE;
+            Wa( "pMgr->SetCmdLineOpt(" );
+            Wa( "    propObjDescPath, strDesc );" );
             Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
             Wa( "ret = oDrvMgr.LoadDriver(" );
-            Wa( "    \"CDBusStreamBusDrv\" );" );
+            Wa( "    \"DBusStreamBusDrv\" );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "InterfPtr pIf;" );
             Wa( "CParamList oParams;" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
-            CCOUT << "ret = CRpcServices::LoadObjDesc(";
-            INDENT_UPL;
-            CCOUT << "\"./"
-                << g_strAppName << "desc.json\",";
-            NEW_LINE;
-            CCOUT << "\"" << strSvcName << "\",";
+            Wa( "oParams[ propIfStateClass ] =" );
+            if( bProxy )
+                CCOUT << "    clsid( CFastRpcProxyState );";
+            else
+                CCOUT << "    clsid( CFastRpcServerState );";
+            NEW_LINES(2);
+            Wa( "ret = CRpcServices::LoadObjDesc(" );
+            CCOUT << "    strDesc, \"" << strSvcName << "\",";
             NEW_LINE;
             if( bProxy )
-                CCOUT << "false, oParams.GetCfg() );";
+                CCOUT << "    false, oParams.GetCfg() );";
             else
-                CCOUT << "true, oParams.GetCfg() );";
-
-            INDENT_DOWNL;
-
+                CCOUT << "    true, oParams.GetCfg() );";
+            NEW_LINE;
             CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
+            NEW_LINE;
+            CCOUT << "    break;";
             NEW_LINE;
 
             CCOUT << "ret = pIf.NewObj(";
-            INDENT_UPL;
-            CCOUT << "clsid( " << strClass << " ),";
             NEW_LINE;
-            CCOUT << "oParams.GetCfg() );";
-            INDENT_DOWNL;
+            CCOUT << "    clsid( " << strClass << " ),";
+            NEW_LINE;
+            CCOUT << "    oParams.GetCfg() );";
 
+            NEW_LINE;
             CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
+            NEW_LINE;
+            CCOUT << "    break;";
             NEW_LINE;
             CCOUT << strClass << "* pSvc = pIf;";
             NEW_LINE;
@@ -3095,9 +3102,8 @@ gint32 CImplMainFunc2::OutputROS()
             NEW_LINE;
 
             CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
+            NEW_LINE;
+            CCOUT << "    break;";
 
             if( !bProxy )
             {
@@ -3969,6 +3975,101 @@ gint32 CExportObjDesc2::BuildObjDescROS(
                 pifr->GetName();
             oIfArray2.append( oJif );
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplClassFactory2::OutputROS()
+{
+    if( m_pNode == nullptr )
+        return -EFAULT;
+
+    gint32 ret = 0;
+    do{
+        CStatements* pStmts = m_pNode;
+
+        std::vector< ObjPtr > vecSvcs;
+        pStmts->GetSvcDecls( vecSvcs );
+
+        std::vector< ObjPtr > vecStructs;
+        pStmts->GetStructDecls( vecStructs );
+        std::vector< ObjPtr > vecActStructs;
+        for( auto& elem : vecStructs )
+        {
+            CStructDecl* psd = elem;
+            if( psd->RefCount() == 0 )
+                continue;
+            vecActStructs.push_back( elem );
+        }
+
+        NEW_LINE;
+
+        if( g_bMklib && bFuse )
+            Wa( "extern void InitMsgIds();" );
+
+        Wa( "FactoryPtr InitClassFactory()" ); 
+        BLOCK_OPEN;
+        CCOUT << "BEGIN_FACTORY_MAPS;";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = elem;
+            if( IsServer() )
+            {
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_SvrImpl );";
+                NEW_LINE;
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_SvrSkel );";
+                NEW_LINE;
+            }
+            if( !IsServer() || g_bMklib )
+            {
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_CliImpl );";
+                NEW_LINE;
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_CliSkel );";
+                NEW_LINE;
+            }
+        }
+        if( vecActStructs.size() )
+            NEW_LINE;
+        for( auto& elem : vecActStructs )
+        {
+            CStructDecl* psd = elem;
+            CCOUT << "INIT_MAP_ENTRY( ";
+            CCOUT << psd->GetName() << " );";
+            NEW_LINE;
+        }
+
+        NEW_LINE;
+        CCOUT << "END_FACTORY_MAPS;";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "extern \"C\"" );
+        Wa( "gint32 DllLoadFactory( FactoryPtr& pFactory )" );
+        BLOCK_OPEN;
+
+        if( g_bMklib && bFuse )
+            Wa( "InitMsgIds();" );
+
+        Wa( "pFactory = InitClassFactory();" );
+        CCOUT << "if( pFactory.IsEmpty() )";
+        INDENT_UPL;
+        CCOUT << "return -EFAULT;";
+        INDENT_DOWNL;
+        CCOUT << "return STATUS_SUCCESS;";
+        BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 

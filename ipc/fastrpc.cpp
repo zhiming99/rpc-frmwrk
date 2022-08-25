@@ -253,7 +253,12 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
             ret = GetStmSkel( hstm, pIf );
 
         if( ERROR( ret ) )
+        {
+            CIoManager* pMgr = GetIoMgr();
+            pMgr->ClosePort(
+                hPort, nullptr, nullptr );
             break;
+        }
 
         TaskletPtr pTask;
         if( bOnline )

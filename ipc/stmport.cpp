@@ -40,7 +40,7 @@ namespace rpcf
 {
 
 static gint32 FireRmtSvrEvent(
-    IPort* pPort, EnumEventId iEvent )
+    IPort* pPort, EnumEventId iEvent, HANDLE hStream )
 {
     // this is an event detected by the
     // socket
@@ -52,20 +52,26 @@ static gint32 FireRmtSvrEvent(
     case eventRmtSvrOnline:
         {
             CCfgOpenerObj oCfg( pPort );
-            auto pcPort = static_cast
+            auto pcPort = dynamic_cast
                 < CDBusStreamPdo* >( pPort );
+            if( pcPort == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
 
+            Variant var;
+            pcPort->GetProperty(
+                propBusPortPtr, var );
+            CPort* pBus = ( ObjPtr& )var;
             guint32 dwPortId = 0;
-            ret = oCfg.GetIntProp( propPortId,
-                dwPortId );
+            ret = oCfg.GetIntProp(
+                propPortId, dwPortId );
 
             CCfgOpener oEvtCtx;
-            HANDLE hStream = pcPort->GetStream();
-            if( hStream == INVALID_HANDLE )
-                break;
-
             oEvtCtx.SetIntPtr( propStmHandle,
                 ( guint32* )hStream );
+            oEvtCtx[ propPortId ] = dwPortId;
 
             IConfigDb* pEvtExt =
                 oEvtCtx.GetCfg();
@@ -73,7 +79,7 @@ static gint32 FireRmtSvrEvent(
             // pass on this event to the pnp
             // manager
             CEventMapHelper< CPort >
-                oEvtHelper( pcPort );
+                oEvtHelper( pBus );
 
             HANDLE hPort =
                 PortToHandle( pPort );
@@ -395,7 +401,8 @@ gint32 CDBusStreamPdo::AllocIrpCtxExt(
                     break;
                 }
             default:
-                ret = -ENOTSUP;
+                ret = super::AllocIrpCtxExt(
+                    pIrpCtx, pContext );
                 break;
             }
             break;
@@ -812,7 +819,7 @@ gint32 CDBusStreamPdo::PostStart(
     return ret;
 }
 
-gint32 CDBusStreamPdo::OnPortStackReady(
+gint32 CDBusStreamPdo::OnPortStackBuilt(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -823,10 +830,13 @@ gint32 CDBusStreamPdo::OnPortStackReady(
     do{
         auto *pBusPort = static_cast
             < CDBusStreamBusPort* >( m_pBusPort );
-        pBusPort->BindStreamPort(
-            GetStream(), PortPtr( this ) );
 
-        FireRmtSvrEvent( this, eventRmtSvrOnline );
+        HANDLE hStream = GetStream();
+        pBusPort->BindStreamPort(
+            hStream, PortPtr( this ) );
+
+        FireRmtSvrEvent( this,
+            eventRmtSvrOnline, hStream );
         Sem_Post( &m_semFireSync );
 
     }while( 0 );
@@ -848,8 +858,9 @@ gint32 CDBusStreamPdo::OnEvent(
         {
             // passive disconnection detected
             Sem_Wait( &m_semFireSync );
-            ret = FireRmtSvrEvent(
-                this, eventRmtSvrOffline );
+            ret = FireRmtSvrEvent( this,
+                eventRmtSvrOffline,
+                ( HANDLE )dwParam1 );
             break;
         }
     default:
@@ -900,13 +911,16 @@ gint32 CDBusStreamBusPort::PostStart(
         CCfgOpener oCfg;
         oCfg[ propIsServer ] = IsServer();
         CIoManager* pMgr = GetIoMgr();
-        stdstr strDesc = "./";
-        strDesc = pMgr->GetModName();
-        strDesc += "desc.json";
+        stdstr strDesc;
+        ret = pMgr->GetCmdLineOpt(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
 
         stdstr strObjName =
             OBJNAME_RPC_STREAMCHAN_SVR;
 
+        oCfg[ propIoMgr ] = ObjPtr( pMgr );
         ret = CRpcServices::LoadObjDesc(
             strDesc, strObjName, IsServer(),
             oCfg.GetCfg() );
@@ -930,6 +944,12 @@ gint32 CDBusStreamBusPort::PostStart(
         if( IsServer() )
         {
             ret = pSvc->Start();
+            if( SUCCEEDED( ret ) )
+            {
+                SetStreamIf( pIf );
+                CRpcStreamChannelSvr* pSvr = pIf;
+                pSvr->SetPort( this );
+            }
         }
         else
         {
@@ -998,6 +1018,7 @@ gint32 CDBusStreamBusPort::StopStreamChan(
 
         CCfgOpener oReqCtx;
         oReqCtx.SetPointer( propIrpPtr, pIrp );
+        oReqCtx.SetPointer( propPortPtr, this );
         TaskletPtr pRespCb;
         if( IsServer() )
         {
@@ -1233,6 +1254,9 @@ gint32 CDBusStreamBusPort::CreateDBusStreamPdo(
             break;
         }
 
+        oExtCfg.SetBoolProp(
+            propIsServer, IsServer() );
+
         ret = pNewPort.NewObj(
             clsid( CDBusStreamPdo ), pCfg );
 
@@ -1281,6 +1305,7 @@ gint32 CDBusStreamBusPort::BuildPdoPortName(
             propPortId, dwPortId );
         if( ERROR( ret ) )
         {
+            ret = 0;
             dwPortId = NewPdoId();
             oCfg.SetIntProp(
                 propPortId, dwPortId );
@@ -1296,7 +1321,7 @@ gint32 CDBusStreamBusPort::BuildPdoPortName(
 }
 
 gint32 CDBusStreamBusPort::OnNewConnection(
-    HANDLE hStream )
+    HANDLE hStream, PortPtr& pPort )
 {
     gint32 ret = 0; 
     do{
@@ -1309,9 +1334,10 @@ gint32 CDBusStreamBusPort::OnNewConnection(
         oCfg[ propBusName ] =
             PORT_CLASS_DBUS_STREAM_BUS;
 
-        PortPtr pPort;
         ret = OpenPdoPort(
             oCfg.GetCfg(), pPort );
+        if( ret == STATUS_PENDING )
+            ret = STATUS_SUCCESS;
 
     }while( 0 );
 
@@ -1330,8 +1356,15 @@ gint32 CDBusStreamBusPort::OnEvent(
     case eventNewConn:
         {
             // passive disconnection detected
+            PortPtr pPort;
             ret = OnNewConnection(
-                ( HANDLE )dwParam1 );
+                ( HANDLE )dwParam1, pPort );
+            if( ERROR( ret ) )
+                break;
+
+            auto pctx = ( IConfigDb* )data;
+            CCfgOpener oCtx( pctx );
+            oCtx[ propPortPtr ] = ObjPtr( pPort );
             break;
         }
     default:

@@ -6001,7 +6001,8 @@ static CfgPtr InitIfSvrCfg(
         else if( strPortClass ==
             PORT_CLASS_DBUS_STREAM_PDO )
         {
-            iStateClass = clsid( CFastRpcSkelServerState );
+            iStateClass =
+                clsid( CFastRpcSkelServerState );
         }
 
         oNewCfg.SetIntProp(

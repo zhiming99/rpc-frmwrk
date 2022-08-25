@@ -197,3 +197,15 @@ gint32 GenHeaderFileROS(
 
 gint32 GenCppFileROS(
     CCppWriter* m_pWriter, ObjPtr& pRoot );
+
+class CImplClassFactory2 :
+    public CImplClassFactory
+{
+    public:
+    typedef CImplClassFactory super;
+    CImplClassFactory2(
+        CCppWriter* pWriter, ObjPtr& pNode, bool bServer )
+        : super( pWriter, pNode, bServer )
+    {}
+    gint32 OutputROS();
+};

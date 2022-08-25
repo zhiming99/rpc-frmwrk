@@ -34,7 +34,7 @@
     _bProxy, CStreamProxyWrapper, CStreamServerWrapper>::type
 
 #define IFBASE( _bProxy ) std::conditional< \
-    _bProxy, CStreamProxySync, CStreamServerSync>::type
+    _bProxy, CStreamProxyAsync, CStreamServerAsync>::type
 
 #define STMBASE( _bProxy ) std::conditional< \
     _bProxy, CStreamProxy, CStreamServer>::type
@@ -178,8 +178,8 @@ class CRpcStmChanBase :
 
             oLock.Unlock();
 
-            ret = m_pPort->OnEvent( eventNewConn,
-                hstm, 0, nullptr );
+            m_pPort->OnEvent( eventNewConn,
+                hstm, 0, ( LONGWORD* )ptctx );
 
         }while( 0 );
 
@@ -244,7 +244,33 @@ class CRpcStmChanBase :
             if( !pPdoPort.IsEmpty() )
             {
                 pPdoPort->OnEvent(
-                    eventDisconn, 0, 0, nullptr );
+                    eventDisconn, hstm, 0, nullptr );
+            }
+            else
+            {
+                CfgPtr pDesc;
+                ret = this->GetDataDesc( hstm, pDesc );
+                if( ERROR( ret ) )
+                    break;
+
+                IConfigDb* ptctx = nullptr;
+                CCfgOpener oDesc(
+                        ( IConfigDb* )pDesc );
+
+                ret = oDesc.GetPointer(
+                        propTransCtx, ptctx );
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oCtx( ptctx );
+                IPort* pPdoPort = nullptr;
+                ret = oCtx.GetPointer(
+                    propPortPtr, pPdoPort );
+                if( SUCCEEDED( ret ) )
+                {
+                    pPdoPort->OnEvent(
+                        eventDisconn, hstm, 0, nullptr );
+                }
             }
 
             ret = super::OnStmClosing( hstm );
@@ -822,7 +848,7 @@ class CRpcStmChanCli :
     public:
     typedef CRpcStmChanBase< true > super;
     CRpcStmChanCli( const IConfigDb* pCfg )
-        : super( pCfg )
+        : _MyVirtBase( pCfg ), super( pCfg )
     {}
     void haha();
 };
@@ -833,7 +859,7 @@ class CRpcStmChanSvr :
     public:
     typedef CRpcStmChanBase< false > super;
     CRpcStmChanSvr( const IConfigDb* pCfg )
-        : super( pCfg )
+        : _MyVirtBase( pCfg ), super( pCfg )
     {}
 
     gint32 AcceptNewStream(
@@ -882,15 +908,20 @@ class CFastRpcSkelBase :
 };
 
 class CFastRpcSkelProxyState :
-    public CInterfaceState
+    public CLocalProxyState
 {
     public:
-    typedef CInterfaceState super;
+    typedef CLocalProxyState super;
     CFastRpcSkelProxyState( const IConfigDb* pCfg )
         : super( pCfg )
     { SetClassId( clsid( CFastRpcSkelProxyState ) ); }
+
     gint32 SubscribeEvents()
     { return 0; }
+
+    bool IsMyDest(
+        const stdstr& strModName ) override
+    { return false; }
 };
 
 class CFastRpcSkelServerState :
@@ -901,8 +932,13 @@ class CFastRpcSkelServerState :
     CFastRpcSkelServerState( const IConfigDb* pCfg )
         : super( pCfg )
     { SetClassId( clsid( CFastRpcSkelServerState ) ); }
+
     gint32 SubscribeEvents()
     { return 0; }
+
+    bool IsMyDest(
+        const stdstr& strModName ) override
+    { return false; }
 };
 
 class CFastRpcSkelProxyBase :
@@ -959,7 +995,6 @@ class CFastRpcProxyState :
         return SubscribeEventsInternal(
             vecEvtToSubscribe );
     }
-
 };
 
 class CFastRpcServerBase :
