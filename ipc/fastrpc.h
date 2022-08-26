@@ -90,6 +90,26 @@ class CRpcStmChanBase :
     inline void SetPort( IPort* pPort )
     { m_pPort = pPort; }
 
+    gint32 OnClose( HANDLE hChannel,
+        IEventSink* pCallback = nullptr ) override
+    {
+        if( hChannel == INVALID_HANDLE )
+            return -EINVAL;
+
+        InterfPtr pIf;
+
+        gint32 ret = this->GetUxStream(
+            hChannel, pIf );
+
+        if( ERROR( ret ) )
+            return 0;
+
+        OnStmClosing( hChannel );
+
+        return IStream::OnClose(
+            hChannel, pCallback );
+    }
+
     gint32 GetSessHash(
         HANDLE hStream, stdstr& strSess ) const
     {
@@ -134,6 +154,9 @@ class CRpcStmChanBase :
         do{
             ret = super::OnStreamReady( hstm );
             if( ERROR( ret ) )
+                break;
+
+            if( !this->IsServer() )
                 break;
 
             CfgPtr pDesc;
@@ -217,9 +240,9 @@ class CRpcStmChanBase :
 
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
-                0, pTask, this,
+                -1, pTask, this,
                 &CRpcStmChanBase::DispatchData, 
-                hstm );
+                ( guint64 )hstm );
             
             if( ERROR( ret ) )
                 break;
@@ -597,10 +620,11 @@ class CRpcStmChanBase :
         return ret;
     }
 
-    gint32 DispatchData( HANDLE hstm )
+    gint32 DispatchData( guint64 data )
     {
         gint32 ret = 0;    
         do{
+            HANDLE hstm = ( HANDLE )data;
             auto pPort = static_cast
                 < CDBusStreamBusPort* >( m_pPort ); 
             PortPtr pPdoPort;
@@ -669,7 +693,7 @@ class CRpcStmChanBase :
             return ret;
 
         FillReadBuf( hstm );
-        DispatchData( hstm );
+        DispatchData( ( guint64 )hstm );
         return ret;
     }
 
@@ -1012,6 +1036,12 @@ class CFastRpcServerBase :
     gint32 GetStmSkel(
         HANDLE hstm, InterfPtr& pIf );
 
+    gint32 AddStmSkel(
+        HANDLE hstm, InterfPtr& pIf );
+
+    gint32 RemoveStmSkel(
+        HANDLE hstm );
+
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
         IConfigDb* pEvtCtx,
@@ -1022,6 +1052,7 @@ class CFastRpcServerBase :
 
     virtual gint32 CreateStmSkel(
         HANDLE hStream,
+        guint32 dwPortId,
         InterfPtr& pIf ) = 0;
 
     gint32 CheckReqCtx(

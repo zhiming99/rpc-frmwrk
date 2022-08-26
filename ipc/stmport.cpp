@@ -112,6 +112,17 @@ CDBusStreamPdo::CDBusStreamPdo(
         if( ERROR( ret ) )
             break;
 
+        if( IsServer() )
+        {
+            HANDLE hstm;
+            ret = oCfg.GetIntPtr( propStmHandle,
+                ( guint32*& )hstm );
+            if( ERROR( ret ) )
+                break;
+
+            SetStream( hstm );
+        }
+
         Sem_Init( &m_semFireSync, 0, 0 );
         SetClassId( clsid( CDBusStreamPdo ) );
 
@@ -378,6 +389,8 @@ gint32 CDBusStreamPdo::AllocIrpCtxExt(
 
             if( pExt == nullptr )
                 ret = -ENOMEM;
+
+            pIrpCtx->SetExtBuf( pBuf );
 
             break;
         }
@@ -828,6 +841,10 @@ gint32 CDBusStreamPdo::OnPortStackBuilt(
 
     gint32 ret = 0;
     do{
+        ret = super::OnPortStackBuilt( pIrp );
+        if( ERROR( ret ) )
+            break;
+
         auto *pBusPort = static_cast
             < CDBusStreamBusPort* >( m_pBusPort );
 
@@ -1090,8 +1107,7 @@ void CDBusStreamBusPort::RemoveBinding(
 gint32 CDBusStreamBusPort::GetStreamPort(
     HANDLE hStream, PortPtr& pPort )
 {
-    if( hStream == INVALID_HANDLE ||
-        pPort.IsEmpty() )
+    if( hStream == INVALID_HANDLE )
         return -EINVAL;;
     CStdRMutex oPortLock( GetLock() );
     auto itr = m_mapStm2Port.find( hStream );
@@ -1331,8 +1347,13 @@ gint32 CDBusStreamBusPort::OnNewConnection(
         oCfg[ propPortClass ] =
             PORT_CLASS_DBUS_STREAM_PDO;
 
-        oCfg[ propBusName ] =
+        stdstr strBus =
             PORT_CLASS_DBUS_STREAM_BUS;
+        strBus += "_0";
+        oCfg[ propBusName ] = strBus;
+
+        oCfg.SetIntPtr( propStmHandle,
+            ( guint32*& )hStream );
 
         ret = OpenPdoPort(
             oCfg.GetCfg(), pPort );

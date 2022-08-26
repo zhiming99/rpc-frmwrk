@@ -2641,7 +2641,7 @@ gint32 CDeclServiceImpl2::OutputROS()
         }
 
         Wa( "gint32 CreateStmSkel(" );
-        Wa( "    HANDLE, InterfPtr& ) override;" );
+        Wa( "    HANDLE, guint32, InterfPtr& ) override;" );
 
         for( auto pifd : vecIfs )
         {
@@ -2759,7 +2759,7 @@ gint32 CImplServiceImpl2::OutputROS()
             strClass += strSvcName + "_SvrImpl";
             CCOUT << "gint32 " << strClass << "::CreateStmSkel(";
             NEW_LINE;
-            Wa( "    HANDLE hStream, InterfPtr& pIf )" );
+            Wa( "    HANDLE hStream, guint32 dwPortId, InterfPtr& pIf )" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
             CCOUT << "do";
@@ -2780,6 +2780,7 @@ gint32 CImplServiceImpl2::OutputROS()
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            Wa( "oCfg[ propPortId ] = dwPortId;" );
             Wa( "ret = pIf.NewObj(" );
             CCOUT << "    clsid( C" << strSvcName << "_SvrSkel ),";
             NEW_LINE;

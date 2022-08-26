@@ -164,36 +164,57 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
     gint32 ret = 0;
     do{
         CCfgOpener oReqCtx( pReqCtx );
-        PIRP pIrp = nullptr;
-        ret = oReqCtx.GetPointer(
-                propIrpPtr, pIrp );
+
+        HANDLE hstm = INVALID_HANDLE;
+        ret = oReqCtx.GetIntPtr(
+            propStmHandle, ( guint32*& )hstm );
         if( ERROR( ret ) )
             break;
 
-        CDBusStreamBusPort* pPort = nullptr;
-        ret = oReqCtx.GetPointer(
-                propPortPtr, pPort );
+        bool bStart = true;
+        ret = oReqCtx.GetBoolProp(
+            0, bStart );
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oReqCfg( pIoReq );
-        IConfigDb* pResp;
-        ret = oReqCfg.GetPointer(
-            propRespPtr, pResp );
-        if( ERROR( ret ) ) 
-            break;
-        
-        gint32 iRet = 0;
-        guint32* pRet = ( guint32* )&iRet;
-        CCfgOpener oResp( pResp );
-        ret = oResp.GetIntProp(
-            propReturnValue, *pRet );
+        HANDLE hPort = INVALID_HANDLE;
+        ret = oReqCtx.GetIntPtr(
+            1, ( guint32*& )hPort );
         if( ERROR( ret ) )
             break;
-        if( ERROR( iRet ) )
+
+        if( bStart )
         {
-            ret = iRet;
+            IConfigDb* pResp = nullptr;
+            CCfgOpenerObj oReq( pIoReq );
+            ret = oReq.GetPointer(
+                propRespPtr, pResp );
+            if( SUCCEEDED( ret ) )
+            {
+                gint32 iRet = 0;
+                guint32* pRet = ( guint32* )&iRet;
+                CCfgOpener oResp( pResp );
+                oResp.GetIntProp(
+                    propReturnValue, *pRet );
+                if( ERROR( iRet ) )
+                {
+                }
+            }
             break;
+        }
+
+        bool bClosePort = false;
+        ret = oReqCtx.GetBoolProp(
+            2, bClosePort );
+        if( ERROR( ret ) )
+            break;
+
+        RemoveStmSkel( hstm );
+        if( bClosePort )
+        {
+            auto pMgr = this->GetIoMgr();
+            pMgr->ClosePort(
+                hPort, nullptr, nullptr );
         }
 
     }while( 0 );
@@ -204,6 +225,22 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
     }
 
     return ret;
+}
+
+gint32 CFastRpcServerBase::AddStmSkel(
+    HANDLE hstm, InterfPtr& pIf )
+{
+    CStdRMutex oLock( GetLock() );
+    m_mapSkelObjs[ hstm ] = pIf;
+    return 0;
+}
+
+gint32 CFastRpcServerBase::RemoveStmSkel(
+    HANDLE hstm )
+{
+    CStdRMutex oLock( GetLock() );
+    m_mapSkelObjs.erase( hstm );
+    return 0;
 }
 
 gint32 CFastRpcServerBase::GetStmSkel(
@@ -248,7 +285,27 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         
         InterfPtr pIf;
         if( bOnline )
-            ret = CreateStmSkel( hstm, pIf );
+        {
+            PortPtr pPort;
+            auto pMgr = this->GetIoMgr();
+            ret = pMgr->GetPortPtr(
+                hPort, pPort );
+            if( ERROR( ret ) )
+                break;
+
+            Variant var;
+            ret = pPort->GetProperty(
+                propPortId, var );
+            if( ERROR( ret ) )
+                break;
+
+            guint32 dwPortId = var;
+            
+            ret = CreateStmSkel(
+                hstm, dwPortId, pIf );
+            if( SUCCEEDED( ret ) )
+                AddStmSkel( hstm, pIf );
+        }
         else
             ret = GetStmSkel( hstm, pIf );
 
@@ -260,6 +317,21 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
             break;
         }
 
+        CParamList oReqCtx;
+        oReqCtx.SetPointer(
+            propIfPtr, ( IEventSink* )pIf );
+
+        oReqCtx.SetIntPtr(
+            propStmHandle, ( guint32*& )hstm );
+
+        // whether start or stop
+        oReqCtx.Push( bOnline );
+
+        // just for allocating prop 1
+        oReqCtx.Push( bOnline );
+        // fill prop 1 with an unsupport type
+        oReqCtx.SetIntPtr( 1, ( guint32*& )hPort );
+
         TaskletPtr pTask;
         if( bOnline )
         {
@@ -270,6 +342,14 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         }
         else
         {
+            bool bClosePort = false;
+            CRpcServices* pSvc = pIf;
+            if( pSvc->GetPortHandle() ==
+                INVALID_HANDLE )
+                bClosePort = true;
+
+            // explicitly close the port
+            oReqCtx.Push( bClosePort );
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pTask, ObjPtr( pIf ),
                 &CRpcServices::StopEx,
@@ -277,16 +357,6 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         }
         if( ERROR( ret ) )
             break;
-
-        CParamList oReqCtx;
-        oReqCtx.SetPointer(
-            propIfPtr, ( IEventSink* )pIf );
-
-        oReqCtx.SetIntPtr(
-            propStmHandle, ( guint32*& )hstm );
-
-        // whether start or stop
-        oReqCtx.Push( bOnline );
 
         TaskletPtr pRespCb;
         ret = NEW_PROXY_RESP_HANDLER2(

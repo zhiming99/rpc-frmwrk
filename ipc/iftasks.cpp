@@ -1278,7 +1278,7 @@ gint32 CIfOpenPortTask::RunTask()
         }
 
         ret = pIf->OpenPort( this );
-        if( Retriable( ret ) )
+        if( !pIf->IsServer() && Retriable( ret ) )
         {
             pIf->SetStateOnEvent( eventRetry );
             ret = STATUS_MORE_PROCESS_NEEDED;
