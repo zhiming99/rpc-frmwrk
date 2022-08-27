@@ -241,6 +241,51 @@ gint32 CDBusStreamBusPort::BroadcastDBusMsg(
     return ret;
 }
 
+gint32 CDBusStreamPdo::SubmitIoctlCmd(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+    {
+        return -EINVAL;
+    }
+
+    gint32 ret = 0;
+
+    // let's process the func irps
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
+
+    do{
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC
+            || pIrp->MinorCmd() != IRP_MN_IOCTL )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->CtrlCode() )
+        {
+        case CTRLCODE_SEND_RESP:
+            {
+                // the m_pReqData contains a
+                // pointer to DMsgPtr
+                ret = HandleSendReq( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = super::SubmitIoctlCmd( pIrp );
+                break;
+            }
+        }
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
+
+    return ret;
+}
+
 gint32 CDBusStreamPdo::HandleSendReq( IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -832,8 +877,7 @@ gint32 CDBusStreamPdo::PostStart(
     return ret;
 }
 
-gint32 CDBusStreamPdo::OnPortStackBuilt(
-    IRP* pIrp )
+gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
 {
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
@@ -841,7 +885,7 @@ gint32 CDBusStreamPdo::OnPortStackBuilt(
 
     gint32 ret = 0;
     do{
-        ret = super::OnPortStackBuilt( pIrp );
+        ret = super::OnPortReady( pIrp );
         if( ERROR( ret ) )
             break;
 

@@ -99,6 +99,9 @@ class CDBusStreamPdo :
     bool IsServer() const
     { return m_bServer; }
 
+    gint32 SubmitIoctlCmd(
+        IRP* pIrp ) override;
+
     gint32 HandleSendReq(
         IRP* pIrp ) override;
 
@@ -116,7 +119,7 @@ class CDBusStreamPdo :
 
     gint32 PreStop( IRP* pIrp ) override;
     gint32 PostStart( IRP* pIrp ) override;
-    gint32 OnPortStackBuilt( IRP* pIrp ) override;
+    gint32 OnPortReady( IRP* pIrp ) override;
 
     gint32 IsIfSvrOnline(
         const DMsgPtr& pMsg ) override;

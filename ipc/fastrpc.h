@@ -148,6 +148,25 @@ class CRpcStmChanBase :
         return ret;
     }
 
+    gint32 OnStreamReadyProxy( HANDLE hstm )
+    {
+        gint32 ret = 0;
+        do{
+            CWriteLock oLock( this->GetSharedLock() );
+
+            m_setStreams.insert( hstm );
+
+            auto& msgElem =
+                    m_mapMsgRead[ hstm ];
+            UNREFERENCED( msgElem );
+            auto& bufElem =
+                    m_mapBufReading[ hstm ];
+            UNREFERENCED( bufElem );
+
+        }while( 0 );
+
+        return ret;
+    }
     gint32 OnStreamReady( HANDLE hstm ) override
     {
         gint32 ret = 0;
@@ -157,7 +176,10 @@ class CRpcStmChanBase :
                 break;
 
             if( !this->IsServer() )
+            {
+                ret = OnStreamReadyProxy( hstm );
                 break;
+            }
 
             CfgPtr pDesc;
             ret = this->GetDataDesc( hstm, pDesc );
@@ -255,10 +277,43 @@ class CRpcStmChanBase :
         return ret;
     }
 
+    gint32 OnStmClosingProxy( HANDLE hstm )
+    {
+        gint32 ret = 0;
+        do{
+            auto pPort = static_cast
+                < CDBusStreamBusPort* >( m_pPort ); 
+            PortPtr pPdoPort;
+            pPort->GetStreamPort( hstm, pPdoPort );
+
+            if( !pPdoPort.IsEmpty() )
+            {
+                pPdoPort->OnEvent(
+                    eventDisconn, hstm, 0, nullptr );
+            }
+
+            ret = super::OnStmClosing( hstm );
+
+            CWriteLock oLock( this->GetSharedLock() );
+
+            m_mapMsgRead.erase( hstm );
+            m_mapBufReading.erase( hstm );
+            m_setStreams.erase( hstm );
+
+        }while( 0 );
+
+        return ret;
+    }
+
     gint32 OnStmClosing( HANDLE hstm ) override
     {
         gint32 ret = 0;
         do{
+            if( !this->IsServer() )
+            {
+                ret = OnStmClosingProxy( hstm );
+                break;
+            }
             auto pPort = static_cast
                 < CDBusStreamBusPort* >( m_pPort ); 
             PortPtr pPdoPort;
@@ -299,6 +354,11 @@ class CRpcStmChanBase :
             ret = super::OnStmClosing( hstm );
 
             CWriteLock oLock( this->GetSharedLock() );
+
+            m_mapMsgRead.erase( hstm );
+            m_mapBufReading.erase( hstm );
+            m_setStreams.erase( hstm );
+
             auto itr =
                 m_mapStm2Sess.find( hstm );
             if( itr == m_mapStm2Sess.end() )
@@ -319,10 +379,6 @@ class CRpcStmChanBase :
                 break;
             }
             --itr2->second;
-
-            m_mapMsgRead.erase( hstm );
-            m_mapBufReading.erase( hstm );
-            m_setStreams.erase( hstm );
 
         }while( 0 );
 
@@ -394,6 +450,11 @@ class CRpcStmChanBase :
         // the bridge
         gint32 ret = 0;
         do{
+            if( !this->IsServer() )
+            {
+                pNewMsg = pFwrdMsg;
+                break;
+            }
             // append a session hash for access
             // control
             CCfgOpener oReqCtx;

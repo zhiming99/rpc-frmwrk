@@ -346,26 +346,6 @@ gint32 CSimpleEvPoll::UpdateIoMaps(
     std::map< HANDLE, CEvLoop::SOURCE_HEADER* >::iterator
         itrSrc;
 
-    if( m_bIoAdd )
-    {
-        for( auto elem : *pMap )
-        {
-            CEvLoop::IO_SOURCE* pSrc =
-                ( CEvLoop::IO_SOURCE* )elem.second;
-            if( pSrc->GetState() == srcsReady )
-            {
-                gint32 iIoKey = IO_KEY(
-                    pSrc->m_iFd, pSrc->m_dwOpt );
-
-                if( mapActFds.find( iIoKey ) !=
-                    mapActFds.end() )
-                    continue;
-
-                mapActFds[ iIoKey ] = elem.first;
-            }
-        }
-        m_bIoAdd = false;
-    }
     if( m_bIoRemove )
     {
         std::map< gint32, HANDLE >::iterator
@@ -401,6 +381,32 @@ gint32 CSimpleEvPoll::UpdateIoMaps(
             itr++;
         }
         m_bIoRemove = false;
+    }
+    // Addition must follow the removal because the fd
+    // could be reused for next io, which makes it
+    // possible the identical iokeys are added and
+    // removed at the same time.
+    // BUGBUG: we need to provide a better iokey than
+    // current one.
+    if( m_bIoAdd )
+    {
+        for( auto elem : *pMap )
+        {
+            CEvLoop::IO_SOURCE* pSrc =
+                ( CEvLoop::IO_SOURCE* )elem.second;
+            if( pSrc->GetState() == srcsReady )
+            {
+                gint32 iIoKey = IO_KEY(
+                    pSrc->m_iFd, pSrc->m_dwOpt );
+
+                if( mapActFds.find( iIoKey ) !=
+                    mapActFds.end() )
+                    continue;
+
+                mapActFds[ iIoKey ] = elem.first;
+            }
+        }
+        m_bIoAdd = false;
     }
 
     return 0;

@@ -7003,7 +7003,7 @@ gint32 CExportDrivers::Output()
             oCli[ JSON_ATTR_MODNAME ] = strAppCli;
             Json::Value oDrvToLoad;
             oDrvToLoad.append( "DBusBusDriver" );
-            if( bStream || bFuse )
+            if( bStream || bFuse || g_bRpcOverStm )
                 oDrvToLoad.append( "UnixSockBusDriver" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
