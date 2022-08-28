@@ -1445,6 +1445,7 @@ gint32 CRpcControlStream2::HandleListening(
         std::deque< CfgPtr >::iterator itr =
             m_queBufToRecv2.begin();
 
+        bool bFound = false;
         while( itr != m_queBufToRecv2.end() )
         {
             CfgPtr pCfg =
@@ -1470,8 +1471,12 @@ gint32 CRpcControlStream2::HandleListening(
             pCtx->SetRespData( pBuf );
             m_queBufToRecv2.erase( itr );
             ret = 0;
+            bFound = true;
             break;
         }
+
+        if( bFound )
+            break;
 
         if( itr == m_queBufToRecv2.end() )
         {

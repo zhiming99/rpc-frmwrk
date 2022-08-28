@@ -364,17 +364,16 @@ class CRpcStmChanBase :
             if( itr == m_mapStm2Sess.end() )
                 break;
 
-            auto itr2 = m_mapSessRefs.find(
-                itr->second.m_strSessHash );
+            stdstr strSess =
+                itr->second.m_strSessHash;
+            m_mapStm2Sess.erase( itr );
 
+            auto itr2 = m_mapSessRefs.find( strSess );
             if( itr2 == m_mapSessRefs.end() )
-            {
-                m_mapStm2Sess.erase( itr );
                 break;
-            }
+
             if( itr2->second <= 1 )
             {
-                m_mapStm2Sess.erase( itr );
                 m_mapSessRefs.erase( itr2 );
                 break;
             }
@@ -925,6 +924,11 @@ class CRpcStmChanBase :
 
         return ret;
     }
+    gint32 OnPostStop(
+        IEventSink* pCallback )
+    {
+        return 0;
+    }
 };
 
 class CRpcStmChanCli :
@@ -1146,6 +1150,9 @@ class CFastRpcProxyBase :
         IEventSink* pCallback ) override;
 
     gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPostStop(
         IEventSink* pCallback ) override;
 
     virtual gint32 CreateStmSkel(

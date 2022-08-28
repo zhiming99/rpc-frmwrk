@@ -3136,6 +3136,8 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( "// Stopping the object" );
             CCOUT << "ret = pSvc->Stop();";
             NEW_LINE;
+            Wa( "oDrvMgr.UnloadDriver(" );
+            CCOUT << "    \"DBusStreamBusDrv\" );";
             BLOCK_CLOSE;
             CCOUT<< "while( 0 );";
             NEW_LINES( 2 );

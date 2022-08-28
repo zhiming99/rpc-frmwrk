@@ -85,7 +85,7 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
                 ret = -ERANGE;
                 break;
             }
-            itr->second++;
+            ++itr->second;
         }
 
     }while( 0 );
@@ -487,5 +487,11 @@ gint32 CFastRpcProxyBase::OnPreStop(
     return ret;
 }
 
+gint32 CFastRpcProxyBase::OnPostStop(
+    IEventSink* pCallback )
+{
+    m_pSkelObj.Clear();
+    return 0;
+}
 
 }

@@ -225,6 +225,64 @@ gint32 CDriverManager::Start()
     return ret;
 }
 
+gint32 CDriverManager::UnloadDriver(
+    const stdstr& strDrvName )
+{
+    gint32 ret = -ENOENT;
+    string strPath = GetBusDrvRegRoot();
+    bool bFound = false;
+    do{
+        // let's walk through the bus port list
+        // to stop all the active bus ports
+        CRegistry& oReg = GetIoMgr()->GetRegistry();
+        vector< string > vecContents;
+
+        do{
+            CStdRMutex a( oReg.GetLock() );
+            ret = oReg.ChangeDir( strPath );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = oReg.ListDir( vecContents );
+            if( ERROR( ret ) )
+                break;
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+        {
+            // well, no child
+        }
+        for( gint32 i = 0; i < ( gint32 )vecContents.size(); i++ )
+        {
+            IPortDriver* pDrv = nullptr;
+            if( vecContents[ i ] != strDrvName )
+                continue;
+
+            bFound = true;
+            ret = FindDriver( vecContents[ i ], pDrv );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pDrv->Stop();
+            if( ERROR( ret ) )
+            {
+                //FIXME: what should I do?
+            }
+        }
+        if( bFound )
+            break;
+
+        if( strPath == GetPortDrvRegRoot() )
+            break;
+
+        strPath = GetPortDrvRegRoot();
+        
+    }while( 1 );
+
+    return ret;
+}
 gint32 CDriverManager::StopDrivers()
 {
     gint32 ret = 0;
