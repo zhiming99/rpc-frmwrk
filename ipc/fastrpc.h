@@ -90,24 +90,101 @@ class CRpcStmChanBase :
     inline void SetPort( IPort* pPort )
     { m_pPort = pPort; }
 
-    gint32 OnClose( HANDLE hChannel,
-        IEventSink* pCallback = nullptr ) override
+    gint32 PassiveClose( HANDLE hstm,
+        IEventSink* pCallback = nullptr )
     {
-        if( hChannel == INVALID_HANDLE )
+        if( hstm == INVALID_HANDLE )
             return -EINVAL;
 
-        InterfPtr pIf;
+        PortPtr pPdoPort;
+        gint32 ret = 0;
+        do{
+            auto pPort = static_cast
+                < CDBusStreamBusPort* >( m_pPort ); 
+            pPort->GetStreamPort( hstm, pPdoPort );
 
-        gint32 ret = this->GetUxStream(
-            hChannel, pIf );
+            if( pPdoPort.IsEmpty() &&
+                this->IsServer() )
+            {
+                CfgPtr pDesc;
+                ret = this->GetDataDesc( hstm, pDesc );
+                if( ERROR( ret ) )
+                    break;
 
+                IConfigDb* ptctx = nullptr;
+                CCfgOpener oDesc(
+                        ( IConfigDb* )pDesc );
+
+                ret = oDesc.GetPointer(
+                        propTransCtx, ptctx );
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oCtx( ptctx );
+                IPort* pPdoPort = nullptr;
+                ret = oCtx.GetPointer(
+                    propPortPtr, pPdoPort );
+
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            if( pPdoPort.IsEmpty() )
+                break;
+
+        }while( 0 );
+
+        OnStmClosing( hstm );
+        IStream::OnClose( hstm, pCallback );
+        if( !pPdoPort.IsEmpty() )
+        {
+            pPdoPort->OnEvent(
+                eventDisconn, hstm, 0, nullptr );
+        }
+        return 0;
+    }
+
+    gint32 OnClose( HANDLE hstm,
+        IEventSink* pCallback = nullptr ) override
+    {
+        gint32 ret = 0;
+        do{
+            gint32 ( *func )( CRpcStmChanBase*,
+                guint64, IEventSink* ) =
+            ([]( CRpcStmChanBase* pIf, guint64 hstm,
+                IEventSink* pCb )->gint32 
+            {
+                pIf->PassiveClose( hstm, pCb );
+                return 0;
+            });
+
+            TaskletPtr pTask;
+            ret = NEW_FUNCCALL_TASK( pTask,
+                this->GetIoMgr(), func,
+                this, hstm, pCallback );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = this->AddSeqTask( pTask );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 ActiveClose( HANDLE hstm,
+        IEventSink* pCallback = nullptr )
+    {
+        if( hstm == INVALID_HANDLE )
+            return -EINVAL;
+
+        InterfPtr pUxIf;
+        gint32 ret = this->GetUxStream( hstm, pUxIf );
         if( ERROR( ret ) )
             return 0;
-
-        OnStmClosing( hChannel );
-
-        return IStream::OnClose(
-            hChannel, pCallback );
+        OnStmClosing( hstm );
+        return IStream::OnClose( hstm, pCallback );
     }
 
     gint32 GetSessHash(
@@ -134,7 +211,6 @@ class CRpcStmChanBase :
     {
         gint32 ret = 0;
         do{
-            CReadLock oLock( GetSharedLock() );
             auto itr =
                 m_mapStm2Sess.find( hStream );
             if( itr == m_mapStm2Sess.end() )
@@ -281,21 +357,9 @@ class CRpcStmChanBase :
     {
         gint32 ret = 0;
         do{
-            auto pPort = static_cast
-                < CDBusStreamBusPort* >( m_pPort ); 
-            PortPtr pPdoPort;
-            pPort->GetStreamPort( hstm, pPdoPort );
-
-            if( !pPdoPort.IsEmpty() )
-            {
-                pPdoPort->OnEvent(
-                    eventDisconn, hstm, 0, nullptr );
-            }
-
             ret = super::OnStmClosing( hstm );
 
             CWriteLock oLock( this->GetSharedLock() );
-
             m_mapMsgRead.erase( hstm );
             m_mapBufReading.erase( hstm );
             m_setStreams.erase( hstm );
@@ -313,42 +377,6 @@ class CRpcStmChanBase :
             {
                 ret = OnStmClosingProxy( hstm );
                 break;
-            }
-            auto pPort = static_cast
-                < CDBusStreamBusPort* >( m_pPort ); 
-            PortPtr pPdoPort;
-            pPort->GetStreamPort( hstm, pPdoPort );
-
-            if( !pPdoPort.IsEmpty() )
-            {
-                pPdoPort->OnEvent(
-                    eventDisconn, hstm, 0, nullptr );
-            }
-            else
-            {
-                CfgPtr pDesc;
-                ret = this->GetDataDesc( hstm, pDesc );
-                if( ERROR( ret ) )
-                    break;
-
-                IConfigDb* ptctx = nullptr;
-                CCfgOpener oDesc(
-                        ( IConfigDb* )pDesc );
-
-                ret = oDesc.GetPointer(
-                        propTransCtx, ptctx );
-                if( ERROR( ret ) )
-                    break;
-
-                CCfgOpener oCtx( ptctx );
-                IPort* pPdoPort = nullptr;
-                ret = oCtx.GetPointer(
-                    propPortPtr, pPdoPort );
-                if( SUCCEEDED( ret ) )
-                {
-                    pPdoPort->OnEvent(
-                        eventDisconn, hstm, 0, nullptr );
-                }
             }
 
             ret = super::OnStmClosing( hstm );

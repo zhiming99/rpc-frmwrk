@@ -784,6 +784,7 @@ gint32 CDBusStreamPdo::PreStop(
             TaskletPtr pStopCb;
             if( IsServer() )
             {
+                CRpcStmChanSvr* pstm = GetStreamIf();
                 ret = NEW_PROXY_RESP_HANDLER2(
                     pStopCb, GetStreamIf(), 
                     &CRpcStmChanSvr::OnStopStmComplete,
@@ -791,21 +792,22 @@ gint32 CDBusStreamPdo::PreStop(
                     ( IConfigDb* )oReqCtx.GetCfg() );
                 if( SUCCEEDED( ret ) )
                 {
-                    CStreamServerSync* pstm = GetStreamIf();
-                    ret = pstm->OnClose( hstm, pStopCb );
+                    ret = pstm->ActiveClose(
+                        hstm, pStopCb );
                 }
             }
             else
             {
-                ret = NEW_PROXY_RESP_HANDLER2(
-                    pStopCb, GetStreamIf(), 
-                    &CRpcStmChanCli::OnStopStmComplete,
-                    ( IEventSink* )nullptr,
-                    ( IConfigDb* )oReqCtx.GetCfg() );
+                CRpcStmChanCli* pstm = GetStreamIf();
+                    ret = NEW_PROXY_RESP_HANDLER2(
+                        pStopCb, GetStreamIf(), 
+                        &CRpcStmChanCli::OnStopStmComplete,
+                        ( IEventSink* )nullptr,
+                        ( IConfigDb* )oReqCtx.GetCfg() );
                 if( SUCCEEDED( ret ) )
                 {
-                    CStreamProxySync* pstm = GetStreamIf();
-                    ret = pstm->OnClose( hstm, pStopCb );
+                    ret = pstm->ActiveClose(
+                        hstm, pStopCb );
                 }
             }
             if( ret == STATUS_PENDING )
@@ -813,7 +815,8 @@ gint32 CDBusStreamPdo::PreStop(
                 ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
             }
-            ( *pStopCb )( eventCancelTask );
+            if( !pStopCb.IsEmpty() )
+                ( *pStopCb )( eventCancelTask );
             SetPreStopStep( pIrp, 1 );
             break;
         }
