@@ -494,4 +494,24 @@ gint32 CFastRpcProxyBase::OnPostStop(
     return 0;
 }
 
+gint32 CFastRpcProxyBase::OnRmtSvrEvent(
+    EnumEventId iEvent,
+    IConfigDb* pEvtCtx,
+    HANDLE hPort )
+{
+    if( pEvtCtx == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        if( iEvent == eventRmtSvrOnline )
+            break;
+        CRpcServices* pSvc = m_pSkelObj;
+        pSvc->SetStateOnEvent( cmdShutdown );
+        pSvc->ClosePort( nullptr );
+        
+    }while( 0 );
+
+    return ret;
+}
+
 }

@@ -121,16 +121,15 @@ class CRpcStmChanBase :
                     break;
 
                 CCfgOpener oCtx( ptctx );
-                IPort* pPdoPort = nullptr;
-                ret = oCtx.GetPointer(
-                    propPortPtr, pPdoPort );
+                ObjPtr pPort;
+                ret = oCtx.GetObjPtr(
+                    propPortPtr, pPort );
 
                 if( ERROR( ret ) )
                     break;
-            }
 
-            if( pPdoPort.IsEmpty() )
-                break;
+                pPdoPort = pPort;
+            }
 
         }while( 0 );
 
@@ -1185,6 +1184,11 @@ class CFastRpcProxyBase :
 
     virtual gint32 CreateStmSkel(
         InterfPtr& pIf ) = 0;
+
+    gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort ) override;
 
     InterfPtr GetStmSkel() const
     { return m_pSkelObj; }

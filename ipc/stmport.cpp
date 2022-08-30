@@ -899,9 +899,12 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
         pBusPort->BindStreamPort(
             hStream, PortPtr( this ) );
 
-        FireRmtSvrEvent( this,
-            eventRmtSvrOnline, hStream );
-        Sem_Post( &m_semFireSync );
+        if( IsServer() )
+        {
+            FireRmtSvrEvent( this,
+                eventRmtSvrOnline, hStream );
+            Sem_Post( &m_semFireSync );
+        }
 
     }while( 0 );
 
@@ -921,7 +924,8 @@ gint32 CDBusStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
-            Sem_Wait( &m_semFireSync );
+            if( IsServer() )
+                Sem_Wait( &m_semFireSync );
             ret = FireRmtSvrEvent( this,
                 eventRmtSvrOffline,
                 ( HANDLE )dwParam1 );

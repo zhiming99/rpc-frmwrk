@@ -232,6 +232,12 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
+        CCfgOpener oCtx( pContext );
+        ret = oCtx.GetIntProp( 0,
+            ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
         if( ERROR( iRet ) )
         {
             ret = iRet;
@@ -245,12 +251,6 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         IConfigDb* pDataDesc = nullptr;
         ret = oResp.GetPointer( 0, pDataDesc );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCtx( pContext );
-        ret = oCtx.GetIntProp( 0,
-            ( guint32& )iStmId );
         if( ERROR( ret ) )
             break;
 
