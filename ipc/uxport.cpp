@@ -769,9 +769,10 @@ gint32 CIoWatchTask::RunTask()
         {
             pLoop->RemoveIoWatch(
                 m_hReadWatch );
+            m_hReadWatch = INVALID_HANDLE;
             pLoop->RemoveIoWatch(
                 m_hWriteWatch );
-            m_hErrWatch = INVALID_HANDLE;
+            m_hWriteWatch = INVALID_HANDLE;
             break;
         }
 

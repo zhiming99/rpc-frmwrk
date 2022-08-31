@@ -1207,7 +1207,7 @@ gint32 CStreamServer::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        ret = STATUS_PENDING;
+        ret = pTask->GetError();
 
     }while( 0 );
 

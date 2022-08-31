@@ -361,41 +361,19 @@ class CStreamRelayBase :
             TaskletPtr pSendClose;
             BufPtr pBuf( true );
             *pBuf = ( guint8 )tokClose;
-            ret = DEFER_IFCALLEX_NOSCHED(
-                pSendClose, ObjPtr( this ),
+            ret = DEFER_IFCALLEX_NOSCHED2(
+                3, pSendClose, ObjPtr( this ),
                 &CRpcTcpBridgeShared::WriteStream,
                 iStmId, *pBuf, 1, ( IEventSink* )nullptr );
 
             if( ERROR( ret ) )
-                break;
-
-            // Let the WriteStream to notify this task when
-            // completed
-            CIfDeferCallTaskEx* pTemp = pSendClose;
-            Variant oVar( pSendClose );
-            pTemp->UpdateParamAt( 3, oVar );
-
-            CParamList oParams;
-            oParams[ propIfPtr ] = ObjPtr( this );
-            TaskGrpPtr pTaskGrp;
-
-            ret = pTaskGrp.NewObj(
-                clsid( CIfTaskGroup ),
-                oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-     
-            pTaskGrp->SetRelation( logicNONE );
-            pTaskGrp->AppendTask( pSendClose );
-            pTaskGrp->AppendTask( pCloseStream );
-
-            TaskletPtr pTask( pTaskGrp );
-            ret = this->AddSeqTask( pTask );
-            if( ERROR( ret ) )
             {
-                ( *pTask )( eventCancelTask );
+                ( *pCloseStream )( eventCancelTask );
+                break;
             }
+
+            this->AddSeqTask( pSendClose );
+            this->AddSeqTask( pCloseStream );
 
         }while( 0 );
 
@@ -528,6 +506,7 @@ class CIfStartUxSockStmRelayTask :
 
     gint32 RunTask();
     gint32 OnTaskComplete( gint32 iRet );
+    void Cleanup();
 };
 
 template< class T >

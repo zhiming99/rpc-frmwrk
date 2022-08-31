@@ -217,6 +217,13 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             ret = -EFAULT;
             break;
         }
+
+        CCfgOpener oCtx( pContext );
+        ret = oCtx.GetIntProp( 0,
+            ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
@@ -229,12 +236,6 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oResp.GetIntProp( propReturnValue,
             ( guint32& ) iRet );
 
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCtx( pContext );
-        ret = oCtx.GetIntProp( 0,
-            ( guint32& )iStmId );
         if( ERROR( ret ) )
             break;
 
@@ -387,6 +388,13 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             ret = -EFAULT;
             break;
         }
+
+        CCfgOpener oCtx( pContext );
+        ret = oCtx.GetIntProp(
+            1, ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oIoReq( pIoReqTask );
         IConfigDb* pResp = nullptr;
         ret = oIoReq.GetPointer(
@@ -408,11 +416,6 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         }
 
         // time to create uxstream object
-        ret = oResp.GetIntProp(
-            1, ( guint32& )iStmId );
-        if( ERROR( ret ) )
-            break;
-
         ret = CreateSocket( iLocal, iRemote );
         if( ERROR( ret ) )
             break;
@@ -817,17 +820,14 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
     InterfPtr pParentIf;
 
     do{
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
         ObjPtr pIf;
         ret = oParams.GetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
         
+        oParams.GetIntProp(
+            2, ( guint32& )iStmId ) ;
+
         pParentIf = pIf;
         CRpcServices* pParent = pIf;
 
@@ -847,6 +847,12 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             pParent == nullptr )
         {
             ret = -EFAULT;
+            break;
+        }
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
             break;
         }
 
@@ -872,9 +878,6 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
         if( ERROR( ret ) )
             break;
-
-        oParams.GetIntProp(
-            2, ( guint32& )iStmId ) ;
 
         if( bBdgSvr )
         {
@@ -953,8 +956,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
     while( ERROR( ret ) )
     {
-        if( pUxSvc == nullptr || 
-            pParentIf.IsEmpty() )
+        if( pParentIf.IsEmpty() )
             break;
 
         if( iStmId < 0 )
@@ -973,6 +975,9 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         }
         else
         {
+            if( pUxSvc == nullptr )
+                break;
+
             CStreamProxyRelay* pStream =
                 ObjPtr( pParent );
 
@@ -1591,6 +1596,9 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
 
     if( !IsReading() )
         return ret;
+
+    if( ret == -ETIMEDOUT )
+        return 0;
 
     BufPtr pPayload( true );
     if( ERROR( ret ) )
