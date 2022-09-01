@@ -755,18 +755,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             ( HANDLE )pSvc, pInterf );
 
         if( ERROR( ret ) )
-        {
-            TaskletPtr pDummyTask;
-            pDummyTask.NewObj(
-                clsid( CIfDummyTask ) );
-
-            DEFER_CALL( pSvc->GetIoMgr(),
-                ObjPtr( pSvc ),
-                &CRpcInterfaceBase::Shutdown,
-                ( IEventSink* )pDummyTask );
-
             break;
-        }
 
         ret = 0;
         oResp[ propReturnValue ] = 0;

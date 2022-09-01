@@ -153,7 +153,7 @@ gint32 CStreamServerRelay::FetchData_Server(
             break;
         }
 
-        ret = pWrapper->GetError();
+        /*ret = pWrapper->GetError();
         if( ret != STATUS_PENDING )
         {
             // the wrapper task has been completed
@@ -161,7 +161,7 @@ gint32 CStreamServerRelay::FetchData_Server(
             // called when we return.
             ret = STATUS_PENDING;
             break;
-        }
+        }*/
 
         // the wrapper task has not run yet
         // though across the process boundary.
@@ -1596,9 +1596,6 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
 
     if( !IsReading() )
         return ret;
-
-    if( ret == -ETIMEDOUT )
-        return 0;
 
     BufPtr pPayload( true );
     if( ERROR( ret ) )
