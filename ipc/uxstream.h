@@ -747,24 +747,70 @@ class CUnixSockStream:
                     HANDLE hChannel = ( HANDLE )
                         ( ( CObjBase* )this );
 
-                    CfgPtr pDataDesc;
+                    InterfPtr pUxIf;
                     IStream* pStream = GetParent();
-                    ret = pStream->GetDataDesc(
-                        hChannel, pDataDesc );
+                    ret = pStream->GetUxStream( hChannel, pUxIf );
                     if( ERROR( ret ) )
                     {
-                        BufPtr pNullTask;
-                        SendUxStreamEvent(
-                            tokClose, pNullTask );
-                        break;
+                        gint32 (*func)( InterfPtr, CUnixSockStream* ) =
+                        ([]( InterfPtr pParent,
+                            CUnixSockStream* pThis )->gint32
+                        {
+                            CfgPtr pDataDesc;
+                            auto pStream = ( CStreamServer* )pParent;
+                            HANDLE hChannel = ( HANDLE )
+                                ( ( CObjBase* )pThis );
+                            gint32 ret = pStream->GetDataDesc(
+                                hChannel, pDataDesc );
+                            if( ERROR( ret ) )
+                            {
+                                BufPtr pNullTask;
+                                pThis->SendUxStreamEvent(
+                                    tokClose, pNullTask );
+                            }
+                            else
+                            {
+                                CParamList oResp;
+                                oResp.Push( ObjPtr( pDataDesc ) );
+                                oResp.Push( hChannel );
+                                IConfigDb* pCfg = oResp.GetCfg();
+                                HANDLE hCfg = ( HANDLE )pCfg;
+                                pStream->OnConnected( hCfg );
+                            }
+                            return 0;
+                        });
+                        InterfPtr pIf = m_pParent;
+                        TaskletPtr pTask;
+                        ret = NEW_FUNCCALL_TASK(
+                            pTask, this->GetIoMgr(), func,
+                            pIf, this );
+                             
+                        if( SUCCEEDED( ret ) )
+                        {
+                            CRpcServices* pSvc = m_pParent;
+                            pSvc->AddSeqTask( pTask );
+                        }
                     }
-                    CParamList oResp;
-                    oResp.Push( ObjPtr( pDataDesc ) );
-                    oResp.Push( hChannel );
-                    IConfigDb* pCfg = oResp.GetCfg();
-                    HANDLE hCfg = ( HANDLE )pCfg;
-                    pStream->OnConnected( hCfg );
-                    ret = 0;
+                    else
+                    {
+                        CfgPtr pDataDesc;
+                        ret = pStream->GetDataDesc(
+                            hChannel, pDataDesc );
+                        if( ERROR( ret ) )
+                        {
+                            BufPtr pNullTask;
+                            SendUxStreamEvent(
+                                tokClose, pNullTask );
+                            break;
+                        }
+                        CParamList oResp;
+                        oResp.Push( ObjPtr( pDataDesc ) );
+                        oResp.Push( hChannel );
+                        IConfigDb* pCfg = oResp.GetCfg();
+                        HANDLE hCfg = ( HANDLE )pCfg;
+                        pStream->OnConnected( hCfg );
+                        ret = 0;
+                    }
                 }
             }
             else if( !this->IsServer() && !bPing )

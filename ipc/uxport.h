@@ -324,6 +324,8 @@ class CIoWatchTask:
         m_qwBytesWrite += pBuf->size();
         gint32 ret = m_oSendQue.WriteStream(
             pBuf, byToken );
+        if( ret == STATUS_PENDING )
+            StartWatch();
         return ret;
     }
 
@@ -331,10 +333,20 @@ class CIoWatchTask:
     virtual gint32 ReleaseChannel();
 
     inline gint32 SendPingPong( bool bPing = true )
-    { return m_oSendQue.SendPingPong( bPing ); }
+    {
+        gint32 ret = m_oSendQue.SendPingPong( bPing );
+        if( ret == STATUS_PENDING )
+            StartWatch();
+        return ret;
+    }
 
     inline gint32 SendClose()
-    { return m_oSendQue.SendClose(); }
+    {
+        gint32 ret = m_oSendQue.SendClose();
+        if( ret == STATUS_PENDING )
+            StartWatch();
+        return ret;
+    }
 
     inline guint64 GetBytesRead()
     { return m_qwBytesRead; }

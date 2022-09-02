@@ -739,7 +739,11 @@ gint32 CIfUxSockTransRelayTaskMH::RunTask()
             // note that this flow control comes from
             // uxport rather than the uxstream.
             if( ERROR_QUEUE_FULL == ret )
+            {
+                Pause();
+                ret = STATUS_PENDING;
                 break;
+            }
 
             CRpcTcpBridgeProxyStream* pIf =
                 GetOwnerIf();

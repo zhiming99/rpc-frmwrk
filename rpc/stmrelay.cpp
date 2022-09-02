@@ -1187,9 +1187,6 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
         ret = pIrp->GetStatus();
         if( ERROR( ret ) )
         {
-            BufPtr pCloseBuf( true );
-            *pCloseBuf = tokClose;
-            PostEvent( pCloseBuf );
             break;
         }
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
@@ -1218,7 +1215,14 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
         ret = STATUS_PENDING;
 
     }while( 0 );
-
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error, the relay "
+            "channel will be closed" );
+        BufPtr pCloseBuf( true );
+        *pCloseBuf = tokClose;
+        PostEvent( pCloseBuf );
+    }
     return ret;
 }
 
@@ -1447,7 +1451,11 @@ gint32 CIfUxSockTransRelayTask::RunTask()
             // note that this flow control comes from
             // uxport rather than the uxstream.
             if( ERROR_QUEUE_FULL == ret )
+            {
+                Pause();
+                ret = STATUS_PENDING;
                 break;
+            }
 
             // remove the packet from the queue
             BufPtr pBuf;

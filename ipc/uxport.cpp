@@ -279,7 +279,10 @@ gint32 CSendQue::OnIoReady()
     gint32 ret = 0;
     do{
         if( m_queBufWrite.empty() )
+        {
+            ret = -ENOENT;
             break;
+        }
 
         STM_PACKET& oPkt =
             m_queBufWrite.front();
@@ -1022,7 +1025,14 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 ret = m_oSendQue.OnIoReady();
                 if( SUCCEEDED( ret ) &&
                     m_oSendQue.GetPendingWrite() == 0 )
+                {
                     ret = OnSendReady();
+                }
+                if( ret == -ENOENT )
+                {
+                    StopWatch();
+                    ret = 0;
+                }
 
             }while( 0 );
         }
@@ -1407,15 +1417,12 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
 
     gint32 ret = 0;
     bool bNotify = false;
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask == nullptr )
+        return -EFAULT;
 
     // let's process the func irps
     do{
-        CIoWatchTask* pTask = m_pIoWatch;
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         CStdRTMutex oTaskLock( pTask->GetLock() );
         CStdRMutex oPortLock( GetLock() );
@@ -1465,8 +1472,8 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
                 ret = pTask->WriteStream(
                     pBuf, tokProgress );
 
-                pBuf->SetOffset( pBuf->offset() -
-                    UXPKT_HEADER_SIZE );
+                // pBuf->SetOffset( pBuf->offset() -
+                //     UXPKT_HEADER_SIZE );
 
                 break;
             }
@@ -1504,7 +1511,11 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
         }
 
     }while( 0 );
-
+    if( ret == -EPIPE )
+    {
+        pTask->OnError( ret );
+        return ret;
+    }
     if( bNotify )
     {
         BufPtr pNullBuf;
@@ -1647,18 +1658,15 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
 {
     gint32 ret = 0;
     bool bNotify = false;
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask == nullptr )
+        return -EFAULT;
+
     do{
         if( pIrp == nullptr ||
             pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
-            break;
-        }
-
-        CIoWatchTask* pTask = m_pIoWatch;
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
             break;
         }
 
@@ -1711,6 +1719,12 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
         }
 
     }while( 0 );
+
+    if( ret == -EPIPE )
+    {
+        pTask->OnError( ret );
+        return ret;
+    }
 
     if( bNotify )
     {
