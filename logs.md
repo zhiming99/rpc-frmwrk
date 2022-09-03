@@ -1,4 +1,10 @@
 ---
+[`Sat Sep 03 2022 04:52:48 PM Beijing`]   
+1. Merged the `rpc-over-stream` branch to the master branch. The evaluation shows not significant performance gain. But it contains many bug fixes in stream support, and it's pararllel request process architecture should have some superior advantage in some situations. so it is merged.
+
+[`Mon Aug 15 2022 11:02:56 PM Beijing`]    
+1. Next 3-4 weeks, I will work on the branch `rpc-over-stream` to evaluate the effect of the solution for performance boost. Good luck to me.
+
 [`Sat Aug 13 2022 09:49:37 AM Beijing`]   
 1. Finally we wrapped up the `rpcfs` development. Congratulations!
 2. Next I need to evaluate how much the performance optimization for `rpc-frmwrk` affects to the whole architecture of `rpc-frmwrk`. Previously, it was planned to move on to auto code generator for `rpcfs` programming. But the performance optimization will affect it a lot. Therefore it is paused before the evaluation is done.
