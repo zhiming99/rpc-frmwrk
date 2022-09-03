@@ -51,6 +51,8 @@ namespace rpcf
 #define PORT_CLASS_UXSOCK_BUS           "UnixSockBusPort"
 #define PORT_CLASS_UXSOCK_STM_PDO       "UnixSockStmPdo"
 #define PORT_CLASS_DBUS_PROXY_PDO_LPBK  "DBusProxyPdoLpbk"
+#define PORT_CLASS_DBUS_STREAM_BUS      "DBusStreamBusPort"
+#define PORT_CLASS_DBUS_STREAM_PDO      "DBusStreamPdo"
 
 // registry path for event subscription from the
 // IoManager
@@ -178,6 +180,8 @@ inline std::string DBUS_DESTINATION(
 
 #define OBJNAME_ROUTER_BRIDGE_AUTH      "RpcRouterBridgeAuthImpl"
 #define OBJNAME_ROUTER_REQFWDR_AUTH     "RpcRouterReqFwdrAuthImpl"
+
+#define OBJNAME_RPC_STREAMCHAN_SVR      "RpcStreamChannelSvr"
 
 #define OBJNAME_IOMANAGER               "Obj_IoManager"
 #define OBJNAME_INVALID                 "Obj_Invalid"

@@ -27,6 +27,7 @@
 using namespace rpcf;
 #include "astnode.h"
 #include "gencpp.h"
+#include "gencpp2.h"
 #include "sha1.h"
 #include "proxy.h"
 #include "genfuse.h"
@@ -35,6 +36,7 @@ extern std::string g_strAppName;
 extern bool g_bMklib;
 extern stdstr g_strLang;
 extern guint32 g_dwFlags;
+extern bool g_bRpcOverStm;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -284,7 +286,8 @@ gint32 CArgListUtils::GetHstream(
 
 gint32 CArgListUtils::GetArgsForCall(
     ObjPtr& pArgList,
-    std::vector< std::string >& vecArgs )  const
+    std::vector< std::string >& vecArgs,
+    bool bExpand )  const
 {
     CArgList* pinal = pArgList;
     if( pinal == nullptr )
@@ -312,7 +315,12 @@ gint32 CArgListUtils::GetArgsForCall(
                 pNode->GetSignature();
 
             if( strSig[ 0 ] == 'h' )
-                strVarName += ".m_hStream";
+            {
+                if( bExpand )
+                    strVarName += ".m_hStream";
+                else
+                    strVarName += "_h";
+            }
 
             vecArgs.push_back( strVarName );
         }
@@ -383,8 +391,32 @@ gint32 CArgListUtils::GetArgTypes(
     return ret;
 }
 
+gint32 CArgListUtils::FindParentByClsid(
+    ObjPtr& pArgList,
+    EnumClsid iClsid,
+    ObjPtr& pNode ) const
+{
+    CAstNodeBase* pinal = pArgList;
+    if( pinal == nullptr )
+        return -EINVAL;
+   
+    gint32 ret = 0; 
+    CAstNodeBase* pParent = pinal->GetParent();
+    while( pParent != nullptr )
+    {
+        if( pParent->GetClsid() == iClsid )
+            break;
+        pParent = pParent->GetParent();
+    }
+    if( pParent == nullptr )
+        return -ENOENT;
+
+    pNode = pParent;
+    return STATUS_SUCCESS;
+}
+
 gint32 CMethodWriter::GenActParams(
-    ObjPtr& pArgList )
+    ObjPtr& pArgList, bool bExpand )
 {
     if( GetArgCount( pArgList ) == 0 )
         return STATUS_SUCCESS;
@@ -393,7 +425,7 @@ gint32 CMethodWriter::GenActParams(
     do{
         std::vector< std::string > vecArgs;
         ret = GetArgsForCall(
-            pArgList, vecArgs );
+            pArgList, vecArgs, bExpand );
         if( ERROR( ret ) )
             break;
 
@@ -414,7 +446,8 @@ gint32 CMethodWriter::GenActParams(
 }
 
 gint32 CMethodWriter::GenActParams(
-    ObjPtr& pArgList, ObjPtr& pArgList2 )
+    ObjPtr& pArgList, ObjPtr& pArgList2,
+    bool bExpand )
 {
     guint32 dwCount =
         GetArgCount( pArgList );
@@ -426,21 +459,21 @@ gint32 CMethodWriter::GenActParams(
         return STATUS_SUCCESS;
 
     if( dwCount == 0 )
-        return GenActParams( pArgList2 );
+        return GenActParams( pArgList2, bExpand );
 
     if( dwCount2 == 0 )
-        return GenActParams( pArgList );
+        return GenActParams( pArgList, bExpand );
 
     gint32 ret = 0;
     do{
         std::vector< std::string > vecArgs;
         ret = GetArgsForCall(
-            pArgList, vecArgs );
+            pArgList, vecArgs, bExpand );
         if( ERROR( ret ) )
             break;
 
         ret = GetArgsForCall(
-            pArgList2, vecArgs );
+            pArgList2, vecArgs, bExpand );
         if( ERROR( ret ) )
             break;
 
@@ -471,7 +504,16 @@ gint32 CMethodWriter::GenSerialArgs(
 
     do{
         NEW_LINE;
-        Wa( "ObjPtr pSerialIf_(this);" );
+        ObjPtr pObj;
+        ret = FindParentByClsid( pArgList,
+            clsid( CInterfaceDecl ), pObj );
+        if( ERROR( ret ) )
+            break;
+        CInterfaceDecl* pifd = pObj;
+        if( pifd->IsStream() )
+            Wa( "ObjPtr pSerialIf_(GetStreamIf());" );
+        else
+            Wa( "ObjPtr pSerialIf_(this);" );
         Wa( "CSerialBase oSerial_( pSerialIf_ );" );
         CEmitSerialCode oesc(
             m_pWriter, pArgList );
@@ -1015,6 +1057,12 @@ gint32 GenHeaderFile(
         pRoot.IsEmpty() )
         return -EINVAL;
 
+    if( g_bRpcOverStm )
+    {
+        return GenHeaderFileROS(
+            pWriter, pRoot );
+    }
+
     gint32 ret = 0;
     do{
         pWriter->SelectHeaderFile();
@@ -1029,8 +1077,6 @@ gint32 GenHeaderFile(
         if( bFuseP )
         {
             CCppWriter* m_pWriter = pWriter;
-            Wa( "#define eventRemoveReq \\" );
-            Wa( "    ( ( EnumEventId )( rpcf::eventUserStart + 101 ) )" );
         }
 
         CDeclareClassIds odci(
@@ -1342,6 +1388,12 @@ gint32 GenCppFile(
         pRoot.IsEmpty() )
         return -EINVAL;
 
+    if( g_bRpcOverStm )
+    {
+        return GenCppFileROS(
+            m_pWriter, pRoot );
+    }
+
     gint32 ret = 0;
     do{
         m_pWriter->SelectCppFile();
@@ -1582,8 +1634,16 @@ gint32 GenCppProj(
         ret = oedrv.Output();
 
         oWriter.SelectDescFile();
-        CExportObjDesc oedesc( &oWriter, pRoot );
-        ret = oedesc.Output();
+        if( !g_bRpcOverStm )
+        {
+            CExportObjDesc oedesc( &oWriter, pRoot );
+            ret = oedesc.Output();
+        }
+        else
+        {
+            CExportObjDesc2 oedesc( &oWriter, pRoot );
+            ret = oedesc.OutputROS();
+        }
         if( ERROR( ret ) )
             break;
         
@@ -3704,9 +3764,9 @@ gint32 CImplServiceImpl::Output()
                 bool bEvent = pmd->IsEvent();
 
                 if( bAsync )
-                    Wa( "/* Async Req */" );
+                    Wa( "/* Async Req Complete Handler*/" );
                 else if( bEvent )
-                    Wa( "/* Event */" );
+                    Wa( "/* Event Handler*/" );
                 else
                     Wa( "/* Sync Req */" );
 
@@ -3767,9 +3827,9 @@ gint32 CImplServiceImpl::Output()
                 continue;
 
             if( bAsync )
-                Wa( "/* Async Req */" );
+                Wa( "/* Async Req Handler*/" );
             else
-                Wa( "/* Sync Req */" );
+                Wa( "/* Sync Req Handler*/" );
 
             CCOUT << "gint32 " << strClass << "::";
             DeclAbstMethod( elem, false, false );
@@ -6943,7 +7003,7 @@ gint32 CExportDrivers::Output()
             oCli[ JSON_ATTR_MODNAME ] = strAppCli;
             Json::Value oDrvToLoad;
             oDrvToLoad.append( "DBusBusDriver" );
-            if( bStream || bFuse )
+            if( bStream || bFuse || g_bRpcOverStm )
                 oDrvToLoad.append( "UnixSockBusDriver" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 

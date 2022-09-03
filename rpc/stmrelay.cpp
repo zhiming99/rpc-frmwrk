@@ -153,7 +153,7 @@ gint32 CStreamServerRelay::FetchData_Server(
             break;
         }
 
-        ret = pWrapper->GetError();
+        /*ret = pWrapper->GetError();
         if( ret != STATUS_PENDING )
         {
             // the wrapper task has been completed
@@ -161,7 +161,7 @@ gint32 CStreamServerRelay::FetchData_Server(
             // called when we return.
             ret = STATUS_PENDING;
             break;
-        }
+        }*/
 
         // the wrapper task has not run yet
         // though across the process boundary.
@@ -217,6 +217,13 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             ret = -EFAULT;
             break;
         }
+
+        CCfgOpener oCtx( pContext );
+        ret = oCtx.GetIntProp( 0,
+            ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
@@ -245,12 +252,6 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         IConfigDb* pDataDesc = nullptr;
         ret = oResp.GetPointer( 0, pDataDesc );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCtx( pContext );
-        ret = oCtx.GetIntProp( 0,
-            ( guint32& )iStmId );
         if( ERROR( ret ) )
             break;
 
@@ -387,6 +388,13 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             ret = -EFAULT;
             break;
         }
+
+        CCfgOpener oCtx( pContext );
+        ret = oCtx.GetIntProp(
+            1, ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oIoReq( pIoReqTask );
         IConfigDb* pResp = nullptr;
         ret = oIoReq.GetPointer(
@@ -408,11 +416,6 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         }
 
         // time to create uxstream object
-        ret = oResp.GetIntProp(
-            1, ( guint32& )iStmId );
-        if( ERROR( ret ) )
-            break;
-
         ret = CreateSocket( iLocal, iRemote );
         if( ERROR( ret ) )
             break;
@@ -817,17 +820,14 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
     InterfPtr pParentIf;
 
     do{
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
         ObjPtr pIf;
         ret = oParams.GetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
         
+        oParams.GetIntProp(
+            2, ( guint32& )iStmId ) ;
+
         pParentIf = pIf;
         CRpcServices* pParent = pIf;
 
@@ -847,6 +847,12 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             pParent == nullptr )
         {
             ret = -EFAULT;
+            break;
+        }
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
             break;
         }
 
@@ -872,9 +878,6 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
         if( ERROR( ret ) )
             break;
-
-        oParams.GetIntProp(
-            2, ( guint32& )iStmId ) ;
 
         if( bBdgSvr )
         {
@@ -953,8 +956,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
 
     while( ERROR( ret ) )
     {
-        if( pUxSvc == nullptr || 
-            pParentIf.IsEmpty() )
+        if( pParentIf.IsEmpty() )
             break;
 
         if( iStmId < 0 )
@@ -973,6 +975,9 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         }
         else
         {
+            if( pUxSvc == nullptr )
+                break;
+
             CStreamProxyRelay* pStream =
                 ObjPtr( pParent );
 
@@ -1182,9 +1187,6 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
         ret = pIrp->GetStatus();
         if( ERROR( ret ) )
         {
-            BufPtr pCloseBuf( true );
-            *pCloseBuf = tokClose;
-            PostEvent( pCloseBuf );
             break;
         }
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
@@ -1213,7 +1215,14 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
         ret = STATUS_PENDING;
 
     }while( 0 );
-
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error, the relay "
+            "channel will be closed" );
+        BufPtr pCloseBuf( true );
+        *pCloseBuf = tokClose;
+        PostEvent( pCloseBuf );
+    }
     return ret;
 }
 
@@ -1442,7 +1451,11 @@ gint32 CIfUxSockTransRelayTask::RunTask()
             // note that this flow control comes from
             // uxport rather than the uxstream.
             if( ERROR_QUEUE_FULL == ret )
+            {
+                Pause();
+                ret = STATUS_PENDING;
                 break;
+            }
 
             // remove the packet from the queue
             BufPtr pBuf;

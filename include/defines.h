@@ -38,6 +38,7 @@
 #include <set>
 #include <memory>
 #include <string.h>
+#include <deque>
 
 #include "clsids.h"
 #include "propids.h"
@@ -730,5 +731,72 @@ class  CStdRTMutex :
     CStdRTMutex( stdrtmutex& oMutex, bool bTryLock );
     CStdRTMutex( stdrtmutex& oMutex, guint32 dwTryTimeMs );
 };
+
+class CSharedLock
+{
+    stdmutex m_oLock;
+    bool m_bWrite = false;
+    gint32 m_iReadCount = 0;
+    sem_t m_semReader;
+    sem_t m_semWriter;
+    // true : reader, false: writer
+    std::deque< bool > m_queue;
+
+    public:
+    CSharedLock();
+    ~CSharedLock();
+
+    gint32 LockRead();
+    gint32 LockWrite();
+    gint32 ReleaseRead();
+    gint32 ReleaseWrite();
+    gint32 TryLockRead();
+    gint32 TryLockWrite();
+};
+
+template < bool bRead >
+struct CLocalLock
+{
+    // only works on the same thread
+    gint32 m_iStatus = STATUS_SUCCESS;
+    CSharedLock* m_pLock = nullptr;
+    bool m_bLocked = false;
+    CLocalLock( CSharedLock& oLock )
+    {
+        m_pLock = &oLock;
+        Lock();
+    }
+
+    ~CLocalLock()
+    { 
+        Unlock();
+        m_pLock = nullptr;
+    }
+
+    void Unlock()
+    {
+        if( !m_bLocked || m_pLock == nullptr )
+            return;
+        m_bLocked = false;
+        bRead ? m_pLock->ReleaseRead() :
+            m_pLock->ReleaseWrite();
+    }
+
+    void Lock()
+    {
+        if( !m_pLock )
+            return;
+        m_iStatus = ( bRead ?
+            m_pLock->LockRead() :
+            m_pLock->LockWrite() );
+        m_bLocked = true;
+    }
+
+    inline gint32 GetStatus() const
+    { return m_iStatus; }
+};
+
+typedef CLocalLock< true > CReadLock;
+typedef CLocalLock< false > CWriteLock;
 
 }

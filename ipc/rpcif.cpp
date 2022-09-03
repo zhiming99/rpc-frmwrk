@@ -133,6 +133,11 @@ static CfgPtr InitIfProxyCfg(
     {
         iStateClass = clsid( CUnixSockStmState );
     }
+    else if( strPortClass ==
+        PORT_CLASS_DBUS_STREAM_PDO )
+    {
+        iStateClass = clsid( CFastRpcSkelProxyState );
+    }
 
     oNewCfg.SetIntProp(
         propIfStateClass, iStateClass );
@@ -4662,7 +4667,7 @@ gint32 CRpcServices::LoadObjDesc(
         }
 
 
-        // get object array
+        // load object factories
         Json::Value& oFactores =
             valObjDesc[ JSON_ATTR_FACTORIES ];
 
@@ -5993,6 +5998,12 @@ static CfgPtr InitIfSvrCfg(
 
         if( strPortClass == PORT_CLASS_UXSOCK_STM_PDO )
             iStateClass = clsid( CUnixSockStmState );
+        else if( strPortClass ==
+            PORT_CLASS_DBUS_STREAM_PDO )
+        {
+            iStateClass =
+                clsid( CFastRpcSkelServerState );
+        }
 
         oNewCfg.SetIntProp(
             propIfStateClass, iStateClass );

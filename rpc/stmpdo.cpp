@@ -1118,35 +1118,11 @@ CTcpStreamPdo::~CTcpStreamPdo()
     sem_destroy( &m_semFireSync );
 }
 
-gint32 GetPreStopStep(
-    PIRP pIrp, guint32& dwStepNo )
-{
-    BufPtr pBuf;
-    pIrp->GetCurCtx()->GetExtBuf( pBuf );
-    if( pBuf.IsEmpty() || pBuf->empty() )
-        return -EINVAL;
+extern gint32 GetPreStopStep(
+    PIRP pIrp, guint32& dwStepNo );
 
-    PORT_START_STOP_EXT* psse =
-        ( PORT_START_STOP_EXT* )pBuf->ptr();
-
-    dwStepNo = *( guint32* )&psse[ 1 ];
-    return 0;
-}
-
-gint32 SetPreStopStep(
-    PIRP pIrp, guint32 dwStepNo )
-{
-    BufPtr pBuf;
-    pIrp->GetCurCtx()->GetExtBuf( pBuf );
-    if( pBuf.IsEmpty() || pBuf->empty() )
-        return -EINVAL;
-
-    PORT_START_STOP_EXT* psse =
-        ( PORT_START_STOP_EXT* )pBuf->ptr();
-
-    *( guint32* )&psse[ 1 ] = dwStepNo;
-    return 0;
-}
+extern gint32 SetPreStopStep(
+    PIRP pIrp, guint32 dwStepNo );
 
 gint32 CTcpStreamPdo::PreStop(
     IRP* pIrp )

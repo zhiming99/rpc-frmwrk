@@ -279,7 +279,10 @@ gint32 CSendQue::OnIoReady()
     gint32 ret = 0;
     do{
         if( m_queBufWrite.empty() )
+        {
+            ret = -ENOENT;
             break;
+        }
 
         STM_PACKET& oPkt =
             m_queBufWrite.front();
@@ -769,9 +772,10 @@ gint32 CIoWatchTask::RunTask()
         {
             pLoop->RemoveIoWatch(
                 m_hReadWatch );
+            m_hReadWatch = INVALID_HANDLE;
             pLoop->RemoveIoWatch(
                 m_hWriteWatch );
-            m_hErrWatch = INVALID_HANDLE;
+            m_hWriteWatch = INVALID_HANDLE;
             break;
         }
 
@@ -1021,7 +1025,14 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 ret = m_oSendQue.OnIoReady();
                 if( SUCCEEDED( ret ) &&
                     m_oSendQue.GetPendingWrite() == 0 )
+                {
                     ret = OnSendReady();
+                }
+                if( ret == -ENOENT )
+                {
+                    StopWatch();
+                    ret = 0;
+                }
 
             }while( 0 );
         }
@@ -1406,15 +1417,12 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
 
     gint32 ret = 0;
     bool bNotify = false;
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask == nullptr )
+        return -EFAULT;
 
     // let's process the func irps
     do{
-        CIoWatchTask* pTask = m_pIoWatch;
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         CStdRTMutex oTaskLock( pTask->GetLock() );
         CStdRMutex oPortLock( GetLock() );
@@ -1464,8 +1472,8 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
                 ret = pTask->WriteStream(
                     pBuf, tokProgress );
 
-                pBuf->SetOffset( pBuf->offset() -
-                    UXPKT_HEADER_SIZE );
+                // pBuf->SetOffset( pBuf->offset() -
+                //     UXPKT_HEADER_SIZE );
 
                 break;
             }
@@ -1503,7 +1511,11 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
         }
 
     }while( 0 );
-
+    if( ret == -EPIPE )
+    {
+        pTask->OnError( ret );
+        return ret;
+    }
     if( bNotify )
     {
         BufPtr pNullBuf;
@@ -1646,18 +1658,15 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
 {
     gint32 ret = 0;
     bool bNotify = false;
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask == nullptr )
+        return -EFAULT;
+
     do{
         if( pIrp == nullptr ||
             pIrp->GetStackSize() == 0 )
         {
             ret = -EINVAL;
-            break;
-        }
-
-        CIoWatchTask* pTask = m_pIoWatch;
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
             break;
         }
 
@@ -1711,6 +1720,12 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
 
     }while( 0 );
 
+    if( ret == -EPIPE )
+    {
+        pTask->OnError( ret );
+        return ret;
+    }
+
     if( bNotify )
     {
         BufPtr pNullBuf( true );
@@ -1735,13 +1750,6 @@ gint32 CUnixSockStmPdo::SendNotify(
     if( pTask == nullptr )
         return -EFAULT;
 
-    IrpPtr pEventIrp;
-    if( !m_queListeningIrps.empty() )
-    {
-        pEventIrp = m_queListeningIrps.front(); 
-        m_queListeningIrps.pop_front();
-    }
-    else
     {
         // waiting for the event irp
         BufPtr pEvtBuf( true );
@@ -1757,7 +1765,7 @@ gint32 CUnixSockStmPdo::SendNotify(
             }
         case tokError:
             {
-                *pBuf = tokError;
+                *pEvtBuf = tokError;
                 pEvtBuf->Append(
                     ( guint8* )pBuf->ptr(),
                     pBuf->size() );
@@ -1808,77 +1816,42 @@ gint32 CUnixSockStmPdo::SendNotify(
         }
     }
 
-    oPortLock.Unlock();
-
+    IrpPtr pEventIrp;
+    if( !m_queListeningIrps.empty() )
+    {
+        pEventIrp = m_queListeningIrps.front(); 
+        m_queListeningIrps.pop_front();
+    }
+    
     if( pEventIrp.IsEmpty() )
         return 0;
 
-    CStdRMutex oIrpLock(
-        pEventIrp->GetLock() );
+    BufPtr pPayload = m_queEventPackets.front();
+    byToken = ( guint8 )pPayload->ptr()[0];
+    m_queEventPackets.pop_front(); 
+
+    oPortLock.Unlock();
+
+    CStdRMutex oIrpLock( pEventIrp->GetLock() );
     ret = pEventIrp->CanContinue(
         IRP_STATE_READY );
     if( ERROR( ret ) )
         return ret;
 
-    BufPtr pRespBuf( true );
     switch( byToken )
     {
     case tokPing:
     case tokPong:
     case tokFlowCtrl:
     case tokLift:
-        {
-            *pRespBuf = byToken;
-            IrpCtxPtr pCtx =
-                pEventIrp->GetTopStack();
-
-            pCtx->SetRespData( pRespBuf );
-            pCtx->SetStatus( ret = 0 );
-            break;
-        }
     case tokError:
-        {
-            *pRespBuf = tokError;
-            pRespBuf->Append(
-                ( guint8* )pBuf->ptr(),
-                pBuf->size() );
-
-            IrpCtxPtr pCtx =
-                pEventIrp->GetTopStack();
-
-            pCtx->SetRespData( pRespBuf );
-            pCtx->SetStatus( ret = 0 );
-            break;
-        }
     case tokData:
     case tokProgress:
         {
-            guint32 dwSize = pBuf->size();
-            dwSize = htonl( dwSize );
-            if( pBuf->offset() > UXPKT_HEADER_SIZE )
-            {
-                pBuf->SetOffset( pBuf->offset() -
-                    UXPKT_HEADER_SIZE );
-                pBuf->ptr()[ 0 ] = byToken;
-                memcpy( pBuf->ptr() + 1, 
-                    &dwSize, sizeof( dwSize ) );
-                pRespBuf = pBuf;
-            }
-            else
-            {
-                pRespBuf->Resize( sizeof( guint8 ) +
-                    sizeof( guint32 ) );
-                pRespBuf->ptr()[ 0 ] = byToken;
-                memcpy( pRespBuf->ptr() + 1, 
-                    &dwSize, sizeof( dwSize ) );
-                pRespBuf->Append(
-                    ( guint8* )pBuf->ptr(),
-                    pBuf->size() );
-            }
-
             IrpCtxPtr pCtx =
                 pEventIrp->GetTopStack();
-            pCtx->SetRespData( pRespBuf );
+
+            pCtx->SetRespData( pPayload );
             pCtx->SetStatus( ret = 0 );
             break;
         }
@@ -1910,14 +1883,9 @@ gint32 CUnixSockStmPdo::SendNotify(
     }
 
     oIrpLock.Unlock();
-    if( !pEventIrp.IsEmpty() )
-    {
-        ret = DEFER_CALL( GetIoMgr(),
-            GetIoMgr(),
-            &CIoManager::CompleteIrp,
-            pEventIrp );
-    }
 
+    auto pMgr = GetIoMgr();
+    pMgr->CompleteIrp( pEventIrp );
     return ret;
 }
 

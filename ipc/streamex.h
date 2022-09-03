@@ -112,6 +112,7 @@ class CIfStmReadWriteTask :
     bool    m_bIn;
     bool    m_bDiscard = false;
     HANDLE  m_hChannel = INVALID_HANDLE;
+    bool    m_bOutQueLimit = true;
 
     gint32 ReadStreamInternal(
         IEventSink* pCallback,
@@ -135,6 +136,12 @@ class CIfStmReadWriteTask :
 
     gint32 NotifyWriteResumed();
     gint32 PopWriteRequest();
+
+    inline void EnableOutQueLimit( bool bEnable )
+    { m_bOutQueLimit = bEnable; }
+
+    inline bool HasOutQueLimit()
+    { return m_bOutQueLimit; }
 
     public:
     typedef CIfUxTaskBase super;
@@ -793,6 +800,9 @@ struct CStreamSyncBase :
         return 0;
     }
     
+    virtual bool HasOutQueLimit() const 
+    { return true; }
+
     gint32 CloseStream( HANDLE hChannel )
     {
         if( hChannel == INVALID_HANDLE )
@@ -2086,10 +2096,14 @@ class CStreamProxyWrapper :
         : super( pCfg )
     {;}
 
+    virtual CRpcServices* GetStreamIf()
+    { return this; }
+
     inline gint32 ReadStream(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamProxySync* pStm = ObjPtr( this );
+        CStreamProxySync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->ReadStream(
@@ -2099,7 +2113,8 @@ class CStreamProxyWrapper :
     inline gint32 ReadStreamNoWait(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamProxySync* pStm = ObjPtr( this );
+        CStreamProxySync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->ReadStreamNoWait(
@@ -2110,7 +2125,8 @@ class CStreamProxyWrapper :
         HANDLE hChannel, BufPtr& pBuf,
         IEventSink* pCb )
     {
-        CStreamProxySync* pStm = ObjPtr( this );
+        CStreamProxySync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->ReadStreamAsync(
@@ -2120,7 +2136,8 @@ class CStreamProxyWrapper :
     inline gint32 WriteStream(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamProxySync* pStm = ObjPtr( this );
+        CStreamProxySync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->WriteStream(
@@ -2130,7 +2147,8 @@ class CStreamProxyWrapper :
     inline gint32 WriteStreamNoWait(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamProxySync* pStm = ObjPtr( this );
+        CStreamProxySync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->WriteStreamNoWait(
@@ -2141,7 +2159,8 @@ class CStreamProxyWrapper :
         HANDLE hChannel, BufPtr& pBuf,
         IEventSink* pCb )
     {
-        CStreamProxySync* pStm = ObjPtr( this );
+        CStreamProxySync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->WriteStreamAsync(
@@ -2158,10 +2177,14 @@ class CStreamServerWrapper :
         : super( pCfg )
     {;}
 
+    virtual CRpcServices* GetStreamIf()
+    { return this; }
+
     inline gint32 ReadStream(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamServerSync* pStm = ObjPtr( this );
+        CStreamServerSync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->ReadStream(
@@ -2171,7 +2194,8 @@ class CStreamServerWrapper :
     inline gint32 ReadStreamNoWait(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamServerSync* pStm = ObjPtr( this );
+        CStreamServerSync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->ReadStreamNoWait(
@@ -2182,7 +2206,8 @@ class CStreamServerWrapper :
         HANDLE hChannel, BufPtr& pBuf,
         IEventSink* pCb )
     {
-        CStreamServerSync* pStm = ObjPtr( this );
+        CStreamServerSync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->ReadStreamAsync(
@@ -2192,7 +2217,8 @@ class CStreamServerWrapper :
     inline gint32 WriteStream(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamServerSync* pStm = ObjPtr( this );
+        CStreamServerSync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->WriteStream(
@@ -2202,7 +2228,8 @@ class CStreamServerWrapper :
     inline gint32 WriteStreamNoWait(
         HANDLE hChannel, BufPtr& pBuf )
     {
-        CStreamServerSync* pStm = ObjPtr( this );
+        CStreamServerSync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->WriteStreamNoWait(
@@ -2213,7 +2240,8 @@ class CStreamServerWrapper :
         HANDLE hChannel, BufPtr& pBuf,
         IEventSink* pCb )
     {
-        CStreamServerSync* pStm = ObjPtr( this );
+        CStreamServerSync* pStm =
+                ObjPtr( GetStreamIf() );
         if( pStm == nullptr )
             return -EFAULT;
         return pStm->WriteStreamAsync(

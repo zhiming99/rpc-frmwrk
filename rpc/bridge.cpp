@@ -5475,6 +5475,12 @@ gint32 CRpcTcpBridge::FetchData_Filter(
             break;
 
         CCfgOpener oTransCtx( pTransCtx );
+        stdstr strHash;
+        ret = oTransCtx.GetStrProp(
+            propSessHash, strHash );
+        if( SUCCEEDED( ret ) )
+            break;
+
         ret = oTransCtx.SetStrProp(
             propSessHash, GetSessHash() );
         if( ERROR( ret ) )

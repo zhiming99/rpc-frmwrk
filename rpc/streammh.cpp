@@ -739,7 +739,11 @@ gint32 CIfUxSockTransRelayTaskMH::RunTask()
             // note that this flow control comes from
             // uxport rather than the uxstream.
             if( ERROR_QUEUE_FULL == ret )
+            {
+                Pause();
+                ret = STATUS_PENDING;
                 break;
+            }
 
             CRpcTcpBridgeProxyStream* pIf =
                 GetOwnerIf();
@@ -1532,6 +1536,7 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
     gint32 ret = 0;
     gint32 iFd = -1;
     gint32 iStmId = -1;
+    InterfPtr pProxy;
 
     do{
         if( pContext == nullptr )
@@ -1539,6 +1544,18 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
             ret = -EFAULT;
             break;
         }
+
+        CCfgOpener oContext( pContext );
+        ret = oContext.GetIntProp(
+            propStreamId, ( guint32& )iStmId );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oContext.GetIntProp( 3,
+            ( guint32& )iFd );
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
@@ -1570,24 +1587,12 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpener oContext( pContext );
-        ret = oContext.GetIntProp( 3,
-            ( guint32& )iFd );
-        if( ERROR( ret ) )
-            break;
-
         guint32 dwPortId = 0;
         ret = oContext.GetIntProp( 1,
             dwPortId );
         if( ERROR( ret ) )
             break;
 
-        ret = oContext.GetIntProp(
-            propStreamId, ( guint32& )iStmId );
-        if( ERROR( ret ) )
-            break;
-
-        InterfPtr pProxy;
         CRpcRouterBridge* pRouter = 
         static_cast< CRpcRouterBridge* >
             ( GetParent() );
@@ -1666,20 +1671,17 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         OnServiceComplete(
             oResp.GetCfg(), pCallback );
 
-        if( iFd > 0 )
+        if( iFd > 0 && !pProxy.IsEmpty() )
         {
             // close the fd to notify the failure
-            close( iFd );
-            iFd = -1;
+            CRpcTcpBridgeProxy* pbp = pProxy;
+            pbp->CloseLocalStream( nullptr, iFd );
         }
         if( iStmId > 0 )
         {
             CRpcTcpBridge* pBridge = ObjPtr( this );
-            if( likely( pBridge != nullptr ) )
-            {
-                pBridge->CloseLocalStream(
-                    nullptr, iStmId );
-            }
+            pBridge->CloseLocalStream(
+                nullptr, iStmId );
         }
     }
 

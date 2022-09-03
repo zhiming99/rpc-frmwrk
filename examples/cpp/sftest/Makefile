@@ -20,8 +20,16 @@ COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags d
 
 C_INCLUDE:=-I./ $(COMMON_INCLUDE)
 
+BITWIDTH:=64
+
 DEBUG_FLAGS:=-D_DEBUG=1 -DDEBUG -ggdb
-RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb
+RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb -fno-strict-aliasing
+
+ifeq ($(BITWIDTH),32)
+FUSE_DEFINES:=
+else
+FUSE_DEFINES:=
+endif
 
 DBG_DIR:=debug
 RLS_DIR:=release
@@ -48,14 +56,16 @@ else ifeq ($(MAKECMDGOALS),debug_clean)
 else ifeq ($(MAKECMDGOALS),release_clean)
 endif
 
-DIST_LIB_DIR = /usr/local/lib
+C_DEFINES+=$(FUSE_DEFINES)
 
+DIST_LIB_DIR = /usr/local/lib
+FUSE_LIB:=
 COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs dbus-1 jsoncpp rpcf)
-LINKER_OPTION:=$(COMMON_LINK) -ldl -lstdc++ -lpthread -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
+LINKER_OPTION:=$(COMMON_LINK) $(FUSE_LIB) -ldl -lstdc++ -lpthread -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
 
 TARGET_SVR:=sftestsvr
 TARGET_CLI:=sftestcli
-TARGET_SO:=sftestlib.so
+TARGET_SO:=libsftest.so
 
 MKLIB:=
 
@@ -107,7 +117,7 @@ $(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2)
 
 $(OUTPUT_DIR)/$(TARGET_SO) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION) -shared
+	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION) -shared
 	@python3 ./synccfg.py
 	@cp *.json $(OUTPUT_DIR)
 

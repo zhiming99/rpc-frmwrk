@@ -1809,7 +1809,7 @@ gint32 CMethodWriterFuse::GenSerialArgs(
     do{
         NEW_LINE;
         Wa( "CJsonSerialBase oSerial_(" );
-        CCOUT << "    ObjPtr( this ), "<<
+        CCOUT << "    ObjPtr( GetStreamIf() ), "<<
             ( bLocked ? "true );" : "false );" );
         NEW_LINE;
 
@@ -1855,7 +1855,7 @@ gint32 CMethodWriterFuse::GenDeserialArgs(
         NEW_LINE;
         Wa( "CJsonSerialBase oDeserial_(" );
 
-        CCOUT << "    ObjPtr( this ), "<<
+        CCOUT << "    ObjPtr( GetStreamIf() ), "<<
             ( bLocked ? "true );" : "false );" );
         NEW_LINE;
         CEmitSerialCodeFuse oedsc(

@@ -34,6 +34,17 @@
             [
                 "UnixSockBusPort"
             ]
+        },
+        {
+            "DriverName"    : "DBusStreamBusDrv",
+            "DriverType"    : "BusDriver",
+            "BusClass"      : "DBusStreamBus",
+            "InternalClass" : "CDBusStreamBusDrv",
+            "Description"   : "This is a bus driver, and the port created is DBusStreamBusPort",
+            "PortClasses"   :
+            [
+                "DBusStreamBusPort"
+            ]
         }
     ],
 
@@ -85,6 +96,19 @@
             "PortClass"     : "UnixSockBusPort",
             "PortDriver"    : "UnixSockBusDriver",
             "InternalClass" : "CUnixSockBusPort"
+        },
+        {
+            "PortType"      : "Pdo",
+            "PortClass"     : "DBusStreamPdo",
+            "InternalClass" : "CDBusStreamPdo",
+            "PortDriver"    : "",
+            "BusPortClass"  : "DBusStreamBusPort"
+        },
+        {
+            "PortType": "Fdo",
+            "PortClass": "DBusStreamBusPort",
+            "PortDriver": "DBusStreamBusDrv",
+            "InternalClass": "CDBusStreamBusPort"
         }
     ],
 
@@ -181,6 +205,10 @@
         },
         {
             "PortClass" : "UnixSockStmPdo",
+            "FdoDriver" : ""
+        },
+        {
+            "PortClass" : "DBusStreamPdo",
             "FdoDriver" : ""
         }
     ],

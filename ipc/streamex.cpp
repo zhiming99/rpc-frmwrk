@@ -224,6 +224,21 @@ CIfStmReadWriteTask::CIfStmReadWriteTask(
         m_bIn = ( bool& )oParams[ 0 ];
         m_hChannel = ( intptr_t& )oParams[ 1 ];
 
+        if( pIf->IsServer() )
+        {
+            CStreamServerSync* pStm =
+                ObjPtr( pIf );
+            EnableOutQueLimit(
+                pStm->HasOutQueLimit() );
+        }
+        else
+        {
+            CStreamProxySync* pStm =
+                ObjPtr( pIf );
+            EnableOutQueLimit(
+                pStm->HasOutQueLimit() );
+        }
+
         oParams.ClearParams();
 
     }while( 0 );
@@ -269,6 +284,10 @@ gint32 CIfStmReadWriteTask::NotifyWriteResumed()
         size_t size = m_queRequests.size();
         if( size != STM_MAX_PACKETS_REPORT - 1 )
             break;
+
+        if( !HasOutQueLimit() )
+            break;
+
         CRpcServices* pSvc = nullptr;
         GET_STMPTR2( pSvc, ret );
         if( ERROR( ret ) )
@@ -1359,8 +1378,9 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
             break;
         }
 
-        if( m_queRequests.size() >=
-            STM_MAX_PACKETS_REPORT )
+        guint32 dwSize = m_queRequests.size();
+        if( dwSize >= STM_MAX_PACKETS_REPORT &&
+            HasOutQueLimit() )
         {
             ret = ERROR_QUEUE_FULL;
             break;

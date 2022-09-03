@@ -206,7 +206,7 @@ typedef CAutoPtr< Clsid_Invalid, IPort > PortPtr;
 class IPort : public IEventSink
 {
 	public:
-    typedef super   IEventSink;
+    typedef IEventSink super;
 
     virtual gint32 PreStart( IRP* irp ) = 0;
     virtual gint32 Start( IRP* irp ) = 0;

@@ -1,0 +1,81 @@
+{
+    "Version" : "1.0",
+    "ServerName": "XXXX",
+    "Objects" :
+    [
+        {
+            "ObjectName": "RpcStreamChannelSvr",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusProxyPdo",
+            "ProxyPortClass-1": "DBusLocalPdo",
+            "IpAddress" : "192.168.3.13",
+            "Compression" : "true",
+            "EnableSSL" : "true",
+            "EnableWS" : "false",
+            "RouterPath" : "/",
+            "Interfaces" :
+            [
+                {
+                    "InterfaceName" : "RpcStreamChannelSvr",
+                    "BindToClsid" : "true",
+                    "DummyInterface" : true
+                },
+                {
+                    "InterfaceName": "IStream"
+                }
+            ]
+        },
+        {
+            "ObjectName": "XXXX",
+            "BusName" : "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId" : "0",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "QueuedRequests" : "false",
+            "ProxyPortClass": "DBusProxyPdo",
+            "ProxyPortClass-1": "DBusLocalPdo",
+            "IpAddress" : "192.168.3.13",
+            "Compression" : "true",
+            "EnableSSL" : "true",
+            "EnableWS" : "false",
+            "RouterPath" : "/",
+            "Interfaces" :
+            [
+                {
+                    "InterfaceName" : "XXXX",
+                    "BindToClsid" : "true"
+                }
+            ]
+        },
+        {
+            "ObjectName": "XXXX_SvrSkel",
+            "BusName" : "DBusStreamBusPort_0",
+            "PortClass": "DBusStreamPdo",
+            "RequestTimeoutSec" : "120",
+            "KeepAliveTimeoutSec" : "60",
+            "Interfaces" :
+            [
+                {
+                    "InterfaceName" : "XXXX_SvrSkel",
+                    "BindToClsid" : "true",
+                    "DummyInterface" : true
+                },
+                {
+                    "InterfaceName" : "IUnknown"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                }
+            ]
+        }
+    ],
+    "ClassFactories" :
+    [
+    ]
+}

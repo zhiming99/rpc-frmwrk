@@ -409,13 +409,19 @@ struct CArgListUtils
         std::vector< ObjPtr >& vecHstms ) const;
 
     gint32 GetArgsForCall( ObjPtr& pArgList,
-        std::vector< std::string >& vecArgs ) const;
+        std::vector< std::string >& vecArgs,
+        bool bExpand = true ) const;
 
     gint32 GetArgTypes( ObjPtr& pArgList,
         std::vector< std::string >& vecTypes ) const;
 
     gint32 GetArgTypes( ObjPtr& pArgList,
         std::set< ObjPtr >& vecTypes ) const;
+
+    gint32 FindParentByClsid(
+        ObjPtr& pArgList,
+        EnumClsid iClsid,
+        ObjPtr& pNode ) const;
 };
 
 struct CMethodWriter 
@@ -427,11 +433,13 @@ struct CMethodWriter
     CMethodWriter( CWriterBase* pWriter );
 
     gint32 GenActParams(
-        ObjPtr& pArgList );
+        ObjPtr& pArgList,
+        bool bExpand = true );
 
     gint32 GenActParams(
         ObjPtr& pArgList,
-        ObjPtr& pArgList2 );
+        ObjPtr& pArgList2,
+        bool bExpand = true );
 
     virtual gint32 GenSerialArgs(
         ObjPtr& pArgList,
@@ -464,6 +472,7 @@ struct CMethodWriter
 class CDeclInterfProxy 
     : public CMethodWriter
 {
+    protected:
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
@@ -481,6 +490,7 @@ class CDeclInterfProxy
 class CDeclInterfSvr
     : public CMethodWriter
 {
+    protected:
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
@@ -523,6 +533,7 @@ class CSetStructRefs :
 
 class CDeclService
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CServiceDecl* m_pNode = nullptr;
 
@@ -538,9 +549,10 @@ using ABSTE = std::pair< std::string, ObjPtr >;
 class CDeclServiceImpl :
     public CMethodWriter
 {
-    public:
+    protected:
     CServiceDecl* m_pNode = nullptr;
     bool m_bServer = true;
+    public:
     typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
         ObjPtr& pNode, bool bServer );
@@ -643,6 +655,7 @@ class CEmitSerialCode
 class CImplIfMethodProxy
     : public CMethodWriter
 {
+    protected:
     CMethodDecl* m_pNode = nullptr;
     CInterfaceDecl* m_pIf = nullptr;
 
@@ -662,6 +675,7 @@ class CImplIfMethodProxy
 class CImplIfMethodSvr
     : public CMethodWriter
 {
+    protected:
     CMethodDecl* m_pNode = nullptr;
     CInterfaceDecl* m_pIf = nullptr;
 
@@ -682,6 +696,7 @@ class CImplIfMethodSvr
 
 class CImplClassFactory
 {
+    protected:
     bool m_bServer = true;
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
@@ -697,6 +712,7 @@ class CImplClassFactory
 class CImplMainFunc :
     public CArgListUtils
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
     bool m_bProxy = true;

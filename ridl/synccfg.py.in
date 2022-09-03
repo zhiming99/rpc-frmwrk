@@ -60,6 +60,13 @@ def SyncCfg() :
         bChanged = False
         if 'Objects' in destVals :
             for elem in destVals[ 'Objects' ]:
+                if ( 'ProxyPortClass' in elem and
+                    elem[ 'ProxyPortClass' ] != 'DBusProxyPdo' ) :
+                        continue
+
+                if  not 'ProxyPortClass' in elem :
+                    continue
+
                 elem[ 'EnableSSL' ] = srcCfgs[ 'EnableSSL' ]
                 elem[ 'PortNumber' ] = srcCfgs[ 'PortNumber' ]
 

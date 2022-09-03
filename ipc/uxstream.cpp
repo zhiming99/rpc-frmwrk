@@ -836,12 +836,8 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
 
         ret = pIrp->GetStatus();
         if( ERROR( ret ) )
-        {
-            BufPtr pCloseBuf( true );
-            *pCloseBuf = tokClose;
-            PostEvent( pCloseBuf );
             break;
-        }
+
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         BufPtr pPayload = pCtx->m_pRespData;
         if( pPayload.IsEmpty() ||
@@ -871,6 +867,16 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
         pIf->RunManagedTask( pTask );
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error, the channel will be closed" );
+        BufPtr pErrBuf( true );
+        *pErrBuf = tokError;
+        pErrBuf->Append(
+            ( guint8* )&ret, sizeof( ret ) );
+        PostEvent( pErrBuf );
+    }
 
     return ret;
 }
