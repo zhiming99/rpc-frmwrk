@@ -752,16 +752,22 @@ class CUnixSockStream:
                     ret = pStream->GetUxStream( hChannel, pUxIf );
                     if( ERROR( ret ) )
                     {
-                        gint32 (*func)( InterfPtr, CUnixSockStream* ) =
-                        ([]( InterfPtr pParent,
-                            CUnixSockStream* pThis )->gint32
+                        gint32 (*func)( InterfPtr ) =
+                        ([]( InterfPtr pUxIf )->gint32
                         {
-                            CfgPtr pDataDesc;
-                            auto pStream = ( CStreamServer* )pParent;
+                            IConfigDb* pDataDesc;
+                            CUnixSockStream* pThis = pUxIf;
+                            auto pStream =
+                                ( CStreamServer* )pThis->m_pParent;
+
                             HANDLE hChannel = ( HANDLE )
                                 ( ( CObjBase* )pThis );
-                            gint32 ret = pStream->GetDataDesc(
-                                hChannel, pDataDesc );
+
+                            CCfgOpenerObj oCfg(
+                                ( const CObjBase* )pThis );
+                            gint32 ret = oCfg.GetPointer(
+                                propDataDesc, pDataDesc );
+
                             if( ERROR( ret ) )
                             {
                                 BufPtr pNullTask;
@@ -779,11 +785,11 @@ class CUnixSockStream:
                             }
                             return 0;
                         });
-                        InterfPtr pIf = m_pParent;
                         TaskletPtr pTask;
+                        InterfPtr pThis = this;
                         ret = NEW_FUNCCALL_TASK(
                             pTask, this->GetIoMgr(), func,
-                            pIf, this );
+                            pThis );
                              
                         if( SUCCEEDED( ret ) )
                         {
