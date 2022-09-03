@@ -1057,7 +1057,7 @@ gint32 CDeclInterfSvr2::OutputAsyncROS(
         INDENT_DOWNL;
         BLOCK_OPEN;
         Wa( "gint32 ret = 0;" );
-        Wa( "do" );
+        CCOUT << "do";
         BLOCK_OPEN;
         Wa( "CCfgOpener oReqCtx( pReqCtx_ );" );
         Wa( "IEventSink* pEvt = nullptr;" );
@@ -3057,6 +3057,8 @@ gint32 CImplMainFunc2::OutputROS()
             CCOUT << "stdstr strDesc= " << "\"./"
                 << g_strAppName << "desc.json\";";
             NEW_LINE;
+            CCOUT << strClass << "* pSvc = nullptr;";
+            NEW_LINE;
             Wa( "pMgr->SetCmdLineOpt(" );
             Wa( "    propObjDescPath, strDesc );" );
             Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
@@ -3064,6 +3066,8 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( "    \"DBusStreamBusDrv\" );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            CCOUT << "do";
+            BLOCK_OPEN;
             Wa( "InterfPtr pIf;" );
             Wa( "CParamList oParams;" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
@@ -3097,8 +3101,7 @@ gint32 CImplMainFunc2::OutputROS()
             NEW_LINE;
             CCOUT << "    break;";
             NEW_LINE;
-            CCOUT << strClass << "* pSvc = pIf;";
-            NEW_LINE;
+            Wa( "pSvc = pIf;" );
             CCOUT << "ret = pSvc->Start();";
             NEW_LINE;
 
@@ -3131,10 +3134,12 @@ gint32 CImplMainFunc2::OutputROS()
                 NEW_LINES( 2 );
                 Wa( "maincli( pSvc, argc, argv );" );
             }
-
+            BLOCK_CLOSE;
+            Wa( "while( 0 );" );
             NEW_LINE;
             Wa( "// Stopping the object" );
-            CCOUT << "ret = pSvc->Stop();";
+            Wa( "if( pSvc != nullptr )" );
+            CCOUT << "    ret = pSvc->Stop();";
             NEW_LINE;
             Wa( "oDrvMgr.UnloadDriver(" );
             CCOUT << "    \"DBusStreamBusDrv\" );";
