@@ -27,7 +27,7 @@ endif
 
 SUBDIRS += bldpkg
 
-EXTRA_DIST= README.md cfgsel Concept.md LICENSE
+EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE
 
 dist_pkgconfig_DATA=rpcf.pc
 
