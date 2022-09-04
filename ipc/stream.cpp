@@ -626,20 +626,10 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
-        // schedule a long task to start the channel
-        if( !bServer )
-        {
-            ret = pIf->AddSeqTask( pStartTask );
-            if( ERROR( ret ) )
-                break;
-        }
-        else
-        {
-            // for server side, it is already on a
-            // seq task context.
-            pStartTask->MarkPending();
-            ret = ( *pStartTask )( 0 );
-        }
+        // make sure the task runs sequentially
+        ret = pIf->AddSeqTask( pStartTask );
+        if( ERROR( ret ) )
+            break;
 
         ClearClientNotify();
 

@@ -58,7 +58,8 @@ gint32 CRecvFilter::OnIoReady()
             ret = read( m_iFd, &byToken, sizeof( byToken ) );
             if( ERROR( ret ) )
             {
-                if( errno == EAGAIN || errno == EWOULDBLOCK )
+                if( errno == EAGAIN ||
+                    errno == EWOULDBLOCK )
                 {
                     ret = -EAGAIN;
                     break;
@@ -396,19 +397,15 @@ gint32 CSendQue::OnIoReady()
             break;
         }
 
-        BufPtr pBuf;
+        BufPtr pBuf = oPkt.pData;
+        if( pBuf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
         while( m_dwBytesToWrite > 0 )
         {
-            if( pBuf.IsEmpty() )
-                pBuf = oPkt.pData;
-
-            if( pBuf.IsEmpty() )
-            {
-                ret = -EFAULT;
-                break;
-            }
-
             if( m_dwBytesToWrite >
                 dwPktSize - m_dwOffsetWrite )
             {
