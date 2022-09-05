@@ -125,6 +125,7 @@ CDBusStreamPdo::CDBusStreamPdo(
 
         Sem_Init( &m_semFireSync, 0, 0 );
         SetClassId( clsid( CDBusStreamPdo ) );
+        m_dwDisconned = 0;
 
     }while( 0 );
 
@@ -924,8 +925,18 @@ gint32 CDBusStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
+            if( m_dwDisconned++ > 0 )
+            {
+                DebugPrint( m_dwDisconned,
+                    "Repeated closing of "
+                    "StreamPdo 0x%llx",
+                    ( HANDLE )this );
+                break;
+            }
             if( IsServer() )
+            {
                 Sem_Wait( &m_semFireSync );
+            }
             ret = FireRmtSvrEvent( this,
                 eventRmtSvrOffline,
                 ( HANDLE )dwParam1 );

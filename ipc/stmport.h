@@ -53,6 +53,7 @@ class CDBusStreamPdo :
 {
     bool m_bServer = false;
     HANDLE m_hStream = INVALID_HANDLE;
+    std::atomic< guint32 > m_dwDisconned;
 
     stdstr m_strHash;
     stdstr m_strPath;

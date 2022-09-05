@@ -754,9 +754,20 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
         if( bServer )
         {
+            CfgPtr pDesc( true );
+            pDesc->Clone( *( IConfigDb* )pObj );
+            {
+                CParamList oConnParam;
+                oConnParam.Push( pObj );
+                oConnParam.Push( ( HANDLE )pSvc );
+                IConfigDb* pCfg = oConnParam.GetCfg();
+                HANDLE hCfg = ( HANDLE )pCfg;
+                pStream->OnConnected( hCfg );
+            }
+
             // set the response for FETCH_DATA request
             CCfgOpener oDataDesc(
-                ( IConfigDb* )pObj );
+                ( IConfigDb* )pDesc );
 
             guint64 qwId = pIf->GetObjId();
             guint64 qwHash = 0;
@@ -766,11 +777,12 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
             oDataDesc[ propPeerObjId ] = qwHash;
 
-            oResp.Push( pObj );
+            oResp.Push( ObjPtr( pDesc ) );
             oResp.Push( dwFd );
 
             oResp.Push( 0 );
             oResp.Push( 0 );
+
         }
         else
         {
@@ -779,15 +791,8 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             oResp.Push( ( HANDLE )pSvc );
             IConfigDb* pCfg = oResp.GetCfg();
 
-            TaskletPtr pConnTask;
-            ret = DEFER_IFCALLEX_NOSCHED(
-                pConnTask,
-                ObjPtr( pParent ),
-                &IStream::OnConnected,
-                ( HANDLE )pCfg ); 
-
-            if( SUCCEEDED( ret ) )
-                ( *pConnTask )( eventZero );
+            CStreamProxy* pProxy = ObjPtr( pParent );
+            pProxy->OnConnected( ( HANDLE )pCfg );
         }
 
     }while( 0 );
@@ -802,9 +807,12 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     if( SUCCEEDED( iRet ) )
     {
         CCfgOpenerObj oCfg( ( IEventSink* )pEvt );
-        oCfg.SetPointer( propRespPtr,
+        iRet = oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
     }
+    if( !IsPending() )
+        DebugPrint( ret, "Warning, "
+            "the task is not pending" );
 
     return ret;
 }
