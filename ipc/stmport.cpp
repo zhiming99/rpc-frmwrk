@@ -763,13 +763,14 @@ gint32 CDBusStreamPdo::PreStop(
     guint32 dwStepNo = 0;
     do{
         ret = GetPreStopStep( pIrp, dwStepNo );
+        if( ERROR( ret ) )
+            break;
         while( dwStepNo == 0 )
         {
             HANDLE hstm = GetStream();
             auto *pBusPort = static_cast
             < CDBusStreamBusPort* >( m_pBusPort );
             pBusPort->RemoveBinding( hstm );
-            SetPreStopStep( pIrp, 1 );
 
             CCfgOpener oReqCtx;
             oReqCtx[ propIrpPtr ] = ObjPtr( pIrp );
@@ -822,7 +823,10 @@ gint32 CDBusStreamPdo::PreStop(
             break;
         }
 
-        ret = GetPreStopStep( pIrp, dwStepNo );
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+            break;
+
+        GetPreStopStep( pIrp, dwStepNo );
         if( dwStepNo == 1 )
         {
             SetPreStopStep( pIrp, 2 );
