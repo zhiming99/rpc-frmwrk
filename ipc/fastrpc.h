@@ -140,6 +140,12 @@ class CRpcStmChanBase :
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
         }
+        else
+        {
+            DebugPrint( 0, "Warning, the "
+                "pPdoPort cannot be found"
+                "@0x%llx for ", hstm );
+        }
         return 0;
     }
 

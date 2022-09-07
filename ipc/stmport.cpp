@@ -1442,7 +1442,7 @@ gint32 CDBusStreamBusPort::OnEvent(
     {
     case eventNewConn:
         {
-            // passive disconnection detected
+            // new connection comes
             PortPtr pPort;
             ret = OnNewConnection(
                 ( HANDLE )dwParam1, pPort );

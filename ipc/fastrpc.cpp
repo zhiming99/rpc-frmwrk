@@ -202,19 +202,21 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
             }
             break;
         }
-
-        bool bClosePort = false;
-        ret = oReqCtx.GetBoolProp(
-            2, bClosePort );
-        if( ERROR( ret ) )
-            break;
-
-        RemoveStmSkel( hstm );
-        if( bClosePort )
+        else
         {
-            auto pMgr = this->GetIoMgr();
-            pMgr->ClosePort(
-                hPort, nullptr, nullptr );
+            bool bClosePort = false;
+            ret = oReqCtx.GetBoolProp(
+                2, bClosePort );
+            if( ERROR( ret ) )
+                break;
+
+            RemoveStmSkel( hstm );
+            if( bClosePort )
+            {
+                auto pMgr = this->GetIoMgr();
+                pMgr->ClosePort(
+                    hPort, nullptr, nullptr );
+            }
         }
 
     }while( 0 );
@@ -230,6 +232,9 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
 gint32 CFastRpcServerBase::AddStmSkel(
     HANDLE hstm, InterfPtr& pIf )
 {
+    if( hstm == INVALID_HANDLE )
+        return -EINVAL;
+
     CStdRMutex oLock( GetLock() );
     m_mapSkelObjs[ hstm ] = pIf;
     return 0;
@@ -251,6 +256,7 @@ gint32 CFastRpcServerBase::GetStmSkel(
         return -ENOENT;
     if( hstm == INVALID_HANDLE )
     {
+        // for broadcasting events
         auto itr = m_mapSkelObjs.begin();
         pIf = itr->second;
         return STATUS_SUCCESS;
@@ -300,7 +306,7 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
                 break;
 
             guint32 dwPortId = var;
-            
+
             ret = CreateStmSkel(
                 hstm, dwPortId, pIf );
             if( SUCCEEDED( ret ) )
@@ -507,6 +513,8 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
             break;
         CRpcServices* pSvc = m_pSkelObj;
         pSvc->SetStateOnEvent( cmdShutdown );
+        // stop at this point could result in segment
+        // fault. ClosePort is good.
         pSvc->ClosePort( nullptr );
         
     }while( 0 );

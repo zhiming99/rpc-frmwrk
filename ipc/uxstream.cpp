@@ -355,32 +355,7 @@ gint32 CIfUxPingTicker::OnCancel(
 
 gint32 CIfUxPingTicker::RunTask()
 {
-    gint32 ret = 0;
-    do{
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetConfig() );
-
-        if( !oCfg.exist( propIfPtr ) )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        guint32 dwInterval = 0;
-        ret = oCfg.GetIntProp(
-            propTimeoutSec, dwInterval );
-
-        if( ERROR( ret ) )
-            break;
-
-        oCfg.SetIntProp(
-            propIntervalSec, dwInterval );
-
-        ret = STATUS_MORE_PROCESS_NEEDED;
-
-    }while( 0 );
-
-    return ret;
+    return STATUS_PENDING;
 }
 
 gint32 CIfUxPingTicker::OnRetry()

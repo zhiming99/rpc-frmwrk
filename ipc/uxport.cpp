@@ -1025,7 +1025,7 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 {
                     ret = OnSendReady();
                 }
-                if( ret == -ENOENT )
+                else if( ret == -ENOENT )
                 {
                     StopWatch();
                     ret = 0;
@@ -1705,7 +1705,6 @@ gint32 CUnixSockStmPdo::SubmitWriteIrp(
             ret = pTask->WriteStream( pBuf );
             if( ret == STATUS_PENDING )
             {
-                pTask->StartWatch();
                 m_queWritingIrps.push_back( pIrp );
                 if( m_queWritingIrps.size() ==
                     STM_MAX_QUEUE_SIZE )
@@ -2045,7 +2044,6 @@ gint32 CUnixSockStmPdo::OnSendReady()
                         pCtx->m_pReqData );
                     if( ret == STATUS_PENDING )
                     {
-                        pTask->StartWatch();
                         bPending = true;
                         break;
                     }

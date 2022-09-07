@@ -1440,9 +1440,6 @@ class CUnixSockStmServerRelay :
 
     virtual gint32 OnPingPongRemote( bool bPing )
     {
-        if( !bPing )
-            ResetPingTicker();
-
         BufPtr pBuf( true );
         return SendBdgeStmEvent(
             bPing ? tokPing : tokPong,
@@ -1469,9 +1466,6 @@ class CUnixSockStmProxyRelay :
 
     virtual gint32 OnPingPong( bool bPing )
     {
-        if( !bPing )
-            ResetPingTicker();
-
         BufPtr pBuf( true );
         return SendUxStreamEvent(
             bPing ? tokPing : tokPong,
