@@ -1,4 +1,7 @@
 ---
+[`Tue Sep 06  202210:33:13 PM Beijing`]   
+1. There is still a difficult bug in the stream module to spot, which caused the initial ping token unreplied from the server per million requests. And therefore, the rpcfs support has to postpone for a while.
+
 [`Sat Sep 03 2022 04:52:48 PM Beijing`]   
 1. Merged the `rpc-over-stream` branch to the master branch. The evaluation shows not significant performance gain. But it contains many bug fixes in stream support, and it's pararllel request process architecture should have some superior advantage in some situations. so it is merged.
 
