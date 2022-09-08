@@ -857,15 +857,12 @@ gint32 CIfStopUxSockStmTask::RunTask()
 gint32 CIfStopUxSockStmTask::OnTaskComplete(
     gint32 iRet )
 {
-    gint32 ret = 0;
-
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
-
     oParams.ClearParams();
     oParams.RemoveProperty( propIfPtr );
 
-    return ret;
+    return iRet;
 }
 
 gint32 CStreamProxy::OpenChannel(

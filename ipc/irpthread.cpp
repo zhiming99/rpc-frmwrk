@@ -335,30 +335,15 @@ void CTaskThread::ThreadProc(
     this->SetThreadName();
     while( !m_bExit )
     {
-        do{
-            ret = ProcessTask( ( guint32 )dwContext );
-
-            // to exhaust the queue before
-            // sleep
-            if( SUCCEEDED( ret ) )
-                continue;
-
+        ProcessTask( ( guint32 )dwContext );
+        if( m_bExit )
             break;
 
-        }while( 1 );
+        ret = Sem_TimedwaitSec( &m_semSync,
+            THREAD_WAKEUP_INTERVAL );
 
-        while( !m_bExit )
-        {
-            ret = Sem_TimedwaitSec( &m_semSync,
-                THREAD_WAKEUP_INTERVAL );
-
-            if( ERROR( ret ) )
-            {
-                if( ret == -EAGAIN )
-                    continue;
-            }
+        if( ERROR( ret ) && ret != -EAGAIN )
             break;
-        }
     }
 
     while( m_bExit )
@@ -732,9 +717,10 @@ gint32 CThreadPool::GetThread(
     ThreadPtr& pThread, bool bStart )
 {
     gint32 ret = 0;
+    CStdRMutex oLock( m_oLock ); 
+
     do{
         ThreadPtr thptr;
-        CStdRMutex oLock( m_oLock ); 
 
         if( m_iMaxThreads == 0 )
             return -ENOENT;
@@ -783,8 +769,8 @@ gint32 CThreadPool::GetThread(
             break;
         }
 
-        if( m_vecThreads.size() <
-            ( guint32 )m_iMaxThreads )
+        if( unlikely( m_vecThreads.size() <
+            ( guint32 )m_iMaxThreads ) )
         {
             ret = thptr.NewObj( m_iThreadClass );
             if( ERROR( ret ) )
@@ -798,15 +784,9 @@ gint32 CThreadPool::GetThread(
                 thptr->Start();
             m_vecThreads.push_back( thptr );
         }
-        else if( m_vecThreads.size() >=
-            ( guint32 )m_iMaxThreads )
-        {
-            thptr = thLeast;
-        }
         else
         {
-           ret = ERROR_FAIL;
-           break;
+            thptr = thLeast;
         }
         pThread = thptr;
 

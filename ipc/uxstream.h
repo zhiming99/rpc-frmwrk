@@ -1091,6 +1091,7 @@ class CUnixSockStream:
             pCallback == nullptr )
             return -EINVAL;
 
+        auto pMgr = this->GetIoMgr();
         do{
             CParamList oParams( pReqCall );
             std::string strMethod;
@@ -1105,21 +1106,12 @@ class CUnixSockStream:
             IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
             pCtx->SetMajorCmd( IRP_MJ_FUNC );
             pIrp->SetCallback( pCallback, 0 );
-            pIrp->SetIrpThread(
-                this->GetIoMgr() );
+            pIrp->SetIrpThread( pMgr );
 
             if( strMethod == "StartReading" )
             {
                 pCtx->SetMinorCmd( IRP_MN_READ );
                 pCtx->SetIoDirection( IRP_DIR_IN );
-
-                guint32 dwTimeoutSec = 0;
-                ret = oIfCfg.GetIntProp(
-                    propKeepAliveSec, dwTimeoutSec );
-                if( ERROR( ret ) )
-                    break;
-                pIrp->SetTimer( dwTimeoutSec,
-                    this->GetIoMgr() );
             }
             else if( strMethod == "WriteStream" )
             {
@@ -1128,6 +1120,13 @@ class CUnixSockStream:
                 pCtx->SetMinorCmd( IRP_MN_WRITE );
                 pCtx->SetIoDirection( IRP_DIR_OUT );
                 pCtx->SetReqData( pBuf );
+
+                guint32 dwTimeoutSec = 0;
+                ret = oIfCfg.GetIntProp(
+                    propKeepAliveSec, dwTimeoutSec );
+                if( ERROR( ret ) )
+                    break;
+                pIrp->SetTimer( dwTimeoutSec, pMgr );
             }
             else if( strMethod == "StartListening" )
             {
@@ -1141,8 +1140,7 @@ class CUnixSockStream:
                     propTimeoutSec, dwTimeoutSec );
                 if( ERROR( ret ) )
                     break;
-                pIrp->SetTimer( dwTimeoutSec,
-                    this->GetIoMgr() );
+                pIrp->SetTimer( dwTimeoutSec, pMgr );
             }
             else if( strMethod == "SendPingPong" ||
                 strMethod== "SendProgress" )

@@ -284,7 +284,7 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
         }
     }
 
-    return ret;
+    return SetError( ret );
 }
 
 gint32 CPnpManager::StartPortsInternal(
