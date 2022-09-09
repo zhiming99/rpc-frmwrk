@@ -402,11 +402,12 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
         // ugly tweak
         // at this point, the pIrp is retired and owned
         // by no one else.
+        CStdRMutex oIrpLock( pIrp->GetLock() );
         pIrp->SetState( pIrp->GetState(),
             IRP_STATE_READY );
-
         gint32 iRet = pIrp->GetStatus();
         COMPLETE_IRP( irpPtr, iRet );
+        oIrpLock.Unlock();
         if( !IsReading() )
             NotifyWriteResumed();
     }
@@ -518,6 +519,18 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
         }
 
         IrpPtr pCurIrp = m_queRequests.front();
+        CStdRMutex oIrpLock( pCurIrp->GetLock() );
+        ret = pCurIrp->CanContinue(
+            IRP_STATE_READY );
+        if( ERROR( ret ) )
+        {
+            m_queRequests.pop_front();
+            if( m_queRequests.size() )
+                continue;
+            ret = ERROR_STATE;
+            break;
+        }
+
         IrpCtxPtr& pCurCtx =
             pCurIrp->GetTopStack();
 
@@ -545,7 +558,6 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
             pBuf->SetOffset( pExt->dwOffset );
             pBuf->SetTailOff( pExt->dwTailOff );
             PopWriteRequest();
-            iRet = pCurIrp->GetStatus();
             COMPLETE_IRP( pCurIrp, iRet );
         }
         else
@@ -567,12 +579,26 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
                 COMPLETE_IRP( pCurIrp, iRet );
             }
         }
+        oIrpLock.Unlock();
 
         ret = ReRun();
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
-    }while( 0 );
+        break;
+
+    }while( 1 );
+
+    if( ERROR( ret ) )
+    {
+        // especially when timeout occurs
+        while( m_queRequests.size() )
+        {
+            auto elem = m_queRequests.front();
+            COMPLETE_IRP( elem, -ECANCELED );
+            m_queRequests.pop_front();
+        }
+    }
 
     return ret;
 }

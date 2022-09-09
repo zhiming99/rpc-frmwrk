@@ -671,7 +671,7 @@ gint32 CIoManager::CancelIrp(
         a.Unlock();
         if( pIrp->GetMasterIrp() != nullptr )
         {
-            ret = CancelAssocIrp( pIrp );
+            this->CancelAssocIrp( pIrp );
         }
 
         ret = PostCompleteIrp( pIrp, true );
