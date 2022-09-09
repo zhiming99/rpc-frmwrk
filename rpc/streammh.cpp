@@ -1018,17 +1018,9 @@ gint32 CIfUxListeningRelayTaskMH::PostEvent(
         }
     case tokError:
         {
-            gint32 iError;
-            memcpy( &iError, pBuf->ptr() + 1,
-                sizeof( gint32 ) );
-
-            iError = ntohl( iError );
-
-            ret = pNewBuf.NewObj();
-            if( ERROR( ret ) )
-                break;
-
-            *pNewBuf = ( guint32& )iError;
+            pNewBuf = pBuf;
+            pNewBuf->SetOffset(
+                pBuf->offset() + 1 );
             break;
         }
     case tokClose:

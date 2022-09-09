@@ -86,9 +86,9 @@ class CStreamRelayBase :
                 ret = this->CloseChannel(
                     hChannel, pCallback );
                 // don't return pending since the
-                // caller is an IFCALL task. it
-                // could not be released
-                // immediately. 
+                // caller is an IFCALL task. it may
+                // cause caller task wait endlessly
+                //
                 if( ret == STATUS_PENDING )
                     ret = 0;
             }
@@ -203,7 +203,8 @@ class CStreamRelayBase :
                     ret = -EINVAL;
                     break;
                 }
-                guint32 dwError = *pBuf;
+                guint32 dwError = ntohl(
+                    ( guint32&)*pBuf );
                 ret = OnChannelError( iStmId,
                     ( gint32& )dwError );
                 break;

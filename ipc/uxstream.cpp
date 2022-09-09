@@ -848,8 +848,9 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
         DebugPrint( ret, "Error, the channel will be closed" );
         BufPtr pErrBuf( true );
         *pErrBuf = tokError;
+        gint32 iRet = htonl( ret );
         pErrBuf->Append(
-            ( guint8* )&ret, sizeof( ret ) );
+            ( guint8* )&iRet, sizeof( iRet ) );
         PostEvent( pErrBuf );
     }
 
