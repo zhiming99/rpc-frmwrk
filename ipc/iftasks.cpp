@@ -2829,7 +2829,7 @@ gint32 CIfParallelTask::operator()(
     }
 
     try{
-        CStdRTMutex oTaskLock( GetLock(), dwTryMs );
+        CStdRTMutex oTaskLock( GetLock() );
 
         if( GetTaskState() == stateStopped )
             return ERROR_STATE;
