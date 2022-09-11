@@ -790,59 +790,37 @@ gint32 CIoWatchTask::operator()(
     guint32 dwContext )
 {
     gint32 ret = 0;
-    try{
-        EnumTaskState iState = GetTaskState();
 
-        if( iState == stateStopped )
-        {
-            if( dwContext == eventIoWatch )
-                return G_SOURCE_REMOVE;
-            return ERROR_STATE;
-        }
-
-        if( iState == stateStarted )
-        {
-            switch( dwContext )
-            {
-            case eventIoWatch:
-                {
-                    std::vector< LONGWORD > vecParams;
-                    ret = GetParamList( vecParams );
-                    if( ERROR( ret ) )
-                        break;
-
-                    guint32 dwCount = GetArgCount(
-                        &IEventSink::OnEvent );
-
-                    if( vecParams.size() < dwCount )
-                    {
-                        ret = -EINVAL;
-                        break;
-                    }
-                    
-                    guint32 revents = vecParams[ 1 ];
-                    ret = OnIoWatchEvent( revents );
-
-                    if( ERROR( ret ) && ret != -EAGAIN )
-                        ret = G_SOURCE_REMOVE;
-                    else
-                        ret = G_SOURCE_CONTINUE;
-
-                    return ret;
-                }
-            default:
-                {
-                    break;
-                }
-            }
-        }
-        ret = super::operator()( dwContext );
-    }
-    catch( std::runtime_error& e )
+    EnumTaskState iState = GetTaskState();
+    if( iState == stateStopped )
     {
-        // lock failed
-        ret = -EACCES;
+        if( dwContext == eventIoWatch )
+            return G_SOURCE_REMOVE;
+        return ERROR_STATE;
     }
+
+    switch( dwContext )
+    {
+    case eventIoWatch:
+        {
+            std::vector< LONGWORD > vecParams;
+            GetParamList( vecParams );
+            guint32 revents = vecParams[ 1 ];
+            ret = OnIoWatchEvent( revents );
+
+            if( ERROR( ret ) && ret != -EAGAIN )
+                ret = G_SOURCE_REMOVE;
+            else
+                ret = G_SOURCE_CONTINUE;
+            return ret;
+        }
+    default:
+        {
+            ret = super::operator()( dwContext );
+            break;
+        }
+    }
+
     return ret;
 }
 
@@ -854,48 +832,40 @@ gint32 CIoWatchTask::OnEvent(
 {
     // Lock to prevent re-entrance 
     gint32 ret = 0;
-    try{
-        CStdRTMutex oTaskLock( GetLock() );
-        switch( iEvent )
-        {
-        case eventIoWatch:
-            {
-                // we have some special processing for
-                // eventIoWatch to bypass the normal
-                // CIfParallelTask's process flow.
-                LwVecPtr pVec( true );
-                std::vector< LONGWORD >& oVec = ( *pVec )();
-                oVec.push_back( iEvent );
-                oVec.push_back( dwParam1 );
-                oVec.push_back( dwParam2 );
-                oVec.push_back( ( LONGWORD )pData );
-
-                CCfgOpener oCfg(
-                    ( IConfigDb* )GetConfig() );
-
-                oCfg.SetObjPtr(
-                    propParamList, ObjPtr( pVec ) );
-
-                // note: the return value won't not be
-                // set by SetError
-                ret = ( *this )( iEvent );
-                oCfg.RemoveProperty( propParamList );
-
-                break;
-                
-            }
-        default:
-            {
-                ret = super::OnEvent( iEvent,
-                    dwParam1, dwParam2, pData );
-                break;
-            }
-        }
-    }
-    catch( std::runtime_error& e )
+    switch( iEvent )
     {
-        // lock failed
-        ret = -EACCES;
+    case eventIoWatch:
+        {
+            // we have some special processing for
+            // eventIoWatch to bypass the normal
+            // CIfParallelTask's process flow.
+            CStdRTMutex oTaskLock( GetLock() );
+            LwVecPtr pVec( true );
+            std::vector< LONGWORD >& oVec = ( *pVec )();
+            oVec.push_back( iEvent );
+            oVec.push_back( dwParam1 );
+            oVec.push_back( dwParam2 );
+            oVec.push_back( ( LONGWORD )pData );
+
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            oCfg.SetObjPtr(
+                propParamList, ObjPtr( pVec ) );
+
+            // note: the return value won't not be
+            // set by SetError
+            ret = ( *this )( iEvent );
+            oCfg.RemoveProperty( propParamList );
+            break;
+            
+        }
+    default:
+        {
+            ret = super::OnEvent( iEvent,
+                dwParam1, dwParam2, pData );
+            break;
+        }
     }
     return ret;
 }
@@ -1011,9 +981,6 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
                 // till exhause all the data in the buffer
             }while( ret > 0 );
 
-            if( ret == -EAGAIN )
-                ret = 0;
-
             break;
         }
         else if( revent & POLLOUT )
@@ -1043,7 +1010,7 @@ gint32 CIoWatchTask::OnIoReady( guint32 revent )
     if( ERROR( ret ) && ret != -EAGAIN )
         OnError( ret );
 
-    return ret;
+    return 0;
 }
 
 gint32 CIoWatchTask::ReleaseChannel()
@@ -1203,7 +1170,7 @@ gint32 CUnixSockStmPdo::PostStart( IRP* pIrp )
 gint32 CUnixSockStmPdo::OnPortReady( IRP* pIrp )
 {
     CIoWatchTask* pTask = m_pIoWatch;
-    if( pTask != nullptr )
+    if( !m_bFlowCtrl )
         pTask->StartWatch( false );
 
     return super::OnPortReady( pIrp );
@@ -1378,6 +1345,7 @@ gint32 CUnixSockStmPdo::HandleListening(
     // let's process the func irps
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
     do{
+        CIoWatchTask* pTask = m_pIoWatch;
         CStdRMutex oPortLock( GetLock() );
         std::deque< BufPtr >& oEvtQue =
             m_queEventPackets;
@@ -1387,6 +1355,11 @@ gint32 CUnixSockStmPdo::HandleListening(
             pCtx->m_pRespData = pBuf;
             oEvtQue.pop_front();
             ret = STATUS_SUCCESS;
+            if( m_bFlowCtrl )
+                break;
+            if( oEvtQue.size() ==
+                STM_MAX_QUEUE_SIZE - 1 )
+                pTask->StartWatch( false );
             break;
         }
 
@@ -1480,7 +1453,7 @@ gint32 CUnixSockStmPdo::HandleStreamCommand(
                 if( m_queDataPackets.size() >=
                     STM_MAX_QUEUE_SIZE )
                 {
-                    ret = ERROR_FAIL;
+                    // ret = ERROR_FAIL;
                     break;
                 }
                 pTask->StartWatch( false );
@@ -1804,12 +1777,6 @@ gint32 CUnixSockStmPdo::SendNotify(
             return ret;
 
         m_queEventPackets.push_back( pEvtBuf );
-        if( m_queEventPackets.size() >=
-            STM_MAX_QUEUE_SIZE )
-        {
-            // stop reading from the unix sock
-            pTask->StopWatch( false );
-        }
     }
 
     IrpPtr pEventIrp;
@@ -1820,7 +1787,15 @@ gint32 CUnixSockStmPdo::SendNotify(
     }
     
     if( pEventIrp.IsEmpty() )
+    {
+        if( m_queEventPackets.size() >=
+            STM_MAX_QUEUE_SIZE )
+        {
+            // stop reading from the unix sock
+            pTask->StopWatch( false );
+        }
         return 0;
+    }
 
     BufPtr pPayload = m_queEventPackets.front();
     byToken = ( guint8 )pPayload->ptr()[0];

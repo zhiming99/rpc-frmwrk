@@ -3906,15 +3906,15 @@ class CDeferredFuncCall :
     }
 };
 
-template < typename ... Types, typename ...Args>
+template < typename TaskClass, typename ... Types, typename ...Args>
 inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
-    CIoManager* pMgr, gint32(*f)(Types ...), Args&&... args )
+    CIoManager* pMgr, TaskClass*, gint32(*f)(Types ...), Args&&... args )
 {
     CTasklet* pDeferredCall;
     if( pMgr == nullptr )
         return -EFAULT;
 
-    pDeferredCall = new CDeferredFuncCall< CIfRetryTask, Types... >(
+    pDeferredCall = new CDeferredFuncCall< TaskClass, Types... >(
         f, pMgr, args... );
 
     if( unlikely( pDeferredCall == nullptr ) )
@@ -3926,7 +3926,10 @@ inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
 }
 
 #define NEW_FUNCCALL_TASK( __pTask, pMgr, func, ... ) \
-    NewDeferredFuncCall( __pTask, pMgr, func , ##__VA_ARGS__ )
+    NewDeferredFuncCall( __pTask, pMgr, ( CIfRetryTask* )nullptr, func , ##__VA_ARGS__ )
+
+#define NEW_FUNCCALL_TASKEX( __pTask, pMgr, func, ... ) \
+    NewDeferredFuncCall( __pTask, pMgr, ( CIfParallelTask* )nullptr, func , ##__VA_ARGS__ )
 
 class CTaskWrapper :
     public CGenericCallback< CIfInterceptTaskProxy >

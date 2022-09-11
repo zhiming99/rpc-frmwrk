@@ -2818,15 +2818,10 @@ gint32 CIfParallelTask::operator()(
     guint32 dwContext )
 {
     // Lock to prevent re-entrance 
-    guint32 dwTryMs = 0;
     gint32 ret = 0;
 
     if( dwContext & eventTryLock )
-    {
-        // wait 1 second before lock failed
-        dwTryMs = 1000;
         dwContext &= ~eventTryLock;
-    }
 
     try{
         CStdRTMutex oTaskLock( GetLock() );
