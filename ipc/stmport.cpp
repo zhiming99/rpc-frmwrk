@@ -904,12 +904,33 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
         pBusPort->BindStreamPort(
             hStream, PortPtr( this ) );
 
-        if( IsServer() )
+        if( !IsServer() )
+            break;
+
+        CStreamServerSync* pstm = GetStreamIf();
+        if( pstm == nullptr )
         {
-            FireRmtSvrEvent( this,
-                eventRmtSvrOnline, hStream );
-            Sem_Post( &m_semFireSync );
+            ret = -EFAULT;
+            break;
         }
+
+        CfgPtr pDesc;
+        pstm->GetDataDesc( hStream, pDesc );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oDesc( ( IConfigDb* )pDesc );
+        IConfigDb* ptctx = nullptr;
+        ret = oDesc.GetPointer(
+            propTransCtx, ptctx );
+        if( ERROR( ret ) )
+            break;
+        CCfgOpener octx( ptctx );
+        octx.SetPointer( propPortPtr, this );
+
+        FireRmtSvrEvent( this,
+            eventRmtSvrOnline, hStream );
+        Sem_Post( &m_semFireSync );
 
     }while( 0 );
 
@@ -1446,12 +1467,6 @@ gint32 CDBusStreamBusPort::OnEvent(
             PortPtr pPort;
             ret = OnNewConnection(
                 ( HANDLE )dwParam1, pPort );
-            if( ERROR( ret ) )
-                break;
-
-            auto pctx = ( IConfigDb* )data;
-            CCfgOpener oCtx( pctx );
-            oCtx[ propPortPtr ] = ObjPtr( pPort );
             break;
         }
     default:
