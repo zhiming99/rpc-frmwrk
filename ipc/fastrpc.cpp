@@ -317,6 +317,13 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
 
         if( ERROR( ret ) )
         {
+            stdstr strFunc = stdstr( "Warning" ) +
+                ( bOnline ? "CreateStmKel" :
+                    "GetStmKel" ) + " failed";
+
+            DebugPrint( ret, 
+                strFunc.c_str() );
+
             CIoManager* pMgr = GetIoMgr();
             pMgr->ClosePort(
                 hPort, nullptr, nullptr );

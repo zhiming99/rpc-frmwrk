@@ -59,7 +59,7 @@ class CDBusStreamPdo :
     stdstr m_strPath;
 
     CTimestampSvr m_oTs;
-    sem_t   m_semFireSync;
+    // sem_t   m_semFireSync;
 
     std::hashmap< guint32, DMsgPtr > m_mapRespMsgs;
 
@@ -100,6 +100,7 @@ class CDBusStreamPdo :
     bool IsServer() const
     { return m_bServer; }
 
+    gint32 CheckExistance( ObjPtr& pIf );
     gint32 SubmitIoctlCmd(
         IRP* pIrp ) override;
 

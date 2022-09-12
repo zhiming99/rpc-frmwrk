@@ -73,8 +73,7 @@ static gint32 FireRmtSvrEvent(
                 ( guint32* )hStream );
             oEvtCtx[ propPortId ] = dwPortId;
 
-            IConfigDb* pEvtExt =
-                oEvtCtx.GetCfg();
+            IConfigDb* pEvtExt = oEvtCtx.GetCfg();
 
             // pass on this event to the pnp
             // manager
@@ -123,7 +122,6 @@ CDBusStreamPdo::CDBusStreamPdo(
             SetStream( hstm );
         }
 
-        Sem_Init( &m_semFireSync, 0, 0 );
         SetClassId( clsid( CDBusStreamPdo ) );
         m_dwDisconned = 0;
 
@@ -885,6 +883,33 @@ gint32 CDBusStreamPdo::PostStart(
     return ret;
 }
 
+gint32 CDBusStreamPdo::CheckExistance(
+    ObjPtr& pUxIf )
+{
+    gint32 ret = 0;
+    do{
+
+        CCfgOpenerObj oIfCfg(
+            ( CObjBase* )pUxIf );
+
+        bool bClose = false;
+        ret = oIfCfg.GetBoolProp(
+            propOnline, bClose );
+
+        if( ERROR( ret ) )
+        {
+            bClose = false;
+            ret = 0;
+        }
+
+        if( bClose )
+            ret = -ENOTCONN;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -899,38 +924,44 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
 
         auto *pBusPort = static_cast
             < CDBusStreamBusPort* >( m_pBusPort );
-
         HANDLE hStream = GetStream();
-        pBusPort->BindStreamPort(
-            hStream, PortPtr( this ) );
-
         if( !IsServer() )
-            break;
-
-        CStreamServerSync* pstm = GetStreamIf();
-        if( pstm == nullptr )
         {
-            ret = -EFAULT;
+            pBusPort->BindStreamPort(
+                hStream, PortPtr( this ) );
             break;
         }
 
-        CfgPtr pDesc;
-        pstm->GetDataDesc( hStream, pDesc );
-        if( ERROR( ret ) )
-            break;
+        do{
+            InterfPtr pUxIf;
+            CStreamServerSync* ps = GetStreamIf();
+            ret = ps->GetUxStream( hStream, pUxIf );
+            if( ERROR( ret ) )
+                break;
 
-        CCfgOpener oDesc( ( IConfigDb* )pDesc );
-        IConfigDb* ptctx = nullptr;
-        ret = oDesc.GetPointer(
-            propTransCtx, ptctx );
-        if( ERROR( ret ) )
-            break;
-        CCfgOpener octx( ptctx );
-        octx.SetPointer( propPortPtr, this );
+            CStdRMutex oBusLcok(
+                pBusPort->GetLock() );
 
-        FireRmtSvrEvent( this,
-            eventRmtSvrOnline, hStream );
-        Sem_Post( &m_semFireSync );
+            ObjPtr pIf = pUxIf;
+            ret = CheckExistance( pIf );
+
+            pBusPort->BindStreamPort(
+                hStream, PortPtr( this ) );
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+        {
+            // still let the port start to success
+            ret = 0;
+            FireRmtSvrEvent( this,
+                eventRmtSvrOffline, hStream );
+        }
+        else
+        {
+            FireRmtSvrEvent( this,
+                eventRmtSvrOnline, hStream );
+        }
 
     }while( 0 );
 
@@ -957,10 +988,6 @@ gint32 CDBusStreamPdo::OnEvent(
                     "StreamPdo 0x%llx",
                     ( HANDLE )this );
                 break;
-            }
-            if( IsServer() )
-            {
-                Sem_Wait( &m_semFireSync );
             }
             ret = FireRmtSvrEvent( this,
                 eventRmtSvrOffline,
