@@ -1,4 +1,7 @@
 ---
+[`Mon Sep 12 2022 03:19:45 PM Beijing`]    
+1. The issue of ping token loss is actually a collection of bugs in the uxport, uxstream, and fastrpc. After extensive code review, bug fixes and testing, the issue is almost gone. I will do some futher tests in the next few days to verify.
+
 [`Tue Sep 06  202210:33:13 PM Beijing`]   
 1. There is still a difficult bug in the stream module to spot, which caused the initial ping token unreplied from the server per million requests. And therefore, the rpcfs support has to postpone for a while.
 
