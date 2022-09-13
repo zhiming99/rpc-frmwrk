@@ -384,7 +384,9 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         }
         CIfRetryTask* pRetry = pTask;
         pRetry->SetClientNotify( pRespCb );
-        ret = this->AddSeqTask( pTask );
+        auto pMgr = this->GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        // ret = this->AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )
             ret = pTask->GetError();
 

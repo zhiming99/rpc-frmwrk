@@ -117,8 +117,8 @@ class CRpcStmChanBase :
             }
             oBusLock.Unlock();
 
-            OnStmClosing( hstm );
-            IStream::OnClose( hstm, pCallback );
+            // OnStmClosing( hstm );
+            // IStream::OnClose( hstm, pCallback );
 
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );

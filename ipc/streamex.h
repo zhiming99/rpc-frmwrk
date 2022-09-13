@@ -1081,6 +1081,15 @@ struct CStreamSyncBase :
                 ( hChannel, oWorker ) );
 
             oIfLock.Unlock();
+            CRpcServices* pUxIf = pIf;
+
+            ret = pUxIf->AddAndRun( oWorker.pReader );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pUxIf->AddAndRun( oWorker.pWriter );
+            if( ERROR( ret ) )
+                break;
 
             CParamList oGrpCfg;
             oGrpCfg[ propIfPtr ] = ObjPtr( this );
@@ -1091,33 +1100,6 @@ struct CStreamSyncBase :
             if( ERROR( ret ) )
                 break;
      
-            pTaskGrp->SetRelation( logicAND );
-            TaskletPtr pStartReader;
-            ret = DEFER_IFCALLEX_NOSCHED(
-                pStartReader,
-                ObjPtr( this ),
-                &CStreamSyncBase::RunManagedTaskWrapper,
-                ( IEventSink* )oWorker.pReader,
-                false );
-
-            if( ERROR( ret ) )
-                break;
-
-            pTaskGrp->AppendTask( pStartReader );
-
-            TaskletPtr pStartWriter;
-            ret = DEFER_IFCALLEX_NOSCHED( 
-                pStartWriter,
-                ObjPtr( this ),
-                &CStreamSyncBase::RunManagedTaskWrapper,
-                ( IEventSink* )oWorker.pWriter,
-                false );
-
-            if( ERROR( ret ) )
-                break;
-
-            pTaskGrp->AppendTask( pStartWriter );
-
             TaskletPtr pFirstEvent;
             if( IsLoopStarted() )
             {
@@ -1179,7 +1161,6 @@ struct CStreamSyncBase :
                 pasc->SetSelfCleanup();
             }
 
-            pTaskGrp->AppendTask( pStartWriter );
             // prevent the OnRecvData_Loop to be
             // the first event
             TaskletPtr pSeqTasks = pTaskGrp;
