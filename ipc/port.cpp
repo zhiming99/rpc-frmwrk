@@ -3247,6 +3247,7 @@ CGenericBusPort::CGenericBusPort(
 void CGenericBusPort::AddPdoPort(
     guint32 iPortId, PortPtr& portPtr )
 {
+    CStdRMutex oPortLock( GetLock() );
     if( m_mapId2Pdo.find( iPortId ) !=
         m_mapId2Pdo.end() )
         return;
@@ -3260,6 +3261,7 @@ void CGenericBusPort::AddPdoPort(
 void CGenericBusPort::RemovePdoPort(
     guint32 iPortId )
 {
+    CStdRMutex oPortLock( GetLock() );
     if(m_mapId2Pdo.find( iPortId )
         == m_mapId2Pdo.end() )
         return;
@@ -3280,6 +3282,7 @@ void CGenericBusPort::RemovePdoPort(
 gint32 CGenericBusPort::GetPdoPort(
     guint32 iPortId, PortPtr& portPtr ) const
 {
+    CStdRMutex oPortLock( GetLock() );
     map<guint32, PortPtr>::const_iterator itr
         = m_mapId2Pdo.find( iPortId );
         if( itr == m_mapId2Pdo.cend() )
@@ -3292,6 +3295,7 @@ gint32 CGenericBusPort::GetPdoPort(
 gint32 CGenericBusPort::GetChildPorts(
         vector< PortPtr >& vecChildPorts )
 {
+    CStdRMutex oPortLock( GetLock() );
     map<guint32, PortPtr>::iterator itr
         = m_mapId2Pdo.begin();
     while( itr != m_mapId2Pdo.cend() )
@@ -3306,6 +3310,7 @@ gint32 CGenericBusPort::GetChildPorts(
 bool CGenericBusPort::PortExist(
     guint32 iPortId ) const
 {
+    CStdRMutex oPortLock( GetLock() );
     return m_mapId2Pdo.find( iPortId )
         != m_mapId2Pdo.end();
 }
