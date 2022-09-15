@@ -50,7 +50,7 @@ enum EnumAsyncEvent : guint8
 class CEvLoop;
 class CSimpleEvPoll
 {
-    bool                                m_bStop; 
+    std::atomic< bool >                 m_bStop; 
     stdrmutex                           m_oLock;
     CEvLoop*                            m_pLoop;
 
@@ -80,7 +80,7 @@ class CSimpleEvPoll
         std::multimap< guint64, HANDLE >& mapActTimers );
 
     gint32 UpdateIoMaps(
-        std::map< gint32, HANDLE >& mapFd2Handle );
+        std::hashmap< gint32, HANDLE >& mapFd2Handle );
 
     gint32 GetWaitTime( guint32& qwIntervalMs );
 
@@ -96,11 +96,13 @@ class CSimpleEvPoll
         std::multimap< guint64, HANDLE >& mapActTimers );
 
     gint32 HandleIoEvents(
-        std::map< gint32, HANDLE >& mapActFds,
-        pollfd* pPollInfo, gint32 iCount );
+        std::hashmap< gint32, HANDLE >& mapActFds,
+        pollfd* pPollInfo,
+        gint32 iNumFds,
+        gint32 iReadyCount );
 
     gint32 BuildPollFds(
-        std::map< gint32, HANDLE >& mapActFds,
+        std::hashmap< gint32, HANDLE >& mapActFds,
         pollfd* pPollInfo, gint32& iCount );
 
     public:

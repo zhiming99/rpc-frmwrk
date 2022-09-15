@@ -173,12 +173,15 @@ gint32 CSimpleEvPoll::RunSource( HANDLE hWatch,
     gint32 ret = m_pLoop->GetSource(
         hWatch, iType, pSrc );
     if( ERROR( ret ) )
-        return ret;
+        return G_SOURCE_REMOVE;
+
     if( pSrc->GetState() != srcsReady )
-        return ERROR_STATE;
+        return G_SOURCE_REMOVE;
+
     TaskletPtr pCallback = pSrc->m_pCallback;
     if( pCallback.IsEmpty() )
-        return -EFAULT;
+        return G_SOURCE_REMOVE;
+
     oLock.Unlock();
     // NOTE: the task should have the ability to
     // be aware of it could have enterred a state
@@ -187,21 +190,22 @@ gint32 CSimpleEvPoll::RunSource( HANDLE hWatch,
     // situation.
     if( iType == srcTimer )
     {
-        CEvLoop::TIMER_SOURCE* pTimerSrc =
-            ( CEvLoop::TIMER_SOURCE* )pSrc;
-        ret = pTimerSrc->TimerCallback( dwContext );
+        ret = pCallback->OnEvent( eventTimeout,
+            dwContext, hWatch, nullptr );
     }
     else if( iType == srcIo )
     {
-        CEvLoop::IO_SOURCE* pIoSrc =
-            ( CEvLoop::IO_SOURCE* )pSrc;
-        ret = pIoSrc->IoCallback( dwContext ); 
+        ret = pCallback->OnEvent( eventIoWatch,
+            dwContext, hWatch, nullptr );
     }
     else if( iType == srcAsync )
     {
-        CEvLoop::ASYNC_SOURCE* pAsyncSrc =
-            ( CEvLoop::ASYNC_SOURCE* )pSrc;
-        ret = pAsyncSrc->AsyncCallback( dwContext );
+        ret = pCallback->OnEvent( eventAsyncWatch,
+            0, hWatch, nullptr );
+    }
+    else
+    {
+        ret = G_SOURCE_REMOVE;
     }
     return ret;
 }
@@ -338,39 +342,31 @@ gint32 CSimpleEvPoll::WakeupLoop(
     ( ( gint32 )( ( fd_ << 16 ) | ( flag_ & 0xffff ) ) )
 
 gint32 CSimpleEvPoll::UpdateIoMaps(
-    std::map< gint32, HANDLE >& mapActFds )
+    std::hashmap< gint32, HANDLE >& mapActFds )
 {
-    std::map< HANDLE, CEvLoop::SOURCE_HEADER* >*
-        pMap = m_pLoop->GetMap( srcIo );
-
-    std::map< HANDLE, CEvLoop::SOURCE_HEADER* >::iterator
-        itrSrc;
-
-    if( m_bIoRemove )
+    auto pMap = m_pLoop->GetMap( srcIo );
+    if( m_bIoRemove && !m_bIoAdd )
     {
-        std::map< gint32, HANDLE >::iterator
-            itr = mapActFds.begin();
+        auto itr = mapActFds.begin();
 
         while( itr != mapActFds.end() )
         {
             HANDLE hWatch = itr->second;
-            itrSrc = pMap->find( hWatch );
+            auto itrSrc = pMap->find( hWatch );
             if( itrSrc == pMap->end() )
             {
                 itr = mapActFds.erase( itr );
                 continue;
             }
 
-            CEvLoop::SOURCE_HEADER* psh =
-                itrSrc->second;
-
+            auto psh = itrSrc->second;
             if( psh == nullptr )
             {
                 itr = mapActFds.erase( itr );
                 continue;
             }
 
-            CEvLoop::IO_SOURCE* pSrc = static_cast
+            auto pSrc = static_cast
                 < CEvLoop::IO_SOURCE* >( psh );
 
             if( pSrc->GetState() != srcsReady )
@@ -383,26 +379,22 @@ gint32 CSimpleEvPoll::UpdateIoMaps(
         m_bIoRemove = false;
     }
     // Addition must follow the removal because the fd
-    // could be reused for next io, which makes it
-    // possible the identical iokeys are added and
-    // removed at the same time.
+    // could be reused by newly added watch, which
+    // makes it possible the identical iokeys are added
+    // and removed at the same time.
     // BUGBUG: we need to provide a better iokey than
     // current one.
     if( m_bIoAdd )
     {
+        mapActFds.clear();
         for( auto elem : *pMap )
         {
-            CEvLoop::IO_SOURCE* pSrc =
-                ( CEvLoop::IO_SOURCE* )elem.second;
+            auto pSrc = static_cast
+                < CEvLoop::IO_SOURCE* >( elem.second );
             if( pSrc->GetState() == srcsReady )
             {
                 gint32 iIoKey = IO_KEY(
                     pSrc->m_iFd, pSrc->m_dwOpt );
-
-                if( mapActFds.find( iIoKey ) !=
-                    mapActFds.end() )
-                    continue;
-
                 mapActFds[ iIoKey ] = elem.first;
             }
         }
@@ -626,7 +618,7 @@ gint32 CSimpleEvPoll::HandleTimeout(
 }
 
 gint32 CSimpleEvPoll::BuildPollFds(
-    std::map< gint32, HANDLE >& mapActFds,
+    std::hashmap< gint32, HANDLE >& mapActFds,
     pollfd* pPollInfo, gint32& iCount )
 {
     if( mapActFds.empty() )
@@ -661,8 +653,9 @@ gint32 CSimpleEvPoll::BuildPollFds(
 }
 
 gint32 CSimpleEvPoll::HandleIoEvents(
-    std::map< gint32, HANDLE >& mapActFds,
-    pollfd* pPollInfo, gint32 iCount )
+    std::hashmap< gint32, HANDLE >& mapActFds,
+    pollfd* pPollInfo, gint32 iNumFds,
+    gint32 iCount )
 {
     if( pPollInfo == nullptr ||
         iCount < 0 )
@@ -670,49 +663,41 @@ gint32 CSimpleEvPoll::HandleIoEvents(
 
     gint32 ret = 0;
     gint32 iFound = 0;
+    gint32 i = 0;
     do{
-        for( guint32 i = 0;
-            i < mapActFds.size() && iFound < iCount;
-            ++i )
+        for( ;i < iNumFds && iFound < iCount; ++i )
         {
             if( pPollInfo[ i ].revents == 0 )
                 continue;
+
+            ++iFound;
+            gint32 iIoKey = IO_KEY( 
+                pPollInfo[ i ].fd,
+                pPollInfo[ i ].events );
+
+            HANDLE hWatch = mapActFds[ iIoKey ];
+            ret = RunSource( hWatch, srcIo,
+                pPollInfo[ i ].revents );
+            if( ret == G_SOURCE_REMOVE ||
+                ERROR( ret ) )
+            {
+                StopSource( hWatch, srcIo );
+                mapActFds.erase( iIoKey );
+            }
+
             if( IsStopped() )
             {
                 ret = ERROR_STATE;
                 break;
             }
-            ++iFound;
-
-            gint32 iIoKey = IO_KEY( 
-                pPollInfo[ i ].fd,
-                pPollInfo[ i ].events );
-
-            HANDLE hWatch =
-                mapActFds[ iIoKey ];
-            ret = RunSource( hWatch, srcIo,
-                pPollInfo[ i ].revents );
-            if( ret == G_SOURCE_REMOVE )
-            {
-                ret = m_pLoop->RemoveSource(
-                    hWatch, srcIo );
-                // BUGBUG: erased the entry may
-                // cause the UpdateIoMaps to
-                // iterate the map with nothing
-                // found
-                mapActFds.erase( iIoKey );
-            }
-            else if( ERROR( ret ) )
-            {
-                StopSource( hWatch, srcIo );
-            }
         }
 
         if( IsStopped() )
-            return ret;
+            break;
 
         CStdRMutex oLock( GetLock() );
         UpdateIoMaps( mapActFds );
+
     }while( 0 );
 
     return ret;
@@ -723,7 +708,7 @@ gint32 CSimpleEvPoll::RunLoop()
     gint32 ret = 0;
     guint32 dwIntervalMs = 0;
     gint32 iFdCount = 4;
-    std::map< gint32, HANDLE > mapActFds;
+    std::hashmap< gint32, HANDLE > mapActFds;
     std::multimap< guint64, HANDLE > mapActTimers;
 
     CStdRMutex oLock( GetLock() );
@@ -747,8 +732,6 @@ gint32 CSimpleEvPoll::RunLoop()
             pBuf->Resize(
                 sizeof( pollfd ) * iFdCount );
             pPollInfo = ( pollfd* )pBuf->ptr();
-            memset( pPollInfo, 0,
-                sizeof( pollfd ) * iFdCount );
         }
         ret = BuildPollFds(
             mapActFds, pPollInfo, iCount );
@@ -770,10 +753,6 @@ gint32 CSimpleEvPoll::RunLoop()
         do{
             ret = poll( pPollInfo,
                 iCount, dwIntervalMs );
-            if( ret > 0 )
-            {
-                // printf( "interval is %d\n", dwIntervalMs );
-            }
             if( ret >= 0 )
             {
                 iReadyCount = ret;
@@ -784,7 +763,7 @@ gint32 CSimpleEvPoll::RunLoop()
                 errno == EINTR )
             {
                 ret = 0;
-                break;
+                continue;
             }
             ret = -errno;
             break;
@@ -804,7 +783,7 @@ gint32 CSimpleEvPoll::RunLoop()
         NowUs();
         HandleTimeout( mapActTimers );
         HandleIoEvents( mapActFds,
-            pPollInfo, iReadyCount );
+            pPollInfo, iCount, iReadyCount );
     }
 
     return ret;

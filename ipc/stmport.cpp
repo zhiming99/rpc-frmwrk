@@ -810,13 +810,19 @@ gint32 CDBusStreamPdo::PreStop(
                         hstm, pStopCb );
                 }
             }
+
+            if( ret == STATUS_SUCCESS )
+                ret = pStopCb->GetError();
+
             if( ret == STATUS_PENDING )
             {
                 ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
             }
+
             if( !pStopCb.IsEmpty() )
                 ( *pStopCb )( eventCancelTask );
+
             SetPreStopStep( pIrp, 1 );
             break;
         }
