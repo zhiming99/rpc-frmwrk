@@ -3871,6 +3871,7 @@ gint32 CGenericBusPort::OpenPdoPort(
                 break;
             }
             else if( dwState != PORT_STATE_READY &&
+                dwState != PORT_STATE_STARTING &&
                 dwState != PORT_STATE_BUSY_SHARED )
             {
                 ret = ERROR_STATE;
