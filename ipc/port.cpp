@@ -3864,15 +3864,14 @@ gint32 CGenericBusPort::OpenPdoPort(
 
             CStdRMutex oPortLock( GetLock() );
             guint32 dwState = GetPortState();
-            if( dwState == PORT_STATE_BUSY ||
-                dwState == PORT_STATE_BUSY_SHARED )
+            if( dwState == PORT_STATE_BUSY )
             {
                 // notify to retry later
                 ret = -EAGAIN;
                 break;
             }
             else if( dwState != PORT_STATE_READY &&
-                dwState != PORT_STATE_STARTING )
+                dwState != PORT_STATE_BUSY_SHARED )
             {
                 ret = ERROR_STATE;
                 break;

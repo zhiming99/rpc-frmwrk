@@ -42,7 +42,7 @@
 #define IFBASE3( _bProxy ) std::conditional< \
     _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
 
-#define MAX_REQCHAN_PER_SESS 200
+#define MAX_REQCHAN_PER_SESS 400
 
 namespace rpcf
 {
@@ -843,19 +843,18 @@ class CRpcStmChanBase :
                 break;
 
             CCfgOpenerObj oReqCfg( pIoReq );
-            IConfigDb* pResp;
-            gint32 iRet = oReqCfg.GetPointer(
-                propRespPtr, pResp );
-            
             CDBusStreamPdo* pPort = nullptr;
             ret = oReqCtx.GetPointer(
                     propPortPtr, pPort );
             if( ERROR( ret ) )
                 break;
 
-            CStdRMutex oIrpLock( pIrp->GetLock() );
+            CStdRMutex oIrpLock(
+                pIrp->GetLock() );
+
             ret = pIrp->CanContinue(
                 IRP_STATE_READY );
+
             if( ERROR( ret ) )
                 break;
 
@@ -865,12 +864,17 @@ class CRpcStmChanBase :
                 break;
             }
 
-            CCfgOpener oResp( pResp );
             IrpCtxPtr& pCtx =
                     pIrp->GetTopStack();
+            IConfigDb* pResp = nullptr;
+            gint32 iRet = oReqCfg.GetPointer(
+                propRespPtr, pResp );
+            
+            CCfgOpener oResp( pResp );
             if( ERROR( iRet ) )
             {
                 pCtx->SetStatus( iRet );
+                ret = iRet;
             }
             else
             {
@@ -881,12 +885,14 @@ class CRpcStmChanBase :
                 if( ERROR( ret ) )
                     pCtx->SetStatus( ret );
                 else
+                {
                     pCtx->SetStatus( iRet );
+                    ret = iRet;
+                }
             }
 
-            guint32 dwMinCmd =
-                    pCtx->GetMinorCmd();
-            if( dwMinCmd == IRP_MN_PNP_START &&
+            guint32 dwCmd = pCtx->GetMinorCmd();
+            if( dwCmd == IRP_MN_PNP_START &&
                 SUCCEEDED( pCtx->GetStatus() ) )
             {
                 HANDLE hstm = INVALID_HANDLE;
@@ -897,7 +903,10 @@ class CRpcStmChanBase :
                 else
                     pPort->SetStream( hstm );
             }
-            SetPreStopStep( pIrp, 1 );
+            else if( dwCmd == IRP_MN_PNP_STOP )
+            {
+                SetPreStopStep( pIrp, 1 );
+            }
             oIrpLock.Unlock();
 
             auto pMgr = this->GetIoMgr();

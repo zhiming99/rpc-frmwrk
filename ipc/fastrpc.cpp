@@ -317,7 +317,7 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
 
         if( ERROR( ret ) )
         {
-            stdstr strFunc = stdstr( "Warning" ) +
+            stdstr strFunc = stdstr( "Warning " ) +
                 ( bOnline ? "CreateStmKel" :
                     "GetStmKel" ) + " failed";
 

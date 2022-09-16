@@ -376,6 +376,7 @@ gint32 CIfStmReadWriteTask::PauseReading(
 gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
     IRP* pIrp )
 {
+    // only when the irp is timedout
     if( pIrp == nullptr )
         return -EINVAL;
 
@@ -397,9 +398,12 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
         }
     }
 
-    if( bFound )
+    gint32 ret = pIrp->GetStatus();
     {
-        // ugly tweak
+        // whether or not found, we need to complete
+        // this irp in special way.
+        //
+        // ugly code
         // at this point, the pIrp is retired and owned
         // by no one else.
         CStdRMutex oIrpLock( pIrp->GetLock() );
@@ -412,11 +416,7 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
             NotifyWriteResumed();
     }
 
-    if( !bHead )
-        return STATUS_PENDING;
-
-    gint32 ret = ReRun();
-    if( SUCCEEDED( ret ) )
+    if( m_queRequests.size() )
         ret = STATUS_PENDING;
 
     return ret;
@@ -591,13 +591,10 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
 
     if( ERROR( ret ) )
     {
-        // especially when timeout occurs
-        while( m_queRequests.size() )
-        {
-            auto elem = m_queRequests.front();
-            COMPLETE_IRP( elem, -ECANCELED );
-            m_queRequests.pop_front();
-        }
+        // to allow irp canceling callback comes in,
+        // but the task is not functioning normally.
+        if( m_queRequests.size() )
+            ret = STATUS_PENDING;
     }
 
     return ret;

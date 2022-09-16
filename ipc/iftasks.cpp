@@ -1667,6 +1667,9 @@ gint32 CIfTaskGroup::Process(
     oTaskLock.Unlock();
 
     ret = super::Process( dwContext );
+    if( IsRunning() && ret == -ENOTSUP )
+        DebugPrint( dwContext, "CIfTaskGroup: "
+            "unexpected end of the group" );
 
     return ret;
 }

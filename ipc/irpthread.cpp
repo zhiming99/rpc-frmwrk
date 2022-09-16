@@ -141,26 +141,7 @@ void CTaskQueue::AddTask( TaskletPtr& pTask )
         return;
 
     CStdRMutex a( m_oLock );
-    if( m_queTasks.size() >= 2 )
-    {
-        deque< TaskletPtr >::iterator
-            itr = m_queTasks.begin() + 1;
-        while( itr != m_queTasks.end() )
-        {
-            if( *itr == pTask )
-            {
-                bAdd = false;
-                break;
-            }
-            ++itr;
-        }
-        if( bAdd )
-            m_queTasks.push_back( pTask );
-    }
-    else
-    {
-        m_queTasks.push_back( pTask ); 
-    }
+    m_queTasks.push_back( pTask ); 
 }
 
 gint32 CTaskQueue::RemoveTask( TaskletPtr& pTask )

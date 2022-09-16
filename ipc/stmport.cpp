@@ -67,6 +67,8 @@ static gint32 FireRmtSvrEvent(
             guint32 dwPortId = 0;
             ret = oCfg.GetIntProp(
                 propPortId, dwPortId );
+            if( ERROR( ret ) )
+                break;
 
             CCfgOpener oEvtCtx;
             oEvtCtx.SetIntPtr( propStmHandle,
