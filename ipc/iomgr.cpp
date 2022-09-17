@@ -1099,23 +1099,6 @@ gint32 CIoManager::OpenPortByCfg(
                 ret = -EFAULT;
                 break;
             }
-            else
-            {
-                CStdRMutex oPortLock( pBus->GetLock() );
-
-                guint32 dwState = pBus->GetPortState();
-                if( dwState == PORT_STATE_STARTING )
-                {
-                    // try it later
-                    ret = -EAGAIN;
-                    break;
-                }
-                else if( dwState != PORT_STATE_READY )
-                {
-                    ret = ERROR_STATE;
-                    break;
-                }
-            }
             // create the pdo port or open the
             // existing pdo port
             ret = pBus->OpenPdoPort( pCfg, pPort );

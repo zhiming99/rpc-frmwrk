@@ -1453,17 +1453,14 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
                     if( ERROR( ret ) )
                         break;
 
-                    if( GetLowerPort().IsEmpty() )
-                    {
-                        // for pdo port or the bottom port, we have a
-                        // notification point for subscribers to register
-                        // the callback for pnp event
-                        ObjPtr pMap;
-                        pMap.NewObj( clsid( CStlEventMap ) );
-                        ret = oReg.SetObject( propEventMapPtr, pMap ); 
-                        if( ERROR( ret ) )
-                            break;
-                    }
+                    // for pdo port or the bottom port, we have a
+                    // notification point for subscribers to register
+                    // the callback for pnp event
+                    ObjPtr pMap;
+                    pMap.NewObj( clsid( CStlEventMap ) );
+                    ret = oReg.SetObject( propEventMapPtr, pMap ); 
+                    if( ERROR( ret ) )
+                        break;
                 }
 
                 PopState( dwOldState );
@@ -3972,8 +3969,11 @@ gint32 CGenericBusPort::OpenPdoPort(
                     this->AddPdoPort( dwPortId, portPtr );
                 }
 
-                if( dwState == PORT_STATE_READY )
+                if( dwState == PORT_STATE_READY ||
+                    dwState == PORT_STATE_BUSY_SHARED )
                 {
+                    // to filter out the dbus-bus
+                    // port's start process
                     oPortLock.Unlock();
 
                     // at this moment, we are OK to
