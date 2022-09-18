@@ -1505,8 +1505,10 @@ gint32 CIfTaskGroup::RunTaskInternal(
         pTask = m_queTasks.front();
         if( pTask.IsEmpty() )
         {
-            ret = -EFAULT;
-            break;
+            DebugPrint( 0, "Error, found "
+                "empty task in the task queue" );
+            m_queTasks.pop_front();
+            continue;
         }
 
         // tell this->OnChildComplete not to reschedule
@@ -1543,8 +1545,6 @@ gint32 CIfTaskGroup::RunTaskInternal(
             // changed before we have grabbed the
             // lock
             ret = m_vecRetVals.back();
-            if( ret == STATUS_PENDING )
-                ret = ERROR_STATE;
         }
 
         if( ret == STATUS_PENDING )
@@ -1684,14 +1684,12 @@ gint32 CIfTaskGroup::OnCancel(
         if( iState == stateStopped )
             return STATUS_PENDING;
 
-        // notify the other guy canceling in
-        // process
-        if( !IsCanceling() )
-            SetCanceling( true );
-        else
-        {
+        if( unlikely( IsCanceling() ) )
             return STATUS_PENDING;
-        }
+
+        // notify the other guys canceling in
+        // process
+        SetCanceling( true );
 
         if( IsNoSched() )
         {
@@ -1721,8 +1719,10 @@ gint32 CIfTaskGroup::OnCancel(
             pTask = m_queTasks.front();
             if( pTask.IsEmpty() )
             {
-                ret = -EFAULT;
-                break;
+                DebugPrint( 0, "Error, found "
+                    "empty task in the task queue" );
+                m_queTasks.pop_front();
+                continue;
             }
 
             // tell this->OnChildComplete not to
@@ -1742,18 +1742,14 @@ gint32 CIfTaskGroup::OnCancel(
             pPrevTask = pTask;
         }
 
-        if( ret != STATUS_PENDING )
+        gint32 iRet = -ECANCELED;
+        for( gint32 i : m_vecRetVals )
         {
-            gint32 iRet = -ECANCELED;
-            for( gint32 i : m_vecRetVals )
-            {
-                if( i == -ECANCELED )
-                    break;
-                iRet = i;
-            }
-            ret = iRet;
+            if( i == -ECANCELED )
+                break;
+            iRet = i;
         }
-
+        ret = iRet;
         break;
 
     }while( 1 );
@@ -1928,6 +1924,15 @@ gint32 CIfTaskGroup::GetTailTask(
 
     pTail = m_queTasks.back();
     return 0;
+}
+
+gint32 CIfTaskGroup::OnTaskComplete(
+    gint32 iRetVal )
+{
+    guint32 dwContext = eventCancelTask;
+    if( iRetVal == -ETIMEDOUT )
+        dwContext = eventTimeoutCancel;
+    return OnCancel( dwContext );
 }
 
 gint32 CIfRootTaskGroup::OnComplete(
@@ -2637,12 +2642,10 @@ gint32 CIfParallelTaskGrp::OnCancel(
         if( GetTaskState() == stateStopped )
             return  ERROR_STATE;
 
-        if( !IsCanceling() )
-            SetCanceling( true );
-        else
-        {
+        if( unlikely( IsCanceling() ) )
             return STATUS_PENDING;
-        }
+
+        SetCanceling( true );
 
         if( IsNoSched() )
         {

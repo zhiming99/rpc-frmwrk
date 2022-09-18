@@ -452,12 +452,12 @@ class CIfTaskGroup
     EnumLogicOp GetRelation() const
     { return m_iTaskRel; }
 
-    virtual gint32 Process( guint32 dwContext );
-    virtual gint32 OnCancel( guint32 dwContext );
+    gint32 Process( guint32 dwContext ) override;
+    gint32 OnCancel( guint32 dwContext ) override;
     virtual gint32 RemoveTask( TaskletPtr& pTask );
 
-    virtual gint32 OnRetry();
-    virtual gint32 OnComplete( gint32 iRet );
+    gint32 OnRetry() override;
+    gint32 OnComplete( gint32 iRet ) override;
 
     inline void GetRetVals(
         std::vector< gint32 >& vecRet ) const
@@ -465,6 +465,7 @@ class CIfTaskGroup
 
     gint32 GetHeadTask( TaskletPtr& pHead );
     gint32 GetTailTask( TaskletPtr& pTail );
+    gint32 OnTaskComplete( gint32 iRetVal ) override;
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
@@ -547,7 +548,7 @@ class CIfParallelTaskGrp
         EnumClsid iClsid,
         std::vector< TaskletPtr >& vecTasks );
 
-    virtual guint32 GetTaskCount() override
+    guint32 GetTaskCount() override
     {
         CStdRTMutex oLock( GetLock() );
         return m_setTasks.size() +
