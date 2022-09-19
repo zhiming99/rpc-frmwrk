@@ -1,4 +1,7 @@
 ---
+[`Mon Sep 19 2022 08:28:10 PM Beijing`]    
+1. Continued fixing memory leaks and stability bugs and making optimizations to the 'ipc' code. Now the `fastrpc` module has reach a stable state. There are still one or two minor bugs to fix so far, but it would be very soon to get them fixed. and then we can move on to support for programming with`rpcfs`.
+
 [`Mon Sep 12 2022 03:19:45 PM Beijing`]    
 1. The issue of ping token loss is actually a collection of bugs in the uxport, uxstream, and fastrpc. After extensive code review, bug fixes and testing, the issue is almost gone. I will do some futher tests in the next few days to verify.
 
