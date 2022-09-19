@@ -54,6 +54,7 @@ class CDBusStreamPdo :
     bool m_bServer = false;
     HANDLE m_hStream = INVALID_HANDLE;
     std::atomic< guint32 > m_dwDisconned;
+    std::atomic< bool > m_bSkelReady;
 
     stdstr m_strHash;
     stdstr m_strPath;
@@ -122,6 +123,7 @@ class CDBusStreamPdo :
     gint32 PreStop( IRP* pIrp ) override;
     gint32 PostStart( IRP* pIrp ) override;
     gint32 OnPortReady( IRP* pIrp ) override;
+    gint32 OnPortStackReady( IRP* pIrp ) override;
 
     gint32 IsIfSvrOnline(
         const DMsgPtr& pMsg ) override;

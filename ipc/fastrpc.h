@@ -117,9 +117,6 @@ class CRpcStmChanBase :
             }
             oBusLock.Unlock();
 
-            // OnStmClosing( hstm );
-            // IStream::OnClose( hstm, pCallback );
-
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
 
@@ -1040,6 +1037,7 @@ class CFastRpcSkelSvrBase :
     CFastRpcSkelSvrBase( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
+    gint32 NotifyStackReady();
 };
 
 class CFastRpcServerState :
@@ -1083,6 +1081,8 @@ class CFastRpcServerBase :
 {
     protected:
     std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
+
+    gint32 NotifyStackReady();
 
     public:
     typedef IFBASE3( false ) super;

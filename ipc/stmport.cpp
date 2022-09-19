@@ -103,7 +103,9 @@ static gint32 FireRmtSvrEvent(
 
 CDBusStreamPdo::CDBusStreamPdo(
     const IConfigDb* pCfg )
-    : super( pCfg )
+    : super( pCfg ),
+    m_dwDisconned( 0 ),
+    m_bSkelReady( false )
 {
     gint32 ret = 0;
     do{
@@ -125,7 +127,6 @@ CDBusStreamPdo::CDBusStreamPdo(
         }
 
         SetClassId( clsid( CDBusStreamPdo ) );
-        m_dwDisconned = 0;
 
     }while( 0 );
 
@@ -933,45 +934,56 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
         auto *pBusPort = static_cast
             < CDBusStreamBusPort* >( m_pBusPort );
         HANDLE hStream = GetStream();
+
+        pBusPort->BindStreamPort(
+            hStream, PortPtr( this ) );
+
         if( !IsServer() )
-        {
-            pBusPort->BindStreamPort(
-                hStream, PortPtr( this ) );
             break;
-        }
 
-        do{
-            InterfPtr pUxIf;
-            CStreamServerSync* ps = GetStreamIf();
-            ret = ps->GetUxStream( hStream, pUxIf );
-            if( ERROR( ret ) )
-                break;
-
-            CStdRMutex oBusLcok(
-                pBusPort->GetLock() );
-
-            ObjPtr pIf = pUxIf;
-            ret = CheckExistance( pIf );
-
-            pBusPort->BindStreamPort(
-                hStream, PortPtr( this ) );
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-        {
-            // still let the port start to success
-            ret = 0;
-            FireRmtSvrEvent( this,
-                eventRmtSvrOffline, hStream );
-        }
-        else
-        {
-            FireRmtSvrEvent( this,
-                eventRmtSvrOnline, hStream );
-        }
+        FireRmtSvrEvent( this,
+            eventRmtSvrOnline, hStream );
 
     }while( 0 );
+
+    pIrp->GetCurCtx()->SetStatus( ret );
+    return ret;
+}
+
+gint32 CDBusStreamPdo::OnPortStackReady(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+
+    gint32 ret = 0;
+    HANDLE hStream = GetStream();
+
+    do{
+        if( !IsServer() )
+            break;
+
+        InterfPtr pUxIf;
+        CStreamServerSync* ps = GetStreamIf();
+        ret = ps->GetUxStream( hStream, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
+        m_bSkelReady = true;
+        ObjPtr pIf = pUxIf;
+        ret = CheckExistance( pIf );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // still let the port start to success
+        OnEvent( eventDisconn,
+            hStream, 0, nullptr );
+        ret = 0;
+    }
 
     pIrp->GetCurCtx()->SetStatus( ret );
     return ret;
@@ -989,6 +1001,8 @@ gint32 CDBusStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
+            if( !m_bSkelReady )
+                break;
             if( m_dwDisconned++ > 0 )
             {
                 DebugPrint( m_dwDisconned,

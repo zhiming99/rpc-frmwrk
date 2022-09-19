@@ -152,6 +152,26 @@ gint32 CFastRpcServerBase::OnPreStop(
     return ret;
 }
 
+gint32 CFastRpcSkelSvrBase::NotifyStackReady()
+{
+    IrpPtr pIrp( true );
+    PortPtr pPort = this->GetPort();
+
+    pIrp->AllocNextStack( nullptr );
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    pCtx->SetMajorCmd( IRP_MJ_PNP );
+    pCtx->SetMinorCmd( IRP_MN_PNP_STACK_READY );
+    pPort->AllocIrpCtxExt( pCtx );
+    pCtx->SetIoDirection( IRP_DIR_OUT ); 
+    pIrp->SetSyncCall( true );
+
+    auto pMgr = this->GetIoMgr();
+    HANDLE hPort = this->GetPortHandle();
+
+    return pMgr->SubmitIrp( hPort,
+        pIrp, false );
+}
+
 gint32 CFastRpcServerBase::OnStartSkelComplete(
     IEventSink* pCallback,
     IEventSink* pIoReq,
@@ -183,24 +203,31 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         if( ERROR( ret ) )
             break;
 
+        ObjPtr pIf;
+        ret = oReqCtx.GetObjPtr(
+            propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
         if( bStart )
         {
+            gint32 iRet = 0;
             IConfigDb* pResp = nullptr;
             CCfgOpenerObj oReq( pIoReq );
             ret = oReq.GetPointer(
                 propRespPtr, pResp );
             if( SUCCEEDED( ret ) )
             {
-                gint32 iRet = 0;
                 guint32* pRet = ( guint32* )&iRet;
                 CCfgOpener oResp( pResp );
                 oResp.GetIntProp(
                     propReturnValue, *pRet );
-                if( ERROR( iRet ) )
-                {
-                }
             }
-            break;
+            if( SUCCEEDED( iRet ) )
+            {
+                CFastRpcSkelSvrBase* pSkel = pIf;
+                ret =pSkel->NotifyStackReady();
+            }
         }
         else
         {
@@ -340,18 +367,39 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         // whether start or stop
         oReqCtx.Push( bOnline );
 
-        // just for allocating prop 1
+        // just make room for prop 1
         oReqCtx.Push( bOnline );
-        // fill prop 1 with an unsupport type
+
+        // set prop 1 with an unsupport type by Push
         oReqCtx.SetIntPtr( 1, ( guint32*& )hPort );
 
+        TaskletPtr pStartTask;
         TaskletPtr pTask;
         if( bOnline )
         {
-            ret = DEFER_IFCALLEX_NOSCHED2(
-                0, pTask, ObjPtr( pIf ),
+            TaskletPtr pStopTask;
+            DEFER_IFCALLEX_NOSCHED2(
+                0, pStartTask, ObjPtr( pIf ),
                 &CRpcServices::StartEx,
                 nullptr );
+
+            DEFER_IFCALLEX_NOSCHED2(
+                0, pStopTask, ObjPtr( pIf ),
+                &CRpcServices::StopEx,
+                nullptr );
+
+            CParamList oParams;
+            oParams[ propIfPtr ] = ObjPtr( this );
+
+            TaskGrpPtr pTaskGrp;
+            pTaskGrp.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            pTaskGrp->SetRelation( logicOR );
+            pTaskGrp->AppendTask( pStartTask );
+            pTaskGrp->AppendTask( pStopTask );
+            pTask = pTaskGrp;
         }
         else
         {
@@ -363,30 +411,24 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
 
             // explicitly close the port
             oReqCtx.Push( bClosePort );
-            ret = DEFER_IFCALLEX_NOSCHED2(
+            DEFER_IFCALLEX_NOSCHED2(
                 0, pTask, ObjPtr( pIf ),
                 &CRpcServices::StopEx,
                 nullptr );
         }
-        if( ERROR( ret ) )
-            break;
 
         TaskletPtr pRespCb;
-        ret = NEW_PROXY_RESP_HANDLER2(
+        NEW_PROXY_RESP_HANDLER2(
             pRespCb, ObjPtr( this ), 
             &CFastRpcServerBase::OnStartSkelComplete,
             nullptr,
             ( IConfigDb* )oReqCtx.GetCfg() );
-        if( ERROR( ret ) )
-        {
-            ( *pTask )( eventCancelTask );
-            break;
-        }
-        CIfRetryTask* pRetry = pTask;
+
+        CIfRetryTask* pRetry =
+            bOnline ? pStartTask : pTask;
         pRetry->SetClientNotify( pRespCb );
         auto pMgr = this->GetIoMgr();
         ret = pMgr->RescheduleTask( pTask );
-        // ret = this->AddSeqTask( pTask );
         if( SUCCEEDED( ret ) )
             ret = pTask->GetError();
 
