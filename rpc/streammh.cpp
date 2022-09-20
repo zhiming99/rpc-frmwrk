@@ -979,9 +979,6 @@ gint32 CIfUxListeningRelayTaskMH::RunTask()
             ( IConfigDb* )oParams.GetCfg() );
 
         ret = OnTaskComplete( ret );
-        if( ret == STATUS_PENDING )
-            break;
-
         if( ERROR( ret ) )
             break;
 

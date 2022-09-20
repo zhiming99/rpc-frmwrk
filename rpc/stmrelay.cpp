@@ -1040,9 +1040,6 @@ gint32 CIfUxListeningRelayTask::RunTask()
             break;
 
         ret = OnTaskComplete( ret );
-        if( ret == STATUS_PENDING )
-            break;
-
         if( ERROR( ret ) )
             break;
 
@@ -1055,10 +1052,13 @@ gint32 CIfUxListeningRelayTask::OnTaskComplete(
     gint32 iRet )
 {
     gint32 ret = 0;
-    if( ERROR( iRet ) )
-        return iRet;
 
     do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
         IConfigDb* pCfg = GetConfig();
         CCfgOpener oCfg( pCfg );
 
@@ -1085,6 +1085,16 @@ gint32 CIfUxListeningRelayTask::OnTaskComplete(
         ret = PostEvent( pPayload );
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error, the relay "
+            "channel will be closed from "
+            "OnTaskComplete" );
+        BufPtr pCloseBuf( true );
+        *pCloseBuf = tokClose;
+        PostEvent( pCloseBuf );
+    }
 
     return ret;
 }
@@ -1210,7 +1220,8 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error, the relay "
-            "channel will be closed" );
+            "channel will be closed from "
+            "OnIrpComplete" );
         BufPtr pCloseBuf( true );
         *pCloseBuf = tokClose;
         PostEvent( pCloseBuf );

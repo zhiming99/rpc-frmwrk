@@ -1046,6 +1046,7 @@ class CUnixSockStream:
             return ERROR_STATE;
 
         do{
+            m_pListeningTask = ObjPtr( pCallback );
             CParamList oParams;
             oParams[ propMethodName ] = __func__;
             ret = SubmitRequest( oParams.GetCfg(),
@@ -1266,7 +1267,8 @@ class CUnixSockStream:
 
             oParams.CopyProp( propTimeoutSec, this );
 
-            ret = m_pListeningTask.NewObj(
+            TaskletPtr pListeningTask;
+            ret = pListeningTask.NewObj(
                 clsid( CIfUxListeningTask ),
                 oParams.GetCfg() );
 
@@ -1274,7 +1276,7 @@ class CUnixSockStream:
                 break;
 
             ret = this->RunManagedTask(
-                m_pListeningTask );
+                pListeningTask );
 
             if( ERROR( ret ) )
                 break;

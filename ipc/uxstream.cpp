@@ -754,10 +754,13 @@ gint32 CIfUxListeningTask::OnTaskComplete(
     gint32 iRet )
 {
     gint32 ret = 0;
-    if( ERROR( iRet ) )
-        return iRet;
 
     do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
         IConfigDb* pCfg = GetConfig();
         CCfgOpener oCfg( pCfg );
 
@@ -789,6 +792,18 @@ gint32 CIfUxListeningTask::OnTaskComplete(
         ret = PostEvent( pPayload );
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error, the channel will "
+            "be closed from OnTaskComplete" );
+        BufPtr pErrBuf( true );
+        *pErrBuf = tokError;
+        gint32 iRet = htonl( ret );
+        pErrBuf->Append(
+            ( guint8* )&iRet, sizeof( iRet ) );
+        PostEvent( pErrBuf );
+    }
 
     return ret;
 }
@@ -845,7 +860,8 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
 
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error, the channel will be closed" );
+        DebugPrint( ret, "Error, the channel will "
+            "be closed from OnIrpComplete" );
         BufPtr pErrBuf( true );
         *pErrBuf = tokError;
         gint32 iRet = htonl( ret );
