@@ -3897,6 +3897,10 @@ class CDeferredFuncCall :
             Delegate( this->m_vecArgs ) );
     }
 
+    using TaskType::OnTaskComplete;
+    gint32 OnTaskComplete( gint32 iRet ) override
+    { return iRet; }
+
     using TaskType::OnComplete;
     gint32 OnComplete( gint32 iRetVal ) override
     {
@@ -3928,8 +3932,32 @@ inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
 #define NEW_FUNCCALL_TASK( __pTask, pMgr, func, ... ) \
     NewDeferredFuncCall( __pTask, pMgr, ( CIfRetryTask* )nullptr, func , ##__VA_ARGS__ )
 
+#define NEW_FUNCCALL_TASK2( _pos, __pTask, pMgr, func, ... ) \
+({ \
+    gint32 _ret = NewDeferredFuncCall( __pTask, pMgr, ( CIfRetryTask* )nullptr, func , ##__VA_ARGS__ );\
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CDeferredFuncCallBase< CIfRetryTask >* pDefer = __pTask; \
+        Variant oVar( __pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
+    } \
+    _ret; \
+})
+
 #define NEW_FUNCCALL_TASKEX( __pTask, pMgr, func, ... ) \
     NewDeferredFuncCall( __pTask, pMgr, ( CIfParallelTask* )nullptr, func , ##__VA_ARGS__ )
+
+#define NEW_FUNCCALL_TASKEX2( __pTask, pMgr, func, ... ) \
+({ \
+    gint32 _ret = NewDeferredFuncCall( __pTask, pMgr, ( CIfParallelTask*)nullptr, func , ##__VA_ARGS__ );\
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CDeferredFuncCallBase< CIfParallelTask >* pDefer = __pTask; \
+        Variant oVar( __pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
+    } \
+    _ret; \
+})
 
 class CTaskWrapper :
     public CGenericCallback< CIfInterceptTaskProxy >

@@ -1037,7 +1037,7 @@ class CFastRpcSkelSvrBase :
     CFastRpcSkelSvrBase( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
-    gint32 NotifyStackReady();
+    gint32 NotifyStackReady( PortPtr& pPort );
 };
 
 class CFastRpcServerState :
@@ -1081,8 +1081,6 @@ class CFastRpcServerBase :
 {
     protected:
     std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
-
-    gint32 NotifyStackReady();
 
     public:
     typedef IFBASE3( false ) super;

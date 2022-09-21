@@ -965,13 +965,14 @@ gint32 CDBusStreamPdo::OnPortStackReady(
         if( !IsServer() )
             break;
 
+        m_bSkelReady = true;
+
         InterfPtr pUxIf;
         CStreamServerSync* ps = GetStreamIf();
         ret = ps->GetUxStream( hStream, pUxIf );
         if( ERROR( ret ) )
             break;
 
-        m_bSkelReady = true;
         ObjPtr pIf = pUxIf;
         ret = CheckExistance( pIf );
 
@@ -1001,7 +1002,7 @@ gint32 CDBusStreamPdo::OnEvent(
     case eventDisconn:
         {
             // passive disconnection detected
-            if( !m_bSkelReady )
+            if( IsServer() && !m_bSkelReady )
                 break;
             if( m_dwDisconned++ > 0 )
             {

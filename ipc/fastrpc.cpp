@@ -152,11 +152,15 @@ gint32 CFastRpcServerBase::OnPreStop(
     return ret;
 }
 
-gint32 CFastRpcSkelSvrBase::NotifyStackReady()
+gint32 CFastRpcSkelSvrBase::NotifyStackReady(
+    PortPtr& pPort )
 {
-    IrpPtr pIrp( true );
-    PortPtr pPort = this->GetPort();
+    // call this method in OnPreStart, which is the
+    // only place to guarantee this request to succeed.
+    if( pPort.IsEmpty() )
+        return -EINVAL;
 
+    IrpPtr pIrp( true );
     pIrp->AllocNextStack( nullptr );
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
     pCtx->SetMajorCmd( IRP_MJ_PNP );
@@ -166,8 +170,7 @@ gint32 CFastRpcSkelSvrBase::NotifyStackReady()
     pIrp->SetSyncCall( true );
 
     auto pMgr = this->GetIoMgr();
-    HANDLE hPort = this->GetPortHandle();
-
+    HANDLE hPort = PortToHandle( pPort );
     return pMgr->SubmitIrp( hPort,
         pIrp, false );
 }
@@ -203,50 +206,27 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         if( ERROR( ret ) )
             break;
 
-        ObjPtr pIf;
-        ret = oReqCtx.GetObjPtr(
-            propIfPtr, pIf );
+        if( bStart )
+            break;
+
+        bool bClosePort = false;
+        ret = oReqCtx.GetBoolProp(
+            2, bClosePort );
         if( ERROR( ret ) )
             break;
 
-        if( bStart )
-        {
-            gint32 iRet = 0;
-            IConfigDb* pResp = nullptr;
-            CCfgOpenerObj oReq( pIoReq );
-            ret = oReq.GetPointer(
-                propRespPtr, pResp );
-            if( SUCCEEDED( ret ) )
-            {
-                guint32* pRet = ( guint32* )&iRet;
-                CCfgOpener oResp( pResp );
-                oResp.GetIntProp(
-                    propReturnValue, *pRet );
-            }
-            if( SUCCEEDED( iRet ) )
-            {
-                CFastRpcSkelSvrBase* pSkel = pIf;
-                ret =pSkel->NotifyStackReady();
-            }
-        }
-        else
-        {
-            bool bClosePort = false;
-            ret = oReqCtx.GetBoolProp(
-                2, bClosePort );
-            if( ERROR( ret ) )
-                break;
+        RemoveStmSkel( hstm );
+        CCfgOpenerObj oIfCfg( this );
 
-            RemoveStmSkel( hstm );
-            if( bClosePort )
-            {
-                auto pMgr = this->GetIoMgr();
-                pMgr->ClosePort(
-                    hPort, nullptr, nullptr );
-            }
+        if( bClosePort )
+        {
+            auto pMgr = this->GetIoMgr();
+            pMgr->ClosePort(
+                hPort, nullptr, nullptr );
         }
 
     }while( 0 );
+
     if( pCallback != nullptr )
     {
         pCallback->OnEvent(
@@ -317,9 +297,9 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
             break;
         
         InterfPtr pIf;
+        PortPtr pPort;
         if( bOnline )
         {
-            PortPtr pPort;
             auto pMgr = this->GetIoMgr();
             ret = pMgr->GetPortPtr(
                 hPort, pPort );
@@ -378,10 +358,26 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         if( bOnline )
         {
             TaskletPtr pStopTask;
-            DEFER_IFCALLEX_NOSCHED2(
-                0, pStartTask, ObjPtr( pIf ),
-                &CRpcServices::StartEx,
-                nullptr );
+            gint32 (*func)( IEventSink*,
+                    CFastRpcSkelSvrBase*, IPort*) =
+                ( []( IEventSink* pCb,
+                    CFastRpcSkelSvrBase* pIf,
+                    IPort* pPort)->gint32
+                {
+                    if( pIf == nullptr ||
+                        pPort == nullptr ||
+                        pCb == nullptr )
+                        return -EINVAL;
+                    PortPtr portPtr( pPort );
+                    pIf->NotifyStackReady( portPtr );
+                    return pIf->StartEx( pCb );
+                });
+
+            NEW_FUNCCALL_TASK2(
+                0, pStartTask,
+                GetIoMgr(), func, nullptr,
+                ( CFastRpcSkelSvrBase* )pIf,
+                ( IPort* )pPort );
 
             DEFER_IFCALLEX_NOSCHED2(
                 0, pStopTask, ObjPtr( pIf ),
