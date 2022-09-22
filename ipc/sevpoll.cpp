@@ -443,7 +443,7 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
             if( pMap->find( hWatch ) ==
                 pMap->end() )
             {
-                mapActTimers.erase( itr++ );
+                itr = mapActTimers.erase( itr );
                 continue;
             }
 
@@ -452,7 +452,7 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
                 itr->second, srcTimer, psh );
             if( ERROR( ret ) )
             {
-                mapActTimers.erase( itr++ );
+                itr = mapActTimers.erase( itr );
                 continue;
             }
 
@@ -460,7 +460,7 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
                 ( CEvLoop::TIMER_SOURCE* )psh;
             if( pSrc->GetState() != srcsReady )
             {
-                mapActTimers.erase( itr++ );
+                itr = mapActTimers.erase( itr );
                 continue;
             }
             itr++;
