@@ -29,7 +29,7 @@
    * Change to the subdirectory `cpp/hellowld`
    * Run `make` to build the hellowld project on both server and client host.
    * Under the `release` directory, you will get `HelloWorldsvr` as server program, and HelloWorldcli as client program.
-   * Check the `README.md` for detain information about the files.
+   * Check the `README.md` for the detail information about the files.
    * The generated files under `hellowld` directory are   
    ![tree](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/hellowld-tree.png)
    * The output of the client program is as follows  
