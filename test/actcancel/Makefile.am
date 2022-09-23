@@ -17,7 +17,7 @@ actclitstdir=$(sysconfdir)/rpcf
 
 actclitst_SOURCES= actctest.cpp actctest.h
 actclitst_LDADD=$(actc_LDFLAGS) libactc.la
-actclitst_CPPFLAGS=$(actc_CPPFLAGS) -DCLIENT
+actclitst_CPPFLAGS=$(actc_CPPFLAGS) -DCLIENT -fPIC
 
 actcsvrtst_SOURCES=actctest.cpp actctest.h
 actcsvrtst_LDADD=$(actc_LDFLAGS) libactc.la
