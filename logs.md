@@ -1,4 +1,7 @@
 ---
+[`Sat Sep 24 2022 10:08:56 PM Beijing`]    
+1. Released 0.5.0. Congratulations!
+
 [`Mon Sep 19 2022 08:28:10 PM Beijing`]    
 1. Continued fixing memory leaks and stability bugs and making optimizations to the 'ipc' code. Now the `fastrpc` module has reach a stable state. There are still one or two minor bugs to fix so far, but it would be very soon to get them fixed. and then we can move on to support for programming with`rpcfs`.
 
