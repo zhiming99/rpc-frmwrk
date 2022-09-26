@@ -394,6 +394,12 @@ gint32 CDBusStreamPdo::HandleSendEvent( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
+            stdstr strMethod = pMsg.GetMember();
+            bool bBroadcast = true;
+            if( strMethod == SYS_EVENT_KEEPALIVE )
+                bBroadcast = false;
+
+
             auto *pBusPort = static_cast
                 < CDBusStreamBusPort* >( m_pBusPort );
 
@@ -401,8 +407,12 @@ gint32 CDBusStreamPdo::HandleSendEvent( IRP* pIrp )
                 CDBusBusPort::LabelMessage( pMsg );
 
             pMsg.SetNoReply( true );
-            ret = pBusPort->BroadcastDBusMsg(
-                pIrp, pMsg );
+            if( bBroadcast )
+                ret = pBusPort->BroadcastDBusMsg(
+                    pIrp, pMsg );
+            else
+                ret = pBusPor->SendDBusMsg(
+                    pIrp, pMsg );
         }
         else
         {

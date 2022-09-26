@@ -4747,6 +4747,7 @@ gint32 CImplIfMethodProxy::OutputSync()
         if( dwCount == 0 )
         {
             CCOUT << ")";
+            INDENT_DOWNL;
         }
         else
         {

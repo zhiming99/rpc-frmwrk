@@ -42,7 +42,7 @@
 #define IFBASE3( _bProxy ) std::conditional< \
     _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
 
-#define MAX_REQCHAN_PER_SESS 400
+#define MAX_REQCHAN_PER_SESS 200
 
 namespace rpcf
 {
@@ -928,7 +928,6 @@ class CRpcStmChanCli :
     CRpcStmChanCli( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
-    void haha();
 };
 
 class CRpcStmChanSvr :
