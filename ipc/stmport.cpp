@@ -411,7 +411,7 @@ gint32 CDBusStreamPdo::HandleSendEvent( IRP* pIrp )
                 ret = pBusPort->BroadcastDBusMsg(
                     pIrp, pMsg );
             else
-                ret = pBusPor->SendDBusMsg(
+                ret = this->SendDBusMsg(
                     pIrp, pMsg );
         }
         else
