@@ -6,11 +6,12 @@ RPC是英文Remote Procedure Calls的简写。 `rpc-frmwrk`提供了一套运行
 
 有时也会用到`Client`的说法，因为`Proxy`在`rpc-frmwrk`的上下文中，指某一个接口的代理对象，而`Client`则泛指容纳一个或多个`Proxy`实例的对象或者应用程序。
 
-### 远程调用(RPC), 进程间调用(IPC)和进程内调用(In-Process Call)
+## 远程调用(RPC), 进程间调用(IPC)和进程内调用(In-Process Call)
 基于RPC-frmwrk的服务器可以同时支持这三种调用。如果服务器和客户端生成的是动态库，则只需改变配置即可完成RPC/IPC/In-Process的切换。
 
 ## 配置`rpc-frmwrk`
-`rpc-frmwrk`的每一对Server/Proxy共享一个对象描述配置文件，该文件给出连接服务器的各种参数，认证的用户信息，或者运行时的参数。除了次文件，还需要一个`driver.json`配置的文件。`driver.json`给出的是Server/Proxy运行时依赖的IO模块，和这些模块的加载顺序。不用紧张，配置文件一般情况下可以通过配置工具和`ridlc`生成的Makefile搞定，若非高级配置，不需要手工设定。
+* `rpc-frmwrk`的每一对Server/Proxy共享一个对象描述配置文件，该文件给出连接服务器的各种参数，认证的用户信息，或者运行时的参数。除了次文件，还需要一个`driver.json`配置的文件。`driver.json`给出的是Server/Proxy运行时依赖的IO模块，和这些模块的加载顺序。不用紧张，配置文件一般情况下可以通过配置工具和`ridlc`生成的Makefile搞定，若非高级配置，不需要手工设定。
+* 关于配置工具的详细介绍，请参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool)。
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy端的每个方法调用都可以指定是同步或者异步调用。
@@ -50,8 +51,22 @@ RPC是英文Remote Procedure Calls的简写。 `rpc-frmwrk`提供了一套运行
 ## 负载均衡
 `rpc-frmwrk`在Multihop的基础上支持Round-Robin负载均衡。由于`rpc-frmwrk`的对话（Session)是有状态的长链接，负载均衡是以在连接建立时进行的，一旦连接建立起来，就不再进行负载均衡，也就不存在逐个Request负载均衡。这是和RESTful架构的RPC不同之处。关于负载均衡的详细介绍可以参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance)。
 
+## `rpcfs`文件系统
+`rpcfs`文件系统是一个由Linux FUSE支持的文件系统，是`rpc-frmwrk`提供的有别于传统编程接口的应用接口和管理接口，它主要有以下功能   
+* 加载和启停用户的服务器或者代理模块。
+* 导出业务模块的运行时状态。
+* 增加或者减少发送`Request`的并发量，发送和接收代理的`Request`。
+* 增加或者减少`Response`的处理进程，发送和接收服务器的`Response`和`Event`。
+* 添加，删除流通道，发送和接收字节流。
+* 导出守护进程的运行状态，和参数和计数器统计。
+* 优雅的关闭服务器或者客户端。
+关于`rpcfs`的内容和结构可以参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/fuse/README.md)。
+
+## I/O子系统
+`rpc-frmwrk`的I/O子系统类似于操作系统的I/O系统，有驱动程序和端口对象组成。不管是服务器还是代理程序都需要I/O子系统。I/O子系统的配置放在`driver.json`的文件中，它给出服务器和代理程序需要加载的驱动程序和类库。在系统目录下的`driver.json`给出了守护进程，系统自带的工具，和测试用例所需要加载的驱动程序和类库。I/O子系统的一大特点是可以分层的，就是由多层的端口对象来组成一个管线(Pipeline)，用以处理复杂的I/O需求。另一个特点是它是异步，每个I/O请求对应一个IoRequestPacket对象，它保存了该I/O请求的所有信息和状态，以保证在I/O就绪时，可以发起新的I/O操作，继续已经开始的操作，或者出错时，取消当前的操作。
+
 ## 性能
-`rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000的连接测试中，2000个连接时达到最大吞吐量，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒1000-1200Requests.
+`rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒1000-1200Requests.
 
 ## 开发
 * `rpc-frmwrk`通过`ridl`接口描述语言定义函数接口，和需要传输的数据结构。并通过`ridl`文件生成各种语言的框架代码，配置文件，以及Makefile和Readme文件. 同一`ridl`文件生成的不同框架可以互操作。有关`ridl`语言的介绍请点击此[链接](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl)。
