@@ -4420,34 +4420,13 @@ gint32 CIfInvokeMethodTask::OnTaskComplete(
             // this task can reach here at the starting
             // state, when the message is not unpacked
             // and the call options are not copied to
-            // this task at all, esp. req-flow-control
+            // this task yet, esp. due to RFC(
+            // request-flow-control )
             if( !bResp )
                 break;
 
-            CInterfaceServer *pServer =
-                ObjPtr( pIf );
-
-            SvrConnPtr pConnMgr =
-                pServer->GetConnMgr();
-
-            if( !pConnMgr.IsEmpty() )
-            {
-                ret = pConnMgr->CanResponse(
-                    ( HANDLE )( ( CObjBase* )this ) );
-            }
-
-            if( ret != ERROR_FALSE )
-            {
-                ret = pIf->SendResponse(
-                    this, pMsg, pResp );
-            }
-
-            // the connection record can be removed
-            if( !pConnMgr.IsEmpty() )
-            {
-                pConnMgr->OnInvokeComplete(
-                    ( HANDLE )( ( CObjBase* )this ) );
-            }
+            ret = pIf->SendResponse( this,
+                pMsg, pResp );
         }
         else if( iType == typeObj )
         {
@@ -4501,27 +4480,6 @@ gint32 CIfInvokeMethodTask::OnComplete(
         RemoveTimer( m_iTimeoutId );
         m_iTimeoutId = 0;
     }
-
-    // servicing the next incoming request or
-    // event message
-    do{
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetConfig() );
-        CRpcServices* pIf = nullptr;
-        
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
-        if( ERROR( ret ) )
-            break;
-
-        pIf = pObj;
-        if( pIf == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-    }while( 0 );
 
     ret = super::OnComplete( iRetVal );
 

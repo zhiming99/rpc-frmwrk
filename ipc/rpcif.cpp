@@ -2285,8 +2285,8 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 ret = pIoTask->GetError();
                 if( ret == STATUS_PENDING )
                 {
-                    // in case the io task is scheduled
-                    // on the this thread.
+                    // in case the para group is
+                    // running on other thread.
                     pIoTask->MarkPending();
                 }
                 ret = 0;

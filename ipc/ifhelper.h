@@ -3947,7 +3947,7 @@ inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
 #define NEW_FUNCCALL_TASKEX( __pTask, pMgr, func, ... ) \
     NewDeferredFuncCall( __pTask, pMgr, ( CIfParallelTask* )nullptr, func , ##__VA_ARGS__ )
 
-#define NEW_FUNCCALL_TASKEX2( __pTask, pMgr, func, ... ) \
+#define NEW_FUNCCALL_TASKEX2( _pos, __pTask, pMgr, func, ... ) \
 ({ \
     gint32 _ret = NewDeferredFuncCall( __pTask, pMgr, ( CIfParallelTask*)nullptr, func , ##__VA_ARGS__ );\
     if( SUCCEEDED( _ret ) ) \

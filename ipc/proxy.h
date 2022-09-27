@@ -1565,7 +1565,7 @@ class CInterfaceServer :
 
     // send a dbus signal, called from the user
     // code
-    gint32 BroadcastEvent(
+    virtual gint32 BroadcastEvent(
         IConfigDb* pEvent,
         IEventSink* pCallback = nullptr );
 
