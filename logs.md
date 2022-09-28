@@ -1,4 +1,7 @@
 ---
+[`Wed Sep 28 2022 03:26:39 PM Beijing`]   
+1. I cannot resist to make fastrpc to support fuse first before the skelton code generator for `rpcfs`, because fastrpc has some good potentials that could be very useful in the future.
+ 
 [`Sat Sep 24 2022 10:08:56 PM Beijing`]    
 1. Released 0.5.0. Congratulations!
 
