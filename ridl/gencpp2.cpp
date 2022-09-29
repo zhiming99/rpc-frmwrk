@@ -3210,11 +3210,6 @@ gint32 GenHeaderFileROS(
         if( ERROR( ret ) )
             break;
 
-        if( bFuseP )
-        {
-            CCppWriter* m_pWriter = pWriter;
-        }
-
         CDeclareClassIds odci(
             pWriter, pRoot );
 

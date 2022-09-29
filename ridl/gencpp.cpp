@@ -1074,11 +1074,6 @@ gint32 GenHeaderFile(
         if( ERROR( ret ) )
             break;
 
-        if( bFuseP )
-        {
-            CCppWriter* m_pWriter = pWriter;
-        }
-
         CDeclareClassIds odci(
             pWriter, pRoot );
 
