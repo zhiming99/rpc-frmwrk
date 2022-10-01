@@ -751,12 +751,31 @@ gint32 CDriverManager::StopPreloadable()
     return ret;
 }
 
+
+
+
 // driver loading 
 gint32 CDriverManager::LoadDriver(
     const string& strDriverName )
 {
+    CCfgOpener oCfg;
+    oCfg[ propDrvName ] = strDriverName;
+    return LoadDriver( oCfg.GetCfg() );
+}
+
+gint32 CDriverManager::LoadDriver(
+    IConfigDb* pCfg )
+{
+
     gint32 ret = 0;
     do{
+        CCfgOpener oExtCfg( pCfg );
+        stdstr strDriverName;
+        ret = oExtCfg.GetStrProp(
+            propDrvName, strDriverName );
+        if( ERROR( ret ) )
+            break;
+
         Json::Value& oDriverArray =
             ( Json::Value& )m_oConfig[ JSON_ATTR_DRIVERS ];
 
@@ -806,19 +825,10 @@ gint32 CDriverManager::LoadDriver(
             break;
         }
 
-        CCfgOpener oExtCfg;
-
         ObjPtr objPtr( GetIoMgr() );
 
         // to pass a pointer to iomanager
         ret = oExtCfg.SetPointer( propIoMgr, GetIoMgr() );
-
-        if( ERROR( ret ) )
-            break;
-
-        // to pass the driver name
-        ret = oExtCfg.SetStrProp(
-            propDrvName, strDriverName );
 
         if( ERROR( ret ) )
             break;

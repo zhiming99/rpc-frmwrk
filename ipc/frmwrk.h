@@ -87,8 +87,7 @@ class CDriverManager : public IService
     gint32 LoadStaticDrivers();
 
     // driver loading 
-    gint32 LoadDriver(
-        const IConfigDb* pCfg );
+    gint32 LoadDriver( IConfigDb* pCfg );
 
     gint32 LoadDriver(
         const std::string& strDriverName );
