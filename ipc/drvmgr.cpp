@@ -842,8 +842,7 @@ gint32 CDriverManager::LoadDriver(
 
         // create the object
         PortDrvPtr pDrv;
-        ret = pDrv.NewObj(
-            iClsid, oExtCfg.GetCfg() );
+        ret = pDrv.NewObj( iClsid, pCfg );
 
         if( ERROR( ret ) )
             break;
