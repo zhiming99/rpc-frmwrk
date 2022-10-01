@@ -93,11 +93,21 @@ CPortDriver::CPortDriver( const IConfigDb* pCfg ) :
     m_pCfgDb( true ),
     m_dwFlags( DRV_STATE_STOPPED | DRV_TYPE_FUNCDRV )
 {
-    *m_pCfgDb = *pCfg;
-    CCfgOpener oCfg( pCfg );
+    gint32 ret = 0;
+    do{
+        if( pCfg == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
-    gint32 ret = oCfg.GetPointer(
-        propIoMgr, m_pIoMgr );
+        *m_pCfgDb = *pCfg;
+        CCfgOpener oCfg( pCfg );
+
+        ret = oCfg.GetPointer(
+            propIoMgr, m_pIoMgr );
+
+    }while( 0 );
 
     if( ERROR( ret ) )
     {
