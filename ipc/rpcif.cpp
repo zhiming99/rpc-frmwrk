@@ -4439,6 +4439,17 @@ gint32 CRpcServices::LoadObjDesc(
                 // useful when sending out event
                 oCfg[ propSrcDBusName ] = strDest;
                 oCfg[ propObjPath ] = strObjPath;
+                if( oObjElem.isMember( JSON_ATTR_SVRSTAT_CLASS ) &&
+                    oObjElem[ JSON_ATTR_SVRSTAT_CLASS ].isString() )
+                {
+                    stdstr strClass = oObjElem[
+                        JSON_ATTR_SVRSTAT_CLASS ].asString();
+                    EnumClsid iClsid = CoGetClassId(
+                        strClass.c_str() );
+                    if( iClsid != clsid( Invalid ) )
+                        oCfg[ propIfStateClass ] =
+                            ( guint32 )iClsid;
+                }
             }
             else
             {
@@ -4496,6 +4507,18 @@ gint32 CRpcServices::LoadObjDesc(
 
                     oCfg[ propDestDBusName ] = strRmtSvrName;
                     oCfg[ propObjPath ] = strNewObjPath;
+                }
+
+                if( oObjElem.isMember( JSON_ATTR_PROXYSTAT_CLASS ) &&
+                    oObjElem[ JSON_ATTR_PROXYSTAT_CLASS ].isString() )
+                {
+                    stdstr strClass = oObjElem[
+                        JSON_ATTR_PROXYSTAT_CLASS ].asString();
+                    EnumClsid iClsid = CoGetClassId(
+                        strClass.c_str() );
+                    if( iClsid != clsid( Invalid ) )
+                        oCfg[ propIfStateClass ] =
+                            ( guint32 )iClsid;
                 }
             }
 

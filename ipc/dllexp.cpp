@@ -184,6 +184,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusStreamBusPort );
     INIT_MAP_ENTRYCFG( CDBusStreamBusDrv );
     INIT_MAP_ENTRYCFG( CDBusStreamPdo );
+    INIT_MAP_ENTRYCFG( CIfInvokeMethodTask2 );
+    INIT_MAP_ENTRYCFG( CIfStartRecvMsgTask2 );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

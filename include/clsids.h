@@ -339,6 +339,8 @@ typedef enum : guint32
     DECL_CLSID( CRpcStreamChannelCli ),
     DECL_CLSID( CDBusStreamBusPort ),
     DECL_CLSID( CDBusStreamBusDrv ),
+    DECL_CLSID( CIfStartRecvMsgTask2 ),
+    DECL_CLSID( CIfInvokeMethodTask2 ),
     DECL_CLSID( CDBusStreamPdo ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,

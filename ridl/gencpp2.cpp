@@ -34,6 +34,7 @@ using namespace rpcf;
 #include "genfuse.h"
 #include "frmwrk.h"
 #include "jsondef.h"
+#include "genfuse2.h"
 
 extern std::string g_strAppName;
 extern bool g_bMklib;
@@ -3050,8 +3051,8 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( " // set a must-have option for" );
             Wa( " // DBusStreamBusPort" );
             Wa( "auto pMgr = ( CIoManager* )g_pIoMgr;" );
-            Wa( "pMgr->SetCmdLineOpt(" );
-            CCOUT << "    propIsServer, "
+            Wa( "CCfgOpener oDrvCfg;" );
+            CCOUT << "oDrvCfg[ propIsServer ] = "
                  << ( bProxy ? "false" : "true" ) << " );";
             NEW_LINE;
             CCOUT << "stdstr strDesc= " << "\"./"
@@ -3059,11 +3060,11 @@ gint32 CImplMainFunc2::OutputROS()
             NEW_LINE;
             CCOUT << strClass << "* pSvc = nullptr;";
             NEW_LINE;
-            Wa( "pMgr->SetCmdLineOpt(" );
-            Wa( "    propObjDescPath, strDesc );" );
+            Wa( "oDrvCfg[ propObjDescPath ] = strDesc;" );
+            Wa( "oDrvCfg[ propDrvName ] = \"DBusStreamBusDrv\";" );
             Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
             Wa( "ret = oDrvMgr.LoadDriver(" );
-            Wa( "    \"DBusStreamBusDrv\" );" );
+            Wa( "    oDrvCfg.GetCfg() );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             CCOUT << "do";
@@ -3071,12 +3072,7 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( "InterfPtr pIf;" );
             Wa( "CParamList oParams;" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
-            Wa( "oParams[ propIfStateClass ] =" );
-            if( bProxy )
-                CCOUT << "    clsid( CFastRpcProxyState );";
-            else
-                CCOUT << "    clsid( CFastRpcServerState );";
-            NEW_LINES(2);
+            NEW_LINE;
             Wa( "ret = CRpcServices::LoadObjDesc(" );
             CCOUT << "    strDesc, \"" << strSvcName << "\",";
             NEW_LINE;
@@ -3263,7 +3259,7 @@ gint32 GenHeaderFileROS(
 
                     if( bFuseP )
                     {
-                        CDeclInterfProxyFuse odip(
+                        CDeclInterfProxyFuse2 odip(
                             pWriter, pObj );
                         ret = odip.Output();
                         if( ERROR( ret ) )
@@ -3280,7 +3276,7 @@ gint32 GenHeaderFileROS(
 
                     if( bFuseS )
                     {
-                        CDeclInterfSvrFuse odis(
+                        CDeclInterfSvrFuse2 odis(
                             pWriter, pObj );
 
                         ret = odis.Output();
@@ -3296,11 +3292,22 @@ gint32 GenHeaderFileROS(
                 }
             case clsid( CServiceDecl ):
                 {
-                    CDeclService2 ods(
-                        pWriter, pObj );
-                    ret = ods.OutputROSSkel();
-                    if( ERROR( ret ) )
-                        break;
+                    if( bFuse )
+                    {
+                        CDeclServiceFuse2 ods(
+                            pWriter, pObj );
+                        ret = ods.OutputROSSkel();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CDeclService2 ods(
+                            pWriter, pObj );
+                        ret = ods.OutputROSSkel();
+                        if( ERROR( ret ) )
+                            break;
+                    }
                     break;
                 }
             case clsid( CAppName ) :
@@ -3351,7 +3358,7 @@ gint32 GenHeaderFileROS(
 
             if( bFuseS )
             {
-                CDeclServiceImplFuse osi(
+                CDeclServiceImplFuse2 osi(
                     pWriter, elem.second, true );
 
                 ret = osi.Output();
@@ -3380,7 +3387,7 @@ gint32 GenHeaderFileROS(
 
             if( bFuseP )
             {
-                CDeclServiceImplFuse osi2(
+                CDeclServiceImplFuse2 osi2(
                     pWriter, elem.second, false );
 
                 ret = osi2.Output();
@@ -3412,7 +3419,7 @@ gint32 GenHeaderFileROS(
 
             if( bFuseS )
             {
-                CImplServiceImplFuse oisi(
+                CImplServiceImplFuse2 oisi(
                     pWriter, elem.second, true );
 
                 ret = oisi.Output();
@@ -3444,7 +3451,7 @@ gint32 GenHeaderFileROS(
 
             if( bFuseP )
             {
-                CImplServiceImplFuse oisi2(
+                CImplServiceImplFuse2 oisi2(
                     pWriter, elem.second, false );
 
                 ret = oisi2.Output();
@@ -3467,7 +3474,7 @@ gint32 GenHeaderFileROS(
             // client side
             if( bFuseP )
             {
-                CImplMainFuncFuse omf(
+                CImplMainFuncFuse2 omf(
                     pWriter, pRoot, true );
                 ret = omf.Output();
                 if( ERROR( ret ) )
@@ -3485,7 +3492,7 @@ gint32 GenHeaderFileROS(
             // server side
             if( bFuseS )
             {
-                CImplMainFuncFuse omf(
+                CImplMainFuncFuse2 omf(
                     pWriter, pRoot, false );
                 ret = omf.Output();
                 if( ERROR( ret ) )
@@ -3509,7 +3516,7 @@ gint32 GenHeaderFileROS(
 extern gint32 FuseDeclareMsgSet(
     CCppWriter* m_pWriter, ObjPtr& pRoot );
 
-gint32 EmitBuildJsonReq( 
+extern gint32 EmitBuildJsonReq2( 
     CWriterBase* m_pWriter );
 
 gint32 GenCppFileROS(
@@ -3559,7 +3566,7 @@ gint32 GenCppFileROS(
             if( ERROR( ret ) )
                 break;
 
-            ret = EmitBuildJsonReq(
+            ret = EmitBuildJsonReq2(
                 m_pWriter );
             if( ERROR( ret ) )
                 break;
@@ -3600,7 +3607,7 @@ gint32 GenCppFileROS(
 
                     if( bFuseP )
                     {
-                        CImplIufProxyFuse oiufp(
+                        CImplIufProxyFuse2 oiufp(
                             m_pWriter, pObj );
                         oiufp.Output();
                     }
@@ -3627,7 +3634,7 @@ gint32 GenCppFileROS(
                         ObjPtr pmd = pmdl->GetChild( i );
                         if( bFuseP )
                         {
-                            CImplIfMethodProxyFuse oiimp(
+                            CImplIfMethodProxyFuse2 oiimp(
                                 m_pWriter, pmd );
                             ret = oiimp.Output();
                             if( ERROR( ret ) )
@@ -3645,7 +3652,7 @@ gint32 GenCppFileROS(
 
                     if( bFuseS )
                     {
-                        CImplIufSvrFuse oiufs(
+                        CImplIufSvrFuse2 oiufs(
                             m_pWriter, pObj );
                         oiufs.Output();
                     }
@@ -3662,7 +3669,7 @@ gint32 GenCppFileROS(
                         ObjPtr pmd = pmdl->GetChild( i );
                         if( bFuseS )
                         {
-                            CImplIfMethodSvrFuse oiims(
+                            CImplIfMethodSvrFuse2 oiims(
                                 m_pWriter, pmd );
                             ret = oiims.Output();
                             if( ERROR( ret ) )

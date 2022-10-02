@@ -152,6 +152,280 @@ gint32 CFastRpcServerBase::OnPreStop(
     return ret;
 }
 
+template< typename T1, typename T >
+gint32 CIfStartRecvMsgTask2::HandleIncomingMsg2(
+    ObjPtr& ifPtr, T1& pMsg )
+{
+    gint32 ret = 0;
+
+    // servicing the incoming request/event
+    // message
+    do{
+        CFastRpcSkelSvrBase* pIf = ifPtr;
+
+        if( pIf == nullptr || pMsg.IsEmpty() )
+            return -EFAULT;
+
+        CParamList oParams;
+        ret = oParams.SetObjPtr( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pBuf;
+        pBuf.NewObj();
+        *pBuf = pMsg;
+        ret = oParams.SetProperty( propMsgPtr, pBuf );
+        if( ERROR( ret ) )
+            break;
+
+        // copy the match ptr if this task is for
+        // a proxy interface
+        oParams.CopyProp( propMatchPtr, this );
+
+        TaskletPtr pTask;
+
+        // DebugPrint( 0, "probe: before invoke" );
+        ret = pTask.NewObj(
+            clsid( CIfInvokeMethodTask2 ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = pIf->GetIoMgr();
+        ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
+            &CFastRpcSkelSvrBase::AddAndRunInvTask,
+            pTask, false );
+
+        break;
+
+    }while( 0 );
+
+    return ret; 
+}
+
+gint32 CIfStartRecvMsgTask2::OnIrpComplete(
+    PIRP pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = pIrp->GetStatus(); 
+    if( ERROR( ret ) )
+    {
+        if( ret != -EAGAIN )
+        {
+            // fatal error, just quit
+            DebugPrint( ret,
+                "Cannot continue to receive message" );
+            return ret;
+        }
+        ret = 0;
+    }
+
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    ObjPtr pObj;
+    
+    ret = oCfg.GetObjPtr( propIfPtr, pObj );
+    if( ERROR( ret ) )
+        return ret;
+
+    CRpcServices* pIf = pObj;
+    if( pIf == nullptr )
+        return -EFAULT;
+
+    IMessageMatch* pMatch = nullptr;
+    ret = oCfg.GetPointer( propMatchPtr, pMatch );
+    if( pMatch == nullptr )
+        return -EFAULT;
+
+    do{
+        if( !pIf->IsConnected() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        CIoManager* pMgr = pIf->GetIoMgr();
+        if( pMgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // whether error or not receiving, we
+        // proceed to handle the incoming irp now
+        ret = pIrp->GetStatus();
+        if( ret == -EAGAIN )
+            break;
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        if( !pCtx->IsNonDBusReq() )
+        {
+            DMsgPtr pMsg = *pCtx->m_pRespData;
+            if( pMsg.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            HandleIncomingMsg2( pObj, pMsg );
+        }
+        else
+        {
+            CfgPtr pCfg;
+            ret = pCtx->GetRespAsCfg( pCfg );
+            if( ERROR( ret ) )
+                break;
+
+            HandleIncomingMsg2( pObj, pCfg );
+        }
+
+        do{
+            // continue receiving the message
+            CParamList oParams;
+
+            // clone all the parameters in this
+            // task
+            oParams[ propIfPtr ] = pObj;
+            oParams.CopyProp( propMatchPtr, this );
+            oParams.CopyProp( propExtInfo, this );
+            ObjPtr pObj = oParams.GetCfg();
+
+            // offload the output tasks to the
+            // task threads
+            ret = this->StartNewRecv( pObj );
+            //
+            // ret = DEFER_CALL( pMgr, ObjPtr( this ),
+            //     &CIfStartRecvMsgTask::StartNewRecv,
+            //     pObj );
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    // this task is retired
+    return 0;
+}
+
+gint32 CIfStartRecvMsgTask2::StartNewRecv(
+    ObjPtr& pCfg )
+{
+    // NOTE: no touch of *this, so no locking
+    gint32 ret = 0;
+    if( pCfg.IsEmpty() )
+        return -EINVAL;
+
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+
+    CFastRpcSkelSvrBase* pIf = nullptr;
+    ret = oCfg.GetPointer( propIfPtr, pIf );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    ObjPtr pMatch;
+    ret = oCfg.GetObjPtr( propMatchPtr, pMatch );
+    if( ERROR( ret ) )
+        return -EINVAL;
+
+    do{
+        CParamList oParams;
+
+        oParams[ propIfPtr ] = ObjPtr( pIf );
+        oParams[ propMatchPtr ] = pMatch;
+
+        // to pass some more information to the new
+        // task
+        oParams.CopyProp( propExtInfo, pCfg );
+
+        // start another recvmsg request
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
+            clsid( CIfStartRecvMsgTask2 ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIfLock( pIf->GetLock() );
+        if( pIf->GetPendingInvCount() >=
+            STM_MAX_PACKETS_REPORT )
+        {
+            pIf->QueueStartTask( pTask );            
+            ret = STATUS_PENDING;
+            break;
+        }
+        // add an concurrent task, and run it
+        // directly.
+        ret = pIf->AddAndRun( pTask, true );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "The new RecvMsgTask failed to AddAndRun" );
+            break;
+        }
+        ret = pTask->GetError();
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "The new RecvMsgTask failed" );
+            break;
+        }
+
+   }while( 0 );
+
+   return ret;
+}
+
+gint32 CIfInvokeMethodTask2::OnComplete(
+    gint32 iRet )
+{
+    CFastRpcSkelSvrBase* pIf = nullptr;
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    gint32 ret = oCfg.GetPointer( propIfPtr, pIf );
+    if( SUCCEEDED( ret ) )
+        pIf->NotifyInvTaskComplete();
+
+    return super::OnComplete( iRet );
+}
+
+gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
+    TaskletPtr& pTask,
+    bool bImmediate )
+{
+    gint32 ret = AddAndRun( pTask, bImmediate );
+    if( ERROR( ret ) )
+        return ret;
+    CStdRMutex oIfLock( GetLock() );
+    m_dwPendingInv++;
+    return STATUS_SUCCESS;
+}
+
+guint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
+{
+    CStdRMutex oIfLock( GetLock() );
+    m_dwPendingInv--;
+    if( m_dwPendingInv < 
+        STM_MAX_PACKETS_REPORT )
+    {
+        if( m_queStartTasks.size() > 0  )
+        {
+            TaskletPtr& pTask =
+                m_queStartTasks.front();
+
+            AddAndRun( pTask );
+            m_queStartTasks.pop_front();
+        }
+    }
+    return STATUS_SUCCESS;
+}
+
 gint32 CFastRpcSkelSvrBase::NotifyStackReady(
     PortPtr& pPort )
 {
@@ -232,6 +506,79 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         pCallback->OnEvent(
             eventTaskComp, ret, 0, nullptr );
     }
+
+    return ret;
+}
+
+gint32 CFastRpcServerBase::BroadcastEvent(
+    IConfigDb* pReqCall,
+    IEventSink* pCallback )
+{
+    if( pReqCall == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        TaskGrpPtr pGrp;
+        CCfgOpener oGrpCfg;
+        oGrpCfg[ propIfPtr ] = ObjPtr( this );
+        ret = pGrp.NewObj(
+            clsid( CIfParallelTaskGrp ),
+            oGrpCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        gint32 ( *func )( IEventSink*,
+            CRpcServices*, IConfigDb* ) =
+            ([]( IEventSink* pCallback,
+                 CRpcServices* pIf,
+                IConfigDb* pReqCall )->gint32
+        {
+            gint32 ret = 0;
+            do{
+                if( pIf == nullptr ||
+                    pReqCall == nullptr )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+
+                guint64 iTaskId = 0;
+                CfgPtr pRespData( true );
+                ret = pIf->RunIoTask(
+                    pReqCall, pRespData,
+                    pCallback, &iTaskId );
+
+            }while( 0 );
+            return ret;
+        });
+
+        auto pMgr = this->GetIoMgr();
+        CStdRMutex oLock( GetLock() );
+        for( auto& elem : m_mapSkelObjs )
+        {
+            TaskletPtr pTask;
+            CRpcServices* pIf = elem.second;
+            ret = NEW_FUNCCALL_TASK2( 0, 
+                pTask, pMgr, func,
+                nullptr,
+                ( CRpcServices* )pIf,
+                pReqCall );
+            if( ERROR( ret ) )
+                continue;
+            pGrp->AppendTask( pTask );
+        }
+        oLock.Unlock();
+
+        CIfParallelTaskGrp *pParaGrp = pGrp;
+        if( pParaGrp->GetPendingCountLocked() == 0 )
+            break;
+
+        TaskletPtr pGrpTask = pParaGrp;
+        ret = this->AddAndRun( pGrpTask );
+
+    }while( 0 );
 
     return ret;
 }

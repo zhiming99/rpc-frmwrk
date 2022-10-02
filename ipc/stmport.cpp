@@ -394,25 +394,7 @@ gint32 CDBusStreamPdo::HandleSendEvent( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
-            stdstr strMethod = pMsg.GetMember();
-            bool bBroadcast = true;
-            if( strMethod == SYS_EVENT_KEEPALIVE )
-                bBroadcast = false;
-
-
-            auto *pBusPort = static_cast
-                < CDBusStreamBusPort* >( m_pBusPort );
-
-            dwSerial =
-                CDBusBusPort::LabelMessage( pMsg );
-
-            pMsg.SetNoReply( true );
-            if( bBroadcast )
-                ret = pBusPort->BroadcastDBusMsg(
-                    pIrp, pMsg );
-            else
-                ret = this->SendDBusMsg(
-                    pIrp, pMsg );
+            ret = SendDBusMsg( pIrp, pMsg );
         }
         else
         {
@@ -1043,13 +1025,8 @@ CDBusStreamBusPort::CDBusStreamBusPort(
     gint32 ret = 0;
     do{
         SetClassId( clsid( CDBusStreamBusPort ) );
-        auto pMgr = GetIoMgr();
-        if( pMgr == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        ret = pMgr->GetCmdLineOpt(
+        CCfgOpener oCfg( pCfg );
+        ret = oCfg.GetBoolProp(
             propIsServer, m_bServer );
         if( ERROR( ret ) )
             break;
@@ -1074,9 +1051,10 @@ gint32 CDBusStreamBusPort::PostStart(
     do{
         CCfgOpener oCfg;
         oCfg[ propIsServer ] = IsServer();
-        CIoManager* pMgr = GetIoMgr();
+        auto pMgr = GetIoMgr();
         stdstr strDesc;
-        ret = pMgr->GetCmdLineOpt(
+        CCfgOpenerObj oPortCfg( this );
+        ret = oPortCfg.GetStrProp(
             propObjDescPath, strDesc );
         if( ERROR( ret ) )
             break;
@@ -1308,6 +1286,14 @@ gint32 CDBusStreamBusDrv::Probe(
         ret = oCfg.SetObjPtr( propEventSink,
             ObjPtr( pTask ) );
 
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.CopyProp( propObjDescPath, this );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.CopyProp( propIsServer, this );
         if( ERROR( ret ) )
             break;
 

@@ -33,7 +33,7 @@
 #define IFBASE2( _bProxy ) std::conditional< \
     _bProxy, CStreamProxyWrapper, CStreamServerWrapper>::type
 
-#define IFBASE( _bProxy ) std::conditional< \
+#define IFBASE1( _bProxy ) std::conditional< \
     _bProxy, CStreamProxyAsync, CStreamServerAsync>::type
 
 #define STMBASE( _bProxy ) std::conditional< \
@@ -55,7 +55,7 @@ struct SESS_INFO
 
 template< bool bProxy >
 class CRpcStmChanBase :
-    public IFBASE( bProxy ) 
+    public IFBASE1( bProxy ) 
 {
     protected:
     timespec m_tsStartTime;
@@ -75,7 +75,7 @@ class CRpcStmChanBase :
     IPort* m_pPort = nullptr;
 
     public:
-    typedef typename IFBASE( bProxy ) super;
+    typedef typename IFBASE1( bProxy ) super;
 
     CSharedLock& GetSharedLock()
     { return m_oSharedLock; }
@@ -974,6 +974,7 @@ class CFastRpcSkelBase :
         return;
     }
 
+    // this is for serialization
     CRpcServices* GetStreamIf() override
     { return m_pParent; }
 
@@ -1028,15 +1029,57 @@ class CFastRpcSkelProxyBase :
     {}
 };
 
+class CIfStartRecvMsgTask2 :
+    public CIfStartRecvMsgTask
+{
+    public:
+    typedef CIfStartRecvMsgTask super;
+    CIfStartRecvMsgTask2( const IConfigDb* pCfg )
+        : super( pCfg )
+    {}
+    gint32 StartNewRecv( ObjPtr& pCfg ) override;
+    gint32 OnIrpComplete( PIRP pIrp ) override;
+    template< typename T1, 
+        typename T=typename std::enable_if<
+            std::is_same<T1, CfgPtr>::value ||
+            std::is_same<T1, DMsgPtr>::value, T1 >::type >
+    gint32 HandleIncomingMsg2( ObjPtr& ifPtr,  T1& pMsg );
+};
+
+class CIfInvokeMethodTask2 :
+    public CIfInvokeMethodTask
+{
+    public:
+    typedef CIfInvokeMethodTask super;
+    CIfInvokeMethodTask2( const IConfigDb* pCfg )
+        : super( pCfg )
+    {}
+    gint32 OnComplete( gint32 iRet ) override;
+};
+
 class CFastRpcSkelSvrBase :
     public CFastRpcSkelBase< false >
 {
+    guint32 m_dwPendingInv = 0;
+    std::deque< TaskletPtr > m_queStartTasks;
+
     public:
     typedef CFastRpcSkelBase< false > super;
     CFastRpcSkelSvrBase( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
+
     gint32 NotifyStackReady( PortPtr& pPort );
+    inline guint32 GetPendingInvCount() const
+    { return m_dwPendingInv; }
+
+    inline void QueueStartTask( TaskletPtr& pTask )
+    { m_queStartTasks.push_back( pTask ); }
+
+    gint32 AddAndRunInvTask(
+        TaskletPtr& pTask,
+        bool bImmediate = false );
+    guint32 NotifyInvTaskComplete();
 };
 
 class CFastRpcServerState :
@@ -1121,6 +1164,10 @@ class CFastRpcServerBase :
         IEventSink* pCallback,
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
+
+    gint32 BroadcastEvent(
+        IConfigDb* pReqCall,
+        IEventSink* pCallback ) override;
 };
 
 class CFastRpcProxyBase :

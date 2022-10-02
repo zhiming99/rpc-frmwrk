@@ -135,8 +135,8 @@ class CDeclService2 :
         super( pWriter, pNode )
     {}
 
-    gint32 OutputROSSkel();
-    gint32 OutputROS( bool bServer ); 
+    virtual gint32 OutputROSSkel();
+    virtual gint32 OutputROS( bool bServer ); 
 };
 
 class CDeclServiceImpl2 :

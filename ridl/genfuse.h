@@ -56,14 +56,15 @@ class CEmitSerialCodeFuse :
 class CDeclInterfProxyFuse
     : public CMethodWriter
 {
+    protected:
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
     typedef CMethodWriter super;
-    CDeclInterfProxyFuse( CCppWriter* pWriter,
-        ObjPtr& pNode );
+    CDeclInterfProxyFuse(
+        CCppWriter* pWriter, ObjPtr& pNode );
 
-    gint32 Output();
+    virtual gint32 Output();
     gint32 OutputEvent( CMethodDecl* pmd );
     gint32 OutputAsync( CMethodDecl* pmd );
 };
@@ -71,17 +72,18 @@ class CDeclInterfProxyFuse
 class CDeclInterfSvrFuse
     : public CMethodWriter
 {
+    protected:
     CInterfaceDecl* m_pNode = nullptr;
 
     public:
 
     typedef CMethodWriter super;
-    CDeclInterfSvrFuse( CCppWriter* pWriter,
-        ObjPtr& pNode );
+    CDeclInterfSvrFuse(
+        CCppWriter* pWriter, ObjPtr& pNode );
 
-    gint32 Output();
+    virtual gint32 Output();
     gint32 OutputEvent( CMethodDecl* pmd );
-    gint32 OutputAsync( CMethodDecl* pmd );
+    virtual gint32 OutputAsync( CMethodDecl* pmd );
 };
 
 class CDeclServiceImplFuse :
@@ -123,6 +125,7 @@ struct CMethodWriterFuse
 class CImplIfMethodProxyFuse
     : public CMethodWriterFuse
 {
+    protected:
     CMethodDecl* m_pNode = nullptr;
     CInterfaceDecl* m_pIf = nullptr;
 
@@ -133,7 +136,7 @@ class CImplIfMethodProxyFuse
         CCppWriter* pWriter, ObjPtr& pNode );
 
     gint32 OutputAsyncCbWrapper();
-    gint32 OutputEvent();
+    virtual gint32 OutputEvent();
     gint32 OutputAsync();
     gint32 Output();
 };
@@ -141,6 +144,7 @@ class CImplIfMethodProxyFuse
 class CImplIfMethodSvrFuse
     : public CMethodWriterFuse
 {
+    protected:
     CMethodDecl* m_pNode = nullptr;
     CInterfaceDecl* m_pIf = nullptr;
 
@@ -152,7 +156,7 @@ class CImplIfMethodSvrFuse
     gint32 OutputEvent();
     gint32 OutputAsyncCallback();
     gint32 OutputAsyncCancelWrapper();
-    gint32 OutputAsyncSerial();
+    virtual gint32 OutputAsyncSerial();
     gint32 OutputAsync();
     gint32 Output();
 };
@@ -166,7 +170,6 @@ class CImplServiceImplFuse :
         ObjPtr& pNode, bool bServer )
         : super( pWriter, pNode, bServer )
     {}
-
     gint32 Output() override;
 };
 
@@ -175,13 +178,13 @@ class CImplIufProxyFuse
 {
     public:
     typedef CImplIufProxy super;
-    CImplIufProxyFuse( CCppWriter* pWriter,
-        ObjPtr& pNode ) :
+    CImplIufProxyFuse(
+        CCppWriter* pWriter, ObjPtr& pNode ) :
         super( pWriter, pNode )
     {}
 
     gint32 OutputDispatch();
-    inline gint32 Output()
+    virtual gint32 Output()
     {
         gint32 ret = super::Output();
         if( ERROR( ret ) )
@@ -195,11 +198,11 @@ class CImplIufSvrFuse :
 {
     public:
     typedef CImplIufSvr super;
-    CImplIufSvrFuse( CCppWriter* pWriter,
-        ObjPtr& pNode ) :
+    CImplIufSvrFuse(
+        CCppWriter* pWriter, ObjPtr& pNode ) :
         super( pWriter, pNode )
     {}
-    gint32 OutputDispatch();
+    virtual gint32 OutputDispatch();
     inline gint32 Output()
     {
         gint32 ret = super::Output();
@@ -212,6 +215,7 @@ class CImplIufSvrFuse :
 class CImplMainFuncFuse :
     public CArgListUtils
 {
+    protected:
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
     bool m_bProxy = true;
@@ -222,6 +226,6 @@ class CImplMainFuncFuse :
         CCppWriter* pWriter,
         ObjPtr& pNode,
         bool bProxy );
-    gint32 Output();
+    virtual gint32 Output();
 };
 
