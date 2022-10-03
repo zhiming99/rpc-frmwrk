@@ -703,7 +703,7 @@ class CImplClassFactory
     public:
     CImplClassFactory(
         CCppWriter* pWriter, ObjPtr& pNode, bool bServer );
-    gint32 Output();
+    virtual gint32 Output();
 
     inline bool IsServer() const
     { return m_bServer; }

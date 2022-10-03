@@ -1132,6 +1132,62 @@ gint32 CImplIfMethodSvrFuse2::OutputAsyncSerial()
     return ret;
 }
 
+gint32 CImplIfMethodSvrFuse2::OutputAsyncCancelWrapper()
+{
+    gint32 ret = 0;
+    std::string strClass = "I";
+    strClass += m_pIf->GetName() + "_SImpl";
+    std::string strMethod = m_pNode->GetName();
+
+    ObjPtr pInArgs = m_pNode->GetInArgs();
+    guint32 dwInCount = GetArgCount( pInArgs );
+
+    bool bSerial = m_pNode->IsSerialize();
+    if( !bSerial )
+        return ERROR_NOT_IMPL;
+
+    do{
+        Wa( "// this method is called when" );
+        Wa( "// timeout happens or user cancels" );
+        Wa( "// this pending request" );
+
+        CCOUT << "gint32 " << strClass << "::"
+            << strMethod << "CancelWrapper(";
+        NEW_LINE;
+        CCOUT << "    IEventSink* pCallback, gint32 iRet,";
+        NEW_LINE;
+        CCOUT << "    IConfigDb* pReqCtx_";
+        if( dwInCount > 0 )
+        {
+            CCOUT << ",";
+            NEW_LINE;
+            CCOUT << "    BufPtr& pBuf_";
+        }
+        CCOUT << " )";
+        NEW_LINE;
+
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+
+        CCOUT << "do";
+        BLOCK_OPEN;
+
+        Wa( "// clean up the FUSE resources" );
+        Wa( "ObjPtr pIf = GetParentIf();" );
+        Wa( "guint64 qwTaskId = pCallback->GetObjId();" );
+        Wa( "CFuseSvcServer* pSvr = pIf;" );
+        CCOUT << "pSvr->OnUserCancelRequest( qwTaskId );";
+        BLOCK_CLOSE;
+        CCOUT << "while( 0 );";
+        NEW_LINES( 2 );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+    
+    return ret;
+}
 gint32 CImplServiceImplFuse2::Output()
 {
     guint32 ret = STATUS_SUCCESS;
@@ -1228,7 +1284,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strTaskId = strCtxId.substr( 0, pos );" );
             Wa( "stdstr strHstm = strCtxId.substr( pos + 1 );" );
-            Wa( "guint64 dwTaskId = strtoull( " );
+            Wa( "guint64 qwTaskId = strtoull( " );
             Wa( "    strTaskId.c_str(), nullptr, 10);\n" );
             CCOUT << "#if BITWIDTH==64";
             NEW_LINE;
@@ -1270,7 +1326,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
             Wa( "if( strMethod != \"KeepAlive\" )" );
             Wa( "{ ret = -ENOTSUP; break;}" );
-            Wa( "ret = this->OnKeepAlive( dwTaskId );" );
+            Wa( "ret = pSkel->OnKeepAlive( qwTaskId );" );
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
@@ -1670,10 +1726,18 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
         Wa( "gint32 iRet =" );
         Wa( "    oMsg[ JSON_ATTR_RETCODE ].asInt();" );
         Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||");
-        Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isUInt64() )" );
+        Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isString() )" );
         Wa( "{ ret = -EINVAL; break; }" );
-        Wa( "guint64 qwTaskId =" );
-        Wa( "    oMsg[ JSON_ATTR_REQCTXID ].asUInt64();" );
+
+        Wa( "stdstr strCtxId = " );
+        Wa( "    oMsg[ JSON_ATTR_REQCTXID ].asString();" );
+        Wa( "size_t pos = strCtxId.find( ':' );" );
+        Wa( "if( pos == stdstr::npos )" );
+        Wa( "{ ret = -EINVAL; break; }" );
+        Wa( "stdstr strTaskId = strCtxId.substr( 0, pos );" );
+        Wa( "guint64 qwTaskId = strtoull( " );
+        Wa( "    strTaskId.c_str(), nullptr, 10);\n" );
+
         Wa( "TaskGrpPtr pGrp;" );
         Wa( "ret = this->GetParallelGrp( pGrp );" );
         Wa( "if( ERROR( ret ) )" );
@@ -1817,7 +1881,7 @@ gint32 CImplMainFuncFuse2::Output()
             NEW_LINE;
 
             ObjPtr pRoot( m_pNode );
-            CImplClassFactory oicf(
+            CImplClassFactoryFuse2 oicf(
                 m_pWriter, pRoot, !bProxy );
 
             ret = oicf.Output();
@@ -2174,6 +2238,103 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             INDENT_DOWN;
             NEW_LINES( 2 );
         }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplClassFactoryFuse2::Output()
+{
+    if( m_pNode == nullptr )
+        return -EFAULT;
+
+    gint32 ret = 0;
+    do{
+        CStatements* pStmts = m_pNode;
+
+        std::vector< ObjPtr > vecSvcs;
+        pStmts->GetSvcDecls( vecSvcs );
+
+        std::vector< ObjPtr > vecStructs;
+        pStmts->GetStructDecls( vecStructs );
+        std::vector< ObjPtr > vecActStructs;
+        for( auto& elem : vecStructs )
+        {
+            CStructDecl* psd = elem;
+            if( psd->RefCount() == 0 )
+                continue;
+            vecActStructs.push_back( elem );
+        }
+
+        NEW_LINE;
+
+        if( g_bMklib && bFuse )
+            Wa( "extern void InitMsgIds();" );
+
+        Wa( "FactoryPtr InitClassFactory()" ); 
+        BLOCK_OPEN;
+        CCOUT << "BEGIN_FACTORY_MAPS;";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = elem;
+            if( IsServer() )
+            {
+                CCOUT << "INIT_MAP_ENTRYCFG( ";
+                CCOUT << "C" << pSvc->GetName()
+                    << "_SvrImpl );";
+                NEW_LINE;
+
+                CCOUT << "INIT_MAP_ENTRYCFG( ";
+                CCOUT << "C" << pSvc->GetName()
+                    << "_SvrSkel );";
+                NEW_LINE;
+            }
+            if( !IsServer() || g_bMklib )
+            {
+                CCOUT << "INIT_MAP_ENTRYCFG( ";
+                CCOUT << "C" << pSvc->GetName()
+                    << "_CliImpl );";
+                NEW_LINE;
+
+                CCOUT << "INIT_MAP_ENTRYCFG( ";
+                CCOUT << "C" << pSvc->GetName()
+                    << "_CliSkel );";
+                NEW_LINE;
+            }
+        }
+        if( vecActStructs.size() )
+            NEW_LINE;
+        for( auto& elem : vecActStructs )
+        {
+            CStructDecl* psd = elem;
+            CCOUT << "INIT_MAP_ENTRY( ";
+            CCOUT << psd->GetName() << " );";
+            NEW_LINE;
+        }
+
+        NEW_LINE;
+        CCOUT << "END_FACTORY_MAPS;";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "extern \"C\"" );
+        Wa( "gint32 DllLoadFactory( FactoryPtr& pFactory )" );
+        BLOCK_OPEN;
+
+        if( g_bMklib && bFuse )
+            Wa( "InitMsgIds();" );
+
+        Wa( "pFactory = InitClassFactory();" );
+        CCOUT << "if( pFactory.IsEmpty() )";
+        INDENT_UPL;
+        CCOUT << "return -EFAULT;";
+        INDENT_DOWNL;
+        CCOUT << "return STATUS_SUCCESS;";
+        BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 

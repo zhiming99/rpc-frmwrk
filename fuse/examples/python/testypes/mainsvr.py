@@ -9,7 +9,7 @@ import time
 from iolib import *
 svcdir = str()
 
-def BuildRespHdr( methodName : str, idx : int ) -> dict:
+def BuildRespHdr( methodName : str, idx : object ) -> dict:
         resp = dict()
         # request header, the information can be found
         # in examples/hellwld.ridl

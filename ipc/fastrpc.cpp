@@ -395,6 +395,51 @@ gint32 CIfInvokeMethodTask2::OnComplete(
     return super::OnComplete( iRet );
 }
 
+gint32 CFastRpcSkelSvrBase::StartRecvTasks(
+    std::vector< MatchPtr >& vecMatches )
+{
+    gint32 ret = 0;
+
+    if( vecMatches.empty() )
+        return 0;
+
+    do{
+        CParamList oParams;
+        ret = oParams.SetObjPtr(
+            propIfPtr, ObjPtr( this ) );
+
+        if( ERROR( ret  ) )
+            break;
+
+        TaskletPtr pRecvMsgTask;
+        for( auto pMatch : vecMatches )
+        {
+            oParams[ propMatchPtr ] =
+                ObjPtr( pMatch );
+
+            ret = pRecvMsgTask.NewObj(
+                clsid( CIfStartRecvMsgTask2 ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = AddAndRun( pRecvMsgTask );
+            if( ERROR( ret ) )
+                break;
+
+            if( ret == STATUS_PENDING )
+                ret = 0;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
     TaskletPtr& pTask,
     bool bImmediate )
@@ -404,7 +449,7 @@ gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
         return ret;
     CStdRMutex oIfLock( GetLock() );
     m_dwPendingInv++;
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 guint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
@@ -418,9 +463,10 @@ guint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
         {
             TaskletPtr& pTask =
                 m_queStartTasks.front();
-
-            AddAndRun( pTask );
             m_queStartTasks.pop_front();
+            DEFER_CALL( GetIoMgr(), this,
+                &CRpcServices::RunManagedTask,
+                pTask, false );
         }
     }
     return STATUS_SUCCESS;
@@ -792,7 +838,7 @@ gint32 CFastRpcServerBase::GetStream(
         propStmHandle, ( guint32*& )hStream );
 }
 
-gint32 CFastRpcServerBase::CheckReqCtx(
+gint32 CFastRpcSkelSvrBase::CheckReqCtx(
     IEventSink* pCallback,
     DMsgPtr& pMsg )
 {

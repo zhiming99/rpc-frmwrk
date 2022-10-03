@@ -80,6 +80,7 @@ class CImplIfMethodSvrFuse2 :
         super( pWriter, pNode )
     {} 
     gint32 OutputAsyncSerial() override;
+    gint32 OutputAsyncCancelWrapper() override;
 };
 
 class CImplServiceImplFuse2 :
@@ -145,4 +146,16 @@ class CDeclServiceFuse2 :
 
     gint32 OutputROS( bool bServer ) override;
     gint32 OutputROSSkel() override;
+};
+
+class CImplClassFactoryFuse2 :
+    public CImplClassFactory
+{
+    public:
+    typedef CImplClassFactory super;
+    CImplClassFactoryFuse2(
+        CCppWriter* pWriter, ObjPtr& pNode, bool bServer )
+        : super( pWriter, pNode, bServer )
+    {}
+    gint32 Output() override;
 };

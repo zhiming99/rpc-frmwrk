@@ -155,7 +155,7 @@ class CImplIfMethodSvrFuse
 
     gint32 OutputEvent();
     gint32 OutputAsyncCallback();
-    gint32 OutputAsyncCancelWrapper();
+    virtual gint32 OutputAsyncCancelWrapper();
     virtual gint32 OutputAsyncSerial();
     gint32 OutputAsync();
     gint32 Output();

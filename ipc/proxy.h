@@ -493,7 +493,7 @@ class CRpcInterfaceBase :
     virtual gint32 Start();
     virtual gint32 StartEx( IEventSink* pCallback );
 
-    gint32 StartRecvTasks(
+    virtual gint32 StartRecvTasks(
         std::vector< MatchPtr >& vecMatches );
 
     // stop the proxy, called by the interface

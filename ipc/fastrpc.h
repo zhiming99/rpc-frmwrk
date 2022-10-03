@@ -1080,6 +1080,13 @@ class CFastRpcSkelSvrBase :
         TaskletPtr& pTask,
         bool bImmediate = false );
     guint32 NotifyInvTaskComplete();
+
+    gint32 StartRecvTasks(
+        std::vector< MatchPtr >& vecMatches ) override;
+
+    gint32 CheckReqCtx(
+        IEventSink* pCallback,
+        DMsgPtr& pMsg ) override;
 };
 
 class CFastRpcServerState :
@@ -1151,10 +1158,6 @@ class CFastRpcServerBase :
         HANDLE hStream,
         guint32 dwPortId,
         InterfPtr& pIf ) = 0;
-
-    gint32 CheckReqCtx(
-        IEventSink* pCallback,
-        DMsgPtr& pMsg ) override;
 
     gint32 GetStream(
         IEventSink* pCallback,

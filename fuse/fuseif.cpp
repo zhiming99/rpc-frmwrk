@@ -33,6 +33,7 @@ using namespace rpcf;
 #include <counters.h>
 #include <regex>
 #include "jsondef.h"
+#include <climits>
 
 #define FUSE_MIN_FILES 2
 
@@ -3436,16 +3437,44 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             break;
         }
 
-        if( !valResp.isMember( JSON_ATTR_REQCTXID ) ||
-            !valResp[ JSON_ATTR_REQCTXID ].isUInt64() )
+        if( !valResp.isMember( JSON_ATTR_REQCTXID ) )
         {
             ret = -EINVAL;
             break;
         }
 
-        guint64 dwTaskId =
+        guint64 qwTaskId = 0;
+        if( valResp[ JSON_ATTR_REQCTXID ].isUInt64() )
+        {
             valResp[ JSON_ATTR_REQCTXID ].asUInt64();
-        ret = RemoveTaskId( dwTaskId );
+        }
+        else if( valResp[ JSON_ATTR_REQCTXID ].isString() )
+        {
+            stdstr strCtxId =
+                valResp[ JSON_ATTR_REQCTXID ].asString();
+
+            size_t pos = strCtxId.find( ':' );
+            if( pos == stdstr::npos )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strTaskId = strCtxId.substr( 0, pos );
+            qwTaskId = strtoull(
+                 strTaskId.c_str(), nullptr, 10);
+            if( qwTaskId == ULLONG_MAX )
+            {
+                ret = -ERANGE;
+                break;
+            }
+        }
+        else
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ret = RemoveTaskId( qwTaskId );
         if( ERROR( ret ) )
         {
             // the request is gone
