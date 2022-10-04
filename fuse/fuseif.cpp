@@ -3446,7 +3446,8 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         guint64 qwTaskId = 0;
         if( valResp[ JSON_ATTR_REQCTXID ].isUInt64() )
         {
-            valResp[ JSON_ATTR_REQCTXID ].asUInt64();
+            qwTaskId =
+                valResp[ JSON_ATTR_REQCTXID ].asUInt64();
         }
         else if( valResp[ JSON_ATTR_REQCTXID ].isString() )
         {

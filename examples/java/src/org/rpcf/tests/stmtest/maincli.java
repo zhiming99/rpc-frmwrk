@@ -83,6 +83,8 @@ public class maincli
                 break;
             }
             long hChannel = jret.getAtLong(0);
+            rpcbase.JavaOutputMsg(
+                    "StreamStarted @" + hChannel);
             for(int i = 0; i < 100; i++)
             {
                 String strMsg = String.format("a message to server %d", i);

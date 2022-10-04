@@ -114,7 +114,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -j:     To generate Java skelton files       
         
-        -f:     To generate `FUSE integration` skelton files.
+        -f:     To generate `FUSE integration` skelton files. C++ only.
         
         -P:     To specify the prefix for the target java package. The java package name would be
                 <prefix>.<appname>.
@@ -123,6 +123,8 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         
         -L：    To generate the README.md in the specified language. Currently we support "cn" for
                 Chinese and "en" for English.
+
+        -s:     To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels. C++ Only.
 
 ```
 

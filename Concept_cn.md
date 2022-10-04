@@ -1,5 +1,5 @@
 # rpc-frmwrk概念和技术介绍
-RPC是英文Remote Procedure Calls的简写。 `rpc-frmwrk`提供了一套运行库和接口API通过抽象，简化，自动化，和集成，封装了分布式应用程序中接口，序列化，错误处理，传输，配置以及运行时监控等功能。接下来，面向基于`rpc-frmwrk`作开发的听众，介绍一些开发过程中会碰到的概念和设计思想。
+RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行库和接口API通过抽象，简化，自动化，和集成，封装了分布式应用程序传输层的接口，序列化，错误处理，传输，配置以及运行时监控等功能。接下来，面向基于`rpc-frmwrk`作开发的听众，介绍一些开发过程中会碰到的概念和设计思想。
 
 ## RPC参与者和传输的信息
 服务器`Server`和代理`Proxy`是RPC通信中的必要的参与方。通信的一般的流程是，Proxy发出请求，叫做`Request`，Server响应请求，提供调用服务，发回结果`Response`，最后Proxy消费`Response`。Server有的时候也会主动的发出信息，叫做`Event`。Proxy发出的调用请求一般来说有明确的目的地，而且一般会有Server发出的`Response`作为响应。而Server主动发出的Event则是广播性质的，只要是订阅该事件的Proxy都会收到。不过`Event`也有特例，如`Keep-Alive`的消息是一对一的，不会广播发布。
