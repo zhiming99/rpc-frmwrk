@@ -358,6 +358,7 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
             ret = STATUS_PENDING;
             break;
         }
+        oIfLock.Unlock();
         // add an concurrent task, and run it
         // directly.
         ret = pIf->AddAndRun( pTask, true );
@@ -444,15 +445,20 @@ gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
     TaskletPtr& pTask,
     bool bImmediate )
 {
-    gint32 ret = AddAndRun( pTask, bImmediate );
-    if( ERROR( ret ) )
-        return ret;
     CStdRMutex oIfLock( GetLock() );
     m_dwPendingInv++;
+    oIfLock.Unlock();
+    gint32 ret = AddAndRun( pTask, bImmediate );
+    if( ERROR( ret ) )
+    {
+        CStdRMutex oIfLock( GetLock() );
+        m_dwPendingInv--;
+        return ret;
+    }
     return ret;
 }
 
-guint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
+gint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
 {
     CStdRMutex oIfLock( GetLock() );
     m_dwPendingInv--;
@@ -461,12 +467,13 @@ guint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
     {
         if( m_queStartTasks.size() > 0  )
         {
-            TaskletPtr& pTask =
+            TaskletPtr pTask =
                 m_queStartTasks.front();
             m_queStartTasks.pop_front();
-            DEFER_CALL( GetIoMgr(), this,
-                &CRpcServices::RunManagedTask,
-                pTask, false );
+            oIfLock.Unlock();
+            gint32 ret = AddAndRun( pTask, false );
+            if( ERROR( ret ) )
+                return ret;
         }
     }
     return STATUS_SUCCESS;

@@ -1079,7 +1079,7 @@ class CFastRpcSkelSvrBase :
     gint32 AddAndRunInvTask(
         TaskletPtr& pTask,
         bool bImmediate = false );
-    guint32 NotifyInvTaskComplete();
+    gint32 NotifyInvTaskComplete();
 
     gint32 StartRecvTasks(
         std::vector< MatchPtr >& vecMatches ) override;
