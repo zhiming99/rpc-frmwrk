@@ -3053,7 +3053,7 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( "auto pMgr = ( CIoManager* )g_pIoMgr;" );
             Wa( "CCfgOpener oDrvCfg;" );
             CCOUT << "oDrvCfg[ propIsServer ] = "
-                 << ( bProxy ? "false" : "true" ) << " );";
+                 << ( bProxy ? "false" : "true" ) << ";";
             NEW_LINE;
             CCOUT << "stdstr strDesc= " << "\"./"
                 << g_strAppName << "desc.json\";";
