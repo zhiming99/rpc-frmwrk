@@ -4450,6 +4450,17 @@ gint32 CRpcServices::LoadObjDesc(
                         oCfg[ propIfStateClass ] =
                             ( guint32 )iClsid;
                 }
+                // only for fastrpc's CFastRpcSkelSvrBase
+                if( oObjElem.isMember( JSON_ATTR_ENABLE_RFC ) &&
+                    oObjElem[ JSON_ATTR_ENABLE_RFC ].isString() )
+                {
+                    string strVal =
+                        oObjElem[ JSON_ATTR_ENABLE_RFC ].asString();
+                    if( strVal == "true" )
+                        oCfg[ propEnableRfc ] = true;
+                    else if( strVal == "false" )
+                        oCfg[ propEnableRfc ] = false;
+                }
             }
             else
             {

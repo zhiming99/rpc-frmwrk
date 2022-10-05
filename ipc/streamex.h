@@ -1134,11 +1134,31 @@ struct CStreamSyncBase :
                     break;
 
                 pTaskGrp->AppendTask( pEnableRead );
+
+                TaskletPtr pCleanup;
+                gint32 ret = DEFER_CANCEL_HANDLER2(
+                    -1, pCleanup, this,
+                    &CStreamSyncBase::OnStmStartupComplete,
+                    ( IEventSink* )pTaskGrp, 0, hChannel );
+
+                if( SUCCEEDED( ret ) )
+                {
+                    CIfAsyncCancelHandler* pasc = pCleanup;
+                    pasc->SetSelfCleanup();
+                }
+
+                // prevent the OnRecvData_Loop to be
+                // the first event
+                TaskletPtr pSeqTasks = pTaskGrp;
+                ret = pMgr->RescheduleTask( pSeqTasks );
+
             }
             else
             {
 
-                TaskletPtr pReadyNotify;
+                ret = this->OnStreamReady( hChannel );
+
+                /*TaskletPtr pReadyNotify;
                 ret = DEFER_IFCALLEX_NOSCHED( 
                     pReadyNotify,
                     ObjPtr( this ),
@@ -1147,24 +1167,8 @@ struct CStreamSyncBase :
                 if( ERROR( ret ) )
                     break;
                 pTaskGrp->AppendTask( pReadyNotify );
+                */
             }
-
-            TaskletPtr pCleanup;
-            gint32 ret = DEFER_CANCEL_HANDLER2(
-                -1, pCleanup, this,
-                &CStreamSyncBase::OnStmStartupComplete,
-                ( IEventSink* )pTaskGrp, 0, hChannel );
-
-            if( SUCCEEDED( ret ) )
-            {
-                CIfAsyncCancelHandler* pasc = pCleanup;
-                pasc->SetSelfCleanup();
-            }
-
-            // prevent the OnRecvData_Loop to be
-            // the first event
-            TaskletPtr pSeqTasks = pTaskGrp;
-            ret = pMgr->RescheduleTask( pSeqTasks );
 
         }while( 0 );
 

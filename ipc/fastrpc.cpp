@@ -412,6 +412,19 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
         if( ERROR( ret  ) )
             break;
 
+        CCfgOpenerObj oIfCfg( this );
+        bool bRfcEnabled;
+        ret = oIfCfg.GetBoolProp(
+            propEnableRfc, bRfcEnabled );
+        if( ERROR( ret ) )
+            bRfcEnabled = false;
+
+        EnumClsid iClsid;
+        if( bRfcEnabled ) 
+            iClsid = clsid( CIfStartRecvMsgTask2 );
+        else
+            iClsid = clsid( CIfStartRecvMsgTask );
+
         TaskletPtr pRecvMsgTask;
         for( auto pMatch : vecMatches )
         {
@@ -419,8 +432,7 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
                 ObjPtr( pMatch );
 
             ret = pRecvMsgTask.NewObj(
-                clsid( CIfStartRecvMsgTask2 ),
-                oParams.GetCfg() );
+                iClsid, oParams.GetCfg() );
 
             if( ERROR( ret ) )
                 break;

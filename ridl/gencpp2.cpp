@@ -1677,6 +1677,7 @@ gint32 CImplIfMethodSvr2::OutputSyncROS()
     bool bNoReply = m_pNode->IsNoReply();
 
     do{
+        Wa( "/* Sync Req Handler*/" );
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "(";
         if( dwCount == 0 )
@@ -1690,7 +1691,7 @@ gint32 CImplIfMethodSvr2::OutputSyncROS()
             if( dwInCount > 0 )
             {
                 bComma = true;
-                GenFormInArgs( pInArgs );
+                GenFormInArgs( pInArgs, true );
             }
             if( dwOutCount > 0 )
             {
@@ -1699,13 +1700,12 @@ gint32 CImplIfMethodSvr2::OutputSyncROS()
                     CCOUT << ",";
                     NEW_LINE;
                 }
-                GenFormOutArgs( pOutArgs );
+                GenFormOutArgs( pOutArgs, true );
             }
             CCOUT << " )";
             INDENT_DOWNL;
         }
         BLOCK_OPEN;
-        Wa( "// Sync Req Handler " );
         Wa( "// TODO: Process the sync request here" );
         Wa( "// return code can be an Error or" );
         Wa( "// STATUS_SUCCESS" );
@@ -1733,6 +1733,7 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
 
     bool bNoReply = m_pNode->IsNoReply();
     do{
+        Wa( "/* Async Req Handler*/" );
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "( ";
         INDENT_UPL;
@@ -1745,7 +1746,7 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
                 bComma = true;
                 CCOUT << ", ";
                 NEW_LINE;
-                GenFormInArgs( pInArgs );
+                GenFormInArgs( pInArgs, true );
                 if( dwOutCount == 0 )
                     CCOUT << " ";
             }
@@ -1756,7 +1757,7 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
                     CCOUT << ", ";
                     NEW_LINE;
                 }
-                GenFormOutArgs( pOutArgs );
+                GenFormOutArgs( pOutArgs, true );
                 CCOUT << " ";
             }
             CCOUT << ")";
@@ -1766,7 +1767,6 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
 
         INDENT_DOWNL;
         BLOCK_OPEN;
-        Wa( "// Async Req Handler" );
         Wa( "// TODO: Emit an async operation here." );
         CCOUT << "// And make sure to call '"
             << strMethod << "Complete'";
@@ -2242,6 +2242,7 @@ gint32 CImplIfMethodProxy2::OutputEventROS()
     bool bSerial = m_pNode->IsSerialize();
 
     do{
+        Wa( "/* Event handler */" );
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "( ";
         if( dwCount > 0 )
@@ -2259,7 +2260,6 @@ gint32 CImplIfMethodProxy2::OutputEventROS()
 
         BLOCK_OPEN;
 
-        Wa( "// Event handler" );
         Wa( "// TODO: Process the event here" );
         CCOUT << "return STATUS_SUCCESS;";
         BLOCK_CLOSE;
@@ -2286,6 +2286,7 @@ gint32 CImplIfMethodProxy2::OutputAsyncROS()
     bool bNoReply = m_pNode->IsNoReply();
 
     do{
+        Wa( "/* Async callback handler */" );
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "Callback" << "( ";
         INDENT_UP;
@@ -2300,7 +2301,6 @@ gint32 CImplIfMethodProxy2::OutputAsyncROS()
         CCOUT << " )";
         INDENT_DOWNL;
         BLOCK_OPEN;
-        Wa( "// Async callback handler " );
         Wa( "// TODO: Process the server response here" );
         Wa( "// return code ignored" );
         CCOUT << "return 0;";

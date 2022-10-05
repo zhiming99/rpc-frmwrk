@@ -762,7 +762,9 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
                 oConnParam.Push( ( HANDLE )pSvc );
                 IConfigDb* pCfg = oConnParam.GetCfg();
                 HANDLE hCfg = ( HANDLE )pCfg;
-                pStream->OnConnected( hCfg );
+                ret = pStream->OnConnected( hCfg );
+                if( ERROR( ret ) )
+                    break;
             }
 
             // set the response for FETCH_DATA request
@@ -792,7 +794,14 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             IConfigDb* pCfg = oResp.GetCfg();
 
             CStreamProxy* pProxy = ObjPtr( pParent );
-            pProxy->OnConnected( ( HANDLE )pCfg );
+            ret = pProxy->OnConnected( ( HANDLE )pCfg );
+            if( ERROR( ret ) )
+            {
+                HANDLE hStm;
+                oResp.Pop( hStm );
+                oResp.Pop( pObj );
+                break;
+            }
         }
 
     }while( 0 );
