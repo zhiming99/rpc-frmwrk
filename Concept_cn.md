@@ -39,7 +39,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 
 ## 服务器对象和对象的地址
-`rpc-frmwrk`的服务器对象是一个继承自CInterfaceServer的对象，同时这个对象在DBus上进行了注册。由于利用DBus作为`rpc-frmwrk`进程间通信的主要途径. 因此服务器对象继承了`DBus`的寻址方式，不过在远程调用时，增加了`rpc-frmwrk`的扩展。所以一个RPC服务对象的地址是一个五元组，{IP地址，TCP端口，路由器路径，对象路径，接口名称}。其中路由器路径请参考下面的条目. 对象路径和接口名称是DBus的地址。这几个参数都存在对象描述文件中， `ridlc`根据定义接口的ridl文件和编译的过程中，自动设置。当进行进程间调用时，就只需要对象路径和接口名称了。
+`rpc-frmwrk`的服务器对象是一个继承自CInterfaceServer的对象，同时这个对象在DBus上进行了注册。由于利用DBus作为`rpc-frmwrk`进程间通信的主要途径. 因此服务器对象继承了`DBus`的寻址方式，不过在远程调用时，增加了`rpc-frmwrk`的扩展。所以一个RPC服务对象的地址是一个五元组，{IP地址，TCP端口，路由器路径，对象路径，接口名称}。其中路由器路径请参考下面的条目. 对象路径和接口名称是DBus的地址。这几个参数都存在对象描述文件中， `ridlc`根据接口定义文件（`ridl`文件）在编译的过程中自动设置。如果服务器和代理都在本地，那么进程间调用就只需对象路径和接口名称了。
 
 ## 流(Streaming)
 
@@ -52,7 +52,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 在`简易模式`编程时，每一个流通道将体现为分别在服务器端和客户端的两个文件，数据的收发体现为对文件的读写操作。用户可以通过在客户端建立一个stream文件而建立一个流通道，比如命令`touch stream_1`。单一连接的流通道个数缺省为32个。不过在大量连接的情况下可以进一步限制。
 
 ## Multihop功能和路由器路径
-当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点，访问树上的其他节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
+当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
 ## 安全和认证
 
@@ -71,8 +71,9 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 增加或者减少`Response`的处理进程，发送和接收服务器的`Response`和`Event`。
 * 添加，删除流通道，发送和接收字节流。
 * 导出守护进程的运行状态，和参数和计数器统计。
-* 优雅的关闭服务器或者客户端。
+* 通过mount/umount优雅的关闭服务器或者客户端。
 关于`rpcfs`的内容和结构可以参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/fuse/README.md)。
+* `rpc-frmwrk`将提供支持`rpcfs`编程的框架生成工具。
 
 ## I/O子系统
 `rpc-frmwrk`的I/O子系统类似于操作系统的I/O系统，有驱动程序和端口对象组成。不管是服务器还是代理程序都需要I/O子系统。I/O子系统的配置放在`driver.json`的文件中，它给出服务器和代理程序需要加载的驱动程序和类库。在系统目录下的`driver.json`给出了守护进程，系统自带的工具，和测试用例所需要加载的驱动程序和类库。I/O子系统的主要特点是可以分层的，就是由多层的端口对象来组成一个管线(Pipeline)，用以处理复杂的I/O需求。另一个特点是它是异步的，每个I/O请求对应一个IoRequestPacket对象，它保存了该I/O请求的所有信息和状态，以保证在I/O就绪时，可以发起新的I/O操作，继续未完成的操作，或者出错时，取消当前的操作。
@@ -84,7 +85,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * `rpc-frmwrk`通过`ridl`接口描述语言定义函数接口，和需要传输的数据结构。并通过`ridlc`生成各种语言的框架代码，配置文件，以及Makefile和Readme文件. 同一`ridl`文件生成的不同框架的客户端和服务器可以互操作。有关`ridl`语言的介绍请点击此[链接](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl)。
 
 * `rpc-frmwrk`内建了一套基于C++的API，对于希望进一步了解`rpc-frmwrk`接口工作原理，或者觉得ridlc生成的代码太慢，想榨取更高的性能的同学，可以参考[`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
-目录下的代码。如果想要提PR，改写`rpc-frmwrk`，那更加欢迎。
+目录下的代码。如果想要提PR，改写`rpc-frmwrk`，那更加期待。
 * `ridlc`是`ridl compiler`的意思。有关`ridlc`的详细信息请参考上面提到的`ridl`的详细介绍一文。
 
 ## 意见和建议
