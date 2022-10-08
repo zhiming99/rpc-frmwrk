@@ -85,7 +85,6 @@ def sendReq( reqfp : object, reqObj : object ):
     
 
 def peekResp( respfp : object)->object :
-    inputs = [respfp]
     # read a four bytes integer as the
     # size of the response
     data = respfp.read(4)
