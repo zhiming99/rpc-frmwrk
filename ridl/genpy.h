@@ -49,8 +49,9 @@ struct CPyFileSet : public IFileSet
     CPyFileSet( const std::string& strOutPath,
         const std::string& strAppName );
 
-    gint32 OpenFiles();
-    gint32 AddSvcImpl( const std::string& strSvcName );
+    gint32 OpenFiles() override;
+    gint32 AddSvcImpl(
+        const stdstr& strSvcName ) override;
     ~CPyFileSet();
 };
 

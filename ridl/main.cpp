@@ -15,9 +15,10 @@
  *
  *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
  *
- *        License:  Licensed under GPL-3.0. You may not use this file except in
- *                  compliance with the License. You may find a copy of the
- *                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
  *
  * =====================================================================================
  */
@@ -124,6 +125,11 @@ bool g_bRpcOverStm = false;
 #include "gencpp.h"
 #include "genpy.h"
 #include "genjava.h"
+
+extern gint32 GenRpcFSkelton(
+    const std::string& strOutPath,
+    const std::string& strAppName,
+    ObjPtr pRoot );
 
 int main( int argc, char** argv )
 {
@@ -397,10 +403,18 @@ int main( int argc, char** argv )
             g_strTarget = g_strAppName;
 
         printf( "Generating files.. \n" );
-        if( g_strLang == "cpp" )
+        if( bFuse || g_bRpcOverStm || g_strLang == "cpp" )
         {
             ret = GenCppProj(
                 g_strOutPath, strAppName, pRoot );
+            if( ERROR( ret ) )
+                break;
+            if( bFuse && g_strLang != "cpp" )
+            {
+                // generating rpcfs skelton code
+                // ret = GenRpcFSkelton(
+                //     g_strOutPath, strAppName, pRoot );
+            }
         }
         else if( g_strLang == "py" )
         {
@@ -418,6 +432,25 @@ int main( int argc, char** argv )
             ret = -ENOTSUP;
         }
 
+        if( ERROR( ret ) )
+            break;
+
+        // store the command to the file 'cmdline'
+        stdstr strCmdLine;
+        for( int i = 0; i < argc; i++ )
+        {
+            strCmdLine += argv[ i ];
+            strCmdLine.append( 1, ' ' );
+        }
+        strCmdLine.append( 1, '\n' );
+        stdstr strPath = g_strOutPath;
+        strPath += "/cmdline";
+        FILE* fp = fopen( strPath.c_str(), "a" );
+        if( fp == nullptr )
+            break;
+        fwrite( strCmdLine.c_str(),
+            strCmdLine.size(), 1, fp );
+        fclose( fp );
 
     }while( 0 );
 
