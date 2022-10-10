@@ -1709,7 +1709,7 @@ gint32 CImplIfMethodSvr2::OutputSyncROS()
         Wa( "// TODO: Process the sync request here" );
         Wa( "// return code can be an Error or" );
         Wa( "// STATUS_SUCCESS" );
-        Wa( "return ERROR_NOT_IMPL;" );
+        CCOUT << "return ERROR_NOT_IMPL;";
         BLOCK_CLOSE;
         NEW_LINE;
 
