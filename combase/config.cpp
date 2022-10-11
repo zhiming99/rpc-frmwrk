@@ -204,7 +204,23 @@ gint32 CConfigDb2::GetPropIds(
 void CConfigDb2::RemoveAll()
 { m_mapProps.clear(); }
 
+#define RESIZE_BUF( _Size, _Ret ) \
+do{ \
+    guint32 dwLocOff = pLoc - oBuf.ptr(); \
+    oBuf.Resize( ( _Size + oBuf.offset() ) ); \
+    if( oBuf.ptr() == nullptr ) \
+    { \
+        _Ret = -ENOMEM; \
+        break; \
+    } \
+    oBuf.SetOffset( dwOrigOff );\
+    pLoc = ( dwLocOff + oBuf.ptr() ); \
+    pEnd = ( oBuf.size() + oBuf.ptr() ); \
+ \
+}while( 0 ) 
+
 #define QPAGE ( ( guint32 )( PAGE_SIZE >> 1 ) )
+
 gint32 CConfigDb2::Serialize(
     CBuffer& oBuf ) const
 {
@@ -219,7 +235,11 @@ gint32 CConfigDb2::Serialize(
     // NOTE: oHeader.dwSize at this point is an
     // estimated size at this moment
 
-    oBuf.Resize( sizeof( SERI_HEADER ) + QPAGE );
+    guint32 dwOrigOff = oBuf.offset();
+    ret = oBuf.Resize( dwOrigOff +
+        sizeof( SERI_HEADER ) + QPAGE );
+    if( ERROR( ret ) )
+        return ret;
 
     char* pLoc = oBuf.ptr();
 

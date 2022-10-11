@@ -38,20 +38,6 @@
 // the same hash across different platform.
 #define hashmap unordered_map
 
-#define RESIZE_BUF( _Size, _Ret ) \
-do{ \
-    guint32 dwLocOff = pLoc - oBuf.ptr(); \
-    oBuf.Resize( ( _Size ) ); \
-    if( oBuf.ptr() == nullptr ) \
-    { \
-        _Ret = -ENOMEM; \
-        break; \
-    } \
-    pLoc = ( dwLocOff + oBuf.ptr() ); \
-    pEnd = ( oBuf.size() + oBuf.ptr() ); \
- \
-}while( 0 ) 
-
 namespace rpcf
 {
 
