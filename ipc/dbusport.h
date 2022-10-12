@@ -66,6 +66,7 @@ class CRpcBasePort : public CPort
         // in case the incoming message is not being
         // handled in time
         std::deque<DMsgPtr>     m_quePendingMsgs;
+        std::deque<CfgPtr>      m_quePendingMsgs2;
 
         // we use a refcount to keep track of count
         // of interfaces referencing the same match
@@ -83,12 +84,14 @@ class CRpcBasePort : public CPort
             m_bConnected = rhs.m_bConnected;
             m_queWaitingIrps = rhs.m_queWaitingIrps;
             m_quePendingMsgs = rhs.m_quePendingMsgs;
+            m_quePendingMsgs2 = rhs.m_quePendingMsgs2;
         }
 
         ~MATCH_ENTRY()
         {
             m_queWaitingIrps.clear();
             m_quePendingMsgs.clear();
+            m_quePendingMsgs2.clear();
         }
 
         int AddRef()
