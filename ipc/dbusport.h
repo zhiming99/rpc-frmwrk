@@ -118,8 +118,8 @@ class CRpcBasePort : public CPort
         }
 
         template< class T >
-        std::deque< T > GetMsgQue( T* p = nullptr )
-        { return std::deque< T >(); }
+        std::deque< T >& GetMsgQue( T* p = nullptr )
+        { return *( std::deque< T >* )nullptr; }
 
     };
 

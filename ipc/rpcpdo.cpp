@@ -38,11 +38,11 @@ namespace rpcf
 using namespace std;
 
 template<>
-std::deque<DMsgPtr> CRpcBasePort::MATCH_ENTRY::GetMsgQue( DMsgPtr* p )
+std::deque<DMsgPtr>& CRpcBasePort::MATCH_ENTRY::GetMsgQue( DMsgPtr* p )
 { return m_quePendingMsgs; }
 
 template<>
-std::deque<CfgPtr> CRpcBasePort::MATCH_ENTRY::GetMsgQue( CfgPtr* p )
+std::deque<CfgPtr>& CRpcBasePort::MATCH_ENTRY::GetMsgQue( CfgPtr* p )
 { return m_quePendingMsgs2; }
 
 CRpcBasePort::CRpcBasePort( const IConfigDb* pCfg )
