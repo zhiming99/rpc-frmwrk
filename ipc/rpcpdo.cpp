@@ -37,6 +37,14 @@ namespace rpcf
 
 using namespace std;
 
+template<>
+std::deque<DMsgPtr> CRpcBasePort::MATCH_ENTRY::GetMsgQue( DMsgPtr* p )
+{ return m_quePendingMsgs; }
+
+template<>
+std::deque<CfgPtr> CRpcBasePort::MATCH_ENTRY::GetMsgQue( CfgPtr* p )
+{ return m_quePendingMsgs2; }
+
 CRpcBasePort::CRpcBasePort( const IConfigDb* pCfg )
     : CPort( pCfg )
 {
@@ -68,135 +76,7 @@ gint32 CRpcBasePort::GetMatchMap(
 gint32 CRpcBasePort::DispatchSignalMsg(
     DBusMessage* pMessage )
 {
-    if( pMessage == nullptr )
-        return -EINVAL;
-
-    gint32 ret = -ENOENT;
-    DMsgPtr pMsg;
-
-    CStdRMutex oPortLock( GetLock() );
-    guint32 dwPortState = GetPortState();
-
-    if( !CanAcceptMsg( dwPortState ) )
-    {
-        // prevent messages piling in the
-        // match entry
-        return ERROR_STATE;
-    }
-
-    map< MatchPtr, MATCH_ENTRY >::iterator itr =
-        m_mapEvtTable.begin();
-
-    vector< IrpPtr > vecIrpsToComplete;
-    vector< IrpPtr > vecIrpsError;
-
-    while( itr != m_mapEvtTable.end() )
-    {
-        pMsg = pMessage;
-        gint32 ret1 =
-            itr->first->IsMyMsgIncoming( pMsg );
-
-        if( ERROR( ret1 ) )
-        {
-            ++itr;
-            continue;
-        }
-
-        MATCH_ENTRY& oMe = itr->second;
-        if( !oMe.IsConnected() )
-        {
-            ++itr;
-            continue;
-        }
-
-        oMe.m_quePendingMsgs.push_back( pMsg );
-        if( oMe.m_queWaitingIrps.empty() )
-        {
-            if( oMe.m_quePendingMsgs.size()
-                > MAX_DBUS_REQS )
-            {
-                // discard the oldest msg if too many
-                oMe.m_quePendingMsgs.pop_front();
-            }
-            ++itr;
-            continue;
-        }
-
-        while( oMe.m_queWaitingIrps.size() > 0 &&
-            oMe.m_quePendingMsgs.size() > 0 )
-        {
-            // first come, first service
-            IrpPtr pIrp; 
-            pIrp = oMe.m_queWaitingIrps.front();
-            oMe.m_queWaitingIrps.pop_front();
-
-            pMsg = oMe.m_quePendingMsgs.front();
-            oMe.m_quePendingMsgs.pop_front();
-
-            oPortLock.Unlock();
-            // BUGBUG: the oMe could turn invalid
-            // at this point under extreme
-            // condition.
-            CStdRMutex oIrpLock( pIrp->GetLock() );
-            oPortLock.Lock();
-            ret = pIrp->CanContinue( IRP_STATE_READY );
-            if( ERROR( ret ) )
-            {
-                // discard the irp and the
-                // messages
-                continue;
-            }
-
-            if( pIrp->GetStackSize() == 0 )
-            {
-                // bad irp
-                vecIrpsError.push_back( pIrp );
-                continue;
-            }
-
-            IrpCtxPtr& pCtx = pIrp->GetTopStack();
-            if( pIrp->IoDirection() == IRP_DIR_IN
-                && pIrp->MinorCmd() == IRP_MN_IOCTL
-                && pIrp->MajorCmd() == IRP_MJ_FUNC )
-            {
-                BufPtr bufPtr( true );
-                *bufPtr = pMsg;
-
-                pCtx->SetRespData( bufPtr );
-                pCtx->SetStatus( 0 );
-                vecIrpsToComplete.push_back( pIrp );
-                continue;
-            }
-
-            //wierd, what is wrong with this irp
-            pCtx->SetStatus( -EINVAL );
-            vecIrpsError.push_back( pIrp );
-        }
-        ++itr;
-    }
-
-    oPortLock.Unlock();
-
-    guint32 dwIrpCount = vecIrpsToComplete.size();
-    for( guint32 i = 0; i < dwIrpCount; i++ )
-    {
-        GetIoMgr()->CompleteIrp(
-            vecIrpsToComplete[ i ] );
-    }
-
-    dwIrpCount = vecIrpsError.size();
-    for( guint32 i = 0; i < dwIrpCount; i++ )
-    {
-        GetIoMgr()->CancelIrp(
-            vecIrpsError[ i ], true, -EINVAL );
-    }
-
-    oPortLock.Lock();
-
-    if( dwIrpCount > 0 )
-        ret = 0;
-
-    return ret;
+    return DispatchSignalMsgT( pMessage );
 }
 
 gint32 CRpcBasePort::FindIrpForResp(
@@ -670,8 +550,8 @@ gint32 CRpcBasePort::HandleUnregMatch( IRP* pIrp )
             gint32 iRefCount = oEntry.Release();
             if( iRefCount == 0 )
             {
-                if( oEntry.m_quePendingMsgs.size() )
-                    oEntry.m_quePendingMsgs.clear();
+                oEntry.m_quePendingMsgs.clear();
+                oEntry.m_quePendingMsgs2.clear();
 
                 MATCH_ENTRY tempEnt = oEntry;
                 pMap->erase( matchPtr );
@@ -713,71 +593,16 @@ gint32 CRpcBasePort::SchedCompleteIrps(
     std::deque< IrpPtr >& queIrps,
     std::deque< DMsgPtr>& queMsgs )
 {
-    gint32 ret = 0;
-    do{
-        IrpVecPtr pIrpVec( true );
-        while( queIrps.size() && queMsgs.size() )
-        {
-            IrpPtr& pIrp = queIrps.front();
-            queIrps.pop_front();
+    return SchedCompleteIrpsT(
+        queIrps, queMsgs );
+}
 
-            if( pIrp.IsEmpty() ||
-                pIrp->GetStackSize() == 0 )
-                continue;
-
-            CStdRMutex oIrpLock(
-                pIrp->GetLock() );
-
-            ret = pIrp->CanContinue(
-                IRP_STATE_READY );
-
-            if( ERROR( ret ) )
-                continue;
-
-            IrpCtxPtr& pCtx =
-                pIrp->GetTopStack();
-
-            BufPtr pBuf( true );
-            *pBuf = queMsgs.front();
-            queMsgs.pop_front();
-            pCtx->SetRespData( pBuf );
-            pCtx->SetStatus( 0 );
-
-            ( *pIrpVec )().push_back( pIrp );
-        }
-
-        if( ( *pIrpVec )().empty() )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        CParamList oParams;
-        ret = oParams.Push( STATUS_SUCCESS );
-        if( ERROR( ret ) )
-            break;
-
-        ObjPtr pObj;
-        pObj = pIrpVec;
-        ret = oParams.Push( pObj );
-        if( ERROR( ret ) )
-            break;
-
-        oParams.Push( ( bool )true );
-
-        oParams.SetPointer(
-            propIoMgr, GetIoMgr() );
-
-        ret = GetIoMgr()->ScheduleTask(
-            clsid( CCancelIrpsTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-    }while( 0 );
-
-    return ret;
+gint32 CRpcBasePort::SchedCompleteIrps(
+    std::deque< IrpPtr >& queIrps,
+    std::deque< CfgPtr >& queMsgs )
+{
+    return SchedCompleteIrpsT(
+        queIrps, queMsgs );
 }
 
 gint32 CRpcBasePort::HandleListening( IRP* pIrp )
@@ -994,6 +819,7 @@ gint32 CRpcBasePort::ClearMatchMapInternal(
         else
         {
             oMe.m_quePendingMsgs.clear();
+            oMe.m_quePendingMsgs2.clear();
         }
         vecMatches.push_back( itrMe->first );
         oMap.erase( itrMe );
@@ -1513,6 +1339,7 @@ gint32 CRpcBasePort::OnModOnOffline(
 
                     oMe.m_queWaitingIrps.clear();
                     oMe.m_quePendingMsgs.clear();
+                    oMe.m_quePendingMsgs2.clear();
                 }
             }
             ++itr;
@@ -1670,151 +1497,7 @@ gint32 CRpcBasePortEx::ClearMatchMap(
 gint32 CRpcBasePortEx::DispatchReqMsg(
     DBusMessage* pMessage )
 {
-    if( pMessage == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-
-    DMsgPtr pMsg( pMessage );
-
-    CStdRMutex oPortLock( GetLock() );
-
-    guint32 dwPortState = GetPortState();
-
-    if( !CanAcceptMsg( dwPortState ) )
-    {
-        // prevent messages piling in the match
-        // entry
-        return -ENOENT;
-    }
-
-    map< MatchPtr, MATCH_ENTRY >::iterator itr =
-        m_mapReqTable.begin();
-
-    IrpPtr pIrpToComplete;
-    vector< IrpPtr > vecIrpToComplete;
-    vector< IrpPtr > vecIrpsError;
-    bool bFound = false;
-
-    while( itr != m_mapReqTable.end() )
-    {
-        ret = itr->first->IsMyMsgIncoming( pMsg );
-        if( SUCCEEDED( ret ) )
-        {
-            bFound = true;
-            do{
-                // test if the match is allowed to
-                // receive requests
-                CCfgOpenerObj oMatch(
-                    ( CObjBase* )( itr->first ) );
-                guint32 dwQueSize = 0;
-
-                ret = oMatch.GetIntProp(
-                    propQueSize, dwQueSize );
-
-                if( ERROR( ret ) )
-                {
-                    dwQueSize = MAX_DBUS_REQS;
-                    ret = 0;
-                }
-
-                if( dwQueSize == 0 )
-                {
-                    ret = ERROR_QUEUE_FULL;
-                    break;
-                }
-
-                MATCH_ENTRY& ome = itr->second;
-                if( !ome.IsConnected() )
-                {
-                    // weird, not connected, how
-                    // did this message arrived
-                    // here
-                    //
-                    // waiting till the server is
-                    // online
-                    //
-                    ret = -ENOTCONN;
-                    break;
-                }
-
-                if( ome.m_queWaitingIrps.empty() )
-                {
-                    ome.m_quePendingMsgs.push_back( pMsg );
-                    if( ome.m_quePendingMsgs.size()
-                        > dwQueSize )
-                    {
-                        // discard the oldest msg
-                        ome.m_quePendingMsgs.pop_front();
-                    }
-                    break;
-                }
-
-                ome.m_quePendingMsgs.push_back( pMsg );
-                while( ome.m_quePendingMsgs.size() > 0 &&
-                    ome.m_queWaitingIrps.size() > 0 ) 
-                {
-                    pMsg = ome.m_quePendingMsgs.front();
-                    ome.m_quePendingMsgs.pop_front();
-
-                    IrpPtr pIrp =
-                        ome.m_queWaitingIrps.front();
-                    ome.m_queWaitingIrps.pop_front();
-                    oPortLock.Unlock();
-
-                    CStdRMutex oIrpLock( pIrp->GetLock() );
-                    oPortLock.Lock();
-                    ret = pIrp->CanContinue( IRP_STATE_READY );
-                    if( ERROR( ret ) )
-                        continue;
-
-                    IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-                    if( pIrp->IoDirection() == IRP_DIR_IN
-                        && pIrp->MinorCmd() == IRP_MN_IOCTL
-                        && pIrp->MajorCmd() == IRP_MJ_FUNC )
-                    {
-                        BufPtr bufPtr( true );
-                        *bufPtr = pMsg;
-                        ret = 0;
-                        pCtx->SetRespData( bufPtr );
-                        pCtx->SetStatus( ret );
-                        vecIrpToComplete.push_back( pIrp );
-                    }
-                    else
-                    {
-                        //wierd, what is wrong
-                        //with this irp
-                        pCtx->SetStatus( -EINVAL );
-                        vecIrpsError.push_back( pIrp );
-                    }
-                }
-
-            }while( 0 );
-        }
-
-        if( bFound )
-            break;
-
-        ++itr;
-    }
-    oPortLock.Unlock();
-
-    CIoManager* pMgr = GetIoMgr();
-    for( auto& elem : vecIrpToComplete )
-    {
-        pMgr->CompleteIrp( elem );
-    }
-
-    for( auto& pIrpErr : vecIrpsError )
-    {
-        pMgr->CancelIrp(
-            pIrpErr, true, -EINVAL );
-    }
-
-    if( !bFound )
-        ret = -ENOENT;
-
-    return ret;
+    return DispatchReqMsgT( pMessage );
 }
 
 CRpcPdoPort::CRpcPdoPort( const IConfigDb* pCfg )
