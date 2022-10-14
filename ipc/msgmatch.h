@@ -53,6 +53,13 @@ class IMessageMatch : public CObjBase
     virtual gint32 IsMyMsgOutgoing(
         DBusMessage* pMsg ) const = 0;
 
+    // if a event message this interface has subcribed
+    virtual gint32 IsMyMsgIncoming(
+        IConfigDb* pMsg ) const = 0;
+
+    virtual gint32 IsMyMsgOutgoing(
+        IConfigDb* pMsg ) const = 0;
+
     // a equalness comparison
     virtual bool operator==(
         const IMessageMatch& rhs ) const = 0;
@@ -60,20 +67,20 @@ class IMessageMatch : public CObjBase
     virtual const IMessageMatch& operator=(
         const IMessageMatch& rhs ) = 0;
 
-    virtual std::string ToDBusRules(
+    virtual stdstr ToDBusRules(
         gint32 iMsgType ) const = 0;
 
-    virtual std::string ToString() const = 0;
+    virtual stdstr ToString() const = 0;
 
     virtual EnumMatchType GetType() const = 0;
 
     virtual bool IsMyDest(
-        const std::string& strDest ) const = 0;
+        const stdstr& strDest ) const = 0;
 
     virtual bool IsMyObjPath(
-        const std::string& strObjPath ) const = 0;
+        const stdstr& strObjPath ) const = 0;
 
-    virtual std::string GetDest() const = 0;
+    virtual stdstr GetDest() const = 0;
 
     virtual const CfgPtr& GetCfg() const = 0;
 };
@@ -90,8 +97,8 @@ namespace std
     {
         bool operator()(const MatchPtr& k1, const MatchPtr& k2) const
             {
-                std::string strVal1 = k1->ToString();
-                std::string strVal2 = k2->ToString();
+                stdstr strVal1 = k1->ToString();
+                stdstr strVal2 = k2->ToString();
 
                 if( strVal1.empty() || strVal2.empty() )
                     return false;
@@ -106,18 +113,20 @@ namespace std
 
 namespace rpcf
 {
-
 class CMessageMatch : public IMessageMatch
 {
     protected:
 
-    std::string     m_strObjPath;
-    std::string     m_strIfName;
+    stdstr     m_strObjPath;
+    stdstr     m_strIfName;
     EnumMatchType   m_iMatchType;
     CfgPtr          m_pCfg;
 
-    public:
+    // if a request message this interface can handle
+    gint32 IsMyMsgBasic( DBusMessage* pMessage ) const;
+    gint32 IsMyMsgBasic( IConfigDb* pMessage ) const;
 
+    public:
     typedef IMessageMatch super;
 
     struct SERI_HEADER : public SERI_HEADER_BASE
@@ -148,723 +157,100 @@ class CMessageMatch : public IMessageMatch
         SetClassId( clsid( CMessageMatch ) );
     }
 
-    CMessageMatch( const IConfigDb* pCfg ) :
-        CMessageMatch()
-    {
-        gint32 ret = 0;
+    // if a event message this interface has subcribed
+    gint32 IsMyMsgIncoming(
+        IConfigDb* pMsg ) const override;
 
-        do{
-            if( pCfg == nullptr )
-            {
-                // maybe user want to setup the
-                // properties later
-                break;
-            }
+    gint32 IsMyMsgOutgoing(
+        IConfigDb* pMsg ) const override;
 
-            CCfgOpener a( pCfg );
+    CMessageMatch( const IConfigDb* pCfg );
 
-            ret = a.GetStrProp(
-                propIfName, m_strIfName );
-
-            if( ERROR( ret ) )
-                break;
-
-            guint32* pMatchType =
-                ( guint32* )&m_iMatchType;
-
-            ret = a.GetIntProp( propMatchType,
-                *pMatchType );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = a.GetStrProp(
-                propObjPath, m_strObjPath );
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-        {
-            std::string strMsg =
-                DebugMsg( ret, "error in CMessageMatch's ctor" );
-
-            throw std::runtime_error( strMsg );
-        }
-    }
-
-    protected:
-    // if a request message this interface can handle
-    gint32 IsMyMsgBasic( DBusMessage* pMessage ) const
-    {
-        gint32 ret = 0;
-
-        do{
-            if( pMessage == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            DMsgPtr pMsg( pMessage );
-
-            if( m_strIfName.empty()
-                || m_strObjPath.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            // test if the interface is the same
-            if( m_strIfName != pMsg.GetInterface() )
-            {
-                ret = ERROR_FALSE;
-                break;
-            }
-
-            // test if the object is the same
-            if( m_strObjPath != pMsg.GetPath() )
-            {
-                ret = ERROR_FALSE;
-            }
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    public:
-
-    gint32 IsMyMsgIncoming( DBusMessage* pMessage ) const
-    {
-        gint32 ret = 0;
-
-        if( pMessage == nullptr )
-            return -EINVAL;
-
-        do{
-            DMsgPtr pMsg( pMessage );
-            bool bClient = ( GetType() == matchClient );
-
-            gint32 iType = pMsg.GetType();
-
-            if( bClient )
-            {
-                switch( iType )
-                {
-                case DBUS_MESSAGE_TYPE_METHOD_RETURN:
-                case DBUS_MESSAGE_TYPE_ERROR:
-                case DBUS_MESSAGE_TYPE_SIGNAL:
-                    break;
-
-                case DBUS_MESSAGE_TYPE_METHOD_CALL:
-                default:
-                    {
-                        ret = -ENOTSUP;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                // a message from the server
-                switch( iType )
-                {
-                case DBUS_MESSAGE_TYPE_METHOD_CALL:
-                    break;
-
-                case DBUS_MESSAGE_TYPE_SIGNAL:
-                case DBUS_MESSAGE_TYPE_METHOD_RETURN:
-                case DBUS_MESSAGE_TYPE_ERROR:
-                default:
-                    {
-                        ret = -ENOTSUP;
-                        break;
-                    }
-                }
-            }
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return IsMyMsgBasic( pMessage );
-    }
+    gint32 IsMyMsgIncoming(
+        DBusMessage* pMessage ) const override;
 
     // if a event message this interface has subcribed
-    gint32 IsMyMsgOutgoing( DBusMessage* pMessage ) const
-    {
-        gint32 ret = 0;
+    gint32 IsMyMsgOutgoing(
+        DBusMessage* pMessage ) const override;
 
-        if( pMessage == nullptr )
-            return -EINVAL;
-
-        do{
-            DMsgPtr pMsg( pMessage );
-            bool bClient = ( GetType() == matchClient );
-
-            gint32 iType = pMsg.GetType();
-
-            if( bClient )
-            {
-                switch( iType )
-                {
-                case DBUS_MESSAGE_TYPE_METHOD_CALL:
-                    break;
-
-                case DBUS_MESSAGE_TYPE_METHOD_RETURN:
-                case DBUS_MESSAGE_TYPE_ERROR:
-                case DBUS_MESSAGE_TYPE_SIGNAL:
-                default:
-                    {
-                        ret = -ENOTSUP;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                switch( iType )
-                {
-                case DBUS_MESSAGE_TYPE_SIGNAL:
-                case DBUS_MESSAGE_TYPE_METHOD_RETURN:
-                case DBUS_MESSAGE_TYPE_ERROR:
-                        break;
-
-                case DBUS_MESSAGE_TYPE_METHOD_CALL:
-                default:
-                    ret = -ENOTSUP;
-                    break;
-                }
-            }
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return IsMyMsgBasic( pMessage );
-    }
-
-    virtual std::string GetDest() const
-    {
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-        std::string strMyDest;
-
-        gint32 ret = oCfg.GetStrProp(
-            propDestDBusName, strMyDest );
-
-        if( ERROR( ret ) )
-            return std::string( "" );
-
-        return strMyDest;
-    }
+    stdstr GetDest() const override;
     
-    virtual bool IsMyObjPath(
-        const std::string& strObjPath ) const
-    {
-
-        // the dest is a prefix of obj path
-        std::string strMyObjPath = m_strObjPath;
-
-        std::replace( strMyObjPath.begin(),
-            strMyObjPath.end(), '/', '.' );
-            
-        if( strObjPath == strMyObjPath )
-            return true;
-
-        return false;
-    }
+    bool IsMyObjPath(
+        const stdstr& strObjPath ) const override;
 
     bool IsMyDest(
-        const std::string& strDest ) const
-    {
-        gint32 ret = 0;
-        std::string strMyDest = GetDest();
-        if( !strMyDest.empty() )
-        {
-            ret = strncmp(
-                strMyDest.c_str(),
-                strDest.c_str(),
-                strDest.size() );
-            if( ret != 0 )
-                return false;
-        }
-        else
-        {
-            // the dest is a prefix of obj path
-            strMyDest = m_strObjPath;
-            std::replace( strMyDest.begin(),
-                strMyDest.end(), '/', '.' );
-            gint32 iIdx = 0;
-
-            if( strMyDest[ 0 ] == '.' )
-                iIdx = 1;
-
-            if( strDest != strMyDest.substr( iIdx, strDest.size() ) )
-                return false;
-
-            // FIXME: it is not a right solution.
-            // we should rely on the
-            // propDestDBusName for accurate match
-            ret = 0;
-        }
-
-        if( ERROR( ret ) )
-            return false;
-
-        return true;
-    }
+        const stdstr& strDest ) const override;
 
     // a equalness comparison
-    bool operator==( const IMessageMatch& rhs ) const
-    {
-        if( m_strObjPath.empty()
-            || m_strIfName.empty() )
-            return false;
-
-        if( GetType() != rhs.GetType() )
-            return false;
-
-        if( ToString() != rhs.ToString() )
-            return false;
-
-        return true;
-    }
+    bool operator==(
+        const IMessageMatch& rhs ) const override;
 
     const IMessageMatch& operator=(
-        const IMessageMatch& rhs )
-    {
-        const CMessageMatch& oMatch =
-            static_cast< const CMessageMatch& >( rhs );
+        const IMessageMatch& rhs ) override;
 
-        return ( *this = oMatch );
-    }
-
-    inline EnumMatchType GetType() const
-    {
-        return m_iMatchType;
-    }
+    EnumMatchType GetType() const override
+    { return m_iMatchType; }
 
     inline void SetType( EnumMatchType iType )
-    {
-        m_iMatchType = iType;
-    }
+    { m_iMatchType = iType; }
 
     inline gint32 GetIfName(
-        std::string& strIfName ) const
+        stdstr& strIfName ) const
     {
         strIfName = m_strIfName;
         return 0;
     }
 
     inline void SetIfName(
-        const std::string& strIfName )
+        const stdstr& strIfName )
     { m_strIfName = strIfName; }
 
     inline gint32 GetObjPath(
-        std::string& strObjPath ) const
+        stdstr& strObjPath ) const
     {
         strObjPath = m_strObjPath;
         return 0;
     }
 
     inline void SetObjPath(
-        const std::string& strObjPath )
+        const stdstr& strObjPath )
     { m_strObjPath = strObjPath; }
 
-    std::string ToDBusRules(
-        gint32 iMsgType ) const
-    {
-        gint32 ret = 0;
+    stdstr ToDBusRules(
+        gint32 iMsgType ) const override;
 
-        std::string strMatch;
-        std::string strRule = "type=";
+    stdstr ToString() const override;
 
-        switch( iMsgType )
-        {
-        case DBUS_MESSAGE_TYPE_SIGNAL:
-            {
-                strRule += "'signal'";
-                break;
-            }
-        case DBUS_MESSAGE_TYPE_METHOD_CALL:
-            {
-                strRule += "'method_call'";
-                break;
-            }
-        case DBUS_MESSAGE_TYPE_METHOD_RETURN:
-            {
-                strRule += "'method_return'";
-                break;
-            }
-        case DBUS_MESSAGE_TYPE_ERROR:
-            {
-                strRule += "'error'";
-                break;
-            }
-        case DBUS_MESSAGE_TYPE_INVALID:
-        default:
-            {
-                strRule = "";
-                break;
-            }
-        }
-
-        if( !strRule.empty() )
-            strMatch = strRule;
-
-        GetIfName( strRule );
-        if( !strRule.empty() )
-        {
-            strMatch += std::string( ",interface='" )
-                + strRule + std::string( "'" );
-        }
-
-        GetObjPath( strRule );
-        if( !strRule.empty() )
-        {
-            strMatch += std::string( ",path='" )
-                + strRule + std::string( "'" );
-        }
-
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-        ret = oCfg.GetStrProp(
-            propMethodName, strRule );
-        if( SUCCEEDED( ret ) )
-        {
-            if( SUCCEEDED( ret ) && !strRule.empty() )
-            {
-                strMatch += std::string( ",member='" )
-                    + strRule + std::string( "'" );
-            }
-        }
-
-        return strMatch;
-    }
-
-    std::string ToString() const
-    {
-        std::string strAll =
-            ToDBusRules( DBUS_MESSAGE_TYPE_INVALID );
-
-        strAll += ",match=";
-        if( GetType() == matchClient )
-        {
-            strAll += "matchClient";
-        }
-        else if( GetType() == matchServer )
-        {
-            strAll += "matchServer";
-        }
-
-        return strAll;
-    }
-
-    virtual gint32 EnumProperties(
-        std::vector< gint32 >& vecProps ) const 
-    {
-        gint32 ret =
-            super::EnumProperties( vecProps );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        vecProps.push_back( propObjPath );
-        vecProps.push_back( propIfName );
-        vecProps.push_back( propMatchType );
-
-        ret = m_pCfg->EnumProperties( vecProps );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return 0;
-    }
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const override;
 
     gint32 GetPropertyType(
-        gint32 iProp, gint32& iType ) const
-    {
+        gint32 iProp, gint32& iType ) const override;
 
-        gint32 ret = 0;
-        switch( iProp )
-        {
-        case propObjPath:
-        case propIfName:
-            {
-                iType = typeString;
-                break;
-            }
-        case propMatchType:
-            {
-                iType = typeUInt32;
-                break;
-            }
-        default:
-            {
-                ret = m_pCfg->GetPropertyType(
-                    iProp, iType );
-                break;
-            }
-        }
-        return ret;
-    }
-
-    bool exist( gint32 iProp ) const
-    {
-        gint32 ret = 0;
-        switch( iProp )
-        {
-        case propObjPath:
-        case propIfName:
-        case propMatchType:
-            {
-                ret = true;
-                break;
-            }
-        default:
-            {
-                ret = m_pCfg->exist( iProp );
-                break;
-            }
-        }
-        return ret;
-    }
+    bool exist( gint32 iProp ) const;
 
     gint32 GetProperty(
         gint32 iProp,
-        Variant& oBuf ) const override
-    {
-        gint32 ret = 0;
-        switch( iProp )
-        {
-        case propObjPath:
-            {
-                oBuf = m_strObjPath;
-                break;
-            }
-        case propIfName:
-            {
-                oBuf = m_strIfName;
-                break;
-            }
-        case propMatchType:
-            {
-                oBuf = GetType();
-                break;
-            }
-        default:
-            {
-                ret = m_pCfg->GetProperty(
-                    iProp, oBuf );
-                break;
-            }
-        }
-        return ret;
-    }
+        Variant& oBuf ) const override;
 
     gint32 SetProperty(
         gint32 iProp,
-        const Variant& oBuf )
-    {
-        gint32 ret = 0;
-        switch( iProp )
-        {
-        case propObjPath:
-            {
-                if( !IsValidDBusPath( ( stdstr& )oBuf ) )
-                {
-                    ret = -EINVAL;
-                    break;
-                }
-                m_strObjPath = ( stdstr& )oBuf;
-                break;
-            }
-        case propIfName:
-            {
-                if( !IsValidDBusName( ( stdstr& )oBuf ) )
-                {
-                    ret = -EINVAL;
-                    break;
-                }
-                m_strIfName = ( stdstr& )oBuf;
-                break;
-            }
-        case propMatchType:
-            {
-                guint32 dwType = oBuf;
-                SetType( ( EnumMatchType )dwType );
-                break;
-            }
-        default:
-            {
-                ret = m_pCfg->SetProperty(
-                    iProp, oBuf );
-                break;
-            }
-        }
-        return ret;
-    }
-    gint32 RemoveProperty( gint32 iProp )
-    {
-        gint32 ret = 0;
-        switch( iProp )
-        {
-        case propObjPath:
-            {
-                m_strObjPath.clear();
-                break;
-            }
-        case propIfName:
-            {
-                m_strIfName.clear();
-                break;
-            }
-        case propMatchType:
-            {
-                SetType( matchInvalid );
-                break;
-            }
-        default:
-            {
-                ret = m_pCfg->
-                    RemoveProperty( iProp );
-                break;
-            }
-        }
-        return ret;
-    }
+        const Variant& oBuf ) override;
+
+    gint32 RemoveProperty( gint32 iProp ) override;
 
     const CMessageMatch& operator=(
-        const CMessageMatch& rhs )
-    {
-        m_strObjPath = rhs.m_strObjPath;
-        m_strIfName = rhs.m_strIfName;
-        SetType( rhs.GetType() );
-        if( !rhs.m_pCfg.IsEmpty() )
-        {
-            *m_pCfg = *rhs.m_pCfg;
-        }
-        else
-        {
-            m_pCfg.Clear();
-        }
+        const CMessageMatch& rhs );
 
-        return *this;
-    }
+    gint32 Serialize(
+        CBuffer& oBuf ) const override;
 
-    virtual gint32 Serialize(
-        CBuffer& oBuf ) const
-    {
-        gint32 ret = 0;
-        CfgPtr pCfg( true );
-        *pCfg = *m_pCfg;
-        CCfgOpener oCfg( ( IConfigDb* )pCfg );
-        oCfg[ propIfName ] = m_strIfName;
-        oCfg[ propObjPath ] = m_strObjPath;
+    gint32 Deserialize(
+        const CBuffer& oBuf ) override;
 
-        SERI_HEADER oHeader;
-
-        oHeader.iMatchType = GetType();
-
-        BufPtr pCfgBuf( true );
-        ret = pCfg->Serialize( *pCfgBuf );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        // NOTE: we DON'T use the 
-        // clsid( CMessageMatch )
-        oHeader.dwClsid = GetClsid();
-
-        oHeader.dwSize = pCfgBuf->size() +
-            sizeof( SERI_HEADER ) -
-            sizeof( SERI_HEADER_BASE );
-
-        oHeader.hton();
-        ret = oBuf.Append(
-            ( guint8* )&oHeader,
-            sizeof( oHeader ) );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        ret = oBuf.Append(
-            ( guint8* )pCfgBuf->ptr(),
-            pCfgBuf->size() );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return 0;
-    }
-
-    virtual gint32 Deserialize(
-        const CBuffer& oBuf )
-    {
-        if( oBuf.empty() )
-            return -EINVAL;
-
-        return Deserialize(
-            oBuf.ptr(), oBuf.size() );
-    }
-
-    virtual gint32 Deserialize(
-        const char* pBuf, guint32 dwSize )
-    {
-        gint32 ret = 0;
-
-        do{
-            if( pBuf == nullptr )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            SERI_HEADER* pHeader =
-                ( SERI_HEADER* )pBuf;
-            
-            SERI_HEADER oHeader;
-            // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
-            oHeader = *pHeader;
-            oHeader.ntoh();
-
-            // NOTE: we DON'T hardcode the clsid(
-            // CMessageMatch )
-            if( oHeader.dwClsid != GetClsid() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            gint32 ret = m_pCfg.NewObj();
-            if( ERROR( ret ) )
-                break;
-
-            ret = m_pCfg->Deserialize(
-                pBuf + sizeof( oHeader ),
-                oHeader.dwSize );
-
-            if( ERROR( ret ) )
-                return ret;
-
-            CCfgOpener oCfg( ( IConfigDb* )m_pCfg );
-            ret = oCfg.GetStrProp(
-                propIfName, m_strIfName );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.GetStrProp(
-                propObjPath, m_strObjPath );
-            if( ERROR( ret ) )
-                break;
-
-            SetType( ( EnumMatchType )oHeader.iMatchType );
-
-        }while( 0 );
-
-        return ret;
-    }
+    gint32 Deserialize(
+        const char* pBuf,
+        guint32 dwSize ) override;
 
     const CfgPtr& GetCfg() const
     { return m_pCfg; }
@@ -875,238 +261,35 @@ class CMessageMatch : public IMessageMatch
 
 class CProxyMsgMatch : public CMessageMatch
 {
-
     public:
-
     typedef CMessageMatch super;
-
-    CProxyMsgMatch( const IConfigDb* pCfg ) :
-        CMessageMatch( pCfg )
-    {
-        SetClassId( clsid( CProxyMsgMatch ) );
-
-        if( pCfg == nullptr )
-            return;
-
-       CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-       oCfg.CopyProp( propIpAddr, pCfg );
-    }
+    CProxyMsgMatch( const IConfigDb* pCfg );
     
     // test if a event message this match is
     // listening to
 
     gint32 IsMyMsgIncoming(
-        DBusMessage* pDBusMsg ) const 
-    {
-        gint32 ret =
-            super::IsMyMsgIncoming( pDBusMsg );
+        DBusMessage* pDBusMsg ) const override;
 
-        if( ERROR( ret ) )
-            return ret;
-
-        DMsgPtr pMsg( pDBusMsg );
-        ObjPtr pTransCtx;
-        ret = pMsg.GetObjArgAt( 0, pTransCtx );
-        if( ERROR( ret ) )
-            return ret;
-
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-        ret = oCfg.IsEqualProp( propConnHandle,
-            ( CObjBase* )pTransCtx );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        std::string strEvtPath;
-        CCfgOpener oTransCtx(
-            ( IConfigDb* )pTransCtx );
-
-        ret = oTransCtx.GetStrProp(
-            propRouterPath, strEvtPath );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        std::string strExpPath;
-        ret = oCfg.GetStrProp(
-            propRouterPath, strExpPath );
-
-        if( ERROR( ret ) )
-            return ret;
-        
-        if( strEvtPath == strExpPath )
-            return STATUS_SUCCESS;
-
-        ret = ERROR_FALSE;
-        if( strEvtPath.size() > strExpPath.size() )
-            return ret;
-
-        guint32 dwLen = strEvtPath.size();
-        if( dwLen < strExpPath.size() )
-        {
-            std::string strVal =
-                strExpPath.substr( 0, dwLen );
-
-            if( pMsg.GetMember() != 
-                SYS_EVENT_RMTSVREVENT )
-                return ret;
-
-            if( strVal != strEvtPath )
-                return ret;
-
-            if( strVal[ dwLen - 1 ] == '/' )
-                return STATUS_SUCCESS;
-
-            if( strExpPath[ dwLen ] == '/' )
-                return STATUS_SUCCESS;
-        }
-        return ERROR_FALSE;
-    }
-
-    std::string ToString() const
-    {
-        std::string strAll = super::ToString();
-
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-
-        guint32 dwConnHandle = 0;
-        gint32 ret = oCfg.GetIntProp(
-            propConnHandle, dwConnHandle );
-
-        if( ERROR( ret ) )
-            return strAll;
-
-        strAll += ",ConnHandle=";
-        strAll += std::to_string( dwConnHandle );
-
-        std::string strValue;
-        ret = oCfg.GetStrProp(
-            propRouterPath, strValue );
-        if( ERROR( ret ) )
-            return strAll;
-
-        strAll += ",RouterPath=";
-        strAll += strValue; 
-
-        return strAll;
-    }
+    stdstr ToString() const override;
 };
 
 class CDBusDisconnMatch : public CMessageMatch
 {
-
     public:
-
     typedef CMessageMatch super;
+    CDBusDisconnMatch( const IConfigDb* pCfg );
 
-    CDBusDisconnMatch( const IConfigDb* pCfg ) :
-        CMessageMatch( pCfg )
-    {
-        SetClassId( clsid( CDBusDisconnMatch ) );
+    gint32 IsMyMsgIncoming(
+        DBusMessage* pMessage ) const override;
 
-        gint32 ret = 0;
-
-        if( pCfg != nullptr )
-        {
-            m_pCfg = pCfg;
-        }
-
-        do{
-            SetObjPath( DBUS_PATH_LOCAL );
-            SetIfName( DBUS_INTERFACE_LOCAL );
-            SetType( matchClient );
-
-            CCfgOpener oCfg( ( IConfigDb* )m_pCfg );
-            ret = oCfg.SetStrProp(
-                propMethodName, "Disconnected" );
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-        {
-            std::string strInfo = DebugMsg(
-                ret, "Error in CDBusDisconnMatch ctor" );
-
-            throw std::runtime_error( strInfo );
-        }
-        return;
-    }
-
-    virtual gint32 IsMyMsgIncoming(
-        DBusMessage* pMessage ) const
-    {
-        DMsgPtr pMsg( pMessage );
-
-        gint32 ret = super::IsMyMsgIncoming( pMsg );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        std::string strMsgMember;
-
-        strMsgMember = pMsg.GetMember();
-
-        if( strMsgMember.empty() )
-            return ERROR_FALSE;
-
-        CCfgOpener oCfg( ( IConfigDb* )m_pCfg );
-        std::string strMember;
-
-        ret = oCfg.GetStrProp(
-            propMethodName, strMember );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        if( strMember != strMsgMember )
-            return ERROR_FALSE;
-
-        return 0;
-    }
-
-    std::string ToString() const
-    {
-        std::string strAll = super::ToString();
-        strAll += ",Member=";
-        strAll += "Disconnected"; 
-        return strAll;
-    }
+    stdstr ToString() const override;
 };
 
 class CDBusSysMatch : public CMessageMatch
 {
     public:
-    CDBusSysMatch( const IConfigDb* pCfg = nullptr ) :
-        CMessageMatch( nullptr )
-    {
-        SetClassId( clsid( CDBusSysMatch ) );
-
-        gint32 ret = 0;
-        do{
-            CCfgOpener matchCfg(
-                ( IConfigDb* )m_pCfg );
-
-            SetObjPath( DBUS_SYS_OBJPATH );
-            SetIfName( DBUS_SYS_INTERFACE );
-            SetType( matchClient );
-
-            ret = matchCfg.SetStrProp(
-                propDestDBusName, 
-                DBUS_SERVICE_DBUS );
-
-            if( ERROR( ret ) )
-                break;
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-        {
-            std::string strMsg = DebugMsg( ret,
-                "error in CDBusSysMatch's ctor" );
-
-            throw std::runtime_error( strMsg );
-        }
-    }
+    CDBusSysMatch( const IConfigDb* pCfg = nullptr );
 };
 
 class CDBusLoopbackMatch : public CMessageMatch
@@ -1118,466 +301,75 @@ class CDBusLoopbackMatch : public CMessageMatch
         DBusMessage* pDBusMsg, bool bIncoming ) const;
 
     gint32 AddRemoveBusName(
-        const std::string& strName, bool bRemove );
+        const stdstr& strName, bool bRemove );
 
     public:
     typedef CMessageMatch super;
     CDBusLoopbackMatch ( const IConfigDb* pCfg );
 
-    virtual gint32 IsMyMsgIncoming(
-        DBusMessage* pDBusMsg ) const;
+    gint32 IsMyMsgIncoming(
+        DBusMessage* pDBusMsg ) const override;
 
-    virtual gint32 IsMyMsgOutgoing(
-        DBusMessage* pDBusMsg ) const;
+    gint32 IsMyMsgOutgoing(
+        DBusMessage* pDBusMsg ) const override;
 
     gint32 AddBusName(
-        const std::string& strName );
+        const stdstr& strName );
 
     gint32 RemoveBusName(
-        const std::string& strName );
+        const stdstr& strName );
 
     gint32 IsRegBusName(
-        const std::string& strBusName ) const;
+        const stdstr& strBusName ) const;
 
 };
-
 
 class CRouterRemoteMatch : public CMessageMatch
 {
     public:
     typedef CMessageMatch super;
-    CRouterRemoteMatch( const IConfigDb* pCfg = nullptr ) :
-        CMessageMatch( pCfg )
-    {
-        SetClassId( clsid( CRouterRemoteMatch ) );
-        SetType( matchClient );
-    }
+    CRouterRemoteMatch( const IConfigDb* pCfg = nullptr );
 
-    virtual gint32 CopyMatch( IMessageMatch* pMatch )
-    {
-        CCfgOpenerObj oCfg( this );
-        gint32 ret = 0;
-
-        do{
-            ret = oCfg.CopyProp( propObjPath, pMatch );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.CopyProp( propIfName, pMatch );
-            if( ERROR( ret ) )
-                break;
-
-            CCfgOpener oCfg2( ( IConfigDb* )GetCfg() );
-            IConfigDb* prhs = pMatch->GetCfg();
-            CCfgOpener orhs( prhs );
-
-            ret = oCfg2.CopyProp(
-                propDestDBusName, prhs );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg2.CopyProp( propPortId, prhs );
-            if( ERROR( ret ) )
-                break;
-
-            stdstr strPath;
-            ret = orhs.GetStrProp(
-                propRouterPath, strPath );
-            if( ERROR( ret ) )
-                break;
-
-            oCfg2.SetStrProp( propRouterPath, strPath );
-            if( strPath == "/" )
-                break;
-
-            // optional
-            oCfg.CopyProp( propPrxyPortId, pMatch );
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    virtual std::string ToString() const
-    {
-        std::string strAll = super::ToString();
-
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-
-        guint32 dwPortId = 0;
-        gint32 ret = oCfg.GetIntProp(
-            propPortId, dwPortId );
-
-        if( ERROR( ret ) )
-            return strAll;
-
-        strAll += ",PortId=";
-        strAll += std::to_string( dwPortId );
-
-        std::string strValue;
-        oCfg.GetStrProp(
-            propDestDBusName, strValue );
-
-        strAll += ",Destination=";
-        strAll += strValue;
-
-        ret = oCfg.GetStrProp(
-            propRouterPath, strValue );
-        if( ERROR( ret ) )
-            return strAll;
-
-        strAll += ",RouterPath=";
-        strAll += strValue; 
-
-        return strAll;
-    }
+    virtual gint32 CopyMatch( IMessageMatch* pMatch );
+    stdstr ToString() const override;
 
     gint32 IsMyReqToRelay(
         IConfigDb* pReqCtx,
-        DBusMessage* pReqMsg ) const
-    {
-        gint32 ret =
-            super::IsMyMsgOutgoing( pReqMsg );
-
-        if( ERROR( ret ) )
-            return ret;
-        do{
-            DMsgPtr pMsg( pReqMsg );
-            CCfgOpener oCfg(
-                ( IConfigDb* )GetCfg() );
-
-            std::string strDest =
-                pMsg.GetDestination();
-
-            ret = oCfg.IsEqual(
-                propDestDBusName, strDest );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.IsEqualProp(
-                propRouterPath, pReqCtx );
-
-            if( ERROR( ret ) )
-                break;
-
-            guint32 dwPortId = 0;
-            CCfgOpener oReqCtx( pReqCtx );
-            ret = oReqCtx.GetIntProp(
-                propConnHandle, dwPortId );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.IsEqual(
-                propPortId, dwPortId );
-
-            break;
-
-        }while( 0 );
-
-        return ret;
-    }
+        DBusMessage* pReqMsg ) const;
 
     gint32 IsMyModEvent(
-        DBusMessage* pEvtMsg ) const
-    {
-        DMsgPtr pMsg( pEvtMsg );
-        if( pMsg.GetMember() !=
-            "NameOwnerChanged" )
-            return ERROR_FALSE;
-
-        std::string strModName;
-        gint32 ret = pMsg.GetStrArgAt(
-            0, strModName );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetCfg() );
-
-        return oCfg.IsEqual(
-            propDestDBusName, strModName );
-    }
+        DBusMessage* pEvtMsg ) const;
 
     gint32 IsMyEvtToForward(
         IConfigDb* pEvtCtx,
-        DBusMessage* pEvtMsg ) const
-    {
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetCfg() );
-
-        gint32 ret = oCfg.IsEqualProp(
-            propRouterPath, pEvtCtx );
-
-        if( ERROR( ret ) )
-            return ERROR_FALSE;
-        
-        ret = super::IsMyMsgIncoming( pEvtMsg );
-
-        if( ERROR( ret ) )
-        {
-            ret = IsMyModEvent( pEvtMsg );
-            if( ERROR( ret ) )
-                return ERROR_FALSE;
-        }
-
-        return ret;
-    }
+        DBusMessage* pEvtMsg ) const;
 
     virtual gint32 IsMyModule(
-        const std::string strModName )
-    {
-        if( strModName.empty() )
-            return -EINVAL;
+        const stdstr strModName );
 
-        std::string strModPath =
-            DBUS_DESTINATION( strModName );
-
-        if( strModPath.size() >=
-            m_strObjPath.size() )
-            return ERROR_FALSE;
-
-        std::replace( strModPath.begin(),
-            strModPath.end(), '.', '/');
-
-        std::string strPrefix;
-        strPrefix = m_strObjPath.substr(
-            0, strModPath.size() );
-        
-        if( strPrefix != strModPath )
-            return ERROR_FALSE;
-
-        std::string strObjName;
-        strObjName = m_strObjPath.substr(
-            strModPath.size(),
-            m_strObjPath.size() );
-
-        if( strObjName.empty() )
-            return ERROR_FALSE;
-
-        if( strObjName[ 0 ] != '/' )
-            return ERROR_FALSE;
-
-        strObjName[ 0 ] = 'O';
-
-        if( strObjName.find( '/' ) !=
-            std::string::npos )
-            return ERROR_FALSE;
-
-        return 0;
-    }
-
-    guint32 GetPortId()
-    {
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-        guint32 dwPortId = 0;
-        oCfg.GetIntProp( propPortId, dwPortId );
-        return dwPortId;
-    }
+    guint32 GetPortId();
 };
 
 class CRouterLocalMatch : public CRouterRemoteMatch
 {
     public:
     typedef CRouterRemoteMatch super;
-    CRouterLocalMatch( const IConfigDb* pCfg = nullptr ) :
-        CRouterRemoteMatch( pCfg )
-    {
-        SetClassId( clsid( CRouterLocalMatch ) );
-        SetType( matchClient );
-    }
+    CRouterLocalMatch( const IConfigDb* pCfg = nullptr );
 
-    gint32 CopyMatch( IMessageMatch* pMatch )
-    {
-        CCfgOpenerObj oCfg( this );
-        gint32 ret = 0;
+    gint32 CopyMatch( IMessageMatch* pMatch ) override;
 
-        do{
-            ret = oCfg.CopyProp(
-                propObjPath, pMatch );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.CopyProp(
-                propIfName, pMatch );
-            if( ERROR( ret ) )
-                break;
-
-            CCfgOpener oCfg2( ( IConfigDb* )GetCfg() );
-            IConfigDb* prhs = pMatch->GetCfg();
-
-            ret = oCfg2.CopyProp(
-                propDestDBusName, prhs );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg2.CopyProp(
-                propRouterPath, prhs );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg2.CopyProp(
-                propSrcDBusName, prhs );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg2.CopyProp(
-                propSrcUniqName, prhs );
-            if( ERROR( ret ) )
-                break;
-
-            oCfg2.CopyProp(
-                propPrxyPortId, prhs );
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    std::string ToString() const
-    {
-        std::string strAll =
-            super::super::ToString();
-
-        std::string strValue;
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-
-        oCfg.GetStrProp(
-            propSrcUniqName, strValue );
-
-        strAll += ",UniqName=";
-        strAll += strValue;
-
-        guint32 dwPortId = 0;
-        oCfg.GetIntProp(
-            propPrxyPortId, dwPortId );
-
-        strAll += ",PrxyPortId=";
-        strAll += std::to_string( dwPortId );
-
-        oCfg.GetStrProp(
-            propRouterPath, strValue );
-
-        strAll += ",RouterPath=";
-        strAll += strValue;
-
-        return strAll;
-    }
+    stdstr ToString() const override;
 
     gint32 IsMyReqToForward(
         IConfigDb* pReqCtx,
-        DBusMessage* pReqMsg ) const
-    {
-        gint32 ret =
-            super::IsMyMsgOutgoing( pReqMsg );
-
-        if( ERROR( ret ) )
-            return ret;
-
-        CCfgOpener oReqCtx( pReqCtx );
-        CCfgOpener oCfg(
-            ( IConfigDb* )GetCfg() );
-
-        ret = oCfg.IsEqualProp(
-            propRouterPath, pReqCtx );
-        if( ERROR( ret ) )
-            return ret;
-        
-        DMsgPtr pMsg( pReqMsg );
-        stdstr strVal = pMsg.GetSender();
-
-        ret = oCfg.IsEqual( propSrcDBusName, 
-            pMsg.GetSender() );
-
-        if( ERROR( ret ) )
-        {
-            ret = oCfg.IsEqual(
-                propSrcUniqName, 
-                pMsg.GetSender() );
-        }
-
-        if( ERROR( ret ) )
-            return ret;
-
-        return 0;
-    }
+        DBusMessage* pReqMsg ) const;
 
     gint32 IsMyEvtToRelay(
         IConfigDb* pEvtCtx,
-        DBusMessage* pEvtMsg ) const
-    {
-        gint32 ret = 0;
+        DBusMessage* pEvtMsg ) const;
 
-        do{
-            CCfgOpener oCfg(
-                ( IConfigDb* )GetCfg() );
-
-            ret = oCfg.IsEqualProp(
-                propRouterPath, pEvtCtx );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = super::IsMyMsgIncoming(
-                pEvtMsg );
-
-            if( ERROR( ret ) )
-            {
-                ret = IsMyModEvent( pEvtMsg );
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            CCfgOpener oEvtCtx( pEvtCtx );
-
-            guint32 dwPortId = 0;
-            ret = oEvtCtx.GetIntProp(
-                propConnHandle, dwPortId );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oCfg.IsEqual(
-                propPrxyPortId, dwPortId );
-
-        }while( 0 );
-
-        return ret;
-    }
-
-    virtual gint32 IsMyModule(
-        const std::string strModName )
-    {
-        if( strModName.empty() )
-            return -EINVAL;
-
-        gint32 ret =
-            super::IsMyModule( strModName );
-
-        if( SUCCEEDED( ret ) )
-            return ret;
-
-        std::string strObjPath = strModName;
-        std::replace( strObjPath.begin(),
-            strObjPath.end(), '.', '/');
-
-        CCfgOpener oCfg( ( IConfigDb* )GetCfg() );
-        ret = oCfg.IsEqual( propSrcDBusName,
-            strModName );
-
-        if( SUCCEEDED( ret ) )
-             return ret;
-
-        ret = oCfg.IsEqual( propDestDBusName,
-            strModName );
- 
-        if( SUCCEEDED( ret ) )
-             return ret;
-
-        return ERROR_FALSE;
-    }
+    gint32 IsMyModule(
+        const stdstr strModName ) override;
 };
 
 }

@@ -213,8 +213,7 @@ do{ \
         _Ret = -ENOMEM; \
         break; \
     } \
-    oBuf.SetOffset( dwOrigOff );\
-    pLoc = ( dwLocOff + oBuf.ptr() ); \
+    pLoc = ( dwOrigOff + dwLocOff + oBuf.ptr() ); \
     pEnd = ( oBuf.size() + oBuf.ptr() ); \
  \
 }while( 0 ) 
@@ -235,13 +234,13 @@ gint32 CConfigDb2::Serialize(
     // NOTE: oHeader.dwSize at this point is an
     // estimated size at this moment
 
-    guint32 dwOrigOff = oBuf.offset();
+    guint32 dwOrigOff = oBuf.size();
     ret = oBuf.Resize( dwOrigOff +
         sizeof( SERI_HEADER ) + QPAGE );
     if( ERROR( ret ) )
         return ret;
 
-    char* pLoc = oBuf.ptr();
+    char* pLoc = oBuf.ptr() + dwOrigOff;
 
     oHeader.hton();
     memcpy( pLoc, &oHeader, sizeof( oHeader ) );
@@ -454,11 +453,14 @@ gint32 CConfigDb2::Serialize(
     if( SUCCEEDED( ret ) )
     {
         SERI_HEADER* pHeader =
-            ( SERI_HEADER* )oBuf.ptr();
+            ( SERI_HEADER* )( oBuf.ptr() + dwOrigOff );
 
-        pHeader->dwSize = htonl(
-            pLoc - oBuf.ptr() -
+        guint32 dwSize = htonl(
+            pLoc - oBuf.ptr() - dwOrigOff -
             sizeof( SERI_HEADER_BASE ) );
+
+        memcpy( &pHeader->dwSize,
+            &dwSize, sizeof( dwSize ) );
 
         RESIZE_BUF( pLoc - oBuf.ptr(), ret );
     }
