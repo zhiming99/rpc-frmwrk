@@ -61,7 +61,11 @@ std::string DebugMsgInternal(
         "[%ld.%09ld-%d]%s(%d): %s(%d)",
         ts.tv_sec,
         ts.tv_nsec,
+#ifdef DEBUG
+        gettid(),
+#else 
         getpid(),
+#endif
         szFunc,
         iLineNum,
         strMsg.c_str(),

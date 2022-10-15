@@ -243,20 +243,12 @@ gint32 CIoManager::PostCompleteIrp( IRP* pIrp, bool bCancel )
             // complete the irp on the same thread
             // CompleteIrp is called. a
             // performance boost
-            ObjPtr irpPtr( pIrp );
-            CCfgOpener oCfg;
-            ret = oCfg.SetObjPtr( propIrpPtr, irpPtr );
-            if( SUCCEEDED( ret ) )
-            {
-                TaskletPtr pTask;
-                ret = pTask.NewObj(
-                    clsid( CIoMgrIrpCompleteTask ),
-                    oCfg.GetCfg() );
-                if( SUCCEEDED( ret ) )
-                {
-                    ( *pTask )( eventZero );
-                }
-            }
+
+            LONGWORD dwParam1 =
+                ( LONGWORD )( ( IRP* )pIrp );
+            LONGWORD dwParam2 = pIrp->m_dwContext;
+            pIrp->m_pCallback->OnEvent( eventIrpComp,
+                dwParam1, dwParam2, nullptr );
         }
         else
         {

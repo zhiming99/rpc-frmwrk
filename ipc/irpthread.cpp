@@ -711,13 +711,18 @@ gint32 CThreadPool::GetThread(
 
         if( m_bAscend )
         {
-            vector<ThreadPtr>::iterator itr =
-                m_vecThreads.begin();
+            auto itr = m_vecThreads.begin();
             while( itr != m_vecThreads.end() ) 
             {
-                // a simple thread choosing strategy
                 gint32 iLoad =
                     ( *itr )->GetLoadCount();
+
+                if( iLoad == 0 )
+                {
+                    iLeastLoad = 0;
+                    thLeast = *itr;
+                    break;
+                }
 
                 if( iLoad < iLeastLoad )
                 {
@@ -729,22 +734,29 @@ gint32 CThreadPool::GetThread(
         }
         else
         {
-            int iNumElems = m_vecThreads.size();
-            for( int i = iNumElems - 1; i >= 0; --i )
+            auto itr = m_vecThreads.rbegin();
+            while( itr != m_vecThreads.rend() ) 
             {
-                // a simple thread choosing strategy
                 gint32 iLoad =
-                    m_vecThreads[ i ]->GetLoadCount();
+                    ( *itr )->GetLoadCount();
+
+                if( iLoad == 0 )
+                {
+                    iLeastLoad = 0;
+                    thLeast = *itr;
+                    break;
+                }
 
                 if( iLoad < iLeastLoad )
                 {
                     iLeastLoad = iLoad;
-                    thLeast = m_vecThreads[ i ];
+                    thLeast = *itr;
                 }
+                ++itr;
             }
         }
 
-        if( iLeastLoad <= 0 )
+        if( iLeastLoad == 0 )
         {
             pThread = thLeast;
             break;
