@@ -1432,7 +1432,6 @@ gint32 CUnixSockStmPdo::HandleListening(
             break;
         }
         m_queListeningIrps.push_back( pIrp );
-        pIrp->SetCompleteInPlace( true );
         ret = STATUS_PENDING;
 
     }while( 0 );
