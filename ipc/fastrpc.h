@@ -29,6 +29,7 @@
 #include "ifhelper.h"
 #include "streamex.h"
 #include "stmport.h"
+#include "counters.h"
 
 #define IFBASE2( _bProxy ) std::conditional< \
     _bProxy, CStreamProxyWrapper, CStreamServerWrapper>::type
@@ -46,6 +47,17 @@
 
 namespace rpcf
 {
+
+struct FASTRPC_MSG
+{
+    guint32 m_dwSize = 0;
+    guint8 m_bType = typeObj;
+    guint8 m_szSig[ 3 ] = { 'F', 'R', 'M' };
+    CfgPtr m_pCfg;
+
+    gint32 Serialize( CBuffer& oBuf );
+    gint32 Deserialize( CBuffer& oBuf );
+};
 
 struct SESS_INFO
 {
@@ -66,7 +78,7 @@ class CRpcStmChanBase :
     std::map< stdstr, guint32 > m_mapSessRefs;
 
     using MSGQUE=
-        std::pair< guint32, std::deque< DMsgPtr > >;
+        std::pair< guint32, std::deque< CfgPtr > >;
     std::hashmap< HANDLE, MSGQUE  > m_mapMsgRead;
     using BUFQUE= std::deque< BufPtr >;
     std::hashmap< HANDLE, BUFQUE > m_mapBufReading;
@@ -286,19 +298,21 @@ class CRpcStmChanBase :
             oPortLock.Unlock();
             oLock.Unlock();
 
-            FillReadBuf( hstm );
+            ret = FillReadBuf( hstm );
+            if( SUCCEEDED( ret ) )
+            {
+                TaskletPtr pTask;
+                ret = DEFER_IFCALLEX_NOSCHED2(
+                    -1, pTask, this,
+                    &CRpcStmChanBase::DispatchData, 
+                    ( guint64 )hstm );
+                
+                if( ERROR( ret ) )
+                    break;
 
-            TaskletPtr pTask;
-            ret = DEFER_IFCALLEX_NOSCHED2(
-                -1, pTask, this,
-                &CRpcStmChanBase::DispatchData, 
-                ( guint64 )hstm );
-            
-            if( ERROR( ret ) )
-                break;
-
-            auto pMgr = this->GetIoMgr();
-            ret = pMgr->RescheduleTask( pTask );
+                auto pMgr = this->GetIoMgr();
+                ret = pMgr->RescheduleTask( pTask );
+            }
 
         }while( 0 );
 
@@ -422,8 +436,8 @@ class CRpcStmChanBase :
 
     gint32 BuildNewMsgToSvr(
         HANDLE hstm,
-        DMsgPtr& pFwrdMsg,
-        DMsgPtr& pNewMsg )
+        IConfigDb* pFwrdMsg,
+        CfgPtr& pNewMsg )
     {
         // for compatible format with the message from
         // the bridge
@@ -456,31 +470,11 @@ class CRpcStmChanBase :
             oReqCtx.SetQwordProp(
                 propTimestamp, ts.tv_sec );
 
-            pNewMsg.CopyHeader( pFwrdMsg );
+            CCfgOpener oReq( pFwrdMsg );
+            oReq.SetPointer( propContext,
+                ( IConfigDb* )oReq.GetCfg() );
 
-            BufPtr pArg( true );
-            gint32 iType = 0;
-            ret = pFwrdMsg.GetArgAt(
-                0, pArg, iType );
-
-            BufPtr pCtxBuf( true );
-            ret = oReqCtx.Serialize( pCtxBuf );
-            if( ERROR( ret ) )
-                break;
-
-            const char* pData = pArg->ptr();
-            const char* pCtx = pCtxBuf->ptr();
-            if( !dbus_message_append_args(
-                pNewMsg, DBUS_TYPE_ARRAY,
-                DBUS_TYPE_BYTE, &pData,
-                pArg->size(), DBUS_TYPE_ARRAY,
-                DBUS_TYPE_BYTE, &pCtx,
-                pCtxBuf->size(),
-                DBUS_TYPE_INVALID ) )
-            {
-                ret = -ENOMEM;
-                break;
-            }
+            pNewMsg = pFwrdMsg;
 
         }while( 0 );
 
@@ -530,7 +524,7 @@ class CRpcStmChanBase :
                 memcpy( &dwSize, pBuf->ptr(),
                     sizeof( dwSize ) );
                 dwSize = ntohl( dwSize );
-                if( dwSize > MAX_BYTES_PER_TRANSFER )
+                if( dwSize > MAX_BYTES_PER_BUFFER )
                 {
                     ret = -EBADMSG;
                     break;
@@ -539,16 +533,26 @@ class CRpcStmChanBase :
                     pBuf->size() - sizeof( dwSize );
                 if( dwPayload == dwSize )
                 {
-                    DMsgPtr pMsg;
-                    ret = pMsg.Deserialize( *pBuf );
+                    CfgPtr pMsg;
+                    FASTRPC_MSG oMsg;
+                    ret = oMsg.Deserialize( *pBuf );
                     if( ERROR( ret ) )
                         break;
+                    if( oMsg.m_bType != typeObj )
+                    {
+                        ret = -EBADMSG;
+                        break;
+                    }
+                    pMsg = oMsg.m_pCfg;
                     stdstr strSender = ":";
                     strSender +=
                         std::to_string( hstm );
-                    pMsg.SetSender( strSender );
-                    DMsgPtr pNewMsg;
+                    CCfgOpener oPayload(
+                        ( IConfigDb* )pMsg );
+                    oPayload[ propSrcDBusName ] =
+                        strSender;
 
+                    CfgPtr pNewMsg;
                     ret = BuildNewMsgToSvr(
                         hstm, pMsg, pNewMsg );
                     if( ERROR( ret ) )
@@ -580,15 +584,28 @@ class CRpcStmChanBase :
                     pHeadBuf->Append(
                         pBuf->ptr(), pBuf->size() );
 
-                    DMsgPtr pMsg;
-                    ret = pMsg.Deserialize( *pHeadBuf );
+                    CfgPtr pMsg;
+                    FASTRPC_MSG oMsg;
+                    ret = oMsg.Deserialize( *pBuf );
                     if( ERROR( ret ) )
                         break;
+                    if( oMsg.m_bType != typeObj )
+                    {
+                        ret = -EBADMSG;
+                        break;
+                    }
+                    pMsg = oMsg.m_pCfg;
                     stdstr strSender = ":";
                     strSender +=
                         std::to_string( hstm );
-                    pMsg.SetSender( strSender );
-                    DMsgPtr pNewMsg;
+
+                    CCfgOpener oPayload(
+                        ( IConfigDb* )pMsg );
+
+                    oPayload[ propSrcDBusName ] =
+                        strSender;
+
+                    CfgPtr pNewMsg;
                     ret = BuildNewMsgToSvr(
                         hstm, pMsg, pNewMsg );
                     if( ERROR( ret ) )
@@ -598,8 +615,10 @@ class CRpcStmChanBase :
                 }
                 else if( dwPayload < dwSize )
                 {
-                    pHeadBuf->Append(
+                    ret = pHeadBuf->Append(
                         pBuf->ptr(), pBuf->size() );
+                    if( ERROR( ret ) )
+                        break;
                     ret = STATUS_MORE_PROCESS_NEEDED;
                 }
                 else
@@ -620,6 +639,7 @@ class CRpcStmChanBase :
 
         gint32 ret = 0;
         do{
+            bool bDispatch = false;
             auto pPort = static_cast
                 < CDBusStreamBusPort* >( m_pPort ); 
             PortPtr pPdoPort;
@@ -631,7 +651,10 @@ class CRpcStmChanBase :
             CReadLock oLock( this->GetSharedLock() );
             auto itr = m_mapMsgRead.find( hstm );
             if( itr == m_mapMsgRead.end() )
+            {
+                ret = -ENOENT;
                 break;
+            }
 
             CPort* pPdo = pPdoPort;
             CStdRMutex oPortLock( pPdo->GetLock() );
@@ -640,20 +663,47 @@ class CRpcStmChanBase :
             auto& msgQue = msgElem.second;
             auto& dwReqCount = msgElem.first;
 
-            if( dwReqCount <= msgQue.size() )
+            if( dwReqCount == 0 )
+            {
+                ret = -EAGAIN;
                 break;
+            }
+
+            gint32 iToRead =
+                dwReqCount - msgQue.size();
+            if( iToRead <= 0 )
+            {
+                // ready to dispatch
+                break;
+            }
+
+            if( msgQue.size() )
+                bDispatch = true;
 
             oPortLock.Unlock();
             oLock.Unlock();
 
-            BufPtr pBuf;
-            ret = this->ReadStreamNoWait(
-                hstm, pBuf );
+            for( int i = 0; i < iToRead; ++i )
+            {
+                BufPtr pBuf;
+                ret = this->ReadStreamNoWait(
+                    hstm, pBuf );
+                if( ERROR( ret ) )
+                    break;
+                ret = FillReadBuf( hstm, pBuf );
+                if( ERROR( ret ) )
+                    break;
+                if( unlikely( ret ==
+                    STATUS_MORE_PROCESS_NEEDED ) )
+                {
+                    i--;
+                    continue;
+                }
+                bDispatch = true;
+            }
 
-            if( ERROR( ret ) )
-                break;
-
-            ret = FillReadBuf( hstm, pBuf );
+            if( bDispatch )
+                ret = 0;
 
         }while( 0 );
 
@@ -673,7 +723,7 @@ class CRpcStmChanBase :
             if( ERROR( ret ) )
                 break;
 
-            std::vector< DMsgPtr > vecMsgs;
+            std::vector< CfgPtr > vecMsgs;
             CReadLock oLock( this->GetSharedLock() );
             if( this->GetState() != stateConnected )
             {
@@ -732,8 +782,11 @@ class CRpcStmChanBase :
         if( ERROR( ret ) )
             return ret;
 
-        FillReadBuf( hstm );
-        DispatchData( ( guint64 )hstm );
+        ret = FillReadBuf( hstm );
+        if( SUCCEEDED( ret ) )
+            DispatchData( ( guint64 )hstm );
+        else if( ret == -EAGAIN )
+            ret = 0;
         return ret;
     }
 
@@ -944,6 +997,131 @@ class CRpcStmChanSvr :
         IConfigDb* pDataDesc ) override;
 };
 
+class CFastRpcServerState :
+    public CIfServerState
+{
+    public:
+    typedef CIfServerState super;
+    CFastRpcServerState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CFastRpcServerState ) ); }
+
+    gint32 SubscribeEvents()
+    {
+        std::vector< EnumPropId > vecEvtToSubscribe =
+            { propRmtSvrEvent };
+        return SubscribeEventsInternal(
+            vecEvtToSubscribe );
+    }
+};
+
+class CFastRpcProxyState :
+    public CRemoteProxyState
+{
+    public:
+    typedef CRemoteProxyState super;
+    CFastRpcProxyState ( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CFastRpcProxyState ) ); }
+
+    gint32 SubscribeEvents()
+    {
+        std::vector< EnumPropId > vecEvtToSubscribe =
+            { propRmtSvrEvent };
+        return SubscribeEventsInternal(
+            vecEvtToSubscribe );
+    }
+};
+
+class CFastRpcServerBase :
+    public virtual IFBASE3( false )
+{
+    protected:
+    std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
+    std::atomic< guint32 > m_dwSeqNo;
+
+    public:
+    typedef IFBASE3( false ) super;
+    CFastRpcServerBase( const IConfigDb* pCfg ) :
+        super( pCfg ), m_dwSeqNo( 0 ) 
+    {}
+
+    inline gint32 NewSeqNo()
+    { return m_dwSeqNo++; }
+
+    gint32 GetStmSkel(
+        HANDLE hstm, InterfPtr& pIf );
+
+    gint32 AddStmSkel(
+        HANDLE hstm, InterfPtr& pIf );
+
+    gint32 RemoveStmSkel(
+        HANDLE hstm );
+
+    gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
+    virtual gint32 CreateStmSkel(
+        HANDLE hStream,
+        guint32 dwPortId,
+        InterfPtr& pIf ) = 0;
+
+    gint32 GetStream(
+        IEventSink* pCallback,
+        HANDLE& hStream );
+
+    gint32 OnStartSkelComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 BroadcastEvent(
+        IConfigDb* pReqCall,
+        IEventSink* pCallback ) override;
+};
+
+class CFastRpcProxyBase :
+    public virtual IFBASE3( true )
+{
+    InterfPtr m_pSkelObj;
+    std::atomic< guint32 > m_dwSeqNo;
+
+    public:
+    typedef IFBASE3( true ) super;
+
+    CFastRpcProxyBase( const IConfigDb* pCfg ):
+        super( pCfg ) 
+    {}
+
+    inline gint32 NewSeqNo()
+    { return m_dwSeqNo++; }
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
+
+    virtual gint32 CreateStmSkel(
+        InterfPtr& pIf ) = 0;
+
+    gint32 OnRmtSvrEvent(
+        EnumEventId iEvent,
+        IConfigDb* pEvtCtx,
+        HANDLE hPort ) override;
+
+    InterfPtr GetStmSkel() const
+    { return m_pSkelObj; }
+};
+
 template< bool bProxy >
 class CFastRpcSkelBase :
     public IFBASE2( bProxy )
@@ -983,6 +1161,227 @@ class CFastRpcSkelBase :
 
     void SetParentIf( InterfPtr& pIf )
     { return m_pParent = pIf; };
+
+    gint32 BuildBufForIrpInternal( BufPtr& pBuf,
+        IConfigDb* pReqCall )
+    {
+        if( pReqCall == nullptr )
+            return -EINVAL;
+
+        gint32 ret = 0;
+        do{
+            if( pBuf.IsEmpty() )
+            {
+                ret = pBuf.NewObj();
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            CReqOpener oReq( pReqCall );
+            gint32 iReqType;
+            ret = oReq.GetReqType(
+                ( guint32& )iReqType );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( iReqType == 
+                DBUS_MESSAGE_TYPE_METHOD_RETURN )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            stdstr strMethod;
+            ret = oReq.GetMethodName( strMethod );
+            if( ERROR( ret ) )
+                break;
+
+            if( strMethod == IF_METHOD_ENABLEEVT ||
+                strMethod == IF_METHOD_DISABLEEVT ||
+                strMethod == IF_METHOD_LISTENING )
+            {
+                // the m_reqData is an MatchPtr
+                ret = this->BuildBufForIrpIfMethod(
+                    pBuf, pReqCall );
+                break;
+            }
+
+            guint32 dwSeqNo = 0;
+            if( this->IsServer() )
+            {
+                CFastRpcServerBase* pSvr = GetParentIf();
+                dwSeqNo = pSvr->NewSeqNo();
+            }
+            else
+            {
+                CFastRpcProxyBase* pProxy = GetParentIf();
+                dwSeqNo = pProxy->NewSeqNo();
+            }
+
+            // remove redudant information from the
+            // request to send
+            oReq.RemoveProperty( propDestDBusName );
+            oReq.RemoveProperty( propSrcDBusName );
+            oReq.SetIntProp( propSeqNo, dwSeqNo );
+
+            *pBuf = ObjPtr( pReqCall );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 CustomizeRequest(
+        IConfigDb* pReqCfg,
+        IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        do{
+            CReqOpener oReqr( pReqCfg );
+            CReqBuilder oReqw( pReqCfg );
+            guint32 dwFlags = 0;
+            ret = oReqr.GetCallFlags( dwFlags );
+            if( ERROR( ret ) )
+                break;
+            dwFlags |= CF_NON_DBUS;
+            oReqw.SetCallFlags( dwFlags );
+
+        }while( 0 );
+
+        return ret;
+    }
+    gint32 IncCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
+    {
+        gint32 ret = 0;
+        do{
+            if( this->IsServer() )
+            {
+                CStatCountersServer* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->IncCounter( iProp, dwVal );
+            }
+            else
+            {
+                CStatCountersProxy* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->IncCounter( iProp, dwVal );
+            }
+        }while( 0 );
+        return ret;
+    }
+
+    gint32 DecCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
+    {
+        gint32 ret = 0;
+        do{
+            if( this->IsServer() )
+            {
+                CStatCountersServer* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->DecCounter( iProp, dwVal );
+            }
+            else
+            {
+                CStatCountersProxy* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->DecCounter( iProp, dwVal );
+            }
+        }while( 0 );
+        return ret;
+    }
+
+    gint32 SetCounter( EnumPropId iProp,
+        guint32 dwVal ) override
+    {
+        gint32 ret = 0;
+        do{
+            if( this->IsServer() )
+            {
+                CStatCountersServer* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->SetCounter( iProp, dwVal );
+            }
+            else
+            {
+                CStatCountersProxy* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->SetCounter( iProp, dwVal );
+            }
+        }while( 0 );
+        return ret;
+    }
+
+    gint32 SetCounter( EnumPropId iProp,
+        guint64 qwVal ) override
+    {
+        gint32 ret = 0;
+        do{
+            if( this->IsServer() )
+            {
+                CStatCountersServer* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->SetCounter( iProp, qwVal );
+            }
+            else
+            {
+                CStatCountersProxy* pIf =
+                    GetParentIf();
+
+                if( pIf == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                ret = pIf->SetCounter( iProp, qwVal );
+            }
+        }while( 0 );
+        return ret;
+    }
 };
 
 class CFastRpcSkelProxyState :
@@ -1027,6 +1426,9 @@ class CFastRpcSkelProxyBase :
     CFastRpcSkelProxyBase( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
+
+    gint32 BuildBufForIrp( BufPtr& pBuf,
+        IConfigDb* pReqCall ) override;
 };
 
 class CIfStartRecvMsgTask2 :
@@ -1084,126 +1486,13 @@ class CFastRpcSkelSvrBase :
     gint32 StartRecvTasks(
         std::vector< MatchPtr >& vecMatches ) override;
 
-    gint32 CheckReqCtx(
-        IEventSink* pCallback,
-        DMsgPtr& pMsg ) override;
-};
+    gint32 SendResponse(
+        IEventSink* pInvTask,
+        IConfigDb* pReq,
+        CfgPtr& pRespData ) override;
 
-class CFastRpcServerState :
-    public CIfServerState
-{
-    public:
-    typedef CIfServerState super;
-    CFastRpcServerState ( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CFastRpcServerState ) ); }
-
-    gint32 SubscribeEvents()
-    {
-        std::vector< EnumPropId > vecEvtToSubscribe =
-            { propRmtSvrEvent };
-        return SubscribeEventsInternal(
-            vecEvtToSubscribe );
-    }
-};
-
-class CFastRpcProxyState :
-    public CRemoteProxyState
-{
-    public:
-    typedef CRemoteProxyState super;
-    CFastRpcProxyState ( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CFastRpcProxyState ) ); }
-
-    gint32 SubscribeEvents()
-    {
-        std::vector< EnumPropId > vecEvtToSubscribe =
-            { propRmtSvrEvent };
-        return SubscribeEventsInternal(
-            vecEvtToSubscribe );
-    }
-};
-
-class CFastRpcServerBase :
-    public virtual IFBASE3( false )
-{
-    protected:
-    std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
-
-    public:
-    typedef IFBASE3( false ) super;
-    CFastRpcServerBase( const IConfigDb* pCfg ) :
-        super( pCfg ) 
-    {}
-
-    gint32 GetStmSkel(
-        HANDLE hstm, InterfPtr& pIf );
-
-    gint32 AddStmSkel(
-        HANDLE hstm, InterfPtr& pIf );
-
-    gint32 RemoveStmSkel(
-        HANDLE hstm );
-
-    gint32 OnRmtSvrEvent(
-        EnumEventId iEvent,
-        IConfigDb* pEvtCtx,
-        HANDLE hPort ) override;
-
-    gint32 OnPreStop(
-        IEventSink* pCallback ) override;
-
-    virtual gint32 CreateStmSkel(
-        HANDLE hStream,
-        guint32 dwPortId,
-        InterfPtr& pIf ) = 0;
-
-    gint32 GetStream(
-        IEventSink* pCallback,
-        HANDLE& hStream );
-
-    gint32 OnStartSkelComplete(
-        IEventSink* pCallback,
-        IEventSink* pIoReq,
-        IConfigDb* pReqCtx );
-
-    gint32 BroadcastEvent(
-        IConfigDb* pReqCall,
-        IEventSink* pCallback ) override;
-};
-
-class CFastRpcProxyBase :
-    public virtual IFBASE3( true )
-{
-    InterfPtr m_pSkelObj;
-
-    public:
-    typedef IFBASE3( true ) super;
-
-    CFastRpcProxyBase( const IConfigDb* pCfg ):
-        super( pCfg ) 
-    {}
-
-    gint32 OnPostStart(
-        IEventSink* pCallback ) override;
-
-    gint32 OnPreStop(
-        IEventSink* pCallback ) override;
-
-    gint32 OnPostStop(
-        IEventSink* pCallback ) override;
-
-    virtual gint32 CreateStmSkel(
-        InterfPtr& pIf ) = 0;
-
-    gint32 OnRmtSvrEvent(
-        EnumEventId iEvent,
-        IConfigDb* pEvtCtx,
-        HANDLE hPort ) override;
-
-    InterfPtr GetStmSkel() const
-    { return m_pSkelObj; }
+    gint32 BuildBufForIrp( BufPtr& pBuf,
+        IConfigDb* pReqCall ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(

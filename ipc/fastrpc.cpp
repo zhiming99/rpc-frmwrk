@@ -36,6 +36,89 @@ using namespace rpcf;
 namespace rpcf
 {
 
+gint32 FASTRPC_MSG::Serialize( CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwSize = 0;
+        guint32 dwOrigOff = oBuf.offset();
+
+        ret = oBuf.Append(
+            ( guint8* )&dwSize, sizeof( dwSize ) );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oBuf.Append(
+            &m_bType, sizeof( m_bType ) );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oBuf.Append(
+            m_szSig, sizeof( m_szSig ) );
+
+        ret = m_pCfg->Serialize( oBuf );
+        if( ERROR( ret ) )
+            break;
+
+        dwSize = htonl(
+            oBuf.size() - sizeof( dwSize ) );
+        char* pLoc = oBuf.ptr();
+        memcpy( pLoc, &dwSize, sizeof( dwSize ) );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 FASTRPC_MSG::Deserialize( CBuffer& oBuf )
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwSize = 0;
+        char* pLoc = oBuf.ptr();
+        memcpy( &dwSize,
+            pLoc, sizeof( guint32 ) );
+        dwSize = ntohl( dwSize );
+        if( dwSize > oBuf.size() )
+        {
+            ret = -ERANGE;
+            break;
+        }
+        pLoc += sizeof( guint32 );
+        m_bType = pLoc[ 0 ];
+        if( m_bType != typeObj )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        pLoc++;
+        m_szSig[ 0 ] = *pLoc++;
+        m_szSig[ 1 ] = *pLoc++;
+        m_szSig[ 2 ] = *pLoc++;
+        if( m_szSig[ 0 ] != 'F' ||
+            m_szSig[ 1 ] != 'R' ||
+            m_szSig[ 2 ] != 'M' )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        if( pLoc - oBuf.ptr() >= oBuf.size() )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
+        if( m_pCfg.IsEmpty() )
+            m_pCfg.NewObj();
+
+        ret = m_pCfg->Deserialize( pLoc,
+            oBuf.size() - ( pLoc - oBuf.ptr() ) );
+
+    }while( 0 );
+
+    return ret;
+}
 gint32 CRpcStmChanSvr::AcceptNewStream(
     IEventSink* pCallback,
     IConfigDb* pDataDesc )
@@ -216,8 +299,6 @@ gint32 CIfStartRecvMsgTask2::OnIrpComplete(
         if( ret != -EAGAIN )
         {
             // fatal error, just quit
-            DebugPrint( ret,
-                "Cannot continue to receive message" );
             return ret;
         }
         ret = 0;
@@ -292,8 +373,6 @@ gint32 CIfStartRecvMsgTask2::OnIrpComplete(
             oParams.CopyProp( propExtInfo, this );
             ObjPtr pObj = oParams.GetCfg();
 
-            // offload the output tasks to the
-            // task threads
             ret = this->StartNewRecv( pObj );
             //
             // ret = DEFER_CALL( pMgr, ObjPtr( this ),
@@ -857,61 +936,122 @@ gint32 CFastRpcServerBase::GetStream(
         propStmHandle, ( guint32*& )hStream );
 }
 
-gint32 CFastRpcSkelSvrBase::CheckReqCtx(
-    IEventSink* pCallback,
-    DMsgPtr& pMsg )
+gint32 CFastRpcSkelProxyBase::BuildBufForIrp(
+    BufPtr& pBuf, IConfigDb* pReqCall )
 {
-    if( pCallback == nullptr || pMsg.IsEmpty() )
+    return BuildBufForIrpInternal( pBuf, pReqCall );
+}
+
+gint32 CFastRpcSkelSvrBase::SendResponse(
+    IEventSink* pInvTask,
+    IConfigDb* pReq,
+    CfgPtr& pRespData )
+{
+    // called to send back the response
+    if( pReq == nullptr ||
+        pRespData.IsEmpty() )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
-        ObjPtr pCtxObj;
-        IConfigDb* pReqCtx;
-        ret = pMsg.GetObjArgAt( 1, pCtxObj );
+        CReqOpener oReq( pReq );
+        gint32 iReqType = 0;
+        ret = oReq.GetReqType(
+            ( guint32& )iReqType ); 
+
         if( ERROR( ret ) )
+            break;
+
+        if( iReqType !=
+            DBUS_MESSAGE_TYPE_METHOD_CALL )
         {
-            ret = 0;
+            ret = -EINVAL;
             break;
         }
 
-        pReqCtx = pCtxObj;
-        if( pReqCtx == nullptr )
-        {
-            // ipc clients
+        CCfgOpener oOptions;
+        oOptions[ propCallFlags ] = ( guint32 )
+            ( DBUS_MESSAGE_TYPE_METHOD_RETURN |
+            CF_NON_DBUS );
+
+        CParamList oParams(
+            ( IConfigDb* )pRespData );
+
+        gint32 iRet = 0;
+        ret = oParams.GetIntProp(
+            propReturnValue, ( guint32& )iRet );
+        if( ERROR( ret ) )
             break;
+
+        ObjPtr pObj =
+            ( IConfigDb* )oOptions.GetCfg();
+        oParams[ propCallOptions ] = pObj;
+
+        CFastRpcServerBase* pSvr = GetParentIf();
+        oParams[ propSeqNo ] = pSvr->NewSeqNo();
+        ret = oParams.CopyProp(
+            propSeqNo2, propSeqNo, pReq );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        IrpPtr pIrp;
+
+        ret = pIrp.NewObj();
+        if( ERROR( ret ) )
+            break;
+
+        ret = pIrp->AllocNextStack( nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pIrpCtx = pIrp->GetTopStack(); 
+
+        pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
+        pIrpCtx->SetCtrlCode( CTRLCODE_SEND_RESP );
+        pIrpCtx->SetIoDirection( IRP_DIR_OUT ); 
+
+        BufPtr pBuf( true );
+        *pBuf = pRespData;
+        pIrpCtx->SetReqData( pBuf );
+
+        TaskletPtr pTask;
+        ret = pTask.NewObj( clsid( CIfDummyTask ) );
+
+        if( SUCCEEDED( ret ) )
+        {
+            EventPtr pEvent;
+            pEvent = pTask;
+            // NOTE: we have fed a dummy task here
+            pIrp->SetCallback( pEvent, 0 );
         }
 
-        TaskletPtr pCb = ObjPtr( pCallback );
-        CCfgOpener oTaskCfg(
-            ( IConfigDb* )pCb->GetConfig() );
+        IncCounter( propMsgRespCount );
+        pIrp->SetTimer(
+            IFSTATE_ENABLE_EVENT_TIMEOUT, pMgr );
 
-        oTaskCfg.CopyProp(
-            propRouterPath, pReqCtx );
+        ret = pMgr->SubmitIrp(
+            GetPortHandle(), pIrp );
 
-        oTaskCfg.CopyProp(
-            propSessHash, pReqCtx );
-
-        CCfgOpener oReqCtx( pReqCtx );
-        oTaskCfg.CopyProp(
-            propTimestamp, pReqCtx );
-
-        oTaskCfg.CopyProp(
-            propStmHandle, pReqCtx );
-
-        CIfInvokeMethodTask* pInv =
-            ObjPtr( pCallback );
-
-        if( likely( pInv != nullptr ) &&
-            pInv->GetTimeLeft() <= 0 )
-        {
-            ret = -ETIMEDOUT;
+        if( ret == STATUS_PENDING )
             break;
-        }
+
+        if( ret == -EAGAIN )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+
+        pIrp->RemoveTimer();
+        pIrp->RemoveCallback();
 
     }while( 0 );
 
     return ret;
+}
+
+gint32 CFastRpcSkelSvrBase::BuildBufForIrp(
+    BufPtr& pBuf, IConfigDb* pReqCall )
+{
+    return BuildBufForIrpInternal( pBuf, pReqCall );
 }
 
 gint32 CFastRpcProxyBase::OnPostStart(

@@ -140,10 +140,10 @@ CDBusStreamPdo::CDBusStreamPdo(
 }
 
 gint32 CDBusStreamPdo::SendDBusMsg(
-    PIRP pIrp, DMsgPtr& pMsg )
+    PIRP pIrp, IConfigDb* pMsg )
 {
     gint32 ret = 0;
-    if( pIrp == nullptr || pMsg.IsEmpty() )
+    if( pIrp == nullptr || pMsg == nullptr )
         return -EINVAL;
 
     do{
@@ -160,7 +160,9 @@ gint32 CDBusStreamPdo::SendDBusMsg(
         HANDLE hStream = GetStream();
 
         BufPtr pBuf( true );
-        ret = pMsg.Serialize( *pBuf );
+        FASTRPC_MSG ofrmsg;
+        ofrmsg.m_pCfg = pMsg;
+        ret = ofrmsg.Serialize( *pBuf );
         if( ERROR( ret ) )
             break;
 
@@ -182,60 +184,6 @@ gint32 CDBusStreamPdo::SendDBusMsg(
                 GetStreamIf();
             ret = pStm->WriteStreamAsync(
                 hStream, pBuf, oCtx.GetCfg() );
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CDBusStreamBusPort::BroadcastDBusMsg(
-    PIRP pIrp, DMsgPtr& pMsg )
-{
-    gint32 ret = 0;
-    if( pIrp == nullptr || pMsg.IsEmpty() )
-        return -EINVAL;
-
-    do{
-        BufPtr pExtBuf;
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-        pCtx->GetExtBuf( pExtBuf );
-        if( unlikely( pExtBuf.IsEmpty() ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        auto pExt =
-            ( IRPCTX_EXTDSP* )pExtBuf->ptr();
-        pExt->m_bWaitWrite = true;
-
-        BufPtr pBuf( true );
-        ret = pMsg.Serialize( *pBuf );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oCtx;
-        oCtx.SetPointer( propIrpPtr, pIrp );
-        CRpcServices* pSvc = GetStreamIf();
-        if( IsServer() )
-        {
-            CStreamServerSync* pStm =
-                GetStreamIf();
-            std::vector< HANDLE > vecUxStms;
-            pStm->EnumStreams( vecUxStms );
-            for( auto& elem : vecUxStms )
-                pStm->WriteStreamAsync( elem,
-                    pBuf, ( IConfigDb* )nullptr );
-        }
-        else
-        {
-            CStreamProxySync* pStm =
-                GetStreamIf();
-            std::vector< HANDLE > vecUxStms;
-            pStm->EnumStreams( vecUxStms );
-            for( auto& elem : vecUxStms )
-                pStm->WriteStreamAsync( elem,
-                    pBuf, ( IConfigDb* )nullptr );
         }
 
     }while( 0 );
@@ -270,7 +218,7 @@ gint32 CDBusStreamPdo::SubmitIoctlCmd(
         case CTRLCODE_SEND_RESP:
             {
                 // the m_pReqData contains a
-                // pointer to DMsgPtr
+                // pointer to the request to send
                 ret = HandleSendReq( pIrp );
                 break;
             }
@@ -307,12 +255,15 @@ gint32 CDBusStreamPdo::HandleSendReq( IRP* pIrp )
         if( dwIoDir == IRP_DIR_INOUT ||
             dwIoDir == IRP_DIR_OUT )
         {
-            DMsgPtr pMsg = *pCtx->m_pReqData;
+            IConfigDb* pMsg = *pCtx->m_pReqData;
             auto *pBusPort = static_cast
                 < CDBusStreamBusPort* >( m_pBusPort );
 
-            dwSerial =
-               CDBusBusPort::LabelMessage( pMsg );
+            CCfgOpener oMsg( pMsg );
+            ret = oMsg.GetIntProp(
+                propSeqNo, dwSerial );
+            if( ERROR( ret ) )
+                break;
 
             if( dwIoDir == IRP_DIR_INOUT )
             {
@@ -326,10 +277,6 @@ gint32 CDBusStreamPdo::HandleSendReq( IRP* pIrp )
                 CStdRMutex oPortLock( GetLock() );
                 m_mapSerial2Resp[ dwSerial ] =
                     IrpPtr( pIrp );
-            }
-            else
-            {
-                pMsg.SetNoReply( true );
             }
 
             ret = SendDBusMsg( pIrp, pMsg );
@@ -383,8 +330,14 @@ gint32 CDBusStreamPdo::HandleSendEvent( IRP* pIrp )
 
         if( dwIoDir == IRP_DIR_OUT )
         {
-            DMsgPtr pMsg = *pCtx->m_pReqData;
-            if( pMsg.GetType() !=
+            IConfigDb* pMsg = *pCtx->m_pReqData;
+            CReqOpener oMsg( pMsg );
+            guint32 dwFlags = 0;
+            ret = oMsg.GetCallFlags( dwFlags );
+            if( ERROR( ret ) )
+                break;
+            dwFlags &= CF_MESSAGE_TYPE_MASK;
+            if( dwFlags !=
                 DBUS_MESSAGE_TYPE_SIGNAL )
             {
                 ret = -EINVAL;
@@ -470,30 +423,26 @@ gint32 CDBusStreamPdo::AllocIrpCtxExt(
 }
 
 gint32 CDBusStreamPdo::OnRespMsgNoIrp(
-    DBusMessage* pDBusMsg )
+    IConfigDb* pRespMsg )
 {
     // this method is guarded by the port lock
     //
     // return -ENOTSUP or ENOENT will tell the dispatch
     // routine to move on to next port
-    if( pDBusMsg == nullptr )
+    if( pRespMsg == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
-        DMsgPtr pMsg( pDBusMsg );
+        CCfgOpener oResp( pRespMsg );
         guint32 dwSerial = 0;
-        ret = pMsg.GetReplySerial( dwSerial );
+        ret = oResp.GetIntProp(
+            propSeqNo2, dwSerial );
         if( ERROR( ret ) )
             break;
 
-        if( dwSerial == 0 )
-        {
-            ret = -EBADMSG;
-            break;
-        }
-
-        m_mapRespMsgs[ dwSerial ] = pMsg;
+        m_mapRespMsgs[ dwSerial ] =
+            CfgPtr( pRespMsg );
 
     }while( 0 );
 
@@ -539,17 +488,14 @@ gint32 CDBusStreamPdo::CompleteSendReq(
             // write operation completed
 
             pExt->m_bWaitWrite = false;
-            DMsgPtr& pMsg = *pCtx->m_pReqData;
+            IConfigDb* pReqMsg =
+                ( ObjPtr& )*pCtx->m_pReqData;
+            CCfgOpener oMsg( pReqMsg );
             guint32 dwSerial = 0;
-            ret = pMsg.GetSerial( dwSerial );
+            ret = oMsg.GetIntProp(
+                propSeqNo, dwSerial );
             if( ERROR( ret ) )
                 break;
-
-            if( dwSerial == 0 )
-            {
-                ret = -EINVAL;
-                break;
-            }
 
             // put the irp to the reading queue for
             // the response we need to check if the
@@ -568,18 +514,14 @@ gint32 CDBusStreamPdo::CompleteSendReq(
             {
                 // the message arrives before
                 // the irp arrives here
-                DMsgPtr pRespMsg = itr->second;
-                m_mapRespMsgs.erase( itr );
-
-                DMsgPtr& pReqMsg = *pCtx->m_pReqData;
-                guint32 dwOldSeqNo = 0;
-                pReqMsg.GetSerial( dwOldSeqNo );
-                pRespMsg.SetReplySerial( dwOldSeqNo );
+                IConfigDb* pRespMsg = itr->second;
 
                 BufPtr pRespBuf( true );
-                *pRespBuf = pRespMsg;
+                *pRespBuf = ObjPtr( pRespMsg );
                 pCtx->SetRespData( pRespBuf );
                 pCtx->SetStatus( ret );
+
+                m_mapRespMsgs.erase( itr );
             }
 
             oPortLock.Unlock();
@@ -605,13 +547,6 @@ gint32 CDBusStreamPdo::CompleteSendReq(
             // the response data 
             if( ERROR( ret ) )
                 break;
-
-            BufPtr& pBuf = pCtx->m_pRespData;
-            if( pBuf.IsEmpty() )
-            {
-                ret = -ENODATA;
-                pCtx->SetStatus( ret );
-            }
         }
 
     }while( 0 );
@@ -666,8 +601,7 @@ gint32 CDBusStreamPdo::CompleteIoctlIrp(
     return ret;
 }
 
-gint32 CDBusStreamPdo::IsIfSvrOnline(
-    const DMsgPtr& pMsg )
+gint32 CDBusStreamPdo::IsIfSvrOnline()
 {
     auto *pBusPort = static_cast
         < CDBusStreamBusPort* >( m_pBusPort );
@@ -678,17 +612,128 @@ gint32 CDBusStreamPdo::IsIfSvrOnline(
     return STATUS_SUCCESS;
 }
 
+gint32 CDBusStreamPdo::HandleListeningInternal(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    IrpPtr pIrpLocked( pIrp );
+
+    do{
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+
+        IMessageMatch* pMatch =
+            *( ObjPtr* )( *pCtx->m_pReqData );
+
+        if( pMatch == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CStdRMutex oPortLock( GetLock() );
+
+        MatchMap *pMap = nullptr;
+
+        MatchPtr matchPtr( pMatch );
+
+        ret = GetMatchMap( pIrp, pMap );
+        if( ERROR( ret ) )
+            break;
+
+        MatchMap::iterator itr =
+            pMap->find( matchPtr );
+
+        if( itr != pMap->end() )
+        {
+            // first, check if there are pending
+            // messages if there are, this irp can
+            // return immediately with the first
+            // pending message.
+            MATCH_ENTRY& oMe = itr->second;
+
+            if( !oMe.IsConnected() )
+            {
+                ret = -ENOTCONN;
+                break;
+            }
+            if( oMe.GetMsgQue< CfgPtr >().size() &&
+                oMe.m_queWaitingIrps.empty() )
+            {
+                BufPtr pBuf( true );
+                *pBuf = oMe.GetMsgQue< CfgPtr >().front();
+                pCtx->SetRespData( pBuf );
+
+                oMe.GetMsgQue< CfgPtr >().pop_front();
+                // immediate return
+            }
+            else if( oMe.GetMsgQue< CfgPtr >().size() &&
+                !oMe.m_queWaitingIrps.empty() )
+            {
+                bool bFound = false;
+                oMe.m_queWaitingIrps.push_back( pIrp );
+                std::deque< IrpPtr > queIrps;
+                std::deque< CfgPtr > queMsgs;
+                while( oMe.m_queWaitingIrps.size() &&
+                    oMe.GetMsgQue< CfgPtr >().size() )
+                {
+                    queIrps.push_back(
+                        oMe.m_queWaitingIrps.front() );
+                    queMsgs.push_back(
+                        oMe.GetMsgQue< CfgPtr >().front() );
+                    oMe.m_queWaitingIrps.pop_front();
+                    oMe.GetMsgQue< CfgPtr >().pop_front();
+                    if( queIrps.front() == pIrpLocked )
+                        bFound = true;
+                }
+                oPortLock.Unlock();
+                ret = SchedCompleteIrps(
+                    queIrps, queMsgs );
+                // BUGBUG:Discard all the remaining
+                // messages.
+                if( SUCCEEDED( ret ) )
+                    ret = STATUS_PENDING;
+                else if( ERROR( ret ) && !bFound )
+                {
+                    // try best to keep in shape
+                    // on error
+                    ret = STATUS_PENDING;
+                }
+            }
+            else
+            {
+                // queue the irp
+                oMe.m_queWaitingIrps.push_back(
+                    IrpPtr( pIrp ) );
+                ret = STATUS_PENDING;
+            }
+            pCtx->SetNonDBusReq( true );
+        }
+        else
+        {
+            // must be registered before listening
+            ret = -ENOENT;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CDBusStreamPdo::HandleListening(
     IRP* pIrp )
 {
     // the irp carry a buffer to receive, it is
-    // assumed to be a DMsgPtr
+    // assumed to be a CfgPtr
     gint32 ret = 0;
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    ret = super::HandleListening( pIrp );
+    ret = HandleListeningInternal( pIrp );
 
     if( ERROR( ret ) )
         return ret;
@@ -704,6 +749,271 @@ gint32 CDBusStreamPdo::HandleListening(
         CRpcStreamChannelCli *pIf =
             GetStreamIf();
         pIf->AddRecvReq( GetStream() );
+    }
+    
+    return ret;
+}
+
+gint32 CDBusStreamPdo::FindIrpForResp(
+    IConfigDb* pMessage, IrpPtr& pReqIrp )
+{
+    gint32 ret = 0;
+
+    if( pMessage == nullptr )
+        return -EINVAL;
+
+    CfgPtr pMsg( pMessage );
+
+    do{
+        IrpPtr pIrp;
+        CCfgOpener oMsg( ( IConfigDb* )pMsg );
+
+        if( true )
+        {
+            guint32 dwSerial = 0;
+            ret = oMsg.GetIntProp(
+                propSeqNo2, dwSerial );
+            if( ERROR( ret ) )
+                break;
+
+            CStdRMutex oPortLock( GetLock() );
+            guint32 dwPortState = GetPortState();
+            if( !CanAcceptMsg( dwPortState ) )
+                return ERROR_STATE;
+
+            std::map< guint32, IrpPtr >::iterator itr =
+                m_mapSerial2Resp.find( dwSerial );
+
+            if( itr == m_mapSerial2Resp.end() )
+            {
+                OnRespMsgNoIrp( pMessage );
+                break;
+            }
+
+            pIrp = itr->second;
+            m_mapSerial2Resp.erase( itr );
+        }
+
+        if( !pIrp.IsEmpty() )
+        {
+
+            CStdRMutex oIrpLock( pIrp->GetLock() ) ;
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                break;
+
+            IrpCtxPtr& pIrpCtx = pIrp->GetCurCtx();
+
+            guint32 dwFlags = 0;
+
+            IConfigDb* pOptions;
+            ret = oMsg.GetPointer(
+                propCallOptions, pOptions );
+            if( ERROR( ret ) )
+            {
+                ret = -EBADMSG;
+                pIrpCtx->SetStatus( ret );
+                break;
+            }
+            CCfgOpener oOptions( pOptions );
+            ret = oOptions.GetIntProp(
+                propCallFlags, dwFlags );
+            if( ERROR( ret ) )
+            {
+                ret = -EBADMSG;
+                pIrpCtx->SetStatus( ret );
+                break;
+            }
+
+            dwFlags &= CF_MESSAGE_TYPE_MASK;
+
+            if( dwFlags ==
+                DBUS_MESSAGE_TYPE_METHOD_RETURN )
+            {
+                BufPtr pBuf( true );
+                *pBuf = pMsg;
+                pIrpCtx->SetRespData( pBuf  );
+                pIrpCtx->SetStatus( 0 );
+            }
+            else 
+            {
+                ret = -EBADMSG;
+                pIrpCtx->SetStatus( ret );
+            }
+
+            pReqIrp = pIrp;
+        }
+        else
+        {
+            ret = -EFAULT;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusStreamPdo::DispatchReqMsg(
+    IConfigDb* pMsg )
+{
+    return DispatchReqMsgT( pMsg );
+}
+
+gint32 CDBusStreamPdo::DispatchSignalMsg(
+    IConfigDb* pMsg )
+{
+    return DispatchSignalMsgT( pMsg );
+}
+
+gint32 CDBusStreamPdo::DispatchRespMsg(
+    IConfigDb* pMsg )
+{
+    IrpPtr pIrp;
+    if( pMsg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    ret = FindIrpForResp( pMsg, pIrp );
+    if( ERROR( ret ) )
+        return ret;
+
+    ret = GetIoMgr()->CompleteIrp( pIrp );
+    return ret;
+}
+
+DBusHandlerResult CDBusStreamPdo::DispatchMsg(
+    gint32 iType, IConfigDb* pMsg )
+{
+    DBusHandlerResult ret =
+        DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+
+    switch( iType )
+    {
+    case DBUS_MESSAGE_TYPE_SIGNAL:
+        {
+            if( DispatchSignalMsg( pMsg ) != -ENOENT )
+                ret = DBUS_HANDLER_RESULT_HANDLED;
+            break;
+        }
+    case DBUS_MESSAGE_TYPE_ERROR:
+    case DBUS_MESSAGE_TYPE_METHOD_RETURN:
+        {
+            if( DispatchRespMsg( pMsg ) != -ENOENT )
+                ret = DBUS_HANDLER_RESULT_HANDLED;
+            break;
+        }
+    case DBUS_MESSAGE_TYPE_METHOD_CALL:
+        {
+            if( DispatchReqMsg( pMsg ) != -ENOENT )
+                ret = DBUS_HANDLER_RESULT_HANDLED;
+            break;
+        }
+    default:
+        break;
+    }
+    return ret;
+}
+gint32 CDBusStreamPdo::DispatchData(
+    CBuffer* pData )
+{
+    gint32 ret = 0;
+
+    if( pData == nullptr )
+        return -EINVAL;
+
+    if( m_pTestIrp.IsEmpty() )
+    {
+        m_pTestIrp.NewObj();
+        m_pTestIrp->AllocNextStack( nullptr );
+        IrpCtxPtr& pIrpCtx = m_pTestIrp->GetTopStack(); 
+        pIrpCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pIrpCtx->SetMinorCmd( IRP_MN_IOCTL );
+        pIrpCtx->SetCtrlCode( CTRLCODE_LISTENING );
+    }
+
+    guint32 dwFlags = 0;
+    CfgPtr pMsg = ( ObjPtr& )*pData;
+    CCfgOpener oMsg( ( IConfigDb* )pMsg );
+
+    IConfigDb* pOptions;
+    ret = oMsg.GetPointer(
+        propCallOptions, pOptions );
+    if( ERROR( ret ) )
+        return -EBADMSG;
+
+    CCfgOpener oOptions( pOptions );
+    ret = oOptions.GetIntProp(
+        propCallFlags, dwFlags );
+    if( ERROR( ret ) )
+        return -EBADMSG;
+
+    gint32 iType = dwFlags & CF_MESSAGE_TYPE_MASK;
+
+    DBusHandlerResult ret2; 
+    guint32 dwPortState = 0;
+    if( true )
+    {
+        CStdRMutex oPortLock( GetLock() );
+        dwPortState = GetPortState();
+
+        if( !( dwPortState == PORT_STATE_READY
+             || dwPortState == PORT_STATE_BUSY_SHARED
+             || dwPortState == PORT_STATE_BUSY
+             || dwPortState == PORT_STATE_BUSY_RESUME ) )
+        {
+            return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+        }
+    }
+
+    guint32 dwOldState = 0;
+    do{
+        ret = CanContinue( m_pTestIrp,
+            PORT_STATE_BUSY_SHARED, &dwOldState );
+
+        if( ret == -EAGAIN )
+        {
+            usleep(100);
+            continue;
+        }
+        break;
+
+    }while( 1 );
+
+
+    if( ERROR( ret ) )
+    {
+#ifdef DEBUG
+        DebugPrint( ret, 
+            "Error, dmsg cannot be processed by CDBusStreamPdo, "
+            "curstate = %d, requested state =%d",
+            dwOldState,
+            PORT_STATE_BUSY_SHARED );
+#endif
+
+        return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+    }
+
+    do{
+
+        ret2 = DispatchMsg( iType, pMsg );
+        if( ret2 != DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+            break;
+
+    }while( 0 );
+
+    PopState( dwOldState );
+
+    if( iType == DBUS_MESSAGE_TYPE_SIGNAL
+        && ret2 == DBUS_HANDLER_RESULT_HALT )
+    {
+        // a channel to stop processing the signal
+        // further
+        ret = ERROR_PREMATURE;
+    }
+    else if( ret2 == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
+    {
+        ret = -ENOENT;
     }
     
     return ret;
