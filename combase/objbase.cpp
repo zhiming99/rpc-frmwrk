@@ -600,7 +600,7 @@ gint32 CObjBase::Release()
     if( iRef == 0 )
         delete this;
 #ifdef DEBUG
-    if( iRef < 0 )
+    else if( unlikely( iRef < 0 ) )
     {
         std::string strError =
             "Release twice on invalid Object of ";

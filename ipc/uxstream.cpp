@@ -738,13 +738,13 @@ gint32 CIfUxListeningTask::PostEvent(
     if( pIf->IsServer() )
     {
         CUnixSockStmServer* pSvr = pObjIf;
-        ret = pSvr->PostUxSockEvent(
+        ret = pSvr->OnUxSockEvent(
             byToken, pNewBuf );
     }
     else
     {
         CUnixSockStmProxy* pProxy = pObjIf;
-        ret = pProxy->PostUxSockEvent(
+        ret = pProxy->OnUxSockEvent(
             byToken, pNewBuf );
     }
     return ret;
@@ -854,7 +854,8 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
-        pIf->RunManagedTask( pTask );
+        // pIf->RunManagedTask( pTask );
+        ( *pTask )( eventZero );
 
     }while( 0 );
 
