@@ -1496,6 +1496,10 @@ class CInterfaceServer :
         IEventSink* pCallback,
         DMsgPtr& pReqMsg );
 
+    virtual gint32 CheckReqCtx(
+        IEventSink* pCallback,
+        CfgPtr& pReqMsg );
+
     // OnCancel is called when the request will be
     // canceled due to some reasons. This call
     // should only be effective when it is an

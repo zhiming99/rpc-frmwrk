@@ -62,7 +62,7 @@ class CDBusStreamPdo :
     CTimestampSvr m_oTs;
     // sem_t   m_semFireSync;
 
-    std::hashmap< guint32, DMsgPtr > m_mapRespMsgs;
+    std::hashmap< guint32, CfgPtr > m_mapRespMsgs;
 
     protected:
 
@@ -75,13 +75,15 @@ class CDBusStreamPdo :
     { return 0; }
 
     gint32 OnRespMsgNoIrp(
-        DBusMessage* pDBusMsg );
+        IConfigDb* pRespMsg );
 
     gint32 CompleteIoctlIrp(
             IRP* pIrp ) override;
 
     gint32 CompleteSendReq( IRP* pIrp );
     gint32 CompleteListening( IRP* pIrp );
+    gint32 HandleListeningInternal(
+        IRP* pIrp );
 
     public:
 
@@ -112,21 +114,20 @@ class CDBusStreamPdo :
         IRP* pIrp ) override;
 
     gint32 HandleListening(
-        IRP* pIrp );
+        IRP* pIrp ) override;
 
     bool Unloadable() override
     { return true; }
 
     gint32 SendDBusMsg(
-        PIRP pIrp, DMsgPtr& pMsg );
+        PIRP pIrp, IConfigDb* pMsg );
 
     gint32 PreStop( IRP* pIrp ) override;
     gint32 PostStart( IRP* pIrp ) override;
     gint32 OnPortReady( IRP* pIrp ) override;
     gint32 OnPortStackReady( IRP* pIrp ) override;
 
-    gint32 IsIfSvrOnline(
-        const DMsgPtr& pMsg ) override;
+    gint32 IsIfSvrOnline();
 
     gint32 OnEvent(
         EnumEventId iEvent,
@@ -138,6 +139,14 @@ class CDBusStreamPdo :
         IrpCtxPtr& pIrpCtx,
         void* pContext ) const;
 
+    gint32 DispatchData( CBuffer* pData ) override;
+    DBusHandlerResult DispatchMsg(
+        gint32 iType, IConfigDb* pMsg );
+    gint32 DispatchRespMsg( IConfigDb* pMsg );
+    gint32 DispatchReqMsg( IConfigDb* pMsg );
+    gint32 DispatchSignalMsg( IConfigDb* pMsg );
+    gint32 FindIrpForResp(
+        IConfigDb* pMessage, IrpPtr& pReqIrp );
 };
 
 class CDBusStreamBusPort : 
@@ -166,9 +175,6 @@ class CDBusStreamBusPort :
     { return m_bServer; }
 
     CDBusStreamBusPort ( const IConfigDb* pCfg );
-
-    gint32 BroadcastDBusMsg(
-        PIRP pIrp, DMsgPtr& pMsg );
 
     gint32 BuildPdoPortName(
         IConfigDb* pCfg,

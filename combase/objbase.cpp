@@ -61,7 +61,11 @@ std::string DebugMsgInternal(
         "[%ld.%09ld-%d]%s(%d): %s(%d)",
         ts.tv_sec,
         ts.tv_nsec,
+#ifdef DEBUG
+        gettid(),
+#else 
         getpid(),
+#endif
         szFunc,
         iLineNum,
         strMsg.c_str(),
@@ -596,7 +600,7 @@ gint32 CObjBase::Release()
     if( iRef == 0 )
         delete this;
 #ifdef DEBUG
-    if( iRef < 0 )
+    else if( unlikely( iRef < 0 ) )
     {
         std::string strError =
             "Release twice on invalid Object of ";

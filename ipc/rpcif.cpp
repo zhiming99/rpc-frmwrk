@@ -3252,7 +3252,7 @@ gint32 CRpcServices::FillRespData(
             ret = pCtx->GetRespAsCfg( pMsg );
             if( SUCCEEDED( ret ) )
             {
-                pResp = pMsg;
+                *pResp = *pMsg;
             }
             else
             {
@@ -5268,6 +5268,19 @@ gint32 CInterfaceProxy::DoInvoke(
         if( ERROR( ret ) )
             break;
 
+        if( strMethod.empty() )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+        else if( strMethod ==
+            SYS_EVENT_KEEPALIVE )
+        {
+            ret = OnKeepAlive(
+                pCallback, KATerm );
+            break;
+        }
+
         ret = InvokeUserMethod(
             pEvtMsg, pCallback );
 
@@ -6561,6 +6574,58 @@ gint32 CInterfaceServer::CheckReqCtx(
     return ret;
 }
 
+gint32 CInterfaceServer::CheckReqCtx(
+    IEventSink* pCallback,
+    CfgPtr& pMsg )
+{
+    if( pCallback == nullptr || pMsg.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ObjPtr pCtxObj;
+        IConfigDb* pReqCtx;
+        CCfgOpener oMsg( ( IConfigDb* )pMsg );
+        ret = oMsg.GetPointer(
+            propContext, pReqCtx );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        TaskletPtr pCb = ObjPtr( pCallback );
+        CCfgOpener oTaskCfg(
+            ( IConfigDb* )pCb->GetConfig() );
+
+        oTaskCfg.CopyProp(
+            propRouterPath, pReqCtx );
+
+        oTaskCfg.CopyProp(
+            propSessHash, pReqCtx );
+
+        CCfgOpener oReqCtx( pReqCtx );
+        oTaskCfg.CopyProp(
+            propTimestamp, pReqCtx );
+
+        oTaskCfg.CopyProp(
+            propStmHandle, pReqCtx );
+
+        CIfInvokeMethodTask* pInv =
+            ObjPtr( pCallback );
+
+        if( likely( pInv != nullptr ) &&
+            pInv->GetTimeLeft() <= 0 )
+        {
+            ret = -ETIMEDOUT;
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CInterfaceServer::DoInvoke(
     DBusMessage* pReqMsg,
     IEventSink* pCallback )
@@ -6704,41 +6769,81 @@ gint32 CInterfaceServer::DoInvoke(
 }
 
 gint32 CInterfaceServer::DoInvoke(
-    IConfigDb* pEvtMsg,
+    IConfigDb* pReq,
     IEventSink* pCallback )
 {
     gint32 ret = 0;
-
+    if( pReq == nullptr || pCallback == nullptr )
+        return -EINVAL;
     do{
-        if( pEvtMsg == nullptr ||
-            pCallback == nullptr )
+        bool bResp = false;
+        CParamList oResp;
+
+        do{
+            CReqOpener oReq( pReq );
+            gint32 iReqType = 0;
+            ret = oReq.GetReqType(
+                ( guint32& )iReqType ); 
+
+            if( ERROR( ret ) )
+                break;
+
+            if( iReqType !=
+                DBUS_MESSAGE_TYPE_METHOD_CALL )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            TaskletPtr pCb = ObjPtr( pCallback );
+            CCfgOpener oTaskCfg(
+                ( IConfigDb* )pCb->GetConfig() );
+            SET_RMT_TASKID( pReq, oTaskCfg );
+
+            // copy the request for reference
+            // later
+            oTaskCfg.SetPointer( propReqPtr, pReq );
+            CfgPtr ptrReq( pReq );
+            ret = CheckReqCtx( pCallback, ptrReq );
+            if( ERROR( ret ) )
+                break;
+
+            ret = InvokeUserMethod( pReq, pCallback );
+
+            guint32 dwFlags = 0;
+            gint32 iRet = oReq.GetCallFlags( dwFlags );
+
+            if( SUCCEEDED( iRet ) && 
+                ( dwFlags & CF_WITH_REPLY ) )
+                bResp = true;
+
+            if( ret != STATUS_PENDING )
+            {
+                oTaskCfg.RemoveProperty(
+                    propRmtTaskId );
+            }
+
+        }while( 0 );
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) && bResp )
         {
-            ret = -EINVAL;
-            break;
+            CCfgOpenerObj oTaskCfg( pCallback );
+            IConfigDb* pUserResp = nullptr;
+            // don't set response data if already 
+            // set
+            gint32 iRet = oTaskCfg.GetPointer(
+                propRespPtr, pUserResp );
+            if( ERROR( iRet ) )
+            {
+                oResp.SetIntProp(
+                    propReturnValue, ret );
+                SetResponse( pCallback,
+                    oResp.GetCfg() );
+            }
         }
-
-        CReqOpener oReq( pEvtMsg );
-        gint32 iReqType = 0;
-
-        ret = oReq.GetReqType(
-            ( guint32& )iReqType ); 
-
-        if( ERROR( ret ) )
-            break;
-
-        if( iReqType != DBUS_MESSAGE_TYPE_METHOD_CALL )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        string strMethod;
-        ret = oReq.GetMethodName( strMethod );
-        if( ERROR( ret ) )
-            break;
-
-        ret = InvokeUserMethod(
-            pEvtMsg, pCallback );
 
     }while( 0 );
 
@@ -6792,8 +6897,8 @@ gint32 CInterfaceServer::SendResponse(
     gint32 ret = 0; 
     do{
         DMsgPtr pMsg( pReqMsg );
-        if( pMsg.GetType() ==
-            DBUS_MESSAGE_TYPE_METHOD_RETURN )
+        if( pMsg.GetType() !=
+            DBUS_MESSAGE_TYPE_METHOD_CALL )
         {
             ret = -EINVAL;
             break;

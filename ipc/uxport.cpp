@@ -243,6 +243,7 @@ gint32 CRecvFilter::OnIoReady()
         m_dwOffsetRead = ( guint32 )-1;
     }
 
+    // DebugPrint( ret, "msg received" );
     return ret;
 }
 
@@ -466,6 +467,7 @@ gint32 CSendQue::OnIoReady()
 
     }while( m_dwRestBytes > 0 );
 
+    // DebugPrint( ret, "msg sent" );
     return ret;
 }
 

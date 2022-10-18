@@ -733,37 +733,27 @@ gint32 IoRequestPacket::SetIrpThread(
     if( pMgr == nullptr )
         return -EINVAL;
 
-    gint32 ret = 0;
-    do{
-        m_pMgr = pMgr;
-        CThreadPool& oPool =
-            pMgr->GetIrpThreadPool();
-
-        ThreadPtr pThread;
-        ret = oPool.GetThread( pThread );
-
-        if( ERROR( ret ) )
-            break;
-
-        m_IrpThrdPtr = pThread;
-        if( m_IrpThrdPtr.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
-    }while( 0 );
-
-    return ret;
+    m_pMgr = pMgr;
+    return STATUS_SUCCESS;
 }
 
 gint32 IoRequestPacket::GetIrpThread(
     ThreadPtr& pthrd )
 {
-    pthrd = m_IrpThrdPtr;
-    if( pthrd.IsEmpty() )
-        return -EFAULT;
+    gint32 ret = 0;
+    do{
+        if( m_pMgr == nullptr )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        CThreadPool& oPool =
+            m_pMgr->GetIrpThreadPool();
+        ret = oPool.GetThread( pthrd );
 
-    return 0;
+    }while( 0 );
+
+    return ret;
 }
 
 void IoRequestPacket::ClearIrpThread()

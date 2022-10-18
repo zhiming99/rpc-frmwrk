@@ -11,7 +11,7 @@ dbusport.cpp portdrv.cpp rpcpdo.cpp dbuspdo.cpp \
 tasklets.cpp lpbkmtch.cpp ifhelper.cpp iiddict.cpp \
 reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp \
 prxyfdo.cpp dbusprxy.cpp fdodrv.cpp fastrpc.cpp \
-stmport.cpp
+stmport.cpp msgmatch.cpp
 
 include_dir=$(top_srcdir)/include
 
