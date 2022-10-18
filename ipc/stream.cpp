@@ -804,6 +804,55 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             }
         }
 
+        gint32 ( *func )( CRpcServices*, CRpcServices* ) =
+            ([]( CRpcServices* pUxIf, CRpcServices* pParent )->gint32
+            {
+                gint32 ret = 0;
+                if( pUxIf == nullptr || pParent == nullptr )
+                    return -EINVAL;
+                do{
+                    ObjPtr pObj = pUxIf;
+                    if( pUxIf->IsServer() )
+                    {
+                        CUnixSockStmServer* pSvc = pObj;
+                        ret = pSvc->StartTicking( nullptr );
+                    }
+                    else
+                    {
+                        CUnixSockStmProxy* pSvc = pObj;
+                        ret = pSvc->StartTicking( nullptr );
+                    }
+                    if( SUCCEEDED( ret ) )
+                        break;
+
+                    HANDLE hstm = ( HANDLE )pUxIf;
+                    pObj = pParent;
+                    if( pParent->IsServer() )
+                    {
+                        CStreamServer* pSvc = pObj;
+                        pSvc->OnChannelError( hstm, ret );
+                    }
+                    else
+                    {
+                        CStreamProxy* pSvc = pObj;
+                        pSvc->OnChannelError( hstm, ret );
+                    }
+
+                }while( 0 );
+                return ret;
+            });
+
+        auto pMgr = pSvc->GetIoMgr();
+        TaskletPtr pListenTask;
+        ret = NEW_FUNCCALL_TASK( pListenTask,
+            pMgr, func, pSvc, pParent );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->RescheduleTask( pListenTask );
+        if( ERROR( ret ) )
+            ( *pListenTask )( eventCancelTask );
+        
     }while( 0 );
 
     oParams.ClearParams();

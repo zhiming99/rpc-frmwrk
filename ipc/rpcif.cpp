@@ -1187,7 +1187,7 @@ gint32 CRpcInterfaceBase::StopEx(
         {
             CIfRetryTask* pRetryTask = pStopTasks;
             // in case the DoStop completed immediately
-                pRetryTask->SetClientNotify( pCallback );
+            pRetryTask->SetClientNotify( pCallback );
         }
 
         CIoManager* pMgr = GetIoMgr();

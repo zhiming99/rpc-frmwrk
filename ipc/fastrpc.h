@@ -865,7 +865,48 @@ class CRpcStmChanBase :
             oIrpLock.Unlock();
 
             auto pMgr = this->GetIoMgr();
-            pMgr->CompleteIrp( pIrp );
+            if( SUCCEEDED( iRet ) )
+            {
+                pMgr->CompleteIrp( pIrp );
+                break;
+            }
+            TaskGrpPtr pTaskGrp;
+            do{
+                CParamList oParams;
+                oParams[ propIfPtr ] = ObjPtr( this );
+
+                ret = pTaskGrp.NewObj(
+                    clsid( CIfTaskGroup ),
+                    oParams.GetCfg() );
+                if( ERROR( ret ) )
+                    break;
+                pTaskGrp->SetRelation( logicNONE );
+
+                TaskletPtr pStopTask;
+                ret = DEFER_IFCALLEX_NOSCHED2(
+                    0, pStopTask, ObjPtr( this ),
+                    &CRpcServices::StopEx, nullptr );
+                if( ERROR( ret ) )
+                    break;
+                pTaskGrp->AppendTask( pStopTask );
+
+                TaskletPtr pCompTask;
+                ret = DEFER_OBJCALL_NOSCHED(
+                    pCompTask, pMgr,
+                    &CIoManager::CompleteIrp, pIrp );
+                if( ERROR( ret ) )
+                    break;
+                pTaskGrp->AppendTask( pCompTask );
+                TaskletPtr pTask = pTaskGrp;
+                ret = pMgr->RescheduleTask( pTask );   
+
+            }while( 0 );
+
+            if( ERROR( ret ) && !pTaskGrp.IsEmpty() )
+            {
+                ( *pTaskGrp )( eventCancelTask );
+                pMgr->CompleteIrp( pIrp );
+            }
 
         }while( 0 );
 

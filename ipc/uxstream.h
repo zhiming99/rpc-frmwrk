@@ -1306,10 +1306,6 @@ class CUnixSockStream:
         gint32 ret = 0;
 
         do{
-            ret = StartTicking( pContext );
-            if( ERROR( ret ) )
-                break;
-
             // start the data reading
             CParamList oParams;
             oParams.SetPointer( propIfPtr, this );

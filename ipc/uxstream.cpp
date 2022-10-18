@@ -746,7 +746,7 @@ gint32 CIfUxListeningTask::PostEvent(
         // to make sure the first tokData to receive
         // happens after OnStreamReady is called.
         CUnixSockStmProxy* pProxy = pObjIf;
-        ret = pProxy->PostUxSockEvent(
+        ret = pProxy->OnUxSockEvent(
             byToken, pNewBuf );
     }
     return ret;
