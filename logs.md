@@ -1,4 +1,8 @@
 ---
+[`Tue Oct 18 2022 09:57:27 AM Beijing`]    
+1. merged the pull request to shrink the fastrpc message size to the master branch. And i have done some optimizations.
+2. Next, let's continue rpcfs programming support.
+
 [`Wed Sep 28 2022 03:26:39 PM Beijing`]   
 1. I cannot resist to make fastrpc to support fuse first before the skelton code generator for `rpcfs`, because fastrpc has some good potentials that could be very useful in the future.
  
