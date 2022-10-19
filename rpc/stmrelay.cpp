@@ -2256,14 +2256,14 @@ gint32 CIfUxRelayTaskHelper::PostUxSockEvent(
     {
         CUnixSockStmServerRelay*
             pUxStm = ObjPtr( m_pSvc );
-        ret = pUxStm->PostUxSockEvent(
+        ret = pUxStm->OnUxSockEvent(
             byToken, pBuf );
     }
     else
     {
         CUnixSockStmProxyRelay*
             pUxStm = ObjPtr( m_pSvc );
-        ret = pUxStm->PostUxSockEvent(
+        ret = pUxStm->OnUxSockEvent(
             byToken, pBuf );
     }
 
@@ -2278,14 +2278,14 @@ gint32 CIfUxRelayTaskHelper::PostTcpStmEvent(
     {
         CUnixSockStmServerRelay*
             pUxStm = ObjPtr( m_pSvc );
-        ret = pUxStm->PostTcpStmEvent(
+        ret = pUxStm->OnTcpStmEvent(
             byToken, pBuf );
     }
     else
     {
         CUnixSockStmProxyRelay*
             pUxStm = ObjPtr( m_pSvc );
-        ret = pUxStm->PostTcpStmEvent(
+        ret = pUxStm->OnTcpStmEvent(
             byToken, pBuf );
     }
     return ret;
