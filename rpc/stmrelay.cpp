@@ -918,39 +918,57 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         oResp.Push( 0 );
         oResp.Push( 0x20 );
 
-        // set the response for OpenChannel
-        TaskletPtr pConnTask;
-
-        if( bBdgSvr )
+        // start the stream readers
+        gint32 ( *func )( CRpcServices*, CRpcServices*, gint32 ) =
+            ([]( CRpcServices* pUxIf,
+                CRpcServices* pParent,
+                gint32 iStmId )->gint32
         {
-            ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
-                ObjPtr( pParent ),
-                &CStreamServerRelay::OnConnected,
-                hChannel );
-        }
-        else
-        {
-            ret = DEFER_IFCALLEX_NOSCHED( pConnTask,
-                ObjPtr( pParent ),
-                &CStreamProxyRelay::OnConnected,
-                hChannel );
-        }
+            gint32 ret = 0;
+            if( pUxIf == nullptr || pParent == nullptr )
+                return -EINVAL;
+            do{
+                ObjPtr pObj = pUxIf;
+                if( pUxIf->IsServer() )
+                {
+                    CUnixSockStmServerRelay* pSvc = pObj;
+                    ret = pSvc->OnPostStartDeferred( nullptr );
+                }
+                else
+                {
+                    CUnixSockStmProxyRelay* pSvc = pObj;
+                    ret = pSvc->OnPostStartDeferred( nullptr );
+                }
+                if( SUCCEEDED( ret ) )
+                    break;
 
+                pObj = pParent;
+                if( pParent->IsServer() )
+                {
+                    CStreamServerRelay* pSvc = pObj;
+                    pSvc->OnChannelError( iStmId, ret );
+                }
+                else
+                {
+                    HANDLE hstm = ( HANDLE )pUxIf;
+                    CStreamProxyRelay* pSvc = pObj;
+                    pSvc->OnChannelError( hstm, ret );
+                }
+
+            }while( 0 );
+            return ret;
+        });
+
+        auto pMgr = pParent->GetIoMgr();
+        TaskletPtr pListenTask;
+        ret = NEW_FUNCCALL_TASK( pListenTask,
+            pMgr, func, pUxSvc, pParent, iStmId );
         if( ERROR( ret ) )
             break;
 
-        ret = pParent->RunManagedTask( pConnTask );
+        ret = pMgr->RescheduleTask( pListenTask );
         if( ERROR( ret ) )
-        {
-            ( *pConnTask )( eventCancelTask );
-            break;
-        }
-
-        if( SUCCEEDED( ret ) )
-            ret = pConnTask->GetError();
-
-        if( ret == STATUS_PENDING )
-            ret = 0;
+            ( *pListenTask )( eventCancelTask );
 
     }while( 0 );
 
@@ -1128,6 +1146,7 @@ gint32 CIfUxListeningRelayTask::PostEvent(
             guint32 dwSize = pBuf->size() -
                 UXPKT_HEADER_SIZE;
             oHelper.IncRxBytes( dwSize );
+            // fall through
         }
     case tokProgress:
         {
@@ -1893,9 +1912,16 @@ gint32 CIfTcpStmTransTask::PostEvent(
 
     switch( byToken )
     {
+    case tokData:
+        {
+            guint32 dwSize = pNewBuf->size();
+            oHelper.IncTxBytes( dwSize );
+            ret = oHelper.ForwardToLocal(
+                byToken, pNewBuf );
+            break;
+        }
     case tokPing:
     case tokPong:
-    case tokData:
     case tokProgress:
         {
             ret = oHelper.ForwardToLocal(

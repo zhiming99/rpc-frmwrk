@@ -851,9 +851,13 @@ class CRpcStmChanBase :
                     pCtx->SetStatus( iRet );
             }
 
+            bool bStart = false;
             guint32 dwMinCmd =
-                    pCtx->GetMinorCmd();
-            if( dwMinCmd == IRP_MN_PNP_START &&
+                pCtx->GetMinorCmd();
+            
+            if( dwMinCmd == IRP_MN_PNP_START )
+                bStart = true;
+            if( bStart &&
                 SUCCEEDED( pCtx->GetStatus() ) )
             {
                 ObjPtr pIf = this;
@@ -865,11 +869,14 @@ class CRpcStmChanBase :
             oIrpLock.Unlock();
 
             auto pMgr = this->GetIoMgr();
-            if( SUCCEEDED( iRet ) )
+            if( SUCCEEDED( iRet ) || !bStart )
             {
                 pMgr->CompleteIrp( pIrp );
                 break;
             }
+
+            // failed to start. stop the interface to
+            // avoid memory leak
             TaskGrpPtr pTaskGrp;
             do{
                 CParamList oParams;

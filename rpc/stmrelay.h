@@ -1187,11 +1187,10 @@ class CUnixSockStmRelayBase :
         do{
             // start the event listening
             CParamList oParams;
+            auto pMgr = this->GetIoMgr();
 
             oParams.SetPointer( propIfPtr, this );
-            oParams.SetPointer( propIoMgr,
-                this->GetIoMgr() );
-
+            oParams.SetPointer( propIoMgr, pMgr );
             oParams.CopyProp( propTimeoutSec, this );
 
             ret = this->m_pListeningTask.NewObj(
@@ -1201,7 +1200,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = this->RunManagedTask(
+            ret = pMgr->RescheduleTask(
                 this->m_pListeningTask );
 
             if( ERROR( ret ) )
@@ -1233,8 +1232,8 @@ class CUnixSockStmRelayBase :
         return ret;
     }
 
-    virtual gint32 OnPostStart(
-        IEventSink* pContext ) override
+    gint32 OnPostStartDeferred(
+        IEventSink* pContext )
     {
         gint32 ret = 0;
 
@@ -1293,12 +1292,6 @@ class CUnixSockStmRelayBase :
                 m_pRdTcpStmTask );
 
         }while( 0 );
-
-        if( ERROR( ret ) )
-        {
-            // cancel all the tasks
-            OnPreStop( pContext );
-        }
 
         return ret;
     }

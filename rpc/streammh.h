@@ -161,13 +161,13 @@ class CRpcTcpBridgeProxyStream :
     CRpcTcpBridgeProxyStream(
         const IConfigDb* pCfg );
 
-    virtual gint32 StartTicking(
+    gint32 StartTicking(
+        IEventSink* pContext ) override;
+
+    gint32 OnPostStartDeferred(
         IEventSink* pContext );
 
-    virtual gint32 OnPostStart(
-        IEventSink* pContext );
-
-    virtual gint32 OnFlowControl();
+    gint32 OnFlowControl() override;
 
     inline gint32 IncTxBytesRemote( guint32 dwSize )
     { return m_oFlowCtrlRmt.IncTxBytes( dwSize ); }
