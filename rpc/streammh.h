@@ -193,36 +193,35 @@ class CRpcTcpBridgeProxyStream :
         return m_iBdgeStmId;
     }
 
-    virtual gint32 OnFCLifted();
+    gint32 OnFCLifted() override;
 
-    virtual gint32 GetReqToLocal(
-        guint8& byToken, BufPtr& pBuf );
+    gint32 GetReqToLocal( guint8& byToken,
+        BufPtr& pBuf ) override;
 
-    virtual gint32 GetReqToRemote(
-        guint8& byToken, BufPtr& pBuf );
+    gint32 GetReqToRemote( guint8& byToken,
+        BufPtr& pBuf ) override;
 
-    virtual gint32 OnFlowControlRemote();
+    gint32 OnFlowControlRemote() override;
 
-    virtual gint32 OnFCLiftedRemote();
+    gint32 OnFCLiftedRemote() override;
 
-    virtual gint32 ForwardToRemote(
-        guint8 byToken, BufPtr& pBuf );
+    gint32 ForwardToRemote( guint8 byToken,
+        BufPtr& pBuf ) override;
 
-    virtual gint32 OnPostStop(
-        IEventSink* pCallback );
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
 
-    virtual gint32 OnDataReceived(
-        CBuffer* pBuf );
+    gint32 OnDataReceived(
+        CBuffer* pBuf ) override;
 
-    virtual gint32 OnDataReceivedRemote(
-        CBuffer* pBuf );
+    // gint32 OnDataReceivedRemote(
+    //     CBuffer* pBuf ) override;
 
-    virtual gint32 OnProgress(
-        CBuffer* pBuf )
-    { return 0; }
+    // virtual gint32 OnProgress(
+    //     CBuffer* pBuf );
 
-    virtual gint32 OnProgressRemote(
-        CBuffer* pBuf )
+    gint32 OnProgressRemote(
+        CBuffer* pBuf ) override
     { return 0; }
 
     virtual IStream* GetParent()
@@ -232,8 +231,8 @@ class CRpcTcpBridgeProxyStream :
         return ( IStream* )pIf;
     }
 
-    virtual gint32 OnPreStop(
-        IEventSink* pCallback );
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
 
     virtual gint32 SendBdgeStmEvent(
         guint8 byToken, BufPtr& pBuf );

@@ -2551,4 +2551,82 @@ EnumFCState CIfUxRelayTaskHelper::IncTxBytes(
     return ret;
 }
 
+gint32 CUnixSockStmServerRelay::OnPingPong( bool bPing )
+{
+    BufPtr pBuf( true );
+    return SendUxStreamEvent(
+        bPing ? tokPing : tokPong,
+        pBuf );
+}
+
+gint32 CUnixSockStmServerRelay::OnPingPongRemote( bool bPing )
+{
+    BufPtr pBuf( true );
+    return SendBdgeStmEvent(
+        bPing ? tokPing : tokPong,
+        pBuf );
+}
+
+IStream* CUnixSockStmServerRelay::GetParent()
+{
+    CStreamProxyRelay* pIf =
+        ObjPtr( m_pParent );
+    return ( IStream* )pIf;
+}
+
+gint32 CUnixSockStmProxyRelay::OnPingPong( bool bPing )
+{
+    BufPtr pBuf( true );
+    return SendUxStreamEvent(
+        bPing ? tokPing : tokPong,
+        pBuf );
+}
+
+gint32 CUnixSockStmProxyRelay::OnPingPongRemote( bool bPing )
+{
+    BufPtr pBuf( true );
+    return SendBdgeStmEvent(
+        bPing ? tokPing : tokPong,
+        pBuf );
+}
+
+IStream* CUnixSockStmProxyRelay::GetParent()
+{
+    CStreamServerRelay* pIf =
+        ObjPtr( m_pParent );
+    return ( IStream* )pIf;
+}
+
+gint32 CUnixSockStmProxyRelay::OnDataReceivedRemote(
+    CBuffer* pBuf )
+{ 
+    guint64 qwBytes = 0, qwPkts = 0;
+    do{
+        bool ret = m_oFlowCtrl.GetOvershoot(
+            qwBytes, qwPkts );
+        if( !ret )
+            break;
+
+        if( qwPkts == 0 && qwBytes == 0 )
+            break;
+
+        if( qwPkts > 0 &&
+            qwPkts <= ( STM_MAX_PACKETS_REPORT >> 1 ) )
+            break;
+
+        if( qwBytes > 0 &&
+            qwBytes <= ( STM_MAX_PENDING_WRITE >> 1 ) )
+            break;
+
+        BufPtr ptrBuf( true );
+        gint32 iRet = htonl( -EPROTO );
+        *ptrBuf = ( guint8 )tokError;
+        ptrBuf->Append( ( guint8* )&iRet, sizeof( iRet ) );
+        PostUxStreamEvent( tokError, ptrBuf );
+
+    }while( 0 );
+
+    return 0;
+}
+
 }

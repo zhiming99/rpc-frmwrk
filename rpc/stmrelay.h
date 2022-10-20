@@ -1084,7 +1084,7 @@ class CUnixSockStmRelayBase :
         return ret;
     }
 
-    virtual gint32 OnPingPong( bool bPing )
+    gint32 OnPingPong( bool bPing ) override
     {
         // to cloak super::OnPingPong
         return 0;
@@ -1094,7 +1094,7 @@ class CUnixSockStmRelayBase :
         CBuffer* pBuf )
     { return 0; }
 
-    virtual gint32 OnFlowControl()
+    gint32 OnFlowControl() override
     {
         this->m_oFlowCtrl.IncFCCount();
         CStdRMutex oIfLock( this->GetLock() );
@@ -1112,7 +1112,7 @@ class CUnixSockStmRelayBase :
         return pTask->Pause();
     }
 
-    virtual gint32 OnFCLifted()
+    gint32 OnFCLifted() override
     {
         this->m_oFlowCtrl.DecFCCount();
         CStdRMutex oIfLock( this->GetLock() );
@@ -1162,7 +1162,7 @@ class CUnixSockStmRelayBase :
         return PauseResumeTasks( pTasks, true );
     }
 
-    virtual gint32 OnDataReceived( CBuffer* pBuf )
+    gint32 OnDataReceived( CBuffer* pBuf ) override
     {
         return 0;
     }
@@ -1172,15 +1172,24 @@ class CUnixSockStmRelayBase :
         return 0;
     }
 
-    virtual gint32 OnProgress( CBuffer* pBuf )
+    gint32 OnProgress( CBuffer* pBuf ) override
     {
-        BufPtr bufPtr( pBuf );
-        return this->SendUxStreamEvent(
-            tokProgress, bufPtr );
+        gint32 ret = 0;
+        do{
+            CfgPtr pReport( true );
+            ret = pReport->Deserialize( *pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            this->m_oFlowCtrl.OnFCReport( pReport );
+
+        }while( 0 );
+
+        return ret;
     }
 
-    virtual gint32 StartTicking(
-        IEventSink* pContext )
+    gint32 StartTicking(
+        IEventSink* pContext ) override
     {
         gint32 ret = 0;
 
@@ -1412,6 +1421,7 @@ class CUnixSockStmRelayBase :
 
     inline EnumFCState IncRxBytes( guint32 dwSize )
     { return this->m_oFlowCtrl.IncRxBytes( dwSize ); }
+    
 };
 
 class CUnixSockStmServerRelay :
@@ -1424,28 +1434,9 @@ class CUnixSockStmServerRelay :
         super( pCfg )
     { SetClassId( clsid( CUnixSockStmServerRelay ) ); }
 
-    virtual gint32 OnPingPong( bool bPing )
-    {
-        BufPtr pBuf( true );
-        return SendUxStreamEvent(
-            bPing ? tokPing : tokPong,
-            pBuf );
-    }
-
-    virtual gint32 OnPingPongRemote( bool bPing )
-    {
-        BufPtr pBuf( true );
-        return SendBdgeStmEvent(
-            bPing ? tokPing : tokPong,
-            pBuf );
-    }
-
-    IStream* GetParent()
-    {
-        CStreamProxyRelay* pIf =
-            ObjPtr( m_pParent );
-        return ( IStream* )pIf;
-    }
+    gint32 OnPingPong( bool bPing ) override;
+    gint32 OnPingPongRemote( bool bPing ) override;
+    IStream* GetParent() override;
 };
 
 class CUnixSockStmProxyRelay :
@@ -1458,28 +1449,18 @@ class CUnixSockStmProxyRelay :
         super( pCfg )
     { SetClassId( clsid( CUnixSockStmProxyRelay ) ); }
 
-    virtual gint32 OnPingPong( bool bPing )
-    {
-        BufPtr pBuf( true );
-        return SendUxStreamEvent(
-            bPing ? tokPing : tokPong,
-            pBuf );
-    }
+    gint32 OnPingPong( bool bPing ) override;
+    gint32 OnPingPongRemote( bool bPing ) override;
+    IStream* GetParent() override;
 
-    virtual gint32 OnPingPongRemote( bool bPing )
+    inline bool GetOvershoot( guint64& qwBytes,
+        guint64& qwPkts ) const
     {
-        BufPtr pBuf( true );
-        return SendBdgeStmEvent(
-            bPing ? tokPing : tokPong,
-            pBuf );
+        return m_oFlowCtrl.GetOvershoot(
+            qwBytes, qwPkts );
     }
-
-    IStream* GetParent()
-    {
-        CStreamServerRelay* pIf =
-            ObjPtr( m_pParent );
-        return ( IStream* )pIf;
-    }
+    gint32 OnDataReceivedRemote(
+        CBuffer* pBuf ) override;
 };
 
 struct CIfUxRelayTaskHelper

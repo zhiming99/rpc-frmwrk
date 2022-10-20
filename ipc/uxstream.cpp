@@ -209,13 +209,40 @@ EnumFCState CFlowControl::OnFCReport(
         qwAckTxBytes, qwAckTxPkts );
 }
 
-bool CFlowControl::CanSend()
+bool CFlowControl::CanSend() const
 {
     if( m_bMonitor )
         return true;
 
     CStdRMutex oLock( GetLock() );
-    return m_byFlowCtrl == 0;
+    return IsFlowCtrl();
+}
+
+bool CFlowControl::IsFlowCtrl() const
+{ return m_byFlowCtrl == 0; }
+
+bool CFlowControl::GetOvershoot(
+    guint64& qwBytes,
+    guint64& qwPkts ) const
+{
+    CStdRMutex oLock( GetLock() );
+    if( !IsFlowCtrl() )
+        return false;
+    qwBytes = qwPkts = 0;
+    guint64 qwDelta =
+        m_qwTxPkts - m_qwAckTxPkts;
+    if( qwDelta > STM_MAX_PACKETS_REPORT )
+    {
+        qwPkts = qwDelta - STM_MAX_PACKETS_REPORT;
+        return true;
+    }
+    qwDelta = m_qwTxBytes - m_qwAckTxBytes;
+    if( qwDelta > STM_MAX_PENDING_WRITE )
+    {
+        qwBytes = qwDelta - STM_MAX_PENDING_WRITE;
+        return true;
+    }
+    return false;
 }
 
 CfgPtr CFlowControl::GetReport()

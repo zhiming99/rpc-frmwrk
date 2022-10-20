@@ -280,7 +280,7 @@ enum EnumFCState : gint32
 class CFlowControl
 {
     // flow control for uxstream only
-    stdrmutex   m_oFCLock;
+    mutable stdrmutex   m_oFCLock;
 
     guint64     m_qwRxBytes = 0;
     guint64     m_qwTxBytes = 0;
@@ -298,15 +298,19 @@ class CFlowControl
     EnumFCState OnReportInternal(
         guint64 qwAckTxBytes, guint64 qwAckTxPkts );
 
+    bool IsFlowCtrl() const;
+
     public:
 
-    inline stdrmutex& GetLock()
+    inline stdrmutex& GetLock() const
     { return m_oFCLock; }
 
     inline void SetAsMonitor( bool bMonitor )
     { m_bMonitor = bMonitor; }
 
-    bool CanSend();
+    bool CanSend() const;
+    bool GetOvershoot( guint64& qwBytes,
+        guint64& qwPackets ) const;
     EnumFCState IncTxBytes( guint32 dwSize );
     EnumFCState IncTxBytes( const BufPtr& pBuf );
     EnumFCState IncRxBytes( guint32 dwSize );

@@ -514,12 +514,6 @@ gint32 CRpcTcpBridgeProxyStream::OnDataReceived(
     return 0;
 }
 
-gint32 CRpcTcpBridgeProxyStream::OnDataReceivedRemote(
-    CBuffer* pBuf )
-{
-    return 0;
-}
-
 gint32 CIfUxRelayTaskHelperMH::GetBridgeIf(
     InterfPtr& pIf, bool bProxy )
 {
