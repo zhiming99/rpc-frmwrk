@@ -22,7 +22,6 @@ examples/python/actcancel/fccli.py \
 examples/python/actcancel/maincli.py \
 examples/python/hellowld/maincli.py \
 examples/python/hellowld/mainsvr.py \
-examples/python/iolib.py \
 examples/python/katest/maincli.py \
 examples/python/katest/mainsvr.py \
 examples/python/testypes/dumpStream.py \
