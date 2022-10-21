@@ -164,6 +164,10 @@ class CRpcTcpBridgeProxyStream :
     gint32 StartTicking(
         IEventSink* pContext ) override;
 
+    gint32 OnPostStart(
+        IEventSink* pContext ) override
+    { return 0; }
+
     gint32 OnPostStartDeferred(
         IEventSink* pContext );
 

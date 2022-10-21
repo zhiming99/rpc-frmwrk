@@ -1241,6 +1241,10 @@ class CUnixSockStmRelayBase :
         return ret;
     }
 
+    gint32 OnPostStart(
+        IEventSink* pContext ) override
+    { return 0; }
+
     gint32 OnPostStartDeferred(
         IEventSink* pContext )
     {
