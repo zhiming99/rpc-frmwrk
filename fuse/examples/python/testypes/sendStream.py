@@ -8,7 +8,7 @@ import time
 import termios
 import fcntl
 import array
-from iolib import *
+from rpcf.iolib import *
 
 def Usage():
     print( "Usage: send a file through the rpc-frmwrk stream channel." )

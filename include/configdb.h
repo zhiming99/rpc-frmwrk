@@ -1448,7 +1448,7 @@ class CCfgOpenerT : public CCfgDbOpener< T >
     bool exist( gint32 iPropId ) const
     {
         if( m_pConstCfg != nullptr &&
-            m_pConstCfg->GetClsid() == clsid( CConfigDb ) )
+            m_pConstCfg->GetClsid() == clsid( CConfigDb2 ) )
         {
             return static_cast< const IConfigDb* >
                 ( m_pConstCfg )->exist( iPropId );

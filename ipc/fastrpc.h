@@ -472,7 +472,7 @@ class CRpcStmChanBase :
 
             CCfgOpener oReq( pFwrdMsg );
             oReq.SetPointer( propContext,
-                ( IConfigDb* )oReq.GetCfg() );
+                ( IConfigDb* )oReqCtx.GetCfg() );
 
             pNewMsg = pFwrdMsg;
 

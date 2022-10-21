@@ -6,7 +6,8 @@ import base64
 import io
 
 import time
-from iolib import *
+from rpcf.iolib import *
+
 def BuildReqHdr( methodName : str, idx : int ) -> dict:
         echoReq = dict()
         # request header, the information can be found

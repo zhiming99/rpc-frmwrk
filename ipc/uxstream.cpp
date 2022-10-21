@@ -870,21 +870,14 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
             break;
 
         // start another listening task
-        CParamList oParams;
-        oParams.CopyProp( propIfPtr, this );
-        oParams.CopyProp( propIoMgr, this );
+        oCfg.RemoveProperty( propIrpPtr );
+        oCfg.RemoveProperty( propRespPtr );
 
-        TaskletPtr pTask;
-
-        ret = pTask.NewObj(
-            clsid( CIfUxListeningTask ),
-            oParams.GetCfg() );
-
+        ret = ReRun();
         if( ERROR( ret ) )
             break;
 
-        // pIf->RunManagedTask( pTask );
-        ( *pTask )( eventZero );
+        ret = STATUS_PENDING;
 
     }while( 0 );
 

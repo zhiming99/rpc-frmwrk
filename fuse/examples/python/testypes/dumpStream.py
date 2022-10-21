@@ -8,7 +8,7 @@ import time
 import termios
 import fcntl
 import array
-from iolib import *
+from rpcf.iolib import *
 
 def Usage():
     print( "Usage: dump the data to a file as from the peer to stream_0 " )

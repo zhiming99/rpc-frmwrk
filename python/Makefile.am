@@ -1,4 +1,4 @@
-pysources = README.md gentoml.sh rpcf/proxy.py rpcf/__init__.py proxy.sip pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh stripsym.sh
+pysources = README.md gentoml.sh rpcf/proxy.py rpcf/__init__.py proxy.sip pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh stripsym.sh rpcf/iolib.py
 
 EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.py  tests/katest/*.py  tests/prtest/*.py  tests/sftest/*.py  tests/sftest/README.md tests/sftest/sfdesc.json tests/stmtest/*.py tests/stmtest/README.md
 
