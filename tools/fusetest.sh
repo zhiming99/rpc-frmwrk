@@ -17,9 +17,6 @@ release/TestTypessvr mpsvr &
 release/TestTypescli mp &
 
 pydir=$basedir/fuse/examples/python
-if [ ! -e $pydir/testypes/iolib.py ]; then
-    ln -s $pydir/iolib.py $pydir/testypes/ || exit 10
-fi
 sleep 5 
 
 python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
