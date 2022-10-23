@@ -1809,8 +1809,22 @@ gint32 CMethodWriterFuse::GenSerialArgs(
     do{
         NEW_LINE;
         Wa( "CJsonSerialBase oSerial_(" );
-        CCOUT << "    ObjPtr( GetStreamIf() ), "<<
-            ( bLocked ? "true );" : "false );" );
+        ObjPtr pObj;
+        ret = FindParentByClsid( pArgList,
+            clsid( CInterfaceDecl ), pObj );
+        if( ERROR( ret ) )
+            break;
+        CInterfaceDecl* pifd = pObj;
+        if( pifd->IsStream() )
+        {
+            CCOUT << "    ObjPtr( GetStreamIf() ), "<<
+                ( bLocked ? "true );" : "false );" );
+        }
+        else
+        {
+            CCOUT << "    ObjPtr( this ), "<<
+                ( bLocked ? "true );" : "false );" );
+        }
         NEW_LINE;
 
         CEmitSerialCodeFuse oesc(
@@ -1855,9 +1869,24 @@ gint32 CMethodWriterFuse::GenDeserialArgs(
         NEW_LINE;
         Wa( "CJsonSerialBase oDeserial_(" );
 
-        CCOUT << "    ObjPtr( GetStreamIf() ), "<<
-            ( bLocked ? "true );" : "false );" );
+        ObjPtr pObj;
+        ret = FindParentByClsid( pArgList,
+            clsid( CInterfaceDecl ), pObj );
+        if( ERROR( ret ) )
+            break;
+        CInterfaceDecl* pifd = pObj;
+        if( pifd->IsStream() )
+        {
+            CCOUT << "    ObjPtr( GetStreamIf() ), "<<
+                ( bLocked ? "true );" : "false );" );
+        }
+        else
+        {
+            CCOUT << "    ObjPtr( this ), "<<
+                ( bLocked ? "true );" : "false );" );
+        }
         NEW_LINE;
+
         CEmitSerialCodeFuse oedsc(
             m_pWriter, pArgList );
 
