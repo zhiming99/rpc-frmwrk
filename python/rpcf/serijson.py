@@ -65,65 +65,67 @@ class CSerialBase :
     def SerialHStream( self, val : str ) -> str:
         return val
 
-    def SerialStruct( self, val : object ) -> dict:
+    def SerialStruct( self, val : object ) -> Tuple[ int, object ]:
         return val.Serialize()
 
-    def SerialArray( self, val : list, sig: str ) -> Tuple[ list, int ]:
+    def SerialArray( self, val : list, sig: str ) -> Tuple[ int, list ]:
         sigLen = len( sig )
         if sig[ 0 ] != '(' :
-            return ( None, -errno.EINVAL )
+            return ( -errno.EINVAL, None )
         if sig[ sigLen -1 ] != ')':
-            return ( None, -errno.EINVAL )
+            return ( -errno.EINVAL, None )
         if sigLen <= 2 :
-            return ( None, -errno.EINVAL )
+            return ( -errno.EINVAL, None )
         sigElem = sig[ 1 : sigLen - 1 ]
 
         res = []
-        ret = ( res, 0 )
+        ret = ( 0, res )
         count = len( val )
         for elem in val :
             ret = self.SerialElem( elem, sigElem )
-            if ret[ 1 ] < 0 :
+            if ret[ 0 ] < 0 :
                 break
             res.append( ret[ 0 ] )
-        if ret[ 1 ] < 0 :
+        if ret[ 0 ] < 0 :
             return ret
-        return ( res, 0 )
+        return ( 0, res )
 
-    def SerialMap( self, val : dict, sig: str ) -> Tuple[ dict, int ]:
+    def SerialMap( self, val : dict, sig: str ) -> Tuple[ int, dict ]:
         sigLen = len( sig )
         if sig[ 0 ] != '[' :
-            return ( None, -errno.EINVAL )
+            return ( -errno.EINVAL, None )
         if sig[ sigLen -1 ] != ']':
-            return ( None, -errno.EINVAL )
+            return ( -errno.EINVAL, None )
         if sigLen <= 2 :
-            return ( None, -errno.EINVAL )
+            return ( -errno.EINVAL, None )
         sigElem = sig[ 1 : sigLen - 1 ]
 
         count = len( val )
         res = dict()
-        ret = ( res, 0 )
+        ret = ( 0, res )
         for ( key, value ) in val.items() :
             ret = self.SerialElem( key, sigElem[ :1 ] )
-            if ret[ 1 ] < 0 :
+            if ret[ 0 ] < 0 :
                 break
             resKey = ret[ 0 ]
             ret = self.SerialElem( value, sigElem[ 1: ] )
-            if ret[ 1 ] < 0 :
+            if ret[ 0 ] < 0 :
                 break
             res[ resKey ] = ret[ 0 ]
-        if ret[ 1 ] < 0 :
+        if ret[ 0 ] < 0 :
             return ret
-        return ( res, 0 )
+        return ( 0, res )
 
-    def SerialElem( self, val : object, sig : str ) -> Tuple[ object, int]:
+    def SerialElem( self, val : object, sig : str ) -> Tuple[ int, object]:
         if sig[ 0 ] == '(' :
             return self.SerialArray( val, sig )
         if sig[ 0 ] == '[' :
             return self.SerialMap( val, sig )
+        if sig[ 0 ] == 'O' :
+            return self.SerialStruct( val )
 
         resElem = self.SerialElemOpt[ sig[ 0 ] ]( self, val )
-        return ( resElem, 0 )
+        return ( 0, resElem )
 
     def DeserialInt64( self, val : int ) -> int:
         return val
@@ -158,15 +160,18 @@ class CSerialBase :
     def DeserialObjPtr( self, val : object )->object:
         return val
 
-    def DeserialStruct( self, val : dict ) -> object:
-        structId = val.GetStructId()
-        structInst = CStructFactoryBase.Create( structId )
-        ret = structInst.Deserialize( val )
-        if ret < 0 :
-            return object()
-        return structInst
+    def DeserialStruct( self, val : dict ) -> Tuple[ int, object ]:
+        try:
+            structId = val[ "StructId" ]
+            structInst = CStructFactoryBase.Create( structId )
+            ret = structInst.Deserialize( val )
+            if ret < 0 :
+                return ( ret, None )
+            return ( 0, structInst )
+        except Exception as err:
+            return ( -errno.EFAULT, None );
 
-    def DeserialArray( self, val : list, sig : str )-> Tuple[ list, int ]:
+    def DeserialArray( self, val : list, sig : str )-> Tuple[ int, list ]:
         sigLen = len( sig )
         if sig[ 0 ] != '(' :
             return ( None, -errno.EINVAL )
@@ -184,12 +189,12 @@ class CSerialBase :
         ret = ( res, 0 )
         for elem in val :
             ret = self.DeserialElem( elem, sigElem )
-            if ret[ 1 ] < 0 :
+            if ret[ 0 ] < 0 :
                 break
             res.append( resElem )
-        return ( ret, res )
+        return ret
 
-    def DeserialMap( self, val : list, sig : str ) -> Tuple[ dict, int ]:
+    def DeserialMap( self, val : dict, sig : str ) -> Tuple[ int, object ]:
         sigLen = len( sig )
         if sig[ 0 ] != '[' :
             return ( None, -errno.EINVAL )
@@ -203,25 +208,27 @@ class CSerialBase :
         count = len( val )
         if count == 0 :
             res  = dict()
-            return ( res, 0 )
+            return ( 0, res )
 
-        ret = ( None, 0 )
+        ret = ( 0, res )
         for key, value in val :
             ret = self.DeserialElem( key, sigElem[ :1 ], elemKey )
-            if ret[ 1 ] < 0 :
+            if ret[ 0 ] < 0 :
                 break
             ret = self.DeserialElem( value, sigElem[ 1: ], elemVal )
-            if ret[ 1 ] < 0 :
+            if ret[ 0 ] < 0 :
                 break
             res[ elemKey ] = elemVal
 
-        return ( res, ret[ 1 ] )
+        return ret
 
-    def DeserialElem( self, val : object, sig : str ) -> Tuple[ object, int ]:
+    def DeserialElem( self, val : object, sig : str ) -> Tuple[ int, object ]:
         if sig[ 0 ] == '(' :
             return self.DeserialArray( val, sig )
         if sig[ 0 ] == '[' :
             return self.DeserialMap( val, sig )
+        if sig[ 0 ] == 'O' :
+            return self.DeserialStruct( val, sig )
         resElem = self.DeserialElemOpt[ sig[ 0 ] ]( self, buf, offset )
         return ( resElem, 0 )
 
