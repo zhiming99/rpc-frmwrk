@@ -291,7 +291,7 @@ static gint32 GetArgsAndSigs( CArgList* pArgList,
     return ret;
 }
 
-static gint32 EmitFormalArgListPy(
+gint32 EmitFormalArgListPy(
     CWriterBase* pWriter, CArgList* pInArgs )
 {
     gint32 ret = 0;
@@ -988,7 +988,7 @@ gint32 CDeclarePyStruct::Output()
     return ret;
 }
 
-gint32 GenStructsFilePy(
+static gint32 GenStructsFilePy(
     CPyWriter* pWriter, ObjPtr& pRoot )
 {
     if( pWriter == nullptr ||
@@ -1640,7 +1640,7 @@ gint32 CImplPySvcProxyBase::Output()
     return ret;
 }
 
-gint32 GenSvcFiles(
+static gint32 GenSvcFiles(
     CPyWriter* pWriter, ObjPtr& pRoot )
 {
     if( pWriter == nullptr ||

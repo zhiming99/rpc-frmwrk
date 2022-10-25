@@ -72,7 +72,13 @@ class CPyWriter : public CWriterBase
         m_pNode = pStmts;
     }
 
-    inline gint32 SelectStructsFile()
+    CPyWriter(
+        const std::string& strPath,
+        const std::string& strAppName ) :
+        super( strPath, strAppName )
+    {}
+
+    virtual gint32 SelectStructsFile()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -80,7 +86,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 0 );
     }
 
-    inline gint32 SelectInitFile()
+    virtual gint32 SelectInitFile()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -88,7 +94,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 1 );
     }
 
-    inline gint32 SelectDescFile()
+    virtual gint32 SelectDescFile()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -96,7 +102,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 2 );
     }
 
-    inline gint32 SelectDrvFile()
+    virtual gint32 SelectDrvFile()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -104,7 +110,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 3 );
     }
 
-    inline gint32 SelectMakefile()
+    virtual gint32 SelectMakefile()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -112,7 +118,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 4 );
     }
 
-    inline gint32 SelectMainCli()
+    virtual gint32 SelectMainCli()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -120,7 +126,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 5 );
     }
 
-    inline gint32 SelectMainSvr()
+    virtual gint32 SelectMainSvr()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -128,7 +134,7 @@ class CPyWriter : public CWriterBase
         return SelectFile( 6 );
     }
 
-    inline gint32 SelectReadme()
+    virtual gint32 SelectReadme()
     {
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
@@ -137,7 +143,7 @@ class CPyWriter : public CWriterBase
     }
 
 
-    inline gint32 SelectImplFile(
+    gint32 SelectImplFile(
         const std::string& strFile )
     {
         decltype( m_pFiles->m_mapSvcImp )::iterator itr =
@@ -152,13 +158,14 @@ class CPyWriter : public CWriterBase
 
 class CDeclarePyStruct
 {
+    protected:
     CPyWriter* m_pWriter = nullptr;
     CStructDecl* m_pNode = nullptr;
 
     public:
     CDeclarePyStruct( CPyWriter* pWriter,
         ObjPtr& pNode );
-    gint32 Output();
+    virtual gint32 Output();
     void OutputStructBase();
 };
 
