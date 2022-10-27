@@ -186,8 +186,9 @@ class CImplPyMthdProxyBase2 :
     CImplPyMthdProxyBase2(
         CPyWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
-    gint32 OutputSync();
+    gint32 OutputSync( bool bSync );
     gint32 OutputEvent();
+    gint32 OutputAsyncCbWrapper( bool bSync );
 };
 
 class CImplPyIfProxyBase2
@@ -215,6 +216,16 @@ class CImplPySvcSvr2
     gint32 OutputSvcSvrClass();
 };
 
+class CImplPyIfSvr2
+{
+    CInterfaceDecl* m_pNode = nullptr;
+    CPyWriter* m_pWriter = nullptr;
+
+    public:
+    CImplPyIfSvr2(
+        CPyWriter* pWriter, ObjPtr& pNode );
+    gint32 Output();
+};
 class CImplPyMthdSvr2 :
     public CMethodWriter
 {
@@ -227,6 +238,18 @@ class CImplPyMthdSvr2 :
         CPyWriter* pWriter, ObjPtr& pNode );
 
     gint32 Output();
+};
+
+class CImplPySvcProxy2
+{
+    CServiceDecl* m_pNode = nullptr;
+    CPyWriter* m_pWriter = nullptr;
+
+    public:
+    CImplPySvcProxy2(
+        CPyWriter* pWriter, ObjPtr& pNode );
+    gint32 Output();
+    gint32 OutputSvcProxyClass();
 };
 
 class CImplPyIfProxy2
@@ -267,11 +290,9 @@ class CImplPyMainFunc2 :
     CImplPyMainFunc2(
         CPyWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
-    using SVC_VEC = std::vector< ObjPtr >;
     gint32 OutputCli( CServiceDecl* pSvc );
     gint32 OutputSvr( CServiceDecl* pSvc );
     bool HasEvent( CServiceDecl* pSvc );
-    bool HasAsync( CServiceDecl* pSvc );
 
     gint32 OutputThrdProcCli( CServiceDecl* pSvc );
     gint32 OutputThrdProcSvr( CServiceDecl* pSvc );
@@ -282,7 +303,7 @@ class CExportPyReadme2 :
 {
     public:
     typedef CExportReadme super;
-    CExportPyReadme( CWriterBase* pWriter,
+    CExportPyReadme2( CWriterBase* pWriter,
         ObjPtr& pNode )
         : super( pWriter, pNode )
     {}
