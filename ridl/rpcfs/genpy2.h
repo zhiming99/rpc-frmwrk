@@ -160,9 +160,6 @@ class CImplPyIfSvrBase2
 class CImplPyMthdSvrBase2 :
     public CImplPyMthdSvrBase
 {
-    CMethodDecl* m_pNode = nullptr;
-    CInterfaceDecl* m_pIf = nullptr;
-
     public:
     typedef CImplPyMthdSvrBase super;
     CImplPyMthdSvrBase2(
@@ -292,7 +289,7 @@ class CImplPyMainFunc2 :
     gint32 Output();
     gint32 OutputCli( CServiceDecl* pSvc );
     gint32 OutputSvr( CServiceDecl* pSvc );
-    bool HasEvent( CServiceDecl* pSvc );
+    static bool HasEvent( CServiceDecl* pSvc );
 
     gint32 OutputThrdProcCli( CServiceDecl* pSvc );
     gint32 OutputThrdProcSvr( CServiceDecl* pSvc );

@@ -286,7 +286,7 @@ gint32 EmitPyArgPack(
                 break;
             }
             stdstr strName = pfa->GetName();
-            CCOUT << "    " << strName;
+            CCOUT << strName;
             if( i < dwCount - 1 )
             {
                 CCOUT << ",";
@@ -314,7 +314,7 @@ gint32 EmitPyBuildReqHeader(
     Wa( "    strIfName : str,  " );
     Wa( "    retCode : int," );
     Wa( "    bProxy : bool," );
-    Wa( "    bResp : bool ) -> object" );
+    Wa( "    bResp : bool ) -> object:" );
     INDENT_UPL;
     Wa( "oReq = dict()" );
     CCOUT << "if bProxy :";
@@ -324,6 +324,7 @@ gint32 EmitPyBuildReqHeader(
     CCOUT << "elif bResp :";
     NEW_LINE;
     CCOUT << "    oReq[ \"" << JSON_ATTR_MSGTYPE << "\" ] = \"resp\"";
+    NEW_LINE;
     CCOUT << "    oReq[ \"" << JSON_ATTR_RETCODE << "\" ] = \"retCode\"";
     NEW_LINE;
     CCOUT << "else :";
@@ -390,7 +391,7 @@ static gint32 EmitPySerialReq(
             Wa( "iRet = [ 0, None ]" );
         CCOUT << strDDict << " = dict()";
         NEW_LINE;
-        Wa( "while ret == 0:" );
+        CCOUT << "while ret == 0:";
         INDENT_UPL;
         for( guint32 i = 0; i < dwCount; i++ )
         {
@@ -428,6 +429,7 @@ static gint32 EmitPySerialReq(
             Wa( "    raise Exception( " );
             CCOUT <<  "        \"Error deserialize "
                 << "parameters %d\" \% error  )";
+            NEW_LINE;
         }
 
     }while( 0 );
@@ -440,20 +442,22 @@ void EmitExceptHandler(
     const stdstr errcode = "-errno.EFAULT" )
 {
 
-    Wa( "except Exception as err:" );
-    Wa( "    print( err )" );
+    CCOUT << "except Exception as err:";
+    INDENT_UPL;
+    Wa( "print( err )" );
     if( bNoRet )
     {
         Wa( "return" );
+        INDENT_DOWNL;
         return;
     }
-    Wa( "    if error < 0 :" );
+    Wa( "if error < 0 :" );
     if( !bList )
         Wa( "    return error" );
     else
         Wa( "    return [ error, None ]" );
     CCOUT << "return " << errcode;
-    NEW_LINE;
+    INDENT_DOWNL;
     return;
 }
 
@@ -492,7 +496,8 @@ gint32 EmitPyDeserialReq(
             Wa( "iRet = [ 0, None ]" );
         CCOUT << strDList << "= [ None ] *"
             << std::to_string( dwCount );
-        Wa( "while True:" );
+        NEW_LINE;
+        CCOUT << "while True:";
         INDENT_UPL;
         for( guint32 i = 0; i < dwCount; i++ )
         {
@@ -528,6 +533,7 @@ gint32 EmitPyDeserialReq(
             Wa( "    raise Exception( " );
             CCOUT <<  "        \"Error deserialize "
                 << "parameters %d\" \% error  )";
+            NEW_LINE;
         }
 
     }while( 0 );
@@ -747,8 +753,7 @@ gint32 CDeclarePyStruct2::Output()
         CCOUT << "super().__init__( self )";
         NEW_LINE;
 
-        guint32 i = 0;
-        for( ; i < dwCount; i++ )
+        for( guint32 i = 0; i < dwCount; i++ )
         {
             ObjPtr pObj = pfl->GetChild( i );
             CFieldDecl* pfd = pObj;
@@ -936,7 +941,6 @@ gint32 CDeclarePyStruct2::Output()
 
         CCOUT << "def Serialize( self ) -> [ int, dict ]:";
         INDENT_UPL;
-        NEW_LINE;
         Wa( "osb = serijson.CSerialBase()" );
         Wa( "res = dict()" );
         NEW_LINE;
@@ -947,7 +951,7 @@ gint32 CDeclarePyStruct2::Output()
         Wa( "fields = dict()" );
 
         bool bCheck = false;
-        for( ; i < dwCount; i++ )
+        for( guint32 i = 0; i < dwCount; i++ )
         {
             CFieldDecl* pfd =
                 pfl->GetChild( i );
@@ -969,10 +973,10 @@ gint32 CDeclarePyStruct2::Output()
         if( bCheck )
             Wa( "iRet = [ 0, None ]" );
 
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
         NEW_LINE;
-        for( i = 0; i < dwCount; i++ )
+        for( guint32 i = 0; i < dwCount; i++ )
         {
             CFieldDecl* pfd = pfl->GetChild( i );
             if( pfd == nullptr )
@@ -997,6 +1001,7 @@ gint32 CDeclarePyStruct2::Output()
                 strDest, strField, strSig, true );
             if( ERROR( ret ) )
                 break;
+            NEW_LINE;
         }
         Wa( "break" );
         INDENT_DOWNL;
@@ -1015,7 +1020,7 @@ gint32 CDeclarePyStruct2::Output()
         INDENT_UPL;
         NEW_LINE;
         Wa( "osb = serijson.CSerialBase()" );
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         CCOUT << "ret = osb.DeserialInt32( val[ \""
@@ -1030,9 +1035,9 @@ gint32 CDeclarePyStruct2::Output()
         if( bCheck )
             Wa( "iRet = [ 0, None ]" );
 
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
-        for( i = 0; i < dwCount; i++ )
+        for( guint32 i = 0; i < dwCount; i++ )
         {
             ObjPtr pObj = pfl->GetChild( i );
             CFieldDecl* pfd = pObj;
@@ -1073,7 +1078,7 @@ gint32 CDeclarePyStruct2::Output()
         EmitExceptHandler( m_pWriter,
             true, false, "Err.ERROR_FAIL" );
         Wa( "return 0" );
-        INDENT_DOWNL;
+        INDENT_DOWN;
         INDENT_DOWNL;
 
     }while( 0 );
@@ -1468,10 +1473,11 @@ gint32 CImplPyIfSvrBase2::OutputDispMsg()
 
         stdstr strClass = "I";
         strClass += strIfName + "_SvrImpl";
-        Wa( "_funcMap_ = {" );
-        for( auto& elem : vecMethods )
+        CCOUT << "_funcMap_ = {";
+        INDENT_UPL;
+        for( guint32 i = 0; i < vecMethods.size(); i++ )
         {
-            CMethodDecl* pNode = elem;
+            CMethodDecl* pNode = vecMethods[ i ];
             if( pNode == nullptr )
                 continue;
             stdstr strName = pNode->GetName();
@@ -1479,9 +1485,15 @@ gint32 CImplPyIfSvrBase2::OutputDispMsg()
                 << "\": lambda self, req : "
                 << strClass << "."
                 << strName << "Wrapper( self, req )";
+            if( i < vecMethods.size() - 1 )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
         }
-
-        Wa( "}" );
+        
+        Wa( " }" );
+        INDENT_DOWNL;
 
         CCOUT << "def DispatchMsg( self, oMsg : dict ):";
         INDENT_UPL;
@@ -1533,7 +1545,7 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         Wa( "asynchronous operation and returning other" );
         Wa( "error code will complete the request. if the" );
         Wa( "method returns STATUS_PENDING, make sure to" );
-        CCOUT << "call" << strName << "CompleteCb later to";
+        CCOUT << "call \"" << strName << "CompleteCb\" later to";
         NEW_LINE;
         Wa( "complete the request. Otherwise, the client" );
         Wa( "will get a timeout error. The return value is a" );
@@ -1542,11 +1554,10 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         Wa( "parameters." );
         Wa( "'''" );
         CCOUT << "def " << strName << "( self,";
-        NEW_LINE;
         if( dwInCount > 0 )
         {
-            INDENT_UP;
-            CCOUT << "reqId : object,";
+            CCOUT << " reqId : object,";
+            INDENT_UPL;
             ret = EmitFormalArgListPy(
                 m_pWriter, pInArgs );
             if( ERROR( ret ) )
@@ -1555,10 +1566,9 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         }
         else
         {
-            CCOUT << "    reqId : object";
+            CCOUT << " reqId : object";
         }
-        NEW_LINE;
-        CCOUT << "    ) -> Tuple[ int, list ] :";
+        CCOUT << " ) -> Tuple[ int, list ] :";
         NEW_LINE;
         Wa( "    pass" );
 
@@ -1574,29 +1584,27 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
             CCOUT << ", oReq : dict";
         CCOUT << " ) -> int :";
         INDENT_UPL;
-        NEW_LINE;
 
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         if( dwInCount == 0 )
         {
             CCOUT << "reqId = oReq[ \""
                 << JSON_ATTR_REQCTXID << "\" ]";
+            NEW_LINE;
             CCOUT << "ret = self." << strName << "( reqId );";
+            NEW_LINE;
         }
         else
         {
             CCOUT << "reqId = oReq[ \""
                 << JSON_ATTR_REQCTXID << "\" ]";
+            NEW_LINE;
             Wa( "osb = serijson.CSerialBase()" );
             CCOUT << "oParams = oReq[ \""
                 << JSON_ATTR_PARAMS << "\" ]";
             NEW_LINE;
-            CCOUT << "args = [None] * "
-                << std::to_string( dwInCount );
-            NEW_LINE;
-
             ret = EmitPyDeserialReq( m_pWriter,
                 pInArgs, "args", "oParams" );
             if( ERROR( ret ) )
@@ -1604,6 +1612,7 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
 
             CCOUT << "ret = self."
                 << strName << "( reqId, *args )";
+            NEW_LINE;
         }
 
         if( bNoReply )
@@ -1634,8 +1643,9 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
             CCOUT << " )";
         else
         {
-            CCOUT << "*retArgs )";
+            CCOUT << ", *retArgs )";
         }
+        NEW_LINE;
         Wa( "return ret" );
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
@@ -1664,14 +1674,14 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         }
         CCOUT << " ) -> int :";
         INDENT_UPL;
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         if( dwOutCount > 0 )
         {
             Wa( "if ret == 0 :" );
             Wa( "    resArgs = dict()" );
-            Wa( "else:" );
+            CCOUT << "else:";
             INDENT_UPL;
             EmitPyArgPack( m_pWriter, pOutArgs, "argPack" );
             ret = EmitPySerialReq( m_pWriter,
@@ -1690,10 +1700,10 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         NEW_LINE;
         CCOUT << "    \"" << JSON_ATTR_IFNAME1 << "\",";
         NEW_LINE;
-        Wa( "    ret, false, true );" );
-        CCOUT << "    oResp[ \""
+        Wa( "    ret, False, True )" );
+        CCOUT << "oResp[ \""
             << JSON_ATTR_PARAMS<< "\" ] = resArgs";
-
+        NEW_LINE;
         Wa( "self.sendResp( oResp )" );
         Wa( "return ret" );
 
@@ -1730,7 +1740,7 @@ gint32 CImplPyMthdSvrBase2::OutputEvent()
             NEW_LINE;
             CCOUT << "\"" << strIfName << "\",";
             NEW_LINE;
-            CCOUT << "0, false, false )";
+            CCOUT << "0, False, False )";
             NEW_LINE;
             CCOUT << "oEvent[ \""
                 << JSON_ATTR_PARAMS<< "\" ] = []";
@@ -1747,8 +1757,8 @@ gint32 CImplPyMthdSvrBase2::OutputEvent()
             break;
 
         CCOUT << ")->int:";
-        INDENT_UPL;
-        Wa( "try:" );
+        NEW_LINE;
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "osb = serijson.CSerialBase()" );
@@ -1761,21 +1771,21 @@ gint32 CImplPyMthdSvrBase2::OutputEvent()
 
         Wa( "reqId = random.randint( 0, 0x100000000 )" );
         Wa( "oEvent = BuildReqHeader( reqId," );
-        CCOUT << "\"" << strName << "\",";
+        CCOUT << "    \"" << strName << "\",";
         NEW_LINE;
-        CCOUT << "\"" << strIfName << "\",";
+        CCOUT << "    \"" << strIfName << "\",";
         NEW_LINE;
-        CCOUT << "0, false, false";
+        CCOUT << "    0, False, False )";
         NEW_LINE;
         CCOUT << "oEvent[ \""
             << JSON_ATTR_PARAMS<< "\" ] = resArgs";
         NEW_LINE;
 
         Wa( "self.sendEvent( oEvent )" );
-        Wa( "return 0" );
-        INDENT_DOWNL;
+        CCOUT << "return 0";
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
+        INDENT_DOWNL;
 
     }while( 0 );
 
@@ -1852,21 +1862,24 @@ gint32 CImplPyIfProxyBase2::OutputDispMsg()
         for( ; i < pmds->GetCount(); i++ )
         {
             ObjPtr pObj = pmds->GetChild( i );
-            vecMethods.push_back( pObj );
+            CMethodDecl* pNode = pObj;
+            if( pNode->IsEvent() || g_bAsyncProxy )
+                vecMethods.push_back( pObj );
         }
 
         if( vecMethods.empty() )
         {
-            ret = -ENOENT;
+            ret = 0;
             break;
         }
 
         stdstr strClass = "I";
         strClass += strIfName + "_CliImpl";
-        Wa( "_funcMap_ = {" );
-        for( auto& elem : vecMethods )
+        CCOUT << "_funcMap_ = {";
+        INDENT_UPL;
+        for( guint32 i = 0; i < vecMethods.size(); i++ )
         {
-            CMethodDecl* pNode = elem;
+            CMethodDecl* pNode = vecMethods[ i ];
             stdstr strName = pNode->GetName();
             if( pNode->IsEvent() )
             {
@@ -1882,9 +1895,15 @@ gint32 CImplPyIfProxyBase2::OutputDispMsg()
                     << strClass << "."
                     << strName << "CbWrapper( self, req )";
             }
+            if( i < vecMethods.size() - 1 )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
         }
-
-        Wa( "}" );
+        
+        Wa( " }" );
+        INDENT_DOWNL;
 
         CCOUT << "def DispatchMsg( self, oMsg : dict ):";
         INDENT_UPL;
@@ -1971,7 +1990,7 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
         CCOUT << "def " << strName
             << "Wrapper( self, oEvent : object ) :";
         INDENT_UPL;
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         CCOUT << "evtId = oEvent[ \""
@@ -1980,7 +1999,6 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
         if( dwInCount == 0 )
         {
             CCOUT << "self." << strName << "( evtId )";
-            NEW_LINE;
         }
         else
         {
@@ -1999,9 +2017,10 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
             CCOUT << "self."
                 << strName << "( evtId, *evtArgs )";
         }
+        NEW_LINE;
+        CCOUT << "return";
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false, true );
-        Wa( "return" );
         INDENT_DOWNL;
         NEW_LINE;
 
@@ -2041,11 +2060,11 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
                 break;
 
             CCOUT << ")->[ int, list ]:";
-            NEW_LINE;
+            INDENT_DOWNL;
         }
 
         INDENT_UPL;
-        Wa( "try" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "oReq = dict()" );
@@ -2166,7 +2185,6 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, true );
         INDENT_DOWNL;
-        INDENT_DOWNL;
 
     }while( 0 );
 
@@ -2214,7 +2232,7 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
             << "CbWrapper( self, oResp : object ) : ";
 
         INDENT_UPL;
-        Wa( "try" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
 
@@ -2251,6 +2269,7 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
         if( dwOutCount == 0 )
         {
             CCOUT << "self." << strName << "Callback( retCode, reqIdr )";
+            NEW_LINE;
             Wa( "return" );
         }
         else
@@ -2271,12 +2290,12 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
             INDENT_DOWNL; // retcode == 0
             CCOUT << "self." << strName
                 << "Callback( retCode, reqIdr, *args )";
+            NEW_LINE;
             Wa( "return" );
         }
 
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, true, false );
-        INDENT_DOWNL;
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2328,9 +2347,9 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
                 continue;
             }
             CInterfaceDecl* pifd = pObj;
-            stdstr strIf = pifd->GetName();
+            stdstr strIfName = pifd->GetName();
 
-            CCOUT << "C" << strIf << "svr";
+            CCOUT << "C" << strIfName << "svr";
             if( i < dwCount - 1 )
             {
                 CCOUT << ",";
@@ -2346,10 +2365,10 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         Wa( "error = 0" );
         Wa( "self.m_strPath = strSvcPoint" );
         Wa( "reqFile = strSvcPoint + \"/jreq_0\"" );
-        Wa( "self.m_reqFp = open( reqFile, \"rb\"" );
+        Wa( "self.m_reqFp = open( reqFile, \"rb\" )" );
         Wa( "respFile = strSvcPoint + \"/jrsp_0\"" );
-        Wa( "self.m_respFp = open( respFile, \"rb\"" );
-        Wa( "self.m_bExit = false" );
+        Wa( "self.m_respFp = open( respFile, \"rb\" )" );
+        Wa( "self.m_bExit = False" );
         Wa( "self.m_oLock = threading.lock()" );
         INDENT_DOWNL;
         
@@ -2357,7 +2376,7 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         Wa( "    self.m_oLock.acquire()" );
         Wa( "    bExit = self.bExit" );
         Wa( "    self.m_oLock.release()" );
-        Wa( "    return bExit: " );
+        Wa( "    return bExit; " );
 
         Wa( "def SetExit() -> bool:" );
         Wa( "    self.m_oLock.acquire()" );
@@ -2378,7 +2397,7 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
 
         CCOUT << "def DispatchMsg( self, oReq : dict ):";
         INDENT_UPL;
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
 
@@ -2395,9 +2414,9 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
             }
             CInterfaceDecl* pifd = pObj;
             stdstr strIfName = pifd->GetName();
-            CCOUT << "if strIf == oReq[ \""
+            CCOUT << "if \"" << strIfName << "\" == oReq[ \""
                << JSON_ATTR_IFNAME1 << "\" ] :";
-
+            NEW_LINE;
             stdstr strClass = "I";
             strClass += strIfName + "_SvrImpl";
             CCOUT << "    " << strClass << ".DispatchMsg( self, oMsg )";
@@ -2409,6 +2428,7 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false, true );
         INDENT_DOWNL;
+        INDENT_DOWNL; // class
 
     }while( 0 );
 
@@ -2480,8 +2500,7 @@ gint32 CImplPyIfSvr2::Output()
         stdstr strIfName = m_pNode->GetName();
         CCOUT << "class C" << strIfName << "svr( I"
             << strIfName << "_SvrImpl ):";
-        INDENT_UP;
-        NEW_LINES( 2 );
+        INDENT_UPL;
         bool bHasMethod = false;
         ObjPtr pObj = m_pNode->GetMethodList();
         std::vector< ObjPtr > vecMethods;
@@ -2500,7 +2519,7 @@ gint32 CImplPyIfSvr2::Output()
                 continue;
 
             bHasMethod = true;
-            CImplPyMthdSvr oms( m_pWriter, elem );
+            CImplPyMthdSvr2 oms( m_pWriter, elem );
             oms.Output();
         }
 
@@ -2608,8 +2627,7 @@ gint32 CImplPyIfProxy2::Output()
         stdstr strIfName = m_pNode->GetName();
         CCOUT << "class C" << strIfName << "cli( I"
              << strIfName << "_CliImpl ):";
-        INDENT_UP;
-        NEW_LINES( 2 );
+        INDENT_UPL;
         ObjPtr pObj = m_pNode->GetMethodList();
         std::vector< ObjPtr > vecMethods;
         CMethodDecls* pmds = pObj;
@@ -2734,7 +2752,7 @@ gint32 CImplPyMthdProxy2::OutputEvent()
 
         if( dwInCount > 0 )
         {
-            CCOUT << "def " << strName << "( self, evtId : int"; 
+            CCOUT << "def " << strName << "( self, evtId : int,"; 
             INDENT_UPL;
 
             ret = EmitFormalArgListPy(
@@ -2811,9 +2829,9 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
                 continue;
             }
             CInterfaceDecl* pifd = pObj;
-            stdstr strIf = pifd->GetName();
+            stdstr strIfName = pifd->GetName();
 
-            CCOUT << "C" << strIf << "cli";
+            CCOUT << "C" << strIfName << "cli";
             if( i < dwCount - 1 )
             {
                 CCOUT << ",";
@@ -2827,12 +2845,12 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         INDENT_UPL;
         Wa( "self.m_strPath = strSvcPoint" );
         Wa( "reqFile = strSvcPoint + \"/jreq_0\"" );
-        Wa( "self.m_reqFp = open( reqFile, \"rb\"" );
+        Wa( "self.m_reqFp = open( reqFile, \"rb\" )" );
         Wa( "respFile = strSvcPoint + \"/jrsp_0\"" );
-        Wa( "self.m_respFp = open( respFile, \"rb\"" );
+        Wa( "self.m_respFp = open( respFile, \"rb\" )" );
         Wa( "evtFile = strSvcPoint + \"/jevt_0\"" );
-        Wa( "self.m_evtFp = open( evtFile, \"rb\"" );
-        Wa( "self.m_bExit = false" );
+        Wa( "self.m_evtFp = open( evtFile, \"rb\" )" );
+        Wa( "self.m_bExit = False" );
         Wa( "self.m_oLock = threading.lock()" );
         INDENT_DOWNL;
         
@@ -2840,7 +2858,7 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         Wa( "    self.m_oLock.acquire()" );
         Wa( "    bExit = self.bExit" );
         Wa( "    self.m_oLock.release()" );
-        Wa( "    return bExit: " );
+        Wa( "    return bExit; " );
 
         Wa( "def SetExit() -> bool:" );
         Wa( "    self.m_oLock.acquire()" );
@@ -2864,7 +2882,7 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
 
         CCOUT << "def DispatchMsg( self, oResp : dict ):";
         INDENT_UPL;
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
 
@@ -2881,9 +2899,9 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
             }
             CInterfaceDecl* pifd = pObj;
             stdstr strIfName = pifd->GetName();
-            CCOUT << "if strIf == oResp[ \""
+            CCOUT << "if \"" << strIfName << "\" == oResp[ \""
                << JSON_ATTR_IFNAME1 << "\" ] :";
-
+            NEW_LINE;
             stdstr strClass = "I";
             strClass += strIfName + "_CliImpl";
             CCOUT << "    " << strClass << ".DispatchMsg( self, oMsg )";
@@ -2895,7 +2913,7 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false, true );
         INDENT_DOWNL;
-        NEW_LINE;
+        INDENT_DOWNL;
     }while( 0 );
 
     return ret;
@@ -2972,7 +2990,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
 
         Wa( "class ListeningThread(threading.Thread):" );
         INDENT_UPL;
-        Wa( "def __init__(self , threadName, oSvr ): )" );
+        Wa( "def __init__(self , threadName, oSvr ):" );
         Wa( "    super(ListeningThread,self).__init__(name=threadName)" );
         Wa( "    self.m_oSvr = oSvr" );
         NEW_LINE;
@@ -2980,9 +2998,9 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "    return self.handleReqs()" );
 
         NEW_LINE;
-        Wa( "def handleReqs( self ):" );
+        CCOUT << "def handleReqs( self ):";
         INDENT_UPL;
-        Wa( "try:" ); 
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "fps = []" );
@@ -2990,7 +3008,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "fp = self.m_oSvr.getReqFp()" );
         Wa( "fps.append( fp )" );
         Wa( "fmap[ fp.fileno ] = lambda oSvr, oMsg : oSvr.DispatchMsg( oMsg )" );
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
         Wa( "ioevents = select.select( fps, [], [] )" );
         Wa( "readable = ioevents[ 0 ]" );
@@ -3004,13 +3022,13 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "    fmap[ s.fileno ]( self.m_oSvr, oMsg )" );
         Wa( "bExit = self.m_oSvr.IsExit()" );
         Wa( "if bExit: " );
-        Wa( "    break" );
-        INDENT_DOWNL;
-        INDENT_DOWNL;
+        CCOUT <<"    break";
+        INDENT_DOWN;
+        INDENT_DOWN;
 
         INDENT_DOWNL;// try
         EmitExceptHandler( m_pWriter, false, true );
-        INDENT_DOWNL;// run
+        INDENT_DOWN;// run
         INDENT_DOWNL;// class
 
     }while( 0 );
@@ -3028,13 +3046,13 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
             break;
 
         Wa( "class MessageThread(threading.Thread):" );
-        Wa( "    def __init__(self , threadName, oProxy ): )" );
+        Wa( "    def __init__(self , threadName, oProxy ):" );
         Wa( "        super(MessageThread,self).__init__(name=threadName)" );
         Wa( "        self.m_oProxy = oProxy" );
         INDENT_UPL;
-        Wa( "def run(self):" );
+        CCOUT << "def run(self):";
         INDENT_UPL;
-        Wa( "try:" ); 
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "fps = []" );
@@ -3051,7 +3069,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
             Wa( "fps.append( fp )" );
             Wa( "fmap[ fp.fileno ] = lambda oProxy, oMsg : oProxy.DispatchMsg( oMsg )" );
         }
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
         Wa( "ioevents = select.select( fps, [], [] )" );
         Wa( "readable = ioevents[ 0 ]" );
@@ -3065,13 +3083,13 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         Wa( "    fmap[ s.fileno ]( self.m_oProxy, oMsg )" );
         Wa( "bExit = self.m_oSvr.IsExit()" );
         Wa( "if bExit: " );
-        Wa( "    break" );
-        INDENT_DOWNL;
-        INDENT_DOWNL;
+        CCOUT << "    break";
+        INDENT_DOWN;
+        INDENT_DOWN;
 
         INDENT_DOWNL;// try
         EmitExceptHandler( m_pWriter, false, true );
-        INDENT_DOWNL;// run
+        INDENT_DOWN;// run
         INDENT_DOWNL;// class
 
     }while( 0 );
@@ -3083,17 +3101,16 @@ gint32 CImplPyMainFunc2::OutputCli(
 {
     gint32 ret = 0;
     do{
-        NEW_LINES( 2 );
+        NEW_LINE;
 
         bool bHasEvent = HasEvent( pSvc );
         if( bHasEvent || g_bAsyncProxy )
             OutputThrdProcCli( pSvc );
 
-        NEW_LINE;
         CCOUT << "def maincli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "strSvcPt = sys.argv[ 1 ]" );
@@ -3107,7 +3124,7 @@ gint32 CImplPyMainFunc2::OutputCli(
         if( bHasEvent || g_bAsyncProxy )
         {
             CCOUT << "oMsgThrd = MessageThread( \""
-                << pSvc->GetName() <<"cliMsg\", oProxy";
+                << pSvc->GetName() <<"cliMsg\", oProxy )";
             NEW_LINE;
             Wa( "oMsgThrd.start()" );
             NEW_LINE;
@@ -3228,23 +3245,21 @@ gint32 CImplPyMainFunc2::OutputSvr(
 {
     gint32 ret = 0;
     do{
-        NEW_LINES( 2 );
+        NEW_LINE;
 
         bool bHasEvent = HasEvent( pSvc );
         OutputThrdProcSvr( pSvc );
 
-        NEW_LINE;
-        CCOUT << "def maincli() :";
+        CCOUT << "def mainsvr() :";
         INDENT_UPL;
-        Wa( "ret = 0" );
-        Wa( "try:" );
+        CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "strSvcPt = sys.argv[ 1 ]" );
         Wa( "print( \"start to work here...\" )" );
 
         stdstr strName = pSvc->GetName();
-        CCOUT << "oSvr = C" << strName << "Proxy(";
+        CCOUT << "oSvr = C" << strName << "Server(";
         NEW_LINE;
         Wa( "    strPath_ )" );
 
@@ -3269,7 +3284,7 @@ gint32 CImplPyMainFunc2::OutputSvr(
 
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
-        Wa( "return ret" );
+        Wa( "return 0" );
         INDENT_DOWNL;
         Wa( "ret = mainsvr()" );
         Wa( "quit( ret )" );
