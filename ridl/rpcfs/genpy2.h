@@ -284,15 +284,19 @@ class CImplPyMainFunc2 :
     public:
     typedef CMethodWriter super;
 
+    using SVC_VEC = std::vector< ObjPtr >;
+
     CImplPyMainFunc2(
         CPyWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
-    gint32 OutputCli( CServiceDecl* pSvc );
-    gint32 OutputSvr( CServiceDecl* pSvc );
-    static bool HasEvent( CServiceDecl* pSvc );
+    gint32 OutputCli( SVC_VEC& vecSvcs );
+    gint32 OutputSvr( SVC_VEC& vecSvcs );
 
-    gint32 OutputThrdProcCli( CServiceDecl* pSvc );
-    gint32 OutputThrdProcSvr( CServiceDecl* pSvc );
+    static bool HasEvent( CServiceDecl* pSvc );
+    static bool HasEvent( SVC_VEC& vecSvcs );
+
+    gint32 OutputThrdProcCli( SVC_VEC& vecSvcs );
+    gint32 OutputThrdProcSvr( SVC_VEC& vecSvcs );
 };
 
 class CExportPyReadme2 :

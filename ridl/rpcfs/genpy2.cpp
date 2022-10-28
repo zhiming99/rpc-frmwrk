@@ -494,8 +494,7 @@ gint32 EmitPyDeserialReq(
 
         if( bCheck )
             Wa( "iRet = [ 0, None ]" );
-        CCOUT << strDList << "= [ None ] *"
-            << std::to_string( dwCount );
+        CCOUT << strDList << "= [ None ] *" << dwCount;
         NEW_LINE;
         CCOUT << "while True:";
         INDENT_UPL;
@@ -1622,8 +1621,7 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         Wa( "iRet = ret[ 0 ]" );
         Wa( "retArgs = ret[ 1 ]" );
         Wa( "if iRet < 0:" );
-        CCOUT << "    retArgs = [ None ] * "
-            << std::to_string( dwOutCount );
+        CCOUT << "    retArgs = [ None ] * " << dwOutCount;
         NEW_LINE;
         CCOUT << "ret = self." << strName << "CompleteCb("
             << "iRet, reqId";
@@ -1974,6 +1972,7 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
         CCOUT << " ) :";
         NEW_LINE;
         Wa( "    pass" );
+        NEW_LINE;
 
         CCOUT << "def " << strName
             << "Wrapper( self, oEvent : object ) :";
@@ -1995,7 +1994,7 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
                 << JSON_ATTR_PARAMS << "\" ]";
             NEW_LINE;
             CCOUT << "evtArgs = [None] * "
-                << std::to_string( dwInCount );
+                << dwInCount;
             NEW_LINE;
 
             ret = EmitPyDeserialReq( m_pWriter,
@@ -2009,7 +2008,7 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
         CCOUT << "return";
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false, true );
-        INDENT_DOWNL;
+        INDENT_DOWN;
         NEW_LINE;
 
     }while( 0 );
@@ -2048,7 +2047,7 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
                 break;
 
             CCOUT << ")->[ int, list ]:";
-            INDENT_DOWNL;
+            INDENT_DOWN;
         }
 
         INDENT_UPL;
@@ -2151,16 +2150,16 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
 
             if( dwOutCount == 0 )
             {
-                Wa( "return [ retCode, [] );" );
+                Wa( "return [ retCode, [] ]" );
             }
             else
             {
                 Wa( "if retCode < 0:" );
-                Wa( "    return [ retCode, None ];" );
-                Wa( "else:" );
+                Wa( "    return [ retCode, None ]" );
+                CCOUT << "else:";
                 INDENT_UPL;
-                CCOUT << "args = [ None ] *"
-                    << std::to_string( dwOutCount );
+                CCOUT << "args = [ None ] *" << dwOutCount;
+                NEW_LINE;
                 CCOUT << "oParams = oResp[ \""
                     << JSON_ATTR_PARAMS << "\" ]";
                 NEW_LINE;
@@ -2963,20 +2962,20 @@ CImplPyMainFunc2::CImplPyMainFunc2(
 }
 
 gint32 CImplPyMainFunc2::OutputThrdProcSvr(
-    CServiceDecl* pSvc )
+    SVC_VEC& vecSvcs )
 {
     gint32 ret = 0;
     do{
-        bool bHasEvt = HasEvent( pSvc );
+        bool bHasEvt = HasEvent( vecSvcs );
         bool bAsync = g_bAsyncProxy;
         if( !bHasEvt && !bAsync )
             break;
 
         CCOUT << "class SvrReqThread(threading.Thread):";
         INDENT_UPL;
-        Wa( "def __init__(self , threadName, oSvr ):" );
+        Wa( "def __init__(self , threadName, oSvrs ):" );
         Wa( "    super(SvrReqThread,self).__init__(name=threadName)" );
-        Wa( "    self.m_oSvr = oSvr" );
+        Wa( "    self.m_oSvrs = oSvrs" );
         Wa( "    self.m_bExit = False" );
         Wa( "    self.m_oLock = threading.lock()" );
 
@@ -3006,9 +3005,17 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "error = 0" );
         Wa( "fps = []" );
         Wa( "fMap = dict()" );
-        Wa( "fp = self.m_oSvr.getReqFp()" );
-        Wa( "fps.append( fp )" );
-        Wa( "fmap[ fp.fileno ] = lambda oSvr, oMsg : oSvr.DispatchMsg( oMsg )" );
+
+        for( guint32 i = 0; i < vecSvcs.size(); i++ )
+        {
+            CCOUT << "oSvr = self.m_oSvrs[ " << i << " ]";
+            NEW_LINE;
+            Wa( "fp = oSvr.getReqFp()" );
+            Wa( "fps.append( fp )" );
+            CCOUT << "fmap[ fp.fileno ] = " << i;
+            NEW_LINES( 2 );
+        }
+
         CCOUT << "while True:";
         INDENT_UPL;
         Wa( "ioevents = select.select( fps, [], [] )" );
@@ -3020,7 +3027,8 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "    error = ret[ 0 ]" );
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
-        Wa( "    fmap[ s.fileno ]( self.m_oSvr, oMsg )" );
+        Wa( "    idx = fmap[ s.fileno ]" );
+        Wa( "    self.m_oSvrs[ i ].DispatchMsg( oMsg )" );
         Wa( "bExit = self.IsExiting()" );
         Wa( "if bExit: " );
         CCOUT <<"    break";
@@ -3037,19 +3045,19 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
 }
 
 gint32 CImplPyMainFunc2::OutputThrdProcCli(
-    CServiceDecl* pSvc )
+    SVC_VEC& vecSvcs )
 {
     gint32 ret = 0;
     do{
-        bool bHasEvt = HasEvent( pSvc );
+        bool bHasEvt = HasEvent( vecSvcs );
         bool bAsync = g_bAsyncProxy;
         if( !bHasEvt && !bAsync )
             break;
 
         Wa( "class CliEvtThread(threading.Thread):" );
-        Wa( "    def __init__(self , threadName, oProxy ):" );
+        Wa( "    def __init__(self , threadName, oProxies ):" );
         Wa( "        super(CliEvtThread,self).__init__(name=threadName)" );
-        Wa( "        self.m_oProxy = oProxy" );
+        Wa( "        self.m_oProxies = oProxies" );
         Wa( "        self.m_bExit = False" );
         Wa( "        self.m_oLock = threading.lock()" );
         INDENT_UPL;
@@ -3074,17 +3082,30 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         Wa( "error = 0" );
         Wa( "fps = []" );
         Wa( "fMap = dict()" );
-        if( bHasEvt )
+        for( guint32 i = 0; i < vecSvcs.size(); i++ )
         {
-            Wa( "fp = self.m_oProxy.getEvtFp()" );
-            Wa( "fps.append( fp )" );
-            Wa( "fmap[ fp.fileno ] = lambda oProxy, oMsg : oProxy.DispatchMsg( oMsg )" );
-        }
-        if( g_bAsyncProxy )
-        {
-            Wa( "fp = self.m_oProxy.getRespFp()" );
-            Wa( "fps.append( fp )" );
-            Wa( "fmap[ fp.fileno ] = lambda oProxy, oMsg : oProxy.DispatchMsg( oMsg )" );
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            bHasEvt = HasEvent( pSvc );
+            if( !bHasEvt && !g_bAsyncProxy )
+                continue;
+            CCOUT << "oProxy = self.m_oProxies[ " << i << " ]";
+            NEW_LINE;
+            if( bHasEvt )
+            {
+                Wa( "fp = oProxy.getEvtFp()" );
+                Wa( "fps.append( fp )" );
+                CCOUT << "fmap[ fp.fileno ] = " << i;
+                NEW_LINE;
+            }
+            if( g_bAsyncProxy )
+            {
+                NEW_LINE;
+                Wa( "fp = oProxy.getRespFp()" );
+                Wa( "fps.append( fp )" );
+                CCOUT << "fmap[ fp.fileno ] = " << i;
+                NEW_LINE;
+            }
+            NEW_LINE;
         }
         CCOUT << "while True:";
         INDENT_UPL;
@@ -3097,7 +3118,8 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         Wa( "    error = ret[ 0 ]" );
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
-        Wa( "    fmap[ s.fileno ]( self.m_oProxy, oMsg )" );
+        Wa( "    idx = fmap[ s.fileno ]" );
+        Wa( "    self.m_oProxies[ idx ].DispatchMsg( oMsg )" );
         Wa( "bExit = self.IsExiting()" );
         Wa( "if bExit: " );
         CCOUT << "    break";
@@ -3114,15 +3136,15 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
 }
 
 gint32 CImplPyMainFunc2::OutputCli(
-    CServiceDecl* pSvc )
+    SVC_VEC& vecSvcs )
 {
     gint32 ret = 0;
     do{
         NEW_LINE;
 
-        bool bHasEvent = HasEvent( pSvc );
+        bool bHasEvent = HasEvent( vecSvcs );
         if( bHasEvent || g_bAsyncProxy )
-            OutputThrdProcCli( pSvc );
+            OutputThrdProcCli( vecSvcs );
 
         CCOUT << "def maincli() :";
         INDENT_UPL;
@@ -3130,18 +3152,31 @@ gint32 CImplPyMainFunc2::OutputCli(
         CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
-        Wa( "strSvcPt = sys.argv[ 1 ]" );
-        Wa( "print( \"start to work here...\" )" );
+        Wa( "oProxies = []" );
 
-        stdstr strName = pSvc->GetName();
-        CCOUT << "oProxy = C" << strName << "Proxy(";
+        Wa( "'''" );
+        Wa( "Note: this is a reference design" );
+        Wa( "you are encouraged to make changes" );
+        Wa( "for your own purpse" );
+        Wa( "'''" );
         NEW_LINE;
-        Wa( "    strSvcPt )" );
+        Wa( "print( \"start to work here...\" )" );
+        for( guint32 i = 0; i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            CCOUT << "strSvcPt = sys.argv[ " << i + 1 << " ]";
+            NEW_LINE;
+            stdstr strName = pSvc->GetName();
+            CCOUT << "oProxy = C" << strName << "Proxy(";
+            NEW_LINE;
+            Wa( "    strSvcPt )" );
+            Wa( "oProxies.append( oProxy )" );
+        }
         
         if( bHasEvent || g_bAsyncProxy )
         {
             CCOUT << "oMsgThrd = CliEvtThread( \""
-                << pSvc->GetName() <<"cliThrd\", oProxy )";
+                << g_strAppName <<"cliThrd\", oProxies )";
             NEW_LINE;
             Wa( "oMsgThrd.start()" );
             NEW_LINE;
@@ -3151,6 +3186,11 @@ gint32 CImplPyMainFunc2::OutputCli(
         Wa( "adding your code here" );
 
         std::vector< ObjPtr > vecIfs;
+        CServiceDecl* pSvc = vecSvcs.front();
+
+        CCOUT << "using '" <<
+            pSvc->GetName() << "' as an example";
+
         pSvc->GetIfRefs( vecIfs );
         if( vecIfs.empty() )
         {
@@ -3258,30 +3298,46 @@ gint32 CImplPyMainFunc2::OutputCli(
 }
 
 gint32 CImplPyMainFunc2::OutputSvr(
-    CServiceDecl* pSvc )
+    SVC_VEC& vecSvcs )
 {
     gint32 ret = 0;
     do{
         NEW_LINE;
 
-        bool bHasEvent = HasEvent( pSvc );
-        OutputThrdProcSvr( pSvc );
+        bool bHasEvent = HasEvent( vecSvcs );
+        OutputThrdProcSvr( vecSvcs );
 
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
         Wa( "error = 0" );
-        Wa( "strSvcPt = sys.argv[ 1 ]" );
-        Wa( "print( \"start to work here...\" )" );
+        Wa( "oSvrs = []" );
 
-        stdstr strName = pSvc->GetName();
-        CCOUT << "oSvr = C" << strName << "Server(";
         NEW_LINE;
-        Wa( "    strSvcPt )" );
+        Wa( "'''" );
+        Wa( "Note: this is a reference design" );
+        Wa( "you are encouraged to make changes" );
+        Wa( "for your own purpse" );
+        Wa( "'''" );
+
+        NEW_LINE;
+        Wa( "print( \"start to work here...\" )" );
+        for( guint32 i = 0; i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            CCOUT << "strSvcPt = sys.argv[ "<< i + 1 << " ]";
+            NEW_LINE;
+            stdstr strName = pSvc->GetName();
+            CCOUT << "oSvr = C" << strName << "Server(";
+            NEW_LINE;
+            Wa( "    strSvcPt )" );
+            Wa( "oSvrs.append( oSvr )" );
+            NEW_LINE;
+        }
 
         CCOUT << "oSvrThrd = SvrReqThread( \""
-            << pSvc->GetName() <<"SvrThrd\", oSvr )";
+            << g_strAppName <<"SvrThrd\", oSvrs )";
         NEW_LINE;
         if( bHasEvent)
         {
@@ -3342,7 +3398,7 @@ gint32 CImplPyMainFunc2::Output()
                 << "Proxy";
             NEW_LINE;
         }
-        ret = OutputCli( vecSvcs.front() );
+        ret = OutputCli( vecSvcs );
         if( ERROR( ret ) )
             break;
 
@@ -3357,7 +3413,7 @@ gint32 CImplPyMainFunc2::Output()
                 << "Server";
             NEW_LINE;
         }
-        ret = OutputSvr( vecSvcs.front() );
+        ret = OutputSvr( vecSvcs );
         if( ERROR( ret ) )
             break;
 
@@ -3408,6 +3464,23 @@ bool CImplPyMainFunc2::HasEvent(
         }
 
     }while( 0 );
+    return bEvent;
+}
+
+bool CImplPyMainFunc2::HasEvent(
+    SVC_VEC& vecSvcs )
+{
+    gint32 ret = 0;
+    bool bEvent = false;
+    for( auto& elem : vecSvcs )
+    {
+        CServiceDecl* pSvc = elem;
+        if( HasEvent( pSvc ) )
+        {
+            bEvent = true;
+            break;
+        }
+    }
     return bEvent;
 }
 
