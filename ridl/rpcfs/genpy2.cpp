@@ -1539,19 +1539,7 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         bool bNoReply = m_pNode->IsNoReply();
 
         Wa( "'''" );
-        Wa( "Request handler" );
-        Wa( "within which to run the business logic." );
-        Wa( "Returning Err.STATUS_PENDING for an" );
-        Wa( "asynchronous operation and returning other" );
-        Wa( "error code will complete the request. if the" );
-        Wa( "method returns STATUS_PENDING, make sure to" );
-        CCOUT << "call \"" << strName << "CompleteCb\" later to";
-        NEW_LINE;
-        Wa( "complete the request. Otherwise, the client" );
-        Wa( "will get a timeout error. The return value is a" );
-        Wa( "list, with the first element as error code and" );
-        Wa( "the second element as a list of the response" );
-        Wa( "parameters." );
+        Wa( "Request handler placeholder" );
         Wa( "'''" );
         CCOUT << "def " << strName << "( self,";
         if( dwInCount > 0 )
@@ -1696,9 +1684,9 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         }
 
         Wa( "oResp = BuildReqHeader( reqId," );
-        CCOUT << "    \"" << JSON_ATTR_METHOD << "\",";
+        CCOUT << "    \"" << strName << "\",";
         NEW_LINE;
-        CCOUT << "    \"" << JSON_ATTR_IFNAME1 << "\",";
+        CCOUT << "    \"" << strIfName << "\",";
         NEW_LINE;
         Wa( "    ret, False, True )" );
         CCOUT << "oResp[ \""
@@ -2360,7 +2348,7 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
 
         CCOUT << " ) :";
         NEW_LINE;
-        Wa( "def __init__( self, strSvcPoint : str ) :" );
+        CCOUT << "def __init__( self, strSvcPoint : str ) :";
         INDENT_UPL;
         Wa( "error = 0" );
         Wa( "self.m_strPath = strSvcPoint" );
@@ -2368,32 +2356,23 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         Wa( "self.m_reqFp = open( reqFile, \"rb\" )" );
         Wa( "respFile = strSvcPoint + \"/jrsp_0\"" );
         Wa( "self.m_respFp = open( respFile, \"rb\" )" );
-        Wa( "self.m_bExit = False" );
-        Wa( "self.m_oLock = threading.lock()" );
         INDENT_DOWNL;
         
-        Wa( "def IsExit() -> bool:" );
-        Wa( "    self.m_oLock.acquire()" );
-        Wa( "    bExit = self.bExit" );
-        Wa( "    self.m_oLock.release()" );
-        Wa( "    return bExit; " );
-
-        Wa( "def SetExit() -> bool:" );
-        Wa( "    self.m_oLock.acquire()" );
-        Wa( "    self.m_bExit = True" );
-        Wa( "    self.m_oLock.release()" );
-
         Wa( "def sendResp( self, oResp : object ) -> int:" );
         Wa( "    return iolib.sendResp( self.m_respFp, oResp )" );
+        NEW_LINE;
 
         Wa( "def sendEvent( self, oEvent : object ) -> int:" );
         Wa( "    return iolib.sendEvent( self.m_respFp, oEvent )" );
+        NEW_LINE;
 
         Wa( "def recvReq( self, oReq : object ) -> [ int, object ]:" );
         Wa( "    return iolib.recvReq( self.m_reqFp, oReq )" );
+        NEW_LINE;
 
         Wa( "def getReqFp( self, oReq : object ) ->  object:" );
         Wa( "    return self.m_reqFp" );
+        NEW_LINE;
 
         CCOUT << "def DispatchMsg( self, oReq : dict ):";
         INDENT_UPL;
@@ -2556,15 +2535,28 @@ gint32 CImplPyMthdSvr2::Output()
     gint32 ret = 0;
 
     do{
+        CMethodDecl* pmd = m_pNode;
+        stdstr strName = pmd->GetName();
+
         Wa( "'''" );
         if( m_pNode->IsAsyncs() )
             Wa( "Asynchronous request handler" );
         else
             Wa( "Synchronous request handler" );
+        Wa( "within which to run the business logic." );
+        Wa( "Returning Err.STATUS_PENDING for an" );
+        Wa( "asynchronous operation and returning other" );
+        Wa( "error code will complete the request. if the" );
+        Wa( "method returns STATUS_PENDING, make sure to" );
+        CCOUT << "call \"self." << strName << "CompleteCb\" later to";
+        NEW_LINE;
+        Wa( "complete the request. Otherwise, the client" );
+        Wa( "will get a timeout error. The return value is a" );
+        Wa( "list, with the first element as error code and" );
+        Wa( "the second element as a list of the response" );
+        Wa( "parameters." );
         Wa( "'''" );
 
-        CMethodDecl* pmd = m_pNode;
-        stdstr strName = pmd->GetName();
         ObjPtr pInArgs = pmd->GetInArgs();
         guint32 dwInCount =
             GetArgCount( pInArgs );
@@ -2769,7 +2761,7 @@ gint32 CImplPyMthdProxy2::OutputEvent()
 
         Wa( ") :" );
 
-        Wa( "return" );
+        CCOUT << "return";
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2841,7 +2833,7 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
 
         CCOUT << ") :";
         NEW_LINE;
-        Wa( "def __init__( self, strSvcPoint : str ) :" );
+        CCOUT << "def __init__( self, strSvcPoint : str ) :";
         INDENT_UPL;
         Wa( "self.m_strPath = strSvcPoint" );
         Wa( "reqFile = strSvcPoint + \"/jreq_0\"" );
@@ -2850,35 +2842,27 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         Wa( "self.m_respFp = open( respFile, \"rb\" )" );
         Wa( "evtFile = strSvcPoint + \"/jevt_0\"" );
         Wa( "self.m_evtFp = open( evtFile, \"rb\" )" );
-        Wa( "self.m_bExit = False" );
-        Wa( "self.m_oLock = threading.lock()" );
         INDENT_DOWNL;
         
-        Wa( "def IsExit() -> bool:" );
-        Wa( "    self.m_oLock.acquire()" );
-        Wa( "    bExit = self.bExit" );
-        Wa( "    self.m_oLock.release()" );
-        Wa( "    return bExit; " );
-
-        Wa( "def SetExit() -> bool:" );
-        Wa( "    self.m_oLock.acquire()" );
-        Wa( "    self.m_bExit = True" );
-        Wa( "    self.m_oLock.release()" );
-
         Wa( "def sendReq( self, oResp : object ) -> int:" );
         Wa( "    return iolib.sendReq( self.m_reqFp, oResp )" );
+        NEW_LINE;
 
         Wa( "def sendEvent( self, oEvent : object ) -> int:" );
         Wa( "    return iolib.sendEvent( self.m_respFp, oEvent )" );
+        NEW_LINE;
 
         Wa( "def recvResp( self, oReq : object ) -> [ int, object ]:" );
         Wa( "    return iolib.recvResp( self.m_reqFp, oReq )" );
+        NEW_LINE;
 
         Wa( "def getRespFp( self ) ->  object:" );
         Wa( "    return self.m_reqFp" );
+        NEW_LINE;
 
         Wa( "def getEvtFp( self ) ->  object:" );
         Wa( "    return self.m_evtFp" );
+        NEW_LINE;
 
         CCOUT << "def DispatchMsg( self, oResp : dict ):";
         INDENT_UPL;
@@ -2988,11 +2972,28 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         if( !bHasEvt && !bAsync )
             break;
 
-        Wa( "class ListeningThread(threading.Thread):" );
+        CCOUT << "class SvrReqThread(threading.Thread):";
         INDENT_UPL;
         Wa( "def __init__(self , threadName, oSvr ):" );
-        Wa( "    super(ListeningThread,self).__init__(name=threadName)" );
+        Wa( "    super(SvrReqThread,self).__init__(name=threadName)" );
         Wa( "    self.m_oSvr = oSvr" );
+        Wa( "    self.m_bExit = False" );
+        Wa( "    self.m_oLock = threading.lock()" );
+
+        NEW_LINE;
+        Wa( "def IsExiting() -> bool:" );
+        Wa( "    self.m_oLock.acquire()" );
+        Wa( "    bExit = self.m_bExit" );
+        Wa( "    self.m_oLock.release()" );
+        Wa( "    return bExit; " );
+        NEW_LINE;
+
+        Wa( "def SetExit() -> bool:" );
+        Wa( "    self.m_oLock.acquire()" );
+        Wa( "    self.m_bExit = True" );
+        Wa( "    self.m_oLock.release()" );
+        NEW_LINE;
+
         NEW_LINE;
         Wa( "def run(self):" );
         Wa( "    return self.handleReqs()" );
@@ -3020,7 +3021,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
         Wa( "    fmap[ s.fileno ]( self.m_oSvr, oMsg )" );
-        Wa( "bExit = self.m_oSvr.IsExit()" );
+        Wa( "bExit = self.IsExiting()" );
         Wa( "if bExit: " );
         CCOUT <<"    break";
         INDENT_DOWN;
@@ -3045,11 +3046,27 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         if( !bHasEvt && !bAsync )
             break;
 
-        Wa( "class MessageThread(threading.Thread):" );
+        Wa( "class CliEvtThread(threading.Thread):" );
         Wa( "    def __init__(self , threadName, oProxy ):" );
-        Wa( "        super(MessageThread,self).__init__(name=threadName)" );
+        Wa( "        super(CliEvtThread,self).__init__(name=threadName)" );
         Wa( "        self.m_oProxy = oProxy" );
+        Wa( "        self.m_bExit = False" );
+        Wa( "        self.m_oLock = threading.lock()" );
         INDENT_UPL;
+
+        Wa( "def IsExiting() -> bool:" );
+        Wa( "    self.m_oLock.acquire()" );
+        Wa( "    bExit = self.m_bExit" );
+        Wa( "    self.m_oLock.release()" );
+        Wa( "    return bExit; " );
+        NEW_LINE;
+
+        Wa( "def SetExit() -> bool:" );
+        Wa( "    self.m_oLock.acquire()" );
+        Wa( "    self.m_bExit = True" );
+        Wa( "    self.m_oLock.release()" );
+        NEW_LINE;
+
         CCOUT << "def run(self):";
         INDENT_UPL;
         CCOUT << "try:";
@@ -3081,7 +3098,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
         Wa( "    fmap[ s.fileno ]( self.m_oProxy, oMsg )" );
-        Wa( "bExit = self.m_oSvr.IsExit()" );
+        Wa( "bExit = self.IsExiting()" );
         Wa( "if bExit: " );
         CCOUT << "    break";
         INDENT_DOWN;
@@ -3119,12 +3136,12 @@ gint32 CImplPyMainFunc2::OutputCli(
         stdstr strName = pSvc->GetName();
         CCOUT << "oProxy = C" << strName << "Proxy(";
         NEW_LINE;
-        Wa( "    strPath_ )" );
+        Wa( "    strSvcPt )" );
         
         if( bHasEvent || g_bAsyncProxy )
         {
-            CCOUT << "oMsgThrd = MessageThread( \""
-                << pSvc->GetName() <<"cliMsg\", oProxy )";
+            CCOUT << "oMsgThrd = CliEvtThread( \""
+                << pSvc->GetName() <<"cliThrd\", oProxy )";
             NEW_LINE;
             Wa( "oMsgThrd.start()" );
             NEW_LINE;
@@ -3261,10 +3278,10 @@ gint32 CImplPyMainFunc2::OutputSvr(
         stdstr strName = pSvc->GetName();
         CCOUT << "oSvr = C" << strName << "Server(";
         NEW_LINE;
-        Wa( "    strPath_ )" );
+        Wa( "    strSvcPt )" );
 
-        CCOUT << "oSvrThrd = ListeningThread( \""
-            << pSvc->GetName() <<"Svr\", oSvr )";
+        CCOUT << "oSvrThrd = SvrReqThread( \""
+            << pSvc->GetName() <<"SvrThrd\", oSvr )";
         NEW_LINE;
         if( bHasEvent)
         {
