@@ -35,6 +35,7 @@ extern guint32 GenClsid( const std::string& strName );
 extern gint32 GenInitFile(
     CPyWriter* pWriter, ObjPtr& pRoot );
 
+extern std::map< char, stdstr > g_mapSig2PyType;
 extern gint32 EmitFormalArgListPy(
     CWriterBase* pWriter, CArgList* pInArgs );
 
@@ -352,7 +353,8 @@ gint32 EmitImports(
     Wa( "from rpcf import iolib" );
     Wa( "from rpcf import serijson" );
     Wa( "import errno" );
-    Wa( "from rpcf import ErrorCode as Err" );
+    Wa( "from rpcf.proxy import ErrorCode as Err" );
+    Wa( "from typing import Union, Tuple, Optional" );
     return 0;
 }
 
@@ -391,7 +393,7 @@ static gint32 EmitPySerialReq(
             Wa( "iRet = [ 0, None ]" );
         CCOUT << strDDict << " = dict()";
         NEW_LINE;
-        CCOUT << "while ret == 0:";
+        CCOUT << "while True:";
         INDENT_UPL;
         for( guint32 i = 0; i < dwCount; i++ )
         {
@@ -1019,9 +1021,9 @@ gint32 CDeclarePyStruct2::Output()
         INDENT_UPL;
         NEW_LINE;
         Wa( "osb = serijson.CSerialBase()" );
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         CCOUT << "ret = osb.DeserialInt32( val[ \""
             << JSON_ATTR_STRUCTID <<"\" ] )";
 
@@ -1268,6 +1270,9 @@ gint32 GenPyProj2(
     gint32 ret = 0;
 
     do{
+        
+        g_mapSig2PyType[ 'o' ] = "object";
+
         struct stat sb;
         if( lstat( strOutPath.c_str(), &sb ) == -1 )
         {
@@ -1339,6 +1344,8 @@ gint32 CPyExportMakefile2::Output()
 {
     Wa( "all:" );
     Wa( "\tmake -C fs" );
+    Wa( "debug:" );
+    Wa( "\tmake -C fs debug" );
     return 0;
 }
 
@@ -1498,7 +1505,6 @@ gint32 CImplPyIfSvrBase2::OutputDispMsg()
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         CCOUT << "strMethod = oMsg[ \""
             << JSON_ATTR_METHOD "\" ]";
         NEW_LINE;
@@ -1572,9 +1578,9 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         CCOUT << " ) -> int :";
         INDENT_UPL;
 
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         if( dwInCount == 0 )
         {
             CCOUT << "reqId = oReq[ \""
@@ -1660,9 +1666,9 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         }
         CCOUT << " ) -> int :";
         INDENT_UPL;
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         if( dwOutCount > 0 )
         {
             Wa( "if ret == 0 :" );
@@ -1744,9 +1750,9 @@ gint32 CImplPyMthdSvrBase2::OutputEvent()
 
         CCOUT << ")->int:";
         NEW_LINE;
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         Wa( "osb = serijson.CSerialBase()" );
 
         EmitPyArgPack( m_pWriter, pInArgs, "argPack" );
@@ -1934,10 +1940,10 @@ gint32 CImplPyMthdProxyBase2::Output()
 {
     if( m_pNode->IsEvent() )
         return OutputEvent();
-    gint32 ret = OutputSync( g_bAsyncProxy );
+    gint32 ret = OutputSync( !g_bAsyncProxy );
     if( ERROR( ret ) )
         return ret;
-    return OutputAsyncCbWrapper( g_bAsyncProxy );
+    return OutputAsyncCbWrapper( !g_bAsyncProxy );
 }
 
 gint32 CImplPyMthdProxyBase2::OutputEvent()
@@ -1979,7 +1985,6 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         CCOUT << "evtId = oEvent[ \""
             << JSON_ATTR_REQCTXID << "\" ]";
         NEW_LINE;
@@ -2051,9 +2056,9 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
         }
 
         INDENT_UPL;
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         Wa( "oReq = dict()" );
         CCOUT << "oReq[ \""
             << JSON_ATTR_REQCTXID << "\" ] = reqId";
@@ -2078,7 +2083,6 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
         else
         {
             Wa( "osb = serijson.CSerialBase()" );
-            Wa(  "resArgs = dict()" );
             EmitPyArgPack( m_pWriter, pInArgs, "argPack" );
             ret = EmitPySerialReq( m_pWriter,
                 pInArgs, "resArgs", "argPack" );
@@ -2219,19 +2223,19 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
             << "CbWrapper( self, oResp : object ) : ";
 
         INDENT_UPL;
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
-
         CCOUT << "reqIdr = oResp[ \""
            << JSON_ATTR_REQCTXID << "\" ]";
         NEW_LINE;
         CCOUT << "strType = oResp[ \""
            << JSON_ATTR_MSGTYPE << "\" ]";
-        NEW_LINE;
+        NEW_LINES( 2 );
         Wa( "if strType != \"resp\" :" );
         Wa( "    error = -errno.EBADMSG" );
         Wa( "    raise Exception( \"Error msg type %d\" \% error  )" );
+        NEW_LINE;
 
         CCOUT << "strMethod = oResp[ \""
            << JSON_ATTR_METHOD << "\" ]";
@@ -2240,6 +2244,7 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
         NEW_LINE;
         Wa( "    error = -errno.EBADMSG" );
         Wa( "    raise Exception( \"Error bad method %d\" \% error  )" );
+        NEW_LINE;
 
         CCOUT << "strIfName = oResp[ \""
            << JSON_ATTR_IFNAME1 << "\" ]";
@@ -2248,6 +2253,7 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
         NEW_LINE;
         Wa( "    error = -errno.EBADMSG" );
         Wa( "    raise Exception( \"Error bad ifName %d\" \% error  )" );
+        NEW_LINE;
 
         CCOUT << "retCode = oResp[ \""
            << JSON_ATTR_RETCODE << "\" ]";
@@ -2282,7 +2288,7 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
         }
 
         INDENT_DOWNL;
-        EmitExceptHandler( m_pWriter, true, false );
+        EmitExceptHandler( m_pWriter, false, true );
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2377,7 +2383,6 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
 
         for( guint32 i = 0; i < vecIfs.size(); i++ )
         {
@@ -2867,7 +2872,6 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
 
         for( guint32 i = 0; i < vecIfs.size(); i++ )
         {
@@ -3002,7 +3006,6 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         Wa( "fps = []" );
         Wa( "fMap = dict()" );
 
@@ -3024,7 +3027,6 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         INDENT_UPL;
         Wa( "ret = iolib.recvMsg( s )" );
         Wa( "if ret[ 0 ] < 0:" );
-        Wa( "    error = ret[ 0 ]" );
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
         Wa( "    idx = fmap[ s.fileno ]" );
@@ -3079,7 +3081,6 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         Wa( "fps = []" );
         Wa( "fMap = dict()" );
         for( guint32 i = 0; i < vecSvcs.size(); i++ )
@@ -3115,7 +3116,6 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         INDENT_UPL;
         Wa( "ret = iolib.recvMsg( s )" );
         Wa( "if ret[ 0 ] < 0:" );
-        Wa( "    error = ret[ 0 ]" );
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
         Wa( "    idx = fmap[ s.fileno ]" );
@@ -3146,21 +3146,35 @@ gint32 CImplPyMainFunc2::OutputCli(
         if( bHasEvent || g_bAsyncProxy )
             OutputThrdProcCli( vecSvcs );
 
+        CCOUT << "def Usage() :";
+        INDENT_UPL;
+        Wa( "print( \"Usage: python3 maincli.py < SP1 Path > < SP2 Path >...\" )");
+        Wa( "print( \"\\t< SP1 path > is the path to the first service's service point. The order\" )" );
+        Wa( "print( \"\\tof the < SP path > is the same as services declared in the ridl file\" )" );
+        INDENT_DOWNL;
+
+
         CCOUT << "def maincli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         Wa( "oProxies = []" );
 
+        CCOUT << "if len( sys.argv ) < "
+            << vecSvcs.size() + 1 << " :";
+        NEW_LINE;
+        Wa( "    Usage()" );
+        Wa( "    return -errno.EINVAL" );
+        NEW_LINE;
         Wa( "'''" );
         Wa( "Note: this is a reference design" );
         Wa( "you are encouraged to make changes" );
         Wa( "for your own purpse" );
         Wa( "'''" );
         NEW_LINE;
-        Wa( "print( \"start to work here...\" )" );
+        Wa( "print( \"Start to work here...\" )" );
         for( guint32 i = 0; i < vecSvcs.size(); i++ )
         {
             CServiceDecl* pSvc = vecSvcs[ i ];
@@ -3171,6 +3185,7 @@ gint32 CImplPyMainFunc2::OutputCli(
             NEW_LINE;
             Wa( "    strSvcPt )" );
             Wa( "oProxies.append( oProxy )" );
+            NEW_LINE;
         }
         
         if( bHasEvent || g_bAsyncProxy )
@@ -3307,14 +3322,26 @@ gint32 CImplPyMainFunc2::OutputSvr(
         bool bHasEvent = HasEvent( vecSvcs );
         OutputThrdProcSvr( vecSvcs );
 
+        CCOUT << "def Usage() :";
+        INDENT_UPL;
+        Wa( "print( \"Usage: python3 mainsvr.py < SP1 Path > < SP2 Path >...\" )");
+        Wa( "print( \"\\t< SP1 path > is the path to the first service's service point. The order\" )" );
+        Wa( "print( \"\\tof the < SP path > is the same as services declared in the ridl file\" )" );
+        INDENT_DOWNL;
+
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
+        Wa( "error = 0" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "error = 0" );
         Wa( "oSvrs = []" );
-
+        CCOUT << "if len( sys.argv ) < "
+            << vecSvcs.size() + 1 << " :";
         NEW_LINE;
+        Wa( "    Usage()" );
+        Wa( "    return -errno.EINVAL" );
+        NEW_LINE;
+
         Wa( "'''" );
         Wa( "Note: this is a reference design" );
         Wa( "you are encouraged to make changes" );
@@ -3322,7 +3349,7 @@ gint32 CImplPyMainFunc2::OutputSvr(
         Wa( "'''" );
 
         NEW_LINE;
-        Wa( "print( \"start to work here...\" )" );
+        Wa( "print( \"Start to work here...\" )" );
         for( guint32 i = 0; i < vecSvcs.size(); i++ )
         {
             CServiceDecl* pSvc = vecSvcs[ i ];
@@ -3404,6 +3431,12 @@ gint32 CImplPyMainFunc2::Output()
 
         m_pWriter->SelectMainSvr();
         EmitImports( m_pWriter );
+
+        Wa( "import os" );
+        Wa( "import time" );
+        Wa( "import threading" );
+        Wa( "import select" );
+
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* pNode = elem;
