@@ -87,6 +87,7 @@ extern std::vector<
     std::unique_ptr< FILECTX > > g_vecBufs;
 
 extern bool g_bNewSerial;
+extern bool g_dwFlags;
 
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
@@ -366,9 +367,21 @@ prime_type :
       | TOK_BYTE
       | TOK_BOOL
       | TOK_BYTEARR
-      | TOK_OBJPTR
       | TOK_HSTREAM
     ;
+prime_type : TOK_OBJPTR
+    {
+        $$ = $1;
+        if( g_dwFlags &
+            ( FUSE_PROXY | FUSE_SERVER ) )
+        {
+            stdstr strMsg = "ObjPtr is not "
+                "supported by rpcfs. Dummy code is generated";
+            PrintWarning(
+                -ENOTSUP, strMsg.c_str() );
+        }
+        CLEAR_RSYMBS;
+    }
 
 arr_type :
     TOK_ARRAY '<' idl_type '>'

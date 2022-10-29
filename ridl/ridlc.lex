@@ -102,9 +102,15 @@ gint32 IsAllZero( char* szText );
         "%s(%d): %s", curpath().c_str(), \
         yylineno, szMsg );
 
+#define PrintMsgInternal( ret, szHead, szMsg ) \
+    printf( "%s(%d): %s: %s(%d)\n", curpath().c_str(), \
+        yylineno, szHead, szMsg, ret );
+
 #define PrintMsg( ret, szMsg ) \
-    printf( "%s(%d): error %s(%d)\n", curpath().c_str(), \
-        yylineno, szMsg, ret );
+    PrintMsgInternal( ret, "error", szMsg )
+
+#define PrintWarning( ret, szMsg ) \
+    PrintMsgInternal( ret, "Warning", szMsg )
 
 #define PrintAndQuit( ret, szMsg ) \
 { \
