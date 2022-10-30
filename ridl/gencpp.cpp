@@ -6954,7 +6954,7 @@ gint32 CExportDrivers::Output()
         std::string strAppName =
             m_pNode->GetName();
 
-        if( g_strLang == "cpp" )
+        if( g_strLang == "cpp" || bFuse )
         {
             std::vector< ObjPtr > vecSvcs;
             ret = m_pNode->GetSvcDecls( vecSvcs );
