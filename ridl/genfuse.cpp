@@ -1044,7 +1044,8 @@ gint32 CDeclInterfProxyFuse::Output()
         NEW_LINE;
         Wa( "virtual gint32 OnReqComplete( IEventSink*," );
         Wa( "    IConfigDb* pReqCtx, Json::Value& val_," );
-        Wa( "    const std::string&, const std::string&, gint32 ) = 0;" );
+        Wa( "    const std::string&, const std::string&," );
+        Wa( "    gint32, bool ) = 0;" );
         NEW_LINE;
         Wa( "const EnumClsid GetIid() const override" );
         CCOUT << "{ return iid( "
@@ -1662,7 +1663,7 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "    Json::Value& valResp," );
             Wa( "    const std::string& strIfName," );
             Wa( "    const std::string& strMethod," );
-            Wa( "    gint32 iRet ) override;" );
+            Wa( "    gint32 iRet, bool bNoReply ) override;" );
             NEW_LINE;
 
             Wa( "/* The following 2 methods are important for */" );
@@ -2054,7 +2055,10 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
         NEW_LINE;
         CCOUT << "    \"" << pifd->GetName() << "\",";
         NEW_LINE;
-        CCOUT << "    iRet );";
+        stdstr strNoReply = "false";
+        if( bNoReply )
+            strNoReply = "true";
+        CCOUT << "    iRet, " << strNoReply << " );";
         NEW_LINE;
 
         BLOCK_CLOSE;
@@ -2209,6 +2213,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         CCOUT << "oOptions_[ propSeriProto ] = ";
         NEW_LINE;
         CCOUT << "    ( guint32 )seriRidl;";
+        NEW_LINE;
         guint32 dwTimeoutSec =
             m_pNode->GetTimeoutSec();
         guint32 dwKeepAliveSec =
@@ -3260,7 +3265,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    Json::Value& valResp," );
             Wa( "    const std::string& strIfName," );
             Wa( "    const std::string& strMethod," );
-            Wa( "    gint32 iRet )" );
+            Wa( "    gint32 iRet, bool bNoReply )" );
             BLOCK_OPEN;
             Wa( "UNREFERENCED( pCallback );" );
             Wa( "gint32 ret = 0;" );
@@ -3277,7 +3282,8 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "ret = oReqCtx_.GetQwordProp( 1, qwReqId );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "this->ReceiveMsgJson( strReq, qwReqId );" );
+            Wa( "if( !bNoReply )" );
+            Wa( "    this->ReceiveMsgJson( strReq, qwReqId );" );
             CCOUT << "this->RemoveReq( qwReqId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );

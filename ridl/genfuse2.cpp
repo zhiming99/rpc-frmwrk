@@ -205,7 +205,8 @@ gint32 CDeclInterfProxyFuse2::Output()
         NEW_LINE;
         Wa( "gint32 OnReqComplete( IEventSink*," );
         Wa( "    IConfigDb* pReqCtx, Json::Value& val_," );
-        Wa( "    const std::string&, const std::string&, gint32 );" );
+        Wa( "    const std::string&, const std::string&," );
+        Wa( "    gint32, bool );" );
         NEW_LINES( 2 );
         Wa( "// Dispatch the Json request messages" );
         Wa( "gint32 DispatchIfReq(" );
@@ -275,7 +276,7 @@ gint32 CDeclInterfProxyFuse2::Output()
         INDENT_DOWNL;
         Wa( "virtual gint32 OnReqComplete( IEventSink*," );
         Wa( "    IConfigDb* pReqCtx, Json::Value& val_," );
-        Wa( "    const stdstr&, const stdstr&, gint32 ) = 0;" );
+        Wa( "    const stdstr&, const stdstr&, gint32, bool ) = 0;" );
         NEW_LINE;
         Wa( "const EnumClsid GetIid() const override" );
         CCOUT << "{ return iid( " << strName << " ); }";
@@ -712,7 +713,7 @@ gint32 CDeclServiceImplFuse2::Output()
             Wa( "    Json::Value& valResp," );
             Wa( "    const stdstr& strIfName," );
             Wa( "    const stdstr& strMethod," );
-            Wa( "    gint32 iRet );" );
+            Wa( "    gint32 iRet, bool ) override;" );
             NEW_LINE;
 
             Wa( "/* The following 2 methods are important for */" );
@@ -1586,7 +1587,8 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "    Json::Value& valResp," );
             Wa( "    const std::string& strIfName," );
             Wa( "    const std::string& strMethod," );
-            Wa( "    gint32 iRet )" );
+            Wa( "    gint32 iRet," );
+            Wa( "    bool bNoReply )" );
             BLOCK_OPEN;
             Wa( "UNREFERENCED( pCallback );" );
             Wa( "gint32 ret = 0;" );
@@ -1603,7 +1605,8 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "ret = oReqCtx_.GetQwordProp( 1, qwReqId );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "this->ReceiveMsgJson( strReq, qwReqId );" );
+            Wa( "if( !bNoReply )" );
+            Wa( "    this->ReceiveMsgJson( strReq, qwReqId );" );
             CCOUT << "this->RemoveReq( qwReqId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
@@ -1671,7 +1674,8 @@ gint32 CImplIufProxyFuse2::OutputOnReqComplete()
         Wa( "    Json::Value& val_," );
         Wa( "    const stdstr& strIfName," );
         Wa( "    const stdstr& strMethod," );
-        Wa( "    gint32 iRet )" );
+        Wa( "    gint32 iRet," );
+        Wa( "    bool bNoReply )" );
         BLOCK_OPEN;
         Wa( "InterfPtr& pParent = GetParentIf();" );
         CCOUT <<  "auto pApi = dynamic_cast< I" <<
@@ -1680,7 +1684,7 @@ gint32 CImplIufProxyFuse2::OutputOnReqComplete()
         Wa( "    ( ( CObjBase* )pParent );" );
         Wa( "return pApi->OnReqComplete( pCallback," );
         Wa( "    pReqCtx, val_, strIfName," );
-        CCOUT << "    strMethod, iRet );";
+        CCOUT << "    strMethod, iRet, bNoReply );";
         BLOCK_CLOSE;
         NEW_LINE;
 
