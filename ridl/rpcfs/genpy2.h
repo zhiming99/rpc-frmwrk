@@ -117,6 +117,7 @@ class CDeclarePyStruct2 :
         : super( pWriter, pNode )
     {}
     gint32 Output() override;
+    void OutputStructBase();
 };
 
 struct CPyExportMakefile2

@@ -60,12 +60,12 @@ class CSerialBase :
         return base64.b64encode(val).decode( 'UTF-8' )
 
     def SerialObjPtr( self, val : object )-> int :
-        pass
+        raise Exception( "ObjPtr is not supported by rpcfs" )
 
     def SerialHStream( self, val : str ) -> str:
         return val
 
-    def SerialStruct( self, val : object ) -> Tuple[ int, object ]:
+    def SerialStruct( self, val : object ) -> Tuple[ int, dict ]:
         return val.Serialize()
 
     def SerialArray( self, val : list, sig: str ) -> Tuple[ int, list ]:
@@ -107,11 +107,11 @@ class CSerialBase :
             ret = self.SerialElem( key, sigElem[ :1 ] )
             if ret[ 0 ] < 0 :
                 break
-            resKey = ret[ 0 ]
+            resKey = ret[ 1 ]
             ret = self.SerialElem( value, sigElem[ 1: ] )
             if ret[ 0 ] < 0 :
                 break
-            res[ resKey ] = ret[ 0 ]
+            res[ resKey ] = ret[ 1 ]
         if ret[ 0 ] < 0 :
             return ret
         return ( 0, res )
@@ -158,7 +158,7 @@ class CSerialBase :
         return base64.b64decode( val )
         
     def DeserialObjPtr( self, val : object )->object:
-        return val
+        raise Exception( "ObjPtr is not supported by rpcfs" )
 
     def DeserialStruct( self, val : dict ) -> Tuple[ int, object ]:
         try:
@@ -191,7 +191,7 @@ class CSerialBase :
             ret = self.DeserialElem( elem, sigElem )
             if ret[ 0 ] < 0 :
                 break
-            res.append( resElem )
+            res.append( ret[ 1 ] )
         return ret
 
     def DeserialMap( self, val : dict, sig : str ) -> Tuple[ int, object ]:
@@ -210,17 +210,20 @@ class CSerialBase :
             res  = dict()
             return ( 0, res )
 
-        ret = ( 0, res )
-        for key, value in val :
-            ret = self.DeserialElem( key, sigElem[ :1 ], elemKey )
+        ret = [ 0, None ]
+        for key, value in val.items() :
+            ret = self.DeserialElem( key, sigElem[ :1 ] )
             if ret[ 0 ] < 0 :
                 break
-            ret = self.DeserialElem( value, sigElem[ 1: ], elemVal )
+            elemKey = ret[ 1 ]
+            ret = self.DeserialElem( value, sigElem[ 1: ] )
             if ret[ 0 ] < 0 :
                 break
-            res[ elemKey ] = elemVal
+            res[ elemKey ] = ret[ 1 ]
 
-        return ret
+        if ret[ 0 ] < 0 :
+            return ret
+        return ( 0, res )
 
     def DeserialElem( self, val : object, sig : str ) -> Tuple[ int, object ]:
         if sig[ 0 ] == '(' :
@@ -229,8 +232,8 @@ class CSerialBase :
             return self.DeserialMap( val, sig )
         if sig[ 0 ] == 'O' :
             return self.DeserialStruct( val, sig )
-        resElem = self.DeserialElemOpt[ sig[ 0 ] ]( self, buf, offset )
-        return ( resElem, 0 )
+        resElem = self.DeserialElemOpt[ sig[ 0 ] ]( self, val )
+        return ( 0, resElem )
 
     SerialElemOpt = {
         'Q' : SerialInt64,    # TOK_UINT64,
