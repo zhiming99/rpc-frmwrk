@@ -2091,8 +2091,9 @@ gint32 CImplMainFuncFuse2::Output()
             BLOCK_OPEN;
             Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
             Wa( "oDrvMgr.UnloadDriver(" );
-            Wa( "    \"DBusStreamBusDrv\" );" );
+            CCOUT << "    \"DBusStreamBusDrv\" );";
             BLOCK_CLOSE;
+            NEW_LINE;
             Wa( "DestroyContext();" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;

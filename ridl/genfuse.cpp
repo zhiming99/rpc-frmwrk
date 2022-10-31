@@ -2051,9 +2051,9 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
             ObjPtr( pmds->GetParent() );
 
         Wa( "OnReqComplete( pCallback, pReqCtx, val_," ); 
-        CCOUT << "    \"" << m_pNode->GetName() << "\",";
-        NEW_LINE;
         CCOUT << "    \"" << pifd->GetName() << "\",";
+        NEW_LINE;
+        CCOUT << "    \"" << m_pNode->GetName() << "\",";
         NEW_LINE;
         stdstr strNoReply = "false";
         if( bNoReply )

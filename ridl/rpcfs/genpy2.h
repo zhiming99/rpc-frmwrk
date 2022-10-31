@@ -158,14 +158,14 @@ class CImplPyIfSvrBase2
 };
 
 class CImplPyMthdSvrBase2 :
-    public CImplPyMthdSvrBase
+    public CMethodWriter
 {
+    CMethodDecl* m_pNode = nullptr;
+    CInterfaceDecl* m_pIf = nullptr;
     public:
-    typedef CImplPyMthdSvrBase super;
+    typedef CMethodWriter super;
     CImplPyMthdSvrBase2(
-        CPyWriter* pWriter, ObjPtr& pNode ):
-        super( pWriter, pNode )
-    {}
+        CPyWriter* pWriter, ObjPtr& pNode );
 
     gint32 Output();
     gint32 OutputSync();
