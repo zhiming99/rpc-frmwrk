@@ -1,4 +1,7 @@
 ---
+[`Tue Nov 01 2022 20:52:27 PM Beijing`]    
+1. I have to take a two weeks leave. So no regular update these weeks.
+
 [`Tue Oct 18 2022 09:57:27 AM Beijing`]    
 1. merged the pull request to shrink the fastrpc message size to the master branch. And i have done some optimizations.
 2. Next, let's continue rpcfs programming support.
