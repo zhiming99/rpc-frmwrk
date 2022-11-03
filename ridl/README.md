@@ -114,10 +114,10 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -j:     To generate Java skelton files       
         
-        -f:     To generate `FUSE integration` skelton files. C++ only.
+        -f:     To generate `rpcfs` skelton files. C++ or Python currently.
         
         -P:     To specify the prefix for the target java package. The java package name would be
-                <prefix>.<appname>.
+                <prefix>.<appname>, Java only.
         
         -l:     To output a shared library instead of executables. This option is for CPP project or FUSE project.
         
@@ -128,7 +128,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
 ```
 
-Currently `ridlc` can output skelton code in C++, Python and Java. In the future, it will be able to generate C# code as well.
+Currently `ridlc` can output skelton code in C++, Python and Java. In the future, it will be able to generate code for other languages as well.
 
 ### Output for C++ project
 
