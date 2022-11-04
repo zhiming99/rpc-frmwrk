@@ -81,7 +81,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 * **typedef** : define an alias for a pre-defined data type.  For example,`typedef myint int32;`
 * **const**: to assign a name to a constant value. For example, `const i = 2;`
 * **struct** : to define a struct.
-* **interface** : an interface is a set of methods logically bounded closely to deliver some kind of service to the client. It is made up of interface id and a set of methods, as similiar to a class in an OO language.
+* **interface** : an interface is a set of method declarations logically bounded closely to deliver some kind of service to the client. It is made up of interface id and a set of methods, as similiar to a class declaration in an OO language.
   * **interface id**: a string to uniquely identify the interface, it is used by `rpc-frmwrk` to locate the service.
   * **method** : a method is the smallest unit of interaction between server and proxy. The proxy send the request, and the server executes at the proxy's request and returns the response. As you can see, an `ridl method` is made up of `method name`, `input parameter list`, `output parameter list`. Beside the three major components a method must have, it can have some attributes, too, within the bracket ahead of the `method name` as shown in the above example. The attributes supported by a `method` include
     * **async, async_s, async_p** : to instruct the ridl compiler to generate asynchronous or synchronous code for server or proxy. `async_s` indicates server side will handle the request asynchronously, `async_p` indicates proxy side to send request asynchronously, and `async` means both sides behave asynchronously. About `asynchronous`, Let me explain a bit more. 
