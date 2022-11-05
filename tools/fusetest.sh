@@ -20,7 +20,8 @@ pydir=$basedir/fuse/examples/python
 sleep 5 
 
 python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
-
+ulimit -n 8192
+ulimit -a
 start=$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc $i &
