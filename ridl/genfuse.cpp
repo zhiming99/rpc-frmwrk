@@ -837,10 +837,10 @@ gint32 CDeclareStruct::OutputFuse()
         NEW_LINES(2);
 
         Wa( "gint32 JsonSerialize(" );
-        Wa( "    BufPtr& pBuf, const Json::Value& val ) override;" );
+        Wa( "    BufPtr& pBuf, const Json::Value& val_ ) override;" );
         NEW_LINE;
         Wa( "gint32 JsonDeserialize(" );
-        CCOUT << "    BufPtr& pBuf, Json::Value& val ) override;";
+        CCOUT << "    BufPtr& pBuf, Json::Value& val_ ) override;";
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
@@ -873,7 +873,7 @@ gint32 CImplSerialStruct::OutputSerialFuse()
         CCOUT << "gint32 " << m_pNode->GetName()
             << "::" << "JsonSerialize(";
         NEW_LINE;
-        Wa( "    BufPtr& pBuf_, const Json::Value& val_ )" );
+        Wa( "    BufPtr& pBuf_, const Json::Value& srcVal )" );
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
         INDENT_UPL;
@@ -888,6 +888,14 @@ gint32 CImplSerialStruct::OutputSerialFuse()
         Wa( "    pBuf_, m_dwMsgId );" );
         Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
+
+        CCOUT << "if( !srcVal.isMember( JSON_ATTR_FIELDS ) )";
+        NEW_LINE;
+        Wa( "{ ret = -ENOENT; break; }" );
+        CCOUT << "const Json::Value& val_ = srcVal[ JSON_ATTR_FIELDS ];";
+        NEW_LINE;
+        Wa( "if( !val_.isObject() )" );
+        Wa( "{ ret = -EINVAL; break; }" );
 
         ObjPtr pFields =
             m_pNode->GetFieldList();
@@ -918,7 +926,7 @@ gint32 CImplSerialStruct::OutputDeserialFuse()
         CCOUT << "gint32 " << m_pNode->GetName()
             << "::" << "JsonDeserialize( ";
         NEW_LINE;
-        CCOUT << "BufPtr& pBuf_, Json::Value& val_ )";
+        CCOUT << "BufPtr& pBuf_, Json::Value& destVal )";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
@@ -949,11 +957,15 @@ gint32 CImplSerialStruct::OutputDeserialFuse()
         Wa( "if( ERROR( ret ) ) return ret;" );
         Wa( "if( m_dwMsgId != dwMsgId )" );
         Wa( "    return -EINVAL;" );
-        Wa( "val_[ JSON_ATTR_STRUCTID ] = dwMsgId;" );
+        Wa( "destVal[ JSON_ATTR_STRUCTID ] = dwMsgId;" );
+        Wa( "Json::Value val_;" );
         NEW_LINE;
 
         CEmitSerialCodeFuse odesc( m_pWriter, pFields );
         odesc.OutputDeserial( "", "pBuf_" );
+        NEW_LINE;
+        CCOUT << "destVal[ JSON_ATTR_FIELDS ] = val_;";
+        NEW_LINE;
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";
         NEW_LINES( 2 );

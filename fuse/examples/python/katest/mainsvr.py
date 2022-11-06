@@ -6,7 +6,7 @@ import base64
 import io
 
 import time
-from iolib import *
+from rpcf.iolib import *
 svcdir = str()
 
 def BuildRespHdr( methodName : str, idx : int ) -> dict:

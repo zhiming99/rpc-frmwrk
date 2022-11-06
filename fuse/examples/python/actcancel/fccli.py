@@ -6,7 +6,7 @@ import select
 import errno
 
 import time
-from iolib import *
+from rpcf.iolib import *
 
 def fctest() :
     error = 0
