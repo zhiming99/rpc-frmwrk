@@ -426,7 +426,7 @@ int main( int argc, char** argv )
             g_strTarget = g_strAppName;
 
         printf( "Generating files.. \n" );
-        if( bFuse || g_bRpcOverStm )
+        if( bFuse || g_bRpcOverStm || g_strLang == "cpp" )
         {
             if( bFuse && g_strLang != "cpp" )
             {
