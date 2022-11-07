@@ -300,7 +300,7 @@ gint32 EmitPyBuildReqHeader(
     CWriterBase* m_pWriter )
 {
     Wa( "def BuildReqHeader(" );
-    Wa( "    repId : object," );
+    Wa( "    reqId : object," );
     Wa( "    strMethod : str," );
     Wa( "    strIfName : str,  " );
     Wa( "    retCode : int," );
@@ -316,7 +316,7 @@ gint32 EmitPyBuildReqHeader(
     NEW_LINE;
     CCOUT << "    oReq[ \"" << JSON_ATTR_MSGTYPE << "\" ] = \"resp\"";
     NEW_LINE;
-    CCOUT << "    oReq[ \"" << JSON_ATTR_RETCODE << "\" ] = \"retCode\"";
+    CCOUT << "    oReq[ \"" << JSON_ATTR_RETCODE << "\" ] = retCode";
     NEW_LINE;
     CCOUT << "else :";
     NEW_LINE;
@@ -515,7 +515,7 @@ gint32 EmitPyDeserialReq(
             stdstr strSig =
                 pType->GetSignature();
 
-            stdstr strDest = "args[";
+            stdstr strDest = strDList + "[";
             strDest += std::to_string( i ) + " ]";
 
             stdstr strSrc = "oParams[ \"";
@@ -1183,9 +1183,12 @@ static gint32 GenIfImplFile(
 
     do{
         EmitImports( m_pWriter );
-        EmitPyBuildReqHeader( m_pWriter );
+        Wa( "import random" );
+        CCOUT << "import " << g_strAppName << "structs";
         NEW_LINE;
 
+        EmitPyBuildReqHeader( m_pWriter );
+        NEW_LINE;
         auto pWriter =
             static_cast< CPyWriter2*>( m_pWriter );
         CImplPyInterfaces2 oipifs(
@@ -1290,6 +1293,7 @@ gint32 GenPyProj2(
 
     gint32 ret = 0;
     g_mapSig2PyType[ 'o' ] = "object";
+    g_mapSig2PyType[ 'h' ] = "str";
 
     do{
         
@@ -1357,6 +1361,7 @@ gint32 GenPyProj2(
 
     }while( 0 );
     g_mapSig2PyType[ 'o' ] = "cpp.ObjPtr";
+    g_mapSig2PyType[ 'h' ] = "int";
 
     return ret;
 }
@@ -1611,10 +1616,8 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         Wa( "serialized response." );
         Wa( "'''" );
 
-        CCOUT << "def " << strName << "Wrapper( self";
-        if( dwInCount > 0 )
-            CCOUT << ", oReq : dict";
-        CCOUT << " ) -> int :";
+        CCOUT << "def " << strName << "Wrapper( self"
+            << ", oReq : dict ) -> int :";
         INDENT_UPL;
 
         Wa( "error = 0" );
@@ -1716,10 +1719,11 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         INDENT_UPL;
         if( dwOutCount > 0 )
         {
-            Wa( "if ret == 0 :" );
+            Wa( "if ret < 0 :" );
             Wa( "    resArgs = dict()" );
             CCOUT << "else:";
             INDENT_UPL;
+            Wa( "osb = serijson.CSerialBase()" );
             EmitPyArgPack( m_pWriter, pOutArgs, "argPack" );
             ret = EmitPySerialReq( m_pWriter,
                 pOutArgs, "resArgs", "argPack" );
@@ -2043,9 +2047,6 @@ gint32 CImplPyMthdProxyBase2::OutputEvent()
             CCOUT << "oParams = oEvent[ \""
                 << JSON_ATTR_PARAMS << "\" ]";
             NEW_LINE;
-            CCOUT << "evtArgs = [None] * "
-                << dwInCount;
-            NEW_LINE;
 
             ret = EmitPyDeserialReq( m_pWriter,
                 pInArgs, "evtArgs", "oParams" );
@@ -2208,8 +2209,6 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
                 Wa( "    return [ retCode, None ]" );
                 CCOUT << "else:";
                 INDENT_UPL;
-                CCOUT << "args = [ None ] *" << dwOutCount;
-                NEW_LINE;
                 CCOUT << "oParams = oResp[ \""
                     << JSON_ATTR_PARAMS << "\" ]";
                 NEW_LINE;
@@ -2321,8 +2320,6 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
         }
         else
         {
-            CCOUT << "args = [None] * "<< dwOutCount;
-            NEW_LINE;
             CCOUT << "if retCode == 0:";
             INDENT_UPL;
             CCOUT << "oParams = oResp[ \""
@@ -2429,7 +2426,7 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         Wa( "    return iolib.recvReq( self.m_reqFp )" );
         NEW_LINE;
 
-        Wa( "def getReqFp( self, oReq : object ) ->  object:" );
+        Wa( "def getReqFp( self ) ->  object:" );
         Wa( "    return self.m_reqFp" );
         NEW_LINE;
 
@@ -2478,6 +2475,8 @@ gint32 CImplPySvcSvr2::Output()
     do{
         stdstr strName = m_pNode->GetName();
         EmitImports( m_pWriter );
+        CCOUT << "import " << g_strAppName << "structs";
+        NEW_LINE;
         CCOUT << "from ifimpl import *";
         NEW_LINE;
 
@@ -2962,6 +2961,8 @@ gint32 CImplPySvcProxy2::Output()
     do{
         stdstr strName = m_pNode->GetName();
         EmitImports( m_pWriter );
+        CCOUT << "import " << g_strAppName << "structs";
+        NEW_LINE;
         CCOUT << "from ifimpl import *";
         NEW_LINE;
 
@@ -3080,7 +3081,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
         Wa( "for oMsg in ret[ 1 ] :" );
         Wa( "    idx = fMap[ s.fileno ]" );
-        CCOUT << "    self.m_oSvrs[ i ].DispatchMsg( oMsg )";
+        CCOUT << "    self.m_oSvrs[ idx ].DispatchMsg( oMsg )";
         INDENT_DOWNL;
         Wa( "bExit = self.IsExiting()" );
         Wa( "if bExit: " );
@@ -3208,6 +3209,7 @@ gint32 CImplPyMainFunc2::OutputCli(
         INDENT_UPL;
         Wa( "ret = 0" );
         Wa( "error = 0" );
+        Wa( "oMsgThrd = None" );
         CCOUT << "try:";
         INDENT_UPL;
         Wa( "oProxies = []" );
@@ -3349,11 +3351,12 @@ gint32 CImplPyMainFunc2::OutputCli(
 
         }while( 0 );
 
-        Wa( "'''" );
-        Wa( "oMsgThrd.SetExit()" );
-        Wa( "oMsgThrd.join()" );
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
+        Wa( "finally:" );
+        Wa( "    if oMsgThrd is not None:" );
+        Wa( "        oMsgThrd.SetExit()" );
+        Wa( "        threading.Thread.join( oMsgThrd )" );
         Wa( "return ret" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
@@ -3384,6 +3387,7 @@ gint32 CImplPyMainFunc2::OutputSvr(
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
         Wa( "error = 0" );
+        Wa( "oSvrThrd = None" );
         CCOUT << "try:";
         INDENT_UPL;
         Wa( "oSvrs = []" );
@@ -3436,6 +3440,10 @@ gint32 CImplPyMainFunc2::OutputSvr(
 
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
+        Wa( "finally:" );
+        Wa( "    if oSvrThrd is not None:" );
+        Wa( "        oSvrThrd.SetExit()" );
+        Wa( "        threading.Thread.join( oSvrThrd )" );
         Wa( "return 0" );
         INDENT_DOWNL;
         Wa( "ret = mainsvr()" );

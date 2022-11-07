@@ -476,7 +476,7 @@ int main( int argc, char** argv )
         strCmdLine.append( 1, '\n' );
         stdstr strPath = g_strOutPath;
         strPath += "/cmdline";
-        FILE* fp = fopen( strPath.c_str(), "a" );
+        FILE* fp = fopen( strPath.c_str(), "w" );
         if( fp == nullptr )
             break;
         fwrite( strCmdLine.c_str(),

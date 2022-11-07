@@ -184,15 +184,17 @@ class CSerialBase :
         res = []
         count = len( val )
         if count == 0 :
-            return ( res, 0 )
+            return ( 0, res )
 
-        ret = ( res, 0 )
+        ret = ( 0, res )
         for elem in val :
             ret = self.DeserialElem( elem, sigElem )
             if ret[ 0 ] < 0 :
                 break
             res.append( ret[ 1 ] )
-        return ret
+        if ret[ 0 ] < 0:
+            return ret
+        return ( 0, res )
 
     def DeserialMap( self, val : dict, sig : str ) -> Tuple[ int, object ]:
         sigLen = len( sig )
