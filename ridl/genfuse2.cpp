@@ -1262,19 +1262,19 @@ gint32 CImplServiceImplFuse2::Output()
             BLOCK_OPEN;
             Wa( "if( this->GetState() != stateConnected )" );
             Wa( "{ ret = -ENOTCONN; break; }" );
-            Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||");
-            Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
-            Wa( "{ ret = -EINVAL; break; }" );
-            Wa( "stdstr strType =" );
-            Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
-            Wa( "if( strType != \"resp\" &&" );
-            Wa( "    strType != \"evt\" )" );
-            Wa( "{ ret = -EINVAL; break; }" );
             Wa( "if( !oMsg.isMember( JSON_ATTR_IFNAME1 ) ||" );
             Wa( "    !oMsg[ JSON_ATTR_IFNAME1 ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strIfName =" );
             Wa( "    oMsg[ JSON_ATTR_IFNAME1 ].asString();" );
+            Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||");
+            Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "stdstr strType =" );
+            Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
+            CCOUT << "if( strType == \"resp\" )";
+            NEW_LINE;
+            BLOCK_OPEN;
             Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||" );
             Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isString() )" );
             Wa( "{ ret = -EINVAL; break; }" );
@@ -1325,10 +1325,45 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strMethod =" );
             Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
-            Wa( "if( strMethod != \"KeepAlive\" )" );
+            Wa( "if( strMethod != \"OnKeepAlive\" )" );
             Wa( "{ ret = -ENOTSUP; break;}" );
             Wa( "ret = pSkel->OnKeepAlive( qwTaskId );" );
             CCOUT << "break;";
+            BLOCK_CLOSE;
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "else if( strType == \"evt\" )";
+            NEW_LINE;
+            BLOCK_OPEN;
+            Wa( "std::vector< InterfPtr > vecIfs;" );
+            Wa( "ret = this->EnumStmSkels( vecIfs );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            for( auto& elem : vecIfRefs )
+            {
+                CInterfRef* pifr = elem;
+                ObjPtr pObj;
+                pifr->GetIfDecl( pObj );
+                CInterfaceDecl* pifd = pObj;
+                stdstr strIfName = pifd->GetName();
+                CCOUT << "if( strIfName == \""
+                    << strIfName << "\" )";
+                NEW_LINE;
+                BLOCK_OPEN;
+
+                Wa( "for( auto& elem : vecIfs )" );
+                BLOCK_OPEN;
+                CCOUT << "C" << strSvcName << "_SvrSkel* pSkel = elem;";
+                NEW_LINE;
+                CCOUT << "ret = pSkel->" << "I" << strIfName
+                    << "_SImpl::DispatchIfMsg( oMsg );";
+                NEW_LINE;
+                BLOCK_CLOSE;// for vecIfs
+                NEW_LINE;
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+            }
+
             BLOCK_CLOSE;
             NEW_LINE;
             CCOUT << "ret = -ENOTSUP;";
@@ -1724,6 +1759,13 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
         Wa( "{ ret = -EINVAL; break; }" );
         Wa( "stdstr strMethod =" );
         Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
+        Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||");
+        Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
+        Wa( "{ ret = -EINVAL; break; }" );
+        Wa( "stdstr strType =" );
+        Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
+        Wa( "if( strType == \"resp\" )" );
+        BLOCK_OPEN;
         Wa( "if( !oMsg.isMember( JSON_ATTR_RETCODE ) ||");
         Wa( "    !oMsg[ JSON_ATTR_RETCODE ].isUInt() )" );
         Wa( "{ ret = -EINVAL; break; }" );
@@ -1753,8 +1795,6 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
         Wa( "CParamList oReqCtx;" );
         Wa( "oReqCtx[ propEventSink ] = ObjPtr( pTask );" );
 
-        Wa( "stdstr strType =" );
-        Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
         for( ; i < dwCount; i++ )
         {
             ObjPtr pObj = pmds->GetChild( i );
@@ -1764,6 +1804,9 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
                 ret = -EFAULT;
                 break;
             }
+            if( pmd->IsEvent() )
+                continue;
+
             ObjPtr pInArgs = pmd->GetInArgs();
             guint32 dwInCount = GetArgCount( pInArgs );
             ObjPtr pOutArgs = pmd->GetOutArgs();
@@ -1772,10 +1815,8 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
                 << pmd->GetName() << "\" )";
             NEW_LINE;
             BLOCK_OPEN;
-            if( !pmd->IsEvent() && !pmd->IsNoReply() )
+            if( !pmd->IsNoReply() )
             {
-                Wa( "if( strType != \"resp\" )" );
-                Wa( "{ ret = -EINVAL; break; }" );
                 CCOUT << "ret = " << strClass << "::"
                     << pmd->GetName() <<"Complete(";
                 NEW_LINE;
@@ -1783,20 +1824,6 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
                 if( dwOutCount > 0 ) 
                     CCOUT << ", oMsg";
                 CCOUT << " );";
-                NEW_LINE;
-                Wa( "if( ret == STATUS_PENDING )" );
-                Wa( "    ret = STATUS_SUCCESS;" );
-            }
-            else if( pmd->IsEvent() )
-            {
-                Wa( "if( strType != \"evt\" )" );
-                Wa( "{ ret = -EINVAL; break; }" );
-                CCOUT << "ret = " << strClass << "::"
-                    << pmd->GetName() <<"(";
-                if( dwInCount > 0 ) 
-                    CCOUT << " oMsg );";
-                else
-                    CCOUT << ");";
                 NEW_LINE;
                 Wa( "if( ret == STATUS_PENDING )" );
                 Wa( "    ret = STATUS_SUCCESS;" );
@@ -1810,7 +1837,49 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
             BLOCK_CLOSE;
             NEW_LINE;
         }
-        Wa( "ret = -ENOENT;" );
+        BLOCK_CLOSE; // strType == resp
+        NEW_LINE;
+        Wa( "else if( strType == \"evt\" )" );
+        BLOCK_OPEN;
+
+        for( i = 0; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( !pmd->IsEvent() )
+                continue;
+
+            ObjPtr pInArgs = pmd->GetInArgs();
+            guint32 dwInCount = GetArgCount( pInArgs );
+            ObjPtr pOutArgs = pmd->GetOutArgs();
+            guint32 dwOutCount = GetArgCount( pOutArgs );
+            CCOUT << "if( strMethod == \""
+                << pmd->GetName() << "\" )";
+            NEW_LINE;
+            BLOCK_OPEN;
+
+            CCOUT << "ret = " << strClass << "::"
+                << pmd->GetName() <<"(";
+            if( dwInCount > 0 ) 
+                CCOUT << " oMsg );";
+            else
+                CCOUT << ");";
+            NEW_LINE;
+            Wa( "if( ret == STATUS_PENDING )" );
+            Wa( "    ret = STATUS_SUCCESS;" );
+
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        BLOCK_CLOSE; // strType == evt
+        NEW_LINE;
+        CCOUT << "ret = -ENOENT;";
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         CCOUT << "return ret;";

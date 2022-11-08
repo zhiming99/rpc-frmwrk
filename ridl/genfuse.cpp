@@ -2526,7 +2526,7 @@ gint32 CImplIfMethodSvrFuse::OutputEvent()
         BLOCK_OPEN;
         Wa( "gint32 ret = 0;" );
         Wa( "if( oJsEvt.empty() ||" ); 
-        Wa( "    oJsEvt.isObject() )" );
+        Wa( "    !oJsEvt.isObject() )" );
         Wa( "    return -EINVAL;" );
         Wa( "CParamList oOptions_;" );
         CCOUT << "oOptions_[ propSeriProto ] = ";
@@ -3042,7 +3042,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strMethod =" );
             Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
-            Wa( "if( strMethod != \"KeepAlive\" )" );
+            Wa( "if( strMethod != \"OnKeepAlive\" )" );
             Wa( "{ ret = -ENOTSUP; break;}" );
             Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||" );
             Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isUInt64() )" );
@@ -3412,6 +3412,13 @@ gint32 CImplIufSvrFuse::OutputDispatch()
         Wa( "{ ret = -EINVAL; break; }" );
         Wa( "stdstr strMethod =" );
         Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
+        Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||");
+        Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
+        Wa( "{ ret = -EINVAL; break; }" );
+        Wa( "stdstr strType =" );
+        Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
+        Wa( "if( strType == \"resp\" )" );
+        BLOCK_OPEN;
         Wa( "if( !oMsg.isMember( JSON_ATTR_RETCODE ) ||");
         Wa( "    !oMsg[ JSON_ATTR_RETCODE ].isUInt() )" );
         Wa( "{ ret = -EINVAL; break; }" );
@@ -3433,8 +3440,6 @@ gint32 CImplIufSvrFuse::OutputDispatch()
         Wa( "CParamList oReqCtx;" );
         Wa( "oReqCtx[ propEventSink ] = ObjPtr( pTask );" );
 
-        Wa( "stdstr strType =" );
-        Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
         for( ; i < dwCount; i++ )
         {
             ObjPtr pObj = pmds->GetChild( i );
@@ -3444,6 +3449,9 @@ gint32 CImplIufSvrFuse::OutputDispatch()
                 ret = -EFAULT;
                 break;
             }
+            if( pmd->IsEvent() )
+                continue;
+
             ObjPtr pInArgs = pmd->GetInArgs();
             guint32 dwInCount = GetArgCount( pInArgs );
             ObjPtr pOutArgs = pmd->GetOutArgs();
@@ -3452,10 +3460,8 @@ gint32 CImplIufSvrFuse::OutputDispatch()
                 << pmd->GetName() << "\" )";
             NEW_LINE;
             BLOCK_OPEN;
-            if( !pmd->IsEvent() && !pmd->IsNoReply() )
+            if( !pmd->IsNoReply() )
             {
-                Wa( "if( strType != \"resp\" )" );
-                Wa( "{ ret = -EINVAL; break; }" );
                 CCOUT << "ret = " << strClass << "::"
                     << pmd->GetName() <<"Complete(";
                 NEW_LINE;
@@ -3463,20 +3469,6 @@ gint32 CImplIufSvrFuse::OutputDispatch()
                 if( dwOutCount > 0 ) 
                     CCOUT << ", oMsg";
                 CCOUT << " );";
-                NEW_LINE;
-                Wa( "if( ret == STATUS_PENDING )" );
-                Wa( "    ret = STATUS_SUCCESS;" );
-            }
-            else if( pmd->IsEvent() )
-            {
-                Wa( "if( strType != \"evt\" )" );
-                Wa( "{ ret = -EINVAL; break; }" );
-                CCOUT << "ret = " << strClass << "::"
-                    << pmd->GetName() <<"(";
-                if( dwInCount > 0 ) 
-                    CCOUT << " oMsg );";
-                else
-                    CCOUT << ");";
                 NEW_LINE;
                 Wa( "if( ret == STATUS_PENDING )" );
                 Wa( "    ret = STATUS_SUCCESS;" );
@@ -3490,7 +3482,49 @@ gint32 CImplIufSvrFuse::OutputDispatch()
             BLOCK_CLOSE;
             NEW_LINE;
         }
-        Wa( "ret = -ENOENT;" );
+        BLOCK_CLOSE; // strType == resp
+        NEW_LINE;
+        Wa( "else if( strType == \"evt\" )" );
+        BLOCK_OPEN;
+
+        for( i = 0; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( !pmd->IsEvent() )
+                continue;
+
+            ObjPtr pInArgs = pmd->GetInArgs();
+            guint32 dwInCount = GetArgCount( pInArgs );
+            ObjPtr pOutArgs = pmd->GetOutArgs();
+            guint32 dwOutCount = GetArgCount( pOutArgs );
+            CCOUT << "if( strMethod == \""
+                << pmd->GetName() << "\" )";
+            NEW_LINE;
+            BLOCK_OPEN;
+
+            CCOUT << "ret = " << strClass << "::"
+                << pmd->GetName() <<"(";
+            if( dwInCount > 0 ) 
+                CCOUT << " oMsg );";
+            else
+                CCOUT << ");";
+            NEW_LINE;
+            Wa( "if( ret == STATUS_PENDING )" );
+            Wa( "    ret = STATUS_SUCCESS;" );
+
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        BLOCK_CLOSE; // strType == evt
+        NEW_LINE;
+        CCOUT << "ret = -ENOENT;";
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         CCOUT << "return ret;";

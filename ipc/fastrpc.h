@@ -1106,6 +1106,9 @@ class CFastRpcServerBase :
     gint32 RemoveStmSkel(
         HANDLE hstm );
 
+    gint32 EnumStmSkels(
+        std::vector< InterfPtr >& vecIfs );
+
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
         IConfigDb* pEvtCtx,

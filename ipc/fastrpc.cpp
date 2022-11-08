@@ -768,6 +768,19 @@ gint32 CFastRpcServerBase::GetStmSkel(
     return STATUS_SUCCESS;
 }
 
+gint32 CFastRpcServerBase::EnumStmSkels(
+    std::vector< InterfPtr >& vecIfs )
+{
+    CStdRMutex oLock( GetLock() );
+    if( m_mapSkelObjs.empty() )
+        return -ENOENT;
+
+    for( auto& elem : m_mapSkelObjs )
+        vecIfs.push_back( elem.second );
+
+    return STATUS_SUCCESS;
+}
+
 gint32 CFastRpcServerBase::OnRmtSvrEvent(
     EnumEventId iEvent,
     IConfigDb* pEvtCtx,
