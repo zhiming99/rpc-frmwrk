@@ -1527,7 +1527,7 @@ gint32 CImplPyIfSvrBase2::OutputDispMsg()
         Wa( " }" );
         INDENT_DOWNL;
 
-        CCOUT << "def DispatchMsg( self, oMsg : dict ):";
+        CCOUT << "def DispatchIfMsg( self, oMsg : dict ):";
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
@@ -1946,7 +1946,7 @@ gint32 CImplPyIfProxyBase2::OutputDispMsg()
         Wa( " }" );
         INDENT_DOWNL;
 
-        CCOUT << "def DispatchMsg( self, oMsg : dict ):";
+        CCOUT << "def DispatchIfMsg( self, oMsg : dict ):";
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
@@ -2404,13 +2404,15 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
 
         CCOUT << " ) :";
         NEW_LINE;
-        CCOUT << "def __init__( self, strSvcPoint : str ) :";
+        CCOUT << "def __init__( self, strSvcPoint : str, num : int ) :";
         INDENT_UPL;
+        Wa( "if num is None:" );
+        Wa( "    num = 0" );
         Wa( "error = 0" );
         Wa( "self.m_strPath = strSvcPoint" );
-        Wa( "reqFile = strSvcPoint + \"/jreq_0\"" );
+        Wa( "reqFile = strSvcPoint + \"/jreq_\" + num" );
         Wa( "self.m_reqFp = open( reqFile, \"rb\" )" );
-        Wa( "respFile = strSvcPoint + \"/jrsp_0\"" );
+        Wa( "respFile = strSvcPoint + \"/jrsp_\" + num" );
         Wa( "self.m_respFp = open( respFile, \"wb\" )" );
         INDENT_DOWNL;
         
@@ -2428,6 +2430,25 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
 
         Wa( "def getReqFp( self ) ->  object:" );
         Wa( "    return self.m_reqFp" );
+        NEW_LINE;
+
+        CCOUT << "def OnKeepAlive( self, reqId : object ) -> int:";
+        INDENT_UPL;
+        Wa( "if reqId is None:" );
+        Wa( "    return -errno.EINVAL" );
+        Wa( "oResp = dict()" );
+        CCOUT << "oResp[ \"" << JSON_ATTR_REQCTXID << "\" ] = reqId";
+        NEW_LINE;
+        CCOUT << "oResp[ \"" << JSON_ATTR_METHOD << "\" ] = \"OnKeepAlive\"";
+        NEW_LINE;
+        CCOUT << "oResp[ \"" << JSON_ATTR_IFNAME1 << "\" ] = \"IInterfaceServer\"";
+        NEW_LINE;
+        CCOUT << "oResp[ \"" << JSON_ATTR_MSGTYPE << "\" ] = \"resp\"";
+        NEW_LINE;
+        CCOUT << "oResp[ \"" << JSON_ATTR_RETCODE << "\" ] = 0";
+        NEW_LINE;
+        CCOUT << "return self.sendResp( oResp )";
+        INDENT_DOWNL;
         NEW_LINE;
 
         CCOUT << "def DispatchMsg( self, oReq : dict ):";
@@ -2453,7 +2474,7 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
             NEW_LINE;
             stdstr strClass = "I";
             strClass += strIfName + "_SvrImpl";
-            CCOUT << "    " << strClass << ".DispatchMsg( self, oReq )";
+            CCOUT << "    " << strClass << ".DispatchIfMsg( self, oReq )";
             NEW_LINE;
             Wa( "    return" );
             if( i < vecIfs.size() - 1 )
@@ -2890,14 +2911,16 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
 
         CCOUT << ") :";
         NEW_LINE;
-        CCOUT << "def __init__( self, strSvcPoint : str ) :";
+        CCOUT << "def __init__( self, strSvcPoint : str, num : int ) :";
         INDENT_UPL;
+        Wa( "if num is None:" );
+        Wa( "    num = 0" );
         Wa( "self.m_strPath = strSvcPoint" );
-        Wa( "reqFile = strSvcPoint + \"/jreq_0\"" );
+        Wa( "reqFile = strSvcPoint + \"/jreq_\" + num" );
         Wa( "self.m_reqFp = open( reqFile, \"wb\" )" );
-        Wa( "respFile = strSvcPoint + \"/jrsp_0\"" );
+        Wa( "respFile = strSvcPoint + \"/jrsp_\" + num" );
         Wa( "self.m_respFp = open( respFile, \"rb\" )" );
-        Wa( "evtFile = strSvcPoint + \"/jevt_0\"" );
+        Wa( "evtFile = strSvcPoint + \"/jevt_\" + num" );
         Wa( "self.m_evtFp = open( evtFile, \"rb\" )" );
         INDENT_DOWNL;
         
@@ -2940,7 +2963,7 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
             NEW_LINE;
             stdstr strClass = "I";
             strClass += strIfName + "_CliImpl";
-            CCOUT << "    " << strClass << ".DispatchMsg( self, oResp )";
+            CCOUT << "    " << strClass << ".DispatchIfMsg( self, oResp )";
             NEW_LINE;
             Wa( "    return" );
             if( i < vecIfs.size() - 1 )
@@ -3219,6 +3242,12 @@ gint32 CImplPyMainFunc2::OutputCli(
         NEW_LINE;
         Wa( "    Usage()" );
         Wa( "    return -errno.EINVAL" );
+        Wa( "num = 0" );
+        CCOUT << "if len( sys.argv ) >= "
+            << vecSvcs.size() + 2 << " :";
+        NEW_LINE;
+        CCOUT << "    num = sys.argv[ "
+            << vecSvcs.size() + 1 << " ]";
         NEW_LINE;
         Wa( "'''" );
         Wa( "Note: this is a reference design" );
@@ -3235,7 +3264,7 @@ gint32 CImplPyMainFunc2::OutputCli(
             stdstr strName = pSvc->GetName();
             CCOUT << "oProxy = C" << strName << "Proxy(";
             NEW_LINE;
-            Wa( "    strSvcPt )" );
+            Wa( "    strSvcPt, num )" );
             Wa( "oProxies.append( oProxy )" );
             NEW_LINE;
         }
@@ -3396,6 +3425,12 @@ gint32 CImplPyMainFunc2::OutputSvr(
         NEW_LINE;
         Wa( "    Usage()" );
         Wa( "    return -errno.EINVAL" );
+        Wa( "num = 0" );
+        CCOUT << "if len( sys.argv ) >= "
+            << vecSvcs.size() + 2 << " :";
+        NEW_LINE;
+        CCOUT << "    num = sys.argv[ "
+            << vecSvcs.size() + 1 << " ]";
         NEW_LINE;
 
         Wa( "'''" );
@@ -3414,7 +3449,7 @@ gint32 CImplPyMainFunc2::OutputSvr(
             stdstr strName = pSvc->GetName();
             CCOUT << "oSvr = C" << strName << "Server(";
             NEW_LINE;
-            Wa( "    strSvcPt )" );
+            Wa( "    strSvcPt, num )" );
             Wa( "oSvrs.append( oSvr )" );
             NEW_LINE;
         }
