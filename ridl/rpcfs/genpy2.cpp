@@ -3089,7 +3089,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
             NEW_LINE;
             Wa( "fp = oSvr.getReqFp()" );
             Wa( "fps.append( fp )" );
-            CCOUT << "fMap[ fp.fileno ] = " << i;
+            CCOUT << "fMap[ fp.fileno() ] = " << i;
             NEW_LINES( 2 );
         }
 
@@ -3101,9 +3101,9 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
         INDENT_UPL;
         Wa( "ret = iolib.recvMsg( s )" );
         Wa( "if ret[ 0 ] < 0:" );
-        Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
+        Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno() )" );
         Wa( "for oMsg in ret[ 1 ] :" );
-        Wa( "    idx = fMap[ s.fileno ]" );
+        Wa( "    idx = fMap[ s.fileno() ]" );
         CCOUT << "    self.m_oSvrs[ idx ].DispatchMsg( oMsg )";
         INDENT_DOWNL;
         Wa( "bExit = self.IsExiting()" );
@@ -3169,7 +3169,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
             {
                 Wa( "fp = oProxy.getEvtFp()" );
                 Wa( "fps.append( fp )" );
-                CCOUT << "fMap[ fp.fileno ] = " << i;
+                CCOUT << "fMap[ fp.fileno() ] = " << i;
                 NEW_LINE;
             }
             if( g_bAsyncProxy )
@@ -3177,7 +3177,7 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
                 NEW_LINE;
                 Wa( "fp = oProxy.getRespFp()" );
                 Wa( "fps.append( fp )" );
-                CCOUT << "fMap[ fp.fileno ] = " << i;
+                CCOUT << "fMap[ fp.fileno() ] = " << i;
                 NEW_LINE;
             }
             NEW_LINE;
@@ -3190,9 +3190,9 @@ gint32 CImplPyMainFunc2::OutputThrdProcCli(
         INDENT_UPL;
         Wa( "ret = iolib.recvMsg( s )" );
         Wa( "if ret[ 0 ] < 0:" );
-        Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno )" );
+        Wa( "    raise Exception( \"Error read @\%d\" \% s.fileno() )" );
         Wa( "for oMsg in ret[ 1 ] :" );
-        Wa( "    idx = fMap[ s.fileno ]" );
+        Wa( "    idx = fMap[ s.fileno() ]" );
         CCOUT << "    self.m_oProxies[ idx ].DispatchMsg( oMsg )";
         INDENT_DOWNL;
         Wa( "bExit = self.IsExiting()" );

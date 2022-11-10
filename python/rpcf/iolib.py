@@ -57,10 +57,10 @@ def recvResp( respfp : object)->[int, list] :
             if size == 0 :
                 error = -errno.ENODATA
                 raise Exception( 'response with error %d' % error )
+            if pos + 4 + size > len( inBuf ):
+                error = -errno.ERANGE
+                raise Exception( 'partial message with error %d' % error )
             payload = inBuf[ pos + 4 : pos + 4 + size ]
-            if len( payload ) == 0:
-                error = -errno.EBADMSG
-                raise Exception( 'partial response with error %d' % error )
             strResp = payload.decode( "UTF-8" )
             res.append( json.loads( strResp ) )
             pos += 4 + size
@@ -143,15 +143,16 @@ def recvMsg( respfp : object)->[int, list] :
             if size == 0 :
                 error = -errno.ENODATA
                 raise Exception( 'response with error %d' % error )
+            if pos + 4 + size > len( inBuf ):
+                error = -errno.ERANGE
+                raise Exception( 'partial message with error %d' % error )
             payload = inBuf[ pos + 4 : pos + 4 + size ]
-            if len( payload ) == 0:
-                error = -errno.EBADMSG
-                raise Exception( 'partial response with error %d' % error )
             strResp = payload.decode( "UTF-8" )
             res.append( json.loads( strResp ) )
             pos += 4 + size
         return [ 0, res ]
     except Exception as err:
+        print( err )
         if error == 0 :
             error = -errno.EFAULT
         return [ error, None ]
