@@ -2410,9 +2410,9 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         Wa( "    num = 0" );
         Wa( "error = 0" );
         Wa( "self.m_strPath = strSvcPoint" );
-        Wa( "reqFile = strSvcPoint + \"/jreq_\" + num" );
+        Wa( "reqFile = strSvcPoint + \"/jreq_\" + str( num )" );
         Wa( "self.m_reqFp = open( reqFile, \"rb\" )" );
-        Wa( "respFile = strSvcPoint + \"/jrsp_\" + num" );
+        Wa( "respFile = strSvcPoint + \"/jrsp_\" + str( num )" );
         Wa( "self.m_respFp = open( respFile, \"wb\" )" );
         INDENT_DOWNL;
         
@@ -2916,11 +2916,11 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         Wa( "if num is None:" );
         Wa( "    num = 0" );
         Wa( "self.m_strPath = strSvcPoint" );
-        Wa( "reqFile = strSvcPoint + \"/jreq_\" + num" );
+        Wa( "reqFile = strSvcPoint + \"/jreq_\" + str( num )" );
         Wa( "self.m_reqFp = open( reqFile, \"wb\" )" );
-        Wa( "respFile = strSvcPoint + \"/jrsp_\" + num" );
+        Wa( "respFile = strSvcPoint + \"/jrsp_\" + str( num )" );
         Wa( "self.m_respFp = open( respFile, \"rb\" )" );
-        Wa( "evtFile = strSvcPoint + \"/jevt_\" + num" );
+        Wa( "evtFile = strSvcPoint + \"/jevt_\" + str( num )" );
         Wa( "self.m_evtFp = open( evtFile, \"rb\" )" );
         INDENT_DOWNL;
         
@@ -3246,8 +3246,8 @@ gint32 CImplPyMainFunc2::OutputCli(
         CCOUT << "if len( sys.argv ) >= "
             << vecSvcs.size() + 2 << " :";
         NEW_LINE;
-        CCOUT << "    num = sys.argv[ "
-            << vecSvcs.size() + 1 << " ]";
+        CCOUT << "    num = int( sys.argv[ "
+            << vecSvcs.size() + 1 << " ] )";
         NEW_LINE;
         Wa( "'''" );
         Wa( "Note: this is a reference design" );
@@ -3429,8 +3429,8 @@ gint32 CImplPyMainFunc2::OutputSvr(
         CCOUT << "if len( sys.argv ) >= "
             << vecSvcs.size() + 2 << " :";
         NEW_LINE;
-        CCOUT << "    num = sys.argv[ "
-            << vecSvcs.size() + 1 << " ]";
+        CCOUT << "    num = int( sys.argv[ "
+            << vecSvcs.size() + 1 << " ] )";
         NEW_LINE;
 
         Wa( "'''" );
