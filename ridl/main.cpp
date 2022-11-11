@@ -116,6 +116,7 @@ bool g_bNewSerial = true;
 stdstr g_strLang = "cpp";
 stdstr g_strLocale ="en";
 guint32 g_dwFlags = 0;
+stdstr g_strCmdLine;
 
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
@@ -139,6 +140,12 @@ int main( int argc, char** argv )
     gint32 ret = 0;
     bool bUninit = false;
     do{
+        for( guint32 i = 0; i < argc; i++ )
+        {
+            g_strCmdLine += argv[ i ];
+            g_strCmdLine.append( 1, ' ' );
+        }
+
         ret = CoInitialize( COINIT_NORPC );
         if( ERROR( ret ) )
             break;
@@ -467,20 +474,17 @@ int main( int argc, char** argv )
             break;
 
         // store the command to the file 'cmdline'
-        stdstr strCmdLine;
-        for( int i = 0; i < argc; i++ )
-        {
-            strCmdLine += argv[ i ];
-            strCmdLine.append( 1, ' ' );
-        }
-        strCmdLine.append( 1, '\n' );
         stdstr strPath = g_strOutPath;
         strPath += "/cmdline";
         FILE* fp = fopen( strPath.c_str(), "w" );
         if( fp == nullptr )
             break;
-        fwrite( strCmdLine.c_str(),
-            strCmdLine.size(), 1, fp );
+        stdstr strShebang = "#!/bin/sh\n";
+        fwrite( strShebang.c_str(),
+            strShebang.size(), 1, fp );
+        g_strCmdLine.append( 1, '\n' );
+        fwrite( g_strCmdLine.c_str(),
+            g_strCmdLine.size(), 1, fp );
         fclose( fp );
 
     }while( 0 );
