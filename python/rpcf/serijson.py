@@ -85,7 +85,7 @@ class CSerialBase :
             ret = self.SerialElem( elem, sigElem )
             if ret[ 0 ] < 0 :
                 break
-            res.append( ret[ 0 ] )
+            res.append( ret[ 1 ] )
         if ret[ 0 ] < 0 :
             return ret
         return ( 0, res )
@@ -233,7 +233,7 @@ class CSerialBase :
         if sig[ 0 ] == '[' :
             return self.DeserialMap( val, sig )
         if sig[ 0 ] == 'O' :
-            return self.DeserialStruct( val, sig )
+            return self.DeserialStruct( val )
         resElem = self.DeserialElemOpt[ sig[ 0 ] ]( self, val )
         return ( 0, resElem )
 
