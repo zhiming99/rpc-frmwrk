@@ -1198,7 +1198,7 @@ class CInterfaceProxy :
             pReqCall, pCallback );
     }
 
-    gint32 OnKeepAliveTerm(
+    virtual gint32 OnKeepAliveTerm(
         IEventSink* pInvokeTask );
 
     virtual gint32 SendFetch_Proxy(
@@ -1512,7 +1512,7 @@ class CInterfaceServer :
             pReqMsg, pCallback );
     }
 
-    gint32 OnKeepAliveOrig(
+    virtual gint32 OnKeepAliveOrig(
         IEventSink* pTask );
 
     gint32 OnKeepAliveRelay(
