@@ -1377,6 +1377,9 @@ extern gint32 FuseDeclareMsgSet(
 extern gint32 EmitBuildJsonReq( 
     CWriterBase* m_pWriter );
 
+extern gint32 EmitBuildJsonReq2( 
+    CWriterBase* m_pWriter );
+
 gint32 GenCppFile(
     CCppWriter* m_pWriter, ObjPtr& pRoot )
 {
@@ -1424,8 +1427,16 @@ gint32 GenCppFile(
             if( ERROR( ret ) )
                 break;
 
-            ret = EmitBuildJsonReq(
-                m_pWriter );
+            if( g_bRpcOverStm )
+            {
+                ret = EmitBuildJsonReq2(
+                    m_pWriter );
+            }
+            else
+            {
+                ret = EmitBuildJsonReq(
+                    m_pWriter );
+            }
             if( ERROR( ret ) )
                 break;
             NEW_LINE;
