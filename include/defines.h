@@ -580,6 +580,8 @@ class CObjBase
     { return m_atmObjCount; }
 
     void Dump( std::string& strDump );
+
+    static guint64 NewObjId();
 };
 
 class IEventSink : public CObjBase
