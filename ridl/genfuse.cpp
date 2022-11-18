@@ -3033,7 +3033,7 @@ gint32 CImplServiceImplFuse::OutputUCRSvr()
 
         Wa( "Json::Value val_( objectValue );" );
         Wa( "val_[ JSON_ATTR_REQCTXID ] =" );
-        Wa( "    ( guint64 )pTask->GetObjId();" );
+        Wa( "    ( Json::UInt64 )pTask->GetObjId();" );
         NEW_LINE;
 
         Wa( "stdstr strReq;" );
