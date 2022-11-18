@@ -6,7 +6,7 @@ from rpcf import serijson
 import errno
 from rpcf.proxy import ErrorCode as Err
 from typing import Union, Tuple, Optional
-import TestTypesstructs
+from TestTypesstructs import *
 from ifimpl import *
 import select
 class CITestTypessvr( IITestTypes_SvrImpl ):
@@ -231,9 +231,27 @@ class CTestTypesSvcServer(
             if "ITestTypes" == oReq[ "Interface" ] :
                 IITestTypes_SvrImpl.DispatchIfMsg( self, oReq )
                 return
+            if "IInterfaceServer" == oReq[ "Interface" ] and "UserCancelRequest" == oReq[ "Method" ] :
+                reqId = oReq[ "RequestId" ]
+                oParams = oReq[ "Parameters" ]
+                reqIdToCancel = oParams[ "RequestId" ]
+                self.UserCancelRequest( reqId, reqIdToCancel )
+                return
             
         except Exception as err:
             print( err )
             return
         
+    def UserCancelRequest( self, reqId : object,
+        reqIdToCancel : object ) -> int:
+        # change this function for customized behavor
+        print( "request", reqIdToCancel, " is canceled" )
+        oParams = dict()
+        oParams[ "RequestId" ] = reqIdToCancel
+        oResp = BuildReqHeader( reqId,
+            "UserCancelRequest",
+            "IInterfaceServer",
+            0, False, True )
+        oResp[ "Parameters" ] = oParams
+        return self.sendResp( oResp )
     

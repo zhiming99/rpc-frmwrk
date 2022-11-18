@@ -106,11 +106,11 @@ def maincli() :
         i0.body[1].creativeId = "giogio"
         i0.body[1].sponsorId = "jojo"
 
-        ret = oProxy.Echo( reqId, i0 )
-        if ret[ 0 ] < 0 :
-            print( "Echo failed with error %d" % ret[0] )
-            return ret[0]
-        i0r = ret[ 1 ][0]
+        iRet = oProxy.Echo( reqId, i0 )
+        if iRet[ 0 ] < 0 :
+            print( "Echo failed with error %d" % iRet[0] )
+            return iRet[0]
+        i0r = iRet[ 1 ][0]
         pprint(vars( i0r ))
         pprint(vars(i0r.body[0]))
         pprint(vars(i0r.body[1]))
@@ -120,11 +120,7 @@ def maincli() :
         if error < 0 :
             return error
         return -errno.EFAULT
-    finally:
-        if oMsgThrd is not None:
-            oMsgThrd.SetExit()
-            threading.Thread.join( oMsgThrd )
-    return ret
+    return 0
     
 ret = maincli()
-quit( ret )
+quit( -ret )

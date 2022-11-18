@@ -6,13 +6,14 @@ from rpcf import serijson
 import errno
 from rpcf.proxy import ErrorCode as Err
 from typing import Union, Tuple, Optional
+from TestTypesstructs import *
+from ifimpl import *
 import os
 import time
 import threading
 import select
 import json
 from TestTypesSvccli import CTestTypesSvcProxy
-from TestTypesstructs import FILE_INFO
 
 class CliEvtThread(threading.Thread):
     def __init__(self , threadName, oProxies ):

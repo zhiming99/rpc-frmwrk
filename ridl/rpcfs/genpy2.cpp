@@ -1187,7 +1187,7 @@ static gint32 GenIfImplFile(
     do{
         EmitImports( m_pWriter );
         Wa( "import random" );
-        CCOUT << "import " << g_strAppName << "structs";
+        CCOUT << "from " << g_strAppName << "structs import *";
         NEW_LINE;
 
         EmitPyBuildReqHeader( m_pWriter );
@@ -1681,7 +1681,7 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
             NEW_LINE;
         }
         CCOUT << "ret = self." << strName << "CompleteCb("
-            << "iRet, reqId";
+            << " reqId, iRet";
         if( dwOutCount == 0 )
             CCOUT << " )";
         else
@@ -1700,11 +1700,11 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         Wa( "is completed asynchronously" );
         Wa( "'''" );
         CCOUT << "def " << strName << "CompleteCb( self,";
-        NEW_LINE;
         if( dwOutCount > 0 )
         {
-            INDENT_UP;
-            CCOUT << "ret : int, reqId : object, ";
+            INDENT_UPL;
+            CCOUT << "reqId : object, ret : int,";
+            NEW_LINE;
             ret = EmitFormalArgListPy(
                 m_pWriter, pOutArgs );
             if( ERROR( ret ) )
@@ -1713,7 +1713,8 @@ gint32 CImplPyMthdSvrBase2::OutputSync()
         }
         else
         {
-            CCOUT << "    ret : int, reqId : object";
+            NEW_LINE;
+            CCOUT << "    reqId : object, ret : int";
         }
         CCOUT << " ) -> int :";
         INDENT_UPL;
@@ -2146,7 +2147,9 @@ gint32 CImplPyMthdProxyBase2::OutputSync( bool bSync )
         {
             // async
             Wa( "ret = self.sendReq( oReq )" );
-            Wa( "return [ ret, None ]" );
+            Wa( "if ret < 0:" );
+            Wa( "    return [ ret, None ]" );
+            Wa( "return [ Err.STATUS_PENDING, None ]" );
         }
         else if( bNoReply )
         {
@@ -2242,34 +2245,6 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
         stdstr strIfName = m_pIf->GetName(); 
         ObjPtr pOutArgs = m_pNode->GetOutArgs();
         guint32 dwOutCount = GetArgCount( pOutArgs );
-        /*Wa( "'''" );
-        Wa( "Async Request callback placeholder" );
-        Wa( "implementatation is in the service file" );
-        Wa( "'''" );
-        CCOUT << "def " << strName << "Callback(";
-        NEW_LINE;
-        CCOUT << "    self, ret : int, reqId : int";
-        if( dwOutCount == 0 )
-        {
-            CCOUT << " ):";
-            NEW_LINE;
-            CCOUT << "    pass";
-        }
-        else
-        {
-            CCOUT << ",";
-            INDENT_UPL;
-            ret = EmitFormalArgListPy(
-                m_pWriter, pOutArgs );
-            if( ERROR( ret ) )
-                break;
-
-            CCOUT << " ):";
-            NEW_LINE;
-            CCOUT << "pass";
-            INDENT_DOWNL;
-        }
-        NEW_LINE; */
 
         Wa( "'''" );
         Wa( "this callback wraper gets called when the" ); 
@@ -2317,14 +2292,23 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
 
         if( dwOutCount == 0 )
         {
-            CCOUT << "self." << strName << "Callback( retCode, reqIdr )";
+            CCOUT << "self." << strName << "Callback( reqIdr, retCode )";
             NEW_LINE;
             CCOUT << "return";
         }
         else
         {
+            if( dwOutCount == 1 )
+                Wa( "args = [ None ]" );
+            else
+            {
+                CCOUT << "args = [ None ] * " << dwOutCount;
+                NEW_LINE;
+            }
+
             CCOUT << "if retCode == 0:";
             INDENT_UPL;
+            Wa( "osb = serijson.CSerialBase()" );
             CCOUT << "oParams = oResp[ \""
                 << JSON_ATTR_PARAMS << "\" ]";
             NEW_LINE;
@@ -2336,7 +2320,7 @@ gint32 CImplPyMthdProxyBase2::OutputAsyncCbWrapper( bool bSync )
 
             INDENT_DOWNL; // retcode == 0
             CCOUT << "self." << strName
-                << "Callback( retCode, reqIdr, *args )";
+                << "Callback( reqIdr, retCode, *args )";
             NEW_LINE;
             CCOUT << "return";
         }
@@ -2446,11 +2430,9 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
         NEW_LINE;
         CCOUT << "oResp[ \"" << JSON_ATTR_IFNAME1 << "\" ] = \"IInterfaceServer\"";
         NEW_LINE;
-        CCOUT << "oResp[ \"" << JSON_ATTR_MSGTYPE << "\" ] = \"resp\"";
+        CCOUT << "oResp[ \"" << JSON_ATTR_MSGTYPE << "\" ] = \"evt\"";
         NEW_LINE;
-        CCOUT << "oResp[ \"" << JSON_ATTR_RETCODE << "\" ] = 0";
-        NEW_LINE;
-        CCOUT << "return self.sendResp( oResp )";
+        CCOUT << "return self.sendEvent( oResp )";
         INDENT_DOWNL;
         NEW_LINE;
 
@@ -2483,9 +2465,52 @@ gint32 CImplPySvcSvr2::OutputSvcSvrClass()
             if( i < vecIfs.size() - 1 )
                 NEW_LINE;
         }
+
+        CCOUT << "if \"IInterfaceServer\" == oReq[ \""
+           << JSON_ATTR_IFNAME1 << "\" ] and ";
+        CCOUT << "\"UserCancelRequest\" == oReq[ \""
+           << JSON_ATTR_METHOD << "\" ] :";
+        INDENT_UPL;
+        CCOUT << "reqId = oReq[ \"" << JSON_ATTR_REQCTXID << "\" ]";
+        NEW_LINE;
+        CCOUT << "oParams = oReq[ \"" << JSON_ATTR_PARAMS << "\" ]";
+        NEW_LINE;
+        CCOUT << "reqIdToCancel = oParams[ \"" << JSON_ATTR_REQCTXID << "\" ]";
+        NEW_LINE;
+        Wa( "self.UserCancelRequest( reqId, reqIdToCancel )" );
+        CCOUT << "return";
+        INDENT_DOWNL;
+
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false, true );
-        INDENT_DOWNL;
+        INDENT_DOWN;
+        NEW_LINE;
+
+        CCOUT << "def UserCancelRequest( self, reqId : object,";
+        NEW_LINE;
+        CCOUT << "    reqIdToCancel : object ) -> int:";
+        INDENT_UPL;
+        CCOUT << "# change this function for customized behavor";
+        NEW_LINE;
+        Wa( "print( \"request\", reqIdToCancel, \" is canceled\" )" );
+        Wa( "oParams = dict()" );
+        CCOUT << "oParams[ \"" << JSON_ATTR_REQCTXID << "\" ] = "
+            << "reqIdToCancel";
+        NEW_LINE;
+        Wa( "oResp = BuildReqHeader( reqId," );
+        CCOUT << "    \"UserCancelRequest\",";
+        NEW_LINE;
+        CCOUT << "    \"IInterfaceServer\",";
+        NEW_LINE;
+        Wa( "    0, False, True )" );
+        CCOUT << "oResp[ \""
+            << JSON_ATTR_PARAMS<< "\" ] = oParams";
+        NEW_LINE;
+        CCOUT << "return self.sendResp( oResp )";
+
+        INDENT_DOWN;
+        NEW_LINE;
+
         INDENT_DOWNL; // class
 
     }while( 0 );
@@ -2499,7 +2524,7 @@ gint32 CImplPySvcSvr2::Output()
     do{
         stdstr strName = m_pNode->GetName();
         EmitImports( m_pWriter );
-        CCOUT << "import " << g_strAppName << "structs";
+        CCOUT << "from " << g_strAppName << "structs import *";
         NEW_LINE;
         CCOUT << "from ifimpl import *";
         NEW_LINE;
@@ -2732,7 +2757,7 @@ gint32 CImplPyIfProxy2::Output()
         }
 
         if( !bHasMethod )
-            Wa( "pass" );
+            CCOUT << "pass";
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2785,17 +2810,18 @@ gint32 CImplPyMthdProxy2::OutputAsyncCallback()
                 m_pWriter, pOutArgs );
             if( ERROR( ret ) )
                 break;
-            Wa( " ) :" );
+            CCOUT << " ) :";
+            NEW_LINE;
         }
         else
         {
             CCOUT << "def " << strName << "Callback( self,";
             INDENT_UPL;
-            CCOUT << "    ret : int, reqId : int ):"; 
+            CCOUT << "    reqId : int, ret : int ):"; 
             NEW_LINE;
         }
 
-        Wa( "pass" );
+        CCOUT << "pass";
         INDENT_DOWNL;
 
     }while( 0 );
@@ -2880,6 +2906,8 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         stdstr strName = m_pNode->GetName();
         CCOUT << "class C" << strName << "Proxy(";
         INDENT_UPL;
+        bool bHasEvent =
+            CImplPyMainFunc2::HasEvent( m_pNode );
         
         std::vector< ObjPtr > vecIfs;
         m_pNode->GetIfRefs( vecIfs );
@@ -2927,8 +2955,8 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         Wa( "self.m_evtFp = open( evtFile, \"rb\" )" );
         INDENT_DOWNL;
         
-        Wa( "def sendReq( self, oResp : object ) -> int:" );
-        Wa( "    return iolib.sendReq( self.m_reqFp, oResp )" );
+        Wa( "def sendReq( self, oReq : object ) -> int:" );
+        Wa( "    return iolib.sendReq( self.m_reqFp, oReq )" );
         NEW_LINE;
 
         Wa( "def recvResp( self ) -> Tuple[ int, object ]:" );
@@ -2943,39 +2971,119 @@ gint32 CImplPySvcProxy2::OutputSvcProxyClass()
         Wa( "    return self.m_evtFp" );
         NEW_LINE;
 
-        CCOUT << "def DispatchMsg( self, oResp : dict ):";
-        INDENT_UPL;
-        CCOUT << "try:";
-        INDENT_UPL;
-
-        for( guint32 i = 0; i < vecIfs.size(); i++ )
+        if( g_bAsyncProxy )
         {
-            auto& elem = vecIfs[ i ];
-            CInterfRef* pIfRef = elem;
-            ObjPtr pObj;
-            ret = pIfRef->GetIfDecl( pObj );
-            if( ERROR( ret ) )
+            CCOUT << "def CancelRequest( self, reqId2Cancel : int ) -> int:";
+            INDENT_UPL;
+            Wa( "error = 0" );
+            CCOUT << "try:";
+            INDENT_UPL;
+            Wa( "oReq = dict()" );
+            Wa( "oParams = dict()" );
+            CCOUT << "oReq[ \""
+                << JSON_ATTR_MSGTYPE << "\" ] = \"req\"";
+            NEW_LINE;
+            CCOUT << "oReq[ \""
+                << JSON_ATTR_IFNAME1 << "\" ] = \"IInterfaceServer\"";
+            NEW_LINE;
+            CCOUT << "oReq[ \""
+                << JSON_ATTR_METHOD << "\" ] = \""
+                << "UserCancelRequest" << "\"";
+            NEW_LINE;
+            CCOUT << "oReq[ \""
+                << JSON_ATTR_REQCTXID << "\" ] = random.randint( 0, 0x100000000 )";
+            NEW_LINE;
+            CCOUT << "oParams[ \""
+                << JSON_ATTR_REQCTXID << "\" ] = reqId2Cancel";
+            NEW_LINE;
+            CCOUT << "oReq[ \""
+                << JSON_ATTR_PARAMS << "\" ] = oParams";
+            NEW_LINE;
+
+            Wa( "ret = self.sendReq( oReq )" );
+
+            Wa( "if ret < 0:" );
+            Wa( "    error = ret" );
+            Wa( "    raise Exception( \"Error sending req %d\" \% error  )" );
+            CCOUT << "return Err.STATUS_PENDING";
+
+            INDENT_DOWNL;
+            EmitExceptHandler( m_pWriter, false );
+            INDENT_DOWNL;
+
+            CCOUT << "def OnUserCancelReqCbWrapper( self, oResp : object ):";
+            INDENT_UPL;
+            Wa( "error = 0" );
+            CCOUT << "try:";
+            INDENT_UPL;
+            CCOUT << "oParams = oResp[ \"" << JSON_ATTR_PARAMS << "\" ]";
+            NEW_LINE;
+            CCOUT << "reqIdCanceled = oParams[ \"" << JSON_ATTR_REQCTXID << "\" ]";
+            NEW_LINE;
+            CCOUT << "retCode = oResp[ \"" << JSON_ATTR_RETCODE << "\" ]";
+            NEW_LINE;
+            CCOUT << "self.OnUserCancelRequstComplete( retCode, reqIdCanceled )";
+            INDENT_DOWNL;
+            EmitExceptHandler( m_pWriter, false, true );
+            INDENT_DOWNL;
+
+            Wa( "'''" );
+            Wa( " adding your cancel handler here " );
+            Wa( "'''" );
+            Wa( "def OnUserCancelRequstComplete( self," );
+            Wa( "    ret : int, reqIdToCancel : int ):" );
+            CCOUT << "    print( \"CancelRequest \%d completed with"
+                <<" status \%d\" \% ( reqIdToCancel, ret ) )";
+            NEW_LINES( 2 );
+        }
+
+        if( g_bAsyncProxy || bHasEvent )
+        {
+            CCOUT << "def DispatchMsg( self, oResp : dict ):";
+            INDENT_UPL;
+            CCOUT << "try:";
+            INDENT_UPL;
+
+            for( guint32 i = 0; i < vecIfs.size(); i++ )
             {
-                ret = 0;
-                continue;
-            }
-            CInterfaceDecl* pifd = pObj;
-            stdstr strIfName = pifd->GetName();
-            CCOUT << "if \"" << strIfName << "\" == oResp[ \""
-               << JSON_ATTR_IFNAME1 << "\" ] :";
-            NEW_LINE;
-            stdstr strClass = "I";
-            strClass += strIfName + "_CliImpl";
-            CCOUT << "    " << strClass << ".DispatchIfMsg( self, oResp )";
-            NEW_LINE;
-            Wa( "    return" );
-            if( i < vecIfs.size() - 1 )
+                auto& elem = vecIfs[ i ];
+                CInterfRef* pIfRef = elem;
+                ObjPtr pObj;
+                ret = pIfRef->GetIfDecl( pObj );
+                if( ERROR( ret ) )
+                {
+                    ret = 0;
+                    continue;
+                }
+                CInterfaceDecl* pifd = pObj;
+                stdstr strIfName = pifd->GetName();
+                CCOUT << "if \"" << strIfName << "\" == oResp[ \""
+                   << JSON_ATTR_IFNAME1 << "\" ] :";
                 NEW_LINE;
+                stdstr strClass = "I";
+                strClass += strIfName + "_CliImpl";
+                CCOUT << "    " << strClass << ".DispatchIfMsg( self, oResp )";
+                NEW_LINE;
+                Wa( "    return" );
+                if( i < vecIfs.size() - 1 )
+                    NEW_LINE;
+            }
+            if( g_bAsyncProxy )
+            {
+                CCOUT << "if \"IInterfaceServer\" == oResp[ \""
+                   << JSON_ATTR_IFNAME1 << "\" ] and ";
+                CCOUT << "\"UserCancelRequest\" == oResp[ \""
+                   << JSON_ATTR_METHOD << "\" ] :";
+                NEW_LINE;
+                Wa( "    self.OnUserCancelReqCbWrapper( oResp )" );
+                CCOUT << "return";
+            }
+            INDENT_DOWNL;
+            EmitExceptHandler( m_pWriter, false, true );
+            INDENT_DOWNL;
         }
         INDENT_DOWNL;
-        EmitExceptHandler( m_pWriter, false, true );
-        INDENT_DOWNL;
-        INDENT_DOWNL;
+
     }while( 0 );
 
     return ret;
@@ -2987,10 +3095,11 @@ gint32 CImplPySvcProxy2::Output()
     do{
         stdstr strName = m_pNode->GetName();
         EmitImports( m_pWriter );
-        CCOUT << "import " << g_strAppName << "structs";
+        CCOUT << "from " << g_strAppName << "structs import *";
         NEW_LINE;
         CCOUT << "from ifimpl import *";
         NEW_LINE;
+        Wa( "import random" );
 
         std::vector< ObjPtr > vecIfs;
         m_pNode->GetIfRefs( vecIfs );
@@ -3047,11 +3156,6 @@ gint32 CImplPyMainFunc2::OutputThrdProcSvr(
 {
     gint32 ret = 0;
     do{
-        bool bHasEvt = HasEvent( vecSvcs );
-        bool bAsync = g_bAsyncProxy;
-        if( !bHasEvt && !bAsync )
-            break;
-
         CCOUT << "class SvrReqThread(threading.Thread):";
         INDENT_UPL;
         Wa( "def __init__(self , threadName, oSvrs ):" );
@@ -3238,7 +3342,8 @@ gint32 CImplPyMainFunc2::OutputCli(
         Wa( "oMsgThrd = None" );
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "oProxies = []" );
+        if( bHasEvent || g_bAsyncProxy )
+            Wa( "oProxies = []" );
 
         CCOUT << "if len( sys.argv ) < "
             << vecSvcs.size() + 1 << " :";
@@ -3268,7 +3373,8 @@ gint32 CImplPyMainFunc2::OutputCli(
             CCOUT << "oProxy = C" << strName << "Proxy(";
             NEW_LINE;
             Wa( "    strSvcPt, num )" );
-            Wa( "oProxies.append( oProxy )" );
+            if( bHasEvent || g_bAsyncProxy )
+                Wa( "oProxies.append( oProxy )" );
             NEW_LINE;
         }
         
@@ -3281,14 +3387,8 @@ gint32 CImplPyMainFunc2::OutputCli(
             NEW_LINE;
         }
 
-        Wa( "'''" );
-        Wa( "adding your code here" );
-
         std::vector< ObjPtr > vecIfs;
         CServiceDecl* pSvc = vecSvcs.front();
-
-        CCOUT << "using '" <<
-            pSvc->GetName() << "' as an example";
 
         pSvc->GetIfRefs( vecIfs );
         if( vecIfs.empty() )
@@ -3335,6 +3435,12 @@ gint32 CImplPyMainFunc2::OutputCli(
 
             if( pmd != nullptr )
             {
+                Wa( "'''" );
+                Wa( "adding your code here" );
+                CCOUT << "using '" <<
+                    pSvc->GetName() << "' as an example";
+                NEW_LINE;
+
                 stdstr strMName = pmd->GetName();
                 std::vector< std::pair< stdstr, stdstr >> vecArgs;
                 ObjPtr pInArgs = pmd->GetInArgs();
@@ -3370,6 +3476,8 @@ gint32 CImplPyMainFunc2::OutputCli(
                             CCOUT << " )'";
                     }
                 }
+                NEW_LINE;
+                CCOUT << "'''";
             }
             else if( bHasEvent )
             {
@@ -3385,14 +3493,17 @@ gint32 CImplPyMainFunc2::OutputCli(
 
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
-        Wa( "finally:" );
-        Wa( "    if oMsgThrd is not None:" );
-        Wa( "        oMsgThrd.SetExit()" );
-        Wa( "        threading.Thread.join( oMsgThrd )" );
+        if( bHasEvent || g_bAsyncProxy )
+        {
+            Wa( "finally:" );
+            Wa( "    if oMsgThrd is not None:" );
+            Wa( "        oMsgThrd.SetExit()" );
+            Wa( "        threading.Thread.join( oMsgThrd )" );
+        }
         Wa( "return ret" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
-        Wa( "quit( ret )" );
+        Wa( "quit( -ret )" );
 
     }while( 0 );
 
@@ -3478,14 +3589,17 @@ gint32 CImplPyMainFunc2::OutputSvr(
 
         INDENT_DOWNL;
         EmitExceptHandler( m_pWriter, false );
-        Wa( "finally:" );
-        Wa( "    if oSvrThrd is not None:" );
-        Wa( "        oSvrThrd.SetExit()" );
-        Wa( "        threading.Thread.join( oSvrThrd )" );
+        if( bHasEvent )
+        {
+            Wa( "finally:" );
+            Wa( "    if oSvrThrd is not None:" );
+            Wa( "        oSvrThrd.SetExit()" );
+            Wa( "        threading.Thread.join( oSvrThrd )" );
+        }
         Wa( "return 0" );
         INDENT_DOWNL;
         Wa( "ret = mainsvr()" );
-        Wa( "quit( ret )" );
+        Wa( "quit( -ret )" );
 
     }while( 0 );
 
@@ -3508,6 +3622,10 @@ gint32 CImplPyMainFunc2::Output()
 
         m_pWriter->SelectMainCli();
         EmitImports( m_pWriter );
+        CCOUT << "from " << g_strAppName << "structs import *";
+        NEW_LINE;
+        CCOUT << "from ifimpl import *";
+        NEW_LINE;
 
         Wa( "import os" );
         Wa( "import time" );
@@ -3529,6 +3647,10 @@ gint32 CImplPyMainFunc2::Output()
 
         m_pWriter->SelectMainSvr();
         EmitImports( m_pWriter );
+        CCOUT << "from " << g_strAppName << "structs import *";
+        NEW_LINE;
+        CCOUT << "from ifimpl import *";
+        NEW_LINE;
 
         Wa( "import os" );
         Wa( "import time" );

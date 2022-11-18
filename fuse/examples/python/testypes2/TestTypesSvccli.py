@@ -6,8 +6,9 @@ from rpcf import serijson
 import errno
 from rpcf.proxy import ErrorCode as Err
 from typing import Union, Tuple, Optional
-import TestTypesstructs
+from TestTypesstructs import *
 from ifimpl import *
+import random
 class CITestTypescli( IITestTypes_CliImpl ):
     '''
     Event handler
@@ -32,8 +33,8 @@ class CTestTypesSvcProxy(
         evtFile = strSvcPoint + "/jevt_" + str( num )
         self.m_evtFp = open( evtFile, "rb" )
         
-    def sendReq( self, oResp : object ) -> int:
-        return iolib.sendReq( self.m_reqFp, oResp )
+    def sendReq( self, oReq : object ) -> int:
+        return iolib.sendReq( self.m_reqFp, oReq )
     
     def recvResp( self ) -> Tuple[ int, object ]:
         return iolib.recvResp( self.m_respFp )

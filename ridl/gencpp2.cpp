@@ -3430,6 +3430,7 @@ gint32 GenHeaderFileROS(
                 ret = oisi.Output();
                 if( ERROR( ret ) )
                     break;
+                oisi.OutputROSSkel();
             }
             else
             {
@@ -3462,6 +3463,8 @@ gint32 GenHeaderFileROS(
                 ret = oisi2.Output();
                 if( ERROR( ret ) )
                     break;
+
+                oisi2.OutputROSSkel();
             }
             else
             {

@@ -1628,6 +1628,7 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "ret = AddReq( qwReqId, qwTaskId );" );
+            CCOUT << "oCfg.RemoveProperty( propTaskId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             NEW_LINE;
@@ -1765,7 +1766,7 @@ gint32 CDeclServiceImplFuse::Output()
         CCOUT << "{ SetClassId( clsid(" << strClass << " ) ); }";
         NEW_LINES( 2 );
 
-        Wa( "//Response&Event Dispatcher" );
+        Wa( "// Response&Event Dispatcher" );
         Wa( "gint32 DispatchMsg(" );
         CCOUT << "    const Json::Value& valMsg ) override;";
 
@@ -1800,11 +1801,32 @@ gint32 CDeclServiceImplFuse::Output()
         NEW_LINE;
 
         Wa( "gint32 OnWriteResumed( HANDLE hChannel ) override" );
-        CCOUT << "{ return OnWriteResumedFuse( hChannel ); } ";
+        Wa( "{ return OnWriteResumedFuse( hChannel ); } " );
+        NEW_LINE;
+
+        Wa( "// methods for active canceling" );
+        Wa( "gint32 UserCancelRequest(" );
+        Wa( "    IEventSink* pCallback," );
+        Wa( "    guint64 qwTaskId ) override;" );
+        NEW_LINE;
+
+        Wa( "private:" );
+        Wa( "gint32 UCRCancelHandler(" );
+        Wa( "    IEventSink* pCallback," );
+        Wa( "    gint32 iRet," );
+        Wa( "    guint64 qwTaskId );" );
+        NEW_LINE;
+
+        Wa( "gint32 UserCancelRequestCbWrapper(" );
+        Wa( "    const Json::Value& oJsResp );" );
+        NEW_LINE;
+
+        Wa( "gint32 UserCancelRequestComplete(" );
+        Wa( "    IEventSink* pCallback," );
+        CCOUT << "    guint64 qwTaskToCancel );";
 
         BLOCK_CLOSE;
-        CCOUT << ";";
-        NEW_LINES( 2 );
+        Wa( ";" );
 
     }while( 0 );
 
@@ -2933,6 +2955,192 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncCancelWrapper()
     return ret;
 }
 
+gint32 CImplServiceImplFuse::OutputUCRSvr()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strSvcName = m_pNode->GetName();
+        stdstr strClassName = "C";
+        strClassName += strSvcName + "_SvrImpl";
+
+        CCOUT << "gint32 " << strClassName
+            << "::UCRCancelHandler(";
+        NEW_LINE;
+        Wa( "    IEventSink* pCallback," );
+        Wa( "    gint32 iRet," );
+        Wa( "    guint64 qwTaskId )" );
+        BLOCK_OPEN;
+        Wa( "return super::UserCancelRequest(" );
+        CCOUT << "    pCallback, qwTaskId );";
+        BLOCK_CLOSE;
+        NEW_LINES(2);
+
+        Wa( "extern gint32 BuildJsonReq(" );
+        Wa( "    IConfigDb* pReqCtx_," );
+        Wa( "    const Json::Value& oJsParams," );
+        Wa( "    const std::string& strMethod," );
+        Wa( "    const std::string& strIfName, " );
+        Wa( "    gint32 iRet," );
+        Wa( "    std::string& strReq," );
+        Wa( "    bool bProxy," );
+        Wa( "    bool bResp );" );
+        NEW_LINE;
+
+        CCOUT << "gint32 " << strClassName
+            << "::UserCancelRequest(";
+        NEW_LINE;
+        Wa( "    IEventSink* pCallback," );
+        Wa( "    guint64 qwInvTaskId )" );
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+        Wa( "TaskletPtr pNewCb;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+
+        Wa( "DisableKeepAlive( pCallback );" );
+        Wa( "ret = SetInvTimeout( pCallback, 30 );" );
+        Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        Wa( "TaskGrpPtr pTaskGrp = GetTaskGroup();" );
+        Wa( "if( pTaskGrp.IsEmpty() )" );
+        BLOCK_OPEN;
+        Wa( "ret = -EFAULT;" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "TaskletPtr pTask;" );
+        Wa( "ret = pTaskGrp->FindTaskByRmtId(" );
+        Wa( "    qwInvTaskId, pTask );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
+        
+        Wa( "CParamList oReqCtx_;" );
+        Wa( "oReqCtx_.SetPointer(" );
+        Wa( "    propEventSink, pCallback );" );
+        NEW_LINE;
+        
+        Wa( "ret = DEFER_CANCEL_HANDLER2(" );
+        Wa( "    -1, pNewCb, this," );
+        CCOUT << "    &"<< strClassName
+            <<"::UCRCancelHandler,";
+        NEW_LINE;
+        Wa( "    pCallback, 0, qwInvTaskId );" );
+        Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        Wa( "Json::Value val_( objectValue );" );
+        Wa( "val_[ JSON_ATTR_REQCTXID ] =" );
+        Wa( "    ( guint64 )pTask->GetObjId();" );
+        NEW_LINE;
+
+        Wa( "stdstr strReq;" );
+        Wa( "IConfigDb* pReqCtx_ = oReqCtx_.GetCfg();" );
+        Wa( "ret = BuildJsonReq( pReqCtx_, val_," );
+        Wa( "    \"UserCancelRequest\"," );
+        Wa( "    \"IInterfaceServer\"," );
+        Wa( "    0, strReq, false, false );" );
+        Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        Wa( "// NOTE: pass strReq to FUSE" );
+        Wa( "ret = this->ReceiveMsgJson( strReq," );
+        Wa( "    pCallback->GetObjId() );" );
+        Wa( "if( SUCCEEDED( ret ) )" );
+        CCOUT << "    ret = STATUS_PENDING;";
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        
+        Wa( "if( ret == STATUS_PENDING )" );
+        Wa( "    return ret;" );
+        NEW_LINE;
+
+        Wa( "if( !pNewCb.IsEmpty() )" );
+        BLOCK_OPEN;
+        Wa( "CIfRetryTask* pTask = pNewCb;" );
+        Wa( "pTask->ClearClientNotify();" );
+        Wa( "if( pCallback != nullptr )" );
+        Wa( "    rpcf::RemoveInterceptCallback(" );
+        Wa( "        pTask, pCallback );" );
+        Wa( "( *pNewCb )( eventCancelTask );" );
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "// fallback to the default request cancel handler" );
+        Wa( "return super::UserCancelRequest(" );
+        CCOUT << "    pCallback, qwInvTaskId );";
+        BLOCK_CLOSE;
+        NEW_LINES(2);
+
+        CCOUT << "gint32 " << strClassName
+            << "::UserCancelRequestComplete(";
+        NEW_LINE;
+        Wa( "    IEventSink* pCallback," );
+        Wa( "    guint64 qwTaskToCancel )" );
+        BLOCK_OPEN;
+        Wa( "if( pCallback == nullptr )" );
+        Wa( "    return -EINVAL;" );
+        Wa( "gint32 ret = super::UserCancelRequest(" );
+        Wa( "    pCallback, qwTaskToCancel );" );
+        Wa( "pCallback->OnEvent(" );
+        Wa( "    eventTaskComp, ret, 0, 0 );" );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINES(2);
+
+        CCOUT << "gint32 " << strClassName
+            <<"::UserCancelRequestCbWrapper(";
+        NEW_LINE;
+        Wa( "    const Json::Value& oJsResp )" );
+        BLOCK_OPEN; 
+        Wa( "gint32 ret = 0;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+
+        Wa( "guint64 qwTaskId = ( HANDLE )" );
+        Wa( "    oJsResp[ JSON_ATTR_REQCTXID ].asUInt64();" );
+        NEW_LINE;
+
+        Wa( "TaskGrpPtr pTaskGrp = GetTaskGroup();" );
+        Wa( "if( pTaskGrp.IsEmpty() )" );
+        Wa( "    break;" );
+        NEW_LINE;
+
+        Wa( "TaskletPtr pTask;" );
+        Wa( "ret = pTaskGrp->FindTask(" );
+        Wa( "    qwTaskId, pTask );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
+
+        Wa( "IConfigDb* pReq = nullptr;" );
+        Wa( "CCfgOpenerObj oInvTask(" );
+        Wa( "    ( IEventSink* )pTask );" );
+        Wa( "ret = oInvTask.GetPointer(" );
+        Wa( "    propReqPtr, pReq );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
+
+        Wa( "guint64 qwTaskToCancel = 0;" );
+        Wa( "CCfgOpener oReq( pReq );" );
+        Wa( "ret = oReq.GetQwordProp(" );
+        Wa( "    0, qwTaskToCancel );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+
+        NEW_LINE;
+        Wa( "ret = UserCancelRequestComplete(" );
+        CCOUT << "    pTask, qwTaskToCancel );";
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+    }while( 0 );
+    return ret;
+}
+
 gint32 CImplServiceImplFuse::Output()
 {
     guint32 ret = STATUS_SUCCESS;
@@ -3047,15 +3255,39 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "stdstr strMethod =" );
             Wa( "    oMsg[ JSON_ATTR_METHOD ].asString();" );
-            Wa( "if( strMethod != \"OnKeepAlive\" )" );
-            Wa( "{ ret = -ENOTSUP; break;}" );
+            Wa( "if( strMethod == \"OnKeepAlive\" )" );
+            BLOCK_OPEN;
+            Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||" );
+            Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "stdstr strType =" );
+            Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
+            Wa( "if( strType != \"evt\" )" );
+            Wa( "{ ret = -EINVAL; break; }" );
             Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||" );
             Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isUInt64() )" );
             Wa( "{ ret = -EINVAL; break; }" );
             Wa( "guint64 dwTaskId =" );
             Wa( "    oMsg[ JSON_ATTR_REQCTXID ].asUInt64();" );
-            Wa( "ret = this->OnKeepAlive( dwTaskId );" );
+            CCOUT << "ret = this->OnKeepAlive( dwTaskId );";
+            NEW_LINE;
             CCOUT << "break;";
+            BLOCK_CLOSE; // OnKeepAlive
+
+            Wa( "if( strMethod == \"UserCancelRequest\" )" );
+            BLOCK_OPEN;
+            Wa( "if( !oMsg.isMember( JSON_ATTR_MSGTYPE ) ||" );
+            Wa( "    !oMsg[ JSON_ATTR_MSGTYPE ].isString() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "stdstr strType =" );
+            Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
+            Wa( "if( strType != \"resp\" )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            CCOUT << "ret = this->UserCancelRequestCbWrapper( oMsg );";
+            NEW_LINE;
+            CCOUT << "break;";
+            BLOCK_CLOSE; // UserCancelRequest
+
             BLOCK_CLOSE;
             NEW_LINE;
             CCOUT << "ret = -ENOTSUP;";
@@ -3064,6 +3296,8 @@ gint32 CImplServiceImplFuse::Output()
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINE;
+
+            OutputUCRSvr();
         }
         else
         {
@@ -3113,7 +3347,6 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    ( Json::UInt64& )qwReqId;" );
             Wa( "if( this->GetState() != stateConnected )" );
             Wa( "{ ret = -ENOTCONN; break; }" );
-            Wa( "CParamList oCtx_( pContext );" );
             std::vector< ObjPtr > vecIfRefs;
             m_pNode->GetIfRefs( vecIfRefs );
             for( auto& elem : vecIfRefs )
@@ -3130,7 +3363,7 @@ gint32 CImplServiceImplFuse::Output()
                 CCOUT << "ret = " << "I" << strIfName
                     << "_PImpl::DispatchIfReq( ";
                 NEW_LINE;
-                CCOUT << "    oCtx_.GetCfg(), oReq, oResp );";
+                CCOUT << "    pContext, oReq, oResp );";
                 NEW_LINE;
                 Wa( "if( ret != STATUS_PENDING )" );
                 Wa( "    this->RemoveReq( qwReqId );" );
@@ -3173,7 +3406,7 @@ gint32 CImplServiceImplFuse::Output()
             BLOCK_CLOSE;
             NEW_LINE;
 
-            // implement the CancelRequestByReqId
+            // implementation of the CancelRequestByReqId
             CCOUT << "gint32 " << strClass
                 << "::CancelRequestByReqId( ";
             NEW_LINE;
@@ -3187,8 +3420,12 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "ret = this->GetTaskId( qwReqId, qwTaskId );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "gint32 (*func)( CRpcServices* pIf, IEventSink*, guint64) =" );
-            Wa("    ([]( CRpcServices* pIf, IEventSink* pThis, guint64 qwReqId )->gint32" );
+            Wa( "gint32 (*func)( CRpcServices* pIf," );
+            Wa( "    IEventSink*, guint64, guint64) =" );
+            Wa( "    ([]( CRpcServices* pIf," );
+            Wa( "        IEventSink* pThis," );
+            Wa( "        guint64 qwReqId, " );
+            Wa( "        guint64 qwThisReq )->gint32" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
             CCOUT << "do";
@@ -3213,7 +3450,11 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "oJsResp[ JSON_ATTR_MSGTYPE ] = \"resp\";" );
             Wa( "oJsResp[ JSON_ATTR_RETCODE ] = iRet;" );
             Wa( "oJsResp[ JSON_ATTR_REQCTXID ] =" );
+            Wa( "    ( Json::UInt64& )qwThisReq;" );
+            Wa( "Json::Value oParams( objectValue );" );
+            Wa( "oParams[ JSON_ATTR_REQCTXID ] =" );
             Wa( "    ( Json::UInt64& )qwReqId;" );
+            Wa( "oJsResp[ JSON_ATTR_PARAMS ] = oParams;" );
             Wa( "Json::StreamWriterBuilder oBuilder;" );
             Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
             CCOUT <<  "stdstr strResp = Json::writeString( "
@@ -3221,8 +3462,8 @@ gint32 CImplServiceImplFuse::Output()
             NEW_LINE;
             CCOUT << strClass << "* pClient = ObjPtr( pIf );";
             NEW_LINE;
-            Wa( "pClient->ReceiveMsgJson( strResp, qwReqId );" );
-            CCOUT << "";
+            Wa( "pClient->ReceiveMsgJson( strResp, qwThisReq );" );
+            CCOUT << "pClient->RemoveReq( qwThisReq );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return 0;";
@@ -3230,10 +3471,11 @@ gint32 CImplServiceImplFuse::Output()
             Wa( ");" );
             Wa( "TaskletPtr pCb;" );
             Wa( "ret = NEW_FUNCCALL_TASK( pCb," );
-            Wa( "    this->GetIoMgr(), func," );
-            Wa( "    this, nullptr, qwThisReq );" );
+            Wa( "    this->GetIoMgr(), func, this," );
+            Wa( "    nullptr, qwReqId, qwThisReq );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            NEW_LINE;
             Wa( "CDeferredFuncCallBase< CIfRetryTask >*" );
             Wa( "    pCall = pCb;" );
             Wa( "ObjPtr pObj( pCall );" );
@@ -3250,11 +3492,16 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    break;" );
             Wa( "CTaskWrapper* ptw = pWrapper;" );
             Wa( "ptw->SetCompleteTask( pCall );" );
+            Wa( "CCfgOpenerObj otwCfg( ptw );" );
+            Wa( "otwCfg.SetQwordProp( propTaskId, qwThisReq );" );
             NEW_LINE;
             Wa( "ret = this->CancelReqAsync(" );
             Wa( "    ptw, qwTaskId );" );
             Wa( "if( ERROR( ret ) )" );
-            Wa( "   ( *ptw )( eventCancelTask );" );
+            BLOCK_OPEN;
+            Wa( "( *ptw )( eventCancelTask );" );
+            CCOUT << "this->RemoveReq( qwReqId );";
+            BLOCK_CLOSE;
             Wa( "break;" );
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
@@ -3489,9 +3736,8 @@ gint32 CImplIufSvrFuse::OutputDispatch()
         }
         BLOCK_CLOSE; // strType == resp
         NEW_LINE;
-        Wa( "else if( strType == \"evt\" )" );
-        BLOCK_OPEN;
 
+        bool bHasEvent = false;
         for( i = 0; i < dwCount; i++ )
         {
             ObjPtr pObj = pmds->GetChild( i );
@@ -3503,32 +3749,50 @@ gint32 CImplIufSvrFuse::OutputDispatch()
             }
             if( !pmd->IsEvent() )
                 continue;
-
-            ObjPtr pInArgs = pmd->GetInArgs();
-            guint32 dwInCount = GetArgCount( pInArgs );
-            ObjPtr pOutArgs = pmd->GetOutArgs();
-            guint32 dwOutCount = GetArgCount( pOutArgs );
-            CCOUT << "if( strMethod == \""
-                << pmd->GetName() << "\" )";
-            NEW_LINE;
+            bHasEvent = true;
+        }
+        if( bHasEvent )
+        {
+            Wa( "else if( strType == \"evt\" )" );
             BLOCK_OPEN;
+            for( i = 0; i < dwCount; i++ )
+            {
+                ObjPtr pObj = pmds->GetChild( i );
+                CMethodDecl* pmd = pObj;
+                if( pmd == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                if( !pmd->IsEvent() )
+                    continue;
 
-            CCOUT << "ret = " << strClass << "::"
-                << pmd->GetName() <<"(";
-            if( dwInCount > 0 ) 
-                CCOUT << " oMsg );";
-            else
-                CCOUT << ");";
-            NEW_LINE;
-            Wa( "if( ret == STATUS_PENDING )" );
-            Wa( "    ret = STATUS_SUCCESS;" );
+                ObjPtr pInArgs = pmd->GetInArgs();
+                guint32 dwInCount = GetArgCount( pInArgs );
+                ObjPtr pOutArgs = pmd->GetOutArgs();
+                guint32 dwOutCount = GetArgCount( pOutArgs );
+                CCOUT << "if( strMethod == \""
+                    << pmd->GetName() << "\" )";
+                NEW_LINE;
+                BLOCK_OPEN;
 
-            CCOUT << "break;";
-            BLOCK_CLOSE;
+                CCOUT << "ret = " << strClass << "::"
+                    << pmd->GetName() <<"(";
+                if( dwInCount > 0 ) 
+                    CCOUT << " oMsg );";
+                else
+                    CCOUT << ");";
+                NEW_LINE;
+                Wa( "if( ret == STATUS_PENDING )" );
+                Wa( "    ret = STATUS_SUCCESS;" );
+
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                NEW_LINE;
+            }
+            BLOCK_CLOSE; // strType == evt
             NEW_LINE;
         }
-        BLOCK_CLOSE; // strType == evt
-        NEW_LINE;
         CCOUT << "ret = -ENOENT;";
         BLOCK_CLOSE;
         Wa( "while( 0 );" );

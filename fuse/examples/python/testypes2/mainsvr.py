@@ -6,6 +6,8 @@ from rpcf import serijson
 import errno
 from rpcf.proxy import ErrorCode as Err
 from typing import Union, Tuple, Optional
+from TestTypesstructs import *
+from ifimpl import *
 import os
 import time
 import threading
@@ -112,4 +114,4 @@ def mainsvr() :
     return 0
     
 ret = mainsvr()
-quit( ret )
+quit( -ret )
