@@ -1497,13 +1497,9 @@ gint32 CImplPyIfSvrBase2::OutputDispMsg()
         for( ; i < pmds->GetCount(); i++ )
         {
             ObjPtr pObj = pmds->GetChild( i );
-            vecMethods.push_back( pObj );
-        }
-
-        if( vecMethods.empty() )
-        {
-            ret = -ENOENT;
-            break;
+            CMethodDecl* pNode = pObj;
+            if( !pNode->IsEvent() )
+                vecMethods.push_back( pObj );
         }
 
         stdstr strClass = "I";
@@ -1532,6 +1528,12 @@ gint32 CImplPyIfSvrBase2::OutputDispMsg()
 
         CCOUT << "def DispatchIfMsg( self, oMsg : dict ):";
         INDENT_UPL;
+        if( vecMethods.empty() )
+        {
+            CCOUT << "pass";
+            INDENT_DOWNL;
+            break;
+        }
         CCOUT << "try:";
         INDENT_UPL;
         CCOUT << "strMethod = oMsg[ \""
@@ -1903,8 +1905,8 @@ gint32 CImplPyIfProxyBase2::OutputDispMsg()
         ObjPtr pObj = m_pNode->GetMethodList();
         std::vector< ObjPtr > vecMethods;
         CMethodDecls* pmds = pObj;
-        guint32 i = 0;
-        for( ; i < pmds->GetCount(); i++ )
+        guint32 i;
+        for( i = 0; i < pmds->GetCount(); i++ )
         {
             ObjPtr pObj = pmds->GetChild( i );
             CMethodDecl* pNode = pObj;
@@ -3481,8 +3483,10 @@ gint32 CImplPyMainFunc2::OutputCli(
             }
             else if( bHasEvent )
             {
+                Wa( "'''" );
                 Wa( "Just waiting and events will " );
                 Wa( "be handled on the event thread" );
+                Wa( "'''" );
                 NEW_LINE;
                 Wa( "while True:" );
                 CCOUT << "    time.sleep(1)";
@@ -3701,7 +3705,6 @@ bool CImplPyMainFunc2::HasEvent(
             pObj = pifd->GetMethodList();
             std::vector< ObjPtr > vecMethods;
             CMethodDecls* pmds = pObj;
-            ;
             for( guint32 j = 0; j < pmds->GetCount(); j++ )
             {
                 ObjPtr pObj = pmds->GetChild( j );

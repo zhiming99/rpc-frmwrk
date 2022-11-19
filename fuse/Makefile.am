@@ -21,6 +21,8 @@ EXTRA_DIST+= \
 examples/python/actcancel/ActiveCancelcli.py \
 examples/python/actcancel/ActiveCancelsvr.py \
 examples/python/actcancel/maincli.py \
+examples/python/evtest/EventTestcli.py \
+examples/python/evtest/mainsvr.py \
 examples/python/hellowld/maincli.py \
 examples/python/hellowld/mainsvr.py \
 examples/python/iftest/IfTestsvr.py \

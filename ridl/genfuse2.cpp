@@ -2035,17 +2035,45 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
         NEW_LINE;
         BLOCK_OPEN;
 
+        ObjPtr pMethods =
+            m_pNode->GetMethodList();
+        CMethodDecls* pmds = pMethods;
+        guint32 dwCount = pmds->GetCount();
+
+        if( dwCount == 0 )
+        {
+            CCOUT << "return 0;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            break;
+        }
+
+        bool bHasReq = false;
+        bool bHasEvent = false;
+
+        guint32 i;
+        for( i = 0; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( pmd->IsEvent() )
+            {
+                bHasEvent = true;
+                continue;
+            }
+            bHasReq = true;
+        }
+        if( ERROR( ret ) )
+            break;
+
         Wa( "gint32 ret = 0;" );
         CCOUT <<"do";
         BLOCK_OPEN;
-        ObjPtr pMethods =
-            m_pNode->GetMethodList();
-
-        CMethodDecls* pmds = pMethods;
-        guint32 i = 0;
-        pmds->GetCount();
-        guint32 dwCount = pmds->GetCount();
-
         Wa( "if( !oMsg.isMember( JSON_ATTR_METHOD ) ||");
         Wa( "    !oMsg[ JSON_ATTR_METHOD ].isString() )" );
         Wa( "{ ret = -EINVAL; break; }" );
@@ -2056,100 +2084,89 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
         Wa( "{ ret = -EINVAL; break; }" );
         Wa( "stdstr strType =" );
         Wa( "    oMsg[ JSON_ATTR_MSGTYPE ].asString();" );
-        Wa( "if( strType == \"resp\" )" );
-        BLOCK_OPEN;
-        Wa( "if( !oMsg.isMember( JSON_ATTR_RETCODE ) ||");
-        Wa( "    !oMsg[ JSON_ATTR_RETCODE ].isUInt() )" );
-        Wa( "{ ret = -EINVAL; break; }" );
-        Wa( "gint32 iRet =" );
-        Wa( "    oMsg[ JSON_ATTR_RETCODE ].asInt();" );
-        Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||");
-        Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isString() )" );
-        Wa( "{ ret = -EINVAL; break; }" );
-
-        Wa( "stdstr strCtxId = " );
-        Wa( "    oMsg[ JSON_ATTR_REQCTXID ].asString();" );
-        Wa( "size_t pos = strCtxId.find( ':' );" );
-        Wa( "if( pos == stdstr::npos )" );
-        Wa( "{ ret = -EINVAL; break; }" );
-        Wa( "stdstr strTaskId = strCtxId.substr( 0, pos );" );
-        Wa( "guint64 qwTaskId = strtoull( " );
-        Wa( "    strTaskId.c_str(), nullptr, 10);\n" );
-
-        Wa( "TaskGrpPtr pGrp;" );
-        Wa( "ret = this->GetParallelGrp( pGrp );" );
-        Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
-        Wa( "TaskletPtr pTask;" );
-        Wa( "ret = pGrp->FindTask( qwTaskId, pTask );" );
-        Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
-        Wa( "CParamList oReqCtx;" );
-        Wa( "oReqCtx[ propEventSink ] = ObjPtr( pTask );" );
-
-        for( ; i < dwCount; i++ )
+        if( bHasReq )
         {
-            ObjPtr pObj = pmds->GetChild( i );
-            CMethodDecl* pmd = pObj;
-            if( pmd == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            if( pmd->IsEvent() )
-                continue;
-
-            ObjPtr pInArgs = pmd->GetInArgs();
-            guint32 dwInCount = GetArgCount( pInArgs );
-            ObjPtr pOutArgs = pmd->GetOutArgs();
-            guint32 dwOutCount = GetArgCount( pOutArgs );
-            CCOUT << "if( strMethod == \""
-                << pmd->GetName() << "\" )";
-            NEW_LINE;
+            Wa( "if( strType == \"resp\" )" );
             BLOCK_OPEN;
-            if( !pmd->IsNoReply() )
-            {
-                CCOUT << "ret = " << strClass << "::"
-                    << pmd->GetName() <<"Complete(";
-                NEW_LINE;
-                CCOUT << "    oReqCtx.GetCfg(), iRet";
-                if( dwOutCount > 0 ) 
-                    CCOUT << ", oMsg";
-                CCOUT << " );";
-                NEW_LINE;
-                Wa( "if( ret == STATUS_PENDING )" );
-                Wa( "    ret = STATUS_SUCCESS;" );
-            }
-            else
-            {
-                Wa( "// no reply" );
-                Wa( "ret = -EINVAL;" );
-            }
-            CCOUT << "break;";
-            BLOCK_CLOSE;
-            NEW_LINE;
-        }
-        BLOCK_CLOSE; // strType == resp
-        NEW_LINE;
+            Wa( "if( !oMsg.isMember( JSON_ATTR_RETCODE ) ||");
+            Wa( "    !oMsg[ JSON_ATTR_RETCODE ].isUInt() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "gint32 iRet =" );
+            Wa( "    oMsg[ JSON_ATTR_RETCODE ].asInt();" );
+            Wa( "if( !oMsg.isMember( JSON_ATTR_REQCTXID ) ||");
+            Wa( "    !oMsg[ JSON_ATTR_REQCTXID ].isString() )" );
+            Wa( "{ ret = -EINVAL; break; }" );
 
-        bool bHasEvent = false;
-        for( i = 0; i < dwCount; i++ )
-        {
-            ObjPtr pObj = pmds->GetChild( i );
-            CMethodDecl* pmd = pObj;
-            if( pmd == nullptr )
+            Wa( "stdstr strCtxId = " );
+            Wa( "    oMsg[ JSON_ATTR_REQCTXID ].asString();" );
+            Wa( "size_t pos = strCtxId.find( ':' );" );
+            Wa( "if( pos == stdstr::npos )" );
+            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "stdstr strTaskId = strCtxId.substr( 0, pos );" );
+            Wa( "guint64 qwTaskId = strtoull( " );
+            Wa( "    strTaskId.c_str(), nullptr, 10);\n" );
+
+            Wa( "TaskGrpPtr pGrp;" );
+            Wa( "ret = this->GetParallelGrp( pGrp );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "TaskletPtr pTask;" );
+            Wa( "ret = pGrp->FindTask( qwTaskId, pTask );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "CParamList oReqCtx;" );
+            Wa( "oReqCtx[ propEventSink ] = ObjPtr( pTask );" );
+
+            for( i = 0; i < dwCount; i++ )
             {
-                ret = -EFAULT;
-                break;
+                ObjPtr pObj = pmds->GetChild( i );
+                CMethodDecl* pmd = pObj;
+                if( pmd == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                if( pmd->IsEvent() )
+                    continue;
+
+                ObjPtr pInArgs = pmd->GetInArgs();
+                guint32 dwInCount = GetArgCount( pInArgs );
+                ObjPtr pOutArgs = pmd->GetOutArgs();
+                guint32 dwOutCount = GetArgCount( pOutArgs );
+                CCOUT << "if( strMethod == \""
+                    << pmd->GetName() << "\" )";
+                NEW_LINE;
+                BLOCK_OPEN;
+                if( !pmd->IsNoReply() )
+                {
+                    CCOUT << "ret = " << strClass << "::"
+                        << pmd->GetName() <<"Complete(";
+                    NEW_LINE;
+                    CCOUT << "    oReqCtx.GetCfg(), iRet";
+                    if( dwOutCount > 0 ) 
+                        CCOUT << ", oMsg";
+                    CCOUT << " );";
+                    NEW_LINE;
+                    Wa( "if( ret == STATUS_PENDING )" );
+                    Wa( "    ret = STATUS_SUCCESS;" );
+                }
+                else
+                {
+                    Wa( "// no reply" );
+                    Wa( "ret = -EINVAL;" );
+                }
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                if( i < dwCount - 1 )
+                    NEW_LINE;
             }
-            if( !pmd->IsEvent() )
-                continue;
-            bHasEvent = true;
+            BLOCK_CLOSE; // strType == resp
+            NEW_LINE;
         }
 
         if( bHasEvent )
         {
-            Wa( "else if( strType == \"evt\" )" );
+            Wa( "if( strType == \"evt\" )" );
             BLOCK_OPEN;
 
             for( i = 0; i < dwCount; i++ )
@@ -2185,7 +2202,8 @@ gint32 CImplIufSvrFuse2::OutputDispatch()
 
                 CCOUT << "break;";
                 BLOCK_CLOSE;
-                NEW_LINE;
+                if( i < dwCount - 1 )
+                    NEW_LINE;
             }
             BLOCK_CLOSE; // strType == evt
             NEW_LINE;

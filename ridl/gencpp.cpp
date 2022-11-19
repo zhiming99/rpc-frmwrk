@@ -4276,11 +4276,12 @@ gint32 CImplIufSvr::Output()
             vecHandlers.push_back( pObj );
         }
 
+        // keep the map even if there are no handlers 
+        CCOUT << "BEGIN_IFHANDLER_MAP( "
+            << strIfName << " );";
+        NEW_LINES( 2 );
         if( !vecHandlers.empty() )
         {
-            CCOUT << "BEGIN_IFHANDLER_MAP( "
-                << strIfName << " );";
-            NEW_LINES( 2 );
             for( auto& elem : vecHandlers )
             {
                 CMethodDecl* pmd = elem;
@@ -4298,10 +4299,10 @@ gint32 CImplIufSvr::Output()
                 INDENT_DOWNL;
                 NEW_LINE;
             }
-
-            Wa( "END_IFHANDLER_MAP;" );
-            NEW_LINE;
         }
+
+        Wa( "END_IFHANDLER_MAP;" );
+        NEW_LINE;
 
         CCOUT << "return STATUS_SUCCESS;";
         BLOCK_CLOSE;

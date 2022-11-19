@@ -61,9 +61,8 @@ class CIfTestServer(
         oResp[ "RequestId" ] = reqId
         oResp[ "Method" ] = "OnKeepAlive"
         oResp[ "Interface" ] = "IInterfaceServer"
-        oResp[ "MessageType" ] = "resp"
-        oResp[ "ReturnCode" ] = 0
-        return self.sendResp( oResp )
+        oResp[ "MessageType" ] = "evt"
+        return self.sendEvent( oResp )
     
     def DispatchMsg( self, oReq : dict ):
         try:

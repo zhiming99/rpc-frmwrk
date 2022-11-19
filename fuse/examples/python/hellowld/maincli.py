@@ -63,10 +63,6 @@ def maincli() :
         if error < 0 :
             return error
         return -errno.EFAULT
-    finally:
-        if oMsgThrd is not None:
-            oMsgThrd.SetExit()
-            threading.Thread.join( oMsgThrd )
     return ret
     
 ret = maincli()

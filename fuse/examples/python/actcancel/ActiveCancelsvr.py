@@ -126,5 +126,6 @@ class CActiveCancelServer(
             "IInterfaceServer",
             0, False, True )
         oResp[ "Parameters" ] = oParams
+        waitThrd.m_bExit = True
         return self.sendResp( oResp )
     
