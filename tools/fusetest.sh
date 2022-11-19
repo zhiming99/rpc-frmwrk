@@ -79,6 +79,7 @@ function pytest()
         release/${appname}svr ./mpsvr
         release/${appname}cli ./mp
         popd
+        sleep 5
         python3 ./mainsvr.py fs/mpsvr/$svcpt 0 &
         sleep 3
         python3 ./maincli.py fs/mp/connection_0/$svcpt 0 || ret=37
