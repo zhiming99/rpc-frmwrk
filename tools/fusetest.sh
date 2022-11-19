@@ -68,7 +68,7 @@ function pytest()
         if (( $ret > 0 )); then break; fi
         echo create directories ...
         mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1
-        rm ./fs/* > /dev/null 2>&1
+        #rm ./fs/release/* > /dev/null 2>&1
         echo get filenames
         ridlfile=`echo $cmdline | awk '{print $NF}'`
         appname=`grep appname $ridlfile | awk '{print $NF}' | sed 's/[";]//g'`
