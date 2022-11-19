@@ -75,6 +75,7 @@ function pytest()
         echo appname is $appname
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
+        ls -r .
         pushd ./fs
         release/${appname}svr ./mpsvr
         sleep 2
