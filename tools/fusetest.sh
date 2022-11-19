@@ -47,3 +47,60 @@ fusermount3 -u mpsvr
 popd
 popd
 
+function pytest()
+{
+    testcase=$1
+    pushd $testcase
+    if [ -e ./maincli.py ]; then 
+        cmdline=`awk '{if(FNR==2) print $0;}' maincli.py | sed -e 's/# //'`
+    elif [ -e ./mainsvr.py ]; then
+        cmdline=`awk '{if(FNR==2) print $0;}' mainsvr.py | sed -e 's/# //'`
+    else
+        echo "error cannot find file 'maincli.py' or 'mainsvr.py'"
+        return 31
+    fi
+
+    ret=0
+    while true; do
+        eval $cmdline
+        echo make $testcase ...
+        make || ret=32
+        if (( $ret > 0 )); then break; fi
+        echo create directories ...
+        mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1
+        rm ./fs/* > /dev/null 2>&1
+        echo get filenames
+        ridlfile=`echo $cmdline | awk '{print $NF}'`
+        appname=`grep appname $ridlfile | awk '{print $NF}' | sed 's/[";]//g'`
+        echo appname is $appname
+        svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
+        echo svcpt is $svcpt
+        pushd ./fs
+        release/${appname}svr ./mpsvr
+        release/${appname}cli ./mp
+        popd
+        python3 ./mainsvr.py fs/mpsvr/$svcpt 0 &
+        sleep 3
+        python3 ./maincli.py fs/mp/connection_0/$svcpt 0 || ret=37
+        pid=`ps aux | grep 'mainsvr.py'| grep -v 'grep' | awk '{ print $2 }' `
+        echo kill -9 $pid
+        kill -9 $pid
+        sleep 3
+        break 1
+    done
+    fusermount3 -u ./fs/mp
+    fusermount3 -u ./fs/mpsvr
+    popd
+    return $ret
+}
+
+pushd $pydir
+
+pytest testypes2 || exit 1
+pytest actcancel || exit 1
+pytest iftest || exit 1
+pytest hellowld || exit 1
+pytest katest || exit 1
+pytest evtest || exit 1
+
+popd
