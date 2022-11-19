@@ -77,6 +77,7 @@ function pytest()
         echo svcpt is $svcpt
         pushd ./fs
         release/${appname}svr ./mpsvr
+        sleep 2
         release/${appname}cli ./mp
         popd
         sleep 5
