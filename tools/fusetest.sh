@@ -68,7 +68,7 @@ function pytest()
     while true; do
         eval $cmdline
         echo make $testcase ...
-        make || ret=32
+        make debug || ret=32
         if (( $ret > 0 )); then break; fi
         echo create directories ...
         mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1
@@ -79,10 +79,10 @@ function pytest()
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
         pushd ./fs
-        echo release/${appname}svr -f ./mpsvr
+        echo debug/${appname}svr -f ./mpsvr
         release/${appname}svr -f ./mpsvr &
         sleep 2
-        echo release/${appname}cli -f ./mp
+        echo debug/${appname}cli -f ./mp
         release/${appname}cli -f ./mp &
         popd
         ls -R .

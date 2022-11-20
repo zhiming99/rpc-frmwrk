@@ -24,7 +24,7 @@ jobs:
     - name: setup build env
       run: libtoolize;aclocal;autoreconf -vfi;automake --add-missing;autoconf;
     - name: configure
-      run: bash ./cfgsel r
+      run: bash ./cfgsel d
     - name: make
       run: cat /proc/cpuinfo && make
     - name: install
