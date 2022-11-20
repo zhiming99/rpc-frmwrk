@@ -41,8 +41,8 @@ echo "scale=10;$end-$start" | bc
 echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 
-fusermount3 -u mp
-fusermount3 -u mpsvr
+umount mp
+umount mpsvr
 
 popd
 popd
@@ -61,7 +61,8 @@ function pytest()
     fi
 
     ret=0
-    ps aux
+    echo ls /dev/fuse -l
+    ls /dev/fuse -l
     while true; do
         eval $cmdline
         echo make $testcase ...
@@ -69,17 +70,15 @@ function pytest()
         if (( $ret > 0 )); then break; fi
         echo create directories ...
         mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1
-        #rm ./fs/release/* > /dev/null 2>&1
         echo get filenames
         ridlfile=`echo $cmdline | awk '{print $NF}'`
         appname=`grep appname $ridlfile | awk '{print $NF}' | sed 's/[";]//g'`
         echo appname is $appname
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
-        ls -R .
         pushd ./fs
         echo release/${appname}svr -f ./mpsvr
-        release/${appname}svr -f ./mpsvr 
+        release/${appname}svr -f ./mpsvr &
         sleep 2
         echo release/${appname}cli -f ./mp
         release/${appname}cli -f ./mp &
@@ -95,8 +94,8 @@ function pytest()
         sleep 3
         break 1
     done
-    fusermount3 -u ./fs/mp
-    fusermount3 -u ./fs/mpsvr
+    umount ./fs/mp
+    umount ./fs/mpsvr
     popd
     return $ret
 }
