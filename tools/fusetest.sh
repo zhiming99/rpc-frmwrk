@@ -61,6 +61,7 @@ function pytest()
     fi
 
     ret=0
+    ps aux
     while true; do
         eval $cmdline
         echo make $testcase ...
@@ -78,7 +79,7 @@ function pytest()
         ls -R .
         pushd ./fs
         echo release/${appname}svr -f ./mpsvr
-        strace -f release/${appname}svr -f ./mpsvr 
+        release/${appname}svr -f ./mpsvr 
         sleep 2
         echo release/${appname}cli -f ./mp
         release/${appname}cli -f ./mp &
