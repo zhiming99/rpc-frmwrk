@@ -63,6 +63,8 @@ function pytest()
     ret=0
     echo ls /dev/fuse -l
     ls /dev/fuse -l
+    echo 'ps aux | grep rpcrouter'
+    ps aux | grep rpcrouter
     while true; do
         eval $cmdline
         echo make $testcase ...
