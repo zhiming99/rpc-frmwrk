@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: update repository
       run: sudo apt-get -o Acquire::Retries=3 update
     - name: install tzdata
@@ -24,7 +24,7 @@ jobs:
     - name: setup build env
       run: libtoolize;aclocal;autoreconf -vfi;automake --add-missing;autoconf;
     - name: configure
-      run: ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
+      run: bash ./cfgsel r
     - name: make
       run: cat /proc/cpuinfo && make
     - name: install
