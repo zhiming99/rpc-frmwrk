@@ -80,10 +80,10 @@ function pytest()
         echo svcpt is $svcpt
         pushd ./fs
         echo debug/${appname}svr -f ./mpsvr
-        release/${appname}svr -f ./mpsvr &
+        debug/${appname}svr -f ./mpsvr &
         sleep 2
         echo debug/${appname}cli -f ./mp
-        release/${appname}cli -f ./mp &
+        debug/${appname}cli -f ./mp &
         popd
         ls -R .
         sleep 5
