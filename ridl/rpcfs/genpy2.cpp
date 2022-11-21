@@ -3486,10 +3486,10 @@ gint32 CImplPyMainFunc2::OutputCli(
                 Wa( "'''" );
                 Wa( "Just waiting and events will " );
                 Wa( "be handled on the event thread" );
-                Wa( "'''" );
-                NEW_LINE;
                 Wa( "while True:" );
                 CCOUT << "    time.sleep(1)";
+                NEW_LINE;
+                Wa( "'''" );
             }
             NEW_LINE;
 

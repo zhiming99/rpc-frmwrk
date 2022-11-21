@@ -85,7 +85,6 @@ function pytest()
         echo debug/${appname}cli -f ./mp
         debug/${appname}cli -f ./mp &
         popd
-        ls -R .
         sleep 5
         python3 ./mainsvr.py fs/mpsvr/$svcpt 0 &
         sleep 3
