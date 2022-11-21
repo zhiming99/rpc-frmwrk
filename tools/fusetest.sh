@@ -63,12 +63,10 @@ function pytest()
     ret=0
     echo ls /dev/fuse -l
     ls /dev/fuse -l
-    echo 'ps aux | grep rpcrouter'
-    ps aux | grep rpcrouter
     while true; do
         eval $cmdline
         echo make $testcase ...
-        make debug || ret=32
+        make || ret=32
         if (( $ret > 0 )); then break; fi
         echo create directories ...
         mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1
@@ -79,11 +77,11 @@ function pytest()
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
         pushd ./fs
-        echo debug/${appname}svr -f ./mpsvr
-        debug/${appname}svr -f ./mpsvr &
+        echo release/${appname}svr ./mpsvr
+        release/${appname}svr ./mpsvr
         sleep 2
-        echo debug/${appname}cli -f ./mp
-        debug/${appname}cli -f ./mp &
+        echo release/${appname}cli -f ./mp
+        release/${appname}cli ./mp
         popd
         sleep 5
         python3 ./mainsvr.py fs/mpsvr/$svcpt 0 &

@@ -469,6 +469,13 @@ class CRpcBasePort : public CPort
         std::deque< CfgPtr >& queMsgs );
 };
 
+template<>
+std::deque<DMsgPtr>& CRpcBasePort::MATCH_ENTRY::GetMsgQue( DMsgPtr* p );
+
+template<>
+std::deque<CfgPtr>& CRpcBasePort::MATCH_ENTRY::GetMsgQue( CfgPtr* p );
+
+
 /**
 * @name CRpcBasePortEx, an extension of
 * CRpcBasePort with the requst map for incoming
