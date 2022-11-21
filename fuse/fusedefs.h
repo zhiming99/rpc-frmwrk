@@ -37,13 +37,14 @@
 // 'evt'
 #define JSON_ATTR_MSGTYPE       "MessageType"
 
-// A json message can have an object attribute 'params'
+// A json message can have an attribute 'params optionally'
 #define JSON_ATTR_PARAMS        "Parameters"
 
 // Json representation of a struct must have a UInt
 // attribute 'structId', as mapped to the internal
 // msgid
 #define JSON_ATTR_STRUCTID      "StructId"
+#define JSON_ATTR_FIELDS        "Fields"
 
 // Each json request/response/event message has an
 // UInt64 attribute reqctxid, as a unique identifier of

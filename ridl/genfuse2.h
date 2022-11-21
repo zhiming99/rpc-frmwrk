@@ -22,6 +22,7 @@
  *
  * =====================================================================================
  */
+#pragma once
 
 class CDeclInterfProxyFuse2 :
     public CDeclInterfProxyFuse
@@ -93,6 +94,7 @@ class CImplServiceImplFuse2 :
         super( pWriter, pNode, bServer )
     {} 
     gint32 Output() override;
+    gint32 OutputROSSkel();
 };
 
 class CImplIufProxyFuse2:
@@ -159,3 +161,16 @@ class CImplClassFactoryFuse2 :
     {}
     gint32 Output() override;
 };
+
+class CImplServiceSkelFuse2 :
+    public CMethodWriter
+{
+    CServiceDecl* m_pNode = nullptr;
+
+    public:
+    typedef CMethodWriter super;
+    CImplServiceSkelFuse2( CCppWriter* pWriter,
+        ObjPtr& pNode );
+    gint32 Output();
+};
+

@@ -1106,6 +1106,9 @@ class CFastRpcServerBase :
     gint32 RemoveStmSkel(
         HANDLE hstm );
 
+    gint32 EnumStmSkels(
+        std::vector< InterfPtr >& vecIfs );
+
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
         IConfigDb* pEvtCtx,
@@ -1477,6 +1480,9 @@ class CFastRpcSkelProxyBase :
 
     gint32 BuildBufForIrp( BufPtr& pBuf,
         IConfigDb* pReqCall ) override;
+
+    gint32 OnKeepAliveTerm(
+        IEventSink* pTask ) override;
 };
 
 class CIfStartRecvMsgTask2 :
@@ -1541,6 +1547,9 @@ class CFastRpcSkelSvrBase :
 
     gint32 BuildBufForIrp( BufPtr& pBuf,
         IConfigDb* pReqCall ) override;
+
+    gint32 OnKeepAliveOrig(
+        IEventSink* pTask ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(

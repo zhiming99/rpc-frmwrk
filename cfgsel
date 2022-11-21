@@ -1,6 +1,6 @@
 #!/sh/bash
 if [ "x$1" == "xd" ]; then
-    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1"
+    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1 -fno-strict-aliasing"
 elif [ "x$1" == "xr" ]; then
     CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
 elif [ "x$1" == "x" ]; then

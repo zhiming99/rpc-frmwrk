@@ -1,8 +1,10 @@
+SUBDIRS= rpcfs .
+
 ridlc_PROGRAMS=ridlc
 ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h \
 genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md odesctpl.json \
 odesctpl2.json drvtpl.json mktpl.in synccfg.py.in pymktpl genjava.cpp genjava.h \
-genfuse.h genfuse.cpp gencpp2.h gencpp2.cpp genfuse2.h genfuse2.cpp
+genfuse.h genfuse.cpp gencpp2.h gencpp2.cpp genfuse2.h genfuse2.cpp genrpcfs.cpp
 
 EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java JavaSerialImpl.java
 
@@ -26,7 +28,7 @@ mktpl : mktpl.in
 synccfg.py : synccfg.py.in
 	sed -e 's,[@]SRCCFG[@],$(ridlc_confdir)/echodesc.json,g' synccfg.py.in > synccfg.py
 
-ridlc_LDADD=$(COMMON_LINK) ../ipc/libipc.la ../combase/libcombase.la -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
+ridlc_LDADD=$(COMMON_LINK) ../ipc/libipc.la ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
 ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java

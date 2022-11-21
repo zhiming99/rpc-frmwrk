@@ -1198,7 +1198,7 @@ class CInterfaceProxy :
             pReqCall, pCallback );
     }
 
-    gint32 OnKeepAliveTerm(
+    virtual gint32 OnKeepAliveTerm(
         IEventSink* pInvokeTask );
 
     virtual gint32 SendFetch_Proxy(
@@ -1512,7 +1512,7 @@ class CInterfaceServer :
             pReqMsg, pCallback );
     }
 
-    gint32 OnKeepAliveOrig(
+    virtual gint32 OnKeepAliveOrig(
         IEventSink* pTask );
 
     gint32 OnKeepAliveRelay(
@@ -1621,17 +1621,17 @@ class CInterfaceServer :
 
     virtual gint32 InitUserFuncs();
 
-    // a user-initialized cancel request
-    gint32 UserCancelRequest(
+    // user-launched cancel request
+    virtual gint32 UserCancelRequest(
         IEventSink* pInvokeTask,
         guint64 qwIoTaskId );
 
-    // a user-initialized cancel request
+    // user-launched cancel request
     gint32 ForceCancelRequests(
         IEventSink* pInvokeTask,
         ObjPtr& pvecTasks );
 
-    // a user-initialized keep-alive request
+    // user-launched one-way keep-alive request
     gint32 KeepAliveRequest(
         IEventSink* pCallback,
         guint64 qwIoTaskId );

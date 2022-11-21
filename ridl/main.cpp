@@ -106,6 +106,7 @@ void Usage()
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
     printf( "\t\toption is for CPP project only\n" );
+    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
 }
 
 static std::string g_strOutPath = "output";
@@ -115,16 +116,19 @@ bool g_bNewSerial = true;
 stdstr g_strLang = "cpp";
 stdstr g_strLocale ="en";
 guint32 g_dwFlags = 0;
+stdstr g_strCmdLine;
 
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
 bool g_bMklib = false;
 bool g_bRpcOverStm = false;
+bool g_bAsyncProxy = false;
 
 #include "seribase.h"
 #include "gencpp.h"
 #include "genpy.h"
 #include "genjava.h"
+#include "getopt.h"
 
 extern gint32 GenRpcFSkelton(
     const std::string& strOutPath,
@@ -136,6 +140,12 @@ int main( int argc, char** argv )
     gint32 ret = 0;
     bool bUninit = false;
     do{
+        for( guint32 i = 0; i < argc; i++ )
+        {
+            g_strCmdLine += argv[ i ];
+            g_strCmdLine.append( 1, ' ' );
+        }
+
         ret = CoInitialize( COINIT_NORPC );
         if( ERROR( ret ) )
             break;
@@ -149,15 +159,28 @@ int main( int argc, char** argv )
         int opt = 0;
         bool bQuit = false;
 
-        while( ( opt =
-            getopt( argc, argv, "ahlI:O:o:pjP:L:f::s" ) ) != -1 )
+        int option_index = 0;
+        static struct option long_options[] = {
+            {"async_proxy", no_argument, 0,  0 },
+            {0, 0,  0,  0 }
+        };
+
+        while( true ) 
         {
+
+            opt = getopt_long( argc, argv,
+                "ahlI:O:o:pjP:L:f::s",
+                long_options, &option_index );
+
+            if( opt == -1 )
+                break;
+
             switch( opt )
             {
-            case 'h' :
+            case 0:
                 {
-                    Usage();
-                    bQuit = true;
+                    if( option_index == 0 )
+                        g_bAsyncProxy = true;
                     break;
                 }
             case 'O':
@@ -309,8 +332,15 @@ int main( int argc, char** argv )
                     g_bRpcOverStm = true;
                     break;
                 }
+            case '?' :
+            case ':' :
+            case 'h' :
             default:
-                break;
+                {
+                    Usage();
+                    bQuit = true;
+                    break;
+                }
             }
 
             if( bQuit )
@@ -405,15 +435,23 @@ int main( int argc, char** argv )
         printf( "Generating files.. \n" );
         if( bFuse || g_bRpcOverStm || g_strLang == "cpp" )
         {
-            ret = GenCppProj(
-                g_strOutPath, strAppName, pRoot );
-            if( ERROR( ret ) )
-                break;
             if( bFuse && g_strLang != "cpp" )
             {
                 // generating rpcfs skelton code
-                // ret = GenRpcFSkelton(
-                //     g_strOutPath, strAppName, pRoot );
+                ret = GenRpcFSkelton(
+                    g_strOutPath, strAppName, pRoot );
+
+                if( ERROR( ret ) )
+                    break;
+
+                stdstr strOutPath = g_strOutPath + "/fs";
+                ret = GenCppProj(
+                    strOutPath, strAppName, pRoot );
+            }
+            else
+            {
+                ret = GenCppProj(
+                    g_strOutPath, strAppName, pRoot );
             }
         }
         else if( g_strLang == "py" )
@@ -436,20 +474,17 @@ int main( int argc, char** argv )
             break;
 
         // store the command to the file 'cmdline'
-        stdstr strCmdLine;
-        for( int i = 0; i < argc; i++ )
-        {
-            strCmdLine += argv[ i ];
-            strCmdLine.append( 1, ' ' );
-        }
-        strCmdLine.append( 1, '\n' );
         stdstr strPath = g_strOutPath;
         strPath += "/cmdline";
-        FILE* fp = fopen( strPath.c_str(), "a" );
+        FILE* fp = fopen( strPath.c_str(), "w" );
         if( fp == nullptr )
             break;
-        fwrite( strCmdLine.c_str(),
-            strCmdLine.size(), 1, fp );
+        stdstr strShebang = "#!/bin/sh\n";
+        fwrite( strShebang.c_str(),
+            strShebang.size(), 1, fp );
+        g_strCmdLine.append( 1, '\n' );
+        fwrite( g_strCmdLine.c_str(),
+            g_strCmdLine.size(), 1, fp );
         fclose( fp );
 
     }while( 0 );

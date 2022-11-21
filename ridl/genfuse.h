@@ -171,6 +171,7 @@ class CImplServiceImplFuse :
         : super( pWriter, pNode, bServer )
     {}
     gint32 Output() override;
+    gint32 OutputUCRSvr();
 };
 
 class CImplIufProxyFuse

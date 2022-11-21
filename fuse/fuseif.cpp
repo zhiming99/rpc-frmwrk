@@ -3437,6 +3437,19 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             break;
         }
 
+        if( !valResp.isMember( JSON_ATTR_MSGTYPE ) ||
+            !valResp[ JSON_ATTR_MSGTYPE ].isString() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        bool bResp = true;
+        stdstr strType =
+            valResp[ JSON_ATTR_MSGTYPE ].asString();
+        if( strType == "evt" ) 
+            bResp = false;
+
         if( !valResp.isMember( JSON_ATTR_REQCTXID ) )
         {
             ret = -EINVAL;
@@ -3475,15 +3488,18 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             break;
         }
 
-        ret = RemoveTaskId( qwTaskId );
-        if( ERROR( ret ) )
+        if( bResp )
         {
-            // the request is gone
-            ret = 0;
-            m_pReqSize->Resize( 0 );
-            if( m_vecOutBufs.empty() )
-                break;
-            continue;
+            ret = RemoveTaskId( qwTaskId );
+            if( ERROR( ret ) )
+            {
+                // the request is gone
+                ret = 0;
+                m_pReqSize->Resize( 0 );
+                if( m_vecOutBufs.empty() )
+                    break;
+                continue;
+            }
         }
 
         m_pReqSize->Resize( 0 );
@@ -4270,15 +4286,15 @@ gint32 CFuseSvcProxy::ReceiveEvtJson(
         RLOCK_TESTMNT; 
 
         CStdRMutex oLock( GetLock() );
-        std::vector< CFuseRespFileProxy* > vecResps;
+        std::vector< CFuseEvtFile* > vecEvtFiles;
         // broadcast events
         for( auto& elem : m_mapGroups )
-            vecResps.push_back(
-                elem.second.m_pRespFile );
+            vecEvtFiles.push_back(
+                elem.second.m_pEvtFile );
 
         oLock.Unlock();
 
-        for( auto& elem : vecResps )
+        for( auto& elem : vecEvtFiles )
             elem->ReceiveEvtJson( strMsg );
 
     }while( 0 );

@@ -551,7 +551,7 @@ CObjBase::CObjBase()
     : m_atmRefCount( 1 )
 {
     m_dwClsid = Clsid_Invalid;
-    m_qwObjId = ++m_atmObjId;
+    m_qwObjId = NewObjId();
     ++m_atmObjCount;
     m_dwMagic = *( guint32* )"ObjB";
 
@@ -722,6 +722,9 @@ gint32 CObjBase::Intitialize(
 {
     return 0;
 }
+
+guint64 CObjBase::NewObjId()
+{ return m_atmObjId++; }
 
 #ifdef DEBUG
 extern std::unordered_map<guint32, std::string> g_mapId2Name;

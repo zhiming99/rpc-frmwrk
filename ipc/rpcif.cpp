@@ -5831,6 +5831,11 @@ gint32 CInterfaceProxy::CancelReqAsync(
         // start the task
         ( *ptw )( eventZero );
 
+        // an ugly patch for rpcfs's registration of request
+        // pass the reqId from the callback to the new callback
+        CCfgOpenerObj otwCfg( ptw );
+        otwCfg.CopyProp( propTaskId, pCallback );
+
         guint64 qwThisTask = 0;
         ret = UserCancelReqAsync( ptw, 
             qwThisTask, qwTaskToCancel );
@@ -7419,8 +7424,11 @@ gint32 CInterfaceServer::UserCancelRequest(
 
             if( pInvTask->GetTaskState() ==
                 stateStopped )
-                return ERROR_STATE;
-           
+            {
+                ret = 0;
+                break;
+            }
+          
             CCfgOpenerObj oCfg( pInvTask ); 
             
             gint32 iType = 0;
@@ -7444,11 +7452,13 @@ gint32 CInterfaceServer::UserCancelRequest(
                     break;
                 }
 
-                CReqBuilder oResp( pReqCfg );
+                CReqBuilder oResp( this );
 
-                oResp.ClearParams();
-                ret = oResp.SwapProp(
-                    propDestDBusName, propSrcDBusName );
+                oResp.CopyProp( propDestDBusName,
+                    propSrcDBusName, pReqCfg );
+
+                oResp.CopyProp( propSrcDBusName,
+                    propDestDBusName, pReqCfg );
 
                 oResp.SetCallFlags( CF_ASYNC_CALL |
                     DBUS_MESSAGE_TYPE_METHOD_RETURN |

@@ -593,6 +593,78 @@ gint32 CFastRpcSkelSvrBase::NotifyStackReady(
         pIrp, false );
 }
 
+gint32 CFastRpcSkelSvrBase::OnKeepAliveOrig(
+    IEventSink* pTask )
+{
+    if( pTask == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CIfInvokeMethodTask* pInvTask =
+            ObjPtr( pTask );
+
+        CStdRTMutex oLock( pInvTask->GetLock() );
+        CCfgOpener oInvCfg(
+            ( IConfigDb* )pInvTask->GetConfig() );
+
+        IConfigDb* pCfg = nullptr;
+        ret = oInvCfg.GetPointer(
+            propReqPtr, pCfg ); 
+        if( ERROR( ret ) )
+            break;
+
+        CReqOpener oReq( pCfg );
+        guint64 iTaskId = 0;
+        ret = oReq.GetQwordProp(
+            propTaskId, iTaskId );
+        if( ERROR( ret ) )
+            break;
+
+        CReqBuilder okaReq( this );
+        stdstr strIfName =
+            DBUS_IF_NAME( "IInterfaceServer" );
+        okaReq.SetIfName( strIfName );
+        okaReq.SetMethodName(
+            SYS_EVENT_KEEPALIVE );
+
+        okaReq.SetCallFlags( 
+           DBUS_MESSAGE_TYPE_SIGNAL |
+           CF_ASYNC_CALL |
+           CF_NON_DBUS );
+
+        stdstr strVal;
+        ret = oReq.GetStrProp(
+            propDestDBusName, strVal );
+        if( SUCCEEDED( ret ) )
+            okaReq.SetSender( strVal );
+
+        ret = oReq.GetStrProp(
+            propSrcDBusName, strVal );
+        if( SUCCEEDED( ret ) )
+            okaReq.SetDestination( strVal );
+
+        oLock.Unlock();
+
+        okaReq.Push( iTaskId );
+        okaReq.Push( ( guint32 )KATerm );
+
+        TaskletPtr pDummyTask;
+
+        ret = pDummyTask.NewObj(
+            clsid( CIfDummyTask ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = BroadcastEvent(
+            okaReq.GetCfg(), pDummyTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFastRpcServerBase::OnStartSkelComplete(
     IEventSink* pCallback,
     IEventSink* pIoReq,
@@ -634,7 +706,6 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
             break;
 
         RemoveStmSkel( hstm );
-        CCfgOpenerObj oIfCfg( this );
 
         if( bClosePort )
         {
@@ -765,6 +836,19 @@ gint32 CFastRpcServerBase::GetStmSkel(
         return -ENOENT;
 
     pIf = itr->second;
+    return STATUS_SUCCESS;
+}
+
+gint32 CFastRpcServerBase::EnumStmSkels(
+    std::vector< InterfPtr >& vecIfs )
+{
+    CStdRMutex oLock( GetLock() );
+    if( m_mapSkelObjs.empty() )
+        return -ENOENT;
+
+    for( auto& elem : m_mapSkelObjs )
+        vecIfs.push_back( elem.second );
+
     return STATUS_SUCCESS;
 }
 
@@ -940,6 +1024,87 @@ gint32 CFastRpcSkelProxyBase::BuildBufForIrp(
     BufPtr& pBuf, IConfigDb* pReqCall )
 {
     return BuildBufForIrpInternal( pBuf, pReqCall );
+}
+
+gint32 CFastRpcSkelProxyBase::OnKeepAliveTerm(
+    IEventSink* pTask )
+{
+    gint32 ret = 0;
+
+    // servicing the incoming request/event
+    // message
+    do{
+        CCfgOpenerObj oCfg( pTask );
+
+        IConfigDb* pCfg = nullptr;
+        ret = oCfg.GetPointer( propMsgPtr, pCfg ); 
+        if( ERROR( ret ) )
+            break;
+
+        CReqOpener oEvent( pCfg );
+        guint64 iTaskId = 0;
+        ret = oEvent.GetQwordProp( 0, iTaskId );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 iPhase = 0;
+        ret = oEvent.GetIntProp( 1, iPhase );
+        if( ERROR( ret ) )
+            break;
+
+        if( iPhase != ( guint32 )KATerm )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        TaskGrpPtr pRootGrp;
+        TaskletPtr pTaskToKa;
+        if( true )
+        {
+            CStdRMutex oIfLock( GetLock() );
+            if( !IsConnected() )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+            pRootGrp = GetTaskGroup();
+            if( pRootGrp.IsEmpty() )
+            {
+                ret = -ENOENT;    
+                break;
+            }
+        }
+
+        ret = pRootGrp->FindTask(
+            iTaskId, pTaskToKa );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pTaskToKa.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CIfIoReqTask* pReqTask = pTaskToKa;
+        if( pReqTask == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        // send a keepalive event
+        EnumEventId iEvent = ( EnumEventId )
+            ( eventTryLock | eventKeepAlive );
+
+        pTaskToKa->OnEvent( iEvent,
+            KATerm, 0, nullptr );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CFastRpcSkelSvrBase::SendResponse(

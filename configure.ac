@@ -260,6 +260,7 @@ AC_CONFIG_FILES([Makefile
                  rpc/security/Makefile
                  rpc/router/Makefile
                  ridl/Makefile
+                 ridl/rpcfs/Makefile
                  tools/Makefile
                  3rd_party/Makefile
                  python/Makefile

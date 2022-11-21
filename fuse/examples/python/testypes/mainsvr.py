@@ -146,7 +146,10 @@ def test() :
         while True:
             #print( time.time() )
             #receive response if any
-            reqs = recvReq(reqfp)
+            ret = recvReq(reqfp)
+            if ret[ 0 ] < 0 :
+                raise Exception( "unexpected error %d" % ret[ 0 ]  )
+            reqs = ret[ 1 ]
             if reqs is None or len( reqs ) == 0:
                 print( "the req is empty ", reqs )
                 continue
