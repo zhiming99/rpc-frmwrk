@@ -22,6 +22,7 @@ examples/python/actcancel/ActiveCancelcli.py \
 examples/python/actcancel/ActiveCancelsvr.py \
 examples/python/actcancel/maincli.py \
 examples/python/evtest/EventTestcli.py \
+examples/python/evtest/maincli.py \
 examples/python/evtest/mainsvr.py \
 examples/python/hellowld/HelloWorldSvcsvr.py \
 examples/python/hellowld/maincli.py \
