@@ -1,4 +1,7 @@
 ---
+[`Mon Nov 21 2022 22:25:30 PM Beijing`]    
+1. merged genpy-for-rpcfs to the master branch. Next we will add support to the `gmssl`, the cipher suite for internet security defined by Chinese standard administration.
+
 [`Sat Nov 19 2022 05:13:17 PM Beijing`]    
 1. genpy-for-rpcfs is almost complete. The remaining work is to add the testcases to the testing process, and then we can conclude this pull-request.
 

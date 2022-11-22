@@ -54,7 +54,7 @@ This project depends on the following 3rd-party packags at runtime:
 10. `FUSE-3 for rpcfs support`
 
 #### Todo
-1. Skelton code generator for `rpcfs` programming
+1. Add support for gmssl
 2. Performance Tuning
 3. Adaptive flow control
-4. A tree-like hierarchical persistant registry.
+
