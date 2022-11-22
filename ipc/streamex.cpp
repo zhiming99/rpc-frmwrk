@@ -1869,6 +1869,8 @@ gint32 CStreamProxySync::StartStream(
             hChannel, pDesc, pCallback );
 
     }while( 0 );
+    if( ERROR( ret ) )
+        OutputMsg( ret, "StartStream failed" );
 
     return ret;
 }
