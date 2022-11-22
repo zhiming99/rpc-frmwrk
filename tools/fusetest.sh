@@ -13,8 +13,8 @@ pushd testypes
 make || exit 10
 
 mkdir mp mpsvr || true
-release/TestTypessvr mpsvr &
-release/TestTypescli mp &
+release/TestTypessvr -f mpsvr &
+release/TestTypescli -f mp &
 
 pydir=$basedir/fuse/examples/python
 sleep 5 
