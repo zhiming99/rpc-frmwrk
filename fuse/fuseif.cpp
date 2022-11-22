@@ -4959,6 +4959,7 @@ static gint32 fuseif_create_stream(
         CParamList oDesc;
         oDesc[ propNodeName ] = strName;
         HANDLE hStream = INVALID_HANDLE;
+        OutputMsg( ret, "fuseif_create_stream: before start stream 0" );
         ret = pStm->StartStream(
             hStream, oDesc.GetCfg(), pSync );
         if( ERROR( ret ) )
@@ -4970,6 +4971,7 @@ static gint32 fuseif_create_stream(
             ret = pSync->WaitForCompleteWakable();
             if( ERROR( ret ) )
                 break;
+            OutputMsg( ret, "fuseif_create_stream: wait complete 1" );
             ret = pSync->GetError();
             if( ERROR( ret ) )
                 break;
@@ -4980,6 +4982,7 @@ static gint32 fuseif_create_stream(
                 propRespPtr, pResp );
             if( ERROR( ret ) )
                 break;
+            OutputMsg( ret, "fuseif_create_stream: wait complete 2" );
 
             CCfgOpener oResp( pResp );
             gint32 iRet = 0;
@@ -4989,11 +4992,13 @@ static gint32 fuseif_create_stream(
             if( ERROR( ret ) )
                 break;
             ret = iRet;
+            OutputMsg( ret, "fuseif_create_stream: wait complete 3" );
             if( ERROR( ret ) )
                 break;
 
             ret = oResp.GetIntPtr(
                 1, ( guint32*& )hStream );
+            OutputMsg( ret, "fuseif_create_stream: wait complete 3" );
 
         }
 
