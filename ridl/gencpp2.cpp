@@ -60,7 +60,7 @@ gint32 CDeclInterfProxy2::OutputROSSkel()
 
         INDENT_UP;
         NEW_LINE;
-        CCOUT<< ": public " << strBase;
+        CCOUT<< ": public virtual " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -76,8 +76,7 @@ gint32 CDeclInterfProxy2::OutputROSSkel()
 
         INDENT_UP;
         NEW_LINE;
-        CCOUT << "super::_MyVirtBase( pCfg ), "
-            << "super( pCfg )";
+        CCOUT << "super( pCfg )";
         NEW_LINE;
         CCOUT << "{}";
         INDENT_DOWN;
@@ -1325,7 +1324,7 @@ gint32 CDeclInterfSvr2::OutputROSSkel()
             "CFastRpcSkelSvrBase";
         INDENT_UP;
         NEW_LINE;
-        CCOUT<< ": public " << strBase;
+        CCOUT<< ": public virtual " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -1339,8 +1338,7 @@ gint32 CDeclInterfSvr2::OutputROSSkel()
             << "( const IConfigDb* pCfg ) :";
         INDENT_UP;
         NEW_LINE;
-        CCOUT << "super::_MyVirtBase( pCfg ), "
-            << "super( pCfg )";
+        CCOUT << "super( pCfg )";
         NEW_LINE;
         CCOUT << "{}";
         INDENT_DOWNL;
@@ -2319,7 +2317,7 @@ gint32 CDeclService2::OutputROSSkel()
     do{
         std::string strSvcName =
             m_pNode->GetName();
-        CCOUT << "DECLARE_AGGREGATED_PROXY(";
+        CCOUT << "DECLARE_AGGREGATED_SKEL_PROXY(";
         INDENT_UP;
         NEW_LINE;
 
@@ -2349,7 +2347,7 @@ gint32 CDeclService2::OutputROSSkel()
         INDENT_DOWN;
         NEW_LINES( 2 );
 
-        CCOUT << "DECLARE_AGGREGATED_SERVER(";
+        CCOUT << "DECLARE_AGGREGATED_SKEL_SERVER(";
         INDENT_UP;
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel,";

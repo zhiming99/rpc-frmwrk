@@ -3327,16 +3327,16 @@ namespace rpcf
         return ret; \
     }
 
-template< typename...Types >
-struct CAggregatedObject< CAggInterfaceServer, Types... >
+template< typename ServerBase, typename...Types >
+struct CAggregatedServer
     : Types...
 {
-    using virtbase = CAggInterfaceServer;
-    using ThisType = CAggregatedObject< CAggInterfaceServer, Types... >;
+    using virtbase = ServerBase;
+    using ThisType = CAggregatedServer< ServerBase, Types... >;
 
     public:
     typedef virtbase super;
-    CAggregatedObject( const IConfigDb* pCfg )
+    CAggregatedServer( const IConfigDb* pCfg )
     : virtbase( pCfg ), Types( pCfg )...
     {
     }
@@ -3423,11 +3423,11 @@ struct IUnknown
 
 #define METHOD_EnumInterfaces "EnumInterfaces"
 
-#define DECLARE_AGGREGATED_SERVER( ClassName, ... )\
-struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnknown\
+#define DECLARE_AGGREGATED_SERVER_INTERNAL( _VirtBase, ClassName, ... )\
+struct ClassName : CAggregatedServer< _VirtBase, ##__VA_ARGS__ >, IUnknown\
 {\
-    using virtbase = CAggInterfaceServer; \
-    typedef CAggregatedObject< virtbase, ##__VA_ARGS__ > super;\
+    using virtbase = _VirtBase; \
+    typedef CAggregatedServer< virtbase, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
         : virtbase( pCfg ), super( pCfg )\
     { this->SetClassId( clsid( ClassName ) ); }\
@@ -3472,6 +3472,9 @@ struct ClassName : CAggregatedObject< CAggInterfaceServer, ##__VA_ARGS__ >, IUnk
     }\
 }
 
+#define DECLARE_AGGREGATED_SERVER( ClassName, ...) \
+    DECLARE_AGGREGATED_SERVER_INTERNAL( CAggInterfaceServer, ClassName, ##__VA_ARGS__ )
+
 // Start point for aggregatable interface
 struct CAggInterfaceProxy :
     public CInterfaceProxy
@@ -3492,15 +3495,15 @@ struct CAggInterfaceProxy :
     { return -ENOENT; }
 };
 
-template< typename...Types >
-struct CAggregatedObject< CAggInterfaceProxy, Types... >
+template< typename ProxyBase, typename...Types >
+struct CAggregatedProxy
     : Types...
 {
-    using virtbase = CAggInterfaceProxy;
-    using ThisType = CAggregatedObject< CAggInterfaceProxy, Types... >;
+    using virtbase = ProxyBase;
+    using ThisType = CAggregatedProxy< ProxyBase, Types... >;
     public:
     typedef virtbase super;
-    CAggregatedObject( const IConfigDb* pCfg )
+    CAggregatedProxy( const IConfigDb* pCfg )
     : virtbase( pCfg ), Types( pCfg )...
     {
     }
@@ -3552,11 +3555,11 @@ struct CAggregatedObject< CAggInterfaceProxy, Types... >
         VA_LIST( pDataDesc, fd, dwOffset, dwSize, pCallback ) )
 };
 
-#define DECLARE_AGGREGATED_PROXY( ClassName, ... )\
-struct ClassName : CAggregatedObject< CAggInterfaceProxy, ##__VA_ARGS__ >\
+#define DECLARE_AGGREGATED_PROXY_INTERNAL( _VirtBase, ClassName, ... )\
+struct ClassName : CAggregatedProxy< _VirtBase, ##__VA_ARGS__ >\
 {\
-    using virtbase = CAggInterfaceProxy; \
-    typedef CAggregatedObject< virtbase, ##__VA_ARGS__ > super;\
+    using virtbase = _VirtBase; \
+    typedef CAggregatedProxy< virtbase, ##__VA_ARGS__ > super;\
     ClassName( const IConfigDb* pCfg )\
         : virtbase( pCfg ), super( pCfg )\
     { this->SetClassId( clsid( ClassName ) ); }\
@@ -3581,6 +3584,9 @@ struct ClassName : CAggregatedObject< CAggInterfaceProxy, ##__VA_ARGS__ >\
         return FORWARD_IF_CALL( iid( IUnknown ), 0, METHOD_EnumInterfaces, pClsids );\
     }\
 }
+
+#define DECLARE_AGGREGATED_PROXY( ClassName, ...) \
+    DECLARE_AGGREGATED_PROXY_INTERNAL( CAggInterfaceProxy, ClassName, ##__VA_ARGS__ )
 
 // declare the synchronous proxy methods
 #define DECL_PROXY_METHOD_SYNC( i, _fname, ... ) \

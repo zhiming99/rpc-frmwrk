@@ -37,9 +37,6 @@
 #define IFBASE1( _bProxy ) std::conditional< \
     _bProxy, CStreamProxyAsync, CStreamServerAsync>::type
 
-#define STMBASE( _bProxy ) std::conditional< \
-    _bProxy, CStreamProxy, CStreamServer>::type
-
 #define IFBASE3( _bProxy ) std::conditional< \
     _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
 
@@ -1175,18 +1172,17 @@ class CFastRpcProxyBase :
 
 template< bool bProxy >
 class CFastRpcSkelBase :
-    public IFBASE2( bProxy )
+    public IFBASE3( bProxy )
 {
     InterfPtr m_pParent;
 
     public:
 
-    typedef typename IFBASE2( bProxy ) super;
-    typedef typename super::super _MyVirtBase;
+    typedef typename IFBASE3( bProxy ) super;
 
     CFastRpcSkelBase(
         const IConfigDb* pCfg ) :
-        _MyVirtBase( pCfg ), super( pCfg )
+        super( pCfg )
     {
         gint32 ret = 0;
         do{
@@ -1204,7 +1200,7 @@ class CFastRpcSkelBase :
     }
 
     // this is for serialization
-    CRpcServices* GetStreamIf() override
+    CRpcServices* GetStreamIf()
     { return m_pParent; }
 
     InterfPtr& GetParentIf()
@@ -1475,7 +1471,7 @@ class CFastRpcSkelProxyBase :
     public:
     typedef CFastRpcSkelBase< true > super;
     CFastRpcSkelProxyBase( const IConfigDb* pCfg )
-        : _MyVirtBase( pCfg ), super( pCfg )
+        : super( pCfg )
     {}
 
     gint32 BuildBufForIrp( BufPtr& pBuf,
@@ -1522,7 +1518,7 @@ class CFastRpcSkelSvrBase :
     public:
     typedef CFastRpcSkelBase< false > super;
     CFastRpcSkelSvrBase( const IConfigDb* pCfg )
-        : _MyVirtBase( pCfg ), super( pCfg )
+        : super( pCfg )
     {}
 
     gint32 NotifyStackReady( PortPtr& pPort );
@@ -1559,5 +1555,11 @@ DECLARE_AGGREGATED_SERVER(
 DECLARE_AGGREGATED_PROXY(
     CRpcStreamChannelCli,
     CRpcStmChanCli );
+
+#define DECLARE_AGGREGATED_SKEL_PROXY( ClassName, ...) \
+    DECLARE_AGGREGATED_PROXY_INTERNAL( CFastRpcSkelProxyBase, ClassName, ##__VA_ARGS__ )
+
+#define DECLARE_AGGREGATED_SKEL_SERVER( ClassName, ...) \
+    DECLARE_AGGREGATED_SERVER_INTERNAL( CFastRpcSkelSvrBase, ClassName, ##__VA_ARGS__ )
 
 }

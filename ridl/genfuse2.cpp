@@ -180,7 +180,7 @@ gint32 CDeclInterfProxyFuse2::Output()
         strBase = "CFastRpcSkelProxyBase";
         INDENT_UP;
         NEW_LINE;
-        CCOUT<< ": public " << strBase;
+        CCOUT<< ": public virtual " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -197,8 +197,7 @@ gint32 CDeclInterfProxyFuse2::Output()
         INDENT_UP;
         NEW_LINE;
 
-        CCOUT << "_MyVirtBase( pCfg ), "
-            << "super( pCfg )";
+        CCOUT << "super( pCfg )";
         NEW_LINE;
 
         CCOUT << "{}";
@@ -308,7 +307,7 @@ gint32 CDeclInterfSvrFuse2::Output()
         INDENT_UP;
         NEW_LINE;
 
-        CCOUT<< ": public " << strBase;
+        CCOUT<< ": public virtual " << strBase;
 
         INDENT_DOWN;
         NEW_LINE;
@@ -323,8 +322,7 @@ gint32 CDeclInterfSvrFuse2::Output()
         INDENT_UP;
         NEW_LINE;
 
-        CCOUT << "_MyVirtBase( pCfg ), "
-            << "super( pCfg )";
+        CCOUT << "super( pCfg )";
         NEW_LINE;
         CCOUT << "{}";
 
@@ -2521,7 +2519,7 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
 
         CCOUT << "#define Clsid_C" << strSvcName << "_CliSkel_Base Clsid_Invalid";
         NEW_LINE;
-        CCOUT << "DECLARE_AGGREGATED_PROXY(";
+        CCOUT << "DECLARE_AGGREGATED_SKEL_PROXY(";
         INDENT_UP;
         NEW_LINE;
 
@@ -2567,7 +2565,7 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
         CCOUT << "#define Clsid_C" << strSvcName << "_SvrSkel_Base Clsid_Invalid";
         NEW_LINE;
         NEW_LINE;
-        CCOUT << "DECLARE_AGGREGATED_SERVER(";
+        CCOUT << "DECLARE_AGGREGATED_SKEL_SERVER(";
         INDENT_UP;
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel_Base,";
