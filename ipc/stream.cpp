@@ -798,6 +798,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             if( ERROR( ret ) )
             {
                 HANDLE hStm;
+                OutputMsg( ret, "OnConnected failed @%lld", hStm );
                 oResp.Pop( hStm );
                 oResp.Pop( pObj );
                 break;
@@ -868,8 +869,13 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         iRet = oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
     }
+    else
+    {
+        OutputMsg( iRet, "Warning, "
+            "the callback task is not found" );
+    }
     if( !IsPending() )
-        DebugPrint( ret, "Warning, "
+        OutputMsg( ret, "Warning, "
             "the task is not pending" );
 
     return ret;
