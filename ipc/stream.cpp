@@ -637,6 +637,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
 
     if( ERROR( ret ) )
     {
+        OutputMsg( ret, "CreateUxSockStmTask failed" );
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
 
@@ -701,6 +702,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
 
+    bool bServer = false;
     do{
         if( ERROR( iRet ) )
         {
@@ -723,7 +725,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             break;
         }
 
-        bool bServer = false;
         ret = oParams.GetBoolProp(
             propIsServer, bServer );
         if( ERROR( ret ) )
@@ -872,10 +873,13 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         iRet = oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
     }
-    if( ERROR( ret ) )
-        OutputMsg( ret, "Error, StartStream Failed" );
-    else
-        OutputMsg( ret, "Info, StartStream succeeded" );
+    if( !bServer )
+    {
+        if( ERROR( ret ) )
+            OutputMsg( ret, "Error, StartStream Failed" );
+        else
+            OutputMsg( ret, "Info, StartStream succeeded" );
+    }
 
     if( !IsPending() )
         DebugPrint( ret, "Warning, "
