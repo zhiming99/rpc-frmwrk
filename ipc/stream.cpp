@@ -545,7 +545,10 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         {
             ret = GetResponse();
             if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "CIfCreateUxSockStmTask no resp" );
                 break;
+            }
         }
 
         CCfgOpener oCfg(
@@ -554,7 +557,10 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         CRpcServices* pIf = nullptr;
         ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "CIfCreateUxSockStmTask no ifPtr" );
             break;
+        }
         
         IStream* pStream =
             dynamic_cast< IStream* >( pIf );
@@ -576,12 +582,18 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         guint32 dwFd = 0;
         ret = oCfg.GetIntProp( propFd, dwFd );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "CIfCreateUxSockStmTask no fd" );
             break;
+        }
 
         IConfigDb* pDataDesc = nullptr;
         ret = oCfg.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "CIfCreateUxSockStmTask no datadesc" );
             break;
+        }
 
         InterfPtr pUxIf;
         ret = pStream->CreateUxStream( pDataDesc,
