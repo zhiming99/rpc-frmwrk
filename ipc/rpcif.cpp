@@ -3304,11 +3304,12 @@ gint32 CRpcServices::FillRespData(
         return ret;
     }
 
+    string strMethod;
+    gint32 iRet = 0;
     do{
-        string strMethod = pMsg.GetMember();
+        strMethod = pMsg.GetMember();
         if( strMethod == SYS_METHOD_SENDDATA )
         {
-            gint32 iRet = 0;
             ret = pMsg.GetIntArgAt(
                 0, ( guint32& )iRet );
 
@@ -3323,8 +3324,6 @@ gint32 CRpcServices::FillRespData(
         }
         else if( strMethod == SYS_METHOD_FETCHDATA )
         {
-            
-            gint32 iRet = 0;
             CParamList oParams( pResp );
             ret = pMsg.GetIntArgAt(
                 0, ( guint32& )iRet );
@@ -3384,7 +3383,6 @@ gint32 CRpcServices::FillRespData(
             // for the default requests, a
             // configDb ptr is returned
             ObjPtr pObj;
-            gint32 iRet = 0;
             ret = pMsg.GetIntArgAt( 0, ( guint32& )iRet );
             if( ERROR( ret ) )
                 break;
@@ -3430,6 +3428,13 @@ gint32 CRpcServices::FillRespData(
         }
 
     }while( 0 );
+
+    if( ERROR( iRet ) || ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "FillRespData: error %d in response of %s ",
+            iRet, strMethod.c_str() );
+    }
 
     return ret;
 }
