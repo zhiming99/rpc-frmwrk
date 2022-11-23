@@ -537,6 +537,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
     do{
         if( ERROR( iRet ) )
         {
+            OutputMsg( iRet, "CIfCreateUxSockStmTask fetchdata failed" );
             ret = iRet;
             break;
         }
