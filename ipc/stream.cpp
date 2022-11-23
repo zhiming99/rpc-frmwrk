@@ -131,6 +131,8 @@ gint32 IStream::CreateUxStream(
 
     }while( 0 );
     
+    if( ERROR( ret ) )
+        OutputMsg( ret, "IStream::CreateUxStream failed" );
     return ret;
 }
 
@@ -576,6 +578,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
+        OutputMsg( ret, "CIfCreateUxSockStmTask here" );
         IConfigDb* pDataDesc = nullptr;
         ret = oCfg.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
@@ -776,10 +779,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             guint64 qwHash = 0;
             ret = GetObjIdHash( qwId, qwHash );
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret, "server OnConnected failed @%lld", qwId );
                 break;
-            }
 
             oDataDesc[ propPeerObjId ] = qwHash;
 
@@ -802,7 +802,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             if( ERROR( ret ) )
             {
                 HANDLE hStm;
-                OutputMsg( ret, "proxy OnConnected failed @%lld", hStm );
                 oResp.Pop( hStm );
                 oResp.Pop( pObj );
                 break;
@@ -872,13 +871,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         CCfgOpenerObj oCfg( ( IEventSink* )pEvt );
         iRet = oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
-    }
-    if( !bServer )
-    {
-        if( ERROR( ret ) )
-            OutputMsg( ret, "Error, StartStream Failed" );
-        else
-            OutputMsg( ret, "Info, StartStream succeeded" );
     }
 
     if( !IsPending() )

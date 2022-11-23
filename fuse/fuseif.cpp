@@ -4970,25 +4970,17 @@ static gint32 fuseif_create_stream(
             ret = pSync->WaitForCompleteWakable();
             if( ERROR( ret ) )
                 break;
-            OutputMsg( ret, "fuseif_create_stream: wait complete 1" );
             ret = pSync->GetError();
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret, "fuseif_create_stream: SyncCall Error " );
                 break;
-            }
 
             CCfgOpenerObj oTaskCfg( pSync );
             IConfigDb* pResp = nullptr;
             ret = oTaskCfg.GetPointer(
                 propRespPtr, pResp );
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret, "fuseif_create_stream: no response 2" );
                 break;
-            }
 
-            OutputMsg( ret, "fuseif_create_stream: wait complete 2" );
             CCfgOpener oResp( pResp );
             gint32 iRet = 0;
             ret = oResp.GetIntProp(
@@ -5025,7 +5017,10 @@ static gint32 fuseif_create_stream(
     }while( 0 );
 
     if( ERROR( ret ) )
-        OutputMsg( ret, "fuseif_create_stream failed" );
+    {
+        DebugPrintEx( logErr, ret,
+            "fuseif_create_stream failed" );
+    }
     return ret;
 }
 
