@@ -874,6 +874,8 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     }
     if( ERROR( ret ) )
         OutputMsg( ret, "Error, StartStream Failed" );
+    else
+        OutputMsg( ret, "Info, StartStream succeeded" );
 
     if( !IsPending() )
         DebugPrint( ret, "Warning, "
