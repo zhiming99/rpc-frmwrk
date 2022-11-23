@@ -546,10 +546,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         {
             ret = GetResponse();
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret, "CIfCreateUxSockStmTask no resp" );
                 break;
-            }
         }
 
         CCfgOpener oCfg(
@@ -558,10 +555,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         CRpcServices* pIf = nullptr;
         ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "CIfCreateUxSockStmTask no ifPtr" );
             break;
-        }
         
         IStream* pStream =
             dynamic_cast< IStream* >( pIf );
@@ -583,28 +577,19 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         guint32 dwFd = 0;
         ret = oCfg.GetIntProp( propFd, dwFd );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "CIfCreateUxSockStmTask no fd" );
             break;
-        }
 
         IConfigDb* pDataDesc = nullptr;
         ret = oCfg.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "CIfCreateUxSockStmTask no datadesc" );
             break;
-        }
 
         InterfPtr pUxIf;
         ret = pStream->CreateUxStream( pDataDesc,
             dwFd, iClsid, bServer, pUxIf );
 
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "CIfCreateUxSockStmTask Failed 1" );
             break;
-        }
 
         TaskletPtr pStartTask;
         CParamList oStartParams;
@@ -616,11 +601,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         {
             ret = oCfg.GetIntProp( 1, dwFd );
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret, "CIfCreateUxSockStmTask Failed 2" );
                 break;
-            }
-
         }
 
         // dataDesc for response
@@ -645,18 +626,12 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             oStartParams.GetCfg() );
 
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "CIfCreateUxSockStmTask Failed 3" );
             break;
-        }
 
         // make sure the task runs sequentially
         ret = pIf->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "CIfCreateUxSockStmTask Failed 4" );
             break;
-        }
 
         ClearClientNotify();
 
@@ -664,7 +639,6 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
 
     if( ERROR( ret ) )
     {
-        OutputMsg( ret, "CreateUxSockStmTask failed" );
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
 

@@ -3339,7 +3339,11 @@ gint32 CRpcServices::FillRespData(
                 break;
 
             if( ERROR( iRet ) )
+            {
+                OutputMsg( iRet,
+                    "FillResp: FetchData failed" );
                 break;
+            }
 
             gint32 iFd = 0;
             guint32 dwOffset = 0;
