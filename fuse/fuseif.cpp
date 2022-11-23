@@ -4973,7 +4973,10 @@ static gint32 fuseif_create_stream(
             OutputMsg( ret, "fuseif_create_stream: wait complete 1" );
             ret = pSync->GetError();
             if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "fuseif_create_stream: SyncCall Error " );
                 break;
+            }
 
             CCfgOpenerObj oTaskCfg( pSync );
             IConfigDb* pResp = nullptr;
@@ -4985,6 +4988,7 @@ static gint32 fuseif_create_stream(
                 break;
             }
 
+            OutputMsg( ret, "fuseif_create_stream: wait complete 2" );
             CCfgOpener oResp( pResp );
             gint32 iRet = 0;
             ret = oResp.GetIntProp(
