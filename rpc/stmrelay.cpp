@@ -241,6 +241,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         if( ERROR( iRet ) )
         {
+            OutputMsg( iRet, "Bridge FetchData failed" );
             ret = iRet;
             break;
         }
@@ -1017,6 +1018,9 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         oResp[ propReturnValue ] = ret;
         iRet = ret;
     }
+
+    if( ERROR( iRet ) )
+        OutputMsg( iRet, "Bridge StartUxSockStmTask failed" );
 
     bool bClosed = false;
     EventPtr pEvt;
