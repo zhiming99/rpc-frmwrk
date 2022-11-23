@@ -775,7 +775,10 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             guint64 qwHash = 0;
             ret = GetObjIdHash( qwId, qwHash );
             if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "server OnConnected failed @%lld", qwId );
                 break;
+            }
 
             oDataDesc[ propPeerObjId ] = qwHash;
 
@@ -798,7 +801,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             if( ERROR( ret ) )
             {
                 HANDLE hStm;
-                OutputMsg( ret, "OnConnected failed @%lld", hStm );
+                OutputMsg( ret, "proxy OnConnected failed @%lld", hStm );
                 oResp.Pop( hStm );
                 oResp.Pop( pObj );
                 break;
@@ -869,13 +872,11 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         iRet = oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
     }
-    else
-    {
-        OutputMsg( iRet, "Warning, "
-            "the callback task is not found" );
-    }
+    if( ERROR( ret ) )
+        OutputMsg( ret, "Error, StartStream Failed" );
+
     if( !IsPending() )
-        OutputMsg( ret, "Warning, "
+        DebugPrint( ret, "Warning, "
             "the task is not pending" );
 
     return ret;
