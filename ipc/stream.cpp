@@ -786,6 +786,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
             oResp.Push( 0 );
             oResp.Push( 0 );
+            OutputMsg( ret, "server StartStream complete" );
 
         }
         else

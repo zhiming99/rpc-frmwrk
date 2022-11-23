@@ -3340,7 +3340,7 @@ gint32 CRpcServices::FillRespData(
             if( ERROR( iRet ) )
             {
                 OutputMsg( iRet,
-                    "FillResp: FetchData failed" );
+                    "FillRespData: FetchData failed" );
                 break;
             }
 
@@ -7017,9 +7017,13 @@ gint32 CInterfaceServer::SendResponse(
                     ret = -ENOMEM;
                     break;
                 }
+                OutputMsg( iRet,
+                    "Server-side FetchData completed" );
             }
             else
             {
+                OutputMsg( iRet,
+                    "Server-side FetchData Failed" );
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_INVALID ) )
