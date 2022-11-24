@@ -57,8 +57,8 @@ elif [ "$1" == "1" ]; then
     
     echo restart rpcrouters...
     cat ${etc_dir}/driver.json
-    ${bin_dir}/rpcrouter $auth -r 2 &
-    ${bin_dir}/rpcrouter $auth -r 1 &
+    ${bin_dir}/rpcrouter $auth -r 2&
+    ${bin_dir}/rpcrouter $auth -r 1&
     pwd
     pushd ./ridl
     ${bin_dir}/ridlc -I ./ -pO ./pytest fulltest.ridl || exit 6
