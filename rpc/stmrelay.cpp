@@ -228,11 +228,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oContext.GetIntProp( 0,
             ( guint32& )iStmId );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete no stmId" );
             break;
-        }
 
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
@@ -325,8 +321,6 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     
     if( ERROR( ret ) )
     {
-        OutputMsg( ret,
-            "svrRelay:OnFetchDataComplete failed" );
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
         OnServiceComplete(
@@ -1028,9 +1022,6 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         oResp[ propReturnValue ] = ret;
         iRet = ret;
     }
-
-    if( ERROR( iRet ) )
-        OutputMsg( iRet, "Bridge StartUxSockStmTask failed" );
 
     bool bClosed = false;
     EventPtr pEvt;

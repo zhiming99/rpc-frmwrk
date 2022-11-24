@@ -5016,11 +5016,6 @@ static gint32 fuseif_create_stream(
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-    {
-        DebugPrintEx( logErr, ret,
-            "fuseif_create_stream failed" );
-    }
     return ret;
 }
 

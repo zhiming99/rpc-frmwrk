@@ -131,8 +131,6 @@ gint32 IStream::CreateUxStream(
 
     }while( 0 );
     
-    if( ERROR( ret ) )
-        OutputMsg( ret, "IStream::CreateUxStream failed" );
     return ret;
 }
 
@@ -537,7 +535,6 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
     do{
         if( ERROR( iRet ) )
         {
-            OutputMsg( iRet, "CIfCreateUxSockStmTask fetchdata failed" );
             ret = iRet;
             break;
         }
@@ -703,7 +700,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
 
-    bool bServer = false;
     do{
         if( ERROR( iRet ) )
         {
@@ -726,6 +722,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             break;
         }
 
+        bool bServer = false;
         ret = oParams.GetBoolProp(
             propIsServer, bServer );
         if( ERROR( ret ) )
@@ -786,7 +783,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
             oResp.Push( 0 );
             oResp.Push( 0 );
-            OutputMsg( ret, "server StartStream complete" );
 
         }
         else
@@ -871,7 +867,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
         iRet = oCfg.SetPointer( propRespPtr,
             ( CObjBase* )oResp.GetCfg() );
     }
-
     if( !IsPending() )
         DebugPrint( ret, "Warning, "
             "the task is not pending" );

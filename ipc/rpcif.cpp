@@ -3338,11 +3338,7 @@ gint32 CRpcServices::FillRespData(
                 break;
 
             if( ERROR( iRet ) )
-            {
-                OutputMsg( iRet,
-                    "FillRespData: FetchData failed" );
                 break;
-            }
 
             gint32 iFd = 0;
             guint32 dwOffset = 0;
@@ -3428,13 +3424,6 @@ gint32 CRpcServices::FillRespData(
         }
 
     }while( 0 );
-
-    if( ERROR( iRet ) || ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "FillRespData: error %d in response of %s ",
-            iRet, strMethod.c_str() );
-    }
 
     return ret;
 }
@@ -7017,13 +7006,9 @@ gint32 CInterfaceServer::SendResponse(
                     ret = -ENOMEM;
                     break;
                 }
-                OutputMsg( iRet,
-                    "Server-side FetchData completed" );
             }
             else
             {
-                OutputMsg( iRet,
-                    "Server-side FetchData Failed" );
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_INVALID ) )
