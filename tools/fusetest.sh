@@ -13,8 +13,8 @@ pushd testypes
 make || exit 10
 
 mkdir mp mpsvr || true
-release/TestTypessvr mpsvr
-release/TestTypescli mp
+release/TestTypessvr -f mpsvr &
+release/TestTypescli -f mp &
 
 pydir=$basedir/fuse/examples/python
 sleep 5 
@@ -27,10 +27,10 @@ start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
 done
-
-wait `jobs -p`
+wait \`jobs -p\`
 end=\$(date +%s.%N)
-echo "time elapsed: scale=10;\$end-\$start" | bc
+echo -n "time elapsed: "
+echo "scale=10;\$end-\$start" | bc
 RUNCLIENT
 
 
@@ -38,7 +38,13 @@ echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 
 umount mp
-umount mpsvr
+while true; do
+    umount mpsvr 
+    if mount | grep TestTypessvr; then
+        sleep 1
+        continue
+    fi
+    break
 
 popd
 popd
