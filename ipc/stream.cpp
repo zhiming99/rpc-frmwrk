@@ -599,6 +599,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             ret = oCfg.GetIntProp( 1, dwFd );
             if( ERROR( ret ) )
                 break;
+
         }
 
         // dataDesc for response
