@@ -229,7 +229,11 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oReq.GetPointer(
             propRespPtr, pResp );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete no resp" );
             break;
+        }
 
         CCfgOpener oResp( pResp );
         gint32 iRet = 0;
@@ -237,7 +241,11 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             ( guint32& ) iRet );
 
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete no return value" );
             break;
+        }
 
         if( ERROR( iRet ) )
         {
@@ -249,12 +257,20 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oResp.GetIntProp(
             1, ( guint32& )iFd );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete no fd" );
             break;
+        }
 
         IConfigDb* pDataDesc = nullptr;
         ret = oResp.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete no datadesc" );
             break;
+        }
 
         // we need to do the following things
         // before reponse to the remote client
