@@ -332,4 +332,5 @@ elif [ "$1" == "1" ]; then
     popd
     echo start fuse test
     bash tools/fusetest.sh
+    kill -9 `pidof rpcrouter`
 fi

@@ -22,21 +22,17 @@ sleep 5
 python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 ulimit -n 8192
 ulimit -a
-start=$(date +%s.%N)
+/bin/bash << RUNCLIENT
+start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
-    python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc $i &
+    python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
 done
 
-#wait
-for((i=0;i<1000;i++)); do
-count=`jobs | grep 'maincli.py'|wc -l`
-if [ count == '200' ]; then
-    break
-fi
-done
+wait `jobs -p`
+end=\$(date +%s.%N)
+echo "time elapsed: scale=10;\$end-\$start" | bc
+RUNCLIENT
 
-end=$(date +%s.%N)
-echo "scale=10;$end-$start" | bc
 
 echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
