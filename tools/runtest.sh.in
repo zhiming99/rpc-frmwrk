@@ -25,12 +25,12 @@ if [ "$1" == "2" ]; then
     echo ${bin_dir}/rpcf/stmsvrtst
     ${bin_dir}/rpcf/stmsvrtst > /dev/null &
     echo starting the bridge...
-    echo ${bin_dir}/rpcrouter $auth -dr 2 
-    ${bin_dir}/rpcrouter $auth -dr 2
+    echo ${bin_dir}/rpcrouter $auth -r 2 
+    ${bin_dir}/rpcrouter $auth -r 2
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
-    echo ${bin_dir}/rpcrouter $auth -dr 1
-    ${bin_dir}/rpcrouter $auth -dr 1
+    echo ${bin_dir}/rpcrouter $auth -r 1
+    ${bin_dir}/rpcrouter $auth -r 1 &
     sleep 15
 
     echo echo test...
@@ -57,8 +57,8 @@ elif [ "$1" == "1" ]; then
     
     echo restart rpcrouters...
     cat ${etc_dir}/driver.json
-    ${bin_dir}/rpcrouter $auth -dr 2
-    ${bin_dir}/rpcrouter $auth -dr 1
+    ${bin_dir}/rpcrouter $auth -r 2 &
+    ${bin_dir}/rpcrouter $auth -r 1 &
     pwd
     pushd ./ridl
     ${bin_dir}/ridlc -I ./ -pO ./pytest fulltest.ridl || exit 6
