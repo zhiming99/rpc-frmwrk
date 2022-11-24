@@ -1414,7 +1414,7 @@ gint32 CStreamServerRelayMH::FetchData_Server(
         TaskletPtr pTask;
         ret = DEFER_IFCALL_NOSCHED(
             pTask, ObjPtr( this ), 
-            &CStreamProxyRelay::OnOpenStreamComplete,
+            &CStreamServerRelayMH::OnOpenStreamComplete,
             pCallback, ( IEventSink* )pDummy, 
             oContext.GetCfg() );
 

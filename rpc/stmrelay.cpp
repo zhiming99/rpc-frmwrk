@@ -160,8 +160,44 @@ gint32 CStreamServerRelay::FetchData_Server(
             // somewhere else, the callback will be
             // called when we return.
             ret = STATUS_PENDING;
+            break;
         }
-        break;
+
+        //how can we be here?
+        ( *pWrapper )( eventCancelTask );
+        oContext.ClearParams();
+        oContext.Push( iStmId );
+        oContext.Push( ObjPtr( pDataDesc ) );
+
+        // the wrapper task has not run yet
+        // though across the process boundary.
+        CParamList oResp;
+        oResp[ propReturnValue ] = 0;
+        oResp.Push( ObjPtr( pDataDesc ) );
+        oResp.Push( ( guint32 )fd );
+        oResp.Push( dwOffset );
+        oResp.Push( dwSize );
+
+        TaskletPtr pDummy;
+        pDummy.NewObj( clsid( CIfDummyTask ) );
+        CCfgOpener oCfg(
+            ( IConfigDb*)pDummy->GetConfig() );
+        oCfg.SetPointer( propRespPtr,
+            ( IConfigDb* )oResp.GetCfg() );
+
+        TaskletPtr pTask;
+        ret = DEFER_IFCALL_NOSCHED(
+            pTask, ObjPtr( this ), 
+            &CStreamServerRelay::OnFetchDataComplete,
+            pCallback, ( IEventSink* )pDummy, 
+            oContext.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
+        if( ret == 0 )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
