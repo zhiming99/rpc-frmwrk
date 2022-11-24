@@ -314,6 +314,8 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     
     if( ERROR( ret ) )
     {
+        OutputMsg( ret,
+            "svrRelay:OnFetchDataComplete failed" );
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
         OnServiceComplete(
