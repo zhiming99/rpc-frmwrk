@@ -153,45 +153,15 @@ gint32 CStreamServerRelay::FetchData_Server(
             break;
         }
 
-        /*ret = pWrapper->GetError();
+        ret = pWrapper->GetError();
         if( ret != STATUS_PENDING )
         {
             // the wrapper task has been completed
             // somewhere else, the callback will be
             // called when we return.
             ret = STATUS_PENDING;
-            break;
-        }*/
-
-        // the wrapper task has not run yet
-        // though across the process boundary.
-        CParamList oResp;
-        oResp[ propReturnValue ] = 0;
-        oResp.Push( ObjPtr( pDataDesc ) );
-        oResp.Push( ( guint32 )fd );
-        oResp.Push( dwOffset );
-        oResp.Push( dwSize );
-
-        TaskletPtr pDummy;
-        pDummy.NewObj( clsid( CIfDummyTask ) );
-        CCfgOpener oCfg(
-            ( IConfigDb*)pDummy->GetConfig() );
-        oCfg.SetPointer( propRespPtr,
-            ( IConfigDb* )oResp.GetCfg() );
-
-        TaskletPtr pTask;
-        ret = DEFER_IFCALL_NOSCHED(
-            pTask, ObjPtr( this ), 
-            &CStreamServerRelay::OnFetchDataComplete,
-            pCallback, ( IEventSink* )pDummy, 
-            oContext.GetCfg() );
-        if( ERROR( ret ) )
-            break;
-
-        CIoManager* pMgr = GetIoMgr();
-        ret = pMgr->RescheduleTask( pTask );
-        if( ret == 0 )
-            ret = STATUS_PENDING;
+        }
+        break;
 
     }while( 0 );
 
@@ -210,6 +180,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     gint32 ret = 0;
     gint32 iFd = -1;
     gint32 iStmId = -1;
+    CParamList oContext( pContext );
 
     do{
         if( pContext == nullptr )
@@ -218,8 +189,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             break;
         }
 
-        CCfgOpener oCtx( pContext );
-        ret = oCtx.GetIntProp( 0,
+        ret = oContext.GetIntProp( 0,
             ( guint32& )iStmId );
         if( ERROR( ret ) )
         {
@@ -233,11 +203,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oReq.GetPointer(
             propRespPtr, pResp );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete no resp" );
             break;
-        }
 
         CCfgOpener oResp( pResp );
         gint32 iRet = 0;
@@ -245,15 +211,10 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             ( guint32& ) iRet );
 
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete no return value" );
             break;
-        }
 
         if( ERROR( iRet ) )
         {
-            OutputMsg( iRet, "Bridge FetchData failed" );
             ret = iRet;
             break;
         }
@@ -261,20 +222,12 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oResp.GetIntProp(
             1, ( guint32& )iFd );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete no fd" );
             break;
-        }
 
         IConfigDb* pDataDesc = nullptr;
         ret = oResp.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete no datadesc" );
             break;
-        }
 
         // we need to do the following things
         // before reponse to the remote client
@@ -315,21 +268,11 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete"
-                "fail to create StartStmTask" );
             break;
-        }
 
         ret = this->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "svrRelay:OnFetchDataComplete"
-                "addSeqTask failed" );
             break;
-        }
         //
         // 2. bind the uxport and the the tcp stream
         //
@@ -371,10 +314,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     }
 
     if( pContext )
-    {
-        CParamList oContext( pContext );
         oContext.ClearParams();
-    }
 
     return ret;
 }
