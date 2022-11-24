@@ -222,7 +222,11 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         ret = oCtx.GetIntProp( 0,
             ( guint32& )iStmId );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete no stmId" );
             break;
+        }
 
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
@@ -311,9 +315,21 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete"
+                "fail to create StartStmTask" );
             break;
+        }
 
         ret = this->AddSeqTask( pStartTask );
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "svrRelay:OnFetchDataComplete"
+                "addSeqTask failed" );
+            break;
+        }
         //
         // 2. bind the uxport and the the tcp stream
         //
