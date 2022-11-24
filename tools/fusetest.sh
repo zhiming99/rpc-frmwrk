@@ -46,6 +46,8 @@ while true; do
     fi
     break
 
+rm -rf ./testypes
+
 popd
 popd
 
@@ -63,8 +65,6 @@ function pytest()
     fi
 
     ret=0
-    echo ls /dev/fuse -l
-    ls /dev/fuse -l
     while true; do
         eval $cmdline
         echo make $testcase ...
@@ -96,7 +96,18 @@ function pytest()
         break 1
     done
     umount ./fs/mp
-    umount ./fs/mpsvr
+
+    while true; do
+        umount ./fs/mpsvr 
+        if mount | grep ${appname}svr; then
+            sleep 1
+            continue
+        fi
+        break
+    done
+
+    rm *.new
+    rm -rf fs
     popd
     return $ret
 }
@@ -111,3 +122,4 @@ pytest katest || exit 1
 pytest evtest || exit 1
 
 popd
+
