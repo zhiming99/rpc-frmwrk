@@ -373,11 +373,6 @@ static gint32 SafeCall(
         }
 
     }while( 0 );
-    if( ret < -1000 )
-    {
-        OutputMsg( ret, "SafeCall: %s returns error",
-            strMethod.c_str() );
-    }
     return ret;
 }
 
