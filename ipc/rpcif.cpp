@@ -2936,9 +2936,6 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             ret = RunIoTask( oBuilder.GetCfg(),
                 oResp.GetCfg(), pCallback, &qwTaskId );
 
-            if( ERROR( ret ) )
-                break;
-
             if( ret == STATUS_PENDING )
             {
                 // the parameter list does not have a
@@ -2948,6 +2945,9 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                 oUserDesc[ propTaskId ] = qwTaskId;
                 break;
             }
+
+            if( ERROR( ret ) )
+                break;
 
             gint32 iRet = 0;
             ret = oResp.GetIntProp(
@@ -3337,7 +3337,11 @@ gint32 CRpcServices::FillRespData(
                 break;
 
             if( ERROR( iRet ) )
+            {
+                OutputMsg( iRet,
+                    "FillResp: FetchData failed" );
                 break;
+            }
 
             gint32 iFd = 0;
             guint32 dwOffset = 0;
