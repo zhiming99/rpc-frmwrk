@@ -3337,7 +3337,11 @@ gint32 CRpcServices::FillRespData(
                 break;
 
             if( ERROR( iRet ) )
+            {
+                OutputMsg( iRet,
+                    "FillRespData: FetchData failed" );
                 break;
+            }
 
             gint32 iFd = 0;
             guint32 dwOffset = 0;
@@ -7008,6 +7012,11 @@ gint32 CInterfaceServer::SendResponse(
             }
             else
             {
+                if( ERROR( iRet ) )
+                {
+                    OutputMsg( iRet,
+                        "SendResponse: FetchData failed" );
+                }
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_INVALID ) )
