@@ -7012,6 +7012,8 @@ gint32 CInterfaceServer::SendResponse(
             }
             else
             {
+                OutputMsg( iRet,
+                    "Server-side FetchData Failed" ); 
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_INVALID ) )
