@@ -45,6 +45,7 @@ while true; do
         continue
     fi
     break
+done
 
 rm -rf ./testypes
 
