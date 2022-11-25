@@ -206,15 +206,18 @@ def test() :
             print( 'EchoNoParams returned with status %d@%s' % ( error, num) )
 
             #EchoStream
+            print( "Start EchoStream... %s" % num )
             req = BuildReqHdr( "EchoStream", idx )
             idx += 1
             AddParameter(req, "hstm", "stream_" + num )
             sendReq( reqfp, req )
+            print( "EchoStream request sent... %s" % num )
             stmfp.write(binBuf[0:8*1024])
             ret = recvResp( respfp )
             if ret[ 0 ] < 0 :
                 error = ret[ 0 ]
                 raise Exception( 'EchoStream recv failed with error %d@%s' % ( error, num) )
+            print( "EchoStream response received... %s" % num )
             objResp = ret[ 1 ][ 0 ]
             error = objResp[ "ReturnCode"]
             if error < 0 :
