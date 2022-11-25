@@ -37,13 +37,13 @@ jobs:
     - name: cleanup for ssl test
       run: bash tools/cfg4ssl.sh sslcfg.json.in
 
-    - name: starting ssl servers
-      run: dbus-run-session bash tools/runtest.sh 2 & 
-    - name: starting ssl test
-      run: dbus-run-session bash tools/runtest.sh 1
+#    - name: starting ssl servers
+#      run: dbus-run-session bash tools/runtest.sh 2 & 
+#    - name: starting ssl test
+#      run: dbus-run-session bash tools/runtest.sh 1
 
-    - name: install debian package tools
-      run: sudo apt-get -y install devscripts debhelper
-    - name: make debian package
-      run: make deb && cd bldpkg && ls -ltr *.deb
+#    - name: install debian package tools
+#      run: sudo apt-get -y install devscripts debhelper
+#    - name: make debian package
+#      run: make deb && cd bldpkg && ls -ltr *.deb
 
