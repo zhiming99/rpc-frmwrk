@@ -52,6 +52,8 @@ rm -rf ./testypes
 popd
 popd
 
+exit 0
+
 function pytest()
 {
     testcase=$1
