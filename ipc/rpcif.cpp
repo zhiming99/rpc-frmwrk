@@ -3304,10 +3304,9 @@ gint32 CRpcServices::FillRespData(
         return ret;
     }
 
-    string strMethod;
     gint32 iRet = 0;
     do{
-        strMethod = pMsg.GetMember();
+        string strMethod = pMsg.GetMember();
         if( strMethod == SYS_METHOD_SENDDATA )
         {
             ret = pMsg.GetIntArgAt(
