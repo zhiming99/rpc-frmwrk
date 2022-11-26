@@ -2285,6 +2285,10 @@ gint32 CUnixSockBusPort::BuildPdoPortName(
         }
         else
         {
+
+            OutputMsg( ret,
+                "CUnixSockBusPort:BuildPdoPortName: "
+                "failure checkpoint 0" );
             ret = ERROR_FAIL;
         }
 
