@@ -544,7 +544,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( iRet ) )
         {
             OutputMsg( iRet,
-                "CIfStartUxSockStmTask: "
+                "CIfCreateUxSockStmTask: "
                 "failure checkpoint 5" );
             ret = iRet;
             break;

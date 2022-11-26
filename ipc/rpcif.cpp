@@ -3305,8 +3305,9 @@ gint32 CRpcServices::FillRespData(
     }
 
     gint32 iRet = 0;
+    stdstr strMethod;
     do{
-        string strMethod = pMsg.GetMember();
+        strMethod = pMsg.GetMember();
         if( strMethod == SYS_METHOD_SENDDATA )
         {
             ret = pMsg.GetIntArgAt(
@@ -3427,7 +3428,12 @@ gint32 CRpcServices::FillRespData(
         }
 
     }while( 0 );
-
+    if( ERROR( ret ) || ERROR( iRet ) )
+    {
+        OutputMsg( ret,
+            "FillRespData %s failed: 7",
+            strMethod.c_str() );
+    }
     return ret;
 }
 
