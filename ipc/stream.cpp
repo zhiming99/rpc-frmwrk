@@ -464,6 +464,9 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
         gint32 iRet = oResp[ propReturnValue ];
         if( ERROR( iRet ) )
         {
+            OutputMsg( iRet,
+                "CIfCreateUxSockStmTask: "
+                "failure checkpoint 0" );
             ret = iRet;
             break;
         }
@@ -677,7 +680,12 @@ gint32 CIfStartUxSockStmTask::RunTask()
 
         ret = pSvc->StartEx( this );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "CIfStartUxSockStmTask: "
+                "failure checkpoint 0" );
             break;
+        }
 
         if( ret == STATUS_PENDING )
             break;
@@ -704,6 +712,9 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     do{
         if( ERROR( iRet ) )
         {
+            OutputMsg( iRet,
+                "CIfStartUxSockStmTask: "
+                "failure checkpoint 1" );
             ret = iRet;
             break;
         }
@@ -858,7 +869,11 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     oParams.ClearParams();
 
     if( ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "CIfStartUxSockStmTask failed" );
         oResp[ propReturnValue ] = ret;
+    }
 
     EventPtr pEvt;
     iRet = GetInterceptTask( pEvt );
