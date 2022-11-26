@@ -4966,11 +4966,11 @@ static gint32 fuseif_create_stream(
             OutputMsg( ret, "StartStream failed" );
             break;
         }
-        OutputMsg( ret,
-            "fuseif_create_stream: checkpoint 1",
-            strName.c_str() );
         if( ret == STATUS_PENDING )
         {
+            OutputMsg( ret,
+                "fuseif_create_stream: checkpoint 1, %s",
+                strName.c_str() );
             // if ctrl-c, it is possible the stream be
             // created invisible, but no harm
             ret = pSync->WaitForCompleteWakable();
@@ -4980,7 +4980,7 @@ static gint32 fuseif_create_stream(
             if( ERROR( ret ) )
             {
                 OutputMsg( ret,
-                    "fuseif_create_stream: checkpoint 2",
+                    "fuseif_create_stream: checkpoint 2, %s",
                     strName.c_str() );
                 break;
             }
@@ -5002,7 +5002,9 @@ static gint32 fuseif_create_stream(
             ret = iRet;
             if( ERROR( ret ) )
             {
-                OutputMsg( ret, "remote StartStream failed" );
+                OutputMsg( ret,
+                    "remote StartStream failed, %s",
+                    strName.c_str() );
                 break;
             }
 
