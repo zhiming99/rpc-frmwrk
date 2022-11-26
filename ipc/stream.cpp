@@ -589,7 +589,12 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             dwFd, iClsid, bServer, pUxIf );
 
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "CIfStartUxSockStmTask: "
+                "failure checkpoint 2" );
             break;
+        }
 
         TaskletPtr pStartTask;
         CParamList oStartParams;
@@ -640,6 +645,9 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
 
     if( ERROR( ret ) )
     {
+        OutputMsg( ret,
+            "CIfCreateUxSockStmTask: "
+            "failure checkpoint 3" );
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
 
