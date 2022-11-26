@@ -496,6 +496,11 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+        OutputMsg( ret,
+            "CIfCreateUxSockStmTask::GetResponse "
+            "failure checkpoint 6" );
+
     return ret;
 }
 
@@ -538,6 +543,9 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
     do{
         if( ERROR( iRet ) )
         {
+            OutputMsg( iRet,
+                "CIfStartUxSockStmTask: "
+                "failure checkpoint 5" );
             ret = iRet;
             break;
         }
@@ -637,7 +645,12 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         // make sure the task runs sequentially
         ret = pIf->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "CIfCreateUxSockStmTask: "
+                "failure checkpoint 6" );
             break;
+        }
 
         ClearClientNotify();
 
@@ -688,12 +701,7 @@ gint32 CIfStartUxSockStmTask::RunTask()
 
         ret = pSvc->StartEx( this );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "CIfStartUxSockStmTask: "
-                "failure checkpoint 0" );
             break;
-        }
 
         if( ret == STATUS_PENDING )
             break;
@@ -720,9 +728,6 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     do{
         if( ERROR( iRet ) )
         {
-            OutputMsg( iRet,
-                "CIfStartUxSockStmTask: "
-                "failure checkpoint 1" );
             ret = iRet;
             break;
         }
