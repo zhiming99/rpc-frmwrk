@@ -4966,6 +4966,9 @@ static gint32 fuseif_create_stream(
             OutputMsg( ret, "StartStream failed" );
             break;
         }
+        OutputMsg( ret,
+            "fuseif_create_stream: checkpoint 1",
+            strName.c_str() );
         if( ret == STATUS_PENDING )
         {
             // if ctrl-c, it is possible the stream be
@@ -4975,7 +4978,12 @@ static gint32 fuseif_create_stream(
                 break;
             ret = pSync->GetError();
             if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "fuseif_create_stream: checkpoint 2",
+                    strName.c_str() );
                 break;
+            }
 
             CCfgOpenerObj oTaskCfg( pSync );
             IConfigDb* pResp = nullptr;
@@ -5022,6 +5030,12 @@ static gint32 fuseif_create_stream(
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "fuseif_create_stream failed %s",
+            strName.c_str() );
+    }
     return ret;
 }
 
@@ -5095,12 +5109,6 @@ gint32 fuseop_create( const char* path,
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "fuseop_create failed %s",
-            path );
-    }
     return ret;
 }
 
