@@ -5022,6 +5022,12 @@ static gint32 fuseif_create_stream(
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "fuseop_create failed %s",
+            strName.c_str() );
+    }
     return ret;
 }
 
