@@ -3530,9 +3530,6 @@ gint32 CIfIoReqTask::RunTask()
         ret = SubmitIoRequest();
 
     }while( 0 );
-    if( ERROR( ret ) )
-        OutputMsg( ret, "CIfIoReqTask "
-            "SubmitIoRequest failed" );
 
     return ret;
 }
@@ -3611,7 +3608,8 @@ gint32 CIfIoReqTask::OnIrpComplete(
         }
 
     }while( 0 );
-    if( ERROR( ret ) )
+
+    if( ret == ERROR_FAIL )
         OutputMsg( ret, "CIfIoReqTask "
             "OnIrpComplete failed" );
 

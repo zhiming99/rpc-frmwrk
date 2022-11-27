@@ -733,7 +733,11 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
         case CTRLCODE_SEND_DATA:
             {
                 if( ERROR( ret ) )
+                {
+                    OutputMsg( ret, "CDBusProxyFdo: "
+                        "checkpoint 8" );
                     break;
+                }
 
                 DMsgPtr pRespMsg =
                     *pTopCtx->m_pRespData;
@@ -750,6 +754,8 @@ gint32 CDBusProxyFdo::CompleteIoctlIrp(
                     ret = ( gint32& )dwVal;
                     if( ERROR( ret ) )
                     {
+                        OutputMsg( ret, "CDBusProxyFdo: "
+                            "checkpoint 6" );
                         break;
                     }
 
