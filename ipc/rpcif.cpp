@@ -3284,6 +3284,11 @@ gint32 CRpcServices::FillRespData(
         oParams[ propReturnValue ] =
             pIrp->GetStatus();
     }
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "FillRespData %s failed: 8" );
+    }
     return ret;
 }
 

@@ -1009,11 +1009,11 @@ gint32 CStreamProxy::OpenChannel(
             break;
         }
 
-        ret = pTask->GetError();
-        if( ERROR( ret ) )
+        gint32 iRet = pTask->GetError();
+        if( ERROR( iRet ) )
             break;
 
-        if( ret != STATUS_PENDING )
+        if( iRet != STATUS_PENDING )
         {
             // some other guy is doing the work
             ret = STATUS_PENDING;
