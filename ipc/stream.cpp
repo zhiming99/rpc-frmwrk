@@ -991,7 +991,7 @@ gint32 CStreamProxy::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        // start listening on the fds
+        // set the task to started state
         ret = ( *pTask )( eventZero );
         if( ret != STATUS_PENDING )
             break;
@@ -999,6 +999,26 @@ gint32 CStreamProxy::OpenChannel(
         // send the request
         ret = SendSetupReq(
             pDataDesc, fd, pTask );
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
+            break;
+        }
+
+        ret = pTask->GetError();
+        if( ERROR( ret ) )
+            break;
+
+        if( ret != STATUS_PENDING )
+        {
+            // some other guy is doing the work
+            ret = STATUS_PENDING;
+            break;
+        }
  
     }while( 0 );
 
