@@ -413,7 +413,7 @@ gint32 CStreamProxy::OnChannelError(
 
 gint32 CStreamProxy::SendSetupReq(
     IConfigDb* pDataDesc,
-    int fd, IEventSink* pCallback )
+    gint32& fd, IEventSink* pCallback )
 {
     if( pDataDesc == nullptr ||
         pCallback == nullptr )
