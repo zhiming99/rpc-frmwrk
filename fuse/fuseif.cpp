@@ -4965,9 +4965,6 @@ static gint32 fuseif_create_stream(
             break;
         if( ret == STATUS_PENDING )
         {
-            OutputMsg( ret,
-                "fuseif_create_stream: checkpoint 1, %s",
-                strName.c_str() );
             // if ctrl-c, it is possible the stream be
             // created invisible, but no harm
             ret = pSync->WaitForCompleteWakable();
@@ -4975,12 +4972,7 @@ static gint32 fuseif_create_stream(
                 break;
             ret = pSync->GetError();
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret,
-                    "fuseif_create_stream: checkpoint 2, %s",
-                    strName.c_str() );
                 break;
-            }
 
             CCfgOpenerObj oTaskCfg( pSync );
             IConfigDb* pResp = nullptr;
