@@ -971,6 +971,10 @@ gint32 CStreamProxy::OpenChannel(
         if( ret != STATUS_PENDING )
             break;
 
+        OutputMsg( ret, 
+            "CStreamProxy OpenChannel: "
+            "checkpoint 1" );
+
         // send the request
         ret = SendSetupReq(
             pDataDesc, fd, pTask );
