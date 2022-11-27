@@ -464,9 +464,6 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
         gint32 iRet = oResp[ propReturnValue ];
         if( ERROR( iRet ) )
         {
-            OutputMsg( iRet,
-                "CIfCreateUxSockStmTask: "
-                "failure checkpoint 0" );
             ret = iRet;
             break;
         }
@@ -495,11 +492,6 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
             propPeerObjId, pDataDescSvr );
 
     }while( 0 );
-
-    if( ERROR( ret ) )
-        OutputMsg( ret,
-            "CIfCreateUxSockStmTask::GetResponse "
-            "failure checkpoint 6" );
 
     return ret;
 }
@@ -597,12 +589,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             dwFd, iClsid, bServer, pUxIf );
 
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "CIfCreateUxSockStmTask: "
-                "failure checkpoint 2" );
             break;
-        }
 
         TaskletPtr pStartTask;
         CParamList oStartParams;
@@ -645,12 +632,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         // make sure the task runs sequentially
         ret = pIf->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "CIfCreateUxSockStmTask: "
-                "failure checkpoint 6" );
             break;
-        }
 
         ClearClientNotify();
 
@@ -658,9 +640,6 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
 
     if( ERROR( ret ) )
     {
-        OutputMsg( ret,
-            "CIfCreateUxSockStmTask: "
-            "failure checkpoint 3" );
         CParamList oResp;
         oResp[ propReturnValue ] = ret;
 
@@ -882,11 +861,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     oParams.ClearParams();
 
     if( ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "CIfStartUxSockStmTask failed" );
         oResp[ propReturnValue ] = ret;
-    }
 
     EventPtr pEvt;
     iRet = GetInterceptTask( pEvt );

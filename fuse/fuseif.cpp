@@ -4962,10 +4962,7 @@ static gint32 fuseif_create_stream(
         ret = pStm->StartStream(
             hStream, oDesc.GetCfg(), pSync );
         if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "StartStream failed" );
             break;
-        }
         if( ret == STATUS_PENDING )
         {
             OutputMsg( ret,
@@ -5001,12 +4998,7 @@ static gint32 fuseif_create_stream(
                 break;
             ret = iRet;
             if( ERROR( ret ) )
-            {
-                OutputMsg( ret,
-                    "remote StartStream failed, %s",
-                    strName.c_str() );
                 break;
-            }
 
             ret = oResp.GetIntPtr(
                 1, ( guint32*& )hStream );
@@ -5032,12 +5024,6 @@ static gint32 fuseif_create_stream(
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "fuseif_create_stream failed %s",
-            strName.c_str() );
-    }
     return ret;
 }
 

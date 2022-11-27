@@ -49,8 +49,6 @@ def test() :
         evtfp = open( evtFile, "rb", buffering=0)
 
         stmFile = svcdir + "/streams/stream_" + num
-
-        print( "openStream %s" % num )
         stmfp = open( stmFile, "w+b", buffering=0)
 
         idx = 1 + int( num ) * 1000
