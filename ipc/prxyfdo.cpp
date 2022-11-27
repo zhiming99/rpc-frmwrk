@@ -205,7 +205,7 @@ gint32 CDBusProxyFdo::HandleSendData( IRP* pIrp )
         {
             // cannot understand how it can
             // succeed immediately
-            DebugPrint( ret, "CDBusProxyFdo: "
+            OutputMsg( ret, "CDBusProxyFdo: "
                 "immediate return happens" );
             IrpCtxPtr& pTopCtx = pNextIrpCtx;
             DMsgPtr pRespMsg =
