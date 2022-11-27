@@ -6897,6 +6897,7 @@ gint32 CInterfaceServer::SendResponse(
         return -EINVAL;
 
     gint32 ret = 0; 
+    stdstr strMethod;
     do{
         DMsgPtr pMsg( pReqMsg );
         if( pMsg.GetType() !=
@@ -6906,7 +6907,7 @@ gint32 CInterfaceServer::SendResponse(
             break;
         }
 
-        string strMethod = pMsg.GetMember( );
+        strMethod = pMsg.GetMember( );
         DMsgPtr pRespMsg;
         ret = pRespMsg.NewResp( pReqMsg );
         if( ERROR( ret ) )
@@ -7008,6 +7009,9 @@ gint32 CInterfaceServer::SendResponse(
             }
             else
             {
+                OutputMsg( iRet,
+                    "SendResponse: fetchdata "
+                    "checkpoint 9" );
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &iRet,
                     DBUS_TYPE_INVALID ) )
@@ -7069,6 +7073,9 @@ gint32 CInterfaceServer::SendResponse(
             ret = pRespData->Serialize( *pBuf );  
             if( ERROR( ret ) )
             {
+                OutputMsg( ret,
+                    "SendResponse: %s "
+                    "checkpoint a", strMethod.c_str() );
                 ret = ERROR_FAIL;
                 if( !dbus_message_append_args( pRespMsg,
                     DBUS_TYPE_UINT32, &ret,
@@ -7145,6 +7152,10 @@ gint32 CInterfaceServer::SendResponse(
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+        OutputMsg( ret,
+            "SendResponse: %s "
+            "checkpoint b", strMethod.c_str() );
     return ret;
 }
 
