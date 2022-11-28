@@ -971,10 +971,6 @@ gint32 CStreamProxy::OpenChannel(
         if( ret != STATUS_PENDING )
             break;
 
-        OutputMsg( ret, 
-            "CStreamProxy OpenChannel: "
-            "checkpoint 1" );
-
         // send the request
         ret = SendSetupReq(
             pDataDesc, fd, pTask );
@@ -1032,10 +1028,6 @@ gint32 CStreamProxy::OpenChannel(
             }
             return 0;
         });
-
-        OutputMsg( 0, "OpenChannel: Immediate "
-            "actively schedule "
-            "the createstmtask" );
 
         CIoManager* pMgr = GetIoMgr();
         TaskletPtr pActCall;

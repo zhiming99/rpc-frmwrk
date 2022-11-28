@@ -3560,15 +3560,11 @@ gint32 CIfIoReqTask::OnIrpComplete(
             if( ERROR( iRet ) )
             {
                 ret = iRet;
-                OutputMsg( ret, "CIfIoReqTask "
-                    "OnIrpComplete checkpoint 3" );
                 break;
             }
         }
         else
         {
-            OutputMsg( iRet, "CIfIoReqTask "
-                "OnIrpComplete checkpoint 4" );
             CCfgOpener oRespCfg;
             oRespCfg[ propReturnValue ] = iRet;
 
@@ -3608,10 +3604,6 @@ gint32 CIfIoReqTask::OnIrpComplete(
         }
 
     }while( 0 );
-
-    if( ret == ERROR_FAIL )
-        OutputMsg( ret, "CIfIoReqTask "
-            "OnIrpComplete failed" );
 
     return ret;
 }

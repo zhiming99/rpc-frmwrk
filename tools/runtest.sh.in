@@ -60,13 +60,6 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcrouter $auth -r 2&
     ${bin_dir}/rpcrouter $auth -r 1&
     pwd
-
-    sleep 5
-    echo start fuse test
-    bash tools/fusetest.sh
-    kill -9 `pidof rpcrouter`
-    exit 0
-
     pushd ./ridl
     ${bin_dir}/ridlc -I ./ -pO ./pytest fulltest.ridl || exit 6
     cd ./pytest
@@ -337,4 +330,7 @@ elif [ "$1" == "1" ]; then
     
 # leaving examples
     popd
+    echo start fuse test
+    bash tools/fusetest.sh
+    kill -9 `pidof rpcrouter`
 fi
