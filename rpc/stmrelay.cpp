@@ -613,7 +613,8 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
         }
 
         OutputMsg( ret, "OpenStreamChannel: "
-            "checkpoint c, immediate return catched" );
+            "checkpoint c, immediate "
+            "return catched" );
         // the response handler was not called
         // and lets' call it here
         CParamList oFdResp;
@@ -736,7 +737,7 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
         // since we have not create the local stream
         // sock yet.
 
-        DebugPrintEx( logCrit, ret,
+        DebugPrintEx( logErr, ret,
             "%s: catched an immediate return",
             __func__ );
 
