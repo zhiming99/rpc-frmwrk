@@ -612,6 +612,8 @@ gint32 CStreamProxyRelay::OnOpenStreamComplete(
             break;
         }
 
+        OutputMsg( ret, "OpenStreamChannel: "
+            "checkpoint c, immediate return catched" );
         // the response handler was not called
         // and lets' call it here
         CParamList oFdResp;
