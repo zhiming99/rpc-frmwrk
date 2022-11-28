@@ -1190,6 +1190,9 @@ gint32 CRpcTcpFido::HandleSendData(
         if( SUCCEEDED( ret ) )
         {
             // cannot succeed at this moment
+            OutputMsg( ret, "CRpcTcpFido: "
+                "HandleSendData checkpoint c %d",
+                getpid() );
             ret = ERROR_FAIL;
         }
 
