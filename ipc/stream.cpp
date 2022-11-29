@@ -992,7 +992,7 @@ gint32 CStreamProxy::OpenChannel(
             break;
         }
 
-        // the create task is not run,
+        // the 'create-sock-stm' task has not run yet,
         // let's reschedule it
         gint32 ( *func )( IEventSink*,
             IConfigDb*, guint32 ) = ([](

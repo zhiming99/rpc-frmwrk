@@ -303,8 +303,6 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             break;
 
         ret = this->AddSeqTask( pStartTask );
-        if( ERROR( ret ) )
-            break;
         //
         // 2. bind the uxport and the the tcp stream
         //
