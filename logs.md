@@ -1,4 +1,8 @@
 ---
+[`Mon Nov 29 2022 12:40:20 PM Beijing`]   
+1. fixed two old bugs in the stream creation process. 
+2. Now let's continue adding `gmssl` to `rpc-frmwrk`.
+
 [`Mon Nov 21 2022 22:25:30 PM Beijing`]    
 1. merged genpy-for-rpcfs to the master branch. Next we will add support to the `gmssl`, the cipher suite for internet security defined by Chinese standard administration.
 
