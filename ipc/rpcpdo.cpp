@@ -1733,17 +1733,6 @@ gint32 CRpcPdoPort::HandleSendData(
         pCtx->SetReqData( pBuf );
 
         ret = HandleSendReq( pIrp );
-        if( ret == STATUS_PENDING )
-            break;
-
-        if( ERROR( ret ) )
-            break;
-
-        if( SUCCEEDED( ret ) )
-        {
-            // cannot succeed at this moment
-            ret = ERROR_FAIL;
-        }
 
     }while( 0 );
 

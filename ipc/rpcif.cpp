@@ -2936,9 +2936,6 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
             ret = RunIoTask( oBuilder.GetCfg(),
                 oResp.GetCfg(), pCallback, &qwTaskId );
 
-            if( ERROR( ret ) )
-                break;
-
             if( ret == STATUS_PENDING )
             {
                 // the parameter list does not have a
@@ -2948,6 +2945,9 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
                 oUserDesc[ propTaskId ] = qwTaskId;
                 break;
             }
+
+            if( ERROR( ret ) )
+                break;
 
             gint32 iRet = 0;
             ret = oResp.GetIntProp(
@@ -3304,11 +3304,11 @@ gint32 CRpcServices::FillRespData(
         return ret;
     }
 
+    gint32 iRet = 0;
     do{
         string strMethod = pMsg.GetMember();
         if( strMethod == SYS_METHOD_SENDDATA )
         {
-            gint32 iRet = 0;
             ret = pMsg.GetIntArgAt(
                 0, ( guint32& )iRet );
 
@@ -3323,8 +3323,6 @@ gint32 CRpcServices::FillRespData(
         }
         else if( strMethod == SYS_METHOD_FETCHDATA )
         {
-            
-            gint32 iRet = 0;
             CParamList oParams( pResp );
             ret = pMsg.GetIntArgAt(
                 0, ( guint32& )iRet );
@@ -3380,7 +3378,6 @@ gint32 CRpcServices::FillRespData(
             // for the default requests, a
             // configDb ptr is returned
             ObjPtr pObj;
-            gint32 iRet = 0;
             ret = pMsg.GetIntArgAt( 0, ( guint32& )iRet );
             if( ERROR( ret ) )
                 break;

@@ -32,7 +32,7 @@ elif [ "$1" == "1" ]; then
     echo ${bin_dir}/rpcrouter $auth -r 1
     ${bin_dir}/rpcrouter $auth -r 1 &
     sleep 15
-    ps aux 
+
     echo echo test...
     ${bin_dir}/rpcf/ifclismk || exit 1
     echo keepalive test...
@@ -332,4 +332,5 @@ elif [ "$1" == "1" ]; then
     popd
     echo start fuse test
     bash tools/fusetest.sh
+    kill -9 `pidof rpcrouter`
 fi

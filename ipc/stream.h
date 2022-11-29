@@ -230,7 +230,7 @@ class CStreamProxy :
     // send the FETCH_DATA request to the server
     gint32 SendSetupReq(
         IConfigDb* pDataDesc,
-        int fd, IEventSink* pCallback );
+        gint32& fd, IEventSink* pCallback );
 
     public:
     typedef CAggInterfaceProxy super;

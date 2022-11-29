@@ -413,7 +413,7 @@ gint32 CStreamProxy::OnChannelError(
 
 gint32 CStreamProxy::SendSetupReq(
     IConfigDb* pDataDesc,
-    int fd, IEventSink* pCallback )
+    gint32& fd, IEventSink* pCallback )
 {
     if( pDataDesc == nullptr ||
         pCallback == nullptr )
@@ -963,7 +963,7 @@ gint32 CStreamProxy::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        // start listening on the fds
+        // set the task to started state
         ret = ( *pTask )( eventZero );
         if( ret != STATUS_PENDING )
             break;
@@ -971,6 +971,75 @@ gint32 CStreamProxy::OpenChannel(
         // send the request
         ret = SendSetupReq(
             pDataDesc, fd, pTask );
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
+            break;
+        }
+
+        gint32 iRet = pTask->GetError();
+        if( ERROR( iRet ) )
+            break;
+
+        if( iRet != STATUS_PENDING )
+        {
+            // some other guy is doing the work
+            ret = STATUS_PENDING;
+            break;
+        }
+
+        // the 'create-sock-stm' task has not run yet,
+        // let's reschedule it
+        gint32 ( *func )( IEventSink*,
+            IConfigDb*, guint32 ) = ([](
+            IEventSink* pTask,
+            IConfigDb* pDesc,
+            guint32 dwFd )->gint32
+        {
+            CParamList oResp;
+            oResp.Push( ObjPtr( pDesc ) );
+            oResp.Push( dwFd );
+            oResp[ propReturnValue ] =
+                ( guint32 )STATUS_SUCCESS;
+            TaskletPtr pDummy;
+            gint32 ret = pDummy.NewObj(
+                clsid( CIfDummyTask ) );
+            if( ERROR( ret ) )
+                return ret;
+
+            CCfgOpener oCfg( ( IConfigDb* )
+                pDummy->GetConfig() );
+            oCfg[ propRespPtr ] =
+                ObjPtr( oResp.GetCfg() );
+
+            IEventSink* pCaller = pDummy;
+            LONGWORD* pData = ( LONGWORD* )pCaller;
+            if( pTask != nullptr )
+            {
+                pTask->OnEvent(
+                    eventTaskComp, 0, 0, pData );
+            }
+            return 0;
+        });
+
+        CIoManager* pMgr = GetIoMgr();
+        TaskletPtr pActCall;
+        ret = NEW_FUNCCALL_TASK(
+            pActCall, pMgr, func,
+            ( IEventSink* )pTask, 
+            pDataDesc, ( guint32 )fd ); 
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->RescheduleTask(
+            pActCall );
+
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
  
     }while( 0 );
 

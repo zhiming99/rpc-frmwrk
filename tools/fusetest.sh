@@ -13,8 +13,8 @@ pushd testypes
 make || exit 10
 
 mkdir mp mpsvr || true
-release/TestTypessvr mpsvr &
-release/TestTypescli mp &
+release/TestTypessvr -f mpsvr &
+release/TestTypescli -f mp &
 
 pydir=$basedir/fuse/examples/python
 sleep 5 
@@ -22,27 +22,32 @@ sleep 5
 python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 ulimit -n 8192
 ulimit -a
-start=$(date +%s.%N)
+/bin/bash << RUNCLIENT
+start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
-    python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc $i &
+    python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
 done
+wait \`jobs -p\`
+end=\$(date +%s.%N)
+echo -n "time elapsed: "
+echo "scale=10;\$end-\$start" | bc
+RUNCLIENT
 
-#wait
-for((i=0;i<1000;i++)); do
-count=`jobs | grep 'maincli.py'|wc -l`
-if [ count == '200' ]; then
-    break
-fi
-done
-
-end=$(date +%s.%N)
-echo "scale=10;$end-$start" | bc
 
 echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 
 umount mp
-umount mpsvr
+while true; do
+    umount mpsvr 
+    if mount | grep TestTypessvr; then
+        sleep 1
+        continue
+    fi
+    break
+done
+
+rm -rf ./testypes
 
 popd
 popd
@@ -61,8 +66,6 @@ function pytest()
     fi
 
     ret=0
-    echo ls /dev/fuse -l
-    ls /dev/fuse -l
     while true; do
         eval $cmdline
         echo make $testcase ...
@@ -94,7 +97,18 @@ function pytest()
         break 1
     done
     umount ./fs/mp
-    umount ./fs/mpsvr
+
+    while true; do
+        umount ./fs/mpsvr 
+        if mount | grep ${appname}svr; then
+            sleep 1
+            continue
+        fi
+        break
+    done
+
+    rm *.new
+    rm -rf fs
     popd
     return $ret
 }
@@ -109,3 +123,4 @@ pytest katest || exit 1
 pytest evtest || exit 1
 
 popd
+

@@ -205,7 +205,27 @@ gint32 CDBusProxyFdo::HandleSendData( IRP* pIrp )
         {
             // cannot understand how it can
             // succeed immediately
-            ret = ERROR_FAIL;
+            IrpCtxPtr& pTopCtx = pNextIrpCtx;
+            DMsgPtr pRespMsg =
+                *pTopCtx->m_pRespData;
+            ret = -EFAULT;
+            while( !pRespMsg.IsEmpty() )
+            {
+                guint32 dwVal = 0;
+                ret = pRespMsg.GetIntArgAt(
+                    0, dwVal );
+
+                if( ERROR( ret ) )
+                    break;
+
+                ret = ( gint32& )dwVal;
+                if( ERROR( ret ) )
+                    break;
+                // copy the response message
+                pCtx->m_pRespData =
+                    pTopCtx->m_pRespData;
+                break;
+            }
         }
 
         pIrp->PopCtxStack();

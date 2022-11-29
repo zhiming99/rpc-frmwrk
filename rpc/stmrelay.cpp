@@ -153,7 +153,7 @@ gint32 CStreamServerRelay::FetchData_Server(
             break;
         }
 
-        /*ret = pWrapper->GetError();
+        ret = pWrapper->GetError();
         if( ret != STATUS_PENDING )
         {
             // the wrapper task has been completed
@@ -161,7 +161,13 @@ gint32 CStreamServerRelay::FetchData_Server(
             // called when we return.
             ret = STATUS_PENDING;
             break;
-        }*/
+        }
+
+        //how can we be here?
+        ( *pWrapper )( eventCancelTask );
+        oContext.ClearParams();
+        oContext.Push( iStmId );
+        oContext.Push( ObjPtr( pDataDesc ) );
 
         // the wrapper task has not run yet
         // though across the process boundary.
@@ -210,6 +216,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     gint32 ret = 0;
     gint32 iFd = -1;
     gint32 iStmId = -1;
+    CParamList oContext( pContext );
 
     do{
         if( pContext == nullptr )
@@ -218,8 +225,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             break;
         }
 
-        CCfgOpener oCtx( pContext );
-        ret = oCtx.GetIntProp( 0,
+        ret = oContext.GetIntProp( 0,
             ( guint32& )iStmId );
         if( ERROR( ret ) )
             break;
@@ -336,10 +342,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     }
 
     if( pContext )
-    {
-        CParamList oContext( pContext );
         oContext.ClearParams();
-    }
 
     return ret;
 }
