@@ -1628,6 +1628,7 @@ gint32 CTcpFidoListenTask::Process(
                 DebugPrint( 0,
                     "The server is not online?,"
                     " retry scheduled..." );
+                // fall through
             }
         case -EAGAIN:
             {
@@ -1645,7 +1646,7 @@ gint32 CTcpFidoListenTask::Process(
         case ERROR_PORT_STOPPED:
         case -ECANCELED:
             {
-                // if canncelled, or disconned, no
+                // if canceled, or disconned, no
                 // need to continue
                 break;
             }
