@@ -2,26 +2,27 @@
 basedir=`pwd`
 pushd examples/cpp/
 if [ -d testypes ]; then
-    make -C testypes clean
-    rm testypes/* || true
+    rm -rf testypes/* || true
 else
     mkdir testypes
 fi
 
-$bin_dir/ridlc -f -O ./testypes ../testypes.ridl
-pushd testypes
-make || exit 10
-
-mkdir mp mpsvr || true
-release/TestTypessvr -f mpsvr &
-release/TestTypescli -f mp &
-
-pydir=$basedir/fuse/examples/python
-sleep 5 
-
-python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 ulimit -n 8192
 ulimit -a
+
+function stressTest()
+{
+    pushd testypes
+    make || exit 10
+
+    mkdir mp mpsvr || true
+    release/TestTypessvr -f mpsvr &
+    release/TestTypescli -f mp &
+    sleep 5 
+
+    pydir=$basedir/fuse/examples/python
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
+
 /bin/bash << RUNCLIENT
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
@@ -33,23 +34,31 @@ echo -n "time elapsed: "
 echo "scale=10;\$end-\$start" | bc
 RUNCLIENT
 
+    echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
+    kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
 
-echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
-kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
+    umount mp
+    while true; do
+        umount mpsvr 
+        if mount | grep TestTypessvr; then
+            sleep 1
+            continue
+        fi
+        break
+    done
 
-umount mp
-while true; do
-    umount mpsvr 
-    if mount | grep TestTypessvr; then
-        sleep 1
-        continue
-    fi
-    break
-done
+    popd
+    rm -rf testypes/*
+}
 
-rm -rf ./testypes
+echo testing normal RPC
+$bin_dir/ridlc -f -O ./testypes ../testypes.ridl
+stressTest
 
-popd
+echo testing RPC-over-stream
+$bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
+stressTest
+
 popd
 
 function pytest()
