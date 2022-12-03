@@ -21,7 +21,7 @@
 
     * `sftest.ridl`: To demonstrate how to upload/download files with the streaming support.
 
-#### Generating the example program of `hellowld`
+#### Generating the 'HelloWorld' program.
    * Make sure `rpc-frmwrk` has been properly setup on both server and client host.
    * Let's use C++ `hellowld` for example.
    * Change to the subdirectory `cpp`
