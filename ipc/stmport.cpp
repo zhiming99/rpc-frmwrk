@@ -1585,14 +1585,11 @@ gint32 CDBusStreamBusDrv::Probe(
         ret = oCfg.SetIntProp( propClsid,
             clsid( CDBusStreamBusPort ) );
 
-        // FIXME: we need a better task to receive the
-        // notification of the port start events
         TaskletPtr pTask;
         ret = pTask.NewObj( clsid( CSyncCallback ) );
         if( ERROR( ret ) )
             break;
 
-        // we don't care the event sink to bind
         ret = oCfg.SetObjPtr( propEventSink,
             ObjPtr( pTask ) );
 

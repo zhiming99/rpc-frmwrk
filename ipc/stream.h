@@ -113,7 +113,7 @@ struct IStream
     }
 
     inline gint32 RemoveUxStream(
-        HANDLE hChannel )
+        HANDLE hChannel, InterfPtr& pIf )
     {
         CRpcServices* pThis = GetInterface();
         CStdRMutex oIfLock( pThis->GetLock() );
@@ -124,6 +124,7 @@ struct IStream
         if( itr == m_mapUxStreams.end() )
             return -ENOENT;
 
+        pIf = itr->second;
         m_mapUxStreams.erase( itr );
 
         return STATUS_SUCCESS;

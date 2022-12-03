@@ -1151,13 +1151,11 @@ gint32 IStream::CloseChannel(
 {
     InterfPtr pIf;
 
-    gint32 ret = GetUxStream( hChannel, pIf );
+    gint32 ret = RemoveUxStream( hChannel, pIf );
     if( ERROR( ret ) )
         return ret;
 
     do{
-        RemoveUxStream( hChannel );
-
         CRpcServices* pSvc = pIf;
         CRpcServices* pThisIf = GetInterface();
 
@@ -1431,7 +1429,17 @@ gint32 IStream::OnPreStopShared(
             break;
 
         if( pTaskGrp->GetTaskCount() == 0 )
-            break;
+        {
+            auto pMgr = pThis->GetIoMgr();
+            TaskletPtr pSync;
+            gint32 (*func)() = ([]()->gint32
+            { return 0; });
+            ret = NEW_FUNCCALL_TASK(
+                pSync, pMgr, func );
+            if( ERROR( ret ) )
+                break;
+            pTaskGrp->AppendTask( pSync );
+        }
 
         TaskletPtr pTask = ObjPtr( pTaskGrp );
         ret = pThis->AddSeqTask( pTask );
