@@ -27,6 +27,7 @@
    * Change to the subdirectory `cpp`
    * Run `ridlc -O ./hellowld ../hellowld.ridl`
    * Change to the subdirectory `cpp/hellowld`
+   * Now you need to add some business logic as shown in [maincli.cpp](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/cpp/hellowld/maincli.cpp) and [HelloWorldSvcsvr.cpp](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/cpp/hellowld/HelloWorldSvcsvr.cpp).   
    * Run `make` to build the hellowld project on both server and client host.
    * Under the `release` directory, you will get `HelloWorldsvr` as server program, and HelloWorldcli as client program.
    * Check the `README.md` for the detail information about the files.
