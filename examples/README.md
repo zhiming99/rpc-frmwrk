@@ -1,3 +1,4 @@
+[中文](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/README_cn.md)
 #### Indroduction
 * This directory contains the typical examples that would be useful in distributed application development.
 
