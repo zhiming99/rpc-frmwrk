@@ -1,4 +1,7 @@
 ---
+[`Sat Dec 03 2022 10:01:20 AM Beijing`]    
+1. There is another bug emerging in the rpcrouter. I will fix it in the next two days.
+
 [`Mon Nov 29 2022 12:40:20 PM Beijing`]   
 1. fixed two old bugs in the stream creation process. 
 2. Now let's continue adding `gmssl` to `rpc-frmwrk`.
