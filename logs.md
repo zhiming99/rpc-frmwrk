@@ -1,7 +1,7 @@
 ---
 [`Mon Dec 05 2022 21:39:10 PM Beijing`]    
 1. The bug is fixed which made the bridge to have file descriptor leaks and unable to create new streams.
-2. Found a defect in the `rpc-over-stream` design, that it cannot be aggregrated to `hostsvr` and `hostcli` as a dynamic library. It need some modifications in the `I/O subsystem`.
+2. Found a defect in the `rpc-over-stream` design, that the server/proxy objects cannot be aggregrated to `hostsvr` and `hostcli` as a service point. It need some fundamental modifications in the `I/O subsystem`.
 
 [`Sat Dec 03 2022 10:01:20 AM Beijing`]    
 1. There is another bug emerging in the rpcrouter. I will fix it in the next two days.
