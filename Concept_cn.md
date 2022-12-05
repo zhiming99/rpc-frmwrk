@@ -95,7 +95,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * `rpc-frmwrk`通过`ridl`接口描述语言定义函数接口，和需要传输的数据结构。并通过`ridlc`生成各种语言的框架代码，配置文件，以及Makefile和Readme文件. 同一`ridl`文件生成的不同框架的客户端和服务器可以互操作。有关`ridl`语言的介绍请点击此[链接](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl)。
 
 * `rpc-frmwrk`内建了一套基于C++的API，对于希望进一步了解`rpc-frmwrk`接口工作原理，或者觉得ridlc生成的代码太慢，想榨取更高的性能的同学，可以参考[`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
-目录下的代码。如果想要提PR，改写`rpc-frmwrk`，那更加期待。
+目录下的代码。欢迎改进和优化`rpc-frmwrk`的各种建议。
 * `ridlc`是`ridl compiler`的意思。有关`ridlc`的详细信息请参考上面提到的`ridl`的详细介绍一文。
 
 ## 意见和建议
