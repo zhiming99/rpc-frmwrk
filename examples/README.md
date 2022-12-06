@@ -16,7 +16,7 @@
 
     * `actcancel.ridl`: To demonstrate how to cancel an ongoing request from client side actively.
 
-    * `katest.ridl`: To demonstrate how to control the keep-alive heartbeat between the proxy and server.
+    * `katest.ridl`: To demonstrate how to control the keep-alive heartbeat between the proxy and server for a long request.
 
     * `stmtest.ridl`: To demonstrate the basic chatting session with the streaming support.
 
