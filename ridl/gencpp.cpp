@@ -511,7 +511,7 @@ gint32 CMethodWriter::GenSerialArgs(
         if( ERROR( ret ) )
             break;
         CInterfaceDecl* pifd = pObj;
-        if( pifd->IsStream() )
+        if( pifd->IsStream() || g_bRpcOverStm )
             Wa( "ObjPtr pSerialIf_(GetStreamIf());" );
         else
             Wa( "ObjPtr pSerialIf_(this);" );
@@ -1750,6 +1750,21 @@ gint32 CDeclareClassIds::Output()
             << "_SvrImpl" << " ),";
 
         NEW_LINE;
+
+        if( g_bRpcOverStm )
+        {
+            CCOUT << "DECL_CLSID( "
+                << "C" << strSvcName
+                << "_ChannelCli" << " ),";
+
+            NEW_LINE;
+
+            CCOUT << "DECL_CLSID( "
+                << "C" << strSvcName
+                << "_ChannelSvr" << " ),";
+
+            NEW_LINE;
+        }
     }
 
     NEW_LINE;
