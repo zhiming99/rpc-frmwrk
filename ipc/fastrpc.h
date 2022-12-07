@@ -1058,9 +1058,6 @@ class CFastRpcServerState :
         return SubscribeEventsInternal(
             vecEvtToSubscribe );
     }
-    gint32 SetupOpenPortParams(
-        IConfigDb* pCfg ) override
-    { return 0; }
 };
 
 class CFastRpcProxyState :
@@ -1079,9 +1076,6 @@ class CFastRpcProxyState :
         return SubscribeEventsInternal(
             vecEvtToSubscribe );
     }
-    gint32 SetupOpenPortParams(
-        IConfigDb* pCfg ) override
-    { return super::SetupOpenPortParams( pCfg ); }
 };
 
 class CFastRpcServerBase :

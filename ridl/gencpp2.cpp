@@ -904,41 +904,20 @@ gint32 CDeclInterfSvr2::OutputEventROS(
         strName = pmd->GetName();
         ObjPtr pArgs = pmd->GetInArgs();
         Wa( "//RPC event sender" );
-        CCOUT << "gint32 " << strName << "(";
+        CCOUT << "virtual gint32 " << strName << "(";
         guint32 dwInCount = GetArgCount( pArgs );
         if( dwInCount > 0 )
         {
             INDENT_UPL;
             GenFormInArgs( pArgs );
-            CCOUT << " )";
+            CCOUT << " ) = 0;";
             INDENT_DOWN;
         }
         else
         {
-            CCOUT << " )";
+            CCOUT << " ) = 0;";
         }
-
-        stdstr strIfName = m_pNode->GetName();
-
         NEW_LINE;
-        BLOCK_OPEN;
-        Wa( "auto pSkel = GetSkelPtr( INVALID_HANDLE );" );
-        Wa( "if( pSkel == nullptr )" );
-        Wa( "    return -EFAULT;" );
-        CCOUT << "return pSkel->" << strName << "(";
-        if( dwInCount == 0 )
-        {
-            CCOUT << ");";
-        }
-        else
-        {
-            INDENT_UPL;
-            GenActParams( pArgs, false );
-            CCOUT << " );";
-            INDENT_DOWN;
-        }
-
-        BLOCK_CLOSE;
 
     }while( 0 );
 
@@ -1178,7 +1157,31 @@ gint32 CDeclInterfSvr2::OutputROSImpl()
 
 gint32 CDeclInterfSvr2::OutputEventROSImpl(
     CMethodDecl* pmd )
-{ return STATUS_SUCCESS; }
+{ 
+    gint32 ret = 0;
+    do{
+        stdstr strName = pmd->GetName();
+        ObjPtr pInArgs = pmd->GetInArgs();
+
+        CCOUT << "gint32 " << strName << "(";
+        guint32 dwInCount = GetArgCount( pInArgs );
+        if( dwInCount > 0 )
+        {
+            INDENT_UPL;
+            GenFormInArgs( pInArgs );
+            CCOUT << " ) override;";
+            INDENT_DOWN;
+        }
+        else
+        {
+            CCOUT << " ) override;";
+        }
+        NEW_LINE;
+
+    }while( 0 );
+
+    return ret;
+}
 
 gint32 CDeclInterfSvr2::OutputSyncROSImpl(
     CMethodDecl* pmd )
@@ -1632,8 +1635,6 @@ gint32 CImplIfMethodSvr2::OutputROS()
     gint32 ret = 0;
 
     do{
-        NEW_LINE;
-
         if( m_pNode->IsEvent() )
         {
             ret = OutputEventROS();
@@ -1656,7 +1657,70 @@ gint32 CImplIfMethodSvr2::OutputROS()
 }
 
 gint32 CImplIfMethodSvr2::OutputEventROS()
-{ return 0; }
+{
+    gint32 ret = 0;
+    do{
+        std::string strClass = "C";
+        strClass += GetSvcName() + "_SvrImpl";
+        std::string strMethod = m_pNode->GetName();
+
+        ObjPtr pInArgs = m_pNode->GetInArgs();
+        guint32 dwInCount = GetArgCount( pInArgs );
+
+        CAstNodeBase* pParent = m_pNode->GetParent();
+        auto pifd = dynamic_cast< CInterfaceDecl* >
+            ( pParent->GetParent() );
+        if( pifd == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        stdstr strIfName = pifd->GetName();
+
+        Wa( "/* RPC event sender */" );
+        CCOUT << "gint32 " << strClass << "::"
+            << strMethod << "(";
+        if( dwInCount > 0 )
+        {
+            INDENT_UPL;
+            GenFormInArgs( pInArgs );
+            CCOUT << " )";
+            INDENT_DOWN;
+        }
+        else
+        {
+            CCOUT << " )";
+        }
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "std::vector< InterfPtr > vecSkels;" );
+        Wa( "gint32 ret = this->EnumStmSkels( vecSkels );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return ret;" );
+        Wa( "for( auto& elem : vecSkels )" );
+        BLOCK_OPEN;
+        CCOUT << "C" << GetSvcName() << "_SvrSkel* pSkel = elem;";
+        NEW_LINE;
+        CCOUT << "ret = pSkel->" << "I" << strIfName
+            << "_SImpl::" << strMethod << "(";
+        if( dwInCount == 0 )
+            CCOUT << ");";
+        else
+        {
+            INDENT_UPL;
+            GenActParams( pInArgs, false );
+            CCOUT << " );";
+            INDENT_DOWN;
+        }
+        BLOCK_CLOSE;
+        NEW_LINE;
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+    }while( 0 );
+
+    return ret;
+}
 
 gint32 CImplIfMethodSvr2::OutputSyncROS()
 {
@@ -2099,7 +2163,7 @@ gint32 CImplIfMethodProxy2::OutputEventROSSkel()
         Wa( "    return -EFAULT;" );
         Wa( "CRpcServices* pSvc = pIf;" );
         CCOUT << "auto pApi = dynamic_cast"
-            << "< I" << m_pIf->GetName() << "_SvrApi* >"
+            << "< I" << m_pIf->GetName() << "_CliApi* >"
             << "( pSvc );";
         NEW_LINE;
         Wa( "if( pApi == nullptr )" );
@@ -2208,8 +2272,6 @@ gint32 CImplIfMethodProxy2::OutputROS()
     gint32 ret = 0;
 
     do{
-        NEW_LINE;
-
         if( m_pNode->IsEvent() )
         {
             ret = OutputEventROS();
@@ -2501,21 +2563,6 @@ gint32 CDeclServiceImpl2::OutputROS()
 
         auto pWriter = static_cast
             < CCppWriter* >( m_pWriter );
-        for( auto pifd : vecIfs )
-        {
-            if( IsServer() )
-            {
-                CDeclInterfSvr2 odifs(
-                    pWriter, pifd );
-                odifs.OutputROS();
-            }
-            else
-            {
-                CDeclInterfProxy2 odifp(
-                    pWriter, pifd );
-                odifp.OutputROS();
-            }
-        }
 
         ObjPtr pNode( m_pNode );
         CDeclService2 ods( pWriter, pNode );
@@ -2589,6 +2636,38 @@ gint32 CDeclServiceImpl2::OutputROS()
             BLOCK_CLOSE;
             CCOUT << ";";
             NEW_LINES( 2 );
+
+            stdstr strChanClass = "C";
+            strChanClass += strSvcName + "_ChannelCli";
+            strBase = "CRpcStreamChannelCli";
+
+            CCOUT << "class " << strChanClass;
+            INDENT_UP;
+            NEW_LINE;
+
+            CCOUT << ": public " << strBase;
+
+            INDENT_DOWN;
+            NEW_LINE;
+            BLOCK_OPEN;
+
+            Wa( "public:" );
+            CCOUT << "typedef "
+                << strBase << " super;";
+            NEW_LINE;
+
+            CCOUT << strChanClass << "(";
+            NEW_LINE;
+            Wa( "    const IConfigDb* pCfg ) :" );
+            INDENT_UP;
+            CCOUT << "super::virtbase( pCfg ), super( pCfg )";
+            INDENT_DOWN;
+            NEW_LINE;
+            Wa( "{ SetClassId( clsid(" );
+            CCOUT << "    " << strChanClass << " ) ); }";
+            BLOCK_CLOSE;
+            Wa( ";" );
+            NEW_LINE;
         }
 
         if( !IsServer() )
@@ -2664,6 +2743,38 @@ gint32 CDeclServiceImpl2::OutputROS()
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
+
+        stdstr strChanClass = "C";
+        strChanClass += strSvcName + "_ChannelSvr";
+        strBase = "CRpcStreamChannelSvr";
+
+        CCOUT << "class " << strChanClass;
+        INDENT_UP;
+        NEW_LINE;
+
+        CCOUT << ": public " << strBase;
+
+        INDENT_DOWN;
+        NEW_LINE;
+        BLOCK_OPEN;
+
+        Wa( "public:" );
+        CCOUT << "typedef "
+            << strBase << " super;";
+        NEW_LINE;
+
+        CCOUT << strChanClass << "(";
+        NEW_LINE;
+        Wa( "    const IConfigDb* pCfg ) :" );
+        INDENT_UP;
+        CCOUT << "super::virtbase( pCfg ), super( pCfg )";
+        INDENT_DOWN;
+        NEW_LINE;
+        Wa( "{ SetClassId( clsid(" );
+        CCOUT << "    "<< strChanClass << " ) ); }";
+        BLOCK_CLOSE;
+        Wa( ";" );
+        NEW_LINE;
 
     }while( 0 );
 
@@ -3275,6 +3386,7 @@ gint32 GenHeaderFileROS(
                         ret = odip.OutputROSSkel();
                         if( ERROR( ret ) )
                             break;
+                        ret = odip.OutputROS();
                     }
 
                     if( bFuseS )
@@ -3290,6 +3402,9 @@ gint32 GenHeaderFileROS(
                             pWriter, pObj );
 
                         ret = odis.OutputROSSkel();
+                        if( ERROR( ret ) )
+                            break;
+                        ret = odis.OutputROS();
                     }
                     break;
                 }
@@ -4045,6 +4160,10 @@ gint32 CImplClassFactory2::OutputROS()
                     << pSvc->GetName()
                     << "_SvrSkel );";
                 NEW_LINE;
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_ChannelSvr );";
+                NEW_LINE;
             }
             if( !IsServer() || g_bMklib )
             {
@@ -4055,6 +4174,10 @@ gint32 CImplClassFactory2::OutputROS()
                 CCOUT << "INIT_MAP_ENTRYCFG( C"
                     << pSvc->GetName()
                     << "_CliSkel );";
+                NEW_LINE;
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_ChannelCli );";
                 NEW_LINE;
             }
         }
