@@ -15,8 +15,8 @@
     * `sftest.ridl`: 展示如何通过`流通道`进行文件的上传和下载.
 
 #### 生成例子程序'HelloWorld'
-   * 首先确保`rpc-frmwrk`已经正确安装和启动.
-   * 我们以C++的`hellowld`为例.
+   * 首先确保`rpc-frmwrk`已经成功安装和启动.
+   * 下面,我们以C++的`hellowld`为例.
       * 从当前目录切换到子目录`cpp`下
       * 在终端上运行命令`ridlc -O ./hellowld ../hellowld.ridl`. 
       * 然后再从当前目录切换到子目录`hellowld`。
