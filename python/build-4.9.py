@@ -30,6 +30,7 @@ makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
 makefile.extra_lib_dirs = [ \
     curPath + "../combase/.libs", \
     curPath + "../ipc/.libs" ]
+makefile.extra_cxxflags = [ "-fno-strict-aliasing" ]
 
 try:
     pkgconfig=os.environ[ 'PKG_CONFIG' ]
