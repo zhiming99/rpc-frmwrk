@@ -146,6 +146,9 @@ class CDriverManager : public IService
 
     inline CIoManager* GetIoMgr() const
     {  return m_pIoMgr; }
+
+    gint32 GetDriver( bool bBus,
+        const stdstr& strName, ObjPtr& pDrv );
 };
 
 typedef CAutoPtr< Clsid_CDriverManager, CDriverManager > DrvMgrPtr;

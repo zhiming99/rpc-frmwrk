@@ -944,10 +944,6 @@ gint32 CDriverManager::RegDrvInternal(
             if( ERROR( ret ) )
                 break;
             
-            ret = oReg.ChangeDir( strRegPath );
-            if( ERROR( ret ) )
-                break;
-
             ret = oReg.SetObject(
                 propEventMapPtr, pEvtMap );
 
@@ -1312,6 +1308,25 @@ gint32 CDriverManager::FindDriver(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CDriverManager::GetDriver( bool bBus,
+    const stdstr& strName, ObjPtr& pDrv )
+{
+    if( strName.empty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    stdstr strPath;
+    if( bBus )
+        strPath = GetBusDrvRegRoot();
+    else
+        strPath = GetPortDrvRegRoot();
+    strPath.push_back( '/' );
+    strPath += strName;
+
+    auto pMgr = GetIoMgr();
+    return pMgr->GetObject( strPath, pDrv );
 }
 
 }
