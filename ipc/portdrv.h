@@ -121,10 +121,13 @@ class CPortDriver : public IPortDriver
         const Variant& oVar ) override;
 
     gint32 EnumPorts(
-            std::vector<PortPtr>& vecPorts ) const;
+        std::vector<PortPtr>& vecPorts ) const;
 
     gint32 GetDrvName(
-            std::string& strName ) const;
+        std::string& strName ) const;
+
+    gint32 GetPortById( guint32 dwPortId,
+        PortPtr& pPort ) const;
 
     virtual gint32 RemovePort( IPort* pPort );
 

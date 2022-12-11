@@ -71,6 +71,21 @@ gint32 CPortDriver::GetDrvName(
     return ret;
 }
 
+gint32 CPortDriver::GetPortById(
+    guint32 dwPortId, PortPtr& pPort ) const
+{
+    CStdRMutex oDrvLock(
+         const_cast< CPortDriver* >( this )->GetLock() );
+
+    auto itr = m_mapIdToPort.find( dwPortId );
+    if( itr != m_mapIdToPort.end() )
+    {
+        pPort = itr->second;
+        return 0;
+    }
+    return -ENOENT;
+}
+
 gint32 CPortDriver::EnumPorts(
         vector<PortPtr>& vecPorts ) const
 {
