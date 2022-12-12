@@ -634,6 +634,12 @@ class CGenericBusPort : public CPort
             PIRP pMasterIrp,
             IPort* pPdoPort );
 
+    inline guint32 GetChildCount()
+    {
+        CStdRMutex oPortLock( GetLock() );
+        return m_mapId2Pdo.size();
+    }
+
     virtual gint32 EnumPdoPorts(
             std::vector<PortPtr>& vecPorts );
 

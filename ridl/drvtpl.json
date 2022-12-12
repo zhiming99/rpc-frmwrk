@@ -171,7 +171,8 @@
             "ModName": "hostsvr",
             "DriversToLoad": [
                 "DBusBusDriver",
-                "UnixSockBusDriver"
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv"
             ],
             "ClassFactories": [
                 "./libfuseif.so"
@@ -181,7 +182,8 @@
             "ModName": "hostcli",
             "DriversToLoad": [
                 "DBusBusDriver",
-                "UnixSockBusDriver"
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv"
             ],
             "ClassFactories": [
                 "./libfuseif.so"
