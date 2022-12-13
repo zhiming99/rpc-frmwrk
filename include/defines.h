@@ -293,6 +293,10 @@ gint32 Execve(
 
 using stdstr = std::string;
 
+// genenerate a 32bit hash
+gint32 GenStrHash( const stdstr& strMsg,
+    guint32& dwHash );
+
 // Event ids for the IEventSink
 enum EnumEventId : guint32
 {

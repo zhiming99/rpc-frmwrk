@@ -38,6 +38,7 @@
 #include <memory>
 #include <iostream>
 #include <array>
+#include "sha1.h"
 
 
 #define MAX_DUMP_SIZE 512
@@ -118,6 +119,25 @@ gint64 GetRandom()
         ( ( dwRand & 0xFFFF0000 ) | iPid );
 
     return ( qwHighVal << 32 )  + dwLowVal;
+}
+
+gint32 GenStrHash(
+    const stdstr& strMsg, guint32& dwHash )
+{
+    if( strMsg.empty() )
+        return -EINVAL;
+
+    SHA1 sha;
+    sha.Input( strMsg.c_str(),
+        strMsg.size() );
+
+    guint32 arrDwords[ 5 ];
+    if( !sha.Result( arrDwords ) )
+        return ERROR_FAIL;
+
+    guint32* ptr = ( guint32* )&dwHash;
+    ptr[ 0 ] = arrDwords[ 3 ];
+    return 0;
 }
 
 gint32 GetCmdOutput( std::string& strResult,
