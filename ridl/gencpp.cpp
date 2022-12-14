@@ -587,7 +587,16 @@ gint32 CMethodWriter::GenDeserialArgs(
 
     do{
         NEW_LINE;
-        Wa( "ObjPtr pDeserialIf_(this);" );
+        ObjPtr pObj;
+        ret = FindParentByClsid( pArgList,
+            clsid( CInterfaceDecl ), pObj );
+        if( ERROR( ret ) )
+            break;
+        CInterfaceDecl* pifd = pObj;
+        if( pifd->IsStream() || g_bRpcOverStm )
+            Wa( "ObjPtr pDeserialIf_(GetStreamIf());" );
+        else
+            Wa( "ObjPtr pDeserialIf_(this);" );
         Wa( "CSerialBase oDeserial_( pDeserialIf_ );" );
         CEmitSerialCode oedsc(
             m_pWriter, pArgList );
@@ -7035,6 +7044,8 @@ gint32 CExportDrivers::Output()
             oDrvToLoad.append( "DBusBusDriver" );
             if( bStream || bFuse || g_bRpcOverStm )
                 oDrvToLoad.append( "UnixSockBusDriver" );
+            if( g_bRpcOverStm )
+                oDrvToLoad.append( "DBusStreamBusDrv" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
             if( bFuseP )

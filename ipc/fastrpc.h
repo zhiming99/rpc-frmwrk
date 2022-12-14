@@ -41,6 +41,7 @@
     _bProxy, CAggInterfaceProxy, CAggInterfaceServer>::type
 
 #define MAX_REQCHAN_PER_SESS 200
+#define DBUS_STREAM_BUS_DRIVER  "DBusStreamBusDrv"
 
 namespace rpcf
 {
@@ -816,64 +817,75 @@ class CRpcStmChanBase :
             gint32 iRet = oReqCfg.GetPointer(
                 propRespPtr, pResp );
             
-            CStdRMutex oIrpLock( pIrp->GetLock() );
-            ret = pIrp->CanContinue(
-                IRP_STATE_READY );
-            if( ERROR( ret ) )
-                break;
-
-            if( pIrp->GetStackSize() == 0 )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            IrpCtxPtr& pCtx =
-                    pIrp->GetTopStack();
-            if( ERROR( iRet ) )
-            {
-                pCtx->SetStatus( iRet );
-            }
-            else
-            {
-                gint32* pRet = &iRet;
-                CCfgOpener oResp( pResp );
-                ret = oResp.GetIntProp(
-                    propReturnValue,
-                    *( guint32* )pRet );
-
-                if( ERROR( ret ) )
-                    pCtx->SetStatus( ret );
-                else
-                    pCtx->SetStatus( iRet );
-            }
-
-            bool bStart = false;
-            guint32 dwMinCmd =
-                pCtx->GetMinorCmd();
-            
-            if( dwMinCmd == IRP_MN_PNP_START )
-                bStart = true;
-            if( bStart &&
-                SUCCEEDED( pCtx->GetStatus() ) )
-            {
-                ObjPtr pIf = this;
-                // binding the two
-                pPort->SetStreamIf( pIf );
-                SetPort( pPort );
-            }
-
-            oIrpLock.Unlock();
-
+            bool bDone = false;
             auto pMgr = this->GetIoMgr();
-            if( SUCCEEDED( iRet ) || !bStart )
-            {
-                pMgr->CompleteIrp( pIrp );
-                break;
-            }
+            do{
+                CStdRMutex oIrpLock( pIrp->GetLock() );
+                ret = pIrp->CanContinue(
+                    IRP_STATE_READY );
+                if( ERROR( ret ) )
+                { 
+                    pIrp = nullptr;
+                    break;
+                }
 
-            // failed to start. stop the interface to
-            // avoid memory leak
+                if( pIrp->GetStackSize() == 0 )
+                {
+                    pIrp = nullptr;
+                    ret = -EINVAL;
+                    break;
+                }
+
+                IrpCtxPtr& pCtx =
+                        pIrp->GetTopStack();
+                if( ERROR( iRet ) )
+                {
+                    pCtx->SetStatus( iRet );
+                }
+                else
+                {
+                    gint32* pRet = &iRet;
+                    CCfgOpener oResp( pResp );
+                    ret = oResp.GetIntProp(
+                        propReturnValue,
+                        *( guint32* )pRet );
+
+                    if( ERROR( ret ) )
+                        pCtx->SetStatus( ret );
+                    else
+                        pCtx->SetStatus( iRet );
+                }
+
+                bool bStart = false;
+                guint32 dwMinCmd =
+                    pCtx->GetMinorCmd();
+
+                ret = pCtx->GetStatus();
+                if( dwMinCmd == IRP_MN_PNP_START )
+                    bStart = true;
+                if( bStart && SUCCEEDED( ret ) )
+                {
+                    ObjPtr pIf = this;
+                    // binding the two
+                    pPort->SetStreamIf( pIf );
+                    SetPort( pPort );
+                }
+
+                oIrpLock.Unlock();
+
+                if( !bStart || SUCCEEDED( ret ) )
+                {
+                    pMgr->CompleteIrp( pIrp );
+                    bDone = true;
+                    break;
+                }
+
+            }while( 0 );
+
+            if( bDone )
+                break;
+
+            // failed to start, stop the interface
             TaskGrpPtr pTaskGrp;
             do{
                 CParamList oParams;
@@ -894,13 +906,16 @@ class CRpcStmChanBase :
                     break;
                 pTaskGrp->AppendTask( pStopTask );
 
-                TaskletPtr pCompTask;
-                ret = DEFER_OBJCALL_NOSCHED(
-                    pCompTask, pMgr,
-                    &CIoManager::CompleteIrp, pIrp );
-                if( ERROR( ret ) )
-                    break;
-                pTaskGrp->AppendTask( pCompTask );
+                if( pIrp != nullptr )
+                {
+                    TaskletPtr pCompTask;
+                    ret = DEFER_OBJCALL_NOSCHED(
+                        pCompTask, pMgr,
+                        &CIoManager::CompleteIrp, pIrp );
+                    if( ERROR( ret ) )
+                        break;
+                    pTaskGrp->AppendTask( pCompTask );
+                }
                 TaskletPtr pTask = pTaskGrp;
                 ret = pMgr->RescheduleTask( pTask );   
 
@@ -909,7 +924,8 @@ class CRpcStmChanBase :
             if( ERROR( ret ) && !pTaskGrp.IsEmpty() )
             {
                 ( *pTaskGrp )( eventCancelTask );
-                pMgr->CompleteIrp( pIrp );
+                if( pIrp != nullptr )
+                    pMgr->CompleteIrp( pIrp );
             }
 
         }while( 0 );
@@ -1084,6 +1100,12 @@ class CFastRpcServerBase :
     protected:
     std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
     std::atomic< guint32 > m_dwSeqNo;
+    guint32 m_dwBusId = 0xFFFFFFFF;
+
+    gint32 OnPreStartComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
 
     public:
     typedef IFBASE3( false ) super;
@@ -1131,6 +1153,18 @@ class CFastRpcServerBase :
     gint32 BroadcastEvent(
         IConfigDb* pReqCall,
         IEventSink* pCallback ) override;
+
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
+
+    inline guint32 GetBusId() const
+    { return m_dwBusId; }
+
+    inline void SetBusId( guint32 dwBusId )
+    { m_dwBusId = dwBusId; }
 };
 
 class CFastRpcProxyBase :
@@ -1138,6 +1172,12 @@ class CFastRpcProxyBase :
 {
     InterfPtr m_pSkelObj;
     std::atomic< guint32 > m_dwSeqNo;
+    guint32 m_dwBusId = 0xFFFFFFFF;
+
+    gint32 OnPreStartComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
 
     public:
     typedef IFBASE3( true ) super;
@@ -1148,6 +1188,9 @@ class CFastRpcProxyBase :
 
     inline gint32 NewSeqNo()
     { return m_dwSeqNo++; }
+
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override;
 
     gint32 OnPostStart(
         IEventSink* pCallback ) override;
@@ -1168,6 +1211,12 @@ class CFastRpcProxyBase :
 
     InterfPtr GetStmSkel() const
     { return m_pSkelObj; }
+
+    guint32 GetBusId() const
+    { return m_dwBusId; }
+
+    void SetBusId( guint32 dwBusId )
+    { m_dwBusId = dwBusId; }
 };
 
 template< bool bProxy >
@@ -1446,6 +1495,9 @@ class CFastRpcSkelProxyState :
     bool IsMyDest(
         const stdstr& strModName ) override
     { return false; }
+
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg ) override;
 };
 
 class CFastRpcSkelServerState :
@@ -1463,6 +1515,9 @@ class CFastRpcSkelServerState :
     bool IsMyDest(
         const stdstr& strModName ) override
     { return false; }
+
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg ) override;
 };
 
 class CFastRpcSkelProxyBase :
@@ -1561,5 +1616,4 @@ DECLARE_AGGREGATED_PROXY(
 
 #define DECLARE_AGGREGATED_SKEL_SERVER( ClassName, ...) \
     DECLARE_AGGREGATED_SERVER_INTERNAL( CFastRpcSkelSvrBase, ClassName, ##__VA_ARGS__ )
-
 }

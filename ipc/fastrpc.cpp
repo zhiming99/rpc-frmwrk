@@ -864,6 +864,18 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         bool bOnline =
             ( iEvent == eventRmtSvrOnline );
 
+        PortPtr pPort;
+        ret = GetIoMgr()->GetPortPtr(
+            hPort, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        Variant oVar;
+        pPort->GetProperty( propBusId, oVar );
+        guint32 dwBusId = oVar;
+        if( dwBusId != this->GetBusId() )
+            break;
+
         CCfgOpener oEvtCtx( pEvtCtx );
         HANDLE hstm = INVALID_HANDLE;
         ret = oEvtCtx.GetIntPtr(
@@ -872,15 +884,8 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
             break;
         
         InterfPtr pIf;
-        PortPtr pPort;
         if( bOnline )
         {
-            auto pMgr = this->GetIoMgr();
-            ret = pMgr->GetPortPtr(
-                hPort, pPort );
-            if( ERROR( ret ) )
-                break;
-
             Variant var;
             ret = pPort->GetProperty(
                 propPortId, var );
@@ -900,8 +905,8 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         if( ERROR( ret ) )
         {
             stdstr strFunc = stdstr( "Warning " ) +
-                ( bOnline ? "CreateStmKel" :
-                    "GetStmKel" ) + " failed";
+                ( bOnline ? "CreateStmSkel" :
+                    "GetStmSkel" ) + " failed";
 
             DebugPrint( ret, 
                 strFunc.c_str() );
@@ -1018,6 +1023,175 @@ gint32 CFastRpcServerBase::GetStream(
     CCfgOpenerObj oTaskCfg( pCallback );
     return  oTaskCfg.GetIntPtr(
         propStmHandle, ( guint32*& )hStream );
+}
+
+gint32 CFastRpcServerBase::OnPreStartComplete(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pCallback == nullptr ||
+        pReqCtx == nullptr ||
+        pIoReq == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg( pIoReq );
+        IConfigDb* pResp;
+        ret = oCfg.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet;
+        ret = oResp.GetIntProp(
+            propReturnValue, ( guint32& )iRet );
+        if( ERROR( ret ) )
+            break;
+
+        ret = iRet;
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwBusId = 0;
+        CCfgOpener oCtx( pReqCtx );
+        ret = oCtx.GetIntProp(
+            propBusId, dwBusId );
+        if( ERROR( ret ) )
+            break;
+
+        SetBusId( dwBusId );
+        CCfgOpenerObj oIfCfg( this );
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+        
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        pdrv->BindNameBus( strName, dwBusId );
+
+    }while( 0 );
+
+    pCallback->OnEvent( eventTaskComp, ret, 0, 0 );
+    return 0;
+}
+
+gint32 CFastRpcServerBase::OnPreStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        IConfigDb* pCtx = nullptr;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetPointer(
+            propSkelCtx, pCtx );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pRespTask;
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespTask, this,
+            &CFastRpcServerBase::OnPreStartComplete,
+            pCallback, pCtx );
+        if( ERROR( ret ) )
+            break;
+
+        PortPtr pBusPort;
+        CfgPtr ctxPtr( pCtx );
+
+        ret = pdrv->Probe2( nullptr,
+            pBusPort, ctxPtr, pRespTask );
+        if( ERROR( ret ) )
+        {
+            ( *pRespTask )( eventCancelTask );
+            break;
+        }
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        guint32 dwBusId = 0;
+        CCfgOpener oCtx( pCtx );
+        ret = oCtx.GetIntProp(
+            propBusId, dwBusId );
+        if( ERROR( ret ) )
+            break;
+
+        SetBusId( dwBusId );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFastRpcServerBase::OnPostStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = pdrv->GetPortById(
+            GetBusId(), pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oIfCfg( this );
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        pdrv->RemoveBinding( strName );
+
+        CDBusStreamBusPort* pBus = pPort;
+        ret = pdrv->DestroyPortSynced( 
+            pBus, pCallback );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CFastRpcSkelProxyBase::BuildBufForIrp(
@@ -1219,6 +1393,133 @@ gint32 CFastRpcSkelSvrBase::BuildBufForIrp(
     return BuildBufForIrpInternal( pBuf, pReqCall );
 }
 
+gint32 CFastRpcProxyBase::OnPreStartComplete(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pCallback == nullptr ||
+        pReqCtx == nullptr ||
+        pIoReq == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg( pIoReq );
+        IConfigDb* pResp;
+        ret = oCfg.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet;
+        ret = oResp.GetIntProp(
+            propReturnValue, ( guint32& )iRet );
+        if( ERROR( ret ) )
+            break;
+
+        ret = iRet;
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwBusId = 0;
+        CCfgOpener oCtx( pReqCtx );
+        ret = oCtx.GetIntProp(
+            propBusId, dwBusId );
+        if( ERROR( ret ) )
+            break;
+
+        SetBusId( dwBusId );
+
+        CCfgOpenerObj oIfCfg( this );
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+        
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        pdrv->BindNameBus( strName, dwBusId );
+
+    }while( 0 );
+
+    pCallback->OnEvent( eventTaskComp, ret, 0, 0 );
+    return 0;
+}
+
+gint32 CFastRpcProxyBase::OnPreStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        IConfigDb* pCtx = nullptr;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetPointer(
+            propSkelCtx, pCtx );
+        if( ERROR( ret ) )
+            break;
+
+        TaskletPtr pRespTask;
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespTask, this,
+            &CFastRpcProxyBase::OnPreStartComplete,
+            pCallback, pCtx );
+        if( ERROR( ret ) )
+            break;
+
+        PortPtr pBusPort;
+        CfgPtr ctxPtr( pCtx );
+
+        ret = pdrv->Probe2( nullptr,
+            pBusPort, ctxPtr, pRespTask );
+        if( ERROR( ret ) )
+        {
+            ( *pRespTask )( eventCancelTask );
+            break;
+        }
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        guint32 dwBusId = 0;
+        CCfgOpener oCtx( pCtx );
+        ret = oCtx.GetIntProp(
+            propBusId, dwBusId );
+        if( ERROR( ret ) )
+            break;
+
+        SetBusId( dwBusId );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFastRpcProxyBase::OnPostStart(
     IEventSink* pCallback )
 {
@@ -1261,7 +1562,53 @@ gint32 CFastRpcProxyBase::OnPostStop(
     IEventSink* pCallback )
 {
     m_pSkelObj.Clear();
-    return 0;
+    gint32 ret = 0;
+    do{
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = pdrv->GetPortById(
+            GetBusId(), pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusPort* pBus = pPort;
+        guint32 dwCount = pBus->GetChildCount();
+        if( dwCount > 0 )
+            break;
+
+        CCfgOpenerObj oIfCfg( this );
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pdrv->RemoveBinding( strName );
+        if( ERROR( ret ) )
+        {
+            // someone else has removed the binding
+            break;
+        }
+
+        ret = pdrv->DestroyPortSynced( 
+            pBus, pCallback );
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CFastRpcProxyBase::OnRmtSvrEvent(
@@ -1275,12 +1622,108 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
     do{
         if( iEvent == eventRmtSvrOnline )
             break;
+
+        PortPtr pPort;
+        ret = GetIoMgr()->GetPortPtr(
+            hPort, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        Variant oVar;
+        guint32 dwBusId = 0;
+        pPort->GetProperty( propBusId, oVar );
+        dwBusId = oVar;
+        if( dwBusId != this->GetBusId() )
+            break;
+
         CRpcServices* pSvc = m_pSkelObj;
         pSvc->SetStateOnEvent( cmdShutdown );
         // stop at this point could result in segment
         // fault. ClosePort is good.
         pSvc->ClosePort( nullptr );
         
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFastRpcSkelServerState::SetupOpenPortParams(
+    IConfigDb* pParams )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::SetupOpenPortParams(
+            pParams );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oIfCfg( this );
+        IConfigDb* pCtx = nullptr;
+        ret = oIfCfg.GetPointer(
+            propSkelCtx, pCtx );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCtx( pCtx );
+        guint32 dwBusId = 0;
+        ret = oCtx.GetIntProp(
+            propBusId, dwBusId );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oParams( pParams );
+        stdstr strName;
+        ret = oParams.GetStrProp(
+            propBusName, strName );
+        if( ERROR( ret ) )
+            break;
+        strName.push_back( '_' );
+        strName += std::to_string( dwBusId );
+
+        oParams.SetStrProp(
+            propBusName, strName );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFastRpcSkelProxyState::SetupOpenPortParams(
+    IConfigDb* pParams )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::SetupOpenPortParams(
+            pParams );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oIfCfg( this );
+        IConfigDb* pCtx = nullptr;
+        ret = oIfCfg.GetPointer(
+            propSkelCtx, pCtx );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCtx( pCtx );
+        guint32 dwBusId = 0;
+        ret = oCtx.GetIntProp(
+            propBusId, dwBusId );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oParams( pParams );
+        stdstr strName;
+        ret = oParams.GetStrProp(
+            propBusName, strName );
+        if( ERROR( ret ) )
+            break;
+        strName.push_back( '_' );
+        strName += std::to_string( dwBusId );
+
+        oParams.SetStrProp(
+            propBusName, strName );
+
     }while( 0 );
 
     return ret;

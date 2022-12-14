@@ -40,6 +40,11 @@ using namespace rpcf;
 extern bool g_bMklib;
 extern stdstr g_strCmdLine;
 
+extern gint32 EmitOnPreStart( 
+    CWriterBase* m_pWriter,
+    CServiceDecl* pSvcNode,
+    bool bProxy );
+
 gint32 EmitGetSvrCtxId( 
     CWriterBase* m_pWriter )
 {
@@ -785,7 +790,10 @@ gint32 CDeclServiceImplFuse2::Output()
             NEW_LINE;
 
             Wa( "gint32 CreateStmSkel(" );
-            CCOUT << "    InterfPtr& pIf ) override;";
+            Wa( "    InterfPtr& pIf ) override;" );
+            NEW_LINE;
+            Wa( "gint32 OnPreStart(" );
+            CCOUT << "    IEventSink* pCallback ) override;";
             BLOCK_CLOSE;
             CCOUT << ";";
             NEW_LINES( 2 );
@@ -892,6 +900,9 @@ gint32 CDeclServiceImplFuse2::Output()
         Wa( "gint32 CreateStmSkel(" );
         Wa( "    HANDLE, guint32, " );
         CCOUT << "    InterfPtr& ) override;";
+        NEW_LINE;
+        Wa( "gint32 OnPreStart(" );
+        CCOUT << "    IEventSink* pCallback ) override;";
 
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -1188,6 +1199,7 @@ gint32 CImplIfMethodSvrFuse2::OutputAsyncCancelWrapper()
     
     return ret;
 }
+
 gint32 CImplServiceImplFuse2::Output()
 {
     guint32 ret = STATUS_SUCCESS;
@@ -1443,6 +1455,13 @@ gint32 CImplServiceImplFuse2::Output()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            CCOUT << "gint32 " << strClass << "::OnPreStart(";
+            NEW_LINE;
+            Wa( "    IEventSink* pCallback )" );
+            BLOCK_OPEN;
+            EmitOnPreStart( m_pWriter, m_pNode, false );
             BLOCK_CLOSE;
             NEW_LINES( 2 );
         }
@@ -1736,6 +1755,13 @@ gint32 CImplServiceImplFuse2::Output()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+            CCOUT << "gint32 " << strClass << "::OnPreStart(";
+            NEW_LINE;
+            Wa( "    IEventSink* pCallback )" );
+            BLOCK_OPEN;
+            EmitOnPreStart( m_pWriter, m_pNode, true );
             BLOCK_CLOSE;
             NEW_LINES( 2 );
         }
@@ -2408,25 +2434,6 @@ gint32 CImplMainFuncFuse2::Output()
             CCOUT << "    break;";
             NEW_LINES( 2 );
 
-            Wa( " // set a must-have option for" );
-            Wa( " // DBusStreamBusPort" );
-            Wa( "pMgr = ( CIoManager* )g_pIoMgr;" );
-            Wa( "CCfgOpener oDrvCfg;" );
-            CCOUT << "oDrvCfg[ propIsServer ] = "
-                 << ( bProxy ? "false" : "true" ) << " ;";
-            NEW_LINE;
-            CCOUT << "stdstr strDesc= " << "\"./"
-                << g_strAppName << "desc.json\";";
-            NEW_LINES( 2 );
-            Wa( "oDrvCfg[ propObjDescPath ] = strDesc;" );
-            Wa( "oDrvCfg[ propDrvName ] = \"DBusStreamBusDrv\";" );
-            Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
-            Wa( "ret = oDrvMgr.LoadDriver(" );
-            Wa( "    oDrvCfg.GetCfg() );" );
-            Wa( "if( ERROR( ret ) )" );
-            Wa( "    break;" );
-            NEW_LINES(2);
-
             CCOUT << "ret = InitRootIf( g_pIoMgr, "
                 << ( bProxy ? "true" : "false" ) << " );";
             NEW_LINE;
@@ -2485,13 +2492,6 @@ gint32 CImplMainFuncFuse2::Output()
             BLOCK_CLOSE;
             CCOUT<< "while( 0 );";
             NEW_LINES( 2 );
-            Wa( "if( pMgr != nullptr )" );
-            BLOCK_OPEN;
-            Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
-            Wa( "oDrvMgr.UnloadDriver(" );
-            CCOUT << "    \"DBusStreamBusDrv\" );";
-            BLOCK_CLOSE;
-            NEW_LINE;
             Wa( "DestroyContext();" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
@@ -2652,7 +2652,6 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             NEW_LINE;
             CCOUT << "C" << strSvcName << "_CliBase,";
             NEW_LINE;
-            Wa( "CFastRpcProxyBase," );
             Wa( "CStatCountersProxy," );
             Wa( "CStreamProxyFuse," );
             Wa( "CFuseSvcProxy," );
@@ -2661,14 +2660,10 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             {
                 CInterfRef* pifr = vecIfs[ i ];
                 std::string strName = pifr->GetName();
-                CCOUT << "I" << strName << "_CliApi";
-                if( i + 1 < vecIfs.size() )
-                {
-                    CCOUT << ",";
-                    NEW_LINE;
-                }
+                CCOUT << "I" << strName << "_CliApi,";
+                NEW_LINE;
             }
-            CCOUT << " );";
+            CCOUT << "CFastRpcProxyBase );";
             INDENT_DOWN;
             NEW_LINES( 2 );
         }
@@ -2693,14 +2688,11 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             {
                 CInterfRef* pifr = vecIfs[ i ];
                 std::string strName = pifr->GetName();
-                CCOUT << "I" << strName << "_SvrApi";
-                if( i + 1 < vecIfs.size() )
-                {
-                    CCOUT << ",";
-                    NEW_LINE;
-                }
+                CCOUT << "I" << strName << "_SvrApi,";
+                NEW_LINE;
             }
-            CCOUT << " );";
+            CCOUT << "CFastRpcServerBase );";
+            INDENT_DOWN;
             INDENT_DOWN;
             NEW_LINES( 2 );
         }

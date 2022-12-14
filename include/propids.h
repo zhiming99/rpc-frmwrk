@@ -212,7 +212,7 @@ enum EnumPropId : gint32
                         // information for transferring requests or events,
                         // which could include propConnHandle, propRouterPath,
 
-    propObjDescFile,    // type: a string as the file path for the object description file
+    propSkelCtx,        // type: a pointer to the skelton interface creation context for rpc-over-stream
     propRouterPath,     // type: an string as the routing path to the destination server
     propPrxyPortId,     // type: a guint32 as the portid for a proxy to forward
                         // the request, 0xfffffff stands for a CRpcReqForwarderProxy, and other values

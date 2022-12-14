@@ -208,12 +208,26 @@ class CDBusStreamBusPort :
 class CDBusStreamBusDrv :
     public CGenBusDriverEx
 {
+    std::map< stdstr, guint32 > m_mapNameToBusId;
     public:
     typedef CGenBusDriverEx super;
     CDBusStreamBusDrv( const IConfigDb* pCfg );
+
 	gint32 Probe( IPort* pLowerPort,
         PortPtr& pNewPort,
-        const IConfigDb* pConfig = NULL );
+        const IConfigDb* pConfig = NULL )
+    { return 0; }
+
+	gint32 Probe2( IPort* pLowerPort,
+        PortPtr& pNewPort, CfgPtr& pCfg,
+        IEventSink* pCallback );
+
+    gint32 BindNameBus(
+        const stdstr& strName,
+        guint32 dwBusId );
+
+    gint32 RemoveBinding(
+        const stdstr& strName );
 };
 
 }

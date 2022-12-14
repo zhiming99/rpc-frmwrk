@@ -44,6 +44,71 @@ extern guint32 g_dwFlags;
 extern bool g_bRpcOverStm;
 extern stdstr g_strTarget;
 
+gint32 EmitOnPreStart( 
+    CWriterBase* m_pWriter,
+    CServiceDecl* pSvcNode,
+    bool bProxy )
+{
+    gint32 ret = 0;
+    if( m_pWriter == nullptr ||
+        pSvcNode == nullptr )
+        return -EINVAL;
+
+    do{
+        CServiceDecl* pSvc = pSvcNode;
+        if( pSvc == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        stdstr strObjName = pSvc->GetName();
+        strObjName += "_ChannelSvr";
+        Wa( "gint32 ret = 0;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "CCfgOpener oCtx;" );
+        Wa( "CCfgOpenerObj oIfCfg( this );" );
+        Wa( "oCtx[ propClsid ] = clsid( " );
+        if( bProxy )
+            CCOUT << "    C" << pSvc->GetName()
+                << "_ChannelCli );";
+        else
+            CCOUT << "    C" << strObjName << " );";
+        NEW_LINE;
+        Wa( "oCtx.CopyProp( propObjDescPath, this );" );
+        Wa( "stdstr strInstName;" );
+        Wa( "ret = oIfCfg.GetStrProp(" );
+        Wa( "    propObjName, strInstName );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        Wa( "oCtx[ 1 ] = strInstName;" );
+        Wa( "guint32 dwHash = 0;" );
+        Wa( "ret = GenStrHash( strInstName, dwHash );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        Wa( "char szBuf[ 16 ];" );
+        Wa( "sprintf( szBuf, \"_\%08X\", dwHash );" );
+        CCOUT << "strInstName = \"" << strObjName << "\";";
+        NEW_LINE;
+        CCOUT << "oCtx[ 0 ] = strInstName;";
+        NEW_LINE;
+        Wa( "strInstName += szBuf;" );
+        Wa( "oCtx[ propObjInstName ] = strInstName;" );
+        CCOUT << "oCtx[ propIsServer ] = "
+            << ( bProxy ? "false" : "true" ) << ";";
+        NEW_LINE;
+        Wa( "oIfCfg.SetPointer( propSkelCtx," );
+        Wa( "    ( IConfigDb* )oCtx.GetCfg() );" );
+        CCOUT << "ret = super::OnPreStart( pCallback );";
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        CCOUT << "return ret;";
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CDeclInterfProxy2::OutputROSSkel()
 {
     gint32 ret = 0;
@@ -372,25 +437,6 @@ gint32 CDeclInterfProxy2::OutputROS()
         INDENT_DOWN;
         NEW_LINE;
 
-        CCOUT << "inline " << strSkel <<"* GetSkelPtr()";
-        NEW_LINE;
-        BLOCK_OPEN;
-        CCOUT << "auto pCli = dynamic_cast"
-            << "< CFastRpcProxyBase* >( this );";
-        NEW_LINE;
-        Wa( "if( pCli == nullptr )" );
-        Wa( "    return nullptr;" );
-        Wa( "InterfPtr pIf = pCli->GetStmSkel();" );
-        Wa( "if( pIf.IsEmpty() )" );
-        Wa( "    return nullptr;" );
-        CCOUT << "auto pSkel = dynamic_cast"
-            << "<" << strSkel << "*>("
-            << "( CRpcServices* )pIf );";
-        NEW_LINE;
-        CCOUT << "return pSkel;";
-        BLOCK_CLOSE;
-        NEW_LINE;
-
         ObjPtr pMethods =
             m_pNode->GetMethodList();
 
@@ -426,6 +472,26 @@ gint32 CDeclInterfProxy2::OutputROS()
             if( i + 1 < dwCount )
                 NEW_LINE;
         }
+
+        NEW_LINE;
+        CCOUT << "inline " << strSkel <<"* GetSkelPtr()";
+        NEW_LINE;
+        BLOCK_OPEN;
+        CCOUT << "auto pCli = dynamic_cast"
+            << "< CFastRpcProxyBase* >( this );";
+        NEW_LINE;
+        Wa( "if( pCli == nullptr )" );
+        Wa( "    return nullptr;" );
+        Wa( "InterfPtr pIf = pCli->GetStmSkel();" );
+        Wa( "if( pIf.IsEmpty() )" );
+        Wa( "    return nullptr;" );
+        CCOUT << "auto pSkel = dynamic_cast"
+            << "<" << strSkel << "*>("
+            << "( CRpcServices* )pIf );";
+        NEW_LINE;
+        CCOUT << "return pSkel;";
+        BLOCK_CLOSE;
+
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
@@ -826,28 +892,6 @@ gint32 CDeclInterfSvr2::OutputROS()
 
         INDENT_DOWN;
         NEW_LINE;
-        CCOUT << "inline " << strSkel
-            << "* GetSkelPtr( HANDLE hstm )";
-        NEW_LINE;
-        BLOCK_OPEN;
-        CCOUT <<  "auto pSvr = dynamic_cast"
-          << "< CFastRpcServerBase* >( this );";
-        NEW_LINE;
-        Wa( "if( pSvr == nullptr )" );
-        Wa( "    return nullptr;" );
-        Wa( "InterfPtr pIf;" );
-        Wa( "gint32 ret = pSvr->GetStmSkel(" );
-        Wa( "    hstm, pIf );" );
-        Wa( "if( ERROR( ret ) )" );
-        Wa( "    return nullptr;" );
-        CCOUT << "auto pSkel = dynamic_cast" 
-            << "<" << strSkel << "*>("
-            << "( CRpcServices* )pIf );";
-        NEW_LINE;
-        CCOUT << "return pSkel;";
-        BLOCK_CLOSE;
-        NEW_LINE;
-
 
         ObjPtr pMethods =
             m_pNode->GetMethodList();
@@ -884,6 +928,29 @@ gint32 CDeclInterfSvr2::OutputROS()
             if( i + 1 < dwCount )
                 NEW_LINE;
         }
+
+        NEW_LINE;
+        CCOUT << "inline " << strSkel
+            << "* GetSkelPtr( HANDLE hstm )";
+        NEW_LINE;
+        BLOCK_OPEN;
+        CCOUT <<  "auto pSvr = dynamic_cast"
+          << "< CFastRpcServerBase* >( this );";
+        NEW_LINE;
+        Wa( "if( pSvr == nullptr )" );
+        Wa( "    return nullptr;" );
+        Wa( "InterfPtr pIf;" );
+        Wa( "gint32 ret = pSvr->GetStmSkel(" );
+        Wa( "    hstm, pIf );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return nullptr;" );
+        CCOUT << "auto pSkel = dynamic_cast" 
+            << "<" << strSkel << "*>("
+            << "( CRpcServices* )pIf );";
+        NEW_LINE;
+        CCOUT << "return pSkel;";
+        BLOCK_CLOSE;
+
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
@@ -2465,20 +2532,15 @@ gint32 CDeclService2::OutputROS( bool bServer )
 
             if( m_pNode->IsStream() )
                 Wa( "CStreamServerAsync," );
-            Wa( "CFastRpcServerBase," );
             for( guint32 i = 0;
                 i < vecIfs.size(); i++ )
             {
                 CInterfRef* pifr = vecIfs[ i ];
                 std::string strName = pifr->GetName();
-                CCOUT << "I" << strName << "_SvrApi";
-                if( i + 1 < vecIfs.size() )
-                {
-                    CCOUT << ",";
-                    NEW_LINE;
-                }
+                CCOUT << "I" << strName << "_SvrApi,";
+                NEW_LINE;
             }
-            CCOUT << " );";
+            CCOUT << "CFastRpcServerBase );";
             INDENT_DOWN;
             NEW_LINES( 2 );
         }
@@ -2496,20 +2558,15 @@ gint32 CDeclService2::OutputROS( bool bServer )
             NEW_LINE;
             if( m_pNode->IsStream() )
                 Wa( "CStreamProxyAsync," );
-            Wa( "CFastRpcProxyBase," );
             for( guint32 i = 0;
                 i < vecIfs.size(); i++ )
             {
                 CInterfRef* pifr = vecIfs[ i ];
                 std::string strName = pifr->GetName();
-                CCOUT << "I" << strName << "_CliApi";
-                if( i + 1 < vecIfs.size() )
-                {
-                    CCOUT << ",";
-                    NEW_LINE;
-                }
+                CCOUT << "I" << strName << "_CliApi,";
+                NEW_LINE;
             }
-            CCOUT << " );";
+            CCOUT << "CFastRpcProxyBase );";
             INDENT_DOWN;
             NEW_LINES( 2 );
         }
@@ -2517,6 +2574,46 @@ gint32 CDeclService2::OutputROS( bool bServer )
     }while( 0 );
 
     return ret;
+}
+
+bool ScanMethodsOfSvc( CServiceDecl* pSvc,
+    bool ( *func )( CMethodDecl* ) )
+{
+    gint32 ret = 0;
+    bool bRet = false;
+    do{
+        std::vector< ObjPtr > vecIfs;
+        pSvc->GetIfRefs( vecIfs );
+        for( guint32 i = 0; i < vecIfs.size(); ++i )
+        {
+            auto& elem = vecIfs[ i ];
+            CInterfRef* pIfRef = elem;
+            ObjPtr pObj;
+            ret = pIfRef->GetIfDecl( pObj );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            CInterfaceDecl* pifd = pObj;
+            if( pifd == nullptr )
+                continue;
+
+            pObj = pifd->GetMethodList();
+            std::vector< ObjPtr > vecMethods;
+            CMethodDecls* pmds = pObj;
+            for( guint32 j = 0; j < pmds->GetCount(); j++ )
+            {
+                ObjPtr pObj = pmds->GetChild( j );
+                CMethodDecl* pmd = pObj;
+                bRet = func( pmd );
+            }
+            if( bRet )
+                break;
+        }
+
+    }while( 0 );
+    return bRet;
 }
 
 gint32 CDeclServiceImpl2::OutputROS()
@@ -2593,8 +2690,7 @@ gint32 CDeclServiceImpl2::OutputROS()
 
             CCOUT << strClass
                 << "( const IConfigDb* pCfg ) :";
-            INDENT_UP;
-            NEW_LINE;
+            INDENT_UPL;
             CCOUT << "super::virtbase( pCfg ), "
                 << "super( pCfg )";
             INDENT_DOWN;
@@ -2614,23 +2710,38 @@ gint32 CDeclServiceImpl2::OutputROS()
                 NEW_LINE;
             }
 
-            Wa( "gint32 CreateStmSkel(" );
-            Wa( "    InterfPtr& pIf ) override;" );
-
             for( auto pifd : vecIfs )
             {
-                if( IsServer() )
-                {
-                    CDeclInterfSvr2 odifs(
-                        pWriter, pifd );
-                    odifs.OutputROSImpl();
-                }
-                else
-                {
-                    CDeclInterfProxy2 odifp(
-                        pWriter, pifd );
-                    odifp.OutputROSImpl();
-                }
+                CDeclInterfProxy2 odifp(
+                    pWriter, pifd );
+                odifp.OutputROSImpl();
+            }
+
+            Wa( "gint32 CreateStmSkel(" );
+            Wa( "    InterfPtr& pIf ) override;" );
+            NEW_LINE;
+            Wa( "gint32 OnPreStart(" );
+            CCOUT << "    IEventSink* pCallback ) override;";
+
+            bool ( *func )( CMethodDecl* ) =
+            ([]( CMethodDecl* pmd )->bool
+            { return pmd->IsAsyncp(); });
+            bool bAsyncp = ScanMethodsOfSvc( pNode, func );
+            if( bAsyncp )
+            {
+                // adding CancelRequest method if there is
+                // async call
+                NEW_LINES( 2 );
+                Wa( "gint32 CancelRequest(" );
+                Wa( "    guint64 qwTaskToCancel )" );
+                BLOCK_OPEN;
+                Wa( "InterfPtr pIf = this->GetStmSkel();" );
+                Wa( "if( pIf.IsEmpty() )" );
+                Wa( "    return -EFAULT;" );
+                Wa( "CInterfaceProxy* pProxy = pIf;" );
+                Wa( "return pProxy->CancelRequest(" );
+                CCOUT << "    qwTaskToCancel );";
+                BLOCK_CLOSE;
             }
 
             BLOCK_CLOSE;
@@ -2658,8 +2769,8 @@ gint32 CDeclServiceImpl2::OutputROS()
 
             CCOUT << strChanClass << "(";
             NEW_LINE;
-            Wa( "    const IConfigDb* pCfg ) :" );
-            INDENT_UP;
+            CCOUT << "    const IConfigDb* pCfg ) :";
+            INDENT_UPL;
             CCOUT << "super::virtbase( pCfg ), super( pCfg )";
             INDENT_DOWN;
             NEW_LINE;
@@ -2696,8 +2807,7 @@ gint32 CDeclServiceImpl2::OutputROS()
 
         CCOUT << strClass
             << "( const IConfigDb* pCfg ) :";
-        INDENT_UP;
-        NEW_LINE;
+        INDENT_UPL;
         CCOUT << "super::virtbase( pCfg ), "
             << "super( pCfg )";
         INDENT_DOWN;
@@ -2721,24 +2831,18 @@ gint32 CDeclServiceImpl2::OutputROS()
             NEW_LINE;
         }
 
-        Wa( "gint32 CreateStmSkel(" );
-        Wa( "    HANDLE, guint32, InterfPtr& ) override;" );
-
         for( auto pifd : vecIfs )
         {
-            if( IsServer() )
-            {
-                CDeclInterfSvr2 odifs(
-                    pWriter, pifd );
-                odifs.OutputROSImpl();
-            }
-            else
-            {
-                CDeclInterfProxy2 odifp(
-                    pWriter, pifd );
-                odifp.OutputROSImpl();
-            }
+            CDeclInterfSvr2 odifs(
+                pWriter, pifd );
+            odifs.OutputROSImpl();
         }
+
+        Wa( "gint32 CreateStmSkel(" );
+        Wa( "    HANDLE, guint32, InterfPtr& ) override;" );
+        NEW_LINE;
+        Wa( "gint32 OnPreStart(" );
+        CCOUT << "    IEventSink* pCallback ) override;";
 
         BLOCK_CLOSE;
         CCOUT << ";";
@@ -2765,8 +2869,8 @@ gint32 CDeclServiceImpl2::OutputROS()
 
         CCOUT << strChanClass << "(";
         NEW_LINE;
-        Wa( "    const IConfigDb* pCfg ) :" );
-        INDENT_UP;
+        CCOUT << "    const IConfigDb* pCfg ) :";
+        INDENT_UPL;
         CCOUT << "super::virtbase( pCfg ), super( pCfg )";
         INDENT_DOWN;
         NEW_LINE;
@@ -2893,6 +2997,7 @@ gint32 CImplServiceImpl2::OutputROS()
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            Wa( "oCfg.CopyProp( propSkelCtx, this );" );
             Wa( "oCfg[ propPortId ] = dwPortId;" );
             Wa( "ret = pIf.NewObj(" );
             CCOUT << "    clsid( C" << strSvcName << "_SvrSkel ),";
@@ -2901,6 +3006,13 @@ gint32 CImplServiceImpl2::OutputROS()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "gint32 " << strClass << "::OnPreStart(";
+            NEW_LINE;
+            Wa( "    IEventSink* pCallback )" );
+            BLOCK_OPEN;
+            EmitOnPreStart( m_pWriter, m_pNode, false );
             BLOCK_CLOSE;
         }
         else
@@ -2918,6 +3030,7 @@ gint32 CImplServiceImpl2::OutputROS()
             Wa( "oCfg[ propIoMgr ] = ObjPtr( pMgr );" );
             Wa( "oCfg[ propIsServer ] = false;" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
+            Wa( "oCfg.CopyProp( propSkelCtx, this );" );
             Wa( "ret = CRpcServices::LoadObjDesc(" );
             CCOUT << "    \"./" << strAppName << "desc.json\",";
             NEW_LINE;
@@ -2934,6 +3047,14 @@ gint32 CImplServiceImpl2::OutputROS()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";
+            BLOCK_CLOSE;
+
+            NEW_LINE;
+            CCOUT << "gint32 " << strClass << "::OnPreStart(";
+            NEW_LINE;
+            Wa( "    IEventSink* pCallback )" );
+            BLOCK_OPEN;
+            EmitOnPreStart( m_pWriter, m_pNode, true );
             BLOCK_CLOSE;
         }
 
@@ -3162,28 +3283,14 @@ gint32 CImplMainFunc2::OutputROS()
             CCOUT << "break;";
             INDENT_DOWNL;
             NEW_LINE;
-            Wa( " // set a must-have option for" );
-            Wa( " // DBusStreamBusPort" );
-            Wa( "auto pMgr = ( CIoManager* )g_pIoMgr;" );
-            Wa( "CCfgOpener oDrvCfg;" );
-            CCOUT << "oDrvCfg[ propIsServer ] = "
-                 << ( bProxy ? "false" : "true" ) << ";";
-            NEW_LINE;
-            CCOUT << "stdstr strDesc= " << "\"./"
+            CCOUT << "stdstr strDesc = " << "\"./"
                 << g_strAppName << "desc.json\";";
             NEW_LINE;
             CCOUT << strClass << "* pSvc = nullptr;";
             NEW_LINE;
-            Wa( "oDrvCfg[ propObjDescPath ] = strDesc;" );
-            Wa( "oDrvCfg[ propDrvName ] = \"DBusStreamBusDrv\";" );
-            Wa( "auto& oDrvMgr = pMgr->GetDrvMgr();" );
-            Wa( "ret = oDrvMgr.LoadDriver(" );
-            Wa( "    oDrvCfg.GetCfg() );" );
-            Wa( "if( ERROR( ret ) )" );
-            Wa( "    break;" );
+            Wa( "InterfPtr pIf;" );
             CCOUT << "do";
             BLOCK_OPEN;
-            Wa( "InterfPtr pIf;" );
             Wa( "CParamList oParams;" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
             NEW_LINE;
@@ -3250,9 +3357,6 @@ gint32 CImplMainFunc2::OutputROS()
             Wa( "// Stopping the object" );
             Wa( "if( pSvc != nullptr )" );
             CCOUT << "    ret = pSvc->Stop();";
-            NEW_LINE;
-            Wa( "oDrvMgr.UnloadDriver(" );
-            CCOUT << "    \"DBusStreamBusDrv\" );";
             BLOCK_CLOSE;
             CCOUT<< "while( 0 );";
             NEW_LINES( 2 );
@@ -3892,7 +3996,6 @@ gint32 CExportObjDesc2::OutputROS()
         Json::Value oMaster = oObjArray[ 1 ];
         Json::Value oSkel = oObjArray[ 2 ];
         oObjArray.clear();
-        oObjArray.append( oChannel );
 
         std::vector< ObjPtr > vecSvcs;
         ret = m_pNode->GetSvcDecls( vecSvcs );
@@ -3906,16 +4009,19 @@ gint32 CExportObjDesc2::OutputROS()
                 continue;
 
             Json::Value oElems( Json::arrayValue );
-            Json::Value oMaster1, oSkel1;
+            Json::Value oMaster1, oSkel1, oChan1;
             oMaster1 = oMaster;
             oSkel1 = oSkel;
+            oChan1 = oChannel;
             oElems.append( oMaster );
             oElems.append( oSkel );
+            oElems.append( oChan1 );
             ret = BuildObjDescROS( psd, oElems );
             if( ERROR( ret ) )
                 break;
             oObjArray.append( oElems[ 0 ] );
             oObjArray.append( oElems[ 1 ] );
+            oObjArray.append( oElems[ 2 ] );
         }
 
         if( ERROR( ret ) )
@@ -3992,6 +4098,7 @@ gint32 CExportObjDesc2::BuildObjDescROS(
     do{
         Json::Value& oMaster = arrElems[ 0 ];
         Json::Value& oSkel = arrElems[ 1 ];
+        Json::Value& oChan = arrElems[ 2 ];
 
         std::string strSvcName = psd->GetName();
         oMaster[ JSON_ATTR_OBJNAME ] = strSvcName;
@@ -4069,6 +4176,8 @@ gint32 CExportObjDesc2::BuildObjDescROS(
 
         oSkel[ JSON_ATTR_OBJNAME ] =
                 strSvcName + "_SvrSkel";
+        oSkel[ JSON_ATTR_BUSNAME ] =
+            "DBusStreamBusPort";
         Json::Value& oIfArray2 = oSkel[ JSON_ATTR_IFARR ];
 
         for( i = 0; i < oIfArray2.size(); i++ )
@@ -4109,6 +4218,30 @@ gint32 CExportObjDesc2::BuildObjDescROS(
             oIfArray2.append( oJif );
         }
 
+        oChan[ JSON_ATTR_OBJNAME ] =
+            strSvcName + "_ChannelSvr";
+
+        Json::Value& oIfArray3 = oChan[ JSON_ATTR_IFARR ];
+        for( i = 0; i < oIfArray3.size(); i++ )
+        {
+            if( !oIfArray3[ i ].isMember(
+                JSON_ATTR_IFNAME ) )
+                continue;
+            Json::Value& oIfElem = oIfArray3[ i ];
+            if( oIfElem[ JSON_ATTR_IFNAME ]
+                == "RpcStreamChannelSvr" )
+            {
+                std::string strMainIf = "C";
+                strMainIf += strSvcName + "_ChannelSvr";
+                oIfElem[ JSON_ATTR_IFNAME ] =
+                    strMainIf;
+                oIfElem[ JSON_ATTR_BIND_CLSID ] =
+                    "true";
+                oIfElem[ JSON_ATTR_DUMMYIF ] =
+                    "true";
+                break;
+            }
+        }
     }while( 0 );
 
     return ret;

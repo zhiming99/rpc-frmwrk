@@ -1364,15 +1364,27 @@ gint32 CDBusStreamBusPort::PostStart(
         auto pMgr = GetIoMgr();
         stdstr strDesc;
         CCfgOpenerObj oPortCfg( this );
-        ret = oPortCfg.GetStrProp(
+        IConfigDb* pContext = nullptr;
+        ret = oPortCfg.GetPointer(
+            propSkelCtx, pContext );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCtx( pContext );
+        ret = oCtx.GetStrProp(
             propObjDescPath, strDesc );
         if( ERROR( ret ) )
             break;
 
-        stdstr strObjName =
-            OBJNAME_RPC_STREAMCHAN_SVR;
+        stdstr strObjName = oCtx[ 0 ];
+        guint32 iClsid = oCtx[ propClsid ];
 
         oCfg[ propIoMgr ] = ObjPtr( pMgr );
+        ret = oCfg.CopyProp(
+            propObjInstName, pContext ); 
+        if( ERROR( ret ) )
+            break;
+
         ret = CRpcServices::LoadObjDesc(
             strDesc, strObjName, IsServer(),
             oCfg.GetCfg() );
@@ -1380,14 +1392,8 @@ gint32 CDBusStreamBusPort::PostStart(
             break;
 
         InterfPtr pIf;
-        if( IsServer() )
-            ret = pIf.NewObj(
-                clsid( CRpcStreamChannelSvr ),
-                oCfg.GetCfg() );
-        else
-            ret = pIf.NewObj(
-                clsid( CRpcStreamChannelCli ),
-                oCfg.GetCfg() );
+        ret = pIf.NewObj( ( EnumClsid )iClsid,
+            oCfg.GetCfg() );
 
         if( ERROR( ret ) )
             break;
@@ -1405,6 +1411,10 @@ gint32 CDBusStreamBusPort::PostStart(
         }
         else
         {
+            // remove the timer as the StartEx has its
+            // own timer, we don't need many timers.
+            pIrp->RemoveTimer();
+
             CRpcStreamChannelCli* pCli = pIf;
             TaskletPtr pStartTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
@@ -1559,78 +1569,121 @@ CDBusStreamBusDrv::CDBusStreamBusDrv(
     SetClassId( clsid( CDBusStreamBusDrv ) );
 }
 
-gint32 CDBusStreamBusDrv::Probe(
+gint32 CDBusStreamBusDrv::Probe2(
         IPort* pLowerPort,
         PortPtr& pNewPort,
-        const IConfigDb* pConfig )
+        CfgPtr& pContext,
+        IEventSink* pCallback )
 {
     gint32 ret = 0;
+    if( pCallback == nullptr ||
+        pContext.IsEmpty() )
+        return -EINVAL;
 
     do{
-        // we don't have dynamic bus yet
-        CfgPtr pCfg( true );
+        CCfgOpener oCtx( ( IConfigDb* )pContext );
 
-        // make a copy of the input args
-        if( pConfig != nullptr )
-            *pCfg = *pConfig;
+        bool bIsServer = oCtx[ propIsServer ];
+        stdstr strMasterIf = oCtx[ 1 ];
 
-        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        if( !bIsServer )
+        {
+            CStdRMutex oDrvLock( GetLock() );
+            auto itr =m_mapNameToBusId.find(
+                strMasterIf );
+            if( itr != m_mapNameToBusId.end() )
+            {
+                guint32 dwBusId = itr->second;
 
-        ret = oCfg.SetStrProp( propPortClass,
-            PORT_CLASS_DBUS_STREAM_BUS );
+                ret = GetPortById(
+                    dwBusId, pNewPort );
 
-        if( ERROR( ret ) )
-            break;
+                if( ERROR( ret ) )
+                    break;
+                oCtx[ propBusId ] = dwBusId;
+                break;
+            }
+        }
+        else
+        {
+            CStdRMutex oDrvLock( GetLock() );
+            auto itr = m_mapNameToBusId.find(
+                strMasterIf );
+            if( itr != m_mapNameToBusId.end() )
+            {
+                ret = -EEXIST;
+                break;
+            }
+        }
 
-        ret = oCfg.SetIntProp( propClsid,
+        CCfgOpener oCfg;
+        oCfg[ propIsServer ] = bIsServer;
+        oCfg[ propPortClass ] =
+            ( char* )PORT_CLASS_DBUS_STREAM_BUS;
+        oCfg[ propObjInstName ] = strMasterIf;
+
+        oCfg.SetIntProp( propClsid,
             clsid( CDBusStreamBusPort ) );
 
-        TaskletPtr pTask;
-        ret = pTask.NewObj( clsid( CSyncCallback ) );
+        oCfg.SetPointer(
+            propEventSink, pCallback );
+
+        ret = CreatePort( pNewPort, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
 
-        ret = oCfg.SetObjPtr( propEventSink,
-            ObjPtr( pTask ) );
+        oCtx.CopyProp( propBusId, pNewPort );
 
-        if( ERROR( ret ) )
-            break;
+        CCfgOpenerObj oPortCfg(
+            ( IPort* )pNewPort );
 
-        ret = oCfg.CopyProp( propObjDescPath, this );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.CopyProp( propIsServer, this );
-        if( ERROR( ret ) )
-            break;
-
-        ret = CreatePort( pNewPort, pCfg );
-        if( ERROR( ret ) )
-            break;
-
-        if( pLowerPort != nullptr )
-        {
-            ret = pNewPort->AttachToPort( pLowerPort );
-        }
-
-        if( ERROR( ret ) )
-            break;
+        oPortCfg.SetPointer( propSkelCtx,
+            ( IConfigDb* )pContext );
 
         ret = NotifyPortAttached( pNewPort );
-        if( ret != STATUS_PENDING )
-            break;
-
-        // waiting for the start to complete
-        CSyncCallback* pSyncTask = pTask;
-        if( pSyncTask != nullptr )
-        {
-            ret = pSyncTask->WaitForComplete();
-            if( SUCCEEDED( ret ) )
-                ret = pSyncTask->GetError();
-        }
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CDBusStreamBusDrv::BindNameBus(
+    const stdstr& strName,
+    guint32 dwBusId )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oDrvLock( GetLock() );
+        auto itr =m_mapNameToBusId.find(
+            strName );
+        if( itr != m_mapNameToBusId.end() )
+        {
+            ret = -EEXIST;
+            break;
+        }
+        m_mapNameToBusId[ strName ] = dwBusId;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CDBusStreamBusDrv::RemoveBinding(
+    const stdstr& strName )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oDrvLock( GetLock() );
+        auto itr =m_mapNameToBusId.find(
+            strName );
+        if( itr == m_mapNameToBusId.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        m_mapNameToBusId.erase( itr );
+
+    }while( 0 );
     return ret;
 }
 
@@ -1789,7 +1842,16 @@ gint32 CDBusStreamBusPort::OnNewConnection(
 
         stdstr strBus =
             PORT_CLASS_DBUS_STREAM_BUS;
-        strBus += "_0";
+        strBus.push_back( '_' );
+
+        Variant oVar;
+        ret = this->GetProperty(
+            propPortId, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwBusId = oVar;
+        strBus += std::to_string( dwBusId );
         oCfg[ propBusName ] = strBus;
 
         oCfg.SetIntPtr( propStmHandle,
