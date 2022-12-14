@@ -1323,6 +1323,7 @@ gint32 CRpcInterfaceBase::DoStop(
             // the callback was not called
             pCompletion->MarkPending( false );
             ( *pCompletion )( eventZero );
+            ret = pCompletion->GetError();
         }
 
     }while( 0 );

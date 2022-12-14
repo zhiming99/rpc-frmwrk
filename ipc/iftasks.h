@@ -324,10 +324,11 @@ class CIfCleanupTask
     // propId 0: iEvent
     // propId 1: depends on the event method's
     //      declaration
+    std::atomic< bool >  m_bCalled;
     public:
     typedef CIfParallelTask super;
     CIfCleanupTask( const IConfigDb* pCfg )
-        : super( pCfg )
+        : super( pCfg ), m_bCalled( false )
     {
         SetClassId( clsid( CIfCleanupTask ) );
     }

@@ -2721,6 +2721,11 @@ gint32 CIfCleanupTask::OnIrpComplete(
 {
     gint32 ret = 0;
     do{
+        if( m_bCalled )
+        {
+            ret = pIrp->GetStatus();
+            break;
+        }
         ret = RunTask();
 
     }while( 0 );
@@ -2749,6 +2754,7 @@ gint32 CIfCleanupTask::RunTask()
             break;
         }
 
+        m_bCalled = true;
         ret = pIf->OnPostStop( this );
 
     }while( 0 );
@@ -2759,6 +2765,8 @@ gint32 CIfCleanupTask::RunTask()
 gint32 CIfCleanupTask::OnTaskComplete(
     gint32 iRetVal )
 {
+    if( m_bCalled )
+        return iRetVal;
     return RunTask();
 }
 
