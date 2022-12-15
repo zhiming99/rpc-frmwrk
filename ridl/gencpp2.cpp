@@ -786,7 +786,7 @@ gint32 CDeclInterfProxy2::OutputEventROSImpl(
         INDENT_UPL;
         if( dwCount > 0 )
         {
-            GenFormInArgs( pArgs );
+            GenFormInArgs( pArgs, true );
             CCOUT << " ) override;";
         }
         else
@@ -834,7 +834,7 @@ gint32 CDeclInterfProxy2::OutputAsyncROSImpl(
             NEW_LINE;
             CCOUT << "gint32 iRet,";
             strDecl += ",";
-            GenFormInArgs( pOutArgs );
+            GenFormInArgs( pOutArgs, true );
             CCOUT << " ) override;";
             INDENT_DOWN;
         }
@@ -1235,7 +1235,7 @@ gint32 CDeclInterfSvr2::OutputEventROSImpl(
         if( dwInCount > 0 )
         {
             INDENT_UPL;
-            GenFormInArgs( pInArgs );
+            GenFormInArgs( pInArgs, true );
             CCOUT << " ) override;";
             INDENT_DOWN;
         }
@@ -1286,7 +1286,7 @@ gint32 CDeclInterfSvr2::OutputSyncROSImpl(
             if( dwInCount > 0 )
             {
                 bComma = true;
-                GenFormInArgs( pInArgs );
+                GenFormInArgs( pInArgs, true );
             }
             if( dwOutCount > 0 )
             {
@@ -1295,7 +1295,7 @@ gint32 CDeclInterfSvr2::OutputSyncROSImpl(
                     CCOUT << ",";
                     NEW_LINE;
                 }
-                GenFormOutArgs( pOutArgs );
+                GenFormOutArgs( pOutArgs, true );
             }
             CCOUT << " ) override;";
             INDENT_DOWN;
@@ -1335,11 +1335,16 @@ gint32 CDeclInterfSvr2::OutputAsyncROSImpl(
         {
             CCOUT << ",";
             NEW_LINE;
-            GenFormInArgs( pInArgs );
+            GenFormInArgs( pInArgs, true );
         }
         CCOUT << " ) override";
         INDENT_DOWNL;
         BLOCK_OPEN;
+        CCOUT << "DebugPrintEx( logErr, iRet,";
+        NEW_LINE;
+        CCOUT << "    \"request '" << strName
+            << "' is canceled.\" );";
+        NEW_LINE;
         CCOUT << "return STATUS_SUCCESS;";
         BLOCK_CLOSE;
         NEW_LINE;
@@ -1363,13 +1368,13 @@ gint32 CDeclInterfSvr2::OutputAsyncROSImpl(
         if( dwInCount > 0 )
         {
             NEW_LINE;
-            GenFormInArgs( pInArgs );
+            GenFormInArgs( pInArgs, true );
         }
         if( dwOutCount > 0 )
         {
             CCOUT << ",";
             NEW_LINE;
-            GenFormOutArgs( pOutArgs );
+            GenFormOutArgs( pOutArgs, true );
         }
         CCOUT << " ) override;";
         INDENT_DOWNL;
@@ -1750,7 +1755,7 @@ gint32 CImplIfMethodSvr2::OutputEventROS()
         if( dwInCount > 0 )
         {
             INDENT_UPL;
-            GenFormInArgs( pInArgs );
+            GenFormInArgs( pInArgs, true );
             CCOUT << " )";
             INDENT_DOWN;
         }
@@ -2376,7 +2381,7 @@ gint32 CImplIfMethodProxy2::OutputEventROS()
         if( dwCount > 0 )
         {
             INDENT_UPL;
-            GenFormInArgs( pInArgs );
+            GenFormInArgs( pInArgs, true );
             CCOUT << " )";
             INDENT_DOWN;
         }
@@ -2424,7 +2429,7 @@ gint32 CImplIfMethodProxy2::OutputAsyncROS()
         {
             CCOUT<< ",";
             NEW_LINE;
-            GenFormInArgs( pOutArgs );
+            GenFormInArgs( pOutArgs, true );
         }
         CCOUT << " )";
         INDENT_DOWNL;

@@ -797,6 +797,38 @@ gint32 CDeclServiceImplFuse2::Output()
             BLOCK_CLOSE;
             CCOUT << ";";
             NEW_LINES( 2 );
+
+            stdstr strChanClass = "C";
+            strChanClass += strSvcName + "_ChannelCli";
+            strBase = "CRpcStreamChannelCli";
+
+            CCOUT << "class " << strChanClass;
+            INDENT_UP;
+            NEW_LINE;
+
+            CCOUT << ": public " << strBase;
+
+            INDENT_DOWN;
+            NEW_LINE;
+            BLOCK_OPEN;
+
+            Wa( "public:" );
+            CCOUT << "typedef "
+                << strBase << " super;";
+            NEW_LINE;
+
+            CCOUT << strChanClass << "(";
+            NEW_LINE;
+            CCOUT << "    const IConfigDb* pCfg ) :";
+            INDENT_UPL;
+            CCOUT << "super::virtbase( pCfg ), super( pCfg )";
+            INDENT_DOWN;
+            NEW_LINE;
+            Wa( "{ SetClassId( clsid(" );
+            CCOUT << "    " << strChanClass << " ) ); }";
+            BLOCK_CLOSE;
+            Wa( ";" );
+            NEW_LINE;
         }
 
         if( vecSMethods.empty() || !IsServer() )
@@ -907,6 +939,38 @@ gint32 CDeclServiceImplFuse2::Output()
         BLOCK_CLOSE;
         CCOUT << ";";
         NEW_LINES( 2 );
+
+        stdstr strChanClass = "C";
+        strChanClass += strSvcName + "_ChannelSvr";
+        strBase = "CRpcStreamChannelSvr";
+
+        CCOUT << "class " << strChanClass;
+        INDENT_UP;
+        NEW_LINE;
+
+        CCOUT << ": public " << strBase;
+
+        INDENT_DOWN;
+        NEW_LINE;
+        BLOCK_OPEN;
+
+        Wa( "public:" );
+        CCOUT << "typedef "
+            << strBase << " super;";
+        NEW_LINE;
+
+        CCOUT << strChanClass << "(";
+        NEW_LINE;
+        CCOUT << "    const IConfigDb* pCfg ) :";
+        INDENT_UPL;
+        CCOUT << "super::virtbase( pCfg ), super( pCfg )";
+        INDENT_DOWN;
+        NEW_LINE;
+        Wa( "{ SetClassId( clsid(" );
+        CCOUT << "    "<< strChanClass << " ) ); }";
+        BLOCK_CLOSE;
+        Wa( ";" );
+        NEW_LINE;
 
     }while( 0 );
 
@@ -1447,6 +1511,7 @@ gint32 CImplServiceImplFuse2::Output()
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            Wa( "oCfg.CopyProp( propSkelCtx, this );" );
             Wa( "oCfg[ propPortId ] = dwPortId;" );
             Wa( "ret = pIf.NewObj(" );
             CCOUT << "    clsid( C" << strSvcName << "_SvrSkel ),";
@@ -1748,6 +1813,7 @@ gint32 CImplServiceImplFuse2::Output()
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            Wa( "oCfg.CopyProp( propSkelCtx, this );" );
             Wa( "ret = pIf.NewObj(" );
             CCOUT << "    clsid( C" << strSvcName << "_CliSkel ),";
             NEW_LINE;
@@ -2418,7 +2484,6 @@ gint32 CImplMainFuncFuse2::Output()
             Wa( "int main( int argc, char** argv)" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
-            Wa( "CIoManager* pMgr = nullptr;" );
             CCOUT << "do";
             BLOCK_OPEN;
             Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
@@ -2678,7 +2743,6 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             CCOUT << "C" << strSvcName << "_SvrBase,";
             NEW_LINE;
 
-            Wa( "CFastRpcServerBase," );
             Wa( "CStatCountersServer," );
             Wa( "CStreamServerFuse," );
             Wa( "CFuseSvcServer," );
@@ -2749,6 +2813,10 @@ gint32 CImplClassFactoryFuse2::Output()
                 CCOUT << "C" << pSvc->GetName()
                     << "_SvrSkel );";
                 NEW_LINE;
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_ChannelSvr );";
+                NEW_LINE;
             }
             if( !IsServer() || g_bMklib )
             {
@@ -2760,6 +2828,10 @@ gint32 CImplClassFactoryFuse2::Output()
                 CCOUT << "INIT_MAP_ENTRYCFG( ";
                 CCOUT << "C" << pSvc->GetName()
                     << "_CliSkel );";
+                NEW_LINE;
+                CCOUT << "INIT_MAP_ENTRYCFG( C"
+                    << pSvc->GetName()
+                    << "_ChannelCli );";
                 NEW_LINE;
             }
         }
