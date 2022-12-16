@@ -1812,7 +1812,8 @@ gint32 CDBusStreamBusPort::BuildPdoPortName(
 
         ret = oCfg.GetIntProp(
             propPortId, dwPortId );
-        if( ERROR( ret ) )
+        if( ERROR( ret ) ||
+            dwPortId == ( ( guint32 )-1 ) )
         {
             ret = 0;
             dwPortId = NewPdoId();

@@ -4898,13 +4898,16 @@ static gint32 fuseif_create_req(
 }
          
 static gint32 fuseif_create_stream(
+    CReadLock& ortlock,
+    const stdstr& strPath,
     const stdstr& strName,
     CFuseStmDir* pDir, 
     fuse_file_info* fi )
 {
     gint32 ret = 0;
     do{
-        CRpcServices* pSvc = pDir->GetIf();
+        ObjPtr ifPtr = pDir->GetIf();
+        CRpcServices* pSvc = ifPtr;
         CFuseSvcProxy* pIf = ObjPtr( pSvc );
         if( pIf == nullptr )
         {
@@ -4963,6 +4966,8 @@ static gint32 fuseif_create_stream(
             hStream, oDesc.GetCfg(), pSync );
         if( ERROR( ret ) )
             break;
+
+        ortlock.Unlock();
         if( ret == STATUS_PENDING )
         {
             // if ctrl-c, it is possible the stream be
@@ -4991,15 +4996,27 @@ static gint32 fuseif_create_stream(
             ret = iRet;
             if( ERROR( ret ) )
                 break;
-
             ret = oResp.GetIntPtr(
                 1, ( guint32*& )hStream );
-
         }
 
         if( SUCCEEDED( ret ) )
         {
             // elevate to exclusive lock
+            ortlock.Lock();
+
+            std::vector< stdstr > vecSubdirs;
+            CFuseObjBase* pObj = nullptr;
+            ret = GetSvcDir( strPath.c_str(),
+                pObj, vecSubdirs );
+            if( ERROR( ret ) )
+                break;
+            if( ret == ENOENT )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
             WLOCK_TESTMNT0( pSvcDir );
             auto pStmFile = new CFuseStmFile(
                 strName, hStream, pStm );
@@ -5085,6 +5102,7 @@ gint32 fuseop_create( const char* path,
         }
 
         ret = fuseif_create_stream(
+            _ortlk, strPath,
             strName, pDir, fi );
 
     }while( 0 );

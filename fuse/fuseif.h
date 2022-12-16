@@ -1546,6 +1546,8 @@ class CFuseServicePoint :
     gint32 Unmount()
     {
         gint32 ret = 0;        
+        std::vector< HANDLE > vecStreams;
+        ObjPtr pIf = this;
         do{
             WLOCK_TESTMNT;
             std::vector< DIR_SPTR > vecChildren;
@@ -1560,7 +1562,6 @@ class CFuseServicePoint :
             if( ERROR( ret ) )
                 break;
 
-            std::vector< HANDLE > vecStreams;
             for( auto& elem : vecChildren )
             {
                 CFuseStmFile* pFile =
@@ -1595,11 +1596,12 @@ class CFuseServicePoint :
                         elem->GetName() );
             }
 
-            ObjPtr pIf = this;
+        }while( 0 );
+        if( SUCCEEDED( ret ) )
+        {
             for( auto& elem : vecStreams )
                 CloseChannel( pIf, elem );
-
-        }while( 0 );
+        }
 
         return ret;
     }
