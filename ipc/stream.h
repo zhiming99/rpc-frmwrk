@@ -39,14 +39,15 @@ struct IStream
     public:
     typedef std::map< HANDLE, InterfPtr > UXSTREAM_MAP;
     UXSTREAM_MAP m_mapUxStreams;
+    CRpcServices* m_pSvc = nullptr;
 
     virtual gint32 CanContinue() = 0;
 
+    inline void SetInterface( CRpcServices* pSvc )
+    { m_pSvc = pSvc; }
+
     inline CRpcServices* GetInterface() const
-    { 
-        return dynamic_cast< CRpcServices* >
-        ( const_cast< IStream* >( this ) );
-    }
+    { return m_pSvc; }
 
     inline gint32 GetUxStream(
         HANDLE hChannel, InterfPtr& pIf ) const
@@ -245,7 +246,7 @@ class CStreamProxy :
 
     CStreamProxy( const IConfigDb* pCfg )
         :super( pCfg )
-    {}
+    { SetInterface( this ); }
 
     const EnumClsid GetIid() const
     { return iid( IStream ); }
@@ -327,7 +328,7 @@ class CStreamServer :
 
     CStreamServer( const IConfigDb* pCfg )
         :super( pCfg )
-    {}
+    { SetInterface( this ); }
 
     const EnumClsid GetIid() const
     { return iid( IStream ); }

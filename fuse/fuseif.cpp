@@ -4642,23 +4642,23 @@ gint32 CFuseSvcServer::AcceptNewStreamFuse(
         }
 
         if( pStmDir->GetChild( strName ) == nullptr )
+        {
+            oLock.Lock();
+            DecStmCount( strSess );
             break;
+        }
 
         // resolve name conflict
         strName += "_";
         strName += strSess.substr( 0, 10 );
-        if( pStmDir->GetChild( strName ) != nullptr )
+        guint32 dwSize = strName.size();
+        while( pStmDir->GetChild( strName ) != nullptr )
         {
-            strName += "_";
-            guint32 dwCount = pStmDir->GetCount();
+            if( strName.size() > dwSize )
+                strName.erase( dwSize );
+            strName.push_back( '_' );
+            guint32 dwCount = NewStmFileId();
             strName += std::to_string( dwCount );
-            if( pStmDir->GetChild( strName ) != nullptr )
-            {
-                ret = -EEXIST;
-                oLock.Lock();
-                DecStmCount( strSess );
-                break;
-            }
         }
         // update the storage with new name
         oDesc.SetStrProp(

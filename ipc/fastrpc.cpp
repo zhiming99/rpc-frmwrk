@@ -1618,6 +1618,7 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
 {
     if( pEvtCtx == nullptr )
         return -EINVAL;
+
     gint32 ret = 0;
     do{
         if( iEvent == eventRmtSvrOnline )
@@ -1637,6 +1638,10 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
             break;
 
         CRpcServices* pSvc = m_pSkelObj;
+        if( pSvc == nullptr ||
+            pSvc->GetPortHandle() != hPort )
+            break;
+
         pSvc->SetStateOnEvent( cmdShutdown );
         // stop at this point could result in segment
         // fault. ClosePort is good.

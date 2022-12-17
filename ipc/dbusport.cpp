@@ -2194,7 +2194,11 @@ gint32 CDBusBusPort::RegBusName(
         case DBUS_REQUEST_NAME_REPLY_IN_QUEUE:
         case DBUS_REQUEST_NAME_REPLY_EXISTS:
             {
-                ret = -EAGAIN;
+                ret = -EEXIST;
+                DebugPrintEx( logErr, ret,
+                "Error, cannot register dbus name, "
+                "check if there is another running"
+                " instance." );
                 break;
             }
         default:

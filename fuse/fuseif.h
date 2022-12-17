@@ -2158,19 +2158,23 @@ class CFuseSvcProxy :
 class CFuseSvcServer :
     public CFuseServicePoint< false >
 {
-    std::vector< guint32 > m_vecGrpIds;
     gint32 m_iLastGrp = 0;
+    std::vector< guint32 > m_vecGrpIds;
     std::hashmap< stdstr, int > m_mapSessCount;
+    std::atomic< guint32 > m_dwStmFileId;
 
     public:
     typedef CFuseServicePoint< false > super;
     CFuseSvcServer( const IConfigDb* pCfg ):
     _MyVirtBase( pCfg ),
-    super( pCfg )
+    super( pCfg ), m_dwStmFileId( 0 )
     {}
 
     gint32 IncStmCount( const stdstr& strSess );
     gint32 DecStmCount( const stdstr& strSess );
+
+    guint32 NewStmFileId()
+    { return m_dwStmFileId++; }
 
     //Response&Event Dispatcher
     virtual gint32 DispatchMsg(
