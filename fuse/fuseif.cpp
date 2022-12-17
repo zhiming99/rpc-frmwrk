@@ -4635,28 +4635,19 @@ gint32 CFuseSvcServer::AcceptNewStreamFuse(
         oLock.Unlock();
 
         if( strName.size() > REG_MAX_NAME - 20 )
-        {
             strName.erase( REG_MAX_NAME - 20 );
-            oDesc.SetStrProp(
-                propNodeName, strName );
-        }
-
-        if( pStmDir->GetChild( strName ) == nullptr )
-        {
-            oLock.Lock();
-            DecStmCount( strSess );
-            break;
-        }
 
         // resolve name conflict
-        strName += "_";
+        strName.push_back( '_' );
         strName += strSess.substr( 0, 10 );
+        strName.push_back( '_' );
         guint32 dwSize = strName.size();
+        strName += std::to_string( NewStmFileId() );
+
         while( pStmDir->GetChild( strName ) != nullptr )
         {
             if( strName.size() > dwSize )
                 strName.erase( dwSize );
-            strName.push_back( '_' );
             guint32 dwCount = NewStmFileId();
             strName += std::to_string( dwCount );
         }
