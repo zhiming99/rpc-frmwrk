@@ -61,7 +61,8 @@ EXTRA_DIST += $(pytests)/actcancel/ActiveCancelcli.py \
  $(pytests)/stmtest/maincli.py
 
 cpptests=./cpp
-EXTRA_DIST += $(cpptests)/actcancel/ActiveCancelcli.cpp \
+EXTRA_DIST += \
+ $(cpptests)/actcancel/ActiveCancelcli.cpp \
  $(cpptests)/actcancel/ActiveCancelcli.h \
  $(cpptests)/actcancel/ActiveCancelsvr.cpp \
  $(cpptests)/actcancel/ActiveCancelsvr.h \
@@ -95,5 +96,39 @@ EXTRA_DIST += $(cpptests)/actcancel/ActiveCancelcli.cpp \
  $(cpptests)/stmtest/StreamTestsvr.cpp \
  $(cpptests)/stmtest/StreamTestsvr.h \
  $(cpptests)/stmtest/commdefs.h \
- $(cpptests)/stmtest/maincli.cpp
-
+ $(cpptests)/stmtest/maincli.cpp \
+ $(cpptests)/rpcfs/actcancel2/ActiveCancelcli.cpp \
+ $(cpptests)/rpcfs/actcancel2/ActiveCancelcli.h \
+ $(cpptests)/rpcfs/actcancel2/ActiveCancelsvr.cpp \
+ $(cpptests)/rpcfs/actcancel2/ActiveCancelsvr.h \
+ $(cpptests)/rpcfs/actcancel2/maincli.cpp \
+ $(cpptests)/rpcfs/asynctst2/AsyncTestcli.cpp \
+ $(cpptests)/rpcfs/asynctst2/AsyncTestcli.h \
+ $(cpptests)/rpcfs/asynctst2/AsyncTestsvr.cpp \
+ $(cpptests)/rpcfs/asynctst2/AsyncTestsvr.h \
+ $(cpptests)/rpcfs/asynctst2/maincli.cpp \
+ $(cpptests)/rpcfs/evtest2/EventTestcli.cpp \
+ $(cpptests)/rpcfs/evtest2/maincli.cpp \
+ $(cpptests)/rpcfs/evtest2/mainsvr.cpp \
+ $(cpptests)/rpcfs/hellowld2/HelloWorldSvcsvr.cpp \
+ $(cpptests)/rpcfs/hellowld2/maincli.cpp \
+ $(cpptests)/rpcfs/iftest2/IfTestsvr.cpp \
+ $(cpptests)/rpcfs/iftest2/maincli.cpp \
+ $(cpptests)/rpcfs/katest2/KeepAlivesvr.cpp \
+ $(cpptests)/rpcfs/katest2/KeepAlivesvr.h \
+ $(cpptests)/rpcfs/katest2/maincli.cpp \
+ $(cpptests)/rpcfs/sftest2/FileTransfercli.cpp \
+ $(cpptests)/rpcfs/sftest2/FileTransfercli.h \
+ $(cpptests)/rpcfs/sftest2/FileTransfersvr.cpp \
+ $(cpptests)/rpcfs/sftest2/FileTransfersvr.h \
+ $(cpptests)/rpcfs/sftest2/Makefile \
+ $(cpptests)/rpcfs/sftest2/Readme.md \
+ $(cpptests)/rpcfs/sftest2/maincli.cpp \
+ $(cpptests)/rpcfs/sftest2/transctx.cpp \
+ $(cpptests)/rpcfs/sftest2/transctx.h \
+ $(cpptests)/rpcfs/stmtest2/StreamTestcli.cpp \
+ $(cpptests)/rpcfs/stmtest2/StreamTestcli.h \
+ $(cpptests)/rpcfs/stmtest2/StreamTestsvr.cpp \
+ $(cpptests)/rpcfs/stmtest2/StreamTestsvr.h \
+ $(cpptests)/rpcfs/stmtest2/commdefs.h \
+ $(cpptests)/rpcfs/stmtest2/maincli.cpp
