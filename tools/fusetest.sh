@@ -51,6 +51,71 @@ RUNCLIENT
     rm -rf testypes/*
 }
 
+
+function mkDirTest()
+{
+    pushd testypes
+    make || exit 10
+
+    mkdir mp mpsvr || true
+    hostsvr -f mpsvr &
+    hostcli -f mp &
+    sleep 5 
+    echo loading TestTypes library to server and proxy...
+    echo "loadl $(pwd)/release/libTestTypes.so" > ./mpsvr/commands
+    echo "loadl $(pwd)/release/libTestTypes.so" > ./mp/commands
+    echo adding service point TestTypes to server and proxy...
+    echo "addsp TestTypesSvc $(pwd)/TestTypesdesc.json" > ./mpsvr/commands
+    echo "addsp TestTypesSvc $(pwd)/TestTypesdesc.json" > ./mp/commands
+
+    pydir=$basedir/fuse/examples/python
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
+
+/bin/bash << RUNCLIENT
+function singleMkdir()
+{
+    idx=0
+    targdir=TestTypesSvc_\$1
+    conndir=connection_\$idx
+    pushd ./mp
+    if [ -d ./\$conndir/\$targdir ]; then
+        rmdir ./\$conndir/\$targdir
+    fi
+    echo mkdir \$targdir
+    mkdir \$targdir
+    popd
+    python3 $pydir/testypes/maincli.py ./\$conndir/\$targdir 0
+    pushd ./mp/
+    rmdir ./\$conndir/\$targdir
+    popd
+}
+start=\$(date +%s.%N)
+for((i=0;i<200;i++));do
+    singleMkdir \$i &
+done
+wait \`jobs -p\`
+end=\$(date +%s.%N)
+echo -n "time elapsed: "
+echo "scale=10;\$end-\$start" | bc
+RUNCLIENT
+
+    echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
+    kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
+
+    umount mp
+    while true; do
+        umount mpsvr 
+        if mount | grep TestTypessvr; then
+            sleep 1
+            continue
+        fi
+        break
+    done
+
+    popd
+    rm -rf testypes/*
+}
+
 echo testing normal RPC
 $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
 stressTest
@@ -59,7 +124,13 @@ echo testing RPC-over-stream
 $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
 stressTest
 
-popd
+echo testing normal RPC
+$bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
+mkDirTest
+
+echo testing RPC-over-stream
+$bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
+mkDirTest
 
 function pytest()
 {
