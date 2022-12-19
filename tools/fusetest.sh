@@ -82,10 +82,8 @@ function singleMkdir()
         rmdir ./\$conndir/\$targdir
     fi
     echo mkdir \$targdir
-    mkdir \$targdir
-    popd
+    mkdir \$targdir 2>/dev/null
     python3 $pydir/testypes/maincli.py ./\$conndir/\$targdir 0
-    pushd ./mp/
     rmdir ./\$conndir/\$targdir
     popd
 }
