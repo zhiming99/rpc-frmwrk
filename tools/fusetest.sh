@@ -124,11 +124,11 @@ stressTest
 
 echo testing normal RPC
 $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
-mkDirTest
+#mkDirTest
 
 echo testing RPC-over-stream
 $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
-mkDirTest
+#mkDirTest
 
 function pytest()
 {

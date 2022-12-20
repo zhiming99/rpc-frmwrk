@@ -3742,6 +3742,8 @@ gint32 CImplServiceImpl::Output()
             break;
 
         Wa( "/****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/" );
+        CCOUT << "// " << g_strCmdLine;
+        NEW_LINE;
         Wa( "// Implement the following methods" );
         Wa( "// to get the RPC proxy/server work" );
         CAstNodeBase* pParent =
