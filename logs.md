@@ -1,4 +1,7 @@
 ---
+[`Wed Dec 21 2022 09:53:17 PM Beijing`]   
+1. There is still some bugs to fix before the pull-request can be submitted. mainly bugs in making/removing service point directory in a busy environment.
+
 [`Mon Dec 05 2022 21:39:10 PM Beijing`]    
 1. The bug is fixed which made the bridge to have file descriptor leaks and unable to create new streams.
 2. Found a defect in the `rpc-over-stream` design, that the server/proxy objects cannot be aggregrated to `hostsvr` and `hostcli` as a service point. It need some fundamental modifications in the `I/O subsystem`.
