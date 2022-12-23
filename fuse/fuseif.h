@@ -589,8 +589,8 @@ class CFuseEvtFile : public CFuseFileEntry
 
     gint32 do_remove( bool bSched );
 
+    protected:
 #ifdef DEBUG
-protected:
     stdstr m_strLastMsg;
 #endif
     guint32 m_dwMsgCount = 0;
