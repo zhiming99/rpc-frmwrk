@@ -591,9 +591,9 @@ class CFuseEvtFile : public CFuseFileEntry
 
 #ifdef DEBUG
 protected:
-    guint32 m_dwMsgCount = 0;
     stdstr m_strLastMsg;
 #endif
+    guint32 m_dwMsgCount = 0;
 
     public:
     typedef CFuseFileEntry super;
