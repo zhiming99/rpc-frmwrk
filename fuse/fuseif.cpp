@@ -2783,7 +2783,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             SetPollHandle( nullptr );
         }
 #ifdef DEBUG
-        m_strLastMsg = strMsg.substr( 30 );
+        m_strLastMsg = strMsg.substr( 0, 100 );
 #endif
         ++m_dwMsgCount;
         size_t dwAvail = GetBytesAvail();
@@ -3430,6 +3430,12 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         }
         vecBufs.clear();
 
+#ifdef DEBUG
+        m_strLastMsg.clear();
+        m_strLastMsg.append( pBuf->ptr(),
+            ( pBuf->size() > 100 ?
+                100 : pBuf->size() ) );
+#endif
         Json::Value valResp;
         if( !m_pReader->parse( pBuf->ptr(),
             pBuf->ptr() + pBuf->size(),
@@ -3511,6 +3517,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         oFileLock.Unlock();
 
         // send the response
+        m_dwMsgCount++;
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
         ret = pSvr->DispatchMsg( valResp );
         if( ret == STATUS_PENDING )
@@ -3758,8 +3765,8 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 #ifdef DEBUG
         m_strLastMsg.clear();
         m_strLastMsg.append( pBuf->ptr(),
-            ( pBuf->size() > 30 ?
-                30 : pBuf->size() ) );
+            ( pBuf->size() > 100 ?
+                100 : pBuf->size() ) );
 #endif
         Json::Value valReq, valResp;
         if( !m_pReader->parse( pBuf->ptr(),
