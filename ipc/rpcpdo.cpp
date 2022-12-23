@@ -844,6 +844,9 @@ gint32 CRpcBasePort::RemoveIrpFromMapInternal(
     gint32 ret = -ENOENT;
     bool bFound = false;
 
+    if( oMap.empty() )
+        return ret;
+
     // brutal search
     MatchMap::iterator itrMe =
         oMap.begin();
@@ -857,7 +860,8 @@ gint32 CRpcBasePort::RemoveIrpFromMapInternal(
 
         if( irpQue.empty() )
         {
-            break;
+            ++itrMe;
+            continue;
         }
 
         deque< IrpPtr >::iterator itrIrp =
@@ -874,6 +878,9 @@ gint32 CRpcBasePort::RemoveIrpFromMapInternal(
             }
             ++itrIrp;
         }
+        if( bFound )
+            break;
+
         ++itrMe;
     }
     if( bFound )
