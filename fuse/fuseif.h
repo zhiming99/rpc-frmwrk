@@ -583,12 +583,17 @@ class CFuseTextFile : public CFuseObjBase
 class CFuseEvtFile : public CFuseFileEntry
 {
     guint32 m_dwGrpId = 0;
-    guint32 m_dwMsgCount = 0;
     guint32 m_dwMsgRead = 0;
     guint32 m_dwLastOff = 0;
     guint32 m_dwBytesAvail = 0;
 
     gint32 do_remove( bool bSched );
+
+#ifdef DEBUG
+protected:
+    guint32 m_dwMsgCount = 0;
+    stdstr m_strLastMsg;
+#endif
 
     public:
     typedef CFuseFileEntry super;

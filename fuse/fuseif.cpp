@@ -2782,7 +2782,9 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             fuse_notify_poll( ph );
             SetPollHandle( nullptr );
         }
-
+#ifdef DEBUG
+        m_strLastMsg = strMsg.substr( 30 );
+#endif
         ++m_dwMsgCount;
         size_t dwAvail = GetBytesAvail();
         while( m_queReqs.size() > 0 && dwAvail > 0 )
@@ -3753,6 +3755,12 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         }
         vecBufs.clear();
 
+#ifdef DEBUG
+        m_strLastMsg.clear();
+        m_strLastMsg.append( pBuf->ptr(),
+            ( pBuf->size() > 30 ?
+                30 : pBuf->size() ) );
+#endif
         Json::Value valReq, valResp;
         if( !m_pReader->parse( pBuf->ptr(),
             pBuf->ptr() + pBuf->size(),
@@ -3768,6 +3776,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         // could happen
         oFileLock.Unlock();
 
+        m_dwMsgCount++;
         ret = pProxy->DispatchReq(
             nullptr, valReq, valResp );
 
