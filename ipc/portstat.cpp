@@ -849,7 +849,7 @@ gint32 CPortState::HandleBusyShared(
             if( dwNewState == PORT_STATE_BUSY_SHARED )
             {
                 ret = PushState(
-                    PORT_STATE_BUSY_SHARED );
+                    PORT_STATE_BUSY_SHARED, false );
                 break;
             }
 

@@ -3784,13 +3784,22 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         oFileLock.Unlock();
 
         m_dwMsgCount++;
+
+        if( !valReq.isMember( JSON_ATTR_REQCTXID ) ||
+            !valReq[ JSON_ATTR_REQCTXID ].isUInt64() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint64 qwReqId =
+            valReq[ JSON_ATTR_REQCTXID ].asUInt64();
+
+        pProxy->AddReqGrp(
+            qwReqId, GetGroupId() );
+
         ret = pProxy->DispatchReq(
             nullptr, valReq, valResp );
-
-        Json::Value& valrid =
-            valResp[ JSON_ATTR_REQCTXID ];
-
-        guint64 qwReqId = valrid.asUInt64();
 
         Json::StreamWriterBuilder oBuilder;
         oBuilder["commentStyle"] = "None";
@@ -3799,12 +3808,11 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
         if( ret == STATUS_PENDING )
         {
-            pProxy->AddReqGrp(
-                qwReqId, GetGroupId() );
             ret = 0;
         }
         else
         {
+            pProxy->RemoveReqGrp( qwReqId );
             // append the response to the resp file
             gint32 (*func)( CFuseSvcProxy*,
                 guint64, guint32,
