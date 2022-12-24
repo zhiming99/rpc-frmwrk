@@ -106,6 +106,7 @@ CDBusProxyPdo::CDBusProxyPdo(
             break;
 
         m_atmReqSent = 0;
+        m_atmRespRecv = 0;
         m_pDBusConn = ( DBusConnection* )pdwValue;
         if( m_pDBusConn == nullptr )
         {
@@ -460,6 +461,7 @@ gint32 CDBusProxyPdo::CompleteFwrdReq(
 
         if( strMember == SYS_METHOD_FORWARDREQ )
         {
+            m_atmRespRecv++;
             ret = UnpackFwrdRespMsg( pIrp );
         }
         else
