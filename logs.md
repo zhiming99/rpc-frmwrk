@@ -1,7 +1,7 @@
 ---
 [`Sun Dec 25 2022 12:58:35 PM Beijing`]   
-1. Finally the bugs in mkDirTest are fixed.
-2. Let's continue gmssl support.
+1. Finally the bugs are fixed in making/removing service point directory.
+2. Let's continue GMSSL support.
 
 [`Wed Dec 21 2022 09:53:17 PM Beijing`]   
 1. There are still some bugs to fix before the pull-request can be submitted. mainly bugs in making/removing service point directory in a busy environment.
