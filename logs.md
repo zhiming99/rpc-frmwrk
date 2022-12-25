@@ -1,6 +1,10 @@
 ---
+[`Sun Dec 25 2022 12:58:35 PM Beijing`]   
+1. Finally the bugs in mkDirTest are fixed.
+2. Let's continue gmssl support.
+
 [`Wed Dec 21 2022 09:53:17 PM Beijing`]   
-1. There is still some bugs to fix before the pull-request can be submitted. mainly bugs in making/removing service point directory in a busy environment.
+1. There are still some bugs to fix before the pull-request can be submitted. mainly bugs in making/removing service point directory in a busy environment.
 
 [`Mon Dec 05 2022 21:39:10 PM Beijing`]    
 1. The bug is fixed which made the bridge to have file descriptor leaks and unable to create new streams.
