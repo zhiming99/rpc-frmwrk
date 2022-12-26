@@ -1271,6 +1271,8 @@ gint32 CImplServiceImplFuse2::Output()
         std::string strSvcName =
             m_pNode->GetName();
 
+        stdstr strOutPath = m_pWriter->GetOutPath();
+
         std::vector< ABSTE > vecPMethods;
         ret = FindAbstMethod( vecPMethods, true );
         if( ERROR( ret ) )
@@ -1502,10 +1504,13 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "oCfg.SetIntPtr( propStmHandle," );
             Wa( "    ( guint32*& )hStream );" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
-            Wa( "ret = CRpcServices::LoadObjDesc(" );
-            CCOUT << "    \"./" << strAppName << "desc.json\",";
+            CCOUT << "const char* szDesc = " << "\""
+                << strOutPath << "/"
+                << g_strAppName << "desc.json\";";
             NEW_LINE;
-            CCOUT << "    \"" << strSvcName << "_SvrSkel\",";
+            Wa( "ret = CRpcServices::LoadObjDesc(" );
+            CCOUT << "    szDesc," << "\""
+                << strSvcName << "_SvrSkel\",";
             NEW_LINE;
             CCOUT << "    true, oCfg.GetCfg() );";
             NEW_LINE;
@@ -1804,10 +1809,13 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "oCfg[ propIoMgr ] = ObjPtr( pMgr );" );
             Wa( "oCfg[ propIsServer ] = false;" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
-            Wa( "ret = CRpcServices::LoadObjDesc(" );
-            CCOUT << "    \"./" << strAppName << "desc.json\",";
+            CCOUT << "const char* szDesc = " << "\""
+                << strOutPath << "/"
+                << g_strAppName << "desc.json\";";
             NEW_LINE;
-            CCOUT << "    \"" << strSvcName << "_SvrSkel\",";
+            Wa( "ret = CRpcServices::LoadObjDesc(" );
+            CCOUT << "    szDesc," << "\""
+                << strSvcName << "_SvrSkel\",";
             NEW_LINE;
             CCOUT << "    false, oCfg.GetCfg() );";
             NEW_LINE;

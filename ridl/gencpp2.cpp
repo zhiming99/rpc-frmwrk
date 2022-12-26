@@ -2896,6 +2896,7 @@ gint32 CImplServiceImpl2::OutputROS()
     do{
         std::string strSvcName =
             m_pNode->GetName();
+        stdstr strOutPath = m_pWriter->GetOutPath();
 
         Wa( "/****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/" );
         CCOUT << "// " << g_strCmdLine;
@@ -2995,10 +2996,13 @@ gint32 CImplServiceImpl2::OutputROS()
             Wa( "oCfg.SetIntPtr( propStmHandle," );
             Wa( "    ( guint32*& )hStream );" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
-            Wa( "ret = CRpcServices::LoadObjDesc(" );
-            CCOUT << "    \"./" << strAppName << "desc.json\",";
+            CCOUT << "const char* szDesc = " << "\""
+                << strOutPath << "/"
+                << g_strAppName << "desc.json\";";
             NEW_LINE;
-            CCOUT << "    \"" << strSvcName << "_SvrSkel\",";
+            Wa( "ret = CRpcServices::LoadObjDesc(" );
+            CCOUT << "    szDesc," <<
+                "\"" << strSvcName << "_SvrSkel\",";
             NEW_LINE;
             CCOUT << "    true, oCfg.GetCfg() );";
             NEW_LINE;
@@ -3038,10 +3042,13 @@ gint32 CImplServiceImpl2::OutputROS()
             Wa( "oCfg[ propIsServer ] = false;" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
             Wa( "oCfg.CopyProp( propSkelCtx, this );" );
-            Wa( "ret = CRpcServices::LoadObjDesc(" );
-            CCOUT << "    \"./" << strAppName << "desc.json\",";
+            CCOUT << "const char* szDesc = " << "\""
+                << strOutPath << "/"
+                << g_strAppName << "desc.json\";";
             NEW_LINE;
-            CCOUT << "    \"" << strSvcName << "_SvrSkel\",";
+            Wa( "ret = CRpcServices::LoadObjDesc(" );
+            CCOUT << "    szDesc," << "\""
+                << strSvcName << "_SvrSkel\",";
             NEW_LINE;
             CCOUT << "    false, oCfg.GetCfg() );";
             NEW_LINE;
@@ -3082,6 +3089,7 @@ gint32 CImplMainFunc2::OutputROS()
         std::string strSvcName = pSvc->GetName();
         std::string strModName = g_strTarget;
         stdstr strSuffix;
+        stdstr strOutPath = m_pWriter->GetOutPath();
         if( m_bProxy )
             strSuffix = "cli";
         else
