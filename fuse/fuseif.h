@@ -1210,10 +1210,7 @@ class CFuseServicePoint :
 
     using super::OnPostStart;
     gint32 OnPostStart( IEventSink* pCallback ) override
-    {
-        gint32 ret = BuildDirectories();
-        return ret; 
-    }
+    { return STATUS_SUCCESS; }
 
     inline timespec GetStartTime() const
     { return m_tsStartTime; }
@@ -1313,20 +1310,35 @@ class CFuseServicePoint :
             pStmDir->SetMode( S_IRWXU );
             m_pSvcDir->AddChild( pDir );
 
-            /*// add an RW stmevt file for stream events
-            auto pStmEvt = 
-                new CFuseStmEvtFile( this );
-            auto pFile = DIR_SPTR( pStmEvt ); 
-            pDir->AddChild( pFile );
-            pStmEvt->DecRef();
-            pStmEvt->SetMode( S_IRUSR );*/
-
             auto pStat=
                 new CFuseSvcStat( this );
             auto psf = DIR_SPTR( pStat );
             pStat->DecRef();
             pStat->SetMode( S_IRUSR );
             m_pSvcDir->AddChild( psf );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 ClearSvcDir()
+    {
+        gint32 ret = 0;
+        if( m_pSvcDir.get() == nullptr )
+            return ret;
+
+        do{
+            std::vector< DIR_SPTR > vecChildren;
+            m_pSvcDir->GetChildren( vecChildren );
+            if( vecChildren.empty() )
+                break;
+
+            for( auto& elem : vecChildren )
+            {
+                stdstr strName = elem->GetName();
+                m_pSvcDir->RemoveChild( strName );
+            }
 
         }while( 0 );
 
@@ -2478,6 +2490,14 @@ class CFuseRootBase:
         HANDLE lwsi )
     {
         gint32 ret = 0;
+        SVC_TYPE* pSp = pSvc;
+        if( pSp == nullptr )
+            return -EINVAL;
+
+        ret = pSp->BuildDirectories();
+        if( ERROR( ret ) )
+            return ret;
+
         do{
             ROOTLK_EXCLUSIVE;
             if( this->GetState() != stateConnected )
@@ -2487,7 +2507,6 @@ class CFuseRootBase:
             }
 
             SVC_INFO* psi = ( SVC_INFO* )lwsi;
-            SVC_TYPE* pSp = pSvc;
             DIR_SPTR pSvcDir = pSp->GetSvcDir();
             CFuseObjBase* pRoot = _pRootDir;
             CFuseSvcDir* psd = static_cast
@@ -2549,6 +2568,9 @@ class CFuseRootBase:
                 psi->m_strSvcName.size();
 
         }while( 0 );
+
+        if( ERROR( ret ) )
+            pSp->ClearSvcDir();
 
         return ret;
     };
