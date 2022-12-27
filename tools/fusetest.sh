@@ -88,7 +88,7 @@ function singleMkdir()
     popd
 }
 start=\$(date +%s.%N)
-for((i=0;i<200;i++));do
+for((i=0;i<199;i++));do
     singleMkdir \$i &
 done
 wait \`jobs -p\`
