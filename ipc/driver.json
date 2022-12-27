@@ -92,6 +92,16 @@
             "PortClasses": [
                 "UnixSockBusPort"
             ]
+        },
+        {
+            "BusClass": "DBusStreamBus",
+            "Description": "This is a bus driver, and the port created is DBusStreamBusPort",
+            "DriverName": "DBusStreamBusDrv",
+            "DriverType": "BusDriver",
+            "InternalClass": "CDBusStreamBusDrv",
+            "PortClasses": [
+                "DBusStreamBusPort"
+            ]
         }
     ],
     "Ports": [
@@ -244,7 +254,20 @@
             "PortClass": "UnixSockBusPort",
             "PortDriver": "UnixSockBusDriver",
             "InternalClass": "CUnixSockBusPort"
-        }
+        },
+        {
+            "BusPortClass": "DBusStreamBusPort",
+            "InternalClass": "CDBusStreamPdo",
+            "PortClass": "DBusStreamPdo",
+            "PortDriver": "",
+            "PortType": "Pdo"
+        },
+        {
+            "InternalClass": "CDBusStreamBusPort",
+            "PortClass": "DBusStreamBusPort",
+            "PortDriver": "DBusStreamBusDrv",
+            "PortType": "Fdo"
+        }        
     ],
     "Modules": [
         {
@@ -398,7 +421,8 @@
             "ModName": "hostsvr",
             "DriversToLoad": [
                 "DBusBusDriver",
-                "UnixSockBusDriver"
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv"
             ],
             "ClassFactories": [
                 "./libfuseif.so"
@@ -408,7 +432,8 @@
             "ModName": "hostcli",
             "DriversToLoad": [
                 "DBusBusDriver",
-                "UnixSockBusDriver"
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv"
             ],
             "ClassFactories": [
                 "./libfuseif.so"
