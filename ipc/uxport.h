@@ -361,6 +361,7 @@ class CUnixSockStmPdo : public CPort
     // flag to allow or deny incoming data
     bool    m_bFlowCtrl = false;
     bool    m_bListenOnly = false;
+    guint32 m_dwFd = 0;
 
     protected:
 
@@ -407,8 +408,7 @@ class CUnixSockStmPdo : public CPort
     // propPath for named sock connection
     //
     CUnixSockStmPdo ( const IConfigDb* pCfg );
-    ~CUnixSockStmPdo()
-    {;}
+    ~CUnixSockStmPdo();
 
     virtual gint32 CancelFuncIrp(
         IRP* pIrp, bool bForce );

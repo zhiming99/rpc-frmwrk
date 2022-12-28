@@ -1054,22 +1054,6 @@ gint32 CIoWatchTask::ReleaseChannel()
                 ( HANDLE )vecHandles[ 1 ] );
             pLoop->RemoveIoWatch(
                 ( HANDLE )vecHandles[ 2 ] );
-            if( vecHandles[ 3 ] > 0 )
-            {
-                guint32 dwFd =
-                    ( guint32 )vecHandles[ 3 ];
-
-                gint32 ret =
-                    shutdown( dwFd, SHUT_RDWR );
-
-                if( ERROR( ret ) )
-                {
-                    DebugPrint( -errno,
-                        "Error shutdown socket[%d]",
-                        dwFd );
-                }
-                ret = close( dwFd );
-            }
             return 0;
         });
 
@@ -1089,8 +1073,6 @@ gint32 CIoWatchTask::ReleaseChannel()
             pLoop->RemoveIoWatch( m_hReadWatch );
             pLoop->RemoveIoWatch( m_hWriteWatch );
             pLoop->RemoveIoWatch( m_hErrWatch );
-            if( m_iFd > 0 )
-                close( m_iFd );
         }
 
         m_hReadWatch = INVALID_HANDLE;
@@ -1191,6 +1173,12 @@ CUnixSockStmPdo::CUnixSockStmPdo(
         if( ERROR( ret ) )
             m_bListenOnly = false;
 
+        ret = oCfg.GetIntProp(
+            propFd, m_dwFd );
+
+        if( ERROR( ret ) )
+            break;
+
         ret = 0;
 
     }while( 0 );
@@ -1202,13 +1190,29 @@ CUnixSockStmPdo::CUnixSockStmPdo(
     }
 }
 
+CUnixSockStmPdo::~CUnixSockStmPdo()
+{
+    // closing the socket here to avoid the fd
+    // reused too early before the bus-port remove
+    // this pdo from its pdo map.
+    gint32 ret =
+        shutdown( m_dwFd, SHUT_RDWR );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( -errno,
+            "Error shutdown socket[%d]",
+            m_dwFd );
+    }
+    close( m_dwFd );
+}
+
 gint32 CUnixSockStmPdo::PostStart( IRP* pIrp )
 {
     CParamList oParams;
 
     oParams.SetPointer( propPortPtr, this );
     oParams.SetPointer( propIoMgr, GetIoMgr() );
-    oParams.CopyProp( propFd, this );
+    oParams.SetIntProp( propFd, m_dwFd );
 
     gint32 ret = 0;
     do{
