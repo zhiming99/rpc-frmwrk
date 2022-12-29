@@ -670,6 +670,11 @@ gint32 CFuseDirectory::fs_rmdir(
                             pNextHop->GetCount() > 0 )
                             break;
 
+                        if( pNextHop != nullptr )
+                            pConn->RemoveChild( HOP_DIR );
+
+                        pConn->RemoveChild( CONN_PARAM_FILE );
+
                         auto pHop = pConn->GetParent();
                         strChild = pConn->GetName();
                         inoParent = pHop->GetObjId();

@@ -1195,15 +1195,20 @@ CUnixSockStmPdo::~CUnixSockStmPdo()
     // closing the socket here to avoid the fd
     // reused too early before the bus-port remove
     // this pdo from its pdo map.
+    gint32& iFd = ( gint32& )m_dwFd;
+    if( iFd < 0 )
+        return;
+
     gint32 ret =
-        shutdown( m_dwFd, SHUT_RDWR );
+        shutdown( iFd, SHUT_RDWR );
     if( ERROR( ret ) )
     {
         DebugPrint( -errno,
             "Error shutdown socket[%d]",
-            m_dwFd );
+            iFd );
     }
-    close( m_dwFd );
+    close( iFd );
+    iFd = -1;
 }
 
 gint32 CUnixSockStmPdo::PostStart( IRP* pIrp )
