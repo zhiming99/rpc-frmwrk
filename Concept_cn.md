@@ -26,7 +26,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 * 异步调用当请求被发出后，调用的线程会立刻返回，不等待服务器返回结果。此时调用者需要查看返回值，确定调用的状态是正在执行（STATUS_PENDING)，或者出错。如果是正在执行中，服务器的`Response`或者系统的错误，都会从回调函数中返回。异步调用在服务器端是有流量控制的，过多的未完成的异步调用会导致新的`Request`被拒绝（ERROR_QUEUE_FULL)，直到服务端有空闲的资源时，才能恢复。
 
-* 虽然回调函数是令人头痛的一件事，不过通过`ridlc`生成的框架代码，将自动生成回调函数，使得这一过程轻松许多。
+* `rpc-frmwrk`仅提供基于回调函数的异步调用。如果一个rpc请求在`ridl`文件中被定义成异步的请求，`ridlc`可以自动生成必要的回调函数，简化开发过程，节省工作量。
 
 ## 任务(Tasklet)和任务组(TaskGroup)
 * 任务（tasklet)源自于Linux kernel中的tasklet_struct，起初用于封装函数和函数的参数，随着开发的不断深入，任务（tasklet)也不断的添加新的功能，早已超过了tasklet的原始范畴，逐渐变成遍布`rpc-frmwrk`一个building-block。实际上，上面提到的回调函数就是由内部tasklet封装和调用的。`rpc-frmwrk`的任务(tasklet)主要包括以下的功能：
