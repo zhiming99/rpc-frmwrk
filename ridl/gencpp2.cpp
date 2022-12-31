@@ -4089,13 +4089,13 @@ gint32 CExportObjDesc2::OutputROS()
 
         const char* args[5];
 
-        args[ 0 ] = "/usr/bin/sed";
+        args[ 0 ] = "/bin/sed";
         args[ 1 ] = strCmdLine.c_str();
         args[ 2 ] = strSrcPy.c_str();
         args[ 3 ] = nullptr;
         char* env[ 1 ] = { nullptr };
 
-        Execve( "/usr/bin/sed",
+        Execve( "/bin/sed",
             const_cast< char* const*>( args ),
             env, strDstPy.c_str() );
 
