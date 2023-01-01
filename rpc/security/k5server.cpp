@@ -334,6 +334,17 @@ gint32 CK5AuthServer::OnStartKdcProxyComplete(
         oParams[ propReturnValue ] = ret;
         OnServiceComplete(
             oParams.GetCfg(), pInvTask );
+
+        InterfPtr pProxy = m_pKdcProxy;
+        if( !m_pKdcProxy.IsEmpty() )
+        {
+            m_pKdcProxy.Clear();
+            TaskletPtr pDummy;
+            pDummy.NewObj( clsid( CIfDummyTask ) );
+            gint32 iRet = pProxy->StopEx( pDummy );
+            if( iRet != STATUS_PENDING )
+                pProxy.Clear();
+        }
     }
 
     return ret;
