@@ -116,18 +116,22 @@ RUNCLIENT
 
 echo testing normal RPC
 $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
+echo stressTest normal
 stressTest
 
 echo testing RPC-over-stream
 $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
+echo stressTest ROS
 stressTest
 
 echo testing normal RPC
 $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
+echo mkDirTest normal
 mkDirTest
 
 echo testing RPC-over-stream
 $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
+echo mkDirTest ROS
 mkDirTest
 
 function pytest()
