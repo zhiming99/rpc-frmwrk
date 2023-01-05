@@ -23,7 +23,7 @@ function stressTest()
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT
+/bin/bash << RUNCLIENT | tee -a $basedir/logdump.txt
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
@@ -34,8 +34,8 @@ echo -n "time elapsed: "
 echo "scale=10;\$end-\$start" | bc
 RUNCLIENT
 
-    echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
-    kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
+    echo pkill -f mainsvr.py
+    pkill -f mainsvr.py
 
     umount mp
     while true; do
@@ -71,7 +71,7 @@ function mkDirTest()
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT
+/bin/bash << RUNCLIENT | tee -a $basedir/logdump.txt
 function singleMkdir()
 {
     idx=0
@@ -97,8 +97,8 @@ echo -n "time elapsed: "
 echo "scale=10;\$end-\$start" | bc
 RUNCLIENT
 
-    echo kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
-    kill -9 `ps aux | grep mainsvr | grep -v grep | awk '{print $2}'`
+    echo pkill -f mainsvr.py
+    pkill -f mainsvr.py
 
     umount mp
     while true; do
@@ -133,6 +133,10 @@ echo testing RPC-over-stream
 $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
+
+if grep -i errno $basedir/logdump.txt; then
+    exit 1
+fi
 
 function pytest()
 {
@@ -172,9 +176,8 @@ function pytest()
         python3 ./mainsvr.py fs/mpsvr/$svcpt 0 &
         sleep 3
         python3 ./maincli.py fs/mp/connection_0/$svcpt 0 || ret=37
-        pid=`ps aux | grep 'mainsvr.py'| grep -v 'grep' | awk '{ print $2 }' `
-        echo kill -9 $pid
-        kill -9 $pid
+        echo pkill -f mainsvr.py
+        pkill -f mainsvr.py
         sleep 3
         break 1
     done
