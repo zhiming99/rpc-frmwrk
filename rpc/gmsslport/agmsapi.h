@@ -24,30 +24,17 @@
  */
 
 #pragma once
-namespace gmsa
+namespace rpcf
 {
-    struct BIO
+    using PIOVE=std::unique_ptr< AGMS_IOVE > ;
+    using IOV = std::deque< PIOVE >;
+
+    struct BLKIO
     {
-        int do_read ( BIO* b, void*&  data, int dlen);
-        int do_write( BIO* b, void* data, int dlen);
-    };
-
-    struct AGMS_METHOD
-    {
-        int ( *do_init )( AGMS* conn );
-        int ( *do_handshake_connect )( AGMS* conn);
-        
-        int ( *do_handshake_accept )( AGMS* conn);
-
-        int ( *do_shutdown )( AGMS* conn );
-
-        int ( *do_recv )( AGMS* conn,
-            uint8_t *& out, size_t outlen,
-            size_t *recvlen);
-
-        int ( *do_send )( AGMS* conn,
-            uint8_t *in, size_t inlen,
-            size_t *sentlen);
+        IOV io_vec;
+        int read ( PIOVE& iover );
+        int write( PIOVE& iovew );
+        int put_back( PIOVE& iover );
     };
 
     enum AGMS_STATE : guint32
@@ -61,21 +48,21 @@ namespace gmsa
 
     struct AGMS_CTX : TLS_CTX
     {
+        AGMS_CTX();
+        int check_private_key();
+        unsigned long set_options( unsigned long op);
+        int set_cipher_list( const char *str);
+        int up_ref();
+        void down_ref();
     };
 
-    struct AGMS : public TLS_CONNECT
-    {
-        AGMS_STATE gms_state;
-        std::unique_ptr< AGMS_CTX > gms_ctx;
-    };
-
-    struct AGMS_IOV
+    struct AGMS_IOVE
     {
         void* ptr;
         guint32 mem_size;
         guint32 start;
         guint32 end;
-        ~AGMS_IOV()
+        ~AGMS_IOVE()
         {
             if( ptr ) free( ptr );
             ptr = nullptr;
@@ -92,60 +79,35 @@ namespace gmsa
             guint32& end );
     };
 
-    int AGMS_get_error(const AGMS *s, int ret_code);
-    void AGMS_library_init();
-    int AGMS_is_init_finished(const AGMS *s);
-
-    AGMS_CTX *AGMS_CTX_new(const AGMS_METHOD *meth);
-    int AGMS_use_PrivateKey_file(AGMS *gms, const char *file, int type);
-    int AGMS_use_certificate_file(AGMS *gms, const char *file, int type);
-
-    int AGMS_CTX_check_private_key(const AGMS_CTX *ctx);
-
-    unsigned long AGMS_CTX_set_options(AGMS_CTX *ctx, unsigned long op);
-    int AGMS_CTX_set_cipher_list(AGMS_CTX *, const char *str);
-
-    int AGMS_CTX_up_ref(AGMS_CTX *ctx);
-    void AGMS_CTX_free(AGMS_CTX *);
-
-    void AGMS_add_all_algorithms();
-    void AGMS_load_error_strings();
-    void ERR_load_BIO_strings();
-    void ERR_load_crypto_strings();
-
-    AGMS *AGMS_new(AGMS_CTX *ctx);
-
-    void AGMS_set_connect_state(AGMS *s);
-    void AGMS_set_accept_state(AGMS *s);
-
-    void AGMS_set0_rbio(AGMS *s, BIO *rbio);
-    void AGMS_set0_wbio(AGMS *s, BIO *wbio);
-
-    int AGMS_write(AGMS *gms, void *buf, int num);
-    int AGMS_read(AGMS *gms, void *& buf, int num);
-
-    int AGMS_pending(const AGMS *s);
-    int AGMS_do_handshake(AGMS *s);
-    int AGMS_shutdown(AGMS *s);
-
-    BIO *BIO_new(const BIO_METHOD *type);
-    int BIO_free(BIO *a);
-
-    int BIO_read(BIO *b, void *& data, int dlen);
+    struct AGMS : public TLS_CONNECT
     {
-        return b->do_read(
-            b, data, dlen );
-    }
+        AGMS_STATE gms_state;
+        std::unique_ptr< AGMS_CTX > gms_ctx;
 
-    int BIO_write(BIO *b, void *data, int dlen);
-    {
-        return b->do_write(
-            b, data, dlen );
-    }
+        AGMS( AGMS_CTX *ctx );
 
-    const BIO_METHOD *BIO_s_mem(void);
+        virtual int init() = 0;
+        virtual int handshake() = 0;
+        virtual int shutdown() = 0;
 
-    const AGMS_METHOD *TLS_method(void);
-    const AGMS_METHOD *TLS_server_method(void);
-    const AGMS_METHOD *TLS_client_method(void);
+        virtual int recv( PIOVE& iove ) = 0;
+        virtual int send( PIOVE& iove ) = 0;
+
+        int get_error(int ret_code);
+
+        void library_init();
+        int is_init_finished(const AGMS *s);
+
+        int use_PrivateKey_file(const char *file, int type);
+        int use_certificate_file(const char *file, int type);
+        void add_all_algorithms();
+        void load_error_strings();
+        void set_connect_state();
+        void set_accept_state();
+
+        void set0_rbio( BLKIO *rbio);
+        void set0_wbio( BLKIO *wbio);
+
+        int pending_bytes();
+    };
 }
