@@ -24,6 +24,7 @@
  */
 
 #pragma once
+#include <stdint.h>
 namespace rpcf
 {
     using PIOVE=std::unique_ptr< AGMS_IOVE > ;
@@ -37,7 +38,7 @@ namespace rpcf
         int put_back( PIOVE& iover );
     };
 
-    enum AGMS_STATE : guint32
+    enum AGMS_STATE : uint32_t
     {
         STAT_INIT,
         STAT_START_HANDSHAKE,
@@ -59,29 +60,30 @@ namespace rpcf
     struct AGMS_IOVE
     {
         void* ptr;
-        guint32 mem_size;
-        guint32 start;
-        guint32 end;
+        uint32_t mem_size;
+        uint32_t start;
+        uint32_t end;
         ~AGMS_IOVE()
         {
             if( ptr ) free( ptr );
             ptr = nullptr;
         }
 
-        gint32 attach( void* ptr,
-            guint32 mem_size,
-            guint32 start = 0,
-            guint32 end = 0 );
+        int attach( void* ptr,
+            uint32_t mem_size,
+            uint32_t start = 0,
+            uint32_t end = 0 );
 
-        gint32 detach( void** pptr,
-            guint32& mem_size,
-            guint32& start,
-            guint32& end );
+        int detach( void** pptr,
+            uint32_t& mem_size,
+            uint32_t& start,
+            uint32_t& end );
+
     };
 
     struct AGMS : public TLS_CONNECT
     {
-        AGMS_STATE gms_state;
+        std::atomic< AGMS_STATE > gms_state;
         std::unique_ptr< AGMS_CTX > gms_ctx;
 
         AGMS( AGMS_CTX *ctx );
@@ -93,10 +95,15 @@ namespace rpcf
         virtual int recv( PIOVE& iove ) = 0;
         virtual int send( PIOVE& iove ) = 0;
 
-        int get_error(int ret_code);
+        int get_error(int ret_code) const;
+
+        void set_state( AGMS_STATE state );
+        AGMS_STATE get_state() const
+        { return gms_state; }
 
         void library_init();
-        int is_init_finished(const AGMS *s);
+        bool is_init_finished() const
+        { return get_state() == STAT_READY; }
 
         int use_PrivateKey_file(const char *file, int type);
         int use_certificate_file(const char *file, int type);
@@ -104,6 +111,7 @@ namespace rpcf
         void load_error_strings();
         void set_connect_state();
         void set_accept_state();
+        bool is_client() const;
 
         void set0_rbio( BLKIO *rbio);
         void set0_wbio( BLKIO *wbio);
