@@ -71,7 +71,7 @@ namespace rpcf
         STAT_WAIT_CLI_HELLO,
         STAT_WAIT_CLI_CERT,
         STAT_WAIT_CLI_CERTVERIFY,
-        STAT_WAIT_CLI_FIN,
+        STAT_WAIT_CLI_FIN
     };
 
     struct AGMS_CTX : TLS_CTX
