@@ -30,12 +30,30 @@ namespace rpcf
     using PIOVE=std::unique_ptr< AGMS_IOVE > ;
     using IOV = std::deque< PIOVE >;
 
-    struct BLKIO
+    struct BLKIO_BASE
     {
         IOV io_vec;
-        int read ( PIOVE& iover );
-        int write( PIOVE& iovew );
-        int put_back( PIOVE& iover );
+        virtual int read ( PIOVE& iover ) = 0;
+        virtual int write( PIOVE& iovew ) = 0;
+        size_t size();
+
+        protected:
+        bool is_partial_record();
+        size_t record_size(); 
+    };
+
+    // incoming message queue
+    struct BLKIN : public BLKIO_BASE
+    {
+        int read( PIOVE& iover ) override;
+        int write( PIOVE& iovew ) override;
+    };
+
+    // outgoing message queue
+    struct BLKOUT : public BLKIO_BASE
+    {
+        int read ( PIOVE& iover ) override;
+        int write( PIOVE& iovew ) override;
     };
 
     enum AGMS_STATE : uint32_t
@@ -44,7 +62,16 @@ namespace rpcf
         STAT_START_HANDSHAKE,
         STAT_READY,
         STAT_HANDSHAKE_FAILED,
-        STAT_SHUTDOWN
+        STAT_SHUTDOWN,
+        STAT_WAIT_SVR_HELLO,
+        STAT_WAIT_SVR_ENCEXT,
+        STAT_WAIT_SVR_CERT,
+        STAT_WAIT_SVR_CERTVERIFY,
+        STAT_WAIT_SVR_FIN,
+        STAT_WAIT_CLI_HELLO,
+        STAT_WAIT_CLI_CERT,
+        STAT_WAIT_CLI_CERTVERIFY,
+        STAT_WAIT_CLI_FIN,
     };
 
     struct AGMS_CTX : TLS_CTX
@@ -79,6 +106,8 @@ namespace rpcf
             uint32_t& start,
             uint32_t& end );
 
+        size_t size() const
+        { return end - start; }
     };
 
     struct AGMS : public TLS_CONNECT
@@ -117,5 +146,46 @@ namespace rpcf
         void set0_wbio( BLKIO *wbio);
 
         int pending_bytes();
+    };
+
+    struct TLS13_HSCTX_BASE
+    {
+        uint8_t psk[32] = {0}; 
+        uint8_t early_secret[32];
+        uint8_t handshake_secret[32];
+        uint8_t master_secret[32];
+        uint8_t client_handshake_traffic_secret[32];
+        uint8_t server_handshake_traffic_secret[32];
+        uint8_t client_application_traffic_secret[32];
+        uint8_t server_application_traffic_secret[32];
+        uint8_t client_write_key[16];
+        uint8_t server_write_key[16];
+    }
+
+    struct TLS13_HSCTX_CLI :
+        public TLS13_HSCTX_BASE
+    {
+        SM2_KEY client_ecdhe;
+        SM2_KEY server_sign_key;
+    };
+
+    struct TLS13_HSCTX_SVR :
+        public TLS13_HSCTX_BASE
+    {
+        SM2_KEY server_ecdhe;
+        SM2_KEY client_sign_key;
+    };
+
+    struct TLS13 : public AGMS
+    {
+        int init() override;
+        int handshake() override;
+        int shutdown() override;
+        int recv( PIOVE& iove ) override;
+        int send( PIOVE& iove ) override;
+
+        protected:
+        int handshake_svr();
+        int handshake_cli();
     };
 }
