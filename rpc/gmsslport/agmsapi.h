@@ -36,7 +36,7 @@ struct BLKIO_BASE
     IOV io_vec;
     virtual int read ( PIOVE& iover ) = 0;
     virtual int write( PIOVE& iovew ) = 0;
-    size_t size();
+    virtual size_t size() const = 0;
 
     protected:
     bool is_partial_record();
@@ -48,6 +48,7 @@ struct BLKIN : public BLKIO_BASE
 {
     int write( PIOVE& iovew ) override;
     int read( PIOVE& iover ) override;
+    size_t size() const override;
     void put_back( PIOVE& iover );
 };
 
@@ -55,6 +56,7 @@ struct BLKOUT : public BLKIO_BASE
 {
     int write( PIOVE& iovew ) override;
     int read( PIOVE& iover ) override;
+    size_t size() const override;
 };
 
 enum AGMS_STATE : uint32_t
@@ -88,9 +90,9 @@ struct AGMS_CTX : TLS_CTX
 struct AGMS_IOVE
 {
     uint8_t* ptr = nullptr;
-    uint32_t mem_size = 0;
-    uint32_t start = 0;
-    uint32_t content_end = 0;
+    size_t mem_size = 0;
+    size_t start = 0;
+    size_t content_end = 0;
 
     ~AGMS_IOVE()
     { clear(); }
@@ -111,28 +113,28 @@ struct AGMS_IOVE
             content_end - start == 0 );
     }
 
-    int alloc( uint32_t size = 0 );
-    int realloc( uint32_t newsize  );
+    int alloc( size_t size = 0 );
+    int realloc( size_t newsize  );
 
     int attach( uint8_t* ptr,
-        uint32_t size,
-        uint32_t start = 0,
-        uint32_t end = 0 );
+        size_t size,
+        size_t start = 0,
+        size_t end = 0 );
 
     int detach( uint8_t** pptr,
-        uint32_t& size,
-        uint32_t& start,
-        uint32_t& end );
+        size_t& size,
+        size_t& start,
+        size_t& end );
 
     size_t size() const
     { return content_end - start; }
 
     int split(
         AGMS_IOVE& bottom_half
-        uint32_t offset );
+        size_t offset );
 
     int copy( uint8_t* src,
-        uint32_t src_size = 0 );
+        size_t src_size = 0 );
 
     int merge(
         AGMS_IOVE& bottom_half );
@@ -176,6 +178,7 @@ struct AGMS : public TLS_CONNECT
     virtual int recv( PIOVE& iove ) = 0;
     virtual int send( PIOVE& iove ) = 0;
 
+    int send_alert( int alert );
     int get_error(int ret_code) const;
 
     void set_state( AGMS_STATE state );
@@ -209,6 +212,14 @@ struct TLS13_HSCTX_BASE
     uint8_t server_application_traffic_secret[32];
     uint8_t client_write_key[16];
     uint8_t server_write_key[16];
+
+	uint8_t verify_data[32];
+	size_t verify_data_len;
+
+	DIGEST_CTX dgst_ctx; // secret generation过程中需要ClientHello等数据输入的
+	DIGEST_CTX null_dgst_ctx; // secret generation过程中不需要握手数据的
+	const BLOCK_CIPHER *cipher = NULL;
+
     void clear();
 }
 
@@ -218,11 +229,7 @@ struct TLS13_HSCTX_CLI :
     typedef TLS13_HSCTX_BASE super;
     SM2_KEY client_ecdhe;
     SM2_KEY server_sign_key;
-	uint8_t verify_data[32];
-	size_t verify_data_len;
-	DIGEST_CTX dgst_ctx; // secret generation过程中需要ClientHello等数据输入的
-	DIGEST_CTX null_dgst_ctx; // secret generation过程中不需要握手数据的
-	const BLOCK_CIPHER *cipher = NULL;
+    bool cert_req_received = false;
 
     void clear();
 };
