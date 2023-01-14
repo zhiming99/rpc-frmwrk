@@ -75,7 +75,10 @@ PIOVE prec; \
     if( prec->size() == enced_recordlen )\
     {\
         if( this->read_bio.size() == 0 )\
+        {\
+            ret = RET_PENDING;\
             break;\
+        }\
     }\
     else\
     {\
@@ -448,6 +451,17 @@ int BLKOUT::read( PIOVE& iover )
 size_t BLKOUT::size() const
 { return io_vec.size(); }
 
+int AGMS_CTX::cleanup()  
+{
+    TLS_CTX* ctx = this;
+    gmssl_secure_clear(&ctx->signkey, sizeof(SM2_KEY));
+    gmssl_secure_clear(&ctx->kenckey, sizeof(SM2_KEY));
+    if (ctx->certs) free(ctx->certs);
+    if (ctx->cacerts) free(ctx->cacerts);
+    memset(ctx, 0, sizeof(TLS_CTX));
+    return 0;
+}
+
 void TLS13_HSCTX_BASE::clear()
 {
     gmssl_secure_clear(psk, sizeof(psk));
@@ -504,6 +518,49 @@ void TLS13_HSCTX_SVR::clear()
 
     gmssl_secure_clear(&client_sign_key,
         sizeof(client_sign_key));
+}
+ 
+int AGMS::shutdown()
+{
+    int ret = 0;
+    switch( get_state() )
+    {
+    case STAT_START_SHUTDOWN: 
+        {
+            size_t recordlen = 0;
+            uint8_t* record = nullptr;
+
+            tls_trace("send Alert close_notify\n");
+            SEND_ALERT( TLS_alert_close_notify); 
+            RECV_RECORD( prec, record, recordlen );
+            // fall through
+        }
+    case STAT_WAIT_CLOSE_NOTIFY:
+        {
+            size_t recordlen = 0;
+            uint8_t* record = nullptr;
+            RECV_RECORD( prec, record, recordlen );
+            if( tls_record_type( record ) ==
+                TLS_record_alert )
+            break;
+        }
+    default:
+        break;
+    }
+
+    if( ret == RET_PENDING )
+        set_state( STAT_WAIT_CLOSE_NOTIFY );
+    else
+        set_state( STAT_SHUTDOWN );
+
+    return ret;
+}
+
+void AGMS::cleanup()
+{
+    TLS_CONNECT* tls_conn = this;
+    gmssl_secure_clear( tls_conn,
+        sizeof( TLS_CONNECT ) );
 }
 
 int AGMS::send_alert( int alert )
@@ -646,7 +703,6 @@ int TLS13::handshake_cli()
     {
     case STAT_START_HANDSHAKE:
         {
-            this->is_client = 1;
             tls_record_set_protocol(
                 enced_record, TLS_protocol_tls12);
 
@@ -695,7 +751,6 @@ int TLS13::handshake_cli()
         {
             // recv ServerHello
             tls_trace("recv ServerHello\n");
-
             RECV_RECORD( prec,
                 enced_record, enced_recordlen );
 
@@ -708,10 +763,13 @@ int TLS13::handshake_cli()
             size_t session_id_len;
             uint8_t server_random[32];
 
-            tls13_record_trace(stderr, enced_record, enced_recordlen, 0, 0);
-            if (tls_record_get_handshake_server_hello(enced_record,
-                &protocol, &random, &session_id, &session_id_len,
-                &cipher_suite, &server_exts, &server_exts_len) != 1)
+            tls13_record_trace(stderr,
+                enced_record, enced_recordlen, 0, 0);
+            if (tls_record_get_handshake_server_hello(
+                enced_record, &protocol, &random,
+                &session_id, &session_id_len,
+                &cipher_suite, &server_exts,
+                &server_exts_len) != 1)
             {
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
@@ -725,8 +783,11 @@ int TLS13::handshake_cli()
             memcpy(server_random, random, 32);
             memcpy(this->session_id, session_id, session_id_len);
             this->session_id_len = session_id_len;
-            if (tls_cipher_suite_in_list(cipher_suite, tls13_ciphers,
-                sizeof(tls13_ciphers)/sizeof(tls13_ciphers[0])) != 1)
+            size_t cipher_count = 
+                sizeof(tls13_ciphers)/sizeof(tls13_ciphers[0]);
+
+            if (tls_cipher_suite_in_list( cipher_suite,
+                tls13_ciphers, cipher_count ) != 1)
             {
                 SEND_ALERT(TLS_alert_handshake_failure);
                 break;
@@ -736,15 +797,21 @@ int TLS13::handshake_cli()
             SM2_POINT server_ecdhe_public;
             if (tls13_server_hello_extensions_get(
                 server_exts, server_exts_len,
-                &server_ecdhe_public) != 1) {
+                &server_ecdhe_public) != 1)
+            {
                 SEND_ALERT(TLS_alert_handshake_failure);
                 break;
             }
             this->protocol = TLS_protocol_tls13;
 
-            tls13_cipher_suite_get(this->cipher_suite, &digest, &hctxc.cipher);
-            digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
-            digest_update(&hctxc.dgst_ctx, enced_record + 5, enced_recordlen - 5);
+            tls13_cipher_suite_get(
+                this->cipher_suite, &digest, &hctxc.cipher);
+
+            digest_update(&hctxc.dgst_ctx,
+                record + 5, recordlen - 5);
+
+            digest_update(&hctxc.dgst_ctx,
+                enced_record + 5, enced_recordlen - 5);
 
 
             printf("generate handshake secrets\n");
@@ -757,28 +824,41 @@ int TLS13::handshake_cli()
             */
 
             uint8_t zeros[32] = {0};
-            sm2_ecdh(&hctxc.client_ecdhe, &server_ecdhe_public, &server_ecdhe_public);
+            sm2_do_ecdh(&hctxc.client_ecdhe,
+                &server_ecdhe_public,
+                &server_ecdhe_public);
+
             /* [1]  */ tls13_hkdf_extract(digest,
-                zeros, hctxc.psk, hctxc.early_secret);
+                zeros, hctxc.psk,
+                hctxc.early_secret);
 
-            /* [5]  */ tls13_derive_secret(hctxc.early_secret, "derived",
-                &hctxc.null_dgst_ctx, hctxc.handshake_secret);
+            /* [5]  */ tls13_derive_secret(
+                hctxc.early_secret, "derived",
+                &hctxc.null_dgst_ctx,
+                hctxc.handshake_secret);
 
-            /* [6]  */ tls13_hkdf_extract(digest, hctxc.handshake_secret,
-                (uint8_t *)&server_ecdhe_public, hctxc.handshake_secret);
+            /* [6]  */ tls13_hkdf_extract(
+                digest, hctxc.handshake_secret,
+                (uint8_t *)&server_ecdhe_public,
+                hctxc.handshake_secret);
 
-            /* [7]  */ tls13_derive_secret(hctxc.handshake_secret,
+            /* [7]  */ tls13_derive_secret(
+                hctxc.handshake_secret,
                 "c hs traffic", &hctxc.dgst_ctx,
                 hctxc.client_handshake_traffic_secret);
 
-            /* [8]  */ tls13_derive_secret(hctxc.handshake_secret,
+            /* [8]  */ tls13_derive_secret(
+                hctxc.handshake_secret,
                 "s hs traffic", &hctxc.dgst_ctx,
                 hctxc.server_handshake_traffic_secret);
 
-            /* [9]  */ tls13_derive_secret(hctxc.handshake_secret,
-                "derived", &hctxc.null_dgst_ctx, hctxc.master_secret);
+            /* [9]  */ tls13_derive_secret(
+                hctxc.handshake_secret,
+                "derived", &hctxc.null_dgst_ctx,
+                hctxc.master_secret);
 
-            /* [10] */ tls13_hkdf_extract(digest, hctxc.master_secret,
+            /* [10] */ tls13_hkdf_extract(
+                digest, hctxc.master_secret,
                 zeros, hctxc.master_secret);
 
             //[sender]_write_key = HKDF-Expand-Label(Secret, "key", "", key_length)
@@ -786,167 +866,66 @@ int TLS13::handshake_cli()
             //[sender] in {server, client}
 
             tls13_hkdf_expand_label(digest,
-            hctxc.server_handshake_traffic_secret,
+                hctxc.server_handshake_traffic_secret,
                 "key", NULL, 0, 16, hctxc.server_write_key);
-
-            tls13_hkdf_expand_label(digest, hctxc.server_handshake_traffic_secret,
-                "iv", NULL, 0, 12, this->server_write_iv);
-            block_cipher_set_encrypt_key(&this->server_write_key,
-                hctxc.cipher, hctxc.server_write_key);
-
-            memset(this->server_seq_num, 0, 8);
-            tls13_hkdf_expand_label(digest, hctxc.client_handshake_traffic_secret,
-                "key", NULL, 0, 16, hctxc.client_write_key);
-
-            tls13_hkdf_expand_label(digest, hctxc.client_handshake_traffic_secret,
-                "iv", NULL, 0, 12, this->client_write_iv);
-
-            block_cipher_set_encrypt_key(&this->client_write_key,
-                hctxc.cipher, hctxc.client_write_key);
-
-            memset(this->client_seq_num, 0, 8);
-
-            SWITCH_STATE( STAT_WAIT_SVR_ENCEXT, enced_recordlen );
-            // fall through
-        }
-    case STAT_WAIT_SVR_ENCEXT:
-        {
-            // recv {EncryptedExtensions}
-            printf("recv {EncryptedExtensions}\n");
-            RECV_RECORD( prec,
-                enced_record, enced_recordlen );
-
-            const uint8_t *server_exts;
-            size_t server_exts_len;
-            int protocol;
-            int cipher_suite;
-            const uint8_t *random;
-            const uint8_t *session_id;
-            size_t session_id_len;
-            uint8_t server_random[32];
-
-            tls13_record_trace(stderr, enced_record, enced_recordlen, 0, 0);
-            if (tls_record_get_handshake_server_hello(enced_record,
-                &protocol, &random, &session_id, &session_id_len,
-                &cipher_suite, &server_exts, &server_exts_len) != 1) {
-                SEND_ALERT(TLS_alert_unexpected_message);
-                break;
-            }
-            if (protocol != TLS_protocol_tls12)
-            {
-                SEND_ALERT(TLS_alert_protocol_version);
-                break;
-            }
-
-            memcpy(server_random, random, 32);
-            memcpy(this->session_id, session_id, session_id_len);
-            this->session_id_len = session_id_len;
-            if (tls_cipher_suite_in_list(cipher_suite, tls13_ciphers,
-                sizeof(tls13_ciphers)/sizeof(tls13_ciphers[0])) != 1)
-            {
-                SEND_ALERT(TLS_alert_handshake_failure);
-                break;
-            }
-
-            this->cipher_suite = cipher_suite;
-            SM2_POINT server_ecdhe_public;
-            if (tls13_server_hello_extensions_get(
-                server_exts, server_exts_len,
-                &server_ecdhe_public) != 1) {
-                SEND_ALERT(TLS_alert_handshake_failure);
-                break;
-            }
-            this->protocol = TLS_protocol_tls13;
-
-            tls13_cipher_suite_get(this->cipher_suite, &digest, &hctxc.cipher);
-            digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
-            digest_update(&hctxc.dgst_ctx, enced_record + 5, enced_recordlen - 5);
-
-
-            printf("generate handshake secrets\n");
-            /*
-            generate handshake keys
-                uint8_t client_write_key[32]
-                uint8_t server_write_key[32]
-                uint8_t client_write_iv[12]
-                uint8_t server_write_iv[12]
-            */
-
-            uint8_t zeros[32] = {0};
-            sm2_ecdh(&hctxc.client_ecdhe, &server_ecdhe_public, &server_ecdhe_public);
-            /* [1]  */ tls13_hkdf_extract(digest,
-                zeros, hctxc.psk, hctxc.early_secret);
-
-            /* [5]  */ tls13_derive_secret(hctxc.early_secret, "derived",
-                &hctxc.null_dgst_ctx, hctxc.handshake_secret);
-
-            /* [6]  */ tls13_hkdf_extract(digest, hctxc.handshake_secret,
-                (uint8_t *)&server_ecdhe_public, hctxc.handshake_secret);
-
-            /* [7]  */ tls13_derive_secret(hctxc.handshake_secret,
-                "c hs traffic", &hctxc.dgst_ctx,
-                hctxc.client_handshake_traffic_secret);
-
-            /* [8]  */ tls13_derive_secret(hctxc.handshake_secret,
-                "s hs traffic", &hctxc.dgst_ctx,
-                hctxc.server_handshake_traffic_secret);
-
-            /* [9]  */ tls13_derive_secret(hctxc.handshake_secret,
-                "derived", &hctxc.null_dgst_ctx, hctxc.master_secret);
-
-            /* [10] */ tls13_hkdf_extract(digest, hctxc.master_secret,
-                zeros, hctxc.master_secret);
-
-            //[sender]_write_key = HKDF-Expand-Label(Secret, "key", "", key_length)
-            //[sender]_write_iv  = HKDF-Expand-Label(Secret, "iv", "", iv_length)
-            //[sender] in {server, client}
 
             tls13_hkdf_expand_label(digest,
-            hctxc.server_handshake_traffic_secret,
-                "key", NULL, 0, 16, hctxc.server_write_key);
-
-            tls13_hkdf_expand_label(digest, hctxc.server_handshake_traffic_secret,
+                hctxc.server_handshake_traffic_secret,
                 "iv", NULL, 0, 12, this->server_write_iv);
-            block_cipher_set_encrypt_key(&this->server_write_key,
+            block_cipher_set_encrypt_key(
+                &this->server_write_key,
                 hctxc.cipher, hctxc.server_write_key);
 
             memset(this->server_seq_num, 0, 8);
-            tls13_hkdf_expand_label(digest, hctxc.client_handshake_traffic_secret,
+            tls13_hkdf_expand_label(digest,
+                hctxc.client_handshake_traffic_secret,
                 "key", NULL, 0, 16, hctxc.client_write_key);
 
-            tls13_hkdf_expand_label(digest, hctxc.client_handshake_traffic_secret,
+            tls13_hkdf_expand_label(digest,
+                hctxc.client_handshake_traffic_secret,
                 "iv", NULL, 0, 12, this->client_write_iv);
 
-            block_cipher_set_encrypt_key(&this->client_write_key,
+            block_cipher_set_encrypt_key(
+                &this->client_write_key,
                 hctxc.cipher, hctxc.client_write_key);
 
             memset(this->client_seq_num, 0, 8);
 
-            SWITCH_STATE( STAT_WAIT_SVR_ENCEXT, enced_recordlen );
+            SWITCH_STATE(
+                STAT_WAIT_SVR_ENCEXT, enced_recordlen );
             // fall through
         }
     case STAT_WAIT_SVR_ENCEXT:
         {
             // recv {EncryptedExtensions}
-            printf("recv {EncryptedExtensions}\n");
-            
-
-            if (tls13_record_decrypt(&this->server_write_key,
+            tls_trace("recv {EncryptedExtensions}\n");
+            if (tls13_record_decrypt(
+                &this->server_write_key,
                 this->server_write_iv,
-                this->server_seq_num, enced_record, enced_recordlen,
-                record, &recordlen) != 1) {
+                this->server_seq_num,
+                enced_record, enced_recordlen,
+                record, &recordlen) != 1)
+            {
                 SEND_ALERT(TLS_alert_bad_record_mac);
                 break;
             }
-            tls13_record_trace(stderr, record, recordlen, 0, 0);
-            if (tls13_record_get_handshake_encrypted_extensions(record) != 1) {
+
+            tls13_record_trace(
+                stderr, record, recordlen, 0, 0);
+
+            if (tls13_record_get_handshake_encrypted_extensions(record) != 1)
+            {
                 SEND_ALERT(TLS_alert_handshake_failure);
                 break;
             }
-            digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
+
+            digest_update(&hctxc.dgst_ctx,
+                record + 5, recordlen - 5);
+
             tls_seq_num_incr(this->server_seq_num);
 
-            SWITCH_STATE( STAT_WAIT_SVR_CERT, enced_recordlen );
+            SWITCH_STATE(
+                STAT_WAIT_SVR_CERT, enced_recordlen );
             // fall through
         }
     case STAT_WAIT_SVR_CERT:
@@ -976,8 +955,10 @@ int TLS13::handshake_cli()
                 enced_recordlen =
                     tls_record_length( enced_record );
 
-                if (tls13_record_decrypt(&this->server_write_key,
-                    this->server_write_iv, this->server_seq_num,
+                if (tls13_record_decrypt(
+                    &this->server_write_key,
+                    this->server_write_iv,
+                    this->server_seq_num,
                     enced_record, enced_recordlen,
                     record, &recordlen) != 1)
                 {
@@ -996,11 +977,14 @@ int TLS13::handshake_cli()
                     type == TLS_handshake_certificate_request)
                 {
                     tls_trace("recv {CertificateRequest*}\n");
-                    tls13_record_trace(stderr, record, recordlen, 0, 0);
+                    tls13_record_trace(
+                        stderr, record, recordlen, 0, 0);
 
                     if (tls13_record_get_handshake_certificate_request(
-                        record, &request_context, &request_context_len,
-                        &cert_request_exts, &cert_request_extslen) != 1)
+                        record, &request_context,
+                        &request_context_len,
+                        &cert_request_exts,
+                        &cert_request_extslen) != 1)
                     {
                         SEND_ALERT(TLS_alert_handshake_failure);
                         break;
@@ -1009,10 +993,13 @@ int TLS13::handshake_cli()
                     // 当前忽略 request_context 和 cert_request_exts
                     // request_context 应该为空，当前实现中不支持Post-Handshake Auth
 
-                    digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
-                    tls_seq_num_incr(this->server_seq_num);
-                    hctxc.cert_req_received = true;
+                    digest_update(&hctxc.dgst_ctx,
+                        record + 5, recordlen - 5);
 
+                    tls_seq_num_incr(
+                        this->server_seq_num);
+
+                    hctxc.cert_req_received = true;
                     if( prec->size() == enced_recordlen )
                     {
                         if( this->read_bio.size() == 0 )
@@ -1057,36 +1044,56 @@ int TLS13::handshake_cli()
 
             tls_trace("recv {Certificate}\n");
             tls13_record_trace(stderr, record, recordlen, 0, 0);
-            if (tls13_record_get_handshake_certificate(record,
-                &request_context, &request_context_len,
+            if (tls13_record_get_handshake_certificate(
+                record, &request_context,
+                &request_context_len,
                 &cert_list, &cert_list_len) != 1)
             {
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
-            if (tls13_process_certificate_list(cert_list, cert_list_len,
-                this->server_certs, &this->server_certs_len) != 1)
+            if (tls13_process_certificate_list(
+                cert_list,cert_list_len,
+                this->server_certs,
+                &this->server_certs_len) != 1)
             {
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
+
             if (x509_certs_get_cert_by_index(
-                    this->server_certs, this->server_certs_len,
-                    0, &cert, &certlen) != 1 ||
-                    x509_cert_get_subject_public_key(
-                    cert, certlen, &hctxc.server_sign_key) != 1)
+                this->server_certs,
+                this->server_certs_len,
+                0, &cert, &certlen) != 1 ||
+                x509_cert_get_subject_public_key(
+                cert, certlen, &hctxc.server_sign_key) != 1)
             {
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
+
             digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
             tls_seq_num_incr(this->server_seq_num);
+
+            // verify server certificate
+            int verify_result = 0;
+            if (x509_certs_verify(
+                this->server_certs,
+                this->server_certs_len,
+                X509_cert_chain_server,
+                this->ca_certs,
+                this->ca_certs_len,
+                X509_MAX_VERIFY_DEPTH,
+                &verify_result) != 1)
+            {
+                SEND_ALERT(TLS_alert_bad_certificate);
+                break;
+            }
 
             SWITCH_STATE( STAT_WAIT_SVR_CERTVERIFY,
                 enced_recordlen );
             // fall through
         }
-
     case STAT_WAIT_SVR_CERTVERIFY:
         {
             // recv {CertificateVerify}
@@ -1105,7 +1112,9 @@ int TLS13::handshake_cli()
                 SEND_ALERT(TLS_alert_bad_record_mac);
                 break;
             }
-            tls13_record_trace(stderr, record, recordlen, 0, 0);
+
+            tls13_record_trace(
+                stderr, record, recordlen, 0, 0);
 
             const uint8_t *server_sig;
             int server_sign_algor;
@@ -1123,21 +1132,32 @@ int TLS13::handshake_cli()
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
-            if (tls13_verify_certificate_verify(TLS_server_mode,
-                &hctxc.server_sign_key, TLS13_SM2_ID, TLS13_SM2_ID_LENGTH,
-                &hctxc.dgst_ctx, server_sig, server_siglen) != 1)
+            if (tls13_verify_certificate_verify(
+                TLS_server_mode,
+                &hctxc.server_sign_key,
+                TLS13_SM2_ID,
+                TLS13_SM2_ID_LENGTH,
+                &hctxc.dgst_ctx,
+                server_sig,
+                server_siglen) != 1)
             {
                 error_print();
                 ret = -1;
                 break;
             }
 
-            digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
-            tls_seq_num_incr(this->server_seq_num);
+            digest_update(&hctxc.dgst_ctx,
+                record + 5, recordlen - 5);
+
+            tls_seq_num_incr(
+                this->server_seq_num);
 
             // use Transcript-Hash(Handshake Context, Certificate*, CertificateVerify*)
-            tls13_compute_verify_data(hctxc.server_handshake_traffic_secret,
-                &hctxc.dgst_ctx, hctxc.verify_data, &hctxc.verify_data_len);
+            tls13_compute_verify_data(
+                hctxc.server_handshake_traffic_secret,
+                &hctxc.dgst_ctx,
+                hctxc.verify_data,
+                &hctxc.verify_data_len);
 
             SWITCH_STATE( STAT_WAIT_SVR_FIN, enced_recordlen );
             // fall through
@@ -1149,9 +1169,12 @@ int TLS13::handshake_cli()
             // recv {Finished}
             tls_trace("recv {Finished}\n");
 
-            if (tls13_record_decrypt(&this->server_write_key,
+            if (tls13_record_decrypt(
+                &this->server_write_key,
                 this->server_write_iv,
-                this->server_seq_num, enced_record, enced_recordlen,
+                this->server_seq_num,
+                enced_record,
+                enced_recordlen,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);
@@ -1162,9 +1185,12 @@ int TLS13::handshake_cli()
             size_t server_verify_data_len;
             size_t padding_len;
 
-            tls13_record_trace(stderr, record, recordlen, 0, 0);
-            if (tls13_record_get_handshake_finished(record,
-                &server_verify_data, &server_verify_data_len) != 1)
+            tls13_record_trace(
+                stderr, record, recordlen, 0, 0);
+
+            if (tls13_record_get_handshake_finished(
+                record, &server_verify_data,
+                &server_verify_data_len) != 1)
             {
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
@@ -1176,7 +1202,10 @@ int TLS13::handshake_cli()
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
-            digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
+
+            digest_update(&hctxc.dgst_ctx,
+                record + 5, recordlen - 5);
+
             tls_seq_num_incr(this->server_seq_num);
 
             // generate server_application_traffic_secret
@@ -1199,16 +1228,22 @@ int TLS13::handshake_cli()
                 tls_trace("send {Certificate*}\n");
                 if (tls13_record_set_handshake_certificate(
                     record, &recordlen, NULL, 0,
-                    this->client_certs, this->client_certs_len) != 1)
+                    this->client_certs,
+                    this->client_certs_len) != 1)
                 {
                     SEND_ALERT(TLS_alert_internal_error);
                     break;
                 }
-                tls13_record_trace(stderr, record, recordlen, 0, 0);
+
+                tls13_record_trace(
+                    stderr, record, recordlen, 0, 0);
+
                 tls13_padding_len_rand(&padding_len);
-                if (tls13_record_encrypt(&this->client_write_key,
+                if (tls13_record_encrypt(
+                    &this->client_write_key,
                     this->client_write_iv,
-                    this->client_seq_num, record, recordlen, padding_len,
+                    this->client_seq_num,
+                    record, recordlen, padding_len,
                     enced_record, &enced_recordlen) != 1) {
                     error_print();
                     (TLS_alert_internal_error);
@@ -1217,33 +1252,41 @@ int TLS13::handshake_cli()
 
                 SEND_RECORD( enced_record, enced_recordlen );
 
-                digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
-                tls_seq_num_incr(this->client_seq_num);
+                digest_update(&hctxc.dgst_ctx,
+                    record + 5, recordlen - 5);
 
+                tls_seq_num_incr(this->client_seq_num);
 
                 // send {CertificateVerify*}
                 tls_trace("send {CertificateVerify*}\n");
                 client_sign_algor = TLS_sig_sm2sig_sm3; // FIXME: 应该放在this里面
 
-                tls13_sign_certificate_verify(TLS_client_mode,
-                    &this->sign_key, TLS13_SM2_ID,
-                    TLS13_SM2_ID_LENGTH, &hctxc.dgst_ctx,
+                tls13_sign_certificate_verify(
+                    TLS_client_mode,
+                    &this->sign_key,
+                    TLS13_SM2_ID,
+                    TLS13_SM2_ID_LENGTH,
+                    &hctxc.dgst_ctx,
                     sig, &siglen);
 
                 if (tls13_record_set_handshake_certificate_verify(
-                    record, &recordlen, client_sign_algor,
+                    record, &recordlen,
+                    client_sign_algor,
                     sig, siglen) != 1)
                 {
                     SEND_ALERT(TLS_alert_internal_error);
                     break;
                 }
 
-                tls13_record_trace(stderr, record, recordlen, 0, 0);
+                tls13_record_trace(
+                    stderr, record, recordlen, 0, 0);
                 tls13_padding_len_rand(&padding_len);
 
                 if (tls13_record_encrypt(
-                    &this->client_write_key, this->client_write_iv,
-                    this->client_seq_num, record, recordlen, padding_len,
+                    &this->client_write_key,
+                    this->client_write_iv,
+                    this->client_seq_num,
+                    record, recordlen, padding_len,
                     enced_record, &enced_recordlen) != 1)
                 {
                     SEND_ALERT(TLS_alert_internal_error);
@@ -1252,7 +1295,8 @@ int TLS13::handshake_cli()
 
                 SEND_RECORD( enced_record, enced_recordlen );
 
-                digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
+                digest_update(&hctxc.dgst_ctx,
+                    record + 5, recordlen - 5);
                 tls_seq_num_incr(this->client_seq_num);
             }
 
@@ -1271,7 +1315,8 @@ int TLS13::handshake_cli()
                 break;
             }
 
-            tls13_record_trace(stderr, record, recordlen, 0, 0);
+            tls13_record_trace(
+                stderr, record, recordlen, 0, 0);
             tls13_padding_len_rand(&padding_len);
             if (tls13_record_encrypt(
                 &this->client_write_key,
@@ -1286,38 +1331,46 @@ int TLS13::handshake_cli()
 
             SEND_RECORD( enced_record, enced_recordlen );
 
-            digest_update(&hctxc.dgst_ctx, record + 5, recordlen - 5);
+            digest_update(&hctxc.dgst_ctx,
+                record + 5, recordlen - 5);
+
             tls_seq_num_incr(this->client_seq_num);
 
             // update server_write_key, server_write_iv, reset server_seq_num
             tls13_hkdf_expand_label(digest,
                 hctxc.server_application_traffic_secret,
-                "key", NULL, 0, 16, hctxc.server_write_key);
+                "key", NULL, 0, 16,
+                hctxc.server_write_key);
 
-            block_cipher_set_encrypt_key(&this->server_write_key,
-                hctxc.cipher, hctxc.server_write_key);
+            block_cipher_set_encrypt_key(
+                &this->server_write_key,
+                hctxc.cipher,
+                hctxc.server_write_key);
 
             tls13_hkdf_expand_label(digest,
                 hctxc.server_application_traffic_secret,
-                "iv", NULL, 0, 12, this->server_write_iv);
+                "iv", NULL, 0, 12,
+                this->server_write_iv);
 
             memset(this->server_seq_num, 0, 8);
 
             //update client_write_key, client_write_iv, reset client_seq_num
             tls13_hkdf_expand_label(digest,
                 hctxc.client_application_traffic_secret,
-                "key", NULL, 0, 16, hctxc.client_write_key);
+                "key", NULL, 0, 16,
+                hctxc.client_write_key);
 
             tls13_hkdf_expand_label(digest,
                 hctxc.client_application_traffic_secret,
-                "iv", NULL, 0, 12, this->client_write_iv);
+                "iv", NULL, 0, 12,
+                this->client_write_iv);
 
-            block_cipher_set_encrypt_key(&this->client_write_key,
-                hctxc.cipher, hctxc.client_write_key);
+            block_cipher_set_encrypt_key(
+                &this->client_write_key,
+                hctxc.cipher,
+                hctxc.client_write_key);
 
             memset(this->client_seq_num, 0, 8);
-
-            fprintf(stderr, "Connection established\n");
             set_state( STAT_READY );
             ret = 0;
             break;
@@ -1485,8 +1538,7 @@ int TLS13::handshake_svr()
 
 
             uint8_t zeros[32] = {0};
-
-            sm2_ecdh(&hctxs.server_ecdhe,
+            sm2_do_ecdh(&hctxs.server_ecdhe,
                 &client_ecdhe_public, &client_ecdhe_public);
 
             /* 1  */ tls13_hkdf_extract(hctxs.digest,
@@ -1818,6 +1870,20 @@ int TLS13::handshake_svr()
 
             tls_seq_num_incr(this->client_seq_num);
 
+            // verify client certificate
+            int verify_result;
+            if (x509_certs_verify(
+                this->client_certs,
+                this->client_certs_len,
+                X509_cert_chain_client,
+                this->ca_certs, this->ca_certs_len,
+                X509_MAX_VERIFY_DEPTH,
+                &verify_result) != 1)
+            {
+                SEND_ALERT(TLS_alert_bad_certificate);
+                break;
+            }
+
             SWITCH_STATE(
                 STAT_WAIT_CLI_CERTVERIFY, enced_recordlen );
             // fall through
@@ -1959,8 +2025,7 @@ int TLS13::handshake_svr()
 
             memset(this->client_seq_num, 0, 8);
             set_state( STAT_READY );
-
-            fprintf(stderr, "Connection Established!\n\n");
+            break;
         }
     default:
         ret = -1;
@@ -1975,6 +2040,108 @@ int TLS13::handshake_svr()
         hctxs.clear();
 
 	return ret;
+}
+
+int TLS13::init( bool is_client )
+{
+    this->is_client = ( int )is_client;
+    if( is_client )
+       return init_cli(); 
+    return init_svr();
+}
+
+static int client_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
+
+int TLS13::init_cli()
+{
+    gint32 ret = 0;
+    do{
+        ret = tls_ctx_init(
+            this->gms_ctx->get(),
+            TLS_protocol_tls13,
+            TLS_client_mode);
+
+        if( ret != 1 )
+            break;
+
+        size_t cipher_count =
+            sizeof(client_ciphers);
+
+        cipher_count /=
+            sizeof(client_ciphers[0]);
+
+        ret = tls_ctx_set_cipher_suites(
+            &ths->gms_ctx, client_ciphers,
+            cipher_count );
+        if( ret != 1 )
+            break;
+
+        ret = init_connect();
+    }while( 0 );
+
+    return ret;
+}
+
+int TLS13::init_connect()
+{
+    int ret = 0;
+    do{
+        TLS_CTX* ctx = gms_ctx->get();
+        this->protocol = ctx->protocol;
+        this->is_client = ctx->is_client;
+
+        size_t i = 0;
+        for (; i < ctx->cipher_suites_cnt; i++)
+        {
+            this->cipher_suites[i] =
+                ctx->cipher_suites[i];
+        }
+
+        this->cipher_suites_cnt =
+            ctx->cipher_suites_cnt;
+
+        if (ctx->certslen >
+            TLS_MAX_CERTIFICATES_SIZE)
+        {
+            error_print();
+            ret = -1;
+            break;
+        }
+
+        if (this->is_client)
+        {
+            memcpy(this->client_certs,
+                ctx->certs, ctx->certslen);
+
+            this->client_certs_len =
+                ctx->certslen;
+
+        }
+        else
+        {
+            memcpy(this->server_certs,
+                ctx->certs, ctx->certslen);
+
+            this->server_certs_len =
+                ctx->certslen;
+        }
+
+        if (ctx->cacertslen >
+            TLS_MAX_CERTIFICATES_SIZE)
+        {
+            error_print();
+            ret = -1;
+            break;
+        }
+        memcpy(this->ca_certs,
+            ctx->cacerts, ctx->cacertslen);
+
+        this->ca_certs_len = ctx->cacertslen;
+        this->sign_key = ctx->signkey;
+
+    }while( 0 );
+
+    return 0;
 }
 
 }

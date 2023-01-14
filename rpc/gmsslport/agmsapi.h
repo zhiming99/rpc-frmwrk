@@ -25,6 +25,10 @@
 
 #pragma once
 #include <stdint.h>
+
+#define RET_OK 0
+#define RET_PENDING 65537
+
 namespace gmssl
 {
 
@@ -75,6 +79,9 @@ enum AGMS_STATE : uint32_t
     STAT_WAIT_CLI_CERT,
     STAT_WAIT_CLI_CERTVERIFY,
     STAT_WAIT_CLI_FIN,
+    STAT_START_SHUTDOWN,
+    STAT_WAIT_CLOSE_NOTIFY,
+    STAT_SHUTDOWN,
 };
 
 struct AGMS_CTX : TLS_CTX
@@ -85,6 +92,7 @@ struct AGMS_CTX : TLS_CTX
     int set_cipher_list( const char *str);
     int up_ref();
     void down_ref();
+    void cleanup();
 };
 
 struct AGMS_IOVE
@@ -170,13 +178,15 @@ struct AGMS : public TLS_CONNECT
     BLKOUT write_bio;
 
     AGMS( AGMS_CTX *ctx );
+    virtual ~AGMS_CTX()
+    { cleanup(); }
 
     virtual int init() = 0;
     virtual int handshake() = 0;
-    virtual int shutdown() = 0;
 
     virtual int recv( PIOVE& iove ) = 0;
     virtual int send( PIOVE& iove ) = 0;
+    int shutdown();
 
     int send_alert( int alert );
     int get_error(int ret_code) const;
@@ -198,6 +208,7 @@ struct AGMS : public TLS_CONNECT
     bool is_client() const;
 
     int pending_bytes();
+    void cleanup();
 };
 
 struct TLS13_HSCTX_BASE
@@ -247,7 +258,8 @@ struct TLS13 : public AGMS
 {
     TLS13_HSCTX_CLI hctxc;
     TLS13_HSCTX_SVR hctxs;
-    int init() override;
+
+    int init( bool is_client ) override;
     int handshake() override;
     int shutdown() override;
 
@@ -260,6 +272,11 @@ struct TLS13 : public AGMS
     protected:
     int handshake_svr();
     int handshake_cli();
+
+    int init_cli();
+    int init_svr();
+
+    int init_connect();
 };
 
 }
