@@ -157,10 +157,10 @@ int AGMS_IOVE::split(
     AGMS_IOVE& bottom_half,
     size_t offset )
 {
-    if( this->content_end - this->start <= offset ||
+    if( this->content_end - this->start <= offset )
         return -EINVAL;
 
-    size_t newsize1 = offset
+    size_t newsize1 = offset;
     size_t newsize2 = this->size() - offset;
 
     this->content_end = this->start + offset;
@@ -219,7 +219,7 @@ int AGMS_IOVE::detach( uint8_t** pptr,
     return 0;
 }
 
-bool is_valid_hdr( uint8_t* record )
+static bool is_valid_hdr( uint8_t* record )
 {
     if (!tls_record_type_name(
         tls_record_type(record)))
@@ -237,15 +237,15 @@ bool is_valid_hdr( uint8_t* record )
 }
 
 #define INVALID_REC ( ( uint8_t* )-1 )
-uint8_t* get_partial_rec( PIOVE& piove )
+
+uint8_t* AGMS_IOVE::get_partial_rec()
 {
-    PIOVE& p = piove;
-    if( p->size() < TLS_RECORD_HEADER_SIZE )
+    if( this->size() < TLS_RECORD_HEADER_SIZE )
         return piove->begin();
 
     size_t total_bytes = 0;
-    uint8_t* cur_rec = p->begin();
-    uint8_t* tail_ptr = p->end();
+    uint8_t* cur_rec = this->begin();
+    uint8_t* tail_ptr = this->end();
 
     bool partial_rec = false;
 
@@ -286,34 +286,39 @@ uint8_t* get_partial_rec( PIOVE& piove )
     return nullptr;
 }
 
-static bool is_partial_rec( PIOVE& piove )
+bool AGMS_IOVE::is_partial_rec()
 {
     if( TLS_RECORD_HEADER_SIZE >
-        piove->size() )
+        this->size() )
         return true;
 
     size_t rec_len =
-        tls_record_length( piove->begin() );
+        tls_record_length( this->begin() );
 
-    if( rec_len > piove->size() )
+    if( rec_len > this->size() )
         return true;
 
     return false;
 }
 
-static bool is_single_rec( PIOVE& piove )
+bool AGMS_IOVE::is_single_rec()
 {
     if( TLS_RECORD_HEADER_SIZE >
-        piove->size() )
+        this->size() )
         return false;
 
     size_t rec_len =
-        tls_record_length( piove->begin() );
+        tls_record_length( this->begin() );
 
-    if( rec_len == piove->size() )
+    if( rec_len == this->size() )
         return true;
 
     return false;
+}
+
+void BLKIO_BASE::put_back( PIOVE& piover )
+{
+    io_vec.push_front( piover );
 }
 
 int BLKIN::write( PIOVE& piove )
@@ -329,14 +334,14 @@ int BLKIN::write( PIOVE& piove )
         if( !io_vec.empty() )
         {
             PIOVE& last = io_vec.back();
-            if( is_partial_rec( last ) )
+            if( last->is_partial_rec() )
             {
                 ret = last->merge( piove );
                 if( ret < 0 )
                     break;
 
-                if( is_partial_rec( last ) ||
-                    is_single_rec( last ) )
+                if( last->is_partial_rec() ||
+                    last->is_single_rec() )
                     break;
 
                 check_hdr = false;
@@ -373,7 +378,7 @@ int BLKIN::write( PIOVE& piove )
         // tail has more than one record
         PIOVE& last = io_vec.back();
         uint8_t* partial_rec =
-            get_partial_rec( last );
+            last->get_partial_rec();
 
         // all the records are complete
         if( partial_rec == nullptr )
@@ -410,7 +415,7 @@ int BLKIN::read( PIOVE& piove )
     if( io_vec.size() == 1 )
     {
         PIOVE& last = io_vec.back();
-        if( is_partial_rec( last ) )
+        if( last->is_partial_rec() )
             return -ENOENT;
     }
     piove = io_vec.front();
@@ -424,16 +429,11 @@ size_t BLKIN::size()
     if( count > 0 )
     {
         PIOVE& last = io_vec.back();
-        if( is_partial_rec( last ) )
+        if( last->is_partial_rec() )
             return count - 1;
         return count;
     }
     return 0;
-}
-
-void BLKIN::put_back( PIOVE& iover )
-{
-    io_vec.push_front( iover );
 }
 
 int BLKOUT::write( PIOVE& iovew )
@@ -472,27 +472,35 @@ void TLS13_HSCTX_BASE::clear()
     gmssl_secure_clear(handshake_secret,
         sizeof(handshake_secret));
 
-    gmssl_secure_clear(master_secret, sizeof(master_secret));
+    gmssl_secure_clear(
+        master_secret, sizeof(master_secret));
 
-    gmssl_secure_clear(client_handshake_traffic_secret,
+    gmssl_secure_clear(
+        client_handshake_traffic_secret,
         sizeof(client_handshake_traffic_secret));
 
-    gmssl_secure_clear(server_handshake_traffic_secret,
+    gmssl_secure_clear(
+        server_handshake_traffic_secret,
         sizeof(server_handshake_traffic_secret));
-    gmssl_secure_clear(client_application_traffic_secret,
+
+    gmssl_secure_clear(
+        client_application_traffic_secret,
         sizeof(client_application_traffic_secret));
 
-    gmssl_secure_clear(server_application_traffic_secret,
+    gmssl_secure_clear(
+        server_application_traffic_secret,
         sizeof(server_application_traffic_secret));
 
-    gmssl_secure_clear(client_write_key,
+    gmssl_secure_clear(
+        client_write_key,
         sizeof(client_write_key));
 
-    gmssl_secure_clear(server_write_key,
+    gmssl_secure_clear(
+        server_write_key,
         sizeof(server_write_key));
 
-    gmssl_secure_clear(verify_data,
-        sizeof(verify_data));
+    gmssl_secure_clear(
+        verify_data, sizeof(verify_data));
 }
 
 void TLS13_HSCTX_CLI::clear()
@@ -535,32 +543,20 @@ int AGMS::shutdown()
             RECV_RECORD( prec, record, recordlen );
             // fall through
         }
-    case STAT_WAIT_CLOSE_NOTIFY:
-        {
-            size_t recordlen = 0;
-            uint8_t* record = nullptr;
-            RECV_RECORD( prec, record, recordlen );
-            if( tls_record_type( record ) ==
-                TLS_record_alert )
-            break;
-        }
     default:
         break;
     }
 
-    if( ret == RET_PENDING )
-        set_state( STAT_WAIT_CLOSE_NOTIFY );
-    else
-        set_state( STAT_SHUTDOWN );
-
+    set_state( STAT_SHUTDOWN );
     return ret;
 }
 
 void AGMS::cleanup()
 {
-    TLS_CONNECT* tls_conn = this;
-    gmssl_secure_clear( tls_conn,
+    TLS_CONNECT* conn = this;
+    gmssl_secure_clear( conn,
         sizeof( TLS_CONNECT ) );
+
 }
 
 int AGMS::send_alert( int alert )
@@ -591,6 +587,102 @@ int AGMS::send_alert( int alert )
     return ret;
 }
 
+int TLS13::recv( IOV& iov )
+{
+	int ret;
+	const BLOCK_CIPHER_KEY *key;
+	const uint8_t *iv;
+	uint8_t *seq_num;
+	uint8_t *enced_record; 
+	size_t enced_recordlen;
+
+	uint8_t *record; 
+	size_t recordlen;
+
+	int record_type;
+
+    TLS_CONNECT* conn = this;
+	if (conn->is_client)
+    {
+		key = &conn->server_write_key;
+		iv = conn->server_write_iv;
+		seq_num = conn->server_seq_num;
+	}
+    else
+    {
+		key = &conn->client_write_key;
+		iv = conn->client_write_iv;
+		seq_num = conn->client_seq_num;
+	}
+
+    do{
+        RECV_RECORD( prec,
+            enced_record, enced_recordlen );
+
+        uint8_t* tail_ptr = prec->end();
+
+        while( enced_record < tail_ptr )
+        {
+            PIOVE pdec_rec( new AGMS_IOVE );
+            pdec_rec->alloc( enced_recordlen );
+
+            if (tls13_gcm_decrypt(key, iv, seq_num,
+                enced_record + TLS_RECORD_HEADER_SIZE,
+                enced_recordlen - TLS_RECORD_HEADER_SIZE,
+                &record_type,
+                pdec_rec->begin(),
+                &recordlen) != 1)
+            {
+                error_print();
+                ret = -1;
+                break;
+            }
+
+            if( recordlen > enced_recordlen )
+            {
+                ret = -ERANGE;
+                break;
+            }
+
+            size_t overhead =
+                ( enced_recordlen - recordlen );
+
+            pdec_rec->trim_bytes_end( overhead );
+            tls_seq_num_incr(seq_num);
+
+            tls_trace("decrypt ApplicationData\n");
+
+            tls_record_trace( stderr,
+                pdec_rec->begin(), recordlen, 0, 0);
+
+            if (record_type !=
+                TLS_record_application_data)
+            {
+                error_print();
+                ret = -EBADMSG;
+                break;
+            }
+
+            enced_record += enced_recordlen +
+                TLS_RECORD_HEADER_SIZE;
+
+            if( enced_record > tail_ptr )
+            {
+                ret = -EBADMSG;
+                break;
+            }
+
+            enced_recordlen =
+                tls_record_length( enced_record );
+
+            iov.push_back( pdec_rec );
+        }
+
+    }while( 1 );
+
+	return 0;
+}
+
 int TLS13::send( PIOVE& piove )
 {
     const BLOCK_CIPHER_KEY *key;
@@ -601,7 +693,7 @@ int TLS13::send( PIOVE& piove )
     size_t padding_len = 0; //FIXME: 在conn中设置是否加随机填充，及设置该值
     int ret = 0;
 
-    if( !is_init_finished() )
+    if( !is_ready() )
         return -EBUSY;
 
     tls_trace("send {ApplicationData}\n");
@@ -628,7 +720,7 @@ int TLS13::send( PIOVE& piove )
         datalen = std::min(
             ( size_t )tail_ptr - cur_blk,
             ( size_t )TLS_MAX_CIPHERTEXT_SIZE );
-            
+         
         PIOVE prec( new AGMS_IOVE );
         size_t mem_size = datalen + 1 +
             padding_len + GHASH_SIZE  +
@@ -1437,7 +1529,6 @@ int TLS13::handshake_svr()
             RECV_RECORD( prec, record, recordlen );
 
             int protocol;
-            int server_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
             const uint8_t *random;
             size_t padding_len;
 
@@ -2050,14 +2141,80 @@ int TLS13::init( bool is_client )
     return init_svr();
 }
 
-static int client_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
+int TLS13::init_svr()
+{
+    gint32 ret = 0;
+    int server_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
+    do{
+        TLS_CTX* ctx = this->gms_ctx.get();
+        TLS_CONNECT* conn = this;
+
+        memset(&ctx, 0, sizeof(ctx));
+        memset(&conn, 0, sizeof(conn));
+
+        ret = tls_ctx_init( ctx->get(),
+            TLS_protocol_tls13,
+            TLS_server_mode);
+
+        if( ret != 1 )
+            break;
+
+        size_t cipher_count =
+            sizeof(client_ciphers);
+
+        cipher_count /=
+            sizeof(server_ciphers[0]);
+
+        ret = tls_ctx_set_cipher_suites(
+            ctx, server_ciphers,
+            cipher_count );
+        if( ret != 1 )
+            break;
+
+        if( tls_ctx_set_certificate_and_key(
+            &ctx, this->certfile.c_str(),
+            this->keyfile.c_str(),
+            this->password.c_str()) != 1)
+        {
+            this->password.replace(
+                0, std::string::npos, 0, ' ' );
+            ret = -1;
+            break;
+        }
+
+        this->password.replace(
+            0, std::string::npos, 0, ' ' );
+
+        if (this->cacertfile.size())
+        {
+            if (tls_ctx_set_ca_certificates(
+                &ctx, cacertfile.c_str(),
+                TLS_DEFAULT_VERIFY_DEPTH) != 1)
+            {
+                ret = -1;
+                break;
+            }
+        }
+
+        ret = init_connect();
+
+    }while( 0 );
+
+    return ret;
+}
 
 int TLS13::init_cli()
 {
     gint32 ret = 0;
+    int client_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
     do{
-        ret = tls_ctx_init(
-            this->gms_ctx->get(),
+        TLS_CTX* ctx = this->gms_ctx.get();
+        TLS_CONNECT* conn = this;
+
+        memset(&ctx, 0, sizeof(ctx));
+        memset(&conn, 0, sizeof(conn));
+
+        ret = tls_ctx_init( ctx->get(),
             TLS_protocol_tls13,
             TLS_client_mode);
 
@@ -2071,11 +2228,36 @@ int TLS13::init_cli()
             sizeof(client_ciphers[0]);
 
         ret = tls_ctx_set_cipher_suites(
-            &ths->gms_ctx, client_ciphers,
+            ctx, client_ciphers,
             cipher_count );
         if( ret != 1 )
             break;
 
+        if( this->certfile.size() &&
+            tls_ctx_set_certificate_and_key(
+            &ctx, this->certfile.c_str(),
+            this->keyfile.c_str(),
+            this->password.c_str()) != 1)
+        {
+            this->password.replace(
+                0, std::string::npos, 0, ' ' );
+            ret = -1;
+            break;
+        }
+
+        this->password.replace(
+            0, std::string::npos, 0, ' ' );
+
+        if (this->cacertfile.size())
+        {
+            if (tls_ctx_set_ca_certificates(
+                &ctx, cacertfile.c_str(),
+                TLS_DEFAULT_VERIFY_DEPTH) != 1)
+            {
+                ret = -1;
+                break;
+            }
+        }
         ret = init_connect();
     }while( 0 );
 
@@ -2115,7 +2297,6 @@ int TLS13::init_connect()
 
             this->client_certs_len =
                 ctx->certslen;
-
         }
         else
         {

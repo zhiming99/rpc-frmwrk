@@ -25,6 +25,7 @@
 
 #pragma once
 #include <stdint.h>
+#include <list>
 
 #define RET_OK 0
 #define RET_PENDING 65537
@@ -33,7 +34,7 @@ namespace gmssl
 {
 
 using PIOVE=std::shared_ptr< AGMS_IOVE > ;
-using IOV = std::deque< PIOVE >;
+using IOV = std::list< PIOVE >;
 
 struct BLKIO_BASE
 {
@@ -41,6 +42,7 @@ struct BLKIO_BASE
     virtual int read ( PIOVE& iover ) = 0;
     virtual int write( PIOVE& iovew ) = 0;
     virtual size_t size() const = 0;
+    void put_back( PIOVE& iover );
 
     protected:
     bool is_partial_record();
@@ -53,7 +55,6 @@ struct BLKIN : public BLKIO_BASE
     int write( PIOVE& iovew ) override;
     int read( PIOVE& iover ) override;
     size_t size() const override;
-    void put_back( PIOVE& iover );
 };
 
 struct BLKOUT : public BLKIO_BASE
@@ -95,8 +96,11 @@ struct AGMS_CTX : TLS_CTX
     void cleanup();
 };
 
+#define IOVE_NOFREE  1
+
 struct AGMS_IOVE
 {
+    uint32_t flags = 0;
     uint8_t* ptr = nullptr;
     size_t mem_size = 0;
     size_t start = 0;
@@ -105,20 +109,30 @@ struct AGMS_IOVE
     ~AGMS_IOVE()
     { clear(); }
 
+    bool no_free()
+    { return ( flags & IOVE_NOFREE ) > 0; }
+
+    void set_no_free( bool no_free = true )
+    {
+        if( no_free )
+            flags |= IOVE_NOFREE;
+        else
+            flags &= ~IOVE_NOFREE;
+    }
+
     void clear()
     {
-        if( ptr )
-        {
-            free( ptr );
-            ptr = nullptr;
-        }
+        if( ptr && !no_free() )
+        { free( ptr ); }
+        ptr = nullptr;
         mem_size = start = content_end = 0;
+        flags = 0;
     }
 
     bool empty()
     {
         return ( ptr == nullptr ||
-            content_end - start == 0 );
+            ( content_end - start == 0 ) );
     }
 
     int alloc( size_t size = 0 );
@@ -168,6 +182,11 @@ struct AGMS_IOVE
         content_end -= bytes;
         return 0;
     }
+
+    // tls record related methods
+    bool is_single_rec();
+    bool is_partial_rec();
+    uint8_t* get_partial_rec();
 };
 
 struct AGMS : public TLS_CONNECT
@@ -176,6 +195,11 @@ struct AGMS : public TLS_CONNECT
     std::unique_ptr< AGMS_CTX > gms_ctx;
     BLKIN read_bio;
     BLKOUT write_bio;
+
+    std::string certfile;
+    std::string keyfile;
+    std::string cacertfile;
+    std::string password;
 
     AGMS( AGMS_CTX *ctx );
     virtual ~AGMS_CTX()
@@ -196,7 +220,7 @@ struct AGMS : public TLS_CONNECT
     { return gms_state; }
 
     void library_init();
-    bool is_init_finished() const
+    bool is_ready() const
     { return get_state() == STAT_READY; }
 
     int use_PrivateKey_file(const char *file, int type);

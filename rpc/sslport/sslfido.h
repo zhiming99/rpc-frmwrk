@@ -46,6 +46,7 @@ namespace rpcf
 #define PORT_CLASS_OPENSSL_FIDO "RpcOpenSSLFido"
 #define JSON_ATTR_CERTFILE      "CertFile"
 #define JSON_ATTR_KEYFILE       "KeyFile"
+#define JSON_ATTR_CACERT        "CACertFile"
 
 enum EnumMyClsid
 {
