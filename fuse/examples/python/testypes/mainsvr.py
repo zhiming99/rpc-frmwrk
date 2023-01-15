@@ -100,7 +100,7 @@ def EchoStream( req : object)->object:
         stmfp.close()
 
     except Exception as err:
-            print( err )
+            print( "EchoStream ", err, res )
 
     return resp
 
