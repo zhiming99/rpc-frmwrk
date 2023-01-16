@@ -43,7 +43,7 @@ def EchoByteArray( req : object )->object :
         res = req[ 'Parameters']['pBuf'].encode()
         bytearr = base64.b64decode(res)
         bufsize = len(bytearr)
-        print(bytearr[bufsize-128:bufsize])
+        print("EchoByteArray ", bytearr[bufsize-128:bufsize])
         AddParameter(resp, 'pRespBuf', req['Parameters']['pBuf'])
         return resp
     except Exception as err:
@@ -53,21 +53,21 @@ def EchoByteArray( req : object )->object :
 def EchoArray( req : object )->object:
     resp = BuildRespHdr('EchoArray', req['RequestId'])
     res = req[ 'Parameters']['arrInts']
-    print(res)
+    print( "EchoArray ", res)
     AddParameter(resp, 'arrIntsR', res)
     return resp
 
 def EchoMap( req : object )->object:
     resp = BuildRespHdr('EchoMap', req['RequestId'])
     res = req[ 'Parameters']['mapReq']
-    print(res)
+    print( "EchoMap ", res)
     AddParameter(resp, 'mapResp', res)
     return resp
 
 def EchoStruct( req : object)->object:
     resp = BuildRespHdr('EchoStruct', req['RequestId'])
     res = req[ 'Parameters']['fi']
-    print(res)
+    print( "EchoStruct ", res)
     AddParameter(resp, 'fir', res)
     return resp
 
@@ -100,7 +100,7 @@ def EchoStream( req : object)->object:
         stmfp.close()
 
     except Exception as err:
-            print( "EchoStream ", err, res )
+        print( "EchoStream ", err, res )
 
     return resp
 
@@ -180,8 +180,6 @@ def test() :
 
         reqfp.close()
         respfp.close()
-        evtfp.close()
-        stmfp.close()
 
     except Exception as err:
         print( err )
@@ -190,8 +188,6 @@ def test() :
         print( "\t<req num> is the suffix of the req file under <service path>" )
         reqfp.close()
         respfp.close()
-        evtfp.close()
-        stmfp.close()
 
     finally :
         return error

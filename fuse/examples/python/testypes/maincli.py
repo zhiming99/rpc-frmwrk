@@ -85,7 +85,7 @@ def test() :
             i4r = objResp['Parameters']["i4r"]
             i5r = objResp['Parameters']["i5r"]
             szTextr = objResp['Parameters']["szTextr"]
-            print( "EchoMany response ", i1r, i2r, i3r, i4r, i5r, szTextr )
+            print( os.getpid(), "EchoMany response ", i1r, i2r, i3r, i4r, i5r, szTextr )
 
             # Echo
             req = BuildReqHdr( "Echo", idx )
@@ -101,7 +101,7 @@ def test() :
             error = objResp[ "ReturnCode"]
             if error < 0 :
                 raise Exception( 'Echo failed with error %d@%s' % ( error, num) )
-            print( "Echo completed with response '%s'" %
+            print( os.getpid(), "Echo completed with response '%s'" %
                 objResp['Parameters']['strResp'])
 
             # EchoByteArray
@@ -132,7 +132,7 @@ def test() :
             res = strBufr.encode()
             binBufr = base64.b64decode(res)
             bufsize = len( binBuf )
-            print( "EchoByteArray ", binBuf[bufsize - 128:bufsize] )
+            print( os.getpid(), "EchoByteArray ", binBuf[bufsize - 128:bufsize] )
 
             # EchoArray
             req = BuildReqHdr( "EchoArray", idx )
@@ -150,7 +150,7 @@ def test() :
                 raise Exception( 'EchoArray failed with error %d@%s' % ( error, num) )
             
             arrIntsR = objResp['Parameters']["arrIntsR"]
-            print( arrIntsR )
+            print( os.getpid(), "EchoArray", arrIntsR )
 
             #EchoMap
             req = BuildReqHdr( "EchoMap", idx )
@@ -167,7 +167,7 @@ def test() :
             if error < 0 :
                 raise Exception( 'EchoMap failed with error %d@%s' % ( error, num) )
             mapResp = objResp['Parameters']["mapResp"]
-            print( mapResp )
+            print( os.getpid(), "EchoMap", mapResp )
 
             #EchoStruct
             req = BuildReqHdr( "EchoStruct", idx )
@@ -191,7 +191,7 @@ def test() :
             if error < 0 :
                 raise Exception( 'EchoStruct failed with error %d@%s' % ( error, num) )
             mapResp = objResp['Parameters']["fir"]
-            print( mapResp )
+            print( os.getpid(), "EchoStruct", mapResp )
             
             #EchoNoParams
             req = BuildReqHdr( "EchoNoParams", idx )
@@ -203,7 +203,7 @@ def test() :
                 raise Exception( 'EchoNoParams recv failed with error %d@%s' % ( error, num) )
             objResp = ret[ 1 ][ 0 ]
             error = objResp[ "ReturnCode"]
-            print( 'EchoNoParams returned with status %d@%s' % ( error, num) )
+            print( os.getpid(), 'EchoNoParams returned with status %d@%s' % ( error, num) )
 
             #EchoStream
             req = BuildReqHdr( "EchoStream", idx )
@@ -226,7 +226,7 @@ def test() :
             hstmr = objResp[ 'Parameters']["hstmr"]
             bufsize = len( binBuf )
             print(binBuf[ bufsize - 128 : bufsize ])
-            print( 'EchoStream %s completed with %s' % ( num, hstmr ))
+            print( os.getpid(), 'EchoStream %s completed with %s' % ( num, hstmr ))
             break
 
         reqfp.close()
