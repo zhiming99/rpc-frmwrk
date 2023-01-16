@@ -71,7 +71,7 @@ function mkDirTest()
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT | tee -a $basedir/logdump.txt
+/bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 function singleMkdir()
 {
     idx=0
@@ -134,9 +134,12 @@ $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
 
-if grep -i errno $basedir/logdump.txt; then
+echo search errors in logdump.txt...
+if grep 'Errno\|-110@0' $basedir/logdump.txt > /dev/null; then
+    echo errors found!
     exit 1
 fi
+echo check passed
 
 function pytest()
 {
