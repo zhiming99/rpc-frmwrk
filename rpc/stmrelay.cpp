@@ -247,6 +247,8 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         if( ERROR( iRet ) )
         {
+            OutputMsg( iRet,
+                "Checkpoint 1: FetchData failed" );
             ret = iRet;
             break;
         }

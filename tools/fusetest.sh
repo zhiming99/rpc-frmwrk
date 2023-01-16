@@ -134,12 +134,12 @@ $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
 
-echo search errors in logdump.txt...
+echo Check errors in logdump.txt...
 if grep 'Errno\|-110@0' $basedir/logdump.txt > /dev/null; then
     echo errors found!
     exit 1
 fi
-echo check passed
+echo Check passed!
 
 function pytest()
 {
