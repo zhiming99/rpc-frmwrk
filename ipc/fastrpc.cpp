@@ -820,23 +820,41 @@ gint32 CFastRpcServerBase::RemoveStmSkel(
 gint32 CFastRpcServerBase::GetStmSkel(
     HANDLE hstm, InterfPtr& pIf )
 {
-    CStdRMutex oLock( GetLock() );
-    if( m_mapSkelObjs.empty() )
-        return -ENOENT;
-    if( hstm == INVALID_HANDLE )
-    {
-        // for broadcasting events
-        auto itr = m_mapSkelObjs.begin();
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( GetLock() );
+        if( m_mapSkelObjs.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        if( hstm == INVALID_HANDLE )
+        {
+            // for broadcasting events
+            auto itr = m_mapSkelObjs.begin();
+            pIf = itr->second;
+            break;
+        }
+
+        auto itr = m_mapSkelObjs.find( hstm );
+        if( itr == m_mapSkelObjs.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
         pIf = itr->second;
-        return STATUS_SUCCESS;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "Checkpoint 2: GetStmSkel failed, "
+            "0x%llx:0x%llx",
+            hstm, pIf->GetObjId() );
     }
-
-    auto itr = m_mapSkelObjs.find( hstm );
-    if( itr == m_mapSkelObjs.end() )
-        return -ENOENT;
-
-    pIf = itr->second;
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 gint32 CFastRpcServerBase::EnumStmSkels(
