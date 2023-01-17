@@ -1,26 +1,26 @@
 import os
-import sys
 import json
-import io
 
 import errno
-import termios
-import time
 import select
 import fcntl
 import array
+
+from typing import List
 
 def setBlocking( fp : object )->int:
     try:
         return fcntl.ioctl( fp.fileno(), 0x4a00 )
     except Exception as err:
-        print( err )
+        print( os.getpid(), "iolib.setBlocking ",
+            err, ":", fp )
 
 def setNonBlocking( fp : object )->int:
     try:
         return fcntl.ioctl( fp.fileno(), 0x4a01 )
     except Exception as err:
-        print( err )
+        print( os.getpid(), "iolib.setNonBlocking ",
+            err, ":", fp )
 
 def getBytesAvail( fp : object )->int:
     buf=array.array('i',[0])
@@ -29,7 +29,7 @@ def getBytesAvail( fp : object )->int:
         return 0
     return buf[0]
 
-def recvResp( respfp : object)->[int, list] :
+def recvResp( respfp : object)->List[int, list] :
     inputs = [respfp]
     # wait for the reponse, it could take
     # up to 2 min to return when something
@@ -84,11 +84,17 @@ def sendReq( reqfp : object, reqObj : object ) -> int:
         reqfp.flush()
         return 0
     except Exception as err:
-        print( err )
+        print( os.getpid(),'iolib.sendReq ',
+            err, ": ", reqfp, "---", reqObj )
         return -errno.EFAULT
     
-
-def peekResp( respfp : object)->[ int, object ] :
+'''
+peekResp: read the non-blocking 'respfp' and return
+immediately if there is no data. Unlike recvResp,
+which wait in select till there is something to
+read.
+'''
+def peekResp( respfp : object)->List[ int, object ] :
     # read a four bytes integer as the
     # size of the response
     data = respfp.read(4)
@@ -104,7 +110,7 @@ def peekResp( respfp : object)->[ int, object ] :
     strResp = data.decode( "UTF-8")
     return [ 0, json.loads(strResp) ]
 
-def recvReq( reqfp : object ) -> [int, object]:
+def recvReq( reqfp : object ) -> List[int, object]:
     return recvResp( reqfp )
 
 def sendResp( respfp : object, resp:object )->int :
@@ -113,7 +119,7 @@ def sendResp( respfp : object, resp:object )->int :
 def sendEvent( respfp : object, evt:object )->int :
     return sendReq( respfp, evt )
 
-def recvMsg( respfp : object)->[int, list] :
+def recvMsg( respfp : object)->List[int, list] :
     inputs = [respfp]
     # wait for the reponse, it could take
     # up to 2 min to return when something
@@ -152,7 +158,8 @@ def recvMsg( respfp : object)->[int, list] :
             pos += 4 + size
         return [ 0, res ]
     except Exception as err:
-        print( err )
+        print( os.getpid(),
+            "iolib.recvMsg", err, ": ", respfp )
         if error == 0 :
             error = -errno.EFAULT
         return [ error, None ]

@@ -235,7 +235,7 @@ def test() :
         stmfp.close()
         
     except Exception as err:
-        print( "error is", err )
+        print( os.getpid(), "error is", err )
         print( "usage: maincli.py <service path> <req num>")
         print( "\t<service path> is /'path to mountpoint'/connection_X/TestTypesSvc")
         print( "\t<req num> is the suffix of the req file under <service path>" )
