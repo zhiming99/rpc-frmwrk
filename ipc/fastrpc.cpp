@@ -707,7 +707,7 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         {
             OutputMsg( ret, "Checkpoint 3: "
                 "OnStartSkelComplete failed, "
-                "0x%llx:0x%llx", hstm, hPort );
+                "%lld:%lld", hstm, hPort );
             ret = iRet;
             break;
         }
@@ -877,8 +877,8 @@ gint32 CFastRpcServerBase::GetStmSkel(
     {
         OutputMsg( ret,
             "Checkpoint 2: GetStmSkel failed, "
-            "0x%llx:0x%llx", hstm,
-            pIf->GetObjId() );
+            "%lld:%lld", pIf->GetObjId(),
+            hstm );
     }
     return ret;
 }
