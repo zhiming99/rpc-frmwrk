@@ -6,8 +6,6 @@ import select
 import fcntl
 import array
 
-from typing import List
-
 def setBlocking( fp : object )->int:
     try:
         return fcntl.ioctl( fp.fileno(), 0x4a00 )
@@ -29,7 +27,7 @@ def getBytesAvail( fp : object )->int:
         return 0
     return buf[0]
 
-def recvResp( respfp : object)->List[int, list] :
+def recvResp( respfp : object)->[int, list] :
     inputs = [respfp]
     # wait for the reponse, it could take
     # up to 2 min to return when something
@@ -94,7 +92,7 @@ immediately if there is no data. Unlike recvResp,
 which wait in select till there is something to
 read.
 '''
-def peekResp( respfp : object)->List[ int, object ] :
+def peekResp( respfp : object)->[ int, object ] :
     # read a four bytes integer as the
     # size of the response
     data = respfp.read(4)
@@ -110,7 +108,7 @@ def peekResp( respfp : object)->List[ int, object ] :
     strResp = data.decode( "UTF-8")
     return [ 0, json.loads(strResp) ]
 
-def recvReq( reqfp : object ) -> List[int, object]:
+def recvReq( reqfp : object ) -> [int, object]:
     return recvResp( reqfp )
 
 def sendResp( respfp : object, resp:object )->int :
@@ -119,7 +117,7 @@ def sendResp( respfp : object, resp:object )->int :
 def sendEvent( respfp : object, evt:object )->int :
     return sendReq( respfp, evt )
 
-def recvMsg( respfp : object)->List[int, list] :
+def recvMsg( respfp : object)->[int, list] :
     inputs = [respfp]
     # wait for the reponse, it could take
     # up to 2 min to return when something
