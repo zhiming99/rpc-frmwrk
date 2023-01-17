@@ -670,29 +670,51 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
     IEventSink* pIoReq,
     IConfigDb* pReqCtx )
 {
-    if( pIoReq == nullptr ||
-        pReqCtx == nullptr )
+    if( pIoReq == nullptr || pReqCtx == nullptr )
         return -EINVAL;
 
     gint32 ret = 0;
+    HANDLE hstm = INVALID_HANDLE;
     do{
         CCfgOpener oReqCtx( pReqCtx );
 
-        HANDLE hstm = INVALID_HANDLE;
         ret = oReqCtx.GetIntPtr(
             propStmHandle, ( guint32*& )hstm );
-        if( ERROR( ret ) )
-            break;
-
-        bool bStart = true;
-        ret = oReqCtx.GetBoolProp(
-            0, bStart );
         if( ERROR( ret ) )
             break;
 
         HANDLE hPort = INVALID_HANDLE;
         ret = oReqCtx.GetIntPtr(
             1, ( guint32*& )hPort );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oIoReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oIoReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        gint32 iRet = 0;
+        CCfgOpener oResp( pResp );
+        ret = oResp.GetIntProp(
+            propReturnValue, ( guint32& )iRet );
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            OutputMsg( ret, "Checkpoint 3: "
+                "OnStartSkelComplete failed, "
+                "0x%llx:0x%llx", hstm, hPort );
+            ret = iRet;
+            break;
+        }
+
+        bool bStart = true;
+        ret = oReqCtx.GetBoolProp(
+            0, bStart );
         if( ERROR( ret ) )
             break;
 
@@ -706,6 +728,7 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
             break;
 
         RemoveStmSkel( hstm );
+        hstm = INVALID_HANDLE;
 
         if( bClosePort )
         {
@@ -715,6 +738,9 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         }
 
     }while( 0 );
+
+    if( ERROR( ret ) && hstm != INVALID_HANDLE )
+        RemoveStmSkel( hstm );
 
     if( pCallback != nullptr )
     {
@@ -851,8 +877,8 @@ gint32 CFastRpcServerBase::GetStmSkel(
     {
         OutputMsg( ret,
             "Checkpoint 2: GetStmSkel failed, "
-            "0x%llx:0x%llx",
-            hstm, pIf->GetObjId() );
+            "0x%llx:0x%llx", hstm,
+            pIf->GetObjId() );
     }
     return ret;
 }
