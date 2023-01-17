@@ -1099,5 +1099,44 @@ gint32 CBuffer::Decompress(
     return 0;
 }
 
+gint32 CBuffer::Detach( char*& pMem,
+    guint32& dwSize,
+    guint32& dwOffset,
+    guint32& dwTailOff )
+{
+    if( m_pData == m_arrBuf ||
+        GetDataType() != DataTypeMem )
+        return -EACCES;
+    pMem = m_pData;
+    dwSize = m_dwSize;
+    dwOffset = m_dwOffset;
+    dwTailOff = m_dwTailOff;
+    new ( this )CBuffer( 0 );
+    SetDataType( DataTypeMem );
+    SetExDataType( typeNone );
+    return 0;
+}
+
+gint32 CBuffer::Attach( char* pMem,
+    guint32 dwSize,
+    guint32 dwOffset,
+    guint32 dwTailOff )
+{
+    if( pMem == nullptr )
+        return -EINVAL;
+
+    //using Append instead
+    if( dwSize < sizeof( m_arrBuf ) )
+        return -ERANGE;
+
+    Resize( 0 );
+    new ( this )CBuffer( pMem , dwSize, false );
+
+    SetOffset( dwOffset );
+    SetTailOff( dwTailOff );
+    SetDataType( DataTypeMem );
+    SetExDataType( typeByteArr );
+    return 0;
+}
 
 }

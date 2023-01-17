@@ -194,14 +194,20 @@ int AGMS_IOVE::merge(
     return 0;
 }
 
-int AGMS_IOVE::attach( uint8_t* ptr,
-    size_t mem_size,
-    size_t start = 0,
-    size_t end = 0 )
+int AGMS_IOVE::attach( uint8_t* nptr,
+    size_t nsize,
+    size_t nstart = 0,
+    size_t nend = 0 )
 {
-    if( ptr == nullptr || mem_size == 0 )
+    if( nptr == nullptr || nsize == 0 )
         return -EINVAL;
     clear();
+
+    ptr = nptr;
+    mem_size = nsize;
+    content_end = nend;
+    start = nstart;
+
     return 0;
 }
 
