@@ -55,6 +55,7 @@ struct BLKIN : public BLKIO_BASE
     int write( PIOVE& iovew ) override;
     int read( PIOVE& iover ) override;
     size_t size() const override;
+    bool has_partial_rec() const;
 };
 
 struct BLKOUT : public BLKIO_BASE

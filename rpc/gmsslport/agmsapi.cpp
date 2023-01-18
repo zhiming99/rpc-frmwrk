@@ -442,6 +442,16 @@ size_t BLKIN::size()
     return 0;
 }
 
+bool BLKIN::has_partial_rec() const
+{
+    if( io_vec.empty() )
+        return false;
+    PIOVE& last = io_vec.back();
+    if( last->is_partial_rec() )
+        return true;
+    return false;
+}
+
 int BLKOUT::write( PIOVE& iovew )
 {
     io_vec.push_back( iovew );
@@ -546,7 +556,7 @@ int AGMS::shutdown()
 
             tls_trace("send Alert close_notify\n");
             SEND_ALERT( TLS_alert_close_notify); 
-            RECV_RECORD( prec, record, recordlen );
+            // RECV_RECORD( prec, record, recordlen );
             // fall through
         }
     default:
