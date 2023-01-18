@@ -107,7 +107,7 @@ def EchoStream( req : object)->object:
 def EchoMany( req : object )->object:
     resp = BuildRespHdr('EchoMany', req['RequestId'])
     params = req[ 'Parameters']
-    AddParameter( resp, 'i1r', params['i1'] + 1)
+    AddParameter( resp, 'i1r', params['i1'] )
     AddParameter( resp, 'i2r', params['i2'] + 2)
     AddParameter( resp, 'i3r', params['i3'] + 3)
     AddParameter( resp, 'i4r', params['i4'] + 4)
