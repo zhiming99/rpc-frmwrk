@@ -1401,13 +1401,26 @@ gint32 CDBusStreamBusPort::PostStart(
         CRpcServices* pSvc = pIf;
         if( IsServer() )
         {
-            ret = pSvc->Start();
-            if( SUCCEEDED( ret ) )
+            CCfgOpener oReqCtx;
+            oReqCtx.SetPointer( propIrpPtr, pIrp );
+            oReqCtx.SetPointer( propPortPtr, this );
+
+            TaskletPtr pRespCb;
+            ret = NEW_PROXY_RESP_HANDLER2(
+                pRespCb, ObjPtr( pSvc ), 
+                &CRpcStreamChannelSvr::OnStartStopComplete,
+                ( IEventSink* )nullptr,
+                ( IConfigDb* )oReqCtx.GetCfg() );
+            if( ERROR( ret ) )
             {
-                SetStreamIf( pIf );
-                CRpcStreamChannelSvr* pSvr = pIf;
-                pSvr->SetPort( this );
+                ( *pRespCb )( eventCancelTask );
+                break;
             }
+            ret = pSvc->StartEx( pRespCb );
+            if( ERROR( ret ) )
+                ( *pRespCb )( eventCancelTask );
+
+            break;
         }
         else
         {

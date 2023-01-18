@@ -253,7 +253,12 @@ class CStartStopSafeBusPort :
                 pNewPort, pTask );
 
             if( ERROR( ret ) )
-                ( *pTask )( eventCancelTask );
+            {
+                if( !pTask.IsEmpty() )
+                    ( *pTask )( eventCancelTask );
+                if( !pCallback.IsEmpty() )
+                    ( *pCallback )( eventCancelTask );
+            }
 
         }while( 0 );
 
