@@ -3543,6 +3543,8 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
     if( ERROR( ret ) )
     {
+        OutputMsg( ret, "Checkpoint 4: "
+            "fs_write_buf failed" );
         m_pReqSize->Resize( 0 );
         m_vecOutBufs.clear();    
     }
