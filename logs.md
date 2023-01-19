@@ -1,4 +1,7 @@
 ---
+[`Thu Jan 19 2023 11:48:38 PM Beijing`]    
+1. while writing gmssl port, the mysterious `Errno 2` bug shows up again. It is difficult to reproduce and therefore the bug-fix progress is slow.
+
 [`Tue Jan 03 2023 11:01:11 PM Beijing`]    
 1. Most of the code for gmssl support will be submitted to the gmssl fork in the next few weeks.
 2. I will add some Chinese translations to the readme files in this repository.
