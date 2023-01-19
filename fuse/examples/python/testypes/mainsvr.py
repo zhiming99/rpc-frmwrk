@@ -148,7 +148,9 @@ def test() :
             #receive response if any
             ret = recvReq(reqfp)
             if ret[ 0 ] < 0 :
-                raise Exception( "unexpected error %d" % ret[ 0 ]  )
+                raise Exception( os.getpid(),
+                    "test()(mainsvr.py): unexpected error %d" % ret[ 0 ]  )
+
             reqs = ret[ 1 ]
             if reqs is None or len( reqs ) == 0:
                 print( "the req is empty ", reqs )
@@ -172,17 +174,18 @@ def test() :
                     if resp is None :
                         print( "the req failed ", req )
                         continue
+
+                    sendResp( respfp, resp )
+
                 except Exception as err :
+                    print( os.getpid(), "test()(mainsvr.py):", err )
                     continue
-
-                sendResp( respfp, resp )
-
 
         reqfp.close()
         respfp.close()
 
     except Exception as err:
-        print( err )
+        print( os.getpid(), "test()(mainsvr.py):", err )
         print( "usage: mainsvr.py <service path> <req num>")
         print( "\t<service path> is /'path to mountpoint'/TestTypesSvc")
         print( "\t<req num> is the suffix of the req file under <service path>" )

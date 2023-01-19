@@ -705,9 +705,6 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
 
         if( ERROR( iRet ) )
         {
-            OutputMsg( ret, "Checkpoint 3: "
-                "OnStartSkelComplete failed, "
-                "%lld:%lld", hPort, hstm );
             ret = iRet;
             break;
         }

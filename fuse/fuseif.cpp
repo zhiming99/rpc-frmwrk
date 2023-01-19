@@ -3519,19 +3519,23 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
         // must release lock here, otherwise, deadlock
         // could happen
+        ++m_dwMsgCount;
         oFileLock.Unlock();
 
         // send the response
-        m_dwMsgCount++;
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
         ret = pSvr->DispatchMsg( valResp );
         if( ret == STATUS_PENDING )
             ret = 0;
 
-        oFileLock.Lock();
-
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Checkpoint 3: "
+                "DispatchMsg failed" );
             break;
+        }
+
+        oFileLock.Lock();
         if( m_vecOutBufs.empty() )
             break;
 
@@ -3786,9 +3790,8 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
         // must release lock here, otherwise, deadlock
         // could happen
+        ++m_dwMsgCount;
         oFileLock.Unlock();
-
-        m_dwMsgCount++;
 
         if( !valReq.isMember( JSON_ATTR_REQCTXID ) ||
             !valReq[ JSON_ATTR_REQCTXID ].isUInt64() )
