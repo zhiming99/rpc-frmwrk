@@ -23,7 +23,7 @@ function stressTest()
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT | tee -a $basedir/logdump.txt
+/bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &

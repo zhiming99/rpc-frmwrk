@@ -547,23 +547,51 @@ void TLS13_HSCTX_SVR::clear()
 int AGMS::shutdown()
 {
     int ret = 0;
+    size_t recordlen = 0;
+    uint8_t* record = nullptr;
+
     switch( get_state() )
     {
     case STAT_START_SHUTDOWN: 
         {
-            size_t recordlen = 0;
-            uint8_t* record = nullptr;
-
             tls_trace("send Alert close_notify\n");
             SEND_ALERT( TLS_alert_close_notify); 
-            // RECV_RECORD( prec, record, recordlen );
-            // fall through
+            set_state( STAT_WAIT_CLOSE_NOTIFY );
+            break;
+        }
+    case STAT_WAIT_CLOSE_NOTIFY:
+        {
+            int level, alert;
+            ret = RET_PENDING;
+            do{
+                RECV_RECORD( prec, record, recordlen );
+                uint8_t* tail_ptr =
+                    prec->begin() + prec->size();
+                while( record < tail_ptr )
+                {
+                    if (tls_record_get_alert(
+                        record, &level, &alert) == 1 &&
+                        alert == TLS_alert_close_notify )
+                    {
+                        set_state(
+                            STAT_START_SHUTDOWN );
+                        ret = 0;
+                        break;
+                    }
+                    record +=
+                        tls_record_length( record );
+                }
+                if( ret == 0 )
+                    break;
+
+            }while( 0 );
+
+            break;
         }
     default:
         break;
     }
 
-    set_state( STAT_SHUTDOWN );
     return ret;
 }
 
@@ -603,9 +631,64 @@ int AGMS::send_alert( int alert )
     return ret;
 }
 
+int TLS13::handle_alert( uint8_t* record )
+{
+    int ret = 0;
+    if( record == nullptr )
+        return -EINVAL;
+    do{
+        int level;
+        int alert;
+
+        size_t recordlen =
+            tls_record_length( record );
+
+        if (tls_record_get_alert(
+            record, &level, &alert) != 1)
+        { 
+            error_print();
+            ret = -1;
+        }    
+        tls_record_trace(stderr, record, *recordlen, 0, 0);
+        if (level == TLS_alert_level_warning)
+        {
+            error_puts("Warning record received!\n");
+        }
+        else if (alert == TLS_alert_close_notify)
+        {
+            // close_notify是唯一需要提供反馈的Fatal
+            // Alert，其他直接中止连接
+            uint8_t alert_record[TLS_ALERT_RECORD_SIZE];
+            size_t alert_record_len;
+
+            tls_record_set_type(
+                alert_record, TLS_record_alert);
+
+            tls_record_set_protocol( alert_record,
+                tls_record_protocol(record));
+
+            tls_record_set_alert(alert_record,
+                &alert_record_len,
+                TLS_alert_level_fatal,
+                TLS_alert_close_notify);
+
+            tls_trace("send Alert close_notifiy\n");
+
+            tls_record_trace(stderr,
+                alert_record, alert_record_len, 0, 0);
+
+            SEND_RECORD( alert_record, alert_record_len );
+        }
+        break;
+
+    }while( 0 );
+
+    return ret;
+}
+
 int TLS13::recv( IOV& iov )
 {
-	int ret;
+	int ret = 0;
 	const BLOCK_CIPHER_KEY *key;
 	const uint8_t *iv;
 	uint8_t *seq_num;
@@ -632,13 +715,43 @@ int TLS13::recv( IOV& iov )
 	}
 
     do{
-        RECV_RECORD( prec,
-            enced_record, enced_recordlen );
+        RECV_RECORD( prec, enced_record,
+            enced_recordlen );
 
         uint8_t* tail_ptr = prec->end();
 
         while( enced_record < tail_ptr )
         {
+            int rec_type =
+                tls_record_type(enced_record)
+            bool bNext = false;
+            switch( rec_type )
+            {
+            case TLS_record_application_data:
+                break;
+            case TLS_record_alert:
+                {
+                    this->handle_alert( enced_record );
+                    bNext = true;
+                    break;
+                }
+            case TLS_record_change_cipher_spec:
+            case TLS_record_handshake:
+            case TLS_record_heartbeat: 
+            case TLS_record_tls12_cid:
+            default:
+                {
+                    bNext = true;
+                    break;
+                }
+            }
+
+            if( bNext )
+            {
+                enced_record += enced_recordlen;
+                continue;
+            }
+
             PIOVE pdec_rec( new AGMS_IOVE );
             pdec_rec->alloc( enced_recordlen );
 
@@ -671,32 +784,25 @@ int TLS13::recv( IOV& iov )
             tls_record_trace( stderr,
                 pdec_rec->begin(), recordlen, 0, 0);
 
-            if (record_type !=
-                TLS_record_application_data)
-            {
-                error_print();
-                ret = -EBADMSG;
-                break;
-            }
+            iov.push_back( pdec_rec );
 
-            enced_record += enced_recordlen +
-                TLS_RECORD_HEADER_SIZE;
-
+            enced_record += enced_recordlen;
             if( enced_record > tail_ptr )
             {
                 ret = -EBADMSG;
                 break;
             }
 
+            if( enced_record == tail_ptr )
+                break;
+
             enced_recordlen =
                 tls_record_length( enced_record );
-
-            iov.push_back( pdec_rec );
         }
 
     }while( 1 );
 
-	return 0;
+	return ret;
 }
 
 int TLS13::send( PIOVE& piove )

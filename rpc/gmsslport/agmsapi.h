@@ -65,7 +65,7 @@ struct BLKOUT : public BLKIO_BASE
     size_t size() const override;
 };
 
-enum AGMS_STATE : uint32_t
+typedef enum : uint32_t
 {
     STAT_INIT,
     STAT_START_HANDSHAKE,
@@ -84,7 +84,8 @@ enum AGMS_STATE : uint32_t
     STAT_START_SHUTDOWN,
     STAT_WAIT_CLOSE_NOTIFY,
     STAT_SHUTDOWN,
-};
+
+} AGMS_STATE;
 
 struct AGMS_CTX : TLS_CTX
 {
@@ -295,6 +296,8 @@ struct TLS13 : public AGMS
     int send( PIOVE& iove ) override;
 
     protected:
+    int handle_alert( uint8_t* record );
+
     int handshake_svr();
     int handshake_cli();
 

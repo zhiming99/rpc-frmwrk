@@ -3338,7 +3338,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             m_vecOutBufs, bufvec );
     if( ERROR( ret ) )
     {
-
         OutputMsg( ret,
             "Checkpoint 3: error copy bufvec" );
         return ret;
