@@ -178,7 +178,7 @@ def test() :
                     sendResp( respfp, resp )
 
                 except Exception as err :
-                    print( os.getpid(), "test()(mainsvr.py):", err )
+                    print( os.getpid(), "mainloop(mainsvr.py):", err )
                     continue
 
         reqfp.close()

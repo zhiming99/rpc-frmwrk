@@ -3533,10 +3533,10 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         if( ret == STATUS_PENDING )
             ret = 0;
 
+        oFileLock.Lock();
         if( ERROR( ret ) )
             break;
 
-        oFileLock.Lock();
         if( m_vecOutBufs.empty() )
             break;
 
@@ -3794,7 +3794,6 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         // must release lock here, otherwise, deadlock
         // could happen
         ++m_dwMsgCount;
-        oFileLock.Unlock();
 
         if( !valReq.isMember( JSON_ATTR_REQCTXID ) ||
             !valReq[ JSON_ATTR_REQCTXID ].isUInt64() )
@@ -3803,6 +3802,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             break;
         }
 
+        oFileLock.Unlock();
         guint64 qwReqId =
             valReq[ JSON_ATTR_REQCTXID ].asUInt64();
 
