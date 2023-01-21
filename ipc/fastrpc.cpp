@@ -736,7 +736,8 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
 
     }while( 0 );
 
-    if( ERROR( ret ) && hstm != INVALID_HANDLE )
+    if( ERROR( ret ) &&
+        hstm != INVALID_HANDLE )
         RemoveStmSkel( hstm );
 
     if( pCallback != nullptr )
@@ -990,7 +991,8 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
                         pCb == nullptr )
                         return -EINVAL;
                     PortPtr portPtr( pPort );
-                    pIf->NotifyStackReady( portPtr );
+                    pIf->NotifyStackReady(
+                        portPtr );
                     return pIf->StartEx( pCb );
                 });
 

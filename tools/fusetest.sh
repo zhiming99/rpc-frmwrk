@@ -135,7 +135,7 @@ echo mkDirTest ROS
 mkDirTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
     echo errors found!
     exit 1
 fi

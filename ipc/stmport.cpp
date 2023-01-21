@@ -1180,7 +1180,12 @@ gint32 CDBusStreamPdo::PostStart(
             hstm, nullptr, pRespCb );
 
         if( ret == STATUS_PENDING )
+        {
+            // startstream has a new timer
+            // and this irp's timer can retire.
+            pIrp->RemoveTimer();
             break;
+        }
 
         if( SUCCEEDED( ret ) )
             SetStream( hstm );
@@ -1334,7 +1339,9 @@ CDBusStreamBusPort::CDBusStreamBusPort(
 {
     gint32 ret = 0;
     do{
-        SetClassId( clsid( CDBusStreamBusPort ) );
+        SetClassId( clsid(
+            CDBusStreamBusPort ) );
+
         CCfgOpener oCfg( pCfg );
         ret = oCfg.GetBoolProp(
             propIsServer, m_bServer );
@@ -1345,7 +1352,8 @@ CDBusStreamBusPort::CDBusStreamBusPort(
     if( ERROR( ret ) )
     {
         throw std::runtime_error( 
-            DebugMsg( ret, "Error occurs in ctor "
+            DebugMsg( ret,
+                "Error occurs in ctor "
                 "of CDBusStreamBusPort" ) );
     }
 }
