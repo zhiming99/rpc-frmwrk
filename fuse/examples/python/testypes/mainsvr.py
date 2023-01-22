@@ -149,7 +149,7 @@ def test() :
             ret = recvReq(reqfp)
             if ret[ 0 ] < 0 :
                 raise Exception( os.getpid(),
-                    "test()(mainsvr.py): unexpected error %d" % ret[ 0 ]  )
+                    "recvReq: unexpected error %d" % ret[ 0 ]  )
 
             reqs = ret[ 1 ]
             if reqs is None or len( reqs ) == 0:

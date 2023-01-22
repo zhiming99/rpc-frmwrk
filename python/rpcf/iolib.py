@@ -64,6 +64,8 @@ def recvResp( respfp : object)->[int, list] :
             pos += 4 + size
         return [ 0, res ]
     except Exception as err:
+        print( os.getpid(),
+            "iolib.recvResp", err, ": ", respfp )
         if error == 0 :
             error = -errno.EFAULT
         return [ error, None ]
