@@ -42,6 +42,7 @@
 
 #define MAX_REQCHAN_PER_SESS 200
 #define DBUS_STREAM_BUS_DRIVER  "DBusStreamBusDrv"
+#define CTRLCODE_SKEL_READY             0x81
 
 namespace rpcf
 {
@@ -1576,7 +1577,7 @@ class CFastRpcSkelSvrBase :
         : super( pCfg )
     {}
 
-    gint32 NotifyStackReady( PortPtr& pPort );
+    gint32 NotifySkelReady( PortPtr& pPort );
     inline guint32 GetPendingInvCount() const
     { return m_dwPendingInv; }
 

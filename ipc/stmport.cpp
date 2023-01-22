@@ -222,6 +222,11 @@ gint32 CDBusStreamPdo::SubmitIoctlCmd(
                 ret = HandleSendReq( pIrp );
                 break;
             }
+        case CTRLCODE_SKEL_READY:
+            {
+                ret = HandleSkelReady( pIrp );
+                break;
+            }
         default:
             {
                 ret = super::SubmitIoctlCmd( pIrp );
@@ -1257,7 +1262,7 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
     return ret;
 }
 
-gint32 CDBusStreamPdo::OnPortStackReady(
+gint32 CDBusStreamPdo::HandleSkelReady(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||

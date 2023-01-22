@@ -570,7 +570,7 @@ gint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
     return STATUS_SUCCESS;
 }
 
-gint32 CFastRpcSkelSvrBase::NotifyStackReady(
+gint32 CFastRpcSkelSvrBase::NotifySkelReady(
     PortPtr& pPort )
 {
     // call this method in OnPreStart, which is the
@@ -581,8 +581,9 @@ gint32 CFastRpcSkelSvrBase::NotifyStackReady(
     IrpPtr pIrp( true );
     pIrp->AllocNextStack( nullptr );
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
-    pCtx->SetMajorCmd( IRP_MJ_PNP );
-    pCtx->SetMinorCmd( IRP_MN_PNP_STACK_READY );
+    pCtx->SetMajorCmd( IRP_MJ_FUNC );
+    pCtx->SetMinorCmd( IRP_MN_IOCTL );
+    pCtx->SetCtrlCode( CTRLCODE_SKEL_READY );
     pPort->AllocIrpCtxExt( pCtx );
     pCtx->SetIoDirection( IRP_DIR_OUT ); 
     pIrp->SetSyncCall( true );
@@ -978,6 +979,7 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         oReqCtx.SetIntPtr( 1, ( guint32*& )hPort );
 
         TaskletPtr pStartTask;
+        TaskletPtr pNotifyTask;
         TaskletPtr pTask;
         if( bOnline )
         {
@@ -993,13 +995,18 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
                         pCb == nullptr )
                         return -EINVAL;
                     PortPtr portPtr( pPort );
-                    pIf->NotifyStackReady(
+                    pIf->NotifySkelReady(
                         portPtr );
-                    return pIf->StartEx( pCb );
+                    return 0;
                 });
 
+            DEFER_IFCALLEX_NOSCHED2(
+                0, pStartTask, ObjPtr( pIf ),
+                &CRpcServices::StartEx,
+                nullptr );
+
             NEW_FUNCCALL_TASK2(
-                0, pStartTask,
+                0, pNotifyTask,
                 GetIoMgr(), func, nullptr,
                 ( CFastRpcSkelSvrBase* )pIf,
                 ( IPort* )pPort );
@@ -1017,10 +1024,21 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
                 clsid( CIfTaskGroup ),
                 oParams.GetCfg() );
 
-            pTaskGrp->SetRelation( logicOR );
+            pTaskGrp->SetRelation( logicAND );
             pTaskGrp->AppendTask( pStartTask );
-            pTaskGrp->AppendTask( pStopTask );
-            pTask = pTaskGrp;
+            pTaskGrp->AppendTask( pNotifyTask );
+
+            TaskGrpPtr pTaskMain;
+            pTaskMain.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            pTaskMain->SetRelation( logicOR );
+            TaskletPtr pStart = pTaskGrp;
+            pTaskMain->AppendTask( pStart );
+            pTaskMain->AppendTask( pStopTask );
+
+            pTask = pTaskMain;
         }
         else
         {
@@ -1053,8 +1071,12 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         if( SUCCEEDED( ret ) )
             ret = pTask->GetError();
 
-        if( ret != STATUS_PENDING )
+        if( ERROR( ret ) )
+        {
+            pRetry->ClearClientNotify();
+            ( *pTask )( eventCancelTask );
             ( *pRespCb )( eventCancelTask );
+        }
                 
     }while( 0 );
 
