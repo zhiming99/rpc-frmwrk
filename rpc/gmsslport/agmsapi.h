@@ -13,12 +13,14 @@
  *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:
  *
- *      Copyright:  2023 Ming Zhi( woodhead99@gmail.com )
+ *   Adapted from GmSSL's source code. The License and disclaimer as follows
  *
- *        License:  This program is free software; you can redistribute it
- *                  and/or modify it under the terms of the GNU General Public
- *                  License version 3.0 as published by the Free Software
- *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
+ *   Copyright 2014-2023 The GmSSL Project. All Rights Reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the License); you may
+ *   not use this file except in compliance with the License.
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * =====================================================================================
  */

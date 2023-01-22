@@ -264,6 +264,12 @@ void fuseif_ll_write_buf(fuse_req_t req,
     }while( 0 );
     free( d );
 
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret, "Checkpoint 5: "
+            "fs_write_buf failed" );
+    }
+
     return;
 }
 
