@@ -690,45 +690,33 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oIoReq( pIoReq );
-        IConfigDb* pResp = nullptr;
-        ret = oIoReq.GetPointer(
-            propRespPtr, pResp );
-        if( ERROR( ret ) )
-            break;
-
-        gint32 iRet = 0;
-        CCfgOpener oResp( pResp );
-        ret = oResp.GetIntProp(
-            propReturnValue, ( guint32& )iRet );
-        if( ERROR( ret ) )
-            break;
-
-        if( ERROR( iRet ) )
+        // ignore the status of pIoReq
+        bool bStart = true;
+        oReqCtx.GetBoolProp( 0, bStart );
+        if( bStart )
         {
-            OutputMsg( iRet, "Checkpoint 6: "
-                "OnStartSkelComplete failed" );
-            ret = iRet;
+            CFastRpcSkelSvrBase* pIf;
+            ret = oReqCtx.GetPointer(
+                propIfPtr, pIf );
+            if( SUCCEEDED( ret ) )
+            {
+                PortPtr pPort = pIf->GetPort();
+                pIf->NotifySkelReady( pPort );
+            }
             break;
         }
 
-        bool bStart = true;
-        ret = oReqCtx.GetBoolProp(
-            0, bStart );
-        if( ERROR( ret ) )
-            break;
-
-        if( bStart )
-            break;
+        RemoveStmSkel( hstm );
+        hstm = INVALID_HANDLE;
 
         bool bClosePort = false;
         ret = oReqCtx.GetBoolProp(
             2, bClosePort );
         if( ERROR( ret ) )
+        {
+            ret = 0;
             break;
-
-        RemoveStmSkel( hstm );
-        hstm = INVALID_HANDLE;
+        }
 
         if( bClosePort )
         {
@@ -738,10 +726,6 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         }
 
     }while( 0 );
-
-    if( ERROR( ret ) &&
-        hstm != INVALID_HANDLE )
-        RemoveStmSkel( hstm );
 
     if( pCallback != nullptr )
     {
@@ -979,37 +963,15 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         oReqCtx.SetIntPtr( 1, ( guint32*& )hPort );
 
         TaskletPtr pStartTask;
-        TaskletPtr pNotifyTask;
+        TaskletPtr pStopTask;
         TaskletPtr pTask;
         if( bOnline )
         {
-            TaskletPtr pStopTask;
-            gint32 (*func)( IEventSink*,
-                    CFastRpcSkelSvrBase*, IPort*) =
-                ( []( IEventSink* pCb,
-                    CFastRpcSkelSvrBase* pIf,
-                    IPort* pPort)->gint32
-                {
-                    if( pIf == nullptr ||
-                        pPort == nullptr ||
-                        pCb == nullptr )
-                        return -EINVAL;
-                    PortPtr portPtr( pPort );
-                    pIf->NotifySkelReady(
-                        portPtr );
-                    return 0;
-                });
 
             DEFER_IFCALLEX_NOSCHED2(
                 0, pStartTask, ObjPtr( pIf ),
                 &CRpcServices::StartEx,
                 nullptr );
-
-            NEW_FUNCCALL_TASK2(
-                0, pNotifyTask,
-                GetIoMgr(), func, nullptr,
-                ( CFastRpcSkelSvrBase* )pIf,
-                ( IPort* )pPort );
 
             DEFER_IFCALLEX_NOSCHED2(
                 0, pStopTask, ObjPtr( pIf ),
@@ -1024,21 +986,11 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
                 clsid( CIfTaskGroup ),
                 oParams.GetCfg() );
 
-            pTaskGrp->SetRelation( logicAND );
+            pTaskGrp->SetRelation( logicOR );
             pTaskGrp->AppendTask( pStartTask );
-            pTaskGrp->AppendTask( pNotifyTask );
+            pTaskGrp->AppendTask( pStopTask );
 
-            TaskGrpPtr pTaskMain;
-            pTaskMain.NewObj(
-                clsid( CIfTaskGroup ),
-                oParams.GetCfg() );
-
-            pTaskMain->SetRelation( logicOR );
-            TaskletPtr pStart = pTaskGrp;
-            pTaskMain->AppendTask( pStart );
-            pTaskMain->AppendTask( pStopTask );
-
-            pTask = pTaskMain;
+            pTask = pTaskGrp;
         }
         else
         {
@@ -1460,6 +1412,26 @@ gint32 CFastRpcSkelSvrBase::BuildBufForIrp(
     return BuildBufForIrpInternal( pBuf, pReqCall );
 }
 
+gint32 CFastRpcSkelSvrBase::OnPreStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        HANDLE hstm = INVALID_HANDLE;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetIntPtr(
+            propStmHandle,
+            ( guint32*& )hstm );
+        if( SUCCEEDED( ret ) )
+        {
+            CFastRpcServerBase* pParent =
+                GetParentIf();
+            pParent->RemoveStmSkel( hstm );
+        }
+
+    }while( 0 );
+    return ret;
+}
 gint32 CFastRpcProxyBase::OnPreStartComplete(
     IEventSink* pCallback,
     IEventSink* pIoReq,

@@ -1602,6 +1602,9 @@ class CFastRpcSkelSvrBase :
 
     gint32 OnKeepAliveOrig(
         IEventSink* pTask ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(
