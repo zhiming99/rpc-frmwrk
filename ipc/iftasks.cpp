@@ -1425,7 +1425,7 @@ gint32 CIfTaskGroup::RunTask()
     gint32 ret = RunTaskInternal( eventZero );
 
     if( ret == ERROR_CANCEL_INSTEAD )
-        ret = OnCancel( eventCancelTask );
+        ret = OnCancel( eventCancelInstead );
 
     return ret;
 }
@@ -1743,11 +1743,14 @@ gint32 CIfTaskGroup::OnCancel(
         }
 
         gint32 iRet = -ECANCELED;
-        for( gint32 i : m_vecRetVals )
+        if( dwContext == eventCancelInstead )
         {
-            if( i == -ECANCELED )
-                break;
-            iRet = i;
+            for( auto& i : m_vecRetVals )
+            {
+                if( i == -ECANCELED )
+                    break;
+                iRet = i;
+            }
         }
         ret = iRet;
         break;
