@@ -690,11 +690,31 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         if( ERROR( ret ) )
             break;
 
-        // ignore the status of pIoReq
+        CCfgOpenerObj oIoReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oIoReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        gint32 iRet = 0;
+        CCfgOpener oResp( pResp );
+        ret = oResp.GetIntProp(
+            propReturnValue, ( guint32& )iRet );
+        if( ERROR( ret ) )
+            break;
+
         bool bStart = true;
         oReqCtx.GetBoolProp( 0, bStart );
         if( bStart )
         {
+            if( ERROR( iRet ) )
+            {
+                // avoid both NotifySkelReady and
+                // the following stop-task
+                // calling StopEx on pIf.
+                break;
+            }
             CFastRpcSkelSvrBase* pIf;
             ret = oReqCtx.GetPointer(
                 propIfPtr, pIf );
@@ -705,9 +725,6 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
             }
             break;
         }
-
-        RemoveStmSkel( hstm );
-        hstm = INVALID_HANDLE;
 
         bool bClosePort = false;
         ret = oReqCtx.GetBoolProp(
