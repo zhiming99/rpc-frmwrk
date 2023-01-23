@@ -710,9 +710,14 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         {
             if( ERROR( iRet ) )
             {
-                // avoid both NotifySkelReady and
-                // the following stop-task
-                // calling StopEx on pIf.
+                ret = iRet;
+                OutputMsg( iRet,
+                    "Checkpoint 6: Start Skel"
+                    "failed" );
+
+                // avoid both NotifySkelReady and the
+                // following stop-task calling StopEx
+                // on pIf.
                 break;
             }
             CFastRpcSkelSvrBase* pIf;
@@ -875,13 +880,6 @@ gint32 CFastRpcServerBase::GetStmSkel(
 
     }while( 0 );
 
-    if( ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "Checkpoint 2: GetStmSkel failed, "
-            "%lld:%lld", pIf->GetObjId(),
-            hstm );
-    }
     return ret;
 }
 

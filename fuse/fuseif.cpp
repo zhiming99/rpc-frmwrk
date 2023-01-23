@@ -3333,15 +3333,10 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         return -EFAULT;
 
     CFuseMutex oFileLock( GetLock() );
-
     ret = CopyFromBufVec(
             m_vecOutBufs, bufvec );
     if( ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "Checkpoint 3: error copy bufvec" );
         return ret;
-    }
 
     do{
         // receive the 4-byte size in big endian
@@ -3543,8 +3538,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
     if( ERROR( ret ) )
     {
-        OutputMsg( ret, "Checkpoint 4: "
-            "fs_write_buf failed" );
         m_pReqSize->Resize( 0 );
         m_vecOutBufs.clear();    
     }
