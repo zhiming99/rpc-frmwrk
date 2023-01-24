@@ -111,22 +111,21 @@ class CRpcStmChanBase :
             if( ERROR( ret ) )
                 break;
 
+            CCfgOpenerObj oIfCfg(
+                ( CObjBase* )pUxIf );
+
+            oIfCfg.SetBoolProp(
+                propOnline, false );
+
             PortPtr pPdoPort;
             auto pBus = static_cast
                 < CDBusStreamBusPort* >( m_pPort ); 
-            CStdRMutex oBusLock( pBus->GetLock() );
-            pBus->GetStreamPort( hstm, pPdoPort );
-            if( pPdoPort.IsEmpty() )
-            {
-                CCfgOpenerObj oIfCfg(
-                    ( CObjBase* )pUxIf );
-                // notify the stream pdo, a close
-                // needed, in case a 'tokError' or
-                // 'tokClose' arrives too early
-                oIfCfg.SetBoolProp( propOnline, false );
+
+            ret = pBus->GetStreamPort(
+                hstm, pPdoPort );
+
+            if( ERROR( ret ) )
                 break;
-            }
-            oBusLock.Unlock();
 
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
