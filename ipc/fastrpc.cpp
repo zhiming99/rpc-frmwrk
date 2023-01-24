@@ -676,6 +676,7 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
 
     gint32 ret = 0;
     HANDLE hstm = INVALID_HANDLE;
+    bool bStart = true;
     do{
         CCfgOpener oReqCtx( pReqCtx );
 
@@ -704,17 +705,12 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
         if( ERROR( ret ) )
             break;
 
-        bool bStart = true;
         oReqCtx.GetBoolProp( 0, bStart );
         if( bStart )
         {
             if( ERROR( iRet ) )
             {
                 ret = iRet;
-                OutputMsg( iRet,
-                    "Checkpoint 6: Start Skel"
-                    "failed" );
-
                 // avoid both NotifySkelReady and the
                 // following stop-task calling StopEx
                 // on pIf.
@@ -755,6 +751,12 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
             eventTaskComp, ret, 0, nullptr );
     }
 
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret, bStart ?
+            "Checkpoint 6: Start Skel failed" :
+            "Checkpoint 7: Stop Skel failed" );
+    }
     return ret;
 }
 

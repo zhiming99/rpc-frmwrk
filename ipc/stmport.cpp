@@ -1121,10 +1121,8 @@ gint32 CDBusStreamPdo::PreStop(
                 }
             }
 
+            SetPreStopStep( pIrp, 1 );
             if( ret == STATUS_SUCCESS )
-                ret = pStopCb->GetError();
-
-            if( ret == STATUS_PENDING )
             {
                 ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
@@ -1133,7 +1131,6 @@ gint32 CDBusStreamPdo::PreStop(
             if( !pStopCb.IsEmpty() )
                 ( *pStopCb )( eventCancelTask );
 
-            SetPreStopStep( pIrp, 1 );
             break;
         }
 
@@ -1411,6 +1408,10 @@ gint32 CDBusStreamBusPort::PostStart(
         if( ERROR( ret ) )
             break;
 
+        // remove the timer as the StartEx has its
+        // own timer, we don't need many timers.
+        pIrp->RemoveTimer();
+
         CRpcServices* pSvc = pIf;
         if( IsServer() )
         {
@@ -1437,10 +1438,6 @@ gint32 CDBusStreamBusPort::PostStart(
         }
         else
         {
-            // remove the timer as the StartEx has its
-            // own timer, we don't need many timers.
-            pIrp->RemoveTimer();
-
             CRpcStreamChannelCli* pCli = pIf;
             TaskletPtr pStartTask;
             ret = DEFER_IFCALLEX_NOSCHED2(

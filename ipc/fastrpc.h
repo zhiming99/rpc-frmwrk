@@ -145,7 +145,7 @@ class CRpcStmChanBase :
         InterfPtr pUxIf;
         gint32 ret = this->GetUxStream( hstm, pUxIf );
         if( ERROR( ret ) )
-            return 0;
+            return ret;
         OnStmClosing( hstm );
         return IStream::OnClose( hstm, pCallback );
     }
@@ -1014,10 +1014,6 @@ class CRpcStmChanBase :
                     pCtx->SetStatus( ret );
                 else
                     pPort->SetStream( hstm );
-            }
-            else if( dwCmd == IRP_MN_PNP_STOP )
-            {
-                SetPreStopStep( pIrp, 1 );
             }
             oIrpLock.Unlock();
 
