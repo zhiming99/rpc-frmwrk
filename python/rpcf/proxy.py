@@ -250,8 +250,9 @@ class PyRpcServices :
         return 0
 
     def Stop( self ) :
+        ret = self.oInst.Stop()
         self.oInst.RemovePyHost()
-        return self.oInst.Stop()
+        return ret
 
     def __enter__( self ) :
         self.Start()
