@@ -49,11 +49,13 @@
 PIOVE prec; \
 { \
     ret = this->read_bio.read( prec ); \
-    if( ret < 0 ) \
+    if( ret == -ENOENT ) \
     { \
-        ret = 0; \
+        ret = RET_PENDING; \
         break; \
     } \
+    else if( ERROR( ret ) ) \
+        break; \
     rec_ptr = prec->begin(); \
     rec_len = \
         tls_record_length( rec_ptr ); \
@@ -122,6 +124,9 @@ int AGMS_IOVE::realloc( size_t newsize )
         return newsize;
 
     int ret = newsize;
+    if( ptr == nullptr )
+        return alloc( newsize );
+
     uint8_t* newbuf = ( uint8_t* )
         ::realloc( ptr, newsize );
 
@@ -129,7 +134,8 @@ int AGMS_IOVE::realloc( size_t newsize )
     {
         ptr = ( uint8_t* )newbuf;
         mem_size = size;
-        content_end = newsize;
+        if( newsize < content_end )
+            content_end = newsize;
     }
     else
     {
@@ -198,8 +204,8 @@ int AGMS_IOVE::merge(
 
 int AGMS_IOVE::attach( uint8_t* nptr,
     size_t nsize,
-    size_t nstart = 0,
-    size_t nend = 0 )
+    size_t nstart,
+    size_t nend )
 {
     if( nptr == nullptr || nsize == 0 )
         return -EINVAL;
@@ -207,13 +213,18 @@ int AGMS_IOVE::attach( uint8_t* nptr,
 
     ptr = nptr;
     mem_size = nsize;
-    content_end = nend;
+
+    if( nend == 0 )
+        content_end = nsize;
+    else
+        content_end = nend;
+
     start = nstart;
 
     return 0;
 }
 
-int AGMS_IOVE::detach( uint8_t** pptr,
+void AGMS_IOVE::expose( uint8_t** pptr,
     size_t& nmem_size,
     size_t& nstart,
     size_t& nend );
@@ -222,7 +233,16 @@ int AGMS_IOVE::detach( uint8_t** pptr,
     nmem_size = memsize;
     nstart = start;
     nend = content_end;
-    ptr = nullptr;
+}
+
+int AGMS_IOVE::detach( uint8_t** pptr,
+    size_t& nmem_size,
+    size_t& nstart,
+    size_t& nend );
+{
+    expose( pptr,
+        nmem_size, nstart, nend );
+    set_no_free();
     clear();
     return 0;
 }
@@ -420,6 +440,8 @@ int BLKIN::write( PIOVE& piove )
 
 int BLKIN::read( PIOVE& piove )
 {
+    if( io_vec.empty() )
+        return -ENOENT;
     if( io_vec.size() == 1 )
     {
         PIOVE& last = io_vec.back();
@@ -575,8 +597,7 @@ int AGMS::shutdown()
                         record, &level, &alert) == 1 &&
                         alert == TLS_alert_close_notify )
                     {
-                        set_state(
-                            STAT_START_SHUTDOWN );
+                        set_state( STAT_CLOSED );
                         ret = 0;
                         break;
                     }

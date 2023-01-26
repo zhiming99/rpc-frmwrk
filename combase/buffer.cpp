@@ -1099,18 +1099,31 @@ gint32 CBuffer::Decompress(
     return 0;
 }
 
+void CBuffer::Expose( char*& pMem,
+    guint32& dwSize,
+    guint32& dwOffset,
+    guint32& dwTailOff )
+{
+    pMem = m_pData;
+    dwSize = m_dwSize;
+    dwOffset = m_dwOffset;
+    dwTailOff = m_dwTailOff;
+    return;
+}
+
 gint32 CBuffer::Detach( char*& pMem,
     guint32& dwSize,
     guint32& dwOffset,
     guint32& dwTailOff )
 {
-    if( m_pData == m_arrBuf ||
-        GetDataType() != DataTypeMem )
+    if( GetDataType() != DataTypeMem )
+        return -EINVAL;
+    if( m_pData == m_arrBuf )
         return -EACCES;
-    pMem = m_pData;
-    dwSize = m_dwSize;
-    dwOffset = m_dwOffset;
-    dwTailOff = m_dwTailOff;
+
+    Expose( pMem, dwSize,
+        dwOffset, dwTailOff );
+
     new ( this )CBuffer( 0 );
     SetDataType( DataTypeMem );
     SetExDataType( typeNone );
@@ -1127,7 +1140,7 @@ gint32 CBuffer::Attach( char* pMem,
 
     //using Append instead
     if( dwSize < sizeof( m_arrBuf ) )
-        return -ERANGE;
+        return -EACCES;
 
     Resize( 0 );
     new ( this )CBuffer( pMem , dwSize, false );

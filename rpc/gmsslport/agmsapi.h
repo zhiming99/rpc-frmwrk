@@ -32,8 +32,109 @@
 #define RET_OK 0
 #define RET_PENDING 65537
 
+#define IOVE_NOFREE  1
+
 namespace gmssl
 {
+
+struct AGMS_IOVE
+{
+    uint32_t flags = 0;
+    uint8_t* ptr = nullptr;
+    size_t mem_size = 0;
+    size_t start = 0;
+    size_t content_end = 0;
+
+    ~AGMS_IOVE()
+    { clear(); }
+
+    inline bool no_free()
+    { return ( flags & IOVE_NOFREE ) > 0; }
+
+    inline void set_no_free(
+        bool no_free = true )
+    {
+        if( no_free )
+            flags |= IOVE_NOFREE;
+        else
+            flags &= ~IOVE_NOFREE;
+    }
+
+    inline void clear()
+    {
+        if( ptr && !no_free() )
+        { free( ptr ); }
+        ptr = nullptr;
+        mem_size = start = content_end = 0;
+        flags = 0;
+    }
+
+    inline bool empty()
+    {
+        return ( ptr == nullptr ||
+            ( content_end - start == 0 ) );
+    }
+
+    int alloc( size_t size = 0 );
+    int realloc( size_t newsize  );
+    inline void clear_content()
+    { start = 0; content_end = mem_size;}
+
+    int attach( uint8_t* ptr,
+        size_t size,
+        size_t start = 0,
+        size_t end = 0 );
+
+    int detach( uint8_t** pptr,
+        size_t& size,
+        size_t& start,
+        size_t& end );
+
+    void expose( uint8_t** pptr,
+        size_t& size,
+        size_t& start,
+        size_t& end );
+
+    inline size_t size() const
+    { return content_end - start; }
+
+    int split(
+        AGMS_IOVE& bottom_half
+        size_t offset );
+
+    int copy( uint8_t* src,
+        size_t src_size = 0 );
+
+    int merge(
+        AGMS_IOVE& bottom_half );
+
+    inline uint8_t* begin()
+    { return ptr + start; }
+
+    inline uint8_t* end()
+    { return ptr + content_end; }
+
+    inline int trim_bytes_front( size_t bytes )
+    {
+        if( begin() + bytes > end() )
+            return -ERANGE;
+        start += bytes;
+        return 0;
+    }
+
+    inline int trim_bytes_end( size_t bytes )
+    {
+        if( end() - bytes < begin() )
+            return -ERANGE;
+        content_end -= bytes;
+        return 0;
+    }
+
+    // tls record related methods
+    bool is_single_rec();
+    bool is_partial_rec();
+    uint8_t* get_partial_rec();
+};
 
 using PIOVE=std::shared_ptr< AGMS_IOVE > ;
 using IOV = std::list< PIOVE >;
@@ -69,11 +170,11 @@ struct BLKOUT : public BLKIO_BASE
 
 typedef enum : uint32_t
 {
+    STAT_HANDSHAKE_FAILED = -2,
+    STAT_CLOSED = -1,
     STAT_INIT,
     STAT_START_HANDSHAKE,
     STAT_READY,
-    STAT_HANDSHAKE_FAILED,
-    STAT_SHUTDOWN,
     STAT_WAIT_SVR_HELLO,
     STAT_WAIT_SVR_ENCEXT,
     STAT_WAIT_SVR_CERT,
@@ -85,7 +186,6 @@ typedef enum : uint32_t
     STAT_WAIT_CLI_FIN,
     STAT_START_SHUTDOWN,
     STAT_WAIT_CLOSE_NOTIFY,
-    STAT_SHUTDOWN,
 
 } AGMS_STATE;
 
@@ -98,99 +198,6 @@ struct AGMS_CTX : TLS_CTX
     int up_ref();
     void down_ref();
     void cleanup();
-};
-
-#define IOVE_NOFREE  1
-
-struct AGMS_IOVE
-{
-    uint32_t flags = 0;
-    uint8_t* ptr = nullptr;
-    size_t mem_size = 0;
-    size_t start = 0;
-    size_t content_end = 0;
-
-    ~AGMS_IOVE()
-    { clear(); }
-
-    bool no_free()
-    { return ( flags & IOVE_NOFREE ) > 0; }
-
-    void set_no_free( bool no_free = true )
-    {
-        if( no_free )
-            flags |= IOVE_NOFREE;
-        else
-            flags &= ~IOVE_NOFREE;
-    }
-
-    void clear()
-    {
-        if( ptr && !no_free() )
-        { free( ptr ); }
-        ptr = nullptr;
-        mem_size = start = content_end = 0;
-        flags = 0;
-    }
-
-    bool empty()
-    {
-        return ( ptr == nullptr ||
-            ( content_end - start == 0 ) );
-    }
-
-    int alloc( size_t size = 0 );
-    int realloc( size_t newsize  );
-
-    int attach( uint8_t* ptr,
-        size_t size,
-        size_t start = 0,
-        size_t end = 0 );
-
-    int detach( uint8_t** pptr,
-        size_t& size,
-        size_t& start,
-        size_t& end );
-
-    size_t size() const
-    { return content_end - start; }
-
-    int split(
-        AGMS_IOVE& bottom_half
-        size_t offset );
-
-    int copy( uint8_t* src,
-        size_t src_size = 0 );
-
-    int merge(
-        AGMS_IOVE& bottom_half );
-
-    uint8_t* begin()
-    { return ptr + start; }
-
-    uint8_t* end()
-    { return ptr + content_end; }
-
-    int trim_bytes_front( size_t bytes )
-    {
-        if( begin() + bytes > end() )
-            return -ERANGE;
-        start += bytes;
-        return 0;
-    }
-
-    int trim_bytes_end( size_t bytes )
-    {
-        if( end() - bytes < begin() )
-            return -ERANGE;
-        content_end -= bytes;
-        return 0;
-    }
-
-    // tls record related methods
-    bool is_single_rec();
-    bool is_partial_rec();
-    uint8_t* get_partial_rec();
 };
 
 struct AGMS : public TLS_CONNECT

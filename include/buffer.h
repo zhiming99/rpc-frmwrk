@@ -687,6 +687,11 @@ class CBuffer : public CObjBase
     gint32 Decompress( guint8* pDest,
         guint32 dwOrigSize ) const;
 
+    void Expose( char*& pMem,
+        guint32& dwSize,
+        guint32& dwOffset,
+        guint32& dwTailOff );
+
     gint32 Detach( char*& pMem,
         guint32& dwSize,
         guint32& dwOffset,
