@@ -726,4 +726,10 @@ class CTcpStreamPdo2 : public CPort
     }
 };
 
+extern gint32 SendListenReq( CPort* pPort,
+    IEventSink* pCallback, BufPtr& pBuf );
+
+extern gint32 SendWriteReq( CPort* pPort,
+    IEventSink* pCallback, BufPtr& pBuf );
+
 }

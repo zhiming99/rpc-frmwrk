@@ -1158,107 +1158,15 @@ gint32 CRpcOpenSSLFido::CompleteWriteIrp(
 gint32 CRpcOpenSSLFido::SendWriteReq(
     IEventSink* pCallback, BufPtr& pBuf )
 {
-    if( pCallback == nullptr ||
-        pBuf.IsEmpty() || pBuf->empty() )
-        return -EINVAL;
-
-    CCfgOpenerObj oTaskCfg( pCallback );
-    guint32 dwTimeoutSec = 0;
-
-    gint32 ret = oTaskCfg.GetIntProp(
-        propTimeoutSec, dwTimeoutSec );
-
-    IrpPtr pIrp( true );
-    PortPtr pLowerPort = GetLowerPort();
-    pIrp->AllocNextStack( pLowerPort );
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-
-    pCtx->SetMajorCmd( IRP_MJ_FUNC );
-    pCtx->SetMinorCmd( IRP_MN_WRITE );
-    pCtx->SetIoDirection( IRP_DIR_OUT );
-    pCtx->SetReqData( pBuf );
-    pIrp->SetCallback(
-        ObjPtr( pCallback ), 0 );
-
-    pLowerPort->AllocIrpCtxExt(
-        pCtx, ( PIRP )pIrp );
-
-    CIoManager* pMgr = GetIoMgr();
-    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
-        pIrp->SetTimer( dwTimeoutSec, pMgr );
-
-    CParamList oParams;
-    oParams.Push( pBuf );
-    BufPtr pReqBuf( true );
-    *pReqBuf = ObjPtr( oParams.GetCfg() );
-
-    ret = GetIoMgr()->SubmitIrpInternal(
-        pLowerPort, pIrp, false );
-
-    if( ret != STATUS_PENDING )
-        pIrp->RemoveTimer();
-
-    return ret;
+    return rpcf::SendWriteReq(
+        this, pCallback, pBuf );
 }
 
 gint32 CRpcOpenSSLFido::SendListenReq(
     IEventSink* pCallback, BufPtr& pBuf )
 {
-    if( pCallback == nullptr )
-        return -EINVAL;
-
-    CCfgOpenerObj oTaskCfg( pCallback );
-    guint32 dwTimeoutSec = 0;
-    gint32 ret = oTaskCfg.GetIntProp(
-        propTimeoutSec, dwTimeoutSec );
-
-    IrpPtr pIrp( true );
-    PortPtr pLowerPort = GetLowerPort();
-    pIrp->AllocNextStack( pLowerPort );
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-
-    pCtx->SetMajorCmd( IRP_MJ_FUNC );
-    pCtx->SetMinorCmd( IRP_MN_IOCTL );
-    pCtx->SetCtrlCode( CTRLCODE_LISTENING );
-    pCtx->SetIoDirection( IRP_DIR_IN );
-    pIrp->SetCallback(
-        ObjPtr( pCallback ), 0 );
-
-    pLowerPort->AllocIrpCtxExt(
-        pCtx, ( PIRP )pIrp );
-
-    CIoManager* pMgr = GetIoMgr();
-    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
-        pIrp->SetTimer( dwTimeoutSec, pMgr );
-
-    ret = pMgr->SubmitIrpInternal(
-        pLowerPort, pIrp, false );
-
-    if( ret != STATUS_PENDING )
-        pIrp->RemoveTimer();
-
-    if( SUCCEEDED( ret ) )
-    {
-        IrpCtxPtr& pCtx = pIrp->GetTopStack();
-        pBuf = pCtx->m_pRespData;
-        if( pBuf.IsEmpty() || pBuf->empty() )
-            return -EFAULT;
-
-        STREAM_SOCK_EVENT* psse = 
-            ( STREAM_SOCK_EVENT* ) pBuf->ptr();
-
-        if( psse->m_iEvent == sseRetWithBuf )
-        {
-            pBuf = psse->m_pInBuf;
-            psse->m_pInBuf.Clear();
-            return 0;
-        }
-
-        if( psse->m_iEvent == sseError )
-            return psse->m_iData;
-    }
-
-    return ret;
+    return rpcf::SendListenReq(
+        this, pCallback, pBuf );
 }
 
 gint32 CRpcOpenSSLFido::AdvanceHandshake(
