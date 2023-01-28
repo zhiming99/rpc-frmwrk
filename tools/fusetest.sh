@@ -21,10 +21,10 @@ function stressTest()
     sleep 5 
 
     echo ls mp
-    ls -R ./mp
+    ls -lR ./mp
 
     echo ls mpsvr
-    ls -R ./mpsvr
+    ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
@@ -71,18 +71,19 @@ function mkDirTest()
     hostcli -f mp &
     sleep 5 
 
-    echo ls mp
-    ls -R ./mp
-
-    echo ls mpsvr
-    ls -R ./mpsvr
-
     echo loading TestTypes library to server and proxy...
     echo "loadl $(pwd)/release/libTestTypes.so" > ./mpsvr/commands
     echo "loadl $(pwd)/release/libTestTypes.so" > ./mp/commands
     echo adding service point TestTypes to server and proxy...
     echo "addsp TestTypesSvc $(pwd)/TestTypesdesc.json" > ./mpsvr/commands
     echo "addsp TestTypesSvc $(pwd)/TestTypesdesc.json" > ./mp/commands
+    sleep 3
+
+    echo ls mp
+    ls -lR ./mp
+
+    echo ls mpsvr
+    ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
