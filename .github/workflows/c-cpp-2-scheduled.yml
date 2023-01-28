@@ -2,7 +2,7 @@ name: C/C++ CI
 
 on:
   schedule:
-    - cron: '* 0,16 * * *'
+    - cron: '0 0,16 * * *'
 
 jobs:
   build:
@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-        with:
+      with:
             ref: add-gmssl-support
 
     - name: update repository
