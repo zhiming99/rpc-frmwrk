@@ -20,6 +20,12 @@ function stressTest()
     release/TestTypescli -f mp &
     sleep 5 
 
+    echo ls mp
+    ls -R ./mp
+
+    echo ls mpsvr
+    ls -R ./mpsvr
+
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
@@ -37,7 +43,10 @@ RUNCLIENT
     echo pkill -f mainsvr.py
     pkill -f mainsvr.py
 
+    echo umount mp
     umount mp
+
+    echo umount mpsvr...
     while true; do
         umount mpsvr 
         if mount | grep TestTypessvr; then
@@ -61,6 +70,13 @@ function mkDirTest()
     hostsvr -f mpsvr &
     hostcli -f mp &
     sleep 5 
+
+    echo ls mp
+    ls -R ./mp
+
+    echo ls mpsvr
+    ls -R ./mpsvr
+
     echo loading TestTypes library to server and proxy...
     echo "loadl $(pwd)/release/libTestTypes.so" > ./mpsvr/commands
     echo "loadl $(pwd)/release/libTestTypes.so" > ./mp/commands
@@ -100,7 +116,10 @@ RUNCLIENT
     echo pkill -f mainsvr.py
     pkill -f mainsvr.py
 
+    echo umount mp
     umount mp
+
+    echo umount mpsvr...
     while true; do
         umount mpsvr 
         if mount | grep TestTypessvr; then

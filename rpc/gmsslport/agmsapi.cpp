@@ -940,9 +940,6 @@ int TLS13::handshake_cli()
     {
     case STAT_START_HANDSHAKE:
         {
-            tls_record_set_protocol(
-                enced_record, TLS_protocol_tls12);
-
             digest_init(&hctxc.dgst_ctx, digest);
             hctxc.null_dgst_ctx = hctxc.dgst_ctx;
             // send ClientHello
@@ -981,6 +978,7 @@ int TLS13::handshake_cli()
 
             this->write_bio.write( prec );
             set_state( STAT_WAIT_SVR_HELLO );
+            ret = RET_PENDING;
             break;
             // 此时尚未确定digest算法，因此无法digest_update
         }
