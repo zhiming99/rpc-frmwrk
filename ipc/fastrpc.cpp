@@ -751,12 +751,6 @@ gint32 CFastRpcServerBase::OnStartSkelComplete(
             eventTaskComp, ret, 0, nullptr );
     }
 
-    if( ERROR( ret ) )
-    {
-        OutputMsg( ret, bStart ?
-            "Checkpoint 6: Start Skel failed" :
-            "Checkpoint 7: Stop Skel failed" );
-    }
     return ret;
 }
 

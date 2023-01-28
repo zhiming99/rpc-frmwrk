@@ -2797,9 +2797,16 @@ class CFuseRootBase:
             {
                 pSync->WaitForCompleteWakable();
                 ret = pSync->GetError();
+
             }
 
         }while( 0 );
+
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Checkpoint2: "
+                "AddSvcPoint failed" );
+        }
 
         return ret;
     }

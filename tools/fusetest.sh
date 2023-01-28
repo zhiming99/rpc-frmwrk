@@ -144,12 +144,12 @@ $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
 echo stressTest ROS
 stressTest
 
-echo testing normal RPC
+echo testing normal RPC via shared library
 $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
 echo mkDirTest normal
 mkDirTest
 
-echo testing RPC-over-stream
+echo testing RPC-over-stream via shared library
 $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
