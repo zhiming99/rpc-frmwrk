@@ -212,9 +212,12 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
 
         if( ERROR( iMethodReturn ) )
         {
-            OutputMsg( iMethodReturn,
-                "Checkpoint 1: CheckConnCmdResp "
-                "failed" );
+            if( !bClose )
+            {
+                OutputMsg( iMethodReturn,
+                    "Checkpoint 1: act connect "
+                    "failed" );
+            }
             break;
         }
 
