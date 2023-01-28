@@ -4870,6 +4870,8 @@ static gint32 fuseif_create_req(
         if( pSvc->GetState() != stateConnected )
         {
             ret = -ENOTCONN;
+            OutputMsg( ret, "Checkpoint 3: "
+                "fuseif_create_req failed" );
             break;
         }
         DIR_SPTR pSvcEnt = nullptr;
