@@ -2,7 +2,7 @@ name: C/C++ CI scheduled
 
 on:
   schedule:
-    - cron: '0,5,10,15,20,25 0 * * *'
+    - cron: '0,5,10,15,20,25 8/12 * * *'
 
 jobs:
   build:
@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-            ref: add-gmssl-support
+        ref: add-gmssl-support
 
     - name: update repository
       run: sudo apt-get -o Acquire::Retries=3 update
