@@ -1614,11 +1614,9 @@ class CFuseServicePoint :
             }
 
         }while( 0 );
-        if( SUCCEEDED( ret ) )
-        {
-            for( auto& elem : vecStreams )
-                CloseChannel( pIf, elem );
-        }
+
+        for( auto& elem : vecStreams )
+            CloseChannel( pIf, elem );
 
         return ret;
     }
@@ -2459,29 +2457,33 @@ class CFuseRootBase:
     inline void SetFuse( fuse* pFuse )
     { m_pFuse = pFuse; }
 
-    // mount the RPC file system at the mount point
-    // strMntPt, with options pOptions
-    gint32 DoMount(
-        const stdstr& strMntPt,
-        IConfigDb* pOptions );
 
     gint32 DoUnmount()
     {
-        for( auto& elem : m_vecIfs )
+        gint32 ret = 0;
+        std::vector< ObjPtr > vecIfs;
+
+        do{
+            ROOTLK_SHARED;
+            vecIfs = m_vecIfs;
+
+        }while( 0 );
+
+        for( auto& elem : vecIfs )
         {
             if( bProxy )
             {
                 CFuseSvcProxy* pIf = elem;
-                pIf->Unmount();
+                ret = pIf->Unmount();
             }
             else
             {
                 CFuseSvcServer* pIf = elem;
-                pIf->Unmount();
+                ret = pIf->Unmount();
             }
         }
         SetFuse( nullptr );
-        return STATUS_SUCCESS;
+        return ret;
     }
 
     gint32 DoAddSvcPoint(
@@ -2855,19 +2857,27 @@ class CFuseRootBase:
     {
         gint32 ret = 0;
         do{
+            std::vector< ObjPtr > vecIfs;
+            do{
+                ROOTLK_EXCLUSIVE;
+                vecIfs = m_vecIfs;
+                m_vecIfs.clear();
+
+            }while( 0 );
+
             CParamList oParams;
             oParams.SetPointer( propIfPtr, this );
 
             TaskGrpPtr pStopTasks;
             ret = pStopTasks.NewObj(
-                clsid( CIfTaskGroup ),
+                clsid( CIfParallelTaskGrp ),
                 oParams.GetCfg() );
             if( ERROR( ret ) )
                 break;
 
             pStopTasks->SetRelation( logicNONE );
 
-            for( auto& elem : m_vecIfs )
+            for( auto& elem : vecIfs )
             {
                 TaskletPtr pTask;
                 ret = DEFER_IFCALLEX_NOSCHED2(
@@ -2880,12 +2890,10 @@ class CFuseRootBase:
 
                 pStopTasks->AppendTask( pTask );
             }
-            m_vecIfs.clear();
             CIfRetryTask* pTask = pStopTasks;
             pTask->SetClientNotify( pCallback );
-            CIoManager* pMgr = this->GetIoMgr();
             TaskletPtr pTempTask( pTask );
-            ret = pMgr->RescheduleTask( pTempTask );
+            ret = this->AddSeqTask( pTempTask );
             if( ERROR( ret ) )
             {
                 ( *pStopTasks )( eventCancelTask );
