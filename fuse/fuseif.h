@@ -2713,8 +2713,7 @@ class CFuseRootBase:
                 pTransGrp->SetClientNotify( pCallback );
 
             pTransGrp->AddRollback( pStopTask );
-            ret = this->AddSeqTask(
-                pTaskGrp, true );
+            ret = this->AddSeqTask( pTaskGrp );
             if( SUCCEEDED( ret ) )
                 ret = pTaskGrp->GetError();
 
