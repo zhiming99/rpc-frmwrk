@@ -13,6 +13,7 @@ ulimit -a
 function stressTest()
 {
     pushd testypes
+    cat ./cmdline
     make || exit 10
 
     mkdir mp mpsvr || true
@@ -64,6 +65,7 @@ RUNCLIENT
 function mkDirTest()
 {
     pushd testypes
+    cat ./cmdline
     make || exit 10
 
     mkdir mp mpsvr || true

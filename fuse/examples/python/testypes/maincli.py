@@ -229,9 +229,14 @@ def test() :
             print( os.getpid(), 'EchoStream %s completed with %s' % ( num, hstmr ))
             break
 
+        
+        print( os.getpid(), 'maincli.py: closing reqfile', reqfp )
         reqfp.close()
+        print( os.getpid(), 'maincli.py: closing respfile', respfp )
         respfp.close()
+        print( os.getpid(), 'maincli.py: closing evtfile', evtfp )
         evtfp.close()
+        print( os.getpid(), 'maincli.py: closing stmfile', stmfp )
         stmfp.close()
         
     except Exception as err:
