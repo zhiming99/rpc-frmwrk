@@ -770,10 +770,20 @@ gint32 CDBusProxyPdo::HandleConnRequest(
 
         if( ret != STATUS_PENDING )
         {
+            OutputMsg( ret,
+                "Checkpoint 4: %s "
+                "immediate return found",
+                __func__ );
             ret = ERROR_FAIL;
         }
 
     }while( 0 );
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret,
+            "Checkpoint 5: %s failed",
+            __func__ );
+    }
 
     return ret;
 }
