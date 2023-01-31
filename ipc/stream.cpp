@@ -1316,7 +1316,7 @@ gint32 CStreamServer::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        ret = pTask->GetError();
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -1381,8 +1381,21 @@ gint32 IStream::OnPreStopShared(
 {
     gint32 ret = 0;
     CRpcServices* pThis = GetInterface(); 
+    TaskGrpPtr pTaskGrp;
 
     do{
+        CParamList oGrpParams;
+        oGrpParams[ propIfPtr ] = ObjPtr( pThis );
+        ret = pTaskGrp.NewObj(
+            clsid( CIfTaskGroup ),
+            oGrpParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        if( pCallback != nullptr )
+            pTaskGrp->SetClientNotify( pCallback );
+        pTaskGrp->SetRelation( logicNONE );
+
         CStdRMutex oIfLock( pThis->GetLock() );
         if( m_mapUxStreams.empty() )
             break;
@@ -1390,21 +1403,6 @@ gint32 IStream::OnPreStopShared(
         UXSTREAM_MAP mapStreams = m_mapUxStreams;
         m_mapUxStreams.clear();
         oIfLock.Unlock();
-        CParamList oGrpParams;
-        TaskGrpPtr pTaskGrp;
-        oGrpParams[ propIfPtr ] = ObjPtr( pThis );
-
-        ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
-            oGrpParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        if( pCallback != nullptr )
-            pTaskGrp->SetClientNotify( pCallback );
-
-        pTaskGrp->SetRelation( logicNONE );
 
         for( auto elem : mapStreams )
         {
@@ -1425,11 +1423,17 @@ gint32 IStream::OnPreStopShared(
             pTaskGrp->AppendTask( pStopTask );
         }
 
+    }while( 0 );
+
+    do{
         if( ERROR( ret ) )
             break;
 
         if( pTaskGrp->GetTaskCount() == 0 )
         {
+            // possibly there are stream stop tasks in
+            // the m_pSeqTasks we schedule a conclusion
+            // task to make sure all the 
             auto pMgr = pThis->GetIoMgr();
             TaskletPtr pSync;
             gint32 (*func)() = ([]()->gint32

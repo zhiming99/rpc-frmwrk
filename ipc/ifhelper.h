@@ -3738,25 +3738,9 @@ gint32 AddSeqTaskTempl( T* pObj,
             oIfLock.Unlock();
             oQueueLock.Unlock();
 
-            CRpcServices* pIf = ObjPtr( pObj );
-            if( unlikely( pIf == nullptr ) )
-            {
-                TaskletPtr pGrpTask( pSeqTasks );
-                ret = pMgr->RescheduleTask(
-                    pGrpTask, bLong );
-                break;
-            }
-            TaskletPtr pDeferTask;
-            ret = DEFER_CALL_NOSCHED(
-                pDeferTask, ObjPtr( pObj ),
-                &CRpcServices::RunManagedTask,
-                pQueuedTasks, false );
-
-            if( ERROR( ret ) )
-                break;
-
+            TaskletPtr pSeqTasks = pQueuedTasks;
             ret = pMgr->RescheduleTask(
-                pDeferTask, bLong );
+                pSeqTasks, bLong );
 
             break;
         }
