@@ -2,7 +2,7 @@ name: C/C++ CI scheduled
 
 on:
   schedule:
-    - cron: '0-50/8 0/8 * * *'
+    - cron: '0-59/20 0/8 * * *'
 
 jobs:
   build:
