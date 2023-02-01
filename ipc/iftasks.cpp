@@ -1704,6 +1704,10 @@ gint32 CIfTaskGroup::OnCancel(
         if( iState == stateStarting )
             SetTaskState( stateStarted );
 
+        if( dwContext == eventCancelInstead &&
+            m_vecRetVals.size() )
+            ret = m_vecRetVals.back();
+
         TaskletPtr pPrevTask;
         while( !m_queTasks.empty() )
         {
@@ -1742,17 +1746,6 @@ gint32 CIfTaskGroup::OnCancel(
             pPrevTask = pTask;
         }
 
-        gint32 iRet = -ECANCELED;
-        if( dwContext == eventCancelInstead )
-        {
-            for( auto& i : m_vecRetVals )
-            {
-                if( i == -ECANCELED )
-                    break;
-                iRet = i;
-            }
-        }
-        ret = iRet;
         break;
 
     }while( 1 );

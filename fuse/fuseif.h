@@ -2554,6 +2554,9 @@ class CFuseRootBase:
                     if( ERROR( ret ) )
                         break;
                     ret = pRoot->AddChild( pNewDir );
+                    OutputMsg( ret, "Checkpoint 3: "
+                        "added conn directory %s",
+                        strName.c_str() );
                 }
             }
             else
@@ -2717,7 +2720,7 @@ class CFuseRootBase:
             pTransGrp->AddRollback( pStopTask );
             ret = this->AddSeqTask( pTaskGrp );
             if( SUCCEEDED( ret ) )
-                ret = pTaskGrp->GetError();
+                ret = STATUS_PENDING;
 
         }while( 0 );
 

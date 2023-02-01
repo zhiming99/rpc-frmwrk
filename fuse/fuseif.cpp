@@ -4020,8 +4020,10 @@ gint32 CFuseConnDir::AddSvcDir(
         oConn[ propClsid ] =
              clsid( CDBusProxyPdo );
 
-        if( super::GetCount() <= 3 )
+        if( super::GetCount() < 3 )
         {
+            // the first svc point directory, and the
+            // other two is 'conn_params' and 'nexthop'
             SetConnParams( oConn.GetCfg() );
         }
         else if( !IsEqualConn( oConn.GetCfg() ) )
