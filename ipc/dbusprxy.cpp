@@ -211,15 +211,7 @@ gint32 CDBusProxyPdo::CheckConnCmdResp(
             break;
 
         if( ERROR( iMethodReturn ) )
-        {
-            if( !bClose )
-            {
-                OutputMsg( iMethodReturn,
-                    "Checkpoint 1: %s failed",
-                    strMember.c_str() );
-            }
             break;
-        }
 
         if( bClose )
             break;
@@ -765,25 +757,8 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             break;
 
         ret = HandleSendReq( pIrp );
-        if( ERROR( ret ) )
-            break;
-
-        if( ret != STATUS_PENDING )
-        {
-            OutputMsg( ret,
-                "Checkpoint 4: %s "
-                "immediate return found",
-                __func__ );
-            ret = ERROR_FAIL;
-        }
 
     }while( 0 );
-    if( ERROR( ret ) )
-    {
-        OutputMsg( ret,
-            "Checkpoint 5: %s failed",
-            __func__ );
-    }
 
     return ret;
 }

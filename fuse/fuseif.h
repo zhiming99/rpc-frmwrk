@@ -2751,6 +2751,10 @@ class CFuseRootBase:
             return -EINVAL;
         gint32 ret = 0;
         bool bAdded = false;
+
+        OutputMsg( 0, "Checkpoint 1: entering %s",
+            __func__ );
+
         do{
             CStdRMutex oLock( this->GetLock() );
             for( auto& elem : m_vecServices )
@@ -2803,11 +2807,8 @@ class CFuseRootBase:
 
         }while( 0 );
 
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "Checkpoint2: "
-                "AddSvcPoint failed" );
-        }
+        OutputMsg( ret, "Checkpoint 2: "
+            "leaving %s", __func__ );
 
         return ret;
     }
