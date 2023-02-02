@@ -2439,7 +2439,7 @@ gint32 CFuseStmFile::fs_write_buf(
 
         if( pIf->GetState() != stateConnected )
         {
-            ret = -ENOTCONN;
+            ret = ERROR_STATE;
             break;
         }
 
@@ -4874,7 +4874,7 @@ static gint32 fuseif_create_req(
             OutputMsg( pSvc->GetState(),
                 "Checkpoint 4: %s failed with "
                 "wrong state", __func__ );
-            ret = -ENOTCONN;
+            ret = ERROR_STATE;
             break;
         }
         DIR_SPTR pSvcEnt = nullptr;
@@ -4940,7 +4940,7 @@ static gint32 fuseif_create_stream(
 
         if( pIf->GetState() != stateConnected )
         {
-            ret = -ENOTCONN;
+            ret = ERROR_STATE;
             break;
         }
 
