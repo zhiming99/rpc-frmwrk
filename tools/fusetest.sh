@@ -18,8 +18,9 @@ function stressTest()
 
     mkdir mp mpsvr || true
     release/TestTypessvr -f mpsvr &
-    release/TestTypescli -f mp &
     sleep 8 
+    release/TestTypescli -f mp &
+    sleep 5
 
     #make sure TestTypesSvc created
     pushd mp
