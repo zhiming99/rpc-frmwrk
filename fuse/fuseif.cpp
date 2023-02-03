@@ -3232,8 +3232,7 @@ gint32 CFuseEvtFile::GetReqSize(
             }
             pReqSize->Append(
                 elem->ptr(), dwCopy );
-            elem->SetOffset(
-                elem->offset() + dwCopy );
+            elem->IncOffset( dwCopy );
             dwCopy = 0;
             break;
         }
@@ -3412,8 +3411,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             BufPtr pBuf = NewBufNoAlloc(
                 elem->ptr(), dwToAdd, true );
             vecBufs.push_back( pBuf );
-            elem->SetOffset(
-                elem->offset() + dwToAdd );
+            elem->IncOffset( dwToAdd );
             dwToAdd = 0;
             break;
         }
@@ -3745,8 +3743,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             BufPtr pBuf = NewBufNoAlloc(
                 elem->ptr(), dwToAdd, true );
             vecBufs.push_back( pBuf );
-            elem->SetOffset(
-                elem->offset() + dwToAdd );
+            elem->IncOffset( dwToAdd );
             dwToAdd = 0;
             break;
         }
@@ -4348,7 +4345,10 @@ gint32 CFuseSvcProxy::ReceiveMsgJson(
         GRP_ELEM ge;
         ret = GetGroup( dwGrpId, ge );
         if( ERROR( ret ) )
+        {
+            RemoveReqGrp( qwReqId );
             break;
+        }
 
         oLock.Unlock();
         auto pRespFile = ge.m_pRespFile;
