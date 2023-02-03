@@ -429,8 +429,10 @@ gint32 CInterfaceState::OnModEvent(
         case eventModOnline:
             {
                 OutputMsg( iEvent, "Checkpoint 5: "
-                    "mod %s is offline",
-                    strModule.c_str() );
+                    "mod %s is going offline,"
+                    "curstate=%d",
+                    strModule.c_str(),
+                    GetState() );
                 SetStateOnEvent( iEvent );
                 break;
             }
