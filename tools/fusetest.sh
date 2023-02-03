@@ -24,7 +24,7 @@ function stressTest()
     #make sure TestTypesSvc created
     pushd mp
     echo mkdir TestTypesSvc_1
-    mkdir TestTypesSvc_1 >/dev/null
+    mkdir TestTypesSvc_1 >/dev/null 2>&1
     popd
 
     echo ls mp
