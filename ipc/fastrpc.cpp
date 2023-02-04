@@ -1175,6 +1175,13 @@ gint32 CFastRpcServerBase::OnPreStart(
             break;
 
         SetBusId( dwBusId );
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        pdrv->BindNameBus( strName, dwBusId );
 
     }while( 0 );
 
@@ -1505,6 +1512,16 @@ gint32 CFastRpcProxyBase::OnPreStartComplete(
 
     }while( 0 );
 
+    if( ERROR( ret ) )
+    {
+        // with state set to stateStartFailed,
+        // further start will not happen even if the
+        // error occurs only in this callback, while
+        // the parent taskgroup is reported success.
+        this->SetStateOnEvent(
+            eventPortStartFailed );
+    }
+
     pCallback->OnEvent( eventTaskComp, ret, 0, 0 );
     return 0;
 }
@@ -1565,7 +1582,22 @@ gint32 CFastRpcProxyBase::OnPreStart(
 
         SetBusId( dwBusId );
 
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        pdrv->BindNameBus( strName, dwBusId );
+
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // start failed.
+        this->SetStateOnEvent(
+            eventPortStartFailed );
+    }
 
     return ret;
 }
