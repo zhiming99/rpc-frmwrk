@@ -1,4 +1,9 @@
 ---
+[`Sat Feb 04 2023 05:36:14 PM Beijing`]   
+1. The mysterious `Errno 2` bug is finally fixed. It turns out to be a bug in the testscript. Besides, we have also fixed a memory leak, stream start failure and some other bugs. The progress is cheerful.
+2. There could still be an `EchoMany reponse lost` issue to fix.
+3. And let's continue development for gmssl support.
+
 [`Thu Jan 19 2023 11:48:38 PM Beijing`]    
 1. while writing gmssl port, the mysterious `Errno 2` bug shows up again. It is difficult to reproduce and therefore the bug-fix progress is slow.
 
