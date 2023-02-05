@@ -4871,9 +4871,6 @@ static gint32 fuseif_create_req(
         CFuseSvcServer* pSvr = ObjPtr( pSvc );
         if( pSvc->GetState() != stateConnected )
         {
-            OutputMsg( pSvc->GetState(),
-                "Checkpoint 4: %s failed with "
-                "wrong state", __func__ );
             ret = ERROR_STATE;
             break;
         }

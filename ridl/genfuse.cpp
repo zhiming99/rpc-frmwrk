@@ -65,7 +65,7 @@ gint32 EmitBuildJsonReq(
     CCOUT << "qwReqId = pCallback->GetObjId();";
     BLOCK_CLOSE;
     NEW_LINE;
-    Wa( "Json::Value oJsReq( objectValue );" );
+    Wa( "Json::Value oJsReq( Json::objectValue );" );
     Wa( "if( SUCCEEDED( iRet ) &&" );
     Wa( "    !oJsParams.empty() &&" );
     Wa( "    oJsParams.isObject() )" );
@@ -2057,7 +2057,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
         NEW_LINES( 2 );
 
         // gen the param list
-        Wa( "Json::Value val_( objectValue );" );
+        Wa( "Json::Value val_( Json::objectValue );" );
         if( dwOutCount > 0 )
         {
             /* need deserialization */
@@ -2361,9 +2361,9 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             if( dwOutCount > 0 )
             {
                 if( dwInCount == 0 )
-                    Wa( "Json::Value val_( objectValue );" );
+                    Wa( "Json::Value val_( Json::objectValue );" );
                 else
-                    Wa( "val_ = Json::Value( objectValue );" );
+                    Wa( "val_ = Json::Value( Json::objectValue );" );
 
                 Wa("do" );
                 BLOCK_OPEN;
@@ -2710,7 +2710,7 @@ gint32 CImplIfMethodSvrFuse::OutputAsyncSerial()
             NEW_LINE;
         }
 
-        Wa( "Json::Value val_( objectValue );" );
+        Wa( "Json::Value val_( Json::objectValue );" );
         if( dwInCount > 0 )
         {
             ret = GenDeserialArgs(
@@ -3031,7 +3031,7 @@ gint32 CImplServiceImplFuse::OutputUCRSvr()
         Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
 
-        Wa( "Json::Value val_( objectValue );" );
+        Wa( "Json::Value val_( Json::objectValue );" );
         Wa( "val_[ JSON_ATTR_REQCTXID ] =" );
         Wa( "    ( Json::UInt64 )pTask->GetObjId();" );
         NEW_LINE;
@@ -3375,7 +3375,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( strIfName == \"IInterfaceServer\" )" );
             BLOCK_OPEN;
             Wa( "if( strMethod != \"UserCancelRequest\" )" );
-            Wa( "{ ret = -EINVAL; break; }" );
+            Wa( "{ ret = -ENOSYS; break; }" );
             Wa( "if( !oReq.isMember( JSON_ATTR_REQCTXID ) ||");
             Wa( "    !oReq[ JSON_ATTR_REQCTXID ].isUInt64() )" );
             Wa( "{ ret = -EINVAL; break; }" );
@@ -3442,7 +3442,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    propReturnValue, ( guint32& )iRet );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "Json::Value oJsResp( objectValue );" );
+            Wa( "Json::Value oJsResp( Json::objectValue );" );
             Wa( "oJsResp[ JSON_ATTR_IFNAME1 ] =" );
             Wa( "    \"IInterfaceServer\";" );
             Wa( "oJsResp[ JSON_ATTR_METHOD ] =" );
@@ -3451,7 +3451,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "oJsResp[ JSON_ATTR_RETCODE ] = iRet;" );
             Wa( "oJsResp[ JSON_ATTR_REQCTXID ] =" );
             Wa( "    ( Json::UInt64& )qwThisReq;" );
-            Wa( "Json::Value oParams( objectValue );" );
+            Wa( "Json::Value oParams( Json::objectValue );" );
             Wa( "oParams[ JSON_ATTR_REQCTXID ] =" );
             Wa( "    ( Json::UInt64& )qwReqId;" );
             Wa( "oJsResp[ JSON_ATTR_PARAMS ] = oParams;" );
@@ -3547,10 +3547,14 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "if( !bNoReply )" );
-            Wa( "    this->ReceiveMsgJson( strReq, qwReqId );" );
+            Wa( "    ret = this->ReceiveMsgJson( strReq, qwReqId );" );
             CCOUT << "this->RemoveReq( qwReqId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    OutputMsg( ret, \"Checkpoint 1: \"" );
+            Wa( "        \"OnReqComplete failed with req %s(%d) \"," );
+            Wa( "        strMethod.c_str(), iRet );" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINE;

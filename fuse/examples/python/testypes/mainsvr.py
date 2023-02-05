@@ -34,7 +34,7 @@ def AddParameter( req : dict, paramName : str, val : object ) :
 def Echo( req : object )->object :
     resp = BuildRespHdr('Echo', req['RequestId'])
     AddParameter(resp, 'strResp', req['Parameters']['strText'])
-    print( "Echo ", req['Parameters']['strText'])
+    print( os.getpid(), "Echo ", req['Parameters']['strText'])
     return resp
 
 def EchoByteArray( req : object )->object :
@@ -43,7 +43,7 @@ def EchoByteArray( req : object )->object :
         res = req[ 'Parameters']['pBuf'].encode()
         bytearr = base64.b64decode(res)
         bufsize = len(bytearr)
-        print("EchoByteArray ", bytearr[bufsize-128:bufsize])
+        print(os.getpid(), "EchoByteArray ", bytearr[bufsize-128:bufsize])
         AddParameter(resp, 'pRespBuf', req['Parameters']['pBuf'])
         return resp
     except Exception as err:
@@ -53,34 +53,34 @@ def EchoByteArray( req : object )->object :
 def EchoArray( req : object )->object:
     resp = BuildRespHdr('EchoArray', req['RequestId'])
     res = req[ 'Parameters']['arrInts']
-    print( "EchoArray ", res)
+    print( os.getpid(), "EchoArray ", res)
     AddParameter(resp, 'arrIntsR', res)
     return resp
 
 def EchoMap( req : object )->object:
     resp = BuildRespHdr('EchoMap', req['RequestId'])
     res = req[ 'Parameters']['mapReq']
-    print( "EchoMap ", res)
+    print( os.getpid(), "EchoMap ", res)
     AddParameter(resp, 'mapResp', res)
     return resp
 
 def EchoStruct( req : object)->object:
     resp = BuildRespHdr('EchoStruct', req['RequestId'])
     res = req[ 'Parameters']['fi']
-    print( "EchoStruct ", res)
+    print( os.getpid(), "EchoStruct ", res)
     AddParameter(resp, 'fir', res)
     return resp
 
 def EchoNoParams( req : object)->object:
     resp = BuildRespHdr('EchoNoParams', req['RequestId'])
-    print("EchoNoParams arrives")
+    print(os.getpid(), "EchoNoParams arrives")
     return resp
 
 def EchoStream( req : object)->object:
     global svcdir
     resp = BuildRespHdr('EchoStream', req['RequestId'])
     res = req[ 'Parameters']['hstm']
-    print("EchoStream ", res)
+    print( os.getpid(), "EchoStream ", res)
     AddParameter(resp, 'hstmr', res)
     #read content in the stream and echo back
     try:
@@ -113,7 +113,7 @@ def EchoMany( req : object )->object:
     AddParameter( resp, 'i4r', params['i4'] + 4)
     AddParameter( resp, 'i5r', params['i5'] + 5)
     AddParameter( resp, 'szTextr', params['szText'] + 'll')
-    print("EchoMany ", resp)
+    print( os.getpid(), "EchoMany ", resp)
     return resp
 
 def test() :
