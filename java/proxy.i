@@ -1676,6 +1676,9 @@ gint32 CJavaProxyImpl::AsyncCallVector(
         ret = this->SendProxyReq( pTask, false,
              strMethod, vecParams, qwIoTaskId ); 
 
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
         if( ret == STATUS_PENDING ) 
         {
             // for canceling purpose

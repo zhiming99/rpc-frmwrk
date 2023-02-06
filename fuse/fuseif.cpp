@@ -3841,10 +3841,10 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
             TaskletPtr pTask;
             CIoManager* pMgr = pProxy->GetIoMgr();
-            ret = NEW_FUNCCALL_TASK( pTask,
+            gint32 iRet = NEW_FUNCCALL_TASK( pTask,
                 pMgr, func, pProxy, qwReqId,
                 GetGroupId(), strResp );
-            if( SUCCEEDED( ret ) )
+            if( SUCCEEDED( iRet ) )
                 pMgr->RescheduleTask( pTask );
         }
 
