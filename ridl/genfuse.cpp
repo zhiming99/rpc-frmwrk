@@ -2416,6 +2416,11 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         Wa( "// oJsResp[ JSON_ATTR_RETCODE ]= ret;" );
         Wa( "if( ERROR( ret ) && !pRespCb_.IsEmpty() )" );
         Wa( "    ( *pRespCb_ )( eventCancelTask );" );
+        if( strMethod == "EchoMany" )
+        {
+            Wa( "OutputMsg( ret, \"Checkpoint 11: \"" );
+            Wa( "    \"'EchoMany' returns\" );" );
+        }
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINE;
@@ -3552,7 +3557,7 @@ gint32 CImplServiceImplFuse::Output()
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             Wa( "if( ERROR( ret ) )" );
-            Wa( "    OutputMsg( ret, \"Checkpoint 1: \"" );
+            Wa( "    OutputMsg( ret, \"Checkpoint 10: \"" );
             Wa( "        \"OnReqComplete failed with req %s(%d) \"," );
             Wa( "        strMethod.c_str(), iRet );" );
             CCOUT << "return ret;";
