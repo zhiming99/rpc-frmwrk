@@ -14,7 +14,7 @@ function stressTest()
 {
     pushd testypes
     cat ./cmdline
-    make || exit 10
+    make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
     release/TestTypessvr -f mpsvr &
@@ -73,7 +73,7 @@ function mkDirTest()
 {
     pushd testypes
     cat ./cmdline
-    make || exit 10
+    make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
     hostsvr -f mpsvr &
@@ -144,21 +144,25 @@ RUNCLIENT
 }
 
 echo testing normal RPC
+echo $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
 echo stressTest normal
 stressTest
 
 echo testing RPC-over-stream
+echo $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
 echo stressTest ROS
 stressTest
 
 echo testing normal RPC via shared library
+echo $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
 echo mkDirTest normal
 mkDirTest
 
 echo testing RPC-over-stream via shared library
+echo $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
@@ -187,7 +191,7 @@ function pytest()
     while true; do
         eval $cmdline
         echo make $testcase ...
-        make || ret=32
+        make > /dev/null 2>&1 || ret=32
         if (( $ret > 0 )); then break; fi
         echo create directories ...
         mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1
