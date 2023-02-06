@@ -1655,11 +1655,14 @@ gint32 CPythonProxyImpl::AsyncCallVector(
         CopyUserOptions( pTask, pOptions );
 
         std::string strMethod( strcMethod );
+
+        CCfgOpener oOptions(
+            ( IConfigDb* )pOptions );
+        bool bNoReply = false;
+
         if( !pOptions.IsEmpty() )
         {
             bool bSysMethod = false;
-            CCfgOpener oOptions(
-                ( IConfigDb* )pOptions );
 
             ret = oOptions.GetBoolProp(
                 propSysMethod, bSysMethod );
@@ -1668,10 +1671,22 @@ gint32 CPythonProxyImpl::AsyncCallVector(
                 strMethod = SYS_METHOD( strMethod );
             else
                 strMethod = USER_METHOD( strMethod );
+
+            ret = oOptions.GetBoolProp(
+                propNoReply, bNoReply );
+            if( ERROR( ret ) )
+            {
+                bNoReply = false;
+                ret = 0;
+            }
         }
+
 
         ret = this->SendProxyReq( pTask, false,
              strMethod, vecParams, qwIoTaskId ); 
+
+        if( SUCCEEDED( ret ) && !bNoReply )
+            ret = STATUS_PENDING;
 
         if( ret == STATUS_PENDING ) 
         {
