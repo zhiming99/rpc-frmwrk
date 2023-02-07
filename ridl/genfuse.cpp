@@ -2231,6 +2231,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         Wa( "    context = oBackupCtx.GetCfg();" );
         Wa( "gint32 ret = 0;" );
         Wa( "TaskletPtr pRespCb_;" );
+        Wa( "Json::Value val_;" );
         CCOUT << "do";
         BLOCK_OPEN;
         Wa( "CParamList oOptions_;" );
@@ -2312,7 +2313,6 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         {
             Wa( "//Serialize the input parameters" );
             Wa( "BufPtr pBuf_( true );" );
-            Wa( "Json::Value val_;" );
             Wa( "if( !oJsReq.isMember( JSON_ATTR_PARAMS) )" );
             Wa( "{ ret = -ENOENT; break; }" );
             Wa( "val_ = oJsReq[ JSON_ATTR_PARAMS ];" );
@@ -2360,12 +2360,9 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             Wa( "    propReturnValue, ( guint32& )ret );" );
             if( dwOutCount > 0 )
             {
-                if( dwInCount == 0 )
-                    Wa( "Json::Value val_( Json::objectValue );" );
-                else
-                    Wa( "val_ = Json::Value( Json::objectValue );" );
+                Wa( "val_ = Json::Value( Json::objectValue );" );
 
-                Wa("do" );
+                CCOUT << "do";
                 BLOCK_OPEN;
                 CCOUT << "if( ERROR( ret ) ) break;";
                 NEW_LINE;
@@ -2388,11 +2385,9 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
                     break;
                 BLOCK_CLOSE;
                 Wa( "while( 0 );" );
-            }
-            if( dwOutCount > 0 )
-            {
+
                 Wa( "if( !ERROR( ret ) && !val_.empty() )" );
-                Wa( "    oJsResp[ JSON_ATTR_PARAMS ] = val_;" );
+                CCOUT << "    oJsResp[ JSON_ATTR_PARAMS ] = val_;";
             }
         }
         else
@@ -2418,8 +2413,13 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         Wa( "    ( *pRespCb_ )( eventCancelTask );" );
         if( strMethod == "EchoMany" )
         {
-            Wa( "OutputMsg( ret, \"Checkpoint 11: \"" );
-            Wa( "    \"'EchoMany' returns\" );" );
+            Wa( "guint32 dwPid = 0;" );
+            Wa( "if( ret == STATUS_PENDING )" );
+            Wa( "    dwPid = val_[ \"i1\" ].asUInt();" );
+            Wa( "else" );
+            Wa( "    dwPid = val_[ \"i1r\" ].asUInt();" );
+            Wa( "OutputMsg( ret, \"Checkpoint 11(%d): \"" );
+            Wa( "   \"'EchoMany' returns\", dwPid );" );
         }
         CCOUT << "return ret;";
         BLOCK_CLOSE;

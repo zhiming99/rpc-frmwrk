@@ -1655,14 +1655,12 @@ gint32 CPythonProxyImpl::AsyncCallVector(
         CopyUserOptions( pTask, pOptions );
 
         std::string strMethod( strcMethod );
-
-        CCfgOpener oOptions(
-            ( IConfigDb* )pOptions );
         bool bNoReply = false;
-
         if( !pOptions.IsEmpty() )
         {
             bool bSysMethod = false;
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
 
             ret = oOptions.GetBoolProp(
                 propSysMethod, bSysMethod );
