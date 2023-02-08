@@ -37,17 +37,20 @@ def recvResp( respfp : object)->[int, list] :
     error = 0
     try:
         while len( inBuf ) == 0:
-            resp = select.select( inputs, [], [] )
+            resp = select.select( inputs, [], [], 2.0 )
             # read at the page boundary
-            data = respfp.read(4096)
-            if len( data ) > 0 and len( data ) < 4096:
+            data = respfp.read(8192)
+            if len( data ) == 0 :
+                #timeout
+                continue
+            if len( data ) > 0 and len( data ) < 8192:
                 inBuf = data
                 break
             while True:
                 inBuf.extend(data)
-                if len( data ) < 4096:
+                if len( data ) < 8192:
                     break
-                data = respfp.read(4096)
+                data = respfp.read(8192)
     
         pos = 0
         while pos < len( inBuf ):
@@ -130,15 +133,15 @@ def recvMsg( respfp : object)->[int, list] :
     try:
         
         # read at the page boundary
-        data = respfp.read(4096)
-        if len( data ) > 0 and len( data ) < 4096:
+        data = respfp.read(8192)
+        if len( data ) > 0 and len( data ) < 8192:
             inBuf = data
-        elif len( data ) == 4096:
+        elif len( data ) == 8192:
             while True:
                 inBuf.extend(data)
-                if len( data ) < 4096:
+                if len( data ) < 8192:
                     break
-                data = respfp.read(4096)
+                data = respfp.read(8192)
         else:
             error = -errno.ENOMSG
             raise Exception( "Error no msg found %d" % error )

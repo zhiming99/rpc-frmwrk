@@ -2080,7 +2080,7 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
-            Wa( "if( ERROR( ret ) ) iRet = ret;" );
+            Wa( "if( ERROR( ret ) && SUCCEEDED( iRet ) ) iRet = ret;" );
         }
         CMethodDecls* pmds =
             ObjPtr( m_pNode->GetParent() );
@@ -2097,6 +2097,17 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
             strNoReply = "true";
         CCOUT << "    iRet, " << strNoReply << " );";
         NEW_LINE;
+
+        if( strMethod == "EchoMany" )
+        {
+            Wa( "guint32 dwPid = 0;" );
+            Wa( "if( SUCCEEDED( iRet ) )" );
+            Wa( "    dwPid = val_[ \"i1r\" ].asUInt();" );
+            Wa( "else" );
+            Wa( "    dwPid = 0;" );
+            Wa( "OutputMsg( ret, \"Checkpoint 11(%d): \"" );
+            Wa( "   \"'EchoMany' returns\", dwPid );" );
+        }
 
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
@@ -2411,16 +2422,6 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         Wa( "// oJsResp[ JSON_ATTR_RETCODE ]= ret;" );
         Wa( "if( ERROR( ret ) && !pRespCb_.IsEmpty() )" );
         Wa( "    ( *pRespCb_ )( eventCancelTask );" );
-        if( strMethod == "EchoMany" )
-        {
-            Wa( "guint32 dwPid = 0;" );
-            Wa( "if( ret == STATUS_PENDING )" );
-            Wa( "    dwPid = val_[ \"i1\" ].asUInt();" );
-            Wa( "else" );
-            Wa( "    dwPid = val_[ \"i1r\" ].asUInt();" );
-            Wa( "OutputMsg( ret, \"Checkpoint 11(%d): \"" );
-            Wa( "   \"'EchoMany' returns\", dwPid );" );
-        }
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINE;
