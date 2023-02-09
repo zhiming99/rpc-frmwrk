@@ -5150,6 +5150,23 @@ gint32 CImplIfMethodProxy::OutputAsync()
         }
         if( !bNoReply )
         {
+            Wa( "gint32 ret2 = pRespCb_->GetError();" );
+            Wa( "if( SUCCEEDED( ret ) )" );
+            BLOCK_OPEN;
+            Wa( "if( ret2 != STATUS_PENDING )" );
+            BLOCK_OPEN;
+            Wa( "// pRespCb_ has been called" );
+            CCOUT << "ret = STATUS_PENDING;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "else" );
+            BLOCK_OPEN;
+            Wa( "// immediate return" );
+            Wa( "( *pRespCb_ )( eventCancelTask );" );
+            CCOUT << "pRespCb_.Clear();";
+            BLOCK_CLOSE;
+            BLOCK_CLOSE;
+
             NEW_LINE;
             Wa( "if( ret == STATUS_PENDING )" );
             BLOCK_OPEN;
@@ -5171,6 +5188,7 @@ gint32 CImplIfMethodProxy::OutputAsync()
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
+            Wa( "// immediate return" );
             Wa( "CCfgOpener oResp_( ( IConfigDb* )pResp_ );" );
             Wa( "oResp_.GetIntProp(" );
             Wa( "    propReturnValue, ( guint32& )ret );" );
@@ -5216,8 +5234,10 @@ gint32 CImplIfMethodProxy::OutputAsync()
         }
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
+        NEW_LINE;
         Wa( "if( ERROR( ret ) && !pRespCb_.IsEmpty() )" );
         Wa( "    ( *pRespCb_ )( eventCancelTask );" );
+        NEW_LINE;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINES( 1 );
