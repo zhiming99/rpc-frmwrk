@@ -2350,6 +2350,23 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
         Wa( "    ( IConfigDb* )pResp_ );" );
         if( !bNoReply )
         {
+            Wa( "gint32 ret2 = pRespCb_->GetError();" );
+            Wa( "if( SUCCEEDED( ret ) )" );
+            BLOCK_OPEN;
+            Wa( "if( ret2 != STATUS_PENDING )" );
+            BLOCK_OPEN;
+            Wa( "// pRespCb_ has been called" );
+            CCOUT << "ret = STATUS_PENDING;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "else" );
+            BLOCK_OPEN;
+            Wa( "// immediate return" );
+            Wa( "( *pRespCb_ )( eventCancelTask );" );
+            CCOUT << "pRespCb_.Clear();";
+            BLOCK_CLOSE;
+            BLOCK_CLOSE;
+            NEW_LINE;
             Wa( "if( ret == STATUS_PENDING )" );
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = oResp_[ propTaskId ];" );
@@ -2360,46 +2377,9 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             CCOUT <<"oContext.SetQwordProp(";
             NEW_LINE;
             CCOUT << "    propTaskId, qwTaskId );";
-            NEW_LINE;
-            CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
-            Wa( "else if( ERROR( ret ) )" );
-            CCOUT << "    break;";
-            NEW_LINE;
-            Wa( "oResp_.GetIntProp(" );
-            Wa( "    propReturnValue, ( guint32& )ret );" );
-            if( dwOutCount > 0 )
-            {
-                Wa( "val_ = Json::Value( Json::objectValue );" );
-
-                CCOUT << "do";
-                BLOCK_OPEN;
-                CCOUT << "if( ERROR( ret ) ) break;";
-                NEW_LINE;
-                Wa( "guint32 dwSeriProto_ = 0;" );
-                Wa( "ret = oResp_.GetIntProp(" );
-                Wa( "    propSeriProto, dwSeriProto_ );" );
-                Wa( "if( ERROR( ret ) ||" );
-                Wa( "    dwSeriProto_ != seriRidl )" );
-                Wa( "    break;" );
-                Wa( "BufPtr pBuf2;" );
-                Wa( "ret = oResp_.GetBufPtr( 0, pBuf2 );" );
-                Wa( "if( ERROR( ret ) )" );
-                Wa( "    break;" );
-                if( ERROR( ret ) )
-                    break;
-
-                ret = GenDeserialArgs( pOutArgs,
-                    "pBuf2", true, true, true, true );
-                if( ERROR( ret ) )
-                    break;
-                BLOCK_CLOSE;
-                Wa( "while( 0 );" );
-
-                Wa( "if( !ERROR( ret ) && !val_.empty() )" );
-                CCOUT << "    oJsResp[ JSON_ATTR_PARAMS ] = val_;";
-            }
+            CCOUT << "// ERROR( ret )";
         }
         else
         {
@@ -2413,15 +2393,14 @@ gint32 CImplIfMethodProxyFuse::OutputAsync()
             CCOUT <<"oContext.SetQwordProp(";
             NEW_LINE;
             CCOUT << "    propTaskId, qwTaskId );";
-            NEW_LINE;
-            CCOUT << "break;";
             BLOCK_CLOSE;
         }
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
-        Wa( "// oJsResp[ JSON_ATTR_RETCODE ]= ret;" );
+        NEW_LINE;
         Wa( "if( ERROR( ret ) && !pRespCb_.IsEmpty() )" );
         Wa( "    ( *pRespCb_ )( eventCancelTask );" );
+        NEW_LINE;
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINE;

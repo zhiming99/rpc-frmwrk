@@ -223,20 +223,16 @@ def test() :
                 inputs = [stmfp]
                 notifylist = select.select( inputs, [], [] )
                 binBuf = stmfp.read(8*1024)
+            print( os.getpid(), "EchoStream resp=", objResp )
             hstmr = objResp[ 'Parameters']["hstmr"]
             bufsize = len( binBuf )
             print(binBuf[ bufsize - 128 : bufsize ])
             print( os.getpid(), 'EchoStream %s completed with %s' % ( num, hstmr ))
             break
-
         
-        print( os.getpid(), 'maincli.py: closing reqfile', reqfp )
         reqfp.close()
-        print( os.getpid(), 'maincli.py: closing respfile', respfp )
         respfp.close()
-        print( os.getpid(), 'maincli.py: closing evtfile', evtfp )
         evtfp.close()
-        print( os.getpid(), 'maincli.py: closing stmfile', stmfp )
         stmfp.close()
         
     except Exception as err:
