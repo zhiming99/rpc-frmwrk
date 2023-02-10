@@ -1,4 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
+// ridlc -O . ../../asynctst.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
