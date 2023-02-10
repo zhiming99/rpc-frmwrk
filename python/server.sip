@@ -808,7 +808,7 @@ cpp::ObjPtr CreateRpcServer(
     cpp::ObjPtr& pMgr,
     const std::string& strDesc,
     const std::string& strObjName,
-    cpp::ObjPtr& pCfgObj );
+    cpp::ObjPtr& pCfgObj )/TransferBack/;
 %MethodCode
     gint32 ret = 0;
     do{

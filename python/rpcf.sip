@@ -707,7 +707,7 @@ namespace cpp
             sipRes = sipCpp->Push( *a0 );
         %End
 
-        cpp::CfgPtr* GetCfg();
+        cpp::CfgPtr* GetCfg()/TransferBack/;
         %MethodCode
         cpp::CfgPtr* pCfg;
         pCfg = new cpp::CfgPtr(
@@ -717,7 +717,7 @@ namespace cpp
         sipRes = pCfg;
         %End
 
-        cpp::ObjPtr* GetCfgAsObj();
+        cpp::ObjPtr* GetCfgAsObj()/TransferBack/;
         %MethodCode
         cpp::IConfigDb* pCfg = 
             sipCpp->GetCfg();
@@ -737,7 +737,7 @@ namespace cpp
 
     cpp::ObjPtr* CreateObject(
         guint32 iClsid,
-        cpp::IConfigDb* pCfg );
+        cpp::IConfigDb* pCfg )/TransferBack/;
     %MethodCode
     cpp::ObjPtr* pObj =
         new cpp::ObjPtr( nullptr, false );

@@ -202,7 +202,7 @@ class PyRpcContext :
         self.pIoMgr = self.CreateIoMgr( strModName )
         if self.pIoMgr is not None :
             ret = self.StartIoMgr( self.pIoMgr )
-            if ret > 0 :
+            if ret < 0 :
                 self.StopIoMgr( self.pIoMgr )
             else :
                 ret = LoadPyFactory( self.pIoMgr )
@@ -212,6 +212,7 @@ class PyRpcContext :
         print( "exiting..." )
         if self.pIoMgr is not None :
             self.StopIoMgr( self.pIoMgr )
+            self.pIoMgr = None
         return self.DestroyRpcCtx()
 
     def __enter__( self ) :
@@ -259,6 +260,9 @@ class PyRpcServices :
 
     def __exit__( self, type, val, traceback ) :
         self.Stop()
+        self.oObj = None
+        self.oInst = None
+        self.pIoMgr = None
 
     def TimerCallback( self, callback, context )->None :
         sig =signature( callback )
