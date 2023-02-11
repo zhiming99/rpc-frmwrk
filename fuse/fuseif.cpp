@@ -2704,14 +2704,20 @@ gint32 CFuseEvtFile::fs_read(
             break;
 
         CFuseMutex oFileLock( GetLock() );
+        bool bNonBlock = IsNonBlock();
         if( m_queReqs.size() )
         {
-            if( IsNonBlock() )
+            if( bNonBlock )
                 break;
 
             m_queReqs.push_back(
                 { req, size, PINTR( d ) } );
             ret = STATUS_PENDING;
+            OutputMsg( bNonBlock,
+                "Checkpoint 12(%s): return pending %d(%d.%d)",
+                __func__, m_dwBytesAvail,
+                m_dwMsgRead,
+                m_queReqs.size() );
             break;
         }
 
@@ -2728,7 +2734,7 @@ gint32 CFuseEvtFile::fs_read(
                 vecBackup, bufvec );
             m_dwBytesAvail -= size;
         }
-        else if( IsNonBlock() )
+        else if( bNonBlock )
         {
             m_dwMsgRead += m_queIncoming.size();
             size = dwAvail;
@@ -2751,6 +2757,11 @@ gint32 CFuseEvtFile::fs_read(
             ret = STATUS_PENDING;
             m_queReqs.push_back(
                 { req, size, PINTR( d ) } );
+            OutputMsg( bNonBlock,
+                "Checkpoint 13(%s): return pending %d(%d.%d)",
+                __func__, m_dwBytesAvail,
+                m_dwMsgRead,
+                m_queReqs.size() );
         }
 
     }while( 0 );
