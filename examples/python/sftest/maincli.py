@@ -148,7 +148,8 @@ def maincli() :
                 OutputMsg( "Removed the local temporary file")
                 break
         
-
+        oProxy = None
+    oContext = None
     return ret
     
 ret = maincli()

@@ -90,7 +90,8 @@ def maincli() :
                         OutputMsg( "Server says(async): " + byResp.decode() )
                 break
                     
-            
+        oProxy = None
+    oContext = None
     return ret
 try:    
     ret = maincli()

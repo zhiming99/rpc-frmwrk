@@ -71,7 +71,8 @@ def maincli() :
                     pret[ 1 ][ 0 ] )
                 ret = 0
                 break
-
+        oProxy = None
+    oContext = None
     return ret
     
 ret = maincli()

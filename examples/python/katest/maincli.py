@@ -41,7 +41,8 @@ def maincli() :
                 i0r = pret[ 1 ][ 0 ]
                 print( "LongWait completed with response " + i0r )
 
-            
+        oProxy = None
+    oContext = None
     return ret
     
 ret = maincli()

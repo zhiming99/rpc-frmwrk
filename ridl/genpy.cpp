@@ -3162,8 +3162,10 @@ gint32 CImplPyMainFunc::OutputCli(
         }while( 0 );
 
         Wa( "'''" );
-        INDENT_DOWN;
         INDENT_DOWNL;
+        CCOUT << "oProxy = None";
+        INDENT_DOWNL;
+        Wa( "oContext = None" );
         Wa( "return ret" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
@@ -3182,10 +3184,21 @@ gint32 CImplPyMainFunc::OutputSvr(
         stdstr strName = pSvc->GetName();
         Wa("import os" );
         CCOUT << "import time";
+        NEW_LINE;
+        CCOUT << "import signal";
         NEW_LINES( 2 );
+
+        Wa( "bExit = False" );
+        Wa( "def SigHandler( signum, frame ):" );
+        Wa( "    global bExit" );
+        Wa( "    bExit = True" );
+
+        NEW_LINE;
+
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
         Wa( "ret = 0" );
+        Wa( "signal.signal( signal.SIGINT, SigHandler)" );
         Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
         CCOUT << "with oContext :";
         INDENT_UPL;
@@ -3208,11 +3221,17 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "snippet for your own purpose" );
         Wa( "'''" );
 
+        Wa( "global bExit" );
         Wa( "while ( cpp.stateConnected ==" );
         Wa( "    oServer.oInst.GetState() ):" );
         Wa( "    time.sleep( 1 )" );
-        INDENT_DOWN;
+        Wa( "    if bExit:" );
+        CCOUT << "        break";
         INDENT_DOWNL;
+        Wa( "print( \"Server loop ended...\" )" );
+        CCOUT << "oServer = None";
+        INDENT_DOWNL;
+        Wa( "oContext = None" );
         Wa( "return ret" );
         INDENT_DOWNL;
 
