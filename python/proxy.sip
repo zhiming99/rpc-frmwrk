@@ -477,7 +477,7 @@ class CPythonInterfBase : public T
                             break;
 
                         PyObject* pObj = sipConvertFromNewType(
-                            val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                            val,sipType_cpp_ObjPtr, Py_None );
 
                         if( pObj == nullptr )
                         {
@@ -929,14 +929,14 @@ class CPythonInterfBase : public T
             ObjPtr* pArgs = new ObjPtr( pParams );
 
             pPyCb = sipConvertFromNewType(
-                pCb, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                pCb, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyCb == nullptr ) )
             {
                 ret = -ENOMEM;
                 break;
             }
             pPyParams = sipConvertFromNewType(
-                pArgs, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                pArgs, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyParams == nullptr ) ) 
             {           
                 ret = -ENOMEM;
@@ -2276,7 +2276,7 @@ class CPythonProxy :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
-            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+            ppBuf, sipType_cpp_BufPtr, Py_None );
 
         if( pPyBufBak == nullptr )
         {
@@ -2338,7 +2338,7 @@ class CPythonProxy :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         sipRes = sipBuildResult(0,"(iRN)",
-            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,SIP_NULLPTR);
+            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,Py_None);
 
         break;
 
@@ -2411,7 +2411,7 @@ class CPythonProxy :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
-            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+            ppBuf, sipType_cpp_BufPtr, Py_None );
         if( unlikely( pPyBufBak == nullptr ) )
         {
             ret = -ENOMEM;

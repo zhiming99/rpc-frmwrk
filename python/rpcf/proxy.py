@@ -213,13 +213,13 @@ class PyRpcContext :
         if self.pIoMgr is not None :
             self.StopIoMgr( self.pIoMgr )
             self.pIoMgr = None
-        return self.DestroyRpcCtx()
 
     def __enter__( self ) :
         self.Start( self.strModName )
 
     def __exit__( self, type, val, traceback ) :
         self.Stop()
+        self.DestroyRpcCtx()
 
 class PyRpcServices :
     def GetError( self ) :
@@ -260,8 +260,8 @@ class PyRpcServices :
 
     def __exit__( self, type, val, traceback ) :
         self.Stop()
-        self.oObj = None
         self.oInst = None
+        self.oObj = None
         self.pIoMgr = None
 
     def TimerCallback( self, callback, context )->None :

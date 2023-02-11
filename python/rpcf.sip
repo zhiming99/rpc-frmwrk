@@ -334,7 +334,7 @@ namespace cpp
                         break;
                 }
                 PyObject* pRetObj = sipConvertFromNewType(
-                    ppObj, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                    ppObj, sipType_cpp_ObjPtr, Py_None );
                 if( pRetObj == nullptr )
                 {
                     ret = -ENOMEM;
@@ -772,7 +772,7 @@ namespace cpp
     %End
 
     cpp::BufPtr* CastToBuf(
-        cpp::ObjPtr* pObj );
+        cpp::ObjPtr* pObj )/TransferBack/;
     %MethodCode
     cpp::BufPtr *pBuf = new cpp::BufPtr(
         nullptr, false );
