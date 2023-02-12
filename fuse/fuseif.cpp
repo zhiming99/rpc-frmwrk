@@ -2724,15 +2724,31 @@ gint32 CFuseEvtFile::fs_read(
         guint32 dwAvail = GetBytesAvail();
         if( dwAvail == 0 )
         {
+            if( this->GetClsid() ==
+                clsid( CFuseRespFileProxy ) )
+            {
+                OutputMsg( 0,
+                    "Checkpoint 15(%s): "
+                    "alert, no data to read@%d,"
+                    "avail=%d, want=%d, "
+                    "msgRead=%d, lastOff=%d",
+                    __func__, off,
+                    m_dwBytesAvail,
+                    size,
+                    m_dwMsgCount,
+                    m_dwLastOff );
+            }
             size = 0;
             break;
         }
         else if( dwAvail >= size )
         {
+            gint32 iMsgCount = m_queIncoming.size();
             FillBufVec( size,
                 m_queIncoming,
                 vecBackup, bufvec );
             m_dwBytesAvail -= size;
+            m_dwLastOff = off + size;
         }
         else if( bNonBlock )
         {
@@ -2740,8 +2756,15 @@ gint32 CFuseEvtFile::fs_read(
             size = dwAvail;
             if( m_dwLastOff > off )
             {
-                DebugPrint( off-m_dwLastOff,
-                    "alert, trying to read old data" );
+                OutputMsg( off-m_dwLastOff,
+                    "Checkpoint 14(%s): "
+                    "alert, trying to read old data @%d,"
+                    "avail=%d, want=%d, msgRead=%d, lastOff=%d",
+                    __func__, off,
+                    m_dwBytesAvail,
+                    size,
+                    m_dwMsgCount,
+                    m_dwLastOff );
             }
             else
             {

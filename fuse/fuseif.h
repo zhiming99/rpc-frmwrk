@@ -2554,9 +2554,6 @@ class CFuseRootBase:
                     if( ERROR( ret ) )
                         break;
                     ret = pRoot->AddChild( pNewDir );
-                    OutputMsg( ret, "Checkpoint 3: "
-                        "added conn directory %s",
-                        strName.c_str() );
                 }
             }
             else
@@ -2809,9 +2806,6 @@ class CFuseRootBase:
             }
 
         }while( 0 );
-
-        OutputMsg( ret, "Checkpoint 2: "
-            "leaving %s", __func__ );
 
         return ret;
     }
