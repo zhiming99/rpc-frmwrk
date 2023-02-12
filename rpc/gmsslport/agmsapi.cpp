@@ -484,7 +484,10 @@ int BLKOUT::write( PIOVE& iovew )
 
 int BLKOUT::read( PIOVE& iover )
 {
+    if( io_vec.empty() )
+        return -ENOENT;
     iover = io_vec.front();
+    io_vec.pop_front();
     return 0;
 }
 
@@ -568,6 +571,13 @@ void TLS13_HSCTX_SVR::clear()
         sizeof(client_sign_key));
 }
  
+AGMS::AGMS()
+{
+    gms_ctx = std::move(
+        std::unique_ptr( new AGMS_CTX ) );
+    gms_state = STAT_INIT;
+}
+
 int AGMS::shutdown()
 {
     int ret = 0;
@@ -2383,13 +2393,15 @@ int TLS13::init_cli()
             this->password.c_str()) != 1)
         {
             this->password.replace(
-                0, std::string::npos, 0, ' ' );
+                0, std::string::npos,
+                str.size(), ' ' );
             ret = -1;
             break;
         }
 
         this->password.replace(
-            0, std::string::npos, 0, ' ' );
+            0, std::string::npos,
+            str.size(), ' ' );
 
         if (this->cacertfile.size())
         {

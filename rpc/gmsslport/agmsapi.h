@@ -186,6 +186,7 @@ typedef enum : uint32_t
     STAT_WAIT_CLI_FIN,
     STAT_START_SHUTDOWN,
     STAT_WAIT_CLOSE_NOTIFY,
+    STAT_CLOSE_NOTIFY_RECEIVED,
 
 } AGMS_STATE;
 
@@ -195,8 +196,6 @@ struct AGMS_CTX : TLS_CTX
     int check_private_key();
     unsigned long set_options( unsigned long op);
     int set_cipher_list( const char *str);
-    int up_ref();
-    void down_ref();
     void cleanup();
 };
 
@@ -212,11 +211,11 @@ struct AGMS : public TLS_CONNECT
     std::string cacertfile;
     std::string password;
 
-    AGMS( AGMS_CTX *ctx );
+    AGMS();
     virtual ~AGMS_CTX()
     { cleanup(); }
 
-    virtual int init() = 0;
+    virtual int init( bool is_client ) = 0; 
     virtual int handshake() = 0;
 
     virtual int recv( PIOVE& iove ) = 0;
@@ -226,7 +225,9 @@ struct AGMS : public TLS_CONNECT
     int send_alert( int alert );
     int get_error(int ret_code) const;
 
-    void set_state( AGMS_STATE state );
+    void set_state( AGMS_STATE state )
+    { gms_stat = state; }
+
     AGMS_STATE get_state() const
     { return gms_state; }
 
