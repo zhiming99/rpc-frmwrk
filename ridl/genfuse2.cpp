@@ -146,6 +146,7 @@ gint32 EmitBuildJsonReq2(
     NEW_LINE;
     Wa( "Json::StreamWriterBuilder oBuilder;" );
     Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
+    Wa( "oBuilder[\"indentation\"] = \"\";" );
     CCOUT <<  "strReq = Json::writeString( "
         << "oBuilder, oJsReq );";
     BLOCK_CLOSE;
@@ -1696,6 +1697,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "oJsResp[ JSON_ATTR_PARAMS ] = oParams;" );
             Wa( "Json::StreamWriterBuilder oBuilder;" );
             Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
+            Wa( "oBuilder[\"indentation\"] = \"\";" );
             CCOUT <<  "stdstr strResp = Json::writeString( "
                 << "oBuilder, oJsResp );";
             NEW_LINE;

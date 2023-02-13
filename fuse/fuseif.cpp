@@ -2713,31 +2713,27 @@ gint32 CFuseEvtFile::fs_read(
             m_queReqs.push_back(
                 { req, size, PINTR( d ) } );
             ret = STATUS_PENDING;
-            OutputMsg( bNonBlock,
-                "Checkpoint 12(%s): return pending %d(%d.%d)",
-                __func__, m_dwBytesAvail,
-                m_dwMsgRead,
-                m_queReqs.size() );
             break;
         }
 
         guint32 dwAvail = GetBytesAvail();
+
+        if( this->GetClsid() ==
+            clsid( CFuseRespFileProxy ) && off == 0 )
+        {
+            OutputMsg( 0,
+                "Checkpoint 15: "
+                "first data read,"
+                "avail=%d, want=%d, "
+                "msgRead=%d, msg=%s ",
+                m_dwBytesAvail,
+                size,
+                m_dwMsgCount,
+                m_strLastMsg.c_str() );
+        }
+
         if( dwAvail == 0 )
         {
-            if( this->GetClsid() ==
-                clsid( CFuseRespFileProxy ) )
-            {
-                OutputMsg( 0,
-                    "Checkpoint 15(%s): "
-                    "alert, no data to read@%d,"
-                    "avail=%d, want=%d, "
-                    "msgRead=%d, lastOff=%d",
-                    __func__, off,
-                    m_dwBytesAvail,
-                    size,
-                    m_dwMsgCount,
-                    m_dwLastOff );
-            }
             size = 0;
             break;
         }
@@ -2780,11 +2776,6 @@ gint32 CFuseEvtFile::fs_read(
             ret = STATUS_PENDING;
             m_queReqs.push_back(
                 { req, size, PINTR( d ) } );
-            OutputMsg( bNonBlock,
-                "Checkpoint 13(%s): return pending %d(%d.%d)",
-                __func__, m_dwBytesAvail,
-                m_dwMsgRead,
-                m_queReqs.size() );
         }
 
     }while( 0 );
@@ -2822,7 +2813,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             SetPollHandle( nullptr );
         }
 #ifdef DEBUG
-        m_strLastMsg = strMsg.substr( 0, 100 );
+        m_strLastMsg = strMsg.substr( 0, 128 );
 #endif
         ++m_dwMsgCount;
         size_t dwAvail = GetBytesAvail();
@@ -3648,6 +3639,7 @@ gint32 CFuseRespFileProxy::CancelFsRequests(
         {
             Json::StreamWriterBuilder oBuilder;
             oBuilder["commentStyle"] = "None";
+            oBuilder["indentation"] = "";
 
             for( auto& elem : vecReqs )
             {
@@ -3835,17 +3827,18 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         ret = pProxy->DispatchReq(
             nullptr, valReq, valResp );
 
-        Json::StreamWriterBuilder oBuilder;
-        oBuilder["commentStyle"] = "None";
-        stdstr strResp =
-            Json::writeString( oBuilder, valResp );
-
         if( ret == STATUS_PENDING )
         {
             ret = 0;
         }
         else
         {
+            Json::StreamWriterBuilder oBuilder;
+            oBuilder["commentStyle"] = "None";
+            oBuilder["indentation"] = "";
+            stdstr strResp =
+                Json::writeString( oBuilder, valResp );
+
             pProxy->RemoveReqGrp( qwReqId );
             // append the response to the resp file
             gint32 (*func)( CFuseSvcProxy*,

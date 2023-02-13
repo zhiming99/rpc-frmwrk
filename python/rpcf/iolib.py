@@ -37,7 +37,7 @@ def recvResp( respfp : object)->[int, list] :
     error = 0
     try:
         while len( inBuf ) == 0:
-            resp = select.select( inputs, [], [], 2.0 )
+            resp = select.select( inputs, [], [], 10.0 )
             # read at the page boundary
             data = respfp.read(8192)
             if len( data ) == 0 :
