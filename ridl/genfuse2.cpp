@@ -1795,10 +1795,6 @@ gint32 CImplServiceImplFuse2::Output()
             CCOUT << "this->RemoveReq( qwReqId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
-            Wa( "if( ERROR( ret ) )" );
-            Wa( "    OutputMsg( ret, \"Checkpoint 10: \"" );
-            Wa( "        \"OnReqComplete failed with req %s(%d) \"," );
-            Wa( "        strMethod.c_str(), iRet );" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINES( 2 );

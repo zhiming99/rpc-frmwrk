@@ -2813,7 +2813,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             SetPollHandle( nullptr );
         }
 //#ifdef DEBUG
-        m_strLastMsg = strMsg.substr( 0, 128 );
+        m_strLastMsg = strMsg.substr( 0, 100 );
 //#endif
         ++m_dwMsgCount;
         size_t dwAvail = GetBytesAvail();
@@ -3460,8 +3460,8 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 #ifdef DEBUG
         m_strLastMsg.clear();
         m_strLastMsg.append( pBuf->ptr(),
-            ( pBuf->size() > 128 ?
-                128 : pBuf->size() ) );
+            ( pBuf->size() > 100 ?
+                100 : pBuf->size() ) );
 #endif
         Json::Value valResp;
         if( !m_pReader->parse( pBuf->ptr(),
@@ -3792,8 +3792,8 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 #ifdef DEBUG
         m_strLastMsg.clear();
         m_strLastMsg.append( pBuf->ptr(),
-            ( pBuf->size() > 128 ?
-                128 : pBuf->size() ) );
+            ( pBuf->size() > 100 ?
+                100 : pBuf->size() ) );
 #endif
         Json::Value valReq, valResp;
         if( !m_pReader->parse( pBuf->ptr(),
@@ -4925,7 +4925,7 @@ static gint32 fuseif_create_req(
         else
             pSvr->AddReqFiles( strSuffix );
 
-        auto pEnt = _pSvcDir->GetChild( strName );
+        auto pEnt = pSvcDir->GetChild( strName );
         if( pEnt == nullptr )
         {
             ret = -EFAULT;
@@ -4938,6 +4938,7 @@ static gint32 fuseif_create_req(
         fi->fh = ( guint64 )pReqFile;
         fi->direct_io = 1;
         fi->keep_cache = 0;
+        fi->nonseekable = 1;
 
     }while( 0 );
 
@@ -5241,7 +5242,7 @@ void* fuseop_init(
    fuse_conn_info *conn,
    fuse_config *cfg )
 {
-    UNREFERENCED( conn );
+    conn->max_readahead = 0;
 
     cfg->entry_timeout = -1;
     cfg->attr_timeout = -1;
