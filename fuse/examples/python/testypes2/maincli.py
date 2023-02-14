@@ -182,7 +182,8 @@ def maincli() :
 
         print( "Start EchoStream...", os.getpid() )
         reqId += 1
-        stmFile = strSvcPt + "/streams/stream_" + str( num )
+        hstmIn = "stream_" + str( num )
+        stmFile = strSvcPt + "/streams/" + hstmIn
         
         #create the stream if not exist
         stmfp = open( stmFile, "w+b", buffering=0)
@@ -191,16 +192,17 @@ def maincli() :
         stmfp.write(binBuf[0:8*1024])
 
         #stream handle is the same as the file name of the stream
-        iRet = oProxy.EchoStream( reqId, "stream_" + str( num ) )
+        iRet = oProxy.EchoStream( reqId, hstmIn )
         if iRet[ 0 ] < 0:
             error = iRet[0]
             raise Exception( "EchoStream failed with error %d" % error )
         oResp = iRet[1]
         #get the stream returned
         hstmr = oResp[0]
-        if hstmr != "stream_" + str( num ):
+        if hstmr != hstmIn:
             error = -errno.EBADF
-            raise Exception( "EchoStream failed 2 with error %d" % error )
+            raise Exception( "EchoStream returned different stream '%s'(origin):'%s'(returned)" %
+                ( hstmr, hstmIn ), os.getpid() )
 
         #read the datablock echoed back
         inputs = [stmfp]
