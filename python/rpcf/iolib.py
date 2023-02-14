@@ -6,6 +6,12 @@ import select
 import fcntl
 import array
 
+def rpcfOpener( path : str, flags : int ) :
+    return os.open( path, flags | os.O_DIRECT | os.O_NONBLOCK )
+
+def rpcOpen( path : str, mode : str ):
+    return open( path, mode, buffering=0, opener=rpcfOpener )
+
 def setBlocking( fp : object )->int:
     try:
         return fcntl.ioctl( fp.fileno(), 0x4a00 )
