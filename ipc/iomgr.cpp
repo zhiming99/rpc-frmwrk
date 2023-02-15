@@ -2126,6 +2126,9 @@ gint32 CIoManager::GetRouterName(
 gint32 CIoManager::AddSeqTask(
     TaskletPtr& pTask, bool bLong )
 {
+    if( IsStopping() )
+        return ERROR_STATE;
+
     CRpcServices* pIf = GetSyncIf();
     if( pIf == nullptr )
         return -EFAULT;
@@ -2215,6 +2218,57 @@ gint32 CIoMgrPostStartTask::operator()(
         Sem_Post( pMgr->GetSyncSem() );
 
     return SetError( ret );
+}
+
+gint32 CSimpleSyncIf::OnPreStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        gint32 (*func)( IEventSink* pCb ) =
+        ([]( IEventSink* pCb )->gint32
+        {
+            if( pCb == nullptr )
+                return -EFAULT;
+            pCb->OnEvent( eventTaskComp, 0, 0, nullptr );
+            return 0;
+        });
+        CIoManager* pMgr = GetIoMgr();
+        TaskletPtr pTailTask;
+        ret = NEW_FUNCCALL_TASK( pTailTask,
+            pMgr, func, pCallback );
+        if( ERROR( ret ) )
+            break;
+        ret = AddSeqTask( pTailTask );
+        if( ERROR( ret ) )
+        {
+            ( *pTailTask )( eventCancelTask );
+            break;
+        }
+        if( SUCCEEDED( ret ) )
+            ret = pTailTask->GetError();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CSimpleSyncIf::Stop()
+{ return CRpcInterfaceBase::Stop(); }
+
+gint32 CSimpleSyncIf::OnPostStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    CStdRMutex oLock( GetLock() );
+    ret = super::OnPostStop( pCallback );
+    if( !m_pSeqTasks.IsEmpty() )
+    {
+        CCfgOpenerObj oCfg(
+            ( IEventSink* )m_pSeqTasks );
+        oCfg.RemoveProperty( propIoMgr );
+    }
+    return ret;
 }
 
 }

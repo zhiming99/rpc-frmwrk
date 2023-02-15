@@ -420,8 +420,6 @@ class CRpcInterfaceBase :
     public IInterfaceEvents,
     public IInterfaceCommands
 {
-
-
     gint32 PauseResume( bool bResume,
         IEventSink* pCallback );
 
@@ -432,6 +430,10 @@ class CRpcInterfaceBase :
 
     gint32 SetReqQueSize(
         IMessageMatch* pMatch, guint32 dwSize );
+
+    gint32 QueueStopTask(
+        CRpcInterfaceBase* pIf,
+        IEventSink* pCallback  );
 
     public:
 
@@ -705,6 +707,8 @@ class CRpcServices :
 
     virtual gint32 StartEx2(
         IEventSink* pCallback );
+
+    gint32 Stop() override;
 
     PROXY_MAP* GetProxyMap(
         EnumClsid iIfId = clsid( Invalid ) );

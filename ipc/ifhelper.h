@@ -3655,6 +3655,9 @@ class _ClassName : public virtual CAggInterfaceProxy{ \
     END_DECL_PROXY_SYNC( _ClassName )
 
 BEGIN_DECL_PROXY_SYNC( CSimpleSyncIf, CInterfaceProxy )
+gint32 OnPreStop( IEventSink* pCallback ) override;
+gint32 OnPostStop( IEventSink* pCallback ) override;
+gint32 Stop() override;
 END_DECL_PROXY_SYNC( CSimpleSyncIf )
 
 /**

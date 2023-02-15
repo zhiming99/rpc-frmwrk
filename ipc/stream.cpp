@@ -1452,6 +1452,9 @@ gint32 IStream::OnPreStopShared(
 
     }while( 0 );
 
+    if( ERROR( ret ) && !pTaskGrp.IsEmpty() )
+        ( *pTaskGrp )( eventCancelTask );
+
     return ret;
 }
 

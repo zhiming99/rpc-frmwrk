@@ -2811,7 +2811,7 @@ class CFuseRootBase:
     }
 
     gint32 OnPostStart(
-        IEventSink* pCallback )
+        IEventSink* pCallback ) override
     {
         gint32 ret = 0;
         do{
@@ -2851,7 +2851,8 @@ class CFuseRootBase:
         return ret;
     }
 
-    gint32 OnPreStop( IEventSink* pCallback )
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
     {
         gint32 ret = 0;
         do{
