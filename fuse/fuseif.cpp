@@ -2725,11 +2725,20 @@ gint32 CFuseEvtFile::fs_read(
                 "Checkpoint 15: "
                 "first data read,"
                 "avail=%d, want=%d, "
-                "msgRead=%d, msg=%s ",
-                m_dwBytesAvail,
-                size,
-                m_dwMsgCount,
+                "msgReceived=%d, msg=%s ",
+                dwAvail, size, m_dwMsgCount,
                 m_strLastMsg.c_str() );
+        }
+
+        if( m_dwLastOff > off )
+        {
+            OutputMsg( off-m_dwLastOff,
+                "Checkpoint 14: "
+                "alert, reading old data @%d,"
+                "avail=%d, want=%d, "
+                "msgReceived=%d, lastOff=%d",
+                off, dwAvail, size,
+                m_dwMsgCount, m_dwLastOff );
         }
 
         if( dwAvail == 0 )
@@ -2737,39 +2746,29 @@ gint32 CFuseEvtFile::fs_read(
             size = 0;
             break;
         }
-        else if( dwAvail >= size )
+
+        if( bNonBlock && size > dwAvail )
+            size = dwAvail;
+
+        if( dwAvail >= size )
         {
-            gint32 iMsgCount = m_queIncoming.size();
-            FillBufVec( size,
-                m_queIncoming,
+            gint32 iRet = FillBufVec(
+                size, m_queIncoming,
                 vecBackup, bufvec );
+            if( size == 0 ||
+                iRet == STATUS_PENDING)
+            {
+                OutputMsg( iRet,
+                    "Checkpoint 16: "
+                    "alert, FillBufRec failed@%d,"
+                    "avail=%d, want=%d, "
+                    "msgReceived=%d, lastOff=%d",
+                    off, dwAvail, size,
+                    m_dwMsgCount, m_dwLastOff );
+                break;
+            }
             m_dwBytesAvail -= size;
             m_dwLastOff = off + size;
-        }
-        else if( bNonBlock )
-        {
-            m_dwMsgRead += m_queIncoming.size();
-            size = dwAvail;
-            if( m_dwLastOff > off )
-            {
-                OutputMsg( off-m_dwLastOff,
-                    "Checkpoint 14(%s): "
-                    "alert, trying to read old data @%d,"
-                    "avail=%d, want=%d, msgRead=%d, lastOff=%d",
-                    __func__, off,
-                    m_dwBytesAvail,
-                    size,
-                    m_dwMsgCount,
-                    m_dwLastOff );
-            }
-            else
-            {
-                m_dwLastOff = off + size;
-            }
-            FillBufVec( size,
-                m_queIncoming,
-                vecBackup, bufvec );
-            m_dwBytesAvail -= size;
         }
         else
         {
