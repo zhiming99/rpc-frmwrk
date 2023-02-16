@@ -70,6 +70,9 @@ static void fuseif_rwinterrupt(
     if (d->id == pthread_self())
         return;
 
+    OutputMsg( 0, "Checkpoint 18(%s): "
+        "about to cancel req",
+        __func__ );
     CFuseObjBase* pObj = d->fe;
     while( pObj != nullptr )
     {
@@ -189,7 +192,12 @@ void fuseif_ll_read(fuse_req_t req,
             req, buf, off, size,
             vecBackup, d );
         if( ret == STATUS_PENDING )
+        {
+            OutputMsg( ret, "Checkpoint 17(%s): "
+                "pending returned",
+                __func__ );
             break;
+        }
 
         fuseif_finish_interrupt( pFuse, req, d );
         if( d != nullptr )
