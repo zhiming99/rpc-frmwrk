@@ -39,7 +39,7 @@ class CTaskThread : public IThread
 {
     protected:
     std::thread                 *m_pServiceThread;
-    bool                        m_bExit;
+    std::atomic< bool >         m_bExit = { false };
     TaskQuePtr                  m_pTaskQue;
     sem_t                       m_semSync;
     gint32                      m_iMyTid;
@@ -212,7 +212,7 @@ class CIrpCompThread : public IThread
     mutable std::mutex          m_oMutex;
     sem_t                       m_semIrps;
     sem_t                       m_semSlots;
-    bool                        m_bExit;
+    std::atomic< bool >         m_bExit = { false };
     std::thread                 *m_pServiceThread;
 
     std::map< const IGenericInterface*, gint32 > m_mapIfs;
@@ -459,7 +459,7 @@ class CUtilities : public IService
     sem_t         m_semWaitingLockLongWait;
 
     // flag to exit the worker thread
-    bool          m_bExit;
+    std::atomic< bool >         m_bExit = { false };
     CIoManager*   m_pIoMgr;
 
     public:

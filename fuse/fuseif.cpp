@@ -2755,18 +2755,11 @@ gint32 CFuseEvtFile::fs_read(
             gint32 iRet = FillBufVec(
                 size, m_queIncoming,
                 vecBackup, bufvec );
+
             if( size == 0 ||
                 iRet == STATUS_PENDING)
-            {
-                OutputMsg( iRet,
-                    "Checkpoint 16: "
-                    "alert, FillBufRec failed@%d,"
-                    "avail=%d, want=%d, "
-                    "msgReceived=%d, lastOff=%d",
-                    off, dwAvail, size,
-                    m_dwMsgCount, m_dwLastOff );
                 break;
-            }
+
             m_dwBytesAvail -= size;
             m_dwLastOff = off + size;
         }
