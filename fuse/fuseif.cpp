@@ -2821,8 +2821,9 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             size_t dwToRead =
                 std::min( dwAvail, dwReqSize );
 
-            DebugPrint( dwToRead,
-                "completing queued read request" );
+            OutputMsg( dwToRead,
+                "Checkpoint 19: completing queued "
+                "read request" );
             std::vector< BufPtr > vecRemoved;
             FillBufVec(
                 dwToRead, m_queIncoming,
@@ -2830,14 +2831,10 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 
             fuseif_finish_interrupt(
                     GetFuse(), req, d );
-            if( dwToRead > 0 )
-            {
-                fuse_reply_data( req, bufvec,
-                    FUSE_BUF_SPLICE_MOVE );
-            }
-            else
-                fuse_reply_err( req, 0 );
-            fuseif_free_buf( bufvec );
+
+            fuseif_complete_read(
+                GetFuse(), req, ret, bufvec );
+
             m_queReqs.pop_front();
             dwAvail -= dwToRead;
         }

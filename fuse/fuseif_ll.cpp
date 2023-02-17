@@ -163,8 +163,15 @@ void fuseif_complete_read(
     if( SUCCEEDED( ret ) )
     {
         if( buf != nullptr )
-            fuse_reply_data( req,
-                buf, FUSE_BUF_SPLICE_MOVE);
+        {
+            ret = fuse_reply_data( req,
+                buf, FUSE_BUF_NO_SPLICE );
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "Checkpoint 20: "
+                    "failed to reply data" );
+            }
+        }
         else
             fuse_reply_err( req, 0 );
     }
@@ -183,17 +190,17 @@ void fuseif_ll_read(fuse_req_t req,
     gint32 ret = 0;
     do{
         fuse* pFuse = GetFuse();
-        fuseif_intr_data d;
-        memset( &d, 0, sizeof( fuseif_intr_data ) );
-        d.fe = ( CFuseObjBase* )fi->fh;
-        fuseif_prepare_interrupt( pFuse, req, &d );
+        auto d = ( fuseif_intr_data* )
+            calloc( 1, sizeof( fuseif_intr_data ) );
+        d->fe = ( CFuseObjBase* )fi->fh;
+        fuseif_prepare_interrupt( pFuse, req, d );
         fuse_bufvec* buf = nullptr;
         std::vector< BufPtr > vecBackup;
         ret = SafeCall( "read", false,
             &CFuseObjBase::fs_read,
             ( const char* )nullptr, fi,
             req, buf, off, size,
-            vecBackup, &d );
+            vecBackup, d );
         if( ret == STATUS_PENDING )
         {
             OutputMsg( ret, "Checkpoint 17(%s): "
@@ -202,7 +209,9 @@ void fuseif_ll_read(fuse_req_t req,
             break;
         }
 
-        fuseif_finish_interrupt( pFuse, req, &d );
+        fuseif_finish_interrupt( pFuse, req, d );
+        if( d != nullptr )
+            free( d );
         fuseif_complete_read(
             pFuse, req, ret, buf );
 
@@ -218,19 +227,19 @@ void fuseif_ll_write_buf(fuse_req_t req,
 {
     gint32 ret = 0;
 
-    fuseif_intr_data d;
-    memset( &d, 0, sizeof( fuseif_intr_data ) );
+    auto d = ( fuseif_intr_data* )
+        calloc( 1, sizeof( fuseif_intr_data ) );
     do{
         fuse* pFuse = GetFuse();
-        d.fe = ( CFuseObjBase* )fi->fh;
-        if( unlikely( d.fe == nullptr ) )
+        d->fe = ( CFuseObjBase* )fi->fh;
+        if( unlikely( d->fe == nullptr ) )
         {
             ret = -EFAULT;
             break;
         }
         TaskletPtr pCallback;
         auto pCmd = dynamic_cast
-            < CFuseCmdFile* >( d.fe );
+            < CFuseCmdFile* >( d->fe );
         if( unlikely( pCmd != nullptr ) )
         {
             // extra parameter for cmdfile
@@ -248,13 +257,13 @@ void fuseif_ll_write_buf(fuse_req_t req,
                 oParams.GetCfg() );
             if( ERROR( ret ) )
                 break;
-            d.pCb = pCallback;
+            d->pCb = pCallback;
         }
 
-        fuseif_prepare_interrupt( pFuse, req, &d );
+        fuseif_prepare_interrupt( pFuse, req, d );
         ret = SafeCall( "write_buf", false,
             &CFuseObjBase::fs_write_buf,
-            nullptr, fi, req, buf, &d );
+            nullptr, fi, req, buf, d );
         if( ret == STATUS_PENDING &&
             !pCallback.IsEmpty() )
         {
@@ -262,7 +271,7 @@ void fuseif_ll_write_buf(fuse_req_t req,
             pSync->WaitForCompleteWakable();
             ret = pSync->GetError();
         }
-        fuseif_finish_interrupt( pFuse, req, &d );
+        fuseif_finish_interrupt( pFuse, req, d );
         if( SUCCEEDED( ret ) )
             fuse_reply_write(
                 req, fuseif_buf_size( buf ) );
@@ -270,6 +279,7 @@ void fuseif_ll_write_buf(fuse_req_t req,
             fuse_reply_err( req, -ret );
 
     }while( 0 );
+    free( d );
 
     return;
 }
