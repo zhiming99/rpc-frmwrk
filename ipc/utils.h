@@ -108,7 +108,7 @@ class CTaskThread : public IThread
 
 class COneshotTaskThread : public CTaskThread
 {
-    bool m_bTaskDone;
+    std::atomic< bool >& m_bTaskDone = super::m_bExit;
     EnumClsid m_iTaskClsid;
     public:
 
@@ -119,13 +119,6 @@ class COneshotTaskThread : public CTaskThread
 
     virtual void ThreadProc( void* context );
     gint32 Start();
-    gint32 Stop();
-
-    // test if the thread is running
-    bool IsRunning() const
-    {
-        return !m_bTaskDone;
-    }
 
     gint32 GetProperty(
         gint32 iProp,
@@ -236,10 +229,7 @@ class CIrpCompThread : public IThread
 
     void Join();
 
-    // we will use AddRef and Release to
-    // manange the reference count.
-    gint32 AddIf( IGenericInterface* pif );
-    gint32 RemoveIf( IGenericInterface* pif );
+    gint32 ProcessIrps();
     gint32 GetLoadCount() const;
     gint32 OnEvent(EnumEventId, LONGWORD, LONGWORD, LONGWORD*)
     { return 0;}

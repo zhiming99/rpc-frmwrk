@@ -204,7 +204,6 @@ CTaskThread::CTaskThread(
 {
     SetClassId( clsid( CTaskThread ) );
     m_pServiceThread = nullptr;
-    m_bExit = false;
     Sem_Init( &m_semSync, 0, 0 );
 }
 
@@ -227,7 +226,6 @@ gint32 CTaskThread::GetLoadCount() const
 
 gint32 CTaskThread::Start()
 {
-    m_bExit = false;
     // NOTE: don't change the value of the
     // last parameter. It is a interface
     // definition
@@ -342,6 +340,9 @@ void CTaskThread::ThreadProc(
 void CTaskThread::AddTask(
     TaskletPtr& pTask )
 {
+    if( m_bExit )
+        return;
+
     m_pTaskQue->AddTask( pTask );
     Sem_Post( &m_semSync );
 }
@@ -411,7 +412,6 @@ COneshotTaskThread::COneshotTaskThread()
     : CTaskThread()
 {
     SetClassId( clsid( COneshotTaskThread ) );
-    m_bTaskDone = false;
     m_iTaskClsid = clsid( Invalid );
 }
 
@@ -432,15 +432,13 @@ void COneshotTaskThread::ThreadProc(
 
     this->SetThreadName();
 
-    while( !m_bTaskDone )
+    bool bTaskDone = false;
+    while( !m_bExit )
     {
-        TaskletPtr pTask;
-        ret = GetHead( pTask );
+        ret = ProcessTask( lContext );
         if( SUCCEEDED( ret ) )
         {
-            ( *pTask )( ( guint32 )lContext );
-            m_bTaskDone = true;
-            PopHead();
+            bTaskDone = true;
             break;
         }
 
@@ -456,12 +454,15 @@ void COneshotTaskThread::ThreadProc(
         // check the task again
     }
 
+    // in case the task is in the queue
+    if( m_bExit && !bTaskDone )
+        ProcessTask( lContext );
+
     return;
 }
 
 gint32 COneshotTaskThread::Start()
 {
-    m_bExit = false;
     // NOTE: don't change the value of the
     // last parameter. It is a interface
     // definition
@@ -469,17 +470,6 @@ gint32 COneshotTaskThread::Start()
             &COneshotTaskThread::ThreadProc,
             this,
             ( void* )( eventOneShotTaskThrdCtx ) );
-    return 0;
-}
-
-gint32 COneshotTaskThread::Stop()
-{
-    m_bTaskDone = true;
-    if( m_pServiceThread->joinable() )
-        m_pServiceThread->join();
-    delete m_pServiceThread;
-    m_pServiceThread = nullptr;
-
     return 0;
 }
 
@@ -559,8 +549,6 @@ gint32 CIrpCompThread::AddIrp( IRP* pirp )
 
 gint32 CIrpCompThread::Start()
 {
-    m_bExit = false;
-
     // NOTE: don't change the value of the
     // last parameter. It is a interface
     // definition
@@ -577,6 +565,35 @@ bool CIrpCompThread::IsRunning() const
         && m_pServiceThread->joinable() );
 }
 
+gint32 CIrpCompThread::ProcessIrps()
+{
+    gint32 ret = 0;
+    do{
+        ret = Sem_Wait( &m_semIrps );
+        if( ERROR( ret ) )
+            break;
+
+        std::deque<IrpPtr> quePendingIrps;
+
+        CStdMutex a( m_oMutex );
+        guint32 dwCount = m_quePendingIrps.size();
+        if( dwCount > 0 )
+        {
+            quePendingIrps = m_quePendingIrps;
+            m_quePendingIrps.clear();
+            for( int i = 0; i < dwCount; ++i )
+                Sem_Post( &m_semSlots );
+        }
+        a.Unlock();
+
+        for( auto elem : quePendingIrps )
+            this->CompleteIrp( elem );
+
+    }while( 0 );
+
+    return ret;
+}
+
 void CIrpCompThread::ThreadProc( void* context )
 {
     IrpPtr pIrp;
@@ -585,33 +602,10 @@ void CIrpCompThread::ThreadProc( void* context )
     this->SetThreadName();
 
     while( !m_bExit )
-    {
-        ret = Sem_Wait( &m_semIrps );
-        if( ERROR( ret ) )
-            break;
+        ProcessIrps();
 
-        std::deque<IrpPtr> quePendingIrps;
-        if( true )
-        {
-            CStdMutex a( m_oMutex );
-            guint32 dwCount = m_quePendingIrps.size();
-            if( dwCount > 0 )
-            {
-                quePendingIrps = m_quePendingIrps;
-                m_quePendingIrps.clear();
-                for( int i = 0; i < dwCount; ++i )
-                    Sem_Post( &m_semSlots );
-            }
-        }
-
-        for( auto elem : quePendingIrps )
-        {
-            CompleteIrp( elem );
-            if( m_bExit )
-                break;
-        }
-    }
-    
+    ProcessIrps();
+    return;
 }
 
 void CIrpCompThread::CompleteIrp( PIRP pIrp )
@@ -633,40 +627,10 @@ CIrpCompThread::~CIrpCompThread()
 }
 
 
-gint32 CIrpCompThread::AddIf( IGenericInterface* pif )
-{
-    gint32 ret = 0;
-    CStdMutex a( m_oMutex );
-    if( m_mapIfs.size() < ICT_MAX_IFS )
-    {
-        m_mapIfs[ pif ] = 1;
-    }
-    else
-    {
-        ret = -ENOMEM;
-    }
-
-    return ret;
-}
-
-gint32 CIrpCompThread::RemoveIf( IGenericInterface* pif )
-{
-
-    gint32 ret = 0;
-
-    CStdMutex a( m_oMutex );
-
-    if( m_mapIfs.erase( pif ) == 0 )
-        ret = -ENOENT;
-
-    return ret;
-}
-
 gint32 CIrpCompThread::GetLoadCount() const
 {
     CStdMutex a( m_oMutex );
     return m_quePendingIrps.size();
-
 }
 
 gint32 CIrpCompThread::Stop()
@@ -679,7 +643,7 @@ gint32 CIrpCompThread::Stop()
         Sem_Post( &m_semIrps );
 
         // waiting till it ends
-        m_pServiceThread->join();
+        Join();
 
         delete m_pServiceThread;
 

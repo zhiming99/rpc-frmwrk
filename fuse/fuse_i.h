@@ -79,6 +79,9 @@ struct fuse_session {
 	char *mountpoint;
 	volatile int exited;
 	int fd;
+#if FUSE_USE_VERSION >= FUSE_MAKE_VERSION(3, 12)
+    void* io;
+#endif
 	struct mount_opts *mo;
 	int debug;
 	int deny_others;
