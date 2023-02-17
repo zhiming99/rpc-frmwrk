@@ -569,10 +569,6 @@ gint32 CIrpCompThread::ProcessIrps()
 {
     gint32 ret = 0;
     do{
-        ret = Sem_Wait( &m_semIrps );
-        if( ERROR( ret ) )
-            break;
-
         std::deque<IrpPtr> quePendingIrps;
 
         CStdMutex a( m_oMutex );
@@ -602,7 +598,12 @@ void CIrpCompThread::ThreadProc( void* context )
     this->SetThreadName();
 
     while( !m_bExit )
+    {
+        ret = Sem_Wait( &m_semIrps );
+        if( ERROR( ret ) )
+            break;
         ProcessIrps();
+    }
 
     ProcessIrps();
     return;
