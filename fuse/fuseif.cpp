@@ -2718,29 +2718,6 @@ gint32 CFuseEvtFile::fs_read(
 
         guint32 dwAvail = GetBytesAvail();
 
-        if( this->GetClsid() ==
-            clsid( CFuseRespFileProxy ) && off == 0 )
-        {
-            OutputMsg( 0,
-                "Checkpoint 15: "
-                "first data read,"
-                "avail=%d, want=%d, "
-                "msgReceived=%d, msg=%s ",
-                dwAvail, size, m_dwMsgCount,
-                m_strLastMsg.c_str() );
-        }
-
-        if( m_dwLastOff > off )
-        {
-            OutputMsg( off-m_dwLastOff,
-                "Checkpoint 14: "
-                "alert, reading old data @%d,"
-                "avail=%d, want=%d, "
-                "msgReceived=%d, lastOff=%d",
-                off, dwAvail, size,
-                m_dwMsgCount, m_dwLastOff );
-        }
-
         if( dwAvail == 0 )
         {
             size = 0;
@@ -2762,6 +2739,42 @@ gint32 CFuseEvtFile::fs_read(
 
             m_dwBytesAvail -= size;
             m_dwLastOff = off + size;
+
+            if( this->GetClsid() ==
+                clsid( CFuseRespFileProxy ) && off == 0 )
+            {
+                char szBuf[ 128 ];
+                szBuf[ 127 ] = 0;
+                if( size <= sizeof( guint32 ) )
+                {
+                    OutputMsg( 0,
+                        "Checkpoint 14: "
+                        "empty bufer returned,"
+                        "avail=%d, want=%d, "
+                        "msgReceived=%d ",
+                        dwAvail, size, m_dwMsgCount );
+                }
+                else
+                {
+                    size_t dwSize = std::min(
+                        size - sizeof( guint32 ),
+                        sizeof( szBuf ) - 1 );
+
+                    char* ptr = ( char* )bufvec->buf[ 0 ].mem +
+                        sizeof( guint32 );
+
+                    memcpy( szBuf, ptr, dwSize );
+                    szBuf[ dwSize ] = 0;
+
+                    OutputMsg( 0,
+                        "Checkpoint 15: "
+                        "first data read,"
+                        "avail=%d, want=%d, "
+                        "msgReceived=%d, msg=%s ",
+                        dwAvail, size, m_dwMsgCount,
+                        szBuf );
+                }
+            }
         }
         else
         {
@@ -2821,9 +2834,6 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             size_t dwToRead =
                 std::min( dwAvail, dwReqSize );
 
-            OutputMsg( dwToRead,
-                "Checkpoint 19: completing queued "
-                "read request" );
             std::vector< BufPtr > vecRemoved;
             FillBufVec(
                 dwToRead, m_queIncoming,
@@ -5064,6 +5074,7 @@ static gint32 fuseif_create_stream(
                 ( CFuseObjBase* )pStmFile;
             fi->direct_io = 1;
             fi->keep_cache = 0;
+            fi->nonseekable = 1;
             pStmFile->IncOpCount();
             pDir->AddChild( pEnt );
         }
