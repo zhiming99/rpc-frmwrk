@@ -691,28 +691,10 @@ int TLS13::handle_alert( uint8_t* record )
         {
             // close_notify是唯一需要提供反馈的Fatal
             // Alert，其他直接中止连接
-            uint8_t alert_record[TLS_ALERT_RECORD_SIZE];
-            size_t alert_record_len;
-
-            tls_record_set_type(
-                alert_record, TLS_record_alert);
-
-            tls_record_set_protocol( alert_record,
-                tls_record_protocol(record));
-
-            tls_record_set_alert(alert_record,
-                &alert_record_len,
-                TLS_alert_level_fatal,
-                TLS_alert_close_notify);
-
-            tls_trace("send Alert close_notifiy\n");
-
-            tls_record_trace(stderr,
-                alert_record, alert_record_len, 0, 0);
-
-            SEND_RECORD( alert_record, alert_record_len );
+            send_alert( TLS_alert_close_notify );
+            this->set_state( STAT_CLOSED );
+            ret = -ENOTCONN;
         }
-        break;
 
     }while( 0 );
 
@@ -764,7 +746,7 @@ int TLS13::recv( IOV& iov )
                 break;
             case TLS_record_alert:
                 {
-                    this->handle_alert( enced_record );
+                    ret = this->handle_alert( enced_record );
                     bNext = true;
                     break;
                 }
@@ -778,6 +760,9 @@ int TLS13::recv( IOV& iov )
                     break;
                 }
             }
+
+            if( ERROR( ret ) )
+                break;
 
             if( bNext )
             {
