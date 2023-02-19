@@ -46,6 +46,7 @@ void fuseif_prepare_interrupt(
     fuseif_intr_data *d);
 
 void fuseif_free_buf(struct fuse_bufvec *buf);
+void fuseif_reply_err( fuse_req_t req, int err );
 
 void fuseif_complete_read(
     fuse* pFuse,
@@ -1990,7 +1991,7 @@ gint32 CFuseStmFile::OnReadStreamComplete(
                 auto req = elem.req;
                 fuseif_finish_interrupt( GetFuse(),
                     req, elem.pintr.get() );
-                fuse_reply_err( req, -iRet );
+                fuseif_reply_err( req, -iRet );
                 m_queReqs.pop_front();
             }
             break;
@@ -2654,7 +2655,7 @@ gint32 CFuseFileEntry::CancelFsRequest(
         auto req = itr->req;
         fuseif_finish_interrupt(
                 GetFuse(), req, d );
-        fuse_reply_err( req, -iRet );
+        fuseif_reply_err( req, -iRet );
         m_queReqs.erase( itr );
         return STATUS_SUCCESS;
     }
@@ -2672,7 +2673,7 @@ gint32 CFuseFileEntry::CancelFsRequests(
         fuseif_finish_interrupt( GetFuse(),
             elem.req, 
             elem.pintr.get() );
-        fuse_reply_err( elem.req, -iRet );
+        fuseif_reply_err( elem.req, -iRet );
     }
     m_queReqs.clear();
 

@@ -152,7 +152,15 @@ void fuseif_prepare_interrupt(
 void fuseif_free_buf(struct fuse_bufvec *buf)
 {      
     free(buf);
-}     
+}
+
+static stdmutex s_oFuseLock;
+
+void fuseif_reply_err( fuse_req_t req, int err )
+{
+    CStdMutex oLock( s_oFuseLock );
+    fuse_reply_err( req, err );
+}
 
 void fuseif_complete_read(
     fuse* pFuse,
@@ -160,12 +168,13 @@ void fuseif_complete_read(
     gint32 ret,
     fuse_bufvec* buf )
 {
+    CStdMutex oLock( s_oFuseLock );
     if( SUCCEEDED( ret ) )
     {
         if( buf != nullptr )
         {
             ret = fuse_reply_data( req,
-                buf, FUSE_BUF_NO_SPLICE );
+                buf, FUSE_BUF_SPLICE_MOVE );
             if( ERROR( ret ) )
             {
                 OutputMsg( ret, "Checkpoint 20: "
@@ -179,6 +188,7 @@ void fuseif_complete_read(
     {
         fuse_reply_err( req, -ret );
     }
+    oLock.Unlock();
     if( buf != nullptr )
         fuseif_free_buf( buf );
 }
