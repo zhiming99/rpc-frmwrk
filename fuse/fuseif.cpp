@@ -4441,6 +4441,17 @@ void CFuseSvcProxy::AddReqFiles(
     AddGroup( dwGrpId,
         { pReqFile, pRespFile, pEvtFile } );
     m_pSvcDir->AddChild( pFile );
+
+    if( m_pSvcDir->GetParent() == nullptr )
+        return;
+
+    stdstr strPath;
+    gint32 ret = this->GetSvcPath( strPath );
+    if( SUCCEEDED( ret ) )
+    {
+        fuse_invalidate_path(
+            GetFuse(), strPath.c_str() );
+    }
 }
 
 gint32 CFuseSvcProxy::DoRmtModEventFuse(
@@ -4595,6 +4606,16 @@ void CFuseSvcServer::AddReqFiles(
     AddGroup( dwGrpId, 
         { pReqFile, pRespFile } );
     m_pSvcDir->AddChild( pFile );
+    if( m_pSvcDir->GetParent() == nullptr )
+        return;
+
+    stdstr strPath;
+    gint32 ret = this->GetSvcPath( strPath );
+    if( SUCCEEDED( ret ) )
+    {
+        fuse_invalidate_path(
+            GetFuse(), strPath.c_str() );
+    }
 }
 
 gint32 CFuseSvcServer::IncStmCount(
@@ -5078,6 +5099,9 @@ static gint32 fuseif_create_stream(
             fi->nonseekable = 1;
             pStmFile->IncOpCount();
             pDir->AddChild( pEnt );
+
+            fuse_invalidate_path(
+                GetFuse(), strPath.c_str() );
         }
 
     }while( 0 );
