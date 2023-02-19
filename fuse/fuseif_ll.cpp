@@ -174,7 +174,7 @@ void fuseif_complete_read(
         if( buf != nullptr )
         {
             ret = fuse_reply_data( req,
-                buf, FUSE_BUF_SPLICE_MOVE );
+                buf, FUSE_BUF_NO_SPLICE );
             if( ERROR( ret ) )
             {
                 OutputMsg( ret, "Checkpoint 20: "
