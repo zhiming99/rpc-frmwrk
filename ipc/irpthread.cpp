@@ -847,6 +847,7 @@ gint32 CThreadPool::Stop()
             m_vecThreads;
 
         m_vecThreads.clear();
+        m_iMaxThreads = 0;
         oLock.Unlock();
 
         for( auto pThread : vecThreads ) 
