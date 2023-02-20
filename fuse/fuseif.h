@@ -1218,7 +1218,7 @@ class CFuseServicePoint :
     inline DIR_SPTR GetSvcDir() const
     { return m_pSvcDir; }
 
-    inline guint32 GetGroupId()
+    inline guint32 NewGroupId()
     { return m_dwGrpIdx++; }
 
     bool IsUnmounted() const

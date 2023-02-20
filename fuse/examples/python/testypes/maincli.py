@@ -71,6 +71,7 @@ def test() :
             AddParameter(req, "szText", 'Hello, you' )
 
             sendReq( reqfp, req )
+            print( os.getpid(), "EchoMany receiving from", respFile )
             ret = recvResp( respfp )
             if ret[ 0 ] < 0 :
                 error = ret[ 0 ]
@@ -101,8 +102,8 @@ def test() :
             error = objResp[ "ReturnCode"]
             if error < 0 :
                 raise Exception( 'Echo failed with error %d@%s' % ( error, num) )
-            print( os.getpid(), "Echo completed with response '%s'" %
-                objResp['Parameters']['strResp'])
+            #print( os.getpid(), "Echo completed with response '%s'" %
+            #    objResp['Parameters']['strResp'])
 
             # EchoByteArray
             req = BuildReqHdr( "EchoByteArray", idx )

@@ -2771,8 +2771,9 @@ gint32 CFuseEvtFile::fs_read(
                         "Checkpoint 15: "
                         "first data read,"
                         "avail=%d, want=%d, "
-                        "msgReceived=%d, msg=%s ",
-                        dwAvail, size, m_dwMsgCount,
+                        "%s, msg=%s ",
+                        dwAvail, size,
+                        GetName().c_str(),
                         szBuf );
                 }
             }
@@ -4397,10 +4398,10 @@ void CFuseSvcProxy::AddReqFiles(
     guint32 dwGrpId = 0;
     if( !( strSuffix.size() == 1 &&
         strSuffix.front() == '0' ) )
-        dwGrpId = GetGroupId();
+        dwGrpId = NewGroupId();
+
     stdstr strName = "jreq_";
     strName += strSuffix;
-
     auto pFile = DIR_SPTR(
         new CFuseReqFileProxy( strName, this ) ); 
     pObj = dynamic_cast< CFuseObjBase* >
@@ -4574,7 +4575,7 @@ void CFuseSvcServer::AddReqFiles(
     guint32 dwGrpId = 0;
     if( !( strSuffix.size() == 1 &&
         strSuffix.front() == '0' ) )
-        dwGrpId = GetGroupId();
+        dwGrpId = NewGroupId();
 
     stdstr strName = "jreq_";
     strName += strSuffix;
