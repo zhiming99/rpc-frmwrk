@@ -426,6 +426,262 @@ gint32 CRpcGmSSLFido::AdvanceHandshake(
         pCallback, pHandshake, false );
 }
 
+gint32 CRpcGmSSLFido::SubmitWriteIrpSingle(
+    PIRP pIrp, CfgPtr& pBufs )
+{
+    gint32 ret = 0;
+    do{
+        IrpCtxPtr pCtx =
+            pIrp->GetTopStack();
+
+        PortPtr pLowerPort = GetLowerPort();
+        ret = pIrp->AllocNextStack(
+            pLowerPort, IOSTACK_ALLOC_COPY );
+
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr pTopCtx =
+            pIrp->GetTopStack();
+
+        pLowerPort->AllocIrpCtxExt(
+            pTopCtx, pIrp );
+
+        CParamList oParams( pBufs );
+        BufPtr pBuf;
+        if( oParams.GetCount() == 1 )
+        {
+            oParams.GetBufPtr( 0, pBuf );
+        }
+        else
+        {
+            pBuf.NewObj();
+            *pBuf = ObjPtr( pBufs );
+        }
+
+        pTopCtx->SetReqData( pBuf );
+        ret = pLowerPort->SubmitIrp( pIrp );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+        {
+            pIrp->PopCtxStack();
+            pCtx->SetStatus( ret );
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcGmSSLFido::SubmitWriteIrpGroup(
+    PIRP pIrp, ObjVecPtr& pvecBufs )
+{
+    gint32 ret = 0;
+    std::vector< ObjPtr >& vecBufs =
+        ( *pvecBufs )();
+
+    if( vecBufs.empty() )
+        return -EINVAL;
+
+    do{
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
+
+        if( vecBufs.empty() )
+            break;
+
+        auto elem = vecBufs.front();
+        vecBufs.pop_front();
+
+        BufPtr pBuf( true );
+        *pBuf = elem;
+
+        BufPtr pExtBuf;
+        if( vecBufs.size() )
+        {
+            pExtBuf.NewObj();
+            *pExtBuf = ObjPtr( pvecBufs );
+        }
+
+        pCtx->SetExtBuf( pExtBuf );
+        PortPtr pLowerPort = GetLowerPort();
+        pIrp->AllocNextStack( pLowerPort );
+        IrpCtxPtr pTopCtx = 
+            pIrp->GetTopStack();
+
+        pTopCtx->SetMajorCmd( IRP_MJ_FUNC );
+        pTopCtx->SetMinorCmd( IRP_MN_WRITE );
+        pTopCtx->SetReqData( pBuf );
+        pTopCtx->SetIoDirection( IRP_DIR_OUT ); 
+        pLowerPort->AllocIrpCtxExt( pTopCtx, pIrp );
+        ret = pLowerPort->SubmitIrp( pIrp );
+        if( ERROR( ret ) )
+            break
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        pIrp->PopCtxStack();
+
+    }while( 1 );
+
+    return ret;
+}
+
+gint32 CRpcGmSSLFido::SubmitWriteIrpIn(
+    IRP* pIrp )
+{
+    gint32 ret = 0;
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    IrpCtxPtr pCtx = pIrp->GetTopStack();
+    do{
+        PIOVE piove;
+        BufPtr pBuf;
+        CfgPtr pCfg;
+        CStdRMutex oLock( this->GetLock() );
+        ret = pCtx->GetReqAsCfg( pCfg );
+        if( ERROR( ret ) )
+        { 
+            pBuf = pCtx->m_pReqData;
+            ret = BufToIove(
+                pBuf, piove, false, false );
+            if( ERROR( ret ) )
+                break;
+
+            ret = m_pSSL->send( piove );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            CParamList oParams(
+                ( IConfigDb* )pCfg );
+            guint32 dwCount = oParams.GetCount();
+            if( dwCount == 0 )
+            {
+                ret = -ENODATA;
+                break;
+            }
+            std::vector< BufPtr > vecBufs;
+            for( guint32 i = 0; i < dwCount; ++i )
+            {
+                ret = oParams.GetBufPtr( i, pBuf );
+                if( ERROR( ret ) )
+                    break;
+                vecBufs.push_back( pBuf );
+            }
+            for( auto& elem : vecBufs )
+            {
+                ret = BufToIove(
+                    pBuf, piove, false, false );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = m_pSSL->send( piove );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+        oLock.Unlock();
+        ret = SubmitWriteIrpOut( pIrp );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        pCtx->SetStatus( ret );
+
+    return ret;
+}
+
+gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
+{
+    gint32 ret = 0;
+    do{
+        ObjVecPtr pvecBufs( true );
+
+        std::vector< ObjPtr >& vecBufs =
+            ( *pvecBufs )();
+
+        CStdRMutex oLock( GetLock() );
+
+        guint32 dwSize = 0;
+        CfgPtr pBufs( true );
+
+        while( m_pSSL->write_bio.size() )
+        {
+            PIOVE piove;
+            CParamList oParams( pBufs );
+            ret = m_pSSL->write_bio.read( piove );
+            if( ERROR( ret ) )
+                break;
+
+            // transfer the buffer ownership
+            ret = IoveToBuf(
+                piove, pBuf, false, true );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( dwSize + TLS_MAX_RECORD_SIZE <
+                MAX_BYTES_PER_TRANSFER )
+            {
+                dwSize += pBuf->size();
+                oParams.Push( pBuf );
+                continue;
+            }
+
+            vecBufs.push_back( ObjPtr( pBufs ) );
+            pBufs.Clear();
+            pBufs.NewObj();
+            CParamList oParams2( pBufs );
+            oParams2.Push( pBuf );
+            dwSize = pBuf->size();
+        }
+
+        oLock.Unlock();
+
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
+        if( ERROR( ret ) )
+        {
+            pCtx->SetStatus( ret );
+            break;
+        }
+
+        CParamList oParams( pBufs );
+        if( oParams.GetCount() > 0 )
+        {
+            vecBufs.push_back(
+                ObjPtr( pBufs ) );
+        }
+
+        if( vecBufs.empty() )
+        {
+            IrpCtxPtr pCtx = pIrp->GetTopStack();
+            ret = -ENODATA;
+            pCtx->SetStatus( ret );
+            break;
+        }
+
+        pCtx->ClearExtBuf();
+        if( vecBufs.size() == 1 )
+        {
+            ret = SubmitWriteIrpSingle( pIrp, pBufs );
+        }
+        else
+        {
+            ret = SubmitWriteIrpGroup( pIrp, pvecBufs );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcGmSSLFido::SendImmediateResp()
 {
     gint32 ret = 0;
@@ -497,6 +753,7 @@ gint32 CRpcGmSSLFido::AdvanceHandshakeInternal(
         if( !pHandshake.IsEmpty() &&
             !pHandshake->empty() )
         {
+            PIOVE pInput;
             ret = BufToIove( pHandshake,
                 pInput, false, false );
 
@@ -800,7 +1057,7 @@ gint32 CRpcGmSSLFido::OnSubmitIrp(
         case IRP_MN_WRITE:
             {
                 // direct stream access
-                ret = SubmitWriteIrp( pIrp );
+                ret = SubmitWriteIrpIn( pIrp );
                 break;
             }
         case IRP_MN_IOCTL:
@@ -826,20 +1083,18 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
     bool bSSLErr = false;
 
     do{
-
         IrpCtxPtr pCtx = pIrp->GetCurCtx();
         IrpCtxPtr pTopCtx = pIrp->GetTopStack();
 
         BufPtr pInBuf = pTopCtx->m_pRespData;
+        pIrp->PopCtxStack();
+
         if( unlikely( ppInBuf.IsEmpty() ) )
         {
-            pIrp->PopCtxStack();
             ret = -EFAULT;
             pCtx->SetStatus( ret );
             break;
         }
-
-        pIrp->PopCtxStack();
 
         STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pInBuf->ptr();
@@ -1111,14 +1366,45 @@ gint32 CRpcGmSSLFido::CompleteWriteIrp(
         return -EINVAL;
 
     gint32 ret = 0;
-    if( !pIrp->IsIrpHolder() )
-    {
-        IrpCtxPtr& pTopCtx = pIrp->GetTopStack();
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
+
+    do{
+        BufPtr pvecBufs; 
+        IrpCtxPtr pTopCtx = pIrp->GetTopStack();
         ret = pTopCtx->GetStatus();
-        pCtx->SetStatus( ret );
         pIrp->PopCtxStack();
-    }
+        if( ERROR( ret ) )
+        {
+            break;
+        }
+
+        if( m_pSSL->get_state() != STAT_READY )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        pCtx->GetExtBuf( pvecBufs );
+        if( pvecBufs.IsEmpty() )
+        {
+            pCtx->SetStatus( ret );
+            break;
+        }
+        pCtx->ClearExtBuf();
+        ObjVecPtr pvecBufs = *pvecBufs;
+        if( pvecBufs.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        ret = SubmitWriteIrpGroup(
+            pIrp, pvecBufs ); 
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
 
     return ret;
 }
@@ -1167,10 +1453,8 @@ gint32 CRpcGmSSLFido::SubmitIoctlCmd(
                 }
                 
                 ret = CompleteListeningIrp( pIrp );
-                if( ret == STATUS_PENDING )
-                    continue;
-
-                break;
+                if( ret != STATUS_PENDING )
+                    break;
 
             }while( 1 );
 

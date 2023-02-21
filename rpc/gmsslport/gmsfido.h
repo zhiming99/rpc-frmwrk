@@ -86,8 +86,15 @@ class CRpcGmSSLFido : public CPort
     BufPtr      m_pOutBuf;
     guint32     m_dwNumSent = 0;
 
-    gint32 ResumeWriteTasks();
-    gint32 SubmitWriteIrp( IRP* pIrp );
+    gint32 SubmitWriteIrpGroup(
+        PIRP pIrp, ObjVecPtr& pvecBufs );
+
+    gint32 SubmitWriteIrpSingle(
+        PIRP pIrp, CfgPtr& pBufs );
+
+    gint32 SubmitWriteIrpIn( IRP* pIrp );
+    gint32 SubmitWriteIrpOut( IRP* pIrp );
+
     gint32 SubmitIoctlCmd( IRP* pIrp );
 
     gint32 CompleteFuncIrp( IRP* pIrp );
