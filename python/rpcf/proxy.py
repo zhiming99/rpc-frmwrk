@@ -237,9 +237,9 @@ class PyRpcServices :
 
         if ret < 0 :
             if isServer :
-                print( "Failed start server..." )
+                print( "Failed to start server(%d)" % ret )
             else :
-                print( "Failed start proxy..." )
+                print( "Failed to start proxy(%d)" % ret )
             return ret
         else :
             if isServer :
@@ -248,7 +248,7 @@ class PyRpcServices :
                 print( "Proxy started..." )
 
         oCheck = self.oInst.GetPyHost()
-        return 0
+        return ret
 
     def Stop( self ) :
         ret = self.oInst.Stop()
