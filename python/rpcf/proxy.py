@@ -31,6 +31,7 @@ import inspect
 import types
 import platform
 import pickle
+import os
 from enum import IntEnum
 from typing import Union, Tuple, Optional
 
@@ -195,6 +196,7 @@ class PyRpcContext :
 
     def __init__( self, strModName= "PyRpcProxy" ) :
         self.strModName = strModName
+        self.status = 0
 
     def Start( self, strModName="PyRpcProxy" ) :
         ret = 0
@@ -206,6 +208,9 @@ class PyRpcContext :
                 self.StopIoMgr( self.pIoMgr )
             else :
                 ret = LoadPyFactory( self.pIoMgr )
+            self.status = ret
+        else:
+            ret = -errno.EFAULT
         return ret
 
     def Stop( self ) :
@@ -216,8 +221,13 @@ class PyRpcContext :
 
     def __enter__( self ) :
         self.Start( self.strModName )
+        return self;
 
     def __exit__( self, type, val, traceback ) :
+        if self.status < 0:
+            print( os.getpid(), "__exit__():",
+                type, val, traceback,
+                self.status )
         self.Stop()
         self.DestroyRpcCtx()
 
@@ -237,9 +247,9 @@ class PyRpcServices :
 
         if ret < 0 :
             if isServer :
-                print( "Failed to start server(%d)" % ret )
+                print( "Failed to start server %d(%d)" % ( os.getpid(), ret ) )
             else :
-                print( "Failed to start proxy(%d)" % ret )
+                print( "Failed to start proxy %d(%d)" % ( os.getpid(), ret ) )
             return ret
         else :
             if isServer :

@@ -15,11 +15,18 @@ from pprint import pprint
 def maincli() :
     ret = 0
     oContext = PyRpcContext( 'PyRpcProxy' )
-    with oContext :
+    with oContext as ctx:
+
+        # Failed to start PyRpcContext
+        if ctx.status < 0 :
+            ret = ctx.status
+            print( os.getpid(), "error start PyRpcContext %d" % ret );
+            return ret
+
         print( "start to work here..." )
         strPath_ = os.path.dirname( os.path.realpath( __file__ ) )
         strPath_ += '/iftestdesc.json'
-        oProxy = CIfTestProxy( oContext.pIoMgr,
+        oProxy = CIfTestProxy( ctx.pIoMgr,
             strPath_, 'IfTest' )
         ret = oProxy.GetError()
         if ret < 0 :
@@ -113,4 +120,4 @@ def maincli() :
     return ret
     
 ret = maincli()
-quit( ret )
+quit( -ret )

@@ -58,6 +58,7 @@ void CPnpManager::OnPortAttached(
         return;
     
     do{
+        CIoManager* pMgr = GetIoMgr();
         IrpPtr pMasterIrp;
 
         CCfgOpenerObj oPortCfg( pPort );
@@ -77,12 +78,61 @@ void CPnpManager::OnPortAttached(
         // or fdo, let's build the port stack on top
         // of the current `pPort' following the
         // information in the driver.json
-        ret = GetIoMgr()->GetDrvMgr().BuildPortStack( pPort );
+        ret = pMgr->GetDrvMgr().BuildPortStack( pPort );
         if( ERROR( ret ) )
         {
-            // don't care because it will always fail
-            // at the end and we can work with just one
-            // port
+            CPort* pCPort = ObjPtr( pPort );
+            gint32 (*func)( CPort*, PIRP, gint32 iRet )=
+            ([]( CPort* pPort, PIRP pIrp, gint32 iRet )->gint32
+            {
+                gint32 ret = 0;
+                CCfgOpenerObj oCfg( pPort );
+                CIoManager* pMgr = pPort->GetIoMgr();
+                if( pIrp != nullptr )
+                {
+                    // complete the master irp
+                    CStdRMutex oIrpLock( pIrp->GetLock() );
+                    ret = pIrp->CanContinue(
+                        IRP_STATE_READY );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        IrpCtxPtr& pCtx =
+                            pIrp->GetTopStack();
+                        pCtx->SetStatus( iRet  );
+                        oIrpLock.Unlock();
+                        pMgr->CompleteIrp( pIrp );
+                    }
+                }
+                IEventSink* pCb = nullptr;
+                ret = oCfg.GetPointer(
+                    propEventSink, pCb );
+                if( SUCCEEDED( ret ) )
+                {
+                    // fake an irp and complete the callback
+                    IrpPtr pIrp2( true );
+                    pIrp2->AllocNextStack( pPort );
+                    IrpCtxPtr pIrpCtx = pIrp2->GetTopStack();
+                    pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
+                    pIrpCtx->SetMinorCmd( IRP_MN_PNP_START );
+                    pIrpCtx->SetIoDirection( IRP_DIR_OUT );
+                    pIrp2->SetState( IRP_STATE_READY,
+                        IRP_STATE_COMPLETED );
+                    pIrpCtx->SetStatus( iRet );
+                    pIrp2->SetStatus( iRet );
+                    pCb->OnEvent( eventIrpComp,
+                        ( LONGWORD )( ( IRP* )pIrp2 ),
+                        0, nullptr );
+                }
+                return 0;
+            });
+            TaskletPtr pTask;
+            NEW_FUNCCALL_TASK( pTask,
+                pMgr, func, pCPort,
+                ( PIRP )pMasterIrp, ret );
+            ret = pMgr->RescheduleTask( pTask );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+            break;
         }
 
         // notify the ports the stack is built
@@ -101,7 +151,7 @@ void CPnpManager::OnPortAttached(
 
         // no check of the port existance, because
         // we are sure it exists
-        ret = GetIoMgr()->SubmitIrp( hPort, pIrp, false );
+        ret = pMgr->SubmitIrp( hPort, pIrp, false );
         if( ERROR( ret ) )
             break;
 
@@ -120,8 +170,7 @@ void CPnpManager::OnPortAttached(
         ObjPtr pPortObj( pPort );
         ObjPtr pIrpObj( ( CObjBase*) pMasterIrp );
 
-        ret = DEFER_CALL( GetIoMgr(),
-            this,
+        ret = DEFER_CALL( pMgr, this,
             &CPnpManager::StartPortStack,
             pPortObj,
             pIrpObj );

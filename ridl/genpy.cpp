@@ -3036,13 +3036,21 @@ gint32 CImplPyMainFunc::OutputCli(
         INDENT_UPL;
         Wa( "ret = 0" );
         Wa( "oContext = PyRpcContext( 'PyRpcProxy' )" );
-        CCOUT << "with oContext :";
+        CCOUT << "with oContext as ctx:";
         INDENT_UPL;
+        CCOUT << "if ctx.status < 0:";
+        INDENT_UPL;
+        Wa( "ret = ctx.status" );
+        Wa( "print( os.getpid(), \"error start PyRpcContext %d\" % ret );" );
+        CCOUT << "return ret";
+        INDENT_DOWNL;
+        NEW_LINE;
+
         Wa( "print( \"start to work here...\" )" );
         Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
         CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
-        CCOUT << "oProxy = C" << strName << "Proxy( oContext.pIoMgr,";
+        CCOUT << "oProxy = C" << strName << "Proxy( ctx.pIoMgr,";
         NEW_LINE;
         CCOUT << "    strPath_, '" << strName << "' )" ;
         NEW_LINE;
@@ -3169,7 +3177,7 @@ gint32 CImplPyMainFunc::OutputCli(
         Wa( "return ret" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
-        Wa( "quit( ret )" );
+        Wa( "quit( -ret )" );
 
     }while( 0 );
 
@@ -3200,13 +3208,20 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "ret = 0" );
         Wa( "signal.signal( signal.SIGINT, SigHandler)" );
         Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
-        CCOUT << "with oContext :";
+        CCOUT << "with oContext as ctx:";
         INDENT_UPL;
+        CCOUT << "if ctx.status < 0:";
+        INDENT_UPL;
+        Wa( "ret = ctx.status" );
+        Wa( "print( os.getpid(), \"error start PyRpcContext %d\" % ret );" );
+        CCOUT << "return ret";
+        INDENT_DOWNL;
+        NEW_LINE;
         Wa( "print( \"start to work here...\" )" );
         Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
         CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
-        CCOUT << "oServer = C" << strName << "Server( oContext.pIoMgr,";
+        CCOUT << "oServer = C" << strName << "Server( ctx.pIoMgr,";
         NEW_LINE;
         CCOUT << "    strPath_, '" << strName << "' )" ;
         NEW_LINE;
@@ -3236,7 +3251,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_DOWNL;
 
         Wa( "ret = mainsvr()" );
-        Wa( "quit( ret )" );
+        Wa( "quit( -ret )" );
 
     }while( 0 );
 
