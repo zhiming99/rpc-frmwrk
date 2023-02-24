@@ -107,3 +107,14 @@
 #define JSON_ATTR_SVRSTAT_CLASS     "ServerStateClass"
 #define JSON_ATTR_PROXYSTAT_CLASS     "ProxyStateClass"
 #define JSON_ATTR_ENABLE_RFC    "EnableRFC"
+
+// SSL options
+// string
+#define JSON_ATTR_CERTFILE      "CertFile"
+#define JSON_ATTR_KEYFILE       "KeyFile"
+#define JSON_ATTR_CACERT        "CACertFile"
+#define JSON_ATTR_SECRET_FILE   "SecretFile"
+// boolean
+#define JSON_ATTR_VERIFY_PEER   "VerifyPeer"
+#define JSON_ATTR_HAS_PASSWORD  "HasPassword"
+#define JSON_ATTR_USING_GMSSL   "UsingGmSSL"
