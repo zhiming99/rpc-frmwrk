@@ -28,6 +28,10 @@
 #pragma once
 #include <stdint.h>
 #include <list>
+#include <errno.h>
+#include <memory>
+#include <atomic>
+#include <string>
 
 #define RET_OK 0
 #define RET_PENDING 65537
@@ -40,7 +44,7 @@ namespace gmssl
 struct AGMS_IOVE
 {
     uint32_t flags = 0;
-    uint8_t* ptr = nullptr;
+    uint8_t* pdata = nullptr;
     size_t mem_size = 0;
     size_t start = 0;
     size_t content_end = 0;
@@ -62,16 +66,16 @@ struct AGMS_IOVE
 
     inline void clear()
     {
-        if( ptr && !no_free() )
-        { free( ptr ); }
-        ptr = nullptr;
+        if( pdata && !no_free() )
+        { free( pdata ); }
+        pdata = nullptr;
         mem_size = start = content_end = 0;
         flags = 0;
     }
 
     inline bool empty()
     {
-        return ( ptr == nullptr ||
+        return ( pdata == nullptr ||
             ( content_end - start == 0 ) );
     }
 
@@ -99,7 +103,7 @@ struct AGMS_IOVE
     { return content_end - start; }
 
     int split(
-        AGMS_IOVE& bottom_half
+        AGMS_IOVE& bottom_half,
         size_t offset );
 
     int copy( uint8_t* src,
@@ -109,10 +113,10 @@ struct AGMS_IOVE
         AGMS_IOVE& bottom_half );
 
     inline uint8_t* begin()
-    { return ptr + start; }
+    { return pdata + start; }
 
     inline uint8_t* end()
-    { return ptr + content_end; }
+    { return pdata + content_end; }
 
     inline int trim_bytes_front( size_t bytes )
     {
@@ -158,7 +162,7 @@ struct BLKIN : public BLKIO_BASE
     int write( PIOVE& iovew ) override;
     int read( PIOVE& iover ) override;
     size_t size() const override;
-    bool has_partial_rec() const;
+    bool has_partial_rec();
 };
 
 struct BLKOUT : public BLKIO_BASE
@@ -168,7 +172,7 @@ struct BLKOUT : public BLKIO_BASE
     size_t size() const override;
 };
 
-typedef enum : uint32_t
+typedef enum : int
 {
     STAT_HANDSHAKE_FAILED = -2,
     STAT_CLOSED = -1,
@@ -212,21 +216,21 @@ struct AGMS : public TLS_CONNECT
     std::string password;
 
     AGMS();
-    virtual ~AGMS_CTX()
+    virtual ~AGMS()
     { cleanup(); }
 
     virtual int init( bool is_client ) = 0; 
     virtual int handshake() = 0;
 
-    virtual int recv( PIOVE& iove ) = 0;
+    virtual int recv( IOV& iov ) = 0;
     virtual int send( PIOVE& iove ) = 0;
-    int shutdown();
+    virtual int shutdown() = 0;
 
     int send_alert( int alert );
     int get_error(int ret_code) const;
 
     void set_state( AGMS_STATE state )
-    { gms_stat = state; }
+    { gms_state = state; }
 
     AGMS_STATE get_state() const
     { return gms_state; }
@@ -241,7 +245,6 @@ struct AGMS : public TLS_CONNECT
     void load_error_strings();
     void set_connect_state();
     void set_accept_state();
-    bool is_client() const;
 
     int pending_bytes();
     void cleanup();
@@ -268,7 +271,7 @@ struct TLS13_HSCTX_BASE
 	const BLOCK_CIPHER *cipher = NULL;
 
     void clear();
-}
+};
 
 struct TLS13_HSCTX_CLI :
     public TLS13_HSCTX_BASE
@@ -277,6 +280,7 @@ struct TLS13_HSCTX_CLI :
     SM2_KEY client_ecdhe;
     SM2_KEY server_sign_key;
     bool cert_req_received = false;
+	const DIGEST *digest = DIGEST_sm3();
 
     void clear();
 };
@@ -284,6 +288,7 @@ struct TLS13_HSCTX_CLI :
 struct TLS13_HSCTX_SVR :
     public TLS13_HSCTX_BASE
 {
+    const DIGEST *digest; 
     typedef TLS13_HSCTX_BASE super;
     SM2_KEY server_ecdhe;
     SM2_KEY client_sign_key;
@@ -300,7 +305,7 @@ struct TLS13 : public AGMS
     int shutdown() override;
 
     // receiving data in cleartext
-    int recv( PIOVE& iove ) override;
+    int recv( IOV& iov ) override;
 
     // sending data in cleartext
     int send( PIOVE& iove ) override;

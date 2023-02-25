@@ -30,20 +30,33 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include "tcpport.h"
 #include "frmwrk.h"
+#include "dbusport.h"
 #include "tcportex.h"
 #include "agmsapi.h"
 #pragma once
 
+#define PORT_CLASS_GMSSL_FIDO "RpcGmSSLFido"
+
+using namespace gmssl;
+
 namespace rpcf
 {
+
+enum EnumMyClsid
+{
+    DECL_CLSID( MyStart ) = clsid( ClassFactoryStart ) + 80,
+    DECL_CLSID( CRpcGmSSLFido ),
+    DECL_CLSID( CRpcGmSSLFidoDrv ),
+    DECL_CLSID( CGmSSLHandshakeTask ),
+    DECL_CLSID( CGmSSLShutdownTask ),
+};
 
 gint32 BufToIove( BufPtr& pSrc,
     PIOVE& pDest, bool bCopy );
 
 gint32 IoveToBuf( PIOVE& pSrc,
-    BufPtr& pSrc, bool bCopy );
+    BufPtr& pDest, bool bCopy );
 
 class CGmSSLHandshakeTask :
     public CIfParallelTask
@@ -79,12 +92,7 @@ class CRpcGmSSLFido : public CPort
 {
     std::unique_ptr< AGMS >       m_pSSL;
 
-    std::deque< TaskletPtr > m_queWriteTasks;
-
-    sem_t       m_semWriteSync;
-    sem_t       m_semReadSync;
-    BufPtr      m_pOutBuf;
-    guint32     m_dwNumSent = 0;
+    bool m_bClient = true;
 
     gint32 SubmitWriteIrpGroup(
         PIRP pIrp, ObjVecPtr& pvecBufs );
@@ -110,15 +118,15 @@ class CRpcGmSSLFido : public CPort
         BufPtr& pBuf )
     {
         return rpcf::SendWriteReq(
-            this, pCallback, buf );
+            this, pCallback, pBuf );
     }
 
     inline gint32 SendListenReq(
         IEventSink* pCallback,
-        BufPtr& pBuf );
+        BufPtr& pBuf )
     {
         return rpcf::SendListenReq(
-            this, pCallback, buf );
+            this, pCallback, pBuf );
     }
 
     gint32 StartSSLShutdown( PIRP pIrp );
@@ -149,7 +157,8 @@ class CRpcGmSSLFido : public CPort
     typedef CPort super;
 
     CRpcGmSSLFido( const IConfigDb* pCfg );
-    ~CRpcGmSSLFido();
+    ~CRpcGmSSLFido()
+    {}
 
     virtual gint32 OnSubmitIrp(
         IRP* pIrp );
@@ -182,6 +191,31 @@ class CRpcGmSSLFido : public CPort
         void* pContext ) const;
 
     gint32 SendImmediateResp();
+};
+
+class CRpcGmSSLFidoDrv : public CRpcTcpFidoDrv
+{
+    std::string m_strCertPath;
+    std::string m_strKeyPath;
+    std::string m_strCAPath;
+    std::string m_strSecret;
+    bool m_bVerifyPeer = false;
+    bool m_bPassword = false;
+
+    gint32 LoadSSLSettings();
+    public:
+    typedef CRpcTcpFidoDrv super;
+
+    CRpcGmSSLFidoDrv(
+        const IConfigDb* pCfg = nullptr );
+
+    ~CRpcGmSSLFidoDrv();
+
+	gint32 Probe( IPort* pLowerPort,
+        PortPtr& pNewPort,
+        const IConfigDb* pConfig = NULL ) override;
+
+    gint32 Start() override;
 };
 
 }

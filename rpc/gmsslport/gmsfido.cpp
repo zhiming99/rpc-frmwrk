@@ -22,7 +22,23 @@
  *
  * =====================================================================================
  */
+#include "jsondef.h"
+#include <gmssl/rand.h>
+#include <gmssl/x509.h>
+#include <gmssl/error.h>
+#include <gmssl/sm2.h>
+#include <gmssl/sm3.h>
+#include <gmssl/sm4.h>
+#include <gmssl/pem.h>
+#include <gmssl/tls.h>
+#include <gmssl/digest.h>
+#include <gmssl/gcm.h>
+#include <gmssl/hmac.h>
+#include <gmssl/hkdf.h>
+#include <gmssl/mem.h>
+#include "agmsapi.h"
 #include "gmsfido.h"
+using namespace gmssl;
 
 namespace rpcf
 {
@@ -37,8 +53,8 @@ gint32 BufToIove( BufPtr& pSrc,
     do{
         if( !pDest )
         {
-            pDest = std::make_shared< AGMS_IOVE >
-                ( new AGMS_IOVE );
+            pDest = std::shared_ptr< AGMS_IOVE >(
+                new AGMS_IOVE );
         }
         if( bCopy )
         {
@@ -94,7 +110,7 @@ gint32 BufToIove( BufPtr& pSrc,
                 pDest->set_no_free();
             }
 
-            ret = pDest->attach( pmem,
+            ret = pDest->attach( ( guint8* )pmem,
                 dwSize, dwStart, dwEnd );
         }
         break;
@@ -139,8 +155,9 @@ gint32 IoveToBuf( PIOVE& pSrc,
             {
                 pSrc->expose( &pmem,
                     dwSize, dwStart, dwEnd );
-                ret = pDest->Attach( pmem,
-                    dwSize, dwStart, dwEnd );
+                ret = pDest->Attach(
+                    ( char* )pmem, dwSize,
+                    dwStart, dwEnd );
                 if( ret == -EACCES )
                 {
                     bCopy = true;
@@ -154,7 +171,7 @@ gint32 IoveToBuf( PIOVE& pSrc,
             else
             {
                 ret = pDest->Attach(
-                    pSrc->begin(), pSrc->size() );
+                    ( char* )pSrc->begin(), pSrc->size() );
                 if( ret == -EACCES )
                 {
                     bCopy = true;
@@ -162,7 +179,7 @@ gint32 IoveToBuf( PIOVE& pSrc,
                 }
                 else if( ERROR( ret ) )
                     break;
-                pDest->SetNoFree();
+                pDest->SetNoFree( true );
             }
         }
         break;
@@ -318,6 +335,15 @@ gint32 CGmSSLHandshakeTask::RunTask()
     return ret;
 }
 
+CRpcGmSSLFido::CRpcGmSSLFido(
+    const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    m_dwFlags &= ~PORTFLG_TYPE_MASK;
+    m_dwFlags |= PORTFLG_TYPE_FIDO;
+    SetClassId( clsid( CRpcGmSSLFido ) );
+}
+
 gint32 CRpcGmSSLFido::PostStart(
     IRP* pIrp )
 {
@@ -356,7 +382,7 @@ gint32 CRpcGmSSLFido::PostStart(
         if( !m_pSSL )
         {
             m_pSSL = std::move(
-                std::unique_ptr( new TLS13 ) );
+                std::unique_ptr< AGMS >( new TLS13 ) );
         }
 
         ret = m_pSSL->init( m_bClient );
@@ -493,7 +519,7 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpGroup(
             break;
 
         auto elem = vecBufs.front();
-        vecBufs.pop_front();
+        vecBufs.erase( vecBufs.begin() );
 
         BufPtr pBuf( true );
         *pBuf = elem;
@@ -518,7 +544,7 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpGroup(
         pLowerPort->AllocIrpCtxExt( pTopCtx, pIrp );
         ret = pLowerPort->SubmitIrp( pIrp );
         if( ERROR( ret ) )
-            break
+            break;
 
         if( ret == STATUS_PENDING )
             break;
@@ -578,7 +604,7 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpIn(
             for( auto& elem : vecBufs )
             {
                 ret = BufToIove(
-                    pBuf, piove, false, false );
+                    elem, piove, false, false );
                 if( ERROR( ret ) )
                     break;
 
@@ -621,6 +647,7 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
                 break;
 
             // transfer the buffer ownership
+            BufPtr pBuf;
             ret = IoveToBuf(
                 piove, pBuf, false, true );
 
@@ -712,7 +739,7 @@ gint32 CRpcGmSSLFido::SendImmediateResp()
                 dwSize += piove->size();
                 oParams.Push( pBuf );
 
-            }while( ( bool )piove )
+            }while( ( bool )piove );
 
             oLock.Unlock();
 
@@ -849,7 +876,6 @@ gint32 CRpcGmSSLFido::AdvanceShutdown(
 {
     return AdvanceHandshakeInternal(
         pCallback, pHandshake, true );
-    return ret;
 }
 
 gint32 CRpcGmSSLFido::DoShutdown(
@@ -1079,17 +1105,21 @@ gint32 CRpcGmSSLFido::OnSubmitIrp(
 gint32 CRpcGmSSLFido::CompleteListeningIrp(
     IRP* pIrp )
 {
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
     gint32 ret = 0;
     bool bSSLErr = false;
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
 
     do{
-        IrpCtxPtr pCtx = pIrp->GetCurCtx();
         IrpCtxPtr pTopCtx = pIrp->GetTopStack();
 
         BufPtr pInBuf = pTopCtx->m_pRespData;
         pIrp->PopCtxStack();
 
-        if( unlikely( ppInBuf.IsEmpty() ) )
+        if( unlikely( pInBuf.IsEmpty() ) )
         {
             ret = -EFAULT;
             pCtx->SetStatus( ret );
@@ -1167,7 +1197,7 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
             if( pRespBuf->empty() )
             {
                 ret = IoveToBuf( elem,
-                    pRespBuf, no, true );
+                    pRespBuf, false, true );
 
                 if( ERROR( ret ) )
                     break;
@@ -1176,10 +1206,13 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
             }
             BufPtr pBuf;
             ret = IoveToBuf(
-                elem, pBuf, no, true );
+                elem, pBuf, false, true );
             if( ERROR( ret ) )
                 break;
-            ret = pRespBuf->Append( pBuf );
+
+            ret = pRespBuf->Append(
+                pBuf->ptr(), pBuf->size() );
+
             if( ERROR( ret ) )
                 break;
         }
@@ -1210,7 +1243,7 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
     return ret;
 }
 
-gint32 CRpcOpenSSLFido::CompleteIoctlIrp(
+gint32 CRpcGmSSLFido::CompleteIoctlIrp(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -1262,9 +1295,6 @@ gint32 CRpcOpenSSLFido::CompleteIoctlIrp(
 
                     if( ERROR( ret ) )
                         break;
-
-                    IrpCtxPtr pTopCtx =
-                        pIrp->GetTopStack();
 
                     IrpCtxPtr pTopCtx =
                         pIrp->GetTopStack();
@@ -1391,15 +1421,15 @@ gint32 CRpcGmSSLFido::CompleteWriteIrp(
             break;
         }
         pCtx->ClearExtBuf();
-        ObjVecPtr pvecBufs = *pvecBufs;
-        if( pvecBufs.IsEmpty() )
+        ObjVecPtr pvBufs = ( ObjPtr& )( *pvecBufs );
+        if( pvBufs.IsEmpty() )
         {
             ret = -ENOENT;
             break;
         }
 
         ret = SubmitWriteIrpGroup(
-            pIrp, pvecBufs ); 
+            pIrp, pvBufs ); 
 
     }while( 0 );
 
@@ -1435,9 +1465,6 @@ gint32 CRpcGmSSLFido::SubmitIoctlCmd(
                 IrpCtxPtr pTopCtx =
                     pIrp->GetTopStack();
 
-                IrpCtxPtr pTopCtx =
-                    pIrp->GetTopStack();
-
                 pLowerPort->AllocIrpCtxExt(
                     pTopCtx, pIrp );
 
@@ -1469,6 +1496,239 @@ gint32 CRpcGmSSLFido::SubmitIoctlCmd(
             break;
         }
     }
+
+    return ret;
+}
+
+CRpcGmSSLFidoDrv::CRpcGmSSLFidoDrv(
+    const IConfigDb* pCfg )
+{
+    SetClassId( clsid( CRpcGmSSLFidoDrv ) );
+}
+
+CRpcGmSSLFidoDrv::~CRpcGmSSLFidoDrv()
+{}
+
+gint32 CRpcGmSSLFidoDrv::Start()
+{
+    gint32 ret = super::Start();
+    if( ERROR( ret ) )
+        return ret;
+    return LoadSSLSettings();
+}
+
+gint32 CRpcGmSSLFidoDrv::Probe(
+    IPort* pLowerPort,
+    PortPtr& pNewPort,
+    const IConfigDb* pConfig )
+{
+    gint32 ret = 0;
+    do{
+        if( pLowerPort == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        CPort* pPort =
+            static_cast< CPort* >( pLowerPort );
+
+        PortPtr pPdoPort;
+        ret = pPort->GetPdoPort( pPdoPort );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oPdoPort(
+            ( CObjBase* )pPdoPort );
+
+        IConfigDb* pConnParams = nullptr;
+        ret = oPdoPort.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        bool bEnableSSL = false;
+        CConnParams oConn( pConnParams );
+        bEnableSSL =
+            oConn.IsSSL() && oConn.IsGmSSL();
+        if( !bEnableSSL )
+        {
+            ret = 0;
+            pNewPort = pLowerPort;
+            break;
+        }
+
+        std::string strPdoClass;
+        CCfgOpenerObj oCfg( pLowerPort );
+        ret = oCfg.GetStrProp(
+            propPdoClass, strPdoClass );
+
+        if( ERROR( ret ) )
+            break;
+
+        std::string strExpPdo =
+            PORT_CLASS_TCP_STREAM_PDO2;
+
+        if( strPdoClass != strExpPdo )
+        {
+            // this is not a port we support
+            ret = -ENOTSUP;
+            break;
+        }
+
+        CParamList oNewCfg;
+        oNewCfg[ propPortClass ] =
+            PORT_CLASS_GMSSL_FIDO;
+
+        oNewCfg.SetIntProp(
+            propPortId, NewPortId() );
+
+        oNewCfg.CopyProp(
+            propConnParams, pLowerPort );
+
+        oNewCfg.SetPointer(
+            propIoMgr, GetIoMgr() );
+
+        oNewCfg.SetPointer(
+            propDrvPtr, this );
+
+        ret = CreatePort( pNewPort,
+            oNewCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = pNewPort->AttachToPort(
+            pLowerPort );
+
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
+{
+    CIoManager* pMgr = GetIoMgr();
+    CDriverManager& oDrvMgr = pMgr->GetDrvMgr();
+    Json::Value& ojc = oDrvMgr.GetJsonCfg();
+    Json::Value& oPorts = ojc[ JSON_ATTR_PORTS ];
+
+    if( oPorts == Json::Value::null )
+        return -ENOENT;
+
+    if( !oPorts.isArray() || oPorts.size() == 0 )
+        return -ENOENT;
+
+    gint32 ret = 0;
+    do{
+        for( guint32 i = 0; i < oPorts.size(); i++ )
+        {
+            Json::Value& elem = oPorts[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            std::string strPortClass =
+                elem[ JSON_ATTR_PORTCLASS ].asString();
+            if( strPortClass != PORT_CLASS_GMSSL_FIDO )
+                continue;
+
+            if( !( elem.isMember( JSON_ATTR_PARAMETERS ) &&
+                elem[ JSON_ATTR_PARAMETERS ].isObject() ) )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            Json::Value& oParams =
+                elem[ JSON_ATTR_PARAMETERS ];
+
+            if( oParams.isMember( JSON_ATTR_VERIFY_PEER ) &&
+                oParams[ JSON_ATTR_VERIFY_PEER ].isString() )
+            {
+                std::string strVal =
+                    oParams[ JSON_ATTR_VERIFY_PEER ].asString();
+                if( strVal == "true" )
+                    m_bVerifyPeer = true;
+            }
+
+            if( oParams.isMember( JSON_ATTR_HAS_PASSWORD ) &&
+                oParams[ JSON_ATTR_HAS_PASSWORD ].isString() )
+            {
+                // prompting for password
+                std::string strVal =
+                    oParams[ JSON_ATTR_HAS_PASSWORD ].asString();
+                if( strVal == "true" )
+                    m_bPassword = true;
+            }
+
+
+            // certificate file path
+            if( oParams.isMember( JSON_ATTR_CERTFILE ) &&
+                oParams[ JSON_ATTR_CERTFILE ].isString() )
+            {
+                std::string strCert =
+                    oParams[ JSON_ATTR_CERTFILE ].asString();
+                ret = access( strCert.c_str(), R_OK );
+                if( ret == -1 )
+                {
+                    ret = -errno;
+                    break;
+                }
+                m_strCertPath = strCert;
+            }
+
+            // private key file path
+            if( oParams.isMember( JSON_ATTR_KEYFILE ) &&
+                oParams[ JSON_ATTR_KEYFILE ].isString() )
+            {
+                std::string strKeyFile =
+                    oParams[ JSON_ATTR_KEYFILE ].asString();
+
+                ret = access( strKeyFile.c_str(), R_OK );
+                if( ret == -1 )
+                {
+                    ret = -errno;
+                    break;
+                }
+                m_strKeyPath = strKeyFile;
+            }
+
+            // certificate file path
+            if( oParams.isMember( JSON_ATTR_CACERT ) &&
+                oParams[ JSON_ATTR_CACERT ].isString() )
+            {
+                std::string strCAPath =
+                    oParams[ JSON_ATTR_CACERT ].asString();
+                ret = access( strCAPath.c_str(), R_OK );
+                if( ret == -1 )
+                {
+                    ret = -errno;
+                    break;
+                }
+                m_strCAPath = strCAPath;
+            }
+
+            // secret file path
+            if( oParams.isMember( JSON_ATTR_SECRET_FILE ) &&
+                oParams[ JSON_ATTR_SECRET_FILE ].isString() )
+            {
+                // either specifying secret file or prompting password
+                std::string strSecret =
+                    oParams[ JSON_ATTR_SECRET_FILE ].asString();
+                ret = access( strSecret.c_str(), R_OK );
+                if( ret == -1 )
+                {
+                    ret = -errno;
+                    break;
+                }
+                m_strSecret = strSecret;
+            }
+        }
+
+    }while( 0 );
 
     return ret;
 }
