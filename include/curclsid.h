@@ -36,8 +36,8 @@ namespace rpcf
 {
 
 // rpc-frmwrk components, last allocation was from
-// ridl/astnode.h
-#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 80 )
+// rpc/gmsslport
+#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 90 )
 
 // last allocation was from proxy.i
 #define PROPIDS_ALLOCATED   ( propReservedEnd + 130 )

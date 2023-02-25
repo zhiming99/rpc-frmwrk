@@ -1164,6 +1164,23 @@ class CConnParams : public IConnParams
             propEnableSSL, bEnable );
     }
 
+    inline bool IsGmSSL() const
+    {
+        CCfgOpener lhs(
+            ( const IConfigDb* )m_pParams );
+        bool bVal = false;
+        lhs.GetBoolProp( propUsingGmSSL, bVal );
+        return bVal;
+    }
+
+    inline void SetGmSSL( bool bEnable )
+    {
+        CCfgOpener lhs(
+            ( IConfigDb* )m_pParams );
+        lhs.SetBoolProp(
+            propUsingGmSSL, bEnable );
+    }
+
     inline bool IsWebSocket() const
     {
         CCfgOpener lhs(

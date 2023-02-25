@@ -44,9 +44,6 @@ namespace rpcf
 {
 
 #define PORT_CLASS_OPENSSL_FIDO "RpcOpenSSLFido"
-#define JSON_ATTR_CERTFILE      "CertFile"
-#define JSON_ATTR_KEYFILE       "KeyFile"
-#define JSON_ATTR_CACERT        "CACertFile"
 
 enum EnumMyClsid
 {
@@ -244,6 +241,7 @@ class CRpcOpenSSLFidoDrv : public CRpcTcpFidoDrv
         PortPtr& pNewPort,
         const IConfigDb* pConfig = NULL );
 
+    gint32 Start() override;
     gint32 LoadSSLSettings();
     gint32 InitSSLContext( bool bServer );
 };

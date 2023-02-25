@@ -1615,6 +1615,14 @@ gint32 CRpcOpenSSLFido::AllocIrpCtxExt(
     return ret;
 }
 
+gint32 CRpcOpenSSLFidoDrv::Start()
+{
+    gint32 ret = super::Start();
+    if( ERROR( ret ) )
+        return ret;
+    return LoadSSLSettings();
+}
+
 gint32 CRpcOpenSSLFidoDrv::Probe(
     IPort* pLowerPort,
     PortPtr& pNewPort,
@@ -1649,7 +1657,8 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
 
         bool bEnableSSL = false;
         CConnParams oConn( pConnParams );
-        bEnableSSL = oConn.IsSSL();
+        bEnableSSL =
+            oConn.IsSSL() && !oConn.IsGmSSL();
         if( !bEnableSSL )
         {
             ret = 0;
