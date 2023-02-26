@@ -5607,29 +5607,36 @@ gint32 CInterfaceProxy::SendProxyReq(
         ret = RunIoTask( oReq.GetCfg(),
             pResp, pCallback, &qwIoTaskId );
 
-        if( ret == STATUS_PENDING )
-        {
-            if( bSync )
-            {
-                CSyncCallback* pSyncCallback =
-                    ObjPtr( pCallback );
-                if( pSyncCallback == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pSyncCallback->WaitForComplete();
-                if( SUCCEEDED( ret ) )
-                    ret = pSyncCallback->GetError();
-            }
-            else
-            {
-                break;
-            }
-        }
-
         if( ERROR( ret ) )
             break;
+
+        if( unlikely(
+            ret == STATUS_SUCCESS && !bSync ) )
+        {
+            CTasklet* pTask = ObjPtr( pCallback );
+            gint32 iRet = pTask->GetError();
+            if( iRet != STATUS_PENDING )
+            {
+                // callback has been called somewhere
+                // else, don't move on further
+                ret = STATUS_PENDING;
+                break;
+            }
+            // immediate return
+        }
+        else if( bSync )
+        {
+            CSyncCallback* pSyncCallback =
+                ObjPtr( pCallback );
+            ret = pSyncCallback->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncCallback->GetError();
+        }
+        else
+        {
+            // STATUS_PENDING
+            break;
+        }
 
         CReqOpener oReq2( oReq.GetCfg() );
         oReq2.GetCallFlags( dwFlags );
