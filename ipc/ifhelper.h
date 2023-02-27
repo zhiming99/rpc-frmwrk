@@ -3957,6 +3957,7 @@ class CTaskWrapper :
 {
     TaskletPtr m_pTask;
     TaskletPtr m_pMajor;
+    bool m_bNoParams = true;
     public:
     typedef CGenericCallback< CIfInterceptTaskProxy > super;
 
@@ -3964,29 +3965,18 @@ class CTaskWrapper :
         super( pCfg )
     { SetClassId( clsid( CTaskWrapper ) ); }
 
-    inline gint32 SetCompleteTask( IEventSink* pTask )
-    {
-        if( pTask == nullptr )
-            m_pTask.Clear();
-        else
-            m_pTask = ObjPtr( pTask );
-        return 0;
-    }
+    gint32 SetCompleteTask( IEventSink* pTask );
+    gint32 SetMajorTask( IEventSink* pTask );
 
-    inline gint32 SetMajorTask( IEventSink* pTask )
-    {
-        if( pTask == nullptr )
-            m_pMajor.Clear();
-        else
-            m_pMajor = ObjPtr( pTask );
-        return 0;
-    }
+    inline void SetNoParams( bool bNoParams )
+    { m_bNoParams = bNoParams; }
 
     gint32 TransferParams();
     gint32 RunTask() override;
     gint32 OnTaskComplete( gint32 iRet ) override;
     gint32 OnComplete( gint32 iRetVal ) override;
     gint32 OnCancel( guint32 dwContext ) override;
+    gint32 OnIrpComplete( PIRP ) override;
 };
 
 }

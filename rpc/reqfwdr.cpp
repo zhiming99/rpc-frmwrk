@@ -699,6 +699,73 @@ gint32 CReqFwdrOpenRmtPortTask::RunTask()
     return ret;
 }
 
+gint32 CReqFwdrOpenRmtPortTask::StopIfSafe(
+    InterfPtr& pIf, gint32 iRetVal )
+{
+    gint32 ret = 0;
+    TaskletPtr pTaskGrp;
+    do{
+        CRpcServices* pSvc = pIf;
+        CIoManager* pMgr = pSvc->GetIoMgr();
+
+        CParamList oParams;
+        oParams.SetPointer(
+            propIfPtr, ( CRpcServices*)pIf );
+
+        ret = pTaskGrp.NewObj( clsid( CIfTaskGroup ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CIfTaskGroup* pGrp = pTaskGrp;
+        pGrp->SetRelation( logicNONE );
+
+        TaskletPtr pStopTask;
+        ret = DEFER_IFCALLEX_NOSCHED2( 
+            0, pStopTask, pIf,
+            &CRpcInterfaceBase::StopEx, nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        pGrp->AppendTask( pStopTask );
+
+        gint32 (*func)( IEventSink*, gint32 ) = 
+        ([]( IEventSink* pCb,
+            gint32 iRet)->gint32
+        {
+            pCb->OnEvent( eventTaskComp,
+                iRet, 0, nullptr );
+            return iRet;
+        });
+
+        EventPtr pEvt;
+        ret = this->GetClientNotify( pEvt );
+        if( SUCCEEDED( ret ) )
+        {
+            // transfer the callback to the
+            // func, to avoid the
+            // synchronization lost. it will
+            // keep the proxy's life cycle
+            // contained.
+            this->ClearClientNotify();
+        }
+        TaskletPtr pCompTask;
+        ret = NEW_FUNCCALL_TASK( pCompTask,
+            pMgr, func, pEvt, iRetVal );
+        if( ERROR( ret ) )
+            break;
+
+        pGrp->AppendTask( pCompTask );
+        ret = pMgr->RescheduleTask( pTaskGrp );
+
+    }while( 0 );
+
+    if( ERROR( ret ) && !pTaskGrp.IsEmpty() )
+        ( *pTaskGrp )( eventCancelTask );
+
+    return ret;
+}
+
 gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
     gint32 iRetVal )
 {
@@ -833,12 +900,9 @@ gint32 CReqFwdrOpenRmtPortTask::RunTaskInternal(
                 if( ERROR( ret ) )
                     break;
 
-                pMgr = pReqFwdr->GetIoMgr();
-                DEFER_CALL( pMgr, ObjPtr( pIf ),
-                    &CInterfaceProxy::StopEx,
-                    pDummyTask );
-
-                ret = iRetVal;
+                ret = this->StopIfSafe(
+                    m_pProxy, iRetVal );
+                break;
             }
         }
         else 

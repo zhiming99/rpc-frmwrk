@@ -74,65 +74,79 @@ void CPnpManager::OnPortAttached(
                 propMasterIrp );
         }
 
-        // Note: we do not care if it is a pdo
-        // or fdo, let's build the port stack on top
-        // of the current `pPort' following the
-        // information in the driver.json
+        // Note: If the BuildPortStack failed, we keep
+        // the start process moving on with the ports
+        // ready, but replacing the callback with a new
+        // one to perform stoping and destroying
+        // instead.
+        TaskletPtr pStopTask;
         ret = pMgr->GetDrvMgr().BuildPortStack( pPort );
         if( ERROR( ret ) )
         {
-            CPort* pCPort = ObjPtr( pPort );
-            gint32 (*func)( CPort*, PIRP, gint32 iRet )=
-            ([]( CPort* pPort, PIRP pIrp, gint32 iRet )->gint32
+            IEventSink* pCb = nullptr;
+            oPortCfg.GetPointer(
+                propEventSink, pCb );
+
+            gint32 (*func)( CPort*, IEventSink*, gint32 ) =
+            ([]( CPort* pPort, IEventSink*
+                pCb, gint32 iRet )->gint32
             {
-                gint32 ret = 0;
-                CCfgOpenerObj oCfg( pPort );
-                CIoManager* pMgr = pPort->GetIoMgr();
-                if( pIrp != nullptr )
-                {
-                    // complete the master irp
-                    CStdRMutex oIrpLock( pIrp->GetLock() );
-                    ret = pIrp->CanContinue(
-                        IRP_STATE_READY );
-                    if( SUCCEEDED( ret ) )
-                    {
-                        IrpCtxPtr& pCtx =
-                            pIrp->GetTopStack();
-                        pCtx->SetStatus( iRet  );
-                        oIrpLock.Unlock();
-                        pMgr->CompleteIrp( pIrp );
-                    }
-                }
-                IEventSink* pCb = nullptr;
-                ret = oCfg.GetPointer(
-                    propEventSink, pCb );
-                if( SUCCEEDED( ret ) )
-                {
-                    // fake an irp and complete the callback
-                    IrpPtr pIrp2( true );
-                    pIrp2->AllocNextStack( pPort );
-                    IrpCtxPtr pIrpCtx = pIrp2->GetTopStack();
-                    pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
-                    pIrpCtx->SetMinorCmd( IRP_MN_PNP_START );
-                    pIrpCtx->SetIoDirection( IRP_DIR_OUT );
-                    pIrp2->SetState( IRP_STATE_READY,
-                        IRP_STATE_COMPLETED );
-                    pIrpCtx->SetStatus( iRet );
-                    pIrp2->SetStatus( iRet );
-                    pCb->OnEvent( eventIrpComp,
-                        ( LONGWORD )( ( IRP* )pIrp2 ),
-                        0, nullptr );
-                }
-                return 0;
+                IrpPtr pIrp( true );
+                pIrp->AllocNextStack( pPort );
+                IrpCtxPtr pIrpCtx = pIrp->GetTopStack();
+                pIrpCtx->SetMajorCmd( IRP_MJ_PNP );
+                pIrpCtx->SetMinorCmd( IRP_MN_PNP_START );
+                pIrpCtx->SetIoDirection( IRP_DIR_OUT );
+                pIrp->SetState( IRP_STATE_READY,
+                    IRP_STATE_COMPLETED );
+                pIrp->SetStatus( iRet );
+                pCb->OnEvent( eventIrpComp,
+                    ( LONGWORD )( ( IRP* )pIrp ),
+                    iRet, nullptr );
+                return iRet;
             });
-            TaskletPtr pTask;
-            NEW_FUNCCALL_TASK( pTask,
-                pMgr, func, pCPort,
-                ( PIRP )pMasterIrp, ret );
-            ret = pMgr->RescheduleTask( pTask );
-            if( SUCCEEDED( ret ) )
-                ret = STATUS_PENDING;
-            break;
+
+            CPort *pCPort = ObjPtr( pPort );
+            TaskletPtr pCbTask; 
+            NEW_FUNCCALL_TASK(
+                pCbTask, pMgr, func, pCPort,
+                ( IEventSink* )pCb, ret );
+
+            if( pCb != nullptr )
+                oPortCfg.RemoveProperty( propEventSink );
+
+            TaskletPtr pWrapper;
+            CCfgOpener oCfg;
+            oCfg.SetPointer( propIoMgr, pMgr );
+
+            pWrapper.NewObj( clsid( CTaskWrapper ),
+                oCfg.GetCfg() );
+
+            CTaskWrapper* ptw = pWrapper;
+            ptw->SetCompleteTask( pCbTask );
+
+            oCfg.SetObjPtr( propPortPtr,
+                ObjPtr( ( IPort* )pPort ) );
+                
+            ret = pStopTask.NewObj(
+                clsid( CPnpMgrStopPortAndDestroyTask ),
+                oCfg.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            if( pCb != nullptr )
+            {
+                CIfRetryTask* pTask = pStopTask;
+                pTask->SetClientNotify( ptw );
+            }
+
+            pWrapper.NewObj( clsid( CTaskWrapper ),
+                oCfg.GetCfg() );
+
+            ptw = pWrapper;
+            ptw->SetCompleteTask( pStopTask );
+            oPortCfg.SetPointer( propEventSink, ptw );
         }
 
         // notify the ports the stack is built
@@ -1205,11 +1219,11 @@ gint32 CPnpManager::DestroyPortStack(
             break;
         }
 
-        IPort* pPort = pPortToDestroy;
-
         deque< PortPtr > quePorts; 
         PortPtr pReadyPort;
-        pPort = pPort->GetTopmostPort();
+
+        IPort* pPort =
+            pPortToDestroy->GetTopmostPort();
 
         while( pPort != nullptr )
         {
@@ -1245,14 +1259,12 @@ gint32 CPnpManager::DestroyPortStack(
         pIrpCtx->SetIoDirection( IRP_DIR_OUT );
 
         pPort = pPortToDestroy;
-        HANDLE hPort = PortToHandle( pPort );
 
         // no check of the port existance, because
         // we are sure it exists
-        ret = ERROR_STATE;
         if( pPort != pReadyPort )
         {
-            ret = pMgr->SubmitIrp( hPort, pIrp, false );
+            ret = pMgr->SubmitIrpInternal( pPort, pIrp, false );
         }
 
         if( ret == ERROR_STATE )
@@ -1289,11 +1301,6 @@ gint32 CPnpManager::DestroyPortStack(
                     propPortPtr,
                     ObjPtr( ( IPort* )portPtr ) );
                     
-                // NOTE: a oneshot task to avoid
-                // blocking the execution of other
-                // tasks due to the potential call
-                // of WaitForComplete from the
-                // StopPortStack
                 TaskletPtr pStopTask;
                 ret = pStopTask.NewObj(
                     clsid( CPnpMgrStopPortAndDestroyTask ),

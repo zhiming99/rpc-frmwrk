@@ -4055,11 +4055,12 @@ gint32 CFdoListeningTask::HandleIrpResp(
                 if( ret == -ENOTCONN ||
                     ERROR( ret ) )
                 {
+                    ret = ERROR_PORT_STOPPED;
+                    pPort->CancelAllIrps( ret );
                     IPort* pdo =
                         pPort->GetBottomPort();
                     FireRmtSvrEvent(
                         pdo, eventRmtSvrOffline );
-                    ret = ERROR_PORT_STOPPED;
                 }
                 break;
             }

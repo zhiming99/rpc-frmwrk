@@ -687,18 +687,18 @@ class CTcpStreamPdo2 : public CPort
     gint32 RemoveIrpFromMap(
         IRP* pIrp );
 
-    virtual gint32 CancelFuncIrp(
-        IRP* pIrp, bool bForce );
+    gint32 CancelFuncIrp(
+        IRP* pIrp, bool bForce ) override;
 
-    virtual gint32 OnSubmitIrp( IRP* pIrp );
+    gint32 OnSubmitIrp( IRP* pIrp ) override;
 
     // make the active connection if not connected
     // yet. Note that, within the PostStart, the
     // eventPortStarted is not sent yet
-    virtual gint32 PostStart( IRP* pIrp );
-    virtual gint32 OnPortReady( IRP* pIrp );
-    virtual gint32 PreStop( IRP* pIrp );
-    virtual gint32 Stop( IRP* pIrp );
+    gint32 PostStart( IRP* pIrp ) override;
+    gint32 OnPortReady( IRP* pIrp ) override;
+    gint32 PreStop( IRP* pIrp ) override;
+    gint32 Stop( IRP* pIrp ) override;
 
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
