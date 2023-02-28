@@ -1511,10 +1511,10 @@ CRpcGmSSLFidoDrv::~CRpcGmSSLFidoDrv()
 
 gint32 CRpcGmSSLFidoDrv::Start()
 {
-    gint32 ret = super::Start();
+    gint32 ret =LoadSSLSettings();
     if( ERROR( ret ) )
         return ret;
-    return LoadSSLSettings();
+    return super::Start();
 }
 
 gint32 CRpcGmSSLFidoDrv::Probe(

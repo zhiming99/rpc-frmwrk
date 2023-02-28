@@ -1617,10 +1617,10 @@ gint32 CRpcOpenSSLFido::AllocIrpCtxExt(
 
 gint32 CRpcOpenSSLFidoDrv::Start()
 {
-    gint32 ret = super::Start();
+    gint32 ret = LoadSSLSettings();
     if( ERROR( ret ) )
         return ret;
-    return LoadSSLSettings();
+    return super::Start();
 }
 
 gint32 CRpcOpenSSLFidoDrv::Probe(
