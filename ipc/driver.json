@@ -222,7 +222,7 @@
                     "Compression": "true",
                     "EnableWS": "false",
                     "EnableSSL": "false",
-                    "HasAuth": "true",
+                    "HasAuth": "false",
                     "RouterPath": "/"
                 },
                 {
@@ -233,11 +233,10 @@
                     "BindAddr": "127.0.0.1",
                     "PdoClass": "TcpStreamPdo2",
                     "Compression": "true",
-                    "EnableWS": "true",
-                    "EnableSSL": "true",
+                    "EnableWS": "false",
+                    "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "HasAuth": "true",
-                    "DestURL": "https://example.com"
+                    "HasAuth": "true"
                 }
             ],
             "MaxConnections": "512"
@@ -267,7 +266,7 @@
             "PortClass": "DBusStreamBusPort",
             "PortDriver": "DBusStreamBusDrv",
             "PortType": "Fdo"
-        }        
+        }
     ],
     "Modules": [
         {
@@ -411,10 +410,8 @@
                 }
             ],
             "ClassFactories": [
-                "./libauth.so",
-                "./libsslpt.so",
-                "./libwspt.so",
-                "./libfuseif.so"
+                "./libfuseif.so",
+                "./libauth.so"
             ]
         },
         {
@@ -531,8 +528,6 @@
             "PortClass": "TcpStreamPdo2",
             "comment": "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
             "ProbeSequence": [
-                "RpcOpenSSLFidoDrv",
-                "RpcWebSockFidoDrv",
                 "RpcSecFidoDrv",
                 "RpcNatProtoFdoDrv",
                 "RpcTcpFidoDrv"
