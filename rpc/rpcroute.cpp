@@ -114,11 +114,6 @@ gint32 CRpcRouter::IsEqualConn(
             break;
 
         ret = oCfg.IsEqualProp(
-            propUsingGmSSL, pConn2 );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.IsEqualProp(
             propConnRecover, pConn2 );
         if( ERROR( ret ) )
             break;
@@ -746,7 +741,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                 std::string strFormat = "ipv4";
                 oConnParams[ propAddrFormat ] = strFormat;
                 oConnParams[ propEnableSSL ] = false;
-                oConnParams[ propUsingGmSSL ] = false;
                 oConnParams[ propEnableWebSock ] = false;
                 oConnParams[ propCompress ] = true;
                 oConnParams[ propConnRecover ] = false;
@@ -811,7 +805,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
 
                 oConnParams[ propDestTcpPort ] = dwPortNum;
 
-                bool bEnableSSL = false;
                 if( oNodeElem.isMember( JSON_ATTR_ENABLE_SSL ) &&
                     oNodeElem[ JSON_ATTR_ENABLE_SSL ].isString() )
                 {
@@ -819,18 +812,7 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                     if( strVal == "false" )
                         oConnParams[ propEnableSSL ] = false;
                     else if( strVal == "true" )
-                    {
                         oConnParams[ propEnableSSL ] = true;
-                        bEnableSSL = true;
-                    }
-                }
-                if( bEnableSSL &&
-                    oNodeElem.isMember( JSON_ATTR_USING_GMSSL ) &&
-                    oNodeElem[ JSON_ATTR_USING_GMSSL ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_USING_GMSSL  ].asString(); 
-                    if( strVal == "true" )
-                        oConnParams[ propUsingGmSSL ] = true;
                 }
 
                 if( oNodeElem.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&

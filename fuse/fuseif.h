@@ -2752,9 +2752,6 @@ class CFuseRootBase:
         gint32 ret = 0;
         bool bAdded = false;
 
-        OutputMsg( 0, "Checkpoint 1: entering %s",
-            __func__ );
-
         do{
             CStdRMutex oLock( this->GetLock() );
             for( auto& elem : m_vecServices )

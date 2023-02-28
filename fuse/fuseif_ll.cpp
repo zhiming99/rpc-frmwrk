@@ -73,9 +73,6 @@ static void fuseif_rwinterrupt(
     if (d->id == pthread_self())
         return;
 
-    OutputMsg( 0, "Checkpoint 18(%s): "
-        "about to cancel req",
-        __func__ );
     CFuseObjBase* pObj = d->fe;
     while( pObj != nullptr )
     {
@@ -173,13 +170,8 @@ void fuseif_complete_read(
     {
         if( buf != nullptr )
         {
-            ret = fuse_reply_data( req,
+            fuse_reply_data( req,
                 buf, FUSE_BUF_SPLICE_MOVE );
-            if( ERROR( ret ) )
-            {
-                OutputMsg( ret, "Checkpoint 20: "
-                    "failed to reply data" );
-            }
         }
         else
             fuse_reply_err( req, 0 );
@@ -212,12 +204,7 @@ void fuseif_ll_read(fuse_req_t req,
             req, buf, off, size,
             vecBackup, d );
         if( ret == STATUS_PENDING )
-        {
-            OutputMsg( ret, "Checkpoint 17(%s): "
-                "pending returned",
-                __func__ );
             break;
-        }
 
         fuseif_finish_interrupt( pFuse, req, d );
         if( d != nullptr )

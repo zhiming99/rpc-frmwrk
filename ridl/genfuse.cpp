@@ -2099,17 +2099,6 @@ gint32 CImplIfMethodProxyFuse::OutputAsyncCbWrapper()
         CCOUT << "    iRet, " << strNoReply << " );";
         NEW_LINE;
 
-        /*if( strMethod == "EchoMany" )
-        {
-            Wa( "guint32 dwPid = 0;" );
-            Wa( "if( SUCCEEDED( iRet ) )" );
-            Wa( "    dwPid = val_[ \"i1r\" ].asUInt();" );
-            Wa( "else" );
-            Wa( "    dwPid = 0;" );
-            Wa( "OutputMsg( ret, \"Checkpoint 11(%d): \"" );
-            Wa( "   \"'EchoMany' returns\", dwPid );" );
-        }*/
-
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
         NEW_LINE;

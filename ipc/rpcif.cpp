@@ -4380,7 +4380,6 @@ gint32 CRpcServices::LoadObjDesc(
                 std::string strFormat = "ipv4";
                 oConnParams[ propAddrFormat ] = strFormat;
                 oConnParams[ propEnableSSL ] = false;
-                oConnParams[ propUsingGmSSL ] = false;
                 oConnParams[ propEnableWebSock ] = false;
                 oConnParams[ propCompress ] = true;
                 oConnParams[ propConnRecover ] = false;
@@ -4391,7 +4390,6 @@ gint32 CRpcServices::LoadObjDesc(
 
                 oConnParams[ propDestTcpPort ] = dwPortNum;
 
-                bool bEnableSSL = false;
                 if( oObjElem.isMember( JSON_ATTR_ENABLE_SSL ) &&
                     oObjElem[ JSON_ATTR_ENABLE_SSL ].isString() &&
                     !bServer )
@@ -4400,21 +4398,7 @@ gint32 CRpcServices::LoadObjDesc(
                     if( strVal == "false" )
                         oConnParams[ propEnableSSL ] = false;
                     else if( strVal == "true" )
-                    {
                         oConnParams[ propEnableSSL ] = true;
-                        bEnableSSL = true;
-                    }
-                }
-                if( bEnableSSL &&
-                    oObjElem.isMember( JSON_ATTR_USING_GMSSL ) &&
-                    oObjElem[ JSON_ATTR_USING_GMSSL ].isString() &&
-                    !bServer )
-                {
-                    strVal = oObjElem[ JSON_ATTR_USING_GMSSL  ].asString(); 
-                    if( strVal == "true" )
-                    {
-                        oConnParams[ propUsingGmSSL ] = true;
-                    }
                 }
 
                 if( oObjElem.isMember( JSON_ATTR_ADDRFORMAT ) &&

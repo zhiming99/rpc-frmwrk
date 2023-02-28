@@ -1657,8 +1657,7 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
 
         bool bEnableSSL = false;
         CConnParams oConn( pConnParams );
-        bEnableSSL =
-            oConn.IsSSL() && !oConn.IsGmSSL();
+        bEnableSSL = oConn.IsSSL();
         if( !bEnableSSL )
         {
             ret = 0;

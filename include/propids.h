@@ -263,7 +263,6 @@ enum EnumPropId : gint32
     propTaskAdded,      // type: a guint32 counter of the number of tasks added by the taskgroup
     propTaskRejected,   // type: a guint32 counter of the number of tasks rejected by the taskgroup
     propStmHandle,      // type: a intptr as a handle of a stream. cannot pass machine boundary
-    propUsingGmSSL,     // type: a bool value to indicate whether to use GmSSL or not, and only valid when propEnableSSL is true
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

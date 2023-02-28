@@ -971,33 +971,17 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
 
                 oElemCfg.SetBoolProp( propEnableWebSock, false );
                 oElemCfg.SetBoolProp( propEnableSSL, false );
-                oElemCfg.SetBoolProp( propUsingGmSSL, false );
                 oElemCfg.SetBoolProp( propCompress, false );
                 oElemCfg.SetBoolProp( propConnRecover, false );
                 oElemCfg.SetBoolProp( propIsServer, true );
 
-                bool bEnableSSL = false;
                 if( oParams.isMember( JSON_ATTR_ENABLE_SSL ) &&
                     oParams[ JSON_ATTR_ENABLE_SSL ].isString() )
                 {
                     string strVal =
                         oParams[ JSON_ATTR_ENABLE_SSL ].asString();
                     if( strVal == "true" )
-                    {
                         oElemCfg.SetBoolProp( propEnableSSL, true );
-                        bEnableSSL = true;
-                    }
-                }
-                if( bEnableSSL &&
-                    oParams.isMember( JSON_ATTR_USING_GMSSL ) &&
-                    oParams[ JSON_ATTR_USING_GMSSL ].isString() )
-                {
-                    string strVal =
-                        oParams[ JSON_ATTR_USING_GMSSL ].asString();
-                    if( strVal == "true" )
-                    {
-                        oElemCfg.SetBoolProp( propUsingGmSSL, true );
-                    }
                 }
 
                 if( oParams.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
