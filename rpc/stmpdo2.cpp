@@ -2516,4 +2516,171 @@ gint32 CTcpStreamPdo2::GetProperty(
     return super::GetProperty( iProp, oBuf );
 }
 
+static gint32 GetCfgFile( stdstr& strFile )
+{
+    gint32 ret = 0;
+    do{
+        ret = access( CONFIG_FILE, R_OK );
+        if( ret == 0 )
+        {
+            strFile = CONFIG_FILE;
+            break;
+        }
+        ret = FindInstCfg(
+            CONFIG_FILE, strFile );
+
+    }while( 0 );
+    return ret;
+}
+
+#include "jsondef.h"
+gint32 CheckForCertPass( bool& bPrompt )
+{
+    gint32 ret = -ENOENT;
+    do{
+        stdstr strFile;
+        ret = GetCfgFile( strFile );        
+        if( ERROR( ret ) )
+            break;
+        
+        Json::Value oValue;
+        ret = ReadJsonCfg( strFile, oValue );
+        if( ERROR( ret ) )
+            break;
+
+        if( !oValue.isMember( JSON_ATTR_MATCH ) ||
+            !oValue[ JSON_ATTR_MATCH ].isArray() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        Json::Value& oMatchArray =
+            oValue[ JSON_ATTR_MATCH ];
+
+        if( oMatchArray == Json::Value::null )
+            break;
+
+        if( !oMatchArray.isArray() 
+            || oMatchArray.size() == 0 )
+            break;
+
+        bool bGmSSL = false;
+        stdstr strOpenSSL = PORT_CLASS_OPENSSL_FIDO;
+        stdstr strGmSSL = PORT_CLASS_GMSSL_FIDO;
+
+        stdstr strPortClass = PORT_CLASS_TCP_STREAM_PDO2;
+
+        guint32 i = 0;
+        bool bOpenSSL = true;
+        for( ; i < oMatchArray.size(); i++ )
+        {
+            Json::Value& elem = oMatchArray[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
+                continue;
+
+            if( Json::Value::null !=
+                elem[ JSON_ATTR_PROBESEQ ] )
+            {
+                Json::Value& oDrvArray =
+                    elem[ JSON_ATTR_PROBESEQ ];
+
+                if( !oDrvArray.isArray() ||
+                    oDrvArray.size() == 0 )
+                    continue;
+
+                for( guint32 j = 0; j < 1; j++ )
+                {
+                    Json::Value& oDrvName = oDrvArray[ j ];
+                    if( oDrvName.empty() ||
+                        !oDrvName.isString() )
+                        continue;
+                    if( oDrvName.asString() ==
+                        "RpcOpenSSLFidoDrv" )
+                    {
+                        bOpenSSL = true;
+                        ret = 0;
+                    }
+                    else if( oDrvName.asString() ==
+                        "RpcGmSSLFidoDrv" )
+                    {
+                        bOpenSSL = false;
+                        ret = 0;
+                    }
+                }
+                break;
+            }
+            break;
+        }
+        if( ERROR( ret  ) )
+            break;
+
+        if( bOpenSSL )
+            strPortClass = PORT_CLASS_OPENSSL_FIDO;
+        else
+            strPortClass = PORT_CLASS_GMSSL_FIDO;
+
+        if( !oValue.isMember( JSON_ATTR_PORTS ) ||
+            !oValue[ JSON_ATTR_PORTS ].isObject() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        Json::Value& oPortArray =
+            oValue[ JSON_ATTR_PORTS ];
+
+        if( oPortArray == Json::Value::null )
+            break;
+
+        if( !oPortArray.isArray() 
+            || oPortArray.size() == 0 )
+            break;
+
+        i = 0;
+        ret = -ENOENT;
+        for( ; i < oPortArray.size(); i++ )
+        {
+            Json::Value& elem = oPortArray[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
+                continue;
+
+            if( !elem.isMember( JSON_ATTR_PARAMETERS ) )
+                break;
+
+            Json::Value& oParams =
+                elem[ JSON_ATTR_PARAMETERS ];
+
+            if( !oParams.isObject() )
+                break;
+
+            if( !oParams.isMember( JSON_ATTR_SECRET_FILE ) )
+                break;
+
+            Json::Value oVal =
+                oParams[ JSON_ATTR_SECRET_FILE ];
+            if( oVal.empty() || !oVal.isString() )
+                break;
+            bPrompt = false;
+            if( oVal.asString() == "console" )
+            {
+                bPrompt = true;
+                ret = 0;
+            }
+            break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 }

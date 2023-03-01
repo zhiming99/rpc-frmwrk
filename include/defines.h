@@ -208,6 +208,8 @@ do{\
 #define G_SOURCE_CONTINUE true
 #define G_SOURCE_REMOVE false
 
+#define SSL_PASS_MAX    32
+
 namespace rpcf
 {
 

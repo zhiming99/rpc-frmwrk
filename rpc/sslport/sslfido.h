@@ -43,8 +43,6 @@
 namespace rpcf
 {
 
-#define PORT_CLASS_OPENSSL_FIDO "RpcOpenSSLFido"
-
 enum EnumMyClsid
 {
     DECL_CLSID( MyStart ) = clsid( ClassFactoryStart ) + 1,

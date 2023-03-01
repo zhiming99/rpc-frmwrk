@@ -196,6 +196,12 @@ typedef enum : int
 
 struct AGMS_CTX : TLS_CTX
 {
+    std::string certfile;
+    std::string keyfile;
+    std::string cacertfile;
+    std::string password;
+    bool verify_peer = false;
+
     AGMS_CTX();
     int check_private_key();
     unsigned long set_options( unsigned long op);
@@ -205,15 +211,10 @@ struct AGMS_CTX : TLS_CTX
 
 struct AGMS : public TLS_CONNECT
 {
-    std::atomic< AGMS_STATE > gms_state;
-    std::unique_ptr< AGMS_CTX > gms_ctx;
+    std::atomic< AGMS_STATE > gms_state = { STAT_INIT };
+    AGMS_CTX *gms_ctx = nullptr;
     BLKIN read_bio;
     BLKOUT write_bio;
-
-    std::string certfile;
-    std::string keyfile;
-    std::string cacertfile;
-    std::string password;
 
     AGMS();
     virtual ~AGMS()

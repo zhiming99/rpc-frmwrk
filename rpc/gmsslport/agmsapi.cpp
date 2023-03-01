@@ -651,11 +651,7 @@ void TLS13_HSCTX_SVR::clear()
 }
  
 AGMS::AGMS()
-{
-    gms_ctx = std::move(
-        std::unique_ptr< AGMS_CTX >( new AGMS_CTX ) );
-    gms_state = STAT_INIT;
-}
+{}
 
 int AGMS::shutdown()
 {
@@ -2360,132 +2356,64 @@ int TLS13::handshake_svr()
 int TLS13::init( bool is_client )
 {
     this->is_client = ( int )is_client;
-    if( is_client )
-       return init_cli(); 
-    return init_svr();
+    TLS_CONNECT* conn = this;
+    memset(conn, 0, sizeof(*conn));
+    return init_connect();
 }
 
-int TLS13::init_svr()
+int init_ctx( AGMS_CTX* ctx, bool is_client )
 {
-    gint32 ret = 0;
-    int server_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
-    do{
-        TLS_CTX* ctx = this->gms_ctx.get();
-        TLS_CONNECT* conn = this;
+    if( ctx == nullptr )
+        return -EINVAL;
 
-        memset(&ctx, 0, sizeof(ctx));
-        memset(&conn, 0, sizeof(conn));
+    int ret = 0;
+    int ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
+    do{
+        int mode = TLS_server_mode;
+        if( is_client )
+            mode = TLS_client_mode;
 
         ret = tls_ctx_init( ctx,
-            TLS_protocol_tls13,
-            TLS_server_mode);
+            TLS_protocol_tls13, mode );
 
-        if( ret != 1 )
+        if( ret < 0 )
             break;
 
-        size_t cipher_count =
-            sizeof(server_ciphers);
-
-        cipher_count /=
-            sizeof(server_ciphers[0]);
+        size_t cipher_count = sizeof(ciphers);
+        cipher_count /= sizeof(ciphers[0]);
 
         ret = tls_ctx_set_cipher_suites(
-            ctx, server_ciphers,
+            ctx, ciphers,
             cipher_count );
         if( ret != 1 )
             break;
 
-        if( tls_ctx_set_certificate_and_key(
-            ctx, this->certfile.c_str(),
-            this->keyfile.c_str(),
-            this->password.c_str()) != 1)
-        {
-            this->password.replace(
-                0, std::string::npos, 0, ' ' );
-            ret = -1;
-            break;
-        }
-
-        this->password.replace(
-            0, std::string::npos, 0, ' ' );
-
-        if (this->cacertfile.size())
-        {
-            if (tls_ctx_set_ca_certificates(
-                ctx, cacertfile.c_str(),
-                TLS_DEFAULT_VERIFY_DEPTH) != 1)
-            {
-                ret = -1;
-                break;
-            }
-        }
-
-        ret = init_connect();
-
-    }while( 0 );
-
-    return ret;
-}
-
-int TLS13::init_cli()
-{
-    gint32 ret = 0;
-    int client_ciphers[] = { TLS_cipher_sm4_gcm_sm3 };
-    do{
-        TLS_CTX* ctx = this->gms_ctx.get();
-        TLS_CONNECT* conn = this;
-
-        memset(&ctx, 0, sizeof(ctx));
-        memset(&conn, 0, sizeof(conn));
-
-        ret = tls_ctx_init( ctx,
-            TLS_protocol_tls13,
-            TLS_client_mode);
-
-        if( ret != 1 )
-            break;
-
-        size_t cipher_count =
-            sizeof(client_ciphers);
-
-        cipher_count /=
-            sizeof(client_ciphers[0]);
-
-        ret = tls_ctx_set_cipher_suites(
-            ctx, client_ciphers,
-            cipher_count );
-        if( ret != 1 )
-            break;
-
-        if( this->certfile.size() &&
+        if( ctx->certfile.size() &&
             tls_ctx_set_certificate_and_key(
-            ctx, this->certfile.c_str(),
-            this->keyfile.c_str(),
-            this->password.c_str()) != 1)
+            ctx, ctx->certfile.c_str(),
+            ctx->keyfile.c_str(),
+            ctx->password.c_str()) != 1)
         {
-            this->password.replace(
-                0, std::string::npos,
-                this->password.size(), ' ' );
             ret = -1;
             break;
         }
 
-        this->password.replace(
-            0, std::string::npos,
-            this->password.size(), ' ' );
-
-        if (this->cacertfile.size())
+        if (ctx->cacertfile.size())
         {
             if (tls_ctx_set_ca_certificates(
-                ctx, cacertfile.c_str(),
+                ctx, ctx->cacertfile.c_str(),
                 TLS_DEFAULT_VERIFY_DEPTH) != 1)
             {
                 ret = -1;
                 break;
             }
         }
-        ret = init_connect();
+
     }while( 0 );
+
+    ctx->password.replace(
+        0, std::string::npos,
+        ctx->password.size(), '0' );
 
     return ret;
 }
@@ -2494,7 +2422,7 @@ int TLS13::init_connect()
 {
     int ret = 0;
     do{
-        TLS_CTX* ctx = gms_ctx.get();
+        TLS_CTX* ctx = gms_ctx;
         this->protocol = ctx->protocol;
         this->is_client = ctx->is_client;
 

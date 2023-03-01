@@ -36,8 +36,6 @@
 #include "agmsapi.h"
 #pragma once
 
-#define PORT_CLASS_GMSSL_FIDO "RpcGmSSLFido"
-
 using namespace gmssl;
 
 namespace rpcf
@@ -91,6 +89,7 @@ class CGmSSLShutdownTask :
 class CRpcGmSSLFido : public CPort
 {
     std::unique_ptr< AGMS >       m_pSSL;
+    AGMS_CTX        *m_pSSLCtx;
 
     bool m_bClient = true;
 
@@ -132,7 +131,6 @@ class CRpcGmSSLFido : public CPort
     gint32 StartSSLShutdown( PIRP pIrp );
 
     gint32 RemoveIrpFromMap( IRP* pIrp );
-    gint32 InitSSL();
 
     gint32 BuildResumeTask(
         TaskletPtr& pResumeTask, PIRP pIrp,
@@ -195,14 +193,15 @@ class CRpcGmSSLFido : public CPort
 
 class CRpcGmSSLFidoDrv : public CRpcTcpFidoDrv
 {
+    std::unique_ptr< AGMS_CTX > m_pGmsCtx;
     std::string m_strCertPath;
     std::string m_strKeyPath;
     std::string m_strCAPath;
-    std::string m_strSecret;
+    std::string m_strSecretPath;
     bool m_bVerifyPeer = false;
-    bool m_bPassword = false;
 
     gint32 LoadSSLSettings();
+    gint32 InitSSLContext();
     public:
     typedef CRpcTcpFidoDrv super;
 

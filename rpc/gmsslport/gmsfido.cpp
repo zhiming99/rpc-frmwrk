@@ -339,9 +339,30 @@ CRpcGmSSLFido::CRpcGmSSLFido(
     const IConfigDb* pCfg ) :
     super( pCfg )
 {
-    m_dwFlags &= ~PORTFLG_TYPE_MASK;
-    m_dwFlags |= PORTFLG_TYPE_FIDO;
-    SetClassId( clsid( CRpcGmSSLFido ) );
+    gint32 ret = 0;
+    do{
+        m_dwFlags &= ~PORTFLG_TYPE_MASK;
+        m_dwFlags |= PORTFLG_TYPE_FIDO;
+        SetClassId( clsid( CRpcGmSSLFido ) );
+
+        CCfgOpener oCfg( pCfg );
+        guint32* ictx;
+        ret = oCfg.GetIntPtr(
+            propContext, ictx );
+        if( ERROR( ret ) )
+            break;
+        AGMS_CTX* pCtx = ( AGMS_CTX* )ictx;
+        m_pSSLCtx = pCtx;
+        m_bClient = pCtx->is_client;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg( ret,
+            "Error occurs in CRpcGmSSLFido ctor" );  
+        throw std::runtime_error( strMsg );
+    }
 }
 
 gint32 CRpcGmSSLFido::PostStart(
@@ -353,38 +374,14 @@ gint32 CRpcGmSSLFido::PostStart(
 
     gint32 ret = 0;
     do{
-        PortPtr pPort = GetLowerPort();
-        ret = pIrp->AllocNextStack( pPort );
-        if( ERROR( ret ) )
-            break;
-
-        IrpCtxPtr& pCtx = pIrp->GetTopStack(); 
-        pCtx->SetMajorCmd( IRP_MJ_FUNC );
-        pCtx->SetMinorCmd( IRP_MN_IOCTL );
-        pCtx->SetCtrlCode( CTRLCODE_IS_CLIENT );
-        pPort->AllocIrpCtxExt( pCtx, pIrp );
-
-        ret = pPort->SubmitIrp( pIrp );
-        if( SUCCEEDED( ret ) )
-        {
-            m_bClient = true;
-        }
-        else if( ret == ERROR_FALSE )
-        {
-            m_bClient = false;
-            ret = 0;
-        }
-
-        pIrp->PopCtxStack();
-        if( ERROR( ret ) )
-            break;
-
         if( !m_pSSL )
         {
             m_pSSL = std::move(
-                std::unique_ptr< AGMS >( new TLS13 ) );
+                std::unique_ptr< AGMS >
+                    ( new TLS13 ) );
         }
 
+        m_pSSL->gms_ctx = m_pSSLCtx;
         ret = m_pSSL->init( m_bClient );
         if( ERROR( ret ) )
             break;
@@ -1504,6 +1501,9 @@ CRpcGmSSLFidoDrv::CRpcGmSSLFidoDrv(
     const IConfigDb* pCfg )
 {
     SetClassId( clsid( CRpcGmSSLFidoDrv ) );
+    m_pGmsCtx = std::move(
+        std::unique_ptr< AGMS_CTX >
+            ( new AGMS_CTX ) );
 }
 
 CRpcGmSSLFidoDrv::~CRpcGmSSLFidoDrv()
@@ -1511,9 +1511,14 @@ CRpcGmSSLFidoDrv::~CRpcGmSSLFidoDrv()
 
 gint32 CRpcGmSSLFidoDrv::Start()
 {
-    gint32 ret =LoadSSLSettings();
-    if( ERROR( ret ) )
-        return ret;
+    gint32 ret1 =LoadSSLSettings();
+    gint32 ret2 = InitSSLContext();
+
+    if( ERROR( ret1 ) ) 
+        return ret1;
+    else if( ERROR( ret2 ) )
+        return ret2;
+
     return super::Start();
 }
 
@@ -1549,8 +1554,7 @@ gint32 CRpcGmSSLFidoDrv::Probe(
 
         bool bEnableSSL = false;
         CConnParams oConn( pConnParams );
-        bEnableSSL =
-            oConn.IsSSL() && oConn.IsGmSSL();
+        bEnableSSL = oConn.IsSSL(); 
         if( !bEnableSSL )
         {
             ret = 0;
@@ -1591,6 +1595,9 @@ gint32 CRpcGmSSLFidoDrv::Probe(
 
         oNewCfg.SetPointer(
             propDrvPtr, this );
+
+        oNewCfg.SetIntPtr( propContext,
+            ( guint32* )m_pGmsCtx.get() );
 
         ret = CreatePort( pNewPort,
             oNewCfg.GetCfg() );
@@ -1654,23 +1661,17 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                     m_bVerifyPeer = true;
             }
 
-            if( oParams.isMember( JSON_ATTR_HAS_PASSWORD ) &&
-                oParams[ JSON_ATTR_HAS_PASSWORD ].isString() )
-            {
-                // prompting for password
-                std::string strVal =
-                    oParams[ JSON_ATTR_HAS_PASSWORD ].asString();
-                if( strVal == "true" )
-                    m_bPassword = true;
-            }
-
-
             // certificate file path
             if( oParams.isMember( JSON_ATTR_CERTFILE ) &&
                 oParams[ JSON_ATTR_CERTFILE ].isString() )
             {
                 std::string strCert =
                     oParams[ JSON_ATTR_CERTFILE ].asString();
+                if( strCert.empty() )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
                 ret = access( strCert.c_str(), R_OK );
                 if( ret == -1 )
                 {
@@ -1686,6 +1687,11 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
             {
                 std::string strKeyFile =
                     oParams[ JSON_ATTR_KEYFILE ].asString();
+                if( strKeyFile.empty() )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
 
                 ret = access( strKeyFile.c_str(), R_OK );
                 if( ret == -1 )
@@ -1702,13 +1708,16 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
             {
                 std::string strCAPath =
                     oParams[ JSON_ATTR_CACERT ].asString();
-                ret = access( strCAPath.c_str(), R_OK );
-                if( ret == -1 )
+                if( strCAPath.size() )
                 {
-                    ret = -errno;
-                    break;
+                    ret = access( strCAPath.c_str(), R_OK );
+                    if( ret == -1 )
+                    {
+                        ret = -errno;
+                        break;
+                    }
+                    m_strCAPath = strCAPath;
                 }
-                m_strCAPath = strCAPath;
             }
 
             // secret file path
@@ -1716,20 +1725,100 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                 oParams[ JSON_ATTR_SECRET_FILE ].isString() )
             {
                 // either specifying secret file or prompting password
-                std::string strSecret =
+                std::string strPath =
                     oParams[ JSON_ATTR_SECRET_FILE ].asString();
-                ret = access( strSecret.c_str(), R_OK );
-                if( ret == -1 )
+                if( strPath.size() )
                 {
-                    ret = -errno;
-                    break;
+                    ret = access( strPath.c_str(), R_OK );
+                    if( ret == -1 )
+                    {
+                        ret = -errno;
+                        break;
+                    }
+                    m_strSecretPath = strPath;
                 }
-                m_strSecret = strSecret;
             }
         }
 
     }while( 0 );
 
+    return ret;
+}
+
+extern char g_szCertPass[ SSL_PASS_MAX + 1 ];
+extern int init_ctx( AGMS_CTX* ctx, bool is_client );
+
+gint32 CRpcGmSSLFidoDrv::InitSSLContext()
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwRole = 0;
+        ret = GetIoMgr()->GetCmdLineOpt(
+            propRouterRole, dwRole );
+        if( ERROR( ret ) )
+            break;
+
+        ret = 0;
+        AGMS_CTX* ctx = m_pGmsCtx.get();
+        TLS_CTX* tctx = ctx;
+        memset(tctx, 0, sizeof(*tctx));
+
+        if( m_strSecretPath.empty() )
+        {
+            ctx->password = "1234";
+        }
+        else if( m_strSecretPath == "console" )
+        {
+            if( g_szCertPass[ 0 ] == 0 )
+            {
+                ret = -EACCES;
+                break;
+            }
+            ctx->password = g_szCertPass;
+        }
+        else
+        {
+            FILE* fp = fopen(
+                m_strSecretPath.c_str(), "r" );
+            if( fp == nullptr )
+            {
+                ret = -errno;
+                break;
+            }
+            char* pszPass = nullptr;
+            size_t len = 0;
+            ret = getline( &pszPass, &len , fp );
+            if( ret == -1 )
+            {
+                if( pszPass )
+                    free( pszPass );
+                ret = -errno;
+                break;
+            }
+            stdstr& pass = ctx->password;
+            pass = pszPass;
+            for( size_t i = 0; i < len; i++ )
+                pszPass[ i ] = ' ';
+            if( pass.size() > SSL_PASS_MAX )
+                ctx->password.erase( SSL_PASS_MAX );
+            while( pass.back() == '\n' ||
+                pass.back() == '\r' )
+                pass.pop_back();
+            if( pass.empty() )
+            {
+                ret = -EACCES;
+                break;
+            }
+        }
+
+        ctx->keyfile = m_strKeyPath;
+        ctx->certfile = m_strCertPath;
+        ctx->cacertfile = m_strCAPath; 
+        ret = init_ctx( ctx, dwRole == 1 );
+
+    }while( 0 );
+    memset( g_szCertPass, 0,
+        sizeof( g_szCertPass ) );
     return ret;
 }
 
