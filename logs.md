@@ -1,4 +1,8 @@
 ---
+[`Thu Mar 02 2023 08:58:47 PM Beijing`]   
+1. Suspended investigation of `EchoMany response lost`. It happens outside `rpc-frmwrk`. However, we have found a way to prevent it from happening. It is not a fix, and we will work out a solution to the bug sometime in the future.
+2. Moved on the development of GmSSL support. We can start debugging as soon as we have completed the changes made to `rpcfg.py` and `updatecfg.py`, the GUI config tool.
+
 [`Sat Feb 18 2023 06:00:24 PM Beijing`]   
 1. Still trying to fix `EchoMany response lost`. Now the bug seems to be outside the rpc-frmwrk, and it needs some time to verify.
 2. Meanwhile, we have fixed the segment fault bug on python testcase `iftest` and `hellowld` quitting.
