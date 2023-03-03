@@ -6,6 +6,7 @@ from shutil import move
 from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Dict
+from typing import Tuple
 import errno
 
 def GetTestPaths( path : str= None ) :
@@ -157,6 +158,61 @@ def ExportTestCfgs( cfgList:list ):
     if pathVal is not None :
         UpdateTestCfg( pathVal[ 1 ], cfgList )
         WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
+
+def IsSSLEnabled( drvCfg : dict ) -> Tuple[ int, bool ] :
+    try:
+        if drvCfg is None :
+            return ( -errno.EINVAL, None )
+        if 'Match' not in drvCfg :
+            return ( -errno.ENOENT, None )
+        oMatches = drvCfg[ 'Match']
+        for oMatch in oMatches:
+            if not 'PortClass' in oMatch:
+                continue
+            if oMatch[ 'PortClass' ] != 'TcpStreamPdo2':
+                continue
+            if not 'ProbeSequence' in oMatch:
+                return ( -errno.ENOENT, None )
+            oDrvArray = oMatch[ 'ProbeSequence' ]
+            if len( oDrvArray ) == 0:
+                return ( -errno.ENOENT, None )
+            if oDrvArray[ 0 ] == 'RpcOpenSSLFido' :
+                return ( 0, True )
+            elif oDrvArray[ 0 ] == 'RpcGmSSLFido' :
+                return ( 0, False )
+            break
+        return ( -errno.ENOENT, None )
+    except Exception as err:
+        return ( -errno.EFAULT, None )
+
+def IsUsingGmSSL( drvCfg : dict ) -> Tuple[ int, bool ]:
+    try:
+        if drvCfg is None :
+            return ( -errno.EINVAL, None )
+        for port in drvCfg[ 'Match' ] :
+            if port[ 'PortClass'] == 'TcpStreamPdo2' :
+                if 'UsingGmSSL' in port:
+                    if port[ 'UsingGmSSL' ] == 'true':
+                        return ( 0, True )
+                return ( 0, False )
+        return ( -errno.ENOENT, None )
+    except Exception as err:
+        return ( -errno.EFAULT, None )
+
+def SetUsingGmSSL( drvCfg : dict, bEnable : bool ) -> int:
+    try:
+        if drvCfg is None :
+            return -errno.EINVAL
+        for port in drvCfg[ 'Match' ] :
+            if port[ 'PortClass'] == 'TcpStreamPdo2' :
+                if bEnable :
+                    port[ 'UsingGmSSL' ] = 'true'
+                else:
+                    port[ 'UsingGmSSL' ] = 'false'
+                return 0
+        return -errno.ENOENT
+    except Exception as err:
+        return -errno.EFAULT
 
 def LoadConfigFiles( path : str) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -425,19 +481,44 @@ def Update_Drv( initCfg: dict, drvFile : list,
             sslCred = security[ 'SSLCred' ]
             if 'KeyFile' in sslCred :
                 keyPath = sslCred[ 'KeyFile' ]
+            else:
+                keyPath = ''
 
             if 'CertFile' in sslCred :
                 certPath = sslCred[ 'CertFile' ]
+            else:
+                certPath = ''
+
+            if 'CACertFile' in sslCred :
+                cacertPath = sslCred[ 'CACertFile' ]
+            else:
+                cacertPath = ''
+
+
+            if 'SecretFile' in sslCred :
+                secretPath = sslCred[ 'SecretFile' ]
+            else:
+                secretPath = ''
+
+            strPort = 'RpcOpenSSLFido'
+            UsingGmSSL = sslCred.get( 'UsingGmSSL' )
+            bGmSSL = False
+            if UsingGmSSL == 'true' :
+                strPort = 'RpcGmSSLFido'
+                bGmSSL = True
 
             for port in ports :
-                if port[ 'PortClass'] != 'RpcOpenSSLFido' :
+                if port[ 'PortClass'] != strPort :
                     continue
                 sslFiles = port[ 'Parameters']
                 if sslFiles is None :
                     continue
                 sslFiles[ "KeyFile"] = keyPath
                 sslFiles[ "CertFile"] = certPath
+                sslFiles[ 'CACertFile' ] = cacertPath
+                sslFiles[ 'SecretFile' ] = secretPath
                 break
+            SetUsingGmSSL( drvVal, bGmSSL )
 
         if 'misc' in security and bServer :
             misc = security[ 'misc' ]
@@ -520,7 +601,16 @@ def Update_Drv( initCfg: dict, drvFile : list,
                     oSeq.insert( 0, "RpcSecFidoDrv" )
                 if bSSL :
                     oSeq.insert( 0, "RpcWebSockFidoDrv" )
-                    oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
+                    if not 'UsingGmSSL' in oMatch:
+                        oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
+                    else:
+                        strVal = oMatch[ 'UsingGmSSL' ]
+                        if strVal == 'true' :
+                            oSeq.insert( 0, "RpcGmSSLFidoDrv" )
+                        elif strVal == 'false':
+                            oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
+                        else:
+                            raise Exception( 'invalid value' ) 
                 oMatch[ 'ProbeSequence' ] = oSeq
                 break
 

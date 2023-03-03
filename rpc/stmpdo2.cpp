@@ -2534,7 +2534,83 @@ static gint32 GetCfgFile( stdstr& strFile )
 }
 
 #include "jsondef.h"
-gint32 CheckForCertPass( bool& bPrompt )
+bool IsSSLEnabled(
+    const Json::Value& oValue, bool& bOpenSSL )
+{
+    bool bRet = false;
+
+    do{
+        if( !oValue.isObject() ||
+            oValue.empty() )
+            break;
+
+        if( !oValue.isMember( JSON_ATTR_MATCH ) ||
+            !oValue[ JSON_ATTR_MATCH ].isArray() )
+            break;
+
+        const Json::Value& oMatchArray =
+            oValue[ JSON_ATTR_MATCH ];
+
+        if( oMatchArray == Json::Value::null )
+            break;
+
+        if( !oMatchArray.isArray() ||
+            oMatchArray.size() == 0 )
+            break;
+
+        stdstr strPortClass =
+            PORT_CLASS_TCP_STREAM_PDO2;
+
+        guint32 i = 0;
+        for( ; i < oMatchArray.size(); i++ )
+        {
+            const Json::Value& elem = oMatchArray[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
+                continue;
+
+
+            if( !elem.isMember( JSON_ATTR_PROBESEQ ) )
+                break;
+
+            const Json::Value& oDrvArray =
+                elem[ JSON_ATTR_PROBESEQ ];
+
+            if( !oDrvArray.isArray() ||
+                oDrvArray.size() == 0 )
+                break;
+
+            const Json::Value& oDrvName =
+                oDrvArray[ 0 ];
+
+            if( oDrvName.empty() ||
+                !oDrvName.isString() )
+                break;
+
+            if( oDrvName.asString() ==
+                "RpcOpenSSLFidoDrv" )
+            {
+                bOpenSSL = true;
+                bRet = true;
+            }
+            else if( oDrvName.asString() ==
+                "RpcGmSSLFidoDrv" )
+            {
+                bOpenSSL = false;
+                bRet = true;
+            }
+            break;
+        }
+
+    }while( 0 );
+
+    return bRet;
+}
+
+gint32 CheckForKeyPass( bool& bPrompt )
 {
     gint32 ret = -ENOENT;
     do{
@@ -2548,77 +2624,14 @@ gint32 CheckForCertPass( bool& bPrompt )
         if( ERROR( ret ) )
             break;
 
-        if( !oValue.isMember( JSON_ATTR_MATCH ) ||
-            !oValue[ JSON_ATTR_MATCH ].isArray() )
+        bool bOpenSSL = false;
+        if( !IsSSLEnabled( oValue, bOpenSSL ) )
         {
-            ret = -EINVAL;
+            ret = ERROR_FALSE;
             break;
         }
 
-        Json::Value& oMatchArray =
-            oValue[ JSON_ATTR_MATCH ];
-
-        if( oMatchArray == Json::Value::null )
-            break;
-
-        if( !oMatchArray.isArray() 
-            || oMatchArray.size() == 0 )
-            break;
-
-        bool bGmSSL = false;
-        stdstr strOpenSSL = PORT_CLASS_OPENSSL_FIDO;
-        stdstr strGmSSL = PORT_CLASS_GMSSL_FIDO;
-
-        stdstr strPortClass = PORT_CLASS_TCP_STREAM_PDO2;
-
-        guint32 i = 0;
-        bool bOpenSSL = true;
-        for( ; i < oMatchArray.size(); i++ )
-        {
-            Json::Value& elem = oMatchArray[ i ];
-            if( elem == Json::Value::null )
-                continue;
-
-            if( strPortClass !=
-                elem[ JSON_ATTR_PORTCLASS ].asString() )
-                continue;
-
-            if( Json::Value::null !=
-                elem[ JSON_ATTR_PROBESEQ ] )
-            {
-                Json::Value& oDrvArray =
-                    elem[ JSON_ATTR_PROBESEQ ];
-
-                if( !oDrvArray.isArray() ||
-                    oDrvArray.size() == 0 )
-                    continue;
-
-                for( guint32 j = 0; j < 1; j++ )
-                {
-                    Json::Value& oDrvName = oDrvArray[ j ];
-                    if( oDrvName.empty() ||
-                        !oDrvName.isString() )
-                        continue;
-                    if( oDrvName.asString() ==
-                        "RpcOpenSSLFidoDrv" )
-                    {
-                        bOpenSSL = true;
-                        ret = 0;
-                    }
-                    else if( oDrvName.asString() ==
-                        "RpcGmSSLFidoDrv" )
-                    {
-                        bOpenSSL = false;
-                        ret = 0;
-                    }
-                }
-                break;
-            }
-            break;
-        }
-        if( ERROR( ret  ) )
-            break;
-
+        stdstr strPortClass;
         if( bOpenSSL )
             strPortClass = PORT_CLASS_OPENSSL_FIDO;
         else
@@ -2634,15 +2647,15 @@ gint32 CheckForCertPass( bool& bPrompt )
         Json::Value& oPortArray =
             oValue[ JSON_ATTR_PORTS ];
 
+        ret = -ENOENT;
         if( oPortArray == Json::Value::null )
             break;
 
-        if( !oPortArray.isArray() 
-            || oPortArray.size() == 0 )
+        if( !oPortArray.isArray() ||
+            oPortArray.size() == 0 )
             break;
 
-        i = 0;
-        ret = -ENOENT;
+        guint32 i = 0;
         for( ; i < oPortArray.size(); i++ )
         {
             Json::Value& elem = oPortArray[ i ];
@@ -2653,22 +2666,21 @@ gint32 CheckForCertPass( bool& bPrompt )
                 elem[ JSON_ATTR_PORTCLASS ].asString() )
                 continue;
 
-            if( !elem.isMember( JSON_ATTR_PARAMETERS ) )
+            if( !elem.isMember( JSON_ATTR_PARAMETERS ) ||
+                !elem[ JSON_ATTR_PARAMETERS ].isObject() )
                 break;
 
             Json::Value& oParams =
                 elem[ JSON_ATTR_PARAMETERS ];
 
-            if( !oParams.isObject() )
-                break;
-
             if( !oParams.isMember( JSON_ATTR_SECRET_FILE ) )
                 break;
 
-            Json::Value oVal =
+            Json::Value& oVal =
                 oParams[ JSON_ATTR_SECRET_FILE ];
             if( oVal.empty() || !oVal.isString() )
                 break;
+
             bPrompt = false;
             if( oVal.asString() == "console" )
             {

@@ -166,14 +166,38 @@ class ConfigDlg(Gtk.Dialog):
         else :
             return None
 
+        bGmSSL = False
+        bret = IsUsingGmSSL( drvVal )
+        if bret[ 0 ] == 0 and bret[ 1 ] :
+            sslPort = 'RpcGmSSLFido'
+            bGmSSL = True
+        else:
+            sslPort = 'RpcOpenSSLFido'
+
+        if bGmSSL :
+            confVals[ 'UsingGmSSL' ] = 'true'
+        else:
+            confVals[ 'UsingGmSSL' ] = 'false'
+
         for port in ports :
             try:
-                if port[ 'PortClass'] == 'RpcOpenSSLFido' :
+                if port[ 'PortClass'] == sslPort :
                     sslFiles = port[ 'Parameters']
                     if sslFiles is None :
                         continue
+
                     confVals["keyFile"] = sslFiles[ "KeyFile"]
                     confVals["certFile"] = sslFiles[ "CertFile"]
+
+                    if 'CACertFile' in sslFiles :
+                        confVals['CACertFile'] = sslFiles[ 'CACertFile']
+                    else:
+                        confVals['CACertFile'] = ''
+
+                    if 'SecretFile' in sslFiles :
+                        confVals['SecretFile'] = sslFiles[ 'SecretFile']
+                    else:
+                        confVals['SecretFile'] = ''
                 
                 if port[ 'PortClass'] == 'RpcTcpBusPort' :
                     connParams = port[ 'Parameters']
@@ -291,6 +315,10 @@ class ConfigDlg(Gtk.Dialog):
 
         self.keyEdit = None
         self.certEdit = None
+        self.cacertEdit = None
+        self.secretEdit = None
+        self.gmsslCheck = None
+
         self.svcEdit = None
         self.realmEdit = None
         self.userEdit = None
@@ -432,7 +460,7 @@ class ConfigDlg(Gtk.Dialog):
  
     def InitSecurityPage( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         row = GetGridRows( grid )
-        self.AddSSLCred( grid, startCol, row, confVals )
+        self.AddSSLCfg( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddAuthCred( grid, startCol, row, confVals )
         row = GetGridRows( grid )
@@ -1095,25 +1123,23 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( authCheck, startCol + 0, startRow, 1, 1 )
         self.ifctx[ ifNo ].authCheck = authCheck
 
-    def AddSSLCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+    def AddSSLCfg( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelSSLfiles = Gtk.Label()
         labelSSLfiles.set_markup("<b>SSL Files</b> ")
         labelSSLfiles.set_xalign(.5)
         grid.attach(labelSSLfiles, startCol + 1, startRow, 1, 1 )
-        
         startRow+=1
+
+        #-----------------------------
         labelKey = Gtk.Label()
         labelKey.set_text("Key File: ")
         labelKey.set_xalign(.5)
         grid.attach(labelKey, startCol + 0, startRow, 1, 1 )
 
         keyEditBox = Gtk.Entry()
-        strKey = ""
-        try:
-            if confVals[ 'keyFile'] is not None :
-                strKey = confVals[ 'keyFile']
-        except Exception as err :
-            pass
+        strKey = confVals.get( 'keyFile' )
+        if strKey is None:
+            strKey = ''
 
         keyEditBox.set_text(strKey)
         grid.attach(keyEditBox, startCol + 1, startRow, 1, 1 )
@@ -1123,19 +1149,17 @@ class ConfigDlg(Gtk.Dialog):
 
         grid.attach(keyBtn, startCol + 2, startRow, 1, 1 )
 
+        #-----------------------------
         labelCert = Gtk.Label()
         labelCert.set_text("Cert File: ")
         labelCert.set_xalign(.5)
         grid.attach(labelCert, startCol + 0, startRow + 1, 1, 1 )
 
         certEditBox = Gtk.Entry()
-        strCert = ""
+        strCert = confVals.get( 'certFile' )
+        if strCert is None:
+            strCert = ''
         
-        try:
-            if confVals[ 'certFile'] is not None :
-                strCert = confVals[ 'certFile']    
-        except Exception as err :
-            pass    
         certEditBox.set_text(strCert)
         grid.attach(certEditBox, startCol + 1, startRow + 1, 1, 1 )
 
@@ -1143,11 +1167,71 @@ class ConfigDlg(Gtk.Dialog):
         certBtn.connect("clicked", self.on_choose_cert_clicked)
         grid.attach(certBtn, startCol + 2, startRow + 1, 1, 1 )
 
+        #-----------------------------
+        labelCACert = Gtk.Label()
+        labelCACert.set_text("CA cert File: ")
+        labelCACert.set_xalign(.5)
+        grid.attach(labelCACert, startCol + 0, startRow + 2, 1, 1 )
+
+        cacertEditBox = Gtk.Entry()
+        strCert = confVals.get( 'CACertFile' )
+        if strCert is None:
+            strCert = ''
+        
+        cacertEditBox.set_text(strCert)
+        grid.attach(cacertEditBox, startCol + 1, startRow + 2, 1, 1 )
+
+        cacertBtn = Gtk.Button.new_with_label("...")
+        cacertBtn.connect("clicked", self.on_choose_cacert_clicked)
+        grid.attach(cacertBtn, startCol + 2, startRow + 2, 1, 1 )
+
+        #-----------------------------
+        labelSecret = Gtk.Label()
+        labelSecret.set_text("Secret File: ")
+        labelSecret.set_xalign(.5)
+        grid.attach(labelSecret, startCol + 0, startRow + 3, 1, 1 )
+
+        secretEditBox = Gtk.Entry()
+        strCert = confVals.get( 'SecretFile' )
+        if strCert is None:
+            strCert = ''
+        
+        secretEditBox.set_text(strCert)
+        grid.attach(secretEditBox, startCol + 1, startRow + 3, 1, 1 )
+
+        secretBtn = Gtk.Button.new_with_label("...")
+        secretBtn.connect("clicked", self.on_choose_secret_clicked)
+        grid.attach(secretBtn, startCol + 2, startRow + 3, 1, 1 )
+
+        #-----------------------------
+        labelGmSSL = Gtk.Label()
+        labelGmSSL.set_text("Using GmSSL: ")
+        labelGmSSL.set_xalign(.5)
+        grid.attach(labelGmSSL, startCol + 0, startRow + 4, 1, 1 )
+        gmsslCheck = Gtk.CheckButton( label = "" )
+        strUsingGmSSL = confVals.get( 'UsingGmSSL' )
+        bGmSSL = False
+        if strUsingGmSSL is None:
+            bGmSSL = False
+        elif strUsingGmSSL == 'true' :
+            bGmSSL = True
+        gmsslCheck.props.active = bGmSSL
+
+        gmsslCheck.connect(
+            "toggled", self.on_button_toggled, "GmSSL")
+        grid.attach( gmsslCheck, startCol + 1, startRow + 4, 1, 1 )
+
+        #-----------------------------
         self.keyEdit = keyEditBox
         self.certEdit = certEditBox
+        self.cacertEdit = cacertEditBox
+        self.secretEdit = secretEditBox
+        self.gmsslCheck = gmsslCheck
 
         keyBtn.editBox = keyEditBox
         certBtn.editBox = certEditBox
+        cacertBtn.editBox = cacertEditBox
+        secretBtn.editBox = secretEditBox
 
     def on_button_toggled( self, button, name ):
         print( name )
@@ -1156,7 +1240,7 @@ class ConfigDlg(Gtk.Dialog):
             if self.ifctx[ ifNo ].webSock.props.active and not button.props.active :
                 button.props.active = True
                 return
-        elif name == 'Auth' :
+        elif name == 'Auth' or name == 'GmSSL':
             pass
         elif name == 'WebSock' :
             ifNo = button.ifNo
@@ -1170,7 +1254,7 @@ class ConfigDlg(Gtk.Dialog):
             if not self.nodeCtxs[ iNo ].webSock.props.active :
                 return
             self.nodeCtxs[ iNo ].sslCheck.set_active(button.props.active)
-        if name == 'SSL2' :
+        elif name == 'SSL2' :
             iNo = button.iNo
             if self.nodeCtxs[ iNo ].webSock.props.active and not button.props.active :
                 button.props.active = True
@@ -1180,6 +1264,12 @@ class ConfigDlg(Gtk.Dialog):
         self.on_choose_file_clicked( button, True )
 
     def on_choose_cert_clicked( self, button ) :
+        self.on_choose_file_clicked( button, False )
+
+    def on_choose_cacert_clicked( self, button ) :
+        self.on_choose_file_clicked( button, False )
+
+    def on_choose_secret_clicked( self, button ) :
         self.on_choose_file_clicked( button, False )
 
     def on_remove_if_clicked( self, button ) :
@@ -1643,6 +1733,12 @@ class ConfigDlg(Gtk.Dialog):
             elemSecs[ 'SSLCred' ] = sslFiles
             sslFiles[ "KeyFile"] = self.keyEdit.get_text()
             sslFiles[ "CertFile"] = self.certEdit.get_text()
+            sslFiles[ "CACertFile"] = self.cacertEdit.get_text()
+            sslFiles[ "SecretFile"] = self.secretEdit.get_text()
+            if self.gmsslCheck.props.active:
+                sslFiles[ "UsingGmSSL" ] = 'true'
+            else:
+                sslFiles[ "UsingGmSSL" ] = 'false'
 
             authInfo = dict()
             elemSecs[ 'AuthInfo' ] = authInfo
