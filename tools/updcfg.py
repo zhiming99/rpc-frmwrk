@@ -506,7 +506,9 @@ def Update_Drv( initCfg: dict, drvFile : list,
             if UsingGmSSL == 'true' :
                 strPort = 'RpcGmSSLFido'
                 bGmSSL = True
-            elif UsingGmSSL != 'false' :
+            elif UsingGmSSL == 'false' or UsingGmSSL is None :
+                bGmSSL = False
+            else :
                 raise Exception( "invalid value" )
 
             for port in ports :
