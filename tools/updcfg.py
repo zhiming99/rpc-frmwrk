@@ -475,6 +475,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
     else :
         return -errno.ENOENT
 
+    bGmSSL = False
     while 'Security' in initCfg :
         security = initCfg[ 'Security' ]
         if 'SSLCred' in security :
@@ -502,10 +503,11 @@ def Update_Drv( initCfg: dict, drvFile : list,
 
             strPort = 'RpcOpenSSLFido'
             UsingGmSSL = sslCred.get( 'UsingGmSSL' )
-            bGmSSL = False
             if UsingGmSSL == 'true' :
                 strPort = 'RpcGmSSLFido'
                 bGmSSL = True
+            elif UsingGmSSL != 'false' :
+                raise Exception( "invalid value" )
 
             for port in ports :
                 if port[ 'PortClass'] != strPort :
@@ -601,16 +603,10 @@ def Update_Drv( initCfg: dict, drvFile : list,
                     oSeq.insert( 0, "RpcSecFidoDrv" )
                 if bSSL :
                     oSeq.insert( 0, "RpcWebSockFidoDrv" )
-                    if not 'UsingGmSSL' in oMatch:
-                        oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
+                    if bGmSSL:
+                        oSeq.insert( 0, "RpcGmSSLFidoDrv" )
                     else:
-                        strVal = oMatch[ 'UsingGmSSL' ]
-                        if strVal == 'true' :
-                            oSeq.insert( 0, "RpcGmSSLFidoDrv" )
-                        elif strVal == 'false':
-                            oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
-                        else:
-                            raise Exception( 'invalid value' ) 
+                        oSeq.insert( 0, "RpcOpenSSLFidoDrv" )
                 oMatch[ 'ProbeSequence' ] = oSeq
                 break
 
@@ -623,7 +619,10 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 if bAuth :
                     oFactories.append ( './libauth.so' )
                 if bSSL:
-                    oFactories.append( './libsslpt.so' )
+                    if bGmSSL:
+                        oFactories.append( './libgmsslpt.so' )
+                    else:
+                        oFactories.append( './libsslpt.so' )
                     oFactories.append( './libwspt.so' )
                 oModule[ "ClassFactories" ] = oFactories
                 break

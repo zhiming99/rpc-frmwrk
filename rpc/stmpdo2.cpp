@@ -2638,7 +2638,7 @@ gint32 CheckForKeyPass( bool& bPrompt )
             strPortClass = PORT_CLASS_GMSSL_FIDO;
 
         if( !oValue.isMember( JSON_ATTR_PORTS ) ||
-            !oValue[ JSON_ATTR_PORTS ].isObject() )
+            !oValue[ JSON_ATTR_PORTS ].isArray() )
         {
             ret = -EINVAL;
             break;
