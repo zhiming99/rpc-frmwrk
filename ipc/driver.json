@@ -66,10 +66,19 @@
             ]
         },
         {
+            "DriverName": "RpcGmSSLFidoDrv",
+            "DriverType": "PortDriver",
+            "InternalClass": "CRpcGmSSLFidoDrv",
+            "Description": "This is a filter port driver, and the port it creats is the CRpcGmSSLFido",
+            "PortClasses": [
+                "RpcGmSSLFido"
+            ]
+        },
+        {
             "DriverName": "RpcSecFidoDrv",
             "DriverType": "PortDriver",
             "InternalClass": "CRpcSecFidoDrv",
-            "Description": "This is a filter port driver, and the port it creats is the CRpcOpenSSLFido",
+            "Description": "This is a filter port driver, and the port it creats is the CRpcSecFido",
             "PortClasses": [
                 "RpcSecFido"
             ]
@@ -159,8 +168,25 @@
             "Parameters": {
                 "comments": "Certificate and private key file paths",
                 "CertFile": "./server.crt",
-                "KeyFile": "./server.key"
-            }
+                "KeyFile": "./server.key",
+                "CACertFile": "",
+                "SecretFile": ""
+            },
+            "VerifyPeer": "false"
+        },
+        {
+            "PortType": "Fido",
+            "PortClass": "RpcGmSSLFido",
+            "InternalClass": "CRpcGmSSLFido",
+            "PortDriver": "RpcGmSSLFidoDrv",
+            "Parameters": {
+                "comments": "Certificate and private key file paths",
+                "CertFile": "./server.pem",
+                "KeyFile": "./server.pem",
+                "CACertFile": "",
+                "SecretFile": ""
+            },
+            "VerifyPeer": "false"
         },
         {
             "PortType": "Fido",
@@ -533,7 +559,8 @@
                 "RpcTcpFidoDrv"
             ],
             "Description": "This match provides a binding between the pdo and the uppper fdo and fido",
-            "comment-1": "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility"
+            "comment-1": "this is a new fork of the TcpStreamPdo, with better flexibility and extensibility",
+            "UsingGmSSL": "false"
         },
         {
             "PortClass": "KdcRelayPdo",

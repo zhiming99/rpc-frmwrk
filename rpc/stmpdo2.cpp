@@ -2534,8 +2534,65 @@ static gint32 GetCfgFile( stdstr& strFile )
 }
 
 #include "jsondef.h"
+bool IsVerifyPeerEnabled(
+    const Json::Value& oValue,
+    const stdstr& strPortClass )
+{
+    bool bRet = false;
+    do{
+        if( !oValue.isObject() ||
+            oValue.empty() )
+            break;
+
+        if( !oValue.isMember( JSON_ATTR_PORTS ) ||
+            !oValue[ JSON_ATTR_PORTS ].isArray() )
+            break;
+
+        const Json::Value& oPorts =
+            oValue[ JSON_ATTR_PORTS ];
+
+        if( oPorts == Json::Value::null )
+            break;
+
+        if( !oPorts.isArray() ||
+            oPorts.size() == 0 )
+            break;
+
+        guint32 i = 0;
+        for( ; i < oPorts.size(); i++ )
+        {
+            const Json::Value& elem = oPorts[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
+                continue;
+
+
+            if( !elem.isMember( JSON_ATTR_VERIFY_PEER ) )
+                break;
+            
+            const Json::Value& oVal =
+                elem[ JSON_ATTR_VERIFY_PEER ];
+
+            if( oVal.empty() || !oVal.isString() )
+                break;
+
+            if( oVal.asString() == "true" )
+                bRet = true;
+        }
+
+    }while( 0 );
+
+    return bRet;
+}
+
 bool IsSSLEnabled(
-    const Json::Value& oValue, bool& bOpenSSL )
+    const Json::Value& oValue,
+    bool& bOpenSSL,
+    const stdstr& strPortClass =
+        PORT_CLASS_TCP_STREAM_PDO2 )
 {
     bool bRet = false;
 
@@ -2557,9 +2614,6 @@ bool IsSSLEnabled(
         if( !oMatchArray.isArray() ||
             oMatchArray.size() == 0 )
             break;
-
-        stdstr strPortClass =
-            PORT_CLASS_TCP_STREAM_PDO2;
 
         guint32 i = 0;
         for( ; i < oMatchArray.size(); i++ )

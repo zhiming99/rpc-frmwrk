@@ -225,7 +225,11 @@ class CRpcOpenSSLFidoDrv : public CRpcTcpFidoDrv
 {
     std::string m_strCertPath;
     std::string m_strKeyPath;
+    std::string m_strCAFile;
+    std::string m_strSecretPath;
+    bool m_bVerifyPeer = false;
     SSL_CTX     *m_pSSLCtx = nullptr;
+    char  m_szPasswd[ SSL_PASS_MAX + 1 ] = {0};
 
     public:
     typedef CRpcTcpFidoDrv super;
@@ -242,6 +246,7 @@ class CRpcOpenSSLFidoDrv : public CRpcTcpFidoDrv
     gint32 Start() override;
     gint32 LoadSSLSettings();
     gint32 InitSSLContext( bool bServer );
+    gint32 HandleKeyPasswd();
 };
 
 }

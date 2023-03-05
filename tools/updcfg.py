@@ -159,7 +159,7 @@ def ExportTestCfgs( cfgList:list ):
         UpdateTestCfg( pathVal[ 1 ], cfgList )
         WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
 
-def IsSSLEnabled( drvCfg : dict ) -> Tuple[ int, bool ] :
+def IsSSLEnabled( drvCfg : dict, portClass='TcpStreamPdo2' ) -> Tuple[ int, bool ] :
     try:
         if drvCfg is None :
             return ( -errno.EINVAL, None )
@@ -169,7 +169,7 @@ def IsSSLEnabled( drvCfg : dict ) -> Tuple[ int, bool ] :
         for oMatch in oMatches:
             if not 'PortClass' in oMatch:
                 continue
-            if oMatch[ 'PortClass' ] != 'TcpStreamPdo2':
+            if oMatch[ 'PortClass' ] != portClass:
                 continue
             if not 'ProbeSequence' in oMatch:
                 return ( -errno.ENOENT, None )
@@ -185,12 +185,12 @@ def IsSSLEnabled( drvCfg : dict ) -> Tuple[ int, bool ] :
     except Exception as err:
         return ( -errno.EFAULT, None )
 
-def IsUsingGmSSL( drvCfg : dict ) -> Tuple[ int, bool ]:
+def IsUsingGmSSL( drvCfg : dict, portClass='TcpStreamPdo2' ) -> Tuple[ int, bool ]:
     try:
         if drvCfg is None :
             return ( -errno.EINVAL, None )
         for port in drvCfg[ 'Match' ] :
-            if port[ 'PortClass'] == 'TcpStreamPdo2' :
+            if port[ 'PortClass'] == portClass :
                 if 'UsingGmSSL' in port:
                     if port[ 'UsingGmSSL' ] == 'true':
                         return ( 0, True )
@@ -199,16 +199,45 @@ def IsUsingGmSSL( drvCfg : dict ) -> Tuple[ int, bool ]:
     except Exception as err:
         return ( -errno.EFAULT, None )
 
-def SetUsingGmSSL( drvCfg : dict, bEnable : bool ) -> int:
+def SetUsingGmSSL( drvCfg : dict, bEnable : bool, portClass='TcpStreamPdo2' ) -> int:
     try:
         if drvCfg is None :
             return -errno.EINVAL
         for port in drvCfg[ 'Match' ] :
-            if port[ 'PortClass'] == 'TcpStreamPdo2' :
+            if port[ 'PortClass'] == portClass :
                 if bEnable :
                     port[ 'UsingGmSSL' ] = 'true'
                 else:
                     port[ 'UsingGmSSL' ] = 'false'
+                return 0
+        return -errno.ENOENT
+    except Exception as err:
+        return -errno.EFAULT
+
+def IsVerifyPeer( drvCfg : dict, portClass : str ) -> Tuple[ int, bool ]:
+    try:
+        if drvCfg is None :
+            return ( -errno.EINVAL, None )
+        for port in drvCfg[ 'Ports' ] :
+            if port[ 'PortClass'] == portClass :
+                if 'VerifyPeer' in port:
+                    if port[ 'VerifyPeer' ] == 'true':
+                        return ( 0, True )
+                return ( 0, False )
+        return ( -errno.ENOENT, None )
+    except Exception as err:
+        return ( -errno.EFAULT, None )
+
+def SetVerifyPeer( drvCfg : dict, bEnable : bool, portClass : str ) -> int:
+    try:
+        if drvCfg is None :
+            return -errno.EINVAL
+        for port in drvCfg[ 'Ports' ] :
+            if port[ 'PortClass'] == portClass :
+                if bEnable :
+                    port[ 'VerifyPeer' ] = 'true'
+                else:
+                    port[ 'VerifyPeer' ] = 'false'
                 return 0
         return -errno.ENOENT
     except Exception as err:
@@ -501,6 +530,15 @@ def Update_Drv( initCfg: dict, drvFile : list,
             else:
                 secretPath = ''
 
+            bVerifyPeer = False
+            strVerifyPeer = sslCred.get( 'VerifyPeer' )
+            if strVerifyPeer == 'true' :
+                bVerifyPeer = True
+            elif strVerifyPeer == 'false' or strVerifyPeer is None :
+                bVerifyPeer = False
+            else :
+                raise Exception( "invalid value" )
+
             strPort = 'RpcOpenSSLFido'
             UsingGmSSL = sslCred.get( 'UsingGmSSL' )
             if UsingGmSSL == 'true' :
@@ -523,6 +561,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 sslFiles[ 'SecretFile' ] = secretPath
                 break
             SetUsingGmSSL( drvVal, bGmSSL )
+            SetVerifyPeer( drvVal, bVerifyPeer, strPort )
 
         if 'misc' in security and bServer :
             misc = security[ 'misc' ]

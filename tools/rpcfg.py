@@ -179,6 +179,12 @@ class ConfigDlg(Gtk.Dialog):
         else:
             confVals[ 'UsingGmSSL' ] = 'false'
 
+        bret = IsVerifyPeer( drvVal, sslPort );
+        if bret[ 0 ] == 0 and bret[ 1 ] :
+            confVals[ 'VerifyPeer' ] = 'true'
+        else:
+            confVals[ 'VerifyPeer' ] = 'false'
+
         for port in ports :
             try:
                 if port[ 'PortClass'] == sslPort :
@@ -318,6 +324,7 @@ class ConfigDlg(Gtk.Dialog):
         self.cacertEdit = None
         self.secretEdit = None
         self.gmsslCheck = None
+        self.vfyPeerCheck = None
 
         self.svcEdit = None
         self.realmEdit = None
@@ -1211,15 +1218,35 @@ class ConfigDlg(Gtk.Dialog):
         gmsslCheck = Gtk.CheckButton( label = "" )
         strUsingGmSSL = confVals.get( 'UsingGmSSL' )
         bGmSSL = False
-        if strUsingGmSSL is None:
+        if strUsingGmSSL is None or strUsingGmSSL == 'false':
             bGmSSL = False
         elif strUsingGmSSL == 'true' :
             bGmSSL = True
         gmsslCheck.props.active = bGmSSL
 
         gmsslCheck.connect(
-            "toggled", self.on_button_toggled, "GmSSL")
+            "toggled", self.on_gmssl_toggled, "GmSSL")
         grid.attach( gmsslCheck, startCol + 1, startRow + 4, 1, 1 )
+        gmsslCheck.confVals = confVals
+
+        #-----------------------------
+        labelVfyPeer = Gtk.Label()
+        labelVfyPeer.set_text("Verify Peer: ")
+        labelVfyPeer.set_xalign(.5)
+        grid.attach(labelVfyPeer, startCol + 0, startRow + 5, 1, 1 )
+        vfyPeerCheck = Gtk.CheckButton( label = "" )
+        strVfyPeer = confVals.get( 'VerifyPeer' )
+        bVerify = False
+        if strVfyPeer is None or strVfyPeer == 'false':
+            bVerify = False
+        elif strVfyPeer == 'true' :
+            bVerify = True
+
+        vfyPeerCheck.props.active = bVerify
+
+        vfyPeerCheck.connect(
+            "toggled", self.on_button_toggled, "VerifyPeer")
+        grid.attach( vfyPeerCheck, startCol + 1, startRow + 5, 1, 1 )
 
         #-----------------------------
         self.keyEdit = keyEditBox
@@ -1227,11 +1254,58 @@ class ConfigDlg(Gtk.Dialog):
         self.cacertEdit = cacertEditBox
         self.secretEdit = secretEditBox
         self.gmsslCheck = gmsslCheck
+        self.vfyPeerCheck = vfyPeerCheck
 
         keyBtn.editBox = keyEditBox
         certBtn.editBox = certEditBox
         cacertBtn.editBox = cacertEditBox
         secretBtn.editBox = secretEditBox
+
+    def on_gmssl_toggled( self, button, name ):
+        if name != 'GmSSL':
+            return
+        #load settings from RpcOpenSSLFido or RpcGmSSLFido
+        drvCfg = self.jsonFiles[ 0 ][ 1 ]
+        if button.props.active :
+            sslPort = 'RpcGmSSLFido'
+        else:
+            sslPort = 'RpcOpenSSLFido'
+        try:
+            for port in drvCfg[ 'Ports' ]:
+                if port[ 'PortClass' ] != sslPort:
+                    continue
+
+                sslFiles = port.get( 'Parameters' )
+                if sslFiles is None:
+                    break;
+
+                keyFile = sslFiles.get( "KeyFile" )
+                if keyFile is None:
+                    keyFile = ''
+                self.keyEdit.set_text( keyFile )
+
+                certFile = sslFiles.get( "CertFile" )
+                if certFile is None:
+                    certFile = ''
+                self.certEdit.set_text( certFile )
+
+                cacertFile = sslFiles.get( 'CACertFile' )
+                if cacertFile is None:
+                    cacertFile = ''
+                self.cacertEdit.set_text( cacertFile )
+
+                secretFile = sslFiles.get( 'SecretFile' )
+                if secretFile is None:
+                    secretFile = ''
+                self.secretEdit.set_text( secretFile )
+                bret = IsVerifyPeer( drvCfg, sslPort )
+                if bret[ 0 ] == 0 and bret[ 1 ]:
+                    self.vfyPeerCheck.props.active = True
+                elif bret[ 0 ] == 0 and not bret[ 1 ]:
+                    self.vfyPeerCheck.props.active = False
+
+        except Exception as err:
+            pass
 
     def on_button_toggled( self, button, name ):
         print( name )
@@ -1240,7 +1314,7 @@ class ConfigDlg(Gtk.Dialog):
             if self.ifctx[ ifNo ].webSock.props.active and not button.props.active :
                 button.props.active = True
                 return
-        elif name == 'Auth' or name == 'GmSSL':
+        elif name == 'Auth' or name == 'GmSSL' or name == 'VerifyPeer':
             pass
         elif name == 'WebSock' :
             ifNo = button.ifNo
@@ -1739,6 +1813,11 @@ class ConfigDlg(Gtk.Dialog):
                 sslFiles[ "UsingGmSSL" ] = 'true'
             else:
                 sslFiles[ "UsingGmSSL" ] = 'false'
+
+            if self.vfyPeerCheck.props.active:
+                sslFiles[ "VerifyPeer" ] = 'true'
+            else:
+                sslFiles[ "VerifyPeer" ] = 'false'
 
             authInfo = dict()
             elemSecs[ 'AuthInfo' ] = authInfo

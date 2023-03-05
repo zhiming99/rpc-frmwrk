@@ -27,6 +27,9 @@
 #include "dbusport.h"
 #include "sslfido.h"
 
+using namespace rpcf;
+extern char g_szKeyPass[SSL_PASS_MAX + 1];
+
 namespace rpcf
 {
 
@@ -81,6 +84,86 @@ gint32 GetSSLError( SSL* pssl, int n )
     return ret;
 }
 
+gint32 CRpcOpenSSLFidoDrv::HandleKeyPasswd()
+{
+    gint32 ret = 0;
+    char* szPass = m_szPasswd;
+    do{
+        if( m_strSecretPath == "1234" )
+            break;
+
+        if( m_strSecretPath == "console" )
+        {
+            char* pPass = g_szKeyPass;
+            if( pPass[ 0 ] == 0 )
+            {
+                ret = -EACCES;
+                break;
+            }
+            memcpy( szPass,
+                pPass, SSL_PASS_MAX );
+        }
+        else
+        {
+            FILE* fp = fopen(
+                m_strSecretPath.c_str(), "r" );
+            if( fp == nullptr )
+            {
+                ret = -errno;
+                break;
+            }
+            char* pszPass = nullptr;
+            size_t len = 0;
+            ret = getline( &pszPass, &len , fp );
+            fclose( fp );
+            fp = nullptr;
+            if( ret == -1 )
+            {
+                if( pszPass )
+                    free( pszPass );
+                ret = -errno;
+                break;
+            }
+
+            if( len == 0 )
+            {
+                // assuming no passwd
+                break;
+            }
+
+            size_t actlen = 
+                std::min( len, ( size_t )SSL_PASS_MAX );
+            memcpy( szPass, pszPass, actlen );
+
+            for( size_t i = 0; i < len; i++ )
+                pszPass[ i ] = ' ';
+            free( pszPass );
+            pszPass = nullptr;
+
+            char* ptail = szPass + actlen - 1;
+            while( ptail >= szPass )
+            {
+                if( *ptail == '\n' || *ptail == '\r' )
+                {
+                    *ptail = 0;
+                    --ptail;
+                    continue;
+                }
+                break;
+            }
+            if( szPass[ 0 ] == 0 )
+            {
+                ret = -EACCES;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    memset( g_szKeyPass, 0, SSL_PASS_MAX + 1 );
+    return ret;
+}
+
 gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
     bool bServer )
 {
@@ -118,6 +201,43 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
          *  files, and check consistency */
         if( 1 )
         {
+            if( m_strCAFile.size() )
+            {
+                ret = SSL_CTX_load_verify_locations(
+                    m_pSSLCtx, m_strCAFile.c_str(),NULL);
+                DebugPrint( ret,
+                    "SSL_CTX_load_verify_locations failed");
+            }
+
+            if( m_bVerifyPeer )
+            {
+                SSL_CTX_set_verify( m_pSSLCtx,
+                    SSL_VERIFY_PEER |
+                    SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+                    NULL);
+            }
+            ret = 0;
+            HandleKeyPasswd();
+            if( m_szPasswd[ 0 ] != 0 )
+            {
+                int ( *passwd_cb )( char*, int, int, void* ) =
+                ([](char *buf, int size,
+                    int rwflag, void *userdata)->int
+                {
+                    if( rwflag == 1 )
+                        return 0;
+                    int len = std::min( size,
+                        ( int )strlen( ( char* )userdata ) );
+                    memcpy( buf, userdata, len );
+                    return len;
+                });
+
+                SSL_CTX_set_default_passwd_cb(
+                    m_pSSLCtx, passwd_cb );
+                SSL_CTX_set_default_passwd_cb_userdata(
+                    m_pSSLCtx, m_szPasswd );
+            }
+
             if( SSL_CTX_use_certificate_file(
                 m_pSSLCtx, m_strCertPath.c_str(),
                 SSL_FILETYPE_PEM) != 1 )
@@ -144,7 +264,7 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
                 m_pSSLCtx ) != 1 )
             {
                 ret = ERROR_FAIL;
-                DebugPrint( ret,
+                OutputMsg( ret,
                     "SSL_CTX_check_private_key failed" );
                 break;
             }
@@ -165,6 +285,8 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
         // ciphers cannot be decoded by wireshark.
         // SSL_CTX_set_cipher_list( m_pSSLCtx,
         //     "AES128-SHA:AES256-SHA" );
+        memset( m_szPasswd, 0, sizeof( m_szPasswd ) );
+
    }while( 0 );
 
    return ret;

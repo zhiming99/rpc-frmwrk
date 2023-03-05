@@ -1727,6 +1727,10 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
     return ret;
 }
 
+extern bool IsVerifyPeerEnabled(
+    const Json::Value& oValue,
+    const stdstr& strPortClass );
+
 gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
 {
     CIoManager* pMgr = GetIoMgr();
@@ -1794,7 +1798,47 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                 }
                 m_strKeyPath = strKeyFile;
             }
+
+            // certificate file path
+            if( oParams.isMember( JSON_ATTR_CACERT ) &&
+                oParams[ JSON_ATTR_CACERT ].isString() )
+            {
+                std::string strCAFile =
+                    oParams[ JSON_ATTR_CACERT ].asString();
+                if( strCAFile.size() )
+                {
+                    ret = access( strCAFile.c_str(), R_OK );
+                    if( ret == -1 )
+                    {
+                        ret = -errno;
+                        break;
+                    }
+                    m_strCAFile = strCAFile;
+                }
+            }
+
+            // secret file path
+            if( oParams.isMember( JSON_ATTR_SECRET_FILE ) &&
+                oParams[ JSON_ATTR_SECRET_FILE ].isString() )
+            {
+                // either specifying secret file or prompting password
+                std::string strPath =
+                    oParams[ JSON_ATTR_SECRET_FILE ].asString();
+                if( strPath.size() )
+                {
+                    ret = access( strPath.c_str(), R_OK );
+                    if( ret == -1 )
+                    {
+                        ret = -errno;
+                        break;
+                    }
+                    m_strSecretPath = strPath;
+                }
+            }
         }
+        if( IsVerifyPeerEnabled(
+            ojc, PORT_CLASS_OPENSSL_FIDO ) )
+            m_bVerifyPeer = true;
 
     }while( 0 );
 
@@ -1806,7 +1850,6 @@ CRpcOpenSSLFidoDrv::CRpcOpenSSLFidoDrv(
     super( pCfg )
 {
     SetClassId( clsid( CRpcOpenSSLFidoDrv ) );
-    LoadSSLSettings();
 }
 
 CRpcOpenSSLFidoDrv::~CRpcOpenSSLFidoDrv()
