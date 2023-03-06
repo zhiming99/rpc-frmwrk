@@ -89,8 +89,11 @@ gint32 CRpcOpenSSLFidoDrv::HandleKeyPasswd()
     gint32 ret = 0;
     char* szPass = m_szPasswd;
     do{
-        if( m_strSecretPath == "1234" )
+        if( m_strSecretPath.empty() )
+        {
+            szPass[ 0 ] = 0;
             break;
+        }
 
         if( m_strSecretPath == "console" )
         {

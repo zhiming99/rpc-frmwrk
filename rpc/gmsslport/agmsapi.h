@@ -196,6 +196,8 @@ typedef enum : int
 
 struct AGMS_CTX : TLS_CTX
 {
+    typedef TLS_CTX super;
+
     std::string certfile;
     std::string keyfile;
     std::string cacertfile;

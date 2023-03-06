@@ -23,6 +23,7 @@
  * =====================================================================================
  */
 #include "jsondef.h"
+extern "C"{
 #include <gmssl/rand.h>
 #include <gmssl/x509.h>
 #include <gmssl/error.h>
@@ -36,10 +37,16 @@
 #include <gmssl/hmac.h>
 #include <gmssl/hkdf.h>
 #include <gmssl/mem.h>
+}
 #include "agmsapi.h"
 #include "gmsfido.h"
 using namespace gmssl;
 
+namespace gmssl{
+extern int init_ctx( AGMS_CTX* ctx, bool is_client );
+}
+
+extern char g_szKeyPass[ SSL_PASS_MAX + 1 ];
 namespace rpcf
 {
 
@@ -102,16 +109,23 @@ gint32 BufToIove( BufPtr& pSrc,
                 }
                 else if( ERROR( ret ) )
                     break;
+
+                ret = pDest->attach(
+                    ( guint8* )pmem,
+                    dwSize, dwStart, dwEnd );
             }
             else
             {
                 pmem = pSrc->ptr();
                 dwSize = pSrc->size();
-                pDest->set_no_free();
+
+                ret = pDest->attach(
+                    ( guint8* )pmem,
+                    dwSize, dwStart, dwEnd );
+                if( SUCCEEDED( ret ) ) 
+                    pDest->set_no_free();
             }
 
-            ret = pDest->attach( ( guint8* )pmem,
-                dwSize, dwStart, dwEnd );
         }
         break;
 
@@ -388,6 +402,7 @@ gint32 CRpcGmSSLFido::PostStart(
 
         // hold the irp and start the handshake
         // task
+        m_pSSL->set_state( STAT_START_HANDSHAKE );
         ret = StartSSLHandshake( pIrp );
         break;
 
@@ -733,7 +748,7 @@ gint32 CRpcGmSSLFido::SendImmediateResp()
                 if( ERROR( ret ) )
                     break;
 
-                dwSize += piove->size();
+                dwSize += pBuf->size();
                 oParams.Push( pBuf );
 
             }while( ( bool )piove );
@@ -802,16 +817,16 @@ gint32 CRpcGmSSLFido::AdvanceHandshakeInternal(
 
         ret = SendImmediateResp();
 
-        if( !ERROR( iRet ) && ERROR( ret ) )
-            iRet = ret;
-
         if( ERROR( iRet ) )
         {
             ret = iRet;
             break;
         }
 
-        if( SUCCEEDED( ret ) )
+        if( ERROR( ret ) )
+            break;
+
+        if( SUCCEEDED( iRet ) )
         {
             // handshake done
             break;
@@ -1499,6 +1514,7 @@ gint32 CRpcGmSSLFido::SubmitIoctlCmd(
 
 CRpcGmSSLFidoDrv::CRpcGmSSLFidoDrv(
     const IConfigDb* pCfg )
+    : super( pCfg )
 {
     SetClassId( clsid( CRpcGmSSLFidoDrv ) );
     m_pGmsCtx = std::move(
@@ -1727,26 +1743,35 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                 // either specifying secret file or prompting password
                 std::string strPath =
                     oParams[ JSON_ATTR_SECRET_FILE ].asString();
-                if( strPath.size() )
+                if( strPath.empty() || strPath == "1234" )
                 {
-                    ret = access( strPath.c_str(), R_OK );
-                    if( ret == -1 )
+                    m_strSecretPath.clear(); 
+                }
+                else
+                {
+                    if( strPath == "console" )
                     {
-                        ret = -errno;
-                        break;
+                        m_strSecretPath = strPath;
                     }
-                    m_strSecretPath = strPath;
+                    else
+                    {
+                        ret = access( strPath.c_str(), R_OK );
+                        if( ret == -1 )
+                        {
+                            ret = -errno;
+                            break;
+                        }
+                        m_strSecretPath = strPath;
+                    }
                 }
             }
+            break;
         }
 
     }while( 0 );
 
     return ret;
 }
-
-extern char g_szCertPass[ SSL_PASS_MAX + 1 ];
-extern int init_ctx( AGMS_CTX* ctx, bool is_client );
 
 gint32 CRpcGmSSLFidoDrv::InitSSLContext()
 {
@@ -1769,12 +1794,12 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
         }
         else if( m_strSecretPath == "console" )
         {
-            if( g_szCertPass[ 0 ] == 0 )
+            if( g_szKeyPass[ 0 ] == 0 )
             {
                 ret = -EACCES;
                 break;
             }
-            ctx->password = g_szCertPass;
+            ctx->password = g_szKeyPass;
         }
         else
         {
@@ -1788,6 +1813,8 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
             char* pszPass = nullptr;
             size_t len = 0;
             ret = getline( &pszPass, &len , fp );
+            fclose( fp );
+            fp = nullptr;
             if( ret == -1 )
             {
                 if( pszPass )
@@ -1795,10 +1822,14 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
                 ret = -errno;
                 break;
             }
+
             stdstr& pass = ctx->password;
             pass = pszPass;
             for( size_t i = 0; i < len; i++ )
                 pszPass[ i ] = ' ';
+            free( pszPass );
+            pszPass = nullptr;
+
             if( pass.size() > SSL_PASS_MAX )
                 ctx->password.erase( SSL_PASS_MAX );
             while( pass.back() == '\n' ||
@@ -1814,11 +1845,17 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
         ctx->keyfile = m_strKeyPath;
         ctx->certfile = m_strCertPath;
         ctx->cacertfile = m_strCAPath; 
-        ret = init_ctx( ctx, dwRole == 1 );
+
+        ret = gmssl::init_ctx( ctx, dwRole == 1 );
+
+        ctx->password.replace(
+            0, std::string::npos,
+            ctx->password.size(), '0' );
+        ctx->password.clear();
 
     }while( 0 );
-    memset( g_szCertPass, 0,
-        sizeof( g_szCertPass ) );
+    memset( g_szKeyPass, 0,
+        sizeof( g_szKeyPass ) );
     return ret;
 }
 

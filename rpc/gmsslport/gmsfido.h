@@ -165,13 +165,9 @@ class CRpcGmSSLFido : public CPort
     // handshake task
     virtual gint32 PostStart( IRP* pIrp );
     virtual gint32 PreStop( IRP* pIrp );
-    virtual gint32 Stop( IRP* pIrp );
 
     inline bool IsClient() const
     { return m_bClient; }
-
-    gint32 CancelFuncIrp(
-        IRP* pIrp, bool bForce );
 
     gint32 DoHandshake( IEventSink* pCallback,
         BufPtr& pHandshake );
@@ -183,10 +179,6 @@ class CRpcGmSSLFido : public CPort
         CfgPtr pCfg, gint32 iIdx,
         guint32 dwTotal, guint32 dwOffset,
         bool bResume );
-
-    gint32 AllocIrpCtxExt(
-        IrpCtxPtr& pIrpCtx,
-        void* pContext ) const;
 
     gint32 SendImmediateResp();
 };

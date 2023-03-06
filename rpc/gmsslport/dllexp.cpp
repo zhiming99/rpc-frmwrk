@@ -48,7 +48,6 @@
 namespace rpcf
 {
 
-// mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
@@ -72,5 +71,11 @@ gint32 DllLoadFactory( FactoryPtr& pFactory )
     if( pFactory.IsEmpty() )
         return -EFAULT;
 
+    return 0;
+}
+
+extern "C"
+gint32 DllUnload()
+{
     return 0;
 }

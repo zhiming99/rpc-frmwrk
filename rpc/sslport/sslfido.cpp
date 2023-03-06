@@ -1824,15 +1824,24 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                 // either specifying secret file or prompting password
                 std::string strPath =
                     oParams[ JSON_ATTR_SECRET_FILE ].asString();
-                if( strPath.size() )
+
+                if( strPath.empty() || strPath == "1234" )
                 {
-                    ret = access( strPath.c_str(), R_OK );
-                    if( ret == -1 )
-                    {
-                        ret = -errno;
-                        break;
-                    }
+                    m_strSecretPath.clear(); 
+                }
+                else
+                {
                     m_strSecretPath = strPath;
+                    if( strPath != "console" )
+                    {
+                        ret = access( strPath.c_str(), R_OK );
+                        if( ret == -1 )
+                        {
+                            ret = -errno;
+                            break;
+                        }
+                        m_strSecretPath = strPath;
+                    }
                 }
             }
         }

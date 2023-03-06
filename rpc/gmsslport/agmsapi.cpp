@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+extern "C"{
 #include <gmssl/rand.h>
 #include <gmssl/x509.h>
 #include <gmssl/error.h>
@@ -42,6 +43,7 @@
 #include <gmssl/hmac.h>
 #include <gmssl/hkdf.h>
 #include <gmssl/mem.h>
+}
 
 #include "rpc.h"
 #include "agmsapi.h"
@@ -574,6 +576,9 @@ int BLKOUT::read( PIOVE& iover )
 size_t BLKOUT::size() const
 { return io_vec.size(); }
 
+AGMS_CTX::AGMS_CTX()
+    : super()
+{}
 void AGMS_CTX::cleanup()  
 {
     TLS_CTX* ctx = this;
@@ -650,10 +655,7 @@ void TLS13_HSCTX_SVR::clear()
         sizeof(client_sign_key));
 }
  
-AGMS::AGMS()
-{}
-
-int AGMS::shutdown()
+int TLS13::shutdown()
 {
     int ret = 0;
 
@@ -703,6 +705,9 @@ int AGMS::shutdown()
 
     return ret;
 }
+
+AGMS::AGMS()
+{}
 
 void AGMS::cleanup()
 {
@@ -1020,7 +1025,7 @@ int TLS13::handshake_cli()
             uint8_t client_random[32];
 
             tls_trace("send ClientHello\n");
-            tls_record_set_protocol(record, TLS_protocol_tls1);
+            tls_record_set_protocol(record, TLS_protocol_tls13);
             rand_bytes(client_random, 32);
             sm2_key_generate(&hctxc.client_ecdhe);
 
@@ -1033,7 +1038,7 @@ int TLS13::handshake_cli()
 
             tls_record_set_handshake_client_hello(
                 record, &recordlen,
-                TLS_protocol_tls12,
+                TLS_protocol_tls13,
                 client_random, NULL, 0,
                 tls13_ciphers, cipher_count,
                 client_exts, client_exts_len);
@@ -1113,6 +1118,7 @@ int TLS13::handshake_cli()
             tls13_cipher_suite_get(
                 this->cipher_suite, &hctxc.digest, &hctxc.cipher);
 
+            recordlen = tls_record_length( record );
             digest_update(&hctxc.dgst_ctx,
                 record + 5, recordlen - 5);
 
@@ -1688,7 +1694,7 @@ int TLS13::handshake_cli()
         }
     default:
         {
-            ret = -EFAULT;
+            ret = ERROR_STATE;
             break;
         }
     }
@@ -1704,41 +1710,41 @@ int TLS13::handshake_cli()
 
 int TLS13::handshake_svr()
 {
-	int ret = 0;
-	uint8_t *record = this->record;
-	size_t recordlen = 0;
-	uint8_t* enced_record = this->enced_record;
-	size_t enced_recordlen = 0;
+    int ret = 0;
+    uint8_t *record = this->record;
+    size_t recordlen = 0;
+    uint8_t* enced_record = this->enced_record;
+    size_t enced_recordlen = 0;
 
     const int* server_ciphers = tls13_ciphers;
 
-	// SM2_KEY server_ecdhe;
-	// SM2_KEY client_sign_key;
+    // SM2_KEY server_ecdhe;
+    // SM2_KEY client_sign_key;
 
-	// const BLOCK_CIPHER *cipher;
-	// const DIGEST *digest;
-	// DIGEST_CTX dgst_ctx;
-	// DIGEST_CTX null_dgst_ctx;
+    // const BLOCK_CIPHER *cipher;
+    // const DIGEST *digest;
+    // DIGEST_CTX dgst_ctx;
+    // DIGEST_CTX null_dgst_ctx;
 
 
-	// uint8_t verify_data[32];
-	// size_t verify_data_len;
+    // uint8_t verify_data[32];
+    // size_t verify_data_len;
 
-	// uint8_t client_write_key[16];
-	// uint8_t server_write_key[16];
+    // uint8_t client_write_key[16];
+    // uint8_t server_write_key[16];
 
-	// uint8_t psk[32] = {0};
-	// uint8_t early_secret[32];
-	// uint8_t handshake_secret[32];
-	// uint8_t client_handshake_traffic_secret[32];
-	// uint8_t server_handshake_traffic_secret[32];
-	// uint8_t client_application_traffic_secret[32];
-	// uint8_t server_application_traffic_secret[32];
-	// uint8_t master_secret[32];
+    // uint8_t psk[32] = {0};
+    // uint8_t early_secret[32];
+    // uint8_t handshake_secret[32];
+    // uint8_t client_handshake_traffic_secret[32];
+    // uint8_t server_handshake_traffic_secret[32];
+    // uint8_t client_application_traffic_secret[32];
+    // uint8_t server_application_traffic_secret[32];
+    // uint8_t master_secret[32];
 
-	int client_verify = 0;
-	if (this->ca_certs_len)
-		client_verify = 1;
+    int client_verify = 0;
+    if (this->ca_certs_len)
+        client_verify = 1;
 
     switch( get_state() )
     {
@@ -1779,7 +1785,7 @@ int TLS13::handshake_svr()
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
-            if (protocol != TLS_protocol_tls12)
+            if (protocol != TLS_protocol_tls13)
             {
                 SEND_ALERT(TLS_alert_protocol_version);
                 break;
@@ -2410,10 +2416,6 @@ int init_ctx( AGMS_CTX* ctx, bool is_client )
         }
 
     }while( 0 );
-
-    ctx->password.replace(
-        0, std::string::npos,
-        ctx->password.size(), '0' );
 
     return ret;
 }

@@ -1685,10 +1685,10 @@ class ConfigDlg(Gtk.Dialog):
 
     def DisplayError( self, text, second_text = None ):
         dialog = Gtk.MessageDialog(
-            self, 0,
-            Gtk.MessageType.ERROR,
-            Gtk.ButtonsType.OK,
-            text )
+            parent=self, flags=0,
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=text )
         if second_text is not None and len( second_text ) > 0 :
             dialog.format_secondary_text( second_text )                     
         dialog.run()
@@ -2174,10 +2174,12 @@ def main() :
                 Gtk.ResponseType.OK,
             )
             response = dialog.run()
-            path = '.'
+            path = None 
             if response == Gtk.ResponseType.OK:
                 path = dialog.get_filename()
             dialog.destroy()
+            if path is None:
+                continue
             win.strCfgPath = path
             win.Export_Files(path, win.bServer)
             continue
