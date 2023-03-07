@@ -79,7 +79,7 @@ PIOVE prec; \
 #define SWITCH_STATE( new_state, rec_len ) \
 { \
     set_state( new_state );\
-    if( prec->size() == enced_recordlen )\
+    if( prec->size() == rec_len )\
     {\
         if( this->read_bio.size() == 0 )\
         {\
@@ -89,7 +89,7 @@ PIOVE prec; \
     }\
     else\
     {\
-        prec->trim_bytes_front( enced_recordlen );\
+        prec->trim_bytes_front( rec_len );\
         this->read_bio.put_back( prec );\
     }\
 }
@@ -1001,6 +1001,9 @@ int TLS13::handshake_cli()
 	uint8_t *enced_record = this->enced_record;
 	size_t enced_recordlen = 0;
 
+	uint8_t *enced_record_in = nullptr;
+	size_t enced_recordlen_in = 0;
+
 	// uint8_t psk[32] = {0};
 	// uint8_t early_secret[32];
 	// uint8_t handshake_secret[32];
@@ -1025,7 +1028,7 @@ int TLS13::handshake_cli()
             uint8_t client_random[32];
 
             tls_trace("send ClientHello\n");
-            tls_record_set_protocol(record, TLS_protocol_tls13);
+            tls_record_set_protocol(record, TLS_protocol_tls12);
             rand_bytes(client_random, 32);
             sm2_key_generate(&hctxc.client_ecdhe);
 
@@ -1038,7 +1041,7 @@ int TLS13::handshake_cli()
 
             tls_record_set_handshake_client_hello(
                 record, &recordlen,
-                TLS_protocol_tls13,
+                TLS_protocol_tls12,
                 client_random, NULL, 0,
                 tls13_ciphers, cipher_count,
                 client_exts, client_exts_len);
@@ -1063,7 +1066,7 @@ int TLS13::handshake_cli()
             // recv ServerHello
             tls_trace("recv ServerHello\n");
             RECV_RECORD( prec,
-                enced_record, enced_recordlen );
+                enced_record_in, enced_recordlen_in );
 
             const uint8_t *server_exts;
             size_t server_exts_len;
@@ -1075,9 +1078,9 @@ int TLS13::handshake_cli()
             uint8_t server_random[32];
 
             tls13_record_trace(stderr,
-                enced_record, enced_recordlen, 0, 0);
+                enced_record_in, enced_recordlen_in, 0, 0);
             if (tls_record_get_handshake_server_hello(
-                enced_record, &protocol, &random,
+                enced_record_in, &protocol, &random,
                 &session_id, &session_id_len,
                 &cipher_suite, &server_exts,
                 &server_exts_len) != 1)
@@ -1123,7 +1126,7 @@ int TLS13::handshake_cli()
                 record + 5, recordlen - 5);
 
             digest_update(&hctxc.dgst_ctx,
-                enced_record + 5, enced_recordlen - 5);
+                enced_record_in + 5, enced_recordlen_in - 5);
 
 
             printf("generate handshake secrets\n");
@@ -1204,7 +1207,7 @@ int TLS13::handshake_cli()
             memset(this->client_seq_num, 0, 8);
 
             SWITCH_STATE(
-                STAT_WAIT_SVR_ENCEXT, enced_recordlen );
+                STAT_WAIT_SVR_ENCEXT, enced_recordlen_in );
             // fall through
         }
     case STAT_WAIT_SVR_ENCEXT:
@@ -1212,13 +1215,13 @@ int TLS13::handshake_cli()
             // recv {EncryptedExtensions}
             tls_trace("recv {EncryptedExtensions}\n");
             RECV_RECORD( prec,
-                enced_record, enced_recordlen );
+                enced_record_in, enced_recordlen_in );
 
             if (tls13_record_decrypt(
                 &this->server_write_key,
                 this->server_write_iv,
                 this->server_seq_num,
-                enced_record, enced_recordlen,
+                enced_record_in, enced_recordlen_in,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);
@@ -1240,7 +1243,7 @@ int TLS13::handshake_cli()
             tls_seq_num_incr(this->server_seq_num);
 
             SWITCH_STATE(
-                STAT_WAIT_SVR_CERT, enced_recordlen );
+                STAT_WAIT_SVR_CERT, enced_recordlen_in );
             // fall through
         }
     case STAT_WAIT_SVR_CERT:
@@ -1266,15 +1269,15 @@ int TLS13::handshake_cli()
                     break;
                 }
 
-                enced_record = prec->begin();
-                enced_recordlen =
-                    tls_record_length( enced_record );
+                enced_record_in = prec->begin();
+                enced_recordlen_in =
+                    tls_record_length( enced_record_in );
 
                 if (tls13_record_decrypt(
                     &this->server_write_key,
                     this->server_write_iv,
                     this->server_seq_num,
-                    enced_record, enced_recordlen,
+                    enced_record_in, enced_recordlen_in,
                     record, &recordlen) != 1)
                 {
                     SEND_ALERT(TLS_alert_bad_record_mac);
@@ -1315,7 +1318,7 @@ int TLS13::handshake_cli()
                         this->server_seq_num);
 
                     hctxc.cert_req_received = true;
-                    if( prec->size() == enced_recordlen )
+                    if( prec->size() == enced_recordlen_in )
                     {
                         if( this->read_bio.size() == 0 )
                         {
@@ -1326,7 +1329,7 @@ int TLS13::handshake_cli()
                     }
                     else
                     {
-                        prec->trim_bytes_front( enced_recordlen );
+                        prec->trim_bytes_front( enced_recordlen_in );
                         this->read_bio.put_back( prec );
                     }
                     // move on to next record
@@ -1408,7 +1411,7 @@ int TLS13::handshake_cli()
             }
 
             SWITCH_STATE( STAT_WAIT_SVR_CERTVERIFY,
-                enced_recordlen );
+                enced_recordlen_in );
             // fall through
         }
     case STAT_WAIT_SVR_CERTVERIFY:
@@ -1416,14 +1419,14 @@ int TLS13::handshake_cli()
             // recv {CertificateVerify}
 
             RECV_RECORD( prec,
-                enced_record, enced_recordlen );
+                enced_record_in, enced_recordlen_in );
 
             tls_trace("recv {CertificateVerify}\n");
             if (tls13_record_decrypt(
                 &this->server_write_key,
                 this->server_write_iv,
                 this->server_seq_num,
-                enced_record, enced_recordlen,
+                enced_record_in, enced_recordlen_in,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);
@@ -1476,13 +1479,13 @@ int TLS13::handshake_cli()
                 hctxc.verify_data,
                 &hctxc.verify_data_len);
 
-            SWITCH_STATE( STAT_WAIT_SVR_FIN, enced_recordlen );
+            SWITCH_STATE( STAT_WAIT_SVR_FIN, enced_recordlen_in );
             // fall through
         }
     case STAT_WAIT_SVR_FIN:
         {
             RECV_RECORD( prec,
-                enced_record, enced_recordlen );
+                enced_record_in, enced_recordlen_in );
             // recv {Finished}
             tls_trace("recv {Finished}\n");
 
@@ -1490,8 +1493,8 @@ int TLS13::handshake_cli()
                 &this->server_write_key,
                 this->server_write_iv,
                 this->server_seq_num,
-                enced_record,
-                enced_recordlen,
+                enced_record_in,
+                enced_recordlen_in,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);
@@ -1716,6 +1719,12 @@ int TLS13::handshake_svr()
     uint8_t* enced_record = this->enced_record;
     size_t enced_recordlen = 0;
 
+    uint8_t* record_in = nullptr;
+    size_t recordlen_in = 0;
+
+    uint8_t* enced_record_in = nullptr;
+    size_t enced_recordlen_in = 0;
+
     const int* server_ciphers = tls13_ciphers;
 
     // SM2_KEY server_ecdhe;
@@ -1752,7 +1761,7 @@ int TLS13::handshake_svr()
         {
             // 1. Recv ClientHello
             tls_trace("recv ClientHello\n");
-            RECV_RECORD( prec, record, recordlen );
+            RECV_RECORD( prec, record_in, recordlen_in );
 
             int protocol;
             const uint8_t *random;
@@ -1775,8 +1784,8 @@ int TLS13::handshake_svr()
 
             SM2_POINT client_ecdhe_public;
 
-            tls13_record_trace(stderr, record, recordlen, 0, 0);
-            if (tls_record_get_handshake_client_hello(record,
+            tls13_record_trace(stderr, record_in, recordlen_in, 0, 0);
+            if (tls_record_get_handshake_client_hello(record_in,
                 &protocol, &random,
                 &session_id, &session_id_len, // 不支持SessionID，不做任何处理
                 &client_ciphers, &client_ciphers_len,
@@ -1785,7 +1794,7 @@ int TLS13::handshake_svr()
                 SEND_ALERT(TLS_alert_unexpected_message);
                 break;
             }
-            if (protocol != TLS_protocol_tls13)
+            if (protocol != TLS_protocol_tls12)
             {
                 SEND_ALERT(TLS_alert_protocol_version);
                 break;
@@ -1816,7 +1825,8 @@ int TLS13::handshake_svr()
             digest_init(&hctxs.dgst_ctx, hctxs.digest);
 
             hctxs.null_dgst_ctx = hctxs.dgst_ctx; // 在密钥导出函数中可能输入的消息为空，因此需要一个空的dgst_ctx，这里不对了，应该在tls13_derive_secret里面直接支持NULL！
-            digest_update(&hctxs.dgst_ctx, record + 5, recordlen - 5);
+            digest_update(&hctxs.dgst_ctx,
+                record_in + 5, recordlen_in - 5);
 
 
             // 2. Send ServerHello
@@ -2115,11 +2125,11 @@ int TLS13::handshake_svr()
 
             if( client_verify )
             {
-                SWITCH_STATE( STAT_WAIT_CLI_CERT, recordlen );
+                SWITCH_STATE( STAT_WAIT_CLI_CERT, recordlen_in );
             }
             else
             {
-                SWITCH_STATE( STAT_WAIT_CLI_FIN, recordlen );
+                SWITCH_STATE( STAT_WAIT_CLI_FIN, recordlen_in );
             }
             break;
         }
@@ -2127,7 +2137,7 @@ int TLS13::handshake_svr()
         {
             // Recv Client {Certificate*}
             tls_trace("recv {Certificate*}\n");
-            RECV_RECORD( prec, enced_record, enced_recordlen );
+            RECV_RECORD( prec, enced_record_in, enced_recordlen_in );
 
             const uint8_t *request_context;
             size_t request_context_len;
@@ -2142,7 +2152,7 @@ int TLS13::handshake_svr()
                 &this->client_write_key,
                 this->client_write_iv,
                 this->client_seq_num,
-                enced_record, enced_recordlen,
+                enced_record_in, enced_recordlen_in,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);
@@ -2202,7 +2212,7 @@ int TLS13::handshake_svr()
             }
 
             SWITCH_STATE(
-                STAT_WAIT_CLI_CERTVERIFY, enced_recordlen );
+                STAT_WAIT_CLI_CERTVERIFY, enced_recordlen_in );
             // fall through
         }
     case STAT_WAIT_CLI_CERTVERIFY:
@@ -2213,12 +2223,12 @@ int TLS13::handshake_svr()
             size_t client_siglen;
 
             tls_trace("recv Client {CertificateVerify*}\n");
-            RECV_RECORD( prec, enced_record, enced_recordlen );
+            RECV_RECORD( prec, enced_record_in, enced_recordlen_in );
             if (tls13_record_decrypt(
                 &this->client_write_key,
                 this->client_write_iv,
                 this->client_seq_num,
-                enced_record, enced_recordlen,
+                enced_record_in, enced_recordlen_in,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);
@@ -2249,14 +2259,14 @@ int TLS13::handshake_svr()
                 record + 5, recordlen - 5);
 
             tls_seq_num_incr(this->client_seq_num);
-            SWITCH_STATE( STAT_WAIT_CLI_FIN, enced_recordlen );
+            SWITCH_STATE( STAT_WAIT_CLI_FIN, enced_recordlen_in );
             // fall through
         }
     case STAT_WAIT_CLI_FIN:
         {
             // 12. Recv Client {Finished}
             tls_trace("recv {Finished}\n");
-            RECV_RECORD( prec, enced_record, enced_recordlen );
+            RECV_RECORD( prec, enced_record_in, enced_recordlen_in );
 
             const uint8_t *client_verify_data;
             size_t client_verify_data_len;
@@ -2265,7 +2275,7 @@ int TLS13::handshake_svr()
                 &this->client_write_key,
                 this->client_write_iv,
                 this->client_seq_num,
-                enced_record, enced_recordlen,
+                enced_record_in, enced_recordlen_in,
                 record, &recordlen) != 1)
             {
                 SEND_ALERT(TLS_alert_bad_record_mac);

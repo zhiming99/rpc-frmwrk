@@ -248,6 +248,7 @@ def LoadConfigFiles( path : str) :
     paths = []
     if path is None:
         curDir = dir_path
+        paths.append( "." )
         paths.append( curDir + "/../../etc/rpcf" )
         paths.append( "/etc/rpcf")
 
