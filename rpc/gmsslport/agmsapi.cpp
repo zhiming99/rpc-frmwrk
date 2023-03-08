@@ -91,6 +91,7 @@ PIOVE prec; \
     {\
         prec->trim_bytes_front( rec_len );\
         this->read_bio.put_back( prec );\
+        ret = RET_PENDING;\
     }\
 }
 
@@ -980,7 +981,7 @@ int TLS13::send( PIOVE& piove )
         tls_seq_num_incr(seq_num);
         cur_blk += datalen;
 
-    }while( true );
+    }
 
     return ret;
 }
@@ -2131,6 +2132,7 @@ int TLS13::handshake_svr()
             {
                 SWITCH_STATE( STAT_WAIT_CLI_FIN, recordlen_in );
             }
+            ret = RET_PENDING;
             break;
         }
     case STAT_WAIT_CLI_CERT:
