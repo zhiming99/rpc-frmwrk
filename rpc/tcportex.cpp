@@ -3632,6 +3632,58 @@ gint32 CRpcNativeProtoFdo::NewStreamId(
     return 0;
 }
 
+gint32 CRpcNativeProtoFdo::OnReceiveBuf(
+    BufPtr& pBuf )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        if( pBuf->GetDataType() == DataTypeMem )
+        {
+            ret = OnReceive( -1, pBuf );
+            break;
+        }
+        else if( unlikely( pBuf->GetDataType() !=
+            DataTypeObjPtr ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ObjPtr pObj = ( ObjPtr& )*pBuf;
+        IConfigDb* pCfg = pObj;
+        if( pCfg == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CParamList oParams( pCfg );
+        gint32 iCount = oParams.GetCount();
+        if( ERROR( iCount ) )
+        {
+            ret = iCount;
+            break;
+        }
+
+        for( gint32 i = 0; i < iCount; i++ )
+        {
+            BufPtr pBuf;
+            ret = oParams.GetBufPtr( i, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = OnReceive( -1, pBuf );
+            if( ERROR( ret ) )
+                break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcNativeProtoFdo::OnReceive(
     gint32 iFd, BufPtr& pBuf )
 {
@@ -4044,8 +4096,8 @@ gint32 CFdoListeningTask::HandleIrpResp(
             }
         case sseRetWithBuf:
             {
-                ret = pPort->OnReceive(
-                    -1, pEvt->m_pInBuf );
+                ret = pPort->OnReceiveBuf(
+                    pEvt->m_pInBuf );
                 pEvt->m_pInBuf.Clear();
                 break;
             }

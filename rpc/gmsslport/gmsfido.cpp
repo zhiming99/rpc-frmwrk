@@ -502,12 +502,8 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpSingle(
         if( ret == STATUS_PENDING )
             break;
 
-        if( ERROR( ret ) )
-        {
-            pIrp->PopCtxStack();
-            pCtx->SetStatus( ret );
-            break;
-        }
+        pIrp->PopCtxStack();
+        pCtx->SetStatus( ret );
 
     }while( 0 );
 
@@ -524,11 +520,13 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpGroup(
     if( vecBufs.empty() )
         return -EINVAL;
 
+    IrpCtxPtr pCtx = pIrp->GetTopStack();
     do{
-        IrpCtxPtr pCtx = pIrp->GetTopStack();
-
         if( vecBufs.empty() )
+        {
+            pCtx->SetStatus( ret );
             break;
+        }
 
         auto elem = vecBufs.front();
         vecBufs.erase( vecBufs.begin() );
@@ -536,14 +534,14 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpGroup(
         BufPtr pBuf( true );
         *pBuf = elem;
 
-        BufPtr pExtBuf;
         if( vecBufs.size() )
         {
+            BufPtr pExtBuf;
             pExtBuf.NewObj();
             *pExtBuf = ObjPtr( pvecBufs );
+            pCtx->SetExtBuf( pExtBuf );
         }
 
-        pCtx->SetExtBuf( pExtBuf );
         PortPtr pLowerPort = GetLowerPort();
         pIrp->AllocNextStack( pLowerPort );
         IrpCtxPtr pTopCtx = 
@@ -555,13 +553,16 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpGroup(
         pTopCtx->SetIoDirection( IRP_DIR_OUT ); 
         pLowerPort->AllocIrpCtxExt( pTopCtx, pIrp );
         ret = pLowerPort->SubmitIrp( pIrp );
-        if( ERROR( ret ) )
-            break;
-
         if( ret == STATUS_PENDING )
             break;
 
         pIrp->PopCtxStack();
+        if( ERROR( ret ) )
+        {
+            pCtx->SetStatus( ret );
+            break;
+        }
+        pCtx->ClearExtBuf();
 
     }while( 1 );
 
@@ -624,32 +625,18 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpIn(
                 if( ERROR( ret ) )
                     break;
             }
+            if( ERROR( ret ) )
+                break;
         }
-        oLock.Unlock();
-        ret = SubmitWriteIrpOut( pIrp );
 
-    }while( 0 );
+        //----------------
 
-    if( ERROR( ret ) )
-        pCtx->SetStatus( ret );
-
-    return ret;
-}
-
-gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
-{
-    gint32 ret = 0;
-    do{
         ObjVecPtr pvecBufs( true );
-
         std::vector< ObjPtr >& vecBufs =
             ( *pvecBufs )();
 
-        CStdRMutex oLock( GetLock() );
-
         guint32 dwSize = 0;
         CfgPtr pBufs( true );
-
         while( m_pSSL->write_bio.size() )
         {
             PIOVE piove;
@@ -666,7 +653,7 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
             if( ERROR( ret ) )
                 break;
 
-            if( dwSize + TLS_MAX_RECORD_SIZE <
+            if( dwSize + pBuf->size() <
                 MAX_BYTES_PER_TRANSFER )
             {
                 dwSize += pBuf->size();
@@ -684,7 +671,6 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
 
         oLock.Unlock();
 
-        IrpCtxPtr pCtx = pIrp->GetTopStack();
         if( ERROR( ret ) )
         {
             pCtx->SetStatus( ret );
@@ -701,7 +687,6 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
         if( vecBufs.empty() )
         {
             IrpCtxPtr pCtx = pIrp->GetTopStack();
-            ret = -ENODATA;
             pCtx->SetStatus( ret );
             break;
         }
@@ -715,6 +700,21 @@ gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
         {
             ret = SubmitWriteIrpGroup( pIrp, pvecBufs );
         }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        pCtx->SetStatus( ret );
+
+    return ret;
+}
+
+gint32 CRpcGmSSLFido::SubmitWriteIrpOut( PIRP pIrp )
+{
+    gint32 ret = 0;
+    do{
+        IrpCtxPtr pCtx = pIrp->GetTopStack();
+        CStdRMutex oLock( GetLock() );
 
     }while( 0 );
 
@@ -1171,10 +1171,11 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
         }
 
         PIOVE piove;
-        BufPtr pRespBuf = psse->m_pInBuf;
+        BufPtr pRespBuf1 = psse->m_pInBuf;
+        psse->m_pInBuf.Clear();
 
         bSSLErr = true;
-        ret = BufToIove( pRespBuf,
+        ret = BufToIove( pRespBuf1,
             piove, false, false );
 
         if( ERROR( ret ) )
@@ -1195,50 +1196,43 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
         oPortLock.Unlock();
 
         SendImmediateResp();
-
         if( ERROR( ret ) )
             break;
 
         if( ret == STATUS_PENDING && iov.empty() )
             break;
 
-        pRespBuf.Clear();
-        pRespBuf.NewObj();
+        BufPtr pBuf;
+        BufPtr pRespBuf;
+        CParamList oResp;
         for( auto& elem : iov )
         {
-            if( pRespBuf->empty() )
-            {
-                ret = IoveToBuf( elem,
-                    pRespBuf, false, true );
-
-                if( ERROR( ret ) )
-                    break;
-
-                continue;
-            }
-            BufPtr pBuf;
             ret = IoveToBuf(
                 elem, pBuf, false, true );
             if( ERROR( ret ) )
                 break;
-
-            ret = pRespBuf->Append(
-                pBuf->ptr(), pBuf->size() );
-
-            if( ERROR( ret ) )
-                break;
+            oResp.Push( pBuf );
         }
 
         if( ERROR( ret ) )
             break;
 
-        pInBuf.Clear();
+        if( oResp.GetCount() == 1 )
+        {
+            pRespBuf = pBuf;
+        }
+        else
+        {
+            pRespBuf.NewObj();
+            *pRespBuf = oResp.GetCfg();
+        }
+
         pInBuf.NewObj();
         pInBuf->Resize(
             sizeof( STREAM_SOCK_EVENT ) );
 
-        psse = ( STREAM_SOCK_EVENT* )
-            pInBuf->ptr();
+        psse = new ( pInBuf->ptr() )
+            STREAM_SOCK_EVENT;
 
         psse->m_iEvent = sseRetWithBuf;
         psse->m_pInBuf = pRespBuf;
@@ -1293,44 +1287,47 @@ gint32 CRpcGmSSLFido::CompleteIoctlIrp(
                 ret = -EBADMSG;
                 pCtx->SetStatus( ret );
             }
-            else
+            else do
             {
                 ret = CompleteListeningIrp( pIrp );
-                while( ret == STATUS_PENDING )
+                if( ret != STATUS_PENDING )
+                    break;
+
+                IrpCtxPtr pCtx =
+                    pIrp->GetTopStack();
+
+                PortPtr pLowerPort = GetLowerPort();
+                ret = pIrp->AllocNextStack(
+                    pLowerPort, IOSTACK_ALLOC_COPY );
+
+                if( ERROR( ret ) )
+                    break;
+
+                IrpCtxPtr pTopCtx =
+                    pIrp->GetTopStack();
+
+                pLowerPort->AllocIrpCtxExt(
+                    pTopCtx, pIrp );
+
+                ret = pLowerPort->SubmitIrp( pIrp );
+                if( ret == STATUS_PENDING )
+                    break;
+
+                if( ERROR( ret ) )
                 {
-                    IrpCtxPtr pCtx =
-                        pIrp->GetTopStack();
-
-                    PortPtr pLowerPort = GetLowerPort();
-                    ret = pIrp->AllocNextStack(
-                        pLowerPort, IOSTACK_ALLOC_COPY );
-
-                    if( ERROR( ret ) )
-                        break;
-
-                    IrpCtxPtr pTopCtx =
-                        pIrp->GetTopStack();
-
-                    pLowerPort->AllocIrpCtxExt(
-                        pTopCtx, pIrp );
-
-                    ret = pLowerPort->SubmitIrp( pIrp );
-                    if( ret == STATUS_PENDING )
-                        break;
-
-                    if( ERROR( ret ) )
-                    {
-                        pIrp->PopCtxStack();
-                        pCtx->SetStatus( ret );
-                        break;
-                    }
+                    pIrp->PopCtxStack();
+                    pCtx->SetStatus( ret );
+                    break;
                 }
-            }
+
+            }while( 1 );
+
             break;
         }
     default:
         {
             ret = pTopCtx->GetStatus();
+            pCtx->SetRespData( pTopCtx->m_pRespData );
             pCtx->SetStatus( ret );
             break;
         }
@@ -1416,9 +1413,7 @@ gint32 CRpcGmSSLFido::CompleteWriteIrp(
         ret = pTopCtx->GetStatus();
         pIrp->PopCtxStack();
         if( ERROR( ret ) )
-        {
             break;
-        }
 
         if( m_pSSL->get_state() != STAT_READY )
         {

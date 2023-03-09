@@ -404,6 +404,8 @@ class CRpcNativeProtoFdo: public CPort
     gint32 OnReceive(
         gint32 iFd, BufPtr& pBuf );
 
+    gint32 OnReceiveBuf( BufPtr& pBuf );
+
     gint32 AllocIrpCtxExt(
         IrpCtxPtr& pIrpCtx,
         void* pContext ) const;

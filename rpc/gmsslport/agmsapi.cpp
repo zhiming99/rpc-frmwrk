@@ -942,7 +942,7 @@ int TLS13::send( PIOVE& piove )
     {
         datalen = std::min(
             ( size_t )( tail_ptr - cur_blk ),
-            ( size_t )TLS_MAX_CIPHERTEXT_SIZE );
+            ( size_t )TLS_MAX_PLAINTEXT_SIZE );
          
         PIOVE prec( new AGMS_IOVE );
         size_t mem_size = datalen + 1 +
