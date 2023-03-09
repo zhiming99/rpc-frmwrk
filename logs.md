@@ -1,4 +1,8 @@
 ---
+[`Thu Mar 09  202302:06:39 PM Beijing`]   
+1. We have almost finished development of GmSSL support, and the GmSSL support can now run as smoothly as OpenSSL does.
+2. Next we may continue to fix some bugs and close the PR.
+
 [`Thu Mar 02 2023 08:58:47 PM Beijing`]   
 1. Suspended investigation of `EchoMany response lost`. It happens outside `rpc-frmwrk`. However, we have found a way to prevent it from happening. It is not a fix, and we will work out a solution to the bug sometime in the future.
 2. Moved on the development of GmSSL support. We can start debugging as soon as we have completed the changes made to `rpcfg.py` and `updatecfg.py`, the GUI config tool.
