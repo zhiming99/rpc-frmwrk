@@ -945,13 +945,6 @@ gint32 CRpcBasePort::CancelAllIrps( gint32 iErrno )
     do{
         CStdRMutex oPortLock( GetLock() );
 
-        guint32 dwPortState = GetPortState();
-        if( dwPortState != PORT_STATE_STOPPING )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
         vector< IrpPtr > vecIrpRemaining;
 
         vector< MatchPtr > vecMatches;
@@ -1939,6 +1932,8 @@ gint32 CRpcPdoPort::SetupDBusSetting(
             if( ERROR( ret ) )
             {
                 // server is not online
+                DebugPrint( ret,
+                    "Checkpoint 51: SetupDBusSetting failed" );
                 break;
             }
             // add the match rule for the signal

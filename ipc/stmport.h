@@ -125,7 +125,7 @@ class CDBusStreamPdo :
     gint32 PreStop( IRP* pIrp ) override;
     gint32 PostStart( IRP* pIrp ) override;
     gint32 OnPortReady( IRP* pIrp ) override;
-    gint32 OnPortStackReady( IRP* pIrp ) override;
+    gint32 HandleSkelReady( IRP* pIrp ); 
 
     gint32 IsIfSvrOnline();
 

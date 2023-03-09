@@ -208,6 +208,8 @@ do{\
 #define G_SOURCE_CONTINUE true
 #define G_SOURCE_REMOVE false
 
+#define SSL_PASS_MAX    32
+
 namespace rpcf
 {
 
@@ -437,6 +439,7 @@ enum EnumEventId : guint32
     eventAsyncWatch,
 
     eventHouseClean,
+    eventCancelInstead,
 
     eventMaxReserved = 0x10000,
     eventUserStart = 0x10001,

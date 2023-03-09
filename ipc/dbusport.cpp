@@ -2382,6 +2382,8 @@ gint32 CDBusBusPort::AddRules(
         if( dbusError.GetName() != nullptr )
         {
             ret = dbusError.Errno();
+            DebugPrint( ret,
+                "Checkpoint 52: AddRules failed" );
             oPortLock.Lock();
             --m_mapRules[ strRules ];
             if( m_mapRules[ strRules ] == 0 )

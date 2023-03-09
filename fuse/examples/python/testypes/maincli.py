@@ -40,16 +40,16 @@ def test() :
         num = sys.argv[2]
 
         reqFile = svcdir + "/jreq_" + num
-        reqfp = open( reqFile, "wb", buffering=0 )
+        reqfp = rpcOpen( reqFile, "wb" )
 
         respFile = svcdir + "/jrsp_" + num
-        respfp = open( respFile, "rb", buffering=0)
+        respfp = rpcOpen( respFile, "rb" )
 
         evtFile = svcdir + "/jevt_" + num
-        evtfp = open( evtFile, "rb", buffering=0)
+        evtfp = rpcOpen( evtFile, "rb" )
 
         stmFile = svcdir + "/streams/stream_" + num
-        stmfp = open( stmFile, "w+b", buffering=0)
+        stmfp = rpcOpen( stmFile, "w+b" )
 
         idx = 1 + int( num ) * 1000
         while True:
@@ -63,7 +63,7 @@ def test() :
             #EchoMany
             req = BuildReqHdr( "EchoMany", idx )
             idx += 1
-            AddParameter(req, "i1", 1 )
+            AddParameter(req, "i1", os.getpid() )
             AddParameter(req, "i2", 2 )
             AddParameter(req, "i3", 3 )
             AddParameter(req, "i4", 4.0 )
@@ -71,6 +71,7 @@ def test() :
             AddParameter(req, "szText", 'Hello, you' )
 
             sendReq( reqfp, req )
+            print( os.getpid(), "EchoMany receiving from", respFile )
             ret = recvResp( respfp )
             if ret[ 0 ] < 0 :
                 error = ret[ 0 ]
@@ -85,7 +86,7 @@ def test() :
             i4r = objResp['Parameters']["i4r"]
             i5r = objResp['Parameters']["i5r"]
             szTextr = objResp['Parameters']["szTextr"]
-            print( "EchoMany response ", i1r, i2r, i3r, i4r, i5r, szTextr )
+            print( os.getpid(), "EchoMany response ", i1r, i2r, i3r, i4r, i5r, szTextr )
 
             # Echo
             req = BuildReqHdr( "Echo", idx )
@@ -101,8 +102,8 @@ def test() :
             error = objResp[ "ReturnCode"]
             if error < 0 :
                 raise Exception( 'Echo failed with error %d@%s' % ( error, num) )
-            print( "Echo completed with response '%s'" %
-                objResp['Parameters']['strResp'])
+            #print( os.getpid(), "Echo completed with response '%s'" %
+            #    objResp['Parameters']['strResp'])
 
             # EchoByteArray
             req = BuildReqHdr( "EchoByteArray", idx )
@@ -132,7 +133,7 @@ def test() :
             res = strBufr.encode()
             binBufr = base64.b64decode(res)
             bufsize = len( binBuf )
-            print( "EchoByteArray ", binBuf[bufsize - 128:bufsize] )
+            print( os.getpid(), "EchoByteArray ", binBuf[bufsize - 128:bufsize] )
 
             # EchoArray
             req = BuildReqHdr( "EchoArray", idx )
@@ -150,7 +151,7 @@ def test() :
                 raise Exception( 'EchoArray failed with error %d@%s' % ( error, num) )
             
             arrIntsR = objResp['Parameters']["arrIntsR"]
-            print( arrIntsR )
+            print( os.getpid(), "EchoArray", arrIntsR )
 
             #EchoMap
             req = BuildReqHdr( "EchoMap", idx )
@@ -167,7 +168,7 @@ def test() :
             if error < 0 :
                 raise Exception( 'EchoMap failed with error %d@%s' % ( error, num) )
             mapResp = objResp['Parameters']["mapResp"]
-            print( mapResp )
+            print( os.getpid(), "EchoMap", mapResp )
 
             #EchoStruct
             req = BuildReqHdr( "EchoStruct", idx )
@@ -191,7 +192,7 @@ def test() :
             if error < 0 :
                 raise Exception( 'EchoStruct failed with error %d@%s' % ( error, num) )
             mapResp = objResp['Parameters']["fir"]
-            print( mapResp )
+            print( os.getpid(), "EchoStruct", mapResp )
             
             #EchoNoParams
             req = BuildReqHdr( "EchoNoParams", idx )
@@ -203,7 +204,7 @@ def test() :
                 raise Exception( 'EchoNoParams recv failed with error %d@%s' % ( error, num) )
             objResp = ret[ 1 ][ 0 ]
             error = objResp[ "ReturnCode"]
-            print( 'EchoNoParams returned with status %d@%s' % ( error, num) )
+            print( os.getpid(), 'EchoNoParams returned with status %d@%s' % ( error, num) )
 
             #EchoStream
             req = BuildReqHdr( "EchoStream", idx )
@@ -223,19 +224,20 @@ def test() :
                 inputs = [stmfp]
                 notifylist = select.select( inputs, [], [] )
                 binBuf = stmfp.read(8*1024)
+            print( os.getpid(), "EchoStream resp=", objResp )
             hstmr = objResp[ 'Parameters']["hstmr"]
             bufsize = len( binBuf )
             print(binBuf[ bufsize - 128 : bufsize ])
-            print( 'EchoStream %s completed with %s' % ( num, hstmr ))
+            print( os.getpid(), 'EchoStream %s completed with %s' % ( num, hstmr ))
             break
-
+        
         reqfp.close()
         respfp.close()
         evtfp.close()
         stmfp.close()
         
     except Exception as err:
-        print( "error is", err )
+        print( os.getpid(), "error is", err )
         print( "usage: maincli.py <service path> <req num>")
         print( "\t<service path> is /'path to mountpoint'/connection_X/TestTypesSvc")
         print( "\t<req num> is the suffix of the req file under <service path>" )

@@ -63,6 +63,9 @@ static size_t fuseif_buf_size(const fuse_bufvec *bufv)
 static void fuseif_rwinterrupt(
     fuse_req_t req, void *d_)
 {
+    if( d_ == nullptr )
+        return;
+
     fuseif_intr_data *d =
         ( fuseif_intr_data* )d_;
     fuse *f = rpcf::GetFuse();
@@ -146,7 +149,15 @@ void fuseif_prepare_interrupt(
 void fuseif_free_buf(struct fuse_bufvec *buf)
 {      
     free(buf);
-}     
+}
+
+static stdmutex s_oFuseLock;
+
+void fuseif_reply_err( fuse_req_t req, int err )
+{
+    CStdMutex oLock( s_oFuseLock );
+    fuse_reply_err( req, err );
+}
 
 void fuseif_complete_read(
     fuse* pFuse,
@@ -154,11 +165,14 @@ void fuseif_complete_read(
     gint32 ret,
     fuse_bufvec* buf )
 {
+    CStdMutex oLock( s_oFuseLock );
     if( SUCCEEDED( ret ) )
     {
         if( buf != nullptr )
+        {
             fuse_reply_data( req,
-                buf, FUSE_BUF_SPLICE_MOVE);
+                buf, FUSE_BUF_SPLICE_MOVE );
+        }
         else
             fuse_reply_err( req, 0 );
     }
@@ -166,6 +180,7 @@ void fuseif_complete_read(
     {
         fuse_reply_err( req, -ret );
     }
+    oLock.Unlock();
     if( buf != nullptr )
         fuseif_free_buf( buf );
 }
@@ -194,7 +209,6 @@ void fuseif_ll_read(fuse_req_t req,
         fuseif_finish_interrupt( pFuse, req, d );
         if( d != nullptr )
             free( d );
-
         fuseif_complete_read(
             pFuse, req, ret, buf );
 

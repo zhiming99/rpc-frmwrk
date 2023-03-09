@@ -757,13 +757,6 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             break;
 
         ret = HandleSendReq( pIrp );
-        if( ERROR( ret ) )
-            break;
-
-        if( ret != STATUS_PENDING )
-        {
-            ret = ERROR_FAIL;
-        }
 
     }while( 0 );
 

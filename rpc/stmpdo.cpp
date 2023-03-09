@@ -981,10 +981,9 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                     string strVal =
                         oParams[ JSON_ATTR_ENABLE_SSL ].asString();
                     if( strVal == "true" )
-                    {
                         oElemCfg.SetBoolProp( propEnableSSL, true );
-                    }
                 }
+
                 if( oParams.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
                     oParams[ JSON_ATTR_ENABLE_WEBSOCKET ].isString() )
                 {

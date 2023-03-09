@@ -3632,6 +3632,58 @@ gint32 CRpcNativeProtoFdo::NewStreamId(
     return 0;
 }
 
+gint32 CRpcNativeProtoFdo::OnReceiveBuf(
+    BufPtr& pBuf )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        if( pBuf->GetDataType() == DataTypeMem )
+        {
+            ret = OnReceive( -1, pBuf );
+            break;
+        }
+        else if( unlikely( pBuf->GetDataType() !=
+            DataTypeObjPtr ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ObjPtr pObj = ( ObjPtr& )*pBuf;
+        IConfigDb* pCfg = pObj;
+        if( pCfg == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CParamList oParams( pCfg );
+        gint32 iCount = oParams.GetCount();
+        if( ERROR( iCount ) )
+        {
+            ret = iCount;
+            break;
+        }
+
+        for( gint32 i = 0; i < iCount; i++ )
+        {
+            BufPtr pBuf;
+            ret = oParams.GetBufPtr( i, pBuf );
+            if( ERROR( ret ) )
+                break;
+
+            ret = OnReceive( -1, pBuf );
+            if( ERROR( ret ) )
+                break;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcNativeProtoFdo::OnReceive(
     gint32 iFd, BufPtr& pBuf )
 {
@@ -4044,8 +4096,8 @@ gint32 CFdoListeningTask::HandleIrpResp(
             }
         case sseRetWithBuf:
             {
-                ret = pPort->OnReceive(
-                    -1, pEvt->m_pInBuf );
+                ret = pPort->OnReceiveBuf(
+                    pEvt->m_pInBuf );
                 pEvt->m_pInBuf.Clear();
                 break;
             }
@@ -4055,11 +4107,12 @@ gint32 CFdoListeningTask::HandleIrpResp(
                 if( ret == -ENOTCONN ||
                     ERROR( ret ) )
                 {
+                    ret = ERROR_PORT_STOPPED;
+                    pPort->CancelAllIrps( ret );
                     IPort* pdo =
                         pPort->GetBottomPort();
                     FireRmtSvrEvent(
                         pdo, eventRmtSvrOffline );
-                    ret = ERROR_PORT_STOPPED;
                 }
                 break;
             }
@@ -4307,6 +4360,116 @@ gint32 CRpcNatProtoFdoDrv::Probe(
             break;
 
     }while( 0 );
+
+    return ret;
+}
+
+gint32 SendWriteReq( CPort* pPort,
+    IEventSink* pCallback, BufPtr& pBuf )
+{
+    if( pCallback == nullptr ||
+        pPort == nullptr ||
+        pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    CCfgOpenerObj oTaskCfg( pCallback );
+    guint32 dwTimeoutSec = 0;
+
+    gint32 ret = oTaskCfg.GetIntProp(
+        propTimeoutSec, dwTimeoutSec );
+
+    IrpPtr pIrp( true );
+    PortPtr pLowerPort = pPort->GetLowerPort();
+    if( pLowerPort.IsEmpty() )
+        return -EINVAL;
+
+    pIrp->AllocNextStack( pLowerPort );
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+
+    pCtx->SetMajorCmd( IRP_MJ_FUNC );
+    pCtx->SetMinorCmd( IRP_MN_WRITE );
+    pCtx->SetIoDirection( IRP_DIR_OUT );
+    pCtx->SetReqData( pBuf );
+    pIrp->SetCallback(
+        ObjPtr( pCallback ), 0 );
+
+    pLowerPort->AllocIrpCtxExt(
+        pCtx, ( PIRP )pIrp );
+
+    CIoManager* pMgr = pPort->GetIoMgr();
+    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
+        pIrp->SetTimer( dwTimeoutSec, pMgr );
+
+    CParamList oParams;
+    oParams.Push( pBuf );
+    BufPtr pReqBuf( true );
+    *pReqBuf = ObjPtr( oParams.GetCfg() );
+
+    ret = pMgr->SubmitIrpInternal(
+        pLowerPort, pIrp, false );
+
+    if( ret != STATUS_PENDING )
+        pIrp->RemoveTimer();
+
+    return ret;
+}
+
+gint32 SendListenReq( CPort* pPort,
+    IEventSink* pCallback, BufPtr& pBuf )
+{
+    if( pCallback == nullptr || pPort == nullptr )
+        return -EINVAL;
+
+    CCfgOpenerObj oTaskCfg( pCallback );
+    guint32 dwTimeoutSec = 0;
+    gint32 ret = oTaskCfg.GetIntProp(
+        propTimeoutSec, dwTimeoutSec );
+
+    IrpPtr pIrp( true );
+    PortPtr pLowerPort = pPort->GetLowerPort();
+    pIrp->AllocNextStack( pLowerPort );
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+
+    pCtx->SetMajorCmd( IRP_MJ_FUNC );
+    pCtx->SetMinorCmd( IRP_MN_IOCTL );
+    pCtx->SetCtrlCode( CTRLCODE_LISTENING );
+    pCtx->SetIoDirection( IRP_DIR_IN );
+    pIrp->SetCallback(
+        ObjPtr( pCallback ), 0 );
+
+    pLowerPort->AllocIrpCtxExt(
+        pCtx, ( PIRP )pIrp );
+
+    CIoManager* pMgr = pPort->GetIoMgr();
+    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
+        pIrp->SetTimer( dwTimeoutSec, pMgr );
+
+    ret = pMgr->SubmitIrpInternal(
+        pLowerPort, pIrp, false );
+
+    if( ret != STATUS_PENDING )
+        pIrp->RemoveTimer();
+
+    if( SUCCEEDED( ret ) )
+    {
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pBuf = pCtx->m_pRespData;
+        if( pBuf.IsEmpty() || pBuf->empty() )
+            return -EFAULT;
+
+        STREAM_SOCK_EVENT* psse = 
+            ( STREAM_SOCK_EVENT* ) pBuf->ptr();
+
+        if( psse->m_iEvent == sseRetWithBuf )
+        {
+            pBuf = psse->m_pInBuf;
+            psse->m_pInBuf.Clear();
+            return 0;
+        }
+
+        if( psse->m_iEvent == sseError )
+            return psse->m_iData;
+    }
 
     return ret;
 }

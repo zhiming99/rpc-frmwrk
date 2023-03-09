@@ -1038,7 +1038,7 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
         ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
+            clsid( CIfParallelTaskGrp ),
             oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -1835,11 +1835,8 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                     // this task to send back the
                     // response when the start is
                     // done.
-                    DEFER_CALL( pMgr, ObjPtr( pIf ),
-                        &CInterfaceServer::StopEx,
-                        pDummyTask );
-
-                    ret = iRetVal;
+                    ret = this->StopIfSafe(
+                        m_pServer, iRetVal );
                 }
             }
             else
@@ -1908,11 +1905,9 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                     if( ERROR( ret ) )
                         break;
 
-                    DEFER_CALL( pMgr, ObjPtr( pIf ),
-                        &CInterfaceProxy::StopEx,
-                        pDummyTask );
-
-                    ret = iRetVal;
+                    ret = this->StopIfSafe(
+                        m_pProxy, iRetVal );
+                    break;
                 }
             }
         }
@@ -3991,7 +3986,7 @@ gint32 CRpcRouterReqFwdr::OnPreStopLongWait(
     oParams[ propIfPtr ] = ObjPtr( this );
     TaskGrpPtr pTaskGrp;
     ret = pTaskGrp.NewObj(
-        clsid( CIfTaskGroup ),
+        clsid( CIfParallelTaskGrp ),
         oParams.GetCfg() );
     if( ERROR( ret ) )
         return ret;

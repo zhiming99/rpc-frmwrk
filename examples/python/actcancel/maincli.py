@@ -68,7 +68,8 @@ def maincli() :
                 else:
                     print( "CancelRequest failed with error " + str( ret ) )
 
-            
+        oProxy = None            
+    oContext = None
     return ret
     
 ret = maincli()

@@ -136,9 +136,9 @@ class CPortDriver : public IPortDriver
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
 
-    gint32 Start();
+    gint32 Start() override;
 
-    gint32 Stop();
+    gint32 Stop() override;
 
     guint32 GetDrvType() const
     { return ( m_dwFlags & ~DRV_TYPE_MASK ); }
@@ -166,7 +166,7 @@ class CGenBusDriver : public IBusDriver
 
     // the Start() method will create the non-pnp bus
     // ports from the configs
-    gint32 Start();
+    gint32 Start() override;
 
     gint32 NewBusId()
     { return m_atmBusId++; }

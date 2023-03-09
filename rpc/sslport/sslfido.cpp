@@ -1158,107 +1158,15 @@ gint32 CRpcOpenSSLFido::CompleteWriteIrp(
 gint32 CRpcOpenSSLFido::SendWriteReq(
     IEventSink* pCallback, BufPtr& pBuf )
 {
-    if( pCallback == nullptr ||
-        pBuf.IsEmpty() || pBuf->empty() )
-        return -EINVAL;
-
-    CCfgOpenerObj oTaskCfg( pCallback );
-    guint32 dwTimeoutSec = 0;
-
-    gint32 ret = oTaskCfg.GetIntProp(
-        propTimeoutSec, dwTimeoutSec );
-
-    IrpPtr pIrp( true );
-    PortPtr pLowerPort = GetLowerPort();
-    pIrp->AllocNextStack( pLowerPort );
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-
-    pCtx->SetMajorCmd( IRP_MJ_FUNC );
-    pCtx->SetMinorCmd( IRP_MN_WRITE );
-    pCtx->SetIoDirection( IRP_DIR_OUT );
-    pCtx->SetReqData( pBuf );
-    pIrp->SetCallback(
-        ObjPtr( pCallback ), 0 );
-
-    pLowerPort->AllocIrpCtxExt(
-        pCtx, ( PIRP )pIrp );
-
-    CIoManager* pMgr = GetIoMgr();
-    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
-        pIrp->SetTimer( dwTimeoutSec, pMgr );
-
-    CParamList oParams;
-    oParams.Push( pBuf );
-    BufPtr pReqBuf( true );
-    *pReqBuf = ObjPtr( oParams.GetCfg() );
-
-    ret = GetIoMgr()->SubmitIrpInternal(
-        pLowerPort, pIrp, false );
-
-    if( ret != STATUS_PENDING )
-        pIrp->RemoveTimer();
-
-    return ret;
+    return rpcf::SendWriteReq(
+        this, pCallback, pBuf );
 }
 
 gint32 CRpcOpenSSLFido::SendListenReq(
     IEventSink* pCallback, BufPtr& pBuf )
 {
-    if( pCallback == nullptr )
-        return -EINVAL;
-
-    CCfgOpenerObj oTaskCfg( pCallback );
-    guint32 dwTimeoutSec = 0;
-    gint32 ret = oTaskCfg.GetIntProp(
-        propTimeoutSec, dwTimeoutSec );
-
-    IrpPtr pIrp( true );
-    PortPtr pLowerPort = GetLowerPort();
-    pIrp->AllocNextStack( pLowerPort );
-    IrpCtxPtr& pCtx = pIrp->GetTopStack();
-
-    pCtx->SetMajorCmd( IRP_MJ_FUNC );
-    pCtx->SetMinorCmd( IRP_MN_IOCTL );
-    pCtx->SetCtrlCode( CTRLCODE_LISTENING );
-    pCtx->SetIoDirection( IRP_DIR_IN );
-    pIrp->SetCallback(
-        ObjPtr( pCallback ), 0 );
-
-    pLowerPort->AllocIrpCtxExt(
-        pCtx, ( PIRP )pIrp );
-
-    CIoManager* pMgr = GetIoMgr();
-    if( dwTimeoutSec > 0 && dwTimeoutSec < 7200 )
-        pIrp->SetTimer( dwTimeoutSec, pMgr );
-
-    ret = pMgr->SubmitIrpInternal(
-        pLowerPort, pIrp, false );
-
-    if( ret != STATUS_PENDING )
-        pIrp->RemoveTimer();
-
-    if( SUCCEEDED( ret ) )
-    {
-        IrpCtxPtr& pCtx = pIrp->GetTopStack();
-        pBuf = pCtx->m_pRespData;
-        if( pBuf.IsEmpty() || pBuf->empty() )
-            return -EFAULT;
-
-        STREAM_SOCK_EVENT* psse = 
-            ( STREAM_SOCK_EVENT* ) pBuf->ptr();
-
-        if( psse->m_iEvent == sseRetWithBuf )
-        {
-            pBuf = psse->m_pInBuf;
-            psse->m_pInBuf.Clear();
-            return 0;
-        }
-
-        if( psse->m_iEvent == sseError )
-            return psse->m_iData;
-    }
-
-    return ret;
+    return rpcf::SendListenReq(
+        this, pCallback, pBuf );
 }
 
 gint32 CRpcOpenSSLFido::AdvanceHandshake(
@@ -1707,6 +1615,14 @@ gint32 CRpcOpenSSLFido::AllocIrpCtxExt(
     return ret;
 }
 
+gint32 CRpcOpenSSLFidoDrv::Start()
+{
+    gint32 ret = LoadSSLSettings();
+    if( ERROR( ret ) )
+        return ret;
+    return super::Start();
+}
+
 gint32 CRpcOpenSSLFidoDrv::Probe(
     IPort* pLowerPort,
     PortPtr& pNewPort,
@@ -1811,6 +1727,10 @@ gint32 CRpcOpenSSLFidoDrv::Probe(
     return ret;
 }
 
+extern bool IsVerifyPeerEnabled(
+    const Json::Value& oValue,
+    const stdstr& strPortClass );
+
 gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
 {
     CIoManager* pMgr = GetIoMgr();
@@ -1878,7 +1798,56 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                 }
                 m_strKeyPath = strKeyFile;
             }
+
+            // certificate file path
+            if( oParams.isMember( JSON_ATTR_CACERT ) &&
+                oParams[ JSON_ATTR_CACERT ].isString() )
+            {
+                std::string strCAFile =
+                    oParams[ JSON_ATTR_CACERT ].asString();
+                if( strCAFile.size() )
+                {
+                    ret = access( strCAFile.c_str(), R_OK );
+                    if( ret == -1 )
+                    {
+                        ret = -errno;
+                        break;
+                    }
+                    m_strCAFile = strCAFile;
+                }
+            }
+
+            // secret file path
+            if( oParams.isMember( JSON_ATTR_SECRET_FILE ) &&
+                oParams[ JSON_ATTR_SECRET_FILE ].isString() )
+            {
+                // either specifying secret file or prompting password
+                std::string strPath =
+                    oParams[ JSON_ATTR_SECRET_FILE ].asString();
+
+                if( strPath.empty() || strPath == "1234" )
+                {
+                    m_strSecretPath.clear(); 
+                }
+                else
+                {
+                    m_strSecretPath = strPath;
+                    if( strPath != "console" )
+                    {
+                        ret = access( strPath.c_str(), R_OK );
+                        if( ret == -1 )
+                        {
+                            ret = -errno;
+                            break;
+                        }
+                        m_strSecretPath = strPath;
+                    }
+                }
+            }
         }
+        if( IsVerifyPeerEnabled(
+            ojc, PORT_CLASS_OPENSSL_FIDO ) )
+            m_bVerifyPeer = true;
 
     }while( 0 );
 
@@ -1890,7 +1859,6 @@ CRpcOpenSSLFidoDrv::CRpcOpenSSLFidoDrv(
     super( pCfg )
 {
     SetClassId( clsid( CRpcOpenSSLFidoDrv ) );
-    LoadSSLSettings();
 }
 
 CRpcOpenSSLFidoDrv::~CRpcOpenSSLFidoDrv()

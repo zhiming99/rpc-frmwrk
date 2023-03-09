@@ -3036,13 +3036,21 @@ gint32 CImplPyMainFunc::OutputCli(
         INDENT_UPL;
         Wa( "ret = 0" );
         Wa( "oContext = PyRpcContext( 'PyRpcProxy' )" );
-        CCOUT << "with oContext :";
+        CCOUT << "with oContext as ctx:";
         INDENT_UPL;
+        CCOUT << "if ctx.status < 0:";
+        INDENT_UPL;
+        Wa( "ret = ctx.status" );
+        Wa( "print( os.getpid(), \"error start PyRpcContext %d\" % ret );" );
+        CCOUT << "return ret";
+        INDENT_DOWNL;
+        NEW_LINE;
+
         Wa( "print( \"start to work here...\" )" );
         Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
         CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
-        CCOUT << "oProxy = C" << strName << "Proxy( oContext.pIoMgr,";
+        CCOUT << "oProxy = C" << strName << "Proxy( ctx.pIoMgr,";
         NEW_LINE;
         CCOUT << "    strPath_, '" << strName << "' )" ;
         NEW_LINE;
@@ -3162,12 +3170,14 @@ gint32 CImplPyMainFunc::OutputCli(
         }while( 0 );
 
         Wa( "'''" );
-        INDENT_DOWN;
         INDENT_DOWNL;
+        CCOUT << "oProxy = None";
+        INDENT_DOWNL;
+        Wa( "oContext = None" );
         Wa( "return ret" );
         INDENT_DOWNL;
         Wa( "ret = maincli()" );
-        Wa( "quit( ret )" );
+        Wa( "quit( -ret )" );
 
     }while( 0 );
 
@@ -3182,18 +3192,36 @@ gint32 CImplPyMainFunc::OutputSvr(
         stdstr strName = pSvc->GetName();
         Wa("import os" );
         CCOUT << "import time";
+        NEW_LINE;
+        CCOUT << "import signal";
         NEW_LINES( 2 );
+
+        Wa( "bExit = False" );
+        Wa( "def SigHandler( signum, frame ):" );
+        Wa( "    global bExit" );
+        Wa( "    bExit = True" );
+
+        NEW_LINE;
+
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
         Wa( "ret = 0" );
+        Wa( "signal.signal( signal.SIGINT, SigHandler)" );
         Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
-        CCOUT << "with oContext :";
+        CCOUT << "with oContext as ctx:";
         INDENT_UPL;
+        CCOUT << "if ctx.status < 0:";
+        INDENT_UPL;
+        Wa( "ret = ctx.status" );
+        Wa( "print( os.getpid(), \"error start PyRpcContext %d\" % ret );" );
+        CCOUT << "return ret";
+        INDENT_DOWNL;
+        NEW_LINE;
         Wa( "print( \"start to work here...\" )" );
         Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
         CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
-        CCOUT << "oServer = C" << strName << "Server( oContext.pIoMgr,";
+        CCOUT << "oServer = C" << strName << "Server( ctx.pIoMgr,";
         NEW_LINE;
         CCOUT << "    strPath_, '" << strName << "' )" ;
         NEW_LINE;
@@ -3208,16 +3236,22 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "snippet for your own purpose" );
         Wa( "'''" );
 
+        Wa( "global bExit" );
         Wa( "while ( cpp.stateConnected ==" );
         Wa( "    oServer.oInst.GetState() ):" );
         Wa( "    time.sleep( 1 )" );
-        INDENT_DOWN;
+        Wa( "    if bExit:" );
+        CCOUT << "        break";
         INDENT_DOWNL;
+        Wa( "print( \"Server loop ended...\" )" );
+        CCOUT << "oServer = None";
+        INDENT_DOWNL;
+        Wa( "oContext = None" );
         Wa( "return ret" );
         INDENT_DOWNL;
 
         Wa( "ret = mainsvr()" );
-        Wa( "quit( ret )" );
+        Wa( "quit( -ret )" );
 
     }while( 0 );
 

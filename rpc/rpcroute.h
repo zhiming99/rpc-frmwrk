@@ -1839,6 +1839,7 @@ class CReqFwdrOpenRmtPortTask
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
     gint32 OnCancel( guint32 dwContext );
+    gint32 StopIfSafe( InterfPtr& pIf, gint32 iRet );
 };
 /**
 * @name CRouterOpenBdgePortTask

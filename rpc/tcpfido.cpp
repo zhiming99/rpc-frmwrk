@@ -1187,13 +1187,6 @@ gint32 CRpcTcpFido::HandleSendData(
         if( ERROR( ret ) )
             break;
 
-        if( SUCCEEDED( ret ) )
-        {
-            // immediate return
-            DebugPrint( ret, "CRpcTcpFido: "
-                "HandleSendData checkpoint c" );
-        }
-
     }while( 0 );
 
     return ret;
@@ -1659,6 +1652,14 @@ gint32 CTcpFidoListenTask::Process(
 
     }while( 1 );
 
+    if( ret == ERROR_PORT_STOPPED )
+    {
+        CRpcTcpFido* pPort = nullptr;
+        oParams.GetPointer( propPortPtr, pPort );
+        pPort->CancelAllIrps(
+            ERROR_PORT_STOPPED );
+    }
+ 
     if( ret != STATUS_PENDING &&
         ret != STATUS_MORE_PROCESS_NEEDED )
     {

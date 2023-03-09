@@ -109,7 +109,7 @@ gint32 EmitBuildJsonReq2(
     CCOUT << "qwReqId = pCallback->GetObjId();";
     BLOCK_CLOSE;
     NEW_LINE;
-    Wa( "Json::Value oJsReq( objectValue );" );
+    Wa( "Json::Value oJsReq( Json::objectValue );" );
     Wa( "if( SUCCEEDED( iRet ) &&" );
     Wa( "    !oJsParams.empty() &&" );
     Wa( "    oJsParams.isObject() )" );
@@ -146,6 +146,7 @@ gint32 EmitBuildJsonReq2(
     NEW_LINE;
     Wa( "Json::StreamWriterBuilder oBuilder;" );
     Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
+    Wa( "oBuilder[\"indentation\"] = \"\";" );
     CCOUT <<  "strReq = Json::writeString( "
         << "oBuilder, oJsReq );";
     BLOCK_CLOSE;
@@ -283,7 +284,7 @@ gint32 CDeclInterfProxyFuse2::Output()
         INDENT_DOWNL;
         Wa( "virtual gint32 OnReqComplete( IEventSink*," );
         Wa( "    IConfigDb* pReqCtx, Json::Value& val_," );
-        Wa( "    const stdstr&, const stdstr&, gint32, bool ) = 0;" );
+        Wa( "    const std::string&, const std::string&, gint32, bool ) = 0;" );
         NEW_LINE;
         Wa( "const EnumClsid GetIid() const override" );
         CCOUT << "{ return iid( " << strName << " ); }";
@@ -716,8 +717,8 @@ gint32 CDeclServiceImplFuse2::Output()
             Wa( "    IEventSink* pCallback," );
             Wa( "    IConfigDb* pReqCtx," );
             Wa( "    Json::Value& valResp," );
-            Wa( "    const stdstr& strIfName," );
-            Wa( "    const stdstr& strMethod," );
+            Wa( "    const std::string& strIfName," );
+            Wa( "    const std::string& strMethod," );
             Wa( "    gint32 iRet, bool ) override;" );
             NEW_LINE;
 
@@ -1138,7 +1139,7 @@ gint32 CImplIfMethodSvrFuse2::OutputAsyncSerial()
             NEW_LINE;
         }
 
-        Wa( "Json::Value val_( objectValue );" );
+        Wa( "Json::Value val_( Json::objectValue );" );
         if( dwInCount > 0 )
         {
             ret = GenDeserialArgs(
@@ -1681,7 +1682,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "    propReturnValue, ( guint32& )iRet );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
-            Wa( "Json::Value oJsResp( objectValue );" );
+            Wa( "Json::Value oJsResp( Json::objectValue );" );
             Wa( "oJsResp[ JSON_ATTR_IFNAME1 ] =" );
             Wa( "    \"IInterfaceServer\";" );
             Wa( "oJsResp[ JSON_ATTR_METHOD ] =" );
@@ -1696,6 +1697,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "oJsResp[ JSON_ATTR_PARAMS ] = oParams;" );
             Wa( "Json::StreamWriterBuilder oBuilder;" );
             Wa( "oBuilder[\"commentStyle\"] = \"None\";" );
+            Wa( "oBuilder[\"indentation\"] = \"\";" );
             CCOUT <<  "stdstr strResp = Json::writeString( "
                 << "oBuilder, oJsResp );";
             NEW_LINE;
@@ -1789,7 +1791,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
             Wa( "if( !bNoReply )" );
-            Wa( "    this->ReceiveMsgJson( strReq, qwReqId );" );
+            Wa( "    ret = this->ReceiveMsgJson( strReq, qwReqId );" );
             CCOUT << "this->RemoveReq( qwReqId );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
@@ -1927,7 +1929,7 @@ gint32 CImplServiceImplFuse2::OutputROSSkel()
             Wa( "if( ERROR( ret ) ) break;" );
             
             NEW_LINE;
-            Wa( "Json::Value val_( objectValue );" );
+            Wa( "Json::Value val_( Json::objectValue );" );
             Wa( "stdstr strCtxId;" );
             Wa( "ret = GetSvrCtxId( pTask, strCtxId );" );
             Wa( "if( ERROR( ret ) )" );
@@ -2097,8 +2099,8 @@ gint32 CImplIufProxyFuse2::OutputOnReqComplete()
         Wa( "    IEventSink* pCallback," );
         Wa( "    IConfigDb* pReqCtx," );
         Wa( "    Json::Value& val_," );
-        Wa( "    const stdstr& strIfName," );
-        Wa( "    const stdstr& strMethod," );
+        Wa( "    const std::string& strIfName," );
+        Wa( "    const std::string& strMethod," );
         Wa( "    gint32 iRet," );
         Wa( "    bool bNoReply )" );
         BLOCK_OPEN;

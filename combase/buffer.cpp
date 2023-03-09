@@ -1099,5 +1099,64 @@ gint32 CBuffer::Decompress(
     return 0;
 }
 
+void CBuffer::Expose( char*& pMem,
+    guint32& dwSize,
+    guint32& dwOffset,
+    guint32& dwTailOff )
+{
+    pMem = m_pData;
+    dwSize = m_dwSize;
+    dwOffset = m_dwOffset;
+    dwTailOff = m_dwTailOff;
+    return;
+}
+
+gint32 CBuffer::Detach( char*& pMem,
+    guint32& dwSize,
+    guint32& dwOffset,
+    guint32& dwTailOff )
+{
+    if( GetDataType() != DataTypeMem )
+        return -EINVAL;
+    if( m_pData == m_arrBuf )
+        return -EACCES;
+
+    Expose( pMem, dwSize,
+        dwOffset, dwTailOff );
+
+    // new ( this )CBuffer( 0 );
+    pMem = m_pData;
+    dwSize = m_dwSize;
+    m_pData = m_arrBuf;
+    m_dwSize = 0;
+
+    SetDataType( DataTypeMem );
+    SetExDataType( typeNone );
+    return 0;
+}
+
+gint32 CBuffer::Attach( char* pMem,
+    guint32 dwSize,
+    guint32 dwOffset,
+    guint32 dwTailOff )
+{
+    if( pMem == nullptr )
+        return -EINVAL;
+
+    //using Append instead
+    if( dwSize < sizeof( m_arrBuf ) )
+        return -EACCES;
+
+    Resize( 0 );
+    // new ( this )CBuffer( pMem , dwSize, false );
+    m_pData = pMem;
+    m_dwSize = dwSize;
+
+    SetOffset( dwOffset );
+    SetTailOff( dwTailOff );
+    SetDataType( DataTypeMem );
+    SetExDataType( typeByteArr );
+    return 0;
+}
 
 }

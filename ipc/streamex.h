@@ -892,7 +892,7 @@ struct CStreamSyncBase :
             if( itr == m_mapStmWorkers.end() )
                 break;
 
-            m_mapStmWorkers.erase( hChannel );
+            m_mapStmWorkers.erase( itr );
 
         }while( 0 );
 

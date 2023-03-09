@@ -1,4 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
+// ridlc -O . ../../iftest.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -7,7 +8,7 @@ using namespace rpcf;
 #include "IfTestsvr.h"
 
 // IEchoThings Server
-/* Sync Req */
+/* Sync Req Handler*/
 gint32 CIfTest_SvrImpl::Echo(
     GlobalFeatureList& i0 /*[ In ]*/,
     GlobalFeatureList& i0r /*[ Out ]*/ )

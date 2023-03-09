@@ -334,7 +334,7 @@ namespace cpp
                         break;
                 }
                 PyObject* pRetObj = sipConvertFromNewType(
-                    ppObj, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                    ppObj, sipType_cpp_ObjPtr, Py_None );
                 if( pRetObj == nullptr )
                 {
                     ret = -ENOMEM;
@@ -707,7 +707,7 @@ namespace cpp
             sipRes = sipCpp->Push( *a0 );
         %End
 
-        cpp::CfgPtr* GetCfg();
+        cpp::CfgPtr* GetCfg()/TransferBack/;
         %MethodCode
         cpp::CfgPtr* pCfg;
         pCfg = new cpp::CfgPtr(
@@ -717,7 +717,7 @@ namespace cpp
         sipRes = pCfg;
         %End
 
-        cpp::ObjPtr* GetCfgAsObj();
+        cpp::ObjPtr* GetCfgAsObj()/TransferBack/;
         %MethodCode
         cpp::IConfigDb* pCfg = 
             sipCpp->GetCfg();
@@ -737,7 +737,7 @@ namespace cpp
 
     cpp::ObjPtr* CreateObject(
         guint32 iClsid,
-        cpp::IConfigDb* pCfg );
+        cpp::IConfigDb* pCfg )/TransferBack/;
     %MethodCode
     cpp::ObjPtr* pObj =
         new cpp::ObjPtr( nullptr, false );
@@ -772,7 +772,7 @@ namespace cpp
     %End
 
     cpp::BufPtr* CastToBuf(
-        cpp::ObjPtr* pObj );
+        cpp::ObjPtr* pObj )/TransferBack/;
     %MethodCode
     cpp::BufPtr *pBuf = new cpp::BufPtr(
         nullptr, false );

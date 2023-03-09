@@ -31,6 +31,7 @@ import inspect
 import types
 import platform
 import pickle
+import os
 from enum import IntEnum
 from typing import Union, Tuple, Optional
 
@@ -195,6 +196,7 @@ class PyRpcContext :
 
     def __init__( self, strModName= "PyRpcProxy" ) :
         self.strModName = strModName
+        self.status = 0
 
     def Start( self, strModName="PyRpcProxy" ) :
         ret = 0
@@ -202,23 +204,32 @@ class PyRpcContext :
         self.pIoMgr = self.CreateIoMgr( strModName )
         if self.pIoMgr is not None :
             ret = self.StartIoMgr( self.pIoMgr )
-            if ret > 0 :
+            if ret < 0 :
                 self.StopIoMgr( self.pIoMgr )
             else :
                 ret = LoadPyFactory( self.pIoMgr )
+            self.status = ret
+        else:
+            ret = -errno.EFAULT
         return ret
 
     def Stop( self ) :
         print( "exiting..." )
         if self.pIoMgr is not None :
             self.StopIoMgr( self.pIoMgr )
-        return self.DestroyRpcCtx()
+            self.pIoMgr = None
 
     def __enter__( self ) :
         self.Start( self.strModName )
+        return self;
 
     def __exit__( self, type, val, traceback ) :
+        if self.status < 0:
+            print( os.getpid(), "__exit__():",
+                type, val, traceback,
+                self.status )
         self.Stop()
+        self.DestroyRpcCtx()
 
 class PyRpcServices :
     def GetError( self ) :
@@ -236,9 +247,9 @@ class PyRpcServices :
 
         if ret < 0 :
             if isServer :
-                print( "Failed start server..." )
+                print( "Failed to start server %d(%d)" % ( os.getpid(), ret ) )
             else :
-                print( "Failed start proxy..." )
+                print( "Failed to start proxy %d(%d)" % ( os.getpid(), ret ) )
             return ret
         else :
             if isServer :
@@ -247,17 +258,21 @@ class PyRpcServices :
                 print( "Proxy started..." )
 
         oCheck = self.oInst.GetPyHost()
-        return 0
+        return ret
 
     def Stop( self ) :
+        ret = self.oInst.Stop()
         self.oInst.RemovePyHost()
-        return self.oInst.Stop()
+        return ret
 
     def __enter__( self ) :
         self.Start()
 
     def __exit__( self, type, val, traceback ) :
         self.Stop()
+        self.oInst = None
+        self.oObj = None
+        self.pIoMgr = None
 
     def TimerCallback( self, callback, context )->None :
         sig =signature( callback )

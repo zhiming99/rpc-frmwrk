@@ -46,6 +46,7 @@ void fuseif_prepare_interrupt(
     fuseif_intr_data *d);
 
 void fuseif_free_buf(struct fuse_bufvec *buf);
+void fuseif_reply_err( fuse_req_t req, int err );
 
 void fuseif_complete_read(
     fuse* pFuse,
@@ -1990,7 +1991,7 @@ gint32 CFuseStmFile::OnReadStreamComplete(
                 auto req = elem.req;
                 fuseif_finish_interrupt( GetFuse(),
                     req, elem.pintr.get() );
-                fuse_reply_err( req, -iRet );
+                fuseif_reply_err( req, -iRet );
                 m_queReqs.pop_front();
             }
             break;
@@ -2439,7 +2440,7 @@ gint32 CFuseStmFile::fs_write_buf(
 
         if( pIf->GetState() != stateConnected )
         {
-            ret = -ENOTCONN;
+            ret = ERROR_STATE;
             break;
         }
 
@@ -2654,7 +2655,7 @@ gint32 CFuseFileEntry::CancelFsRequest(
         auto req = itr->req;
         fuseif_finish_interrupt(
                 GetFuse(), req, d );
-        fuse_reply_err( req, -iRet );
+        fuseif_reply_err( req, -iRet );
         m_queReqs.erase( itr );
         return STATUS_SUCCESS;
     }
@@ -2672,7 +2673,7 @@ gint32 CFuseFileEntry::CancelFsRequests(
         fuseif_finish_interrupt( GetFuse(),
             elem.req, 
             elem.pintr.get() );
-        fuse_reply_err( elem.req, -iRet );
+        fuseif_reply_err( elem.req, -iRet );
     }
     m_queReqs.clear();
 
@@ -2704,9 +2705,10 @@ gint32 CFuseEvtFile::fs_read(
             break;
 
         CFuseMutex oFileLock( GetLock() );
+        bool bNonBlock = IsNonBlock();
         if( m_queReqs.size() )
         {
-            if( IsNonBlock() )
+            if( bNonBlock )
                 break;
 
             m_queReqs.push_back(
@@ -2716,35 +2718,28 @@ gint32 CFuseEvtFile::fs_read(
         }
 
         guint32 dwAvail = GetBytesAvail();
+
         if( dwAvail == 0 )
         {
             size = 0;
             break;
         }
-        else if( dwAvail >= size )
-        {
-            FillBufVec( size,
-                m_queIncoming,
-                vecBackup, bufvec );
-            m_dwBytesAvail -= size;
-        }
-        else if( IsNonBlock() )
-        {
-            m_dwMsgRead += m_queIncoming.size();
+
+        if( bNonBlock && size > dwAvail )
             size = dwAvail;
-            if( m_dwLastOff > off )
-            {
-                DebugPrint( off-m_dwLastOff,
-                    "alert, trying to read old data" );
-            }
-            else
-            {
-                m_dwLastOff = off + size;
-            }
-            FillBufVec( size,
-                m_queIncoming,
+
+        if( dwAvail >= size )
+        {
+            gint32 iRet = FillBufVec(
+                size, m_queIncoming,
                 vecBackup, bufvec );
+
+            if( size == 0 ||
+                iRet == STATUS_PENDING)
+                break;
+
             m_dwBytesAvail -= size;
+            m_dwLastOff = off + size;
         }
         else
         {
@@ -2787,9 +2782,9 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             fuse_notify_poll( ph );
             SetPollHandle( nullptr );
         }
-#ifdef DEBUG
+//#ifdef DEBUG
         m_strLastMsg = strMsg.substr( 0, 100 );
-#endif
+//#endif
         ++m_dwMsgCount;
         size_t dwAvail = GetBytesAvail();
         while( m_queReqs.size() > 0 && dwAvail > 0 )
@@ -2804,8 +2799,6 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
             size_t dwToRead =
                 std::min( dwAvail, dwReqSize );
 
-            DebugPrint( dwToRead,
-                "completing queued read request" );
             std::vector< BufPtr > vecRemoved;
             FillBufVec(
                 dwToRead, m_queIncoming,
@@ -2813,14 +2806,10 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 
             fuseif_finish_interrupt(
                     GetFuse(), req, d );
-            if( dwToRead > 0 )
-            {
-                fuse_reply_data( req, bufvec,
-                    FUSE_BUF_SPLICE_MOVE );
-            }
-            else
-                fuse_reply_err( req, 0 );
-            fuseif_free_buf( bufvec );
+
+            fuseif_complete_read(
+                GetFuse(), req, ret, bufvec );
+
             m_queReqs.pop_front();
             dwAvail -= dwToRead;
         }
@@ -3232,8 +3221,7 @@ gint32 CFuseEvtFile::GetReqSize(
             }
             pReqSize->Append(
                 elem->ptr(), dwCopy );
-            elem->SetOffset(
-                elem->offset() + dwCopy );
+            elem->IncOffset( dwCopy );
             dwCopy = 0;
             break;
         }
@@ -3333,7 +3321,6 @@ gint32 CFuseRespFileSvr::fs_write_buf(
         return -EFAULT;
 
     CFuseMutex oFileLock( GetLock() );
-
     ret = CopyFromBufVec(
             m_vecOutBufs, bufvec );
     if( ERROR( ret ) )
@@ -3413,8 +3400,7 @@ gint32 CFuseRespFileSvr::fs_write_buf(
             BufPtr pBuf = NewBufNoAlloc(
                 elem->ptr(), dwToAdd, true );
             vecBufs.push_back( pBuf );
-            elem->SetOffset(
-                elem->offset() + dwToAdd );
+            elem->IncOffset( dwToAdd );
             dwToAdd = 0;
             break;
         }
@@ -3519,19 +3505,19 @@ gint32 CFuseRespFileSvr::fs_write_buf(
 
         // must release lock here, otherwise, deadlock
         // could happen
+        ++m_dwMsgCount;
         oFileLock.Unlock();
 
         // send the response
-        m_dwMsgCount++;
         CFuseSvcServer* pSvr = ObjPtr( GetIf() );
         ret = pSvr->DispatchMsg( valResp );
         if( ret == STATUS_PENDING )
             ret = 0;
 
         oFileLock.Lock();
-
         if( ERROR( ret ) )
             break;
+
         if( m_vecOutBufs.empty() )
             break;
 
@@ -3617,6 +3603,7 @@ gint32 CFuseRespFileProxy::CancelFsRequests(
         {
             Json::StreamWriterBuilder oBuilder;
             oBuilder["commentStyle"] = "None";
+            oBuilder["indentation"] = "";
 
             for( auto& elem : vecReqs )
             {
@@ -3746,8 +3733,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             BufPtr pBuf = NewBufNoAlloc(
                 elem->ptr(), dwToAdd, true );
             vecBufs.push_back( pBuf );
-            elem->SetOffset(
-                elem->offset() + dwToAdd );
+            elem->IncOffset( dwToAdd );
             dwToAdd = 0;
             break;
         }
@@ -3786,9 +3772,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
         // must release lock here, otherwise, deadlock
         // could happen
-        oFileLock.Unlock();
-
-        m_dwMsgCount++;
+        ++m_dwMsgCount;
 
         if( !valReq.isMember( JSON_ATTR_REQCTXID ) ||
             !valReq[ JSON_ATTR_REQCTXID ].isUInt64() )
@@ -3797,6 +3781,7 @@ gint32 CFuseReqFileProxy::fs_write_buf(
             break;
         }
 
+        oFileLock.Unlock();
         guint64 qwReqId =
             valReq[ JSON_ATTR_REQCTXID ].asUInt64();
 
@@ -3806,17 +3791,18 @@ gint32 CFuseReqFileProxy::fs_write_buf(
         ret = pProxy->DispatchReq(
             nullptr, valReq, valResp );
 
-        Json::StreamWriterBuilder oBuilder;
-        oBuilder["commentStyle"] = "None";
-        stdstr strResp =
-            Json::writeString( oBuilder, valResp );
-
         if( ret == STATUS_PENDING )
         {
             ret = 0;
         }
         else
         {
+            Json::StreamWriterBuilder oBuilder;
+            oBuilder["commentStyle"] = "None";
+            oBuilder["indentation"] = "";
+            stdstr strResp =
+                Json::writeString( oBuilder, valResp );
+
             pProxy->RemoveReqGrp( qwReqId );
             // append the response to the resp file
             gint32 (*func)( CFuseSvcProxy*,
@@ -3846,10 +3832,10 @@ gint32 CFuseReqFileProxy::fs_write_buf(
 
             TaskletPtr pTask;
             CIoManager* pMgr = pProxy->GetIoMgr();
-            ret = NEW_FUNCCALL_TASK( pTask,
+            gint32 iRet = NEW_FUNCCALL_TASK( pTask,
                 pMgr, func, pProxy, qwReqId,
                 GetGroupId(), strResp );
-            if( SUCCEEDED( ret ) )
+            if( SUCCEEDED( iRet ) )
                 pMgr->RescheduleTask( pTask );
         }
 
@@ -4022,8 +4008,10 @@ gint32 CFuseConnDir::AddSvcDir(
         oConn[ propClsid ] =
              clsid( CDBusProxyPdo );
 
-        if( super::GetCount() <= 3 )
+        if( super::GetCount() < 3 )
         {
+            // the first svc point directory, and the
+            // other two is 'conn_params' and 'nexthop'
             SetConnParams( oConn.GetCfg() );
         }
         else if( !IsEqualConn( oConn.GetCfg() ) )
@@ -4348,7 +4336,10 @@ gint32 CFuseSvcProxy::ReceiveMsgJson(
         GRP_ELEM ge;
         ret = GetGroup( dwGrpId, ge );
         if( ERROR( ret ) )
+        {
+            RemoveReqGrp( qwReqId );
             break;
+        }
 
         oLock.Unlock();
         auto pRespFile = ge.m_pRespFile;
@@ -4370,10 +4361,10 @@ void CFuseSvcProxy::AddReqFiles(
     guint32 dwGrpId = 0;
     if( !( strSuffix.size() == 1 &&
         strSuffix.front() == '0' ) )
-        dwGrpId = GetGroupId();
+        dwGrpId = NewGroupId();
+
     stdstr strName = "jreq_";
     strName += strSuffix;
-
     auto pFile = DIR_SPTR(
         new CFuseReqFileProxy( strName, this ) ); 
     pObj = dynamic_cast< CFuseObjBase* >
@@ -4414,6 +4405,17 @@ void CFuseSvcProxy::AddReqFiles(
     AddGroup( dwGrpId,
         { pReqFile, pRespFile, pEvtFile } );
     m_pSvcDir->AddChild( pFile );
+
+    if( m_pSvcDir->GetParent() == nullptr )
+        return;
+
+    stdstr strPath;
+    gint32 ret = this->GetSvcPath( strPath );
+    if( SUCCEEDED( ret ) )
+    {
+        fuse_invalidate_path(
+            GetFuse(), strPath.c_str() );
+    }
 }
 
 gint32 CFuseSvcProxy::DoRmtModEventFuse(
@@ -4536,7 +4538,7 @@ void CFuseSvcServer::AddReqFiles(
     guint32 dwGrpId = 0;
     if( !( strSuffix.size() == 1 &&
         strSuffix.front() == '0' ) )
-        dwGrpId = GetGroupId();
+        dwGrpId = NewGroupId();
 
     stdstr strName = "jreq_";
     strName += strSuffix;
@@ -4568,6 +4570,16 @@ void CFuseSvcServer::AddReqFiles(
     AddGroup( dwGrpId, 
         { pReqFile, pRespFile } );
     m_pSvcDir->AddChild( pFile );
+    if( m_pSvcDir->GetParent() == nullptr )
+        return;
+
+    stdstr strPath;
+    gint32 ret = this->GetSvcPath( strPath );
+    if( SUCCEEDED( ret ) )
+    {
+        fuse_invalidate_path(
+            GetFuse(), strPath.c_str() );
+    }
 }
 
 gint32 CFuseSvcServer::IncStmCount(
@@ -4871,7 +4883,7 @@ static gint32 fuseif_create_req(
         CFuseSvcServer* pSvr = ObjPtr( pSvc );
         if( pSvc->GetState() != stateConnected )
         {
-            ret = -ENOTCONN;
+            ret = ERROR_STATE;
             break;
         }
         DIR_SPTR pSvcEnt = nullptr;
@@ -4898,7 +4910,7 @@ static gint32 fuseif_create_req(
         else
             pSvr->AddReqFiles( strSuffix );
 
-        auto pEnt = _pSvcDir->GetChild( strName );
+        auto pEnt = pSvcDir->GetChild( strName );
         if( pEnt == nullptr )
         {
             ret = -EFAULT;
@@ -4911,6 +4923,7 @@ static gint32 fuseif_create_req(
         fi->fh = ( guint64 )pReqFile;
         fi->direct_io = 1;
         fi->keep_cache = 0;
+        fi->nonseekable = 1;
 
     }while( 0 );
 
@@ -4937,7 +4950,7 @@ static gint32 fuseif_create_stream(
 
         if( pIf->GetState() != stateConnected )
         {
-            ret = -ENOTCONN;
+            ret = ERROR_STATE;
             break;
         }
 
@@ -5047,8 +5060,12 @@ static gint32 fuseif_create_stream(
                 ( CFuseObjBase* )pStmFile;
             fi->direct_io = 1;
             fi->keep_cache = 0;
+            fi->nonseekable = 1;
             pStmFile->IncOpCount();
             pDir->AddChild( pEnt );
+
+            fuse_invalidate_path(
+                GetFuse(), strPath.c_str() );
         }
 
     }while( 0 );
@@ -5214,7 +5231,7 @@ void* fuseop_init(
    fuse_conn_info *conn,
    fuse_config *cfg )
 {
-    UNREFERENCED( conn );
+    conn->max_readahead = 0;
 
     cfg->entry_timeout = -1;
     cfg->attr_timeout = -1;

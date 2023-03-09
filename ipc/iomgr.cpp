@@ -1228,7 +1228,9 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
                         break;
 
                     CRpcServices* pIf = GetSyncIf();
-                    pIf->Start();
+                    ret = pIf->Start();
+                    if( ERROR( ret ) )
+                        break;
 
                     // notified we can start.  the
                     // sem will be posted after
@@ -1252,6 +1254,7 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
             default:
                 break;
             }
+            break;
         }
     case eventWorkitemCancel:
         {
@@ -1260,6 +1263,7 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
             default:
                 break;
             }
+            break;
         }
     case eventTimeout:
         {
@@ -1275,6 +1279,7 @@ gint32 CIoManager::OnEvent( EnumEventId iEvent,
             default:
                 break;
             }
+            break;
         }
     default:
         break;
@@ -1413,15 +1418,26 @@ gint32 CIoManager::Start()
         CCfgOpener a;
         a.SetPointer( propIoMgr, this );
 
-        ScheduleTaskMainLoop(
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
             clsid( CIoMgrPostStartTask ),
             a.GetCfg() );
 
+        if( ERROR( ret ) )
+            break;
+
+        ret = RescheduleTaskMainLoop( pTask );
+        if( ERROR( ret ) )
+            break;
+
         // let's enter the main loop. The whole
         // system begin to run.
-        GetMainIoLoop()->Start();
+        ret = GetMainIoLoop()->Start();
+        if( ERROR( ret ) )
+            break;
 
-        sem_wait( GetSyncSem() );
+        Sem_Wait( GetSyncSem() );
+        ret = pTask->GetError();
 
     }while( 0 );
 
@@ -2126,6 +2142,9 @@ gint32 CIoManager::GetRouterName(
 gint32 CIoManager::AddSeqTask(
     TaskletPtr& pTask, bool bLong )
 {
+    if( IsStopping() )
+        return ERROR_STATE;
+
     CRpcServices* pIf = GetSyncIf();
     if( pIf == nullptr )
         return -EFAULT;
@@ -2191,13 +2210,17 @@ gint32 CIoMgrPostStartTask::operator()(
     guint32 dwContext )
 {
     gint32 ret = 0;
-    if( GetConfig().IsEmpty() )
-        return SetError( -EFAULT );
-
     ObjPtr pObj;
-    CCfgOpenerObj oCfg( this );
     CIoManager* pMgr = nullptr;
     do{
+        IConfigDb* pCfg = GetConfig();
+        if( pCfg == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CCfgOpener oCfg( pCfg );
+
         ret = oCfg.GetPointer( propIoMgr, pMgr );
         if( ERROR( ret ) )
             break;
@@ -2206,15 +2229,68 @@ gint32 CIoMgrPostStartTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        pMgr->OnEvent( eventWorkitem,
-            eventStart, 0, nullptr );
+        ret = pMgr->OnEvent( eventWorkitem,
+            eventStart, 0, ( LONGWORD* )this );
 
     }while( 0 );
+
+    SetError( ret );
 
     if( pMgr )
         Sem_Post( pMgr->GetSyncSem() );
 
-    return SetError( ret );
+    return ret;
+}
+
+gint32 CSimpleSyncIf::OnPreStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        gint32 (*func)( IEventSink* pCb ) =
+        ([]( IEventSink* pCb )->gint32
+        {
+            if( pCb == nullptr )
+                return -EFAULT;
+            pCb->OnEvent( eventTaskComp, 0, 0, nullptr );
+            return 0;
+        });
+        CIoManager* pMgr = GetIoMgr();
+        TaskletPtr pTailTask;
+        ret = NEW_FUNCCALL_TASK( pTailTask,
+            pMgr, func, pCallback );
+        if( ERROR( ret ) )
+            break;
+        ret = AddSeqTask( pTailTask );
+        if( ERROR( ret ) )
+        {
+            ( *pTailTask )( eventCancelTask );
+            break;
+        }
+        if( SUCCEEDED( ret ) )
+            ret = pTailTask->GetError();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CSimpleSyncIf::Stop()
+{ return CRpcInterfaceBase::Stop(); }
+
+gint32 CSimpleSyncIf::OnPostStop(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    CStdRMutex oLock( GetLock() );
+    ret = super::OnPostStop( pCallback );
+    if( !m_pSeqTasks.IsEmpty() )
+    {
+        CCfgOpenerObj oCfg(
+            ( IEventSink* )m_pSeqTasks );
+        oCfg.RemoveProperty( propIoMgr );
+    }
+    return ret;
 }
 
 }

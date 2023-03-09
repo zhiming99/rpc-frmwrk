@@ -1234,7 +1234,15 @@ gint32 CIfOpenPortTask::OnIrpComplete(
                 {
                     hPort = ( HANDLE& )*pCtx->m_pRespData;
                 }
-                pIf->OnPortEvent( iEvent, hPort );
+                if( hPort != INVALID_HANDLE )
+                {
+                    pIf->OnPortEvent( iEvent, hPort );
+                }
+                else
+                {
+                    pIf->SetStateOnEvent(
+                        eventPortStartFailed );
+                }
             }
             else 
             {
@@ -1425,7 +1433,7 @@ gint32 CIfTaskGroup::RunTask()
     gint32 ret = RunTaskInternal( eventZero );
 
     if( ret == ERROR_CANCEL_INSTEAD )
-        ret = OnCancel( eventCancelTask );
+        ret = OnCancel( eventCancelInstead );
 
     return ret;
 }
@@ -1704,6 +1712,10 @@ gint32 CIfTaskGroup::OnCancel(
         if( iState == stateStarting )
             SetTaskState( stateStarted );
 
+        if( dwContext == eventCancelInstead &&
+            m_vecRetVals.size() )
+            ret = m_vecRetVals.back();
+
         TaskletPtr pPrevTask;
         while( !m_queTasks.empty() )
         {
@@ -1742,14 +1754,6 @@ gint32 CIfTaskGroup::OnCancel(
             pPrevTask = pTask;
         }
 
-        gint32 iRet = -ECANCELED;
-        for( gint32 i : m_vecRetVals )
-        {
-            if( i == -ECANCELED )
-                break;
-            iRet = i;
-        }
-        ret = iRet;
         break;
 
     }while( 1 );
@@ -5768,6 +5772,26 @@ gint32 CTaskWrapper::TransferParams()
     return ret;
 }
 
+gint32 CTaskWrapper::SetCompleteTask(
+    IEventSink* pTask )
+{
+    if( pTask == nullptr )
+        m_pTask.Clear();
+    else
+        m_pTask = ObjPtr( pTask );
+    return 0;
+}
+
+gint32 CTaskWrapper::SetMajorTask(
+    IEventSink* pTask )
+{
+    if( pTask == nullptr )
+        m_pMajor.Clear();
+    else
+        m_pMajor = ObjPtr( pTask );
+    return 0;
+}
+
 gint32 CTaskWrapper::RunTask()
 {
     if( m_pMajor.IsEmpty() )
@@ -5784,7 +5808,15 @@ gint32 CTaskWrapper::OnTaskComplete(
     super::OnTaskComplete( iRet );
     CIfRetryTask* pTask = m_pTask;
     if( pTask != nullptr )
-        ( *pTask )( eventZero );
+    {
+        if( m_bNoParams )
+            ( *pTask )( eventZero );
+        else
+        {
+            pTask->OnEvent( eventTaskComp,
+                iRet, 0, nullptr );
+        }
+    }
     return iRet;
 }
 
@@ -5804,6 +5836,24 @@ gint32 CTaskWrapper::OnCancel(
     if( !m_pMajor.IsEmpty() )
         ( *m_pMajor )( eventCancelTask );
     return super::OnCancel( dwContext );
+}
+
+gint32 CTaskWrapper::OnIrpComplete(
+    PIRP pIrp )
+{
+    CIfRetryTask* pTask = m_pTask;
+    if( pTask != nullptr )
+    {
+        if( m_bNoParams )
+            ( *pTask )( eventZero );
+        else
+        {
+            gint32 iRet = pIrp->GetStatus();
+            pTask->OnEvent( eventIrpComp,
+                iRet, 0, ( LONGWORD* )pIrp );
+        }
+    }
+    return 0;
 }
 
 }

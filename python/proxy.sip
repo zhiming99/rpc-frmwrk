@@ -477,7 +477,7 @@ class CPythonInterfBase : public T
                             break;
 
                         PyObject* pObj = sipConvertFromNewType(
-                            val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                            val,sipType_cpp_ObjPtr, Py_None );
 
                         if( pObj == nullptr )
                         {
@@ -929,14 +929,14 @@ class CPythonInterfBase : public T
             ObjPtr* pArgs = new ObjPtr( pParams );
 
             pPyCb = sipConvertFromNewType(
-                pCb, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                pCb, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyCb == nullptr ) )
             {
                 ret = -ENOMEM;
                 break;
             }
             pPyParams = sipConvertFromNewType(
-                pArgs, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                pArgs, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyParams == nullptr ) ) 
             {           
                 ret = -ENOMEM;
@@ -1655,6 +1655,7 @@ gint32 CPythonProxyImpl::AsyncCallVector(
         CopyUserOptions( pTask, pOptions );
 
         std::string strMethod( strcMethod );
+        bool bNoReply = false;
         if( !pOptions.IsEmpty() )
         {
             bool bSysMethod = false;
@@ -1668,10 +1669,22 @@ gint32 CPythonProxyImpl::AsyncCallVector(
                 strMethod = SYS_METHOD( strMethod );
             else
                 strMethod = USER_METHOD( strMethod );
+
+            ret = oOptions.GetBoolProp(
+                propNoReply, bNoReply );
+            if( ERROR( ret ) )
+            {
+                bNoReply = false;
+                ret = 0;
+            }
         }
+
 
         ret = this->SendProxyReq( pTask, false,
              strMethod, vecParams, qwIoTaskId ); 
+
+        if( SUCCEEDED( ret ) && !bNoReply )
+            ret = STATUS_PENDING;
 
         if( ret == STATUS_PENDING ) 
         {
@@ -2263,7 +2276,7 @@ class CPythonProxy :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
-            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+            ppBuf, sipType_cpp_BufPtr, Py_None );
 
         if( pPyBufBak == nullptr )
         {
@@ -2325,7 +2338,7 @@ class CPythonProxy :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         sipRes = sipBuildResult(0,"(iRN)",
-            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,SIP_NULLPTR);
+            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,Py_None);
 
         break;
 
@@ -2398,7 +2411,7 @@ class CPythonProxy :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
-            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+            ppBuf, sipType_cpp_BufPtr, Py_None );
         if( unlikely( pPyBufBak == nullptr ) )
         {
             ret = -ENOMEM;
@@ -2520,7 +2533,7 @@ cpp::ObjPtr CreateProxy(
     cpp::ObjPtr& pMgr,
     const std::string& strDesc,
     const std::string& strObjName,
-    cpp::ObjPtr& pCfgObj );
+    cpp::ObjPtr& pCfgObj )/TransferBack/;
 %MethodCode
     gint32 ret = 0;
     do{

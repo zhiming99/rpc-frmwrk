@@ -222,6 +222,11 @@ gint32 CDBusStreamPdo::SubmitIoctlCmd(
                 ret = HandleSendReq( pIrp );
                 break;
             }
+        case CTRLCODE_SKEL_READY:
+            {
+                ret = HandleSkelReady( pIrp );
+                break;
+            }
         default:
             {
                 ret = super::SubmitIoctlCmd( pIrp );
@@ -1116,10 +1121,8 @@ gint32 CDBusStreamPdo::PreStop(
                 }
             }
 
+            SetPreStopStep( pIrp, 1 );
             if( ret == STATUS_SUCCESS )
-                ret = pStopCb->GetError();
-
-            if( ret == STATUS_PENDING )
             {
                 ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
@@ -1128,7 +1131,6 @@ gint32 CDBusStreamPdo::PreStop(
             if( !pStopCb.IsEmpty() )
                 ( *pStopCb )( eventCancelTask );
 
-            SetPreStopStep( pIrp, 1 );
             break;
         }
 
@@ -1180,7 +1182,12 @@ gint32 CDBusStreamPdo::PostStart(
             hstm, nullptr, pRespCb );
 
         if( ret == STATUS_PENDING )
+        {
+            // startstream has a new timer
+            // and this irp's timer can retire.
+            pIrp->RemoveTimer();
             break;
+        }
 
         if( SUCCEEDED( ret ) )
             SetStream( hstm );
@@ -1252,7 +1259,7 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
     return ret;
 }
 
-gint32 CDBusStreamPdo::OnPortStackReady(
+gint32 CDBusStreamPdo::HandleSkelReady(
     IRP* pIrp )
 {
     if( pIrp == nullptr ||
@@ -1334,7 +1341,9 @@ CDBusStreamBusPort::CDBusStreamBusPort(
 {
     gint32 ret = 0;
     do{
-        SetClassId( clsid( CDBusStreamBusPort ) );
+        SetClassId( clsid(
+            CDBusStreamBusPort ) );
+
         CCfgOpener oCfg( pCfg );
         ret = oCfg.GetBoolProp(
             propIsServer, m_bServer );
@@ -1345,7 +1354,8 @@ CDBusStreamBusPort::CDBusStreamBusPort(
     if( ERROR( ret ) )
     {
         throw std::runtime_error( 
-            DebugMsg( ret, "Error occurs in ctor "
+            DebugMsg( ret,
+                "Error occurs in ctor "
                 "of CDBusStreamBusPort" ) );
     }
 }
@@ -1398,23 +1408,36 @@ gint32 CDBusStreamBusPort::PostStart(
         if( ERROR( ret ) )
             break;
 
+        // remove the timer as the StartEx has its
+        // own timer, we don't need many timers.
+        pIrp->RemoveTimer();
+
         CRpcServices* pSvc = pIf;
         if( IsServer() )
         {
-            ret = pSvc->Start();
-            if( SUCCEEDED( ret ) )
+            CCfgOpener oReqCtx;
+            oReqCtx.SetPointer( propIrpPtr, pIrp );
+            oReqCtx.SetPointer( propPortPtr, this );
+
+            TaskletPtr pRespCb;
+            ret = NEW_PROXY_RESP_HANDLER2(
+                pRespCb, ObjPtr( pSvc ), 
+                &CRpcStreamChannelSvr::OnStartStopComplete,
+                ( IEventSink* )nullptr,
+                ( IConfigDb* )oReqCtx.GetCfg() );
+            if( ERROR( ret ) )
             {
-                SetStreamIf( pIf );
-                CRpcStreamChannelSvr* pSvr = pIf;
-                pSvr->SetPort( this );
+                ( *pRespCb )( eventCancelTask );
+                break;
             }
+            ret = pSvc->StartEx( pRespCb );
+            if( ERROR( ret ) )
+                ( *pRespCb )( eventCancelTask );
+
+            break;
         }
         else
         {
-            // remove the timer as the StartEx has its
-            // own timer, we don't need many timers.
-            pIrp->RemoveTimer();
-
             CRpcStreamChannelCli* pCli = pIf;
             TaskletPtr pStartTask;
             ret = DEFER_IFCALLEX_NOSCHED2(

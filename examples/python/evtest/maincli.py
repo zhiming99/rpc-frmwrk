@@ -41,7 +41,8 @@ def maincli() :
             while( oProxy.oInst.GetState() == cpp.stateConnected ):
                 time.sleep(1)
 
-            
+        oProxy = None
+    oContext = None
     return ret
     
 ret = maincli()

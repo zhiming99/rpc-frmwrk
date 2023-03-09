@@ -1469,7 +1469,7 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
             else if( dwMinorCmd == IRP_MN_PNP_STACK_DESTROY )
             {
                 // IRP_MN_PNP_STACK_DESTROY
-                ret = OnPortStackDestroy( pIrp );
+                OnPortStackDestroy( pIrp );
 
                 if( pLowerPort == nullptr )
                 {

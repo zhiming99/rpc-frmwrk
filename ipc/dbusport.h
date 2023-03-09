@@ -140,8 +140,6 @@ class CRpcBasePort : public CPort
     gint32 FindIrpForResp(
         DBusMessage* pMsg, IrpPtr& pIrp );
 
-    gint32 CancelAllIrps( gint32 iErrno );
-    
     protected:
 
     template< class T, class T2=typename std::conditional<
@@ -467,6 +465,9 @@ class CRpcBasePort : public CPort
     gint32 SchedCompleteIrps(
         std::deque< IrpPtr >& queIrps,
         std::deque< CfgPtr >& queMsgs );
+
+    virtual gint32 CancelAllIrps( gint32 iErrno );
+ 
 };
 
 template<>

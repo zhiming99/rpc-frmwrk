@@ -1,26 +1,30 @@
 import os
-import sys
 import json
-import io
 
 import errno
-import termios
-import time
 import select
 import fcntl
 import array
+
+def rpcfOpener( path : str, flags : int ) :
+    return os.open( path, flags | os.O_DIRECT | os.O_NONBLOCK )
+
+def rpcOpen( path : str, mode : str ):
+    return open( path, mode, buffering=0, opener=rpcfOpener )
 
 def setBlocking( fp : object )->int:
     try:
         return fcntl.ioctl( fp.fileno(), 0x4a00 )
     except Exception as err:
-        print( err )
+        print( os.getpid(), "iolib.setBlocking ",
+            err, ":", fp )
 
 def setNonBlocking( fp : object )->int:
     try:
         return fcntl.ioctl( fp.fileno(), 0x4a01 )
     except Exception as err:
-        print( err )
+        print( os.getpid(), "iolib.setNonBlocking ",
+            err, ":", fp )
 
 def getBytesAvail( fp : object )->int:
     buf=array.array('i',[0])
@@ -39,17 +43,20 @@ def recvResp( respfp : object)->[int, list] :
     error = 0
     try:
         while len( inBuf ) == 0:
-            resp = select.select( inputs, [], [] )
+            resp = select.select( inputs, [], [], 10.0 )
             # read at the page boundary
-            data = respfp.read(4096)
-            if len( data ) > 0 and len( data ) < 4096:
+            data = respfp.read(8192)
+            if len( data ) == 0 :
+                #timeout
+                continue
+            if len( data ) > 0 and len( data ) < 8192:
                 inBuf = data
                 break
             while True:
                 inBuf.extend(data)
-                if len( data ) < 4096:
+                if len( data ) < 8192:
                     break
-                data = respfp.read(4096)
+                data = respfp.read(8192)
     
         pos = 0
         while pos < len( inBuf ):
@@ -66,6 +73,8 @@ def recvResp( respfp : object)->[int, list] :
             pos += 4 + size
         return [ 0, res ]
     except Exception as err:
+        print( os.getpid(),
+            "iolib.recvResp", err, ": ", respfp )
         if error == 0 :
             error = -errno.EFAULT
         return [ error, None ]
@@ -84,10 +93,16 @@ def sendReq( reqfp : object, reqObj : object ) -> int:
         reqfp.flush()
         return 0
     except Exception as err:
-        print( err )
+        print( os.getpid(),'iolib.sendReq ',
+            err, ": ", reqfp, "---", reqObj )
         return -errno.EFAULT
     
-
+'''
+peekResp: read the non-blocking 'respfp' and return
+immediately if there is no data. Unlike recvResp,
+which wait in select till there is something to
+read.
+'''
 def peekResp( respfp : object)->[ int, object ] :
     # read a four bytes integer as the
     # size of the response
@@ -124,15 +139,15 @@ def recvMsg( respfp : object)->[int, list] :
     try:
         
         # read at the page boundary
-        data = respfp.read(4096)
-        if len( data ) > 0 and len( data ) < 4096:
+        data = respfp.read(8192)
+        if len( data ) > 0 and len( data ) < 8192:
             inBuf = data
-        elif len( data ) == 4096:
+        elif len( data ) == 8192:
             while True:
                 inBuf.extend(data)
-                if len( data ) < 4096:
+                if len( data ) < 8192:
                     break
-                data = respfp.read(4096)
+                data = respfp.read(8192)
         else:
             error = -errno.ENOMSG
             raise Exception( "Error no msg found %d" % error )
@@ -152,7 +167,8 @@ def recvMsg( respfp : object)->[int, list] :
             pos += 4 + size
         return [ 0, res ]
     except Exception as err:
-        print( err )
+        print( os.getpid(),
+            "iolib.recvMsg", err, ": ", respfp )
         if error == 0 :
             error = -errno.EFAULT
         return [ error, None ]

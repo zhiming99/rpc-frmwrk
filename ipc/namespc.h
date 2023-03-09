@@ -53,6 +53,8 @@ namespace rpcf
 #define PORT_CLASS_DBUS_PROXY_PDO_LPBK  "DBusProxyPdoLpbk"
 #define PORT_CLASS_DBUS_STREAM_BUS      "DBusStreamBusPort"
 #define PORT_CLASS_DBUS_STREAM_PDO      "DBusStreamPdo"
+#define PORT_CLASS_OPENSSL_FIDO         "RpcOpenSSLFido"
+#define PORT_CLASS_GMSSL_FIDO           "RpcGmSSLFido"
 
 // registry path for event subscription from the
 // IoManager

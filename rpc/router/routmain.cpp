@@ -25,6 +25,7 @@
 #include <string>
 #include <iostream>
 #include <unistd.h>
+#include <limits.h>
 
 #include "routmain.h"
 #include <ifhelper.h>
@@ -52,7 +53,7 @@ static std::string g_strMPoint;
 // two globals must be present for libfuseif.so
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
-
+char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 
 void CIfRouterTest::setUp()
 {
@@ -195,6 +196,8 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 namespace rpcf{
 gint32 AddFilesAndDirsReqFwdr( CRpcServices* );
 gint32 AddFilesAndDirsBdge( CRpcServices* );
+extern gint32 CheckForKeyPass( bool& bPrompt );
+
 }
 
 gint32 AddFilesAndDirs( CRpcServices* pSvc )
@@ -418,6 +421,29 @@ int main( int argc, char** argv )
         Usage( argv[ 0 ] );
         exit( -ret );
     }
+
+    bool bPrompt = false;
+    bool bExit = false;
+    ret = CheckForKeyPass( bPrompt );
+    while( SUCCEEDED( ret ) && bPrompt )
+    {
+        char* pPass = getpass( "SSL Key Password:" );
+        if( pPass == nullptr )
+        {
+            bExit = true;
+            ret = -errno;
+            break;
+        }
+        size_t len = strlen( pPass );
+        len = std::min(
+            len, ( size_t )SSL_PASS_MAX );
+        memcpy( g_szKeyPass, pPass, len );
+        break;
+    }
+
+    if( bExit )
+        return -ret;
+
 
     if( g_bDaemon )
         daemon( 1, 0 );

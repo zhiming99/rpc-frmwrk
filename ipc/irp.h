@@ -307,6 +307,8 @@ struct IRP_CONTEXT : CObjBase
     void SetStatus( gint32 dwStatus );
     gint32 SetExtBuf( const BufPtr& bufPtr );
     void GetExtBuf( BufPtr& bufPtr ) const;
+    inline void ClearExtBuf()
+    { m_pExtBuf.Clear(); }
 
     gint32 SetRespData( const BufPtr& bufPtr );
     gint32 SetReqData( const BufPtr& bufPtr );

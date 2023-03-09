@@ -1055,6 +1055,36 @@ gint32 CRpcInterfaceBase::StartEx(
     return ret;
 }
 
+gint32 CRpcInterfaceBase::QueueStopTask(
+    CRpcInterfaceBase* pIf,
+    IEventSink* pCallback  )
+{
+    gint32 ret = 0;
+    do{
+        TaskletPtr pStopTask;
+        ret = DEFER_IFCALLEX_NOSCHED2( 
+            0, pStopTask, pIf,
+            &CRpcInterfaceBase::StopEx, nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        CIfRetryTask* pRetry = pStopTask; 
+        pRetry->SetClientNotify( pCallback );
+
+        CIoManager* pMgr = pIf->GetIoMgr();
+        ret = pMgr->AddSeqTask( pStopTask );
+        if( ERROR( ret ) )
+        {
+            (*pStopTask)( eventCancelTask );
+            break;
+        }
+        if( SUCCEEDED( ret ) )
+            ret = pStopTask->GetError();
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRpcInterfaceBase::Stop()
 {
     gint32 ret = 0;
@@ -1438,7 +1468,7 @@ gint32 CRpcInterfaceBase::OnPortEvent(
                 break;
 
             // we need an asynchronous call
-            ret = StopEx( pTask );
+            QueueStopTask( this, pTask );
             break;
         }
     case eventPortStarted:
@@ -1643,11 +1673,7 @@ gint32 CRpcInterfaceBase::OnDBusEvent(
             if( ERROR( ret ) )
                 break;
 
-            ret = DEFER_CALL(
-                GetIoMgr(), this,
-                &CRpcInterfaceBase::StopEx,
-                ( IEventSink* )pTask );
-                
+            QueueStopTask( this, pTask );
             break;
         }
     case eventDBusOnline:
@@ -1787,7 +1813,7 @@ gint32 CRpcInterfaceBase::OnAdminEvent(
             if( ERROR( ret ) )
                 break;
 
-            ret = StopEx( pTask );
+            ret = QueueStopTask( this, pTask );
             break;
         }
     case cmdPause:
@@ -2564,6 +2590,71 @@ gint32 CRpcServices::StartEx(
     return ret;
 }
 
+gint32 CRpcServices::Stop()
+{
+    gint32 ret = 0;
+    do{
+        TaskletPtr pTask;
+        ret = pTask.NewObj(
+            clsid( CSyncCallback ) );
+
+        if( ERROR( ret ) )
+            break;
+
+        EnumEventId iEvent = cmdShutdown;
+        EnumIfState iState = GetState();
+        if( iState == stateStartFailed )
+            iEvent = cmdCleanup;
+
+        ret = SetStateOnEvent( iEvent );
+        if( ERROR( ret ) )
+        {
+            if( iState != stateStopping )
+                break;
+
+            OutputMsg( ret, "Warning( %s ): another "
+                "StopEx is running, "
+                "wait it to complete",
+                __func__ );
+
+            gint32 (*func)( IEventSink* pCb ) =
+            ([]( IEventSink* pCb )->gint32
+            {
+                if( pCb == nullptr )
+                    return -EFAULT;
+                pCb->OnEvent( eventTaskComp, 0, 0, nullptr );
+                return 0;
+            });
+
+            TaskletPtr pSync;
+            CIoManager* pMgr = GetIoMgr();
+            ret = NEW_FUNCCALL_TASK( pSync,
+                pMgr, func, ( IEventSink* )pTask );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pMgr->AddSeqTask( pSync );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+        }
+        else
+        {
+            ret = QueueStopTask( this, pTask );
+        }
+
+        if( ret == STATUS_PENDING )
+        {
+            CSyncCallback* pSyncTask = pTask;
+            ret = pSyncTask->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncTask->GetError();
+        }
+
+    }while( 0 );
+    
+    return ret;
+}
+
 gint32 CRpcServices::OnPreStart(
     IEventSink* pCallback )
 {
@@ -2585,21 +2676,20 @@ gint32 CRpcServices::OnPostStop(
     IEventSink* pCallback )
 {
     CStdRMutex oIfLock( GetLock() );
+    if( !m_pSeqTasks.IsEmpty() &&
+        m_pSeqTasks->GetTaskCount() > 0 )
+    {
+        TaskGrpPtr pSeqTasks = m_pSeqTasks;
+        oIfLock.Unlock();
+        ( *pSeqTasks )( eventCancelTask );
+        oIfLock.Lock();
+    }
     m_vecMatches.clear();
     m_mapFuncs.clear();
     m_mapProxyFuncs.clear();
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
-    if( !m_pSeqTasks.IsEmpty() &&
-        m_pSeqTasks->GetTaskCount() > 0 )
-    {
-        TaskGrpPtr pSeqTasks = m_pSeqTasks;
-        m_pSeqTasks.Clear(); 
-        oIfLock.Unlock();
-        ( *pSeqTasks )( eventCancelTask );
-    }
-    // should be the last to remove
     m_pRootTaskGroup.Clear();
 
     return 0;
@@ -4308,9 +4398,7 @@ gint32 CRpcServices::LoadObjDesc(
                     if( strVal == "false" )
                         oConnParams[ propEnableSSL ] = false;
                     else if( strVal == "true" )
-                    {
                         oConnParams[ propEnableSSL ] = true;
-                    }
                 }
 
                 if( oObjElem.isMember( JSON_ATTR_ADDRFORMAT ) &&
@@ -5503,29 +5591,36 @@ gint32 CInterfaceProxy::SendProxyReq(
         ret = RunIoTask( oReq.GetCfg(),
             pResp, pCallback, &qwIoTaskId );
 
-        if( ret == STATUS_PENDING )
-        {
-            if( bSync )
-            {
-                CSyncCallback* pSyncCallback =
-                    ObjPtr( pCallback );
-                if( pSyncCallback == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pSyncCallback->WaitForComplete();
-                if( SUCCEEDED( ret ) )
-                    ret = pSyncCallback->GetError();
-            }
-            else
-            {
-                break;
-            }
-        }
-
         if( ERROR( ret ) )
             break;
+
+        if( unlikely(
+            ret == STATUS_SUCCESS && !bSync ) )
+        {
+            CTasklet* pTask = ObjPtr( pCallback );
+            gint32 iRet = pTask->GetError();
+            if( iRet != STATUS_PENDING )
+            {
+                // callback has been called somewhere
+                // else, don't move on further
+                ret = STATUS_PENDING;
+                break;
+            }
+            // immediate return
+        }
+        else if( bSync )
+        {
+            CSyncCallback* pSyncCallback =
+                ObjPtr( pCallback );
+            ret = pSyncCallback->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncCallback->GetError();
+        }
+        else
+        {
+            // STATUS_PENDING
+            break;
+        }
 
         CReqOpener oReq2( oReq.GetCfg() );
         oReq2.GetCallFlags( dwFlags );

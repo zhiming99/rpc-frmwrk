@@ -175,7 +175,7 @@ class CPythonServerImpl :
             ObjPtr* ppCtx = new ObjPtr();
             *ppCtx = pCallback;
             PyObject* pPyCtx = sipConvertFromNewType(
-                ppCtx, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                ppCtx, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyCtx == nullptr ) )
             {
                 ret = -EFAULT;
@@ -185,7 +185,7 @@ class CPythonServerImpl :
             ObjPtr* ppObj = new ObjPtr();
             *ppObj = pDesc;
             PyObject* pPyObj = sipConvertFromNewType(
-                ppObj, sipType_cpp_ObjPtr, SIP_NULLPTR );
+                ppObj, sipType_cpp_ObjPtr, Py_None );
             if( unlikely( pPyObj == nullptr ) )
             {
                 ret = -EFAULT;
@@ -352,7 +352,7 @@ class CPythonServer :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
-            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+            ppBuf, sipType_cpp_BufPtr, Py_None );
 
         if( pPyBufBak == nullptr )
         {
@@ -413,8 +413,8 @@ class CPythonServer :
             break;
 
         BufPtr* ppBuf = new BufPtr( pBuf );
-        return sipBuildResult(0,"(iRN)",
-            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,SIP_NULLPTR);
+        sipRes = sipBuildResult(0,"(iRN)",
+            0, pPyBuf, ppBuf,sipType_cpp_BufPtr,Py_None);
 
         break;
 
@@ -487,7 +487,7 @@ class CPythonServer :
 
         BufPtr* ppBuf = new BufPtr( pBuf );
         PyObject* pPyBufBak = sipConvertFromNewType(
-            ppBuf, sipType_cpp_BufPtr, SIP_NULLPTR );
+            ppBuf, sipType_cpp_BufPtr, Py_None );
         if( unlikely( pPyBufBak == nullptr ) )
         {
             ret = -ENOMEM;
@@ -808,7 +808,7 @@ cpp::ObjPtr CreateRpcServer(
     cpp::ObjPtr& pMgr,
     const std::string& strDesc,
     const std::string& strObjName,
-    cpp::ObjPtr& pCfgObj );
+    cpp::ObjPtr& pCfgObj )/TransferBack/;
 %MethodCode
     gint32 ret = 0;
     do{

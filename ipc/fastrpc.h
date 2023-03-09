@@ -42,6 +42,7 @@
 
 #define MAX_REQCHAN_PER_SESS 200
 #define DBUS_STREAM_BUS_DRIVER  "DBusStreamBusDrv"
+#define CTRLCODE_SKEL_READY             0x81
 
 namespace rpcf
 {
@@ -110,22 +111,21 @@ class CRpcStmChanBase :
             if( ERROR( ret ) )
                 break;
 
+            CCfgOpenerObj oIfCfg(
+                ( CObjBase* )pUxIf );
+
+            oIfCfg.SetBoolProp(
+                propOnline, false );
+
             PortPtr pPdoPort;
             auto pBus = static_cast
                 < CDBusStreamBusPort* >( m_pPort ); 
-            CStdRMutex oBusLock( pBus->GetLock() );
-            pBus->GetStreamPort( hstm, pPdoPort );
-            if( pPdoPort.IsEmpty() )
-            {
-                CCfgOpenerObj oIfCfg(
-                    ( CObjBase* )pUxIf );
-                // notify the stream pdo, a close
-                // needed, in case a 'tokError' or
-                // 'tokClose' arrives too early
-                oIfCfg.SetBoolProp( propOnline, false );
+
+            ret = pBus->GetStreamPort(
+                hstm, pPdoPort );
+
+            if( ERROR( ret ) )
                 break;
-            }
-            oBusLock.Unlock();
 
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
@@ -144,7 +144,7 @@ class CRpcStmChanBase :
         InterfPtr pUxIf;
         gint32 ret = this->GetUxStream( hstm, pUxIf );
         if( ERROR( ret ) )
-            return 0;
+            return ret;
         OnStmClosing( hstm );
         return IStream::OnClose( hstm, pCallback );
     }
@@ -1014,10 +1014,6 @@ class CRpcStmChanBase :
                 else
                     pPort->SetStream( hstm );
             }
-            else if( dwCmd == IRP_MN_PNP_STOP )
-            {
-                SetPreStopStep( pIrp, 1 );
-            }
             oIrpLock.Unlock();
 
             auto pMgr = this->GetIoMgr();
@@ -1576,7 +1572,7 @@ class CFastRpcSkelSvrBase :
         : super( pCfg )
     {}
 
-    gint32 NotifyStackReady( PortPtr& pPort );
+    gint32 NotifySkelReady( PortPtr& pPort );
     inline guint32 GetPendingInvCount() const
     { return m_dwPendingInv; }
 
@@ -1601,6 +1597,9 @@ class CFastRpcSkelSvrBase :
 
     gint32 OnKeepAliveOrig(
         IEventSink* pTask ) override;
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(

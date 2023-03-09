@@ -13,17 +13,31 @@ ulimit -a
 function stressTest()
 {
     pushd testypes
-    make || exit 10
+    cat ./cmdline
+    make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
     release/TestTypessvr -f mpsvr &
+    sleep 8 
     release/TestTypescli -f mp &
-    sleep 5 
+    sleep 5
+
+    #make sure TestTypesSvc created
+    pushd mp
+    echo mkdir TestTypesSvc_1
+    mkdir TestTypesSvc_1 >/dev/null 2>&1
+    popd
+
+    echo ls mp
+    ls -lR ./mp
+
+    echo ls mpsvr
+    ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT | tee -a $basedir/logdump.txt
+/bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
@@ -37,7 +51,10 @@ RUNCLIENT
     echo pkill -f mainsvr.py
     pkill -f mainsvr.py
 
+    echo umount mp
     umount mp
+
+    echo umount mpsvr...
     while true; do
         umount mpsvr 
         if mount | grep TestTypessvr; then
@@ -55,23 +72,32 @@ RUNCLIENT
 function mkDirTest()
 {
     pushd testypes
-    make || exit 10
+    cat ./cmdline
+    make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
     hostsvr -f mpsvr &
     hostcli -f mp &
     sleep 5 
+
     echo loading TestTypes library to server and proxy...
     echo "loadl $(pwd)/release/libTestTypes.so" > ./mpsvr/commands
     echo "loadl $(pwd)/release/libTestTypes.so" > ./mp/commands
     echo adding service point TestTypes to server and proxy...
     echo "addsp TestTypesSvc $(pwd)/TestTypesdesc.json" > ./mpsvr/commands
     echo "addsp TestTypesSvc $(pwd)/TestTypesdesc.json" > ./mp/commands
+    sleep 3
+
+    echo ls mp
+    ls -lR ./mp
+
+    echo ls mpsvr
+    ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT | tee -a $basedir/logdump.txt
+/bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 function singleMkdir()
 {
     idx=0
@@ -88,7 +114,7 @@ function singleMkdir()
     popd
 }
 start=\$(date +%s.%N)
-for((i=0;i<199;i++));do
+for((i=0;i<200;i++));do
     singleMkdir \$i &
 done
 wait \`jobs -p\`
@@ -100,7 +126,10 @@ RUNCLIENT
     echo pkill -f mainsvr.py
     pkill -f mainsvr.py
 
+    echo umount mp
     umount mp
+
+    echo umount mpsvr...
     while true; do
         umount mpsvr 
         if mount | grep TestTypessvr; then
@@ -115,28 +144,35 @@ RUNCLIENT
 }
 
 echo testing normal RPC
+echo $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
 echo stressTest normal
 stressTest
 
 echo testing RPC-over-stream
+echo $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
 echo stressTest ROS
 stressTest
 
-echo testing normal RPC
+echo testing normal RPC via shared library
+echo $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
 echo mkDirTest normal
 mkDirTest
 
-echo testing RPC-over-stream
+echo testing RPC-over-stream via shared library
+echo $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
 
-if grep -i errno $basedir/logdump.txt; then
+echo Check errors in logdump.txt...
+if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+    echo errors found!
     exit 1
 fi
+echo Check passed!
 
 function pytest()
 {
@@ -155,7 +191,7 @@ function pytest()
     while true; do
         eval $cmdline
         echo make $testcase ...
-        make || ret=32
+        make > /dev/null 2>&1 || ret=32
         if (( $ret > 0 )); then break; fi
         echo create directories ...
         mkdir ./fs/mp ./fs/mpsvr > /dev/null 2>&1

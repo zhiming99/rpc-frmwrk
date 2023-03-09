@@ -338,17 +338,8 @@ gint32 CDriverManager::StopDrivers()
 
 gint32 CDriverManager::Stop()
 {
-    gint32 ret = StopPreloadable();
-    if( ERROR( ret ) )
-    {
-        if( ret != -ENOENT &&
-            ret != -ENOPKG )
-            return ret;
-    }
-
-    ret = StopDrivers();
-
-    return ret;
+    StopPreloadable();
+    return StopDrivers();
 }
 
 gint32 CDriverManager::LoadClassFactories()
@@ -501,11 +492,16 @@ gint32 CDriverManager::LoadStaticDrivers()
                 continue;
 
             ret = LoadDriver( oDrvToLoad[ i ].asString() );
+            if( ret == -ENOPKG )
+                continue;
+
             if( ERROR( ret ) )
             {
                 // FIXME: bad thing happens, what to do
+                break;
             }
         }
+
     }while( 0 );
 
     return ret;
@@ -1088,30 +1084,25 @@ gint32 CDriverManager::BuildPortStack(
     IPort* pPort )
 {
     gint32 ret = 0;
-
     if( pPort == nullptr )
-    {
         return -EINVAL;
-    }
-
-
-    Json::Value& oMatchArray = m_oConfig[ JSON_ATTR_MATCH ];
-
-    if( oMatchArray == Json::Value::null )
-    {
-        return -ENOENT;
-    }
-
-    if( !oMatchArray.isArray() 
-        || oMatchArray.size() == 0 )
-    {
-        return -ENOENT;
-    }
-
-    CCfgOpener a;
-    a.SetStrProp( propConfigPath, m_strCfgPath );
 
     do{
+        Json::Value& oMatchArray =
+            m_oConfig[ JSON_ATTR_MATCH ];
+
+        if( oMatchArray == Json::Value::null )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        if( !oMatchArray.isArray() 
+            || oMatchArray.size() == 0 )
+        {
+            ret = -ENOENT;
+            break;
+        }
 
         CCfgOpenerObj oPortCfg( pPort );
 
@@ -1131,11 +1122,13 @@ gint32 CDriverManager::BuildPortStack(
             if( elem == Json::Value::null )
                 continue;
 
-            if( elem[ JSON_ATTR_PORTCLASS ].asString() != strPortClass )
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
                 continue;
 
             std::string strVal;
-            if( elem[ JSON_ATTR_FDODRIVER ] != Json::Value::null )
+            if( Json::Value::null !=
+                elem[ JSON_ATTR_FDODRIVER ] )
             {
                 strVal = elem[ JSON_ATTR_FDODRIVER ].asString();
                 if( strVal.empty() )
@@ -1144,7 +1137,8 @@ gint32 CDriverManager::BuildPortStack(
                 break;
             }
 
-            if( elem[ JSON_ATTR_FIDODRIVER ] != Json::Value::null )
+            if( Json::Value::null !=
+                elem[ JSON_ATTR_FIDODRIVER ] )
             {
                 strVal = elem[ JSON_ATTR_FIDODRIVER ].asString();
                 if( strVal.empty() )
@@ -1153,9 +1147,12 @@ gint32 CDriverManager::BuildPortStack(
                 break;
             }
 
-            if( elem[ JSON_ATTR_PROBESEQ ] != Json::Value::null )
+            if( Json::Value::null !=
+                elem[ JSON_ATTR_PROBESEQ ] )
             {
-                Json::Value& oDrvArray = elem[ JSON_ATTR_PROBESEQ ];
+                Json::Value& oDrvArray =
+                    elem[ JSON_ATTR_PROBESEQ ];
+
                 if( !oDrvArray.isArray() 
                     || oDrvArray.size() == 0 )
                     continue;
@@ -1187,7 +1184,7 @@ gint32 CDriverManager::BuildPortStack(
             {
                 // not loaded yet
                 ret = LoadDriver( strDrvName );
-                if( ERROR( ret ) )
+                if( ret == -ENOPKG )
                 {
                     DebugPrint( ret,
                         "Driver %s is not found"
@@ -1195,15 +1192,26 @@ gint32 CDriverManager::BuildPortStack(
                         strDrvName.c_str() );
                     continue;
                 }
+                else if( ERROR( ret ) )
+                {
+                    DebugPrint( ret,
+                        "error load Driver %s",
+                        strDrvName.c_str() );
+                    break;
+                }
 
                 ret = FindDriver( strDrvName, pDrv );
                 if( ERROR( ret ) )
                     break;
             }
 
+            CCfgOpener oCfg;
+            oCfg.SetStrProp(
+                propConfigPath, m_strCfgPath );
+
             PortPtr pNewPort;
             ret = pDrv->Probe(
-                pPort, pNewPort, a.GetCfg() );
+                pPort, pNewPort, oCfg.GetCfg() );
 
             if( ERROR( ret ) )
                 break;
@@ -1214,7 +1222,9 @@ gint32 CDriverManager::BuildPortStack(
 
     }while( 0 );
 
-    ret = 0;
+    if( ret == -ENOPKG )
+        ret = 0;
+
     return ret;
 }
 

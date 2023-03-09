@@ -701,6 +701,7 @@ class CSyncCallback :
     {
         SetClassId( clsid( CSyncCallback ) );
         Sem_Init( &m_semWait, 0, 0 );
+        SetError( STATUS_PENDING );
     }
 
     ~CSyncCallback()

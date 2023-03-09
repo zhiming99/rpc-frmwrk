@@ -42,7 +42,8 @@ def maincli() :
                 return pret[0]
             strResp = pret[1][0]
             print( "Server replys '" + strResp + "'")
-            
+        oProxy = None
+    oContext = None 
     return ret
     
 ret = maincli()
