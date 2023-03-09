@@ -15,7 +15,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 6. `Peer online/offline awareness.`
 7. `Publishing multiple local/remote object services via single network port.`
 8. [`Full-duplex streaming channels`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
-9. [`Secure Socket Layer (SSL) support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+9. [`OpenSSL support and GmSSL support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 12. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
