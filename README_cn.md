@@ -19,7 +19,7 @@
 6. `通信双方上线/下线的检测和通知`
 7. `同一网络端口可以支持数目不限的多个服务端`
 8. [`数目可配的全双工流控的流通道`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
-9. [`SSL支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+9. [`OpenSSL的支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 12. [`基于Kerberos 5的认证功能`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
@@ -27,6 +27,7 @@
 14. [`自动生成C++, Python和Java的框架代码`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`守护进程的图形配置工具`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 16. [`RPC文件系统rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
+17. [`支持国密传输(SM2+SM4+GCM)`]
 
 ## 编译`rpc-frmwrk`   
 * 请参考[`如何编译rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60)给出的详细的信息和步骤.   
