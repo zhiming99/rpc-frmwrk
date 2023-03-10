@@ -732,7 +732,6 @@ gint32 CRpcGmSSLFido::SendImmediateResp()
             CParamList oParams;
             guint32 dwSize = 0;
             do{
-                BufPtr pBuf;
                 ret = m_pSSL->write_bio.read(
                     piove );
                 if( ERROR( ret ) )
@@ -742,6 +741,7 @@ gint32 CRpcGmSSLFido::SendImmediateResp()
                 }
 
                 // transfer the buffer ownership
+                BufPtr pBuf;
                 ret = IoveToBuf( piove, pBuf,
                     false, true );
 
@@ -1202,16 +1202,18 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
         if( ret == STATUS_PENDING && iov.empty() )
             break;
 
-        BufPtr pBuf;
+        BufPtr pBufLast;
         BufPtr pRespBuf;
         CParamList oResp;
         for( auto& elem : iov )
         {
+            BufPtr pBuf;
             ret = IoveToBuf(
                 elem, pBuf, false, true );
             if( ERROR( ret ) )
                 break;
             oResp.Push( pBuf );
+            pBufLast = pBuf;
         }
 
         if( ERROR( ret ) )
@@ -1219,7 +1221,7 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
 
         if( oResp.GetCount() == 1 )
         {
-            pRespBuf = pBuf;
+            pRespBuf = pBufLast;
         }
         else
         {

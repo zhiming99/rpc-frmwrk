@@ -5379,25 +5379,7 @@ gint32 CInterfaceProxy::OnCancel_Proxy(
     IConfigDb* pReqMsg,
     IEventSink* pCallback )
 {
-    if( pReqMsg == nullptr ||
-        pCallback == nullptr )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    do{
-        TaskletPtr pTasklet;
-        pTasklet = ObjPtr( pCallback ); 
-        CIfParallelTask* pTask = pTasklet;
-
-        if( pTask == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-    }while( 0 );
-
-    return ret;
+    return 0;
 }
 
 gint32 CInterfaceProxy::OnKeepAlive(

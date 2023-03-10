@@ -3279,23 +3279,14 @@ gint32 CIfIoReqTask::OnCancel(
             ( IConfigDb* )GetConfig() );
         CRpcServices* pIf = nullptr;
         
-        ObjPtr pObj;
-        ret = oCfg.GetObjPtr( propIfPtr, pObj );
+        ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
-
-        pIf = pObj;
 
         CfgPtr pResp;
         ret = GetRespData( pResp );
         if( ERROR( ret ) )
             break;
-
-        if( pIf == nullptr || pResp.IsEmpty() )
-        {
-            ret = -EFAULT;
-            break;
-        }
 
         pIf->OnCancel(
             ( IConfigDb* )pResp, this );
@@ -3307,11 +3298,13 @@ gint32 CIfIoReqTask::OnCancel(
         if( ERROR( ret ) )
         {
             // set the return value for canceling
-            std::vector< LONGWORD > vecParams;
-            ret = GetParamList( vecParams );
-            if( SUCCEEDED( ret ) )
-                oResp[ propReturnValue ] =
-                    ( guint32 )vecParams[ 1 ];
+            if( dwContext == eventTimeoutCancel )
+                ret = -ETIMEDOUT;
+            else if( dwContext == eventUserCancel )
+                ret = ERROR_USER_CANCEL;
+            else
+                ret = ERROR_FAIL;
+            oResp[ propReturnValue ] = ret;
             ret = 0;
         }
 

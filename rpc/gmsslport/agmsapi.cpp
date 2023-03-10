@@ -1330,7 +1330,8 @@ int TLS13::handshake_cli()
                     }
                     else
                     {
-                        prec->trim_bytes_front( enced_recordlen_in );
+                        prec->trim_bytes_front(
+                            enced_recordlen_in );
                         this->read_bio.put_back( prec );
                     }
                     // move on to next record
