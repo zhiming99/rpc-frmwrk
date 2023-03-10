@@ -1,5 +1,10 @@
 ---
-[`Thu Mar 09  202302:06:39 PM Beijing`]   
+[`Thu Mar 09 2023 09:20:04 PM Beijing`]   
+1. Merged the add-gmssl-support to the master branch. This PR has also delivered many bug-fixes, and `rpc-frmwrk` should be more stable now. Congratulations!
+2. The GmSSL's makefile is yet to provide because GmSSL itself is not provided as an off-the-shelf package and has to be built locally.
+3. There are also some documentation work to do in the next few days for GmSSL, as well as testcases for GmSSL.
+
+[`Thu Mar 09 2023 02:06:39 PM Beijing`]   
 1. We have almost finished development of GmSSL support, and the GmSSL support can now run as smoothly as OpenSSL does.
 2. Next we may continue to fix some bugs and close the PR.
 
