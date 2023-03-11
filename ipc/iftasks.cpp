@@ -3286,7 +3286,10 @@ gint32 CIfIoReqTask::OnCancel(
         CfgPtr pResp;
         ret = GetRespData( pResp );
         if( ERROR( ret ) )
-            break;
+        {
+            pResp.NewObj();
+            SetRespData( pResp );
+        }
 
         pIf->OnCancel(
             ( IConfigDb* )pResp, this );
@@ -3302,8 +3305,21 @@ gint32 CIfIoReqTask::OnCancel(
                 ret = -ETIMEDOUT;
             else if( dwContext == eventUserCancel )
                 ret = ERROR_USER_CANCEL;
+            else if( dwContext == eventCancelTask )
+                ret = -ECANCELED;
             else
-                ret = ERROR_FAIL;
+            {
+                vector< LONGWORD > vecParams;
+                ret = GetParamList( vecParams );
+                if( ERROR( ret ) )
+                {
+                    ret = ERROR_FAIL;
+                }
+                else
+                {
+                    ret = vecParams[ 1 ];
+                }
+            }
             oResp[ propReturnValue ] = ret;
             ret = 0;
         }
