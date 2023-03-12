@@ -57,7 +57,6 @@
 10. `FUSE-3`
 
 ## TODO
-1. 添加对国密[gmssl](https://github.com/guanzhi/GmSSL)的支持
-2. 添加ridl的教程
-3. 性能优化
-4. 自适应流量控制
+1. 添加ridl的教程
+2. 性能优化
+3. 自适应流量控制
