@@ -1232,18 +1232,18 @@ class CRpcTcpBridge :
         IEventSink* pCallback,
         IConfigDb* pInfo );
 
-    virtual gint32 SendResponse(
+    gint32 SendResponse(
         IEventSink* pInvTask,
         IConfigDb* pReqMsg,
-        CfgPtr& pRespData );
+        CfgPtr& pRespData ) override;
 
     // called to set the response to send back
-    virtual gint32 SetResponse(
+    gint32 SetResponse(
         IEventSink* pTask,
-        CfgPtr& pRespData );
+        CfgPtr& pRespData ) override;
 
-    virtual gint32 OnPreStart(
-        IEventSink* pCallback )
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override
     {
         gint32 ret =
             super::OnPreStart( pCallback );

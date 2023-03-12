@@ -3019,7 +3019,17 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
         CCfgOpener oResp(
             ( IConfigDb* )pObj );
 
-        oResp[ propReturnValue ] = iRetVal;
+        if( oResp.exist( propReturnValue ) )
+        {
+            oResp.GetIntProp( propReturnValue,
+                ( guint32& )iRetVal );
+        }
+        else
+        {
+            if( SUCCEEDED( iRetVal ) )
+                iRetVal = -EBADMSG;
+            oResp[ propReturnValue ] = iRetVal;
+        }
         if( SUCCEEDED( iRetVal ) && !oResp.exist( 0 ) )
         {
             DebugPrint( iRetVal,

@@ -1812,8 +1812,20 @@ gint32 CRpcPdoPort::HandleSendReq( IRP* pIrp )
                 // m_mapSerial2Resp ahead of
                 // sending.
                 CStdRMutex oPortLock( GetLock() );
-                m_mapSerial2Resp[ dwSerial ] =
-                    IrpPtr( pIrp );
+                if( m_mapSerial2Resp.find( dwSerial ) !=
+                    m_mapSerial2Resp.end() )
+                {
+                    // EACCES is the error dbus would
+                    // return if we send a message with
+                    // duplicated serial
+                    ret = -EACCES;
+                    break;
+                }
+                else
+                {
+                    m_mapSerial2Resp[ dwSerial ] =
+                        IrpPtr( pIrp );
+                }
             }
             else
             {

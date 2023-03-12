@@ -1617,25 +1617,7 @@ gint32 CTcpFidoListenTask::Process(
 
         case -ETIMEDOUT:
         case -ENOTCONN:
-            {
-                DebugPrint( 0,
-                    "The server is not online?,"
-                    " retry scheduled..." );
-                // fall through
-            }
         case -EAGAIN:
-            {
-                if( ( *pVecBuf )().empty() )
-                    break;
-
-                pFido->ScheduleRecvDataTask(
-                    pVecBuf );
-
-                ( *pVecBuf )().clear();
-                ret = STATUS_MORE_PROCESS_NEEDED;
-                break;
-            }
-
         case ERROR_PORT_STOPPED:
         case -ECANCELED:
             {
@@ -1652,12 +1634,11 @@ gint32 CTcpFidoListenTask::Process(
 
     }while( 1 );
 
-    if( ret == ERROR_PORT_STOPPED )
+    if( ERROR( ret ) )
     {
         CRpcTcpFido* pPort = nullptr;
         oParams.GetPointer( propPortPtr, pPort );
-        pPort->CancelAllIrps(
-            ERROR_PORT_STOPPED );
+        pPort->CancelAllIrps( ret );
     }
  
     if( ret != STATUS_PENDING &&

@@ -956,7 +956,9 @@ gint32 CRpcTcpBridgeProxy::FillRespDataFwrdReq(
 
         if( ERROR( iRet ) )
         {
-            ret = iRet;
+            oParams.SetIntProp( propReturnValue, iRet );
+            DebugPrint( iRet,
+                "FillRespDataFwrdReq failed" );
             break;
         }
 
@@ -1045,11 +1047,6 @@ gint32 CRpcTcpBridgeProxy::FillRespData(
                 {
                     ret = FillRespDataFwrdReq(
                         pIrp, pResp );
-                    if( ERROR( ret ) )
-                    {
-                        DebugPrint( ret,
-                            "FillRespDataFwrdReq failed" );
-                    }
                     break;
                 }
             }

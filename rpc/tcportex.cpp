@@ -4099,7 +4099,10 @@ gint32 CFdoListeningTask::HandleIrpResp(
                 ret = pPort->OnReceiveBuf(
                     pEvt->m_pInBuf );
                 pEvt->m_pInBuf.Clear();
-                break;
+                if( !ERROR( ret ) )
+                    break;
+                pEvt->m_iData = ret;
+                // fall through
             }
         case sseError:
             {
@@ -4107,10 +4110,9 @@ gint32 CFdoListeningTask::HandleIrpResp(
                 if( ret == -ENOTCONN ||
                     ERROR( ret ) )
                 {
-                    ret = ERROR_PORT_STOPPED;
                     pPort->CancelAllIrps( ret );
-                    IPort* pdo =
-                        pPort->GetBottomPort();
+                    ret = ERROR_PORT_STOPPED;
+                    IPort* pdo = pPort->GetBottomPort();
                     FireRmtSvrEvent(
                         pdo, eventRmtSvrOffline );
                 }
