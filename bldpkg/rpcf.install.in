@@ -5,6 +5,7 @@ usr/bin/rpcrouter
 usr/bin/hostsvr
 usr/bin/hostcli
 usr/bin/rpcf/*.py
+usr/bin/rpcf/gmsslkey.sh
 etc/rpcf/*.json
 usr/share/man/man1/ridlc.1
 usr/share/man/man1/rpcrouter.1
