@@ -1,5 +1,5 @@
 pysources = rpcfg.py updcfg.py rpcfgnui.py
-EXTRA_DIST= $(pysources) README.md runtest.sh.in Dockerfile testcfgs/mincfg.json testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh
+EXTRA_DIST= $(pysources) README.md runtest.sh.in Dockerfile testcfgs/mincfg.json testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh gmsslkey.sh
 
 docker:
 	docker build -t rpcf .
@@ -9,5 +9,5 @@ install-exec-local:
 	if [ "x$(DESTDIR)" == "x" ];then BinDir=$(bindir);\
 	else BinDir=$(DESTDIR)$(bindir); fi;\
 	if [ ! -e $${BinDir}/rpcf ]; then mkdir -p $${BinDir}/rpcf;fi; \
-	cp rpcfg.py updcfg.py rpcfgnui.py $${BinDir}/rpcf;\
+	cp rpcfg.py updcfg.py rpcfgnui.py gmsslkey.sh $${BinDir}/rpcf;\
     chmod +x $${BinDir}/rpcf/{rpcfg,updcfg,rpcfgnui}.py

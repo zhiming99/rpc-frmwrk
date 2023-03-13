@@ -23,6 +23,37 @@ def vc_changed(stack, gparamstring):
         wnd.DisplayError( "node name is not valid" )
         stack.set_visible_child( wnd.gridmh )
 
+def GenOpenSSLkey( dlg, strPath : str ) :
+    strHead = "cd " + strPath + ";"
+    os.system( strHead + 'openssl req -x509 -new -subj "/C=CN/CN=foo" -addext "subjectAltName = DNS:rpcf.org" -addext "certificatePolicies = 1.2.3.4" -newkey rsa:2048 -nodes -keyout server.key -out server.crt -days 365' ) 
+    strKeyFile = strPath + "/server.key"
+    dlg.keyEdit.set_text( strKeyFile )
+    strCertFile = strPath + "/server.crt"
+    dlg.certEdit.set_text( strCertFile )
+
+def GenGmSSLkey( dlg, strPath : str ) :
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    dir_path += "/gmsslkey.sh"
+    cmdline = "sh " + dir_path + " " + strPath
+    os.system( cmdline )
+    strFile = strPath + "/signkey.pem"
+    dlg.keyEdit.set_text( strFile )
+
+    strFile = strPath + "/certs.pem"
+    dlg.certEdit.set_text( strFile )
+
+    strFile = strPath + "/cacert.pem"
+    dlg.cacertEdit.set_text( strFile )
+    dlg.secretEdit.set_text( "" )
+
+    strCKey = "./clientkey.pem"
+    strCCert = "./clientcert.pem"
+    strCARoot = "./rootcacert.pem"
+
+    cmdline = "cd " + strPath + ";tar zcf clientkeys.tar.gz " + \
+        strCKey + " " + strCCert + " " + strCARoot
+    os.system( cmdline )
+
 class InterfaceContext :
     def __init__(self, ifNo ):
         self.ifNo = ifNo
@@ -1233,7 +1264,7 @@ class ConfigDlg(Gtk.Dialog):
         labelVfyPeer = Gtk.Label()
         labelVfyPeer.set_text("Verify Peer: ")
         labelVfyPeer.set_xalign(.5)
-        grid.attach(labelVfyPeer, startCol + 0, startRow + 5, 1, 1 )
+        grid.attach(labelVfyPeer, startCol + 2, startRow + 4, 1, 1 )
         vfyPeerCheck = Gtk.CheckButton( label = "" )
         strVfyPeer = confVals.get( 'VerifyPeer' )
         bVerify = False
@@ -1246,7 +1277,12 @@ class ConfigDlg(Gtk.Dialog):
 
         vfyPeerCheck.connect(
             "toggled", self.on_button_toggled, "VerifyPeer")
-        grid.attach( vfyPeerCheck, startCol + 1, startRow + 5, 1, 1 )
+        grid.attach( vfyPeerCheck, startCol + 3, startRow + 4, 1, 1 )
+
+        if self.bServer or not bGmSSL :
+            genKeyBtn = Gtk.Button.new_with_label("Gen Demo Key")
+            genKeyBtn.connect("clicked", self.on_choose_key_dir_clicked)
+            grid.attach( genKeyBtn, startCol + 1, startRow + 5, 1, 1 )
 
         #-----------------------------
         self.keyEdit = keyEditBox
@@ -1386,6 +1422,30 @@ class ConfigDlg(Gtk.Dialog):
 
         dialog.destroy()
         
+    def on_choose_key_dir_clicked( self, button ) :
+        dialog = Gtk.FileChooserDialog(
+            title="Please choose a directory", parent=self,
+                action=Gtk.FileChooserAction.SELECT_FOLDER )
+        
+        dialog.add_buttons(
+            Gtk.STOCK_CANCEL,
+            Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN,
+            Gtk.ResponseType.OK,
+        )
+        #self.add_filters(dialog, False)
+        response = dialog.run()
+        if response != Gtk.ResponseType.OK:
+            dialog.destroy()
+            return
+        strPath = dialog.get_filename()
+        bGmSSL = self.gmsslCheck.props.active
+        if not bGmSSL :
+            GenOpenSSLkey( self, strPath )
+        else:
+            GenGmSSLkey( self, strPath )
+        dialog.destroy()
+
     def add_filters(self, dialog, bKey ):
         filter_text = Gtk.FileFilter()
         if bKey :
