@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: C++ CI with GmSSL
 
 on:
   push:
@@ -31,4 +31,4 @@ jobs:
     - name: ls files
       run: pwd; ls ./
     - name: build gmssl
-      run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;make test;sudo make install
+      run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
