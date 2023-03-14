@@ -28,7 +28,5 @@ jobs:
     - name: install sip
       run: sudo apt-get -y install sip5-tools || sudo apt-get -y install sip-dev python3-sip python3-sip-dev || true; sudo apt-get -y install fuse3 libfuse3-3 libfuse3-dev || true; sudo apt-get -y install libjsoncpp1 libjsoncpp-dev || sudo apt-get -y install libjsoncpp25 libjsoncpp-dev 
 
-    - name: ls files
-      run: pwd; ls ./
     - name: build gmssl
-      run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
+      run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install;ls bin/;ls /usr/local/lib/
