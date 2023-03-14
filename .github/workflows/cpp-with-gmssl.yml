@@ -30,5 +30,6 @@ jobs:
 
     - name: build gmssl
       run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
-    - name: ls files
-      run: echo ls ./gmssl/build/bin/libgmssl.a;ls ./gmssl/build/bin/libgmssl.a -l || echo no such file;echo ls /usr/local/lib/libgmssl.a;ls /usr/local/lib/libgmssl.a || echo no such file
+    - name: find files
+      run: echo find libgmssl.a; find ./gmssl/ -name 'libgmssl.a' || true;
+      
