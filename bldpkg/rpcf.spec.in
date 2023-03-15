@@ -78,6 +78,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
 %{_libdir}/libsslpt.so*
+%{_libdir}/libgmsslpt.so*
 %{_libdir}/libwspt.so*
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_libdir}/librpcbaseJNI.so*
