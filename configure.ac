@@ -255,6 +255,7 @@ AC_CONFIG_FILES([Makefile
                  ipc/Makefile
                  rpc/Makefile
                  rpc/sslport/Makefile
+                 rpc/gmsslport/Makefile
                  rpc/wsport/Makefile
                  rpc/wsport/wsproto/Makefile
                  rpc/security/Makefile
