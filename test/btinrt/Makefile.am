@@ -18,9 +18,11 @@ btinrtclidir=$(sysconfdir)/rpcf
 btinrtcli_SOURCES= btinrtst.cpp btinrtst.h
 btinrtcli_LDADD=$(btinrt_LDFLAGS) libbtinrt.la
 btinrtcli_CPPFLAGS=$(btinrt_CPPFLAGS) -DCLIENT
+btinrtcli_LDFLAGS=-rdynamic
 
 btinrtsvr_SOURCES=btinrtst.cpp btinrtst.h
 btinrtsvr_LDADD=$(btinrt_LDFLAGS) libbtinrt.la
 btinrtsvr_CPPFLAGS=$(btinrt_CPPFLAGS) -DSERVER
+btinrtsvr_LDFLAGS=-rdynamic
 
 link_dir=./

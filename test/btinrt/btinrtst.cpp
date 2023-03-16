@@ -37,6 +37,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 static bool g_bAuth = false;
 static bool g_bRfc = false;
 static bool g_bSepConn = false;
+char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 
 void CIfSmokeTest::setUp()
 {

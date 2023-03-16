@@ -13,8 +13,8 @@
             "ProxyPortClass-1": "DBusLocalPdo",
             "comment-1": "IpAddress is the ip address of the server",
             "IpAddress": "127.0.0.1",
-            "Compression": "true",
-            "EnableSSL": "false",
+            "Compression": "false",
+            "EnableSSL": "true",
             "EnableWS": "false",
             "RouterPath": "/",
             "Interfaces": [
@@ -29,98 +29,13 @@
                 }
             ],
             "PortNumber": "4132"
-        },
-        {
-            "ObjectName": "RpcTcpBridgeImpl",
-            "BusName": "RpcTcpBusPort_0",
-            "PortClass": "TcpStreamPdo2",
-            "PortNumber": "4132",
-            "RequestTimeoutSec": "120",
-            "KeepAliveTimeoutSec": "60",
-            "Note-1": " bridge's ip address is decided at runtime",
-            "ProxyPortClass": "TcpStreamPdo2",
-            "RemoteModName": "btinrtsvr",
-            "Interfaces": [
-                {
-                    "Comment-0": "the following attributes are mandatory",
-                    "InterfaceName": "CRpcTcpBridgeImpl",
-                    "BindToClsid": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "IStream",
-                    "Pausable": "false"
-                },
-                {
-                    "InterfaceName": "CRpcTcpBridge",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true"
-                }
-            ]
-        },
-        {
-            "ObjectName": "RpcTcpBridgeAuthImpl",
-            "BusName": "RpcTcpBusPort_0",
-            "PortClass": "TcpStreamPdo2",
-            "PortNumber": "4132",
-            "RequestTimeoutSec": "120",
-            "KeepAliveTimeoutSec": "60",
-            "Note-1": " bridge's ip address is decided at runtime",
-            "ProxyPortClass": "TcpStreamPdo2",
-            "RemoteModName": "btinrtsvr",
-            "Interfaces": [
-                {
-                    "Comment-0": "the following attributes are mandatory",
-                    "InterfaceName": "CRpcTcpBridgeAuthImpl",
-                    "BindToClsid": "true",
-                    "DummyInterface": "true"
-                },
-                {
-                    "InterfaceName": "IInterfaceServer",
-                    "Pausable": "false",
-                    "DummyInterface": "true"
-                },
-                {
-                    "InterfaceName": "IUnknown",
-                    "Pausable": "false",
-                    "DummyInterface": "true"
-                },
-                {
-                    "InterfaceName": "IStream",
-                    "Pausable": "false",
-                    "DummyInterface": "true"
-                },
-                {
-                    "InterfaceName": "IStreamMH",
-                    "Pausable": "false",
-                    "DummyInterface": "true"
-                },
-                {
-                    "InterfaceName": "CRpcTcpBridge",
-                    "Pausable": "true"
-                },
-                {
-                    "InterfaceName": "CStatCountersServer",
-                    "Pausable": "true",
-                    "DummyInterface": "true"
-                }
-            ]
         }
     ],
     "ClassFactories": [
         "./libbtinrt.so",
         "./libauth.so",
         "./libsslpt.so",
+        "./libgmsslpt.so",
         "./libwspt.so"
     ]
 }

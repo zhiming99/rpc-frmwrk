@@ -51,7 +51,10 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
     echo build-in-router test
+    if [ -d ./reqfwdr ]; then pushd ./reqfwdr; fi
     ${bin_dir}/rpcf/btinrtcli || exit 5
+    cur_path=`basename $(pwd)`
+    if [ $cur_path == "reqfwdr" ]; then popd; fi
     kill -9 `pidof btinrtsvr`
     kill -9 `pidof ifsvrsmk`
     kill -9 `pidof kasvrtst`
