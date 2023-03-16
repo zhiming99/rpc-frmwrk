@@ -55,6 +55,7 @@
 8. `Python 3.5+.`
 9. `Java OpenJDK 8+.`
 10. `FUSE-3`
+10. `GmSSL 3.0`
 
 ## TODO
 1. 添加ridl的教程

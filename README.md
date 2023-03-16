@@ -52,6 +52,7 @@ This project depends on the following 3rd-party packags at runtime:
 8. `python 3.5+ is required for Python support.`
 9. `Java OpenJDK 8 or higher for Java support.`
 10. `FUSE-3 for rpcfs support`
+11. `GmSSL 3.0`
 
 #### Todo
 1. Add tutorials for `ridl`

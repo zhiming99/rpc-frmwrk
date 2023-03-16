@@ -1,4 +1,10 @@
 ---
+
+[`Thu Mar 16 2023 08:13:21 PM Beijing`]   
+1. I have now finished GmSSL support development officially, congratulations.
+2. Next I will remove the references to lowlevel API of the fuse, mainly read/write, because it goes beyond the FUSE expected usage of the API and will cost more extra effort to keep synchronized with the code changes from upstream.
+3. I will also work on the next level speed boost for stream transfer. In a particular configuration, `rpc-frmwrk` will remove the unix sockets between the rpcrouter and the client/server, which can reduce greatly the overhead of moving bytes through the stream channel. Thanks to the earlier work on gencpp2 and genfuse2, we are now able to move on with less effort to achieve this goal.
+
 [`Thu Mar 09 2023 09:20:04 PM Beijing`]   
 1. Merged the add-gmssl-support to the master branch. This PR has also delivered many bug-fixes, and `rpc-frmwrk` should be more stable now. Congratulations!
 2. The GmSSL's makefile is yet to provide because GmSSL itself is not provided as an off-the-shelf package and has to be built locally.
