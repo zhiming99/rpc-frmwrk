@@ -2,7 +2,7 @@ name: rpc-frmwrk CI scheduled
 
 on:
   schedule:
-    - cron: '10 0 */2 * *'
+    - cron: '10 0 */3 * *'
 
 jobs:
   build:
@@ -74,3 +74,13 @@ jobs:
       run: dbus-run-session bash tools/runtest.sh 2 k & 
     - name: starting websocket test
       run: dbus-run-session bash tools/runtest.sh 1 k
+
+    - name: configure gmssl
+      run: bash tools/cfg4gmssl.sh
+    - name: starting gmssl servers
+      run: dbus-run-session bash tools/runtest.sh 2 & 
+    - name: starting gmssl test
+      run: dbus-run-session bash tools/runtest.sh 1
+    - name: cleanup gmssl files
+      run: rm ./reqfwdr/driver.json && rmdir reqfwdr || true
+
