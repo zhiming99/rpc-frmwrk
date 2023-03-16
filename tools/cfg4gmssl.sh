@@ -26,7 +26,6 @@ popd
 if [ ! -d reqfwdr ]; then
     mkdir reqfwdr
 fi
-cd reqfwdr
-python3 ./tools/updgmskey.py /usr/local/etc/rpcf/driver.json $keydir > driver.json
+python3 ./tools/updgmskey.py /usr/local/etc/rpcf/driver.json $keydir > reqfwdr/driver.json
 
 
