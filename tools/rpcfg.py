@@ -1404,6 +1404,8 @@ class ConfigDlg(Gtk.Dialog):
         self.gridNet.show_all()
 
     def on_choose_file_clicked( self, button, bKey:bool ) :
+        if not button.editBox is None:
+            strPath = button.editBox.get_text()
         dialog = Gtk.FileChooserDialog(
             title="Please choose a file", parent=self, action=Gtk.FileChooserAction.OPEN
         )
@@ -1413,8 +1415,10 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.STOCK_OPEN,
             Gtk.ResponseType.OK,
         )
+        if strPath is not None:
+            dialog.set_filename( strPath )
 
-        self.add_filters(dialog, bKey)
+        #self.add_filters(dialog, bKey)
 
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
@@ -1423,6 +1427,7 @@ class ConfigDlg(Gtk.Dialog):
         dialog.destroy()
         
     def on_choose_key_dir_clicked( self, button ) :
+        strCurPath = self.keyEdit.get_text()
         dialog = Gtk.FileChooserDialog(
             title="Please choose a directory", parent=self,
                 action=Gtk.FileChooserAction.SELECT_FOLDER )
@@ -1433,6 +1438,7 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.STOCK_OPEN,
             Gtk.ResponseType.OK,
         )
+        dialog.set_filename( strCurPath )
         #self.add_filters(dialog, False)
         response = dialog.run()
         if response != Gtk.ResponseType.OK:

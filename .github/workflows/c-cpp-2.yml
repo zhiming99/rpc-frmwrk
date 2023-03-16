@@ -43,6 +43,15 @@ jobs:
     - name: install
       run: sudo make install
 
+    - name: configure gmssl
+      run: bash tools/cfg4gmssl.sh
+    - name: starting gmssl servers
+      run: dbus-run-session bash tools/runtest.sh 2 & 
+    - name: starting gmssl test
+      run: dbus-run-session bash tools/runtest.sh 1
+    - name: cleanup gmssl files
+      run: rm ./reqfwdr/driver.json && rmdir reqfwdr || true
+
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
     - name: cleanup for kerberos test

@@ -1,5 +1,13 @@
 pysources = rpcfg.py updcfg.py rpcfgnui.py
-EXTRA_DIST= $(pysources) README.md runtest.sh.in Dockerfile testcfgs/mincfg.json testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh gmsslkey.sh
+
+testcfgfiles=testcfgs/mincfg.json \
+testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh \
+gmsslkey.sh cfg4gmssl.sh updgmskey.py testcfgs/gmsslcfgs/signkey.pem \
+testcfgs/gmsslcfgs/certs.pem testcfgs/gmsslcfgs/cacerts.pem \
+testcfgs/gmsslcfgs/clientkey.pem testcfgs/gmsslcfgs/clientcert.pem \
+testcfgs/gmsslcfgs/rootcacert.pem testcfgs/gmsslcfgs/initcfg.json.in
+
+EXTRA_DIST= $(pysources) README.md runtest.sh.in Dockerfile $(testcfgfiles)
 
 docker:
 	docker build -t rpcf .
