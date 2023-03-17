@@ -5,7 +5,7 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the `
   * Programming with `rpcfs` requires only file operations and JSON support, and very little training effort.
   * The request/response/events are in JSON format, and programming language neutral.
     For example, you can even send a request via shell commands like `cat requests_file > jreq_0`. 
-  * Creating stream channels by `touch stream_0`, an `open` call from your programming language.
+  * Creating stream channels by `touch stream_0` under `stream` directory, as leads to a system call `open`.
     The stream channel delivers full-duplex bytes stream transfer through double encrypted channel of SSL & kerberos.
   * Easy management of the concurrency and resource consumption by adding/removing files or adding/removing directories.
   * Monitoring the working status of `service point` with the read-only file `svcstat`.
