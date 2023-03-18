@@ -1124,7 +1124,6 @@ gint32 CBuffer::Detach( char*& pMem,
     Expose( pMem, dwSize,
         dwOffset, dwTailOff );
 
-    // new ( this )CBuffer( 0 );
     pMem = m_pData;
     dwSize = m_dwSize;
     m_pData = m_arrBuf;
@@ -1148,7 +1147,6 @@ gint32 CBuffer::Attach( char* pMem,
         return -EACCES;
 
     Resize( 0 );
-    // new ( this )CBuffer( pMem , dwSize, false );
     m_pData = pMem;
     m_dwSize = dwSize;
 

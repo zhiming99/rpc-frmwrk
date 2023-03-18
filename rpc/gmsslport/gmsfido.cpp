@@ -42,6 +42,22 @@ extern "C"{
 #include "gmsfido.h"
 using namespace gmssl;
 
+#define DETACH_SAFE( pBuf_, pMem_, dwSize_, dwOff_, dwTailOff_ ) \
+do{ \
+    ret = pBuf_->Detach( pMem_, dwSize_, dwOff_, dwTailOff_ ); \
+    if( ret == -EACCES ) \
+    { \
+        pMem_ = ( decltype( pMem_ ) )malloc( pBuf_->size() ); \
+        memcpy( pMem_, pBuf_->ptr(), pBuf_->size() ); \
+        dwSize_ = pBuf_->size(); \
+        dwOff_ = 0; \
+        dwTailOff_ = dwSize_; \
+        pBuf_->Resize( 0 ); \
+        ret = 0;\
+        break; \
+    } \
+}while( 0 )
+
 namespace gmssl{
 extern int init_ctx( AGMS_CTX* ctx, bool is_client );
 }
@@ -99,15 +115,11 @@ gint32 BufToIove( BufPtr& pSrc,
                     ret = -EFAULT;
                     break;
                 }
-                ret = pSrc->Detach( pmem,
+
+                DETACH_SAFE( pSrc, pmem,
                     dwSize, dwStart, dwEnd );
-                if( ret == -EACCES )
-                {
-                    ret = 0;
-                    bCopy = true;
-                    continue;
-                }
-                else if( ERROR( ret ) )
+
+                if( ERROR( ret ) )
                     break;
 
                 ret = pDest->attach(
@@ -127,9 +139,8 @@ gint32 BufToIove( BufPtr& pSrc,
             }
 
         }
-        break;
 
-    }while( 1 );
+    }while( 0 );
 
     return ret;
 }
