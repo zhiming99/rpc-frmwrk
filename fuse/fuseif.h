@@ -199,6 +199,8 @@ class CFuseObjBase : public CDirEntry
 
     gint32 fs_access(const char *,
         fuse_file_info*, int);
+
+    void NotifyPoll();
     /*
     gint32 create();
     gint32 unlink();
@@ -431,20 +433,13 @@ class CFuseFileEntry : public CFuseObjBase
     {
         BufPtr pBuf;
         guint32 dwOff;
+        guint64 qwReqId;
     };
 
     std::deque< INBUF > m_queIncoming;
 
     using PINTR = 
         std::unique_ptr< fuseif_intr_data >;
-    struct REQCTX
-    {
-        fuse_req_t req;
-        size_t dwReqSize;
-        PINTR pintr;
-    };
-
-    std::deque< REQCTX > m_queReqs;
 
     gint32 FillBufVec(
         size_t& dwReqSize,
@@ -496,14 +491,6 @@ class CFuseFileEntry : public CFuseObjBase
         dst[ 2 ] = src[2];
         dst[ 3 ] = src[3];
         return ntohl( dwSize ) + sizeof( dwSize );
-    }
-
-    guint32 GetBytesRequired() const
-    { 
-        guint32 ret = 0;
-        for( auto& elem : m_queReqs )
-            ret += elem.dwReqSize;
-        return ret;
     }
 
     gint32 fs_getattr(
@@ -620,7 +607,8 @@ class CFuseEvtFile : public CFuseFileEntry
         fuseif_intr_data* d ) override;
 
     gint32 ReceiveEvtJson(
-        const stdstr& strMsg );
+        const stdstr& strMsg,
+        guint64 qwReqId = 0 );
 
     virtual gint32 ReceiveMsgJson(
         const stdstr& strMsg,
@@ -711,7 +699,7 @@ class CFuseRespFileSvr : public CFuseEvtFile
     }
 
     gint32 CancelFsRequests(
-        gint32 iRet ) override;
+        gint32 iRet = -ECANCELED ) override;
 
     gint32 fs_release(
         const char* path,
@@ -757,6 +745,9 @@ class CFuseReqFileSvr : public CFuseRespFileSvr
 
     gint32 ReceiveMsgJson(
         const stdstr& strMsg,
+        guint64 qwReqId );
+
+    gint32 OnUserCancelRequest(
         guint64 qwReqId );
 };
 
@@ -828,6 +819,9 @@ class CFuseReqFileProxy :
     gint32 fs_release(
         const char* path,
         fuse_file_info * fi ) override;
+
+    gint32 CancelFsRequests(
+        gint32 iRet = -ECANCELED ) override;
 };
 
 class CFuseStmDir : public CFuseDirectory
@@ -1023,7 +1017,6 @@ class CFuseStmFile : public CFuseFileEntry
         void *arg, 
         unsigned int flags,
         void *data ) override;
-    void NotifyPoll();
 
     gint32 fs_release(
         const char* path,
