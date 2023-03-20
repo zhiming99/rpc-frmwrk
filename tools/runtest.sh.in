@@ -5,10 +5,12 @@ export PATH=/usr/lib/ccache:$PATH
 export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 if [ "x$2" == "xk" ]; then
     auth="-a";
-    echo kinit -k -t /etc/krb5.keytab zhiming || exit 1;
-    kinit -k -t /etc/krb5.keytab zhiming || exit 1;
-    echo klist
-    klist
+    if [ ! -f /etc/krb5.keytab ]; then
+        echo kinit -k -t /etc/krb5.keytab zhiming || exit 1;
+        kinit -k -t /etc/krb5.keytab zhiming || exit 1;
+        echo klist
+        klist
+    fi
 else
     auth="";
 fi
