@@ -219,11 +219,17 @@ def IsVerifyPeer( drvCfg : dict, portClass : str ) -> Tuple[ int, bool ]:
         if drvCfg is None :
             return ( -errno.EINVAL, None )
         for port in drvCfg[ 'Ports' ] :
-            if port[ 'PortClass'] == portClass :
-                if 'VerifyPeer' in port:
-                    if port[ 'VerifyPeer' ] == 'true':
-                        return ( 0, True )
-                return ( 0, False )
+            if port[ 'PortClass'] != portClass :
+                continue
+            if not 'Parameters' in port : 
+                break
+            oParams = port[ 'Parameters' ]
+            if 'VerifyPeer' in oParams:
+                if oParams[ 'VerifyPeer' ] == 'true':
+                    return ( 0, True )
+                elif oParams[ 'VerifyPeer' ] == 'false':
+                    return ( 0, False )
+            return -errno.EINVAL, None
         return ( -errno.ENOENT, None )
     except Exception as err:
         return ( -errno.EFAULT, None )
@@ -233,12 +239,16 @@ def SetVerifyPeer( drvCfg : dict, bEnable : bool, portClass : str ) -> int:
         if drvCfg is None :
             return -errno.EINVAL
         for port in drvCfg[ 'Ports' ] :
-            if port[ 'PortClass'] == portClass :
-                if bEnable :
-                    port[ 'VerifyPeer' ] = 'true'
-                else:
-                    port[ 'VerifyPeer' ] = 'false'
-                return 0
+            if port[ 'PortClass'] != portClass :
+                continue
+            if not 'Parameters' in port : 
+                port[ 'Parameters' ] = dict()
+            oParams = port[ 'Parameters' ]
+            if bEnable :
+                oParams[ 'VerifyPeer' ] = 'true'
+            else:
+                oParams[ 'VerifyPeer' ] = 'false'
+            return 0
         return -errno.ENOENT
     except Exception as err:
         return -errno.EFAULT

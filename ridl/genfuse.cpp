@@ -4119,6 +4119,8 @@ gint32 CImplMainFuncFuse::Output()
             CCOUT<< "while( 0 );";
             NEW_LINES( 2 );
             Wa( "DestroyContext();" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    OutputMsg( ret, \"main(): error occurs\" );" );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINES(2);

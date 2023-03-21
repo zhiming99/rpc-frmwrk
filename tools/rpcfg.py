@@ -210,7 +210,7 @@ class ConfigDlg(Gtk.Dialog):
         else:
             confVals[ 'UsingGmSSL' ] = 'false'
 
-        bret = IsVerifyPeer( drvVal, sslPort );
+        bret = IsVerifyPeer( drvVal, sslPort )
         if bret[ 0 ] == 0 and bret[ 1 ] :
             confVals[ 'VerifyPeer' ] = 'true'
         else:

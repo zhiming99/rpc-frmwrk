@@ -1853,6 +1853,7 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
         ctx->keyfile = m_strKeyPath;
         ctx->certfile = m_strCertPath;
         ctx->cacertfile = m_strCAPath; 
+        ctx->verify_peer = m_bVerifyPeer;
 
         ret = gmssl::init_ctx( ctx, dwRole == 1 );
 
