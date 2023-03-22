@@ -801,7 +801,7 @@ gint32 CIoWatchTask::operator()(
     gint32 ret = 0;
 
     EnumTaskState iState = GetTaskState();
-    if( iState == stateStopped )
+    if( IsStopped( iState ) )
     {
         if( dwContext == eventIoWatch )
             return G_SOURCE_REMOVE;

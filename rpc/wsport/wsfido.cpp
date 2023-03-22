@@ -495,7 +495,7 @@ gint32 CRpcWebSockFido::ClearTask( gint32 iIdx )
     EnumTaskState iState =
         pTask->GetTaskState();
 
-    if( iState == stateStopped )
+    if( pTask->IsStopped( iState ) )
         return 0;
 
     ( *pTask )( eventCancelTask );

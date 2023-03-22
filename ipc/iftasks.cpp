@@ -1301,6 +1301,15 @@ gint32 CIfOpenPortTask::RunTask()
     return ret;
 }
 
+bool CIfTaskGroup::IsStopped(
+    EnumTaskState iState ) const
+{
+    if( iState == stateStopped ||
+        iState == stateStopping )
+        return true;
+    return false;
+}
+
 void CIfTaskGroup::PopTask()
 {
     if( !m_queTasks.empty() )
@@ -1360,7 +1369,7 @@ gint32 CIfTaskGroup::AppendTask(
     // canceling or cleanup is going on
     EnumTaskState iStat = GetTaskState();
 
-    if( unlikely( iStat == stateStopped ) )
+    if( unlikely( IsStopped( iStat ) ) )
         return ERROR_STATE;
 
     if( iStat == stateStarted && !IsRunning() )
@@ -1451,7 +1460,7 @@ gint32 CIfTaskGroup::RunTaskInternal(
     CStdRTMutex oTaskLock( GetLock() );
 
     EnumTaskState iState = GetTaskState();
-    if( unlikely( iState == stateStopped ) )
+    if( unlikely( IsStopped( iState ) ) )
         return STATUS_PENDING;
 
     if( unlikely( IsCanceling() ) )
@@ -1656,7 +1665,7 @@ gint32 CIfTaskGroup::Process(
 
     CStdRTMutex oTaskLock( GetLock() );
 
-    if( GetTaskState() == stateStopped )
+    if( IsStopped( GetTaskState() ) )
         return ERROR_STATE;
 
     CCfgOpener oCfg(
@@ -1689,7 +1698,7 @@ gint32 CIfTaskGroup::OnCancel(
     do{
         CStdRTMutex oTaskLock( GetLock() );
         EnumTaskState iState = GetTaskState();
-        if( iState == stateStopped )
+        if( IsStopped( iState ) )
             return STATUS_PENDING;
 
         if( unlikely( IsCanceling() ) )
@@ -1764,10 +1773,13 @@ gint32 CIfTaskGroup::OnCancel(
 gint32 CIfTaskGroup::OnComplete( gint32 iRet )
 {
     CStdRTMutex oTaskLock( GetLock() );
-    if( GetTaskState() == stateStopped )
+    if( IsStopped( GetTaskState() ) )
         return ERROR_STATE;
 
+    SetTaskState( stateStopping );
+    oTaskLock.Unlock();
     gint32 ret = super::OnComplete( iRet );
+    oTaskLock.Lock();
     SetTaskState( stateStopped );
     RemoveProperty( propContext );
     return ret;
@@ -2362,7 +2374,7 @@ gint32 CIfParallelTaskGrp::RunTaskInternal(
     CStdRTMutex oTaskLock( GetLock() );
 
     EnumTaskState iState = GetTaskState();
-    if( iState == stateStopped )
+    if( IsStopped( iState ) )
         return  STATUS_PENDING;
 
     if( IsCanceling() )
@@ -2455,7 +2467,7 @@ gint32 CIfParallelTaskGrp::AppendTask(
             break;
         }
         EnumTaskState iState = GetTaskState();
-        if( iState == stateStopped )
+        if( IsStopped( iState ) )
         {
             ret = ERROR_STATE;
             break;
@@ -2643,7 +2655,7 @@ gint32 CIfParallelTaskGrp::OnCancel(
 
     do{
         CStdRTMutex oTaskLock( GetLock() );
-        if( GetTaskState() == stateStopped )
+        if( IsStopped( GetTaskState() ) )
             return  ERROR_STATE;
 
         if( unlikely( IsCanceling() ) )
@@ -2832,6 +2844,15 @@ gint32 CIfParallelTask::OnEvent(
 * @{ */
 /**  @} */
 
+bool CIfParallelTask::IsStopped(
+    EnumTaskState iState ) const
+{
+    if( iState == stateStopped ||
+        iState == stateStopping )
+        return true;
+    return false;
+}
+
 gint32 CIfParallelTask::operator()(
     guint32 dwContext )
 {
@@ -2844,7 +2865,7 @@ gint32 CIfParallelTask::operator()(
     try{
         CStdRTMutex oTaskLock( GetLock() );
 
-        if( GetTaskState() == stateStopped )
+        if( IsStopped( GetTaskState() ) )
             return ERROR_STATE;
 
         if( GetTaskState() == stateStarting )
@@ -2883,7 +2904,10 @@ gint32 CIfParallelTask::operator()(
 gint32 CIfParallelTask::OnComplete(
     gint32 iRet )
 {
+    SetTaskState( stateStopping );
+    GetLock().unlock();
     gint32 ret = super::OnComplete( iRet );
+    GetLock().lock();
     SetTaskState( stateStopped );
     return ret;
 }
@@ -2891,7 +2915,7 @@ gint32 CIfParallelTask::OnComplete(
 gint32 CIfParallelTask::OnCancel(
     guint32 dwContext )
 {
-    if( GetTaskState() == stateStopped )
+    if( IsStopped( GetTaskState() ) )
         return 0;
 
     CancelIrp();
@@ -4662,7 +4686,7 @@ gint32 CIfInvokeMethodTask::OnKeepAliveRelay()
     do{
         CStdRTMutex oTaskLock( GetLock() );
 
-        if( GetTaskState() == stateStopped )
+        if( IsStopped( GetTaskState() ) )
             return ERROR_STATE;
 
         ObjPtr pObj;

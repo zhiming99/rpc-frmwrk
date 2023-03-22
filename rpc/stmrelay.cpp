@@ -2027,8 +2027,8 @@ gint32 CIfTcpStmTransTask::ResumeWriting()
         // let the ongoing irp to proceed
         // till it is completed
         CStdRTMutex oTaskLock( GetLock() );
-        guint32 dwState = GetTaskState();
-        if( dwState == stateStopped )
+        EnumTaskState dwState = GetTaskState();
+        if( IsStopped( dwState ) )
         {
             ret = ERROR_STATE;
             break;

@@ -5289,7 +5289,7 @@ gint32 CRpcTcpBridge::Handshake(
                 ppt->GetTaskState();
             oIfLock.Unlock();
             CStdRTMutex oTaskLock( ppt->GetLock() );
-            if( iState == stateStopped )
+            if( ppt->IsStopped( iState ) )
             {
                 // the handshake window has closed,
                 // but the bridge is not down yet

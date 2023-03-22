@@ -2151,7 +2151,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
             pParaLock->lock();
             EnumTaskState iTaskState =
                 pParaGrp->GetTaskState();
-            if( iTaskState == stateStopped ||
+            if( pParaGrp->IsStopped( iTaskState ) ||
                 ( iTaskState == stateStarted &&
                     !pParaGrp->IsRunning() ) )
             {
@@ -2227,7 +2227,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
             EnumTaskState iTaskState =
                 pParaGrp->GetTaskState();
 
-            if( iTaskState == stateStopped ||
+            if( pParaGrp->IsStopped( iTaskState ) ||
                 ( iTaskState == stateStarted &&
                     !pParaGrp->IsRunning() ) )
             {
@@ -7496,9 +7496,9 @@ gint32 CInterfaceServer::UserCancelRequest(
         {
             CStdRTMutex oTaskLock(
                 pInvTask->GetLock() );
-
-            if( pInvTask->GetTaskState() ==
-                stateStopped )
+            EnumTaskState iState = 
+                pInvTask->GetTaskState();
+            if( pInvTask->IsStopped( iState ) )
             {
                 ret = 0;
                 break;
@@ -7696,8 +7696,9 @@ gint32 CInterfaceServer::KeepAliveRequest(
         CStdRTMutex oTaskLock(
             pInvTask->GetLock() );
 
-        if( pInvTask->GetTaskState() ==
-            stateStopped )
+        EnumTaskState iState =
+            pInvTask->GetTaskState();
+        if( pInvTask->IsStopped( iState ) )
         {
             ret = ERROR_STATE;
             break;

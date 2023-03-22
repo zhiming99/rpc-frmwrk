@@ -1160,17 +1160,6 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
             break;
         }
         else if( unlikely(
-            psse->m_iEvent == sseRetWithFd ||
-            psse->m_iEvent == sseInvalid ) )
-        {
-            psse->m_iEvent = sseError;
-            psse->m_iData = -ENOTSUP;
-            psse->m_iEvtSrc = GetClsid();
-            pCtx->SetRespData( pInBuf );
-            pCtx->SetStatus( STATUS_SUCCESS );
-            break;
-        }
-        else if( unlikely(
             psse->m_iEvent != sseRetWithBuf ) )
         {
             psse->m_iEvent = sseError;
@@ -1257,7 +1246,22 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
     }while( 0 );
 
     if( ERROR( ret ) && bSSLErr )
-        pCtx->SetStatus( ret );
+    {
+        BufPtr pInBuf( true );
+        pInBuf->Resize(
+            sizeof( STREAM_SOCK_EVENT ) );
+
+        STREAM_SOCK_EVENT* psse = 
+            new ( pInBuf->ptr() ) STREAM_SOCK_EVENT;
+
+        psse->m_iEvent = sseError;
+        psse->m_iData = ret;
+        psse->m_iEvtSrc = GetClsid();
+
+        pCtx->SetRespData( pInBuf );
+        pCtx->SetStatus( 0 );
+        ret = 0;
+    }
 
     return ret;
 }

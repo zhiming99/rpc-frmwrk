@@ -239,6 +239,8 @@ class CIfParallelTask
         LONGWORD dwParam1,
         LONGWORD dwParam2,
         LONGWORD* pData );
+
+    bool IsStopped( EnumTaskState iState ) const;
 };
 
 class CIfEnableEventTask
@@ -467,6 +469,7 @@ class CIfTaskGroup
     gint32 GetHeadTask( TaskletPtr& pHead );
     gint32 GetTailTask( TaskletPtr& pTail );
     gint32 OnTaskComplete( gint32 iRetVal ) override;
+    bool IsStopped( EnumTaskState iState ) const;
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;

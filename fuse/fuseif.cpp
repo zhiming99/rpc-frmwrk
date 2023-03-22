@@ -2967,7 +2967,7 @@ gint32 CFuseRespFileSvr::CancelFsRequests(
         m_setTaskIds.clear();
 
         m_vecOutBufs.clear();
-        m_pReqSize.Clear();
+        m_pReqSize->Resize( 0 );
 
         oFileLock.Unlock();
 
