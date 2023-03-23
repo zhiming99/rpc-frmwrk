@@ -223,16 +223,16 @@ gint32 CDirEntry::GetChildren(
 }
 
 gint32 CDirEntry::GetFullPath(
-    stdstr& strPath )
+    stdstr& strPath ) const
 {
     gint32 ret = 0;
-    CDirEntry* pde = this;
+    const CDirEntry* pde = this;
     while( !pde->IsRoot() )
     {
         stdstr strName = this->GetName();
         if( strPath.size() )
-            strName.append( '/' );
-        strPath.insert( strPath.begin(), strName );
+            strName.push_back( '/' );
+        strPath.insert( 0, strName );
         pde = pde->GetParent();
     }
     if( strPath.size() )
