@@ -222,6 +222,27 @@ gint32 CDirEntry::GetChildren(
     return vecChildren.size();
 }
 
+gint32 CDirEntry::GetFullPath(
+    stdstr& strPath )
+{
+    gint32 ret = 0;
+    CDirEntry* pde = this;
+    while( !pde->IsRoot() )
+    {
+        stdstr strName = this->GetName();
+        if( strPath.size() )
+            strName.append( '/' );
+        strPath.insert( strPath.begin(), strName );
+        pde = pde->GetParent();
+    }
+    if( strPath.size() )
+        strPath.insert( strPath.begin(), '/' );
+    else
+        strPath = "/";
+    return 0;
+}
+
+
 CRegistry::CRegistry()
     : super()
 {
