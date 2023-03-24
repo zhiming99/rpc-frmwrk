@@ -37,6 +37,9 @@ using namespace rpcf;
 
 #define FUSE_MIN_FILES 2
 
+#if LOWLEVEL==1
+#include <fuse_lowlevel.h>
+#else
 void fuseif_finish_interrupt(
     fuse *f, fuse_req_t req,
     fuseif_intr_data *d);
@@ -53,6 +56,7 @@ void fuseif_complete_read(
     fuse_req_t req,
     gint32 ret,
     fuse_bufvec* buf );
+#endif
 
 namespace rpcf
 {
@@ -110,7 +114,7 @@ bool IsUnmounted( CRpcServices* pIf )
     return pCli->IsUnmounted();
 }
 
-fuse* GetFuse()
+MYFUSE* GetFuse()
 {
     CRpcServices* pSvc = GetRootIf();
     if( pSvc->IsServer() )
@@ -122,7 +126,7 @@ fuse* GetFuse()
     return pProxy->GetFuse();
 }
 
-void SetFuse( fuse* pFuse )
+void SetFuse( MYFUSE* pFuse )
 {
     CRpcServices* pSvc = GetRootIf();
     if( pSvc->IsServer() )
@@ -205,7 +209,6 @@ gint32 AddSvcPoint(
     return pRoot->AddSvcPoint(
         strObj, strDesc, iClsid );
 }
-
 
 void CFuseObjBase::SetPollHandle(
     fuse_pollhandle* pollHandle )
@@ -356,7 +359,8 @@ gint32 CFuseDirectory::fs_opendir(
     const char* path,
     fuse_file_info *fi )
 {
-    if( path == nullptr || fi == nullptr )
+    UNREFERENCED( path );
+    if( fi == nullptr )
         return -EINVAL;
 
     CFuseMutex oLock( GetLock() );
@@ -374,7 +378,9 @@ gint32 CFuseDirectory::fs_releasedir(
     const char* path,
     fuse_file_info *fi )
 {
-    if( path == nullptr || fi == nullptr )
+    UNREFERENCED( path );
+
+    if( fi == nullptr )
         return -EINVAL;
 
     CFuseMutex oLock( GetLock() );
@@ -605,9 +611,9 @@ gint32 CFuseDirectory::fs_rmdir(
 
                 stdstr strChild = strName;
 
-                fuse* pFuse = GetFuse();
+                MYFUSE* pFuse = GetFuse();
                 fuse_session* se =
-                    fuse_get_session( pFuse );
+                    fuseif_get_session( GetFuse() );
 
                 if( pSvcIf->IsServer() )
                 {
@@ -813,8 +819,7 @@ gint32 CFuseDirectory::fs_mkdir(
             ret = pSvc->AddSvcPoint( path, pCb );
             if( ERROR( ret ) )
                 break;
-            fuse_invalidate_path(
-                GetFuse(), "/" );
+
         }
         else
         {
@@ -830,11 +835,10 @@ gint32 CFuseDirectory::fs_mkdir(
             ret = pSvc->AddSvcPoint( path, pCb );
             if( ERROR( ret ) )
                 break;
-            stdstr strPath = "/" + GetName();
-            fuse_invalidate_path(
-                GetFuse(), strPath.c_str() );
         }
 
+        fuseif_invalidate_path(
+            GetFuse(), "/", this );
         // SetMode( mode );
 
     }while( 0 );
@@ -915,6 +919,84 @@ gint32 CFuseDirectory::fs_readdir(
 
     return ret;
 }
+
+#if LOWLEVEL==1
+static gint32 dirbuf_add( struct dirbuf *b,
+    const char *name, struct stat* stbuf,
+    off_t off, size_t max_size )
+{
+    size_t oldsize = b->size;
+
+    size_t inc_size = fuse_add_direntry(
+        b->req, NULL, 0, name, NULL, 0);
+
+    if( b->size + inc_size > max_size )
+        return -ENOMEM;
+
+    b->size += inc_size;
+    b->p = (char *) realloc(b->p, b->size);
+
+    fuse_add_direntry(b->req, b->p + oldsize,
+        b->size - oldsize, name,
+        stbuf, off );
+    return 0;
+}
+
+gint32 CFuseDirectory::fs_readdir_ll(
+    const char *path,
+    fuse_file_info *fi, dirbuf& dbuf,
+    off_t off, size_t max_size,
+    fuse_readdir_flags flags )
+{
+    gint32 ret = 0;
+    do{
+        CFuseMutex oLock( GetLock() );
+        std::vector< DIR_SPTR > vecChildren;
+        GetChildren( vecChildren );
+        oLock.Unlock();
+        if( off >= vecChildren.size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        off_t idx = 0;
+        for( auto& elem : vecChildren )
+        {
+            if( idx < off )
+                continue;
+
+            auto pObj = dynamic_cast
+                < CFuseObjBase* >( elem.get() );
+            if( pObj == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            struct stat file_stat;
+            pObj->fs_getattr(
+                "", nullptr, &file_stat );
+
+            const char* szName = 
+                pObj->GetName().c_str();
+
+            gint32 iRet = dirbuf_add(
+                &dbuf, szName,
+                &file_stat, idx, max_size );
+
+            if( ERROR( iRet ) )
+            {
+                // reached size limit 'max_size'
+                break;
+            }
+            ++idx;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+#endif
 
 gint32 CFuseTextFile::fs_read(
     const char* path,
@@ -2387,12 +2469,12 @@ gint32 CFuseStmFile::fs_release(
                 pParent->GetObjId();
 
         fuse_ino_t inoChild = GetObjId();
-        fuse* pFuse = GetFuse();
+        MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
         fuse_session* se =
-            fuse_get_session( pFuse );
+            fuseif_get_session( pFuse );
 
         fuse_lowlevel_notify_delete( se,
             inoParent, inoChild,
@@ -2589,12 +2671,12 @@ static gint32 fuseif_remove_req_svr(
         fuse_ino_t inoParent =
             _pSvcDir->GetObjId();
 
-        fuse* pFuse = GetFuse();
+        MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
         fuse_session* se =
-            fuse_get_session( pFuse );
+            fuseif_get_session( pFuse );
 
         for( auto& elem : vecInoid )
         {
@@ -2698,12 +2780,12 @@ static gint32 fuseif_remove_req_proxy(
         fuse_ino_t inoParent =
             _pSvcDir->GetObjId();
 
-        fuse* pFuse = GetFuse();
+        MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
         fuse_session* se =
-            fuse_get_session( pFuse );
+            fuseif_get_session( pFuse );
 
         for( auto& elem : vecInoid )
         {
@@ -3697,12 +3779,29 @@ stdstr CFuseConnDir::GetRouterPath(
     return strPath;
 }
 
+#define ADD_CHILD( _pDir, _pent ) \
+({  gint32 iRet = 0;\
+    if( bFirst && bInvalidate ) \
+    { \
+        stdstr strPath; \
+        iRet = _pDir->GetFullPath( strPath ); \
+        fuseif_invalidate_path( \
+            GetFuse(), strPath.c_str(), \
+            _pDir ); \
+        bFirst = false; \
+    } \
+    _pDir->AddChild( _pent ); \
+    iRet;\
+})
+
 gint32 CFuseConnDir::AddSvcDir(
-    const DIR_SPTR& pEnt )
+    const DIR_SPTR& pEnt,
+    bool bInvalidate )
 {
     auto pDir = static_cast
         < CFuseSvcDir* >( pEnt.get() );
     gint32 ret = 0;
+    bool bFirst = true;
     do{
         if( pDir == nullptr )
         {
@@ -3763,7 +3862,7 @@ gint32 CFuseConnDir::AddSvcDir(
         stdstr strPath2 = "/";
         if( strPath == strPath2 )
         {
-            ret = AddChild( pEnt );
+            ret = ADD_CHILD( this, pEnt );
             break;
         }
 
@@ -3807,7 +3906,7 @@ gint32 CFuseConnDir::AddSvcDir(
                 pNewDir->DecRef();
 
                 DIR_SPTR pEnt1( pNewDir );
-                pCur->AddChild( pEnt1 );
+                ADD_CHILD( pCur, pEnt1 );
                 pHop = pNewDir;
                 pNewDir->SetMode( S_IRUSR | S_IXUSR );
                 pConn = nullptr;
@@ -3824,13 +3923,13 @@ gint32 CFuseConnDir::AddSvcDir(
                 pNewDir->DecRef();
 
                 DIR_SPTR pEnt1( pNewDir );
-                pHop->AddChild( pEnt1 );
+                ADD_CHILD( pHop, pEnt1 );
                 pNewDir->SetMode( S_IRUSR | S_IXUSR );
                 pConn = pEnt1.get();
             }
             pCur = pConn;
         }
-        pCur->AddChild( pEnt );
+        ADD_CHILD( pCur, pEnt );
 
     }while( 0 );
 
@@ -4147,8 +4246,9 @@ void CFuseSvcProxy::AddReqFiles(
     gint32 ret = this->GetSvcPath( strPath );
     if( SUCCEEDED( ret ) )
     {
-        fuse_invalidate_path(
-            GetFuse(), strPath.c_str() );
+        fuseif_invalidate_path(
+            GetFuse(), strPath.c_str(),
+            m_pSvcDir.get() );
     }
 }
 
@@ -4314,8 +4414,9 @@ void CFuseSvcServer::AddReqFiles(
     gint32 ret = this->GetSvcPath( strPath );
     if( SUCCEEDED( ret ) )
     {
-        fuse_invalidate_path(
-            GetFuse(), strPath.c_str() );
+        fuseif_invalidate_path(
+            GetFuse(), strPath.c_str(),
+            m_pSvcDir.get() );
     }
 }
 
@@ -4801,8 +4902,8 @@ static gint32 fuseif_create_stream(
             pStmFile->IncOpCount();
             pDir->AddChild( pEnt );
 
-            fuse_invalidate_path(
-                GetFuse(), strPath.c_str() );
+            fuseif_invalidate_path( GetFuse(), 
+                strPath.c_str(), pDir );
         }
 
     }while( 0 );
@@ -4934,7 +5035,7 @@ int fuseop_readdir(
 }
 
 #include <signal.h>
-static int set_one_signal_handler(
+int set_one_signal_handler(
     int sig, void (*handler)(int), int remove)
 {
     struct sigaction sa;
@@ -4958,7 +5059,7 @@ static int set_one_signal_handler(
     return 0;
 }
 
-static void do_nothing(int sig)
+void do_nothing(int sig)
 {
     OutputMsg( sig, "doing nothing with signal" );
 }
@@ -5113,6 +5214,8 @@ static fuse_operations fuseif_ops =
     .lseek = fuseop_lseek,
 #endif
 };
+
+#if LOWLEVEL==0
 /* Command line parsing */
 struct options {
     int no_reconnect;
@@ -5131,7 +5234,8 @@ static const struct fuse_opt option_spec[] = {
 };
 
 extern ObjPtr g_pIoMgr;
-gint32 fuseif_main( fuse_args& args,
+
+gint32 fuseif_main_hl( fuse_args& args,
     fuse_cmdline_opts& opts )
 {
     struct fuse *fuse;
@@ -5198,6 +5302,7 @@ out1:
         return ERROR_FAIL;
     return res;
 }
+#endif
 
 // common method for a class factory library
 extern "C"

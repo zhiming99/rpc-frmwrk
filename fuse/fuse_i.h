@@ -14,6 +14,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#if LOWLEVEL==1
+
+gint32 fuseif_post_mkdir(
+    rpcf::IEventSink* pCallback,
+    fuse_file_info* fi );
+#else
 struct node_table {
     struct node **array;
     size_t use;
@@ -102,6 +108,7 @@ struct fuse_session {
 	size_t bufsize;
 	int error;
 };
+#endif
 #ifdef __cplusplus
 }
 #endif
@@ -279,7 +286,7 @@ static gint32 SafeCall(
 
                 CSyncCallback* pSync = pCallback;
                 fuse_file_info fi1 = {0};
-                fi1.fh = ( intptr_t )( IEventSink* )pSync;
+                fi1.fh = ( HANDLE )( IEventSink* )pSync;
                 stdstr strName = pSvcDir->GetName();
                 auto pParent = dynamic_cast
                 < CFuseDirectory* >( pSvcDir->GetParent() );
@@ -352,7 +359,7 @@ static gint32 SafeCall(
 
                 CSyncCallback* pSync = pCallback;
                 fuse_file_info fi1 = {0};
-                fi1.fh = ( intptr_t )( IEventSink* )pSync;
+                fi1.fh = ( HANDLE )( IEventSink* )pSync;
                 ret = ( pParent->*func )(
                     strName.c_str(), &fi1, args... );
                 _ortlk.Unlock();
@@ -361,7 +368,14 @@ static gint32 SafeCall(
                     pSync->WaitForCompleteWakable();
                     ret = pSync->GetError();
                 }
-
+#if LOWLEVEL==1
+                if( SUCCEEDED( ret ) )
+                {
+                    _ortlk.Lock();
+                    ret = fuseif_post_mkdir(
+                        pSync, fi );
+                }
+#endif
                 break;
             }
             ret = -EEXIST;
