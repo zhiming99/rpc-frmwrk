@@ -229,7 +229,7 @@ gint32 CDirEntry::GetFullPath(
     const CDirEntry* pde = this;
     while( !pde->IsRoot() )
     {
-        stdstr strName = this->GetName();
+        stdstr strName = pde->GetName();
         if( strPath.size() )
             strName.push_back( '/' );
         strPath.insert( 0, strName );
