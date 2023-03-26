@@ -143,7 +143,7 @@ gint32 fuseif_get_path(
         ret = fuseif_get_fhctx( ino, fhctx );
         if( ERROR( ret ) )
             break;
-        if( !fhctx.pFile || !fhctx.pSvc )
+        if( !fhctx.pFile )
         {
             ret = -EFAULT;
             break;
@@ -155,18 +155,29 @@ gint32 fuseif_get_path(
     return ret;
 }
 
-
 static void fuseif_ll_getattr(
     fuse_req_t req,
     fuse_ino_t ino, 
     fuse_file_info *fi) 
 {
+    gint32 ret = 0;
     struct stat stbuf;
-    gint32 ret = SafeCall(
-        "getattr", false,
-        &CFuseObjBase::fs_getattr,
-        nullptr, fi, &stbuf );
+    do{
+        stdstr strPath;
+        const char* szPath = nullptr;
+        if( fi == nullptr )
+        {
+            ret = fuseif_get_path( ino, strPath );
+            if( ERROR( ret ) )
+                break;
+            szPath = strPath.c_str();
+        }
+        ret = SafeCall(
+            "getattr", false,
+            &CFuseObjBase::fs_getattr,
+            szPath, fi, &stbuf );
 
+    }while( 0 );
     if( ERROR( ret ) )
     {
         fuseif_reply_err( req, ret );
@@ -322,7 +333,8 @@ static void fuseif_ll_opendir( fuse_req_t req,
         if( ERROR( ret ) )
             break;
 
-        ret = fuseop_opendir( nullptr, fi );
+        ret = fuseop_opendir(
+            strPath.c_str(), fi );
         if( ERROR( ret ) )
             break;
 
@@ -361,7 +373,7 @@ static void fuseif_ll_lookup(fuse_req_t req,
         ret = fuseif_get_fhctx( parent, fhctx );
         if( ERROR( ret ) )
             break;
-        if( !fhctx.pFile || !fhctx.pSvc )
+        if( !fhctx.pFile )
         {
             ret = -EFAULT;
             break;
@@ -380,7 +392,7 @@ static void fuseif_ll_lookup(fuse_req_t req,
             ret = -ENOENT;
             break;
         };
-        auto pfd = dynamic_cast< CFuseDirectory* >
+        auto pfd = dynamic_cast< CFuseObjBase* >
             ( pChild.get() );
 
         BufPtr pBuf( true );
@@ -593,6 +605,35 @@ static void fuseif_ll_poll(fuse_req_t req,
        fuseif_reply_err( req, ret );
 }
 
+extern gint32 fuseop_access(
+    const char* path, int flags );
+static void fuseif_ll_access(fuse_req_t req,
+    fuse_ino_t ino, int mask)
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPath;
+        ret = fuseif_get_path( ino, strPath );
+        if( ERROR( ret ) )
+            break;
+        ret = fuseop_access(
+            strPath.c_str(), mask );
+
+    }while( 0 );
+    fuseif_reply_err( req, ret );
+}
+
+extern gint32 fuseop_release(
+    const char* path, fuse_file_info * fi );
+
+static void fuseif_ll_release(fuse_req_t req,
+    fuse_ino_t ino, fuse_file_info *fi)
+{
+    gint32 ret = 0;
+    ret = fuseop_release( nullptr, fi );
+    fuseif_reply_err( req, ret );
+}
+
 static const struct fuse_lowlevel_ops fuseif_ll_oper = {
     .init       = fuseif_ll_init,
     .lookup     = fuseif_ll_lookup,
@@ -602,9 +643,11 @@ static const struct fuse_lowlevel_ops fuseif_ll_oper = {
     .rmdir      = fuseif_ll_rmdir,
     .open       = fuseif_ll_open,
     .read       = fuseif_ll_read,
+    .release    = fuseif_ll_release,
     .opendir    = fuseif_ll_opendir,
     .readdir    = fuseif_ll_readdir,
     .releasedir = fuseif_ll_releasedir,
+    .access     = fuseif_ll_access,
     .create     = fuseif_ll_create,
     .ioctl      = fuseif_ll_ioctl,
     .poll       = fuseif_ll_poll,
@@ -673,8 +716,6 @@ gint32 fuseif_main_ll( fuse_args& args,
 
     if (fuse_session_mount(se, opts.mountpoint) != 0)
         goto out3;
-
-    fuse_daemonize(opts.foreground);
 
     /* Block until ctrl+c or fusermount -u */
     if (opts.singlethread)

@@ -997,7 +997,7 @@ class CFuseStmFile : public CFuseFileEntry
         m_bFlowCtrl( false )
     {
         SetClassId( clsid( CFuseStmFile ) );
-        SetMode( S_IRUSR | S_IWUSR );
+        SetMode( S_IFREG | S_IRUSR | S_IWUSR );
 
         // using STM_MAX_PACKETS_REPORT - 1 to avoid
         // sending out the flow-control-lifted
@@ -1348,7 +1348,7 @@ class CFuseServicePoint :
                 new CFuseSvcDir( strName, this );
             m_pSvcDir = DIR_SPTR( pSvcDir ); 
             m_pSvcDir->DecRef();
-            pSvcDir->SetMode( S_IRWXU );
+            pSvcDir->SetMode( S_IFDIR | S_IRWXU );
 
             AddReqFiles( "0" );
 
@@ -1357,14 +1357,14 @@ class CFuseServicePoint :
                 new CFuseStmDir( this );
             auto pDir = DIR_SPTR( pStmDir ); 
             pStmDir->DecRef();
-            pStmDir->SetMode( S_IRWXU );
+            pStmDir->SetMode( S_IFDIR | S_IRWXU );
             m_pSvcDir->AddChild( pDir );
 
             auto pStat=
                 new CFuseSvcStat( this );
             auto psf = DIR_SPTR( pStat );
             pStat->DecRef();
-            pStat->SetMode( S_IRUSR );
+            pStat->SetMode( S_IFREG | S_IRUSR );
             m_pSvcDir->AddChild( psf );
 
         }while( 0 );
@@ -1538,7 +1538,8 @@ class CFuseServicePoint :
 
             auto pStmFile = new CFuseStmFile(
                 strName, hStream, this );
-            pStmFile->SetMode( S_IRUSR | S_IWUSR );
+            pStmFile->SetMode(
+                S_IFREG | S_IRUSR | S_IWUSR );
             pStmFile->DecRef();
 
             ret = pDir->AddChild(
@@ -1997,15 +1998,16 @@ class CFuseServicePoint :
                 if( ERROR( ret ) )
                     break;
 
-                CfgPtr pCfg;
+                CCfgOpener oCfg;
+                oCfg.SetPointer( propIoMgr,
+                    this->GetIoMgr() );
                 ret = CRpcServices::LoadObjDesc(
                     strPath, strName,
-                    this->IsServer(), pCfg );
+                    this->IsServer(), oCfg.GetCfg() );
                 if( ERROR( ret ) )
                     break;
 
                 ObjPtr pObj;
-                CCfgOpener oCfg( ( IConfigDb* )pCfg );
                 ret = oCfg.GetObjPtr( propObjList, pObj );
                 if( ERROR( ret ) )
                     break;
@@ -2328,6 +2330,9 @@ class CFuseRootBase:
         {
             fuse_ino_t ino =
                 ctx.pFile->GetObjId();
+            if( unlikely( ctx.pFile->GetClsid() ==
+                clsid( CFuseRootDir ) ) )
+                ino = 1;
             m_mapIno2Handle[ ino ] = fh;
         }
 #endif
@@ -2724,26 +2729,25 @@ class CFuseRootBase:
                     strInstName.substr( 0, pos );
             }
 
-            CfgPtr pCfg( true );
+            CCfgOpener oCfg;
             if( strObjInst != psi->m_strSvcName )
             {
-                CCfgOpener oCfg(
-                    ( IConfigDb* )pCfg );
                 // to override the original object
                 // instance name
                 oCfg[ propObjInstName ] =
                     strObjInst;
             }
 
+            oCfg.SetPointer( propIoMgr, pMgr );
             ret = CRpcServices::LoadObjDesc(
                 psi->m_strDescPath,
-                psi->m_strSvcName, !bProxy, pCfg );
+                psi->m_strSvcName, !bProxy,
+                oCfg.GetCfg());
             if( ERROR( ret ) )
                 break;
 
-            CCfgOpener oCfg( ( IConfigDb* )pCfg );
-            oCfg.SetPointer( propIoMgr, pMgr );
-            ret = pIf.NewObj( psi->m_iClsid, pCfg );
+            ret = pIf.NewObj( psi->m_iClsid,
+                oCfg.GetCfg() );
             if( ERROR( ret ) )
                 break;
 
@@ -2907,7 +2911,8 @@ class CFuseRootBase:
                 new CFuseCmdFile() ); 
             auto pObj = dynamic_cast
                 < CFuseObjBase* >( pFile.get() );
-            pObj->SetMode( S_IWUSR );
+            pObj->SetMode(
+                S_IFREG | S_IRUSR | S_IWUSR );
             pObj->DecRef();
             ret = pRoot->AddChild( pFile );
             if( ERROR( ret ) )
@@ -2917,7 +2922,7 @@ class CFuseRootBase:
                 new CFuseClassList( nullptr ) ); 
             pObj = dynamic_cast
                 < CFuseObjBase* >( pList.get() );
-            pObj->SetMode( S_IWUSR );
+            pObj->SetMode( S_IFREG | S_IRUSR );
             pObj->DecRef();
             ret = pRoot->AddChild( pList );
             if( ERROR( ret ) )
@@ -2925,7 +2930,8 @@ class CFuseRootBase:
 
             auto pUserDir = new CFuseDirectory(
                 USER_DIR, nullptr );
-            pUserDir->SetMode( S_IRUSR | S_IXUSR );
+            pUserDir->SetMode(
+                S_IFDIR | S_IRUSR | S_IXUSR );
             pUserDir->DecRef();
             m_pUserDir = DIR_SPTR( pUserDir );
             ret = pRoot->AddChild( m_pUserDir );

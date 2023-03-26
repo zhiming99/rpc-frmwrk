@@ -319,18 +319,20 @@ gint32 CFuseObjBase::fs_access(
            (  ( flags & W_OK ) != 0 );
         bool bCur =
            ( ( dwMode & S_IWUSR ) != 0 );
-        if( bReq != bCur )
+        if( !bCur && bReq )
             break;
 
         bReq = (  ( flags & R_OK ) != 0 );
         bCur = ( ( dwMode & S_IRUSR ) != 0 );
-        if( bReq != bCur )
+        if( !bCur && bReq )
             break;
 
         bReq = (  ( flags & X_OK ) != 0 );
         bCur = ( ( dwMode & S_IXUSR ) != 0 );
-        if( bReq != bCur )
+        if( !bCur && bReq )
             break;
+
+        ret = 0;
 
     }while( 0 );
 
@@ -369,6 +371,7 @@ gint32 CFuseDirectory::fs_opendir(
     fi->direct_io = 1;
     fi->keep_cache = 0;
     fi->nonseekable = 1;
+    fi->cache_readdir = 0;
     fi->fh = ( guint64 )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;
@@ -480,7 +483,7 @@ CFuseRootDir::CFuseRootDir( CRpcServices* pIf ) :
     super( "/", pIf )
 {
     SetClassId( clsid( CFuseRootDir ) );
-    SetMode( S_IRUSR | S_IXUSR );
+    SetMode( S_IFDIR | S_IRWXU );
 }
 
 gint32 CFuseRootDir::fs_getattr(
@@ -490,8 +493,8 @@ gint32 CFuseRootDir::fs_getattr(
 {
     INIT_STATBUF( stbuf );
     stbuf->st_ino = 1;
-    stbuf->st_mode = S_IFDIR | GetMode();
-    stbuf->st_nlink = 1;
+    stbuf->st_mode = S_IFDIR | S_IRWXU;
+    stbuf->st_nlink = IsHidden() ? 0 : 1;
     return 0;
 }
 
@@ -852,8 +855,8 @@ gint32 CFuseDirectory::fs_getattr(
 {
     INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
-    stbuf->st_mode = S_IFDIR | GetMode();
-    stbuf->st_nlink = 1;
+    stbuf->st_mode = S_IFDIR | S_IRUSR | S_IXUSR;
+    stbuf->st_nlink = IsHidden() ? 0 : 1;
     return 0;
 }
 
@@ -865,7 +868,7 @@ gint32 CFuseFileEntry::fs_getattr(
     INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
     stbuf->st_mode = S_IFREG | GetMode();
-    stbuf->st_nlink = 1;
+    stbuf->st_nlink = IsHidden() ? 0 : 1;
     guint32 size = 0;
     this->fs_ioctl( path, fi,
         FIOC_GETSIZE, nullptr, 0,
@@ -882,7 +885,7 @@ gint32 CFuseTextFile::fs_getattr(
     INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
     stbuf->st_mode = S_IFREG | GetMode();
-    stbuf->st_nlink = 1;
+    stbuf->st_nlink = IsHidden() ? 0 : 1;
     stbuf->st_size = m_strContent.size();
     return 0;
 }
@@ -952,19 +955,18 @@ gint32 CFuseDirectory::fs_readdir_ll(
     do{
         CFuseMutex oLock( GetLock() );
         std::vector< DIR_SPTR > vecChildren;
-        GetChildren( vecChildren );
-        oLock.Unlock();
-        if( off >= vecChildren.size() )
+        if( off > GetCount() )
         {
             ret = -ENOENT;
             break;
         }
-        off_t idx = 0;
-        for( auto& elem : vecChildren )
-        {
-            if( idx < off )
-                continue;
+        GetChildren( vecChildren );
+        oLock.Unlock();
 
+        off_t idx = 0;
+        for( off_t i = off; i < vecChildren.size(); ++i )
+        {
+            auto& elem = vecChildren[ i ];
             auto pObj = dynamic_cast
                 < CFuseObjBase* >( elem.get() );
             if( pObj == nullptr )
@@ -982,14 +984,13 @@ gint32 CFuseDirectory::fs_readdir_ll(
 
             gint32 iRet = dirbuf_add(
                 &dbuf, szName,
-                &file_stat, idx, max_size );
+                &file_stat, i + 1, max_size );
 
             if( ERROR( iRet ) )
             {
                 // reached size limit 'max_size'
                 break;
             }
-            ++idx;
         }
 
     }while( 0 );
@@ -1303,8 +1304,8 @@ gint32 CFuseCmdFile::fs_getattr(
 {
     INIT_STATBUF( stbuf );
     stbuf->st_ino = GetObjId();
-    stbuf->st_mode = S_IFREG | S_IWUSR;
-    stbuf->st_nlink = 1;
+    stbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR;
+    stbuf->st_nlink = IsHidden() ? 0 : 1;
     stbuf->st_size = 0;
     return 0;
 }
@@ -3723,7 +3724,7 @@ CFuseConnDir::CFuseConnDir( const stdstr& strName )
 {
     SetClassId( clsid( CFuseConnDir ) );
     // SetMode( S_IRUSR | S_IXUSR );
-    SetMode( S_IRWXU );
+    SetMode( S_IFDIR | S_IRWXU );
 
     // add an RO _nexthop directory this dir is
     // for docking nodes of sub router-path
@@ -4202,7 +4203,7 @@ void CFuseSvcProxy::AddReqFiles(
         new CFuseReqFileProxy( strName, this ) ); 
     pObj = dynamic_cast< CFuseObjBase* >
         ( pFile.get() );
-    pObj->SetMode( S_IRUSR | S_IWUSR );
+    pObj->SetMode( S_IFREG | S_IWUSR );
     pObj->DecRef();
     auto pReqFile = static_cast
         < CFuseReqFileProxy* >( pObj );
@@ -4216,7 +4217,7 @@ void CFuseSvcProxy::AddReqFiles(
         new CFuseRespFileProxy( strName, this ) );
     pObj = dynamic_cast
         < CFuseObjBase* >( pFile.get() );
-    pObj->SetMode( S_IRUSR );
+    pObj->SetMode( S_IFREG | S_IRUSR );
     pObj->DecRef();
     auto pRespFile = static_cast
         < CFuseRespFileProxy* >( pObj );
@@ -4230,7 +4231,7 @@ void CFuseSvcProxy::AddReqFiles(
         new CFuseEvtFile( strName, this ) ); 
     pObj = dynamic_cast
         < CFuseObjBase* >( pFile.get() );
-    pObj->SetMode( S_IRUSR );
+    pObj->SetMode( S_IFREG | S_IRUSR );
     pObj->DecRef();
     auto pEvtFile = static_cast
         < CFuseEvtFile* >( pObj );
@@ -4383,7 +4384,7 @@ void CFuseSvcServer::AddReqFiles(
         new CFuseReqFileSvr( strName, this ) ); 
     pObj = dynamic_cast< CFuseObjBase* >
         ( pFile.get() );
-    pObj->SetMode( S_IRUSR );
+    pObj->SetMode( S_IFREG | S_IRUSR );
     pObj->DecRef();
     auto pReqFile = static_cast
         < CFuseReqFileSvr* >( pObj );
@@ -4399,7 +4400,7 @@ void CFuseSvcServer::AddReqFiles(
         new CFuseRespFileSvr( strName, this ) ); 
     pObj = dynamic_cast
         < CFuseObjBase* >( pFile.get() );
-    pObj->SetMode( S_IWUSR );
+    pObj->SetMode( S_IFREG | S_IWUSR );
     pObj->DecRef();
     auto pRespFile = static_cast
         < CFuseRespFileSvr* >( pObj );
