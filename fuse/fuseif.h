@@ -55,7 +55,7 @@ gint32 fuseif_remkdir( const stdstr&, guint32 );
 
 #define propSvcPoint ( propReservedEnd + 1 )
 
-#define LOWLEVEL 0
+#define LOWLEVEL 1
 
 #if LOWLEVEL==1
 #define MYFUSE fuse_ll
@@ -2304,6 +2304,7 @@ class CFuseRootBase:
     std::vector< SVC_INFO > m_vecServices;
     std::hashmap< stdstr, guint32 > m_mapSvcInsts;
     DIR_SPTR m_pUserDir;
+    TaskGrpPtr  m_pRmDirTask;
 
     public:
     typedef T super;
@@ -3004,6 +3005,13 @@ class CFuseRootBase:
         // don't call it after the initialization stage so
         // far
         return m_pUserDir->AddChild( pEnt );
+    }
+
+    inline gint32 AddRmdirTask(
+        TaskletPtr& pTask )
+    { 
+        return this->AddSeqTaskInternal(
+            m_pRmDirTask, pTask, false );
     }
 };
 

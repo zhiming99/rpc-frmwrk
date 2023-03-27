@@ -416,6 +416,8 @@ static void fuseif_ll_lookup(fuse_req_t req,
         fuseif_reply_err( req, ret );
 }
 
+static CSharedLock s_oFuseApiLock;
+
 extern gint32 fuseop_unlink( const char* path );
 static void fuseif_ll_unlink(fuse_req_t req,
     fuse_ino_t parent, const char *name)
@@ -434,19 +436,100 @@ static void fuseif_ll_unlink(fuse_req_t req,
     fuseif_reply_err( req, ret );
 }
 
-extern int fuseop_rmdir( const char *path );
+extern int fuseif_rmdir_internal(
+    const char *path, IEventSink* pCb )
+{
+    gint32 ret = 0;
+    do{
+        ROOTLK_SHARED;
+        std::vector<stdstr> vecSubdirs;
+        CFuseObjBase* pSvcDir = nullptr;
+        ret = rpcf::GetSvcDir(
+            path, pSvcDir, vecSubdirs );
+        if( SUCCEEDED( ret ) && vecSubdirs.empty() )
+        {
+            fuse_file_info fi1 = {0};
+            fi1.fh = ( HANDLE )( IEventSink* )pCb;
+            stdstr strName = pSvcDir->GetName();
+            auto pParent = dynamic_cast
+            < CFuseDirectory* >( pSvcDir->GetParent() );
+            ret = pParent->fs_rmdir(
+                strName.c_str(), &fi1, false );
+            break;
+        }
+        else
+        {
+            ret = -EACCES;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
 static void fuseif_ll_rmdir( fuse_req_t req,
     fuse_ino_t parent, const char *name)
 {
     gint32 ret = 0;
+    gint32 (*func)( HANDLE, guint64,
+        const char*, IEventSink* ) =
+    ([]( HANDLE req, guint64 parent,
+        const char* name, IEventSink* pCb )->gint32
+    {
+        gint32 ret = 0;
+        do{
+            stdstr strPath;
+            ret = fuseif_get_path( parent, strPath );
+            if( ERROR( ret ) )
+                break;
+            strPath.push_back( '/' );
+            strPath += name;
+            ret = fuseif_rmdir_internal(
+                strPath.c_str(), pCb );
+
+        }while( 0 );
+        return ret;
+    });
+    
+    TaskletPtr pRmdir;
     do{
-        stdstr strPath;
-        ret = fuseif_get_path( parent, strPath );
+        InterfPtr pIf = GetRootIf();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CRpcServices* pSvc = pIf;
+
+        TaskletPtr pSyncTask;
+        ret = pSyncTask.NewObj(
+            clsid( CSyncCallback ) );
         if( ERROR( ret ) )
             break;
-        strPath.push_back( '/' );
-        strPath += name;
-        ret = fuseop_rmdir( strPath.c_str() );
+        CSyncCallback* pSync = pSyncTask;
+
+        ret = NEW_FUNCCALL_TASK2(
+            3, pRmdir, pSvc->GetIoMgr(),
+            func, ( HANDLE )req,
+            ( guint64)parent, name, nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        CIfRetryTask* pTemp = pRmdir;
+        pTemp->SetClientNotify( pSync );
+
+        CFuseRootProxy* pProxy = pIf;
+        CFuseRootServer* pSvr = pIf;
+        if( pSvr )
+            ret = pSvr->AddRmdirTask( pRmdir );
+        else
+            ret = pProxy->AddRmdirTask( pRmdir );
+        if( ERROR( ret ) )
+        {
+            ( *pRmdir )( eventCancelTask );
+            break;
+        }
+
+        pSync->WaitForCompleteWakable();
+        ret = pSync->GetError();
 
     }while( 0 );
     fuseif_reply_err( req, ret );

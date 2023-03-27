@@ -639,10 +639,12 @@ gint32 CFuseDirectory::fs_rmdir(
                     inoParent = pParent->GetObjId();
                     inoChild = psd->GetObjId();
 
+#if LOWLEVEL==0
                     fuse_lowlevel_notify_delete( se,
                         inoParent, inoChild,
                         strChild.c_str(),
                         strChild.size() );
+#endif
                 }
                 else
                 {
@@ -665,10 +667,12 @@ gint32 CFuseDirectory::fs_rmdir(
                     inoParent = pConn->GetObjId();
                     inoChild = psd->GetObjId();
 
+#if LOWLEVEL==0
                     fuse_lowlevel_notify_delete( se,
                         inoParent, inoChild,
                         strChild.c_str(),
                         strChild.size() );
+#endif
                     
                     do{
                         bool bRoot = false;
@@ -703,10 +707,12 @@ gint32 CFuseDirectory::fs_rmdir(
                         inoChild = pConn->GetObjId();
                         pHop->RemoveChild( strChild );
 
+#if LOWLEVEL==0
                         fuse_lowlevel_notify_delete( se,
                             inoParent, inoChild,
                             strChild.c_str(),
                             strChild.size() );
+#endif
 
                         if( bRoot )
                             break;
