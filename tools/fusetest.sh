@@ -132,7 +132,7 @@ RUNCLIENT
     echo umount mpsvr...
     while true; do
         umount mpsvr 
-        if mount | grep TestTypessvr; then
+        if mount | grep 'TestTypessvr\|hostsvr'; then
             sleep 1
             continue
         fi

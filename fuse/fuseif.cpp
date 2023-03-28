@@ -4783,6 +4783,7 @@ static gint32 fuseif_create_stream(
     fuse_file_info* fi )
 {
     gint32 ret = 0;
+    bool bLocked = true;
     do{
         ObjPtr ifPtr = pDir->GetIf();
         CRpcServices* pSvc = ifPtr;
@@ -4845,6 +4846,7 @@ static gint32 fuseif_create_stream(
         if( ERROR( ret ) )
             break;
 
+        bLocked = false;
         ortlock.Unlock();
         if( ret == STATUS_PENDING )
         {
@@ -4878,11 +4880,11 @@ static gint32 fuseif_create_stream(
                 1, ( guint32*& )hStream );
         }
 
+        bLocked = true;
+        ortlock.Lock();
         if( SUCCEEDED( ret ) )
         {
             // elevate to exclusive lock
-            ortlock.Lock();
-
             std::vector< stdstr > vecSubdirs;
             CFuseObjBase* pObj = nullptr;
             ret = GetSvcDir( strPath.c_str(),
@@ -4914,18 +4916,22 @@ static gint32 fuseif_create_stream(
         }
 
     }while( 0 );
-
+    if( !bLocked )
+    {
+        // restore the locking state 
+        ortlock.Lock();
+    }
     return ret;
 }
 
-gint32 fuseop_create( const char* path,
-    mode_t mode, fuse_file_info* fi )
+gint32 fuseop_create_internal( const char* path,
+    mode_t mode, fuse_file_info* fi,
+    CReadLock& ortlock )
 {
     if( path == nullptr || fi == nullptr )
         return -EINVAL;
     gint32 ret = 0;
     do{
-        ROOTLK_SHARED;
         stdstr strPath( path );
         size_t pos = strPath.rfind( '/' );
         if( pos + 1 == strPath.size() )
@@ -4984,8 +4990,24 @@ gint32 fuseop_create( const char* path,
         }
 
         ret = fuseif_create_stream(
-            _ortlk, strPath,
+            ortlock, strPath,
             strName, pDir, fi );
+
+    }while( 0 );
+
+    return ret;
+}
+
+static gint32 fuseop_create( const char* path,
+    mode_t mode, fuse_file_info* fi )
+{
+    if( path == nullptr || fi == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        ROOTLK_SHARED;
+        ret = fuseop_create_internal(
+            path, mode, fi, _ortlk );
 
     }while( 0 );
 

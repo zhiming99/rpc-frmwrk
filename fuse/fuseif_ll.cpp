@@ -569,8 +569,11 @@ static void fuseif_ll_init(void *userdata,
         SIGUSR1, do_nothing, 0 );
 }
 
-extern gint32 fuseop_create( const char* path,
-    mode_t mode, fuse_file_info* fi );
+extern gint32 fuseop_create_internal(
+    const char* path, mode_t mode,
+    fuse_file_info* fi,
+    CReadLock& ortlock );
+
 static void fuseif_ll_create(fuse_req_t req,
     fuse_ino_t parent, const char *name,
     mode_t mode, fuse_file_info *fi)
@@ -583,14 +586,16 @@ static void fuseif_ll_create(fuse_req_t req,
         if( ERROR( ret ) )
             break;
 
+        ROOTLK_SHARED;
+
         strPath.push_back( '/' );
         strPath += name;
-        ret = fuseop_create(
-            strPath.c_str(), mode, fi );
+        ret = fuseop_create_internal(
+            strPath.c_str(), mode,
+            fi, _ortlk );
         if( ERROR( ret ) )
             break;
 
-        ROOTLK_SHARED;
         auto pObj = reinterpret_cast
             < CFuseObjBase* >( fi->fh );
         struct stat stbuf;
