@@ -109,6 +109,7 @@ function singleMkdir()
     fi
     echo mkdir \$targdir
     mkdir \$targdir 2>/dev/null
+    sleep 1
     python3 $pydir/testypes/maincli.py ./\$conndir/\$targdir 0
     rmdir ./\$conndir/\$targdir
     popd
