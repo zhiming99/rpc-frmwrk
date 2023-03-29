@@ -201,24 +201,18 @@ gint32 fuseif_post_mkdir(
             break;
 
         CFuseSvcProxy* pCli = pSp;
+        CFuseSvcServer* pSvr = pSp;
         CFuseSvcDir* pSvcDir = nullptr;
         if( pCli != nullptr )
         {
             // proxy side has a complex process of
             // directory creation 
-            pSvcDir = static_cast< CFuseSvcDir* >
-                ( pCli->GetSvcDir().get() );
-
-            CDirEntry* pParent =
-                pSvcDir->GetParent();
-
-            stdstr strPath;
-            pParent->GetFullPath( strPath );
-            // FIXME: it is not adequate in some
-            // situations.
-            fuseif_invalidate_path( GetFuse(),
-                strPath.c_str(), pParent );
+            ret = -ENOENT;
+            break;
         }
+
+        pSvcDir = static_cast< CFuseSvcDir* >
+            ( pSvr->GetSvcDir().get() );
 
         if( fi == nullptr ||
             fi->fh == INVALID_HANDLE )
