@@ -127,7 +127,14 @@ RUNCLIENT
     pkill -f mainsvr.py
 
     echo umount mp
-    umount mp
+    while true; do
+        umount ./mp 
+        if mount | grep 'TestTypescli\|hostcli'; then
+            sleep 1
+            continue
+        fi
+        break
+    done
 
     echo umount mpsvr...
     while true; do

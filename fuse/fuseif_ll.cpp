@@ -410,6 +410,7 @@ static void fuseif_ll_lookup(fuse_req_t req,
         e->attr_timeout = 100000;
         e->attr = stbuf;
         fuse_reply_entry( req, e );
+        ret = 0;
 
     }while( 0 );
     if( ERROR( ret ) )

@@ -846,8 +846,8 @@ gint32 CFuseDirectory::fs_mkdir(
                 break;
         }
 
-        fuseif_invalidate_path(
-            GetFuse(), "/", this );
+        // fuseif_invalidate_path(
+        //     GetFuse(), "/", this );
         // SetMode( mode );
 
     }while( 0 );
@@ -3787,17 +3787,16 @@ stdstr CFuseConnDir::GetRouterPath(
 }
 
 #define ADD_CHILD( _pDir, _pent ) \
-({  gint32 iRet = 0;\
+({  gint32 iRet = _pDir->AddChild( _pent ); \
     if( bFirst && bInvalidate ) \
     { \
         stdstr strPath; \
-        iRet = _pDir->GetFullPath( strPath ); \
+        _pDir->GetFullPath( strPath ); \
         fuseif_invalidate_path( \
             GetFuse(), strPath.c_str(), \
             _pDir ); \
         bFirst = false; \
     } \
-    _pDir->AddChild( _pent ); \
     iRet;\
 })
 
