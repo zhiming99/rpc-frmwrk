@@ -20,7 +20,7 @@ function stressTest()
     release/TestTypessvr -f mpsvr &
     sleep 8 
     release/TestTypescli -f mp &
-    sleep 5
+    sleep 4
 
     #make sure TestTypesSvc created
     pushd mp
