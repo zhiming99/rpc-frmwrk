@@ -20,7 +20,7 @@ function stressTest()
     release/TestTypessvr -f mpsvr &
     sleep 8 
     release/TestTypescli -f mp &
-    sleep 5
+    sleep 4
 
     #make sure TestTypesSvc created
     pushd mp
@@ -114,7 +114,7 @@ function singleMkdir()
     popd
 }
 start=\$(date +%s.%N)
-for((i=0;i<200;i++));do
+for((i=0;i<199;i++));do
     singleMkdir \$i &
 done
 wait \`jobs -p\`
