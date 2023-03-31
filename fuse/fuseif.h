@@ -55,27 +55,15 @@ gint32 fuseif_remkdir( const stdstr&, guint32 );
 
 #define propSvcPoint ( propReservedEnd + 1 )
 
-#define LOWLEVEL 1
-
-#if LOWLEVEL==1
 #define MYFUSE fuse_ll
 #define fuseif_main fuseif_main_ll
 
-#define fuseif_invalidate_path( fuse, var0, var1 ) \
+#define fuseif_invalidate_path( fuse, var1 ) \
     fuse_lowlevel_notify_inval_inode( \
         fuse->se, ( var1 )->GetObjId(), 0, 0);
-#else
-#define MYFUSE fuse
-#define fuseif_main fuseif_main_hl
-
-#define fuseif_invalidate_path( fuse, var0, var1 ) \
-    fuse_invalidate_path( fuse, var0 );
-
-#endif
 
 extern "C"
 {
-#if LOWLEVEL==1
 struct dirbuf
 {
     fuse_req_t req = nullptr;
@@ -88,7 +76,6 @@ struct fuse_ll
     fuse_session* se = nullptr;
 };
 
-#endif
 }
 
 fuse_session* fuseif_get_session(
@@ -288,14 +275,12 @@ class CFuseObjBase : public CDirEntry
         struct fuse_file_info *fi )
     { return -ENOSYS; }
 
-#if LOWLEVEL==1
     virtual gint32 fs_readdir_ll(
         const char *path,
         fuse_file_info *fi, dirbuf& dbuf,
         off_t off, size_t max_size,
         fuse_readdir_flags flags )
     { return -ENOSYS; }
-#endif
     virtual gint32 fs_readdir(
         const char *path,
         fuse_file_info *fi,
@@ -414,13 +399,11 @@ class CFuseDirectory : public CFuseObjBase
         const char* path,
         fuse_file_info * fi ) override;
 
-#if LOWLEVEL==1
     gint32 fs_readdir_ll(
         const char *path,
         fuse_file_info *fi, dirbuf& dbuf,
         off_t off, size_t max_size,
         fuse_readdir_flags flags ) override;
-#endif
     gint32 fs_readdir(
         const char *path,
         fuse_file_info *fi,
@@ -1545,12 +1528,10 @@ class CFuseServicePoint :
             ret = pDir->AddChild(
                 DIR_SPTR( pStmFile ) );
 
-            strSvcPath.push_back( '/' );
-            strSvcPath.append( STREAM_DIR );
             if( GetFuse() )
             {
-                fuseif_invalidate_path( GetFuse(),
-                    strSvcPath.c_str(), pDir );
+                fuseif_invalidate_path(
+                    GetFuse(), pDir );
             }
             
         }while( 0 );
@@ -2326,7 +2307,6 @@ class CFuseRootBase:
             m_mapHandles.end() )
             return -EEXIST;
         m_mapHandles[ fh ] = ctx;
-#if LOWLEVEL == 1
         if( ctx.pFile )
         {
             fuse_ino_t ino =
@@ -2336,7 +2316,6 @@ class CFuseRootBase:
                 ino = 1;
             m_mapIno2Handle[ ino ] = fh;
         }
-#endif
         return STATUS_SUCCESS;
     }
 
@@ -2346,14 +2325,12 @@ class CFuseRootBase:
         auto itr = m_mapHandles.find( fh );
         if( itr == m_mapHandles.end() )
             return -ENOENT;
-#if LOWLEVEL == 1
         if( itr->second.pFile )
         {
             FHCTX& ctx = itr->second;
             fuse_ino_t ino = ctx.pFile->GetObjId();
             m_mapIno2Handle.erase( ino );
         }
-#endif
         m_mapHandles.erase( itr );
         return STATUS_SUCCESS;
     }
@@ -2368,7 +2345,6 @@ class CFuseRootBase:
         return STATUS_SUCCESS;
     }
 
-#if LOWLEVEL == 1
     gint32 GetFhFromIno(
         fuse_ino_t ino, guint64& fh ) const
     {
@@ -2379,7 +2355,6 @@ class CFuseRootBase:
         fh = itr->second;
         return STATUS_SUCCESS;
     }
-#endif
     gint32 RemoveSvcPoint( CRpcServices* pIf )
     {
         if( pIf == nullptr )
@@ -2640,7 +2615,7 @@ class CFuseRootBase:
                     if( SUCCEEDED( ret ) && GetFuse() )
                     {
                         fuseif_invalidate_path(
-                            GetFuse(), "/", pRoot );
+                            GetFuse(), pRoot );
                     }
                 }
             }
@@ -2801,11 +2776,9 @@ class CFuseRootBase:
             if( pCallback != nullptr )
             {
                 pTransGrp->SetClientNotify( pCallback );
-#if LOWLEVEL==1
                 CCfgOpenerObj oTaskCfg( pCallback );
                 oTaskCfg.SetPointer(
                     propSvcPoint, ( CRpcServices* )pIf );
-#endif
             }
 
             pTransGrp->AddRollback( pStopTask );

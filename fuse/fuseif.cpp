@@ -37,26 +37,7 @@ using namespace rpcf;
 
 #define FUSE_MIN_FILES 2
 
-#if LOWLEVEL==1
 #include <fuse_lowlevel.h>
-#else
-void fuseif_finish_interrupt(
-    fuse *f, fuse_req_t req,
-    fuseif_intr_data *d);
-
-void fuseif_prepare_interrupt(
-    fuse *f, fuse_req_t req,
-    fuseif_intr_data *d);
-
-void fuseif_free_buf(struct fuse_bufvec *buf);
-void fuseif_reply_err( fuse_req_t req, int err );
-
-void fuseif_complete_read(
-    fuse* pFuse,
-    fuse_req_t req,
-    gint32 ret,
-    fuse_bufvec* buf );
-#endif
 
 namespace rpcf
 {
@@ -639,12 +620,6 @@ gint32 CFuseDirectory::fs_rmdir(
                     inoParent = pParent->GetObjId();
                     inoChild = psd->GetObjId();
 
-#if LOWLEVEL==0
-                    fuse_lowlevel_notify_delete( se,
-                        inoParent, inoChild,
-                        strChild.c_str(),
-                        strChild.size() );
-#endif
                 }
                 else
                 {
@@ -666,13 +641,6 @@ gint32 CFuseDirectory::fs_rmdir(
 
                     inoParent = pConn->GetObjId();
                     inoChild = psd->GetObjId();
-
-#if LOWLEVEL==0
-                    fuse_lowlevel_notify_delete( se,
-                        inoParent, inoChild,
-                        strChild.c_str(),
-                        strChild.size() );
-#endif
                     
                     do{
                         bool bRoot = false;
@@ -706,13 +674,6 @@ gint32 CFuseDirectory::fs_rmdir(
                         inoParent = pHop->GetObjId();
                         inoChild = pConn->GetObjId();
                         pHop->RemoveChild( strChild );
-
-#if LOWLEVEL==0
-                        fuse_lowlevel_notify_delete( se,
-                            inoParent, inoChild,
-                            strChild.c_str(),
-                            strChild.size() );
-#endif
 
                         if( bRoot )
                             break;
@@ -847,7 +808,7 @@ gint32 CFuseDirectory::fs_mkdir(
         }
 
         // fuseif_invalidate_path(
-        //     GetFuse(), "/", this );
+        //     GetFuse(), this );
         // SetMode( mode );
 
     }while( 0 );
@@ -929,7 +890,6 @@ gint32 CFuseDirectory::fs_readdir(
     return ret;
 }
 
-#if LOWLEVEL==1
 static gint32 dirbuf_add( struct dirbuf *b,
     const char *name, struct stat* stbuf,
     off_t off, size_t max_size )
@@ -1003,7 +963,6 @@ gint32 CFuseDirectory::fs_readdir_ll(
 
     return ret;
 }
-#endif
 
 gint32 CFuseTextFile::fs_read(
     const char* path,
@@ -3790,11 +3749,8 @@ stdstr CFuseConnDir::GetRouterPath(
 ({  gint32 iRet = _pDir->AddChild( _pent ); \
     if( bFirst && bInvalidate ) \
     { \
-        stdstr strPath; \
-        _pDir->GetFullPath( strPath ); \
         fuseif_invalidate_path( \
-            GetFuse(), strPath.c_str(), \
-            _pDir ); \
+            GetFuse(), _pDir ); \
         bFirst = false; \
     } \
     iRet;\
@@ -4248,14 +4204,8 @@ void CFuseSvcProxy::AddReqFiles(
     if( m_pSvcDir->GetParent() == nullptr )
         return;
 
-    stdstr strPath;
-    gint32 ret = this->GetSvcPath( strPath );
-    if( SUCCEEDED( ret ) )
-    {
-        fuseif_invalidate_path(
-            GetFuse(), strPath.c_str(),
-            m_pSvcDir.get() );
-    }
+    fuseif_invalidate_path(
+        GetFuse(), m_pSvcDir.get() );
 }
 
 gint32 CFuseSvcProxy::DoRmtModEventFuse(
@@ -4416,14 +4366,8 @@ void CFuseSvcServer::AddReqFiles(
     if( m_pSvcDir->GetParent() == nullptr )
         return;
 
-    stdstr strPath;
-    gint32 ret = this->GetSvcPath( strPath );
-    if( SUCCEEDED( ret ) )
-    {
-        fuseif_invalidate_path(
-            GetFuse(), strPath.c_str(),
-            m_pSvcDir.get() );
-    }
+    fuseif_invalidate_path(
+        GetFuse(), m_pSvcDir.get() );
 }
 
 gint32 CFuseSvcServer::IncStmCount(
@@ -4910,8 +4854,8 @@ static gint32 fuseif_create_stream(
             pStmFile->IncOpCount();
             pDir->AddChild( pEnt );
 
-            fuseif_invalidate_path( GetFuse(), 
-                strPath.c_str(), pDir );
+            fuseif_invalidate_path(
+                GetFuse(), pDir );
         }
 
     }while( 0 );
@@ -5221,116 +5165,6 @@ out1:
         return -EINVAL;
     return res;
 }
-
-static fuse_operations fuseif_ops =
-{
-    .getattr = fuseop_getattr,
-    .mkdir = fuseop_mkdir,
-    .unlink = fuseop_unlink,
-    .rmdir = fuseop_rmdir,
-    .open = fuseop_open,
-    .release = fuseop_release,
-    .opendir = fuseop_opendir,
-    .readdir = fuseop_readdir,
-    .releasedir = fuseop_releasedir,
-    .init = fuseop_init,
-    .create = fuseop_create,
-    .utimens = fuseop_utimens,
-    .ioctl = fuseop_ioctl,
-    .poll = fuseop_poll,
-#if FUSE_USE_VERSION >= 35
-    .lseek = fuseop_lseek,
-#endif
-};
-
-#if LOWLEVEL==0
-/* Command line parsing */
-struct options {
-    int no_reconnect;
-    // int update_interval;
-};
-static struct options options = {
-        .no_reconnect = 0,
-    //     .update_interval = 1,
-};
-
-#define OPTION(t, p) { t, offsetof(struct options, p), 1 }
-static const struct fuse_opt option_spec[] = {
-        OPTION("--no-reconnect", no_reconnect),
-   //      OPTION("--update-interval=%d", update_interval),
-        FUSE_OPT_END
-};
-
-extern ObjPtr g_pIoMgr;
-
-gint32 fuseif_main_hl( fuse_args& args,
-    fuse_cmdline_opts& opts )
-{
-    struct fuse *fuse;
-    struct fuse_loop_config config;
-    struct fuse_session *se = nullptr; 
-    int res;
-
-    if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
-        return 1;
-
-    if( options.no_reconnect )
-    {
-        CIoManager* pMgr = g_pIoMgr;
-        pMgr->SetCmdLineOpt( propConnRecover, false );
-    }
-
-    if (fuse_parse_cmdline(&args, &opts) != 0)
-        return 1;
-
-    fuse = fuse_new(&args, &fuseif_ops, sizeof(fuseif_ops), NULL);
-    if (fuse == NULL) {
-        res = 1;
-        goto out1;
-    }
-    SetFuse( fuse );
-    if( opts.mountpoint == nullptr )
-    {
-        res = 1;
-        goto out1;
-    }
-
-    if (fuse_mount(fuse,opts.mountpoint) != 0) {
-        res = 1;
-        goto out2;
-    }
-
-    se = fuse_get_session(fuse);
-    if (fuse_set_signal_handlers(se) != 0) {
-        res = 1;
-        goto out3;
-    }
-    fuseif_tweak_llops( se );
-
-    if (opts.singlethread)
-        res = fuse_loop(fuse);
-    else {
-        config.clone_fd = opts.clone_fd;
-        config.max_idle_threads = opts.max_idle_threads;
-        res = fuse_loop_mt(fuse, &config);
-    }
-    if (res)
-        res = 1;
-
-    fuse_remove_signal_handlers(se);
-out3:
-    fuseif_unmount();
-    fuse_unmount(fuse);
-out2:
-    fuse_destroy(fuse);
-out1:
-    free(opts.mountpoint);
-    fuse_opt_free_args(&args);
-    if( res != 0 )
-        return ERROR_FAIL;
-    return res;
-}
-#endif
 
 // common method for a class factory library
 extern "C"

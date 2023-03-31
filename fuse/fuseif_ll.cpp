@@ -103,8 +103,6 @@ static void fuseif_ll_write_buf(fuse_req_t req,
     fuse_ino_t ino, fuse_bufvec *buf,
     off_t off, fuse_file_info *fi);
 
-#if LOWLEVEL==1
-
 #define fuseif_prepare_interrupt( f, req, d)
 #define fuseif_finish_interrupt( f, req, d)
 
@@ -821,103 +819,6 @@ out1:
         return ERROR_FAIL;
     return res;
 }
-#else
-static void fuseif_rwinterrupt(
-    fuse_req_t req, void *d_)
-{
-    if( d_ == nullptr )
-        return;
-
-    fuseif_intr_data *d =
-        ( fuseif_intr_data* )d_;
-    MYFUSE *f = rpcf::GetFuse();
-
-    if (d->id == pthread_self())
-        return;
-
-    CFuseObjBase* pObj = d->fe;
-    while( pObj != nullptr )
-    {
-        CFuseStmFile* pstm = dynamic_cast
-            < CFuseStmFile* >( pObj );
-        if( pstm != nullptr )
-        {
-            CFuseMutex oLock( pstm->GetLock() );
-            pstm->CancelFsRequest( req );
-            break;
-        }
-        CFuseFileEntry* pfe = dynamic_cast
-            < CFuseFileEntry* >( pObj );
-        if( pfe != nullptr )
-        {
-            CFuseMutex oLock( pfe->GetLock() );
-            pfe->CancelFsRequest( req );
-            break;
-        }
-        break;
-    }
-    pthread_mutex_lock(&f->lock);
-    while (!d->finished) {
-        struct timeval now;
-        struct timespec timeout;
-
-        pthread_kill(d->id, f->conf.intr_signal );
-        gettimeofday(&now, NULL);
-        timeout.tv_sec = now.tv_sec + 1;
-        timeout.tv_nsec = now.tv_usec * 1000;
-        pthread_cond_timedwait(&d->cond, &f->lock, &timeout);
-    }
-    pthread_mutex_unlock(&f->lock);
-}
-
-static void fuseif_do_finish_interrupt(
-    fuse *f, fuse_req_t req,
-    fuseif_intr_data *d)
-{
-    pthread_mutex_lock(&f->lock);
-    d->finished = 1;
-    pthread_cond_broadcast(&d->cond);
-    pthread_mutex_unlock(&f->lock);
-    fuse_req_interrupt_func(req, NULL, NULL);
-    pthread_cond_destroy(&d->cond);
-}
-
-static void fuseif_do_prepare_interrupt(
-    fuse_req_t req,
-    fuseif_intr_data *d)
-{   
-    d->id = pthread_self();
-    pthread_cond_init(&d->cond, NULL);
-    d->finished = 0;
-    fuse_req_interrupt_func(req, fuseif_rwinterrupt, d);
-}       
-        
-inline void fuseif_finish_interrupt(
-    fuse *f, fuse_req_t req,
-    fuseif_intr_data *d)
-{   
-    if (f->conf.intr)
-        fuseif_do_finish_interrupt(f, req, d);
-}       
-
-inline void fuseif_prepare_interrupt(
-    fuse *f, fuse_req_t req,
-    fuseif_intr_data *d)
-{              
-    if (f->conf.intr)
-        fuseif_do_prepare_interrupt(req, d);
-}
-
-void fuseif_tweak_llops( fuse_session* se )
-{
-    if( se == nullptr )
-        return;
-
-    se->op.read = fuseif_ll_read;
-    se->op.write_buf = fuseif_ll_write_buf;
-    return;
-}
-#endif
 
 static void fuseif_ll_read(fuse_req_t req,
     fuse_ino_t ino, size_t size,
