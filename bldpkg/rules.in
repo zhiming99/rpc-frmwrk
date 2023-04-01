@@ -8,8 +8,10 @@ ifeq ($(build_cpu),arm)
 dhopt:= --no-parallel
 endif
 
+cfgopt:= @GMSSL_CFGOPT@
+
 %:
 	dh $@ $(dhopt)
 
 override_dh_auto_configure:
-	dh_auto_configure -- "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
+	dh_auto_configure -- $(cfgopt) "CPPFLAGS=-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"

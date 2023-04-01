@@ -37,7 +37,9 @@ the @PACKAGE_NAME@ static libraries.
 ./configure --prefix=/usr --includedir=%{_includedir} --mandir=%{_mandir} \
 --infodir=%{_infodir} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} \
 --disable-silent-rules --libdir=%{_libdir} \
---disable-maintainer-mode --disable-dependency-tracking CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
+--disable-maintainer-mode --disable-dependency-tracking \
+CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
+@GMSSL_CFGOPT@
 
 %make_build
 
@@ -54,7 +56,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/rpcfg.py
 %{_bindir}/rpcf/rpcfgnui.py
 %{_bindir}/rpcf/updcfg.py
-%{_bindir}/rpcf/gmsslkey.py
+@GMSSL_RPMFILES@
 %{_bindir}/rpcrouter
 %{_bindir}/hostsvr
 %{_bindir}/hostcli
@@ -78,7 +80,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
 %{_libdir}/libsslpt.so*
-%{_libdir}/libgmsslpt.so*
 %{_libdir}/libwspt.so*
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_libdir}/librpcbaseJNI.so*

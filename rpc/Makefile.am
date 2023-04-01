@@ -22,7 +22,9 @@ librpc_la_LIBADD= -L../combase -L../ipc ../combase/libcombase.la ../ipc/libipc.l
 
 SUBDIRS= . router
 
+if ENABLE_GMSSL
 SUBDIRS += gmsslport
+endif
 
 if ENABLE_OPENSSL
 SUBDIRS += sslport wsport

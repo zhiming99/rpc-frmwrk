@@ -269,7 +269,9 @@ AC_CONFIG_FILES([Makefile
                  pics/Makefile
                  bldpkg/Makefile
                  bldpkg/control
+                 bldpkg/rules
                  bldpkg/rpcf.spec
+                 bldpkg/rpcf.install
                  java/Makefile
                  examples/Makefile
                  fuse/Makefile
@@ -290,22 +292,28 @@ AC_CONFIG_FILES([Makefile
 
 AC_ARG_ENABLE([testcases],
     [AS_HELP_STRING([--disable-testcases], [build and install without testcases])],
-    [:],
+    [enable_testcases=no],
     [enable_testcases=yes])
 
 AC_ARG_ENABLE([openssl],
     [AS_HELP_STRING([--disable-openssl], [build and install without openssl])],
-    [:],
+    [enable_openssl=no],
     [enable_openssl=yes])
 
 AC_ARG_ENABLE([kerberos],
     [AS_HELP_STRING([--disable-kerberos], [build and install without kerberos])],
-    [:],
+    [enable_kerberos=no],
     [enable_kerberos=yes])
 
-AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
-AM_CONDITIONAL([ENABLE_OPENSSL],[test "$enable_openssl" = "yes"])
-AM_CONDITIONAL([ENABLE_KERBEROS],[test "$enable_kerberos" = "yes"])
+AC_ARG_ENABLE([gmssl],
+    [AS_HELP_STRING([--disable-gmssl], [build and install without GmSSL])],
+    [enable_gmssl=no],
+    [enable_gmssl=yes])
+
+AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
+AM_CONDITIONAL([ENABLE_OPENSSL],[test x$enable_openssl = xyes])
+AM_CONDITIONAL([ENABLE_KERBEROS],[test x$enable_kerberos = xyes])
+AM_CONDITIONAL([ENABLE_GMSSL],[test x$enable_gmssl = xyes])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
@@ -315,5 +323,22 @@ AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)
+
+case $enable_gmssl in
+    yes)
+        GMSSL_DEBFILES='usr/bin/rpcf/gmsslkey.sh'
+        GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.py %{_libdir}/libgmsslpt.so*'
+        GMSSL_CFGOPT=
+    ;;
+    no)
+        GMSSL_DEBFILES=
+        GMSSL_RPMFILES=
+        GMSSL_CFGOPT='--disable-gmssl'
+    ;;
+esac
+
+AC_SUBST(GMSSL_DEBFILES)
+AC_SUBST(GMSSL_RPMFILES)
+AC_SUBST(GMSSL_CFGOPT)
 
 AC_OUTPUT

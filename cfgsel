@@ -1,10 +1,13 @@
 #!/sh/bash
-if [ "x$1" == "xd" ]; then
-    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1 -fno-strict-aliasing"
-elif [ "x$1" == "xr" ]; then
-    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
-elif [ "x$1" == "x" ]; then
-    echo "Usage: cfgsel <d/r>"
+bld=$1
+shift
+if [ "x$bld" == "xd" ]; then
+    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O0 -ggdb -DDEBUG -D_DEBUG=1 -fno-strict-aliasing" $@
+elif [ "x$bld" == "xr" ]; then
+    CONFIG_SHELL=/bin/bash ./configure "CPPFLAGS=-O2 -g -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" $@
+else
+    echo "Usage: cfgsel <d/r> [options]"
     echo "  d: debug build"
     echo "  r: release build"
+    echo "  options: options to pass to the configure script"
 fi
