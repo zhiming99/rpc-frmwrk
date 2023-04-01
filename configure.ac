@@ -327,7 +327,7 @@ AC_SUBST(VERSION2)
 case $enable_gmssl in
     yes)
         GMSSL_DEBFILES='usr/bin/rpcf/gmsslkey.sh'
-        GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.pyZZZZZ%{_libdir}/libgmsslpt.so*'
+        GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.shZZZZZ%{_libdir}/libgmsslpt.so*'
         GMSSL_CFGOPT=
     ;;
     no)
