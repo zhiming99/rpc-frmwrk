@@ -1,12 +1,26 @@
 #!/bin/bash
 # parameters:
 # $1: path to store the keys and certs
-# $2: number of client keys
-# $3: number of server keys
-# gmssl demo key generator, adapted from GmSSL script from 
-# https://github.com/guanzhi/GmSSL/blob/master/demos/scripts/tls13demo.sh
+# $2: number of client keys, 1 if not specified
+# $3: number of server keys, 1 if not specified
+# gmssl demo key generator, adapted from GmSSL script
+# @https://github.com/guanzhi/GmSSL/blob/master/demos/scripts/tls13demo.sh
+
 PATH=/usr/local/bin:$PATH
-targetdir=$1
+if [ "x$1" != "x" -a ! -d $1 ]; then
+    echo Usage: bash gmsslkey.sh [directory to store keys] [ number of client keys ] [number of server keys]
+    exit 1
+fi
+
+if [ "x$1" == "x" ]; then
+    targetdir="$HOME/.rpcf/gmssl"
+    if [ ! -d $targetdir ]; then
+        mkdir -p $targetdir
+    fi
+else
+    targetdir=$1
+fi
+
 if [ "x$2" == "x" ];then
     numcli=1
 else
@@ -19,15 +33,7 @@ else
     numsvr=$3
 fi
 
-if [ ! -d $targetdir ]; then
-    exit 1
-fi
-
 pushd $targetdir
-
-if [ ! -f index.txt ]; then
-    touch index.txt
-fi
 
 if [ ! -f rpcf_serial ]; then
     echo '0' > rpcf_serial
@@ -57,24 +63,29 @@ rm careq.pem
 fi
 
 idx_base=`head -n1 rpcf_serial`
-for((i=idx_base;i<idx_base+numsvr;i++));do
+let endidx=idx_base+numsvr
+for((i=idx_base;i<endidx;i++));do
 gmssl sm2keygen -pass 1234 -out signkey.pem
 gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "server:$i" -key signkey.pem -pass 1234 -out signreq.pem
 gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
 cat signcert.pem > certs.pem
 cat cacert.pem >> certs.pem
 tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
-rm signreq.pem signkey.pem signcert.pem  certs.pem
+if ((i<endidx-1)); then
+    rm signreq.pem signkey.pem signcert.pem  certs.pem
+fi
 done
 
 let idx_base+=numsvr
-
-for((i=idx_base;i<idx_base+numcli;i++));do
+let endidx=idx_base+numcli
+for((i=idx_base;i<endidx;i++));do
 gmssl sm2keygen -pass 1234 -out clientkey.pem
 gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "client:$i" -key clientkey.pem -pass 1234 -out clientreq.pem
 gmssl reqsign -in clientreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out clientcert.pem
 tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem rootcacert.pem 
-rm clientkey.pem clientreq.pem clientcert.pem
+if ((i<endidx-1)); then
+    rm clientkey.pem clientreq.pem clientcert.pem
+fi
 done
 
 let idx_base+=numcli
@@ -91,5 +102,8 @@ mv rootcakey.pem cakey.pem private_keys/
 mv rootcacert.pem cacert.pem private_keys/
 chmod og-rwx private_keys/rootcakey.pem private_keys/cakey.pem
 
+else
+    echo "GmSSL is not installed, and please install GmSSL first."
 fi #which gmssl
+
 popd

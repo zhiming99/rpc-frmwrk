@@ -23,36 +23,56 @@ def vc_changed(stack, gparamstring):
         wnd.DisplayError( "node name is not valid" )
         stack.set_visible_child( wnd.gridmh )
 
-def GenOpenSSLkey( dlg, strPath : str ) :
-    strHead = "cd " + strPath + ";"
-    os.system( strHead + 'openssl req -x509 -new -subj "/C=CN/CN=foo" -addext "subjectAltName = DNS:rpcf.org" -addext "certificatePolicies = 1.2.3.4" -newkey rsa:2048 -nodes -keyout server.key -out server.crt -days 365' ) 
-    strKeyFile = strPath + "/server.key"
-    dlg.keyEdit.set_text( strKeyFile )
-    strCertFile = strPath + "/server.crt"
-    dlg.certEdit.set_text( strCertFile )
-
-def GenGmSSLkey( dlg, strPath : str ) :
+def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    dir_path += "/gmsslkey.sh"
-    cmdline = "sh " + dir_path + " " + strPath
+    dir_path += "/opensslkey.sh"
+    cmdline = "bash " + dir_path + " " + strPath + " " + cnum + " " + snum
     os.system( cmdline )
-    strFile = strPath + "/signkey.pem"
-    dlg.keyEdit.set_text( strFile )
+    if bServer :
+        strFile = strPath + "/signkey.pem"
+        dlg.keyEdit.set_text( strFile )
 
-    strFile = strPath + "/certs.pem"
-    dlg.certEdit.set_text( strFile )
+        strFile = strPath + "/signcert.pem"
+        dlg.certEdit.set_text( strFile )
 
-    strFile = strPath + "/cacert.pem"
-    dlg.cacertEdit.set_text( strFile )
+        strFile = strPath + "/certs.pem"
+        dlg.cacertEdit.set_text( strFile )
+    else:
+        strFile = strPath + "/clientkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/clientcert.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/certs.pem"
+        dlg.cacertEdit.set_text( strFile )
+
     dlg.secretEdit.set_text( "" )
 
-    strCKey = "./clientkey.pem"
-    strCCert = "./clientcert.pem"
-    strCARoot = "./rootcacert.pem"
-
-    cmdline = "cd " + strPath + ";tar zcf clientkeys.tar.gz " + \
-        strCKey + " " + strCCert + " " + strCARoot
+def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    dir_path += "/gmsslkey.sh"
+    cmdline = "bash " + dir_path + " " + strPath + " " + cnum + " " + snum
     os.system( cmdline )
+    if bServer :
+        strFile = strPath + "/signkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/signcert.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/certs.pem"
+        dlg.cacertEdit.set_text( strFile )
+    else:
+        strFile = strPath + "/clientkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/clientcert.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/rootcacert.pem"
+        dlg.cacertEdit.set_text( strFile )
+    dlg.secretEdit.set_text( "" )
 
 class InterfaceContext :
     def __init__(self, ifNo ):
@@ -1427,29 +1447,27 @@ class ConfigDlg(Gtk.Dialog):
         dialog.destroy()
         
     def on_choose_key_dir_clicked( self, button ) :
-        strCurPath = self.keyEdit.get_text()
-        dialog = Gtk.FileChooserDialog(
-            title="Please choose a directory", parent=self,
-                action=Gtk.FileChooserAction.SELECT_FOLDER )
-        
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN,
-            Gtk.ResponseType.OK,
-        )
-        dialog.set_filename( strCurPath )
-        #self.add_filters(dialog, False)
+        dialog = SSLNumKeyDialog( self )
+
         response = dialog.run()
         if response != Gtk.ResponseType.OK:
             dialog.destroy()
             return
-        strPath = dialog.get_filename()
+        cnum = dialog.cnumEdit.get_text()
+        snum = dialog.snumEdit.get_text()
+
+        strCurPath = os.path.expanduser( "~" ) + "/.rpcf"
         bGmSSL = self.gmsslCheck.props.active
-        if not bGmSSL :
-            GenOpenSSLkey( self, strPath )
+        if bGmSSL :
+            strCurPath += "/gmssl"
+            if not os.path.isdir( strCurPath ):
+                os.makedirs( strCurPath )
+            GenGmSSLkey( self, strCurPath, self.bServer, cnum, snum )
         else:
-            GenGmSSLkey( self, strPath )
+            strCurPath += "/openssl"
+            if not os.path.isdir( strCurPath ):
+                os.makedirs( strCurPath )
+            GenOpenSSLkey( self, strCurPath, self.bServer, cnum, snum )
         dialog.destroy()
 
     def add_filters(self, dialog, bKey ):
@@ -2050,7 +2068,7 @@ class ConfigDlg(Gtk.Dialog):
 
         ret = Update_InitCfg( initFile, destPath )
         os.remove( initFile )
-        return ret;
+        return ret
 
     def UpdateConfig( self ) :
         return self.Export_Files( None, self.bServer )
@@ -2192,7 +2210,51 @@ class LBGrpEditDlg(Gtk.Dialog):
         if len( self.grpSet ) == 0 :
             self.rmMemberBtn.set_sensitive( False )
         self.toMemberBtn.set_sensitive( True )
-        
+
+class SSLNumKeyDialog(Gtk.Dialog):
+    def __init__(self, parent ):
+        Gtk.Dialog.__init__(self, flags=0,
+        transient_for = parent )
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK )
+
+        grid = Gtk.Grid()
+        grid.set_column_homogeneous( True )
+        grid.props.row_spacing = 6
+        grid.props.column_spacing = 6
+
+        startCol = 0
+        startRow = 0
+
+        labelNumCli = Gtk.Label()
+        labelNumCli.set_text("Number of Client Keys: ")
+        labelNumCli.set_xalign(.5)
+        grid.attach(labelNumCli, startCol + 0, startRow, 1, 1 )
+
+        cnumEditBox = Gtk.Entry()
+        cnumEditBox.set_text( "1" )
+
+        grid.attach(cnumEditBox, startCol + 1, startRow, 1, 1 )
+
+        labelNumSvr = Gtk.Label()
+        labelNumSvr.set_text("Number of Client Keys: ")
+        labelNumSvr.set_xalign(.5)
+        grid.attach(labelNumSvr, startCol + 0, startRow + 1, 1, 1 )
+
+        snumEditBox = Gtk.Entry()
+        snumEditBox.set_text( "1" )
+        grid.attach(snumEditBox, startCol + 1, startRow + 1, 1, 1 )
+
+        self.cnumEdit = cnumEditBox
+        self.snumEdit = snumEditBox
+
+        self.set_border_width(10)
+        #self.set_default_size(400, 460)
+        box = self.get_content_area()
+        box.add(grid)
+        self.show_all()
+
 import getopt
 def usage():
     print( "Usage: python3 rpcfg.py [-hc]" )
