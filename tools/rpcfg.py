@@ -81,10 +81,10 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
         strFile = strPath + "/signkey.pem"
         dlg.keyEdit.set_text( strFile )
 
-        strFile = strPath + "/signcert.pem"
+        strFile = strPath + "/certs.pem"
         dlg.certEdit.set_text( strFile )
 
-        strFile = strPath + "/certs.pem"
+        strFile = strPath + "/cacert.pem"
         dlg.cacertEdit.set_text( strFile )
     else:
         strFile = strPath + "/clientkey.pem"

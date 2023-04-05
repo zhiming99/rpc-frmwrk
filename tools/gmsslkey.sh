@@ -70,7 +70,7 @@ for((i=idx_base;i<endidx;i++));do
     gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
     cat signcert.pem > certs.pem
     cat cacert.pem >> certs.pem
-    tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
+    tar zcf serverkeys-$i.tar.gz signkey.pem cacert.pem certs.pem
     rm signreq.pem signkey.pem signcert.pem  certs.pem
 done
 
@@ -110,9 +110,8 @@ if [ ! -d ./private_keys ]; then
 fi
 
 mv rootcakey.pem cakey.pem private_keys/
-mv cacert.pem private_keys/
 chmod og-rwx private_keys/rootcakey.pem private_keys/cakey.pem
-cp rootcacert.pem private_keys
+cp cacert.pem rootcacert.pem private_keys/
 else
     echo "GmSSL is not installed, and please install GmSSL first."
 fi #which gmssl
