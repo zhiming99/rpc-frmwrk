@@ -45,47 +45,58 @@ if [ -d private_keys ]; then
 fi
 
 if [ ! -f rootcakey.pem ]; then
-rm *.pem
-gmssl sm2keygen -pass 1234 -out rootcakey.pem
-gmssl certgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN ROOTCA -days 3650 -key rootcakey.pem -pass 1234 -out rootcacert.pem -key_usage keyCertSign -key_usage cRLSign -ca
+    rm *.pem
+    gmssl sm2keygen -pass 1234 -out rootcakey.pem
+    gmssl certgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN ROOTCA -days 3650 -key rootcakey.pem -pass 1234 -out rootcacert.pem -key_usage keyCertSign -key_usage cRLSign -ca
 fi
 
 if [ ! -f cakey.pem ]; then
-mkdir backup
-mv rootca*.pem backup/
-rm *.pem
-mv backup/* ./
-rmdir backup
-gmssl sm2keygen -pass 1234 -out cakey.pem
-gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "Sub CA" -key cakey.pem -pass 1234 -out careq.pem
-gmssl reqsign -in careq.pem -days 365 -key_usage keyCertSign -ca -path_len_constraint 0 -cacert rootcacert.pem -key rootcakey.pem -pass 1234 -out cacert.pem
-rm careq.pem
+    mkdir backup
+    mv rootca*.pem backup/
+    rm *.pem
+    mv backup/* ./
+    rmdir backup
+    gmssl sm2keygen -pass 1234 -out cakey.pem
+    gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "Sub CA" -key cakey.pem -pass 1234 -out careq.pem
+    gmssl reqsign -in careq.pem -days 365 -key_usage keyCertSign -ca -path_len_constraint 0 -cacert rootcacert.pem -key rootcakey.pem -pass 1234 -out cacert.pem
+    rm careq.pem
 fi
 
 idx_base=`head -n1 rpcf_serial`
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
-gmssl sm2keygen -pass 1234 -out signkey.pem
-gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "server:$i" -key signkey.pem -pass 1234 -out signreq.pem
-gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
-cat signcert.pem > certs.pem
-cat cacert.pem >> certs.pem
-tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
-if ((i<endidx-1)); then
+    gmssl sm2keygen -pass 1234 -out signkey.pem
+    gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "server:$i" -key signkey.pem -pass 1234 -out signreq.pem
+    gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
+    cat signcert.pem > certs.pem
+    cat cacert.pem >> certs.pem
+    tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
     rm signreq.pem signkey.pem signcert.pem  certs.pem
-fi
+done
+
+for((i=0;i<endidx;i++)); do
+    if [ -f serverkeys-$i.tar.gz ]; then
+        tar zxf serverkeys-$i.tar.gz
+        break
+    fi
 done
 
 let idx_base+=numsvr
 let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
-gmssl sm2keygen -pass 1234 -out clientkey.pem
-gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "client:$i" -key clientkey.pem -pass 1234 -out clientreq.pem
-gmssl reqsign -in clientreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out clientcert.pem
-tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem rootcacert.pem 
-if ((i<endidx-1)); then
+    gmssl sm2keygen -pass 1234 -out clientkey.pem
+    gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "client:$i" -key clientkey.pem -pass 1234 -out clientreq.pem
+    gmssl reqsign -in clientreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out clientcert.pem
+    tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem rootcacert.pem 
     rm clientkey.pem clientreq.pem clientcert.pem
-fi
+done
+
+#keep the first client keys in the directory
+for((i=0;i<endidx;i++)); do
+    if [ -f clientkeys-$i.tar.gz ]; then
+        tar zxf clientkeys-$i.tar.gz
+        break
+    fi
 done
 
 let idx_base+=numcli
@@ -99,9 +110,9 @@ if [ ! -d ./private_keys ]; then
 fi
 
 mv rootcakey.pem cakey.pem private_keys/
-mv rootcacert.pem cacert.pem private_keys/
+mv cacert.pem private_keys/
 chmod og-rwx private_keys/rootcakey.pem private_keys/cakey.pem
-
+cp rootcacert.pem private_keys
 else
     echo "GmSSL is not installed, and please install GmSSL first."
 fi #which gmssl

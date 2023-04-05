@@ -23,11 +23,34 @@ def vc_changed(stack, gparamstring):
         wnd.DisplayError( "node name is not valid" )
         stack.set_visible_child( wnd.gridmh )
 
+def SilentRun( strCmd : str ):
+    cmdline = "expect -c \"" + strCmd + "\" - <<EOF\n"
+    cmdline += "expect {\n"
+    cmdline += "\"Sign the certificate? \" { send \"y\\r\";exp_continue}\n" 
+    cmdline += "\"requests certified, commit? \" { send \"y\\r\";exp_continue}\n" 
+    cmdline += "\"eof\" { exit }\n" 
+    cmdline += "\"timeout\" { exit }\n" 
+    cmdline += "}\n" 
+    cmdline += "EOF\n"
+    return os.system( cmdline )
+
 def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path += "/opensslkey.sh"
-    cmdline = "bash " + dir_path + " " + strPath + " " + cnum + " " + snum
-    os.system( cmdline )
+    cmdline = "/bin/bash " + dir_path + " " + strPath + " " + cnum + " " + snum
+    bExpect = False
+    ret = os.system( "which expect" )
+    if ret == 0 :
+        bExpect = True
+    if bExpect :
+        cmdline = "spawn " + cmdline
+        ret = SilentRun( cmdline )
+    else:
+        ret = os.system( cmdline )
+
+    if ret != 0 :
+        return
+
     if bServer :
         strFile = strPath + "/signkey.pem"
         dlg.keyEdit.set_text( strFile )
@@ -1299,7 +1322,7 @@ class ConfigDlg(Gtk.Dialog):
             "toggled", self.on_button_toggled, "VerifyPeer")
         grid.attach( vfyPeerCheck, startCol + 3, startRow + 4, 1, 1 )
 
-        if self.bServer or not bGmSSL :
+        if self.bServer :
             genKeyBtn = Gtk.Button.new_with_label("Gen Demo Key")
             genKeyBtn.connect("clicked", self.on_choose_key_dir_clicked)
             grid.attach( genKeyBtn, startCol + 1, startRow + 5, 1, 1 )

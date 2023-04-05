@@ -65,66 +65,80 @@ if [ ! -d ./demoCA/newcerts ]; then
 fi
 
 if [ ! -f rootcakey.pem ]; then
-rm *.pem
-
-openssl genrsa -out rootcakey.pem 4096
-openssl req -new -sha256 -x509 -days 3650 -config ${SSLCNF} -extensions v3_ca -key rootcakey.pem -out rootcacert.pem -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=ROOTCA/emailAddress=woodhead99@gmail.com"
-
+    rm *.pem
+    openssl genrsa -out rootcakey.pem 4096
+    openssl req -new -sha256 -x509 -days 3650 -config ${SSLCNF} -extensions v3_ca -key rootcakey.pem -out rootcacert.pem -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=ROOTCA/emailAddress=woodhead99@gmail.com"
 fi
 
 if [ ! -f cakey.pem ]; then
-mkdir backup
-mv rootca*.pem backup/
-rm *.pem
-mv backup/* ./
-rmdir backup
+    mkdir backup
+    mv rootca*.pem backup/
+    rm *.pem
+    mv backup/* ./
+    rmdir backup
 
-openssl genrsa -out cakey.pem 2048
-openssl req -new -sha256 -key cakey.pem  -out careq.pem -days 365 -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Sub CA/emailAddress=woodhead99@gmail.com"
-openssl ca -days 365 -cert rootcacert.pem -keyfile rootcakey.pem -md sha256 -extensions v3_ca -config ${SSLCNF} -in careq.pem -out cacert.pem
-rm careq.pem
-cat cacert.pem > certs.pem
-cat rootcacert.pem >> certs.pem
+    openssl genrsa -out cakey.pem 2048
+    openssl req -new -sha256 -key cakey.pem  -out careq.pem -days 365 -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Sub CA/emailAddress=woodhead99@gmail.com"
+    openssl ca -days 365 -cert rootcacert.pem -keyfile rootcakey.pem -md sha256 -extensions v3_ca -config ${SSLCNF} -in careq.pem -out cacert.pem
+    rm careq.pem
+    cat cacert.pem > certs.pem
+    cat rootcacert.pem >> certs.pem
 fi
 
 idx_base=`cat rpcf_serial`
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
-openssl genrsa -out signkey.pem 2048
-openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server:$i"
-#openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
-openssl x509 -req -in signreq.pem -CA cacert.pem -CAkey cakey.pem -days 365 -out signcert.pem -CAcreateserial
-tar zcf serverkeys-$idx_base.tar.gz signkey.pem signcert.pem certs.pem
-if ((i<endidx-1)); then
+    openssl genrsa -out signkey.pem 2048
+    openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server:$i"
+    if which expect; then
+        openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
+    else
+        openssl x509 -req -in signreq.pem -CA cacert.pem -CAkey cakey.pem -days 365 -out signcert.pem -CAcreateserial
+    fi
+    tar zcf serverkeys-$idx_base.tar.gz signkey.pem signcert.pem certs.pem
     rm signreq.pem signkey.pem signcert.pem
-fi
+done
+
+#keep the first server keys in the directory
+for((i=0;i<endidx;i++)); do
+    if [ -f serverkeys-$i.tar.gz ]; then
+        tar zxf serverkeys-$i.tar.gz
+        break
+    fi
 done
 
 let idx_base+=numsvr
 let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
-openssl genrsa -out clientkey.pem 2048
-openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=client:$i"
-#openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in clientreq.pem -out clientcert.pem
-openssl x509 -req -in clientreq.pem -CA cacert.pem -CAkey cakey.pem -days 365 -out clientcert.pem -CAcreateserial
-
-tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem certs.pem
-if ((i<endidx-1)); then
+    openssl genrsa -out clientkey.pem 2048
+    openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=client:$i"
+    if which expect; then
+        openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in clientreq.pem -out clientcert.pem
+    else
+        openssl x509 -req -in clientreq.pem -CA cacert.pem -CAkey cakey.pem -days 365 -out clientcert.pem -CAcreateserial
+    fi
+    tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem certs.pem
     rm clientkey.pem clientreq.pem clientcert.pem
-fi
+done
+
+#keep the first client keys in the directory
+for((i=0;i<endidx;i++)); do
+    if [ -f clientkeys-$i.tar.gz ]; then
+        tar zxf clientkeys-$i.tar.gz
+        break
+    fi
 done
 
 let idx_base+=numcli
 echo $idx_base > rpcf_serial
  
-#gmssl certparse -in clientcert.pem
-
 if [ ! -d ./private_keys ]; then
     mkdir ./private_keys
 fi
 
-mv rootcakey.pem rootcacert.pem cakey.pem cacert.pem certs.pem private_keys/
+mv rootcakey.pem rootcacert.pem cakey.pem cacert.pem private_keys/
 chmod og-rwx private_keys/rootcakey.pem private_keys/cakey.pem
+cp certs.pem private_keys
 
 else
     echo openssl is not installed, and please install openssl first.
