@@ -2089,7 +2089,8 @@ class ConfigDlg(Gtk.Dialog):
         if ret < 0 :
             return ret
 
-        ret = Update_InitCfg( initFile, destPath )
+        passDlg = PasswordDialog( self )
+        ret = Update_InitCfg( initFile, destPath, passDlg )
         os.remove( initFile )
         return ret
 
@@ -2277,6 +2278,58 @@ class SSLNumKeyDialog(Gtk.Dialog):
         box = self.get_content_area()
         box.add(grid)
         self.show_all()
+
+class PasswordDialog(Gtk.Dialog):
+    def __init__(self, parent ):
+        super().__init__(
+        title = "Requiring Password to Update config files",
+        flags=0, transient_for = parent )
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK )
+
+        grid = Gtk.Grid()
+        grid.set_column_homogeneous( True )
+        grid.props.row_spacing = 6
+        grid.props.column_spacing = 6
+
+        startCol = 0
+        startRow = 0
+
+        labelPass = Gtk.Label()
+        labelPass.set_text("Password: ")
+        labelPass.set_xalign(.5)
+        grid.attach(labelPass, startCol + 0, startRow, 1, 1 )
+
+        passEditBox = Gtk.Entry()
+        passEditBox.set_text( "" )
+        passEditBox.set_visibility( False )
+        passEditBox.props.input_purpose = Gtk.InputPurpose.PASSWORD
+        grid.attach(passEditBox, startCol + 1, startRow, 1, 1 )
+
+        labelEmpty = Gtk.Label()
+        labelEmpty.set_xalign(.5)
+        grid.attach(labelEmpty, startCol + 1, startRow + 1, 2, 1 )
+
+        self.passEdit = passEditBox
+        self.set_border_width(10)
+        #self.set_default_size(400, 460)
+        box = self.get_content_area()
+        box.add(grid)
+        self.show_all()
+
+    def runDlg( self )->( int, int ):
+        ret = 0
+        response = self.run()
+        passwd = None
+        if response != Gtk.ResponseType.OK:
+            self.destroy()
+            ret = -errno.EINVAL
+        else:
+            passwd = self.passEdit.get_text()
+            self.destroy()
+            ret = 0
+        return ( ret, passwd )
 
 import getopt
 def usage():
