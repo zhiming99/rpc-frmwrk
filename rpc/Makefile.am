@@ -28,6 +28,12 @@ endif
 
 if ENABLE_OPENSSL
 SUBDIRS += sslport wsport
+else
+
+if ENABLE_GMSSL
+SUBDIRS += wsport
+endif
+
 endif
 
 if ENABLE_KERBEROS

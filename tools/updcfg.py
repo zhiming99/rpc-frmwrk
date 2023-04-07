@@ -173,6 +173,25 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
 def WriteTestCfg( strPath, jsonVal ) :
     return OverwriteJsonFile( strPath, jsonVal )
 
+def ExtraUpdateBtinrt(
+    drvVal : object, destVal : object ):
+    try:
+        oFactories = None
+        if 'Modules' in drvVal :
+            oModules = drvVal[ 'Modules' ]
+            for oModule in oModules :
+                if oModule[ 'ModName' ] != 'rpcrouter':
+                    continue
+                oFactories = oModule[ "ClassFactories" ]
+                break
+        if oFactories is None:
+            return
+
+        destVal[ "ClassFactories" ] = oFactories
+    except Exception as err:
+        pass
+
+
 def ExportTestCfgsTo( cfgList:list, destPath:str ):
     testDescs = [ "actcdesc.json",
         "asyndesc.json",
@@ -196,6 +215,10 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
         if pathVal is None :
             continue
         UpdateTestCfg( pathVal[ 1 ], cfgList )
+
+        if testDesc == "btinrt.json" :
+            ExtraUpdateBtinrt( cfgList[ 2 ], pathVal[ 1 ] )
+
         ret = WriteTestCfg(
             destPath + "/" + testDesc,
             pathVal[ 1 ] )
@@ -232,6 +255,10 @@ def ExportTestCfgs( cfgList:list ):
         if pathVal is None :
             continue
         UpdateTestCfg( pathVal[ 1 ], cfgList )
+
+        if testDesc == "btinrt.json" :
+            ExtraUpdateBtinrt( cfgList[ 2 ], pathVal[ 1 ] )
+
         ret = WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
         if ret < 0 :
             break
@@ -395,7 +422,7 @@ def LoadConfigFiles( path : str) :
     return jsonvals
 
 def Update_AuthPrxy( initCfg: dict, drvFile : list,
-    bServer: bool, destDir : str ) -> int :
+    bServer: bool, destDir : str, drvVal : object ) -> int :
 
     ret = 0
     apVal = drvFile[ 1 ]
@@ -476,7 +503,7 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         authInfo[ 'UserName' ] = userName
 
     oConn0[ 'BindAddr' ] = oConn0[ 'IpAddress' ]
-    cfgList = [ oConn0, authInfo ]
+    cfgList = [ oConn0, authInfo, drvVal ]
     if destDir is None :
         ret = ExportTestCfgs( cfgList )
     else:
@@ -618,7 +645,6 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 cacertPath = sslCred[ 'CACertFile' ]
             else:
                 cacertPath = ''
-
 
             if 'SecretFile' in sslCred :
                 secretPath = sslCred[ 'SecretFile' ]
@@ -810,8 +836,9 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         if ret < 0 :
             return ret
 
-        ret = Update_AuthPrxy(
-            initCfg, jsonFiles[ 3 ], bServer, destDir )
+        drvVal = jsonFiles[ 0 ][ 1 ]
+        ret = Update_AuthPrxy( initCfg,
+            jsonFiles[ 3 ], bServer, destDir, drvVal )
         if ret < 0 :
             return ret
 
