@@ -187,7 +187,8 @@ def ExtraUpdateBtinrt(
         if oFactories is None:
             return
 
-        destVal[ "ClassFactories" ] = oFactories
+        destVal[ "ClassFactories" ] = deepcopy( oFactories )
+        destVal[ "ClassFactories" ].remove( "libfuseif.so" )
     except Exception as err:
         pass
 
