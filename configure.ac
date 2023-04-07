@@ -159,7 +159,7 @@ DEPLIBS_ALL='dbus-1 jsoncpp cppunit mit-krb5 fuse3'
 
 case $enable_openssl in
     yes)
-    DEPLIBS_ALL+='openssl'
+    DEPLIBS_ALL+=' openssl'
     ;;
     no)
     ;;
