@@ -341,11 +341,13 @@ AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)
 
+enable_websock=no
 case $enable_gmssl in
     yes)
         GMSSL_DEBFILES='usr/bin/rpcf/gmsslkey.sh'
         GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.shZZZZZ%{_libdir}/libgmsslpt.so*'
         GMSSL_CFGOPT=
+        enable_websock=yes
     ;;
     no)
         GMSSL_DEBFILES=
@@ -360,9 +362,10 @@ case $enable_openssl in
         OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
         OPENSSL_CFGOPT=
         OPENSSL_DEBLIBS='libssl-dev,'
-        OPENSSL_DEBPKGS='openssl, libssl1.1,'
+        OPENSSL_DEBPKGS='openssl, libssl1.1, expect,'
         OPENSSL_RPMLIBS='openssl-devel'
-        OPENSSL_RPMPKGS='openssl openssl-libs'
+        OPENSSL_RPMPKGS='openssl openssl-libs expect'
+        enable_websock=yes
     ;;
     no)
         OPENSSL_DEBFILES=
@@ -372,6 +375,15 @@ case $enable_openssl in
         OPENSSL_DEBPKGS=
         OPENSSL_RPMLIBS=
         OPENSSL_RPMPKGS=
+    ;;
+esac
+
+case $enable_websock in
+    yes)
+        WEBSOCK_RPMFILES='%{_libdir}/libwspt.so*'
+    ;;
+    no)
+        WEBSOCK_RPMFILES=
     ;;
 esac
 
@@ -386,5 +398,6 @@ AC_SUBST(OPENSSL_DEBLIBS)
 AC_SUBST(OPENSSL_DEBPKGS)
 AC_SUBST(OPENSSL_RPMLIBS)
 AC_SUBST(OPENSSL_RPMPKGS)
+AC_SUBST(WEBSOCK_RPMFILES)
 
 AC_OUTPUT

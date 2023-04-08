@@ -9,7 +9,7 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
 BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel fuse3-devel
-Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs @OPENSSL_RPMPKGS@ cppunit fuse3 fuse3-libs expect bash
+Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs @OPENSSL_RPMPKGS@ cppunit fuse3 fuse3-libs bash
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -58,6 +58,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/updcfg.py
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@
+@WEBSOCK_RPMFILES@
 %{_bindir}/rpcrouter
 %{_bindir}/hostsvr
 %{_bindir}/hostcli
