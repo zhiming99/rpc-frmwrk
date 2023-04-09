@@ -274,8 +274,8 @@ case $host in
 esac
 
 CXXFLAGS+=' -std=c++11'
+CXXFLAGS+=' -DVERSION_STRING="\"$(VERSION)\""'
 
-AC_SUBST([CXXFLAGS])
 AC_SUBST([BITWIDTH])
 
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
@@ -341,6 +341,8 @@ AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)
 
+FEATURES=
+
 enable_websock=no
 case $enable_gmssl in
     yes)
@@ -348,11 +350,13 @@ case $enable_gmssl in
         GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.shZZZZZ%{_libdir}/libgmsslpt.so*'
         GMSSL_CFGOPT=
         enable_websock=yes
+        FEATURES+="+gmssl "
     ;;
     no)
         GMSSL_DEBFILES=
         GMSSL_RPMFILES=
         GMSSL_CFGOPT='--disable-gmssl'
+        FEATURES+="-gmssl "
     ;;
 esac
 
@@ -366,6 +370,7 @@ case $enable_openssl in
         OPENSSL_RPMLIBS='openssl-devel'
         OPENSSL_RPMPKGS='openssl openssl-libs expect'
         enable_websock=yes
+        FEATURES+="+openssl "
     ;;
     no)
         OPENSSL_DEBFILES=
@@ -375,6 +380,7 @@ case $enable_openssl in
         OPENSSL_DEBPKGS=
         OPENSSL_RPMLIBS=
         OPENSSL_RPMPKGS=
+        FEATURES+="-openssl "
     ;;
 esac
 
@@ -387,6 +393,10 @@ case $enable_websock in
     ;;
 esac
 
+CXXFLAGS+=' -DFEATURES="\"$(FEATURES)\""'
+
+AC_SUBST([CXXFLAGS])
+AC_SUBST(FEATURES)
 AC_SUBST(GMSSL_DEBFILES)
 AC_SUBST(GMSSL_RPMFILES)
 AC_SUBST(GMSSL_CFGOPT)

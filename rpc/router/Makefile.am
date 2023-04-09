@@ -23,27 +23,7 @@ else
 OFFSET_MACRO=
 endif
 
-features=
-if ENABLE_GMSSL
-    features += +gmssl
-else
-    features += -gmssl
-endif
-
-if ENABLE_OPENSSL
-    features += +openssl
-else
-    features += -openssl
-endif
-
-if ENABLE_KERBEROS
-    features += +kerberos
-else
-    features += -kerberos
-endif
-
 rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC \
- -I$(include_fusedir) $(OFFSET_MACRO) -DVERSION_STRING="\"$(VERSION)\"" \
- -DFEATURES="\"$(features)\""
+ -I$(include_fusedir) $(OFFSET_MACRO) 
 
 rpcrouter_LDFLAGS=-rdynamic

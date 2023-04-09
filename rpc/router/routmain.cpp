@@ -315,8 +315,8 @@ void CIfRouterTest::testSvrStartStop()
 
 void Version()
 {
-    fprintf( stderr, "Version: %s\n", VERSION_STRING  );
-    fprintf( stderr, "Features: %s\n", FEATURES );
+    fprintf( stdout, "Version: %s\n", VERSION_STRING  );
+    fprintf( stdout, "Features: %s\n", FEATURES );
 }
 
 void Usage( char* szName )
