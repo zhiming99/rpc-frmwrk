@@ -2058,7 +2058,7 @@ class ConfigDlg(Gtk.Dialog):
 
         return ret
 
-    def Export_InstPkg( self, initCfg : object, cfgPath : str )->int :
+    def Export_Installer( self, initCfg : object, cfgPath : str )->int :
         ret = 0
         try:
             bSSL = IsFeatureEnabled( "\(gmssl\|openssl\)" )
@@ -2116,7 +2116,7 @@ class ConfigDlg(Gtk.Dialog):
             inst_script+="if (($?==0)); then echo unzip success; else echo unzip failed;exit 1;fi\n"
             inst_script+="pushd $unzipdir; bash ./instcfg.sh $1;popd\n"
             inst_script+="if (($?==0)); then echo install complete;else echo install failed;fi\n"
-            inst_script+="#rm -rf $unzipdir\n"
+            inst_script+="rm -rf $unzipdir\n"
             inst_script+="exit 0\n"
             inst_script+="__GZFILE__\n"
 
@@ -2139,7 +2139,7 @@ class ConfigDlg(Gtk.Dialog):
                 fp.close()
                 cmdline = "cat " + svrPkg + " >> " + instSvr
                 os.system( cmdline )
-                cmdline = "chmod u+x " + instSvr
+                cmdline = "chmod u+x " + instSvr + ";"
                 os.system( cmdline )
 
             if os.access( cliPkg, os.W_OK ):
@@ -2161,7 +2161,7 @@ class ConfigDlg(Gtk.Dialog):
                 fp.close()
                 cmdline = "cat " + cliPkg + " >> " + instCli
                 os.system( cmdline )
-                cmdline = "chmod u+x " + instCli
+                cmdline = "chmod u+x " + instCli + ";"
                 os.system( cmdline )
 
             cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
@@ -2227,7 +2227,7 @@ class ConfigDlg(Gtk.Dialog):
             fp = open( initFile, 'r' )
             cfgVal = json.load( fp )
             fp.close()
-            ret = self.Export_InstPkg( cfgVal, initFile )
+            ret = self.Export_Installer( cfgVal, initFile )
             return ret
 
         ret = self.Export_InitCfg( initFile )
@@ -2412,7 +2412,7 @@ class SSLNumKeyDialog(Gtk.Dialog):
         grid.attach(labelNumSvr, startCol + 0, startRow + 1, 1, 1 )
 
         snumEditBox = Gtk.Entry()
-        snumEditBox.set_text( "1" )
+        snumEditBox.set_text( "0" )
         grid.attach(snumEditBox, startCol + 1, startRow + 1, 1, 1 )
 
         self.cnumEdit = cnumEditBox

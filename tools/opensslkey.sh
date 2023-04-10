@@ -210,23 +210,23 @@ if [ -f USESSL ]; then
         idx_base=\$(head -n1 clidx)
         let keyidx=idx_base+\$1
         if [ -f clientkeys-\$keyidx.tar.gz ]; then
-            tar -C \$keydir clientkeys-\$keyidx.tar.gz
+            tar -C \$keydir -xf clientkeys-\$keyidx.tar.gz
             python3 \$updinitcfg -c \$keydir ./initcfg.json
             chmod 400 \$keydir/*.pem
         fi
         for i in clientkeys-*; do
-            echo "cat /dev/null > \$i"
+            cat /dev/null > \$i
         done
     else
         idx_base=\$(head -n1 svridx)
         let keyidx=idx_base+\$1
         if [ -f serverkeys-\$keyidx.tar.gz ]; then
-            tar -C \$keydir serverkeys-\$keyidx.tar.gz
+            tar -C \$keydir -xf serverkeys-\$keyidx.tar.gz
             python3 \$updinitcfg \$keydir ./initcfg.json
             chmod 400 \$keydir/*.pem
         fi
         for i in serverkeys-*; do
-            echo "cat /dev/null > \$i"
+            cat /dev/null > \$i
         done
     fi
     rpcfgnui=/usr/bin/rpcf/rpcfgnui.py
@@ -240,7 +240,7 @@ fi
 
 initcfg=\$(pwd)/initcfg.json
 if which sudo; then
-    sudo pytho3 \$rpcfgnui ./initcfg.json
+    sudo python3 \$rpcfgnui ./initcfg.json
 else
     su -c "python3 \$rpcfgnui \$initcfg"
 fi
