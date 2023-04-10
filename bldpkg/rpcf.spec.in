@@ -82,7 +82,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
-%{_libdir}/libwspt.so*
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_libdir}/librpcbaseJNI.so*
 %{_libdir}/rpcf/rpcbase.jar

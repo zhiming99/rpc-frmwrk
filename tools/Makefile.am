@@ -1,4 +1,4 @@
-pysources = rpcfg.py updcfg.py rpcfgnui.py
+pysources = rpcfg.py updcfg.py rpcfgnui.py updinitcfg.py
 
 testcfgfiles=testcfgs/mincfg.json \
 testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh
