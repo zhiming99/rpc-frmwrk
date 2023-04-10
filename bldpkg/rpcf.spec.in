@@ -56,6 +56,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/rpcfg.py
 %{_bindir}/rpcf/rpcfgnui.py
 %{_bindir}/rpcf/updcfg.py
+%{_bindir}/rpcf/updinitcfg.py
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@
 @WEBSOCK_RPMFILES@

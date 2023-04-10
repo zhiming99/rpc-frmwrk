@@ -2058,6 +2058,137 @@ class ConfigDlg(Gtk.Dialog):
 
         return ret
 
+    def Export_InstPkg( self, initCfg : object, cfgPath : str )->int :
+        ret = 0
+        try:
+            bSSL = True
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            if os.path.basename( dir_path ) == 'tools':
+                routerPath = dir_path + "/../rpc/router/.libs/rpcrouter"
+            elif os.path.basename( dir_path ) == 'rpcf':
+                routerPath = dir_path + "../rpcrouter"
+                if not os.access( routerPath, os.X_OK ):
+                    return -errno.ENOENT
+            else:
+                raise Exception( "error rpcrouter not found" )
+            cmdline = routerPath + " -v | grep '\\+..ssl' > /dev/null"
+            ret = os.system( cmdline )
+            if ret != 0:
+                bSSL = False
+                ret = 0
+
+            strKeyPath = os.path.expanduser( "~" ) + "/.rpcf"
+            bGmSSL = False
+            try:
+                sslFiles = initCfg[ 'Security' ][ 'SSLCred' ]
+                if 'UsingGmSSL' in sslFiles: 
+                    if sslFiles[ 'UsingGmSSL' ] == 'true':
+                        bGmSSL = True
+            except Exception as err:
+                bSSL = False
+
+            if bGmSSL:
+                instPkg = strKeyPath + "/gmssl"
+            else:
+                instPkg = strKeyPath + "/openssl"
+
+            curDir = os.path.dirname( cfgPath )
+            cmdline = "cp " + instPkg + "/inst*.tar " + curDir
+            ret = os.system( cmdline )
+            if ret != 0:
+                ret = -ret
+                raise Exception( "error copy instsvr.tar and instcli.tar" )
+
+            svrPkg = curDir + "/instsvr.tar"
+            cliPkg = curDir + "/instcli.tar"
+
+            bSSL2 = False
+            if 'Connections' in initCfg:
+                oConn = initCfg[ 'Connections']
+                for oElem in oConn :
+                    if 'EnableSSL' in oElem :
+                        if oElem[ 'EnableSSL' ] == 'true' :
+                            bSSL2 = True
+                            break
+
+            if not bSSL or not bSSL2:
+                #removing the keys if not necessary
+                if os.access( cliPkg, os.W_OK ):
+                    cmdline = "keyfiles=`tar tf " + cliPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
+                    cmdline += "for i in $keyfiles; do tar --delete -f " + cliPkg + " $i;done"
+                    os.system( cmdline )
+
+                if os.access( svrPkg, os.W_OK ):
+                    cmdline = "keyfiles=`tar tf " + svrPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
+                    cmdline += "for i in $keyfiles; do tar --delete -f " + svrPkg + " $i;done"
+                    os.system( cmdline )
+
+            # generate the master install package
+            inst_script="#!/bin/bash\n"
+            inst_script+="unzipdir=$(mktemp -d /temp/rpcfinst_XXXXX)\n"
+            inst_script+="GZFILE=`awk '/^__GZFILE__/ {print NR + 1; exit 0; }' $0`\n"
+            inst_script+="tail -n+$GZFILE $0 | tar -zxv -C $unzipdir > /dev/null 2>&1\n"
+            inst_script+="if (($?==0)); then echo unzip success; else echo unzip failed;exit 1;fi\n"
+            inst_script+="pushd $unzipdir; bash ./instcfg.sh $1;popd\n"
+            inst_script+="if (($?==0)); then echo install complete;else echo install failed;fi\n"
+            inst_script+="#rm -rf $unzipdir\n"
+            inst_script+="exit 0\n"
+            inst_script+="__GZFILE__\n"
+
+            if self.bServer and os.access( svrPkg, os.W_OK ):
+                cmdline = "tar rf " + svrPkg + " -C " + curDir + " initcfg.json;"
+                if bSSL and bSSL2:
+                    cmdline += "touch " + curDir + "/USESSL;"
+                    cmdline += "tar rf " + svrPkg + " -C " + curDir + " USESSL;"
+
+                cmdline += "rm -f " + svrPkg + ".gz || true;"
+                cmdline += "gzip " + svrPkg + ";"
+                ret = os.system( cmdline )
+                if ret != 0 :
+                    ret = -ret
+                    raise Exception( "error create server installer" )
+                svrPkg += ".gz"
+                instSvr = curDir + "/instsvr.sh"
+                fp = open( instSvr, "w" )
+                fp.write( inst_script )
+                fp.close()
+                cmdline = "cat " + svrPkg + " >> " + instSvr
+                os.system( cmdline )
+                cmdline = "chmod u+x " + instSvr
+                os.system( cmdline )
+
+            if os.access( cliPkg, os.W_OK ):
+                cmdline = "tar rf " + cliPkg + " -C " + curDir + " initcfg.json;"
+                if bSSL and bSSL2:
+                    cmdline += "touch " + curDir + "/USESSL;"
+                    cmdline += "tar rf " + cliPkg + " -C " + curDir + " USESSL;"
+
+                cmdline += "rm -f " + cliPkg + ".gz || true;"
+                cmdline += "gzip " + cliPkg + ";"
+                ret = os.system( cmdline )
+                if ret != 0 :
+                    ret = -ret
+                    raise Exception( "error create client installer" )
+                cliPkg += ".gz"
+                instCli = curDir + "/instcli.sh"
+                fp = open( instCli, "w" )
+                fp.write( inst_script )
+                fp.close()
+                cmdline = "cat " + cliPkg + " >> " + instCli
+                os.system( cmdline )
+                cmdline = "chmod u+x " + instCli
+                os.system( cmdline )
+
+            cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
+            #cmdline += "rm " + curDir + "/initcfg.json || true;"
+            os.system( cmdline )
+
+        except Exception as err:
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
+
     def Export_InitCfg( self, path ) -> int :
         jsonVal = dict()
         ret = self.Export_Conns( jsonVal )
@@ -2105,7 +2236,14 @@ class ConfigDlg(Gtk.Dialog):
         initFile = '/tmp/initcfg.json'
         if destPath is not None :
             initFile = destPath + '/initcfg.json'
-            return self.Export_InitCfg( initFile )
+            ret = self.Export_InitCfg( initFile )
+            if ret < 0:
+                return ret
+            fp = open( initFile, 'r' )
+            cfgVal = json.load( fp )
+            fp.close()
+            ret = self.Export_InstPkg( cfgVal, initFile )
+            return ret
 
         ret = self.Export_InitCfg( initFile )
         if ret < 0 :
@@ -2284,7 +2422,7 @@ class SSLNumKeyDialog(Gtk.Dialog):
         grid.attach(cnumEditBox, startCol + 1, startRow, 1, 1 )
 
         labelNumSvr = Gtk.Label()
-        labelNumSvr.set_text("Number of Client Keys: ")
+        labelNumSvr.set_text("Number of Server Keys: ")
         labelNumSvr.set_xalign(.5)
         grid.attach(labelNumSvr, startCol + 0, startRow + 1, 1, 1 )
 

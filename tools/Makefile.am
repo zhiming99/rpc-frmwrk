@@ -42,7 +42,7 @@ install-exec-local:
 	if [ "x$(DESTDIR)" == "x" ];then BinDir=$(bindir);\
 	else BinDir=$(DESTDIR)$(bindir); fi;\
 	if [ ! -e $${BinDir}/rpcf ]; then mkdir -p $${BinDir}/rpcf;fi; \
-	install rpcfg.py updcfg.py rpcfgnui.py $${BinDir}/rpcf/;\
+	install rpcfg.py updcfg.py rpcfgnui.py updinitcfg.py $${BinDir}/rpcf/;\
     chmod +x $${BinDir}/rpcf/{rpcfg,updcfg,rpcfgnui}.py;\
     eval ${gmssl_cmd}\
     eval ${openssl_cmd}
