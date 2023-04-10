@@ -35,6 +35,21 @@ def GetTestPaths( path : str= None ) :
 
     return paths
 
+def IsFeatureEnabled( feature : str ) -> bool :
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    if os.path.basename( dir_path ) == 'tools':
+        routerPath = dir_path + "/../rpc/router/.libs/rpcrouter"
+    elif os.path.basename( dir_path ) == 'rpcf':
+        routerPath = dir_path + "../rpcrouter"
+        if not os.access( routerPath, os.X_OK ):
+            return False
+
+    cmdline = routerPath + " -v | grep '\+" + feature + "' > /dev/null"
+    ret = os.system( cmdline )
+    if ret != 0:
+        return False
+    return True
+
 def ReadTestCfg( paths:list, name:str) :
     jsonVal = None
     for path in paths:

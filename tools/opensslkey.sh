@@ -191,10 +191,10 @@ let idx_base-=numsvr
 cat > instcfg.sh << EOF
 #!/bin/bash
 if [ "x\$1" == "x" ]; then
-    echo Usage: \$0 <key idx starting from zero>
+    echo "Usage: \$0 <key idx starting from zero>"
     exit 1
 fi
-if [ -f USESSL; ] then
+if [ -f USESSL ]; then
     keydir=\$HOME/.rpcf/openssl
     if [ ! -d \$keydir ]; then
         mkdir -p \$keydir || exit 1
@@ -215,7 +215,7 @@ if [ -f USESSL; ] then
             chmod 400 \$keydir/*.pem
         fi
         for i in clientkeys-*; do
-            cat /dev/null > \$i
+            echo "cat /dev/null > \$i"
         done
     else
         idx_base=\$(head -n1 svridx)

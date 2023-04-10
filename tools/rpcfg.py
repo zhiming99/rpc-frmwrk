@@ -2061,22 +2061,7 @@ class ConfigDlg(Gtk.Dialog):
     def Export_InstPkg( self, initCfg : object, cfgPath : str )->int :
         ret = 0
         try:
-            bSSL = True
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            if os.path.basename( dir_path ) == 'tools':
-                routerPath = dir_path + "/../rpc/router/.libs/rpcrouter"
-            elif os.path.basename( dir_path ) == 'rpcf':
-                routerPath = dir_path + "../rpcrouter"
-                if not os.access( routerPath, os.X_OK ):
-                    return -errno.ENOENT
-            else:
-                raise Exception( "error rpcrouter not found" )
-            cmdline = routerPath + " -v | grep '\\+..ssl' > /dev/null"
-            ret = os.system( cmdline )
-            if ret != 0:
-                bSSL = False
-                ret = 0
-
+            bSSL = IsFeatureEnabled( "\(gmssl\|openssl\)" )
             strKeyPath = os.path.expanduser( "~" ) + "/.rpcf"
             bGmSSL = False
             try:
@@ -2125,7 +2110,7 @@ class ConfigDlg(Gtk.Dialog):
 
             # generate the master install package
             inst_script="#!/bin/bash\n"
-            inst_script+="unzipdir=$(mktemp -d /temp/rpcfinst_XXXXX)\n"
+            inst_script+="unzipdir=$(mktemp -d /tmp/rpcfinst_XXXXX)\n"
             inst_script+="GZFILE=`awk '/^__GZFILE__/ {print NR + 1; exit 0; }' $0`\n"
             inst_script+="tail -n+$GZFILE $0 | tar -zxv -C $unzipdir > /dev/null 2>&1\n"
             inst_script+="if (($?==0)); then echo unzip success; else echo unzip failed;exit 1;fi\n"

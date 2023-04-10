@@ -12,7 +12,8 @@ def usage():
     print( "\t-c this is a client host" )
     print( "\t-h print this help" )
 
-def upd_initcfg( cfgPath : str, bServer : bool, strKeyDir : str ):
+def upd_initcfg( strKeyDir : str, cfgPath : str, bServer : bool ):
+    ret = 0
     try:
         fp = open( cfgPath, "r" )
         initCfg = json.load( fp )
@@ -71,6 +72,8 @@ def upd_initcfg( cfgPath : str, bServer : bool, strKeyDir : str ):
         print( text, second_text )
         ret = -errno.EFAULT
 
+    return ret
+
 def main():
     bServer = True
     try:
@@ -96,10 +99,10 @@ def main():
     
 
     ret = 0
-    destDir = args[ 0 ]
+    keyDir = args[ 0 ]
     cfgPath = args[ 1 ]
 
-    ret = upd_initcfg( destDir, cfgPath, bServer )
+    ret = upd_initcfg( keyDir, cfgPath, bServer )
     quit( -ret )
 
 if __name__ == "__main__":
