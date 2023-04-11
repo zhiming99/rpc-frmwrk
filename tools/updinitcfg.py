@@ -21,7 +21,9 @@ def upd_initcfg( strKeyDir : str, cfgPath : str, bServer : bool ):
 
         oSecurity = initCfg[ "Security" ]
         sslFiles = oSecurity[ "SSLCred" ]
-        bCfgSvr = initCfg[ "IsServer" ]
+        bCfgSvr = False
+        if initCfg[ "IsServer" ] == 'true' :
+            bCfgSvr = True
         bGmSSL = False
         if 'UsingGmSSL' in sslFiles:
             usingGmSSL = sslFiles[ "UsingGmSSL" ]

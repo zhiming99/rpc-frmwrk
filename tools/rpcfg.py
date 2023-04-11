@@ -7,6 +7,8 @@ from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Tuple
 import errno
+import tarfile
+import time
 from updcfg import *
 
 def vc_changed(stack, gparamstring):
@@ -96,6 +98,79 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
         strFile = strPath + "/rootcacert.pem"
         dlg.cacertEdit.set_text( strFile )
     dlg.secretEdit.set_text( "" )
+
+def get_instcfg_content()->str :
+    content='''#!/bin/bash
+paths=$(echo $PATH | tr ':' ' ' ) 
+for i in $paths; do
+    a=$i/rpcf/rpcfgnui.py
+    if [ -f $a ]; then
+        rpcfgnui=$a
+        break
+    fi
+done
+
+if [ "x$rpcfgnui" == "x" ]; then
+    $rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
+    if [ ! -f $rpcfgnui ]; then
+        exit 1
+    fi       
+fi
+if [ -f USESSL ]; then
+    if grep 'UsingGmSSL":."true"' ./initcfg.json; then
+        keydir=$HOME/.rpcf/gmssl
+    else     
+        keydir=$HOME/.rpcf/openssl
+    fi       
+    if [ ! -d $keydir ]; then
+        mkdir -p $keydir || exit 1
+    fi   
+    updinitcfg=`dirname $rpcfgnui`/updinitcfg.py
+    if [ ! -f $updinitcfg ]; then exit 1; fi
+    if [ -f clientkeys-1.tar.gz  ]; then
+        keyfile=clientkeys-1.tar.gz
+        option="-c"
+    elif [ -f serverkeys-0.tar.gz  ]; then
+        keyfile=serverkeys-0.tar.gz
+        option=
+    fi       
+    tar -C $keydir -xf $keyfile || exit 1
+    python3 $updinitcfg $option $keydir ./initcfg.json
+    chmod 400 $keydir/*.pem
+    cat /dev/null > $keyfile
+fi
+
+initcfg=$(pwd)/initcfg.json
+if which sudo; then
+    sudo python3 $rpcfgnui ./initcfg.json
+else
+    su -c "python3 $rpcfgnui $initcfg"
+fi
+'''
+    return content
+
+def get_instscript_content() :
+    content = '''#!/bin/bash
+unzipdir=$(mktemp -d /tmp/rpcfinst_XXXXX)
+GZFILE=`awk '/^__GZFILE__/ {print NR + 1; exit 0; }' $0`
+tail -n+$GZFILE $0 | tar -zxv -C $unzipdir > /dev/null 2>&1
+if (($?==0)); then
+    echo unzip success;
+else
+    echo unzip failed;
+    exit 1;
+fi
+pushd $unzipdir; bash ./instcfg.sh $1;popd
+if (($?==0)); then
+    echo install complete;
+else
+    echo install failed;
+fi
+rm -rf $unzipdir
+exit 0
+__GZFILE__
+'''
+    return content
 
 class InterfaceContext :
     def __init__(self, ifNo ):
@@ -288,9 +363,9 @@ class ConfigDlg(Gtk.Dialog):
                             confVals[ "KeyFile"] = dirPath + "/clientkey.pem"
                             confVals[ "CertFile"] = dirPath + "/clientcert.pem"
                             if bGmSSL:
-                                sslFiles[ "CACertFile"] = dirPath + "/rootcacert.pem"
+                                confVals[ "CACertFile"] = dirPath + "/rootcacert.pem"
                             else:
-                                sslFiles[ "CACertFile"] = dirPath + "/certs.pem"
+                                confVals[ "CACertFile"] = dirPath + "/certs.pem"
                             confVals[ "SecretFile"] = ""
                         else:
                             confVals["KeyFile"] = sslFiles[ "KeyFile"]
@@ -2058,6 +2133,150 @@ class ConfigDlg(Gtk.Dialog):
 
         return ret
 
+    # create installer for keys generated outside rpcfg.py
+    def CreateInstaller( self, initCfg : object,
+        cfgPath : str, destPath : str,
+        isServer : bool, bSSL : bool ) -> int:
+        ret = 0
+        try:
+            if bSSL :
+                sslFiles = initCfg[ 'Security' ][ 'SSLCred' ]
+                files = [ sslFiles[ 'KeyFile' ],
+                    sslFiles[ 'CertFile' ] ]
+
+                if 'CACertFile' in sslFiles:
+                    files.append( sslFiles[ 'CACertFile' ] )
+
+                if isServer :
+                    keyPkg = destPath + "/serverkeys-0.tar.gz"
+                    destPkg = destPath + "/instsvr.tar"
+                    installer = destPath + "/instsvr"
+                else:
+                    keyPkg = destPath + "/clientkeys-1.tar.gz"
+                    destPkg = destPath + "/instcli.tar"
+                    installer = destPath + "/instcli"
+
+                dirPath = os.path.dirname( files[ 0 ] )
+                fileName = os.path.basename( files[ 0 ] )
+                cmdLine = 'tar cf ' + keyPkg + " -C " + dirPath + " " + fileName
+                ret = os.system( cmdLine )
+                if ret != 0:
+                    ret = -ret
+                    raise Exception( "Error create tar file " + files[ 0 ] )
+                files.pop(0)
+                for i in files:
+                    dirPath = os.path.dirname( i )
+                    fileName = os.path.basename( i )
+                    cmdLine = 'tar rf ' + keyPkg + " -C " + dirPath + " " +  fileName
+                    ret = os.system( cmdLine )
+                    if ret != 0:
+                        ret = -ret
+                        raise Exception( "Error appending to tar file " + i )
+
+                cmdLine = "touch " + destPath + "/USESSL"
+                os.system( cmdLine )
+
+            fp = open( destPath + '/instcfg.sh', 'w' )
+            fp.write( get_instcfg_content() )
+            fp.close()
+
+            cmdLine = "cd " + destPath + ";" 
+            if isServer :
+                cmdLine += "echo 0 > svridx;"
+                cmdLine += "echo 1 > endidx;"
+                cmdLine += "tar cf " + destPkg + " svridx endidx "
+                suffix = "-0-1.sh"
+            else:
+                cmdLine += "echo 1 > clidx;"
+                cmdLine += "echo 2 > endidx;"
+                cmdLine += "tar cf " + destPkg + " clidx endidx "
+                suffix = "-1-1.sh"
+
+            if bSSL:
+                cmdLine += os.path.basename( keyPkg ) + " USESSL "
+
+            cmdLine += " instcfg.sh;"
+            cmdLine += "rm *idx || true;rm *.tar.gz instcfg.sh USESSL|| true;"
+            cmdLine += "rm -rf " + destPkg + ".gz"
+            ret = os.system( cmdLine )
+            if ret != 0:
+                ret = -ret
+                raise Exception( "Error creating install package" )
+
+            # add instcfg to destPkg
+            cfgDir = os.path.dirname( cfgPath )
+            cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json; gzip " + destPkg
+            ret = os.system( cmdLine )
+            if ret != 0:
+                ret = -ret
+                raise Exception( "Error creating install package" )
+            destPkg += ".gz"
+
+            # create the installer
+            curDate = time.strftime('-%Y-%m-%d')
+            installer += curDate + suffix
+            fp = open( installer, "w" )
+            fp.write( get_instscript_content() )
+            fp.close()
+
+            cmdLine = "cat " + destPkg + " >> " + installer
+            os.system( cmdLine )
+            cmdLine = "chmod u+x " + installer + ";"
+            cmdLine += "rm -rf " + destPkg
+            os.system( cmdLine )
+
+        except Exception as err:
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
+
+
+    def CopyInstPkg( self, keyPath : str, destPath: str )->int:
+        ret = 0
+        files = [ 'instsvr.tar', 'instcli.tar' ]
+        try:
+            idxFiles = [ keyPath + "/svridx",
+                keyPath + "/clidx" ]
+            sf = keyPath + "/rpcf_serial.old"
+            if os.access( sf, os.R_OK ):
+                idxFiles.append( sf )
+
+            indexes = []
+            for i in idxFiles:
+                fp = open( i, "r" )
+                idx = int( fp.read( 4 ) )
+                fp.close()
+                indexes.append( idx )
+
+            if len( indexes ) == 2:
+                indexes.append( 0 )
+            
+            if indexes[ 0 ] < indexes[ 2 ]:
+                files.remove('instsvr.tar')
+            if indexes[ 1 ] < indexes[ 0 ]:
+                files.remove('instcli.tar')
+            if len( files ) == 0 :                
+                raise Exception( "InstPkgs too old to copy" )
+
+            for i in files:
+                cmdLine = "cp " + keyPath + "/" + i + " " + destPath
+                ret = os.system( cmdLine )
+                if ret != 0:
+                    ret = -ret
+                    raise Exception( "failed to copy " + i  )
+        except Exception as err:
+            if ret == 0:
+                ret = -errno.ENOENT
+        return ret
+    
+    class InstPkg :
+        def __init__( self ):
+            self.pkgName = ""
+            self.startIdx = ""
+            self.isServer = True
+            self.instName = ""
+
     def Export_Installer( self, initCfg : object, cfgPath : str )->int :
         ret = 0
         try:
@@ -2073,17 +2292,11 @@ class ConfigDlg(Gtk.Dialog):
                 bSSL = False
 
             if bGmSSL:
-                instPkg = strKeyPath + "/gmssl"
+                strKeyPath += "/gmssl"
             else:
-                instPkg = strKeyPath + "/openssl"
+                strKeyPath += "/openssl"
 
             curDir = os.path.dirname( cfgPath )
-            cmdline = "cp " + instPkg + "/inst*.tar " + curDir
-            ret = os.system( cmdline )
-            if ret != 0:
-                ret = -ret
-                raise Exception( "error copy instsvr.tar and instcli.tar" )
-
             svrPkg = curDir + "/instsvr.tar"
             cliPkg = curDir + "/instcli.tar"
 
@@ -2095,6 +2308,14 @@ class ConfigDlg(Gtk.Dialog):
                         if oElem[ 'EnableSSL' ] == 'true' :
                             bSSL2 = True
                             break
+
+            ret = self.CopyInstPkg( strKeyPath, curDir )
+            if ret < 0:
+                ret = self.CreateInstaller(
+                    initCfg, cfgPath, curDir, self.bServer, bSSL and bSSL2 )
+                if ret < 0:
+                    raise Exception( "Error CreateInstaller in " + curDir + " with " + cfgPath )
+                return ret
 
             if not bSSL or not bSSL2:
                 #removing the keys if not necessary
@@ -2109,60 +2330,77 @@ class ConfigDlg(Gtk.Dialog):
                     os.system( cmdline )
 
             # generate the master install package
-            inst_script="#!/bin/bash\n"
-            inst_script+="unzipdir=$(mktemp -d /tmp/rpcfinst_XXXXX)\n"
-            inst_script+="GZFILE=`awk '/^__GZFILE__/ {print NR + 1; exit 0; }' $0`\n"
-            inst_script+="tail -n+$GZFILE $0 | tar -zxv -C $unzipdir > /dev/null 2>&1\n"
-            inst_script+="if (($?==0)); then echo unzip success; else echo unzip failed;exit 1;fi\n"
-            inst_script+="pushd $unzipdir; bash ./instcfg.sh $1;popd\n"
-            inst_script+="if (($?==0)); then echo install complete;else echo install failed;fi\n"
-            inst_script+="rm -rf $unzipdir\n"
-            inst_script+="exit 0\n"
-            inst_script+="__GZFILE__\n"
+            instScript=get_instscript_content()
 
-            if self.bServer and os.access( svrPkg, os.W_OK ):
-                cmdline = "tar rf " + svrPkg + " -C " + curDir + " initcfg.json;"
+            svrObj = self.InstPkg()
+            svrObj.pkgName = svrPkg
+            svrObj.startIdx = "svridx"
+            svrObj.isServer = True
+            svrObj.instName = "instsvr"
+
+            cliObj = self.InstPkg()
+            cliObj.pkgName = cliPkg
+            cliObj.startIdx = "clidx"
+            cliObj.isServer = False
+            cliObj.instName = "instcli"
+
+            objs = [ svrObj, cliObj ]
+            for obj in objs :
+                if not obj.isServer and not self.bServer:
+                    continue
+                if os.access( obj.pkgName, os.W_OK ):
+                    cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json;"
+
+                bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"
-                    cmdline += "tar rf " + svrPkg + " -C " + curDir + " USESSL;"
+                    cmdline += "tar rf " + obj.pkgName + " -C " + curDir + " USESSL;"
+                    bHasKey = True
 
-                cmdline += "rm -f " + svrPkg + ".gz || true;"
-                cmdline += "gzip " + svrPkg + ";"
+                cmdline += "rm -f " + obj.pkgName + ".gz || true;"
+                cmdline += "gzip " + obj.pkgName + ";"
                 ret = os.system( cmdline )
                 if ret != 0 :
                     ret = -ret
-                    raise Exception( "error create server installer" )
-                svrPkg += ".gz"
-                instSvr = curDir + "/instsvr.sh"
-                fp = open( instSvr, "w" )
-                fp.write( inst_script )
+                    if obj.isServer :
+                        strMsg = "error create server installer"
+                    else:
+                        strMsg = "error create client installer"
+                    raise Exception( strMsg )
+
+                obj.pkgName += ".gz"
+                installer = curDir + "/" + obj.instName + ".sh"
+                fp = open( installer, "w" )
+                fp.write( instScript )
                 fp.close()
-                cmdline = "cat " + svrPkg + " >> " + instSvr
+                cmdline = "cat " + obj.pkgName + " >> " + installer
                 os.system( cmdline )
-                cmdline = "chmod u+x " + instSvr + ";"
+                cmdline = "chmod u+x " + installer + ";"
                 os.system( cmdline )
 
-            if os.access( cliPkg, os.W_OK ):
-                cmdline = "tar rf " + cliPkg + " -C " + curDir + " initcfg.json;"
-                if bSSL and bSSL2:
-                    cmdline += "touch " + curDir + "/USESSL;"
-                    cmdline += "tar rf " + cliPkg + " -C " + curDir + " USESSL;"
-
-                cmdline += "rm -f " + cliPkg + ".gz || true;"
-                cmdline += "gzip " + cliPkg + ";"
-                ret = os.system( cmdline )
-                if ret != 0 :
-                    ret = -ret
-                    raise Exception( "error create client installer" )
-                cliPkg += ".gz"
-                instCli = curDir + "/instcli.sh"
-                fp = open( instCli, "w" )
-                fp.write( inst_script )
-                fp.close()
-                cmdline = "cat " + cliPkg + " >> " + instCli
-                os.system( cmdline )
-                cmdline = "chmod u+x " + instCli + ";"
-                os.system( cmdline )
+                # generate a more meaningfule name
+                curDate = time.strftime('%Y-%m-%d')
+                newName = curDir + '/' + obj.instName + '-' + curDate
+                if bHasKey :
+                    try:
+                        tf = tarfile.open( obj.pkgName, "r:gz")
+                        ti = tf.getmember(obj.startIdx)
+                        startFp = tf.extractfile( ti )
+                        startIdx = int( startFp.read(4) )
+                        startFp.close()
+                        ti = tf.getmember( 'endidx' )
+                        endFp = tf.extractfile( ti)
+                        endIdx = int( endFp.read(4) )
+                        count = endIdx - startIdx
+                        endFp.close()
+                        if count < 0 :
+                            raise Exception( "bad index file" )
+                        newName += "-" + str( startIdx ) + "-" + str( count ) + ".sh"
+                    except Exception as err:     
+                        pass
+                    finally:
+                        tf.close()
+                os.system( "mv " + installer + " " + newName )
 
             cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
             #cmdline += "rm " + curDir + "/initcfg.json || true;"

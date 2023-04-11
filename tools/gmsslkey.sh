@@ -16,6 +16,7 @@ if [ "x$1" == "x" ]; then
     targetdir="$HOME/.rpcf/gmssl"
     if [ ! -d $targetdir ]; then
         mkdir -p $targetdir
+        chmod 700 $targetdir
     fi
 else
     targetdir=$1
@@ -157,17 +158,33 @@ if [ "x\$1" == "x" ]; then
     echo "Usage: \$0 <key idx starting from zero>"
     exit 1
 fi
+
+rpcfgnui=
+paths=\$(echo \$PATH | tr ':' ' ' )
+for i in \$paths; do
+    af=\$i/rpcf/rpcfgnui.py
+    if [ -f \$af ]; then
+        rpcfgnui=\$af
+        break
+    fi
+done
+
+if [ "x\$rpcfgnui" == "x" ]; then
+    \$rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
+    if [ ! -f \$rpcfgnui ]; then
+        exit 1
+    fi
+fi
+
 if [ -f USESSL ]; then
     keydir=\$HOME/.rpcf/gmssl
     if [ ! -d \$keydir ]; then
         mkdir -p \$keydir || exit 1
+        chmod 700 \$keydir
     fi
-    updinitcfg=/usr/bin/rpcf/updinitcfg.py
+    updinitcfg=\$(dirname \$rpcfgnui)/updinitcfg.py
     if [ ! -f \$updinitcfg ]; then
-        updinitcfg=/usr/local/bin/rpcf/updinitcfg.py
-        if [ ! -f \$updinitcfg ];then
-            exit 1
-        fi
+        exit 1
     fi
     if [ -f clidx ]; then
         idx_base=\$(head -n1 clidx)
@@ -180,7 +197,7 @@ if [ -f USESSL ]; then
         for i in clientkeys-*; do
             cat /dev/null > \$i
         done
-    else
+    elif [ -f svridx ];then
         idx_base=\$(head -n1 svridx)
         let keyidx=idx_base+\$1
         if [ -f serverkeys-\$keyidx.tar.gz ]; then
@@ -191,13 +208,6 @@ if [ -f USESSL ]; then
         for i in serverkeys-*; do
             cat /dev/null > \$i
         done
-    fi
-    rpcfgnui=/usr/bin/rpcf/rpcfgnui.py
-    if [ ! -f \$rpcfgnui ]; then
-        rpcfgnui=/usr/local/bin/rpcf/rpcfgnui.py
-        if [ ! -f \$rpcfnui ];then
-            exit 1
-        fi
     fi
 fi
 
