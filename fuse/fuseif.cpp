@@ -2431,21 +2431,11 @@ gint32 CFuseStmFile::fs_release(
             break;
 
         pParent->RemoveChild( strName );
-        fuse_ino_t inoParent =
-                pParent->GetObjId();
-
-        fuse_ino_t inoChild = GetObjId();
         MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
-        fuse_session* se =
-            fuseif_get_session( pFuse );
-
-        fuse_lowlevel_notify_delete( se,
-            inoParent, inoChild,
-            strName.c_str(),
-            strName.size() );
+        fuseif_invalidate_path( pFuse, pParent );
 
         CRpcServices* pSvc = GetIf();
         HANDLE hStream = GetStream();
@@ -2519,7 +2509,6 @@ gint32 CFuseEvtFile::fs_read(
             size = 0;
             break;
         }
-
         if( bNonBlock && size > dwAvail )
             size = dwAvail;
 
@@ -2634,23 +2623,11 @@ static gint32 fuseif_remove_req_svr(
         }
         pSvr->RemoveGroup( dwGrpId );
 
-        fuse_ino_t inoParent =
-            _pSvcDir->GetObjId();
-
         MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
-        fuse_session* se =
-            fuseif_get_session( pFuse );
-
-        for( auto& elem : vecInoid )
-        {
-            fuse_lowlevel_notify_delete( se,
-                inoParent, elem.first,
-                elem.second.c_str(),
-                elem.second.size() );
-        }
+        fuseif_invalidate_path( pFuse, _pSvcDir );
 
     }while( 0 );
 
@@ -2743,25 +2720,11 @@ static gint32 fuseif_remove_req_proxy(
 
         pProxy->RemoveGroup( dwGrpId );
 
-        fuse_ino_t inoParent =
-            _pSvcDir->GetObjId();
-
         MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
-        fuse_session* se =
-            fuseif_get_session( pFuse );
-
-        for( auto& elem : vecInoid )
-        {
-            fuse_lowlevel_notify_delete( se,
-                inoParent, elem.first,
-                elem.second.c_str(),
-                elem.second.size() );
-            DebugPrint( 0, "%s is removed",
-                elem.second.c_str() );
-        }
+        fuseif_invalidate_path( pFuse, _pSvcDir );
 
     }while( 0 );
 
@@ -2885,6 +2848,13 @@ gint32 CFuseEvtFile::fs_unlink(
             break;
         }
 
+        EnumClsid iClsid = this->GetClsid();
+        if( iClsid != clsid( CFuseReqFileProxy )&&
+            iClsid != clsid( CFuseReqFileSvr ) )
+        {
+            ret = -EACCES;
+            break;
+        }
         CancelFsRequests( -ECANCELED );
 
         if( GetOpCount() > 0 )
@@ -4663,6 +4633,11 @@ static gint32 fuseif_create_req(
         if( strSuffix.empty() )
         {
             ret = -EINVAL;
+            break;
+        }
+        if( strSuffix == "0" )
+        {
+            ret = -EEXIST;
             break;
         }
 

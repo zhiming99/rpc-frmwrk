@@ -71,7 +71,7 @@ def test() :
             AddParameter(req, "szText", 'Hello, you' )
 
             sendReq( reqfp, req )
-            print( os.getpid(), "EchoMany receiving from", respFile )
+            #print( os.getpid(), "EchoMany receiving from", respFile )
             ret = recvResp( respfp )
             if ret[ 0 ] < 0 :
                 error = ret[ 0 ]
