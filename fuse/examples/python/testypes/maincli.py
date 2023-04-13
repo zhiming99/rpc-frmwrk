@@ -64,7 +64,7 @@ def test() :
             req = BuildReqHdr( "EchoMany", idx )
             idx += 1
             AddParameter(req, "i1", os.getpid() )
-            AddParameter(req, "i2", 2 )
+            AddParameter(req, "i2", int( num ) )
             AddParameter(req, "i3", 3 )
             AddParameter(req, "i4", 4.0 )
             AddParameter(req, "i5", 5.0 )

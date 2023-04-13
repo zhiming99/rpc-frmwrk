@@ -740,15 +740,9 @@ def Update_Drv( initCfg: dict, drvFile : list,
         for port in ports :
             if port[ 'PortClass'] != 'RpcTcpBusPort' :
                 continue
-            ifList = port[ 'Parameters' ]
-            if len( ifList ) < len( oConns ):
-                ifList += ( [ defCfg ] *
-                    ( len(oConns ) - len( ifList ) ) )
-            elif len( ifList ) > len( oConns ) :
-                ifList = ifList[ : len(oConns )]
-
-            for i in range( len( ifList ) ) :
-                ifCfg = ifList[ i ]
+            ifList = []
+            for i in range( len( oConns ) ) :
+                ifCfg = dict()
                 oConn = oConns[ i ]
                 for key, val in oConn.items() :
                     if key == 'IpAddress' :
@@ -757,6 +751,8 @@ def Update_Drv( initCfg: dict, drvFile : list,
                         ifCfg[ key ] = val
                 if oConn[ 'EnableWS' ] == "false" :
                     ifCfg.pop( "DestURL", None )
+                ifList.append( ifCfg )
+
             port[ 'Parameters'] = ifList
             break
         break

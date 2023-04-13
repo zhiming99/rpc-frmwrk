@@ -2522,6 +2522,33 @@ gint32 CFuseEvtFile::fs_read(
         m_dwBytesAvail -= size;
         m_dwLastOff = off + size;
 
+        if( this->GetClsid() ==
+            clsid( CFuseRespFileProxy ) && off == 0 )
+        {
+            char szBuf[ 128 ];
+            szBuf[ 127 ] = 0;
+            if( size <= sizeof( guint32 ) )
+                break;
+            size_t dwSize = std::min(
+                size - sizeof( guint32 ),
+                sizeof( szBuf ) - 1 );
+
+            char* ptr = ( char* )bufvec->buf[ 0 ].mem +
+                sizeof( guint32 );
+
+            memcpy( szBuf, ptr, dwSize );
+            szBuf[ dwSize ] = 0;
+
+            OutputMsg( 0,
+                "Checkpoint 15: "
+                "first data read,"
+                "avail=%d, want=%d, "
+                "%s, msg=%s group=%d ",
+                dwAvail, size,
+                GetName().c_str(),
+                szBuf, this->GetGroupId() );
+        }
+
     }while( 0 );
 
     return ret;
@@ -4649,19 +4676,11 @@ static gint32 fuseif_create_req(
             ret = ERROR_STATE;
             break;
         }
-        DIR_SPTR pSvcEnt = nullptr;
-        if( pProxy != nullptr )
-            pSvcEnt = pProxy->GetSvcDir();
-        else
-            pSvcEnt = pSvr->GetSvcDir();
-
-        auto pSvcDir = static_cast
-            < CFuseSvcDir* >( pSvcEnt.get() );
 
         stdstr strName = "jreq_";
         strName += strSuffix;
 
-        WLOCK_TESTMNT0( pSvcDir );
+        WLOCK_TESTMNT0( pDir );
         if( pDir->GetChild( strName ) != nullptr )
         {
             ret = -EEXIST;
@@ -4673,7 +4692,7 @@ static gint32 fuseif_create_req(
         else
             pSvr->AddReqFiles( strSuffix );
 
-        auto pEnt = pSvcDir->GetChild( strName );
+        auto pEnt = pDir->GetChild( strName );
         if( pEnt == nullptr )
         {
             ret = -EFAULT;
