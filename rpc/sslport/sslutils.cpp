@@ -115,33 +115,37 @@ gint32 CRpcOpenSSLFidoDrv::HandleKeyPasswd()
                 ret = -errno;
                 break;
             }
-            char* pszPass = nullptr;
-            size_t len = 0;
-            ret = getline( &pszPass, &len , fp );
+            char buf[ SSL_PASS_MAX + 1 ];
+            size_t len = sizeof( buf );
+            char* pret = fgets( buf, len , fp );
             fclose( fp );
             fp = nullptr;
-            if( ret == -1 )
+            if( pret == nullptr )
             {
-                if( pszPass )
-                    free( pszPass );
                 ret = -errno;
                 break;
             }
 
-            if( len == 0 )
-            {
-                // assuming no passwd
-                break;
-            }
+            len = strlen( buf );
 
-            size_t actlen = 
-                std::min( len, ( size_t )SSL_PASS_MAX );
-            memcpy( szPass, pszPass, actlen );
+            // assuming no passwd
+            if( len == 0 )
+                break;
+
+            if( buf[ len - 1 ] == '\n' )
+                buf[ len - 1 ] = 0;
+            --len;
+
+            if( len == 0 )
+                break;
+
+            size_t actlen = std::min( len,
+                ( size_t )SSL_PASS_MAX );
+
+            memcpy( szPass, buf, actlen );
 
             for( size_t i = 0; i < len; i++ )
-                pszPass[ i ] = ' ';
-            free( pszPass );
-            pszPass = nullptr;
+                buf[ i ] = ' ';
 
             char* ptail = szPass + actlen - 1;
             while( ptail >= szPass )

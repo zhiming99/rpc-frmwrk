@@ -1822,25 +1822,35 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
                 ret = -errno;
                 break;
             }
-            char* pszPass = nullptr;
-            size_t len = 0;
-            ret = getline( &pszPass, &len , fp );
+
+            char buf[ SSL_PASS_MAX + 1 ];
+            size_t len = sizeof( buf );
+            char* pret = fgets( buf, len , fp );
             fclose( fp );
             fp = nullptr;
-            if( ret == -1 )
+            if( pret == nullptr )
             {
-                if( pszPass )
-                    free( pszPass );
                 ret = -errno;
                 break;
             }
 
+            len = strlen( buf );
+
+            // assuming no passwd
+            if( len == 0 )
+                break;
+
+            if( buf[ len - 1 ] == '\n' )
+                buf[ len - 1 ] = 0;
+            --len;
+
+            if( len == 0 )
+                break;
+
             stdstr& pass = ctx->password;
-            pass = pszPass;
+            pass = buf;
             for( size_t i = 0; i < len; i++ )
-                pszPass[ i ] = ' ';
-            free( pszPass );
-            pszPass = nullptr;
+                buf[ i ] = ' ';
 
             if( pass.size() > SSL_PASS_MAX )
                 ctx->password.erase( SSL_PASS_MAX );
