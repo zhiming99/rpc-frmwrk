@@ -33,7 +33,13 @@ if [ "$1" == "2" ]; then
 elif [ "$1" == "1" ]; then
     echo starting the reqfwdr...
     echo ${bin_dir}/rpcrouter $auth -r 1
-    if [ -d ./reqfwdr ]; then pushd ./reqfwdr; fi
+    if [ -d ./reqfwdr ];then
+       pushd ./reqfwdr;
+       echo driver.json under reqfwdr
+       cat ./driver.json;
+       echo driver.json under etc/rpcf
+       cat /usr/local/etc/rpcf/driver.json
+    fi
     ${bin_dir}/rpcrouter $auth -r 1 &
     cur_path=`basename $(pwd)`
     if [ $cur_path == "reqfwdr" ]; then popd; fi
