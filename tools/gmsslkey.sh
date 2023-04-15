@@ -76,6 +76,7 @@ fi
 
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
+    chmod 600 signcert.pem signkey.pem certs.pem || true
     gmssl sm2keygen -pass 1234 -out signkey.pem
     gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "server:$i" -key signkey.pem -pass 1234 -out signreq.pem
     gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
@@ -124,6 +125,7 @@ svr_idx=$startkey
 let idx_base+=numsvr
 let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
+    chmod 600 clientkey.pem clientcert.pem || true
     gmssl sm2keygen -pass 1234 -out clientkey.pem
     gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "client:$i" -key clientkey.pem -pass 1234 -out clientreq.pem
     gmssl reqsign -in clientreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out clientcert.pem

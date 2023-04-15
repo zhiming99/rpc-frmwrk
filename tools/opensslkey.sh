@@ -65,7 +65,7 @@ fi
 if which openssl; then
 
 if [ -d private_keys ]; then 
-    mv private_keys/* ./
+    mv -f private_keys/* ./
 fi
 
 if [ ! -d ./demoCA/newcerts ]; then
@@ -89,9 +89,9 @@ fi
 
 if [ ! -f cakey.pem ]; then
     mkdir backup
-    mv rootca*.pem backup/
+    mv -f rootca*.pem backup/
     rm *.pem
-    mv backup/* ./
+    mv -f backup/* ./
     rmdir backup
 
     openssl genrsa -out cakey.pem 2048
@@ -109,6 +109,7 @@ fi
 
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
+    chmod 600 signcert.pem signkey.pem || true
     openssl genrsa -out signkey.pem 2048
     openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server:$i"
     if which expect; then
@@ -150,7 +151,7 @@ function find_key_to_show()
     fi
 }
 
-#keep the generated first server keys in the directory
+#keep the first generated server keys as the current server keys in the directory
 startkey=0
 find_key_to_show 1
 echo $startkey > svridx
@@ -159,6 +160,7 @@ svr_idx=$startkey
 let idx_base+=numsvr
 let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
+    chmod 600 clientcert.pem clientkey.pem || true
     openssl genrsa -out clientkey.pem 2048
     openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=client:$i"
     if which expect; then
@@ -170,19 +172,19 @@ for((i=idx_base;i<endidx;i++));do
     rm clientkey.pem clientreq.pem clientcert.pem
 done
 
-#keep the first client keys in the directory
+#keep the first generated client keys as the current client keys in the directory
 find_key_to_show 0
 echo $startkey > clidx
 cli_idx=$startkey
 
-mv rpcf_serial rpcf_serial.old
+mv -f rpcf_serial rpcf_serial.old
 echo $endidx > rpcf_serial
 
 if [ ! -d ./private_keys ]; then
     mkdir ./private_keys
 fi
 
-mv rootcakey.pem rootcacert.pem cakey.pem cacert.pem private_keys/
+mv -f rootcakey.pem rootcacert.pem cakey.pem cacert.pem private_keys/
 chmod 400 private_keys/rootcakey.pem private_keys/cakey.pem
 cp certs.pem private_keys
 
@@ -266,9 +268,9 @@ if (( svr_idx >= idx_base )); then
     done
 
     tar rf instsvr.tar svridx
-    mv clidx endidx
+    mv -f clidx endidx
     tar rf instsvr.tar endidx
-    mv endidx clidx
+    mv -f endidx clidx
     tar rf instsvr.tar instcfg.sh
 else
     rm -rf instsvr.tar
@@ -284,9 +286,9 @@ if (( cli_idx >= svr_end )); then
         fi
     done
     tar rf instcli.tar clidx
-    mv rpcf_serial endidx
+    mv -f rpcf_serial endidx
     tar rf instcli.tar endidx
-    mv endidx rpcf_serial
+    mv -f endidx rpcf_serial
     tar rf instcli.tar instcfg.sh
 else
     rm -rf instcli.tar

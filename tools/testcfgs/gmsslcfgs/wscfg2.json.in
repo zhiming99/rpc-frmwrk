@@ -6,7 +6,7 @@
             "Compression": "true",
             "EnableSSL": "true",
             "HasAuth": "true",
-            "EnableWS": "true",
+            "EnableWS": "false",
             "DestURL": "https://example.com/chat",
             "RouterPath": "/"
         }
@@ -18,7 +18,7 @@
             "CACertFile": "",
             "SecretFile": "",
             "UsingGmSSL": "true",
-            "VerifyPeer": "false"
+            "VerifyPeer": "true"
         },
         "AuthInfo": {
             "Realm": "rpcf.org",

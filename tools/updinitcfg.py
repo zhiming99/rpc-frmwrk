@@ -46,6 +46,12 @@ def upd_initcfg( strKeyDir : str, cfgPath : str, bServer : bool ):
                 if len( strVal ) > 0:
                     sslFiles[ "CACertFile"] = \
                         strKeyDir + "/" + os.path.basename( strVal )
+            if 'SecretFile' in sslFiles :
+                strVal = sslFiles[ "SecretFile"]
+                if len( strVal ) > 0 and \
+                    strVal != "console" and strVal != "1234":
+                    sslFiles[ "SecretFile"] = \
+                        strKeyDir + "/" + os.path.basename( strVal )
         elif not bServer :
             strVal = sslFiles[ "KeyFile" ]
             keyName = os.path.basename( strVal )

@@ -160,7 +160,7 @@ else
     echo unzip failed;
     exit 1;
 fi
-pushd $unzipdir; bash ./instcfg.sh $1;popd
+pushd $unzipdir > /dev/null; bash ./instcfg.sh $1;popd > /dev/null
 if (($?==0)); then
     echo install complete;
 else
@@ -2136,25 +2136,39 @@ class ConfigDlg(Gtk.Dialog):
     # create installer for keys generated outside rpcfg.py
     def CreateInstaller( self, initCfg : object,
         cfgPath : str, destPath : str,
-        isServer : bool, bSSL : bool ) -> int:
+        bServer : bool, bInstKeys : bool ) -> int:
         ret = 0
         try:
-            if bSSL :
+            if bServer :
+                destPkg = destPath + "/instsvr.tar"
+                installer = destPath + "/instsvr"
+            else:
+                destPkg = destPath + "/instcli.tar"
+                installer = destPath + "/instcli"
+
+            if bInstKeys :
+                bGmSSL = False
                 sslFiles = initCfg[ 'Security' ][ 'SSLCred' ]
+                if "UsingGmSSL" in sslFiles:
+                    if sslFiles[ "UsingGmSSL" ] == "true": 
+                        bGmSSL = True
                 files = [ sslFiles[ 'KeyFile' ],
                     sslFiles[ 'CertFile' ] ]
 
                 if 'CACertFile' in sslFiles:
                     files.append( sslFiles[ 'CACertFile' ] )
 
-                if isServer :
+                if 'SecretFile' in sslFiles:
+                    oSecret = sslFiles[ 'SecretFile' ]
+                    if oSecret == "" or oSecret == "1234":
+                       pass 
+                    elif os.access( oSecret, os.R_OK ):
+                        files.append( oSecret )
+
+                if bServer :
                     keyPkg = destPath + "/serverkeys-0.tar.gz"
-                    destPkg = destPath + "/instsvr.tar"
-                    installer = destPath + "/instsvr"
                 else:
                     keyPkg = destPath + "/clientkeys-1.tar.gz"
-                    destPkg = destPath + "/instcli.tar"
-                    installer = destPath + "/instcli"
 
                 dirPath = os.path.dirname( files[ 0 ] )
                 fileName = os.path.basename( files[ 0 ] )
@@ -2181,23 +2195,33 @@ class ConfigDlg(Gtk.Dialog):
             fp.close()
 
             cmdLine = "cd " + destPath + ";" 
-            if isServer :
-                cmdLine += "echo 0 > svridx;"
-                cmdLine += "echo 1 > endidx;"
-                cmdLine += "tar cf " + destPkg + " svridx endidx "
-                suffix = "-0-1.sh"
-            else:
-                cmdLine += "echo 1 > clidx;"
-                cmdLine += "echo 2 > endidx;"
-                cmdLine += "tar cf " + destPkg + " clidx endidx "
-                suffix = "-1-1.sh"
+            cmdLine += "tar cf " + destPkg
+            suffix = ".sh"
 
-            if bSSL:
+            if bInstKeys:
+                if bServer :
+                    cmdLine += "echo 0 > svridx;"
+                    cmdLine += "echo 1 > endidx;"
+                    cmdLine += " svridx endidx "
+                    suffix = "-0-1.sh"
+                else:
+                    cmdLine += "echo 1 > clidx;"
+                    cmdLine += "echo 2 > endidx;"
+                    cmdLine += " clidx endidx "
+                    suffix = "-1-1.sh"
                 cmdLine += os.path.basename( keyPkg ) + " USESSL "
 
             cmdLine += " instcfg.sh;"
-            cmdLine += "rm *idx || true;rm *.tar.gz instcfg.sh USESSL|| true;"
+            cmdLine += "rm instcfg.sh || true;"
+            if bInstKeys:
+                if bServer:
+                    cmdLine += "rm svridx || true;"
+                else:
+                    cmdLine += "rm clidx || true;"
             cmdLine += "rm -rf " + destPkg + ".gz"
+            if bInstKeys:
+               cmdLine += " USESSL "+ keyPkg
+
             ret = os.system( cmdLine )
             if ret != 0:
                 ret = -ret
@@ -2214,15 +2238,28 @@ class ConfigDlg(Gtk.Dialog):
 
             # create the installer
             curDate = time.strftime('-%Y-%m-%d')
-            installer += curDate + suffix
+            if bInstKeys:
+                if bGmSSL:
+                    curDate = "-g-" + curDate
+                else:
+                    curDate = "-o-" + curDate
+            else:
+                installer += curDate + suffix
             fp = open( installer, "w" )
             fp.write( get_instscript_content() )
             fp.close()
 
-            cmdLine = "cat " + destPkg + " >> " + installer
+            cmdLine = "cd " + destPath + ";" 
+            cmdLine += "cat " + destPkg + " >> " + installer
             os.system( cmdLine )
             cmdLine = "chmod u+x " + installer + ";"
             cmdLine += "rm -rf " + destPkg
+            if bInstKeys:
+                cmdLine += " USESSL endidx "
+                if bServer :
+                    cmdLine += "svridx"
+                else:
+                    cmdLine += "clidx"
             os.system( cmdLine )
 
         except Exception as err:
@@ -2317,14 +2354,24 @@ class ConfigDlg(Gtk.Dialog):
                     raise Exception( "Error CreateInstaller in " + curDir + " with " + cfgPath )
                 return ret
 
+            if os.access( cliPkg, os.W_OK ):
+                bCliPkg = True
+            else:
+                bCliPkg = False
+
+            if os.access( svrPkg, os.W_OK ):
+                bSvrPkg = True
+            else:
+                bSvrPkg = False
+
             if not bSSL or not bSSL2:
                 #removing the keys if not necessary
-                if os.access( cliPkg, os.W_OK ):
+                if bCliPkg:
                     cmdline = "keyfiles=`tar tf " + cliPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                     cmdline += "for i in $keyfiles; do tar --delete -f " + cliPkg + " $i;done"
                     os.system( cmdline )
 
-                if os.access( svrPkg, os.W_OK ):
+                if bSvrPkg:
                     cmdline = "keyfiles=`tar tf " + svrPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                     cmdline += "for i in $keyfiles; do tar --delete -f " + svrPkg + " $i;done"
                     os.system( cmdline )
@@ -2332,25 +2379,36 @@ class ConfigDlg(Gtk.Dialog):
             # generate the master install package
             instScript=get_instscript_content()
 
+            objs = []
             svrObj = self.InstPkg()
-            svrObj.pkgName = svrPkg
-            svrObj.startIdx = "svridx"
-            svrObj.isServer = True
+            if bSvrPkg:
+                svrObj.pkgName = svrPkg
+                svrObj.startIdx = "svridx"
             svrObj.instName = "instsvr"
+            svrObj.isServer = True
+            objs.append( svrObj )
 
             cliObj = self.InstPkg()
-            cliObj.pkgName = cliPkg
-            cliObj.startIdx = "clidx"
-            cliObj.isServer = False
+            if bCliPkg:
+                cliObj.pkgName = cliPkg
+                cliObj.startIdx = "clidx"
             cliObj.instName = "instcli"
+            cliObj.isServer = False
+            objs.append( cliObj )
 
-            objs = [ svrObj, cliObj ]
             for obj in objs :
+                if obj.pkgName == "" :
+                    ret = self.CreateInstaller( initCfg, cfgPath,
+                        curDir, self.bServer, False )
+                    if ret < 0:
+                        raise Exception( "Error CreateInstaller in " + \
+                            curDir + " with " + cfgPath )
+                    continue
+
                 if not obj.isServer and not self.bServer:
                     continue
-                if os.access( obj.pkgName, os.W_OK ):
-                    cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json;"
 
+                cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json;"
                 bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"
@@ -2378,10 +2436,15 @@ class ConfigDlg(Gtk.Dialog):
                 cmdline = "chmod u+x " + installer + ";"
                 os.system( cmdline )
 
-                # generate a more meaningfule name
+                # generate a more intuitive name
                 curDate = time.strftime('%Y-%m-%d')
-                newName = curDir + '/' + obj.instName + '-' + curDate
                 if bHasKey :
+                    if bGmSSL:
+                        indicator= '-g-'
+                    else:
+                        indicator= '-o-'
+                    newName = curDir + '/' + \
+                        obj.instName + indicator + curDate
                     try:
                         tf = tarfile.open( obj.pkgName, "r:gz")
                         ti = tf.getmember(obj.startIdx)
@@ -2397,13 +2460,17 @@ class ConfigDlg(Gtk.Dialog):
                             raise Exception( "bad index file" )
                         newName += "-" + str( startIdx ) + "-" + str( count ) + ".sh"
                     except Exception as err:     
-                        pass
+                        newName += ".sh"
                     finally:
                         tf.close()
+                else:
+                    newName = curDir + '/' + \
+                        obj.instName + '-' + curDate + ".sh"
+
                 os.system( "mv " + installer + " " + newName )
 
             cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
-            #cmdline += "rm " + curDir + "/initcfg.json || true;"
+            cmdline += "rm " + curDir + "/initcfg.json || true;"
             os.system( cmdline )
 
         except Exception as err:
