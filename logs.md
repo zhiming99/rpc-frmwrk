@@ -1,4 +1,8 @@
 ---
+[`Sat Apr 15 2023 11:06:44 PM Beijing`]   
+1. The PR remove-lowlevel-rw-fuse is merged and closed.
+2. Next, I will continue to make `fuse` and `auth` modules compile-time pluggable.
+3. After this, I will resume the speed boost task.
 
 [`Thu Mar 16 2023 08:13:21 PM Beijing`]   
 1. I have now finished GmSSL support development officially, congratulations.
