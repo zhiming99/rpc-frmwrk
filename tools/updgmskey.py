@@ -71,12 +71,10 @@ def main()->int:
     if not os.path.isabs( strKeyPath ) :
         strKeyPath = os.path.abspath( strKeyPath )
 
-    if strBase == 'initcfg.json.in' :
-        ret = UpdInitCfg_GmSSL( cfgPath, strKeyPath )
-    elif strBase == 'driver.json':
+    if strBase == 'driver.json':
         ret = UpdDrv_GmSSL( cfgPath, strKeyPath )
     else :
-        ret = -errno.EINVAL
+        ret = UpdInitCfg_GmSSL( cfgPath, strKeyPath )
     quit( -ret )
 
 if __name__ == "__main__":

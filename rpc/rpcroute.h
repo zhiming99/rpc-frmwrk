@@ -3162,7 +3162,7 @@ inline gint32 NewIfDeferredCall2( EnumClsid iTaskClsid,
 #define CHECK_GRP_STATE \
     CStdRTMutex oTaskLock( GetLock() ); \
     EnumTaskState iState = GetTaskState(); \
-    if( iState == stateStopped ) \
+    if( IsStopped( iState ) ) \
     { \
         ret = ERROR_STATE; \
         break; \

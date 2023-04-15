@@ -20,7 +20,7 @@ function stressTest()
     release/TestTypessvr -f mpsvr &
     sleep 8 
     release/TestTypescli -f mp &
-    sleep 5
+    sleep 4
 
     #make sure TestTypesSvc created
     pushd mp
@@ -39,7 +39,7 @@ function stressTest()
 
 /bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 start=\$(date +%s.%N)
-for((i=0;i<200;i++));do
+for((i=1;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
 done
 wait \`jobs -p\`
@@ -114,7 +114,7 @@ function singleMkdir()
     popd
 }
 start=\$(date +%s.%N)
-for((i=0;i<200;i++));do
+for((i=0;i<199;i++));do
     singleMkdir \$i &
 done
 wait \`jobs -p\`
@@ -127,12 +127,19 @@ RUNCLIENT
     pkill -f mainsvr.py
 
     echo umount mp
-    umount mp
+    while true; do
+        umount ./mp 
+        if mount | grep 'TestTypescli\|hostcli'; then
+            sleep 1
+            continue
+        fi
+        break
+    done
 
     echo umount mpsvr...
     while true; do
         umount mpsvr 
-        if mount | grep TestTypessvr; then
+        if mount | grep 'TestTypessvr\|hostsvr'; then
             sleep 1
             continue
         fi

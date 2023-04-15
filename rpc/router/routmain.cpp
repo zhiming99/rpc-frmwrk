@@ -313,6 +313,12 @@ void CIfRouterTest::testSvrStartStop()
     return;
 }
 
+void Version()
+{
+    fprintf( stdout, "Version: %s\n", VERSION_STRING  );
+    fprintf( stdout, "Features: %s\n", FEATURES );
+}
+
 void Usage( char* szName )
 {
     fprintf( stderr,
@@ -320,9 +326,10 @@ void Usage( char* szName )
         "\t [ -a to enable authentication ]\n"
         "\t [ -c to establish a seperate connection to the same bridge per client, only for role 1 ]\n"
         "\t [ -f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
-        "\t [ -s < Service Name for authentication, valid for role 2 or 3, and ignored for role 1 > ]\n"
+        "\t [ -s < Service Name for authentication, valid for role 2, and ignored for role 1 > ]\n"
         "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
         "\t [ -d to run as a daemon ]\n"
+        "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
         szName );
 }
@@ -336,7 +343,7 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:adcfs:m:" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "hr:adcfs:m:v" ) ) != -1 )
     {
         switch (opt)
         {
@@ -387,7 +394,12 @@ int main( int argc, char** argv )
         case 'h':
             {
                 Usage( argv[ 0 ] );
-                exit(0);
+                exit( 0 );
+            }
+        case 'v':
+            {
+                Version();
+                exit( 0 );
             }
         default: /*  '?' */
             ret = -EINVAL;

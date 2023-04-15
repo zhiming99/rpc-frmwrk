@@ -205,6 +205,9 @@ struct AGMS_CTX : TLS_CTX
     bool verify_peer = false;
 
     AGMS_CTX();
+    ~AGMS_CTX()
+    { cleanup(); }
+
     int check_private_key();
     unsigned long set_options( unsigned long op);
     int set_cipher_list( const char *str);
@@ -242,14 +245,9 @@ struct AGMS : public TLS_CONNECT
     bool is_ready() const
     { return get_state() == STAT_READY; }
 
-    int use_PrivateKey_file(const char *file, int type);
-    int use_certificate_file(const char *file, int type);
-    void add_all_algorithms();
-    void load_error_strings();
-    void set_connect_state();
-    void set_accept_state();
+    inline bool is_verify_peer() const
+    { return gms_ctx->verify_peer; }
 
-    int pending_bytes();
     void cleanup();
 };
 

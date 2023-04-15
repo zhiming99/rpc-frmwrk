@@ -5,8 +5,10 @@ import sys
 from shutil import move
 from copy import deepcopy
 from urllib.parse import urlparse
-from typing import Dict
+from typing import Tuple
 import errno
+import tarfile
+import time
 from updcfg import *
 
 def vc_changed(stack, gparamstring):
@@ -23,36 +25,152 @@ def vc_changed(stack, gparamstring):
         wnd.DisplayError( "node name is not valid" )
         stack.set_visible_child( wnd.gridmh )
 
-def GenOpenSSLkey( dlg, strPath : str ) :
-    strHead = "cd " + strPath + ";"
-    os.system( strHead + 'openssl req -x509 -new -subj "/C=CN/CN=foo" -addext "subjectAltName = DNS:rpcf.org" -addext "certificatePolicies = 1.2.3.4" -newkey rsa:2048 -nodes -keyout server.key -out server.crt -days 365' ) 
-    strKeyFile = strPath + "/server.key"
-    dlg.keyEdit.set_text( strKeyFile )
-    strCertFile = strPath + "/server.crt"
-    dlg.certEdit.set_text( strCertFile )
+def SilentRun( strCmd : str ):
+    cmdline = "expect -c \"" + strCmd + "\" - <<EOF\n"
+    cmdline += "expect {\n"
+    cmdline += "\"Sign the certificate? \" { send \"y\\r\";exp_continue}\n" 
+    cmdline += "\"requests certified, commit? \" { send \"y\\r\";exp_continue}\n" 
+    cmdline += "\"eof\" { exit }\n" 
+    cmdline += "\"timeout\" { exit }\n" 
+    cmdline += "}\n" 
+    cmdline += "EOF\n"
+    return os.system( cmdline )
 
-def GenGmSSLkey( dlg, strPath : str ) :
+def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    dir_path += "/gmsslkey.sh"
-    cmdline = "sh " + dir_path + " " + strPath
-    os.system( cmdline )
-    strFile = strPath + "/signkey.pem"
-    dlg.keyEdit.set_text( strFile )
+    dir_path += "/opensslkey.sh"
+    cmdline = "/bin/bash " + dir_path + " " + strPath + " " + cnum + " " + snum
+    bExpect = False
+    ret = os.system( "which expect" )
+    if ret == 0 :
+        bExpect = True
+    if bExpect :
+        cmdline = "spawn " + cmdline
+        ret = SilentRun( cmdline )
+    else:
+        ret = os.system( cmdline )
 
-    strFile = strPath + "/certs.pem"
-    dlg.certEdit.set_text( strFile )
+    if ret != 0 :
+        return
 
-    strFile = strPath + "/cacert.pem"
-    dlg.cacertEdit.set_text( strFile )
+    if bServer :
+        strFile = strPath + "/signkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/signcert.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/certs.pem"
+        dlg.cacertEdit.set_text( strFile )
+    else:
+        strFile = strPath + "/clientkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/clientcert.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/certs.pem"
+        dlg.cacertEdit.set_text( strFile )
+
     dlg.secretEdit.set_text( "" )
 
-    strCKey = "./clientkey.pem"
-    strCCert = "./clientcert.pem"
-    strCARoot = "./rootcacert.pem"
-
-    cmdline = "cd " + strPath + ";tar zcf clientkeys.tar.gz " + \
-        strCKey + " " + strCCert + " " + strCARoot
+def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    dir_path += "/gmsslkey.sh"
+    cmdline = "bash " + dir_path + " " + strPath + " " + cnum + " " + snum
     os.system( cmdline )
+    if bServer :
+        strFile = strPath + "/signkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/certs.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/cacert.pem"
+        dlg.cacertEdit.set_text( strFile )
+    else:
+        strFile = strPath + "/clientkey.pem"
+        dlg.keyEdit.set_text( strFile )
+
+        strFile = strPath + "/clientcert.pem"
+        dlg.certEdit.set_text( strFile )
+
+        strFile = strPath + "/rootcacert.pem"
+        dlg.cacertEdit.set_text( strFile )
+    dlg.secretEdit.set_text( "" )
+
+def get_instcfg_content()->str :
+    content='''#!/bin/bash
+paths=$(echo $PATH | tr ':' ' ' ) 
+for i in $paths; do
+    a=$i/rpcf/rpcfgnui.py
+    if [ -f $a ]; then
+        rpcfgnui=$a
+        break
+    fi
+done
+
+if [ "x$rpcfgnui" == "x" ]; then
+    $rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
+    if [ ! -f $rpcfgnui ]; then
+        exit 1
+    fi       
+fi
+if [ -f USESSL ]; then
+    if grep 'UsingGmSSL":."true"' ./initcfg.json; then
+        keydir=$HOME/.rpcf/gmssl
+    else     
+        keydir=$HOME/.rpcf/openssl
+    fi       
+    if [ ! -d $keydir ]; then
+        mkdir -p $keydir || exit 1
+    fi   
+    updinitcfg=`dirname $rpcfgnui`/updinitcfg.py
+    if [ ! -f $updinitcfg ]; then exit 1; fi
+    if [ -f clientkeys-1.tar.gz  ]; then
+        keyfile=clientkeys-1.tar.gz
+        option="-c"
+    elif [ -f serverkeys-0.tar.gz  ]; then
+        keyfile=serverkeys-0.tar.gz
+        option=
+    fi       
+    tar -C $keydir -xf $keyfile || exit 1
+    python3 $updinitcfg $option $keydir ./initcfg.json
+    chmod 400 $keydir/*.pem
+    cat /dev/null > $keyfile
+fi
+
+initcfg=$(pwd)/initcfg.json
+if which sudo; then
+    sudo python3 $rpcfgnui ./initcfg.json
+else
+    su -c "python3 $rpcfgnui $initcfg"
+fi
+'''
+    return content
+
+def get_instscript_content() :
+    content = '''#!/bin/bash
+unzipdir=$(mktemp -d /tmp/rpcfinst_XXXXX)
+GZFILE=`awk '/^__GZFILE__/ {print NR + 1; exit 0; }' $0`
+tail -n+$GZFILE $0 | tar -zxv -C $unzipdir > /dev/null 2>&1
+if (($?==0)); then
+    echo unzip success;
+else
+    echo unzip failed;
+    exit 1;
+fi
+pushd $unzipdir > /dev/null; bash ./instcfg.sh $1;popd > /dev/null
+if (($?==0)); then
+    echo install complete;
+else
+    echo install failed;
+fi
+rm -rf $unzipdir
+exit 0
+__GZFILE__
+'''
+    return content
 
 class InterfaceContext :
     def __init__(self, ifNo ):
@@ -210,7 +328,7 @@ class ConfigDlg(Gtk.Dialog):
         else:
             confVals[ 'UsingGmSSL' ] = 'false'
 
-        bret = IsVerifyPeer( drvVal, sslPort );
+        bret = IsVerifyPeer( drvVal, sslPort )
         if bret[ 0 ] == 0 and bret[ 1 ] :
             confVals[ 'VerifyPeer' ] = 'true'
         else:
@@ -223,18 +341,40 @@ class ConfigDlg(Gtk.Dialog):
                     if sslFiles is None :
                         continue
 
-                    confVals["keyFile"] = sslFiles[ "KeyFile"]
-                    confVals["certFile"] = sslFiles[ "CertFile"]
+                    if self.bServer :
+                        confVals["KeyFile"] = sslFiles[ "KeyFile"]
+                        confVals["CertFile"] = sslFiles[ "CertFile"]
 
-                    if 'CACertFile' in sslFiles :
-                        confVals['CACertFile'] = sslFiles[ 'CACertFile']
-                    else:
-                        confVals['CACertFile'] = ''
+                        if 'CACertFile' in sslFiles :
+                            confVals['CACertFile'] = sslFiles[ 'CACertFile']
+                        else:
+                            confVals['CACertFile'] = ''
 
-                    if 'SecretFile' in sslFiles :
-                        confVals['SecretFile'] = sslFiles[ 'SecretFile']
-                    else:
-                        confVals['SecretFile'] = ''
+                        if 'SecretFile' in sslFiles :
+                            confVals['SecretFile'] = sslFiles[ 'SecretFile']
+                        else:
+                            confVals['SecretFile'] = ''
+                    else: 
+                        keyPath = sslFiles[ "KeyFile" ]
+                        dirPath = os.path.dirname( keyPath )
+                        keyName = os.path.basename( keyPath )
+                        if keyName == "signkey.pem" :
+                            '''generated by rpcfg'''
+                            confVals[ "KeyFile"] = dirPath + "/clientkey.pem"
+                            confVals[ "CertFile"] = dirPath + "/clientcert.pem"
+                            if bGmSSL:
+                                confVals[ "CACertFile"] = dirPath + "/rootcacert.pem"
+                            else:
+                                confVals[ "CACertFile"] = dirPath + "/certs.pem"
+                            confVals[ "SecretFile"] = ""
+                        else:
+                            confVals["KeyFile"] = sslFiles[ "KeyFile"]
+                            confVals["CertFile"] = sslFiles[ "CertFile"]
+                            confVals["CACertFile"] = sslFiles[ "CACertFile"]
+                            if 'SecretFile' in sslFiles :
+                                confVals['SecretFile'] = sslFiles[ 'SecretFile']
+                            else:
+                                confVals['SecretFile'] = ''
                 
                 if port[ 'PortClass'] == 'RpcTcpBusPort' :
                     connParams = port[ 'Parameters']
@@ -1175,7 +1315,7 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelKey, startCol + 0, startRow, 1, 1 )
 
         keyEditBox = Gtk.Entry()
-        strKey = confVals.get( 'keyFile' )
+        strKey = confVals.get( 'KeyFile' )
         if strKey is None:
             strKey = ''
 
@@ -1194,7 +1334,7 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelCert, startCol + 0, startRow + 1, 1, 1 )
 
         certEditBox = Gtk.Entry()
-        strCert = confVals.get( 'certFile' )
+        strCert = confVals.get( 'CertFile' )
         if strCert is None:
             strCert = ''
         
@@ -1279,7 +1419,7 @@ class ConfigDlg(Gtk.Dialog):
             "toggled", self.on_button_toggled, "VerifyPeer")
         grid.attach( vfyPeerCheck, startCol + 3, startRow + 4, 1, 1 )
 
-        if self.bServer or not bGmSSL :
+        if self.bServer :
             genKeyBtn = Gtk.Button.new_with_label("Gen Demo Key")
             genKeyBtn.connect("clicked", self.on_choose_key_dir_clicked)
             grid.attach( genKeyBtn, startCol + 1, startRow + 5, 1, 1 )
@@ -1427,29 +1567,27 @@ class ConfigDlg(Gtk.Dialog):
         dialog.destroy()
         
     def on_choose_key_dir_clicked( self, button ) :
-        strCurPath = self.keyEdit.get_text()
-        dialog = Gtk.FileChooserDialog(
-            title="Please choose a directory", parent=self,
-                action=Gtk.FileChooserAction.SELECT_FOLDER )
-        
-        dialog.add_buttons(
-            Gtk.STOCK_CANCEL,
-            Gtk.ResponseType.CANCEL,
-            Gtk.STOCK_OPEN,
-            Gtk.ResponseType.OK,
-        )
-        dialog.set_filename( strCurPath )
-        #self.add_filters(dialog, False)
+        dialog = SSLNumKeyDialog( self )
+
         response = dialog.run()
         if response != Gtk.ResponseType.OK:
             dialog.destroy()
             return
-        strPath = dialog.get_filename()
+        cnum = dialog.cnumEdit.get_text()
+        snum = dialog.snumEdit.get_text()
+
+        strCurPath = os.path.expanduser( "~" ) + "/.rpcf"
         bGmSSL = self.gmsslCheck.props.active
-        if not bGmSSL :
-            GenOpenSSLkey( self, strPath )
+        if bGmSSL :
+            strCurPath += "/gmssl"
+            if not os.path.isdir( strCurPath ):
+                os.makedirs( strCurPath )
+            GenGmSSLkey( self, strCurPath, self.bServer, cnum, snum )
         else:
-            GenGmSSLkey( self, strPath )
+            strCurPath += "/openssl"
+            if not os.path.isdir( strCurPath ):
+                os.makedirs( strCurPath )
+            GenOpenSSLkey( self, strCurPath, self.bServer, cnum, snum )
         dialog.destroy()
 
     def add_filters(self, dialog, bKey ):
@@ -1995,6 +2133,352 @@ class ConfigDlg(Gtk.Dialog):
 
         return ret
 
+    # create installer for keys generated outside rpcfg.py
+    def CreateInstaller( self, initCfg : object,
+        cfgPath : str, destPath : str,
+        bServer : bool, bInstKeys : bool ) -> int:
+        ret = 0
+        try:
+            if bServer :
+                destPkg = destPath + "/instsvr.tar"
+                installer = destPath + "/instsvr"
+            else:
+                destPkg = destPath + "/instcli.tar"
+                installer = destPath + "/instcli"
+
+            if bInstKeys :
+                bGmSSL = False
+                sslFiles = initCfg[ 'Security' ][ 'SSLCred' ]
+                if "UsingGmSSL" in sslFiles:
+                    if sslFiles[ "UsingGmSSL" ] == "true": 
+                        bGmSSL = True
+                files = [ sslFiles[ 'KeyFile' ],
+                    sslFiles[ 'CertFile' ] ]
+
+                if 'CACertFile' in sslFiles:
+                    files.append( sslFiles[ 'CACertFile' ] )
+
+                if 'SecretFile' in sslFiles:
+                    oSecret = sslFiles[ 'SecretFile' ]
+                    if oSecret == "" or oSecret == "1234":
+                       pass 
+                    elif os.access( oSecret, os.R_OK ):
+                        files.append( oSecret )
+
+                if bServer :
+                    keyPkg = destPath + "/serverkeys-0.tar.gz"
+                else:
+                    keyPkg = destPath + "/clientkeys-1.tar.gz"
+
+                dirPath = os.path.dirname( files[ 0 ] )
+                fileName = os.path.basename( files[ 0 ] )
+                cmdLine = 'tar cf ' + keyPkg + " -C " + dirPath + " " + fileName
+                ret = os.system( cmdLine )
+                if ret != 0:
+                    ret = -ret
+                    raise Exception( "Error create tar file " + files[ 0 ] )
+                files.pop(0)
+                for i in files:
+                    dirPath = os.path.dirname( i )
+                    fileName = os.path.basename( i )
+                    cmdLine = 'tar rf ' + keyPkg + " -C " + dirPath + " " +  fileName
+                    ret = os.system( cmdLine )
+                    if ret != 0:
+                        ret = -ret
+                        raise Exception( "Error appending to tar file " + i )
+
+                cmdLine = "touch " + destPath + "/USESSL"
+                os.system( cmdLine )
+
+            fp = open( destPath + '/instcfg.sh', 'w' )
+            fp.write( get_instcfg_content() )
+            fp.close()
+
+            cmdLine = "cd " + destPath + ";" 
+            cmdLine += "tar cf " + destPkg
+            suffix = ".sh"
+
+            if bInstKeys:
+                if bServer :
+                    cmdLine += "echo 0 > svridx;"
+                    cmdLine += "echo 1 > endidx;"
+                    cmdLine += " svridx endidx "
+                    suffix = "-0-1.sh"
+                else:
+                    cmdLine += "echo 1 > clidx;"
+                    cmdLine += "echo 2 > endidx;"
+                    cmdLine += " clidx endidx "
+                    suffix = "-1-1.sh"
+                cmdLine += os.path.basename( keyPkg ) + " USESSL "
+
+            cmdLine += " instcfg.sh;"
+            cmdLine += "rm instcfg.sh || true;"
+            if bInstKeys:
+                if bServer:
+                    cmdLine += "rm svridx || true;"
+                else:
+                    cmdLine += "rm clidx || true;"
+            cmdLine += "rm -rf " + destPkg + ".gz"
+            if bInstKeys:
+               cmdLine += " USESSL "+ keyPkg
+
+            ret = os.system( cmdLine )
+            if ret != 0:
+                ret = -ret
+                raise Exception( "Error creating install package" )
+
+            # add instcfg to destPkg
+            cfgDir = os.path.dirname( cfgPath )
+            cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json; gzip " + destPkg
+            ret = os.system( cmdLine )
+            if ret != 0:
+                ret = -ret
+                raise Exception( "Error creating install package" )
+            destPkg += ".gz"
+
+            # create the installer
+            curDate = time.strftime('-%Y-%m-%d')
+            if bInstKeys:
+                if bGmSSL:
+                    curDate = "-g-" + curDate
+                else:
+                    curDate = "-o-" + curDate
+            else:
+                installer += curDate + suffix
+            fp = open( installer, "w" )
+            fp.write( get_instscript_content() )
+            fp.close()
+
+            cmdLine = "cd " + destPath + ";" 
+            cmdLine += "cat " + destPkg + " >> " + installer
+            os.system( cmdLine )
+            cmdLine = "chmod u+x " + installer + ";"
+            cmdLine += "rm -rf " + destPkg
+            if bInstKeys:
+                cmdLine += " USESSL endidx "
+                if bServer :
+                    cmdLine += "svridx"
+                else:
+                    cmdLine += "clidx"
+            os.system( cmdLine )
+
+        except Exception as err:
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
+
+
+    def CopyInstPkg( self, keyPath : str, destPath: str )->int:
+        ret = 0
+        files = [ 'instsvr.tar', 'instcli.tar' ]
+        try:
+            idxFiles = [ keyPath + "/svridx",
+                keyPath + "/clidx" ]
+            sf = keyPath + "/rpcf_serial.old"
+            if os.access( sf, os.R_OK ):
+                idxFiles.append( sf )
+
+            indexes = []
+            for i in idxFiles:
+                fp = open( i, "r" )
+                idx = int( fp.read( 4 ) )
+                fp.close()
+                indexes.append( idx )
+
+            if len( indexes ) == 2:
+                indexes.append( 0 )
+            
+            if indexes[ 0 ] < indexes[ 2 ]:
+                files.remove('instsvr.tar')
+            if indexes[ 1 ] < indexes[ 0 ]:
+                files.remove('instcli.tar')
+            if len( files ) == 0 :                
+                raise Exception( "InstPkgs too old to copy" )
+
+            for i in files:
+                cmdLine = "cp " + keyPath + "/" + i + " " + destPath
+                ret = os.system( cmdLine )
+                if ret != 0:
+                    ret = -ret
+                    raise Exception( "failed to copy " + i  )
+        except Exception as err:
+            if ret == 0:
+                ret = -errno.ENOENT
+        return ret
+    
+    class InstPkg :
+        def __init__( self ):
+            self.pkgName = ""
+            self.startIdx = ""
+            self.isServer = True
+            self.instName = ""
+
+    def Export_Installer( self, initCfg : object, cfgPath : str )->int :
+        ret = 0
+        try:
+            bSSL = IsFeatureEnabled( "\(gmssl\|openssl\)" )
+            strKeyPath = os.path.expanduser( "~" ) + "/.rpcf"
+            bGmSSL = False
+            try:
+                sslFiles = initCfg[ 'Security' ][ 'SSLCred' ]
+                if 'UsingGmSSL' in sslFiles: 
+                    if sslFiles[ 'UsingGmSSL' ] == 'true':
+                        bGmSSL = True
+            except Exception as err:
+                bSSL = False
+
+            if bGmSSL:
+                strKeyPath += "/gmssl"
+            else:
+                strKeyPath += "/openssl"
+
+            curDir = os.path.dirname( cfgPath )
+            svrPkg = curDir + "/instsvr.tar"
+            cliPkg = curDir + "/instcli.tar"
+
+            bSSL2 = False
+            if 'Connections' in initCfg:
+                oConn = initCfg[ 'Connections']
+                for oElem in oConn :
+                    if 'EnableSSL' in oElem :
+                        if oElem[ 'EnableSSL' ] == 'true' :
+                            bSSL2 = True
+                            break
+
+            ret = self.CopyInstPkg( strKeyPath, curDir )
+            if ret < 0:
+                ret = self.CreateInstaller(
+                    initCfg, cfgPath, curDir, self.bServer, bSSL and bSSL2 )
+                if ret < 0:
+                    raise Exception( "Error CreateInstaller in " + curDir + " with " + cfgPath )
+                return ret
+
+            if os.access( cliPkg, os.W_OK ):
+                bCliPkg = True
+            else:
+                bCliPkg = False
+
+            if os.access( svrPkg, os.W_OK ):
+                bSvrPkg = True
+            else:
+                bSvrPkg = False
+
+            if not bSSL or not bSSL2:
+                #removing the keys if not necessary
+                if bCliPkg:
+                    cmdline = "keyfiles=`tar tf " + cliPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
+                    cmdline += "for i in $keyfiles; do tar --delete -f " + cliPkg + " $i;done"
+                    os.system( cmdline )
+
+                if bSvrPkg:
+                    cmdline = "keyfiles=`tar tf " + svrPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
+                    cmdline += "for i in $keyfiles; do tar --delete -f " + svrPkg + " $i;done"
+                    os.system( cmdline )
+
+            # generate the master install package
+            instScript=get_instscript_content()
+
+            objs = []
+            svrObj = self.InstPkg()
+            if bSvrPkg:
+                svrObj.pkgName = svrPkg
+                svrObj.startIdx = "svridx"
+            svrObj.instName = "instsvr"
+            svrObj.isServer = True
+            objs.append( svrObj )
+
+            cliObj = self.InstPkg()
+            if bCliPkg:
+                cliObj.pkgName = cliPkg
+                cliObj.startIdx = "clidx"
+            cliObj.instName = "instcli"
+            cliObj.isServer = False
+            objs.append( cliObj )
+
+            for obj in objs :
+                if obj.pkgName == "" :
+                    ret = self.CreateInstaller( initCfg, cfgPath,
+                        curDir, self.bServer, False )
+                    if ret < 0:
+                        raise Exception( "Error CreateInstaller in " + \
+                            curDir + " with " + cfgPath )
+                    continue
+
+                if not obj.isServer and not self.bServer:
+                    continue
+
+                cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json;"
+                bHasKey = False
+                if bSSL and bSSL2:
+                    cmdline += "touch " + curDir + "/USESSL;"
+                    cmdline += "tar rf " + obj.pkgName + " -C " + curDir + " USESSL;"
+                    bHasKey = True
+
+                cmdline += "rm -f " + obj.pkgName + ".gz || true;"
+                cmdline += "gzip " + obj.pkgName + ";"
+                ret = os.system( cmdline )
+                if ret != 0 :
+                    ret = -ret
+                    if obj.isServer :
+                        strMsg = "error create server installer"
+                    else:
+                        strMsg = "error create client installer"
+                    raise Exception( strMsg )
+
+                obj.pkgName += ".gz"
+                installer = curDir + "/" + obj.instName + ".sh"
+                fp = open( installer, "w" )
+                fp.write( instScript )
+                fp.close()
+                cmdline = "cat " + obj.pkgName + " >> " + installer
+                os.system( cmdline )
+                cmdline = "chmod u+x " + installer + ";"
+                os.system( cmdline )
+
+                # generate a more intuitive name
+                curDate = time.strftime('%Y-%m-%d')
+                if bHasKey :
+                    if bGmSSL:
+                        indicator= '-g-'
+                    else:
+                        indicator= '-o-'
+                    newName = curDir + '/' + \
+                        obj.instName + indicator + curDate
+                    try:
+                        tf = tarfile.open( obj.pkgName, "r:gz")
+                        ti = tf.getmember(obj.startIdx)
+                        startFp = tf.extractfile( ti )
+                        startIdx = int( startFp.read(4) )
+                        startFp.close()
+                        ti = tf.getmember( 'endidx' )
+                        endFp = tf.extractfile( ti)
+                        endIdx = int( endFp.read(4) )
+                        count = endIdx - startIdx
+                        endFp.close()
+                        if count < 0 :
+                            raise Exception( "bad index file" )
+                        newName += "-" + str( startIdx ) + "-" + str( count ) + ".sh"
+                    except Exception as err:     
+                        newName += ".sh"
+                    finally:
+                        tf.close()
+                else:
+                    newName = curDir + '/' + \
+                        obj.instName + '-' + curDate + ".sh"
+
+                os.system( "mv " + installer + " " + newName )
+
+            cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
+            cmdline += "rm " + curDir + "/initcfg.json || true;"
+            os.system( cmdline )
+
+        except Exception as err:
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
+
     def Export_InitCfg( self, path ) -> int :
         jsonVal = dict()
         ret = self.Export_Conns( jsonVal )
@@ -2042,15 +2526,23 @@ class ConfigDlg(Gtk.Dialog):
         initFile = '/tmp/initcfg.json'
         if destPath is not None :
             initFile = destPath + '/initcfg.json'
-            return self.Export_InitCfg( initFile )
+            ret = self.Export_InitCfg( initFile )
+            if ret < 0:
+                return ret
+            fp = open( initFile, 'r' )
+            cfgVal = json.load( fp )
+            fp.close()
+            ret = self.Export_Installer( cfgVal, initFile )
+            return ret
 
         ret = self.Export_InitCfg( initFile )
         if ret < 0 :
             return ret
 
-        ret = Update_InitCfg( initFile, destPath )
+        passDlg = PasswordDialog( self )
+        ret = Update_InitCfg( initFile, destPath, passDlg )
         os.remove( initFile )
-        return ret;
+        return ret
 
     def UpdateConfig( self ) :
         return self.Export_Files( None, self.bServer )
@@ -2192,7 +2684,102 @@ class LBGrpEditDlg(Gtk.Dialog):
         if len( self.grpSet ) == 0 :
             self.rmMemberBtn.set_sensitive( False )
         self.toMemberBtn.set_sensitive( True )
-        
+
+class SSLNumKeyDialog(Gtk.Dialog):
+    def __init__(self, parent ):
+        Gtk.Dialog.__init__(self, flags=0,
+        transient_for = parent )
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK )
+
+        grid = Gtk.Grid()
+        grid.set_column_homogeneous( True )
+        grid.props.row_spacing = 6
+        grid.props.column_spacing = 6
+
+        startCol = 0
+        startRow = 0
+
+        labelNumCli = Gtk.Label()
+        labelNumCli.set_text("Number of Client Keys: ")
+        labelNumCli.set_xalign(.5)
+        grid.attach(labelNumCli, startCol + 0, startRow, 1, 1 )
+
+        cnumEditBox = Gtk.Entry()
+        cnumEditBox.set_text( "1" )
+
+        grid.attach(cnumEditBox, startCol + 1, startRow, 1, 1 )
+
+        labelNumSvr = Gtk.Label()
+        labelNumSvr.set_text("Number of Server Keys: ")
+        labelNumSvr.set_xalign(.5)
+        grid.attach(labelNumSvr, startCol + 0, startRow + 1, 1, 1 )
+
+        snumEditBox = Gtk.Entry()
+        snumEditBox.set_text( "0" )
+        grid.attach(snumEditBox, startCol + 1, startRow + 1, 1, 1 )
+
+        self.cnumEdit = cnumEditBox
+        self.snumEdit = snumEditBox
+
+        self.set_border_width(10)
+        #self.set_default_size(400, 460)
+        box = self.get_content_area()
+        box.add(grid)
+        self.show_all()
+
+class PasswordDialog(Gtk.Dialog):
+    def __init__(self, parent ):
+        super().__init__(
+        title = "Requiring Password to Update config files",
+        flags=0, transient_for = parent )
+        self.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK )
+
+        grid = Gtk.Grid()
+        grid.set_column_homogeneous( True )
+        grid.props.row_spacing = 6
+        grid.props.column_spacing = 6
+
+        startCol = 0
+        startRow = 0
+
+        labelPass = Gtk.Label()
+        labelPass.set_text("Password: ")
+        labelPass.set_xalign(.5)
+        grid.attach(labelPass, startCol + 0, startRow, 1, 1 )
+
+        passEditBox = Gtk.Entry()
+        passEditBox.set_text( "" )
+        passEditBox.set_visibility( False )
+        passEditBox.props.input_purpose = Gtk.InputPurpose.PASSWORD
+        grid.attach(passEditBox, startCol + 1, startRow, 1, 1 )
+
+        labelEmpty = Gtk.Label()
+        labelEmpty.set_xalign(.5)
+        grid.attach(labelEmpty, startCol + 1, startRow + 1, 2, 1 )
+
+        self.passEdit = passEditBox
+        self.set_border_width(10)
+        box = self.get_content_area()
+        box.add(grid)
+        self.show_all()
+
+    def runDlg( self )->Tuple[ int, int ]:
+        ret = 0
+        response = self.run()
+        passwd = None
+        if response != Gtk.ResponseType.OK:
+            self.destroy()
+            ret = -errno.EINVAL
+        else:
+            passwd = self.passEdit.get_text()
+            self.destroy()
+            ret = 0
+        return ( ret, passwd )
+
 import getopt
 def usage():
     print( "Usage: python3 rpcfg.py [-hc]" )

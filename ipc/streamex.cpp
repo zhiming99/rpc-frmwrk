@@ -646,7 +646,7 @@ gint32 CIfStmReadWriteTask::PeekStream(
     do{
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
-        if( dwState == stateStopped )
+        if( IsStopped( dwState ) )
         {
             ret = ERROR_STATE;
             break;
@@ -698,7 +698,7 @@ gint32 CIfStmReadWriteTask::GetPendingBytes(
         dwBytes = 0;
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
-        if( dwState == stateStopped )
+        if( IsStopped( dwState ) )
         {
             ret = ERROR_STATE;
             break;
@@ -734,7 +734,7 @@ gint32 CIfStmReadWriteTask::GetPendingReqs(
         dwCount = 0;
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
-        if( dwState == stateStopped )
+        if( IsStopped( dwState ) )
         {
             ret = ERROR_STATE;
             break;
@@ -760,7 +760,7 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
 
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
-        if( dwState == stateStopped )
+        if( IsStopped( dwState ) )
         {
             ret = ERROR_STATE;
             break;
@@ -1395,7 +1395,7 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
     do{
         CStdRTMutex oTaskLock( GetLock() );
         EnumIfState dwState = GetTaskState();
-        if( dwState == stateStopped )
+        if( IsStopped( dwState ) )
         {
             ret = ERROR_STATE;
             break;

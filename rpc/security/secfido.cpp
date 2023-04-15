@@ -529,9 +529,11 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
             BufPtr pInBuf;
             bool bEncrypted = false;
 
+            CStdRMutex oLock( this->GetLock() );
             ret = GetPktCached(
                 pInBuf, bEncrypted ); 
 
+            oLock.Unlock();
             if( SUCCEEDED( ret ) )
             {
                 BufPtr pOutBuf; 
@@ -971,25 +973,60 @@ gint32 CRpcSecFido::CompleteListeningIrp(
             ret = -EBADMSG;
             break;
         }
-
         psse->m_pInBuf.Clear();
-        if( m_pInBuf.IsEmpty() ||
-            m_pInBuf->empty() )
+        CStdRMutex oLock( this->GetLock() );
+        if( pSecPacket->GetExDataType() == typeObj )
         {
-            m_pInBuf = pSecPacket;
+            ObjPtr& pObj = *pSecPacket;
+            CParamList oBufs( ( IConfigDb* )pObj );
+            gint32 iCount = oBufs.GetCount();
+            if( iCount < 0 )
+            {
+                ret = iCount;
+                break;
+            }
+            if( iCount == 0 )
+            {
+                ret = -EBADMSG;
+                break;
+            }
+            gint32 i = 0;
+            BufPtr pBuf;
+            if( m_pInBuf.IsEmpty() ||
+                m_pInBuf->empty() )
+            {
+                oBufs.GetBufPtr( 0, pBuf );
+                m_pInBuf = pBuf;
+                i++;
+            }
+            for( ;i < iCount; i++ )
+            {
+                oBufs.GetBufPtr( i, pBuf );
+                m_pInBuf->Append( pBuf->ptr(),
+                    pBuf->size() );
+            }
         }
         else
         {
-            ret = m_pInBuf->Append(
-                pSecPacket->ptr(),
-                pSecPacket->size() );
-            if( ERROR( ret ) )
-                break;
+            if( m_pInBuf.IsEmpty() ||
+                m_pInBuf->empty() )
+            {
+                m_pInBuf = pSecPacket;
+            }
+            else
+            {
+                ret = m_pInBuf->Append(
+                    pSecPacket->ptr(),
+                    pSecPacket->size() );
+                if( ERROR( ret ) )
+                    break;
+            }
         }
 
         bool bEncrypted = false;
         BufPtr pInBuf;
         ret = GetPktCached( pInBuf, bEncrypted );
+        oLock.Unlock();
         if( ERROR( ret ) )
         {
             break;

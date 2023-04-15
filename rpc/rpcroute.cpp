@@ -5823,7 +5823,7 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
     CStdRTMutex oTaskLock( GetLock() );
 
     EnumTaskState iState = GetTaskState();
-    if( iState == stateStopped )
+    if( IsStopped( iState ) )
         return  STATUS_PENDING;
 
     if( IsCanceling() )

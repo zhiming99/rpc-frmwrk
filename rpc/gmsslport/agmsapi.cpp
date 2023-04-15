@@ -62,6 +62,14 @@ PIOVE prec; \
     rec_ptr = prec->begin(); \
     rec_len = \
         tls_record_length( rec_ptr ); \
+    int rec_type = \
+        tls_record_type(rec_ptr); \
+    if( TLS_record_alert == rec_type ) \
+    { \
+        ret = handle_alert( rec_ptr ); \
+        if( ERROR( ret ) ) \
+            break;\
+    } \
 }
 
 #define SEND_RECORD( rec_ptr, rec_len ) \
@@ -580,6 +588,7 @@ size_t BLKOUT::size() const
 AGMS_CTX::AGMS_CTX()
     : super()
 {}
+
 void AGMS_CTX::cleanup()  
 {
     TLS_CTX* ctx = this;
@@ -778,6 +787,10 @@ int TLS13::handle_alert( uint8_t* record )
             send_alert( TLS_alert_close_notify );
             this->set_state( STAT_CLOSED );
             ret = -ENOTCONN;
+        }
+        else
+        {
+            ret = -1000 - alert;
         }
 
     }while( 0 );
@@ -1399,7 +1412,7 @@ int TLS13::handshake_cli()
 
             // verify server certificate
             int verify_result = 0;
-            if (x509_certs_verify(
+            if (is_verify_peer() && x509_certs_verify(
                 this->server_certs,
                 this->server_certs_len,
                 X509_cert_chain_server,
@@ -2201,8 +2214,8 @@ int TLS13::handshake_svr()
             tls_seq_num_incr(this->client_seq_num);
 
             // verify client certificate
-            int verify_result;
-            if (x509_certs_verify(
+            int verify_result = 0;
+            if (is_verify_peer() && x509_certs_verify(
                 this->client_certs,
                 this->client_certs_len,
                 X509_cert_chain_client,

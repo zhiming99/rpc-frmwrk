@@ -8,8 +8,8 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, openssl-devel, cppunit-devel fuse3-devel
-Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs openssl openssl-libs cppunit fuse3 fuse3-libs
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel fuse3-devel
+Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs @OPENSSL_RPMPKGS@ cppunit fuse3 fuse3-libs bash
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -37,7 +37,9 @@ the @PACKAGE_NAME@ static libraries.
 ./configure --prefix=/usr --includedir=%{_includedir} --mandir=%{_mandir} \
 --infodir=%{_infodir} --sysconfdir=%{_sysconfdir} --localstatedir=%{_localstatedir} \
 --disable-silent-rules --libdir=%{_libdir} \
---disable-maintainer-mode --disable-dependency-tracking CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing"
+--disable-maintainer-mode --disable-dependency-tracking \
+CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
+@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@
 
 %make_build
 
@@ -54,7 +56,10 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/rpcfg.py
 %{_bindir}/rpcf/rpcfgnui.py
 %{_bindir}/rpcf/updcfg.py
-%{_bindir}/rpcf/gmsslkey.py
+%{_bindir}/rpcf/updinitcfg.py
+@GMSSL_RPMFILES@
+@OPENSSL_RPMFILES@
+@WEBSOCK_RPMFILES@
 %{_bindir}/rpcrouter
 %{_bindir}/hostsvr
 %{_bindir}/hostcli
@@ -77,9 +82,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
-%{_libdir}/libsslpt.so*
-%{_libdir}/libgmsslpt.so*
-%{_libdir}/libwspt.so*
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_libdir}/librpcbaseJNI.so*
 %{_libdir}/rpcf/rpcbase.jar

@@ -28,6 +28,26 @@ AC_PROG_INSTALL
 AC_LANG([C++])
 #AX_CXX_COMPILE_STDCXX(11,[noext], [mandatory])
 
+AC_ARG_ENABLE([testcases],
+    [AS_HELP_STRING([--disable-testcases], [build and install without testcases])],
+    [enable_testcases=no],
+    [enable_testcases=yes])
+
+AC_ARG_ENABLE([openssl],
+    [AS_HELP_STRING([--disable-openssl], [build and install without openssl])],
+    [enable_openssl=no],
+    [enable_openssl=yes])
+
+AC_ARG_ENABLE([kerberos],
+    [AS_HELP_STRING([--disable-kerberos], [build and install without kerberos])],
+    [enable_kerberos=no],
+    [enable_kerberos=yes])
+
+AC_ARG_ENABLE([gmssl],
+    [AS_HELP_STRING([--disable-gmssl], [build and install without GmSSL])],
+    [enable_gmssl=no],
+    [enable_gmssl=yes])
+
 AC_CHECK_PROG([python3], python3, yes)
 AC_CHECK_PROG([sipbuild], [sip-build], yes)
 AC_CHECK_PROG([sip4], [sip], yes)
@@ -51,9 +71,17 @@ AC_CHECK_LIB([jsoncpp], [_ZNK4Json5ValuecvbEv],
 [LIBS="${LIBS}"
 AC_DEFINE([HAVE_LIBjsoncpp], [1], [Define to 1 if you have jsoncpp.])])
 
-AC_CHECK_LIB([ssl], [SSL_do_handshake],
-[LIBS="${LIBS}"
-AC_DEFINE([HAVE_LIBssl], [1], [Define to 1 if you have ssl.])])
+case $enable_openssl in
+    yes)
+
+    AC_CHECK_LIB([ssl], [SSL_do_handshake],
+    [LIBS="${LIBS}"
+    AC_DEFINE([HAVE_LIBssl], [1], [Define to 1 if you have ssl.])])
+
+    ;;
+    no)
+    ;;
+esac
 
 AC_CHECK_LIB([gssapi_krb5], [gss_wrap],
 [LIBS="${LIBS}"
@@ -127,7 +155,16 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
-DEPLIBS_ALL='dbus-1 jsoncpp cppunit openssl mit-krb5 fuse3'
+DEPLIBS_ALL='dbus-1 jsoncpp cppunit mit-krb5 fuse3'
+
+case $enable_openssl in
+    yes)
+    DEPLIBS_ALL+=' openssl'
+    ;;
+    no)
+    ;;
+esac
+
 DEPLIBS='dbus-1 jsoncpp'
 DEPLIBS_CPPUNIT='dbus-1 jsoncpp cppunit'
 DEPLIBS_SSL='dbus-1 jsoncpp openssl'
@@ -237,8 +274,8 @@ case $host in
 esac
 
 CXXFLAGS+=' -std=c++11'
+CXXFLAGS+=' -DVERSION_STRING="\"$(VERSION)\""'
 
-AC_SUBST([CXXFLAGS])
 AC_SUBST([BITWIDTH])
 
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
@@ -269,7 +306,9 @@ AC_CONFIG_FILES([Makefile
                  pics/Makefile
                  bldpkg/Makefile
                  bldpkg/control
+                 bldpkg/rules
                  bldpkg/rpcf.spec
+                 bldpkg/rpcf.install
                  java/Makefile
                  examples/Makefile
                  fuse/Makefile
@@ -288,24 +327,10 @@ AC_CONFIG_FILES([Makefile
                  test/smoketest/Makefile
                  rpcf.pc ])
 
-AC_ARG_ENABLE([testcases],
-    [AS_HELP_STRING([--disable-testcases], [build and install without testcases])],
-    [:],
-    [enable_testcases=yes])
-
-AC_ARG_ENABLE([openssl],
-    [AS_HELP_STRING([--disable-openssl], [build and install without openssl])],
-    [:],
-    [enable_openssl=yes])
-
-AC_ARG_ENABLE([kerberos],
-    [AS_HELP_STRING([--disable-kerberos], [build and install without kerberos])],
-    [:],
-    [enable_kerberos=yes])
-
-AM_CONDITIONAL([ENABLE_TESTCASES],[test "$enable_testcases" = "yes"])
-AM_CONDITIONAL([ENABLE_OPENSSL],[test "$enable_openssl" = "yes"])
-AM_CONDITIONAL([ENABLE_KERBEROS],[test "$enable_kerberos" = "yes"])
+AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
+AM_CONDITIONAL([ENABLE_OPENSSL],[test x$enable_openssl = xyes])
+AM_CONDITIONAL([ENABLE_KERBEROS],[test x$enable_kerberos = xyes])
+AM_CONDITIONAL([ENABLE_GMSSL],[test x$enable_gmssl = xyes])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
@@ -315,5 +340,74 @@ AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)
+
+FEATURES=
+
+enable_websock=no
+case $enable_gmssl in
+    yes)
+        GMSSL_DEBFILES='usr/bin/rpcf/gmsslkey.sh'
+        GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.shZZZZZ%{_libdir}/libgmsslpt.so*'
+        GMSSL_CFGOPT=
+        enable_websock=yes
+        FEATURES+="+gmssl "
+    ;;
+    no)
+        GMSSL_DEBFILES=
+        GMSSL_RPMFILES=
+        GMSSL_CFGOPT='--disable-gmssl'
+        FEATURES+="-gmssl "
+    ;;
+esac
+
+case $enable_openssl in
+    yes)
+        OPENSSL_DEBFILES='usr/bin/rpcf/opensslkey.shZZZZZetc/rpcf/openssl.cnf'
+        OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
+        OPENSSL_CFGOPT=
+        OPENSSL_DEBLIBS='libssl-dev,'
+        OPENSSL_DEBPKGS='openssl, libssl1.1, expect,'
+        OPENSSL_RPMLIBS='openssl-devel'
+        OPENSSL_RPMPKGS='openssl openssl-libs expect'
+        enable_websock=yes
+        FEATURES+="+openssl "
+    ;;
+    no)
+        OPENSSL_DEBFILES=
+        OPENSSL_RPMFILES=
+        OPENSSL_CFGOPT='--disable-openssl'
+        OPENSSL_DEBLIBS=
+        OPENSSL_DEBPKGS=
+        OPENSSL_RPMLIBS=
+        OPENSSL_RPMPKGS=
+        FEATURES+="-openssl "
+    ;;
+esac
+
+case $enable_websock in
+    yes)
+        WEBSOCK_RPMFILES='%{_libdir}/libwspt.so*'
+    ;;
+    no)
+        WEBSOCK_RPMFILES=
+    ;;
+esac
+
+CXXFLAGS+=' -DFEATURES="\"$(FEATURES)\""'
+
+AC_SUBST([CXXFLAGS])
+AC_SUBST(FEATURES)
+AC_SUBST(GMSSL_DEBFILES)
+AC_SUBST(GMSSL_RPMFILES)
+AC_SUBST(GMSSL_CFGOPT)
+
+AC_SUBST(OPENSSL_DEBFILES)
+AC_SUBST(OPENSSL_RPMFILES)
+AC_SUBST(OPENSSL_CFGOPT)
+AC_SUBST(OPENSSL_DEBLIBS)
+AC_SUBST(OPENSSL_DEBPKGS)
+AC_SUBST(OPENSSL_RPMLIBS)
+AC_SUBST(OPENSSL_RPMPKGS)
+AC_SUBST(WEBSOCK_RPMFILES)
 
 AC_OUTPUT

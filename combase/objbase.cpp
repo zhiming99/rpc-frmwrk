@@ -850,40 +850,30 @@ CSharedLock::~CSharedLock()
 gint32 CSharedLock::LockRead()
 {
     CStdMutex oLock( m_oLock );
-    if( m_bWrite )
+    if( !m_bWrite && m_queue.empty() )
     {
-        m_queue.push_back( true );
-        oLock.Unlock();
-        return Sem_Wait_Wakable( &m_semReader );
+        m_iReadCount++;
+        return STATUS_SUCCESS;
     }
-    else
-    {
-        if( m_queue.empty() )
-        {
-            m_iReadCount++;
-            oLock.Unlock();
-            return STATUS_SUCCESS;
-        }
-        m_queue.push_back( true );
-        oLock.Unlock();
-        return Sem_Wait_Wakable( &m_semReader );
-    }
+    m_queue.push_back( true );
+    oLock.Unlock();
+    return Sem_Wait( &m_semReader );
 }
 
 gint32 CSharedLock::LockWrite()
 {
     CStdMutex oLock( m_oLock );
-    if( m_bWrite )
+    if( m_bWrite || m_queue.size() )
     {
         m_queue.push_back( false );
         oLock.Unlock();
-        return Sem_Wait_Wakable( &m_semWriter );
+        return Sem_Wait( &m_semWriter );
     }
     else if( m_iReadCount > 0 )
     {
         m_queue.push_back( false );
         oLock.Unlock();
-        return Sem_Wait_Wakable( &m_semWriter );
+        return Sem_Wait( &m_semWriter );
     }
     else if( m_iReadCount == 0 )
     {
@@ -900,19 +890,18 @@ gint32 CSharedLock::ReleaseRead()
     if( m_iReadCount > 0 )
         return STATUS_SUCCESS;
 
-    if( m_iReadCount == 0 )
-    {
-        if( m_queue.empty() )
-            return STATUS_SUCCESS;
+    if( unlikely( m_iReadCount < 0 ) )
+        return -EFAULT;
 
-        if( m_queue.front() == true )
-            return -EFAULT;
+    if( m_queue.empty() )
+        return STATUS_SUCCESS;
 
-        m_bWrite = true;
-        m_queue.pop_front();
-        return Sem_Post( &m_semWriter );
-    }
-    return -EFAULT;
+    if( m_queue.front() == true )
+        return -EFAULT;
+
+    m_bWrite = true;
+    m_queue.pop_front();
+    return Sem_Post( &m_semWriter );
 }
 
 gint32 CSharedLock::ReleaseWrite()
@@ -949,7 +938,6 @@ gint32 CSharedLock::TryLockRead()
     if( !m_bWrite && m_queue.empty() )
     {
         m_iReadCount++;
-        oLock.Unlock();
         return STATUS_SUCCESS;
     }
     return -EAGAIN;
@@ -958,13 +946,12 @@ gint32 CSharedLock::TryLockRead()
 gint32 CSharedLock::TryLockWrite()
 {
     CStdMutex oLock( m_oLock );
-    if( m_bWrite || m_iReadCount > 0 ) 
+    if( m_bWrite || m_queue.size() ) 
         return -EAGAIN;
 
     if( m_iReadCount == 0 )
     {
         m_bWrite = true;
-        oLock.Unlock();
         return 0;
     }
     return -EFAULT;

@@ -798,7 +798,17 @@ struct CLocalLock
         m_iStatus = ( bRead ?
             m_pLock->LockRead() :
             m_pLock->LockWrite() );
-        m_bLocked = true;
+        if( SUCCEEDED( m_iStatus ) )
+        {
+            m_bLocked = true;
+        }
+        else
+        {
+            stdstr strMsg = DebugMsg( m_iStatus,
+                "Error locking %sLock",
+                ( bRead ? "Read" : "Write" ) );
+            throw std::runtime_error( strMsg );
+        }
     }
 
     inline gint32 GetStatus() const

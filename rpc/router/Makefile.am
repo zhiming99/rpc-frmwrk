@@ -24,5 +24,6 @@ OFFSET_MACRO=
 endif
 
 rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC \
- -I$(include_fusedir) $(OFFSET_MACRO)
+ -I$(include_fusedir) $(OFFSET_MACRO) 
+
 rpcrouter_LDFLAGS=-rdynamic

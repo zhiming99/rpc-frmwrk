@@ -42,6 +42,22 @@ extern "C"{
 #include "gmsfido.h"
 using namespace gmssl;
 
+#define DETACH_SAFE( pBuf_, pMem_, dwSize_, dwOff_, dwTailOff_ ) \
+do{ \
+    ret = pBuf_->Detach( pMem_, dwSize_, dwOff_, dwTailOff_ ); \
+    if( ret == -EACCES ) \
+    { \
+        pMem_ = ( decltype( pMem_ ) )malloc( pBuf_->size() ); \
+        memcpy( pMem_, pBuf_->ptr(), pBuf_->size() ); \
+        dwSize_ = pBuf_->size(); \
+        dwOff_ = 0; \
+        dwTailOff_ = dwSize_; \
+        pBuf_->Resize( 0 ); \
+        ret = 0;\
+        break; \
+    } \
+}while( 0 )
+
 namespace gmssl{
 extern int init_ctx( AGMS_CTX* ctx, bool is_client );
 }
@@ -99,15 +115,11 @@ gint32 BufToIove( BufPtr& pSrc,
                     ret = -EFAULT;
                     break;
                 }
-                ret = pSrc->Detach( pmem,
+
+                DETACH_SAFE( pSrc, pmem,
                     dwSize, dwStart, dwEnd );
-                if( ret == -EACCES )
-                {
-                    ret = 0;
-                    bCopy = true;
-                    continue;
-                }
-                else if( ERROR( ret ) )
+
+                if( ERROR( ret ) )
                     break;
 
                 ret = pDest->attach(
@@ -127,9 +139,8 @@ gint32 BufToIove( BufPtr& pSrc,
             }
 
         }
-        break;
 
-    }while( 1 );
+    }while( 0 );
 
     return ret;
 }
@@ -1149,17 +1160,6 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
             break;
         }
         else if( unlikely(
-            psse->m_iEvent == sseRetWithFd ||
-            psse->m_iEvent == sseInvalid ) )
-        {
-            psse->m_iEvent = sseError;
-            psse->m_iData = -ENOTSUP;
-            psse->m_iEvtSrc = GetClsid();
-            pCtx->SetRespData( pInBuf );
-            pCtx->SetStatus( STATUS_SUCCESS );
-            break;
-        }
-        else if( unlikely(
             psse->m_iEvent != sseRetWithBuf ) )
         {
             psse->m_iEvent = sseError;
@@ -1246,7 +1246,22 @@ gint32 CRpcGmSSLFido::CompleteListeningIrp(
     }while( 0 );
 
     if( ERROR( ret ) && bSSLErr )
-        pCtx->SetStatus( ret );
+    {
+        BufPtr pInBuf( true );
+        pInBuf->Resize(
+            sizeof( STREAM_SOCK_EVENT ) );
+
+        STREAM_SOCK_EVENT* psse = 
+            new ( pInBuf->ptr() ) STREAM_SOCK_EVENT;
+
+        psse->m_iEvent = sseError;
+        psse->m_iData = ret;
+        psse->m_iEvtSrc = GetClsid();
+
+        pCtx->SetRespData( pInBuf );
+        pCtx->SetStatus( 0 );
+        ret = 0;
+    }
 
     return ret;
 }
@@ -1807,25 +1822,35 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
                 ret = -errno;
                 break;
             }
-            char* pszPass = nullptr;
-            size_t len = 0;
-            ret = getline( &pszPass, &len , fp );
+
+            char buf[ SSL_PASS_MAX + 1 ];
+            size_t len = sizeof( buf );
+            char* pret = fgets( buf, len , fp );
             fclose( fp );
             fp = nullptr;
-            if( ret == -1 )
+            if( pret == nullptr )
             {
-                if( pszPass )
-                    free( pszPass );
                 ret = -errno;
                 break;
             }
 
+            len = strlen( buf );
+
+            // assuming no passwd
+            if( len == 0 )
+                break;
+
+            if( buf[ len - 1 ] == '\n' )
+                buf[ len - 1 ] = 0;
+            --len;
+
+            if( len == 0 )
+                break;
+
             stdstr& pass = ctx->password;
-            pass = pszPass;
+            pass = buf;
             for( size_t i = 0; i < len; i++ )
-                pszPass[ i ] = ' ';
-            free( pszPass );
-            pszPass = nullptr;
+                buf[ i ] = ' ';
 
             if( pass.size() > SSL_PASS_MAX )
                 ctx->password.erase( SSL_PASS_MAX );
@@ -1842,6 +1867,7 @@ gint32 CRpcGmSSLFidoDrv::InitSSLContext()
         ctx->keyfile = m_strKeyPath;
         ctx->certfile = m_strCertPath;
         ctx->cacertfile = m_strCAPath; 
+        ctx->verify_peer = m_bVerifyPeer;
 
         ret = gmssl::init_ctx( ctx, dwRole == 1 );
 

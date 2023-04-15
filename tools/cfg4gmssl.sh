@@ -2,7 +2,7 @@
 keydir=$(pwd)/tools/testcfgs/gmsslcfgs
 
 pushd ./tools
-input=./testcfgs/gmsslcfgs/initcfg.json.in
+input=$keydir/$1
 output=${input%%.in}
 
 # driver.json for bridge

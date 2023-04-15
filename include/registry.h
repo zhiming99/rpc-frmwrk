@@ -91,6 +91,8 @@ class CDirEntry : public CObjBase
     gint32 RemoveAllChildren();
     void RemoveAllProps();
 
+    gint32 GetFullPath(
+        stdstr& strPath ) const;
 };
 
 class CRegistry : public CObjBase

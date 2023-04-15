@@ -130,7 +130,7 @@ class CIfTransactGroup :
         // with the `m_iRet' unset yet if the
         // process's load is very high.
         //
-        // iRet = m_pTaskGrp->GetError();
+        iRet = m_vecRetVals[ 0 ];
         super::OnComplete( iRet );
 
         m_pRbackGrp->RemoveProperty(
