@@ -62,8 +62,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @WEBSOCK_RPMFILES@
 @FUSE3_RPMFILES@
 %{_bindir}/rpcrouter
-%{_bindir}/hostsvr
-%{_bindir}/hostcli
 %{_sysconfdir}/rpcf/authprxy.json
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json

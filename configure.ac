@@ -422,7 +422,7 @@ esac
 case $enable_fuse3 in
     yes)
         FUSE3_RPMLIBS="fuse3-devel"
-        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*'
+        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcli'
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
         FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcli"
