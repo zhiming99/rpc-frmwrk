@@ -31,7 +31,10 @@
 #include <ifhelper.h>
 #include <frmwrk.h>
 #include <rpcroute.h>
+
+#ifdef FUSE3
 #include <fuseif.h>
+#endif
 
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
@@ -194,12 +197,16 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 }
 
 namespace rpcf{
+extern gint32 CheckForKeyPass( bool& bPrompt );
+
+#ifdef FUSE3
 gint32 AddFilesAndDirsReqFwdr( CRpcServices* );
 gint32 AddFilesAndDirsBdge( CRpcServices* );
-extern gint32 CheckForKeyPass( bool& bPrompt );
+#endif
 
 }
 
+#ifdef FUSE3
 gint32 AddFilesAndDirs( CRpcServices* pSvc )
 {
     if( pSvc == nullptr )
@@ -265,6 +272,7 @@ gint32 MountAndLoop( CRpcServices* pSvc )
 
     return ret;
 }
+#endif
 
 void CIfRouterTest::testSvrStartStop()
 {
@@ -297,10 +305,14 @@ void CIfRouterTest::testSvrStartStop()
             while( pSvr->IsConnected() )
                 sleep( 1 );
         }
+#ifdef FUSE3
         else
         {
            ret = MountAndLoop( pSvr );
         }
+#else
+        ret = -ENOTSUP;
+#endif
 
     }while( 0 );
 
@@ -327,7 +339,9 @@ void Usage( char* szName )
         "\t [ -c to establish a seperate connection to the same bridge per client, only for role 1 ]\n"
         "\t [ -f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
         "\t [ -s < Service Name for authentication, valid for role 2, and ignored for role 1 > ]\n"
+#ifdef FUSE3
         "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
+#endif
         "\t [ -d to run as a daemon ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
@@ -382,6 +396,7 @@ int main( int argc, char** argv )
             }
         case 'm':
             {
+#ifdef FUSE3
                 g_strMPoint = optarg;
                 if( g_strMPoint.size() >
                     MAX_BYTES_MPOINT - 1 )
@@ -389,6 +404,7 @@ int main( int argc, char** argv )
                     ret = -ENAMETOOLONG;
                     break;
                 }
+#endif
                 break;
             }
         case 'h':

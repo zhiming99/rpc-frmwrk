@@ -48,6 +48,11 @@ AC_ARG_ENABLE([gmssl],
     [enable_gmssl=no],
     [enable_gmssl=yes])
 
+AC_ARG_ENABLE([fuse3],
+    [AS_HELP_STRING([--disable-fuse3], [build and install without fuse3])],
+    [enable_fuse3=no],
+    [enable_fuse3=yes])
+
 AC_CHECK_PROG([python3], python3, yes)
 AC_CHECK_PROG([sipbuild], [sip-build], yes)
 AC_CHECK_PROG([sip4], [sip], yes)
@@ -91,10 +96,16 @@ AC_CHECK_LIB([krb5], [krb5_init_context],
 [LIBS="${LIBS}"
 AC_DEFINE([HAVE_LIBkrb5], [1], [Define to 1 if you have krb5.])])
 
-AC_CHECK_LIB([fuse3], [fuse_mount],
-[LIBS="${LIBS}"
-AC_DEFINE([HAVE_LIBfuse3], [1], [Define to 1 if you have fuse3.]) ],
-[AC_MSG_ERROR([fuse3 was not found])] )
+case $enable_fuse3 in
+    yes)
+    AC_CHECK_LIB([fuse3], [fuse_mount],
+    [LIBS="${LIBS}"
+    AC_DEFINE([HAVE_LIBfuse3], [1], [Define to 1 if you have fuse3.]) ],
+    [AC_MSG_ERROR([fuse3 was not found])] )
+    ;;
+    no)
+    ;;
+esac
 
 AC_CHECK_LIB([atomic], [__atomic_fetch_add_8],
 [LIBS="${LIBS}"
@@ -164,6 +175,21 @@ case $enable_openssl in
     no)
     ;;
 esac
+
+case $enable_fuse3 in
+    yes)
+    case $ac_cv_lib_fuse3_fuse_mount in
+        yes)
+            DEPLIBS_ALL+=' fuse3'
+        ;;
+        no)
+        ;;
+        esac
+    ;;
+    no)
+    ;;
+esac
+
 
 DEPLIBS='dbus-1 jsoncpp'
 DEPLIBS_CPPUNIT='dbus-1 jsoncpp cppunit'
@@ -335,7 +361,7 @@ AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
 AM_CONDITIONAL([JDK],[test x$ac_cv_prog_javac = xyes])
-AM_CONDITIONAL([FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes])
+AM_CONDITIONAL([FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$enable_fuse3 = xyes])
 AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
@@ -393,6 +419,31 @@ case $enable_websock in
     ;;
 esac
 
+case $enable_fuse3 in
+    yes)
+        FUSE3_RPMLIBS="fuse3-devel"
+        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*'
+        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
+        FUSE3_RPMPKGS="fuse3 fuse3-libs"
+        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcli"
+        FUSE3_DEBLIBS=" libfuse3-dev"
+        FUSE3_DEBPKGS="fuse3,libfuse3-3,"
+        FUSE3_CFGOPT=
+        FEATURES+="+fuse "
+    ;;
+    no)
+        FUSE3_RPMLIBS=
+        FUSE3_RPMFILES=
+        FUSE3_RPMHEADERS=
+        FUSE3_RPMPKGS=
+        FUSE3_DEBFILES=
+        FUSE3_DEBLIBS=
+        FUSE3_DEBPKGS=
+        FUSE3_CFGOPT='--disable-fuse3'
+        FEATURES+="-fuse3 "
+    ;;
+esac
+
 CXXFLAGS+=' -DFEATURES="\"$(FEATURES)\""'
 
 AC_SUBST([CXXFLAGS])
@@ -409,5 +460,14 @@ AC_SUBST(OPENSSL_DEBPKGS)
 AC_SUBST(OPENSSL_RPMLIBS)
 AC_SUBST(OPENSSL_RPMPKGS)
 AC_SUBST(WEBSOCK_RPMFILES)
+
+AC_SUBST(FUSE3_DEBFILES)
+AC_SUBST(FUSE3_RPMFILES)
+AC_SUBST(FUSE3_CFGOPT)
+AC_SUBST(FUSE3_DEBLIBS)
+AC_SUBST(FUSE3_DEBPKGS)
+AC_SUBST(FUSE3_RPMLIBS)
+AC_SUBST(FUSE3_RPMPKGS)
+AC_SUBST(FUSE3_RPMHEADERS)
 
 AC_OUTPUT

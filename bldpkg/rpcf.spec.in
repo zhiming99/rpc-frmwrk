@@ -8,8 +8,8 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel fuse3-devel
-Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs @OPENSSL_RPMPKGS@ cppunit fuse3 fuse3-libs bash
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel @FUSE3_RPMLIBS@
+Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ bash
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -39,7 +39,7 @@ the @PACKAGE_NAME@ static libraries.
 --disable-silent-rules --libdir=%{_libdir} \
 --disable-maintainer-mode --disable-dependency-tracking \
 CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
-@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@
+@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@
 
 %make_build
 
@@ -60,6 +60,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@
 @WEBSOCK_RPMFILES@
+@FUSE3_RPMFILES@
 %{_bindir}/rpcrouter
 %{_bindir}/hostsvr
 %{_bindir}/hostcli
@@ -85,7 +86,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_libdir}/librpcbaseJNI.so*
 %{_libdir}/rpcf/rpcbase.jar
-%{_libdir}/libfuseif.so*
 
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
@@ -164,9 +164,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/uxstream.h
 %{_includedir}/rpcf/ipc/prxyport.h
 %{_includedir}/rpcf/ipc/fdodrv.h
-%{_includedir}/rpcf/ipc/fuseif.h
-%{_includedir}/rpcf/ipc/fusedefs.h
-%{_includedir}/rpcf/ipc/serijson.h
+@FUSE3_RPMHEADERS@
 %{_includedir}/rpcf/ipc/fastrpc.h
 %{_includedir}/rpcf/ipc/stmport.h
 %{_includedir}/rpcf/nsdef.h

@@ -39,4 +39,7 @@ include_ridlcdir=$(top_srcdir)/ridlc
 
 link_dir=-L$(top_srcdir)/debug64/
 ridlc_CPPFLAGS= -I$(include_ipcdir) -I$(top_srcdir)/include -fPIC
+if FUSE3
+ridlc_CPPFLAGS+= -DFUSE3
+endif
 

@@ -794,7 +794,9 @@ def Update_Drv( initCfg: dict, drvFile : list,
             for oModule in oModules :
                 if oModule[ 'ModName' ] != 'rpcrouter':
                     continue
-                oFactories = ['./libfuseif.so']
+                oFactories=[]
+                if IsFeatureEnabled( "fuse3" ):
+                    oFactories.append( './libfuseif.so' )
                 if bAuth :
                     oFactories.append ( './libauth.so' )
                 if bSSL:

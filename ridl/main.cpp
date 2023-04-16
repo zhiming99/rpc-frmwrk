@@ -97,16 +97,18 @@ void Usage()
     printf( "\t-j:\tTo generate the Java skelton files\n" );
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only\n" );
+#ifdef FUSE3
     printf( "\t-f[s|p]:\tTo generate cpp skelton files for\n" );
     printf( "\t\tFUSE integration. And parameter 's' is for\n" );
     printf( "\t\tserver FUSE only, 'p' for proxy FUSE only,\n" );
     printf( "\t\tnone for FUSE on both side\n." );
+    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
+#endif
 
     printf( "\t-l:\tTo output a shared library\n" );
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
     printf( "\t\toption is for CPP project only\n" );
-    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
 }
 
 static std::string g_strOutPath = "output";
@@ -308,6 +310,7 @@ int main( int argc, char** argv )
                 }
             case 'f':
                 {
+#ifdef FUSE3
                     // make a shared lib for FUSE integration
                     if( optarg == nullptr )
                     {
@@ -325,6 +328,11 @@ int main( int argc, char** argv )
                         Usage();
                         bQuit = true;
                     }
+#else
+                    printf( "Error '-f' is not supported by this build\n" );
+                    ret = -ENOTSUP;
+                    bQuit = true;
+#endif
                     break;
                 }
             case 's':
