@@ -325,12 +325,6 @@ void CIfRouterTest::testSvrStartStop()
     return;
 }
 
-void Version()
-{
-    fprintf( stdout, "Version: %s\n", VERSION_STRING  );
-    fprintf( stdout, "Features: %s\n", FEATURES );
-}
-
 void Usage( char* szName )
 {
     fprintf( stderr,
@@ -404,6 +398,11 @@ int main( int argc, char** argv )
                     ret = -ENAMETOOLONG;
                     break;
                 }
+#else
+                fprintf( stderr,
+                    "Error '-m' is not supported "
+                    "by this build\n" );
+                ret = -ENOTSUP;
 #endif
                 break;
             }
@@ -414,7 +413,7 @@ int main( int argc, char** argv )
             }
         case 'v':
             {
-                Version();
+                fprintf( stdout, "%s", Version() );
                 exit( 0 );
             }
         default: /*  '?' */

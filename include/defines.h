@@ -299,6 +299,7 @@ using stdstr = std::string;
 gint32 GenStrHash( const stdstr& strMsg,
     guint32& dwHash );
 
+const char* Version();
 // Event ids for the IEventSink
 enum EnumEventId : guint32
 {

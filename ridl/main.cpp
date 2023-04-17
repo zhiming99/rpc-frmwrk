@@ -171,7 +171,7 @@ int main( int argc, char** argv )
         {
 
             opt = getopt_long( argc, argv,
-                "ahlI:O:o:pjP:L:f::s",
+                "ahvlI:O:o:pjP:L:f::s",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -302,7 +302,8 @@ int main( int argc, char** argv )
                     if( g_strLocale != "en" &&
                         g_strLocale != "cn" )
                     {
-                        printf( "Error -L specifies unsupported language\n" );
+                        fprintf( stderr,
+                            "Error -L specifies unsupported language\n" );
                         Usage();
                         bQuit = true;
                     }
@@ -324,12 +325,14 @@ int main( int argc, char** argv )
                         g_dwFlags = FUSE_PROXY;
                     else
                     {
-                        printf( "Error '-f' is followed with invalid argument\n" );
+                        fprintf( stderr,
+                            "Error '-f' is followed with invalid argument\n" );
                         Usage();
                         bQuit = true;
                     }
 #else
-                    printf( "Error '-f' is not supported by this build\n" );
+                    fprintf( stderr,
+                        "Error '-f' is not supported by this build\n" );
                     ret = -ENOTSUP;
                     bQuit = true;
 #endif
@@ -338,6 +341,12 @@ int main( int argc, char** argv )
             case 's':
                 {
                     g_bRpcOverStm = true;
+                    break;
+                }
+            case 'v':
+                {
+                    printf( "%s", Version() );
+                    bQuit = true;
                     break;
                 }
             case '?' :

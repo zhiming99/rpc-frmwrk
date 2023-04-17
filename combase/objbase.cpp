@@ -470,6 +470,12 @@ int Sem_Wait_Wakable( sem_t* psem )
     return ret;
 }
 
+const char* szVersion = "Version: "
+    VERSION_STRING "\n" "Features: " FEATURES "\n";
+
+const char* Version()
+{ return szVersion; }
+
 CStdRTMutex::CStdRTMutex( stdrtmutex& oMutex ) :
     CMutex< stdrtmutex >( oMutex )
 {}
