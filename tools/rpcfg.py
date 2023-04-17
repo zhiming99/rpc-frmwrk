@@ -316,16 +316,18 @@ class ConfigDlg(Gtk.Dialog):
             return None
 
         bGmSSL = False
-        bret = IsUsingGmSSL( drvVal )
-        if bret[ 0 ] == 0 and bret[ 1 ] :
-            sslPort = 'RpcGmSSLFido'
-            bGmSSL = True
+        if self.hasGmSSL and self.hasOpenSSL :
+            bret = IsUsingGmSSL( drvVal )
+            if bret[ 0 ] == 0 :
+               bGmSSL = bret[ 1 ]
         else:
-            sslPort = 'RpcOpenSSLFido'
+            bGmSSL = self.hasGmSSL
 
         if bGmSSL :
+            sslPort = 'RpcGmSSLFido'
             confVals[ 'UsingGmSSL' ] = 'true'
         else:
+            sslPort = 'RpcOpenSSLFido'
             confVals[ 'UsingGmSSL' ] = 'false'
 
         bret = IsVerifyPeer( drvVal, sslPort )
@@ -468,7 +470,7 @@ class ConfigDlg(Gtk.Dialog):
                         if ifCfg0[ 'EnableWS' ] == 'true':
                             ifCfg0[ 'DestURL' ] = svrObj[ 'DestURL' ]
 
-                        if authInfo is not None:
+                        if authInfo is not None and self.hasAuth:
                             ifCfg0[ 'HasAuth' ] = 'true'
                         else:
                             ifCfg0[ 'HasAuth' ] = 'false'
@@ -561,6 +563,10 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY )
 
         self.bServer = bServer
+        self.hasGmSSL=IsFeatureEnabled( "gmssl" )
+        self.hasOpenSSL=IsFeatureEnabled( "openssl" )
+        self.hasSSL = ( self.hasGmSSL or self.hasOpenSSL ) 
+        self.hasAuth=IsFeatureEnabled( "auth" )
 
         confVals = self.RetrieveInfo()
         self.confVals = confVals
@@ -751,6 +757,13 @@ class ConfigDlg(Gtk.Dialog):
             grid.attach( sslCheck, startCol + 2, startRow + 6, 1, 1 )
             sslCheck.iNo = i
             nodeCtx.sslCheck = sslCheck
+
+            if not self.hasSSL:
+                sslCheck.props.active = False
+                sslCheck.set_sensitive( False )
+                webSockCheck.props.active = False
+                webSockCheck.set_sensitive( False )
+                urlEdit.set_sensitive( False )
 
             removeBtn = Gtk.Button.new_with_label("Remove Node " + str( i ))
             removeBtn.connect("clicked", self.on_remove_node_clicked)
@@ -1256,6 +1269,11 @@ class ConfigDlg(Gtk.Dialog):
         self.ifctx[ ifNo ].urlEdit = urlEdit
         urlEdit.ifNo = ifNo
 
+        if not self.hasSSL:
+            webSockCheck.props.active = False
+            webSockCheck.set_sensitive( False )
+            urlEdit.set_sensitive( False )
+
     def AddSSLOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict, ifNo = 0 ) :
         bActive = False
         try:
@@ -1279,6 +1297,10 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( sslCheck, startCol + 2, startRow, 1, 1 )
         self.ifctx[ ifNo ].sslCheck = sslCheck
 
+        if not self.hasSSL:
+            sslCheck.set_active( False )
+            sslCheck.set_sensitive( False )
+
         bActive = False
         try:
             if not self.bServer: 
@@ -1300,6 +1322,10 @@ class ConfigDlg(Gtk.Dialog):
         authCheck.ifNo = ifNo
         grid.attach( authCheck, startCol + 0, startRow, 1, 1 )
         self.ifctx[ ifNo ].authCheck = authCheck
+
+        if not self.hasAuth :
+            authCheck.set_active( False )
+            authCheck.set_sensitive( False )
 
     def AddSSLCfg( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelSSLfiles = Gtk.Label()
@@ -1399,6 +1425,10 @@ class ConfigDlg(Gtk.Dialog):
             "toggled", self.on_gmssl_toggled, "GmSSL")
         grid.attach( gmsslCheck, startCol + 1, startRow + 4, 1, 1 )
         gmsslCheck.confVals = confVals
+
+        if not ( self.hasGmSSL and self.hasOpenSSL ):
+            gmsslCheck.props.active = self.hasGmSSL
+            gmsslCheck.set_sensitive( False )
 
         #-----------------------------
         labelVfyPeer = Gtk.Label()
@@ -2317,7 +2347,7 @@ class ConfigDlg(Gtk.Dialog):
     def Export_Installer( self, initCfg : object, cfgPath : str )->int :
         ret = 0
         try:
-            bSSL = IsFeatureEnabled( "\(gmssl\|openssl\)" )
+            bSSL = self.hasSSL
             strKeyPath = os.path.expanduser( "~" ) + "/.rpcf"
             bGmSSL = False
             try:
@@ -2470,7 +2500,7 @@ class ConfigDlg(Gtk.Dialog):
                 os.system( "mv " + installer + " " + newName )
 
             cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
-            cmdline += "rm " + curDir + "/initcfg.json || true;"
+            #cmdline += "rm " + curDir + "/initcfg.json || true;"
             os.system( cmdline )
 
         except Exception as err:

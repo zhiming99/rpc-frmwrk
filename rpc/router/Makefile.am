@@ -24,11 +24,15 @@ endif
 
 rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
 
-if FUSE3
+if ENABLE_FUSE3
 include_fusedir=$(top_srcdir)/fuse
 rpcrouter_LDADD+=-L$(top_srcdir)/fuse ../../fuse/libfuseif.la 
 rpcrouter_CPPFLAGS+=-I$(include_fusedir) -DFUSE3
 rpcrouter_SOURCES+=rtfiles.cpp rtfiles.h
+endif
+
+if ENABLE_AUTH
+rpcrouter_CPPFLAGS+=-DAUTH
 endif
 
 rpcrouter_LDFLAGS=-rdynamic

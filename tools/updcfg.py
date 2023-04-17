@@ -40,7 +40,7 @@ def IsFeatureEnabled( feature : str ) -> bool :
     if os.path.basename( dir_path ) == 'tools':
         routerPath = dir_path + "/../rpc/router/.libs/rpcrouter"
     elif os.path.basename( dir_path ) == 'rpcf':
-        routerPath = dir_path + "../rpcrouter"
+        routerPath = dir_path + "/../rpcrouter"
         if not os.access( routerPath, os.X_OK ):
             return False
 
@@ -202,13 +202,10 @@ def ExtraUpdateBtinrt(
         if oFactories is None:
             return
 
-        destList = destVal[ "ClassFactories" ]
-        for i in oFactories:
-            if i in destList:
-                continue
-            if i == "./libfuseif.so":
-                continue
-            destList.append( i )
+        destList = [ "./libbtinrt.so" ]
+        destList.extend( oFactories )
+        destList.remove( "./libfuseif.so" )
+        destVal[ "ClassFactories" ] = destList
     except Exception as err:
         pass
 

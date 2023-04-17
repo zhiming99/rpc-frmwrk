@@ -1,7 +1,7 @@
 ACLOCAL_AMFLAGS= -I m4
 SUBDIRS=3rd_party combase ipc 
 
-if FUSE3
+if ENABLE_FUSE3
 SUBDIRS += fuse
 endif
 

@@ -28,6 +28,11 @@ AC_PROG_INSTALL
 AC_LANG([C++])
 #AX_CXX_COMPILE_STDCXX(11,[noext], [mandatory])
 
+AC_ARG_ENABLE([ssl],
+    [AS_HELP_STRING([--disable-ssl], [build and install without SSL support])],
+    [enable_gmssl=no, enable_openssl=no],
+    [])
+
 AC_ARG_ENABLE([testcases],
     [AS_HELP_STRING([--disable-testcases], [build and install without testcases])],
     [enable_testcases=no],
@@ -38,10 +43,10 @@ AC_ARG_ENABLE([openssl],
     [enable_openssl=no],
     [enable_openssl=yes])
 
-AC_ARG_ENABLE([kerberos],
-    [AS_HELP_STRING([--disable-kerberos], [build and install without kerberos])],
-    [enable_kerberos=no],
-    [enable_kerberos=yes])
+AC_ARG_ENABLE([auth],
+    [AS_HELP_STRING([--disable-auth], [build and install without authentication])],
+    [enable_auth=no],
+    [enable_auth=yes])
 
 AC_ARG_ENABLE([gmssl],
     [AS_HELP_STRING([--disable-gmssl], [build and install without GmSSL])],
@@ -82,19 +87,26 @@ case $enable_openssl in
     AC_CHECK_LIB([ssl], [SSL_do_handshake],
     [LIBS="${LIBS}"
     AC_DEFINE([HAVE_LIBssl], [1], [Define to 1 if you have ssl.])])
-
+    AC_CHECK_HEADERS([openssl/ssl.h])
     ;;
     no)
     ;;
 esac
 
-AC_CHECK_LIB([gssapi_krb5], [gss_wrap],
-[LIBS="${LIBS}"
-AC_DEFINE([HAVE_LIBgssapi], [1], [Define to 1 if you have krb5-gssapi.])])
+case $enable_auth in
+    yes)
+    AC_CHECK_LIB([gssapi_krb5], [gss_wrap],
+    [LIBS="${LIBS}"
+    AC_DEFINE([HAVE_LIBgssapi], [1], [Define to 1 if you have krb5-gssapi.])])
 
-AC_CHECK_LIB([krb5], [krb5_init_context],
-[LIBS="${LIBS}"
-AC_DEFINE([HAVE_LIBkrb5], [1], [Define to 1 if you have krb5.])])
+    AC_CHECK_LIB([krb5], [krb5_init_context],
+    [LIBS="${LIBS}"
+    AC_DEFINE([HAVE_LIBkrb5], [1], [Define to 1 if you have krb5.])])
+    AC_CHECK_HEADERS([gssapi/gssapi_krb5.h])
+    ;;
+    no)
+    ;;
+esac
 
 case $enable_fuse3 in
     yes)
@@ -120,8 +132,8 @@ AC_CHECK_HEADERS([arpa/inet.h \
                 sys/socket.h \
                 sys/time.h \
                 unistd.h \
-                lz4.h \
-                openssl/ssl.h])
+                lz4.h 
+                ])
 
 AC_CHECK_HEADERS([dbus/dbus.h])
 AC_CHECK_HEADERS([glib.h])
@@ -166,7 +178,7 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T 
 
-DEPLIBS_ALL='dbus-1 jsoncpp cppunit mit-krb5 fuse3'
+DEPLIBS_ALL='dbus-1 jsoncpp cppunit'
 
 case $enable_openssl in
     yes)
@@ -189,6 +201,15 @@ case $enable_fuse3 in
     no)
     ;;
 esac
+
+case $enable_auth in
+    yes)
+    DEPLIBS_ALL+=' mit-krb5'
+    ;;
+    no)
+    ;;
+esac
+
 
 
 DEPLIBS='dbus-1 jsoncpp'
@@ -355,13 +376,13 @@ AC_CONFIG_FILES([Makefile
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
 AM_CONDITIONAL([ENABLE_OPENSSL],[test x$enable_openssl = xyes])
-AM_CONDITIONAL([ENABLE_KERBEROS],[test x$enable_kerberos = xyes])
+AM_CONDITIONAL([ENABLE_AUTH],[test x$enable_auth = xyes])
 AM_CONDITIONAL([ENABLE_GMSSL],[test x$enable_gmssl = xyes])
+AM_CONDITIONAL([ENABLE_FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$enable_fuse3 = xyes])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
 AM_CONDITIONAL([JDK],[test x$ac_cv_prog_javac = xyes])
-AM_CONDITIONAL([FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$enable_fuse3 = xyes])
 AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
@@ -426,10 +447,10 @@ case $enable_fuse3 in
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
         FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcli"
-        FUSE3_DEBLIBS=" libfuse3-dev"
+        FUSE3_DEBLIBS=" libfuse3-dev,"
         FUSE3_DEBPKGS="fuse3,libfuse3-3,"
         FUSE3_CFGOPT=
-        FEATURES+="+fuse "
+        FEATURES+="+fuse3 "
     ;;
     no)
         FUSE3_RPMLIBS=
@@ -441,6 +462,27 @@ case $enable_fuse3 in
         FUSE3_DEBPKGS=
         FUSE3_CFGOPT='--disable-fuse3'
         FEATURES+="-fuse3 "
+    ;;
+esac
+
+case $enable_auth in
+    yes)
+        AUTH_RPMLIBS="krb5-devel"
+        AUTH_RPMFILES="%{_libdir}/libauth.so*ZZZZZ%{_sysconfdir}/rpcf/authprxy.json"
+        AUTH_RPMPKGS="krb5-libs" 
+        AUTH_DEBLIBS="libkrb5-dev,"
+        AUTH_DEBPKGS="libkrb5-3,"
+        AUTH_CFGOPT=
+        FEATURES+="+auth "
+    ;;
+    no)
+        AUTH_RPMLIBS=
+        AUTH_RPMFILES=
+        AUTH_RPMPKGS=
+        AUTH_DEBLIBS=
+        AUTH_DEBPKGS=
+        AUTH_CFGOPT='--disable-auth'
+        FEATURES+="-auth "
     ;;
 esac
 
@@ -469,5 +511,12 @@ AC_SUBST(FUSE3_DEBPKGS)
 AC_SUBST(FUSE3_RPMLIBS)
 AC_SUBST(FUSE3_RPMPKGS)
 AC_SUBST(FUSE3_RPMHEADERS)
+
+AC_SUBST(AUTH_RPMLIBS)
+AC_SUBST(AUTH_RPMFILES)
+AC_SUBST(AUTH_RPMPKGS)
+AC_SUBST(AUTH_DEBLIBS)
+AC_SUBST(AUTH_DEBPKGS)
+AC_SUBST(AUTH_CFGOPT)
 
 AC_OUTPUT

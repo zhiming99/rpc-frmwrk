@@ -329,10 +329,12 @@ void Usage( char* szName )
 {
     fprintf( stderr,
         "Usage: %s [ -r <role number, 1: reqfwrd, 2: bridge>, mandatory ]\n"
+#ifdef AUTH
         "\t [ -a to enable authentication ]\n"
+        "\t [ -s < Service Name for authentication, valid for role 2, and ignored for role 1 > ]\n"
+#endif
         "\t [ -c to establish a seperate connection to the same bridge per client, only for role 1 ]\n"
         "\t [ -f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
-        "\t [ -s < Service Name for authentication, valid for role 2, and ignored for role 1 > ]\n"
 #ifdef FUSE3
         "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
 #endif
@@ -365,8 +367,16 @@ int main( int argc, char** argv )
             }
         case 'a':
             {
+#ifdef AUTH
                 g_bAuth = true;
                 break;
+#else
+                fprintf( stderr,
+                    "Error '-a' is not supported "
+                    "by this build\n" );
+                ret = -ENOTSUP;
+                break;
+#endif
             }
         case 'c':
             {
@@ -375,7 +385,14 @@ int main( int argc, char** argv )
             }
         case 's':
             {
+#ifdef AUTH                
                 g_strService = optarg;
+#else
+                fprintf( stderr,
+                    "Error '-s' is not supported "
+                    "by this build\n" );
+                ret = -ENOTSUP;
+#endif
                 break;
             }
         case 'd':

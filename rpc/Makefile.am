@@ -36,6 +36,6 @@ endif
 
 endif
 
-if ENABLE_KERBEROS
+if ENABLE_AUTH
 SUBDIRS += security
 endif

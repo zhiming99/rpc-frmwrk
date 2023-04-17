@@ -8,8 +8,8 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, krb5-devel, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel @FUSE3_RPMLIBS@
-Requires:       dbus dbus-libs jsoncpp krb5-libs lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ bash
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, @AUTH_RPMLIBS@, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel @FUSE3_RPMLIBS@
+Requires:       dbus dbus-libs jsoncpp @AUTH_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ bash
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -39,7 +39,7 @@ the @PACKAGE_NAME@ static libraries.
 --disable-silent-rules --libdir=%{_libdir} \
 --disable-maintainer-mode --disable-dependency-tracking \
 CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
-@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@
+@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@
 
 %make_build
 
@@ -61,8 +61,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @OPENSSL_RPMFILES@
 @WEBSOCK_RPMFILES@
 @FUSE3_RPMFILES@
+@AUTH_RPMFILES@
 %{_bindir}/rpcrouter
-%{_sysconfdir}/rpcf/authprxy.json
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
@@ -77,7 +77,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/sfdesc.json
 %{_sysconfdir}/rpcf/stmdesc.json
 %{_sysconfdir}/rpcf/prdesc.json
-%{_libdir}/libauth.so*
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
