@@ -12,7 +12,7 @@ SUBDIRS += test
 endif
 
 if SWIG
-if JDK
+if ENABLE_JAVA
 SUBDIRS += java
 endif
 endif

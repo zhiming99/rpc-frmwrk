@@ -98,10 +98,7 @@ void Usage()
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only\n" );
 #ifdef FUSE3
-    printf( "\t-f[s|p]:\tTo generate cpp skelton files for\n" );
-    printf( "\t\tFUSE integration. And parameter 's' is for\n" );
-    printf( "\t\tserver FUSE only, 'p' for proxy FUSE only,\n" );
-    printf( "\t\tnone for FUSE on both side\n." );
+    printf( "\t-f:\tTo generate cpp skelton files for rpcfs\n" );
     printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
 #endif
 
@@ -275,6 +272,7 @@ int main( int argc, char** argv )
                     g_strLang = "py";
                     break;
                 }
+#ifdef JAVA
             case 'j':
                 {
                     g_strLang = "java";
@@ -290,6 +288,17 @@ int main( int argc, char** argv )
                     }
                     break;
                 }
+#else
+            case 'j':
+            case 'P':
+                {
+                    fprintf( stderr,
+                        "Error '-%c' is not supported by this build\n", opt );
+                    ret = -ENOTSUP;
+                    bQuit = true;
+                    break;
+                }
+#endif
 
             case 'l':
                 {

@@ -58,11 +58,24 @@ AC_ARG_ENABLE([fuse3],
     [enable_fuse3=no],
     [enable_fuse3=yes])
 
+AC_ARG_ENABLE([java],
+    [AS_HELP_STRING([--disable-java], [no generation of Java skelton code])],
+    [enable_java=no],
+    [enable_java=yes])
+
 AC_CHECK_PROG([python3], python3, yes)
 AC_CHECK_PROG([sipbuild], [sip-build], yes)
 AC_CHECK_PROG([sip4], [sip], yes)
 AC_CHECK_PROG([swig], [swig], yes)
-AC_CHECK_PROG([javac],[javac],yes)
+
+case $enable_java in
+    yes)
+    AC_CHECK_PROG([javac],[javac],yes)
+    ;;
+    no)
+    ;;
+esac
+
 LT_INIT
 
 # Checks for libraries.
@@ -338,11 +351,6 @@ AC_CONFIG_FILES([Makefile
                  combase/Makefile
                  ipc/Makefile
                  rpc/Makefile
-                 rpc/sslport/Makefile
-                 rpc/gmsslport/Makefile
-                 rpc/wsport/Makefile
-                 rpc/wsport/wsproto/Makefile
-                 rpc/security/Makefile
                  rpc/router/Makefile
                  ridl/Makefile
                  ridl/rpcfs/Makefile
@@ -356,9 +364,8 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rules
                  bldpkg/rpcf.spec
                  bldpkg/rpcf.install
-                 java/Makefile
+                 bldpkg/rpcf-dev.install
                  examples/Makefile
-                 fuse/Makefile
                  test/Makefile
                  test/actcancel/Makefile
                  test/asynctst/Makefile
@@ -382,7 +389,7 @@ AM_CONDITIONAL([ENABLE_FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$ena
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
-AM_CONDITIONAL([JDK],[test x$ac_cv_prog_javac = xyes])
+AM_CONDITIONAL([ENABLE_JAVA],[test x$ac_cv_prog_javac = xyes -a x$enable_java = xyes])
 AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
@@ -393,6 +400,8 @@ FEATURES=
 enable_websock=no
 case $enable_gmssl in
     yes)
+        AC_CONFIG_FILES([
+             rpc/gmsslport/Makefile ])
         GMSSL_DEBFILES='usr/bin/rpcf/gmsslkey.sh'
         GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.shZZZZZ%{_libdir}/libgmsslpt.so*'
         GMSSL_CFGOPT=
@@ -409,6 +418,8 @@ esac
 
 case $enable_openssl in
     yes)
+        AC_CONFIG_FILES([
+             rpc/sslport/Makefile ])
         OPENSSL_DEBFILES='usr/bin/rpcf/opensslkey.shZZZZZetc/rpcf/openssl.cnf'
         OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
         OPENSSL_CFGOPT=
@@ -433,6 +444,9 @@ esac
 
 case $enable_websock in
     yes)
+        AC_CONFIG_FILES([
+             rpc/wsport/Makefile 
+             rpc/wsport/wsproto/Makefile ])
         WEBSOCK_RPMFILES='%{_libdir}/libwspt.so*'
     ;;
     no)
@@ -442,6 +456,8 @@ esac
 
 case $enable_fuse3 in
     yes)
+        AC_CONFIG_FILES([
+             fuse/Makefile ])
         FUSE3_RPMLIBS="fuse3-devel"
         FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcli'
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
@@ -467,6 +483,8 @@ esac
 
 case $enable_auth in
     yes)
+        AC_CONFIG_FILES([
+             rpc/security/Makefile ])
         AUTH_RPMLIBS="krb5-devel"
         AUTH_RPMFILES="%{_libdir}/libauth.so*ZZZZZ%{_sysconfdir}/rpcf/authprxy.json"
         AUTH_RPMPKGS="krb5-libs" 
@@ -483,6 +501,34 @@ case $enable_auth in
         AUTH_DEBPKGS=
         AUTH_CFGOPT='--disable-auth'
         FEATURES+="-auth "
+    ;;
+esac
+
+case $enable_java in
+    yes)
+        AC_CONFIG_FILES([
+                 java/Makefile ])
+        JAVA_RPMLIBS="java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk" 
+        JAVA_RPMPKGS=
+        JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
+        JAVA_RPMHEADERS="%{_sysconfdir}/rpcf/JavaSerialBase.javaZZZZZ%{_sysconfdir}/rpcf/JavaSerialImpl.java"
+        JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk,"
+        JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
+        JAVA_DEBPKGS=
+        JAVA_DEBHEADERS="etc/rpcf/*.java"
+        JAVA_CFGOPT=
+        FEATURES+="+java "
+    ;;
+    no)
+        JAVA_RPMLIBS=
+        JAVA_RPMPKGS=
+        JAVA_RPMFILES=
+        JAVA_DEBLIBS=
+        JAVA_DEBPKGS=
+        JAVA_DEBFILES=
+        JAVA_DEBHEADERS=
+        JAVA_CFGOPT='--disable-java'
+        FEATURES+="-java "
     ;;
 esac
 
@@ -518,5 +564,15 @@ AC_SUBST(AUTH_RPMPKGS)
 AC_SUBST(AUTH_DEBLIBS)
 AC_SUBST(AUTH_DEBPKGS)
 AC_SUBST(AUTH_CFGOPT)
+
+AC_SUBST(JAVA_RPMLIBS)
+AC_SUBST(JAVA_RPMPKGS)
+AC_SUBST(JAVA_RPMFILES)
+AC_SUBST(JAVA_RPMHEADERS)
+AC_SUBST(JAVA_DEBLIBS)
+AC_SUBST(JAVA_DEBPKGS)
+AC_SUBST(JAVA_DEBFILES)
+AC_SUBST(JAVA_DEBHEADERS)
+AC_SUBST(JAVA_CFGOPT)
 
 AC_OUTPUT

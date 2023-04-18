@@ -8,7 +8,7 @@ ifeq ($(build_cpu),arm)
 dhopt:= --no-parallel
 endif
 
-cfgopt:= @GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@
+cfgopt:= @GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@ @JAVA_CFGOPT@
 
 %:
 	dh $@ $(dhopt)

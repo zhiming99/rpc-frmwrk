@@ -8,8 +8,8 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, @AUTH_RPMLIBS@, lz4-devel, @OPENSSL_RPMLIBS@, cppunit-devel @FUSE3_RPMLIBS@
-Requires:       dbus dbus-libs jsoncpp @AUTH_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ bash
+BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, @AUTH_RPMLIBS@, lz4-devel, @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ cppunit-devel
+Requires:       dbus dbus-libs jsoncpp @AUTH_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @JAVA_RPMPKGS@ bash
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -39,7 +39,7 @@ the @PACKAGE_NAME@ static libraries.
 --disable-silent-rules --libdir=%{_libdir} \
 --disable-maintainer-mode --disable-dependency-tracking \
 CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
-@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@
+@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@ @JAVA_CFGOPT@
 
 %make_build
 
@@ -62,6 +62,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @WEBSOCK_RPMFILES@
 @FUSE3_RPMFILES@
 @AUTH_RPMFILES@
+@JAVA_RPMFILES@
 %{_bindir}/rpcrouter
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
@@ -81,9 +82,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
 %{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
-%{_libdir}/librpcbaseJNI.so*
-%{_libdir}/rpcf/rpcbase.jar
-
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
@@ -97,8 +95,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/pymktpl
 %{_sysconfdir}/rpcf/seribase.py
 %{_sysconfdir}/rpcf/synccfg.py
-%{_sysconfdir}/rpcf/JavaSerialBase.java
-%{_sysconfdir}/rpcf/JavaSerialImpl.java
+@JAVA_RPMHEADERS@
 %{_libdir}/pkgconfig/rpcf.pc
 %{_bindir}/rpcf/actclitst
 %{_bindir}/rpcf/actcsvrtst

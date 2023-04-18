@@ -1,6 +1,6 @@
 usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/*.whl
-usr/lib/@DEB_HOST_MULTIARCH@/rpcf/*.jar
+@JAVA_DEBFILES@
 usr/bin/rpcrouter
 @FUSE3_DEBFILES@
 usr/bin/rpcf/*.py

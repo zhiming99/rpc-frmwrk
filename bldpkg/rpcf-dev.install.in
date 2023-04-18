@@ -10,7 +10,7 @@ usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.la
 usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
 usr/include/rpcf/*.h
 usr/include/rpcf/ipc/*.h
-etc/rpcf/*.java
+@JAVA_DEBHEADERS@
 etc/rpcf/*.py
 etc/rpcf/*tpl
 
