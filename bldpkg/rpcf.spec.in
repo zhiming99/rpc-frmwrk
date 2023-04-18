@@ -78,6 +78,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/sfdesc.json
 %{_sysconfdir}/rpcf/stmdesc.json
 %{_sysconfdir}/rpcf/prdesc.json
+%{_sysconfdir}/rpcf/authprxy.json
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*

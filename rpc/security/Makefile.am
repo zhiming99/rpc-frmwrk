@@ -8,7 +8,7 @@ libauth_la_CPPFLAGS = -I$(top_srcdir)/ipc -I../ \
 
 libauth_ladir=$(libdir)
 
-dist_libauth_conf_DATA=authprxy.json
+dist_libauth_conf_DATA=
 libauth_confdir=$(sysconfdir)/rpcf
 
 libauth_la_LDFLAGS = -version-info @VERSION2@

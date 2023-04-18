@@ -20,6 +20,12 @@ rpcfrpcdir=$(top_srcdir)/rpc
 librpc_la_LDFLAGS=-version-info @VERSION2@
 librpc_la_LIBADD= -L../combase -L../ipc ../combase/libcombase.la ../ipc/libipc.la -lpthread -ldl
 
+#authprxy.json is required by tools/rpcfg.py
+#put it here so that disabling security module
+#will not affect its installation
+dist_rpcconf_DATA=security/authprxy.json
+rpcconfdir=$(sysconfdir)/rpcf
+
 SUBDIRS= . router
 
 if ENABLE_GMSSL

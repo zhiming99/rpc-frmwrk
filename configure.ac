@@ -486,7 +486,7 @@ case $enable_auth in
         AC_CONFIG_FILES([
              rpc/security/Makefile ])
         AUTH_RPMLIBS="krb5-devel"
-        AUTH_RPMFILES="%{_libdir}/libauth.so*ZZZZZ%{_sysconfdir}/rpcf/authprxy.json"
+        AUTH_RPMFILES="%{_libdir}/libauth.so*"
         AUTH_RPMPKGS="krb5-libs" 
         AUTH_DEBLIBS="libkrb5-dev,"
         AUTH_DEBPKGS="libkrb5-3,"
