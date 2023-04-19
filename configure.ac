@@ -544,7 +544,7 @@ case $enable_python in
                  python/setup.py ])
         PYTHON_RPMLIBS="python3-devel, python3-pip, ( sip5 or sip6 )," 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
-        PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install $i; done"
+        PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
         PYTHON_DEBLIBS="python3-setuptools, sip5-tools | sip-dev,"
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
