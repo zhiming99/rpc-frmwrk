@@ -387,19 +387,22 @@ def SetVerifyPeer( drvCfg : dict, bEnable : bool, portClass : str ) -> int:
 
 def LoadConfigFiles( path : str) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
+    parent_dir = os.path.basename( dir_path )
     paths = []
     if path is None:
-        curDir = dir_path
-        paths.append( "." )
-        paths.append( curDir + "/../../etc/rpcf" )
-        paths.append( "/etc/rpcf")
-
-        paths.append( curDir + "/../ipc" )
-        paths.append( curDir + "/../rpc/router" )
-        paths.append( curDir + "/../rpc/security" )
+        if parent_dir == "rpcf" :
+            curDir = dir_path
+            paths.append( "." )
+            paths.append( curDir + "/../../etc/rpcf" )
+            paths.append( "/etc/rpcf")
+        else:
+            paths.append( curDir + "/../ipc" )
+            paths.append( curDir + "/../rpc/router" )
+            paths.append( curDir + "/../rpc/security" )
     else:
         paths.append( path )
     
+    count = 4
     jsonvals = [ None ] * 4
     for strPath in paths :
         try:
@@ -408,6 +411,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( drvfile, "r" )
                 jsonvals[ 0 ] = [drvfile, json.load(fp) ]
                 fp.close()
+                count-=1
         except Exception as err :
             pass
         try:
@@ -416,6 +420,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( rtfile, "r" )
                 jsonvals[ 1 ] = [rtfile, json.load(fp)]
                 fp.close()
+                count-=1
         except Exception as err :
             pass
 
@@ -425,6 +430,7 @@ def LoadConfigFiles( path : str) :
                 fp = open( rtaufile, "r" )
                 jsonvals[ 2 ] = [rtaufile, json.load(fp)]
                 fp.close()
+                count-=1
         except Exception as err :
             pass
         
@@ -434,10 +440,34 @@ def LoadConfigFiles( path : str) :
                 fp = open( auprxyfile, "r" )
                 jsonvals[ 3 ] = [auprxyfile, json.load(fp)]
                 fp.close()
+                count-=1
         except Exception as err :
             pass            
 
-    return jsonvals
+        if count == 0:
+            break
+
+    if count == 0:
+        return jsonvals
+
+    idx = 0
+    fn = None
+    for i in jsonvals: 
+        if i is not None:
+            idx+=1
+            continue
+        if idx == 0:
+            fn = "driver.json"
+        elif idx == 1:
+            fn = "router.json"
+        elif idx == 2:
+            fn = "rtauth.json"
+        else:
+            fn = "authprxy.json"
+    if fn is not None:
+        raise Exception( "Error open " + fn )
+            
+    return None
 
 def Update_AuthPrxy( initCfg: dict, drvFile : list,
     bServer: bool, destDir : str, drvVal : object ) -> int :

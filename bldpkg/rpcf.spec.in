@@ -96,7 +96,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/pymktpl
 %{_sysconfdir}/rpcf/seribase.py
 %{_sysconfdir}/rpcf/synccfg.py
-@JAVA_RPMHEADERS@
+%{_sysconfdir}/rpcf/JavaSerialBase.java
+%{_sysconfdir}/rpcf/JavaSerialImpl.java
 %{_libdir}/pkgconfig/rpcf.pc
 %{_bindir}/rpcf/actclitst
 %{_bindir}/rpcf/actcsvrtst

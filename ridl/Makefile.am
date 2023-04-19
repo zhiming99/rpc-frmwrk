@@ -31,7 +31,7 @@ synccfg.py : synccfg.py.in
 ridlc_LDADD=$(COMMON_LINK) ../ipc/libipc.la ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
-ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py pymktpl synccfg.py
+ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java
 ridlc_confdir=$(sysconfdir)/rpcf
 
 include_ipcdir=$(top_srcdir)/ipc
@@ -45,6 +45,5 @@ endif
 
 if ENABLE_JAVA
 ridlc_CPPFLAGS+= -DJAVA
-ridlc_conf_DATA+=JavaSerialBase.java JavaSerialImpl.java
 endif
 
