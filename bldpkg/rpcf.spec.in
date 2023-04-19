@@ -8,7 +8,7 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, python3-devel, python3-pip, flex, bison, libtool, shtool, automake, autoconf, make, ( sip5 or sip6 ), dbus-devel, jsoncpp-devel, @AUTH_RPMLIBS@, lz4-devel, @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ cppunit-devel
+BuildRequires:  gcc, g++, python3, flex, bison, libtool, shtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @AUTH_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ cppunit-devel
 Requires:       dbus dbus-libs jsoncpp @AUTH_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @JAVA_RPMPKGS@ bash
 
 %description
@@ -39,7 +39,8 @@ the @PACKAGE_NAME@ static libraries.
 --disable-silent-rules --libdir=%{_libdir} \
 --disable-maintainer-mode --disable-dependency-tracking \
 CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
-@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@ @JAVA_CFGOPT@
+@GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@ @JAVA_CFGOPT@ \
+@PYTHON_CFGOPT@
 
 %make_build
 
@@ -63,6 +64,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @FUSE3_RPMFILES@
 @AUTH_RPMFILES@
 @JAVA_RPMFILES@
+@PYTHON_RPMFILES@
 %{_bindir}/rpcrouter
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
@@ -82,7 +84,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
-%{_libdir}/rpcf/@PACKAGE_NAME@-@VERSION@-*.whl
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
@@ -181,12 +182,10 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/*.a
 
 %post
-for i in %{_libdir}/rpcf/*.whl; do
-    pip3 install $i;
-done
+@PYTHON_RPMPOST@
 
 %postun
-pip3 uninstall -y @PACKAGE_NAME@
+@PYTHON_RPMPOSTUN@ @PACKAGE_NAME@
 
 
 %changelog

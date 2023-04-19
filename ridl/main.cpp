@@ -93,10 +93,16 @@ void Usage()
         "\t\tfor server. If not specified, the\n"
         "\t\t'appname' from the ridl will be used\n" );
 
+#ifdef PYTHON
     printf( "\t-p:\tTo generate the Python skelton files\n" );
+#endif
+
+#ifdef JAVA
     printf( "\t-j:\tTo generate the Java skelton files\n" );
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only\n" );
+#endif
+
 #ifdef FUSE3
     printf( "\t-f:\tTo generate cpp skelton files for rpcfs\n" );
     printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
@@ -269,8 +275,16 @@ int main( int argc, char** argv )
                 }
             case 'p':
                 {
+#ifdef PYTHON
                     g_strLang = "py";
                     break;
+#else
+                    fprintf( stderr,
+                        "Error '-%c' is not supported by this build\n", opt );
+                    ret = -ENOTSUP;
+                    bQuit = true;
+                    break;
+#endif
                 }
 #ifdef JAVA
             case 'j':

@@ -4,6 +4,7 @@ DEBDIR=${DISTDIR}/debian
 DESTDIR=$2
 pkgname=$3
 prefix=$4
+BUILD_PYTHON=$5
 
 #the script can run only on debian family of system
 os_name=`cat /etc/os-release | grep '^ID_LIKE' | awk -F '=' '{print $2}'`
@@ -55,6 +56,7 @@ DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
+if [ "x$BUILD_PYTHON" == "xyes" ]; then
 cat << EOF >> ${DEBDIR}/postinst
 #!/bin/bash
 cd XXXX/${PACKAGE_NAME}
@@ -68,6 +70,11 @@ cat << EOF >> ${DEBDIR}/postrm
 pip3 uninstall -y ${PACKAGE_NAME}
 #DEBHELPER#
 EOF
+else
+    touch ${DEBDIR}/postrm
+    touch ${DEBDIR}/postinst
+fi
+
 
 sed -i "s:ZZZZZ:\n:g" rpcf.install
 sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf.install > ${DEBDIR}/rpcf.install

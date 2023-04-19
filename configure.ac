@@ -63,10 +63,23 @@ AC_ARG_ENABLE([java],
     [enable_java=no],
     [enable_java=yes])
 
-AC_CHECK_PROG([python3], python3, yes)
-AC_CHECK_PROG([sipbuild], [sip-build], yes)
-AC_CHECK_PROG([sip4], [sip], yes)
+AC_ARG_ENABLE([python],
+    [AS_HELP_STRING([--disable-python], [no generation of python skelton code])],
+    [enable_python=no],
+    [enable_python=yes])
+
+
 AC_CHECK_PROG([swig], [swig], yes)
+
+case $enable_java in
+    yes)
+    AC_CHECK_PROG([python3], python3, yes)
+    AC_CHECK_PROG([sipbuild], [sip-build], yes)
+    AC_CHECK_PROG([sip4], [sip], yes)
+    ;;
+    no)
+    ;;
+esac
 
 case $enable_java in
     yes)
@@ -356,8 +369,6 @@ AC_CONFIG_FILES([Makefile
                  ridl/rpcfs/Makefile
                  tools/Makefile
                  3rd_party/Makefile
-                 python/Makefile
-                 python/setup.py
                  pics/Makefile
                  bldpkg/Makefile
                  bldpkg/control
@@ -390,6 +401,7 @@ AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
 AM_CONDITIONAL([SIP4],[test x$ac_cv_prog_sip4 = xyes])
 AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
 AM_CONDITIONAL([ENABLE_JAVA],[test x$ac_cv_prog_javac = xyes -a x$enable_java = xyes])
+AM_CONDITIONAL([ENABLE_PYTHON],[test \( "x$ac_cv_prog_sip4" = "xyes" -o "x$ac_cv_prog_sipbuild" = "xyes" \) -a "x$enable_python" = "xyes"])
 AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
 
 VERSION2='$(subst .,:,$(VERSION))'
@@ -425,7 +437,7 @@ case $enable_openssl in
         OPENSSL_CFGOPT=
         OPENSSL_DEBLIBS='libssl-dev,'
         OPENSSL_DEBPKGS='openssl, libssl1.1, expect,'
-        OPENSSL_RPMLIBS='openssl-devel'
+        OPENSSL_RPMLIBS='openssl-devel,'
         OPENSSL_RPMPKGS='openssl openssl-libs expect'
         enable_websock=yes
         FEATURES+="+openssl "
@@ -458,7 +470,7 @@ case $enable_fuse3 in
     yes)
         AC_CONFIG_FILES([
              fuse/Makefile ])
-        FUSE3_RPMLIBS="fuse3-devel"
+        FUSE3_RPMLIBS="fuse3-devel,"
         FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcli'
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
@@ -485,9 +497,9 @@ case $enable_auth in
     yes)
         AC_CONFIG_FILES([
              rpc/security/Makefile ])
-        AUTH_RPMLIBS="krb5-devel"
-        AUTH_RPMFILES="%{_libdir}/libauth.so*"
+        AUTH_RPMLIBS="krb5-devel,"
         AUTH_RPMPKGS="krb5-libs" 
+        AUTH_RPMFILES="%{_libdir}/libauth.so*"
         AUTH_DEBLIBS="libkrb5-dev,"
         AUTH_DEBPKGS="libkrb5-3,"
         AUTH_CFGOPT=
@@ -508,24 +520,46 @@ case $enable_java in
     yes)
         AC_CONFIG_FILES([
                  java/Makefile ])
-        JAVA_RPMLIBS="java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk" 
-        JAVA_RPMPKGS=
+        JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk," 
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk,"
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
-        JAVA_DEBPKGS=
         JAVA_CFGOPT=
         FEATURES+="+java "
     ;;
     no)
         JAVA_RPMLIBS=
-        JAVA_RPMPKGS=
         JAVA_RPMFILES=
         JAVA_DEBLIBS=
-        JAVA_DEBPKGS=
         JAVA_DEBFILES=
         JAVA_CFGOPT='--disable-java'
         FEATURES+="-java "
+    ;;
+esac
+
+case $enable_python in
+    yes)
+        AC_CONFIG_FILES([
+                 python/Makefile
+                 python/setup.py ])
+        PYTHON_RPMLIBS="python3-devel, python3-pip, ( sip5 or sip6 )," 
+        PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
+        PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install $i; done"
+        PYTHON_RPMPOSTUN="pip3 uninstall -y"
+        PYTHON_DEBLIBS="python3-setuptools, sip5-tools | sip-dev,"
+        PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
+        PYTHON_CFGOPT=
+        FEATURES+="+python "
+    ;;
+    no)
+        PYTHON_RPMLIBS=
+        PYTHON_RPMFILES=
+        PYTHON_RPMPOST=
+        PYTHON_DEBLIBS=
+        PYTHON_RPMPOSTUN="hiddenvar="
+        PYTHON_DEBFILES=
+        PYTHON_CFGOPT='--disable-python'
+        FEATURES+="-python "
     ;;
 esac
 
@@ -563,11 +597,17 @@ AC_SUBST(AUTH_DEBPKGS)
 AC_SUBST(AUTH_CFGOPT)
 
 AC_SUBST(JAVA_RPMLIBS)
-AC_SUBST(JAVA_RPMPKGS)
 AC_SUBST(JAVA_RPMFILES)
 AC_SUBST(JAVA_DEBLIBS)
-AC_SUBST(JAVA_DEBPKGS)
 AC_SUBST(JAVA_DEBFILES)
 AC_SUBST(JAVA_CFGOPT)
+
+AC_SUBST(PYTHON_RPMLIBS)
+AC_SUBST(PYTHON_RPMFILES)
+AC_SUBST(PYTHON_RPMPOST)
+AC_SUBST(PYTHON_DEBLIBS)
+AC_SUBST(PYTHON_RPMPOSTUN)
+AC_SUBST(PYTHON_DEBFILES)
+AC_SUBST(PYTHON_CFGOPT)
 
 AC_OUTPUT

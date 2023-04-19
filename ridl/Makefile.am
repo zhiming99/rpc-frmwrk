@@ -47,3 +47,6 @@ if ENABLE_JAVA
 ridlc_CPPFLAGS+= -DJAVA
 endif
 
+if ENABLE_PYTHON
+ridlc_CPPFLAGS+= -DPYTHON
+endif

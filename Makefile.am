@@ -18,11 +18,15 @@ endif
 endif
 
 if SIPBUILD
+if ENABLE_PYTHON
 SUBDIRS += python
+endif
 endif
 
 if SIP4                                                                 
+if ENABLE_PYTHON
 SUBDIRS += python                                                       
+endif
 endif                          
 
 SUBDIRS += bldpkg
