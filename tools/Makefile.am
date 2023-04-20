@@ -1,4 +1,4 @@
-pysources = rpcfg.py updcfg.py rpcfgnui.py updinitcfg.py
+pysources = rpcfg.py rpcfgnui.py updinitcfg.py
 
 testcfgfiles=testcfgs/mincfg.json \
 testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh
@@ -32,7 +32,7 @@ else
     openssl_cmd=true;
 endif
 
-EXTRA_DIST= $(pysources) README.md runtest.sh.in Dockerfile $(testcfgfiles) $(runtime_files)
+EXTRA_DIST= $(pysources) README.md runtest.sh.in updcfg.py.in Dockerfile $(testcfgfiles) $(runtime_files)
 
 docker:
 	docker build -t rpcf .

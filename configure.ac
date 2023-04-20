@@ -368,6 +368,7 @@ AC_CONFIG_FILES([Makefile
                  ridl/Makefile
                  ridl/rpcfs/Makefile
                  tools/Makefile
+                 tools/updcfg.py
                  3rd_party/Makefile
                  pics/Makefile
                  bldpkg/Makefile

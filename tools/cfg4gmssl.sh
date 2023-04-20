@@ -19,7 +19,13 @@ pkill -f maincli.py
 
 cat $output
 
-sudo python3 /usr/local/bin/rpcf/rpcfgnui.py $output
+if which sudo; then
+    SUDO="sudo"
+else
+    SUDO=
+fi
+
+$SUDO python3 /usr/local/bin/rpcf/rpcfgnui.py $output
 
 popd
 

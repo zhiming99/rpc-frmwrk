@@ -6,8 +6,13 @@ output=${input%.in}
 sed "s:XXXXX:${keydir}:g" $1 > $output
 echo pidof rpcrouter
 pidof rpcrouter
-sudo kill -9 `pidof rpcrouter` || true
-sudo kill -9 `pidof python3` || true
+if which sudo; then
+    SUDO="sudo"
+else
+    SUDO=
+fi
+$SUDO pkill rpcrouter || true
+$SUDO pkill python3 || true
 cat $output
-sudo python3 /usr/local/bin/rpcf/rpcfgnui.py $output
+$SUDO python3 /usr/local/bin/rpcf/rpcfgnui.py $output
 popd
