@@ -578,7 +578,7 @@ gint32 CRegistry::MakeDir(
 }
 
 gint32 CRegistry::RemoveProperty(
-    guint32 iProp )
+    gint32 iProp )
 {
     gint32 ret = 0;
 

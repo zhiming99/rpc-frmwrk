@@ -64,8 +64,8 @@ class IMessageMatch : public CObjBase
     virtual bool operator==(
         const IMessageMatch& rhs ) const = 0;
 
-    virtual const IMessageMatch& operator=(
-        const IMessageMatch& rhs ) = 0;
+    /*virtual const IMessageMatch& operator=(
+        const IMessageMatch& rhs ) = 0;*/
 
     virtual stdstr ToDBusRules(
         gint32 iMsgType ) const = 0;
@@ -185,8 +185,9 @@ class CMessageMatch : public IMessageMatch
     bool operator==(
         const IMessageMatch& rhs ) const override;
 
-    const IMessageMatch& operator=(
+    /*const IMessageMatch& operator=(
         const IMessageMatch& rhs ) override;
+        */
 
     EnumMatchType GetType() const override
     { return m_iMatchType; }

@@ -503,14 +503,14 @@ bool CMessageMatch::operator==( const IMessageMatch& rhs ) const
     return true;
 }
 
-const IMessageMatch& CMessageMatch::operator=(
+/*const IMessageMatch& CMessageMatch::operator=(
     const IMessageMatch& rhs )
 {
     const CMessageMatch& oMatch =
         static_cast< const CMessageMatch& >( rhs );
 
     return ( *this = oMatch );
-}
+}*/
 
 stdstr CMessageMatch::ToDBusRules(
     gint32 iMsgType ) const

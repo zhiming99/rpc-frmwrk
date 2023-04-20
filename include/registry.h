@@ -121,7 +121,7 @@ class CRegistry : public CObjBase
         const std::string& strPath,
         CDirEntry*& pDir ) const;
 
-    gint32 RemoveProperty( guint32 iProp );
+    gint32 RemoveProperty( gint32 iProp ) override;
 
     gint32 GetProperty(
         gint32 iProp,

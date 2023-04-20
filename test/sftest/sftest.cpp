@@ -32,8 +32,6 @@ using namespace rpcf;
 #include "sftest.h"
 #include "sfsvr.h"
 
-#define NSEC_PER_SEC 1000000000
-
 CPPUNIT_TEST_SUITE_REGISTRATION( CIfSmokeTest );
 
 void CIfSmokeTest::setUp()
@@ -219,7 +217,7 @@ void CIfSmokeTest::testCliStartStop()
         double nsec = .0;
         if( ts2.tv_nsec < ts.tv_nsec )
         {
-            nsec = ts2.tv_nsec + ( 10 ^ 9 ) - ts.tv_nsec;
+            nsec = ts2.tv_nsec + NSEC_PER_SEC - ts.tv_nsec;
             iCarry = 1;
         }
         else
@@ -247,7 +245,7 @@ void CIfSmokeTest::testCliStartStop()
         nsec = .0;
         if( ts2.tv_nsec < ts.tv_nsec )
         {
-            nsec = ts2.tv_nsec + ( 10 ^ 9 ) - ts.tv_nsec;
+            nsec = ts2.tv_nsec + NSEC_PER_SEC - ts.tv_nsec;
             iCarry = 1;
         }
         else

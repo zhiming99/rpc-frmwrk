@@ -39,6 +39,7 @@
 #include <memory>
 #include <string.h>
 #include <deque>
+#include <stdexcept>
 
 #include "clsids.h"
 #include "propids.h"
@@ -46,6 +47,8 @@
 
 #include <arpa/inet.h>
 #include <dbus/dbus.h>
+
+#define NSEC_PER_SEC 1000000000
 
 #if defined(__LP64__) || defined(_LP64)
 #define BUILD_64   1

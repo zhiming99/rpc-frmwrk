@@ -378,9 +378,13 @@ int Sem_Timedwait( sem_t* psem, const timespec& ts )
 
     if( ts.tv_nsec > 0 )
     {
-        iCarry = ( ts.tv_nsec + ts.tv_nsec ) / ( 10^9 );
-        sInterval.tv_nsec =
-            ( sInterval.tv_nsec + ts.tv_nsec ) % ( 10^9 );
+        auto nsec = sInterval.tv_nsec + ts.tv_nsec;
+        if( nsec > NSEC_PER_SEC )
+        {
+            iCarry = 1;
+            nsec -= NSEC_PER_SEC;
+        }
+        sInterval.tv_nsec = nsec;
     }
 
     sInterval.tv_sec += ts.tv_sec + iCarry;
