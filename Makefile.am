@@ -7,9 +7,7 @@ endif
 
 SUBDIRS += rpc ridl tools pics examples
 
-if ENABLE_TESTCASES
 SUBDIRS += test
-endif
 
 if SWIG
 if ENABLE_JAVA

@@ -40,7 +40,7 @@ the @PACKAGE_NAME@ static libraries.
 --disable-maintainer-mode --disable-dependency-tracking \
 CPPFLAGS="-O2 -g3 -DRELEASE -D_DEBUG=0 -fno-strict-aliasing" \
 @GMSSL_CFGOPT@ @OPENSSL_CFGOPT@ @FUSE3_CFGOPT@ @AUTH_CFGOPT@ @JAVA_CFGOPT@ \
-@PYTHON_CFGOPT@
+@PYTHON_CFGOPT@ @TEST_CFGOPT@
 
 %make_build
 
@@ -69,18 +69,10 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
-%{_sysconfdir}/rpcf/actcdesc.json
-%{_sysconfdir}/rpcf/asyndesc.json
+%{_sysconfdir}/rpcf/authprxy.json
 %{_sysconfdir}/rpcf/btinrt.json
 %{_sysconfdir}/rpcf/echodesc.json
-%{_sysconfdir}/rpcf/evtdesc.json
-%{_sysconfdir}/rpcf/hwdesc.json
-%{_sysconfdir}/rpcf/inproc.json
-%{_sysconfdir}/rpcf/kadesc.json
-%{_sysconfdir}/rpcf/sfdesc.json
-%{_sysconfdir}/rpcf/stmdesc.json
-%{_sysconfdir}/rpcf/prdesc.json
-%{_sysconfdir}/rpcf/authprxy.json
+@TEST_RPMFILES@
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
@@ -100,28 +92,11 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/JavaSerialBase.java
 %{_sysconfdir}/rpcf/JavaSerialImpl.java
 %{_libdir}/pkgconfig/rpcf.pc
-%{_bindir}/rpcf/actclitst
-%{_bindir}/rpcf/actcsvrtst
-%{_bindir}/rpcf/asynclitst
-%{_bindir}/rpcf/asyncsvrtst
 %{_bindir}/rpcf/btinrtcli
 %{_bindir}/rpcf/btinrtsvr
-%{_bindir}/rpcf/evtclitst
-%{_bindir}/rpcf/evtsvrtst
-%{_bindir}/rpcf/hwclismk
-%{_bindir}/rpcf/hwsvrsmk
 %{_bindir}/rpcf/ifclismk
 %{_bindir}/rpcf/ifsvrsmk
-%{_bindir}/rpcf/inproctst
-%{_bindir}/rpcf/kaclitst
-%{_bindir}/rpcf/kasvrtst
-%{_bindir}/rpcf/prclitst
-%{_bindir}/rpcf/prsvrtst
-%{_bindir}/rpcf/sfclitst
-%{_bindir}/rpcf/sfsvrtst
-%{_bindir}/rpcf/smoketest
-%{_bindir}/rpcf/stmclitst
-%{_bindir}/rpcf/stmsvrtst
+@TEST_RPMBINS@
 %{_includedir}/rpcf/autoptr.h
 %{_includedir}/rpcf/buffer.h
 %{_includedir}/rpcf/clsids.h

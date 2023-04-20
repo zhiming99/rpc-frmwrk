@@ -6,7 +6,13 @@ usr/bin/rpcrouter
 usr/bin/rpcf/*.py
 @GMSSL_DEBFILES@
 @OPENSSL_DEBFILES@
-etc/rpcf/*.json
+@TEST_DEBFILES@
+etc/rpcf/echodesc.json
+etc/rpcf/btinrt.json
+etc/rpcf/rtauth.json
+etc/rpcf/router.json
+etc/rpcf/authprxy.json
+etc/rpcf/driver.json
 usr/share/man/man1/ridlc.1
 usr/share/man/man1/rpcrouter.1
 usr/share/man/man7/ridl.7

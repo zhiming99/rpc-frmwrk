@@ -77,6 +77,7 @@ fi
 
 
 sed -i "s:ZZZZZ:\n:g" rpcf.install
+sed -i "s:ZZZZZ:\n:g" rpcf-dev.install
 sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf.install > ${DEBDIR}/rpcf.install
 sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf-dev.install > ${DEBDIR}/rpcf-dev.install
 sed "s/[@]DEB_HOST_MULTIARCH[@]/${DEB_HOST_MULTIARCH}/g" rpcf-static.install.in > ${DEBDIR}/rpcf-static.install

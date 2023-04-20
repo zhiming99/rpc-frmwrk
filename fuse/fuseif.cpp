@@ -2522,33 +2522,6 @@ gint32 CFuseEvtFile::fs_read(
         m_dwBytesAvail -= size;
         m_dwLastOff = off + size;
 
-        if( this->GetClsid() ==
-            clsid( CFuseRespFileProxy ) && off == 0 )
-        {
-            char szBuf[ 128 ];
-            szBuf[ 127 ] = 0;
-            if( size <= sizeof( guint32 ) )
-                break;
-            size_t dwSize = std::min(
-                size - sizeof( guint32 ),
-                sizeof( szBuf ) - 1 );
-
-            char* ptr = ( char* )bufvec->buf[ 0 ].mem +
-                sizeof( guint32 );
-
-            memcpy( szBuf, ptr, dwSize );
-            szBuf[ dwSize ] = 0;
-
-            OutputMsg( 0,
-                "Checkpoint 15: "
-                "first data read,"
-                "avail=%d, want=%d, "
-                "%s, msg=%s group=%d ",
-                dwAvail, size,
-                GetName().c_str(),
-                szBuf, this->GetGroupId() );
-        }
-
     }while( 0 );
 
     return ret;

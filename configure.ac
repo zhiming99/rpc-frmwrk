@@ -378,18 +378,8 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf-dev.install
                  examples/Makefile
                  test/Makefile
-                 test/actcancel/Makefile
-                 test/asynctst/Makefile
-                 test/evtest/Makefile
-                 test/helloworld/Makefile
-                 test/inproc/Makefile
-                 test/prtest/Makefile
-                 test/katest/Makefile
-                 test/sftest/Makefile
-                 test/stmtest/Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile
-                 test/smoketest/Makefile
                  rpcf.pc ])
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
@@ -563,6 +553,39 @@ case $enable_python in
     ;;
 esac
 
+case $enable_testcases in
+    yes)
+        AC_CONFIG_FILES([
+         test/actcancel/Makefile
+         test/asynctst/Makefile
+         test/evtest/Makefile
+         test/helloworld/Makefile
+         test/inproc/Makefile
+         test/prtest/Makefile
+         test/katest/Makefile
+         test/sftest/Makefile
+         test/stmtest/Makefile
+         test/smoketest/Makefile
+         ])
+        TEST_DEBFILES='etc/rpcf/actcdesc.jsonZZZZZetc/rpcf/asyndesc.jsonZZZZZetc/rpcf/evtdesc.jsonZZZZZetc/rpcf/hwdesc.jsonZZZZZetc/rpcf/inproc.jsonZZZZZetc/rpcf/kadesc.jsonZZZZZetc/rpcf/sfdesc.jsonZZZZZetc/rpcf/stmdesc.jsonZZZZZetc/rpcf/prdesc.json'
+        TEST_DEBBINS='usr/bin/rpcf/actclitstZZZZZusr/bin/rpcf/actcsvrtstZZZZZusr/bin/rpcf/asynclitstZZZZZusr/bin/rpcf/asyncsvrtstZZZZZusr/bin/rpcf/evtclitstZZZZZusr/bin/rpcf/evtsvrtstZZZZZusr/bin/rpcf/hwclismkZZZZZusr/bin/rpcf/hwsvrsmkZZZZZusr/bin/rpcf/inproctstZZZZZusr/bin/rpcf/kaclitstZZZZZusr/bin/rpcf/kasvrtstZZZZZusr/bin/rpcf/prclitstZZZZZusr/bin/rpcf/prsvrtstZZZZZusr/bin/rpcf/sfclitstZZZZZusr/bin/rpcf/sfsvrtstZZZZZusr/bin/rpcf/smoketestZZZZZusr/bin/rpcf/stmclitstZZZZZusr/bin/rpcf/stmsvrtst'
+
+        TEST_RPMFILES='%{_sysconfdir}/rpcf/actcdesc.jsonZZZZZ%{_sysconfdir}/rpcf/asyndesc.jsonZZZZZ%{_sysconfdir}/rpcf/evtdesc.jsonZZZZZ%{_sysconfdir}/rpcf/hwdesc.jsonZZZZZ%{_sysconfdir}/rpcf/inproc.jsonZZZZZ%{_sysconfdir}/rpcf/kadesc.jsonZZZZZ%{_sysconfdir}/rpcf/sfdesc.jsonZZZZZ%{_sysconfdir}/rpcf/stmdesc.jsonZZZZZ%{_sysconfdir}/rpcf/prdesc.json'
+
+        TEST_RPMBINS='%{_bindir}/rpcf/actclitstZZZZZ%{_bindir}/rpcf/actcsvrtstZZZZZ%{_bindir}/rpcf/asynclitstZZZZZ%{_bindir}/rpcf/asyncsvrtstZZZZZ%{_bindir}/rpcf/evtclitstZZZZZ%{_bindir}/rpcf/evtsvrtstZZZZZ%{_bindir}/rpcf/hwclismkZZZZZ%{_bindir}/rpcf/hwsvrsmkZZZZZ%{_bindir}/rpcf/inproctstZZZZZ%{_bindir}/rpcf/kaclitstZZZZZ%{_bindir}/rpcf/kasvrtstZZZZZ%{_bindir}/rpcf/prclitstZZZZZ%{_bindir}/rpcf/prsvrtstZZZZZ%{_bindir}/rpcf/sfclitstZZZZZ%{_bindir}/rpcf/sfsvrtstZZZZZ%{_bindir}/rpcf/smoketestZZZZZ%{_bindir}/rpcf/stmclitstZZZZZ%{_bindir}/rpcf/stmsvrtst'
+
+        TEST_CFGOPT=
+        FEATURES+="+testcases "
+    ;;
+    no)
+        TEST_DEBFILES=
+        TEST_DEBBINS=
+        TEST_RPMFILES=
+        TEST_RPMBINS=
+        TEST_CFGOPT='--disable-testcases'
+        FEATURES+="-testcases "
+    ;;
+esac
 CXXFLAGS+=' -DFEATURES="\"$(FEATURES)\""'
 
 AC_SUBST([CXXFLAGS])
@@ -609,5 +632,11 @@ AC_SUBST(PYTHON_DEBLIBS)
 AC_SUBST(PYTHON_RPMPOSTUN)
 AC_SUBST(PYTHON_DEBFILES)
 AC_SUBST(PYTHON_CFGOPT)
+
+AC_SUBST(TEST_DEBFILES)
+AC_SUBST(TEST_DEBBINS)
+AC_SUBST(TEST_RPMFILES)
+AC_SUBST(TEST_RPMBINS)
+AC_SUBST(TEST_CFGOPT)
 
 AC_OUTPUT

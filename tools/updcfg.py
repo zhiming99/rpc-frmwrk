@@ -19,17 +19,18 @@ def GetTestPaths( path : str= None ) :
         paths.append( "/etc/rpcf")
 
         curDir += "/../test/"
-        paths.append( curDir + "actcancel" )
-        paths.append( curDir + "asynctst" )
-        paths.append( curDir + "btinrt" )
-        paths.append( curDir + "evtest" )
-        paths.append( curDir + "helloworld" )
         paths.append( curDir + "iftest" )
-        paths.append( curDir + "inproc" )
-        paths.append( curDir + "katest" )
-        paths.append( curDir + "prtest" )
-        paths.append( curDir + "sftest" )
-        paths.append( curDir + "stmtest" )
+        paths.append( curDir + "btinrt" )
+        if IsFeatureEnabled( 'testcases' ):
+            paths.append( curDir + "actcancel" )
+            paths.append( curDir + "asynctst" )
+            paths.append( curDir + "evtest" )
+            paths.append( curDir + "helloworld" )
+            paths.append( curDir + "inproc" )
+            paths.append( curDir + "katest" )
+            paths.append( curDir + "prtest" )
+            paths.append( curDir + "sftest" )
+            paths.append( curDir + "stmtest" )
     else:
         paths.append( path )
 
@@ -211,16 +212,16 @@ def ExtraUpdateBtinrt(
 
 
 def ExportTestCfgsTo( cfgList:list, destPath:str ):
-    testDescs = [ "actcdesc.json",
-        "asyndesc.json",
-        "btinrt.json",
-        "evtdesc.json",
-        "hwdesc.json",
-        "echodesc.json",
-        "kadesc.json",
-        "prdesc.json",
-        "sfdesc.json",
-        "stmdesc.json" ]
+    testDescs = [ 'echodesc.json', 'btinrt.json' ]
+    if IsFeatureEnabled( 'testcases' ):
+        testDescs.extend(  [ "actcdesc.json",
+            "asyndesc.json",
+            "evtdesc.json",
+            "hwdesc.json",
+            "kadesc.json",
+            "prdesc.json",
+            "sfdesc.json",
+            "stmdesc.json" ] )
 
     paths = GetTestPaths( destPath )
     pathVal = ReadTestCfg( paths, testDescs[ 0 ] )
@@ -255,16 +256,16 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
     return ret
 
 def ExportTestCfgs( cfgList:list ):
-    testDescs = [ "actcdesc.json",
-        "asyndesc.json",
-        "btinrt.json",
-        "evtdesc.json",
-        "hwdesc.json",
-        "echodesc.json",
-        "kadesc.json",
-        "prdesc.json",
-        "sfdesc.json",
-        "stmdesc.json" ]
+    testDescs = [ 'echodesc.json', 'btinrt.json' ]
+    if IsFeatureEnabled( 'testcases' ):
+        testDescs.extend(  [ "actcdesc.json",
+            "asyndesc.json",
+            "evtdesc.json",
+            "hwdesc.json",
+            "kadesc.json",
+            "prdesc.json",
+            "sfdesc.json",
+            "stmdesc.json" ] )
 
     ret = 0
     paths = GetTestPaths()
