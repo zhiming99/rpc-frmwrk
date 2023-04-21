@@ -2225,22 +2225,24 @@ class ConfigDlg(Gtk.Dialog):
             fp.close()
 
             cmdLine = "cd " + destPath + ";" 
-            cmdLine += "tar cf " + destPkg
             suffix = ".sh"
 
             if bInstKeys:
                 if bServer :
                     cmdLine += "echo 0 > svridx;"
                     cmdLine += "echo 1 > endidx;"
+                    cmdLine += "tar cf " + destPkg
                     cmdLine += " svridx endidx "
                     suffix = "-0-1.sh"
                 else:
                     cmdLine += "echo 1 > clidx;"
                     cmdLine += "echo 2 > endidx;"
+                    cmdLine += "tar cf " + destPkg
                     cmdLine += " clidx endidx "
                     suffix = "-1-1.sh"
-                cmdLine += os.path.basename( keyPkg ) + " USESSL "
-
+                cmdLine += os.path.basename( keyPkg ) + " USESSL"
+            else:
+                cmdLine += "tar cf " + destPkg
             cmdLine += " instcfg.sh;"
             cmdLine += "rm instcfg.sh || true;"
             if bInstKeys:
@@ -2270,19 +2272,17 @@ class ConfigDlg(Gtk.Dialog):
             curDate = time.strftime('-%Y-%m-%d')
             if bInstKeys:
                 if bGmSSL:
-                    curDate = "-g-" + curDate
+                    curDate = "-g" + curDate
                 else:
-                    curDate = "-o-" + curDate
-            else:
-                installer += curDate + suffix
+                    curDate = "-o" + curDate
+            installer += curDate + suffix
             fp = open( installer, "w" )
             fp.write( get_instscript_content() )
             fp.close()
 
             cmdLine = "cd " + destPath + ";" 
-            cmdLine += "cat " + destPkg + " >> " + installer
-            os.system( cmdLine )
-            cmdLine = "chmod u+x " + installer + ";"
+            cmdLine += "cat " + destPkg + " >> " + installer + ";"
+            cmdLine += "chmod u+x " + installer + ";"
             cmdLine += "rm -rf " + destPkg
             if bInstKeys:
                 cmdLine += " USESSL endidx "
@@ -2563,6 +2563,7 @@ class ConfigDlg(Gtk.Dialog):
             cfgVal = json.load( fp )
             fp.close()
             ret = self.Export_Installer( cfgVal, initFile )
+            os.system( "rm -rf " + initFile )
             return ret
 
         ret = self.Export_InitCfg( initFile )
