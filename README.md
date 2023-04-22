@@ -25,7 +25,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 16. [`rpcfs - filesystem interface for rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 
 #### Building `rpc-frmwrk`   
-* Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60) for detail description.   
+* Please refer to this article [`How to build rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-manually-build-%60RPC-frmwrk%60) for detail description.   
 * If you are using Ubuntu or Fedora, you may want to install the [`deb package or rpm package`](https://github.com/zhiming99/rpc-frmwrk/releases/tag/0.5.0) to skip the painstaking building process.
 
 #### Installation
