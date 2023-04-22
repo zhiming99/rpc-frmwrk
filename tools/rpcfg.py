@@ -2382,6 +2382,13 @@ class ConfigDlg(Gtk.Dialog):
                     initCfg, cfgPath, curDir, self.bServer, bSSL and bSSL2 )
                 if ret < 0:
                     raise Exception( "Error CreateInstaller in " + curDir + " with " + cfgPath )
+
+                if bSSL and bSSL2 :
+                    return ret
+
+                #non ssl situation, create both
+                ret = self.CreateInstaller(
+                    initCfg, cfgPath, curDir, not self.bServer, False )
                 return ret
 
             if os.access( cliPkg, os.W_OK ):

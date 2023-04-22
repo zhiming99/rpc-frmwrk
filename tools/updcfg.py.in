@@ -147,7 +147,7 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
         bRemove = True
         json.dump( jsonVal, fp, indent=4)
         fp.close()
-        ret = os.system( "which sudo" )
+        ret = os.system( "which sudo > /dev/null" )
         bSudo = True
         if ret != 0:
             bSudo = False
