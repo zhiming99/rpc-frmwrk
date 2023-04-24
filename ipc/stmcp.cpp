@@ -26,7 +26,7 @@
 void CStreamQueue::SetState(
     EnumTaskState dwState )
 {
-    CStdRMutex oLock( this->GetLock() );
+    CStdMutex oLock( this->GetLock() );
     m_dwState = dwState;
 }
 
@@ -34,7 +34,7 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
 {
     gint32 ret = 0;
     do{
-        CStdRMutex oLock( GetLock() );
+        CStdMutex oLock( GetLock() );
         if( GetState() != stateStarted )
         {
             ret = ERROR_STATE;
@@ -55,8 +55,11 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
         if( ERROR( ret ) )
             break;
 
+        m_bInProcess = true;
         CIoManager* pMgr = this->GetIoMgr();
         ret = pMgr->RescheduleTask( pTask );
+        if( ERROR( ret ) )
+            m_bInProcess = false;
 
     }while( 0 );
 
@@ -67,7 +70,7 @@ gint32 CStreamQueue::SubmitIrp( IrpPtr& pIrp )
 {
     gint32 ret = 0;
     do{
-        CStdRMutex oLock( GetLock() );
+        CStdMutex oLock( GetLock() );
         if( GetState() != stateStarted )
         {
             ret = ERROR_STATE;
@@ -112,18 +115,18 @@ gint32 CStreamQueue::ProcessIrps()
     gint32 ret = 0;
     do{
         CIoManager* pMgr = GetIoMgr();
-        CStdRMutex oLock( this->GetLock() );
+        CStdMutex oLock( this->GetLock() );
         if( GetState() == stateStopped )
         {
             ret = ERROR_STATE;
             break;
         }
-        if( !m_bProcess )
-            m_bProcess = true;
+        if( !m_bInProcess )
+            m_bInProcess = true;
 
         if( m_quePkts.empty() || m_queIrps.empty() )
         {
-            m_bProcess = false;
+            m_bInProcess = false;
             break;
         }
 
@@ -150,7 +153,7 @@ gint32 CStreamQueue::ProcessIrps()
             oLock.Lock();
             m_quePkts.pop_front();
         }
-        m_bProcess = false;
+        m_bInProcess = false;
 
     }while( 0 );
 
@@ -163,7 +166,7 @@ gint32 CStreamQueue::CancelAllIrps(
 {
     gint32 ret = 0;
     do{
-        CStdRMutex oLock( this->GetLock() );
+        CStdMutex oLock( this->GetLock() );
         if( GetState() == stateStopped )
         {
             ret = ERROR_STATE;

@@ -2613,12 +2613,10 @@ gint32 CUnixSockStmProxyRelay::OnDataReceivedRemote(
         if( qwPkts == 0 && qwBytes == 0 )
             break;
 
-        if( qwPkts > 0 &&
-            qwPkts <= ( STM_MAX_PACKETS_REPORT >> 1 ) )
-            break;
-
-        if( qwBytes > 0 &&
-            qwBytes <= ( STM_MAX_PENDING_WRITE >> 1 ) )
+        if( ( ( qwPkts > 0 &&
+            qwPkts <= ( STM_MAX_PACKETS_REPORT >> 3 ) ) &&
+            ( qwBytes > 0 &&
+                qwBytes <= ( STM_MAX_PENDING_WRITE >> 8 ) ) )
             break;
 
         BufPtr ptrBuf( true );

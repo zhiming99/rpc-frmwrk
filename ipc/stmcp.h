@@ -38,7 +38,7 @@ class CStreamQueue
     CStmConnPoint* m_pParent = nullptr;
 
     // server side lock
-    stdrmutex m_oLock;
+    stdmutex m_oLock;
     bool m_bInProcess = false;
     EnumTaskState m_dwState = stateStarting;
     gint32 ProcessIrps();
@@ -50,7 +50,7 @@ public:
     ~CStreamQueue()
     {}
 
-    stdrmutex& GetLock()
+    stdmutex& GetLock()
     { return m_oLock; }
 
     void SetParent( CStmConnPoint* pParent )
@@ -73,9 +73,7 @@ public:
     gint32 CancelAllIrps( gint32 iError );
 
     EnumTaskState GetState() const
-    {
-        return m_dwState;
-    }
+    { return m_dwState; }
     
     void SetState( EnumTaskState dwState );
 };
@@ -135,7 +133,12 @@ class CStmConnPointT
     { return m_oRecvQue.SubmitIrp( pIrp ); };
 
     gint32 Stop()
-    { return 0; }
+    {
+        m_oRecvQue.SetState( stateStopping );
+        m_oRecvQue.CancelAllIrps();
+        m_oRecvQue.SetState( stateStopped );
+        return 0;
+    }
 };
 
 }
