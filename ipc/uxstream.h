@@ -1306,36 +1306,7 @@ class CUnixSockStream:
 
     virtual gint32 OnPostStart(
         IEventSink* pContext )
-    {
-        gint32 ret = 0;
-
-        do{
-            // start the data reading
-            CParamList oParams;
-            oParams.SetPointer( propIfPtr, this );
-            oParams.SetPointer( propIoMgr, this );
-            oParams.CopyProp( propTimeoutSec, this );
-            oParams.CopyProp(
-                propKeepAliveSec, this );
-
-            oParams.Push( ( bool )true );
-
-            ret = m_pReadingTask.NewObj(
-                clsid( CIfUxSockTransTask ),
-                oParams.GetCfg() );
-            if( ERROR( ret ) )
-                break;
-
-            ret = this->RunManagedTask(
-                m_pReadingTask );
-
-            if( !ERROR( ret ) )
-                ret = 0;
-
-        }while( 0 );
-
-        return ret;
-    }
+    { return 0; }
 
     virtual gint32 OnPreStop( IEventSink* pCallback ) 
     {
