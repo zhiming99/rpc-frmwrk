@@ -76,6 +76,9 @@ public:
     { return m_dwState; }
     
     void SetState( EnumTaskState dwState );
+
+    gint32 Start();
+    gint32 Stop();
 };
 
 class CStmConnPoint : IService
@@ -100,8 +103,7 @@ class CStmConnPoint : IService
     gint32 OnEvent( EnumEventId iEvent,
         LONGWORD dwParam1,
         LONGWORD dwParam2,
-        LONGWORD* pData ) override
-    { return 0; }
+        LONGWORD* pData ) override;
 };
 
 template< bool bProxy >
@@ -132,13 +134,8 @@ class CStmConnPointT
     gint32 SubmitListeningIrp( PIRP pIrp )
     { return m_oRecvQue.SubmitIrp( pIrp ); };
 
-    gint32 Stop()
-    {
-        m_oRecvQue.SetState( stateStopping );
-        m_oRecvQue.CancelAllIrps();
-        m_oRecvQue.SetState( stateStopped );
-        return 0;
-    }
+    inline gint32 Stop()
+    { return m_oRecvQue.Stop(); }
 };
 
 }

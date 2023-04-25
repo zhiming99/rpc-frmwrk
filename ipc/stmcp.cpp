@@ -30,6 +30,26 @@ void CStreamQueue::SetState(
     m_dwState = dwState;
 }
 
+gint32 CStreamQueue::Start() 
+{
+    SetState( stateStarted );
+    return 0;
+}
+
+gint32 CStreamQueue::Stop() 
+{
+    if( true )
+    {
+        CStdMutx oLock( this->GetLock() );
+        if( GetState() == stateStopped )
+            return ERROR_STATE;
+    }
+    SetState( stateStopping );
+    CancelAllIrps();
+    SetState( stateStopped );
+    return 0;
+}
+
 gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
 {
     gint32 ret = 0;
@@ -38,6 +58,12 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
         if( GetState() != stateStarted )
         {
             ret = ERROR_STATE;
+            break;
+        }
+
+        if( m_quePkts.size >= STM_MAX_QUEUE_SIZE )
+        {
+            ret = ERROR_QUEUE_FULL;
             break;
         }
 
@@ -84,6 +110,12 @@ gint32 CStreamQueue::SubmitIrp( IrpPtr& pIrp )
             break;
         }
 
+        if( m_queIrps.size() >= STM_MAX_QUEUE_SIZE )
+        {
+            ret = ERROR_QUEUE_FULL;
+            break;
+        }
+
         if( m_queIrps.size() )
         {
             m_queIrps.push_back( pIrp );
@@ -104,6 +136,13 @@ gint32 CStreamQueue::SubmitIrp( IrpPtr& pIrp )
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         pCtx->SetRespData( pResp );
         pCtx->SetStatus( STATUS_SUCCESS );
+        if( m_quePkts.size() ==
+            STM_MAX_QUEUE_SIZE - 1 )
+        {
+            oLock.Unlock();
+            GetParent()->OnEvent( eventResumed,
+                0, 0, ( guint32* )this );
+        }
 
     }while( 0 );
 
@@ -136,22 +175,35 @@ gint32 CStreamQueue::ProcessIrps()
             IrpPtr pIrp = m_queIrps.front();
             m_queIrps.pop_front( pIrp );
             BufPtr pResp = m_quePkts.front();
+            m_quePkts.pop_front();
             oLock.Unlock();
 
+            bool bPutBack = false;
             CStdRMutex oIrpLock( pIrp->GetLock() );
-            if( !pIrp->CanContinue( IRP_STATE_READY ) )
+            if( pIrp->CanContinue( IRP_STATE_READY ) )
             {
-                oLock.Lock();
-                continue;
+                IrpCtxPtr& pCtx = pIrp->GetTopStack();
+                pCtx->SetRespData( pResp );
+                pCtx->SetStatus( STATUS_SUCCESS );
+                oIrpLock.Unlock();
+                pMgr->CompleteIrp( pIrp );
             }
-            IrpCtxPtr& pCtx = pIrp->GetTopStack();
-            pCtx->SetRespData( pResp );
-            pCtx->SetStatus( STATUS_SUCCESS );
-            oIrpLock.Unlock();
-
-            pMgr->CompleteIrp( pIrp );
+            else
+            {
+                oIrpLock.Unlock();
+                bPutBack = true;
+            }
             oLock.Lock();
-            m_quePkts.pop_front();
+            if( bPutBack )
+                m_quePkts.push_front( pResp );
+            guint32 dwCount = m_quePkts.size();
+            if( !bPutBack &&
+                dwCount == STM_MAX_QUEUE_SIZE - 1 )
+            {
+                GetParent()->OnEvent( eventResumed,
+                    0, 0, ( guint32* )this );
+            }
+            oLock.Lock();
         }
         m_bInProcess = false;
 
@@ -225,15 +277,12 @@ CStmConnPoint::CStmConnPoint(
 gint32 CStmConnPoint::Start()
 {
     gint32 ret = 0;
-    do{
-        gint32 iCount = sizeof( m_arrQues ) /
-            sizeof( m_arrQues[ 0 ] )
 
-        for( gint32 i = 0; i < iCount; i++ )
-            m_arrQues[ i ].SetState(
-                stateStarted );
+    gint32 iCount = sizeof( m_arrQues ) /
+        sizeof( m_arrQues[ 0 ] )
 
-    }while( 0 );
+    for( gint32 i = 0; i < iCount; i++ )
+        m_arrQues[ i ].Start();
 
     return ret;
 }
@@ -246,17 +295,45 @@ gint32 CStmConnPoint::Stop()
             sizeof( m_arrQues[ 0 ] )
 
         for( gint32 i = 0; i < iCount; i++ )
-        {
-            m_arrQues[ i ].SetState(
-                stateStopping );
-
-            m_arrQues[ i ].CancelAllIrps();
-
-            m_arrQues[ i ].SetState(
-                stateStopped );
-        }
+            m_arrQues[ i ].Stop();
 
     }while( 0 );
     return ret;
 }
 
+gint32 CStmConnPoint::OnEvent(
+    EnumEventId iEvent,
+    LONGWORD dwParam1,
+    LONGWORD dwParam2,
+    LONGWORD* pData )
+{
+    gint32 ret = 0;
+    switch( iEvent )
+    {
+    case eventResumed:
+        {
+            auto pQue = reinterpret_cast
+                < CStreamQueue* >( pData );
+
+            guint32 dwIdx = ( pQue - m_arrQues ) /
+                sizeof( *pQue );
+
+            if( dwIdx >= 2 )
+            {
+                ret = -ERANGE;
+                break;
+            }
+
+            dwIdx ^= 1;
+
+            BufPtr pBuf( true );
+            pBuf->Resize( 1 );
+            *pBuf->ptr() = tokLift;
+            m_arrQues[ dwIdx ].QueuePacket( pBuf );
+            break;
+        }
+    default:
+        break;
+    }
+    return ret;
+}

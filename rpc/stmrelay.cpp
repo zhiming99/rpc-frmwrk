@@ -2624,6 +2624,8 @@ gint32 CUnixSockStmProxyRelay::OnDataReceivedRemote(
         *ptrBuf = ( guint8 )tokError;
         ptrBuf->Append( ( guint8* )&iRet, sizeof( iRet ) );
         PostUxStreamEvent( tokError, ptrBuf );
+        DebugPrintEx( logErr, -EPROTO,
+            "Error received unwanted packets/bytes" );
 
     }while( 0 );
 
