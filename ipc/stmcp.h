@@ -106,17 +106,16 @@ class CStmConnPoint : IService
         LONGWORD* pData ) override;
 };
 
-template< bool bProxy >
-class CStmConnPointT
+class CStmConnPointHelper
 {
-    ObjPtr m_pObj;
-
+    ObjPtr& m_pObj;
     CStmConnPoint& m_oStmCp;
     CStreamQueue& m_oRecvQue;
     CStreamQueue& m_oSendQue;
 
     public:
-    CStmConnPointT( ObjPtr& pStmCp )
+    CStmConnPointHelper(
+        ObjPtr& pStmCp, bool bProxy )
         m_pObj( pStmCp ),
         m_oStmCp( ( CStmConnPoint& )m_pObj ),
         m_oRecvQue(
@@ -136,6 +135,79 @@ class CStmConnPointT
 
     inline gint32 Stop()
     { return m_oRecvQue.Stop(); }
+};
+
+class CStmCpPdo : public CPort
+{
+    protected:
+
+    gint32 SubmitReadIrp( IRP* pIrp )
+    { return -ENOTSUP; }
+    gint32 SubmitWriteIrp( IRP* pIrp );
+    gint32 SubmitIoctlCmd( IRP* pIrp );
+    gint32 HandleListening( IRP* pIrp );
+    gint32 HandleStreamCommand( IRP* pIrp );
+
+    ObjPtr m_pStmCp;
+    bool   m_bStarter;
+
+    public:
+
+    typedef CPort super;
+
+    // the configuration must includes the
+    // following properties
+    //
+    // propIoMgr
+    //
+    // propBusPortPtr
+    //
+    // 
+    // propPortId
+    //
+    // optional properties:
+    //
+    // propPortClass
+    // propPortName
+    //
+    // ;there must be one of the following two options
+    // propFd for unamed sock creation
+    // propPath for named sock connection
+    //
+    CStmCpPdo( const IConfigDb* pCfg );
+    ~CStmCpPdo();
+
+    virtual gint32 CancelFuncIrp(
+        IRP* pIrp, bool bForce );
+    gint32 RemoveIrpFromMap( IRP* pIrp );
+    virtual gint32 OnSubmitIrp( IRP* pIrp );
+
+    // make the active connection if not connected
+    // yet. Note that, within the PostStart, the
+    // eventPortStarted is not sent yet
+    virtual gint32 PostStart( IRP* pIrp );
+
+	virtual gint32 PreStop( IRP* pIrp );
+
+    // events from the watch task
+    // data received from local sock
+    gint32 OnStmRecv( BufPtr& pBuf );
+
+    gint32 OnUxSockEvent(
+        guint8 byToken, BufPtr& pBuf );
+
+    // the local sock is ready for sending
+    gint32 OnSendReady();
+    inline bool IsConnected()
+    {}
+
+    gint32 SendNotify(
+        guint8 byToken, BufPtr& pBuf );
+
+    gint32 OnPortReady( IRP* pIrp );
+
+    bool IsStarter()
+    { return m_bStarter; }
 };
 
 }

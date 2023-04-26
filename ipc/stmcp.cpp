@@ -337,3 +337,344 @@ gint32 CStmConnPoint::OnEvent(
     }
     return ret;
 }
+
+gint32 CStmCpPdo::CancelFuncIrp(
+    IRP* pIrp, bool bForce )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ret = RemoveIrpFromMap( pIrp );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        pCtx->SetStatus( ret = ERROR_CANCEL );
+
+        oIrpLock.Unlock();
+        super::CancelFuncIrp( pIrp, bForce );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStmCpPdo::SubmitIoctlCmd(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    // let's process the func irps
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
+    do{
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC
+            || pIrp->MinorCmd() != IRP_MN_IOCTL )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->CtrlCode() )
+        {
+        case CTRLCODE_LISTENING:
+            {
+                // server side I/O
+                ret = HandleListening( pIrp );
+                break;
+            }
+        case CTRLCODE_STREAM_CMD:
+            {
+                ret = HandleStreamCommand( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
+
+    return ret;
+}
+
+gint32 CStmCpPdo::HandleListening(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    // let's process the func irps
+    IrpCtxPtr& pCtx = pIrp->GetTopStack();
+    do{
+        CIoWatchTask* pTask = m_pIoWatch;
+        CStdRMutex oPortLock( GetLock() );
+        std::deque< BufPtr >& oEvtQue =
+            m_queEventPackets;
+        if( !oEvtQue.empty() )
+        {
+            BufPtr pBuf = oEvtQue.front();        
+            pCtx->m_pRespData = pBuf;
+            oEvtQue.pop_front();
+            ret = STATUS_SUCCESS;
+            if( m_bFlowCtrl )
+                break;
+            if( oEvtQue.size() ==
+                STM_MAX_QUEUE_SIZE - 1 )
+                pTask->StartWatch( false );
+            break;
+        }
+
+        if( m_queListeningIrps.size() >
+            STM_MAX_QUEUE_SIZE )
+        {
+            // why send read request so many times
+            ret = ERROR_QUEUE_FULL;
+            break;
+        }
+        m_queListeningIrps.push_back( pIrp );
+        ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CStmCpPdo::HandleStreamCommand(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    bool bNotify = false;
+    CIoWatchTask* pTask = m_pIoWatch;
+    if( pTask == nullptr )
+        return -EFAULT;
+
+    // let's process the func irps
+    do{
+
+        CStdRTMutex oTaskLock( pTask->GetLock() );
+        CStdRMutex oPortLock( GetLock() );
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+
+        bool bOut = true;
+        if( pCtx->GetIoDirection() == IRP_DIR_IN )
+            bOut = false;
+
+        if( bOut && m_queWritingIrps.size() >=
+            STM_MAX_QUEUE_SIZE )
+            return ERROR_QUEUE_FULL;
+
+        if( bOut && !m_queWritingIrps.empty() )
+        {
+            m_queWritingIrps.push_back( pIrp );
+            if( m_queWritingIrps.size() ==
+                STM_MAX_QUEUE_SIZE )
+                bNotify = true;
+            ret = STATUS_PENDING;
+            break;
+        }
+            
+        BufPtr pBuf = pCtx->m_pReqData;
+        if( pBuf.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint8 cToken = pBuf->ptr()[ 0 ];
+        switch( cToken )
+        {
+        case tokPong:
+            ret = pTask->SendPingPong( false );
+            break;
+
+        case tokPing:
+            ret = pTask->SendPingPong( true );
+            break;
+
+        case tokProgress:
+            {
+                pBuf->SetOffset( pBuf->offset() +
+                    UXPKT_HEADER_SIZE );
+
+                ret = pTask->WriteStream(
+                    pBuf, tokProgress );
+
+                // pBuf->SetOffset( pBuf->offset() -
+                //     UXPKT_HEADER_SIZE );
+
+                break;
+            }
+        case tokLift:
+            {
+                m_bFlowCtrl = false;
+                if( m_queDataPackets.size() >=
+                    STM_MAX_QUEUE_SIZE )
+                {
+                    // ret = ERROR_FAIL;
+                    break;
+                }
+                pTask->StartWatch( false );
+                break;
+            }
+        case tokFlowCtrl:
+            {
+                m_bFlowCtrl = true;
+                pTask->StopWatch( false );
+                break;
+            }
+        default:
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+        if( ret == STATUS_PENDING )
+        {
+            m_queWritingIrps.push_back( pIrp );
+            if( m_queWritingIrps.size() ==
+                STM_MAX_QUEUE_SIZE )
+                bNotify = true;
+        }
+
+    }while( 0 );
+    if( ret == -EPIPE )
+    {
+        pTask->OnError( ret );
+        return ret;
+    }
+    if( bNotify )
+    {
+        BufPtr pNullBuf;
+        SendNotify( tokFlowCtrl, pNullBuf );
+    }
+
+    return ret;
+}
+
+gint32 CStmCpPdo::OnSubmitIrp(
+    IRP* pIrp )
+{
+
+    gint32 ret = 0;
+    do{
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        // let's process the func irps
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->MinorCmd() )
+        {
+        case IRP_MN_READ:
+            {
+                ret = SubmitReadIrp( pIrp );
+                break;
+            }
+        case IRP_MN_WRITE:
+            {
+                ret = SubmitWriteIrp( pIrp );
+                break;
+            }
+        case IRP_MN_IOCTL:
+            {
+                switch( pIrp->CtrlCode() )
+                {
+                case CTRLCODE_LISTENING:
+                case CTRLCODE_STREAM_CMD:
+                    {
+                        ret = SubmitIoctlCmd( pIrp );
+                        break;
+                    }
+                default:
+                    {
+                        ret = -ENOTSUP;
+                        break;
+                    }
+                }
+
+                if( ret != -ENOTSUP )
+                    break;
+                // fall through
+            }
+        default:
+            {
+                ret = PassUnknownIrp( pIrp );
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+    {
+        pIrp->GetCurCtx()->SetStatus( ret );
+    }
+
+    return ret;
+}
+
+gint32 CStmCpPdo::SubmitWriteIrp(
+    PIRP pIrp )
+{
+    gint32 ret = 0;
+    bool bNotify = false;
+
+    do{
+        if( pIrp == nullptr ||
+            pIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CStmConnPointHelper oh(
+            m_pStmCp, IsStarter() );
+
+    }while( 0 );
+
+    if( ret == -EPIPE )
+    {
+        pTask->OnError( ret );
+        return ret;
+    }
+
+    if( bNotify )
+    {
+        BufPtr pNullBuf( true );
+        SendNotify( tokFlowCtrl, pNullBuf );
+    }
+
+    return ret;
+}
+
