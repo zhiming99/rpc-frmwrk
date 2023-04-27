@@ -420,42 +420,13 @@ gint32 CStmCpPdo::HandleListening(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    gint32 ret = 0;
-
     // let's process the func irps
     IrpCtxPtr& pCtx = pIrp->GetTopStack();
-    do{
-        CIoWatchTask* pTask = m_pIoWatch;
-        CStdRMutex oPortLock( GetLock() );
-        std::deque< BufPtr >& oEvtQue =
-            m_queEventPackets;
-        if( !oEvtQue.empty() )
-        {
-            BufPtr pBuf = oEvtQue.front();        
-            pCtx->m_pRespData = pBuf;
-            oEvtQue.pop_front();
-            ret = STATUS_SUCCESS;
-            if( m_bFlowCtrl )
-                break;
-            if( oEvtQue.size() ==
-                STM_MAX_QUEUE_SIZE - 1 )
-                pTask->StartWatch( false );
-            break;
-        }
+    bool bStarter = this->IsStarter();
+    CStmConnPointHelper oh(
+        m_pStmCp, bStarter );
 
-        if( m_queListeningIrps.size() >
-            STM_MAX_QUEUE_SIZE )
-        {
-            // why send read request so many times
-            ret = ERROR_QUEUE_FULL;
-            break;
-        }
-        m_queListeningIrps.push_back( pIrp );
-        ret = STATUS_PENDING;
-
-    }while( 0 );
-
-    return ret;
+    return  oh.SubmitListeningIrp( pIrp );
 }
 
 gint32 CStmCpPdo::HandleStreamCommand(
@@ -466,85 +437,34 @@ gint32 CStmCpPdo::HandleStreamCommand(
         return -EINVAL;
 
     gint32 ret = 0;
-    bool bNotify = false;
-    CIoWatchTask* pTask = m_pIoWatch;
-    if( pTask == nullptr )
-        return -EFAULT;
-
     // let's process the func irps
     do{
 
-        CStdRTMutex oTaskLock( pTask->GetLock() );
         CStdRMutex oPortLock( GetLock() );
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
 
-        bool bOut = true;
-        if( pCtx->GetIoDirection() == IRP_DIR_IN )
-            bOut = false;
-
-        if( bOut && m_queWritingIrps.size() >=
-            STM_MAX_QUEUE_SIZE )
-            return ERROR_QUEUE_FULL;
-
-        if( bOut && !m_queWritingIrps.empty() )
-        {
-            m_queWritingIrps.push_back( pIrp );
-            if( m_queWritingIrps.size() ==
-                STM_MAX_QUEUE_SIZE )
-                bNotify = true;
-            ret = STATUS_PENDING;
-            break;
-        }
-            
+        bool bStarter = this->IsStarter(); 
         BufPtr pBuf = pCtx->m_pReqData;
-        if( pBuf.IsEmpty() )
+        if( pBuf.IsEmpty() || pBuf->empty() )
         {
             ret = -EINVAL;
             break;
         }
 
+        CStmConnPointHelper oh(
+            m_pStmCp, bStarter );
+
         guint8 cToken = pBuf->ptr()[ 0 ];
         switch( cToken )
         {
         case tokPong:
-            ret = pTask->SendPingPong( false );
-            break;
-
         case tokPing:
-            ret = pTask->SendPingPong( true );
+        case tokProgress:
+            ret = oh.Send( pBuf );
             break;
 
-        case tokProgress:
-            {
-                pBuf->SetOffset( pBuf->offset() +
-                    UXPKT_HEADER_SIZE );
-
-                ret = pTask->WriteStream(
-                    pBuf, tokProgress );
-
-                // pBuf->SetOffset( pBuf->offset() -
-                //     UXPKT_HEADER_SIZE );
-
-                break;
-            }
         case tokLift:
-            {
-                m_bFlowCtrl = false;
-                if( m_queDataPackets.size() >=
-                    STM_MAX_QUEUE_SIZE )
-                {
-                    // ret = ERROR_FAIL;
-                    break;
-                }
-                pTask->StartWatch( false );
-                break;
-            }
         case tokFlowCtrl:
-            {
-                m_bFlowCtrl = true;
-                pTask->StopWatch( false );
-                break;
-            }
         default:
             {
                 ret = -EINVAL;
@@ -552,25 +472,7 @@ gint32 CStmCpPdo::HandleStreamCommand(
             }
         }
 
-        if( ret == STATUS_PENDING )
-        {
-            m_queWritingIrps.push_back( pIrp );
-            if( m_queWritingIrps.size() ==
-                STM_MAX_QUEUE_SIZE )
-                bNotify = true;
-        }
-
     }while( 0 );
-    if( ret == -EPIPE )
-    {
-        pTask->OnError( ret );
-        return ret;
-    }
-    if( bNotify )
-    {
-        BufPtr pNullBuf;
-        SendNotify( tokFlowCtrl, pNullBuf );
-    }
 
     return ret;
 }
@@ -658,22 +560,54 @@ gint32 CStmCpPdo::SubmitWriteIrp(
             ret = -EINVAL;
             break;
         }
+        bool bStarter = IsStarter();
         CStmConnPointHelper oh(
-            m_pStmCp, IsStarter() );
+            m_pStmCp, bStarter );
+
+        IrpCtxPtr& pCtx = pIrp->GetTopStack();
+        BufPtr& pPayload = pCtx->m_pReqData;
+        if( pPayload->IsEmpty() ||
+            pPayload->empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        BufPtr pNewBuf;
+        guint8 byToken = tokData;
+        guint32 dwSize =
+            htonl( pPayload->size() ); 
+
+        if( bStarter ||
+            pPayload->offset() < UXPKT_HEADER_SIZE )
+        {
+            pNewBuf.NewObj();
+
+            ret = pNewBuf->Append( &byToken, 1 );
+            if( ERROR( ret ) )
+                break;
+            ret = pNewBuf->Append(
+                &dwSize, sizeof( dwSize ) );
+            if( ERROR( ret ) )
+                break;
+            ret = pNewBuf->Append( pPayload );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            // non-starter, that is, from router 
+            guint32 dwNewOff = 
+                pPayload->offset() - UXPKT_HEADER_SIZE;
+            pPayload->SetOffset( dwNewOff );
+            pPayload->ptr()[ 0 ] = byToken;
+            memcpy( pPayload->ptr() + 1,
+                &dwSize, sizeof( dwSize ) );
+        }
+
+        ret = oh.Send( pNewBuf );
 
     }while( 0 );
-
-    if( ret == -EPIPE )
-    {
-        pTask->OnError( ret );
-        return ret;
-    }
-
-    if( bNotify )
-    {
-        BufPtr pNullBuf( true );
-        SendNotify( tokFlowCtrl, pNullBuf );
-    }
 
     return ret;
 }
