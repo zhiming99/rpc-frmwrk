@@ -118,3 +118,4 @@
 #define JSON_ATTR_VERIFY_PEER   "VerifyPeer"
 #define JSON_ATTR_HAS_PASSWORD  "HasPassword"
 #define JSON_ATTR_USING_GMSSL   "UsingGmSSL"
+#define JSON_ATTR_NONSOCK_STREAM "NonSockStream"
