@@ -212,8 +212,13 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
             {
                 ret = SSL_CTX_load_verify_locations(
                     m_pSSLCtx, m_strCAFile.c_str(),NULL);
-                DebugPrint( ret,
-                    "SSL_CTX_load_verify_locations failed");
+                if( ret == 0 )
+                {
+                    ret = -EKEYREJECTED;
+                    DebugPrint( ret,
+                        "SSL_CTX_load_verify_locations failed");
+                    break;
+                }
             }
 
             if( m_bVerifyPeer )

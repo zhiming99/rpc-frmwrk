@@ -178,7 +178,7 @@ gint32 CoLoadClassFactories( const char* dir )
 {
     string strPrefix = dir;
     std::vector< stdstr > vecLibs =
-        { "libipc.so", "librpc.so" };
+        { "libipc.so" };
 
     gint32 ret = 0;
     for( auto& elem : vecLibs )
@@ -267,7 +267,7 @@ gint32 CoInitialize( guint32 dwContext )
     if( ERROR( ret ) )
         return ret;
 
-    if( ( dwContext && COINIT_NORPC ) == 0 )
+    if( ( dwContext & COINIT_NORPC ) == 0 )
         ret = CoLoadClassFactories(
             strPath.c_str() );
 

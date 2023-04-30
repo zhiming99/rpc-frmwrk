@@ -123,6 +123,12 @@ void CIfRouterTest::setUp()
             }
 
             pSvc->SetRouterName( MODULE_NAME );
+
+            ret = pSvc->TryLoadClassFactory(
+                "./librpc.so" );
+            if( ERROR( ret ) )
+                break;
+
             ret = pSvc->Start();
         }
         else
