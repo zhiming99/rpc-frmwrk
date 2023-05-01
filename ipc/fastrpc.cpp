@@ -1130,7 +1130,13 @@ gint32 CFastRpcServerBase::OnPreStart(
         ret = oDrvMgr.GetDriver( true,
             DBUS_STREAM_BUS_DRIVER, pDrv );
         if( ERROR( ret ) )
+        {
+            DebugPrintEx( logErr, ret, 
+                "Driver %s is not loaded, "
+                "Please check your config.",
+                DBUS_STREAM_BUS_DRIVER );
             break;
+        }
 
         CDBusStreamBusDrv* pdrv = pDrv;
         if( pdrv == nullptr )

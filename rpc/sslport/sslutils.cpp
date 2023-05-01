@@ -215,8 +215,9 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
                 if( ret == 0 )
                 {
                     ret = -EKEYREJECTED;
-                    DebugPrint( ret,
-                        "SSL_CTX_load_verify_locations failed");
+                    DebugPrintEx( logErr, ret,
+                        "SSL_CTX_load_verify_locations failed with %",
+                        m_strCAFile.c_str() );
                     break;
                 }
             }
@@ -255,8 +256,9 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
                 SSL_FILETYPE_PEM) != 1 )
             {
                 ret = -ENOTSUP;
-                DebugPrint( ret,
-                    "SSL_CTX_use_certificate_file failed");
+                DebugPrintEx( logErr, ret,
+                    "SSL_CTX_use_certificate_file failed with %s",
+                    m_strCertPath.c_str() );
                 break;
             }
 
@@ -265,8 +267,9 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
                 SSL_FILETYPE_PEM ) != 1 )
             {
                 ret = -ENOENT;
-                DebugPrint( ret,
-                    "SSL_CTX_use_PrivateKey_file failed" );
+                DebugPrintEx( logErr, ret,
+                    "SSL_CTX_use_PrivateKey_file failed with %s",
+                    m_strKeyPath.c_str() );
                 break;
             }
 
@@ -276,12 +279,13 @@ gint32 CRpcOpenSSLFidoDrv::InitSSLContext(
                 m_pSSLCtx ) != 1 )
             {
                 ret = ERROR_FAIL;
-                OutputMsg( ret,
+                DebugPrintEx( logErr, ret,
                     "SSL_CTX_check_private_key failed" );
                 break;
             }
 
-            DebugPrint( 0, "certificate and private"
+            DebugPrintEx( logInfo, 0,
+                "certificate and private"
                 "key loaded and verified");
         }
 

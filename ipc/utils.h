@@ -43,6 +43,7 @@ class CTaskThread : public IThread
     TaskQuePtr                  m_pTaskQue;
     sem_t                       m_semSync;
     gint32                      m_iMyTid;
+    std::atomic< bool >         m_bRunning = { true };
 
     gint32 GetHead( TaskletPtr& pTask );
     gint32 PopHead();
@@ -108,7 +109,6 @@ class CTaskThread : public IThread
 
 class COneshotTaskThread : public CTaskThread
 {
-    std::atomic< bool >& m_bTaskDone = super::m_bExit;
     EnumClsid m_iTaskClsid;
     public:
 
@@ -209,6 +209,7 @@ class CIrpCompThread : public IThread
     std::thread                 *m_pServiceThread;
 
     std::map< const IGenericInterface*, gint32 > m_mapIfs;
+    std::atomic< bool >         m_bRunning = { true };
     
 
     public:

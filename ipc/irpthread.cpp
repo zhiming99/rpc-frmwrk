@@ -215,8 +215,9 @@ CTaskThread::~CTaskThread()
 // test if the thread is running
 bool CTaskThread::IsRunning() const
 {
-    return ( m_pServiceThread != nullptr
-        && m_pServiceThread->joinable() );
+    return ( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() &&
+        m_bRunning );
 }
 
 gint32 CTaskThread::GetLoadCount() const
@@ -255,8 +256,7 @@ gint32 CTaskThread::Stop()
 
 void CTaskThread::Join()
 {
-    if( IsRunning() )
-        m_pServiceThread->join();
+    m_pServiceThread->join();
 }
 
 gint32 CTaskThread::SetThreadName(
@@ -334,6 +334,7 @@ void CTaskThread::ThreadProc(
             break;
     }
 
+    m_bRunning = false;
     return;
 }
 
@@ -457,7 +458,8 @@ void COneshotTaskThread::ThreadProc(
     // in case the task is in the queue
     if( m_bExit && !bTaskDone )
         ProcessTask( lContext );
-
+ 
+    m_bRunning = false;
     return;
 }
 
@@ -561,8 +563,9 @@ gint32 CIrpCompThread::Start()
 
 bool CIrpCompThread::IsRunning() const
 {
-    return ( m_pServiceThread != nullptr
-        && m_pServiceThread->joinable() );
+    return ( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() &&
+        m_bRunning );
 }
 
 gint32 CIrpCompThread::ProcessIrps()
@@ -606,6 +609,7 @@ void CIrpCompThread::ThreadProc( void* context )
     }
 
     ProcessIrps();
+    m_bRunning = false;
     return;
 }
 
@@ -655,8 +659,7 @@ gint32 CIrpCompThread::Stop()
 
 void CIrpCompThread::Join()
 {
-    if( IsRunning() )
-        m_pServiceThread->join();
+    m_pServiceThread->join();
 }
 
 gint32 CThreadPool::GetThread(
