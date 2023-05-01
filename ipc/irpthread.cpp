@@ -256,7 +256,9 @@ gint32 CTaskThread::Stop()
 
 void CTaskThread::Join()
 {
-    m_pServiceThread->join();
+    if( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() )
+        m_pServiceThread->join();
 }
 
 gint32 CTaskThread::SetThreadName(
@@ -659,7 +661,9 @@ gint32 CIrpCompThread::Stop()
 
 void CIrpCompThread::Join()
 {
-    m_pServiceThread->join();
+    if( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() )
+        m_pServiceThread->join();
 }
 
 gint32 CThreadPool::GetThread(
