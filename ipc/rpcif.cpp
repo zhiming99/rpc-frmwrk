@@ -2523,6 +2523,49 @@ gint32 CRpcServices::StartEx(
 
     do{
 
+        gint32 (*OnPreStartCompleted)(
+            CTasklet*, CRpcServices* ) =
+        ([]( CTasklet* pCb, CRpcServices* pIf )->gint32
+        {
+            gint32 ret = 0;
+            do{
+                CCfgOpener oCfg( ( IConfigDb* )
+                    pCb->GetConfig() );
+
+                IConfigDb* pResp = nullptr;
+                ret = oCfg.GetPointer(
+                    propRespPtr, pResp );
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oResp( pResp );
+                gint32 iRet = 0;
+                ret = oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& )iRet );
+                if( ERROR( ret ) )
+                    break;
+
+                if( SUCCEEDED( iRet ) )
+                    break;
+
+                // set the interface to
+                // stateStartFailed
+                pIf->SetStateOnEvent(
+                    eventPortStartFailed );
+
+            }while( 0 );
+            return ret;
+        });
+
+        TaskletPtr ppscb;
+        ret = NEW_COMPLETE_FUNCALL( 0,
+            ppscb, this->GetIoMgr(),
+            OnPreStartCompleted, nullptr,
+            this );
+        if( ERROR( ret ) )
+            break;
+
         TaskletPtr pPreStart;
         ret = DEFER_IFCALLEX_NOSCHED2(
             0, pPreStart, ObjPtr( this ),
@@ -2531,6 +2574,10 @@ gint32 CRpcServices::StartEx(
 
         if( ERROR( ret ) )
             break;
+
+        CIfRetryTask* pRetry = pPreStart;
+        pRetry->SetClientNotify( ppscb );
+        pRetry->MarkPending();
 
         TaskletPtr pStartEx2;
         ret = DEFER_IFCALLEX_NOSCHED2(
@@ -4662,6 +4709,15 @@ gint32 CRpcServices::LoadObjDesc(
                 !oIfName.isString() )
                 continue;
             
+            stdstr strIfName =
+                oIfName.asString().substr(
+                0, DBUS_MAXIMUM_NAME_LENGTH );
+            if( strIfName.empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             bool bPausable = false;
             if( oIfDesc.isMember( JSON_ATTR_PAUSABLE ) &&
                 oIfDesc[ JSON_ATTR_PAUSABLE ].isString() &&
@@ -4683,15 +4739,8 @@ gint32 CRpcServices::LoadObjDesc(
                 oIfDesc[ JSON_ATTR_BIND_CLSID ].asString() == "true" )
             {
                 // the master interface
-                strVal = oIfName.asString().substr(
-                    0, DBUS_MAXIMUM_NAME_LENGTH );
-                if( strVal.empty() )
-                {
-                    ret = -EINVAL;
-                    break;
-                }
                 oCfg[ propIfName ] = 
-                    DBUS_IF_NAME( oIfName.asString() );
+                    DBUS_IF_NAME( strIfName );
 
                 if( bPausable )
                     oCfg[ propPausable ] = bPausable;
@@ -4700,6 +4749,17 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg[ propDummyMatch ] = true;
 
                 continue;
+            }
+
+            if( strIfName == "IStream" &&
+                oIfDesc.isMember( JSON_ATTR_NONSOCK_STREAM ) &&
+                oIfDesc[ JSON_ATTR_NONSOCK_STREAM ].isString() )
+            {
+                strVal = oIfDesc[ JSON_ATTR_NONSOCK_STREAM ].asString();
+                if( strVal.size() > 0 && strVal == "true" )
+                    oCfg.SetBoolProp( propNonSockStm, true );
+                else
+                    oCfg.SetBoolProp( propNonSockStm, false );
             }
 
             MatchPtr pMatch;

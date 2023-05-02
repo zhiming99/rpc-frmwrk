@@ -3979,4 +3979,23 @@ class CTaskWrapper :
     gint32 OnIrpComplete( PIRP ) override;
 };
 
+#define NEW_COMPLETE_FUNCALL( _pos, __pTask, pMgr, func, ... ) \
+({ \
+    gint32 ret = 0; \
+    do{ \
+        NEW_FUNCCALL_TASK2( _pos, __pTask, pMgr, func, __VA_ARGS__ );\
+        TaskletPtr ptw; \
+        CCfgOpener oCfg; \
+        oCfg.SetPointer( propIoMgr, pMgr ); \
+        ret = ptw.NewObj( clsid( CTaskWrapper ), \
+            ( IConfigDb* )oCfg.GetCfg() ); \
+        if( ERROR( ret ) ) \
+            break; \
+        CTaskWrapper* pWrapper = ptw;\
+        pWrapper->SetCompleteTask( __pTask ); \
+        __pTask = ptw; \
+    }while( 0 ); \
+    ret; \
+})
+
 }

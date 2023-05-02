@@ -306,7 +306,7 @@ class CFuseObjBase : public CDirEntry
     virtual gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched )
+        bool bRemoveGrp )
     { return -EACCES; }
 
     virtual gint32 fs_opendir(
@@ -601,7 +601,7 @@ class CFuseTextFile : public CFuseObjBase
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched ) override
+        bool bRemoveGrp ) override
     { return -EACCES;}
 
 };
@@ -672,7 +672,7 @@ class CFuseEvtFile : public CFuseFileEntry
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched ) override;
+        bool bRemoveGrp ) override;
 
     gint32 fs_open(
         const char* path,
@@ -1047,7 +1047,7 @@ class CFuseStmFile : public CFuseFileEntry
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched ) override;
+        bool bRemoveGrp ) override;
 
     gint32 fs_ioctl(
         const char *path,
@@ -1408,16 +1408,21 @@ class CFuseServicePoint :
     {
         if( m_strSvcPath.empty() )
         {
+            strPath.clear();
             CDirEntry* pDir = m_pSvcDir.get();
-            if( unlikely( m_pSvcDir == nullptr ) )
+            if( unlikely( pDir == nullptr ) )
                 return -EFAULT;
-            else while( pDir != nullptr )
-            {
+
+            do{
                 stdstr strName = "/";
                 strName.append( pDir->GetName() );
                 strPath.insert( 0, strName );
                 pDir = pDir->GetParent();
-            }
+            }while( !pDir->IsRoot() );
+
+            if( strPath.empty() )
+                return -EINVAL;
+
             m_strSvcPath = strPath;
         }
         else
