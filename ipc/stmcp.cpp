@@ -23,6 +23,9 @@
  */
 #include "stmcp.h"
 
+namespace rpcf
+{
+
 void CStreamQueue::SetState(
     EnumTaskState dwState )
 {
@@ -40,19 +43,32 @@ gint32 CStreamQueue::Stop()
 {
     if( true )
     {
-        CStdMutx oLock( this->GetLock() );
+        CStdMutex oLock( this->GetLock() );
         if( GetState() == stateStopped )
             return ERROR_STATE;
     }
     SetState( stateStopping );
-    CancelAllIrps();
+    CancelAllIrps( ERROR_PORT_STOPPED );
     SetState( stateStopped );
+    GetParent()->OnEvent( eventStop,
+        0, 0, ( LONGWORD* )this );
     return 0;
+}
+
+CIoManager* CStreamQueue::GetIoMgr()
+{
+    if( m_pParent == nullptr )
+        return nullptr;
+    return m_pParent->GetIoMgr();
 }
 
 gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
 {
     gint32 ret = 0;
+    bool bNotify = false;
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
     do{
         CStdMutex oLock( GetLock() );
         if( GetState() != stateStarted )
@@ -61,52 +77,76 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
             break;
         }
 
-        if( m_quePkts.size >= STM_MAX_QUEUE_SIZE )
+        if( m_quePkts.size() >=
+            STM_MAX_QUEUE_SIZE )
         {
             ret = ERROR_QUEUE_FULL;
             break;
         }
 
+        guint8& byToken =
+            ( guint8& )pBuf->ptr()[ 0 ];
         m_quePkts.push_back( pBuf );
+
+        if( m_quePkts.size() ==
+            STM_MAX_QUEUE_SIZE )
+        {
+            if( byToken != tokFlowCtrl &&
+                byToken != tokLift )
+                bNotify = true;
+        }
+
         if( m_bInProcess )
             break;
 
         if( m_queIrps.empty() )
             break;
 
-        TaslketPtr pTask;
-        ret = DEFER_OBJCALL_NOSCHED(
-            pTask, this,
-            &CStreamQueue::ProcessIrps );
+        gint32 (*func )( intptr_t ) = 
+            ( []( intptr_t iQue )->gint32
+            {
+                auto pQue = reinterpret_cast
+                    < CStreamQueue* >( iQue );
+                return pQue->ProcessIrps();
+            });
+
+        TaskletPtr pTask;
+        CIoManager* pMgr = this->GetIoMgr();
+        ret = NEW_FUNCCALL_TASK(
+            pTask, pMgr, func,
+            ( intptr_t )this );
         if( ERROR( ret ) )
             break;
 
         m_bInProcess = true;
-        CIoManager* pMgr = this->GetIoMgr();
         ret = pMgr->RescheduleTask( pTask );
         if( ERROR( ret ) )
+        {
             m_bInProcess = false;
+            break;
+        }
 
     }while( 0 );
+
+    if( bNotify )
+    {
+        GetParent()->OnEvent( eventPaused,
+            0, 0, ( guint64* )this );
+    }
 
     return ret;
 }
 
-gint32 CStreamQueue::SubmitIrp( IrpPtr& pIrp )
+gint32 CStreamQueue::SubmitIrp( PIRP pIrp )
 {
     gint32 ret = 0;
+    if( pIrp == nullptr )
+        return -EINVAL;
     do{
         CStdMutex oLock( GetLock() );
         if( GetState() != stateStarted )
         {
             ret = ERROR_STATE;
-            break;
-        }
-
-        if( m_bInProcess || m_quePkts.empty() )
-        {
-            m_queIrps.push_back( pIrp );
-            ret = STATUS_PENDING;
             break;
         }
 
@@ -116,17 +156,32 @@ gint32 CStreamQueue::SubmitIrp( IrpPtr& pIrp )
             break;
         }
 
+        IrpPtr irpPtr = pIrp;
+        if( m_bInProcess || m_quePkts.empty() )
+        {
+            m_queIrps.push_back( irpPtr );
+            ret = STATUS_PENDING;
+            break;
+        }
+
         if( m_queIrps.size() )
         {
-            m_queIrps.push_back( pIrp );
-            TaslketPtr pTask;
-            ret = DEFER_OBJCALL_NOSCHED(
-                pTask, this,
-                &CStreamQueue::ProcessIrps );
+            m_queIrps.push_back( irpPtr );
+            gint32 (*func )( intptr_t ) = 
+                ( []( intptr_t iQue )->gint32
+                {
+                    auto pQue = reinterpret_cast
+                        < CStreamQueue* >( iQue );
+                    return pQue->ProcessIrps();
+                });
+
+            TaskletPtr pTask;
+            CIoManager* pMgr = this->GetIoMgr();
+            ret = NEW_FUNCCALL_TASK(
+                pTask, pMgr, func,
+                ( intptr_t )this );
             if( ERROR( ret ) )
                 break;
-
-            CIoManager* pMgr = this->GetIoMgr();
             ret = pMgr->RescheduleTask( pTask );
             break;
         }
@@ -141,7 +196,7 @@ gint32 CStreamQueue::SubmitIrp( IrpPtr& pIrp )
         {
             oLock.Unlock();
             GetParent()->OnEvent( eventResumed,
-                0, 0, ( guint32* )this );
+                0, 0, ( LONGWORD* )this );
         }
 
     }while( 0 );
@@ -173,14 +228,15 @@ gint32 CStreamQueue::ProcessIrps()
             m_quePkts.size() )
         {
             IrpPtr pIrp = m_queIrps.front();
-            m_queIrps.pop_front( pIrp );
+            m_queIrps.pop_front();
             BufPtr pResp = m_quePkts.front();
             m_quePkts.pop_front();
             oLock.Unlock();
 
             bool bPutBack = false;
             CStdRMutex oIrpLock( pIrp->GetLock() );
-            if( pIrp->CanContinue( IRP_STATE_READY ) )
+            ret = pIrp->CanContinue( IRP_STATE_READY );
+            if( SUCCEEDED( ret ) )
             {
                 IrpCtxPtr& pCtx = pIrp->GetTopStack();
                 pCtx->SetRespData( pResp );
@@ -200,15 +256,57 @@ gint32 CStreamQueue::ProcessIrps()
             if( !bPutBack &&
                 dwCount == STM_MAX_QUEUE_SIZE - 1 )
             {
+                oLock.Unlock();
                 GetParent()->OnEvent( eventResumed,
-                    0, 0, ( guint32* )this );
+                    0, 0, ( LONGWORD* )this );
+                oLock.Lock();
             }
-            oLock.Lock();
         }
         m_bInProcess = false;
 
     }while( 0 );
 
+
+    return ret;
+}
+
+gint32 CStreamQueue::RemoveIrpFromMap(
+    PIRP pIrp )
+{
+    gint32 ret = 0;
+    if( pIrp == nullptr )
+        return -EINVAL;
+
+    bool bFound = false;
+    do{
+        CStdMutex oLock( this->GetLock() );
+        if( GetState() == stateStopped )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        if( m_queIrps.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        guint64 id = pIrp->GetObjId();
+        auto itr = m_queIrps.begin();
+        while( itr != m_queIrps.end() )
+        {
+            if( ( *itr )->GetObjId() == id )
+            {
+                m_queIrps.erase( itr );
+                bFound = true;
+                break;
+            }
+            itr++;
+        }
+        oLock.Unlock();
+        if( !bFound )
+            ret = -ENOENT;
+
+    }while( 0 );
 
     return ret;
 }
@@ -231,10 +329,13 @@ gint32 CStreamQueue::CancelAllIrps(
         }
 
         std::vector< IrpPtr > vecIrps;
-        vecIrps.insert( m_queIrps.begin(),
+        vecIrps.insert( vecIrps.begin(),
+            m_queIrps.begin(),
             m_queIrps.end() );
+
         m_queIrps.clear();
         m_quePkts.clear();
+
         oLock.Unlock();
 
         for( auto& elem : vecIrps )
@@ -253,15 +354,18 @@ CStmConnPoint::CStmConnPoint(
 {
     gint32 ret = 0;
     do{
+        SetClassId( clsid( CStmConnPoint ) );
         CCfgOpener oCfg( pCfg );
         ret = oCfg.GetPointer(
-            propIoMgr, m_pIoMgr );
+            propIoMgr, m_pMgr );
 
         gint32 iCount = sizeof( m_arrQues ) /
-            sizeof( m_arrQues[ 0 ] )
+            sizeof( m_arrQues[ 0 ] );
 
         for( gint32 i = 0; i < iCount; i++ )
             m_arrQues[ i ].SetParent( this );
+
+        ret = Start();
 
     }while( 0 );
 
@@ -279,7 +383,7 @@ gint32 CStmConnPoint::Start()
     gint32 ret = 0;
 
     gint32 iCount = sizeof( m_arrQues ) /
-        sizeof( m_arrQues[ 0 ] )
+        sizeof( m_arrQues[ 0 ] );
 
     for( gint32 i = 0; i < iCount; i++ )
         m_arrQues[ i ].Start();
@@ -292,7 +396,7 @@ gint32 CStmConnPoint::Stop()
     gint32 ret = 0;
     do{
         gint32 iCount = sizeof( m_arrQues ) /
-            sizeof( m_arrQues[ 0 ] )
+            sizeof( m_arrQues[ 0 ] );
 
         for( gint32 i = 0; i < iCount; i++ )
             m_arrQues[ i ].Stop();
@@ -311,6 +415,8 @@ gint32 CStmConnPoint::OnEvent(
     switch( iEvent )
     {
     case eventResumed:
+    case eventPaused:
+    case eventStop:
         {
             auto pQue = reinterpret_cast
                 < CStreamQueue* >( pData );
@@ -328,7 +434,12 @@ gint32 CStmConnPoint::OnEvent(
 
             BufPtr pBuf( true );
             pBuf->Resize( 1 );
-            *pBuf->ptr() = tokLift;
+            if( iEvent == eventResumed )
+                pBuf->ptr()[ 0 ] = tokLift;
+            else if( iEvent == eventPaused )
+                pBuf->ptr()[ 0 ] = tokFlowCtrl;
+            else
+                pBuf->ptr()[ 0 ] = tokClose;
             m_arrQues[ dwIdx ].QueuePacket( pBuf );
             break;
         }
@@ -336,6 +447,57 @@ gint32 CStmConnPoint::OnEvent(
         break;
     }
     return ret;
+}
+
+CStmCpPdo::CStmCpPdo( const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    SetClassId( clsid( CStmCpPdo ) );
+    this->m_dwFlags &= ~PORTFLG_TYPE_MASK;
+    this->m_dwFlags |= PORTFLG_TYPE_PDO;
+
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = 0;
+
+    do{
+        ret = oCfg.GetPointer(
+            propBusPortPtr, m_pBusPort );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oCfg.GetObjPtr(
+            propStmConnPt, m_pStmCp );
+        if( ERROR( ret ) )
+            break;
+
+        oCfg.GetBoolProp(
+            propStarter, m_bStarter );
+
+        CCfgOpenerObj oPortCfg( this );
+        oPortCfg.RemoveProperty(
+            propStmConnPt );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        throw std::runtime_error(
+            "Error in CStmCpPdo ctor" );
+    }
+}
+
+gint32 CStmCpPdo::RemoveIrpFromMap(
+    PIRP pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    bool bStarter = this->IsStarter();
+    CStmConnPointHelper oh(
+        m_pStmCp, bStarter );
+    return oh.RemoveIrpFromMap( pIrp );
 }
 
 gint32 CStmCpPdo::CancelFuncIrp(
@@ -566,7 +728,7 @@ gint32 CStmCpPdo::SubmitWriteIrp(
 
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         BufPtr& pPayload = pCtx->m_pReqData;
-        if( pPayload->IsEmpty() ||
+        if( pPayload.IsEmpty() ||
             pPayload->empty() )
         {
             ret = -EINVAL;
@@ -586,11 +748,18 @@ gint32 CStmCpPdo::SubmitWriteIrp(
             ret = pNewBuf->Append( &byToken, 1 );
             if( ERROR( ret ) )
                 break;
+
             ret = pNewBuf->Append(
-                &dwSize, sizeof( dwSize ) );
+                ( guint8* )&dwSize,
+                sizeof( dwSize ) );
+
             if( ERROR( ret ) )
                 break;
-            ret = pNewBuf->Append( pPayload );
+
+            ret = pNewBuf->Append(
+                pPayload->ptr(),
+                pPayload->size() );
+
             if( ERROR( ret ) )
                 break;
         }
@@ -600,9 +769,15 @@ gint32 CStmCpPdo::SubmitWriteIrp(
             guint32 dwNewOff = 
                 pPayload->offset() - UXPKT_HEADER_SIZE;
             pPayload->SetOffset( dwNewOff );
+
             pPayload->ptr()[ 0 ] = byToken;
-            memcpy( pPayload->ptr() + 1,
-                &dwSize, sizeof( dwSize ) );
+            char* dest = pPayload->ptr() + 1;
+            char* src = ( char* )&dwSize;
+            dest[ 0 ] = src[ 0 ];
+            dest[ 1 ] = src[ 1 ];
+            dest[ 2 ] = src[ 2 ];
+            dest[ 3 ] = src[ 3 ];
+            pNewBuf = pPayload;
         }
 
         ret = oh.Send( pNewBuf );
@@ -612,3 +787,12 @@ gint32 CStmCpPdo::SubmitWriteIrp(
     return ret;
 }
 
+gint32 CStmCpPdo::PreStop( IRP* pIrp )
+{
+    CStmConnPointHelper oh(
+        m_pStmCp, this->IsStarter() );
+    oh.Stop();
+    return super::PreStop( pIrp );
+}
+
+}

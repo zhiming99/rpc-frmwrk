@@ -1001,6 +1001,18 @@ gint32 CUnixSockStmState::SetupOpenPortParams(
     return 0;
 }
 
+gint32 CStmCpState::SetupOpenPortParams(
+        IConfigDb* pCfg )
+{
+    CCfgOpener oCfg( pCfg );
+
+    oCfg.CopyProp( propStarter, this );
+    oCfg.CopyProp( propStmConnPt, this );
+    oCfg.CopyProp( propListenOnly, this );
+
+    return 0;
+}
+
 gint32 CRemoteProxyState::SetupOpenPortParams(
         IConfigDb* pCfg )
 {

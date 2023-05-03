@@ -63,18 +63,34 @@ gint32 IStream::CreateUxStream(
     InterfPtr& pIf )
 {
     if( pDataDesc == nullptr ||
-        iClsid == clsid( Invalid ) ||
-        iFd < 0 )
+        iClsid == clsid( Invalid ) )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
         CObjBase* pParent = GetInterface();
-
+        CCfgOpener oDataDesc( pDataDesc );
         CParamList oNewCfg;
 
         oNewCfg.SetBoolProp(
             propIsServer, bServer );
+
+        if( unlikely( this->IsNonSockStm() ) )
+        {
+            oNewCfg.SetBoolProp(
+                propStarter, true );
+        }
+        else if( unlikely( oDataDesc.exist(
+            propStmConnPt ) ) )
+        {
+            oNewCfg.SetBoolProp(
+                propStarter, false );
+        }
+        else if( unlikely( iFd < 0 ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         oNewCfg.SetIntProp(
             propFd, ( guint32& )iFd );
@@ -83,7 +99,6 @@ gint32 IStream::CreateUxStream(
             propParentPtr, pParent ); 
 
         guint32 dwTimeoutSec = 0;
-        CCfgOpener oDataDesc( pDataDesc );
         ret = oDataDesc.GetIntProp(
             propTimeoutSec, dwTimeoutSec );
         if( ERROR( ret ) )
@@ -565,11 +580,19 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
 
         bool& bServer = m_bServer;
 
-        EnumClsid iClsid =
-            clsid( CUnixSockStmProxy );
-
+        EnumClsid iClsid = clsid( Invalid );
         if( bServer )
             iClsid = clsid( CUnixSockStmServer );
+        else
+            iClsid = clsid( CUnixSockStmProxy );
+
+        ObjPtr pStmCp;
+        if( pStream->IsNonSockStm() )
+        {
+            oCfg.GetObjPtr(
+                propStmConnPt, pStmCp );
+            oCfg.RemoveProperty( propStmConnPt );
+        }
 
         guint32 dwFd = 0;
         ret = oCfg.GetIntProp( propFd, dwFd );
@@ -600,6 +623,14 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             if( ERROR( ret ) )
                 break;
 
+        }
+
+        if( pStream->IsNonSockStm() )
+        {
+            CCfgOpenerObj oIfCfg(
+                ( CObjBase* )pUxIf );
+            oIfCfg.SetObjPtr(
+                propStmConnPt, pStmCp );
         }
 
         // dataDesc for response
@@ -784,7 +815,20 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
             oResp.Push( 0 );
             oResp.Push( 0 );
-
+            if( pStream->IsNonSockStm() )
+            {
+                // the fd is invalid
+                oResp.SetBoolProp( propNonFd, true );
+                CCfgOpenerObj oUxCfg( pSvc );
+                CObjBase* pObj;
+                ret = oUxCfg.GetPointer(
+                    propStmConnPt, pObj );
+                if( ERROR( ret ) )
+                    break;
+                oDataDesc.SetQwordProp(
+                    propStmConnPt, ( guint64 )pObj );
+                pObj->AddRef();
+            }
         }
         else
         {
@@ -934,6 +978,7 @@ gint32 CStreamProxy::OpenChannel(
     gint32 ret = 0;
     fd = -1;
     do{
+        CIoManager* pMgr = this->GetIoMgr();
         CCfgOpener oDesc( pDataDesc );
         // add the iid to the data desc
         oDesc.SetIntProp(
@@ -946,12 +991,32 @@ gint32 CStreamProxy::OpenChannel(
         // CUnixSockStream
         CParamList oParams;
         oParams[ propIfPtr ] = ObjPtr( this );
-        oParams[ propIoMgr ] = ObjPtr( GetIoMgr() );
+        oParams[ propIoMgr ] = ObjPtr( pMgr );
         oParams[ propFd ] = ( guint32 )fd;
         oParams[ propIsServer ] = ( bool )false;
         oParams[ propEventSink ] = ObjPtr( pCallback );
 
         oParams.Push( ObjPtr( pDataDesc ) );
+
+        ObjPtr pStmCp;
+        if( this->IsNonSockStm() )
+        {
+            CCfgOpener oCpCfg;
+            oCpCfg.SetPointer( propIoMgr, pMgr );
+            ret = pStmCp.NewObj(
+                clsid( CStmConnPoint ),
+                oCpCfg.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            CObjBase* pObj = pStmCp;
+            oDesc.SetQwordProp(
+                propStmConnPt, ( guint64 )pObj );
+
+            pStmCp->AddRef();
+            oParams.SetObjPtr(
+                propStmConnPt, pStmCp );
+        }
 
         // creation will happen when the FETCH_DATA
         // request succeeds
@@ -977,6 +1042,8 @@ gint32 CStreamProxy::OpenChannel(
 
         if( ERROR( ret ) )
         {
+            if( !pStmCp.IsEmpty() )
+                pStmCp->Release();
             ( *pTask )( eventCancelTask );
             break;
         }
@@ -1026,7 +1093,6 @@ gint32 CStreamProxy::OpenChannel(
             return 0;
         });
 
-        CIoManager* pMgr = GetIoMgr();
         TaskletPtr pActCall;
         ret = NEW_FUNCCALL_TASK(
             pActCall, pMgr, func,
@@ -1290,13 +1356,29 @@ gint32 CStreamServer::OpenChannel(
     int iRemote = -1, iLocal = -1;
 
     do{
-        ret = CreateSocket( iLocal, iRemote );
-        if( ERROR( ret ) )
-            break;
-
+        CIoManager* pMgr = this->GetIoMgr();
+        ObjPtr pStmCp;
         CParamList oParams;
+        if( !this->IsNonSockStm() )
+        {
+            ret = CreateSocket( iLocal, iRemote );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            CCfgOpener oCpCfg;
+            oCpCfg.SetPointer( propIoMgr, pMgr );
+            ret = pStmCp.NewObj(
+                clsid( CStmConnPoint ),
+                oCpCfg.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            oParams[ propStmConnPt ] = pStmCp;
+        }
+
         oParams[ propIfPtr ] = ObjPtr( this );
-        oParams[ propIoMgr ] = ObjPtr( GetIoMgr() );
+        oParams[ propIoMgr ] = ObjPtr( pMgr );
         oParams[ propFd ] = iLocal;
         oParams[ propEventSink ] = ObjPtr( pCallback );
         oParams[ propIsServer ] = ( bool )true;

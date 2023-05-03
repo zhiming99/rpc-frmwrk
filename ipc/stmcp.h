@@ -24,13 +24,19 @@
 
 #pragma once
 
-#include "configdb.h"
 #include "defines.h"
+#include "frmwrk.h"
+#include "portdrv.h"
+#include "port.h"
+#include "emaphelp.h"
+#include "iftasks.h"
 #include "ifhelper.h"
+#include "uxport.h"
 
 namespace rpcf
 {
 
+class CStmConnPoint;
 class CStreamQueue
 {
     std::deque< IrpPtr > m_queIrps;
@@ -38,10 +44,9 @@ class CStreamQueue
     CStmConnPoint* m_pParent = nullptr;
 
     // server side lock
-    stdmutex m_oLock;
+    mutable stdmutex m_oLock;
     bool m_bInProcess = false;
     EnumTaskState m_dwState = stateStarting;
-    gint32 ProcessIrps();
 
 public:
 
@@ -50,7 +55,7 @@ public:
     ~CStreamQueue()
     {}
 
-    stdmutex& GetLock()
+    inline stdmutex& GetLock() const
     { return m_oLock; }
 
     void SetParent( CStmConnPoint* pParent )
@@ -59,18 +64,13 @@ public:
     inline CStmConnPoint* GetParent()
     { return m_pParent; }
 
-    inline CIoManager* GetIoMgr()
-    {
-        if( m_pParent == nullptr )
-            return nullptr;
-        return m_pParent->GetIoMgr();
-    }
-
+    CIoManager* GetIoMgr();
     gint32 QueuePacket( BufPtr& pBuf );
-    gint32 SubmitIrp( IrpPtr& pIrp );
+    gint32 SubmitIrp( PIRP pIrp );
 
     // cancel all the irps held by this conn
     gint32 CancelAllIrps( gint32 iError );
+    gint32 RemoveIrpFromMap( PIRP pIrp );
 
     EnumTaskState GetState() const
     { return m_dwState; }
@@ -79,9 +79,10 @@ public:
 
     gint32 Start();
     gint32 Stop();
+    gint32 ProcessIrps();
 };
 
-class CStmConnPoint : IService
+class CStmConnPoint : public IService
 {
     CStreamQueue m_arrQues[ 2 ];
 
@@ -95,7 +96,7 @@ class CStmConnPoint : IService
     { return bProxy ? m_oQue2Cli : m_oQue2Svr; }
 
     inline CIoManager* GetIoMgr()
-    { return m_pIoMgr; }
+    { return m_pMgr; }
 
     gint32 Start() override;
     gint32 Stop() override;
@@ -115,16 +116,16 @@ class CStmConnPointHelper
 
     public:
     CStmConnPointHelper(
-        ObjPtr& pStmCp, bool bProxy )
+        ObjPtr& pStmCp, bool bProxy ) :
         m_pObj( pStmCp ),
-        m_oStmCp( ( CStmConnPoint& )m_pObj ),
+        m_oStmCp( *( CStmConnPoint* )m_pObj ),
         m_oRecvQue(
             m_oStmCp.GetQueue( bProxy ) ),
         m_oSendQue(
-            m_oStmCp.GetQueue( !bProxy ) ),
+            m_oStmCp.GetQueue( !bProxy ) )
     {}
 
-    ~CStmCConnPointT( ObjPtr pStmCp )
+    ~CStmConnPointHelper()
     {}
 
     gint32 Send( BufPtr& pBuf )
@@ -135,6 +136,9 @@ class CStmConnPointHelper
 
     inline gint32 Stop()
     { return m_oRecvQue.Stop(); }
+
+    gint32 RemoveIrpFromMap( PIRP pIrp )
+    { return m_oRecvQue.RemoveIrpFromMap( pIrp ); }
 };
 
 class CStmCpPdo : public CPort
@@ -149,7 +153,7 @@ class CStmCpPdo : public CPort
     gint32 HandleStreamCommand( IRP* pIrp );
 
     ObjPtr m_pStmCp;
-    bool   m_bStarter;
+    bool   m_bStarter = false;
 
     public:
 
@@ -159,52 +163,23 @@ class CStmCpPdo : public CPort
     // following properties
     //
     // propIoMgr
-    //
     // propBusPortPtr
-    //
-    // 
     // propPortId
     //
     // optional properties:
-    //
     // propPortClass
     // propPortName
     //
-    // ;there must be one of the following two options
-    // propFd for unamed sock creation
-    // propPath for named sock connection
-    //
     CStmCpPdo( const IConfigDb* pCfg );
-    ~CStmCpPdo();
+    ~CStmCpPdo()
+    {}
 
     virtual gint32 CancelFuncIrp(
         IRP* pIrp, bool bForce );
     gint32 RemoveIrpFromMap( IRP* pIrp );
     virtual gint32 OnSubmitIrp( IRP* pIrp );
 
-    // make the active connection if not connected
-    // yet. Note that, within the PostStart, the
-    // eventPortStarted is not sent yet
-    virtual gint32 PostStart( IRP* pIrp );
-
-	virtual gint32 PreStop( IRP* pIrp );
-
-    // events from the watch task
-    // data received from local sock
-    gint32 OnStmRecv( BufPtr& pBuf );
-
-    gint32 OnUxSockEvent(
-        guint8 byToken, BufPtr& pBuf );
-
-    // the local sock is ready for sending
-    gint32 OnSendReady();
-    inline bool IsConnected()
-    {}
-
-    gint32 SendNotify(
-        guint8 byToken, BufPtr& pBuf );
-
-    gint32 OnPortReady( IRP* pIrp );
+    gint32 PreStop( IRP* pIrp );
 
     bool IsStarter()
     { return m_bStarter; }

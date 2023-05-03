@@ -425,6 +425,23 @@ class CUnixSockStmState : public CLocalProxyState
     
     gint32 SetupOpenPortParams(
         IConfigDb* pCfg );
+
+    gint32 SubscribeEvents()
+    { return 0; }
+};
+
+class CStmCpState : public CLocalProxyState
+{
+    public:
+    typedef CLocalProxyState super;
+    CStmCpState( const IConfigDb* pCfg )
+        :super( pCfg )
+    { SetClassId( clsid( CStmCpState ) ); }
+    
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg );
+    gint32 SubscribeEvents()
+    { return 0; }
 };
 
 class CDummyInterfaceState : public CLocalProxyState

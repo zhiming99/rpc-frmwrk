@@ -456,6 +456,10 @@ class CUnixSockBusPort :
         IConfigDb* pConfig,
         PortPtr& pNewPort );
 
+    gint32 CreateStmCpPdo(
+        IConfigDb* pCfg,
+        PortPtr& pNewPort );
+
     public:
     typedef CGenericBusPortEx super;
     CUnixSockBusPort( const IConfigDb* pCfg ) :

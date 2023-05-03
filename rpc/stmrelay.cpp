@@ -23,6 +23,7 @@
 
 #include "rpcroute.h"
 #include "stmrelay.h"
+#include "stmcp.h"
 
 namespace rpcf
 {
@@ -261,6 +262,22 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
+        ObjPtr pscp;
+        CStmConnPoint* pStmCp = nullptr;
+        CCfgOpener oDesc( pDataDesc );
+        if( pDataDesc->exist( propStmConnPt ) )
+        {
+            guint64 qwStmCp = 0;
+            ret = oDesc.GetQwordProp(
+                propStmConnPt, qwStmCp );
+            if( ERROR( ret ) )
+                break;
+            pStmCp = reinterpret_cast
+                < CStmConnPoint* >( qwStmCp );
+            pscp = pStmCp;
+            pStmCp->Release();
+        }
+
         // we need to do the following things
         // before reponse to the remote client
         //
@@ -279,6 +296,13 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         oUxIf.SetIntProp( propStreamId,
             ( guint32& )iStmId );
+
+
+        if( !pscp.IsEmpty() )
+        {
+            oDesc.RemoveProperty( propStmConnPt );
+            oUxIf.SetObjPtr( propStmConnPt, pscp );
+        }
 
         // use CIfUxListeningRelayTask to
         // receive incoming stream as well as
@@ -418,15 +442,31 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             break;
         }
 
-        // time to create uxstream object
-        ret = CreateSocket( iLocal, iRemote );
-        if( ERROR( ret ) )
-            break;
-
         IConfigDb* pDataDesc = nullptr;
         ret = oResp.GetPointer( 0, pDataDesc );
         if( ERROR( ret ) )
             break;
+
+        ObjPtr pStmCp;
+        if( !pContext->exist( propStmConnPt ) )
+        {
+            // time to create uxstream object
+            ret = CreateSocket( iLocal, iRemote );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            ret = oCtx.GetObjPtr(
+                propStmConnPt, pStmCp );
+            if( ERROR( ret ) )
+                break;
+            CObjBase* pObj = pStmCp;
+            CCfgOpener oDesc( pDataDesc );
+            oDesc.SetQwordProp(
+                propStmConnPt, ( guint64 )pObj );
+            pObj->AddRef();
+        }
 
         InterfPtr pUxIf;
         ret = CreateUxStream( pDataDesc, iLocal,
@@ -443,6 +483,8 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             ( guint32& )iStmId );
 
         oUxIf.SetBoolProp( propListenOnly, true );
+        if( !pStmCp.IsEmpty() )
+            oUxIf.SetObjPtr( propStmConnPt, pStmCp );
 
         CParamList oParams;
         oParams[ propIsServer ] = ( bool )true;
@@ -690,8 +732,27 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
             break;
         }
 
+        ObjPtr pscp;
+        if( pDataDesc->exist( propStmConnPt ) )
+        {
+            guint64 qwStmCp;
+            CCfgOpener oDesc( pDataDesc );
+            oDesc.GetQwordProp(
+                propStmConnPt, qwStmCp );
+            CStmConnPoint* pStmCp = reinterpret_cast
+                < CStmConnPoint* >( qwStmCp );
+            pscp = pStmCp;
+            pStmCp->Release();
+            oDesc.RemoveProperty( propStmConnPt );
+        }
+
         gint32 iStmId = -1;
         oContext.Push( ObjPtr( pDataDesc ) );
+        if( !pscp.IsEmpty() )
+        {
+            oContext.SetObjPtr(
+                propStmConnPt, pscp );
+        }
 
         TaskletPtr pWrapper;
         ret = NEW_PROXY_RESP_HANDLER2(

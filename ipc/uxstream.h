@@ -352,6 +352,88 @@ class CUnixSockStream:
 
     static CfgPtr InitCfg( const IConfigDb* pCfg )
     {
+        gint32 ret = 0;
+        CfgPtr pRet;
+        do{
+            CCfgOpener oCfg( pCfg );
+            bool bNonSockStm = false;
+            if( oCfg.exist( propStarter ) )
+            {
+                bNonSockStm = true;
+            }
+            else
+            {
+                IConfigDb* pDesc = nullptr;
+                ret = oCfg.GetPointer( 0, pDesc );
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oDesc( pDesc );
+                if( oDesc.exist( propStmConnPt ) )
+                {
+                    bNonSockStm = true;
+                    oCfg.SetBoolProp(
+                        propStarter, false );
+                }
+            }
+            if( unlikely( bNonSockStm ) )
+                pRet = InitCfg_Stmcp( pCfg );
+            else
+                pRet = InitCfg_Uxsock( pCfg );
+
+        }while( 0 );
+
+        if( ERROR( ret ) )
+        {
+            throw std::invalid_argument(
+                DebugMsg( -EINVAL, "Error occurs" ) );
+        }
+        return pRet;
+    }
+
+    static CfgPtr InitCfg_Stmcp(
+        const IConfigDb* pCfg )
+    {
+        // since it is a system provided interface,
+        // we make a config manually at present.
+        gint32 ret = 0;
+
+        CfgPtr pNewCfg =
+            InitCfg_Uxsock( pCfg );
+
+        CCfgOpener oNewCfg(
+            ( IConfigDb* )pNewCfg );
+
+
+        do{
+            ret = oNewCfg.SetIntProp(
+                propIfStateClass, 
+                clsid( CStmCpState ) ) ;
+
+            if( ERROR( ret ) )
+                break;
+
+            oNewCfg.SetStrProp( propPortClass,
+                PORT_CLASS_STMCP_PDO );
+
+            oNewCfg.SetIntProp(
+                propPortId, ( guint32 )-1 );
+
+            oNewCfg.RemoveProperty( propFd );
+
+        }while( 0 );
+        
+        if( ERROR( ret ) )
+        {
+            throw std::invalid_argument(
+                DebugMsg( -EINVAL, "Error occurs" ) );
+        }
+        return pNewCfg;
+    }
+
+    static CfgPtr InitCfg_Uxsock(
+        const IConfigDb* pCfg )
+    {
         // since it is a system provided interface,
         // we make a config manually at present.
         CCfgOpener oNewCfg; 
@@ -424,51 +506,23 @@ class CUnixSockStream:
                     propDestDBusName, strDest );
             }
 
-            // build a match
-            MatchPtr pMatch;
-            pMatch.NewObj( clsid( CMessageMatch ) );
-
-            CCfgOpenerObj oMatch(
-                ( CObjBase* )pMatch );
-
-            oMatch.SetStrProp(
-                propObjPath, strVal );
-
-            gint32 iType = matchClient;
-            if( bServer )
-                iType = matchServer;
-
-            oMatch.SetIntProp(
-                propMatchType, iType );
-
             std::string strIfName = DBUS_IF_NAME(
                 UXSOCK_OBJNAME_SERVER );
 
-            oMatch.SetStrProp(
-                propIfName, strIfName );
-
-            oMatch.SetBoolProp(
-                propPausable, false );
-
-            ObjVecPtr pObjVec( true );
-            ( *pObjVec )().push_back( pMatch );
-
-            oNewCfg.SetObjPtr(
-                propObjList, ObjPtr( pObjVec ) );
-
             // for the creation of CInterfaceState
+            EnumMatchType iType =
+                bServer ? matchServer : matchClient;
             oNewCfg[ propIfName ] = strIfName;
             oNewCfg[ propMatchType ] = iType;
-            oNewCfg[ propObjPath ] = strVal;
 
-            strVal = "UnixSockBusPort_0";
+            strVal = PORT_CLASS_UXSOCK_BUS "_0";
             if( !oNewCfg.exist( propBusName ) )
             {
                 oNewCfg.SetStrProp(
                     propBusName, strVal );
             }
 
-            strVal = "UnixSockStmPdo";
+            strVal = PORT_CLASS_UXSOCK_STM_PDO;
             if( !oNewCfg.exist( propPortClass ) )
             {
                 oNewCfg.SetStrProp(
@@ -838,8 +892,8 @@ class CUnixSockStream:
         return 0;
     }
 
-    // only happens when the underlying ux port's
-    // output queue is full.
+    // happens once the underlying ux port's
+    // output queue has free slot
     virtual gint32 OnFCLifted()
     {
         gint32 ret = 0;

@@ -46,6 +46,7 @@
 #include "loopool.h"
 #include "stmport.h"
 #include "fastrpc.h"
+#include "stmcp.h"
 
 #include <dlfcn.h>
 
@@ -184,6 +185,9 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusStreamBusPort );
     INIT_MAP_ENTRYCFG( CDBusStreamBusDrv );
     INIT_MAP_ENTRYCFG( CDBusStreamPdo );
+    INIT_MAP_ENTRYCFG( CStmCpPdo );
+    INIT_MAP_ENTRYCFG( CStmCpState );
+    INIT_MAP_ENTRYCFG( CStmConnPoint );
     INIT_MAP_ENTRYCFG( CIfInvokeMethodTask2 );
     INIT_MAP_ENTRYCFG( CIfStartRecvMsgTask2 );
 
