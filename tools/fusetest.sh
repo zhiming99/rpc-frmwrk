@@ -39,7 +39,7 @@ function stressTest()
 
 /bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 start=\$(date +%s.%N)
-for((i=1;i<200;i++));do
+for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
 done
 wait \`jobs -p\`
