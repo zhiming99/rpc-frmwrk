@@ -1730,10 +1730,20 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
             pSvc->GetPortHandle() != hPort )
             break;
 
-        pSvc->SetStateOnEvent( cmdShutdown );
+        // pSvc->SetStateOnEvent( cmdShutdown );
         // stop at this point could result in segment
         // fault. ClosePort is good.
-        pSvc->ClosePort( nullptr );
+        // pSvc->ClosePort( nullptr );
+
+        TaskletPtr pStopTask;
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pStopTask, ObjPtr( this ),
+            &CRpcServices::StopEx,
+            nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        GetIoMgr()->RescheduleTask( pStopTask );
         
     }while( 0 );
 
