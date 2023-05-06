@@ -71,7 +71,7 @@ AC_ARG_ENABLE([python],
 
 AC_CHECK_PROG([swig], [swig], yes)
 
-case $enable_java in
+case $enable_python in
     yes)
     AC_CHECK_PROG([python3], python3, yes)
     AC_CHECK_PROG([sipbuild], [sip-build], yes)
