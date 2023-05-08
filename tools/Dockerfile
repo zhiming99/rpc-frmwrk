@@ -13,13 +13,15 @@ CMD kinit -k -t /etc/krb5.keytab zhiming || exit 2
 
 RUN apt-get install -y gcc g++ python3 python3-dev python3-pip flex bison \
 libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
-libdbus-1-dev libjsoncpp1 libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
+libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev krb5-kdc krb5-admin-server krb5-user \
-bash net-tools procps swig openjdk-8-jdk-headless;pip3 install numpy wheel
+bash net-tools procps swig openjdk-8-jdk-headless cmake;pip3 install numpy wheel
 RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25
-RUN apt-get -y install git;cd ${HOME} && git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
+RUN apt-get -y install git;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
+RUN cd ${home};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
+RUN cd ${HOME};git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
 RUN cd ${HOME}/rpc-frmwrk && bash cfgsel r && make && make install;\
