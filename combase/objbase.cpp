@@ -318,10 +318,11 @@ gint32 FindInstCfg(
     // relative path
     std::string strFile = "./";
     char buf[ 1024 ];
+    buf[ sizeof( buf ) - 1 ] = 0;
     size_t iSize = std::min(
-        strFileName.size(), sizeof( buf ) - 1 );
+        strFileName.size() + 1, sizeof( buf ) - 1 );
     strncpy( buf,
-        strFileName.c_str(), iSize + 1 );
+        strFileName.c_str(), iSize );
     strFile += basename( buf );
 
     do{
