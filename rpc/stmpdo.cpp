@@ -341,7 +341,11 @@ gint32 CRpcTcpBusPort::LoadPortOptions(
             propRouterRole, dwRole );
 
         if( ERROR( ret ) )
-            dwRole = 1;
+        {
+            DebugPrintEx( logErr, ret,
+                "Cannot determine the role of the rpcrouter" );
+            break;
+        }
 
         CCfgOpener oCfg( pCfg );
         if( dwRole & 0x02 )
@@ -376,7 +380,9 @@ gint32 CRpcTcpBusPort::PostStart(
         }
 
         CCfgOpener oOptions;
-        LoadPortOptions( oOptions.GetCfg() );
+        ret = LoadPortOptions( oOptions.GetCfg() );
+        if( ERROR( ret ) )
+            break;
 
         bool bListening = false;
         oOptions.GetBoolProp(

@@ -77,7 +77,10 @@ CRpcReqForwarder::CRpcReqForwarder(
         ret = pMgr->GetCmdLineOpt(
             propSepConns, m_bSepConns );
         if( ERROR( ret ) )
+        {
             m_bSepConns = false;
+            ret = 0;
+        }
 
         if( !IsRfcEnabled() )
             break;
