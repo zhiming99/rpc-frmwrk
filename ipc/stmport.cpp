@@ -1406,7 +1406,12 @@ gint32 CDBusStreamBusPort::PostStart(
             oCfg.GetCfg() );
 
         if( ERROR( ret ) )
+        {
+            DebugPrintEx( logErr, ret,
+                "Unable to create object %s[0x%x]",
+                strObjName.c_str(), iClsid );
             break;
+        }
 
         // remove the timer as the StartEx has its
         // own timer, we don't need many timers.
