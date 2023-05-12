@@ -212,7 +212,7 @@ function pytest()
         echo release/${appname}svr -d -m ./mpsvr
         release/${appname}svr -d -m ../mpsvr
         sleep 2
-        echo release/${appname}cli -m ./mp
+        echo release/${appname}cli -d -m ./mp
         release/${appname}cli -m ./mp
         popd
         sleep 5
