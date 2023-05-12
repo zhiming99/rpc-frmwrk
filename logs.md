@@ -1,4 +1,13 @@
 ---
+[`Fri May 05 2023 09:51:41 PM Beijing`]   
+1. Code complete the non-socket-stream support. The extensive test can only be done when ridlc can generate the skelton with non-socket-stream enabled.
+2. Next i will add the ridlc the new feature to generate integrated server/proxy with builtin rpcrouter rather than stand-alone rpcrouters, to see the maximum performance gain the non-socket-stream can reach.
+
+[`Sat Apr 22 2023 10:14:15 AM Beijing`]    
+1. We have modulized features `gmssl`, `openssl` `fuse3`, `auth`, `java`, `python`, and `testcases`. All the features are now pluggable at compile time, and can be disabled by adding a `--disable-xxx` when running script `configure` or `cfgsel`.
+2. We have improved the deployment utility by generating the server/client side installer with `rpcfg.py`, which is preferable to the previous `initcfg.json` file. And the installer can install the private keys and certs as well as the system settings.
+3. Next we will move on to add a new uxport to boast the streaming performance to the next level.
+
 [`Sat Apr 15 2023 11:06:44 PM Beijing`]   
 1. The PR remove-lowlevel-rw-fuse is merged and closed.
 2. Next, I will continue to make `fuse` and `auth` modules compile-time pluggable.
