@@ -461,11 +461,10 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
                 propStmConnPt, pStmCp );
             if( ERROR( ret ) )
                 break;
-            CObjBase* pObj = pStmCp;
+
             CCfgOpener oDesc( pDataDesc );
-            oDesc.SetQwordProp(
-                propStmConnPt, ( guint64 )pObj );
-            pObj->AddRef();
+            oDesc.SetQwordProp( propStmConnPt,
+                ( guint64 )( CObjBase*) pStmCp );
         }
 
         InterfPtr pUxIf;

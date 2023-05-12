@@ -24,7 +24,7 @@ RUN cd ${home};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
 RUN cd ${HOME};git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
-RUN cd ${HOME}/rpc-frmwrk && bash cfgsel r && make && make install;\
+RUN cd ${HOME}/rpc-frmwrk && bash cfgsel -r && make && make install;\
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
 ADD ./testcfgs/mincfg.json /root
 RUN python3 /usr/local/bin/rpcf/rpcfgnui.py ${HOME}/mincfg.json

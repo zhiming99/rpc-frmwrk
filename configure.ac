@@ -463,10 +463,11 @@ case $enable_fuse3 in
              fuse/Makefile ])
         FUSE3_RPMLIBS="fuse3-devel,"
         FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcli'
-        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
+        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.hZZZZZ%{_libdir}/rpcf/librtfiles.a'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
         FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcli"
         FUSE3_DEBLIBS=" libfuse3-dev,"
+        FUSE3_DEBHEADERS='usr/lib/*/rpcf/librtfiles.a'
         FUSE3_DEBPKGS="fuse3,libfuse3-3,"
         FUSE3_CFGOPT=
         FEATURES+="+fuse3 "
@@ -612,6 +613,8 @@ AC_SUBST(FUSE3_DEBPKGS)
 AC_SUBST(FUSE3_RPMLIBS)
 AC_SUBST(FUSE3_RPMPKGS)
 AC_SUBST(FUSE3_RPMHEADERS)
+AC_SUBST(FUSE3_DEBHEADERS)
+
 
 AC_SUBST(AUTH_RPMLIBS)
 AC_SUBST(AUTH_RPMFILES)

@@ -724,6 +724,31 @@ class CImplMainFunc :
         ObjPtr& pNode,
         bool bProxy );
     gint32 Output();
+    static gint32 EmitInitContext(
+        bool bProxy, CCppWriter* pWriter );
+    static gint32 EmitInitRouter(
+        bool bProxy, CCppWriter* pWriter );
+    static gint32 EmitRtMainFunc(
+        bool bProxy, CCppWriter* pWriter );
+    static void EmitRtUsage(
+        bool bProxy, CCppWriter* m_pWriter );
+    static gint32 EmitFuseMain(
+        std::vector<ObjPtr>& vecSvcs, 
+        bool bProxy, CCppWriter* pWriter );
+    static gint32 EmitFuseMainContent(
+        std::vector< ObjPtr >& vecSvcs,
+        bool bProxy, CCppWriter* m_pWriter );
+    gint32 EmitNormalMainContent(
+        std::vector< ObjPtr >& vecSvcs );
+    gint32 DeclUserMainFunc(
+        std::vector< ObjPtr >& vecSvcs,
+        bool bDeclare );
+    gint32 CallUserMainFunc(
+        std::vector< ObjPtr >& vecSvcs );
+    static gint32 EmitRtFuseLoop(
+        bool bProxy, CCppWriter* m_pWriter );
+    gint32 EmitUserMainContent(
+        std::vector< ObjPtr >& vecSvcs );
 };
 
 struct CExportBase
@@ -770,6 +795,7 @@ class CExportDrivers :
     CExportDrivers( CWriterBase* pWriter,
         ObjPtr& pNode );
     gint32 Output();
+    gint32 OutputBuiltinRt();
 };
 
 class CExportReadme

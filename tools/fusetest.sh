@@ -17,9 +17,9 @@ function stressTest()
     make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
-    release/TestTypessvr -f mpsvr &
+    release/TestTypessvr -m mpsvr &
     sleep 8 
-    release/TestTypescli -f mp &
+    release/TestTypescli -m mp &
     sleep 4
 
     #make sure TestTypesSvc created
@@ -76,8 +76,8 @@ function mkDirTest()
     make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
-    hostsvr -f mpsvr &
-    hostcli -f mp &
+    hostsvr -m mpsvr &
+    hostcli -m mp &
     sleep 5 
 
     echo loading TestTypes library to server and proxy...
@@ -209,10 +209,10 @@ function pytest()
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
         pushd ./fs
-        echo release/${appname}svr ./mpsvr
+        echo release/${appname}svr -d -m ./mpsvr
         release/${appname}svr ./mpsvr
         sleep 2
-        echo release/${appname}cli -f ./mp
+        echo release/${appname}cli -m ./mp
         release/${appname}cli ./mp
         popd
         sleep 5

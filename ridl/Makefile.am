@@ -50,3 +50,7 @@ endif
 if ENABLE_PYTHON
 ridlc_CPPFLAGS+= -DPYTHON
 endif
+
+if ENABLE_AUTH
+ridlc_CPPFLAGS+= -DAUTH
+endif

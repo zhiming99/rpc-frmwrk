@@ -38,6 +38,7 @@ extern bool g_bMklib;
 extern stdstr g_strLang;
 extern guint32 g_dwFlags;
 extern bool g_bRpcOverStm;
+extern bool g_bBuiltinRt;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -6449,6 +6450,953 @@ CImplMainFunc::CImplMainFunc(
     m_bProxy = bProxy;
 }
 
+gint32 CImplMainFunc::EmitInitRouter(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        Wa( "// create and start the router" );
+        CCOUT << "std::string strRtName = \""
+            << g_strAppName << "_Router\";";
+        NEW_LINE;
+        Wa( "pSvc->SetRouterName( strRtName );" );
+        Wa( "stdstr strDescPath = \"./router.json\";" );
+        Wa( "if( g_bAuth )" );
+        BLOCK_OPEN;
+        Wa( "pSvc->SetCmdLineOpt(" );
+        Wa( "    propHasAuth, g_bAuth );" );
+        CCOUT << "strDescPath = \"./rtauth.json\";";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "CCfgOpener oRtCfg;" );
+        Wa( "oRtCfg.SetStrProp(" );
+            Wa( "propSvrInstName, strRtName );" );
+        Wa( "oRtCfg[ propIoMgr ] = g_pIoMgr;" );
+        Wa( "ret = CRpcServices::LoadObjDesc(" );
+        Wa( "    strDescPath," );
+        Wa( "    OBJNAME_ROUTER," );
+        Wa( "    true, oRtCfg.GetCfg() );" );
+
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+
+        Wa( "oRtCfg[ propIfStateClass ] =" );
+        Wa( "    clsid( CIfRouterMgrState );" );
+
+        CCOUT << "oRtCfg[ propRouterRole ] = "
+            << ( bProxy ? "1;" : "2;" );
+        NEW_LINE;
+
+        Wa( "ret =  g_pRouter.NewObj(" );
+        Wa( "    clsid( CRpcRouterManagerImpl )," );
+        Wa( "    oRtCfg.GetCfg() );" );
+
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+            
+        Wa( "CInterfaceServer* pRouter = g_pRouter;" );
+        Wa( "if( unlikely( pRouter == nullptr ) )" );
+        BLOCK_OPEN;
+        Wa( "ret = -EFAULT;" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "ret = pRouter->Start();" );
+        Wa( "if( ERROR( ret ) )" );
+        BLOCK_OPEN;
+        Wa( "pRouter->Stop();" );
+        Wa( "g_pRouter.Clear();" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+void CImplMainFunc::EmitRtUsage(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    Wa( "void Usage( char* szName )" );
+    BLOCK_OPEN;
+    Wa( "fprintf( stderr," );
+    Wa( "    \"Usage: \%s [OPTION]\\n\"" );
+#ifdef FUSE3
+    if( !bProxy || bFuse )
+        Wa( "    \"\\t [ -m <mount point> to export runtime information via "
+            "'rpcfs' at the directory 'mount point' ]\\n\"" );
+#endif
+#ifdef AUTH
+    Wa( "    \"\\t [ -a to enable authentication ]\\n\"" );
+#endif
+    Wa( "    \"\\t [ -d to run as a daemon ]\\n\"" );
+    CCOUT << "    \"\\t [ -h this help ]\\n\", szName );";
+    BLOCK_CLOSE;
+    NEW_LINE;
+}
+
+gint32 CImplMainFunc::EmitRtFuseLoop(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
+        Wa( "fuse_cmdline_opts opts;" );
+        Wa( "ret = fuseif_daemonize( args, opts, argc, argv );" );
+        CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINES( 2 );
+        CCOUT << "ret = InitRootIf( g_pIoMgr, "
+            << ( bProxy ? "true" : "false" ) << " );";
+        NEW_LINE;
+        CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "CRpcServices* pRt = g_pRouter;" );
+            CCOUT << "ret = AddFilesAndDirs( "
+                << ( bProxy ? "true" : "false" )
+                << ", pRt );";
+            NEW_LINE;
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+        }
+        NEW_LINE;
+        Wa( "args = FUSE_ARGS_INIT(argc, argv);" );
+        Wa( "ret = fuseif_main( args, opts );" );
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+
+        NEW_LINE;
+        Wa( "// Stop the root object" );
+        Wa( "InterfPtr pRoot = GetRootIf();" );
+        Wa( "if( !pRoot.IsEmpty() )" );
+        Wa( "    pRoot->Stop();" );
+        CCOUT << "ReleaseRootIf();";
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplMainFunc::EmitFuseMainContent(
+    std::vector< ObjPtr >& vecSvcs,
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        Wa( "gint32 ret = 0;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
+        Wa( "fuse_cmdline_opts opts;" );
+        Wa( "ret = fuseif_daemonize( args, opts, argc, argv );" );
+        CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINES( 2 );
+        Wa( "ret = InitContext();" );
+        CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINE;
+        CCOUT << "ret = InitRootIf( g_pIoMgr, "
+            << ( bProxy ? "true" : "false" ) << " );";
+        NEW_LINE;
+        CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "CRpcServices* pRt = g_pRouter;" );
+            CCOUT << "ret = AddFilesAndDirs( "
+                << ( bProxy ? "true" : "false" )
+                << ", pRt );";
+            NEW_LINE;
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+        }
+        Wa( "CRpcServices* pRoot = GetRootIf();" );
+        if( vecSvcs.size() )
+        {
+            Wa( "do" );
+            BLOCK_OPEN;
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pSvc = elem;
+                stdstr strSvcName = pSvc->GetName();
+
+                std::string strClass =
+                    std::string( "C" ) + strSvcName;
+                if( bProxy )
+                    strClass += "_CliImpl";
+                else
+                    strClass += "_SvrImpl";
+
+                CCOUT << "// add the "
+                    << strSvcName << " directory";
+                NEW_LINE;
+                CCOUT << "ret = AddSvcPoint(";
+                NEW_LINE;
+                CCOUT << "    \""
+                    << strSvcName << "\",";
+                NEW_LINE;
+                CCOUT << "    \"./"
+                    << g_strAppName << "desc.json\",";
+                NEW_LINE;
+                CCOUT << "    clsid( " << strClass << " ),";
+                NEW_LINE;
+                CCOUT << "    " 
+                    << ( bProxy ? "true" : "false" )
+                    << " );";
+                NEW_LINE;
+                CCOUT << "if( ERROR( ret ) )";
+                NEW_LINE;
+                CCOUT << "    break;";
+                NEW_LINE;
+            }
+        }
+        NEW_LINE;
+        Wa( "args = FUSE_ARGS_INIT(argc, argv);" );
+        Wa( "ret = fuseif_main( args, opts );" );
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+
+        NEW_LINE;
+        Wa( "// Stop the root object" );
+        Wa( "pRoot->Stop();" );
+        CCOUT << "ReleaseRootIf();";
+        NEW_LINE;
+        BLOCK_CLOSE;
+        CCOUT<< "while( 0 );";
+        NEW_LINES( 2 );
+        Wa( "DestroyContext();" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    OutputMsg( ret, \"main(): error occurs\" );" );
+        CCOUT << "return ret;";
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplMainFunc::EmitFuseMain(
+    std::vector< ObjPtr >& vecSvcs,
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        Wa( "int _main( int argc, char** argv )" );
+        BLOCK_OPEN;
+        EmitFuseMainContent(
+            vecSvcs, bProxy, m_pWriter );
+        BLOCK_CLOSE;
+        NEW_LINES(2);
+
+    }while( 0 );
+
+    return ret;
+}
+
+#define EMIT_CONVERT_ARGV \
+do{ \
+    Wa( "// using fuse" ); \
+    Wa( "std::vector< std::string > strArgv;" ); \
+    Wa( "strArgv.push_back( argv[ 0 ] );" ); \
+    Wa( "if( !bDaemon )" ); \
+    Wa( "    strArgv.push_back( \"-f\" );" ); \
+    Wa( "strArgv.push_back( g_strMPoint );" ); \
+ \
+    Wa( "int argcf = strArgv.size();" ); \
+    Wa( "char* argvf[ 100 ];" ); \
+    Wa( "size_t dwCount = std::min(" ); \
+    Wa( "    strArgv.size()," ); \
+    Wa( "    sizeof( argvf ) / sizeof( argvf[ 0 ] ) );" ); \
+ \
+    Wa( "BufPtr pArgBuf( true );" ); \
+    Wa( "size_t dwOff = 0;" ); \
+    Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
+    BLOCK_OPEN; \
+    Wa( "ret = pArgBuf->Append(" ); \
+    Wa( "    strArgv[ i ].c_str()," ); \
+    Wa( "    strArgv[ i ].size() + 1 );" ); \
+    Wa( "if( ERROR( ret ) )" ); \
+    Wa( "    break;" ); \
+    Wa( "argvf[ i ] = ( char* )dwOff;" ); \
+    CCOUT << "dwOff += strArgv[ i ].size() + 1;"; \
+    BLOCK_CLOSE; \
+    NEW_LINE; \
+    Wa( "if( ERROR( ret ) )" ); \
+    Wa( "    break;" ); \
+    Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
+    Wa( "    argvf[ i ] += ( intptr_t )pArgBuf->ptr();" ); \
+}while( 0 )
+
+gint32 CImplMainFunc::EmitRtMainFunc(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        EmitRtUsage( bProxy, m_pWriter );
+        NEW_LINE;
+        Wa( "int _main( int argc, char** argv);" );
+
+        Wa( "int main( int argc, char** argv )" );
+        BLOCK_OPEN;
+        Wa( "bool bDaemon = false;" );
+        Wa( "int opt = 0;" );
+        Wa( "int ret = 0;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        if( !bProxy || bFuse )
+            Wa( "while( ( opt = getopt( argc, argv, \"hadm:\" ) ) != -1 )" );
+        else
+            Wa( "while( ( opt = getopt( argc, argv, \"had\" ) ) != -1 )" );
+        BLOCK_OPEN;
+        Wa( "switch( opt )" );
+        BLOCK_OPEN;
+#ifdef AUTH
+        Wa( "case 'a':" );
+        Wa( "    { g_bAuth = true; break; }" );
+#else
+        CCOUT << "case 'a':";
+        INDENT_UPL;
+        Wa( "{" );
+        Wa( "    fprintf( stderr," );
+        Wa( "        \"Error '-a' cannot be used with AUTH disabled\\n\" );" );
+        Wa( "    ret = -EINVAL;" );
+        Wa( "    break;" );
+        CCOUT << "}";
+        INDENT_DOWNL;
+#endif
+        if( !bProxy || bFuse )
+        {
+#ifdef FUSE3
+            CCOUT << "case 'm':";
+            INDENT_UPL;
+            Wa( "{" );
+            Wa( "    g_strMPoint = optarg;" );
+            Wa( "    if( g_strMPoint.size() > REG_MAX_NAME - 1 )" );
+            Wa( "        ret = -ENAMETOOLONG;" );
+            Wa( "    break;" );
+            CCOUT << "}";
+            INDENT_DOWNL;
+#else
+            CCOUT << "case 'm':";
+            INDENT_UPL;
+            Wa( "{" );
+            Wa( "    fprintf( stderr," );
+            Wa( "        \"Error '-m' cannot be used with FUSE3 disabled\\n\" );" );
+            Wa( "    ret = -EINVAL;" );
+            Wa( "    break;" );
+            CCOUT << "}";
+            INDENT_DOWNL;
+#endif
+        }
+        Wa( "case 'd':" );
+        Wa( "    { bDaemon = true; break; }" );
+        Wa( "case 'h':" );
+        Wa( "default:" );
+        CCOUT << "    { Usage( argv[ 0 ] ); exit( 0 ); }";
+        BLOCK_CLOSE;
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+
+        if( !g_bBuiltinRt )
+        {
+            EMIT_CONVERT_ARGV;
+            CCOUT << "ret = _main( argcf, argvf );";
+            BLOCK_CLOSE;
+            Wa( "while( 0 );" );
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            break;
+        }
+
+        Wa( "if( true )" );
+        BLOCK_OPEN;
+        Wa( "bool bPrompt = false;" );
+        Wa( "bool bExit = false;" );
+        Wa( "ret = CheckForKeyPass( bPrompt );" );
+        Wa( "while( SUCCEEDED( ret ) && bPrompt )" );
+        BLOCK_OPEN;
+        Wa( "char* pPass = getpass( \"SSL Key Password:\" );" );
+        Wa( "if( pPass == nullptr )" );
+        BLOCK_OPEN;
+        Wa( "bExit = true;" );
+        Wa( "ret = -errno;" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "size_t len = strlen( pPass );" );
+        Wa( "len = std::min(" );
+        Wa( "    len, ( size_t )SSL_PASS_MAX );" );
+        Wa( "memcpy( g_szKeyPass, pPass, len );" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "if( bExit )" );
+        CCOUT << "    break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        if( bProxy && !bFuse )
+        {
+            Wa( "if( bDaemon )" );
+            Wa( "    daemon( 1, 0 );" );
+            CCOUT << "ret = _main( argc, argv );";
+            BLOCK_CLOSE;
+            Wa( "while( 0 );" );
+            CCOUT << "return ret;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            break;
+        }
+#ifdef FUSE3
+        if( bFuse )
+        {
+            Wa( "if( g_strMPoint.empty() )" );
+            BLOCK_OPEN;
+            Wa( "ret = -EINVAL;" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        else
+        {
+            // !bProxy && !bFuse
+            Wa( "if( g_strMPoint.empty() )" );
+            BLOCK_OPEN;
+            Wa( "if( bDaemon )" );
+            Wa( "    daemon( 1, 0 );" );
+            Wa( "ret = _main( argc, argv );" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+
+        EMIT_CONVERT_ARGV;
+        CCOUT << "ret = _main( argcf, argvf );";
+#else
+        Wa( "if( bDaemon )" );
+        Wa( "    daemon( 1, 0 );" );
+        CCOUT << "ret = _main( argc, argv );";
+#endif
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplMainFunc::EmitInitContext(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        std::string strModName = g_strTarget;
+        stdstr strSuffix;
+        if( bProxy )
+            strSuffix = "cli";
+        else
+            strSuffix = "svr";
+
+        if( g_bBuiltinRt )
+        {
+            // declare must-have global variables
+#ifdef FUSE3
+            if( !bProxy || bFuse )
+            {
+                Wa( "static std::string g_strMPoint;" );
+                Wa( "extern gint32 AddFilesAndDirs(" );
+                Wa( "    bool bProxy, CRpcServices* pSvc );" );
+            }
+#endif
+            Wa( "static bool g_bAuth = false;" );
+            Wa( "static ObjPtr g_pRouter;" );
+            Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
+            NEW_LINE; 
+            Wa( "namespace rpcf{" );
+            Wa( "extern gint32 CheckForKeyPass(" );
+            Wa( "    bool& bPrompt );" );
+            Wa( "}" );
+            EmitRtMainFunc( bProxy, m_pWriter );
+            NEW_LINE;
+        }
+        else if( bFuse )
+        {
+            Wa( "static std::string g_strMPoint;" );
+            Wa( "static bool g_bAuth = false;" );
+            EmitRtMainFunc( bProxy, m_pWriter );
+            NEW_LINE;
+        }
+
+        Wa( "gint32 InitContext()" );
+        BLOCK_OPEN;
+        Wa( "gint32 ret = CoInitialize( 0 );" );
+        CCOUT << "if( ERROR( ret ) )";
+        INDENT_UPL;
+        CCOUT << "return ret;";
+        INDENT_DOWNL;
+
+        CCOUT << "do";
+        BLOCK_OPEN;
+        CCOUT << "// load class factory for '"
+            << strModName << "'";
+        NEW_LINE;
+        CCOUT << "FactoryPtr p = "
+            << "InitClassFactory();";
+        NEW_LINE;
+        CCOUT << "ret = CoAddClassFactory( p );";
+        NEW_LINE;
+        CCOUT << "if( ERROR( ret ) )";
+        INDENT_UPL;
+        CCOUT << "break;";
+        INDENT_DOWNL;
+        NEW_LINE;
+        Wa( "CParamList oParams;" );
+        CCOUT << "oParams.Push( \""
+            << strModName + strSuffix << "\" );";
+        NEW_LINES( 2 );
+
+        Wa( "// adjust the thread number if necessary" );
+        if( bProxy )
+        {
+            Wa( "oParams[ propMaxIrpThrd ] = 0;" );
+            Wa( "oParams[ propMaxTaskThrd ] = 1;" );
+        }
+        else if( !g_bBuiltinRt )
+        {
+            Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+            Wa( "oParams[ propMaxTaskThrd ] = 2;" );
+        }
+        else
+        {
+            Wa( "guint32 dwNumThrds =" );
+            Wa( "    ( guint32 )std::max( 1U," );
+            Wa( "    std::thread::hardware_concurrency() );" );
+
+            Wa( "if( dwNumThrds > 1 )" );
+            Wa( "    dwNumThrds = ( dwNumThrds >> 1 );" );
+
+            Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
+            Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+        }
+        NEW_LINE;
+
+        CCOUT << "ret = g_pIoMgr.NewObj(";
+        INDENT_UPL;
+        CCOUT << "clsid( CIoManager ), ";
+        NEW_LINE;
+        CCOUT << "oParams.GetCfg() );";
+        INDENT_DOWNL;
+        CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINES( 2 );
+        CCOUT << "CIoManager* pSvc = g_pIoMgr;";
+        NEW_LINE;
+
+        Wa( "pSvc->SetCmdLineOpt(" );
+        CCOUT << "    propRouterRole, "
+            << ( bProxy ? "1 );" : "2 );" );
+        NEW_LINE;
+
+        CCOUT << "ret = pSvc->Start();";
+        NEW_LINE;
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
+
+        if( g_bBuiltinRt )
+            EmitInitRouter( bProxy, m_pWriter );
+
+        BLOCK_CLOSE;
+        CCOUT << "while( 0 );";
+        NEW_LINES( 2 );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        // DestroyContext
+        Wa( "gint32 DestroyContext()" );
+        BLOCK_OPEN;
+        if( g_bBuiltinRt )
+        {
+            Wa( "if( !g_pRouter.IsEmpty() )" );
+            BLOCK_OPEN;
+            Wa( "IService* pRt = g_pRouter;" );
+            Wa( "pRt->Stop();" );
+            CCOUT << "g_pRouter.Clear();";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        Wa( "IService* pSvc = g_pIoMgr;" );
+        Wa( "if( pSvc != nullptr )" );
+        BLOCK_OPEN;
+        Wa( "pSvc->Stop();" );
+        CCOUT << "g_pIoMgr.Clear();";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+        Wa( "CoUninitialize();" );
+
+        CCOUT << "DebugPrintEx( logErr, 0,";
+        INDENT_UPL;
+        CCOUT << "\"#Leaked objects is %d\",";
+        NEW_LINE;
+        CCOUT << "CObjBase::GetActCount() );";
+        INDENT_DOWNL;
+        CCOUT << "return STATUS_SUCCESS;";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplMainFunc::DeclUserMainFunc(
+    std::vector< ObjPtr >& vecSvcs, bool bDecl )
+{
+    gint32 ret = 0;
+    if( vecSvcs.empty() )
+        return -EINVAL;
+    do{
+        bool& bProxy = m_bProxy;
+        stdstr strClass;
+#ifdef FUSE3
+        if( !bProxy && g_bBuiltinRt && !bDecl )
+            Wa( "#include \"fuseif.h\"" );
+#endif
+
+        if( vecSvcs.size() == 1 )
+        {
+            if( bProxy )
+                CCOUT << "gint32 maincli( ";
+            else
+                CCOUT << "gint32 mainsvr( ";
+
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strSvcName = pSvc->GetName();
+
+            strClass = 
+                stdstr( "C" ) + strSvcName;
+
+            if( bProxy )
+                strClass += "_CliImpl";
+            else
+                strClass += "_SvrImpl";
+            CCOUT << strClass << "* pIf, int argc, char** argv )";
+            if( bDecl )
+                CCOUT << ";";
+            NEW_LINE;
+            break;
+        }
+
+        if( bProxy )
+            CCOUT << "gint32 maincli(";
+        else
+            CCOUT << "gint32 mainsvr(";
+
+        INDENT_UPL;
+        for( size_t i = 0; i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            stdstr strSvcName = pSvc->GetName();
+
+            strClass = 
+                std::string( "C" ) + strSvcName;
+            if( bProxy )
+                strClass += "_CliImpl";
+            else
+                strClass += "_SvrImpl";
+            CCOUT << strClass << "* pIf" << i << ",";
+            NEW_LINE;
+        }
+        CCOUT << "int argc, char** argv )";
+        if( bDecl )
+            CCOUT << ";";
+        INDENT_DOWNL;
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplMainFunc::CallUserMainFunc(
+    std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    if( vecSvcs.empty() )
+        return -EINVAL;
+    do{
+        bool& bProxy = m_bProxy;
+        if( vecSvcs.size() == 1 )
+        {
+            if( bProxy )
+                Wa( "ret = maincli( pIf, argc, argv );" );
+            else
+                Wa( "ret = mainsvr( pIf, argc, argv );" );
+            break;
+        }
+
+        if( bProxy )
+            CCOUT << "ret = maincli(";
+        else
+            CCOUT << "ret = mainsvr(";
+        INDENT_UPL;
+        for( size_t i = 0; i < vecSvcs.size(); i++ )
+        {
+            CCOUT <<  "vecIfs[ " << i << " ],";
+            NEW_LINE;
+        }
+        CCOUT << "argc, argv );";
+        INDENT_DOWNL;
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplMainFunc::EmitNormalMainContent(
+        std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    do{
+        bool& bProxy = m_bProxy;
+        Wa( "gint32 ret = 0;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "ret = InitContext();" );
+        CCOUT << "if( ERROR( ret ) )";
+        INDENT_UPL;
+        CCOUT << "break;";
+        INDENT_DOWNL;
+        NEW_LINE;
+        CCOUT << "stdstr strDesc = " << "\"./"
+            << g_strAppName << "desc.json\";";
+        NEW_LINE;
+        CCOUT << "CRpcServices* pSvc = nullptr;";
+        NEW_LINE;
+        Wa( "InterfPtr pIf;" );
+        if( vecSvcs.size() > 1 )
+            Wa( "std::vector< InterfPtr > vecIfs;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "CParamList oParams;" );
+        size_t idx = 0;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strSvcName = pSvc->GetName();
+            stdstr strClass =
+                std::string( "C" ) + strSvcName;
+            if( bProxy )
+                strClass += "_CliImpl";
+            else
+                strClass += "_SvrImpl";
+
+            Wa( "oParams.Clear();" );
+            Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
+            NEW_LINE;
+            Wa( "ret = CRpcServices::LoadObjDesc(" );
+            CCOUT << "    strDesc, \"" << strSvcName << "\",";
+            NEW_LINE;
+            if( bProxy )
+                CCOUT << "    false, oParams.GetCfg() );";
+            else
+                CCOUT << "    true, oParams.GetCfg() );";
+            NEW_LINE;
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINE;
+
+            CCOUT << "ret = pIf.NewObj(";
+            NEW_LINE;
+            CCOUT << "    clsid( " << strClass << " ),";
+            NEW_LINE;
+            CCOUT << "    oParams.GetCfg() );";
+
+            NEW_LINE;
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            NEW_LINE;
+            Wa( "pSvc = pIf;" );
+            CCOUT << "ret = pSvc->Start();";
+            NEW_LINE;
+            if( vecSvcs.size() > 1 )
+            {
+                CCOUT << "vecIfs.push_back( pIf );";
+                NEW_LINE;
+            }
+            CCOUT << "if( ERROR( ret ) )";
+            NEW_LINE;
+            CCOUT << "    break;";
+            if( bProxy )
+            {
+                NEW_LINE;
+                CCOUT << "while( pSvc->GetState()"
+                    << "== stateRecovery )";
+                INDENT_UPL;
+                CCOUT << "sleep( 1 );";
+                INDENT_DOWNL;
+                NEW_LINE;
+                CCOUT << "if( pSvc->GetState() != "
+                    << "stateConnected )";
+                NEW_LINE;
+                BLOCK_OPEN;
+                CCOUT << "ret = ERROR_STATE;";
+                NEW_LINE;
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                if( idx < vecSvcs.size() - 1 )
+                    NEW_LINES( 2 );
+            }
+            else
+            {
+                NEW_LINE;
+                CCOUT << "if( pSvc->GetState()"
+                    << "!= stateConnected )";
+                NEW_LINE;
+                BLOCK_OPEN;
+                CCOUT << "ret = ERROR_STATE;";
+                NEW_LINE;
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                if( idx < vecSvcs.size() - 1 )
+                    NEW_LINES( 2 );
+            }
+        }
+
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        NEW_LINE;
+
+        CCOUT << "if( SUCCEEDED( ret ) )";
+        INDENT_UPL;
+        CallUserMainFunc( vecSvcs );
+        INDENT_DOWNL;
+
+        if( vecSvcs.size() == 1 )
+        {
+            Wa( "// Stopping the object" );
+            Wa( "if( !pIf.IsEmpty() )" );
+            CCOUT << "    pIf->Stop();";
+        }
+        else
+        {
+            Wa( "// Stopping the objects" );
+            Wa( "for( auto& pInterf : vecIfs )" );
+            CCOUT << "    pInterf->Stop();";
+        }
+        BLOCK_CLOSE;
+        CCOUT<< "while( 0 );";
+        NEW_LINES( 2 );
+        Wa( "DestroyContext();" );
+        CCOUT << "return ret;";
+
+    }while( 0 );
+    return ret;
+}
+
+#define EMIT_CHECK_AND_SLEEP( _bComment ) \
+do{ \
+    if( vecSvcs.size() == 1 ) \
+    { \
+        if( _bComment ) \
+        { \
+            Wa( "// replace 'sleep' with your code for" ); \
+            Wa( "// advanced control" ); \
+        } \
+        CCOUT << "while( pIf->IsConnected() )"; \
+        INDENT_UPL; \
+        CCOUT << "sleep( 1 );"; \
+        INDENT_DOWNL; \
+        CCOUT << "ret = STATUS_SUCCESS;"; \
+    } \
+    else \
+    { \
+        if( _bComment ) \
+        { \
+            Wa( "// replace 'sleep' with your code for" ); \
+            Wa( "// advanced control" ); \
+        } \
+        Wa( "while( true )" ); \
+        BLOCK_OPEN; \
+        for( size_t i = 0; i < vecSvcs.size(); i++ ) \
+        { \
+            CCOUT << "if( !pIf" << i << "->IsConnected() )"; \
+            NEW_LINE; \
+            Wa( "    break;" ); \
+        } \
+        CCOUT << "sleep( 1 );"; \
+        BLOCK_CLOSE; \
+        NEW_LINE; \
+        CCOUT << "ret = STATUS_SUCCESS;"; \
+    } \
+}while( 0 )
+
+gint32 CImplMainFunc::EmitUserMainContent(
+    std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    do{
+        bool& bProxy = m_bProxy;
+        if( bProxy )
+        {
+            Wa( "//-----Adding your code here---" );
+            CCOUT << "return STATUS_SUCCESS;";
+        }
+#ifdef FUSE3
+        else if( !g_bBuiltinRt )
+        {
+            Wa( "gint32 ret = 0;" );
+            EMIT_CHECK_AND_SLEEP( true );
+            NEW_LINE;
+            CCOUT << "return ret;";
+        }
+        else
+        {
+            Wa( "gint32 ret = 0;" );
+            Wa( "if( g_strMPoint.empty() )" );
+            BLOCK_OPEN;
+            EMIT_CHECK_AND_SLEEP( false );
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "else" );
+            BLOCK_OPEN;
+            EmitRtFuseLoop( false, m_pWriter );
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "return ret;";
+        }
+#else
+        else
+        {
+            Wa( "gint32 ret = 0;" );
+            EMIT_CHECK_AND_SLEEP( true );
+            NEW_LINE;
+            CCOUT << "return ret;";
+        }
+#endif
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CImplMainFunc::Output()
 {
     gint32 ret = 0;
@@ -6466,7 +7414,7 @@ gint32 CImplMainFunc::Output()
         else
             strSuffix = "svr";
         {
-            bool bProxy = ( strSuffix == "cli" );
+            bool bProxy = m_bProxy;
             std::string strClass =
                 std::string( "C" ) + strSvcName;
             if( bProxy )
@@ -6486,6 +7434,11 @@ gint32 CImplMainFunc::Output()
             Wa( "#include \"rpc.h\"" );
             Wa( "#include \"proxy.h\"" );
             Wa( "using namespace rpcf;" );
+            if( g_bRpcOverStm )
+            {
+                Wa( "#include \"stmport.h\"" );
+                Wa( "#include \"fastrpc.h\"" );
+            }
             for( auto elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
@@ -6512,14 +7465,29 @@ gint32 CImplMainFunc::Output()
             if( g_bMklib )
                 Wa( "extern ObjPtr g_pIoMgr;" );
             else
+            {
                 Wa( "ObjPtr g_pIoMgr;" );
+#ifdef FUSE3
+                if( g_bBuiltinRt && !bProxy )
+                    Wa( "std::set< guint32 > g_setMsgIds;" );
+#endif
+            }
             NEW_LINE;
 
             ObjPtr pRoot( m_pNode );
-            CImplClassFactory oicf(
-                m_pWriter, pRoot, !bProxy );
+            if( g_bRpcOverStm )
+            {
+                CImplClassFactory2 oicf(
+                    m_pWriter, pRoot, !bProxy );
+                ret = oicf.OutputROS();
+            }
+            else
+            {
+                CImplClassFactory oicf(
+                    m_pWriter, pRoot, !bProxy );
+                ret = oicf.Output();
+            }
 
-            ret = oicf.Output();
             if( ERROR( ret ) )
                 break;
 
@@ -6528,118 +7496,14 @@ gint32 CImplMainFunc::Output()
 
             NEW_LINE;
             // InitContext
-            Wa( "gint32 InitContext()" );
-            BLOCK_OPEN;
-            Wa( "gint32 ret = CoInitialize( 0 );" );
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "return ret;";
-            INDENT_DOWNL;
-
-            CCOUT << "do";
-            BLOCK_OPEN;
-            CCOUT << "// load class factory for '"
-                << strModName << "'";
-            NEW_LINE;
-            CCOUT << "FactoryPtr p = "
-                << "InitClassFactory();";
-            NEW_LINE;
-            CCOUT << "ret = CoAddClassFactory( p );";
-            NEW_LINE;
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-            Wa( "CParamList oParams;" );
-            CCOUT << "oParams.Push( \""
-                << strModName + strSuffix << "\" );";
-            NEW_LINES( 2 );
-
-            Wa( "// adjust the thread number if necessary" );
-            if( bProxy )
-            {
-                Wa( "oParams[ propMaxIrpThrd ] = 0;" );
-                Wa( "oParams[ propMaxTaskThrd ] = 1;" );
-            }
-            else
-            {
-                Wa( "oParams[ propMaxIrpThrd ] = 2;" );
-                Wa( "oParams[ propMaxTaskThrd ] = 2;" );
-            }
-            NEW_LINE;
-
-            CCOUT << "ret = g_pIoMgr.NewObj(";
-            INDENT_UPL;
-            CCOUT << "clsid( CIoManager ), ";
-            NEW_LINE;
-            CCOUT << "oParams.GetCfg() );";
-            INDENT_DOWNL;
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-            CCOUT << "IService* pSvc = g_pIoMgr;";
-            NEW_LINE;
-            CCOUT << "ret = pSvc->Start();";
-            NEW_LINE;
-            BLOCK_CLOSE;
-            CCOUT << "while( 0 );";
-            NEW_LINES( 2 );
-            Wa( "if( ERROR( ret ) )" );
-            BLOCK_OPEN;
-            CCOUT << "g_pIoMgr.Clear();";
-            NEW_LINE;
-            CCOUT << "CoUninitialize();";
-            BLOCK_CLOSE;
-            NEW_LINE;
-            CCOUT << "return ret;";
-            BLOCK_CLOSE;
-            NEW_LINES( 2 );
-
-            // DestroyContext
-            Wa( "gint32 DestroyContext()" );
-            BLOCK_OPEN;
-            Wa( "IService* pSvc = g_pIoMgr;" );
-            Wa( "if( pSvc != nullptr )" );
-            BLOCK_OPEN;
-            Wa( "pSvc->Stop();" );
-            CCOUT << "g_pIoMgr.Clear();";
-            BLOCK_CLOSE;
-            NEW_LINES( 2 );
-            Wa( "CoUninitialize();" );
-
-            CCOUT << "DebugPrintEx( logErr, 0,";
-            INDENT_UPL;
-            CCOUT << "\"#Leaked objects is %d\",";
-            NEW_LINE;
-            CCOUT << "CObjBase::GetActCount() );";
-            INDENT_DOWNL;
-            CCOUT << "return STATUS_SUCCESS;";
-            BLOCK_CLOSE;
-            NEW_LINES( 2 );
+            EmitInitContext( bProxy, m_pWriter );
 
             //  business logic
-            if( bProxy )
-            {
-                CCOUT << "gint32 maincli(";
-                INDENT_UPL;
-                CCOUT << strClass << "* pIf,";
-                NEW_LINE;
-                CCOUT << "int argc, char** argv );";
-                INDENT_DOWNL;
-            }
-            else
-            {
-                CCOUT << "gint32 mainsvr( ";
-                INDENT_UPL;
-                CCOUT << strClass << "* pIf,";
-                NEW_LINE;
-                CCOUT << "int argc, char** argv );";
-                INDENT_DOWNL;
-            }
-            NEW_LINES( 1 );
+            ret = DeclUserMainFunc( vecSvcs, true );
+            if( ERROR( ret ) )
+                break;
+
+            NEW_LINE;
 
             // main function
             if( g_bMklib )
@@ -6655,140 +7519,26 @@ gint32 CImplMainFunc::Output()
             }
             else
             {
-                Wa( "int main( int argc, char** argv)" );
+                if( g_bBuiltinRt )
+                {
+                    Wa( "int _main( int argc, char** argv )" );
+                }
+                else
+                {
+                    Wa( "int main( int argc, char** argv )" );
+                }
             }
             BLOCK_OPEN;
-            Wa( "gint32 ret = 0;" );
-            CCOUT << "do";
-            BLOCK_OPEN;
-            Wa( "ret = InitContext();" );
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-            Wa( "InterfPtr pIf;" );
-            Wa( "CParamList oParams;" );
-            Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
-            CCOUT << "ret = CRpcServices::LoadObjDesc(";
-            INDENT_UPL;
-            CCOUT << "\"./"
-                << g_strAppName << "desc.json\",";
-            NEW_LINE;
-            CCOUT << "\"" << strSvcName << "\",";
-            NEW_LINE;
-            if( bProxy )
-                CCOUT << "false, oParams.GetCfg() );";
-            else
-                CCOUT << "true, oParams.GetCfg() );";
-
-            INDENT_DOWNL;
-
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-
-            CCOUT << "ret = pIf.NewObj(";
-            INDENT_UPL;
-            CCOUT << "clsid( " << strClass << " ),";
-            NEW_LINE;
-            CCOUT << "oParams.GetCfg() );";
-            INDENT_DOWNL;
-
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-            CCOUT << strClass << "* pSvc = pIf;";
-            NEW_LINE;
-            CCOUT << "ret = pSvc->Start();";
-            NEW_LINE;
-
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-
-            if( !bProxy )
-            {
-                NEW_LINE;
-                Wa( "mainsvr( pSvc, argc, argv );" );
-            }
-            else
-            {
-                NEW_LINE;
-                CCOUT << "while( pSvc->GetState()"
-                    << "== stateRecovery )";
-                INDENT_UPL;
-                CCOUT << "sleep( 1 );";
-                INDENT_DOWNL;
-                NEW_LINE;
-                CCOUT << "if( pSvc->GetState() != "
-                    << "stateConnected )";
-                NEW_LINE;
-                BLOCK_OPEN;
-                CCOUT << "ret = ERROR_STATE;";
-                NEW_LINE;
-                CCOUT << "break;";
-                BLOCK_CLOSE;
-                NEW_LINES( 2 );
-                Wa( "maincli( pSvc, argc, argv );" );
-            }
-
-            NEW_LINE;
-            Wa( "// Stopping the object" );
-            CCOUT << "ret = pSvc->Stop();";
-            NEW_LINE;
-            BLOCK_CLOSE;
-            CCOUT<< "while( 0 );";
-            NEW_LINES( 2 );
-            Wa( "DestroyContext();" );
-            Wa( "if( ERROR( ret ) )" );
-            Wa( "    OutputMsg( ret, \"main(): error occurs\" );" );
-            CCOUT << "return ret;";
+            EmitNormalMainContent( vecSvcs );
             BLOCK_CLOSE;
             NEW_LINES(2);
 
-            Wa( "//-----Your code begins here---" );
+            if( bProxy || !g_bBuiltinRt )
+                Wa( "//-----Your code begins here---" );
             //  business logic
-            if( bProxy )
-            {
-                CCOUT << "gint32 maincli(";
-                INDENT_UPL;
-                CCOUT << strClass << "* pIf,";
-                NEW_LINE;
-                CCOUT << "int argc, char** argv )";
-                INDENT_DOWNL;
-            }
-            else
-            {
-                CCOUT << "gint32 mainsvr( ";
-                INDENT_UPL;
-                CCOUT << strClass << "* pIf,";
-                NEW_LINE;
-                CCOUT << "int argc, char** argv )";
-                INDENT_DOWNL;
-            }
+            DeclUserMainFunc( vecSvcs, false );
             BLOCK_OPEN;
-            if( bProxy )
-            {
-                Wa( "//-----Adding your code here---" );
-            }
-            else
-            {
-                CCOUT << "// replace 'sleep' with your code for";
-                NEW_LINE;
-                CCOUT << "// advanced control";
-                NEW_LINE;
-                CCOUT << "while( pIf->IsConnected() )";
-                INDENT_UPL;
-                CCOUT << "sleep( 1 );";
-                INDENT_DOWNL;
-            }
-            CCOUT << "return STATUS_SUCCESS;";
+            EmitUserMainContent( vecSvcs );
             BLOCK_CLOSE;
             NEW_LINES( 2 );
         }
@@ -6939,7 +7689,11 @@ gint32 CExportMakefile::Output()
             "s:XXXOBJSSVR:" + strObjServer + ":; " +
             "s:XXXOBJSCLI:" + strObjClient + ":; ";
 
+#ifdef FUSE3
+        if( bFuse || g_bBuiltinRt )
+#else
         if( bFuse )
+#endif
         {
             strCmdLine +="s:XXXFUSE:-lutils -lfuseif:; ";
             strCmdLine +="s:jsoncpp:jsoncpp fuse3:; ";
@@ -6949,6 +7703,15 @@ gint32 CExportMakefile::Output()
         {
             strCmdLine +="s:XXXFUSE::; ";
             strCmdLine +="s:XXXDEFINES::; ";
+        }
+
+        if( g_bBuiltinRt )
+        {
+            strCmdLine +="s:XXXRTFILES:-lrtfiles -lrpc:; ";
+        }
+        else
+        {
+            strCmdLine +="s:XXXRTFILES::; ";
         }
 
         if( g_bMklib )
@@ -6988,15 +7751,114 @@ CExportDrivers::CExportDrivers(
     CWriterBase* pWriter,
     ObjPtr& pNode )
     : super( pWriter, pNode )
-{ m_strFile = "./drvtpl.json"; }
+{
+    m_strFile = "./drvtpl.json";
+    if( g_bBuiltinRt )
+        m_strFile = "./driver.json";
+}
 
 #include "jsondef.h"
 #include "frmwrk.h"
+
+gint32 CExportDrivers::OutputBuiltinRt()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strAppName = m_pNode->GetName();
+        Json::Value oVal( Json::objectValue );
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        bool bStream = false;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+                continue;
+            if( psd->IsStream() )
+            {
+                bStream = true;
+                break;
+            }
+        }
+
+        oVal[ JSON_ATTR_PATCH_CFG ] = "true";
+
+        std::string strAppCli =
+            strAppName + "cli";
+
+        std::string strAppSvr =
+            strAppName + "svr";
+
+        Json::Value oModuleArray(
+            Json::arrayValue );
+
+        Json::Value oCli;
+        oCli[ JSON_ATTR_MODNAME ] = strAppCli;
+        Json::Value oDrvToLoad;
+        oDrvToLoad.append( "DBusBusDriver" );
+        oDrvToLoad.append( "RpcTcpBusDriver" );
+        oDrvToLoad.append( "ProxyFdoDriver" );
+        oDrvToLoad.append( "UnixSockBusDriver" );
+        if( g_bRpcOverStm )
+            oDrvToLoad.append( "DBusStreamBusDrv" );
+        oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+
+        Json::Value oSvr;
+        oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
+        oSvr[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+
+        Json::Value oFactories =
+            Json::Value( Json::arrayValue );
+        oFactories.append(
+            Json::Value( "./librpc.so" ) );
+
+#ifdef AUTH
+        oFactories.append(
+            Json::Value( "./libauth.so" ) );
+#endif
+
+        oCli[ JSON_ATTR_FACTORIES ] = oFactories;
+        oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
+#ifdef FUSE3
+        if( bFuseP )
+        {
+            oCli[ JSON_ATTR_FACTORIES ].append(
+                Json::Value( "./libfuseif.so" ) );
+        }
+        oSvr[ JSON_ATTR_FACTORIES ].append(
+            Json::Value( "./libfuseif.so" ) );
+#endif
+        oModuleArray.append( oSvr );
+        oModuleArray.append( oCli );
+
+        oVal[ JSON_ATTR_MODULES ] = oModuleArray;
+
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        pWriter->write( oVal, m_pWriter->m_curFp );
+        m_pWriter->m_curFp->flush();
+
+    }while( 0 );
+    return ret;
+}
 
 gint32 CExportDrivers::Output()
 {
     gint32 ret = 0;
     do{
+        if( g_bBuiltinRt )
+        {
+            ret = OutputBuiltinRt();
+            break;
+        }
+
         ret = super::Output();
         if( ERROR( ret ) )
             break;
@@ -7043,7 +7905,6 @@ gint32 CExportDrivers::Output()
                     break;
                 }
             }
-
             
             std::string strAppCli =
                 strAppName + "cli";
@@ -7333,6 +8194,11 @@ gint32 CExportObjDesc::BuildObjDesc(
             Json::Value oJif;
             oJif[ JSON_ATTR_IFNAME ] =
                 "IStream";
+            if( g_bBuiltinRt )
+            {
+                oJif[ JSON_ATTR_NONSOCK_STREAM ] =
+                    "true";
+            }
             oIfArray.append( oJif );
         }
 

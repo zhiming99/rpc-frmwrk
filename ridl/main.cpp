@@ -282,7 +282,7 @@ int main( int argc, char** argv )
                     break;
 #else
                     fprintf( stderr,
-                        "Error '-%c' is not supported by this build\n", opt );
+                        "Error '-%c' is not supported by PYTHON disabled\n", opt );
                     ret = -ENOTSUP;
                     bQuit = true;
                     break;
@@ -309,7 +309,7 @@ int main( int argc, char** argv )
             case 'P':
                 {
                     fprintf( stderr,
-                        "Error '-%c' is not supported by this build\n", opt );
+                        "Error '-%c' is not supported by JAVA disabled\n", opt );
                     ret = -ENOTSUP;
                     bQuit = true;
                     break;
@@ -322,7 +322,8 @@ int main( int argc, char** argv )
                     if( g_bBuiltinRt )
                     {
                         fprintf( stderr,
-                            "Error '-b' cannot be used with this option\n" );
+                            "Error '-b' cannot be used with '-l' option\n" );
+                        bQuit = true;
                     }
                     break;
                 }
@@ -362,7 +363,7 @@ int main( int argc, char** argv )
                     }
 #else
                     fprintf( stderr,
-                        "Error '-f' is not supported by this build\n" );
+                        "Error '-f' is not supported with FUSE3 disabled\n" );
                     ret = -ENOTSUP;
                     bQuit = true;
 #endif
@@ -379,7 +380,8 @@ int main( int argc, char** argv )
                     if( g_bMklib )
                     {
                         fprintf( stderr,
-                            "Error '-l' cannot be used with this option\n" );
+                            "Error '-l' cannot be used with '-b' option\n" );
+                        bQuit = true;
                     }
                     break;
                 }

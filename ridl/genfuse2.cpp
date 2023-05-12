@@ -39,6 +39,7 @@ using namespace rpcf;
 
 extern bool g_bMklib;
 extern stdstr g_strCmdLine;
+extern bool g_bBuiltinRt;
 
 extern gint32 EmitOnPreStart( 
     CWriterBase* m_pWriter,
@@ -2336,7 +2337,7 @@ gint32 CImplMainFuncFuse2::Output()
         else
             strSuffix = "svr";
         {
-            bool bProxy = ( strSuffix == "cli" );
+            bool bProxy = m_bProxy;
             if( bProxy )
             {
                 m_pWriter->SelectMainCli();
@@ -2398,181 +2399,11 @@ gint32 CImplMainFuncFuse2::Output()
             NEW_LINE;
 
             // InitContext
-            Wa( "gint32 InitContext()" );
-            BLOCK_OPEN;
-            Wa( "gint32 ret = CoInitialize( 0 );" );
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "return ret;";
-            INDENT_DOWNL;
+            EmitInitContext(
+                bProxy, m_pWriter );
 
-            CCOUT << "do";
-            BLOCK_OPEN;
-            CCOUT << "// load class factory for '"
-                << strModName << "'";
-            NEW_LINE;
-            CCOUT << "FactoryPtr p = "
-                << "InitClassFactory();";
-            NEW_LINE;
-            CCOUT << "ret = CoAddClassFactory( p );";
-            NEW_LINE;
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-            Wa( "CParamList oParams;" );
-            CCOUT << "oParams.Push( \""
-                << strModName + strSuffix << "\" );";
-            NEW_LINES( 2 );
-
-            Wa( "// adjust the thread number if necessary" );
-            if( bProxy )
-            {
-                Wa( "oParams[ propMaxIrpThrd ] = 0;" );
-                Wa( "oParams[ propMaxTaskThrd ] = 1;" );
-            }
-            else
-            {
-                Wa( "oParams[ propMaxIrpThrd ] = 2;" );
-                Wa( "oParams[ propMaxTaskThrd ] = 2;" );
-            }
-            NEW_LINE;
-
-            CCOUT << "ret = g_pIoMgr.NewObj(";
-            INDENT_UPL;
-            CCOUT << "clsid( CIoManager ), ";
-            NEW_LINE;
-            CCOUT << "oParams.GetCfg() );";
-            INDENT_DOWNL;
-            CCOUT << "if( ERROR( ret ) )";
-            INDENT_UPL;
-            CCOUT << "break;";
-            INDENT_DOWNL;
-            NEW_LINE;
-            CCOUT << "IService* pSvc = g_pIoMgr;";
-            NEW_LINE;
-            CCOUT << "ret = pSvc->Start();";
-            NEW_LINE;
-            BLOCK_CLOSE;
-            CCOUT << "while( 0 );";
-            NEW_LINES( 2 );
-            Wa( "if( ERROR( ret ) )" );
-            BLOCK_OPEN;
-            CCOUT << "g_pIoMgr.Clear();";
-            NEW_LINE;
-            CCOUT << "CoUninitialize();";
-            BLOCK_CLOSE;
-            NEW_LINE;
-            CCOUT << "return ret;";
-            BLOCK_CLOSE;
-            NEW_LINES( 2 );
-
-            // DestroyContext
-            Wa( "gint32 DestroyContext()" );
-            BLOCK_OPEN;
-            Wa( "IService* pSvc = g_pIoMgr;" );
-            Wa( "if( pSvc != nullptr )" );
-            BLOCK_OPEN;
-            Wa( "pSvc->Stop();" );
-            CCOUT << "g_pIoMgr.Clear();";
-            BLOCK_CLOSE;
-            NEW_LINES( 2 );
-            Wa( "CoUninitialize();" );
-
-            CCOUT << "DebugPrintEx( logErr, 0,";
-            INDENT_UPL;
-            CCOUT << "\"#Leaked objects is %d\",";
-            NEW_LINE;
-            CCOUT << "CObjBase::GetActCount() );";
-            INDENT_DOWNL;
-            CCOUT << "return STATUS_SUCCESS;";
-            BLOCK_CLOSE;
-            NEW_LINES( 2 );
-
-            // main function
-            Wa( "int main( int argc, char** argv)" );
-            BLOCK_OPEN;
-            Wa( "gint32 ret = 0;" );
-            CCOUT << "do";
-            BLOCK_OPEN;
-            Wa( "fuse_args args = FUSE_ARGS_INIT(argc, argv);" );
-            Wa( "fuse_cmdline_opts opts;" );
-            Wa( "ret = fuseif_daemonize( args, opts, argc, argv );" );
-            CCOUT << "if( ERROR( ret ) )";
-            NEW_LINE;
-            CCOUT << "    break;";
-            NEW_LINES( 2 );
-            Wa( "ret = InitContext();" );
-            CCOUT << "if( ERROR( ret ) )";
-            NEW_LINE;
-            CCOUT << "    break;";
-            NEW_LINES( 2 );
-
-            CCOUT << "ret = InitRootIf( g_pIoMgr, "
-                << ( bProxy ? "true" : "false" ) << " );";
-            NEW_LINE;
-            CCOUT << "if( ERROR( ret ) )";
-            NEW_LINE;
-            CCOUT << "    break;";
-            NEW_LINE;
-            Wa( "CRpcServices* pRoot = GetRootIf();" );
-            Wa( "do" );
-            BLOCK_OPEN;
-            for( auto& elem : vecSvcs )
-            {
-                CServiceDecl* pSvc = elem;
-                stdstr strSvcName = pSvc->GetName();
-
-                std::string strClass =
-                    std::string( "C" ) + strSvcName;
-                if( bProxy )
-                    strClass += "_CliImpl";
-                else
-                    strClass += "_SvrImpl";
-
-                CCOUT << "// add the "
-                    << strSvcName << " directory";
-                NEW_LINE;
-                CCOUT << "ret = AddSvcPoint(";
-                NEW_LINE;
-                CCOUT << "    \""
-                    << strSvcName << "\",";
-                NEW_LINE;
-                CCOUT << "    \"./"
-                    << g_strAppName << "desc.json\",";
-                NEW_LINE;
-                CCOUT << "    clsid( " << strClass << " ),";
-                NEW_LINE;
-                CCOUT << "    " 
-                    << ( bProxy ? "true" : "false" )
-                    << " );";
-                NEW_LINE;
-                CCOUT << "if( ERROR( ret ) )";
-                NEW_LINE;
-                CCOUT << "    break;";
-                NEW_LINE;
-            }
-            NEW_LINE;
-            Wa( "args = FUSE_ARGS_INIT(argc, argv);" );
-            Wa( "ret = fuseif_main( args, opts );" );
-            BLOCK_CLOSE;
-            Wa( "while( 0 );" );
-
-            NEW_LINE;
-            Wa( "// Stop the root object" );
-            Wa( "pRoot->Stop();" );
-            CCOUT << "ReleaseRootIf();";
-            NEW_LINE;
-            BLOCK_CLOSE;
-            CCOUT<< "while( 0 );";
-            NEW_LINES( 2 );
-            Wa( "DestroyContext();" );
-            Wa( "if( ERROR( ret ) )" );
-            Wa( "    OutputMsg( ret, \"main(): error occurs\" );" );
-            CCOUT << "return ret;";
-            BLOCK_CLOSE;
-            NEW_LINES(2);
+            EmitFuseMain( vecSvcs,
+                bProxy, m_pWriter );
         }
 
     }while( 0 );
