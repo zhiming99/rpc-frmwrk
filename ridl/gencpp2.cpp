@@ -3627,7 +3627,7 @@ gint32 CExportObjDesc2::OutputROS()
         m_pWriter->m_curFp->close();
 
         Json::Value oVal;
-        ret = ReadJsonCfg(
+        ret = ReadJsonCfgFile(
             m_pWriter->m_strCurFile,
             oVal );
         if( ERROR( ret ) )

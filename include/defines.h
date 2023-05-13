@@ -47,6 +47,7 @@
 
 #include <arpa/inet.h>
 #include <dbus/dbus.h>
+#include <json/json.h>
 
 #define NSEC_PER_SEC 1000000000
 
@@ -289,6 +290,10 @@ gint32 GetModulePath( std::string& strResult );
 gint32 FindInstCfg(
     const std::string& strFileName,
     std::string& strPath );
+
+gint32 ReadJsonCfgFile(
+    const std::string& strFile,
+    Json::Value& valConfig );
 
 gint32 Execve(
     const char* cmd,

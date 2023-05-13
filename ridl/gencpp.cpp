@@ -6972,7 +6972,7 @@ gint32 CImplMainFunc::EmitInitContext(
         NEW_LINES( 2 );
 
         Wa( "// adjust the thread number if necessary" );
-        if( bProxy )
+        if( bProxy && !g_bBuiltinRt )
         {
             Wa( "oParams[ propMaxIrpThrd ] = 0;" );
             Wa( "oParams[ propMaxTaskThrd ] = 1;" );
@@ -7867,7 +7867,7 @@ gint32 CExportDrivers::Output()
         m_pWriter->m_curFp->close();
 
         Json::Value oVal;
-        ret = ReadJsonCfg(
+        ret = ReadJsonCfgFile(
             m_pWriter->m_strCurFile,
             oVal );
         if( ERROR( ret ) )
@@ -7992,7 +7992,7 @@ gint32 CExportObjDesc::Output()
         m_pWriter->m_curFp->close();
 
         Json::Value oVal;
-        ret = ReadJsonCfg(
+        ret = ReadJsonCfgFile(
             m_pWriter->m_strCurFile,
             oVal );
         if( ERROR( ret ) )

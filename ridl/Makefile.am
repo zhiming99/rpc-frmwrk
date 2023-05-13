@@ -28,7 +28,7 @@ mktpl : mktpl.in
 synccfg.py : synccfg.py.in
 	sed -e 's,[@]SRCCFG[@],$(ridlc_confdir)/echodesc.json,g' synccfg.py.in > synccfg.py
 
-ridlc_LDADD=$(COMMON_LINK) ../ipc/libipc.la ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
+ridlc_LDADD=$(COMMON_LINK) ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
 ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java
