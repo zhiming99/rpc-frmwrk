@@ -6717,32 +6717,29 @@ do{ \
     Wa( "    strArgv.size()," ); \
     Wa( "    sizeof( argvf ) / sizeof( argvf[ 0 ] ) );" ); \
  \
-    Wa( "BufPtr pArgBuf( true );" ); \
-    Wa( "size_t dwOff = 0;" ); \
+    Wa( "size_t dwSize = 0;" ); \
     Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
     BLOCK_OPEN; \
-    Wa( "ret = pArgBuf->Append(" ); \
-    Wa( "    strArgv[ i ].c_str()," ); \
-    Wa( "    strArgv[ i ].size() + 1 );" ); \
-    Wa( "if( ERROR( ret ) )" ); \
-    Wa( "    break;" ); \
-    Wa( "argvf[ i ] = ( char* )dwOff;" ); \
-    CCOUT << "dwOff += strArgv[ i ].size() + 1;"; \
-    BLOCK_CLOSE; \
+    Wa( "argvf[ i ] = ( char* )dwSize;" ); \
+    CCOUT << "dwSize += strArgv[ i ].size() + 1;"; \
+    BLOCK_CLOSE;  \
     NEW_LINE; \
-    Wa( "if( ERROR( ret ) )" ); \
-    Wa( "    break;" ); \
-\
-    Wa( "char* pMem = nullptr;" ); \
-    Wa( "guint32 dwOff_, dwTail_, dwSize_;" ); \
-    Wa( "pArgBuf->Detach(" ); \
-    Wa( "    pMem, dwSize_, dwOff_, dwTail_ );" ); \
-    Wa( "pArgBuf.Clear();" ); \
+    Wa( "char* pMem = ( char* )malloc( dwSize );" ); \
+    Wa( "if( pMem == nullptr )" ); \
+    BLOCK_OPEN; \
+    Wa( "ret = -ENOMEM;" ); \
+    CCOUT << "break;"; \
+    BLOCK_CLOSE;  \
+    NEW_LINE; \
     Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
-    Wa( "argvf[ i ] +=" ); \
-    Wa( "    ( intptr_t )( pMem + dwOff_ );" ); \
+    BLOCK_OPEN; \
+    Wa( "argvf[ i ] += ( intptr_t )pMem;" ); \
+    Wa( "strcpy( argvf[ i ]," ); \
+    CCOUT << "    strArgv[ i ].c_str() );"; \
+    BLOCK_CLOSE;  \
+    NEW_LINE; \
     Wa( "ret = _main( argcf, argvf );" ); \
-    CCOUT << "free( pMem ); pMem = nullptr;"; \
+    CCOUT << "free( pMem ); pMem = nullptr;";  \
 }while( 0 )
 
 gint32 CImplMainFunc::EmitRtMainFunc(
