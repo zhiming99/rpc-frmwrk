@@ -166,6 +166,9 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
                 MAX_REQCHAN_PER_SESS )
             {
                 ret = -ERANGE;
+                DebugPrintEx( logErr, ret,
+                    "Stream limits reached, "
+                    "and new stream is rejected" );
                 break;
             }
             ++itr->second;

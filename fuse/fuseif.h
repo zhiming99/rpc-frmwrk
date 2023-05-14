@@ -2770,10 +2770,38 @@ class CFuseRootBase:
 
             pTransGrp->AppendTask( pUpdTask );
 
+            gint32 ( *func )( IEventSink*, IEventSink* )=
+            ( []( IEventSink* pCb, IEventSink* pIf )->gint32
+            {
+                CCfgOpenerObj oCfg( pCb );
+                IEventSink* pTask = nullptr;
+                gint32 ret = oCfg.GetPointer(
+                    propParentTask, pTask );
+                if( SUCCEEDED( ret ) )
+                {
+                    CCfgOpenerObj oGrp(
+                        ( CObjBase* )pTask );
+                    gint32 iRet = 0;
+                    ret = oGrp.GetIntProp(
+                        propReturnValue,
+                        ( guint32& )iRet );
+                    if( SUCCEEDED( ret ) )
+                        ret = iRet;
+                }
+                else
+                {
+                    ret = -ECANCELED;
+                }
+                DebugPrintEx( logErr, ret,
+                   "AddSvcPoint failed @%s", 
+                   CoGetClassName( pIf->GetClsid() ) );
+                CRpcServices* pSvc = ObjPtr( pIf );
+                return pSvc->StopEx( pCb );
+            });
+
             TaskletPtr pStopTask;
-            ret = DEFER_IFCALLEX_NOSCHED2(
-                0, pStopTask, ObjPtr( pIf ),
-                &CRpcServices::StopEx, nullptr );
+            ret = NEW_FUNCCALL_TASK2( 0, pStopTask,
+                this->GetIoMgr(), func, nullptr, pIf );
 
             if( ERROR( ret ) )
                 break;

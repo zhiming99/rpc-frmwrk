@@ -119,7 +119,7 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
             break;
 
         m_bInProcess = true;
-        ret = pMgr->RescheduleTask( pTask );
+        ret = this->RescheduleTask( pTask );
         if( ERROR( ret ) )
         {
             m_bInProcess = false;
@@ -182,7 +182,7 @@ gint32 CStreamQueue::SubmitIrp( PIRP pIrp )
                 ( intptr_t )this );
             if( ERROR( ret ) )
                 break;
-            ret = pMgr->RescheduleTask( pTask );
+            ret = this->RescheduleTask( pTask );
             break;
         }
 
@@ -421,9 +421,7 @@ gint32 CStmConnPoint::OnEvent(
             auto pQue = reinterpret_cast
                 < CStreamQueue* >( pData );
 
-            guint32 dwIdx = ( pQue - m_arrQues ) /
-                sizeof( *pQue );
-
+            guint32 dwIdx = pQue - m_arrQues;
             if( dwIdx >= 2 )
             {
                 ret = -ERANGE;
@@ -622,6 +620,7 @@ gint32 CStmCpPdo::HandleStreamCommand(
         case tokPong:
         case tokPing:
         case tokProgress:
+        case tokClose:
             ret = oh.Send( pBuf );
             break;
 
@@ -789,10 +788,53 @@ gint32 CStmCpPdo::SubmitWriteIrp(
 
 gint32 CStmCpPdo::PreStop( IRP* pIrp )
 {
-    CStmConnPointHelper oh(
-        m_pStmCp, this->IsStarter() );
-    oh.Stop();
+    do{
+        MloopPtr pLoop = GetMainLoop();
+        if( !pLoop.IsEmpty() )
+        {
+            CLoopPools& oLoops =
+                GetIoMgr()->GetLoopPools();
+            oLoops.ReleaseMainLoop(
+                UXSOCK_TAG, pLoop );
+        }
+
+        CStmConnPointHelper oh(
+            m_pStmCp, this->IsStarter() );
+        oh.Stop();
+
+    }while( 0 );
+
     return super::PreStop( pIrp );
+}
+
+gint32 CStmCpPdo::PostStart( IRP* pIrp ) 
+{
+    gint32 ret = super::PostStart( pIrp );
+    if( ERROR( ret ) )
+        return ret;
+    CIoManager* pMgr = GetIoMgr();
+    CLoopPools& oLoops = pMgr->GetLoopPools();
+    MloopPtr pLoop;
+    ret = oLoops.AllocMainLoop(
+        UXSOCK_TAG, pLoop );
+    if( ERROR( ret ) )
+        return ret;
+    SetMainLoop( pLoop );
+
+    return STATUS_SUCCESS;
+}
+
+gint32 CStreamQueue::RescheduleTask(
+    TaskletPtr pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+    CMainIoLoop* pMain = m_pLoop;
+    if( pMain == nullptr )
+        return -EFAULT;
+    pTask->MarkPending();
+    pMain->AddTask( pTask );
+    return STATUS_SUCCESS;
 }
 
 }

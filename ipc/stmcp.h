@@ -47,6 +47,7 @@ class CStreamQueue
     mutable stdmutex m_oLock;
     bool m_bInProcess = false;
     EnumTaskState m_dwState = stateStarting;
+    MloopPtr m_pLoop;
 
 public:
 
@@ -80,6 +81,11 @@ public:
     gint32 Start();
     gint32 Stop();
     gint32 ProcessIrps();
+
+    inline void SetLoop( MloopPtr pLoop )
+    { m_pLoop = pLoop; }
+
+    gint32 RescheduleTask( TaskletPtr pTask );
 };
 
 class CStmConnPoint : public IService
@@ -105,6 +111,14 @@ class CStmConnPoint : public IService
         LONGWORD dwParam1,
         LONGWORD dwParam2,
         LONGWORD* pData ) override;
+
+    void SetLoop( MloopPtr pLoop, bool bProxy )
+    {
+        if( bProxy )
+            m_oQue2Cli.SetLoop( pLoop );
+        else
+            m_oQue2Svr.SetLoop( pLoop );
+    }
 };
 
 class CStmConnPointHelper
@@ -154,6 +168,7 @@ class CStmCpPdo : public CPort
 
     ObjPtr m_pStmCp;
     bool   m_bStarter = false;
+    MloopPtr m_pLoop;
 
     public:
 
@@ -174,12 +189,24 @@ class CStmCpPdo : public CPort
     ~CStmCpPdo()
     {}
 
+    inline MloopPtr& GetMainLoop()
+    { return m_pLoop; }
+
+    inline void SetMainLoop( MloopPtr pLoop )
+    {
+        m_pLoop = pLoop;
+        CStmConnPoint* pStmcp = m_pStmCp;
+        pStmcp->SetLoop(
+            pLoop, this->IsStarter() );
+    }
+
     virtual gint32 CancelFuncIrp(
         IRP* pIrp, bool bForce );
     gint32 RemoveIrpFromMap( IRP* pIrp );
     virtual gint32 OnSubmitIrp( IRP* pIrp );
 
-    gint32 PreStop( IRP* pIrp );
+    gint32 PostStart( IRP* pIrp ) override;
+    gint32 PreStop( IRP* pIrp ) override;
 
     bool IsStarter()
     { return m_bStarter; }

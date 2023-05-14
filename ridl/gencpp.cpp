@@ -6702,7 +6702,7 @@ gint32 CImplMainFunc::EmitFuseMain(
     return ret;
 }
 
-#define EMIT_CONVERT_ARGV \
+#define EMIT_CALL_MAIN \
 do{ \
     Wa( "// using fuse" ); \
     Wa( "std::vector< std::string > strArgv;" ); \
@@ -6732,8 +6732,17 @@ do{ \
     NEW_LINE; \
     Wa( "if( ERROR( ret ) )" ); \
     Wa( "    break;" ); \
+\
+    Wa( "char* pMem = nullptr;" ); \
+    Wa( "guint32 dwOff_, dwTail_, dwSize_;" ); \
+    Wa( "pArgBuf->Detach(" ); \
+    Wa( "    pMem, dwSize_, dwOff_, dwTail_ );" ); \
+    Wa( "pArgBuf.Clear();" ); \
     Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
-    Wa( "    argvf[ i ] += ( intptr_t )pArgBuf->ptr();" ); \
+    Wa( "argvf[ i ] +=" ); \
+    Wa( "    ( intptr_t )( pMem + dwOff_ );" ); \
+    Wa( "ret = _main( argcf, argvf );" ); \
+    CCOUT << "free( pMem ); pMem = nullptr;"; \
 }while( 0 )
 
 gint32 CImplMainFunc::EmitRtMainFunc(
@@ -6811,8 +6820,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
 
         if( !g_bBuiltinRt )
         {
-            EMIT_CONVERT_ARGV;
-            CCOUT << "ret = _main( argcf, argvf );";
+            EMIT_CALL_MAIN;
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
             CCOUT << "return ret;";
@@ -6883,8 +6891,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             NEW_LINE;
         }
 
-        EMIT_CONVERT_ARGV;
-        CCOUT << "ret = _main( argcf, argvf );";
+        EMIT_CALL_MAIN;
 #else
         Wa( "if( bDaemon )" );
         Wa( "    daemon( 1, 0 );" );
