@@ -6710,19 +6710,22 @@ do{ \
     Wa( "if( !bDaemon )" ); \
     Wa( "    strArgv.push_back( \"-f\" );" ); \
     Wa( "strArgv.push_back( g_strMPoint );" ); \
+    NEW_LINE;\
  \
-    Wa( "int argcf = strArgv.size();" ); \
-    Wa( "char* argvf[ 100 ];" ); \
-    Wa( "size_t dwCount = std::min(" ); \
-    Wa( "    strArgv.size()," ); \
-    Wa( "    sizeof( argvf ) / sizeof( argvf[ 0 ] ) );" ); \
- \
+    Wa( "size_t argcf = strArgv.size();" ); \
+    Wa( "char* argvf[ argcf ];" ); \
     Wa( "size_t dwSize = 0;" ); \
-    Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
+    Wa( "for( size_t i = 0; i < argcf; i++ )" ); \
     BLOCK_OPEN; \
     Wa( "argvf[ i ] = ( char* )dwSize;" ); \
     CCOUT << "dwSize += strArgv[ i ].size() + 1;"; \
     BLOCK_CLOSE;  \
+    NEW_LINE; \
+    Wa( "if( dwSize > 1024 )" ); \
+    BLOCK_OPEN; \
+    Wa( "ret = -EINVAL;" ); \
+    CCOUT << "break;"; \
+    BLOCK_CLOSE; \
     NEW_LINE; \
     Wa( "char* pMem = ( char* )malloc( dwSize );" ); \
     Wa( "if( pMem == nullptr )" ); \
@@ -6731,7 +6734,7 @@ do{ \
     CCOUT << "break;"; \
     BLOCK_CLOSE;  \
     NEW_LINE; \
-    Wa( "for( size_t i = 0; i < dwCount; i++ )" ); \
+    Wa( "for( size_t i = 0; i < argcf; i++ )" ); \
     BLOCK_OPEN; \
     Wa( "argvf[ i ] += ( intptr_t )pMem;" ); \
     Wa( "strcpy( argvf[ i ]," ); \
