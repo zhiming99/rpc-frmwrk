@@ -1,4 +1,7 @@
 ---
+[`Tue May 16 2023 08:46:40 PM Beijing`]    
+1. The pull-request is almost done, except some minor work to wrap up. I will merge it in the next few days. The performance gain is not cheerful. It seems requiring changes of the architechtual level to see the significant improvment in performance.
+
 [`Fri May 05 2023 09:51:41 PM Beijing`]   
 1. Code complete the non-socket-stream support. The extensive test can only be done when ridlc can generate the skelton with non-socket-stream enabled.
 2. Next i will add the ridlc the new feature to generate integrated server/proxy with builtin rpcrouter rather than stand-alone rpcrouters, to see the maximum performance gain the non-socket-stream can reach.
