@@ -188,6 +188,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CStmCpPdo );
     INIT_MAP_ENTRYCFG( CStmCpState );
     INIT_MAP_ENTRYCFG( CStmConnPoint );
+    INIT_MAP_ENTRYCFG( CThreadPools );
     INIT_MAP_ENTRYCFG( CIfInvokeMethodTask2 );
     INIT_MAP_ENTRYCFG( CIfStartRecvMsgTask2 );
 

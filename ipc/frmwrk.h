@@ -338,6 +338,7 @@ class CIoManager : public IService
     PnpMgrPtr                   m_pPnpMgr;
     sem_t                       m_semSync;
     LPoolsPtr                   m_pLPools;
+    ThrdPoolsPtr                m_pPools;
 
     // currently we allow only one instance of
     // CIoManager in a process. we use
@@ -476,6 +477,7 @@ class CIoManager : public IService
     const std::string& GetModName() const;
     sem_t* GetSyncSem() const;
     CLoopPools& GetLoopPools() const;
+    CThreadPools& GetThreadPools() const;
 
     ObjPtr& GetSyncIf() const;
 

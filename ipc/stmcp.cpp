@@ -789,15 +789,6 @@ gint32 CStmCpPdo::SubmitWriteIrp(
 gint32 CStmCpPdo::PreStop( IRP* pIrp )
 {
     do{
-        MloopPtr pLoop = GetMainLoop();
-        if( !pLoop.IsEmpty() )
-        {
-            CLoopPools& oLoops =
-                GetIoMgr()->GetLoopPools();
-            oLoops.ReleaseMainLoop(
-                UXSOCK_TAG, pLoop );
-        }
-
         CStmConnPointHelper oh(
             m_pStmCp, this->IsStarter() );
         oh.Stop();
@@ -809,19 +800,7 @@ gint32 CStmCpPdo::PreStop( IRP* pIrp )
 
 gint32 CStmCpPdo::PostStart( IRP* pIrp ) 
 {
-    gint32 ret = super::PostStart( pIrp );
-    if( ERROR( ret ) )
-        return ret;
-    CIoManager* pMgr = GetIoMgr();
-    CLoopPools& oLoops = pMgr->GetLoopPools();
-    MloopPtr pLoop;
-    ret = oLoops.AllocMainLoop(
-        UXSOCK_TAG, pLoop );
-    if( ERROR( ret ) )
-        return ret;
-    SetMainLoop( pLoop );
-
-    return STATUS_SUCCESS;
+    return super::PostStart( pIrp );
 }
 
 gint32 CStreamQueue::RescheduleTask(
@@ -829,11 +808,24 @@ gint32 CStreamQueue::RescheduleTask(
 {
     if( pTask.IsEmpty() )
         return -EINVAL;
-    CMainIoLoop* pMain = m_pLoop;
-    if( pMain == nullptr )
+    CIoManager* pMgr =
+        GetParent()->GetIoMgr();
+    
+    CThreadPools& oPools =
+        pMgr->GetThreadPools();
+
+    ThreadPtr pth;
+    gint32 ret = oPools.GetThread(
+        UXSOCK_TAG, pth );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    CTaskThread* ptth = pth;
+    if( ptth == nullptr )
         return -EFAULT;
     pTask->MarkPending();
-    pMain->AddTask( pTask );
+    ptth->AddTask( pTask );
     return STATUS_SUCCESS;
 }
 

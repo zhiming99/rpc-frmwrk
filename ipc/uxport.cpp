@@ -2423,6 +2423,12 @@ gint32 CUnixSockBusPort::PreStart( IRP* pIrp )
     if( ERROR( ret ) )
         return ret;
 
+    CThreadPools& otp = pMgr->GetThreadPools();
+    ret = otp.CreatePool(
+        UXSOCK_TAG, 20, dwCount, "UxTask-" );
+    if( ERROR( ret ) )
+        return ret;
+
     return super::PreStart( pIrp );
 }
 
