@@ -139,6 +139,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @FUSE3_RPMHEADERS@
 %{_includedir}/rpcf/ipc/fastrpc.h
 %{_includedir}/rpcf/ipc/stmport.h
+%{_includedir}/rpcf/ipc/stmcp.h
 %{_includedir}/rpcf/nsdef.h
 %{_includedir}/rpcf/objfctry.h
 %{_includedir}/rpcf/propids.h
