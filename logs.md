@@ -1,4 +1,8 @@
 ---
+[`Thu May 18 2023 07:41:47 PM Beijing`]   
+1. I have merged `add-non-socket-stream` to the master branch.
+2. The new test shows the performance of `echo test` with built-in router has a breakthrough improvement of entering micro-second level. The average request is around 500us. **Congratulations**!
+
 [`Tue May 16 2023 08:46:40 PM Beijing`]    
 1. The pull-request is almost done, except some minor work to wrap up. I will merge it in the next few days. The performance gain is not cheerful. It seems requiring changes of the architechtual level to see the significant improvment in performance.
 
