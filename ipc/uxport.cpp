@@ -2226,6 +2226,12 @@ gint32 CUnixSockBusPort::CreatePdoPort(
             ret = CreateUxStreamPdo(
                 pCfg, pNewPort );
         }
+        else if( strPortClass
+            == PORT_CLASS_STMCP_PDO )
+        {
+            ret = CreateStmCpPdo(
+                pCfg, pNewPort );
+        }
         else
         {
             ret = -ENOTSUP;
@@ -2258,7 +2264,8 @@ gint32 CUnixSockBusPort::BuildPdoPortName(
             if( ERROR( ret ) )
                 break;
 
-            if( strClass != PORT_CLASS_UXSOCK_STM_PDO )
+            if( strClass != PORT_CLASS_UXSOCK_STM_PDO && 
+                strClass != PORT_CLASS_STMCP_PDO )
             {
                 ret = -EINVAL;
                 break;
@@ -2271,6 +2278,14 @@ gint32 CUnixSockBusPort::BuildPdoPortName(
                     propPortId, dwPortId );
                 if( ERROR( ret ) )
                     break;
+
+                if( dwPortId == ( guint32 )-1 )
+                {
+                    dwPortId = 
+                        NewPdoId() + 0x80000000;
+                    oCfgOpener.SetIntProp(
+                        propPortId, dwPortId );
+                }
             }
             else if( pCfg->exist( propFd ) )
             {
@@ -2278,6 +2293,11 @@ gint32 CUnixSockBusPort::BuildPdoPortName(
                     propFd, dwPortId );
                 if( ERROR( ret ) )
                     break;
+            }
+            else
+            {
+                ret = -EINVAL;
+                break;
             }
 
             strPortName = strClass +
@@ -2349,6 +2369,47 @@ gint32 CUnixSockBusPort::CreateUxStreamPdo(
     return ret;
 }
 
+gint32 CUnixSockBusPort::CreateStmCpPdo(
+    IConfigDb* pCfg,
+    PortPtr& pNewPort )
+{
+    if( pCfg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        std::string strPortName;
+        guint32 dwPortId = 0;
+
+        CCfgOpener oExtCfg(
+            ( IConfigDb* )pCfg );
+
+        ret = oExtCfg.GetIntProp(
+            propPortId, dwPortId );
+
+        if( ERROR( ret ) )
+            break;
+
+        // verify if the port already exists
+        if( this->PortExist( dwPortId ) )
+        {
+            ret = -EEXIST;
+            break;
+        }
+
+        ret = pNewPort.NewObj(
+            clsid( CStmCpPdo ), pCfg );
+
+        // the pdo port `Start()' will be deferred
+        // till the complete port stack is built.
+        //
+        // And well, we are done here
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CUnixSockBusPort::PreStart( IRP* pIrp )
 {
     CIoManager* pMgr = GetIoMgr();
@@ -2362,15 +2423,21 @@ gint32 CUnixSockBusPort::PreStart( IRP* pIrp )
     if( ERROR( ret ) )
         return ret;
 
+    CThreadPools& otp = pMgr->GetThreadPools();
+    ret = otp.CreatePool(
+        UXSOCK_TAG, 20, dwCount, "UxTask-" );
+    if( ERROR( ret ) )
+        return ret;
+
     return super::PreStart( pIrp );
 }
 
 gint32 CUnixSockBusPort::PostStop( IRP* pIrp )
 {
-    gint32 ret = 0; 
     CIoManager* pMgr = GetIoMgr();
     CLoopPools& oPools = pMgr->GetLoopPools();
-    return oPools.DestroyPool( UXSOCK_TAG );
+    oPools.DestroyPool( UXSOCK_TAG );
+    return 0;
 }
 
 }

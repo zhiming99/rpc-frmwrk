@@ -638,9 +638,6 @@ gint32 CFuseDirectory::fs_rmdir(
 
                     pConn->RemoveChild( strChild );
                     pRootIf->RemoveSvcPoint( pSvc );
-
-                    inoParent = pConn->GetObjId();
-                    inoChild = psd->GetObjId();
                     
                     do{
                         bool bRoot = false;
@@ -671,8 +668,6 @@ gint32 CFuseDirectory::fs_rmdir(
 
                         auto pHop = pConn->GetParent();
                         strChild = pConn->GetName();
-                        inoParent = pHop->GetObjId();
-                        inoChild = pConn->GetObjId();
                         pHop->RemoveChild( strChild );
 
                         if( bRoot )
@@ -1841,9 +1836,9 @@ gint32 CFuseStmFile::fs_ioctl(
 gint32 CFuseStmFile::fs_unlink(
     const char* path,
     fuse_file_info *fi,
-    bool bSched )
+    bool bRemoveGrp )
 {
-    UNREFERENCED( bSched );
+    UNREFERENCED( bRemoveGrp );
     gint32 ret = 0;
     do{
         CRpcServices* pSvc = GetIf();
@@ -2563,175 +2558,86 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 }
 
 using INO_INFO=std::pair< guint64, stdstr>;
-static gint32 fuseif_remove_req_svr(
-    CRpcServices* pIf,
-    stdstr& strSuffix,
-    guint32 dwGrpId )
+
+static gint32 fuseif_remove_req(
+    CRpcServices* pIf, stdstr& strSuffix )
 {
     gint32 ret = 0;
     do{
-        auto pSvr = dynamic_cast
-            < CFuseSvcServer* >( pIf );
-
         std::vector< INO_INFO > vecInoid;
         WLOCK_TESTMNT2( pIf );
 
+        std::vector< stdstr > vecPrefixes = {"jrsp_"};
+
         stdstr strPath;
-        ret = pSvr->GetSvcPath( strPath );
+        if( pIf->IsServer() )
+        {
+            auto pSvr = dynamic_cast
+                < CFuseSvcServer* >( pIf );
+            ret = pSvr->GetSvcPath( strPath );
+        }
+        else
+        {
+            auto pProxy = dynamic_cast
+                < CFuseSvcProxy* >( pIf );
+            ret = pProxy->GetSvcPath( strPath );
+            vecPrefixes.push_back( "jevt_" );
+        }
+
         if( ERROR( ret ) )
             break;
 
-        stdstr strReq = "jreq_";
-        strReq += strSuffix;
-
-        auto pReq = static_cast
-            < CFuseReqFileSvr* >
-            ( _pSvcDir->GetChild( strReq ) );
-
-        if( pReq != nullptr )
+        for( auto& elem : vecPrefixes )
         {
-            fuse_file_info fi = {0};
-            fi.fh = ( guint64 )
-                ( CFuseObjBase* )pReq;
-            stdstr strReqPath =
-                strPath + "/" + strReq;
-            pReq->fs_unlink(
-                strReqPath.c_str(), &fi, false );
-            vecInoid.push_back( {
-               pReq->GetObjId(), strReq } );
+            stdstr strFile = elem + strSuffix;
+            auto pFile = dynamic_cast< CFuseObjBase* >
+                ( _pSvcDir->GetChild( strFile ) );
+
+            if( pFile != nullptr )
+            {
+                fuse_file_info fi = {0};
+                fi.fh = ( guint64 )pFile;
+                fi.fh = ( guint64 )
+                    ( CFuseObjBase* )pFile;
+                stdstr strRespPath =
+                    strPath + "/" + strFile;
+
+                pFile->fs_unlink(
+                    strRespPath.c_str(), &fi, false );
+
+                vecInoid.push_back( {
+                   pFile->GetObjId(),
+                   std::move( strFile ) } );
+            }
         }
-
-        stdstr strResp = "jrsp_";
-        strResp += strSuffix;
-
-        auto pResp = static_cast
-            < CFuseRespFileSvr* >
-            ( _pSvcDir->GetChild( strResp ) );
-
-        if( pResp != nullptr )
-        {
-            fuse_file_info fi = {0};
-            fi.fh = ( guint64 )
-                ( CFuseObjBase* )pResp;
-            stdstr strRespPath =
-                strPath + "/" + strResp;
-            pResp->fs_unlink(
-                strRespPath.c_str(), &fi, false );
-
-            vecInoid.push_back( {
-               pResp->GetObjId(), strResp } );
-        }
-        pSvr->RemoveGroup( dwGrpId );
 
         MYFUSE* pFuse = GetFuse();
         if( pFuse == nullptr )
             break;
 
-        fuseif_invalidate_path( pFuse, _pSvcDir );
+        fuse_ino_t inoParent =
+            _pSvcDir->GetObjId();
+
+        fuse_session* se =
+            fuseif_get_session( pFuse );
+
+        for( auto& elem : vecInoid )
+        {
+            fuse_lowlevel_notify_delete( se,
+                inoParent, elem.first,
+                elem.second.c_str(),
+                elem.second.size() );
+            DebugPrintEx( logInfo, 0,
+                "%s is removed",
+                elem.second.c_str() );
+        }
 
     }while( 0 );
 
     return ret;
 }
 
-static gint32 fuseif_remove_req_proxy(
-    CRpcServices* pIf,
-    stdstr& strSuffix,
-    guint32 dwGrpId )
-{
-    gint32 ret = 0;
-    do{
-
-        auto pProxy = dynamic_cast
-            < CFuseSvcProxy* >( pIf );
-
-        std::vector< INO_INFO > vecInoid;
-        WLOCK_TESTMNT2( pIf );
-
-        stdstr strPath;
-        ret = pProxy->GetSvcPath( strPath );
-        if( ERROR( ret ) )
-            break;
-
-        stdstr strReq = "jreq_";
-        strReq += strSuffix;
-
-        auto pReq = static_cast
-            < CFuseReqFileProxy* >
-            ( _pSvcDir->GetChild( strReq ) );
-
-        if( pReq != nullptr )
-        {
-            fuse_file_info fi = {0};
-            fi.fh = ( guint64 )
-                ( CFuseObjBase* )pReq;
-            stdstr strReqPath =
-                strPath + "/" + strReq;
-            pReq->fs_unlink(
-                strReqPath.c_str(), &fi, false );
-
-            vecInoid.push_back( {
-               pReq->GetObjId(), strReq } );
-        }
-
-        stdstr strResp = "jrsp_";
-        strResp += strSuffix;
-
-        auto pResp = static_cast
-            < CFuseRespFileProxy* >
-            ( _pSvcDir->GetChild( strResp ) );
-
-        if( pResp != nullptr )
-        {
-            fuse_file_info fi = {0};
-            fi.fh = ( guint64 )pResp;
-            fi.fh = ( guint64 )
-                ( CFuseObjBase* )pResp;
-            stdstr strRespPath =
-                strPath + "/" + strResp;
-            pResp->fs_unlink(
-                strRespPath.c_str(), &fi, false );
-
-            vecInoid.push_back( {
-               pResp->GetObjId(), strResp } );
-        }
-
-        stdstr strEvt = "jevt_";
-        strEvt += strSuffix;
-
-        auto pEvt = static_cast< CFuseEvtFile* >
-            ( _pSvcDir->GetChild( strEvt ) );
-
-        if( pEvt != nullptr )
-        {
-            fuse_file_info fi = {0};
-            fi.fh = ( guint64 )
-                ( CFuseObjBase* )pEvt;
-
-            stdstr strEvtPath =
-                strPath + "/" + strEvt;
-
-            pEvt->fs_unlink(
-                strEvtPath.c_str(), &fi, false );
-
-            vecInoid.push_back( {
-               pEvt->GetObjId(), strEvt } );
-        }
-
-        pProxy->RemoveGroup( dwGrpId );
-
-        MYFUSE* pFuse = GetFuse();
-        if( pFuse == nullptr )
-            break;
-
-        fuseif_invalidate_path( pFuse, _pSvcDir );
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CFuseEvtFile::do_remove( bool bSched )
+gint32 CFuseEvtFile::do_remove( bool bRemoveGrp )
 {
     gint32 ret = 0;
     do{
@@ -2751,17 +2657,13 @@ gint32 CFuseEvtFile::do_remove( bool bSched )
             break;
 
         pParent->RemoveChild( strName );
-
-        if( !bSched )
+        if( !bRemoveGrp )
             break;
 
-        guint32 dwGrpId = GetGroupId();
-
         gint32 ( *func )( CRpcServices*,
-            const stdstr&, guint32 ) =
+            const stdstr& ) =
             ([]( CRpcServices* pIf,
-                const stdstr& strName,
-                guint32 dwGrpId )->gint32
+                const stdstr& strName )->gint32
         {
             gint32 ret = 0;
             do{
@@ -2773,17 +2675,8 @@ gint32 CFuseEvtFile::do_remove( bool bSched )
 
                 stdstr strSuffix =
                     strName.substr( 5 );
-
-                if( pIf->IsServer() )
-                {
-                    ret = fuseif_remove_req_svr(
-                        pIf, strSuffix, dwGrpId );
-                }
-                else
-                {
-                    ret = fuseif_remove_req_proxy(
-                        pIf, strSuffix, dwGrpId );
-                }
+                ret = fuseif_remove_req(
+                    pIf, strSuffix );
 
             }while( 0 );
 
@@ -2792,10 +2685,23 @@ gint32 CFuseEvtFile::do_remove( bool bSched )
 
         TaskletPtr pTask;
         CRpcServices* pIf = GetIf();
+        guint32 dwGrpId = this->GetGroupId();
+        if( pIf->IsServer() )
+        {
+            auto pSvr = dynamic_cast
+                < CFuseSvcServer* >( pIf );
+            pSvr->RemoveGroup( dwGrpId );
+        }
+        else
+        {
+            auto pProxy = dynamic_cast
+                < CFuseSvcProxy* >( pIf );
+            pProxy->RemoveGroup( dwGrpId );
+        }
+
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = NEW_FUNCCALL_TASK( pTask,
-            pMgr, func, pIf, strName,
-            GetGroupId() );
+            pMgr, func, pIf, strName );
 
         if( ERROR( ret ) )
             break;
@@ -2838,7 +2744,7 @@ gint32 CFuseEvtFile::fs_release(
 gint32 CFuseEvtFile::fs_unlink(
     const char* path,
     fuse_file_info * fi,
-    bool bSched )
+    bool bRemoveGrp )
 {
     gint32 ret = 0;
     do{
@@ -2850,7 +2756,8 @@ gint32 CFuseEvtFile::fs_unlink(
 
         EnumClsid iClsid = this->GetClsid();
         if( iClsid != clsid( CFuseReqFileProxy )&&
-            iClsid != clsid( CFuseReqFileSvr ) )
+            iClsid != clsid( CFuseReqFileSvr ) &&
+            bRemoveGrp )
         {
             ret = -EACCES;
             break;
@@ -2864,7 +2771,7 @@ gint32 CFuseEvtFile::fs_unlink(
         }
 
         SetRemoved();
-        ret = do_remove( bSched );
+        ret = do_remove( bRemoveGrp );
 
     }while( 0 );
 

@@ -306,7 +306,7 @@ class CFuseObjBase : public CDirEntry
     virtual gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched )
+        bool bRemoveGrp )
     { return -EACCES; }
 
     virtual gint32 fs_opendir(
@@ -601,7 +601,7 @@ class CFuseTextFile : public CFuseObjBase
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched ) override
+        bool bRemoveGrp ) override
     { return -EACCES;}
 
 };
@@ -672,7 +672,7 @@ class CFuseEvtFile : public CFuseFileEntry
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched ) override;
+        bool bRemoveGrp ) override;
 
     gint32 fs_open(
         const char* path,
@@ -1047,7 +1047,7 @@ class CFuseStmFile : public CFuseFileEntry
     gint32 fs_unlink(
         const char* path,
         fuse_file_info *fi,
-        bool bSched ) override;
+        bool bRemoveGrp ) override;
 
     gint32 fs_ioctl(
         const char *path,
@@ -1408,16 +1408,21 @@ class CFuseServicePoint :
     {
         if( m_strSvcPath.empty() )
         {
+            strPath.clear();
             CDirEntry* pDir = m_pSvcDir.get();
-            if( unlikely( m_pSvcDir == nullptr ) )
+            if( unlikely( pDir == nullptr ) )
                 return -EFAULT;
-            else while( pDir != nullptr )
-            {
+
+            do{
                 stdstr strName = "/";
                 strName.append( pDir->GetName() );
                 strPath.insert( 0, strName );
                 pDir = pDir->GetParent();
-            }
+            }while( !pDir->IsRoot() );
+
+            if( strPath.empty() )
+                return -EINVAL;
+
             m_strSvcPath = strPath;
         }
         else
@@ -2765,10 +2770,38 @@ class CFuseRootBase:
 
             pTransGrp->AppendTask( pUpdTask );
 
+            gint32 ( *func )( IEventSink*, IEventSink* )=
+            ( []( IEventSink* pCb, IEventSink* pIf )->gint32
+            {
+                CCfgOpenerObj oCfg( pCb );
+                IEventSink* pTask = nullptr;
+                gint32 ret = oCfg.GetPointer(
+                    propParentTask, pTask );
+                if( SUCCEEDED( ret ) )
+                {
+                    CCfgOpenerObj oGrp(
+                        ( CObjBase* )pTask );
+                    gint32 iRet = 0;
+                    ret = oGrp.GetIntProp(
+                        propReturnValue,
+                        ( guint32& )iRet );
+                    if( SUCCEEDED( ret ) )
+                        ret = iRet;
+                }
+                else
+                {
+                    ret = -ECANCELED;
+                }
+                DebugPrintEx( logErr, ret,
+                   "AddSvcPoint failed @%s", 
+                   CoGetClassName( pIf->GetClsid() ) );
+                CRpcServices* pSvc = ObjPtr( pIf );
+                return pSvc->StopEx( pCb );
+            });
+
             TaskletPtr pStopTask;
-            ret = DEFER_IFCALLEX_NOSCHED2(
-                0, pStopTask, ObjPtr( pIf ),
-                &CRpcServices::StopEx, nullptr );
+            ret = NEW_FUNCCALL_TASK2( 0, pStopTask,
+                this->GetIoMgr(), func, nullptr, pIf );
 
             if( ERROR( ret ) )
                 break;

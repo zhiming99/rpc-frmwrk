@@ -166,6 +166,9 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
                 MAX_REQCHAN_PER_SESS )
             {
                 ret = -ERANGE;
+                DebugPrintEx( logErr, ret,
+                    "Stream limits reached, "
+                    "and new stream is rejected" );
                 break;
             }
             ++itr->second;
@@ -1130,7 +1133,13 @@ gint32 CFastRpcServerBase::OnPreStart(
         ret = oDrvMgr.GetDriver( true,
             DBUS_STREAM_BUS_DRIVER, pDrv );
         if( ERROR( ret ) )
+        {
+            DebugPrintEx( logErr, ret, 
+                "Driver %s is not loaded, "
+                "Please check your config.",
+                DBUS_STREAM_BUS_DRIVER );
             break;
+        }
 
         CDBusStreamBusDrv* pdrv = pDrv;
         if( pdrv == nullptr )
@@ -1724,10 +1733,20 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
             pSvc->GetPortHandle() != hPort )
             break;
 
-        pSvc->SetStateOnEvent( cmdShutdown );
+        // pSvc->SetStateOnEvent( cmdShutdown );
         // stop at this point could result in segment
         // fault. ClosePort is good.
-        pSvc->ClosePort( nullptr );
+        // pSvc->ClosePort( nullptr );
+
+        TaskletPtr pStopTask;
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pStopTask, ObjPtr( this ),
+            &CRpcServices::StopEx,
+            nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        GetIoMgr()->RescheduleTask( pStopTask );
         
     }while( 0 );
 

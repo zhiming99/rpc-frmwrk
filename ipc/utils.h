@@ -43,6 +43,8 @@ class CTaskThread : public IThread
     TaskQuePtr                  m_pTaskQue;
     sem_t                       m_semSync;
     gint32                      m_iMyTid;
+    std::atomic< bool >         m_bRunning = { true };
+    stdstr                      m_strName;
 
     gint32 GetHead( TaskletPtr& pTask );
     gint32 PopHead();
@@ -100,15 +102,11 @@ class CTaskThread : public IThread
     virtual gint32 EnumProperties(
         std::vector< gint32 >& vecProps ) const;
 
-    gint32 SetThreadName(
-        const char* szName = nullptr );
-
     void Join();
 };
 
 class COneshotTaskThread : public CTaskThread
 {
-    std::atomic< bool >& m_bTaskDone = super::m_bExit;
     EnumClsid m_iTaskClsid;
     public:
 
@@ -143,6 +141,7 @@ class CThreadPool : public IService
     gint32                  m_iThreadCount;
     CIoManager*             m_pMgr;
     bool                    m_bAscend;
+    stdstr                  m_strPrefix;
 
     protected:
     std::vector< ThreadPtr > m_vecThreads;
@@ -195,6 +194,60 @@ class CTaskThreadPool : public CThreadPool
     gint32 RemoveTask( TaskletPtr& pTask );
 };
 
+class CThreadPools : public IService
+{
+    std::hashmap< guint32, ThrdPoolPtr > m_mapPools;
+    mutable stdrmutex m_oLock;
+    CIoManager* m_pMgr = nullptr;
+
+    public:
+    typedef IService super;
+    CThreadPools( const IConfigDb* pCfg );
+
+    inline CIoManager* GetIoMgr()
+    { return m_pMgr; }
+
+    stdrmutex& GetLock() const
+    { return m_oLock; }
+
+    inline bool IsPool( guint32 dwTag ) const
+    {
+        auto itr = m_mapPools.find( dwTag );
+        if( itr == m_mapPools.end() )
+            return false;
+        return true;
+    }
+
+    gint32 CreatePool(
+        guint32 dwTag,
+        guint32 dwLoadLimit,
+        guint32 dwMaxThreads,
+        const stdstr& strPrefix );
+
+    gint32 DestroyPool( guint32 dwTag );
+
+    gint32 GetThread(
+        guint32 dwTag, 
+        ThreadPtr& pLoop );
+
+    gint32 PutThread(
+        guint32 dwTag,
+        ThreadPtr& pLoop );
+
+    gint32 Start() override
+    { return 0; }
+
+    gint32 Stop() override;
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD    dwParam1,
+        LONGWORD    dwParam2,
+        LONGWORD*   pData ) override
+    { return -ENOTSUP; }
+};
+
+typedef CAutoPtr< Clsid_Invalid, CThreadPools > ThrdPoolsPtr;
+
 class IGenericInterface;
 
 class CIrpCompThread : public IThread
@@ -209,6 +262,7 @@ class CIrpCompThread : public IThread
     std::thread                 *m_pServiceThread;
 
     std::map< const IGenericInterface*, gint32 > m_mapIfs;
+    std::atomic< bool >         m_bRunning = { true };
     
 
     public:

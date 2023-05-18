@@ -34,6 +34,7 @@
 #include "rtfiles.h"
 #include "taskschd.h"
 
+#ifdef FUSE3
 namespace rpcf{
 
 Json::Value DumpConnParams( const IConfigDb* pConn )
@@ -1093,3 +1094,16 @@ gint32 AddFilesAndDirsReqFwdr(
 
 }
 
+gint32 AddFilesAndDirs(
+    bool bProxy, CRpcServices* pSvc )
+{
+    if( pSvc == nullptr )
+        return -EFAULT;
+
+    if( bProxy )
+        return AddFilesAndDirsReqFwdr( pSvc );
+
+    return AddFilesAndDirsBdge( pSvc );
+}
+
+#endif

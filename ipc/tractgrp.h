@@ -37,115 +37,22 @@ class CIfTransactGroup :
 
     public:
     typedef CIfTaskGroup super;
-    CIfTransactGroup( const IConfigDb* pCfg )
-        : super( pCfg )
-    {
-        gint32 ret = 0;
-        do{
-            SetClassId( clsid( CIfTransactGroup ) );
-
-            ret = m_pTaskGrp.NewObj(
-                clsid( CIfTaskGroup ),
-                pCfg );
-
-            ret = m_pRbackGrp.NewObj(
-                clsid( CIfTaskGroup ),
-                pCfg );
-
-            SetRelation( logicOR );
-            m_pTaskGrp->SetRelation( logicAND );
-            m_pRbackGrp->SetRelation( logicNONE );
-
-            TaskletPtr pTask = m_pTaskGrp;
-            super::AppendTask( pTask );
-
-            pTask = m_pRbackGrp;
-            super::AppendTask( pTask );
-
-        }while( 0 );
-
-        if( ERROR( ret ) )
-        {
-            std::string strMsg = DebugMsg( ret,
-                "Error in CIfTransactGroup ctor" );
-            throw std::runtime_error( strMsg );
-        }
-    }
+    CIfTransactGroup( const IConfigDb* pCfg );
 
     gint32 AppendTask(
-        TaskletPtr& pTask )
-    {
-        if( pTask.IsEmpty() )
-            return -EINVAL;
-
-        if( m_pTaskGrp.IsEmpty() )
-            return -EFAULT;
-
-        CCfgOpenerObj oTaskCfg(
-            ( CObjBase* )pTask );
-
-        oTaskCfg.SetIntPtr(
-            propTransGrpPtr, ( guint32* )this );
-
-        return m_pTaskGrp->AppendTask( pTask );
-    }
+        TaskletPtr& pTask );
 
     gint32 AddRollback(
         TaskletPtr& pRbTask,
-        bool bBack = true )
-    {
-        if( pRbTask.IsEmpty() )
-            return -EINVAL;
+        bool bBack = true );
 
-        if( m_pRbackGrp->IsRunning() )
-            return ERROR_STATE;
+    gint32 SetTaskRelation( EnumLogicOp iop );
+    gint32 SetRbRelation( EnumLogicOp iop );
 
-        gint32 ret = 0;
+    gint32 OnChildComplete(
+        gint32 iRet, CTasklet* pChild );
 
-        if( bBack )
-            ret = m_pRbackGrp->AppendTask( pRbTask );
-        else
-            ret = m_pRbackGrp->InsertTask( pRbTask );
-
-        return ret;
-    }
-
-    gint32 SetTaskRelation( EnumLogicOp iop )
-    {
-        m_pTaskGrp->SetRelation( iop );
-        return 0;
-    }
-
-    gint32 SetRbRelation( EnumLogicOp iop )
-    {
-        m_pRbackGrp->SetRelation( iop );
-        return 0;
-    }
-
-    gint32 OnComplete( gint32 iRet )
-    {
-        // don't use m_pTaskGrp's GetError here,
-        // because at the moment, the m_pTaskGrp
-        // could still be in its OnComplete call
-        // with the `m_iRet' unset yet if the
-        // process's load is very high.
-        //
-        iRet = m_vecRetVals[ 0 ];
-        super::OnComplete( iRet );
-
-        m_pRbackGrp->RemoveProperty(
-            propParentTask );
-
-        m_pTaskGrp->RemoveProperty(
-            propParentTask );
-
-        TaskletPtr pTask( m_pRbackGrp );
-        RemoveTask( pTask );
-        pTask = m_pTaskGrp;
-        RemoveTask( pTask );
-
-        return iRet;
-    }
+    gint32 OnComplete( gint32 iRet );
 };
 
 }

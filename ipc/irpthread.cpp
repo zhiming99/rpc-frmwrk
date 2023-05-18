@@ -109,7 +109,8 @@ gint32 IThread::SetThreadName(
     gint32 ret = 0;
     string strName;
 
-    if( szName != nullptr )
+    if( szName != nullptr &&
+        szName[ 0 ] != 0 )
     {
         strName = szName;
     }
@@ -205,6 +206,15 @@ CTaskThread::CTaskThread(
     SetClassId( clsid( CTaskThread ) );
     m_pServiceThread = nullptr;
     Sem_Init( &m_semSync, 0, 0 );
+    CCfgOpener oCfg( pCfg );
+    gint32 ret = oCfg.GetStrProp(
+        0, m_strName );
+    if( ERROR( ret ) )
+    {
+        m_strName = CoGetClassName(
+            GetClsid() );
+    }
+
 }
 
 CTaskThread::~CTaskThread()
@@ -215,8 +225,9 @@ CTaskThread::~CTaskThread()
 // test if the thread is running
 bool CTaskThread::IsRunning() const
 {
-    return ( m_pServiceThread != nullptr
-        && m_pServiceThread->joinable() );
+    return ( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() &&
+        m_bRunning );
 }
 
 gint32 CTaskThread::GetLoadCount() const
@@ -255,31 +266,9 @@ gint32 CTaskThread::Stop()
 
 void CTaskThread::Join()
 {
-    if( IsRunning() )
+    if( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() )
         m_pServiceThread->join();
-}
-
-gint32 CTaskThread::SetThreadName(
-    const char* szName )
-{
-    string strName;
-
-    if( szName != nullptr )
-    {
-        strName = szName;
-    }
-    else
-    {
-        strName = CoGetClassName(
-            GetClsid() );
-
-        gint32 iTid = this->GetTid(); 
-        strName += "-";
-        strName += std::to_string( iTid );
-    }
-
-    return super::SetThreadName(
-        strName.c_str() );
 }
 
 gint32 CTaskThread::ProcessTask(
@@ -311,7 +300,7 @@ void CTaskThread::ThreadProc(
     gint32 ret = 0;
     LONGWORD dwContext = ( LONGWORD )pContext;
 
-    this->SetThreadName();
+    this->SetThreadName( m_strName.c_str() );
     while( !m_bExit )
     {
         ProcessTask( ( guint32 )dwContext );
@@ -334,6 +323,7 @@ void CTaskThread::ThreadProc(
             break;
     }
 
+    m_bRunning = false;
     return;
 }
 
@@ -430,7 +420,7 @@ void COneshotTaskThread::ThreadProc(
     gint32 ret = 0;
     LONGWORD lContext = ( LONGWORD )pContext;
 
-    this->SetThreadName();
+    this->SetThreadName( m_strName.c_str() );
 
     bool bTaskDone = false;
     while( !m_bExit )
@@ -457,7 +447,8 @@ void COneshotTaskThread::ThreadProc(
     // in case the task is in the queue
     if( m_bExit && !bTaskDone )
         ProcessTask( lContext );
-
+ 
+    m_bRunning = false;
     return;
 }
 
@@ -561,8 +552,9 @@ gint32 CIrpCompThread::Start()
 
 bool CIrpCompThread::IsRunning() const
 {
-    return ( m_pServiceThread != nullptr
-        && m_pServiceThread->joinable() );
+    return ( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() &&
+        m_bRunning );
 }
 
 gint32 CIrpCompThread::ProcessIrps()
@@ -606,6 +598,7 @@ void CIrpCompThread::ThreadProc( void* context )
     }
 
     ProcessIrps();
+    m_bRunning = false;
     return;
 }
 
@@ -655,7 +648,8 @@ gint32 CIrpCompThread::Stop()
 
 void CIrpCompThread::Join()
 {
-    if( IsRunning() )
+    if( m_pServiceThread != nullptr &&
+        m_pServiceThread->joinable() )
         m_pServiceThread->join();
 }
 
@@ -730,12 +724,22 @@ gint32 CThreadPool::GetThread(
         if( unlikely( m_vecThreads.size() <
             ( guint32 )m_iMaxThreads ) )
         {
-            ret = thptr.NewObj( m_iThreadClass );
+            CCfgOpener oCfg;
+            if( m_strPrefix.size() )
+            {
+                stdstr strName = m_strPrefix +
+                    std::to_string( m_iThreadCount );
+                oCfg.SetStrProp( 0, strName );
+            }
+
+            ret = thptr.NewObj( m_iThreadClass,
+                ( IConfigDb* )oCfg.GetCfg() );
+
             if( ERROR( ret ) )
                 break;
 
-            CCfgOpenerObj oCfg( ( CObjBase* )thptr );
-            oCfg.SetIntProp( propThreadId,
+            CCfgOpenerObj oThrdCfg;
+            oThrdCfg.SetIntProp( propThreadId,
                 m_iThreadCount++ );
 
             if( bStart )
@@ -759,13 +763,10 @@ gint32 CThreadPool::PutThread( IThread* pThread )
     gint32 ret = 0;
     if( pThread != nullptr )
     {
+        
+        ThreadPtr thptr = pThread;
         CStdRMutex oLock( m_oLock ); 
-
-        gint32 iRefCount = pThread->AddRef();
-        pThread->Release();
-
-        if( iRefCount == 2
-            && m_vecThreads.size() > ( guint32 )m_iMaxThreads )
+        if( m_vecThreads.size() > ( guint32 )m_iMaxThreads )
         {
             // if the threads limit is exceeded,
             // don't keep it in the pool
@@ -775,7 +776,8 @@ gint32 CThreadPool::PutThread( IThread* pThread )
 
             while( itr != m_vecThreads.end() )
             {
-                if( ( *itr )->GetObjId() != pThread->GetObjId() )
+                if( ( *itr )->GetObjId() !=
+                    pThread->GetObjId() )
                 {
                     ++itr;
                     continue;
@@ -783,6 +785,8 @@ gint32 CThreadPool::PutThread( IThread* pThread )
                 m_vecThreads.erase( itr );
                 break;
             }
+            oLock.Unlock();
+            thptr->Stop();
         }
     }
     else
@@ -815,6 +819,8 @@ CThreadPool::CThreadPool( const IConfigDb* pCfg )
     if( ERROR( ret ) )
         throw std::invalid_argument(
             "thread class is not given" );
+
+    a.GetStrProp( 3, m_strPrefix );
 
     ret = a.GetPointer( propIoMgr, m_pMgr );
     if( ERROR( ret ) )
@@ -888,6 +894,114 @@ gint32 CTaskThreadPool::RemoveTask(
     }while( 0 );
 
     return ret;
+}
+
+CThreadPools::CThreadPools( const IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        if( pCfg == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CCfgOpener oParams( pCfg );
+        ret = oParams.GetPointer(
+            propIoMgr, m_pMgr );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        throw std::runtime_error(
+            DebugMsg( ret, "Error occurs "
+                "in CLoopPool ctor" ) );
+    }
+}
+
+gint32 CThreadPools::CreatePool(
+    guint32 dwTag,
+    guint32 dwLoadLimit,
+    guint32 dwMaxThreads,
+    const stdstr& strPrefix )
+{
+    CStdRMutex oLock( GetLock() );
+
+    if( IsPool( dwTag ) )
+        return 0;
+
+    CIoManager* pMgr = GetIoMgr();
+    if( dwMaxThreads == 0 )
+        dwMaxThreads = pMgr->GetNumCores(); 
+
+    ThrdPoolPtr pPool;
+    CParamList oParams;
+    oParams.Push( dwLoadLimit );
+    oParams.Push( dwMaxThreads );
+    oParams.Push( clsid( CTaskThread ) );
+    oParams.Push( strPrefix );
+    oParams.SetPointer( propIoMgr, pMgr );
+
+    gint32 ret = pPool.NewObj(
+        clsid( CTaskThreadPool ),
+        oParams.GetCfg() );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_mapPools[ dwTag ] = pPool;
+    return ret;
+}
+
+gint32 CThreadPools::DestroyPool( guint32 dwTag )
+{
+    CStdRMutex oLock( GetLock() );
+
+    if( !IsPool( dwTag ) )
+        return -ENOENT;
+
+    ThrdPoolPtr pPool = m_mapPools[ dwTag ];
+    m_mapPools.erase( dwTag );
+    oLock.Unlock();
+    pPool->Stop();
+    return STATUS_SUCCESS;
+}
+
+gint32 CThreadPools::GetThread(
+    guint32 dwTag, 
+    ThreadPtr& pThread )
+{
+    CStdRMutex oLock( GetLock() );
+    if( !IsPool( dwTag ) )
+        return -ENOENT;
+    ThrdPoolPtr pPool = m_mapPools[ dwTag ];
+    return pPool->GetThread( pThread );
+}
+
+gint32 CThreadPools::PutThread(
+    guint32 dwTag,
+    ThreadPtr& pThread )
+{
+    CStdRMutex oLock( GetLock() );
+    if( !IsPool( dwTag ) )
+        return -ENOENT;
+    ThrdPoolPtr& pPool = m_mapPools[ dwTag ];
+    return pPool->PutThread( pThread );
+}
+
+
+gint32 CThreadPools::Stop()
+{
+    std::vector< guint32 > vecPools;
+    CStdRMutex oLock( GetLock() );
+    for( auto elem : m_mapPools )
+        vecPools.push_back( elem.first );
+
+    m_mapPools.clear();
+    oLock.Unlock();
+    for( auto& elem : vecPools )
+        DestroyPool( elem );
+
+    return 0;
 }
 
 }

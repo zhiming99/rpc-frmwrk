@@ -426,7 +426,8 @@ gint32 CInterfaceState::OnModEvent(
         case eventRmtModOffline:
         case eventModOffline:
             {
-                OutputMsg( iEvent, "Checkpoint 6: "
+                DebugPrintEx( logWarning, iEvent,
+                    "Checkpoint 6: "
                     "mod %s is going offline,"
                     "curstate=%d",
                     strModule.c_str(),
@@ -437,7 +438,8 @@ gint32 CInterfaceState::OnModEvent(
         case eventRmtModOnline:
         case eventModOnline:
             {
-                OutputMsg( iEvent, "Checkpoint 5: "
+                DebugPrintEx( logInfo, iEvent,
+                    "Checkpoint 5: "
                     "mod %s is going online,"
                     "curstate=%d",
                     strModule.c_str(),
@@ -996,6 +998,18 @@ gint32 CUnixSockStmState::SetupOpenPortParams(
     oCfg.CopyProp( propFd, this );
     oCfg.CopyProp( propTimeoutSec, this );
     oCfg.CopyProp( propKeepAliveSec, this );
+    oCfg.CopyProp( propListenOnly, this );
+
+    return 0;
+}
+
+gint32 CStmCpState::SetupOpenPortParams(
+        IConfigDb* pCfg )
+{
+    CCfgOpener oCfg( pCfg );
+
+    oCfg.CopyProp( propStarter, this );
+    oCfg.CopyProp( propStmConnPt, this );
     oCfg.CopyProp( propListenOnly, this );
 
     return 0;

@@ -393,9 +393,9 @@ class CBuffer : public CObjBase
     template<typename T, 
         typename T2 = typename std::enable_if<
             std::is_base_of< IAutoPtr, T >::value, T >::type,
-        typename exclude_dmsg = class std::enable_if<
+        typename exclude_dmsg = typename std::enable_if<
             !std::is_same< DMsgPtr, T >::value &&
-            !std::is_same< ObjPtr, T >::value >::type,
+            !std::is_same< ObjPtr, T >::value, T >::type,
         typename T4=T >
     operator T()
     {

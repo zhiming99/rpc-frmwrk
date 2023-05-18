@@ -2,7 +2,7 @@ name: rpc-frmwrk CI scheduled
 
 on:
   schedule:
-    - cron: '10 0 */3 * *'
+    - cron: '10 8 * * *'
 
 jobs:
   build:
@@ -37,7 +37,7 @@ jobs:
     - name: setup build env
       run: libtoolize;aclocal;autoreconf -vfi;automake --add-missing;autoconf;
     - name: configure
-      run: bash ./cfgsel r
+      run: bash ./cfgsel -r
     - name: make
       run: cat /proc/cpuinfo && make
     - name: install

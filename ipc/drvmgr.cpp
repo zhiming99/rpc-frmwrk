@@ -39,74 +39,121 @@ namespace rpcf
 
 using namespace std;
 
+static gint32 SimpleMergeCfg(
+    Json::Value& vDest,
+    const Json::Value& vSrc )
+{
+    gint32 ret = 0;
+    do{
+        using ARR_ATTR=
+            std::pair< const char*, const char* >;
+
+        std::vector< ARR_ATTR > vecArrs =
+            { { JSON_ATTR_MODULES, JSON_ATTR_MODNAME },
+            { JSON_ATTR_PORTS, JSON_ATTR_PORTCLASS },
+            { JSON_ATTR_DRIVERS, JSON_ATTR_DRVNAME } };
+        for( auto elem : vecArrs )
+        {
+            if( !vSrc.isMember( elem.first ) ||
+                !vSrc[ elem.first ].isArray() )
+                continue;
+            const Json::Value& oSrc = vSrc[ elem.first ];
+            if( !vDest.isMember( elem.first ) ||
+                !vDest[ elem.first ].isArray() )
+            {
+                vDest[ elem.first ] = oSrc;
+                continue;
+            }
+            Json::Value& oDest = vDest[ elem.first ];
+            guint32 dwCount = oDest.size();
+            for( gint32 i = 0; i < oSrc.size(); ++i )
+            {
+                bool bFound = false;
+                auto& vs = oSrc[ i ][ elem.second ];
+                for( gint32 j = 0; j < dwCount; ++j )
+                {
+                    auto& vd = oDest[ j ][ elem.second ];
+                    if( vs == vd )
+                    {
+                        oDest[ j ] = oSrc[ i ];
+                        bFound = true;
+                        break;
+                    }
+                }
+                if( !bFound )
+                    oDest.append( oSrc[ i ] );
+            }
+        }
+    }while( 0 );
+    return ret;
+}
+
 gint32 ReadJsonCfg(
     const std::string& strFile,
-    Json::Value& valConfig )
+    Json::Value& vConfig )
 {
-
     gint32 ret = 0;
-    FILE* fp = NULL;
-    size_t iLen = 0;
     do{
-        fp = fopen( strFile.c_str(), "rb" );
-        if( fp == NULL )
-        {
-            ret = -errno;
-            break;
-        }
-        ret = fseek( fp, 0, SEEK_END );
+        ret = ReadJsonCfgFile(
+            strFile, vConfig );
         if( ERROR( ret ) )
-        {
-            ret = -errno;
             break;
-        }
-        iLen = ( size_t )ftell( fp );
-        if( ERROR( iLen ) )
-        {
-            ret = -errno;
-            break;
-        }
 
-        if( iLen < 100
-            || iLen > 1024 * 1024 )
+        bool bPatch = false;
+        if( vConfig.isMember( JSON_ATTR_PATCH_CFG ) )
+        {
+            Json::Value& vPatch =
+                vConfig[ JSON_ATTR_PATCH_CFG ];
+            if( vPatch.isString() &&
+                vPatch.asString() == "true" )
+                bPatch = true;
+        }
+        if( !bPatch )
+            break;
+        
+        Json::Value vBase( Json::objectValue );
+        stdstr strPath;
+
+        ret = FindInstCfg( strFile, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        if( strFile.find( strPath ) != stdstr::npos )
         {
             ret = -EBADMSG;
             break;
         }
 
-        fseek( fp, 0, SEEK_SET );
+        ret = ReadJsonCfgFile(
+            strPath, vBase );
+        if( ERROR( ret ) )
+            break;
 
-        BufPtr buf( true );
-        buf->Resize( iLen + 16 );
-        size_t iSize = fread( buf->ptr(), 1, iLen, fp );
-        if( iSize < iLen )
+        bPatch = false;
+        if( vBase.isMember( JSON_ATTR_PATCH_CFG ) )
         {
-            ret = -EBADF;
+            Json::Value& vPatch =
+                vBase[ JSON_ATTR_PATCH_CFG ];
+            if( vPatch.isString() &&
+                vPatch.asString() == "true" )
+                bPatch = true;
+        }
+        if( bPatch )
+        {
+            ret = -EINVAL;
             break;
         }
-
-        Json::CharReaderBuilder oBuilder;
-        Json::CharReader* pReader = nullptr;
-        pReader = oBuilder.newCharReader();
-        if( pReader == nullptr )
-        {
-            ret = -EFAULT;
+        ret = SimpleMergeCfg( vBase, vConfig );
+        if( ERROR( ret ) )
             break;
-        }
-        if( !pReader->parse( buf->ptr(),
-            buf->ptr() + buf->size(),
-            &valConfig, nullptr ) )
-        {
-            ret = -EBADMSG;
-        }
 
-        delete pReader;
+        vConfig = vBase;
 
     }while( 0 );
-
-    if( fp != nullptr )
+    if( ERROR( ret ) )
     {
-        fclose( fp );
+        vConfig = Json::Value(
+            Json::objectValue );
     }
 
     return ret;
@@ -189,7 +236,7 @@ CDriverManager::~CDriverManager()
 gint32 CDriverManager::Start()
 {
 
-    int ret = 0;
+    gint32 ret = 0;
     do{
         // make the registry entries    
         CRegistry& oReg = GetIoMgr()->GetRegistry();

@@ -40,11 +40,17 @@ struct IStream
     typedef std::map< HANDLE, InterfPtr > UXSTREAM_MAP;
     UXSTREAM_MAP m_mapUxStreams;
     CRpcServices* m_pSvc = nullptr;
+    bool    m_bNonSockStm = false;
 
     virtual gint32 CanContinue() = 0;
 
     inline void SetInterface( CRpcServices* pSvc )
-    { m_pSvc = pSvc; }
+    {
+        m_pSvc = pSvc;
+        CCfgOpenerObj oCfg( pSvc );
+        oCfg.GetBoolProp(
+            propNonSockStm, m_bNonSockStm );
+    }
 
     inline CRpcServices* GetInterface() const
     { return m_pSvc; }
@@ -212,6 +218,9 @@ struct IStream
     gint32 OnUxStmEvtWrapper(
         HANDLE hChannel,
         IConfigDb* pCfg );
+    
+    inline bool IsNonSockStm() const
+    { return m_bNonSockStm; }
 };
 
 struct IStreamServer : public IStream

@@ -123,6 +123,12 @@ void CIfRouterTest::setUp()
             }
 
             pSvc->SetRouterName( MODULE_NAME );
+
+            ret = pSvc->TryLoadClassFactory(
+                "./librpc.so" );
+            if( ERROR( ret ) )
+                break;
+
             ret = pSvc->Start();
         }
         else
@@ -198,25 +204,11 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 
 namespace rpcf{
 extern gint32 CheckForKeyPass( bool& bPrompt );
-
-#ifdef FUSE3
-gint32 AddFilesAndDirsReqFwdr( CRpcServices* );
-gint32 AddFilesAndDirsBdge( CRpcServices* );
-#endif
-
 }
 
 #ifdef FUSE3
-gint32 AddFilesAndDirs( CRpcServices* pSvc )
-{
-    if( pSvc == nullptr )
-        return -EFAULT;
-
-    if( g_dwRole == 1 )
-        return AddFilesAndDirsReqFwdr( pSvc );
-
-    return AddFilesAndDirsBdge( pSvc );
-}
+extern gint32 AddFilesAndDirs(
+    bool bProxy, CRpcServices* pSvc );
 
 gint32 MountAndLoop( CRpcServices* pSvc )
 {
@@ -245,13 +237,14 @@ gint32 MountAndLoop( CRpcServices* pSvc )
         if( ERROR( ret ) )
             break;
 
+        bool bProxy = ( g_dwRole == 1 );
         g_pIoMgr = pSvc->GetIoMgr();
         ret = InitRootIf(
-            pSvc->GetIoMgr(), g_dwRole == 1 );
+            pSvc->GetIoMgr(), bProxy );
         if( ERROR( ret ) )
             break;
 
-        ret = AddFilesAndDirs( pSvc );
+        ret = AddFilesAndDirs( bProxy, pSvc );
         if( ERROR( ret ) )
             break;
 

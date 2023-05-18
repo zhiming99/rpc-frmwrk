@@ -1,5 +1,6 @@
 usr/bin/ridlc
 @TEST_DEBBINS@
+@FUSE3_DEBHEADERS@
 usr/bin/rpcf/btinrtsvr
 usr/bin/rpcf/btinrtcli
 usr/bin/rpcf/ifsvrsmk

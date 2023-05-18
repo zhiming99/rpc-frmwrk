@@ -263,6 +263,9 @@ enum EnumPropId : gint32
     propTaskAdded,      // type: a guint32 counter of the number of tasks added by the taskgroup
     propTaskRejected,   // type: a guint32 counter of the number of tasks rejected by the taskgroup
     propStmHandle,      // type: a intptr as a handle of a stream. cannot pass machine boundary
+    propStmConnPt,      // type: an objptr holding a connection point for stream transfer
+    propStarter,        // type: a boolean value indicate whether this end of propStmConnPt is a connection starter
+    propNonSockStm,     // type: a boolean value indicate whether to use non-sock stream
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

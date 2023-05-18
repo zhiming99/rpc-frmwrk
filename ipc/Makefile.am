@@ -11,7 +11,7 @@ dbusport.cpp portdrv.cpp rpcpdo.cpp dbuspdo.cpp \
 tasklets.cpp lpbkmtch.cpp ifhelper.cpp iiddict.cpp \
 reqopen.cpp uxport.cpp uxstream.cpp streamex.cpp \
 prxyfdo.cpp dbusprxy.cpp fdodrv.cpp fastrpc.cpp \
-stmport.cpp msgmatch.cpp
+stmport.cpp msgmatch.cpp stmcp.cpp tractgrp.cpp
 
 include_dir=$(top_srcdir)/include
 
@@ -23,7 +23,7 @@ mainloop.h msgmatch.h namespc.h port.h \
 portdrv.h portex.h reqopen.h sevpoll.h \
 stream.h streamex.h tasklets.h tractgrp.h \
 utils.h uxport.h uxstream.h proxy.h prxyport.h fdodrv.h \
-stmport.h fastrpc.h
+stmport.h fastrpc.h stmcp.h
 
 rpcfipcdir=$(includedir)/rpcf/ipc
 

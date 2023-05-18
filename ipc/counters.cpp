@@ -54,6 +54,9 @@ gint32 CStatCountersServer::OnPostStop(
     IEventSink* pCallback )
 {
     UnregisterFilter( m_pMsgFilter );
+    CMessageCounterTask* pFilter = m_pMsgFilter;
+    if( pFilter != nullptr )
+        pFilter->Stop();
     m_pMsgFilter.Clear();
     return 0;
 }
@@ -80,6 +83,12 @@ gint32 CStatCountersProxy::OnPostStop(
     IEventSink* pCallback )
 {
     UnregisterFilter( m_pMsgFilter );
+    CMessageCounterTaskProxy* pFilter =
+        m_pMsgFilter;
+
+    if( pFilter != nullptr )
+        pFilter->Stop();
+
     m_pMsgFilter.Clear();
     return 0;
 }

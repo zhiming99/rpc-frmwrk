@@ -716,6 +716,12 @@ CIoManager::GetLoopPools() const
     return *m_pLPools;
 }
 
+CThreadPools&
+CIoManager::GetThreadPools() const
+{
+    return *m_pPools;
+}
+
 ObjPtr&
 CIoManager::GetSyncIf() const
 {
@@ -1773,6 +1779,15 @@ CIoManager::CIoManager( const std::string& strModName ) :
                 "CMainIoLoop failed to initialize" );
         }
 
+        ret = m_pPools.NewObj(
+            clsid( CThreadPools ), pCfg );
+
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CThreadPools failed to initialize" );
+        }
+
         ret = m_pDrvMgr.NewObj(
             clsid( CDriverManager ), pCfg );
 
@@ -2198,6 +2213,7 @@ gint32 CIoMgrStopTask::operator()(
         ret = pMgr->GetLoopPools().Stop();
         ret = pMgr->GetMainIoLoop()->Stop();
         ret = pMgr->GetUtils().Stop();
+        ret = pMgr->GetThreadPools().Stop();
     }
 
     if( dwContext == eventOneShotTaskThrdCtx )

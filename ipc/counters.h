@@ -312,6 +312,12 @@ class CMessageCounterBase :
 
     virtual gint32 Process( guint32 dwContext )
     { return 0; }
+
+    void Stop()
+    {
+        CCfgOpenerObj oTaskCfg( this );    
+        oTaskCfg.RemoveProperty( propIfPtr );
+    }
 };
 
 class CMessageCounterTask :

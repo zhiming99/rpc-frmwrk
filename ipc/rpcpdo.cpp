@@ -1944,8 +1944,6 @@ gint32 CRpcPdoPort::SetupDBusSetting(
             if( ERROR( ret ) )
             {
                 // server is not online
-                DebugPrint( ret,
-                    "Checkpoint 51: SetupDBusSetting failed" );
                 break;
             }
             // add the match rule for the signal

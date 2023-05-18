@@ -103,6 +103,10 @@ void CIfSmokeTest::setUp()
         pSvc->SetCmdLineOpt(
             propRouterRole, 2 );
 #endif
+        ret = pSvc->TryLoadClassFactory(
+            "./librpc.so" );
+        if( ERROR( ret ) )
+            break;
 
         if( pSvc != nullptr )
             ret = pSvc->Start();

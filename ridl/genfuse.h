@@ -228,5 +228,18 @@ class CImplMainFuncFuse :
         ObjPtr& pNode,
         bool bProxy );
     virtual gint32 Output();
+    inline static gint32 EmitInitContext(
+        bool bProxy, CCppWriter* pWriter )
+    { 
+        return CImplMainFunc::EmitInitContext(
+            bProxy, pWriter );
+    }
+    static gint32 EmitFuseMain(
+        std::vector<ObjPtr>& vecSvcs, 
+        bool bProxy, CCppWriter* pWriter )
+    {
+        return CImplMainFunc::EmitFuseMain(
+            vecSvcs, bProxy, pWriter );
+    }
 };
 

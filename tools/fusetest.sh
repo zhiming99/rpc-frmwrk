@@ -17,9 +17,9 @@ function stressTest()
     make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
-    release/TestTypessvr -f mpsvr &
+    release/TestTypessvr -m mpsvr &
     sleep 8 
-    release/TestTypescli -f mp &
+    release/TestTypescli -m mp &
     sleep 4
 
     #make sure TestTypesSvc created
@@ -39,7 +39,7 @@ function stressTest()
 
 /bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
 start=\$(date +%s.%N)
-for((i=1;i<200;i++));do
+for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
 done
 wait \`jobs -p\`
@@ -76,8 +76,8 @@ function mkDirTest()
     make > /dev/null 2>&1 || exit 10
 
     mkdir mp mpsvr || true
-    hostsvr -f mpsvr &
-    hostcli -f mp &
+    hostsvr -m mpsvr &
+    hostcli -m mp &
     sleep 5 
 
     echo loading TestTypes library to server and proxy...
@@ -209,11 +209,11 @@ function pytest()
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
         pushd ./fs
-        echo release/${appname}svr ./mpsvr
-        release/${appname}svr ./mpsvr
+        echo release/${appname}svr -d -m ./mpsvr
+        release/${appname}svr -d -m ./mpsvr
         sleep 2
-        echo release/${appname}cli -f ./mp
-        release/${appname}cli ./mp
+        echo release/${appname}cli -d -m ./mp
+        release/${appname}cli -d -m ./mp
         popd
         sleep 5
         python3 ./mainsvr.py fs/mpsvr/$svcpt 0 &

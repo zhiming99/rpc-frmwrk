@@ -1990,7 +1990,7 @@ gint32 CRpcTcpBridgeProxyAuth::EnableInterfaces()
     if( !pTaskGrp.IsEmpty() )
         ( *pTaskGrp )( eventCancelTask );
 
-    if( pRespCb.IsEmpty() )
+    if( !pRespCb.IsEmpty() )
         ( *pRespCb )( eventCancelTask );
 
     return ret;

@@ -318,10 +318,11 @@ gint32 FindInstCfg(
     // relative path
     std::string strFile = "./";
     char buf[ 1024 ];
+    buf[ sizeof( buf ) - 1 ] = 0;
     size_t iSize = std::min(
-        strFileName.size(), sizeof( buf ) - 1 );
+        strFileName.size() + 1, sizeof( buf ) - 1 );
     strncpy( buf,
-        strFileName.c_str(), iSize + 1 );
+        strFileName.c_str(), iSize );
     strFile += basename( buf );
 
     do{
@@ -348,6 +349,80 @@ gint32 FindInstCfg(
 
     return ret;
 }
+
+gint32 ReadJsonCfgFile(
+    const std::string& strFile,
+    Json::Value& valConfig )
+{
+
+    gint32 ret = 0;
+    FILE* fp = NULL;
+    size_t iLen = 0;
+    do{
+        fp = fopen( strFile.c_str(), "rb" );
+        if( fp == NULL )
+        {
+            ret = -errno;
+            break;
+        }
+        ret = fseek( fp, 0, SEEK_END );
+        if( ERROR( ret ) )
+        {
+            ret = -errno;
+            break;
+        }
+        iLen = ( size_t )ftell( fp );
+        if( ERROR( iLen ) )
+        {
+            ret = -errno;
+            break;
+        }
+
+        if( iLen < 100
+            || iLen > 1024 * 1024 )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        fseek( fp, 0, SEEK_SET );
+
+        BufPtr buf( true );
+        buf->Resize( iLen + 16 );
+        size_t iSize = fread( buf->ptr(), 1, iLen, fp );
+        if( iSize < iLen )
+        {
+            ret = -EBADF;
+            break;
+        }
+
+        Json::CharReaderBuilder oBuilder;
+        Json::CharReader* pReader = nullptr;
+        pReader = oBuilder.newCharReader();
+        if( pReader == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        if( !pReader->parse( buf->ptr(),
+            buf->ptr() + buf->size(),
+            &valConfig, nullptr ) )
+        {
+            ret = -EBADMSG;
+        }
+
+        delete pReader;
+
+    }while( 0 );
+
+    if( fp != nullptr )
+    {
+        fclose( fp );
+    }
+
+    return ret;
+}
+
 
 int Sem_Init( sem_t* psem, int pshared, unsigned int value )
 {

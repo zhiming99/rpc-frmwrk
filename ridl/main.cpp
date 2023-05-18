@@ -108,6 +108,7 @@ void Usage()
     printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
 #endif
 
+    printf( "\t-b:\tTo output the skelton with built-in router\n" );
     printf( "\t-l:\tTo output a shared library\n" );
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
@@ -122,6 +123,7 @@ stdstr g_strLang = "cpp";
 stdstr g_strLocale ="en";
 guint32 g_dwFlags = 0;
 stdstr g_strCmdLine;
+bool g_bBuiltinRt = false;
 
 // the prefix for java package name
 stdstr g_strPrefix = "org.rpcf.";
@@ -174,7 +176,7 @@ int main( int argc, char** argv )
         {
 
             opt = getopt_long( argc, argv,
-                "ahvlI:O:o:pjP:L:f::s",
+                "abhvlI:O:o:pjP:L:f::s",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -280,7 +282,7 @@ int main( int argc, char** argv )
                     break;
 #else
                     fprintf( stderr,
-                        "Error '-%c' is not supported by this build\n", opt );
+                        "Error '-%c' is not supported by PYTHON disabled\n", opt );
                     ret = -ENOTSUP;
                     bQuit = true;
                     break;
@@ -307,7 +309,7 @@ int main( int argc, char** argv )
             case 'P':
                 {
                     fprintf( stderr,
-                        "Error '-%c' is not supported by this build\n", opt );
+                        "Error '-%c' is not supported by JAVA disabled\n", opt );
                     ret = -ENOTSUP;
                     bQuit = true;
                     break;
@@ -317,6 +319,12 @@ int main( int argc, char** argv )
             case 'l':
                 {
                     g_bMklib = true;
+                    if( g_bBuiltinRt )
+                    {
+                        fprintf( stderr,
+                            "Error '-b' cannot be used with '-l' option\n" );
+                        bQuit = true;
+                    }
                     break;
                 }
             case 'L':
@@ -355,7 +363,7 @@ int main( int argc, char** argv )
                     }
 #else
                     fprintf( stderr,
-                        "Error '-f' is not supported by this build\n" );
+                        "Error '-f' is not supported with FUSE3 disabled\n" );
                     ret = -ENOTSUP;
                     bQuit = true;
 #endif
@@ -364,6 +372,17 @@ int main( int argc, char** argv )
             case 's':
                 {
                     g_bRpcOverStm = true;
+                    break;
+                }
+            case 'b':
+                {
+                    g_bBuiltinRt = true;
+                    if( g_bMklib )
+                    {
+                        fprintf( stderr,
+                            "Error '-l' cannot be used with '-b' option\n" );
+                        bQuit = true;
+                    }
                     break;
                 }
             case 'v':
