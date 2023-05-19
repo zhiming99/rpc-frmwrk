@@ -6859,7 +6859,12 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         if( bProxy && !bFuse )
         {
             Wa( "if( bDaemon )" );
-            Wa( "    daemon( 1, 0 );" );
+            BLOCK_OPEN;
+            Wa( "ret = daemon( 1, 0 );" );
+            Wa( "if( ret < 0 )" );
+            CCOUT << "{ ret = -errno; break; }";
+            BLOCK_CLOSE;
+            NEW_LINE;
             CCOUT << "ret = _main( argc, argv );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
@@ -6884,7 +6889,12 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "if( g_strMPoint.empty() )" );
             BLOCK_OPEN;
             Wa( "if( bDaemon )" );
-            Wa( "    daemon( 1, 0 );" );
+            BLOCK_OPEN;
+            Wa( "ret = daemon( 1, 0 );" );
+            Wa( "if( ret < 0 )" );
+            CCOUT << "{ ret = -errno; break; }";
+            BLOCK_CLOSE;
+            NEW_LINE;
             Wa( "ret = _main( argc, argv );" );
             CCOUT << "break;";
             BLOCK_CLOSE;
@@ -6894,7 +6904,12 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         EMIT_CALL_MAIN;
 #else
         Wa( "if( bDaemon )" );
-        Wa( "    daemon( 1, 0 );" );
+        BLOCK_OPEN;
+        Wa( "ret = daemon( 1, 0 );" );
+        Wa( "if( ret < 0 )" );
+        CCOUT << "{ ret = -errno; break; }";
+        BLOCK_CLOSE;
+        NEW_LINE;
         CCOUT << "ret = _main( argc, argv );";
 #endif
         BLOCK_CLOSE;

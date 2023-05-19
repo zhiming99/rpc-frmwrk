@@ -35,6 +35,13 @@ To build a shared library instead of a program. This option works for C++ projec
 .BR \-L " "\fIlang\fR
 To output the 'README.md' file in the specified language <lang>. Currently we support
 two languages, "cn" as Chinese, and "en" as English.
+.TP
+.BR \-s " "
+To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels. C++ Only.
+.TP
+.BR \-b " "
+To generate the skelton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
+
 
 .SH SEE ALSO
 ridl(7), rpcrouter(1)

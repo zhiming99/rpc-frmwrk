@@ -150,6 +150,6 @@ gint32 maincli(
             "Echo request succeeded with resp '%s'",
             strResp.c_str() );
 
-    return STATUS_SUCCESS;
+    return ret;
 }
 

@@ -5,7 +5,7 @@
 * The following code snippet is what the ridl looks like:
 
 ```
-// must have statement
+// `appname` is a must-have statement
 appname "example";
 typedef array< array< string > > STRMATRIX2;
 
@@ -125,7 +125,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
                 Chinese and "en" for English.
 
         -s:     To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels. C++ Only.
-
+        -b:     To generate the skelton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
 ```
 
 Currently `ridlc` can output skelton code in C++, Python and Java. In the future, it will be able to generate code for other languages as well.
