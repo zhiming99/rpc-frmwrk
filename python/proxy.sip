@@ -34,6 +34,8 @@ typedef enum
 
 #include "streamex.h"
 #include "counters.h"
+#include "stmport.h"
+#include "fastrpc.h"
 
 class CPythonProxyBase :
     public CStreamProxyAsync
@@ -72,6 +74,18 @@ DECLARE_AGGREGATED_SERVER(
     CPythonServer,
     CStatCountersServer,
     CStreamServerAsync );
+
+DECLARE_AGGREGATED_PROXY(
+    CPythonProxyROS,
+    CStatCountersProxy,
+    CPythonProxyBase,
+    CFastRpcProxyBase );
+
+DECLARE_AGGREGATED_SERVER(
+    CPythonServerROS,
+    CStatCountersServer,
+    CStreamServerAsync,
+    CFastRpcServerBase );
 
 template< class T >
 class CPythonInterfBase : public T

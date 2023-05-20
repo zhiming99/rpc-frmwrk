@@ -889,20 +889,16 @@ static gint32 dirbuf_add( struct dirbuf *b,
     const char *name, struct stat* stbuf,
     off_t off, size_t max_size )
 {
-    size_t oldsize = b->size;
-
     size_t inc_size = fuse_add_direntry(
         b->req, NULL, 0, name, NULL, 0);
 
     if( b->size + inc_size > max_size )
         return -ENOMEM;
 
-    b->size += inc_size;
-    b->p = (char *) realloc(b->p, b->size);
+    fuse_add_direntry(b->req, b->p + b->size,
+        inc_size, name, stbuf, off );
 
-    fuse_add_direntry(b->req, b->p + oldsize,
-        b->size - oldsize, name,
-        stbuf, off );
+    b->size += inc_size;
     return 0;
 }
 
@@ -4025,64 +4021,89 @@ gint32 CFuseSvcProxy::ReceiveMsgJson(
     return ret;
 }
 
-void CFuseSvcProxy::AddReqFiles(
-    const stdstr& strSuffix )
+gint32 CFuseSvcProxy::AddReqFiles(
+    const stdstr& strSuffix, DIR_SPTR& pReq )
 {
     // add an RW request file
-    CFuseObjBase* pObj = nullptr;
-    guint32 dwGrpId = 0;
-    if( !( strSuffix.size() == 1 &&
-        strSuffix.front() == '0' ) )
-        dwGrpId = NewGroupId();
+    gint32 ret = 0;
+    do{
+        CFuseObjBase* pObj = nullptr;
+        guint32 dwGrpId = 0;
+        if( strSuffix != "0" )
+            dwGrpId = NewGroupId();
 
-    stdstr strName = "jreq_";
-    strName += strSuffix;
-    auto pFile = DIR_SPTR(
-        new CFuseReqFileProxy( strName, this ) ); 
-    pObj = dynamic_cast< CFuseObjBase* >
-        ( pFile.get() );
-    pObj->SetMode( S_IFREG | S_IWUSR );
-    pObj->DecRef();
-    auto pReqFile = static_cast
-        < CFuseReqFileProxy* >( pObj );
-    pReqFile->SetGroupId( dwGrpId );
-    m_pSvcDir->AddChild( pFile );
+        stdstr strName = "jreq_";
+        strName += strSuffix;
+        auto pFile = DIR_SPTR(
+            new CFuseReqFileProxy( strName, this ) ); 
+        pObj = dynamic_cast< CFuseObjBase* >
+            ( pFile.get() );
+        pObj->SetMode( S_IFREG | S_IWUSR );
+        pObj->DecRef();
+        auto pReqFile = static_cast
+            < CFuseReqFileProxy* >( pObj );
+        pReqFile->SetGroupId( dwGrpId );
+        ret = m_pSvcDir->AddChild( pFile );
+        if( ERROR( ret ) )
+            break;
+        pReq = pFile;
 
-    // add an RO RESP file 
-    strName = "jrsp_";
-    strName += strSuffix;
-    pFile = DIR_SPTR(
-        new CFuseRespFileProxy( strName, this ) );
-    pObj = dynamic_cast
-        < CFuseObjBase* >( pFile.get() );
-    pObj->SetMode( S_IFREG | S_IRUSR );
-    pObj->DecRef();
-    auto pRespFile = static_cast
-        < CFuseRespFileProxy* >( pObj );
-    pRespFile->SetGroupId( dwGrpId );
-    m_pSvcDir->AddChild( pFile );
+        // add an RO RESP file 
+        strName = "jrsp_";
+        strName += strSuffix;
+        pFile = DIR_SPTR(
+            new CFuseRespFileProxy( strName, this ) );
+        pObj = dynamic_cast
+            < CFuseObjBase* >( pFile.get() );
+        pObj->SetMode( S_IFREG | S_IRUSR );
+        pObj->DecRef();
+        auto pRespFile = static_cast
+            < CFuseRespFileProxy* >( pObj );
+        pRespFile->SetGroupId( dwGrpId );
+        ret = m_pSvcDir->AddChild( pFile );
+        if( ERROR( ret ) )
+        {
+            strName = pReqFile->GetName();
+            m_pSvcDir->RemoveChild( strName );
+            break;
+        }
 
-    // add an RO event file 
-    strName = "jevt_";
-    strName += strSuffix;
-    pFile = DIR_SPTR(
-        new CFuseEvtFile( strName, this ) ); 
-    pObj = dynamic_cast
-        < CFuseObjBase* >( pFile.get() );
-    pObj->SetMode( S_IFREG | S_IRUSR );
-    pObj->DecRef();
-    auto pEvtFile = static_cast
-        < CFuseEvtFile* >( pObj );
-    pEvtFile->SetGroupId( dwGrpId );
-    AddGroup( dwGrpId,
-        { pReqFile, pRespFile, pEvtFile } );
-    m_pSvcDir->AddChild( pFile );
+        // add an RO event file 
+        strName = "jevt_";
+        strName += strSuffix;
+        pFile = DIR_SPTR(
+            new CFuseEvtFile( strName, this ) ); 
+        pObj = dynamic_cast
+            < CFuseObjBase* >( pFile.get() );
+        pObj->SetMode( S_IFREG | S_IRUSR );
+        pObj->DecRef();
+        auto pEvtFile = static_cast
+            < CFuseEvtFile* >( pObj );
+        pEvtFile->SetGroupId( dwGrpId );
+        ret = m_pSvcDir->AddChild( pFile );
+        if( ERROR( ret ) )
+        {
+            strName = pReqFile->GetName();
+            m_pSvcDir->RemoveChild( strName );
+            strName = pRespFile->GetName();
+            m_pSvcDir->RemoveChild( strName );
+            break;
+        }
 
-    if( m_pSvcDir->GetParent() == nullptr )
-        return;
+        AddGroup( dwGrpId,
+            { pReqFile, pRespFile, pEvtFile } );
 
-    fuseif_invalidate_path(
-        GetFuse(), m_pSvcDir.get() );
+        if( m_pSvcDir->GetParent() == nullptr )
+            break;
+
+        fuseif_invalidate_path(
+            GetFuse(), m_pSvcDir.get() );
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        pReq.reset();
+
+    return ret;
 }
 
 gint32 CFuseSvcProxy::DoRmtModEventFuse(
@@ -4200,51 +4221,68 @@ gint32 CFuseSvcServer::ReceiveMsgJson(
     return ret;
 }
 
-void CFuseSvcServer::AddReqFiles(
-    const stdstr& strSuffix )
+gint32 CFuseSvcServer::AddReqFiles(
+    const stdstr& strSuffix, DIR_SPTR& pReq )
 {
     // add an RO request file
-    CFuseObjBase* pObj = nullptr;
-    guint32 dwGrpId = 0;
-    if( !( strSuffix.size() == 1 &&
-        strSuffix.front() == '0' ) )
-        dwGrpId = NewGroupId();
+    gint32 ret = 0;
+    do{
+        CFuseObjBase* pObj = nullptr;
+        guint32 dwGrpId = 0;
+        if( strSuffix != "0" )
+            dwGrpId = NewGroupId();
 
-    stdstr strName = "jreq_";
-    strName += strSuffix;
-    auto pFile = DIR_SPTR(
-        new CFuseReqFileSvr( strName, this ) ); 
-    pObj = dynamic_cast< CFuseObjBase* >
-        ( pFile.get() );
-    pObj->SetMode( S_IFREG | S_IRUSR );
-    pObj->DecRef();
-    auto pReqFile = static_cast
-        < CFuseReqFileSvr* >( pObj );
-    pReqFile->SetGroupId( dwGrpId );
-    m_pSvcDir->AddChild( pFile );
+        stdstr strName = "jreq_";
+        strName += strSuffix;
+        auto pFile = DIR_SPTR(
+            new CFuseReqFileSvr( strName, this ) ); 
+        pObj = dynamic_cast< CFuseObjBase* >
+            ( pFile.get() );
+        pObj->SetMode( S_IFREG | S_IRUSR );
+        pObj->DecRef();
+        auto pReqFile = static_cast
+            < CFuseReqFileSvr* >( pObj );
+        pReqFile->SetGroupId( dwGrpId );
+        ret = m_pSvcDir->AddChild( pFile );
+        if( ERROR( ret ) )
+            break;
+        pReq = pFile;
 
-    // add an WO RESP file for both
-    // response and event
-    strName = "jrsp_";
-    strName += strSuffix;
+        // add an WO RESP file for both
+        // response and event
+        strName = "jrsp_";
+        strName += strSuffix;
 
-    pFile = DIR_SPTR(
-        new CFuseRespFileSvr( strName, this ) ); 
-    pObj = dynamic_cast
-        < CFuseObjBase* >( pFile.get() );
-    pObj->SetMode( S_IFREG | S_IWUSR );
-    pObj->DecRef();
-    auto pRespFile = static_cast
-        < CFuseRespFileSvr* >( pObj );
-    pRespFile->SetGroupId( dwGrpId );
-    AddGroup( dwGrpId, 
-        { pReqFile, pRespFile } );
-    m_pSvcDir->AddChild( pFile );
-    if( m_pSvcDir->GetParent() == nullptr )
-        return;
+        pFile = DIR_SPTR(
+            new CFuseRespFileSvr( strName, this ) ); 
+        pObj = dynamic_cast
+            < CFuseObjBase* >( pFile.get() );
+        pObj->SetMode( S_IFREG | S_IWUSR );
+        pObj->DecRef();
+        auto pRespFile = static_cast
+            < CFuseRespFileSvr* >( pObj );
+        pRespFile->SetGroupId( dwGrpId );
+        ret = m_pSvcDir->AddChild( pFile );
+        if( ERROR( ret ) )
+        {
+            strName = pReqFile->GetName();
+            m_pSvcDir->RemoveChild( strName );
+            break;
+        }
 
-    fuseif_invalidate_path(
-        GetFuse(), m_pSvcDir.get() );
+        AddGroup( dwGrpId, 
+            { pReqFile, pRespFile } );
+        if( m_pSvcDir->GetParent() == nullptr )
+            break;
+
+        fuseif_invalidate_path(
+            GetFuse(), m_pSvcDir.get() );
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        pReq.reset();
+
+    return ret;
 }
 
 gint32 CFuseSvcServer::IncStmCount(
@@ -4567,20 +4605,19 @@ static gint32 fuseif_create_req(
             break;
         }
 
+        DIR_SPTR pEnt;
         if( pProxy != nullptr )
-            pProxy->AddReqFiles( strSuffix );
+            ret = pProxy->AddReqFiles(
+                strSuffix, pEnt );
         else
-            pSvr->AddReqFiles( strSuffix );
+            ret = pSvr->AddReqFiles(
+                strSuffix, pEnt );
 
-        auto pEnt = pDir->GetChild( strName );
-        if( pEnt == nullptr )
-        {
-            ret = -EFAULT;
+        if( ERROR( ret ) )
             break;
-        }
 
         auto pReqFile = dynamic_cast
-            < CFuseObjBase* >( pEnt );
+            < CFuseObjBase* >( pEnt.get() );
 
         fi->fh = ( guint64 )pReqFile;
         fi->direct_io = 1;

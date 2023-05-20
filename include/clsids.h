@@ -346,6 +346,8 @@ typedef enum : guint32
     DECL_CLSID( CStmCpState ),
     DECL_CLSID( CStmConnPoint ),
     DECL_CLSID( CThreadPools ),
+    DECL_CLSID( CPythonProxyROS ),
+    DECL_CLSID( CPythonServerROS ),
     DECL_CLSID( MaxClsid ),
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
