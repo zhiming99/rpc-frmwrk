@@ -46,7 +46,7 @@
 ## 开发
 `rpc-frmwrk`支持两种模式的`RPC`应用程序的开发.
 1. `高级模式`： `rpc-frmwrk`提供接口描述语言[`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)和编译程序`ridlc`生成可以支持`C++`, `Pyhton`, `Java`的框架代码. 例子代码在[这里](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld).`高级模式`使用的是`rpc-frmwrk`的原生架构，用户通过运用`rpc-frmwrk`运行库提供的接口，和各种内建的工具类，执行同步，异步，超时，取消，以及`流`传输等功能，从而实现高性能的业务逻辑。
-2. [`简单模式`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统（`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会以对文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全抛开了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
+2. [`简单模式`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统（`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会以对文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全封装了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
 
 ## 第三方依赖  
 1. `dbus-1.0 (dbus-devel)`

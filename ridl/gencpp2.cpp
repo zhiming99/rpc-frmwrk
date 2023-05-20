@@ -1818,6 +1818,7 @@ gint32 CImplIfMethodSvr2::OutputSyncROS()
         if( dwCount == 0 )
         {
             CCOUT << ")";
+            NEW_LINE;
         }
         else
         {
