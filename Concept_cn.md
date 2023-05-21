@@ -65,7 +65,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 ## 安全和认证
 
-* `rpc-frmwrk`通过OpenSSL支持[SSL连接](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)，或者[WebSocket](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)的SSL连接。
+* `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)，或者基于[WebSocket](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)的SSL连接。
 * `rpc-frmwrk`支持[Kerberos 5认证](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/security/README.md)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
 * `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。
 
