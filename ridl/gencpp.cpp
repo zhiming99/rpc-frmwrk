@@ -7031,10 +7031,13 @@ gint32 CImplMainFunc::EmitInitContext(
         CCOUT << "CIoManager* pSvc = g_pIoMgr;";
         NEW_LINE;
 
-        Wa( "pSvc->SetCmdLineOpt(" );
-        CCOUT << "    propRouterRole, "
-            << ( bProxy ? "1 );" : "2 );" );
-        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "pSvc->SetCmdLineOpt(" );
+            CCOUT << "    propRouterRole, "
+                << ( bProxy ? "1 );" : "2 );" );
+            NEW_LINE;
+        }
 
         CCOUT << "ret = pSvc->Start();";
         NEW_LINE;

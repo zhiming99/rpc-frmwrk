@@ -1,7 +1,7 @@
-SUBDIRS= iftest btinrt
+SUBDIRS= iftest btinrt helloworld 
 
 if ENABLE_TESTCASES
-SUBDIRS+= actcancel asynctst evtest helloworld inproc katest prtest sftest smoketest stmtest
+SUBDIRS+= actcancel asynctst evtest inproc katest prtest sftest smoketest stmtest
 endif
 
 EXTRA_DIST= Readme.md
