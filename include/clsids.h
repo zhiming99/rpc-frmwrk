@@ -346,9 +346,14 @@ typedef enum : guint32
     DECL_CLSID( CStmCpState ),
     DECL_CLSID( CStmConnPoint ),
     DECL_CLSID( CThreadPools ),
-    DECL_CLSID( CPythonProxyROS ),
-    DECL_CLSID( CPythonServerROS ),
+    DECL_CLSID( CPythonProxyRosImpl ),
+    DECL_CLSID( CPythonServerRosImpl ),
+    DECL_CLSID( CRosRpcSvc_CliSkel ), 
+    DECL_CLSID( CRosRpcSvc_SvrSkel ),
+    DECL_CLSID( CRosRpcSvc_ChannelCli ),
+    DECL_CLSID( CRosRpcSvc_ChannelSvr ),
     DECL_CLSID( MaxClsid ),
+
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,
@@ -368,7 +373,9 @@ typedef enum : guint32
     DECL_IID( CFuseServicePoint ),
     DECL_IID( IAuthenticateProxy ),
     DECL_IID( CRpcMinBridge ),
+    DECL_IID( IRosRpcSvc ),
     DECL_CLSID( ReservedIidEnd ) = 0x1FFFFFFF,
+
     DECL_CLSID( UserClsidStart ) = 0x20000000,
 
     DECL_CLSID( Invalid ) = 0xFFFFFFFF
