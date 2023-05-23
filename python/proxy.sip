@@ -75,18 +75,6 @@ DECLARE_AGGREGATED_SERVER(
     CStatCountersServer,
     CStreamServerAsync );
 
-DECLARE_AGGREGATED_PROXY(
-    CPythonProxyROS,
-    CStatCountersProxy,
-    CPythonProxyBase,
-    CFastRpcProxyBase );
-
-DECLARE_AGGREGATED_SERVER(
-    CPythonServerROS,
-    CStatCountersServer,
-    CStreamServerAsync,
-    CFastRpcServerBase );
-
 template< class T >
 class CPythonInterfBase : public T
 {
