@@ -25,14 +25,14 @@
  */ 
 %ModuleHeaderCode
 
-class CPythonServerImpl :
-    public CPythonInterfBase< CPythonServer >
+class CPythonServer:
+    public CPythonInterfBase< CPythonServerBase >
 {
     public:
-    typedef CPythonInterfBase< CPythonServer > super;
-    CPythonServerImpl( const IConfigDb* pCfg ) 
+    typedef CPythonInterfBase< CPythonServerBase > super;
+    CPythonServer( const IConfigDb* pCfg ) 
         : super::_MyVirtBase( pCfg ), super( pCfg )
-    { SetClassId( clsid( CPythonServerImpl ) ); }
+    {}
 
     gint32 SendEvent(
         PyObject* pCallback,
@@ -69,7 +69,7 @@ class CPythonServerImpl :
                 CParamList oReqCtx;
                 ret = NEW_PROXY_RESP_HANDLER2(
                     pTask, ObjPtr( this ),
-                    &CPythonServerImpl::OnAsyncCallResp,
+                    &CPythonInterfBase::OnAsyncCallResp,
                     nullptr, oReqCtx.GetCfg() );
 
                 if( ERROR( ret ) )
@@ -208,6 +208,11 @@ class CPythonServerImpl :
 
 };
 
+DECLARE_AGGREGATED_SERVER(
+    CPythonServerImpl,
+    CStatCountersServer,
+    CPythonServer );
+
 %End
 
 class CPythonServer :
@@ -217,8 +222,8 @@ class CPythonServer :
 
     gint32 SetPyHost( PyObject* pObj );
     %MethodCode
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -227,8 +232,8 @@ class CPythonServer :
 
     PyObject* GetPyHost();
     %MethodCode
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         PyObject* pObj = nullptr;
         sipRes = SIP_NULLPTR;
         if( pImpl != nullptr ) 
@@ -242,8 +247,8 @@ class CPythonServer :
 
     gint32 RemovePyHost();
     %MethodCode
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -253,8 +258,8 @@ class CPythonServer :
     gint32 CloseStream( HANDLE hChannel );
     %MethodCode
         Py_BEGIN_ALLOW_THREADS;
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -269,8 +274,8 @@ class CPythonServer :
         HANDLE hChannel, PyObject* pPyBuf );
     %MethodCode
     do{
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -296,8 +301,8 @@ class CPythonServer :
         HANDLE hChannel, PyObject* pPyBuf );
     %MethodCode
     do{
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -327,8 +332,8 @@ class CPythonServer :
 
     do{
 
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -376,8 +381,8 @@ class CPythonServer :
     %MethodCode
     gint32 ret = 0;
     do{
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -433,8 +438,8 @@ class CPythonServer :
     sipRes = pResp;
     gint32 ret = 0;
     do{
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
 
         if( pImpl == nullptr || a1 == nullptr ) 
         {
@@ -513,8 +518,8 @@ class CPythonServer :
     %MethodCode
     do{
         sipRes = 0;
-        CPythonServerImpl* pImpl = static_cast
-            < CPythonServerImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -562,9 +567,8 @@ class CPythonServer :
         guint32 dwKeepAliveSec = 0 );
     %MethodCode
         do{
-            CPythonServerImpl* pImpl =
-            static_cast< CPythonServerImpl* >
-                ( sipCpp );
+            auto* pImpl = dynamic_cast
+                < CPythonServer* >( sipCpp );
             if( a0->IsEmpty() )
             {
                 sipRes = -EINVAL;
@@ -584,9 +588,8 @@ class CPythonServer :
         gint32 ret = 0;
         CParamList oResp;
         do{
-            CPythonServerImpl* pImpl =
-            static_cast< CPythonServerImpl* >
-                ( sipCpp );
+            auto* pImpl = dynamic_cast
+                < CPythonServer* >( sipCpp );
 
             if( a0->IsEmpty() )
             {
@@ -629,9 +632,8 @@ class CPythonServer :
         gint32 ret = 0;
         CParamList oResp;
         do{
-            CPythonServerImpl* pImpl =
-            static_cast< CPythonServerImpl* >
-                ( sipCpp );
+            auto* pImpl = dynamic_cast
+                < CPythonServer* >( sipCpp );
 
             if( a0->IsEmpty() )
             {
@@ -669,26 +671,23 @@ class CPythonServer :
 
     PyObject* GetChanCtx( HANDLE hChannel );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->GetChanCtx( a0 );
     %End
 
     gint32 SetChanCtx(
         HANDLE hChannel, PyObject* pCtx );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->SetChanCtx( a0, a1 );
     %End
 
     gint32 RemoveChanCtx( HANDLE hChannel );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->RemoveChanCtx( a0 );
     %End
 
@@ -699,9 +698,8 @@ class CPythonServer :
         PyObject* pListArgs,
         guint32 dwSeriProto );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->SendEvent(
             a0, *a1, *a2, *a3, a4, a5 );
     %End
@@ -716,9 +714,8 @@ class CPythonServer :
         PyObject* pCtx,
         cpp::ObjPtr& pTimer /Out/ );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->AddTimer(
             a0, a1, a2, *a3 );
     %End
@@ -726,9 +723,8 @@ class CPythonServer :
     gint32 DisableTimer(
         cpp::ObjPtr& pTimer );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->DisableTimer( *a0 );
     %End
 
@@ -737,9 +733,8 @@ class CPythonServer :
         PyObject* pCb,
         PyObject* pListResp );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->InstallCancelNotify(
             *a0, a1, a2 );
     %End
@@ -750,9 +745,8 @@ class CPythonServer :
     a1 = 0;
     do{
         sipRes = 0;
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         InterfPtr pIf;
         ret = pImpl->GetUxStream( a0, pIf );
         if( ERROR( ret ) )
@@ -769,18 +763,16 @@ class CPythonServer :
 
     HANDLE GetChanByIdHash( guint64 );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->GetChanByIdHash( a0 );
     %End
 
     gint32 PyDeferCall( PyObject* pPyCb,
         PyObject* pPyArgs );
     %MethodCode
-        CPythonServerImpl* pImpl =
-        static_cast< CPythonServerImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
         sipRes = pImpl->PyDeferCall( a0, a1 );
     %End
 };
@@ -803,6 +795,8 @@ gint32 ChainTasks(
             pTask2 );
     }
 %End
+
+%Include fastrpc.sip
 
 cpp::ObjPtr CreateRpcServer(
     cpp::ObjPtr& pMgr,
