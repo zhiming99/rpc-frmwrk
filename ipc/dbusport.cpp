@@ -1199,6 +1199,7 @@ gint32 CDBusBusPort::Stop( IRP *pIrp )
     m_pMatchDisconn.Clear();
     m_pMatchLpbkServer.Clear();
     m_pMatchLpbkProxy.Clear();
+    dbus_shutdown();
     return ret;
 }
 

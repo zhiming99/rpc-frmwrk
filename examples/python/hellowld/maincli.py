@@ -38,7 +38,7 @@ def maincli() :
             '''
             pret = oProxy.Echo( "Hello, Server" )
             if pret[ 0 ] < 0 :
-                print( "Echo failed with error " + pret[0] )
+                print( "Echo failed with error " + str( pret[0] ) )
                 return pret[0]
             strResp = pret[1][0]
             print( "Server replys '" + strResp + "'")

@@ -263,11 +263,6 @@ CDBusLocalPdo::CDBusLocalPdo( const IConfigDb* pCfg )
 
 CDBusLocalPdo::~CDBusLocalPdo()
 {
-    if( m_pDBusConn )
-    {
-        dbus_connection_unref( m_pDBusConn );
-        m_pDBusConn = nullptr;
-    }
 }
 
 gint32 CDBusLocalPdo::OnModOnOffline(
@@ -537,6 +532,12 @@ gint32 CDBusLocalPdo::Stop( IRP *pIrp )
 
     ClearDBusSetting( m_matchDBus );
     m_matchDBus.Clear();
+
+    if( m_pDBusConn )
+    {
+        dbus_connection_unref( m_pDBusConn );
+        m_pDBusConn = nullptr;
+    }
 
     return ret;
 }

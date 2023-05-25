@@ -1261,17 +1261,24 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
             {
                 // most likely there is a proto value
-                oResp.GetIntProp(
+                iRet = oResp.GetIntProp(
                     propSeriProto, dwSeriProto );
 
-                if( dwSeriProto != dwReqProto )
+                if( SUCCEEDED( iRet ) &&
+                    dwSeriProto != dwReqProto )
                 {
                     ret = -EBADMSG;
-                    DebugPrint( ret,
+                    DebugPrintEx( logErr, ret,
                         "proto not agree,"
                         " resp %d, req %d",
                         dwSeriProto, dwReqProto );
                     break;
+                }
+                else if( ERROR( iRet ) )
+                {
+                    // in case the request timedout or
+                    // other unexpected local errors
+                    dwSeriProto = dwReqProto;
                 }
 
                 PyObject* pRet =
