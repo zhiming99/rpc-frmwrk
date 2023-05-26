@@ -355,6 +355,7 @@ class CPythonInterfBase : public T
         PyObject* listResp )
     {
         gint32 ret = 0;
+        bool bByteArray = false;
         do{
             CParamList oResp( pResp );
 
@@ -513,6 +514,7 @@ class CPythonInterfBase : public T
                             break;
                         }
                         PyList_SetItem( listArgs, i, pByteArr );
+                        bByteArray = true;
                         break;
                     }
                 case typeDMsg:
@@ -540,6 +542,8 @@ class CPythonInterfBase : public T
             PyList_SetItem( listResp,
                 0, PyLong_FromLong( ret ) );
         }
+        else if( bByteArray )
+            return STATUS_MORE_PROCESS_NEEDED;
 
         return ret;
     }
@@ -1299,7 +1303,11 @@ class CPythonInterfBase : public T
                 PyObject* pRet = PyLong_FromLong( ret );
                 PyList_SetItem( pPyResp, 0, pRet );
                 if( SUCCEEDED( ret ) )
+                {
+                    // callback, no need to protect the
+                    // bytearray storage
                     FillList( pResp, pPyResp );
+                }
             }
 
             PyObject* pHost = nullptr;
@@ -1846,6 +1854,16 @@ gint32 CPythonProxy::PyProxyCall(
         if( ERROR( ret ) )
             break;
 
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+        {
+            CfgPtr* ppCfg = new CfgPtr( pRmtResp );
+            PyObject* pPyBufBak = sipConvertFromNewType(
+                ppCfg, sipType_cpp_CfgPtr, Py_None );
+            PyList_Append( listResp, pPyBufBak );
+            Py_DECREF( pPyBufBak );
+            ret = 0;
+        }
+
         qwTaskCancel = 0;
         
     }while( 0 );
@@ -1984,6 +2002,7 @@ PyObject* CPythonProxy::PyProxyCall2(
             guint64 qwTaskCancel = 0;
             oResp.GetQwordProp(
                 propTaskId, qwTaskCancel );
+            listResp = PyList_New( 2 );
             PyList_SetItem( listResp, 1,
                 PyLong_FromLongLong( qwTaskCancel ) );
             break;
@@ -2021,15 +2040,27 @@ PyObject* CPythonProxy::PyProxyCall2(
             ret = -EBADMSG;
             break;
         }
+
         ret = FillList( pRmtResp, listResp );
         if( ERROR( ret ) )
             break;
+
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+        {
+            CfgPtr* ppCfg = new CfgPtr( pRmtResp );
+            PyObject* pPyBufBak = sipConvertFromNewType(
+                ppCfg, sipType_cpp_CfgPtr, Py_None );
+            PyList_Append( listResp, pPyBufBak );
+            Py_DECREF( pPyBufBak );
+            ret = 0;
+        }
 
     }while( 0 );
 
     PyList_SetItem( listResp, 0,
         PyLong_FromLong( ret ) );
 
+    // as a newly returned object
     Py_INCREF( listResp );
 
     return listResp;

@@ -1378,6 +1378,7 @@ gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
         Wa( "    return [ -errno.EBADMSG, None ] " );
         NEW_LINE;
 
+        Wa( "rmtret = ret" );
         Wa( "offset = 0" );
         if( dwInCount == 0 )
             Wa( "osb = CSerialBase( self )" );
@@ -1409,6 +1410,8 @@ gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
             NEW_LINE;
         }
 
+        Wa( "if len( rmtret ) == 3:" );
+        Wa( "    return [ 0, listRet, rmtret ]" );
         Wa( "return [ 0, listRet ]" );
         INDENT_DOWNL;
 
@@ -1430,7 +1433,7 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
 
         if( dwOutCount > 0 )
             CCOUT << "def " << strName
-                << "CbWrapper( self, context, ret, listArgs ) :"; 
+                << "CbWrapper( self, context, ret, ridlBuf ) :"; 
         else
             CCOUT << "def " << strName
                 << "CbWrapper( self, context, ret ) :"; 
@@ -1461,9 +1464,9 @@ gint32 CImplPyMthdProxyBase::OutputAsyncCbWrapper()
         Wa( "    return" );
 
         NEW_LINE;
-        Wa( "if listArgs is None or len( listArgs ) == 0 :" );
+        Wa( "if ridlBuf is None or len( ridlBuf ) == 0 :" );
         Wa( "    return" );
-        Wa( "buf = listArgs[ 0 ]" );
+        Wa( "buf = ridlBuf" );
         Wa( "if buf is None or not isinstance( buf, bytearray ):" );
         Wa( "    return" );
         NEW_LINE;
