@@ -167,11 +167,6 @@ CDBusProxyPdo::CDBusProxyPdo(
 
 CDBusProxyPdo::~CDBusProxyPdo()
 {
-    if( m_pDBusConn )
-    {
-        dbus_connection_unref( m_pDBusConn );
-        m_pDBusConn = nullptr;
-    }
 }
 
 gint32 CDBusProxyPdo::CheckConnCmdResp(
@@ -2364,6 +2359,25 @@ gint32 CDBusProxyPdo::OnQueryStop( IRP* pIrp )
     return ret;
 }
 
+gint32 CDBusProxyPdo::PreStop( IRP* pIrp )
+{
+    if( pIrp == nullptr
+        || pIrp->GetStackSize() == 0 ) 
+        return -EINVAL;
+    gint32 ret = 0;
+
+    do{
+        ret = super::PreStop( pIrp );
+        CStdRMutex oPortLock( GetLock() );
+        if( m_pDBusConn )
+        {
+            dbus_connection_unref( m_pDBusConn );
+            m_pDBusConn = nullptr;
+        }
+
+    }while( 0 );
+    return ret;
+}
 gint32 CDBusProxyPdo::NotifyRouterOffline()
 {
     gint32 ret = 0;

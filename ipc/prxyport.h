@@ -129,6 +129,7 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     virtual gint32 PostStart( IRP* pIrp );
     virtual gint32 OnQueryStop( IRP* pIrp );
+	gint32 PreStop( IRP* pIrp ) override;
 
     gint32 OnModOnOffline(
         DBusMessage* pDBusMsg );
