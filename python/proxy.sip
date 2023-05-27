@@ -1234,15 +1234,13 @@ class CPythonInterfBase : public T
             ret = oReqCtx.GetIntPtr( 0, ptrVal );
             if( ERROR( ret ) )
                 break;
-            PyObject* pPyCb =
-                ( PyObject* )ptrVal;
+            pPyCb = ( PyObject* )ptrVal;
 
             ret = oReqCtx.GetIntPtr( 1, ptrVal );
             if( ERROR( ret ) )
                 break;
 
-            PyObject* pPyResp =
-                ( PyObject* )ptrVal;  
+            pPyResp = ( PyObject* )ptrVal;  
 
             oReqCtx.GetIntProp( 3, dwReqProto );
 
@@ -1883,6 +1881,7 @@ PyObject* CPythonProxy::PyProxyCall2(
     PyObject* listResp )
 {
     gint32 ret = 0;
+    bool bIncRef = true;
     do{
         bool bSync = false;
         if( pCb == nullptr || pCb == Py_None )
@@ -2005,6 +2004,7 @@ PyObject* CPythonProxy::PyProxyCall2(
             listResp = PyList_New( 2 );
             PyList_SetItem( listResp, 1,
                 PyLong_FromLongLong( qwTaskCancel ) );
+            bIncRef = false;
             break;
         }
 
@@ -2061,7 +2061,8 @@ PyObject* CPythonProxy::PyProxyCall2(
         PyLong_FromLong( ret ) );
 
     // as a newly returned object
-    Py_INCREF( listResp );
+    if( bIncRef )
+        Py_INCREF( listResp );
 
     return listResp;
 }
@@ -2165,7 +2166,10 @@ class CPythonProxy :
             gint32 ret = 
                 pImpl->GetPyHost( pObj );
             if( SUCCEEDED( ret ) )
+            {
                 sipRes = pObj;
+                Py_INCREF( pObj );
+            }
         }
     %End
 
