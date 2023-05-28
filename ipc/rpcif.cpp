@@ -2377,6 +2377,38 @@ gint32 CRpcInterfaceBase::AddAndRun(
     return ret;
 }
 
+gint32 CRpcInterfaceBase::FindMatch(
+    const stdstr strIfName,
+    MatchPtr& pIfMatch )
+{
+    gint32 ret = 0;
+    stdstr strRegIf;
+
+    CStdRMutex oIfLock( GetLock() );
+    for( auto pMatch : m_vecMatches )
+    {
+        CCfgOpenerObj oMatch(
+            ( CObjBase* )pMatch );
+
+        ret = oMatch.GetStrProp(
+            propIfName, strRegIf );
+
+        if( ERROR( ret ) )
+            continue;
+
+        if( strIfName == strRegIf )
+        {
+            pIfMatch = pMatch;
+            break;
+        }
+    }
+
+    if( !pIfMatch.IsEmpty() )
+        return STATUS_SUCCESS;
+
+    return -ENOENT;
+}
+
 gint32 CRpcServices::GetIidFromIfName(
     const std::string& strIfName,
     EnumClsid& iid )
