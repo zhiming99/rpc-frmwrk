@@ -26,11 +26,14 @@
 #include "rpc.h"
 using namespace rpcf;
 #include "genpy.h"
+#include "gencpp2.h"
 
 extern std::string g_strAppName;
 extern stdstr g_strCmdLine;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern guint32 GenClsid( const std::string& strName );
+extern bool g_bRpcOverStm;
+extern bool g_bBuiltinRt;
 
 std::map< char, stdstr > g_mapSig2PyType =
 {
@@ -1814,8 +1817,16 @@ gint32 GenPyProj(
             break;
 
         oWriter.SelectDescFile();
-        CExportObjDesc oedesc( &oWriter, pRoot );
-        ret = oedesc.Output();
+        if( !g_bRpcOverStm )
+        {
+            CExportObjDesc oedesc( &oWriter, pRoot );
+            ret = oedesc.Output();
+        }
+        else
+        {
+            CExportObjDesc2 oedesc( &oWriter, pRoot );
+            ret = oedesc.OutputROS();
+        }
         if( ERROR( ret ) )
             break;
 
@@ -3038,7 +3049,16 @@ gint32 CImplPyMainFunc::OutputCli(
         CCOUT << "def maincli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
-        Wa( "oContext = PyRpcContext( 'PyRpcProxy' )" );
+        if( g_bRpcOverStm || g_bBuiltinRt )
+        {
+            stdstr strModName = g_strAppName + "cli";
+            CCOUT << "oContext = PyRpcContext( '" << strModName << "' )";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "oContext = PyRpcContext( 'PyRpcProxy' )" );
+        }
         CCOUT << "with oContext as ctx:";
         INDENT_UPL;
         CCOUT << "if ctx.status < 0:";
@@ -3210,7 +3230,16 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_UPL;
         Wa( "ret = 0" );
         Wa( "signal.signal( signal.SIGINT, SigHandler)" );
-        Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
+        if( g_bRpcOverStm || g_bBuiltinRt )
+        {
+            stdstr strModName = g_strAppName + "svr";
+            CCOUT << "oContext = PyRpcContext( '" << strModName << "' )";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
+        }
         CCOUT << "with oContext as ctx:";
         INDENT_UPL;
         CCOUT << "if ctx.status < 0:";

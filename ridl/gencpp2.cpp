@@ -2997,12 +2997,14 @@ gint32 CImplServiceImpl2::OutputROS()
             Wa( "oCfg.SetIntPtr( propStmHandle," );
             Wa( "    ( guint32*& )hStream );" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
-            CCOUT << "const char* szDesc = " << "\""
-                << strOutPath << "/"
-                << g_strAppName << "desc.json\";";
-            NEW_LINE;
+            Wa( "std::string strDesc;" );
+            Wa( "CCfgOpenerObj oIfCfg( this );" );
+            Wa( "ret = oIfCfg.GetStrProp(" );
+            Wa( "    propObjDescPath, strDesc );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
             Wa( "ret = CRpcServices::LoadObjDesc(" );
-            CCOUT << "    szDesc," <<
+            CCOUT << "    strDesc," <<
                 "\"" << strSvcName << "_SvrSkel\",";
             NEW_LINE;
             CCOUT << "    true, oCfg.GetCfg() );";
@@ -3043,12 +3045,14 @@ gint32 CImplServiceImpl2::OutputROS()
             Wa( "oCfg[ propIsServer ] = false;" );
             Wa( "oCfg.SetPointer( propParentPtr, this );" );
             Wa( "oCfg.CopyProp( propSkelCtx, this );" );
-            CCOUT << "const char* szDesc = " << "\""
-                << strOutPath << "/"
-                << g_strAppName << "desc.json\";";
-            NEW_LINE;
+            Wa( "std::string strDesc;" );
+            Wa( "CCfgOpenerObj oIfCfg( this );" );
+            Wa( "ret = oIfCfg.GetStrProp(" );
+            Wa( "    propObjDescPath, strDesc );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
             Wa( "ret = CRpcServices::LoadObjDesc(" );
-            CCOUT << "    szDesc," << "\""
+            CCOUT << "    strDesc," << "\""
                 << strSvcName << "_SvrSkel\",";
             NEW_LINE;
             CCOUT << "    false, oCfg.GetCfg() );";

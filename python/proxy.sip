@@ -1607,7 +1607,7 @@ class CPythonProxy:
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
 
-    gint32 AsyncCallVector(
+    virtual gint32 AsyncCallVector(
         IEventSink* pTask,
         CfgPtr& pOptions,
         CfgPtr& pResp,
@@ -2579,10 +2579,19 @@ cpp::ObjPtr CreateProxy(
         if( ERROR( ret ) )
             break;
 
+        EnumClsid iClsid =
+            clsid( CPythonProxyImpl );
+        EnumClsid iStateClass = clsid( Invalid );
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.GetIntProp( propIfStateClass,
+            ( guint32& )iStateClass );
+        if( SUCCEEDED( ret ) &&
+            iStateClass == clsid( CFastRpcProxyState ) )
+            iClsid = clsid( CPythonProxyRosImpl );
+
         ObjPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CPythonProxyImpl ),
-            pCfg );
+        ret = pIf.NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
             break;
 

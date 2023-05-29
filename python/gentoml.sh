@@ -9,3 +9,10 @@ fi
 if [ "x${ARMBUILD}" == "x1" ]; then
     sed -i "s:\(\"combase\):\"atomic\", \1:" pyproject.toml
 fi
+if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then
+    echo generate python extention package with debug infomation
+    sed -i "s:ZZZZZ:,\"-O0\", \"-ggdb\":" pyproject.toml
+else
+    echo generate release version of python extention package 
+    sed -i "s:ZZZZZ::" pyproject.toml
+fi

@@ -996,7 +996,7 @@ class PyRpcServer( PyRpcServices ) :
         self.pIoMgr = pIoMgr
         self.iError = 0
         oParams = cpp.CParamList()
-        oObj = CreateRpcServer( pIoMgr,
+        oObj = CreateServer( pIoMgr,
             strDesc, strSvrObj,
             oParams.GetCfgAsObj() )
         if oObj is None or oObj.IsEmpty() :

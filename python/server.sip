@@ -34,7 +34,7 @@ class CPythonServer:
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
 
-    gint32 SendEvent(
+    virtual gint32 SendEvent(
         PyObject* pCallback,
         const std::string& strCIfName,
         const std::string& strMethod,
@@ -94,31 +94,15 @@ class CPythonServer:
             oReq.SetIntProp(
                 propSeriProto, dwSeriProto );
 
+            
+
             bool bHasMatch = true;
             if( true )
             {
                 CStdRMutex oIfLock( GetLock() );
                 MatchPtr pIfMatch;
-                for( auto pMatch : m_vecMatches )
-                {
-                    CCfgOpenerObj oMatch(
-                        ( CObjBase* )pMatch );
-
-                    std::string strRegIf;
-
-                    ret = oMatch.GetStrProp(
-                        propIfName, strRegIf );
-
-                    if( ERROR( ret ) )
-                        continue;
-
-                    if( strIfName == strRegIf )
-                    {
-                        pIfMatch = pMatch;
-                        break;
-                    }
-                }
-
+                this->FindMatch(
+                    strIfName, pIfMatch );
                 if( !pIfMatch.IsEmpty() )
                     oReq.SetIfName( strIfName );
                 else
@@ -241,7 +225,10 @@ class CPythonServer :
             gint32 ret = 
                 pImpl->GetPyHost( pObj );
             if( SUCCEEDED( ret ) )
+            {
                 sipRes = pObj;
+                Py_INCREF( pObj );
+            }
         }
     %End
 
@@ -798,7 +785,7 @@ gint32 ChainTasks(
 
 %Include fastrpc.sip
 
-cpp::ObjPtr CreateRpcServer(
+cpp::ObjPtr CreateServer(
     cpp::ObjPtr& pMgr,
     const std::string& strDesc,
     const std::string& strObjName,
@@ -827,10 +814,19 @@ cpp::ObjPtr CreateRpcServer(
         if( ERROR( ret ) )
             break;
 
+        EnumClsid iClsid =
+            clsid( CPythonServerImpl );
+        EnumClsid iStateClass = clsid( Invalid );
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.GetIntProp( propIfStateClass,
+            ( guint32& )iStateClass );
+        if( SUCCEEDED( ret ) &&
+            iStateClass == clsid( CFastRpcServerState ) )
+            iClsid = clsid( CPythonServerRosImpl );
+
         cpp::ObjPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CPythonServerImpl ),
-            pCfg );
+        ret = pIf.NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
             break;
 

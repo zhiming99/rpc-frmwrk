@@ -758,13 +758,27 @@ class CRpcStmChanBase :
             oLock.Unlock();
 
             BufPtr pBuf( true );
+            dwCount = 0;
             for( auto& elem : vecMsgs )
             {
                 *pBuf = elem;
                 auto ptr = ( CBuffer* )pBuf;
-                pPdoPort->OnEvent(
+                gint32 iRet = pPdoPort->OnEvent(
                     cmdDispatchData, 0, 0,
                     ( LONGWORD* )ptr );
+                if( ERROR( iRet ) )
+                    ++dwCount;
+            }
+            if( dwCount > 0 )
+            {
+                oLock.Lock();
+                oPortLock.Lock();
+                // restore the count for failed dispatch
+                auto itr = m_mapMsgRead.find( hstm );
+                if( itr == m_mapMsgRead.end() )
+                    break;
+                auto& msgElem = itr->second;
+                msgElem.first += dwCount;
             }
 
         }while( 0 );

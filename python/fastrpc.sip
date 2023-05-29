@@ -49,6 +49,15 @@ class IPythonRpcSvc_PImpl
     
     const EnumClsid GetIid() const override
     { return iid( IPythonRpcSvc ); }
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override
+    {
+        CRpcServices* pSvc = this->GetStreamIf();
+        return pSvc->InvokeUserMethod(
+            pParams, pCallback );
+    }
 };
 
 class IPythonRpcSvc_CliApi
@@ -83,6 +92,15 @@ class IPythonRpcSvc_SImpl
     gint32 InitUserFuncs();
     const EnumClsid GetIid() const override
     { return iid( IPythonRpcSvc ); }
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override
+    {
+        CRpcServices* pSvc = this->GetStreamIf();
+        return pSvc->InvokeUserMethod(
+            pParams, pCallback );
+    }
 };
 
 class IPythonRpcSvc_SvrApi
@@ -106,6 +124,7 @@ class IPythonRpcSvc_SvrApi
         auto pSkel = dynamic_cast<IPythonRpcSvc_SImpl*>(( CRpcServices* )pIf );
         return pSkel;
     }
+
 };
 
 DECLARE_AGGREGATED_SKEL_PROXY(
@@ -172,6 +191,17 @@ class CPythonProxyRosImpl
     
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
+
+    gint32 AsyncCallVector(
+        IEventSink* pTask,
+        CfgPtr& pOptions,
+        CfgPtr& pResp,
+        const std::string& strcMethod,
+        std::vector< Variant >& vecParams ) override;
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override;
 };
 
 #define Clsid_CPythonRpcSvc_SvrBase    Clsid_Invalid
@@ -209,6 +239,18 @@ class CPythonServerRosImpl
     
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override;
+
+    gint32 SendEvent(
+        PyObject* pCallback,
+        const std::string& strCIfName,
+        const std::string& strMethod,
+        const std::string& strDest,
+        PyObject* pArgs,
+        guint32 dwSeriProto ) override;
 };
 
 %End
@@ -247,8 +289,15 @@ gint32 CPythonProxyRosImpl::CreateStmSkel(
             propObjDescPath, strCfg );
         if( ERROR( ret ) )
             break;
+
+        stdstr strSvcName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strSvcName );
+        if( ERROR( ret ) )
+            break;
+
         ret = CRpcServices::LoadObjDesc(
-            strCfg,"PythonRpcSvc_CliSkel",
+            strCfg, strSvcName + "_SvrSkel",
             false, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -269,11 +318,14 @@ gint32 CPythonProxyRosImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CPythonRpcSvc_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
-        stdstr strInstName;
+
+        stdstr strSvcName;
         ret = oIfCfg.GetStrProp(
-            propObjName, strInstName );
+            propObjName, strSvcName );
         if( ERROR( ret ) )
             break;
+
+        stdstr strInstName = strSvcName;
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );
@@ -281,7 +333,7 @@ gint32 CPythonProxyRosImpl::OnPreStart(
             break;
         char szBuf[ 16 ];
         sprintf( szBuf, "_%08X", dwHash );
-        strInstName = "PythonRpcSvc_ChannelSvr";
+        strInstName = strSvcName + "_ChannelSvr";
         oCtx[ 0 ] = strInstName;
         strInstName += szBuf;
         oCtx[ propObjInstName ] = strInstName;
@@ -290,6 +342,194 @@ gint32 CPythonProxyRosImpl::OnPreStart(
             ( IConfigDb* )oCtx.GetCfg() );
         ret = super::OnPreStart( pCallback );
     }while( 0 );
+    return ret;
+}
+
+gint32 CPythonProxyRosImpl::AsyncCallVector(
+    IEventSink* pTask,
+    CfgPtr& pOptions,
+    CfgPtr& pResp,
+    const std::string& strcMethod,
+    std::vector< Variant >& vecParams )
+{
+    gint32 ret = 0;
+
+    do{ 
+        if( pTask == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint64 qwIoTaskId = 0; 
+        CCfgOpenerObj oCfg( pTask );
+        if( pResp.IsEmpty() )
+            pResp.NewObj();
+
+        CopyUserOptions( pTask, pOptions );
+
+        std::string strMethod( strcMethod );
+        bool bNoReply = false;
+        if( !pOptions.IsEmpty() )
+        {
+            bool bSysMethod = false;
+            CCfgOpener oOptions(
+                ( IConfigDb* )pOptions );
+
+            ret = oOptions.GetBoolProp(
+                propSysMethod, bSysMethod );
+
+            if( SUCCEEDED( ret ) && bSysMethod )
+                strMethod = SYS_METHOD( strMethod );
+            else
+                strMethod = USER_METHOD( strMethod );
+
+            ret = oOptions.GetBoolProp(
+                propNoReply, bNoReply );
+            if( ERROR( ret ) )
+            {
+                bNoReply = false;
+                ret = 0;
+            }
+        }
+        CInterfaceProxy* pIf = this->GetStmSkel();
+        ret = pIf->SendProxyReq( pTask, false,
+             strMethod, vecParams, qwIoTaskId ); 
+
+        if( SUCCEEDED( ret ) && !bNoReply )
+            ret = STATUS_PENDING;
+
+        if( ret == STATUS_PENDING ) 
+        {
+            // for canceling purpose
+            CParamList oResp( ( IConfigDb* )pResp );
+            oResp[ propTaskId ] = qwIoTaskId;
+            break;
+        }
+
+        if( ERROR( ret ) ) 
+            break; 
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CPythonProxyRosImpl::InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback )
+{
+    return CPythonProxy::InvokeUserMethod(
+        pParams, pCallback );
+}
+
+
+gint32 CPythonServerRosImpl::SendEvent(
+    PyObject* pCallback,
+    const std::string& strCIfName,
+    const std::string& strMethod,
+    const std::string& strDest,
+    PyObject* pArgs,
+    guint32 dwSeriProto )
+{
+    guint32 ret = 0;
+    bool bDec = false;
+    TaskletPtr pTask;
+    do{
+        if( strMethod.empty() ||
+            strCIfName.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::vector< Variant > vecArgs;
+        ret = List2Vector( pArgs, vecArgs );
+        if( ERROR( ret ) )
+            break;
+
+        IEventSink* pCb = nullptr;
+        if( pCallback == nullptr ||
+            pCallback == Py_None )
+        {
+            pTask.NewObj( clsid( CIfDummyTask ) );
+        }
+        else
+        {
+            CParamList oReqCtx;
+            ret = NEW_PROXY_RESP_HANDLER2(
+                pTask, ObjPtr( this ),
+                &CPythonInterfBase::OnAsyncCallResp,
+                nullptr, oReqCtx.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            oReqCtx.Push(
+                ( intptr_t ) pCallback );
+            Py_INCREF( pCallback );
+
+            PyObject* listResp = PyList_New( 2 );
+            oReqCtx.Push( ( intptr_t )listResp );
+            bDec = true;
+        }
+        pCb = pTask;
+
+        Py_BEGIN_ALLOW_THREADS;
+
+        std::string strIfName =
+           DBUS_IF_NAME( strCIfName );
+
+        std::vector< InterfPtr > vecIfs;
+        ret = this->EnumStmSkels( vecIfs );
+        if( SUCCEEDED( ret ) )
+        {
+            CRpcServices* pSkel = vecIfs[ 0 ];
+            bool bHasMatch = true;
+            MatchPtr pIfMatch;
+
+            CReqBuilder oReq( pSkel );
+            oReq.SetIntProp(
+                propSeriProto, dwSeriProto );
+
+            pSkel->FindMatch(
+                strIfName, pIfMatch );
+
+            if( !pIfMatch.IsEmpty() )
+                oReq.SetIfName( strIfName );
+            else
+                bHasMatch = false;
+
+            if( bHasMatch )
+            {
+                if( !strDest.empty() )
+                    oReq.SetDestination( strDest );
+                
+                // we don't expect a response
+                oReq.SetCallFlags( 
+                   DBUS_MESSAGE_TYPE_SIGNAL
+                   | CF_ASYNC_CALL );
+
+                oReq.SetMethodName( strMethod );
+
+                for( auto elem : vecArgs )
+                    oReq.Push( elem );
+
+                ret = BroadcastEvent(
+                    oReq.GetCfg(), pCb );
+            }
+        }
+        Py_END_ALLOW_THREADS;
+        
+    }while( 0 );
+
+    if( ret != STATUS_PENDING && bDec )
+    {
+        Py_DECREF( pCallback );
+        if( !pTask.IsEmpty() )
+            ( *pTask )( eventCancelTask );
+    }
+
     return ret;
 }
 
@@ -314,8 +554,15 @@ gint32 CPythonServerRosImpl::CreateStmSkel(
             propObjDescPath, strCfg );
         if( ERROR( ret ) )
             break;
+
+        stdstr strSvcName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strSvcName );
+        if( ERROR( ret ) )
+            break;
+
         ret = CRpcServices::LoadObjDesc(
-            strCfg,"PythonRpcSvc_SvrSkel",
+            strCfg, strSvcName + "_SvrSkel",
             true, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -338,11 +585,13 @@ gint32 CPythonServerRosImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CPythonRpcSvc_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
-        stdstr strInstName;
+
+        stdstr strSvcName;
         ret = oIfCfg.GetStrProp(
-            propObjName, strInstName );
+            propObjName, strSvcName );
         if( ERROR( ret ) )
             break;
+        stdstr strInstName = strSvcName;
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );
@@ -350,7 +599,7 @@ gint32 CPythonServerRosImpl::OnPreStart(
             break;
         char szBuf[ 16 ];
         sprintf( szBuf, "_%08X", dwHash );
-        strInstName = "PythonRpcSvc_ChannelSvr";
+        strInstName = strSvcName + "_ChannelSvr";
         oCtx[ 0 ] = strInstName;
         strInstName += szBuf;
         oCtx[ propObjInstName ] = strInstName;
@@ -362,6 +611,13 @@ gint32 CPythonServerRosImpl::OnPreStart(
     return ret;
 }
 
+gint32 CPythonServerRosImpl::InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback )
+{
+    return CPythonServer::InvokeUserMethod(
+        pParams, pCallback );
+}
 static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
@@ -369,6 +625,10 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CPythonServerImpl );
     INIT_MAP_ENTRYCFG( CPythonProxyRosImpl );
     INIT_MAP_ENTRYCFG( CPythonServerRosImpl );
+    INIT_MAP_ENTRYCFG( CPythonRpcSvc_CliSkel );
+    INIT_MAP_ENTRYCFG( CPythonRpcSvc_SvrSkel );
+    INIT_MAP_ENTRYCFG( CPythonRpcSvc_ChannelCli );
+    INIT_MAP_ENTRYCFG( CPythonRpcSvc_ChannelSvr );
     END_FACTORY_MAPS;
 };
 
