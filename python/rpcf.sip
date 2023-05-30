@@ -735,6 +735,18 @@ namespace cpp
         %End
     };
 
+    cpp::ObjPtr* CreateIoMgr(
+        cpp::IConfigDb* pCfg )/TransferBack/;
+    %MethodCode
+    cpp::ObjPtr* pObj =
+        new cpp::ObjPtr( nullptr, false );
+    gint32 ret = pObj->NewObj(
+        clsid( CIoManager ), a0 ); 
+    if( ret < 0 )
+        return SIP_NULLPTR;
+    sipRes = pObj;
+    %End
+
     cpp::ObjPtr* CreateObject(
         guint32 iClsid,
         cpp::IConfigDb* pCfg )/TransferBack/;

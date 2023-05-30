@@ -333,7 +333,7 @@ gint32 CFuseTextFile::fs_open(
     fi->direct_io = 1;
     fi->keep_cache = 0;
     fi->nonseekable = 1;
-    fi->fh = ( guint64 )( CFuseObjBase* )this;
+    fi->fh = ( intptr_t )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;
 }
@@ -446,7 +446,7 @@ gint32 CFuseFileEntry::fs_open(
     fi->direct_io = 1;
     fi->keep_cache = 0;
     fi->nonseekable = 1;
-    fi->fh = ( guint64 )( CFuseObjBase* )this;
+    fi->fh = ( intptr_t )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;
 }
@@ -1279,7 +1279,7 @@ gint32 CFuseCmdFile::fs_open(
     fi->direct_io = 1;
     fi->keep_cache = 0;
     fi->nonseekable = 1;
-    fi->fh = ( guint64 )( CFuseObjBase* )this;
+    fi->fh = ( intptr_t )( CFuseObjBase* )this;
     return STATUS_SUCCESS;
 }
 
@@ -1763,7 +1763,7 @@ gint32 CFuseStmFile::fs_open(
     fi->direct_io = 1;
     fi->keep_cache = 0;
     fi->nonseekable = 0;
-    fi->fh = ( guint64 )( CFuseObjBase* )this;
+    fi->fh = ( intptr_t )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;
 }
@@ -2556,7 +2556,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 using INO_INFO=std::pair< guint64, stdstr>;
 
 static gint32 fuseif_remove_req(
-    CRpcServices* pIf, stdstr& strSuffix )
+    CRpcServices* pIf, stdstr& strSurfix )
 {
     gint32 ret = 0;
     do{
@@ -2585,7 +2585,7 @@ static gint32 fuseif_remove_req(
 
         for( auto& elem : vecPrefixes )
         {
-            stdstr strFile = elem + strSuffix;
+            stdstr strFile = elem + strSurfix;
             auto pFile = dynamic_cast< CFuseObjBase* >
                 ( _pSvcDir->GetChild( strFile ) );
 
@@ -2669,10 +2669,10 @@ gint32 CFuseEvtFile::do_remove( bool bRemoveGrp )
                     break;
                 }
 
-                stdstr strSuffix =
+                stdstr strSurfix =
                     strName.substr( 5 );
                 ret = fuseif_remove_req(
-                    pIf, strSuffix );
+                    pIf, strSurfix );
 
             }while( 0 );
 
@@ -4022,18 +4022,18 @@ gint32 CFuseSvcProxy::ReceiveMsgJson(
 }
 
 gint32 CFuseSvcProxy::AddReqFiles(
-    const stdstr& strSuffix, DIR_SPTR& pReq )
+    const stdstr& strSurfix, DIR_SPTR& pReq )
 {
     // add an RW request file
     gint32 ret = 0;
     do{
         CFuseObjBase* pObj = nullptr;
         guint32 dwGrpId = 0;
-        if( strSuffix != "0" )
+        if( strSurfix != "0" )
             dwGrpId = NewGroupId();
 
         stdstr strName = "jreq_";
-        strName += strSuffix;
+        strName += strSurfix;
         auto pFile = DIR_SPTR(
             new CFuseReqFileProxy( strName, this ) ); 
         pObj = dynamic_cast< CFuseObjBase* >
@@ -4050,7 +4050,7 @@ gint32 CFuseSvcProxy::AddReqFiles(
 
         // add an RO RESP file 
         strName = "jrsp_";
-        strName += strSuffix;
+        strName += strSurfix;
         pFile = DIR_SPTR(
             new CFuseRespFileProxy( strName, this ) );
         pObj = dynamic_cast
@@ -4070,7 +4070,7 @@ gint32 CFuseSvcProxy::AddReqFiles(
 
         // add an RO event file 
         strName = "jevt_";
-        strName += strSuffix;
+        strName += strSurfix;
         pFile = DIR_SPTR(
             new CFuseEvtFile( strName, this ) ); 
         pObj = dynamic_cast
@@ -4222,18 +4222,18 @@ gint32 CFuseSvcServer::ReceiveMsgJson(
 }
 
 gint32 CFuseSvcServer::AddReqFiles(
-    const stdstr& strSuffix, DIR_SPTR& pReq )
+    const stdstr& strSurfix, DIR_SPTR& pReq )
 {
     // add an RO request file
     gint32 ret = 0;
     do{
         CFuseObjBase* pObj = nullptr;
         guint32 dwGrpId = 0;
-        if( strSuffix != "0" )
+        if( strSurfix != "0" )
             dwGrpId = NewGroupId();
 
         stdstr strName = "jreq_";
-        strName += strSuffix;
+        strName += strSurfix;
         auto pFile = DIR_SPTR(
             new CFuseReqFileSvr( strName, this ) ); 
         pObj = dynamic_cast< CFuseObjBase* >
@@ -4251,7 +4251,7 @@ gint32 CFuseSvcServer::AddReqFiles(
         // add an WO RESP file for both
         // response and event
         strName = "jrsp_";
-        strName += strSuffix;
+        strName += strSurfix;
 
         pFile = DIR_SPTR(
             new CFuseRespFileSvr( strName, this ) ); 
@@ -4569,18 +4569,18 @@ gint32 fuseop_unlink( const char* path )
 }
 
 static gint32 fuseif_create_req(
-    const stdstr& strSuffix,
+    const stdstr& strSurfix,
     CFuseSvcDir* pDir, 
     fuse_file_info* fi )
 {
     gint32 ret = 0;
     do{
-        if( strSuffix.empty() )
+        if( strSurfix.empty() )
         {
             ret = -EINVAL;
             break;
         }
-        if( strSuffix == "0" )
+        if( strSurfix == "0" )
         {
             ret = -EEXIST;
             break;
@@ -4596,7 +4596,7 @@ static gint32 fuseif_create_req(
         }
 
         stdstr strName = "jreq_";
-        strName += strSuffix;
+        strName += strSurfix;
 
         WLOCK_TESTMNT0( pDir );
         if( pDir->GetChild( strName ) != nullptr )
@@ -4608,10 +4608,10 @@ static gint32 fuseif_create_req(
         DIR_SPTR pEnt;
         if( pProxy != nullptr )
             ret = pProxy->AddReqFiles(
-                strSuffix, pEnt );
+                strSurfix, pEnt );
         else
             ret = pSvr->AddReqFiles(
-                strSuffix, pEnt );
+                strSurfix, pEnt );
 
         if( ERROR( ret ) )
             break;
@@ -4619,7 +4619,7 @@ static gint32 fuseif_create_req(
         auto pReqFile = dynamic_cast
             < CFuseObjBase* >( pEnt.get() );
 
-        fi->fh = ( guint64 )pReqFile;
+        fi->fh = ( intptr_t )pReqFile;
         fi->direct_io = 1;
         fi->keep_cache = 0;
         fi->nonseekable = 1;
@@ -4757,16 +4757,17 @@ static gint32 fuseif_create_stream(
             auto pEnt = DIR_SPTR( pStmFile ); 
             pStmFile->SetMode( S_IRUSR | S_IWUSR );
             pStmFile->DecRef();
-            fi->fh = ( guint64 )
+            fi->fh = ( intptr_t )
                 ( CFuseObjBase* )pStmFile;
             fi->direct_io = 1;
             fi->keep_cache = 0;
             fi->nonseekable = 1;
             pStmFile->IncOpCount();
-            pDir->AddChild( pEnt );
+            ret = pDir->AddChild( pEnt );
 
-            fuseif_invalidate_path(
-                GetFuse(), pDir );
+            if( SUCCEEDED( ret ) )
+                fuseif_invalidate_path(
+                    GetFuse(), pDir );
         }
 
     }while( 0 );

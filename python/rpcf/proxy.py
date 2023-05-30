@@ -169,8 +169,7 @@ class PyRpcContext :
         if ret < 0 :
             return None
         p2 = cpp.CastToCfg( p1.GetCfgAsObj() )
-        p3=cpp.CreateObject(
-            cpp.Clsid_CIoManager, p2 )
+        p3=cpp.CreateIoMgr( p2 )
         return p3
 
     def StartIoMgr( self, pIoMgr ) :
@@ -194,14 +193,14 @@ class PyRpcContext :
         print( "proxy.py: about to quit..." )
         self.CleanUp()
 
-    def __init__( self, strModName= "PyRpcProxy" ) :
-        self.strModName = strModName
+    def __init__( self, strInitParams = "PyRpcProxy" ) :
+        self.strInitParams = strInitParams
         self.status = 0
 
-    def Start( self, strModName="PyRpcProxy" ) :
+    def Start( self, strInitParams ) :
         ret = 0
         print( "entering..." )
-        self.pIoMgr = self.CreateIoMgr( strModName )
+        self.pIoMgr = self.CreateIoMgr( strInitParams )
         if self.pIoMgr is not None :
             ret = self.StartIoMgr( self.pIoMgr )
             if ret < 0 :
@@ -220,7 +219,7 @@ class PyRpcContext :
             self.pIoMgr = None
 
     def __enter__( self ) :
-        self.Start( self.strModName )
+        self.Start( self.strInitParams )
         return self;
 
     def __exit__( self, type, val, traceback ) :

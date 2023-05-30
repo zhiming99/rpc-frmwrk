@@ -1296,7 +1296,7 @@ class CFuseServicePoint :
     }
 
     virtual gint32 AddReqFiles(
-        const stdstr& strSuffix, DIR_SPTR& ) = 0;
+        const stdstr& strSurfix, DIR_SPTR& ) = 0;
 
     // build the directory hierarchy for this service
     gint32 BuildDirectories()
@@ -2199,7 +2199,7 @@ class CFuseSvcProxy :
     { return 0; }
 
     gint32 AddReqFiles(
-        const stdstr& strSuffix, DIR_SPTR& ) override ;
+        const stdstr& strSurfix, DIR_SPTR& ) override ;
 
     gint32 DoRmtModEventFuse(
         EnumEventId iEvent,
@@ -2256,7 +2256,7 @@ class CFuseSvcServer :
         guint32 dwGrpId ) override;
 
     gint32 AddReqFiles(
-        const stdstr& strSuffix, DIR_SPTR& ) override ;
+        const stdstr& strSurfix, DIR_SPTR& ) override ;
 };
 
 struct FHCTX
