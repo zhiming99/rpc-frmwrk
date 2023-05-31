@@ -962,14 +962,6 @@ class CFuseStmFile : public CFuseFileEntry
         std::vector<INBUF>& vecIncoming );
     sem_t m_semFlowCtrl;
 
-    gint32 fs_read_blocking(
-        const char* path,
-        fuse_file_info *fi,
-        fuse_req_t req, fuse_bufvec*& bufvec,
-        off_t off, size_t size,
-        std::vector< BufPtr >& vecBackup,
-        fuseif_intr_data* d );
-
     public:
 
     typedef CFuseFileEntry super;
@@ -1001,6 +993,8 @@ class CFuseStmFile : public CFuseFileEntry
     void SetStream( HANDLE hStream )
     { m_hStream = hStream; }
 
+    gint32 FillAndNotify();
+
     gint32 fs_open(
         const char *path,
         fuse_file_info *fi ) override;
@@ -1010,9 +1004,6 @@ class CFuseStmFile : public CFuseFileEntry
         gint32 iRet,
         BufPtr& pBuf,
         IConfigDb* pCtx );
-
-    gint32 StartNextRead( BufPtr& pRetBuf );
-    gint32 OnCompleteReadReq();
 
     gint32 OnWriteStreamComplete(
         HANDLE hStream,
@@ -1900,7 +1891,7 @@ class CFuseServicePoint :
 
             auto pStmFile = static_cast
                 < CFuseStmFile* >( pObj );
-            pStmFile->NotifyPoll();
+            pStmFile->FillAndNotify();
 
         }while( 0 );
 

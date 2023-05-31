@@ -1882,74 +1882,6 @@ gint32 CFuseStmFile::fs_unlink(
     return ret;
 }
 
-gint32 CFuseStmFile::StartNextRead( BufPtr& pBuf )
-{
-    gint32 ret = 0;
-    do{
-        InterfPtr pIf = GetIf();
-        CRpcServices* pSvc = pIf;
-        CStreamServerSync* pStmSvr = pIf;
-        CStreamProxySync* pStmProxy = pIf;
-        guint32 dwPReq = 0;
-        HANDLE hStream = GetStream();
-        if( pStmSvr != nullptr )
-        {
-            ret = pStmSvr->GetPendingReqs(
-                hStream, dwPReq );
-        }
-        else
-        {
-            ret = pStmProxy->GetPendingReqs(
-                hStream, dwPReq );
-        }
-        if( ERROR( ret ) )
-            break;
-
-        if( dwPReq > 0 )
-        {
-            ret = STATUS_PENDING;
-            break;
-        }
-        
-        if( pStmSvr != nullptr )
-        {
-            ret = pStmSvr->ReadStreamAsync(
-                hStream, pBuf,
-                ( IConfigDb* )nullptr );
-        }
-        else
-        {
-            ret = pStmProxy->ReadStreamAsync(
-                hStream, pBuf,
-                ( IConfigDb* )nullptr );
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
-gint32 CFuseStmFile::OnCompleteReadReq()
-{
-    gint32 ret = 0;
-
-    do{
-        CFuseMutex oLock( GetLock() );
-
-        size_t dwAvail = GetBytesAvail();
-        if( dwAvail > 0  )
-        {
-            guint32 dwFlags = POLLIN;
-            SetRevents( GetRevents() | dwFlags );
-            NotifyPoll();
-            break;
-        }
-
-    }while( 0 );
-
-    return ret;
-}
-
 gint32 CFuseStmFile::OnReadStreamComplete(
     HANDLE hStream,
     gint32 iRet,
@@ -2038,6 +1970,25 @@ gint32 CFuseStmFile::FillIncomingQue(
     return ret;
 }
  
+gint32 CFuseStmFile::FillAndNotify()
+{
+    std::vector< INBUF > vecIncoming;
+    FillIncomingQue( vecIncoming );
+
+    CFuseMutex oLock( GetLock() );
+
+    auto endPos = m_queIncoming.end();
+    if( vecIncoming.size() )
+        m_queIncoming.insert( endPos,
+            vecIncoming.begin(),
+            vecIncoming.end());
+
+    if( m_queIncoming.size() )
+        NotifyPoll();
+
+    return 0;
+}
+
 gint32 CFuseStmFile::fs_read(
     const char* path,
     fuse_file_info *fi,
@@ -2052,21 +2003,14 @@ gint32 CFuseStmFile::fs_read(
         if( size == 0 )
             break;
 
-        std::vector< INBUF > vecIncoming;
-        FillIncomingQue( vecIncoming );
-
+        //Non-blocking only
         CFuseMutex oLock( GetLock() );
-
-        auto endPos = m_queIncoming.end();
-        if( vecIncoming.size() )
-            m_queIncoming.insert( endPos,
-                vecIncoming.begin(),
-                vecIncoming.end());
-
-        // no-blocking read
         size_t dwAvail = GetBytesAvail();
         size_t dwBytesRead = 
             std::min( size, dwAvail );
+
+        if( dwBytesRead == 0 )
+            break;
 
         FillBufVec( dwBytesRead,
             m_queIncoming, vecBackup,
@@ -2345,30 +2289,11 @@ gint32 CFuseStmFile::fs_poll(
     gint32 ret = 0;
     do{
         gint32 ret = 0;
-        guint32 dwSize = 0;
-
-        HANDLE hstm = GetStream();
-        ObjPtr pObj = GetIf();
-        CStreamProxyFuse* pProxy = pObj;
-        CStreamServerFuse* pSvr = pObj;
-        if( pSvr != nullptr )
-        {
-            ret = pSvr->GetPendingBytes(
-                hstm, dwSize );
-        }
-        else
-        {
-            ret = pProxy->GetPendingBytes(
-                hstm, dwSize );
-        }
 
         CFuseMutex oLock( GetLock() );
         bool bCanSend = !GetFlowCtrl();
         SetPollHandle( ph );
         if( m_queIncoming.size() > 0 )
-            *reventsp |= POLLIN;
-
-        if( SUCCEEDED( ret ) && dwSize > 0 )
             *reventsp |= POLLIN;
 
         if(  bCanSend )
