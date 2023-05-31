@@ -1970,23 +1970,32 @@ gint32 CFuseStmFile::FillIncomingQue(
     return ret;
 }
  
-gint32 CFuseStmFile::FillAndNotify()
+void CFuseStmFile::FillAndNotify( bool bNotify )
 {
     std::vector< INBUF > vecIncoming;
-    FillIncomingQue( vecIncoming );
-
     CFuseMutex oLock( GetLock() );
 
+    size_t dwAvail = GetBytesAvail();
+    size_t dwCount = m_queIncoming.size();
+    if( dwCount >= MAX_STM_QUE_SIZE ||
+        dwAvail >= STM_MAX_PENDING_WRITE )
+    {
+        // don't pull packets from the underlying
+        // queue to lift the flow-control.
+        if( bNotify )
+            NotifyPoll();
+        return;
+    }
+
+    FillIncomingQue( vecIncoming );
     auto endPos = m_queIncoming.end();
     if( vecIncoming.size() )
         m_queIncoming.insert( endPos,
             vecIncoming.begin(),
             vecIncoming.end());
-
-    if( m_queIncoming.size() )
+    if( m_queIncoming.size() && bNotify )
         NotifyPoll();
-
-    return 0;
+    return;
 }
 
 gint32 CFuseStmFile::fs_read(
@@ -2005,7 +2014,17 @@ gint32 CFuseStmFile::fs_read(
 
         //Non-blocking only
         CFuseMutex oLock( GetLock() );
+
         size_t dwAvail = GetBytesAvail();
+        if( dwAvail < size )
+        {
+            // to make sure read won't return empty
+            // handed with some pending bytes still
+            // available 
+            FillAndNotify( false );
+            dwAvail = GetBytesAvail();
+        }
+
         size_t dwBytesRead = 
             std::min( size, dwAvail );
 
@@ -2291,6 +2310,10 @@ gint32 CFuseStmFile::fs_poll(
         gint32 ret = 0;
 
         CFuseMutex oLock( GetLock() );
+        // this fill is to make sure there is no
+        // pending bytes in the underlying stream
+        // interface when 'select' is about to wait.
+        FillAndNotify( false );
         bool bCanSend = !GetFlowCtrl();
         SetPollHandle( ph );
         if( m_queIncoming.size() > 0 )

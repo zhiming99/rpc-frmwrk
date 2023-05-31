@@ -993,7 +993,7 @@ class CFuseStmFile : public CFuseFileEntry
     void SetStream( HANDLE hStream )
     { m_hStream = hStream; }
 
-    gint32 FillAndNotify();
+    void FillAndNotify( bool bNotify = true );
 
     gint32 fs_open(
         const char *path,
