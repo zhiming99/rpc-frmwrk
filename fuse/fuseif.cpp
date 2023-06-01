@@ -2018,7 +2018,7 @@ gint32 CFuseStmFile::fs_read(
         size_t dwAvail = GetBytesAvail();
         if( dwAvail < size )
         {
-            // to make sure read won't return empty
+            // to make sure read not return empty
             // handed with some pending bytes still
             // available 
             FillAndNotify( false );
@@ -2504,7 +2504,7 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
 using INO_INFO=std::pair< guint64, stdstr>;
 
 static gint32 fuseif_remove_req(
-    CRpcServices* pIf, stdstr& strSurfix )
+    CRpcServices* pIf, stdstr& strSurffix )
 {
     gint32 ret = 0;
     do{
@@ -2533,7 +2533,7 @@ static gint32 fuseif_remove_req(
 
         for( auto& elem : vecPrefixes )
         {
-            stdstr strFile = elem + strSurfix;
+            stdstr strFile = elem + strSurffix;
             auto pFile = dynamic_cast< CFuseObjBase* >
                 ( _pSvcDir->GetChild( strFile ) );
 
@@ -2617,10 +2617,10 @@ gint32 CFuseEvtFile::do_remove( bool bRemoveGrp )
                     break;
                 }
 
-                stdstr strSurfix =
+                stdstr strSurffix =
                     strName.substr( 5 );
                 ret = fuseif_remove_req(
-                    pIf, strSurfix );
+                    pIf, strSurffix );
 
             }while( 0 );
 
@@ -3970,18 +3970,18 @@ gint32 CFuseSvcProxy::ReceiveMsgJson(
 }
 
 gint32 CFuseSvcProxy::AddReqFiles(
-    const stdstr& strSurfix, DIR_SPTR& pReq )
+    const stdstr& strSurffix, DIR_SPTR& pReq )
 {
     // add an RW request file
     gint32 ret = 0;
     do{
         CFuseObjBase* pObj = nullptr;
         guint32 dwGrpId = 0;
-        if( strSurfix != "0" )
+        if( strSurffix != "0" )
             dwGrpId = NewGroupId();
 
         stdstr strName = "jreq_";
-        strName += strSurfix;
+        strName += strSurffix;
         auto pFile = DIR_SPTR(
             new CFuseReqFileProxy( strName, this ) ); 
         pObj = dynamic_cast< CFuseObjBase* >
@@ -3998,7 +3998,7 @@ gint32 CFuseSvcProxy::AddReqFiles(
 
         // add an RO RESP file 
         strName = "jrsp_";
-        strName += strSurfix;
+        strName += strSurffix;
         pFile = DIR_SPTR(
             new CFuseRespFileProxy( strName, this ) );
         pObj = dynamic_cast
@@ -4018,7 +4018,7 @@ gint32 CFuseSvcProxy::AddReqFiles(
 
         // add an RO event file 
         strName = "jevt_";
-        strName += strSurfix;
+        strName += strSurffix;
         pFile = DIR_SPTR(
             new CFuseEvtFile( strName, this ) ); 
         pObj = dynamic_cast
@@ -4170,18 +4170,18 @@ gint32 CFuseSvcServer::ReceiveMsgJson(
 }
 
 gint32 CFuseSvcServer::AddReqFiles(
-    const stdstr& strSurfix, DIR_SPTR& pReq )
+    const stdstr& strSurffix, DIR_SPTR& pReq )
 {
     // add an RO request file
     gint32 ret = 0;
     do{
         CFuseObjBase* pObj = nullptr;
         guint32 dwGrpId = 0;
-        if( strSurfix != "0" )
+        if( strSurffix != "0" )
             dwGrpId = NewGroupId();
 
         stdstr strName = "jreq_";
-        strName += strSurfix;
+        strName += strSurffix;
         auto pFile = DIR_SPTR(
             new CFuseReqFileSvr( strName, this ) ); 
         pObj = dynamic_cast< CFuseObjBase* >
@@ -4199,7 +4199,7 @@ gint32 CFuseSvcServer::AddReqFiles(
         // add an WO RESP file for both
         // response and event
         strName = "jrsp_";
-        strName += strSurfix;
+        strName += strSurffix;
 
         pFile = DIR_SPTR(
             new CFuseRespFileSvr( strName, this ) ); 
@@ -4517,18 +4517,18 @@ gint32 fuseop_unlink( const char* path )
 }
 
 static gint32 fuseif_create_req(
-    const stdstr& strSurfix,
+    const stdstr& strSurffix,
     CFuseSvcDir* pDir, 
     fuse_file_info* fi )
 {
     gint32 ret = 0;
     do{
-        if( strSurfix.empty() )
+        if( strSurffix.empty() )
         {
             ret = -EINVAL;
             break;
         }
-        if( strSurfix == "0" )
+        if( strSurffix == "0" )
         {
             ret = -EEXIST;
             break;
@@ -4544,7 +4544,7 @@ static gint32 fuseif_create_req(
         }
 
         stdstr strName = "jreq_";
-        strName += strSurfix;
+        strName += strSurffix;
 
         WLOCK_TESTMNT0( pDir );
         if( pDir->GetChild( strName ) != nullptr )
@@ -4556,10 +4556,10 @@ static gint32 fuseif_create_req(
         DIR_SPTR pEnt;
         if( pProxy != nullptr )
             ret = pProxy->AddReqFiles(
-                strSurfix, pEnt );
+                strSurffix, pEnt );
         else
             ret = pSvr->AddReqFiles(
-                strSurfix, pEnt );
+                strSurffix, pEnt );
 
         if( ERROR( ret ) )
             break;

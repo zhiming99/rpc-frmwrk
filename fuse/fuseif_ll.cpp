@@ -760,7 +760,6 @@ static const struct fuse_opt option_spec[] = {
         FUSE_OPT_END
 };
 
-extern ObjPtr g_pIoMgr;
 namespace rpcf{
 extern void SetFuse( MYFUSE* );
 }
@@ -778,7 +777,10 @@ gint32 fuseif_main_ll( fuse_args& args,
 
     if( options.no_reconnect )
     {
-        CIoManager* pMgr = g_pIoMgr;
+        CRpcServices* pRoot = GetRootIf();
+        if( pRoot == nullptr )
+            return 1;
+        CIoManager* pMgr = pRoot->GetIoMgr();
         pMgr->SetCmdLineOpt( propConnRecover, false );
     }
 
