@@ -27,6 +27,7 @@
 using namespace rpcf;
 #include "genpy.h"
 #include "gencpp2.h"
+#include "jsondef.h"
 
 extern std::string g_strAppName;
 extern stdstr g_strCmdLine;
@@ -3037,23 +3038,95 @@ CImplPyMainFunc::CImplPyMainFunc(
     }
 }
 
-gint32 CImplPyMainFunc::OutputCli(
-    CServiceDecl* pSvc )
+gint32 CImplPyMainFunc::EmitUsage()
 {
     gint32 ret = 0;
     do{
-        stdstr strName = pSvc->GetName();
+        CCOUT << "def Usage():";
+        INDENT_UPL;
+        CCOUT << "print( \"Usage: \%s [OPTION]\\n\" +";
+        INDENT_UPL;
+        Wa( "\"\\t [ -a to enable authentication ]\\n\" +" );
+        Wa( "\"\\t [ -d to run as a daemon ]\\n\" +" );
+        Wa( "\"\\t [ -h this help ]\\n\" \% ( sys.argv[ 0 ] )," );
+        CCOUT << "file=sys.stderr )";
+        INDENT_DOWN;
+        INDENT_DOWNL;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplPyMainFunc::EmitGetOpt()
+{
+    gint32 ret = 0;
+    do{
+        Wa( "argv = sys.argv[1:]" );
+        Wa( "try:" );
+        Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
+
+        Wa( "except:" );
+        Wa( "    Usage()" );
+        Wa( "    sys.exit( ErrorCode.EINVAL )" );
+
+        Wa( "params=dict()" );
+        Wa( "for opt, arg in opts:" );
+        Wa( "    if opt in ('-a'):" );
+        Wa( "        params[ 'bAuth' ] = True" );
+        Wa( "    elif opt in ('-d'):" );
+        Wa( "        params[ 'bDaemon' ] = True" );
+        Wa( "    elif opt in ('-h'):" );
+        Wa( "        Usage()" );
+        Wa( "        sys.exit( 0 )" );
+
+
+    }while( 0 );
+
+    return ret;
+}
+gint32 CImplPyMainFunc::OutputCli(
+    std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    do{
+        if( vecSvcs.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
         Wa("import os" );
         Wa("import time" );
-        NEW_LINES( 2 );
+        if( g_bBuiltinRt )
+        {
+            Wa( "import sys" );
+            Wa( "import getopt" );
+            NEW_LINE;
+            EmitUsage();
+        }
+        NEW_LINE;
         CCOUT << "def maincli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
-        if( g_bRpcOverStm || g_bBuiltinRt )
+        stdstr strModName = g_strAppName + "cli";
+        if( g_bRpcOverStm && !g_bBuiltinRt )
         {
-            stdstr strModName = g_strAppName + "cli";
             CCOUT << "oContext = PyRpcContext( '" << strModName << "' )";
             NEW_LINE;
+        }
+        else if( g_bBuiltinRt )
+        {
+            ret = EmitGetOpt();
+            if( ERROR( ret ) )
+                break;
+            CCOUT << "params[ '" << JSON_ATTR_MODNAME
+                << "' ] = \"" << strModName << "\"";
+            NEW_LINE;
+            CCOUT << "params[ 'AppName' ] = \""
+                << g_strAppName << "\"";
+            NEW_LINE;
+            CCOUT << "params[ '"
+                << JSON_ATTR_ROUTER_ROLE << "' ] = 1";
+            NEW_LINE;
+            Wa( "oContext = PyRpcContext( params )" );
         }
         else
         {
@@ -3064,7 +3137,8 @@ gint32 CImplPyMainFunc::OutputCli(
         CCOUT << "if ctx.status < 0:";
         INDENT_UPL;
         Wa( "ret = ctx.status" );
-        Wa( "print( os.getpid(), \"error start PyRpcContext %d\" % ret );" );
+        Wa( "print( os.getpid(), " );
+        Wa( "    \"Error start PyRpcContext %d\" % ret )" );
         CCOUT << "return ret";
         INDENT_DOWNL;
         NEW_LINE;
@@ -3073,28 +3147,93 @@ gint32 CImplPyMainFunc::OutputCli(
         Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
         CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
-        CCOUT << "oProxy = C" << strName << "Proxy( ctx.pIoMgr,";
-        NEW_LINE;
-        CCOUT << "    strPath_, '" << strName << "' )" ;
-        NEW_LINE;
-        Wa( "ret = oProxy.GetError()" );
-        Wa( "if ret < 0 :" );
-        Wa( "    return ret" );
-        NEW_LINE;
-        CCOUT << "with oProxy :";
-        INDENT_UPL;
+        for( auto elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = elem;
+            stdstr strName = pSvc->GetName();
+            stdstr strVar = "oProxy_";
+            strVar += strName;
 
-        Wa( "state = oProxy.oInst.GetState()" );
-        Wa( "while state == cpp.stateRecovery :" );
-        Wa( "    time.sleep( 1 )" );
-        Wa( "    state = oProxy.oInst.GetState()" );
-        Wa( "if state != cpp.stateConnected :" );
-        Wa( "    return ErrorCode.ERROR_STATE" );
+            CCOUT << strVar << " = C" << strName << "Proxy( ctx.pIoMgr,";
+            NEW_LINE;
+            CCOUT << "    strPath_, '" << strName << "' )" ;
+            NEW_LINE;
+            CCOUT << "ret = "<< strVar << ".GetError()";
+            NEW_LINE;
+            Wa( "if ret < 0 :" );
+            Wa( "    return ret" );
+            NEW_LINE;
+        }
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strName = pSvc->GetName();
+            stdstr strVar = "oProxy_";
+            strVar += strName;
+            CCOUT << "with " << strVar << " as oProxy:";
+        }
+        else
+        {  
+            CCOUT << "with(";
+            INDENT_UPL
+            for( int i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                stdstr strVar = "oProxy_";
+                strVar += strName;
+                CCOUT << strVar << " as oProxy";
+                if( i > 0 )
+                    CCOUT << i;
+                if( i < vecSvcs.size() - 1 )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                else
+                {
+                    NEW_LINE;
+                    CCOUT << "):";
+                }
+            }
+            INDENT_DOWN;
+        }
+
+        INDENT_UPL;
+        if( vecSvcs.size() == 1 )
+        {
+            Wa( "state = oProxy.oInst.GetState()" );
+            Wa( "while state == cpp.stateRecovery :" );
+            Wa( "    time.sleep( 1 )" );
+            Wa( "    state = oProxy.oInst.GetState()" );
+            Wa( "if state != cpp.stateConnected :" );
+            Wa( "    return ErrorCode.ERROR_STATE" );
+        }
+        else
+        {
+            for( int i = 0; i < vecSvcs.size(); i++ )
+            {
+                stdstr strVar = "oProxy";
+                if( i > 0 )
+                    strVar += std::to_string( i );
+                CCOUT << "state = " << strVar << ".oInst.GetState()";
+                NEW_LINE;
+                Wa( "while state == cpp.stateRecovery :" );
+                Wa( "    time.sleep( 1 )" );
+                CCOUT << "    state = "<< strVar << ".oInst.GetState()";
+                NEW_LINE;
+                Wa( "if state != cpp.stateConnected :" );
+                Wa( "    return ErrorCode.ERROR_STATE" );
+                if( i < vecSvcs.size() - 1 )
+                    NEW_LINE;
+            }
+        }
         NEW_LINE;
         Wa( "'''" );
         Wa( "adding your code here" );
 
         std::vector< ObjPtr > vecIfs;
+        CServiceDecl* pSvc = vecSvcs[ 0 ];
         pSvc->GetIfRefs( vecIfs );
         if( vecIfs.empty() )
         {
@@ -3194,7 +3333,27 @@ gint32 CImplPyMainFunc::OutputCli(
 
         Wa( "'''" );
         INDENT_DOWNL;
-        CCOUT << "oProxy = None";
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strName = pSvc->GetName();
+            CCOUT << "oProxy_" << strName << "= None";
+        }
+        else
+        {
+            for( int i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                stdstr strVar = "oProxy_";
+                strVar += strName;
+                if( i > 0 )
+                    strVar += std::to_string( i );
+                CCOUT << strVar << " = None";
+                if( i < vecSvcs.size() - 1 )
+                    NEW_LINE;
+            }
+        }
         INDENT_DOWNL;
         Wa( "oContext = None" );
         Wa( "return ret" );
@@ -3208,16 +3367,28 @@ gint32 CImplPyMainFunc::OutputCli(
 }
 
 gint32 CImplPyMainFunc::OutputSvr(
-    CServiceDecl* pSvc )
+    std::vector< ObjPtr >& vecSvcs )
 {
     gint32 ret = 0;
     do{
-        stdstr strName = pSvc->GetName();
+        if( vecSvcs.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
         Wa("import os" );
         CCOUT << "import time";
         NEW_LINE;
         CCOUT << "import signal";
-        NEW_LINES( 2 );
+        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "import sys" );
+            Wa( "import getopt" );
+            NEW_LINE;
+            EmitUsage();
+        }
+        NEW_LINE;
 
         Wa( "bExit = False" );
         Wa( "def SigHandler( signum, frame ):" );
@@ -3230,11 +3401,27 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_UPL;
         Wa( "ret = 0" );
         Wa( "signal.signal( signal.SIGINT, SigHandler)" );
-        if( g_bRpcOverStm || g_bBuiltinRt )
+        stdstr strModName = g_strAppName + "svr";
+        if( g_bRpcOverStm && !g_bBuiltinRt )
         {
-            stdstr strModName = g_strAppName + "svr";
             CCOUT << "oContext = PyRpcContext( '" << strModName << "' )";
             NEW_LINE;
+        }
+        else if( g_bBuiltinRt )
+        {
+            ret = EmitGetOpt();
+            if( ERROR( ret ) )
+                break;
+            CCOUT << "params[ '" << JSON_ATTR_MODNAME
+                << "' ] = \"" << strModName << "\"";
+            NEW_LINE;
+            CCOUT << "params[ 'AppName' ] = \""
+                << g_strAppName << "\"";
+            NEW_LINE;
+            CCOUT << "params[ '"
+                << JSON_ATTR_ROUTER_ROLE << "' ] = 2";
+            NEW_LINE;
+            Wa( "oContext = PyRpcContext( params )" );
         }
         else
         {
@@ -3245,23 +3432,68 @@ gint32 CImplPyMainFunc::OutputSvr(
         CCOUT << "if ctx.status < 0:";
         INDENT_UPL;
         Wa( "ret = ctx.status" );
-        Wa( "print( os.getpid(), \"error start PyRpcContext %d\" % ret );" );
+        Wa( "print( os.getpid()," ); 
+        Wa( "    \"Error start PyRpcContext %d\" % ret )" );
         CCOUT << "return ret";
         INDENT_DOWNL;
         NEW_LINE;
+
         Wa( "print( \"start to work here...\" )" );
         Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
         CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
-        CCOUT << "oServer = C" << strName << "Server( ctx.pIoMgr,";
-        NEW_LINE;
-        CCOUT << "    strPath_, '" << strName << "' )" ;
-        NEW_LINE;
-        Wa( "ret = oServer.GetError()" );
-        Wa( "if ret < 0 :" );
-        Wa( "    return ret" );
-        NEW_LINE;
-        CCOUT << "with oServer :";
+        for( auto elem : vecSvcs )
+        {
+            CServiceDecl* pSvc = elem;
+            stdstr strName = pSvc->GetName();
+            stdstr strVar = "oServer_";
+            strVar += strName;
+
+            CCOUT << strVar << " = C" << strName << "Server( ctx.pIoMgr,";
+            NEW_LINE;
+            CCOUT << "    strPath_, '" << strName << "' )" ;
+            NEW_LINE;
+            CCOUT << "ret = "<< strVar << ".GetError()";
+            NEW_LINE;
+            Wa( "if ret < 0 :" );
+            Wa( "    return ret" );
+            NEW_LINE;
+        }
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strName = pSvc->GetName();
+            stdstr strVar = "oServer_";
+            strVar += strName;
+            CCOUT << "with " << strVar << " as oServer:";
+        }
+        else
+        {
+            CCOUT << "with(";
+            INDENT_UPL
+            for( int i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                stdstr strVar = "oServer_";
+                strVar += strName;
+                CCOUT << strVar << " as oServer";
+                if( i > 0 )
+                    CCOUT << i;
+                if( i < vecSvcs.size() - 1 )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+                else
+                {
+                    NEW_LINE;
+                    CCOUT << "):";
+                }
+            }
+            INDENT_DOWN;
+        }
+
         INDENT_UPL;
         Wa( "'''" );
         Wa( "made change to the following code" );
@@ -3269,14 +3501,60 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "'''" );
 
         Wa( "global bExit" );
-        Wa( "while ( cpp.stateConnected ==" );
-        Wa( "    oServer.oInst.GetState() ):" );
+        if( vecSvcs.size() == 1 )
+        {
+            Wa( "while ( cpp.stateConnected ==" );
+            Wa( "    oServer.oInst.GetState() ):" );
+        }
+        else
+        {
+            CCOUT << "while(";
+            INDENT_UPL;
+            for( int i = 0; i < vecSvcs.size(); ++i )
+            {
+                stdstr strVar = "oServer";
+                if( i > 0 )
+                    strVar += std::to_string( i );
+                CCOUT << "cpp.stateConnected == "
+                    << strVar << ".oInst.GetState()";
+                if( i < vecSvcs.size() - 1 )
+                {
+                    CCOUT << " and";
+                    NEW_LINE;
+                }
+                else
+                {
+                    NEW_LINE;
+                    CCOUT << "):";
+                    INDENT_DOWNL;
+                }
+            }
+        }
         Wa( "    time.sleep( 1 )" );
         Wa( "    if bExit:" );
         CCOUT << "        break";
         INDENT_DOWNL;
         Wa( "print( \"Server loop ended...\" )" );
-        CCOUT << "oServer = None";
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strName = pSvc->GetName();
+            CCOUT << "oServer_" 
+                << strName <<"  = None";
+        }
+        else
+        {
+            for( int i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                stdstr strVar = "oServer_";
+                strVar += strName;
+                CCOUT << strVar << " = None";
+                if( i < vecSvcs.size() - 1 )
+                    NEW_LINE;
+            }
+        }
         INDENT_DOWNL;
         Wa( "oContext = None" );
         Wa( "return ret" );
@@ -3299,7 +3577,6 @@ gint32 CImplPyMainFunc::Output()
         if( ERROR( ret ) )
             break;
 
-        CServiceDecl* pSvc = vecSvcs.front();
         m_pWriter->SelectMainCli();
         OUTPUT_BANNER();
         for( auto& elem : vecSvcs )
@@ -3311,7 +3588,7 @@ gint32 CImplPyMainFunc::Output()
                 << "Proxy";
             NEW_LINE;
         }
-        ret = OutputCli( pSvc );
+        ret = OutputCli( vecSvcs );
         if( ERROR( ret ) )
             break;
 
@@ -3326,7 +3603,7 @@ gint32 CImplPyMainFunc::Output()
                 << "Server";
             NEW_LINE;
         }
-        ret = OutputSvr( pSvc );
+        ret = OutputSvr( vecSvcs );
         if( ERROR( ret ) )
             break;
 

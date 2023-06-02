@@ -162,28 +162,53 @@ class PyReqContext :
         self.oContext = object()
 
 class PyRpcContext :
-    def CreateIoMgr( self, strModName ) :
+    def StartIoMgr( self, oInitParams ) :
         cpp.CoInitialize(0)
         p1=cpp.CParamList()
-        ret = p1.SetStrProp( 0, strModName )
+        ret = 0
+        try:
+            if type( oInitParams ) is str:
+                ret = p1.SetStrProp( 0, oInitParams )
+            elif type( oInitParams ) is dict:
+                if 'ModName' in oInitParams:
+                    p1.SetStrProp( 0,
+                        oInitParams[ 'ModName' ] )
+                else:
+                    ret = -ErrorCode.EINVAL
+                    raise Exception(
+                        "Error cannot find Module name")
+                if 'Role' in oInitParams:
+                    p1.SetIntProp( 101,
+                        oInitParams[ 'Role' ] )
+                else:
+                    ret = -ErrorCode.EINVAL
+                    raise Exception(
+                        "Error cannot router role property" )
+                if 'bAuth' in oInitParams:
+                    p1.SetBoolProp( 102,
+                        oInitParams[ 'bAuth' ] )
+                if 'bDaemon' in oInitParams:
+                    p1.SetBoolProp( 103,
+                        oInitParams[ 'bDaemon' ] )
+                if 'AppName' in oInitParams:
+                    p1.SetStrProp( 104,
+                        oInitParams[ 'AppName' ] )
+                else:
+                    ret = -ErrorCode.EINVAL
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -ErrorCode.EFAULT
+
         if ret < 0 :
             return None
+
         p2 = cpp.CastToCfg( p1.GetCfgAsObj() )
-        p3=cpp.CreateIoMgr( p2 )
+        p3=cpp.StartIoMgr( p2 )
         return p3
 
-    def StartIoMgr( self, pIoMgr ) :
-        p = cpp.CastToSvc( pIoMgr )
-        if p is None :
-            return -errno.EFAULT
-        ret = p.Start()
-        return ret
-
     def StopIoMgr( self, pIoMgr ) :
-        p = cpp.CastToSvc( pIoMgr )
-        if p is None :
-            return -errno.EFAULT
-        ret = p.Stop()
+        ret = cpp.StopIoMgr( pIoMgr )
         return ret
 
     def CleanUp( self ) :
@@ -193,23 +218,21 @@ class PyRpcContext :
         print( "proxy.py: about to quit..." )
         self.CleanUp()
 
-    def __init__( self, strInitParams = "PyRpcProxy" ) :
-        self.strInitParams = strInitParams
+    def __init__( self, oInitParams = "PyRpcProxy" ) :
+        if oInitParams is None:
+            raise Exception(
+                "Error init parameter cannot be None" )
+        self.oInitParams = oInitParams
         self.status = 0
 
-    def Start( self, strInitParams ) :
+    def Start( self, oInitParams ) :
         ret = 0
         print( "entering..." )
-        self.pIoMgr = self.CreateIoMgr( strInitParams )
-        if self.pIoMgr is not None :
-            ret = self.StartIoMgr( self.pIoMgr )
-            if ret < 0 :
-                self.StopIoMgr( self.pIoMgr )
-            else :
-                ret = LoadPyFactory( self.pIoMgr )
-            self.status = ret
-        else:
+        self.pIoMgr = self.StartIoMgr( oInitParams )
+        if self.pIoMgr is None :
             ret = -errno.EFAULT
+            raise Exception(
+                "Error Start IoManager" )
         return ret
 
     def Stop( self ) :
@@ -219,8 +242,8 @@ class PyRpcContext :
             self.pIoMgr = None
 
     def __enter__( self ) :
-        self.Start( self.strInitParams )
-        return self;
+        self.Start( self.oInitParams )
+        return self
 
     def __exit__( self, type, val, traceback ) :
         if self.status < 0:
@@ -266,6 +289,7 @@ class PyRpcServices :
 
     def __enter__( self ) :
         self.Start()
+        return self
 
     def __exit__( self, type, val, traceback ) :
         self.Stop()

@@ -7849,13 +7849,16 @@ gint32 CExportDrivers::OutputBuiltinRt()
         oCli[ JSON_ATTR_FACTORIES ] = oFactories;
         oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
 #ifdef FUSE3
-        if( bFuseP )
+        if( g_strLang == "cpp" )
         {
-            oCli[ JSON_ATTR_FACTORIES ].append(
+            if( bFuseP )
+            {
+                oCli[ JSON_ATTR_FACTORIES ].append(
+                    Json::Value( "./libfuseif.so" ) );
+            }
+            oSvr[ JSON_ATTR_FACTORIES ].append(
                 Json::Value( "./libfuseif.so" ) );
         }
-        oSvr[ JSON_ATTR_FACTORIES ].append(
-            Json::Value( "./libfuseif.so" ) );
 #endif
         oModuleArray.append( oSvr );
         oModuleArray.append( oCli );

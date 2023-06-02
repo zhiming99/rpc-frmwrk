@@ -2604,7 +2604,8 @@ cpp::ObjPtr CreateProxy(
 
 gint32 LoadPyFactory( cpp::ObjPtr& pMgr );
 %MethodCode
-    sipRes = LoadThisLib( *a0 );
+    //sipRes = LoadThisLib( *a0 );
+    sipRes = 0;
 %End
 
 CPythonProxy* CastToProxy(

@@ -360,8 +360,12 @@ class CImplPyMainFunc :
     CImplPyMainFunc(
         CPyWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
-    gint32 OutputCli( CServiceDecl* pSvc );
-    gint32 OutputSvr( CServiceDecl* pSvc );
+    gint32 OutputCli(
+        std::vector< ObjPtr >& vecSvcs );
+    gint32 OutputSvr(
+        std::vector< ObjPtr >& vecSvcs );
+    gint32 EmitGetOpt();
+    gint32 EmitUsage();
 };
 
 class CExportPyReadme :

@@ -27,6 +27,7 @@
 %Module(name=rpcbase, language="C++")
 
 %ModuleHeaderCode
+#pragma once
 #include <string>
 #include "rpc.h"
 #include "defines.h"
@@ -35,11 +36,25 @@
 using namespace cpp;
 #include "proxy.h"
 #include "seribase.h"
+#include <unistd.h>
+#include "dlfcn.h"
 
 extern std::string convertPythonUnicodeObjectToStdString(PyObject *pyUnicodeObj);
+extern "C" gint32 DllLoadFactory( FactoryPtr& pFactory );
+extern char g_szKeyPass[ SSL_PASS_MAX + 1 ];
+extern ObjPtr g_pRouter;
+extern ObjPtr g_pIoMgr;
+extern std::set< guint32 > g_setMsgIds;
+gint32 CheckKeyPass();
+gint32 OpenThisLib();
 %End
 
 %ModuleCode
+
+char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
+ObjPtr g_pRouter;
+ObjPtr g_pIoMgr;
+std::set< guint32 > g_setMsgIds;
 
 void DumpObj(PyObject *o)
 {
@@ -56,6 +71,81 @@ std::string convertPythonUnicodeObjectToStdString(PyObject *pyUnicodeObj)
 }
 
 using namespace cpp;
+
+gint32 CheckKeyPass()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPath;
+        ret = GetLibPath(
+            strPath, "libipc.so" );
+        if( ERROR( ret ) )
+            break;
+
+        strPath += "/librpc.so";
+        void* handle = dlopen( strPath.c_str(),
+            RTLD_NOW | RTLD_GLOBAL );
+        if( handle == nullptr )
+        {
+            ret = -ENOENT;
+            DebugPrintEx( logErr, ret,
+                "Error librpc.so not found" );
+            break;
+        }
+        auto func = ( gint32 (*)(bool& ) )
+            dlsym( handle, "_ZN3cpp15CheckForKeyPassERb" );
+        if( func == nullptr )
+        {
+            ret = -ENOENT;
+            DebugPrintEx( logErr, ret,
+                "Error undefined symobol %s in " 
+                "librpc.so ",
+                __func__ );
+            break;
+        }
+
+        bool bPrompt = false;
+        bool bExit = false;
+        ret = func( bPrompt );
+        while( SUCCEEDED( ret ) && bPrompt )
+        {
+            char* pPass = getpass( "SSL Key Password:" );
+            if( pPass == nullptr )
+            {
+                bExit = true;
+                ret = -errno;
+                break;
+            }
+            size_t len = strlen( pPass );
+            len = std::min(
+                len, ( size_t )SSL_PASS_MAX );
+            memcpy( g_szKeyPass, pPass, len );
+            break;
+        }
+        ret = 0;
+        if( bExit )
+            break;
+    }while( 0 );
+    return ret;
+}
+
+gint32 OpenThisLib()
+{
+    gint32 ret = 0;
+    do{
+        std::string strResult;
+        const char* szLib = "rpcbase.cpython";
+        ret = GetLibPathName( strResult, szLib );
+        if( ERROR( ret ) )
+            break;
+        // explicitly open this library so that the
+        // global variables can be found by other
+        // shared libraray to load.
+        dlopen( strResult.c_str(),
+            RTLD_NOW | RTLD_GLOBAL );
+    }while( 0 );
+    return ret;
+}
 
 %End
 
@@ -191,7 +281,14 @@ namespace cpp
         Py_Initialize();
         sipRes = cpp::CoInitialize( a0 );
     %End
+
     gint32 CoUninitialize();
+    %MethodCode
+        cpp::CoUninitialize();
+        DebugPrintEx( logErr, 0,
+            "#Leaked objects is %d",
+            CObjBase::GetActCount() );
+    %End
 
     class CObjBase
     {
@@ -735,16 +832,181 @@ namespace cpp
         %End
     };
 
-    cpp::ObjPtr* CreateIoMgr(
+    cpp::ObjPtr* StartIoMgr(
         cpp::IConfigDb* pCfg )/TransferBack/;
     %MethodCode
+    gint32 ret = 0;
     cpp::ObjPtr* pObj =
         new cpp::ObjPtr( nullptr, false );
-    gint32 ret = pObj->NewObj(
-        clsid( CIoManager ), a0 ); 
-    if( ret < 0 )
-        return SIP_NULLPTR;
-    sipRes = pObj;
+    CCfgOpener oCfg( a0 );
+    sipRes = SIP_NULLPTR;
+    do{
+        stdstr strModName;
+        ret = oCfg.GetStrProp( 0, strModName );
+        if( ERROR( ret ) )
+            break;
+
+        FactoryPtr p;
+        ret = DllLoadFactory( p );
+        if( ERROR( ret ) )
+            return SIP_NULLPTR;
+        ret = CoAddClassFactory( p );
+        if( ERROR( ret ) )
+            break;
+
+        if( !oCfg.exist( 101 ) )
+        {
+            ret = pObj->NewObj(
+                clsid( CIoManager ), a0 ); 
+            if( ret < 0 )
+                break;
+
+            CIoManager* pMgr = *pObj;
+            ret = pMgr->Start();
+            if( ERROR( ret ) )
+                break;
+
+            sipRes = pObj;
+            g_pIoMgr = *pObj;
+        }
+        else
+        {
+            OpenThisLib();
+            guint32 dwNumThrds =
+                ( guint32 )std::max( 1U,
+                std::thread::hardware_concurrency() );
+            if( dwNumThrds > 1 )
+                dwNumThrds = ( dwNumThrds >> 1 );
+            oCfg[ propMaxTaskThrd ] = dwNumThrds;
+            oCfg[ propMaxIrpThrd ] = 2;
+
+            guint32 dwRole = 1;
+            oCfg.GetIntProp( 101, dwRole );
+            oCfg.RemoveProperty( 101 );
+            
+            bool bAuth = false;
+            if( oCfg.exist( 102 ) )
+            {
+                oCfg.GetBoolProp( 102, bAuth );
+                oCfg.RemoveProperty( 102 );
+            }
+
+            bool bDaemon = false;
+            if( oCfg.exist( 103 ) )
+            {
+                oCfg.GetBoolProp( 103, bDaemon );
+                oCfg.RemoveProperty( 103 );
+            }
+            stdstr strAppName;
+            if( oCfg.exist( 104 ) )
+            {
+                oCfg.GetStrProp( 104, strAppName );
+                oCfg.RemoveProperty( 104 );
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            ret = CheckKeyPass();
+            if( ERROR( ret ) )
+                break;
+
+            if( bDaemon )
+            {
+                ret = daemon( 1, 0 );
+                if( ret < 0 )
+                {
+                    ret = -errno;
+                    break;
+                }
+            }
+
+            ret = pObj->NewObj(
+                clsid( CIoManager ), a0 );
+            if( ERROR( ret ) )
+                break;
+
+            CIoManager* pMgr = *pObj;
+            pMgr->SetCmdLineOpt(
+                propRouterRole, dwRole );
+            ret = pMgr->Start();
+            if( ERROR( ret ) )
+                break;
+
+            // create and start the router
+            stdstr strRtName =
+                strAppName + "_Router";
+            pMgr->SetRouterName( strRtName );
+            stdstr strDescPath = "./router.json";
+            if( bAuth )
+            {
+                pMgr->SetCmdLineOpt(
+                    propHasAuth, bAuth );
+                strDescPath = "./rtauth.json";
+            }
+
+            CCfgOpener oRtCfg;
+            oRtCfg.SetStrProp(
+                propSvrInstName, strRtName );
+            oRtCfg.SetPointer( propIoMgr, pMgr );
+            ret = CRpcServices::LoadObjDesc(
+                strDescPath,
+                OBJNAME_ROUTER,
+                true, oRtCfg.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            oRtCfg[ propIfStateClass ] =
+                clsid( CIfRouterMgrState );
+            oRtCfg[ propRouterRole ] = dwRole;
+            ret =  g_pRouter.NewObj(
+                clsid( CRpcRouterManagerImpl ),
+                oRtCfg.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            CInterfaceServer* pRouter = g_pRouter;
+            if( unlikely( pRouter == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pRouter->Start();
+            if( ERROR( ret ) )
+            {
+                pRouter->Stop();
+                g_pRouter.Clear();
+                break;
+            }            
+            sipRes = pObj;
+            g_pIoMgr = *pObj;
+        }
+
+    }while( 0 );
+    if( sipRes == SIP_NULLPTR )
+        delete pObj;
+    %End
+
+    gint32 StopIoMgr( ObjPtr* pObj );
+    %MethodCode
+    sipRes = 0;
+    do{
+        if( !g_pRouter.IsEmpty() )
+        {
+            IService* pRt = g_pRouter;
+            pRt->Stop();
+            g_pRouter.Clear();
+        }
+        g_pIoMgr.Clear();
+        if( a0 == nullptr )
+            break;
+        cpp::IService* pMgr = *a0;
+        if( pMgr == nullptr )
+            break;
+        sipRes = pMgr->Stop();
+    }while( 0 );
     %End
 
     cpp::ObjPtr* CreateObject(
