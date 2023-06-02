@@ -1,4 +1,9 @@
 ---
+[`Fri Jun 02 2023 03:28:02 PM Beijing`]    
+1. Now Python has been enabled fastrpc and built-in router support. That is, Python can have a performance of around 500us with some configuration.
+2. Next I will make Java to have the two features.
+3. Besides, I am pretty sure that the `EchoMany response lost` issue has been spotted and fixed.
+
 [`Thu May 18 2023 07:41:47 PM Beijing`]   
 1. I have merged `add-non-socket-stream` to the master branch.
 2. The new test shows the performance of `echo test` with built-in router has a breakthrough improvement of entering micro-second level. The average request is around 500us. **Congratulations**!
