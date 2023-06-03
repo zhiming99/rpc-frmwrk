@@ -1094,7 +1094,8 @@ gint32 AddFilesAndDirsReqFwdr(
 
 }
 
-gint32 AddFilesAndDirs(
+using namespace rpcf;
+extern "C" gint32 AddFilesAndDirs(
     bool bProxy, CRpcServices* pSvc )
 {
     if( pSvc == nullptr )

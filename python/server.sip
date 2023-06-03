@@ -844,3 +844,7 @@ CPythonServer* CastToServer(
     sipRes = pSvr;
 %End
 
+%Feature FUSE3
+%If ( FUSE3 )
+%Include fuseif.sip
+%End

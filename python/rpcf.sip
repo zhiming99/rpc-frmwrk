@@ -47,6 +47,7 @@ extern ObjPtr g_pIoMgr;
 extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
 gint32 OpenThisLib();
+extern void* g_pLibHandle;
 %End
 
 %ModuleCode
@@ -93,7 +94,7 @@ gint32 CheckKeyPass()
             break;
         }
         auto func = ( gint32 (*)(bool& ) )
-            dlsym( handle, "_ZN3cpp15CheckForKeyPassERb" );
+            dlsym( handle, "CheckForKeyPass" );
         if( func == nullptr )
         {
             ret = -ENOENT;
@@ -129,6 +130,7 @@ gint32 CheckKeyPass()
     return ret;
 }
 
+void* g_pLibHandle = nullptr;
 gint32 OpenThisLib()
 {
     gint32 ret = 0;
@@ -141,8 +143,13 @@ gint32 OpenThisLib()
         // explicitly open this library so that the
         // global variables can be found by other
         // shared libraray to load.
-        dlopen( strResult.c_str(),
+        g_pLibHandle = dlopen( strResult.c_str(),
             RTLD_NOW | RTLD_GLOBAL );
+        if( g_pLibHandle == nullptr )
+        {
+            DebugPrintEx( logErr,
+                0, "%s", dlerror() );
+        }
     }while( 0 );
     return ret;
 }
@@ -986,7 +993,14 @@ namespace cpp
 
     }while( 0 );
     if( sipRes == SIP_NULLPTR )
+    {
         delete pObj;
+        if( g_pLibHandle != nullptr )
+        {
+            dlclose( g_pLibHandle );
+            g_pLibHandle = nullptr;
+        }
+    }
     %End
 
     gint32 StopIoMgr( ObjPtr* pObj );
@@ -1007,6 +1021,11 @@ namespace cpp
             break;
         sipRes = pMgr->Stop();
     }while( 0 );
+    if( g_pLibHandle != nullptr )
+    {
+        dlclose( g_pLibHandle );
+        g_pLibHandle = nullptr;
+    }
     %End
 
     cpp::ObjPtr* CreateObject(

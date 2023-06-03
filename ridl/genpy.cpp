@@ -3038,17 +3038,21 @@ CImplPyMainFunc::CImplPyMainFunc(
     }
 }
 
-gint32 CImplPyMainFunc::EmitUsage()
+gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
 {
     gint32 ret = 0;
     do{
         CCOUT << "def Usage():";
         INDENT_UPL;
-        CCOUT << "print( \"Usage: \%s [OPTION]\\n\" +";
+        CCOUT << "print( ( \"Usage: \%s [OPTION]\\n\" +";
         INDENT_UPL;
         Wa( "\"\\t [ -a to enable authentication ]\\n\" +" );
         Wa( "\"\\t [ -d to run as a daemon ]\\n\" +" );
-        Wa( "\"\\t [ -h this help ]\\n\" \% ( sys.argv[ 0 ] )," );
+#ifdef FUSE3
+        if( !bProxy && g_bBuiltinRt )
+            Wa( "\"\\t [ -m to specify a directory as the mountpoint for rpcfs ]\\n\" +" );
+#endif
+        Wa( "\"\\t [ -h this help ]\\n\" ) \% ( sys.argv[ 0 ] )," );
         CCOUT << "file=sys.stderr )";
         INDENT_DOWN;
         INDENT_DOWNL;
@@ -3056,28 +3060,46 @@ gint32 CImplPyMainFunc::EmitUsage()
     return ret;
 }
 
-gint32 CImplPyMainFunc::EmitGetOpt()
+gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
 {
     gint32 ret = 0;
     do{
         Wa( "argv = sys.argv[1:]" );
         Wa( "try:" );
+#ifdef FUSE3
+        if( !bProxy && g_bBuiltinRt )
+            Wa( "    opts, args = getopt.getopt(argv, \"hadm:\")" );
+        else
+            Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
+#else
         Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
+#endif
 
         Wa( "except:" );
         Wa( "    Usage()" );
-        Wa( "    sys.exit( ErrorCode.EINVAL )" );
-
+        Wa( "    sys.exit( errno.EINVAL )" );
+#ifdef FUSE3
+        if( !bProxy && g_bBuiltinRt )
+            Wa( "bMount = False" );
+#endif
         Wa( "params=dict()" );
         Wa( "for opt, arg in opts:" );
         Wa( "    if opt in ('-a'):" );
         Wa( "        params[ 'bAuth' ] = True" );
         Wa( "    elif opt in ('-d'):" );
         Wa( "        params[ 'bDaemon' ] = True" );
+#ifdef FUSE3
+        if( !bProxy && g_bBuiltinRt )
+        Wa( "    elif opt in ('-m'):" );
+        Wa( "        params[ 'MountPoint' ] = arg" );
+        Wa( "        bMount = True" );
+#endif
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 0 )" );
-
+        Wa( "    else:" );
+        Wa( "        Usage()" );
+        Wa( "        sys.exit( 1 )" );
 
     }while( 0 );
 
@@ -3100,7 +3122,7 @@ gint32 CImplPyMainFunc::OutputCli(
             Wa( "import sys" );
             Wa( "import getopt" );
             NEW_LINE;
-            EmitUsage();
+            EmitUsage( true );
         }
         NEW_LINE;
         CCOUT << "def maincli() :";
@@ -3114,7 +3136,7 @@ gint32 CImplPyMainFunc::OutputCli(
         }
         else if( g_bBuiltinRt )
         {
-            ret = EmitGetOpt();
+            ret = EmitGetOpt( true );
             if( ERROR( ret ) )
                 break;
             CCOUT << "params[ '" << JSON_ATTR_MODNAME
@@ -3365,6 +3387,57 @@ gint32 CImplPyMainFunc::OutputCli(
 
     return ret;
 }
+#define EMIT_MAINLOOP_SVR \
+do{ \
+    Wa( "signal.signal( signal.SIGINT, SigHandler)" ); \
+    Wa( "'''" ); \
+    Wa( "made change to the following code" ); \
+    Wa( "snippet for your own purpose" ); \
+    Wa( "'''" ); \
+    Wa( "global bExit" ); \
+    if( vecSvcs.size() == 1 ) \
+    { \
+        Wa( "while ( cpp.stateConnected ==" ); \
+        Wa( "    oServer.oInst.GetState() ):" ); \
+    } \
+    else \
+    { \
+        CCOUT << "while("; \
+        INDENT_UPL; \
+        for( int i = 0; i < vecSvcs.size(); ++i ) \
+        { \
+            stdstr strVar = "oServer"; \
+            if( i > 0 ) \
+                strVar += std::to_string( i ); \
+            CCOUT << "cpp.stateConnected == " \
+                << strVar << ".oInst.GetState()"; \
+            if( i < vecSvcs.size() - 1 ) \
+            { \
+                CCOUT << " and"; \
+                NEW_LINE; \
+            } \
+            else \
+            { \
+                NEW_LINE; \
+                CCOUT << "):"; \
+                INDENT_DOWNL; \
+            } \
+        } \
+    } \
+    Wa( "    time.sleep( 1 )" ); \
+    Wa( "    if bExit:" ); \
+    CCOUT << "        break"; \
+}while( 0 );
+
+#define EMIT_SIGHANDLER \
+do{ \
+    Wa( "import signal" ); \
+    Wa( "bExit = False" ); \
+    Wa( "def SigHandler( signum, frame ):" ); \
+    Wa( "    global bExit" ); \
+    Wa( "    bExit = True" ); \
+    NEW_LINE; \
+}while( 0 )
 
 gint32 CImplPyMainFunc::OutputSvr(
     std::vector< ObjPtr >& vecSvcs )
@@ -3379,28 +3452,20 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa("import os" );
         CCOUT << "import time";
         NEW_LINE;
-        CCOUT << "import signal";
-        NEW_LINE;
         if( g_bBuiltinRt )
         {
             Wa( "import sys" );
             Wa( "import getopt" );
             NEW_LINE;
-            EmitUsage();
+            EmitUsage( false );
         }
         NEW_LINE;
 
-        Wa( "bExit = False" );
-        Wa( "def SigHandler( signum, frame ):" );
-        Wa( "    global bExit" );
-        Wa( "    bExit = True" );
-
-        NEW_LINE;
+        EMIT_SIGHANDLER;
 
         CCOUT << "def mainsvr() :";
         INDENT_UPL;
         Wa( "ret = 0" );
-        Wa( "signal.signal( signal.SIGINT, SigHandler)" );
         stdstr strModName = g_strAppName + "svr";
         if( g_bRpcOverStm && !g_bBuiltinRt )
         {
@@ -3409,7 +3474,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         }
         else if( g_bBuiltinRt )
         {
-            ret = EmitGetOpt();
+            ret = EmitGetOpt( false );
             if( ERROR( ret ) )
                 break;
             CCOUT << "params[ '" << JSON_ATTR_MODNAME
@@ -3495,44 +3560,24 @@ gint32 CImplPyMainFunc::OutputSvr(
         }
 
         INDENT_UPL;
-        Wa( "'''" );
-        Wa( "made change to the following code" );
-        Wa( "snippet for your own purpose" );
-        Wa( "'''" );
-
-        Wa( "global bExit" );
-        if( vecSvcs.size() == 1 )
+#ifdef FUSE3
+        if( g_bBuiltinRt )
         {
-            Wa( "while ( cpp.stateConnected ==" );
-            Wa( "    oServer.oInst.GetState() ):" );
+            Wa( "if bMount:" );
+            Wa( "    fuseif_mainloop(" );
+            Wa( "        sys.argv[ 0 ], params[ 'MountPoint' ] );" );
+            CCOUT << "else :";
+            INDENT_UPL;
+            EMIT_MAINLOOP_SVR;
+            INDENT_DOWN;
         }
         else
         {
-            CCOUT << "while(";
-            INDENT_UPL;
-            for( int i = 0; i < vecSvcs.size(); ++i )
-            {
-                stdstr strVar = "oServer";
-                if( i > 0 )
-                    strVar += std::to_string( i );
-                CCOUT << "cpp.stateConnected == "
-                    << strVar << ".oInst.GetState()";
-                if( i < vecSvcs.size() - 1 )
-                {
-                    CCOUT << " and";
-                    NEW_LINE;
-                }
-                else
-                {
-                    NEW_LINE;
-                    CCOUT << "):";
-                    INDENT_DOWNL;
-                }
-            }
+            EMIT_MAINLOOP_SVR;
         }
-        Wa( "    time.sleep( 1 )" );
-        Wa( "    if bExit:" );
-        CCOUT << "        break";
+#else
+        EMIT_MAINLOOP_SVR;
+#endif
         INDENT_DOWNL;
         Wa( "print( \"Server loop ended...\" )" );
         if( vecSvcs.size() == 1 )

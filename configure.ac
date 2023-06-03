@@ -462,12 +462,12 @@ case $enable_fuse3 in
         AC_CONFIG_FILES([
              fuse/Makefile ])
         FUSE3_RPMLIBS="fuse3-devel,"
-        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcli'
-        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.hZZZZZ%{_libdir}/rpcf/librtfiles.a'
+        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so'
+        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
-        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcli"
+        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so"
         FUSE3_DEBLIBS=" libfuse3-dev,"
-        FUSE3_DEBHEADERS='usr/lib/*/rpcf/librtfiles.a'
+        FUSE3_DEBHEADERS=
         FUSE3_DEBPKGS="fuse3,libfuse3-3,"
         FUSE3_CFGOPT=
         FEATURES+="+fuse3 "

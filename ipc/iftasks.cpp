@@ -196,7 +196,7 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
         if( ret != -EAGAIN )
         {
             // fatal error, just quit
-            DebugPrint( ret,
+            DebugPrintEx( logWarning, ret,
                 "Cannot continue to receive message" );
             return ret;
         }

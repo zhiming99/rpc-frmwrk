@@ -1,5 +1,10 @@
 #!/bin/bash
-DBUS_INC=$(echo $(pkg-config --cflags dbus-1 jsoncpp) | sed 's/^-I/, "/g;s/ -I/", "/g;s/\(.*\)$/\1"/' | sed 's:/:\\/:g')
+if [ "$FUSE3" == "1" ]; then
+    DBUS_INC=$(echo $(pkg-config --cflags dbus-1 jsoncpp fuse3) | sed 's/^-I/, "/g;s/ -I/", "/g;s/\(.*\)$/\1"/' | sed 's:/:\\/:g')
+else
+    DBUS_INC=$(echo $(pkg-config --cflags dbus-1 jsoncpp ) | sed 's/^-I/, "/g;s/ -I/", "/g;s/\(.*\)$/\1"/' | sed 's:/:\\/:g')
+fi
+
 sed "s:XXXXXXXX:$DBUS_INC:g" pyproject.toml.tmpl > pyproject.toml
 scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 sed -i "s:YYY:$scriptDir/..:g" pyproject.toml
@@ -15,4 +20,11 @@ if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then
 else
     echo generate release version of python extention package 
     sed -i "s:ZZZZZ::" pyproject.toml
+fi
+if [ "$FUSE3" == "1" ]; then
+    sed -i "s:FUSELIB:'fuseif':" pyproject.toml
+    sed -i "s:zzzzz::" pyproject.toml
+else
+    sed -i "s:FUSELIB::" pyproject.toml
+    sed -i "s:zzzzz:\"FUSE3\",:" pyproject.toml
 fi

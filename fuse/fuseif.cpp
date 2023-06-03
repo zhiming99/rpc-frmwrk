@@ -2491,9 +2491,9 @@ gint32 CFuseEvtFile::ReceiveEvtJson(
         }
 
         NotifyPoll();
-//#ifdef DEBUG
+#ifdef DEBUG
         m_strLastMsg = strMsg.substr( 0, 100 );
-//#endif
+#endif
         ++m_dwMsgCount;
 
     }while( 0 );

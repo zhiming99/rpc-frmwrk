@@ -2664,7 +2664,10 @@ bool IsSSLEnabled(
     return bRet;
 }
 
-gint32 CheckForKeyPass( bool& bPrompt )
+}
+
+using namespace rpcf;
+extern "C" gint32 CheckForKeyPass( bool& bPrompt )
 {
     gint32 ret = -ENOENT;
     do{
@@ -2747,6 +2750,4 @@ gint32 CheckForKeyPass( bool& bPrompt )
     }while( 0 );
 
     return ret;
-}
-
 }
