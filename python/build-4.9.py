@@ -72,7 +72,7 @@ makefile.extra_include_dirs = [ \
     dbus_path + jsoncpp_path + python3_path
 
 if bFuse :
-    makefile.extra_include_dirs.append( fuse3_path )
+    makefile.extra_include_dirs.extend( fuse3_path )
     makefile.extra_include_dirs.append( curPath + "../fuse" )
 
 if libdir is not None :
