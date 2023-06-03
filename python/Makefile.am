@@ -31,6 +31,7 @@ all:
         cp `pwd`/$${sofile} rpcf/$(PYTHON_EXT) ;\
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     elif [ "x$(SIPVER)" == "x4" ]; then \
+        export FUSE3="$(LINK_FUSE)";\
         export CC=$(CC); \
 		export CXX=$(CXX); \
 		export PKG_CONFIG=$(PKG_CONFIG);\

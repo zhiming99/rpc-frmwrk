@@ -14,7 +14,16 @@ if len( sys.argv ) > 1 :
     libdir=sys.argv[ 1 ]
 
 #os.system( "rm ./sip4build/*" )
-os.system( " ".join([config.sip_bin, "-c", "./sip4build", "-b", build_file, "rpcf.sip" ] ) )
+bFuse=False
+if 'FUSE3' in os.environ:
+    if os.environ[ 'FUSE3' ] == "1" :
+        bFuse = True
+
+command=" ".join([config.sip_bin, "-c", "./sip4build", "-b", build_file ] )
+if not bFuse :
+    command+=" -x 'FUSE3'"
+command+=' rpcf.sip'
+os.system( command )
 
 macros = config.build_macros()
 macros[ 'CC' ] = os.environ['CC']
@@ -26,10 +35,16 @@ sysroot = os.environ['SYSROOT']
 makefile = sipconfig.SIPModuleMakefile(config, build_file, export_all=1)
 makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]
+if bFuse :
+    makefile.extra_libs.append( "fuseif" )
+
 makefile.extra_defines = ["DEBUG","_USE_LIBEV" ]
 makefile.extra_lib_dirs = [ \
     curPath + "../combase/.libs", \
     curPath + "../ipc/.libs" ]
+if bFuse:
+    makefile.extra_lib_dirs.append( curPath + "../fuse/.libs" )
+
 makefile.extra_cxxflags = [ "-fno-strict-aliasing" ]
 
 try:
@@ -49,12 +64,16 @@ python3_path = os.popen( python_inc ).read().split()
 
 dbus_path = os.popen( pkgconfig + ' --cflags dbus-1 | sed "s/-I//g"').read().split()
 jsoncpp_path = os.popen( pkgconfig + ' --cflags jsoncpp | sed "s/-I//g"').read().split()
+fuse3_path = os.popen( pkgconfig + ' --cflags fuse3 | sed "s/-I//g"').read().split()
 makefile.extra_include_dirs = [ \
     curPath + "../include", \
     curPath + "../ipc", \
-    curPath + "../test/stmtest", \
     sysroot + "/usr/include" ] + \
     dbus_path + jsoncpp_path + python3_path
+
+if bFuse :
+    makefile.extra_include_dirs.append( fuse3_path )
+    makefile.extra_include_dirs.append( curPath + "../fuse" )
 
 if libdir is not None :
     rpaths = "-Wl,-rpath=" + libdir + ",-rpath=" + libdir + "/rpcf"

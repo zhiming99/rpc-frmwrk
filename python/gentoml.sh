@@ -25,6 +25,6 @@ if [ "$FUSE3" == "1" ]; then
     sed -i "s:FUSELIB:'fuseif':" pyproject.toml
     sed -i "s:zzzzz::" pyproject.toml
 else
-    sed -i "s:FUSELIB::" pyproject.toml
+    sed -i "s:FUSELIB,::" pyproject.toml
     sed -i "s:zzzzz:\"FUSE3\",:" pyproject.toml
 fi
