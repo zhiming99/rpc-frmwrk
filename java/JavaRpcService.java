@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.lang.ClassCastException;
 
 /*
- * Hilarious, I need C preprocessor to spawn the java
- * classes.
+ * Note: we need a C preprocessor to spawn the final
+ * java classes.
  */
 
 abstract public class JavaRpcService implements IRpcService

@@ -56,19 +56,8 @@ class CJavaProxyBase :
         jobject pCb,
         jobject pContext,
         CfgPtr& pOptions,
-        jobject listArgs )
-    { return nullptr; }
+        jobject listArgs ) = 0;
 };
-
-DECLARE_AGGREGATED_PROXY(
-    CJavaProxy,
-    CStatCountersProxy,
-    CJavaProxyBase );
-
-DECLARE_AGGREGATED_SERVER(
-    CJavaServer,
-    CStatCountersServer,
-    CStreamServerAsync );
 
 template< class T >
 class CJavaInterfBase : public T
@@ -1572,14 +1561,14 @@ class CJavaInterfBase : public T
     }
 };
 
-class CJavaProxyImpl :
-    public CJavaInterfBase< CJavaProxy >
+class CJavaProxy :
+    public CJavaInterfBase< CJavaProxyBase >
 {
     public:
-    typedef CJavaInterfBase< CJavaProxy > super;
-    CJavaProxyImpl( const IConfigDb* pCfg ) 
+    typedef CJavaInterfBase< CJavaProxyBase > super;
+    CJavaProxy( const IConfigDb* pCfg ) 
         : super::_MyVirtBase( pCfg ), super( pCfg )
-    { SetClassId( clsid( CJavaProxyImpl ) ); }
+    {}
 
     gint32 AsyncCallVector(
         IEventSink* pTask,
@@ -1593,7 +1582,7 @@ class CJavaProxyImpl :
         jobject pCb,
         jobject pContext,
         CfgPtr& pOptions,
-        jobject listArgs );
+        jobject listArgs ) override;
 
     jobject GetIdHashByChan(
         JNIEnv *jenv,
@@ -1634,7 +1623,7 @@ class CJavaProxyImpl :
     }
 };
 
-gint32 CJavaProxyImpl::AsyncCallVector(
+gint32 CJavaProxy::AsyncCallVector(
     IEventSink* pTask,
     CfgPtr& pOptions,
     CfgPtr& pResp,
@@ -1704,7 +1693,7 @@ gint32 CJavaProxyImpl::AsyncCallVector(
     return ret;
 }
 
-jobject CJavaProxyImpl::JavaProxyCall2(
+jobject CJavaProxy::JavaProxyCall2(
     JNIEnv *jenv,
     jobject pCb,
     jobject pContext,
@@ -1769,7 +1758,7 @@ jobject CJavaProxyImpl::JavaProxyCall2(
         {
             ret = NEW_PROXY_RESP_HANDLER2(
                 pWrapperCb, ObjPtr( this ),
-                &CJavaProxyImpl::OnAsyncCallResp,
+                &CJavaProxy::OnAsyncCallResp,
                 nullptr, oReqCtx.GetCfg() );
 
             if( ERROR( ret ) )
@@ -1896,6 +1885,11 @@ jobject CJavaProxyImpl::JavaProxyCall2(
     return jret;
 }
 
+DECLARE_AGGREGATED_PROXY(
+    CJavaProxyImpl,
+    CStatCountersProxy,
+    CJavaProxy );
+
 jobject CreateProxy(
     JNIEnv *jenv,
     ObjPtr& pMgr,
@@ -1955,7 +1949,7 @@ jobject CastToProxy(
 {
     gint32 ret = 0;
     jobject jret = NewJRet( jenv );
-    CJavaProxyImpl* pProxy = pObj;
+    CJavaProxy* pProxy = pObj;
     if( pProxy == nullptr )
     {
         SetErrorJRet( jenv, jret, -EFAULT );
@@ -1984,27 +1978,6 @@ void JavaOutputMsg(
     const std::string strMsg )
 {
     OutputMsg( 0, "%s", strMsg.c_str() );
-}
-
-class CJavaServerImpl;
-static FactoryPtr InitClassFactory()
-{
-    BEGIN_FACTORY_MAPS;
-    INIT_MAP_ENTRYCFG( CJavaProxy );
-    INIT_MAP_ENTRYCFG( CJavaServer );
-    INIT_MAP_ENTRYCFG( CJavaProxyImpl );
-    INIT_MAP_ENTRYCFG( CJavaServerImpl );
-    END_FACTORY_MAPS;
-};
-
-extern "C"
-gint32 DllLoadFactory( FactoryPtr& pFactory )
-{
-    pFactory = InitClassFactory();
-    if( pFactory.IsEmpty() )
-        return -EFAULT;
-
-    return 0;
 }
 
 gint32 LoadThisLib( ObjPtr& pIoMgr )
@@ -2052,9 +2025,10 @@ void JavaDbgPrint(
     const std::string strMsg, int level = 3 );
 
 gint32 LoadJavaFactory( ObjPtr& pMgr );
+void JavaOutputMsg( const std::string strMsg );
 
 %nodefaultctor;
-%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxy {
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxyBase {
     if (swigCPtr != 0) {
       if (swigCMemOwn) {
         swigCMemOwn = false;
@@ -2063,24 +2037,10 @@ gint32 LoadJavaFactory( ObjPtr& pMgr );
     }
     super.delete();
   }
-class CJavaProxy : public CInterfaceProxy
+class CJavaProxyBase : public CInterfaceProxy
 {
 };
 
-%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServer {
-    if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
-      swigCPtr = 0;
-    }
-    super.delete();
-  }
-class CJavaServer : public CInterfaceServer
-{
-};
-
-void JavaOutputMsg( const std::string strMsg );
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaInterfBase {
     if (swigCPtr != 0) {
       if (swigCMemOwn) {
@@ -2089,7 +2049,8 @@ void JavaOutputMsg( const std::string strMsg );
       swigCPtr = 0;
     }
     super.delete();
-  }
+}
+
 template< typename T >
 class CJavaInterfBase
     : public T
@@ -2429,9 +2390,9 @@ class CJavaInterfBase
 
 };
 
-%template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxy>;
+%template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxyBase>;
 
-%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxyImpl {
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxy {
     if (swigCPtr != 0) {
       if (swigCMemOwn) {
         swigCMemOwn = false;
@@ -2440,8 +2401,8 @@ class CJavaInterfBase
     }
     super.delete();
   }
-class CJavaProxyImpl :
-    public CJavaInterfBase<CJavaProxy>
+class CJavaProxy :
+    public CJavaInterfBase<CJavaProxyBase>
 {
     public:
     jobject GetIdHashByChan(
@@ -2492,5 +2453,4 @@ class CJavaProxyImpl :
 };
 
 %clearnodefaultctor;
-
 %include "server.i"

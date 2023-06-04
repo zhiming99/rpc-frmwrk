@@ -682,7 +682,7 @@ jobject NewJavaProxy( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
-        "org/rpcf/rpcbase/CJavaProxyImpl";
+        "org/rpcf/rpcbase/CJavaProxy";
 
     return NewWrapperObj(
         jenv, strClass, lPtr, bOwner );
@@ -692,7 +692,7 @@ jobject NewJavaServer( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
-        "org/rpcf/rpcbase/CJavaServerImpl";
+        "org/rpcf/rpcbase/CJavaServer";
 
     return NewWrapperObj(
         jenv, strClass, lPtr, bOwner );
@@ -1204,6 +1204,16 @@ class CfgPtr
     }
 }
 
+%nodefaultctor;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CBuffer {
+    if (swigCPtr != 0) {
+      if (swigCMemOwn) {
+        swigCMemOwn = false;
+      }
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
 class CBuffer : public CObjBase
 {
     public:
@@ -1212,6 +1222,7 @@ class CBuffer : public CObjBase
     char* ptr();
     gint32 size() const;
 };
+%clearnodefaultctor;
 
 class BufPtr
 {

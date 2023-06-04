@@ -30,7 +30,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             if( jret.ERROR() )
                 break;
 
-            m_oInst = ( CJavaServerImpl )
+            m_oInst = ( CJavaServer )
                 jret.getAt( 0 );
 
         }while( false );

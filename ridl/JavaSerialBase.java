@@ -60,10 +60,10 @@ abstract public class JavaSerialBase
                 ( CRpcServices )getInst();
             if( oSvc.IsServer() )
                 osb = new JavaSerialHelperS(
-                    ( CJavaServerImpl )oSvc );
+                    ( CJavaServer )oSvc );
             else
                 osb = new JavaSerialHelperP(
-                    ( CJavaProxyImpl )oSvc );
+                    ( CJavaProxy )oSvc );
             return osb;
         }
     }

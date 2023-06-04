@@ -1661,7 +1661,7 @@ gint32 GenSerialHelper(
          args[1] = "-P";
          args[2] = "-DJavaSerialImpl=JavaSerialHelperP";
          args[3] = "-DGetIdHash=GetPeerIdHash";
-         args[4] = "-DInstType=CJavaProxyImpl" ;
+         args[4] = "-DInstType=CJavaProxy" ;
          args[5] = strArg5.c_str();
          args[6] = strInput.c_str();
          args[7] = "-o";
@@ -1672,7 +1672,7 @@ gint32 GenSerialHelper(
          args[1] = "-P";
          args[2] = "-DJavaSerialImpl=JavaSerialHelperS";
          args[3] = "-DGetIdHash=GetIdHashByChan";
-         args[4] = "-DInstType=CJavaServerImpl" ;
+         args[4] = "-DInstType=CJavaServer" ;
          args[5] = strArg5.c_str();
          args[6] = strInput.c_str();
          args[7] = "-o";

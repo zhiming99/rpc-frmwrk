@@ -34,7 +34,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
             if( jret.ERROR() )
                 break;
 
-            m_oInst = ( CJavaProxyImpl )
+            m_oInst = ( CJavaProxy )
                 jret.getAt( 0 );
 
         }while( false );
