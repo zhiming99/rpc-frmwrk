@@ -38,6 +38,8 @@ extern CAliasMap g_mapAliases;
 extern stdstr g_strPrefix;
 extern stdstr g_strLocale;
 extern stdstr g_strCmdLine;
+extern bool g_bRpcOverStm;
+extern bool g_bBuiltinRt;
 
 std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
 std::map<stdstr, ObjPtr> g_mapArrayTypeDecl;
@@ -1345,7 +1347,13 @@ gint32 CJavaSnippet::EmitArgClassObj(
     CJTypeHelper::GetFormalArgList( pArgs, vecArgs );
     for( gint32 i = 0; i < vecArgs.size(); i++ )
     {
-        CCOUT << vecArgs[ i ].first << ".class";
+        auto& strType = vecArgs[ i ].first; 
+        if( strType.substr( 0, 3 ) != "Map" )
+            CCOUT << strType << ".class";
+        else
+        {
+            CCOUT << "( Class< " << strType << " > )( Class<?> )Map.class";
+        }
         if( i < vecArgs.size() - 1 )
         {
             CCOUT << ",";
@@ -4140,7 +4148,16 @@ gint32 CImplJavaMainCli::Output()
         os.EmitGetDescPath( false );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
-        Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
+        stdstr strModName = g_strAppName + "svr";
+        if( g_bRpcOverStm && !g_bBuiltinRt )
+        {
+            CCOUT << "m_oCtx = JavaRpcContext.createProxy( \"" << strModName << "\" );";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
+        }
         Wa( "if( m_oCtx == null )" );
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
@@ -4319,7 +4336,16 @@ gint32 CImplJavaMainSvr::Output()
         os.EmitGetDescPath( true );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
-        Wa( "m_oCtx = JavaRpcContext.createServer(); " );
+        stdstr strModName = g_strAppName + "svr";
+        if( g_bRpcOverStm && !g_bBuiltinRt )
+        {
+            CCOUT << "m_oCtx = JavaRpcContext.createServer( \"" << strModName << "\" );";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "m_oCtx = JavaRpcContext.createServer(); " );
+        }
         Wa( "if( m_oCtx == null )" );
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;

@@ -618,28 +618,5 @@ gint32 CPythonServerRosImpl::InvokeUserMethod(
     return CPythonServer::InvokeUserMethod(
         pParams, pCallback );
 }
-static FactoryPtr InitClassFactory()
-{
-    BEGIN_FACTORY_MAPS;
-    INIT_MAP_ENTRYCFG( CPythonProxyImpl );
-    INIT_MAP_ENTRYCFG( CPythonServerImpl );
-    INIT_MAP_ENTRYCFG( CPythonProxyRosImpl );
-    INIT_MAP_ENTRYCFG( CPythonServerRosImpl );
-    INIT_MAP_ENTRYCFG( CPythonRpcSvc_CliSkel );
-    INIT_MAP_ENTRYCFG( CPythonRpcSvc_SvrSkel );
-    INIT_MAP_ENTRYCFG( CPythonRpcSvc_ChannelCli );
-    INIT_MAP_ENTRYCFG( CPythonRpcSvc_ChannelSvr );
-    END_FACTORY_MAPS;
-};
-
-extern "C"
-gint32 DllLoadFactory( FactoryPtr& pFactory )
-{
-    pFactory = InitClassFactory();
-    if( pFactory.IsEmpty() )
-        return -EFAULT;
-
-    return 0;
-}
 
 %End
