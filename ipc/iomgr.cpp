@@ -1893,7 +1893,7 @@ CIoManager::CIoManager(
         CCfgOpener oDrvCfg;
         oDrvCfg.SetPointer( propIoMgr, this );
         ret = oDrvCfg.CopyProp(
-            propConfigPath, 0, pCfg );
+            propConfigPath, pCfg );
         if( ERROR( ret ) )
         {
             oDrvCfg.SetStrProp(
