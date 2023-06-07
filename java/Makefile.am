@@ -13,7 +13,7 @@ javawrapper_DATA=rpcbase.jar
 javawrapperdir=$(libdir)/rpcf
 
 rpcbasejava = JavaRpcService.java $(rpcbasedir)/JRetVal.java $(rpcbasedir)/Helpers.java $(rpcbasedir)/JavaRpcContext.java $(rpcbasedir)/JavaReqContext.java $(rpcbasedir)/RC.java $(rpcbasedir)/JavaRpcServer.java $(rpcbasedir)/JavaRpcProxy.java $(rpcbasedir)/IRpcService.java
-EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i
+EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i fastrpc.i
 
 rpcbase.jar: rpcbase_wrap.cpp $(rpcbasejava) Makefile.am
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServer -DIsServer="isServer(){ return true;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceS.java
