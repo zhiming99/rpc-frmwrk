@@ -29,6 +29,7 @@
 using namespace rpcf;
 #include "genjava.h"
 #include "genpy.h"
+#include "gencpp2.h"
 #include <fcntl.h>
 #include "filetran.h"
 
@@ -2030,8 +2031,16 @@ gint32 GenJavaProj(
         }
 
         oWriter.SelectDescFile();
-        CExportObjDesc oedesc( &oWriter, pRoot );
-        ret = oedesc.Output();
+        if( !g_bRpcOverStm )
+        {
+            CExportObjDesc oedesc( &oWriter, pRoot );
+            ret = oedesc.Output();
+        }
+        else
+        {
+            CExportObjDesc2 oedesc( &oWriter, pRoot );
+            ret = oedesc.OutputROS();
+        }
         if( ERROR( ret ) )
         {
             OutputMsg( ret,
@@ -4148,16 +4157,24 @@ gint32 CImplJavaMainCli::Output()
         os.EmitGetDescPath( false );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
-        stdstr strModName = g_strAppName + "svr";
-        if( g_bRpcOverStm && !g_bBuiltinRt )
-        {
-            CCOUT << "m_oCtx = JavaRpcContext.createProxy( \"" << strModName << "\" );";
-            NEW_LINE;
-        }
-        else
+        stdstr strModName = g_strAppName + "cli";
+        if( !g_bRpcOverStm && !g_bBuiltinRt )
         {
             Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
         }
+        else
+        {
+            Wa( "// prepare the init parameters for iomgr" );
+            Wa( "Map< Integer, Object > oInit =" );
+            Wa( "    new HashMap< Integer, Object >();" );
+            CCOUT << "oInit.put( 0, \"" << strModName << "\" );";
+            NEW_LINE;
+            Wa( "String strCfgPath = getDescPath( \"driver.json\");" );
+            Wa( "if( strCfgPath.length() > 0 )" );
+            Wa( "    oInit.put( 105, strCfgPath );" );
+            Wa( "m_oCtx = JavaRpcContext.createProxy( oInit );" );
+        }
+
         Wa( "if( m_oCtx == null )" );
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
@@ -4337,15 +4354,23 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         stdstr strModName = g_strAppName + "svr";
-        if( g_bRpcOverStm && !g_bBuiltinRt )
-        {
-            CCOUT << "m_oCtx = JavaRpcContext.createServer( \"" << strModName << "\" );";
-            NEW_LINE;
-        }
-        else
+        if( !g_bRpcOverStm && !g_bBuiltinRt )
         {
             Wa( "m_oCtx = JavaRpcContext.createServer(); " );
         }
+        else
+        {
+            Wa( "// prepare the init parameters for iomgr" );
+            Wa( "Map< Integer, Object > oInit =" );
+            Wa( "    new HashMap< Integer, Object >();" );
+            CCOUT << "oInit.put( 0, \"" << strModName << "\" );";
+            NEW_LINE;
+            Wa( "String strCfgPath = getDescPath( \"driver.json\");" );
+            Wa( "if( strCfgPath.length() > 0 )" );
+            Wa( "    oInit.put( 105, strCfgPath );" );
+            Wa( "m_oCtx = JavaRpcContext.createServer( oInit ); " );
+        }
+
         Wa( "if( m_oCtx == null )" );
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;

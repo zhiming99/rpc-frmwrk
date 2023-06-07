@@ -44,7 +44,7 @@ class CJavaServer:
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
 
-    gint32 SendEvent(
+    virtual gint32 SendEvent(
         JNIEnv *jenv,
         jobject pCallback,
         const std::string& strCIfName,
@@ -325,10 +325,19 @@ jobject CreateServer(
         if( ERROR( ret ) )
             break;
 
+        EnumClsid iClsid =
+            clsid( CJavaServerImpl );
+        EnumClsid iStateClass = clsid( Invalid );
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.GetIntProp( propIfStateClass,
+            ( guint32& )iStateClass );
+        if( SUCCEEDED( ret ) &&
+            iStateClass == clsid( CFastRpcServerState ) )
+            iClsid = clsid( CJavaServerRosImpl );
+
         ObjPtr* ppIf = new ObjPtr();
-        ret = ppIf->NewObj(
-            clsid( CJavaServerImpl ),
-            pCfg );
+        ret = ppIf->NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
         {
             delete ppIf;
@@ -379,24 +388,6 @@ DECLARE_AGGREGATED_SERVER(
     CStatCountersServer,
     CJavaServer );
 
-static FactoryPtr InitClassFactory()
-{
-    BEGIN_FACTORY_MAPS;
-    INIT_MAP_ENTRYCFG( CJavaProxyImpl );
-    INIT_MAP_ENTRYCFG( CJavaServerImpl );
-    END_FACTORY_MAPS;
-};
-
-extern "C"
-gint32 DllLoadFactory( FactoryPtr& pFactory )
-{
-    pFactory = InitClassFactory();
-    if( pFactory.IsEmpty() )
-        return -EFAULT;
-
-    return 0;
-}
-
 }
 
 %nodefaultctor;
@@ -436,7 +427,7 @@ class CJavaServer:
     {
         gint32 ret = 0;
         do{
-            auto pImpl = static_cast
+            auto pImpl = dynamic_cast
                 < CJavaServer* >( $self );
             if( pCallback.IsEmpty() )
             {
@@ -460,7 +451,7 @@ class CJavaServer:
     {
         gint32 ret = 0;
         CParamList oResp;
-        auto pImpl = static_cast
+        auto pImpl = dynamic_cast
             < CJavaServer* >( $self );
         do{
 
@@ -508,7 +499,7 @@ class CJavaServer:
     {
         gint32 ret = 0;
         CParamList oResp;
-        auto pImpl = static_cast
+        auto pImpl = dynamic_cast
             < CJavaServer* >( $self );
         bool bNoReply = false;
         do{
@@ -585,7 +576,7 @@ class CJavaServer:
         return ret;
     }
 
-    gint32 SendEvent(
+    virtual gint32 SendEvent(
         JNIEnv *jenv,
         jobject pCallback,
         const std::string& strIfName,
@@ -594,7 +585,7 @@ class CJavaServer:
         jobject pListArgs,
         gint32 dwSeriProto )
     {
-        auto pImpl = static_cast
+        auto pImpl = dynamic_cast
             < CJavaServer* >( $self );
         return pImpl->SendEvent( jenv,
             pCallback, strIfName,
@@ -630,3 +621,17 @@ jobject CastToServer(
     JNIEnv *jenv,
     ObjPtr& pObj );
 
+%include "fastrpc.i"
+
+%header{
+class CJavaServerRosImpl :
+    public CJavaRpcSvc_SvrImpl
+{
+    public:
+    typedef CJavaRpcSvc_SvrImpl super;
+    CJavaServerRosImpl( const IConfigDb* pCfg )
+    : super::virtbase( pCfg ), super( pCfg )
+    { SetClassId( clsid( CJavaServerRosImpl ) ); }
+};
+
+}

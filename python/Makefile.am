@@ -12,9 +12,7 @@ endif
 
 if ENABLE_FUSE3
 LINK_FUSE=1
-endif
-
-if !ENABLE_FUSE3
+else
 LINK_FUSE=0
 endif
 

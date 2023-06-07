@@ -12,13 +12,14 @@ librpcbaseJNI_la_LIBADD = -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_sr
 javawrapper_DATA=rpcbase.jar
 javawrapperdir=$(libdir)/rpcf
 
-EXTRA_DIST = JavaRpcService.java $(rpcbasedir)/JRetVal.java $(rpcbasedir)/Helpers.java $(rpcbasedir)/JavaRpcContext.java $(rpcbasedir)/JavaReqContext.java $(rpcbasedir)/RC.java $(rpcbasedir)/JavaRpcServer.java $(rpcbasedir)/JavaRpcProxy.java $(rpcbasedir)/IRpcService.java rpcbase.i proxy.i server.i
+rpcbasejava = JavaRpcService.java $(rpcbasedir)/JRetVal.java $(rpcbasedir)/Helpers.java $(rpcbasedir)/JavaRpcContext.java $(rpcbasedir)/JavaReqContext.java $(rpcbasedir)/RC.java $(rpcbasedir)/JavaRpcServer.java $(rpcbasedir)/JavaRpcProxy.java $(rpcbasedir)/IRpcService.java
+EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i
 
-rpcbase.jar: rpcbase_wrap.cpp
+rpcbase.jar: rpcbase_wrap.cpp $(rpcbasejava) Makefile.am
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServer -DIsServer="isServer(){ return true;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceS.java
 	cpp -P -DJavaRpcService=JavaRpcServiceP -DInstType=CJavaProxy -DIsServer="isServer(){ return false;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceP.java
 	javac src/org/rpcf/rpcbase/*.java
 	cd src;jar -cf ../rpcbase.jar org/rpcf/rpcbase/*.class
 
-rpcbase_wrap.cpp:rpcbase.i proxy.i server.i
+rpcbase_wrap.cpp:rpcbase.i proxy.i server.i fastrpc.i
 	swig -c++ -java -package org.rpcf.rpcbase -outdir src/org/rpcf/rpcbase -o rpcbase_wrap.cpp rpcbase.i

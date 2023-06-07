@@ -1220,7 +1220,10 @@ class CFastRpcProxyBase :
         HANDLE hPort ) override;
 
     InterfPtr GetStmSkel() const
-    { return m_pSkelObj; }
+    {
+        CStdRMutex oLock( this->GetLock() );
+        return m_pSkelObj;
+    }
 
     guint32 GetBusId() const
     { return m_dwBusId; }

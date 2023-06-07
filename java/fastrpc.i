@@ -1,19 +1,20 @@
 /*
  * =====================================================================================
  *
- *       Filename:  fastrpc.sip
+ *       Filename:  fastrpc.i
  *
- *    Description:  a sip file as the wrapper of fastrpc related classes for python
+ *    Description:  the swig file as the wrapper of the fastrpc classes and
+ *                  helper classes for Java
  *
  *        Version:  1.0
- *        Created:  05/23/2023 11:44:51 AM
+ *        Created:  06/05/2023 14:02:30
  *       Revision:  none
  *       Compiler:  gcc
  *
  *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:
  *
- *      Copyright:  2023 Ming Zhi( woodhead99@gmail.com )
+ *      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
  *
  *        License:  This program is free software; you can redistribute it
  *                  and/or modify it under the terms of the GNU General Public
@@ -22,33 +23,37 @@
  *
  * =====================================================================================
  */ 
-%ModuleHeaderCode
 
-#include "stmport.h"
-#include "fastrpc.h"
+%header{
 
 enum EnumMyClsid
 {
-    DECL_CLSID( CPythonRpcSvc_CliSkel ) = 0x5095AA9D,
-    DECL_CLSID( CPythonRpcSvc_SvrSkel ),
-    DECL_CLSID( CPythonRpcSvc_ChannelCli ),
-    DECL_CLSID( CPythonRpcSvc_ChannelSvr ),
+    DECL_CLSID( CSwigRosRpcSvc_CliSkel ) = 0xC62DFC66,
+    DECL_CLSID( CSwigRosRpcSvc_SvrSkel ),
+    DECL_CLSID( CSwigRosRpcSvc_ChannelCli ),
+    DECL_CLSID( CSwigRosRpcSvc_ChannelSvr ),
 
-    DECL_IID( IPythonRpcSvc ),
+    DECL_IID( ISwigRosRpcSvc ),
+
+    DECL_CLSID( CJavaRpcSvc_CliImpl ) = Clsid_Invalid,
+    DECL_CLSID( CJavaRpcSvc_SvrImpl ) = Clsid_Invalid,
+    DECL_CLSID( CJavaRpcSvc_CliBase ) = Clsid_Invalid,
+    DECL_CLSID( CJavaRpcSvc_SvrBase ) = Clsid_Invalid,
+
 };
 
-class IPythonRpcSvc_PImpl
+class ISwigRosRpcSvc_PImpl
     : public virtual CFastRpcSkelProxyBase
 {
     public:
     typedef CFastRpcSkelProxyBase super;
-    IPythonRpcSvc_PImpl( const IConfigDb* pCfg ) :
+    ISwigRosRpcSvc_PImpl( const IConfigDb* pCfg ) :
         super( pCfg )
         {}
     gint32 InitUserFuncs();
     
     const EnumClsid GetIid() const override
-    { return iid( IPythonRpcSvc ); }
+    { return iid( ISwigRosRpcSvc ); }
 
     gint32 InvokeUserMethod(
         IConfigDb* pParams,
@@ -60,38 +65,41 @@ class IPythonRpcSvc_PImpl
     }
 };
 
-class IPythonRpcSvc_CliApi
+class ISwigRosRpcSvc_CliApi
     : public virtual CAggInterfaceProxy
 {
     public:
     typedef CAggInterfaceProxy super;
-    IPythonRpcSvc_CliApi( const IConfigDb* pCfg ) :
+    ISwigRosRpcSvc_CliApi( const IConfigDb* pCfg ) :
         super( pCfg )
         {}
-    inline IPythonRpcSvc_PImpl* GetSkelPtr()
+    inline ISwigRosRpcSvc_PImpl* GetSkelPtr()
     {
-        auto pCli = dynamic_cast< CFastRpcProxyBase* >( this );
+        auto pCli = dynamic_cast
+            < CFastRpcProxyBase* >( this );
         if( pCli == nullptr )
             return nullptr;
         InterfPtr pIf = pCli->GetStmSkel();
         if( pIf.IsEmpty() )
             return nullptr;
-        auto pSkel = dynamic_cast<IPythonRpcSvc_PImpl*>(( CRpcServices* )pIf );
+        auto pSkel = dynamic_cast
+            <ISwigRosRpcSvc_PImpl*>(
+                ( CRpcServices* )pIf );
         return pSkel;
     }
 };
 
-class IPythonRpcSvc_SImpl
+class ISwigRosRpcSvc_SImpl
     : public virtual CFastRpcSkelSvrBase
 {
     public:
     typedef CFastRpcSkelSvrBase super;
-    IPythonRpcSvc_SImpl( const IConfigDb* pCfg ) :
+    ISwigRosRpcSvc_SImpl( const IConfigDb* pCfg ) :
         super( pCfg )
         {}
     gint32 InitUserFuncs();
     const EnumClsid GetIid() const override
-    { return iid( IPythonRpcSvc ); }
+    { return iid( ISwigRosRpcSvc ); }
 
     gint32 InvokeUserMethod(
         IConfigDb* pParams,
@@ -103,15 +111,15 @@ class IPythonRpcSvc_SImpl
     }
 };
 
-class IPythonRpcSvc_SvrApi
+class ISwigRosRpcSvc_SvrApi
     : public virtual CAggInterfaceServer
 {
     public:
     typedef CAggInterfaceServer super;
-    IPythonRpcSvc_SvrApi( const IConfigDb* pCfg ) :
+    ISwigRosRpcSvc_SvrApi( const IConfigDb* pCfg ) :
         super( pCfg )
         {}
-    inline IPythonRpcSvc_SImpl* GetSkelPtr( HANDLE hstm )
+    inline ISwigRosRpcSvc_SImpl* GetSkelPtr( HANDLE hstm )
     {
         auto pSvr = dynamic_cast< CFastRpcServerBase* >( this );
         if( pSvr == nullptr )
@@ -121,70 +129,68 @@ class IPythonRpcSvc_SvrApi
             hstm, pIf );
         if( ERROR( ret ) )
             return nullptr;
-        auto pSkel = dynamic_cast<IPythonRpcSvc_SImpl*>(( CRpcServices* )pIf );
+        auto pSkel = dynamic_cast<ISwigRosRpcSvc_SImpl*>(( CRpcServices* )pIf );
         return pSkel;
     }
 
 };
 
 DECLARE_AGGREGATED_SKEL_PROXY(
-    CPythonRpcSvc_CliSkel,
-    IPythonRpcSvc_PImpl );
+    CSwigRosRpcSvc_CliSkel,
+    ISwigRosRpcSvc_PImpl );
 
 DECLARE_AGGREGATED_SKEL_SERVER(
-    CPythonRpcSvc_SvrSkel,
-    IPythonRpcSvc_SImpl );
+    CSwigRosRpcSvc_SvrSkel,
+    ISwigRosRpcSvc_SImpl );
 
 
-class CPythonRpcSvc_ChannelCli
+class CSwigRosRpcSvc_ChannelCli
     : public CRpcStreamChannelCli
 {
     public:
     typedef CRpcStreamChannelCli super;
-    CPythonRpcSvc_ChannelCli(
+    CSwigRosRpcSvc_ChannelCli(
         const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(
-        CPythonRpcSvc_ChannelCli ) ); }
+        CSwigRosRpcSvc_ChannelCli ) ); }
 };
 
-class CPythonRpcSvc_ChannelSvr
+class CSwigRosRpcSvc_ChannelSvr
     : public CRpcStreamChannelSvr
 {
     public:
     typedef CRpcStreamChannelSvr super;
-    CPythonRpcSvc_ChannelSvr(
+    CSwigRosRpcSvc_ChannelSvr(
         const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(
-        CPythonRpcSvc_ChannelSvr ) ); }
+        CSwigRosRpcSvc_ChannelSvr ) ); }
 };
 
-#define Clsid_CPythonRpcSvc_CliBase    Clsid_Invalid
-
 DECLARE_AGGREGATED_PROXY(
-    CPythonRpcSvc_CliBase,
+    CJavaRpcSvc_CliBase,
     CStatCountersProxy,
-    CPythonProxy,
-    IPythonRpcSvc_CliApi,
+    CJavaProxy,
+    ISwigRosRpcSvc_CliApi,
     CFastRpcProxyBase );
 
-class CPythonProxyRosImpl
-    : public CPythonRpcSvc_CliBase
+class CJavaRpcSvc_CliImpl
+    : public CJavaRpcSvc_CliBase
 {
     public:
-    typedef CPythonRpcSvc_CliBase super;
-    CPythonProxyRosImpl( const IConfigDb* pCfg ) :
+    typedef CJavaRpcSvc_CliBase super;
+    CJavaRpcSvc_CliImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
-    { SetClassId( clsid(CPythonProxyRosImpl ) ); }
+    { SetClassId( clsid(CJavaRpcSvc_CliImpl ) ); }
 
     /* The following 2 methods are important for */
     /* streaming transfer. rewrite them if necessary */
     gint32 OnStreamReady( HANDLE hChannel ) override
-    { return CPythonProxy::OnStreamReady( hChannel ); } 
+    { return CJavaProxy::OnStreamReady( hChannel ); } 
     
     gint32 OnStmClosing( HANDLE hChannel ) override
-    { return CPythonProxy::OnStmClosing( hChannel ); }
+    { return CJavaProxy::OnStmClosing( hChannel ); }
     
     gint32 CreateStmSkel(
         InterfPtr& pIf ) override;
@@ -204,35 +210,33 @@ class CPythonProxyRosImpl
         IEventSink* pCallback ) override;
 };
 
-#define Clsid_CPythonRpcSvc_SvrBase    Clsid_Invalid
-
 DECLARE_AGGREGATED_SERVER(
-    CPythonRpcSvc_SvrBase,
+    CJavaRpcSvc_SvrBase,
     CStatCountersServer,
-    CPythonServer,
-    IPythonRpcSvc_SvrApi,
+    CJavaServer,
+    ISwigRosRpcSvc_SvrApi,
     CFastRpcServerBase );
 
-class CPythonServerRosImpl
-    : public CPythonRpcSvc_SvrBase
+class CJavaRpcSvc_SvrImpl
+    : public CJavaRpcSvc_SvrBase
 {
     public:
-    typedef CPythonRpcSvc_SvrBase super;
-    CPythonServerRosImpl( const IConfigDb* pCfg ) :
+    typedef CJavaRpcSvc_SvrBase super;
+    CJavaRpcSvc_SvrImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
-    { SetClassId( clsid( CPythonServerRosImpl ) ); }
+    { SetClassId( clsid( CJavaRpcSvc_SvrImpl ) ); }
 
     /* The following 3 methods are important for */
     /* streaming transfer. rewrite them if necessary */
     gint32 OnStreamReady( HANDLE hChannel ) override
-    { return CPythonServer::OnStreamReady( hChannel ); } 
+    { return CJavaServer::OnStreamReady( hChannel ); } 
     
     gint32 OnStmClosing( HANDLE hChannel ) override
-    { return CPythonServer::OnStmClosing( hChannel ); }
+    { return CJavaServer::OnStmClosing( hChannel ); }
     
     gint32 AcceptNewStream(
         IEventSink* pCb, IConfigDb* pDataDesc ) override
-    { return CPythonServer::AcceptNewStream( pCb, pDataDesc ); }
+    { return CJavaServer::AcceptNewStream( pCb, pDataDesc ); }
     
     gint32 CreateStmSkel(
         HANDLE, guint32, InterfPtr& ) override;
@@ -245,33 +249,30 @@ class CPythonServerRosImpl
         IEventSink* pCallback ) override;
 
     gint32 SendEvent(
-        PyObject* pCallback,
+        JNIEnv *jenv,
+        jobject pCallback,
         const std::string& strCIfName,
         const std::string& strMethod,
         const std::string& strDest,
-        PyObject* pArgs,
+        jobject pArgs,
         guint32 dwSeriProto ) override;
 };
 
-%End
-
-%ModuleCode
-
-gint32 IPythonRpcSvc_PImpl::InitUserFuncs()
+gint32 ISwigRosRpcSvc_PImpl::InitUserFuncs()
 {
-    BEGIN_IFPROXY_MAP( IPythonRpcSvc, false );
+    BEGIN_IFPROXY_MAP( ISwigRosRpcSvc, false );
     END_IFPROXY_MAP;
     return STATUS_SUCCESS;
 }
 
-gint32 IPythonRpcSvc_SImpl::InitUserFuncs()
+gint32 ISwigRosRpcSvc_SImpl::InitUserFuncs()
 {
-    BEGIN_IFHANDLER_MAP( IPythonRpcSvc );
+    BEGIN_IFHANDLER_MAP( ISwigRosRpcSvc );
     END_IFHANDLER_MAP;
     return STATUS_SUCCESS;
 }
 
-gint32 CPythonProxyRosImpl::CreateStmSkel(
+gint32 CJavaRpcSvc_CliImpl::CreateStmSkel(
     InterfPtr& pIf )
 {
     gint32 ret = 0;
@@ -302,13 +303,13 @@ gint32 CPythonProxyRosImpl::CreateStmSkel(
         if( ERROR( ret ) )
             break;
         ret = pIf.NewObj(
-            clsid( CPythonRpcSvc_CliSkel ),
+            clsid( CSwigRosRpcSvc_CliSkel ),
             oCfg.GetCfg() );
     }while( 0 );
     return ret;
 }
 
-gint32 CPythonProxyRosImpl::OnPreStart(
+gint32 CJavaRpcSvc_CliImpl::OnPreStart(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
@@ -316,7 +317,7 @@ gint32 CPythonProxyRosImpl::OnPreStart(
         CCfgOpener oCtx;
         CCfgOpenerObj oIfCfg( this );
         oCtx[ propClsid ] = clsid( 
-            CPythonRpcSvc_ChannelCli );
+            CSwigRosRpcSvc_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
 
         stdstr strSvcName;
@@ -345,7 +346,7 @@ gint32 CPythonProxyRosImpl::OnPreStart(
     return ret;
 }
 
-gint32 CPythonProxyRosImpl::AsyncCallVector(
+gint32 CJavaRpcSvc_CliImpl::AsyncCallVector(
     IEventSink* pTask,
     CfgPtr& pOptions,
     CfgPtr& pResp,
@@ -423,26 +424,27 @@ gint32 CPythonProxyRosImpl::AsyncCallVector(
     return ret;
 }
 
-gint32 CPythonProxyRosImpl::InvokeUserMethod(
+gint32 CJavaRpcSvc_CliImpl::InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )
 {
-    return CPythonProxy::InvokeUserMethod(
+    return CJavaProxy::InvokeUserMethod(
         pParams, pCallback );
 }
 
-
-gint32 CPythonServerRosImpl::SendEvent(
-    PyObject* pCallback,
+gint32 CJavaRpcSvc_SvrImpl::SendEvent(
+    JNIEnv *jenv,
+    jobject pCallback,
     const std::string& strCIfName,
     const std::string& strMethod,
     const std::string& strDest,
-    PyObject* pArgs,
+    jobject pArgs,
     guint32 dwSeriProto )
 {
     guint32 ret = 0;
-    bool bDec = false;
     TaskletPtr pTask;
+    jobject pjCb = nullptr;
+    jobject pjret = nullptr;
     do{
         if( strMethod.empty() ||
             strCIfName.empty() )
@@ -452,13 +454,12 @@ gint32 CPythonServerRosImpl::SendEvent(
         }
 
         std::vector< Variant > vecArgs;
-        ret = List2Vector( pArgs, vecArgs );
+        ret = List2Vector( jenv, pArgs, vecArgs );
         if( ERROR( ret ) )
             break;
 
         IEventSink* pCb = nullptr;
-        if( pCallback == nullptr ||
-            pCallback == Py_None )
+        if( pCallback == nullptr )
         {
             pTask.NewObj( clsid( CIfDummyTask ) );
         }
@@ -467,23 +468,22 @@ gint32 CPythonServerRosImpl::SendEvent(
             CParamList oReqCtx;
             ret = NEW_PROXY_RESP_HANDLER2(
                 pTask, ObjPtr( this ),
-                &CPythonInterfBase::OnAsyncCallResp,
+                &CJavaServer::OnAsyncCallResp,
                 nullptr, oReqCtx.GetCfg() );
 
             if( ERROR( ret ) )
                 break;
 
-            oReqCtx.Push(
-                ( intptr_t ) pCallback );
-            Py_INCREF( pCallback );
+            pjCb = jenv->NewGlobalRef( pCallback );
+            jobject jret = NewJRet( jenv );
+            pjret = jenv->NewGlobalRef( jret );
 
-            PyObject* listResp = PyList_New( 2 );
-            oReqCtx.Push( ( intptr_t )listResp );
-            bDec = true;
+            oReqCtx.Push( ( intptr_t ) pjCb );
+            oReqCtx.Push( ( intptr_t )pjret );
+            oReqCtx.Push( strMethod );
+            oReqCtx.Push( seriNone );
         }
         pCb = pTask;
-
-        Py_BEGIN_ALLOW_THREADS;
 
         std::string strIfName =
            DBUS_IF_NAME( strCIfName );
@@ -513,7 +513,7 @@ gint32 CPythonServerRosImpl::SendEvent(
                 if( !strDest.empty() )
                     oReq.SetDestination( strDest );
                 
-                // we don't expect a response
+                // we do not expect a response
                 oReq.SetCallFlags( 
                    DBUS_MESSAGE_TYPE_SIGNAL
                    | CF_ASYNC_CALL );
@@ -521,27 +521,30 @@ gint32 CPythonServerRosImpl::SendEvent(
                 oReq.SetMethodName( strMethod );
 
                 for( auto elem : vecArgs )
-                    oReq.Push( elem );
+                    oReq.Push<BufPtr&>( elem );
 
                 ret = BroadcastEvent(
                     oReq.GetCfg(), pCb );
             }
         }
-        Py_END_ALLOW_THREADS;
         
     }while( 0 );
 
-    if( ret != STATUS_PENDING && bDec )
+    if( ret != STATUS_PENDING )
     {
-        Py_DECREF( pCallback );
         if( !pTask.IsEmpty() )
             ( *pTask )( eventCancelTask );
+
+        if( pjCb != nullptr )
+            jenv->DeleteGlobalRef( pjCb );
+        if( pjret != nullptr )
+            jenv->DeleteGlobalRef( pjret );
     }
 
     return ret;
 }
 
-gint32 CPythonServerRosImpl::CreateStmSkel(
+gint32 CJavaRpcSvc_SvrImpl::CreateStmSkel(
     HANDLE hStream,
     guint32 dwPortId,
     InterfPtr& pIf )
@@ -577,13 +580,13 @@ gint32 CPythonServerRosImpl::CreateStmSkel(
         oCfg.CopyProp( propSkelCtx, this );
         oCfg[ propPortId ] = dwPortId;
         ret = pIf.NewObj(
-            clsid( CPythonRpcSvc_SvrSkel ),
+            clsid( CSwigRosRpcSvc_SvrSkel ),
             oCfg.GetCfg() );
     }while( 0 );
     return ret;
 }
 
-gint32 CPythonServerRosImpl::OnPreStart(
+gint32 CJavaRpcSvc_SvrImpl::OnPreStart(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
@@ -591,7 +594,7 @@ gint32 CPythonServerRosImpl::OnPreStart(
         CCfgOpener oCtx;
         CCfgOpenerObj oIfCfg( this );
         oCtx[ propClsid ] = clsid( 
-            CPythonRpcSvc_ChannelSvr );
+            CSwigRosRpcSvc_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
 
         stdstr strSvcName;
@@ -619,12 +622,12 @@ gint32 CPythonServerRosImpl::OnPreStart(
     return ret;
 }
 
-gint32 CPythonServerRosImpl::InvokeUserMethod(
+gint32 CJavaRpcSvc_SvrImpl::InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )
 {
-    return CPythonServer::InvokeUserMethod(
+    return CJavaServer::InvokeUserMethod(
         pParams, pCallback );
 }
 
-%End
+}

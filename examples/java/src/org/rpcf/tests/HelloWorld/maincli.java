@@ -68,7 +68,7 @@ public class maincli
 
             String strResp = (String)jret.getAt(0);
             System.out.println(
-                    "The server responsed with '" + strResp + "'" );
+                    "The server responded with '" + strResp + "'" );
 
         }while( false );
 

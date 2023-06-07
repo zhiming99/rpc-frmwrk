@@ -1570,14 +1570,14 @@ class CJavaProxy :
         : super::_MyVirtBase( pCfg ), super( pCfg )
     {}
 
-    gint32 AsyncCallVector(
+    virtual gint32 AsyncCallVector(
         IEventSink* pTask,
         CfgPtr& pOptions,
         CfgPtr& pResp,
         const std::string& strcMethod,
         std::vector< Variant >& vecParams );
 
-    jobject JavaProxyCall2(
+    virtual jobject JavaProxyCall2(
         JNIEnv *jenv,
         jobject pCb,
         jobject pContext,
@@ -1922,10 +1922,19 @@ jobject CreateProxy(
         if( ERROR( ret ) )
             break;
 
+        EnumClsid iClsid =
+            clsid( CJavaProxyImpl );
+        EnumClsid iStateClass = clsid( Invalid );
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.GetIntProp( propIfStateClass,
+            ( guint32& )iStateClass );
+        if( SUCCEEDED( ret ) &&
+            iStateClass == clsid( CFastRpcProxyState ) )
+            iClsid = clsid( CJavaProxyRosImpl );
+
         ObjPtr* pIf = new ObjPtr();
-        ret = pIf->NewObj(
-            clsid( CJavaProxyImpl ),
-            pCfg );
+        ret = pIf->NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
         {
             delete pIf;
@@ -2454,3 +2463,40 @@ class CJavaProxy :
 
 %clearnodefaultctor;
 %include "server.i"
+
+%header{
+class CJavaProxyRosImpl :
+    public CJavaRpcSvc_CliImpl
+{
+    public:
+    typedef CJavaRpcSvc_CliImpl super;
+    CJavaProxyRosImpl( const IConfigDb* pCfg )
+    : super::virtbase( pCfg ), super( pCfg )
+    { SetClassId( clsid( CJavaProxyRosImpl ) ); }
+};
+
+static FactoryPtr InitClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+    INIT_MAP_ENTRYCFG( CJavaProxyImpl );
+    INIT_MAP_ENTRYCFG( CJavaServerImpl );
+    INIT_MAP_ENTRYCFG( CJavaProxyRosImpl );
+    INIT_MAP_ENTRYCFG( CJavaServerRosImpl );
+    INIT_MAP_ENTRYCFG( CSwigRosRpcSvc_CliSkel );
+    INIT_MAP_ENTRYCFG( CSwigRosRpcSvc_SvrSkel );
+    INIT_MAP_ENTRYCFG( CSwigRosRpcSvc_ChannelCli );
+    INIT_MAP_ENTRYCFG( CSwigRosRpcSvc_ChannelSvr );
+    END_FACTORY_MAPS;
+};
+
+extern "C"
+gint32 DllLoadFactory( FactoryPtr& pFactory )
+{
+    pFactory = InitClassFactory();
+    if( pFactory.IsEmpty() )
+        return -EFAULT;
+
+    return 0;
+}
+
+}

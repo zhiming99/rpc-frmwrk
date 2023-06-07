@@ -1652,9 +1652,12 @@ gint32 CFastRpcProxyBase::OnPreStop(
 gint32 CFastRpcProxyBase::OnPostStop(
     IEventSink* pCallback )
 {
-    m_pSkelObj.Clear();
     gint32 ret = 0;
     do{
+        {
+            CStdRMutex oIfLock( this->GetLock() );
+            m_pSkelObj.Clear();
+        }
         ObjPtr pDrv;
         auto oDrvMgr = GetIoMgr()->GetDrvMgr();
         ret = oDrvMgr.GetDriver( true,

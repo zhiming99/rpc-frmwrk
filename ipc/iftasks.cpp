@@ -1082,6 +1082,8 @@ gint32 CIfEnableEventTask::OnIrpComplete(
         ret = pIrp->GetStatus();
         if( unlikely( ret == -ENOTCONN ) )
         {
+            DebugPrintEx( logErr, ret,
+                "Error, Remote server is not ready" );
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
             if( SUCCEEDED( ret ) )
