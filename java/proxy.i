@@ -694,11 +694,11 @@ class CJavaInterfBase : public T
             if( ERROR( ret ) )
                 break;
             guint32* pObj = nullptr;
-            DebugPrint( 0, "RemoveJavaHost()..." );
             ret = oCfg.GetIntPtr(
                 propJavaObj, pObj );
             if( ERROR( ret ) )
                 break;
+            DebugPrint( 0, "RemoveJavaHost()..." );
             oCfg.RemoveProperty( propJavaObj );
             jobject pjObj = ( jobject )pObj;
             if( pjObj != nullptr )
@@ -2039,9 +2039,6 @@ void JavaOutputMsg( const std::string strMsg );
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxyBase {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -2052,9 +2049,6 @@ class CJavaProxyBase : public CInterfaceProxy
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaInterfBase {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -2403,9 +2397,6 @@ class CJavaInterfBase
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaProxy {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();

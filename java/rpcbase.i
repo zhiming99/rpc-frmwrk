@@ -370,6 +370,9 @@ gint32 CoUninitializeEx();
 
 %nodefaultctor;
 
+%feature("ref")   CObjBase "$this->AddRef();"
+%feature("unref") CObjBase "$this->Release();"
+
 %typemap(javadestruct, methodname="delete", methodmodifiers="public synchronized") CObjBase {
     if (swigCPtr != 0) {
       if (swigCMemOwn) {
@@ -400,18 +403,13 @@ class CObjBase
     public:
     gint32 AddRef();
     gint32 Release();
+    gint32 GetRefCount();
     gint32 SetClassId( EnumClsid iClsid );
     EnumClsid GetClsid() const;
 };
 
-%feature("ref")   CObjBase "$this->AddRef();"
-%feature("unref") CObjBase "$this->Release();"
-
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IConfigDb {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -427,9 +425,6 @@ class IConfigDb : public CObjBase
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IEventSink {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -437,9 +432,6 @@ class IConfigDb : public CObjBase
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IService {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -1500,9 +1492,6 @@ class CfgPtr
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CBuffer {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -2968,9 +2957,6 @@ IService* CastToSvc(
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CRpcServices {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -2989,9 +2975,6 @@ class CRpcServices : public IService
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceProxy {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -3006,9 +2989,6 @@ class CInterfaceProxy : public CRpcServices
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceServer {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();

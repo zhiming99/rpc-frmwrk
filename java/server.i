@@ -393,9 +393,6 @@ DECLARE_AGGREGATED_SERVER(
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServerBase {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -408,9 +405,6 @@ class CJavaServerBase :
 %template(CJavaInterfBaseS) CJavaInterfBase<CJavaServerBase>;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServer{
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();

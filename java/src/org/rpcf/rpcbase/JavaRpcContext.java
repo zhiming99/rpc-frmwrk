@@ -2,6 +2,7 @@ package org.rpcf.rpcbase;
 import java.lang.String;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 
 public class JavaRpcContext 
 {
@@ -143,6 +144,12 @@ public class JavaRpcContext
 
     int CleanUp()
     {
+        System.gc();
+        try{
+            TimeUnit.SECONDS.sleep(2);
+        }
+        catch( InterruptedException e )
+        {};
         return rpcbase.CoUninitializeEx();
     }
 
@@ -176,7 +183,7 @@ public class JavaRpcContext
         if( m_pIoMgr != null )
         {
             StopIoMgr( m_pIoMgr );
-            m_pIoMgr = null;
+            m_pIoMgr.Clear();
         }
         return DestroyRpcCtx();
     }
