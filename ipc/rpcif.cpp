@@ -2770,6 +2770,7 @@ gint32 CRpcServices::OnPostStop(
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
     m_pRootTaskGroup.Clear();
+    m_pSeqTasks.Clear();
 
     return 0;
 }

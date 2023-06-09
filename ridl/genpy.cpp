@@ -3090,9 +3090,11 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "        params[ 'bDaemon' ] = True" );
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
-        Wa( "    elif opt in ('-m'):" );
-        Wa( "        params[ 'MountPoint' ] = arg" );
-        Wa( "        bMount = True" );
+        {
+            Wa( "    elif opt in ('-m'):" );
+            Wa( "        params[ 'MountPoint' ] = arg" );
+            Wa( "        bMount = True" );
+        }
 #endif
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
