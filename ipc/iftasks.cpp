@@ -2906,10 +2906,13 @@ gint32 CIfParallelTask::operator()(
 gint32 CIfParallelTask::OnComplete(
     gint32 iRet )
 {
+    // unlocking the task for OnComplete can cause
+    // Canceling Task to fail, and this task become
+    // orphan task with owners gone. However without
+    // unlocking, the risk of dead-lock. Both risks are
+    // fatal.
     SetTaskState( stateStopping );
-    GetLock().unlock();
     gint32 ret = super::OnComplete( iRet );
-    GetLock().lock();
     SetTaskState( stateStopped );
     return ret;
 }

@@ -51,6 +51,8 @@ def test() :
         stmFile = svcdir + "/streams/stream_" + num
         stmfp = rpcOpen( stmFile, "w+b" )
 
+        parentDir = os.path.basename( svcdir )
+
         idx = 1 + int( num ) * 1000
         while True:
             print( time.time() )
@@ -68,7 +70,7 @@ def test() :
             AddParameter(req, "i3", 3 )
             AddParameter(req, "i4", 4.0 )
             AddParameter(req, "i5", 5.0 )
-            AddParameter(req, "szText", 'Hello, you' )
+            AddParameter(req, "szText", parentDir )
 
             sendReq( reqfp, req )
             #print( os.getpid(), "EchoMany receiving from", respFile )
@@ -211,7 +213,10 @@ def test() :
             idx += 1
             AddParameter(req, "hstm", "stream_" + num )
             sendReq( reqfp, req )
-            stmfp.write(binBuf[0:8*1024])
+            tagLen = len( parentDir )
+            newBuf = binBuf[0:8*1024-tagLen ]
+            newBuf.extend( parentDir.encode( "UTF-8" ) )
+            stmfp.write(newBuf)
             ret = recvResp( respfp )
             if ret[ 0 ] < 0 :
                 error = ret[ 0 ]
