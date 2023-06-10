@@ -4,7 +4,7 @@ lib_LTLIBRARIES=librpcbaseJNI.la
 
 if ENABLE_FUSE3
 fuse3_macro=-DFUSE3
-fuse3_lib=-lfuseif
+fuse3_lib=$(top_srcdir)/fuse/libfuseif.la
 fuse3_inc=-I$(top_srcdir)/fuse
 fuse3_src=fuseif.i
 else
