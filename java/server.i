@@ -617,6 +617,10 @@ jobject CastToServer(
 
 %include "fastrpc.i"
 
+#ifdef FUSE3
+%include "fuseif.i"
+#endif
+
 %header{
 class CJavaServerRosImpl :
     public CJavaRpcSvc_SvrImpl

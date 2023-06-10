@@ -34,8 +34,8 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
             if( jret.ERROR() )
                 break;
 
-            m_oInst = ( CJavaProxy )
-                jret.getAt( 0 );
+            setInst( ( CJavaProxy )
+                jret.getAt( 0 ) );
 
         }while( false );
 
@@ -162,7 +162,13 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         CfgPtr pCfg,
         Object[] args )
     {
-        return ( JRetVal )m_oInst.JavaProxyCall2(
+        if( getInst() == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+        return ( JRetVal )getInst().JavaProxyCall2(
             ( Object )callback,
             context, pCfg,
             ( Object )args );

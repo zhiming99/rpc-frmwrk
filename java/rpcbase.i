@@ -1111,6 +1111,7 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
         }
         else
         {
+            // built-in router enabled
             OpenThisLib();
             guint32 dwNumThrds =
                 ( guint32 )std::max( 1U,
@@ -1149,6 +1150,7 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 break;
             }
 
+            // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
                 break;

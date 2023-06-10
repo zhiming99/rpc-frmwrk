@@ -25,22 +25,23 @@ public class JavaRpcContext
     /**
      * @param oInit A map with multiple input parameters.
      * The valid key value is one of the following.
-     * <p>0 : a string of the module name, mandatory</p>
+     *      <p>0 : a string of the module name, mandatory</p>
      *
-     *    <p>101: role of the rpcrouter, only valid when
-     *    builti-in router is enabled.</p>
+     *      <p>101: role of the rpcrouter, only valid when
+     *      builti-in router is enabled.</p>
      *
-     *    <p>102: a boolean telling whether the authoration
-     *    enabled or not, optional.</p>
+     *      <p>102: a boolean telling whether the authoration
+     *      enabled or not, optional.</p>
      *
-     *    <p>103: a boolean telling whether running as a
-     *    daemon, optional.</p>
+     *      <p>103: a boolean telling whether running as a
+     *      daemon, optional.</p>
      *
-     *    <p>104: a string of the application name, optional.</p>
+     *      <p>104: a string of the application name, optional.</p>
      *
-     *    <p>105: a string as the path of 'driver.json', which
-     *    can override the default path of the driver.json.
-     *    optional.</p>
+     *      <p>105: a string as the path of 'driver.json', which
+     *      can override the default path of the driver.json.
+     *      It is a must-have attribute when fastrpc or
+     *      built-in router is enabled.</p>
      * @return an ObjPtr object holding the instance of IoMgr on success
      * and null on error, with m_iError set.
      */
@@ -144,6 +145,8 @@ public class JavaRpcContext
 
     int CleanUp()
     {
+        // tell the garbage collector to release
+        // the 'proxy' objects.
         System.gc();
         try{
             TimeUnit.SECONDS.sleep(2);

@@ -1430,6 +1430,89 @@ gint32 CJavaSnippet::EmitGetDescPath(
     return 0;
 }
 
+gint32 CJavaSnippet::EmitGetOpt( bool bServer )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strCmd = g_strPrefix + g_strAppName + ".";
+        if( bServer )
+            strCmd += "mainsvr";
+        else
+            strCmd += "maincli";
+
+        Wa( "Options options = new Options();" );
+        Wa( "Option oAuth = new Option(\"a\", \"to enable authentication\");" );
+        Wa( "oAuth.setRequired(false);" );
+        Wa( "options.addOption(oAuth);" );
+
+        Wa( "Option oDaemon = new Option(\"d\", \"to run as a daemon\");" );
+        Wa( "oDaemon.setRequired(false);" );
+        Wa( "options.addOption(oDaemon);" );
+
+#ifdef FUSE3
+        if( bServer && g_bBuiltinRt )
+        {
+            Wa( "String strMPoint = null;" );
+            Wa( "Option oMountPoint = new Option(\"m\", true," );
+            Wa( "    \"to specify a directory as the mount-point for rpcfs\" );" );
+            Wa( "oMountPoint.setRequired(false);" );
+            Wa( "options.addOption(oMountPoint);" );
+        }
+#endif
+        Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
+        Wa( "oHelp.setRequired(false);" );
+        Wa( "options.addOption(oHelp);" );
+
+
+        Wa( "CommandLineParser parser = new DefaultParser();" );
+        Wa( "HelpFormatter formatter = new HelpFormatter();" );
+        Wa( "CommandLine cmd = null;" );
+
+        CCOUT << "try";
+        BLOCK_OPEN;
+        CCOUT << "cmd = parser.parse(options, args);";
+        BLOCK_CLOSE; 
+        NEW_LINE;
+        Wa( "catch (ParseException e)" );
+        BLOCK_OPEN;
+        Wa( "System.out.println(e.getMessage());" );
+        CCOUT << "formatter.printHelp(\"" << strCmd << "\", options);";
+        NEW_LINE;
+        CCOUT << "System.exit(RC.EINVAL);";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "Option[] actOpts = cmd.getOptions();" );
+        Wa( "for( Option opt : actOpts )" );
+        BLOCK_OPEN; 
+        Wa( "if( opt.getOpt() == \"a\" )" );
+        Wa( "    oInit.put( 102, Boolean.valueOf( true ) );" );
+        Wa( "else if( opt.getOpt() == \"d\" )" );
+        Wa( "    oInit.put( 103, Boolean.valueOf( true ) );" );
+#ifdef FUSE3
+        if( bServer && g_bBuiltinRt )
+        {
+            Wa( "else if( opt.getOpt() == \"m\" )" );
+            Wa( "    strMPoint = opt.getValue();" );
+        }
+#endif
+        Wa( "else if( opt.getOpt() == \"h\" )" );
+        BLOCK_OPEN; 
+        CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
+        NEW_LINE;
+        CCOUT << "System.exit(RC.STATUS_SUCCESS);";
+        BLOCK_CLOSE;
+        BLOCK_CLOSE; 
+        NEW_LINE;
+        if( bServer )
+            Wa( "oInit.put( 101, Integer.valueOf( 2 ) );" );
+        else
+            Wa( "oInit.put( 101, Integer.valueOf( 1 ) );" );
+
+    }while( 0 );
+    return ret;
+}
+
 CJavaFileSet::CJavaFileSet(
     const std::string& strOutPath,
     const std::string& strAppName )
@@ -4143,11 +4226,251 @@ CImplJavaMainCli::CImplJavaMainCli(
         throw std::runtime_error( strMsg );
     }
 }
+
+#define EMIT_CREATE_SVC( _bServer, _strObj, _strSvc ) \
+do{ \
+    if( _bServer ) \
+        Wa( "// create the server object" ); \
+    else \
+        Wa( "// create the proxy object" ); \
+    CCOUT << _strObj <<" = new " << _strSvc; \
+    if( _bServer ) \
+        CCOUT << "svr("; \
+    else         \
+        CCOUT << "cli("; \
+    NEW_LINE; \
+    Wa( "    m_oCtx.getIoMgr(), " ); \
+    CCOUT << "    strDescPath,"; \
+    NEW_LINE; \
+    CCOUT << "    \""<< _strSvc << "\" );"; \
+    NEW_LINES( 2 ); \
+    Wa( "// check if there are errors" ); \
+    CCOUT << "if( RC.ERROR( "<< _strObj << ".getError() ) )"; \
+    NEW_LINE; \
+    CCOUT << "{ ret = " << _strObj << ".getError(); return; }"; \
+    NEW_LINE; \
+    NEW_LINE; \
+    if( _bServer ) \
+        Wa( "// start the server" ); \
+    else \
+        Wa( "// start the proxy" ); \
+    CCOUT << "ret = " << _strObj << ".start();"; \
+    NEW_LINE; \
+    Wa( "if( RC.ERROR( ret ) )" ); \
+    Wa( "    return;" ); \
+    NEW_LINE; \
+    if( !_bServer ) \
+    { \
+        Wa( "// test remote server is not online" ); \
+        CCOUT << "while( "<< _strObj << ".getState() == RC.stateRecovery )"; \
+        NEW_LINE; \
+        Wa( "try{" ); \
+        Wa( "    TimeUnit.SECONDS.sleep(1);" ); \
+        Wa( "}" ); \
+        Wa( "catch( InterruptedException e ){};" ); \
+        NEW_LINE; \
+    }\
+    CCOUT << "if( " << _strObj << ".getState() != RC.stateConnected )"; \
+    NEW_LINE; \
+    Wa( "{ ret = RC.ERROR_STATE; return; }" ); \
+}while( 0 )
+
+#define EMIT_CALL_TO_USERMAIN( bSvr ) \
+do{ \
+    if( vecSvcs.size() == 1 ) \
+    { \
+        CServiceDecl* pSvc = vecSvcs[ 0 ]; \
+        stdstr strSvcName = pSvc->GetName(); \
+        if( bSvr ) \
+            strSvcName += "svr"; \
+        else \
+            strSvcName += "cli"; \
+        Wa( "ret = userMain(" ); \
+        CCOUT << "    ( " << strSvcName << " )oSvc );"; \
+    } \
+    else  \
+    { \
+        Wa( "ret = userMain(" ); \
+        for( int i = 0; i < vecSvcs.size(); i++ ) \
+        { \
+            CServiceDecl* pSvc = vecSvcs[ i ]; \
+            stdstr strSvcName = pSvc->GetName(); \
+            if( bSvr ) \
+                strSvcName += "svr"; \
+            else \
+                strSvcName += "cli"; \
+            CCOUT << "    ( " << strSvcName << " )oSvcs[ " << i << " ]"; \
+            if( i < vecSvcs.size() - 1 ) \
+            { \
+                CCOUT << ","; \
+                NEW_LINE; \
+            } \
+            else \
+            { \
+                CCOUT << " );"; \
+            } \
+        } \
+    } \
+}while( 0 );
+
+#define EMIT_NORMAL_LOOP_SVR \
+do{ \
+    Wa( "// replace the following code with your own" ); \
+    Wa( "// logic if necessary. The requests" ); \
+    Wa( "// handling is going on in the background" ); \
+    Wa( "while( true )" ); \
+    BLOCK_OPEN;\
+    CCOUT << "try"; \
+    BLOCK_OPEN; \
+    Wa( "TimeUnit.SECONDS.sleep(1);" ); \
+    BLOCK_CLOSE;\
+    Wa( "catch( InterruptedException e ){}" ); \
+    if( vecSvcs.size() == 1 ) \
+    { \
+        Wa( "if( oSvc.getState() != RC.stateConnected )" ); \
+        CCOUT << "    break;"; \
+    } \
+    else for( int i = 0; i < vecSvcs.size(); i++ ) \
+    { \
+        CCOUT << "if( oSvc" << std::to_string( i ) \
+            << ".getState() != RC.stateConnected )"; \
+        NEW_LINE; \
+        CCOUT << "    break;"; \
+        if( i < vecSvcs.size() - 1 ) \
+            NEW_LINE; \
+    } \
+    BLOCK_CLOSE;\
+}while( 0 )
+
+#define EMIT_USER_MAIN( bSvr ) \
+do{ \
+    Wa( "// ------customize this method for your own purpose----" ); \
+    CCOUT << "public static int userMain("; \
+    INDENT_UPL \
+    if( vecSvcs.size() == 1 ) \
+    { \
+        CServiceDecl* pSvc = vecSvcs[ 0 ]; \
+        stdstr strSvcName = pSvc->GetName(); \
+        if( bSvr ) \
+            strSvcName += "svr"; \
+        else \
+            strSvcName += "cli"; \
+        CCOUT << strSvcName << " oSvc )"; \
+    } \
+    else for( int i = 0; i < vecSvcs.size(); i++ ) \
+    { \
+        CServiceDecl* pSvc = vecSvcs[ i ]; \
+        stdstr strSvcName = pSvc->GetName(); \
+        if( bSvr ) \
+            strSvcName += "svr"; \
+        else \
+            strSvcName += "cli"; \
+        CCOUT << strSvcName << " oSvc" << i; \
+        if( i < vecSvcs.size() - 1 ) \
+        {\
+            CCOUT << ","; \
+            NEW_LINE; \
+        }\
+        else \
+            CCOUT << " )"; \
+    } \
+    INDENT_DOWNL \
+    BLOCK_OPEN; \
+    if( bSvr ) \
+        EMIT_NORMAL_LOOP_SVR; \
+    else \
+        EMIT_HELP_SEND_REQUEST; \
+    NEW_LINE;\
+    CCOUT << "return RC.ERROR_NOT_IMPL;"; \
+    BLOCK_CLOSE; \
+}while( 0 );
+
+#define EMIT_HELP_SEND_REQUEST \
+do{ \
+    std::vector< ObjPtr > vecm; \
+    ret = CJTypeHelper::GetMethodsOfSvc( \
+        vecSvcs[ 0 ], vecm ); \
+    if( ERROR( ret ) || vecm.empty() ) \
+        break; \
+    ObjPtr pMethod; \
+    CArgListUtils oau; \
+    bool bHasEvent = false; \
+    for( auto& elem : vecm ) \
+    { \
+        pMethod = elem; \
+        CMethodDecl* pmd = elem; \
+        if( pmd->IsEvent() ) \
+        { \
+            bHasEvent = true; \
+            pMethod.Clear(); \
+            continue; \
+        } \
+        ObjPtr pInArgs = pmd->GetInArgs(); \
+        if( oau.GetArgCount( pInArgs ) > 1 ) \
+            break; \
+    } \
+    CMethodDecl* pmd = pMethod; \
+    if( vecSvcs.size() > 1 ) \
+        strObj = "oSvc0"; \
+    if( pmd != nullptr ) \
+    { \
+        Wa( "/*// request something from the server" ); \
+        CCOUT << "JRetVal jret = " << strObj << "." \
+            << pmd->GetName(); \
+        ObjPtr pInArgs = pmd->GetInArgs(); \
+        gint32 iInCount = \
+            oau.GetArgCount( pInArgs ); \
+ \
+        if( iInCount == 0 && pmd->IsAsyncp() ) \
+        { \
+            CCOUT << "( oYourCtx );"; \
+            NEW_LINE; \
+        } \
+        else if( iInCount == 0 ) \
+        { \
+            CCOUT << "();"; \
+            NEW_LINE; \
+        } \
+        else if( iInCount > 0 ) \
+        { \
+            if( pmd->IsAsyncp() ) \
+                CCOUT << "( oYourCtx,"; \
+            else \
+                CCOUT << "("; \
+            INDENT_UPL; \
+            ret = os.EmitActArgList( pInArgs ); \
+            if( ERROR( ret ) ) \
+                break; \
+            CCOUT << ");"; \
+            INDENT_DOWNL; \
+        } \
+        Wa( "if( jret.ERROR() )" ); \
+        Wa( "{ ret = jret.getError();return; }" ); \
+        CCOUT << "*/"; \
+    } \
+    else if( bHasEvent ) \
+    { \
+        Wa( "/*" ); \
+        Wa( " *Just waiting and events will " ); \
+        Wa( " *be handled in the background" ); \
+        NEW_LINE; \
+        CCOUT << " while( "<< strObj \
+            << ".getState() == RC.stateConnected )"; \
+        Wa( " try{" ); \
+        Wa( "     TimeUnit.SECONDS.sleep(1);" ); \
+        Wa( " } catch (InterruptedException e) {" ); \
+        Wa( " }" ); \
+        CCOUT << " */"; \
+    } \
+}while( 0 )
+
 gint32 CImplJavaMainCli::Output()
 {
     CJavaSnippet os( m_pWriter );
     os.EmitBanner();
     Wa( "import java.util.concurrent.TimeUnit;" );
+    if( g_bBuiltinRt )
+        Wa( "import org.apache.commons.cli.*;" );
     gint32 ret = 0;
     do{
         CCOUT << "public class maincli";
@@ -4172,6 +4495,12 @@ gint32 CImplJavaMainCli::Output()
             Wa( "String strCfgPath = getDescPath( \"driver.json\");" );
             Wa( "if( strCfgPath.length() > 0 )" );
             Wa( "    oInit.put( 105, strCfgPath );" );
+            if( g_bBuiltinRt )
+            {
+                os.EmitGetOpt( false );
+                CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
+                NEW_LINE;
+            }
             Wa( "m_oCtx = JavaRpcContext.createProxy( oInit );" );
         }
 
@@ -4179,17 +4508,23 @@ gint32 CImplJavaMainCli::Output()
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
 
-        Wa( "int ret = 0;" );
-        Wa( "JavaRpcProxy oSvc = null;" );
-        CCOUT << "try";
-        BLOCK_OPEN;
-
         std::vector< ObjPtr > vecSvcs;
         ret = m_pNode->GetSvcDecls( vecSvcs );
         if( ERROR( ret ) || vecSvcs.empty() )
             break;
-        CServiceDecl* pSvc = vecSvcs[ 0 ];
-        stdstr strSvc = pSvc->GetName();
+
+        Wa( "int ret = 0;" );
+        if( vecSvcs.size() == 1 )
+            Wa( "JavaRpcProxy oSvc = null;" );
+        else
+        {
+            CCOUT << "JavaRpcProxy[] oSvcs = new JavaRpcProxy[ "
+                << std::to_string( vecSvcs.size() )<< " ];";
+            NEW_LINE;
+        }
+
+        CCOUT << "try";
+        BLOCK_OPEN;
 
         stdstr strDescName = g_strAppName + "desc.json";
         Wa( "String strDescPath =" );
@@ -4197,125 +4532,56 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINE;
         Wa( "if( strDescPath.isEmpty() )" );
         Wa( "{ ret = -RC.ENOENT; return; }" );
-        Wa( "// create the service object" );
-
-        CCOUT << strSvc << "cli oSvcCli = new " << strSvc << "cli(";
         NEW_LINE;
-            Wa( "    m_oCtx.getIoMgr(), " );
-            CCOUT << "    strDescPath,";
-            NEW_LINE;
-            CCOUT << "    \""<< strSvc << "\" );";
-
-        NEW_LINES( 2 );
-        Wa( "oSvc = oSvcCli;" );
-        Wa( "// check if there are errors" );
-        Wa( "if( RC.ERROR( oSvcCli.getError() ) )" );
-        Wa( "{ ret = oSvcCli.getError(); return; }" );
-
-        NEW_LINE;
-        Wa( "// start the proxy" );
-        Wa( "ret = oSvcCli.start();" );
-        Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    return;" );
-        
-        NEW_LINE;
-        Wa( "// test remote server is not online" );
-        Wa( "while( oSvcCli.getState() == RC.stateRecovery )" );
-        Wa( "try{" );
-        Wa( "    TimeUnit.SECONDS.sleep(1);" );
-        Wa( "}" );
-        Wa( "catch( InterruptedException e ){};" );
-        NEW_LINE;
-        Wa( "if( oSvcCli.getState() != RC.stateConnected )" );
-        Wa( "{ ret = RC.ERROR_STATE; return; }" );
-        NEW_LINE;
-        std::vector< ObjPtr > vecm;
-        ret = CJTypeHelper::GetMethodsOfSvc(
-            vecSvcs[ 0 ], vecm );
-        if( ERROR( ret ) || vecm.empty() )
-            break;
-
-        ObjPtr pMethod;
-        CArgListUtils oau;
-        bool bHasEvent = false;
-        for( auto& elem : vecm )
+        stdstr strObj = "oSvc";
+        if( vecSvcs.size() == 1 )
         {
-            pMethod = elem;
-            CMethodDecl* pmd = elem;
-            if( pmd->IsEvent() )
-            {
-                bHasEvent = true;
-                pMethod.Clear();
-                continue;
-            }
-            ObjPtr pInArgs = pmd->GetInArgs();
-            if( oau.GetArgCount( pInArgs ) > 1 )
-                break;
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strSvc = pSvc->GetName();
+            EMIT_CREATE_SVC( false, strObj, strSvc );
         }
-
-        CMethodDecl* pmd = pMethod;
-        if( pmd != nullptr )
+        else
         {
-            Wa( "/*// request something from the server" );
-            CCOUT << "JRetVal jret = oSvcCli."
-                << pmd->GetName();
-            ObjPtr pInArgs = pmd->GetInArgs();
-            gint32 iInCount =
-                oau.GetArgCount( pInArgs );
-
-            if( iInCount == 0 && pmd->IsAsyncp() )
+            for( int i = 0; i < vecSvcs.size(); i++ )
             {
-                CCOUT << "( oYourCtx );";
-                NEW_LINE;
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strSvc = pSvc->GetName();
+                stdstr strObj = "oSvcs[ ";
+                strObj += std::to_string( i ) + " ]";
+                EMIT_CREATE_SVC( false, strObj, strSvc );
+                if( i < vecSvcs.size() - 1 )
+                    NEW_LINE;
             }
-            else if( iInCount == 0 )
-            {
-                CCOUT << "();";
-                NEW_LINE;
-            }
-            else if( iInCount > 0 )
-            {
-                if( pmd->IsAsyncp() )
-                    CCOUT << "( oYourCtx,";
-                else
-                    CCOUT << "(";
-                INDENT_UPL;
-                ret = os.EmitActArgList( pInArgs );
-                if( ERROR( ret ) )
-                    break;
-                CCOUT << ");";
-                INDENT_DOWNL;
-            }
-            Wa( "if( jret.ERROR() )" );
-            Wa( "{ ret = jret.getError();return; }" );
-            CCOUT << "*/";
         }
-        else if( bHasEvent )
-        {
-            Wa( "/*" );
-            Wa( " *Just waiting and events will " );
-            Wa( " *be handled in the background" );
-            NEW_LINE;
-            Wa( " while( oSvcCli.getState() == RC.stateConnected )" );
-            Wa( " try{" );
-            Wa( "     TimeUnit.SECONDS.sleep(1);" );
-            Wa( " } catch (InterruptedException e) {" );
-            Wa( " }" );
-            CCOUT << " */";
-        }
+        NEW_LINE;
+        EMIT_CALL_TO_USERMAIN( false );
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "finally" );
         BLOCK_OPEN;
         Wa( "rpcbase.JavaOutputMsg(" );
         Wa( "    \"Quit with status: \" + ret);" );
-        Wa( "if( oSvc != null )" );
-        Wa( "    oSvc.stop();" );
+        if( vecSvcs.size() == 1 )
+        {
+            Wa( "if( oSvc != null )" );
+            Wa( "    oSvc.stop();" );
+        }
+        else for( int i = 0; i < vecSvcs.size(); i++ )
+        {
+            strObj = "oSvcs[ ";
+            strObj += std::to_string( i ) + " ]";
+            CCOUT << "if( " << strObj << " != null )";
+            NEW_LINE;
+            CCOUT << "    " << strObj << ".stop();";
+            NEW_LINE;
+        }
         Wa( "m_oCtx.stop();" );
         CCOUT << "System.exit( -ret );";
         BLOCK_CLOSE;
         // end of main
         BLOCK_CLOSE; 
+        NEW_LINE;
+        EMIT_USER_MAIN( false );
         // end of class
         BLOCK_CLOSE; 
 
@@ -4338,11 +4604,12 @@ CImplJavaMainSvr::CImplJavaMainSvr(
         throw std::runtime_error( strMsg );
     }
 }
-
 gint32 CImplJavaMainSvr::Output()
 {
     CJavaSnippet os( m_pWriter );
     os.EmitBanner();
+    if( g_bBuiltinRt )
+        Wa( "import org.apache.commons.cli.*;" );
     Wa( "import java.util.concurrent.TimeUnit;" );
     gint32 ret = 0;
     do{
@@ -4368,6 +4635,12 @@ gint32 CImplJavaMainSvr::Output()
             Wa( "String strCfgPath = getDescPath( \"driver.json\");" );
             Wa( "if( strCfgPath.length() > 0 )" );
             Wa( "    oInit.put( 105, strCfgPath );" );
+            if( g_bBuiltinRt )
+            {
+                os.EmitGetOpt( true );
+                CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
+                NEW_LINE;
+            }
             Wa( "m_oCtx = JavaRpcContext.createServer( oInit ); " );
         }
 
@@ -4375,17 +4648,23 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
 
-        Wa( "int ret = 0;" );
-        Wa( "JavaRpcServer oSvc = null;" );
-        CCOUT << "try";
-        BLOCK_OPEN;
-
         std::vector< ObjPtr > vecSvcs;
         ret = m_pNode->GetSvcDecls( vecSvcs );
         if( ERROR( ret ) || vecSvcs.empty() )
             break;
-        CServiceDecl* pSvc = vecSvcs[ 0 ];
-        stdstr strSvc = pSvc->GetName();
+
+        Wa( "int ret = 0;" );
+        if( vecSvcs.size() == 1 )
+            Wa( "JavaRpcServer oSvc = null;" );
+        else
+        {
+            CCOUT << "JavaRpcServer[] oSvcs = new JavaRpcServer[ "
+                << std::to_string( vecSvcs.size() )<< " ];";
+            NEW_LINE;
+        }
+
+        CCOUT << "try";
+        BLOCK_OPEN;
 
         stdstr strDescName = g_strAppName + "desc.json";
         Wa( "String strDescPath =" );
@@ -4393,51 +4672,82 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINE;
         Wa( "if( strDescPath.isEmpty() )" );
         Wa( "{ ret = -RC.ENOENT; return; }" );
-        Wa( "// create the service object" );
+        NEW_LINE;
+        stdstr strObj = "oSvc";
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strSvc = pSvc->GetName();
+            EMIT_CREATE_SVC( true, strObj, strSvc );
+        }
+        else
+        {
+            for( int i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strSvc = pSvc->GetName();
+                stdstr strObj = "oSvcs[ ";
+                strObj += std::to_string( i ) + " ]";
+                EMIT_CREATE_SVC( true, strObj, strSvc );
+                if( i < vecSvcs.size() - 1 )
+                    NEW_LINE;
+            }
+        }
+        NEW_LINE;
 
-        CCOUT << strSvc << "svr oSvcSvr = new " << strSvc << "svr(";
-        NEW_LINE;
-            Wa( "    m_oCtx.getIoMgr(), " );
-            CCOUT << "    strDescPath,";
+#ifdef FUSE3
+        if( g_bBuiltinRt )
+        {
+            Wa( "if( strMPoint == null || ");
+            Wa( "    strMPoint.length() == 0 )" );
+            BLOCK_OPEN;
+            EMIT_CALL_TO_USERMAIN( true );
+            BLOCK_CLOSE;
             NEW_LINE;
-            CCOUT << "    \""<< strSvc << "\" );";
-        NEW_LINES( 2 );
-        Wa( "oSvc = oSvcSvr;" );
-        Wa( "// check if there are errors" );
-        Wa( "if( RC.ERROR( oSvcSvr.getError() ) )" );
-        Wa( "{ ret = oSvcSvr.getError(); return; }" );
-        NEW_LINE;
-        Wa( "ret = oSvcSvr.start();" );
-        Wa( "if( RC.ERROR( ret ) )" );
-        Wa( "    return;" );
-        
-        NEW_LINE;
-        Wa( "do{" );
-        CCOUT << "try{";
-        INDENT_UPL;
-        Wa( "// replace 'sleep()' with your favorite" );
-        Wa( "// waiting logic if necessary. The requests" );
-        Wa( "// handling is going on in the background" );
-        Wa( "TimeUnit.SECONDS.sleep(1);" );
-        Wa( "if( oSvcSvr.getState() != RC.stateConnected )" );
-        CCOUT << "    break;";
-        INDENT_DOWNL;
-        Wa( "}" );
-        Wa( "catch( InterruptedException e ){}" );
-        CCOUT << "}while( true );";
+            Wa( "else" );
+            BLOCK_OPEN;
+            stdstr strCmd = g_strPrefix + g_strAppName + ".";
+            strCmd += "mainsvr";
+            Wa( "rpcbase.fuseif_mainloop(" );
+            CCOUT << "    \"" << strCmd << "\",";
+            NEW_LINE;
+            CCOUT << "    strMPoint );";
+            BLOCK_CLOSE;
+        }
+        else
+        {
+            EMIT_CALL_TO_USERMAIN( true );
+        }
+#else
+        EMIT_CALL_TO_USERMAIN( true );
+#endif
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "finally" );
         BLOCK_OPEN;
         Wa( "rpcbase.JavaOutputMsg(" );
         Wa( "    \"Quit with status: \" + ret);" );
-        Wa( "if( oSvc != null )" );
-        Wa( "    oSvc.stop();" );
+        if( vecSvcs.size() == 1 )
+        {
+            Wa( "if( oSvc != null )" );
+            Wa( "    oSvc.stop();" );
+        }
+        else for( int i = 0; i < vecSvcs.size(); i++ )
+        {
+            strObj = "oSvcs[ ";
+            strObj += std::to_string( i ) + " ]";
+            CCOUT << "if( " << strObj << " != null )";
+            NEW_LINE;
+            CCOUT << "    " << strObj << ".stop();";
+            NEW_LINE;
+        }
         Wa( "m_oCtx.stop();" );
         CCOUT << "System.exit( -ret );";
         BLOCK_CLOSE; 
         // endof main
         BLOCK_CLOSE; 
+        NEW_LINE;
+        EMIT_USER_MAIN( true );
         // endof class
         BLOCK_CLOSE; 
 

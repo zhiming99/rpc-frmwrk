@@ -26,17 +26,27 @@ abstract public class JavaRpcService implements IRpcService
     public void setError( int iError )
     { m_iError = iError; }
 
-    public InstType getInst() { return m_oInst; }
+    public InstType getInst()
+    { return m_oInst; }
+
+    public void setInst( InstType oInst )
+    { m_oInst = oInst; }
 
     public int getState()
-    { return m_oInst.GetState(); }
+    {
+        InstType oInst = getInst();
+        if( oInst != null )
+            return oInst.GetState();
+        return RC.stateInvalid;
+    }
 
     public int start()
     {
-        if( m_oInst == null )
+        InstType oInst = getInst();
+        if( oInst == null )
             return -RC.EFAULT;
-        m_oInst.SetJavaHost( this );
-        int ret = m_oInst.Start();
+        oInst.SetJavaHost( this );
+        int ret = oInst.Start();
 
         if( ret < 0 )
         {
@@ -61,10 +71,11 @@ abstract public class JavaRpcService implements IRpcService
 
     public int stop()
     {
-        if( m_oInst == null )
-            return 0;
-        m_oInst.RemoveJavaHost();
-        return m_oInst.Stop();
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        oInst.RemoveJavaHost();
+        return oInst.Stop();
     }
 
     public void timerCallback(
@@ -85,7 +96,14 @@ abstract public class JavaRpcService implements IRpcService
     public JRetVal addTimer( int timeoutSec,
         Object callback,  Object context )
     {
-        Object jret = m_oInst.AddTimer(
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+        Object jret = oInst.AddTimer(
             timeoutSec, callback, context );
         return ( JRetVal )jret;
     }
@@ -94,7 +112,11 @@ abstract public class JavaRpcService implements IRpcService
     */
     public int disableTimer( ObjPtr timerObj )
     {
-        return m_oInst.DisableTimer( timerObj );
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+
+        return oInst.DisableTimer( timerObj );
     }
 
     /* attach a complete notification to the task
@@ -109,10 +131,14 @@ abstract public class JavaRpcService implements IRpcService
         ICancelNotify callback,
         Object[] listArgs )
     {
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+
         JRetVal jret = new JRetVal();
         for( Object i : listArgs )
             jret.addElem( i );
-        return m_oInst.InstallCancelNotify(
+        return oInst.InstallCancelNotify(
             task, callback, jret );
     }
 
@@ -227,7 +253,15 @@ abstract public class JavaRpcService implements IRpcService
             o = ( ObjPtr )jret.getAt( 0 );
         }
 
-        jret = ( JRetVal )m_oInst.StartStream( o );
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+
+        jret = ( JRetVal )oInst.StartStream( o );
 
         if( jret == null )
         {
@@ -239,12 +273,18 @@ abstract public class JavaRpcService implements IRpcService
 
     public int closeStream( long hChannel )
     {
-        return m_oInst.CloseStream( hChannel );
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.CloseStream( hChannel );
     }
 
     public int writeStream( long hChannel, byte[] pBuf )
     {
-        return m_oInst.WriteStream( hChannel, pBuf );
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.WriteStream( hChannel, pBuf );
     }
 
     public void onWriteStreamComplete( int iRet,
@@ -274,19 +314,28 @@ abstract public class JavaRpcService implements IRpcService
     public int writeStreamAsync( long hChannel,
         byte[] pBuf, IAsyncRespCb callback )
     {
-        return m_oInst.WriteStreamAsync(
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.WriteStreamAsync(
             hChannel, pBuf, callback );
     }
 
     public int writeStreamAsync( long hChannel, byte[] pBuf )
     {
-        return m_oInst.WriteStreamAsync(
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.WriteStreamAsync(
             hChannel, pBuf, m_oWriteStmCallback );
     }
 
     public int writeStreamNoWait( long hChannel, byte[] pBuf )
     {
-        return m_oInst.WriteStreamNoWait( hChannel, pBuf );
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.WriteStreamNoWait( hChannel, pBuf );
     }
 
     /* ReadStream to read `size' bytes from the
@@ -306,14 +355,28 @@ abstract public class JavaRpcService implements IRpcService
     */
     public JRetVal readStream( long hChannel )
     {
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
         return ( JRetVal )
-            m_oInst.ReadStream( hChannel, 0 );
+            oInst.ReadStream( hChannel, 0 );
     }
 
     public JRetVal readStream( long hChannel, int size )
     {
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
         return ( JRetVal )
-            m_oInst.ReadStream( hChannel, size );
+            oInst.ReadStream( hChannel, size );
     }
 
     /*
@@ -366,14 +429,28 @@ abstract public class JavaRpcService implements IRpcService
 
     public JRetVal readStreamAsync( long hChannel, int size )
     {
-        return ( JRetVal )m_oInst.ReadStreamAsync(
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+        return ( JRetVal )oInst.ReadStreamAsync(
             hChannel, m_oReadStmCallback, size );
     }
 
     public JRetVal readStreamAsync( long hChannel,
         int size, IAsyncRespCb callback )
     {
-        return ( JRetVal )m_oInst.ReadStreamAsync(
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+        return ( JRetVal )oInst.ReadStreamAsync(
             hChannel, callback, size );
     }
     /*
@@ -384,8 +461,15 @@ abstract public class JavaRpcService implements IRpcService
      */
     public JRetVal readStreamNoWait( long hChannel)
     {
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
         return ( JRetVal )
-            m_oInst.ReadStreamNoWait( hChannel );
+            oInst.ReadStreamNoWait( hChannel );
     }
 
     /* event called when the stream `hChannel' is
@@ -704,7 +788,10 @@ abstract public class JavaRpcService implements IRpcService
     public int deferCall(
         IDeferredCall callback, Object[] args )
     {
-        return m_oInst.DeferCall( callback, args );
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.DeferCall( callback, args );
     }
 
     public void deferCallback(
@@ -721,19 +808,32 @@ abstract public class JavaRpcService implements IRpcService
     public int setChanCtx(
         long hChannel, Object pCtx)
     {
-        return m_oInst.SetChanCtx(
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.SetChanCtx(
             hChannel, pCtx );
     }
 
     public int removeChanCtx(
         long hChannel )
     {
-        return m_oInst.RemoveChanCtx( hChannel );
+        InstType oInst = getInst();
+        if( oInst == null )
+            return -RC.EFAULT;
+        return oInst.RemoveChanCtx( hChannel );
     }
 
     public JRetVal getChanCtx( long hChannel )
     {
-        return ( JRetVal )m_oInst.GetChanCtx(
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+        return ( JRetVal )oInst.GetChanCtx(
             hChannel );
     }
 }
