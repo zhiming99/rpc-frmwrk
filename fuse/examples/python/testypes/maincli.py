@@ -228,13 +228,24 @@ def test() :
                 raise Exception( 'EchoStream %s failed with error %d' % ( num, error ) )
             else :
                 inputs = [stmfp]
-                notifylist = select.select( inputs, [], [] )
-                binBuf = stmfp.read(8*1024)
+                bMissed = False
+                binBuf = bytearray()
+                while len( binBuf ) < 8*1024:
+                    if select.select( inputs, [], [], 10 )[0]:
+                        binBuf = stmfp.read(8*1024)
+                    else:
+                        newBuf = stmfp.read(8*1024)
+                        binBuf.extend(newBuf)
+                        bMissed = True
+
             print( os.getpid(), "EchoStream resp=", objResp )
             hstmr = objResp[ 'Parameters']["hstmr"]
             bufsize = len( binBuf )
             print(binBuf[ bufsize - 128 : bufsize ])
             print( os.getpid(), 'EchoStream %s completed with %s' % ( num, hstmr ))
+
+            if bMissed :
+                raise Exception( "[Errno 14] select did not catch the incoming data")
             break
         
         reqfp.close()
