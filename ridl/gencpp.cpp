@@ -6942,7 +6942,7 @@ gint32 CImplMainFunc::EmitInitContext(
             if( !bProxy || bFuse )
             {
                 Wa( "static std::string g_strMPoint;" );
-                Wa( "extern gint32 AddFilesAndDirs(" );
+                Wa( "extern \"C\" gint32 AddFilesAndDirs(" );
                 Wa( "    bool bProxy, CRpcServices* pSvc );" );
             }
 #endif
@@ -6951,7 +6951,7 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
             NEW_LINE; 
             Wa( "namespace rpcf{" );
-            Wa( "extern gint32 CheckForKeyPass(" );
+            Wa( "extern \"C\" gint32 CheckForKeyPass(" );
             Wa( "    bool& bPrompt );" );
             Wa( "}" );
             EmitRtMainFunc( bProxy, m_pWriter );
