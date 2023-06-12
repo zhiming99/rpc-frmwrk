@@ -1342,19 +1342,15 @@ gint32 CRpcInterfaceBase::DoStop(
             ret = -EFAULT;
             break;
         }
-
+        pTask->MarkPending();
         ret = AppendAndRun( pTask );
         if( ERROR( ret ) )
-            break;
-
-        ret = pTask->GetError();
-        if( ret != STATUS_PENDING )
         {
             // the callback was not called
-            pCompletion->MarkPending( false );
             ( *pCompletion )( eventZero );
             ret = pCompletion->GetError();
         }
+        ret = pTask->GetError();
 
     }while( 0 );
 

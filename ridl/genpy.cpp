@@ -3107,6 +3107,158 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
 
     return ret;
 }
+
+
+gint32 CImplPyMainFunc::EmitProxySampleCode(
+    std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    do{
+        Wa( "'''" );
+        Wa( "adding your code here" );
+
+        std::vector< ObjPtr > vecIfs;
+        CServiceDecl* pSvc = vecSvcs[ 0 ];
+        pSvc->GetIfRefs( vecIfs );
+        if( vecIfs.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        auto& elem = vecIfs.front();
+        do{
+            CInterfRef* pIfRef = elem;
+            ObjPtr pObj;
+            ret = pIfRef->GetIfDecl( pObj );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                break;
+            }
+            CInterfaceDecl* pIf = pObj;
+            pObj = pIf->GetMethodList();
+            std::vector< ObjPtr > vecMethods;
+
+            CMethodDecls* pmds = pObj;
+            guint32 i = 0;
+            for( ; i < pmds->GetCount(); i++ )
+            {
+                ObjPtr pObj = pmds->GetChild( i );
+                vecMethods.push_back( pObj );
+            }
+            if( vecMethods.empty() )
+                break;
+
+            bool bHasEvent = false;
+            CMethodDecl* pmd = nullptr;
+            for( auto& elem : vecMethods )
+            {
+                pmd = vecMethods.front();
+                if( pmd->IsEvent() )
+                {
+                    pmd = nullptr;
+                    bHasEvent = true;
+                    continue;
+                }
+                break;
+            }
+
+            if( pmd != nullptr )
+            {
+                stdstr strMName = pmd->GetName();
+                std::vector< std::pair< stdstr, stdstr >> vecArgs;
+                ObjPtr pInArgs = pmd->GetInArgs();
+                guint32 dwInCount = GetArgCount( pInArgs );
+                if( dwInCount == 0 )
+                {
+                    Wa( "Calling a proxy method like" );
+                    CCOUT << "oProxy." << strMName << "()";
+                }
+                else
+                {
+                    ret = GetArgsAndSigs( pInArgs, vecArgs );
+                    if( ERROR( ret ) )
+                        break;
+
+                    Wa( "Calling a proxy method like" );
+                    CCOUT << "'oProxy." << strMName << "(";
+                    if( vecArgs.size() > 2 )
+                    {
+                        NEW_LINE;
+                        CCOUT << "    ";
+                    }
+                    else
+                    {
+                        CCOUT << " ";
+                    }
+                    for( int i = 0; i < vecArgs.size(); i++ )
+                    {
+                        auto& elem = vecArgs[ i ];
+                        CCOUT << elem.first;
+                        if( i < vecArgs.size() - 1 )
+                            CCOUT << ", ";
+                        else
+                            CCOUT << " )'";
+                    }
+                }
+            }
+            else if( bHasEvent )
+            {
+                Wa( "Just waiting and events will " );
+                Wa( "be handled in the background" );
+                NEW_LINE;
+                Wa( "import time" );
+                Wa( "while( oProxy.oInst.GetState() == cpp.stateConnected ):" );
+                CCOUT << "    time.sleep(1)";
+            }
+            NEW_LINE;
+
+        }while( 0 );
+
+        Wa( "'''" );
+    }while( 0 );
+    return ret;
+}
+
+
+#define EMIT_CALL_TO_USERMAIN( bProxy ) \
+do{ \
+    if( !bProxy ) \
+        Wa( "signal.signal( signal.SIGINT, SigHandler)" ); \
+    stdstr strSuffix; \
+    if( bProxy )\
+        strSuffix = "cli";\
+    else\
+        strSuffix = "svr";\
+    CCOUT << "ret = main" << strSuffix << "(";\
+    stdstr strPrefix;\
+    if( bProxy ) \
+        strPrefix = "oProxy"; \
+    else \
+        strPrefix = "oServer"; \
+    if( vecSvcs.size() == 1 ) \
+    { \
+        CCOUT << " " << strPrefix << " )"; \
+    } \
+    else for( int i = 0; i < vecSvcs.size(); i++ ) \
+    { \
+        if( i > 0 ) \
+            CCOUT << "    " << strPrefix \
+                << std::to_string( i ); \
+        else  \
+            CCOUT << " " << strPrefix; \
+        if( i < vecSvcs.size() - 1 ) \
+        { \
+            CCOUT << ","; \
+            NEW_LINE; \
+        } \
+        else \
+        { \
+            CCOUT << " )"; \
+        } \
+    } \
+}while( 0 )
 gint32 CImplPyMainFunc::OutputCli(
     std::vector< ObjPtr >& vecSvcs )
 {
@@ -3127,7 +3279,7 @@ gint32 CImplPyMainFunc::OutputCli(
             EmitUsage( true );
         }
         NEW_LINE;
-        CCOUT << "def maincli() :";
+        CCOUT << "def MainEntryCli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
         stdstr strModName = g_strAppName + "cli";
@@ -3252,110 +3404,7 @@ gint32 CImplPyMainFunc::OutputCli(
                     NEW_LINE;
             }
         }
-        NEW_LINE;
-        Wa( "'''" );
-        Wa( "adding your code here" );
-
-        std::vector< ObjPtr > vecIfs;
-        CServiceDecl* pSvc = vecSvcs[ 0 ];
-        pSvc->GetIfRefs( vecIfs );
-        if( vecIfs.empty() )
-        {
-            ret = -ENOENT;
-            break;
-        }
-
-        auto& elem = vecIfs.front();
-        do{
-            CInterfRef* pIfRef = elem;
-            ObjPtr pObj;
-            ret = pIfRef->GetIfDecl( pObj );
-            if( ERROR( ret ) )
-            {
-                ret = 0;
-                break;
-            }
-            CInterfaceDecl* pIf = pObj;
-            pObj = pIf->GetMethodList();
-            std::vector< ObjPtr > vecMethods;
-
-            CMethodDecls* pmds = pObj;
-            guint32 i = 0;
-            for( ; i < pmds->GetCount(); i++ )
-            {
-                ObjPtr pObj = pmds->GetChild( i );
-                vecMethods.push_back( pObj );
-            }
-            if( vecMethods.empty() )
-                break;
-
-            bool bHasEvent = false;
-            CMethodDecl* pmd = nullptr;
-            for( auto& elem : vecMethods )
-            {
-                pmd = vecMethods.front();
-                if( pmd->IsEvent() )
-                {
-                    pmd = nullptr;
-                    bHasEvent = true;
-                    continue;
-                }
-                break;
-            }
-
-            if( pmd != nullptr )
-            {
-                stdstr strMName = pmd->GetName();
-                std::vector< std::pair< stdstr, stdstr >> vecArgs;
-                ObjPtr pInArgs = pmd->GetInArgs();
-                guint32 dwInCount = GetArgCount( pInArgs );
-                if( dwInCount == 0 )
-                {
-                    Wa( "Calling a proxy method like" );
-                    CCOUT << "oProxy." << strMName << "()";
-                }
-                else
-                {
-                    ret = GetArgsAndSigs( pInArgs, vecArgs );
-                    if( ERROR( ret ) )
-                        break;
-
-                    Wa( "Calling a proxy method like" );
-                    CCOUT << "'oProxy." << strMName << "(";
-                    if( vecArgs.size() > 2 )
-                    {
-                        NEW_LINE;
-                        CCOUT << "    ";
-                    }
-                    else
-                    {
-                        CCOUT << " ";
-                    }
-                    for( int i = 0; i < vecArgs.size(); i++ )
-                    {
-                        auto& elem = vecArgs[ i ];
-                        CCOUT << elem.first;
-                        if( i < vecArgs.size() - 1 )
-                            CCOUT << ", ";
-                        else
-                            CCOUT << " )'";
-                    }
-                }
-            }
-            else if( bHasEvent )
-            {
-                Wa( "Just waiting and events will " );
-                Wa( "be handled in the background" );
-                NEW_LINE;
-                Wa( "import time" );
-                Wa( "while( oProxy.oInst.GetState() == cpp.stateConnected ):" );
-                CCOUT << "    time.sleep(1)";
-            }
-            NEW_LINE;
-
-        }while( 0 );
-
-        Wa( "'''" );
+        EMIT_CALL_TO_USERMAIN( true );
         INDENT_DOWNL;
         if( vecSvcs.size() == 1 )
         {
@@ -3382,54 +3431,125 @@ gint32 CImplPyMainFunc::OutputCli(
         Wa( "oContext = None" );
         Wa( "return ret" );
         INDENT_DOWNL;
-        Wa( "ret = maincli()" );
-        Wa( "quit( -ret )" );
+        EmitDefineUserMain( vecSvcs, true );
+        Wa( "if __name__ == '__main__' :" );
+        Wa( "    ret = MainEntryCli()" );
+        Wa( "    quit( -ret )" );
+
 
     }while( 0 );
 
     return ret;
 }
-#define EMIT_MAINLOOP_SVR \
-do{ \
-    Wa( "signal.signal( signal.SIGINT, SigHandler)" ); \
-    Wa( "'''" ); \
-    Wa( "made change to the following code" ); \
-    Wa( "snippet for your own purpose" ); \
-    Wa( "'''" ); \
-    Wa( "global bExit" ); \
-    if( vecSvcs.size() == 1 ) \
-    { \
-        Wa( "while ( cpp.stateConnected ==" ); \
-        Wa( "    oServer.oInst.GetState() ):" ); \
-    } \
-    else \
-    { \
-        CCOUT << "while("; \
-        INDENT_UPL; \
-        for( int i = 0; i < vecSvcs.size(); ++i ) \
-        { \
-            stdstr strVar = "oServer"; \
-            if( i > 0 ) \
-                strVar += std::to_string( i ); \
-            CCOUT << "cpp.stateConnected == " \
-                << strVar << ".oInst.GetState()"; \
-            if( i < vecSvcs.size() - 1 ) \
-            { \
-                CCOUT << " and"; \
-                NEW_LINE; \
-            } \
-            else \
-            { \
-                NEW_LINE; \
-                CCOUT << "):"; \
-                INDENT_DOWNL; \
-            } \
-        } \
-    } \
-    Wa( "    time.sleep( 1 )" ); \
-    Wa( "    if bExit:" ); \
-    CCOUT << "        break"; \
-}while( 0 );
+
+gint32 CImplPyMainFunc::EmitDefineUserMain( 
+    std::vector< ObjPtr >& vecSvcs,
+    bool bProxy )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPrefix, strSuffix;
+        Wa( "#------customize the method below for your own purpose----" ); \
+        if( bProxy )
+        {
+            CCOUT << "def maincli( ";
+            strPrefix = "oProxy";
+            strSuffix = "Proxy";
+        }
+        else
+        {
+            CCOUT << "def mainsvr( ";
+            strPrefix = "oServer";
+            strSuffix = "Server";
+        }
+        INDENT_UPL;
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strSvcName = pSvc->GetName();
+            CCOUT << strPrefix << ": C" 
+                << strSvcName << strSuffix
+                << " ) -> int:";
+        }
+        else for( int i = 0; i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            stdstr strSvcName = pSvc->GetName();
+            stdstr strVar = strPrefix;
+            if( i > 0 )
+                strVar += std::to_string( i );
+            CCOUT << strVar << ": C" 
+                << strSvcName << strSuffix;
+
+            if( i < vecSvcs.size() - 1 )
+            {
+                CCOUT << ",";
+                NEW_LINE;
+            }
+            else
+            {
+                CCOUT << " ) -> int:";
+            }
+        }
+        NEW_LINE;
+        if( bProxy )
+            EmitProxySampleCode( vecSvcs );
+        else
+            EmitMainloopServer( vecSvcs );
+        Wa( "return 0" );
+        INDENT_DOWNL;
+
+    }while( 0 );
+
+    return ret;
+
+}
+
+gint32 CImplPyMainFunc::EmitMainloopServer( 
+    std::vector< ObjPtr >& vecSvcs )
+{
+    do{
+        Wa( "'''" );
+        Wa( "make change to the following code" );
+        Wa( "snippet for your own purpose" );
+        Wa( "'''" );
+        Wa( "global bExit" );
+        if( vecSvcs.size() == 1 )
+        {
+            Wa( "while ( cpp.stateConnected ==" );
+            Wa( "    oServer.oInst.GetState() ):" );
+        }
+        else
+        {
+            CCOUT << "while(";
+            INDENT_UPL;
+            for( int i = 0; i < vecSvcs.size(); ++i )
+            {
+                stdstr strVar = "oServer";
+                if( i > 0 )
+                    strVar += std::to_string( i );
+                CCOUT << "cpp.stateConnected == "
+                    << strVar << ".oInst.GetState()";
+                if( i < vecSvcs.size() - 1 )
+                {
+                    CCOUT << " and";
+                    NEW_LINE;
+                }
+                else
+                {
+                    NEW_LINE;
+                    CCOUT << "):";
+                    INDENT_DOWNL;
+                }
+            }
+        }
+        Wa( "    time.sleep( 1 )" );
+        Wa( "    if bExit:" );
+        CCOUT << "        break";
+        NEW_LINE;
+    }while( 0 );
+    return 0;
+}
 
 #define EMIT_SIGHANDLER \
 do{ \
@@ -3465,7 +3585,7 @@ gint32 CImplPyMainFunc::OutputSvr(
 
         EMIT_SIGHANDLER;
 
-        CCOUT << "def mainsvr() :";
+        CCOUT << "def MainEntrySvr() :";
         INDENT_UPL;
         Wa( "ret = 0" );
         stdstr strModName = g_strAppName + "svr";
@@ -3570,15 +3690,15 @@ gint32 CImplPyMainFunc::OutputSvr(
             Wa( "        sys.argv[ 0 ], params[ 'MountPoint' ] );" );
             CCOUT << "else :";
             INDENT_UPL;
-            EMIT_MAINLOOP_SVR;
+            EMIT_CALL_TO_USERMAIN( false );
             INDENT_DOWN;
         }
         else
         {
-            EMIT_MAINLOOP_SVR;
+            EMIT_CALL_TO_USERMAIN( false );
         }
 #else
-        EMIT_MAINLOOP_SVR;
+        EMIT_CALL_TO_USERMAIN( false );
 #endif
         INDENT_DOWNL;
         Wa( "print( \"Server loop ended...\" )" );
@@ -3607,8 +3727,11 @@ gint32 CImplPyMainFunc::OutputSvr(
         Wa( "return ret" );
         INDENT_DOWNL;
 
-        Wa( "ret = mainsvr()" );
-        Wa( "quit( -ret )" );
+        EmitDefineUserMain( vecSvcs, false );
+
+        Wa( "if __name__ == '__main__' :" );
+        Wa( "    ret = MainEntrySvr()" );
+        Wa( "    quit( -ret )" );
 
     }while( 0 );
 
@@ -3696,8 +3819,8 @@ gint32 CExportPyReadme::Output_en()
 
         CCOUT << "* **maincli.py**, **mainsvr.py**: "
             << "Containing defintion of `maincli()` function for client, as the main "
-            << "entry for client program "
-            << "and definition of `mainsvr()` function server program respectively. ";
+            << "entry point for client program "
+            << "and definition of `mainsvr()` function for server program respectively. ";
         NEW_LINE;
         CCOUT << "And you can make changes to the files to customize the program. "
             << "The `ridlc` will not touch them if they exist in the project directory, "

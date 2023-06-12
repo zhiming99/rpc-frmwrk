@@ -366,6 +366,13 @@ class CImplPyMainFunc :
         std::vector< ObjPtr >& vecSvcs );
     gint32 EmitGetOpt( bool bProxy );
     gint32 EmitUsage( bool bProxy );
+    gint32 EmitMainloopServer( 
+        std::vector< ObjPtr >& vecSvcs );
+    gint32 EmitProxySampleCode( 
+        std::vector< ObjPtr >& vecSvcs );
+    gint32 EmitDefineUserMain( 
+        std::vector< ObjPtr >& vecSvcs,
+        bool bProxy );
 };
 
 class CExportPyReadme :

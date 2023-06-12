@@ -4285,12 +4285,18 @@ do{ \
             strSvcName += "svr"; \
         else \
             strSvcName += "cli"; \
-        Wa( "ret = userMain(" ); \
+        if( bSvr ) \
+            Wa( "ret = mainsvr(" ); \
+        else \
+            Wa( "ret = maincli(" ); \
         CCOUT << "    ( " << strSvcName << " )oSvc );"; \
     } \
     else  \
     { \
-        Wa( "ret = userMain(" ); \
+        if( bSvr ) \
+            Wa( "ret = mainsvr(" ); \
+        else \
+            Wa( "ret = maincli(" ); \
         for( int i = 0; i < vecSvcs.size(); i++ ) \
         { \
             CServiceDecl* pSvc = vecSvcs[ i ]; \
@@ -4345,7 +4351,10 @@ do{ \
 #define EMIT_USER_MAIN( bSvr ) \
 do{ \
     Wa( "// ------customize this method for your own purpose----" ); \
-    CCOUT << "public static int userMain("; \
+    if( bSvr ) \
+        CCOUT << "public static int mainsvr("; \
+    else \
+        CCOUT << "public static int maincli("; \
     INDENT_UPL \
     if( vecSvcs.size() == 1 ) \
     { \
