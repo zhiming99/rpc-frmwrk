@@ -1,4 +1,8 @@
 ---
+[`Mon Jun 12 2023 10:11:46 PM Beijing`]   
+1. We have almose finished adding fastrpc and built-in router support to both Python and Java. The remaining work is to fix some bugs and make it stable.
+2. The haunting `EchoMany response lost` issue is reopened. There is still an unknown bug in the rpcfs module.
+
 [`Fri Jun 02 2023 03:28:02 PM Beijing`]    
 1. Now Python has been enabled fastrpc and built-in router support. That is, Python can have a performance of around 500us with some configuration.
 2. Next I will make Java to have the two features.
