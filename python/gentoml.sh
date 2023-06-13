@@ -16,7 +16,7 @@ if [ "x${ARMBUILD}" == "x1" ]; then
 fi
 if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then
     echo generate python extention package with debug infomation
-    sed -i "s:ZZZZZ:,\"-O0\", \"-ggdb\":" pyproject.toml
+    sed -i "s:ZZZZZ:,\"-O0\", \"-ggdb\", \"-DDEBUG\", \"-UNDEBUG\":" pyproject.toml
 else
     echo generate release version of python extention package 
     sed -i "s:ZZZZZ::" pyproject.toml

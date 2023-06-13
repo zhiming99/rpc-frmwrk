@@ -1069,7 +1069,8 @@ gint32 CRpcInterfaceBase::QueueStopTask(
             break;
 
         CIfRetryTask* pRetry = pStopTask; 
-        pRetry->SetClientNotify( pCallback );
+        if( pCallback != nullptr )
+            pRetry->SetClientNotify( pCallback );
 
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = pMgr->AddSeqTask( pStopTask );
@@ -1347,8 +1348,8 @@ gint32 CRpcInterfaceBase::DoStop(
         if( ERROR( ret ) )
         {
             // the callback was not called
-            ( *pCompletion )( eventZero );
-            ret = pCompletion->GetError();
+            ( *pTask )( eventCancelTask );
+            break;
         }
         ret = pTask->GetError();
 
