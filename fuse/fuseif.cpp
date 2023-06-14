@@ -201,7 +201,6 @@ void CFuseObjBase::SetPollHandle(
 
 void CFuseObjBase::NotifyPoll()
 {
-    CFuseMutex oFileLock( GetLock() );
     fuse_pollhandle* ph = GetPollHandle();
     if( ph != nullptr )
     {
@@ -1656,7 +1655,9 @@ gint32 CFuseEvtFile::fs_poll(
     gint32 ret = 0;
     do{
         CFuseMutex oLock( GetLock() );
-        SetPollHandle( ph );
+        if( ph != nullptr )
+            SetPollHandle( ph );
+
         if( m_queIncoming.size() > 0 )
             *reventsp |= POLLIN;
 
@@ -1762,7 +1763,7 @@ gint32 CFuseStmFile::fs_open(
 
     fi->direct_io = 1;
     fi->keep_cache = 0;
-    fi->nonseekable = 0;
+    fi->nonseekable = 1;
     fi->fh = ( intptr_t )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;
@@ -1786,8 +1787,6 @@ gint32 CFuseStmFile::fs_ioctl(
                 guint32* pSize = ( guint32* )data;
 
                 *pSize = GetBytesAvail();
-                oLock.Unlock();
-
                 guint32 dwSize = 0;
                 InterfPtr pIf = GetIf();
                 CStreamServerFuse* pSvr = pIf;
@@ -1921,6 +1920,7 @@ gint32 CFuseStmFile::OnReadStreamComplete(
 }
 
 gint32 CFuseStmFile::FillIncomingQue(
+    guint32 dwAvail,
     std::vector<INBUF>& vecIncoming )
 {
     gint32 ret = 0;
@@ -1945,6 +1945,12 @@ gint32 CFuseStmFile::FillIncomingQue(
         if( ERROR( ret ) )
             break;
         
+        dwSize = std::min( dwSize,
+            STM_MAX_PENDING_WRITE - dwAvail );
+
+        size_t dwQueSize = MAX_STM_QUE_SIZE -
+            m_queIncoming.size(); 
+
         while( dwSize > 0 )
         {
             BufPtr pBuf;
@@ -1961,11 +1967,20 @@ gint32 CFuseStmFile::FillIncomingQue(
             if( ERROR( ret ) )
                 break;
 
-            dwSize -= pBuf->size();
             vecIncoming.push_back( { pBuf, 0, 0 } );
+            if( dwSize > pBuf->size() )
+                dwSize -= pBuf->size();
+            else
+                break;
+
+            if( vecIncoming.size() == dwQueSize )
+                break;
         }
 
     }while( 0 );
+
+    if( vecIncoming.size() )
+        return 0;
 
     return ret;
 }
@@ -1987,12 +2002,14 @@ void CFuseStmFile::FillAndNotify( bool bNotify )
         return;
     }
 
-    FillIncomingQue( vecIncoming );
-    auto endPos = m_queIncoming.end();
+    FillIncomingQue( dwAvail, vecIncoming );
     if( vecIncoming.size() )
+    {
+        auto endPos = m_queIncoming.end();
         m_queIncoming.insert( endPos,
             vecIncoming.begin(),
             vecIncoming.end());
+    }
     if( m_queIncoming.size() && bNotify )
         NotifyPoll();
     return;
@@ -2315,7 +2332,9 @@ gint32 CFuseStmFile::fs_poll(
         // interface when 'select' is about to wait.
         FillAndNotify( false );
         bool bCanSend = !GetFlowCtrl();
-        SetPollHandle( ph );
+        if( ph != nullptr )
+            SetPollHandle( ph );
+
         if( m_queIncoming.size() > 0 )
             *reventsp |= POLLIN;
 
@@ -3463,7 +3482,9 @@ gint32 CFuseReqFileProxy::fs_poll(
     do{
         CFuseMutex oLock( GetLock() );
 
-        SetPollHandle( ph );
+        if( ph != nullptr )
+            SetPollHandle( ph );
+
         if( m_queIncoming.size() )
             *reventsp |= POLLIN;
 

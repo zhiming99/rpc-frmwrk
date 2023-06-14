@@ -405,9 +405,7 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
 
         // remove the timer if any
         if( pIrp->HasTimer() )
-        {
-            GetUtils().GetTimerSvc().RemoveTimer( pIrp->m_iTimerId );
-        }
+            pIrp->RemoveTimer();
 
         pIrp->SetState(
             IRP_STATE_COMPLETING, IRP_STATE_COMPLETED );

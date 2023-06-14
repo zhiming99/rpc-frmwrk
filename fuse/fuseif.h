@@ -959,6 +959,7 @@ class CFuseStmFile : public CFuseFileEntry
     gint32 SendBufVec( fuse_bufvec* bufvec );
 
     gint32 FillIncomingQue(
+        guint32 dwAvail,
         std::vector<INBUF>& vecIncoming );
     sem_t m_semFlowCtrl;
 

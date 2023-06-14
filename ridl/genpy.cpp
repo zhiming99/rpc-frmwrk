@@ -3224,8 +3224,6 @@ gint32 CImplPyMainFunc::EmitProxySampleCode(
 
 #define EMIT_CALL_TO_USERMAIN( bProxy ) \
 do{ \
-    if( !bProxy ) \
-        Wa( "signal.signal( signal.SIGINT, SigHandler)" ); \
     stdstr strSuffix; \
     if( bProxy )\
         strSuffix = "cli";\
@@ -3259,6 +3257,17 @@ do{ \
         } \
     } \
 }while( 0 )
+
+#define EMIT_SIGHANDLER \
+do{ \
+    Wa( "import signal" ); \
+    Wa( "bExit = False" ); \
+    Wa( "def SigHandler( signum, frame ):" ); \
+    Wa( "    global bExit" ); \
+    Wa( "    bExit = True" ); \
+    NEW_LINE; \
+}while( 0 )
+
 gint32 CImplPyMainFunc::OutputCli(
     std::vector< ObjPtr >& vecSvcs )
 {
@@ -3279,9 +3288,12 @@ gint32 CImplPyMainFunc::OutputCli(
             EmitUsage( true );
         }
         NEW_LINE;
+        EMIT_SIGHANDLER;
+
         CCOUT << "def MainEntryCli() :";
         INDENT_UPL;
         Wa( "ret = 0" );
+        Wa( "signal.signal( signal.SIGINT, SigHandler)" );
         stdstr strModName = g_strAppName + "cli";
         if( g_bRpcOverStm && !g_bBuiltinRt )
         {
@@ -3376,13 +3388,18 @@ gint32 CImplPyMainFunc::OutputCli(
         }
 
         INDENT_UPL;
+        Wa( "global bExit" );
+        CCOUT << "try:";
+        INDENT_UPL;
         if( vecSvcs.size() == 1 )
         {
             Wa( "state = oProxy.oInst.GetState()" );
             Wa( "while state == cpp.stateRecovery :" );
             Wa( "    time.sleep( 1 )" );
             Wa( "    state = oProxy.oInst.GetState()" );
-            Wa( "if state != cpp.stateConnected :" );
+            Wa( "    if bExit:" );
+            Wa( "        break" );
+            Wa( "if state != cpp.stateConnected or bExit:" );
             Wa( "    return ErrorCode.ERROR_STATE" );
         }
         else
@@ -3398,13 +3415,18 @@ gint32 CImplPyMainFunc::OutputCli(
                 Wa( "    time.sleep( 1 )" );
                 CCOUT << "    state = "<< strVar << ".oInst.GetState()";
                 NEW_LINE;
-                Wa( "if state != cpp.stateConnected :" );
+                Wa( "    if bExit:" );
+                Wa( "        break" );
+                Wa( "if state != cpp.stateConnected or bExit:" );
                 Wa( "    return ErrorCode.ERROR_STATE" );
                 if( i < vecSvcs.size() - 1 )
                     NEW_LINE;
             }
         }
         EMIT_CALL_TO_USERMAIN( true );
+        INDENT_DOWNL;
+        Wa( "except Exception as err:" );
+        Wa( "    print( err )" );
         INDENT_DOWNL;
         if( vecSvcs.size() == 1 )
         {
@@ -3551,16 +3573,6 @@ gint32 CImplPyMainFunc::EmitMainloopServer(
     return 0;
 }
 
-#define EMIT_SIGHANDLER \
-do{ \
-    Wa( "import signal" ); \
-    Wa( "bExit = False" ); \
-    Wa( "def SigHandler( signum, frame ):" ); \
-    Wa( "    global bExit" ); \
-    Wa( "    bExit = True" ); \
-    NEW_LINE; \
-}while( 0 )
-
 gint32 CImplPyMainFunc::OutputSvr(
     std::vector< ObjPtr >& vecSvcs )
 {
@@ -3588,6 +3600,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         CCOUT << "def MainEntrySvr() :";
         INDENT_UPL;
         Wa( "ret = 0" );
+        Wa( "signal.signal( signal.SIGINT, SigHandler)" );
         stdstr strModName = g_strAppName + "svr";
         if( g_bRpcOverStm && !g_bBuiltinRt )
         {
@@ -3682,12 +3695,14 @@ gint32 CImplPyMainFunc::OutputSvr(
         }
 
         INDENT_UPL;
+        CCOUT << "try:";
+        INDENT_UPL;
 #ifdef FUSE3
         if( g_bBuiltinRt )
         {
             Wa( "if bMount:" );
             Wa( "    fuseif_mainloop(" );
-            Wa( "        sys.argv[ 0 ], params[ 'MountPoint' ] );" );
+            Wa( "        sys.argv[ 0 ], params[ 'MountPoint' ] )" );
             CCOUT << "else :";
             INDENT_UPL;
             EMIT_CALL_TO_USERMAIN( false );
@@ -3700,6 +3715,9 @@ gint32 CImplPyMainFunc::OutputSvr(
 #else
         EMIT_CALL_TO_USERMAIN( false );
 #endif
+        INDENT_DOWNL;
+        Wa( "except Exception as err:" );
+        Wa( "    print( err )" );
         INDENT_DOWNL;
         Wa( "print( \"Server loop ended...\" )" );
         if( vecSvcs.size() == 1 )

@@ -419,6 +419,7 @@ gint32 CPortState::PopState( guint32& dwState )
             m_pResume.Clear();
 
             IrpPtr pIrp = m_pExclIrp;
+            m_pExclIrp.Clear();
 
             // whether or not STOP_RESUME or
             // BUSY_RESUME, we will determine it

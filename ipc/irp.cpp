@@ -135,47 +135,25 @@ void IRP_CONTEXT::SetStatus( gint32 iStatus )
 
 gint32 IRP_CONTEXT::SetExtBuf( const BufPtr& bufPtr )
 {
-    gint32 ret = 0;
-    try{
-        // make a content copy
-        m_pExtBuf = bufPtr;
-    }
-    catch( std::invalid_argument& e )
-    {
-        ret = -EINVAL;
-    }
-    return ret;
+    m_pExtBuf = bufPtr;
+    return 0;
 }
 
 gint32 IRP_CONTEXT::SetReqData( const BufPtr& bufPtr )
 {
-    gint32 ret = 0;
-    try{
-       m_pReqData = bufPtr;
-    }
-    catch( std::invalid_argument& e )
-    {
-       ret = -EINVAL; 
-    }
-    return ret;
+    m_pReqData = bufPtr;
+    return 0;
 }
 
 gint32 IRP_CONTEXT::SetRespData( const BufPtr& bufPtr )
 {
-    gint32 ret = 0;
-    try{
-        if( bufPtr.IsEmpty() )
-        {
-            m_pRespData.Clear();
-            return 0;
-        }
-        m_pRespData = bufPtr;
-    }
-    catch( std::invalid_argument& e )
+    if( bufPtr.IsEmpty() )
     {
-       ret = -EINVAL; 
+        m_pRespData.Clear();
+        return 0;
     }
-    return ret;
+    m_pRespData = bufPtr;
+    return 0;
 }
 
 gint32 IRP_CONTEXT::GetRespAsCfg( CfgPtr& pCfg )
