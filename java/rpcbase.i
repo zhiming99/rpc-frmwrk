@@ -1180,7 +1180,9 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             // create and start the router
             stdstr strRtName =
                 strAppName + "_Router";
-            pMgr->SetRouterName( strRtName );
+            pMgr->SetRouterName(
+                strRtName + "_" +
+                std::to_string( getpid() ) );
             stdstr strDescPath = "./router.json";
             if( bAuth )
             {
@@ -1193,6 +1195,8 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             oRtCfg.SetStrProp(
                 propSvrInstName, strRtName );
             oRtCfg.SetPointer( propIoMgr, pMgr );
+            pMgr->SetCmdLineOpt(
+                propSvrInstName, strRtName );
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
                 OBJNAME_ROUTER,

@@ -34,7 +34,7 @@
 #define MOD_CLIENT_NAME "StreamingClient"
 #define OBJNAME_ECHOCLIENT "CStreamingClient"               
 
-#define LOOP_COUNT  30000
+#define LOOP_COUNT  1000
 // Declare the class id for this object and declare the
 // iid for the interfaces we have implemented for this
 // object.

@@ -175,6 +175,9 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 
         oCfg[ propSvrInstName ] = MODULE_NAME;
         oCfg[ propIoMgr ] = m_pMgr;
+        CIoManager* pMgr = m_pMgr;
+        pMgr->SetCmdLineOpt(
+            propSvrInstName, MODULE_NAME );
         ret = CRpcServices::LoadObjDesc(
             strDescPath, OBJNAME_ROUTER, true,
             oCfg.GetCfg() );

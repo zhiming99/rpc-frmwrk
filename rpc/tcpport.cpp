@@ -4606,7 +4606,10 @@ gint32 CStmSockInvalStmNotifyTask::Process(
             DBUS_IF_NAME( IFNAME_TCP_BRIDGE ) );
 
         string strRtName;
-        pMgr->GetRouterName( strRtName );
+        ret = pMgr->GetCmdLineOpt(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
 
         if( !bAuth )
         {

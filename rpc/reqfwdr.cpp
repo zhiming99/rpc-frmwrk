@@ -3478,10 +3478,10 @@ gint32 CRpcReqForwarder::ForwardEvent(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oRtCfg( pRouter );
+        CCfgOpenerObj oIfCfg( this );
 
         string strRtName;
-        ret = oRtCfg.GetStrProp(
+        ret = oIfCfg.GetStrProp(
             propSvrInstName, strRtName );
         if( ERROR( ret ) )
             break;

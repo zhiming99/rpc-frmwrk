@@ -227,6 +227,8 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
             propSvrInstName, strRtName );
 
         oParams[ propIoMgr ] = m_pMgr;
+        pMgr->SetCmdLineOpt(
+            propSvrInstName, strRtName );
         ret = CRpcServices::LoadObjDesc(
             strDescPath,
             OBJNAME_ROUTER,
