@@ -51,27 +51,25 @@ class CPythonProxyBase :
         PyObject* tupleArgs,
         PyObject* tupleResp,
         guint32 dwSeriProto,
-        guint64& qwTaskCancel ) 
-    { return -ENOTSUP; }
+        guint64& qwTaskCancel ) = 0;
 
     virtual PyObject* PyProxyCall2(
         PyObject* pCb,
         PyObject* pContext,
         CfgPtr& pOptions,
         PyObject* listArgs,
-        PyObject* listResp )
-    { return Py_None; }
+        PyObject* listResp ) = 0;
 };
 
-DECLARE_AGGREGATED_PROXY(
-    CPythonProxy,
-    CStatCountersProxy,
-    CPythonProxyBase );
-
-DECLARE_AGGREGATED_SERVER(
-    CPythonServer,
-    CStatCountersServer,
-    CStreamServerAsync );
+class CPythonServerBase :
+    public CStreamServerAsync
+{
+    public:
+    typedef CStreamServerAsync super;
+    CPythonServerBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ), super( pCfg )
+    {}
+};
 
 template< class T >
 class CPythonInterfBase : public T
@@ -357,6 +355,7 @@ class CPythonInterfBase : public T
         PyObject* listResp )
     {
         gint32 ret = 0;
+        bool bByteArray = false;
         do{
             CParamList oResp( pResp );
 
@@ -515,6 +514,7 @@ class CPythonInterfBase : public T
                             break;
                         }
                         PyList_SetItem( listArgs, i, pByteArr );
+                        bByteArray = true;
                         break;
                     }
                 case typeDMsg:
@@ -542,6 +542,8 @@ class CPythonInterfBase : public T
             PyList_SetItem( listResp,
                 0, PyLong_FromLong( ret ) );
         }
+        else if( bByteArray )
+            return STATUS_MORE_PROCESS_NEEDED;
 
         return ret;
     }
@@ -1232,15 +1234,13 @@ class CPythonInterfBase : public T
             ret = oReqCtx.GetIntPtr( 0, ptrVal );
             if( ERROR( ret ) )
                 break;
-            PyObject* pPyCb =
-                ( PyObject* )ptrVal;
+            pPyCb = ( PyObject* )ptrVal;
 
             ret = oReqCtx.GetIntPtr( 1, ptrVal );
             if( ERROR( ret ) )
                 break;
 
-            PyObject* pPyResp =
-                ( PyObject* )ptrVal;  
+            pPyResp = ( PyObject* )ptrVal;  
 
             oReqCtx.GetIntProp( 3, dwReqProto );
 
@@ -1263,17 +1263,24 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
             {
                 // most likely there is a proto value
-                oResp.GetIntProp(
+                iRet = oResp.GetIntProp(
                     propSeriProto, dwSeriProto );
 
-                if( dwSeriProto != dwReqProto )
+                if( SUCCEEDED( iRet ) &&
+                    dwSeriProto != dwReqProto )
                 {
                     ret = -EBADMSG;
-                    DebugPrint( ret,
+                    DebugPrintEx( logErr, ret,
                         "proto not agree,"
                         " resp %d, req %d",
                         dwSeriProto, dwReqProto );
                     break;
+                }
+                else if( ERROR( iRet ) )
+                {
+                    // in case the request timedout or
+                    // other unexpected local errors
+                    dwSeriProto = dwReqProto;
                 }
 
                 PyObject* pRet =
@@ -1294,7 +1301,11 @@ class CPythonInterfBase : public T
                 PyObject* pRet = PyLong_FromLong( ret );
                 PyList_SetItem( pPyResp, 0, pRet );
                 if( SUCCEEDED( ret ) )
+                {
+                    // callback, no need to protect the
+                    // bytearray storage
                     FillList( pResp, pPyResp );
+                }
             }
 
             PyObject* pHost = nullptr;
@@ -1587,16 +1598,16 @@ class CPythonInterfBase : public T
     }
 };
 
-class CPythonProxyImpl :
-    public CPythonInterfBase< CPythonProxy >
+class CPythonProxy:
+    public CPythonInterfBase< CPythonProxyBase >
 {
     public:
-    typedef CPythonInterfBase< CPythonProxy > super;
-    CPythonProxyImpl( const IConfigDb* pCfg ) 
+    typedef CPythonInterfBase< CPythonProxyBase > super;
+    CPythonProxy( const IConfigDb* pCfg ) 
         : super::_MyVirtBase( pCfg ), super( pCfg )
-    { SetClassId( clsid( CPythonProxyImpl ) ); }
+    {}
 
-    gint32 AsyncCallVector(
+    virtual gint32 AsyncCallVector(
         IEventSink* pTask,
         CfgPtr& pOptions,
         CfgPtr& pResp,
@@ -1610,7 +1621,7 @@ class CPythonProxyImpl :
         PyObject* listArgs,
         PyObject* listResp,
         guint32 dwSeriProto,
-        guint64& qwTaskCancel );
+        guint64& qwTaskCancel ) override;
 
     gint32 PyProxyCallSync(
         const std::string& strIfName,
@@ -1624,14 +1635,19 @@ class CPythonProxyImpl :
         PyObject* pContext,
         CfgPtr& pOptions,
         PyObject* listArgs,
-        PyObject* listResp );
+        PyObject* listResp ) override;
 };
+
+DECLARE_AGGREGATED_PROXY(
+    CPythonProxyImpl,
+    CStatCountersProxy,
+    CPythonProxy );
 
 %End
 
 %ModuleCode
 
-gint32 CPythonProxyImpl::AsyncCallVector(
+gint32 CPythonProxy::AsyncCallVector(
     IEventSink* pTask,
     CfgPtr& pOptions,
     CfgPtr& pResp,
@@ -1702,7 +1718,7 @@ gint32 CPythonProxyImpl::AsyncCallVector(
     return ret;
 }
 
-gint32 CPythonProxyImpl::PyProxyCall(
+gint32 CPythonProxy::PyProxyCall(
     PyObject* pCb,
     const std::string& strIfName,
     const std::string& strMethod,
@@ -1737,7 +1753,7 @@ gint32 CPythonProxyImpl::PyProxyCall(
         {
             ret = NEW_PROXY_RESP_HANDLER2(
                 pWrapperCb, ObjPtr( this ),
-                &CPythonProxyImpl::OnAsyncCallResp,
+                &CPythonInterfBase::OnAsyncCallResp,
                 nullptr, oReqCtx.GetCfg() );
 
             if( ERROR( ret ) )
@@ -1836,6 +1852,16 @@ gint32 CPythonProxyImpl::PyProxyCall(
         if( ERROR( ret ) )
             break;
 
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+        {
+            CfgPtr* ppCfg = new CfgPtr( pRmtResp );
+            PyObject* pPyBufBak = sipConvertFromNewType(
+                ppCfg, sipType_cpp_CfgPtr, Py_None );
+            PyList_Append( listResp, pPyBufBak );
+            Py_DECREF( pPyBufBak );
+            ret = 0;
+        }
+
         qwTaskCancel = 0;
         
     }while( 0 );
@@ -1847,7 +1873,7 @@ gint32 CPythonProxyImpl::PyProxyCall(
     return ret;
 }
 
-PyObject* CPythonProxyImpl::PyProxyCall2(
+PyObject* CPythonProxy::PyProxyCall2(
     PyObject* pCb,
     PyObject* pContext,
     CfgPtr& pOptions,
@@ -1855,6 +1881,7 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
     PyObject* listResp )
 {
     gint32 ret = 0;
+    bool bIncRef = true;
     do{
         bool bSync = false;
         if( pCb == nullptr || pCb == Py_None )
@@ -1912,7 +1939,7 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
         {
             ret = NEW_PROXY_RESP_HANDLER2(
                 pWrapperCb, ObjPtr( this ),
-                &CPythonProxyImpl::OnAsyncCallResp,
+                &CPythonInterfBase::OnAsyncCallResp,
                 nullptr, oReqCtx.GetCfg() );
 
             if( ERROR( ret ) )
@@ -1974,8 +2001,10 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
             guint64 qwTaskCancel = 0;
             oResp.GetQwordProp(
                 propTaskId, qwTaskCancel );
+            listResp = PyList_New( 2 );
             PyList_SetItem( listResp, 1,
                 PyLong_FromLongLong( qwTaskCancel ) );
+            bIncRef = false;
             break;
         }
 
@@ -2011,21 +2040,34 @@ PyObject* CPythonProxyImpl::PyProxyCall2(
             ret = -EBADMSG;
             break;
         }
+
         ret = FillList( pRmtResp, listResp );
         if( ERROR( ret ) )
             break;
+
+        if( ret == STATUS_MORE_PROCESS_NEEDED )
+        {
+            CfgPtr* ppCfg = new CfgPtr( pRmtResp );
+            PyObject* pPyBufBak = sipConvertFromNewType(
+                ppCfg, sipType_cpp_CfgPtr, Py_None );
+            PyList_Append( listResp, pPyBufBak );
+            Py_DECREF( pPyBufBak );
+            ret = 0;
+        }
 
     }while( 0 );
 
     PyList_SetItem( listResp, 0,
         PyLong_FromLong( ret ) );
 
-    Py_INCREF( listResp );
+    // as a newly returned object
+    if( bIncRef )
+        Py_INCREF( listResp );
 
     return listResp;
 }
 
-gint32 CPythonProxyImpl::PyProxyCallSync(
+gint32 CPythonProxy::PyProxyCallSync(
     const std::string& strIfName,
     const std::string& strMethod,
     PyObject* listArgs,
@@ -2037,26 +2079,6 @@ gint32 CPythonProxyImpl::PyProxyCallSync(
         strIfName, strMethod, listArgs,
         listResp, dwSeriProto,
         qwTaskCancel );
-}
-
-static FactoryPtr InitClassFactory()
-{
-    BEGIN_FACTORY_MAPS;
-    INIT_MAP_ENTRYCFG( CPythonProxy );
-    INIT_MAP_ENTRYCFG( CPythonServer );
-    INIT_MAP_ENTRYCFG( CPythonProxyImpl );
-    INIT_MAP_ENTRYCFG( CPythonServerImpl );
-    END_FACTORY_MAPS;
-};
-
-extern "C"
-gint32 DllLoadFactory( FactoryPtr& pFactory )
-{
-    pFactory = InitClassFactory();
-    if( pFactory.IsEmpty() )
-        return -EFAULT;
-
-    return 0;
 }
 
 gint32 LoadThisLib( ObjPtr& pIoMgr )
@@ -2125,8 +2147,8 @@ class CPythonProxy :
 
     gint32 SetPyHost( PyObject* pObj );
     %MethodCode
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -2135,8 +2157,8 @@ class CPythonProxy :
 
     PyObject* GetPyHost();
     %MethodCode
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         PyObject* pObj = nullptr;
         sipRes = SIP_NULLPTR;
         if( pImpl != nullptr ) 
@@ -2144,14 +2166,17 @@ class CPythonProxy :
             gint32 ret = 
                 pImpl->GetPyHost( pObj );
             if( SUCCEEDED( ret ) )
+            {
                 sipRes = pObj;
+                Py_INCREF( pObj );
+            }
         }
     %End
 
     gint32 RemovePyHost();
     %MethodCode
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -2162,8 +2187,8 @@ class CPythonProxy :
         HANDLE& hChannel /Out/ );
     %MethodCode
         Py_BEGIN_ALLOW_THREADS;
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -2178,8 +2203,8 @@ class CPythonProxy :
     gint32 CloseStream( HANDLE hChannel );
     %MethodCode
         Py_BEGIN_ALLOW_THREADS;
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         if( pImpl == nullptr ) 
             sipRes = -EFAULT;
         else
@@ -2194,8 +2219,8 @@ class CPythonProxy :
         HANDLE hChannel, PyObject* pPyBuf );
     %MethodCode
     do{
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -2220,8 +2245,8 @@ class CPythonProxy :
         HANDLE hChannel, PyObject* pPyBuf );
     %MethodCode
     do{
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -2251,8 +2276,8 @@ class CPythonProxy :
 
     do{
 
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -2300,8 +2325,8 @@ class CPythonProxy :
     %MethodCode
     gint32 ret = 0;
     do{
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -2357,8 +2382,8 @@ class CPythonProxy :
     sipRes = pResp;
     gint32 ret = 0;
     do{
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
 
         if( pImpl == nullptr || a1 == nullptr ) 
         {
@@ -2437,8 +2462,8 @@ class CPythonProxy :
     %MethodCode
     do{
         sipRes = 0;
-        CPythonProxyImpl* pImpl = static_cast
-            < CPythonProxyImpl* >( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
 
         if( pImpl == nullptr ) 
         {
@@ -2491,9 +2516,8 @@ class CPythonProxy :
         PyObject* pCtx,
         cpp::ObjPtr& pTimer /Out/ );
     %MethodCode
-        CPythonProxyImpl* pImpl =
-        static_cast< CPythonProxyImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         sipRes = pImpl->AddTimer(
             a0, a1, a2, *a3 );
     %End
@@ -2501,9 +2525,8 @@ class CPythonProxy :
     gint32 DisableTimer(
         cpp::ObjPtr& pTimer );
     %MethodCode
-        CPythonProxyImpl* pImpl =
-        static_cast< CPythonProxyImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         sipRes = pImpl->DisableTimer( *a0 );
     %End
 
@@ -2513,18 +2536,16 @@ class CPythonProxy :
 
     HANDLE GetChanByIdHash( guint64 );
     %MethodCode
-        CPythonProxyImpl* pImpl =
-        static_cast< CPythonProxyImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         sipRes = pImpl->GetChanByIdHash( a0 );
     %End
 
     gint32 PyDeferCall( PyObject* pPyCb,
         PyObject* pPyArgs );
     %MethodCode
-        CPythonProxyImpl* pImpl =
-        static_cast< CPythonProxyImpl* >
-            ( sipCpp );
+        auto* pImpl = dynamic_cast
+            < CPythonProxy* >( sipCpp );
         sipRes = pImpl->PyDeferCall( a0, a1 );
     %End
 };
@@ -2558,10 +2579,19 @@ cpp::ObjPtr CreateProxy(
         if( ERROR( ret ) )
             break;
 
+        EnumClsid iClsid =
+            clsid( CPythonProxyImpl );
+        EnumClsid iStateClass = clsid( Invalid );
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.GetIntProp( propIfStateClass,
+            ( guint32& )iStateClass );
+        if( SUCCEEDED( ret ) &&
+            iStateClass == clsid( CFastRpcProxyState ) )
+            iClsid = clsid( CPythonProxyRosImpl );
+
         ObjPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CPythonProxyImpl ),
-            pCfg );
+        ret = pIf.NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
             break;
 
@@ -2574,7 +2604,8 @@ cpp::ObjPtr CreateProxy(
 
 gint32 LoadPyFactory( cpp::ObjPtr& pMgr );
 %MethodCode
-    sipRes = LoadThisLib( *a0 );
+    //sipRes = LoadThisLib( *a0 );
+    sipRes = 0;
 %End
 
 CPythonProxy* CastToProxy(

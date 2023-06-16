@@ -25,25 +25,25 @@ public class JRetVal {
     { m_listResp.add( pObj ); }
 
     public void AddElemInt( int val )
-    { m_listResp.add( new Integer( val ) ); }
+    { m_listResp.add( Integer.valueOf( val ) ); }
 
     public void AddElemByte( byte val )
-    { m_listResp.add( new Byte( val ) ); }
+    { m_listResp.add( Byte.valueOf( val ) ); }
 
     public void AddElemShort( short val )
-    { m_listResp.add( new Short( val ) ); }
+    { m_listResp.add( Short.valueOf( val ) ); }
 
     public void AddElemLong( long val )
-    { m_listResp.add( new Long( val ) ); }
+    { m_listResp.add( Long.valueOf( val ) ); }
 
     public void AddElemBool( boolean bval )
-    { m_listResp.add( new Boolean( bval ) ); }
+    { m_listResp.add( Boolean.valueOf( bval ) ); }
 
     public void AddElemFloat( float val )
-    { m_listResp.add( new Float( val ) ); }
+    { m_listResp.add( Float.valueOf( val ) ); }
 
     public void AddElemDouble( double val )
-    { m_listResp.add( new Double( val ) ); }
+    { m_listResp.add( Double.valueOf( val ) ); }
 
     public void clear()
     {

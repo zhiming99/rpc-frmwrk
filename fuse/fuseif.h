@@ -959,16 +959,9 @@ class CFuseStmFile : public CFuseFileEntry
     gint32 SendBufVec( fuse_bufvec* bufvec );
 
     gint32 FillIncomingQue(
+        guint32 dwAvail,
         std::vector<INBUF>& vecIncoming );
     sem_t m_semFlowCtrl;
-
-    gint32 fs_read_blocking(
-        const char* path,
-        fuse_file_info *fi,
-        fuse_req_t req, fuse_bufvec*& bufvec,
-        off_t off, size_t size,
-        std::vector< BufPtr >& vecBackup,
-        fuseif_intr_data* d );
 
     public:
 
@@ -1001,6 +994,8 @@ class CFuseStmFile : public CFuseFileEntry
     void SetStream( HANDLE hStream )
     { m_hStream = hStream; }
 
+    void FillAndNotify( bool bNotify = true );
+
     gint32 fs_open(
         const char *path,
         fuse_file_info *fi ) override;
@@ -1010,9 +1005,6 @@ class CFuseStmFile : public CFuseFileEntry
         gint32 iRet,
         BufPtr& pBuf,
         IConfigDb* pCtx );
-
-    gint32 StartNextRead( BufPtr& pRetBuf );
-    gint32 OnCompleteReadReq();
 
     gint32 OnWriteStreamComplete(
         HANDLE hStream,
@@ -1231,7 +1223,7 @@ class CFuseServicePoint :
     typedef typename IFBASE( bProxy ) _MyVirtBase;
     typedef typename IFBASE( bProxy ) super;
     CFuseServicePoint( const IConfigDb* pCfg ) :
-        super( pCfg ), m_dwGrpIdx( 1 )
+        super( pCfg ), m_dwGrpIdx( 0 )
     {
         clock_gettime(
             CLOCK_REALTIME, &m_tsStartTime );
@@ -1252,7 +1244,7 @@ class CFuseServicePoint :
     { return m_pSvcDir; }
 
     inline guint32 NewGroupId()
-    { return m_dwGrpIdx++; }
+    { return ++m_dwGrpIdx; }
 
     bool IsUnmounted() const
     { return m_bUnmounted; }
@@ -1295,8 +1287,8 @@ class CFuseServicePoint :
         return m_mapGroups.size();
     }
 
-    virtual void AddReqFiles(
-        const stdstr& strSuffix ) = 0;
+    virtual gint32 AddReqFiles(
+        const stdstr& strSurffix, DIR_SPTR& ) = 0;
 
     // build the directory hierarchy for this service
     gint32 BuildDirectories()
@@ -1333,7 +1325,10 @@ class CFuseServicePoint :
             m_pSvcDir->DecRef();
             pSvcDir->SetMode( S_IFDIR | S_IRWXU );
 
-            AddReqFiles( "0" );
+            DIR_SPTR pEnt;
+            ret = AddReqFiles( "0", pEnt );
+            if( ERROR( ret ) )
+                break;
 
             // add an RW directory for streams
             auto pStmDir =
@@ -1897,7 +1892,7 @@ class CFuseServicePoint :
 
             auto pStmFile = static_cast
                 < CFuseStmFile* >( pObj );
-            pStmFile->NotifyPoll();
+            pStmFile->FillAndNotify();
 
         }while( 0 );
 
@@ -2195,8 +2190,8 @@ class CFuseSvcProxy :
     inline gint32 OnStreamReadyFuse( HANDLE hStream )
     { return 0; }
 
-    void AddReqFiles(
-        const stdstr& strSuffix ) override;
+    gint32 AddReqFiles(
+        const stdstr& strSurffix, DIR_SPTR& ) override ;
 
     gint32 DoRmtModEventFuse(
         EnumEventId iEvent,
@@ -2252,8 +2247,8 @@ class CFuseSvcServer :
     virtual gint32 RemoveGroup(
         guint32 dwGrpId ) override;
 
-    void AddReqFiles(
-        const stdstr& strSuffix ) override;
+    gint32 AddReqFiles(
+        const stdstr& strSurffix, DIR_SPTR& ) override ;
 };
 
 struct FHCTX

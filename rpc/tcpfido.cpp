@@ -1131,7 +1131,11 @@ gint32 CRpcTcpFido::BuildSendDataMsg(
             break;
 
         string strRtName;
-        GetIoMgr()->GetRouterName( strRtName );
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->GetCmdLineOpt(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
 
         string strDest = DBUS_DESTINATION2( 
             strRtName, BRIDGE_NAME );

@@ -2434,7 +2434,10 @@ gint32 CStmPdoSvrOfflineNotifyTask::SendNotify()
         CReqBuilder oParams;
 
         std::string strRtName;
-        pMgr->GetRouterName( strRtName );
+        ret = pMgr->GetCmdLineOpt(
+            propSvrInstName, strRtName );
+        if( ERROR( ret ) )
+            break;
 
         oParams.SetIfName(
             DBUS_IF_NAME( IFNAME_TCP_BRIDGE ) );

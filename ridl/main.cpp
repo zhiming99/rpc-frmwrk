@@ -76,43 +76,44 @@ void Usage()
     printf( "\t compile the `ridl file'"
         "and output the RPC skelton files.\n" );
 
-    printf( "Options -h:\tTo print this help\n");
+    printf( "Options -h:\tTo print this help.\n");
 
     printf( "\t-I:\tTo specify the path to"
         " search for the included files.\n"
         "\t\tAnd this option can repeat many"
-        "times\n" );
+        "times.\n" );
 
     printf( "\t-O:\tTo specify the path for\n"
         "\t\tthe output files. 'output' is the \n"
-        "\t\tdefault path if not specified\n" );
+        "\t\tdefault path if not specified.\n" );
 
     printf( "\t-o:\tTo specify the file name as\n"
         "\t\tthe base of the target image. That is,\n"
         "\t\tthe <name>cli for client and <name>svr\n"
         "\t\tfor server. If not specified, the\n"
-        "\t\t'appname' from the ridl will be used\n" );
+        "\t\t'appname' from the ridl will be used.\n" );
 
 #ifdef PYTHON
-    printf( "\t-p:\tTo generate the Python skelton files\n" );
+    printf( "\t-p:\tTo generate the Python skelton files.\n" );
 #endif
 
 #ifdef JAVA
     printf( "\t-j:\tTo generate the Java skelton files\n" );
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
-    printf( "\t\tThis option is for Java only\n" );
+    printf( "\t\tThis option is for Java only.\n" );
 #endif
 
 #ifdef FUSE3
     printf( "\t-f:\tTo generate cpp skelton files for rpcfs\n" );
-    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs\n" );
+    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs.\n" );
 #endif
 
-    printf( "\t-b:\tTo output the skelton with built-in router\n" );
-    printf( "\t-l:\tTo output a shared library\n" );
+    printf( "\t-s:\tTo output the skelton with fastrpc support.\n" );
+    printf( "\t-b:\tTo output the skelton with built-in router.\n" );
+    printf( "\t-l:\tTo output a shared library.\n" );
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
-    printf( "\t\toption is for CPP project only\n" );
+    printf( "\t\toption is for CPP project only.\n" );
 }
 
 static std::string g_strOutPath = "output";
@@ -492,7 +493,7 @@ int main( int argc, char** argv )
             g_strTarget = g_strAppName;
 
         printf( "Generating files.. \n" );
-        if( bFuse || g_bRpcOverStm || g_strLang == "cpp" )
+        if( bFuse || g_strLang == "cpp" )
         {
             if( bFuse && g_strLang != "cpp" )
             {

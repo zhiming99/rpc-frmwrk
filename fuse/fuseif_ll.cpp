@@ -286,24 +286,34 @@ static void fuseif_ll_readdir(
 {
     dirbuf dbuf;
     dbuf.req = req;
-
-    gint32 ret = SafeCall(
-        "readdir", false,
-        &CFuseObjBase::fs_readdir_ll,
-        nullptr, fi, dbuf, off, size,
-        ( fuse_readdir_flags )0 );
-    if( ret == -ENOENT )
+    if( size == 0 ||
+        size > MAX_BYTES_PER_BUFFER )
     {
-        fuse_reply_buf( req, nullptr, 0 );
+        fuseif_reply_err( req, -EINVAL );
         return;
     }
-    if( ERROR( ret ) )
-    {
-        fuseif_reply_err( req, ret );
-        return;
-    }
+    dbuf.p = ( char* )malloc( size );
+    do{
+        gint32 ret = SafeCall(
+            "readdir", false,
+            &CFuseObjBase::fs_readdir_ll,
+            nullptr, fi, dbuf, off, size,
+            ( fuse_readdir_flags )0 );
+        if( ret == -ENOENT )
+        {
+            fuse_reply_buf( req, nullptr, 0 );
+            break;
+        }
+        if( ERROR( ret ) )
+        {
+            fuseif_reply_err( req, ret );
+            break;
+        }
 
-    fuse_reply_buf( req, dbuf.p, dbuf.size );
+        fuse_reply_buf( req, dbuf.p, dbuf.size );
+
+    }while( 0 );
+
     free( dbuf.p );
     dbuf.p = nullptr;
     return;
@@ -408,8 +418,6 @@ static void fuseif_ll_lookup(fuse_req_t req,
     if( ERROR( ret ) )
         fuseif_reply_err( req, ret );
 }
-
-static CSharedLock s_oFuseApiLock;
 
 extern gint32 fuseop_unlink( const char* path );
 static void fuseif_ll_unlink(fuse_req_t req,
@@ -752,7 +760,6 @@ static const struct fuse_opt option_spec[] = {
         FUSE_OPT_END
 };
 
-extern ObjPtr g_pIoMgr;
 namespace rpcf{
 extern void SetFuse( MYFUSE* );
 }
@@ -770,7 +777,10 @@ gint32 fuseif_main_ll( fuse_args& args,
 
     if( options.no_reconnect )
     {
-        CIoManager* pMgr = g_pIoMgr;
+        CRpcServices* pRoot = GetRootIf();
+        if( pRoot == nullptr )
+            return 1;
+        CIoManager* pMgr = pRoot->GetIoMgr();
         pMgr->SetCmdLineOpt( propConnRecover, false );
     }
 

@@ -405,9 +405,7 @@ gint32 CIoManager::CompleteIrp( IRP* pIrpComp )
 
         // remove the timer if any
         if( pIrp->HasTimer() )
-        {
-            GetUtils().GetTimerSvc().RemoveTimer( pIrp->m_iTimerId );
-        }
+            pIrp->RemoveTimer();
 
         pIrp->SetState(
             IRP_STATE_COMPLETING, IRP_STATE_COMPLETED );
@@ -1788,15 +1786,6 @@ CIoManager::CIoManager( const std::string& strModName ) :
                 "CThreadPools failed to initialize" );
         }
 
-        ret = m_pDrvMgr.NewObj(
-            clsid( CDriverManager ), pCfg );
-
-        if( ERROR( ret ) )
-        {
-            throw std::runtime_error(
-                "CDriverManager failed to initialize" );
-        }
-
         // load count
         a.Push( 1 );
         // max thread
@@ -1832,34 +1821,6 @@ CIoManager::CIoManager( const std::string& strModName ) :
             clsid( CLoopPools ), pCfg );
         if( ERROR( ret ) )
             break;
-
-        Json::Value& oCfg = m_pDrvMgr->GetJsonCfg();
-        if( oCfg == Json::Value::null )
-        {
-            throw std::invalid_argument(
-                "No config" );
-        }
-
-        m_dwNumCores = std::max( 1U,
-            std::thread::hardware_concurrency() );
-
-        Json::Value& oArch = oCfg[ JSON_ATTR_ARCH ];
-        if( oArch != Json::Value::null && 
-            oArch.isMember( JSON_ATTR_NUM_CORE ) &&
-            oArch[ JSON_ATTR_NUM_CORE ] != Json::Value::null )
-        {
-            Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
-            string strVal = oCores.asString();
-            guint32 dwNumCores = std::strtol(
-                strVal.c_str(), nullptr, 10 );
-            if( dwNumCores != 0 )
-            {
-                // the user wants to limit the 
-                // physical number
-                m_dwNumCores = std::min(
-                    m_dwNumCores, dwNumCores );
-            }
-        }
 
         m_iHcTimer = 0;
 
@@ -1925,6 +1886,54 @@ CIoManager::CIoManager(
 
             m_pTaskThrdPool->SetMaxThreads(
                 dwMaxThrds );
+        }
+
+        CCfgOpener oDrvCfg;
+        oDrvCfg.SetPointer( propIoMgr, this );
+        ret = oDrvCfg.CopyProp(
+            propConfigPath, pCfg );
+        if( ERROR( ret ) )
+        {
+            oDrvCfg.SetStrProp(
+                propConfigPath, CONFIG_FILE );
+        }
+
+        ret = m_pDrvMgr.NewObj(
+            clsid( CDriverManager ),
+            oDrvCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+        {
+            throw std::runtime_error(
+                "CDriverManager failed to initialize" );
+        }
+
+        Json::Value& oJsonCfg = m_pDrvMgr->GetJsonCfg();
+        if( oJsonCfg == Json::Value::null )
+        {
+            throw std::invalid_argument(
+                "No config" );
+        }
+
+        m_dwNumCores = std::max( 1U,
+            std::thread::hardware_concurrency() );
+
+        Json::Value& oArch = oJsonCfg[ JSON_ATTR_ARCH ];
+        if( oArch != Json::Value::null && 
+            oArch.isMember( JSON_ATTR_NUM_CORE ) &&
+            oArch[ JSON_ATTR_NUM_CORE ] != Json::Value::null )
+        {
+            Json::Value& oCores = oArch[ JSON_ATTR_NUM_CORE ];
+            string strVal = oCores.asString();
+            guint32 dwNumCores = std::strtol(
+                strVal.c_str(), nullptr, 10 );
+            if( dwNumCores != 0 )
+            {
+                // the user wants to limit the 
+                // physical number
+                m_dwNumCores = std::min(
+                    m_dwNumCores, dwNumCores );
+            }
         }
 
     }while( 0 );

@@ -1652,9 +1652,12 @@ gint32 CFastRpcProxyBase::OnPreStop(
 gint32 CFastRpcProxyBase::OnPostStop(
     IEventSink* pCallback )
 {
-    m_pSkelObj.Clear();
     gint32 ret = 0;
     do{
+        {
+            CStdRMutex oIfLock( this->GetLock() );
+            m_pSkelObj.Clear();
+        }
         ObjPtr pDrv;
         auto oDrvMgr = GetIoMgr()->GetDrvMgr();
         ret = oDrvMgr.GetDriver( true,
@@ -1737,17 +1740,8 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
         // stop at this point could result in segment
         // fault. ClosePort is good.
         // pSvc->ClosePort( nullptr );
+        this->QueueStopTask( this, nullptr );
 
-        TaskletPtr pStopTask;
-        ret = DEFER_IFCALLEX_NOSCHED2(
-            0, pStopTask, ObjPtr( this ),
-            &CRpcServices::StopEx,
-            nullptr );
-        if( ERROR( ret ) )
-            break;
-
-        GetIoMgr()->RescheduleTask( pStopTask );
-        
     }while( 0 );
 
     return ret;

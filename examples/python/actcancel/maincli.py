@@ -47,7 +47,7 @@ def maincli() :
                 print( "LongWait succeeded so quickly " + str( pret[ 1 ][ 0 ] ) )
                 return ret
 
-            if ret != 65537 :
+            if ret != ErrorCode.STATUS_PENDING :
                 print( "LongWait returned with strange error " + str( pret[ 0 ] ) )
                 return ret
 

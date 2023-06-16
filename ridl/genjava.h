@@ -309,8 +309,12 @@ class CJavaSnippet
     gint32 EmitGetArgTypes(
         ObjPtr& pArgs );
 
-    gint32 EmitGetDescPath(
-        bool bServer );
+    gint32 EmitGetDescPath( bool bServer );
+
+    gint32 EmitUsage( bool bServer );
+
+    gint32 EmitGetOpt( bool bServer );
+    
 };
 
 class CImplJavaMethodSvrBase :

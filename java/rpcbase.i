@@ -35,6 +35,16 @@
 #include <vector>
 #include <algorithm>
 using namespace rpcf;
+#include "stmport.h"
+#include "fastrpc.h"
+
+extern "C" gint32 DllLoadFactory( FactoryPtr& pFactory );
+extern char g_szKeyPass[ SSL_PASS_MAX + 1 ];
+ObjPtr g_pIoMgr;
+ObjPtr g_pRouter;
+extern std::set< guint32 > g_setMsgIds;
+gint32 CheckKeyPass();
+
 %}
 
 %include "std_string.i"
@@ -85,6 +95,7 @@ enum // EnumEventId
 %javaconst(0)    propNoReply;
 %javaconst(0)    propTimeoutSec;
 %javaconst(0)    propKeepAliveSec;
+%javaconst(0)    propConfigPath;
 
 typedef int32_t EnumPropId;
 enum // EnumPropId
@@ -99,7 +110,8 @@ enum // EnumPropId
     propSeriProto,
     propNoReply,
     propTimeoutSec,
-    propKeepAliveSec
+    propKeepAliveSec,
+    propConfigPath,
 };
 
 typedef int32_t EnumIfState;
@@ -354,9 +366,12 @@ enum // some constants
 %template(vectorVars) std::vector<Variant>;
 
 gint32 CoInitialize( gint32 iCtx );
-gint32 CoUninitialize();
+gint32 CoUninitializeEx();
 
 %nodefaultctor;
+
+%feature("ref")   CObjBase "$this->AddRef();"
+%feature("unref") CObjBase "$this->Release();"
 
 %typemap(javadestruct, methodname="delete", methodmodifiers="public synchronized") CObjBase {
     if (swigCPtr != 0) {
@@ -388,18 +403,13 @@ class CObjBase
     public:
     gint32 AddRef();
     gint32 Release();
+    gint32 GetRefCount();
     gint32 SetClassId( EnumClsid iClsid );
     EnumClsid GetClsid() const;
 };
 
-%feature("ref")   CObjBase "$this->AddRef();"
-%feature("unref") CObjBase "$this->Release();"
-
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IConfigDb {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -415,9 +425,6 @@ class IConfigDb : public CObjBase
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IEventSink {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -425,9 +432,6 @@ class IConfigDb : public CObjBase
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") IService {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -682,7 +686,7 @@ jobject NewJavaProxy( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
-        "org/rpcf/rpcbase/CJavaProxyImpl";
+        "org/rpcf/rpcbase/CJavaProxy";
 
     return NewWrapperObj(
         jenv, strClass, lPtr, bOwner );
@@ -692,7 +696,7 @@ jobject NewJavaServer( JNIEnv *jenv,
     long lPtr, bool bOwner = true )
 {
     stdstr strClass =
-        "org/rpcf/rpcbase/CJavaServerImpl";
+        "org/rpcf/rpcbase/CJavaServer";
 
     return NewWrapperObj(
         jenv, strClass, lPtr, bOwner );
@@ -987,6 +991,285 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
     return pCfg;
 }
 
+static void* g_pLibHandle = nullptr;
+gint32 OpenThisLib()
+{
+    gint32 ret = 0;
+    do{
+        std::string strResult;
+        const char* szLib = "librpcbaseJNI";
+        ret = GetLibPathName( strResult, szLib );
+        if( ERROR( ret ) )
+            break;
+        // explicitly open this library so that the
+        // global variables can be found by other
+        // shared libraray to load.
+        g_pLibHandle = dlopen( strResult.c_str(),
+            RTLD_NOW | RTLD_GLOBAL );
+        if( g_pLibHandle == nullptr )
+        {
+            DebugPrintEx( logErr,
+                0, "%s", dlerror() );
+        }
+    }while( 0 );
+    return ret;
+}
+
+char g_szKeyPass[ SSL_PASS_MAX + 1 ];
+gint32 CheckKeyPass()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPath;
+        ret = GetLibPath(
+            strPath, "libipc.so" );
+        if( ERROR( ret ) )
+            break;
+
+        strPath += "/librpc.so";
+        void* handle = dlopen( strPath.c_str(),
+            RTLD_NOW | RTLD_GLOBAL );
+        if( handle == nullptr )
+        {
+            ret = -ENOENT;
+            DebugPrintEx( logErr, ret,
+                "Error librpc.so not found" );
+            break;
+        }
+        auto func = ( gint32 (*)(bool& ) )
+            dlsym( handle, "CheckForKeyPass" );
+        if( func == nullptr )
+        {
+            ret = -ENOENT;
+            DebugPrintEx( logErr, ret,
+                "Error undefined symobol %s in " 
+                "librpc.so ",
+                __func__ );
+            break;
+        }
+
+        bool bPrompt = false;
+        bool bExit = false;
+        ret = func( bPrompt );
+        while( SUCCEEDED( ret ) && bPrompt )
+        {
+            char* pPass = getpass( "SSL Key Password:" );
+            if( pPass == nullptr )
+            {
+                bExit = true;
+                ret = -errno;
+                break;
+            }
+            size_t len = strlen( pPass );
+            len = std::min(
+                len, ( size_t )SSL_PASS_MAX );
+            memcpy( g_szKeyPass, pPass, len );
+            break;
+        }
+        ret = 0;
+        if( bExit )
+            break;
+    }while( 0 );
+    return ret;
+}
+
+ObjPtr* StartIoMgr( CfgPtr& pCfg )
+{
+    gint32 ret = 0;
+    cpp::ObjPtr* pObj =
+        new cpp::ObjPtr( nullptr, false );
+    CCfgOpener oCfg( ( IConfigDb* )pCfg );
+    ObjPtr* sipRes = nullptr;
+    do{
+        stdstr strModName;
+        ret = oCfg.GetStrProp( 0, strModName );
+        if( ERROR( ret ) )
+            break;
+
+        FactoryPtr p;
+        ret = DllLoadFactory( p );
+        if( ERROR( ret ) )
+            return nullptr;
+        ret = CoAddClassFactory( p );
+        if( ERROR( ret ) )
+            break;
+
+        if( !oCfg.exist( 101 ) )
+        {
+            ret = pObj->NewObj(
+                clsid( CIoManager ), pCfg ); 
+            if( ret < 0 )
+                break;
+
+            CIoManager* pMgr = *pObj;
+            ret = pMgr->Start();
+            if( ERROR( ret ) )
+                break;
+
+            sipRes = pObj;
+            g_pIoMgr = *pObj;
+        }
+        else
+        {
+            // built-in router enabled
+            OpenThisLib();
+            guint32 dwNumThrds =
+                ( guint32 )std::max( 1U,
+                std::thread::hardware_concurrency() );
+            if( dwNumThrds > 1 )
+                dwNumThrds = ( dwNumThrds >> 1 );
+            oCfg[ propMaxTaskThrd ] = dwNumThrds;
+            oCfg[ propMaxIrpThrd ] = 2;
+
+            guint32 dwRole = 1;
+            oCfg.GetIntProp( 101, dwRole );
+            oCfg.RemoveProperty( 101 );
+            
+            bool bAuth = false;
+            if( oCfg.exist( 102 ) )
+            {
+                oCfg.GetBoolProp( 102, bAuth );
+                oCfg.RemoveProperty( 102 );
+            }
+
+            bool bDaemon = false;
+            if( oCfg.exist( 103 ) )
+            {
+                oCfg.GetBoolProp( 103, bDaemon );
+                oCfg.RemoveProperty( 103 );
+            }
+            stdstr strAppName;
+            if( oCfg.exist( 104 ) )
+            {
+                oCfg.GetStrProp( 104, strAppName );
+                oCfg.RemoveProperty( 104 );
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            // it will prompt for keypass if necessary
+            ret = CheckKeyPass();
+            if( ERROR( ret ) )
+                break;
+
+            if( bDaemon )
+            {
+                ret = daemon( 1, 0 );
+                if( ret < 0 )
+                {
+                    ret = -errno;
+                    break;
+                }
+            }
+
+            ret = pObj->NewObj(
+                clsid( CIoManager ), pCfg );
+            if( ERROR( ret ) )
+                break;
+
+            CIoManager* pMgr = *pObj;
+            pMgr->SetCmdLineOpt(
+                propRouterRole, dwRole );
+            ret = pMgr->Start();
+            if( ERROR( ret ) )
+                break;
+
+            // create and start the router
+            stdstr strRtName =
+                strAppName + "_Router";
+            pMgr->SetRouterName(
+                strRtName + "_" +
+                std::to_string( getpid() ) );
+            stdstr strDescPath = "./router.json";
+            if( bAuth )
+            {
+                pMgr->SetCmdLineOpt(
+                    propHasAuth, bAuth );
+                strDescPath = "./rtauth.json";
+            }
+
+            CCfgOpener oRtCfg;
+            oRtCfg.SetStrProp(
+                propSvrInstName, strRtName );
+            oRtCfg.SetPointer( propIoMgr, pMgr );
+            pMgr->SetCmdLineOpt(
+                propSvrInstName, strRtName );
+            ret = CRpcServices::LoadObjDesc(
+                strDescPath,
+                OBJNAME_ROUTER,
+                true, oRtCfg.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            oRtCfg[ propIfStateClass ] =
+                clsid( CIfRouterMgrState );
+            oRtCfg[ propRouterRole ] = dwRole;
+            ret =  g_pRouter.NewObj(
+                clsid( CRpcRouterManagerImpl ),
+                oRtCfg.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            CInterfaceServer* pRouter = g_pRouter;
+            if( unlikely( pRouter == nullptr ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pRouter->Start();
+            if( ERROR( ret ) )
+            {
+                pRouter->Stop();
+                g_pRouter.Clear();
+                break;
+            }            
+            sipRes = pObj;
+            g_pIoMgr = *pObj;
+        }
+
+    }while( 0 );
+    if( sipRes == nullptr )
+    {
+        delete pObj;
+        if( g_pLibHandle != nullptr )
+        {
+            dlclose( g_pLibHandle );
+            g_pLibHandle = nullptr;
+        }
+    }
+    return sipRes;
+}
+
+gint32 StopIoMgr( ObjPtr* pObj )
+{
+    gint32 ret = 0;
+    do{
+        if( !g_pRouter.IsEmpty() )
+        {
+            IService* pRt = g_pRouter;
+            pRt->Stop();
+            g_pRouter.Clear();
+        }
+        g_pIoMgr.Clear();
+        if( pObj == nullptr )
+            break;
+        cpp::IService* pMgr = *pObj;
+        if( pMgr == nullptr )
+            break;
+        ret = pMgr->Stop();
+
+    }while( 0 );
+    if( g_pLibHandle != nullptr )
+    {
+        dlclose( g_pLibHandle );
+        g_pLibHandle = nullptr;
+    }
+    return ret;
+}
+
 inline gint32 CheckAndResize( BufPtr& pBuf,
     gint32 iPos, gint32 iSize )
 {
@@ -1031,6 +1314,14 @@ void SerialIntNoCheck(
         &nval, sizeof( guint32 ) );
 }
 
+gint32 CoUninitializeEx()
+{
+    cpp::CoUninitialize();
+    DebugPrintEx( logErr, 0,
+        "#Leaked objects is %d",
+        CObjBase::GetActCount() );
+    return 0;
+}
 %}
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
@@ -1204,6 +1495,13 @@ class CfgPtr
     }
 }
 
+%nodefaultctor;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CBuffer {
+    if (swigCPtr != 0) {
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
 class CBuffer : public CObjBase
 {
     public:
@@ -1212,6 +1510,7 @@ class CBuffer : public CObjBase
     char* ptr();
     gint32 size() const;
 };
+%clearnodefaultctor;
 
 class BufPtr
 {
@@ -2652,6 +2951,10 @@ ObjPtr* CreateObject(
 %newobject CastToCfg;
 CfgPtr* CastToCfg( ObjPtr* pObj );
 
+%newobject StartIoMgr;
+ObjPtr* StartIoMgr( CfgPtr& pCfg );
+
+gint32 StopIoMgr( ObjPtr* pObj );
 
 %newobject CastToSvc;
 IService* CastToSvc(
@@ -2660,9 +2963,6 @@ IService* CastToSvc(
 %nodefaultctor;
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CRpcServices {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -2681,9 +2981,6 @@ class CRpcServices : public IService
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceProxy {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
@@ -2698,9 +2995,6 @@ class CInterfaceProxy : public CRpcServices
 
 %typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CInterfaceServer {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();

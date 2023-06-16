@@ -540,6 +540,10 @@ class CRpcInterfaceBase :
 
     virtual gint32 AddStopTasks(
         IEventSink* pTaskGrp ) = 0;
+
+    gint32 FindMatch(
+        const stdstr strIfName,
+        MatchPtr& pIfMatch );
 };
 
 struct IRpcNonDBusIf

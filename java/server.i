@@ -25,16 +25,26 @@
  */ 
 %header{
 
-class CJavaServerImpl :
-    public CJavaInterfBase<CJavaServer>
+class CJavaServerBase :
+    public CStreamServerAsync
 {
     public:
-    typedef CJavaInterfBase< CJavaServer > super;
-    CJavaServerImpl( const IConfigDb* pCfg ) 
-        : super::_MyVirtBase( pCfg ), super( pCfg )
-    { SetClassId( clsid( CJavaServerImpl ) ); }
+    typedef CStreamServerAsync super;
+    CJavaServerBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ), super( pCfg )
+    {}
+};
 
-    gint32 SendEvent(
+class CJavaServer:
+    public CJavaInterfBase<CJavaServerBase>
+{
+    public:
+    typedef CJavaInterfBase< CJavaServerBase > super;
+    CJavaServer( const IConfigDb* pCfg ) 
+        : super::_MyVirtBase( pCfg ), super( pCfg )
+    {}
+
+    virtual gint32 SendEvent(
         JNIEnv *jenv,
         jobject pCallback,
         const std::string& strCIfName,
@@ -70,7 +80,7 @@ class CJavaServerImpl :
                 CParamList oReqCtx;
                 ret = NEW_PROXY_RESP_HANDLER2(
                     pTask, ObjPtr( this ),
-                    &CJavaServerImpl::OnAsyncCallResp,
+                    &CJavaServer::OnAsyncCallResp,
                     nullptr, oReqCtx.GetCfg() );
 
                 if( ERROR( ret ) )
@@ -315,10 +325,19 @@ jobject CreateServer(
         if( ERROR( ret ) )
             break;
 
+        EnumClsid iClsid =
+            clsid( CJavaServerImpl );
+        EnumClsid iStateClass = clsid( Invalid );
+
+        CCfgOpener oCfg( ( IConfigDb* )pCfg );
+        ret = oCfg.GetIntProp( propIfStateClass,
+            ( guint32& )iStateClass );
+        if( SUCCEEDED( ret ) &&
+            iStateClass == clsid( CFastRpcServerState ) )
+            iClsid = clsid( CJavaServerRosImpl );
+
         ObjPtr* ppIf = new ObjPtr();
-        ret = ppIf->NewObj(
-            clsid( CJavaServerImpl ),
-            pCfg );
+        ret = ppIf->NewObj( iClsid, pCfg );
         if( ERROR( ret ) )
         {
             delete ppIf;
@@ -347,7 +366,7 @@ jobject CastToServer(
 {
     gint32 ret = 0;
     jobject jret = NewJRet( jenv );
-    CJavaServerImpl* pSvr = pObj;
+    CJavaServer* pSvr = pObj;
     if( pSvr == nullptr )
     {
         SetErrorJRet( jenv, jret, -EFAULT );
@@ -364,21 +383,34 @@ jobject CastToServer(
     return jret;
 }
 
+DECLARE_AGGREGATED_SERVER(
+    CJavaServerImpl,
+    CStatCountersServer,
+    CJavaServer );
+
 }
 
 %nodefaultctor;
-%template(CJavaInterfBaseS) CJavaInterfBase<CJavaServer>;
-%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServerImpl {
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServerBase {
     if (swigCPtr != 0) {
-      if (swigCMemOwn) {
-        swigCMemOwn = false;
-      }
       swigCPtr = 0;
     }
     super.delete();
   }
-class CJavaServerImpl :
-    public CJavaInterfBase<CJavaServer>
+class CJavaServerBase :
+    public CInterfaceServer
+{
+};
+
+%template(CJavaInterfBaseS) CJavaInterfBase<CJavaServerBase>;
+%typemap(javadestruct_derived, methodname="delete", methodmodifiers="public synchronized") CJavaServer{
+    if (swigCPtr != 0) {
+      swigCPtr = 0;
+    }
+    super.delete();
+  }
+class CJavaServer:
+    public CJavaInterfBase<CJavaServerBase>
 {
     public:
 %extend{ 
@@ -389,8 +421,8 @@ class CJavaServerImpl :
     {
         gint32 ret = 0;
         do{
-            CJavaServerImpl* pImpl = static_cast
-                < CJavaServerImpl* >( $self );
+            auto pImpl = dynamic_cast
+                < CJavaServer* >( $self );
             if( pCallback.IsEmpty() )
             {
                 ret = -EINVAL;
@@ -413,8 +445,8 @@ class CJavaServerImpl :
     {
         gint32 ret = 0;
         CParamList oResp;
-        CJavaServerImpl* pImpl = static_cast
-            < CJavaServerImpl* >( $self );
+        auto pImpl = dynamic_cast
+            < CJavaServer* >( $self );
         do{
 
             if( pCallback.IsEmpty() )
@@ -461,8 +493,8 @@ class CJavaServerImpl :
     {
         gint32 ret = 0;
         CParamList oResp;
-        CJavaServerImpl* pImpl = static_cast
-            < CJavaServerImpl* >( $self );
+        auto pImpl = dynamic_cast
+            < CJavaServer* >( $self );
         bool bNoReply = false;
         do{
             if( pCallback.IsEmpty() )
@@ -538,7 +570,7 @@ class CJavaServerImpl :
         return ret;
     }
 
-    gint32 SendEvent(
+    virtual gint32 SendEvent(
         JNIEnv *jenv,
         jobject pCallback,
         const std::string& strIfName,
@@ -547,8 +579,8 @@ class CJavaServerImpl :
         jobject pListArgs,
         gint32 dwSeriProto )
     {
-        CJavaServerImpl* pImpl = static_cast
-            < CJavaServerImpl* >( $self );
+        auto pImpl = dynamic_cast
+            < CJavaServer* >( $self );
         return pImpl->SendEvent( jenv,
             pCallback, strIfName,
             strMethod, strDest,
@@ -583,3 +615,21 @@ jobject CastToServer(
     JNIEnv *jenv,
     ObjPtr& pObj );
 
+%include "fastrpc.i"
+
+#ifdef FUSE3
+%include "fuseif.i"
+#endif
+
+%header{
+class CJavaServerRosImpl :
+    public CJavaRpcSvc_SvrImpl
+{
+    public:
+    typedef CJavaRpcSvc_SvrImpl super;
+    CJavaServerRosImpl( const IConfigDb* pCfg )
+    : super::virtbase( pCfg ), super( pCfg )
+    { SetClassId( clsid( CJavaServerRosImpl ) ); }
+};
+
+}

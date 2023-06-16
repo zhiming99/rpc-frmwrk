@@ -945,10 +945,9 @@ gint32 CPort::AllocIrpCtxExt(
                     oExt.m_dwState = 0;
 
                     BufPtr pBuf( true );
-                    if( ERROR( ret ) )
-                        break;
-
-                    *pBuf = oExt;
+                    pBuf->Resize(sizeof( oExt ));
+                    memcpy( pBuf->ptr(),
+                        &oExt, pBuf->size() );
                     pIrpCtx->SetExtBuf( pBuf );
                     break;
                 }
@@ -3810,7 +3809,9 @@ gint32 CGenericBusPort::AllocIrpCtxExt(
                     oExt.m_dwExtState = 0;
 
                     BufPtr pBuf( true );
-                    *pBuf = oExt;
+                    pBuf->Resize(sizeof( oExt ));
+                    memcpy( pBuf->ptr(),
+                        &oExt, pBuf->size() );
                     ret = pIrpCtx->SetExtBuf( pBuf );
                     break;
                 }

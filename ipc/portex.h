@@ -322,7 +322,14 @@ class CStartStopSafeBusPort :
             }
             else if( ERROR( ret ) )
             {
-                pRetryTask->MarkPending( false );
+                //pRetryTask->MarkPending( false );
+                const char* szName = 
+                    CoGetClassName( pPort->GetClsid() );
+
+                DebugPrintEx( logErr, ret,
+                    "Error stopping port %s@0x%llx", 
+                    szName );
+
                 ( *pRetryTask )( eventCancelTask );
                 break;
             }

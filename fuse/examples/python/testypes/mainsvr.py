@@ -93,10 +93,8 @@ def EchoStream( req : object)->object:
             data = stmfp.read(8*1024)
             inBuf.extend( data )
             size -= len( data )
-        pos = len(inBuf) - 2
-        inBuf[ pos ] = 0x41
-        inBuf[ pos + 1 ] = 0x42
         stmfp.write(inBuf)
+        print( "stream@", res, inBuf[8160:8192] )
         stmfp.close()
 
     except Exception as err:
@@ -108,11 +106,11 @@ def EchoMany( req : object )->object:
     resp = BuildRespHdr('EchoMany', req['RequestId'])
     params = req[ 'Parameters']
     AddParameter( resp, 'i1r', params['i1'] )
-    AddParameter( resp, 'i2r', params['i2'] + 2)
-    AddParameter( resp, 'i3r', params['i3'] + 3)
-    AddParameter( resp, 'i4r', params['i4'] + 4)
-    AddParameter( resp, 'i5r', params['i5'] + 5)
-    AddParameter( resp, 'szTextr', params['szText'] + 'll')
+    AddParameter( resp, 'i2r', params['i2'] )
+    AddParameter( resp, 'i3r', params['i3'] )
+    AddParameter( resp, 'i4r', params['i4'] )
+    AddParameter( resp, 'i5r', params['i5'] )
+    AddParameter( resp, 'szTextr', params['szText'] )
     print( os.getpid(), "EchoMany ", resp)
     return resp
 

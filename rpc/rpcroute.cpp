@@ -1324,8 +1324,11 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                 if( ERROR( ret ) )
                     break;
 
-                ret = oIfParams.CopyProp(
-                    propSvrInstName, this );
+                stdstr strRtName;
+                pMgr->GetRouterName( strRtName );
+                ret = oIfParams.SetStrProp(
+                    propSvrInstName, strRtName );
+
                 if( ERROR( ret ) )
                     break;
 
@@ -4024,8 +4027,9 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
 {
     gint32 ret = 0;
     do{
+        CIoManager* pMgr = GetIoMgr();
         CParamList oParams;
-        oParams.SetPointer( propIoMgr, GetIoMgr() );
+        oParams.SetPointer( propIoMgr, pMgr );
 
         EnumClsid iClsid =
             clsid( CRpcReqForwarderImpl );
@@ -4037,8 +4041,10 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.CopyProp(
-            propSvrInstName, this );
+        stdstr strRtName;
+        pMgr->GetRouterName( strRtName );
+        ret = oParams.SetStrProp(
+            propSvrInstName, strRtName );
         if( ERROR( ret ) )
             break;
 
@@ -4053,8 +4059,7 @@ gint32 CRpcRouterReqFwdr::StartReqFwdr(
                 clsid( CRpcReqForwarderAuthImpl );
         }
 
-        oParams.SetPointer(
-            propIoMgr, GetIoMgr() );
+        oParams.SetPointer( propIoMgr, pMgr );
 
         ret = CRpcServices::LoadObjDesc(
             strObjDesc,

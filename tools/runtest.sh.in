@@ -48,7 +48,7 @@ elif [ "$1" == "1" ]; then
     echo pause-resume test
     ${bin_dir}/rpcf/prclitst || exit 4
     echo stream test
-    ${bin_dir}/rpcf/stmclitst > /dev/null || exit 6
+    ${bin_dir}/rpcf/stmclitst || exit 6
     kill -9 `pidof rpcrouter`
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
@@ -166,7 +166,7 @@ elif [ "$1" == "1" ]; then
 
     pushd cpp
     cp sftest/Makefile Makefile.sftest
-    echo "for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O $c $i;done"
+    echo "for i in ../*.ridl;do b=\${i%%.ridl};c=\${b##../}; ridlc -O \$c \$i;done"
     for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O ./$c $i;done
     mv Makefile.sftest sftest/Makefile
 

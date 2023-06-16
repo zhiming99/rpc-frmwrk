@@ -1,4 +1,4 @@
-pysources = README.md gentoml.sh rpcf/proxy.py rpcf/__init__.py proxy.sip pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh stripsym.sh rpcf/iolib.py rpcf/serijson.py
+pysources = README.md gentoml.sh rpcf/proxy.py rpcf/__init__.py proxy.sip pyproject.toml.tmpl rpcf.sip server.sip setup.py build-4.9.py blddpkg.sh stripsym.sh rpcf/iolib.py rpcf/serijson.py fastrpc.sip fuseif.sip
 
 EXTRA_DIST= $(pysources) tests/actcancel/*.py  tests/evtest/*.py tests/iftest/*.py  tests/katest/*.py  tests/prtest/*.py  tests/sftest/*.py  tests/sftest/README.md tests/sftest/sfdesc.json tests/stmtest/*.py tests/stmtest/README.md
 
@@ -10,19 +10,26 @@ if SIPBUILD
 SIPVER=5
 endif
 
+if ENABLE_FUSE3
+LINK_FUSE=1
+else
+LINK_FUSE=0
+endif
+
 PYTHON_EXT1=`python3 -c "import importlib.machinery;print('rpcbase',importlib.machinery.EXTENSION_SUFFIXES[0],sep='')"`
 PYTHON_EXT=$(PYTHON_EXT1).$(VERSION)
 
 all:
 	@if echo "$(COMMON_LINK)" | grep "latomic"; then export ARMBUILD="1"; else export ARMBUILD="0";fi;\
 	if [ "x$(SIPVER)" == "x5" ]; then \
-        bash gentoml.sh $(libdir);\
+        FUSE3="$(LINK_FUSE)" bash gentoml.sh $(libdir);\
 		sip-build --verbose --build-dir ./sipbuild; \
         rm rpcf/$(PYTHON_EXT1)*;\
 		sofile=$$(find ./sipbuild -name $(PYTHON_EXT1));\
         cp `pwd`/$${sofile} rpcf/$(PYTHON_EXT) ;\
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     elif [ "x$(SIPVER)" == "x4" ]; then \
+        export FUSE3="$(LINK_FUSE)";\
         export CC=$(CC); \
 		export CXX=$(CXX); \
 		export PKG_CONFIG=$(PKG_CONFIG);\

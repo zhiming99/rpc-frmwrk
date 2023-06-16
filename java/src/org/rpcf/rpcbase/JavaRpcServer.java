@@ -30,8 +30,8 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             if( jret.ERROR() )
                 break;
 
-            m_oInst = ( CJavaServerImpl )
-                jret.getAt( 0 );
+            setInst( ( CJavaServer )
+                jret.getAt( 0 ) );
 
         }while( false );
 
@@ -52,7 +52,10 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
     public int onServiceComplete(
         ObjPtr callback, int ret, Object[] args )
     {
-        return m_oInst.OnServiceComplete(
+        if( getInst() == null )
+            return -RC.EFAULT;
+
+        return getInst().OnServiceComplete(
             callback, ret,
             RC.seriNone,
             args );
@@ -61,7 +64,10 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
     public int setResponse(
         ObjPtr callback, int ret, Object[] args )
     {
-        return m_oInst.SetResponse(
+        if( getInst() == null )
+            return -RC.EFAULT;
+
+        return getInst().SetResponse(
             callback, ret,
             RC.seriNone,
             args );
@@ -70,11 +76,14 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
     public int ridlOnServiceComplete(
         ObjPtr callback, int ret, BufPtr pBuf )
     {
+        if( getInst() == null )
+            return -RC.EFAULT;
+
         List<Object> lstObj =
             new ArrayList< Object >();
         if( pBuf != null )
             lstObj.add( pBuf );
-        return m_oInst.OnServiceComplete(
+        return getInst().OnServiceComplete(
             callback, ret,
             RC.seriRidl,
             lstObj.toArray() );
@@ -83,10 +92,12 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
     public int ridlSetResponse(
         ObjPtr callback, int ret, byte[] pBuf )
     {
+        if( getInst() == null )
+            return -RC.EFAULT;
         List<Object> lstObj =
             new ArrayList< Object >();
         lstObj.add( pBuf );
-        return m_oInst.SetResponse(
+        return getInst().SetResponse(
             callback, ret,
             RC.seriRidl,
             lstObj.toArray() );
@@ -101,7 +112,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         String destName, Object[] arrArgs )
     {
         evtName = "UserEvent_" + evtName;
-        return m_oInst.SendEvent( callback,
+        return getInst().SendEvent( callback,
             ifName, evtName, destName, arrArgs,
             RC.seriNone );
     }
@@ -114,9 +125,11 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         String ifName, String evtName,
         String destName, BufPtr pBuf )
     {
+        if( getInst() == null )
+            return -RC.EFAULT;
         evtName = "UserEvent_" + evtName;
         Object[] argsArr = new Object[]{ pBuf };
-        return m_oInst.SendEvent( callback,
+        return getInst().SendEvent( callback,
             ifName, evtName, destName,
             argsArr, RC.seriRidl );
     }

@@ -1069,7 +1069,8 @@ gint32 CRpcInterfaceBase::QueueStopTask(
             break;
 
         CIfRetryTask* pRetry = pStopTask; 
-        pRetry->SetClientNotify( pCallback );
+        if( pCallback != nullptr )
+            pRetry->SetClientNotify( pCallback );
 
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = pMgr->AddSeqTask( pStopTask );
@@ -1342,19 +1343,15 @@ gint32 CRpcInterfaceBase::DoStop(
             ret = -EFAULT;
             break;
         }
-
+        pTask->MarkPending();
         ret = AppendAndRun( pTask );
         if( ERROR( ret ) )
-            break;
-
-        ret = pTask->GetError();
-        if( ret != STATUS_PENDING )
         {
             // the callback was not called
-            pCompletion->MarkPending( false );
-            ( *pCompletion )( eventZero );
-            ret = pCompletion->GetError();
+            ( *pTask )( eventCancelTask );
+            break;
         }
+        ret = pTask->GetError();
 
     }while( 0 );
 
@@ -2377,6 +2374,38 @@ gint32 CRpcInterfaceBase::AddAndRun(
     return ret;
 }
 
+gint32 CRpcInterfaceBase::FindMatch(
+    const stdstr strIfName,
+    MatchPtr& pIfMatch )
+{
+    gint32 ret = 0;
+    stdstr strRegIf;
+
+    CStdRMutex oIfLock( GetLock() );
+    for( auto pMatch : m_vecMatches )
+    {
+        CCfgOpenerObj oMatch(
+            ( CObjBase* )pMatch );
+
+        ret = oMatch.GetStrProp(
+            propIfName, strRegIf );
+
+        if( ERROR( ret ) )
+            continue;
+
+        if( strIfName == strRegIf )
+        {
+            pIfMatch = pMatch;
+            break;
+        }
+    }
+
+    if( !pIfMatch.IsEmpty() )
+        return STATUS_SUCCESS;
+
+    return -ENOENT;
+}
+
 gint32 CRpcServices::GetIidFromIfName(
     const std::string& strIfName,
     EnumClsid& iid )
@@ -2738,6 +2767,7 @@ gint32 CRpcServices::OnPostStop(
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
     m_pRootTaskGroup.Clear();
+    m_pSeqTasks.Clear();
 
     return 0;
 }

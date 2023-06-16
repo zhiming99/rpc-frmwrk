@@ -175,6 +175,9 @@ CfgPtr CIfRouterTest::InitRouterCfg(
 
         oCfg[ propSvrInstName ] = MODULE_NAME;
         oCfg[ propIoMgr ] = m_pMgr;
+        CIoManager* pMgr = m_pMgr;
+        pMgr->SetCmdLineOpt(
+            propSvrInstName, MODULE_NAME );
         ret = CRpcServices::LoadObjDesc(
             strDescPath, OBJNAME_ROUTER, true,
             oCfg.GetCfg() );
@@ -202,12 +205,10 @@ CfgPtr CIfRouterTest::InitRouterCfg(
     return oCfg.GetCfg();
 }
 
-namespace rpcf{
-extern gint32 CheckForKeyPass( bool& bPrompt );
-}
+extern "C" gint32 CheckForKeyPass( bool& bPrompt );
 
 #ifdef FUSE3
-extern gint32 AddFilesAndDirs(
+extern "C" gint32 AddFilesAndDirs(
     bool bProxy, CRpcServices* pSvc );
 
 gint32 MountAndLoop( CRpcServices* pSvc )

@@ -462,12 +462,12 @@ case $enable_fuse3 in
         AC_CONFIG_FILES([
              fuse/Makefile ])
         FUSE3_RPMLIBS="fuse3-devel,"
-        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcli'
-        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.hZZZZZ%{_libdir}/rpcf/librtfiles.a'
+        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so'
+        FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
-        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcli"
+        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so"
         FUSE3_DEBLIBS=" libfuse3-dev,"
-        FUSE3_DEBHEADERS='usr/lib/*/rpcf/librtfiles.a'
+        FUSE3_DEBHEADERS=
         FUSE3_DEBPKGS="fuse3,libfuse3-3,"
         FUSE3_CFGOPT=
         FEATURES+="+fuse3 "
@@ -512,9 +512,9 @@ case $enable_java in
     yes)
         AC_CONFIG_FILES([
                  java/Makefile ])
-        JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk," 
+        JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, apache-commons-cli, " 
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
-        JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk,"
+        JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
         JAVA_CFGOPT=
         FEATURES+="+java "

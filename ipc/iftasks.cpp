@@ -196,7 +196,7 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
         if( ret != -EAGAIN )
         {
             // fatal error, just quit
-            DebugPrint( ret,
+            DebugPrintEx( logWarning, ret,
                 "Cannot continue to receive message" );
             return ret;
         }
@@ -1082,6 +1082,8 @@ gint32 CIfEnableEventTask::OnIrpComplete(
         ret = pIrp->GetStatus();
         if( unlikely( ret == -ENOTCONN ) )
         {
+            DebugPrintEx( logErr, ret,
+                "Error, Remote server is not ready" );
             ret = pIf->SetStateOnEvent(
                 eventModOffline );
             if( SUCCEEDED( ret ) )
@@ -2904,10 +2906,13 @@ gint32 CIfParallelTask::operator()(
 gint32 CIfParallelTask::OnComplete(
     gint32 iRet )
 {
+    // unlocking the task for OnComplete can cause
+    // Canceling Task to fail, and this task become
+    // orphan task with owners gone. However without
+    // unlocking, the risk of dead-lock. Both risks are
+    // fatal.
     SetTaskState( stateStopping );
-    GetLock().unlock();
     gint32 ret = super::OnComplete( iRet );
-    GetLock().lock();
     SetTaskState( stateStopped );
     return ret;
 }

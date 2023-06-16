@@ -3,7 +3,7 @@ rpcrouter_SOURCES=routmain.cpp routmain.h README.md rpcrouter.1
 
 rpcrouter_LDADD=
 if ENABLE_FUSE3
-rpcrouter_LDADD+=-L$(top_srcdir)/fuse ../../fuse/libfuseif.la librtfiles.a
+rpcrouter_LDADD+=-L$(top_srcdir)/fuse ../../fuse/libfuseif.la librtfiles.la
 endif
 
 rpcrouter_LDADD+=../librpc.la ../../ipc/libipc.la $(COMMON_LINK) \
@@ -34,11 +34,13 @@ if ENABLE_FUSE3
 include_fusedir=$(top_srcdir)/fuse
 rpcrouter_CPPFLAGS+=-I$(include_fusedir) -DFUSE3
 
-librtfiles_a_LIBRARIES=librtfiles.a
-librtfiles_a_SOURCES = rtfiles.cpp rtfiles.h
-librtfiles_a_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(include_fusedir) -DFUSE3
-librtfiles_a_HEADERS=
-librtfiles_adir=$(libdir)/rpcf
+librtfiles_la_LTLIBRARIES=librtfiles.la
+librtfiles_la_SOURCES = rtfiles.cpp rtfiles.h
+librtfiles_la_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(include_fusedir) -DFUSE3
+librtfiles_HEADERS=
+librtfiles_la_LIBADD= ../../rpc/librpc.la ../../fuse/libfuseif.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) 
+librtfiles_la_LDFLAGS= -version-info @VERSION2@
+librtfiles_ladir=$(libdir)/rpcf
 librtfilesdir=$(includedir)/rpcf/ipc
 
 endif

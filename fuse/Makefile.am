@@ -42,7 +42,7 @@ examples/python/testypes2/maincli.py \
 examples/python/testypes2/mainsvr.py
 
 libfuseif_la_LDFLAGS=-version-info @VERSION2@
-libfuseif_la_LIBADD= -lpthread -ldl -llz4 $(COMMON_LINK_FUSE3) -L../3rd_party -lutils 
+libfuseif_la_LIBADD= ../ipc/libipc.la ../combase/libcombase.la -lstdc++ $(COMMON_LINK_FUSE3) -lpthread -ldl -llz4 -L../3rd_party -lutils 
 
 include_ipcdir=$(top_srcdir)/ipc
 

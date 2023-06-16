@@ -2437,6 +2437,9 @@ gint32 CUnixSockBusPort::PostStop( IRP* pIrp )
     CIoManager* pMgr = GetIoMgr();
     CLoopPools& oPools = pMgr->GetLoopPools();
     oPools.DestroyPool( UXSOCK_TAG );
+
+    CThreadPools& otps = pMgr->GetThreadPools();
+    otps.DestroyPool( UXSOCK_TAG );
     return 0;
 }
 

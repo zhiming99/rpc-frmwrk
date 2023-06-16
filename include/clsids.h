@@ -298,16 +298,16 @@ typedef enum : guint32
     DECL_CLSID( CIfDeferCallTaskEx2 ),
     DECL_CLSID( CSimpleSyncIf ),
     DECL_CLSID( CRedudantNodes ),
-    DECL_CLSID( CPythonProxy ),
-    DECL_CLSID( CPythonServer ),
+    DECL_CLSID( CPythonProxyRosImpl ),
+    DECL_CLSID( CPythonServerRosImpl ),
     DECL_CLSID( CPythonProxyImpl ),
     DECL_CLSID( CPythonServerImpl ),
     DECL_CLSID( CIfAsyncCancelHandler ),
     DECL_CLSID( CIfParallelTaskGrpRfc ),
     DECL_CLSID( CIfParallelTaskGrpRfc2 ),
     DECL_CLSID( CRRTaskScheduler ),
-    DECL_CLSID( CJavaProxy ),
-    DECL_CLSID( CJavaServer ),
+    DECL_CLSID( CJavaProxyRosImpl ),
+    DECL_CLSID( CJavaServerRosImpl ),
     DECL_CLSID( CJavaProxyImpl ),
     DECL_CLSID( CJavaServerImpl ),
     DECL_CLSID( CStlObjMap ),
@@ -347,6 +347,7 @@ typedef enum : guint32
     DECL_CLSID( CStmConnPoint ),
     DECL_CLSID( CThreadPools ),
     DECL_CLSID( MaxClsid ),
+
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
     DECL_CLSID( ReservedClsidEnd ) = 0x0FFFFFFF,
     DECL_CLSID( ReservedIidStart ) = 0x10000000,
@@ -367,6 +368,7 @@ typedef enum : guint32
     DECL_IID( IAuthenticateProxy ),
     DECL_IID( CRpcMinBridge ),
     DECL_CLSID( ReservedIidEnd ) = 0x1FFFFFFF,
+
     DECL_CLSID( UserClsidStart ) = 0x20000000,
 
     DECL_CLSID( Invalid ) = 0xFFFFFFFF
