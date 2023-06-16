@@ -683,4 +683,50 @@ DBusHandlerResult CDBusLoopbackPdo::PreDispatchMsg(
     return ret;
 }
 
+gint32 CDBusLoopbackPdo::SubmitIoctlCmd(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr
+        || pIrp->GetStackSize() == 0 )
+    {
+        return -EINVAL;
+    }
+
+    gint32 ret = 0;
+
+    // let's process the func irps
+    IrpCtxPtr pCtx = pIrp->GetCurCtx();
+
+    do{
+
+        if( pIrp->MajorCmd() != IRP_MJ_FUNC
+            || pIrp->MinorCmd() != IRP_MN_IOCTL )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        switch( pIrp->CtrlCode() )
+        {
+        case CTRLCODE_SEND_RESP:
+        case CTRLCODE_SEND_EVENT:
+            {
+                // server side I/O
+                ret = super::HandleSendReq( pIrp );
+                break;
+            }
+        default:
+            {
+                ret = super::SubmitIoctlCmd( pIrp );
+                break;
+            }
+        }
+    }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        pCtx->SetStatus( ret );
+
+    return ret;
+}
+
 }

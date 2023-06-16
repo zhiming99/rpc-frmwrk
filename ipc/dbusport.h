@@ -813,6 +813,8 @@ class CDBusLoopbackPdo : public CRpcPdoPort
 
     virtual bool Unloadable()
     { return false; }
+
+    gint32 SubmitIoctlCmd( IRP* pIrp );
 };
 
 struct CStartStopPdoCtx
