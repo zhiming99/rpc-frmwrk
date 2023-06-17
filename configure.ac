@@ -512,9 +512,9 @@ case $enable_java in
     yes)
         AC_CONFIG_FILES([
                  java/Makefile ])
-        JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, apache-commons-cli, " 
+        JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, swig, apache-commons-cli, " 
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
-        JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "
+        JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
         JAVA_CFGOPT=
         FEATURES+="+java "
@@ -538,7 +538,7 @@ case $enable_python in
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
-        PYTHON_DEBLIBS="python3-setuptools, sip5-tools | sip-dev,"
+        PYTHON_DEBLIBS="python3-setuptools, sip5-tools | sip-dev | sip-tools,"
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=
         FEATURES+="+python "
