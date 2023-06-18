@@ -43,14 +43,27 @@ all:
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     fi
 
-install:
-	if [ "x$(DESTDIR)" != "x" ];then \
+genpipopt:
+	$(eval pipopt=$(shell os_name=$$(cat /etc/issue | awk '{print $$1}');\
+    os_version=$$(cat /etc/issue | awk '{print $$3}');\
+    if [ "x$${os_name}" == "xDebian" ]; then \
+        echo $$(if (($${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
+    elif [ "x$${os_name}" == "xUbuntu" ]; then \
+        os_version=$$(echo $${os_version} | awk -F'.' "{print $$1}"); \
+        echo $$(if (($${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
+    fi))
+	@if [ "x${pipopt}" != "x" ]; then \
+        echo Warning: break-system-packages enabled; \
+    fi;
+
+install: genpipopt
+	@if [ "x$(DESTDIR)" != "x" ];then \
         cp rpcf/$(PYTHON_EXT) ./$(PYTHON_EXT).bak; \
         symdir=`pwd`/../bldpkg/symlibs/dbgsyms;\
         if [ ! -d $${symdir} ];then mkdir -p $${symdir};fi;\
         bash ./stripsym.sh rpcf/$(PYTHON_EXT) $${symdir};\
     fi;
-	if [ "x$${SUDO_USER}" == "x" ];then \
+	@if [ "x$${SUDO_USER}" == "x" ];then \
 		python3 setup.py bdist_wheel; \
 	else \
 		su -c "python3 setup.py bdist_wheel" $${SUDO_USER} ;\
@@ -60,9 +73,9 @@ install:
 	if [ "x$(DESTDIR)" == "x" ]; then \
 		echo destdir is $(DESTDIR);\
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip3 install --force-reinstall --user $${pkg};\
+			pip3 install ${pipopt} --force-reinstall --user $${pkg};\
 		else \
-			su -c "pip3 install --force-reinstall --user $${pkg}" $${SUDO_USER};\
+			su -c "pip3 install ${pipopt} --force-reinstall --user $${pkg}" $${SUDO_USER};\
 		fi; \
 	else\
         mv ./$(PYTHON_EXT).bak rpcf/$(PYTHON_EXT); \
@@ -70,12 +83,12 @@ install:
 		bash blddpkg.sh `pwd`/../ $(libdir) $${pkg}; \
 	fi
 
-uninstall:
+uninstall: genpipopt
 	@if [ "x$(DESTDIR)" == "x" ]; then \
 		if [ "x$${SUDO_USER}" == "x" ];then \
-			pip3 uninstall -y @PACKAGE_NAME@;\
+			pip3 uninstall -y ${pipopt} @PACKAGE_NAME@;\
 		else \
-			su -c "pip3 uninstall -y @PACKAGE_NAME@" $${SUDO_USER};\
+			su -c "pip3 uninstall -y ${pipopt} @PACKAGE_NAME@" $${SUDO_USER};\
 		fi; \
 	fi
 
