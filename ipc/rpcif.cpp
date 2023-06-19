@@ -3195,6 +3195,9 @@ CRpcServices::CRpcServices( const IConfigDb* pCfg )
             RemoveProperty( propObjList );
         }
 
+        clock_gettime(
+            CLOCK_REALTIME, &m_tsStartTime );
+
     }while( 0 );
 
     return;
