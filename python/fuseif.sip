@@ -168,7 +168,7 @@ gint32 AddSvcStatFiles(
             break;
         }
         sipRes = AddSvcStatFilesInner(
-            pSvc, strName );
+            pSvc, *a1 );
     }while( 0 );
     Py_END_ALLOW_THREADS;
 %End
