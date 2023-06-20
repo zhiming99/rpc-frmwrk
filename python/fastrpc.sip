@@ -129,10 +129,12 @@ class IPythonRpcSvc_SvrApi
 
 DECLARE_AGGREGATED_SKEL_PROXY(
     CPythonRpcSvc_CliSkel,
+    CStatCountersProxySkel,
     IPythonRpcSvc_PImpl );
 
 DECLARE_AGGREGATED_SKEL_SERVER(
     CPythonRpcSvc_SvrSkel,
+    CStatCountersServerSkel,
     IPythonRpcSvc_SImpl );
 
 
@@ -164,7 +166,7 @@ class CPythonRpcSvc_ChannelSvr
 
 DECLARE_AGGREGATED_PROXY(
     CPythonRpcSvc_CliBase,
-    CStatCountersProxy,
+    CStatCounters_CliBase,
     CPythonProxy,
     IPythonRpcSvc_CliApi,
     CFastRpcProxyBase );
@@ -208,7 +210,7 @@ class CPythonProxyRosImpl
 
 DECLARE_AGGREGATED_SERVER(
     CPythonRpcSvc_SvrBase,
-    CStatCountersServer,
+    CStatCounters_SvrBase,
     CPythonServer,
     IPythonRpcSvc_SvrApi,
     CFastRpcServerBase );

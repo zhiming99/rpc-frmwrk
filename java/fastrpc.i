@@ -137,10 +137,12 @@ class ISwigRosRpcSvc_SvrApi
 
 DECLARE_AGGREGATED_SKEL_PROXY(
     CSwigRosRpcSvc_CliSkel,
+    CStatCountersProxySkel,
     ISwigRosRpcSvc_PImpl );
 
 DECLARE_AGGREGATED_SKEL_SERVER(
     CSwigRosRpcSvc_SvrSkel,
+    CStatCountersServerSkel,
     ISwigRosRpcSvc_SImpl );
 
 
@@ -170,7 +172,7 @@ class CSwigRosRpcSvc_ChannelSvr
 
 DECLARE_AGGREGATED_PROXY(
     CJavaRpcSvc_CliBase,
-    CStatCountersProxy,
+    CStatCounters_CliBase,
     CJavaProxy,
     ISwigRosRpcSvc_CliApi,
     CFastRpcProxyBase );
@@ -212,7 +214,7 @@ class CJavaRpcSvc_CliImpl
 
 DECLARE_AGGREGATED_SERVER(
     CJavaRpcSvc_SvrBase,
-    CStatCountersServer,
+    CStatCounters_SvrBase,
     CJavaServer,
     ISwigRosRpcSvc_SvrApi,
     CFastRpcServerBase );

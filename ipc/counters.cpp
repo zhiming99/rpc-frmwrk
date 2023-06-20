@@ -69,7 +69,7 @@ gint32 CStatCountersProxy::OnPreStart(
     CParamList oParams;
     oParams[ propIfPtr ] = ObjPtr( this );
     ret = m_pMsgFilter.NewObj(
-        clsid( CMessageCounterTaskProxy ),
+        clsid( CMessageCounterTask ),
         oParams.GetCfg() );
 
     if( ERROR( ret ) )
@@ -83,7 +83,7 @@ gint32 CStatCountersProxy::OnPostStop(
     IEventSink* pCallback )
 {
     UnregisterFilter( m_pMsgFilter );
-    CMessageCounterTaskProxy* pFilter =
+    CMessageCounterTask* pFilter =
         m_pMsgFilter;
 
     if( pFilter != nullptr )

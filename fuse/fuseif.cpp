@@ -76,7 +76,7 @@ CFuseSvcDir* GetSvcDir( CRpcServices* pIf )
         pSvcDir = static_cast< CFuseSvcDir* >
             ( pSvr->GetSvcDir().get() );
     }
-    else
+    else if( pCli != nullptr )
     {
         pSvcDir = static_cast< CFuseSvcDir* >
             ( pCli->GetSvcDir().get() );
@@ -1026,6 +1026,24 @@ const char* IfStateToString( EnumIfState dwState )
     }
 }
 
+static gint32 GetFormatTime(
+    time_t epoc_sec, stdstr& strTime )
+{
+    time_t t;
+    char outstr[200];
+    struct tm *tmp;
+
+    tmp = localtime(&epoc_sec);
+    if (tmp == NULL)
+        return ERROR_FAIL;
+
+    if (strftime(outstr, sizeof(outstr), "%c", tmp) == 0)
+        return ERROR_FAIL;
+
+    strTime = outstr;
+    return STATUS_SUCCESS;
+}
+
 gint32 CFuseSvcStat::UpdateContent()
 {
     gint32 ret = 0;
@@ -1037,14 +1055,20 @@ gint32 CFuseSvcStat::UpdateContent()
         Json::Value oVal;
 
         CRpcServices* pIf = GetIf();
-        if( unlikely( pIf == nullptr ) )
+        if( pIf == nullptr )
         {
-            ret = -EFAULT;
-            break;
+            pIf = GetUserObj();
+            if( pIf == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
         }
         bool bServer = pIf->IsServer();
 
         timespec tsNow, tsStart;
+        tsStart = pIf->GetStartTime();
+
         ret = clock_gettime(
             CLOCK_REALTIME, &tsNow );
 
@@ -1056,6 +1080,12 @@ gint32 CFuseSvcStat::UpdateContent()
             tsNow.tv_sec,
             tsNow.tv_nsec );
         oVal[ "CurTime" ] = szBuf;
+
+        stdstr strFtime;
+        ret = GetFormatTime(
+            tsStart.tv_sec, strFtime );
+        if( SUCCEEDED( ret ) )
+            oVal[ "StartTime" ] = strFtime;
         
         stdstr strState;
         strState = IfStateToString(
@@ -1064,23 +1094,9 @@ gint32 CFuseSvcStat::UpdateContent()
         guint32 dwCount = this->GetActCount();
         oVal[ "NumObjects" ] = dwCount;
 
-        auto pSvr = dynamic_cast
-            < CFuseSvcServer* >( pIf );
-
-        auto pProxy = dynamic_cast
-            < CFuseSvcProxy* >( pIf );
-
         time_t uptime;
         if( SUCCEEDED( ret ) )
         {
-            if( bServer )
-            {
-                tsStart = pSvr->GetStartTime();
-            }
-            else
-            {
-                tsStart = pProxy->GetStartTime();
-            }
             uptime =
                 tsNow.tv_sec - tsStart.tv_sec;
 
@@ -1106,8 +1122,22 @@ gint32 CFuseSvcStat::UpdateContent()
              oVal[ "ObjectPath" ] = strVal;
 
         CFuseSvcDir* pSvcDir = GetSvcDir( pIf );
-        strVal = pSvcDir->GetName();
-        oVal[ "SvcName" ] = strVal;
+        if( pSvcDir != nullptr )
+        {
+            strVal = pSvcDir->GetName();
+            oVal[ "SvcName" ] = strVal;
+        }
+        else
+        {
+            strVal = this->GetName();
+            size_t pos = strVal.rfind( "_SvcStat" );
+            if( pos != std::string::npos )
+            {
+                strVal = strVal.substr( 0, pos );
+                if( strVal.size() )
+                    oVal[ "SvcName" ] = strVal;
+            }
+        }
 
         TaskGrpPtr pParaGrp;
         ret = pIf->GetParallelGrp( pParaGrp );
@@ -1117,7 +1147,7 @@ gint32 CFuseSvcStat::UpdateContent()
             pParaGrp->FindTaskByClsid(
                 clsid( CIfInvokeMethodTask ),
                 vecTasks );
-            oVal[ "IncomingReqs" ] =
+            oVal[ "PendingReqsIn" ] =
                 ( Json::UInt )vecTasks.size();
         }
         else if( SUCCEEDED( ret ) )
@@ -1125,25 +1155,34 @@ gint32 CFuseSvcStat::UpdateContent()
             pParaGrp->FindTaskByClsid(
                 clsid( CIfIoReqTask ),
                 vecTasks );
-            oVal[ "OutgoingReqs" ] =
+            oVal[ "PendingReqs" ] =
                 ( Json::UInt )vecTasks.size();
         }
         oVal[ "IsServer" ] = bServer;
 
         auto pStm = dynamic_cast
             < IStream* >( pIf );
-        oVal[ "StmCount" ] =
-            pStm->GetStreamCount();
+        if( pStm != nullptr )
+        {
+            oVal[ "StmCount" ] =
+                pStm->GetStreamCount();
+        }
 
         if( bServer )
         {
-            oVal[ "ReqFiles" ] =
-                pSvr->GetGroupCount();
+            auto pSvr = dynamic_cast
+                < CFuseSvcServer* >( pIf );
+            if( pSvr != nullptr )
+                oVal[ "ReqFiles" ] =
+                    pSvr->GetGroupCount();
         }
         else
         {
-            oVal[ "ReqFiles" ] =
-                pProxy->GetGroupCount();
+            auto pProxy = dynamic_cast
+                < CFuseSvcProxy* >( pIf );
+            if( pProxy != nullptr )
+                oVal[ "ReqFiles" ] =
+                    pProxy->GetGroupCount();
         }
 
         while( pIf->IsServer() )

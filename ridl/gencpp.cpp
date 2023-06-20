@@ -1041,6 +1041,7 @@ gint32 CHeaderPrologue::Output()
     Wa( "#include <string>" );
     Wa( "#include \"rpc.h\"" );
     Wa( "#include \"ifhelper.h\"" );
+    Wa( "#include \"counters.h\"" );
     if( m_pStmts->IsStreamNeeded() )
         Wa( "#include \"streamex.h\"" );
     else
@@ -1049,7 +1050,6 @@ gint32 CHeaderPrologue::Output()
     {
         Wa( "#include \"serijson.h\"" );
         Wa( "#include \"fuseif.h\"" );
-        Wa( "#include \"counters.h\"" );
     }
     NEW_LINE;
     CCOUT << "#define DECLPTRO( _type, _name ) \\";
@@ -2875,9 +2875,9 @@ gint32 CDeclService::Output()
 
         CCOUT << "C" << strSvcName << "_CliSkel,";
         NEW_LINE;
+        Wa( "CStatCountersProxy," );
         if( bFuseP )
         {
-            Wa( "CStatCountersProxy," );
             Wa( "CStreamProxyFuse," );
             Wa( "CFuseSvcProxy," );
         }
@@ -2905,9 +2905,9 @@ gint32 CDeclService::Output()
         CCOUT << "C" << strSvcName << "_SvrSkel,";
         NEW_LINE;
 
+        Wa( "CStatCountersServer," );
         if( bFuseS )
         {
-            Wa( "CStatCountersServer," );
             Wa( "CStreamServerFuse," );
             Wa( "CFuseSvcServer," );
         }
@@ -6540,6 +6540,7 @@ void CImplMainFunc::EmitRtUsage(
 }
 
 gint32 CImplMainFunc::EmitRtFuseLoop(
+    std::vector< ObjPtr >& vecSvcs,
     bool bProxy, CCppWriter* m_pWriter )
 {
     gint32 ret = 0;
@@ -6562,6 +6563,7 @@ gint32 CImplMainFunc::EmitRtFuseLoop(
         NEW_LINE;
         if( g_bBuiltinRt )
         {
+            NEW_LINE;
             Wa( "CRpcServices* pRt = g_pRouter;" );
             CCOUT << "ret = AddFilesAndDirs( "
                 << ( bProxy ? "true" : "false" )
@@ -6569,6 +6571,25 @@ gint32 CImplMainFunc::EmitRtFuseLoop(
             NEW_LINE;
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            NEW_LINE;
+            if( vecSvcs.size() == 1 )
+                Wa( "ret = AddSvcStatFiles( pIf );" );
+            else 
+            {
+                Wa( "ret = AddSvcStatFiles(" );
+                for( guint32 i = 0; i < vecSvcs.size(); i++ )
+                {
+                    if( i == 0 )
+                        CCOUT << "    pIf, ";
+                    else if( i < vecSvcs.size() - 1 )
+                        CCOUT << "pIf" << i << ", ";
+                    else
+                        CCOUT << "pIf" << i << " ); ";
+                }
+                NEW_LINE;
+                Wa( "if( ERROR( ret ) )" );
+                Wa( "    break;" );
+            }
         }
         NEW_LINE;
         Wa( "args = FUSE_ARGS_INIT(argc, argv);" );
@@ -6628,7 +6649,7 @@ gint32 CImplMainFunc::EmitFuseMainContent(
         Wa( "CRpcServices* pRoot = GetRootIf();" );
         if( vecSvcs.size() )
         {
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             for( auto& elem : vecSvcs )
             {
@@ -7095,6 +7116,93 @@ gint32 CImplMainFunc::EmitInitContext(
     return ret;
 }
 
+gint32 CImplMainFunc::EmitAddSvcStatFiles(
+    std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    do{
+        if( vecSvcs.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        Wa( "gint32 AddSvcStatFiles(" );
+        if( vecSvcs.size() == 1 )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strSvcName = pSvc->GetName();
+            CCOUT << "    C" << strSvcName << "_SvrImpl* pIf )";
+            NEW_LINE;
+        }
+        else for( gint32 i = 0; i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            stdstr strSvcName = pSvc->GetName();
+            if( i == 0 )
+                CCOUT << "    C" << strSvcName 
+                    << "_SvrImpl* pIf";
+            else
+                CCOUT << "    C" << strSvcName 
+                    << "_SvrImpl* pIf" << i;
+            if( i < vecSvcs.size() - 1 )
+                CCOUT << ",";
+            else
+                CCOUT << " )";
+            NEW_LINE;
+        }
+        BLOCK_OPEN;
+        Wa( "gint32 ret = 0;" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "CFuseRootServer* pSvr = GetRootIf();" );
+        Wa( "if( pSvr == nullptr )" );
+        BLOCK_OPEN;
+        Wa( "ret = -EFAULT;" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+        Wa( "stdstr strName;" );
+        Wa( "ObjPtr pObj;" );
+        Wa( "DIR_SPTR pEnt;" );
+        Wa( "CFuseObjBase* pList;" );
+        NEW_LINE;
+
+        for( gint32 i = 0; i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            stdstr strSvcName = pSvc->GetName();
+            Wa( "pList = new CFuseSvcStat( nullptr );" );
+            Wa( "pList->SetMode( S_IRUSR );" );
+            Wa( "pList->DecRef();" );
+            CCOUT << "strName = \""
+                << strSvcName << "_SvcStat\";";
+            NEW_LINE;
+            Wa( "pList->SetName( strName );" );
+            if( i == 0 )
+                Wa( "pObj = pIf;" );
+            else
+            {
+                CCOUT << "pObj = pIf" << i << ";";
+                NEW_LINE;
+            }
+            Wa( "pList->SetUserObj( pObj );" );
+            Wa( "pEnt = DIR_SPTR( pList );" );
+            CCOUT << "pSvr->Add2UserDir( pEnt );";
+            if( i < vecSvcs.size() - 1 )
+                NEW_LINES( 2 );
+        }
+        NEW_LINE;
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CImplMainFunc::DeclUserMainFunc(
     std::vector< ObjPtr >& vecSvcs, bool bDecl )
 {
@@ -7106,7 +7214,14 @@ gint32 CImplMainFunc::DeclUserMainFunc(
         stdstr strClass;
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt && !bDecl )
+        {
             Wa( "#include \"fuseif.h\"" );
+            if( !bFuseS )
+            {
+                EmitAddSvcStatFiles( vecSvcs );
+                NEW_LINE;
+            }
+        }
 #endif
 
         if( vecSvcs.size() == 1 )
@@ -7150,7 +7265,10 @@ gint32 CImplMainFunc::DeclUserMainFunc(
                 strClass += "_CliImpl";
             else
                 strClass += "_SvrImpl";
-            CCOUT << strClass << "* pIf" << i << ",";
+            if( i > 0 )
+                CCOUT << strClass << "* pIf" << i << ",";
+            else
+                CCOUT << strClass << "* pIf,";
             NEW_LINE;
         }
         CCOUT << "int argc, char** argv )";
@@ -7225,7 +7343,7 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         size_t idx = 0;
         for( auto& elem : vecSvcs )
         {
-            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            CServiceDecl* pSvc = elem;
             stdstr strSvcName = pSvc->GetName();
             stdstr strClass =
                 std::string( "C" ) + strSvcName;
@@ -7365,7 +7483,10 @@ do{ \
         BLOCK_OPEN; \
         for( size_t i = 0; i < vecSvcs.size(); i++ ) \
         { \
-            CCOUT << "if( !pIf" << i << "->IsConnected() )"; \
+            if( i == 0 ) \
+                CCOUT << "if( !pIf->IsConnected() )"; \
+            else \
+                CCOUT << "if( !pIf" << i << "->IsConnected() )"; \
             NEW_LINE; \
             Wa( "    break;" ); \
         } \
@@ -7405,7 +7526,8 @@ gint32 CImplMainFunc::EmitUserMainContent(
             NEW_LINE;
             Wa( "else" );
             BLOCK_OPEN;
-            EmitRtFuseLoop( false, m_pWriter );
+            EmitRtFuseLoop(
+                vecSvcs, false, m_pWriter );
             BLOCK_CLOSE;
             NEW_LINE;
             CCOUT << "return ret;";

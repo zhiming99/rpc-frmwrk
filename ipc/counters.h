@@ -247,7 +247,17 @@ class CMessageCounterBase :
 
     virtual gint32 FilterMsgIncoming(
         IEventSink* pInvTask, IConfigDb* pMsg )
-    { return 0; }
+    {
+        CCfgOpenerObj oTaskCfg( this );    
+        T* pIf = nullptr;
+
+        gint32 ret = oTaskCfg.GetPointer(
+            propIfPtr, pIf );
+        if( ERROR( ret ) )
+            return 0;
+
+        return pIf->IncCounter( propMsgCount );
+    }
 
     virtual gint32 GetFilterStrategy(
         IEventSink* pCallback,
@@ -286,7 +296,7 @@ class CMessageCounterBase :
 
         do{
             DMsgPtr pMsg( pRawMsg );
-            CStatCountersServer* pIf = nullptr;
+            T* pIf = nullptr;
 
             CCfgOpener oTaskCfg(
                 ( IConfigDb* )GetConfig() );    
@@ -321,22 +331,13 @@ class CMessageCounterBase :
 };
 
 class CMessageCounterTask :
-    public CMessageCounterBase< CStatCountersServer > 
+    public CMessageCounterBase< CRpcServices > 
 {
     public:
-    typedef CMessageCounterBase< CStatCountersServer > super;
+    typedef CMessageCounterBase< CRpcServices > super;
     CMessageCounterTask( const IConfigDb* pCfg )
         : super( pCfg )
     { SetClassId( clsid( CMessageCounterTask ) ); }
-};
-class CMessageCounterTaskProxy :
-    public CMessageCounterBase< CStatCountersProxy >
-{
-    public:
-    typedef CMessageCounterBase< CStatCountersProxy > super;
-    CMessageCounterTaskProxy( const IConfigDb* pCfg )
-        : super( pCfg )
-    { SetClassId( clsid( CMessageCounterTaskProxy ) ); }
 };
 
 }

@@ -7,6 +7,35 @@ extern gint32 AddFilesAndDirs( ObjPtr& pRt );
 
 %ModuleCode
 
+gint32 AddSvcStatFilesInner(
+    CRpcServices* pIf,
+    const std::string& strName )
+{
+    gint32 ret = 0;
+    do{
+        CFuseRootServer* pSvr = GetRootIf();
+        if( pSvr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CFuseObjBase* pList =
+            new CFuseSvcStat( nullptr );
+        pList->SetMode( S_IRUSR );
+        pList->DecRef();
+        stdstr strFile = strName + "_SvcStat";
+        pList->SetName( strFile );
+        ObjPtr pObj = pIf;
+        pList->SetUserObj( pObj );
+        auto pEnt = DIR_SPTR( pList );
+        ROOTLK_EXCLUSIVE;
+        pSvr->Add2UserDir( pEnt );
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 AddFilesAndDirs( ObjPtr& pRt )
 {
     gint32 ret = 0;
@@ -126,3 +155,20 @@ gint32 fuseif_mainloop(
     Py_END_ALLOW_THREADS;
 %End
 
+gint32 AddSvcStatFiles(
+    cpp::ObjPtr* pIf,
+    const std::string& strName );
+%MethodCode
+    Py_BEGIN_ALLOW_THREADS;
+    do{
+        CRpcServices* pSvc = *a0;
+        if( pSvc == nullptr ) 
+        {
+            sipRes = -EFAULT;
+            break;
+        }
+        sipRes = AddSvcStatFilesInner(
+            pSvc, strName );
+    }while( 0 );
+    Py_END_ALLOW_THREADS;
+%End
