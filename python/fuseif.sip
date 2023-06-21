@@ -7,9 +7,8 @@ extern gint32 AddFilesAndDirs( ObjPtr& pRt );
 
 %ModuleCode
 
-gint32 AddSvcStatFilesInner(
-    CRpcServices* pIf,
-    const std::string& strName )
+static std::vector< std::pair< ObjPtr, stdstr > > s_vecIfs;
+gint32 AddSvcStatFiles()
 {
     gint32 ret = 0;
     do{
@@ -20,17 +19,20 @@ gint32 AddSvcStatFilesInner(
             break;
         }
 
-        CFuseObjBase* pList =
-            new CFuseSvcStat( nullptr );
-        pList->SetMode( S_IRUSR );
-        pList->DecRef();
-        stdstr strFile = strName + "_SvcStat";
-        pList->SetName( strFile );
-        ObjPtr pObj = pIf;
-        pList->SetUserObj( pObj );
-        auto pEnt = DIR_SPTR( pList );
-        ROOTLK_EXCLUSIVE;
-        pSvr->Add2UserDir( pEnt );
+        for( auto elem : s_vecIfs )
+        {
+            CFuseObjBase* pList =
+                new CFuseSvcStat( nullptr );
+            pList->SetMode( S_IRUSR );
+            pList->DecRef();
+            stdstr strFile =
+                elem.second + "_SvcStat";
+            pList->SetName( strFile );
+            pList->SetUserObj( elem.first );
+            auto pEnt = DIR_SPTR( pList );
+            pSvr->Add2UserDir( pEnt );
+        }
+        s_vecIfs.clear();
 
     }while( 0 );
     return ret;
@@ -137,6 +139,8 @@ gint32 fuseif_mainloop(
         if( ERROR( ret ) )
             break;
 
+        AddSvcStatFiles();
+
         args = FUSE_ARGS_INIT(argcfi, argvf);
         ret = fuseif_main( args, opts );
 
@@ -155,20 +159,40 @@ gint32 fuseif_mainloop(
     Py_END_ALLOW_THREADS;
 %End
 
-gint32 AddSvcStatFiles(
+gint32 AddSvcStatFile(
     cpp::ObjPtr* pIf,
     const std::string& strName );
 %MethodCode
-    Py_BEGIN_ALLOW_THREADS;
+    sipRes = 0;
     do{
-        CRpcServices* pSvc = *a0;
-        if( pSvc == nullptr ) 
+        if( a0 == nullptr || a1 == nullptr )
         {
-            sipRes = -EFAULT;
+            sipRes = -EINVAL;
             break;
         }
-        sipRes = AddSvcStatFilesInner(
-            pSvc, *a1 );
+        if( a0->IsEmpty() || a1->empty() )
+        {
+            sipRes = -EINVAL;
+            break;
+        }
+        bool bDup = false;
+        for( auto& elem : s_vecIfs )
+        {
+            if( *a1 == elem.second ||
+                ( *a0 )->GetObjId() ==
+                    elem.first->GetObjId() )
+            {
+                bDup = true;
+                break;
+            }
+        }
+        if( bDup )
+        {
+            sipRes = -EEXIST;
+            break;
+        }
+        s_vecIfs.push_back( { *a0, *a1 } );
+
     }while( 0 );
-    Py_END_ALLOW_THREADS;
+
 %End

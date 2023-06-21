@@ -1838,11 +1838,7 @@ gint32 CStatCounters_SvrBase::GetCounter2(
         CFastRpcServerBase* pSvr =
             ObjPtr( this );
 
-        ret = super::GetCounter2(
-            iPropId, dwVal );
-
-        if( ERROR( ret ) )
-            break;
+        super::GetCounter2( iPropId, dwVal );
 
         std::vector< InterfPtr > vecIfs;
         ret = pSvr->EnumStmSkels( vecIfs );
@@ -1854,15 +1850,14 @@ gint32 CStatCounters_SvrBase::GetCounter2(
 
         for( auto& elem : vecIfs )
         {
-            CStatCountersServer* pSvc = elem;
+            CStatCountersServerSkel* pSvc = elem;
             guint32 dwVal0 = 0;
             ret = pSvc->GetCounter2(
                 iPropId, dwVal0 );
             if( SUCCEEDED( ret ) )
                 dwVal += dwVal0;
-            else 
-                ret = STATUS_SUCCESS;
         }
+        ret = STATUS_SUCCESS;
 
     }while( 0 );
     return ret;
@@ -1877,11 +1872,7 @@ gint32 CStatCounters_SvrBase::GetCounter2(
         CFastRpcServerBase* pSvr =
             ObjPtr( this );
 
-        ret = super::GetCounter2(
-            iPropId, qwVal );
-
-        if( ERROR( ret ) )
-            break;
+        super::GetCounter2( iPropId, qwVal );
 
         std::vector< InterfPtr > vecIfs;
         ret = pSvr->EnumStmSkels( vecIfs );
@@ -1893,15 +1884,14 @@ gint32 CStatCounters_SvrBase::GetCounter2(
 
         for( auto& elem : vecIfs )
         {
-            CStatCountersServer* pSvc = elem;
+            CStatCountersServerSkel* pSvc = elem;
             guint32 qwVal0 = 0;
             ret = pSvc->GetCounter2(
                 iPropId, qwVal0 );
             if( SUCCEEDED( ret ) )
                 qwVal += qwVal0;
-            else
-                ret = STATUS_SUCCESS;
         }
+        ret = STATUS_SUCCESS;
 
     }while( 0 );
     return ret;
@@ -1915,7 +1905,7 @@ gint32 CStatCounters_CliBase::GetCounter2(
         CFastRpcProxyBase* pProxy =
             ObjPtr( this );
 
-        CStatCountersProxy* pSkel =
+        CStatCountersProxySkel* pSkel =
             pProxy->GetStmSkel();
         if( pSkel == nullptr )
         {
@@ -1938,7 +1928,7 @@ gint32 CStatCounters_CliBase::GetCounter2(
         CFastRpcProxyBase* pProxy =
             ObjPtr( this );
 
-        CStatCountersProxy* pSkel =
+        CStatCountersProxySkel* pSkel =
             pProxy->GetStmSkel();
         if( pSkel == nullptr )
         {
@@ -1948,6 +1938,7 @@ gint32 CStatCounters_CliBase::GetCounter2(
 
         ret = pSkel->GetCounter2(
             iPropId, qwVal );
+
     }while( 0 );
     return ret;
 }

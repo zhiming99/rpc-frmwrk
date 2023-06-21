@@ -3698,9 +3698,21 @@ gint32 CImplPyMainFunc::OutputSvr(
 #ifdef FUSE3
         if( g_bBuiltinRt )
         {
-            Wa( "if bMount:" );
-            Wa( "    fuseif_mainloop(" );
-            Wa( "        sys.argv[ 0 ], params[ 'MountPoint' ] )" );
+            CCOUT << "if bMount:";
+            INDENT_UPL;
+            for( gint32 i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                CCOUT << "AddSvcStatFile( oServer";
+                if( i > 0 )
+                    CCOUT << i;
+                CCOUT << ".oObj, \"" << strName << "\" )";
+                NEW_LINE;
+            }
+            Wa( "fuseif_mainloop(" );
+            CCOUT << "    sys.argv[ 0 ], params[ 'MountPoint' ] )";
+            INDENT_DOWNL;
             CCOUT << "else :";
             INDENT_UPL;
             EMIT_CALL_TO_USERMAIN( false );

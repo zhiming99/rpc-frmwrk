@@ -4721,6 +4721,17 @@ gint32 CImplJavaMainSvr::Output()
             NEW_LINE;
             Wa( "else" );
             BLOCK_OPEN;
+            for( gint32 i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                Wa( "rpcbase.AddSvcStatFile(" );
+                CCOUT <<"    oSvc";
+                if( i > 0 )
+                    CCOUT << i;
+                CCOUT << ".getInst(), \"" << strName << "\" );";
+                NEW_LINE;
+            }
             stdstr strCmd = g_strPrefix + g_strAppName + ".";
             strCmd += "mainsvr";
             Wa( "rpcbase.fuseif_mainloop(" );
