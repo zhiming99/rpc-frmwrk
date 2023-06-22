@@ -32,6 +32,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
 
             setInst( ( CJavaServer )
                 jret.getAt( 0 ) );
+            obj.Clear();
 
         }while( false );
 

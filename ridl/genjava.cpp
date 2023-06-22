@@ -4579,15 +4579,22 @@ gint32 CImplJavaMainCli::Output()
         if( vecSvcs.size() == 1 )
         {
             Wa( "if( oSvc != null )" );
-            Wa( "    oSvc.stop();" );
+            BLOCK_OPEN;
+            Wa( "oSvc.stop();" );
+            CCOUT << "oSvc.setInst( null );";
+            BLOCK_CLOSE;
+            NEW_LINE;
         }
         else for( int i = 0; i < vecSvcs.size(); i++ )
         {
             strObj = "oSvcs[ ";
             strObj += std::to_string( i ) + " ]";
             CCOUT << "if( " << strObj << " != null )";
+            BLOCK_OPEN;
+            CCOUT << strObj << ".stop();";
             NEW_LINE;
-            CCOUT << "    " << strObj << ".stop();";
+            CCOUT << strObj << ".setInst( null );";
+            BLOCK_CLOSE;
             NEW_LINE;
         }
         Wa( "m_oCtx.stop();" );
@@ -4756,7 +4763,11 @@ gint32 CImplJavaMainSvr::Output()
         if( vecSvcs.size() == 1 )
         {
             Wa( "if( oSvc != null )" );
-            Wa( "    oSvc.stop();" );
+            BLOCK_OPEN;
+            Wa( "oSvc.stop();" );
+            CCOUT << "oSvc.setInst( null );";
+            BLOCK_CLOSE;
+            NEW_LINE;
         }
         else for( int i = 0; i < vecSvcs.size(); i++ )
         {
@@ -4764,7 +4775,11 @@ gint32 CImplJavaMainSvr::Output()
             strObj += std::to_string( i ) + " ]";
             CCOUT << "if( " << strObj << " != null )";
             NEW_LINE;
-            CCOUT << "    " << strObj << ".stop();";
+            BLOCK_OPEN;
+            CCOUT << strObj << ".stop();";
+            NEW_LINE;
+            CCOUT << strObj << ".setInst( null );";
+            BLOCK_CLOSE;
             NEW_LINE;
         }
         Wa( "m_oCtx.stop();" );
