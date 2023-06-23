@@ -34,7 +34,7 @@
 #define MOD_CLIENT_NAME "StreamingClient"
 #define OBJNAME_ECHOCLIENT "CStreamingClient"               
 
-#define LOOP_COUNT  1000
+#define LOOP_COUNT  30000
 // Declare the class id for this object and declare the
 // iid for the interfaces we have implemented for this
 // object.
@@ -50,6 +50,48 @@ enum EnumMyClsid
     DECL_IID( CEchoServer )
 };
 
+struct STMCTX
+{
+    std::atomic< guint32 > m_dwCount = {0};
+
+    inline guint32 IncCounter()
+    { return m_dwCount++; }
+
+    inline guint32 GetCounter()
+    { return m_dwCount; }
+
+    inline void SetCounter( guint32 dwCount )
+    { m_dwCount = dwCount; }
+};
+
+struct CStreamContext
+{
+    std::map< HANDLE, STMCTX > m_mapCtx;
+    CRpcServices* m_pParent = nullptr;
+
+    CStreamContext( CRpcServices* pParent )
+    { m_pParent = pParent; }
+
+    STMCTX& GetContext2( HANDLE handle ) 
+    {
+        CStdRMutex oLock( m_pParent->GetLock() );
+        auto itr = m_mapCtx.find( handle );
+        if( itr != m_mapCtx.end() )
+            return itr->second;
+
+        return m_mapCtx[ handle ];
+    }
+
+    gint32 RemoveContext( HANDLE handle )
+    {
+        CStdRMutex oLock( m_pParent->GetLock() );
+        gint32 count = m_mapCtx.erase( handle );
+        if( count == 0 )
+            return -ENOENT;
+        return STATUS_SUCCESS;
+    }
+};
+
 // Declare the interface class
 //
 // Note that unlike the CEchoServer in Helloworld test.
@@ -59,7 +101,7 @@ enum EnumMyClsid
 // CAggInterfaceServer.
 class CEchoServer :
     public virtual CAggInterfaceServer
-{ 
+{
     public: 
     typedef CAggInterfaceServer super;
 
@@ -88,12 +130,14 @@ BEGIN_DECL_IF_PROXY_SYNC( CEchoServer, CEchoClient )
 END_DECL_IF_PROXY_SYNC( CEchoClient );
 
 class CMyStreamProxy :
-    public CStreamProxySync
+    public CStreamProxySync,
+    public CStreamContext
 {
     public:
     typedef CStreamProxySync super;
     CMyStreamProxy( const IConfigDb* pCfg ) :
-        super::_MyVirtBase( pCfg ), super( pCfg )
+        super::_MyVirtBase( pCfg ), super( pCfg ),
+        CStreamContext( this )
     {
     }
 
@@ -141,12 +185,14 @@ class CMyStreamProxy :
 };
 
 class CMyStreamServer :
-    public CStreamServerSync
+    public CStreamServerSync,
+    public CStreamContext
 {
     public:
     typedef CStreamServerSync super;
     CMyStreamServer( const IConfigDb* pCfg ) :
-        super::_MyVirtBase( pCfg ), super( pCfg )
+        super::_MyVirtBase( pCfg ), super( pCfg ),
+        CStreamContext( this )
     {}
 
     virtual gint32 OnRecvData_Loop(
@@ -159,8 +205,7 @@ class CMyStreamServer :
         HANDLE hChannel );
 
     virtual gint32 OnCloseChannel_Loop(
-        HANDLE hChannel )
-    { return 0; }
+        HANDLE hChannel );
 
     virtual gint32 OnStart_Loop()
     { return 0; }

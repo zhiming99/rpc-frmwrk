@@ -58,16 +58,11 @@ gint32 CMyStreamServer::OnSendDone_Loop(
     HANDLE hChannel, gint32 iRet )
 {
     BufPtr pBuf;
-    CfgPtr pCfg;
     gint32 ret = 0;
 
     // get channel specific context
-    ret = GetContext( hChannel, pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CParamList oCfg( pCfg );
-    guint32 dwCount = oCfg[ 0 ];
+    auto& stmctx = GetContext2( hChannel );
+    guint32 dwCount = stmctx.GetCounter();
 
     do{
         if( ERROR( iRet ) )
@@ -99,8 +94,10 @@ gint32 CMyStreamServer::OnSendDone_Loop(
 
         if( ret == STATUS_PENDING )
         {
+            dwCount = stmctx.IncCounter();
+            if( ( dwCount & 0x3ff ) == 0 )
             printf( "Proxy @0x%x says(%d): %s\n",
-                ( guint32 )hChannel, dwCount++,
+                ( guint32 )hChannel, dwCount,
                 ( char* )pBuf->ptr() );
             // remove the buf from the pending
             // queue.
@@ -122,11 +119,7 @@ gint32 CMyStreamServer::OnSendDone_Loop(
 
     }while( 0 );
 
-    if( SUCCEEDED( ret ) )
-    {
-        oCfg[ 0 ] = dwCount;
-    }
-    else if( ERROR( ret ) )
+    if( ERROR( ret ) )
     {
         DebugPrintEx( logNotice, ret,
             "Error in OnSendDone_Loop"
@@ -143,27 +136,20 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
 {
     gint32 ret = 0;
 
-    CfgPtr pCfg;
     // get channel specific context
-    ret = GetContext( hChannel, pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CParamList oCfg( pCfg );
-    guint32 dwCount = 0;
-
+    auto& stmctx = GetContext2( hChannel );
+    guint32 dwCount = stmctx.GetCounter();
 
     do{
         // this handler will be the first one to
         // call after the loop starts
-        ret = oCfg.GetIntProp( 0, dwCount );
-        if( ret == -ENOENT )
+        if( dwCount == 0 )
         {
             // the first time, send greetings
             BufPtr pBuf( true );
             *pBuf = std::string( "Hello, Proxy" );
             WriteStreamNoWait( hChannel, pBuf );
-            oCfg.Push( dwCount );
+            stmctx.IncCounter();
             ret = 0;
             break;
         }
@@ -184,6 +170,13 @@ gint32 CMyStreamServer::OnWriteEnabled_Loop(
     return ret;
 }
 
+gint32 CMyStreamServer::OnCloseChannel_Loop(
+        HANDLE hChannel )
+{
+    RemoveContext( hChannel );
+    return 0;
+}
+
 gint32 CMyStreamServer::OnRecvData_Loop(
     HANDLE hChannel, gint32 iRet )
 {
@@ -202,12 +195,8 @@ gint32 CMyStreamServer::OnRecvData_Loop(
         return 0;
 
     // get channel specific context
-    ret = GetContext( hChannel, pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CParamList oCfg( pCfg );
-    guint32 dwCount = oCfg[ 0 ];
+    auto& stmctx = GetContext2( hChannel );
+    guint32 dwCount = stmctx.GetCounter();
 
     do{
         if( ERROR( iRet ) )
@@ -239,8 +228,10 @@ gint32 CMyStreamServer::OnRecvData_Loop(
 
         if( ret == STATUS_PENDING )
         {
+            dwCount = stmctx.IncCounter();
+            if( ( dwCount & 0x3ff ) == 0 )
             printf( "Proxy @0x%x says(%d): %s\n",
-                ( guint32 )hChannel, dwCount++,
+                ( guint32 )hChannel, dwCount,
                 ( char* )pBuf->ptr() );
             // remove the buf from the pending
             // queue.
@@ -262,11 +253,7 @@ gint32 CMyStreamServer::OnRecvData_Loop(
 
     }while( 0 );
 
-    if( SUCCEEDED( ret ) )
-    {
-        oCfg[ 0 ] = dwCount;
-    }
-    else if( ERROR( ret ) )
+    if( ERROR( ret ) )
     {
         DebugPrintEx( logNotice, ret,
             "Error in OnRecvData_Loop"
