@@ -6477,7 +6477,7 @@ gint32 CImplMainFunc::EmitInitRouter(
 
         Wa( "CCfgOpener oRtCfg;" );
         Wa( "oRtCfg.SetStrProp(" );
-            Wa( "propSvrInstName, strRtName );" );
+        Wa( "    propSvrInstName, strRtName );" );
         Wa( "oRtCfg[ propIoMgr ] = g_pIoMgr;" );
         Wa( "CIoManager* pMgr = g_pIoMgr;" );
         Wa( "pMgr->SetCmdLineOpt(" );
@@ -6540,9 +6540,12 @@ void CImplMainFunc::EmitRtUsage(
     Wa( "    \"\\t [ -a to enable authentication ]\\n\"" );
 #endif
     Wa( "    \"\\t [ -d to run as a daemon ]\\n\"" );
-    Wa( "    \"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
-    Wa( "    \"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
-    Wa( "    \"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
+    if( g_bBuiltinRt )
+    {
+        Wa( "    \"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
+        Wa( "    \"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
+        Wa( "    \"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
+    }
     CCOUT << "    \"\\t [ -h this help ]\\n\", szName );";
     BLOCK_CLOSE;
     NEW_LINE;
@@ -6785,8 +6788,11 @@ gint32 CImplMainFunc::EmitRtMainFunc(
     do{
         EmitRtUsage( bProxy, m_pWriter );
         NEW_LINE;
-        Wa( "#include <getopt.h>" );
-        Wa( "#include <sys/stat.h>" );
+        if( g_bBuiltinRt )
+        {
+            Wa( "#include <getopt.h>" );
+            Wa( "#include <sys/stat.h>" );
+        }
         Wa( "int _main( int argc, char** argv);" );
 
         Wa( "int main( int argc, char** argv )" );
@@ -6796,60 +6802,70 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         Wa( "int ret = 0;" );
         CCOUT << "do";
         BLOCK_OPEN;
-        stdstr strOpt;
-        if( !bProxy || bFuse )
-            strOpt = "hadm:"; 
-        else
-            strOpt = "had";
 
-        Wa( "gint32 iOptIdx = 0;" );
-        Wa( "struct option arrLongOptions[] = {" );
-        Wa( "    {\"driver\",   required_argument, 0,  0 }," );
-        Wa( "    {\"objdesc\",  required_argument, 0,  0 }," );
-        Wa( "    {\"router\",   required_argument, 0,  0 }," );
-        Wa( "    {0,             0,                 0,  0 }" );
-        Wa( "};            " );
-        CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
-        NEW_LINE;
-        Wa( "    arrLongOptions, &iOptIdx ) ) != -1 )" );
+        if( g_bBuiltinRt )
+        {
+            stdstr strOpt;
+            if( !bProxy )
+                strOpt = "hadm:"; 
+            else
+                strOpt = "had";
+            Wa( "gint32 iOptIdx = 0;" );
+            Wa( "struct option arrLongOptions[] = {" );
+            Wa( "    {\"driver\",   required_argument, 0,  0 }," );
+            Wa( "    {\"objdesc\",  required_argument, 0,  0 }," );
+            Wa( "    {\"router\",   required_argument, 0,  0 }," );
+            Wa( "    {0,             0,                 0,  0 }" );
+            Wa( "};            " );
+            CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
+            NEW_LINE;
+            Wa( "    arrLongOptions, &iOptIdx ) ) != -1 )" );
+        }
+        else
+        {
+            Wa( "while( ( opt = getopt( argc, argv, \"hadm:\" ) ) != -1 )" );
+        }
         BLOCK_OPEN;
         Wa( "switch( opt )" );
         BLOCK_OPEN;
-        Wa( "case 0:" );
-        BLOCK_OPEN;
-        Wa( "struct stat sb;" );
-        Wa( "ret = lstat( optarg, &sb );" );
-        Wa( "if( ret < 0 )" );
-        BLOCK_OPEN;
-        Wa( "perror( strerror( errno ) );" );
-        Wa( "ret = -errno;" );
-        CCOUT << "break;";
-        BLOCK_CLOSE;
-        NEW_LINE;
-        Wa( "if( ( sb.st_mode & S_IFMT ) != S_IFLNK &&" );
-        Wa( "    ( sb.st_mode & S_IFMT ) != S_IFREG )" );
-        BLOCK_OPEN;
-        Wa( "fprintf( stderr, \"Error invalid file '%s'.\\n\", optarg );" );
-        Wa( "ret = -EINVAL;" );
-        CCOUT << "break;";
-        BLOCK_CLOSE;
-        NEW_LINE;
-        Wa( "if( iOptIdx == 0 )" );
-        Wa( "    g_strDrvPath = optarg;" );
-        Wa( "else if( iOptIdx == 1 )" );
-        Wa( "    g_strObjDesc = optarg;" );
-        Wa( "else if( iOptIdx == 2 )" );
-        Wa( "    g_strRtDesc = optarg;" );
-        Wa( "else" );
-        BLOCK_OPEN;
-        Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
-        Wa( "Usage( argv[ 0 ] );" );
-        CCOUT << "ret = -EINVAL;";
-        BLOCK_CLOSE;
-        NEW_LINE;
-        CCOUT << "break;";
-        BLOCK_CLOSE;
-        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "case 0:" );
+            BLOCK_OPEN;
+            Wa( "struct stat sb;" );
+            Wa( "ret = lstat( optarg, &sb );" );
+            Wa( "if( ret < 0 )" );
+            BLOCK_OPEN;
+            Wa( "perror( strerror( errno ) );" );
+            Wa( "ret = -errno;" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "if( ( sb.st_mode & S_IFMT ) != S_IFLNK &&" );
+            Wa( "    ( sb.st_mode & S_IFMT ) != S_IFREG )" );
+            BLOCK_OPEN;
+            Wa( "fprintf( stderr, \"Error invalid file '%s'.\\n\", optarg );" );
+            Wa( "ret = -EINVAL;" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "if( iOptIdx == 0 )" );
+            Wa( "    g_strDrvPath = optarg;" );
+            Wa( "else if( iOptIdx == 1 )" );
+            Wa( "    g_strObjDesc = optarg;" );
+            Wa( "else if( iOptIdx == 2 )" );
+            Wa( "    g_strRtDesc = optarg;" );
+            Wa( "else" );
+            BLOCK_OPEN;
+            Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
+            Wa( "Usage( argv[ 0 ] );" );
+            CCOUT << "ret = -EINVAL;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
 #ifdef AUTH
         Wa( "case 'a':" );
         Wa( "    { g_bAuth = true; break; }" );
