@@ -305,6 +305,16 @@ gint32 GetModulePath( std::string& strResult )
     return 0;
 }
 
+stdstr GetDirName( const stdstr& strPath )
+{
+    char szPath[ 1024 ];
+    size_t pos = strPath.copy(
+        szPath, sizeof( szPath ) - 1 );
+    szPath[ pos ] = 0;
+    stdstr strRet = dirname( szPath );
+    return strRet;
+}
+
 gint32 FindInstCfg(
     const std::string& strFileName,
     std::string& strPath )

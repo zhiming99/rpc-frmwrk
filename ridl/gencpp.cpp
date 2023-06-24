@@ -6460,12 +6460,18 @@ gint32 CImplMainFunc::EmitInitRouter(
         NEW_LINE;
         Wa( "pSvc->SetRouterName( strRtName + \"_\" +" );
         Wa( "    std::to_string( getpid() ) );" );
-        Wa( "stdstr strDescPath = \"./router.json\";" );
+        Wa( "stdstr strDescPath;" ); 
+        Wa( "if( g_strRtDesc.size() )" );
+        Wa( "    strDescPath = g_strRtDesc;" );
+        Wa( "else if( g_bAuth )" );
+        Wa( "    strDescPath = \"./rtauth.json\";" );
+        Wa( "else" );
+        Wa( "    strDescPath = \"./router.json\";" );
+        NEW_LINE;
         Wa( "if( g_bAuth )" );
         BLOCK_OPEN;
         Wa( "pSvc->SetCmdLineOpt(" );
-        Wa( "    propHasAuth, g_bAuth );" );
-        CCOUT << "strDescPath = \"./rtauth.json\";";
+        CCOUT << "    propHasAuth, g_bAuth );";
         BLOCK_CLOSE;
         NEW_LINE;
 
@@ -6534,6 +6540,9 @@ void CImplMainFunc::EmitRtUsage(
     Wa( "    \"\\t [ -a to enable authentication ]\\n\"" );
 #endif
     Wa( "    \"\\t [ -d to run as a daemon ]\\n\"" );
+    Wa( "    \"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
+    Wa( "    \"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
+    Wa( "    \"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
     CCOUT << "    \"\\t [ -h this help ]\\n\", szName );";
     BLOCK_CLOSE;
     NEW_LINE;
@@ -6776,6 +6785,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
     do{
         EmitRtUsage( bProxy, m_pWriter );
         NEW_LINE;
+        Wa( "#include <getopt.h>" );
+        Wa( "#include <sys/stat.h>" );
         Wa( "int _main( int argc, char** argv);" );
 
         Wa( "int main( int argc, char** argv )" );
@@ -6785,13 +6796,60 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         Wa( "int ret = 0;" );
         CCOUT << "do";
         BLOCK_OPEN;
+        stdstr strOpt;
         if( !bProxy || bFuse )
-            Wa( "while( ( opt = getopt( argc, argv, \"hadm:\" ) ) != -1 )" );
+            strOpt = "hadm:"; 
         else
-            Wa( "while( ( opt = getopt( argc, argv, \"had\" ) ) != -1 )" );
+            strOpt = "had";
+
+        Wa( "gint32 iOptIdx = 0;" );
+        Wa( "struct option arrLongOptions[] = {" );
+        Wa( "    {\"driver\",   required_argument, 0,  0 }," );
+        Wa( "    {\"objdesc\",  required_argument, 0,  0 }," );
+        Wa( "    {\"router\",   required_argument, 0,  0 }," );
+        Wa( "    {0,             0,                 0,  0 }" );
+        Wa( "};            " );
+        CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
+        NEW_LINE;
+        Wa( "    arrLongOptions, &iOptIdx ) ) != -1 )" );
         BLOCK_OPEN;
         Wa( "switch( opt )" );
         BLOCK_OPEN;
+        Wa( "case 0:" );
+        BLOCK_OPEN;
+        Wa( "struct stat sb;" );
+        Wa( "ret = lstat( optarg, &sb );" );
+        Wa( "if( ret < 0 )" );
+        BLOCK_OPEN;
+        Wa( "perror( strerror( errno ) );" );
+        Wa( "ret = -errno;" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "if( ( sb.st_mode & S_IFMT ) != S_IFLNK &&" );
+        Wa( "    ( sb.st_mode & S_IFMT ) != S_IFREG )" );
+        BLOCK_OPEN;
+        Wa( "fprintf( stderr, \"Error invalid file '%s'.\\n\", optarg );" );
+        Wa( "ret = -EINVAL;" );
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "if( iOptIdx == 0 )" );
+        Wa( "    g_strDrvPath = optarg;" );
+        Wa( "else if( iOptIdx == 1 )" );
+        Wa( "    g_strObjDesc = optarg;" );
+        Wa( "else if( iOptIdx == 2 )" );
+        Wa( "    g_strRtDesc = optarg;" );
+        Wa( "else" );
+        BLOCK_OPEN;
+        Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
+        Wa( "Usage( argv[ 0 ] );" );
+        CCOUT << "ret = -EINVAL;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        CCOUT << "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
 #ifdef AUTH
         Wa( "case 'a':" );
         Wa( "    { g_bAuth = true; break; }" );
@@ -6970,6 +7028,9 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    bool bProxy, CRpcServices* pSvc );" );
             }
 #endif
+            Wa( "static std::string g_strDrvPath;" );
+            Wa( "static std::string g_strObjDesc;" );
+            Wa( "static std::string g_strRtDesc;" );
             Wa( "static bool g_bAuth = false;" );
             Wa( "static ObjPtr g_pRouter;" );
             Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
@@ -7039,6 +7100,8 @@ gint32 CImplMainFunc::EmitInitContext(
 
             Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
             Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+            Wa( "if( g_strDrvPath.size() )" );
+            Wa( "    oParams[ propConfigPath ] = g_strDrvPath;" );
         }
         NEW_LINE;
 
@@ -7162,7 +7225,7 @@ gint32 CImplMainFunc::EmitAddSvcStatFiles(
         BLOCK_CLOSE;
         NEW_LINE;
 
-        Wa( "stdstr strName;" );
+        Wa( "std::string strName;" );
         Wa( "ObjPtr pObj;" );
         Wa( "DIR_SPTR pEnt;" );
         Wa( "CFuseObjBase* pList;" );
@@ -7329,8 +7392,21 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         CCOUT << "break;";
         INDENT_DOWNL;
         NEW_LINE;
-        CCOUT << "stdstr strDesc = " << "\"./"
-            << g_strAppName << "desc.json\";";
+        if( g_bBuiltinRt )
+        {
+            Wa( "std::string strDesc;" );
+            Wa( "if( g_strObjDesc.empty() )" );
+            CCOUT << "    strDesc = " << "\"./"
+                << g_strAppName << "desc.json\";";
+            NEW_LINE;
+            Wa( "else" );
+            Wa( "    strDesc = g_strObjDesc;" );
+        }
+        else
+        {
+            CCOUT << "std::string strDesc = " << "\"./"
+                << g_strAppName << "desc.json\";";
+        }
         NEW_LINE;
         CCOUT << "CRpcServices* pSvc = nullptr;";
         NEW_LINE;

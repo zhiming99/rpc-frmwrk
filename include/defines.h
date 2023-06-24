@@ -287,6 +287,8 @@ gint32 GetLibPath( std::string& strResult,
 
 gint32 GetModulePath( std::string& strResult );
 
+std::string GetDirName( const std::string& strPath );
+
 gint32 FindInstCfg(
     const std::string& strFileName,
     std::string& strPath );
