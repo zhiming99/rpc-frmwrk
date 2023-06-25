@@ -1498,6 +1498,15 @@ gint32 CDBusStreamBusPort::StopStreamChan(
     gint32 ret = 0;
     do{
         ObjPtr pIf = GetStreamIf();
+        CRpcServices* pSvc = pIf;
+
+        // FIXME: we should also check if the upstream
+        // CFastRpcProxyBase or CFastRpcServerBase is
+        // in stopping state or not.
+        if( pSvc->GetState() == stateStopping ||
+            pSvc->GetState() == stateStopped )
+            break;
+
         TaskletPtr pStopTask;
         ret = DEFER_IFCALLEX_NOSCHED2(
             0, pStopTask, pIf, 
@@ -1534,15 +1543,6 @@ gint32 CDBusStreamBusPort::StopStreamChan(
         CIfRetryTask* pRetry = pStopTask;
         pRetry->SetClientNotify( pRespCb );
         auto pMgr = this->GetIoMgr();
-        CRpcServices* pSvc = pIf;
-
-        // FIXME: we should also check if the upstream
-        // CFastRpcProxyBase or CFastRpcServerBase is
-        // in stopping state or not.
-        if( pSvc->GetState() == stateStopping ||
-            pSvc->GetState() == stateStopped )
-            break;
-
         ret = pMgr->RescheduleTask( pStopTask );
         if( ERROR( ret ) )
         {

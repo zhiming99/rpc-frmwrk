@@ -193,6 +193,12 @@ class PyRpcContext :
                 if 'AppName' in oInitParams:
                     p1.SetStrProp( 104,
                         oInitParams[ 'AppName' ] )
+                if 'driver' in oInitParams:
+                    p1.SetStrProp( 105,
+                        oInitParams[ 'driver' ] )
+                if 'router' in oInitParams:
+                    p1.SetStrProp( 106,
+                        oInitParams[ 'router' ] )
                 else:
                     ret = -ErrorCode.EINVAL
         except Exception as err:

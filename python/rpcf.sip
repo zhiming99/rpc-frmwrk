@@ -916,6 +916,22 @@ namespace cpp
                 break;
             }
 
+            stdstr strCfg;
+            if( oCfg.exist( 105 ) )
+            {
+                oCfg.GetStrProp( 105, strCfg );
+                oCfg.RemoveProperty( 105 );
+                oCfg.SetStrProp(
+                    propConfigPath, strCfg );
+            }
+
+            stdstr strRtFile;
+            if( oCfg.exist( 106 ) )
+            {
+                oCfg.GetStrProp( 106, strRtFile );
+                oCfg.RemoveProperty( 106 );
+            }
+
             ret = CheckKeyPass();
             if( ERROR( ret ) )
                 break;
@@ -948,12 +964,19 @@ namespace cpp
             pMgr->SetRouterName(
                 strRtName + "_" +
                 std::to_string( getpid() ) );
-            stdstr strDescPath = "./router.json";
+
+            stdstr strDescPath;
+            if( strRtFile.size())
+                strDescPath = strRtFile;
+            else if( bAuth )
+                strDescPath = "./rtauth.json";
+            else
+                strDescPath = "./router.json";
+
             if( bAuth )
             {
                 pMgr->SetCmdLineOpt(
                     propHasAuth, bAuth );
-                strDescPath = "./rtauth.json";
             }
 
             CCfgOpener oRtCfg;

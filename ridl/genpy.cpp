@@ -3050,6 +3050,12 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
         if( !bProxy && g_bBuiltinRt )
             Wa( "\"\\t [ -m to specify a directory as the mountpoint for rpcfs ]\\n\" +" );
 #endif
+        if( g_bBuiltinRt )
+        {
+            Wa( "\"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
+            Wa( "\"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
+            Wa( "\"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
+        }
         Wa( "\"\\t [ -h this help ]\\n\" ) \% ( sys.argv[ 0 ] )," );
         CCOUT << "file=sys.stderr )";
         INDENT_DOWN;
@@ -3064,14 +3070,15 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
     do{
         Wa( "argv = sys.argv[1:]" );
         Wa( "try:" );
+        stdstr strShort = "had";
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
-            Wa( "    opts, args = getopt.getopt(argv, \"hadm:\")" );
-        else
-            Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
-#else
-        Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
+            strShort = "hadm:";
 #endif
+        CCOUT << "    opts, args = getopt.getopt(argv, \""<< strShort <<"\","; 
+        NEW_LINE;
+        CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\" ] )";
+        NEW_LINE;
 
         Wa( "except:" );
         Wa( "    Usage()" );
@@ -3094,6 +3101,28 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
             Wa( "        bMount = True" );
         }
 #endif
+        CCOUT << "    elif opt in ('--driver', '--router', '--objdesc'):";
+        INDENT_UP;
+        INDENT_UPL;
+        CCOUT << "try:";
+        INDENT_UPL;
+        Wa( "stinfo = os.stat( arg )" );
+        Wa( "if not stat.S_ISREG( stinfo.st_mode ) and not stat.S_ISLNK( stinfo.st_mode):" );
+        CCOUT << "    raise Exception( \"Error invalid file '%s'\" \% arg )";
+        INDENT_DOWNL;
+        Wa( "except Exception as err:" );
+        Wa( "    print( err )" );
+        Wa( "    Usage()" );
+        Wa( "    sys.exit( 1 )" );
+        Wa( "if opt == '--driver':" );
+        Wa( "    params[ 'driver' ] = arg" );
+        Wa( "elif opt == '--router':" );
+        Wa( "    params[ 'router' ] = arg" );
+        Wa( "else:" );
+        CCOUT << "    params[ 'objdesc' ] = arg";
+        INDENT_DOWN;
+        INDENT_DOWNL;
+
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 0 )" );
@@ -3282,6 +3311,7 @@ gint32 CImplPyMainFunc::OutputCli(
         {
             Wa( "import sys" );
             Wa( "import getopt" );
+            Wa( "import stat" );
             NEW_LINE;
             EmitUsage( true );
         }
@@ -3330,8 +3360,11 @@ gint32 CImplPyMainFunc::OutputCli(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
-        CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+        Wa( "if 'objdesc' in params:" );
+        Wa( "    strPath_ = params[ 'objdesc' ]" );
+        Wa( "else:" );
+        Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+        CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
         for( auto elem : vecSvcs )
         {
@@ -3588,6 +3621,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         {
             Wa( "import sys" );
             Wa( "import getopt" );
+            Wa( "import stat" );
             NEW_LINE;
             EmitUsage( false );
         }
@@ -3637,8 +3671,11 @@ gint32 CImplPyMainFunc::OutputSvr(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
-        CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+        Wa( "if 'objdesc' in params:" );
+        Wa( "    strPath_ = params[ 'objdesc' ]" );
+        Wa( "else:" );
+        Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+        CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
         NEW_LINE;        
         for( auto elem : vecSvcs )
         {
