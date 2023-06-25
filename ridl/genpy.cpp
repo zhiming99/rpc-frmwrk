@@ -3360,12 +3360,21 @@ gint32 CImplPyMainFunc::OutputCli(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        Wa( "if 'objdesc' in params:" );
-        Wa( "    strPath_ = params[ 'objdesc' ]" );
-        Wa( "else:" );
-        Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
-        CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
-        NEW_LINE;        
+        if( g_bBuiltinRt )
+        {
+            Wa( "if 'objdesc' in params:" );
+            Wa( "    strPath_ = params[ 'objdesc' ]" );
+            Wa( "else:" );
+            Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+            CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__) )" );
+            CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
         for( auto elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
@@ -3671,12 +3680,21 @@ gint32 CImplPyMainFunc::OutputSvr(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        Wa( "if 'objdesc' in params:" );
-        Wa( "    strPath_ = params[ 'objdesc' ]" );
-        Wa( "else:" );
-        Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
-        CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
-        NEW_LINE;        
+        if( g_bBuiltinRt )
+        {
+            Wa( "if 'objdesc' in params:" );
+            Wa( "    strPath_ = params[ 'objdesc' ]" );
+            Wa( "else:" );
+            Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+            CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__) )" );
+            CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
         for( auto elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
