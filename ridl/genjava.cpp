@@ -1450,24 +1450,46 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         Wa( "Option oAuth = new Option(\"a\", \"to enable authentication\");" );
         Wa( "oAuth.setRequired(false);" );
         Wa( "options.addOption(oAuth);" );
+        NEW_LINE;
 
         Wa( "Option oDaemon = new Option(\"d\", \"to run as a daemon\");" );
         Wa( "oDaemon.setRequired(false);" );
         Wa( "options.addOption(oDaemon);" );
+        NEW_LINE;
 
 #ifdef FUSE3
-        if( bServer && g_bBuiltinRt )
+        if( bServer )
         {
             Wa( "String strMPoint = null;" );
             Wa( "Option oMountPoint = new Option(\"m\", true," );
             Wa( "    \"to specify a directory as the mount-point for rpcfs\" );" );
             Wa( "oMountPoint.setRequired(false);" );
             Wa( "options.addOption(oMountPoint);" );
+            NEW_LINE;
         }
 #endif
+        Wa( "Option oDriver = new Option(\"xd\", \"driver\", true," );
+        Wa( "    \"to specify the path to the customized 'driver.json'.\" );" );
+        Wa( "oDriver.setRequired(false);" );
+        Wa( "options.addOption(oDriver);" );
+        NEW_LINE;
+
+        Wa( "Option oRouter = new Option(\"xr\", \"router\", true," );
+        Wa( "    \"to specify the path to the customized 'router.json'.\" );" );
+        Wa( "oRouter.setRequired(false);" );
+        Wa( "options.addOption(oRouter);" );
+        NEW_LINE;
+
+        Wa( "Option oObjDesc = new Option(\"xo\", \"objdesc\", true," );
+        Wa( "    \"to specify the path to the object description file.\" );" );
+        Wa( "oObjDesc.setRequired(false);" );
+        Wa( "options.addOption(oObjDesc);" );
+        NEW_LINE;
+
         Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
         Wa( "oHelp.setRequired(false);" );
         Wa( "options.addOption(oHelp);" );
+        NEW_LINE;
 
 
         Wa( "CommandLineParser parser = new DefaultParser();" );
@@ -1491,22 +1513,51 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         Wa( "Option[] actOpts = cmd.getOptions();" );
         Wa( "for( Option opt : actOpts )" );
         BLOCK_OPEN; 
+        Wa( "boolean bCheck = false;" );
         Wa( "if( opt.getOpt() == \"a\" )" );
         Wa( "    oInit.put( 102, Boolean.valueOf( true ) );" );
         Wa( "else if( opt.getOpt() == \"d\" )" );
         Wa( "    oInit.put( 103, Boolean.valueOf( true ) );" );
 #ifdef FUSE3
-        if( bServer && g_bBuiltinRt )
+        if( bServer )
         {
             Wa( "else if( opt.getOpt() == \"m\" )" );
             Wa( "    strMPoint = opt.getValue();" );
         }
 #endif
+        Wa( "else if( opt.getLongOpt() == \"driver\" )" );
+        Wa( "{ bCheck = true; oInit.put( 105, opt.getValue() ); }" );
+        Wa( "else if( opt.getLongOpt() == \"router\" )" );
+        Wa( "{ bCheck = true; oInit.put( 106, opt.getValue() ); }" );
+        Wa( "else if( opt.getLongOpt() == \"objdesc\" )" );
+        Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
+
         Wa( "else if( opt.getOpt() == \"h\" )" );
         BLOCK_OPEN; 
         CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
         NEW_LINE;
         CCOUT << "System.exit(RC.STATUS_SUCCESS);";
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "if( bCheck )" );
+        CCOUT << "try";
+        BLOCK_OPEN;
+        Wa( "java.io.File oFile = new java.io.File( opt.getValue() );" );
+        Wa( "if( !oFile.isFile() )" );
+        BLOCK_OPEN;
+        Wa( "System.err.println( \"Error invalid file '\"" );
+        Wa( "    + opt.getValue() + \"'\" );" );
+        CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
+        NEW_LINE;
+        CCOUT << "System.exit(RC.EINVAL);";
+        BLOCK_CLOSE;
+        BLOCK_CLOSE;
+        CCOUT << "catch ( Exception e )";
+        BLOCK_OPEN;
+        Wa( "System.err.println(e.getMessage());" );
+        CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
+        NEW_LINE;
+        CCOUT << "System.exit(RC.EFAULT);";
         BLOCK_CLOSE;
         BLOCK_CLOSE; 
         NEW_LINE;
@@ -4334,7 +4385,7 @@ do{ \
     BLOCK_OPEN;\
     CCOUT << "try"; \
     BLOCK_OPEN; \
-    Wa( "TimeUnit.SECONDS.sleep(1);" ); \
+    CCOUT << "TimeUnit.SECONDS.sleep(1);"; \
     BLOCK_CLOSE;\
     Wa( "catch( InterruptedException e ){}" ); \
     if( vecSvcs.size() == 1 ) \
@@ -4512,6 +4563,7 @@ gint32 CImplJavaMainCli::Output()
             Wa( "    oInit.put( 105, strCfgPath );" );
             if( g_bBuiltinRt )
             {
+                Wa( "String strDescPath = \"\";" );
                 os.EmitGetOpt( false );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
                 NEW_LINE;
@@ -4542,9 +4594,21 @@ gint32 CImplJavaMainCli::Output()
         BLOCK_OPEN;
 
         stdstr strDescName = g_strAppName + "desc.json";
-        Wa( "String strDescPath =" );
-        CCOUT << "    getDescPath( \"" << strDescName << "\" );";
-        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "if( strDescPath.isEmpty() )" );
+            BLOCK_OPEN;
+            Wa( "strDescPath =" );
+            CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "String strDescPath =" );
+            CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+            NEW_LINE;
+        }
         Wa( "if( strDescPath.isEmpty() )" );
         Wa( "{ ret = -RC.ENOENT; return; }" );
         NEW_LINE;
@@ -4659,6 +4723,7 @@ gint32 CImplJavaMainSvr::Output()
             Wa( "    oInit.put( 105, strCfgPath );" );
             if( g_bBuiltinRt )
             {
+                Wa( "String strDescPath = \"\";" );
                 os.EmitGetOpt( true );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
                 NEW_LINE;
@@ -4689,9 +4754,21 @@ gint32 CImplJavaMainSvr::Output()
         BLOCK_OPEN;
 
         stdstr strDescName = g_strAppName + "desc.json";
-        Wa( "String strDescPath =" );
-        CCOUT << "    getDescPath( \"" << strDescName << "\" );";
-        NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            Wa( "if( strDescPath.isEmpty() )" );
+            BLOCK_OPEN;
+            Wa( "strDescPath =" );
+            CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "String strDescPath =" );
+            CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+            NEW_LINE;
+        }
         Wa( "if( strDescPath.isEmpty() )" );
         Wa( "{ ret = -RC.ENOENT; return; }" );
         NEW_LINE;
@@ -4733,10 +4810,12 @@ gint32 CImplJavaMainSvr::Output()
                 CServiceDecl* pSvc = vecSvcs[ i ];
                 stdstr strName = pSvc->GetName();
                 Wa( "rpcbase.AddSvcStatFile(" );
-                CCOUT <<"    oSvc";
-                if( i > 0 )
-                    CCOUT << i;
-                CCOUT << ".getInst(), \"" << strName << "\" );";
+                if( vecSvcs.size() == 1 )
+                    CCOUT <<"    oSvc.getInst(), "
+                        << "\"" << strName << "\" );";
+                else
+                    CCOUT <<"    oSvcs[ " << i << " ]"
+                        << ".getInst(), \"" << strName << "\" );";
                 NEW_LINE;
             }
             stdstr strCmd = g_strPrefix + g_strAppName + ".";

@@ -42,6 +42,11 @@ public class JavaRpcContext
      *      can override the default path of the driver.json.
      *      It is a must-have attribute when fastrpc or
      *      built-in router is enabled.</p>
+
+     *      <p>106: a string as the path of 'router.json', which
+     *      can override the default path of the router.json.
+     *      It is a must-have attribute when fastrpc or
+     *      built-in router is enabled.</p>
      * @return an ObjPtr object holding the instance of IoMgr on success
      * and null on error, with m_iError set.
      */
@@ -106,6 +111,11 @@ public class JavaRpcContext
                     ( String )oInit.get ( 104 );
                 if( strVal != null )
                     oCfg.SetStrProp( 104, strVal );
+
+                strVal =
+                    ( String )oInit.get ( 106 );
+                if( strVal != null )
+                    oCfg.SetStrProp( 106, strVal );
             }
 
             JRetVal jret =

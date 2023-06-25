@@ -1150,6 +1150,13 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 break;
             }
 
+            stdstr strRtFile;
+            if( oCfg.exist( 106 ) )
+            {
+                oCfg.GetStrProp( 106, strRtFile );
+                oCfg.RemoveProperty( 106 );
+            }
+
             // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
@@ -1183,12 +1190,18 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             pMgr->SetRouterName(
                 strRtName + "_" +
                 std::to_string( getpid() ) );
-            stdstr strDescPath = "./router.json";
+            stdstr strDescPath;
+            if( strRtFile.size() )
+                strDescPath = strRtFile;
+            else if( bAuth )
+                strDescPath = "./rtauth.json";
+            else
+                strDescPath = "./router.json";
+
             if( bAuth )
             {
                 pMgr->SetCmdLineOpt(
                     propHasAuth, bAuth );
-                strDescPath = "./rtauth.json";
             }
 
             CCfgOpener oRtCfg;
