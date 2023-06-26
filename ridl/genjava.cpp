@@ -1525,11 +1525,11 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
             Wa( "    strMPoint = opt.getValue();" );
         }
 #endif
-        Wa( "else if( opt.getLongOpt() == \"driver\" )" );
+        Wa( "else if( opt.getOpt() == \"xd\" || opt.getLongOpt() == \"driver\" )" );
         Wa( "{ bCheck = true; oInit.put( 105, opt.getValue() ); }" );
-        Wa( "else if( opt.getLongOpt() == \"router\" )" );
+        Wa( "else if( opt.getOpt() == \"xr\" || opt.getLongOpt() == \"router\" )" );
         Wa( "{ bCheck = true; oInit.put( 106, opt.getValue() ); }" );
-        Wa( "else if( opt.getLongOpt() == \"objdesc\" )" );
+        Wa( "else if( opt.getOpt() == \"xo\" || opt.getLongOpt() == \"objdesc\" )" );
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
 
         Wa( "else if( opt.getOpt() == \"h\" )" );
