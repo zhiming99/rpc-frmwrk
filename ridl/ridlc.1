@@ -24,20 +24,20 @@ To generate the Python skelton files.
 To generate the Java skelton files.
 .TP
 .BR \-f " "
-To generate the 'FUSE integration' skelton files.
+To generate the 'skelton files with 'rpcfs' support. C++ or Python at present.
 .TP
 .BR \-P " "\fIprefix\fR
 To specify the prefix of the Java package. This option is only effective for Java.
 .TP
 .BR \-l " "
-To build a shared library instead of a program. This option works for C++ project or FUSE project.
+To build a shared library instead of a program. This option works for programms of C++ skelton
 .TP
 .BR \-L " "\fIlang\fR
 To output the 'README.md' file in the specified language <lang>. Currently we support
 two languages, "cn" as Chinese, and "en" as English.
 .TP
 .BR \-s " "
-To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels. C++ Only.
+To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels.
 .TP
 .BR \-b " "
 To generate the skelton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
