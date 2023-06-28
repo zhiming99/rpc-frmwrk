@@ -2350,6 +2350,8 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
         if( dwDiff > dwTimeoutSec )
         {
             ret = -ETIMEDOUT;
+            DebugPrintEx( logErr, ret,
+                "Error login timeout" );
             break;
         }
         
