@@ -1465,14 +1465,13 @@ gint32 CRouterLocalMatch::IsMyReqToForward(
     DMsgPtr pMsg( pReqMsg );
     stdstr strVal = pMsg.GetSender();
 
-    ret = oCfg.IsEqual( propSrcDBusName, 
-        pMsg.GetSender() );
+    ret = oCfg.IsEqual(
+        propSrcDBusName, strVal );
 
     if( ERROR( ret ) )
     {
         ret = oCfg.IsEqual(
-            propSrcUniqName, 
-            pMsg.GetSender() );
+            propSrcUniqName, strVal );
     }
 
     if( ERROR( ret ) )
