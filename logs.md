@@ -1,4 +1,8 @@
 ---
+[`Fri Jun 30 2023 10:16:20 PM Beijing`]   
+1. builtin router support is fully completed.
+2. Next I will try to remove the crosstalk between dbuslocalpdo and the loopback ports. The new design is less smart than than the original one, but it can help to finally generate a skelton without dbus-connection, significant for non-linux platform.
+
 [`Mon Jun 12 2023 10:11:46 PM Beijing`]   
 1. We have almose finished adding fastrpc and built-in router support to both Python and Java. The remaining work is to fix some bugs and make it stable.
 2. The haunting `EchoMany response lost` issue is reopened. There is still an unknown bug in the rpcfs module.
