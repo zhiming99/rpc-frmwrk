@@ -345,4 +345,7 @@ elif [ "$1" == "1" ]; then
     echo start fuse test
     bash tools/fusetest.sh || exit 10
     kill -9 `pidof rpcrouter`
+
+    echo start btinrt test
+    bash tools/btinrtst.sh || exit 11
 fi

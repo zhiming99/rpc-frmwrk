@@ -97,6 +97,9 @@ EXTRA_DIST += \
  $(cpptests)/stmtest/StreamTestsvr.h \
  $(cpptests)/stmtest/commdefs.h \
  $(cpptests)/stmtest/maincli.cpp \
+ $(cpptests)/testypes/maincli.cpp \
+ $(cpptests)/testypes/cmdline \
+ $(cpptests)/testypes/TestTypesSvcsvr.cpp \
  $(cpptests)/rpcfs/actcancel2/ActiveCancelcli.cpp \
  $(cpptests)/rpcfs/actcancel2/ActiveCancelcli.h \
  $(cpptests)/rpcfs/actcancel2/ActiveCancelsvr.cpp \

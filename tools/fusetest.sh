@@ -1,10 +1,10 @@
 #!/bin/bash
 basedir=`pwd`
 pushd examples/cpp/
-if [ -d testypes ]; then
-    rm -rf testypes/* || true
+if [ -d testdir ]; then
+    rm -rf testdir/* || true
 else
-    mkdir testypes
+    mkdir testdir
 fi
 
 ulimit -n 8192
@@ -12,7 +12,7 @@ ulimit -a
 
 function stressTest()
 {
-    pushd testypes
+    pushd testdir
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
@@ -65,13 +65,13 @@ RUNCLIENT
     done
 
     popd
-    rm -rf testypes/*
+    rm -rf testdir/*
 }
 
 
 function mkDirTest()
 {
-    pushd testypes
+    pushd testdir
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
@@ -147,30 +147,30 @@ RUNCLIENT
     done
 
     popd
-    rm -rf testypes/*
+    rm -rf testdir/*
 }
 
 echo testing normal RPC
-echo $bin_dir/ridlc -f -O ./testypes ../testypes.ridl
-$bin_dir/ridlc -f -O ./testypes ../testypes.ridl
+echo $bin_dir/ridlc -f -O ./testdir ../testypes.ridl
+$bin_dir/ridlc -f -O ./testdir ../testypes.ridl
 echo stressTest normal
 stressTest
 
 echo testing RPC-over-stream
-echo $bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
-$bin_dir/ridlc -sf -O ./testypes ../testypes.ridl
+echo $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
+$bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
 echo stressTest ROS
 stressTest
 
 echo testing normal RPC via shared library
-echo $bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
-$bin_dir/ridlc -lf -O ./testypes ../testypes.ridl
+echo $bin_dir/ridlc -lf -O ./testdir ../testypes.ridl
+$bin_dir/ridlc -lf -O ./testdir ../testypes.ridl
 echo mkDirTest normal
 mkDirTest
 
 echo testing RPC-over-stream via shared library
-echo $bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
-$bin_dir/ridlc -lsf -O ./testypes ../testypes.ridl
+echo $bin_dir/ridlc -lsf -O ./testdir ../testypes.ridl
+$bin_dir/ridlc -lsf -O ./testdir ../testypes.ridl
 echo mkDirTest ROS
 mkDirTest
 

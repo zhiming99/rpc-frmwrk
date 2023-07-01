@@ -6743,8 +6743,15 @@ do{ \
     Wa( "// using fuse" ); \
     Wa( "std::vector< std::string > strArgv;" ); \
     Wa( "strArgv.push_back( argv[ 0 ] );" ); \
-    Wa( "if( !bDaemon )" ); \
-    Wa( "    strArgv.push_back( \"-f\" );" ); \
+    if( !g_bBuiltinRt ) \
+    { \
+        Wa( "if( bDaemon )" ); \
+        Wa( "    strArgv.push_back( \"-f\" );" ); \
+    } \
+    else \
+    { \
+        Wa( "strArgv.push_back( \"-f\" );" ); \
+    } \
     Wa( "strArgv.push_back( g_strMPoint );" ); \
     NEW_LINE;\
  \
@@ -6954,15 +6961,16 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         BLOCK_CLOSE;
         NEW_LINE;
 
+        Wa( "if( bDaemon )" );
+        BLOCK_OPEN;
+        Wa( "ret = daemon( 1, 0 );" );
+        Wa( "if( ret < 0 )" );
+        CCOUT << "{ ret = -errno; break; }";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
         if( bProxy && !bFuse )
         {
-            Wa( "if( bDaemon )" );
-            BLOCK_OPEN;
-            Wa( "ret = daemon( 1, 0 );" );
-            Wa( "if( ret < 0 )" );
-            CCOUT << "{ ret = -errno; break; }";
-            BLOCK_CLOSE;
-            NEW_LINE;
             CCOUT << "ret = _main( argc, argv );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
@@ -6971,6 +6979,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             NEW_LINE;
             break;
         }
+
 #ifdef FUSE3
         if( bFuse )
         {
@@ -6986,13 +6995,6 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             // !bProxy && !bFuse
             Wa( "if( g_strMPoint.empty() )" );
             BLOCK_OPEN;
-            Wa( "if( bDaemon )" );
-            BLOCK_OPEN;
-            Wa( "ret = daemon( 1, 0 );" );
-            Wa( "if( ret < 0 )" );
-            CCOUT << "{ ret = -errno; break; }";
-            BLOCK_CLOSE;
-            NEW_LINE;
             Wa( "ret = _main( argc, argv );" );
             CCOUT << "break;";
             BLOCK_CLOSE;
@@ -7001,13 +7003,6 @@ gint32 CImplMainFunc::EmitRtMainFunc(
 
         EMIT_CALL_MAIN;
 #else
-        Wa( "if( bDaemon )" );
-        BLOCK_OPEN;
-        Wa( "ret = daemon( 1, 0 );" );
-        Wa( "if( ret < 0 )" );
-        CCOUT << "{ ret = -errno; break; }";
-        BLOCK_CLOSE;
-        NEW_LINE;
         CCOUT << "ret = _main( argc, argv );";
 #endif
         BLOCK_CLOSE;
