@@ -6745,7 +6745,7 @@ do{ \
     Wa( "strArgv.push_back( argv[ 0 ] );" ); \
     if( !g_bBuiltinRt ) \
     { \
-        Wa( "if( bDaemon )" ); \
+        Wa( "if( !bDaemon )" ); \
         Wa( "    strArgv.push_back( \"-f\" );" ); \
     } \
     else \
