@@ -886,6 +886,8 @@ gint32 CFileSet::AddSvcImpl(
         gint32 idx = m_vecFiles.size();
         std::string strExt = ".cpp";
         std::string strExtHdr = ".h";
+        std::string strCliExt = ".cpp";
+        std::string strCliExtHdr = ".h";
         std::string strCpp = m_strPath +
             "/" + strSvcName + "svr.cpp";
         std::string strCliCpp = m_strPath +
@@ -894,7 +896,7 @@ gint32 CFileSet::AddSvcImpl(
         ret = access( strCpp.c_str(), F_OK );
         if( ret == 0 )
         {
-            strExt = "cpp.new";
+            strExt = ".cpp.new";
             strCpp = m_strPath + "/" +
                 strSvcName + "svr.cpp.new";
         }
@@ -902,7 +904,7 @@ gint32 CFileSet::AddSvcImpl(
         ret = access( strCliCpp.c_str(), F_OK );
         if( ret == 0 )
         {
-            strExt = ".cpp.new";
+            strCliExt = ".cpp.new";
             strCliCpp = m_strPath + "/" +
                 strSvcName + "cli.cpp.new";
         }
@@ -924,7 +926,7 @@ gint32 CFileSet::AddSvcImpl(
         ret = access( strCliHeader.c_str(), F_OK );
         if( ret == 0 )
         {
-            strExtHdr = ".h.new";
+            strCliExtHdr = ".h.new";
             strCliHeader = m_strPath + "/" +
                 strSvcName + "cli.h.new";
         }
@@ -944,7 +946,7 @@ gint32 CFileSet::AddSvcImpl(
 
         idx += 1;
         m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + "cli" + strExtHdr ] = idx;
+        m_mapSvcImp[ strSvcName + "cli" + strCliExtHdr ] = idx;
 
         pstm = STMPTR( new std::ofstream(
             strCpp,
@@ -962,7 +964,7 @@ gint32 CFileSet::AddSvcImpl(
 
         idx += 1;
         m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + "cli" + strExt ] = idx;
+        m_mapSvcImp[ strSvcName + "cli" + strCliExt ] = idx;
 
     }while( 0 );
 
