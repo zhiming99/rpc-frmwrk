@@ -54,3 +54,12 @@ endif
 if ENABLE_AUTH
 ridlc_CPPFLAGS+= -DAUTH
 endif
+
+if ENABLE_OPENSSL
+ridlc_CPPFLAGS+= -DOPENSSL
+endif
+
+if ENABLE_GMSSL
+ridlc_CPPFLAGS+= -DGMSSL
+endif
+

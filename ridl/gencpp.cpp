@@ -7931,7 +7931,7 @@ gint32 CExportMakefile::Output()
 #ifdef FUSE3
         if( bFuse || g_bBuiltinRt )
 #else
-        if( bFuse )
+        if( false )
 #endif
         {
             strCmdLine +="s:XXXFUSE:-lutils -lfuseif:; ";
@@ -7946,7 +7946,7 @@ gint32 CExportMakefile::Output()
 
         if( g_bBuiltinRt )
         {
-            strCmdLine +="s:XXXRTFILES:-lrtfiles -lrpc:; ";
+            strCmdLine +="s:XXXRTFILES:-lrtfiles -lrpc -rdynamic:; ";
         }
         else
         {
@@ -8058,6 +8058,21 @@ gint32 CExportDrivers::OutputBuiltinRt()
 #ifdef AUTH
         oFactories.append(
             Json::Value( "./libauth.so" ) );
+#endif
+
+#ifdef OPENSSL
+        oFactories.append(
+            Json::Value( "./libsslpt.so" ) );
+#endif
+
+#ifdef GMSSL
+        oFactories.append(
+            Json::Value( "./libgmsslpt.so" ) );
+#endif
+
+#if defined( OPENSSL ) || defined( GMSSL )
+        oFactories.append(
+            Json::Value( "./libwspt.so" ) );
 #endif
 
         oCli[ JSON_ATTR_FACTORIES ] = oFactories;
