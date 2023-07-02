@@ -5,6 +5,15 @@ SUPPORTED_ENCRYPTION_TYPES="aes256-cts:normal aes128-cts:normal"
 KADMIN_PRINCIPAL="kadmin/admin"
 KADMIN_PASSWORD="MITiys5K6"
 
+plugindir=`dpkg -L krb5-kdc | grep 'plugins$' | head -n 1`
+plugindir=$plugindir/libkrb5
+if [ ! -e $plugindir ]; then
+    make -p $plugindir
+fi
+
+echo ln -s /usr/local/lib/rpcf/libauth.so $plugindir
+ln -s /usr/local/lib/rpcf/libauth.so $plugindir
+
 echo "==================================================================================="
 echo "==== Kerberos KDC and Kadmin ======================================================"
 echo "==================================================================================="

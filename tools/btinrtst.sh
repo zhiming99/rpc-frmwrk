@@ -1,4 +1,8 @@
 #!/bin/bash
+auth=
+if [ "x$1" == "x-a" ]; then
+    auth=$1
+fi
 pkill rpcrouter
 pushd examples/cpp/testypes
 tail -n 18 maincli.cpp
@@ -9,8 +13,8 @@ cat cmdline
 bash cmdline
 make
 sleep 1
-release/TestTypessvr &
+release/TestTypessvr $auth &
 sleep 2
-release/TestTypescli
+release/TestTypescli $auth
 pkill TestTypessvr
 popd
