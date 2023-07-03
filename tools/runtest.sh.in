@@ -45,10 +45,10 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcf/kaclitst || exit 2
     echo active-cancel test...
     ${bin_dir}/rpcf/actclitst || exit 3
-    echo pause-resume test
+    echo pause-resume test...
     ${bin_dir}/rpcf/prclitst || exit 4
-    echo stream test
-    ${bin_dir}/rpcf/stmclitst || exit 6
+    echo stream test...
+    ${bin_dir}/rpcf/stmclitst &> stmdump || ( cat stmdump && exit 6 )
     kill -9 `pidof rpcrouter`
     ${bin_dir}/rpcf/btinrtsvr &
     sleep 5
