@@ -50,11 +50,11 @@ elif [ "$1" == "1" ]; then
     echo stream test...
     ${bin_dir}/rpcf/stmclitst &> stmdump || ( ls -l . && cat stmdump && exit 6 )
     kill -9 `pidof rpcrouter`
-    ${bin_dir}/rpcf/btinrtsvr &
+    ${bin_dir}/rpcf/btinrtsvr $auth &
     sleep 5
     echo build-in-router test
     if [ -d ./reqfwdr ]; then pushd ./reqfwdr; fi
-    ${bin_dir}/rpcf/btinrtcli || exit 5
+    ${bin_dir}/rpcf/btinrtcli $auth || exit 5
     cur_path=`basename $(pwd)`
     if [ $cur_path == "reqfwdr" ]; then popd; fi
     kill -9 `pidof btinrtsvr`

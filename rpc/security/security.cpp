@@ -1086,26 +1086,35 @@ gint32 CRpcReqForwarderProxyAuth::ForwardRequest(
         pMsgRaw == nullptr )
         return -EINVAL;
 
-    std::string strDest =
-        AUTH_DEST( this );
-
-    DMsgPtr pMsg( pMsgRaw );
     gint32 ret = 0;
+    DMsgPtr pMsg( pMsgRaw );
+    CRpcRouter* pRouter = GetParent();
+    std::string strDest = AUTH_DEST( pRouter );
     do{
-        if( strDest != pMsg.GetDestination() )
-            break;
+        std::string strIfName;
+        strIfName = pMsg.GetInterface();
 
-        CRpcRouter* pRouter = GetParent();
+        bool bAuthIf = ( strIfName ==
+            DBUS_IF_NAME( "IAuthenticate" ) );
+
+        if( strDest != pMsg.GetDestination() )
+        {
+            if( bAuthIf )
+            {
+                DebugPrintEx( logErr, ret,
+                    "Error auth Message" );
+                ret = -EACCES;
+            }
+            break;
+        }
+
         if( !pRouter->HasAuth() )
         {
             ret = -EBADMSG;
             break;
         }
 
-        std::string strIfName;
-        strIfName = pMsg.GetInterface();
-        if( strIfName != DBUS_IF_NAME(
-                "IAuthenticate" ) )
+        if( !bAuthIf )
         {
             ret = -EINVAL;
             break;
@@ -2968,6 +2977,9 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
 
         if( strDir != pMsg.GetPath() )
         {
+            if( ERROR( ret ) )
+                DebugPrintEx( logErr, ret,
+                    "Error check message" );
             ret = ERROR_FALSE;
             break;
         }
@@ -2983,7 +2995,7 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
             ret = ERROR_FALSE;
             break;
         }
-                
+
         ret = pMatchHit.NewObj(
             clsid( CRouterRemoteMatch ) );
         if( ERROR( ret ) )

@@ -223,12 +223,12 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
         CIoManager* pMgr = m_pMgr;
         pMgr->GetRouterName( strRtName );
 
-        oParams.SetStrProp(
-            propSvrInstName, strRtName );
+        oParams.SetStrProp( propSvrInstName,
+            MODNAME_RPCROUTER );
 
         oParams[ propIoMgr ] = m_pMgr;
-        pMgr->SetCmdLineOpt(
-            propSvrInstName, strRtName );
+        pMgr->SetCmdLineOpt( propSvrInstName,
+            MODNAME_RPCROUTER );
         ret = CRpcServices::LoadObjDesc(
             strDescPath,
             OBJNAME_ROUTER,

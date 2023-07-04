@@ -6478,12 +6478,13 @@ gint32 CImplMainFunc::EmitInitRouter(
         NEW_LINE;
 
         Wa( "CCfgOpener oRtCfg;" );
-        Wa( "oRtCfg.SetStrProp(" );
-        Wa( "    propSvrInstName, strRtName );" );
+        Wa( "oRtCfg.SetStrProp( propSvrInstName," );
+        Wa( "    MODNAME_RPCROUTER );" );
         Wa( "oRtCfg[ propIoMgr ] = g_pIoMgr;" );
         Wa( "CIoManager* pMgr = g_pIoMgr;" );
-        Wa( "pMgr->SetCmdLineOpt(" );
-        Wa( "    propSvrInstName, strRtName );" );
+        Wa( "pMgr->SetCmdLineOpt( propSvrInstName,");
+        Wa("     MODNAME_RPCROUTER );" );
+        NEW_LINE;
         Wa( "ret = CRpcServices::LoadObjDesc(" );
         Wa( "    strDescPath," );
         Wa( "    OBJNAME_ROUTER," );

@@ -980,11 +980,11 @@ namespace cpp
             }
 
             CCfgOpener oRtCfg;
-            oRtCfg.SetStrProp(
-                propSvrInstName, strRtName );
+            oRtCfg.SetStrProp( propSvrInstName,
+                MODNAME_RPCROUTER );
             oRtCfg.SetPointer( propIoMgr, pMgr );
-            pMgr->SetCmdLineOpt(
-                propSvrInstName, strRtName );
+            pMgr->SetCmdLineOpt( propSvrInstName,
+                MODNAME_RPCROUTER );
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
                 OBJNAME_ROUTER,

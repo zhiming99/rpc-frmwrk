@@ -211,12 +211,12 @@ gint32 InitContext()
                 propHasAuth, g_bAuth );
         }
         CCfgOpener oRtCfg;
-        oRtCfg.SetStrProp(
-            propSvrInstName, strRtName );
+        oRtCfg.SetStrProp( propSvrInstName,
+            MODNAME_RPCROUTER );
         oRtCfg[ propIoMgr ] = g_pIoMgr;
         CIoManager* pMgr = g_pIoMgr;
-        pMgr->SetCmdLineOpt(
-            propSvrInstName, strRtName );
+        pMgr->SetCmdLineOpt( propSvrInstName,
+            MODNAME_RPCROUTER );
         ret = CRpcServices::LoadObjDesc(
             strDescPath,
             OBJNAME_ROUTER,
