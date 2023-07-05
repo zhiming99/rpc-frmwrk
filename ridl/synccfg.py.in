@@ -2,13 +2,20 @@
 import json
 import os
 import sys 
+import errno
 from shutil import move
 from copy import deepcopy
 import multiprocessing
 
-def UpdateDrv() :
-    drvFile = os.path.dirname(os.path.realpath(__file__)) + "/driver.json"
+sys.path.append( '@BINPATH@' )
+from updcfg import *
+
+def UpdateDrv( sysDrvPath : str ) :
+    drvPath = os.path.dirname(os.path.realpath(__file__))
+    drvFile = drvPath + "/driver.json"
+    ret = 0
     try:
+        bBuiltinRt=XXXBUILTINRT
         srcFp = open( drvFile, "r" )
         srcVals = json.load( srcFp )
         srcFp.close()
@@ -22,13 +29,70 @@ def UpdateDrv() :
             multiprocessing.cpu_count() )
 
         srcVals[ 'Arch' ] = oArch
+        if not bBuiltinRt :
+            return
 
+        if( not IsFeatureEnabled( "gmssl" ) and
+            not IsFeatureEnabled( "openssl") ):
+            return
+
+        sysDrvFile = sysDrvPath + "/driver.json"
+        sysDrvFp = open( sysDrvFile, "r" )
+        sysDrvVals = json.load( sysDrvFp )
+        bret = IsUsingGmSSL( sysDrvVals )
+        if bret[ 0 ] < 0 :
+            return
+
+        bGmSSL = bret[ 1 ]
+        for port in sysDrvVals[ 'Ports' ] :
+            strClass = port[ 'PortClass' ]
+            if bGmSSL and strClass != 'RpcGmSSLFido' :
+                continue
+            if not bGmSSL and strClass != 'RpcOpenSSLFido':
+                continue
+            sslPort = deepcopy( port )
+            break
+
+        if sslPort is None:
+            return
+
+        if not "Parameters" in sslPort:
+            return
+
+        params = sslPort[ "Parameters" ]
+        keyPath = params[ "KeyFile" ]
+
+        dirPath = os.path.dirname( keyPath )
+        keyName = os.path.basename( keyPath )
+        if keyName == "signkey.pem":
+            params[ "KeyFile" ] = dirPath + "/clientkey.pem"
+            params[ "CertFile" ] = dirPath + "/clientcert.pem"
+            if bGmSSL:
+                params[ "CACertFile"] = dirPath + "/rootcacert.pem"
+            else:
+                params[ "CACertFile"] = dirPath + "/certs.pem"
+            params[ "SecretFile"] = ""
+
+        cliSrcVals = deepcopy( srcVals )
+        cliSrcVals[ "Ports" ] = [ sslPort ]
+        cliDrvFile = drvPath + "/driver-cli.json"
+
+    except Exception as oErr :
+        ret = -errno.EFAULT
+    finally:
+        if ret < 0 or srcVals is None:
+            return
         destFp = open( drvFile, 'w' )
         json.dump( srcVals, destFp, indent = 4)
         destFp.close()
 
-    except Exception as oErr :
-        pass
+        if cliSrcVals is None:
+            return
+        destFp = open( cliDrvFile, 'w' )
+        json.dump( cliSrcVals, destFp, indent = 4 )
+        destFp.close()
+
+
 
 def SyncCfg() :
 
@@ -91,7 +155,7 @@ def SyncCfg() :
             json.dump( destVals, destFp, indent = 4)
             destFp.close()
 
-        UpdateDrv()
+        UpdateDrv( os.path.dirname( srcPath ) )
         print( "Configuration updated successfully" )
 
     except Exception as err:

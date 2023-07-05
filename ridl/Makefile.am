@@ -27,6 +27,7 @@ mktpl : mktpl.in
 
 synccfg.py : synccfg.py.in
 	sed -e 's,[@]SRCCFG[@],$(ridlc_confdir)/echodesc.json,g' synccfg.py.in > synccfg.py
+	sed -i -e 's,[@]BINPATH[@],$(bindir)/rpcf,g' synccfg.py
 
 ridlc_LDADD=$(COMMON_LINK) ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)

@@ -8026,6 +8026,7 @@ gint32 CExportDrivers::OutputBuiltinRt()
         }
 
         oVal[ JSON_ATTR_PATCH_CFG ] = "true";
+        oVal[ JSON_ATTR_BASE_CFG ] = "driver.json";
 
         std::string strAppCli =
             strAppName + "cli";
@@ -8350,8 +8351,13 @@ gint32 CExportObjDesc::Output()
         stdstr strCmdLine = "s:XXXDESTDIR:";
         strCmdLine += strDesc + ":;" +
             "s:XXXOBJLIST:" + strObjList +
+            ":;";
+        strCmdLine += stdstr( "s:XXXBUILTINRT:" ) +
+            ( g_bBuiltinRt ? "True" : "False" ) +
             ":";
 
+        OutputMsg( 0, "cmdline is %s",
+            strCmdLine.c_str() );
         const char* args[5];
 
         args[ 0 ] = "/bin/sed";

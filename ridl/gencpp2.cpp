@@ -3747,8 +3747,13 @@ gint32 CExportObjDesc2::OutputROS()
         stdstr strCmdLine = "s:XXXDESTDIR:";
         strCmdLine += strDesc + ":;" +
             "s:XXXOBJLIST:" + strObjList +
+            ":;";
+        strCmdLine += stdstr( "s:XXXBUILTINRT:" ) +
+            ( g_bBuiltinRt ? "True" : "False" ) +
             ":";
 
+        OutputMsg( 0, "cmdline is %s",
+            strCmdLine.c_str() );
         const char* args[5];
 
         args[ 0 ] = "/bin/sed";
