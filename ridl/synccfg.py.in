@@ -92,8 +92,6 @@ def UpdateDrv( sysDrvPath : str ) :
         json.dump( cliSrcVals, destFp, indent = 4 )
         destFp.close()
 
-
-
 def SyncCfg() :
 
     srcPath = '@SRCCFG@'
@@ -110,7 +108,7 @@ def SyncCfg() :
                 try:
                     if elem[ "ObjectName" ] == "CEchoServer" :
                         srcCfgs = elem
-                        break;
+                        break
                 except Exception as oErr :
                     pass
 
@@ -167,4 +165,5 @@ def SyncCfg() :
 
     return 0
 
-SyncCfg()
+if __name__ == '__main__' :
+    SyncCfg()

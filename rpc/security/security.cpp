@@ -1519,8 +1519,8 @@ gint32 CAuthentProxy::CreateSessImpl(
 
         CCfgOpener oCfg;
 
-        oCfg.SetPointer(
-            propIoMgr, pRouter->GetIoMgr() );
+        oCfg.SetPointer( propIoMgr,
+            pRouter->GetIoMgr() );
 
         ret = CRpcServices::LoadObjDesc(
             DESC_FILE, strObjName,

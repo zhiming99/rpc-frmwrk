@@ -4653,7 +4653,7 @@ gint32 CRpcServices::LoadObjDesc(
                 // CRpcPdoPort::SetupDBusSetting
                 if( strRmtObjName.empty() && strRmtModName.empty() )
                 {
-                    // important for proxy
+                    // important property for proxy
                     oCfg[ propDestDBusName ] = strDest;
                     oCfg[ propObjPath ] = strObjPath;
                 }
@@ -4682,6 +4682,7 @@ gint32 CRpcServices::LoadObjDesc(
                         break;
                     }
 
+                    // important property for proxy
                     oCfg[ propDestDBusName ] = strRmtSvrName;
                     oCfg[ propObjPath ] = strNewObjPath;
                 }
@@ -4824,47 +4825,7 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
-                // allow each interface to have
-                // its own destination
-                std::string strRmtModName;
-                std::string strRmtObjName;
-                std::string strNewObjPath;
-                std::string strRmtSvrName;
-
-                if( oIfDesc.isMember( JSON_ATTR_RMTMODNAME ) &&
-                    oIfDesc[ JSON_ATTR_RMTMODNAME ].isString() )
-                {
-                    strRmtModName = 
-                        oIfDesc[ JSON_ATTR_RMTMODNAME ].asString();
-                }
-
-                if( oIfDesc.isMember( JSON_ATTR_RMTOBJNAME ) &&
-                    oIfDesc[ JSON_ATTR_RMTOBJNAME ].isString() )
-                {
-                    strRmtObjName =
-                        oIfDesc[ JSON_ATTR_RMTOBJNAME ].asString();
-                }
-
-                // this will be required by the 
-                // CRpcPdoPort::SetupDBusSetting
-                if( strRmtObjName.empty() || strRmtModName.empty() )
-                {
-                    oMatch.CopyProp( propDestDBusName, pCfg );
-                }
-                else
-                {
-                    strNewObjPath = DBUS_OBJ_PATH(
-                        strRmtModName, strRmtObjName );
-
-                    strRmtSvrName = DBUS_DESTINATION2(
-                        strRmtModName, strRmtObjName );
-
-                    oMatch.SetStrProp(
-                        propDestDBusName, strRmtSvrName );
-
-                    oMatch.SetStrProp(
-                        propObjPath, strNewObjPath );
-                }
+                oMatch.CopyProp( propDestDBusName, pCfg );
             }
 
             ( *pObjVec )().push_back( pMatch );
@@ -4878,7 +4839,6 @@ gint32 CRpcServices::LoadObjDesc(
             ObjPtr pObj( pObjVec );
             oCfg.SetObjPtr( propObjList, pObj );
         }
-
 
         // load object factories
         Json::Value& oFactores =
