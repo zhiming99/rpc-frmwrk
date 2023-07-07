@@ -127,7 +127,7 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
         stat_info = os.stat( strPath )
         uid = stat_info.st_uid
 
-        if uid == os.getuid() :
+        if uid == os.geteuid() :
             fp = open(strPath, "w")
             json.dump( jsonVal, fp, indent=4)
             fp.close()
