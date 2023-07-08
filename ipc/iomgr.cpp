@@ -2318,4 +2318,143 @@ gint32 CSimpleSyncIf::OnPostStop(
     return ret;
 }
 
+stdstr InstIdFromObjDesc(
+    const stdstr& strDesc,
+    const stdstr& strObj )
+{
+    gint32 ret = 0;
+    stdstr strVal = std::string( "t" ) +
+        std::to_string( RPC_SVR_DEFAULT_PORTNUM );
+    do{
+        Json::Value oVal;
+        ret = ReadJsonCfgFile( strDesc, oVal );
+        if( ERROR( ret ) )
+            break;
+        if( !oVal.isMember( JSON_ATTR_OBJARR ) ||
+            !oVal[ JSON_ATTR_OBJARR ].isArray() ||
+            !oVal[ JSON_ATTR_OBJARR ].size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        Json::Value oObjArr =
+            oVal[ JSON_ATTR_OBJARR ];
+
+        gint32 i = 0;
+        for( ; i < oObjArr.size(); i++ )
+        {
+            Json::Value& oElem = oObjArr[ i ];
+            if( oElem == Json::Value::null )
+                continue;
+            if( !oElem.isObject() ||
+                oElem.isMember( JSON_ATTR_OBJNAME ) )
+                continue;
+
+            if( oElem[ JSON_ATTR_OBJNAME ].asString() !=
+                strObj )
+                continue;
+            if( !oElem.isMember( JSON_ATTR_TCPPORT ) )
+                break;
+            stdstr strVal1 =
+                oElem[ JSON_ATTR_TCPPORT ].asString();
+
+            guint32 dwVal = strtoul(
+                strVal1.c_str(), nullptr, 10 );
+            if( dwVal > 65535 ||
+                dwVal < RPC_SVR_DEFAULT_PORTNUM )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            strVal = stdstr( "t" ) +
+                std::to_string( dwVal );
+            break;
+        }
+
+        if( i == oObjArr.size() )
+            ret = -ENOENT;
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        return "";
+    return strVal;
+}
+
+stdstr InstIdFromDrv(
+    const stdstr& strDrv )
+{
+    gint32 ret = 0;
+    stdstr strVal = std::string( "t" ) +
+        std::to_string( RPC_SVR_DEFAULT_PORTNUM );
+    do{
+        Json::Value oVal;
+        ret = ReadJsonCfg( strDrv, oVal );
+        if( ERROR( ret ) )
+            break;
+
+        if( !oVal.isMember( JSON_ATTR_PORTS ) ||
+            !oVal[ JSON_ATTR_PORTS ].isArray() ||
+            !oVal[ JSON_ATTR_PORTS ].size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        Json::Value& oPorts =
+            oVal[ JSON_ATTR_PORTS ];
+
+        gint32 i = 0;
+        for( ; i < oPorts.size(); i++ )
+        {
+            Json::Value& oElem = oPorts[ i ];
+            if( oElem == Json::Value::null )
+                continue;
+
+            if( !oElem.isMember( JSON_ATTR_PORTCLASS ) ||
+                !oElem[ JSON_ATTR_PORTCLASS ].isString() )
+                continue;
+
+            string strPortClass =
+                oElem[ JSON_ATTR_PORTCLASS ].asString();
+            if( strPortClass != PORT_CLASS_RPC_TCPBUS )
+                continue;
+
+            if( !oElem.isMember( JSON_ATTR_PARAMETERS ) || 
+                !oElem[ JSON_ATTR_PARAMETERS ].isArray() ||
+                oElem[ JSON_ATTR_PARAMETERS ].size() == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            Json::Value& oPort =
+                oElem[ JSON_ATTR_PARAMETERS ][ 0 ];
+            if( !oPort.isMember( JSON_ATTR_TCPPORT ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strVal1 = oPort.asString();
+            guint32 dwVal = strtoul(
+                strVal1.c_str(), nullptr, 10 );
+            if( dwVal > 65535 ||
+                dwVal < RPC_SVR_DEFAULT_PORTNUM )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            strVal = stdstr( "t" ) +
+                std::to_string( dwVal );
+            break;
+        }
+        if( i == oPorts.size() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return "";
+
+    return strVal;
+}
+
 }

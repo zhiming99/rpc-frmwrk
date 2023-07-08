@@ -44,6 +44,14 @@ extern gint32 ReadJsonCfg(
     const std::string& strFile,
     Json::Value& valConfig );
 
+// two helpers for ridl
+stdstr InstIdFromObjDesc(
+    const stdstr& strDesc,
+    const stdstr& strObj );
+
+stdstr InstIdFromDrv(
+    const stdstr& strDrv );
+
 class CDriverManager : public IService
 {
     protected:
