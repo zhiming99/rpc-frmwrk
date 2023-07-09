@@ -42,6 +42,26 @@ namespace rpcf
 
 using namespace std;
 
+bool IsBuiltinRouter( CIoManager* pMgr )
+{
+    bool bRet = false;
+    do{
+        stdstr strInstName, strRouterName;
+        gint32 ret = pMgr->GetRouterName(
+            strRouterName );
+        if( ERROR( ret ) )
+            break;
+        ret = pMgr->GetCmdLineOpt(
+            propSvrInstName, strInstName );
+        if( ERROR( ret ) )
+            break;
+        if( strRouterName != MODNAME_RPCROUTER ||
+            strInstName != MODNAME_RPCROUTER )
+            bRet = true;
+    }while( 0 );
+    return bRet;
+}
+
 CRpcTcpBusPort::CRpcTcpBusPort(
     const IConfigDb* pCfg )
     : super( pCfg )
@@ -391,8 +411,18 @@ gint32 CRpcTcpBusPort::PostStart(
         if( !bListening )
             break;
 
+        auto pMgr = GetIoMgr();
         CStlObjVector::MyType& vecParams =
             ( *pParams )();
+
+        if( IsBuiltinRouter( pMgr ) )
+        {
+            // builtin router allows a single listening
+            // port
+            vecParams.erase(
+                vecParams.begin() + 1,
+                vecParams.end() );
+        }
 
         for( auto elem : vecParams )
         {
@@ -402,7 +432,7 @@ gint32 CRpcTcpBusPort::PostStart(
             CCfgOpener oCfg(
                 ( IConfigDb* )pCfg );
 
-            oCfg.SetPointer( propIoMgr, GetIoMgr() );
+            oCfg.SetPointer( propIoMgr, pMgr );
             oCfg.SetPointer( propPortPtr, this );
             oCfg.SetObjPtr( propConnParams, elem );
 
