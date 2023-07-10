@@ -900,6 +900,7 @@ CThreadPools::CThreadPools( const IConfigDb* pCfg )
 {
     gint32 ret = 0;
     do{
+        SetClassId( clsid( CThreadPools ) );
         if( pCfg == nullptr )
         {
             ret = -EINVAL;

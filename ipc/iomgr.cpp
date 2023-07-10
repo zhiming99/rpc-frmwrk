@@ -1478,6 +1478,12 @@ gint32 CIoManager::RescheduleTaskMainLoop(
             break;
         }
         pTask->MarkPending();
+        CMainIoLoop* pMainLoop = GetMainIoLoop();
+        if( pMainLoop->IsStopped() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         GetMainIoLoop()->AddTask( pTask );
 
         if( !pTask->IsAsync() )
@@ -2347,14 +2353,19 @@ stdstr InstIdFromObjDesc(
             if( oElem == Json::Value::null )
                 continue;
             if( !oElem.isObject() ||
-                oElem.isMember( JSON_ATTR_OBJNAME ) )
+                !oElem.isMember( JSON_ATTR_OBJNAME ) )
                 continue;
 
             if( oElem[ JSON_ATTR_OBJNAME ].asString() !=
                 strObj )
                 continue;
+
             if( !oElem.isMember( JSON_ATTR_TCPPORT ) )
+            {
+                ret = -EINVAL;
                 break;
+            }
+
             stdstr strVal1 =
                 oElem[ JSON_ATTR_TCPPORT ].asString();
 
@@ -2406,34 +2417,37 @@ stdstr InstIdFromDrv(
         gint32 i = 0;
         for( ; i < oPorts.size(); i++ )
         {
-            Json::Value& oElem = oPorts[ i ];
-            if( oElem == Json::Value::null )
+            Json::Value& oPort = oPorts[ i ];
+            if( oPort == Json::Value::null )
                 continue;
 
-            if( !oElem.isMember( JSON_ATTR_PORTCLASS ) ||
-                !oElem[ JSON_ATTR_PORTCLASS ].isString() )
+            if( !oPort.isMember( JSON_ATTR_PORTCLASS ) ||
+                !oPort[ JSON_ATTR_PORTCLASS ].isString() )
                 continue;
 
             string strPortClass =
-                oElem[ JSON_ATTR_PORTCLASS ].asString();
+                oPort[ JSON_ATTR_PORTCLASS ].asString();
             if( strPortClass != PORT_CLASS_RPC_TCPBUS )
                 continue;
 
-            if( !oElem.isMember( JSON_ATTR_PARAMETERS ) || 
-                !oElem[ JSON_ATTR_PARAMETERS ].isArray() ||
-                oElem[ JSON_ATTR_PARAMETERS ].size() == 0 )
+            if( !oPort.isMember( JSON_ATTR_PARAMETERS ) || 
+                !oPort[ JSON_ATTR_PARAMETERS ].isArray() ||
+                oPort[ JSON_ATTR_PARAMETERS ].size() == 0 )
             {
                 ret = -ENOENT;
                 break;
             }
-            Json::Value& oPort =
-                oElem[ JSON_ATTR_PARAMETERS ][ 0 ];
-            if( !oPort.isMember( JSON_ATTR_TCPPORT ) )
+            Json::Value& oParam =
+                oPort[ JSON_ATTR_PARAMETERS ][ 0 ];
+            if( !oParam.isMember( JSON_ATTR_TCPPORT ) )
             {
                 ret = -EINVAL;
                 break;
             }
-            stdstr strVal1 = oPort.asString();
+
+            stdstr strVal1 =
+                oParam[ JSON_ATTR_TCPPORT ].asString();
+
             guint32 dwVal = strtoul(
                 strVal1.c_str(), nullptr, 10 );
             if( dwVal > 65535 ||
