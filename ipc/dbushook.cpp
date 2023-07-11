@@ -583,6 +583,40 @@ CDBusDispatchCallback::CDBusDispatchCallback(
     }
 }
 
+gint32 CDBusDispatchCallback::DoRemoveWatch()
+{
+    gint32 ret = 0;
+    do{
+        CEvLoop* pLoop = m_pParent->GetLoop();
+        pLoop->StopSource( m_hWatch, srcAsync );
+        ret = pLoop->RemoveSource(
+            m_hWatch, srcAsync );
+
+    }while( 0 );
+
+    return ret;
+}
+
+void CDBusDispatchCallback::RemoveWatch(
+    void *data )
+{
+    if( data == nullptr )
+        return;
+
+    gint32 ret = 0;
+    do{
+        CDBusDispatchCallback* pThis =
+            ( CDBusDispatchCallback*) data;
+
+        ret = pThis->DoRemoveWatch();
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return;
+}
+
 gint32 CDBusDispatchCallback::Initialize()
 {
     gint32 ret = 0;
@@ -600,7 +634,7 @@ gint32 CDBusDispatchCallback::Initialize()
             pConn,
             &DispatchChange,
             this,
-            nullptr );
+            &RemoveWatch );
 
         // start immediately
         oParams.Push( true );

@@ -315,20 +315,7 @@ gint32 CEvLoop::Stop()
         if( ERROR( ret ) )
             break;
 
-        // wait setupdone change to false  to
-        // enable resource removal from other
-        // threads
-        // while( m_pDBusHook->IsSetupDone() )
-
-        ret = m_pDBusHook->Stop();
-        if( ERROR( ret ) )
-            break;
-
-        // don't clear it here because the dbus
-        // connections may not have removed the
-        // callbacks yet
-        //
-        // ClearAll();
+         m_pDBusHook->ClearAll();
 
     }while( 0 );
 
@@ -337,8 +324,6 @@ gint32 CEvLoop::Stop()
 
 void CEvLoop::ClearAll()
 {
-    m_pDBusHook->ClearAll();
-    
     CStdRMutex oLock( GetLock() );
     std::map< HANDLE, SOURCE_HEADER* >::iterator itr;
     itr = m_mapTimWatch.begin();
