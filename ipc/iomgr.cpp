@@ -1830,6 +1830,9 @@ CIoManager::CIoManager( const std::string& strModName ) :
 
         m_iHcTimer = 0;
 
+        m_dwNumCores = std::max( 1U,
+            std::thread::hardware_concurrency() );
+
     }while( 0 );
 
     return;
@@ -1868,6 +1871,7 @@ CIoManager::CIoManager(
     gint32 ret = 0;
     do{
         CCfgOpener oCfg( pCfg );
+
         guint32 dwMaxThrds = 0;
         ret = oCfg.GetIntProp(
             propMaxIrpThrd, dwMaxThrds );
@@ -1920,9 +1924,6 @@ CIoManager::CIoManager(
             throw std::invalid_argument(
                 "No config" );
         }
-
-        m_dwNumCores = std::max( 1U,
-            std::thread::hardware_concurrency() );
 
         Json::Value& oArch = oJsonCfg[ JSON_ATTR_ARCH ];
         if( oArch != Json::Value::null && 
