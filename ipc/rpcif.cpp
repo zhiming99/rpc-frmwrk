@@ -4717,6 +4717,9 @@ gint32 CRpcServices::LoadObjDesc(
         if( i == oObjArray.size() )
         {
             ret = -ENOENT;
+            DebugPrintEx( logErr, ret,
+                "Error LoadObjDesc unable to find object '%s'",
+                strObjName.c_str() );
             break;
         }
 

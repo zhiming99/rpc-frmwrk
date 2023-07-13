@@ -174,14 +174,14 @@ class PyRpcContext :
                     p1.SetStrProp( 0,
                         oInitParams[ 'ModName' ] )
                 else:
-                    ret = -ErrorCode.EINVAL
+                    ret = -errno.EINVAL
                     raise Exception(
                         "Error cannot find Module name")
                 if 'Role' in oInitParams:
                     p1.SetIntProp( 101,
                         oInitParams[ 'Role' ] )
                 else:
-                    ret = -ErrorCode.EINVAL
+                    ret = -errno.EINVAL
                     raise Exception(
                         "Error cannot router role property" )
                 if 'bAuth' in oInitParams:
@@ -199,8 +199,9 @@ class PyRpcContext :
                 if 'router' in oInitParams:
                     p1.SetStrProp( 106,
                         oInitParams[ 'router' ] )
-                else:
-                    ret = -ErrorCode.EINVAL
+                if 'InstName' in oInitParams:
+                    p1.SetStrProp( 107,
+                        oInitParams[ 'InstName' ] )
         except Exception as err:
             print( err )
             if ret == 0:

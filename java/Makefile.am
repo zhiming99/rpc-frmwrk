@@ -19,7 +19,7 @@ librpcbaseJNI_la_CPPFLAGS = -I$(top_srcdir)/ipc -I../ -I$(top_srcdir)/combase -I
 
 librpcbaseJNI_ladir=$(libdir)
 librpcbaseJNI_la_LDFLAGS = -version-info @VERSION2@
-librpcbaseJNI_la_LIBADD = -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party $(fuse3_lib) -lipc -lcombase -lpthread -ldl $(COMMON_LINK) 
+librpcbaseJNI_la_LIBADD = -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party $(fuse3_lib) ../ipc/libipc.la ../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) 
 
 javawrapper_DATA=rpcbase.jar
 javawrapperdir=$(libdir)/rpcf
