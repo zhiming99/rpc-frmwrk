@@ -977,12 +977,12 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         oParams[ JSON_ATTR_BINDADDR ].asString();
 
                     string strNormVal;
-                    ret = NormalizeIpAddr(
-                        AF_INET, strAddr, strNormVal );
+                    ret = NormalizeIpAddrEx( strAddr, strNormVal );
                     if( ERROR( ret ) )
                     {
-                        ret = NormalizeIpAddr(
-                            AF_INET6, strAddr, strNormVal );
+                        DebugPrintEx( logErr, ret,
+                            "Error invalid network address" );
+                        break;
                     }
 
                     oElemCfg.SetStrProp( propDestIpAddr, strNormVal );

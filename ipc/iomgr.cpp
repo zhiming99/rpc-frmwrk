@@ -35,6 +35,7 @@
 #include "portex.h"
 
 #include "ifhelper.h"
+#include "dbusport.h"
 
 namespace rpcf
 {
@@ -2325,6 +2326,29 @@ gint32 CSimpleSyncIf::OnPostStop(
     return ret;
 }
 
+static gint32 GenHashInstId(
+    guint32 dwPort,
+    const stdstr& strIpAddr,
+    stdstr& strHash )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strVal1 = "t_";
+        strVal1 += strIpAddr + "_" +
+            std::to_string( dwPort );
+
+        guint32 dwHash;
+        ret = GenStrHash( strVal1, dwHash );
+        if( ERROR( ret ) )
+            break;
+
+        ret = BytesToString( ( guint8* )&dwHash,
+            sizeof( dwHash ), strHash );
+
+    }while( 0 );
+    return ret;
+}
+
 stdstr InstIdFromObjDesc(
     const stdstr& strDesc,
     const stdstr& strObj )
@@ -2361,7 +2385,8 @@ stdstr InstIdFromObjDesc(
                 strObj )
                 continue;
 
-            if( !oElem.isMember( JSON_ATTR_TCPPORT ) )
+            if( !oElem.isMember( JSON_ATTR_TCPPORT ) ||
+                !oElem[ JSON_ATTR_TCPPORT ].isString() )
             {
                 ret = -EINVAL;
                 break;
@@ -2378,17 +2403,38 @@ stdstr InstIdFromObjDesc(
                 ret = -EINVAL;
                 break;
             }
-            strVal = stdstr( "t" ) +
-                std::to_string( dwVal );
+
+            if( !oElem.isMember( JSON_ATTR_IPADDR ) ||
+                !oElem[ JSON_ATTR_IPADDR ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strVal2 =
+                oElem[ JSON_ATTR_IPADDR ].asString();
+
+            stdstr strIpAddr;
+            ret = NormalizeIpAddrEx(
+                strVal2, strIpAddr );
+            if( ERROR( ret ) )
+                break;
+
+            ret = GenHashInstId(
+                dwVal, strIpAddr, strVal );
             break;
         }
+
+        if( ERROR( ret ) )
+            break;
 
         if( i == oObjArr.size() )
             ret = -ENOENT;
 
     }while( 0 );
+
     if( ERROR( ret ) )
         return "";
+
     return strVal;
 }
 
@@ -2440,7 +2486,8 @@ stdstr InstIdFromDrv(
             }
             Json::Value& oParam =
                 oPort[ JSON_ATTR_PARAMETERS ][ 0 ];
-            if( !oParam.isMember( JSON_ATTR_TCPPORT ) )
+            if( !oParam.isMember( JSON_ATTR_TCPPORT ) ||
+                !oParam[ JSON_ATTR_TCPPORT ].isString() )
             {
                 ret = -EINVAL;
                 break;
@@ -2457,10 +2504,30 @@ stdstr InstIdFromDrv(
                 ret = -EINVAL;
                 break;
             }
-            strVal = stdstr( "t" ) +
-                std::to_string( dwVal );
+
+            if( !oParam.isMember( JSON_ATTR_BINDADDR ) ||
+                !oParam[ JSON_ATTR_BINDADDR ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strVal2 =
+                oParam[ JSON_ATTR_BINDADDR ].asString();
+
+            stdstr strIpAddr;
+            ret = NormalizeIpAddrEx(
+                strVal2, strIpAddr );
+            if( ERROR( ret ) )
+                break;
+
+            ret = GenHashInstId(
+                dwVal, strIpAddr, strVal );
             break;
         }
+
+        if( ERROR( ret ) )
+            break;
+
         if( i == oPorts.size() )
             ret = -ENOENT;
 

@@ -48,6 +48,7 @@ extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
 gint32 OpenThisLib();
 extern void* g_pLibHandle;
+extern stdstr g_strInstId;
 %End
 
 %ModuleCode
@@ -56,6 +57,7 @@ char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 ObjPtr g_pRouter;
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
+stdstr g_strInstId;
 
 void DumpObj(PyObject *o)
 {
@@ -885,7 +887,7 @@ namespace cpp
             if( dwNumThrds > 1 )
                 dwNumThrds = ( dwNumThrds >> 1 );
             oCfg[ propMaxTaskThrd ] = dwNumThrds;
-            oCfg[ propMaxIrpThrd ] = 2;
+            oCfg[ propMaxIrpThrd ] = 0;
 
             guint32 dwRole = 1;
             oCfg.GetIntProp( 101, dwRole );
@@ -932,6 +934,33 @@ namespace cpp
                 oCfg.RemoveProperty( 106 );
             }
 
+            if( !oCfg.exist( 107 ) )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            stdstr strInstName;
+            oCfg.GetStrProp( 107, strInstName );
+            oCfg.RemoveProperty( 107 );
+
+            stdstr strRtName = strAppName + "_rt_";
+
+            if( strRtName !=
+                strInstName.substr( 0, strRtName.size() ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            g_strInstId = strInstName.substr(
+                strRtName.size() );
+            if( g_strInstId.empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             ret = CheckKeyPass();
             if( ERROR( ret ) )
                 break;
@@ -959,10 +988,8 @@ namespace cpp
                 break;
 
             // create and start the router
-            stdstr strRtName =
-                strAppName + "_Router";
             pMgr->SetRouterName(
-                strRtName + "_" +
+                strRtName +
                 std::to_string( getpid() ) );
 
             stdstr strDescPath;
@@ -981,10 +1008,10 @@ namespace cpp
 
             CCfgOpener oRtCfg;
             oRtCfg.SetStrProp( propSvrInstName,
-                MODNAME_RPCROUTER );
+                strInstName );
             oRtCfg.SetPointer( propIoMgr, pMgr );
             pMgr->SetCmdLineOpt( propSvrInstName,
-                MODNAME_RPCROUTER );
+                strInstName );
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
                 OBJNAME_ROUTER,
@@ -1156,6 +1183,23 @@ namespace cpp
         guint32 GetState() const;
     };
 
+    PyObject* InstIdFromObjDesc(
+        const std::string& strDesc,
+        const std::string& strObj );
+    %MethodCode
+        stdstr val = InstIdFromObjDesc(
+            *a0, *a1 );
+        sipRes = PyUnicode_FromString(
+            val.c_str() );
+    %End
+
+    PyObject* InstIdFromDrv(
+        const std::string& strDrv );
+    %MethodCode
+        stdstr val = InstIdFromDrv( *a0 );
+        sipRes = PyUnicode_FromString(
+            val.c_str() );
+    %End
 };
 
 %Include proxy.sip

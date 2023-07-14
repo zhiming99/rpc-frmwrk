@@ -328,7 +328,12 @@ gint32 CJavaRpcSvc_CliImpl::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        stdstr strInstName = strSvcName;
+        stdstr strInstName;
+        ret = oIfCfg.GetStrProp(
+            propObjInstName, strInstName );
+        if( ERROR( ret ) )
+            strInstName = strSvcName;
+
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );
@@ -604,7 +609,13 @@ gint32 CJavaRpcSvc_SvrImpl::OnPreStart(
             propObjName, strSvcName );
         if( ERROR( ret ) )
             break;
-        stdstr strInstName = strSvcName;
+
+        stdstr strInstName;
+        ret = oIfCfg.GetStrProp(
+            propObjInstName, strInstName );
+        if( ERROR( ret ) )
+            strInstName = strSvcName;
+
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );

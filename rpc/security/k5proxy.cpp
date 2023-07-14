@@ -889,6 +889,12 @@ gint32 CK5AuthProxy::InitEnvRouter(
     return 0;
 }
 
+void CK5AuthProxy::DestroyEnvRouter(
+    CIoManager* pMgr )
+{
+    g_oHookMap.SetIoMgr( nullptr );
+}
+
 CK5AuthProxy::CK5AuthProxy(
     const IConfigDb* pCfg ) :
     super( pCfg )

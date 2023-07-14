@@ -809,6 +809,14 @@ cpp::ObjPtr CreateServer(
                 propIoMgr, *a0 );
         }
 
+        if( !g_pRouter.IsEmpty() &&
+            g_strInstId.size() )
+        {
+            CParamList oParams( pCfg );
+            oParams.SetStrProp( propObjInstName,
+                *a2 + "_" + g_strInstId );
+        }
+
         ret = CRpcServices::LoadObjDesc(
             *a1, *a2, true, pCfg );
         if( ERROR( ret ) )

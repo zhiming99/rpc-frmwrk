@@ -6458,11 +6458,11 @@ gint32 CImplMainFunc::EmitInitRouter(
     do{
         Wa( "// create and start the router" );
         CCOUT << "std::string strRtName = \""
-            << g_strAppName << "_Router\";";
+            << g_strAppName << "_rt_\";";
         NEW_LINE;
-        Wa( "pSvc->SetRouterName( strRtName + \"_\" +" );
+        Wa( "pSvc->SetRouterName( strRtName +" );
         Wa( "    std::to_string( getpid() ) );" );
-        Wa( "stdstr strDescPath;" ); 
+        Wa( "std::string strDescPath;" ); 
         Wa( "if( g_strRtDesc.size() )" );
         Wa( "    strDescPath = g_strRtDesc;" );
         Wa( "else if( g_bAuth )" );
@@ -6479,11 +6479,11 @@ gint32 CImplMainFunc::EmitInitRouter(
 
         Wa( "CCfgOpener oRtCfg;" );
         Wa( "oRtCfg.SetStrProp( propSvrInstName," );
-        Wa( "    MODNAME_RPCROUTER );" );
+        Wa( "    g_strInstName );" );
         Wa( "oRtCfg[ propIoMgr ] = g_pIoMgr;" );
         Wa( "CIoManager* pMgr = g_pIoMgr;" );
         Wa( "pMgr->SetCmdLineOpt( propSvrInstName,");
-        Wa("     MODNAME_RPCROUTER );" );
+        Wa("     g_strInstName );" );
         NEW_LINE;
         Wa( "ret = CRpcServices::LoadObjDesc(" );
         Wa( "    strDescPath," );
@@ -6548,6 +6548,10 @@ void CImplMainFunc::EmitRtUsage(
         Wa( "    \"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
         Wa( "    \"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
         Wa( "    \"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
+        if( bProxy )
+            Wa( "    \"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
+        else
+            Wa( "    \"\\t [ --instname <name> to specify the instance name for this server'. ]\\n\"" );
     }
     CCOUT << "    \"\\t [ -h this help ]\\n\", szName );";
     BLOCK_CLOSE;
@@ -6825,6 +6829,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    {\"driver\",   required_argument, 0,  0 }," );
             Wa( "    {\"objdesc\",  required_argument, 0,  0 }," );
             Wa( "    {\"router\",   required_argument, 0,  0 }," );
+            Wa( "    {\"instname\", required_argument, 0,  0 }," );
             Wa( "    {0,             0,                 0,  0 }" );
             Wa( "};            " );
             CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
@@ -6842,6 +6847,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         {
             Wa( "case 0:" );
             BLOCK_OPEN;
+            Wa( "if( iOptIdx != 3 )" );
+            BLOCK_OPEN;
             Wa( "struct stat sb;" );
             Wa( "ret = lstat( optarg, &sb );" );
             Wa( "if( ret < 0 )" );
@@ -6858,6 +6865,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "ret = -EINVAL;" );
             CCOUT << "break;";
             BLOCK_CLOSE;
+            BLOCK_CLOSE;
             NEW_LINE;
             Wa( "if( iOptIdx == 0 )" );
             Wa( "    g_strDrvPath = optarg;" );
@@ -6865,6 +6873,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    g_strObjDesc = optarg;" );
             Wa( "else if( iOptIdx == 2 )" );
             Wa( "    g_strRtDesc = optarg;" );
+            Wa( "else if( iOptIdx == 3 )" );
+            Wa( "    g_strInstName = optarg;" );
             Wa( "else" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
@@ -7045,6 +7055,9 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "static std::string g_strDrvPath;" );
             Wa( "static std::string g_strObjDesc;" );
             Wa( "static std::string g_strRtDesc;" );
+            CCOUT << "static std::string g_strInstName( \""
+                << g_strAppName << "_\" );";
+            NEW_LINE;
             Wa( "static bool g_bAuth = false;" );
             Wa( "static ObjPtr g_pRouter;" );
             Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
@@ -7113,7 +7126,7 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "    dwNumThrds = ( dwNumThrds >> 1 );" );
 
             Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
-            Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+            Wa( "oParams[ propMaxIrpThrd ] = 0;" );
             Wa( "if( g_strDrvPath.size() )" );
             Wa( "    oParams[ propConfigPath ] = g_strDrvPath;" );
         }
@@ -7400,14 +7413,9 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         Wa( "gint32 ret = 0;" );
         CCOUT << "do";
         BLOCK_OPEN;
-        Wa( "ret = InitContext();" );
-        CCOUT << "if( ERROR( ret ) )";
-        INDENT_UPL;
-        CCOUT << "break;";
-        INDENT_DOWNL;
-        NEW_LINE;
         if( g_bBuiltinRt )
         {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
             Wa( "std::string strDesc;" );
             Wa( "if( g_strObjDesc.empty() )" );
             CCOUT << "    strDesc = " << "\"./"
@@ -7415,12 +7423,46 @@ gint32 CImplMainFunc::EmitNormalMainContent(
             NEW_LINE;
             Wa( "else" );
             Wa( "    strDesc = g_strObjDesc;" );
+            if( bProxy )
+            {
+                Wa( "std::string strInstId = InstIdFromObjDesc(" );
+                CCOUT << "    strDesc, \"" << pSvc->GetName() << "\" );";
+                NEW_LINE;
+                Wa( "if( strInstId.empty() )" );
+                Wa( "{ ret = -EINVAL; break;}" );
+                CCOUT << "if( g_strInstName == \"" 
+                    << g_strAppName << "_\" )";
+                NEW_LINE;
+                Wa( "    g_strInstName += strInstId;" );
+            }
+            else
+            {
+                Wa( "std::string strDrv;" );
+                Wa( "if( g_strDrvPath.size() )" );
+                Wa( "    strDrv = g_strDrvPath;" );
+                Wa( "else" );
+                Wa( "    strDrv = \"./driver.json\";" );
+                Wa( "std::string strInstId = InstIdFromDrv( strDrv );" );
+                Wa( "if( strInstId.empty() )" );
+                Wa( "{ ret = -EINVAL; break;}" );
+                NEW_LINE;
+                CCOUT << "if( g_strInstName == \"" 
+                    << g_strAppName << "_\" )";
+                NEW_LINE;
+                Wa( "    g_strInstName += strInstId;" );
+            }
         }
         else
         {
             CCOUT << "std::string strDesc = " << "\"./"
                 << g_strAppName << "desc.json\";";
         }
+        NEW_LINE;
+        Wa( "ret = InitContext();" );
+        CCOUT << "if( ERROR( ret ) )";
+        INDENT_UPL;
+        CCOUT << "break;";
+        INDENT_DOWNL;
         NEW_LINE;
         CCOUT << "CRpcServices* pSvc = nullptr;";
         NEW_LINE;
@@ -7444,6 +7486,12 @@ gint32 CImplMainFunc::EmitNormalMainContent(
 
             Wa( "oParams.Clear();" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
+            if( g_bBuiltinRt )
+            {
+                Wa( "oParams[ propObjInstName ] =" );
+                CCOUT << "    \"" << strSvcName << "_\" +strInstId;";
+                NEW_LINE;
+            }
             NEW_LINE;
             Wa( "ret = CRpcServices::LoadObjDesc(" );
             CCOUT << "    strDesc, \"" << strSvcName << "\",";

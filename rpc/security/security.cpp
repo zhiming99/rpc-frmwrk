@@ -29,6 +29,7 @@
 #include "rpcroute.h"
 #include "security.h"
 #include "k5proxy.h"
+#include <regex>
 
 namespace rpcf
 {
@@ -1474,6 +1475,66 @@ gint32 CAuthentProxy::BuildLoginTask(
     return ret;
 }
 
+gint32 CAuthentProxy::CorrectInstName(
+    CIoManager* pMgr,
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strName;
+
+        ret = pMgr->GetCmdLineOpt(
+            propSvrInstName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        // no more correction
+        if( strName == MODNAME_RPCROUTER )
+            break;
+
+        CCfgOpener oCfg( pCfg );
+        stdstr strPath = oCfg[ propObjPath ];
+        stdstr strDest = oCfg[ propDestDBusName ];
+
+        std::regex e ( MODNAME_RPCROUTER );
+        strPath = std::regex_replace(
+            strPath, e, strName,
+            std::regex_constants::format_first_only );
+
+        strDest = std::regex_replace(
+            strDest, e, strName,
+            std::regex_constants::format_first_only );
+
+        oCfg[ propObjPath ] = strPath;
+        oCfg[ propDestDBusName ] = strDest;
+
+        if( oCfg.exist( propObjList ) )
+        {
+            ObjPtr pObj;
+            ret = oCfg.GetObjPtr( propObjList, pObj );
+            if( ERROR( ret ) )
+                break;
+
+            ObjVecPtr pObjVec( pObj );
+            if( pObjVec.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            for( auto pElem : ( *pObjVec )() )
+            {
+                CMessageMatch* pMatch = pElem;
+                pMatch->SetObjPath( strPath );
+                Variant oVar = strDest;
+                pMatch->SetProperty(
+                    propDestDBusName, oVar );
+            }
+        }
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CAuthentProxy::CreateSessImpl(
     const IConfigDb* pConnParams,
     CRpcRouter* pRouter,
@@ -1518,9 +1579,9 @@ gint32 CAuthentProxy::CreateSessImpl(
         }
 
         CCfgOpener oCfg;
+        CIoManager* pMgr = pRouter->GetIoMgr();
 
-        oCfg.SetPointer( propIoMgr,
-            pRouter->GetIoMgr() );
+        oCfg.SetPointer( propIoMgr, pMgr );
 
         ret = CRpcServices::LoadObjDesc(
             DESC_FILE, strObjName,
@@ -1537,6 +1598,11 @@ gint32 CAuthentProxy::CreateSessImpl(
         oCfg.SetPointer(
             propRouterPtr, pRouter );
 
+        if( strMech == "krb5" )
+        {
+            ret = CorrectInstName(
+                pMgr, oCfg.GetCfg() );
+        }
 
         // use a special ifstate
         oCfg.SetIntProp( propIfStateClass,
@@ -1824,6 +1890,12 @@ gint32 CAuthentProxy::InitEnvRouter(
     CIoManager* pMgr )
 {
     return CK5AuthProxy::InitEnvRouter( pMgr );
+}
+
+void CAuthentProxy::DestroyEnvRouter(
+    CIoManager* pMgr )
+{
+    CK5AuthProxy::DestroyEnvRouter( pMgr );
 }
 
 gint32 CRpcTcpBridgeProxyAuth::OnEnableComplete(
@@ -2977,10 +3049,9 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
 
         if( strDir != pMsg.GetPath() )
         {
-            if( ERROR( ret ) )
-                DebugPrintEx( logErr, ret,
-                    "Error check message" );
             ret = ERROR_FALSE;
+            DebugPrintEx( logErr, ret,
+                "Error check message" );
             break;
         }
 
@@ -3075,6 +3146,11 @@ gint32 CRpcReqForwarderAuth::OnPreStop(
     IEventSink* pCallback )
 {
     return super::OnPreStop( pCallback );
+}
+
+CRpcReqForwarderAuth::~CRpcReqForwarderAuth()
+{
+    CAuthentProxy::DestroyEnvRouter( GetIoMgr() );
 }
 
 gint32 CAuthentServer::InitUserFuncs()

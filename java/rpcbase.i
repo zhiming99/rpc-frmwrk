@@ -44,7 +44,7 @@ ObjPtr g_pIoMgr;
 ObjPtr g_pRouter;
 extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
-
+stdstr g_strInstId;
 %}
 
 %include "std_string.i"
@@ -1119,7 +1119,7 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             if( dwNumThrds > 1 )
                 dwNumThrds = ( dwNumThrds >> 1 );
             oCfg[ propMaxTaskThrd ] = dwNumThrds;
-            oCfg[ propMaxIrpThrd ] = 2;
+            oCfg[ propMaxIrpThrd ] = 0;
 
             guint32 dwRole = 1;
             oCfg.GetIntProp( 101, dwRole );
@@ -1157,6 +1157,32 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 oCfg.RemoveProperty( 106 );
             }
 
+            if( !oCfg.exist( 107 ) )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            stdstr strInstName;
+            oCfg.GetStrProp( 107, strInstName );
+            oCfg.RemoveProperty( 107 );
+
+            stdstr strRtName = strAppName + "_rt_";
+
+            if( strRtName !=
+                strInstName.substr( 0, strRtName.size() ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            g_strInstId = strInstName.substr(
+                strRtName.size() );
+            if( g_strInstId.empty() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
             // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
@@ -1185,11 +1211,9 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 break;
 
             // create and start the router
-            stdstr strRtName =
-                strAppName + "_Router";
-            pMgr->SetRouterName(
-                strRtName + "_" +
+            pMgr->SetRouterName( strRtName +
                 std::to_string( getpid() ) );
+
             stdstr strDescPath;
             if( strRtFile.size() )
                 strDescPath = strRtFile;
@@ -1206,11 +1230,11 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
 
             CCfgOpener oRtCfg;
             oRtCfg.SetStrProp( propSvrInstName,
-                MODNAME_RPCROUTER );
+                strInstName );
 
             oRtCfg.SetPointer( propIoMgr, pMgr );
             pMgr->SetCmdLineOpt( propSvrInstName,
-                MODNAME_RPCROUTER );
+                strInstName );
 
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
@@ -1337,6 +1361,7 @@ gint32 CoUninitializeEx()
         CObjBase::GetActCount() );
     return 0;
 }
+
 %}
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
@@ -3344,4 +3369,13 @@ class Variant
         return STATUS_SUCCESS;
     }
 };
+
+// two helpers for ridlc
+std::string InstIdFromObjDesc(
+    const std::string& strDesc,
+    const std::string& strObj );
+
+std::string InstIdFromDrv(
+    const std::string& strDrv );
+
 %include "proxy.i"

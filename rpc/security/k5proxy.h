@@ -102,7 +102,12 @@ struct CKrb5InitHook : public CObjBase
     { return ( CIoManager* )m_pMgr; }
 
     void SetIoMgr( CIoManager* pMgr )
-    { m_pMgr = pMgr; }
+    {
+        if( pMgr != nullptr )
+            m_pMgr = pMgr;
+        else
+            m_pMgr.Clear();
+    }
 
     gint32 Start();
 
@@ -289,6 +294,9 @@ class CK5AuthProxy :
     CK5AuthProxy( const IConfigDb* pCfg );
 
     static gint32 InitEnvRouter(
+        CIoManager* pMgr );
+
+    static void DestroyEnvRouter(
         CIoManager* pMgr );
 
     inline stdrmutex& GetGssLock()

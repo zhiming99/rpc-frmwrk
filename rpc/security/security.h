@@ -234,6 +234,9 @@ class CAuthentProxy :
     static gint32 InitEnvRouter(
         CIoManager* pMgr );
 
+    static void DestroyEnvRouter(
+        CIoManager* pMgr );
+
     gint32 GetSessImpl(
         ObjPtr& pSessImpl ) const
     {
@@ -254,6 +257,10 @@ class CAuthentProxy :
         IEventSink* pCallback );
 
     gint32 StopSessImpl();
+
+    static gint32 CorrectInstName(
+        CIoManager* pMgr,
+        IConfigDb* pCfg );
 
     static gint32 CreateSessImpl(
         const IConfigDb* pConnParams,
@@ -649,6 +656,8 @@ class CRpcReqForwarderAuth :
         CIoManager* pMgr = GetIoMgr();
         CAuthentProxy::InitEnvRouter( pMgr );
     }
+
+    ~CRpcReqForwarderAuth();
 
     const EnumClsid GetIid() const
     { return iid( CRpcReqForwarderAuth ); }

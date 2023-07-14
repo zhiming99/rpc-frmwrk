@@ -1486,6 +1486,15 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         Wa( "options.addOption(oObjDesc);" );
         NEW_LINE;
 
+        Wa( "Option oInstName = new Option(\"xi\", \"instname\", true," );
+        if( bServer )
+            Wa( "    \"to specify the server instance name for this server.\" );" );
+        else
+            Wa( "    \"to specify the server instance name to connect.\" );" );
+        Wa( "oInstName.setRequired(false);" );
+        Wa( "options.addOption(oInstName);" );
+        NEW_LINE;
+
         Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
         Wa( "oHelp.setRequired(false);" );
         Wa( "options.addOption(oHelp);" );
@@ -1531,6 +1540,8 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         Wa( "{ bCheck = true; oInit.put( 106, opt.getValue() ); }" );
         Wa( "else if( opt.getOpt() == \"xo\" || opt.getLongOpt() == \"objdesc\" )" );
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
+        Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
+        Wa( "{ oInit.put( 107, opt.getValue() ); }" );
 
         Wa( "else if( opt.getOpt() == \"h\" )" );
         BLOCK_OPEN; 
@@ -4547,12 +4558,21 @@ gint32 CImplJavaMainCli::Output()
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         stdstr strModName = g_strAppName + "cli";
+        stdstr strDescName = g_strAppName + "desc.json";
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) || vecSvcs.empty() )
+            break;
+
         if( !g_bRpcOverStm && !g_bBuiltinRt )
         {
             Wa( "m_oCtx = JavaRpcContext.createProxy(); " );
         }
         else
         {
+            if( g_bBuiltinRt )
+                Wa( "System.loadLibrary(\"rpcbaseJNI\");" );
             Wa( "// prepare the init parameters for iomgr" );
             Wa( "Map< Integer, Object > oInit =" );
             Wa( "    new HashMap< Integer, Object >();" );
@@ -4567,6 +4587,24 @@ gint32 CImplJavaMainCli::Output()
                 os.EmitGetOpt( false );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
                 NEW_LINE;
+                Wa( "if( strDescPath.isEmpty() )" );
+                BLOCK_OPEN;
+                Wa( "strDescPath =" );
+                CCOUT << "    getDescPath( \"" << strDescName << "\" );";
+                BLOCK_CLOSE;
+                NEW_LINE;
+                Wa( "if( !oInit.containsKey( 107 ) )" );
+                BLOCK_OPEN;
+                CServiceDecl* pSvc = vecSvcs[ 0 ];
+                Wa( "String strInstId = rpcbase.InstIdFromObjDesc(" );
+                CCOUT << "    strDescPath, \"" << pSvc->GetName() << "\" );";
+                NEW_LINE;
+                CCOUT << "String strInstName = \"" << g_strAppName
+                    << "_rt_\" + strInstId;";
+                NEW_LINE;
+                CCOUT << "oInit.put( 107, strInstName );";
+                BLOCK_CLOSE;
+                NEW_LINE;
             }
             Wa( "m_oCtx = JavaRpcContext.createProxy( oInit );" );
         }
@@ -4574,11 +4612,6 @@ gint32 CImplJavaMainCli::Output()
         Wa( "if( m_oCtx == null )" );
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
-
-        std::vector< ObjPtr > vecSvcs;
-        ret = m_pNode->GetSvcDecls( vecSvcs );
-        if( ERROR( ret ) || vecSvcs.empty() )
-            break;
 
         Wa( "int ret = 0;" );
         if( vecSvcs.size() == 1 )
@@ -4593,17 +4626,7 @@ gint32 CImplJavaMainCli::Output()
         CCOUT << "try";
         BLOCK_OPEN;
 
-        stdstr strDescName = g_strAppName + "desc.json";
-        if( g_bBuiltinRt )
-        {
-            Wa( "if( strDescPath.isEmpty() )" );
-            BLOCK_OPEN;
-            Wa( "strDescPath =" );
-            CCOUT << "    getDescPath( \"" << strDescName << "\" );";
-            BLOCK_CLOSE;
-            NEW_LINE;
-        }
-        else
+        if( !g_bBuiltinRt )
         {
             Wa( "String strDescPath =" );
             CCOUT << "    getDescPath( \"" << strDescName << "\" );";
@@ -4707,12 +4730,20 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         stdstr strModName = g_strAppName + "svr";
+
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) || vecSvcs.empty() )
+            break;
+
         if( !g_bRpcOverStm && !g_bBuiltinRt )
         {
             Wa( "m_oCtx = JavaRpcContext.createServer(); " );
         }
         else
         {
+            if( g_bBuiltinRt )
+                Wa( "System.loadLibrary(\"rpcbaseJNI\");" );
             Wa( "// prepare the init parameters for iomgr" );
             Wa( "Map< Integer, Object > oInit =" );
             Wa( "    new HashMap< Integer, Object >();" );
@@ -4723,9 +4754,22 @@ gint32 CImplJavaMainSvr::Output()
             Wa( "    oInit.put( 105, strCfgPath );" );
             if( g_bBuiltinRt )
             {
+                Wa( "else" );
+                Wa( "    strCfgPath = \"driver.json\";" );
                 Wa( "String strDescPath = \"\";" );
                 os.EmitGetOpt( true );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
+                NEW_LINE;
+                Wa( "if( !oInit.containsKey( 107 ) )" );
+                BLOCK_OPEN;
+                CServiceDecl* pSvc = vecSvcs[ 0 ];
+                Wa( "String strInstId = rpcbase.InstIdFromDrv(" );
+                Wa( "    strCfgPath );" );
+                CCOUT << "String strInstName = \"" << g_strAppName
+                    << "_rt_\" + strInstId;";
+                NEW_LINE;
+                CCOUT << "oInit.put( 107, strInstName );";
+                BLOCK_CLOSE;
                 NEW_LINE;
             }
             Wa( "m_oCtx = JavaRpcContext.createServer( oInit ); " );
@@ -4734,11 +4778,6 @@ gint32 CImplJavaMainSvr::Output()
         Wa( "if( m_oCtx == null )" );
         Wa( "    System.exit( RC.EFAULT );" );
         NEW_LINE;
-
-        std::vector< ObjPtr > vecSvcs;
-        ret = m_pNode->GetSvcDecls( vecSvcs );
-        if( ERROR( ret ) || vecSvcs.empty() )
-            break;
 
         Wa( "int ret = 0;" );
         if( vecSvcs.size() == 1 )

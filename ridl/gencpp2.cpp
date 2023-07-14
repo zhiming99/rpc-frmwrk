@@ -78,9 +78,15 @@ gint32 EmitOnPreStart(
         Wa( "oCtx.CopyProp( propObjDescPath, this );" );
         Wa( "stdstr strInstName;" );
         Wa( "ret = oIfCfg.GetStrProp(" );
+        Wa( "    propObjInstName, strInstName );" );
+        Wa( "if( ERROR( ret ) )" );
+        BLOCK_OPEN;
+        Wa( "ret = oIfCfg.GetStrProp(" );
         Wa( "    propObjName, strInstName );" );
         Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
+        CCOUT << "    break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
         Wa( "oCtx[ 1 ] = strInstName;" );
         Wa( "guint32 dwHash = 0;" );
         Wa( "ret = GenStrHash( strInstName, dwHash );" );

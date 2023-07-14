@@ -36,8 +36,6 @@
 #include <fcntl.h>
 #include "jsondef.h"
 #include "dbusport.h"
-#include <sys/socket.h>
-#include <netdb.h>
 
 namespace rpcf
 {
@@ -4308,49 +4306,16 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 strVal = oObjElem[ JSON_ATTR_IPADDR ].asString(); 
                 string strNormVal;
-                ret = NormalizeIpAddr(
-                    AF_INET, strVal, strNormVal );
-                if( ERROR( ret ) )
-                {
-                    ret = NormalizeIpAddr(
-                        AF_INET6, strVal, strNormVal );
-                }
-
+                ret = NormalizeIpAddrEx( strVal, strNormVal );
                 if( SUCCEEDED( ret ) )
                     oCfg[ propDestIpAddr ] = strNormVal;
                 else if( !bProxyPdo )
                     ret = 0;
                 else
                 {
-                    addrinfo hints, *result = nullptr;
-                    memset( &hints, 0, sizeof( addrinfo ) );
-                    hints.ai_family = AF_UNSPEC;
-                    hints.ai_socktype = SOCK_STREAM;
-
-                    ret = getaddrinfo( strVal.c_str(),
-                        nullptr, &hints, &result );
-                    if( ret < 0 )
-                        break;
-                    // use the first address only
-                    sockaddr_in* h =
-                        ( sockaddr_in *)result->ai_addr;
-                    char szIpAddr[ INET6_ADDRSTRLEN + 1 ];
-                    szIpAddr[ INET6_ADDRSTRLEN ] = 0;
-
-                    const char* szRet = inet_ntop(
-                        result->ai_family,
-                        &h->sin_addr,
-                        szIpAddr,
-                        INET6_ADDRSTRLEN );
-
-                    if( szRet == nullptr )
-                    {
-                        ret = -errno;
-                        freeaddrinfo( result );
-                        break;
-                    }
-                    oCfg[ propDestIpAddr ] = szRet;
-                    freeaddrinfo( result );
+                    DebugPrintEx( logErr, ret,
+                        "Error invalid network address" );
+                    break;
                 }
             }
 

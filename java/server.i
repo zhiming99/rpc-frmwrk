@@ -320,6 +320,14 @@ jobject CreateServer(
                 propIoMgr, pMgr );
         }
 
+        if( !g_pRouter.IsEmpty() &&
+            g_strInstId.size() )
+        {
+            CParamList oParams( pCfg );
+            oParams.SetStrProp( propObjInstName,
+                strObjName + "_" + g_strInstId );
+        }
+
         ret = CRpcServices::LoadObjDesc(
             strDesc, strObjName, true, pCfg );
         if( ERROR( ret ) )

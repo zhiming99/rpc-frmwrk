@@ -14,6 +14,7 @@ def UpdateDrv( sysDrvPath : str ) :
     drvPath = os.path.dirname(os.path.realpath(__file__))
     drvFile = drvPath + "/driver.json"
     ret = 0
+    cliSrcVals = None
     try:
         bBuiltinRt=XXXBUILTINRT
         srcFp = open( drvFile, "r" )
