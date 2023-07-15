@@ -325,7 +325,7 @@ jobject CreateServer(
             stdstr strVal;
             CIoManager* pm = pMgr;
             CParamList oParams( pCfg );
-            ret = pm>GetCmdLineOpt(
+            ret = pm->GetCmdLineOpt(
                 propSvrInstName, strVal );
             if( SUCCEEDED( ret ) )
                 oParams.SetStrProp(
