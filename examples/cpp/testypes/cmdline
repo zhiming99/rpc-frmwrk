@@ -1,2 +1,2 @@
 #!/bin/sh
-ridlc -bO . ../../testypes.ridl 
+ridlc -bsO . ../../testypes.ridl 

@@ -44,7 +44,6 @@ ObjPtr g_pIoMgr;
 ObjPtr g_pRouter;
 extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
-stdstr g_strInstId;
 %}
 
 %include "std_string.i"
@@ -1162,27 +1161,12 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 ret = -ENOENT;
                 break;
             }
+
             stdstr strInstName;
             oCfg.GetStrProp( 107, strInstName );
             oCfg.RemoveProperty( 107 );
 
             stdstr strRtName = strAppName + "_rt_";
-
-            if( strRtName !=
-                strInstName.substr( 0, strRtName.size() ) )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            g_strInstId = strInstName.substr(
-                strRtName.size() );
-            if( g_strInstId.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
             // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
@@ -1229,12 +1213,12 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             }
 
             CCfgOpener oRtCfg;
-            oRtCfg.SetStrProp( propSvrInstName,
-                strInstName );
+            oRtCfg.SetStrProp(
+                propSvrInstName, strInstName );
 
             oRtCfg.SetPointer( propIoMgr, pMgr );
-            pMgr->SetCmdLineOpt( propSvrInstName,
-                strInstName );
+            pMgr->SetCmdLineOpt(
+                propSvrInstName, strInstName );
 
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,

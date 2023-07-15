@@ -7488,9 +7488,8 @@ gint32 CImplMainFunc::EmitNormalMainContent(
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
             if( g_bBuiltinRt )
             {
-                Wa( "oParams[ propObjInstName ] =" );
-                CCOUT << "    \"" << strSvcName << "_\" +strInstId;";
-                NEW_LINE;
+                Wa( "oParams[ propSvrInstName ] =" );
+                Wa( "    g_strInstName;" );
             }
             NEW_LINE;
             Wa( "ret = CRpcServices::LoadObjDesc(" );

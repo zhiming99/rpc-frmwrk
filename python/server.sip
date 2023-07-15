@@ -794,6 +794,7 @@ cpp::ObjPtr CreateServer(
     gint32 ret = 0;
     do{
         cpp::CfgPtr pCfg = *a3;
+        CIoManager* pMgr = *a0;
 
         if( pCfg.IsEmpty() )
         {
@@ -809,12 +810,15 @@ cpp::ObjPtr CreateServer(
                 propIoMgr, *a0 );
         }
 
-        if( !g_pRouter.IsEmpty() &&
-            g_strInstId.size() )
+        if( !g_pRouter.IsEmpty() )
         {
             CParamList oParams( pCfg );
-            oParams.SetStrProp( propObjInstName,
-                *a2 + "_" + g_strInstId );
+            stdstr strVal;
+            ret = pMgr->GetCmdLineOpt(
+                propSvrInstName, strVal );
+            if( SUCCEEDED( ret ) )
+                oParams.SetStrProp(
+                    propSvrInstName, strVal  );
         }
 
         ret = CRpcServices::LoadObjDesc(

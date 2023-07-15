@@ -320,6 +320,7 @@ gint32 CPythonProxyRosImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CPythonRpcSvc_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
 
         stdstr strSvcName;
         ret = oIfCfg.GetStrProp(
@@ -327,12 +328,7 @@ gint32 CPythonProxyRosImpl::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        stdstr strInstName;
-        ret = oIfCfg.GetStrProp(
-            propObjInstName, strInstName );
-        if( ERROR( ret ) )
-            strInstName = strSvcName;
-
+        stdstr strInstName = strSvcName;
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );
@@ -600,6 +596,7 @@ gint32 CPythonServerRosImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CPythonRpcSvc_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
 
         stdstr strSvcName;
         ret = oIfCfg.GetStrProp(
@@ -607,12 +604,7 @@ gint32 CPythonServerRosImpl::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        stdstr strInstName;
-        ret = oIfCfg.GetStrProp(
-            propObjInstName, strInstName );
-        if( ERROR( ret ) )
-            strInstName = strSvcName;
-
+        stdstr strInstName = strSvcName;
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );

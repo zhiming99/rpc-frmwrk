@@ -48,7 +48,6 @@ extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
 gint32 OpenThisLib();
 extern void* g_pLibHandle;
-extern stdstr g_strInstId;
 %End
 
 %ModuleCode
@@ -57,7 +56,6 @@ char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 ObjPtr g_pRouter;
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
-stdstr g_strInstId;
 
 void DumpObj(PyObject *o)
 {
@@ -945,22 +943,7 @@ namespace cpp
             oCfg.RemoveProperty( 107 );
 
             stdstr strRtName = strAppName + "_rt_";
-
-            if( strRtName !=
-                strInstName.substr( 0, strRtName.size() ) )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
-            g_strInstId = strInstName.substr(
-                strRtName.size() );
-            if( g_strInstId.empty() )
-            {
-                ret = -EINVAL;
-                break;
-            }
-
+            // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
                 break;
@@ -1007,11 +990,12 @@ namespace cpp
             }
 
             CCfgOpener oRtCfg;
-            oRtCfg.SetStrProp( propSvrInstName,
-                strInstName );
+            oRtCfg.SetStrProp(
+                propSvrInstName, strInstName );
+
             oRtCfg.SetPointer( propIoMgr, pMgr );
-            pMgr->SetCmdLineOpt( propSvrInstName,
-                strInstName );
+            pMgr->SetCmdLineOpt(
+                propSvrInstName, strInstName );
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
                 OBJNAME_ROUTER,

@@ -2559,27 +2559,31 @@ cpp::ObjPtr CreateProxy(
     gint32 ret = 0;
     do{
         cpp::CfgPtr pCfg = *a3;
+        CIoManager* pMgr = *a0;
 
         if( pCfg.IsEmpty() )
         {
             CParamList oParams;
             oParams.SetObjPtr(
-                propIoMgr, *a0 );
+                propIoMgr, pMgr );
             pCfg = oParams.GetCfg();
         }
         else
         {
             CParamList oParams( pCfg );
             oParams.SetObjPtr(
-                propIoMgr, *a0 );
+                propIoMgr, pMgr );
         }
 
-        if( !g_pRouter.IsEmpty() &&
-            g_strInstId.size() )
+        if( !g_pRouter.IsEmpty() )
         {
             CParamList oParams( pCfg );
-            oParams.SetStrProp( propObjInstName,
-                *a2 + "_" + g_strInstId );
+            stdstr strVal;
+            ret = pMgr->GetCmdLineOpt(
+                propSvrInstName, strVal );
+            if( SUCCEEDED( ret ) )
+                oParams.SetStrProp(
+                    propSvrInstName, strVal  );
         }
 
         ret = CRpcServices::LoadObjDesc(

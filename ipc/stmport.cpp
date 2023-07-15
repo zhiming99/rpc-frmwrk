@@ -1395,6 +1395,9 @@ gint32 CDBusStreamBusPort::PostStart(
         if( ERROR( ret ) )
             break;
 
+        oCfg.CopyProp(
+            propSvrInstName, pContext );
+
         ret = CRpcServices::LoadObjDesc(
             strDesc, strObjName, IsServer(),
             oCfg.GetCfg() );

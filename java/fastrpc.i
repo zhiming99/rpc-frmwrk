@@ -321,6 +321,7 @@ gint32 CJavaRpcSvc_CliImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CSwigRosRpcSvc_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
 
         stdstr strSvcName;
         ret = oIfCfg.GetStrProp(
@@ -328,12 +329,7 @@ gint32 CJavaRpcSvc_CliImpl::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        stdstr strInstName;
-        ret = oIfCfg.GetStrProp(
-            propObjInstName, strInstName );
-        if( ERROR( ret ) )
-            strInstName = strSvcName;
-
+        stdstr strInstName = strSvcName;
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );
@@ -603,6 +599,7 @@ gint32 CJavaRpcSvc_SvrImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CSwigRosRpcSvc_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
 
         stdstr strSvcName;
         ret = oIfCfg.GetStrProp(
@@ -610,12 +607,7 @@ gint32 CJavaRpcSvc_SvrImpl::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        stdstr strInstName;
-        ret = oIfCfg.GetStrProp(
-            propObjInstName, strInstName );
-        if( ERROR( ret ) )
-            strInstName = strSvcName;
-
+        stdstr strInstName = strSvcName;
         oCtx[ 1 ] = strInstName;
         guint32 dwHash = 0;
         ret = GenStrHash( strInstName, dwHash );
