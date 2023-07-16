@@ -199,13 +199,13 @@ class PyRpcContext :
                 if 'router' in oInitParams:
                     p1.SetStrProp( 106,
                         oInitParams[ 'router' ] )
-                if 'InstName' in oInitParams:
+                if 'instname' in oInitParams:
                     p1.SetStrProp( 107,
-                        oInitParams[ 'InstName' ] )
+                        oInitParams[ 'instname' ] )
         except Exception as err:
             print( err )
             if ret == 0:
-                ret = -ErrorCode.EFAULT
+                ret = -errno.EFAULT
 
         if ret < 0 :
             return None
@@ -443,7 +443,7 @@ class PyRpcServices :
     '''
     def WriteStreamNoWait( self, hChannel, pBuf ) :
         if len( pBuf ) == 0:
-            return -ErrorCode.EINVAL
+            return -errno.EINVAL
         return self.oInst.WriteStreamNoWait(
             hChannel, pBuf )
 

@@ -3057,8 +3057,6 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
             Wa( "\"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
             if( bProxy )
                 Wa( "\"\\t [ --instname <name> to specify the string as the name of the server instance to connect'. ]\\n\"" );
-            else
-                Wa( "\"\\t [ --instname <name> to specify the string as the name of this server instance'. ]\\n\"" );
         }
         Wa( "\"\\t [ -h this help ]\\n\" ) \% ( sys.argv[ 0 ] )," );
         CCOUT << "file=sys.stderr )";
@@ -3081,7 +3079,10 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
 #endif
         CCOUT << "    opts, args = getopt.getopt(argv, \""<< strShort <<"\","; 
         NEW_LINE;
-        CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\" ] )";
+        if( bProxy )
+            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\" ] )";
+        else
+            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\" ] )";
         NEW_LINE;
 
         Wa( "except:" );
@@ -3105,15 +3106,14 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
             Wa( "        bMount = True" );
         }
 #endif
-        CCOUT << "    elif opt in ('--driver', '--router', '--objdesc', '--instname' ):";
+        CCOUT << "    elif opt in ('--driver', '--router', '--objdesc' ):";
         INDENT_UP;
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        Wa( "if opt != '--instname':" );
-        Wa( "    stinfo = os.stat( arg )" );
-        Wa( "    if not stat.S_ISREG( stinfo.st_mode ) and not stat.S_ISLNK( stinfo.st_mode):" );
-        CCOUT << "        raise Exception( \"Error invalid file '%s'\" \% arg )";
+        Wa( "stinfo = os.stat( arg )" );
+        Wa( "if not stat.S_ISREG( stinfo.st_mode ) and not stat.S_ISLNK( stinfo.st_mode):" );
+        CCOUT << "    raise Exception( \"Error invalid file '%s'\" \% arg )";
         INDENT_DOWNL;
         Wa( "except Exception as err:" );
         Wa( "    print( err )" );
@@ -3123,13 +3123,15 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "    params[ 'driver' ] = arg" );
         Wa( "elif opt == '--router':" );
         Wa( "    params[ 'router' ] = arg" );
-        Wa( "elif opt == '--instname':" );
-        Wa( "    params[ 'instname' ] = arg" );
         Wa( "else:" );
         CCOUT << "    params[ 'objdesc' ] = arg";
         INDENT_DOWN;
         INDENT_DOWNL;
-
+        if( bProxy )
+        {
+            Wa( "    elif opt == '--instname':" );
+            Wa( "        params[ 'instname' ] = arg" );
+        }
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 0 )" );
@@ -3356,12 +3358,12 @@ gint32 CImplPyMainFunc::OutputCli(
             CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
             NEW_LINE;
             CServiceDecl* pSvc = vecSvcs[ 0 ];
-            Wa( "if not 'InstName' in params:" );
+            Wa( "if not 'instname' in params:" );
             INDENT_UPL;
             Wa( "strInstId = cpp.InstIdFromObjDesc(" );
             CCOUT << "    strPath_, \"" << pSvc->GetName() << "\" )";
             NEW_LINE;
-            CCOUT << "params[ 'InstName' ] = \""
+            CCOUT << "params[ 'instname' ] = \""
                 << g_strAppName << "_rt_\" + strInstId";
             INDENT_DOWNL;
             Wa( "oContext = PyRpcContext( params )" );
@@ -3679,12 +3681,10 @@ gint32 CImplPyMainFunc::OutputSvr(
             Wa( "    strCfg = params[ 'driver' ]" );
             Wa( "else:" );
             Wa( "    strCfg = './driver.json'" );
-            CCOUT << "if not 'InstName' in params:";
-            INDENT_UPL;
             Wa( "strInstId = cpp.InstIdFromDrv( strCfg )" );
-            CCOUT << "params[ 'InstName' ] = \""
+            CCOUT << "params[ 'instname' ] = \""
                 << g_strAppName << "_rt_\" + strInstId";
-            INDENT_DOWNL;
+            NEW_LINE;
             Wa( "oContext = PyRpcContext( params )" );
         }
         else

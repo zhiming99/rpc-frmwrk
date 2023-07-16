@@ -37,7 +37,7 @@ gint32 DllLoadFactory( FactoryPtr& pFactory )
 static std::string g_strDrvPath;
 static std::string g_strObjDesc;
 static std::string g_strRtDesc;
-static std::string g_strInstName( "TestTypes_" );
+static std::string g_strInstName( "TestTypes_rt_" );
 static bool g_bAuth = false;
 static ObjPtr g_pRouter;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
@@ -83,7 +83,7 @@ int main( int argc, char** argv )
             {
                 case 0:
                 {
-                    if( iOptIdx != 3 )
+                    if( iOptIdx < 3 )
                     {
                         struct stat sb;
                         ret = lstat( optarg, &sb );
@@ -108,8 +108,15 @@ int main( int argc, char** argv )
                     else if( iOptIdx == 2 )
                         g_strRtDesc = optarg;
                     else if( iOptIdx == 3 )
+                    {
+                        if( !IsValidName( optarg ) )
+                        {
+                            fprintf( stderr, "Error invalid instance name '%s'.\n", optarg );
+                            ret = -EINVAL;
+                            break;
+                        }
                         g_strInstName = optarg;
-                    else
+                    }else
                     {
                         fprintf( stderr, "Error invalid option.\n" );
                         Usage( argv[ 0 ] );
@@ -295,7 +302,7 @@ int _main( int argc, char** argv )
             strDesc, "TestTypesSvc" );
         if( strInstId.empty() )
         { ret = -EINVAL; break;}
-        if( g_strInstName == "TestTypes_" )
+        if( g_strInstName == "TestTypes_rt_" )
             g_strInstName += strInstId;
         
         ret = InitContext();

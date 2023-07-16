@@ -1407,12 +1407,12 @@ gint32 CJavaSnippet::EmitGetArgTypes(
 }
 
 gint32 CJavaSnippet::EmitGetDescPath(
-    bool bServer )
+    bool bProxy )
 {
     Wa( "public static String getDescPath( String strName )" );
     BLOCK_OPEN;
     Wa( "String strDescPath =" );
-    CCOUT << "    " << ( bServer ? "mainsvr" : "maincli" )
+    CCOUT << "    " << ( bProxy ? "maincli" : "mainsvr" )
     << ".class.getProtectionDomain().getCodeSource().getLocation().getPath();";
     NEW_LINE;
     stdstr strPrefix = "/";
@@ -1436,15 +1436,15 @@ gint32 CJavaSnippet::EmitGetDescPath(
     return 0;
 }
 
-gint32 CJavaSnippet::EmitGetOpt( bool bServer )
+gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
 {
     gint32 ret = 0;
     do{
         stdstr strCmd = g_strPrefix + g_strAppName + ".";
-        if( bServer )
-            strCmd += "mainsvr";
-        else
+        if( bProxy )
             strCmd += "maincli";
+        else
+            strCmd += "mainsvr";
 
         Wa( "Options options = new Options();" );
         Wa( "Option oAuth = new Option(\"a\", \"to enable authentication\");" );
@@ -1458,7 +1458,7 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         NEW_LINE;
 
 #ifdef FUSE3
-        if( bServer )
+        if( !bProxy )
         {
             Wa( "String strMPoint = null;" );
             Wa( "Option oMountPoint = new Option(\"m\", true," );
@@ -1486,14 +1486,14 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         Wa( "options.addOption(oObjDesc);" );
         NEW_LINE;
 
-        Wa( "Option oInstName = new Option(\"xi\", \"instname\", true," );
-        if( bServer )
-            Wa( "    \"to specify the server instance name for this server.\" );" );
-        else
+        if( bProxy )
+        {
+            Wa( "Option oInstName = new Option(\"xi\", \"instname\", true," );
             Wa( "    \"to specify the server instance name to connect.\" );" );
-        Wa( "oInstName.setRequired(false);" );
-        Wa( "options.addOption(oInstName);" );
-        NEW_LINE;
+            Wa( "oInstName.setRequired(false);" );
+            Wa( "options.addOption(oInstName);" );
+            NEW_LINE;
+        }
 
         Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
         Wa( "oHelp.setRequired(false);" );
@@ -1528,21 +1528,23 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         Wa( "else if( opt.getOpt() == \"d\" )" );
         Wa( "    oInit.put( 103, Boolean.valueOf( true ) );" );
 #ifdef FUSE3
-        if( bServer )
+        if( !bProxy )
         {
             Wa( "else if( opt.getOpt() == \"m\" )" );
             Wa( "    strMPoint = opt.getValue();" );
         }
 #endif
         Wa( "else if( opt.getOpt() == \"xd\" || opt.getLongOpt() == \"driver\" )" );
-        Wa( "{ bCheck = true; oInit.put( 105, opt.getValue() ); }" );
+        Wa( "{ bCheck = true; strCfgPath = opt.getValue(); oInit.put( 105, strCfgPath ); }" );
         Wa( "else if( opt.getOpt() == \"xr\" || opt.getLongOpt() == \"router\" )" );
         Wa( "{ bCheck = true; oInit.put( 106, opt.getValue() ); }" );
         Wa( "else if( opt.getOpt() == \"xo\" || opt.getLongOpt() == \"objdesc\" )" );
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
-        Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
-        Wa( "{ oInit.put( 107, opt.getValue() ); }" );
-
+        if( bProxy )
+        {
+            Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
+            Wa( "{ oInit.put( 107, opt.getValue() ); }" );
+        }
         Wa( "else if( opt.getOpt() == \"h\" )" );
         BLOCK_OPEN; 
         CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
@@ -1572,10 +1574,10 @@ gint32 CJavaSnippet::EmitGetOpt( bool bServer )
         BLOCK_CLOSE;
         BLOCK_CLOSE; 
         NEW_LINE;
-        if( bServer )
-            Wa( "oInit.put( 101, Integer.valueOf( 2 ) );" );
-        else
+        if( bProxy )
             Wa( "oInit.put( 101, Integer.valueOf( 1 ) );" );
+        else
+            Wa( "oInit.put( 101, Integer.valueOf( 2 ) );" );
 
     }while( 0 );
     return ret;
@@ -4554,7 +4556,7 @@ gint32 CImplJavaMainCli::Output()
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
-        os.EmitGetDescPath( false );
+        os.EmitGetDescPath( true );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         stdstr strModName = g_strAppName + "cli";
@@ -4584,7 +4586,7 @@ gint32 CImplJavaMainCli::Output()
             if( g_bBuiltinRt )
             {
                 Wa( "String strDescPath = \"\";" );
-                os.EmitGetOpt( false );
+                os.EmitGetOpt( true );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
                 NEW_LINE;
                 Wa( "if( strDescPath.isEmpty() )" );
@@ -4726,7 +4728,7 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
-        os.EmitGetDescPath( true );
+        os.EmitGetDescPath( false );
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         stdstr strModName = g_strAppName + "svr";
@@ -4757,11 +4759,9 @@ gint32 CImplJavaMainSvr::Output()
                 Wa( "else" );
                 Wa( "    strCfgPath = \"driver.json\";" );
                 Wa( "String strDescPath = \"\";" );
-                os.EmitGetOpt( true );
+                os.EmitGetOpt( false );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
                 NEW_LINE;
-                Wa( "if( !oInit.containsKey( 107 ) )" );
-                BLOCK_OPEN;
                 CServiceDecl* pSvc = vecSvcs[ 0 ];
                 Wa( "String strInstId = rpcbase.InstIdFromDrv(" );
                 Wa( "    strCfgPath );" );
@@ -4769,7 +4769,6 @@ gint32 CImplJavaMainSvr::Output()
                     << "_rt_\" + strInstId;";
                 NEW_LINE;
                 CCOUT << "oInit.put( 107, strInstName );";
-                BLOCK_CLOSE;
                 NEW_LINE;
             }
             Wa( "m_oCtx = JavaRpcContext.createServer( oInit ); " );

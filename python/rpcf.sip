@@ -940,6 +940,13 @@ namespace cpp
 
             stdstr strInstName;
             oCfg.GetStrProp( 107, strInstName );
+            if( !IsValidName( strInstName ) )
+            {
+                ret = -EINVAL;
+                DebugPrintEx( logErr, ret, 
+                    "Error invalid instance name" );
+                break;
+            }
             oCfg.RemoveProperty( 107 );
 
             stdstr strRtName = strAppName + "_rt_";

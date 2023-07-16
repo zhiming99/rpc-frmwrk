@@ -6550,8 +6550,6 @@ void CImplMainFunc::EmitRtUsage(
         Wa( "    \"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
         if( bProxy )
             Wa( "    \"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
-        else
-            Wa( "    \"\\t [ --instname <name> to specify the instance name for this server'. ]\\n\"" );
     }
     CCOUT << "    \"\\t [ -h this help ]\\n\", szName );";
     BLOCK_CLOSE;
@@ -6829,7 +6827,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    {\"driver\",   required_argument, 0,  0 }," );
             Wa( "    {\"objdesc\",  required_argument, 0,  0 }," );
             Wa( "    {\"router\",   required_argument, 0,  0 }," );
-            Wa( "    {\"instname\", required_argument, 0,  0 }," );
+            if( bProxy )
+                Wa( "    {\"instname\", required_argument, 0,  0 }," );
             Wa( "    {0,             0,                 0,  0 }" );
             Wa( "};            " );
             CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
@@ -6847,7 +6846,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         {
             Wa( "case 0:" );
             BLOCK_OPEN;
-            Wa( "if( iOptIdx != 3 )" );
+            Wa( "if( iOptIdx < 3 )" );
             BLOCK_OPEN;
             Wa( "struct stat sb;" );
             Wa( "ret = lstat( optarg, &sb );" );
@@ -6873,8 +6872,20 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    g_strObjDesc = optarg;" );
             Wa( "else if( iOptIdx == 2 )" );
             Wa( "    g_strRtDesc = optarg;" );
-            Wa( "else if( iOptIdx == 3 )" );
-            Wa( "    g_strInstName = optarg;" );
+            if( bProxy )
+            {
+                Wa( "else if( iOptIdx == 3 )" );
+                BLOCK_OPEN;
+                Wa( "if( !IsValidName( optarg ) )" );
+                BLOCK_OPEN;
+                Wa( "fprintf( stderr, \"Error invalid instance name '%s'.\\n\", optarg );" );
+                Wa( "ret = -EINVAL;" );
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+                NEW_LINE;
+                CCOUT << "g_strInstName = optarg;";
+                BLOCK_CLOSE;
+            }
             Wa( "else" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
@@ -7056,7 +7067,7 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "static std::string g_strObjDesc;" );
             Wa( "static std::string g_strRtDesc;" );
             CCOUT << "static std::string g_strInstName( \""
-                << g_strAppName << "_\" );";
+                << g_strAppName << "_rt_\" );";
             NEW_LINE;
             Wa( "static bool g_bAuth = false;" );
             Wa( "static ObjPtr g_pRouter;" );
@@ -7431,7 +7442,7 @@ gint32 CImplMainFunc::EmitNormalMainContent(
                 Wa( "if( strInstId.empty() )" );
                 Wa( "{ ret = -EINVAL; break;}" );
                 CCOUT << "if( g_strInstName == \"" 
-                    << g_strAppName << "_\" )";
+                    << g_strAppName << "_rt_\" )";
                 NEW_LINE;
                 Wa( "    g_strInstName += strInstId;" );
             }
@@ -7445,11 +7456,7 @@ gint32 CImplMainFunc::EmitNormalMainContent(
                 Wa( "std::string strInstId = InstIdFromDrv( strDrv );" );
                 Wa( "if( strInstId.empty() )" );
                 Wa( "{ ret = -EINVAL; break;}" );
-                NEW_LINE;
-                CCOUT << "if( g_strInstName == \"" 
-                    << g_strAppName << "_\" )";
-                NEW_LINE;
-                Wa( "    g_strInstName += strInstId;" );
+                Wa( "g_strInstName += strInstId;" );
             }
         }
         else
