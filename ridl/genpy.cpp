@@ -3057,6 +3057,8 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
             Wa( "\"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
             if( bProxy )
                 Wa( "\"\\t [ --instname <name> to specify the string as the name of the server instance to connect'. ]\\n\"" );
+            else
+                Wa( "\"\\t [ --instname <name> to specify the string as the name of this server instance'. ]\\n\"" );
         }
         Wa( "\"\\t [ -h this help ]\\n\" ) \% ( sys.argv[ 0 ] )," );
         CCOUT << "file=sys.stderr )";
@@ -3079,10 +3081,7 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
 #endif
         CCOUT << "    opts, args = getopt.getopt(argv, \""<< strShort <<"\","; 
         NEW_LINE;
-        if( bProxy )
-            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\" ] )";
-        else
-            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\" ] )";
+        CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\" ] )";
         NEW_LINE;
 
         Wa( "except:" );
@@ -3127,11 +3126,8 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         CCOUT << "    params[ 'objdesc' ] = arg";
         INDENT_DOWN;
         INDENT_DOWNL;
-        if( bProxy )
-        {
-            Wa( "    elif opt == '--instname':" );
-            Wa( "        params[ 'instname' ] = arg" );
-        }
+        Wa( "    elif opt == '--instname':" );
+        Wa( "        params[ 'instname' ] = arg" );
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 0 )" );
@@ -3358,7 +3354,7 @@ gint32 CImplPyMainFunc::OutputCli(
             CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
             NEW_LINE;
             CServiceDecl* pSvc = vecSvcs[ 0 ];
-            Wa( "if not 'instname' in params:" );
+            CCOUT << "if not 'instname' in params:";
             INDENT_UPL;
             Wa( "strInstId = cpp.InstIdFromObjDesc(" );
             CCOUT << "    strPath_, \"" << pSvc->GetName() << "\" )";
@@ -3681,10 +3677,12 @@ gint32 CImplPyMainFunc::OutputSvr(
             Wa( "    strCfg = params[ 'driver' ]" );
             Wa( "else:" );
             Wa( "    strCfg = './driver.json'" );
+            CCOUT << "if not 'instname' in params:";
+            INDENT_UPL;
             Wa( "strInstId = cpp.InstIdFromDrv( strCfg )" );
             CCOUT << "params[ 'instname' ] = \""
                 << g_strAppName << "_rt_\" + strInstId";
-            NEW_LINE;
+            INDENT_DOWNL;
             Wa( "oContext = PyRpcContext( params )" );
         }
         else

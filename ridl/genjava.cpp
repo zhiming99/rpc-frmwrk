@@ -1486,14 +1486,11 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "options.addOption(oObjDesc);" );
         NEW_LINE;
 
-        if( bProxy )
-        {
-            Wa( "Option oInstName = new Option(\"xi\", \"instname\", true," );
-            Wa( "    \"to specify the server instance name to connect.\" );" );
-            Wa( "oInstName.setRequired(false);" );
-            Wa( "options.addOption(oInstName);" );
-            NEW_LINE;
-        }
+        Wa( "Option oInstName = new Option(\"xi\", \"instname\", true," );
+        Wa( "    \"to specify the server instance name to connect.\" );" );
+        Wa( "oInstName.setRequired(false);" );
+        Wa( "options.addOption(oInstName);" );
+        NEW_LINE;
 
         Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
         Wa( "oHelp.setRequired(false);" );
@@ -1540,11 +1537,8 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "{ bCheck = true; oInit.put( 106, opt.getValue() ); }" );
         Wa( "else if( opt.getOpt() == \"xo\" || opt.getLongOpt() == \"objdesc\" )" );
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
-        if( bProxy )
-        {
-            Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
-            Wa( "{ oInit.put( 107, opt.getValue() ); }" );
-        }
+        Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
+        Wa( "{ oInit.put( 107, opt.getValue() ); }" );
         Wa( "else if( opt.getOpt() == \"h\" )" );
         BLOCK_OPEN; 
         CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
@@ -4762,6 +4756,8 @@ gint32 CImplJavaMainSvr::Output()
                 os.EmitGetOpt( false );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
                 NEW_LINE;
+                Wa( "if( !oInit.containsKey( 107 ) )" );
+                BLOCK_OPEN;
                 CServiceDecl* pSvc = vecSvcs[ 0 ];
                 Wa( "String strInstId = rpcbase.InstIdFromDrv(" );
                 Wa( "    strCfgPath );" );
@@ -4769,6 +4765,7 @@ gint32 CImplJavaMainSvr::Output()
                     << "_rt_\" + strInstId;";
                 NEW_LINE;
                 CCOUT << "oInit.put( 107, strInstName );";
+                BLOCK_CLOSE;
                 NEW_LINE;
             }
             Wa( "m_oCtx = JavaRpcContext.createServer( oInit ); " );
