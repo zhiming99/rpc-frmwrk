@@ -634,7 +634,8 @@ class CIoManager : public IService
 
     gint32 TryFindDescFile(
         const std::string& strFile,
-        std::string& strPath );
+        std::string& strPath,
+        bool bSkipLocal = false );
 
     gint32 AddAndRun(
         TaskletPtr& pTask, bool bImmediate );

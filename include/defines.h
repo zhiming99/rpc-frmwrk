@@ -277,7 +277,7 @@ inline gint32 SendBytesNoSig( int iFd,
 gint64 GetRandom();
 
 gint32 GetEnvLibPath(
-    std::set< std::string >& oSet );
+    std::vector< std::string >& oSet );
 
 gint32 GetLibPathName( std::string& strResult,
     const char* szLibName = nullptr );

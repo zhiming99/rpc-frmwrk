@@ -197,7 +197,7 @@ gint32 GetCmdOutput( std::string& strResult,
     return ret;
 }
 
-gint32 GetEnvLibPath( std::set< std::string >& oSet )
+gint32 GetEnvLibPath( std::vector< std::string >& oSet )
 {
     char* szEnv = secure_getenv(
         "LD_LIBRARY_PATH" );
@@ -213,7 +213,7 @@ gint32 GetEnvLibPath( std::set< std::string >& oSet )
     pos = s.find_first_of( delim );
     if( pos == std::string::npos )
     {
-        oSet.insert( s );
+        oSet.push_back( s );
         return STATUS_SUCCESS;
     }
     while( pos != std::string::npos )
@@ -221,7 +221,7 @@ gint32 GetEnvLibPath( std::set< std::string >& oSet )
         if( pos > 0 )
         {
             token = s.substr( 0, pos );
-            oSet.insert( token );
+            oSet.push_back( token );
         }
         s.erase( 0, pos + 1 );
         pos = s.find_first_of( delim );

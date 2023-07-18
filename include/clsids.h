@@ -113,7 +113,7 @@ typedef enum : guint32
     DECL_CLSID( CPnpMgrQueryStopCompletion ),
     DECL_CLSID( CPnpMgrDoStopNoMasterIrp ),
     DECL_CLSID( CPnpMgrStartPortCompletionTask ),
-    DECL_CLSID( Reserved1 ),
+    DECL_CLSID( CStlStrVector ),
     DECL_CLSID( CPnpMgrStopPortAndDestroyTask ),
     DECL_CLSID( CGenBusPortStopChildTask ),
     DECL_CLSID( CPortStartStopNotifTask ),

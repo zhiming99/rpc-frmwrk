@@ -607,4 +607,113 @@ gint32 CStlQwordVector::Deserialize(
         oBuf.ptr(), oBuf.size() );
 }
 
+gint32 CStlStrVector::Serialize(
+    CBuffer& oBuf ) const
+{
+    SERI_HEADER oHeader;
+
+    guint32 dwSize = 0;
+    for( auto& elem : m_vecElems )
+        dwSize += elem.size() + sizeof( guint32 );
+
+    oHeader.dwClsid = clsid( CStlStrVector );
+    oHeader.dwSize = dwSize + HEADER_NBSIZE ;
+
+    oBuf.Resize( sizeof( SERI_HEADER_BASE ) +
+        oHeader.dwSize );
+
+    oHeader.dwCount = m_vecElems.size();
+
+    oHeader.hton();
+    memcpy( oBuf.ptr(),
+        &oHeader, sizeof( oHeader ) );
+
+    char *pElem = 
+        ( oBuf.ptr() + sizeof( oHeader ) );
+
+    for( auto& i : m_vecElems )
+    {
+        guint32 dwBytes = htonl( i.size() );
+        memcpy( pElem,
+            &dwBytes, sizeof( dwBytes ) );
+        pElem + sizeof( dwBytes );
+        memcpy( pElem, i.c_str(), i.size() );
+        pElem += i.size(); 
+    }
+    return 0;
+}
+
+gint32 CStlStrVector::Deserialize(
+    const CBuffer& oBuf )
+{
+    if( oBuf.empty() )
+        return -EINVAL;
+
+    return Deserialize(
+        oBuf.ptr(), oBuf.size() );
+}
+
+gint32 CStlStrVector::Deserialize(
+    const char* pBuf, guint32 dwBufSize )
+{
+    const SERI_HEADER* pHeader =
+        ( SERI_HEADER* )pBuf;
+
+    if( pHeader == nullptr )
+        return -EINVAL;
+
+    if( dwBufSize < sizeof( SERI_HEADER ) )
+        return -EINVAL;
+
+    SERI_HEADER oHeader( *pHeader );
+    oHeader.ntoh();
+
+    m_vecElems.clear();
+    gint32 ret = 0;
+
+    do{
+        if( oHeader.dwClsid != clsid( CStlStrVector ) )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
+
+        if( oHeader.bVersion != 1 )
+        {
+            ret = -ENOTSUP;
+        }
+
+        if( oHeader.dwSize > BUF_MAX_SIZE ) 
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        oHeader.dwSize -= HEADER_NBSIZE;
+        char* pElems = ( char* )( pHeader + 1 );
+        const char* pEnd = pBuf + dwBufSize;
+        for( guint32 i = 0;
+            i < oHeader.dwCount && pElems < pEnd;
+            ++i )
+        {
+            guint32 dwBytes;
+            memcpy( &dwBytes,
+                pElems, sizeof( dwBytes ) );
+            dwBytes = ntohl( dwBytes );
+            pElems += sizeof( dwBytes );
+            if( pElems + dwBytes > pEnd )
+            {
+                ret = -ERANGE;
+                break;
+            }
+            m_vecElems.push_back(
+                stdstr( pElems, dwBytes ) );
+            pElems += dwBytes;
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 }

@@ -1723,17 +1723,17 @@ CIoManager::CIoManager( const std::string& strModName ) :
         }
         m_pReg->MakeDir( "/cmdline" );
 
-        StrSetPtr psetPaths( true );
-        ( *psetPaths )().insert( "." );
+        StrVecPtr pvecPaths( true );
+        // ( *pvecPaths )().insert( "." );
 
         std::string strPath;
         // get the libcombase.so's path
         ret = GetLibPath( strPath );
         if( SUCCEEDED( ret ) )
         {
-            ( *psetPaths )().insert( strPath );
+            ( *pvecPaths )().push_back( strPath );
             stdstr strTestLibs = strPath + "/rpcf";
-            ( *psetPaths )().insert( strTestLibs );
+            ( *pvecPaths )().push_back( strTestLibs );
         }
 
         // get the executable's path
@@ -1741,20 +1741,20 @@ CIoManager::CIoManager( const std::string& strModName ) :
         ret = GetModulePath( strPath ); 
         if( SUCCEEDED( ret ) )
         {
-            ( *psetPaths )().insert( strPath );
+            ( *pvecPaths )().push_back( strPath );
             stdstr strTestBins = strPath + "/rpcf";
-            ( *psetPaths )().insert( strTestBins );
+            ( *pvecPaths )().push_back( strTestBins );
         }
 
-        if( ( *psetPaths)().empty() )
+        if( ( *pvecPaths)().empty() )
         {
             throw std::runtime_error(
                 "Error get search paths for"
                 " config files" );
         }
 
-        GetEnvLibPath( ( *psetPaths )() );
-        ObjPtr pObj = psetPaths;
+        GetEnvLibPath( ( *pvecPaths )() );
+        ObjPtr pObj = pvecPaths;
         this->SetCmdLineOpt(
             propSearchPaths, pObj );
 
@@ -2021,15 +2021,15 @@ gint32 CIoManager::TryLoadClassFactory(
         if( ERROR( ret ) )
             break;
 
-        StrSetPtr psetPaths( pObj );
-        if( psetPaths.IsEmpty() )
+        StrVecPtr pvecPaths( pObj );
+        if( pvecPaths.IsEmpty() )
         {
             ret = -ENOENT;
             break;
         }
 
         bool bLoaded = false;
-        for( auto& elem : ( *psetPaths )() )
+        for( auto& elem : ( *pvecPaths )() )
         {
             std::string strFullPath =
                 elem + "/" + strFile;
@@ -2069,7 +2069,8 @@ gint32 CIoManager::TryLoadClassFactory(
 
 gint32 CIoManager::TryFindDescFile(
     const std::string& strFileName,
-    std::string& strPath )
+    std::string& strPath,
+    bool bSkipLocal )
 {
     gint32 ret = 0;
     do{
@@ -2079,13 +2080,16 @@ gint32 CIoManager::TryFindDescFile(
         std::string strFile =
             basename( strFileName.c_str() );
 
-        stdstr strLocal = "./" + strFile;
-        ret = access( strLocal.c_str(), R_OK );
-        if( ret == 0 )
+        if( !bSkipLocal )
         {
-            strPath = strLocal;
-            ret = STATUS_SUCCESS;
-            break;
+            stdstr strLocal = "./" + strFile;
+            ret = access( strLocal.c_str(), R_OK );
+            if( ret == 0 )
+            {
+                strPath = strLocal;
+                ret = STATUS_SUCCESS;
+                break;
+            }
         }
 
         ret = GetCmdLineOpt(
@@ -2093,15 +2097,15 @@ gint32 CIoManager::TryFindDescFile(
         if( ERROR( ret ) )
             break;
 
-        StrSetPtr psetPaths( pObj );
-        if( psetPaths.IsEmpty() )
+        StrVecPtr pvecPaths( pObj );
+        if( pvecPaths.IsEmpty() )
         {
             ret = -ENOENT;
             break;
         }
         bool bFound = false;
         std::string strFullPath;
-        for( auto& elem : ( *psetPaths )() )
+        for( auto& elem : ( *pvecPaths )() )
         {
             strFullPath = elem + "/" +  strFile;
             ret = access(
@@ -2385,6 +2389,17 @@ stdstr InstIdFromObjDesc(
                 strObj )
                 continue;
 
+            bool bws = false;
+            if( oElem.isMember(
+                JSON_ATTR_ENABLE_WEBSOCKET ) )
+            {
+                Json::Value& val = oElem[
+                    JSON_ATTR_ENABLE_WEBSOCKET ];
+                if( val.isString() &&
+                    val.asString() == "true" )
+                    bws = true;
+            }
+
             if( !oElem.isMember( JSON_ATTR_TCPPORT ) ||
                 !oElem[ JSON_ATTR_TCPPORT ].isString() )
             {
@@ -2397,8 +2412,37 @@ stdstr InstIdFromObjDesc(
 
             guint32 dwVal = strtoul(
                 strVal1.c_str(), nullptr, 10 );
-            if( dwVal > 65535 ||
-                dwVal < RPC_SVR_DEFAULT_PORTNUM )
+
+            if( dwVal > 65535 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( bws )
+            {
+                // for websocket, we use the URL to
+                // generate the instance id instead
+                if( !oElem.isMember( JSON_ATTR_DEST_URL) )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                Json::Value& val =
+                    oElem[ JSON_ATTR_DEST_URL ];
+                if( !val.isString() )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+
+                stdstr strVal2 = val.asString();
+                ret = GenHashInstId(
+                    dwVal, strVal2, strVal );
+                break;
+            }
+
+            if( dwVal < RPC_SVR_DEFAULT_PORTNUM )
             {
                 ret = -EINVAL;
                 break;
@@ -2419,6 +2463,13 @@ stdstr InstIdFromObjDesc(
             if( ERROR( ret ) )
                 break;
 
+            if( strIpAddr == "0.0.0.0" ||
+                strIpAddr == "::" ||
+                strIpAddr == "::0" )
+            {
+                ret = -EINVAL;
+                break;
+            }
             ret = GenHashInstId(
                 dwVal, strIpAddr, strVal );
             break;
