@@ -52,6 +52,16 @@ stdstr InstIdFromObjDesc(
 stdstr InstIdFromDrv(
     const stdstr& strDrv );
 
+gint32 UpdateObjDesc(
+    const stdstr strDesc,
+    IConfigDb* pCfg,
+    stdstr& strNewDesc );
+
+gint32 UpdateDrvCfg(
+    const stdstr strDriver,
+    IConfigDb* pCfg,
+    stdstr& strNewDrv );
+
 class CDriverManager : public IService
 {
     protected:

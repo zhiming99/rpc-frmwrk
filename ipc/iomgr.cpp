@@ -37,6 +37,9 @@
 #include "ifhelper.h"
 #include "dbusport.h"
 
+#include <fstream>
+#include <memory>
+
 namespace rpcf
 {
 
@@ -2588,6 +2591,380 @@ stdstr InstIdFromDrv(
         return "";
 
     return strVal;
+}
+
+/**
+* @name UpdateObjDesc update the attributes in the desc
+* file and return a new desc file on success
+* @{
+    @param strDesc a path to the object description
+    file to update
+
+    @param pCfg A map with multiple input parameters.
+    The valid key value is one of the following.
+
+         <p>101: the role of the rpcrouter, only valid
+         when builti-in router is enabled.</p>
+
+         <p>102: a boolean telling whether the
+         authoration enabled or not, [optional].</p>
+
+         <p>104: a string of the application name.</p>
+
+         <p>107: a string as the server instance name
+         of the builtin router. [optional]</p>
+
+         <p>108: a string as the server instance name
+         of the stand-alone router. [optional]</p>
+
+         <p>109: a string as the ip address to connect
+         toor bind to [optional]</p>
+
+         <p>110: a string as the port numer to connect
+         to or listen on [optional]</p>
+
+    @param strNewDesc an new desc file, or empty if
+    nothing to update. and property 107 is set with new
+    instance name if both 107 and 108 are not present.
+
+    @return a status code.
+*/
+/**  @} */
+
+gint32 UpdateObjDesc(
+    const stdstr strDesc,
+    IConfigDb* pCfg,
+    stdstr& strNewDesc )
+{
+    if( strDesc.empty() ||
+        pCfg == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        guint32 dwVal;
+        ret = oCfg.GetIntProp( 101, dwVal );
+        if( ERROR( ret ) )
+            break;
+
+        bool bChanged = false;
+        bool bProxy = ( dwVal == 1 );
+        bool bAuth = false;
+        oCfg.GetBoolProp( 102, bAuth );
+
+        stdstr strAppName;
+        ret = oCfg.GetStrProp( 104, strAppName );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strInst;
+        oCfg.GetStrProp( 107, strInst );
+
+        stdstr strSaInst;
+        if( bProxy )
+            oCfg.GetStrProp( 108, strSaInst );
+
+        stdstr strIpAddr;
+        oCfg.GetStrProp( 109, strIpAddr );
+
+        stdstr strPort;
+        oCfg.GetStrProp( 110, strPort );
+
+        Json::Value oVal;
+        ret = ReadJsonCfgFile( strDesc, oVal );
+        if( ERROR( ret ) )
+            break;
+
+        Json::Value& oObjArr =
+            oVal[ JSON_ATTR_OBJARR ];
+
+        gint32 i;
+
+        // update auth info
+        if( bProxy )
+        {
+            if( !oVal.isMember( JSON_ATTR_OBJARR ) ||
+                !oVal[ JSON_ATTR_OBJARR ].isArray() ||
+                !oVal[ JSON_ATTR_OBJARR ].size() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            for( i = 0; i < oObjArr.size(); i++ )
+            {
+                Json::Value& oElem = oObjArr[ i ];
+                if( oElem == Json::Value::null )
+                    continue;
+                if( !oElem.isObject() )
+                    continue;
+                if( !oElem.isMember(
+                    JSON_ATTR_AUTHINFO ) && bAuth )
+                    continue;
+                if( oElem.isMember(
+                    JSON_ATTR_AUTHINFO) && !bAuth )
+                {
+                    oElem.removeMember(
+                        JSON_ATTR_AUTHINFO );
+                    bChanged = true;
+                }
+            }
+            if( ERROR( ret ) )
+                break;
+        }
+
+        // update ip address
+        if( strIpAddr.size() || strPort.size() )
+        {
+            for( i = 0; i < oObjArr.size(); i++ )
+            {
+                Json::Value& oElem = oObjArr[ i ];
+                if( oElem == Json::Value::null )
+                    continue;
+                if( !oElem.isObject() )
+                    continue;
+                if( strIpAddr.size() &&
+                    oElem.isMember( JSON_ATTR_IPADDR ) )
+                {
+                    oElem[ JSON_ATTR_IPADDR ] =
+                        strIpAddr;
+                    bChanged = true;
+                }
+                if( strPort.size() &&
+                    oElem.isMember( JSON_ATTR_TCPPORT ) )
+                {
+                    oElem[ JSON_ATTR_TCPPORT ] =
+                        strPort;
+                    bChanged = true;
+                }
+            }
+        }
+
+        //update server name
+        if( strInst.size() )
+        {
+            // using the name from cmdline
+            oVal[ JSON_ATTR_SVRNAME ] = strInst;
+            bChanged = true;
+        }
+        else if( strSaInst.empty() )
+        {
+            // generate the server name if no
+            // stand-alone router name is given
+            // otherwise, using the original name from
+            // the file.
+            stdstr strInstId;
+            for( i = 0; i< oObjArr.size(); i++ )
+            {
+                Json::Value& oElem = oObjArr[ i ];
+                if( oElem == Json::Value::null )
+                    continue;
+                if( !oElem.isObject() )
+                    continue;
+                if( oElem.isMember( JSON_ATTR_IPADDR ) )
+                {
+                    strIpAddr = oElem[
+                        JSON_ATTR_IPADDR ].asString();
+                    strPort = oElem[
+                        JSON_ATTR_TCPPORT ].asString();
+
+                    guint32 dwPort = strtoul(
+                        strPort.c_str(), nullptr, 10 );
+                    ret = GenHashInstId(
+                        dwPort, strIpAddr, strInstId );
+                    break;
+                }
+            }
+            if( ERROR( ret ) )
+                break;
+            if( strInstId.empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            stdstr strNewName =
+                strAppName + "_rt_" + strInstId;
+            oVal[ JSON_ATTR_SVRNAME ] = strNewName;
+            oCfg[ 107 ] = strNewName;
+            bChanged = true;
+        }
+
+        if( !bChanged )
+            break;
+
+        char szNewDesc[] = "/tmp/rpcfod_XXXXXX";
+        int iFd = mkstemp( szNewDesc );
+        if( iFd < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        close( iFd );
+
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        std::ofstream ofs;
+        ofs.open ( szNewDesc ,
+            std::ofstream::out |
+            std::ofstream::trunc);
+        pWriter->write( oVal, &ofs );
+        ofs.close();
+        strNewDesc = szNewDesc;
+
+    }while( 0 );
+
+    return ret;
+}
+
+/**
+* @name UpdateDriver update the attributes in the
+* driver.json file and return a new desc file on
+* success
+* @{
+    @param strDriver a path to the driver.json
+    file to update
+
+    @param pCfg A map with multiple input parameters.
+    The valid key value is one of the following.
+
+         <p>101: the role of the rpcrouter, only valid
+         when builti-in router is enabled.</p>
+
+         <p>109: a string as the ip address to bind to
+         </p>
+
+         <p>110: a string as the port numer to listen
+         on </p>
+
+    @param strNewDrv an new driver.json, or empty if
+    nothing to update. 
+
+    @return a status code.
+*/
+/**  @} */
+
+gint32 UpdateDrvCfg(
+    const stdstr strDriver,
+    IConfigDb* pCfg,
+    stdstr& strNewDrv )
+{
+    if( strDriver.empty() ||
+        pCfg == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        guint32 dwVal;
+        ret = oCfg.GetIntProp( 101, dwVal );
+        if( ERROR( ret ) )
+            break;
+
+        bool bChanged = false;
+        bool bProxy = ( dwVal == 1 );
+
+        stdstr strAppName;
+        ret = oCfg.GetStrProp( 104, strAppName );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strIpAddr;
+        oCfg.GetStrProp( 109, strIpAddr );
+
+        stdstr strPort;
+        oCfg.GetStrProp( 110, strPort );
+
+        Json::Value oVal;
+        ret = ReadJsonCfgFile( strDriver, oVal );
+        if( ERROR( ret ) )
+            break;
+
+        Json::Value& oPorts =
+            oVal[ JSON_ATTR_PORTS ];
+
+        gint32 i;
+
+        // update ip address
+        for( i = 0; i < oPorts.size(); i++ )
+        {
+            Json::Value& oElem = oPorts[ i ];
+            if( oElem == Json::Value::null )
+                continue;
+            if( !oElem.isObject() ||
+                !oElem.isMember( JSON_ATTR_PORTCLASS ) )
+                continue;
+
+            Json::Value& oClass =
+                oElem[ JSON_ATTR_PORTCLASS ];
+            if( oClass.asString() !=
+                PORT_CLASS_RPC_TCPBUS )
+                continue;
+
+            Json::Value& oParams =
+                oElem[ JSON_ATTR_PARAMETERS ];
+
+            if( !oParams.isArray() ||
+                !oParams.size() )
+            {
+                ret = -EINVAL;
+            }
+
+            Json::Value& oParam = oParams[ 0 ];
+            if( !oParam.isMember( JSON_ATTR_BINDADDR ) ||
+                !oParam.isMember( JSON_ATTR_TCPPORT ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( strIpAddr.size() )
+            {
+                oParam[ JSON_ATTR_BINDADDR ] =
+                    strIpAddr;
+                bChanged = true;
+            }
+
+            if( strPort.size() )
+            {
+                oParam[ JSON_ATTR_TCPPORT ] =
+                    strPort;
+                bChanged = true;
+            }
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( !bChanged )
+            break;
+
+        char szNewDrv[] = "/tmp/rpcfdrv_XXXXXX";
+        int iFd = mkstemp( szNewDrv );
+        if( iFd < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        close( iFd );
+
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        std::ofstream ofs;
+        ofs.open ( szNewDrv ,
+            std::ofstream::out |
+            std::ofstream::trunc);
+        pWriter->write( oVal, &ofs );
+        ofs.close();
+        strNewDrv = szNewDrv;
+
+    }while( 0 );
+
+    return ret;
 }
 
 }
