@@ -2441,7 +2441,7 @@ stdstr InstIdFromObjDesc(
 
                 stdstr strVal2 = val.asString();
                 ret = GenHashInstId(
-                    dwVal, strVal2, strVal );
+                    0, strVal2, strVal );
                 break;
             }
 
@@ -2760,19 +2760,34 @@ gint32 UpdateObjDesc(
                     continue;
                 if( !oElem.isObject() )
                     continue;
-                if( oElem.isMember( JSON_ATTR_IPADDR ) )
+                const char* p =
+                    JSON_ATTR_ENABLE_WEBSOCKET;
+                if( oElem.isMember( p ) &&
+                    oElem[ p ].isString() &&
+                    oElem[ p ].asString() == "true" )
                 {
-                    strIpAddr = oElem[
-                        JSON_ATTR_IPADDR ].asString();
-                    strPort = oElem[
-                        JSON_ATTR_TCPPORT ].asString();
-
-                    guint32 dwPort = strtoul(
-                        strPort.c_str(), nullptr, 10 );
+                    p = JSON_ATTR_DEST_URL;
+                    stdstr strVal =
+                        oElem[ p ].asString();
                     ret = GenHashInstId(
-                        dwPort, strIpAddr, strInstId );
+                        0, strVal, strInstId );
                     break;
                 }
+
+                if( !oElem.isMember( JSON_ATTR_IPADDR ) )
+                    continue;
+
+                strIpAddr = oElem[
+                    JSON_ATTR_IPADDR ].asString();
+                strPort = oElem[
+                    JSON_ATTR_TCPPORT ].asString();
+
+                guint32 dwPort = strtoul(
+                    strPort.c_str(), nullptr, 10 );
+                ret = GenHashInstId(
+                    dwPort, strIpAddr, strInstId );
+
+                break;
             }
             if( ERROR( ret ) )
                 break;

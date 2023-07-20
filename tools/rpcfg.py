@@ -1467,23 +1467,16 @@ class ConfigDlg(Gtk.Dialog):
         cacertBtn.editBox = cacertEditBox
         secretBtn.editBox = secretEditBox
 
-    def on_gmssl_toggled( self, button, name ):
-        if name != 'GmSSL':
-            return
-        #load settings from RpcOpenSSLFido or RpcGmSSLFido
-        drvCfg = self.jsonFiles[ 0 ][ 1 ]
-        if button.props.active :
-            sslPort = 'RpcGmSSLFido'
-        else:
-            sslPort = 'RpcOpenSSLFido'
+    def switch_between_ssl_gmssl( self, sslPort : str ):
         try:
+            drvCfg = self.jsonFiles[ 0 ][ 1 ]
             for port in drvCfg[ 'Ports' ]:
                 if port[ 'PortClass' ] != sslPort:
                     continue
 
                 sslFiles = port.get( 'Parameters' )
                 if sslFiles is None:
-                    break;
+                    break
 
                 keyFile = sslFiles.get( "KeyFile" )
                 if keyFile is None:
@@ -1513,30 +1506,46 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err:
             pass
 
+    def on_gmssl_toggled( self, button, name ):
+        if name != 'GmSSL':
+            return
+        #load settings from RpcOpenSSLFido or RpcGmSSLFido
+        if button.props.active :
+            sslPort = 'RpcGmSSLFido'
+        else:
+            sslPort = 'RpcOpenSSLFido'
+
+        self.switch_between_ssl_gmssl( sslPort )
+
     def on_button_toggled( self, button, name ):
         print( name )
+        bActive = button.props.active
         if name == 'SSL' :
             ifNo = button.ifNo
-            if self.ifctx[ ifNo ].webSock.props.active and not button.props.active :
+            if self.ifctx[ ifNo ].webSock.props.active and not bActive :
                 button.props.active = True
                 return
         elif name == 'Auth' or name == 'GmSSL' or name == 'VerifyPeer':
             pass
         elif name == 'WebSock' :
             ifNo = button.ifNo
-            self.ifctx[ ifNo ].urlEdit.set_sensitive( button.props.active )
+            self.ifctx[ ifNo ].urlEdit.set_sensitive( bActive )
             if not self.ifctx[ ifNo ].webSock.props.active :
                 return
-            self.ifctx[ ifNo ].sslCheck.set_active(button.props.active)
+            self.ifctx[ ifNo ].sslCheck.set_active( bActive )
+            self.switch_between_ssl_gmssl( "RpcOpenSSLFido" )
+            self.gmsslCheck.props.active = False
         elif name == 'WebSock2' :
             iNo = button.iNo
-            self.nodeCtxs[ iNo ].urlEdit.set_sensitive( button.props.active )
+            self.nodeCtxs[ iNo ].urlEdit.set_sensitive( bActive )
             if not self.nodeCtxs[ iNo ].webSock.props.active :
                 return
-            self.nodeCtxs[ iNo ].sslCheck.set_active(button.props.active)
+            self.nodeCtxs[ iNo ].sslCheck.set_active( bActive )
+            self.switch_between_ssl_gmssl( "RpcOpenSSLFido" )
+            self.gmsslCheck.props.active = False
         elif name == 'SSL2' :
             iNo = button.iNo
-            if self.nodeCtxs[ iNo ].webSock.props.active and not button.props.active :
+            if self.nodeCtxs[ iNo ].webSock.props.active and not bActive  :
                 button.props.active = True
                 return
 
