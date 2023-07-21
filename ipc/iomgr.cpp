@@ -2835,7 +2835,7 @@ gint32 UpdateObjDesc(
 }
 
 /**
-* @name UpdateDriver update the attributes in the
+* @name UpdateDrvCfg update the attributes in the
 * driver.json file and return a new desc file on
 * success
 * @{
