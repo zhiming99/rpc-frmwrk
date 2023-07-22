@@ -1704,6 +1704,9 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                 if( ret == -1 )
                 {
                     ret = -errno;
+                    DebugPrintEx( logErr, ret,
+                        "Error cannot find GMSSL certificate '%s'",
+                        strCert.c_str() );
                     break;
                 }
                 m_strCertPath = strCert;
@@ -1725,6 +1728,9 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                 if( ret == -1 )
                 {
                     ret = -errno;
+                    DebugPrintEx( logErr, ret,
+                        "Error cannot find GMSSL key '%s'",
+                        strKeyFile.c_str() );
                     break;
                 }
                 m_strKeyPath = strKeyFile;
@@ -1742,6 +1748,9 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                     if( ret == -1 )
                     {
                         ret = -errno;
+                        DebugPrintEx( logErr, ret,
+                            "Error cannot find GMSSL CA certificate '%s'",
+                            strCAPath.c_str() );
                         break;
                     }
                     m_strCAPath = strCAPath;
@@ -1771,6 +1780,9 @@ gint32 CRpcGmSSLFidoDrv::LoadSSLSettings()
                         if( ret == -1 )
                         {
                             ret = -errno;
+                            DebugPrintEx( logErr, ret,
+                                "Error cannot find GMSSL secret '%s'",
+                                strPath.c_str() );
                             break;
                         }
                         m_strSecretPath = strPath;

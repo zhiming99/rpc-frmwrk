@@ -1778,6 +1778,9 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                 if( ret == -1 )
                 {
                     ret = -errno;
+                    DebugPrintEx( logErr, ret,
+                        "Error cannot find ssl certificate '%s'",
+                        strCert.c_str() );
                     break;
                 }
                 m_strCertPath = strCert;
@@ -1794,6 +1797,9 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                 if( ret == -1 )
                 {
                     ret = -errno;
+                    DebugPrintEx( logErr, ret,
+                        "Error cannot find ssl key '%s'",
+                        strKeyFile.c_str() );
                     break;
                 }
                 m_strKeyPath = strKeyFile;
@@ -1811,6 +1817,9 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                     if( ret == -1 )
                     {
                         ret = -errno;
+                        DebugPrintEx( logErr, ret,
+                            "Error cannot find ssl CA certificate '%s'",
+                            strCAFile.c_str() );
                         break;
                     }
                     m_strCAFile = strCAFile;
@@ -1838,6 +1847,9 @@ gint32 CRpcOpenSSLFidoDrv::LoadSSLSettings()
                         if( ret == -1 )
                         {
                             ret = -errno;
+                            DebugPrintEx( logErr, ret,
+                                "Error cannot find the secret file '%s'",
+                                strPath.c_str() );
                             break;
                         }
                         m_strSecretPath = strPath;
