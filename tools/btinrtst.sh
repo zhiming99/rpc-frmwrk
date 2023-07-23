@@ -15,7 +15,11 @@ make
 sleep 1
 release/TestTypessvr $auth &
 sleep 2
-ret=`release/TestTypescli $auth --driver ./driver-cli.json`
+if release/TestTypescli $auth --driver ./driver-cli.json; then
+    ret = 0
+else
+    ret = 11
+fi
 pkill TestTypessvr
 popd
 exit ret
