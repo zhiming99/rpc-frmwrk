@@ -22,4 +22,4 @@ else
 fi
 pkill TestTypessvr
 popd
-exit ret
+exit $ret
