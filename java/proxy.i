@@ -1915,18 +1915,6 @@ jobject CreateProxy(
                 propIoMgr, pMgr );
         }
 
-        if( !g_pRouter.IsEmpty() )
-        {
-            stdstr strVal;
-            CIoManager* pm = pMgr;
-            CParamList oParams( pCfg );
-            ret = pm->GetCmdLineOpt(
-                propSvrInstName, strVal );
-            if( SUCCEEDED( ret ) )
-                oParams.SetStrProp(
-                    propSvrInstName, strVal  );
-        }
-
         ret = CRpcServices::LoadObjDesc(
             strDesc, strObjName,
             false, pCfg );

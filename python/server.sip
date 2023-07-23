@@ -800,25 +800,14 @@ cpp::ObjPtr CreateServer(
         {
             CParamList oParams;
             oParams.SetObjPtr(
-                propIoMgr, *a0 );
+                propIoMgr, pMgr );
             pCfg = oParams.GetCfg();
         }
         else
         {
             CParamList oParams( pCfg );
             oParams.SetObjPtr(
-                propIoMgr, *a0 );
-        }
-
-        if( !g_pRouter.IsEmpty() )
-        {
-            CParamList oParams( pCfg );
-            stdstr strVal;
-            ret = pMgr->GetCmdLineOpt(
-                propSvrInstName, strVal );
-            if( SUCCEEDED( ret ) )
-                oParams.SetStrProp(
-                    propSvrInstName, strVal  );
+                propIoMgr, pMgr );
         }
 
         ret = CRpcServices::LoadObjDesc(

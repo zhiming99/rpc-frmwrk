@@ -2575,17 +2575,6 @@ cpp::ObjPtr CreateProxy(
                 propIoMgr, pMgr );
         }
 
-        if( !g_pRouter.IsEmpty() )
-        {
-            CParamList oParams( pCfg );
-            stdstr strVal;
-            ret = pMgr->GetCmdLineOpt(
-                propSvrInstName, strVal );
-            if( SUCCEEDED( ret ) )
-                oParams.SetStrProp(
-                    propSvrInstName, strVal  );
-        }
-
         ret = CRpcServices::LoadObjDesc(
             *a1, *a2, false, pCfg );
         if( ERROR( ret ) )

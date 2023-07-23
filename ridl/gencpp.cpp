@@ -1691,8 +1691,7 @@ gint32 CDeclareClassIds::Output()
     ret = m_pStmts->GetSvcDecls( vecSvcs );
     if( ERROR( ret ) )
     {
-        printf(
-        "error no service declared\n" );
+        printf( "error no service declared\n" );
         return ret;
     }
     std::vector< std::string > vecNames;
@@ -6545,13 +6544,28 @@ void CImplMainFunc::EmitRtUsage(
     Wa( "    \"\\t [ -d to run as a daemon ]\\n\"" );
     if( g_bBuiltinRt )
     {
+        if( bProxy )
+        {
+            Wa( "    \"\\t [ -i <ip address> to specify the destination ip address. ]\\n\"" );
+            Wa( "    \"\\t [ -p <port number> to specify the tcp port number to ]\\n\"" );
+        }
+        else
+        {
+            Wa( "    \"\\t [ -i <ip address> to specify the ip address to bind ]\\n\"" );
+            Wa( "    \"\\t [ -p <port number> to specify the tcp port number to listen on ]\\n\"" );
+        }
         Wa( "    \"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
         Wa( "    \"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
         Wa( "    \"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
         if( bProxy )
+        {
             Wa( "    \"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
+            Wa( "    \"\\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\\n\"" );
+        }
         else
+        {
             Wa( "    \"\\t [ --instname <name> to specify the instance name for this server'. ]\\n\"" );
+        }
     }
     CCOUT << "    \"\\t [ -h this help ]\\n\", szName );";
     BLOCK_CLOSE;
@@ -6795,6 +6809,111 @@ do{ \
     CCOUT << "free( pMem ); pMem = nullptr;";  \
 }while( 0 )
 
+gint32 CImplMainFunc::EmitCleanup(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        Wa( "// cleanup" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "if( g_strObjDesc.substr( 0, 12 ) ==" );
+        Wa( "    \"/tmp/rpcfod_\" )" );
+        CCOUT << "    unlink( g_strObjDesc.c_str() );";
+        if( !bProxy )
+        {
+            NEW_LINE;
+            Wa( "if( g_strDrvPath.substr( 0, 13 ) ==" );
+            Wa( "    \"/tmp/rpcfdrv_\" )" );
+            CCOUT << "    unlink( g_strDrvPath.c_str() );";
+        }
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CImplMainFunc::EmitUpdateCfgs(
+        bool bProxy, CCppWriter* m_pWriter )
+{
+    gint32 ret = 0;
+    do{
+        Wa( "// update config files" );
+        CCOUT << "do";
+        BLOCK_OPEN;
+        Wa( "CCfgOpener oCfg;" );
+        if( bProxy )
+            Wa( "oCfg[ 101 ] = 1;" );
+        else
+            Wa( "oCfg[ 101 ] = 2;" );
+
+        Wa( "oCfg[ 102 ] = ( bool& )g_bAuth;" );
+        CCOUT << "oCfg[ 104 ] = \""
+            << g_strAppName << "\";";
+        NEW_LINE;
+        CCOUT << "if( g_strInstName != \"" 
+            << g_strAppName << "_rt_\" )";
+        NEW_LINE;
+        Wa( "    oCfg[ 107 ] = g_strInstName;" );
+        Wa( "if( g_strSaInstName.size() )" );
+        Wa( "    oCfg[ 108 ] = g_strSaInstName;" );
+        Wa( "if( g_strIpAddr.size() )" );
+        Wa( "    oCfg[ 109 ] = g_strIpAddr;" );
+        Wa( "if( g_strPortNum.size() )" );
+        Wa( "    oCfg[ 110 ] = g_strPortNum;" );
+        NEW_LINE;
+        Wa( "std::string strDesc;" );
+        Wa( "if( g_strObjDesc.empty() )" );
+        CCOUT << "    strDesc = " << "\"./"
+            << g_strAppName << "desc.json\";";
+        NEW_LINE;
+        Wa( "else" );
+        Wa( "    strDesc = g_strObjDesc;" );
+        Wa( "std::string strNewDesc;" );
+        Wa( "ret = UpdateObjDesc( strDesc," );
+        Wa( "    oCfg.GetCfg(), strNewDesc );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+        Wa( "if( strNewDesc.size() )" );
+        Wa( "    g_strObjDesc = strNewDesc;" );
+        CCOUT << "if( g_strInstName == \"" << g_strAppName 
+            << "_rt_\" &&";
+        NEW_LINE;
+        Wa( "    g_strSaInstName.empty() )" );
+        Wa( "    oCfg.GetStrProp( 107, g_strInstName );" );
+        Wa( "else if( g_strSaInstName.size() )" );
+        CCOUT << "    g_strInstName = g_strSaInstName;";
+        if( !bProxy )
+        {
+            NEW_LINE;
+            Wa( "// update driver.json" );
+            Wa( "if( g_strIpAddr.empty() &&" );
+            Wa( "    g_strPortNum.empty() )" );
+            Wa( "    break;" );
+            Wa( "std::string strDriver;" );
+            Wa( "if( g_strDrvPath.empty() )" );
+            CCOUT << "    strDriver = \"./driver.json\";";
+            NEW_LINE;
+            Wa( "else" );
+            Wa( "    strDriver = g_strDrvPath;" );
+            Wa( "std::string strNewDrv;" );
+            Wa( "ret = UpdateDrvCfg( strDriver," );
+            Wa( "    oCfg.GetCfg(), strNewDrv );" );
+            Wa( "if( ERROR( ret ) )" );
+            Wa( "    break;" );
+            Wa( "if( strNewDrv.size() )" );
+            Wa( "    g_strDrvPath = strNewDrv;" );
+        }
+        BLOCK_CLOSE;
+        Wa( "while( 0 );" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    break;" );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CImplMainFunc::EmitRtMainFunc(
     bool bProxy, CCppWriter* m_pWriter )
 {
@@ -6821,15 +6940,17 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         {
             stdstr strOpt;
             if( !bProxy )
-                strOpt = "hadm:"; 
+                strOpt = "hadm:i:p:"; 
             else
-                strOpt = "had";
+                strOpt = "hadi:p:";
             Wa( "gint32 iOptIdx = 0;" );
             Wa( "struct option arrLongOptions[] = {" );
             Wa( "    {\"driver\",   required_argument, 0,  0 }," );
             Wa( "    {\"objdesc\",  required_argument, 0,  0 }," );
             Wa( "    {\"router\",   required_argument, 0,  0 }," );
             Wa( "    {\"instname\", required_argument, 0,  0 }," );
+            if( bProxy )
+                Wa( "    {\"sainstname\", required_argument, 0,  0 }," );
             Wa( "    {0,             0,                 0,  0 }" );
             Wa( "};            " );
             CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
@@ -6842,10 +6963,12 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         }
         BLOCK_OPEN;
         Wa( "switch( opt )" );
+        INDENT_DOWN; // switch specific indent
         BLOCK_OPEN;
         if( g_bBuiltinRt )
         {
-            Wa( "case 0:" );
+            CCOUT << "case 0:";
+            INDENT_UPL;
             BLOCK_OPEN;
             Wa( "if( iOptIdx < 3 )" );
             BLOCK_OPEN;
@@ -6873,8 +6996,12 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    g_strObjDesc = optarg;" );
             Wa( "else if( iOptIdx == 2 )" );
             Wa( "    g_strRtDesc = optarg;" );
-            Wa( "else if( iOptIdx == 3 )" );
+            if( bProxy )
+                Wa( "else if( iOptIdx == 3 || iOptIdx == 4 )" );
+            else
+                Wa( "else if( iOptIdx == 3 )" );
             BLOCK_OPEN;
+
             Wa( "if( !IsValidName( optarg ) )" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr, \"Error invalid instance name '%s'.\\n\", optarg );" );
@@ -6882,8 +7009,29 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
-            CCOUT << "g_strInstName = optarg;";
+            if( bProxy )
+            {
+                Wa( "if( iOptIdx == 3 )" );
+                Wa( "   g_strInstName = optarg;" );
+                Wa( "else" );
+                Wa( "    g_strSaInstName = optarg;" );
+                Wa( "if( g_strSaInstName.size() &&" );
+                CCOUT << "    g_strInstName != \"" << g_strAppName << "_rt_\" )";
+                NEW_LINE;
+                BLOCK_OPEN;
+                Wa( "fprintf( stderr, \"Error specifying both 'instname' \"" );
+                Wa( "    \"and 'sainstname' at the same time\"");
+                Wa( "    \" '%s'.\\n\", optarg );" );
+                Wa( "ret = -EINVAL;" );
+                CCOUT << "break;";
+                BLOCK_CLOSE;
+            }
+            else
+            {
+                Wa( "g_strInstName = optarg;" );
+            }
             BLOCK_CLOSE;
+            NEW_LINE;
             Wa( "else" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
@@ -6893,7 +7041,37 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             NEW_LINE;
             CCOUT << "break;";
             BLOCK_CLOSE;
-            NEW_LINE;
+            INDENT_DOWNL;
+            CCOUT << "case 'i':";
+            INDENT_UPL;
+            Wa( "{" );
+            Wa( "    std::string strIpRaw = optarg;" );
+            Wa( "    ret = NormalizeIpAddrEx(" );
+            Wa( "        strIpRaw, g_strIpAddr );" );
+            Wa( "    if( ERROR( ret ) )" );
+            Wa( "    {" );
+            Wa( "        ret = -EINVAL;" );
+            Wa( "        fprintf( stderr," );
+            Wa( "            \"Error invalid ip address.\\n\" );" );
+            Wa( "    }" );
+            Wa( "    break;" );
+            CCOUT << "}";
+            INDENT_DOWNL;
+            CCOUT << "case 'p':";
+            INDENT_UPL;
+            Wa( "{" );
+            Wa( "    std::string g_strPortNum = optarg;" );
+            Wa( "    guint32 dwPort = strtoul(");
+            Wa( "        g_strPortNum.c_str(), nullptr, 10 );" );
+            Wa( "    if( dwPort > 65535 || dwPort < 1024 )" );
+            Wa( "    {" );
+            Wa( "        ret = -EINVAL;" );
+            Wa( "        fprintf( stderr," );
+            Wa( "            \"Error invalid tcp port number.\\n\" );" );
+            Wa( "    }" );
+            Wa( "    break;" );
+            CCOUT << "}";
+            INDENT_DOWNL;
         }
 #ifdef AUTH
         Wa( "case 'a':" );
@@ -6938,7 +7116,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         Wa( "case 'h':" );
         Wa( "default:" );
         CCOUT << "    { Usage( argv[ 0 ] ); exit( 0 ); }";
-        BLOCK_CLOSE;
+        INDENT_UP; // switch specific indent
+        BLOCK_CLOSE; // switch
         BLOCK_CLOSE;
         NEW_LINE;
 
@@ -6983,6 +7162,9 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         BLOCK_CLOSE;
         NEW_LINE;
 
+        EmitUpdateCfgs( bProxy, m_pWriter );
+        NEW_LINE;
+
         Wa( "if( bDaemon )" );
         BLOCK_OPEN;
         Wa( "ret = daemon( 1, 0 );" );
@@ -6996,6 +7178,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             CCOUT << "ret = _main( argc, argv );";
             BLOCK_CLOSE;
             Wa( "while( 0 );" );
+            if( g_bBuiltinRt )
+                EmitCleanup( bProxy, m_pWriter );
             CCOUT << "return ret;";
             BLOCK_CLOSE;
             NEW_LINE;
@@ -7029,6 +7213,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
 #endif
         BLOCK_CLOSE;
         Wa( "while( 0 );" );
+        if( g_bBuiltinRt )
+            EmitCleanup( bProxy, m_pWriter );
         CCOUT << "return ret;";
         BLOCK_CLOSE;
         NEW_LINE;
@@ -7067,6 +7253,9 @@ gint32 CImplMainFunc::EmitInitContext(
             CCOUT << "static std::string g_strInstName( \""
                 << g_strAppName << "_rt_\" );";
             NEW_LINE;
+            Wa( "static std::string g_strSaInstName;" );
+            Wa( "static std::string g_strIpAddr;" );
+            Wa( "static std::string g_strPortNum;" );
             Wa( "static bool g_bAuth = false;" );
             Wa( "static ObjPtr g_pRouter;" );
             Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
@@ -7432,33 +7621,15 @@ gint32 CImplMainFunc::EmitNormalMainContent(
             NEW_LINE;
             Wa( "else" );
             Wa( "    strDesc = g_strObjDesc;" );
-            if( bProxy )
-            {
-                Wa( "std::string strInstId = InstIdFromObjDesc(" );
-                CCOUT << "    strDesc, \"" << pSvc->GetName() << "\" );";
-                NEW_LINE;
-                Wa( "if( strInstId.empty() )" );
-                Wa( "{ ret = -EINVAL; break;}" );
-                CCOUT << "if( g_strInstName == \"" 
-                    << g_strAppName << "_rt_\" )";
-                NEW_LINE;
-                Wa( "    g_strInstName += strInstId;" );
-            }
-            else
-            {
-                Wa( "std::string strDrv;" );
-                Wa( "if( g_strDrvPath.size() )" );
-                Wa( "    strDrv = g_strDrvPath;" );
-                Wa( "else" );
-                Wa( "    strDrv = \"./driver.json\";" );
-                Wa( "std::string strInstId = InstIdFromDrv( strDrv );" );
-                Wa( "if( strInstId.empty() )" );
-                Wa( "{ ret = -EINVAL; break;}" );
-                CCOUT << "if( g_strInstName == \"" 
-                    << g_strAppName << "_rt_\" )";
-                NEW_LINE;
-                Wa( "    g_strInstName += strInstId;" );
-            }
+            Wa( "std::string strInstId = InstIdFromObjDesc(" );
+            CCOUT << "    strDesc, \"" << pSvc->GetName() << "\" );";
+            NEW_LINE;
+            Wa( "if( strInstId.empty() )" );
+            Wa( "{ ret = -EINVAL; break;}" );
+            CCOUT << "if( g_strInstName == \"" 
+                << g_strAppName << "_rt_\" )";
+            NEW_LINE;
+            Wa( "    g_strInstName += strInstId;" );
         }
         else
         {
@@ -7494,11 +7665,6 @@ gint32 CImplMainFunc::EmitNormalMainContent(
 
             Wa( "oParams.Clear();" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
-            if( g_bBuiltinRt )
-            {
-                Wa( "oParams[ propSvrInstName ] =" );
-                Wa( "    g_strInstName;" );
-            }
             NEW_LINE;
             Wa( "ret = CRpcServices::LoadObjDesc(" );
             CCOUT << "    strDesc, \"" << strSvcName << "\",";
@@ -8149,6 +8315,79 @@ gint32 CExportDrivers::OutputBuiltinRt()
 
         oVal[ JSON_ATTR_MODULES ] = oModuleArray;
 
+        // pickout the fist listening port from the
+        // base config file 'driver.json', because
+        // builtin-rt supports just one listening port.
+        stdstr strDrvPath;
+        ret = FindInstCfg( "driver.json", strDrvPath );
+        if( SUCCEEDED( ret ) )
+        do{
+            Json::Value oDrvVal;
+            ret = ReadJsonCfgFile(
+                strDrvPath, oDrvVal );
+            if( ERROR( ret ) )
+                break;
+            
+            if( !oDrvVal.isMember( JSON_ATTR_PORTS ) ||
+                !oDrvVal[ JSON_ATTR_PORTS ].isArray() ||
+                !oDrvVal[ JSON_ATTR_PORTS ].size() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            Json::Value& oPorts =
+                oDrvVal[ JSON_ATTR_PORTS ];
+
+            Json::Value oTcpBusPort;
+            gint32 i = 0;
+            for( ; i < oPorts.size(); i++ )
+            {
+                Json::Value& oPort = oPorts[ i ];
+                if( oPort == Json::Value::null )
+                    continue;
+
+                if( !oPort.isMember( JSON_ATTR_PORTCLASS ) ||
+                    !oPort[ JSON_ATTR_PORTCLASS ].isString() )
+                    continue;
+
+                stdstr strPortClass =
+                    oPort[ JSON_ATTR_PORTCLASS ].asString();
+                if( strPortClass != PORT_CLASS_RPC_TCPBUS )
+                    continue;
+
+                if( !oPort.isMember( JSON_ATTR_PARAMETERS ) || 
+                    !oPort[ JSON_ATTR_PARAMETERS ].isArray() ||
+                    oPort[ JSON_ATTR_PARAMETERS ].size() == 0 )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+
+                Json::Value& oParams =
+                    oPort[ JSON_ATTR_PARAMETERS ];
+
+                Json::Value oNewParams( Json::arrayValue );
+                oNewParams.append( oParams[ 0 ] );
+                oTcpBusPort = oPort;
+                oTcpBusPort[ JSON_ATTR_PARAMETERS ] =
+                    oNewParams;
+                break;
+            }
+            if( ERROR( ret ) )
+                break;
+
+            Json::Value oNewPorts( Json::arrayValue );
+            oNewPorts.append( oTcpBusPort );
+            oVal[ JSON_ATTR_PORTS ] = oNewPorts;
+
+        }while( 0 );
+        if( ERROR( ret ) )
+        {
+            printf( "Error read json file %s(%d)",
+                strDrvPath.c_str(), ret );
+        }
+        ret = 0;
         Json::StreamWriterBuilder oBuilder;
         oBuilder["commentStyle"] = "None";
         oBuilder["indentation"] = "    ";

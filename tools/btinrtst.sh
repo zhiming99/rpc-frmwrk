@@ -15,6 +15,7 @@ make
 sleep 1
 release/TestTypessvr $auth &
 sleep 2
-release/TestTypescli $auth --driver ./driver-cli.json
+ret=`release/TestTypescli $auth --driver ./driver-cli.json`
 pkill TestTypessvr
 popd
+exit ret

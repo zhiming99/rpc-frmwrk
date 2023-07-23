@@ -752,6 +752,10 @@ class CImplMainFunc :
         std::vector< ObjPtr >& vecSvcs );
     gint32 EmitAddSvcStatFiles(
         std::vector< ObjPtr >& vecSvcs );
+    static gint32 EmitUpdateCfgs(
+        bool bProxy, CCppWriter* m_pWriter );
+    static gint32 EmitCleanup(
+        bool bProxy, CCppWriter* m_pWriter );
 };
 
 struct CExportBase

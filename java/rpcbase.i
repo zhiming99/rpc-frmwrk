@@ -111,6 +111,11 @@ enum // EnumPropId
     propTimeoutSec,
     propKeepAliveSec,
     propConfigPath,
+    propObjDescPath,
+    propDestIpAddr,
+    propDestTcpPort,
+    propSrcIpAddr,
+    propSrcTcpPort
 };
 
 typedef int32_t EnumIfState;
@@ -1156,14 +1161,23 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 oCfg.RemoveProperty( 106 );
             }
 
-            if( !oCfg.exist( 107 ) )
+            stdstr strInstName;
+            if( oCfg.exist( 107 ) )
+            {
+                oCfg.GetStrProp( 107, strInstName );
+                oCfg.RemoveProperty( 107 );
+            }
+            else if( oCfg.exist( 108 ) )
+            {
+                oCfg.GetStrProp( 108, strInstName );
+                oCfg.RemoveProperty( 108 );
+            }
+            else
             {
                 ret = -ENOENT;
                 break;
             }
 
-            stdstr strInstName;
-            oCfg.GetStrProp( 107, strInstName );
             if( !IsValidName( strInstName ) )
             {
                 ret = -EINVAL;
@@ -1171,7 +1185,6 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                     "Error invalid instance name" );
                 break;
             }
-            oCfg.RemoveProperty( 107 );
 
             stdstr strRtName = strAppName + "_rt_";
             // it will prompt for keypass if necessary
@@ -1353,6 +1366,71 @@ gint32 CoUninitializeEx()
     return 0;
 }
 
+jobject UpdateObjDesc(
+    JNIEnv *jenv,
+    const std::string& strDesc,
+    CfgPtr& pCfg )
+{
+    if( jenv == nullptr )
+        return nullptr;
+
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    do{
+        stdstr strNewDesc;
+        gint32 ret = cpp::UpdateObjDesc(
+            strDesc, pCfg, strNewDesc );
+
+        SetErrorJRet(
+            jenv, jret, ret );
+        if( ERROR( ret ) )
+            break;
+
+        if( strNewDesc.size() )
+        {
+            jstring jstrNewDesc =
+                jenv->NewStringUTF(
+                    strNewDesc.c_str() );
+            AddElemToJRet( jenv,
+                jret, jstrNewDesc );
+        }
+    }while( 0 );
+    return jret; 
+}
+
+jobject UpdateDrvCfg(
+    JNIEnv *jenv,
+    const std::string& strDriver,
+    CfgPtr& pCfg )
+{
+    if( jenv == nullptr )
+        return nullptr;
+
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    do{
+        stdstr strNewDrv;
+        gint32 ret = cpp::UpdateDrvCfg(
+            strDriver, pCfg, strNewDrv );
+
+        SetErrorJRet(
+            jenv, jret, ret );
+        if( ERROR( ret ) )
+            break;
+
+        if( strNewDrv.size() )
+        {
+            jstring jstrNewDrv =
+                jenv->NewStringUTF(
+                    strNewDrv.c_str() );
+            AddElemToJRet( jenv,
+                jret, jstrNewDrv );
+        }
+    }while( 0 );
+    return jret; 
+}
 %}
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
@@ -3368,5 +3446,15 @@ std::string InstIdFromObjDesc(
 
 std::string InstIdFromDrv(
     const std::string& strDrv );
+
+jobject UpdateObjDesc(
+    JNIEnv *jenv,
+    const std::string& strDesc,
+    CfgPtr& pCfg );
+
+jobject UpdateDrvCfg(
+    JNIEnv *jenv,
+    const std::string& strDriver,
+    CfgPtr& pCfg );
 
 %include "proxy.i"

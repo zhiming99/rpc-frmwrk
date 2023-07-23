@@ -239,7 +239,13 @@ namespace cpp
         propSeriProto,
         propNoReply,
         propTimeoutSec,
-        propKeepAliveSec
+        propKeepAliveSec,
+        propConfigPath,
+        propObjDescPath
+        propDestIpAddr,
+        propDestTcpPort
+        propSrcIpAddr,
+        propSrcTcpPort
     };
 
     enum // EnumIfState
@@ -932,14 +938,23 @@ namespace cpp
                 oCfg.RemoveProperty( 106 );
             }
 
-            if( !oCfg.exist( 107 ) )
+            stdstr strInstName;
+            if( oCfg.exist( 107 ) )
+            {
+                oCfg.GetStrProp( 107, strInstName );
+                oCfg.RemoveProperty( 107 );
+            }
+            else if( oCfg.exist( 108 ) )
+            {
+                oCfg.GetStrProp( 108, strInstName );
+                oCfg.RemoveProperty( 108 );
+            }
+            else
             {
                 ret = -ENOENT;
                 break;
             }
 
-            stdstr strInstName;
-            oCfg.GetStrProp( 107, strInstName );
             if( !IsValidName( strInstName ) )
             {
                 ret = -EINVAL;
@@ -947,7 +962,6 @@ namespace cpp
                     "Error invalid instance name" );
                 break;
             }
-            oCfg.RemoveProperty( 107 );
 
             stdstr strRtName = strAppName + "_rt_";
             // it will prompt for keypass if necessary
@@ -1190,6 +1204,60 @@ namespace cpp
         stdstr val = InstIdFromDrv( *a0 );
         sipRes = PyUnicode_FromString(
             val.c_str() );
+    %End
+
+    PyObject* UpdateObjDesc( 
+        const std::string& strDesc,
+        cpp::CfgPtr& pCfg );
+    %MethodCode
+    do{
+        stdstr strNewDesc;
+        gint32 ret = UpdateObjDesc(
+            *a0, *a1, strNewDesc );
+        PyObject* listResp = PyTuple_New( 2 );
+        if( listResp == nullptr )
+        {
+            sipRes = Py_None;
+            break;
+        }
+        PyObject* pRet = PyLong_FromLong( ret );
+        PyTuple_SetItem( listResp, 0, pRet );
+        PyTuple_SetItem( listResp, 1, Py_None );
+        if( SUCCEEDED( ret ) && strNewDesc.size() )
+        {
+            PyObject* pStr = PyUnicode_FromString(
+                strNewDesc.c_str() );
+            PyTuple_SetItem( listResp, 1, pStr );
+        }
+        sipRes = listResp;
+    }while( 0 );
+    %End
+
+    PyObject* UpdateDrvCfg( 
+        const std::string& strDriver,
+        cpp::CfgPtr& pCfg );
+    %MethodCode
+    do{
+        stdstr strNewDrv;
+        gint32 ret = UpdateDrvCfg(
+            *a0, *a1, strNewDrv );
+        PyObject* listResp = PyTuple_New( 2 );
+        if( listResp == nullptr )
+        {
+            sipRes = Py_None;
+            break;
+        }
+        PyObject* pRet = PyLong_FromLong( ret );
+        PyTuple_SetItem( listResp, 0, pRet );
+        PyTuple_SetItem( listResp, 1, Py_None );
+        if( SUCCEEDED( ret ) && strNewDrv.size() )
+        {
+            PyObject* pStr = PyUnicode_FromString(
+                strNewDrv.c_str() );
+            PyTuple_SetItem( listResp, 1, pStr );
+        }
+        sipRes = listResp;
+    }while( 0 );
     %End
 };
 

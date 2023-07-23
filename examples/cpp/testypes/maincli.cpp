@@ -38,6 +38,9 @@ static std::string g_strDrvPath;
 static std::string g_strObjDesc;
 static std::string g_strRtDesc;
 static std::string g_strInstName( "TestTypes_rt_" );
+static std::string g_strSaInstName;
+static std::string g_strIpAddr;
+static std::string g_strPortNum;
 static bool g_bAuth = false;
 static ObjPtr g_pRouter;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
@@ -52,10 +55,13 @@ void Usage( char* szName )
         "Usage: %s [OPTION]\n"
         "\t [ -a to enable authentication ]\n"
         "\t [ -d to run as a daemon ]\n"
+        "\t [ -i <ip address> to specify the destination ip address. ]\n"
+        "\t [ -p <port number> to specify the tcp port number to ]\n"
         "\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\n"
         "\t [ --objdesc <path> to specify the path to the object description file. ]\n"
         "\t [ --router <path> to specify the path to the customized 'router.json'. ]\n"
         "\t [ --instname <name> to specify the server instance name to connect'. ]\n"
+        "\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -74,14 +80,15 @@ int main( int argc, char** argv )
             {"objdesc",  required_argument, 0,  0 },
             {"router",   required_argument, 0,  0 },
             {"instname", required_argument, 0,  0 },
+            {"sainstname", required_argument, 0,  0 },
             {0,             0,                 0,  0 }
         };            
-        while( ( opt = getopt_long( argc, argv, "had",
+        while( ( opt = getopt_long( argc, argv, "hadi:p:",
             arrLongOptions, &iOptIdx ) ) != -1 )
         {
             switch( opt )
             {
-                case 0:
+            case 0:
                 {
                     if( iOptIdx < 3 )
                     {
@@ -107,7 +114,7 @@ int main( int argc, char** argv )
                         g_strObjDesc = optarg;
                     else if( iOptIdx == 2 )
                         g_strRtDesc = optarg;
-                    else if( iOptIdx == 3 )
+                    else if( iOptIdx == 3 || iOptIdx == 4 )
                     {
                         if( !IsValidName( optarg ) )
                         {
@@ -115,8 +122,21 @@ int main( int argc, char** argv )
                             ret = -EINVAL;
                             break;
                         }
-                        g_strInstName = optarg;
-                    }else
+                        if( iOptIdx == 3 )
+                           g_strInstName = optarg;
+                        else
+                            g_strSaInstName = optarg;
+                        if( g_strSaInstName.size() &&
+                            g_strInstName != "TestTypes_rt_" )
+                        {
+                            fprintf( stderr, "Error specifying both 'instname' "
+                                "and 'sainstname' at the same time"
+                                " '%s'.\n", optarg );
+                            ret = -EINVAL;
+                            break;
+                        }
+                    }
+                    else
                     {
                         fprintf( stderr, "Error invalid option.\n" );
                         Usage( argv[ 0 ] );
@@ -124,13 +144,39 @@ int main( int argc, char** argv )
                     }
                     break;
                 }
-                case 'a':
-                    { g_bAuth = true; break; }
-                case 'd':
-                    { bDaemon = true; break; }
-                case 'h':
-                default:
-                    { Usage( argv[ 0 ] ); exit( 0 ); }
+            case 'i':
+                {
+                    std::string strIpRaw = optarg;
+                    ret = NormalizeIpAddrEx(
+                        strIpRaw, g_strIpAddr );
+                    if( ERROR( ret ) )
+                    {
+                        ret = -EINVAL;
+                        fprintf( stderr,
+                            "Error invalid ip address.\n" );
+                    }
+                    break;
+                }
+            case 'p':
+                {
+                    std::string g_strPortNum = optarg;
+                    guint32 dwPort = strtoul(
+                        g_strPortNum.c_str(), nullptr, 10 );
+                    if( dwPort > 65535 || dwPort < 1024 )
+                    {
+                        ret = -EINVAL;
+                        fprintf( stderr,
+                            "Error invalid tcp port number.\n" );
+                    }
+                    break;
+                }
+            case 'a':
+                { g_bAuth = true; break; }
+            case 'd':
+                { bDaemon = true; break; }
+            case 'h':
+            default:
+                { Usage( argv[ 0 ] ); exit( 0 ); }
             }
         }
         if( ERROR( ret ) )
@@ -158,6 +204,42 @@ int main( int argc, char** argv )
             if( bExit )
                 break;
         }
+        // update config files
+        do{
+            CCfgOpener oCfg;
+            oCfg[ 101 ] = 1;
+            oCfg[ 102 ] = ( bool& )g_bAuth;
+            oCfg[ 104 ] = "TestTypes";
+            if( g_strInstName != "TestTypes_rt_" )
+                oCfg[ 107 ] = g_strInstName;
+            if( g_strSaInstName.size() )
+                oCfg[ 108 ] = g_strSaInstName;
+            if( g_strIpAddr.size() )
+                oCfg[ 109 ] = g_strIpAddr;
+            if( g_strPortNum.size() )
+                oCfg[ 110 ] = g_strPortNum;
+            
+            std::string strDesc;
+            if( g_strObjDesc.empty() )
+                strDesc = "./TestTypesdesc.json";
+            else
+                strDesc = g_strObjDesc;
+            std::string strNewDesc;
+            ret = UpdateObjDesc( strDesc,
+                oCfg.GetCfg(), strNewDesc );
+            if( ERROR( ret ) )
+                break;
+            if( strNewDesc.size() )
+                g_strObjDesc = strNewDesc;
+            if( g_strInstName == "TestTypes_rt_" &&
+                g_strSaInstName.empty() )
+                oCfg.GetStrProp( 107, g_strInstName );
+            else if( g_strSaInstName.size() )
+                g_strInstName = g_strSaInstName;
+        }while( 0 );
+        if( ERROR( ret ) )
+            break;
+        
         if( bDaemon )
         {
             ret = daemon( 1, 0 );
@@ -165,6 +247,12 @@ int main( int argc, char** argv )
             { ret = -errno; break; }
         }
         ret = _main( argc, argv );
+    }while( 0 );
+    // cleanup
+    do{
+        if( g_strObjDesc.substr( 0, 12 ) ==
+            "/tmp/rpcfod_" )
+            unlink( g_strObjDesc.c_str() );
     }while( 0 );
     return ret;
 }
@@ -315,8 +403,6 @@ int _main( int argc, char** argv )
             CParamList oParams;
             oParams.Clear();
             oParams[ propIoMgr ] = g_pIoMgr;
-            oParams[ propSvrInstName ] =
-                g_strInstName;
             
             ret = CRpcServices::LoadObjDesc(
                 strDesc, "TestTypesSvc",

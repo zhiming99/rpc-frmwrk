@@ -10,13 +10,61 @@ import multiprocessing
 sys.path.append( '@BINPATH@' )
 from updcfg import *
 
+def UpdateBusPort( drvFile, sysVals ):
+    try:
+        ret = 0
+        newParam = None
+
+        srcFp = open( drvFile, "r" )
+        srcVals = json.load( srcFp )
+        srcFp.close()
+        
+        ports = sysVals[ 'Ports' ]
+        for port in ports:
+            if port[ 'PortClass' ] == 'RpcTcpBusPort':
+               newParam = port[ 'Parameters' ][ 0 ]
+               break
+
+        if newParam is None:
+            raise Exception( "Error invalid json file" )
+
+        ports = srcVals[ 'Ports' ]
+        for port in ports:
+            if port[ 'PortClass' ] == 'RpcTcpBusPort':
+                port['Parameters'][0] = newParam
+                break
+
+        srcFp = open( drvFile, "w" )
+        json.dump( srcVals, srcFp, indent = 4)
+        srcFp.close()
+
+    except Exception as err:
+        ret = -errno.EFAULT
+    return ret
+
 def UpdateDrv( sysDrvPath : str ) :
     drvPath = os.path.dirname(os.path.realpath(__file__))
     drvFile = drvPath + "/driver.json"
     ret = 0
-    cliSrcVals = None
     try:
+        cliSrcVals = None
+        srcVals = None
+
         bBuiltinRt=XXXBUILTINRT
+        if not bBuiltinRt :
+            return
+
+        sysDrvFile = sysDrvPath + "/driver.json"
+        sysDrvFp = open( sysDrvFile, "r" )
+        sysDrvVals = json.load( sysDrvFp )
+        sysDrvFp.close()
+
+        # update driver.json
+        ret = UpdateBusPort( drvFile, sysDrvVals )
+        if ret < 0:
+            return
+
+        # update driver-cli.json
         srcFp = open( drvFile, "r" )
         srcVals = json.load( srcFp )
         srcFp.close()
@@ -30,21 +78,17 @@ def UpdateDrv( sysDrvPath : str ) :
             multiprocessing.cpu_count() )
 
         srcVals[ 'Arch' ] = oArch
-        if not bBuiltinRt :
-            return
 
         if( not IsFeatureEnabled( "gmssl" ) and
             not IsFeatureEnabled( "openssl") ):
             return
 
-        sysDrvFile = sysDrvPath + "/driver.json"
-        sysDrvFp = open( sysDrvFile, "r" )
-        sysDrvVals = json.load( sysDrvFp )
         bret = IsUsingGmSSL( sysDrvVals )
         if bret[ 0 ] < 0 :
             return
 
         bGmSSL = bret[ 1 ]
+        sslPorts = []
         for port in sysDrvVals[ 'Ports' ] :
             strClass = port[ 'PortClass' ]
             if bGmSSL and strClass != 'RpcGmSSLFido' :
@@ -52,30 +96,33 @@ def UpdateDrv( sysDrvPath : str ) :
             if not bGmSSL and strClass != 'RpcOpenSSLFido':
                 continue
             sslPort = deepcopy( port )
+            sslPorts.append( sslPort )
             break
 
-        if sslPort is None:
+        if len( sslPorts ) == 0:
             return
 
-        if not "Parameters" in sslPort:
-            return
+        for sslPort in sslPorts:
+            if not "Parameters" in sslPort:
+                continue
+            params = sslPort[ "Parameters" ]
+            keyPath = params[ "KeyFile" ]
 
-        params = sslPort[ "Parameters" ]
-        keyPath = params[ "KeyFile" ]
+            dirPath = os.path.dirname( keyPath )
+            keyName = os.path.basename( keyPath )
+            if keyName == "signkey.pem":
+                params[ "KeyFile" ] = dirPath + "/clientkey.pem"
+                params[ "CertFile" ] = dirPath + "/clientcert.pem"
+                if bGmSSL:
+                    params[ "CACertFile"] = dirPath + "/rootcacert.pem"
+                else:
+                    params[ "CACertFile"] = dirPath + "/certs.pem"
+                params[ "SecretFile"] = ""
 
-        dirPath = os.path.dirname( keyPath )
-        keyName = os.path.basename( keyPath )
-        if keyName == "signkey.pem":
-            params[ "KeyFile" ] = dirPath + "/clientkey.pem"
-            params[ "CertFile" ] = dirPath + "/clientcert.pem"
-            if bGmSSL:
-                params[ "CACertFile"] = dirPath + "/rootcacert.pem"
-            else:
-                params[ "CACertFile"] = dirPath + "/certs.pem"
-            params[ "SecretFile"] = ""
-
+        if 'Ports' in srcVals:
+            sslPorts.extend( srcVals[ 'Ports' ] )
         cliSrcVals = deepcopy( srcVals )
-        cliSrcVals[ "Ports" ] = [ sslPort ]
+        cliSrcVals[ "Ports" ] = sslPorts
         cliDrvFile = drvPath + "/driver-cli.json"
 
     except Exception as oErr :
