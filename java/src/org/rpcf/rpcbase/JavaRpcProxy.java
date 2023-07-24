@@ -36,6 +36,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
 
             setInst( ( CJavaProxy )
                 jret.getAt( 0 ) );
+            obj.Clear();
 
         }while( false );
 

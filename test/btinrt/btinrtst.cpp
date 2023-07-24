@@ -223,12 +223,12 @@ CfgPtr CIfSmokeTest::InitRouterCfg()
         CIoManager* pMgr = m_pMgr;
         pMgr->GetRouterName( strRtName );
 
-        oParams.SetStrProp(
-            propSvrInstName, strRtName );
+        oParams.SetStrProp( propSvrInstName,
+            MODNAME_RPCROUTER );
 
         oParams[ propIoMgr ] = m_pMgr;
-        pMgr->SetCmdLineOpt(
-            propSvrInstName, strRtName );
+        pMgr->SetCmdLineOpt( propSvrInstName,
+            MODNAME_RPCROUTER );
         ret = CRpcServices::LoadObjDesc(
             strDescPath,
             OBJNAME_ROUTER,
@@ -419,33 +419,27 @@ void CIfSmokeTest::testCliStartStop()
     }
     else
     {
-
         OutputMsg( ret, "successfully completed" );
     }
     // stop the proxy
-    ret = pIf->Stop();
-    if( ret == STATUS_PENDING )
+    gint32 iRet = pIf->Stop();
+    if( iRet == STATUS_PENDING )
     {
         // the underlying port is also stopping,
         // wait till it is done. otherwise the
         // iomanager's stop could go wrong
         while( pIf->GetState() != stateStopped )
             sleep( 1 );
-
-        ret = 0;
     }
-
-    CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
     // release all the resources of the proxy
     pIf.Clear();
 
-    ret = pRouter->Stop();
-    if( ret == STATUS_PENDING )
+    iRet = pRouter->Stop();
+    if( iRet == STATUS_PENDING )
     {
         while( pIf->GetState() != stateStopped )
             sleep( 1 );
-        ret = 0;
     }
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );

@@ -29,6 +29,7 @@
 #include "rpcroute.h"
 #include "security.h"
 #include "k5proxy.h"
+#include <regex>
 
 namespace rpcf
 {
@@ -1086,26 +1087,35 @@ gint32 CRpcReqForwarderProxyAuth::ForwardRequest(
         pMsgRaw == nullptr )
         return -EINVAL;
 
-    std::string strDest =
-        AUTH_DEST( this );
-
-    DMsgPtr pMsg( pMsgRaw );
     gint32 ret = 0;
+    DMsgPtr pMsg( pMsgRaw );
+    CRpcRouter* pRouter = GetParent();
+    std::string strDest = AUTH_DEST( pRouter );
     do{
-        if( strDest != pMsg.GetDestination() )
-            break;
+        std::string strIfName;
+        strIfName = pMsg.GetInterface();
 
-        CRpcRouter* pRouter = GetParent();
+        bool bAuthIf = ( strIfName ==
+            DBUS_IF_NAME( "IAuthenticate" ) );
+
+        if( strDest != pMsg.GetDestination() )
+        {
+            if( bAuthIf )
+            {
+                DebugPrintEx( logErr, ret,
+                    "Error auth Message" );
+                ret = -EACCES;
+            }
+            break;
+        }
+
         if( !pRouter->HasAuth() )
         {
             ret = -EBADMSG;
             break;
         }
 
-        std::string strIfName;
-        strIfName = pMsg.GetInterface();
-        if( strIfName != DBUS_IF_NAME(
-                "IAuthenticate" ) )
+        if( !bAuthIf )
         {
             ret = -EINVAL;
             break;
@@ -1465,6 +1475,66 @@ gint32 CAuthentProxy::BuildLoginTask(
     return ret;
 }
 
+gint32 CAuthentProxy::CorrectInstName(
+    CIoManager* pMgr,
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strName;
+
+        ret = pMgr->GetCmdLineOpt(
+            propSvrInstName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        // no more correction
+        if( strName == MODNAME_RPCROUTER )
+            break;
+
+        CCfgOpener oCfg( pCfg );
+        stdstr strPath = oCfg[ propObjPath ];
+        stdstr strDest = oCfg[ propDestDBusName ];
+
+        std::regex e ( MODNAME_RPCROUTER );
+        strPath = std::regex_replace(
+            strPath, e, strName,
+            std::regex_constants::format_first_only );
+
+        strDest = std::regex_replace(
+            strDest, e, strName,
+            std::regex_constants::format_first_only );
+
+        oCfg[ propObjPath ] = strPath;
+        oCfg[ propDestDBusName ] = strDest;
+
+        if( oCfg.exist( propObjList ) )
+        {
+            ObjPtr pObj;
+            ret = oCfg.GetObjPtr( propObjList, pObj );
+            if( ERROR( ret ) )
+                break;
+
+            ObjVecPtr pObjVec( pObj );
+            if( pObjVec.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            for( auto pElem : ( *pObjVec )() )
+            {
+                CMessageMatch* pMatch = pElem;
+                pMatch->SetObjPath( strPath );
+                Variant oVar = strDest;
+                pMatch->SetProperty(
+                    propDestDBusName, oVar );
+            }
+        }
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CAuthentProxy::CreateSessImpl(
     const IConfigDb* pConnParams,
     CRpcRouter* pRouter,
@@ -1509,9 +1579,9 @@ gint32 CAuthentProxy::CreateSessImpl(
         }
 
         CCfgOpener oCfg;
+        CIoManager* pMgr = pRouter->GetIoMgr();
 
-        oCfg.SetPointer(
-            propIoMgr, pRouter->GetIoMgr() );
+        oCfg.SetPointer( propIoMgr, pMgr );
 
         ret = CRpcServices::LoadObjDesc(
             DESC_FILE, strObjName,
@@ -1528,6 +1598,11 @@ gint32 CAuthentProxy::CreateSessImpl(
         oCfg.SetPointer(
             propRouterPtr, pRouter );
 
+        if( strMech == "krb5" )
+        {
+            ret = CorrectInstName(
+                pMgr, oCfg.GetCfg() );
+        }
 
         // use a special ifstate
         oCfg.SetIntProp( propIfStateClass,
@@ -1815,6 +1890,12 @@ gint32 CAuthentProxy::InitEnvRouter(
     CIoManager* pMgr )
 {
     return CK5AuthProxy::InitEnvRouter( pMgr );
+}
+
+void CAuthentProxy::DestroyEnvRouter(
+    CIoManager* pMgr )
+{
+    CK5AuthProxy::DestroyEnvRouter( pMgr );
 }
 
 gint32 CRpcTcpBridgeProxyAuth::OnEnableComplete(
@@ -2350,6 +2431,8 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
         if( dwDiff > dwTimeoutSec )
         {
             ret = -ETIMEDOUT;
+            DebugPrintEx( logErr, ret,
+                "Error login timeout" );
             break;
         }
         
@@ -2890,6 +2973,127 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
     return ret;
 }
 
+gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
+    IConfigDb* pTransCtx,
+    DMsgPtr& pMsg,
+    MatchPtr& pMatchHit )
+{
+    if( pTransCtx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        ret = super::CheckReqToFwrd(
+            pTransCtx, pMsg, pMatchHit );
+        if( SUCCEEDED( ret ) )
+            break;
+
+        std::string strVal;
+        CMessageMatch* pAuthMatch =
+            ( CMessageMatch* )m_pAuthMatch;
+        pAuthMatch->GetIfName( strVal );
+        if( pMsg.GetInterface() != strVal )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+        CCfgOpener oTransCtx( pTransCtx );
+        std::string strPath;
+        ret = oTransCtx.GetStrProp(
+            propRouterPath, strPath );
+        if( ERROR( ret ) )
+            break;
+
+        if( strPath != "/" )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+        guint32 dwPortId = 0;
+        ret = oTransCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr pIf;
+        ret = GetBridgeProxy( dwPortId, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        if( pMsg.GetType() !=
+            DBUS_MESSAGE_TYPE_METHOD_CALL )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+        CCfgOpenerObj oIfCfg( ( CObjBase*) pIf );
+        ret = oIfCfg.GetStrProp(
+            propObjPath, strVal );
+        if( ERROR( ret ) )
+            break;
+
+        size_t pos = strVal.find_last_of( '/' );
+        if( pos == std::string::npos )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+        std::string strDir =
+            strVal.substr( 0, pos + 1 );
+
+        strDir += OBJNAME_ROUTER_BRIDGE_AUTH;
+
+        if( strDir != pMsg.GetPath() )
+        {
+            ret = ERROR_FALSE;
+            DebugPrintEx( logErr, ret,
+                "Error check message" );
+            break;
+        }
+
+        std::replace( strDir.begin(),
+            strDir.end(), '/', '.' );
+
+        if( strDir[ 0 ] == '.' )
+            strDir.erase( strDir.begin() );
+
+        if( strDir != pMsg.GetDestination() )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+
+        ret = pMatchHit.NewObj(
+            clsid( CRouterRemoteMatch ) );
+        if( ERROR( ret ) )
+            break;
+
+        CRouterRemoteMatch* prrm = pMatchHit;
+        prrm->CopyMatch( m_pAuthMatch );
+
+        CCfgOpenerObj oMatch( prrm );
+
+        oMatch.SetStrProp(
+            propObjPath, pMsg.GetPath() );
+
+        oMatch.SetStrProp( propDestDBusName,
+            pMsg.GetDestination() );
+  
+        oMatch.SetIntProp(
+            propIid, iid( IAuthenticate ) );
+
+        oMatch.SetIntProp(
+            propPortId, 0xffffffff );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CRpcReqForwarderAuth::ClearRefCountByPortId(
     guint32 dwPortId,
     std::vector< std::string >& vecUniqNames )
@@ -2942,6 +3146,11 @@ gint32 CRpcReqForwarderAuth::OnPreStop(
     IEventSink* pCallback )
 {
     return super::OnPreStop( pCallback );
+}
+
+CRpcReqForwarderAuth::~CRpcReqForwarderAuth()
+{
+    CAuthentProxy::DestroyEnvRouter( GetIoMgr() );
 }
 
 gint32 CAuthentServer::InitUserFuncs()

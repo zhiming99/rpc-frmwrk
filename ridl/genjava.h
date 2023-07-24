@@ -311,9 +311,7 @@ class CJavaSnippet
 
     gint32 EmitGetDescPath( bool bServer );
 
-    gint32 EmitUsage( bool bServer );
-
-    gint32 EmitGetOpt( bool bServer );
+    gint32 EmitGetOpt( bool bProxy );
     
 };
 

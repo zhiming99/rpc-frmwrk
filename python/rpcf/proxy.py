@@ -156,6 +156,83 @@ def GetTypeObj( typeid ) :
         return bool
     return None
 
+def UpdateObjDesc(
+    strDesc : str, params : dict )->Tuple[ int, str ]:
+    try:
+        ret = 0
+        oCfg = cpp.CParamList()
+        if 'Role' in params:
+            oCfg.SetIntProp( 101, params[ 'Role' ] )
+        else:
+            ret = -errno.EINVAL
+            raise Exception(
+                "Error UpdateObjDesc cannot find router role" )
+        if 'bAuth' in params:
+            oCfg.SetBoolProp( 102, params[ 'bAuth' ] )
+        if 'AppName' in params:
+            oCfg.SetStrProp( 104, params[ 'AppName' ] )
+        else:
+            ret = -errno.EINVAL
+            raise Exception(
+                "Error UpdateObjDesc cannot find AppName" )
+        if 'instname' in params and 'sainstname' in params:
+            ret = -errno.EINVAL
+            raise Exception(
+                "Error specifying both 'instname' and 'sainstname'" )
+
+        if 'instname' in params:
+            oCfg.SetStrProp( 107, params[ 'instname' ] )
+
+        if 'sainstname' in params:
+            oCfg.SetStrProp( 108, params[ 'sainstname' ] )
+
+        if 'ipaddr' in params:
+            oCfg.SetStrProp( 109, params[ 'ipaddr' ] )
+
+        if 'portnum' in params:
+            oCfg.SetStrProp( 110, params[ 'portnum' ] )
+
+        p2 = oCfg.GetCfg()
+        resp = cpp.UpdateObjDesc( strDesc, p2 )
+        if not 'instname' in params and not 'sainstname' in params:
+            ret, instName = oCfg.GetStrProp( 107 )
+            if ret < 0:
+                raise Exception(
+                    "Error find 'instname' in response" )
+            params[ 'instname' ] = instName
+        return resp
+    except Exception as err:
+        if ret == 0:
+            ret = -errno.EFAULT
+            return ( ret, None )
+
+def UpdateDrvCfg(
+    strDriver : str, params : dict )->Tuple[ int, str ]:
+    try:
+        ret = 0
+        oCfg = cpp.CParamList()
+        if 'Role' in params:
+            oCfg.SetIntProp( 101, params[ 'Role' ] )
+        else:
+            ret = -errno.EINVAL
+            raise Exception(
+                "Error UpdateDrvCfg cannot find router role" )
+        if 'AppName' in params:
+            oCfg.SetStrProp( 104, params[ 'AppName' ] )
+
+        if 'ipaddr' in params:
+            oCfg.SetStrProp( 109, params[ 'ipaddr' ] )
+
+        if 'portnum' in params:
+            oCfg.SetStrProp( 110, params[ 'portnum' ] )
+
+        p2 = oCfg.GetCfg()
+        return cpp.UpdateDrvCfg( strDriver, p2 )
+    except Exception as err:
+        if ret == 0:
+            ret = -errno.EFAULT
+            return ( ret, None )
+
 class PyReqContext :
     def __init__( self ) :
         self.oCallback = object()
@@ -174,16 +251,16 @@ class PyRpcContext :
                     p1.SetStrProp( 0,
                         oInitParams[ 'ModName' ] )
                 else:
-                    ret = -ErrorCode.EINVAL
+                    ret = -errno.EINVAL
                     raise Exception(
                         "Error cannot find Module name")
                 if 'Role' in oInitParams:
                     p1.SetIntProp( 101,
                         oInitParams[ 'Role' ] )
                 else:
-                    ret = -ErrorCode.EINVAL
+                    ret = -errno.EINVAL
                     raise Exception(
-                        "Error cannot router role property" )
+                        "Error cannot find router role" )
                 if 'bAuth' in oInitParams:
                     p1.SetBoolProp( 102,
                         oInitParams[ 'bAuth' ] )
@@ -193,12 +270,22 @@ class PyRpcContext :
                 if 'AppName' in oInitParams:
                     p1.SetStrProp( 104,
                         oInitParams[ 'AppName' ] )
-                else:
-                    ret = -ErrorCode.EINVAL
+                if 'driver' in oInitParams:
+                    p1.SetStrProp( 105,
+                        oInitParams[ 'driver' ] )
+                if 'router' in oInitParams:
+                    p1.SetStrProp( 106,
+                        oInitParams[ 'router' ] )
+                if 'instname' in oInitParams:
+                    p1.SetStrProp( 107,
+                        oInitParams[ 'instname' ] )
+                elif 'sainstname' in oInitParams:
+                    p1.SetStrProp( 107,
+                        oInitParams[ 'sainstname' ] )
         except Exception as err:
             print( err )
             if ret == 0:
-                ret = -ErrorCode.EFAULT
+                ret = -errno.EFAULT
 
         if ret < 0 :
             return None
@@ -436,7 +523,7 @@ class PyRpcServices :
     '''
     def WriteStreamNoWait( self, hChannel, pBuf ) :
         if len( pBuf ) == 0:
-            return -ErrorCode.EINVAL
+            return -errno.EINVAL
         return self.oInst.WriteStreamNoWait(
             hChannel, pBuf )
 

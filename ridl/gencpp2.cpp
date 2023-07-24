@@ -76,6 +76,7 @@ gint32 EmitOnPreStart(
             CCOUT << "    C" << strObjName << " );";
         NEW_LINE;
         Wa( "oCtx.CopyProp( propObjDescPath, this );" );
+        Wa( "oCtx.CopyProp( propSvrInstName, this );" );
         Wa( "stdstr strInstName;" );
         Wa( "ret = oIfCfg.GetStrProp(" );
         Wa( "    propObjName, strInstName );" );
@@ -2455,7 +2456,6 @@ gint32 CDeclService2::OutputROSSkel()
         CCOUT << "DECLARE_AGGREGATED_SKEL_PROXY(";
         INDENT_UP;
         NEW_LINE;
-
         std::vector< ObjPtr > vecIfs;
         m_pNode->GetIfRefs( vecIfs );
         if( vecIfs.empty() )
@@ -2466,6 +2466,7 @@ gint32 CDeclService2::OutputROSSkel()
 
         CCOUT << "C" << strSvcName << "_CliSkel,";
         NEW_LINE;
+        Wa( "CStatCountersProxySkel," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -2487,7 +2488,7 @@ gint32 CDeclService2::OutputROSSkel()
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel,";
         NEW_LINE;
-
+        Wa( "CStatCountersServerSkel," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -2536,6 +2537,7 @@ gint32 CDeclService2::OutputROS( bool bServer )
             CCOUT << "C" << strSvcName << "_SvrBase,";
             NEW_LINE;
 
+            Wa( "CStatCounters_SvrBase," );
             if( m_pNode->IsStream() )
                 Wa( "CStreamServerAsync," );
             for( guint32 i = 0;
@@ -2562,6 +2564,7 @@ gint32 CDeclService2::OutputROS( bool bServer )
 
             CCOUT << "C" << strSvcName << "_CliBase,";
             NEW_LINE;
+            Wa( "CStatCounters_CliBase," );
             if( m_pNode->IsStream() )
                 Wa( "CStreamProxyAsync," );
             for( guint32 i = 0;
@@ -3745,6 +3748,9 @@ gint32 CExportObjDesc2::OutputROS()
         stdstr strCmdLine = "s:XXXDESTDIR:";
         strCmdLine += strDesc + ":;" +
             "s:XXXOBJLIST:" + strObjList +
+            ":;";
+        strCmdLine += stdstr( "s:XXXBUILTINRT:" ) +
+            ( g_bBuiltinRt ? "True" : "False" ) +
             ":";
 
         const char* args[5];

@@ -42,7 +42,7 @@ namespace rpcf
 
 CSimpleEvPoll::CSimpleEvPoll(
     const IConfigDb* pCfg ) :
-    m_bStop( true ), m_iPiper( -1 ),
+    m_bStop( false ), m_iPiper( -1 ),
     m_iPipew( -1 ), m_bIoAdd( false ),
     m_bIoRemove( false ), m_bTimeAdd( false ),
     m_bTimeRemove( false )

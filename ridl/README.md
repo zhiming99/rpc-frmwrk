@@ -114,7 +114,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -j:     To generate Java skelton files       
         
-        -f:     To generate `rpcfs` skelton files. C++ or Python currently.
+        -f:     To generate skelton files with 'rpcfs' support. C++ or Python currently.
         
         -P:     To specify the prefix for the target java package. The java package name would be
                 <prefix>.<appname>, Java only.
@@ -124,7 +124,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -L：    To generate the README.md in the specified language. Currently we support "cn" for
                 Chinese and "en" for English.
 
-        -s:     To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels. C++ Only.
+        -s:     To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels.
         -b:     To generate the skelton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
 ```
 

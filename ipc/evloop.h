@@ -468,6 +468,8 @@ class CDBusDispatchCallback:
         void *data);
 
     gint32 DoDispatch();
+    static void RemoveWatch( void *data );
+    gint32 DoRemoveWatch();
 };
 
 class CDBusWakeupCallback:

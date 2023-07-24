@@ -35,6 +35,10 @@
 #include "portex.h"
 
 #include "ifhelper.h"
+#include "dbusport.h"
+
+#include <fstream>
+#include <memory>
 
 namespace rpcf
 {
@@ -1478,6 +1482,12 @@ gint32 CIoManager::RescheduleTaskMainLoop(
             break;
         }
         pTask->MarkPending();
+        CMainIoLoop* pMainLoop = GetMainIoLoop();
+        if( pMainLoop->IsStopped() )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         GetMainIoLoop()->AddTask( pTask );
 
         if( !pTask->IsAsync() )
@@ -1716,17 +1726,17 @@ CIoManager::CIoManager( const std::string& strModName ) :
         }
         m_pReg->MakeDir( "/cmdline" );
 
-        StrSetPtr psetPaths( true );
-        ( *psetPaths )().insert( "./" );
+        StrVecPtr pvecPaths( true );
+        // ( *pvecPaths )().insert( "." );
 
         std::string strPath;
         // get the libcombase.so's path
         ret = GetLibPath( strPath );
         if( SUCCEEDED( ret ) )
         {
-            ( *psetPaths )().insert( strPath );
+            ( *pvecPaths )().push_back( strPath );
             stdstr strTestLibs = strPath + "/rpcf";
-            ( *psetPaths )().insert( strTestLibs );
+            ( *pvecPaths )().push_back( strTestLibs );
         }
 
         // get the executable's path
@@ -1734,20 +1744,20 @@ CIoManager::CIoManager( const std::string& strModName ) :
         ret = GetModulePath( strPath ); 
         if( SUCCEEDED( ret ) )
         {
-            ( *psetPaths )().insert( strPath );
+            ( *pvecPaths )().push_back( strPath );
             stdstr strTestBins = strPath + "/rpcf";
-            ( *psetPaths )().insert( strTestBins );
+            ( *pvecPaths )().push_back( strTestBins );
         }
 
-        if( ( *psetPaths)().empty() )
+        if( ( *pvecPaths)().empty() )
         {
             throw std::runtime_error(
                 "Error get search paths for"
                 " config files" );
         }
 
-        GetEnvLibPath( ( *psetPaths )() );
-        ObjPtr pObj = psetPaths;
+        GetEnvLibPath( ( *pvecPaths )() );
+        ObjPtr pObj = pvecPaths;
         this->SetCmdLineOpt(
             propSearchPaths, pObj );
 
@@ -1824,6 +1834,9 @@ CIoManager::CIoManager( const std::string& strModName ) :
 
         m_iHcTimer = 0;
 
+        m_dwNumCores = std::max( 1U,
+            std::thread::hardware_concurrency() );
+
     }while( 0 );
 
     return;
@@ -1862,6 +1875,7 @@ CIoManager::CIoManager(
     gint32 ret = 0;
     do{
         CCfgOpener oCfg( pCfg );
+
         guint32 dwMaxThrds = 0;
         ret = oCfg.GetIntProp(
             propMaxIrpThrd, dwMaxThrds );
@@ -1914,9 +1928,6 @@ CIoManager::CIoManager(
             throw std::invalid_argument(
                 "No config" );
         }
-
-        m_dwNumCores = std::max( 1U,
-            std::thread::hardware_concurrency() );
 
         Json::Value& oArch = oJsonCfg[ JSON_ATTR_ARCH ];
         if( oArch != Json::Value::null && 
@@ -2013,15 +2024,15 @@ gint32 CIoManager::TryLoadClassFactory(
         if( ERROR( ret ) )
             break;
 
-        StrSetPtr psetPaths( pObj );
-        if( psetPaths.IsEmpty() )
+        StrVecPtr pvecPaths( pObj );
+        if( pvecPaths.IsEmpty() )
         {
             ret = -ENOENT;
             break;
         }
 
         bool bLoaded = false;
-        for( auto& elem : ( *psetPaths )() )
+        for( auto& elem : ( *pvecPaths )() )
         {
             std::string strFullPath =
                 elem + "/" + strFile;
@@ -2061,7 +2072,8 @@ gint32 CIoManager::TryLoadClassFactory(
 
 gint32 CIoManager::TryFindDescFile(
     const std::string& strFileName,
-    std::string& strPath )
+    std::string& strPath,
+    bool bSkipLocal )
 {
     gint32 ret = 0;
     do{
@@ -2071,13 +2083,16 @@ gint32 CIoManager::TryFindDescFile(
         std::string strFile =
             basename( strFileName.c_str() );
 
-        stdstr strLocal = "./" + strFile;
-        ret = access( strLocal.c_str(), R_OK );
-        if( ret == 0 )
+        if( !bSkipLocal )
         {
-            strPath = strLocal;
-            ret = STATUS_SUCCESS;
-            break;
+            stdstr strLocal = "./" + strFile;
+            ret = access( strLocal.c_str(), R_OK );
+            if( ret == 0 )
+            {
+                strPath = strLocal;
+                ret = STATUS_SUCCESS;
+                break;
+            }
         }
 
         ret = GetCmdLineOpt(
@@ -2085,15 +2100,15 @@ gint32 CIoManager::TryFindDescFile(
         if( ERROR( ret ) )
             break;
 
-        StrSetPtr psetPaths( pObj );
-        if( psetPaths.IsEmpty() )
+        StrVecPtr pvecPaths( pObj );
+        if( pvecPaths.IsEmpty() )
         {
             ret = -ENOENT;
             break;
         }
         bool bFound = false;
         std::string strFullPath;
-        for( auto& elem : ( *psetPaths )() )
+        for( auto& elem : ( *pvecPaths )() )
         {
             strFullPath = elem + "/" +  strFile;
             ret = access(
@@ -2315,6 +2330,655 @@ gint32 CSimpleSyncIf::OnPostStop(
             ( IEventSink* )m_pSeqTasks );
         oCfg.RemoveProperty( propIoMgr );
     }
+    return ret;
+}
+
+static gint32 GenHashInstId(
+    guint32 dwPort,
+    const stdstr& strIpAddr,
+    stdstr& strHash )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strVal1 = "t_";
+        strVal1 += strIpAddr + "_" +
+            std::to_string( dwPort );
+
+        guint32 dwHash;
+        ret = GenStrHash( strVal1, dwHash );
+        if( ERROR( ret ) )
+            break;
+
+        ret = BytesToString( ( guint8* )&dwHash,
+            sizeof( dwHash ), strHash );
+
+    }while( 0 );
+    return ret;
+}
+
+stdstr InstIdFromObjDesc(
+    const stdstr& strDesc,
+    const stdstr& strObj )
+{
+    gint32 ret = 0;
+    stdstr strVal = std::string( "t" ) +
+        std::to_string( RPC_SVR_DEFAULT_PORTNUM );
+    do{
+        Json::Value oVal;
+        ret = ReadJsonCfgFile( strDesc, oVal );
+        if( ERROR( ret ) )
+            break;
+        if( !oVal.isMember( JSON_ATTR_OBJARR ) ||
+            !oVal[ JSON_ATTR_OBJARR ].isArray() ||
+            !oVal[ JSON_ATTR_OBJARR ].size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        Json::Value oObjArr =
+            oVal[ JSON_ATTR_OBJARR ];
+
+        gint32 i = 0;
+        for( ; i < oObjArr.size(); i++ )
+        {
+            Json::Value& oElem = oObjArr[ i ];
+            if( oElem == Json::Value::null )
+                continue;
+            if( !oElem.isObject() ||
+                !oElem.isMember( JSON_ATTR_OBJNAME ) )
+                continue;
+
+            if( oElem[ JSON_ATTR_OBJNAME ].asString() !=
+                strObj )
+                continue;
+
+            bool bws = false;
+            if( oElem.isMember(
+                JSON_ATTR_ENABLE_WEBSOCKET ) )
+            {
+                Json::Value& val = oElem[
+                    JSON_ATTR_ENABLE_WEBSOCKET ];
+                if( val.isString() &&
+                    val.asString() == "true" )
+                    bws = true;
+            }
+
+            if( !oElem.isMember( JSON_ATTR_TCPPORT ) ||
+                !oElem[ JSON_ATTR_TCPPORT ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            stdstr strVal1 =
+                oElem[ JSON_ATTR_TCPPORT ].asString();
+
+            guint32 dwVal = strtoul(
+                strVal1.c_str(), nullptr, 10 );
+
+            if( dwVal > 65535 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( bws )
+            {
+                // for websocket, we use the URL to
+                // generate the instance id instead
+                if( !oElem.isMember( JSON_ATTR_DEST_URL) )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+                Json::Value& val =
+                    oElem[ JSON_ATTR_DEST_URL ];
+                if( !val.isString() )
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+
+                stdstr strVal2 = val.asString();
+                ret = GenHashInstId(
+                    0, strVal2, strVal );
+                break;
+            }
+
+            if( dwVal < RPC_SVR_DEFAULT_PORTNUM )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( !oElem.isMember( JSON_ATTR_IPADDR ) ||
+                !oElem[ JSON_ATTR_IPADDR ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strVal2 =
+                oElem[ JSON_ATTR_IPADDR ].asString();
+
+            stdstr strIpAddr;
+            ret = NormalizeIpAddrEx(
+                strVal2, strIpAddr );
+            if( ERROR( ret ) )
+                break;
+
+            if( strIpAddr == "0.0.0.0" ||
+                strIpAddr == "::" ||
+                strIpAddr == "::0" )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            ret = GenHashInstId(
+                dwVal, strIpAddr, strVal );
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( i == oObjArr.size() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return "";
+
+    return strVal;
+}
+
+stdstr InstIdFromDrv(
+    const stdstr& strDrv )
+{
+    gint32 ret = 0;
+    stdstr strVal = std::string( "t" ) +
+        std::to_string( RPC_SVR_DEFAULT_PORTNUM );
+    do{
+        Json::Value oVal;
+        ret = ReadJsonCfg( strDrv, oVal );
+        if( ERROR( ret ) )
+            break;
+
+        if( !oVal.isMember( JSON_ATTR_PORTS ) ||
+            !oVal[ JSON_ATTR_PORTS ].isArray() ||
+            !oVal[ JSON_ATTR_PORTS ].size() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        Json::Value& oPorts =
+            oVal[ JSON_ATTR_PORTS ];
+
+        gint32 i = 0;
+        for( ; i < oPorts.size(); i++ )
+        {
+            Json::Value& oPort = oPorts[ i ];
+            if( oPort == Json::Value::null )
+                continue;
+
+            if( !oPort.isMember( JSON_ATTR_PORTCLASS ) ||
+                !oPort[ JSON_ATTR_PORTCLASS ].isString() )
+                continue;
+
+            string strPortClass =
+                oPort[ JSON_ATTR_PORTCLASS ].asString();
+            if( strPortClass != PORT_CLASS_RPC_TCPBUS )
+                continue;
+
+            if( !oPort.isMember( JSON_ATTR_PARAMETERS ) || 
+                !oPort[ JSON_ATTR_PARAMETERS ].isArray() ||
+                oPort[ JSON_ATTR_PARAMETERS ].size() == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            Json::Value& oParam =
+                oPort[ JSON_ATTR_PARAMETERS ][ 0 ];
+            if( !oParam.isMember( JSON_ATTR_TCPPORT ) ||
+                !oParam[ JSON_ATTR_TCPPORT ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            stdstr strVal1 =
+                oParam[ JSON_ATTR_TCPPORT ].asString();
+
+            guint32 dwVal = strtoul(
+                strVal1.c_str(), nullptr, 10 );
+            if( dwVal > 65535 ||
+                dwVal < RPC_SVR_DEFAULT_PORTNUM )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( !oParam.isMember( JSON_ATTR_BINDADDR ) ||
+                !oParam[ JSON_ATTR_BINDADDR ].isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strVal2 =
+                oParam[ JSON_ATTR_BINDADDR ].asString();
+
+            stdstr strIpAddr;
+            ret = NormalizeIpAddrEx(
+                strVal2, strIpAddr );
+            if( ERROR( ret ) )
+                break;
+
+            ret = GenHashInstId(
+                dwVal, strIpAddr, strVal );
+            break;
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( i == oPorts.size() )
+            ret = -ENOENT;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return "";
+
+    return strVal;
+}
+
+/**
+* @name UpdateObjDesc update the attributes in the desc
+* file and return a new desc file on success
+* @{
+    @param strDesc a path to the object description
+    file to update
+
+    @param pCfg A map with multiple input parameters.
+    The valid key value is one of the following.
+
+         <p>101: the role of the rpcrouter, only valid
+         when builti-in router is enabled.</p>
+
+         <p>102: a boolean telling whether the
+         authoration enabled or not, [optional].</p>
+
+         <p>104: a string of the application name.</p>
+
+         <p>107: a string as the server instance name
+         of the builtin router. [optional]</p>
+
+         <p>108: a string as the server instance name
+         of the stand-alone router. [optional]</p>
+
+         <p>109: a string as the ip address to connect
+         toor bind to [optional]</p>
+
+         <p>110: a string as the port numer to connect
+         to or listen on [optional]</p>
+
+    @param strNewDesc an new desc file, or empty if
+    nothing to update. and property 107 is set with new
+    instance name if both 107 and 108 are not present.
+
+    @return a status code.
+*/
+/**  @} */
+
+gint32 UpdateObjDesc(
+    const stdstr strDesc,
+    IConfigDb* pCfg,
+    stdstr& strNewDesc )
+{
+    if( strDesc.empty() ||
+        pCfg == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        guint32 dwVal;
+        ret = oCfg.GetIntProp( 101, dwVal );
+        if( ERROR( ret ) )
+            break;
+
+        bool bChanged = false;
+        bool bProxy = ( dwVal == 1 );
+        bool bAuth = false;
+        oCfg.GetBoolProp( 102, bAuth );
+
+        stdstr strAppName;
+        ret = oCfg.GetStrProp( 104, strAppName );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strInst;
+        oCfg.GetStrProp( 107, strInst );
+
+        stdstr strSaInst;
+        if( bProxy )
+            oCfg.GetStrProp( 108, strSaInst );
+
+        stdstr strIpAddr;
+        oCfg.GetStrProp( 109, strIpAddr );
+
+        stdstr strPort;
+        oCfg.GetStrProp( 110, strPort );
+
+        Json::Value oVal;
+        ret = ReadJsonCfgFile( strDesc, oVal );
+        if( ERROR( ret ) )
+            break;
+
+        Json::Value& oObjArr =
+            oVal[ JSON_ATTR_OBJARR ];
+
+        gint32 i;
+
+        // update auth info
+        if( bProxy )
+        {
+            if( !oVal.isMember( JSON_ATTR_OBJARR ) ||
+                !oVal[ JSON_ATTR_OBJARR ].isArray() ||
+                !oVal[ JSON_ATTR_OBJARR ].size() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            for( i = 0; i < oObjArr.size(); i++ )
+            {
+                Json::Value& oElem = oObjArr[ i ];
+                if( oElem == Json::Value::null )
+                    continue;
+                if( !oElem.isObject() )
+                    continue;
+                if( !oElem.isMember(
+                    JSON_ATTR_AUTHINFO ) && bAuth )
+                    continue;
+                if( oElem.isMember(
+                    JSON_ATTR_AUTHINFO) && !bAuth )
+                {
+                    oElem.removeMember(
+                        JSON_ATTR_AUTHINFO );
+                    bChanged = true;
+                }
+            }
+            if( ERROR( ret ) )
+                break;
+        }
+
+        // update ip address
+        if( strIpAddr.size() || strPort.size() )
+        {
+            for( i = 0; i < oObjArr.size(); i++ )
+            {
+                Json::Value& oElem = oObjArr[ i ];
+                if( oElem == Json::Value::null )
+                    continue;
+                if( !oElem.isObject() )
+                    continue;
+                if( strIpAddr.size() &&
+                    oElem.isMember( JSON_ATTR_IPADDR ) )
+                {
+                    oElem[ JSON_ATTR_IPADDR ] =
+                        strIpAddr;
+                    bChanged = true;
+                }
+                if( strPort.size() &&
+                    oElem.isMember( JSON_ATTR_TCPPORT ) )
+                {
+                    oElem[ JSON_ATTR_TCPPORT ] =
+                        strPort;
+                    bChanged = true;
+                }
+            }
+        }
+
+        //update server name
+        if( strInst.size() )
+        {
+            // using the name from cmdline
+            oVal[ JSON_ATTR_SVRNAME ] = strInst;
+            bChanged = true;
+        }
+        else if( strSaInst.empty() )
+        {
+            // generate the server name if no
+            // stand-alone router name is given
+            // otherwise, using the original name from
+            // the file.
+            stdstr strInstId;
+            for( i = 0; i< oObjArr.size(); i++ )
+            {
+                Json::Value& oElem = oObjArr[ i ];
+                if( oElem == Json::Value::null )
+                    continue;
+                if( !oElem.isObject() )
+                    continue;
+                const char* p =
+                    JSON_ATTR_ENABLE_WEBSOCKET;
+                if( oElem.isMember( p ) &&
+                    oElem[ p ].isString() &&
+                    oElem[ p ].asString() == "true" )
+                {
+                    p = JSON_ATTR_DEST_URL;
+                    stdstr strVal =
+                        oElem[ p ].asString();
+                    ret = GenHashInstId(
+                        0, strVal, strInstId );
+                    break;
+                }
+
+                if( !oElem.isMember( JSON_ATTR_IPADDR ) )
+                    continue;
+
+                strIpAddr = oElem[
+                    JSON_ATTR_IPADDR ].asString();
+                strPort = oElem[
+                    JSON_ATTR_TCPPORT ].asString();
+
+                guint32 dwPort = strtoul(
+                    strPort.c_str(), nullptr, 10 );
+                ret = GenHashInstId(
+                    dwPort, strIpAddr, strInstId );
+
+                break;
+            }
+            if( ERROR( ret ) )
+                break;
+            if( strInstId.empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            stdstr strNewName =
+                strAppName + "_rt_" + strInstId;
+            oVal[ JSON_ATTR_SVRNAME ] = strNewName;
+            oCfg[ 107 ] = strNewName;
+            bChanged = true;
+        }
+
+        if( !bChanged )
+            break;
+
+        char szNewDesc[] = "/tmp/rpcfod_XXXXXX";
+        int iFd = mkstemp( szNewDesc );
+        if( iFd < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        close( iFd );
+
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        std::ofstream ofs;
+        ofs.open ( szNewDesc ,
+            std::ofstream::out |
+            std::ofstream::trunc);
+        pWriter->write( oVal, &ofs );
+        ofs.close();
+        strNewDesc = szNewDesc;
+
+    }while( 0 );
+
+    return ret;
+}
+
+/**
+* @name UpdateDrvCfg update the attributes in the
+* driver.json file and return a new desc file on
+* success
+* @{
+    @param strDriver a path to the driver.json
+    file to update
+
+    @param pCfg A map with multiple input parameters.
+    The valid key value is one of the following.
+
+         <p>101: the role of the rpcrouter, only valid
+         when builti-in router is enabled.</p>
+
+         <p>109: a string as the ip address to bind to
+         </p>
+
+         <p>110: a string as the port numer to listen
+         on </p>
+
+    @param strNewDrv an new driver.json, or empty if
+    nothing to update. 
+
+    @return a status code.
+*/
+/**  @} */
+
+gint32 UpdateDrvCfg(
+    const stdstr strDriver,
+    IConfigDb* pCfg,
+    stdstr& strNewDrv )
+{
+    if( strDriver.empty() ||
+        pCfg == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        guint32 dwVal;
+        ret = oCfg.GetIntProp( 101, dwVal );
+        if( ERROR( ret ) )
+            break;
+
+        bool bChanged = false;
+        bool bProxy = ( dwVal == 1 );
+
+        stdstr strAppName;
+        ret = oCfg.GetStrProp( 104, strAppName );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strIpAddr;
+        oCfg.GetStrProp( 109, strIpAddr );
+
+        stdstr strPort;
+        oCfg.GetStrProp( 110, strPort );
+
+        Json::Value oVal;
+        ret = ReadJsonCfgFile( strDriver, oVal );
+        if( ERROR( ret ) )
+            break;
+
+        Json::Value& oPorts =
+            oVal[ JSON_ATTR_PORTS ];
+
+        gint32 i;
+
+        // update ip address
+        for( i = 0; i < oPorts.size(); i++ )
+        {
+            Json::Value& oElem = oPorts[ i ];
+            if( oElem == Json::Value::null )
+                continue;
+            if( !oElem.isObject() ||
+                !oElem.isMember( JSON_ATTR_PORTCLASS ) )
+                continue;
+
+            Json::Value& oClass =
+                oElem[ JSON_ATTR_PORTCLASS ];
+            if( oClass.asString() !=
+                PORT_CLASS_RPC_TCPBUS )
+                continue;
+
+            Json::Value& oParams =
+                oElem[ JSON_ATTR_PARAMETERS ];
+
+            if( !oParams.isArray() ||
+                !oParams.size() )
+            {
+                ret = -EINVAL;
+            }
+
+            Json::Value& oParam = oParams[ 0 ];
+            if( !oParam.isMember( JSON_ATTR_BINDADDR ) ||
+                !oParam.isMember( JSON_ATTR_TCPPORT ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+
+            if( strIpAddr.size() )
+            {
+                oParam[ JSON_ATTR_BINDADDR ] =
+                    strIpAddr;
+                bChanged = true;
+            }
+
+            if( strPort.size() )
+            {
+                oParam[ JSON_ATTR_TCPPORT ] =
+                    strPort;
+                bChanged = true;
+            }
+        }
+
+        if( ERROR( ret ) )
+            break;
+
+        if( !bChanged )
+            break;
+
+        char szNewDrv[] = "/tmp/rpcfdrv_XXXXXX";
+        int iFd = mkstemp( szNewDrv );
+        if( iFd < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        close( iFd );
+
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "    ";
+        std::unique_ptr<Json::StreamWriter> pWriter(
+            oBuilder.newStreamWriter() );
+        std::ofstream ofs;
+        ofs.open ( szNewDrv ,
+            std::ofstream::out |
+            std::ofstream::trunc);
+        pWriter->write( oVal, &ofs );
+        ofs.close();
+        strNewDrv = szNewDrv;
+
+    }while( 0 );
+
     return ret;
 }
 

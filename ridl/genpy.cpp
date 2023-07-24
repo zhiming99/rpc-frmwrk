@@ -3050,6 +3050,31 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
         if( !bProxy && g_bBuiltinRt )
             Wa( "\"\\t [ -m to specify a directory as the mountpoint for rpcfs ]\\n\" +" );
 #endif
+        if( g_bBuiltinRt )
+        {
+            if( bProxy )
+            {
+                Wa( "\"\\t [ -i <ip address> to specify the destination ip address. ]\\n\"" );
+                Wa( "\"\\t [ -p <port number> to specify the tcp port number to ]\\n\"" );
+            }
+            else
+            {
+                Wa( "\"\\t [ -i <ip address> to specify the ip address to bind ]\\n\"" );
+                Wa( "\"\\t [ -p <port number> to specify the tcp port number to listen on ]\\n\"" );
+            }
+            Wa( "\"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
+            Wa( "\"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
+            Wa( "\"\\t [ --router <path> to specify the path to the customized 'router.json'. ]\\n\"" );
+            if( bProxy )
+            {
+                Wa( "\"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
+                Wa( "\"\\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\\n\"" );
+            }
+            else
+            {
+                Wa( "\"\\t [ --instname <name> to specify the string as the name of this server instance'. ]\\n\"" );
+            }
+        }
         Wa( "\"\\t [ -h this help ]\\n\" ) \% ( sys.argv[ 0 ] )," );
         CCOUT << "file=sys.stderr )";
         INDENT_DOWN;
@@ -3062,30 +3087,38 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
 {
     gint32 ret = 0;
     do{
+        Wa( "params=dict()" );
         Wa( "argv = sys.argv[1:]" );
         Wa( "try:" );
+        stdstr strShort = "hadi:p:";
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
-            Wa( "    opts, args = getopt.getopt(argv, \"hadm:\")" );
-        else
-            Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
-#else
-        Wa( "    opts, args = getopt.getopt(argv, \"had\")" );
+            strShort = "hadi:p:m:";
 #endif
+        CCOUT << "    opts, args = getopt.getopt(argv, \""<< strShort <<"\","; 
+        NEW_LINE;
+        if( bProxy && g_bBuiltinRt )
+            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\", \"sainstname=\" ] )";
+        else if( !bProxy && g_bBuiltinRt )
+            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\" ] )";
+        NEW_LINE;
 
         Wa( "except:" );
         Wa( "    Usage()" );
-        Wa( "    sys.exit( errno.EINVAL )" );
+        Wa( "    return -errno.EINVAL" );
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
             Wa( "bMount = False" );
 #endif
-        Wa( "params=dict()" );
         Wa( "for opt, arg in opts:" );
         Wa( "    if opt in ('-a'):" );
         Wa( "        params[ 'bAuth' ] = True" );
         Wa( "    elif opt in ('-d'):" );
         Wa( "        params[ 'bDaemon' ] = True" );
+        Wa( "    elif opt in ('-i'):" );
+        Wa( "        params[ 'ipaddr' ] = arg" );
+        Wa( "    elif opt in ('-p'):" );
+        Wa( "        params[ 'portnum' ] = arg" );
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
         {
@@ -3094,6 +3127,39 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
             Wa( "        bMount = True" );
         }
 #endif
+        CCOUT << "    elif opt in ('--driver', '--router', '--objdesc' ):";
+        INDENT_UP;
+        INDENT_UPL;
+        CCOUT << "try:";
+        INDENT_UPL;
+        Wa( "stinfo = os.stat( arg )" );
+        Wa( "if not stat.S_ISREG( stinfo.st_mode ) and not stat.S_ISLNK( stinfo.st_mode):" );
+        CCOUT << "    raise Exception( \"Error invalid file '%s'\" \% arg )";
+        INDENT_DOWNL;
+        Wa( "except Exception as err:" );
+        Wa( "    print( err )" );
+        Wa( "    Usage()" );
+        Wa( "    sys.exit( 1 )" );
+        Wa( "if opt == '--driver':" );
+        Wa( "    params[ 'driver' ] = arg" );
+        Wa( "elif opt == '--router':" );
+        Wa( "    params[ 'router' ] = arg" );
+        Wa( "else:" );
+        CCOUT << "    params[ 'objdesc' ] = arg";
+        INDENT_DOWN;
+        INDENT_DOWNL;
+        Wa( "    elif opt == '--instname':" );
+        Wa( "        params[ 'instname' ] = arg" );
+        Wa( "        if 'sainstname' in params:" );
+        Wa( "            print( 'Error specifying both instname and sainstname')" );
+        Wa( "            Usage()" );
+        Wa( "            sys.exit( 1 )" );
+        Wa( "    elif opt == '--sainstname':" );
+        Wa( "        params[ 'sainstname' ] = arg" );
+        Wa( "        if 'instname' in params:" );
+        Wa( "            print( 'Error specifying both instname and sainstname')" );
+        Wa( "            Usage()" );
+        Wa( "            sys.exit( 1 )" );
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 0 )" );
@@ -3282,6 +3348,7 @@ gint32 CImplPyMainFunc::OutputCli(
         {
             Wa( "import sys" );
             Wa( "import getopt" );
+            Wa( "import stat" );
             NEW_LINE;
             EmitUsage( true );
         }
@@ -3300,6 +3367,8 @@ gint32 CImplPyMainFunc::OutputCli(
         }
         else if( g_bBuiltinRt )
         {
+            CCOUT << "try:";
+            INDENT_UPL;
             ret = EmitGetOpt( true );
             if( ERROR( ret ) )
                 break;
@@ -3312,6 +3381,19 @@ gint32 CImplPyMainFunc::OutputCli(
             CCOUT << "params[ '"
                 << JSON_ATTR_ROUTER_ROLE << "' ] = 1";
             NEW_LINE;
+            Wa( "if 'objdesc' in params:" );
+            Wa( "    strPath_ = params[ 'objdesc' ]" );
+            Wa( "else:" );
+            Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+            CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+            Wa( "ret, strNewDesc = \\" );
+            Wa( "    UpdateObjDesc( strPath_, params )" );
+            Wa( "if ret < 0:" );
+            Wa( "    print( 'Error UpdateObjDesc', ret )" );
+            Wa( "    return ret" );
+            Wa( "if isinstance( strNewDesc, str ) and len( strNewDesc ):" );
+            Wa( "    strPath_ = strNewDesc" );
             Wa( "oContext = PyRpcContext( params )" );
         }
         else
@@ -3330,9 +3412,12 @@ gint32 CImplPyMainFunc::OutputCli(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
-        CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
-        NEW_LINE;        
+        if( !g_bBuiltinRt )
+        {
+            Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__) )" );
+            CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
         for( auto elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
@@ -3430,7 +3515,7 @@ gint32 CImplPyMainFunc::OutputCli(
         {
             CServiceDecl* pSvc = vecSvcs[ 0 ];
             stdstr strName = pSvc->GetName();
-            CCOUT << "oProxy_" << strName << "= None";
+            CCOUT << "oProxy_" << strName << " = None";
         }
         else
         {
@@ -3449,6 +3534,19 @@ gint32 CImplPyMainFunc::OutputCli(
         }
         INDENT_DOWNL;
         Wa( "oContext = None" );
+        if( g_bBuiltinRt )
+        {
+            INDENT_DOWNL;
+            CCOUT << "finally:";
+            INDENT_UPL;
+            CCOUT << "if 'objdesc' in params:";
+            INDENT_UPL;
+            Wa( "strDesc = params[ 'objdesc' ]" );
+            Wa( "if strDesc[:12] == '/tmp/rpcfod_':" );
+            CCOUT << "    os.unlink( strDesc )";
+            INDENT_DOWN;
+            INDENT_DOWNL;
+        }
         Wa( "return ret" );
         INDENT_DOWNL;
         EmitDefineUserMain( vecSvcs, true );
@@ -3588,6 +3686,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         {
             Wa( "import sys" );
             Wa( "import getopt" );
+            Wa( "import stat" );
             NEW_LINE;
             EmitUsage( false );
         }
@@ -3607,6 +3706,8 @@ gint32 CImplPyMainFunc::OutputSvr(
         }
         else if( g_bBuiltinRt )
         {
+            CCOUT << "try:";
+            INDENT_UPL;
             ret = EmitGetOpt( false );
             if( ERROR( ret ) )
                 break;
@@ -3619,6 +3720,34 @@ gint32 CImplPyMainFunc::OutputSvr(
             CCOUT << "params[ '"
                 << JSON_ATTR_ROUTER_ROLE << "' ] = 2";
             NEW_LINE;
+            Wa( "if 'driver' in params:" );
+            Wa( "    strCfg = params[ 'driver' ]" );
+            Wa( "else:" );
+            Wa( "    strCfg = './driver.json'" );
+            Wa( "if 'objdesc' in params:" );
+            Wa( "    strPath_ = params[ 'objdesc' ]" );
+            Wa( "else:" );
+            Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+            CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+            Wa( "ret, strNewDesc = \\" );
+            Wa( "    UpdateObjDesc( strPath_, params )" );
+            Wa( "if ret < 0:" );
+            Wa( "    print( 'Error UpdateObjDesc', ret )" );
+            Wa( "    return ret" );
+            Wa( "if isinstance( strNewDesc, str ) and len( strNewDesc ):" );
+            Wa( "    params[ 'objdesc' ] = strNewDesc" );
+            CCOUT << "if 'ipaddr' in params or 'portnum' in params:";
+            INDENT_UPL;
+            Wa( "ret, strNewCfg = \\" );
+            Wa( "    UpdateDrvCfg( strCfg, params )" );
+            Wa( "if ret < 0:" );
+            Wa( "    print( 'Error UpdateDrvCfg', ret )" );
+            Wa( "    return ret" );
+            Wa( "if isinstance( strNewCfg, str ) and len( strNewCfg ):" );
+            Wa( "    params[ 'driver' ] = strNewCfg" );
+            INDENT_DOWNL;
+
             Wa( "oContext = PyRpcContext( params )" );
         }
         else
@@ -3637,9 +3766,21 @@ gint32 CImplPyMainFunc::OutputSvr(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
-        CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
-        NEW_LINE;        
+        if( g_bBuiltinRt )
+        {
+            Wa( "if 'objdesc' in params:" );
+            Wa( "    strPath_ = params[ 'objdesc' ]" );
+            Wa( "else:" );
+            Wa( "    strPath_ = os.path.dirname( os.path.realpath( __file__ ) )" );
+            CCOUT << "    strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
+        else
+        {
+            Wa( "strPath_ = os.path.dirname( os.path.realpath( __file__) )" );
+            CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
+            NEW_LINE;
+        }
         for( auto elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
@@ -3698,9 +3839,21 @@ gint32 CImplPyMainFunc::OutputSvr(
 #ifdef FUSE3
         if( g_bBuiltinRt )
         {
-            Wa( "if bMount:" );
-            Wa( "    fuseif_mainloop(" );
-            Wa( "        sys.argv[ 0 ], params[ 'MountPoint' ] )" );
+            CCOUT << "if bMount:";
+            INDENT_UPL;
+            for( gint32 i = 0; i < vecSvcs.size(); i++ )
+            {
+                CServiceDecl* pSvc = vecSvcs[ i ];
+                stdstr strName = pSvc->GetName();
+                CCOUT << "AddSvcStatFile( oServer";
+                if( i > 0 )
+                    CCOUT << i;
+                CCOUT << ".oObj, \"" << strName << "\" )";
+                NEW_LINE;
+            }
+            Wa( "fuseif_mainloop(" );
+            CCOUT << "    sys.argv[ 0 ], params[ 'MountPoint' ] )";
+            INDENT_DOWNL;
             CCOUT << "else :";
             INDENT_UPL;
             EMIT_CALL_TO_USERMAIN( false );
@@ -3723,7 +3876,7 @@ gint32 CImplPyMainFunc::OutputSvr(
             CServiceDecl* pSvc = vecSvcs[ 0 ];
             stdstr strName = pSvc->GetName();
             CCOUT << "oServer_" 
-                << strName <<"  = None";
+                << strName <<" = None";
         }
         else
         {
@@ -3740,6 +3893,25 @@ gint32 CImplPyMainFunc::OutputSvr(
         }
         INDENT_DOWNL;
         Wa( "oContext = None" );
+        if( g_bBuiltinRt )
+        {
+            INDENT_DOWNL;
+            CCOUT << "finally:";
+            INDENT_UPL;
+            CCOUT << "if 'objdesc' in params:";
+            INDENT_UPL;
+            Wa( "strVal = params[ 'objdesc' ]" );
+            Wa( "if strVal[:12] == '/tmp/rpcfod_':" );
+            CCOUT << "    os.unlink( strVal )";
+            INDENT_DOWNL;
+            CCOUT << "if 'driver' in params:";
+            INDENT_UPL;
+            Wa( "strVal = params[ 'driver' ]" );
+            Wa( "if strVal[:13] == '/tmp/rpcfdrv_':" );
+            CCOUT << "    os.unlink( strVal )";
+            INDENT_DOWN;
+            INDENT_DOWNL;
+        }
         Wa( "return ret" );
         INDENT_DOWNL;
 

@@ -9,7 +9,7 @@
             "PortId": "0",
             "RequestTimeoutSec": "120",
             "KeepAliveTimeoutSec": "60",
-            "ProxyPortClass": "DBusProxyPdoLpbk",
+            "ProxyPortClass": "DBusProxyPdo",
             "ProxyPortClass-1": "DBusLocalPdo",
             "comment-1": "IpAddress is the ip address of the server",
             "IpAddress": "127.0.0.1",

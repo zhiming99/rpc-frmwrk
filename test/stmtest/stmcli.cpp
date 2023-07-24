@@ -25,6 +25,7 @@
 
 using namespace rpcf;
 #include "stmsvr.h"
+#include <climits>
 
 using namespace std;
 
@@ -50,11 +51,34 @@ gint32 CMyStreamProxy::OnRecvData_Loop(
         if( ERROR( ret ) )
             break;
 
+        auto& stmctx = GetContext2( hChannel );
         std::string strMsg(
             ( char* )pBuf->ptr() );
 
-        printf( "server says: %s\n",
-            strMsg.c_str() );
+        size_t pos = strMsg.rfind( ' ' ); 
+        if( pos == stdstr::npos )
+            continue;
+
+        pos = strMsg.rfind( ' ', pos - 1 );
+        if( pos == stdstr::npos )
+            continue;
+
+        size_t end = pos;
+        pos = strMsg.rfind( ' ', pos - 1 );
+        if( pos == stdstr::npos )
+            continue;
+
+        stdstr strVal = strMsg.substr(
+            pos + 1, end - pos - 1 );
+
+        guint32 dwCount = strtoul(
+            strVal.c_str(), nullptr, 10 );
+        if( dwCount == ULONG_MAX )
+            continue;
+
+        if( ( dwCount & 0x3ff ) == 0 )
+            printf( "server says: %s\n",
+                strMsg.c_str() );
 
     }while( 1 );
 
@@ -69,22 +93,13 @@ gint32 CMyStreamProxy::SendMessage(
 {
     gint32 ret = 0;
 
-    CfgPtr pCfg;
-
     // get channel specific context
-    ret = GetContext( hChannel, pCfg );
-    if( ERROR( ret ) )
-        return ret;
+    auto& stmctx = GetContext2( hChannel );
 
-    CParamList oCfg( pCfg );
-    guint32 dwCount = 0;
     BufPtr pBuf( true );
 
     do{
-        ret = oCfg.GetIntProp( 0, dwCount );
-        if( ERROR( ret ) )
-            break;
-
+        guint32 dwCount = stmctx.GetCounter();
         if( dwCount == LOOP_COUNT )
         {
             StopLoop();
@@ -110,18 +125,9 @@ gint32 CMyStreamProxy::SendMessage(
         if( ERROR( ret ) )
             break;
 
-        if( SUCCEEDED( ret ) )
-            dwCount++;
+        stmctx.IncCounter();
 
     }while( 0 );
-
-
-    if( SUCCEEDED( ret ) )
-    {
-        // update the context for next run
-        oCfg.SetIntProp( 0, dwCount );
-    }
-
     return ret;
 }
 
@@ -132,9 +138,7 @@ gint32 CMyStreamProxy::OnSendDone_Loop(
 
     CfgPtr pCfg;
     // get channel specific context
-    ret = GetContext( hChannel, pCfg );
-    if( ERROR( ret ) )
-        return ret;
+    auto& stmctx = GetContext2( hChannel );
 
     do{
         if( ERROR( iRet ) )
@@ -143,11 +147,7 @@ gint32 CMyStreamProxy::OnSendDone_Loop(
             break;
         }
 
-        CParamList oCfg( pCfg );
-        guint32 dwCount = oCfg[ 0 ];
-        ++dwCount;
-        oCfg[ 0 ] = dwCount;
-
+        stmctx.IncCounter();
         ret = SendMessage( hChannel );
 
     }while( 0 );
@@ -168,25 +168,20 @@ gint32 CMyStreamProxy::OnWriteEnabled_Loop(
 
     CfgPtr pCfg;
     // get channel specific context
-    ret = GetContext( hChannel, pCfg );
-    if( ERROR( ret ) )
-        return ret;
-
-    CParamList oCfg( pCfg );
-    guint32 dwCount = 0;
+    auto& stmctx = GetContext2( hChannel );
 
     do{
         // this handler will be the first one to
         // call after the loop starts
-        ret = oCfg.GetIntProp( 0, dwCount );
-        if( ret == -ENOENT )
+        guint32 dwCount = stmctx.GetCounter();
+        if( dwCount == 0 )
         {
             // the first time, send greetings
             BufPtr pBuf( true );
             *pBuf = std::string( "Hello, Server" );
             WriteStreamNoWait( hChannel, pBuf );
             DebugPrint( 0, "say hello to server" );
-            oCfg.Push( ++dwCount );
+            stmctx.IncCounter();
             ret = 0;
         }
         else if( ERROR( ret ) )
@@ -216,5 +211,7 @@ gint32 CMyStreamProxy::OnStart_Loop()
 gint32 CMyStreamProxy::OnCloseChannel_Loop(
     HANDLE hChannel )
 {
-    return StopLoop();
+    gint32 ret = StopLoop();
+    RemoveContext( hChannel );
+    return ret;
 }

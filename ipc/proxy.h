@@ -681,6 +681,7 @@ class CRpcServices :
     // the queue of pending invoke tasks, for queued
     // task processing
     TaskGrpPtr             m_pSeqTasks;
+    timespec               m_tsStartTime;
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall, IEventSink* pCallback );
@@ -1069,6 +1070,9 @@ class CRpcServices :
     virtual gint32 SetCounter(
         EnumPropId iProp, guint64 qwVal )
     { return 0; }
+
+    inline timespec GetStartTime() const
+    { return m_tsStartTime; }
 
     private:
     template< class T >

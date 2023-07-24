@@ -289,7 +289,8 @@ void CIfSmokeTest::testCliStartStop()
             if( ERROR( ret ) )
                 break;
 
-            printf( "Server says: %s\n", pBuf->ptr() );
+            if( ( i & 0x3ff ) == 0 )
+                printf( "Server says: %s\n", pBuf->ptr() );
         }
         clock_gettime( CLOCK_REALTIME, &ts2 );
 

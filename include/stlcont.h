@@ -352,6 +352,28 @@ class CStlObjVector : public CStlVector< ObjPtr >
 
 typedef CAutoPtr< clsid( CStlObjVector ), CStlObjVector > ObjVecPtr;
 
+class CStlStrVector : public CStlVector< stdstr >
+{
+    public:
+
+    typedef CStlVector< stdstr > super;
+    CStlStrVector() :super()
+    {
+        SetClassId( clsid( CStlStrVector ) );
+    }
+
+    gint32 Serialize(
+        CBuffer& oBuf ) const;
+
+    gint32 Deserialize(
+        const CBuffer& obuf );
+
+    gint32 Deserialize(
+        const char* pBuf, guint32 dwBufSize );
+};
+
+typedef CAutoPtr< clsid( CStlStrVector ), CStlStrVector > StrVecPtr;
+
 template< typename Key_, typename Val_ >
 class CStlMap : public CObjBase
 {
@@ -611,12 +633,12 @@ public:
 
 typedef CAutoPtr< clsid( CStlObjSet ), CStlObjSet > ObjSetPtr;
 
-class CStlStringSet : public CStlSet< std::string >
+class CStlStringSet : public CStlSet< stdstr >
 {
 public:
-    typedef std::string ElemType;
+    typedef stdstr ElemType;
 
-    CStlStringSet() :CStlSet< std::string >()
+    CStlStringSet() :CStlSet< stdstr >()
     { SetClassId( clsid( CStlStringSet ) ); }
 
     ~CStlStringSet()

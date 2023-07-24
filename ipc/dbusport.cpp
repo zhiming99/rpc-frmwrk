@@ -34,6 +34,8 @@
 //#include "connhelp.h"
 #include "emaphelp.h"
 #include "ifhelper.h"
+#include <sys/socket.h>
+#include <netdb.h>
 
 namespace rpcf
 {
@@ -143,6 +145,63 @@ gint32 NormalizeIpAddr(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 NormalizeIpAddrEx(
+    const stdstr& strAddr,
+    stdstr& strRet )
+{
+    gint32 ret = 0;
+    if( strAddr.empty() )
+        return -EINVAL;
+
+    do{
+        string strNormVal;
+        ret = NormalizeIpAddr(
+            AF_INET, strAddr, strNormVal );
+        if( ERROR( ret ) )
+        {
+            ret = NormalizeIpAddr(
+                AF_INET6, strAddr, strNormVal );
+        }
+
+        if( SUCCEEDED( ret ) )
+        {
+            strRet = strNormVal;
+            break;
+        }
+        addrinfo hints, *result = nullptr;
+        memset( &hints, 0, sizeof( addrinfo ) );
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+
+        ret = getaddrinfo( strAddr.c_str(),
+            nullptr, &hints, &result );
+        if( ret < 0 )
+            break;
+        // use the first address only
+        sockaddr_in* h =
+            ( sockaddr_in *)result->ai_addr;
+        char szIpAddr[ INET6_ADDRSTRLEN + 1 ];
+        szIpAddr[ INET6_ADDRSTRLEN ] = 0;
+
+        const char* szRet = inet_ntop(
+            result->ai_family,
+            &h->sin_addr,
+            szIpAddr,
+            INET6_ADDRSTRLEN );
+
+        if( szRet == nullptr )
+        {
+            ret = -errno;
+            freeaddrinfo( result );
+            break;
+        }
+        strRet = szRet;
+        freeaddrinfo( result );
+
+    }while( 0 );
     return ret;
 }
 

@@ -44,7 +44,6 @@ ObjPtr g_pIoMgr;
 ObjPtr g_pRouter;
 extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
-
 %}
 
 %include "std_string.i"
@@ -112,6 +111,11 @@ enum // EnumPropId
     propTimeoutSec,
     propKeepAliveSec,
     propConfigPath,
+    propObjDescPath,
+    propDestIpAddr,
+    propDestTcpPort,
+    propSrcIpAddr,
+    propSrcTcpPort
 };
 
 typedef int32_t EnumIfState;
@@ -1119,7 +1123,7 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             if( dwNumThrds > 1 )
                 dwNumThrds = ( dwNumThrds >> 1 );
             oCfg[ propMaxTaskThrd ] = dwNumThrds;
-            oCfg[ propMaxIrpThrd ] = 2;
+            oCfg[ propMaxIrpThrd ] = 0;
 
             guint32 dwRole = 1;
             oCfg.GetIntProp( 101, dwRole );
@@ -1150,6 +1154,39 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 break;
             }
 
+            stdstr strRtFile;
+            if( oCfg.exist( 106 ) )
+            {
+                oCfg.GetStrProp( 106, strRtFile );
+                oCfg.RemoveProperty( 106 );
+            }
+
+            stdstr strInstName;
+            if( oCfg.exist( 107 ) )
+            {
+                oCfg.GetStrProp( 107, strInstName );
+                oCfg.RemoveProperty( 107 );
+            }
+            else if( oCfg.exist( 108 ) )
+            {
+                oCfg.GetStrProp( 108, strInstName );
+                oCfg.RemoveProperty( 108 );
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( !IsValidName( strInstName ) )
+            {
+                ret = -EINVAL;
+                DebugPrintEx( logErr, ret, 
+                    "Error invalid instance name" );
+                break;
+            }
+
+            stdstr strRtName = strAppName + "_rt_";
             // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
@@ -1178,25 +1215,31 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 break;
 
             // create and start the router
-            stdstr strRtName =
-                strAppName + "_Router";
-            pMgr->SetRouterName(
-                strRtName + "_" +
+            pMgr->SetRouterName( strRtName +
                 std::to_string( getpid() ) );
-            stdstr strDescPath = "./router.json";
+
+            stdstr strDescPath;
+            if( strRtFile.size() )
+                strDescPath = strRtFile;
+            else if( bAuth )
+                strDescPath = "./rtauth.json";
+            else
+                strDescPath = "./router.json";
+
             if( bAuth )
             {
                 pMgr->SetCmdLineOpt(
                     propHasAuth, bAuth );
-                strDescPath = "./rtauth.json";
             }
 
             CCfgOpener oRtCfg;
             oRtCfg.SetStrProp(
-                propSvrInstName, strRtName );
+                propSvrInstName, strInstName );
+
             oRtCfg.SetPointer( propIoMgr, pMgr );
             pMgr->SetCmdLineOpt(
-                propSvrInstName, strRtName );
+                propSvrInstName, strInstName );
+
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
                 OBJNAME_ROUTER,
@@ -1321,6 +1364,72 @@ gint32 CoUninitializeEx()
         "#Leaked objects is %d",
         CObjBase::GetActCount() );
     return 0;
+}
+
+jobject UpdateObjDesc(
+    JNIEnv *jenv,
+    const std::string& strDesc,
+    CfgPtr& pCfg )
+{
+    if( jenv == nullptr )
+        return nullptr;
+
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    do{
+        stdstr strNewDesc;
+        gint32 ret = cpp::UpdateObjDesc(
+            strDesc, pCfg, strNewDesc );
+
+        SetErrorJRet(
+            jenv, jret, ret );
+        if( ERROR( ret ) )
+            break;
+
+        if( strNewDesc.size() )
+        {
+            jstring jstrNewDesc =
+                jenv->NewStringUTF(
+                    strNewDesc.c_str() );
+            AddElemToJRet( jenv,
+                jret, jstrNewDesc );
+        }
+    }while( 0 );
+    return jret; 
+}
+
+jobject UpdateDrvCfg(
+    JNIEnv *jenv,
+    const std::string& strDriver,
+    CfgPtr& pCfg )
+{
+    if( jenv == nullptr )
+        return nullptr;
+
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    do{
+        stdstr strNewDrv;
+        gint32 ret = cpp::UpdateDrvCfg(
+            strDriver, pCfg, strNewDrv );
+
+        SetErrorJRet(
+            jenv, jret, ret );
+        if( ERROR( ret ) )
+            break;
+
+        if( strNewDrv.size() )
+        {
+            jstring jstrNewDrv =
+                jenv->NewStringUTF(
+                    strNewDrv.c_str() );
+            AddElemToJRet( jenv,
+                jret, jstrNewDrv );
+        }
+    }while( 0 );
+    return jret; 
 }
 %}
 
@@ -3329,4 +3438,23 @@ class Variant
         return STATUS_SUCCESS;
     }
 };
+
+// two helpers for ridlc
+std::string InstIdFromObjDesc(
+    const std::string& strDesc,
+    const std::string& strObj );
+
+std::string InstIdFromDrv(
+    const std::string& strDrv );
+
+jobject UpdateObjDesc(
+    JNIEnv *jenv,
+    const std::string& strDesc,
+    CfgPtr& pCfg );
+
+jobject UpdateDrvCfg(
+    JNIEnv *jenv,
+    const std::string& strDriver,
+    CfgPtr& pCfg );
+
 %include "proxy.i"

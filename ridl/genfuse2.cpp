@@ -655,7 +655,7 @@ gint32 CDeclServiceImplFuse2::Output()
             Wa( "    IEventSink* pCallback )" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "guint64 qwTaskId = 0, qwReqId = 0;" );
             Wa( "CCfgOpener oReq( ( IConfigDb*)pReqCfg );" );
@@ -2433,6 +2433,7 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
 
         CCOUT << "C" << strSvcName << "_CliSkel_Base,";
         NEW_LINE;
+        Wa( "CStatCountersProxySkel," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -2478,6 +2479,7 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
         NEW_LINE;
         CCOUT << "C" << strSvcName << "_SvrSkel_Base,";
         NEW_LINE;
+        Wa( "CStatCountersServerSkel," );
         for( guint32 i = 0;
             i < vecIfs.size(); i++ )
         {
@@ -2560,7 +2562,7 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             NEW_LINE;
             CCOUT << "C" << strSvcName << "_CliBase,";
             NEW_LINE;
-            Wa( "CStatCountersProxy," );
+            Wa( "CStatCounters_CliBase," );
             Wa( "CStreamProxyFuse," );
             Wa( "CFuseSvcProxy," );
             for( guint32 i = 0;
@@ -2586,7 +2588,7 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             CCOUT << "C" << strSvcName << "_SvrBase,";
             NEW_LINE;
 
-            Wa( "CStatCountersServer," );
+            Wa( "CStatCounters_SvrBase," );
             Wa( "CStreamServerFuse," );
             Wa( "CFuseSvcServer," );
 

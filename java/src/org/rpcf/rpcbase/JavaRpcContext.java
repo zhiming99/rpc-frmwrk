@@ -42,6 +42,23 @@ public class JavaRpcContext
      *      can override the default path of the driver.json.
      *      It is a must-have attribute when fastrpc or
      *      built-in router is enabled.</p>
+     *
+     *      <p>106: a string as the path of 'router.json', which
+     *      can override the default path of the router.json.
+     *      It is a must-have attribute when fastrpc or
+     *      built-in router is enabled.</p>
+     *
+     *      <p>107: a string as the server instance name of the
+     *      builtin router.</p>
+     *
+     *      <p>108: a string as the server instance name of the
+     *      stand-alone router.</p>
+     *
+     *      <p>109: a string as the ip address to connect  toor
+     *      bind to</p>
+     *
+     *      <p>110: a string as the port numer to connect to or
+     *      listen on</p>
      * @return an ObjPtr object holding the instance of IoMgr on success
      * and null on error, with m_iError set.
      */
@@ -106,6 +123,29 @@ public class JavaRpcContext
                     ( String )oInit.get ( 104 );
                 if( strVal != null )
                     oCfg.SetStrProp( 104, strVal );
+
+                strVal =
+                    ( String )oInit.get ( 106 );
+                if( strVal != null )
+                    oCfg.SetStrProp( 106, strVal );
+
+                if( oInit.containsKey( 107 ) )
+                {
+                    strVal =
+                        ( String )oInit.get ( 107 );
+                    if( strVal != null )
+                        oCfg.SetStrProp( 107, strVal );
+                }
+                else if( oInit.containsKey( 108 ) )
+                {
+                    strVal =
+                        ( String )oInit.get ( 108 );
+                    if( strVal != null )
+                    {
+                        // use 107 on purpose
+                        oCfg.SetStrProp( 107, strVal );
+                    }
+                }
             }
 
             JRetVal jret =
@@ -231,5 +271,149 @@ public class JavaRpcContext
         Map<Integer, Object> oInitParams )
     { return create( false,  oInitParams ); }
 
+    public static JRetVal UpdateObjDesc(
+        String strDesc,
+        Map< Integer, Object > oInitMaps )
+    {
+        JRetVal jret = new JRetVal();
+        try{
+            CParamList oCfg= new CParamList();
+            if( oInitMaps.containsKey( 101 ) )
+            {
+                oCfg.SetIntProp( 101,
+                    ( Integer )oInitMaps.get( 101 ) );   
+            }
+            else
+            { 
+                throw new RuntimeException(
+                    "Error UpdateObjDesc cannot find router role( 101 )" );
+            }
+            if( oInitMaps.containsKey( 102 ) )
+                oCfg.SetBoolProp( 102,
+                    ( Boolean )oInitMaps.get( 102 ) );
+
+            if( oInitMaps.containsKey( 104 ) )
+                oCfg.SetStrProp( 104,
+                    ( String )oInitMaps.get( 104 ) );
+            else
+            { 
+                throw new RuntimeException(
+                    "Error UpdateObjDesc cannot find AppName( 104 )" );
+            }
+
+            if( oInitMaps.containsKey( 107 ) )
+                oCfg.SetStrProp( 107,
+                    ( String )oInitMaps.get( 107 ) );
+
+            if( oInitMaps.containsKey( 108 ) )
+                oCfg.SetStrProp( 108,
+                    ( String )oInitMaps.get( 108 ) );
+
+            if( oInitMaps.containsKey( 109 ) )
+                oCfg.SetStrProp( 109,
+                    ( String )oInitMaps.get( 109 ) );
+
+            if( oInitMaps.containsKey( 110 ) )
+                oCfg.SetStrProp( 110,
+                    ( String )oInitMaps.get( 110 ) );
+
+            jret = ( JRetVal )oCfg.GetCfg();
+            if( jret.ERROR() )
+                throw new RuntimeException(
+                    "Error UpdateObjDesc cannot create cfgptr" );
+
+            ObjPtr pObj = ( ObjPtr )jret.getAt(0);
+            CfgPtr pCfg = rpcbase.CastToCfg( pObj );
+            jret = ( JRetVal )rpcbase.UpdateObjDesc(
+                strDesc, pCfg );
+            if( jret.ERROR() )
+                throw new RuntimeException(
+                    "Error UpdateObjDesc failed with " + jret.getError() );
+
+            if( !oInitMaps.containsKey(107) &&
+                !oInitMaps.containsKey(108) )
+            {
+                JRetVal jret1 = ( JRetVal )oCfg.GetStrProp(107);
+                if( jret1.ERROR())
+                    throw new RuntimeException(
+                        "Error UpdateObjDesc cannot find instance id " +
+                        jret1.getError() );
+                String strInstId =
+                    ( String )jret1.getAt( 0 );
+                oInitMaps.put(
+                    107, ( Object )strInstId );
+            }
+        }
+        catch( RuntimeException e)
+        {
+            e.printStackTrace();
+            if( jret.SUCCEEDED() )
+                jret.setError( -RC.EFAULT );
+        }
+
+        return jret;
+    }
+
+    /**
+     * @param strDriver
+     * @param oInitMaps
+     * @return
+     */
+    public static JRetVal UpdateDrvCfg(
+        String strDriver,
+        Map< Integer, Object > oInitMaps )
+    {
+        JRetVal jret = new JRetVal();
+        try{
+            CParamList oCfg= new CParamList();
+            if( oInitMaps.containsKey( 101 ) )
+            {
+                oCfg.SetIntProp( 101,
+                    ( Integer )oInitMaps.get( 101 ) );   
+            }
+            else
+            { 
+                throw new RuntimeException(
+                    "Error UpdateDrvCfg cannot find router role( 101 )" );
+            }
+
+            if( oInitMaps.containsKey( 104 ) )
+                oCfg.SetStrProp( 104,
+                    ( String )oInitMaps.get( 104 ) );
+            else
+            { 
+                throw new RuntimeException(
+                    "Error UpdateDrvCfg cannot find AppName( 104 )" );
+            }
+
+            if( oInitMaps.containsKey( 109 ) )
+                oCfg.SetStrProp( 109,
+                    ( String )oInitMaps.get( 109 ) );
+
+            if( oInitMaps.containsKey( 110 ) )
+                oCfg.SetStrProp( 110,
+                    ( String )oInitMaps.get( 110 ) );
+
+            jret = ( JRetVal )oCfg.GetCfg();
+            if( jret.ERROR() )
+                throw new RuntimeException(
+                    "Error UpdateDrvCfg cannot create cfgptr" );
+
+            ObjPtr pObj = ( ObjPtr )jret.getAt(0);
+            CfgPtr pCfg = rpcbase.CastToCfg( pObj );
+            jret = ( JRetVal )rpcbase.UpdateDrvCfg(
+                strDriver, pCfg );
+            if( jret.ERROR() )
+                throw new RuntimeException(
+                    "Error UpdateDrvCfg failed with " + jret.getError() );
+        }
+        catch( RuntimeException e )
+        {
+            e.printStackTrace();
+            if( jret.SUCCEEDED() )
+                jret.setError( -RC.EFAULT );
+        }
+        return jret;
+    }
 }
 

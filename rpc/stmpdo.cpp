@@ -391,6 +391,7 @@ gint32 CRpcTcpBusPort::PostStart(
         if( !bListening )
             break;
 
+        auto pMgr = GetIoMgr();
         CStlObjVector::MyType& vecParams =
             ( *pParams )();
 
@@ -402,7 +403,7 @@ gint32 CRpcTcpBusPort::PostStart(
             CCfgOpener oCfg(
                 ( IConfigDb* )pCfg );
 
-            oCfg.SetPointer( propIoMgr, GetIoMgr() );
+            oCfg.SetPointer( propIoMgr, pMgr );
             oCfg.SetPointer( propPortPtr, this );
             oCfg.SetObjPtr( propConnParams, elem );
 
@@ -947,12 +948,12 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         oParams[ JSON_ATTR_BINDADDR ].asString();
 
                     string strNormVal;
-                    ret = NormalizeIpAddr(
-                        AF_INET, strAddr, strNormVal );
+                    ret = NormalizeIpAddrEx( strAddr, strNormVal );
                     if( ERROR( ret ) )
                     {
-                        ret = NormalizeIpAddr(
-                            AF_INET6, strAddr, strNormVal );
+                        DebugPrintEx( logErr, ret,
+                            "Error invalid network address" );
+                        break;
                     }
 
                     oElemCfg.SetStrProp( propDestIpAddr, strNormVal );

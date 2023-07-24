@@ -8,15 +8,6 @@ if [ ! -e /etc/ssl/certs/rpcf.crt ]; then
     ln -s $keydir/server.crt /etc/ssl/certs/rpcf.crt
 fi
 
-plugindir=`dpkg -L krb5-kdc | grep 'plugins$' | head -n 1`
-plugindir=$plugindir/libkrb5
-if [ ! -e $plugindir ]; then
-    make -p $plugindir
-fi
-
-echo ln -s /usr/local/lib/rpcf/libauth.so $plugindir
-ln -s /usr/local/lib/rpcf/libauth.so $plugindir
-
 echo "==================================================================================="
 echo "==== /etc/nginx/conf.d/ssl.conf ==================================================="
 echo "==================================================================================="

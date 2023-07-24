@@ -239,7 +239,13 @@ namespace cpp
         propSeriProto,
         propNoReply,
         propTimeoutSec,
-        propKeepAliveSec
+        propKeepAliveSec,
+        propConfigPath,
+        propObjDescPath
+        propDestIpAddr,
+        propDestTcpPort
+        propSrcIpAddr,
+        propSrcTcpPort
     };
 
     enum // EnumIfState
@@ -885,7 +891,7 @@ namespace cpp
             if( dwNumThrds > 1 )
                 dwNumThrds = ( dwNumThrds >> 1 );
             oCfg[ propMaxTaskThrd ] = dwNumThrds;
-            oCfg[ propMaxIrpThrd ] = 2;
+            oCfg[ propMaxIrpThrd ] = 0;
 
             guint32 dwRole = 1;
             oCfg.GetIntProp( 101, dwRole );
@@ -916,6 +922,49 @@ namespace cpp
                 break;
             }
 
+            stdstr strCfg;
+            if( oCfg.exist( 105 ) )
+            {
+                oCfg.GetStrProp( 105, strCfg );
+                oCfg.RemoveProperty( 105 );
+                oCfg.SetStrProp(
+                    propConfigPath, strCfg );
+            }
+
+            stdstr strRtFile;
+            if( oCfg.exist( 106 ) )
+            {
+                oCfg.GetStrProp( 106, strRtFile );
+                oCfg.RemoveProperty( 106 );
+            }
+
+            stdstr strInstName;
+            if( oCfg.exist( 107 ) )
+            {
+                oCfg.GetStrProp( 107, strInstName );
+                oCfg.RemoveProperty( 107 );
+            }
+            else if( oCfg.exist( 108 ) )
+            {
+                oCfg.GetStrProp( 108, strInstName );
+                oCfg.RemoveProperty( 108 );
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            if( !IsValidName( strInstName ) )
+            {
+                ret = -EINVAL;
+                DebugPrintEx( logErr, ret, 
+                    "Error invalid instance name" );
+                break;
+            }
+
+            stdstr strRtName = strAppName + "_rt_";
+            // it will prompt for keypass if necessary
             ret = CheckKeyPass();
             if( ERROR( ret ) )
                 break;
@@ -943,25 +992,31 @@ namespace cpp
                 break;
 
             // create and start the router
-            stdstr strRtName =
-                strAppName + "_Router";
             pMgr->SetRouterName(
-                strRtName + "_" +
+                strRtName +
                 std::to_string( getpid() ) );
-            stdstr strDescPath = "./router.json";
+
+            stdstr strDescPath;
+            if( strRtFile.size())
+                strDescPath = strRtFile;
+            else if( bAuth )
+                strDescPath = "./rtauth.json";
+            else
+                strDescPath = "./router.json";
+
             if( bAuth )
             {
                 pMgr->SetCmdLineOpt(
                     propHasAuth, bAuth );
-                strDescPath = "./rtauth.json";
             }
 
             CCfgOpener oRtCfg;
             oRtCfg.SetStrProp(
-                propSvrInstName, strRtName );
+                propSvrInstName, strInstName );
+
             oRtCfg.SetPointer( propIoMgr, pMgr );
             pMgr->SetCmdLineOpt(
-                propSvrInstName, strRtName );
+                propSvrInstName, strInstName );
             ret = CRpcServices::LoadObjDesc(
                 strDescPath,
                 OBJNAME_ROUTER,
@@ -1133,6 +1188,77 @@ namespace cpp
         guint32 GetState() const;
     };
 
+    PyObject* InstIdFromObjDesc(
+        const std::string& strDesc,
+        const std::string& strObj );
+    %MethodCode
+        stdstr val = InstIdFromObjDesc(
+            *a0, *a1 );
+        sipRes = PyUnicode_FromString(
+            val.c_str() );
+    %End
+
+    PyObject* InstIdFromDrv(
+        const std::string& strDrv );
+    %MethodCode
+        stdstr val = InstIdFromDrv( *a0 );
+        sipRes = PyUnicode_FromString(
+            val.c_str() );
+    %End
+
+    PyObject* UpdateObjDesc( 
+        const std::string& strDesc,
+        cpp::CfgPtr& pCfg );
+    %MethodCode
+    do{
+        stdstr strNewDesc;
+        gint32 ret = UpdateObjDesc(
+            *a0, *a1, strNewDesc );
+        PyObject* listResp = PyTuple_New( 2 );
+        if( listResp == nullptr )
+        {
+            sipRes = Py_None;
+            break;
+        }
+        PyObject* pRet = PyLong_FromLong( ret );
+        PyTuple_SetItem( listResp, 0, pRet );
+        PyTuple_SetItem( listResp, 1, Py_None );
+        if( SUCCEEDED( ret ) && strNewDesc.size() )
+        {
+            PyObject* pStr = PyUnicode_FromString(
+                strNewDesc.c_str() );
+            PyTuple_SetItem( listResp, 1, pStr );
+        }
+        sipRes = listResp;
+    }while( 0 );
+    %End
+
+    PyObject* UpdateDrvCfg( 
+        const std::string& strDriver,
+        cpp::CfgPtr& pCfg );
+    %MethodCode
+    do{
+        stdstr strNewDrv;
+        gint32 ret = UpdateDrvCfg(
+            *a0, *a1, strNewDrv );
+        PyObject* listResp = PyTuple_New( 2 );
+        if( listResp == nullptr )
+        {
+            sipRes = Py_None;
+            break;
+        }
+        PyObject* pRet = PyLong_FromLong( ret );
+        PyTuple_SetItem( listResp, 0, pRet );
+        PyTuple_SetItem( listResp, 1, Py_None );
+        if( SUCCEEDED( ret ) && strNewDrv.size() )
+        {
+            PyObject* pStr = PyUnicode_FromString(
+                strNewDrv.c_str() );
+            PyTuple_SetItem( listResp, 1, pStr );
+        }
+        sipRes = listResp;
+    }while( 0 );
+    %End
 };
 
 %Include proxy.sip

@@ -40,6 +40,10 @@ gint32 NormalizeIpAddr(
     const std::string strIn,
     std::string& strOut );
 
+gint32 NormalizeIpAddrEx(
+    const stdstr& strAddr,
+    stdstr& strRet );
+
 gint32 IpAddrToByteStr(
     const std::string& strIpAddr,
     std::string& strRet );

@@ -36,8 +36,6 @@
 #include <fcntl.h>
 #include "jsondef.h"
 #include "dbusport.h"
-#include <sys/socket.h>
-#include <netdb.h>
 
 namespace rpcf
 {
@@ -3195,6 +3193,9 @@ CRpcServices::CRpcServices( const IConfigDb* pCfg )
             RemoveProperty( propObjList );
         }
 
+        clock_gettime(
+            CLOCK_REALTIME, &m_tsStartTime );
+
     }while( 0 );
 
     return;
@@ -4305,49 +4306,16 @@ gint32 CRpcServices::LoadObjDesc(
             {
                 strVal = oObjElem[ JSON_ATTR_IPADDR ].asString(); 
                 string strNormVal;
-                ret = NormalizeIpAddr(
-                    AF_INET, strVal, strNormVal );
-                if( ERROR( ret ) )
-                {
-                    ret = NormalizeIpAddr(
-                        AF_INET6, strVal, strNormVal );
-                }
-
+                ret = NormalizeIpAddrEx( strVal, strNormVal );
                 if( SUCCEEDED( ret ) )
                     oCfg[ propDestIpAddr ] = strNormVal;
                 else if( !bProxyPdo )
                     ret = 0;
                 else
                 {
-                    addrinfo hints, *result = nullptr;
-                    memset( &hints, 0, sizeof( addrinfo ) );
-                    hints.ai_family = AF_UNSPEC;
-                    hints.ai_socktype = SOCK_STREAM;
-
-                    ret = getaddrinfo( strVal.c_str(),
-                        nullptr, &hints, &result );
-                    if( ret < 0 )
-                        break;
-                    // use the first address only
-                    sockaddr_in* h =
-                        ( sockaddr_in *)result->ai_addr;
-                    char szIpAddr[ INET6_ADDRSTRLEN + 1 ];
-                    szIpAddr[ INET6_ADDRSTRLEN ] = 0;
-
-                    const char* szRet = inet_ntop(
-                        result->ai_family,
-                        &h->sin_addr,
-                        szIpAddr,
-                        INET6_ADDRSTRLEN );
-
-                    if( szRet == nullptr )
-                    {
-                        ret = -errno;
-                        freeaddrinfo( result );
-                        break;
-                    }
-                    oCfg[ propDestIpAddr ] = szRet;
-                    freeaddrinfo( result );
+                    DebugPrintEx( logErr, ret,
+                        "Error invalid network address" );
+                    break;
                 }
             }
 
@@ -4650,7 +4618,7 @@ gint32 CRpcServices::LoadObjDesc(
                 // CRpcPdoPort::SetupDBusSetting
                 if( strRmtObjName.empty() && strRmtModName.empty() )
                 {
-                    // important for proxy
+                    // important property for proxy
                     oCfg[ propDestDBusName ] = strDest;
                     oCfg[ propObjPath ] = strObjPath;
                 }
@@ -4679,6 +4647,7 @@ gint32 CRpcServices::LoadObjDesc(
                         break;
                     }
 
+                    // important property for proxy
                     oCfg[ propDestDBusName ] = strRmtSvrName;
                     oCfg[ propObjPath ] = strNewObjPath;
                 }
@@ -4713,6 +4682,9 @@ gint32 CRpcServices::LoadObjDesc(
         if( i == oObjArray.size() )
         {
             ret = -ENOENT;
+            DebugPrintEx( logErr, ret,
+                "Error LoadObjDesc unable to find object '%s'",
+                strObjName.c_str() );
             break;
         }
 
@@ -4821,47 +4793,7 @@ gint32 CRpcServices::LoadObjDesc(
             }
             else
             {
-                // allow each interface to have
-                // its own destination
-                std::string strRmtModName;
-                std::string strRmtObjName;
-                std::string strNewObjPath;
-                std::string strRmtSvrName;
-
-                if( oIfDesc.isMember( JSON_ATTR_RMTMODNAME ) &&
-                    oIfDesc[ JSON_ATTR_RMTMODNAME ].isString() )
-                {
-                    strRmtModName = 
-                        oIfDesc[ JSON_ATTR_RMTMODNAME ].asString();
-                }
-
-                if( oIfDesc.isMember( JSON_ATTR_RMTOBJNAME ) &&
-                    oIfDesc[ JSON_ATTR_RMTOBJNAME ].isString() )
-                {
-                    strRmtObjName =
-                        oIfDesc[ JSON_ATTR_RMTOBJNAME ].asString();
-                }
-
-                // this will be required by the 
-                // CRpcPdoPort::SetupDBusSetting
-                if( strRmtObjName.empty() || strRmtModName.empty() )
-                {
-                    oMatch.CopyProp( propDestDBusName, pCfg );
-                }
-                else
-                {
-                    strNewObjPath = DBUS_OBJ_PATH(
-                        strRmtModName, strRmtObjName );
-
-                    strRmtSvrName = DBUS_DESTINATION2(
-                        strRmtModName, strRmtObjName );
-
-                    oMatch.SetStrProp(
-                        propDestDBusName, strRmtSvrName );
-
-                    oMatch.SetStrProp(
-                        propObjPath, strNewObjPath );
-                }
+                oMatch.CopyProp( propDestDBusName, pCfg );
             }
 
             ( *pObjVec )().push_back( pMatch );
@@ -4875,7 +4807,6 @@ gint32 CRpcServices::LoadObjDesc(
             ObjPtr pObj( pObjVec );
             oCfg.SetObjPtr( propObjList, pObj );
         }
-
 
         // load object factories
         Json::Value& oFactores =

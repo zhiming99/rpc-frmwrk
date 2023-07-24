@@ -65,7 +65,13 @@ CRpcTcpBridgeProxy::CRpcTcpBridgeProxy(
             ret = -EFAULT;
             break;
         }
-        RemoveProperty( propRouterPtr );
+        // NOTE: it is possible to take long to do
+        // handshake with the peer without registered
+        // with the router. And in the meantime the
+        // parent router could have shutdown. So keep a
+        // reference to the router till this object
+        // finally get fully stopped.
+        // RemoveProperty( propRouterPtr );
 
     }while( 0 );
 
@@ -2001,10 +2007,11 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
     CRpcRouter* pParent = GetParent();
     CRpcRouterReqFwdr* pRouter =
         ObjPtr( pParent );
-    if( pRouter == nullptr )
-        return 0;
 
     do{
+        if( pRouter->GetState() != stateConnected )
+            break;
+
         CStatCountersProxy* psc =
             ObjPtr( this );
 
@@ -2033,7 +2040,7 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
             ppsc, psc, propFailureCount, guint32 );
 
     }while( 0 );
-
+    RemoveProperty( propRouterPtr );
     return 0;
 }
 

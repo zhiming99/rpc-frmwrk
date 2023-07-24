@@ -1627,6 +1627,12 @@ gint32 CWsHandshakeTask::OnIrpComplete(
     if( ret != STATUS_PENDING )
         ret = OnTaskComplete( ret );
 
+    if( SUCCEEDED( ret ) )
+        DebugPrintEx( logInfo, ret,
+            "WebSocket handshake complete" );
+    else if( ERROR( ret ) )
+        DebugPrintEx( logErr, ret,
+            "WebSocket handshake failed" );
     return ret;
 }
 
@@ -1651,6 +1657,12 @@ gint32 CWsHandshakeTask::RunTask()
     if( ret != STATUS_PENDING )
         ret = OnTaskComplete( ret );
 
+    if( SUCCEEDED( ret ) )
+        DebugPrintEx( logInfo, ret,
+            "WebSocket handshake complete" );
+    else if( ERROR( ret ) )
+        DebugPrintEx( logErr, ret,
+            "WebSocket handshake failed" );
     return ret;
 }
 

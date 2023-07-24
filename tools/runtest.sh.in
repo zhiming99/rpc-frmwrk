@@ -45,16 +45,16 @@ elif [ "$1" == "1" ]; then
     ${bin_dir}/rpcf/kaclitst || exit 2
     echo active-cancel test...
     ${bin_dir}/rpcf/actclitst || exit 3
-    echo pause-resume test
+    echo pause-resume test...
     ${bin_dir}/rpcf/prclitst || exit 4
-    echo stream test
-    ${bin_dir}/rpcf/stmclitst || exit 6
+    echo stream test...
+    ${bin_dir}/rpcf/stmclitst &> stmdump || ( ls -l . && cat stmdump && exit 6 )
     kill -9 `pidof rpcrouter`
-    ${bin_dir}/rpcf/btinrtsvr &
+    ${bin_dir}/rpcf/btinrtsvr $auth &
     sleep 5
     echo build-in-router test
     if [ -d ./reqfwdr ]; then pushd ./reqfwdr; fi
-    ${bin_dir}/rpcf/btinrtcli || exit 5
+    ${bin_dir}/rpcf/btinrtcli $auth || exit 5
     cur_path=`basename $(pwd)`
     if [ $cur_path == "reqfwdr" ]; then popd; fi
     kill -9 `pidof btinrtsvr`
@@ -167,7 +167,13 @@ elif [ "$1" == "1" ]; then
     pushd cpp
     cp sftest/Makefile Makefile.sftest
     echo "for i in ../*.ridl;do b=\${i%%.ridl};c=\${b##../}; ridlc -O \$c \$i;done"
-    for i in ../*.ridl;do b=${i%%.ridl};c=${b##../}; ridlc -O ./$c $i;done
+    for i in ../*.ridl; do
+        b=${i%%.ridl};c=${b##../};
+        if [ "$c" == "testypes" ]; then
+            continue; 
+        fi
+        ridlc -O ./$c $i;
+    done
     mv Makefile.sftest sftest/Makefile
 
     pushd hellowld
@@ -345,4 +351,7 @@ elif [ "$1" == "1" ]; then
     echo start fuse test
     bash tools/fusetest.sh || exit 10
     kill -9 `pidof rpcrouter`
+
+    echo start btinrt test
+    bash tools/btinrtst.sh $auth || exit 11
 fi

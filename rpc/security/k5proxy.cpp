@@ -527,7 +527,7 @@ krb5_error_code CInitHookMap::Krb5SendHook(
     const krb5_data *realm,
     const krb5_data *message,
     krb5_data **new_message_out,
-    krb5_data **reply_out)  
+    krb5_data **reply_out)
 {
     gint32 ret = 0;
 
@@ -668,11 +668,12 @@ krb5_error_code CInitHookMap::Krb5SendHook(
         pdata->length = pToken->size() -
             sizeof( guint32 );
 
-        pdata->data = ( char* )malloc( pdata->length );
+        pdata->data =
+            ( char* )malloc( pdata->length );
 
         memcpy( pdata->data,
             pToken->ptr() + sizeof( guint32 ),
-            pToken->size() );
+            dwSize );
 
     }while( 0 );
 
@@ -886,6 +887,12 @@ gint32 CK5AuthProxy::InitEnvRouter(
     g_oHookMap.Start();
 
     return 0;
+}
+
+void CK5AuthProxy::DestroyEnvRouter(
+    CIoManager* pMgr )
+{
+    g_oHookMap.SetIoMgr( nullptr );
 }
 
 CK5AuthProxy::CK5AuthProxy(

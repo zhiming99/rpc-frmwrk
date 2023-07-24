@@ -643,4 +643,33 @@ AC_SUBST(TEST_RPMFILES)
 AC_SUBST(TEST_RPMBINS)
 AC_SUBST(TEST_CFGOPT)
 
+AC_CANONICAL_HOST
+
+build_linux=no
+build_windows=no
+build_mac=no
+
+# Detect the target system
+case $host_os in
+    linux*)
+        build_linux=yes
+        CXXFLAGS+=" -DLINUX"
+        ;;
+    cygwin*|mingw*)
+        build_windows=yes
+        CXXFLAGS+=" -DWINDOWS"
+        ;;
+    darwin*)
+        build_mac=yes
+        CXXFLAGS+=" -DOSX"
+        ;;
+    *)
+        AC_MSG_ERROR(["OS $host_os is not supported"])
+        ;;
+esac
+
+AM_CONDITIONAL([LINUX], [test x$build_linux = yes])
+AM_CONDITIONAL([WINDOWS], [test x$build_windows = yes])
+AM_CONDITIONAL([OSX], [test x$build_mac = yes])
+
 AC_OUTPUT

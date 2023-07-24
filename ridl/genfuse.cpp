@@ -1612,7 +1612,7 @@ gint32 CDeclServiceImplFuse::Output()
             Wa( "    IEventSink* pCallback ) override" );
             BLOCK_OPEN;
             Wa( "gint32 ret = 0;" );
-            Wa( "do" );
+            CCOUT << "do";
             BLOCK_OPEN;
             Wa( "ret = super::CustomizeRequest(");
             Wa( "    pReqCfg, pCallback );" );

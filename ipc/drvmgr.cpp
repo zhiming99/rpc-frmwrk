@@ -100,6 +100,7 @@ gint32 ReadJsonCfg(
             break;
 
         bool bPatch = false;
+        stdstr strBaseCfg;
         if( vConfig.isMember( JSON_ATTR_PATCH_CFG ) )
         {
             Json::Value& vPatch =
@@ -110,15 +111,26 @@ gint32 ReadJsonCfg(
         }
         if( !bPatch )
             break;
+
+        if( vConfig.isMember( JSON_ATTR_BASE_CFG ) )
+        { 
+            Json::Value& vBase =
+                vConfig[ JSON_ATTR_BASE_CFG ];
+            if( vBase.isString() )
+                strBaseCfg = vBase.asString();
+        }
+
+       if( strBaseCfg.empty() )
+           strBaseCfg = strFile;
         
         Json::Value vBase( Json::objectValue );
         stdstr strPath;
 
-        ret = FindInstCfg( strFile, strPath );
+        ret = FindInstCfg( strBaseCfg, strPath );
         if( ERROR( ret ) )
             break;
 
-        if( strFile.find( strPath ) != stdstr::npos )
+        if( strBaseCfg.find( strPath ) != stdstr::npos )
         {
             ret = -EBADMSG;
             break;

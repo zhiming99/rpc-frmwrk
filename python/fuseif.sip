@@ -7,6 +7,37 @@ extern gint32 AddFilesAndDirs( ObjPtr& pRt );
 
 %ModuleCode
 
+static std::vector< std::pair< ObjPtr, stdstr > > s_vecIfs;
+gint32 AddSvcStatFiles()
+{
+    gint32 ret = 0;
+    do{
+        CFuseRootServer* pSvr = GetRootIf();
+        if( pSvr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        for( auto elem : s_vecIfs )
+        {
+            CFuseObjBase* pList =
+                new CFuseSvcStat( nullptr );
+            pList->SetMode( S_IRUSR );
+            pList->DecRef();
+            stdstr strFile =
+                elem.second + "_SvcStat";
+            pList->SetName( strFile );
+            pList->SetUserObj( elem.first );
+            auto pEnt = DIR_SPTR( pList );
+            pSvr->Add2UserDir( pEnt );
+        }
+        s_vecIfs.clear();
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 AddFilesAndDirs( ObjPtr& pRt )
 {
     gint32 ret = 0;
@@ -108,6 +139,8 @@ gint32 fuseif_mainloop(
         if( ERROR( ret ) )
             break;
 
+        AddSvcStatFiles();
+
         args = FUSE_ARGS_INIT(argcfi, argvf);
         ret = fuseif_main( args, opts );
 
@@ -126,3 +159,40 @@ gint32 fuseif_mainloop(
     Py_END_ALLOW_THREADS;
 %End
 
+gint32 AddSvcStatFile(
+    cpp::ObjPtr* pIf,
+    const std::string& strName );
+%MethodCode
+    sipRes = 0;
+    do{
+        if( a0 == nullptr || a1 == nullptr )
+        {
+            sipRes = -EINVAL;
+            break;
+        }
+        if( a0->IsEmpty() || a1->empty() )
+        {
+            sipRes = -EINVAL;
+            break;
+        }
+        bool bDup = false;
+        for( auto& elem : s_vecIfs )
+        {
+            if( *a1 == elem.second ||
+                ( *a0 )->GetObjId() ==
+                    elem.first->GetObjId() )
+            {
+                bDup = true;
+                break;
+            }
+        }
+        if( bDup )
+        {
+            sipRes = -EEXIST;
+            break;
+        }
+        s_vecIfs.push_back( { *a0, *a1 } );
+
+    }while( 0 );
+
+%End

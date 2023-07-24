@@ -740,6 +740,12 @@ gint32 CK5AuthServer::OnPostStart(
 
         if( SUCCEEDED( ret ) )
             m_pSvcCred = pCred;
+        else
+        {
+            DebugPrintEx( logErr, ret,
+                "Error failed to get creditential for %s",
+                strSvcName.c_str() );
+        }
 
     }while( 0 );
 

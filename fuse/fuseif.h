@@ -1212,7 +1212,6 @@ class CFuseServicePoint :
     private:
     stdstr m_strSvcPath;
     bool    m_bUnmounted = false;
-    timespec m_tsStartTime;
 
     protected:
     DIR_SPTR m_pSvcDir;
@@ -1225,8 +1224,6 @@ class CFuseServicePoint :
     CFuseServicePoint( const IConfigDb* pCfg ) :
         super( pCfg ), m_dwGrpIdx( 0 )
     {
-        clock_gettime(
-            CLOCK_REALTIME, &m_tsStartTime );
     }
 
     using super::GetIid;
@@ -1236,9 +1233,6 @@ class CFuseServicePoint :
     using super::OnPostStart;
     gint32 OnPostStart( IEventSink* pCallback ) override
     { return STATUS_SUCCESS; }
-
-    inline timespec GetStartTime() const
-    { return m_tsStartTime; }
 
     inline DIR_SPTR GetSvcDir() const
     { return m_pSvcDir; }

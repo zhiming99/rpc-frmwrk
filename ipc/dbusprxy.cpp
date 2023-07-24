@@ -621,10 +621,11 @@ gint32 CDBusProxyPdo::HandleConnRequest(
             break;
 
         CParamList oMethodArgs;
+
+        // the uniq name of the dbus connection
         oMethodArgs.SetStrProp(
             propSrcUniqName, strBusName );
 
-        // the uniq name of the dbus connection
         oMethodArgs.CopyProp(
             propSrcDBusName, this );
 
@@ -2150,10 +2151,11 @@ gint32 CDBusProxyPdo::HandleRmtRegMatch(
         pMsg.SetMember( strMember );
 
         oParams[ propMethodName ] = strMember;
+
+        // the uniq name of the dbus connection
         oParams.CopyProp(
             propSrcUniqName, pMatchToSend );
 
-        // the uniq name of the dbus connection
         oParams.CopyProp(
             propSrcDBusName, this );
 

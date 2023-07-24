@@ -44,6 +44,24 @@ extern gint32 ReadJsonCfg(
     const std::string& strFile,
     Json::Value& valConfig );
 
+// two helpers for ridl
+stdstr InstIdFromObjDesc(
+    const stdstr& strDesc,
+    const stdstr& strObj );
+
+stdstr InstIdFromDrv(
+    const stdstr& strDrv );
+
+gint32 UpdateObjDesc(
+    const stdstr strDesc,
+    IConfigDb* pCfg,
+    stdstr& strNewDesc );
+
+gint32 UpdateDrvCfg(
+    const stdstr strDriver,
+    IConfigDb* pCfg,
+    stdstr& strNewDrv );
+
 class CDriverManager : public IService
 {
     protected:
@@ -626,7 +644,8 @@ class CIoManager : public IService
 
     gint32 TryFindDescFile(
         const std::string& strFile,
-        std::string& strPath );
+        std::string& strPath,
+        bool bSkipLocal = false );
 
     gint32 AddAndRun(
         TaskletPtr& pTask, bool bImmediate );

@@ -32,7 +32,7 @@
 #include "counters.h"
 
 #define IFBASE2( _bProxy ) std::conditional< \
-    _bProxy, CStreamProxyWrapper, CStreamServerWrapper>::type
+    _bProxy, CFastRpcSkelProxyBase, CFastRpcSkelSvrBase>::type
 
 #define IFBASE1( _bProxy ) std::conditional< \
     _bProxy, CStreamProxyAsync, CStreamServerAsync>::type
@@ -1360,137 +1360,7 @@ class CFastRpcSkelBase :
 
         return ret;
     }
-    gint32 IncCounter( EnumPropId iProp,
-        guint32 dwVal = 1 ) override
-    {
-        gint32 ret = 0;
-        do{
-            if( this->IsServer() )
-            {
-                CStatCountersServer* pIf =
-                    GetParentIf();
 
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->IncCounter( iProp, dwVal );
-            }
-            else
-            {
-                CStatCountersProxy* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->IncCounter( iProp, dwVal );
-            }
-        }while( 0 );
-        return ret;
-    }
-
-    gint32 DecCounter( EnumPropId iProp,
-        guint32 dwVal = 1 ) override
-    {
-        gint32 ret = 0;
-        do{
-            if( this->IsServer() )
-            {
-                CStatCountersServer* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->DecCounter( iProp, dwVal );
-            }
-            else
-            {
-                CStatCountersProxy* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->DecCounter( iProp, dwVal );
-            }
-        }while( 0 );
-        return ret;
-    }
-
-    gint32 SetCounter( EnumPropId iProp,
-        guint32 dwVal ) override
-    {
-        gint32 ret = 0;
-        do{
-            if( this->IsServer() )
-            {
-                CStatCountersServer* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->SetCounter( iProp, dwVal );
-            }
-            else
-            {
-                CStatCountersProxy* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->SetCounter( iProp, dwVal );
-            }
-        }while( 0 );
-        return ret;
-    }
-
-    gint32 SetCounter( EnumPropId iProp,
-        guint64 qwVal ) override
-    {
-        gint32 ret = 0;
-        do{
-            if( this->IsServer() )
-            {
-                CStatCountersServer* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->SetCounter( iProp, qwVal );
-            }
-            else
-            {
-                CStatCountersProxy* pIf =
-                    GetParentIf();
-
-                if( pIf == nullptr )
-                {
-                    ret = -EFAULT;
-                    break;
-                }
-                ret = pIf->SetCounter( iProp, qwVal );
-            }
-        }while( 0 );
-        return ret;
-    }
 };
 
 class CFastRpcSkelProxyState :
@@ -1617,6 +1487,245 @@ class CFastRpcSkelSvrBase :
 
     gint32 OnPreStop(
         IEventSink* pCallback ) override;
+};
+
+#define SUM_COUNTER( _dest, _src, _prop, _type ) \
+do{ \
+    _type tempVal = 0; \
+    _src->GetCounter2( _prop, tempVal ); \
+    _dest->IncCounter( _prop, tempVal ); \
+}while( 0 )
+
+template< bool bProxy >
+class CStatCountersSkelBase :
+    public virtual IFBASE2( bProxy )
+{
+    protected:
+
+    IStatCounters m_oCounters;
+    TaskletPtr m_pMsgFilter;
+
+    public:
+    typedef typename IFBASE2( bProxy ) super;
+    CStatCountersSkelBase( const IConfigDb* pCfg )
+        : super( pCfg )
+    {}
+
+    gint32 IncCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
+    {
+        return m_oCounters.IncCounter( iProp, dwVal );
+    };
+
+    gint32 DecCounter( EnumPropId iProp,
+        guint32 dwVal = 1 ) override
+    {
+        return m_oCounters.DecCounter( iProp, dwVal );
+    }
+    gint32 SetCounter(
+        EnumPropId iProp, guint32 dwVal ) override
+    {
+        return m_oCounters.SetCounter(
+            iProp, dwVal );
+    }
+
+    gint32 SetCounter(
+        EnumPropId iProp, guint64 qwVal ) override
+    {
+        return m_oCounters.SetCounter(
+            iProp, qwVal );
+    }
+
+    virtual gint32 GetCounters( CfgPtr& pCfg )
+    { return m_oCounters.GetCounters( pCfg ); }
+
+    virtual gint32 GetCounter(
+        guint32 iPropId, BufPtr& pBuf )
+    {
+        return m_oCounters.GetCounter(
+            iPropId, pBuf );
+    }
+
+    virtual gint32 GetCounter2(
+        guint32 iPropId, guint32& dwVal )
+    {
+        return m_oCounters.GetCounter2(
+            iPropId, dwVal );
+    }
+
+    virtual gint32 GetCounter2(
+        guint32 iPropId, guint64& qwVal )
+    {
+        return m_oCounters.GetCounter2(
+            iPropId, qwVal );
+    }
+
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override
+    {
+        gint32 ret = 0;
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        ret = m_pMsgFilter.NewObj(
+            clsid( CMessageCounterTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        return this->RegisterFilter( m_pMsgFilter );
+    }
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override
+    {
+        this->UnregisterFilter( m_pMsgFilter );
+        CMessageCounterTask* pFilter = m_pMsgFilter;
+        if( pFilter != nullptr )
+            pFilter->Stop();
+        m_pMsgFilter.Clear();
+        return 0;
+    }
+};
+
+class CStatCountersProxySkel:
+    public CStatCountersSkelBase< true >
+{
+    public:
+    typedef CStatCountersSkelBase< true > super;
+    CStatCountersProxySkel( const IConfigDb* pCfg ) :
+        super::super( pCfg ), super( pCfg )
+    {}
+
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override
+    {
+        gint32 ret = 0;
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        ret = m_pMsgFilter.NewObj(
+            clsid( CMessageCounterTask ),
+            oParams.GetCfg() );
+
+        if( ERROR( ret ) )
+            return ret;
+
+        return super::OnPreStart( pCallback );
+    }
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override
+    {
+        do{
+            auto psc = this;
+
+            CStatCountersProxy* ppsc =
+                this->GetParentIf();
+
+            if( psc == nullptr || ppsc == nullptr )
+                break;
+
+            SUM_COUNTER(
+                ppsc, psc, propRxBytes, guint64 );
+
+            SUM_COUNTER(
+                ppsc, psc, propTxBytes, guint64 );
+
+            SUM_COUNTER(
+                ppsc, psc, propMsgCount, guint32 );
+
+            SUM_COUNTER(
+                ppsc, psc, propEventCount, guint32 );
+
+            SUM_COUNTER(
+                ppsc, psc, propMsgRespCount, guint32 );
+
+            SUM_COUNTER(
+                ppsc, psc, propFailureCount, guint32 );
+
+        }while( 0 );
+        return super::OnPostStop( pCallback );
+    }
+};
+
+class CStatCountersServerSkel:
+    public CStatCountersSkelBase< false >
+{
+    public:
+    typedef CStatCountersSkelBase< false > super;
+    CStatCountersServerSkel( const IConfigDb* pCfg ) :
+        super::super( pCfg ),super( pCfg )
+    {}
+    gint32 OnPreStart(
+        IEventSink* pCallback ) override
+    { return super::OnPreStart( pCallback ); }
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override
+    {
+        do{
+            auto psc = this;
+
+            CStatCountersServer* ppsc =
+                this->GetParentIf();
+
+            if( psc == nullptr || ppsc == nullptr )
+                break;
+
+            SUM_COUNTER(
+                ppsc, psc, propRxBytes, guint64 );
+
+            SUM_COUNTER(
+                ppsc, psc, propTxBytes, guint64 );
+
+            SUM_COUNTER(
+                ppsc, psc, propMsgCount, guint32 );
+
+            SUM_COUNTER(
+                ppsc, psc, propEventCount, guint32 );
+
+            SUM_COUNTER(
+                ppsc, psc, propMsgRespCount, guint32 );
+
+            SUM_COUNTER(
+                ppsc, psc, propFailureCount, guint32 );
+
+        }while( 0 );
+        return super::OnPostStop( pCallback );
+    }
+};
+
+// buddy class for CFastRpcServerBase
+class CStatCounters_SvrBase:
+    public CStatCountersServer
+{
+    public:
+    typedef CStatCountersServer super;
+    CStatCounters_SvrBase( const IConfigDb* pCfg )
+    : CAggInterfaceServer( pCfg ), super( pCfg )
+    {}
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint32& dwVal ) override;
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint64& qwVal ) override;
+};
+
+class CStatCounters_CliBase:
+    public CStatCountersProxy
+{
+    public:
+    typedef CStatCountersProxy super;
+    CStatCounters_CliBase( const IConfigDb* pCfg )
+    : CAggInterfaceProxy( pCfg ), super( pCfg )
+    {}
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint32& dwVal ) override;
+
+    gint32 GetCounter2(
+        guint32 iPropId, guint64& qwVal ) override;
 };
 
 DECLARE_AGGREGATED_SERVER(
