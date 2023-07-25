@@ -1,7 +1,8 @@
 ---
-[`Fri Jun 30 2023 10:16:20 PM Beijing`]   
-1. builtin router support is fully completed.
-2. Next I will try to remove the crosstalk between dbuslocalpdo and the loopback ports. The new design is less smart than than the original one, but it can help to finally generate a skelton without dbus-connection, significant for non-linux platform.
+[`Tue Jul 25 2023 04:05:27 PM Beijing`]   
+1. We have finished and merged the pull request bugfix-and-btinrt-techdebt.
+2. Next we will move on to automate websocket and kerberos configuration process.
+3. And then we may choose to develop feature from `rate limiter`, `connection recovery`, `oauth2` or `windows port`.
 
 [`Mon Jun 12 2023 10:11:46 PM Beijing`]   
 1. We have almose finished adding fastrpc and built-in router support to both Python and Java. The remaining work is to fix some bugs and make it stable.
