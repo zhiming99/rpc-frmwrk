@@ -557,10 +557,10 @@ class ConfigDlg(Gtk.Dialog):
 
         Gtk.Dialog.__init__(self, title, flags=0)
         self.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            "Load From", Gtk.ResponseType.APPLY,
+            "Export To", Gtk.ResponseType.YES,
             Gtk.STOCK_OK, Gtk.ResponseType.OK,
-            Gtk.STOCK_SAVE_AS, Gtk.ResponseType.YES,
-            Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY )
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL )
 
         self.bServer = bServer
         self.hasGmSSL=IsFeatureEnabled( "gmssl" )
@@ -1254,7 +1254,7 @@ class ConfigDlg(Gtk.Dialog):
         labelUrl.set_xalign(1)
         grid.attach(labelUrl, startCol + 0, startRow + 1, 1, 1 )
 
-        strUrl = "https://example.com"
+        strUrl = "https://example.com/chat"
         try :
             if confVals[ 'connParams'] is not None :
                 param0 = confVals[ 'connParams'][ ifNo ]
@@ -1786,12 +1786,12 @@ class ConfigDlg(Gtk.Dialog):
         maxconnEdit = Gtk.Entry()
         maxconnEdit.set_text(strMaxConns)
         grid.attach( maxconnEdit , startCol + 1, startRow + 1, 1, 1 )
+        self.maxconnEdit = maxconnEdit
     
         labelTs = Gtk.Label()
         labelTs.set_text("Task Scheduler ")
         labelTs.set_xalign(.5)
         grid.attach( labelTs, startCol + 0, startRow + 2, 1, 1 )
-        self.maxconnEdit = maxconnEdit
 
         tsCheck = Gtk.CheckButton(label="")
         if 'TaskScheduler' in confVals :
@@ -1804,6 +1804,19 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( tsCheck, startCol + 1, startRow + 2, 1, 1)
         self.tsCheck = tsCheck
  
+        labelCfgWs = Gtk.Label()
+        labelCfgWs.set_text("Config Web Server ")
+        labelCfgWs.set_xalign(.5)
+        grid.attach( labelCfgWs, startCol + 0, startRow + 3, 1, 1 )
+
+        checkCfgWs = Gtk.CheckButton(label="")
+        checkCfgWs.props.active = False
+
+        checkCfgWs.connect(
+            "toggled", self.on_button_toggled, "CfgWs")
+        grid.attach( checkCfgWs, startCol + 1, startRow + 3, 1, 1)
+        self.checkCfgWs = checkCfgWs
+
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
         if tree_iter is not None:
@@ -2093,6 +2106,8 @@ class ConfigDlg(Gtk.Dialog):
 
             if self.tsCheck.props.active :
                 miscOpts[ 'TaskScheduler' ] = "RR"
+            if self.checkCfgWs.props.active and self.bServer:
+                miscOpts[ 'ConfigWebServer' ] = 'true'
 
         except Exception as err :
             text = "Failed to export node:" + str( err )
@@ -2328,12 +2343,14 @@ class ConfigDlg(Gtk.Dialog):
             if len( indexes ) == 2:
                 indexes.append( 0 )
             
+            '''
             if indexes[ 0 ] < indexes[ 2 ]:
                 files.remove('instsvr.tar')
             if indexes[ 1 ] < indexes[ 0 ]:
                 files.remove('instcli.tar')
             if len( files ) == 0 :                
                 raise Exception( "InstPkgs too old to copy" )
+            '''
 
             for i in files:
                 cmdLine = "cp " + keyPath + "/" + i + " " + destPath
@@ -2863,6 +2880,7 @@ def main() :
             if ret < 0 :
                 continue
         elif response == Gtk.ResponseType.YES:
+            #Save As
             dialog = Gtk.FileChooserDialog(
                 title="Please choose a directory",
                 parent=win,
@@ -2884,6 +2902,7 @@ def main() :
             win.Export_Files(path, win.bServer)
             continue
         elif response == Gtk.ResponseType.APPLY:
+            #Load Another Config File
             dialog = Gtk.FileChooserDialog(
                 title="Please choose a directory",
                 parent=win,
@@ -2895,9 +2914,13 @@ def main() :
                 Gtk.ResponseType.OK,
             )
             response = dialog.run()
-            path = '.'
+            path = None 
             if response == Gtk.ResponseType.OK:
                 path = dialog.get_filename()
+            dialog.destroy()
+            dialog = None
+            if path is None:
+                continue
             drvCfgPath = path + "/" + "driver.json"
             try:
                 fp = open( drvCfgPath, "r" )
@@ -2908,10 +2931,10 @@ def main() :
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                 second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
                 win.DisplayError( text, second_text )
-                dialog.destroy()
+                if dialog is not None:
+                    dialog.destroy()
                 continue
 
-            dialog.destroy()
             win.strCfgPath = path
             win.ReinitDialog( path )
             continue

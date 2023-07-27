@@ -99,7 +99,7 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 elem.pop( 'DestURL', None )
 
     except Exception as err:
-        pass
+        print( "Error UpdateTestCfg", file=sys.stderr )
 
     return
 

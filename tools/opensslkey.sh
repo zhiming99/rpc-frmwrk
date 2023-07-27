@@ -123,7 +123,7 @@ done
 
 function find_key_to_show()
 {
-    if (($1==1 )); then
+    if (($1==1)); then
         fn='serverkeys'
     else
         fn='clientkeys'
@@ -272,8 +272,6 @@ if (( svr_idx >= idx_base )); then
     tar rf instsvr.tar endidx
     mv -f endidx clidx
     tar rf instsvr.tar instcfg.sh
-else
-    rm -rf instsvr.tar
 fi 
 
 if (( cli_idx >= svr_end )); then
@@ -290,8 +288,6 @@ if (( cli_idx >= svr_end )); then
     tar rf instcli.tar endidx
     mv -f endidx rpcf_serial
     tar rf instcli.tar instcfg.sh
-else
-    rm -rf instcli.tar
 fi 
 
 else

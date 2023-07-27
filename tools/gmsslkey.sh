@@ -236,8 +236,6 @@ if (( svr_idx >= idx_base )); then
     tar rf instsvr.tar endidx
     mv endidx clidx
     tar rf instsvr.tar instcfg.sh
-else
-    rm -rf instsvr.tar
 fi 
 
 if (( cli_idx >= svr_end )); then
@@ -254,8 +252,6 @@ if (( cli_idx >= svr_end )); then
     tar rf instcli.tar endidx
     mv endidx rpcf_serial
     tar rf instcli.tar instcfg.sh
-else
-    rm -rf instcli.tar
 fi 
 
 else
