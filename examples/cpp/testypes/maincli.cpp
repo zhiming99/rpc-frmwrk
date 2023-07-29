@@ -10,7 +10,7 @@ using namespace rpcf;
 #include "TestTypesSvccli.h"
 
 ObjPtr g_pIoMgr;
-
+std::set< guint32 > g_setMsgIds;
 
 FactoryPtr InitClassFactory()
 {

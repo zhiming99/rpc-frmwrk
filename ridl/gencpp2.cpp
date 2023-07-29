@@ -3966,8 +3966,6 @@ gint32 CImplClassFactory2::OutputROS()
             vecActStructs.push_back( elem );
         }
 
-        NEW_LINE;
-
         if( g_bMklib && bFuse )
             Wa( "extern void InitMsgIds();" );
 

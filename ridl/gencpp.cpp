@@ -6374,8 +6374,6 @@ gint32 CImplClassFactory::Output()
             vecActStructs.push_back( elem );
         }
 
-        NEW_LINE;
-
         if( g_bMklib && bFuse )
             Wa( "extern void InitMsgIds();" );
 
@@ -7929,7 +7927,14 @@ gint32 CImplMainFunc::Output()
             {
                 Wa( "ObjPtr g_pIoMgr;" );
 #ifdef FUSE3
-                if( g_bBuiltinRt && !bProxy )
+                // NOTE: although the proxy program
+                // does not need g_setMsgIds, but it
+                // links with libfuseif.so which
+                // requires g_setMsgIds. It is strange
+                // that gcc 12 can successfully link
+                // without g_setMsgIds for the client
+                // program, but gcc 13 fails.
+                if( g_bBuiltinRt )
                     Wa( "std::set< guint32 > g_setMsgIds;" );
 #endif
             }
