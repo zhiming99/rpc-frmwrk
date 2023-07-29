@@ -7,7 +7,9 @@ from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
+from tempfile import mkstemp
 import errno
+from updwscfg import *
 
 g_passDlg = None
 def GetTestPaths( path : str= None ) :
@@ -104,13 +106,8 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
     return
 
 def tempname()->str:
-    strPrefix = "/tmp/rpcfgtmp"
-    for i in range( 10000 ):
-        strName = strPrefix + str( i )
-        if not os.access( strName, os.R_OK ):
-            break
-    if i >= 10000:
-        return ""
+    f, strName = mkstemp( prefix='rpcfgtmp', dir='/tmp')
+    os.close(f)
     return strName
 
 def OverwriteJsonFile( strPath : str, jsonVal )->int:
@@ -143,8 +140,8 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
             ret = -errno.EEXIST
             return ret
 
-        fp = open( tempfile, "w" )
         bRemove = True
+        fp = open( tempfile, "w" )
         json.dump( jsonVal, fp, indent=4)
         fp.close()
         ret = os.system( "which sudo > /dev/null" )
@@ -193,7 +190,7 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
             ret = -errno.EFAULT
     finally:
         if bRemove:
-            os.system( "rm " + tempfile )
+            os.unlink( tempfile )
 
     return ret
 
@@ -899,6 +896,8 @@ def Update_InitCfg( cfgPath : str, destDir : str,
             jsonFiles[ 3 ], bServer, destDir, drvVal )
         if ret < 0 :
             return ret
+
+        ret = ConfigWebServer( initCfg )
 
     except Exception as err:
         text = "Update_InitCfg failed:" + str( err )

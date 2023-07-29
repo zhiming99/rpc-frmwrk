@@ -29,13 +29,13 @@ def InstallKeys( oResps : [] ) -> int:
         cacertFile = oResp[ 'CACertFile']
         cmdline = ''
         keyName = 'rpcf_' + os.path.basename( keyFile )
-        cmdline = 'sudo cp ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
+        cmdline = 'sudo install ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
         keyPath = '/etc/ssl/private/' + keyName
         certName = 'rpcf_' + os.path.basename( certFile )
-        cmdline += 'sudo cp ' + certFile + ' /etc/ssl/certs/' + certName + ";"
+        cmdline += 'sudo install ' + certFile + ' /etc/ssl/certs/' + certName + ";"
         certPath = '/etc/ssl/certs/' + certName
         cacertName = 'rpcf_' + os.path.basename( cacertFile )
-        cmdline += 'sudo cp ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
+        cmdline += 'sudo install ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
         cacertPath = '/etc/ssl/certs/' + cacertName
         for oResp in oResps:
             oResp[ 'KeyFile'] = keyPath
@@ -100,19 +100,12 @@ def ExtractParams( initCfg : object) ->( dict, ):
 
 def Config_Nginx( initCfg : object ):
     cfgText = '''server {{
-    # redirect all HTTP to HTTPS
-    listen 80;
-    server_name {ServerName}
-    return 301 https://{ServerName}:{WsPortNum}$request_uri;
-}}
-
-server {{
     listen {WsPortNum} http2 ssl;
     listen [::]:{WsPortNum} http2 ssl;
 
     server_name {ServerName};
 
-    ssl_certificate {CertFile}
+    ssl_certificate {CertFile};
     ssl_certificate_key {KeyFile};
     #ssl_dhparam /etc/ssl/certs/dhparam.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
@@ -178,7 +171,11 @@ upstream {AppName} {{
     cmdline = "sudo install " + cfgFile + " /etc/nginx/sites-available/ &&"
     cmdline += "cd /etc/nginx/sites-enabled && sudo ln -s /etc/nginx/sites-available/rpcf_nginx.conf &&"
     cmdline += "rm " + cfgFile
-    return -os.system( cmdline )
+    ret = -os.system( cmdline )
+    if ret < 0:
+        return ret
+    cmdline = "sudo systemctl restart nginx"
+    ret = -os.system( cmdline )
 
 def Config_Apache( initCfg : object ):
     cfgText = '''<VirtualHost *:{WsPortNum}>
@@ -221,7 +218,28 @@ def Config_Apache( initCfg : object ):
         fp.write( cfg )
     fp.close()
     cmdline = "sudo install " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile
-    return -os.system( cmdline )
+    ret = -os.system( cmdline )
+    if ret < 0:
+        return ret
+    cmdline = "sudo systemctl restart httpd"
+    ret = -os.system( cmdline )
+
+def ConfigWebServer( initCfg : object )->int:
+    ret = 0
+    try:
+        oMisc = initCfg[ 'Security' ]['misc']
+        if oMisc['ConfigWebServer'] != 'true':
+            return ret
+        if IsNginxInstalled():
+            ret = Config_Nginx( initCfg )
+        elif IsApacheInstalled():
+            ret = Config_Apache( initCfg )
+
+    except Exception as err:
+        print( err )
+        if ret == 0:
+            ret = -errno.EFAULT
+    return ret
 
 def test():
     try:
