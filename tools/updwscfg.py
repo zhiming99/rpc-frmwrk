@@ -29,13 +29,13 @@ def InstallKeys( oResps : [] ) -> int:
         cacertFile = oResp[ 'CACertFile']
         cmdline = ''
         keyName = 'rpcf_' + os.path.basename( keyFile )
-        cmdline = 'sudo install ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
+        cmdline = 'sudo install -D -m 600 ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
         keyPath = '/etc/ssl/private/' + keyName
         certName = 'rpcf_' + os.path.basename( certFile )
-        cmdline += 'sudo install ' + certFile + ' /etc/ssl/certs/' + certName + ";"
+        cmdline += 'sudo install -D -m 644 ' + certFile + ' /etc/ssl/certs/' + certName + ";"
         certPath = '/etc/ssl/certs/' + certName
         cacertName = 'rpcf_' + os.path.basename( cacertFile )
-        cmdline += 'sudo install ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
+        cmdline += 'sudo install -D -m 644 ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
         cacertPath = '/etc/ssl/certs/' + cacertName
         for oResp in oResps:
             oResp[ 'KeyFile'] = keyPath
@@ -98,7 +98,7 @@ def ExtractParams( initCfg : object) ->( dict, ):
         print( err )
         return ()
 
-def Config_Nginx( initCfg : object ):
+def Config_Nginx( initCfg : object ) -> int:
     cfgText = '''server {{
     listen {WsPortNum} http2 ssl;
     listen [::]:{WsPortNum} http2 ssl;
@@ -168,7 +168,7 @@ upstream {AppName} {{
             )
         fp.write( cfg )
     fp.close()
-    cmdline = "sudo install " + cfgFile + " /etc/nginx/sites-available/ &&"
+    cmdline = "sudo install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
     cmdline += "cd /etc/nginx/sites-enabled && sudo ln -s /etc/nginx/sites-available/rpcf_nginx.conf &&"
     cmdline += "rm " + cfgFile
     ret = -os.system( cmdline )
@@ -176,8 +176,9 @@ upstream {AppName} {{
         return ret
     cmdline = "sudo systemctl restart nginx"
     ret = -os.system( cmdline )
+    return ret
 
-def Config_Apache( initCfg : object ):
+def Config_Apache( initCfg : object )->int:
     cfgText = '''<VirtualHost *:{WsPortNum}>
       ServerName "{ServerName}"
       SSLEngine on
@@ -187,15 +188,15 @@ def Config_Apache( initCfg : object ):
       RewriteEngine on
       RewriteCond ${{HTTP:Upgrade}} websocket [NC]
       RewriteCond ${{HTTP:Connection}} upgrade [NC]
-      RewriteRule .* "wss://{IpAddress}:{PortNumber}/$1" [P,L]
+      RewriteRule .* "wss://{IpAddress}:{PortNum}/$1" [P,L]
 
       SSLProxyEngine on
       SSLProxyVerify none
       SSLProxyCheckPeerCN off
       SSLProxyCheckPeerExpire off
 
-      ProxyPass /{AppName} wss://{IpAddress}:{PortNumber}/
-      ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNumber}/
+      ProxyPass /{AppName} wss://{IpAddress}:{PortNum}/
+      ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyRequests off
 </VirtualHost>
 
@@ -217,17 +218,20 @@ def Config_Apache( initCfg : object ):
             )
         fp.write( cfg )
     fp.close()
-    cmdline = "sudo install " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile
+    cmdline = "sudo install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile
     ret = -os.system( cmdline )
     if ret < 0:
         return ret
     cmdline = "sudo systemctl restart httpd"
     ret = -os.system( cmdline )
+    return ret
 
 def ConfigWebServer( initCfg : object )->int:
     ret = 0
     try:
         oMisc = initCfg[ 'Security' ]['misc']
+        if not 'ConfigWebServer' in oMisc:
+            return ret
         if oMisc['ConfigWebServer'] != 'true':
             return ret
         if IsNginxInstalled():

@@ -897,7 +897,13 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         if ret < 0 :
             return ret
 
+        if not IsFeatureEnabled( "openssl" ):
+            return ret
+
         ret = ConfigWebServer( initCfg )
+        if ret < 0:
+            print( "Error failed to config web server " + str(ret))
+            ret = 0
 
     except Exception as err:
         text = "Update_InitCfg failed:" + str( err )
