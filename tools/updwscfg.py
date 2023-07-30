@@ -238,6 +238,9 @@ def ConfigWebServer( initCfg : object )->int:
             ret = Config_Nginx( initCfg )
         elif IsApacheInstalled():
             ret = Config_Apache( initCfg )
+            if ret == 0:
+                print( "Apache httpd is configured. And " +
+                    "make sure mod_ssl is installed" )
 
     except Exception as err:
         print( err )
