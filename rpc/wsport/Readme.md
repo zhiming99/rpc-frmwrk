@@ -119,4 +119,4 @@ return 301 https://$host$request_uri/;
 ```
 
   9. Setup Nginx or Apache with `rpcfg.py`   
-  `rpcfg.py` can automatically generate and deploy the config file for an Nginx or Apache server when `websocket` transfer enabled. Check the last checkbox `Config Web Server` on the ![security page](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg2.png), and press button `OK` or `Export`, all will be set. For Apache, the SSL module `mod_ssl` is seperate from the `httpd` package, and make sure it is also installed.
+  `rpcfg.py` can automatically generate and deploy the config file for an Nginx or Apache server when `websocket` transfer enabled. Check the last checkbox `Config Web Server` on the ![security page](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg2.png), and press button `OK`, all will be set. For Apache, the SSL module `mod_ssl` is seperate from the `httpd` package, and make sure it is also installed.
