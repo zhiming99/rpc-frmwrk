@@ -5,6 +5,7 @@
 # $3: number of server keys, 1 if not specified
 # openssl demo key generator
 
+bitwidth=2048
 if [ "x$1" != "x" -a ! -d $1 ]; then
     echo Usage: bash opensslkey.sh [directory to store keys] [ number of client keys ] [number of server keys]
     exit 1
@@ -82,7 +83,7 @@ if [ ! -d ./demoCA/newcerts ]; then
 fi
 
 if [ ! -f rootcakey.pem ]; then
-    rm *.pem
+    rm -rf *.pem
     openssl genrsa -out rootcakey.pem 4096
     openssl req -new -sha256 -x509 -days 3650 -config ${SSLCNF} -extensions v3_ca -key rootcakey.pem -out rootcacert.pem -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=ROOTCA/emailAddress=woodhead99@gmail.com"
 fi
@@ -90,11 +91,11 @@ fi
 if [ ! -f cakey.pem ]; then
     mkdir backup
     mv -f rootca*.pem backup/
-    rm *.pem
+    rm -rf *.pem
     mv -f backup/* ./
     rmdir backup
 
-    openssl genrsa -out cakey.pem 2048
+    openssl genrsa -out cakey.pem ${bitwidth}
     openssl req -new -sha256 -key cakey.pem  -out careq.pem -days 365 -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Sub CA/emailAddress=woodhead99@gmail.com"
     openssl ca -days 365 -cert rootcacert.pem -keyfile rootcakey.pem -md sha256 -extensions v3_ca -config ${SSLCNF} -in careq.pem -out cacert.pem
     rm careq.pem
@@ -110,7 +111,7 @@ fi
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
     chmod 600 signcert.pem signkey.pem || true
-    openssl genrsa -out signkey.pem 2048
+    openssl genrsa -out signkey.pem ${bitwidth}
     openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server:$i"
     if which expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
@@ -161,7 +162,7 @@ let idx_base+=numsvr
 let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
     chmod 600 clientcert.pem clientkey.pem || true
-    openssl genrsa -out clientkey.pem 2048
+    openssl genrsa -out clientkey.pem ${bitwidth}
     openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=client:$i"
     if which expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in clientreq.pem -out clientcert.pem

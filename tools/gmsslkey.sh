@@ -52,7 +52,7 @@ if [ -d private_keys ]; then
 fi
 
 if [ ! -f rootcakey.pem ]; then
-    rm *.pem
+    rm -rf *.pem
     gmssl sm2keygen -pass 1234 -out rootcakey.pem
     gmssl certgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN ROOTCA -days 3650 -key rootcakey.pem -pass 1234 -out rootcacert.pem -key_usage keyCertSign -key_usage cRLSign -ca
 fi
@@ -60,7 +60,7 @@ fi
 if [ ! -f cakey.pem ]; then
     mkdir backup
     mv rootca*.pem backup/
-    rm *.pem
+    rm -rf *.pem
     mv backup/* ./
     rmdir backup
     gmssl sm2keygen -pass 1234 -out cakey.pem

@@ -10,6 +10,7 @@ import errno
 import tarfile
 import time
 from updcfg import *
+from updwscfg import *
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -2585,28 +2586,48 @@ class ConfigDlg(Gtk.Dialog):
             text = "Error occurs : " + error
             self.DisplayError( text )
             return -1
-                
-        initFile = '/tmp/initcfg.json'
-        if destPath is not None :
-            initFile = destPath + '/initcfg.json'
+                    
+        try:
+            initFile = '/tmp/initcfg.json'
+            if destPath is not None :
+                initFile = destPath + '/initcfg.json'
+                ret = self.Export_InitCfg( initFile )
+                if ret < 0:
+                    return ret
+                fp = open( initFile, 'r' )
+                cfgVal = json.load( fp )
+                fp.close()
+                ret = self.Export_Installer( cfgVal, initFile )
+                return ret
+
             ret = self.Export_InitCfg( initFile )
+            if ret < 0 :
+                return ret
+
+            passDlg = PasswordDialog( self )
+            ret, passwd = passDlg.runDlg()
             if ret < 0:
                 return ret
-            fp = open( initFile, 'r' )
-            cfgVal = json.load( fp )
-            fp.close()
-            ret = self.Export_Installer( cfgVal, initFile )
-            os.system( "rm -rf " + initFile )
-            return ret
 
-        ret = self.Export_InitCfg( initFile )
-        if ret < 0 :
-            return ret
+            if IsSudoAvailable():
+                #make the following sudo password free
+                os.system( "echo " + passwd + "| sudo -S echo updating..." )
 
-        passDlg = PasswordDialog( self )
-        ret = Update_InitCfg( initFile, destPath, passDlg )
-        os.remove( initFile )
-        return ret
+            ret = Update_InitCfg( initFile, destPath, passDlg )
+            if ret < 0:
+                return ret
+
+            if not IsFeatureEnabled( "openssl" ):
+                return ret
+
+            ret = ConfigWebServer( initFile )
+            if ret < 0:
+                print( "Error failed to config web server " + str(ret))
+                ret = 0
+        finally:
+            if initFile is not None:
+                os.unlink( initFile )
+            return ret
 
     def UpdateConfig( self ) :
         return self.Export_Files( None, self.bServer )
@@ -2836,12 +2857,11 @@ class PasswordDialog(Gtk.Dialog):
         response = self.run()
         passwd = None
         if response != Gtk.ResponseType.OK:
-            self.destroy()
             ret = -errno.EINVAL
         else:
             passwd = self.passEdit.get_text()
-            self.destroy()
             ret = 0
+        self.destroy()
         return ( ret, passwd )
 
 import getopt

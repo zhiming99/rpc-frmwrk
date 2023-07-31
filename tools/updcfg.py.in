@@ -9,7 +9,6 @@ from typing import Dict
 from typing import Tuple
 from tempfile import mkstemp
 import errno
-from updwscfg import *
 
 g_passDlg = None
 def GetTestPaths( path : str= None ) :
@@ -168,12 +167,8 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
         if ret == 0 :
             return ret
 
-        ret, passwd = g_passDlg.runDlg()
-        if ret != 0:
-            return ret
-
         if bSudo:
-            strCmd = "echo " + passwd + "| sudo -S cp " + tempfile + \
+            strCmd = "sudo cp " + tempfile + \
                 " " + strPath 
             ret = os.system( strCmd )
         else:
@@ -896,14 +891,6 @@ def Update_InitCfg( cfgPath : str, destDir : str,
             jsonFiles[ 3 ], bServer, destDir, drvVal )
         if ret < 0 :
             return ret
-
-        if not IsFeatureEnabled( "openssl" ):
-            return ret
-
-        ret = ConfigWebServer( initCfg )
-        if ret < 0:
-            print( "Error failed to config web server " + str(ret))
-            ret = 0
 
     except Exception as err:
         text = "Update_InitCfg failed:" + str( err )

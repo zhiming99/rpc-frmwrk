@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from typing import Dict
 import errno
 from updcfg import *
+from updwscfg import *
 
 import getopt, sys
 
@@ -18,7 +19,6 @@ def usage():
 
 import getopt
 def main():
-    bServer = True
     try:
         opts, args = getopt.getopt(sys.argv[1:], "h" )
     except getopt.GetoptError as err:
@@ -44,6 +44,14 @@ def main():
 
     try:
         ret = Update_InitCfg( initFile, None )
+        if not IsFeatureEnabled( "openssl" ):
+            return ret
+
+        ret = ConfigWebServer( initFile )
+        if ret < 0:
+            print( "Error failed to config web server " + str(ret))
+            ret = 0
+
     except Exception as err:
         text = "Failed to update the config files:" + str( err )
         exc_type, exc_obj, exc_tb = sys.exc_info()

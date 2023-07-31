@@ -19,7 +19,13 @@ def IsApacheInstalled()->bool:
         return True
     return False
 
-def InstallKeys( oResps : [] ) -> int:
+def IsSudoAvailable()->bool:
+    ret = os.system( "which sudo > /dev/null" )
+    if ret != 0:
+        return False
+    return True
+
+def InstallKeys( oResps : [] ) -> Tuple[ int, str ]:
     srcKeys = {}
     ret = 0
     try:
@@ -29,25 +35,25 @@ def InstallKeys( oResps : [] ) -> int:
         cacertFile = oResp[ 'CACertFile']
         cmdline = ''
         keyName = 'rpcf_' + os.path.basename( keyFile )
-        cmdline = 'sudo install -D -m 600 ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
+        cmdline = '{sudo} install -D -m 600 ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
         keyPath = '/etc/ssl/private/' + keyName
         certName = 'rpcf_' + os.path.basename( certFile )
-        cmdline += 'sudo install -D -m 644 ' + certFile + ' /etc/ssl/certs/' + certName + ";"
+        cmdline += '{sudo} install -D -m 644 ' + certFile + ' /etc/ssl/certs/' + certName + ";"
         certPath = '/etc/ssl/certs/' + certName
         cacertName = 'rpcf_' + os.path.basename( cacertFile )
-        cmdline += 'sudo install -D -m 644 ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
+        cmdline += '{sudo} install -D -m 644 ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
         cacertPath = '/etc/ssl/certs/' + cacertName
         for oResp in oResps:
             oResp[ 'KeyFile'] = keyPath
             oResp[ 'CertFile'] = certPath
             oResp[ 'CACertFile'] = cacertPath
-        ret = -os.system(cmdline)
+        return ( ret, cmdline )
     except Exception as err:
         print( err )
         if ret == 0:
             ret = errno.EFAULT
 
-    return ret
+    return ( ret, None )
 
 def ExtractParams( initCfg : object) ->( dict, ):
     try:
@@ -152,9 +158,11 @@ upstream {AppName} {{
 
 '''
     oResps = ExtractParams( initCfg )
-    ret = InstallKeys( oResps )
+    cmdline = ""
+    ret, keyCmds = InstallKeys( oResps )
     if ret < 0:
         pass
+    cmdline += keyCmds
     cfgFile = "/tmp/rpcf_nginx.conf"
     fp = open( cfgFile, "w" )
     for o in oResps :
@@ -168,14 +176,19 @@ upstream {AppName} {{
             )
         fp.write( cfg )
     fp.close()
-    cmdline = "sudo install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
-    cmdline += "cd /etc/nginx/sites-enabled && sudo ln -s /etc/nginx/sites-available/rpcf_nginx.conf &&"
-    cmdline += "rm " + cfgFile
-    ret = -os.system( cmdline )
-    if ret < 0:
-        return ret
-    cmdline = "sudo systemctl restart nginx"
-    ret = -os.system( cmdline )
+    cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
+    cmdline += "cd /etc/nginx/sites-enabled && {sudo} rm ./rpcf_nginx.conf && "
+    cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf &&"
+    cmdline += "rm " + cfgFile + ";"
+    cmdline += "{sudo} systemctl restart nginx"
+    if IsSudoAvailable() :
+        actCmd = cmdline.format( sudo='sudo' )
+    else:
+        if os.geteuid() != 0:
+            actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
+        else:
+            actCmd = cmdline.format( sudo='' )
+    ret = -os.system( actCmd )
     return ret
 
 def Config_Apache( initCfg : object )->int:
@@ -202,9 +215,11 @@ def Config_Apache( initCfg : object )->int:
 
 '''
     oResps = ExtractParams( initCfg )
-    ret = InstallKeys( oResps )
+    cmdline = ""
+    ret, keyCmds = InstallKeys( oResps )
     if ret < 0:
         return ret
+    cmdline += keyCmds
     cfgFile = "/tmp/rpcf_apache.conf"
     fp = open( cfgFile, "w" )
     for o in oResps :
@@ -218,22 +233,44 @@ def Config_Apache( initCfg : object )->int:
             )
         fp.write( cfg )
     fp.close()
-    cmdline = "sudo install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile
-    ret = -os.system( cmdline )
-    if ret < 0:
-        return ret
-    cmdline = "sudo systemctl restart httpd"
-    ret = -os.system( cmdline )
+    cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile + ";"
+    cmdline += "{sudo} systemctl restart httpd"
+    if IsSudoAvailable() :
+        actCmd = cmdline.format( sudo='sudo' )
+    else:
+        if os.geteuid() != 0:
+            actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
+        else:
+            actCmd = cmdline.format( sudo='' )
+    ret = -os.system( actCmd )
     return ret
 
-def ConfigWebServer( initCfg : object )->int:
+def ConfigWebServer2( initCfg : object )->int:
     ret = 0
     try:
+        if initCfg[ 'IsServer' ] != 'true':
+            return ret
         oMisc = initCfg[ 'Security' ]['misc']
         if not 'ConfigWebServer' in oMisc:
             return ret
         if oMisc['ConfigWebServer'] != 'true':
             return ret
+
+        bEnableWS = False
+        oConns = initCfg['Connections']
+        for oConn in oConns:
+            if not ( 'EnableWS' in oConn and
+                'EnableSSL' in oConn ):
+                continue
+            if not ( oConn['EnableWS'] == 'true' and
+                oConn['EnableSSL'] == 'true' ):
+                continue
+            bEnableWS = True
+            break
+
+        if not bEnableWS:
+            return ret
+
         if IsNginxInstalled():
             ret = Config_Nginx( initCfg )
         elif IsApacheInstalled():
@@ -241,12 +278,25 @@ def ConfigWebServer( initCfg : object )->int:
             if ret == 0:
                 print( "Apache httpd is configured. And " +
                     "make sure mod_ssl is installed" )
-
     except Exception as err:
         print( err )
         if ret == 0:
             ret = -errno.EFAULT
     return ret
+
+def ConfigWebServer( initFile : str ) -> int :
+    try:
+        ret = 0
+        fp = open( initFile, 'r' )
+        cfgVal = json.load( fp )
+        fp.close()
+        ret = ConfigWebServer2( cfgVal )
+    except Exception as err:
+        print( err )
+        if ret == 0:
+            ret = -errno.EFAULT
+    finally:
+        return ret
 
 def test():
     try:
