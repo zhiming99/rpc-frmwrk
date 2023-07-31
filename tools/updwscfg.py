@@ -27,13 +27,12 @@ def IsSudoAvailable()->bool:
 
 def InstallKeys( oResps : [] ) -> Tuple[ int, str ]:
     srcKeys = {}
-    ret = 0
     try:
+        cmdline = ''
         oResp = oResps[0]
         keyFile = oResp[ 'KeyFile']
         certFile = oResp[ 'CertFile']
         cacertFile = oResp[ 'CACertFile']
-        cmdline = ''
         keyName = 'rpcf_' + os.path.basename( keyFile )
         cmdline = '{sudo} install -D -m 600 ' + keyFile + ' /etc/ssl/private/' + keyName + ";"
         keyPath = '/etc/ssl/private/' + keyName
@@ -47,13 +46,10 @@ def InstallKeys( oResps : [] ) -> Tuple[ int, str ]:
             oResp[ 'KeyFile'] = keyPath
             oResp[ 'CertFile'] = certPath
             oResp[ 'CACertFile'] = cacertPath
-        return ( ret, cmdline )
+        return ( 0, cmdline )
     except Exception as err:
         print( err )
-        if ret == 0:
-            ret = errno.EFAULT
-
-    return ( ret, None )
+        return ( -errno.EFAULT, None )
 
 def ExtractParams( initCfg : object) ->( dict, ):
     try:
