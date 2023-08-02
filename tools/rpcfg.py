@@ -1818,6 +1818,32 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( checkCfgWs, startCol + 1, startRow + 3, 1, 1)
         self.checkCfgWs = checkCfgWs
 
+        labelCfgKrb5 = Gtk.Label()
+        labelCfgKrb5.set_text("Config Kerberos")
+        labelCfgKrb5.set_xalign(.5)
+        grid.attach( labelCfgKrb5, startCol + 0, startRow + 4, 1, 1 )
+
+        checkCfgKrb5 = Gtk.CheckButton(label="")
+        checkCfgKrb5.props.active = False
+
+        checkCfgKrb5.connect(
+            "toggled", self.on_button_toggled, "CfgKrb5")
+        grid.attach( checkCfgKrb5, startCol + 1, startRow + 4, 1, 1)
+        self.checkCfgKrb5 = checkCfgKrb5
+
+        labelKProxy = Gtk.Label()
+        labelKProxy.set_text("kinit proxy")
+        labelKProxy.set_xalign(.5)
+        grid.attach( labelKProxy, startCol + 1, startRow + 5, 1, 1 )
+
+        checkKProxy = Gtk.CheckButton(label="")
+        checkKProxy.props.active = False
+
+        checkKProxy.connect(
+            "toggled", self.on_button_toggled, "KProxy")
+        grid.attach( checkKProxy, startCol + 2, startRow + 5, 1, 1)
+        self.checkKProxy = checkKProxy
+
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
         if tree_iter is not None:
@@ -2193,6 +2219,8 @@ class ConfigDlg(Gtk.Dialog):
         cfgPath : str, destPath : str,
         bServer : bool, bInstKeys : bool ) -> int:
         ret = 0
+        keyPkg = None
+        destPkg = None
         try:
             if bServer :
                 destPkg = destPath + "/instsvr.tar"
@@ -2284,6 +2312,7 @@ class ConfigDlg(Gtk.Dialog):
                 ret = -ret
                 raise Exception( "Error creating install package" )
 
+            keyPkg = None
             # add instcfg to destPkg
             cfgDir = os.path.dirname( cfgPath )
             cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json; gzip " + destPkg
@@ -2318,6 +2347,13 @@ class ConfigDlg(Gtk.Dialog):
             os.system( cmdLine )
 
         except Exception as err:
+            try:
+                if keyPkg is not None:
+                    os.unlink( keyPkg )
+                if destPkg is not None:
+                    os.unlink( destPkg )
+            except:
+                pass
             if ret == 0:
                 ret = -errno.EFAULT
 

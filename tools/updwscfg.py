@@ -310,11 +310,11 @@ def Config_Krb5Client( initCfg : object ):
  allow_weak_crypto = true
 
 [realms]
-  {RealmUpper} = {
+  {RealmUpper} = {{
   kdc = {KdcServer}
   admin_server = {KdcServer}
   default_domain = {RealmLower}
- }
+ }}
 
 [domain_realm]
  .{RealmLower} = {RealmUpper}
