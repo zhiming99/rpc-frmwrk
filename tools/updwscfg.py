@@ -295,32 +295,7 @@ def ConfigWebServer( initFile : str ) -> int :
         return ret
 
 def Config_Krb5Client( initCfg : object ):
-    '''[logging]
- default = FILE:/var/log/krb5libs.log
- kdc = FILE:/var/log/krb5kdc.log
- admin_server = FILE:/var/log/kadmind.log
-
-[libdefaults]
- default_realm = {RealmUpper}
- dns_lookup_realm = false
- dns_lookup_kdc = false
- ticket_lifetime = 24h
- renew_lifetime = 7d
- forwardable = true
- allow_weak_crypto = true
-
-[realms]
-  {RealmUpper} = {{
-  kdc = {KdcServer}
-  admin_server = {KdcServer}
-  default_domain = {RealmLower}
- }}
-
-[domain_realm]
- .{RealmLower} = {RealmUpper}
- {RealmLower} = {RealmUpper}
-
-    '''
+    pass
 
 def test():
     try:
