@@ -684,6 +684,7 @@ class ConfigDlg(Gtk.Dialog):
 
             ipAddr = Gtk.Entry()
             ipAddr.set_text( nodeCfg[ 'IpAddress' ] )
+            ipAddr.set_tooltip_text( "Enter an ip address or a domain name." )
             grid.attach(ipAddr, startCol + 1, startRow + 2, 1, 1 )
             ipAddr.iNo = i
             nodeCtx.ipAddr = ipAddr
@@ -749,6 +750,7 @@ class ConfigDlg(Gtk.Dialog):
             nodeCtx.compress = compress
 
             sslCheck = Gtk.CheckButton( label = "SSL" )
+            sslCheck.set_tooltip_text( "Enable OpenSSL or GMSSL" )
             if nodeCfg[ 'EnableSSL' ] == 'false' :
                 sslCheck.props.active = False
             else :
@@ -1148,6 +1150,9 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass
         ipEditBox.set_text(ipAddr)
+        ipEditBox.set_tooltip_text( "Enter an ip address or a domain name." +
+            " And don't use '0.0.0.0' which will go to the proxy config and" +
+            " an invalid address to connect" )
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
         self.ifctx[ ifNo ].ipAddr = ipEditBox
 
@@ -1302,6 +1307,7 @@ class ConfigDlg(Gtk.Dialog):
             sslCheck.set_active( False )
             sslCheck.set_sensitive( False )
 
+        sslCheck.set_tooltip_text( "Enable OpenSSL or GMSSL" )
         bActive = False
         try:
             if not self.bServer: 
@@ -1451,7 +1457,7 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( vfyPeerCheck, startCol + 3, startRow + 4, 1, 1 )
 
         if self.bServer :
-            genKeyBtn = Gtk.Button.new_with_label("Gen Demo Key")
+            genKeyBtn = Gtk.Button.new_with_label("Gen Self-Signed Keys")
             genKeyBtn.connect("clicked", self.on_choose_key_dir_clicked)
             grid.attach( genKeyBtn, startCol + 1, startRow + 5, 1, 1 )
 
@@ -1630,6 +1636,59 @@ class ConfigDlg(Gtk.Dialog):
             GenOpenSSLkey( self, strCurPath, self.bServer, cnum, snum )
         dialog.destroy()
 
+    def GetKrb5Conf( self ) -> str:
+        strKrb5Conf = '''[logging]
+default = FILE:/var/log/krb5libs.log
+kdc = FILE:/var/log/krb5kdc.log
+admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+default_realm = {RealmUpper}
+dns_lookup_realm = false
+dns_lookup_kdc = false
+ticket_lifetime = 24h
+renew_lifetime = 7d
+forwardable = true
+allow_weak_crypto = true
+
+[realms]
+{RealmUpper} = {{
+kdc = {KdcServer}
+admin_server = {KdcServer}
+default_domain = {RealmLower}
+}}
+
+[domain_realm]
+.{RealmLower} = {RealmUpper}
+{RealmLower} = {RealmUpper}
+
+'''
+        try:
+            if not self.IsKrb5Enabled( self.confVals ): 
+                raise Exception( "krb5 not enabled" )
+            kdcIp = self.kdcEdit.get_text()
+            if len( kdcIp ) == 0:
+                raise Exception( "kdc address is empty" )
+
+            strRealm = self.realmEdit.get_text()
+            strRealm = str
+            if len( strRealm ) == 0:
+                raise Exception( "Realm is empty" )
+            strRet = strKrb5Conf.format(
+                KdcServer=kdcIp,
+                RealmLower=strRealm.lower(),
+                RealmUpper=strRealm.upper()
+            )
+            return strRet
+                
+        except Exception as err:
+            print( err )
+            return ""
+    
+    
+    def on_init_test_kdc_clicked( self, button ):
+        pass
+
     def add_filters(self, dialog, bKey ):
         filter_text = Gtk.FileFilter()
         if bKey :
@@ -1645,11 +1704,33 @@ class ConfigDlg(Gtk.Dialog):
         filter_any.add_pattern("*")
         dialog.add_filter(filter_any)
 
+    def IsKrb5Enabled( self, confVals )->bool :
+        authInfo = None
+        bKrb5 = False
+        try:
+            authInfo = confVals[ 'AuthInfo']
+            authMech = authInfo[ 'AuthMech' ]
+            if authMech == 'krb5':
+                bKrb5 = True
+        except Exception as err :
+            return False
+
+        return bKrb5
+
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
         labelAuthCred.set_markup("<b>Auth Information</b>")
         labelAuthCred.set_xalign(.5)
         grid.attach(labelAuthCred, startCol + 1, startRow + 0, 1, 1 )
+
+        authInfo = None
+        try:
+            if 'AuthInfo' in confVals :
+                authInfo = confVals[ 'AuthInfo']
+        except Exception as err :
+            pass
+
+        bKrb5 = self.IsKrb5Enabled( confVals )
 
         labelMech = Gtk.Label()
         labelMech.set_text("Auth Mech: ")
@@ -1666,19 +1747,17 @@ class ConfigDlg(Gtk.Dialog):
         mechCombo.set_sensitive( False )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
+        if not bKrb5:
+            return
+
         labelSvc = Gtk.Label()
         labelSvc.set_text("Service Name: ")
         labelSvc.set_xalign(.5)
         grid.attach(labelSvc, startCol + 0, startRow + 2, 1, 1 )
 
         strSvc = ""
-        try:
-            if 'AuthInfo' in confVals :
-                authInfo = confVals[ 'AuthInfo']
-                if 'ServiceName' in authInfo :
-                    strSvc = authInfo[ 'ServiceName']
-        except Exception as err :
-            pass
+        if authInfo is not None and 'ServiceName' in authInfo :
+            strSvc = authInfo['ServiceName']
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
@@ -1690,13 +1769,9 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelRealm, startCol + 0, startRow + 3, 1, 1 )
 
         strRealm = ""
-        try:
-            if 'AuthInfo' in confVals :
-                authInfo = confVals[ 'AuthInfo']
-                if 'Realm' in authInfo :
-                    strRealm = authInfo[ 'Realm']
-        except Exception as err :
-            pass
+        if authInfo is not None and 'Realm' in authInfo :
+            strRealm = authInfo['Realm']
+
         realmEditBox = Gtk.Entry()
         realmEditBox.set_text(strRealm)
         grid.attach(realmEditBox, startCol + 1, startRow + 3, 2, 1 )
@@ -1707,15 +1782,10 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelSign, startCol + 0, startRow + 4, 1, 1 )
 
         idx = 1
-        try:
-            if 'AuthInfo' in confVals :
-                authInfo = confVals[ 'AuthInfo']
-                if 'SignMessage' in authInfo :
-                    strSign = authInfo[ 'SignMessage']
-                    if strSign == 'false' :
-                        idx = 0
-        except Exception as err :
-            pass
+        if authInfo is not None and 'SignMessage' in authInfo :
+            strSign = authInfo[ 'SignMessage']
+            if strSign == 'false' :
+                idx = 0
 
         signMethod = Gtk.ListStore()
         signMethod = Gtk.ListStore(int, str)
@@ -1760,6 +1830,15 @@ class ConfigDlg(Gtk.Dialog):
         userEditBox = Gtk.Entry()
         userEditBox.set_text(strUser)
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
+
+        if self.bServer:
+            toolTip = "Setting up a KDC server " + \
+                " on this host with the information from" + \
+                " the 'Auth Information' section"
+            initKdcBtn = Gtk.Button.new_with_label("Initialize Test KDC")
+            initKdcBtn.connect("clicked", self.on_init_test_kdc_clicked)
+            initKdcBtn.set_tooltip_text( toolTip )
+            grid.attach( initKdcBtn, startCol + 1, startRow + 7, 2, 1 )
 
         self.svcEdit = svcEditBox
         self.realmEdit = realmEditBox
@@ -1812,6 +1891,8 @@ class ConfigDlg(Gtk.Dialog):
 
         checkCfgWs = Gtk.CheckButton(label="")
         checkCfgWs.props.active = False
+        checkCfgWs.set_tooltip_text( "Config the local installation " +
+            "of the Nginx or Apache server for websocket connection" );
 
         checkCfgWs.connect(
             "toggled", self.on_button_toggled, "CfgWs")
@@ -1890,7 +1971,8 @@ class ConfigDlg(Gtk.Dialog):
                 else :
                     return "Identical IP and Port pair found between interfaces"
 
-                if interf.ipAddr.get_text() == '0.0.0.0' :
+                if ( interf.ipAddr.get_text() == '0.0.0.0' or  
+                    interf.ipAddr.get_text() == "::" ) :
                     return "Ip address is '0.0.0.0'"
 
                 if interf.rtpathEdit is not None :
