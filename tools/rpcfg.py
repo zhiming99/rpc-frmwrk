@@ -11,6 +11,7 @@ import tarfile
 import time
 from updcfg import *
 from updwscfg import *
+import re
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -1150,9 +1151,9 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass
         ipEditBox.set_text(ipAddr)
-        ipEditBox.set_tooltip_text( "Enter an ip address or a domain name." +
-            " And don't use '0.0.0.0' which will go to the proxy config and" +
-            " an invalid address to connect" )
+        ipEditBox.set_tooltip_text( "Enter an IP address or a domain name. " +
+            "And don't use '0.0.0.0', because the IP address will " +
+            "also go to the proxy config and is invalid to connect to" )
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
         self.ifctx[ ifNo ].ipAddr = ipEditBox
 
@@ -1636,6 +1637,72 @@ class ConfigDlg(Gtk.Dialog):
             GenOpenSSLkey( self, strCurPath, self.bServer, cnum, snum )
         dialog.destroy()
 
+    def GetTestKdcIp( self ) -> str:
+        kdcIp = ""
+        try:
+            kdcIp = self.ifctx[ 0 ].ipAddr.get_text()
+        except:
+            pass
+        return kdcIp
+
+    def GetTestRealm( self ) -> str:
+        strRealm = self.realmEdit.get_text()
+        if len( strRealm ) == 0:
+            strRealm = 'RPCF.ORG'
+
+        return strRealm
+
+    def GetTestKdcSvc( self ) -> str:
+        strSvc = self.svcEdit.get_text()
+        if len( strSvc ) == 0:
+            strSvc = 'host/rpcf'
+        if strSvc.find( '@' ) == -1:
+            strRealm = self.GetTestRealm()
+            strSvc += '@' + strRealm 
+        return strSvc
+
+    def GetTestKdcUser( self ) -> str:
+        strUser = self.userEdit.get_text()
+        if len( strUser ) == 0:
+            strUser = os.getlogin()
+
+        if strUser.find( '@' ) == -1:
+            strRealm = self.GetTestRealm()
+            strUser += '@' + strRealm 
+        return strUser
+
+    def GetKadmAcl( self ) -> str:
+        strAcl = ''' 
+kadmin/admin    *
+{Service} i
+{User}  il
+'''
+        strSvc = self.GetTestKdcSvc()
+        strUser = self.GetTestKdcUser()
+        return strAcl.format(
+            Service=strSvc,
+            User=strUser )
+
+    def GetKdcConf( self ) -> str:
+        strKdcConf='''[realms]
+{Realm} = {{
+    acl_file = /etc/krb5kdc/kadm5.acl
+    max_renewable_life = 7d 0h 0m 0s
+    supported_enctypes = aes256-cts:normal aes128-cts:normal
+    default_principal_flags = +preauth
+    key_stash_file = /etc/krb5kdc/stash
+}}
+'''
+        try:
+            strRealm = self.GetTestRealm()
+            strRet = strKdcConf.format(
+                Realm=strRealm.upper() )
+            return strRet
+                
+        except Exception as err:
+            print( err )
+            return ""
+
     def GetKrb5Conf( self ) -> str:
         strKrb5Conf = '''[logging]
 default = FILE:/var/log/krb5libs.log
@@ -1666,14 +1733,12 @@ default_domain = {RealmLower}
         try:
             if not self.IsKrb5Enabled( self.confVals ): 
                 raise Exception( "krb5 not enabled" )
-            kdcIp = self.kdcEdit.get_text()
-            if len( kdcIp ) == 0:
-                raise Exception( "kdc address is empty" )
 
-            strRealm = self.realmEdit.get_text()
-            strRealm = str
-            if len( strRealm ) == 0:
-                raise Exception( "Realm is empty" )
+            kdcIp = self.GetTestKdcIp()
+            if len( kdcIp ) == 0:
+                raise Exception( "Unable to determine kdc address" )
+
+            strRealm = self.GetTestRealm()
             strRet = strKrb5Conf.format(
                 KdcServer=kdcIp,
                 RealmLower=strRealm.lower(),
@@ -1684,8 +1749,118 @@ default_domain = {RealmLower}
         except Exception as err:
             print( err )
             return ""
+
+    def AddEntryToHosts( self,
+        strIpAddr : str,
+        strDomain : str ):
+
+        bExist = False
+        pattern = strIpAddr + ".*" + strDomain
+        with open('/etc/hosts', 'r') as fp:
+            for line in fp:
+                if re.search( pattern, line ):
+                    bExist = True
+        if bExist :
+            return
+
+        cmdline = "sudo echo '" + strIpAddr + '\t' + \
+            strDomain + "' >> /etc/hosts"
+        os.system( cmdline )
+        return
+
+    def AddPrincipal( self,
+        strPrinc : str,
+        strPassword : str ):
+        cmdline = 'sudo kadmin.local -q "addprinc '
+        if len( strPassword ) == 0:
+            cmdline += '-pw ' + strPassword
+        else:
+            cmdline += '-randkey'
+        ret = os.system( cmdline )
+        if ret < 0:
+            print( "Error add principal '" + strPrinc + "'" )
+
+        return
+
+    def DeletePrincipal( self,
+        strPrinc : str ) :
+        cmdline = 'sudo kadmin.local -q "delete_principal -force ' +\
+            strPrinc + '"'
+        os.system( cmdline )
     
-    
+    def SetupTestKdc( self ):
+        tempKrb = None
+        tempKdc = None
+        try:
+            strConf = self.GetKrb5Conf()
+            if len( strConf ) == 0:
+                return -errno.EFAULT
+
+            tempKrb = tempname()
+            if len(tempKrb) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempKrb, "w" )
+            fp.write( strConf )
+            fp.close()
+
+            tempKdc = tempname()
+            strKdc = self.GetKdcConf()
+            if len(tempKdc) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempKdc, "w" )
+            fp.write( strKdc )
+            fp.close()
+
+            tempAcl = tempname()
+            strAcl = self.GetKadmAcl()
+            if len(tempAcl) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempAcl, "w" )
+            fp.write( strAcl )
+            fp.close()
+
+            cmdline = 'sudo install -bm 644 ' + tempKrb
+            cmdline += ' /etc/krb5.conf;'
+            cmdline = 'sudo install -bm 644 ' + tempKdc
+            cmdline += ' /etc/krb5kdc/kdc.conf;'
+            cmdline = 'sudo install -bm 644 ' + tempAcl
+            cmdline += ' /etc/krb5kdc/kadm5.acl;'
+
+            ret = os.system( cmdline )
+            if ret < 0:
+                return ret
+
+            strDomain = self.GetTestRealm()
+            strIpAddr = self.GetTestKdcIp()
+            self.AddEntryToHosts(
+                strIpAddr, strDomain )
+
+            AddPrincipal( "kadmin/admin", "MITiys5K6" )
+
+            strUser = self.GetTestKdcUser()
+            AddPrincipal( strUser, "123456" )
+
+            strSvc = self.GetTestKdcSvc()
+            AddPrincipal( strSvc, "" )
+
+            #add a keytable
+            cmdline = 'sudo kadmin.local -q "ktadd ' + strSvc + '"'
+            os.system( cmdline )
+            return 0
+                
+        except Exception as err:
+            print( err )
+        finally:
+            if tempKrb is not None:
+                os.unlink( tempKrb )
+            if tempKdc is not None:
+                os.unlink( tempKdc )
+            if tempAcl is not None:
+                os.unlink( tempAcl )
+
     def on_init_test_kdc_clicked( self, button ):
         pass
 
