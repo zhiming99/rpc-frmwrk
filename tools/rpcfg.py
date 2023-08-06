@@ -1752,7 +1752,7 @@ default_domain = {RealmLower}
 
     def AddEntryToHosts( self,
         strIpAddr : str,
-        strDomain : str ):
+        strDomain : str ) -> str:
 
         bExist = False
         pattern = strIpAddr + ".*" + strDomain
@@ -1761,36 +1761,33 @@ default_domain = {RealmLower}
                 if re.search( pattern, line ):
                     bExist = True
         if bExist :
-            return
+            return ""
 
-        cmdline = "sudo echo '" + strIpAddr + '\t' + \
-            strDomain + "' >> /etc/hosts"
-        os.system( cmdline )
-        return
+        cmdline = '{sudo} echo "' + strIpAddr + '\t' + \
+            strDomain + '" >> /etc/hosts'
+        return cmdline
 
     def AddPrincipal( self,
         strPrinc : str,
-        strPassword : str ):
-        cmdline = 'sudo kadmin.local -q "addprinc '
-        if len( strPassword ) == 0:
-            cmdline += '-pw ' + strPassword
+        strPass : str ) -> str:
+        cmdline = '{sudo} kadmin.local -q "addprinc '
+        if len( strPass ) == 0:
+            cmdline += '-pw ' + strPass
         else:
             cmdline += '-randkey'
-        ret = os.system( cmdline )
-        if ret < 0:
-            print( "Error add principal '" + strPrinc + "'" )
-
-        return
+        return cmdline
 
     def DeletePrincipal( self,
-        strPrinc : str ) :
-        cmdline = 'sudo kadmin.local -q "delete_principal -force ' +\
+        strPrinc : str ) -> str :
+        cmdline = '{sudo} kadmin.local -q "delete_principal -force ' +\
             strPrinc + '"'
-        os.system( cmdline )
+        return cmdline
     
     def SetupTestKdc( self ):
         tempKrb = None
         tempKdc = None
+        tempAcl = None
+        tempNewRealm = None
         try:
             strConf = self.GetKrb5Conf()
             if len( strConf ) == 0:
@@ -1822,34 +1819,66 @@ default_domain = {RealmLower}
             fp.write( strAcl )
             fp.close()
 
-            cmdline = 'sudo install -bm 644 ' + tempKrb
+            tempNewRealm = tempname()
+            fp = open( tempNewRealm, "w" )
+            fp.write( '''
+krb5_newrealm <<EOF
+123456
+123456
+EOF
+''' )
+            fp.close()
+
+            cmdline = '{sudo} install -bm 644 ' + tempKrb
             cmdline += ' /etc/krb5.conf;'
-            cmdline = 'sudo install -bm 644 ' + tempKdc
+            cmdline = '{sudo} install -bm 644 ' + tempKdc
             cmdline += ' /etc/krb5kdc/kdc.conf;'
-            cmdline = 'sudo install -bm 644 ' + tempAcl
+            cmdline = '{sudo} install -bm 644 ' + tempAcl
             cmdline += ' /etc/krb5kdc/kadm5.acl;'
 
-            ret = os.system( cmdline )
-            if ret < 0:
-                return ret
+            cmdline += '{sudo} bash ' + tempNewRealm
 
             strDomain = self.GetTestRealm()
             strIpAddr = self.GetTestKdcIp()
-            self.AddEntryToHosts(
+            cmdline += self.AddEntryToHosts(
                 strIpAddr, strDomain )
 
-            AddPrincipal( "kadmin/admin", "MITiys5K6" )
+            cmdline += ";"
+            cmdline += self.DeletePrincipal(
+                "kadmin/admin" )
+
+            cmdline += ";"
+            cmdline += self.AddPrincipal(
+                "kadmin/admin", "MITiys5K6" )
 
             strUser = self.GetTestKdcUser()
-            AddPrincipal( strUser, "123456" )
+            cmdline += ";"
+            cmdline += self.DeletePrincipal( strUser )
+            cmdline += ";"
+            cmdline += self.AddPrincipal(
+                strUser, "123456" )
 
             strSvc = self.GetTestKdcSvc()
-            AddPrincipal( strSvc, "" )
+            cmdline += ";"
+            cmdline += self.DeletePrincipal( strSvc )
+            cmdline += ";"
+            cmdline += self.AddPrincipal( strSvc, "" )
 
-            #add a keytable
-            cmdline = 'sudo kadmin.local -q "ktadd ' + strSvc + '"'
-            os.system( cmdline )
-            return 0
+            #add svc to keytable
+            cmdline += ";"
+            cmdline += '{sudo} kadmin.local -q "ktadd ' + strSvc + '"'
+
+            if os.geteuid() == 0:
+                actCmd = cmdline.format( sudo = '' )
+            elif self.IsSudoAvailable():
+                actCmd = cmdline.format(
+                    sudo = 'sudo' )
+            else:
+                actCmd = 'su -c "' + cmdline.format(
+                    sudo = '' ) + '"'
+
+            ret = os.system( actCmd )
+            return ret 
                 
         except Exception as err:
             print( err )
@@ -1860,6 +1889,8 @@ default_domain = {RealmLower}
                 os.unlink( tempKdc )
             if tempAcl is not None:
                 os.unlink( tempAcl )
+            if tempNewRealm is not None:
+                os.unlink( tempNewRealm )
 
     def on_init_test_kdc_clicked( self, button ):
         pass
