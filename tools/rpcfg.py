@@ -1717,6 +1717,7 @@ ticket_lifetime = 24h
 renew_lifetime = 7d
 forwardable = true
 allow_weak_crypto = true
+default_keytab_name=FILE:{DefKeytab}
 
 [realms]
 {RealmUpper} = {{
@@ -1742,7 +1743,8 @@ default_domain = {RealmLower}
             strRet = strKrb5Conf.format(
                 KdcServer=kdcIp,
                 RealmLower=strRealm.lower(),
-                RealmUpper=strRealm.upper()
+                RealmUpper=strRealm.upper(),
+                DefKeytab=GetTestKeytabPath()
             )
             return strRet
                 
@@ -1750,39 +1752,6 @@ default_domain = {RealmLower}
             print( err )
             return ""
 
-    def AddEntryToHosts( self,
-        strIpAddr : str,
-        strDomain : str ) -> str:
-
-        bExist = False
-        pattern = strIpAddr + ".*" + strDomain
-        with open('/etc/hosts', 'r') as fp:
-            for line in fp:
-                if re.search( pattern, line ):
-                    bExist = True
-        if bExist :
-            return ""
-
-        cmdline = '{sudo} echo "' + strIpAddr + '\t' + \
-            strDomain + '" >> /etc/hosts'
-        return cmdline
-
-    def AddPrincipal( self,
-        strPrinc : str,
-        strPass : str ) -> str:
-        cmdline = '{sudo} kadmin.local -q "addprinc '
-        if len( strPass ) == 0:
-            cmdline += '-pw ' + strPass
-        else:
-            cmdline += '-randkey'
-        return cmdline
-
-    def DeletePrincipal( self,
-        strPrinc : str ) -> str :
-        cmdline = '{sudo} kadmin.local -q "delete_principal -force ' +\
-            strPrinc + '"'
-        return cmdline
-    
     def SetupTestKdc( self ):
         tempKrb = None
         tempKdc = None
@@ -1829,56 +1798,61 @@ EOF
 ''' )
             fp.close()
 
-            cmdline = '{sudo} install -bm 644 ' + tempKrb
-            cmdline += ' /etc/krb5.conf;'
-            cmdline = '{sudo} install -bm 644 ' + tempKdc
-            cmdline += ' /etc/krb5kdc/kdc.conf;'
-            cmdline = '{sudo} install -bm 644 ' + tempAcl
-            cmdline += ' /etc/krb5kdc/kadm5.acl;'
+            cmdline = "{sudo} install -bm 644 " + tempKrb
+            cmdline += " /etc/krb5.conf;"
+            cmdline = "{sudo} install -bm 644 " + tempKdc
+            cmdline += " /etc/krb5kdc/kdc.conf;"
+            cmdline = "{sudo} install -bm 644 " + tempAcl
+            cmdline += " /etc/krb5kdc/kadm5.acl;"
 
-            cmdline += '{sudo} bash ' + tempNewRealm
+            cmdline += "{sudo} bash " + tempNewRealm
 
             strDomain = self.GetTestRealm()
             strIpAddr = self.GetTestKdcIp()
-            cmdline += self.AddEntryToHosts(
+            cmdline += AddEntryToHosts(
                 strIpAddr, strDomain )
 
             cmdline += ";"
-            cmdline += self.DeletePrincipal(
+            cmdline += DeletePrincipal(
                 "kadmin/admin" )
 
             cmdline += ";"
-            cmdline += self.AddPrincipal(
+            cmdline += AddPrincipal(
                 "kadmin/admin", "MITiys5K6" )
 
             strUser = self.GetTestKdcUser()
             cmdline += ";"
-            cmdline += self.DeletePrincipal( strUser )
+            cmdline += DeletePrincipal( strUser )
             cmdline += ";"
-            cmdline += self.AddPrincipal(
-                strUser, "123456" )
+            cmdline += AddPrincipal( strUser, "" )
 
             strSvc = self.GetTestKdcSvc()
             cmdline += ";"
-            cmdline += self.DeletePrincipal( strSvc )
+            cmdline += DeletePrincipal( strSvc )
             cmdline += ";"
-            cmdline += self.AddPrincipal( strSvc, "" )
+            cmdline += AddPrincipal( strSvc, "" )
 
             #add svc to keytable
             cmdline += ";"
-            cmdline += '{sudo} kadmin.local -q "ktadd ' + strSvc + '"'
+            strKeytab = GetTestKeytabPath()
+            cmdline += AddToKeytab(
+                strSvc, strKeytab )
+            cmdline += ";"
+            cmdline += AddToKeytab(
+                strUser, strKeytab )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strKeytab )
 
             if os.geteuid() == 0:
                 actCmd = cmdline.format( sudo = '' )
-            elif self.IsSudoAvailable():
+            elif IsSudoAvailable():
                 actCmd = cmdline.format(
                     sudo = 'sudo' )
             else:
-                actCmd = 'su -c "' + cmdline.format(
-                    sudo = '' ) + '"'
+                actCmd = "su -c '" + cmdline.format(
+                    sudo = "" ) + "'"
 
-            ret = os.system( actCmd )
-            return ret 
+            return os.system( actCmd )
                 
         except Exception as err:
             print( err )
@@ -1893,6 +1867,7 @@ EOF
                 os.unlink( tempNewRealm )
 
     def on_init_test_kdc_clicked( self, button ):
+        #self.SetupTestKdc()
         pass
 
     def add_filters(self, dialog, bKey ):

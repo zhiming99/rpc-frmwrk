@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import json
 import os
-import sys 
 from shutil import move
 from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
 import errno
+import socket
+import re
 
 def IsNginxInstalled()->bool:
     if os.access( '/usr/sbin/nginx', os.X_OK | os.R_OK ):
@@ -294,8 +295,118 @@ def ConfigWebServer( initFile : str ) -> int :
     finally:
         return ret
 
-def Config_Krb5Client( initCfg : object ):
-    pass
+def AddEntryToHosts(
+    strIpAddr : str,
+    strDomain : str ) -> str:
+
+    bExist = False
+    pattern = strIpAddr + ".*" + strDomain
+    with open('/etc/hosts', 'r') as fp:
+        for line in fp:
+            if re.search( pattern, line ):
+                bExist = True
+    if bExist :
+        return ""
+
+    cmdline = "{sudo} echo '" + strIpAddr + '\t' + \
+        strDomain + "' >> /etc/hosts"
+    return cmdline
+
+def AddPrincipal(
+    strPrinc : str,
+    strPass : str,
+    bLocal = True ) -> str:
+    if bLocal:
+        kadmin = "kadmin.local"
+    else:
+        kadmin = "kadmin"
+    cmdline = "{sudo} " + kadmin + " -q 'addprinc "
+    if len( strPass ) == 0:
+        cmdline += "-pw " + strPass
+    else:
+        cmdline += "-randkey"
+    return cmdline
+
+def DeletePrincipal(
+    strPrinc : str,
+    bLocal = True ) -> str :
+    if bLocal:
+        kadmin = "kadmin.local"
+    else:
+        kadmin = "kadmin"
+    cmdline = "{sudo} " + kadmin + " -q 'delete_principal -force " + \
+        strPrinc + "'"
+    return cmdline
+
+def AddToKeytab(
+    strPrinc : str,
+    strKeytab : str,
+    bLocal = True ) -> str:
+    if bLocal:
+        kadmin = "kadmin.local"
+    else:
+        kadmin = "kadmin"
+    strKtPath = os.path.dirname( strKeytab )
+    cmdline = ""
+    if not os.access( strKtPath, os.R_OK | os.X_OK ):
+        cmdline += "{sudo} mkdir -p " + strKtPath + "&&"
+
+    if len( strKeytab ) == 0:
+        cmdline += "{sudo} " + kadmin + " -q 'ktrem " + strPrinc + "' || "
+        cmdline += "{sudo} " + kadmin + " -q 'ktadd " + strPrinc + "'"
+    else:
+        cmdline = "{sudo} " + kadmin + " -k " + strKeytab + \
+            " -q 'ktrem " + strPrinc + "' || "
+        cmdline += "{sudo} " + kadmin + " -k "+ strKeytab + \
+            " -q 'ktadd " + strPrinc + "'"
+    return cmdline
+
+def GetTestKeytabPath()->str:
+    if os.getuid() == 0:
+        return "/root/.rpcf/krb5/krb5.keytab"
+    return "/home/" + os.getlogin() + \
+        "/.rpcf/krb5/krb5.keytab"
+
+def ChangeKeytabOwner(
+    strKeytab: str,
+    strUser : str = "" ) -> str:
+    if len( strUser ) == 0:
+        strUser = os.getlogin()
+    cmdline = "{sudo} chown " + strUser + " " + strKeytab + ";"
+    cmdline += "{sudo} chmod 600 " + strKeytab
+    return cmdline
+
+def IsLocalIpAddr(
+    strIpAddr : str ) -> bool:
+    bRet = True
+    try:
+        s = socket.socket(
+            socket.AF_INET, socket.SOCK_DGRAM )
+        s.bind( ( strIpAddr, 65432 ) )
+        s.listen()
+        return True
+    except Exception as err:
+        return False
+    finally:
+        s.close()
+
+def Config_Kerberos2( initCfg : object ) -> int:
+    ret = 0
+    try:
+        bServer = False
+        if initCfg[ 'IsServer' ] == 'true' :
+            bServer = True
+        authInfo = initCfg[ 'Security' ][ 'AuthInfo' ]
+        ipAddr = authInfo[ 'KdcIp' ]
+        bLocal = False
+        if bServer and IsLocalIpAddr( ipAddr ) :
+            bLocal = True
+
+    except Exception as err:
+        print( err )
+        if ret == 0:
+            ret = -errno.EFAULT
+        return ret
 
 def test():
     try:
