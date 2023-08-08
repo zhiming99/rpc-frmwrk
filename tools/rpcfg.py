@@ -1703,6 +1703,57 @@ kadmin/admin    *
             print( err )
             return ""
 
+    def GenKrb5InstFiles( self,
+        destPath : str,
+        bServer : bool ) -> int:
+        ret = 0
+        try:
+            if not IsFeatureEnabled( "auth" ):
+                print( "Warning 'auth' is not enabled and no need " + \
+                    "to generate krb5 files for installer" )
+                return 1
+                
+            if not self.IsKrb5Enabled(): 
+                print( "Warning 'krb5' is not selected and no need " + \
+                    "to generate krb5 files for installer" )
+                return 2
+
+            krbConf = self.GetKrb5Conf()
+            if krbConf == "" :
+                print( "Warning 'krb5.conf' is not generated" )
+                return 3
+
+            strSrcPath = os.path.dirname(
+                GetTestKeytabPath() )
+
+            if bServer :
+                re.sub( "^default_client_.*$", "", krbConf )
+                destKeytab = destPath + "/krb5.keytab"
+                srcKeytab = strSrcPath + "/krb5.keytab"
+            else:
+                re.sub( "^default_keytab_.*$", "", krbConf )
+                destKeytab = destPath + "/krb5cli.keytab"
+                srcKeytab = strSrcPath + "/krb5cli.keytab"
+
+            destConf = destPath + "/krb5.conf"
+            fp = open( destConf, "w" )
+            fp.write( krbConf )
+            fp.close()
+
+            cmdline = "cp -f " + srcKeytab + " " + destKeytab
+            ret = os.system( cmdline )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+        return ret
+
+    def GenAuthInstFiles( self,
+        destPath : str,
+        bServer : bool ) -> int:
+        return 1
+
     def GetKrb5Conf( self ) -> str:
         strKrb5Conf = '''[logging]
 default = FILE:/var/log/krb5libs.log
@@ -1718,6 +1769,7 @@ renew_lifetime = 7d
 forwardable = true
 allow_weak_crypto = true
 default_keytab_name=FILE:{DefKeytab}
+default_client_keytab_name=FILE:{DefCliKeytab}
 
 [realms]
 {RealmUpper} = {{
@@ -1732,7 +1784,7 @@ default_domain = {RealmLower}
 
 '''
         try:
-            if not self.IsKrb5Enabled( self.confVals ): 
+            if not self.IsKrb5Enabled(): 
                 raise Exception( "krb5 not enabled" )
 
             kdcIp = self.GetTestKdcIp()
@@ -1740,11 +1792,14 @@ default_domain = {RealmLower}
                 raise Exception( "Unable to determine kdc address" )
 
             strRealm = self.GetTestRealm()
+            strKeytab = GetTestKeytabPath()
+            strCliKeytab = os.path.dirname( strCliKeytab ) + "/krb5cli.keytab"
             strRet = strKrb5Conf.format(
                 KdcServer=kdcIp,
                 RealmLower=strRealm.lower(),
                 RealmUpper=strRealm.upper(),
-                DefKeytab=GetTestKeytabPath()
+                DefKeytab=strKeytab,
+                DefCliKeytab=strCliKeytab
             )
             return strRet
                 
@@ -1820,12 +1875,14 @@ EOF
             cmdline += AddPrincipal(
                 "kadmin/admin", "MITiys5K6" )
 
+            #add principal for the client user
             strUser = self.GetTestKdcUser()
             cmdline += ";"
             cmdline += DeletePrincipal( strUser )
             cmdline += ";"
             cmdline += AddPrincipal( strUser, "" )
 
+            #add principal for the server service
             strSvc = self.GetTestKdcSvc()
             cmdline += ";"
             cmdline += DeletePrincipal( strSvc )
@@ -1838,10 +1895,16 @@ EOF
             cmdline += AddToKeytab(
                 strSvc, strKeytab )
             cmdline += ";"
-            cmdline += AddToKeytab(
-                strUser, strKeytab )
-            cmdline += ";"
             cmdline += ChangeKeytabOwner( strKeytab )
+
+            #add user to client keytable
+            cmdline += ";"
+            strCliKeytab = os.path.dirname( strKeytab ) + \
+                "/krb5cli.keytable"
+            cmdline += AddToKeytab(
+                strUser, strCliKeytab )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strCliKeytab )
 
             if os.geteuid() == 0:
                 actCmd = cmdline.format( sudo = '' )
@@ -1885,7 +1948,17 @@ EOF
         filter_any.add_pattern("*")
         dialog.add_filter(filter_any)
 
-    def IsKrb5Enabled( self, confVals )->bool :
+    def IsKrb5Enabled( self )->bool :
+        try:
+            if not self.ifctx[ 0 ].authCheck.props.active :
+                return False
+            if self.svcEdit is None:
+                return False
+            return True
+        except Exception as err:
+            return False
+
+    def IsKrb5Enabled2( self, confVals )->bool :
         authInfo = None
         bKrb5 = False
         try:
@@ -1911,8 +1984,6 @@ EOF
         except Exception as err :
             pass
 
-        bKrb5 = self.IsKrb5Enabled( confVals )
-
         labelMech = Gtk.Label()
         labelMech.set_text("Auth Mech: ")
         labelMech.set_xalign(.5)
@@ -1928,8 +1999,6 @@ EOF
         mechCombo.set_sensitive( False )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
-        if not bKrb5:
-            return
 
         labelSvc = Gtk.Label()
         labelSvc.set_text("Service Name: ")
@@ -2575,10 +2644,27 @@ EOF
                 ret = -ret
                 raise Exception( "Error creating install package" )
 
+            
+            ret = self.GenAuthInstFiles(
+                destPath, bServer )
+            if ret < 0:
+                raise Exception( "Error generating auth files " + \
+                    "when creating install package" )
+            elif ret > 0:
+                bAuthFiles = False
+            else:
+                bAuthFiles = True
+
             keyPkg = None
             # add instcfg to destPkg
             cfgDir = os.path.dirname( cfgPath )
-            cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json; gzip " + destPkg
+            cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json;"
+
+            if bAuthFiles: 
+                cmdLine += 'tar rf ' + destPkg + " -C " + cfgDir + \
+                    "krb5.conf krb5*.keytab ;"
+
+            cmdLine = "gzip " + destPkg
             ret = os.system( cmdLine )
             if ret != 0:
                 ret = -ret
