@@ -1655,7 +1655,7 @@ class ConfigDlg(Gtk.Dialog):
     def GetTestKdcSvc( self ) -> str:
         strSvc = self.svcEdit.get_text()
         if len( strSvc ) == 0:
-            strSvc = 'host/rpcf'
+            strSvc = 'host1/rpcrouter'
         if strSvc.find( '@' ) == -1:
             strRealm = self.GetTestRealm()
             strSvc += '@' + strRealm 
@@ -1915,7 +1915,15 @@ EOF
                 actCmd = "su -c '" + cmdline.format(
                     sudo = "" ) + "'"
 
-            return os.system( actCmd )
+            ret = os.system( actCmd )
+            if ret < 0:
+                return ret
+
+            if self.realmEdit is not None:
+                self.realmEdit.set_text( strDomain )
+                self.svcEdit.set_text( strSvc )
+                self.userEdit.set_text( strUser )
+                self.kdcEdit.set_text( strIpAddr ) 
                 
         except Exception as err:
             print( err )
@@ -1929,9 +1937,118 @@ EOF
             if tempNewRealm is not None:
                 os.unlink( tempNewRealm )
 
-    def on_init_test_kdc_clicked( self, button ):
-        #self.SetupTestKdc()
-        pass
+    def UpdateAuthSettings( self ) -> int:
+        ret = 0
+        try:
+            bServer = self.bServer
+            if not self.IsKrb5Enabled() :
+                return ret
+
+            if self.realmEdit is None :
+                return -errno.ENOENT
+
+            bChangeUser = False
+            bChangeSvc = False
+            bChangeKdc = False
+            bChangeRealm = False
+
+            authInfo = self.confVals[ 'AuthInfo']
+            strNewRealm = self.realmEdit.get_text()
+            strNewSvc = self.svcEdit.get_text()
+            strNewUser = self.userEdit.get_text()
+            strNewKdcIp = self.kdcEdit.get_text()
+
+            strNewRealm.strip()
+            strNewSvc.strip()
+            strNewUser.strip()
+            strNewKdcIp.strip()
+
+            if strNewRealm == "" :
+                raise Exception( "Realm is empty" )
+            if strNewSvc == "":
+                raise Exception( "Service is empty" )
+            if strNewUser == "":
+                raise Exception( "User is empty" )
+            if strNewKdcIp == "":
+                raise Exception( "KDC address is empty" )
+
+            if bServer and IsLocalIpAddr( strNewKdcIp ):
+                bChangeSvc = True
+                bChangeUser = True
+            else:
+                ## change through installer
+                bChangeSvc = False
+                bChangeUser = False
+
+            if authInfo[ 'Realm' ] !=  strNewRealm :
+                bChangeRealm = True
+            if authInfo[ 'KdcIp' ] != strNewKdcIp :
+                bChangeKdc = True
+
+            if not bChangeKdc and not bChangeUser and \
+                not bChangeSvc and not bChangeRealm :
+                return ret
+            
+            passDlg = PasswordDialog( self )
+            ret, passwd = passDlg.runDlg()
+            if ret < 0:
+                return ret
+
+            if IsSudoAvailable():
+                #make the following sudo password free
+                os.system( "echo " + passwd + "| sudo -S echo updating..." )
+
+
+            cmdline = ""
+            if bChangeSvc :
+                strKeytab = GetTestKeytabPath()
+                cmdline += AddToKeytab(
+                    strNewSvc, strKeytab )
+                cmdline += ChangeKeytabOwner( strKeytab )
+                cmdline += ";"
+
+                #add user to client keytable
+            if bChangeUser :
+                if strKeytab is None:
+                    strKeytab = GetTestKeytabPath()
+                strCliKeytab = os.path.dirname( strKeytab ) + \
+                    "/krb5cli.keytable"
+                cmdline += AddToKeytab(
+                    strNewUser, strCliKeytab )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strCliKeytab )
+
+            if len( cmdline ) > 0:
+                if os.geteuid() == 0:
+                    actCmd = cmdline.format( sudo = '' )
+                elif IsSudoAvailable():
+                    actCmd = cmdline.format(
+                        sudo = 'sudo' )
+                else:
+                    actCmd = "su -c '" + cmdline.format(
+                        sudo = "" ) + "'"
+
+                ret = os.system( actCmd )
+                if ret < 0:
+                    return ret
+
+            if bChangeKdc or bChangeRealm:
+                pass
+                #ret = RewriteKrb5Cfg(
+                #    strNewRealm, strNewKdcIp )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+        return ret
+
+    def on_update_auth_settings( self, button ):
+        if self.checkInitKdc is not None \
+            and self.checkInitKdc.props.active :
+            self.SetupTestKdc()
+        else :
+            self.UpdateAuthSettings()
 
     def add_filters(self, dialog, bKey ):
         filter_text = Gtk.FileFilter()
@@ -2082,13 +2199,28 @@ EOF
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
 
         if self.bServer:
-            toolTip = "Setting up a KDC server " + \
-                " on this host with the information from" + \
-                " the 'Auth Information' section"
-            initKdcBtn = Gtk.Button.new_with_label("Initialize Test KDC")
-            initKdcBtn.connect("clicked", self.on_init_test_kdc_clicked)
-            initKdcBtn.set_tooltip_text( toolTip )
-            grid.attach( initKdcBtn, startCol + 1, startRow + 7, 2, 1 )
+
+            toolTip = "Initialize a KDC server on this host"
+            toolTip2 = "Update the Kerberos settings with " +\
+                "the above 'Auth Information'"
+
+            updKrb5Btn = Gtk.Button.new_with_label("Update Auth Settings")
+            updKrb5Btn.connect("clicked", self.on_update_auth_settings )
+            updKrb5Btn.set_tooltip_text( toolTip2 )
+            grid.attach( updKrb5Btn, startCol + 1, startRow + 7, 2, 1 )
+
+            labelInitKdc = Gtk.Label()
+            labelInitKdc.set_text("Init KDC: ")
+            labelInitKdc.set_xalign(.5)
+            grid.attach(labelInitKdc, startCol + 0, startRow + 8, 1, 1 )
+
+            checkInitKdc = Gtk.CheckButton(label="")
+            checkInitKdc.props.active = False
+            checkInitKdc.connect(
+                "toggled", self.on_button_toggled, "InitKdc")
+            grid.attach( checkInitKdc, startCol + 1, startRow + 8, 1, 1)
+            checkInitKdc.set_tooltip_text( toolTip )
+            self.checkInitKdc = checkInitKdc
 
         self.svcEdit = svcEditBox
         self.realmEdit = realmEditBox
@@ -2142,31 +2274,17 @@ EOF
         checkCfgWs = Gtk.CheckButton(label="")
         checkCfgWs.props.active = False
         checkCfgWs.set_tooltip_text( "Config the local installation " +
-            "of the Nginx or Apache server for websocket connection" );
+            "of the Nginx or Apache server for websocket connection" )
 
         checkCfgWs.connect(
             "toggled", self.on_button_toggled, "CfgWs")
         grid.attach( checkCfgWs, startCol + 1, startRow + 3, 1, 1)
         self.checkCfgWs = checkCfgWs
 
-        labelCfgKrb5 = Gtk.Label()
-        labelCfgKrb5.set_text("Config Kerberos")
-        labelCfgKrb5.set_xalign(.5)
-        grid.attach( labelCfgKrb5, startCol + 0, startRow + 4, 1, 1 )
-
-        checkCfgKrb5 = Gtk.CheckButton(label="")
-        checkCfgKrb5.props.active = False
-
-        checkCfgKrb5.connect(
-            "toggled", self.on_button_toggled, "CfgKrb5")
-        grid.attach( checkCfgKrb5, startCol + 1, startRow + 4, 1, 1)
-        self.checkCfgKrb5 = checkCfgKrb5
-
         labelKProxy = Gtk.Label()
         labelKProxy.set_text("kinit proxy")
         labelKProxy.set_xalign(.5)
         grid.attach( labelKProxy, startCol + 1, startRow + 5, 1, 1 )
-
         checkKProxy = Gtk.CheckButton(label="")
         checkKProxy.props.active = False
 
@@ -2441,8 +2559,7 @@ EOF
             authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
             authInfo[ 'AuthMech' ] = 'krb5'
             authInfo[ 'UserName' ] = self.userEdit.get_text()
-            if self.bServer :
-                authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
+            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
 
             tree_iter = self.signCombo.get_active_iter()
             if tree_iter is not None:
@@ -2987,6 +3104,10 @@ EOF
 
             ret = self.Export_InitCfg( initFile )
             if ret < 0 :
+                return ret
+
+            if IsInDevTree():
+                ret = Update_InitCfg( initFile, destPath, passDlg )
                 return ret
 
             passDlg = PasswordDialog( self )

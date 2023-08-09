@@ -10,6 +10,17 @@ import errno
 import socket
 import re
 
+def IsInDevTree() -> bool:
+    strPath = os.path.dirname(os.path.realpath(__file__))
+    stat_info = os.stat( strPath )
+    uid = stat_info.st_uid
+    if uid != os.geteuid() :
+        return False
+    strPath += '/../configure.ac'
+    if os.access( strPath, os.R_OK ):
+        return True
+    return False
+
 def IsNginxInstalled()->bool:
     if os.access( '/usr/sbin/nginx', os.X_OK | os.R_OK ):
         return True
