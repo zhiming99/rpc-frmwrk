@@ -1,4 +1,27 @@
 #!/usr/bin/env python3
+#*
+#* =====================================================================================
+#*
+#*       Filename:  rpcfg.py
+#*
+#*    Description:  implementation of a GUI config tool for rpc-frmwrk
+#*
+#*        Version:  1.0
+#*        Created:  04/26/2021 10:43:00 PM
+#*       Revision:  none
+#*       Compiler:  gcc
+#*
+#*         Author:  Ming Zhi( woodhead99@gmail.com )
+#*   Organization:
+#*
+#*      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+#*
+#*        License:  Licensed under GPL-3.0. You may not use this file except in
+#*                  compliance with the License. You may find a copy of the
+#*                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+#*
+#* =====================================================================================
+#*
 import json
 import os
 import sys 
@@ -11,6 +34,7 @@ import tarfile
 import time
 from updcfg import *
 from updwscfg import *
+from krbparse import *
 import re
 
 def vc_changed(stack, gparamstring):
@@ -2018,6 +2042,19 @@ EOF
                 cmdline += ";"
                 cmdline += ChangeKeytabOwner( strCliKeytab )
 
+            #update krb5.conf
+            strTmpConf ='/tmp/krb5dxsdf021.conf'
+            if bChangeKdc or bChangeRealm:
+                ret, node = ParseKrb5Conf( '/etc/krb5.conf' )
+                if ret == 0 && node is not None:
+                    ret = UpdateKrb5Cfg( node, strNewRealm,
+                        strNewKdcIp, strTmpConf, False )
+                    node.RemoveChildren()
+                    if ret == 0:
+                        cmdline += ";"
+                        cmdline += "{sudo} install -bm 644 " + strTmpConf + \
+                            " /etc/krb5.conf || rm -f " + strTmpConf
+
             if len( cmdline ) > 0:
                 if os.geteuid() == 0:
                     actCmd = cmdline.format( sudo = '' )
@@ -2028,14 +2065,10 @@ EOF
                     actCmd = "su -c '" + cmdline.format(
                         sudo = "" ) + "'"
 
+                print( actCmd )
                 ret = os.system( actCmd )
                 if ret < 0:
                     return ret
-
-            if bChangeKdc or bChangeRealm:
-                pass
-                #ret = RewriteKrb5Cfg(
-                #    strNewRealm, strNewKdcIp )
 
         except Exception as err:
             print( err )
