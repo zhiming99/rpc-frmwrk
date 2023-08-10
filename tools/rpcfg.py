@@ -2046,7 +2046,7 @@ EOF
             strTmpConf ='/tmp/krb5dxsdf021.conf'
             if bChangeKdc or bChangeRealm:
                 ret, node = ParseKrb5Conf( '/etc/krb5.conf' )
-                if ret == 0 && node is not None:
+                if ret == 0 and node is not None:
                     ret = UpdateKrb5Cfg( node, strNewRealm,
                         strNewKdcIp, strTmpConf, False )
                     node.RemoveChildren()
