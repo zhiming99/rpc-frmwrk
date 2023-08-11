@@ -1,4 +1,4 @@
-pysources = rpcfg.py rpcfgnui.py updinitcfg.py updwscfg.py krbparse.py
+pysources = rpcfg.py rpcfgnui.py updinitcfg.py updwscfg.py krbparse.py updk5cfg.py
 
 testcfgfiles=testcfgs/mincfg.json \
 testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh
@@ -42,7 +42,7 @@ install-exec-local:
 	if [ "x$(DESTDIR)" == "x" ];then BinDir=$(bindir);\
 	else BinDir=$(DESTDIR)$(bindir); fi;\
 	if [ ! -e $${BinDir}/rpcf ]; then mkdir -p $${BinDir}/rpcf;fi; \
-	install rpcfg.py updcfg.py rpcfgnui.py updinitcfg.py updwscfg.py krbparse.py $${BinDir}/rpcf/;\
+	install rpcfg.py updcfg.py rpcfgnui.py updinitcfg.py updwscfg.py krbparse.py updk5cfg.py $${BinDir}/rpcf/;\
     chmod +x $${BinDir}/rpcf/{rpcfg,updcfg,rpcfgnui}.py;\
     eval ${gmssl_cmd}\
     eval ${openssl_cmd}

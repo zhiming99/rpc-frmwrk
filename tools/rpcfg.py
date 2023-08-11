@@ -34,7 +34,7 @@ import tarfile
 import time
 from updcfg import *
 from updwscfg import *
-from krbparse import *
+from updk5cfg import *
 import re
 
 def vc_changed(stack, gparamstring):
@@ -945,7 +945,7 @@ class ConfigDlg(Gtk.Dialog):
         grpCtx = self.grpCtxs[ iNo ]
         strText = SetToString( grpCtx.grpSet )
         grpCtx.textbuffer.set_text( strText )
-        grpCtx.grpName = dialog.nameEntry.get_text()
+        grpCtx.grpName = dialog.nameEntry.get_text().strip()
         SetBtnText( grpCtx.removeBtn, "Remove '" + grpCtx.grpName + "'" )
         SetBtnText( grpCtx.changeBtn, "Change '" + grpCtx.grpName + "'" )
         grpCtx.labelName.set_markup( "<b>group '" + grpCtx.grpName + "'</b>" )
@@ -1091,7 +1091,7 @@ class ConfigDlg(Gtk.Dialog):
             for nodeCtx in self.nodeCtxs :
                 if nodeCtx.IsEmpty() :
                     continue
-                strName = nodeCtx.nodeName.get_text()
+                strName = nodeCtx.nodeName.get_text().strip()
                 if len( strName ) == 0 :
                     continue
                 if not strName.isidentifier() :
@@ -1644,8 +1644,8 @@ class ConfigDlg(Gtk.Dialog):
         if response != Gtk.ResponseType.OK:
             dialog.destroy()
             return
-        cnum = dialog.cnumEdit.get_text()
-        snum = dialog.snumEdit.get_text()
+        cnum = dialog.cnumEdit.get_text().strip()
+        snum = dialog.snumEdit.get_text().strip()
 
         strCurPath = os.path.expanduser( "~" ) + "/.rpcf"
         bGmSSL = self.gmsslCheck.props.active
@@ -1664,20 +1664,23 @@ class ConfigDlg(Gtk.Dialog):
     def GetTestKdcIp( self ) -> str:
         kdcIp = ""
         try:
-            kdcIp = self.ifctx[ 0 ].ipAddr.get_text()
+            kdcIp = self.kdcEdit.get_text().strip().lower()
+            if kdcIp != '' and IsLocalIpAddr( kdcIp ) :
+                return kdcIp
+            return self.ifctx[ 0 ].ipAddr.get_text().strip()
         except:
-            pass
+            kdcIp = ''
         return kdcIp
 
     def GetTestRealm( self ) -> str:
-        strRealm = self.realmEdit.get_text()
+        strRealm = self.realmEdit.get_text().strip()
         if len( strRealm ) == 0:
             strRealm = 'RPCF.ORG'
 
         return strRealm
 
     def GetTestKdcSvc( self ) -> str:
-        strSvc = self.svcEdit.get_text()
+        strSvc = self.svcEdit.get_text().strip()
         if len( strSvc ) == 0:
             strSvc = 'host1/rpcrouter'
         if strSvc.find( '@' ) == -1:
@@ -1686,7 +1689,7 @@ class ConfigDlg(Gtk.Dialog):
         return strSvc
 
     def GetTestKdcUser( self ) -> str:
-        strUser = self.userEdit.get_text()
+        strUser = self.userEdit.get_text().strip()
         if len( strUser ) == 0:
             strUser = os.getlogin()
 
@@ -1699,7 +1702,8 @@ class ConfigDlg(Gtk.Dialog):
         strAcl = ''' 
 kadmin/admin    *
 {Service} i
-{User}  il
+{User}  i
+
 '''
         strSvc = self.GetTestKdcSvc()
         strUser = self.GetTestKdcUser()
@@ -1720,7 +1724,7 @@ kadmin/admin    *
         try:
             strRealm = self.GetTestRealm()
             strRet = strKdcConf.format(
-                Realm=strRealm.upper() )
+                Realm=strRealm )
             return strRet
                 
         except Exception as err:
@@ -1776,7 +1780,10 @@ kadmin/admin    *
     def GenAuthInstFiles( self,
         destPath : str,
         bServer : bool ) -> int:
-        return 1
+        if self.IsKrb5Enabled() :
+            return self.GenKrb5InstFiles(
+                destPath, bServer )
+        return 0
 
     def GetKrb5Conf( self ) -> str:
         strKrb5Conf = '''[logging]
@@ -1785,7 +1792,7 @@ kdc = FILE:/var/log/krb5kdc.log
 admin_server = FILE:/var/log/kadmind.log
 
 [libdefaults]
-default_realm = {RealmUpper}
+default_realm = {Realm}
 dns_lookup_realm = false
 dns_lookup_kdc = false
 ticket_lifetime = 24h
@@ -1796,15 +1803,15 @@ default_keytab_name=FILE:{DefKeytab}
 default_client_keytab_name=FILE:{DefCliKeytab}
 
 [realms]
-{RealmUpper} = {{
+{Realm} = {{
 kdc = {KdcServer}
 admin_server = {KdcServer}
-default_domain = {RealmLower}
+default_domain = {DomainName}
 }}
 
 [domain_realm]
-.{RealmLower} = {RealmUpper}
-{RealmLower} = {RealmUpper}
+.{DomainName} = {Realm}
+{DomainName} = {Realm}
 
 '''
         try:
@@ -1820,8 +1827,8 @@ default_domain = {RealmLower}
             strCliKeytab = os.path.dirname( strCliKeytab ) + "/krb5cli.keytab"
             strRet = strKrb5Conf.format(
                 KdcServer=kdcIp,
-                RealmLower=strRealm.lower(),
-                RealmUpper=strRealm.upper(),
+                DomainName=strRealm.lower(),
+                Realm=strRealm,
                 DefKeytab=strKeytab,
                 DefCliKeytab=strCliKeytab
             )
@@ -1977,15 +1984,10 @@ EOF
             bChangeRealm = False
 
             authInfo = self.confVals[ 'AuthInfo']
-            strNewRealm = self.realmEdit.get_text()
-            strNewSvc = self.svcEdit.get_text()
-            strNewUser = self.userEdit.get_text()
-            strNewKdcIp = self.kdcEdit.get_text()
-
-            strNewRealm.strip()
-            strNewSvc.strip()
-            strNewUser.strip()
-            strNewKdcIp.strip()
+            strNewRealm = self.realmEdit.get_text().strip()
+            strNewSvc = self.svcEdit.get_text().strip()
+            strNewUser = self.userEdit.get_text().strip()
+            strNewKdcIp = self.kdcEdit.get_text().strip()
 
             if strNewRealm == "" :
                 raise Exception( "Realm is empty" )
@@ -2006,41 +2008,57 @@ EOF
 
             if authInfo[ 'Realm' ] !=  strNewRealm :
                 bChangeRealm = True
-            if authInfo[ 'KdcIp' ] != strNewKdcIp :
+            if self.confVals[ 'kdcAddr' ] != strNewKdcIp :
                 bChangeKdc = True
 
             if not bChangeKdc and not bChangeUser and \
                 not bChangeSvc and not bChangeRealm :
                 return ret
             
-            passDlg = PasswordDialog( self )
-            ret, passwd = passDlg.runDlg()
-            if ret < 0:
-                return ret
-
             if IsSudoAvailable():
-                #make the following sudo password free
+                passDlg = PasswordDialog( self )
+                ret, passwd = passDlg.runDlg()
+                if ret < 0:
+                    return ret
                 os.system( "echo " + passwd + "| sudo -S echo updating..." )
+                passwd = None
 
 
             cmdline = ""
+            cmdline += '{sudo} systemctl stop krb5-kdc'
             if bChangeSvc :
+                cmdline += ";"
+                cmdline += DeletePrincipal( strNewSvc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strNewSvc, "" )
+                cmdline += ";"
                 strKeytab = GetTestKeytabPath()
                 cmdline += AddToKeytab(
                     strNewSvc, strKeytab )
+                cmdline += " && "
                 cmdline += ChangeKeytabOwner( strKeytab )
                 cmdline += ";"
 
-                #add user to client keytable
+            #add user to client keytable
             if bChangeUser :
                 if strKeytab is None:
                     strKeytab = GetTestKeytabPath()
                 strCliKeytab = os.path.dirname( strKeytab ) + \
                     "/krb5cli.keytable"
+                cmdline += DeletePrincipal( strNewUser )
+                cmdline += ";"
+                cmdline += AddPrincipal( strNewUser, "" )
+                cmdline += ";"
                 cmdline += AddToKeytab(
                     strNewUser, strCliKeytab )
-                cmdline += ";"
+                cmdline += " && "
+                aclFile = "/etc/krb5kdc/kadm5.acl"
                 cmdline += ChangeKeytabOwner( strCliKeytab )
+                cmdline += ";"
+                cmdline += "if ! {sudo} grep '" + strNewUser + "' " + aclFile + "; then "
+                cmdline += "{sudo} echo >> " + aclFile + ";"
+                cmdline += "{sudo} echo '" + strNewUser + " i' >> "
+                cmdline += aclFile + "; fi"
 
             #update krb5.conf
             strTmpConf ='/tmp/krb5dxsdf021.conf'
@@ -2056,6 +2074,8 @@ EOF
                             " /etc/krb5.conf || rm -f " + strTmpConf
 
             if len( cmdline ) > 0:
+                cmdline += ";"
+                cmdline += '{sudo} systemctl restart krb5-kdc'
                 if os.geteuid() == 0:
                     actCmd = cmdline.format( sudo = '' )
                 elif IsSudoAvailable():
@@ -2234,7 +2254,7 @@ EOF
         if self.bServer:
 
             toolTip = "Initialize a KDC server on this host"
-            toolTip2 = "Update the Kerberos settings with " +\
+            toolTip2 = "Update the Kerberos system settings with " +\
                 "the above 'Auth Information'"
 
             updKrb5Btn = Gtk.Button.new_with_label("Update Auth Settings")
@@ -2344,40 +2364,40 @@ EOF
                 if interf.IsEmpty() :
                     continue
                 if interf.sslCheck.props.active :
-                    if len( self.keyEdit.get_text() ) == 0 :
+                    if len( self.keyEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, key file is empty"
-                    if len( self.certEdit.get_text() ) == 0 :
+                    if len( self.certEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, cert file is empty"
                 if interf.authCheck.props.active :
-                    if len( self.realmEdit.get_text() ) == 0 :
+                    if len( self.realmEdit.get_text().strip() ) == 0 :
                         return "Auth enabled, but realm is empty"
-                    if len( self.svcEdit.get_text() ) == 0 and self.bServer :
+                    if len( self.svcEdit.get_text().strip() ) == 0 and self.bServer :
                         return "Auth enabled, but service is empty"
-                    if len( self.kdcEdit.get_text() ) == 0 and self.bServer :
+                    if len( self.kdcEdit.get_text().strip() ) == 0 and self.bServer :
                         return "Auth enabled, but kdc address is empty"
-                    if len( self.userEdit.get_text() ) == 0 and not self.bServer:
+                    if len( self.userEdit.get_text().strip() ) == 0 and not self.bServer:
                         return "Auth enabled, but user name is empty"
-                if len( interf.ipAddr.get_text() ) == 0 :
+                if len( interf.ipAddr.get_text().strip() ) == 0 :
                     return "Ip address is empty"
                 else :
-                    strIp = interf.ipAddr.get_text()
+                    strIp = interf.ipAddr.get_text().strip()
 
-                if len( interf.port.get_text() ) == 0 :
+                if len( interf.port.get_text().strip() ) == 0 :
                     return "Port number is empty"
                 else:
-                    strPort = interf.port.get_text()
+                    strPort = interf.port.get_text().strip()
 
                 if (strIp, strPort) not in addrSet :
                     addrSet.add((strIp, strPort))
                 else :
                     return "Identical IP and Port pair found between interfaces"
 
-                if ( interf.ipAddr.get_text() == '0.0.0.0' or  
-                    interf.ipAddr.get_text() == "::" ) :
+                if ( interf.ipAddr.get_text().strip() == '0.0.0.0' or  
+                    interf.ipAddr.get_text().strip() == "::" ) :
                     return "Ip address is '0.0.0.0'"
 
                 if interf.rtpathEdit is not None :
-                    strPath = interf.rtpathEdit.get_text()
+                    strPath = interf.rtpathEdit.get_text().strip()
                     if strPath[ 0 ] != '/' :
                         return "RouterPath is not a valid path"
                     try:
@@ -2386,7 +2406,7 @@ EOF
                         return "RouterPath is not a valid path"
 
                 if interf.webSock.props.active :
-                    if len( interf.urlEdit.get_text() ) == 0 :
+                    if len( interf.urlEdit.get_text().strip() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
 
             if not self.bServer :
@@ -2401,21 +2421,21 @@ EOF
                 if nodeCtx.IsEmpty() :
                     continue
                 if nodeCtx.sslCheck.props.active :
-                    if len( self.keyEdit.get_text() ) == 0 :
+                    if len( self.keyEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, but key file is empty"
-                    if len( self.certEdit.get_text() ) == 0 :
+                    if len( self.certEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, but cert file is empty"
-                if len( nodeCtx.ipAddr.get_text() ) == 0 :
+                if len( nodeCtx.ipAddr.get_text().strip() ) == 0 :
                     return "Ip address is empty"
-                if len( nodeCtx.port.get_text() ) == 0 :
+                if len( nodeCtx.port.get_text().strip() ) == 0 :
                     return "Port number is empty"
                 else :
-                    strPort = nodeCtx.port.get_text()
+                    strPort = nodeCtx.port.get_text().strip()
 
-                if nodeCtx.ipAddr.get_text() == '0.0.0.0' :
+                if nodeCtx.ipAddr.get_text().strip() == '0.0.0.0' :
                     return "ip address is '0.0.0.0'"
                 else :
-                    strIp = nodeCtx.ipAddr.get_text()
+                    strIp = nodeCtx.ipAddr.get_text().strip()
 
                 if (strIp, strPort) not in addrSet :
                     addrSet.add((strIp, strPort))
@@ -2423,10 +2443,10 @@ EOF
                     return "Identical IP and Port pair found between nodes"
 
                 if nodeCtx.webSock.props.active :
-                    if len( interf.urlEdit.get_text() ) == 0 :
+                    if len( interf.urlEdit.get_text().strip() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
                 
-                strName = nodeCtx.nodeName.get_text()
+                strName = nodeCtx.nodeName.get_text().strip()
                 if len( strName ) == 0:
                     return "Multihop node name cannot be empty"
 
@@ -2462,17 +2482,17 @@ EOF
 
     def ExportNodeCtx( self, nodeCtx, nodeCfg ):
         try:
-            strVal = nodeCtx.ipAddr.get_text() 
+            strVal = nodeCtx.ipAddr.get_text().strip() 
             if len( strVal ) == 0 :
                 raise Exception("'IP address' cannot be empty") 
             nodeCfg[ 'IpAddress' ] = strVal
 
-            strVal = nodeCtx.port.get_text()
+            strVal = nodeCtx.port.get_text().strip()
             if len( strVal ) == 0 :
                 strVal = str( 4132 )
             nodeCfg[ 'PortNumber' ] = strVal
 
-            strVal = nodeCtx.nodeName.get_text()
+            strVal = nodeCtx.nodeName.get_text().strip()
             if len( strVal ) == 0 :
                 raise Exception("'Node Name' cannot be empty") 
             nodeCfg[ 'NodeName' ] = strVal
@@ -2492,7 +2512,7 @@ EOF
             else:
                 nodeCfg[ "EnableSSL" ] = "false"
 
-            strVal = nodeCtx.urlEdit.get_text()
+            strVal = nodeCtx.urlEdit.get_text().strip()
             if nodeCtx.webSock.props.active :
                 if len( strVal ) == 0 :
                     raise Exception("'WebSocket URL' cannot be empty") 
@@ -2521,10 +2541,10 @@ EOF
                 if curVals.IsEmpty() :
                     continue
                 elem = dict()
-                strIp = curVals.ipAddr.get_text()
+                strIp = curVals.ipAddr.get_text().strip()
                 elem[ 'IpAddress' ] = strIp
-                strPort = curVals.port.get_text()
-                elem[ 'PortNumber' ] = curVals.port.get_text()
+                strPort = curVals.port.get_text().strip()
+                elem[ 'PortNumber' ] = curVals.port.get_text().strip()
                 if curVals.compress.props.active :
                     elem[ 'Compression' ] = 'true'
                 else:
@@ -2542,12 +2562,12 @@ EOF
 
                 if curVals.webSock.props.active :
                     elem[ 'EnableWS' ] = 'true'
-                    elem[ 'DestURL' ] = curVals.urlEdit.get_text()
+                    elem[ 'DestURL' ] = curVals.urlEdit.get_text().strip()
                 else:
                     elem[ 'EnableWS' ] = 'false'
 
                 if i == 0 :
-                    strPath = curVals.rtpathEdit.get_text()
+                    strPath = curVals.rtpathEdit.get_text().strip()
                     if len( strPath ) == 0 :
                         strPath = '/'
                     elem[ 'RouterPath' ] = strPath
@@ -2571,10 +2591,10 @@ EOF
             jsonVal[ 'Security' ] = elemSecs
             sslFiles = dict()
             elemSecs[ 'SSLCred' ] = sslFiles
-            sslFiles[ "KeyFile"] = self.keyEdit.get_text()
-            sslFiles[ "CertFile"] = self.certEdit.get_text()
-            sslFiles[ "CACertFile"] = self.cacertEdit.get_text()
-            sslFiles[ "SecretFile"] = self.secretEdit.get_text()
+            sslFiles[ "KeyFile"] = self.keyEdit.get_text().strip()
+            sslFiles[ "CertFile"] = self.certEdit.get_text().strip()
+            sslFiles[ "CACertFile"] = self.cacertEdit.get_text().strip()
+            sslFiles[ "SecretFile"] = self.secretEdit.get_text().strip()
             if self.gmsslCheck.props.active:
                 sslFiles[ "UsingGmSSL" ] = 'true'
             else:
@@ -2588,11 +2608,11 @@ EOF
             authInfo = dict()
             elemSecs[ 'AuthInfo' ] = authInfo
 
-            authInfo[ 'Realm' ] = self.realmEdit.get_text()
-            authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
+            authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
+            authInfo[ 'ServiceName' ] = self.svcEdit.get_text().strip()
             authInfo[ 'AuthMech' ] = 'krb5'
-            authInfo[ 'UserName' ] = self.userEdit.get_text()
-            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
+            authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
+            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
 
             tree_iter = self.signCombo.get_active_iter()
             if tree_iter is not None:
@@ -2606,7 +2626,7 @@ EOF
             miscOpts = dict()
             elemSecs[ 'misc' ] = miscOpts
             try:
-                iVal = int( self.maxconnEdit.get_text() )
+                iVal = int( self.maxconnEdit.get_text().strip() )
                 if iVal > 60000 :
                     iVal = 60000
             except Exception as err :
