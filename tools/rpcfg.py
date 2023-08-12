@@ -1679,7 +1679,7 @@ class ConfigDlg(Gtk.Dialog):
 
         return strRealm
 
-    def GetTestKdcSvc( self ) -> str:
+    def GetTestKdcSvcPrinc( self ) -> str:
         strSvc = self.svcEdit.get_text().strip()
         if len( strSvc ) == 0:
             strSvc = 'host1/rpcrouter'
@@ -1705,7 +1705,7 @@ kadmin/admin    *
 {User}  i
 
 '''
-        strSvc = self.GetTestKdcSvc()
+        strSvc = self.GetTestKdcSvcPrinc()
         strUser = self.GetTestKdcUser()
         return strAcl.format(
             Service=strSvc,
@@ -1714,17 +1714,18 @@ kadmin/admin    *
     def GetKdcConf( self ) -> str:
         strKdcConf='''[realms]
 {Realm} = {{
-    acl_file = /etc/krb5kdc/kadm5.acl
+    acl_file = {KdcConfPath}/kadm5.acl
     max_renewable_life = 7d 0h 0m 0s
     supported_enctypes = aes256-cts:normal aes128-cts:normal
     default_principal_flags = +preauth
-    key_stash_file = /etc/krb5kdc/stash
+    key_stash_file = {KdcConfPath}/stash
 }}
 '''
         try:
             strRealm = self.GetTestRealm()
             strRet = strKdcConf.format(
-                Realm=strRealm )
+                Realm=strRealm,
+                KdcConfPath=GetKdcConfPath() )
             return strRet
                 
         except Exception as err:
@@ -1780,10 +1781,9 @@ kadmin/admin    *
     def GenAuthInstFiles( self,
         destPath : str,
         bServer : bool ) -> int:
-        if self.IsKrb5Enabled() :
-            return self.GenKrb5InstFiles(
-                destPath, bServer )
-        return 0
+        ret = self.GenKrb5InstFiles(
+            destPath, bServer )
+        return ret
 
     def GetKrb5Conf( self ) -> str:
         strKrb5Conf = '''[logging]
@@ -1824,7 +1824,7 @@ default_domain = {DomainName}
 
             strRealm = self.GetTestRealm()
             strKeytab = GetTestKeytabPath()
-            strCliKeytab = os.path.dirname( strCliKeytab ) + "/krb5cli.keytab"
+            strCliKeytab = os.path.dirname( strKeytab ) + "/krb5cli.keytab"
             strRet = strKrb5Conf.format(
                 KdcServer=kdcIp,
                 DomainName=strRealm.lower(),
@@ -1838,11 +1838,13 @@ default_domain = {DomainName}
             print( err )
             return ""
 
-    def SetupTestKdc( self ):
+    def SetupTestKdc( self )->int:
         tempKrb = None
         tempKdc = None
         tempAcl = None
         tempNewRealm = None
+        tempInit = None
+        ret = 0
         try:
             strConf = self.GetKrb5Conf()
             if len( strConf ) == 0:
@@ -1884,19 +1886,22 @@ EOF
 ''' )
             fp.close()
 
-            cmdline = "{sudo} install -bm 644 " + tempKrb
+            cmdline = '{sudo} systemctl stop {KdcSvc};'
+            cmdline += "{sudo} install -bm 644 " + tempKrb
             cmdline += " /etc/krb5.conf;"
-            cmdline = "{sudo} install -bm 644 " + tempKdc
-            cmdline += " /etc/krb5kdc/kdc.conf;"
-            cmdline = "{sudo} install -bm 644 " + tempAcl
-            cmdline += " /etc/krb5kdc/kadm5.acl;"
+            cmdline += "{sudo} install -bm 644 " + tempKdc
+            cmdline += " {KdcConfPath}/kdc.conf;"
+            cmdline += "{sudo} install -bm 644 " + tempAcl
+            cmdline += " {KdcConfPath}/kadm5.acl;"
 
             cmdline += "{sudo} bash " + tempNewRealm
+            cmdline += ";"
 
             strDomain = self.GetTestRealm()
             strIpAddr = self.GetTestKdcIp()
             cmdline += AddEntryToHosts(
-                strIpAddr, strDomain )
+                strIpAddr,
+                strDomain + " kdc." + strDomain )
 
             cmdline += ";"
             cmdline += DeletePrincipal(
@@ -1914,7 +1919,7 @@ EOF
             cmdline += AddPrincipal( strUser, "" )
 
             #add principal for the server service
-            strSvc = self.GetTestKdcSvc()
+            strSvc = self.GetTestKdcSvcPrinc()
             cmdline += ";"
             cmdline += DeletePrincipal( strSvc )
             cmdline += ";"
@@ -1931,21 +1936,35 @@ EOF
             #add user to client keytable
             cmdline += ";"
             strCliKeytab = os.path.dirname( strKeytab ) + \
-                "/krb5cli.keytable"
+                "/krb5cli.keytab"
             cmdline += AddToKeytab(
                 strUser, strCliKeytab )
             cmdline += ";"
             cmdline += ChangeKeytabOwner( strCliKeytab )
 
+            cmdline += ";"
+            cmdline += '{sudo} systemctl restart {KdcSvc};'
+
             if os.geteuid() == 0:
-                actCmd = cmdline.format( sudo = '' )
+                actCmd = cmdline.format( sudo = '',
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() )
             elif IsSudoAvailable():
                 actCmd = cmdline.format(
-                    sudo = 'sudo' )
+                    sudo = 'sudo',
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() )
+                passDlg = PasswordDialog( self )
+                ret, passwd = passDlg.runDlg()
+                if ret < 0:
+                    return ret
+                os.system( "echo " + passwd + "| sudo -S echo updating..." )
+                passwd = None
             else:
                 actCmd = "su -c '" + cmdline.format(
                     sudo = "" ) + "'"
 
+            #print( actCmd )
             ret = os.system( actCmd )
             if ret < 0:
                 return ret
@@ -1955,6 +1974,12 @@ EOF
                 self.svcEdit.set_text( strSvc )
                 self.userEdit.set_text( strUser )
                 self.kdcEdit.set_text( strIpAddr ) 
+
+            tempInit = tempname()
+            ret = self.Export_InitCfg( tempInit )
+            if ret < 0 :
+                return ret
+            return  Update_InitCfg( tempInit, None )
                 
         except Exception as err:
             print( err )
@@ -1967,9 +1992,13 @@ EOF
                 os.unlink( tempAcl )
             if tempNewRealm is not None:
                 os.unlink( tempNewRealm )
+            if tempInit is not None:
+                os.unlink( tempInit )
 
     def UpdateAuthSettings( self ) -> int:
         ret = 0
+        strTmpConf = None
+        tempInit = None
         try:
             bServer = self.bServer
             if not self.IsKrb5Enabled() :
@@ -2025,7 +2054,7 @@ EOF
 
 
             cmdline = ""
-            cmdline += '{sudo} systemctl stop krb5-kdc'
+            cmdline += '{sudo} systemctl stop {KdcSvc}'
             if bChangeSvc :
                 cmdline += ";"
                 cmdline += DeletePrincipal( strNewSvc )
@@ -2044,7 +2073,7 @@ EOF
                 if strKeytab is None:
                     strKeytab = GetTestKeytabPath()
                 strCliKeytab = os.path.dirname( strKeytab ) + \
-                    "/krb5cli.keytable"
+                    "/krb5cli.keytab"
                 cmdline += DeletePrincipal( strNewUser )
                 cmdline += ";"
                 cmdline += AddPrincipal( strNewUser, "" )
@@ -2052,7 +2081,7 @@ EOF
                 cmdline += AddToKeytab(
                     strNewUser, strCliKeytab )
                 cmdline += " && "
-                aclFile = "/etc/krb5kdc/kadm5.acl"
+                aclFile = "{KdcConfPath}/kadm5.acl"
                 cmdline += ChangeKeytabOwner( strCliKeytab )
                 cmdline += ";"
                 cmdline += "if ! {sudo} grep '" + strNewUser + "' " + aclFile + "; then "
@@ -2061,7 +2090,7 @@ EOF
                 cmdline += aclFile + "; fi"
 
             #update krb5.conf
-            strTmpConf ='/tmp/krb5dxsdf021.conf'
+            strTmpConf =tempname()
             if bChangeKdc or bChangeRealm:
                 ret, node = ParseKrb5Conf( '/etc/krb5.conf' )
                 if ret == 0 and node is not None:
@@ -2071,29 +2100,49 @@ EOF
                     if ret == 0:
                         cmdline += ";"
                         cmdline += "{sudo} install -bm 644 " + strTmpConf + \
-                            " /etc/krb5.conf || rm -f " + strTmpConf
+                            " /etc/krb5.conf;"
+
+                    cmdline += AddEntryToHosts(
+                        strNewKdcIp,
+                        strNewRealm + " kdc." + strNewRealm )
 
             if len( cmdline ) > 0:
                 cmdline += ";"
-                cmdline += '{sudo} systemctl restart krb5-kdc'
+                cmdline += '{sudo} systemctl restart {KdcSvc}'
                 if os.geteuid() == 0:
-                    actCmd = cmdline.format( sudo = '' )
+                    actCmd = cmdline.format( sudo = '',
+                        KdcConfPath=GetKdcConfPath(),
+                        KdcSvc = GetKdcSvcName() )
                 elif IsSudoAvailable():
                     actCmd = cmdline.format(
-                        sudo = 'sudo' )
+                        sudo = 'sudo',
+                        KdcConfPath=GetKdcConfPath(),
+                        KdcSvc = GetKdcSvcName() )
                 else:
                     actCmd = "su -c '" + cmdline.format(
                         sudo = "" ) + "'"
 
-                print( actCmd )
+                #print( actCmd )
                 ret = os.system( actCmd )
                 if ret < 0:
                     return ret
+
+            tempInit = tempname()
+            ret = self.Export_InitCfg( tempInit )
+            if ret < 0 :
+                return ret
+            return  Update_InitCfg( tempInit, None )
 
         except Exception as err:
             print( err )
             if ret == 0:
                 ret = -errno.EFAULT
+
+        finally:
+            if strTmpConf is not None:
+                os.unlink( strTmpConf )
+            if tempInit is not None:
+                os.unlink( tempInit )
         return ret
 
     def on_update_auth_settings( self, button ):
@@ -2815,26 +2864,27 @@ EOF
                 raise Exception( "Error creating install package" )
 
             
-            ret = self.GenAuthInstFiles(
-                destPath, bServer )
-            if ret < 0:
-                raise Exception( "Error generating auth files " + \
-                    "when creating install package" )
-            elif ret > 0:
-                bAuthFiles = False
-            else:
-                bAuthFiles = True
-
             keyPkg = None
             # add instcfg to destPkg
             cfgDir = os.path.dirname( cfgPath )
             cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json;"
 
-            if bAuthFiles: 
-                cmdLine += 'tar rf ' + destPkg + " -C " + cfgDir + \
-                    "krb5.conf krb5*.keytab ;"
+            bAuthFile = False
+            ret = self.GenAuthInstFiles(
+                destPath, bServer )
+            if ret == 0:
+                bAuthFile = True
+                cmdLine += 'tar rf ' + destPkg + " -C " + destPath + \
+                    " krb5.conf "
+                if bServer:
+                    cmdLine += 'krb5.keytab;'
+                else:
+                    cmdLine += 'krb5cli.keytab;'
+            elif ret < 0:
+                raise Exception( "Error generating auth files " + \
+                    "when creating install package" )
 
-            cmdLine = "gzip " + destPkg
+            cmdLine += "gzip " + destPkg
             ret = os.system( cmdLine )
             if ret != 0:
                 ret = -ret
@@ -2863,6 +2913,8 @@ EOF
                     cmdLine += "svridx"
                 else:
                     cmdLine += "clidx"
+            if bAuthFile :
+                cmdline += " krb5.conf krb5.keytab krb5cli.keytab"
             os.system( cmdLine )
 
         except Exception as err:
@@ -3034,6 +3086,19 @@ EOF
                     cmdline += "tar rf " + obj.pkgName + " -C " + curDir + " USESSL;"
                     bHasKey = True
 
+                ret = self.GenAuthInstFiles(
+                    curDir, obj.isServer )
+                if ret == 0:
+                    cmdline += 'tar rf ' + obj.pkgName + " -C " + curDir + \
+                        " krb5.conf "
+                    if obj.isServer:
+                        cmdline += 'krb5.keytab;'
+                    else:
+                        cmdline += 'krb5cli.keytab;'
+                elif ret < 0:
+                    raise Exception( "Error generating auth files " + \
+                        "when creating install package" )
+
                 cmdline += "rm -f " + obj.pkgName + ".gz || true;"
                 cmdline += "gzip " + obj.pkgName + ";"
                 ret = os.system( cmdline )
@@ -3088,11 +3153,13 @@ EOF
 
                 os.system( "mv " + installer + " " + newName )
 
-            cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
+            cmdline = "cd " + curDir + " && ( rm ./USESSL > /dev/null 2>&1;" + \
+                "rm ./*.gz krb5.conf krb5.keytab krb5cli.keytab > /dev/null 2>&1 )"
             #cmdline += "rm " + curDir + "/initcfg.json || true;"
             os.system( cmdline )
 
         except Exception as err:
+            print( err )
             if ret == 0:
                 ret = -errno.EFAULT
 

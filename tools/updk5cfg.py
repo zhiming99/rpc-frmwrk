@@ -24,8 +24,8 @@ def AddEntryToHosts(
     if bExist :
         return ""
 
-    cmdline = "{sudo} echo '" + strIpAddr + '\t' + \
-        strDomain + "' >> /etc/hosts"
+    cmdline = "{sudo} sh -c 'echo \"" + strIpAddr + '\t' + \
+        strDomain + "\" >> /etc/hosts'"
     return cmdline
 
 def AddPrincipal(
@@ -38,7 +38,7 @@ def AddPrincipal(
         kadmin = "kadmin"
     cmdline = "{sudo} " + kadmin + " -q 'addprinc "
     if len( strPass ) != 0:
-        cmdline += "-pw " + strPass + "'"
+        cmdline += "-pw \"" + strPass + "\" " + strPrinc + "'"
     else:
         cmdline += "-randkey " + strPrinc + "'"
     return cmdline
@@ -76,6 +76,33 @@ def AddToKeytab(
         cmdline += "{sudo} " + kadmin + \
             " -q 'ktadd -k " + strKeytab + " " + strPrinc + "'"
     return cmdline
+
+def GetDistName() -> str:
+    with open('/etc/os-release', 'r') as fp:
+        for line in fp:
+            if re.search( 'debian', line, flags=re.IGNORECASE ):
+                return 'debian'
+            elif re.search( 'ubuntu', line, flags=re.IGNORECASE ):
+                return 'debian'
+            elif re.search( 'fedora', line, flags=re.IGNORECASE ):
+                return 'fedora'
+    return ""
+
+def GetKdcSvcName() -> str:
+    strDist = GetDistName()
+    if strDist == "debian":
+        return 'krb5-kdc'
+    elif strDist == 'fedora':
+        return 'krb5kdc'
+    return ""
+
+def GetKdcConfPath() -> str:
+    strDist = GetDistName()
+    if strDist == 'debian':
+        return '/etc/krb5kdc'
+    elif strDist == 'fedora':
+        return '/var/kerberos/krb5kdc'
+    return ""
 
 def GetTestKeytabPath()->str:
     if os.getuid() == 0:
@@ -338,8 +365,6 @@ def UpdateKrb5Cfg( ast : AstNode,
     return ret
 
 if __name__ == "__main__":
-    IsLocalIpAddr( "192.168.3.13" )
-
     ret, ast = ParseKrb5Conf( "/etc/krb5.conf" )
     if ret < 0:
         quit( -ret )
