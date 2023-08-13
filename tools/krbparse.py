@@ -22,14 +22,11 @@
 #*
 #* =====================================================================================
 #*
-import os
-from shutil import move
-from copy import deepcopy
 from typing import Dict
 from typing import Tuple
 import errno
 import re
-from updwscfg import *
+#from updwscfg import *
 
 class NodeType:
     invalid = 0
@@ -134,11 +131,10 @@ class AstNode:
             return None
 
 def GetTokens( line : str, bkv = False ) :
-    global statStack
     if not bkv:
         results = re.split(" +|\t+|\n+", line)
     else:
-        results1 = line.strip().split( '=', maxsplit=2 )
+        results1 = line.strip().split( '=', maxsplit=1 )
         results = []
         for i in results1:
             results.append(i.strip())
@@ -327,3 +323,28 @@ def ParseKrb5Conf( strPath : str ) -> Tuple[ int, object ] :
             ret = -errno.EFAULT
     return (ret, None)
 
+
+def FindSection( astRoot : AstNode, strSection: str) -> Tuple[bool, AstNode]:
+    ret = False 
+    try:
+        for i in astRoot.children:
+            if i.strVal != strSection:
+                continue
+            return ( True, i )
+    except Exception as err :
+        print( err )
+    return ( ret, None )
+
+def FindRealm( astRoot : AstNode, strRealm: str) -> Tuple[bool, AstNode]:
+    ret = False 
+    try:
+        for i in astRoot.children:
+            if i.strVal != '[realms]':
+                continue
+            for realm in i.children:
+                realmName = realm.children[0].strVal
+                if realmName == strRealm:
+                    return ( True, realm )
+    except Exception as err :
+        print( err )
+    return ( ret, None )

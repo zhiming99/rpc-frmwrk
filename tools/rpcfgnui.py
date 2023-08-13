@@ -2,13 +2,10 @@
 import json
 import os
 import sys 
-from shutil import move
-from copy import deepcopy
-from urllib.parse import urlparse
-from typing import Dict
 import errno
 from updcfg import *
 from updwscfg import *
+from updk5cfg import ConfigAuthServer
 
 import getopt, sys
 
@@ -49,7 +46,15 @@ def main():
 
         ret = ConfigWebServer( initFile )
         if ret < 0:
-            print( "Error failed to config web server " + str(ret))
+            print( "Error failed to config web server %d" % ret )
+            ret = 0
+
+        if not IsFeatureEnabled( "auth" ):
+            return ret
+
+        ret = ConfigAuthServer( initFile )
+        if ret < 0:
+            print( "Error failed to config auth server %d" % ret )
             ret = 0
 
     except Exception as err:

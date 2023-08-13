@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 import json
 import os
-from shutil import move
-from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
 import errno
-import socket
-import re
+
+def rpcf_system(
+    command : str ) -> int:
+    ret = os.system( command )
+    if os.WIFEXITED( ret ):
+        return -os.WEXITSTATUS( ret )
+    return -errno.EFAULT
 
 def IsInDevTree() -> bool:
     strPath = os.path.dirname(os.path.realpath(__file__))
@@ -32,7 +35,7 @@ def IsApacheInstalled()->bool:
     return False
 
 def IsSudoAvailable()->bool:
-    ret = os.system( "which sudo > /dev/null" )
+    ret = rpcf_system( "which sudo > /dev/null" )
     if ret != 0:
         return False
     return True
@@ -63,7 +66,7 @@ def InstallKeys( oResps : [] ) -> Tuple[ int, str ]:
         print( err )
         return ( -errno.EFAULT, None )
 
-def ExtractParams( initCfg : object) ->( dict, ):
+def ExtractParams( initCfg : object) ->Tuple[ dict ]:
     try:
         if not 'Connections' in initCfg:
             ret = -errno.ENOENT
@@ -196,7 +199,7 @@ upstream {AppName} {{
             actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
         else:
             actCmd = cmdline.format( sudo='' )
-    ret = -os.system( actCmd )
+    ret = rpcf_system( actCmd )
     return ret
 
 def Config_Apache( initCfg : object )->int:
@@ -250,7 +253,7 @@ def Config_Apache( initCfg : object )->int:
             actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
         else:
             actCmd = cmdline.format( sudo='' )
-    ret = -os.system( actCmd )
+    ret = rpcf_system( actCmd )
     return ret
 
 def ConfigWebServer2( initCfg : object )->int:
@@ -293,8 +296,8 @@ def ConfigWebServer2( initCfg : object )->int:
     return ret
 
 def ConfigWebServer( initFile : str ) -> int :
+    ret = 0
     try:
-        ret = 0
         fp = open( initFile, 'r' )
         cfgVal = json.load( fp )
         fp.close()
@@ -303,6 +306,5 @@ def ConfigWebServer( initFile : str ) -> int :
         print( err )
         if ret == 0:
             ret = -errno.EFAULT
-    finally:
-        return ret
+    return ret
 

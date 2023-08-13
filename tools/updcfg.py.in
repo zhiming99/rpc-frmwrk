@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
 from tempfile import mkstemp
+from updwscfg import rpcf_system
 import errno
 
 g_passDlg = None
@@ -143,26 +144,26 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
         fp = open( tempfile, "w" )
         json.dump( jsonVal, fp, indent=4)
         fp.close()
-        ret = os.system( "which sudo > /dev/null" )
+        ret = rpcf_system( "which sudo > /dev/null" )
         bSudo = True
         if ret != 0:
             bSudo = False
         if bCmdLine :
             if bSudo:
                 strCmd = "sudo cp " + tempfile + " " + strPath
-                ret = os.system( strCmd )
+                ret = rpcf_system( strCmd )
             else:
                 strCmd = "su -c 'cp " + tempfile + " " + strPath + "'"
-                ret = os.system( strCmd )
+                ret = rpcf_system( strCmd )
 
             return ret
 
         if bSudo:
             strCmd = "sudo -n cp " + tempfile + " " + strPath
-            ret = os.system( strCmd )
+            ret = rpcf_system( strCmd )
         else:
             strCmd = "su -c 'cp " + tempfile + " " + strPath + "'"
-            ret = os.system( strCmd )
+            ret = rpcf_system( strCmd )
 
         if ret == 0 :
             return ret
@@ -170,15 +171,12 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
         if bSudo:
             strCmd = "sudo cp " + tempfile + \
                 " " + strPath 
-            ret = os.system( strCmd )
+            ret = rpcf_system( strCmd )
         else:
             ret = errno.ENOTSUP
 
         if ret == 0 :
             return ret
-
-        if ret > 0:
-            ret = -ret
 
     except Exception as err:
         if ret == 0:

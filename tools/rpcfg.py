@@ -25,7 +25,6 @@
 import json
 import os
 import sys 
-from shutil import move
 from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Tuple
@@ -60,21 +59,21 @@ def SilentRun( strCmd : str ):
     cmdline += "\"timeout\" { exit }\n" 
     cmdline += "}\n" 
     cmdline += "EOF\n"
-    return os.system( cmdline )
+    return rpcf_system( cmdline )
 
 def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path += "/opensslkey.sh"
     cmdline = "/bin/bash " + dir_path + " " + strPath + " " + cnum + " " + snum
     bExpect = False
-    ret = os.system( "which expect" )
+    ret = rpcf_system( "which expect" )
     if ret == 0 :
         bExpect = True
     if bExpect :
         cmdline = "spawn " + cmdline
         ret = SilentRun( cmdline )
     else:
-        ret = os.system( cmdline )
+        ret = rpcf_system( cmdline )
 
     if ret != 0 :
         return
@@ -104,7 +103,7 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path += "/gmsslkey.sh"
     cmdline = "bash " + dir_path + " " + strPath + " " + cnum + " " + snum
-    os.system( cmdline )
+    rpcf_system( cmdline )
     if bServer :
         strFile = strPath + "/signkey.pem"
         dlg.keyEdit.set_text( strFile )
@@ -168,7 +167,7 @@ fi
 
 initcfg=$(pwd)/initcfg.json
 if which sudo; then
-    sudo python3 $rpcfgnui ./initcfg.json
+    sudo python3 $rpcfgnui $initcfg
 else
     su -c "python3 $rpcfgnui $initcfg"
 fi
@@ -1770,7 +1769,7 @@ kadmin/admin    *
             fp.close()
 
             cmdline = "cp -f " + srcKeytab + " " + destKeytab
-            ret = os.system( cmdline )
+            ret = rpcf_system( cmdline )
 
         except Exception as err:
             print( err )
@@ -1958,14 +1957,16 @@ EOF
                 ret, passwd = passDlg.runDlg()
                 if ret < 0:
                     return ret
-                os.system( "echo " + passwd + "| sudo -S echo updating..." )
+                ret = rpcf_system( "echo " + passwd + "| sudo -S echo updating..." )
                 passwd = None
+                if ret < 0:
+                    return ret
             else:
                 actCmd = "su -c '" + cmdline.format(
                     sudo = "" ) + "'"
 
             #print( actCmd )
-            ret = os.system( actCmd )
+            ret = rpcf_system( actCmd )
             if ret < 0:
                 return ret
 
@@ -2049,8 +2050,10 @@ EOF
                 ret, passwd = passDlg.runDlg()
                 if ret < 0:
                     return ret
-                os.system( "echo " + passwd + "| sudo -S echo updating..." )
+                ret = rpcf_system( "echo " + passwd + "| sudo -S echo updating..." )
                 passwd = None
+                if ret < 0:
+                    return ret
 
 
             cmdline = ""
@@ -2123,7 +2126,7 @@ EOF
                         sudo = "" ) + "'"
 
                 #print( actCmd )
-                ret = os.system( actCmd )
+                ret = rpcf_system( actCmd )
                 if ret < 0:
                     return ret
 
@@ -2383,16 +2386,35 @@ EOF
         grid.attach( checkCfgWs, startCol + 1, startRow + 3, 1, 1)
         self.checkCfgWs = checkCfgWs
 
+        if not IsFeatureEnabled( "auth" ):
+            return
+
+        labelCfgKrb5 = Gtk.Label()
+        labelCfgKrb5.set_text("Config Krb5 Server")
+        labelCfgKrb5.set_xalign(.5)
+        grid.attach( labelCfgKrb5, startCol + 0, startRow + 4, 1, 1 )
+
+        checkCfgKrb5 = Gtk.CheckButton(label="")
+        checkCfgKrb5.props.active = False
+        checkCfgKrb5.set_tooltip_text(
+            "Tell the installer to config the Kerberos, besides rpc-frmwrk" )
+
+        checkCfgKrb5.connect(
+            "toggled", self.on_button_toggled, "CfgAuth")
+        grid.attach( checkCfgKrb5, startCol + 1, startRow + 4, 1, 1)
+        self.checkCfgKrb5 = checkCfgKrb5
+
         labelKProxy = Gtk.Label()
         labelKProxy.set_text("kinit proxy")
         labelKProxy.set_xalign(.5)
-        grid.attach( labelKProxy, startCol + 1, startRow + 5, 1, 1 )
+        grid.attach( labelKProxy, startCol + 0, startRow + 5, 1, 1 )
         checkKProxy = Gtk.CheckButton(label="")
         checkKProxy.props.active = False
+        checkKProxy.set_tooltip_text( "Config kinit, kadmin to connect to the Kerberos server via rpcrouter" )
 
         checkKProxy.connect(
             "toggled", self.on_button_toggled, "KProxy")
-        grid.attach( checkKProxy, startCol + 2, startRow + 5, 1, 1)
+        grid.attach( checkKProxy, startCol + 1, startRow + 5, 1, 1)
         self.checkKProxy = checkKProxy
 
     def on_sign_msg_changed(self, combo) :
@@ -2686,6 +2708,10 @@ EOF
                 miscOpts[ 'TaskScheduler' ] = "RR"
             if self.checkCfgWs.props.active and self.bServer:
                 miscOpts[ 'ConfigWebServer' ] = 'true'
+            if self.checkCfgKrb5.props.active and self.bServer:
+                miscOpts[ 'ConfigKrb5' ] = 'true'
+            if self.checkCfgKrb5.props.active and not self.bServer:
+                miscOpts[ 'KinitProxy' ] = 'true'
 
         except Exception as err :
             text = "Failed to export node:" + str( err )
@@ -2807,22 +2833,20 @@ EOF
                 dirPath = os.path.dirname( files[ 0 ] )
                 fileName = os.path.basename( files[ 0 ] )
                 cmdLine = 'tar cf ' + keyPkg + " -C " + dirPath + " " + fileName
-                ret = os.system( cmdLine )
+                ret = rpcf_system( cmdLine )
                 if ret != 0:
-                    ret = -ret
                     raise Exception( "Error create tar file " + files[ 0 ] )
                 files.pop(0)
                 for i in files:
                     dirPath = os.path.dirname( i )
                     fileName = os.path.basename( i )
                     cmdLine = 'tar rf ' + keyPkg + " -C " + dirPath + " " +  fileName
-                    ret = os.system( cmdLine )
+                    ret = rpcf_system( cmdLine )
                     if ret != 0:
-                        ret = -ret
                         raise Exception( "Error appending to tar file " + i )
 
                 cmdLine = "touch " + destPath + "/USESSL"
-                os.system( cmdLine )
+                rpcf_system( cmdLine )
 
             fp = open( destPath + '/instcfg.sh', 'w' )
             fp.write( get_instcfg_content() )
@@ -2858,9 +2882,8 @@ EOF
             if bInstKeys:
                cmdLine += " USESSL "+ keyPkg
 
-            ret = os.system( cmdLine )
+            ret = rpcf_system( cmdLine )
             if ret != 0:
-                ret = -ret
                 raise Exception( "Error creating install package" )
 
             
@@ -2885,9 +2908,8 @@ EOF
                     "when creating install package" )
 
             cmdLine += "gzip " + destPkg
-            ret = os.system( cmdLine )
+            ret = rpcf_system( cmdLine )
             if ret != 0:
-                ret = -ret
                 raise Exception( "Error creating install package" )
             destPkg += ".gz"
 
@@ -2905,7 +2927,7 @@ EOF
 
             cmdLine = "cd " + destPath + ";" 
             cmdLine += "cat " + destPkg + " >> " + installer + ";"
-            cmdLine += "chmod u+x " + installer + ";"
+            cmdLine += "chmod 700 " + installer + ";"
             cmdLine += "rm -rf " + destPkg
             if bInstKeys:
                 cmdLine += " USESSL endidx "
@@ -2915,7 +2937,7 @@ EOF
                     cmdLine += "clidx"
             if bAuthFile :
                 cmdline += " krb5.conf krb5.keytab krb5cli.keytab"
-            os.system( cmdLine )
+            rpcf_system( cmdLine )
 
         except Exception as err:
             try:
@@ -2962,9 +2984,8 @@ EOF
 
             for i in files:
                 cmdLine = "cp " + keyPath + "/" + i + " " + destPath
-                ret = os.system( cmdLine )
+                ret = rpcf_system( cmdLine )
                 if ret != 0:
-                    ret = -ret
                     raise Exception( "failed to copy " + i  )
         except Exception as err:
             if ret == 0:
@@ -3040,12 +3061,12 @@ EOF
                 if bCliPkg:
                     cmdline = "keyfiles=`tar tf " + cliPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                     cmdline += "for i in $keyfiles; do tar --delete -f " + cliPkg + " $i;done"
-                    os.system( cmdline )
+                    rpcf_system( cmdline )
 
                 if bSvrPkg:
                     cmdline = "keyfiles=`tar tf " + svrPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                     cmdline += "for i in $keyfiles; do tar --delete -f " + svrPkg + " $i;done"
-                    os.system( cmdline )
+                    rpcf_system( cmdline )
 
             # generate the master install package
             instScript=get_instscript_content()
@@ -3101,9 +3122,8 @@ EOF
 
                 cmdline += "rm -f " + obj.pkgName + ".gz || true;"
                 cmdline += "gzip " + obj.pkgName + ";"
-                ret = os.system( cmdline )
+                ret = rpcf_system( cmdline )
                 if ret != 0 :
-                    ret = -ret
                     if obj.isServer :
                         strMsg = "error create server installer"
                     else:
@@ -3116,9 +3136,9 @@ EOF
                 fp.write( instScript )
                 fp.close()
                 cmdline = "cat " + obj.pkgName + " >> " + installer
-                os.system( cmdline )
-                cmdline = "chmod u+x " + installer + ";"
-                os.system( cmdline )
+                rpcf_system( cmdline )
+                cmdline = "chmod 700 " + installer + ";"
+                rpcf_system( cmdline )
 
                 # generate a more intuitive name
                 curDate = time.strftime('%Y-%m-%d')
@@ -3151,12 +3171,12 @@ EOF
                     newName = curDir + '/' + \
                         obj.instName + '-' + curDate + ".sh"
 
-                os.system( "mv " + installer + " " + newName )
+                rpcf_system( "mv " + installer + " " + newName )
 
             cmdline = "cd " + curDir + " && ( rm ./USESSL > /dev/null 2>&1;" + \
                 "rm ./*.gz krb5.conf krb5.keytab krb5cli.keytab > /dev/null 2>&1 )"
             #cmdline += "rm " + curDir + "/initcfg.json || true;"
-            os.system( cmdline )
+            rpcf_system( cmdline )
 
         except Exception as err:
             print( err )
@@ -3230,14 +3250,16 @@ EOF
                 ret = Update_InitCfg( initFile, destPath, passDlg )
                 return ret
 
-            passDlg = PasswordDialog( self )
-            ret, passwd = passDlg.runDlg()
-            if ret < 0:
-                return ret
-
             if IsSudoAvailable():
                 #make the following sudo password free
-                os.system( "echo " + passwd + "| sudo -S echo updating..." )
+                passDlg = PasswordDialog( self )
+                ret, passwd = passDlg.runDlg()
+                if ret < 0:
+                    return ret
+                ret = rpcf_system( "echo " + passwd + "| sudo -S echo updating..." )
+                passwd = None
+                if ret < 0:
+                    return ret
 
             ret = Update_InitCfg( initFile, destPath, passDlg )
             if ret < 0:
@@ -3467,6 +3489,7 @@ class PasswordDialog(Gtk.Dialog):
         passEditBox.set_visibility( False )
         passEditBox.props.input_purpose = Gtk.InputPurpose.PASSWORD
         grid.attach(passEditBox, startCol + 1, startRow, 1, 1 )
+        passEditBox.connect( 'activate', self.submit)
 
         labelEmpty = Gtk.Label()
         labelEmpty.set_xalign(.5)
@@ -3489,6 +3512,9 @@ class PasswordDialog(Gtk.Dialog):
             ret = 0
         self.destroy()
         return ( ret, passwd )
+
+    def submit( self, entry ):
+        self.response( Gtk.ResponseType.OK )
 
 import getopt
 def usage():

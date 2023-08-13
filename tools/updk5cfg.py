@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 import json
 import os
-from shutil import move
-from copy import deepcopy
-from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
 import errno
 import socket
 import re
 from krbparse import *
+from updwscfg import IsSudoAvailable
 
 def AddEntryToHosts(
     strIpAddr : str,
@@ -164,20 +162,6 @@ def ReplaceKdcAddr( astRoot : AstNode, strAddr : str ) -> int:
         print( err )
         if ret == 0:
             ret = -errno.EFAULT
-    return ret
-
-def FindRealm( astRoot : AstNode, strRealm: str) -> bool:
-    ret = False 
-    try:
-        for i in astRoot.children:
-            if i.strVal != '[realms]':
-                continue
-            for realm in i.children:
-                realmName = realm.children[0].strVal
-                if realmName.upper() == strRealm.upper():
-                    ret = True
-    except Exception as err :
-        print( err )
     return ret
 
 def GetNewRealmAstNode(
@@ -346,7 +330,8 @@ def UpdateKrb5Cfg( ast : AstNode,
         ret = ReplaceKdcAddr( ast, strKdcAddr )
         if ret < 0:
             return ret
-        if not FindRealm( ast, strRealm ) :
+        ret, realm = FindRealm( ast, strRealm )
+        if not ret:
             AddNewRealm( ast, strRealm, strKdcAddr )
         ret = UpdateLibDefaults( ast, strRealm, bInstall )
         if ret < 0:
@@ -358,6 +343,118 @@ def UpdateKrb5Cfg( ast : AstNode,
             fp.close()
         else:
             print( strRet )
+    except Exception as err:
+        print( err )
+        if ret == 0:
+            ret = -errno.EFAULT
+    return ret
+
+def ConfigKrb5( initCfg : dict, curDir : str )-> int:
+    ret = 0
+    bServer = False
+    try:
+        if initCfg[ 'IsServer' ] == 'true':
+            bServer = True
+
+        oMisc = initCfg[ 'Security' ]['misc']
+        if not 'ConfigKrb5' in oMisc:
+            return ret
+
+        if oMisc['ConfigKrb5'] != 'true':
+            return ret
+
+        bAuth = False
+        oConns = initCfg['Connections']
+        for oConn in oConns:
+            if not 'HasAuth' in oConn :
+                continue
+            if not oConn['HasAuth'] == 'true' :
+                continue
+            bAuth = True
+            break
+
+        if not bAuth:
+            return ret
+
+        oAuth = initCfg[ 'Security' ][ 'AuthInfo' ]
+        if oAuth[ 'AuthMech' ] != 'krb5':
+            return ret
+
+        curDir = curDir.strip()
+        if curDir == '' :
+            curDir = '.'
+
+        destPath = GetTestKeytabPath()
+        if destPath == '' :
+            raise Exception( "Error empty keytab path" )
+
+        if bServer:
+            strKeytab = curDir + '/krb5.keytab'
+            destPath += '/krb5.keytab'
+        else:
+            strKeytab += curDir + '/krb5cli.keytab'
+            destPath += '/krb5cli.keytab'
+
+        cmdline = "install -m 600 " + \
+            strKeytab + " " +  destPath + ";"
+
+        cmdline += ChangeKeytabOwner( destPath )
+        cmdline += ";"
+
+        strKrbConf = curDir + "/krb5.conf"
+        ret, ast = ParseKrb5Conf( strKrbConf )
+        if ret < 0:
+            return ret
+
+        ret, section = FindSection( ast, '[libdefaults]' )
+        if not ret:
+            ret = -errno.ENOENT
+            raise Exception( "Error cannot find section [libdefaults]" )
+
+        if bServer:
+            strKey = 'default_keytab_name'
+        else:
+            strKey = 'default_client_keytab_name'
+
+        for kv in section.children:
+            if kv.children[ 0 ].strVal == strKey:
+                kv.children[ 1 ].strVal = "FILE:" + destPath
+                break
+
+        strConf = ast.Dumps( 0 )
+        fp = open( strKrbConf, "w" )
+        fp.write( strConf )
+        fp.close()
+
+        cmdline += '{sudo} install -bm 644 ' + strKrbConf + \
+            ' /etc/krb5.conf'
+
+        if os.geteuid() == 0:
+            actCmd = cmdline.format( sudo = '' )
+        elif IsSudoAvailable():
+            actCmd = cmdline.format( sudo = 'sudo' )
+        else:
+            actCmd = "su -c '" + cmdline.format(
+                sudo = "" ) + "'"
+
+        ret = rpcf_system( actCmd )
+
+    except Exception as err:
+        print( err )
+        if ret == 0:
+            ret = -errno.EFAULT
+
+    return ret
+
+def ConfigAuthServer( initFile : str ) -> int:
+    try:
+        ret = 0
+        fp = open( initFile, 'r' )
+        cfgVal = json.load( fp )
+        fp.close()
+        ret = ConfigKrb5( cfgVal,
+            os.path.dirname( initFile ) )
+
     except Exception as err:
         print( err )
         if ret == 0:
