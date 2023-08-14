@@ -5,6 +5,14 @@ from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
 import errno
+import re
+
+def IsValidPassword(
+    password : str ) -> bool:
+    ret = re.match( "^[a-zA-Z0-9#?!@$%^&*-]{2,}$", password )
+    if ret is None:
+        return False
+    return True
 
 def rpcf_system(
     command : str ) -> int:

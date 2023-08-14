@@ -583,9 +583,18 @@ class ConfigDlg(Gtk.Dialog):
         Gtk.Dialog.__init__(self, title, flags=0)
         self.add_buttons(
             "Load From", Gtk.ResponseType.APPLY,
-            "Export To", Gtk.ResponseType.YES,
+            "Installer...", Gtk.ResponseType.YES,
             Gtk.STOCK_OK, Gtk.ResponseType.OK,
             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL )
+
+        oInstBtn = self.get_widget_for_response(
+            Gtk.ResponseType.YES )
+        oInstBtn.set_tooltip_text(
+            "Create configuration installers for deployment.")
+        oLoadBtn = self.get_widget_for_response(
+            Gtk.ResponseType.APPLY )
+        oLoadBtn.set_tooltip_text(
+            "Reload settings from a driver.json.")
 
         self.bServer = bServer
         self.hasGmSSL=IsFeatureEnabled( "gmssl" )
@@ -1666,7 +1675,9 @@ class ConfigDlg(Gtk.Dialog):
             kdcIp = self.kdcEdit.get_text().strip().lower()
             if kdcIp != '' and IsLocalIpAddr( kdcIp ) :
                 return kdcIp
-            return self.ifctx[ 0 ].ipAddr.get_text().strip()
+            for ctx in self.ifctx :
+                if ctx.authCheck.props.active :
+                    return ctx.ipAddr.get_text().strip()
         except:
             kdcIp = ''
         return kdcIp
@@ -1746,6 +1757,10 @@ kadmin/admin    *
                     "to generate krb5 files for installer" )
                 return 2
 
+            if not IsTestKdcSet():
+                print( "Warning local KDC is not setup " )
+                return 3
+
             krbConf = self.GetKrb5Conf()
             if krbConf == "" :
                 print( "Warning 'krb5.conf' is not generated" )
@@ -1819,7 +1834,8 @@ default_domain = {DomainName}
 
             kdcIp = self.GetTestKdcIp()
             if len( kdcIp ) == 0:
-                raise Exception( "Unable to determine kdc address" )
+                raise Exception( "Unable to determine kdc address, " + \
+                "and at lease one interface should be auth enabled" )
 
             strRealm = self.GetTestRealm()
             strKeytab = GetTestKeytabPath()
@@ -1836,6 +1852,16 @@ default_domain = {DomainName}
         except Exception as err:
             print( err )
             return ""
+
+    def ElevatePrivilege( self ) -> int:
+        passDlg = PasswordDialog( self )
+        ret, passwd = passDlg.runDlg()
+        if ret < 0:
+            self.DisplayError( "Error invalid password")
+            return ret
+        ret = rpcf_system( "echo '" + passwd + "'| sudo -S echo updating..." )
+        passwd = None
+        return ret
 
     def SetupTestKdc( self )->int:
         tempKrb = None
@@ -1898,11 +1924,13 @@ EOF
 
             strDomain = self.GetTestRealm()
             strIpAddr = self.GetTestKdcIp()
-            cmdline += AddEntryToHosts(
+
+            strHostEntry = AddEntryToHosts(
                 strIpAddr,
                 strDomain + " kdc." + strDomain )
+            if strHostEntry != "":
+                cmdline += strHostEntry + ";"
 
-            cmdline += ";"
             cmdline += DeletePrincipal(
                 "kadmin/admin" )
 
@@ -1931,17 +1959,22 @@ EOF
                 strSvc, strKeytab )
             cmdline += ";"
             cmdline += ChangeKeytabOwner( strKeytab )
+            cmdline += ";"
 
             #add user to client keytable
-            cmdline += ";"
             strCliKeytab = os.path.dirname( strKeytab ) + \
                 "/krb5cli.keytab"
+            cmdline += ";"
             cmdline += AddToKeytab(
                 strUser, strCliKeytab )
             cmdline += ";"
             cmdline += ChangeKeytabOwner( strCliKeytab )
 
             cmdline += ";"
+
+            #add a tag file
+            cmdline += "touch " + os.path.dirname( strKeytab ) + "/kdcinited;"
+
             cmdline += '{sudo} systemctl restart {KdcSvc};'
 
             if os.geteuid() == 0:
@@ -1949,21 +1982,18 @@ EOF
                     KdcSvc = GetKdcSvcName(),
                     KdcConfPath = GetKdcConfPath() )
             elif IsSudoAvailable():
+                ret = self.ElevatePrivilege()
+                if ret < 0:
+                    return ret
                 actCmd = cmdline.format(
                     sudo = 'sudo',
                     KdcSvc = GetKdcSvcName(),
                     KdcConfPath = GetKdcConfPath() )
-                passDlg = PasswordDialog( self )
-                ret, passwd = passDlg.runDlg()
-                if ret < 0:
-                    return ret
-                ret = rpcf_system( "echo " + passwd + "| sudo -S echo updating..." )
-                passwd = None
-                if ret < 0:
-                    return ret
             else:
                 actCmd = "su -c '" + cmdline.format(
-                    sudo = "" ) + "'"
+                    sudo = "",
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() ) + "'"
 
             #print( actCmd )
             ret = rpcf_system( actCmd )
@@ -1976,11 +2006,12 @@ EOF
                 self.userEdit.set_text( strUser )
                 self.kdcEdit.set_text( strIpAddr ) 
 
-            tempInit = tempname()
-            ret = self.Export_InitCfg( tempInit )
-            if ret < 0 :
-                return ret
-            return  Update_InitCfg( tempInit, None )
+            if self.checkNoUpdRpc.props.active:
+                tempInit = tempname()
+                ret = self.Export_InitCfg( tempInit )
+                if ret < 0 :
+                    return ret
+                return  Update_InitCfg( tempInit, None )
                 
         except Exception as err:
             print( err )
@@ -2046,15 +2077,9 @@ EOF
                 return ret
             
             if IsSudoAvailable():
-                passDlg = PasswordDialog( self )
-                ret, passwd = passDlg.runDlg()
+                ret = self.ElevatePrivilege()
                 if ret < 0:
                     return ret
-                ret = rpcf_system( "echo " + passwd + "| sudo -S echo updating..." )
-                passwd = None
-                if ret < 0:
-                    return ret
-
 
             cmdline = ""
             cmdline += '{sudo} systemctl stop {KdcSvc}'
@@ -2103,11 +2128,13 @@ EOF
                     if ret == 0:
                         cmdline += ";"
                         cmdline += "{sudo} install -bm 644 " + strTmpConf + \
-                            " /etc/krb5.conf;"
+                            " /etc/krb5.conf"
 
-                    cmdline += AddEntryToHosts(
+                    strCmd = AddEntryToHosts(
                         strNewKdcIp,
                         strNewRealm + " kdc." + strNewRealm )
+                    if strCmd != "" :
+                        cmdline += ";" + strCmd
 
             if len( cmdline ) > 0:
                 cmdline += ";"
@@ -2123,18 +2150,21 @@ EOF
                         KdcSvc = GetKdcSvcName() )
                 else:
                     actCmd = "su -c '" + cmdline.format(
-                        sudo = "" ) + "'"
+                        sudo = "",
+                        KdcConfPath=GetKdcConfPath(),
+                        KdcSvc = GetKdcSvcName() ) + "'"
 
                 #print( actCmd )
                 ret = rpcf_system( actCmd )
                 if ret < 0:
                     return ret
 
-            tempInit = tempname()
-            ret = self.Export_InitCfg( tempInit )
-            if ret < 0 :
-                return ret
-            return  Update_InitCfg( tempInit, None )
+            if self.checkNoUpdRpc.props.active:
+                tempInit = tempname()
+                ret = self.Export_InitCfg( tempInit )
+                if ret < 0 :
+                    return ret
+                return  Update_InitCfg( tempInit, None )
 
         except Exception as err:
             print( err )
@@ -2149,11 +2179,10 @@ EOF
         return ret
 
     def on_update_auth_settings( self, button ):
-        if self.checkInitKdc is not None \
-            and self.checkInitKdc.props.active :
-            self.SetupTestKdc()
-        else :
-            self.UpdateAuthSettings()
+        self.UpdateAuthSettings()
+
+    def on_init_kdc_settings( self, button ):
+        self.SetupTestKdc()
 
     def add_filters(self, dialog, bKey ):
         filter_text = Gtk.FileFilter()
@@ -2172,7 +2201,12 @@ EOF
 
     def IsKrb5Enabled( self )->bool :
         try:
-            if not self.ifctx[ 0 ].authCheck.props.active :
+            bChecked = False
+            for ctx in self.ifctx :
+                if ctx.authCheck.props.active :
+                    bChecked = True
+                    break
+            if not bChecked :
                 return False
             if self.svcEdit is None:
                 return False
@@ -2272,7 +2306,7 @@ EOF
         grid.attach( signCombo, startCol + 1, startRow + 4, 1, 1 )
 
         labelKdc = Gtk.Label()
-        labelKdc.set_text("KDC IP address: ")
+        labelKdc.set_text("KDC Address: ")
         labelKdc.set_xalign(.5)
         grid.attach(labelKdc, startCol + 0, startRow + 5, 1, 1 )
 
@@ -2314,18 +2348,25 @@ EOF
             updKrb5Btn.set_tooltip_text( toolTip2 )
             grid.attach( updKrb5Btn, startCol + 1, startRow + 7, 2, 1 )
 
-            labelInitKdc = Gtk.Label()
-            labelInitKdc.set_text("Init KDC: ")
-            labelInitKdc.set_xalign(.5)
-            grid.attach(labelInitKdc, startCol + 0, startRow + 8, 1, 1 )
+            initKrb5Btn = Gtk.Button.new_with_label("Initialize KDC")
+            initKrb5Btn.connect("clicked", self.on_init_kdc_settings )
+            initKrb5Btn.set_tooltip_text( toolTip )
+            grid.attach( initKrb5Btn, startCol + 1, startRow + 8, 2, 1 )
 
-            checkInitKdc = Gtk.CheckButton(label="")
-            checkInitKdc.props.active = False
-            checkInitKdc.connect(
-                "toggled", self.on_button_toggled, "InitKdc")
-            grid.attach( checkInitKdc, startCol + 1, startRow + 8, 1, 1)
-            checkInitKdc.set_tooltip_text( toolTip )
-            self.checkInitKdc = checkInitKdc
+            labelNoUpdRpc = Gtk.Label()
+            labelNoUpdRpc.set_text("No Change To RPC")
+            labelNoUpdRpc.set_xalign(.5)
+            grid.attach(labelNoUpdRpc, startCol + 0, startRow + 9, 1, 1 )
+
+            checkNoUpdRpc = Gtk.CheckButton(label="")
+            checkNoUpdRpc.props.active = False
+            checkNoUpdRpc.connect(
+                "toggled", self.on_button_toggled, "NoUpdRpc")
+            grid.attach( checkNoUpdRpc, startCol + 1, startRow + 9, 1, 1)
+            toolTip3 = "Don't update the settings for rpc-frmwrk after " + \
+                "Initialized KDC or Updated Auth Settings"
+            checkNoUpdRpc.set_tooltip_text( toolTip3 )
+            self.checkNoUpdRpc = checkNoUpdRpc
 
         self.svcEdit = svcEditBox
         self.realmEdit = realmEditBox
@@ -3247,21 +3288,16 @@ EOF
                 return ret
 
             if IsInDevTree():
-                ret = Update_InitCfg( initFile, destPath, passDlg )
+                ret = Update_InitCfg( initFile, destPath )
                 return ret
 
             if IsSudoAvailable():
                 #make the following sudo password free
-                passDlg = PasswordDialog( self )
-                ret, passwd = passDlg.runDlg()
-                if ret < 0:
-                    return ret
-                ret = rpcf_system( "echo " + passwd + "| sudo -S echo updating..." )
-                passwd = None
+                ret = self.ElevatePrivilege()
                 if ret < 0:
                     return ret
 
-            ret = Update_InitCfg( initFile, destPath, passDlg )
+            ret = Update_InitCfg( initFile, destPath, None )
             if ret < 0:
                 return ret
 
@@ -3501,7 +3537,7 @@ class PasswordDialog(Gtk.Dialog):
         box.add(grid)
         self.show_all()
 
-    def runDlg( self )->Tuple[ int, int ]:
+    def runDlg( self )->Tuple[ int, str ]:
         ret = 0
         response = self.run()
         passwd = None
@@ -3511,6 +3547,8 @@ class PasswordDialog(Gtk.Dialog):
             passwd = self.passEdit.get_text()
             ret = 0
         self.destroy()
+        if not IsValidPassword( passwd ):
+            return ( -errno.EINVAL, None )
         return ( ret, passwd )
 
     def submit( self, entry ):

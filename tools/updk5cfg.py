@@ -9,6 +9,7 @@ import re
 from krbparse import *
 from updwscfg import IsSudoAvailable
 
+    
 def AddEntryToHosts(
     strIpAddr : str,
     strDomain : str ) -> str:
@@ -19,6 +20,7 @@ def AddEntryToHosts(
         for line in fp:
             if re.search( pattern, line ):
                 bExist = True
+                break
     if bExist :
         return ""
 
@@ -103,10 +105,14 @@ def GetKdcConfPath() -> str:
     return ""
 
 def GetTestKeytabPath()->str:
-    if os.getuid() == 0:
-        return "/root/.rpcf/krb5/krb5.keytab"
-    return "/home/" + os.getlogin() + \
-        "/.rpcf/krb5/krb5.keytab"
+    return os.path.expanduser( "~" ) + "/.rpcf/krb5/krb5.keytab"
+
+def IsTestKdcSet() :
+    strPath = os.path.dirname( GetTestKeytabPath() )
+    strPath += "/kdcinited" 
+    if os.access( strPath, os.F_OK ):
+        return True
+    return False
 
 def ChangeKeytabOwner(
     strKeytab: str,
