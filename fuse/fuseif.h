@@ -24,14 +24,8 @@
  * =====================================================================================
  */
 #pragma once
-#if BUILD_64
-#define FUSE_USE_VERSION 35
-#else
-#if ARM
-#define FUSE_USE_VERSION 34
-#else
-#define FUSE_USE_VERSION 34
-#endif
+#define FUSE_USE_VERSION FUSE_VERSION
+#if BUILD_64 == 0
 #define _FILE_OFFSET_BITS 64
 #endif
 

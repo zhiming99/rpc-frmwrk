@@ -351,7 +351,9 @@ gint32 CFuseDirectory::fs_opendir(
     fi->direct_io = 1;
     fi->keep_cache = 0;
     fi->nonseekable = 1;
+#if FUSE_USE_VERSION > 32
     fi->cache_readdir = 0;
+#endif
     fi->fh = ( guint64 )( CFuseObjBase* )this;
 
     return STATUS_SUCCESS;

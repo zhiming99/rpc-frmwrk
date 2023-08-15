@@ -131,7 +131,7 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
     if( bNotify )
     {
         GetParent()->OnEvent( eventPaused,
-            0, 0, ( guint64* )this );
+            0, 0, ( LONGWORD* )this );
     }
 
     return ret;
