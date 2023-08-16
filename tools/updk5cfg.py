@@ -7,15 +7,51 @@ import errno
 import socket
 import re
 from krbparse import *
-from updwscfg import IsSudoAvailable
-
+from updwscfg import IsSudoAvailable, rpcf_system
+import platform
     
+def CheckPrincipal(
+    strPrinc : str,
+    strRealm : str ) -> bool:
+    ret = True
+    try:
+        strPrinc = strPrinc.strip()
+        strRealm = strRealm.strip()
+        if len( strPrinc ) > 256 or len( strRealm ) > 256:
+            raise Exception( "Error principal too long" )
+        components = strPrinc.strip().split( "@" )
+        if len( components ) > 2:
+            raise Exception( "Error principal should have only one '@'" )
+
+        if components[ 1 ] != strRealm :
+            raise Exception( "Error the principal has different realm" )
+
+    except Exception as err:
+        print( err )
+        if ret == True:
+            ret = False
+
+    return ret
+    
+def SetInstNameOfPrinc(
+        strPrinc : str, strInst : str  ) -> str:
+    strPrinc = strPrinc.strip()
+    if len( strPrinc ) == 0:
+        raise Exception(
+            'Error empty principal' )
+    components = strPrinc.split( '@' )
+    if len( components ) != 2:
+        raise Exception(
+            'Error invalid principal' )
+    return components[ 0 ] + "/" + \
+        strInst + "@" + components[ 1 ]
+
 def AddEntryToHosts(
     strIpAddr : str,
-    strDomain : str ) -> str:
+    strNames : str ) -> str:
 
     bExist = False
-    pattern = strIpAddr + ".*" + strDomain
+    pattern = strIpAddr + ".*" + strNames
     with open('/etc/hosts', 'r') as fp:
         for line in fp:
             if re.search( pattern, line ):
@@ -25,7 +61,7 @@ def AddEntryToHosts(
         return ""
 
     cmdline = "{sudo} sh -c 'echo \"" + strIpAddr + '\t' + \
-        strDomain + "\" >> /etc/hosts'"
+        strNames + "\" >> /etc/hosts'"
     return cmdline
 
 def AddPrincipal(
@@ -34,9 +70,11 @@ def AddPrincipal(
     bLocal = True ) -> str:
     if bLocal:
         kadmin = "kadmin.local"
+        sudostr = '{sudo} '
     else:
         kadmin = "kadmin"
-    cmdline = "{sudo} " + kadmin + " -q 'addprinc "
+        sudostr = ''
+    cmdline = sudostr + kadmin + " -q 'addprinc "
     if len( strPass ) != 0:
         cmdline += "-pw \"" + strPass + "\" " + strPrinc + "'"
     else:
@@ -48,34 +86,62 @@ def DeletePrincipal(
     bLocal = True ) -> str :
     if bLocal:
         kadmin = "kadmin.local"
+        sudostr = '{sudo} '
     else:
         kadmin = "kadmin"
-    cmdline = "{sudo} " + kadmin + " -q 'delete_principal -force " + \
+        sudostr = ''
+    cmdline = sudostr + kadmin + " -q 'delete_principal -force " + \
         strPrinc + "'"
     return cmdline
 
-def AddToKeytab(
+def AddToKeytabInternal(
     strPrinc : str,
     strKeytab : str,
-    bLocal = True ) -> str:
+    bAdd : bool,
+    bLocal = True,
+    strAdmin = None ) -> str:
     if bLocal:
         kadmin = "kadmin.local"
+        sudostr = '{sudo} '
     else:
-        kadmin = "kadmin"
+        if strAdmin is None:
+            kadmin = "kadmin"
+        else:
+            kadmin = "kadmin -k -p " + strAdmin
+        sudostr = ''
+
     strKtPath = os.path.dirname( strKeytab )
     cmdline = ""
     if not os.access( strKtPath, os.R_OK | os.X_OK ):
         cmdline += "mkdir -p " + strKtPath + "&&"
 
     if len( strKeytab ) == 0:
-        cmdline += "{sudo} " + kadmin + " -q 'ktrem " + strPrinc + "';"
-        cmdline += "{sudo} " + kadmin + " -q 'ktadd " + strPrinc + "'"
+        cmdline += sudostr + kadmin + " -q 'ktrem " + strPrinc + "';"
+        if bAdd:
+            cmdline += sudostr + kadmin + " -q 'ktadd " + strPrinc + "'"
     else:
-        cmdline += "{sudo} " + kadmin + \
+        cmdline += sudostr + kadmin + \
             " -q 'ktrem -k " + strKeytab + " " + strPrinc + "';"
-        cmdline += "{sudo} " + kadmin + \
-            " -q 'ktadd -k " + strKeytab + " " + strPrinc + "'"
+        if bAdd:
+            cmdline += sudostr + kadmin + \
+                " -q 'ktadd -k " + strKeytab + " " + strPrinc + "'"
     return cmdline
+
+def AddToKeytab(
+    strPrinc : str,
+    strKeytab : str,
+    bLocal = True,
+    strAdmin = None ) -> str:
+    return AddToKeytabInternal(
+        strPrinc, strKeytab, True, bLocal, strAdmin )
+
+def DelFromKeytab(
+    strPrinc : str,
+    strKeytab : str,
+    bLocal = True,
+    strAdmin = None ) -> str:
+    return AddToKeytabInternal(
+        strPrinc, strKeytab, False, bLocal, strAdmin )
 
 def GetDistName() -> str:
     with open('/etc/os-release', 'r') as fp:
@@ -86,6 +152,14 @@ def GetDistName() -> str:
                 return 'debian'
             elif re.search( 'fedora', line, flags=re.IGNORECASE ):
                 return 'fedora'
+    return ""
+
+def GetKadminSvcName() -> str:
+    strDist = GetDistName()
+    if strDist == "debian":
+        return 'krb5-admin-server'
+    elif strDist == 'fedora':
+        return 'kadmin'
     return ""
 
 def GetKdcSvcName() -> str:
@@ -106,6 +180,9 @@ def GetKdcConfPath() -> str:
 
 def GetTestKeytabPath()->str:
     return os.path.expanduser( "~" ) + "/.rpcf/krb5/krb5.keytab"
+
+def GetTestAdminKeytabPath()->str:
+    return os.path.expanduser( "~" ) + "/.rpcf/krb5/krb5adm.keytab"
 
 def IsTestKdcSet() :
     strPath = os.path.dirname( GetTestKeytabPath() )
@@ -137,19 +214,6 @@ def IsLocalIpAddr(
         return False
     finally:
         s.close()
-
-def Config_Kerberos2( initCfg : object ) -> int:
-    ret = 0
-    try:
-        bServer = False
-        if initCfg[ 'IsServer' ] == 'true' :
-            bServer = True
-
-    except Exception as err:
-        print( err )
-        if ret == 0:
-            ret = -errno.EFAULT
-        return ret
 
 def ReplaceKdcAddr( astRoot : AstNode, strAddr : str ) -> int:
     ret = 0
@@ -355,9 +419,32 @@ def UpdateKrb5Cfg( ast : AstNode,
             ret = -errno.EFAULT
     return ret
 
+def GenNewKeytabSvr(
+    strPrinc : str, strKeytab : str ) -> str:
+    components = strPrinc.strip().split( "@" )
+    if len( components ) > 2:
+        ret = -errno.EINVAL
+        raise Exception(
+            'Error invalid service principal' )
+    strHostPrinc = components[ 0 ] + "/" + \
+        platform.node() + "@" + components[ 1 ]
+
+    strAdminPrinc = components[ 0 ] + "/admin" + \
+         "@" + components[ 1 ]
+    cmdline += AddPrincipal(
+        strHostPrinc, "", False, strAdminPrinc )
+    cmdline += ";"
+    cmdline += AddToKeytab(
+        strHostPrinc, strKeytab, False, strAdminPrinc )
+    cmdline += ";"
+    cmdline += DelFromKeytab(
+        strAdminPrinc, strKeytab, False, strAdminPrinc )
+    return cmdline
+
 def ConfigKrb5( initCfg : dict, curDir : str )-> int:
     ret = 0
     bServer = False
+    strPrinc = None
     try:
         if initCfg[ 'IsServer' ] == 'true':
             bServer = True
@@ -371,12 +458,14 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
 
         bAuth = False
         oConns = initCfg['Connections']
+        strIpAddr = ""
         for oConn in oConns:
             if not 'HasAuth' in oConn :
                 continue
             if not oConn['HasAuth'] == 'true' :
                 continue
             bAuth = True
+            strIpAddr = oConn[ 'IpAddress' ]
             break
 
         if not bAuth:
@@ -385,6 +474,9 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
         oAuth = initCfg[ 'Security' ][ 'AuthInfo' ]
         if oAuth[ 'AuthMech' ] != 'krb5':
             return ret
+
+        strPrinc = oAuth[ 'ServiceName' ]
+        strRealm = oAuth[ 'Realm' ]
 
         curDir = curDir.strip()
         if curDir == '' :
@@ -434,6 +526,14 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
 
         cmdline += '{sudo} install -bm 644 ' + strKrbConf + \
             ' /etc/krb5.conf'
+
+        if bServer:
+            cmdline += ";"
+            cmdline += GenNewKeytabSvr( strPrinc, destPath )
+            cmdline += ";"
+            strNames = platform.node() + " " + strRealm
+            cmdline += AddEntryToHosts(
+                strIpAddr, strNames )
 
         if os.geteuid() == 0:
             actCmd = cmdline.format( sudo = '' )

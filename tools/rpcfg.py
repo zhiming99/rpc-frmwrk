@@ -35,6 +35,7 @@ from updcfg import *
 from updwscfg import *
 from updk5cfg import *
 import re
+import platform
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -594,7 +595,7 @@ class ConfigDlg(Gtk.Dialog):
         oLoadBtn = self.get_widget_for_response(
             Gtk.ResponseType.APPLY )
         oLoadBtn.set_tooltip_text(
-            "Reload settings from a driver.json.")
+            "Reload settings from another driver.json.")
 
         self.bServer = bServer
         self.hasGmSSL=IsFeatureEnabled( "gmssl" )
@@ -1692,11 +1693,19 @@ class ConfigDlg(Gtk.Dialog):
     def GetTestKdcSvcPrinc( self ) -> str:
         strSvc = self.svcEdit.get_text().strip()
         if len( strSvc ) == 0:
-            strSvc = 'host1/rpcrouter'
+            strSvc = 'rpcrouter'
         if strSvc.find( '@' ) == -1:
             strRealm = self.GetTestRealm()
             strSvc += '@' + strRealm 
         return strSvc
+
+    def GetTestKdcHostSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcPrinc()
+        return SetInstNameOfPrinc( strSvc, platform.node() )
+
+    def GetTestKdcAdminSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcPrinc()
+        return SetInstNameOfPrinc( strSvc, "admin" )
 
     def GetTestKdcUser( self ) -> str:
         strUser = self.userEdit.get_text().strip()
@@ -1709,16 +1718,13 @@ class ConfigDlg(Gtk.Dialog):
         return strUser
 
     def GetKadmAcl( self ) -> str:
-        strAcl = ''' 
-kadmin/admin    *
-{Service} i
+        strAcl = '''{ServiceAdm} aic
 {User}  i
-
 '''
-        strSvc = self.GetTestKdcSvcPrinc()
+        strSvc = self.GetTestKdcAdminSvcPrinc()
         strUser = self.GetTestKdcUser()
         return strAcl.format(
-            Service=strSvc,
+            ServiceAdm=strSvc,
             User=strUser )
 
     def GetKdcConf( self ) -> str:
@@ -1766,13 +1772,16 @@ kadmin/admin    *
                 print( "Warning 'krb5.conf' is not generated" )
                 return 3
 
+            if not self.checkCfgKrb5.props.active:
+                return 4
+
             strSrcPath = os.path.dirname(
                 GetTestKeytabPath() )
 
             if bServer :
                 re.sub( "^default_client_.*$", "", krbConf )
                 destKeytab = destPath + "/krb5.keytab"
-                srcKeytab = strSrcPath + "/krb5.keytab"
+                srcKeytab = strSrcPath + "/krb5adm.keytab"
             else:
                 re.sub( "^default_keytab_.*$", "", krbConf )
                 destKeytab = destPath + "/krb5cli.keytab"
@@ -1783,7 +1792,11 @@ kadmin/admin    *
             fp.write( krbConf )
             fp.close()
 
-            cmdline = "cp -f " + srcKeytab + " " + destKeytab
+            cmdline = "rm -f " + destKeytab + " > /dev/null 2>&1"
+            cmdline += ";"
+            cmdline += 'cp ' + srcKeytab + ' ' + destKeytab
+
+            print( cmdline )
             ret = rpcf_system( cmdline )
 
         except Exception as err:
@@ -1912,6 +1925,7 @@ EOF
             fp.close()
 
             cmdline = '{sudo} systemctl stop {KdcSvc};'
+            cmdline += '{sudo} systemctl stop ' + GetKadminSvcName() + ";"
             cmdline += "{sudo} install -bm 644 " + tempKrb
             cmdline += " /etc/krb5.conf;"
             cmdline += "{sudo} install -bm 644 " + tempKdc
@@ -1919,27 +1933,25 @@ EOF
             cmdline += "{sudo} install -bm 644 " + tempAcl
             cmdline += " {KdcConfPath}/kadm5.acl;"
 
-            cmdline += "{sudo} bash " + tempNewRealm
-            cmdline += ";"
-
             strDomain = self.GetTestRealm()
             strIpAddr = self.GetTestKdcIp()
 
+            strNames = platform.node() + " " + \
+                strDomain + " kdc." + strDomain
+
             strHostEntry = AddEntryToHosts(
-                strIpAddr,
-                strDomain + " kdc." + strDomain )
+                strIpAddr, strNames )
             if strHostEntry != "":
                 cmdline += strHostEntry + ";"
 
-            cmdline += DeletePrincipal(
-                "kadmin/admin" )
-
-            cmdline += ";"
-            cmdline += AddPrincipal(
-                "kadmin/admin", "MITiys5K6" )
+            cmdline += "{sudo} bash " + tempNewRealm
 
             #add principal for the client user
             strUser = self.GetTestKdcUser()
+            if not CheckPrincipal( strUser, strDomain ):
+                ret = -errno.EINVAL 
+                return ret
+
             cmdline += ";"
             cmdline += DeletePrincipal( strUser )
             cmdline += ";"
@@ -1947,23 +1959,49 @@ EOF
 
             #add principal for the server service
             strSvc = self.GetTestKdcSvcPrinc()
+            if not CheckPrincipal( strSvc, strDomain ):
+                ret = -errno.EINVAL 
+                return ret
             cmdline += ";"
             cmdline += DeletePrincipal( strSvc )
             cmdline += ";"
             cmdline += AddPrincipal( strSvc, "" )
+            cmdline += ";"
+
+            strHostPrinc = self.GetTestKdcHostSvcPrinc()
+            cmdline += DeletePrincipal( strHostPrinc )
+            cmdline += ";"
+            cmdline += AddPrincipal( strHostPrinc, "" )
+            cmdline += ";"
+
+            strAdminPrinc = self.GetTestKdcAdminSvcPrinc()
+            cmdline += DeletePrincipal( strAdminPrinc )
+            cmdline += ";"
+            cmdline += AddPrincipal( strAdminPrinc, "" )
+            cmdline += ";"
+
 
             #add svc to keytable
-            cmdline += ";"
             strKeytab = GetTestKeytabPath()
+            cmdline += "rm -rf " + strKeytab + ">/dev/null 2>&1;"
+            strAdmKt = GetTestAdminKeytabPath()
+            cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
+
             cmdline += AddToKeytab(
-                strSvc, strKeytab )
+                strHostPrinc, strKeytab )
             cmdline += ";"
             cmdline += ChangeKeytabOwner( strKeytab )
             cmdline += ";"
+            cmdline += AddToKeytab(
+                strAdminPrinc, strAdmKt )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strAdmKt )
 
             #add user to client keytable
             strCliKeytab = os.path.dirname( strKeytab ) + \
                 "/krb5cli.keytab"
+            cmdline += ";"
+            cmdline += "rm -rf " + strCliKeytab + ">/dev/null 2>&1"
             cmdline += ";"
             cmdline += AddToKeytab(
                 strUser, strCliKeytab )
@@ -1976,6 +2014,7 @@ EOF
             cmdline += "touch " + os.path.dirname( strKeytab ) + "/kdcinited;"
 
             cmdline += '{sudo} systemctl restart {KdcSvc};'
+            cmdline += '{sudo} systemctl restart ' + GetKadminSvcName() + ";"
 
             if os.geteuid() == 0:
                 actCmd = cmdline.format( sudo = '',
@@ -1995,7 +2034,7 @@ EOF
                     KdcSvc = GetKdcSvcName(),
                     KdcConfPath = GetKdcConfPath() ) + "'"
 
-            #print( actCmd )
+            print( actCmd )
             ret = rpcf_system( actCmd )
             if ret < 0:
                 return ret
@@ -2059,6 +2098,12 @@ EOF
             if strNewKdcIp == "":
                 raise Exception( "KDC address is empty" )
 
+            if not CheckPrincipal( strNewUser, strNewRealm ):
+                raise Exception( "bad principal '%s'" % strNewUser )
+
+            if not CheckPrincipal( strNewSvc, strNewRealm ):
+                raise Exception( "bad principal '%s'" % strNewSvc )
+
             if bServer and IsLocalIpAddr( strNewKdcIp ):
                 bChangeSvc = True
                 bChangeUser = True
@@ -2089,11 +2134,32 @@ EOF
                 cmdline += ";"
                 cmdline += AddPrincipal( strNewSvc, "" )
                 cmdline += ";"
+
+                strHostPrinc = self.GetTestKdcHostSvcPrinc()
+                cmdline += DeletePrincipal( strHostPrinc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strHostPrinc, "" )
+                cmdline += ";"
+
+                strAdminPrinc = self.GetTestKdcAdminSvcPrinc()
+                cmdline += DeletePrincipal( strAdminPrinc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strAdminPrinc, "" )
+                cmdline += ";"
+
                 strKeytab = GetTestKeytabPath()
+                cmdline += "rm -rf " + strKeytab + ">/dev/null 2>&1;"
+                strAdmKt = GetTestAdminKeytabPath()
+                cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
                 cmdline += AddToKeytab(
-                    strNewSvc, strKeytab )
+                    strHostPrinc, strKeytab )
                 cmdline += " && "
                 cmdline += ChangeKeytabOwner( strKeytab )
+                cmdline += " && "
+                cmdline += AddToKeytab(
+                    strAdminPrinc, strAdmKt )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strAdmKt )
                 cmdline += ";"
 
             #add user to client keytable
@@ -2102,6 +2168,8 @@ EOF
                     strKeytab = GetTestKeytabPath()
                 strCliKeytab = os.path.dirname( strKeytab ) + \
                     "/krb5cli.keytab"
+                cmdline += "rm -rf " + strCliKeytab + ">/dev/null 2>&1"
+                cmdline += ";"
                 cmdline += DeletePrincipal( strNewUser )
                 cmdline += ";"
                 cmdline += AddPrincipal( strNewUser, "" )
@@ -2109,9 +2177,9 @@ EOF
                 cmdline += AddToKeytab(
                     strNewUser, strCliKeytab )
                 cmdline += " && "
-                aclFile = "{KdcConfPath}/kadm5.acl"
                 cmdline += ChangeKeytabOwner( strCliKeytab )
                 cmdline += ";"
+                aclFile = "{KdcConfPath}/kadm5.acl"
                 cmdline += "if ! {sudo} grep '" + strNewUser + "' " + aclFile + "; then "
                 cmdline += "{sudo} echo >> " + aclFile + ";"
                 cmdline += "{sudo} echo '" + strNewUser + " i' >> "
@@ -2121,7 +2189,7 @@ EOF
             strTmpConf =tempname()
             if bChangeKdc or bChangeRealm:
                 ret, node = ParseKrb5Conf( '/etc/krb5.conf' )
-                if ret == 0 and node is not None:
+                if ret == 0:
                     ret = UpdateKrb5Cfg( node, strNewRealm,
                         strNewKdcIp, strTmpConf, False )
                     node.RemoveChildren()
@@ -2130,11 +2198,14 @@ EOF
                         cmdline += "{sudo} install -bm 644 " + strTmpConf + \
                             " /etc/krb5.conf"
 
-                    strCmd = AddEntryToHosts(
-                        strNewKdcIp,
-                        strNewRealm + " kdc." + strNewRealm )
-                    if strCmd != "" :
-                        cmdline += ";" + strCmd
+                strNames = platform.node() + " " + \
+                    strNewRealm.lower()+ " kdc." + \
+                    strNewRealm.lower()
+
+                strCmd = AddEntryToHosts(
+                    strNewKdcIp, strNames )
+                if strCmd != "" :
+                    cmdline += ";" + strCmd
 
             if len( cmdline ) > 0:
                 cmdline += ";"
@@ -2154,7 +2225,7 @@ EOF
                         KdcConfPath=GetKdcConfPath(),
                         KdcSvc = GetKdcSvcName() ) + "'"
 
-                #print( actCmd )
+                print( actCmd )
                 ret = rpcf_system( actCmd )
                 if ret < 0:
                     return ret
