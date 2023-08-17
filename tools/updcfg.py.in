@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
 from tempfile import mkstemp
-from updwscfg import rpcf_system
+from updwscfg import IsSudoAvailable, rpcf_system
 import errno
 
 g_passDlg = None
@@ -144,10 +144,7 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
         fp = open( tempfile, "w" )
         json.dump( jsonVal, fp, indent=4)
         fp.close()
-        ret = rpcf_system( "which sudo > /dev/null" )
-        bSudo = True
-        if ret != 0:
-            bSudo = False
+        bSudo = IsSudoAvailable()
         if bCmdLine :
             if bSudo:
                 strCmd = "sudo cp " + tempfile + " " + strPath
