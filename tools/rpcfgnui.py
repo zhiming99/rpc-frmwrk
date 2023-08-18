@@ -40,22 +40,19 @@ def main():
     initFile = args[ 0 ]
 
     try:
+        if IsFeatureEnabled( "auth" ):
+            ret = ConfigAuthServer( initFile )
+            if ret < 0:
+                print( "Error failed to config auth server %d" % ret )
+                return ret
+
+        if IsFeatureEnabled( "openssl" ):
+            ret = ConfigWebServer( initFile )
+            if ret < 0:
+                print( "Error failed to config web server %d" % ret )
+                return ret  
+
         ret = Update_InitCfg( initFile, None )
-        if not IsFeatureEnabled( "openssl" ):
-            return ret
-
-        ret = ConfigWebServer( initFile )
-        if ret < 0:
-            print( "Error failed to config web server %d" % ret )
-            ret = 0
-
-        if not IsFeatureEnabled( "auth" ):
-            return ret
-
-        ret = ConfigAuthServer( initFile )
-        if ret < 0:
-            print( "Error failed to config auth server %d" % ret )
-            ret = 0
 
     except Exception as err:
         text = "Failed to update the config files:" + str( err )

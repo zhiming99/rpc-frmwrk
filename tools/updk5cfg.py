@@ -9,6 +9,13 @@ import re
 from krbparse import *
 from updwscfg import IsSudoAvailable, rpcf_system
 import platform
+
+def GetLocalIp( strIpAddr : str )->str:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(( strIpAddr, 88))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
     
 def CheckPrincipal(
     strPrinc : str,
@@ -23,9 +30,6 @@ def CheckPrincipal(
         if len( components ) > 2:
             raise Exception( "Error principal should have only one '@'" )
 
-        if components[ 1 ] != strRealm :
-            raise Exception( "Error the principal has different realm" )
-
     except Exception as err:
         print( err )
         if ret == True:
@@ -33,18 +37,8 @@ def CheckPrincipal(
 
     return ret
     
-def SetInstNameOfPrinc(
-        strPrinc : str, strInst : str  ) -> str:
-    strPrinc = strPrinc.strip()
-    if len( strPrinc ) == 0:
-        raise Exception(
-            'Error empty principal' )
-    components = strPrinc.split( '@' )
-    if len( components ) != 2:
-        raise Exception(
-            'Error invalid principal' )
-    return components[ 0 ] + "/" + \
-        strInst + "@" + components[ 1 ]
+def GetSvcNameFromStore( strSvcHost : str ) -> str:
+    return strSvcHost.strip().split( '@', maxsplit=1)[ 0 ]
 
 def AddEntryToHosts(
     strIpAddr : str,
@@ -67,12 +61,16 @@ def AddEntryToHosts(
 def AddPrincipal(
     strPrinc : str,
     strPass : str,
-    bLocal = True ) -> str:
+    bLocal = True,
+    strAdmin = None ) -> str:
     if bLocal:
         kadmin = "kadmin.local"
         sudostr = '{sudo} '
     else:
-        kadmin = "kadmin"
+        if strAdmin is None:
+            kadmin = "kadmin"
+        else:
+            kadmin = "kadmin -k -p " + strAdmin
         sudostr = ''
     cmdline = sudostr + kadmin + " -q 'addprinc "
     if len( strPass ) != 0:
@@ -83,12 +81,16 @@ def AddPrincipal(
 
 def DeletePrincipal(
     strPrinc : str,
-    bLocal = True ) -> str :
+    bLocal = True,
+    strAdmin = None ) -> str:
     if bLocal:
         kadmin = "kadmin.local"
         sudostr = '{sudo} '
     else:
-        kadmin = "kadmin"
+        if strAdmin is None:
+            kadmin = "kadmin"
+        else:
+            kadmin = "kadmin -k -p " + strAdmin
         sudostr = ''
     cmdline = sudostr + kadmin + " -q 'delete_principal -force " + \
         strPrinc + "'"
@@ -113,16 +115,18 @@ def AddToKeytabInternal(
     strKtPath = os.path.dirname( strKeytab )
     cmdline = ""
     if not os.access( strKtPath, os.R_OK | os.X_OK ):
-        cmdline += "mkdir -p " + strKtPath + "&&"
+        cmdline += "mkdir -p " + strKtPath + ";"
 
     if len( strKeytab ) == 0:
-        cmdline += sudostr + kadmin + " -q 'ktrem " + strPrinc + "';"
+        cmdline += sudostr + kadmin + " -q 'ktrem " + strPrinc + "'"
         if bAdd:
+            cmdline += ';'
             cmdline += sudostr + kadmin + " -q 'ktadd " + strPrinc + "'"
     else:
         cmdline += sudostr + kadmin + \
-            " -q 'ktrem -k " + strKeytab + " " + strPrinc + "';"
+            " -q 'ktrem -k " + strKeytab + " " + strPrinc + "'"
         if bAdd:
+            cmdline += ';'
             cmdline += sudostr + kadmin + \
                 " -q 'ktadd -k " + strKeytab + " " + strPrinc + "'"
     return cmdline
@@ -427,11 +431,11 @@ def GenNewKeytabSvr(
         raise Exception(
             'Error invalid service principal' )
     strHostPrinc = components[ 0 ] + "/" + \
-        platform.node() + "@" + components[ 1 ]
+        platform.node().lower() + "@" + components[ 1 ]
 
     strAdminPrinc = components[ 0 ] + "/admin" + \
          "@" + components[ 1 ]
-    cmdline += AddPrincipal(
+    cmdline = AddPrincipal(
         strHostPrinc, "", False, strAdminPrinc )
     cmdline += ";"
     cmdline += AddToKeytab(
@@ -451,10 +455,10 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
 
         oMisc = initCfg[ 'Security' ]['misc']
         if not 'ConfigKrb5' in oMisc:
-            return ret
+            return 1
 
         if oMisc['ConfigKrb5'] != 'true':
-            return ret
+            return 2
 
         bAuth = False
         oConns = initCfg['Connections']
@@ -469,20 +473,24 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             break
 
         if not bAuth:
-            return ret
+            return 3
 
         oAuth = initCfg[ 'Security' ][ 'AuthInfo' ]
         if oAuth[ 'AuthMech' ] != 'krb5':
-            return ret
+            return 4
 
-        strPrinc = oAuth[ 'ServiceName' ]
+        strSvcName = GetSvcNameFromStore( oAuth[ 'ServiceName' ] )
+        strHostSvc = strSvcName + "@" + platform.node()
+        oAuth[ 'ServiceName' ] = strHostSvc
+
         strRealm = oAuth[ 'Realm' ]
+        strPrinc = strSvcName + "@" + strRealm
 
         curDir = curDir.strip()
         if curDir == '' :
             curDir = '.'
 
-        destPath = GetTestKeytabPath()
+        destPath = os.path.dirname( GetTestKeytabPath() )
         if destPath == '' :
             raise Exception( "Error empty keytab path" )
 
@@ -493,7 +501,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             strKeytab += curDir + '/krb5cli.keytab'
             destPath += '/krb5cli.keytab'
 
-        cmdline = "install -m 600 " + \
+        cmdline = "install -D -m 600 " + \
             strKeytab + " " +  destPath + ";"
 
         cmdline += ChangeKeytabOwner( destPath )
@@ -531,7 +539,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             cmdline += ";"
             cmdline += GenNewKeytabSvr( strPrinc, destPath )
             cmdline += ";"
-            strNames = platform.node() + " " + strRealm
+            strNames = platform.node()
             cmdline += AddEntryToHosts(
                 strIpAddr, strNames )
 
@@ -560,6 +568,13 @@ def ConfigAuthServer( initFile : str ) -> int:
         fp.close()
         ret = ConfigKrb5( cfgVal,
             os.path.dirname( initFile ) )
+        if ret < 0:
+            return ret
+
+        if ret == 0:
+            fp = open( initFile, 'w' )
+            json.dump( cfgVal, fp, indent=4)
+            fp.close()
 
     except Exception as err:
         print( err )

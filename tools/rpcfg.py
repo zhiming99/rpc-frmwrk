@@ -167,11 +167,7 @@ if [ -f USESSL ]; then
 fi
 
 initcfg=$(pwd)/initcfg.json
-if which sudo; then
-    sudo python3 $rpcfgnui $initcfg
-else
-    su -c "python3 $rpcfgnui $initcfg"
-fi
+python3 $rpcfgnui $initcfg
 '''
     return content
 
@@ -192,7 +188,7 @@ if (($?==0)); then
 else
     echo install failed;
 fi
-rm -rf $unzipdir
+#rm -rf $unzipdir
 exit 0
 __GZFILE__
 '''
@@ -1690,22 +1686,33 @@ class ConfigDlg(Gtk.Dialog):
 
         return strRealm
 
-    def GetTestKdcSvcPrinc( self ) -> str:
+    def GetTestKdcSvcName( self ) -> str:
         strSvc = self.svcEdit.get_text().strip()
         if len( strSvc ) == 0:
             strSvc = 'rpcrouter'
-        if strSvc.find( '@' ) == -1:
-            strRealm = self.GetTestRealm()
-            strSvc += '@' + strRealm 
+        if strSvc.find( '@' ) > -1:
+            strSvc = strSvc.split( '@', maxsplit=1 )[ 0 ]
+        if strSvc.find( '/' ) > -1:
+            strSvc = strSvc.split( '/', maxsplit=1 )[ 0 ]
+        if not strSvc.isidentifier():
+            raise Exception( "Error service name '%s' is not a valid identifier" % strSvc )
         return strSvc
 
-    def GetTestKdcHostSvcPrinc( self ) -> str:
-        strSvc = self.GetTestKdcSvcPrinc()
-        return SetInstNameOfPrinc( strSvc, platform.node() )
+    # GSSAPI form of the ServiceName
+    def GetTestKdcHostSvcName( self ) -> str:
+        strSvc = self.GetTestKdcSvcName()
+        return strSvc + "@" + platform.node()
 
+    # principal for server usage
+    def GetTestKdcHostSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcName()
+        return strSvc + "/" + platform.node().lower() +\
+            '@' + self.GetTestRealm()
+
+    # principal for admin usage
     def GetTestKdcAdminSvcPrinc( self ) -> str:
-        strSvc = self.GetTestKdcSvcPrinc()
-        return SetInstNameOfPrinc( strSvc, "admin" )
+        strSvc = self.GetTestKdcSvcName()
+        return strSvc + "/admin@" + self.GetTestRealm()
 
     def GetTestKdcUser( self ) -> str:
         strUser = self.userEdit.get_text().strip()
@@ -1779,11 +1786,11 @@ class ConfigDlg(Gtk.Dialog):
                 GetTestKeytabPath() )
 
             if bServer :
-                re.sub( "^default_client_.*$", "", krbConf )
+                krbConf = re.sub( "^default_client_.*$", "", krbConf, flags=re.MULTILINE )
                 destKeytab = destPath + "/krb5.keytab"
                 srcKeytab = strSrcPath + "/krb5adm.keytab"
             else:
-                re.sub( "^default_keytab_.*$", "", krbConf )
+                krbConf = re.sub( "^default_keytab_.*$", "", krbConf, flags=re.MULTILINE)
                 destKeytab = destPath + "/krb5cli.keytab"
                 srcKeytab = strSrcPath + "/krb5cli.keytab"
 
@@ -1828,6 +1835,8 @@ forwardable = true
 allow_weak_crypto = true
 default_keytab_name=FILE:{DefKeytab}
 default_client_keytab_name=FILE:{DefCliKeytab}
+rdns = false
+qualify_shortname = false
 
 [realms]
 {Realm} = {{
@@ -1958,14 +1967,7 @@ EOF
             cmdline += AddPrincipal( strUser, "" )
 
             #add principal for the server service
-            strSvc = self.GetTestKdcSvcPrinc()
-            if not CheckPrincipal( strSvc, strDomain ):
-                ret = -errno.EINVAL 
-                return ret
-            cmdline += ";"
-            cmdline += DeletePrincipal( strSvc )
-            cmdline += ";"
-            cmdline += AddPrincipal( strSvc, "" )
+            strSvc = self.GetTestKdcSvcName()
             cmdline += ";"
 
             strHostPrinc = self.GetTestKdcHostSvcPrinc()
@@ -2101,7 +2103,7 @@ EOF
             if not CheckPrincipal( strNewUser, strNewRealm ):
                 raise Exception( "bad principal '%s'" % strNewUser )
 
-            if not CheckPrincipal( strNewSvc, strNewRealm ):
+            if not strNewSvc.isidentifier() :
                 raise Exception( "bad principal '%s'" % strNewSvc )
 
             if bServer and IsLocalIpAddr( strNewKdcIp ):
@@ -2130,10 +2132,6 @@ EOF
             cmdline += '{sudo} systemctl stop {KdcSvc}'
             if bChangeSvc :
                 cmdline += ";"
-                cmdline += DeletePrincipal( strNewSvc )
-                cmdline += ";"
-                cmdline += AddPrincipal( strNewSvc, "" )
-                cmdline += ";"
 
                 strHostPrinc = self.GetTestKdcHostSvcPrinc()
                 cmdline += DeletePrincipal( strHostPrinc )
@@ -2153,9 +2151,9 @@ EOF
                 cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
                 cmdline += AddToKeytab(
                     strHostPrinc, strKeytab )
-                cmdline += " && "
+                cmdline += ";"
                 cmdline += ChangeKeytabOwner( strKeytab )
-                cmdline += " && "
+                cmdline += ";"
                 cmdline += AddToKeytab(
                     strAdminPrinc, strAdmKt )
                 cmdline += ";"
@@ -2176,7 +2174,7 @@ EOF
                 cmdline += ";"
                 cmdline += AddToKeytab(
                     strNewUser, strCliKeytab )
-                cmdline += " && "
+                cmdline += ";"
                 cmdline += ChangeKeytabOwner( strCliKeytab )
                 cmdline += ";"
                 aclFile = "{KdcConfPath}/kadm5.acl"
@@ -2334,7 +2332,8 @@ EOF
 
         strSvc = ""
         if authInfo is not None and 'ServiceName' in authInfo :
-            strSvc = authInfo['ServiceName']
+            strSvc = GetSvcNameFromStore(
+                authInfo['ServiceName'] )
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
@@ -2792,7 +2791,7 @@ EOF
             elemSecs[ 'AuthInfo' ] = authInfo
 
             authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
-            authInfo[ 'ServiceName' ] = self.svcEdit.get_text().strip()
+            authInfo[ 'ServiceName' ] = self.GetTestKdcHostSvcName()
             authInfo[ 'AuthMech' ] = 'krb5'
             authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
             authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
@@ -3212,7 +3211,11 @@ EOF
                 if not obj.isServer and not self.bServer:
                     continue
 
-                cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json;"
+                fp = open( curDir + '/instcfg.sh', 'w' )
+                fp.write( get_instcfg_content() )
+                fp.close()
+
+                cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json instcfg.sh;"
                 bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"
@@ -3286,7 +3289,7 @@ EOF
                 rpcf_system( "mv " + installer + " " + newName )
 
             cmdline = "cd " + curDir + " && ( rm ./USESSL > /dev/null 2>&1;" + \
-                "rm ./*.gz krb5.conf krb5.keytab krb5cli.keytab > /dev/null 2>&1 )"
+                "rm *.gz krb5.conf krb5.keytab krb5cli.keytab instcfg.sh > /dev/null 2>&1);"
             #cmdline += "rm " + curDir + "/initcfg.json || true;"
             rpcf_system( cmdline )
 
