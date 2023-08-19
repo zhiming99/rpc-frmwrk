@@ -267,7 +267,7 @@ def Config_Apache( initCfg : object )->int:
 def ConfigWebServer2( initCfg : object )->int:
     ret = 0
     try:
-        if initCfg[ 'IsServer' ] != 'true':
+        if initCfg[ 'InstToSvr' ] != 'true':
             return ret
         oMisc = initCfg[ 'Security' ]['misc']
         if not 'ConfigWebServer' in oMisc:

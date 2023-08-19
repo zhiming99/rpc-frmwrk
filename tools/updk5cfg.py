@@ -37,9 +37,6 @@ def CheckPrincipal(
 
     return ret
     
-def GetSvcNameFromStore( strSvcHost : str ) -> str:
-    return strSvcHost.strip().split( '@', maxsplit=1)[ 0 ]
-
 def AddEntryToHosts(
     strIpAddr : str,
     strNames : str ) -> str:
@@ -424,14 +421,14 @@ def UpdateKrb5Cfg( ast : AstNode,
     return ret
 
 def GenNewKeytabSvr(
-    strPrinc : str, strKeytab : str ) -> str:
-    components = strPrinc.strip().split( "@" )
-    if len( components ) > 2:
+    strSvcHost : str, strRealm : str, strKeytab : str ) -> str:
+    components = strSvcHost.strip().split( "@" )
+    if len( components ) != 2:
         ret = -errno.EINVAL
         raise Exception(
             'Error invalid service principal' )
     strHostPrinc = components[ 0 ] + "/" + \
-        platform.node().lower() + "@" + components[ 1 ]
+        components[ 1 ].lower() + "@" + strRealm
 
     strAdminPrinc = components[ 0 ] + "/admin" + \
          "@" + components[ 1 ]
@@ -448,9 +445,9 @@ def GenNewKeytabSvr(
 def ConfigKrb5( initCfg : dict, curDir : str )-> int:
     ret = 0
     bServer = False
-    strPrinc = None
+    strSvcHost = None
     try:
-        if initCfg[ 'IsServer' ] == 'true':
+        if initCfg[ 'InstToSvr' ] == 'true':
             bServer = True
 
         oMisc = initCfg[ 'Security' ]['misc']
@@ -479,12 +476,8 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
         if oAuth[ 'AuthMech' ] != 'krb5':
             return 4
 
-        strSvcName = GetSvcNameFromStore( oAuth[ 'ServiceName' ] )
-        strHostSvc = strSvcName + "@" + platform.node()
-        oAuth[ 'ServiceName' ] = strHostSvc
-
+        strSvcHost = oAuth[ 'ServiceName' ]
         strRealm = oAuth[ 'Realm' ]
-        strPrinc = strSvcName + "@" + strRealm
 
         curDir = curDir.strip()
         if curDir == '' :
@@ -498,7 +491,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             strKeytab = curDir + '/krb5.keytab'
             destPath += '/krb5.keytab'
         else:
-            strKeytab += curDir + '/krb5cli.keytab'
+            strKeytab = curDir + '/krb5cli.keytab'
             destPath += '/krb5cli.keytab'
 
         cmdline = "install -D -m 600 " + \
@@ -537,11 +530,13 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
 
         if bServer:
             cmdline += ";"
-            cmdline += GenNewKeytabSvr( strPrinc, destPath )
-            cmdline += ";"
-            strNames = platform.node()
-            cmdline += AddEntryToHosts(
-                strIpAddr, strNames )
+            cmdline += GenNewKeytabSvr(
+                strSvcHost, strRealm, destPath )
+
+        cmdline += ";"
+        components = strSvcHost.split( '@' )
+        cmdline += AddEntryToHosts(
+            strIpAddr, components[ 1 ] )
 
         if os.geteuid() == 0:
             actCmd = cmdline.format( sudo = '' )
@@ -568,13 +563,6 @@ def ConfigAuthServer( initFile : str ) -> int:
         fp.close()
         ret = ConfigKrb5( cfgVal,
             os.path.dirname( initFile ) )
-        if ret < 0:
-            return ret
-
-        if ret == 0:
-            fp = open( initFile, 'w' )
-            json.dump( cfgVal, fp, indent=4)
-            fp.close()
 
     except Exception as err:
         print( err )

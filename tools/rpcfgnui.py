@@ -40,6 +40,24 @@ def main():
     initFile = args[ 0 ]
 
     try:
+        bServer = None
+        if os.access( './clidx', os.F_OK ):
+            bServer = False
+        elif os.access( './svridx', os.F_OK ):
+            bServer = True
+
+        if bServer is None:
+            raise Exception( "Error bad installer" )
+
+        fp = open( initFile, 'r' )
+        initCfg = json.load( fp )
+        fp.close()
+
+        initCfg[ 'InstToSvr' ] = bServer
+        fp = open( initFile, 'w' )
+        json.dump( initCfg, fp, indent=4 )
+        fp.close()
+
         if IsFeatureEnabled( "auth" ):
             ret = ConfigAuthServer( initFile )
             if ret < 0:

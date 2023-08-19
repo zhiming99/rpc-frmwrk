@@ -1686,33 +1686,31 @@ class ConfigDlg(Gtk.Dialog):
 
         return strRealm
 
-    def GetTestKdcSvcName( self ) -> str:
-        strSvc = self.svcEdit.get_text().strip()
-        if len( strSvc ) == 0:
-            strSvc = 'rpcrouter'
-        if strSvc.find( '@' ) > -1:
-            strSvc = strSvc.split( '@', maxsplit=1 )[ 0 ]
-        if strSvc.find( '/' ) > -1:
-            strSvc = strSvc.split( '/', maxsplit=1 )[ 0 ]
-        if not strSvc.isidentifier():
-            raise Exception( "Error service name '%s' is not a valid identifier" % strSvc )
-        return strSvc
-
     # GSSAPI form of the ServiceName
-    def GetTestKdcHostSvcName( self ) -> str:
-        strSvc = self.GetTestKdcSvcName()
-        return strSvc + "@" + platform.node()
+    def GetTestKdcSvcHostName( self ) -> str:
+        strSvc = self.svcEdit.get_text().strip()
+        if len( strSvc ) > 0:
+            components = strSvc.split( '@' )
+            if len( components ) == 1:
+                strSvc += '@' + platform.node()
+            elif len( components ) > 2:
+                raise Exception( "Error service name '%s' is valid" % strSvc )
+        else:
+            strSvc = 'rpcrouter' + "@" + platform.node()
+        return strSvc
 
     # principal for server usage
     def GetTestKdcHostSvcPrinc( self ) -> str:
-        strSvc = self.GetTestKdcSvcName()
-        return strSvc + "/" + platform.node().lower() +\
+        strSvc = self.GetTestKdcSvcHostName()
+        components = strSvc.split( '@' )
+        return components[ 0 ] + "/" + components[ 1 ].lower() + \
             '@' + self.GetTestRealm()
 
     # principal for admin usage
     def GetTestKdcAdminSvcPrinc( self ) -> str:
-        strSvc = self.GetTestKdcSvcName()
-        return strSvc + "/admin@" + self.GetTestRealm()
+        strSvc = self.GetTestKdcSvcHostName()
+        components = strSvc.split( '@' )
+        return components[ 0 ] + "/admin@" + self.GetTestRealm()
 
     def GetTestKdcUser( self ) -> str:
         strUser = self.userEdit.get_text().strip()
@@ -1967,7 +1965,7 @@ EOF
             cmdline += AddPrincipal( strUser, "" )
 
             #add principal for the server service
-            strSvc = self.GetTestKdcSvcName()
+            strSvc = self.GetTestKdcSvcHostName()
             cmdline += ";"
 
             strHostPrinc = self.GetTestKdcHostSvcPrinc()
@@ -2102,9 +2100,6 @@ EOF
 
             if not CheckPrincipal( strNewUser, strNewRealm ):
                 raise Exception( "bad principal '%s'" % strNewUser )
-
-            if not strNewSvc.isidentifier() :
-                raise Exception( "bad principal '%s'" % strNewSvc )
 
             if bServer and IsLocalIpAddr( strNewKdcIp ):
                 bChangeSvc = True
@@ -2332,8 +2327,7 @@ EOF
 
         strSvc = ""
         if authInfo is not None and 'ServiceName' in authInfo :
-            strSvc = GetSvcNameFromStore(
-                authInfo['ServiceName'] )
+            strSvc = authInfo['ServiceName']
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
@@ -2791,7 +2785,7 @@ EOF
             elemSecs[ 'AuthInfo' ] = authInfo
 
             authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
-            authInfo[ 'ServiceName' ] = self.GetTestKdcHostSvcName()
+            authInfo[ 'ServiceName' ] = self.GetTestKdcSvcHostName()
             authInfo[ 'AuthMech' ] = 'krb5'
             authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
             authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
