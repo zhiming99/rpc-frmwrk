@@ -45,7 +45,7 @@ def AddEntryToHosts(
     pattern = strIpAddr + ".*" + strNames
     with open('/etc/hosts', 'r') as fp:
         for line in fp:
-            if re.search( pattern, line ):
+            if re.search( pattern, line, flags=re.IGNORECASE ):
                 bExist = True
                 break
     if bExist :

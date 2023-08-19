@@ -854,7 +854,11 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         initCfg = json.load( fp )
         fp.close()
 
-        strVal = initCfg[ 'IsServer' ]
+        if 'InstToSvr' in initCfg:
+            strVal = initCfg[ 'InstToSvr' ]
+        else:
+            strVal = initCfg[ 'IsServer' ]
+
         if strVal == 'true' :
             bServer = True
         elif strVal == 'false' :

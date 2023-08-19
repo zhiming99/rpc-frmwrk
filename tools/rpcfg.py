@@ -188,7 +188,7 @@ if (($?==0)); then
 else
     echo install failed;
 fi
-#rm -rf $unzipdir
+rm -rf $unzipdir
 exit 0
 __GZFILE__
 '''
@@ -1801,7 +1801,7 @@ class ConfigDlg(Gtk.Dialog):
             cmdline += ";"
             cmdline += 'cp ' + srcKeytab + ' ' + destKeytab
 
-            print( cmdline )
+            #print( cmdline )
             ret = rpcf_system( cmdline )
 
         except Exception as err:
@@ -2034,7 +2034,7 @@ EOF
                     KdcSvc = GetKdcSvcName(),
                     KdcConfPath = GetKdcConfPath() ) + "'"
 
-            print( actCmd )
+            #print( actCmd )
             ret = rpcf_system( actCmd )
             if ret < 0:
                 return ret
@@ -2218,7 +2218,7 @@ EOF
                         KdcConfPath=GetKdcConfPath(),
                         KdcSvc = GetKdcSvcName() ) + "'"
 
-                print( actCmd )
+                #print( actCmd )
                 ret = rpcf_system( actCmd )
                 if ret < 0:
                     return ret
@@ -2331,6 +2331,8 @@ EOF
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
+        svcEditBox.set_tooltip_text( "Host-based service name in " + \
+            "the form 'service@hostname'" )
         grid.attach(svcEditBox, startCol + 1, startRow + 2, 2, 1 )
 
         labelRealm = Gtk.Label()
@@ -2404,7 +2406,7 @@ EOF
         if self.bServer:
 
             toolTip = "Initialize a KDC server on this host"
-            toolTip2 = "Update the Kerberos system settings with " +\
+            toolTip2 = "Update the local Kerberos settings with " +\
                 "the above 'Auth Information'"
 
             updKrb5Btn = Gtk.Button.new_with_label("Update Auth Settings")

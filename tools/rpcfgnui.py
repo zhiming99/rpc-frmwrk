@@ -40,10 +40,12 @@ def main():
     initFile = args[ 0 ]
 
     try:
-        bServer = None
         if os.access( './clidx', os.F_OK ):
             bServer = False
         elif os.access( './svridx', os.F_OK ):
+            bServer = True
+        else:
+            #auto-testing does not provide both files
             bServer = True
 
         if bServer is None:
