@@ -53,7 +53,10 @@ def main():
         initCfg = json.load( fp )
         fp.close()
 
-        initCfg[ 'InstToSvr' ] = bServer
+        if bServer:
+            initCfg[ 'InstToSvr' ] = 'true'
+        else:
+            initCfg[ 'InstToSvr' ] = 'false'
         fp = open( initFile, 'w' )
         json.dump( initCfg, fp, indent=4 )
         fp.close()

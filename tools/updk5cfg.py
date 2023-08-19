@@ -431,7 +431,7 @@ def GenNewKeytabSvr(
         components[ 1 ].lower() + "@" + strRealm
 
     strAdminPrinc = components[ 0 ] + "/admin" + \
-         "@" + components[ 1 ]
+         "@" + strRealm
     cmdline = AddPrincipal(
         strHostPrinc, "", False, strAdminPrinc )
     cmdline += ";"
@@ -478,6 +478,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
 
         strSvcHost = oAuth[ 'ServiceName' ]
         strRealm = oAuth[ 'Realm' ]
+        strKdcIp = oAuth[ 'KdcIp' ]
 
         curDir = curDir.strip()
         if curDir == '' :
@@ -537,6 +538,10 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
         components = strSvcHost.split( '@' )
         cmdline += AddEntryToHosts(
             strIpAddr, components[ 1 ] )
+
+        cmdline += ";"
+        cmdline += AddEntryToHosts(
+            strKdcIp, strRealm )
 
         if os.geteuid() == 0:
             actCmd = cmdline.format( sudo = '' )
