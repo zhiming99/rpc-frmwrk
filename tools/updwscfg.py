@@ -104,7 +104,7 @@ def ExtractParams( initCfg : object) ->Tuple[ dict ]:
             if not path.isidentifier() :
                 raise Exception( "Error the basename of the path must be a valid identifier")
             
-            oResp[ 'AppName' ] = urlComp.path[1:]
+            oResp[ 'AppName' ] = path
             oResps.append( oResp )
 
         if ( not 'Security' in initCfg or
@@ -196,9 +196,9 @@ upstream {AppName} {{
         fp.write( cfg )
     fp.close()
     cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
-    cmdline += "cd /etc/nginx/sites-enabled && {sudo} rm ./rpcf_nginx.conf && "
-    cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf &&"
-    cmdline += "rm " + cfgFile + ";"
+    cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf || "
+    cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf || "
+    cmdline += "rm " + cfgFile + " || echo nginx setup complete );"
     cmdline += "{sudo} systemctl restart nginx"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
@@ -267,8 +267,13 @@ def Config_Apache( initCfg : object )->int:
 def ConfigWebServer2( initCfg : object )->int:
     ret = 0
     try:
-        if initCfg[ 'InstToSvr' ] != 'true':
+        if initCfg[ 'IsServer' ] != 'true':
             return ret
+
+        if "InstToSvr" in initCfg and \
+            initCfg[ 'InstToSvr' ] == 'false':
+            return ret
+
         oMisc = initCfg[ 'Security' ]['misc']
         if not 'ConfigWebServer' in oMisc:
             return ret

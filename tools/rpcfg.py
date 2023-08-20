@@ -715,7 +715,7 @@ class ConfigDlg(Gtk.Dialog):
             ipAddr = Gtk.Entry()
             ipAddr.set_text( nodeCfg[ 'IpAddress' ] )
             ipAddr.set_tooltip_text( "Enter an ip address or a domain name." )
-            grid.attach(ipAddr, startCol + 1, startRow + 2, 1, 1 )
+            grid.attach(ipAddr, startCol + 1, startRow + 2, 2, 1 )
             ipAddr.iNo = i
             nodeCtx.ipAddr = ipAddr
 
@@ -726,7 +726,7 @@ class ConfigDlg(Gtk.Dialog):
 
             portNum = Gtk.Entry()
             portNum.set_text( nodeCfg[ 'PortNumber' ] )
-            grid.attach(portNum, startCol + 1, startRow + 3, 1, 1 )
+            grid.attach(portNum, startCol + 1, startRow + 3, 2, 1 )
             portNum.iNo = i
             nodeCtx.port = portNum
 
@@ -757,7 +757,7 @@ class ConfigDlg(Gtk.Dialog):
             urlEdit = Gtk.Entry()
             urlEdit.set_text( strUrl )
             urlEdit.set_sensitive( webSockCheck.props.active )
-            grid.attach(urlEdit, startCol + 1, startRow + 5, 1, 1 )
+            grid.attach(urlEdit, startCol + 1, startRow + 5, 2, 1 )
             nodeCtx.urlEdit = urlEdit
             urlEdit.iNo = i
 
@@ -1167,7 +1167,7 @@ class ConfigDlg(Gtk.Dialog):
         else :    
             labelIp.set_text("Server IP: ")
 
-        labelIp.set_xalign(1)
+        labelIp.set_xalign(.5)
         grid.attach(labelIp, startCol, startRow, 1, 1 )
 
         ipEditBox = Gtk.Entry()
@@ -1206,7 +1206,7 @@ class ConfigDlg(Gtk.Dialog):
             pass                
         portEditBox = Gtk.Entry()
         portEditBox.set_text( str( portNum ) )
-        grid.attach( portEditBox, startCol + 1, startRow + 1, 1, 1)
+        grid.attach( portEditBox, startCol + 1, startRow + 1, 2, 1)
         self.ifctx[ ifNo ].port = portEditBox
 
         rows = GetGridRows( grid )
@@ -1233,27 +1233,28 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( compressCheck, startCol + 1, rows, 1, 1)
         self.ifctx[ ifNo ].compress = compressCheck
 
+        rows = GetGridRows( grid )
+        labelPath = Gtk.Label()
+        strText = 'RouterPath: '
+        labelPath.set_text( strText )
+
+        labelPath.set_xalign(1)
+        grid.attach(labelPath, startCol + 0, rows + 0, 1, 1 )
+
+        strPath = GetRouterPath( "echodesc.json" )
+        pathEditBox = Gtk.Entry()
+        pathEditBox.set_text( str( strPath ) )
+        grid.attach( pathEditBox, startCol + 1, rows + 0, 2, 1)
+        self.ifctx[ 0 ].rtpathEdit = pathEditBox
+
         if ifNo == 0 :
             rows = GetGridRows( grid )
-            labelPath = Gtk.Label()
-            strText = 'RouterPath: '
-            labelPath.set_text( strText )
-
-            labelPath.set_xalign(1)
-            grid.attach(labelPath, startCol + 0, rows + 0, 1, 1 )
-
-            strPath = GetRouterPath( "echodesc.json" )
-            pathEditBox = Gtk.Entry()
-            pathEditBox.set_text( str( strPath ) )
-            grid.attach( pathEditBox, startCol + 1, rows + 0, 1, 1)
-            self.ifctx[ 0 ].rtpathEdit = pathEditBox
-
-            rows = GetGridRows( grid )
-            addBtn = Gtk.Button.new_with_label("Add interface")
+            addBtn = Gtk.Button.new_with_label("Add New Interface")
             addBtn.connect("clicked", self.on_add_if_clicked)
             grid.attach(addBtn, startCol + 1, rows + 1, 1, 1 )
 
         else :
+            rows = GetGridRows( grid )
             removeBtn = Gtk.Button.new_with_label(
                 "Remove interface " + str(ifNo) )
             removeBtn.ifNo = ifNo
@@ -1301,7 +1302,7 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit = Gtk.Entry()
         urlEdit.set_text( strUrl )
         urlEdit.set_sensitive( bActive )
-        grid.attach(urlEdit, startCol + 1, startRow + 1, 1, 1 )
+        grid.attach(urlEdit, startCol + 1, startRow + 1, 2, 1 )
         self.ifctx[ ifNo ].urlEdit = urlEdit
         urlEdit.ifNo = ifNo
 
@@ -1943,7 +1944,9 @@ EOF
             strDomain = self.GetTestRealm()
             strIpAddr = self.GetTestKdcIp()
 
-            strNames = platform.node() + " " + \
+            strSvcHost = self.GetTestKdcSvcHostName()
+            comps = strSvcHost.split( "@" )
+            strNames = comps[ 1 ] + " " + \
                 strDomain + " kdc." + strDomain
 
             strHostEntry = AddEntryToHosts(
@@ -2191,7 +2194,9 @@ EOF
                         cmdline += "{sudo} install -bm 644 " + strTmpConf + \
                             " /etc/krb5.conf"
 
-                strNames = platform.node() + " " + \
+                strSvcHost = self.GetTestKdcSvcHostName()
+                comps = strSvcHost.split( "@" )
+                strNames = comps[ 1 ] + " " + \
                     strNewRealm.lower()+ " kdc." + \
                     strNewRealm.lower()
 
@@ -2272,9 +2277,12 @@ EOF
                     break
             if not bChecked :
                 return False
-            if self.svcEdit is None:
-                return False
-            return True
+            it = self.mechCombo.get_active_iter()
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'Kerberos':
+                    return True
         except Exception as err:
             return False
 
@@ -2439,6 +2447,7 @@ EOF
         self.signCombo = signCombo
         self.kdcEdit = kdcEditBox
         self.userEdit = userEditBox
+        self.mechCombo = mechCombo
 
     def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelMisc = Gtk.Label()

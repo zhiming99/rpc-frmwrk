@@ -534,14 +534,16 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             cmdline += GenNewKeytabSvr(
                 strSvcHost, strRealm, destPath )
 
-        cmdline += ";"
         components = strSvcHost.split( '@' )
-        cmdline += AddEntryToHosts(
+        strCmd = AddEntryToHosts(
             strIpAddr, components[ 1 ] )
+        if len( strCmd ) > 0:
+            cmdline += ";" + strCmd
 
-        cmdline += ";"
-        cmdline += AddEntryToHosts(
-            strKdcIp, strRealm )
+        strCmd = AddEntryToHosts( strKdcIp,
+            "kdc." + strRealm + " " + strRealm)
+        if len( strCmd ) > 0:
+            cmdline += ";" + strCmd
 
         if os.geteuid() == 0:
             actCmd = cmdline.format( sudo = '' )
