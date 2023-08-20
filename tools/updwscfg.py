@@ -196,7 +196,7 @@ upstream {AppName} {{
         fp.write( cfg )
     fp.close()
     cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
-    cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf || "
+    cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf;"
     cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf ) && "
     cmdline += "rm " + cfgFile + " && echo nginx setup complete ;"
     cmdline += "{sudo} systemctl restart nginx"
