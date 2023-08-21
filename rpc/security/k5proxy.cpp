@@ -1328,7 +1328,11 @@ gint32 CK5AuthProxy::Krb5Login(
         &min_stat, &pCred );
 
     if( ERROR( ret ) )
+    {
+        DebugPrintEx( logErr, ret,
+            "Error Login failed" );
         return ret;
+    }
 
     CCfgOpenerObj oIfCfg( this );
     oIfCfg.SetBoolProp( propNoEnc, false );

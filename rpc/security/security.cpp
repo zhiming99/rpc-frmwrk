@@ -650,6 +650,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
 
         if( ERROR( iRet ) )
         {
+            OnServiceComplete( pResp, pCallback );
             ret = iRet;
             break;
         }
@@ -3545,12 +3546,10 @@ gint32 CAuthentServer::StartAuthImpl(
         if( ERROR( ret ) )
             break;
 
+        m_pAuthImpl = pIf;
         ret = pIf->StartEx( pRespCb );
         if( ret != STATUS_PENDING )
             ( *pRespCb )( eventCancelTask );
-
-        if( SUCCEEDED( ret ) )
-            m_pAuthImpl = pIf;
 
     }while( 0 );
 

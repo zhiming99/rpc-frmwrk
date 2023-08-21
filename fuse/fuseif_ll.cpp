@@ -768,7 +768,6 @@ gint32 fuseif_main_ll( fuse_args& args,
     fuse_cmdline_opts& opts )
 {
     struct MYFUSE fuse;
-    struct fuse_loop_config config;
     struct fuse_session *se = nullptr; 
     int res;
 
@@ -812,9 +811,17 @@ gint32 fuseif_main_ll( fuse_args& args,
     if (opts.singlethread)
         res = fuse_session_loop(se);
     else {
+#if FUSE_USE_VERSION < FUSE_MAKE_VERSION(3, 12)
+        struct fuse_loop_config config;
         config.clone_fd = opts.clone_fd;
         config.max_idle_threads = opts.max_idle_threads;
         res = fuse_session_loop_mt(se, &config);
+#else
+        struct fuse_loop_config* config = fuse_loop_cfg_create();
+        fuse_loop_cfg_set_clone_fd( config, opts.clone_fd );
+        fuse_loop_cfg_set_idle_threads( config, opts.max_idle_threads );
+        res = fuse_session_loop_mt(se, config);
+#endif
     }
 
     fuse_session_unmount(se);

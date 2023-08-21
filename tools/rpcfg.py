@@ -1251,6 +1251,8 @@ class ConfigDlg(Gtk.Dialog):
             rows = GetGridRows( grid )
             addBtn = Gtk.Button.new_with_label("Add New Interface")
             addBtn.connect("clicked", self.on_add_if_clicked)
+            addBtn.set_tooltip_text(
+                "Rpcrouter only, and not work for built-in router apps" )
             grid.attach(addBtn, startCol + 1, rows + 1, 1, 1 )
 
         else :
@@ -1875,6 +1877,9 @@ default_domain = {DomainName}
             return ""
 
     def ElevatePrivilege( self ) -> int:
+        ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
+        if ret == 0 :
+            return ret
         passDlg = PasswordDialog( self )
         ret, passwd = passDlg.runDlg()
         if ret < 0:
@@ -2247,6 +2252,52 @@ EOF
                 os.unlink( tempInit )
         return ret
 
+    def on_update_ws_settings( self, button ):
+        if not IsFeatureEnabled( "openssl" ):
+            return ret
+
+        error = self.VerifyInput()
+        if error != 'success' :
+            text = "Error occurs : " + error
+            self.DisplayError( text )
+            return -1
+                    
+        try:
+            initFile = tempname()
+            ret = self.Export_InitCfg( initFile )
+            if ret < 0 :
+                return ret
+
+            if IsSudoAvailable():
+                #make the following sudo password free
+                ret = self.ElevatePrivilege()
+                if ret < 0:
+                    return ret
+
+            fp = open( initFile, 'r' )
+            cfgVal = json.load( fp )
+            fp.close()
+
+            miscOpts = cfgVal[ 'Security' ][ 'misc' ]
+            miscOpts[ 'ConfigWebServer' ] = 'true'
+
+            ret = ConfigWebServer( initFile )
+            if ret < 0:
+                print( "Error failed to config web server " + str(ret))
+                ret = 0
+            else:
+                print( "WebServer is configured for rpc-frmwrk successfully" )
+            return ret
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+            return ret
+        finally:
+            if initFile is not None:
+                os.unlink( initFile )
+
     def on_update_auth_settings( self, button ):
         self.UpdateAuthSettings()
 
@@ -2488,14 +2539,14 @@ EOF
         self.tsCheck = tsCheck
  
         labelCfgWs = Gtk.Label()
-        labelCfgWs.set_text("Config Web Server ")
+        labelCfgWs.set_text("Setup WS")
         labelCfgWs.set_xalign(.5)
         grid.attach( labelCfgWs, startCol + 0, startRow + 3, 1, 1 )
 
         checkCfgWs = Gtk.CheckButton(label="")
         checkCfgWs.props.active = False
-        checkCfgWs.set_tooltip_text( "Config the local installation " +
-            "of the Nginx or Apache server for websocket connection" )
+        checkCfgWs.set_tooltip_text( 
+            "The installer will setup WebServer for rpc-frmwrk" )
 
         checkCfgWs.connect(
             "toggled", self.on_button_toggled, "CfgWs")
@@ -2506,14 +2557,14 @@ EOF
             return
 
         labelCfgKrb5 = Gtk.Label()
-        labelCfgKrb5.set_text("Config Krb5 Server")
+        labelCfgKrb5.set_text("Setup Krb5")
         labelCfgKrb5.set_xalign(.5)
         grid.attach( labelCfgKrb5, startCol + 0, startRow + 4, 1, 1 )
 
         checkCfgKrb5 = Gtk.CheckButton(label="")
         checkCfgKrb5.props.active = False
         checkCfgKrb5.set_tooltip_text(
-            "Tell the installer to config the Kerberos, besides rpc-frmwrk" )
+            "The installer will setup the Kerberos for rpc-frmwrk" )
 
         checkCfgKrb5.connect(
             "toggled", self.on_button_toggled, "CfgAuth")
@@ -2526,12 +2577,26 @@ EOF
         grid.attach( labelKProxy, startCol + 0, startRow + 5, 1, 1 )
         checkKProxy = Gtk.CheckButton(label="")
         checkKProxy.props.active = False
-        checkKProxy.set_tooltip_text( "Config kinit, kadmin to connect to the Kerberos server via rpcrouter" )
+        checkKProxy.set_tooltip_text(
+            "Config kinit, kadmin to connect to the Kerberos server via rpcrouter" + \
+            ", which requires the presence of 'rpcrouter'")
 
         checkKProxy.connect(
             "toggled", self.on_button_toggled, "KProxy")
         grid.attach( checkKProxy, startCol + 1, startRow + 5, 1, 1)
         self.checkKProxy = checkKProxy
+
+        btnText = "Config WebServer"
+        if not IsNginxInstalled() and \
+            not IsApacheInstalled() :
+            return
+
+        updWsBtn = Gtk.Button.new_with_label( btnText )
+        updWsBtn.connect("clicked", self.on_update_ws_settings )
+        updWsBtn.set_tooltip_text(
+            "Update the local WebServer settings" )
+
+        grid.attach( updWsBtn, startCol + 1, startRow + 6, 2, 1 )
 
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
@@ -3115,7 +3180,7 @@ EOF
             self.isServer = True
             self.instName = ""
 
-    def Export_Installer( self, initCfg : object, cfgPath : str )->int :
+    def BuildInstallers( self, initCfg : object, cfgPath : str )->int :
         ret = 0
         try:
             bSSL = self.hasSSL
@@ -3342,6 +3407,36 @@ EOF
 
         return ret
 
+    def Export_Installer( self, destPath : str, bServer: bool ) -> int :
+        error = self.VerifyInput()
+        if error != 'success' :
+            text = "Error occurs : " + error
+            self.DisplayError( text )
+            return -1
+        ret = 0
+        try:
+            initFile = None
+            if destPath is None :
+                raise Exception( 'Error dest path is none' )
+            if not os.access( destPath, os.X_OK ):
+                raise Exception( 'Error dest path is not valid' )
+                
+            initFile = destPath + '/initcfg.json'
+            ret = self.Export_InitCfg( initFile )
+            if ret < 0:
+                raise Exception( 'Error export initcfg.json' )
+            fp = open( initFile, 'r' )
+            cfgVal = json.load( fp )
+            fp.close()
+            ret = self.BuildInstallers( cfgVal, initFile )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
+
     def Export_Files( self, destPath : str, bServer: bool ) -> int :
         error = self.VerifyInput()
         if error != 'success' :
@@ -3350,24 +3445,13 @@ EOF
             return -1
                     
         try:
-            initFile = '/tmp/initcfg.json'
-            if destPath is not None :
-                initFile = destPath + '/initcfg.json'
-                ret = self.Export_InitCfg( initFile )
-                if ret < 0:
-                    return ret
-                fp = open( initFile, 'r' )
-                cfgVal = json.load( fp )
-                fp.close()
-                ret = self.Export_Installer( cfgVal, initFile )
-                return ret
-
+            initFile = tempname()
             ret = self.Export_InitCfg( initFile )
             if ret < 0 :
                 return ret
 
             if IsInDevTree():
-                ret = Update_InitCfg( initFile, destPath )
+                ret = Update_InitCfg( initFile, None )
                 return ret
 
             if IsSudoAvailable():
@@ -3376,7 +3460,7 @@ EOF
                 if ret < 0:
                     return ret
 
-            ret = Update_InitCfg( initFile, destPath, None )
+            ret = Update_InitCfg( initFile, None )
             if ret < 0:
                 return ret
 
@@ -3688,7 +3772,7 @@ def main() :
             if path is None:
                 continue
             win.strCfgPath = path
-            win.Export_Files(path, win.bServer)
+            win.Export_Installer(path, win.bServer)
             continue
         elif response == Gtk.ResponseType.APPLY:
             #Load Another Config File
