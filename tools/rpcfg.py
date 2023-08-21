@@ -2539,14 +2539,14 @@ EOF
         self.tsCheck = tsCheck
  
         labelCfgWs = Gtk.Label()
-        labelCfgWs.set_text("Setup WS")
+        labelCfgWs.set_text("WS Installer")
         labelCfgWs.set_xalign(.5)
         grid.attach( labelCfgWs, startCol + 0, startRow + 3, 1, 1 )
 
         checkCfgWs = Gtk.CheckButton(label="")
         checkCfgWs.props.active = False
         checkCfgWs.set_tooltip_text( 
-            "The installer will setup WebServer for rpc-frmwrk" )
+            "The installer can setup WebServer for rpc-frmwrk" )
 
         checkCfgWs.connect(
             "toggled", self.on_button_toggled, "CfgWs")
@@ -2557,14 +2557,14 @@ EOF
             return
 
         labelCfgKrb5 = Gtk.Label()
-        labelCfgKrb5.set_text("Setup Krb5")
+        labelCfgKrb5.set_text("Krb5 Installer")
         labelCfgKrb5.set_xalign(.5)
         grid.attach( labelCfgKrb5, startCol + 0, startRow + 4, 1, 1 )
 
         checkCfgKrb5 = Gtk.CheckButton(label="")
         checkCfgKrb5.props.active = False
         checkCfgKrb5.set_tooltip_text(
-            "The installer will setup the Kerberos for rpc-frmwrk" )
+            "The installer can setup Kerberos for rpc-frmwrk" )
 
         checkCfgKrb5.connect(
             "toggled", self.on_button_toggled, "CfgAuth")
@@ -2594,7 +2594,7 @@ EOF
         updWsBtn = Gtk.Button.new_with_label( btnText )
         updWsBtn.connect("clicked", self.on_update_ws_settings )
         updWsBtn.set_tooltip_text(
-            "Update the local WebServer settings" )
+            "Config the local WebServer" )
 
         grid.attach( updWsBtn, startCol + 1, startRow + 6, 2, 1 )
 
