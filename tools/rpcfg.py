@@ -2891,7 +2891,7 @@ EOF
                 miscOpts[ 'ConfigWebServer' ] = 'true'
             if self.checkCfgKrb5.props.active and self.bServer:
                 miscOpts[ 'ConfigKrb5' ] = 'true'
-            if self.checkCfgKrb5.props.active and not self.bServer:
+            if self.checkKProxy.props.active:
                 miscOpts[ 'KinitProxy' ] = 'true'
 
         except Exception as err :

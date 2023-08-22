@@ -163,6 +163,17 @@ def GetKadminSvcName() -> str:
         return 'kadmin'
     return ""
 
+def EnableKinitProxy() -> bool:
+    strDist = GetDistName()
+    if strDist == "debian":
+        cmdline = "destPath=`dpkg -L libkrb5 | grep 'plugins/libkrb5'| head -n 1`"
+    elif strDist == 'fedora':
+        cmdline = "destPath=`rpm -L krb5-libs | grep 'plugins/libkrb5' | head -n 1`"
+    else:
+        return False
+    cmdline += ';'
+    return False
+
 def GetKdcSvcName() -> str:
     strDist = GetDistName()
     if strDist == "debian":
