@@ -1,4 +1,7 @@
 ---
+[`Tue Aug 22 2023 09:35:55 PM Beijing`]   
+1. We have almost finished the autoconfig of web server and kerberos via rpcfg.py. There is only `enabling kinit proxy` left to complete. I will add it in the next few days. Also some documentation work remains to do for this autoconfig feature.
+
 [`Tue Jul 25 2023 04:05:27 PM Beijing`]   
 1. We have finished and merged the pull request bugfix-and-btinrt-techdebt.
 2. Next we will move on to automate websocket and kerberos configuration process.
