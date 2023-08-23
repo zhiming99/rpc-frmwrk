@@ -2974,6 +2974,19 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
     return ret;
 }
 
+CRpcRouterReqFwdrAuth::CRpcRouterReqFwdrAuth(
+    const IConfigDb* pCfg ) :
+    CAggInterfaceServer( pCfg ), super( pCfg ),
+    CRpcRouterAuthShared( this )
+{
+    bool bKProxy = false;
+    CIoManager* pMgr = GetIoMgr();
+    gint32 ret = pMgr->GetCmdLineOpt(
+        propKProxy, bKProxy );
+    if( SUCCEEDED( ret ) )
+        m_bKProxy = bKProxy;
+}
+
 gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
     IConfigDb* pTransCtx,
     DMsgPtr& pMsg,
@@ -3047,25 +3060,43 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
             strVal.substr( 0, pos + 1 );
 
         strDir += OBJNAME_ROUTER_BRIDGE_AUTH;
+        stdstr strInPath = DBUS_OBJ_PATH(
+            MODNAME_RPCROUTER,
+            OBJNAME_ROUTER_BRIDGE_AUTH );
 
-        if( strDir != pMsg.GetPath() )
+        if( m_bKProxy &&
+            pMsg.GetPath() == strInPath )
         {
-            ret = ERROR_FALSE;
-            DebugPrintEx( logErr, ret,
-                "Error check message" );
-            break;
+            pMsg.SetPath( strDir );
+            stdstr strDest = strDir;
+            std::replace( strDest.begin(),
+                strDest.end(), '/', '.' );
+
+            if( strDest[ 0 ] == '.' )
+                strDest.erase( strDest.begin() );
+            pMsg.SetDestination( strDest );
         }
-
-        std::replace( strDir.begin(),
-            strDir.end(), '/', '.' );
-
-        if( strDir[ 0 ] == '.' )
-            strDir.erase( strDir.begin() );
-
-        if( strDir != pMsg.GetDestination() )
+        else
         {
-            ret = ERROR_FALSE;
-            break;
+            if( strDir != pMsg.GetPath() )
+            {
+                ret = ERROR_FALSE;
+                DebugPrintEx( logErr, ret,
+                    "Error check message" );
+                break;
+            }
+
+            std::replace( strDir.begin(),
+                strDir.end(), '/', '.' );
+
+            if( strDir[ 0 ] == '.' )
+                strDir.erase( strDir.begin() );
+
+            if( strDir != pMsg.GetDestination() )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
         }
 
         ret = pMatchHit.NewObj(

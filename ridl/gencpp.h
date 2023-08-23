@@ -756,6 +756,8 @@ class CImplMainFunc :
         bool bProxy, CCppWriter* m_pWriter );
     static gint32 EmitCleanup(
         bool bProxy, CCppWriter* m_pWriter );
+    static void EmitKProxyLoop(
+        CCppWriter* m_pWriter );
 };
 
 struct CExportBase

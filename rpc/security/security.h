@@ -504,7 +504,7 @@ class CRpcReqForwarderProxyAuth :
         DMsgPtr& pRespMsg,
         IEventSink* pCallback );
 
-    virtual gint32 BuildNewMsgToFwrd(
+    gint32 BuildNewMsgToFwrd(
         IConfigDb* pReqCtx,
         DMsgPtr& pFwrdMsg,
         DMsgPtr& pNewMsg ) override;
@@ -841,12 +841,10 @@ class CRpcRouterReqFwdrAuth :
     public CRpcRouterReqFwdr,
     public CRpcRouterAuthShared
 {
+    bool m_bKProxy = false;
     public:
     typedef CRpcRouterReqFwdr super;
-    CRpcRouterReqFwdrAuth( const IConfigDb* pCfg )
-        : CAggInterfaceServer( pCfg ), super( pCfg ),
-        CRpcRouterAuthShared( this )
-    {}
+    CRpcRouterReqFwdrAuth( const IConfigDb* pCfg );
 
     gint32 CheckReqToFwrd(
         IConfigDb* pTransCtx,

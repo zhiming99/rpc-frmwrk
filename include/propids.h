@@ -266,6 +266,7 @@ enum EnumPropId : gint32
     propStmConnPt,      // type: an objptr holding a connection point for stream transfer
     propStarter,        // type: a boolean value indicate whether this end of propStmConnPt is a connection starter
     propNonSockStm,     // type: a boolean value indicate whether to use non-sock stream
+    propKProxy,         // type: a boolean value indicate whether the builtin-app serve as a kinit proxy
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
