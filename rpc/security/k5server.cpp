@@ -840,7 +840,7 @@ gint32 CK5AuthServer::GenSessHash(
         if( gssctx != GSS_C_NO_CONTEXT )
             strSess = "AU";
         else
-            strSess = "AUCU";
+            strSess = "AUcu";
         strSess += strRet;
 
         DebugPrint( 0, "Sess hash is %s",

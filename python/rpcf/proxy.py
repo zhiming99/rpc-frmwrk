@@ -254,9 +254,10 @@ class PyRpcContext :
                     ret = -errno.EINVAL
                     raise Exception(
                         "Error cannot find Module name")
+                dwRole = None
                 if 'Role' in oInitParams:
-                    p1.SetIntProp( 101,
-                        oInitParams[ 'Role' ] )
+                    dwRole = oInitParams[ 'Role' ]
+                    p1.SetIntProp( 101, dwRole )
                 else:
                     ret = -errno.EINVAL
                     raise Exception(
@@ -282,6 +283,9 @@ class PyRpcContext :
                 elif 'sainstname' in oInitParams:
                     p1.SetStrProp( 107,
                         oInitParams[ 'sainstname' ] )
+                if 'bKProxy' in oInitParams and dwRole == 1:
+                    p1.SetBoolProp( 111,
+                        oInitParams[ 'bKProxy' ] )
         except Exception as err:
             print( err )
             if ret == 0:

@@ -1452,6 +1452,23 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "options.addOption(oAuth);" );
         NEW_LINE;
 
+#ifdef AUTH
+        if( bProxy )
+        {
+            Wa( "Option oKProxy = new Option(\"k\", false," );
+            Wa( "\"to run as a kinit proxy.\" );" );
+            Wa( "oKProxy.setRequired(false);" );
+            Wa( "options.addOption(oKProxy);" );
+            NEW_LINE;
+
+            Wa( "Option oUserName = new Option(\"l\", true," );
+            Wa( "\"login with the given user name and then quit.\" );" );
+            Wa( "oUserName.setRequired(false);" );
+            Wa( "options.addOption(oUserName);" );
+            NEW_LINE;
+        }
+#endif
+
         Wa( "Option oDaemon = new Option(\"d\", \"to run as a daemon\");" );
         Wa( "oDaemon.setRequired(false);" );
         Wa( "options.addOption(oDaemon);" );
@@ -1569,6 +1586,22 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
         if( bProxy )
         {
+#ifdef AUTH
+            Wa( "else if( opt.getOpt() == \"k\" )" );
+            BLOCK_OPEN;
+            Wa( "oInit.put( 111, Boolean.valueOf( true ) );" );
+            CCOUT << "bKProxy = true;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+            Wa( "else if( opt.getOpt() == \"l\" )" );
+            BLOCK_OPEN;
+            Wa( "oInit.put( 111, Boolean.valueOf( true ) );" );
+            Wa( "strUserName = opt.getValue();" );
+            CCOUT << "bKProxy = true;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+#endif
+
             Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
             BLOCK_OPEN;
             Wa( "oInit.put( 107, opt.getValue() );" );
@@ -4595,6 +4628,47 @@ do{ \
     } \
 }while( 0 )
 
+gint32 CJavaSnippet::EmitKProxyLoop()
+{
+    gint32 ret = 0;
+    do{
+        Wa( "public static int KProxyLoop( String strUserName )" );
+        BLOCK_OPEN;
+        Wa( "int ret = 0;" );
+        Wa( "if( strUserName == \"\" )" );
+        BLOCK_OPEN;
+        Wa( "while( true )" );
+        Wa( "    try{" ); \
+        Wa( "        TimeUnit.SECONDS.sleep(1);" ); \
+        Wa( "    }" ); \
+        CCOUT << "    catch( InterruptedException e ){ break; };"; \
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "else" );
+        BLOCK_OPEN;
+        Wa( "String strCmd = \"kinit -ki \" + strUserName;" );
+        Wa( "Process p;" );
+        Wa( "String s;" );
+        CCOUT << "try{";
+        INDENT_UPL;
+        Wa( "p = Runtime.getRuntime().exec( strCmd );" );
+        Wa( "BufferedReader br = new BufferedReader(" );
+        Wa( "    new InputStreamReader(p.getInputStream()));" );
+        Wa( "while ((s = br.readLine()) != null)" );
+        Wa( "    System.out.println(\"kinit: \" + s);" );
+        Wa( "p.waitFor();" );
+        Wa( "ret = -p.exitValue();" );
+        CCOUT << "p.destroy();";
+        INDENT_DOWNL;
+        CCOUT<<"} catch( Exception e ){}";
+        BLOCK_CLOSE;
+        CCOUT << "return ret;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+    }while( 0 );
+    return ret;
+}
+
 gint32 CImplJavaMainCli::Output()
 {
     CJavaSnippet os( m_pWriter );
@@ -4602,7 +4676,14 @@ gint32 CImplJavaMainCli::Output()
     Wa( "import java.util.concurrent.TimeUnit;" );
     Wa( "import java.io.File;" );
     if( g_bBuiltinRt )
+    {
         Wa( "import org.apache.commons.cli.*;" );
+#ifdef AUTH
+        // for KProxyLoop
+        Wa( "import java.io.BufferedReader;" );
+        Wa( "import java.io.InputStreamReader;" );
+#endif
+    }
 
     gint32 ret = 0;
     do{
@@ -4611,6 +4692,10 @@ gint32 CImplJavaMainCli::Output()
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
         os.EmitGetDescPath( true );
+#ifdef AUTH
+        if( g_bBuiltinRt )
+            os.EmitKProxyLoop();
+#endif
         Wa( "public static void main( String[] args )" );
         BLOCK_OPEN;
         stdstr strModName = g_strAppName + "cli";
@@ -4648,6 +4733,10 @@ gint32 CImplJavaMainCli::Output()
             Wa( "    oInit.put( 105, strCfgPath );" );
             if( g_bBuiltinRt )
             {
+#ifdef AUTH
+                Wa( "String strUserName = \"\";" );
+                Wa( "boolean bKProxy = false;" );
+#endif
                 Wa( "String strDescPath = \"\";" );
                 os.EmitGetOpt( true );
                 CCOUT << "oInit.put( 104, \"" << g_strAppName << "\" );";
@@ -4686,6 +4775,17 @@ gint32 CImplJavaMainCli::Output()
             CCOUT << "    getDescPath( \"" << strDescName << "\" );";
             NEW_LINE;
         }
+#ifdef AUTH
+        else
+        {
+            Wa( "if( bKProxy )" );
+            BLOCK_OPEN;
+            Wa( "ret = KProxyLoop( strUserName );" );
+            CCOUT << "return;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+#endif
         Wa( "if( strDescPath.isEmpty() )" );
         Wa( "{ ret = -RC.ENOENT; return; }" );
         NEW_LINE;

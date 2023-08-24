@@ -6564,6 +6564,7 @@ void CImplMainFunc::EmitRtUsage(
             Wa( "    \"\\t [ -p <port number> to specify the tcp port number to. ]\\n\"" );
 #ifdef AUTH
             Wa( "    \"\\t [ -k to run as a kinit proxy. ]\\n\"" );
+            Wa( "    \"\\t [ -l <user name> login with the user name and then quit. ]\\n\"" );
 #endif
         }
         else
@@ -6935,6 +6936,7 @@ void CImplMainFunc::EmitKProxyLoop(
     CCppWriter* m_pWriter )
 {
     Wa( "#include <signal.h>" );
+    Wa( "#include <stdlib.h>" );
     Wa( "std::atomic< bool > s_bExit( false );" );
     Wa( "void signalHandler( int signum )" );
     Wa( "{ s_bExit = true; }" );
@@ -6942,6 +6944,14 @@ void CImplMainFunc::EmitKProxyLoop(
 
     Wa( "int KProxyLoop()" );
     BLOCK_OPEN;
+    Wa( "if( g_strUserName.size() )" );
+    BLOCK_OPEN;
+    Wa( "std::string strCmd = \"kinit -ki \";" );
+    Wa( "strCmd += g_strUserName;" );
+    Wa( "gint32 ret = system( strCmd.c_str() );" );
+    Wa( "return -ret;" );
+    BLOCK_CLOSE;
+    NEW_LINE;
     Wa( "signal( SIGINT, signalHandler );" );
     Wa( "while( !s_bExit )" );
     Wa( "    sleep( 3 );" );
@@ -6984,7 +6994,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             if( !bProxy )
                 strOpt = "hadm:i:p:"; 
             else
-                strOpt = "hadki:p:";
+                strOpt = "hadkl:i:p:";
             Wa( "gint32 iOptIdx = 0;" );
             Wa( "struct option arrLongOptions[] = {" );
             Wa( "    {\"driver\",   required_argument, 0,  0 }," );
@@ -7117,9 +7127,18 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             if( bProxy )
             {
 #ifdef AUTH
-                Wa( "case 'k':" );
-                Wa( "    { g_bKProxy = true; break; }" );
+                Wa( "case 'l':" );
+                CCOUT << "case 'k':";
+                INDENT_UPL;
+                Wa( "{" );
+                Wa( "    g_bKProxy = true;" );
+                Wa( "    if( opt == 'l' )" );
+                Wa( "        g_strUserName = optarg;" );
+                Wa( "    break;" );
+                CCOUT << "}";
+                INDENT_DOWNL;
 #else
+                Wa( "case 'l':" );
                 CCOUT << "case 'k':";
                 INDENT_UPL;
                 Wa( "{" );
@@ -7331,7 +7350,10 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "static bool g_bAuth = false;" );
 #ifdef AUTH
             if( bProxy )
+            {
                 Wa( "static bool g_bKProxy = false;" );
+                Wa( "static std::string g_strUserName;" );
+            }
 #endif
             Wa( "static ObjPtr g_pRouter;" );
             Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
@@ -7725,6 +7747,7 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         NEW_LINE;
         Wa( "ret = InitContext();" );
         CCOUT << "if( ERROR( ret ) )";
+        NEW_LINE;
         CCOUT << "    break;";
         NEW_LINE;
 

@@ -2623,6 +2623,9 @@ stdstr InstIdFromDrv(
          <p>110: a string as the port numer to connect
          to or listen on [optional]</p>
 
+         <p>111: a boolean to tell if the router run as a 
+         kinit proxy</p>
+
     @param strNewDesc an new desc file, or empty if
     nothing to update. and property 107 is set with new
     instance name if both 107 and 108 are not present.

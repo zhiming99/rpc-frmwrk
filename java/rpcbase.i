@@ -1161,6 +1161,13 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
                 oCfg.RemoveProperty( 106 );
             }
 
+            bool bKProxy = false;
+            if( oCfg.exist( 111 ) )
+            {
+                oCfg.GetBoolProp( 111, bKProxy );
+                oCfg.RemoveProperty( 111 );
+            }
+
             stdstr strInstName;
             if( oCfg.exist( 107 ) )
             {
@@ -1214,9 +1221,20 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             if( ERROR( ret ) )
                 break;
 
-            // create and start the router
-            pMgr->SetRouterName( strRtName +
-                std::to_string( getpid() ) );
+            if( dwRole == 1 && bAuth && bKProxy )
+            {
+                pMgr->SetCmdLineOpt(
+                    propKProxy, true );
+                pMgr->SetRouterName(
+                    MODNAME_RPCROUTER );
+            }
+            else
+            {
+                // create and start the router
+                pMgr->SetRouterName(
+                    strRtName +
+                    std::to_string( getpid() ) );
+            }
 
             stdstr strDescPath;
             if( strRtFile.size() )

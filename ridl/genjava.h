@@ -312,7 +312,7 @@ class CJavaSnippet
     gint32 EmitGetDescPath( bool bServer );
 
     gint32 EmitGetOpt( bool bProxy );
-    
+    gint32 EmitKProxyLoop();    
 };
 
 class CImplJavaMethodSvrBase :

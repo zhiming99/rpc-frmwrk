@@ -43,6 +43,7 @@ static std::string g_strIpAddr;
 static std::string g_strPortNum;
 static bool g_bAuth = false;
 static bool g_bKProxy = false;
+static std::string g_strUserName;
 static ObjPtr g_pRouter;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 
@@ -58,7 +59,8 @@ void Usage( char* szName )
         "\t [ -d to run as a daemon. ]\n"
         "\t [ -i <ip address> to specify the destination ip address. ]\n"
         "\t [ -p <port number> to specify the tcp port number to. ]\n"
-        "\t [ -k to run as a kinit proxy. ]\n"
+        "\t [ -k to run as a kinit proxy. If a user name is given, this program will try to login with that name ]\n"
+        "\t [ -l <user name> preauth with the user name and then quit. ]\n"
         "\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\n"
         "\t [ --objdesc <path> to specify the path to the object description file. ]\n"
         "\t [ --router <path> to specify the path to the customized 'router.json'. ]\n"
@@ -70,12 +72,21 @@ void Usage( char* szName )
 #include <getopt.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <stdlib.h>
 std::atomic< bool > s_bExit( false );
 void signalHandler( int signum )
 { s_bExit = true; }
 
 int KProxyLoop()
 {
+    if( g_strUserName.size() )
+    {
+        std::string strCmd = "kinit -ki ";
+        strCmd += g_strUserName;
+        gint32 ret = system( strCmd.c_str() );
+        return -ret;
+        
+    }
     signal( SIGINT, signalHandler );
     while( !s_bExit )
         sleep( 3 );
@@ -98,7 +109,7 @@ int main( int argc, char** argv )
             {"sainstname", required_argument, 0,  0 },
             {0,             0,                 0,  0 }
         };            
-        while( ( opt = getopt_long( argc, argv, "hadki:p:",
+        while( ( opt = getopt_long( argc, argv, "hadkl:i:p:",
             arrLongOptions, &iOptIdx ) ) != -1 )
         {
             switch( opt )
@@ -185,8 +196,14 @@ int main( int argc, char** argv )
                     }
                     break;
                 }
+            case 'l':
             case 'k':
-                { g_bKProxy = true; break; }
+                {
+                    g_bKProxy = true;
+                    if( opt == 'l' )
+                        g_strUserName = optarg;
+                    break;
+                }
             case 'a':
                 { g_bAuth = true; break; }
             case 'd':
@@ -328,7 +345,7 @@ gint32 InitContext()
             pSvc->SetRouterName( strRtName +
                 std::to_string( getpid() ) );
         else
-            pSvc->SetRouterName( MODNAME_RPCROUTER);
+            pSvc->SetRouterName( MODNAME_RPCROUTER );
         std::string strDescPath;
         if( g_strRtDesc.size() )
             strDescPath = g_strRtDesc;
@@ -423,7 +440,8 @@ int _main( int argc, char** argv )
             g_strInstName += strInstId;
         
         ret = InitContext();
-        if( ERROR( ret ) )    break;
+        if( ERROR( ret ) )
+            break;
         if( g_bKProxy )
         {
             ret = KProxyLoop();
