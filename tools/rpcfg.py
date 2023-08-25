@@ -680,6 +680,9 @@ class ConfigDlg(Gtk.Dialog):
         self.AddAuthCred( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddMiscOptions( grid, startCol, row, confVals )
+        row = GetGridRows( grid )
+        self.AddInstallerOptions( grid, startCol, row, confVals)
+
 
     def AddNode( self, grid:Gtk.Grid, i ) :
         try:
@@ -2298,6 +2301,17 @@ EOF
             if initFile is not None:
                 os.unlink( initFile )
 
+    def on_enable_kinit_proxy( self, button ):
+        ret = self.ElevatePrivilege()
+        if ret < 0:
+            return ret
+        bEnabled = IsKinitProxyEnabled()
+        EnableKinitProxy( not bEnabled )
+        if IsKinitProxyEnabled() :
+            button.set_label( "Disable KProxy")
+        else:
+            button.set_label( "Enable KProxy")
+
     def on_update_auth_settings( self, button ):
         self.UpdateAuthSettings()
 
@@ -2538,19 +2552,48 @@ EOF
         grid.attach( tsCheck, startCol + 1, startRow + 2, 1, 1)
         self.tsCheck = tsCheck
  
+        btnText = "Config WebServer"
+        if not IsNginxInstalled() and \
+            not IsApacheInstalled() :
+            return
+
+        updWsBtn = Gtk.Button.new_with_label( btnText )
+        updWsBtn.connect("clicked", self.on_update_ws_settings )
+        updWsBtn.set_tooltip_text( "Config the local WebServer" )
+        grid.attach( updWsBtn, startCol + 1, startRow + 3, 2, 1 )
+
+        if IsKinitProxyEnabled():
+            btnText = "Disable KProxy"
+        else:
+            btnText = "Enable KProxy"
+        btnEnaKProxy = Gtk.Button.new_with_label( btnText )
+        btnEnaKProxy.connect("clicked", self.on_enable_kinit_proxy )
+        btnEnaKProxy.set_tooltip_text( "Enable/Disable kinit proxy on this host" )
+        grid.attach( btnEnaKProxy , startCol + 1, startRow + 4, 2, 1 )
+
+        if not IsFeatureEnabled( 'auth' ) :
+            btnEnaKProxy.set_sensitive( False )
+        return
+
+    def AddInstallerOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        labelInstaller = Gtk.Label()
+        labelInstaller.set_markup("<b>Installer Options</b>")
+        labelInstaller.set_xalign(.5)
+        grid.attach(labelInstaller, startCol + 1, startRow + 0, 1, 1 )
+
         labelCfgWs = Gtk.Label()
         labelCfgWs.set_text("WS Installer")
         labelCfgWs.set_xalign(.5)
-        grid.attach( labelCfgWs, startCol + 0, startRow + 3, 1, 1 )
+        grid.attach( labelCfgWs, startCol + 0, startRow + 1, 1, 1 )
 
         checkCfgWs = Gtk.CheckButton(label="")
         checkCfgWs.props.active = False
         checkCfgWs.set_tooltip_text( 
-            "The installer can setup WebServer for rpc-frmwrk" )
+            "The installer will setup WebServer for rpc-frmwrk" )
 
         checkCfgWs.connect(
             "toggled", self.on_button_toggled, "CfgWs")
-        grid.attach( checkCfgWs, startCol + 1, startRow + 3, 1, 1)
+        grid.attach( checkCfgWs, startCol + 1, startRow + 1, 1, 1)
         self.checkCfgWs = checkCfgWs
 
         if not IsFeatureEnabled( "auth" ):
@@ -2559,44 +2602,32 @@ EOF
         labelCfgKrb5 = Gtk.Label()
         labelCfgKrb5.set_text("Krb5 Installer")
         labelCfgKrb5.set_xalign(.5)
-        grid.attach( labelCfgKrb5, startCol + 0, startRow + 4, 1, 1 )
+        grid.attach( labelCfgKrb5, startCol + 0, startRow + 2, 1, 1 )
 
         checkCfgKrb5 = Gtk.CheckButton(label="")
         checkCfgKrb5.props.active = False
         checkCfgKrb5.set_tooltip_text(
-            "The installer can setup Kerberos for rpc-frmwrk" )
+            "The installer will setup Kerberos for rpc-frmwrk" )
 
         checkCfgKrb5.connect(
             "toggled", self.on_button_toggled, "CfgAuth")
-        grid.attach( checkCfgKrb5, startCol + 1, startRow + 4, 1, 1)
+        grid.attach( checkCfgKrb5, startCol + 1, startRow + 2, 1, 1)
         self.checkCfgKrb5 = checkCfgKrb5
 
         labelKProxy = Gtk.Label()
-        labelKProxy.set_text("kinit proxy")
+        labelKProxy.set_text("Kproxy Installer")
         labelKProxy.set_xalign(.5)
-        grid.attach( labelKProxy, startCol + 0, startRow + 5, 1, 1 )
+        grid.attach( labelKProxy, startCol + 0, startRow + 3, 1, 1 )
         checkKProxy = Gtk.CheckButton(label="")
         checkKProxy.props.active = False
         checkKProxy.set_tooltip_text(
-            "Config kinit, kadmin to connect to the Kerberos server via rpcrouter" + \
-            ", which requires the presence of 'rpcrouter'")
+            "The installer will enable kinit proxy for rpc-frmwrk" )
 
         checkKProxy.connect(
             "toggled", self.on_button_toggled, "KProxy")
-        grid.attach( checkKProxy, startCol + 1, startRow + 5, 1, 1)
+        grid.attach( checkKProxy, startCol + 1, startRow + 3, 1, 1)
         self.checkKProxy = checkKProxy
-
-        btnText = "Config WebServer"
-        if not IsNginxInstalled() and \
-            not IsApacheInstalled() :
-            return
-
-        updWsBtn = Gtk.Button.new_with_label( btnText )
-        updWsBtn.connect("clicked", self.on_update_ws_settings )
-        updWsBtn.set_tooltip_text(
-            "Config the local WebServer" )
-
-        grid.attach( updWsBtn, startCol + 1, startRow + 6, 2, 1 )
+        return
 
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()

@@ -163,15 +163,47 @@ def GetKadminSvcName() -> str:
         return 'kadmin'
     return ""
 
-def EnableKinitProxy() -> bool:
+def IsKinitProxyEnabled()->bool:
     strDist = GetDistName()
     if strDist == "debian":
-        cmdline = "destPath=`dpkg -L libkrb5 | grep 'plugins/libkrb5'| head -n 1`"
+        cmdline = "destPath=`dpkg -L libkrb5-3 | grep 'plugins/libkrb5'| head -n 1`/libauth.so"
     elif strDist == 'fedora':
-        cmdline = "destPath=`rpm -L krb5-libs | grep 'plugins/libkrb5' | head -n 1`"
+        cmdline = "destPath=`rpm -ql krb5-libs | grep 'plugins/libkrb5' | head -n 1`/libauth.so"
     else:
         return False
-    cmdline += ';'
+    cmdline += " && ls $destPath"
+    ret = rpcf_system( cmdline )
+    if ret == 0:
+        return True
+    return False
+
+def EnableKinitProxy( bEnable : bool ) -> bool:
+    strDist = GetDistName()
+    if strDist == "debian":
+        cmdline = "destPath=`dpkg -L libkrb5-3 | grep 'plugins/libkrb5'| head -n 1`"
+    elif strDist == 'fedora':
+        cmdline = "destPath=`rpm -ql krb5-libs | grep 'plugins/libkrb5' | head -n 1`"
+    else:
+        return False
+    if bEnable:
+        cmdline += ";srcPath=`echo $destPath | sed 's:krb5/plugins/libkrb5::'`libauth.so;"
+        cmdline += "if [ ! -f $srcPath ]; then srcPath='/usr/local/lib/libauth.so';fi;"
+        cmdline += "if [ -f $srcPath ]; then {sudo} ln -s $srcPath $destPath;"
+        cmdline += "else echo cannot find libauth.so; fi"
+    else:
+        cmdline += ";if [ -f $destPath/libauth.so ]; then {sudo} rm $destPath/libauth.so;fi"
+
+    if os.geteuid() == 0:
+        actCmd = cmdline.format( sudo = '' )
+    elif IsSudoAvailable():
+        actCmd = cmdline.format( sudo = 'sudo' )
+    else:
+        actCmd = "su -c '" + cmdline.format(
+            sudo = "" ) + "'"
+    print( actCmd )
+    ret = rpcf_system( actCmd )
+    if ret == 0:
+        return True
     return False
 
 def GetKdcSvcName() -> str:
@@ -565,6 +597,12 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
                 sudo = "" ) + "'"
 
         ret = rpcf_system( actCmd )
+        if ret < 0:
+            return ret
+
+        if 'KinitProxy' in oMisc and \
+            oMisc['KinitProxy'] == 'true':
+            EnableKinitProxy( True )
 
     except Exception as err:
         print( err )
