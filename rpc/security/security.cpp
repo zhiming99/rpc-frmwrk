@@ -1450,26 +1450,27 @@ gint32 CAuthentProxy::BuildLoginTask(
     do{
         std::string strMech = GET_MECH( pIf );
 
-        if( strMech != "krb5" &&
-            strMech != "ntlm" )
+        if( strMech == "krb5" )
         {
-            ret = -ENOTSUP;
+#ifdef KRB5
+            TaskletPtr pLoginTask;
+            ret = DEFER_IFCALLEX2_NOSCHED2(
+                0, pLoginTask, ObjPtr( pIf ),
+                &CK5AuthProxy::DoLogin,
+                nullptr );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfRetryTask* pRetryTask = pLoginTask;
+            pRetryTask->SetClientNotify( pCallback );
+
+            pTask = pLoginTask;
             break;
+#endif
         }
 
-        TaskletPtr pLoginTask;
-        ret = DEFER_IFCALLEX2_NOSCHED2(
-            0, pLoginTask, ObjPtr( pIf ),
-            &CK5AuthProxy::DoLogin,
-            nullptr );
-
-        if( ERROR( ret ) )
-            break;
-
-        CIfRetryTask* pRetryTask = pLoginTask;
-        pRetryTask->SetClientNotify( pCallback );
-
-        pTask = pLoginTask;
+        ret = -ENOTSUP;
 
     }while( 0 );
 
@@ -1570,8 +1571,7 @@ gint32 CAuthentProxy::CreateSessImpl(
             break;
 
         std::string strObjName;
-        if( strMech == "krb5" ||
-            strMech == "ntlm" )
+        if( strMech == "krb5" )
             strObjName = OBJNAME_AUTHSVR;
         else
         {
@@ -1601,21 +1601,26 @@ gint32 CAuthentProxy::CreateSessImpl(
 
         if( strMech == "krb5" )
         {
+#ifdef KRB5
             ret = CorrectInstName(
                 pMgr, oCfg.GetCfg() );
+
+            // use a special ifstate
+            oCfg.SetIntProp( propIfStateClass,
+                clsid( CRemoteProxyStateAuth ) );
+
+            InterfPtr pIf;
+            ret = pIf.NewObj(
+                clsid( CAuthentProxyK5Impl ),
+                oCfg.GetCfg() );
+
+            if( SUCCEEDED( ret ) )
+                pImpl = pIf;
+            break;
+#endif
         }
 
-        // use a special ifstate
-        oCfg.SetIntProp( propIfStateClass,
-            clsid( CRemoteProxyStateAuth ) );
-
-        InterfPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CAuthentProxyK5Impl ),
-            oCfg.GetCfg() );
-
-        if( SUCCEEDED( ret ) )
-            pImpl = pIf;
+        ret = -ENOTSUP;
 
     }while( 0 );
 
@@ -1890,13 +1895,18 @@ gint32 CAuthentProxy::VerifyMicMsg(
 gint32 CAuthentProxy::InitEnvRouter(
     CIoManager* pMgr )
 {
+#ifdef KRB5
     return CK5AuthProxy::InitEnvRouter( pMgr );
+#endif
+    return 0;
 }
 
 void CAuthentProxy::DestroyEnvRouter(
     CIoManager* pMgr )
 {
+#ifdef KRB5
     CK5AuthProxy::DestroyEnvRouter( pMgr );
+#endif
 }
 
 gint32 CRpcTcpBridgeProxyAuth::OnEnableComplete(
@@ -3613,8 +3623,20 @@ gint32 CAuthentServer::OnPostStart(
             oAuth.SetStrProp(
                 propServiceName, strSvcName );
         }
+        stdstr strMech;
+        ret = oAuth.GetStrProp(
+            propAuthMech, strMech );\
+        if( ERROR( ret ) )
+            break;
 
-        ret = StartAuthImpl( pCallback );
+        if( strMech == "krb5" )
+        {
+#ifdef KRB5
+            ret = StartAuthImpl( pCallback );
+            break;
+#endif
+        }
+        ret = -ENOTSUP;
 
     }while( 0 );
 

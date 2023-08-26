@@ -47,6 +47,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CRpcTcpBridgeAuthImpl );
     INIT_MAP_ENTRYCFG( CRpcRouterReqFwdrAuthImpl );
     INIT_MAP_ENTRYCFG( CRpcRouterBridgeAuthImpl );
+#ifdef KRB5
     INIT_MAP_ENTRYCFG( CAuthentProxyK5Impl );
     INIT_MAP_ENTRYCFG( CKdcChannelProxy );
     INIT_MAP_ENTRYCFG( CK5AuthServer );
@@ -59,6 +60,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CKrb5InitHook );
     INIT_MAP_ENTRYCFG( CRemoteProxyStateAuth );
     INIT_MAP_ENTRYCFG( CKdcRelayProxyStat );
+#endif
 
     END_FACTORY_MAPS;
 };

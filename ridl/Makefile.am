@@ -52,6 +52,11 @@ if ENABLE_PYTHON
 ridlc_CPPFLAGS+= -DPYTHON
 endif
 
+
+if ENABLE_KRB5
+ridlc_CPPFLAGS+= -DKRB5 
+endif
+
 if ENABLE_AUTH
 ridlc_CPPFLAGS+= -DAUTH
 endif

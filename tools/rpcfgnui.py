@@ -63,7 +63,7 @@ def main():
         json.dump( initCfg, fp, indent=4 )
         fp.close()
 
-        if IsFeatureEnabled( "auth" ):
+        if IsFeatureEnabled( "krb5" ):
             ret = ConfigAuthServer( initFile )
             if ret < 0:
                 print( "Error failed to config auth server %d" % ret )

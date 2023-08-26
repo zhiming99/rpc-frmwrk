@@ -59,8 +59,8 @@ void Usage( char* szName )
         "\t [ -d to run as a daemon. ]\n"
         "\t [ -i <ip address> to specify the destination ip address. ]\n"
         "\t [ -p <port number> to specify the tcp port number to. ]\n"
-        "\t [ -k to run as a kinit proxy. If a user name is given, this program will try to login with that name ]\n"
-        "\t [ -l <user name> preauth with the user name and then quit. ]\n"
+        "\t [ -k to run as a kinit proxy. ]\n"
+        "\t [ -l <user name> login with the user name and then quit. ]\n"
         "\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\n"
         "\t [ --objdesc <path> to specify the path to the object description file. ]\n"
         "\t [ --router <path> to specify the path to the customized 'router.json'. ]\n"
@@ -74,7 +74,7 @@ void Usage( char* szName )
 #include <signal.h>
 #include <stdlib.h>
 std::atomic< bool > s_bExit( false );
-void signalHandler( int signum )
+void SignalHandler( int signum )
 { s_bExit = true; }
 
 int KProxyLoop()
@@ -87,7 +87,7 @@ int KProxyLoop()
         return -ret;
         
     }
-    signal( SIGINT, signalHandler );
+    signal( SIGINT, SignalHandler );
     while( !s_bExit )
         sleep( 3 );
     printf( "\n" );

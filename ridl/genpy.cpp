@@ -3056,7 +3056,7 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
             {
                 Wa( "\"\\t [ -i <ip address> to specify the destination ip address. ]\\n\"" );
                 Wa( "\"\\t [ -p <port number> to specify the tcp port number to ]\\n\"" );
-#ifdef AUTH
+#ifdef KRB5
                 Wa( "\"\\t [ -k to run as a kinit proxy. ]\\n\"" );
                 Wa( "\"\\t [ -l <user name> login with the user name and then quit. ]\\n\"" );
 #endif
@@ -3099,7 +3099,7 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         if( !bProxy && g_bBuiltinRt )
             strShort = "hadi:p:m:";
 #endif
-#ifdef AUTH
+#ifdef KRB5
         if( bProxy && g_bBuiltinRt )
             strShort += "kl:";
 #endif
@@ -3122,7 +3122,7 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "    if opt in ('-a'):" );
         Wa( "        params[ 'bAuth' ] = True" );
 
-#ifdef AUTH
+#ifdef KRB5
         if( bProxy && g_bBuiltinRt )
         {
             Wa( "    elif opt in ('-k'):" );
@@ -3185,7 +3185,7 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "    else:" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 1 )" );
-#ifdef AUTH
+#ifdef KRB5
         if( bProxy && g_bBuiltinRt )
         {
             Wa( "if 'bKProxy' in params and not 'bAuth' in params:" );
@@ -3470,7 +3470,7 @@ gint32 CImplPyMainFunc::OutputCli(
         }
         else
         {
-#ifdef AUTH
+#ifdef KRB5
             Wa( "if 'bKProxy' in params and params[ 'bKProxy' ]:" );
             Wa( "    if 'UserName' in params:" );
             Wa( "        strUser = params[ 'UserName' ]" );

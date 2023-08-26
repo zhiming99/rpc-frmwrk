@@ -6457,7 +6457,7 @@ gint32 CImplMainFunc::EmitInitRouter(
         CCOUT << "std::string strRtName = \""
             << g_strAppName << "_rt_\";";
         NEW_LINE;
-#ifdef AUTH
+#ifdef KRB5
         if( bProxy )
         {
             Wa( "if( !g_bKProxy )" );
@@ -6562,7 +6562,7 @@ void CImplMainFunc::EmitRtUsage(
         {
             Wa( "    \"\\t [ -i <ip address> to specify the destination ip address. ]\\n\"" );
             Wa( "    \"\\t [ -p <port number> to specify the tcp port number to. ]\\n\"" );
-#ifdef AUTH
+#ifdef KRB5
             Wa( "    \"\\t [ -k to run as a kinit proxy. ]\\n\"" );
             Wa( "    \"\\t [ -l <user name> login with the user name and then quit. ]\\n\"" );
 #endif
@@ -6938,7 +6938,7 @@ void CImplMainFunc::EmitKProxyLoop(
     Wa( "#include <signal.h>" );
     Wa( "#include <stdlib.h>" );
     Wa( "std::atomic< bool > s_bExit( false );" );
-    Wa( "void signalHandler( int signum )" );
+    Wa( "void SignalHandler( int signum )" );
     Wa( "{ s_bExit = true; }" );
     NEW_LINE;
 
@@ -6952,7 +6952,7 @@ void CImplMainFunc::EmitKProxyLoop(
     Wa( "return -ret;" );
     BLOCK_CLOSE;
     NEW_LINE;
-    Wa( "signal( SIGINT, signalHandler );" );
+    Wa( "signal( SIGINT, SignalHandler );" );
     Wa( "while( !s_bExit )" );
     Wa( "    sleep( 3 );" );
     Wa( "printf( \"\\n\" );" );
@@ -6973,7 +6973,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "#include <getopt.h>" );
             Wa( "#include <sys/stat.h>" );
 
-#ifdef AUTH
+#ifdef KRB5
             if( bProxy )
                 EmitKProxyLoop( m_pWriter );
 #endif
@@ -7126,7 +7126,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             INDENT_DOWNL;
             if( bProxy )
             {
-#ifdef AUTH
+#ifdef KRB5
                 Wa( "case 'l':" );
                 CCOUT << "case 'k':";
                 INDENT_UPL;
@@ -7213,7 +7213,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             break;
         }
 
-#ifdef AUTH
+#ifdef KRB5
         if( bProxy )
         {
             Wa( "if( !g_bAuth && g_bKProxy )" );
@@ -7348,7 +7348,7 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "static std::string g_strIpAddr;" );
             Wa( "static std::string g_strPortNum;" );
             Wa( "static bool g_bAuth = false;" );
-#ifdef AUTH
+#ifdef KRB5
             if( bProxy )
             {
                 Wa( "static bool g_bKProxy = false;" );
@@ -7457,7 +7457,7 @@ gint32 CImplMainFunc::EmitInitContext(
 
         if( g_bBuiltinRt )
         {
-#ifdef AUTH
+#ifdef KRB5
             if( bProxy )
             {
                 Wa( "if( g_bKProxy )" );
@@ -7751,7 +7751,7 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         CCOUT << "    break;";
         NEW_LINE;
 
-#ifdef AUTH
+#ifdef KRB5
         if( g_bBuiltinRt && bProxy )
         {
             Wa( "if( g_bKProxy )" );

@@ -1452,7 +1452,7 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "options.addOption(oAuth);" );
         NEW_LINE;
 
-#ifdef AUTH
+#ifdef KRB5
         if( bProxy )
         {
             Wa( "Option oKProxy = new Option(\"k\", false," );
@@ -1586,7 +1586,7 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
         if( bProxy )
         {
-#ifdef AUTH
+#ifdef KRB5
             Wa( "else if( opt.getOpt() == \"k\" )" );
             BLOCK_OPEN;
             Wa( "oInit.put( 111, Boolean.valueOf( true ) );" );
@@ -4678,7 +4678,7 @@ gint32 CImplJavaMainCli::Output()
     if( g_bBuiltinRt )
     {
         Wa( "import org.apache.commons.cli.*;" );
-#ifdef AUTH
+#ifdef KRB5
         // for KProxyLoop
         Wa( "import java.io.BufferedReader;" );
         Wa( "import java.io.InputStreamReader;" );
@@ -4692,7 +4692,7 @@ gint32 CImplJavaMainCli::Output()
         BLOCK_OPEN;
         Wa( "public static JavaRpcContext m_oCtx;" );
         os.EmitGetDescPath( true );
-#ifdef AUTH
+#ifdef KRB5
         if( g_bBuiltinRt )
             os.EmitKProxyLoop();
 #endif
@@ -4733,7 +4733,7 @@ gint32 CImplJavaMainCli::Output()
             Wa( "    oInit.put( 105, strCfgPath );" );
             if( g_bBuiltinRt )
             {
-#ifdef AUTH
+#ifdef KRB5
                 Wa( "String strUserName = \"\";" );
                 Wa( "boolean bKProxy = false;" );
 #endif
@@ -4775,7 +4775,7 @@ gint32 CImplJavaMainCli::Output()
             CCOUT << "    getDescPath( \"" << strDescName << "\" );";
             NEW_LINE;
         }
-#ifdef AUTH
+#ifdef KRB5
         else
         {
             Wa( "if( bKProxy )" );

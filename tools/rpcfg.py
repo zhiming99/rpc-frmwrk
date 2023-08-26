@@ -597,7 +597,7 @@ class ConfigDlg(Gtk.Dialog):
         self.hasGmSSL=IsFeatureEnabled( "gmssl" )
         self.hasOpenSSL=IsFeatureEnabled( "openssl" )
         self.hasSSL = ( self.hasGmSSL or self.hasOpenSSL ) 
-        self.hasAuth=IsFeatureEnabled( "auth" )
+        self.hasAuth=IsFeatureEnabled( "krb5" )
 
         confVals = self.RetrieveInfo()
         self.confVals = confVals
@@ -682,6 +682,7 @@ class ConfigDlg(Gtk.Dialog):
         self.AddMiscOptions( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddInstallerOptions( grid, startCol, row, confVals)
+        self.ToggleAuthControls( self.IsKrb5Enabled() )
 
 
     def AddNode( self, grid:Gtk.Grid, i ) :
@@ -1568,7 +1569,11 @@ class ConfigDlg(Gtk.Dialog):
             if self.ifctx[ ifNo ].webSock.props.active and not bActive :
                 button.props.active = True
                 return
-        elif name == 'Auth' or name == 'GmSSL' or name == 'VerifyPeer':
+        elif name == 'Auth' :
+            if IsFeatureEnabled( 'krb5' ):
+                self.ToggleAuthControls( bActive )
+            return
+        elif name == 'GmSSL' or name == 'VerifyPeer':
             pass
         elif name == 'WebSock' :
             ifNo = button.ifNo
@@ -1591,6 +1596,18 @@ class ConfigDlg(Gtk.Dialog):
             if self.nodeCtxs[ iNo ].webSock.props.active and not bActive  :
                 button.props.active = True
                 return
+    def on_selection_changed(self, widget):
+        if not IsFeatureEnabled( 'krb5' ):
+            return
+        it = widget.get_active_iter()
+        if it is not None:
+            model = widget.get_model()
+            row_id, name = model[it][:2]
+            if name == 'Kerberos':
+                self.ToggleAuthControls( True )
+                return
+            self.ToggleAuthControls( False )
+        return
 
     def on_choose_key_clicked( self, button ) :
         self.on_choose_file_clicked( button, True )
@@ -1764,19 +1781,14 @@ class ConfigDlg(Gtk.Dialog):
         bServer : bool ) -> int:
         ret = 0
         try:
-            if not IsFeatureEnabled( "auth" ):
-                print( "Warning 'auth' is not enabled and no need " + \
-                    "to generate krb5 files for installer" )
-                return 1
-                
             if not self.IsKrb5Enabled(): 
                 print( "Warning 'krb5' is not selected and no need " + \
                     "to generate krb5 files for installer" )
-                return 2
+                return 1
 
             if not IsTestKdcSet():
                 print( "Warning local KDC is not setup " )
-                return 3
+                return 2
 
             krbConf = self.GetKrb5Conf()
             if krbConf == "" :
@@ -2335,6 +2347,8 @@ EOF
 
     def IsKrb5Enabled( self )->bool :
         try:
+            if not IsFeatureEnabled( "krb5" ):
+                return False
             bChecked = False
             for ctx in self.ifctx :
                 if ctx.authCheck.props.active :
@@ -2349,20 +2363,25 @@ EOF
                 if name == 'Kerberos':
                     return True
         except Exception as err:
+            print( err )
             return False
 
-    def IsKrb5Enabled2( self, confVals )->bool :
-        authInfo = None
-        bKrb5 = False
-        try:
-            authInfo = confVals[ 'AuthInfo']
-            authMech = authInfo[ 'AuthMech' ]
-            if authMech == 'krb5':
-                bKrb5 = True
-        except Exception as err :
-            return False
-
-        return bKrb5
+    def ToggleAuthControls( self, bSensitive : bool ):
+        self.svcEdit.set_sensitive( bSensitive )
+        self.realmEdit.set_sensitive( bSensitive )
+        self.signCombo.set_sensitive( bSensitive )
+        self.kdcEdit.set_sensitive( bSensitive )
+        self.userEdit.set_sensitive( bSensitive )
+        self.btnEnaKProxy.set_sensitive( bSensitive )
+        if self.bServer:
+            self.updKrb5Btn.set_sensitive( bSensitive )
+            self.initKrb5Btn.set_sensitive( bSensitive )
+            self.checkCfgKrb5.set_sensitive( bSensitive )
+            self.checkKProxy.set_sensitive( bSensitive )
+            self.labelCfgKrb5.set_sensitive( bSensitive )
+            self.labelKProxy.set_sensitive( bSensitive )
+            self.checkNoUpdRpc.set_sensitive( bSensitive )
+            self.labelNoUpdRpc.set_sensitive( bSensitive )
 
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
@@ -2384,12 +2403,14 @@ EOF
 
         mechList = Gtk.ListStore()
         mechList = Gtk.ListStore(int, str)
-        mechList.append([1, "Kerberos"])
+        mechList.append([1, "Kerberos"] )
+        mechList.append( [2, "Oauth2"] )
     
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
         mechCombo.set_active( 0 )
         mechCombo.set_sensitive( False )
+        mechCombo.connect('changed', self.on_selection_changed )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
 
@@ -2475,6 +2496,7 @@ EOF
         userEditBox = Gtk.Entry()
         userEditBox.set_text(strUser)
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
+        bKrb5 = self.IsKrb5Enabled()
 
         if self.bServer:
 
@@ -2486,16 +2508,19 @@ EOF
             updKrb5Btn.connect("clicked", self.on_update_auth_settings )
             updKrb5Btn.set_tooltip_text( toolTip2 )
             grid.attach( updKrb5Btn, startCol + 1, startRow + 7, 2, 1 )
+            self.updKrb5Btn = updKrb5Btn
 
             initKrb5Btn = Gtk.Button.new_with_label("Initialize KDC")
             initKrb5Btn.connect("clicked", self.on_init_kdc_settings )
             initKrb5Btn.set_tooltip_text( toolTip )
             grid.attach( initKrb5Btn, startCol + 1, startRow + 8, 2, 1 )
+            self.initKrb5Btn = initKrb5Btn
 
             labelNoUpdRpc = Gtk.Label()
             labelNoUpdRpc.set_text("No Change To RPC")
             labelNoUpdRpc.set_xalign(.5)
             grid.attach(labelNoUpdRpc, startCol + 0, startRow + 9, 1, 1 )
+            self.labelNoUpdRpc = labelNoUpdRpc
 
             checkNoUpdRpc = Gtk.CheckButton(label="")
             checkNoUpdRpc.props.active = False
@@ -2570,9 +2595,8 @@ EOF
         btnEnaKProxy.connect("clicked", self.on_enable_kinit_proxy )
         btnEnaKProxy.set_tooltip_text( "Enable/Disable kinit proxy on this host" )
         grid.attach( btnEnaKProxy , startCol + 1, startRow + 4, 2, 1 )
+        self.btnEnaKProxy = btnEnaKProxy
 
-        if not IsFeatureEnabled( 'auth' ) :
-            btnEnaKProxy.set_sensitive( False )
         return
 
     def AddInstallerOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
@@ -2596,9 +2620,6 @@ EOF
         grid.attach( checkCfgWs, startCol + 1, startRow + 1, 1, 1)
         self.checkCfgWs = checkCfgWs
 
-        if not IsFeatureEnabled( "auth" ):
-            return
-
         labelCfgKrb5 = Gtk.Label()
         labelCfgKrb5.set_text("Krb5 Installer")
         labelCfgKrb5.set_xalign(.5)
@@ -2608,6 +2629,7 @@ EOF
         checkCfgKrb5.props.active = False
         checkCfgKrb5.set_tooltip_text(
             "The installer will setup Kerberos for rpc-frmwrk" )
+        self.labelCfgKrb5 = labelCfgKrb5
 
         checkCfgKrb5.connect(
             "toggled", self.on_button_toggled, "CfgAuth")
@@ -2615,18 +2637,20 @@ EOF
         self.checkCfgKrb5 = checkCfgKrb5
 
         labelKProxy = Gtk.Label()
-        labelKProxy.set_text("Kproxy Installer")
+        labelKProxy.set_text("KProxy Installer")
         labelKProxy.set_xalign(.5)
         grid.attach( labelKProxy, startCol + 0, startRow + 3, 1, 1 )
         checkKProxy = Gtk.CheckButton(label="")
         checkKProxy.props.active = False
         checkKProxy.set_tooltip_text(
             "The installer will enable kinit proxy for rpc-frmwrk" )
+        self.labelKProxy = labelKProxy
 
         checkKProxy.connect(
             "toggled", self.on_button_toggled, "KProxy")
         grid.attach( checkKProxy, startCol + 1, startRow + 3, 1, 1)
         self.checkKProxy = checkKProxy
+
         return
 
     def on_sign_msg_changed(self, combo) :
