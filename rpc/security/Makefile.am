@@ -1,10 +1,17 @@
 lib_LTLIBRARIES=libauth.la
 
-rpcfauth_headers = k5proxy.h k5server.h kdcfdo.h secclsid.h secfido.h security.h README.md
-libauth_la_SOURCES = security.cpp dllexp.cpp kdcfdo.cpp secfido.cpp k5proxy.cpp k5server.cpp $(rpcfauth_headers)
-
 libauth_la_CPPFLAGS = -I$(top_srcdir)/ipc -I../ \
 -I$(top_srcdir)/combase -I$(top_srcdir)/rpc -I$(top_srcdir)/3rd_party
+
+if ENABLE_KRB5
+libauth_la_CPPFLAGS += -DKRB5
+krb5_sources=kdcfdo.cpp secfido.cpp k5proxy.cpp k5server.cpp 
+else
+krb5_sources=
+endif
+
+rpcfauth_headers = k5proxy.h k5server.h kdcfdo.h secclsid.h secfido.h security.h README.md
+libauth_la_SOURCES = security.cpp dllexp.cpp $(rpcfauth_headers) $(krb5_sources)
 
 libauth_ladir=$(libdir)
 

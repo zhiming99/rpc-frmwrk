@@ -650,6 +650,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
 
         if( ERROR( iRet ) )
         {
+            OnServiceComplete( pResp, pCallback );
             ret = iRet;
             break;
         }
@@ -1449,26 +1450,27 @@ gint32 CAuthentProxy::BuildLoginTask(
     do{
         std::string strMech = GET_MECH( pIf );
 
-        if( strMech != "krb5" &&
-            strMech != "ntlm" )
+        if( strMech == "krb5" )
         {
-            ret = -ENOTSUP;
+#ifdef KRB5
+            TaskletPtr pLoginTask;
+            ret = DEFER_IFCALLEX2_NOSCHED2(
+                0, pLoginTask, ObjPtr( pIf ),
+                &CK5AuthProxy::DoLogin,
+                nullptr );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfRetryTask* pRetryTask = pLoginTask;
+            pRetryTask->SetClientNotify( pCallback );
+
+            pTask = pLoginTask;
             break;
+#endif
         }
 
-        TaskletPtr pLoginTask;
-        ret = DEFER_IFCALLEX2_NOSCHED2(
-            0, pLoginTask, ObjPtr( pIf ),
-            &CK5AuthProxy::DoLogin,
-            nullptr );
-
-        if( ERROR( ret ) )
-            break;
-
-        CIfRetryTask* pRetryTask = pLoginTask;
-        pRetryTask->SetClientNotify( pCallback );
-
-        pTask = pLoginTask;
+        ret = -ENOTSUP;
 
     }while( 0 );
 
@@ -1569,8 +1571,7 @@ gint32 CAuthentProxy::CreateSessImpl(
             break;
 
         std::string strObjName;
-        if( strMech == "krb5" ||
-            strMech == "ntlm" )
+        if( strMech == "krb5" )
             strObjName = OBJNAME_AUTHSVR;
         else
         {
@@ -1600,21 +1601,26 @@ gint32 CAuthentProxy::CreateSessImpl(
 
         if( strMech == "krb5" )
         {
+#ifdef KRB5
             ret = CorrectInstName(
                 pMgr, oCfg.GetCfg() );
+
+            // use a special ifstate
+            oCfg.SetIntProp( propIfStateClass,
+                clsid( CRemoteProxyStateAuth ) );
+
+            InterfPtr pIf;
+            ret = pIf.NewObj(
+                clsid( CAuthentProxyK5Impl ),
+                oCfg.GetCfg() );
+
+            if( SUCCEEDED( ret ) )
+                pImpl = pIf;
+            break;
+#endif
         }
 
-        // use a special ifstate
-        oCfg.SetIntProp( propIfStateClass,
-            clsid( CRemoteProxyStateAuth ) );
-
-        InterfPtr pIf;
-        ret = pIf.NewObj(
-            clsid( CAuthentProxyK5Impl ),
-            oCfg.GetCfg() );
-
-        if( SUCCEEDED( ret ) )
-            pImpl = pIf;
+        ret = -ENOTSUP;
 
     }while( 0 );
 
@@ -1889,13 +1895,18 @@ gint32 CAuthentProxy::VerifyMicMsg(
 gint32 CAuthentProxy::InitEnvRouter(
     CIoManager* pMgr )
 {
+#ifdef KRB5
     return CK5AuthProxy::InitEnvRouter( pMgr );
+#endif
+    return 0;
 }
 
 void CAuthentProxy::DestroyEnvRouter(
     CIoManager* pMgr )
 {
+#ifdef KRB5
     CK5AuthProxy::DestroyEnvRouter( pMgr );
+#endif
 }
 
 gint32 CRpcTcpBridgeProxyAuth::OnEnableComplete(
@@ -2973,6 +2984,19 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
     return ret;
 }
 
+CRpcRouterReqFwdrAuth::CRpcRouterReqFwdrAuth(
+    const IConfigDb* pCfg ) :
+    CAggInterfaceServer( pCfg ), super( pCfg ),
+    CRpcRouterAuthShared( this )
+{
+    bool bKProxy = false;
+    CIoManager* pMgr = GetIoMgr();
+    gint32 ret = pMgr->GetCmdLineOpt(
+        propKProxy, bKProxy );
+    if( SUCCEEDED( ret ) )
+        m_bKProxy = bKProxy;
+}
+
 gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
     IConfigDb* pTransCtx,
     DMsgPtr& pMsg,
@@ -3046,25 +3070,43 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
             strVal.substr( 0, pos + 1 );
 
         strDir += OBJNAME_ROUTER_BRIDGE_AUTH;
+        stdstr strInPath = DBUS_OBJ_PATH(
+            MODNAME_RPCROUTER,
+            OBJNAME_ROUTER_BRIDGE_AUTH );
 
-        if( strDir != pMsg.GetPath() )
+        if( m_bKProxy &&
+            pMsg.GetPath() == strInPath )
         {
-            ret = ERROR_FALSE;
-            DebugPrintEx( logErr, ret,
-                "Error check message" );
-            break;
+            pMsg.SetPath( strDir );
+            stdstr strDest = strDir;
+            std::replace( strDest.begin(),
+                strDest.end(), '/', '.' );
+
+            if( strDest[ 0 ] == '.' )
+                strDest.erase( strDest.begin() );
+            pMsg.SetDestination( strDest );
         }
-
-        std::replace( strDir.begin(),
-            strDir.end(), '/', '.' );
-
-        if( strDir[ 0 ] == '.' )
-            strDir.erase( strDir.begin() );
-
-        if( strDir != pMsg.GetDestination() )
+        else
         {
-            ret = ERROR_FALSE;
-            break;
+            if( strDir != pMsg.GetPath() )
+            {
+                ret = ERROR_FALSE;
+                DebugPrintEx( logErr, ret,
+                    "Error check message" );
+                break;
+            }
+
+            std::replace( strDir.begin(),
+                strDir.end(), '/', '.' );
+
+            if( strDir[ 0 ] == '.' )
+                strDir.erase( strDir.begin() );
+
+            if( strDir != pMsg.GetDestination() )
+            {
+                ret = ERROR_FALSE;
+                break;
+            }
         }
 
         ret = pMatchHit.NewObj(
@@ -3545,12 +3587,10 @@ gint32 CAuthentServer::StartAuthImpl(
         if( ERROR( ret ) )
             break;
 
+        m_pAuthImpl = pIf;
         ret = pIf->StartEx( pRespCb );
         if( ret != STATUS_PENDING )
             ( *pRespCb )( eventCancelTask );
-
-        if( SUCCEEDED( ret ) )
-            m_pAuthImpl = pIf;
 
     }while( 0 );
 
@@ -3583,8 +3623,20 @@ gint32 CAuthentServer::OnPostStart(
             oAuth.SetStrProp(
                 propServiceName, strSvcName );
         }
+        stdstr strMech;
+        ret = oAuth.GetStrProp(
+            propAuthMech, strMech );\
+        if( ERROR( ret ) )
+            break;
 
-        ret = StartAuthImpl( pCallback );
+        if( strMech == "krb5" )
+        {
+#ifdef KRB5
+            ret = StartAuthImpl( pCallback );
+            break;
+#endif
+        }
+        ret = -ENOTSUP;
 
     }while( 0 );
 

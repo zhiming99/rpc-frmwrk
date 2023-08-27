@@ -5319,12 +5319,12 @@ gint32 CRpcRouterManager::Start()
             if( ERROR( ret ) )
                 break;
 
+            m_vecRoutersBdge.push_back(
+                InterfPtr( pRtObj ) );
             CRpcRouterBridge* prt = pRtObj;
             ret = prt->Start();
             if( ERROR( ret ) )
                 break;
-
-            m_vecRoutersBdge.push_back( prt );
         }
 
         if( m_dwRole & 0x01 )

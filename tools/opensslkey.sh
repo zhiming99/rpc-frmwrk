@@ -5,6 +5,7 @@
 # $3: number of server keys, 1 if not specified
 # openssl demo key generator
 
+bitwidth=2048
 if [ "x$1" != "x" -a ! -d $1 ]; then
     echo Usage: bash opensslkey.sh [directory to store keys] [ number of client keys ] [number of server keys]
     exit 1
@@ -82,7 +83,7 @@ if [ ! -d ./demoCA/newcerts ]; then
 fi
 
 if [ ! -f rootcakey.pem ]; then
-    rm *.pem
+    rm -rf *.pem
     openssl genrsa -out rootcakey.pem 4096
     openssl req -new -sha256 -x509 -days 3650 -config ${SSLCNF} -extensions v3_ca -key rootcakey.pem -out rootcacert.pem -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=ROOTCA/emailAddress=woodhead99@gmail.com"
 fi
@@ -90,11 +91,11 @@ fi
 if [ ! -f cakey.pem ]; then
     mkdir backup
     mv -f rootca*.pem backup/
-    rm *.pem
+    rm -rf *.pem
     mv -f backup/* ./
     rmdir backup
 
-    openssl genrsa -out cakey.pem 2048
+    openssl genrsa -out cakey.pem ${bitwidth}
     openssl req -new -sha256 -key cakey.pem  -out careq.pem -days 365 -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Sub CA/emailAddress=woodhead99@gmail.com"
     openssl ca -days 365 -cert rootcacert.pem -keyfile rootcakey.pem -md sha256 -extensions v3_ca -config ${SSLCNF} -in careq.pem -out cacert.pem
     rm careq.pem
@@ -110,7 +111,7 @@ fi
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
     chmod 600 signcert.pem signkey.pem || true
-    openssl genrsa -out signkey.pem 2048
+    openssl genrsa -out signkey.pem ${bitwidth}
     openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server:$i"
     if which expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
@@ -123,7 +124,7 @@ done
 
 function find_key_to_show()
 {
-    if (($1==1 )); then
+    if (($1==1)); then
         fn='serverkeys'
     else
         fn='clientkeys'
@@ -161,7 +162,7 @@ let idx_base+=numsvr
 let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
     chmod 600 clientcert.pem clientkey.pem || true
-    openssl genrsa -out clientkey.pem 2048
+    openssl genrsa -out clientkey.pem ${bitwidth}
     openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=client:$i"
     if which expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in clientreq.pem -out clientcert.pem
@@ -191,72 +192,6 @@ cp certs.pem private_keys
 svr_end=$idx_base
 let idx_base-=numsvr
 
-cat > instcfg.sh << EOF
-#!/bin/bash
-if [ "x\$1" == "x" ]; then
-    echo "Usage: \$0 <key idx starting from zero>"
-    exit 1
-fi
-
-paths=\$(echo \$PATH | tr ':' ' ' )
-for i in \$paths; do
-    af=\$i/rpcf/rpcfgnui.py
-    if [ -f \$af ]; then
-        rpcfgnui=\$af
-        break
-    fi
-done
-
-if [ "x\$rpcfgnui" == "x" ]; then
-    \$rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
-    if [ ! -f \$rpcfgnui ]; then
-        exit 1
-    fi
-fi
-
-if [ -f USESSL ]; then
-    keydir=\$HOME/.rpcf/openssl
-    if [ ! -d \$keydir ]; then
-        mkdir -p \$keydir || exit 1
-        chmod 700 \$keydir
-    fi
-    updinitcfg=\$(dirname \$rpcfgnui)/updinitcfg.py
-    if [ ! -f \$updinitcfg ]; then
-        exit 1
-    fi
-    if [ -f clidx ]; then
-        idx_base=\$(head -n1 clidx)
-        let keyidx=idx_base+\$1
-        if [ -f clientkeys-\$keyidx.tar.gz ]; then
-            tar -C \$keydir -xf clientkeys-\$keyidx.tar.gz
-            python3 \$updinitcfg -c \$keydir ./initcfg.json
-            chmod 400 \$keydir/*.pem
-        fi
-        for i in clientkeys-*; do
-            cat /dev/null > \$i
-        done
-    elif [ -f svridx ]; then
-        idx_base=\$(head -n1 svridx)
-        let keyidx=idx_base+\$1
-        if [ -f serverkeys-\$keyidx.tar.gz ]; then
-            tar -C \$keydir -xf serverkeys-\$keyidx.tar.gz
-            python3 \$updinitcfg \$keydir ./initcfg.json
-            chmod 400 \$keydir/*.pem
-        fi
-        for i in serverkeys-*; do
-            cat /dev/null > \$i
-        done
-    fi
-fi
-
-initcfg=\$(pwd)/initcfg.json
-if which sudo; then
-    sudo python3 \$rpcfgnui ./initcfg.json
-else
-    su -c "python3 \$rpcfgnui \$initcfg"
-fi
-EOF
-
 if (( svr_idx >= idx_base )); then
     if ! tar cf instsvr.tar serverkeys-$svr_idx.tar.gz; then
         exit 1
@@ -271,9 +206,6 @@ if (( svr_idx >= idx_base )); then
     mv -f clidx endidx
     tar rf instsvr.tar endidx
     mv -f endidx clidx
-    tar rf instsvr.tar instcfg.sh
-else
-    rm -rf instsvr.tar
 fi 
 
 if (( cli_idx >= svr_end )); then
@@ -289,9 +221,6 @@ if (( cli_idx >= svr_end )); then
     mv -f rpcf_serial endidx
     tar rf instcli.tar endidx
     mv -f endidx rpcf_serial
-    tar rf instcli.tar instcfg.sh
-else
-    rm -rf instcli.tar
 fi 
 
 else

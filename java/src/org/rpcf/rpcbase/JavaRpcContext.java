@@ -59,6 +59,9 @@ public class JavaRpcContext
      *
      *      <p>110: a string as the port numer to connect to or
      *      listen on</p>
+     *
+     *      <p>111: a boolean to tell if the router run as a 
+     *      kinit proxy</p>
      * @return an ObjPtr object holding the instance of IoMgr on success
      * and null on error, with m_iError set.
      */
@@ -145,6 +148,11 @@ public class JavaRpcContext
                         // use 107 on purpose
                         oCfg.SetStrProp( 107, strVal );
                     }
+                }
+                if( oInit.containsKey( 111 ) )
+                {
+                    bVal = ( Boolean )oInit.get( 111 );
+                    oCfg.SetBoolProp( 111, bVal );
                 }
             }
 

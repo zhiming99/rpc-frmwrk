@@ -10,7 +10,7 @@ using namespace rpcf;
 #include "TestTypesSvccli.h"
 
 ObjPtr g_pIoMgr;
-
+std::set< guint32 > g_setMsgIds;
 
 FactoryPtr InitClassFactory()
 {
@@ -42,6 +42,8 @@ static std::string g_strSaInstName;
 static std::string g_strIpAddr;
 static std::string g_strPortNum;
 static bool g_bAuth = false;
+static bool g_bKProxy = false;
+static std::string g_strUserName;
 static ObjPtr g_pRouter;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 
@@ -53,10 +55,12 @@ void Usage( char* szName )
 {
     fprintf( stderr,
         "Usage: %s [OPTION]\n"
-        "\t [ -a to enable authentication ]\n"
-        "\t [ -d to run as a daemon ]\n"
+        "\t [ -a to enable authentication. ]\n"
+        "\t [ -d to run as a daemon. ]\n"
         "\t [ -i <ip address> to specify the destination ip address. ]\n"
-        "\t [ -p <port number> to specify the tcp port number to ]\n"
+        "\t [ -p <port number> to specify the tcp port number to. ]\n"
+        "\t [ -k to run as a kinit proxy. ]\n"
+        "\t [ -l <user name> login with the user name and then quit. ]\n"
         "\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\n"
         "\t [ --objdesc <path> to specify the path to the object description file. ]\n"
         "\t [ --router <path> to specify the path to the customized 'router.json'. ]\n"
@@ -67,6 +71,28 @@ void Usage( char* szName )
 
 #include <getopt.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <stdlib.h>
+std::atomic< bool > s_bExit( false );
+void SignalHandler( int signum )
+{ s_bExit = true; }
+
+int KProxyLoop()
+{
+    if( g_strUserName.size() )
+    {
+        std::string strCmd = "kinit -ki ";
+        strCmd += g_strUserName;
+        gint32 ret = system( strCmd.c_str() );
+        return -ret;
+        
+    }
+    signal( SIGINT, SignalHandler );
+    while( !s_bExit )
+        sleep( 3 );
+    printf( "\n" );
+    return 0;
+}
 int _main( int argc, char** argv);
 int main( int argc, char** argv )
 {
@@ -83,7 +109,7 @@ int main( int argc, char** argv )
             {"sainstname", required_argument, 0,  0 },
             {0,             0,                 0,  0 }
         };            
-        while( ( opt = getopt_long( argc, argv, "hadi:p:",
+        while( ( opt = getopt_long( argc, argv, "hadkl:i:p:",
             arrLongOptions, &iOptIdx ) ) != -1 )
         {
             switch( opt )
@@ -146,15 +172,16 @@ int main( int argc, char** argv )
                 }
             case 'i':
                 {
-                    std::string strIpRaw = optarg;
+                    std::string strTemp;
                     ret = NormalizeIpAddrEx(
-                        strIpRaw, g_strIpAddr );
+                        optarg, strTemp );
                     if( ERROR( ret ) )
                     {
                         ret = -EINVAL;
                         fprintf( stderr,
                             "Error invalid ip address.\n" );
                     }
+                    g_strIpAddr = optarg;
                     break;
                 }
             case 'p':
@@ -170,6 +197,14 @@ int main( int argc, char** argv )
                     }
                     break;
                 }
+            case 'l':
+            case 'k':
+                {
+                    g_bKProxy = true;
+                    if( opt == 'l' )
+                        g_strUserName = optarg;
+                    break;
+                }
             case 'a':
                 { g_bAuth = true; break; }
             case 'd':
@@ -181,6 +216,12 @@ int main( int argc, char** argv )
         }
         if( ERROR( ret ) )
             break;
+        if( !g_bAuth && g_bKProxy )
+        {
+            fprintf( stderr,
+                "Error '-k' is only valid with '-a' option.\n" );
+            ret = -EINVAL;
+        }
         if( true )
         {
             bool bPrompt = false;
@@ -296,10 +337,16 @@ gint32 InitContext()
         if( ERROR( ret ) )
             break;
         
+        if( g_bKProxy )
+            pSvc->SetCmdLineOpt(
+                propKProxy, g_bKProxy );
         // create and start the router
         std::string strRtName = "TestTypes_rt_";
-        pSvc->SetRouterName( strRtName +
-            std::to_string( getpid() ) );
+        if( !g_bKProxy )
+            pSvc->SetRouterName( strRtName +
+                std::to_string( getpid() ) );
+        else
+            pSvc->SetRouterName( MODNAME_RPCROUTER );
         std::string strDescPath;
         if( g_strRtDesc.size() )
             strDescPath = g_strRtDesc;
@@ -396,7 +443,12 @@ int _main( int argc, char** argv )
         ret = InitContext();
         if( ERROR( ret ) )
             break;
-        
+        if( g_bKProxy )
+        {
+            ret = KProxyLoop();
+            break;
+        }
+
         CRpcServices* pSvc = nullptr;
         InterfPtr pIf;
         do{

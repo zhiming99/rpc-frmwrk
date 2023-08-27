@@ -373,6 +373,7 @@ class CImplPyMainFunc :
     gint32 EmitDefineUserMain( 
         std::vector< ObjPtr >& vecSvcs,
         bool bProxy );
+    gint32 EmitKProxyLoop();
 };
 
 class CExportPyReadme :

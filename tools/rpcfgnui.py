@@ -2,12 +2,10 @@
 import json
 import os
 import sys 
-from shutil import move
-from copy import deepcopy
-from urllib.parse import urlparse
-from typing import Dict
 import errno
 from updcfg import *
+from updwscfg import *
+from updk5cfg import ConfigAuthServer
 
 import getopt, sys
 
@@ -18,7 +16,6 @@ def usage():
 
 import getopt
 def main():
-    bServer = True
     try:
         opts, args = getopt.getopt(sys.argv[1:], "h" )
     except getopt.GetoptError as err:
@@ -43,7 +40,43 @@ def main():
     initFile = args[ 0 ]
 
     try:
+        if os.access( './clidx', os.F_OK ):
+            bServer = False
+        elif os.access( './svridx', os.F_OK ):
+            bServer = True
+        else:
+            #auto-testing does not provide both files
+            bServer = True
+
+        if bServer is None:
+            raise Exception( "Error bad installer" )
+
+        fp = open( initFile, 'r' )
+        initCfg = json.load( fp )
+        fp.close()
+
+        if bServer:
+            initCfg[ 'InstToSvr' ] = 'true'
+        else:
+            initCfg[ 'InstToSvr' ] = 'false'
+        fp = open( initFile, 'w' )
+        json.dump( initCfg, fp, indent=4 )
+        fp.close()
+
+        if IsFeatureEnabled( "krb5" ):
+            ret = ConfigAuthServer( initFile )
+            if ret < 0:
+                print( "Error failed to config auth server %d" % ret )
+                return ret
+
+        if IsFeatureEnabled( "openssl" ):
+            ret = ConfigWebServer( initFile )
+            if ret < 0:
+                print( "Error failed to config web server %d" % ret )
+                return ret  
+
         ret = Update_InitCfg( initFile, None )
+
     except Exception as err:
         text = "Failed to update the config files:" + str( err )
         exc_type, exc_obj, exc_tb = sys.exc_info()

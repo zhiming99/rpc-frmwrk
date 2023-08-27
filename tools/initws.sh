@@ -16,7 +16,9 @@ if [ ! -e /etc/nginx/conf.d ]; then
     mkdir -p /etc/nginx/conf.d
 fi
 
-echo '127.0.0.1	example.com' >> /etc/hosts
+if ! grep '127.0.0.1	example.com' /etc/hosts; then
+    echo '127.0.0.1	example.com' >> /etc/hosts
+fi
 
 tee /etc/nginx/conf.d/ssl.conf << EOF
 server {

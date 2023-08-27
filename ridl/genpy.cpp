@@ -3056,6 +3056,10 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
             {
                 Wa( "\"\\t [ -i <ip address> to specify the destination ip address. ]\\n\"" );
                 Wa( "\"\\t [ -p <port number> to specify the tcp port number to ]\\n\"" );
+#ifdef KRB5
+                Wa( "\"\\t [ -k to run as a kinit proxy. ]\\n\"" );
+                Wa( "\"\\t [ -l <user name> login with the user name and then quit. ]\\n\"" );
+#endif
             }
             else
             {
@@ -3095,6 +3099,10 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         if( !bProxy && g_bBuiltinRt )
             strShort = "hadi:p:m:";
 #endif
+#ifdef KRB5
+        if( bProxy && g_bBuiltinRt )
+            strShort += "kl:";
+#endif
         CCOUT << "    opts, args = getopt.getopt(argv, \""<< strShort <<"\","; 
         NEW_LINE;
         if( bProxy && g_bBuiltinRt )
@@ -3113,6 +3121,17 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "for opt, arg in opts:" );
         Wa( "    if opt in ('-a'):" );
         Wa( "        params[ 'bAuth' ] = True" );
+
+#ifdef KRB5
+        if( bProxy && g_bBuiltinRt )
+        {
+            Wa( "    elif opt in ('-k'):" );
+            Wa( "        params[ 'bKProxy' ] = True" );
+            Wa( "    elif opt in ('-l'):" );
+            Wa( "        params[ 'bKProxy' ] = True" );
+            Wa( "        params[ 'UserName' ] = arg" );
+        }
+#endif
         Wa( "    elif opt in ('-d'):" );
         Wa( "        params[ 'bDaemon' ] = True" );
         Wa( "    elif opt in ('-i'):" );
@@ -3166,6 +3185,15 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "    else:" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 1 )" );
+#ifdef KRB5
+        if( bProxy && g_bBuiltinRt )
+        {
+            Wa( "if 'bKProxy' in params and not 'bAuth' in params:" );
+            Wa( "    print( \"Error '-k' or '-l' is only valid when '-a' is present \")" );
+            Wa( "    Usage()" );
+            Wa( "    sys.exit( 1 )" );
+        }
+#endif
 
     }while( 0 );
 
@@ -3332,6 +3360,25 @@ do{ \
     NEW_LINE; \
 }while( 0 )
 
+gint32 CImplPyMainFunc::EmitKProxyLoop()
+{
+    if( g_bBuiltinRt )
+    {
+        CCOUT << "def KProxyLoop( strUserName : str = None ) -> int:";
+        INDENT_UPL;
+        Wa( "global bExit" );
+        Wa( "if strUserName is None:" );
+        Wa( "    while not bExit:" );
+        Wa( "        time.sleep( 3 )" );
+        Wa( "    print( \"\\n\" )" );
+        CCOUT << "    return 0";
+        NEW_LINE;
+        Wa( "strCmd = \"kinit -ki \" + strUserName" );
+        CCOUT << "return -os.system( strCmd )";
+        INDENT_DOWNL;
+    }
+    return 0;
+}
 gint32 CImplPyMainFunc::OutputCli(
     std::vector< ObjPtr >& vecSvcs )
 {
@@ -3354,6 +3401,9 @@ gint32 CImplPyMainFunc::OutputCli(
         }
         NEW_LINE;
         EMIT_SIGHANDLER;
+
+        EmitKProxyLoop();
+        NEW_LINE;
 
         CCOUT << "def MainEntryCli() :";
         INDENT_UPL;
@@ -3418,6 +3468,18 @@ gint32 CImplPyMainFunc::OutputCli(
             CCOUT << "strPath_ += '/" << g_strAppName << "desc.json'";
             NEW_LINE;
         }
+        else
+        {
+#ifdef KRB5
+            Wa( "if 'bKProxy' in params and params[ 'bKProxy' ]:" );
+            Wa( "    if 'UserName' in params:" );
+            Wa( "        strUser = params[ 'UserName' ]" );
+            Wa( "    else:" );
+            Wa( "        strUser = None" );
+            Wa( "    return KProxyLoop( strUser )" );
+#endif
+        }
+
         for( auto elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;

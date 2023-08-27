@@ -43,10 +43,10 @@ AC_ARG_ENABLE([openssl],
     [enable_openssl=no],
     [enable_openssl=yes])
 
-AC_ARG_ENABLE([auth],
-    [AS_HELP_STRING([--disable-auth], [build and install without authentication])],
-    [enable_auth=no],
-    [enable_auth=yes])
+AC_ARG_ENABLE([krb5],
+    [AS_HELP_STRING([--disable-krb5], [build and install without Kerberos authentication])],
+    [enable_krb5=no],
+    [enable_krb5=yes])
 
 AC_ARG_ENABLE([gmssl],
     [AS_HELP_STRING([--disable-gmssl], [build and install without GmSSL])],
@@ -119,7 +119,7 @@ case $enable_openssl in
     ;;
 esac
 
-case $enable_auth in
+case $enable_krb5 in
     yes)
     AC_CHECK_LIB([gssapi_krb5], [gss_wrap],
     [LIBS="${LIBS}"
@@ -228,7 +228,7 @@ case $enable_fuse3 in
     ;;
 esac
 
-case $enable_auth in
+case $enable_krb5 in
     yes)
     DEPLIBS_ALL+=' mit-krb5'
     ;;
@@ -385,7 +385,8 @@ AC_CONFIG_FILES([Makefile
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
 AM_CONDITIONAL([ENABLE_OPENSSL],[test x$enable_openssl = xyes])
-AM_CONDITIONAL([ENABLE_AUTH],[test x$enable_auth = xyes])
+AM_CONDITIONAL([ENABLE_KRB5],[test x$enable_krb5 = xyes])
+AM_CONDITIONAL([ENABLE_AUTH],[test x$enable_krb5 = xyes -o x$enable_oauth2 = xyes ])
 AM_CONDITIONAL([ENABLE_GMSSL],[test x$enable_gmssl = xyes])
 AM_CONDITIONAL([ENABLE_FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$enable_fuse3 = xyes])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
@@ -485,26 +486,26 @@ case $enable_fuse3 in
     ;;
 esac
 
-case $enable_auth in
+case $enable_krb5 in
     yes)
         AC_CONFIG_FILES([
              rpc/security/Makefile ])
-        AUTH_RPMLIBS="krb5-devel,"
-        AUTH_RPMPKGS="krb5-libs" 
-        AUTH_RPMFILES="%{_libdir}/libauth.so*"
-        AUTH_DEBLIBS="libkrb5-dev,"
-        AUTH_DEBPKGS="libkrb5-3,"
-        AUTH_CFGOPT=
-        FEATURES+="+auth "
+        KRB5_RPMLIBS="krb5-devel,"
+        KRB5_RPMPKGS="krb5-libs" 
+        KRB5_RPMFILES="%{_libdir}/libauth.so*"
+        KRB5_DEBLIBS="libkrb5-dev,"
+        KRB5_DEBPKGS="libkrb5-3,"
+        KRB5_CFGOPT=
+        FEATURES+="+krb5 "
     ;;
     no)
-        AUTH_RPMLIBS=
-        AUTH_RPMFILES=
-        AUTH_RPMPKGS=
-        AUTH_DEBLIBS=
-        AUTH_DEBPKGS=
-        AUTH_CFGOPT='--disable-auth'
-        FEATURES+="-auth "
+        KRB5_RPMLIBS=
+        KRB5_RPMFILES=
+        KRB5_RPMPKGS=
+        KRB5_DEBLIBS=
+        KRB5_DEBPKGS=
+        KRB5_CFGOPT='--disable-krb5'
+        FEATURES+="-krb5 "
     ;;
 esac
 
@@ -616,12 +617,12 @@ AC_SUBST(FUSE3_RPMHEADERS)
 AC_SUBST(FUSE3_DEBHEADERS)
 
 
-AC_SUBST(AUTH_RPMLIBS)
-AC_SUBST(AUTH_RPMFILES)
-AC_SUBST(AUTH_RPMPKGS)
-AC_SUBST(AUTH_DEBLIBS)
-AC_SUBST(AUTH_DEBPKGS)
-AC_SUBST(AUTH_CFGOPT)
+AC_SUBST(KRB5_RPMLIBS)
+AC_SUBST(KRB5_RPMFILES)
+AC_SUBST(KRB5_RPMPKGS)
+AC_SUBST(KRB5_DEBLIBS)
+AC_SUBST(KRB5_DEBPKGS)
+AC_SUBST(KRB5_CFGOPT)
 
 AC_SUBST(JAVA_RPMLIBS)
 AC_SUBST(JAVA_RPMFILES)

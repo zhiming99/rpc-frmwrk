@@ -23,8 +23,11 @@
  * =====================================================================================
  */ 
 
+%insert("begin") %{                                                                                                                                                                                           
+#include "fuseif.h"                                                                                                                                                                                           
+%}
+
 %{
-#include "fuseif.h"
 std::set< guint32 > g_setMsgIds;
 
 static std::vector< std::pair< ObjPtr, stdstr > > s_vecIfs;

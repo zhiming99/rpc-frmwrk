@@ -11,8 +11,8 @@ if [ ! -e $plugindir ]; then
     make -p $plugindir
 fi
 
-echo ln -s /usr/local/lib/rpcf/libauth.so $plugindir
-ln -s /usr/local/lib/rpcf/libauth.so $plugindir
+#echo ln -s /usr/local/lib/libauth.so $plugindir
+#ln -s /usr/local/lib/libauth.so $plugindir
 
 echo "==================================================================================="
 echo "==== Kerberos KDC and Kadmin ======================================================"

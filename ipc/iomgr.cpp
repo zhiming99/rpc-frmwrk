@@ -2623,6 +2623,9 @@ stdstr InstIdFromDrv(
          <p>110: a string as the port numer to connect
          to or listen on [optional]</p>
 
+         <p>111: a boolean to tell if the router run as a 
+         kinit proxy</p>
+
     @param strNewDesc an new desc file, or empty if
     nothing to update. and property 107 is set with new
     instance name if both 107 and 108 are not present.
@@ -2665,7 +2668,20 @@ gint32 UpdateObjDesc(
             oCfg.GetStrProp( 108, strSaInst );
 
         stdstr strIpAddr;
-        oCfg.GetStrProp( 109, strIpAddr );
+        stdstr strRawAddr;
+        ret = oCfg.GetStrProp( 109, strRawAddr );
+        bool bDomain = false;
+        if( SUCCEEDED( ret ) )
+        {
+            ret = NormalizeIpAddrEx2(
+                strRawAddr, strIpAddr, bDomain );
+            if( ERROR( ret ) )
+            {
+                DebugPrintEx( logErr, ret,
+                    "Error invalid IP address" );
+                break;
+            }
+        }
 
         stdstr strPort;
         oCfg.GetStrProp( 110, strPort );
@@ -2706,6 +2722,25 @@ gint32 UpdateObjDesc(
                     oElem.removeMember(
                         JSON_ATTR_AUTHINFO );
                     bChanged = true;
+                }
+                if( oElem.isMember(
+                    JSON_ATTR_AUTHINFO) && bAuth )
+                {
+                    Json::Value& oAuth =
+                        oElem[ JSON_ATTR_AUTHINFO ];
+                    if( !oAuth.isMember( JSON_ATTR_SVCNAME ) ||
+                        !oAuth[ JSON_ATTR_SVCNAME ].isString() )
+                        continue;
+                    Json::Value& oSvc =
+                        oAuth[ JSON_ATTR_SVCNAME ];
+                    stdstr strSvc = oSvc.asString();
+                    size_t pos = strSvc.find_first_of( '@' );
+                    if( pos != std::string::npos )
+                        strSvc.erase( pos );
+                    strSvc.push_back( '@' );
+                    // built a new svc-host address
+                    strSvc += strRawAddr;
+                    oSvc = strSvc;
                 }
             }
             if( ERROR( ret ) )
@@ -2886,7 +2921,19 @@ gint32 UpdateDrvCfg(
             break;
 
         stdstr strIpAddr;
-        oCfg.GetStrProp( 109, strIpAddr );
+        stdstr strRawAddr;
+        ret = oCfg.GetStrProp( 109, strRawAddr );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = NormalizeIpAddrEx(
+                strRawAddr, strIpAddr );
+            if( ERROR( ret ) )
+            {
+                DebugPrintEx( logErr, ret,
+                    "Error invalid ip address" );
+                break;
+            }
+        }
 
         stdstr strPort;
         oCfg.GetStrProp( 110, strPort );

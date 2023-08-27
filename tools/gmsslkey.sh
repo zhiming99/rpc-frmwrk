@@ -52,7 +52,7 @@ if [ -d private_keys ]; then
 fi
 
 if [ ! -f rootcakey.pem ]; then
-    rm *.pem
+    rm -rf *.pem
     gmssl sm2keygen -pass 1234 -out rootcakey.pem
     gmssl certgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN ROOTCA -days 3650 -key rootcakey.pem -pass 1234 -out rootcacert.pem -key_usage keyCertSign -key_usage cRLSign -ca
 fi
@@ -60,7 +60,7 @@ fi
 if [ ! -f cakey.pem ]; then
     mkdir backup
     mv rootca*.pem backup/
-    rm *.pem
+    rm -rf *.pem
     mv backup/* ./
     rmdir backup
     gmssl sm2keygen -pass 1234 -out cakey.pem
@@ -154,73 +154,6 @@ cp cacert.pem rootcacert.pem private_keys/
 svr_end=$idx_base
 let idx_base-=numsvr
 
-cat > instcfg.sh << EOF
-#!/bin/bash
-if [ "x\$1" == "x" ]; then
-    echo "Usage: \$0 <key idx starting from zero>"
-    exit 1
-fi
-
-rpcfgnui=
-paths=\$(echo \$PATH | tr ':' ' ' )
-for i in \$paths; do
-    af=\$i/rpcf/rpcfgnui.py
-    if [ -f \$af ]; then
-        rpcfgnui=\$af
-        break
-    fi
-done
-
-if [ "x\$rpcfgnui" == "x" ]; then
-    \$rpcfgnui="/usr/local/bin/rpcf/rpcfgnui.py"
-    if [ ! -f \$rpcfgnui ]; then
-        exit 1
-    fi
-fi
-
-if [ -f USESSL ]; then
-    keydir=\$HOME/.rpcf/gmssl
-    if [ ! -d \$keydir ]; then
-        mkdir -p \$keydir || exit 1
-        chmod 700 \$keydir
-    fi
-    updinitcfg=\$(dirname \$rpcfgnui)/updinitcfg.py
-    if [ ! -f \$updinitcfg ]; then
-        exit 1
-    fi
-    if [ -f clidx ]; then
-        idx_base=\$(head -n1 clidx)
-        let keyidx=idx_base+\$1
-        if [ -f clientkeys-\$keyidx.tar.gz ]; then
-            tar -C \$keydir -xf clientkeys-\$keyidx.tar.gz
-            python3 \$updinitcfg -c \$keydir ./initcfg.json
-            chmod 400 \$keydir/*.pem
-        fi
-        for i in clientkeys-*; do
-            cat /dev/null > \$i
-        done
-    elif [ -f svridx ];then
-        idx_base=\$(head -n1 svridx)
-        let keyidx=idx_base+\$1
-        if [ -f serverkeys-\$keyidx.tar.gz ]; then
-            tar -C \$keydir -xf serverkeys-\$keyidx.tar.gz
-            python3 \$updinitcfg \$keydir ./initcfg.json
-            chmod 400 \$keydir/*.pem
-        fi
-        for i in serverkeys-*; do
-            cat /dev/null > \$i
-        done
-    fi
-fi
-
-initcfg=\$(pwd)/initcfg.json
-if which sudo; then
-    sudo python3 \$rpcfgnui ./initcfg.json
-else
-    su -c "python3 \$rpcfgnui \$initcfg"
-fi
-EOF
-
 if (( svr_idx >= idx_base )); then
     if ! tar cf instsvr.tar serverkeys-$svr_idx.tar.gz; then
         exit 1
@@ -235,9 +168,6 @@ if (( svr_idx >= idx_base )); then
     mv clidx endidx
     tar rf instsvr.tar endidx
     mv endidx clidx
-    tar rf instsvr.tar instcfg.sh
-else
-    rm -rf instsvr.tar
 fi 
 
 if (( cli_idx >= svr_end )); then
@@ -253,9 +183,6 @@ if (( cli_idx >= svr_end )); then
     mv rpcf_serial endidx
     tar rf instcli.tar endidx
     mv endidx rpcf_serial
-    tar rf instcli.tar instcfg.sh
-else
-    rm -rf instcli.tar
 fi 
 
 else

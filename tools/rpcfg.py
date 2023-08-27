@@ -1,8 +1,30 @@
 #!/usr/bin/env python3
+#*
+#* =====================================================================================
+#*
+#*       Filename:  rpcfg.py
+#*
+#*    Description:  implementation of a GUI config tool for rpc-frmwrk
+#*
+#*        Version:  1.0
+#*        Created:  04/26/2021 10:43:00 PM
+#*       Revision:  none
+#*       Compiler:  gcc
+#*
+#*         Author:  Ming Zhi( woodhead99@gmail.com )
+#*   Organization:
+#*
+#*      Copyright:  2021 Ming Zhi( woodhead99@gmail.com )
+#*
+#*        License:  Licensed under GPL-3.0. You may not use this file except in
+#*                  compliance with the License. You may find a copy of the
+#*                  License at 'http://www.gnu.org/licenses/gpl-3.0.html'
+#*
+#* =====================================================================================
+#*
 import json
 import os
 import sys 
-from shutil import move
 from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Tuple
@@ -10,6 +32,10 @@ import errno
 import tarfile
 import time
 from updcfg import *
+from updwscfg import *
+from updk5cfg import *
+import re
+import platform
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -34,21 +60,21 @@ def SilentRun( strCmd : str ):
     cmdline += "\"timeout\" { exit }\n" 
     cmdline += "}\n" 
     cmdline += "EOF\n"
-    return os.system( cmdline )
+    return rpcf_system( cmdline )
 
 def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path += "/opensslkey.sh"
     cmdline = "/bin/bash " + dir_path + " " + strPath + " " + cnum + " " + snum
     bExpect = False
-    ret = os.system( "which expect" )
+    ret = rpcf_system( "which expect" )
     if ret == 0 :
         bExpect = True
     if bExpect :
         cmdline = "spawn " + cmdline
         ret = SilentRun( cmdline )
     else:
-        ret = os.system( cmdline )
+        ret = rpcf_system( cmdline )
 
     if ret != 0 :
         return
@@ -78,7 +104,7 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path += "/gmsslkey.sh"
     cmdline = "bash " + dir_path + " " + strPath + " " + cnum + " " + snum
-    os.system( cmdline )
+    rpcf_system( cmdline )
     if bServer :
         strFile = strPath + "/signkey.pem"
         dlg.keyEdit.set_text( strFile )
@@ -141,11 +167,7 @@ if [ -f USESSL ]; then
 fi
 
 initcfg=$(pwd)/initcfg.json
-if which sudo; then
-    sudo python3 $rpcfgnui ./initcfg.json
-else
-    su -c "python3 $rpcfgnui $initcfg"
-fi
+python3 $rpcfgnui $initcfg
 '''
     return content
 
@@ -557,16 +579,25 @@ class ConfigDlg(Gtk.Dialog):
 
         Gtk.Dialog.__init__(self, title, flags=0)
         self.add_buttons(
-            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            "Load From", Gtk.ResponseType.APPLY,
+            "Installer...", Gtk.ResponseType.YES,
             Gtk.STOCK_OK, Gtk.ResponseType.OK,
-            Gtk.STOCK_SAVE_AS, Gtk.ResponseType.YES,
-            Gtk.STOCK_OPEN, Gtk.ResponseType.APPLY )
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL )
+
+        oInstBtn = self.get_widget_for_response(
+            Gtk.ResponseType.YES )
+        oInstBtn.set_tooltip_text(
+            "Create configuration installers for deployment.")
+        oLoadBtn = self.get_widget_for_response(
+            Gtk.ResponseType.APPLY )
+        oLoadBtn.set_tooltip_text(
+            "Reload settings from another driver.json.")
 
         self.bServer = bServer
-        self.hasGmSSL=IsFeatureEnabled( "gmssl" )
-        self.hasOpenSSL=IsFeatureEnabled( "openssl" )
+        self.hasGmSSL = IsFeatureEnabled( "gmssl" )
+        self.hasOpenSSL = IsFeatureEnabled( "openssl" )
         self.hasSSL = ( self.hasGmSSL or self.hasOpenSSL ) 
-        self.hasAuth=IsFeatureEnabled( "auth" )
+        self.hasAuth = IsFeatureEnabled( "krb5" )
 
         confVals = self.RetrieveInfo()
         self.confVals = confVals
@@ -649,6 +680,10 @@ class ConfigDlg(Gtk.Dialog):
         self.AddAuthCred( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddMiscOptions( grid, startCol, row, confVals )
+        row = GetGridRows( grid )
+        self.AddInstallerOptions( grid, startCol, row, confVals)
+        self.ToggleAuthControls( self.IsKrb5Enabled() )
+
 
     def AddNode( self, grid:Gtk.Grid, i ) :
         try:
@@ -683,7 +718,8 @@ class ConfigDlg(Gtk.Dialog):
 
             ipAddr = Gtk.Entry()
             ipAddr.set_text( nodeCfg[ 'IpAddress' ] )
-            grid.attach(ipAddr, startCol + 1, startRow + 2, 1, 1 )
+            ipAddr.set_tooltip_text( "Enter an ip address or a domain name." )
+            grid.attach(ipAddr, startCol + 1, startRow + 2, 2, 1 )
             ipAddr.iNo = i
             nodeCtx.ipAddr = ipAddr
 
@@ -694,7 +730,7 @@ class ConfigDlg(Gtk.Dialog):
 
             portNum = Gtk.Entry()
             portNum.set_text( nodeCfg[ 'PortNumber' ] )
-            grid.attach(portNum, startCol + 1, startRow + 3, 1, 1 )
+            grid.attach(portNum, startCol + 1, startRow + 3, 2, 1 )
             portNum.iNo = i
             nodeCtx.port = portNum
 
@@ -725,7 +761,7 @@ class ConfigDlg(Gtk.Dialog):
             urlEdit = Gtk.Entry()
             urlEdit.set_text( strUrl )
             urlEdit.set_sensitive( webSockCheck.props.active )
-            grid.attach(urlEdit, startCol + 1, startRow + 5, 1, 1 )
+            grid.attach(urlEdit, startCol + 1, startRow + 5, 2, 1 )
             nodeCtx.urlEdit = urlEdit
             urlEdit.iNo = i
 
@@ -748,6 +784,7 @@ class ConfigDlg(Gtk.Dialog):
             nodeCtx.compress = compress
 
             sslCheck = Gtk.CheckButton( label = "SSL" )
+            sslCheck.set_tooltip_text( "Enable OpenSSL or GMSSL" )
             if nodeCfg[ 'EnableSSL' ] == 'false' :
                 sslCheck.props.active = False
             else :
@@ -917,7 +954,7 @@ class ConfigDlg(Gtk.Dialog):
         grpCtx = self.grpCtxs[ iNo ]
         strText = SetToString( grpCtx.grpSet )
         grpCtx.textbuffer.set_text( strText )
-        grpCtx.grpName = dialog.nameEntry.get_text()
+        grpCtx.grpName = dialog.nameEntry.get_text().strip()
         SetBtnText( grpCtx.removeBtn, "Remove '" + grpCtx.grpName + "'" )
         SetBtnText( grpCtx.changeBtn, "Change '" + grpCtx.grpName + "'" )
         grpCtx.labelName.set_markup( "<b>group '" + grpCtx.grpName + "'</b>" )
@@ -1063,7 +1100,7 @@ class ConfigDlg(Gtk.Dialog):
             for nodeCtx in self.nodeCtxs :
                 if nodeCtx.IsEmpty() :
                     continue
-                strName = nodeCtx.nodeName.get_text()
+                strName = nodeCtx.nodeName.get_text().strip()
                 if len( strName ) == 0 :
                     continue
                 if not strName.isidentifier() :
@@ -1134,7 +1171,7 @@ class ConfigDlg(Gtk.Dialog):
         else :    
             labelIp.set_text("Server IP: ")
 
-        labelIp.set_xalign(1)
+        labelIp.set_xalign(.5)
         grid.attach(labelIp, startCol, startRow, 1, 1 )
 
         ipEditBox = Gtk.Entry()
@@ -1147,6 +1184,9 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass
         ipEditBox.set_text(ipAddr)
+        ipEditBox.set_tooltip_text( "Enter an IP address or a domain name. " +
+            "And don't use '0.0.0.0', because the IP address will " +
+            "also go to the proxy config and is invalid to connect to" )
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
         self.ifctx[ ifNo ].ipAddr = ipEditBox
 
@@ -1170,7 +1210,7 @@ class ConfigDlg(Gtk.Dialog):
             pass                
         portEditBox = Gtk.Entry()
         portEditBox.set_text( str( portNum ) )
-        grid.attach( portEditBox, startCol + 1, startRow + 1, 1, 1)
+        grid.attach( portEditBox, startCol + 1, startRow + 1, 2, 1)
         self.ifctx[ ifNo ].port = portEditBox
 
         rows = GetGridRows( grid )
@@ -1197,27 +1237,30 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( compressCheck, startCol + 1, rows, 1, 1)
         self.ifctx[ ifNo ].compress = compressCheck
 
+        rows = GetGridRows( grid )
+        labelPath = Gtk.Label()
+        strText = 'RouterPath: '
+        labelPath.set_text( strText )
+
+        labelPath.set_xalign(1)
+        grid.attach(labelPath, startCol + 0, rows + 0, 1, 1 )
+
+        strPath = GetRouterPath( "echodesc.json" )
+        pathEditBox = Gtk.Entry()
+        pathEditBox.set_text( str( strPath ) )
+        grid.attach( pathEditBox, startCol + 1, rows + 0, 2, 1)
+        self.ifctx[ 0 ].rtpathEdit = pathEditBox
+
         if ifNo == 0 :
             rows = GetGridRows( grid )
-            labelPath = Gtk.Label()
-            strText = 'RouterPath: '
-            labelPath.set_text( strText )
-
-            labelPath.set_xalign(1)
-            grid.attach(labelPath, startCol + 0, rows + 0, 1, 1 )
-
-            strPath = GetRouterPath( "echodesc.json" )
-            pathEditBox = Gtk.Entry()
-            pathEditBox.set_text( str( strPath ) )
-            grid.attach( pathEditBox, startCol + 1, rows + 0, 1, 1)
-            self.ifctx[ 0 ].rtpathEdit = pathEditBox
-
-            rows = GetGridRows( grid )
-            addBtn = Gtk.Button.new_with_label("Add interface")
+            addBtn = Gtk.Button.new_with_label("Add New Interface")
             addBtn.connect("clicked", self.on_add_if_clicked)
+            addBtn.set_tooltip_text(
+                "Rpcrouter only, and not work for built-in router apps" )
             grid.attach(addBtn, startCol + 1, rows + 1, 1, 1 )
 
         else :
+            rows = GetGridRows( grid )
             removeBtn = Gtk.Button.new_with_label(
                 "Remove interface " + str(ifNo) )
             removeBtn.ifNo = ifNo
@@ -1254,7 +1297,7 @@ class ConfigDlg(Gtk.Dialog):
         labelUrl.set_xalign(1)
         grid.attach(labelUrl, startCol + 0, startRow + 1, 1, 1 )
 
-        strUrl = "https://example.com"
+        strUrl = "https://example.com/chat"
         try :
             if confVals[ 'connParams'] is not None :
                 param0 = confVals[ 'connParams'][ ifNo ]
@@ -1265,7 +1308,7 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit = Gtk.Entry()
         urlEdit.set_text( strUrl )
         urlEdit.set_sensitive( bActive )
-        grid.attach(urlEdit, startCol + 1, startRow + 1, 1, 1 )
+        grid.attach(urlEdit, startCol + 1, startRow + 1, 2, 1 )
         self.ifctx[ ifNo ].urlEdit = urlEdit
         urlEdit.ifNo = ifNo
 
@@ -1301,6 +1344,7 @@ class ConfigDlg(Gtk.Dialog):
             sslCheck.set_active( False )
             sslCheck.set_sensitive( False )
 
+        sslCheck.set_tooltip_text( "Enable OpenSSL or GMSSL" )
         bActive = False
         try:
             if not self.bServer: 
@@ -1450,7 +1494,7 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( vfyPeerCheck, startCol + 3, startRow + 4, 1, 1 )
 
         if self.bServer :
-            genKeyBtn = Gtk.Button.new_with_label("Gen Demo Key")
+            genKeyBtn = Gtk.Button.new_with_label("Gen Self-Signed Keys")
             genKeyBtn.connect("clicked", self.on_choose_key_dir_clicked)
             grid.attach( genKeyBtn, startCol + 1, startRow + 5, 1, 1 )
 
@@ -1525,7 +1569,11 @@ class ConfigDlg(Gtk.Dialog):
             if self.ifctx[ ifNo ].webSock.props.active and not bActive :
                 button.props.active = True
                 return
-        elif name == 'Auth' or name == 'GmSSL' or name == 'VerifyPeer':
+        elif name == 'Auth' :
+            if IsFeatureEnabled( "krb5" ):
+                self.ToggleAuthControls( bActive )
+            return
+        elif name == 'GmSSL' or name == 'VerifyPeer':
             pass
         elif name == 'WebSock' :
             ifNo = button.ifNo
@@ -1548,6 +1596,18 @@ class ConfigDlg(Gtk.Dialog):
             if self.nodeCtxs[ iNo ].webSock.props.active and not bActive  :
                 button.props.active = True
                 return
+    def on_selection_changed(self, widget):
+        if not IsFeatureEnabled( "krb5" ):
+            return
+        it = widget.get_active_iter()
+        if it is not None:
+            model = widget.get_model()
+            row_id, name = model[it][:2]
+            if name == 'Kerberos':
+                self.ToggleAuthControls( True )
+                return
+            self.ToggleAuthControls( False )
+        return
 
     def on_choose_key_clicked( self, button ) :
         self.on_choose_file_clicked( button, True )
@@ -1612,8 +1672,8 @@ class ConfigDlg(Gtk.Dialog):
         if response != Gtk.ResponseType.OK:
             dialog.destroy()
             return
-        cnum = dialog.cnumEdit.get_text()
-        snum = dialog.snumEdit.get_text()
+        cnum = dialog.cnumEdit.get_text().strip()
+        snum = dialog.snumEdit.get_text().strip()
 
         strCurPath = os.path.expanduser( "~" ) + "/.rpcf"
         bGmSSL = self.gmsslCheck.props.active
@@ -1628,6 +1688,647 @@ class ConfigDlg(Gtk.Dialog):
                 os.makedirs( strCurPath )
             GenOpenSSLkey( self, strCurPath, self.bServer, cnum, snum )
         dialog.destroy()
+
+    def GetTestKdcIp( self ) -> str:
+        kdcIp = ""
+        try:
+            kdcIp = self.kdcEdit.get_text().strip().lower()
+            if kdcIp != '' and IsLocalIpAddr( kdcIp ) :
+                return kdcIp
+            for ctx in self.ifctx :
+                if ctx.authCheck.props.active :
+                    return ctx.ipAddr.get_text().strip()
+        except:
+            kdcIp = ''
+        return kdcIp
+
+    def GetTestRealm( self ) -> str:
+        strRealm = self.realmEdit.get_text().strip()
+        if len( strRealm ) == 0:
+            strRealm = 'RPCF.ORG'
+
+        return strRealm
+
+    # GSSAPI form of the ServiceName
+    def GetTestKdcSvcHostName( self ) -> str:
+        strSvc = self.svcEdit.get_text().strip()
+        if len( strSvc ) > 0:
+            components = strSvc.split( '@' )
+            if len( components ) == 1:
+                strSvc += '@' + platform.node()
+            elif len( components ) > 2:
+                raise Exception( "Error service name '%s' is valid" % strSvc )
+        else:
+            strSvc = 'rpcrouter' + "@" + platform.node()
+        return strSvc
+
+    # principal for server usage
+    def GetTestKdcHostSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcHostName()
+        components = strSvc.split( '@' )
+        return components[ 0 ] + "/" + components[ 1 ].lower() + \
+            '@' + self.GetTestRealm()
+
+    # principal for admin usage
+    def GetTestKdcAdminSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcHostName()
+        components = strSvc.split( '@' )
+        return components[ 0 ] + "/admin@" + self.GetTestRealm()
+
+    def GetTestKdcUser( self ) -> str:
+        strUser = self.userEdit.get_text().strip()
+        if len( strUser ) == 0:
+            strUser = os.getlogin()
+
+        if strUser.find( '@' ) == -1:
+            strRealm = self.GetTestRealm()
+            strUser += '@' + strRealm 
+        return strUser
+
+    def GetKadmAcl( self ) -> str:
+        strAcl = '''{ServiceAdm} aic
+{User}  i
+'''
+        strSvc = self.GetTestKdcAdminSvcPrinc()
+        strUser = self.GetTestKdcUser()
+        return strAcl.format(
+            ServiceAdm=strSvc,
+            User=strUser )
+
+    def GetKdcConf( self ) -> str:
+        strKdcConf='''[realms]
+{Realm} = {{
+    acl_file = {KdcConfPath}/kadm5.acl
+    max_renewable_life = 7d 0h 0m 0s
+    supported_enctypes = aes256-cts:normal aes128-cts:normal
+    default_principal_flags = +preauth
+    key_stash_file = {KdcConfPath}/stash
+}}
+'''
+        try:
+            strRealm = self.GetTestRealm()
+            strRet = strKdcConf.format(
+                Realm=strRealm,
+                KdcConfPath=GetKdcConfPath() )
+            return strRet
+                
+        except Exception as err:
+            print( err )
+            return ""
+
+    def GenKrb5InstFiles( self,
+        destPath : str,
+        bServer : bool ) -> int:
+        ret = 0
+        try:
+            if not self.IsKrb5Enabled(): 
+                print( "Warning 'krb5' is not selected and no need " + \
+                    "to generate krb5 files for installer" )
+                return 1
+
+            if not IsTestKdcSet():
+                print( "Warning local KDC is not setup " )
+                return 2
+
+            krbConf = self.GetKrb5Conf()
+            if krbConf == "" :
+                print( "Warning 'krb5.conf' is not generated" )
+                return 3
+
+            if not self.checkCfgKrb5.props.active:
+                return 4
+
+            strSrcPath = os.path.dirname(
+                GetTestKeytabPath() )
+
+            if bServer :
+                krbConf = re.sub( "^default_client_.*$", "", krbConf, flags=re.MULTILINE )
+                destKeytab = destPath + "/krb5.keytab"
+                srcKeytab = strSrcPath + "/krb5adm.keytab"
+            else:
+                krbConf = re.sub( "^default_keytab_.*$", "", krbConf, flags=re.MULTILINE)
+                destKeytab = destPath + "/krb5cli.keytab"
+                srcKeytab = strSrcPath + "/krb5cli.keytab"
+
+            destConf = destPath + "/krb5.conf"
+            fp = open( destConf, "w" )
+            fp.write( krbConf )
+            fp.close()
+
+            cmdline = "rm -f " + destKeytab + " > /dev/null 2>&1"
+            cmdline += ";"
+            cmdline += 'cp ' + srcKeytab + ' ' + destKeytab
+
+            #print( cmdline )
+            ret = rpcf_system( cmdline )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+        return ret
+
+    def GenAuthInstFiles( self,
+        destPath : str,
+        bServer : bool ) -> int:
+        ret = self.GenKrb5InstFiles(
+            destPath, bServer )
+        return ret
+
+    def GetKrb5Conf( self ) -> str:
+        strKrb5Conf = '''[logging]
+default = FILE:/var/log/krb5libs.log
+kdc = FILE:/var/log/krb5kdc.log
+admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+default_realm = {Realm}
+dns_lookup_realm = false
+dns_lookup_kdc = false
+ticket_lifetime = 24h
+renew_lifetime = 7d
+forwardable = true
+allow_weak_crypto = true
+default_keytab_name=FILE:{DefKeytab}
+default_client_keytab_name=FILE:{DefCliKeytab}
+rdns = false
+qualify_shortname = false
+
+[realms]
+{Realm} = {{
+kdc = {KdcServer}
+admin_server = {KdcServer}
+default_domain = {DomainName}
+}}
+
+[domain_realm]
+.{DomainName} = {Realm}
+{DomainName} = {Realm}
+
+'''
+        try:
+            if not self.IsKrb5Enabled(): 
+                raise Exception( "krb5 not enabled" )
+
+            kdcIp = self.GetTestKdcIp()
+            if len( kdcIp ) == 0:
+                raise Exception( "Unable to determine kdc address, " + \
+                "and at lease one interface should be auth enabled" )
+
+            strRealm = self.GetTestRealm()
+            strKeytab = GetTestKeytabPath()
+            strCliKeytab = os.path.dirname( strKeytab ) + "/krb5cli.keytab"
+            strRet = strKrb5Conf.format(
+                KdcServer=kdcIp,
+                DomainName=strRealm.lower(),
+                Realm=strRealm,
+                DefKeytab=strKeytab,
+                DefCliKeytab=strCliKeytab
+            )
+            return strRet
+                
+        except Exception as err:
+            print( err )
+            return ""
+
+    def ElevatePrivilege( self ) -> int:
+        ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
+        if ret == 0 :
+            return ret
+        passDlg = PasswordDialog( self )
+        ret, passwd = passDlg.runDlg()
+        if ret < 0:
+            self.DisplayError( "Error invalid password")
+            return ret
+        ret = rpcf_system( "echo '" + passwd + "'| sudo -S echo updating..." )
+        passwd = None
+        return ret
+
+    def SetupTestKdc( self )->int:
+        tempKrb = None
+        tempKdc = None
+        tempAcl = None
+        tempNewRealm = None
+        tempInit = None
+        ret = 0
+        try:
+            strConf = self.GetKrb5Conf()
+            if len( strConf ) == 0:
+                return -errno.EFAULT
+
+            tempKrb = tempname()
+            if len(tempKrb) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempKrb, "w" )
+            fp.write( strConf )
+            fp.close()
+
+            tempKdc = tempname()
+            strKdc = self.GetKdcConf()
+            if len(tempKdc) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempKdc, "w" )
+            fp.write( strKdc )
+            fp.close()
+
+            tempAcl = tempname()
+            strAcl = self.GetKadmAcl()
+            if len(tempAcl) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempAcl, "w" )
+            fp.write( strAcl )
+            fp.close()
+
+            tempNewRealm = tempname()
+            fp = open( tempNewRealm, "w" )
+            fp.write( '''
+krb5_newrealm <<EOF
+123456
+123456
+EOF
+''' )
+            fp.close()
+
+            cmdline = '{sudo} systemctl stop {KdcSvc};'
+            cmdline += '{sudo} systemctl stop ' + GetKadminSvcName() + ";"
+            cmdline += "{sudo} install -bm 644 " + tempKrb
+            cmdline += " /etc/krb5.conf;"
+            cmdline += "{sudo} install -bm 644 " + tempKdc
+            cmdline += " {KdcConfPath}/kdc.conf;"
+            cmdline += "{sudo} install -bm 644 " + tempAcl
+            cmdline += " {KdcConfPath}/kadm5.acl;"
+
+            strDomain = self.GetTestRealm()
+            strIpAddr = self.GetTestKdcIp()
+
+            strSvcHost = self.GetTestKdcSvcHostName()
+            comps = strSvcHost.split( "@" )
+            strNames = comps[ 1 ] + " " + \
+                strDomain + " kdc." + strDomain
+
+            strHostEntry = AddEntryToHosts(
+                strIpAddr, strNames )
+            if strHostEntry != "":
+                cmdline += strHostEntry + ";"
+
+            cmdline += "{sudo} bash " + tempNewRealm
+
+            #add principal for the client user
+            strUser = self.GetTestKdcUser()
+            if not CheckPrincipal( strUser, strDomain ):
+                ret = -errno.EINVAL 
+                return ret
+
+            cmdline += ";"
+            cmdline += DeletePrincipal( strUser )
+            cmdline += ";"
+            cmdline += AddPrincipal( strUser, "" )
+
+            #add principal for the server service
+            strSvc = self.GetTestKdcSvcHostName()
+            cmdline += ";"
+
+            strHostPrinc = self.GetTestKdcHostSvcPrinc()
+            cmdline += DeletePrincipal( strHostPrinc )
+            cmdline += ";"
+            cmdline += AddPrincipal( strHostPrinc, "" )
+            cmdline += ";"
+
+            strAdminPrinc = self.GetTestKdcAdminSvcPrinc()
+            cmdline += DeletePrincipal( strAdminPrinc )
+            cmdline += ";"
+            cmdline += AddPrincipal( strAdminPrinc, "" )
+            cmdline += ";"
+
+
+            #add svc to keytable
+            strKeytab = GetTestKeytabPath()
+            cmdline += "rm -rf " + strKeytab + ">/dev/null 2>&1;"
+            strAdmKt = GetTestAdminKeytabPath()
+            cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
+
+            cmdline += AddToKeytab(
+                strHostPrinc, strKeytab )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strKeytab )
+            cmdline += ";"
+            cmdline += AddToKeytab(
+                strAdminPrinc, strAdmKt )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strAdmKt )
+
+            #add user to client keytable
+            strCliKeytab = os.path.dirname( strKeytab ) + \
+                "/krb5cli.keytab"
+            cmdline += ";"
+            cmdline += "rm -rf " + strCliKeytab + ">/dev/null 2>&1"
+            cmdline += ";"
+            cmdline += AddToKeytab(
+                strUser, strCliKeytab )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strCliKeytab )
+
+            cmdline += ";"
+
+            #add a tag file
+            cmdline += "touch " + os.path.dirname( strKeytab ) + "/kdcinited;"
+
+            cmdline += '{sudo} systemctl restart {KdcSvc};'
+            cmdline += '{sudo} systemctl restart ' + GetKadminSvcName() + ";"
+
+            if os.geteuid() == 0:
+                actCmd = cmdline.format( sudo = '',
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() )
+            elif IsSudoAvailable():
+                ret = self.ElevatePrivilege()
+                if ret < 0:
+                    return ret
+                actCmd = cmdline.format(
+                    sudo = 'sudo',
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() )
+            else:
+                actCmd = "su -c '" + cmdline.format(
+                    sudo = "",
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() ) + "'"
+
+            #print( actCmd )
+            ret = rpcf_system( actCmd )
+            if ret < 0:
+                return ret
+
+            if self.realmEdit is not None:
+                self.realmEdit.set_text( strDomain )
+                self.svcEdit.set_text( strSvc )
+                self.userEdit.set_text( strUser )
+                self.kdcEdit.set_text( strIpAddr ) 
+
+            if self.checkNoUpdRpc.props.active:
+                tempInit = tempname()
+                ret = self.Export_InitCfg( tempInit )
+                if ret < 0 :
+                    return ret
+                return  Update_InitCfg( tempInit, None )
+                
+        except Exception as err:
+            print( err )
+        finally:
+            if tempKrb is not None:
+                os.unlink( tempKrb )
+            if tempKdc is not None:
+                os.unlink( tempKdc )
+            if tempAcl is not None:
+                os.unlink( tempAcl )
+            if tempNewRealm is not None:
+                os.unlink( tempNewRealm )
+            if tempInit is not None:
+                os.unlink( tempInit )
+
+    def UpdateAuthSettings( self ) -> int:
+        ret = 0
+        strTmpConf = None
+        tempInit = None
+        try:
+            bServer = self.bServer
+            if not self.IsKrb5Enabled() :
+                return ret
+
+            if self.realmEdit is None :
+                return -errno.ENOENT
+
+            bChangeUser = False
+            bChangeSvc = False
+            bChangeKdc = False
+            bChangeRealm = False
+
+            authInfo = self.confVals[ 'AuthInfo']
+            strNewRealm = self.realmEdit.get_text().strip()
+            strNewSvc = self.svcEdit.get_text().strip()
+            strNewUser = self.userEdit.get_text().strip()
+            strNewKdcIp = self.kdcEdit.get_text().strip()
+
+            if strNewRealm == "" :
+                raise Exception( "Realm is empty" )
+            if strNewSvc == "":
+                raise Exception( "Service is empty" )
+            if strNewUser == "":
+                raise Exception( "User is empty" )
+            if strNewKdcIp == "":
+                raise Exception( "KDC address is empty" )
+
+            if not CheckPrincipal( strNewUser, strNewRealm ):
+                raise Exception( "bad principal '%s'" % strNewUser )
+
+            if bServer and IsLocalIpAddr( strNewKdcIp ):
+                bChangeSvc = True
+                bChangeUser = True
+            else:
+                ## change through installer
+                bChangeSvc = False
+                bChangeUser = False
+
+            if authInfo[ 'Realm' ] !=  strNewRealm :
+                bChangeRealm = True
+            if self.confVals[ 'kdcAddr' ] != strNewKdcIp :
+                bChangeKdc = True
+
+            if not bChangeKdc and not bChangeUser and \
+                not bChangeSvc and not bChangeRealm :
+                return ret
+            
+            if IsSudoAvailable():
+                ret = self.ElevatePrivilege()
+                if ret < 0:
+                    return ret
+
+            cmdline = ""
+            cmdline += '{sudo} systemctl stop {KdcSvc}'
+            if bChangeSvc :
+                cmdline += ";"
+
+                strHostPrinc = self.GetTestKdcHostSvcPrinc()
+                cmdline += DeletePrincipal( strHostPrinc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strHostPrinc, "" )
+                cmdline += ";"
+
+                strAdminPrinc = self.GetTestKdcAdminSvcPrinc()
+                cmdline += DeletePrincipal( strAdminPrinc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strAdminPrinc, "" )
+                cmdline += ";"
+
+                strKeytab = GetTestKeytabPath()
+                cmdline += "rm -rf " + strKeytab + ">/dev/null 2>&1;"
+                strAdmKt = GetTestAdminKeytabPath()
+                cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
+                cmdline += AddToKeytab(
+                    strHostPrinc, strKeytab )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strKeytab )
+                cmdline += ";"
+                cmdline += AddToKeytab(
+                    strAdminPrinc, strAdmKt )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strAdmKt )
+                cmdline += ";"
+
+            #add user to client keytable
+            if bChangeUser :
+                if strKeytab is None:
+                    strKeytab = GetTestKeytabPath()
+                strCliKeytab = os.path.dirname( strKeytab ) + \
+                    "/krb5cli.keytab"
+                cmdline += "rm -rf " + strCliKeytab + ">/dev/null 2>&1"
+                cmdline += ";"
+                cmdline += DeletePrincipal( strNewUser )
+                cmdline += ";"
+                cmdline += AddPrincipal( strNewUser, "" )
+                cmdline += ";"
+                cmdline += AddToKeytab(
+                    strNewUser, strCliKeytab )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strCliKeytab )
+                cmdline += ";"
+                aclFile = "{KdcConfPath}/kadm5.acl"
+                cmdline += "if ! {sudo} grep '" + strNewUser + "' " + aclFile + "; then "
+                cmdline += "{sudo} echo >> " + aclFile + ";"
+                cmdline += "{sudo} echo '" + strNewUser + " i' >> "
+                cmdline += aclFile + "; fi"
+
+            #update krb5.conf
+            strTmpConf =tempname()
+            if bChangeKdc or bChangeRealm:
+                ret, node = ParseKrb5Conf( '/etc/krb5.conf' )
+                if ret == 0:
+                    ret = UpdateKrb5Cfg( node, strNewRealm,
+                        strNewKdcIp, strTmpConf, False )
+                    node.RemoveChildren()
+                    if ret == 0:
+                        cmdline += ";"
+                        cmdline += "{sudo} install -bm 644 " + strTmpConf + \
+                            " /etc/krb5.conf"
+
+                strSvcHost = self.GetTestKdcSvcHostName()
+                comps = strSvcHost.split( "@" )
+                strNames = comps[ 1 ] + " " + \
+                    strNewRealm.lower()+ " kdc." + \
+                    strNewRealm.lower()
+
+                strCmd = AddEntryToHosts(
+                    strNewKdcIp, strNames )
+                if strCmd != "" :
+                    cmdline += ";" + strCmd
+
+            if len( cmdline ) > 0:
+                cmdline += ";"
+                cmdline += '{sudo} systemctl restart {KdcSvc}'
+                if os.geteuid() == 0:
+                    actCmd = cmdline.format( sudo = '',
+                        KdcConfPath=GetKdcConfPath(),
+                        KdcSvc = GetKdcSvcName() )
+                elif IsSudoAvailable():
+                    actCmd = cmdline.format(
+                        sudo = 'sudo',
+                        KdcConfPath=GetKdcConfPath(),
+                        KdcSvc = GetKdcSvcName() )
+                else:
+                    actCmd = "su -c '" + cmdline.format(
+                        sudo = "",
+                        KdcConfPath=GetKdcConfPath(),
+                        KdcSvc = GetKdcSvcName() ) + "'"
+
+                #print( actCmd )
+                ret = rpcf_system( actCmd )
+                if ret < 0:
+                    return ret
+
+            if self.checkNoUpdRpc.props.active:
+                tempInit = tempname()
+                ret = self.Export_InitCfg( tempInit )
+                if ret < 0 :
+                    return ret
+                return  Update_InitCfg( tempInit, None )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        finally:
+            if strTmpConf is not None:
+                os.unlink( strTmpConf )
+            if tempInit is not None:
+                os.unlink( tempInit )
+        return ret
+
+    def on_update_ws_settings( self, button ):
+        if not IsFeatureEnabled( "openssl" ):
+            return ret
+
+        error = self.VerifyInput()
+        if error != 'success' :
+            text = "Error occurs : " + error
+            self.DisplayError( text )
+            return -1
+                    
+        try:
+            initFile = tempname()
+            ret = self.Export_InitCfg( initFile )
+            if ret < 0 :
+                return ret
+
+            if IsSudoAvailable():
+                #make the following sudo password free
+                ret = self.ElevatePrivilege()
+                if ret < 0:
+                    return ret
+
+            fp = open( initFile, 'r' )
+            cfgVal = json.load( fp )
+            fp.close()
+
+            miscOpts = cfgVal[ 'Security' ][ 'misc' ]
+            miscOpts[ 'ConfigWebServer' ] = 'true'
+
+            ret = ConfigWebServer( initFile )
+            if ret < 0:
+                print( "Error failed to config web server " + str(ret))
+                ret = 0
+            else:
+                print( "WebServer is configured for rpc-frmwrk successfully" )
+            return ret
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+            return ret
+        finally:
+            if initFile is not None:
+                os.unlink( initFile )
+
+    def on_enable_kinit_proxy( self, button ):
+        ret = self.ElevatePrivilege()
+        if ret < 0:
+            return ret
+        bEnabled = IsKinitProxyEnabled()
+        EnableKinitProxy( not bEnabled )
+        if IsKinitProxyEnabled() :
+            button.set_label( "Disable KProxy")
+        else:
+            button.set_label( "Enable KProxy")
+
+    def on_update_auth_settings( self, button ):
+        self.UpdateAuthSettings()
+
+    def on_init_kdc_settings( self, button ):
+        self.SetupTestKdc()
 
     def add_filters(self, dialog, bKey ):
         filter_text = Gtk.FileFilter()
@@ -1644,11 +2345,56 @@ class ConfigDlg(Gtk.Dialog):
         filter_any.add_pattern("*")
         dialog.add_filter(filter_any)
 
+    def IsKrb5Enabled( self )->bool :
+        try:
+            if not IsFeatureEnabled( "krb5" ):
+                return False
+            bChecked = False
+            for ctx in self.ifctx :
+                if ctx.authCheck.props.active :
+                    bChecked = True
+                    break
+            if not bChecked :
+                return False
+            it = self.mechCombo.get_active_iter()
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'Kerberos':
+                    return True
+        except Exception as err:
+            print( err )
+            return False
+
+    def ToggleAuthControls( self, bSensitive : bool ):
+        self.svcEdit.set_sensitive( bSensitive )
+        self.realmEdit.set_sensitive( bSensitive )
+        self.signCombo.set_sensitive( bSensitive )
+        self.kdcEdit.set_sensitive( bSensitive )
+        self.userEdit.set_sensitive( bSensitive )
+        self.btnEnaKProxy.set_sensitive( bSensitive )
+        if self.bServer:
+            self.updKrb5Btn.set_sensitive( bSensitive )
+            self.initKrb5Btn.set_sensitive( bSensitive )
+            self.checkCfgKrb5.set_sensitive( bSensitive )
+            self.checkKProxy.set_sensitive( bSensitive )
+            self.labelCfgKrb5.set_sensitive( bSensitive )
+            self.labelKProxy.set_sensitive( bSensitive )
+            self.checkNoUpdRpc.set_sensitive( bSensitive )
+            self.labelNoUpdRpc.set_sensitive( bSensitive )
+
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
         labelAuthCred.set_markup("<b>Auth Information</b>")
         labelAuthCred.set_xalign(.5)
         grid.attach(labelAuthCred, startCol + 1, startRow + 0, 1, 1 )
+
+        authInfo = None
+        try:
+            if 'AuthInfo' in confVals :
+                authInfo = confVals[ 'AuthInfo']
+        except Exception as err :
+            pass
 
         labelMech = Gtk.Label()
         labelMech.set_text("Auth Mech: ")
@@ -1657,13 +2403,16 @@ class ConfigDlg(Gtk.Dialog):
 
         mechList = Gtk.ListStore()
         mechList = Gtk.ListStore(int, str)
-        mechList.append([1, "Kerberos"])
+        mechList.append([1, "Kerberos"] )
+        mechList.append( [2, "Oauth2"] )
     
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
         mechCombo.set_active( 0 )
         mechCombo.set_sensitive( False )
+        mechCombo.connect('changed', self.on_selection_changed )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
+
 
         labelSvc = Gtk.Label()
         labelSvc.set_text("Service Name: ")
@@ -1671,16 +2420,13 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelSvc, startCol + 0, startRow + 2, 1, 1 )
 
         strSvc = ""
-        try:
-            if 'AuthInfo' in confVals :
-                authInfo = confVals[ 'AuthInfo']
-                if 'ServiceName' in authInfo :
-                    strSvc = authInfo[ 'ServiceName']
-        except Exception as err :
-            pass
+        if authInfo is not None and 'ServiceName' in authInfo :
+            strSvc = authInfo['ServiceName']
 
         svcEditBox = Gtk.Entry()
         svcEditBox.set_text(strSvc)
+        svcEditBox.set_tooltip_text( "Host-based service name in " + \
+            "the form 'service@hostname'" )
         grid.attach(svcEditBox, startCol + 1, startRow + 2, 2, 1 )
 
         labelRealm = Gtk.Label()
@@ -1689,13 +2435,9 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelRealm, startCol + 0, startRow + 3, 1, 1 )
 
         strRealm = ""
-        try:
-            if 'AuthInfo' in confVals :
-                authInfo = confVals[ 'AuthInfo']
-                if 'Realm' in authInfo :
-                    strRealm = authInfo[ 'Realm']
-        except Exception as err :
-            pass
+        if authInfo is not None and 'Realm' in authInfo :
+            strRealm = authInfo['Realm']
+
         realmEditBox = Gtk.Entry()
         realmEditBox.set_text(strRealm)
         grid.attach(realmEditBox, startCol + 1, startRow + 3, 2, 1 )
@@ -1706,15 +2448,10 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach(labelSign, startCol + 0, startRow + 4, 1, 1 )
 
         idx = 1
-        try:
-            if 'AuthInfo' in confVals :
-                authInfo = confVals[ 'AuthInfo']
-                if 'SignMessage' in authInfo :
-                    strSign = authInfo[ 'SignMessage']
-                    if strSign == 'false' :
-                        idx = 0
-        except Exception as err :
-            pass
+        if authInfo is not None and 'SignMessage' in authInfo :
+            strSign = authInfo[ 'SignMessage']
+            if strSign == 'false' :
+                idx = 0
 
         signMethod = Gtk.ListStore()
         signMethod = Gtk.ListStore(int, str)
@@ -1729,7 +2466,7 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( signCombo, startCol + 1, startRow + 4, 1, 1 )
 
         labelKdc = Gtk.Label()
-        labelKdc.set_text("KDC IP address: ")
+        labelKdc.set_text("KDC Address: ")
         labelKdc.set_xalign(.5)
         grid.attach(labelKdc, startCol + 0, startRow + 5, 1, 1 )
 
@@ -1759,12 +2496,48 @@ class ConfigDlg(Gtk.Dialog):
         userEditBox = Gtk.Entry()
         userEditBox.set_text(strUser)
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
+        bKrb5 = self.IsKrb5Enabled()
+
+        if self.bServer:
+
+            toolTip = "Initialize a KDC server on this host"
+            toolTip2 = "Update the local Kerberos settings with " +\
+                "the above 'Auth Information'"
+
+            updKrb5Btn = Gtk.Button.new_with_label("Update Auth Settings")
+            updKrb5Btn.connect("clicked", self.on_update_auth_settings )
+            updKrb5Btn.set_tooltip_text( toolTip2 )
+            grid.attach( updKrb5Btn, startCol + 1, startRow + 7, 2, 1 )
+            self.updKrb5Btn = updKrb5Btn
+
+            initKrb5Btn = Gtk.Button.new_with_label("Initialize KDC")
+            initKrb5Btn.connect("clicked", self.on_init_kdc_settings )
+            initKrb5Btn.set_tooltip_text( toolTip )
+            grid.attach( initKrb5Btn, startCol + 1, startRow + 8, 2, 1 )
+            self.initKrb5Btn = initKrb5Btn
+
+            labelNoUpdRpc = Gtk.Label()
+            labelNoUpdRpc.set_text("No Change To RPC")
+            labelNoUpdRpc.set_xalign(.5)
+            grid.attach(labelNoUpdRpc, startCol + 0, startRow + 9, 1, 1 )
+            self.labelNoUpdRpc = labelNoUpdRpc
+
+            checkNoUpdRpc = Gtk.CheckButton(label="")
+            checkNoUpdRpc.props.active = False
+            checkNoUpdRpc.connect(
+                "toggled", self.on_button_toggled, "NoUpdRpc")
+            grid.attach( checkNoUpdRpc, startCol + 1, startRow + 9, 1, 1)
+            toolTip3 = "Don't update the settings for rpc-frmwrk after " + \
+                "Initialized KDC or Updated Auth Settings"
+            checkNoUpdRpc.set_tooltip_text( toolTip3 )
+            self.checkNoUpdRpc = checkNoUpdRpc
 
         self.svcEdit = svcEditBox
         self.realmEdit = realmEditBox
         self.signCombo = signCombo
         self.kdcEdit = kdcEditBox
         self.userEdit = userEditBox
+        self.mechCombo = mechCombo
 
     def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelMisc = Gtk.Label()
@@ -1786,12 +2559,12 @@ class ConfigDlg(Gtk.Dialog):
         maxconnEdit = Gtk.Entry()
         maxconnEdit.set_text(strMaxConns)
         grid.attach( maxconnEdit , startCol + 1, startRow + 1, 1, 1 )
+        self.maxconnEdit = maxconnEdit
     
         labelTs = Gtk.Label()
         labelTs.set_text("Task Scheduler ")
         labelTs.set_xalign(.5)
         grid.attach( labelTs, startCol + 0, startRow + 2, 1, 1 )
-        self.maxconnEdit = maxconnEdit
 
         tsCheck = Gtk.CheckButton(label="")
         if 'TaskScheduler' in confVals :
@@ -1804,6 +2577,82 @@ class ConfigDlg(Gtk.Dialog):
         grid.attach( tsCheck, startCol + 1, startRow + 2, 1, 1)
         self.tsCheck = tsCheck
  
+        btnText = "Config WebServer"
+        if not IsNginxInstalled() and \
+            not IsApacheInstalled() :
+            return
+
+        updWsBtn = Gtk.Button.new_with_label( btnText )
+        updWsBtn.connect("clicked", self.on_update_ws_settings )
+        updWsBtn.set_tooltip_text( "Config the local WebServer" )
+        grid.attach( updWsBtn, startCol + 1, startRow + 3, 2, 1 )
+
+        if IsKinitProxyEnabled():
+            btnText = "Disable KProxy"
+        else:
+            btnText = "Enable KProxy"
+        btnEnaKProxy = Gtk.Button.new_with_label( btnText )
+        btnEnaKProxy.connect("clicked", self.on_enable_kinit_proxy )
+        btnEnaKProxy.set_tooltip_text( "Enable/Disable kinit proxy on this host" )
+        grid.attach( btnEnaKProxy , startCol + 1, startRow + 4, 2, 1 )
+        self.btnEnaKProxy = btnEnaKProxy
+
+        return
+
+    def AddInstallerOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
+        labelInstaller = Gtk.Label()
+        labelInstaller.set_markup("<b>Installer Options</b>")
+        labelInstaller.set_xalign(.5)
+        grid.attach(labelInstaller, startCol + 1, startRow + 0, 1, 1 )
+
+        labelCfgWs = Gtk.Label()
+        labelCfgWs.set_text("WS Installer")
+        labelCfgWs.set_xalign(.5)
+        grid.attach( labelCfgWs, startCol + 0, startRow + 1, 1, 1 )
+
+        checkCfgWs = Gtk.CheckButton(label="")
+        checkCfgWs.props.active = False
+        checkCfgWs.set_tooltip_text( 
+            "The installer will setup WebServer for rpc-frmwrk" )
+
+        checkCfgWs.connect(
+            "toggled", self.on_button_toggled, "CfgWs")
+        grid.attach( checkCfgWs, startCol + 1, startRow + 1, 1, 1)
+        self.checkCfgWs = checkCfgWs
+
+        labelCfgKrb5 = Gtk.Label()
+        labelCfgKrb5.set_text("Krb5 Installer")
+        labelCfgKrb5.set_xalign(.5)
+        grid.attach( labelCfgKrb5, startCol + 0, startRow + 2, 1, 1 )
+
+        checkCfgKrb5 = Gtk.CheckButton(label="")
+        checkCfgKrb5.props.active = False
+        checkCfgKrb5.set_tooltip_text(
+            "The installer will setup Kerberos for rpc-frmwrk" )
+        self.labelCfgKrb5 = labelCfgKrb5
+
+        checkCfgKrb5.connect(
+            "toggled", self.on_button_toggled, "CfgAuth")
+        grid.attach( checkCfgKrb5, startCol + 1, startRow + 2, 1, 1)
+        self.checkCfgKrb5 = checkCfgKrb5
+
+        labelKProxy = Gtk.Label()
+        labelKProxy.set_text("KProxy Installer")
+        labelKProxy.set_xalign(.5)
+        grid.attach( labelKProxy, startCol + 0, startRow + 3, 1, 1 )
+        checkKProxy = Gtk.CheckButton(label="")
+        checkKProxy.props.active = False
+        checkKProxy.set_tooltip_text(
+            "The installer will enable kinit proxy for rpc-frmwrk" )
+        self.labelKProxy = labelKProxy
+
+        checkKProxy.connect(
+            "toggled", self.on_button_toggled, "KProxy")
+        grid.attach( checkKProxy, startCol + 1, startRow + 3, 1, 1)
+        self.checkKProxy = checkKProxy
+
+        return
+
     def on_sign_msg_changed(self, combo) :
         tree_iter = combo.get_active_iter()
         if tree_iter is not None:
@@ -1822,39 +2671,40 @@ class ConfigDlg(Gtk.Dialog):
                 if interf.IsEmpty() :
                     continue
                 if interf.sslCheck.props.active :
-                    if len( self.keyEdit.get_text() ) == 0 :
+                    if len( self.keyEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, key file is empty"
-                    if len( self.certEdit.get_text() ) == 0 :
+                    if len( self.certEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, cert file is empty"
                 if interf.authCheck.props.active :
-                    if len( self.realmEdit.get_text() ) == 0 :
+                    if len( self.realmEdit.get_text().strip() ) == 0 :
                         return "Auth enabled, but realm is empty"
-                    if len( self.svcEdit.get_text() ) == 0 and self.bServer :
+                    if len( self.svcEdit.get_text().strip() ) == 0 and self.bServer :
                         return "Auth enabled, but service is empty"
-                    if len( self.kdcEdit.get_text() ) == 0 and self.bServer :
+                    if len( self.kdcEdit.get_text().strip() ) == 0 and self.bServer :
                         return "Auth enabled, but kdc address is empty"
-                    if len( self.userEdit.get_text() ) == 0 and not self.bServer:
+                    if len( self.userEdit.get_text().strip() ) == 0 and not self.bServer:
                         return "Auth enabled, but user name is empty"
-                if len( interf.ipAddr.get_text() ) == 0 :
+                if len( interf.ipAddr.get_text().strip() ) == 0 :
                     return "Ip address is empty"
                 else :
-                    strIp = interf.ipAddr.get_text()
+                    strIp = interf.ipAddr.get_text().strip()
 
-                if len( interf.port.get_text() ) == 0 :
+                if len( interf.port.get_text().strip() ) == 0 :
                     return "Port number is empty"
                 else:
-                    strPort = interf.port.get_text()
+                    strPort = interf.port.get_text().strip()
 
                 if (strIp, strPort) not in addrSet :
                     addrSet.add((strIp, strPort))
                 else :
                     return "Identical IP and Port pair found between interfaces"
 
-                if interf.ipAddr.get_text() == '0.0.0.0' :
+                if ( interf.ipAddr.get_text().strip() == '0.0.0.0' or  
+                    interf.ipAddr.get_text().strip() == "::" ) :
                     return "Ip address is '0.0.0.0'"
 
                 if interf.rtpathEdit is not None :
-                    strPath = interf.rtpathEdit.get_text()
+                    strPath = interf.rtpathEdit.get_text().strip()
                     if strPath[ 0 ] != '/' :
                         return "RouterPath is not a valid path"
                     try:
@@ -1863,7 +2713,7 @@ class ConfigDlg(Gtk.Dialog):
                         return "RouterPath is not a valid path"
 
                 if interf.webSock.props.active :
-                    if len( interf.urlEdit.get_text() ) == 0 :
+                    if len( interf.urlEdit.get_text().strip() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
 
             if not self.bServer :
@@ -1878,21 +2728,21 @@ class ConfigDlg(Gtk.Dialog):
                 if nodeCtx.IsEmpty() :
                     continue
                 if nodeCtx.sslCheck.props.active :
-                    if len( self.keyEdit.get_text() ) == 0 :
+                    if len( self.keyEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, but key file is empty"
-                    if len( self.certEdit.get_text() ) == 0 :
+                    if len( self.certEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, but cert file is empty"
-                if len( nodeCtx.ipAddr.get_text() ) == 0 :
+                if len( nodeCtx.ipAddr.get_text().strip() ) == 0 :
                     return "Ip address is empty"
-                if len( nodeCtx.port.get_text() ) == 0 :
+                if len( nodeCtx.port.get_text().strip() ) == 0 :
                     return "Port number is empty"
                 else :
-                    strPort = nodeCtx.port.get_text()
+                    strPort = nodeCtx.port.get_text().strip()
 
-                if nodeCtx.ipAddr.get_text() == '0.0.0.0' :
+                if nodeCtx.ipAddr.get_text().strip() == '0.0.0.0' :
                     return "ip address is '0.0.0.0'"
                 else :
-                    strIp = nodeCtx.ipAddr.get_text()
+                    strIp = nodeCtx.ipAddr.get_text().strip()
 
                 if (strIp, strPort) not in addrSet :
                     addrSet.add((strIp, strPort))
@@ -1900,10 +2750,10 @@ class ConfigDlg(Gtk.Dialog):
                     return "Identical IP and Port pair found between nodes"
 
                 if nodeCtx.webSock.props.active :
-                    if len( interf.urlEdit.get_text() ) == 0 :
+                    if len( interf.urlEdit.get_text().strip() ) == 0 :
                         return "WebSocket enabled, but dest url is empty"
                 
-                strName = nodeCtx.nodeName.get_text()
+                strName = nodeCtx.nodeName.get_text().strip()
                 if len( strName ) == 0:
                     return "Multihop node name cannot be empty"
 
@@ -1939,17 +2789,17 @@ class ConfigDlg(Gtk.Dialog):
 
     def ExportNodeCtx( self, nodeCtx, nodeCfg ):
         try:
-            strVal = nodeCtx.ipAddr.get_text() 
+            strVal = nodeCtx.ipAddr.get_text().strip() 
             if len( strVal ) == 0 :
                 raise Exception("'IP address' cannot be empty") 
             nodeCfg[ 'IpAddress' ] = strVal
 
-            strVal = nodeCtx.port.get_text()
+            strVal = nodeCtx.port.get_text().strip()
             if len( strVal ) == 0 :
                 strVal = str( 4132 )
             nodeCfg[ 'PortNumber' ] = strVal
 
-            strVal = nodeCtx.nodeName.get_text()
+            strVal = nodeCtx.nodeName.get_text().strip()
             if len( strVal ) == 0 :
                 raise Exception("'Node Name' cannot be empty") 
             nodeCfg[ 'NodeName' ] = strVal
@@ -1969,7 +2819,7 @@ class ConfigDlg(Gtk.Dialog):
             else:
                 nodeCfg[ "EnableSSL" ] = "false"
 
-            strVal = nodeCtx.urlEdit.get_text()
+            strVal = nodeCtx.urlEdit.get_text().strip()
             if nodeCtx.webSock.props.active :
                 if len( strVal ) == 0 :
                     raise Exception("'WebSocket URL' cannot be empty") 
@@ -1998,10 +2848,10 @@ class ConfigDlg(Gtk.Dialog):
                 if curVals.IsEmpty() :
                     continue
                 elem = dict()
-                strIp = curVals.ipAddr.get_text()
+                strIp = curVals.ipAddr.get_text().strip()
                 elem[ 'IpAddress' ] = strIp
-                strPort = curVals.port.get_text()
-                elem[ 'PortNumber' ] = curVals.port.get_text()
+                strPort = curVals.port.get_text().strip()
+                elem[ 'PortNumber' ] = curVals.port.get_text().strip()
                 if curVals.compress.props.active :
                     elem[ 'Compression' ] = 'true'
                 else:
@@ -2019,12 +2869,12 @@ class ConfigDlg(Gtk.Dialog):
 
                 if curVals.webSock.props.active :
                     elem[ 'EnableWS' ] = 'true'
-                    elem[ 'DestURL' ] = curVals.urlEdit.get_text()
+                    elem[ 'DestURL' ] = curVals.urlEdit.get_text().strip()
                 else:
                     elem[ 'EnableWS' ] = 'false'
 
                 if i == 0 :
-                    strPath = curVals.rtpathEdit.get_text()
+                    strPath = curVals.rtpathEdit.get_text().strip()
                     if len( strPath ) == 0 :
                         strPath = '/'
                     elem[ 'RouterPath' ] = strPath
@@ -2048,10 +2898,10 @@ class ConfigDlg(Gtk.Dialog):
             jsonVal[ 'Security' ] = elemSecs
             sslFiles = dict()
             elemSecs[ 'SSLCred' ] = sslFiles
-            sslFiles[ "KeyFile"] = self.keyEdit.get_text()
-            sslFiles[ "CertFile"] = self.certEdit.get_text()
-            sslFiles[ "CACertFile"] = self.cacertEdit.get_text()
-            sslFiles[ "SecretFile"] = self.secretEdit.get_text()
+            sslFiles[ "KeyFile"] = self.keyEdit.get_text().strip()
+            sslFiles[ "CertFile"] = self.certEdit.get_text().strip()
+            sslFiles[ "CACertFile"] = self.cacertEdit.get_text().strip()
+            sslFiles[ "SecretFile"] = self.secretEdit.get_text().strip()
             if self.gmsslCheck.props.active:
                 sslFiles[ "UsingGmSSL" ] = 'true'
             else:
@@ -2065,12 +2915,11 @@ class ConfigDlg(Gtk.Dialog):
             authInfo = dict()
             elemSecs[ 'AuthInfo' ] = authInfo
 
-            authInfo[ 'Realm' ] = self.realmEdit.get_text()
-            authInfo[ 'ServiceName' ] = self.svcEdit.get_text()
+            authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
+            authInfo[ 'ServiceName' ] = self.GetTestKdcSvcHostName()
             authInfo[ 'AuthMech' ] = 'krb5'
-            authInfo[ 'UserName' ] = self.userEdit.get_text()
-            if self.bServer :
-                authInfo[ 'KdcIp' ] = self.kdcEdit.get_text()
+            authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
+            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
 
             tree_iter = self.signCombo.get_active_iter()
             if tree_iter is not None:
@@ -2084,7 +2933,7 @@ class ConfigDlg(Gtk.Dialog):
             miscOpts = dict()
             elemSecs[ 'misc' ] = miscOpts
             try:
-                iVal = int( self.maxconnEdit.get_text() )
+                iVal = int( self.maxconnEdit.get_text().strip() )
                 if iVal > 60000 :
                     iVal = 60000
             except Exception as err :
@@ -2093,6 +2942,12 @@ class ConfigDlg(Gtk.Dialog):
 
             if self.tsCheck.props.active :
                 miscOpts[ 'TaskScheduler' ] = "RR"
+            if self.checkCfgWs.props.active and self.bServer:
+                miscOpts[ 'ConfigWebServer' ] = 'true'
+            if self.checkCfgKrb5.props.active and self.bServer:
+                miscOpts[ 'ConfigKrb5' ] = 'true'
+            if self.checkKProxy.props.active:
+                miscOpts[ 'KinitProxy' ] = 'true'
 
         except Exception as err :
             text = "Failed to export node:" + str( err )
@@ -2177,6 +3032,8 @@ class ConfigDlg(Gtk.Dialog):
         cfgPath : str, destPath : str,
         bServer : bool, bInstKeys : bool ) -> int:
         ret = 0
+        keyPkg = None
+        destPkg = None
         try:
             if bServer :
                 destPkg = destPath + "/instsvr.tar"
@@ -2212,22 +3069,20 @@ class ConfigDlg(Gtk.Dialog):
                 dirPath = os.path.dirname( files[ 0 ] )
                 fileName = os.path.basename( files[ 0 ] )
                 cmdLine = 'tar cf ' + keyPkg + " -C " + dirPath + " " + fileName
-                ret = os.system( cmdLine )
+                ret = rpcf_system( cmdLine )
                 if ret != 0:
-                    ret = -ret
                     raise Exception( "Error create tar file " + files[ 0 ] )
                 files.pop(0)
                 for i in files:
                     dirPath = os.path.dirname( i )
                     fileName = os.path.basename( i )
                     cmdLine = 'tar rf ' + keyPkg + " -C " + dirPath + " " +  fileName
-                    ret = os.system( cmdLine )
+                    ret = rpcf_system( cmdLine )
                     if ret != 0:
-                        ret = -ret
                         raise Exception( "Error appending to tar file " + i )
 
                 cmdLine = "touch " + destPath + "/USESSL"
-                os.system( cmdLine )
+                rpcf_system( cmdLine )
 
             fp = open( destPath + '/instcfg.sh', 'w' )
             fp.write( get_instcfg_content() )
@@ -2263,17 +3118,34 @@ class ConfigDlg(Gtk.Dialog):
             if bInstKeys:
                cmdLine += " USESSL "+ keyPkg
 
-            ret = os.system( cmdLine )
+            ret = rpcf_system( cmdLine )
             if ret != 0:
-                ret = -ret
                 raise Exception( "Error creating install package" )
 
+            
+            keyPkg = None
             # add instcfg to destPkg
             cfgDir = os.path.dirname( cfgPath )
-            cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json; gzip " + destPkg
-            ret = os.system( cmdLine )
+            cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json;"
+
+            bAuthFile = False
+            ret = self.GenAuthInstFiles(
+                destPath, bServer )
+            if ret == 0:
+                bAuthFile = True
+                cmdLine += 'tar rf ' + destPkg + " -C " + destPath + \
+                    " krb5.conf "
+                if bServer:
+                    cmdLine += 'krb5.keytab;'
+                else:
+                    cmdLine += 'krb5cli.keytab;'
+            elif ret < 0:
+                raise Exception( "Error generating auth files " + \
+                    "when creating install package" )
+
+            cmdLine += "gzip " + destPkg
+            ret = rpcf_system( cmdLine )
             if ret != 0:
-                ret = -ret
                 raise Exception( "Error creating install package" )
             destPkg += ".gz"
 
@@ -2291,7 +3163,7 @@ class ConfigDlg(Gtk.Dialog):
 
             cmdLine = "cd " + destPath + ";" 
             cmdLine += "cat " + destPkg + " >> " + installer + ";"
-            cmdLine += "chmod u+x " + installer + ";"
+            cmdLine += "chmod 700 " + installer + ";"
             cmdLine += "rm -rf " + destPkg
             if bInstKeys:
                 cmdLine += " USESSL endidx "
@@ -2299,9 +3171,18 @@ class ConfigDlg(Gtk.Dialog):
                     cmdLine += "svridx"
                 else:
                     cmdLine += "clidx"
-            os.system( cmdLine )
+            if bAuthFile :
+                cmdline += " krb5.conf krb5.keytab krb5cli.keytab"
+            rpcf_system( cmdLine )
 
         except Exception as err:
+            try:
+                if keyPkg is not None:
+                    os.unlink( keyPkg )
+                if destPkg is not None:
+                    os.unlink( destPkg )
+            except:
+                pass
             if ret == 0:
                 ret = -errno.EFAULT
 
@@ -2328,18 +3209,19 @@ class ConfigDlg(Gtk.Dialog):
             if len( indexes ) == 2:
                 indexes.append( 0 )
             
+            '''
             if indexes[ 0 ] < indexes[ 2 ]:
                 files.remove('instsvr.tar')
             if indexes[ 1 ] < indexes[ 0 ]:
                 files.remove('instcli.tar')
             if len( files ) == 0 :                
                 raise Exception( "InstPkgs too old to copy" )
+            '''
 
             for i in files:
                 cmdLine = "cp " + keyPath + "/" + i + " " + destPath
-                ret = os.system( cmdLine )
+                ret = rpcf_system( cmdLine )
                 if ret != 0:
-                    ret = -ret
                     raise Exception( "failed to copy " + i  )
         except Exception as err:
             if ret == 0:
@@ -2353,7 +3235,7 @@ class ConfigDlg(Gtk.Dialog):
             self.isServer = True
             self.instName = ""
 
-    def Export_Installer( self, initCfg : object, cfgPath : str )->int :
+    def BuildInstallers( self, initCfg : object, cfgPath : str )->int :
         ret = 0
         try:
             bSSL = self.hasSSL
@@ -2415,12 +3297,12 @@ class ConfigDlg(Gtk.Dialog):
                 if bCliPkg:
                     cmdline = "keyfiles=`tar tf " + cliPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                     cmdline += "for i in $keyfiles; do tar --delete -f " + cliPkg + " $i;done"
-                    os.system( cmdline )
+                    rpcf_system( cmdline )
 
                 if bSvrPkg:
                     cmdline = "keyfiles=`tar tf " + svrPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                     cmdline += "for i in $keyfiles; do tar --delete -f " + svrPkg + " $i;done"
-                    os.system( cmdline )
+                    rpcf_system( cmdline )
 
             # generate the master install package
             instScript=get_instscript_content()
@@ -2454,18 +3336,34 @@ class ConfigDlg(Gtk.Dialog):
                 if not obj.isServer and not self.bServer:
                     continue
 
-                cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json;"
+                fp = open( curDir + '/instcfg.sh', 'w' )
+                fp.write( get_instcfg_content() )
+                fp.close()
+
+                cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json instcfg.sh;"
                 bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"
                     cmdline += "tar rf " + obj.pkgName + " -C " + curDir + " USESSL;"
                     bHasKey = True
 
+                ret = self.GenAuthInstFiles(
+                    curDir, obj.isServer )
+                if ret == 0:
+                    cmdline += 'tar rf ' + obj.pkgName + " -C " + curDir + \
+                        " krb5.conf "
+                    if obj.isServer:
+                        cmdline += 'krb5.keytab;'
+                    else:
+                        cmdline += 'krb5cli.keytab;'
+                elif ret < 0:
+                    raise Exception( "Error generating auth files " + \
+                        "when creating install package" )
+
                 cmdline += "rm -f " + obj.pkgName + ".gz || true;"
                 cmdline += "gzip " + obj.pkgName + ";"
-                ret = os.system( cmdline )
+                ret = rpcf_system( cmdline )
                 if ret != 0 :
-                    ret = -ret
                     if obj.isServer :
                         strMsg = "error create server installer"
                     else:
@@ -2478,9 +3376,9 @@ class ConfigDlg(Gtk.Dialog):
                 fp.write( instScript )
                 fp.close()
                 cmdline = "cat " + obj.pkgName + " >> " + installer
-                os.system( cmdline )
-                cmdline = "chmod u+x " + installer + ";"
-                os.system( cmdline )
+                rpcf_system( cmdline )
+                cmdline = "chmod 700 " + installer + ";"
+                rpcf_system( cmdline )
 
                 # generate a more intuitive name
                 curDate = time.strftime('%Y-%m-%d')
@@ -2513,13 +3411,15 @@ class ConfigDlg(Gtk.Dialog):
                     newName = curDir + '/' + \
                         obj.instName + '-' + curDate + ".sh"
 
-                os.system( "mv " + installer + " " + newName )
+                rpcf_system( "mv " + installer + " " + newName )
 
-            cmdline = "rm " + curDir + "/USESSL || true;rm " + curDir + "/*.gz || true;"
+            cmdline = "cd " + curDir + " && ( rm ./USESSL > /dev/null 2>&1;" + \
+                "rm *.gz krb5.conf krb5.keytab krb5cli.keytab instcfg.sh > /dev/null 2>&1);"
             #cmdline += "rm " + curDir + "/initcfg.json || true;"
-            os.system( cmdline )
+            rpcf_system( cmdline )
 
         except Exception as err:
+            print( err )
             if ret == 0:
                 ret = -errno.EFAULT
 
@@ -2562,34 +3462,74 @@ class ConfigDlg(Gtk.Dialog):
 
         return ret
 
+    def Export_Installer( self, destPath : str, bServer: bool ) -> int :
+        error = self.VerifyInput()
+        if error != 'success' :
+            text = "Error occurs : " + error
+            self.DisplayError( text )
+            return -1
+        ret = 0
+        try:
+            initFile = None
+            if destPath is None :
+                raise Exception( 'Error dest path is none' )
+            if not os.access( destPath, os.X_OK ):
+                raise Exception( 'Error dest path is not valid' )
+                
+            initFile = destPath + '/initcfg.json'
+            ret = self.Export_InitCfg( initFile )
+            if ret < 0:
+                raise Exception( 'Error export initcfg.json' )
+            fp = open( initFile, 'r' )
+            cfgVal = json.load( fp )
+            fp.close()
+            ret = self.BuildInstallers( cfgVal, initFile )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
+
     def Export_Files( self, destPath : str, bServer: bool ) -> int :
         error = self.VerifyInput()
         if error != 'success' :
             text = "Error occurs : " + error
             self.DisplayError( text )
             return -1
-                
-        initFile = '/tmp/initcfg.json'
-        if destPath is not None :
-            initFile = destPath + '/initcfg.json'
+                    
+        try:
+            initFile = tempname()
             ret = self.Export_InitCfg( initFile )
+            if ret < 0 :
+                return ret
+
+            if IsInDevTree():
+                ret = Update_InitCfg( initFile, None )
+                return ret
+
+            if IsSudoAvailable():
+                #make the following sudo password free
+                ret = self.ElevatePrivilege()
+                if ret < 0:
+                    return ret
+
+            ret = Update_InitCfg( initFile, None )
             if ret < 0:
                 return ret
-            fp = open( initFile, 'r' )
-            cfgVal = json.load( fp )
-            fp.close()
-            ret = self.Export_Installer( cfgVal, initFile )
-            os.system( "rm -rf " + initFile )
-            return ret
 
-        ret = self.Export_InitCfg( initFile )
-        if ret < 0 :
-            return ret
+            if not IsFeatureEnabled( "openssl" ):
+                return ret
 
-        passDlg = PasswordDialog( self )
-        ret = Update_InitCfg( initFile, destPath, passDlg )
-        os.remove( initFile )
-        return ret
+            ret = ConfigWebServer( initFile )
+            if ret < 0:
+                print( "Error failed to config web server " + str(ret))
+                ret = 0
+        finally:
+            if initFile is not None:
+                os.unlink( initFile )
+            return ret
 
     def UpdateConfig( self ) :
         return self.Export_Files( None, self.bServer )
@@ -2803,6 +3743,7 @@ class PasswordDialog(Gtk.Dialog):
         passEditBox.set_visibility( False )
         passEditBox.props.input_purpose = Gtk.InputPurpose.PASSWORD
         grid.attach(passEditBox, startCol + 1, startRow, 1, 1 )
+        passEditBox.connect( 'activate', self.submit)
 
         labelEmpty = Gtk.Label()
         labelEmpty.set_xalign(.5)
@@ -2814,18 +3755,22 @@ class PasswordDialog(Gtk.Dialog):
         box.add(grid)
         self.show_all()
 
-    def runDlg( self )->Tuple[ int, int ]:
+    def runDlg( self )->Tuple[ int, str ]:
         ret = 0
         response = self.run()
         passwd = None
         if response != Gtk.ResponseType.OK:
-            self.destroy()
             ret = -errno.EINVAL
         else:
             passwd = self.passEdit.get_text()
-            self.destroy()
             ret = 0
+        self.destroy()
+        if not IsValidPassword( passwd ):
+            return ( -errno.EINVAL, None )
         return ( ret, passwd )
+
+    def submit( self, entry ):
+        self.response( Gtk.ResponseType.OK )
 
 import getopt
 def usage():
@@ -2863,6 +3808,7 @@ def main() :
             if ret < 0 :
                 continue
         elif response == Gtk.ResponseType.YES:
+            #Save As
             dialog = Gtk.FileChooserDialog(
                 title="Please choose a directory",
                 parent=win,
@@ -2881,9 +3827,10 @@ def main() :
             if path is None:
                 continue
             win.strCfgPath = path
-            win.Export_Files(path, win.bServer)
+            win.Export_Installer(path, win.bServer)
             continue
         elif response == Gtk.ResponseType.APPLY:
+            #Load Another Config File
             dialog = Gtk.FileChooserDialog(
                 title="Please choose a directory",
                 parent=win,
@@ -2895,9 +3842,13 @@ def main() :
                 Gtk.ResponseType.OK,
             )
             response = dialog.run()
-            path = '.'
+            path = None 
             if response == Gtk.ResponseType.OK:
                 path = dialog.get_filename()
+            dialog.destroy()
+            dialog = None
+            if path is None:
+                continue
             drvCfgPath = path + "/" + "driver.json"
             try:
                 fp = open( drvCfgPath, "r" )
@@ -2908,10 +3859,10 @@ def main() :
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                 second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
                 win.DisplayError( text, second_text )
-                dialog.destroy()
+                if dialog is not None:
+                    dialog.destroy()
                 continue
 
-            dialog.destroy()
             win.strCfgPath = path
             win.ReinitDialog( path )
             continue

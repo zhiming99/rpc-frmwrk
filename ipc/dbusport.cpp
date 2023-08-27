@@ -148,12 +148,14 @@ gint32 NormalizeIpAddr(
     return ret;
 }
 
-gint32 NormalizeIpAddrEx(
+gint32 NormalizeIpAddrEx2(
     const stdstr& strAddr,
-    stdstr& strRet )
+    stdstr& strRet,
+    bool& bDomain )
 {
     gint32 ret = 0;
-    if( strAddr.empty() )
+    if( strAddr.empty() ||
+        strAddr.size() > REG_MAX_NAME )
         return -EINVAL;
 
     do{
@@ -176,6 +178,7 @@ gint32 NormalizeIpAddrEx(
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
 
+        // address lookup
         ret = getaddrinfo( strAddr.c_str(),
             nullptr, &hints, &result );
         if( ret < 0 )
@@ -200,9 +203,19 @@ gint32 NormalizeIpAddrEx(
         }
         strRet = szRet;
         freeaddrinfo( result );
+        bDomain = true;
 
     }while( 0 );
     return ret;
+}
+
+gint32 NormalizeIpAddrEx(
+    const stdstr& strAddr,
+    stdstr& strRet )
+{
+    bool bDomain = false;
+    return NormalizeIpAddrEx2(
+        strAddr, strRet, bDomain );
 }
 
 /**

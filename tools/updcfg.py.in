@@ -7,6 +7,8 @@ from copy import deepcopy
 from urllib.parse import urlparse
 from typing import Dict
 from typing import Tuple
+from tempfile import mkstemp
+from updwscfg import IsSudoAvailable, rpcf_system
 import errno
 
 g_passDlg = None
@@ -99,18 +101,13 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 elem.pop( 'DestURL', None )
 
     except Exception as err:
-        pass
+        print( "Error UpdateTestCfg", file=sys.stderr )
 
     return
 
 def tempname()->str:
-    strPrefix = "/tmp/rpcfgtmp"
-    for i in range( 10000 ):
-        strName = strPrefix + str( i )
-        if not os.access( strName, os.R_OK ):
-            break
-    if i >= 10000:
-        return ""
+    f, strName = mkstemp( prefix='rpcfgtmp', dir='/tmp')
+    os.close(f)
     return strName
 
 def OverwriteJsonFile( strPath : str, jsonVal )->int:
@@ -143,57 +140,47 @@ def OverwriteJsonFile( strPath : str, jsonVal )->int:
             ret = -errno.EEXIST
             return ret
 
-        fp = open( tempfile, "w" )
         bRemove = True
+        fp = open( tempfile, "w" )
         json.dump( jsonVal, fp, indent=4)
         fp.close()
-        ret = os.system( "which sudo > /dev/null" )
-        bSudo = True
-        if ret != 0:
-            bSudo = False
+        bSudo = IsSudoAvailable()
         if bCmdLine :
             if bSudo:
                 strCmd = "sudo cp " + tempfile + " " + strPath
-                ret = os.system( strCmd )
+                ret = rpcf_system( strCmd )
             else:
                 strCmd = "su -c 'cp " + tempfile + " " + strPath + "'"
-                ret = os.system( strCmd )
+                ret = rpcf_system( strCmd )
 
             return ret
 
         if bSudo:
             strCmd = "sudo -n cp " + tempfile + " " + strPath
-            ret = os.system( strCmd )
+            ret = rpcf_system( strCmd )
         else:
             strCmd = "su -c 'cp " + tempfile + " " + strPath + "'"
-            ret = os.system( strCmd )
+            ret = rpcf_system( strCmd )
 
         if ret == 0 :
             return ret
 
-        ret, passwd = g_passDlg.runDlg()
-        if ret != 0:
-            return ret
-
         if bSudo:
-            strCmd = "echo " + passwd + "| sudo -S cp " + tempfile + \
+            strCmd = "sudo cp " + tempfile + \
                 " " + strPath 
-            ret = os.system( strCmd )
+            ret = rpcf_system( strCmd )
         else:
             ret = errno.ENOTSUP
 
         if ret == 0 :
             return ret
 
-        if ret > 0:
-            ret = -ret
-
     except Exception as err:
         if ret == 0:
             ret = -errno.EFAULT
     finally:
         if bRemove:
-            os.system( "rm " + tempfile )
+            os.unlink( tempfile )
 
     return ret
 
@@ -867,7 +854,11 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         initCfg = json.load( fp )
         fp.close()
 
-        strVal = initCfg[ 'IsServer' ]
+        if 'InstToSvr' in initCfg:
+            strVal = initCfg[ 'InstToSvr' ]
+        else:
+            strVal = initCfg[ 'IsServer' ]
+
         if strVal == 'true' :
             bServer = True
         elif strVal == 'false' :

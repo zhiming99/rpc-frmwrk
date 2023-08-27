@@ -6374,8 +6374,6 @@ gint32 CImplClassFactory::Output()
             vecActStructs.push_back( elem );
         }
 
-        NEW_LINE;
-
         if( g_bMklib && bFuse )
             Wa( "extern void InitMsgIds();" );
 
@@ -6459,8 +6457,24 @@ gint32 CImplMainFunc::EmitInitRouter(
         CCOUT << "std::string strRtName = \""
             << g_strAppName << "_rt_\";";
         NEW_LINE;
+#ifdef KRB5
+        if( bProxy )
+        {
+            Wa( "if( !g_bKProxy )" );
+            Wa( "    pSvc->SetRouterName( strRtName +" );
+            Wa( "        std::to_string( getpid() ) );" );
+            Wa( "else" );
+            Wa( "    pSvc->SetRouterName( MODNAME_RPCROUTER );" );
+        }
+        else
+        {
+            Wa( "pSvc->SetRouterName( strRtName +" );
+            Wa( "    std::to_string( getpid() ) );" );
+        }
+#else
         Wa( "pSvc->SetRouterName( strRtName +" );
         Wa( "    std::to_string( getpid() ) );" );
+#endif
         Wa( "std::string strDescPath;" ); 
         Wa( "if( g_strRtDesc.size() )" );
         Wa( "    strDescPath = g_strRtDesc;" );
@@ -6536,23 +6550,27 @@ void CImplMainFunc::EmitRtUsage(
 #ifdef FUSE3
     if( !bProxy || bFuse )
         Wa( "    \"\\t [ -m <mount point> to export runtime information via "
-            "'rpcfs' at the directory 'mount point' ]\\n\"" );
+            "'rpcfs' at the directory 'mount point'. ]\\n\"" );
 #endif
 #ifdef AUTH
-    Wa( "    \"\\t [ -a to enable authentication ]\\n\"" );
+    Wa( "    \"\\t [ -a to enable authentication. ]\\n\"" );
 #endif
-    Wa( "    \"\\t [ -d to run as a daemon ]\\n\"" );
+    Wa( "    \"\\t [ -d to run as a daemon. ]\\n\"" );
     if( g_bBuiltinRt )
     {
         if( bProxy )
         {
             Wa( "    \"\\t [ -i <ip address> to specify the destination ip address. ]\\n\"" );
-            Wa( "    \"\\t [ -p <port number> to specify the tcp port number to ]\\n\"" );
+            Wa( "    \"\\t [ -p <port number> to specify the tcp port number to. ]\\n\"" );
+#ifdef KRB5
+            Wa( "    \"\\t [ -k to run as a kinit proxy. ]\\n\"" );
+            Wa( "    \"\\t [ -l <user name> login with the user name and then quit. ]\\n\"" );
+#endif
         }
         else
         {
-            Wa( "    \"\\t [ -i <ip address> to specify the ip address to bind ]\\n\"" );
-            Wa( "    \"\\t [ -p <port number> to specify the tcp port number to listen on ]\\n\"" );
+            Wa( "    \"\\t [ -i <ip address> to specify the ip address to bind. ]\\n\"" );
+            Wa( "    \"\\t [ -p <port number> to specify the tcp port number to listen on. ]\\n\"" );
         }
         Wa( "    \"\\t [ --driver <path> to specify the path to the customized 'driver.json'. ]\\n\"" );
         Wa( "    \"\\t [ --objdesc <path> to specify the path to the object description file. ]\\n\"" );
@@ -6914,6 +6932,35 @@ gint32 CImplMainFunc::EmitUpdateCfgs(
     return ret;
 }
 
+void CImplMainFunc::EmitKProxyLoop(
+    CCppWriter* m_pWriter )
+{
+    Wa( "#include <signal.h>" );
+    Wa( "#include <stdlib.h>" );
+    Wa( "std::atomic< bool > s_bExit( false );" );
+    Wa( "void SignalHandler( int signum )" );
+    Wa( "{ s_bExit = true; }" );
+    NEW_LINE;
+
+    Wa( "int KProxyLoop()" );
+    BLOCK_OPEN;
+    Wa( "if( g_strUserName.size() )" );
+    BLOCK_OPEN;
+    Wa( "std::string strCmd = \"kinit -ki \";" );
+    Wa( "strCmd += g_strUserName;" );
+    Wa( "gint32 ret = system( strCmd.c_str() );" );
+    Wa( "return -ret;" );
+    BLOCK_CLOSE;
+    NEW_LINE;
+    Wa( "signal( SIGINT, SignalHandler );" );
+    Wa( "while( !s_bExit )" );
+    Wa( "    sleep( 3 );" );
+    Wa( "printf( \"\\n\" );" );
+    CCOUT << "return 0;";
+    BLOCK_CLOSE;
+    NEW_LINE;
+}
+
 gint32 CImplMainFunc::EmitRtMainFunc(
     bool bProxy, CCppWriter* m_pWriter )
 {
@@ -6925,6 +6972,11 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         {
             Wa( "#include <getopt.h>" );
             Wa( "#include <sys/stat.h>" );
+
+#ifdef KRB5
+            if( bProxy )
+                EmitKProxyLoop( m_pWriter );
+#endif
         }
         Wa( "int _main( int argc, char** argv);" );
 
@@ -6942,7 +6994,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             if( !bProxy )
                 strOpt = "hadm:i:p:"; 
             else
-                strOpt = "hadi:p:";
+                strOpt = "hadkl:i:p:";
             Wa( "gint32 iOptIdx = 0;" );
             Wa( "struct option arrLongOptions[] = {" );
             Wa( "    {\"driver\",   required_argument, 0,  0 }," );
@@ -7045,15 +7097,16 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             CCOUT << "case 'i':";
             INDENT_UPL;
             Wa( "{" );
-            Wa( "    std::string strIpRaw = optarg;" );
+            Wa( "    std::string strTemp;" );
             Wa( "    ret = NormalizeIpAddrEx(" );
-            Wa( "        strIpRaw, g_strIpAddr );" );
+            Wa( "        optarg, strTemp );" );
             Wa( "    if( ERROR( ret ) )" );
             Wa( "    {" );
             Wa( "        ret = -EINVAL;" );
             Wa( "        fprintf( stderr," );
             Wa( "            \"Error invalid ip address.\\n\" );" );
             Wa( "    }" );
+            Wa( "    g_strIpAddr = optarg;" );
             Wa( "    break;" );
             CCOUT << "}";
             INDENT_DOWNL;
@@ -7072,6 +7125,32 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    break;" );
             CCOUT << "}";
             INDENT_DOWNL;
+            if( bProxy )
+            {
+#ifdef KRB5
+                Wa( "case 'l':" );
+                CCOUT << "case 'k':";
+                INDENT_UPL;
+                Wa( "{" );
+                Wa( "    g_bKProxy = true;" );
+                Wa( "    if( opt == 'l' )" );
+                Wa( "        g_strUserName = optarg;" );
+                Wa( "    break;" );
+                CCOUT << "}";
+                INDENT_DOWNL;
+#else
+                Wa( "case 'l':" );
+                CCOUT << "case 'k':";
+                INDENT_UPL;
+                Wa( "{" );
+                Wa( "    fprintf( stderr," );
+                Wa( "        \"Error '-k' are not available in this build\\n\" );" );
+                Wa( "    ret = -EINVAL;" );
+                Wa( "    break;" );
+                CCOUT << "}";
+                INDENT_DOWNL;
+#endif
+            }
         }
 #ifdef AUTH
         Wa( "case 'a':" );
@@ -7081,7 +7160,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         INDENT_UPL;
         Wa( "{" );
         Wa( "    fprintf( stderr," );
-        Wa( "        \"Error '-a' cannot be used with AUTH disabled\\n\" );" );
+        Wa( "        \"Error '-a' are not available in this build\\n\" );" );
         Wa( "    ret = -EINVAL;" );
         Wa( "    break;" );
         CCOUT << "}";
@@ -7134,6 +7213,19 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             NEW_LINE;
             break;
         }
+
+#ifdef KRB5
+        if( bProxy )
+        {
+            Wa( "if( !g_bAuth && g_bKProxy )" );
+            BLOCK_OPEN;
+            Wa( "fprintf( stderr," );
+            Wa( "    \"Error '-k' is only valid with '-a' option.\\n\" );" );
+            CCOUT << "ret = -EINVAL;";
+            BLOCK_CLOSE;
+            NEW_LINE;
+        }
+#endif
 
         Wa( "if( true )" );
         BLOCK_OPEN;
@@ -7257,6 +7349,13 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "static std::string g_strIpAddr;" );
             Wa( "static std::string g_strPortNum;" );
             Wa( "static bool g_bAuth = false;" );
+#ifdef KRB5
+            if( bProxy )
+            {
+                Wa( "static bool g_bKProxy = false;" );
+                Wa( "static std::string g_strUserName;" );
+            }
+#endif
             Wa( "static ObjPtr g_pRouter;" );
             Wa( "char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};" );
             NEW_LINE; 
@@ -7358,7 +7457,17 @@ gint32 CImplMainFunc::EmitInitContext(
         NEW_LINE;
 
         if( g_bBuiltinRt )
+        {
+#ifdef KRB5
+            if( bProxy )
+            {
+                Wa( "if( g_bKProxy )" );
+                Wa( "    pSvc->SetCmdLineOpt(" );
+                Wa( "        propKProxy, g_bKProxy );" );
+            }
+#endif
             EmitInitRouter( bProxy, m_pWriter );
+        }
 
         BLOCK_CLOSE;
         CCOUT << "while( 0 );";
@@ -7639,10 +7748,22 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         NEW_LINE;
         Wa( "ret = InitContext();" );
         CCOUT << "if( ERROR( ret ) )";
-        INDENT_UPL;
-        CCOUT << "break;";
-        INDENT_DOWNL;
         NEW_LINE;
+        CCOUT << "    break;";
+        NEW_LINE;
+
+#ifdef KRB5
+        if( g_bBuiltinRt && bProxy )
+        {
+            Wa( "if( g_bKProxy )" );
+            BLOCK_OPEN;
+            Wa( "ret = KProxyLoop();" );
+            CCOUT << "break;";
+            BLOCK_CLOSE;
+        }
+#endif
+
+        NEW_LINES( 2 );
         CCOUT << "CRpcServices* pSvc = nullptr;";
         NEW_LINE;
         Wa( "InterfPtr pIf;" );
@@ -7929,7 +8050,14 @@ gint32 CImplMainFunc::Output()
             {
                 Wa( "ObjPtr g_pIoMgr;" );
 #ifdef FUSE3
-                if( g_bBuiltinRt && !bProxy )
+                // NOTE: although the proxy program
+                // does not need g_setMsgIds, but it
+                // links with libfuseif.so which
+                // requires g_setMsgIds. It is strange
+                // that gcc 12 can successfully link
+                // without g_setMsgIds for the client
+                // program, but gcc 13 fails.
+                if( g_bBuiltinRt )
                     Wa( "std::set< guint32 > g_setMsgIds;" );
 #endif
             }
