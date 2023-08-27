@@ -594,10 +594,10 @@ class ConfigDlg(Gtk.Dialog):
             "Reload settings from another driver.json.")
 
         self.bServer = bServer
-        self.hasGmSSL=IsFeatureEnabled( "gmssl" )
-        self.hasOpenSSL=IsFeatureEnabled( "openssl" )
+        self.hasGmSSL = IsFeatureEnabled( "gmssl" )
+        self.hasOpenSSL = IsFeatureEnabled( "openssl" )
         self.hasSSL = ( self.hasGmSSL or self.hasOpenSSL ) 
-        self.hasAuth=IsFeatureEnabled( "krb5" )
+        self.hasAuth = IsFeatureEnabled( "krb5" )
 
         confVals = self.RetrieveInfo()
         self.confVals = confVals
@@ -1570,7 +1570,7 @@ class ConfigDlg(Gtk.Dialog):
                 button.props.active = True
                 return
         elif name == 'Auth' :
-            if IsFeatureEnabled( 'krb5' ):
+            if IsFeatureEnabled( "krb5" ):
                 self.ToggleAuthControls( bActive )
             return
         elif name == 'GmSSL' or name == 'VerifyPeer':
@@ -1597,7 +1597,7 @@ class ConfigDlg(Gtk.Dialog):
                 button.props.active = True
                 return
     def on_selection_changed(self, widget):
-        if not IsFeatureEnabled( 'krb5' ):
+        if not IsFeatureEnabled( "krb5" ):
             return
         it = widget.get_active_iter()
         if it is not None:

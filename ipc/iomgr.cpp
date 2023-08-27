@@ -2668,7 +2668,20 @@ gint32 UpdateObjDesc(
             oCfg.GetStrProp( 108, strSaInst );
 
         stdstr strIpAddr;
-        oCfg.GetStrProp( 109, strIpAddr );
+        stdstr strRawAddr;
+        ret = oCfg.GetStrProp( 109, strRawAddr );
+        bool bDomain = false;
+        if( SUCCEEDED( ret ) )
+        {
+            ret = NormalizeIpAddrEx2(
+                strRawAddr, strIpAddr, bDomain );
+            if( ERROR( ret ) )
+            {
+                DebugPrintEx( logErr, ret,
+                    "Error invalid IP address" );
+                break;
+            }
+        }
 
         stdstr strPort;
         oCfg.GetStrProp( 110, strPort );
@@ -2709,6 +2722,25 @@ gint32 UpdateObjDesc(
                     oElem.removeMember(
                         JSON_ATTR_AUTHINFO );
                     bChanged = true;
+                }
+                if( oElem.isMember(
+                    JSON_ATTR_AUTHINFO) && bAuth )
+                {
+                    Json::Value& oAuth =
+                        oElem[ JSON_ATTR_AUTHINFO ];
+                    if( !oAuth.isMember( JSON_ATTR_SVCNAME ) ||
+                        !oAuth[ JSON_ATTR_SVCNAME ].isString() )
+                        continue;
+                    Json::Value& oSvc =
+                        oAuth[ JSON_ATTR_SVCNAME ];
+                    stdstr strSvc = oSvc.asString();
+                    size_t pos = strSvc.find_first_of( '@' );
+                    if( pos != std::string::npos )
+                        strSvc.erase( pos );
+                    strSvc.push_back( '@' );
+                    // built a new svc-host address
+                    strSvc += strRawAddr;
+                    oSvc = strSvc;
                 }
             }
             if( ERROR( ret ) )
@@ -2889,7 +2921,19 @@ gint32 UpdateDrvCfg(
             break;
 
         stdstr strIpAddr;
-        oCfg.GetStrProp( 109, strIpAddr );
+        stdstr strRawAddr;
+        ret = oCfg.GetStrProp( 109, strRawAddr );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = NormalizeIpAddrEx(
+                strRawAddr, strIpAddr );
+            if( ERROR( ret ) )
+            {
+                DebugPrintEx( logErr, ret,
+                    "Error invalid ip address" );
+                break;
+            }
+        }
 
         stdstr strPort;
         oCfg.GetStrProp( 110, strPort );

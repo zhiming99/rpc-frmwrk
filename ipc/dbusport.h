@@ -44,6 +44,11 @@ gint32 NormalizeIpAddrEx(
     const stdstr& strAddr,
     stdstr& strRet );
 
+gint32 NormalizeIpAddrEx2(
+    const stdstr& strAddr,
+    stdstr& strRet,
+    bool& bDomain );
+
 gint32 IpAddrToByteStr(
     const std::string& strIpAddr,
     std::string& strRet );

@@ -172,15 +172,16 @@ int main( int argc, char** argv )
                 }
             case 'i':
                 {
-                    std::string strIpRaw = optarg;
+                    std::string strTemp;
                     ret = NormalizeIpAddrEx(
-                        strIpRaw, g_strIpAddr );
+                        optarg, strTemp );
                     if( ERROR( ret ) )
                     {
                         ret = -EINVAL;
                         fprintf( stderr,
                             "Error invalid ip address.\n" );
                     }
+                    g_strIpAddr = optarg;
                     break;
                 }
             case 'p':

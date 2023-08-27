@@ -7097,15 +7097,16 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             CCOUT << "case 'i':";
             INDENT_UPL;
             Wa( "{" );
-            Wa( "    std::string strIpRaw = optarg;" );
+            Wa( "    std::string strTemp;" );
             Wa( "    ret = NormalizeIpAddrEx(" );
-            Wa( "        strIpRaw, g_strIpAddr );" );
+            Wa( "        optarg, strTemp );" );
             Wa( "    if( ERROR( ret ) )" );
             Wa( "    {" );
             Wa( "        ret = -EINVAL;" );
             Wa( "        fprintf( stderr," );
             Wa( "            \"Error invalid ip address.\\n\" );" );
             Wa( "    }" );
+            Wa( "    g_strIpAddr = optarg;" );
             Wa( "    break;" );
             CCOUT << "}";
             INDENT_DOWNL;
