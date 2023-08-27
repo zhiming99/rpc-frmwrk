@@ -2,7 +2,8 @@
 The authentication process is the process to allow only valid users to access the rpc-frmwrk's service.
 Currently the rpc-frmwrk relies only on the `Kerberos 5` authentication framework. In the future, 
 we will add more authentication approaches besides the `Kerberos 5`. This document also tries to give some
-cookbook guide for users with no experience to `Kerberos` in advance.
+cookbook guide for users with no experience to `Kerberos` in advance. If you are timid about reading through
+the long document, please scroll to the bottom for some magic solution.
 
 #### What does `Kerberos 5` do in rpc-frmwrk?
 The following are some services, `Kerberos` can provides, and of course, it can provide far more
@@ -140,6 +141,7 @@ to work with `rpc-frmwrk` on such a simple network.
 3. If the service ticket expires, the session will ends in 10 minutes.
 4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
 5. Make sure the firewall not block the `kerberos` ports, especially port 88 on your `kdc` machine, for the access from service servers.
-
+##### 6. Using rpcfg.py 
+1. [`rpcfg.py`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool) has some useful buttons on the `security page` to make the learning process much easier to initialize the kerberos environment. The taget use case is a small business environment, where the simple authentication is enough to meet the user's requiremnt. If this is the case, deploying a working environment can be as fast as within a few minutes. 
 
 
