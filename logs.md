@@ -1,4 +1,11 @@
 ---
+[`Tue Aug 27 2023 08:59:30 PM Beijing`]   
+1. Merged the branch `autocfg-websock-and-kerberos` to the master. We have officially finished this pull request. And this release has delivered the following features:
+   * To automatically configure `nginx` and `apache` and install `SSL` keys for rpc-frmwrk to communicate via secured websocket connection
+   * To automatically configure the `Kerberos` server, create service principals and user principals, deploy the keytab and rewrite the krb5.conf, and enable `kinit` proxy, to put the `Kerberos` ready for rpc-frmwrk.
+   * To generate installers capable of setting up target server/client host with working Websocket or Kerberos authentication.
+   * Added more command line options for built-in router applications, to cover more scenarios with `Kerberos` authentication enabled.
+   
 [`Tue Aug 22 2023 09:35:55 PM Beijing`]   
 1. We have almost finished the autoconfig of web server and kerberos via rpcfg.py. There is only `enabling kinit proxy` left to complete. I will add it in the next few days. Also some documentation work remains to do for this autoconfig feature.
 
