@@ -1969,10 +1969,11 @@ EOF
             strNames = comps[ 1 ] + " " + \
                 strDomain + " kdc." + strDomain
 
-            strHostEntry = AddEntryToHosts(
-                strIpAddr, strNames )
-            if strHostEntry != "":
-                cmdline += strHostEntry + ";"
+            if not IsNameRegistred( strIpAddr, comps[ 1 ] ):
+                strHostEntry = AddEntryToHosts(
+                    strIpAddr, strNames )
+                if strHostEntry != "":
+                    cmdline += strHostEntry + ";"
 
             cmdline += "{sudo} bash " + tempNewRealm
 
@@ -2220,10 +2221,11 @@ EOF
                     strNewRealm.lower()+ " kdc." + \
                     strNewRealm.lower()
 
-                strCmd = AddEntryToHosts(
-                    strNewKdcIp, strNames )
-                if strCmd != "" :
-                    cmdline += ";" + strCmd
+                if not IsNameRegistred( strNewKdcIp, comps[ 1 ] ):
+                    strCmd = AddEntryToHosts(
+                        strNewKdcIp, strNames )
+                    if strCmd != "" :
+                        cmdline += ";" + strCmd
 
             if len( cmdline ) > 0:
                 cmdline += ";"
@@ -2498,6 +2500,16 @@ EOF
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
         bKrb5 = self.IsKrb5Enabled()
 
+        if IsKinitProxyEnabled():
+            btnText = "Disable KProxy"
+        else:
+            btnText = "Enable KProxy"
+        btnEnaKProxy = Gtk.Button.new_with_label( btnText )
+        btnEnaKProxy.connect("clicked", self.on_enable_kinit_proxy )
+        btnEnaKProxy.set_tooltip_text( "Enable/Disable kinit proxy on this host" )
+        grid.attach( btnEnaKProxy , startCol + 1, startRow + 7, 2, 1 )
+        self.btnEnaKProxy = btnEnaKProxy
+
         if self.bServer:
 
             toolTip = "Initialize a KDC server on this host"
@@ -2507,26 +2519,26 @@ EOF
             updKrb5Btn = Gtk.Button.new_with_label("Update Auth Settings")
             updKrb5Btn.connect("clicked", self.on_update_auth_settings )
             updKrb5Btn.set_tooltip_text( toolTip2 )
-            grid.attach( updKrb5Btn, startCol + 1, startRow + 7, 2, 1 )
+            grid.attach( updKrb5Btn, startCol + 1, startRow + 8, 2, 1 )
             self.updKrb5Btn = updKrb5Btn
 
             initKrb5Btn = Gtk.Button.new_with_label("Initialize KDC")
             initKrb5Btn.connect("clicked", self.on_init_kdc_settings )
             initKrb5Btn.set_tooltip_text( toolTip )
-            grid.attach( initKrb5Btn, startCol + 1, startRow + 8, 2, 1 )
+            grid.attach( initKrb5Btn, startCol + 1, startRow + 9, 2, 1 )
             self.initKrb5Btn = initKrb5Btn
 
             labelNoUpdRpc = Gtk.Label()
             labelNoUpdRpc.set_text("No Change To RPC")
             labelNoUpdRpc.set_xalign(.5)
-            grid.attach(labelNoUpdRpc, startCol + 0, startRow + 9, 1, 1 )
+            grid.attach(labelNoUpdRpc, startCol + 0, startRow + 10, 1, 1 )
             self.labelNoUpdRpc = labelNoUpdRpc
 
             checkNoUpdRpc = Gtk.CheckButton(label="")
             checkNoUpdRpc.props.active = False
             checkNoUpdRpc.connect(
                 "toggled", self.on_button_toggled, "NoUpdRpc")
-            grid.attach( checkNoUpdRpc, startCol + 1, startRow + 9, 1, 1)
+            grid.attach( checkNoUpdRpc, startCol + 1, startRow + 10, 1, 1)
             toolTip3 = "Don't update the settings for rpc-frmwrk after " + \
                 "Initialized KDC or Updated Auth Settings"
             checkNoUpdRpc.set_tooltip_text( toolTip3 )
@@ -2586,16 +2598,6 @@ EOF
         updWsBtn.connect("clicked", self.on_update_ws_settings )
         updWsBtn.set_tooltip_text( "Config the local WebServer" )
         grid.attach( updWsBtn, startCol + 1, startRow + 3, 2, 1 )
-
-        if IsKinitProxyEnabled():
-            btnText = "Disable KProxy"
-        else:
-            btnText = "Enable KProxy"
-        btnEnaKProxy = Gtk.Button.new_with_label( btnText )
-        btnEnaKProxy.connect("clicked", self.on_enable_kinit_proxy )
-        btnEnaKProxy.set_tooltip_text( "Enable/Disable kinit proxy on this host" )
-        grid.attach( btnEnaKProxy , startCol + 1, startRow + 4, 2, 1 )
-        self.btnEnaKProxy = btnEnaKProxy
 
         return
 

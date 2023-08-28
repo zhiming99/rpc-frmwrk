@@ -36,20 +36,35 @@ def CheckPrincipal(
             ret = False
 
     return ret
-    
+
+def ValidateName( hostname : str ) -> bool:
+    if len(hostname) > 255:
+        return False
+    if hostname[-1] == ".":
+        hostname = hostname[:-1] # strip exactly one dot from the right, if present
+    allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
+    return all(allowed.match(x) for x in hostname.split(".")) 
+
+def IsNameRegistred(
+    strIpAddr : str,
+    strName : str ) ->bool:
+    try:
+        if not ValidateName( strName ):
+            return False
+        addrInfo = socket.getaddrinfo(
+            strName, 0,
+            proto=socket.IPPROTO_TCP,
+            type=socket.SOCK_STREAM )
+        for elem in addrInfo:
+            if elem[4][0] == strIpAddr:
+                return True
+    except Exception as err:
+        print( err )
+    return False
+
 def AddEntryToHosts(
     strIpAddr : str,
     strNames : str ) -> str:
-
-    bExist = False
-    pattern = strIpAddr + ".*" + strNames
-    with open('/etc/hosts', 'r') as fp:
-        for line in fp:
-            if re.search( pattern, line, flags=re.IGNORECASE ):
-                bExist = True
-                break
-    if bExist :
-        return ""
 
     cmdline = "{sudo} sh -c 'echo \"" + strIpAddr + '\t' + \
         strNames + "\" >> /etc/hosts'"
@@ -578,15 +593,17 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
                 strSvcHost, strRealm, destPath )
 
         components = strSvcHost.split( '@' )
-        strCmd = AddEntryToHosts(
-            strIpAddr, components[ 1 ] )
-        if len( strCmd ) > 0:
-            cmdline += ";" + strCmd
+        if not IsNameRegistred( components[ 1 ] ):
+            strCmd = AddEntryToHosts(
+                strIpAddr, components[ 1 ] )
+            if len( strCmd ) > 0:
+                cmdline += ";" + strCmd
 
-        strCmd = AddEntryToHosts( strKdcIp,
-            "kdc." + strRealm + " " + strRealm)
-        if len( strCmd ) > 0:
-            cmdline += ";" + strCmd
+        if not IsNameRegistred( strRealm ):
+            strCmd = AddEntryToHosts( strKdcIp,
+                "kdc." + strRealm + " " + strRealm)
+            if len( strCmd ) > 0:
+                cmdline += ";" + strCmd
 
         if os.geteuid() == 0:
             actCmd = cmdline.format( sudo = '' )
