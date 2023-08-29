@@ -470,9 +470,37 @@ class CIfTaskGroup
     gint32 GetTailTask( TaskletPtr& pTail );
     gint32 OnTaskComplete( gint32 iRetVal ) override;
     bool IsStopped( EnumTaskState iState ) const;
+
+    template< class T >
+    gint32 FindTaskByType(
+        TaskletPtr& pTask, T* pHint );
+
+    template< class T >
+    gint32 FindTasksByType(
+        std::vector< TaskletPtr > vecTasks,
+        T* pHint );
 };
 
 typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
+
+template< class T >
+gint32 CIfTaskGroup::FindTaskByType(
+    TaskletPtr& pTask, T* pHint )
+{
+    pHint = nullptr;
+    CStdRTMutex oLock( GetLock() );
+    for( auto elem : m_queTasks )
+    {
+        pHint = elem;
+        if( pHint == nullptr )
+            continue;
+        pTask = elem;
+        break;
+    }
+    if( pHint != nullptr )
+        return STATUS_SUCCESS;
+    return -ENOENT;
+}
 
 class CIfRootTaskGroup
     : public CIfTaskGroup
@@ -575,7 +603,124 @@ class CIfParallelTaskGrp
 
     virtual gint32 RemoveTask( TaskletPtr& pTask );
     gint32 OnCancel( guint32 dwContext );
+
+    template< class T >
+    gint32 FindTaskByType(
+        TaskletPtr& pTask, T* pHint )
+    {
+        pHint = nullptr;
+        CStdRTMutex oLock( GetLock() );
+        for( auto elem : m_setTasks )
+        {
+            pHint = elem;
+            if( pHint == nullptr )
+                continue;
+            pTask = elem;
+            break;
+        }
+        if( pHint != nullptr )
+            return STATUS_SUCCESS;
+        for( auto elem : m_quePendingTasks )
+        {
+            pHint = elem;
+            if( pHint == nullptr )
+                continue;
+            pTask = elem;
+            break;
+        }
+        if( pHint != nullptr )
+            return STATUS_SUCCESS;
+        return -ENOENT;
+    }
+
+    template< class T >
+    gint32 FindTasksByType(
+        std::vector< TaskletPtr > vecTasks, T* pHint )
+    {
+        pHint = nullptr;
+        std::vector< TaskGrpPtr > vecGrps;
+        CStdRTMutex oLock( GetLock() );
+        for( auto elem : m_setTasks )
+        {
+            pHint = elem;
+            CIfTaskGroup* pGrp = elem;
+            if( pHint == nullptr && pGrp == nullptr )
+                continue;
+            if( pHint )
+            {
+                vecTasks.push_back( elem );
+                continue;
+            }
+            vecGrps.push_back( 
+                TaskGrpPtr( pGrp ) );
+        }
+        for( auto elem : m_quePendingTasks )
+        {
+            pHint = elem;
+            CIfTaskGroup* pGrp = elem;
+            if( pHint == nullptr && pGrp == nullptr )
+                continue;
+            if( pHint )
+            {
+                vecTasks.push_back( elem );
+                continue;
+            }
+            vecGrps.push_back( 
+                TaskGrpPtr( pGrp ) );
+        }
+        oLock.Unlock();
+        for( auto elem : vecGrps )
+        {
+            CIfParallelTaskGrp* ppGrp = elem;
+            if( ppGrp )
+                ppGrp->FindTasksByType(
+                    vecTasks, pHint );
+            else
+                elem->FindTasksByType(
+                    vecTasks, pHint );
+        }
+        if( vecTasks.size() )
+            return STATUS_SUCCESS;
+        return -ENOENT;
+    }
 };
+
+template< class T >
+gint32 CIfTaskGroup::FindTasksByType(
+    std::vector< TaskletPtr > vecTasks, T* pHint )
+{
+    pHint = nullptr;
+    std::vector< TaskGrpPtr > vecGrps;
+    CStdRTMutex oLock( GetLock() );
+    for( auto elem : m_queTasks )
+    {
+        pHint = elem;
+        CIfTaskGroup* pGrp = elem;
+        if( pHint == nullptr && pGrp == nullptr )
+            continue;
+        if( pHint )
+        {
+            vecTasks.push_back( elem );
+            continue;
+        }
+        vecGrps.push_back( 
+            TaskGrpPtr( pGrp ) );
+    }
+    oLock.Unlock();
+    for( auto elem : vecGrps )
+    {
+        CIfParallelTaskGrp* ppGrp = elem;
+        if( ppGrp )
+            ppGrp->FindTasksByType(
+                vecTasks, pHint );
+        else
+            elem->FindTasksByType(
+                vecTasks, pHint );
+    }
+    if( vecTasks.size() )
+        return STATUS_SUCCESS;
+    return -ENOENT;
+}
 
 class CIfStartRecvMsgTask
     : public CIfParallelTask
@@ -957,6 +1102,77 @@ class CIfCallbackInterceptor :
     gint32 RunTask();
     gint32 OnTaskComplete( gint32 iRet );
     gint32 OnComplete( gint32 iRet );
+};
+
+#define CHECK_GRP_STATE \
+    CStdRTMutex oTaskLock( GetLock() ); \
+    EnumTaskState iState = GetTaskState(); \
+    if( IsStopped( iState ) ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    } \
+    if( IsCanceling() ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    } \
+    if( !IsRunning() && \
+        iState == stateStarted ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    }
+
+class CIfParallelTaskGrpRfc :
+    public CIfParallelTaskGrp
+{
+    guint32 m_dwMaxRunning = RFC_MAX_REQS;
+    guint32 m_dwMaxPending = RFC_MAX_PENDINGS;
+    std::atomic< guint32 > m_dwTaskAdded;
+    std::atomic< guint32 > m_dwTaskRejected;
+
+    public:
+    typedef CIfParallelTaskGrp super;
+    CIfParallelTaskGrpRfc( const IConfigDb* pCfg );
+
+    gint32 SetLimit(
+        guint32 dwMaxRunning,
+        guint32 dwMaxPending,
+        bool bNoResched = false );
+
+    gint32 GetLimit(
+        guint32& dwMaxRunning,
+        guint32& dwMaxPending ) const;
+
+    inline gint32 GetMaxRunning() const
+    { return m_dwMaxRunning; }
+
+    inline guint32 GetMaxPending() const
+    { return m_dwMaxPending; }
+
+    inline gint32 GetRunningCount() const
+    { return m_setTasks.size() - 1; }
+
+    virtual gint32 RunTaskInternal(
+        guint32 dwContext ) override;
+
+    virtual gint32 OnChildComplete(
+        gint32 ret, CTasklet* pChild ) override;
+
+    gint32 AddAndRun( TaskletPtr& pTask );
+
+    virtual gint32 AppendTask(
+        TaskletPtr& pTask ) override ;
+
+    virtual gint32 InsertTask(
+        TaskletPtr& pTask ) override ;
+
+    inline guint32 GetTaskAdded() const
+    { return m_dwTaskAdded; }
+
+    inline guint32 GetTaskRejected() const
+    { return m_dwTaskRejected; }
 };
 
 }

@@ -778,33 +778,22 @@ gint32 CRpcInterfaceBase::Start()
 gint32 CRpcInterfaceBase::GetParallelGrp(
     TaskGrpPtr& pParaGrp )
 {
+    gint32 ret = 0;
     TaskGrpPtr pRootTaskGrp;
     CIfRootTaskGroup* pRootGrp = nullptr;
 
-    if( true )
-    {
-        pRootTaskGrp = GetTaskGroup();
-        if( pRootTaskGrp.IsEmpty() )
-            return -ENOENT;
+    pRootTaskGrp = GetTaskGroup();
+    if( pRootTaskGrp.IsEmpty() )
+        return -ENOENT;
 
-        // as a guard to the root group
-        pRootGrp = pRootTaskGrp;
-    }
+    // as a guard to the root group
+    pRootGrp = pRootTaskGrp;
 
-    gint32 ret = 0;
-
-    do{
-        std::vector< TaskletPtr > vecTasks;
-        ret = pRootGrp->FindTaskByClsid(
-            clsid( CIfParallelTaskGrp ),
-            vecTasks );
-        if( ERROR( ret ) )
-            break;
-
-        // return the first one
-        pParaGrp = vecTasks.front();
-
-    }while( 0 );
+    TaskletPtr pTask;
+    ret = pRootGrp->FindTaskByType(
+        pTask, ( CIfParallelTaskGrp* )0 );
+    if( SUCCEEDED( ret ) )
+        pParaGrp = pTask;
 
     return ret;
 }

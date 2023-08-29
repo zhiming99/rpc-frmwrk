@@ -5894,4 +5894,320 @@ gint32 CTaskWrapper::OnIrpComplete(
     return 0;
 }
 
+CIfParallelTaskGrpRfc::CIfParallelTaskGrpRfc(
+    const IConfigDb* pCfg )
+    : super( pCfg ),
+      m_dwTaskAdded( 0 ),
+      m_dwTaskRejected( 0 )
+{
+    SetClassId( clsid( CIfParallelTaskGrpRfc ) );
+
+    CCfgOpener oCfg(
+        ( IConfigDb* )GetConfig() );
+    gint32 ret = 0;
+    do{
+        guint32 dwMaxRunning = 0;
+        guint32 dwMaxPending = 0;
+
+        ret = oCfg.GetIntProp(
+            propMaxReqs, dwMaxRunning );
+
+        if( SUCCEEDED( ret ) )
+        {
+            m_dwMaxRunning = dwMaxRunning;
+            oCfg.RemoveProperty( propMaxReqs );
+        }
+
+        ret = oCfg.GetIntProp(
+            propMaxPendings, dwMaxPending );
+
+        if( SUCCEEDED( ret ) )
+        {
+            m_dwMaxPending = dwMaxPending;
+            oCfg.RemoveProperty( propMaxPendings );
+        }
+
+    }while( 0 );
+
+    return;
+}
+
+gint32 CIfParallelTaskGrpRfc::OnChildComplete(
+    gint32 iRet, CTasklet* pChild )
+{
+
+    CStdRTMutex oTaskLock( GetLock() );
+    if( GetRunningCount() > GetMaxRunning() )
+    {
+        TaskletPtr taskPtr = pChild;
+        RemoveTask( taskPtr );
+        return 0;
+    }
+    return super::OnChildComplete( iRet, pChild );
+}
+
+gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
+    guint32 dwContext )
+{
+    CStdRTMutex oTaskLock( GetLock() );
+
+    EnumTaskState iState = GetTaskState();
+    if( IsStopped( iState ) )
+        return  STATUS_PENDING;
+
+    if( IsCanceling() )
+        return STATUS_PENDING;
+
+    if( !IsRunning() &&
+        iState == stateStarted )
+        return STATUS_PENDING;
+
+    CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+    if( IsNoSched() )
+        return STATUS_PENDING;
+
+    if( iState == stateStarting )
+    {
+        SetTaskState( stateStarted );
+        SetRunning( true );
+    }
+
+    if( GetTaskCount() == 0 )
+    {
+        SetRunning( false );
+        return STATUS_SUCCESS;
+    }
+
+    if( GetPendingCount() == 0 )
+        return STATUS_PENDING;
+
+    gint32 iCount =
+        GetMaxRunning() - GetRunningCount();
+
+    if( iCount <= 0 )
+        return STATUS_PENDING;
+
+    gint32 ret = 0;
+    std::deque< TaskletPtr > queTasksToRun;
+
+    do{
+
+
+        iCount = std::min( ( size_t )iCount,
+            ( size_t )GetPendingCount() );
+
+        queTasksToRun.insert(
+            queTasksToRun.begin(),
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.begin() + iCount );
+
+        m_quePendingTasks.erase(
+            m_quePendingTasks.begin(),
+            m_quePendingTasks.begin() + iCount );
+
+        m_setTasks.insert(
+            queTasksToRun.begin(),
+            queTasksToRun.end() );
+
+        SetNoSched( true );
+        oTaskLock.Unlock();
+
+        for( auto pTask : queTasksToRun )
+        {
+            if( !pTask.IsEmpty() )
+                ( *pTask )( eventZero );
+        }
+
+        queTasksToRun.clear();
+        oTaskLock.Lock();
+        SetNoSched( false );
+
+        iCount =
+            GetMaxRunning() - GetRunningCount();
+
+        if( GetPendingCount() > 0 && iCount > 0 )
+        {
+            // there are free slot for more
+            // request
+            continue;
+        }
+
+        if( GetTaskCount() > 0 )
+            ret = STATUS_PENDING;
+
+        break;
+
+    }while( 1 );
+
+    if( ret != STATUS_PENDING )
+        SetRunning( false );
+
+    return ret;
+}
+
+
+gint32 CIfParallelTaskGrpRfc::AddAndRun(
+    TaskletPtr& pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        CHECK_GRP_STATE;
+
+        if( ( gint32 )GetPendingCount() + GetRunningCount() >=
+            ( gint32 )GetMaxPending() + GetMaxRunning() )
+        {
+            m_dwTaskRejected++;
+            ret = ERROR_QUEUE_FULL;
+            DebugPrint( ret,
+                "RFC: queue is full,"
+                " AddAndRun failed" );
+            break;
+        }
+
+        CCfgOpenerObj oCfg( ( CObjBase* )pTask );
+
+        oCfg.SetPointer( propParentTask, this );
+        m_quePendingTasks.push_back( pTask );
+        m_dwTaskAdded++;
+
+        if( IsNoSched() )
+        {
+            pTask->MarkPending();
+            break;
+        }
+
+        if( !IsRunning() ||
+            GetRunningCount() >= GetMaxRunning() )
+        {
+            pTask->MarkPending();
+            break;
+        }
+
+        oTaskLock.Unlock();
+
+        // re-run this task group immediately
+        ret = ( *this )( eventZero );
+        if( pTask->GetError() == STATUS_PENDING )
+            pTask->MarkPending();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::AppendTask(
+    TaskletPtr& pTask )
+{
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        if( ( gint32 )GetPendingCount() + GetRunningCount() >=
+            ( gint32 )GetMaxPending() + GetMaxRunning() )
+        {
+            DebugPrint( ret,
+                "RFC: queue is full,"
+                " append task failed" );
+            ret = ERROR_QUEUE_FULL;
+            m_dwTaskRejected++;
+            break;
+        }
+
+        ret = super::AppendTask( pTask );
+        m_dwTaskAdded++;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::InsertTask(
+    TaskletPtr& pTask )
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        m_dwTaskAdded++;
+
+        CCfgOpenerObj oTaskCfg(
+            ( CObjBase* )pTask );
+
+        oTaskCfg.SetObjPtr(
+            propParentTask, ObjPtr( this ) );
+
+        m_quePendingTasks.push_front( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::GetLimit(
+    guint32& dwMaxRunning,
+    guint32& dwMaxPending ) const
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        dwMaxPending = std::min(
+            m_dwMaxPending, RFC_MAX_PENDINGS );
+
+        dwMaxRunning = std::min(
+            m_dwMaxRunning, RFC_MAX_REQS );
+
+   }while( 0 );
+
+   return ret;
+}
+
+gint32 CIfParallelTaskGrpRfc::SetLimit(
+    guint32 dwMaxRunning,
+    guint32 dwMaxPending,
+    bool bNoResched )
+{
+    if( dwMaxPending == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+
+        m_dwMaxPending = std::min(
+            dwMaxPending, RFC_MAX_PENDINGS );
+
+        m_dwMaxRunning = std::min(
+            dwMaxRunning, RFC_MAX_REQS );
+
+        if( IsNoSched() )
+            break;
+
+        if( bNoResched )
+            break;
+
+        CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
+
+        if( GetRunningCount() < GetMaxRunning() &&
+            GetPendingCount() > 0 )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+
+            CIoManager* pMgr = nullptr;
+            gint32 ret = GET_IOMGR( oCfg, pMgr );
+            if( ERROR( ret ) )
+                break;
+
+            TaskletPtr pThisTask( this );
+            ret = pMgr->RescheduleTask( pThisTask );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
 }
