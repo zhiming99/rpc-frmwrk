@@ -280,7 +280,7 @@ gint32 CIfStartRecvMsgTask2::HandleIncomingMsg2(
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
             &CFastRpcSkelSvrBase::AddAndRunInvTask,
-            pTask, false );
+            pTask );
 
         break;
 
@@ -340,29 +340,29 @@ gint32 CIfStartRecvMsgTask2::OnIrpComplete(
         // whether error or not receiving, we
         // proceed to handle the incoming irp now
         ret = pIrp->GetStatus();
-        if( ret == -EAGAIN )
-            break;
-
-        IrpCtxPtr& pCtx = pIrp->GetTopStack();
-        if( !pCtx->IsNonDBusReq() )
+        if( ret != -EAGAIN )
         {
-            DMsgPtr pMsg = *pCtx->m_pRespData;
-            if( pMsg.IsEmpty() )
+            IrpCtxPtr& pCtx = pIrp->GetTopStack();
+            if( !pCtx->IsNonDBusReq() )
             {
-                ret = -EFAULT;
-                break;
+                DMsgPtr pMsg = *pCtx->m_pRespData;
+                if( pMsg.IsEmpty() )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                HandleIncomingMsg2( pObj, pMsg );
             }
+            else
+            {
+                CfgPtr pCfg;
+                ret = pCtx->GetRespAsCfg( pCfg );
+                if( ERROR( ret ) )
+                    break;
 
-            HandleIncomingMsg2( pObj, pMsg );
-        }
-        else
-        {
-            CfgPtr pCfg;
-            ret = pCtx->GetRespAsCfg( pCfg );
-            if( ERROR( ret ) )
-                break;
-
-            HandleIncomingMsg2( pObj, pCfg );
+                HandleIncomingMsg2( pObj, pCfg );
+            }
         }
 
         do{
@@ -373,14 +373,9 @@ gint32 CIfStartRecvMsgTask2::OnIrpComplete(
             // task
             oParams[ propIfPtr ] = pObj;
             oParams.CopyProp( propMatchPtr, this );
-            oParams.CopyProp( propExtInfo, this );
             ObjPtr pObj = oParams.GetCfg();
 
             ret = this->StartNewRecv( pObj );
-            //
-            // ret = DEFER_CALL( pMgr, ObjPtr( this ),
-            //     &CIfStartRecvMsgTask::StartNewRecv,
-            //     pObj );
 
         }while( 0 );
 
@@ -419,28 +414,34 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
         oParams[ propIfPtr ] = ObjPtr( pIf );
         oParams[ propMatchPtr ] = pMatch;
 
-        // to pass some more information to the new
-        // task
-        oParams.CopyProp( propExtInfo, pCfg );
-
         // start another recvmsg request
         TaskletPtr pTask;
         ret = pTask.NewObj(
             clsid( CIfStartRecvMsgTask2 ),
             oParams.GetCfg() );
-
         if( ERROR( ret ) )
             break;
 
-        CStdRMutex oIfLock( pIf->GetLock() );
-        if( pIf->GetPendingInvCount() >=
-            STM_MAX_PACKETS_REPORT )
+        CIfParallelTaskGrpRfc* pGrpRfc =
+            pIf->GetGrpRfc();
+
+        if( true )
         {
-            pIf->QueueStartTask( pTask );            
-            ret = STATUS_PENDING;
-            break;
+            CStdRTMutex oTaskLock( pGrpRfc->GetLock() );
+            CStdRMutex oIfLock( pIf->GetLock() );
+            bool bQueFull = false;
+            ret = pGrpRfc->IsQueueFull( bQueFull );
+            if( ERROR( ret ) )
+                break;
+
+            if( bQueFull )
+            {
+                ret = pIf->QueueStartTask(
+                    pTask, pMatch );            
+                break;
+            }
         }
-        oIfLock.Unlock();
+
         // add an concurrent task, and run it
         // directly.
         ret = pIf->AddAndRun( pTask, true );
@@ -471,11 +472,25 @@ gint32 CIfInvokeMethodTask2::OnComplete(
 {
     CFastRpcSkelSvrBase* pIf = nullptr;
     CCfgOpener oCfg( ( IConfigDb* )GetConfig() );
-    gint32 ret = oCfg.GetPointer( propIfPtr, pIf );
-    if( SUCCEEDED( ret ) )
+    oCfg.GetPointer( propIfPtr, pIf );
+    if( !oCfg.exist( propQueFull ) ) 
         pIf->NotifyInvTaskComplete();
 
     return super::OnComplete( iRet );
+}
+
+gint32 CFastRpcSkelSvrBase::SetLimit(
+    guint32 dwMaxRunning,
+    guint32 dwMaxPending,
+    bool bNoResched )
+{
+    TaskGrpPtr pGrp;
+    CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
+    if( pGrpRfc )
+        pGrpRfc->SetLimit( dwMaxRunning + 1,
+            dwMaxPending, bNoResched );
+
+    return STATUS_SUCCESS;
 }
 
 gint32 CFastRpcSkelSvrBase::StartRecvTasks(
@@ -487,46 +502,38 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
         return 0;
 
     do{
-        CParamList oParams;
-        ret = oParams.SetObjPtr(
-            propIfPtr, ObjPtr( this ) );
+        CCfgOpenerObj oIfCfg( this );
+        bool bRfcEnabled = false;
+        oIfCfg.GetBoolProp(
+            propEnableRfc, bRfcEnabled );
 
-        if( ERROR( ret  ) )
+        CCfgOpener oCfg;
+        oCfg[ propIfPtr ] = ObjPtr( this );
+        ret = m_pGrpRfc.NewObj(
+            clsid( CIfParallelTaskGrpRfc ),
+            oCfg.GetCfg() );
+        if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oIfCfg( this );
-        bool bRfcEnabled;
-        ret = oIfCfg.GetBoolProp(
-            propEnableRfc, bRfcEnabled );
+        TaskletPtr pPHTask;
+        ret = pPHTask.NewObj(
+            clsid( CIfCallbackInterceptor ),
+            oCfg.GetCfg() );
         if( ERROR( ret ) )
-            bRfcEnabled = false;
+            break;
 
-        EnumClsid iClsid;
-        if( bRfcEnabled ) 
-            iClsid = clsid( CIfStartRecvMsgTask2 );
-        else
-            iClsid = clsid( CIfStartRecvMsgTask );
+        m_pGrpRfc->AppendTask( pPHTask );
 
-        TaskletPtr pRecvMsgTask;
-        for( auto pMatch : vecMatches )
-        {
-            oParams[ propMatchPtr ] =
-                ObjPtr( pMatch );
+        this->SetLimit(
+            STM_MAX_PACKETS_REPORT,
+            0, true );
 
-            ret = pRecvMsgTask.NewObj(
-                iClsid, oParams.GetCfg() );
+        TaskletPtr pTask( m_pGrpRfc );
+        ret = this->AddAndRun( pTask );
+        if( ERROR( ret ) )
+            return ret;
 
-            if( ERROR( ret ) )
-                break;
-
-            ret = AddAndRun( pRecvMsgTask );
-            if( ERROR( ret ) )
-                break;
-
-            if( ret == STATUS_PENDING )
-                ret = 0;
-        }
-
+        ret = super::StartRecvTasks( vecMatches );
         if( ERROR( ret ) )
             break;
 
@@ -536,18 +543,23 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
 }
 
 gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
-    TaskletPtr& pTask,
-    bool bImmediate )
+    TaskletPtr& pTask )
 {
-    CStdRMutex oIfLock( GetLock() );
-    m_dwPendingInv++;
-    oIfLock.Unlock();
-    gint32 ret = AddAndRun( pTask, bImmediate );
+    CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
+    gint32 ret = pGrpRfc->AddAndRun( pTask );
+
+    if( SUCCEEDED( ret ) )
+        return ret;
+
     if( ERROR( ret ) )
     {
-        CStdRMutex oIfLock( GetLock() );
-        m_dwPendingInv--;
-        return ret;
+        CCfgOpener oResp;
+        oResp[ propReturnValue ] = ret;
+        CCfgOpener oTaskCfg( ( IConfigDb* )
+            pTask->GetConfig() );
+        oTaskCfg[ propQueFull ] = true;
+        OnServiceComplete(
+            oResp.GetCfg(), pTask );
     }
     return ret;
 }
@@ -555,20 +567,15 @@ gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
 gint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
 {
     CStdRMutex oIfLock( GetLock() );
-    m_dwPendingInv--;
-    if( m_dwPendingInv < 
-        STM_MAX_PACKETS_REPORT )
+    if( m_queStartTasks.size() > 0  )
     {
-        if( m_queStartTasks.size() > 0  )
-        {
-            TaskletPtr pTask =
-                m_queStartTasks.front();
-            m_queStartTasks.pop_front();
-            oIfLock.Unlock();
-            gint32 ret = AddAndRun( pTask, false );
-            if( ERROR( ret ) )
-                return ret;
-        }
+        TaskletPtr pTask =
+            m_queStartTasks.front().first;
+        m_queStartTasks.pop_front();
+        oIfLock.Unlock();
+        gint32 ret = AddAndRun( pTask, false );
+        if( ERROR( ret ) )
+            return ret;
     }
     return STATUS_SUCCESS;
 }
@@ -1459,6 +1466,30 @@ gint32 CFastRpcSkelSvrBase::OnPreStop(
     }while( 0 );
     return ret;
 }
+
+gint32 CFastRpcSkelSvrBase::QueueStartTask(
+    TaskletPtr& pTask, MatchPtr pMatch )
+{
+    gint32 ret = 0;
+    bool bNoEnt = true;
+    do{
+        for( auto& e : m_queStartTasks )
+        {
+            if( e.second == pMatch->GetObjId() )
+            {
+                bNoEnt = false;
+                break;
+            }
+        }
+        if( bNoEnt )
+            m_queStartTasks.push_back(
+                { pTask, pMatch->GetObjId() } );
+        else
+            ret = -EEXIST;
+    }while( 0 );
+    return ret;
+}
+
 gint32 CFastRpcProxyBase::OnPreStartComplete(
     IEventSink* pCallback,
     IEventSink* pIoReq,
@@ -1623,6 +1654,7 @@ gint32 CFastRpcProxyBase::OnPostStart(
         if( ERROR( ret ) )
             break;
 
+        m_pSkel = pIf;
         m_pSkelObj = pIf;
         ret = pIf->StartEx( pCallback );
 
@@ -1638,10 +1670,10 @@ gint32 CFastRpcProxyBase::OnPreStop(
     if( pCallback == nullptr )
         return -EINVAL;
     do{
-        if( m_pSkelObj.IsEmpty() )
+        if( m_pSkel.IsEmpty() )
             break;
 
-        ret = m_pSkelObj->StopEx(
+        ret = m_pSkel->StopEx(
             pCallback );
 
     }while( 0 );
@@ -1654,10 +1686,8 @@ gint32 CFastRpcProxyBase::OnPostStop(
 {
     gint32 ret = 0;
     do{
-        {
-            CStdRMutex oIfLock( this->GetLock() );
-            m_pSkelObj.Clear();
-        }
+        m_pSkelObj = nullptr;
+        m_pSkel.Clear();
         ObjPtr pDrv;
         auto oDrvMgr = GetIoMgr()->GetDrvMgr();
         ret = oDrvMgr.GetDriver( true,
@@ -1731,7 +1761,7 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
         if( dwBusId != this->GetBusId() )
             break;
 
-        CRpcServices* pSvc = m_pSkelObj;
+        CRpcServices* pSvc = GetStmSkel();
         if( pSvc == nullptr ||
             pSvc->GetPortHandle() != hPort )
             break;
@@ -1745,6 +1775,27 @@ gint32 CFastRpcProxyBase::OnRmtSvrEvent(
     }while( 0 );
 
     return ret;
+}
+
+InterfPtr CFastRpcProxyBase::GetStmSkel() const
+{ return InterfPtr( m_pSkelObj ); }
+
+gint32 CFastRpcServerBase::SetLimit(
+    guint32 dwMaxRunning,
+    guint32 dwMaxPending,
+    bool bNoResched )
+{
+    std::vector< InterfPtr > vecSkels;
+    gint32 ret = EnumStmSkels( vecSkels );
+    if( ERROR( ret ) )
+        return ret;
+    for( auto e : vecSkels )
+    {
+        CFastRpcSkelSvrBase* pSkel = e;
+        pSkel->SetLimit( dwMaxRunning,
+            dwMaxPending, bNoResched );
+    }
+    return STATUS_SUCCESS;
 }
 
 gint32 CFastRpcSkelServerState::SetupOpenPortParams(

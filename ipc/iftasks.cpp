@@ -236,29 +236,29 @@ gint32 CIfStartRecvMsgTask::OnIrpComplete(
         // whether error or not receiving, we
         // proceed to handle the incoming irp now
         ret = pIrp->GetStatus();
-        if( ret == -EAGAIN )
-            break;
-
-        IrpCtxPtr& pCtx = pIrp->GetTopStack();
-        if( !pCtx->IsNonDBusReq() )
+        if( ret != -EAGAIN )
         {
-            DMsgPtr pMsg = *pCtx->m_pRespData;
-            if( pMsg.IsEmpty() )
+            IrpCtxPtr& pCtx = pIrp->GetTopStack();
+            if( !pCtx->IsNonDBusReq() )
             {
-                ret = -EFAULT;
-                break;
+                DMsgPtr pMsg = *pCtx->m_pRespData;
+                if( pMsg.IsEmpty() )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                HandleIncomingMsg( pObj, pMsg );
             }
+            else
+            {
+                CfgPtr pCfg;
+                ret = pCtx->GetRespAsCfg( pCfg );
+                if( ERROR( ret ) )
+                    break;
 
-            HandleIncomingMsg( pObj, pMsg );
-        }
-        else
-        {
-            CfgPtr pCfg;
-            ret = pCtx->GetRespAsCfg( pCfg );
-            if( ERROR( ret ) )
-                break;
-
-            HandleIncomingMsg( pObj, pCfg );
+                HandleIncomingMsg( pObj, pCfg );
+            }
         }
 
         do{
@@ -6210,4 +6210,19 @@ gint32 CIfParallelTaskGrpRfc::SetLimit(
 
     return ret;
 }
+gint32 CIfParallelTaskGrpRfc::IsQueueFull(
+    bool& bFull ) const
+{
+    gint32 ret = 0;
+    do{
+        CHECK_GRP_STATE;
+        if( ( gint32 )GetPendingCount() + GetRunningCount() >=
+            ( gint32 )GetMaxPending() + GetMaxRunning() )
+            bFull = true;
+        else
+            bFull = false;
+    }while( 0 );
+    return ret;
+}
+
 }

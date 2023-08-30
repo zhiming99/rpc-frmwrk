@@ -2255,8 +2255,9 @@ gint32 CImplIfMethodProxy2::OutputEventROSSkel()
             INDENT_DOWN;
         }
         NEW_LINE;
-        Wa( "return ret;" );
+        CCOUT << "return ret;";
         BLOCK_CLOSE;
+        NEW_LINE;
 
     }while( 0 );
 
@@ -3079,6 +3080,7 @@ gint32 CImplServiceImpl2::OutputROS()
             EmitOnPreStart( m_pWriter, m_pNode, true );
             BLOCK_CLOSE;
         }
+        NEW_LINE;
 
     }while( 0 );
 

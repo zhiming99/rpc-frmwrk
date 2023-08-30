@@ -39,8 +39,8 @@ namespace rpcf
 // rpc/gmsslport
 #define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 90 )
 
-// last allocation was from proxy.i
-#define PROPIDS_ALLOCATED   ( propReservedEnd + 130 )
+// last allocation was from fastrpc.h
+#define PROPIDS_ALLOCATED   ( propReservedEnd + 140 )
 
 // iid allocated by rpc/security/secclsid
 #define IID_ALLOCATED    ( clsid( ReservedIidStart ) + 220 )

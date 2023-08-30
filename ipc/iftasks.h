@@ -546,7 +546,7 @@ class CIfParallelTaskGrp
     std::set< TaskletPtr > m_setTasks;
     std::deque< TaskletPtr > m_quePendingTasks;
 
-    guint32 GetPendingCount()
+    guint32 GetPendingCount() const
     { return m_quePendingTasks.size(); }
 
     public:
@@ -1173,6 +1173,8 @@ class CIfParallelTaskGrpRfc :
 
     inline guint32 GetTaskRejected() const
     { return m_dwTaskRejected; }
+
+    gint32 IsQueueFull( bool& bFull ) const;
 };
 
 }

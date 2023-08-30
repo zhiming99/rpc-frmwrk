@@ -47,6 +47,12 @@
 namespace rpcf
 {
 
+typedef enum : guint32
+{
+    propQueFull = propReservedEnd + 131,
+
+} EnumFastRpcPropId;
+
 struct FASTRPC_MSG
 {
     guint32 m_dwSize = 0;
@@ -1175,12 +1181,19 @@ class CFastRpcServerBase :
 
     inline void SetBusId( guint32 dwBusId )
     { m_dwBusId = dwBusId; }
+
+    gint32 SetLimit(
+        guint32 dwMaxRunning,
+        guint32 dwMaxPending,
+        bool bNoResched );
 };
 
+class CFastRpcSkelProxyBase;
 class CFastRpcProxyBase :
     public virtual IFBASE3( true )
 {
-    InterfPtr m_pSkelObj;
+    InterfPtr m_pSkel;
+    std::atomic< CFastRpcSkelProxyBase* > m_pSkelObj;
     std::atomic< guint32 > m_dwSeqNo;
     guint32 m_dwBusId = 0xFFFFFFFF;
 
@@ -1193,7 +1206,7 @@ class CFastRpcProxyBase :
     typedef IFBASE3( true ) super;
 
     CFastRpcProxyBase( const IConfigDb* pCfg ):
-        super( pCfg ) 
+        super( pCfg ), m_pSkelObj( nullptr ) 
     {}
 
     inline gint32 NewSeqNo()
@@ -1219,11 +1232,7 @@ class CFastRpcProxyBase :
         IConfigDb* pEvtCtx,
         HANDLE hPort ) override;
 
-    InterfPtr GetStmSkel() const
-    {
-        CStdRMutex oLock( this->GetLock() );
-        return m_pSkelObj;
-    }
+    InterfPtr GetStmSkel() const;
 
     guint32 GetBusId() const
     { return m_dwBusId; }
@@ -1451,24 +1460,28 @@ class CFastRpcSkelSvrBase :
     public CFastRpcSkelBase< false >
 {
     guint32 m_dwPendingInv = 0;
-    std::deque< TaskletPtr > m_queStartTasks;
+    std::deque< std::pair< TaskletPtr, guint64 > > m_queStartTasks;
+    guint32 m_dwReservedSlots = 1;
+    TaskGrpPtr m_pGrpRfc;
 
     public:
     typedef CFastRpcSkelBase< false > super;
     CFastRpcSkelSvrBase( const IConfigDb* pCfg )
-        : super( pCfg )
+        : super( pCfg ), m_pGrpRfc( nullptr, false )
     {}
+
+    inline TaskGrpPtr GetGrpRfc() const
+    { return m_pGrpRfc; }
 
     gint32 NotifySkelReady( PortPtr& pPort );
     inline guint32 GetPendingInvCount() const
     { return m_dwPendingInv; }
 
-    inline void QueueStartTask( TaskletPtr& pTask )
-    { m_queStartTasks.push_back( pTask ); }
+    gint32 QueueStartTask( TaskletPtr& , MatchPtr );
 
     gint32 AddAndRunInvTask(
-        TaskletPtr& pTask,
-        bool bImmediate = false );
+        TaskletPtr& pTask );
+
     gint32 NotifyInvTaskComplete();
 
     gint32 StartRecvTasks(
@@ -1487,6 +1500,11 @@ class CFastRpcSkelSvrBase :
 
     gint32 OnPreStop(
         IEventSink* pCallback ) override;
+
+    gint32 SetLimit(
+        guint32 dwMaxRunning,
+        guint32 dwMaxPending,
+        bool bNoResched = false );
 };
 
 #define SUM_COUNTER( _dest, _src, _prop, _type ) \
