@@ -2731,6 +2731,9 @@ gint32 UpdateObjDesc(
                     if( !oAuth.isMember( JSON_ATTR_SVCNAME ) ||
                         !oAuth[ JSON_ATTR_SVCNAME ].isString() )
                         continue;
+                    if( strRawAddr.empty() )
+                        continue;
+                    bChanged = true;
                     Json::Value& oSvc =
                         oAuth[ JSON_ATTR_SVCNAME ];
                     stdstr strSvc = oSvc.asString();
