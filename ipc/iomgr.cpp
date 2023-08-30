@@ -2713,8 +2713,7 @@ gint32 UpdateObjDesc(
                     continue;
                 if( !oElem.isObject() )
                     continue;
-                if( !oElem.isMember(
-                    JSON_ATTR_AUTHINFO ) && bAuth )
+                if( !oElem.isMember( JSON_ATTR_AUTHINFO ) )
                     continue;
                 if( oElem.isMember(
                     JSON_ATTR_AUTHINFO) && !bAuth )
@@ -2723,15 +2722,14 @@ gint32 UpdateObjDesc(
                         JSON_ATTR_AUTHINFO );
                     bChanged = true;
                 }
-                if( oElem.isMember(
-                    JSON_ATTR_AUTHINFO) && bAuth )
+                else //( isMember( JSON_ATTR_AUTHINFO ) && bAuth )
                 {
+                    if( strRawAddr.empty() )
+                        continue;
                     Json::Value& oAuth =
                         oElem[ JSON_ATTR_AUTHINFO ];
                     if( !oAuth.isMember( JSON_ATTR_SVCNAME ) ||
                         !oAuth[ JSON_ATTR_SVCNAME ].isString() )
-                        continue;
-                    if( strRawAddr.empty() )
                         continue;
                     bChanged = true;
                     Json::Value& oSvc =
