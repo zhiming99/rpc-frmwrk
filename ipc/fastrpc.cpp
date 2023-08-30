@@ -507,6 +507,13 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
         oIfCfg.GetBoolProp(
             propEnableRfc, bRfcEnabled );
 
+        if( !bRfcEnabled )
+        {
+            ret = super::StartRecvTasks(
+                vecMatches );
+            break;
+        }
+
         CCfgOpener oCfg;
         oCfg[ propIfPtr ] = ObjPtr( this );
         ret = m_pGrpRfc.NewObj(
