@@ -9,6 +9,8 @@ import re
 
 def IsValidPassword(
     password : str ) -> bool:
+    if password is None:
+        return False
     ret = re.match( "^[a-zA-Z0-9#?!@$%^&*-]{2,}$", password )
     if ret is None:
         return False

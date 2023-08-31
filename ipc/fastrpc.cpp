@@ -503,10 +503,11 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
 
     do{
         CCfgOpenerObj oIfCfg( this );
-        bool bRfcEnabled = false;
+        bool bRfcEnabled = true;
         oIfCfg.GetBoolProp(
             propEnableRfc, bRfcEnabled );
 
+        bRfcEnabled = true;
         if( !bRfcEnabled )
         {
             ret = super::StartRecvTasks(
@@ -514,6 +515,7 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
             break;
         }
 
+        OutputMsg( 0, "Rfc enabled" );
         CCfgOpener oCfg;
         oCfg[ propIfPtr ] = ObjPtr( this );
         ret = m_pGrpRfc.NewObj(

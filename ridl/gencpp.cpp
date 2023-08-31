@@ -6974,7 +6974,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "#include <sys/stat.h>" );
 
 #ifdef KRB5
-            if( bProxy )
+            if( bProxy && !bFuseP )
                 EmitKProxyLoop( m_pWriter );
 #endif
         }
@@ -6993,6 +6993,8 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             stdstr strOpt;
             if( !bProxy )
                 strOpt = "hadm:i:p:"; 
+            else if( bFuseP )
+                strOpt = "hadkm:i:p:"; 
             else
                 strOpt = "hadkl:i:p:";
             Wa( "gint32 iOptIdx = 0;" );
@@ -7128,13 +7130,19 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             if( bProxy )
             {
 #ifdef KRB5
-                Wa( "case 'l':" );
+                if( !bFuseP )
+                {
+                    Wa( "case 'l':" );
+                }
                 CCOUT << "case 'k':";
                 INDENT_UPL;
                 Wa( "{" );
                 Wa( "    g_bKProxy = true;" );
-                Wa( "    if( opt == 'l' )" );
-                Wa( "        g_strUserName = optarg;" );
+                if( !bFuseP )
+                {
+                    Wa( "    if( opt == 'l' )" );
+                    Wa( "        g_strUserName = optarg;" );
+                }
                 Wa( "    break;" );
                 CCOUT << "}";
                 INDENT_DOWNL;
@@ -7353,7 +7361,8 @@ gint32 CImplMainFunc::EmitInitContext(
             if( bProxy )
             {
                 Wa( "static bool g_bKProxy = false;" );
-                Wa( "static std::string g_strUserName;" );
+                if( !bFuseP )
+                    Wa( "static std::string g_strUserName;" );
             }
 #endif
             Wa( "static ObjPtr g_pRouter;" );

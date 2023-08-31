@@ -1943,6 +1943,9 @@ gint32 CRpcPdoPort::SetupDBusSetting(
             ret = pBusPort->IsDBusSvrOnline( strDest );
             if( ERROR( ret ) )
             {
+                DebugPrintEx( logErr, ret,
+                    "Error dbus server '%s' not online",
+                    strDest );
                 // server is not online
                 break;
             }
@@ -1957,7 +1960,11 @@ gint32 CRpcPdoPort::SetupDBusSetting(
                     pBusPort->AddRules( strRules );
 
                 if( ERROR( iRet ) )
+                {
+                    DebugPrintEx( logErr,
+                        ret, "Error AddRules failed" );
                     ret = iRet;
+                }
             }
         }
 

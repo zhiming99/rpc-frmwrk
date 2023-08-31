@@ -186,7 +186,7 @@ def IsKinitProxyEnabled()->bool:
         cmdline = "destPath=`rpm -ql krb5-libs | grep 'plugins/libkrb5' | head -n 1`/libauth.so"
     else:
         return False
-    cmdline += " && ls $destPath"
+    cmdline += " && ls $destPath 2>/dev/null"
     ret = rpcf_system( cmdline )
     if ret == 0:
         return True

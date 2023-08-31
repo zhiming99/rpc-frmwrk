@@ -1897,8 +1897,9 @@ default_domain = {DomainName}
             return ret
         passDlg = PasswordDialog( self )
         ret, passwd = passDlg.runDlg()
-        if ret < 0:
+        if ret == -errno.EINVAL:
             self.DisplayError( "Error invalid password")
+        if ret < 0:
             return ret
         ret = rpcf_system( "echo '" + passwd + "'| sudo -S echo updating..." )
         passwd = None
@@ -2498,7 +2499,6 @@ EOF
         userEditBox = Gtk.Entry()
         userEditBox.set_text(strUser)
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
-        bKrb5 = self.IsKrb5Enabled()
 
         if IsKinitProxyEnabled():
             btnText = "Disable KProxy"
@@ -3762,10 +3762,9 @@ class PasswordDialog(Gtk.Dialog):
         response = self.run()
         passwd = None
         if response != Gtk.ResponseType.OK:
-            ret = -errno.EINVAL
-        else:
-            passwd = self.passEdit.get_text()
-            ret = 0
+            self.destroy()
+            return ( -errno.ECANCELED, None )
+        passwd = self.passEdit.get_text()
         self.destroy()
         if not IsValidPassword( passwd ):
             return ( -errno.EINVAL, None )
