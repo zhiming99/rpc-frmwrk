@@ -77,6 +77,11 @@ gint32 CoCreateInstance(
         ret = -EINVAL;
     }
 
+    if( ERROR( ret ) )
+        DebugPrintEx( logErr, ret,
+            "Error create object of class '%d'",
+            iClsid );
+
     return ret;
 }
 

@@ -1228,6 +1228,8 @@ gint32 CIfOpenPortTask::OnIrpComplete(
 
         if( ERROR( iRet ) )
         {
+            DebugPrintEx( logErr, iRet,
+                "CIfOpenPortTask failed" );
             ret = iRet;
             if( !Retriable( ret ) )
             {

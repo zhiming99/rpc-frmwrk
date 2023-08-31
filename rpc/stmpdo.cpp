@@ -1061,6 +1061,17 @@ gint32 CRpcTcpBusDriver::Probe(
         ret = oCfg.SetIntProp( propClsid,
             clsid( CRpcTcpBusPort ) );
 
+        // FIXME: we need a better task to receive the
+        // notification of the port start events
+        TaskletPtr pTask;
+        ret = pTask.NewObj( clsid( CSyncCallback ) );
+        if( ERROR( ret ) )
+            break;
+
+        // we don't care the event sink to bind
+        ret = oCfg.SetObjPtr( propEventSink,
+            ObjPtr( pTask ) );
+
         if( ERROR( ret ) )
             break;
 
@@ -1072,17 +1083,21 @@ gint32 CRpcTcpBusDriver::Probe(
         {
             ret = pNewPort->AttachToPort(
                 pLowerPort );
+            if( ERROR( ret ) )
+                break;
         }
 
-        if( SUCCEEDED( ret ) )
+        ret = NotifyPortAttached( pNewPort );
+        if( ret != STATUS_PENDING )
+            break;
+
+        // waiting for the start to complete
+        CSyncCallback* pSyncTask = pTask;
+        if( pSyncTask != nullptr )
         {
-            CEventMapHelper< CPortDriver >
-                oEvtHelper( this );
-            oEvtHelper.BroadcastEvent(
-                eventPnp,
-                eventPortAttached,
-                PortToHandle( pNewPort ),
-                nullptr );
+            ret = pSyncTask->WaitForComplete();
+            if( SUCCEEDED( ret ) )
+                ret = pSyncTask->GetError();
         }
     }while( 0 );
 

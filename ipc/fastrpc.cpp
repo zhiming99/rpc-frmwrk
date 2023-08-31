@@ -425,15 +425,17 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
         CIfParallelTaskGrpRfc* pGrpRfc =
             pIf->GetGrpRfc();
 
-        if( true )
+        bool bQueFull = false;
+        ret = pGrpRfc->IsQueueFull( bQueFull );
+        if( ERROR( ret ) )
+            break;
+
+        if( bQueFull )
         {
             CStdRTMutex oTaskLock( pGrpRfc->GetLock() );
             CStdRMutex oIfLock( pIf->GetLock() );
-            bool bQueFull = false;
-            ret = pGrpRfc->IsQueueFull( bQueFull );
-            if( ERROR( ret ) )
-                break;
 
+            pGrpRfc->IsQueueFull( bQueFull );
             if( bQueFull )
             {
                 ret = pIf->QueueStartTask(
