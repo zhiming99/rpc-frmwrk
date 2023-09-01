@@ -672,7 +672,7 @@ gint32 CDBusProxyPdo::HandleConnRequest(
         else
             strCmd = SYS_METHOD_CLOSERMTPORT;
 
-        if( m_bAuth && !IS_AUTH_PROXY( this ) )
+        if( m_bAuth && !IS_AUTH_PROXY( this ) && bConnect )
         {
             strCmd = SYS_METHOD_LOCALLOGIN;
             // the method is from an interface
