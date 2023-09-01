@@ -719,6 +719,7 @@ gint32 CInterfaceState::Start(
 
 gint32 CInterfaceState::Stop()
 {
+    UnsubscribeEvents();
     return 0;
 }
 
