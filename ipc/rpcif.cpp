@@ -2738,14 +2738,27 @@ gint32 CRpcServices::OnPostStart(
 gint32 CRpcServices::OnPostStop(
     IEventSink* pCallback )
 {
+
     CStdRMutex oIfLock( GetLock() );
-    if( !m_pSeqTasks.IsEmpty() &&
-        m_pSeqTasks->GetTaskCount() > 0 )
+    while( !m_pSeqTasks.IsEmpty() )
     {
         TaskGrpPtr pSeqTasks = m_pSeqTasks;
         oIfLock.Unlock();
-        ( *pSeqTasks )( eventCancelTask );
+
+        CStdRTMutex oTaskLock( pSeqTasks->GetLock() );
         oIfLock.Lock();
+        if( pSeqTasks != m_pSeqTasks )
+            continue;
+
+        if( pSeqTasks->GetTaskCount() > 0 )
+        {
+            oTaskLock.Unlock();
+            oIfLock.Unlock();
+            ( *pSeqTasks )( eventCancelTask );
+            oIfLock.Lock();
+        }
+        m_pSeqTasks.Clear();
+        break;
     }
     m_vecMatches.clear();
     m_mapFuncs.clear();
@@ -2754,7 +2767,6 @@ gint32 CRpcServices::OnPostStop(
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
     m_pRootTaskGroup.Clear();
-    m_pSeqTasks.Clear();
 
     return 0;
 }
@@ -5146,6 +5158,8 @@ gint32 CRpcServices::AddSeqTaskInternal(
     TaskletPtr& pTask,
     bool bLong )
 {
+    if( GetState() == stateStopped )
+        return ERROR_STATE;
     return AddSeqTaskTempl(
         this, pQueuedTasks, pTask, bLong );
 }
