@@ -182,7 +182,12 @@ gint32 CStreamQueue::SubmitIrp( PIRP pIrp )
                 ( intptr_t )this );
             if( ERROR( ret ) )
                 break;
+            m_bInProcess = true;
             ret = this->RescheduleTask( pTask );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+            else
+                m_bInProcess = false;
             break;
         }
 
@@ -213,17 +218,16 @@ gint32 CStreamQueue::ProcessIrps()
         if( GetState() == stateStopped )
         {
             ret = ERROR_STATE;
+            m_bInProcess = false;
             break;
         }
-        if( !m_bInProcess )
-            m_bInProcess = true;
-
         if( m_quePkts.empty() || m_queIrps.empty() )
         {
             m_bInProcess = false;
             break;
         }
 
+        m_bInProcess = true;
         while( m_queIrps.size() &&
             m_quePkts.size() )
         {
@@ -322,12 +326,6 @@ gint32 CStreamQueue::CancelAllIrps(
             ret = ERROR_STATE;
             break;
         }
-        if( m_bInProcess )
-        {
-            ret = -EAGAIN;
-            break;
-        }
-
         std::vector< IrpPtr > vecIrps;
         vecIrps.insert( vecIrps.begin(),
             m_queIrps.begin(),
