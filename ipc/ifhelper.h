@@ -3682,8 +3682,8 @@ gint32 AddSeqTaskTempl( T* pObj,
         return -EINVAL;
 
     gint32 ret = 0;
-    bool bNew = false;
     do{
+        bool bNew = false;
         TaskGrpPtr ptrSeqTasks;
         CIoManager* pMgr = pObj->GetIoMgr();
 
