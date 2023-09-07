@@ -171,6 +171,9 @@ gint32 CDBusStreamPdo::SendDBusMsg(
         CCfgOpener oCtx;
         oCtx.SetPointer( propIrpPtr, pIrp );
         CRpcServices* pSvc = GetStreamIf();
+        // the downstream request handler has its own
+        // timer.
+        pIrp->RemoveTimer();
         if( IsServer() )
         {
             CStreamServerSync* pStm =
