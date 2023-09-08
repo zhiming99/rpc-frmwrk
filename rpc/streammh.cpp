@@ -1604,11 +1604,17 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         // before reponse to the remote client
         //
         // 1. create and start the tcpbdgestm proxy
-        InterfPtr pUxIf = pProxy;
+        InterfPtr pUxIf;
         ret = CreateUxStream( pDataDesc, iFd,
             clsid( CRpcTcpBridgeProxyStream ),
             false, pUxIf );
 
+        if( ERROR( ret ) )
+            break;
+
+        HANDLE hChannel =
+            ( HANDLE )( CRpcServices* )pUxIf;
+        ret = AddUxStream( hChannel, pUxIf );
         if( ERROR( ret ) )
             break;
 
@@ -1988,12 +1994,6 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
     InterfPtr pParentIf;
 
     do{
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
         ObjPtr pIf;
         ret = oParams.GetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )
@@ -2024,14 +2024,13 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
             ret = -EFAULT;
             break;
         }
-
         HANDLE hChannel = ( HANDLE )pUxSvc;
-        InterfPtr pChanlIf( pUxSvc );
-        ret = pStream->AddUxStream(
-            hChannel, pChanlIf );
 
-        if( ERROR( ret ) )
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
             break;
+        }
 
         oParams.GetIntProp(
             2, ( guint32& )iStmId ) ;

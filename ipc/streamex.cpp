@@ -246,7 +246,7 @@ CIfStmReadWriteTask::CIfStmReadWriteTask(
     if( ERROR( ret ) )
     {
         std::string strMsg = DebugMsg( ret,
-            "Error in CIfUxSockTransRelayTask ctor" );
+            "Error in CIfStmReadWriteTask ctor" );
         throw std::runtime_error( strMsg );
     }
 }
