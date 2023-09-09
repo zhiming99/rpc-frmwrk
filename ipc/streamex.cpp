@@ -492,15 +492,22 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
     gint32 ret = 0;
 
     do{
-        ret = pIrp->GetStatus();
-        if( ERROR( ret ) )
-            break;
-
         // we should not be here
         if( IsReading() )
         {
             ret = ERROR_STATE;
             break;
+        }
+
+        ret = pIrp->GetStatus();
+        if( ERROR( ret ) )
+        {
+            if( m_queRequests.empty() )
+                break;
+            IrpPtr pCurIrp = m_queRequests.front();
+            COMPLETE_IRP( pCurIrp, ret );
+            m_queRequests.pop_front();
+            continue;
         }
 
         IrpCtxPtr pCtx = pIrp->GetTopStack();
@@ -1640,6 +1647,12 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
     do{
         bool bReport = IsReport( pBuf );
         CStdRTMutex oTaskLock( GetLock() );
+        EnumIfState dwState = GetTaskState();
+        if( IsStopped( dwState ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         if( bReport )
         {
             if( m_queBufRead.empty() || m_bDiscard )

@@ -695,9 +695,6 @@ gint32 CIfUxListeningTask::RunTask()
         if( ret == STATUS_PENDING )
             break;
 
-        if( ERROR( ret ) )
-            break;
-
         ret = OnTaskComplete( ret );
         if( ERROR( ret ) )
             break;
@@ -884,7 +881,7 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error, the channel will "
-            "be closed from OnIrpComplete" );
+            "be closed from OnIrpComplete, 0x%llx", this );
         BufPtr pErrBuf( true );
         *pErrBuf = tokError;
         gint32 iRet = htonl( ret );
