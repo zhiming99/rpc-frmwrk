@@ -14,7 +14,6 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
     IConfigDb* context, gint32 iRet,
     const std::string& strResp /*[ In ]*/ )
 {
-    gint32 ret = 0;
     {
         // TODO: Process the server response here
         // return code ignored
@@ -28,13 +27,24 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
         oCtx.GetPointer( 2, pCallback );
         
         idx++;
-        OutputMsg( ret,
-            "Server resp( %d ): %s",
-            idx.load(), strResp.c_str() );
-        count--;
-        if( count == 0 && pCallback )
+        if( SUCCEEDED( iRet ) )
+        {
+            OutputMsg( 0,
+                "Server resp( %d ): %s",
+                idx.load(), strResp.c_str() );
+            count--;
+            if( count == 0 && pCallback )
+                pCallback->OnEvent(
+                    eventTaskComp, 0, 0, 0 );
+        }
+        else if( ERROR( iRet ) )
+        {
+            OutputMsg( iRet,
+                "Server resp( %d ): failed, quitting",
+                idx.load() );
             pCallback->OnEvent(
-                eventTaskComp, 0, 0, 0 );
+                eventTaskComp, iRet, 0, 0 );
+        }
     }while( 0 );
     return 0;
 }

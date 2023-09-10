@@ -843,9 +843,9 @@ void CObjBase::Dump( std::string& strDump )
 {
     char szBuf[ 128 ];
 #if BUILD_64 == 0
-    sprintf( szBuf, "0x%08X: ", ( LONGWORD )this );
+    sprintf( szBuf, "0x%08x: ", ( LONGWORD )this );
 #else
-    sprintf( szBuf, "0x%08lX: ", ( LONGWORD )this );
+    sprintf( szBuf, "0x%08lx: ", ( LONGWORD )this );
 #endif
     strDump += szBuf;
     strDump += ", clsid: ";
