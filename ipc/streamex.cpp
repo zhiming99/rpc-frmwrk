@@ -373,6 +373,21 @@ gint32 CIfStmReadWriteTask::PauseReading(
     return ret;
 }
 
+#define RESCHED_TASK \
+do{ \
+    if( m_queRequests.size() ) \
+    { \
+        ret = ReRun(); \
+        if( SUCCEEDED( ret ) ) \
+            ret = STATUS_PENDING; \
+    } \
+    else \
+    { \
+        Pause(); \
+        ret = STATUS_PENDING; \
+    } \
+}while( 0 )
+
 gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
     IRP* pIrp )
 {
@@ -416,10 +431,12 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
             NotifyWriteResumed();
     }
 
-    if( m_queRequests.size() )
-        ret = STATUS_PENDING;
+    if( bHead && m_queRequests.size() )
+        ReRun();
+    else if( m_queRequests.empty() )
+        Pause();
 
-    return ret;
+    return STATUS_PENDING;
 }
 
 bool CIfStmReadWriteTask::IsLoopStarted()
@@ -489,27 +506,27 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
     if( pIrp == nullptr )
         return -EINVAL;
 
-    gint32 ret = 0;
+    // we should not be here
+    if( IsReading() )
+        return ERROR_STATE;
 
-    do{
-        // we should not be here
-        if( IsReading() )
+    gint32 ret = pIrp->GetStatus();
+    if( ERROR( ret ) )
+    {
+        while( m_queRequests.size() )
         {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        ret = pIrp->GetStatus();
-        if( ERROR( ret ) )
-        {
-            if( m_queRequests.empty() )
-                break;
             IrpPtr pCurIrp = m_queRequests.front();
-            COMPLETE_IRP( pCurIrp, ret );
             m_queRequests.pop_front();
-            continue;
+            CStdRMutex oIrpLock( pCurIrp->GetLock() );
+            ret = pCurIrp->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                continue;
+            COMPLETE_IRP( pCurIrp, ret );
         }
-
+        RESCHED_TASK;
+        return STATUS_PENDING;
+    }
+    else do{
         IrpCtxPtr pCtx = pIrp->GetTopStack();
         BufPtr pWritten = pCtx->m_pReqData;
         if( pWritten.IsEmpty() ||
@@ -521,20 +538,16 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
 
         if( m_queRequests.empty() )
         {
-            ret = ERROR_STATE;
+            RESCHED_TASK;
             break;
         }
 
         IrpPtr pCurIrp = m_queRequests.front();
         CStdRMutex oIrpLock( pCurIrp->GetLock() );
-        ret = pCurIrp->CanContinue(
-            IRP_STATE_READY );
+        ret = pCurIrp->CanContinue( IRP_STATE_READY );
         if( ERROR( ret ) )
         {
-            m_queRequests.pop_front();
-            if( m_queRequests.size() )
-                continue;
-            ret = ERROR_STATE;
+            ret = STATUS_PENDING;
             break;
         }
 
@@ -545,6 +558,9 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
         if( pBuf != pWritten )
         {
             ret = -EINVAL;
+            PopWriteRequest();
+            COMPLETE_IRP( pCurIrp, ret );
+            RESCHED_TASK;
             break;
         }
 
@@ -588,21 +604,9 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
         }
         oIrpLock.Unlock();
 
-        ret = ReRun();
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        RESCHED_TASK;
 
-        break;
-
-    }while( 1 );
-
-    if( ERROR( ret ) )
-    {
-        // to allow irp canceling callback comes in,
-        // but the task is not functioning normally.
-        if( m_queRequests.size() )
-            ret = STATUS_PENDING;
-    }
+    }while( 0 );
 
     return ret;
 }
@@ -1146,9 +1150,16 @@ gint32 CIfStmReadWriteTask::OnCancel(
     guint32 dwContext )
 {
     gint32 ret = -ECANCELED;
-    do{
-        super::OnCancel( dwContext );
+    super::OnCancel( dwContext );
+    OnTaskComplete( ret );
+    return ret;
+}
 
+gint32 CIfStmReadWriteTask::OnTaskComplete(
+    gint32 iRetVal )
+{
+    gint32 ret = 0;
+    do{
         std::deque< IrpPtr > queIrps;
         queIrps = m_queRequests;
         m_queRequests.clear();
@@ -1168,12 +1179,15 @@ gint32 CIfStmReadWriteTask::OnCancel(
             // because the task will be stopped
             // before the OnIrpComplete is able to
             // be called.
-            COMPLETE_IRP( elem, -ECANCELED );
+            CStdRMutex oIrpLock( elem->GetLock() );
+            ret = elem->CanContinue( IRP_STATE_READY );
+            if( ERROR( ret ) )
+                continue;
+            COMPLETE_IRP( elem, iRetVal );
         }
 
-    }while( 0 ); 
-
-    return ret;
+    }while( 0 );
+    return STATUS_PENDING;
 }
 
 gint32 CIfStmReadWriteTask::RunTask()
@@ -1236,9 +1250,6 @@ gint32 CIfStmReadWriteTask::RunTask()
                 ret = STATUS_PENDING;
                 break;
             }
-
-            if( ERROR( ret ) )
-                break;
 
             PopWriteRequest();
             COMPLETE_IRP( pIrp, ret );

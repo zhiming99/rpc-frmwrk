@@ -220,7 +220,8 @@ class CIfStmReadWriteTask :
     }
 
     gint32 OnIrpComplete( IRP* pIrp );
-    gint32 OnCancel( guint32 dwContext );
+    gint32 OnTaskComplete( gint32 iRetVal ) override;
+    gint32 OnCancel( guint32 dwContext ) override;
     gint32 RunTask();
 
     inline bool IsReading() const
@@ -878,13 +879,15 @@ struct CStreamSyncBase :
 
             if( !oWorker.pReader.IsEmpty() )
             {
-                ( *oWorker.pReader )(
-                    eventCancelTask );
+                oWorker.pReader->OnEvent(
+                    eventTaskComp, -ECANCELED,
+                    0, 0 );
             }
             if( !oWorker.pWriter.IsEmpty() )
             {
-                ( *oWorker.pWriter )(
-                    eventCancelTask );
+                oWorker.pWriter->OnEvent(
+                    eventTaskComp, -ECANCELED,
+                    0, 0 );
             }
 
             oIfLock.Lock();
@@ -1176,22 +1179,7 @@ struct CStreamSyncBase :
         {
             if( !pTaskGrp.IsEmpty() )
                 ( *pTaskGrp )( eventCancelTask );
-
-            CStdRMutex oIfLock( this->GetLock() );
-            if( hChannel != INVALID_HANDLE )
-                m_mapStmWorkers.erase( hChannel );
-            oIfLock.Unlock();
-
-            if( !oWorker.pReader.IsEmpty() )
-            {
-                ( *oWorker.pReader )(
-                    eventCancelTask );
-            }
-            if( !oWorker.pWriter.IsEmpty() )
-            {
-                ( *oWorker.pWriter )(
-                    eventCancelTask );
-            }
+            StopWorkers( hChannel );
         }
 
         return ret;
