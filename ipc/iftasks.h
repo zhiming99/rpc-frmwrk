@@ -263,8 +263,7 @@ class CIfOpenPortTask
     virtual gint32 OnIrpComplete( PIRP pIrp );
     virtual gint32 RunTask();
     // canceling is not supported yet
-    virtual gint32 OnCancel( guint32 dwContext )
-    { return STATUS_PENDING; }
+    virtual gint32 OnCancel( guint32 dwContext );
 };
 
 class CIfStopTask

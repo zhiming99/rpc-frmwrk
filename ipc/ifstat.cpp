@@ -49,7 +49,7 @@ std::map< STATEMAP_KEY, EnumIfState > CInterfaceState::m_mapState =
     STATEMAP_ENTRY( stateStarting,  eventPortStopping,      stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventDBusOffline,       stateStopped ),
     STATEMAP_ENTRY( stateStarting,  eventRmtSvrOffline,     stateStopped ),
-    STATEMAP_ENTRY( stateStarting,  cmdShutdown,            stateStopped ),
+    STATEMAP_ENTRY( stateStarting,  cmdShutdown,            stateStopping ),
     STATEMAP_ENTRY( stateConnected, eventPaused,            statePaused ),
     STATEMAP_ENTRY( stateConnected, eventPortStopping,      stateStopping ),
     STATEMAP_ENTRY( stateConnected, eventDBusOffline,       stateStopping ),

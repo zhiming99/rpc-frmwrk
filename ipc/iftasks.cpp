@@ -1289,6 +1289,11 @@ gint32 CIfOpenPortTask::RunTask()
             break;
         }
 
+        timespec ts;
+        clock_gettime( CLOCK_REALTIME, &ts );
+        oParams.SetQwordProp(
+            propTimestamp, ts.tv_sec );
+
         ret = pIf->OpenPort( this );
         if( !pIf->IsServer() && Retriable( ret ) )
         {
@@ -1303,6 +1308,31 @@ gint32 CIfOpenPortTask::RunTask()
     }while( 0 );
 
     return ret;
+}
+gint32 CIfOpenPortTask::OnCancel(
+    guint32 dwContext )
+{
+    do{
+        ObjPtr pObj;
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );        
+
+        gint32 ret = oCfg.GetObjPtr(
+            propIfPtr, pObj );
+        if( ERROR( ret ) )
+            break;
+        timespec ts;
+        guint64 qwStartSec = 0;
+        clock_gettime( CLOCK_REALTIME, &ts );
+        oCfg.GetQwordProp(
+            propTimestamp, qwStartSec );
+
+        DebugPrintEx( logWarning, dwContext,
+            "%s's openport task canceled after %d sec",
+            CoGetClassName( pObj->GetClsid() ),
+            ts.tv_sec - qwStartSec );
+    }while( 0 );
+    return 0;
 }
 
 bool CIfTaskGroup::IsStopped(
@@ -1597,6 +1627,7 @@ gint32 CIfTaskGroup::RunTaskInternal(
 
     if( ret == ERROR_CANCEL_INSTEAD )
     {
+        SetTaskState( stateStopping );
         return ret;
     }
     else if( ret != STATUS_PENDING )
@@ -1604,6 +1635,7 @@ gint32 CIfTaskGroup::RunTaskInternal(
         // for those Unlock'd condition, this call
         // does not have effect
         SetRunning( false );
+        SetTaskState( stateStopping );
     }
 
     return ret;
@@ -1702,7 +1734,8 @@ gint32 CIfTaskGroup::OnCancel(
     do{
         CStdRTMutex oTaskLock( GetLock() );
         EnumTaskState iState = GetTaskState();
-        if( IsStopped( iState ) )
+        if( IsStopped( iState ) &&
+            dwContext != eventCancelInstead )
             return STATUS_PENDING;
 
         if( unlikely( IsCanceling() ) )
@@ -1776,14 +1809,14 @@ gint32 CIfTaskGroup::OnCancel(
 
 gint32 CIfTaskGroup::OnComplete( gint32 iRet )
 {
-    CStdRTMutex oTaskLock( GetLock() );
-    if( IsStopped( GetTaskState() ) )
-        return ERROR_STATE;
+    // CStdRTMutex oTaskLock( GetLock() );
+    // if( IsStopped( GetTaskState() ) )
+    //     return ERROR_STATE;
 
-    SetTaskState( stateStopping );
-    oTaskLock.Unlock();
+    // SetTaskState( stateStopping );
+    // oTaskLock.Unlock();
     gint32 ret = super::OnComplete( iRet );
-    oTaskLock.Lock();
+    CStdRTMutex oTaskLock( GetLock() );
     SetTaskState( stateStopped );
     RemoveProperty( propContext );
     return ret;
@@ -1958,6 +1991,8 @@ gint32 CIfTaskGroup::OnTaskComplete(
 gint32 CIfRootTaskGroup::OnComplete(
     gint32 iRetVal )
 {
+    CStdRTMutex oLock( GetLock() );
+    SetTaskState( stateStarted );
     SetCanceling( false );
     return 0;
 }
@@ -2400,6 +2435,7 @@ gint32 CIfParallelTaskGrp::RunTaskInternal(
 
     if( GetTaskCount() == 0 )
     {
+        SetTaskState( stateStopping );
         SetRunning( false );
         return STATUS_SUCCESS;
     }
@@ -2448,7 +2484,10 @@ gint32 CIfParallelTaskGrp::RunTaskInternal(
     }while( 1 );
 
     if( ret != STATUS_PENDING )
+    {
         SetRunning( false );
+        SetTaskState( stateStopping );
+    }
 
     // we will be removed from the root task
     // group
@@ -2729,6 +2768,7 @@ gint32 CIfParallelTaskGrp::OnCancel(
         }while( 0 );
 
         SetNoSched( false );
+        SetTaskState( stateStopping );
         break;
 
     }while( 1 );
@@ -5210,7 +5250,15 @@ gint32 CIfDummyTask::OnEvent(
     {
     case eventIrpComp:
         {
+            IRP* pIrp = ( PIRP )dwParam1;
+            SetError( pIrp->GetStatus() );
             RemoveProperty( propIrpPtr );
+            break;
+        }
+    case eventTaskComp:
+        {
+            gint32 iRet = ( gint32 ) dwParam1;
+            SetError( iRet );
             break;
         }
     default:
@@ -5976,6 +6024,7 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
 
     if( GetTaskCount() == 0 )
     {
+        SetTaskState( stateStopping );
         SetRunning( false );
         return STATUS_SUCCESS;
     }
@@ -6042,7 +6091,10 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
     }while( 1 );
 
     if( ret != STATUS_PENDING )
+    {
         SetRunning( false );
+        SetTaskState( stateStopping );
+    }
 
     return ret;
 }
