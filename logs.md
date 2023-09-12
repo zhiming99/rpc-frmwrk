@@ -1,4 +1,8 @@
 ---
+[`Tue Sep 12 2023 08:41:51 PM Beijing`]    
+1. The new pull request tries to fix a performance issue in built-in router server, which fails many incoming requests due to heavily usage of seqential task group. It can be solved easily. Also there are some memory leaks that have to be addressed along with the performance issue. Hopefully we can get all these bugs fixed next week.
+2. After all this done, we will proceed with the 'rate limiter' feature.
+ 
 [`Tue Aug 27 2023 08:59:30 PM Beijing`]   
 1. Merged the branch `autocfg-websock-and-kerberos` to the master. We have officially finished this pull request. And this release has delivered the following features:
    * To automatically configure `nginx` and `apache` and install `SSL` keys for rpc-frmwrk to communicate via secured websocket connection
