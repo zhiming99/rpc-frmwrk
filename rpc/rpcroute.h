@@ -750,6 +750,9 @@ class CRpcReqForwarder :
         return 0;
     }
 
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
+
 }; // CRpcReqForwarder
 
 class CRpcRfpForwardEventTask

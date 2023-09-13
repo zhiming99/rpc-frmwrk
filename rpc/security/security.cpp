@@ -2602,6 +2602,10 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
     return ret;
 }
 
+gint32 CRpcReqForwarderAuth::OnPostStop(
+    IEventSink* pCallback )
+{ return super::OnPostStop( pCallback ); }
+
 gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
     IEventSink* pInvTask,
     IConfigDb* pCfg,
