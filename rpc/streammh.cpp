@@ -1618,13 +1618,9 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oUxIf(
-            ( CObjBase*) pUxIf );
-
-        ret = oUxIf.SetIntProp(
-            propStreamId, iStmId );
-        if( ERROR( ret ) )
-            break;
+        CCfgOpenerObj oUxIf( ( CObjBase*) pUxIf );
+        oUxIf.SetIntProp( propStreamId, iStmId );
+        BindUxTcpStream( hChannel, iStmId );
 
         // to set CIfUxListeningRelayTask to
         // receive both incoming stream as well as
@@ -1649,6 +1645,8 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
             break;
 
         ret = this->AddSeqTask( pStartTask );
+        if( ERROR( ret ) )
+            ( *pStartTask )( eventCancelTask );
 
     }while( 0 );
     
@@ -2026,21 +2024,12 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
         }
         HANDLE hChannel = ( HANDLE )pUxSvc;
 
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
         oParams.GetIntProp(
             2, ( guint32& )iStmId ) ;
 
-        CStreamServerRelayMH* pStmRly = pParentIf;
-        ret = pStmRly->BindUxTcpStream( 
-            hChannel, iStmId );
-
-        if( ERROR( ret ) )
+        if( ERROR( iRet ) )
         {
+            ret = iRet;
             break;
         }
 
@@ -2102,9 +2091,6 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
             pParentIf.IsEmpty() )
             break;
 
-        if( iStmId < 0 )
-            break;
-
         CRpcServices* pParent = pParentIf;
         CStreamServerRelayMH* pStream =
             ObjPtr( pParent );
@@ -2112,7 +2098,8 @@ gint32 CIfStartUxSockStmRelayTaskMH::OnTaskComplete(
         if( unlikely( pStream == nullptr ) )
             break;
 
-        pStream->OnClose( iStmId );
+        pStream->OnChannelError(
+            ( HANDLE )pUxSvc, ret );
 
         break;
     }

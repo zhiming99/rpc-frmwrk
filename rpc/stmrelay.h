@@ -373,8 +373,18 @@ class CStreamRelayBase :
                 break;
             }
 
-            this->AddSeqTask( pSendClose );
-            this->AddSeqTask( pCloseStream );
+            ret = this->AddSeqTask( pSendClose );
+            if( ERROR( ret ) )
+            {
+                ( *pSendClose )( eventCancelTask );
+                break;
+            }
+            ret = this->AddSeqTask( pCloseStream );
+            if( ERROR( ret ) )
+            {
+                ( *pSendClose )( eventCancelTask );
+                ( *pCloseStream )( eventCancelTask );
+            }
 
         }while( 0 );
 
@@ -421,6 +431,9 @@ class CStreamServerRelay :
     gint32 OnConnected( HANDLE hChannel ) override
     { return 0; }
 
+    gint32 OnPreStop(
+        IEventSink* pContext ) override
+    { return super::OnPreStop( pContext ); }
 };
 
 // this interface will be hosted by
@@ -479,7 +492,6 @@ class CStreamProxyRelay :
     gint32 OnConnected( HANDLE hChannel ) override
     { return 0; }
 
-    using super::OnPostStart;
     gint32 OnPostStart(
         IEventSink* pContext ) override
     {
@@ -492,6 +504,9 @@ class CStreamProxyRelay :
             propTxBytes, ( guint64 )0 );
         return 0;
     }
+    gint32 OnPreStop(
+        IEventSink* pContext ) override
+    { return super::OnPreStop( pContext ); }
 };
 
 class CIfStartUxSockStmRelayTask :
@@ -507,6 +522,7 @@ class CIfStartUxSockStmRelayTask :
 
     gint32 RunTask();
     gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnCancel( guint32 dwContext ) override;
     void Cleanup();
 };
 
@@ -1426,6 +1442,9 @@ class CUnixSockStmRelayBase :
     inline EnumFCState IncRxBytes( guint32 dwSize )
     { return this->m_oFlowCtrl.IncRxBytes( dwSize ); }
     
+    gint32 OnPostStop(
+        IEventSink* pContext ) override
+    { return super::OnPostStop( pContext ); }
 };
 
 class CUnixSockStmServerRelay :

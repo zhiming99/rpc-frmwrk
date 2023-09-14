@@ -131,7 +131,10 @@ class CRpcStmChanBase :
                 hstm, pPdoPort );
 
             if( ERROR( ret ) )
+            {
+                ActiveClose( hstm );
                 break;
+            }
 
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
@@ -1463,12 +1466,11 @@ class CFastRpcSkelSvrBase :
     std::deque< std::pair< TaskletPtr, guint64 > > m_queStartTasks;
     guint32 m_dwReservedSlots = 1;
     TaskGrpPtr m_pGrpRfc;
+    bool m_bRfcEnabled = true;
 
     public:
     typedef CFastRpcSkelBase< false > super;
-    CFastRpcSkelSvrBase( const IConfigDb* pCfg )
-        : super( pCfg ), m_pGrpRfc( nullptr, false )
-    {}
+    CFastRpcSkelSvrBase( const IConfigDb* pCfg );
 
     inline TaskGrpPtr GetGrpRfc() const
     { return m_pGrpRfc; }

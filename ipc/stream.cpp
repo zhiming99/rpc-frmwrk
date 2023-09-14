@@ -29,6 +29,7 @@
 #include "stream.h"
 #include "uxstream.h"
 #include "sha1.h"
+#include "stmcp.h"
 
 namespace rpcf
 {
@@ -611,6 +612,12 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
+        CRpcServices* pUxSvc = pUxIf;
+        ret = pStream->AddUxStream(
+            ( HANDLE )pUxSvc, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
         TaskletPtr pStartTask;
         CParamList oStartParams;
 
@@ -660,7 +667,11 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         // make sure the task runs sequentially
         ret = pIf->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
+        {
+            ( *pStartTask )(
+                eventCancelTask );
             break;
+        }
 
         ClearClientNotify();
 
@@ -684,6 +695,18 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
     }
 
     return ret;
+}
+
+CIfStartUxSockStmTask::CIfStartUxSockStmTask(
+    const IConfigDb* pCfg ) : super( pCfg )
+{ SetClassId( clsid( CIfStartUxSockStmTask ) ); }
+
+CIfStartUxSockStmTask::~CIfStartUxSockStmTask()
+{
+    gint32 ret = GetError();
+    if( ERROR( ret ) )
+        DebugPrintEx( logWarning, ret,
+            "Destroying CIfStartUxSockStmTask" );
 }
 
 gint32 CIfStartUxSockStmTask::RunTask()
@@ -732,13 +755,27 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
 
+    InterfPtr pUxIf;
+    ObjPtr pIf;
+
     do{
-        if( ERROR( iRet ) )
+        if( SUCCEEDED( iRet ) )
         {
-            ret = iRet;
-            break;
+            EventPtr pCb;
+            ret = GetClientNotify( pCb );
+            if( SUCCEEDED( ret ) )
+            {
+                CIfInvokeMethodTask* pInv = pCb;
+                if( pInv != nullptr )
+                {
+                    // reset timer, we don't want the
+                    // start process be abrupted by
+                    // unwanted timeout.
+                    pInv->ResetTimer();
+                }
+            }
         }
-        ObjPtr pIf;
+
         ret = oParams.GetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
@@ -754,29 +791,27 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             break;
         }
 
-        bool bServer = false;
-        ret = oParams.GetBoolProp(
-            propIsServer, bServer );
+        bool bServer = pParent->IsServer();
+
+        ObjPtr pUxObj;
+        ret = oParams.GetObjPtr( 0, pUxObj );
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.GetObjPtr( 0, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        CRpcServices* pSvc = pIf;
+        CRpcServices* pSvc = pUxObj;
         if( pSvc == nullptr )
         {
             ret = -EFAULT;
             break;
         }
+        pUxIf = pUxObj;
 
-        InterfPtr pInterf = pIf;
-        ret = pStream->AddUxStream(
-            ( HANDLE )pSvc, pInterf );
-
-        if( ERROR( ret ) )
+        // all the input parameters are set
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
             break;
+        }
 
         ret = 0;
         oResp[ propReturnValue ] = 0;
@@ -802,7 +837,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             CCfgOpener oDataDesc(
                 ( IConfigDb* )pDesc );
 
-            guint64 qwId = pIf->GetObjId();
+            guint64 qwId = pUxIf->GetObjId();
             guint64 qwHash = 0;
             ret = GetObjIdHash( qwId, qwHash );
             if( ERROR( ret ) )
@@ -817,17 +852,17 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             oResp.Push( 0 );
             if( pStream->IsNonSockStm() )
             {
-                // the fd is invalid
+                // the fd is ignored
                 oResp.SetBoolProp( propNonFd, true );
                 CCfgOpenerObj oUxCfg( pSvc );
-                CObjBase* pObj;
+                CStmConnPoint* pscp;
                 ret = oUxCfg.GetPointer(
-                    propStmConnPt, pObj );
+                    propStmConnPt, pscp );
                 if( ERROR( ret ) )
                     break;
                 oDataDesc.SetQwordProp(
-                    propStmConnPt, ( guint64 )pObj );
-                pObj->AddRef();
+                    propStmConnPt, ( guint64 )pscp );
+                pscp->RegForTransfer();
             }
         }
         else
@@ -915,6 +950,64 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     if( !IsPending() )
         DebugPrint( ret, "Warning, "
             "the task is not pending" );
+
+    if( ERROR( ret ) &&
+        !pIf.IsEmpty() &&
+        !pUxIf.IsEmpty() )
+    {
+        CRpcServices* pSvc = pIf;
+        HANDLE hUxIf = ( HANDLE )
+            ( CRpcServices* )pUxIf;
+        if( pSvc->IsServer() )
+        {
+            CStreamServer* pStm = pIf;
+            pStm->OnChannelError( hUxIf, ret );
+        }
+        else
+        {
+            CStreamProxy* pStm = pIf;
+            pStm->OnChannelError( hUxIf, ret );
+        }
+    }
+    return ret;
+}
+
+gint32 CIfStartUxSockStmTask::OnCancel(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
+
+    do{
+        OutputMsg( 0, "%s canceling",
+            CoGetClassName( this->GetClsid() ) );
+        ObjPtr pUxIf;
+        ObjPtr pIf;
+        ret = oParams.GetObjPtr( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+        
+        CRpcServices* pParent = pIf;
+        ret = oParams.GetObjPtr( 0, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = pIf;
+        HANDLE hUxIf = ( HANDLE )
+            ( CRpcServices* )pUxIf;
+        if( pSvc->IsServer() )
+        {
+            CStreamServer* pStm = pIf;
+            pStm->OnClose( hUxIf );
+        }
+        else
+        {
+            CStreamProxy* pStm = pIf;
+            pStm->OnClose( hUxIf );
+        }
+
+    }while( 0 );
 
     return ret;
 }
@@ -1009,11 +1102,10 @@ gint32 CStreamProxy::OpenChannel(
             if( ERROR( ret ) )
                 break;
 
-            CObjBase* pObj = pStmCp;
+            CStmConnPoint* pcp = pStmCp;
             oDesc.SetQwordProp(
-                propStmConnPt, ( guint64 )pObj );
-
-            pStmCp->AddRef();
+                propStmConnPt, ( guint64 )pcp );
+            pcp->RegForTransfer();
             oParams.SetObjPtr(
                 propStmConnPt, pStmCp );
         }
@@ -1248,7 +1340,9 @@ gint32 IStream::CloseChannel(
 
         ret = pThisIf->AddSeqTask( pStopTask );
 
-        if( SUCCEEDED( ret ) )
+        if( ERROR( ret ) )
+            ( *pStopTask )( eventCancelTask );
+        else
             ret = STATUS_PENDING;
 
     }while( 0 );
@@ -1394,7 +1488,7 @@ gint32 CStreamServer::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        ret = this->AddSeqTask( pTask );
+        ret = this->AddAndRun( pTask );
         if( ERROR( ret ) )
             break;
 

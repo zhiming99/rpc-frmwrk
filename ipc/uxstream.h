@@ -1358,11 +1358,12 @@ class CUnixSockStream:
         return ret;
     }
 
-    virtual gint32 OnPostStart(
-        IEventSink* pContext )
+    gint32 OnPostStart(
+        IEventSink* pContext ) override
     { return 0; }
 
-    virtual gint32 OnPreStop( IEventSink* pCallback ) 
+    virtual gint32 OnPreStop(
+        IEventSink* pCallback ) override
     {
         gint32 ret = 0;
 
@@ -1381,7 +1382,8 @@ class CUnixSockStream:
         return ret;
     }
 
-    gint32 OnPostStop( IEventSink* pCallback )
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override
     {
         super::OnPostStop( pCallback );
         m_pParent.Clear();

@@ -39,7 +39,7 @@
 namespace rpcf
 {
 
-static gint32 FireRmtSvrEvent(
+static gint32 FireRmtSvrEvent2(
     IPort* pPort, EnumEventId iEvent, HANDLE hStream )
 {
     // this is an event detected by the
@@ -1253,7 +1253,7 @@ gint32 CDBusStreamPdo::OnPortReady( IRP* pIrp )
         if( !IsServer() )
             break;
 
-        FireRmtSvrEvent( this,
+        FireRmtSvrEvent2( this,
             eventRmtSvrOnline, hStream );
 
     }while( 0 );
@@ -1324,7 +1324,7 @@ gint32 CDBusStreamPdo::OnEvent(
                     ( HANDLE )this );
                 break;
             }
-            ret = FireRmtSvrEvent( this,
+            ret = FireRmtSvrEvent2( this,
                 eventRmtSvrOffline,
                 ( HANDLE )dwParam1 );
             break;

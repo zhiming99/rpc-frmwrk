@@ -61,7 +61,7 @@
             "PortClass": "DBusStreamPdo",
             "RequestTimeoutSec" : "120",
             "KeepAliveTimeoutSec" : "60",
-            "EnableRFC" : "false",
+            "EnableRFC" : "true",
             "Interfaces" :
             [
                 {

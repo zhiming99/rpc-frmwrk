@@ -481,6 +481,18 @@ gint32 CIfInvokeMethodTask2::OnComplete(
     return super::OnComplete( iRet );
 }
 
+CFastRpcSkelSvrBase::CFastRpcSkelSvrBase(
+    const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    CCfgOpener oCfg( pCfg );
+    bool bRfcEnabled = true;
+    gint32 ret = oCfg.GetBoolProp(
+        propEnableRfc, bRfcEnabled );
+    if( SUCCEEDED( ret ) )
+        m_bRfcEnabled = bRfcEnabled;
+}
+
 gint32 CFastRpcSkelSvrBase::SetLimit(
     guint32 dwMaxRunning,
     guint32 dwMaxPending,
@@ -489,7 +501,7 @@ gint32 CFastRpcSkelSvrBase::SetLimit(
     TaskGrpPtr pGrp;
     CIfParallelTaskGrpRfc* pGrpRfc = m_pGrpRfc;
     if( pGrpRfc )
-        pGrpRfc->SetLimit( dwMaxRunning + 1,
+        pGrpRfc->SetLimit( dwMaxRunning,
             dwMaxPending, bNoResched );
 
     return STATUS_SUCCESS;
@@ -504,20 +516,14 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
         return 0;
 
     do{
-        CCfgOpenerObj oIfCfg( this );
-        bool bRfcEnabled = true;
-        oIfCfg.GetBoolProp(
-            propEnableRfc, bRfcEnabled );
-
-        bRfcEnabled = true;
-        if( !bRfcEnabled )
+        if( !m_bRfcEnabled )
         {
             ret = super::StartRecvTasks(
                 vecMatches );
             break;
         }
 
-        OutputMsg( 0, "Rfc enabled" );
+        DebugPrint( 0, "Rfc enabled" );
         CCfgOpener oCfg;
         oCfg[ propIfPtr ] = ObjPtr( this );
         ret = m_pGrpRfc.NewObj(
@@ -536,17 +542,34 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
         m_pGrpRfc->AppendTask( pPHTask );
 
         this->SetLimit(
-            STM_MAX_PACKETS_REPORT,
-            0, true );
+            STM_MAX_PACKETS_REPORT, 0,
+            true );
 
         TaskletPtr pTask( m_pGrpRfc );
         ret = this->AddAndRun( pTask );
         if( ERROR( ret ) )
             return ret;
 
-        ret = super::StartRecvTasks( vecMatches );
-        if( ERROR( ret ) )
-            break;
+        TaskletPtr pRecvMsgTask;
+        for( auto pMatch : vecMatches )
+        {
+            oCfg[ propMatchPtr ] =
+                ObjPtr( pMatch );
+
+            ret = pRecvMsgTask.NewObj(
+                clsid( CIfStartRecvMsgTask2 ),
+                oCfg.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = AddAndRun( pRecvMsgTask );
+            if( ERROR( ret ) )
+                break;
+
+            if( ret == STATUS_PENDING )
+                ret = 0;
+        }
 
     }while( 0 );
 

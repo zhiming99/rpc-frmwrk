@@ -422,12 +422,12 @@ class CIfStartUxSockStmTask :
     public:
     typedef CIfInterceptTaskProxy super;
 
-    CIfStartUxSockStmTask( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CIfStartUxSockStmTask ) ); }
+    CIfStartUxSockStmTask( const IConfigDb* pCfg );
+    ~CIfStartUxSockStmTask();
 
-    gint32 RunTask();
-    gint32 OnTaskComplete( gint32 iRet );
+    gint32 RunTask() override;
+    gint32 OnTaskComplete( gint32 iRet ) override;
+    gint32 OnCancel( guint32 dwContext ) override;
 };
 
 class CIfStopUxSockStmTask :
