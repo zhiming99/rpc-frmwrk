@@ -1,4 +1,8 @@
 ---
+[`Sat Sep 16 2023 06:53:13 PM Beijing`]   
+1. previously I was planning to release version 0.6.0, in the last week of Sep.
+2. Now I have found 3 new memory leaks in the stress test. And I must postpone the release for one or two weeks.
+
 [`Sat Sep 16 2023 04:41:49 AM Beijing`]   
 1. The gpg key is expired, so the update will be delayed for a while.
 
