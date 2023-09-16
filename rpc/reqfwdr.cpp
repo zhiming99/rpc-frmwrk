@@ -2002,7 +2002,9 @@ gint32 CRpcReqForwarder::OnModEvent(
         if( ERROR( ret ) )
             break;
 
-        CIfRetryTask* pRetry = pDeferTask;
+        CIfRetryTask* pRetry = plcc;
+        pRetry->SetSyncCancel();
+        pRetry = pDeferTask;
         pRetry->SetClientNotify( plcc );
 
         CStdRMutex oIfLock( GetLock() );
@@ -5777,6 +5779,7 @@ gint32 CRpcReqForwarder::OnPostStart(
 gint32 CRpcReqForwarder::OnPreStop(
     IEventSink* pCallback )
 {
+    m_pIfStat->UnsubscribeEvents();
     if( m_pScheduler.IsEmpty() )
         return 0;
     ITaskScheduler* pSched = m_pScheduler;

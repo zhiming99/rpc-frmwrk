@@ -996,6 +996,11 @@ gint32 CIfRetryTask::CancelTaskChain(
         dwContext == eventTimeoutCancel )
         dwContext = eventTaskComp;
 
+    if( IsSyncCancel() )
+    {
+        DoCancelTaskChain( dwContext, iError );
+        return 0;
+    }
     return DEFER_CALL(
         pMgr, ObjPtr( pTask ),
         &CIfRetryTask::DoCancelTaskChain,
@@ -2906,6 +2911,7 @@ gint32 CIfParallelTask::operator()(
     if( dwContext & eventTryLock )
         dwContext &= ~eventTryLock;
 
+    TaskletPtr pCancelTask;
     try{
         CStdRTMutex oTaskLock( GetLock() );
 
@@ -2936,11 +2942,23 @@ gint32 CIfParallelTask::operator()(
             }
         }
         ret = super::operator()( dwContext );
+        if( unlikely( IsSyncCancel() ) )
+        {
+            pCancelTask = m_pCancelTask;
+            m_pCancelTask.Clear();
+        }
     }
     catch( std::runtime_error& e )
     {
         // lock failed
         ret = -EACCES;
+    }
+    if( unlikely( !pCancelTask.IsEmpty() ) )
+    {
+        DoCancelTaskChainSync(
+            pCancelTask,
+            eventCancelTask,
+            -ECANCELED );
     }
     return ret;
 }
@@ -3212,6 +3230,59 @@ gint32 CIfParallelTask::GetPropertyType(
     return super::GetPropertyType( iProp, iType );
 }
 
+gint32 CIfParallelTask::CancelTaskChain(
+    guint32 dwContext,
+    gint32 iError )
+{
+    if( IsSyncCancel() )
+    {
+        TaskletPtr pTask =
+            GetFwrdTask( true );
+        if( pTask.IsEmpty() )
+            return 0;
+        m_pCancelTask = pTask;
+    }
+    else
+    {
+        super::CancelTaskChain(
+            dwContext, iError );
+    }
+    return 0;
+}
+
+gint32 CIfParallelTask::DoCancelTaskChainSync(
+    TaskletPtr pTask,
+    guint32 dwContext,
+    gint32 iError )
+{
+    TaskletPtr pOldTask;
+    do{
+        pOldTask = pTask;
+        CIfRetryTask* pRetry = pTask;
+        if( pRetry == nullptr )
+            break;
+
+        pTask = pRetry->GetFwrdTask( false );
+        if( pTask.IsEmpty() )
+        {
+            pTask = pOldTask;
+            break;
+        }
+
+    }while( 1 );
+
+    EnumClsid iClsid = pTask->GetClsid();
+    const char* pszClass =
+        CoGetClassName( iClsid );
+
+    DebugPrintEx( logErr,
+        dwContext, "scheduled to "
+        "cancel task %s...", pszClass );
+
+    return pTask->OnEvent(
+        ( EnumEventId )dwContext,
+        iError, 0, nullptr );
+}
 /**
 * @name SubmitIoRequest: build the dbus message
 * with the pReq and send an irp down to the

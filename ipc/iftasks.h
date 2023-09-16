@@ -92,10 +92,10 @@ class CIfRetryTask
     sem_t               m_semWait;
     TaskletPtr          m_pParentTask;
     TaskletPtr          m_pFwdrTask;
+    bool                m_bSyncCancel = false;
 
     gint32 SetFwrdTask( IEventSink* pCallback );
-    TaskletPtr GetFwrdTask( bool bClear = false );
-    gint32 CancelTaskChain(
+    virtual gint32 CancelTaskChain(
         guint32 dwContest,
         gint32 iError = -ECANCELED );
 
@@ -165,6 +165,7 @@ class CIfRetryTask
     gint32 GetClientNotify( EventPtr& pEvt ) const;
 
     TaskletPtr GetEndFwrdTask( bool bClear = false );
+    TaskletPtr GetFwrdTask( bool bClear = false );
     gint32 ClearFwrdTask();
 
     template< class ClassName >
@@ -174,6 +175,12 @@ class CIfRetryTask
         LONGWORD dwParam1 = 0,
         LONGWORD dwParam2 = 0,
         LONGWORD* pdata = nullptr );
+
+    inline void SetSyncCancel()
+    { m_bSyncCancel = true; }
+
+    inline bool IsSyncCancel() const
+    { return m_bSyncCancel; }
 };
 
 typedef EnumIfState EnumTaskState;
@@ -183,6 +190,16 @@ class CIfParallelTask
 
     protected:
     std::atomic< EnumTaskState > m_iTaskState;
+    TaskletPtr m_pCancelTask;
+
+    gint32 CancelTaskChain(
+        guint32 dwContest,
+        gint32 iError = -ECANCELED ) override;
+
+    gint32 DoCancelTaskChainSync(
+        TaskletPtr pTask,
+        guint32 dwContest,
+        gint32 iError = -ECANCELED );
 
     public:
     typedef CIfRetryTask super;

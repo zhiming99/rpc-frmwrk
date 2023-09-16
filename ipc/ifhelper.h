@@ -3983,7 +3983,10 @@ class CTaskWrapper :
 ({ \
     gint32 ret = 0; \
     do{ \
-        NEW_FUNCCALL_TASK2( _pos, __pTask, pMgr, func, __VA_ARGS__ );\
+        ret = NEW_FUNCCALL_TASK( __pTask, pMgr, func, __VA_ARGS__ );\
+        if(  ERROR( ret ) ) \
+            break; \
+        CDeferredFuncCallBase< CIfRetryTask >* pDefer = __pTask; \
         TaskletPtr ptw; \
         CCfgOpener oCfg; \
         oCfg.SetPointer( propIoMgr, pMgr ); \
@@ -3994,6 +3997,8 @@ class CTaskWrapper :
         CTaskWrapper* pWrapper = ptw;\
         pWrapper->SetCompleteTask( __pTask ); \
         __pTask = ptw; \
+        Variant oVar( __pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     }while( 0 ); \
     ret; \
 })
