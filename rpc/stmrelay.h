@@ -1225,7 +1225,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 this->m_pListeningTask );
 
             if( ERROR( ret ) )
@@ -1289,7 +1289,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 this->m_pWritingTask );
 
             if( ERROR( ret ) )
@@ -1303,7 +1303,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 m_pWrTcpStmTask );
 
             if( ERROR( ret ) )
@@ -1317,7 +1317,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 m_pRdTcpStmTask );
 
         }while( 0 );
