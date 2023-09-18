@@ -52,8 +52,6 @@ gint32 CStreamQueue::Stop( bool bStarter )
     SetState( stateStopping );
     CancelAllIrps( ERROR_PORT_STOPPED );
     SetState( stateStopped );
-    GetParent()->OnEvent( eventStop,
-        0, 0, ( LONGWORD* )this );
     return 0;
 }
 

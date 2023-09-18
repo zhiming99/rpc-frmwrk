@@ -449,7 +449,10 @@ class CRpcInterfaceBase :
         TaskGrpPtr& pParaGrp );
 
     TaskGrpPtr& GetTaskGroup()
-    { return m_pRootTaskGroup; }
+    {
+        CStdRMutex oIfLock( GetLock() );
+        return m_pRootTaskGroup;
+    }
 
     bool IsMyPort( HANDLE hPort )
     {
