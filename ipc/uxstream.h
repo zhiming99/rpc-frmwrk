@@ -1325,8 +1325,7 @@ class CUnixSockStream:
 
             oParams.CopyProp( propTimeoutSec, this );
 
-            TaskletPtr pListeningTask;
-            ret = pListeningTask.NewObj(
+            ret = m_pListeningTask.NewObj(
                 clsid( CIfUxListeningTask ),
                 oParams.GetCfg() );
 
@@ -1334,7 +1333,7 @@ class CUnixSockStream:
                 break;
 
             ret = this->RunManagedTask(
-                pListeningTask );
+                m_pListeningTask );
 
             if( ERROR( ret ) )
                 break;
@@ -1355,6 +1354,14 @@ class CUnixSockStream:
 
         }while( 0 );
 
+        if( ERROR( ret ) )
+        {
+            if( !m_pListeningTask.IsEmpty() )
+                ( *m_pListeningTask )( eventCancelTask );
+
+            if( !m_pPingTicker.IsEmpty() )
+                ( *m_pPingTicker )( eventCancelTask );
+        }
         return ret;
     }
 
@@ -1390,9 +1397,10 @@ class CUnixSockStream:
         m_pListeningTask.Clear();
         m_pPingTicker.Clear();
         m_pReadingTask.Clear();
-        DebugPrintEx( logInfo, 0,
-            "a CUnixSockStream object"
-            "@0x%x is over", this );
+        DebugPrintEx( logWarning,
+            0, "a %s object @0x%llx is over",
+            CoGetClassName( this->GetClsid() ),
+            this );
         return 0;
     }
 
