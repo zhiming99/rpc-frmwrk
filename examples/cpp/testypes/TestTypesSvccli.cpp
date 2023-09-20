@@ -14,17 +14,16 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
     IConfigDb* context, gint32 iRet,
     const std::string& strResp /*[ In ]*/ )
 {
-    {
-        // TODO: Process the server response here
-        // return code ignored
+    do{
         CCfgOpener oCtx( context );
-        guint32 *val0, *val1;
+        guint32 *val0, *val1, *val2;
+        // counters shared with the caller function
         oCtx.GetIntPtr( 0, val0 );
         oCtx.GetIntPtr( 1, val1 );
+        oCtx.GetIntPtr( 2, val2 );
         auto& idx = *( ( std::atomic< int >* )val0 );
         auto& count = *( ( std::atomic< int >* )val1);
-        CSyncCallback* pCallback = nullptr;
-        oCtx.GetPointer( 2, pCallback );
+        auto& failures = *( ( std::atomic< int >* )val2);
         
         idx++;
         if( SUCCEEDED( iRet ) )
@@ -32,18 +31,22 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
             OutputMsg( 0,
                 "Server resp( %d ): %s",
                 idx.load(), strResp.c_str() );
-            count--;
-            if( count == 0 && pCallback )
-                pCallback->OnEvent(
-                    eventTaskComp, 0, 0, 0 );
         }
         else if( ERROR( iRet ) )
         {
+            failures++;
             OutputMsg( iRet,
-                "Server resp( %d ): failed, quitting",
-                idx.load() );
-            pCallback->OnEvent(
-                eventTaskComp, iRet, 0, 0 );
+                "Server resp( %d ): failed",
+                failures.load() );
+        }
+        if( --count == 0 )
+        {
+            CSyncCallback* pSync = nullptr;
+            gint32 ret = oCtx.GetPointer( 3, pSync );
+            if( ERROR( ret ) )
+                break;
+            pSync->OnEvent(
+                eventTaskComp, 0, 0, nullptr );
         }
     }while( 0 );
     return 0;

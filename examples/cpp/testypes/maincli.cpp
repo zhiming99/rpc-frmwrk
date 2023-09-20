@@ -512,6 +512,7 @@ int _main( int argc, char** argv )
 
 std::atomic< int > idx( 0 );
 std::atomic< int > count( 1000 );
+std::atomic< int > failures( 0 );
 gint32 SyncEcho( CTestTypesSvc_CliImpl* pIf )
 {
     gint32 ret = 0;
@@ -532,16 +533,20 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
     gint32 ret = 0;
     do{
         CParamList oParams;
+        // counters shared with the callback
         oParams.Push( ( intptr_t )&idx );
         oParams.Push( ( intptr_t )&count );
+        oParams.Push( ( intptr_t )&failures );
 
+        // synchronization task between this function
+        // and the callback
         TaskletPtr pSyncTask;
         ret = pSyncTask.NewObj(
             clsid( CSyncCallback ) );
         if( ERROR( ret ) )
             break;
-
         oParams.Push( ObjPtr( pSyncTask ) );
+
         for( int i = 0; i < 1000; i++ )
         {
             stdstr strResp;
@@ -553,10 +558,15 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
             {
                 count--;
                 OutputMsg( ret,
-                    "Error calling Echo3, ( %d )", i );
+                    "Error sending Echo3 request, ( %d )", i );
             }
         }
+
+        if( count == 0 )
+            break;
+
         CSyncCallback* pSync = pSyncTask;
+        // the requests are sent, wait for responses
         ret = pSync->WaitForCompleteWakable();
 
     }while( 0 );

@@ -656,6 +656,38 @@ void DumpObjs( bool bAll = false)
         }
     }
 }
+
+// find objects by class id
+void DbgFindObjs( gint32 iClsid )
+{
+    for( auto pObj : g_vecObjs )
+    {
+        std::string strObj;
+        if( pObj != nullptr )
+        {
+            if( pObj->GetClsid() == iClsid )
+                printf( "0x%llx\n", ( CObjBase* )pObj );
+        }
+    }
+}
+// find objects by class name
+void DbgFindCN( const char* szName )
+{
+    for( auto pObj : g_vecObjs )
+    {
+        std::string strObj;
+        if( pObj != nullptr )
+        {
+            EnumClsid iClsid = pObj->GetClsid();
+            const char* szClass =
+                CoGetClassName( iClsid );
+            if( szClass == nullptr )
+                continue;
+            if( strcmp( szClass, szName ) == 0 )
+                printf( "0x%llx\n", ( CObjBase* )pObj );
+        }
+    }
+}
 #endif
 
 CObjBase::CObjBase()

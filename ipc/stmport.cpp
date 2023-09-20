@@ -171,9 +171,15 @@ gint32 CDBusStreamPdo::SendDBusMsg(
         CCfgOpener oCtx;
         oCtx.SetPointer( propIrpPtr, pIrp );
         CRpcServices* pSvc = GetStreamIf();
-        // the downstream request handler has its own
-        // timer.
-        pIrp->RemoveTimer();
+
+        guint32 dwIoDir = pCtx->GetIoDirection();
+        if( dwIoDir == IRP_DIR_OUT )
+        {
+            // the downstream request handler has its
+            // own timer to cover the write operation.
+            pIrp->RemoveTimer();
+        }
+
         if( IsServer() )
         {
             CStreamServerSync* pStm =
@@ -464,9 +470,7 @@ gint32 CDBusStreamPdo::CompleteSendReq(
     gint32 ret = -EINVAL;
     if( pIrp == nullptr ||
         pIrp->GetStackSize() == 0 )
-    {
         return ret;
-    }
 
     do{
         // let's process the func irps
@@ -474,10 +478,6 @@ gint32 CDBusStreamPdo::CompleteSendReq(
         guint32 dwIoDir = pCtx->GetIoDirection();
         
         if( dwIoDir != IRP_DIR_INOUT )
-            break;
-
-        ret = pCtx->GetStatus();
-        if( ERROR( ret ) )
             break;
 
         BufPtr pExtBuf;
@@ -491,10 +491,14 @@ gint32 CDBusStreamPdo::CompleteSendReq(
         auto pExt =
             ( IRPCTX_EXTDSP* )pExtBuf->ptr();
 
+        ret = pCtx->GetStatus();
         if( pExt->m_bWaitWrite )
         {
-            // write operation completed
+            // write operation failed
+            if( ERROR( ret ) )
+                break;
 
+            // write operation completed
             pExt->m_bWaitWrite = false;
             IConfigDb* pReqMsg =
                 ( ObjPtr& )*pCtx->m_pReqData;
@@ -533,8 +537,6 @@ gint32 CDBusStreamPdo::CompleteSendReq(
             }
 
             oPortLock.Unlock();
-            if( ERROR( ret ) )
-                break;
 
             if( IsServer() )
             {
@@ -553,8 +555,25 @@ gint32 CDBusStreamPdo::CompleteSendReq(
         {
             ret = pCtx->GetStatus();
             // the response data 
+            if( SUCCEEDED( ret ) )
+                break;
+
+            // Error happens
+            // remove the request from the irp map
+            IConfigDb* pReqMsg =
+                ( ObjPtr& )*pCtx->m_pReqData;
+            CCfgOpener oMsg( pReqMsg );
+            guint32 dwSerial = 0;
+            ret = oMsg.GetIntProp(
+                propSeqNo, dwSerial );
             if( ERROR( ret ) )
                 break;
+
+            CStdRMutex oPortLock( GetLock() );
+            auto itr =
+                m_mapRespMsgs.find( dwSerial );
+            if( itr != m_mapRespMsgs.end() )
+                m_mapRespMsgs.erase( itr );
         }
 
     }while( 0 );
