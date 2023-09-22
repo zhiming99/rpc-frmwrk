@@ -1675,6 +1675,42 @@ gint32 CIoManager::RescheduleTask(
     return ret;
 }
 
+gint32 CIoManager::RescheduleTaskByTid(
+    TaskletPtr& pTask, guint32 dwTid )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pTask.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( dwTid == 0 )
+            dwTid = rpcf::GetTid();
+
+        ThreadPtr pThread;
+        ret = GetTaskThreadPool().GetThreadByTid(
+            pThread, dwTid );
+        if( SUCCEEDED( ret ) )
+        {
+            CTaskThread* pgth =
+                static_cast< CTaskThread* >( pThread );
+
+            if( pgth )
+            {
+                pTask->MarkPending();
+                pgth->AddTask( pTask );
+            }
+            break;
+        }
+        ret = RescheduleTask( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIoManager::Stop()
 {
     gint32 ret = 0;

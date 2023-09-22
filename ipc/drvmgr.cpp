@@ -346,6 +346,8 @@ gint32 CDriverManager::StopDrivers()
 {
     gint32 ret = 0;
     string strPath = GetBusDrvRegRoot();
+    gint32 iPass = 0;
+    stdstr strDBusDrv = "DBusBusDriver";
     do{
         // let's walk through the bus port list
         // to stop all the active bus ports
@@ -369,6 +371,25 @@ gint32 CDriverManager::StopDrivers()
         {
             // well, no child
         }
+        if( iPass == 0 )
+        {
+            bool bFound = false;
+            auto itr = vecContents.begin();
+            while( itr != vecContents.end() )
+            {
+                if( *itr == strDBusDrv )
+                {
+                    bFound = true;
+                    vecContents.erase( itr );
+                    break;
+                }
+                itr++;
+            }
+
+            if( bFound )
+                vecContents.push_back( strDBusDrv );
+        }
+
         for( gint32 i = 0; i < ( gint32 )vecContents.size(); i++ )
         {
             IPortDriver* pDrv = nullptr;
@@ -390,6 +411,7 @@ gint32 CDriverManager::StopDrivers()
             break;
 
         strPath = GetPortDrvRegRoot();
+        iPass++;
         
     }while( 1 );
     return ret;

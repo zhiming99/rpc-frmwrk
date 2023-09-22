@@ -667,6 +667,7 @@ class IServiceEx : public IService
 
 class IThread : public IService
 {
+    gint32 m_iSysTid = 0;
     public:
     virtual void ThreadProc( void* context ) = 0;
     virtual gint32 GetLoadCount() const = 0;
@@ -674,6 +675,10 @@ class IThread : public IService
     virtual gint32 SetThreadName(
         const char* szName = nullptr );
     virtual void Join() = 0;
+    inline gint32 GetTid() const
+    { return m_iSysTid; }
+    inline void SetTid( const gint32 iTid )
+    { m_iSysTid = iTid; }
 };
 
 class IoRequestPacket;
