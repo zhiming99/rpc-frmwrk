@@ -3985,38 +3985,69 @@ gint32 CRpcRouterReqFwdr::OnPreStopLongWait(
 
     }while( 0 );
 
-    CParamList oParams;
-    oParams[ propIfPtr ] = ObjPtr( this );
+    TaskGrpPtr pTopGrp;
     TaskGrpPtr pTaskGrp;
-    ret = pTaskGrp.NewObj(
-        clsid( CIfParallelTaskGrp ),
-        oParams.GetCfg() );
+    do{
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        ret = pTaskGrp.NewObj(
+            clsid( CIfParallelTaskGrp ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        bool bHasProxy =
+            ( mapId2Proxies.size() > 0 );
+        for( auto&& elem : mapId2Proxies )
+        {
+            ADD_STOPIF_TASK( ret,
+                pTaskGrp, elem.second );
+        }
+        mapId2Proxies.clear();
+
+        if( !m_pReqFwdr.IsEmpty() )
+        {
+            // reqfwdr should be stopped after all the
+            // proxies are stopped.
+            ret = pTopGrp.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            if( bHasProxy )
+            {
+                TaskletPtr pTask = pTaskGrp;
+                pTopGrp->AppendTask( pTask );
+            }
+            ADD_STOPIF_TASK( ret,
+                pTopGrp, m_pReqFwdr );
+        }
+        else if( bHasProxy )
+        {
+            pTopGrp = pTaskGrp;
+        }
+        else
+        {
+            break;
+        }
+        if( pTopGrp->GetTaskCount() > 0 )
+        {
+            pTopGrp->SetClientNotify( pCallback );
+            TaskletPtr pTask = pTopGrp;
+            ret = GetIoMgr()->
+                RescheduleTask( pTask );
+
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+        }
+
+    }while( 0 );
     if( ERROR( ret ) )
-        return ret;
-
-    pTaskGrp->SetClientNotify( pCallback );
-    pTaskGrp->SetRelation( logicNONE );
-
-    for( auto&& elem : mapId2Proxies )
     {
-        ADD_STOPIF_TASK( ret,
-            pTaskGrp, elem.second );
-    }
-    mapId2Proxies.clear();
-
-    if( !m_pReqFwdr.IsEmpty() )
-    {
-        ADD_STOPIF_TASK( ret,
-            pTaskGrp, m_pReqFwdr );
-    }
-
-    if( pTaskGrp->GetTaskCount() > 0 )
-    {
-        TaskletPtr pTask = pTaskGrp;
-        ret = GetIoMgr()->
-            RescheduleTask( pTask );
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        if( !pTopGrp.IsEmpty() )
+            ( *pTopGrp )( eventCancelTask );
+        else if( !pTaskGrp.IsEmpty() )
+            ( *pTaskGrp )( eventCancelTask );
     }
 
     return ret;
