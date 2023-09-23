@@ -1,4 +1,7 @@
 ---
+[`Sat Sep 23 2023 09:01:53 PM Beijing`]   
+1. Having fixed one memory leak, and two regression bugs. The progress is a bit slow. There are still two bugs to kill, besides fixing the performance issue as the PR requests
+
 [`Sat Sep 16 2023 06:53:13 PM Beijing`]   
 1. previously I was planning to release version 0.6.0, in the last week of Sep.
 2. Now I have found 3 new memory leaks in the stress test. And I must postpone the release for one or two weeks.
