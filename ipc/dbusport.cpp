@@ -1773,7 +1773,7 @@ gint32 CDBusBusPort::ScheduleLpbkTask(
 
         CIoManager* pMgr = GetIoMgr();
 
-        ret = pMgr->ScheduleTask(
+        ret = pMgr->ScheduleTaskMainLoop(
             clsid( CDBusTransLpbkMsgTask ),
             oParams.GetCfg() );
 

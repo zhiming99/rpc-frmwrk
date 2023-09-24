@@ -1921,7 +1921,10 @@ gint32 CRpcTcpBridgeShared::OnPostStartShared(
             RunManagedTask( pTask );
 
         if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
             break;
+        }
 
     }while( 0 );
 

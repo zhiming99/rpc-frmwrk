@@ -339,15 +339,16 @@ gint32 CDBusProxyPdo::CompleteConnReq(
         // set the return status
         pCtx->SetStatus( ret );
 
+        // the reqData is set by this port
+        // so we can remove it
+        pCtx->m_pReqData.Clear();
+        pCtx->m_pRespData.Clear();
+
         if( pIrp->CtrlCode() == CTRLCODE_DISCONN )
         {
             // active disconnection is done
             break;
         }
-
-        // the reqData is set by this port
-        // so we can remove it
-        pCtx->m_pReqData.Clear();
 
         break;
 

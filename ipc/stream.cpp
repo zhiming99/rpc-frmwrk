@@ -702,12 +702,7 @@ CIfStartUxSockStmTask::CIfStartUxSockStmTask(
 { SetClassId( clsid( CIfStartUxSockStmTask ) ); }
 
 CIfStartUxSockStmTask::~CIfStartUxSockStmTask()
-{
-    gint32 ret = GetError();
-    if( ERROR( ret ) )
-        DebugPrintEx( logWarning, ret,
-            "Destroying CIfStartUxSockStmTask" );
-}
+{}
 
 gint32 CIfStartUxSockStmTask::RunTask()
 {
@@ -729,12 +724,56 @@ gint32 CIfStartUxSockStmTask::RunTask()
             break;
         }
 
-        ret = pSvc->StartEx( this );
+        gint32 (*func)( CTasklet* ,
+            CRpcServices*, CIfStartUxSockStmTask* ) =
+        ([]( CTasklet* pCb,
+            CRpcServices* pIf,
+            CIfStartUxSockStmTask* pTask )->gint32
+        {
+            if( pTask == nullptr )
+                return -EINVAL;
+            gint32 ret = 0;
+            CCfgOpener oCfg(
+                ( IConfigDb* )pCb->GetConfig() );
+            IConfigDb* pResp = nullptr;
+            ret = oCfg.GetPointer( propRespPtr, pResp );
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpener oResp( pResp );
+                gint32 iRet = oResp.GetIntProp(
+                    propReturnValue, ( guint32& )ret );
+                if( ERROR( iRet ) )
+                    ret = iRet;
+            }
+
+            EnumTaskState iState =
+                    pTask->GetTaskState();
+            if( pTask->IsStopped( iState ) )
+                return ERROR_STATE;
+
+            TaskletPtr pDefer;
+            ret = DEFER_CALL_NOSCHED( pDefer,
+                pTask, &IEventSink::OnEvent,
+               eventTaskComp, ret, 0, nullptr ); 
+
+            if( ERROR( ret ) )
+                return ret;
+
+            auto pMgr = pIf->GetIoMgr();
+            return pMgr->RescheduleTaskByTid( pDefer );
+        });
+        // This task is to make sure 'StartTicking' runs 
+        // outside the root group.
+        TaskletPtr pStartCb;
+        ret = NEW_COMPLETE_FUNCALL( 0,
+            pStartCb, pSvc->GetIoMgr(),
+            func, nullptr, pSvc, this );
         if( ERROR( ret ) )
             break;
 
-        if( ret == STATUS_PENDING )
-            break;
+        ret = pSvc->StartEx( pStartCb );
+        if( ERROR( ret ) )
+            ( *pStartCb )( eventCancelTask );
 
     }while( 0 );
 
@@ -883,55 +922,17 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             }
         }
 
-        gint32 ( *func )( CRpcServices*, CRpcServices* ) =
-            ([]( CRpcServices* pUxIf, CRpcServices* pParent )->gint32
-            {
-                gint32 ret = 0;
-                if( pUxIf == nullptr || pParent == nullptr )
-                    return -EINVAL;
-                do{
-                    ObjPtr pObj = pUxIf;
-                    if( pUxIf->IsServer() )
-                    {
-                        CUnixSockStmServer* pSvc = pObj;
-                        ret = pSvc->StartTicking( nullptr );
-                    }
-                    else
-                    {
-                        CUnixSockStmProxy* pSvc = pObj;
-                        ret = pSvc->StartTicking( nullptr );
-                    }
-                    if( SUCCEEDED( ret ) )
-                        break;
+        if( pSvc->IsServer() )
+        {
+            CUnixSockStmServer* pStm = pUxIf;
+            ret = pStm->StartTicking( nullptr );
+        }
+        else
+        {
+            CUnixSockStmProxy* pStm = pUxIf;
+            ret = pStm->StartTicking( nullptr );
+        }
 
-                    HANDLE hstm = ( HANDLE )pUxIf;
-                    pObj = pParent;
-                    if( pParent->IsServer() )
-                    {
-                        CStreamServer* pSvc = pObj;
-                        pSvc->OnChannelError( hstm, ret );
-                    }
-                    else
-                    {
-                        CStreamProxy* pSvc = pObj;
-                        pSvc->OnChannelError( hstm, ret );
-                    }
-
-                }while( 0 );
-                return ret;
-            });
-
-        auto pMgr = pSvc->GetIoMgr();
-        TaskletPtr pListenTask;
-        ret = NEW_FUNCCALL_TASK( pListenTask,
-            pMgr, func, pSvc, pParent );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pMgr->RescheduleTask( pListenTask );
-        if( ERROR( ret ) )
-            ( *pListenTask )( eventCancelTask );
-        
     }while( 0 );
 
     oParams.ClearParams();
@@ -1311,7 +1312,11 @@ gint32 IStream::CloseChannel(
 
     gint32 ret = RemoveUxStream( hChannel, pIf );
     if( ERROR( ret ) )
+    {
+        DebugPrint( ret,
+            "RemoveUxStream failed 0x%llx", hChannel );
         return ret;
+    }
 
     do{
         CRpcServices* pSvc = pIf;
@@ -1341,7 +1346,12 @@ gint32 IStream::CloseChannel(
         ret = pThisIf->AddSeqTask( pStopTask );
 
         if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error OnClose failed to add stoptask for 0x%llx @state=%d",
+                pSvc, pThisIf->GetState() );
             ( *pStopTask )( eventCancelTask );
+        }
         else
             ret = STATUS_PENDING;
 

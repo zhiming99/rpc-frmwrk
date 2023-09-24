@@ -381,6 +381,9 @@ class CIfTaskGroup
 
     std::deque< TaskletPtr > m_queTasks;
     std::vector< gint32 > m_vecRetVals;
+#ifdef DEBUG
+    std::vector< gint32 > m_vecClsids;
+#endif
 
     virtual gint32 RunTaskInternal(
         guint32 dwContext );
@@ -489,7 +492,8 @@ class CIfTaskGroup
 
     template< class T >
     gint32 FindTaskByType(
-        TaskletPtr& pTask, T* pHint );
+        TaskletPtr& pTask, T* pHint,
+        bool bReverse = false );
 
     template< class T >
     gint32 FindTasksByType(
@@ -501,17 +505,42 @@ typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
 
 template< class T >
 gint32 CIfTaskGroup::FindTaskByType(
-    TaskletPtr& pTask, T* pHint )
+    TaskletPtr& pTask, T* pHint,
+    bool bReverse )
 {
     pHint = nullptr;
     CStdRTMutex oLock( GetLock() );
-    for( auto elem : m_queTasks )
+    if( m_queTasks.empty() )
+        return -ENOENT;
+    if( !bReverse )
     {
-        pHint = elem;
-        if( pHint == nullptr )
-            continue;
-        pTask = elem;
-        break;
+        auto itr = m_queTasks.begin();
+        while( itr != m_queTasks.end() )
+        {
+            pHint = *itr;
+            if( pHint == nullptr )
+            {
+                itr++;
+                continue;
+            }
+            pTask = *itr;
+            break;
+        }
+    }
+    else
+    {
+        auto itr = m_queTasks.rbegin();
+        while( itr != m_queTasks.rend() )
+        {
+            pHint = *itr;
+            if( pHint == nullptr )
+            {
+                itr++;
+                continue;
+            }
+            pTask = *itr;
+            break;
+        }
     }
     if( pHint != nullptr )
         return STATUS_SUCCESS;

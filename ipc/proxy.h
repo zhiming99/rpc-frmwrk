@@ -711,6 +711,8 @@ class CRpcServices :
 
     virtual gint32 RebuildMatches();
 
+    gint32 RunManagedParaTask( TaskletPtr& pTask );
+
     public:
 
     virtual gint32 StartEx2(

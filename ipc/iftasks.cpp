@@ -1446,6 +1446,9 @@ gint32 CIfTaskGroup::AppendAndRun(
         {
             bImmediate = true;
             m_vecRetVals.clear();
+#ifdef DEBUG
+            m_vecClsids.clear();
+#endif
         }
 
     }while( 0 );
@@ -1472,6 +1475,9 @@ gint32 CIfTaskGroup::OnRetry()
         // clear the return values if any on retry
         CStdRTMutex oTaskLock( GetLock() );
         m_vecRetVals.clear();
+#ifdef DEBUG
+        m_vecClsids.clear();
+#endif
     }
     return RunTask();
 }
@@ -1527,6 +1533,8 @@ gint32 CIfTaskGroup::RunTaskInternal(
             m_queTasks.size() > 0 )
         {
             // cancel the rest tasks
+            SetRunning( false );
+            SetTaskState( stateStopping );
             return ERROR_CANCEL_INSTEAD;
         }
 
@@ -1538,6 +1546,8 @@ gint32 CIfTaskGroup::RunTaskInternal(
             m_queTasks.size() > 0 )
         {
             // cancel the rest tasks
+            SetRunning( false );
+            SetTaskState( stateStopping );
             return ERROR_CANCEL_INSTEAD;
         }
         
@@ -1632,6 +1642,7 @@ gint32 CIfTaskGroup::RunTaskInternal(
 
     if( ret == ERROR_CANCEL_INSTEAD )
     {
+        SetRunning( false );
         SetTaskState( stateStopping );
         return ret;
     }
@@ -1673,6 +1684,9 @@ gint32 CIfTaskGroup::OnChildComplete(
             break;
         }
 
+#ifdef DEBUG
+        m_vecClsids.push_back( pChild->GetClsid() );
+#endif
         PopTask();
         m_vecRetVals.push_back( iRet );
 
@@ -1746,22 +1760,24 @@ gint32 CIfTaskGroup::OnCancel(
         if( unlikely( IsCanceling() ) )
             return STATUS_PENDING;
 
-        // notify the other guys canceling in
-        // process
-        SetCanceling( true );
-
         if( IsNoSched() )
         {
             // some thread is working on this object
             // let's do it later
-            SetCanceling( false );
             oTaskLock.Unlock();
             usleep( 100 );
             continue;
         }
 
+        // notify the other guys canceling in
+        // process
+        SetCanceling( true );
+
         if( iState == stateStarting )
-            SetTaskState( stateStarted );
+            SetTaskState( stateStopping );
+
+        if( IsRunning() )
+            SetRunning( false );
 
         if( dwContext == eventCancelInstead &&
             m_vecRetVals.size() )
@@ -1997,8 +2013,11 @@ gint32 CIfRootTaskGroup::OnComplete(
     gint32 iRetVal )
 {
     CStdRTMutex oLock( GetLock() );
-    SetTaskState( stateStarted );
+    if( GetTaskState() == stateStopped )
+        return 0;
+    SetTaskState( stateStarting );
     SetCanceling( false );
+    SetRunning( false );
     return 0;
 }
 
@@ -2026,11 +2045,11 @@ gint32 CIfRootTaskGroup::OnChildComplete(
             break;
         }
 
+#ifdef DEBUG
+        m_vecClsids.push_back( pChild->GetClsid() );
+#endif
         PopTask();
         m_vecRetVals.push_back( iRet );
-
-        if( IsNoSched() )
-            break;
 
         // don't reschedule on empty task queue,
         // otherwise, the child task/taskgroup
@@ -2040,11 +2059,19 @@ gint32 CIfRootTaskGroup::OnChildComplete(
         {
             // there could be too many ret values
             // if we don't clean up
-            m_vecRetVals.clear();
-
+            if( m_vecRetVals.size() >= 32 )
+            {
+                m_vecRetVals.clear();
+#ifdef DEBUG
+                m_vecClsids.clear();
+#endif
+            }
             // no need to reschedule
             break;
         }
+
+        if( IsNoSched() )
+            break;
 
         CfgPtr pCfg = GetConfig();
         CCfgOpener oCfg( ( IConfigDb* )pCfg );
@@ -5861,14 +5888,12 @@ gint32 CIfInterceptTaskProxy::OnComplete(
     return super::OnComplete( iRetVal );
 }
 
-gint32 CTaskWrapper::TransferParams()
+gint32 CTaskWrapper::TransferParams(
+    gint32 iRetVal )
 {
-    if( m_pTask.IsEmpty() )
-        return 0;
-
     gint32 ret = 0;
     CCfgOpener oCfg( ( IConfigDb* )
-        m_pTask->GetConfig() );
+        this->GetConfig() );
     do{
 
         IConfigDb* pSrc = this->GetConfig();
@@ -5916,17 +5941,18 @@ gint32 CTaskWrapper::TransferParams()
         }
 
         pSrc = pT->GetConfig();
-        oCfg.CopyProp( propRespPtr, pSrc );
+        ret = oCfg.CopyProp( propRespPtr, pSrc );
 
     }while( 0 );
 
     if( ERROR( ret ) )
     {
         CCfgOpener oResp;
-        oResp[ propReturnValue ] = ret;
+        oResp[ propReturnValue ] = iRetVal;
         oResp[ propSeqNo ] = 0x12345;
         oCfg.SetPointer( propRespPtr,
             ( IConfigDb* )oResp.GetCfg() );
+        ret = 0;
     }
     return ret;
 }
@@ -5963,7 +5989,7 @@ gint32 CTaskWrapper::RunTask()
 gint32 CTaskWrapper::OnTaskComplete(
     gint32 iRet )
 {
-    TransferParams();
+    TransferParams( iRet );
     super::OnTaskComplete( iRet );
     CIfRetryTask* pTask = m_pTask;
     if( pTask != nullptr )

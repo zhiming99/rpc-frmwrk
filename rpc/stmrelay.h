@@ -1254,6 +1254,16 @@ class CUnixSockStmRelayBase :
 
         }while( 0 );
 
+        if( ERROR( ret ) )
+        {
+            if( !this->m_pListeningTask.IsEmpty() )
+                ( *this->m_pListeningTask )(
+                    eventCancelTask );
+
+            if( !this->m_pPingTicker.IsEmpty() )
+                ( *this->m_pPingTicker )(
+                    eventCancelTask );
+        }
         return ret;
     }
 

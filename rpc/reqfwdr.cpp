@@ -1979,6 +1979,16 @@ gint32 CRpcReqForwarder::OnModEvent(
         if( strModule[ 0 ] != ':' )
             break;
 
+        ObjPtr pObj;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetObjPtr(
+            propRouterPtr, pObj );
+        if( ERROR( ret ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
         //
         // ret = GetRefCountByUniqName( strModule );
         // if( ret <= 0 )
@@ -2007,30 +2017,11 @@ gint32 CRpcReqForwarder::OnModEvent(
         pRetry = pDeferTask;
         pRetry->SetClientNotify( plcc );
 
-        CStdRMutex oIfLock( GetLock() );
-        if( !IsConnected() )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-
-        ret = this->AddAndRun( plcc );
+        ret = RunManagedTask( plcc );
         if( ERROR( ret ) )
         {
             ( *plcc )( eventCancelTask );
             plcc.Clear();
-            break;
-        }
-
-        oIfLock.Unlock();
-
-        ObjPtr pObj;
-        CCfgOpenerObj oIfCfg( this );
-        ret = oIfCfg.GetObjPtr(
-            propRouterPtr, pObj );
-        if( ERROR( ret ) )
-        {
-            ret = ERROR_STATE;
             break;
         }
 
