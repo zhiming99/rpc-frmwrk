@@ -6197,7 +6197,7 @@ gint32 CInterfaceProxy::CancelReqAsync(
             break;
 
         CDeferredFuncCallBase< CIfRetryTask >* pCall = pTask;
-        ObjPtr pObj( pCall );
+        ObjPtr pObj( pWrapper );
         Variant oArg0( pObj );
         pCall->UpdateParamAt( 0, oArg0 );
 

@@ -560,6 +560,12 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
                 OutputMsg( ret,
                     "Error sending Echo3 request, ( %d )", i );
             }
+            if( SUCCEEDED( ret ) )
+            {
+                count--;
+                OutputMsg( ret,
+                    "Succeeded Echo3 request immediately, ( %d )", i );
+            }
         }
 
         if( count == 0 )

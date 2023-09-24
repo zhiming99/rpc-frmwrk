@@ -3493,10 +3493,6 @@ gint32 CImplServiceImplFuse::Output()
             NEW_LINE;
             Wa( "CDeferredFuncCallBase< CIfRetryTask >*" );
             Wa( "    pCall = pCb;" );
-            Wa( "ObjPtr pObj( pCall );" );
-            Wa( "Variant oArg0( pObj );" );
-            Wa( "pCall->UpdateParamAt( 1, oArg0 );" );
-            NEW_LINE;
             Wa( "TaskletPtr pWrapper;" );
             Wa( "CCfgOpener oCfg;" );
             Wa( "oCfg.SetPointer( propIfPtr, this );" );
@@ -3505,6 +3501,11 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "   ( IConfigDb* )oCfg.GetCfg() );" );
             Wa( "if( ERROR( ret ) )" );
             Wa( "    break;" );
+            NEW_LINE;
+            Wa( "ObjPtr pObj( pWrapper );" );
+            Wa( "Variant oArg0( pObj );" );
+            Wa( "pCall->UpdateParamAt( 1, oArg0 );" );
+            NEW_LINE;
             Wa( "CTaskWrapper* ptw = pWrapper;" );
             Wa( "ptw->SetCompleteTask( pCall );" );
             Wa( "CCfgOpenerObj otwCfg( ptw );" );
