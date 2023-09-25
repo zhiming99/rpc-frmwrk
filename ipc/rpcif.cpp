@@ -2788,6 +2788,7 @@ gint32 CRpcServices::OnPostStop(
             oIfLock.Lock();
             continue;
         }
+        pGrp->SetRunning( false );
         pGrp->SetTaskState( stateStopped );
         pGrp->RemoveProperty( propIfPtr );
         m_pRootTaskGroup.Clear();
@@ -5157,7 +5158,7 @@ gint32 CRpcServices::DoRmtModEvent(
     if( pRoot2 != pRoot ) \
         continue; \
     EnumTaskState iState = pRoot->GetTaskState(); \
-    if( iState == stateStopped ) \
+    if( pRoot->IsStopped( iState ) ) \
     { \
         ret = ERROR_STATE; \
         break; \
@@ -5400,7 +5401,8 @@ gint32 CRpcServices::RunManagedTask(
                 break;
             }
             CHECK_ROOTGRP;
-            if( pRoot->GetTaskCount() > 0 )
+            if( pRoot->GetTaskCount() > 0 ||
+                pRoot->IsNoSched() )
             {
                 bRun = false;
                 ptrTask->MarkPending();

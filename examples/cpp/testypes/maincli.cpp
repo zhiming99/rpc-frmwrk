@@ -554,17 +554,20 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
             strText += std::to_string( i );
             ret = pIf->Echo3( oParams.GetCfg(),
                 strText, strResp );
+            if( ret == STATUS_PENDING )
+                continue;
+            count--;
             if( ERROR( ret ) )
             {
-                count--;
                 OutputMsg( ret,
                     "Error sending Echo3 request, ( %d )", i );
             }
-            if( SUCCEEDED( ret ) )
+            else
             {
-                count--;
                 OutputMsg( ret,
-                    "Succeeded Echo3 request immediately, ( %d )", i );
+                    "Succeeded Echo3 request "
+                    "immediately, ( %d ), %s",
+                    i, strResp.c_str() );
             }
         }
 

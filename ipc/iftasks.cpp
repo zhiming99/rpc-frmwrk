@@ -1434,17 +1434,24 @@ gint32 CIfTaskGroup::AppendAndRun(
         return -EINVAL;
 
     gint32 ret = 0;
-    bool bImmediate = false;
+    bool bRun = true;
 
     CStdRTMutex oTaskLock( GetLock() );
     do{
+        guint32 dwCount = GetTaskCount();
         ret = AppendTask( pTask );
         if( ERROR( ret ) )
             break;
 
-        if( GetTaskCount() == 1 )
+        bool bNoSched = ( IsNoSched() ||
+            m_vecRetVals.size() );
+
+        if( dwCount > 0 || bNoSched )
         {
-            bImmediate = true;
+            bRun = false;
+        }
+        else
+        {
             m_vecRetVals.clear();
 #ifdef DEBUG
             m_vecClsids.clear();
@@ -1453,8 +1460,7 @@ gint32 CIfTaskGroup::AppendAndRun(
 
     }while( 0 );
 
-    if( SUCCEEDED( ret ) &&
-        bImmediate == true )
+    if( SUCCEEDED( ret ) && bRun == true )
     {
         oTaskLock.Unlock();
         ( *this )( eventZero );
@@ -1772,12 +1778,8 @@ gint32 CIfTaskGroup::OnCancel(
         // notify the other guys canceling in
         // process
         SetCanceling( true );
-
-        if( iState == stateStarting )
-            SetTaskState( stateStopping );
-
-        if( IsRunning() )
-            SetRunning( false );
+        SetTaskState( stateStopping );
+        SetRunning( false );
 
         if( dwContext == eventCancelInstead &&
             m_vecRetVals.size() )
@@ -2015,9 +2017,9 @@ gint32 CIfRootTaskGroup::OnComplete(
     CStdRTMutex oLock( GetLock() );
     if( GetTaskState() == stateStopped )
         return 0;
-    SetTaskState( stateStarting );
+    SetTaskState( stateStarted );
     SetCanceling( false );
-    SetRunning( false );
+    SetRunning( true );
     return 0;
 }
 
@@ -2059,11 +2061,11 @@ gint32 CIfRootTaskGroup::OnChildComplete(
         {
             // there could be too many ret values
             // if we don't clean up
-            if( m_vecRetVals.size() >= 32 )
+            if( m_vecRetVals.size() >= 16 )
             {
-                m_vecRetVals.clear();
+                m_vecRetVals.erase( m_vecRetVals.begin() );
 #ifdef DEBUG
-                m_vecClsids.clear();
+                m_vecClsids.erase( m_vecClsids.begin() );
 #endif
             }
             // no need to reschedule
@@ -2089,6 +2091,92 @@ gint32 CIfRootTaskGroup::OnChildComplete(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CIfRootTaskGroup::RunTaskInternal(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    CStdRTMutex oTaskLock( GetLock() );
+
+    EnumTaskState iState = GetTaskState();
+    if( unlikely( IsStopped( iState ) ) )
+        return STATUS_PENDING;
+
+    if( unlikely( IsCanceling() ) )
+        return STATUS_PENDING;
+
+    if( unlikely( IsNoSched() ) )
+        return STATUS_PENDING;
+
+    if( iState == stateStarting )
+    {
+        SetTaskState( stateStarted );
+        SetRunning( true );
+    }
+
+    TaskletPtr pPrevTask;
+    while( !m_queTasks.empty() )
+    {
+        TaskletPtr pTask;
+
+        if( !pPrevTask.IsEmpty() &&
+            pPrevTask == m_queTasks.front() ) 
+        {
+            m_queTasks.pop_front();
+            continue;
+        }
+
+        pTask = m_queTasks.front();
+        if( pTask.IsEmpty() )
+        {
+            DebugPrint( 0, "Error, found "
+                "empty task in the task queue" );
+            m_queTasks.pop_front();
+            continue;
+        }
+
+        // tell OnChildComplete not to reschedule
+        // this taskgrp because it is running
+        SetNoSched( true );
+
+        oTaskLock.Unlock();
+
+        ( *pTask )( dwContext );
+        ret = pTask->GetError();
+
+        oTaskLock.Lock();
+        SetNoSched( false );
+
+        if( unlikely( ret ==
+            STATUS_MORE_PROCESS_NEEDED ) )
+        {
+            // retry will happen on the child task,
+            // let's pending
+            // Taskgroup will not return
+            // STATUS_MORE_PROCESS_NEEDED
+            ret = STATUS_PENDING;
+        }
+
+        if( ( m_queTasks.empty() ||
+            m_queTasks.front() != pTask ) &&
+            ret == STATUS_PENDING )
+        {
+            // the task has been removed from the
+            // queue. Recheck the task's error
+            // code, probably the return code
+            // changed before we have grabbed the
+            // lock
+            ret = m_vecRetVals.back();
+        }
+
+        if( ret == STATUS_PENDING )
+            break;
+
+        pPrevTask = pTask;
+    }
+
+    return STATUS_PENDING;
 }
 
 gint32 CIfStopTask::OnIrpComplete(
@@ -2736,17 +2824,18 @@ gint32 CIfParallelTaskGrp::OnCancel(
         if( unlikely( IsCanceling() ) )
             return STATUS_PENDING;
 
-        SetCanceling( true );
-
         if( IsNoSched() )
         {
             // some thread is working on this
             // object let's do it later
-            SetCanceling( false );
             oTaskLock.Unlock();
             usleep( 100 );
             continue;
         }
+
+        SetRunning( false );
+        SetCanceling( true );
+        SetTaskState( stateStopping );
 
         SetNoSched( true );
 
@@ -2775,6 +2864,9 @@ gint32 CIfParallelTaskGrp::OnCancel(
                 m_setTasks.clear();
             }
 
+            if( vecTasks.empty() )
+                break;
+
             oTaskLock.Unlock();
 
             for( auto elem : vecTasks )
@@ -2800,7 +2892,6 @@ gint32 CIfParallelTaskGrp::OnCancel(
         }while( 0 );
 
         SetNoSched( false );
-        SetTaskState( stateStopping );
         break;
 
     }while( 1 );

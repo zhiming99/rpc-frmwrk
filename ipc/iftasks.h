@@ -440,7 +440,9 @@ class CIfTaskGroup
         m_iTaskState = iState;
     }
 
-    virtual gint32 AppendTask( TaskletPtr& pTask );
+    virtual gint32 AppendTask(
+        TaskletPtr& pTask );
+
     gint32 AppendAndRun( TaskletPtr& pTask );
 
     virtual guint32 GetTaskCount() 
@@ -550,6 +552,9 @@ gint32 CIfTaskGroup::FindTaskByType(
 class CIfRootTaskGroup
     : public CIfTaskGroup
 {
+    protected:
+    virtual gint32 RunTaskInternal(
+        guint32 dwContext );
     public:
     typedef CIfTaskGroup super;
     CIfRootTaskGroup( const IConfigDb* pCfg )
@@ -557,9 +562,7 @@ class CIfRootTaskGroup
     {
         SetClassId( clsid( CIfRootTaskGroup ) );
     }
-    // the race condtion can happen between 
-    //  ( RunTask, OnCancel, OnChildComplete )
-    // 
+
     virtual gint32 OnComplete( gint32 iRet );
     virtual gint32 OnChildComplete(
         gint32 iRet, CTasklet* pChild );
@@ -613,7 +616,8 @@ class CIfParallelTaskGrp
     virtual gint32 OnChildComplete(
         gint32 ret, CTasklet* pChild );
 
-    gint32 AppendTask( TaskletPtr& pTask );
+    gint32 AppendTask(
+        TaskletPtr& pTask ) override;
 
     gint32 FindTask( guint64 iTaskId,
         TaskletPtr& pTask );
@@ -1207,7 +1211,7 @@ class CIfParallelTaskGrpRfc :
 
     gint32 AddAndRun( TaskletPtr& pTask );
 
-    virtual gint32 AppendTask(
+    gint32 AppendTask(
         TaskletPtr& pTask ) override ;
 
     virtual gint32 InsertTask(

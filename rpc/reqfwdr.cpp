@@ -5312,7 +5312,7 @@ gint32 CRpcReqForwarderProxy::OnModEvent(
         CIfRetryTask* pRetryTask = pTask;
         pRetryTask->SetClientNotify( pRespTask );
 
-        ret = AppendAndRun( pTask );
+        ret = this->AddSeqTask( pTask );
         if( ERROR( ret ) )
             break;
 
