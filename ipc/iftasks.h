@@ -553,19 +553,14 @@ class CIfRootTaskGroup
     : public CIfTaskGroup
 {
     protected:
-    virtual gint32 RunTaskInternal(
-        guint32 dwContext );
+    gint32 RunTaskInternal(
+        guint32 dwContext ) override;
     public:
     typedef CIfTaskGroup super;
-    CIfRootTaskGroup( const IConfigDb* pCfg )
-       : super( pCfg ) 
-    {
-        SetClassId( clsid( CIfRootTaskGroup ) );
-    }
-
-    virtual gint32 OnComplete( gint32 iRet );
-    virtual gint32 OnChildComplete(
-        gint32 iRet, CTasklet* pChild );
+    CIfRootTaskGroup( const IConfigDb* pCfg );
+    gint32 OnComplete( gint32 iRet ) override;
+    gint32 OnChildComplete(
+        gint32 iRet, CTasklet* pChild ) override;
 };
 
 

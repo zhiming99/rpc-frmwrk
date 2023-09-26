@@ -927,9 +927,6 @@ gint32 CRpcInterfaceBase::StartEx(
         if( ERROR( ret ) )
             break;
 
-        m_pRootTaskGroup->SetRelation(
-            logicNONE );
-
         // non-IO interface
         ret = oParams.CopyProp(propNoPort, this );
         if( SUCCEEDED( ret ) )
@@ -1164,9 +1161,6 @@ gint32 CRpcInterfaceBase::StopEx(
 
             if( ERROR( ret ) )
                 break;
-
-            m_pRootTaskGroup->SetRelation(
-                logicNONE );
         }
         oIfLock.Unlock();
 

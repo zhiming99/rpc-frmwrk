@@ -2011,6 +2011,16 @@ gint32 CIfTaskGroup::OnTaskComplete(
     return OnCancel( dwContext );
 }
 
+CIfRootTaskGroup::CIfRootTaskGroup(
+    const IConfigDb* pCfg ) :
+    super( pCfg ) 
+{
+    SetClassId( clsid( CIfRootTaskGroup ) );
+    SetRelation( logicNONE );
+    SetTaskState( stateStarted );
+    SetRunning( true );
+}
+
 gint32 CIfRootTaskGroup::OnComplete(
     gint32 iRetVal )
 {

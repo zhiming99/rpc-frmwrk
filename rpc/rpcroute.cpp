@@ -5049,6 +5049,28 @@ gint32 CRouterAddRemoteMatchTask::RunTask()
         if( ERROR( ret ) )
             break;
 
+        if( bEnable )
+        {
+            guint32 dwPortId = 0;
+            InterfPtr pIf;
+            CCfgOpenerObj oMatch( pMatch );
+            ret = oMatch.GetIntProp(
+                propPortId, dwPortId );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pRouter->GetBridge(
+                dwPortId, pIf );
+            if( ERROR( ret ) )
+                break;
+            CRpcServices* pSvc = pIf;
+            if( !pSvc->IsConnected() )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+        }
+
         ret = AddRemoteMatchInternal(
             pRouter, pMatch, bEnable );
 
