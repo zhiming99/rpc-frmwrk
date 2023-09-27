@@ -2682,9 +2682,11 @@ gint32 UpdateObjDesc(
     do{
         CCfgOpener oCfg( pCfg );
         guint32 dwVal;
+        guint32 dwRole;
         ret = oCfg.GetIntProp( 101, dwVal );
         if( ERROR( ret ) )
             break;
+        dwRole = dwVal;
 
         bool bChanged = false;
         bool bProxy = ( dwVal == 1 );
@@ -2879,7 +2881,12 @@ gint32 UpdateObjDesc(
         if( !bChanged )
             break;
 
-        char szNewDesc[] = "/tmp/rpcfod_XXXXXX";
+        char szNewDesc[32];
+        if( dwRole == 2 )
+            strcpy( szNewDesc, "/tmp/rpcfos_XXXXXX" );
+        else
+            strcpy( szNewDesc, "/tmp/rpcfod_XXXXXX" );
+
         int iFd = mkstemp( szNewDesc );
         if( iFd < 0 )
         {

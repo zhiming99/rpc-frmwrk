@@ -6836,7 +6836,10 @@ gint32 CImplMainFunc::EmitCleanup(
         CCOUT << "do";
         BLOCK_OPEN;
         Wa( "if( g_strObjDesc.substr( 0, 12 ) ==" );
-        Wa( "    \"/tmp/rpcfod_\" )" );
+        if( bProxy )
+            Wa( "    \"/tmp/rpcfod_\" )" );
+        else
+            Wa( "    \"/tmp/rpcfos_\" )" );
         CCOUT << "    unlink( g_strObjDesc.c_str() );";
         if( !bProxy )
         {
@@ -7427,9 +7430,6 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "guint32 dwNumThrds =" );
             Wa( "    ( guint32 )std::max( 1U," );
             Wa( "    std::thread::hardware_concurrency() );" );
-
-            Wa( "if( dwNumThrds > 1 )" );
-            Wa( "    dwNumThrds = ( dwNumThrds >> 1 );" );
 
             Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
             Wa( "oParams[ propMaxIrpThrd ] = 0;" );
