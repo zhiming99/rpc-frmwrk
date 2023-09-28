@@ -1529,6 +1529,9 @@ gint32 CIfTaskGroup::RunTaskInternal(
         SetRunning( true );
     }
 
+    if( GetHeadState() == waitComplete )
+        return STATUS_PENDING;
+
     if( !m_vecRetVals.empty() )
     {
         // last task's return value
@@ -1620,7 +1623,10 @@ gint32 CIfTaskGroup::RunTaskInternal(
         }
 
         if( ret == STATUS_PENDING )
+        {
+            SetHeadState( waitComplete );
             break;
+        }
 
         pPrevTask = pTask;
 
@@ -1686,6 +1692,8 @@ gint32 CIfTaskGroup::OnChildComplete(
             // completion.
             // or a task in the queue is timeout before
             // get chance to run.
+            TaskletPtr pChildTask( pChild );
+            RemoveTask( pChildTask );
             ret = -ENOENT;
             break;
         }
@@ -1696,7 +1704,15 @@ gint32 CIfTaskGroup::OnChildComplete(
         PopTask();
         m_vecRetVals.push_back( iRet );
 
-        if( IsNoSched() )
+        EnumTaskState iState = GetTaskState();
+        if( IsNoSched() || IsStopped( iState ) )
+            break;
+
+        // the head task is canceled
+        // if( iState == stateStarting )
+        //     break;
+
+        if( GetHeadState() != waitComplete )
             break;
 
         CCfgOpener oCfg(
@@ -1707,9 +1723,9 @@ gint32 CIfTaskGroup::OnChildComplete(
         if( ERROR( ret ) )
             break;
 
+        SetHeadState( waitRunning );
         oTaskLock.Unlock();
 
-        // DebugPrint( ( intptr_t )this, "Reschedule TaskGroup" );
         // regain control by rescheduling this task
         TaskletPtr pThisTask( this );
         ret = pMgr->RescheduleTask( pThisTask );
@@ -2187,6 +2203,43 @@ gint32 CIfRootTaskGroup::RunTaskInternal(
     }
 
     return STATUS_PENDING;
+}
+
+gint32 CIfRootTaskGroup::AppendAndRun(
+    TaskletPtr& pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    bool bRun = true;
+
+    CStdRTMutex oTaskLock( GetLock() );
+    do{
+        guint32 dwCount = GetTaskCount();
+        ret = AppendTask( pTask );
+        if( ERROR( ret ) )
+            break;
+
+        if( dwCount > 0 || IsNoSched() )
+        {
+            bRun = false;
+        }
+
+    }while( 0 );
+
+    if( SUCCEEDED( ret ) && bRun == true )
+    {
+        oTaskLock.Unlock();
+        ( *this )( eventZero );
+    }
+    else if( SUCCEEDED( ret ) )
+    {
+        // there is some other tasks running
+        pTask->MarkPending();
+    }
+    
+    return ret;
 }
 
 gint32 CIfStopTask::OnIrpComplete(

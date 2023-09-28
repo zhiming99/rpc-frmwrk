@@ -364,6 +364,14 @@ typedef enum
 
 } EnumLogicOp;
 
+typedef enum 
+{
+    waitStart,
+    waitComplete,
+    waitRunning,
+
+} EnumHeadState;
+
 class CIfTaskGroup
     : public CIfRetryTask
 {
@@ -374,6 +382,7 @@ class CIfTaskGroup
     bool m_bRunning = false;
     bool m_bCanceling = false;
     bool m_bNoSched = false;
+    EnumHeadState m_byHeadState = waitStart;
 
     protected:
 
@@ -443,7 +452,8 @@ class CIfTaskGroup
     virtual gint32 AppendTask(
         TaskletPtr& pTask );
 
-    gint32 AppendAndRun( TaskletPtr& pTask );
+    virtual gint32 AppendAndRun(
+        TaskletPtr& pTask );
 
     virtual guint32 GetTaskCount() 
     {
@@ -491,6 +501,12 @@ class CIfTaskGroup
     gint32 GetTailTask( TaskletPtr& pTail );
     gint32 OnTaskComplete( gint32 iRetVal ) override;
     bool IsStopped( EnumTaskState iState ) const;
+
+    inline void SetHeadState( EnumHeadState byState )
+    { m_byHeadState = byState; }
+
+    inline EnumHeadState GetHeadState() const
+    { return m_byHeadState; }
 
     template< class T >
     gint32 FindTaskByType(
@@ -561,6 +577,8 @@ class CIfRootTaskGroup
     gint32 OnComplete( gint32 iRet ) override;
     gint32 OnChildComplete(
         gint32 iRet, CTasklet* pChild ) override;
+    gint32 AppendAndRun(
+        TaskletPtr& pTask ) override;
 };
 
 
