@@ -523,7 +523,6 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
             break;
         }
 
-        DebugPrint( 0, "Rfc enabled" );
         CCfgOpener oCfg;
         oCfg[ propIfPtr ] = ObjPtr( this );
         ret = m_pGrpRfc.NewObj(
