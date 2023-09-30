@@ -2356,18 +2356,7 @@ gint32 CSimpleSyncIf::Stop()
 
 gint32 CSimpleSyncIf::OnPostStop(
     IEventSink* pCallback )
-{
-    gint32 ret = 0;
-    CStdRMutex oLock( GetLock() );
-    ret = super::OnPostStop( pCallback );
-    if( !m_pSeqTasks.IsEmpty() )
-    {
-        CCfgOpenerObj oCfg(
-            ( IEventSink* )m_pSeqTasks );
-        oCfg.RemoveProperty( propIoMgr );
-    }
-    return ret;
-}
+{ return super::OnPostStop( pCallback ); }
 
 static gint32 GenHashInstId(
     guint32 dwPort,
