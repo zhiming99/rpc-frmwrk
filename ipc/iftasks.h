@@ -573,12 +573,19 @@ class CIfRootTaskGroup
         guint32 dwContext ) override;
     public:
     typedef CIfTaskGroup super;
+
     CIfRootTaskGroup( const IConfigDb* pCfg );
+
     gint32 OnComplete( gint32 iRet ) override;
+
     gint32 OnChildComplete(
         gint32 iRet, CTasklet* pChild ) override;
+
     gint32 AppendAndRun(
         TaskletPtr& pTask ) override;
+
+    gint32 OnCancel(
+        guint32 dwContext ) override;
 };
 
 

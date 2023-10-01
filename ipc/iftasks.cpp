@@ -1444,7 +1444,7 @@ gint32 CIfTaskGroup::AppendAndRun(
             break;
 
         bool bNoSched = ( IsNoSched() ||
-            m_vecRetVals.size() );
+            GetHeadState() != waitStart );
 
         if( dwCount > 0 || bNoSched )
         {
@@ -1863,7 +1863,12 @@ gint32 CIfTaskGroup::OnComplete( gint32 iRet )
 
 bool CIfTaskGroup::exist( TaskletPtr& pTask )
 {
+    if( pTask.IsEmpty() )
+        return false;
+
     CStdRTMutex oTaskLock( GetLock() );
+    if( m_queTasks.empty() ) 
+        return false;
 
     deque< TaskletPtr >::iterator itr;
     itr = std::find( m_queTasks.begin(),
@@ -1878,7 +1883,12 @@ bool CIfTaskGroup::exist( TaskletPtr& pTask )
 gint32 CIfTaskGroup::RemoveTask(
     TaskletPtr& pTask )
 {
+    if( pTask.IsEmpty() )
+        return false;
+
     CStdRTMutex oTaskLock( GetLock() );
+    if( m_queTasks.empty() ) 
+        return false;
 
     deque< TaskletPtr >::iterator itr;
     itr = std::find( m_queTasks.begin(),
@@ -2239,6 +2249,76 @@ gint32 CIfRootTaskGroup::AppendAndRun(
         pTask->MarkPending();
     }
     
+    return ret;
+}
+
+gint32 CIfRootTaskGroup::OnCancel(
+    guint32 dwContext )
+{
+    gint32 ret = -ECANCELED;
+    do{
+        CStdRTMutex oTaskLock( GetLock() );
+        EnumTaskState iState = GetTaskState();
+        if( IsStopped( iState ) )
+            return STATUS_PENDING;
+
+        if( unlikely( IsCanceling() ) )
+            return STATUS_PENDING;
+
+        if( IsNoSched() )
+        {
+            // some thread is working on this object
+            // let's do it later
+            oTaskLock.Unlock();
+            usleep( 100 );
+            continue;
+        }
+
+        // notify the other guys canceling in
+        // process
+        SetCanceling( true );
+        SetTaskState( stateStopping );
+        SetRunning( false );
+
+        TaskletPtr pPrevTask;
+        while( !m_queTasks.empty() )
+        {
+            TaskletPtr pTask;
+
+            if( !pPrevTask.IsEmpty() &&
+                pPrevTask == m_queTasks.front() ) 
+            {
+                m_queTasks.pop_front();
+                continue;
+            }
+
+            pTask = m_queTasks.front();
+            if( pTask.IsEmpty() )
+            {
+                DebugPrint( 0, "Error, found "
+                    "empty task in the task queue" );
+                m_queTasks.pop_front();
+                continue;
+            }
+
+            SetNoSched( true );
+            oTaskLock.Unlock();
+
+            ( *pTask )( eventCancelTask );
+
+            oTaskLock.Lock();
+            SetNoSched( false );
+
+            pPrevTask = pTask;
+        }
+
+        SetCanceling( false );
+        SetTaskState( stateStarted );
+        SetRunning( true );
+        break;
+
+    }while( 1 );
+
     return ret;
 }
 
@@ -4912,7 +4992,6 @@ gint32 CIfInvokeMethodTask::OnKeepAliveOrig()
         if( ERROR( ret ) )
             break;
 
-        DebugPrint( ret, "Schedule next keep-alive" );
         // schedule the next keep-alive event
         if( dwTimeoutSec > 0 )
         {

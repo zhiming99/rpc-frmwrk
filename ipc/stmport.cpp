@@ -1232,17 +1232,13 @@ gint32 CDBusStreamPdo::CheckExistance(
         CCfgOpenerObj oIfCfg(
             ( CObjBase* )pUxIf );
 
-        bool bClose = false;
+        bool bOnline;
         ret = oIfCfg.GetBoolProp(
-            propOnline, bClose );
-
+            propOnline, bOnline );
         if( ERROR( ret ) )
-        {
-            bClose = false;
-            ret = 0;
-        }
+            bOnline = true;
 
-        if( bClose )
+        if( !bOnline )
             ret = -ENOTCONN;
 
     }while( 0 );

@@ -132,7 +132,7 @@ class CRpcStmChanBase :
 
             if( ERROR( ret ) )
             {
-                ActiveClose( hstm );
+                ret = ActiveClose( hstm );
                 break;
             }
 

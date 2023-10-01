@@ -1034,10 +1034,7 @@ gint32 CRpcInterfaceBase::StartEx(
         ret = STATUS_PENDING;
 
     if( ERROR( ret ) )
-    {
         ClearActiveTasks();
-        m_pRootTaskGroup.Clear();
-    }
 
     return ret;
 }
@@ -1145,23 +1142,6 @@ gint32 CRpcInterfaceBase::StopEx(
         if( stateStopping != GetState() )
             return ERROR_STATE;
 
-        TaskGrpPtr pRoot = GetTaskGroup();
-        if( pRoot.IsEmpty() )
-        {
-            CParamList oParams;
-            ret = oParams.SetObjPtr(
-                propIfPtr, ObjPtr( this ) );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = m_pRootTaskGroup.NewObj(
-                clsid( CIfRootTaskGroup ),
-                oParams.GetCfg() ); 
-
-            if( ERROR( ret ) )
-                break;
-        }
         oIfLock.Unlock();
 
         TaskletPtr pPreStop;
@@ -2739,6 +2719,10 @@ gint32 CRpcServices::OnPostStop(
     IEventSink* pCallback )
 {
 
+    guint32 dwCount = 0;
+    TaskGrpPtr pGrp = GetTaskGroup();
+    if( !pGrp.IsEmpty() )
+        dwCount = pGrp->GetTaskCount();
     CStdRMutex oIfLock( GetLock() );
     while( !m_pSeqTasks.IsEmpty() )
     {
@@ -2768,13 +2752,14 @@ gint32 CRpcServices::OnPostStop(
     m_pStmMatch.Clear();
     while( !m_pRootTaskGroup.IsEmpty() )
     {
-        TaskGrpPtr pGrp = GetTaskGroup();
+        pGrp = GetTaskGroup();
         oIfLock.Unlock();
         CStdRTMutex oTaskLock( pGrp->GetLock() );
         oIfLock.Lock();
         if( pGrp != m_pRootTaskGroup )
             continue;
-        if( pGrp->GetTaskCount() > 0 )
+        dwCount = pGrp->GetTaskCount();
+        if( dwCount > 0 )
         {
             oIfLock.Unlock();
             oTaskLock.Unlock();
