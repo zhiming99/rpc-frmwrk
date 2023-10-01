@@ -1236,7 +1236,10 @@ gint32 CDBusStreamPdo::CheckExistance(
         ret = oIfCfg.GetBoolProp(
             propOnline, bOnline );
         if( ERROR( ret ) )
+        {
             bOnline = true;
+            ret = 0;
+        }
 
         if( !bOnline )
             ret = -ENOTCONN;
