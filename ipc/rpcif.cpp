@@ -2061,7 +2061,8 @@ gint32 CRpcInterfaceBase::AppendAndRun(
     if( pRoot.IsEmpty() )
         return -EFAULT;
 
-    return pRoot->AppendAndRun( pTask );
+    CIfRootTaskGroup* prg = pRoot;
+    return prg->AppendAndRun( pTask );
 }
 
 gint32 CRpcInterfaceBase::AddAndRun(

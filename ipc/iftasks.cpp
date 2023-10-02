@@ -1427,53 +1427,6 @@ gint32 CIfTaskGroup::AppendTask(
     return 0;
 }
 
-gint32 CIfTaskGroup::AppendAndRun(
-    TaskletPtr& pTask )
-{
-    if( pTask.IsEmpty() )
-        return -EINVAL;
-
-    gint32 ret = 0;
-    bool bRun = true;
-
-    CStdRTMutex oTaskLock( GetLock() );
-    do{
-        guint32 dwCount = GetTaskCount();
-        ret = AppendTask( pTask );
-        if( ERROR( ret ) )
-            break;
-
-        bool bNoSched = ( IsNoSched() ||
-            GetHeadState() != waitStart );
-
-        if( dwCount > 0 || bNoSched )
-        {
-            bRun = false;
-        }
-        else
-        {
-            m_vecRetVals.clear();
-#ifdef DEBUG
-            m_vecClsids.clear();
-#endif
-        }
-
-    }while( 0 );
-
-    if( SUCCEEDED( ret ) && bRun == true )
-    {
-        oTaskLock.Unlock();
-        ( *this )( eventZero );
-    }
-    else if( SUCCEEDED( ret ) )
-    {
-        // there is some other tasks running
-        pTask->MarkPending();
-    }
-    
-    return ret;
-}
-
 gint32 CIfTaskGroup::OnRetry()
 {
     if( true )

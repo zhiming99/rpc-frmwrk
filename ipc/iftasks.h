@@ -452,9 +452,6 @@ class CIfTaskGroup
     virtual gint32 AppendTask(
         TaskletPtr& pTask );
 
-    virtual gint32 AppendAndRun(
-        TaskletPtr& pTask );
-
     virtual guint32 GetTaskCount() 
     {
         CStdRTMutex oLock( GetLock() );
@@ -582,7 +579,7 @@ class CIfRootTaskGroup
         gint32 iRet, CTasklet* pChild ) override;
 
     gint32 AppendAndRun(
-        TaskletPtr& pTask ) override;
+        TaskletPtr& pTask );
 
     gint32 OnCancel(
         guint32 dwContext ) override;
