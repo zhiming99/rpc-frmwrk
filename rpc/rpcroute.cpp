@@ -1117,6 +1117,7 @@ gint32 CRouterStartReqFwdrProxyTask::
                 pMatch, pIfPtr );
             if( ERROR( ret ) )
                 break;
+            pIf = pIfPtr;
         }
         else if( ERROR( ret ) )
         {
@@ -1139,6 +1140,7 @@ gint32 CRouterStartReqFwdrProxyTask::
             break;
         }
 
+        break;
         // in case the transaction failed
         TaskletPtr pRbTask;
         ret = pRouter->BuildStartStopReqFwdrProxy(
@@ -2327,7 +2329,7 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
             pTaskGrp->AppendTask( pFwrdTasks );
 
         // put the bridge to the stopping state to
-        // prevent further incoming requests
+        // block new requests
         ret = pBridge->SetStateOnEvent(
             cmdShutdown );
         if( ERROR( ret ) )
@@ -4938,6 +4940,7 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
             pProxy = pIf;
         }
 
+        break;
         // in case somewhere the transaction failed,
         // add a rollback task
         TaskletPtr pRbTask;
@@ -4995,6 +4998,7 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
             else if( ERROR( ret ) )
                 break;
 
+            break;
             // in case the rest transaction failed
             // add a rollback task
             TaskletPtr pRbTask;
@@ -5049,7 +5053,7 @@ gint32 CRouterAddRemoteMatchTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        if( bEnable )
+        while( bEnable )
         {
             guint32 dwPortId = 0;
             InterfPtr pIf;
@@ -5065,10 +5069,14 @@ gint32 CRouterAddRemoteMatchTask::RunTask()
                 break;
             CRpcServices* pSvc = pIf;
             if( !pSvc->IsConnected() )
-            {
                 ret = ERROR_STATE;
-                break;
-            }
+
+            break;
+        }
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret, "Error bridge not exist" );
+            break;
         }
 
         ret = AddRemoteMatchInternal(

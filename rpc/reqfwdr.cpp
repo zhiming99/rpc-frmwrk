@@ -4923,7 +4923,7 @@ gint32 CRpcReqForwarderProxy::AddInterface(
         }
         else
         {
-            ++itr->second.second;
+            ++( itr->second.second );
             ret = EEXIST;
         }
 
@@ -4947,14 +4947,60 @@ gint32 CRpcReqForwarderProxy::RemoveInterface(
 
         if( itr != m_mapMatchRefs.end() )
         {
-            --itr->second.second;
+            --( itr->second.second );
             if( itr->second.second <= 0 )
             {
-                m_vecMatches.erase(
-                    m_vecMatches.begin() +
-                    itr->second.first );
-
+                auto matchPair = itr->second;
                 m_mapMatchRefs.erase( ptrMatch );
+                CMessageMatch* pcMatch = ptrMatch;
+                stdstr strMatch = pcMatch->ToString();
+                bool bFound = false;
+
+                if( m_vecMatches.empty() )
+                {
+                    DebugPrint( ret, "match 0x%llx not found2, %s",
+                        pMatch, strMatch.c_str() );
+                    break;
+                }
+
+                auto it2 = m_vecMatches.end();
+                if( m_vecMatches.size() <= matchPair.first )
+                {
+                    it2 = m_vecMatches.end() - 1;
+                }
+                else
+                {
+                    it2 = m_vecMatches.begin() + matchPair.first;
+                }
+                while( it2 != m_vecMatches.begin() )
+                {
+                    stdstr&& strVal = ( *it2 )->ToString();
+                    if( strVal == strMatch )
+                    {
+                        m_vecMatches.erase( it2 );
+                        bFound = true;
+                        break;
+                    }
+                    it2--;
+                }
+
+                if( bFound )
+                    break;
+
+                if( it2 == m_vecMatches.begin() )
+                {
+                    stdstr&& strVal = ( *it2 )->ToString();
+                    if( strVal == strMatch )
+                    {
+                        m_vecMatches.erase( it2 );
+                        bFound = true;
+                        break;
+                    }
+                }
+
+                if( !bFound )
+                    DebugPrint( ret, "match 0x%llx not found, %s",
+                        pMatch, strMatch.c_str() );
             }
             else
             {

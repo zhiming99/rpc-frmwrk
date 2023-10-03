@@ -981,7 +981,8 @@ gint32 CIfStartUxSockStmTask::OnCancel(
         ( IConfigDb* )GetConfig() );
 
     do{
-        OutputMsg( 0, "%s canceling",
+        DebugPrintEx( logWarning,
+            -ECANCELED, "%s canceling",
             CoGetClassName( this->GetClsid() ) );
         ObjPtr pUxIf;
         ObjPtr pIf;
