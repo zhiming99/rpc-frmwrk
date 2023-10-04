@@ -6428,8 +6428,6 @@ gint32 CIfParallelTaskGrpRfc::AddAndRun(
 
         // re-run this task group immediately
         ret = ( *this )( eventZero );
-        if( pTask->GetError() == STATUS_PENDING )
-            pTask->MarkPending();
 
     }while( 0 );
 

@@ -54,9 +54,18 @@ struct SEC_PACKET_HEADER
 
 struct IAuthenticate;
 
+typedef enum{
+    stateWait,
+    stateCompleting,
+    stateReady
+
+} SecCtxState;
+
 class CRpcSecFido : public CPort
 {
     BufPtr      m_pInBuf;
+    SecCtxState m_bWaitSecCtx = stateWait;
+    IrpPtr      m_pIrpWaitCtx;
 
     gint32 GetPktCached(
         BufPtr& pRetBuf, bool& bEncrypted );
@@ -101,6 +110,17 @@ class CRpcSecFido : public CPort
 
     bool HasSecCtx() const;
     gint32 GetSecCtx( ObjPtr& pObj ) const;
+    gint32 SetProperty( gint32 iProp,
+        const Variant& oVar ) override;
+
+    gint32 PreStop( IRP* pIrp ) override
+    {
+        gint32 ret = 
+            super::PreStop( pIrp );
+        CStdRMutex oPortLock( GetLock() );
+        m_pIrpWaitCtx.Clear();
+        return ret;
+    }
 };
 
 }

@@ -533,9 +533,36 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
             ret = GetPktCached(
                 pInBuf, bEncrypted ); 
 
-            oLock.Unlock();
             if( SUCCEEDED( ret ) )
             {
+                if( bEncrypted &&
+                    m_bWaitSecCtx == stateWait )
+                {
+                    m_pIrpWaitCtx = pIrp;
+                    pIrp->PopCtxStack();
+                    pIrp->AllocNextStack(
+                        nullptr, IOSTACK_ALLOC_COPY );
+                    IrpCtxPtr& pTopCtx = pIrp->GetTopStack(); 
+
+                    //waiting for the ctx to be set
+                    sse.m_iEvent = sseRetWithBuf;
+                    sse.m_pInBuf = pInBuf;
+                    BufPtr pEvtBuf( true );
+                    pEvtBuf->Resize( sizeof( sse ) );
+                    new ( pEvtBuf->ptr() )
+                        STREAM_SOCK_EVENT( sse );
+                    pTopCtx->SetRespData( pEvtBuf );
+                    ret = STATUS_PENDING;
+                    break;
+                }
+                else if( bEncrypted &&
+                    m_bWaitSecCtx == stateCompleting )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
+                oLock.Unlock();
+
                 BufPtr pOutBuf; 
                 ret = DecryptPkt( pInBuf,
                     pOutBuf, bEncrypted );
@@ -554,6 +581,7 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
                 break;
             }
 
+            oLock.Unlock();
             if( ERROR( ret ) )
                 break;
 
@@ -1026,7 +1054,6 @@ gint32 CRpcSecFido::CompleteListeningIrp(
         bool bEncrypted = false;
         BufPtr pInBuf;
         ret = GetPktCached( pInBuf, bEncrypted );
-        oLock.Unlock();
         if( ERROR( ret ) )
         {
             break;
@@ -1036,6 +1063,7 @@ gint32 CRpcSecFido::CompleteListeningIrp(
             // incoming data is not a complete
             // packet, and re-submit the listening
             // irp
+            oLock.Unlock();
             pTopCtx->m_pRespData.Clear();
             IPort* pPort = GetLowerPort();
             ret = pPort->SubmitIrp( pIrp );
@@ -1053,6 +1081,26 @@ gint32 CRpcSecFido::CompleteListeningIrp(
 
             break;
         }
+
+        if( bEncrypted &&
+            m_bWaitSecCtx == stateWait )
+        {
+            m_pIrpWaitCtx = pIrp;
+
+            pIrp->PopCtxStack();
+            pIrp->AllocNextStack(
+                nullptr, IOSTACK_ALLOC_COPY );
+            pIrp->GetTopStack() = pTopCtx;
+            psse->m_pInBuf = pInBuf;
+            ret = STATUS_PENDING;
+            break;
+        }
+        else if( bEncrypted &&
+            m_bWaitSecCtx == stateCompleting )
+        {
+            m_bWaitSecCtx = stateReady;
+        }
+        oLock.Unlock();
 
         BufPtr pOutBuf;
         ret = DecryptPkt( pInBuf,
@@ -1235,6 +1283,40 @@ gint32 CRpcSecFido::CompleteWriteIrp(
         pIrp->PopCtxStack();
     }
 
+    return ret;
+}
+
+gint32 CRpcSecFido::SetProperty(
+    gint32 iProp, const Variant& oVal )
+{
+    gint32 ret = 0;
+    CStdRMutex oLock( GetLock() );
+    switch( iProp )
+    {
+    case propSecCtx:
+        { 
+            m_pCfgDb->SetProperty( iProp, oVal );
+            m_bWaitSecCtx = stateCompleting;
+            if( !m_pIrpWaitCtx.IsEmpty() )
+            {
+                IrpPtr pIrp = m_pIrpWaitCtx;    
+                m_pIrpWaitCtx.Clear();
+                CIoManager* pMgr = GetIoMgr();
+                DEFER_CALL( pMgr, pMgr,
+                    &CIoManager::CompleteIrp,
+                    pIrp );
+            }
+            else
+            {
+                m_bWaitSecCtx = stateReady;
+            }
+            break;
+        }
+    default:
+        ret = super::SetProperty(
+            iProp, oVal );
+        break;
+    }
     return ret;
 }
 
