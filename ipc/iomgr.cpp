@@ -251,7 +251,8 @@ gint32 CIoManager::PostCompleteIrp( IRP* pIrp, bool bCancel )
             LONGWORD dwParam1 =
                 ( LONGWORD )( ( IRP* )pIrp );
             LONGWORD dwParam2 = pIrp->m_dwContext;
-            pIrp->m_pCallback->OnEvent( eventIrpComp,
+            TaskletPtr pCb = pIrp->m_pCallback;
+            pCb->OnEvent( eventIrpComp,
                 dwParam1, dwParam2, nullptr );
         }
         else
@@ -462,7 +463,8 @@ gint32 CIoMgrIrpCompleteTask::operator()(
             LONGWORD dwParam2 =
                 pIrp->m_dwContext;
 
-            pIrp->m_pCallback->OnEvent(
+            TaskletPtr pCb = pIrp->m_pCallback;
+            pCb->OnEvent(
                 eventIrpComp,
                 dwParam1,
                 dwParam2,

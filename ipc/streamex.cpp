@@ -96,11 +96,11 @@ bRet; \
 #define CLEAR_CALLBACK( _pIrp, _bCancel ) \
 ({ \
     do{ \
-        if( _pIrp.IsEmpty() ) break;\
+        if( _pIrp.IsEmpty() || \
+            _pIrp->GetStackSize() == 0 ) \
+            break; \
         BufPtr pExtBuf; \
         IrpCtxPtr pCtx; \
-        if( _pIrp->GetStackSize() == 0 ) \
-            break; \
         pCtx = _pIrp->GetTopStack(); \
         pCtx->GetExtBuf( pExtBuf ); \
         if( pExtBuf.IsEmpty() || \
@@ -117,6 +117,27 @@ bRet; \
         pCtxExt->pCallback.Clear(); \
     }while( 0 ); \
 })
+
+#define COMPLETE_SEND_IRP2( _pIrp, _ret ) \
+do{ \
+    gint32 _iRet = ( gint32 )( _ret ); \
+    CStdRMutex oIrpLock( _pIrp->GetLock() ); \
+    if( _pIrp->GetState() == IRP_STATE_READY ) \
+    { \
+        _pIrp->RemoveTimer(); \
+        _pIrp->RemoveCallback(); \
+        _pIrp->SetStatus( ( _iRet ) ); \
+        _pIrp->SetState( IRP_STATE_READY, \
+            IRP_STATE_COMPLETED ); \
+        if( _pIrp->GetStackSize() > 0 ) \
+        { \
+            IrpCtxPtr& pctx = _pIrp->GetTopStack();\
+            pctx->SetStatus( _iRet ); \
+        } \
+        if( INVOKE_CALLBACK( _pIrp ) ) break;\
+        Sem_Post( &_pIrp->m_semWait ); \
+    } \
+}while( 0 )
 
 #define COMPLETE_SEND_IRP( _pIrp, _ret ) \
 do{ \
@@ -1174,11 +1195,10 @@ gint32 CIfStmReadWriteTask::OnTaskComplete(
 
         for( auto elem : queIrps )
         {
-            // manually complete the irp
-            // Cannot use CompleteIrp here,
-            // because the task will be stopped
-            // before the OnIrpComplete is able to
-            // be called.
+            // manually complete the irp Cannot use
+            // CompleteIrp here, because the task will
+            // be stopped before the OnIrpComplete is
+            // able to be called.
             CStdRMutex oIrpLock( elem->GetLock() );
             ret = elem->CanContinue( IRP_STATE_READY );
             if( ERROR( ret ) )
@@ -1494,9 +1514,46 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
 
         // send out notification on irp
         // completion.
+        gint32 (*func)( IEventSink*, PIRP ) =
+        ([]( IEventSink* pTask, PIRP pIrp  )
+        {
+            CIfParallelTask* ppara =
+                ObjPtr( pTask );
+
+            CStdRTMutex oLock( ppara->GetLock() );
+            EnumTaskState iState = 
+                ppara->GetTaskState();
+            if( iState != stateStopped )
+            {
+                LONGWORD dwParam1 =
+                    ( LONGWORD )( ( IRP* )pIrp );
+                LONGWORD dwParam2 = pIrp->m_dwContext;
+                ppara->OnEvent( eventIrpComp,
+                    dwParam1, dwParam2, nullptr );
+            }
+            else
+            {
+                oLock.Unlock();
+                CStdRMutex oIrpLock( pIrp->GetLock() );
+                pIrp->SetState( pIrp->GetState(),
+                    IRP_STATE_READY );
+                gint32 iRet = pIrp->GetStatus();
+                IrpPtr ptrIrp( pIrp );
+                COMPLETE_SEND_IRP2( ptrIrp, iRet );
+            }
+            return 0;
+        });
+
+        TaskletPtr pCb;
+        ret = NEW_COMPLETE_FUNCALL( -1, pCb,
+            pMgr, func, this, pIrp );
+        if( ERROR( ret ) )
+            break;
+        ( *pCb )( eventZero );
+
         pIrp->MarkPending();
-        pIrp->SetCallback(
-            this, ( intptr_t )this );
+        pIrp->SetCallback( EventPtr( pCb ),
+            ( intptr_t )this );
 
         if( m_queRequests.empty() )
         {

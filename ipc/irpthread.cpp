@@ -618,7 +618,8 @@ void CIrpCompThread::CompleteIrp( PIRP pIrp )
     {
         //FIXME: can I continue
         LONGWORD dwParam1 = ( LONGWORD )pIrp;
-        pIrp->m_pCallback->OnEvent(
+        TaskletPtr pCb = pIrp->m_pCallback;
+        pCb->OnEvent(
             eventIrpComp, dwParam1, 0, 0 );
     }
 }
