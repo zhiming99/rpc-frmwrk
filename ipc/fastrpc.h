@@ -273,15 +273,6 @@ class CRpcStmChanBase :
                 m_mapSessRefs[ strSess ] = 1;
             else
             {
-                if( itr->second >=
-                    MAX_REQCHAN_PER_SESS )
-                {
-                    ret = -ERANGE;
-                    DebugPrintEx( logErr, ret,
-                        "Stream limits reached, "
-                        "and new stream is rejected" );
-                    break;
-                }
                 ++itr->second;
             }
             oLock.Unlock();

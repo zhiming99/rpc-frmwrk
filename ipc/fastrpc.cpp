@@ -123,8 +123,50 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
     IEventSink* pCallback,
     IConfigDb* pDataDesc )
 {
-    return super::AcceptNewStream(
-        pCallback, pDataDesc );
+    gint32 ret = 0;
+    do{
+        if( pDataDesc == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = super::AcceptNewStream(
+            pCallback, pDataDesc );
+        if( ERROR( ret ) )
+            break;
+
+        IConfigDb* ptctx;
+        CCfgOpener oDesc( pDataDesc );
+        ret = oDesc.GetPointer(
+            propTransCtx, ptctx );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strSess;
+        CCfgOpener oCtx( ptctx ); 
+        ret = oCtx.GetStrProp(
+            propSessHash, strSess );
+        if( ERROR( ret ) )
+            break;
+
+        CWriteLock oLock( this->GetSharedLock() );
+        auto itr = m_mapSessRefs.find( strSess );
+        if( itr != m_mapSessRefs.end() )
+        {
+            if( itr->second >=
+                MAX_REQCHAN_PER_SESS )
+            {
+                ret = -ERANGE;
+                DebugPrintEx( logErr, ret,
+                    "Stream limits reached, "
+                    "and new stream is rejected" );
+                break;
+            }
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CFastRpcServerBase::OnPreStop(
