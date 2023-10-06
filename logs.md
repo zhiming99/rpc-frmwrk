@@ -1,4 +1,7 @@
 ---
+[`Fri Oct 06 2023 06:12:38 PM Beijing`]   
+1. Having cleared all the blocking bugs. Now we can move on to fix the major performance issue.
+
 [`Sat Sep 23 2023 09:01:53 PM Beijing`]   
 1. Having fixed one memory leak, and two regression bugs. The progress is a bit slow. There are still two bugs to kill, besides fixing the performance issue as the PR requests
 
