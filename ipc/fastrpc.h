@@ -268,6 +268,22 @@ class CRpcStmChanBase :
             m_mapStm2Sess[ hstm ] =
                     { strSess, strPath };
 
+            auto itr = m_mapSessRefs.find( strSess );
+            if( itr == m_mapSessRefs.end() )
+                m_mapSessRefs[ strSess ] = 1;
+            else
+            {
+                if( itr->second >=
+                    MAX_REQCHAN_PER_SESS )
+                {
+                    ret = -ERANGE;
+                    DebugPrintEx( logErr, ret,
+                        "Stream limits reached, "
+                        "and new stream is rejected" );
+                    break;
+                }
+                ++itr->second;
+            }
             oLock.Unlock();
 
             ret = m_pPort->OnEvent(
