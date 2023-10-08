@@ -356,6 +356,10 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
 {
     CStdRTMutex oTaskLock( GetLock() );
 
+    EnumIfState dwState = GetTaskState();
+    if( IsStopped( dwState ) )
+        return ERROR_STATE;
+
     if( GetReqCount() > 0 )
         Resume();
 

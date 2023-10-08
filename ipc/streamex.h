@@ -203,6 +203,10 @@ class CIfStmReadWriteTask :
             return 0;
 
         CStdRTMutex oTaskLock( GetLock() );
+        EnumIfState dwState = GetTaskState();
+        if( IsStopped( dwState ) )
+            return ERROR_STATE;
+
         m_bDiscard = bDiscard;
         if( bDiscard )
         {
@@ -843,7 +847,8 @@ struct CStreamSyncBase :
 
         gint32 ret = 0;
         do{
-            GetWorker( hChannel, false, pTask );
+            ret = GetWorker(
+                hChannel, false, pTask );
             if( ERROR( ret ) )
                 break;
 
@@ -939,7 +944,7 @@ struct CStreamSyncBase :
      * @} */
     
     gint32 OnClose( HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+        IEventSink* pCallback = nullptr ) override
     {
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
@@ -1928,8 +1933,7 @@ struct CStreamSyncBase :
             ret = GetWorker(
                 hChannel, true, pTask );
             if( ERROR( ret ) )
-                return ret;
-
+                break;
 
             CIfStmReadWriteTask* pRdTask = pTask;
             if( pRdTask == nullptr )
