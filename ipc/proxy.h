@@ -448,7 +448,7 @@ class CRpcInterfaceBase :
     gint32 GetParallelGrp(
         TaskGrpPtr& pParaGrp );
 
-    TaskGrpPtr& GetTaskGroup()
+    TaskGrpPtr GetTaskGroup()
     {
         CStdRMutex oIfLock( GetLock() );
         return m_pRootTaskGroup;
