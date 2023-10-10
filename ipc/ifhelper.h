@@ -3838,6 +3838,8 @@ gint32 AddSeqTaskTempl( T2* pObj,
     return ret;
 }
 
+#define AddSeqTaskIf AddSeqTaskTempl< CRpcServices, CRpcServices >
+
 /*
  * macro ADD_TIMER adds a timer of sepcified
  * seconds, with the callback and its parameters.

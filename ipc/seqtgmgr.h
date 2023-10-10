@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  seqtask.h
+ *       Filename:  seqtgmgr.h
  *
  *    Description:  declarations of classes and  functions for sequential tasks
  *
@@ -35,23 +35,21 @@ struct SEQTG_ELEM
     }
 };
 
-#define AddSeqTaskIf AddSeqTaskTempl< CRpcServices, CRpcServices >
-
-template< class Handle, class T >
+template< class Handle, class HostClass >
 struct CSeqTaskGrpMgr : public CObjBase
 {
-    T* m_pParent;
+    HostClass* m_pParent;
     std::hashmap< Handle, SEQTG_ELEM > m_mapSeqTgs;
     EnumIfState m_iMgrState = stateStarted;
 
     typedef CObjBase super;
     CSeqTaskGrpMgr() : super()
-    { SetClassId( clsid( CSeqTaskGrpMgr ) ); }
+    {}
 
-    inline void SetParent( T* pParent )
+    inline void SetParent( HostClass* pParent )
     { m_pParent = pParent; }
 
-    inline T* GetParent()
+    inline HostClass* GetParent()
     { return m_pParent; }
 
     inline stdrmutex& GetLock()
@@ -83,11 +81,12 @@ struct CSeqTaskGrpMgr : public CObjBase
         SEQTG_ELEM otg;
         m_mapSeqTgs[ htg ] = otg;
         itr = m_mapSeqTgs.find( htg );
-        auto& pSeqTasks = itr->second.m_pSeqTasks;
-
+        auto& pSeqTasks =
+            itr->second.m_pSeqTasks;
         oLock.Unlock();
+
         ret = AddSeqTaskIf(
-            m_pParent, pSeqTasks, pTask );
+            GetParent(), pSeqTasks, pTask );
 
         oLock.Lock();
         if( ERROR( ret ) )
@@ -127,9 +126,8 @@ struct CSeqTaskGrpMgr : public CObjBase
                 ret = ERROR_STATE;
                 break;
             }
-
             oLock.Unlock();
-            ret = AddSeqTaskIf( m_pParent,
+            ret = AddSeqTaskIf( GetParent(),
                 itr->second.m_pSeqTasks, pTask );
         }while( 0 );
 
@@ -172,7 +170,7 @@ struct CSeqTaskGrpMgr : public CObjBase
             oLock.Unlock();
 
             ret = AddSeqTaskIf(
-                m_pParent, pSeqTasks, pTask );
+                GetParent(), pSeqTasks, pTask );
 
             if( ERROR( ret ) )
                 break;
@@ -189,10 +187,12 @@ struct CSeqTaskGrpMgr : public CObjBase
                     {
                         ret = -EINVAL;
                         if( pCb != nullptr )
+                        {
                             pCb->OnEvent(
                                 eventTaskComp,
                                 -EINVAL, 0, 0 );
-                            break;
+                        }
+                        break;
                     }
                     CSeqTaskGrpMgr* pTgMgr = ptgm;
                     CRpcServices* pSvc =
@@ -236,7 +236,7 @@ struct CSeqTaskGrpMgr : public CObjBase
 
             if( SUCCEEDED( iRet ) )
             {
-                iRet = AddSeqTaskIf( m_pParent,
+                iRet = AddSeqTaskIf( GetParent(),
                     pSeqTasks, pCleanup );
             }
 
@@ -389,11 +389,16 @@ struct CSeqTaskGrpMgr : public CObjBase
                     vecTasks[ i ].first,
                     vecTasks[ i ].second );
             }
+
             if( !pSync.IsEmpty() )
             {
                 pSync->WaitForCompleteWakable();
                 ret = pSync->GetError();
                 this->SetState( stateStopped );
+            }
+            else
+            {
+                ret = STATUS_PENDING;
             }
 
         }while( 0 );

@@ -5418,8 +5418,8 @@ gint32 CRpcServices::AddSeqTaskInternal(
     TaskletPtr& pTask,
     bool bLong )
 {
-    return AddSeqTaskTempl< CRpcServices, CRpcServices>
-        ( this, pQueuedTasks, pTask, bLong );
+    return AddSeqTaskIf(
+        this, pQueuedTasks, pTask, bLong );
 }
 
 gint32 CRpcServices::AddSeqTask(
