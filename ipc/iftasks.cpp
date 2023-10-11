@@ -2058,10 +2058,14 @@ gint32 CIfRootTaskGroup::OnChildComplete(
 #endif
             }
             // no need to reschedule
+            SetHeadState( waitRunning );
             break;
         }
 
         if( IsNoSched() )
+            break;
+
+        if( GetHeadState() != waitComplete )
             break;
 
         CfgPtr pCfg = GetConfig();
@@ -2072,6 +2076,7 @@ gint32 CIfRootTaskGroup::OnChildComplete(
         if( ERROR( ret ) )
             break;
 
+        SetHeadState( waitRunning );
         oTaskLock.Unlock();
         // regain control by rescheduling this task
         TaskletPtr pThisTask( this );
@@ -2103,6 +2108,9 @@ gint32 CIfRootTaskGroup::RunTaskInternal(
         SetTaskState( stateStarted );
         SetRunning( true );
     }
+
+    if( GetHeadState() == waitComplete )
+        return STATUS_PENDING;
 
     TaskletPtr pPrevTask;
     while( !m_queTasks.empty() )
@@ -2160,7 +2168,10 @@ gint32 CIfRootTaskGroup::RunTaskInternal(
         }
 
         if( ret == STATUS_PENDING )
+        {
+            SetHeadState( waitComplete );
             break;
+        }
 
         pPrevTask = pTask;
     }
@@ -2265,6 +2276,7 @@ gint32 CIfRootTaskGroup::OnCancel(
             pPrevTask = pTask;
         }
 
+        SetHeadState( waitRunning );
         SetCanceling( false );
         SetTaskState( stateStarted );
         SetRunning( true );
@@ -2915,7 +2927,7 @@ gint32 CIfParallelTaskGrp::OnCancel(
     do{
         CStdRTMutex oTaskLock( GetLock() );
         if( IsStopped( GetTaskState() ) )
-            return  ERROR_STATE;
+            return  STATUS_PENDING;
 
         if( unlikely( IsCanceling() ) )
             return STATUS_PENDING;
