@@ -132,10 +132,13 @@ class CRpcStmChanBase :
 
             if( ERROR( ret ) )
             {
-                ret = ActiveClose( hstm );
+                ret = ActiveClose( hstm, pCallback );
                 break;
             }
 
+            if( this->GetState() == stateStopping )
+                ret = ActiveClose( hstm, pCallback );
+ 
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
 

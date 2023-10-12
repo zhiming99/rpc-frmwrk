@@ -24,9 +24,11 @@
 
 #pragma once
 
-#include "../ipc/uxstream.h"
-#include "../ipc/stream.h"
+#include "uxstream.h"
+#include "stream.h"
+#include "stmcp.h"
 #include "tcpport.h"
+
 
 namespace rpcf
 {
@@ -59,8 +61,8 @@ class CStreamRelayBase :
     { return 0; }
 
     // the local sock is closed
-    virtual gint32 OnClose( HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+    gint32 OnClose( HANDLE hChannel,
+        IEventSink* pCallback = nullptr ) override
     {
         gint32 ret = 0;
         if( hChannel == INVALID_HANDLE )
@@ -1402,6 +1404,15 @@ class CUnixSockStmRelayBase :
     virtual gint32 OnPreStop( IEventSink* pCallback ) 
     {
         ReportByteStat();
+        if( this->GetPortHandle() == INVALID_HANDLE )
+        {
+            CCfgOpenerObj oIfCfg( this );
+            CStmConnPoint* pscp = nullptr;
+            gint32 ret = oIfCfg.GetPointer(
+                propStmConnPt, pscp );
+            if( SUCCEEDED( ret ) )
+                pscp->Stop( false );
+        }
 
         super::OnPreStop( pCallback );
 

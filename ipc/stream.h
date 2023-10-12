@@ -309,9 +309,9 @@ class CStreamProxy :
             hChannel, byToken, pBuf );
     }
 
-    virtual gint32 OnClose(
+    gint32 OnClose(
         HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+        IEventSink* pCallback = nullptr ) override
     {
         return IStream::OnClose(
             hChannel, pCallback );
@@ -390,9 +390,9 @@ class CStreamServer :
             hChannel, byToken, pBuf );
     }
 
-    virtual gint32 OnClose(
+    gint32 OnClose(
         HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+        IEventSink* pCallback = nullptr ) override
     {
         return IStream::OnClose(
             hChannel, pCallback );

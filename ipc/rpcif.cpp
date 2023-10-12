@@ -2077,12 +2077,12 @@ gint32 CRpcInterfaceBase::AddAndRun(
     CIfRootTaskGroup* pRootTaskGroup = nullptr;
     if( true )
     {
-        pRootTaskGroup = GetTaskGroup();
-        if( pRootTaskGroup == nullptr )
+        pRootGrp = GetTaskGroup();
+        if( pRootGrp.IsEmpty() )
             return -EFAULT;
 
         // as a guard to the root group
-        pRootGrp = pRootTaskGroup;
+        pRootTaskGroup = pRootGrp;
     }
 
     gint32 ret = 0;
@@ -2236,28 +2236,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 break;
             }
 
-            if( dwCount == 0 && bRunning )
-            {
-                pParaLock->unlock();
-                ret = ERROR_STATE;
-                DebugPrint( GetTid(),
-                    "root task is in wrong state, dwCount=%d, bRunning=%d",
-                    dwCount, bRunning );
-                break;
-            }
-            else if( dwCount > 0 && !bRunning )
-            {
-                // don't lock the io task, because it
-                // could cause deadlock
-                pIoTask->MarkPending();
-                pParaLock->unlock();
-                ret = 0;
-
-                DebugPrintEx( logInfo, GetTid(),
-                    "root task not run immediately, dwCount=%d, bRunning=%d",
-                    dwCount, bRunning );
-            }
-            else
+            if( dwCount > 0 && bRunning )
             {
                 pParaLock->unlock();
 
@@ -2282,6 +2261,35 @@ gint32 CRpcInterfaceBase::AddAndRun(
                     pIoTask->MarkPending();
                 }
                 ret = 0;
+            }
+            else if( dwCount == 0 && !bRunning )
+            {
+                pParaLock->unlock();
+                ( *pRootGrp )( eventZero );
+                ret = pIoTask->GetError();
+                if( ret == STATUS_PENDING )
+                    pIoTask->MarkPending();
+                ret = 0;
+            }
+            else if( dwCount > 0 && !bRunning )
+            {
+                // don't lock the io task, because it
+                // could cause deadlock
+                pIoTask->MarkPending();
+                pParaLock->unlock();
+                ret = 0;
+
+                DebugPrintEx( logInfo, GetTid(),
+                    "root task not run immediately, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
+            }
+            else // if( dwCount == 0 && bRunning )
+            {
+                pParaLock->unlock();
+                ret = ERROR_STATE;
+                DebugPrint( GetTid(),
+                    "root task is in wrong state, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
             }
         }
         else if( bImmediate && bRunning && dwCount > 0 )
@@ -2753,7 +2761,7 @@ gint32 CRpcServices::OnPostStop(
     m_pStmMatch.Clear();
     while( !m_pRootTaskGroup.IsEmpty() )
     {
-        pGrp = GetTaskGroup();
+        pGrp = m_pRootTaskGroup;
         oIfLock.Unlock();
         CStdRTMutex oTaskLock( pGrp->GetLock() );
         oIfLock.Lock();
@@ -5298,26 +5306,7 @@ gint32 CRpcServices::RunManagedParaTask(
             break;
         }
 
-        if( dwCount == 0 && bRunning )
-        {
-            pParaLock->unlock();
-            ret = ERROR_STATE;
-            DebugPrint( GetTid(),
-                "root task is in wrong state, dwCount=%d, bRunning=%d",
-                dwCount, bRunning );
-            break;
-        }
-        else if( dwCount > 0 && !bRunning )
-        {
-            pTask->MarkPending();
-            pParaLock->unlock();
-            ret = 0;
-
-            DebugPrintEx( logInfo, GetTid(),
-                "root task not run immediately, dwCount=%d, bRunning=%d",
-                dwCount, bRunning );
-        }
-        else
+        if( dwCount > 0 && bRunning )
         {
             pParaLock->unlock();
             oIfLock.Unlock();
@@ -5331,6 +5320,35 @@ gint32 CRpcServices::RunManagedParaTask(
                 pTask->MarkPending();
             }
             ret = 0;
+        }
+        else if( dwCount == 0 && !bRunning )
+        {
+            pParaLock->unlock();
+            oIfLock.Unlock();
+
+            ( *pRoot )( eventZero );
+            ret = pTask->GetError();
+            if( ret == STATUS_PENDING )
+                pTask->MarkPending();
+            ret = 0;
+        }
+        else if( dwCount > 0 && !bRunning )
+        {
+            pTask->MarkPending();
+            pParaLock->unlock();
+            ret = 0;
+
+            DebugPrintEx( logInfo, GetTid(),
+                "root task not run immediately, dwCount=%d, bRunning=%d",
+                dwCount, bRunning );
+        }
+        else // if( dwCount == 0 && bRunning )
+        {
+            pParaLock->unlock();
+            ret = ERROR_STATE;
+            DebugPrint( GetTid(),
+                "root task is in wrong state, dwCount=%d, bRunning=%d",
+                dwCount, bRunning );
         }
         break;
 
