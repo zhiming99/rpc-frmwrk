@@ -201,7 +201,7 @@ def maincli() :
         hstmr = oResp[0]
         if hstmr != hstmIn:
             error = -errno.EBADF
-            raise Exception( "EchoStream returned different stream '%s'(origin):'%s'(returned)" %
+            raise Exception( "EchoStream returned different stream '%s'(returned):'%s'(origin)" %
                 ( hstmr, hstmIn ), os.getpid() )
 
         #read the datablock echoed back
