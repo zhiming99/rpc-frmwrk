@@ -5035,7 +5035,7 @@ gint32 fuseif_remkdir(
 
 void fuseif_tweak_llops( fuse_session* se );
 
-static gint32 fuseif_unmount()
+gint32 fuseif_unmount()
 {
     InterfPtr& pIf = GetRootIf();
     CRpcServices* pSvc = GetRootIf();
