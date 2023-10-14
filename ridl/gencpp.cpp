@@ -8890,6 +8890,8 @@ gint32 CExportObjDesc::BuildObjDesc(
                 oJif[ JSON_ATTR_NONSOCK_STREAM ] =
                     "true";
             }
+            oJif[ JSON_ATTR_SEQTGMGR ] =
+                "true";
             oIfArray.append( oJif );
         }
 

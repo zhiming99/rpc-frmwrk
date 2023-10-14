@@ -435,7 +435,7 @@ class CStreamServerRelay :
 
     gint32 OnPreStop(
         IEventSink* pContext ) override
-    { return super::OnPreStop( pContext ); }
+    { return OnPreStopShared( pContext ); }
 };
 
 // this interface will be hosted by
@@ -508,7 +508,7 @@ class CStreamProxyRelay :
     }
     gint32 OnPreStop(
         IEventSink* pContext ) override
-    { return super::OnPreStop( pContext ); }
+    { return OnPreStopShared( pContext ); }
 };
 
 class CIfStartUxSockStmRelayTask :

@@ -4778,6 +4778,18 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg.SetBoolProp( propNonSockStm, true );
                 else
                     oCfg.SetBoolProp( propNonSockStm, false );
+
+            }
+
+            if( strIfName == "IStream" &&
+                oIfDesc.isMember( JSON_ATTR_SEQTGMGR ) &&
+                oIfDesc[ JSON_ATTR_SEQTGMGR ].isString() )
+            {
+                strVal = oIfDesc[ JSON_ATTR_SEQTGMGR ].asString();
+                if( strVal.size() > 0 && strVal == "true" )
+                    oCfg.SetBoolProp( propSeqTgMgr, true );
+                else
+                    oCfg.SetBoolProp( propSeqTgMgr, false );
             }
 
             MatchPtr pMatch;

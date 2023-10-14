@@ -1,5 +1,4 @@
-/*
- * =====================================================================================
+/* * =====================================================================================
  *
  *       Filename:  seqtgmgr.h
  *
@@ -23,42 +22,72 @@
  */
 #pragma once
 #include "ifhelper.h"
+namespace rpcf{
 
 struct SEQTG_ELEM
 {
     TaskGrpPtr m_pSeqTasks;
     EnumTaskState m_iState = stateStarting;
-    SEQTG_EMEM( const SEQTG_ELEM& elem )
+    SEQTG_ELEM( const SEQTG_ELEM& elem )
     {
         m_pSeqTasks = elem.m_pSeqTasks;
         m_iState = elem.m_iState;
     }
+    SEQTG_ELEM()
+    {}
 };
 
 template< class Handle, class HostClass >
 struct CSeqTaskGrpMgr : public CObjBase
 {
-    HostClass* m_pParent;
+    CRpcServices* m_pParent;
     std::hashmap< Handle, SEQTG_ELEM > m_mapSeqTgs;
     EnumIfState m_iMgrState = stateStarted;
+    mutable stdrmutex m_oLock;
 
     typedef CObjBase super;
     CSeqTaskGrpMgr() : super()
     {}
 
-    inline void SetParent( HostClass* pParent )
+    inline void SetParent( CRpcServices* pParent )
     { m_pParent = pParent; }
 
-    inline HostClass* GetParent()
+    inline CRpcServices* GetParent() const
     { return m_pParent; }
 
+    CIoManager* GetIoMgr()
+    {
+        if( GetParent() == nullptr )
+            return nullptr;
+        return GetParent()->GetIoMgr();
+    }
+
     inline stdrmutex& GetLock()
-    { return m_pParent->GetLock(); }
+    { return m_oLock; }
 
     inline void SetState( EnumIfState iState )
     {
-        CStdRMutex oLock( GetLock() )
+        CStdRMutex oLock( GetLock() );
         m_iMgrState = iState;
+    }
+
+    gint32 AllocSeqSlot( HANDLE htg )
+    {
+        if( htg == 0 )
+            return -EINVAL;
+
+        CStdRMutex oLock( GetLock() );
+        if( m_iMgrState != stateStarted )
+            return ERROR_STATE;
+
+        auto itr = m_mapSeqTgs.find( htg );
+        if( itr != m_mapSeqTgs.end() )
+            return -EEXIST;
+
+        SEQTG_ELEM otg;
+        m_mapSeqTgs[ htg ] = otg;
+        itr = m_mapSeqTgs.find( htg );
+        return 0;
     }
 
     gint32 AddStartTask(
@@ -70,23 +99,22 @@ struct CSeqTaskGrpMgr : public CObjBase
         gint32 ret = 0;
         CStdRMutex oLock( GetLock() );
         if( m_iMgrState != stateStarted )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
-        auto itr = m_mapSeqTgs.find( htg );
-        if( itr != m_mapSeqTgs.end() )
-            return -EEXIST;
+            return ERROR_STATE;
 
-        SEQTG_ELEM otg;
-        m_mapSeqTgs[ htg ] = otg;
-        itr = m_mapSeqTgs.find( htg );
-        auto& pSeqTasks =
-            itr->second.m_pSeqTasks;
+        auto itr = m_mapSeqTgs.find( htg );
+        if( itr == m_mapSeqTgs.end() )
+        {
+            SEQTG_ELEM otg;
+            m_mapSeqTgs[ htg ] = otg;
+            itr = m_mapSeqTgs.find( htg );
+        }
+        auto& elem = itr->second;
         oLock.Unlock();
 
         ret = AddSeqTaskIf(
-            GetParent(), pSeqTasks, pTask );
+            GetParent(),
+            elem.m_pSeqTasks,
+            pTask, false );
 
         oLock.Lock();
         if( ERROR( ret ) )
@@ -95,7 +123,7 @@ struct CSeqTaskGrpMgr : public CObjBase
         }
         else
         {
-            itr->second.m_iState = stateStarted;
+            elem.m_iState = stateStarted;
         }
         return ret;
     }
@@ -126,9 +154,15 @@ struct CSeqTaskGrpMgr : public CObjBase
                 ret = ERROR_STATE;
                 break;
             }
+
+            auto& pSeqTasks =
+                itr->second.m_pSeqTasks;
+
             oLock.Unlock();
-            ret = AddSeqTaskIf( GetParent(),
-                itr->second.m_pSeqTasks, pTask );
+            ret = AddSeqTaskIf(
+                GetParent(),
+                pSeqTasks,
+                pTask, false );
         }while( 0 );
 
         return ret;
@@ -152,11 +186,20 @@ struct CSeqTaskGrpMgr : public CObjBase
             auto itr = m_mapSeqTgs.find( htg );
             if( itr == m_mapSeqTgs.end() )
             {
-                ret = -ENOENT;
+                // caller should guarantee the stop
+                // task come later than start task
+                ret = ERROR_STATE;
                 break;
             }
 
-            if( itr->second.m_iState != stateStarted )
+            auto iState = itr->second.m_iState;
+            if( unlikely( iState == stateStarting ) )
+            {
+                oLock.Unlock();
+                std::this_thread::yield();
+                continue;
+            }
+            else if( iState != stateStarted )
             {
                 ret = ERROR_STATE;
                 break;
@@ -170,7 +213,9 @@ struct CSeqTaskGrpMgr : public CObjBase
             oLock.Unlock();
 
             ret = AddSeqTaskIf(
-                GetParent(), pSeqTasks, pTask );
+                GetParent(),
+                pSeqTasks,
+                pTask, false );
 
             if( ERROR( ret ) )
                 break;
@@ -198,7 +243,7 @@ struct CSeqTaskGrpMgr : public CObjBase
                     CRpcServices* pSvc =
                         pTgMgr->GetParent();
 
-                    CIoManager* pMgr;
+                    CIoManager* pMgr = pSvc->GetIoMgr();
                     TaskletPtr pRemove;
                     ret = DEFER_OBJCALL_NOSCHED(
                         pRemove, pTgMgr,
@@ -229,6 +274,9 @@ struct CSeqTaskGrpMgr : public CObjBase
             });
 
             TaskletPtr pCleanup;
+            CIoManager* pMgr =
+                GetParent()->GetIoMgr();
+
             gint32 iRet = NEW_FUNCCALL_TASK(
                 pCleanup, pMgr, func,
                 ObjPtr( this ), htg,
@@ -236,11 +284,14 @@ struct CSeqTaskGrpMgr : public CObjBase
 
             if( SUCCEEDED( iRet ) )
             {
-                iRet = AddSeqTaskIf( GetParent(),
-                    pSeqTasks, pCleanup );
+                iRet = AddSeqTaskIf(
+                    GetParent(),
+                    pSeqTasks,
+                    pCleanup, false );
             }
+            break;
 
-        }while( 0 );
+        }while( 1 );
 
         return ret;
     }
@@ -274,10 +325,7 @@ struct CSeqTaskGrpMgr : public CObjBase
         return ret;
     }
 
-    virtual gint32 GetStopTask(
-        Handle htg, TaskletPtr& pStopTask ) = 0;
-
-    typedef HTPAIR std::pair< Handle, TaskletPtr >;
+    typedef std::pair< Handle, TaskletPtr > HTPAIR;
     gint32 Stop( IEventSink* pCallback )
     {
         gint32 ret = 0;
@@ -286,7 +334,7 @@ struct CSeqTaskGrpMgr : public CObjBase
             oParams.SetPointer(
                 propIfPtr, GetParent() );
             TaskGrpPtr pGrp;
-            ret = pGrp->NewObj(
+            ret = pGrp.NewObj(
                 clsid( CIfParallelTaskGrp ),
                 oParams.GetCfg() );
             if( ERROR( ret ) )
@@ -310,13 +358,8 @@ struct CSeqTaskGrpMgr : public CObjBase
                 if( elem.second.m_iState ==
                     stateStopped )
                     continue;
-                TaskletPtr pStopTask;
-                ret = GetStopTask(
-                    elem.first, pStopTask );
-                if( ERROR( ret ) )
-                    continue;
                 vecTasks.push_back(
-                    { elem.first, pStopTask } );
+                    { elem.first, TaskletPtr() } );
             }
             oLock.Unlock();
             if( vecTasks.empty() )
@@ -330,7 +373,6 @@ struct CSeqTaskGrpMgr : public CObjBase
             ([]( IEventSink* pSvc )
             { return 0; } );
             
-            std::vector< TaskletPtr > vecNotifies;
             for( auto& elem : vecTasks )
             {
                 TaskletPtr pNotify;
@@ -338,7 +380,7 @@ struct CSeqTaskGrpMgr : public CObjBase
                     pNotify, pMgr,
                     func, GetParent() );
                 pGrp->AppendTask( pNotify );
-                vecNotifies.push_back( pNotify );
+                elem.second = pNotify;
             }
 
             TaskletPtr pSync;
@@ -348,30 +390,34 @@ struct CSeqTaskGrpMgr : public CObjBase
                 gint32 (*func1)( IEventSink*, IEventSink*, ObjPtr& ) =
                 ([]( IEventSink* pCb,
                     IEventSink* pUserCb,
-                    ObjPtr& pseqmgr )
+                    ObjPtr& pseqmgr )->gint32
                 {
-                    CCfgOpenerObj oCbCfg( pCb );
-                    IConfigDb* pResp;
                     CSeqTaskGrpMgr* pSeqMgr = pseqmgr;
                     if( pSeqMgr != nullptr )
                         pSeqMgr->SetState( stateStopped );
 
-                    gint32 ret = pResp->GetPointer(
+                    IConfigDb* pResp;
+                    CCfgOpenerObj oCbCfg( pCb );
+                    gint32 ret = oCbCfg.GetPointer(
                         propRespPtr, pResp );
                     if( SUCCEEDED( ret ) )
                     {
+                        guint32 dwVal = 0;
                         CCfgOpener oResp( pResp );
                         gint32 iRet = oResp.GetIntProp(
-                            propReturnValue, ret );
+                            propReturnValue,
+                            ( guint32& )ret );
+
                         if( ERROR( iRet ) )
                             ret = iRet;
                     }
-                    ret = pUserCb->OnEvent(
+                    pUserCb->OnEvent(
                         eventTaskComp, ret, 0, nullptr );
+                    return ret;
                 });
                 TaskletPtr pWrapper;
                 NEW_COMPLETE_FUNCALL( 0, pWrapper,
-                    func1, nullptr, pCallback,
+                    pMgr, func1, nullptr, pCallback,
                     ObjPtr( this ) );
                 pRetry->SetClientNotify( pWrapper );
             }
@@ -381,18 +427,24 @@ struct CSeqTaskGrpMgr : public CObjBase
                 pRetry->SetClientNotify( pSync );
             }
 
-            GetParent()->RunManagedTask( pGrp );
-
-            for( int i = 0; i < vecNotifies.size(); i++ )
+            ret = GetParent()->RunManagedTask( pGrp );
+            if( ERROR( ret ) )
             {
-                AddStopTask( vecNotifies[ i ], 
-                    vecTasks[ i ].first,
-                    vecTasks[ i ].second );
+                ( *pGrp )( eventCancelTask );
+                break;
+            }
+
+            auto phc = dynamic_cast< HostClass* >( GetParent() );
+            for( auto& elem : vecTasks )
+            {
+                phc->OnClose(
+                    elem.first, elem.second );
             }
 
             if( !pSync.IsEmpty() )
             {
-                pSync->WaitForCompleteWakable();
+                CSyncCallback* pscb = pSync;
+                pscb->WaitForCompleteWakable();
                 ret = pSync->GetError();
                 this->SetState( stateStopped );
             }
@@ -405,3 +457,5 @@ struct CSeqTaskGrpMgr : public CObjBase
         return ret;
     }
 };
+
+}

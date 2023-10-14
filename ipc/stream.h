@@ -30,10 +30,12 @@
 #include <exception>
 
 #include "uxport.h"
+#include "seqtgmgr.h"
 
 namespace rpcf
 {
 
+struct CStmSeqTgMgr;
 struct IStream
 {
     public:
@@ -41,16 +43,11 @@ struct IStream
     UXSTREAM_MAP m_mapUxStreams;
     CRpcServices* m_pSvc = nullptr;
     bool    m_bNonSockStm = false;
+    ObjPtr  m_pSeqTgMgr;
 
     virtual gint32 CanContinue() = 0;
 
-    inline void SetInterface( CRpcServices* pSvc )
-    {
-        m_pSvc = pSvc;
-        CCfgOpenerObj oCfg( pSvc );
-        oCfg.GetBoolProp(
-            propNonSockStm, m_bNonSockStm );
-    }
+    void SetInterface( CRpcServices* pSvc );
 
     inline CRpcServices* GetInterface() const
     { return m_pSvc; }
@@ -210,6 +207,9 @@ struct IStream
     gint32 CreateSocket(
         int& fdlocal, int& fdRemote );
 
+    gint32 OnPreStopSharedParallel(
+        IEventSink* pCallback );
+
     gint32 OnPreStopShared(
         IEventSink* pCallback );
 
@@ -221,6 +221,30 @@ struct IStream
     
     inline bool IsNonSockStm() const
     { return m_bNonSockStm; }
+
+    CStmSeqTgMgr* GetSeqTgMgr();
+
+    gint32 AddStartTask(
+        HANDLE hChannel, TaskletPtr& pTask );
+
+    gint32 AddStopTask(
+        IEventSink* pCallback,
+        HANDLE hChannel,
+        TaskletPtr& pTask );
+
+    gint32 AddSeqTask2(
+        HANDLE hChannel, TaskletPtr& pTask );
+
+    gint32 StopSeqTgMgr(
+        IEventSink* pCallback );
+};
+
+struct CStmSeqTgMgr :
+    public CSeqTaskGrpMgr< HANDLE, IStream >
+{
+    typedef CSeqTaskGrpMgr< HANDLE, IStream > super;
+    CStmSeqTgMgr() : super()
+    { SetClassId( clsid( CStmSeqTgMgr ) ); }
 };
 
 struct IStreamServer : public IStream
@@ -356,7 +380,7 @@ class CStreamServer :
 
     virtual gint32 OnPreStop( IEventSink* pCallback )
     {
-        return OnPreStopShared( pCallback );
+        return OnPreStopSharedParallel( pCallback );
     }
 
     virtual gint32 AcceptNewStream(

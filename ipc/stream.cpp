@@ -34,6 +34,118 @@
 namespace rpcf
 {
 
+CStmSeqTgMgr* IStream::GetSeqTgMgr()
+{ return m_pSeqTgMgr; }
+
+void IStream::SetInterface( CRpcServices* pSvc )
+{
+    m_pSvc = pSvc;
+
+    CCfgOpenerObj oCfg( pSvc );
+    oCfg.GetBoolProp(
+        propNonSockStm, m_bNonSockStm );
+
+    bool bSeqTgMgr = false;
+    gint32 ret = oCfg.GetBoolProp(
+        propSeqTgMgr, bSeqTgMgr );
+    if( ERROR( ret ) || !bSeqTgMgr )
+        return;
+
+    m_pSeqTgMgr.NewObj( clsid( CStmSeqTgMgr ) );
+    GetSeqTgMgr()->SetParent( GetInterface() );
+}
+
+gint32 IStream::AddStartTask(
+    HANDLE hChannel, TaskletPtr& pTask )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pTask.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = GetInterface();
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        if( psmgr == nullptr ||
+            !pSvc->IsServer() )
+            return pSvc->AddSeqTask( pTask );
+
+        ret = psmgr->AddStartTask(
+            hChannel, pTask );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 IStream::AddStopTask(
+    IEventSink* pCallback,
+    HANDLE hChannel,
+    TaskletPtr& pTask )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pTask.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = GetInterface();
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        bool bSvr = pSvc->IsServer();
+        if( psmgr == nullptr || !bSvr )
+        {
+            if( pCallback != nullptr )
+            {
+                CIfRetryTask* pRetry = pTask;
+                pRetry->SetClientNotify( pCallback );
+            }
+            ret = pSvc->AddSeqTask( pTask );
+            break;
+        }
+
+        ret = psmgr->AddStopTask(
+            pCallback, hChannel, pTask );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 IStream::AddSeqTask2(
+    HANDLE hChannel, TaskletPtr& pTask )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = GetInterface();
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        if( psmgr == nullptr ||
+            !pSvc->IsServer() )
+            return pSvc->AddSeqTask( pTask );
+
+        ret = psmgr->AddSeqTask(
+            hChannel, pTask );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 IStream::StopSeqTgMgr(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        if( psmgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = psmgr->Stop( pCallback );
+
+    }while( 0 );
+    return ret;
+}
+
 bool IStream::CanSend( HANDLE hChannel )
 {
     InterfPtr pIf;
@@ -613,10 +725,6 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             break;
 
         CRpcServices* pUxSvc = pUxIf;
-        ret = pStream->AddUxStream(
-            ( HANDLE )pUxSvc, pUxIf );
-        if( ERROR( ret ) )
-            break;
 
         TaskletPtr pStartTask;
         CParamList oStartParams;
@@ -664,12 +772,21 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
+        ret = pStream->AddUxStream(
+            ( HANDLE )pUxSvc, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
         // make sure the task runs sequentially
-        ret = pIf->AddSeqTask( pStartTask );
+        ret = pStream->AddStartTask(
+            ( HANDLE )pUxSvc, pStartTask );
         if( ERROR( ret ) )
         {
-            ( *pStartTask )(
-                eventCancelTask );
+            InterfPtr pTemp;
+            pStream->RemoveUxStream(
+                ( HANDLE )pUxSvc, pTemp );
+
+            ( *pStartTask )( eventCancelTask );
             break;
         }
 
@@ -1333,18 +1450,14 @@ gint32 IStream::CloseChannel(
         CParamList oParams;
         oParams.Push( ObjPtr( pIf ) );
         oParams[ propIfPtr ] = ObjPtr( pThisIf );
-        if( pCallback != nullptr )
-        {
-            oParams[ propEventSink ] =
-                ObjPtr( pCallback );
-        }
 
         TaskletPtr pStopTask;
         pStopTask.NewObj(
             clsid( CIfStopUxSockStmTask ),
             oParams.GetCfg() );
 
-        ret = pThisIf->AddSeqTask( pStopTask );
+        ret = AddStopTask(
+            pCallback, hChannel, pStopTask );
 
         if( ERROR( ret ) )
         {
@@ -1563,6 +1676,12 @@ gint32 IStream::OnClose(
     return 0;
 }
 
+gint32 IStream::OnPreStopSharedParallel(
+    IEventSink* pCallback )
+{
+    return StopSeqTgMgr( pCallback );
+}
+
 gint32 IStream::OnPreStopShared(
     IEventSink* pCallback )
 {
@@ -1638,9 +1757,9 @@ gint32 IStream::OnPreStopShared(
 
     if( bNotify )
     {
-        // possibly there are stream stop tasks in
-        // the m_pSeqTasks we schedule a conclusion
-        // task to make sure all the 
+        // possibly there are stream stop tasks in the
+        // m_pSeqTasks, so schedule a conclusion task
+        // to make sure all the stop tasks are done.
         if( SUCCEEDED( ret ) )
         {
             TaskletPtr pFinalCb;
