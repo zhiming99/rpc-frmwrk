@@ -31,6 +31,7 @@
 #include "dbusport.h"
 #include "connhelp.h"
 #include "jsondef.h"
+#include "rtseqmgr.h"
 
 namespace rpcf
 {
