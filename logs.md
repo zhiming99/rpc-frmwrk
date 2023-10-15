@@ -1,4 +1,8 @@
 ---
+[`Sun Oct 15 2023 09:53:43 PM Beijing`]   
+1. Having merged pull request #22 to the master branch.
+2. We still have a few issues (see issues) to fix before preceeding with new features development.
+
 [`Fri Oct 06 2023 06:12:38 PM Beijing`]   
 1. Having cleared all the blocking bugs. Now we can move on to fix the major performance issue.
 
