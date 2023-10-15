@@ -30,11 +30,12 @@
 #include "uxstream.h"
 #include "sha1.h"
 #include "stmcp.h"
+#include "seqtgmgr.h"
 
 namespace rpcf
 {
 
-CStmSeqTgMgr* IStream::GetSeqTgMgr()
+ObjPtr IStream::GetSeqTgMgr()
 { return m_pSeqTgMgr; }
 
 void IStream::SetInterface( CRpcServices* pSvc )
@@ -52,7 +53,8 @@ void IStream::SetInterface( CRpcServices* pSvc )
         return;
 
     m_pSeqTgMgr.NewObj( clsid( CStmSeqTgMgr ) );
-    GetSeqTgMgr()->SetParent( GetInterface() );
+    CStmSeqTgMgr* pSeqMgr = GetSeqTgMgr();
+    pSeqMgr->SetParent( GetInterface() );
 }
 
 gint32 IStream::AddStartTask(

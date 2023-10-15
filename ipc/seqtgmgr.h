@@ -221,10 +221,12 @@ struct CSeqTaskGrpMgr : public CObjBase
                 break;
 
             gint32 (*func)( ObjPtr&,
-                Handle, IEventSink* ) =
+                Handle, IEventSink*,
+                CRpcServices* ) =
 
             ([]( ObjPtr& ptgm, Handle htg,
-                IEventSink* pCb )->gint32
+                IEventSink* pCb,
+                CRpcServices* pSvc )->gint32
             {
                 gint32 ret = 0;
                 do{
@@ -240,8 +242,6 @@ struct CSeqTaskGrpMgr : public CObjBase
                         break;
                     }
                     CSeqTaskGrpMgr* pTgMgr = ptgm;
-                    CRpcServices* pSvc =
-                        pTgMgr->GetParent();
 
                     CIoManager* pMgr = pSvc->GetIoMgr();
                     TaskletPtr pRemove;
@@ -258,6 +258,7 @@ struct CSeqTaskGrpMgr : public CObjBase
                         pRetry->SetClientNotify( pCb );
                     }
 
+                    pRemove->MarkPending();
                     TaskletPtr pManaged;
                     ret = DEFER_CALL_NOSCHED(
                         pManaged, pSvc,
@@ -280,7 +281,7 @@ struct CSeqTaskGrpMgr : public CObjBase
             gint32 iRet = NEW_FUNCCALL_TASK(
                 pCleanup, pMgr, func,
                 ObjPtr( this ), htg,
-                pCallback );
+                pCallback, GetParent() );
 
             if( SUCCEEDED( iRet ) )
             {
@@ -456,6 +457,14 @@ struct CSeqTaskGrpMgr : public CObjBase
         }while( 0 );
         return ret;
     }
+};
+
+struct CStmSeqTgMgr :
+    public CSeqTaskGrpMgr< HANDLE, IStream >
+{
+    typedef CSeqTaskGrpMgr< HANDLE, IStream > super;
+    CStmSeqTgMgr() : super()
+    { SetClassId( clsid( CStmSeqTgMgr ) ); }
 };
 
 }

@@ -30,12 +30,10 @@
 #include <exception>
 
 #include "uxport.h"
-#include "seqtgmgr.h"
 
 namespace rpcf
 {
 
-struct CStmSeqTgMgr;
 struct IStream
 {
     public:
@@ -222,7 +220,7 @@ struct IStream
     inline bool IsNonSockStm() const
     { return m_bNonSockStm; }
 
-    CStmSeqTgMgr* GetSeqTgMgr();
+    ObjPtr GetSeqTgMgr();
 
     gint32 AddStartTask(
         HANDLE hChannel, TaskletPtr& pTask );
@@ -237,14 +235,6 @@ struct IStream
 
     gint32 StopSeqTgMgr(
         IEventSink* pCallback );
-};
-
-struct CStmSeqTgMgr :
-    public CSeqTaskGrpMgr< HANDLE, IStream >
-{
-    typedef CSeqTaskGrpMgr< HANDLE, IStream > super;
-    CStmSeqTgMgr() : super()
-    { SetClassId( clsid( CStmSeqTgMgr ) ); }
 };
 
 struct IStreamServer : public IStream

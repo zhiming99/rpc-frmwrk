@@ -47,6 +47,7 @@
 #include "stmport.h"
 #include "fastrpc.h"
 #include "stmcp.h"
+#include "seqtgmgr.h"
 
 #include <dlfcn.h>
 
