@@ -43,6 +43,7 @@ static std::string g_strIpAddr;
 static std::string g_strPortNum;
 static bool g_bAuth = false;
 static bool g_bKProxy = false;
+static bool g_bAsync = false;
 static std::string g_strUserName;
 static ObjPtr g_pRouter;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
@@ -109,7 +110,7 @@ int main( int argc, char** argv )
             {"sainstname", required_argument, 0,  0 },
             {0,             0,                 0,  0 }
         };            
-        while( ( opt = getopt_long( argc, argv, "hadkl:i:p:",
+        while( ( opt = getopt_long( argc, argv, "hadkl:i:p:s",
             arrLongOptions, &iOptIdx ) ) != -1 )
         {
             switch( opt )
@@ -209,6 +210,8 @@ int main( int argc, char** argv )
                 { g_bAuth = true; break; }
             case 'd':
                 { bDaemon = true; break; }
+            case 's':
+                { g_bAsync = true; break; }
             case 'h':
             default:
                 { Usage( argv[ 0 ] ); exit( 0 ); }
@@ -328,14 +331,20 @@ gint32 InitContext()
             clsid( CIoManager ), 
             oParams.GetCfg() );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error create iomgr" );
             break;
+        }
 
         CIoManager* pSvc = g_pIoMgr;
         pSvc->SetCmdLineOpt(
             propRouterRole, 1 );
         ret = pSvc->Start();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error start iomgr" );
             break;
+        }
         
         if( g_bKProxy )
             pSvc->SetCmdLineOpt(
@@ -391,6 +400,7 @@ gint32 InitContext()
         ret = pRouter->Start();
         if( ERROR( ret ) )
         {
+            OutputMsg( ret, "Error start router" );
             pRouter->Stop();
             g_pRouter.Clear();
             break;
@@ -442,7 +452,10 @@ int _main( int argc, char** argv )
         
         ret = InitContext();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error InitContext" );
             break;
+        }
         if( g_bKProxy )
         {
             ret = KProxyLoop();
@@ -469,7 +482,10 @@ int _main( int argc, char** argv )
             pSvc = pIf;
             ret = pSvc->Start();
             if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "Error start the proxy" );
                 break;
+            }
             while( pSvc->GetState()== stateRecovery )
                 sleep( 1 );
             
@@ -493,9 +509,12 @@ int _main( int argc, char** argv )
 }
 
 //-----Your code begins here---
-gint32 maincli( CTestTypesSvc_CliImpl* pIf, int argc, char** argv )
+
+std::atomic< int > idx( 0 );
+std::atomic< int > count( 1000 );
+std::atomic< int > failures( 0 );
+gint32 SyncEcho( CTestTypesSvc_CliImpl* pIf )
 {
-    //-----Adding your code here---
     gint32 ret = 0;
     for( int i = 0; i < 1000; i++ )
     {
@@ -506,6 +525,76 @@ gint32 maincli( CTestTypesSvc_CliImpl* pIf, int argc, char** argv )
         OutputMsg( ret,
             "Server resp( %d ): %s", i, strResp.c_str() );
     }
-    return STATUS_SUCCESS;
+    return ret;
 }
 
+gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
+{
+    gint32 ret = 0;
+    do{
+        CParamList oParams;
+        // counters shared with the callback
+        oParams.Push( ( intptr_t )&idx );
+        oParams.Push( ( intptr_t )&count );
+        oParams.Push( ( intptr_t )&failures );
+
+        // synchronization task between this function
+        // and the callback
+        TaskletPtr pSyncTask;
+        ret = pSyncTask.NewObj(
+            clsid( CSyncCallback ) );
+        if( ERROR( ret ) )
+            break;
+        oParams.Push( ObjPtr( pSyncTask ) );
+
+        for( int i = 0; i < 1000; i++ )
+        {
+            stdstr strResp;
+            stdstr strText = "Hello, World ";
+            strText += std::to_string( i );
+            ret = pIf->Echo3( oParams.GetCfg(),
+                strText, strResp );
+            if( ret == STATUS_PENDING )
+                continue;
+            count--;
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "Error sending Echo3 request, ( %d )", i );
+            }
+            else
+            {
+                OutputMsg( ret,
+                    "Succeeded Echo3 request "
+                    "immediately, ( %d ), %s",
+                    i, strResp.c_str() );
+            }
+        }
+
+        if( count == 0 )
+            break;
+
+        CSyncCallback* pSync = pSyncTask;
+        // the requests are sent, wait for responses
+        ret = pSync->WaitForCompleteWakable();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 maincli( CTestTypesSvc_CliImpl* pIf, int argc, char** argv )
+{
+    gint32 ret = 0;
+    if( g_bAsync )
+        ret = AsyncEcho( pIf );
+    else
+        ret = SyncEcho( pIf );
+    if( SUCCEEDED( ret ) )
+        OutputMsg( ret,
+            "Echo test is completed");
+    else
+        OutputMsg( ret,
+            "Echo test is failed");
+    return ret;
+}

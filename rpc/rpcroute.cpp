@@ -1117,6 +1117,7 @@ gint32 CRouterStartReqFwdrProxyTask::
                 pMatch, pIfPtr );
             if( ERROR( ret ) )
                 break;
+            pIf = pIfPtr;
         }
         else if( ERROR( ret ) )
         {
@@ -1139,6 +1140,7 @@ gint32 CRouterStartReqFwdrProxyTask::
             break;
         }
 
+        break;
         // in case the transaction failed
         TaskletPtr pRbTask;
         ret = pRouter->BuildStartStopReqFwdrProxy(
@@ -2327,7 +2329,7 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
             pTaskGrp->AppendTask( pFwrdTasks );
 
         // put the bridge to the stopping state to
-        // prevent further incoming requests
+        // block new requests
         ret = pBridge->SetStateOnEvent(
             cmdShutdown );
         if( ERROR( ret ) )
@@ -3985,38 +3987,69 @@ gint32 CRpcRouterReqFwdr::OnPreStopLongWait(
 
     }while( 0 );
 
-    CParamList oParams;
-    oParams[ propIfPtr ] = ObjPtr( this );
+    TaskGrpPtr pTopGrp;
     TaskGrpPtr pTaskGrp;
-    ret = pTaskGrp.NewObj(
-        clsid( CIfParallelTaskGrp ),
-        oParams.GetCfg() );
+    do{
+        CParamList oParams;
+        oParams[ propIfPtr ] = ObjPtr( this );
+        ret = pTaskGrp.NewObj(
+            clsid( CIfParallelTaskGrp ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        bool bHasProxy =
+            ( mapId2Proxies.size() > 0 );
+        for( auto&& elem : mapId2Proxies )
+        {
+            ADD_STOPIF_TASK( ret,
+                pTaskGrp, elem.second );
+        }
+        mapId2Proxies.clear();
+
+        if( !m_pReqFwdr.IsEmpty() )
+        {
+            // reqfwdr should be stopped after all the
+            // proxies are stopped.
+            ret = pTopGrp.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            if( bHasProxy )
+            {
+                TaskletPtr pTask = pTaskGrp;
+                pTopGrp->AppendTask( pTask );
+            }
+            ADD_STOPIF_TASK( ret,
+                pTopGrp, m_pReqFwdr );
+        }
+        else if( bHasProxy )
+        {
+            pTopGrp = pTaskGrp;
+        }
+        else
+        {
+            break;
+        }
+        if( pTopGrp->GetTaskCount() > 0 )
+        {
+            pTopGrp->SetClientNotify( pCallback );
+            TaskletPtr pTask = pTopGrp;
+            ret = GetIoMgr()->
+                RescheduleTask( pTask );
+
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+        }
+
+    }while( 0 );
     if( ERROR( ret ) )
-        return ret;
-
-    pTaskGrp->SetClientNotify( pCallback );
-    pTaskGrp->SetRelation( logicNONE );
-
-    for( auto&& elem : mapId2Proxies )
     {
-        ADD_STOPIF_TASK( ret,
-            pTaskGrp, elem.second );
-    }
-    mapId2Proxies.clear();
-
-    if( !m_pReqFwdr.IsEmpty() )
-    {
-        ADD_STOPIF_TASK( ret,
-            pTaskGrp, m_pReqFwdr );
-    }
-
-    if( pTaskGrp->GetTaskCount() > 0 )
-    {
-        TaskletPtr pTask = pTaskGrp;
-        ret = GetIoMgr()->
-            RescheduleTask( pTask );
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        if( !pTopGrp.IsEmpty() )
+            ( *pTopGrp )( eventCancelTask );
+        else if( !pTaskGrp.IsEmpty() )
+            ( *pTaskGrp )( eventCancelTask );
     }
 
     return ret;
@@ -4907,6 +4940,7 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
             pProxy = pIf;
         }
 
+        break;
         // in case somewhere the transaction failed,
         // add a rollback task
         TaskletPtr pRbTask;
@@ -4964,6 +4998,7 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
             else if( ERROR( ret ) )
                 break;
 
+            break;
             // in case the rest transaction failed
             // add a rollback task
             TaskletPtr pRbTask;
@@ -5017,6 +5052,32 @@ gint32 CRouterAddRemoteMatchTask::RunTask()
         ret = oParams.GetPointer( 1, pMatch );
         if( ERROR( ret ) )
             break;
+
+        while( bEnable )
+        {
+            guint32 dwPortId = 0;
+            InterfPtr pIf;
+            CCfgOpenerObj oMatch( pMatch );
+            ret = oMatch.GetIntProp(
+                propPortId, dwPortId );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pRouter->GetBridge(
+                dwPortId, pIf );
+            if( ERROR( ret ) )
+                break;
+            CRpcServices* pSvc = pIf;
+            if( !pSvc->IsConnected() )
+                ret = ERROR_STATE;
+
+            break;
+        }
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret, "Error bridge not exist" );
+            break;
+        }
 
         ret = AddRemoteMatchInternal(
             pRouter, pMatch, bEnable );

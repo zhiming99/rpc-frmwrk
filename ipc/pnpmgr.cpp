@@ -304,7 +304,7 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
 
         pCtx->SetRespData( pBuf );
 
-        pEventSink->OnEvent( eventIrpComp,
+        ret2 = pEventSink->OnEvent( eventIrpComp,
             ( LONGWORD )( ( IRP* )pIrp ), 0, nullptr );
 
         oCfg.RemoveProperty( propEventSink );

@@ -71,8 +71,6 @@ CRpcReqForwarder::CRpcReqForwarder(
             break;
         }
 
-        RemoveProperty( propRouterPtr );
-
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->GetCmdLineOpt(
             propSepConns, m_bSepConns );
@@ -1971,6 +1969,8 @@ gint32 CRpcReqForwarder::OnModEvent(
         return -EINVAL;
 
     gint32 ret = 0;
+    TaskletPtr plcc;
+    TaskletPtr pDeferTask;
     do{
         if( iEvent == eventModOnline )
             break;
@@ -1979,39 +1979,83 @@ gint32 CRpcReqForwarder::OnModEvent(
         if( strModule[ 0 ] != ':' )
             break;
 
+        ObjPtr pObj;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetObjPtr(
+            propRouterPtr, pObj );
+        if( ERROR( ret ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
         //
         // ret = GetRefCountByUniqName( strModule );
         // if( ret <= 0 )
         //     break;
 
-        ObjPtr pObj;
-        TaskletPtr pDeferTask;
-        ret = DEFER_IFCALLEX_NOSCHED(
+        ret = DEFER_IFCALLEX_NOSCHED2( 0,
             pDeferTask, ObjPtr( this ),
             &CRpcReqForwarder::OnModOfflineInternal,
-            ( IEventSink* )pObj, iEvent, strModule );
+            nullptr, iEvent, strModule );
 
         if( ERROR( ret ) )
             break;
 
-        Variant oVar( pDeferTask );
-        CIfDeferCallTaskEx* pTask = pDeferTask;
-        pTask->UpdateParamAt( 0, oVar );
+        // this task serves to control the lifecycle of
+        // pDeferTask no longer than CRpcReqForwarder
+        gint32 (*func)( IEventSink* ) =
+        ([]( IEventSink* )->gint32 { return 0; });
 
-        // using the reqfwdr's sequential
-        // taskgroup
-        ret = GetParent()->AddSeqTask(
-            pDeferTask, false );
-
+        ret = NEW_COMPLETE_FUNCALL( 0, plcc,
+            this->GetIoMgr(), func, nullptr );
         if( ERROR( ret ) )
-            ( *pDeferTask )( eventCancelTask );
+            break;
+
+        CIfRetryTask* pRetry = plcc;
+        pRetry->SetSyncCancel();
+        pRetry = pDeferTask;
+        pRetry->SetClientNotify( plcc );
+
+        ret = RunManagedTask( plcc );
+        if( ERROR( ret ) )
+        {
+            ( *plcc )( eventCancelTask );
+            plcc.Clear();
+            break;
+        }
+
+        CRpcRouter* pParent = pObj;
+        if( unlikely( pParent == nullptr ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        // using the reqfwdr's sequential taskgroup
+        ret = pParent->AddSeqTask(
+            pDeferTask, false );
 
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 
     }while( 0 );
-
+    if( ERROR( ret ) )
+    {
+        if( !plcc.IsEmpty() )
+            ( *plcc )( eventCancelTask );
+        if( !pDeferTask.IsEmpty() )
+            ( *pDeferTask )( eventCancelTask );
+    }
     return ret;
+}
+
+gint32 CRpcReqForwarder::OnPostStop(
+    IEventSink* pCallback )
+{
+    CCfgOpenerObj oIfCfg( this );
+    m_pParent = nullptr;
+    oIfCfg.RemoveProperty( propRouterPtr );
+    return 0;
 }
 
 gint32 CRpcReqForwarder::GetInvTaskPrxyPortId(
@@ -2058,8 +2102,8 @@ gint32 CRpcReqForwarder::OnModOfflineInternal(
     gint32 ret = 0;
 
     do{
-        OutputMsg( 0, "%s is down",
-            strUniqName.c_str() );
+        DebugPrintEx( logErr, 0,
+            "%s is down", strUniqName.c_str() );
 
         ClearRefCountByUniqName(
             strUniqName, setPortIds );
@@ -4879,7 +4923,7 @@ gint32 CRpcReqForwarderProxy::AddInterface(
         }
         else
         {
-            ++itr->second.second;
+            ++( itr->second.second );
             ret = EEXIST;
         }
 
@@ -4903,14 +4947,60 @@ gint32 CRpcReqForwarderProxy::RemoveInterface(
 
         if( itr != m_mapMatchRefs.end() )
         {
-            --itr->second.second;
+            --( itr->second.second );
             if( itr->second.second <= 0 )
             {
-                m_vecMatches.erase(
-                    m_vecMatches.begin() +
-                    itr->second.first );
-
+                auto matchPair = itr->second;
                 m_mapMatchRefs.erase( ptrMatch );
+                CMessageMatch* pcMatch = ptrMatch;
+                stdstr strMatch = pcMatch->ToString();
+                bool bFound = false;
+
+                if( m_vecMatches.empty() )
+                {
+                    DebugPrint( ret, "match 0x%llx not found2, %s",
+                        pMatch, strMatch.c_str() );
+                    break;
+                }
+
+                auto it2 = m_vecMatches.end();
+                if( m_vecMatches.size() <= matchPair.first )
+                {
+                    it2 = m_vecMatches.end() - 1;
+                }
+                else
+                {
+                    it2 = m_vecMatches.begin() + matchPair.first;
+                }
+                while( it2 != m_vecMatches.begin() )
+                {
+                    stdstr&& strVal = ( *it2 )->ToString();
+                    if( strVal == strMatch )
+                    {
+                        m_vecMatches.erase( it2 );
+                        bFound = true;
+                        break;
+                    }
+                    it2--;
+                }
+
+                if( bFound )
+                    break;
+
+                if( it2 == m_vecMatches.begin() )
+                {
+                    stdstr&& strVal = ( *it2 )->ToString();
+                    if( strVal == strMatch )
+                    {
+                        m_vecMatches.erase( it2 );
+                        bFound = true;
+                        break;
+                    }
+                }
+
+                if( !bFound )
+                    DebugPrint( ret, "match 0x%llx not found, %s",
+                        pMatch, strMatch.c_str() );
             }
             else
             {
@@ -5268,7 +5358,7 @@ gint32 CRpcReqForwarderProxy::OnModEvent(
         CIfRetryTask* pRetryTask = pTask;
         pRetryTask->SetClientNotify( pRespTask );
 
-        ret = AppendAndRun( pTask );
+        ret = this->AddSeqTask( pTask );
         if( ERROR( ret ) )
             break;
 
@@ -5726,6 +5816,7 @@ gint32 CRpcReqForwarder::OnPostStart(
 gint32 CRpcReqForwarder::OnPreStop(
     IEventSink* pCallback )
 {
+    m_pIfStat->UnsubscribeEvents();
     if( m_pScheduler.IsEmpty() )
         return 0;
     ITaskScheduler* pSched = m_pScheduler;

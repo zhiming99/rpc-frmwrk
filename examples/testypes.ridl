@@ -22,6 +22,9 @@ interface ITestTypes
     Echo( string strText )
         returns ( string strResp ) ;
 
+    [ async_p ] Echo3( string strText )
+        returns ( string strResp ) ;
+
     EchoByteArray( bytearray pBuf )
         returns ( bytearray pRespBuf );
 

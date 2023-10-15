@@ -564,6 +564,14 @@ class CIoManager : public IService
         TaskletPtr& pTask,
         bool bOneshot = false );
 
+    // schedule a task to the thread with threadid =
+    // dwTid. And if dwTid == 0, the current thread is
+    // used. If the thread is not found, fallback to
+    // RescheduleTask
+    gint32 RescheduleTaskByTid(
+        TaskletPtr& pTask,
+        guint32 dwTid = 0 );
+
     void WaitThreadsQuit();
 
     gint32 ScheduleTaskMainLoop(

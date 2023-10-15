@@ -307,16 +307,6 @@ gint32 IoRequestPacket::AllocNextStack(
     gint32 ret = 0;
 
     do{
-        if( pPort == nullptr && m_vecCtxStack.size() > 0 )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        else if( pPort == nullptr )
-        {
-            // we are ok with the nullptr for the first port
-        }
-        
         if( iAllocOption == IOSTACK_ALLOC_COPY )
         {
             // copy the stack top

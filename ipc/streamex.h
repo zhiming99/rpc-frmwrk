@@ -203,6 +203,10 @@ class CIfStmReadWriteTask :
             return 0;
 
         CStdRTMutex oTaskLock( GetLock() );
+        EnumIfState dwState = GetTaskState();
+        if( IsStopped( dwState ) )
+            return ERROR_STATE;
+
         m_bDiscard = bDiscard;
         if( bDiscard )
         {
@@ -220,7 +224,8 @@ class CIfStmReadWriteTask :
     }
 
     gint32 OnIrpComplete( IRP* pIrp );
-    gint32 OnCancel( guint32 dwContext );
+    gint32 OnTaskComplete( gint32 iRetVal ) override;
+    gint32 OnCancel( guint32 dwContext ) override;
     gint32 RunTask();
 
     inline bool IsReading() const
@@ -842,7 +847,8 @@ struct CStreamSyncBase :
 
         gint32 ret = 0;
         do{
-            GetWorker( hChannel, false, pTask );
+            ret = GetWorker(
+                hChannel, false, pTask );
             if( ERROR( ret ) )
                 break;
 
@@ -878,13 +884,15 @@ struct CStreamSyncBase :
 
             if( !oWorker.pReader.IsEmpty() )
             {
-                ( *oWorker.pReader )(
-                    eventCancelTask );
+                oWorker.pReader->OnEvent(
+                    eventTaskComp, -ECANCELED,
+                    0, 0 );
             }
             if( !oWorker.pWriter.IsEmpty() )
             {
-                ( *oWorker.pWriter )(
-                    eventCancelTask );
+                oWorker.pWriter->OnEvent(
+                    eventTaskComp, -ECANCELED,
+                    0, 0 );
             }
 
             oIfLock.Lock();
@@ -936,7 +944,7 @@ struct CStreamSyncBase :
      * @} */
     
     gint32 OnClose( HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+        IEventSink* pCallback = nullptr ) override
     {
         if( hChannel == INVALID_HANDLE )
             return -EINVAL;
@@ -1176,22 +1184,7 @@ struct CStreamSyncBase :
         {
             if( !pTaskGrp.IsEmpty() )
                 ( *pTaskGrp )( eventCancelTask );
-
-            CStdRMutex oIfLock( this->GetLock() );
-            if( hChannel != INVALID_HANDLE )
-                m_mapStmWorkers.erase( hChannel );
-            oIfLock.Unlock();
-
-            if( !oWorker.pReader.IsEmpty() )
-            {
-                ( *oWorker.pReader )(
-                    eventCancelTask );
-            }
-            if( !oWorker.pWriter.IsEmpty() )
-            {
-                ( *oWorker.pWriter )(
-                    eventCancelTask );
-            }
+            StopWorkers( hChannel );
         }
 
         return ret;
@@ -1940,8 +1933,7 @@ struct CStreamSyncBase :
             ret = GetWorker(
                 hChannel, true, pTask );
             if( ERROR( ret ) )
-                return ret;
-
+                break;
 
             CIfStmReadWriteTask* pRdTask = pTask;
             if( pRdTask == nullptr )

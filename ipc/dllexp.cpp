@@ -47,6 +47,7 @@
 #include "stmport.h"
 #include "fastrpc.h"
 #include "stmcp.h"
+#include "seqtgmgr.h"
 
 #include <dlfcn.h>
 
@@ -72,8 +73,9 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRY( CStlIrpVector2 );
     INIT_MAP_ENTRY( CStlPortVector );
     INIT_MAP_ENTRY( COneshotTaskThread );
-    INIT_MAP_ENTRYCFG( CTaskWrapper );
+    INIT_MAP_ENTRY( CStmSeqTgMgr );
 
+    INIT_MAP_ENTRYCFG( CTaskWrapper );
     INIT_MAP_ENTRYCFG( CTaskThread );
     INIT_MAP_ENTRYCFG( CMainIoLoop );
     INIT_MAP_ENTRYCFG( CCancelIrpsTask );

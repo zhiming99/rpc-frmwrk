@@ -251,7 +251,8 @@ gint32 CIoManager::PostCompleteIrp( IRP* pIrp, bool bCancel )
             LONGWORD dwParam1 =
                 ( LONGWORD )( ( IRP* )pIrp );
             LONGWORD dwParam2 = pIrp->m_dwContext;
-            pIrp->m_pCallback->OnEvent( eventIrpComp,
+            TaskletPtr pCb = pIrp->m_pCallback;
+            pCb->OnEvent( eventIrpComp,
                 dwParam1, dwParam2, nullptr );
         }
         else
@@ -462,7 +463,8 @@ gint32 CIoMgrIrpCompleteTask::operator()(
             LONGWORD dwParam2 =
                 pIrp->m_dwContext;
 
-            pIrp->m_pCallback->OnEvent(
+            TaskletPtr pCb = pIrp->m_pCallback;
+            pCb->OnEvent(
                 eventIrpComp,
                 dwParam1,
                 dwParam2,
@@ -1675,6 +1677,42 @@ gint32 CIoManager::RescheduleTask(
     return ret;
 }
 
+gint32 CIoManager::RescheduleTaskByTid(
+    TaskletPtr& pTask, guint32 dwTid )
+{
+    gint32 ret = 0;
+
+    do{
+        if( pTask.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( dwTid == 0 )
+            dwTid = rpcf::GetTid();
+
+        ThreadPtr pThread;
+        ret = GetTaskThreadPool().GetThreadByTid(
+            pThread, dwTid );
+        if( SUCCEEDED( ret ) )
+        {
+            CTaskThread* pgth =
+                static_cast< CTaskThread* >( pThread );
+
+            if( pgth )
+            {
+                pTask->MarkPending();
+                pgth->AddTask( pTask );
+            }
+            break;
+        }
+        ret = RescheduleTask( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CIoManager::Stop()
 {
     gint32 ret = 0;
@@ -2320,18 +2358,7 @@ gint32 CSimpleSyncIf::Stop()
 
 gint32 CSimpleSyncIf::OnPostStop(
     IEventSink* pCallback )
-{
-    gint32 ret = 0;
-    CStdRMutex oLock( GetLock() );
-    ret = super::OnPostStop( pCallback );
-    if( !m_pSeqTasks.IsEmpty() )
-    {
-        CCfgOpenerObj oCfg(
-            ( IEventSink* )m_pSeqTasks );
-        oCfg.RemoveProperty( propIoMgr );
-    }
-    return ret;
-}
+{ return super::OnPostStop( pCallback ); }
 
 static gint32 GenHashInstId(
     guint32 dwPort,
@@ -2646,9 +2673,11 @@ gint32 UpdateObjDesc(
     do{
         CCfgOpener oCfg( pCfg );
         guint32 dwVal;
+        guint32 dwRole;
         ret = oCfg.GetIntProp( 101, dwVal );
         if( ERROR( ret ) )
             break;
+        dwRole = dwVal;
 
         bool bChanged = false;
         bool bProxy = ( dwVal == 1 );
@@ -2843,7 +2872,12 @@ gint32 UpdateObjDesc(
         if( !bChanged )
             break;
 
-        char szNewDesc[] = "/tmp/rpcfod_XXXXXX";
+        char szNewDesc[32];
+        if( dwRole == 2 )
+            strcpy( szNewDesc, "/tmp/rpcfos_XXXXXX" );
+        else
+            strcpy( szNewDesc, "/tmp/rpcfod_XXXXXX" );
+
         int iFd = mkstemp( szNewDesc );
         if( iFd < 0 )
         {

@@ -119,7 +119,13 @@ gint32 IThread::SetThreadName(
         strName = CoGetClassName(
             GetClsid() );
 
-        gint32 iTid = GetTid();
+        gint32 iTid = 0;
+        Variant oVar;
+        ret = GetProperty( propThreadId, oVar );
+        if( ERROR( ret ) )
+            iTid = this->GetTid();
+        else
+            iTid = oVar; 
         strName += "-";
         strName += std::to_string( iTid );
     }
@@ -301,6 +307,7 @@ void CTaskThread::ThreadProc(
     LONGWORD dwContext = ( LONGWORD )pContext;
 
     this->SetThreadName( m_strName.c_str() );
+    this->SetTid( rpcf::GetTid() );
     while( !m_bExit )
     {
         ProcessTask( ( guint32 )dwContext );
@@ -361,7 +368,7 @@ gint32 CTaskThread::GetProperty(
     switch( iProp )
     {
     case propThreadId:
-        oVar = GetTid();
+        oVar = GetMyTid();
         break;
 
     default:
@@ -379,7 +386,7 @@ gint32 CTaskThread::SetProperty(
     switch( iProp )
     {
     case propThreadId:
-        SetTid( oVar );
+        SetMyTid( oVar );
         break;
 
     default:
@@ -421,6 +428,7 @@ void COneshotTaskThread::ThreadProc(
     LONGWORD lContext = ( LONGWORD )pContext;
 
     this->SetThreadName( m_strName.c_str() );
+    this->SetTid( rpcf::GetTid() );
 
     bool bTaskDone = false;
     while( !m_bExit )
@@ -588,6 +596,7 @@ void CIrpCompThread::ThreadProc( void* context )
     gint32 ret = 0;
 
     this->SetThreadName();
+    this->SetTid( rpcf::GetTid() );
 
     while( !m_bExit )
     {
@@ -609,7 +618,8 @@ void CIrpCompThread::CompleteIrp( PIRP pIrp )
     {
         //FIXME: can I continue
         LONGWORD dwParam1 = ( LONGWORD )pIrp;
-        pIrp->m_pCallback->OnEvent(
+        TaskletPtr pCb = pIrp->m_pCallback;
+        pCb->OnEvent(
             eventIrpComp, dwParam1, 0, 0 );
     }
 }
@@ -651,6 +661,50 @@ void CIrpCompThread::Join()
     if( m_pServiceThread != nullptr &&
         m_pServiceThread->joinable() )
         m_pServiceThread->join();
+}
+
+gint32 CIrpCompThread::GetProperty(
+    gint32 iProp, Variant& oVar ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propThreadId:
+        oVar = GetMyTid();
+        break;
+
+    default:
+        ret = super::GetProperty(
+            iProp, oVar );
+        break;
+    }
+    return ret;
+}
+
+gint32 CIrpCompThread::SetProperty(
+    gint32 iProp, const Variant& oVar )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propThreadId:
+        SetMyTid( oVar );
+        break;
+
+    default:
+        ret = super::SetProperty(
+            iProp, oVar );
+        break;
+    }
+    return ret;
+}
+
+gint32 CIrpCompThread::EnumProperties(
+    std::vector< gint32 >& vecProps ) const
+{
+    super::EnumProperties( vecProps );
+    vecProps.push_back( propThreadId );
+    return 0;
 }
 
 gint32 CThreadPool::GetThread(
@@ -755,6 +809,34 @@ gint32 CThreadPool::GetThread(
     }while( 0 );
     m_bAscend = !m_bAscend;
 
+    return ret;
+}
+
+gint32 CThreadPool::GetThreadByTid(
+    ThreadPtr& pThread,
+    guint32 dwTid )
+{
+    gint32 ret = 0;
+    if( dwTid == 0 )
+        dwTid = rpcf::GetTid();
+    do{
+        bool bFound = false;
+        ThreadPtr thptr = pThread;
+        // find the specified thread
+        CStdRMutex oLock( m_oLock ); 
+        auto itr = m_vecThreads.begin();
+        while( itr != m_vecThreads.end() )
+        {
+            if( ( *itr )->GetTid() != dwTid )
+            {
+                ++itr;
+                continue;
+            }
+            pThread = *itr;
+            bFound = true;
+            break;
+        }
+    }while( 0 );
     return ret;
 }
 

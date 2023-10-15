@@ -695,9 +695,6 @@ gint32 CIfUxListeningTask::RunTask()
         if( ret == STATUS_PENDING )
             break;
 
-        if( ERROR( ret ) )
-            break;
-
         ret = OnTaskComplete( ret );
         if( ERROR( ret ) )
             break;
@@ -783,20 +780,21 @@ gint32 CIfUxListeningTask::OnTaskComplete(
     gint32 iRet )
 {
     gint32 ret = 0;
+    CRpcServices* pIf = nullptr;
 
     do{
+        IConfigDb* pCfg = GetConfig();
+        CCfgOpener oCfg( pCfg );
+
+        ret = oCfg.GetPointer( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
         if( ERROR( iRet ) )
         {
             ret = iRet;
             break;
         }
-        IConfigDb* pCfg = GetConfig();
-        CCfgOpener oCfg( pCfg );
-
-        ObjPtr pIf;
-        ret = oCfg.GetObjPtr( propIfPtr, pIf );
-        if( ERROR( ret ) )
-            break;
 
         IConfigDb* pResp = nullptr;
         ret = oCfg.GetPointer(
@@ -825,7 +823,8 @@ gint32 CIfUxListeningTask::OnTaskComplete(
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error, the channel will "
-            "be closed from OnTaskComplete" );
+            "be closed from OnTaskComplete, 0x%llx @ 0x%llx",
+            this, pIf );
         BufPtr pErrBuf( true );
         *pErrBuf = tokError;
         gint32 iRet = htonl( ret );
@@ -845,10 +844,10 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
+    CRpcServices* pIf = nullptr;
     do{
         IConfigDb* pCfg = GetConfig();
         CCfgOpener oCfg( pCfg );
-        CRpcServices* pIf = nullptr;
         ret = oCfg.GetPointer( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
@@ -884,7 +883,8 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error, the channel will "
-            "be closed from OnIrpComplete" );
+            "be closed from OnIrpComplete, 0x%llx @ 0x%llx",
+            this, pIf );
         BufPtr pErrBuf( true );
         *pErrBuf = tokError;
         gint32 iRet = htonl( ret );

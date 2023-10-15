@@ -85,10 +85,10 @@ class CTaskThread : public IThread
         return ENOTSUP;
     }
 
-    gint32 GetTid() const
+    gint32 GetMyTid() const
     { return m_iMyTid; }
 
-    void SetTid( const gint32 iTid )
+    void SetMyTid( const gint32 iTid )
     { m_iMyTid = iTid; }
 
     gint32 GetProperty(
@@ -99,8 +99,9 @@ class CTaskThread : public IThread
         gint32 iProp,
         const Variant& oVar ) override;
 
-    virtual gint32 EnumProperties(
-        std::vector< gint32 >& vecProps ) const;
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const
+        override;
 
     void Join();
 };
@@ -178,6 +179,10 @@ class CThreadPool : public IService
             LONGWORD dwParam2,
             LONGWORD* pData )
     { return 0; }
+
+    gint32 GetThreadByTid(
+        ThreadPtr& pThread,
+        guint32 dwTid = 0 );
 };
 
 typedef CAutoPtr< Clsid_Invalid, CThreadPool > ThrdPoolPtr;
@@ -260,11 +265,11 @@ class CIrpCompThread : public IThread
     sem_t                       m_semSlots;
     std::atomic< bool >         m_bExit = { false };
     std::thread                 *m_pServiceThread;
+    gint32                      m_iMyTid = 0;
 
     std::map< const IGenericInterface*, gint32 > m_mapIfs;
     std::atomic< bool >         m_bRunning = { true };
     
-
     public:
     CIrpCompThread();
     ~CIrpCompThread();
@@ -287,6 +292,24 @@ class CIrpCompThread : public IThread
     gint32 GetLoadCount() const;
     gint32 OnEvent(EnumEventId, LONGWORD, LONGWORD, LONGWORD*)
     { return 0;}
+
+    gint32 GetProperty(
+        gint32 iProp,
+        Variant& oVar ) const override;
+
+    gint32 SetProperty(
+        gint32 iProp,
+        const Variant& oVar ) override;
+
+    gint32 EnumProperties(
+        std::vector< gint32 >& vecProps ) const
+        override;
+
+    gint32 GetMyTid() const
+    { return m_iMyTid; }
+
+    void SetMyTid( const gint32 iTid )
+    { m_iMyTid = iTid; }
 };
 
 class CIrpThreadPool : public CThreadPool

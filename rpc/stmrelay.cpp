@@ -218,6 +218,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
     gint32 iFd = -1;
     gint32 iStmId = -1;
     CParamList oContext( pContext );
+    InterfPtr pUxIf;
 
     do{
         if( pContext == nullptr )
@@ -272,22 +273,30 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
                 propStmConnPt, qwStmCp );
             if( ERROR( ret ) )
                 break;
-            pStmCp = reinterpret_cast
-                < CStmConnPoint* >( qwStmCp );
-            pscp = pStmCp;
-            pStmCp->Release();
+            ret = CStmConnPoint::RetrieveAndUnreg(
+                qwStmCp, pscp );
+            if( ERROR( ret ) )
+                break;
         }
 
         // we need to do the following things
         // before reponse to the remote client
         //
         // 1. create and start the uxstream proxy
-        InterfPtr pUxIf;
         ret = CreateUxStream(
             pDataDesc, iFd,
             clsid( CUnixSockStmProxyRelay ),
             false, pUxIf );
 
+        if( ERROR( ret ) )
+            break;
+
+        HANDLE hChannel =
+            ( HANDLE )( CRpcServices* )pUxIf;
+        CStdRMutex oIfLock( GetLock() );
+        if( !this->IsConnected() )
+            break;
+        ret = AddUxStream( hChannel, pUxIf );
         if( ERROR( ret ) )
             break;
 
@@ -297,6 +306,8 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         oUxIf.SetIntProp( propStreamId,
             ( guint32& )iStmId );
 
+        BindUxTcpStream( hChannel, iStmId );
+        oIfLock.Unlock();
 
         if( !pscp.IsEmpty() )
         {
@@ -327,6 +338,12 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             break;
 
         ret = this->AddSeqTask( pStartTask );
+        if( ERROR( ret ) )
+        {
+            ( *pStartTask )( eventCancelTask );
+            pUxIf.Clear();
+            break;
+        }
         //
         // 2. bind the uxport and the the tcp stream
         //
@@ -348,6 +365,12 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
         OnServiceComplete(
             oResp.GetCfg(), pCallback );
 
+        if( !pUxIf.IsEmpty() )
+        {
+            CRpcServices* pUxSvc = pUxIf;
+            this->OnChannelError(
+                ( HANDLE )pUxSvc, ret );
+        }
         if( iFd > 0 )
         {
             // close the fd to notify the failure
@@ -407,6 +430,7 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
     gint32 iStmId = -1;
     gint32 iLocal = -1;
     gint32 iRemote = -1;
+    InterfPtr pUxIf;
 
     do{
         if( pIoReqTask == nullptr ||
@@ -467,7 +491,6 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
                 ( guint64 )( CObjBase*) pStmCp );
         }
 
-        InterfPtr pUxIf;
         ret = CreateUxStream( pDataDesc, iLocal,
             clsid( CUnixSockStmServerRelay ),
             true, pUxIf );
@@ -478,8 +501,22 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
         CCfgOpenerObj oUxIf(
             ( CObjBase*) pUxIf );
 
+        CStdRMutex oIfLock( GetLock() );
+
+        if( !this->IsConnected() )
+            break;
+
+        HANDLE hChannel =
+            ( HANDLE )( CRpcServices* )pUxIf;
+        ret = AddUxStream( hChannel, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
         oUxIf.SetIntProp( propStreamId,
             ( guint32& )iStmId );
+
+        BindUxTcpStream( hChannel, iStmId );
+        oIfLock.Unlock();
 
         oUxIf.SetBoolProp( propListenOnly, true );
         if( !pStmCp.IsEmpty() )
@@ -505,6 +542,13 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             break;
 
         ret = this->AddSeqTask( pStartTask );
+        if( ERROR( ret ) )
+        {
+            ( *pStartTask )(
+                eventCancelTask );
+            pUxIf.Clear();
+            break;
+        }
         
     }while( 0 );
 
@@ -518,6 +562,13 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
 
         oTaskCfg.SetObjPtr( propRespPtr,
             ObjPtr( oResp.GetCfg() ) );
+
+        if( !pUxIf.IsEmpty() )
+        {
+            CRpcServices* pUxSvc = pUxIf;
+            this->OnChannelError(
+                ( HANDLE )pUxSvc, ret );
+        }
 
         if( iStmId > 0 )
         {
@@ -738,10 +789,11 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
             CCfgOpener oDesc( pDataDesc );
             oDesc.GetQwordProp(
                 propStmConnPt, qwStmCp );
-            CStmConnPoint* pStmCp = reinterpret_cast
-                < CStmConnPoint* >( qwStmCp );
-            pscp = pStmCp;
-            pStmCp->Release();
+            ObjPtr pObj;
+            ret = CStmConnPoint::RetrieveAndUnreg(
+                qwStmCp, pscp );
+            if( ERROR( ret ) )
+                break;
             oDesc.RemoveProperty( propStmConnPt );
         }
 
@@ -850,12 +902,53 @@ gint32 CIfStartUxSockStmRelayTask::RunTask()
             break;
         }
 
-        ret = pSvc->StartEx( this );
+        gint32 (*func)( CTasklet* ,
+            CRpcServices*, CIfStartUxSockStmRelayTask* ) =
+        ([]( CTasklet* pCb,
+            CRpcServices* pIf,
+            CIfStartUxSockStmRelayTask* pTask )->gint32
+        {
+            if( pTask == nullptr )
+                return -EINVAL;
+            gint32 ret = 0;
+            CCfgOpener oCfg(
+                ( IConfigDb* )pCb->GetConfig() );
+            IConfigDb* pResp = nullptr;
+            ret = oCfg.GetPointer( propRespPtr, pResp );
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpener oResp( pResp );
+                gint32 iRet = oResp.GetIntProp(
+                    propReturnValue, ( guint32& )ret );
+                if( ERROR( iRet ) )
+                    ret = iRet;
+            }
+            EnumTaskState iState =
+                    pTask->GetTaskState();
+            if( pTask->IsStopped( iState ) )
+                return ERROR_STATE;
+
+            TaskletPtr pDefer;
+            ret = DEFER_CALL_NOSCHED( pDefer,
+                pTask, &IEventSink::OnEvent,
+               eventTaskComp, ret, 0, nullptr ); 
+            if( ERROR( ret ) )
+                return ret;
+
+            auto pMgr = pIf->GetIoMgr();
+            return pMgr->RescheduleTaskByTid( pDefer );
+        });
+
+        TaskletPtr pStartCb;
+        ret = NEW_COMPLETE_FUNCALL( 0,
+            pStartCb, pSvc->GetIoMgr(),
+            func, nullptr, pSvc, this );
         if( ERROR( ret ) )
             break;
 
-        if( ret == STATUS_PENDING )
-            break;
+        ret = pSvc->StartEx( pStartCb );
+        if( ERROR( ret ) )
+            ( *pStartCb )( eventCancelTask );
 
     }while( 0 );
 
@@ -876,11 +969,11 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
 
-    CRpcServices* pUxSvc = nullptr;
     gint32 iStmId = -1;
     gint32 iRemote = -1;
 
     InterfPtr pParentIf;
+    CRpcServices* pUxSvc = nullptr;
 
     do{
         ObjPtr pIf;
@@ -913,12 +1006,6 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             break;
         }
 
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
         bool bBdgSvr = false;
         if( pParent->IsServer() )
             bBdgSvr = true;
@@ -935,28 +1022,10 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         }
 
         HANDLE hChannel = ( HANDLE )pUxSvc;
-        InterfPtr pChanlIf( pIf );
-        ret = pStream->AddUxStream(
-            hChannel, pChanlIf );
 
-        if( ERROR( ret ) )
-            break;
-
-        if( bBdgSvr )
+        if( ERROR( iRet ) )
         {
-            CStreamServerRelay* pStmRly = pParentIf;
-            ret = pStmRly->BindUxTcpStream( 
-                hChannel, iStmId );
-        }
-        else
-        {
-            CStreamProxyRelay* pStmRly = pParentIf;
-            ret = pStmRly->BindUxTcpStream( 
-                hChannel, iStmId );
-        }
-
-        if( ERROR( ret ) )
-        {
+            ret = iRet;
             break;
         }
 
@@ -981,57 +1050,16 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         oResp.Push( 0 );
         oResp.Push( 0x20 );
 
-        // start the stream readers
-        gint32 ( *func )( CRpcServices*, CRpcServices*, gint32 ) =
-            ([]( CRpcServices* pUxIf,
-                CRpcServices* pParent,
-                gint32 iStmId )->gint32
+        if( pUxSvc->IsServer() )
         {
-            gint32 ret = 0;
-            if( pUxIf == nullptr || pParent == nullptr )
-                return -EINVAL;
-            do{
-                ObjPtr pObj = pUxIf;
-                if( pUxIf->IsServer() )
-                {
-                    CUnixSockStmServerRelay* pSvc = pObj;
-                    ret = pSvc->OnPostStartDeferred( nullptr );
-                }
-                else
-                {
-                    CUnixSockStmProxyRelay* pSvc = pObj;
-                    ret = pSvc->OnPostStartDeferred( nullptr );
-                }
-                if( SUCCEEDED( ret ) )
-                    break;
-
-                pObj = pParent;
-                if( pParent->IsServer() )
-                {
-                    CStreamServerRelay* pSvc = pObj;
-                    pSvc->OnChannelError( iStmId, ret );
-                }
-                else
-                {
-                    HANDLE hstm = ( HANDLE )pUxIf;
-                    CStreamProxyRelay* pSvc = pObj;
-                    pSvc->OnChannelError( hstm, ret );
-                }
-
-            }while( 0 );
-            return ret;
-        });
-
-        auto pMgr = pParent->GetIoMgr();
-        TaskletPtr pListenTask;
-        ret = NEW_FUNCCALL_TASK( pListenTask,
-            pMgr, func, pUxSvc, pParent, iStmId );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pMgr->RescheduleTask( pListenTask );
-        if( ERROR( ret ) )
-            ( *pListenTask )( eventCancelTask );
+            CUnixSockStmServerRelay* pStm = pIf;
+            ret = pStm->OnPostStartDeferred( nullptr );
+        }
+        else
+        {
+            CUnixSockStmProxyRelay* pStm = pIf;
+            ret = pStm->OnPostStartDeferred( nullptr );
+        }
 
     }while( 0 );
 
@@ -1040,7 +1068,7 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
         if( pParentIf.IsEmpty() )
             break;
 
-        if( iStmId < 0 )
+        if( pUxSvc == nullptr )
             break;
 
         CRpcServices* pParent = pParentIf;
@@ -1052,20 +1080,19 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
             if( unlikely( pStream == nullptr ) )
                 break;
 
-            pStream->OnClose( iStmId );
+            pStream->OnChannelError(
+                ( HANDLE )pUxSvc, ret );
         }
         else
         {
-            if( pUxSvc == nullptr )
-                break;
-
             CStreamProxyRelay* pStream =
                 ObjPtr( pParent );
 
             if( unlikely( pStream == nullptr ) )
                 break;
 
-            pStream->OnClose( ( HANDLE )pUxSvc );
+            pStream->OnChannelError(
+                ( HANDLE )pUxSvc, ret );
         }
 
         break;
@@ -1105,6 +1132,55 @@ gint32 CIfStartUxSockStmRelayTask::OnTaskComplete(
     ClearClientNotify();
 
     return iRet;
+}
+
+gint32 CIfStartUxSockStmRelayTask::OnCancel(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
+
+    do{
+        gint32 iStmId = -1;
+        ObjPtr pUxIf;
+        ObjPtr pIf;
+        OutputMsg( 0, "%s@0x%llx canceling",
+            CoGetClassName( this->GetClsid() ),
+            this );
+        ret = oParams.GetObjPtr( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.GetIntProp(
+            2, ( guint32& )iStmId ) ;
+        if( ERROR( ret ) )
+            break;
+        
+        CRpcServices* pParent = pIf;
+        ret = oParams.GetObjPtr( 0, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = pIf;
+        HANDLE hUxIf = ( HANDLE )
+            ( CRpcServices* )pUxIf;
+        if( pSvc->IsServer() )
+        {
+            CStreamServerRelay* pStm = pIf;
+            pStm->OnChannelError(
+                hUxIf, -ECANCELED );
+        }
+        else
+        {
+            CStreamProxyRelay* pStm = pIf;
+            pStm->OnChannelError(
+                hUxIf, -ECANCELED );
+        }
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CIfUxListeningRelayTask::RunTask()

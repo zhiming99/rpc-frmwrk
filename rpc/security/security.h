@@ -731,6 +731,9 @@ class CRpcReqForwarderAuth :
     gint32 OnPreStop(
         IEventSink* pCallback ) override;
 
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
+
 };
 
 struct CRpcRouterAuthShared

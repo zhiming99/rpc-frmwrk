@@ -3935,6 +3935,15 @@ gint32 CExportObjDesc2::BuildObjDescROS(
             {
                 oIfElem[ JSON_ATTR_NONSOCK_STREAM ] =
                     "true";
+                oIfElem[ JSON_ATTR_SEQTGMGR ] =
+                    "true";
+                ++iCount;
+            }
+            else if( oIfElem[ JSON_ATTR_IFNAME ] ==
+                "IStream" ) 
+            {
+                oIfElem[ JSON_ATTR_SEQTGMGR ] =
+                    "true";
                 ++iCount;
             }
             if( iCount == 2 )

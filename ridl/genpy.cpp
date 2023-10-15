@@ -3963,7 +3963,7 @@ gint32 CImplPyMainFunc::OutputSvr(
             CCOUT << "if 'objdesc' in params:";
             INDENT_UPL;
             Wa( "strVal = params[ 'objdesc' ]" );
-            Wa( "if strVal[:12] == '/tmp/rpcfod_':" );
+            Wa( "if strVal[:12] == '/tmp/rpcfos_':" );
             CCOUT << "    os.unlink( strVal )";
             INDENT_DOWNL;
             CCOUT << "if 'driver' in params:";

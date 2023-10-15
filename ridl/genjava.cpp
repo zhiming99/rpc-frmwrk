@@ -5088,7 +5088,7 @@ gint32 CImplJavaMainSvr::Output()
         {
             Wa( "if( ( strDescPath.length() > 12 ) &&" );
             Wa( "    strDescPath.substring(0, 12).equals(" ); 
-            Wa( "    \"/tmp/rpcfod_\" ) )" );
+            Wa( "    \"/tmp/rpcfos_\" ) )" );
             BLOCK_OPEN;
             Wa( "File descFile = new File( strDescPath );" );
             CCOUT << "descFile.delete();";

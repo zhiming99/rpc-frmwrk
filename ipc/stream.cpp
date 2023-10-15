@@ -29,9 +29,124 @@
 #include "stream.h"
 #include "uxstream.h"
 #include "sha1.h"
+#include "stmcp.h"
+#include "seqtgmgr.h"
 
 namespace rpcf
 {
+
+ObjPtr IStream::GetSeqTgMgr()
+{ return m_pSeqTgMgr; }
+
+void IStream::SetInterface( CRpcServices* pSvc )
+{
+    m_pSvc = pSvc;
+
+    CCfgOpenerObj oCfg( pSvc );
+    oCfg.GetBoolProp(
+        propNonSockStm, m_bNonSockStm );
+
+    bool bSeqTgMgr = false;
+    gint32 ret = oCfg.GetBoolProp(
+        propSeqTgMgr, bSeqTgMgr );
+    if( ERROR( ret ) || !bSeqTgMgr )
+        return;
+
+    m_pSeqTgMgr.NewObj( clsid( CStmSeqTgMgr ) );
+    CStmSeqTgMgr* pSeqMgr = GetSeqTgMgr();
+    pSeqMgr->SetParent( GetInterface() );
+}
+
+gint32 IStream::AddStartTask(
+    HANDLE hChannel, TaskletPtr& pTask )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pTask.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = GetInterface();
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        if( psmgr == nullptr ||
+            !pSvc->IsServer() )
+            return pSvc->AddSeqTask( pTask );
+
+        ret = psmgr->AddStartTask(
+            hChannel, pTask );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 IStream::AddStopTask(
+    IEventSink* pCallback,
+    HANDLE hChannel,
+    TaskletPtr& pTask )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pTask.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = GetInterface();
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        bool bSvr = pSvc->IsServer();
+        if( psmgr == nullptr || !bSvr )
+        {
+            if( pCallback != nullptr )
+            {
+                CIfRetryTask* pRetry = pTask;
+                pRetry->SetClientNotify( pCallback );
+            }
+            ret = pSvc->AddSeqTask( pTask );
+            break;
+        }
+
+        ret = psmgr->AddStopTask(
+            pCallback, hChannel, pTask );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 IStream::AddSeqTask2(
+    HANDLE hChannel, TaskletPtr& pTask )
+{
+    if( hChannel == INVALID_HANDLE ||
+        pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        CRpcServices* pSvc = GetInterface();
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        if( psmgr == nullptr ||
+            !pSvc->IsServer() )
+            return pSvc->AddSeqTask( pTask );
+
+        ret = psmgr->AddSeqTask(
+            hChannel, pTask );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 IStream::StopSeqTgMgr(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        CStmSeqTgMgr* psmgr = GetSeqTgMgr();
+        if( psmgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = psmgr->Stop( pCallback );
+
+    }while( 0 );
+    return ret;
+}
 
 bool IStream::CanSend( HANDLE hChannel )
 {
@@ -611,6 +726,8 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
+        CRpcServices* pUxSvc = pUxIf;
+
         TaskletPtr pStartTask;
         CParamList oStartParams;
 
@@ -657,10 +774,23 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
-        // make sure the task runs sequentially
-        ret = pIf->AddSeqTask( pStartTask );
+        ret = pStream->AddUxStream(
+            ( HANDLE )pUxSvc, pUxIf );
         if( ERROR( ret ) )
             break;
+
+        // make sure the task runs sequentially
+        ret = pStream->AddStartTask(
+            ( HANDLE )pUxSvc, pStartTask );
+        if( ERROR( ret ) )
+        {
+            InterfPtr pTemp;
+            pStream->RemoveUxStream(
+                ( HANDLE )pUxSvc, pTemp );
+
+            ( *pStartTask )( eventCancelTask );
+            break;
+        }
 
         ClearClientNotify();
 
@@ -686,6 +816,13 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
     return ret;
 }
 
+CIfStartUxSockStmTask::CIfStartUxSockStmTask(
+    const IConfigDb* pCfg ) : super( pCfg )
+{ SetClassId( clsid( CIfStartUxSockStmTask ) ); }
+
+CIfStartUxSockStmTask::~CIfStartUxSockStmTask()
+{}
+
 gint32 CIfStartUxSockStmTask::RunTask()
 {
     gint32 ret = 0;
@@ -706,12 +843,56 @@ gint32 CIfStartUxSockStmTask::RunTask()
             break;
         }
 
-        ret = pSvc->StartEx( this );
+        gint32 (*func)( CTasklet* ,
+            CRpcServices*, CIfStartUxSockStmTask* ) =
+        ([]( CTasklet* pCb,
+            CRpcServices* pIf,
+            CIfStartUxSockStmTask* pTask )->gint32
+        {
+            if( pTask == nullptr )
+                return -EINVAL;
+            gint32 ret = 0;
+            CCfgOpener oCfg(
+                ( IConfigDb* )pCb->GetConfig() );
+            IConfigDb* pResp = nullptr;
+            ret = oCfg.GetPointer( propRespPtr, pResp );
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpener oResp( pResp );
+                gint32 iRet = oResp.GetIntProp(
+                    propReturnValue, ( guint32& )ret );
+                if( ERROR( iRet ) )
+                    ret = iRet;
+            }
+
+            EnumTaskState iState =
+                    pTask->GetTaskState();
+            if( pTask->IsStopped( iState ) )
+                return ERROR_STATE;
+
+            TaskletPtr pDefer;
+            ret = DEFER_CALL_NOSCHED( pDefer,
+                pTask, &IEventSink::OnEvent,
+               eventTaskComp, ret, 0, nullptr ); 
+
+            if( ERROR( ret ) )
+                return ret;
+
+            auto pMgr = pIf->GetIoMgr();
+            return pMgr->RescheduleTaskByTid( pDefer );
+        });
+        // This task is to make sure 'StartTicking' runs 
+        // outside the root group.
+        TaskletPtr pStartCb;
+        ret = NEW_COMPLETE_FUNCALL( 0,
+            pStartCb, pSvc->GetIoMgr(),
+            func, nullptr, pSvc, this );
         if( ERROR( ret ) )
             break;
 
-        if( ret == STATUS_PENDING )
-            break;
+        ret = pSvc->StartEx( pStartCb );
+        if( ERROR( ret ) )
+            ( *pStartCb )( eventCancelTask );
 
     }while( 0 );
 
@@ -732,13 +913,27 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     CParamList oParams(
         ( IConfigDb* )GetConfig() );
 
+    InterfPtr pUxIf;
+    ObjPtr pIf;
+
     do{
-        if( ERROR( iRet ) )
+        if( SUCCEEDED( iRet ) )
         {
-            ret = iRet;
-            break;
+            EventPtr pCb;
+            ret = GetClientNotify( pCb );
+            if( SUCCEEDED( ret ) )
+            {
+                CIfInvokeMethodTask* pInv = pCb;
+                if( pInv != nullptr )
+                {
+                    // reset timer, we don't want the
+                    // start process be abrupted by
+                    // unwanted timeout.
+                    pInv->ResetTimer();
+                }
+            }
         }
-        ObjPtr pIf;
+
         ret = oParams.GetObjPtr( propIfPtr, pIf );
         if( ERROR( ret ) )
             break;
@@ -754,29 +949,27 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             break;
         }
 
-        bool bServer = false;
-        ret = oParams.GetBoolProp(
-            propIsServer, bServer );
+        bool bServer = pParent->IsServer();
+
+        ObjPtr pUxObj;
+        ret = oParams.GetObjPtr( 0, pUxObj );
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.GetObjPtr( 0, pIf );
-        if( ERROR( ret ) )
-            break;
-
-        CRpcServices* pSvc = pIf;
+        CRpcServices* pSvc = pUxObj;
         if( pSvc == nullptr )
         {
             ret = -EFAULT;
             break;
         }
+        pUxIf = pUxObj;
 
-        InterfPtr pInterf = pIf;
-        ret = pStream->AddUxStream(
-            ( HANDLE )pSvc, pInterf );
-
-        if( ERROR( ret ) )
+        // all the input parameters are set
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
             break;
+        }
 
         ret = 0;
         oResp[ propReturnValue ] = 0;
@@ -802,7 +995,7 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             CCfgOpener oDataDesc(
                 ( IConfigDb* )pDesc );
 
-            guint64 qwId = pIf->GetObjId();
+            guint64 qwId = pUxIf->GetObjId();
             guint64 qwHash = 0;
             ret = GetObjIdHash( qwId, qwHash );
             if( ERROR( ret ) )
@@ -817,17 +1010,17 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             oResp.Push( 0 );
             if( pStream->IsNonSockStm() )
             {
-                // the fd is invalid
+                // the fd is ignored
                 oResp.SetBoolProp( propNonFd, true );
                 CCfgOpenerObj oUxCfg( pSvc );
-                CObjBase* pObj;
+                CStmConnPoint* pscp;
                 ret = oUxCfg.GetPointer(
-                    propStmConnPt, pObj );
+                    propStmConnPt, pscp );
                 if( ERROR( ret ) )
                     break;
                 oDataDesc.SetQwordProp(
-                    propStmConnPt, ( guint64 )pObj );
-                pObj->AddRef();
+                    propStmConnPt, ( guint64 )pscp );
+                pscp->RegForTransfer();
             }
         }
         else
@@ -848,55 +1041,17 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             }
         }
 
-        gint32 ( *func )( CRpcServices*, CRpcServices* ) =
-            ([]( CRpcServices* pUxIf, CRpcServices* pParent )->gint32
-            {
-                gint32 ret = 0;
-                if( pUxIf == nullptr || pParent == nullptr )
-                    return -EINVAL;
-                do{
-                    ObjPtr pObj = pUxIf;
-                    if( pUxIf->IsServer() )
-                    {
-                        CUnixSockStmServer* pSvc = pObj;
-                        ret = pSvc->StartTicking( nullptr );
-                    }
-                    else
-                    {
-                        CUnixSockStmProxy* pSvc = pObj;
-                        ret = pSvc->StartTicking( nullptr );
-                    }
-                    if( SUCCEEDED( ret ) )
-                        break;
+        if( pSvc->IsServer() )
+        {
+            CUnixSockStmServer* pStm = pUxIf;
+            ret = pStm->StartTicking( nullptr );
+        }
+        else
+        {
+            CUnixSockStmProxy* pStm = pUxIf;
+            ret = pStm->StartTicking( nullptr );
+        }
 
-                    HANDLE hstm = ( HANDLE )pUxIf;
-                    pObj = pParent;
-                    if( pParent->IsServer() )
-                    {
-                        CStreamServer* pSvc = pObj;
-                        pSvc->OnChannelError( hstm, ret );
-                    }
-                    else
-                    {
-                        CStreamProxy* pSvc = pObj;
-                        pSvc->OnChannelError( hstm, ret );
-                    }
-
-                }while( 0 );
-                return ret;
-            });
-
-        auto pMgr = pSvc->GetIoMgr();
-        TaskletPtr pListenTask;
-        ret = NEW_FUNCCALL_TASK( pListenTask,
-            pMgr, func, pSvc, pParent );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pMgr->RescheduleTask( pListenTask );
-        if( ERROR( ret ) )
-            ( *pListenTask )( eventCancelTask );
-        
     }while( 0 );
 
     oParams.ClearParams();
@@ -915,6 +1070,65 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
     if( !IsPending() )
         DebugPrint( ret, "Warning, "
             "the task is not pending" );
+
+    if( ERROR( ret ) &&
+        !pIf.IsEmpty() &&
+        !pUxIf.IsEmpty() )
+    {
+        CRpcServices* pSvc = pIf;
+        HANDLE hUxIf = ( HANDLE )
+            ( CRpcServices* )pUxIf;
+        if( pSvc->IsServer() )
+        {
+            CStreamServer* pStm = pIf;
+            pStm->OnChannelError( hUxIf, ret );
+        }
+        else
+        {
+            CStreamProxy* pStm = pIf;
+            pStm->OnChannelError( hUxIf, ret );
+        }
+    }
+    return ret;
+}
+
+gint32 CIfStartUxSockStmTask::OnCancel(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
+
+    do{
+        DebugPrintEx( logWarning,
+            -ECANCELED, "%s canceling",
+            CoGetClassName( this->GetClsid() ) );
+        ObjPtr pUxIf;
+        ObjPtr pIf;
+        ret = oParams.GetObjPtr( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+        
+        CRpcServices* pParent = pIf;
+        ret = oParams.GetObjPtr( 0, pUxIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = pIf;
+        HANDLE hUxIf = ( HANDLE )
+            ( CRpcServices* )pUxIf;
+        if( pSvc->IsServer() )
+        {
+            CStreamServer* pStm = pIf;
+            pStm->OnClose( hUxIf );
+        }
+        else
+        {
+            CStreamProxy* pStm = pIf;
+            pStm->OnClose( hUxIf );
+        }
+
+    }while( 0 );
 
     return ret;
 }
@@ -1009,11 +1223,10 @@ gint32 CStreamProxy::OpenChannel(
             if( ERROR( ret ) )
                 break;
 
-            CObjBase* pObj = pStmCp;
+            CStmConnPoint* pcp = pStmCp;
             oDesc.SetQwordProp(
-                propStmConnPt, ( guint64 )pObj );
-
-            pStmCp->AddRef();
+                propStmConnPt, ( guint64 )pcp );
+            pcp->RegForTransfer();
             oParams.SetObjPtr(
                 propStmConnPt, pStmCp );
         }
@@ -1219,7 +1432,11 @@ gint32 IStream::CloseChannel(
 
     gint32 ret = RemoveUxStream( hChannel, pIf );
     if( ERROR( ret ) )
+    {
+        DebugPrint( ret,
+            "RemoveUxStream failed 0x%llx", hChannel );
         return ret;
+    }
 
     do{
         CRpcServices* pSvc = pIf;
@@ -1235,20 +1452,23 @@ gint32 IStream::CloseChannel(
         CParamList oParams;
         oParams.Push( ObjPtr( pIf ) );
         oParams[ propIfPtr ] = ObjPtr( pThisIf );
-        if( pCallback != nullptr )
-        {
-            oParams[ propEventSink ] =
-                ObjPtr( pCallback );
-        }
 
         TaskletPtr pStopTask;
         pStopTask.NewObj(
             clsid( CIfStopUxSockStmTask ),
             oParams.GetCfg() );
 
-        ret = pThisIf->AddSeqTask( pStopTask );
+        ret = AddStopTask(
+            pCallback, hChannel, pStopTask );
 
-        if( SUCCEEDED( ret ) )
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error OnClose failed to add stoptask for 0x%llx @state=%d",
+                pSvc, pThisIf->GetState() );
+            ( *pStopTask )( eventCancelTask );
+        }
+        else
             ret = STATUS_PENDING;
 
     }while( 0 );
@@ -1394,7 +1614,7 @@ gint32 CStreamServer::OpenChannel(
         if( ERROR( ret ) )
             break;
 
-        ret = this->AddSeqTask( pTask );
+        ret = this->AddAndRun( pTask );
         if( ERROR( ret ) )
             break;
 
@@ -1458,84 +1678,110 @@ gint32 IStream::OnClose(
     return 0;
 }
 
+gint32 IStream::OnPreStopSharedParallel(
+    IEventSink* pCallback )
+{
+    return StopSeqTgMgr( pCallback );
+}
+
 gint32 IStream::OnPreStopShared(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
     CRpcServices* pThis = GetInterface(); 
-    TaskGrpPtr pTaskGrp;
+    bool bNotify = true;
+    auto pMgr = pThis->GetIoMgr();
 
     do{
-        CParamList oGrpParams;
-        oGrpParams[ propIfPtr ] = ObjPtr( pThis );
-        ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
-            oGrpParams.GetCfg() );
-        if( ERROR( ret ) )
-            break;
+        gint32 (*func)( IEventSink*, IEventSink*) =
+        ([]( IEventSink* pCb, IEventSink* pNotify )->gint32
+        {
+            gint32 ret = 0;
+            if( pCb == nullptr || pNotify == 0 )
+                return -EINVAL;
 
-        if( pCallback != nullptr )
-            pTaskGrp->SetClientNotify( pCallback );
-        pTaskGrp->SetRelation( logicNONE );
+            CCfgOpenerObj oCbCfg( pCb );
+            IConfigDb* pResp;
+            ret = oCbCfg.GetPointer(
+                propRespPtr, pResp );
+            if( SUCCEEDED( ret ) )
+            {
+                CCfgOpener oResp( pResp );
+                oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& )ret );
+            }
+            pNotify->OnEvent(
+                eventTaskComp, ret, 0, nullptr );
+
+            return 0;
+        });
 
         CStdRMutex oIfLock( pThis->GetLock() );
         if( m_mapUxStreams.empty() )
             break;
 
-        UXSTREAM_MAP mapStreams = m_mapUxStreams;
-        m_mapUxStreams.clear();
+        std::vector< HANDLE > vecStreams;
+        for( auto elem : m_mapUxStreams )
+            vecStreams.push_back( elem.first );
+
         oIfLock.Unlock();
 
-        for( auto elem : mapStreams )
-        {
-            CParamList oParams;
-            oParams.Push( ObjPtr( elem.second ) );
-            oParams[ propIfPtr ] = ObjPtr( pThis );
-
-            TaskletPtr pStopTask;
-            ret = pStopTask.NewObj(
-                clsid( CIfStopUxSockStmTask ),
-                oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-            {
-                ret = -ENOMEM;
-                break;
-            }
-            pTaskGrp->AppendTask( pStopTask );
-        }
-
-    }while( 0 );
-
-    do{
-        if( ERROR( ret ) )
+        if( vecStreams.empty() )
             break;
 
-        if( pTaskGrp->GetTaskCount() == 0 )
+        for( int i = 0; i < vecStreams.size(); i++ )
         {
-            // possibly there are stream stop tasks in
-            // the m_pSeqTasks we schedule a conclusion
-            // task to make sure all the 
-            auto pMgr = pThis->GetIoMgr();
-            TaskletPtr pSync;
-            gint32 (*func)() = ([]()->gint32
-            { return 0; });
-            ret = NEW_FUNCCALL_TASK(
-                pSync, pMgr, func );
-            if( ERROR( ret ) )
-                break;
-            pTaskGrp->AppendTask( pSync );
-        }
+            if( i < vecStreams.size() - 1 )
+            {
+                this->OnClose(
+                    vecStreams[ i ], nullptr );
+            }
+            else
+            {
+                TaskletPtr pFinalCb;
+                NEW_COMPLETE_FUNCALL( 0,
+                    pFinalCb, pMgr,
+                    func, nullptr, pCallback );
+                ( *pFinalCb )( eventZero );
 
-        TaskletPtr pTask = ObjPtr( pTaskGrp );
-        ret = pThis->AddSeqTask( pTask );
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+                ret = this->OnClose(
+                    vecStreams[ i ], pFinalCb );
+
+                if( SUCCEEDED( ret ) )
+                    bNotify = false;
+                else
+                    ( *pFinalCb )( eventCancelTask );
+            }
+        }
 
     }while( 0 );
 
-    if( ERROR( ret ) && !pTaskGrp.IsEmpty() )
-        ( *pTaskGrp )( eventCancelTask );
+    if( bNotify )
+    {
+        // possibly there are stream stop tasks in the
+        // m_pSeqTasks, so schedule a conclusion task
+        // to make sure all the stop tasks are done.
+        if( SUCCEEDED( ret ) )
+        {
+            TaskletPtr pFinalCb;
+            gint32 (*func1)( IEventSink*) =
+            ([]( IEventSink* pNotify )->gint32
+            {
+                pNotify->OnEvent(
+                    eventTaskComp, 0, 0, nullptr );
+                return 0;
+            });
+            NEW_FUNCCALL_TASK( pFinalCb,
+                pMgr, func1, pCallback );
+            ret = pThis->AddSeqTask( pFinalCb );
+            if( ERROR( ret ) )
+                ( *pFinalCb )( eventCancelTask );
+        }
+    }
+
+    if( SUCCEEDED( ret ) )
+        ret = STATUS_PENDING;
 
     return ret;
 }

@@ -764,6 +764,7 @@ namespace rpcf{
 extern void SetFuse( MYFUSE* );
 }
 
+gint32 fuseif_unmount();
 gint32 fuseif_main_ll( fuse_args& args,
     fuse_cmdline_opts& opts )
 {
@@ -787,7 +788,6 @@ gint32 fuseif_main_ll( fuse_args& args,
         return 1;
 
     memset( &fuse, 0, sizeof( fuse ) );
-    SetFuse( &fuse );
     if( opts.mountpoint == nullptr )
     {
         res = 1;
@@ -797,15 +797,25 @@ gint32 fuseif_main_ll( fuse_args& args,
     se = fuse_session_new(&args,
         &fuseif_ll_oper , sizeof(fuse_lowlevel_ops ), &fuse);
     if (se == NULL)
+    {
+        res = 1;
         goto out1;
+    }
 
     fuse.se = se;
-
     if (fuse_set_signal_handlers(se) != 0)
+    {
+        res = 1;
         goto out2;
+    }
 
+    SetFuse( &fuse );
     if (fuse_session_mount(se, opts.mountpoint) != 0)
+    {
+        SetFuse( nullptr );
+        res = 1;
         goto out3;
+    }
 
     /* Block until ctrl+c or fusermount -u */
     if (opts.singlethread)
@@ -824,6 +834,8 @@ gint32 fuseif_main_ll( fuse_args& args,
 #endif
     }
 
+    fuseif_unmount();
+    SetFuse( nullptr );
     fuse_session_unmount(se);
 out3:
     fuse_remove_signal_handlers(se);

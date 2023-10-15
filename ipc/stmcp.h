@@ -49,6 +49,12 @@ class CStreamQueue
     EnumTaskState m_dwState = stateStarting;
     MloopPtr m_pLoop;
 
+    guint64  m_qwBytesIn = 0;
+    guint64  m_qwBytesOut = 0;
+    guint64  m_qwPktsIn = 0;
+    guint64  m_qwPktsOut = 0;
+    gint8    m_byStoppedBy = -1;
+
 public:
 
     CStreamQueue()
@@ -79,7 +85,7 @@ public:
     void SetState( EnumTaskState dwState );
 
     gint32 Start();
-    gint32 Stop();
+    gint32 Stop( bool bStarter );
     gint32 ProcessIrps();
 
     inline void SetLoop( MloopPtr pLoop )
@@ -92,33 +98,46 @@ class CStmConnPoint : public IService
 {
     CStreamQueue m_arrQues[ 2 ];
 
-    CStreamQueue& m_oQue2Cli = m_arrQues[ 0 ];
-    CStreamQueue& m_oQue2Svr = m_arrQues[ 1 ];
     CIoManager* m_pMgr;
+
+    static stdmutex m_oLock;
+    static std::hashmap< HANDLE, ObjPtr > m_mapConnPts;
 
     public:
     CStmConnPoint( const IConfigDb* pCfg );
-    inline CStreamQueue& GetQueue( bool bProxy )
-    { return bProxy ? m_oQue2Cli : m_oQue2Svr; }
+    inline CStreamQueue& GetSendQueue( bool bStarter )
+    { return bStarter ? m_arrQues[ 0 ] : m_arrQues[ 1 ]; }
+
+    inline CStreamQueue& GetRecvQueue( bool bStarter )
+    { return bStarter ? m_arrQues[ 1 ] : m_arrQues[ 0 ]; }
 
     inline CIoManager* GetIoMgr()
     { return m_pMgr; }
 
     gint32 Start() override;
-    gint32 Stop() override;
+    gint32 Stop() override
+    { return 0; }
+    gint32 Stop( bool bStarter );
 
     gint32 OnEvent( EnumEventId iEvent,
         LONGWORD dwParam1,
         LONGWORD dwParam2,
         LONGWORD* pData ) override;
 
-    void SetLoop( MloopPtr pLoop, bool bProxy )
+    void SetLoop( MloopPtr pLoop, bool bStarter )
     {
-        if( bProxy )
-            m_oQue2Cli.SetLoop( pLoop );
+        if( bStarter )
+            GetSendQueue( bStarter ).SetLoop( pLoop );
         else
-            m_oQue2Svr.SetLoop( pLoop );
+            GetRecvQueue( bStarter ).SetLoop( pLoop );
     }
+
+    static stdmutex& GetLock()
+    { return m_oLock; }
+
+    gint32 RegForTransfer();
+    static gint32 RetrieveAndUnreg(
+        HANDLE hConn, ObjPtr& pConn );
 };
 
 class CStmConnPointHelper
@@ -130,13 +149,13 @@ class CStmConnPointHelper
 
     public:
     CStmConnPointHelper(
-        ObjPtr& pStmCp, bool bProxy ) :
+        ObjPtr& pStmCp, bool bStarter ) :
         m_pObj( pStmCp ),
         m_oStmCp( *( CStmConnPoint* )m_pObj ),
         m_oRecvQue(
-            m_oStmCp.GetQueue( bProxy ) ),
+            m_oStmCp.GetRecvQueue( bStarter ) ),
         m_oSendQue(
-            m_oStmCp.GetQueue( !bProxy ) )
+            m_oStmCp.GetSendQueue( bStarter ) )
     {}
 
     ~CStmConnPointHelper()
@@ -148,8 +167,8 @@ class CStmConnPointHelper
     gint32 SubmitListeningIrp( PIRP pIrp )
     { return m_oRecvQue.SubmitIrp( pIrp ); };
 
-    inline gint32 Stop()
-    { return m_oRecvQue.Stop(); }
+    inline gint32 Stop( bool bStarter )
+    { return m_oRecvQue.Stop( bStarter ); }
 
     gint32 RemoveIrpFromMap( PIRP pIrp )
     { return m_oRecvQue.RemoveIrpFromMap( pIrp ); }

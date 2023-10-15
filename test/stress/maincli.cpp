@@ -156,7 +156,7 @@ gint32 echocli(
 
         DebugPrint( 0, "req %d, pending %d, thread %d",
              dwIdx, ( guint32 )g_dwReqs,
-             cpp::GetTid() );
+             rpcf::GetTid() );
 
         stdstr strResp;
         ret = pIf->Echo(
@@ -170,7 +170,7 @@ gint32 echocli(
     while( true )
     {
         DebugPrint( 0, "pending %d, thread %d",
-             ( guint32 )g_dwReqs, cpp::GetTid() );
+             ( guint32 )g_dwReqs, rpcf::GetTid() );
         sleep( 20 );
     }
     return STATUS_SUCCESS;
@@ -192,7 +192,7 @@ gint32 pingcli(
 
         DebugPrint( 0, "req %d, pending %d, thread %d",
              dwIdx, ( guint32 )g_dwReqs,
-             cpp::GetTid() );
+             rpcf::GetTid() );
 
         ret = pIf->Ping( strMsg );
 
@@ -202,7 +202,7 @@ gint32 pingcli(
     while( true )
     {
         DebugPrint( 0, "pending %d, thread %d",
-             ( guint32 )g_dwReqs, cpp::GetTid() );
+             ( guint32 )g_dwReqs, rpcf::GetTid() );
         sleep( 20 );
     }
     return STATUS_SUCCESS;

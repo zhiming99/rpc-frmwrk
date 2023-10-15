@@ -21,6 +21,17 @@ gint32 CTestTypesSvc_SvrImpl::Echo(
     return STATUS_SUCCESS;
 }
 /* Sync Req Handler*/
+gint32 CTestTypesSvc_SvrImpl::Echo3(
+    const std::string& strText /*[ In ]*/,
+    std::string& strResp /*[ Out ]*/ )
+{
+    // TODO: Process the sync request here
+    // return code can be an Error or
+    // STATUS_SUCCESS
+    strResp = strText;
+    return STATUS_SUCCESS;
+}
+/* Sync Req Handler*/
 gint32 CTestTypesSvc_SvrImpl::EchoByteArray(
     BufPtr& pBuf /*[ In ]*/,
     BufPtr& pRespBuf /*[ Out ]*/ )

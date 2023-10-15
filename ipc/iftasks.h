@@ -92,10 +92,10 @@ class CIfRetryTask
     sem_t               m_semWait;
     TaskletPtr          m_pParentTask;
     TaskletPtr          m_pFwdrTask;
+    bool                m_bSyncCancel = false;
 
     gint32 SetFwrdTask( IEventSink* pCallback );
-    TaskletPtr GetFwrdTask( bool bClear = false );
-    gint32 CancelTaskChain(
+    virtual gint32 CancelTaskChain(
         guint32 dwContest,
         gint32 iError = -ECANCELED );
 
@@ -165,6 +165,7 @@ class CIfRetryTask
     gint32 GetClientNotify( EventPtr& pEvt ) const;
 
     TaskletPtr GetEndFwrdTask( bool bClear = false );
+    TaskletPtr GetFwrdTask( bool bClear = false );
     gint32 ClearFwrdTask();
 
     template< class ClassName >
@@ -174,6 +175,12 @@ class CIfRetryTask
         LONGWORD dwParam1 = 0,
         LONGWORD dwParam2 = 0,
         LONGWORD* pdata = nullptr );
+
+    inline void SetSyncCancel()
+    { m_bSyncCancel = true; }
+
+    inline bool IsSyncCancel() const
+    { return m_bSyncCancel; }
 };
 
 typedef EnumIfState EnumTaskState;
@@ -183,6 +190,16 @@ class CIfParallelTask
 
     protected:
     std::atomic< EnumTaskState > m_iTaskState;
+    TaskletPtr m_pCancelTask;
+
+    gint32 CancelTaskChain(
+        guint32 dwContest,
+        gint32 iError = -ECANCELED ) override;
+
+    gint32 DoCancelTaskChainSync(
+        TaskletPtr pTask,
+        guint32 dwContest,
+        gint32 iError = -ECANCELED );
 
     public:
     typedef CIfRetryTask super;
@@ -263,8 +280,7 @@ class CIfOpenPortTask
     virtual gint32 OnIrpComplete( PIRP pIrp );
     virtual gint32 RunTask();
     // canceling is not supported yet
-    virtual gint32 OnCancel( guint32 dwContext )
-    { return STATUS_PENDING; }
+    virtual gint32 OnCancel( guint32 dwContext );
 };
 
 class CIfStopTask
@@ -348,6 +364,14 @@ typedef enum
 
 } EnumLogicOp;
 
+typedef enum 
+{
+    waitStart,
+    waitComplete,
+    waitRunning,
+
+} EnumHeadState;
+
 class CIfTaskGroup
     : public CIfRetryTask
 {
@@ -358,6 +382,7 @@ class CIfTaskGroup
     bool m_bRunning = false;
     bool m_bCanceling = false;
     bool m_bNoSched = false;
+    EnumHeadState m_byHeadState = waitStart;
 
     protected:
 
@@ -365,6 +390,9 @@ class CIfTaskGroup
 
     std::deque< TaskletPtr > m_queTasks;
     std::vector< gint32 > m_vecRetVals;
+#ifdef DEBUG
+    std::vector< gint32 > m_vecClsids;
+#endif
 
     virtual gint32 RunTaskInternal(
         guint32 dwContext );
@@ -421,8 +449,8 @@ class CIfTaskGroup
         m_iTaskState = iState;
     }
 
-    virtual gint32 AppendTask( TaskletPtr& pTask );
-    gint32 AppendAndRun( TaskletPtr& pTask );
+    virtual gint32 AppendTask(
+        TaskletPtr& pTask );
 
     virtual guint32 GetTaskCount() 
     {
@@ -471,9 +499,16 @@ class CIfTaskGroup
     gint32 OnTaskComplete( gint32 iRetVal ) override;
     bool IsStopped( EnumTaskState iState ) const;
 
+    inline void SetHeadState( EnumHeadState byState )
+    { m_byHeadState = byState; }
+
+    inline EnumHeadState GetHeadState() const
+    { return m_byHeadState; }
+
     template< class T >
     gint32 FindTaskByType(
-        TaskletPtr& pTask, T* pHint );
+        TaskletPtr& pTask, T* pHint,
+        bool bReverse = false );
 
     template< class T >
     gint32 FindTasksByType(
@@ -485,17 +520,42 @@ typedef CAutoPtr< Clsid_Invalid, CIfTaskGroup > TaskGrpPtr;
 
 template< class T >
 gint32 CIfTaskGroup::FindTaskByType(
-    TaskletPtr& pTask, T* pHint )
+    TaskletPtr& pTask, T* pHint,
+    bool bReverse )
 {
     pHint = nullptr;
     CStdRTMutex oLock( GetLock() );
-    for( auto elem : m_queTasks )
+    if( m_queTasks.empty() )
+        return -ENOENT;
+    if( !bReverse )
     {
-        pHint = elem;
-        if( pHint == nullptr )
-            continue;
-        pTask = elem;
-        break;
+        auto itr = m_queTasks.begin();
+        while( itr != m_queTasks.end() )
+        {
+            pHint = *itr;
+            if( pHint == nullptr )
+            {
+                itr++;
+                continue;
+            }
+            pTask = *itr;
+            break;
+        }
+    }
+    else
+    {
+        auto itr = m_queTasks.rbegin();
+        while( itr != m_queTasks.rend() )
+        {
+            pHint = *itr;
+            if( pHint == nullptr )
+            {
+                itr++;
+                continue;
+            }
+            pTask = *itr;
+            break;
+        }
     }
     if( pHint != nullptr )
         return STATUS_SUCCESS;
@@ -505,19 +565,24 @@ gint32 CIfTaskGroup::FindTaskByType(
 class CIfRootTaskGroup
     : public CIfTaskGroup
 {
+    protected:
+    gint32 RunTaskInternal(
+        guint32 dwContext ) override;
     public:
     typedef CIfTaskGroup super;
-    CIfRootTaskGroup( const IConfigDb* pCfg )
-       : super( pCfg ) 
-    {
-        SetClassId( clsid( CIfRootTaskGroup ) );
-    }
-    // the race condtion can happen between 
-    //  ( RunTask, OnCancel, OnChildComplete )
-    // 
-    virtual gint32 OnComplete( gint32 iRet );
-    virtual gint32 OnChildComplete(
-        gint32 iRet, CTasklet* pChild );
+
+    CIfRootTaskGroup( const IConfigDb* pCfg );
+
+    gint32 OnComplete( gint32 iRet ) override;
+
+    gint32 OnChildComplete(
+        gint32 iRet, CTasklet* pChild ) override;
+
+    gint32 AppendAndRun(
+        TaskletPtr& pTask );
+
+    gint32 OnCancel(
+        guint32 dwContext ) override;
 };
 
 
@@ -568,7 +633,8 @@ class CIfParallelTaskGrp
     virtual gint32 OnChildComplete(
         gint32 ret, CTasklet* pChild );
 
-    gint32 AppendTask( TaskletPtr& pTask );
+    gint32 AppendTask(
+        TaskletPtr& pTask ) override;
 
     gint32 FindTask( guint64 iTaskId,
         TaskletPtr& pTask );
@@ -1162,7 +1228,7 @@ class CIfParallelTaskGrpRfc :
 
     gint32 AddAndRun( TaskletPtr& pTask );
 
-    virtual gint32 AppendTask(
+    gint32 AppendTask(
         TaskletPtr& pTask ) override ;
 
     virtual gint32 InsertTask(

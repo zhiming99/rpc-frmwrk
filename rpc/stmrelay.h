@@ -24,9 +24,11 @@
 
 #pragma once
 
-#include "../ipc/uxstream.h"
-#include "../ipc/stream.h"
+#include "uxstream.h"
+#include "stream.h"
+#include "stmcp.h"
 #include "tcpport.h"
+
 
 namespace rpcf
 {
@@ -59,8 +61,8 @@ class CStreamRelayBase :
     { return 0; }
 
     // the local sock is closed
-    virtual gint32 OnClose( HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+    gint32 OnClose( HANDLE hChannel,
+        IEventSink* pCallback = nullptr ) override
     {
         gint32 ret = 0;
         if( hChannel == INVALID_HANDLE )
@@ -373,8 +375,18 @@ class CStreamRelayBase :
                 break;
             }
 
-            this->AddSeqTask( pSendClose );
-            this->AddSeqTask( pCloseStream );
+            ret = this->AddSeqTask( pSendClose );
+            if( ERROR( ret ) )
+            {
+                ( *pSendClose )( eventCancelTask );
+                break;
+            }
+            ret = this->AddSeqTask( pCloseStream );
+            if( ERROR( ret ) )
+            {
+                ( *pSendClose )( eventCancelTask );
+                ( *pCloseStream )( eventCancelTask );
+            }
 
         }while( 0 );
 
@@ -421,6 +433,9 @@ class CStreamServerRelay :
     gint32 OnConnected( HANDLE hChannel ) override
     { return 0; }
 
+    gint32 OnPreStop(
+        IEventSink* pContext ) override
+    { return OnPreStopShared( pContext ); }
 };
 
 // this interface will be hosted by
@@ -479,7 +494,6 @@ class CStreamProxyRelay :
     gint32 OnConnected( HANDLE hChannel ) override
     { return 0; }
 
-    using super::OnPostStart;
     gint32 OnPostStart(
         IEventSink* pContext ) override
     {
@@ -492,6 +506,9 @@ class CStreamProxyRelay :
             propTxBytes, ( guint64 )0 );
         return 0;
     }
+    gint32 OnPreStop(
+        IEventSink* pContext ) override
+    { return OnPreStopShared( pContext ); }
 };
 
 class CIfStartUxSockStmRelayTask :
@@ -507,6 +524,7 @@ class CIfStartUxSockStmRelayTask :
 
     gint32 RunTask();
     gint32 OnTaskComplete( gint32 iRet );
+    gint32 OnCancel( guint32 dwContext ) override;
     void Cleanup();
 };
 
@@ -1209,7 +1227,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 this->m_pListeningTask );
 
             if( ERROR( ret ) )
@@ -1238,6 +1256,16 @@ class CUnixSockStmRelayBase :
 
         }while( 0 );
 
+        if( ERROR( ret ) )
+        {
+            if( !this->m_pListeningTask.IsEmpty() )
+                ( *this->m_pListeningTask )(
+                    eventCancelTask );
+
+            if( !this->m_pPingTicker.IsEmpty() )
+                ( *this->m_pPingTicker )(
+                    eventCancelTask );
+        }
         return ret;
     }
 
@@ -1273,7 +1301,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 this->m_pWritingTask );
 
             if( ERROR( ret ) )
@@ -1287,7 +1315,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 m_pWrTcpStmTask );
 
             if( ERROR( ret ) )
@@ -1301,7 +1329,7 @@ class CUnixSockStmRelayBase :
             if( ERROR( ret ) )
                 break;
 
-            ret = pMgr->RescheduleTask(
+            ret = this->RunManagedTask(
                 m_pRdTcpStmTask );
 
         }while( 0 );
@@ -1376,6 +1404,15 @@ class CUnixSockStmRelayBase :
     virtual gint32 OnPreStop( IEventSink* pCallback ) 
     {
         ReportByteStat();
+        if( this->GetPortHandle() == INVALID_HANDLE )
+        {
+            CCfgOpenerObj oIfCfg( this );
+            CStmConnPoint* pscp = nullptr;
+            gint32 ret = oIfCfg.GetPointer(
+                propStmConnPt, pscp );
+            if( SUCCEEDED( ret ) )
+                pscp->Stop( false );
+        }
 
         super::OnPreStop( pCallback );
 
@@ -1426,6 +1463,9 @@ class CUnixSockStmRelayBase :
     inline EnumFCState IncRxBytes( guint32 dwSize )
     { return this->m_oFlowCtrl.IncRxBytes( dwSize ); }
     
+    gint32 OnPostStop(
+        IEventSink* pContext ) override
+    { return super::OnPostStop( pContext ); }
 };
 
 class CUnixSockStmServerRelay :

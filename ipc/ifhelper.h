@@ -3711,27 +3711,15 @@ gint32 AddSeqTaskTempl( T* pObj,
             pSeqTasks->GetLock() );
 
         oIfLock.Lock();
-        if( pQueuedTasks.IsEmpty() )
-            continue;
-
-        if( !( pQueuedTasks == ptrSeqTasks ) )
+        if( pQueuedTasks != ptrSeqTasks )
             continue;
 
         ret = pQueuedTasks->AppendTask( pTask );
-        if( ERROR( ret ) && !bNew )
+        if( ERROR( ret ) )
         {
             // the old seqTask is completed
             pQueuedTasks.Clear();
             continue;
-        }
-        else if( ERROR( ret ) && bNew )
-        {
-            // something bad happened
-            DebugPrint( ret,
-                "a fatal error happens "
-                "on sequential queue..." );
-            pQueuedTasks.Clear();
-            break;
         }
 
         pTask->MarkPending();
@@ -3758,6 +3746,99 @@ gint32 AddSeqTaskTempl( T* pObj,
 
     return ret;
 }
+
+#define CHECK_IFSTATE( _pObj ) \
+({ \
+    bool bRet = true; \
+    EnumIfState iState = pObj->GetState(); \
+    if( iState == stateStopped ) \
+        bRet = false; \
+    bRet; \
+})
+
+template< class T,
+    class T2 =typename std::enable_if<
+        std::is_base_of< CRpcServices, T >::value,
+        T >::type >
+gint32 AddSeqTaskTempl( T2* pObj,
+    TaskGrpPtr& pQueuedTasks,
+    TaskletPtr& pTask,
+    bool bLong )
+{
+    if( pTask.IsEmpty() || pObj == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        bool bNew = false;
+        TaskGrpPtr ptrSeqTasks;
+        CIoManager* pMgr = pObj->GetIoMgr();
+
+        CStdRMutex oIfLock( pObj->GetLock() );
+        if( pQueuedTasks.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams[ propIoMgr ] = ObjPtr( pMgr );
+
+            ret = pQueuedTasks.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            pQueuedTasks->SetRelation(logicNONE );
+            bNew = true;
+        }
+        ptrSeqTasks = pQueuedTasks;
+        oIfLock.Unlock();
+
+        CStdRTMutex oQueueLock(
+            ptrSeqTasks->GetLock() );
+
+        oIfLock.Lock();
+        if( !CHECK_IFSTATE( pObj ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+            
+        if( pQueuedTasks != ptrSeqTasks )
+            continue;
+
+        ret = pQueuedTasks->AppendTask( pTask );
+        if( ERROR( ret ) )
+        {
+            // the old seqTask is completed
+            pQueuedTasks.Clear();
+            continue;
+        }
+
+        pTask->MarkPending();
+        if( SUCCEEDED( ret ) && bNew )
+        {
+            // a new pQueuedTasks, add and run
+            oIfLock.Unlock();
+            oQueueLock.Unlock();
+
+            TaskletPtr pSeqTasks = pQueuedTasks;
+            ret = pMgr->RescheduleTask(
+                pSeqTasks, bLong );
+
+            break;
+        }
+        if( SUCCEEDED( ret ) && !bNew )
+        {
+            // pQueuedTasks is already running
+            // just waiting for the turn.
+        }
+        break;
+
+    }while( 1 );
+    return ret;
+}
+
+#define AddSeqTaskIf AddSeqTaskTempl< CRpcServices, CRpcServices >
 
 /*
  * macro ADD_TIMER adds a timer of sepcified
@@ -3971,7 +4052,7 @@ class CTaskWrapper :
     inline void SetNoParams( bool bNoParams )
     { m_bNoParams = bNoParams; }
 
-    gint32 TransferParams();
+    gint32 TransferParams( gint32 iRetVal );
     gint32 RunTask() override;
     gint32 OnTaskComplete( gint32 iRet ) override;
     gint32 OnComplete( gint32 iRetVal ) override;
@@ -3983,7 +4064,10 @@ class CTaskWrapper :
 ({ \
     gint32 ret = 0; \
     do{ \
-        NEW_FUNCCALL_TASK2( _pos, __pTask, pMgr, func, __VA_ARGS__ );\
+        ret = NEW_FUNCCALL_TASK( __pTask, pMgr, func, __VA_ARGS__ );\
+        if(  ERROR( ret ) ) \
+            break; \
+        CDeferredFuncCallBase< CIfRetryTask >* pDefer = __pTask; \
         TaskletPtr ptw; \
         CCfgOpener oCfg; \
         oCfg.SetPointer( propIoMgr, pMgr ); \
@@ -3994,6 +4078,8 @@ class CTaskWrapper :
         CTaskWrapper* pWrapper = ptw;\
         pWrapper->SetCompleteTask( __pTask ); \
         __pTask = ptw; \
+        Variant oVar( __pTask ); \
+        pDefer->UpdateParamAt( _pos, oVar );  \
     }while( 0 ); \
     ret; \
 })

@@ -39,19 +39,19 @@ gint32 CStreamQueue::Start()
     return 0;
 }
 
-gint32 CStreamQueue::Stop() 
+gint32 CStreamQueue::Stop( bool bStarter ) 
 {
     if( true )
     {
         CStdMutex oLock( this->GetLock() );
         if( GetState() == stateStopped )
             return ERROR_STATE;
+        if( m_byStoppedBy == -1 )
+            m_byStoppedBy = bStarter ? 0 : 1;
     }
     SetState( stateStopping );
     CancelAllIrps( ERROR_PORT_STOPPED );
     SetState( stateStopped );
-    GetParent()->OnEvent( eventStop,
-        0, 0, ( LONGWORD* )this );
     return 0;
 }
 
@@ -87,6 +87,8 @@ gint32 CStreamQueue::QueuePacket( BufPtr& pBuf )
         guint8& byToken =
             ( guint8& )pBuf->ptr()[ 0 ];
         m_quePkts.push_back( pBuf );
+        m_qwBytesIn += pBuf->size();
+        m_qwPktsIn++;
 
         if( m_quePkts.size() ==
             STM_MAX_QUEUE_SIZE )
@@ -193,6 +195,8 @@ gint32 CStreamQueue::SubmitIrp( PIRP pIrp )
 
         BufPtr pResp = m_quePkts.front();
         m_quePkts.pop_front();
+        m_qwPktsOut++;
+        m_qwBytesOut += pResp->size();
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
         pCtx->SetRespData( pResp );
         pCtx->SetStatus( STATUS_SUCCESS );
@@ -235,6 +239,8 @@ gint32 CStreamQueue::ProcessIrps()
             m_queIrps.pop_front();
             BufPtr pResp = m_quePkts.front();
             m_quePkts.pop_front();
+            m_qwPktsOut++;
+            m_qwBytesOut += pResp->size();
             oLock.Unlock();
 
             bool bPutBack = false;
@@ -255,7 +261,11 @@ gint32 CStreamQueue::ProcessIrps()
             }
             oLock.Lock();
             if( bPutBack )
+            {
                 m_quePkts.push_front( pResp );
+                m_qwPktsOut--;
+                m_qwBytesOut -= pResp->size();
+            }
             guint32 dwCount = m_quePkts.size();
             if( !bPutBack &&
                 dwCount == STM_MAX_QUEUE_SIZE - 1 )
@@ -347,6 +357,29 @@ gint32 CStreamQueue::CancelAllIrps(
     return ret;
 }
 
+std::hashmap< HANDLE, ObjPtr > CStmConnPoint::m_mapConnPts;
+stdmutex CStmConnPoint::m_oLock;
+
+gint32 CStmConnPoint::RegForTransfer()
+{
+    CStdMutex oLock( GetLock() );
+    m_mapConnPts.insert(
+        { ( HANDLE )this, ObjPtr( this ) } );
+    return 0;
+}
+
+gint32 CStmConnPoint::RetrieveAndUnreg(
+    HANDLE hConn, ObjPtr& pConn )
+{
+    CStdMutex oLock( GetLock() );
+    auto itr = m_mapConnPts.find( hConn );
+    if( itr == m_mapConnPts.end() )
+        return -ENOENT;
+    pConn = itr->second;
+    m_mapConnPts.erase( itr );
+    return STATUS_SUCCESS;
+}
+
 CStmConnPoint::CStmConnPoint(
     const IConfigDb* pCfg )
 {
@@ -389,17 +422,19 @@ gint32 CStmConnPoint::Start()
     return ret;
 }
 
-gint32 CStmConnPoint::Stop()
+gint32 CStmConnPoint::Stop( bool bStarter )
 {
+    ObjPtr pObj;
     gint32 ret = 0;
     do{
         gint32 iCount = sizeof( m_arrQues ) /
             sizeof( m_arrQues[ 0 ] );
 
         for( gint32 i = 0; i < iCount; i++ )
-            m_arrQues[ i ].Stop();
+            m_arrQues[ i ].Stop( bStarter );
 
     }while( 0 );
+    RetrieveAndUnreg( ( HANDLE )this, pObj ); 
     return ret;
 }
 
@@ -414,7 +449,6 @@ gint32 CStmConnPoint::OnEvent(
     {
     case eventResumed:
     case eventPaused:
-    case eventStop:
         {
             auto pQue = reinterpret_cast
                 < CStreamQueue* >( pData );
@@ -432,11 +466,18 @@ gint32 CStmConnPoint::OnEvent(
             pBuf->Resize( 1 );
             if( iEvent == eventResumed )
                 pBuf->ptr()[ 0 ] = tokLift;
-            else if( iEvent == eventPaused )
-                pBuf->ptr()[ 0 ] = tokFlowCtrl;
             else
-                pBuf->ptr()[ 0 ] = tokClose;
+                pBuf->ptr()[ 0 ] = tokFlowCtrl;
             m_arrQues[ dwIdx ].QueuePacket( pBuf );
+            break;
+        }
+    case eventStop:
+        {
+            BufPtr pBuf( true );
+            pBuf->Resize( 1 );
+            pBuf->ptr()[ 0 ] = tokClose;
+            for( int i = 0; i < 2; i++ )
+                m_arrQues[ i ].QueuePacket( pBuf );
             break;
         }
     default:
@@ -786,12 +827,9 @@ gint32 CStmCpPdo::SubmitWriteIrp(
 
 gint32 CStmCpPdo::PreStop( IRP* pIrp )
 {
-    do{
-        CStmConnPointHelper oh(
-            m_pStmCp, this->IsStarter() );
-        oh.Stop();
-
-    }while( 0 );
+    CStmConnPoint* pscp = m_pStmCp;
+    if( pscp != nullptr )
+        pscp->Stop( IsStarter() );
 
     return super::PreStop( pIrp );
 }

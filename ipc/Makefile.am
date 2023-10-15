@@ -23,7 +23,7 @@ mainloop.h msgmatch.h namespc.h port.h \
 portdrv.h portex.h reqopen.h sevpoll.h \
 stream.h streamex.h tasklets.h tractgrp.h \
 utils.h uxport.h uxstream.h proxy.h prxyport.h fdodrv.h \
-stmport.h fastrpc.h stmcp.h
+stmport.h fastrpc.h stmcp.h seqtgmgr.h
 
 rpcfipcdir=$(includedir)/rpcf/ipc
 

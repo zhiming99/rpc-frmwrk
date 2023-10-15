@@ -671,21 +671,6 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         // the login is not complete yet.
         if( bContinue )
         {
-            // We need to send out the response
-            // without encryption, and must be ahead
-            // of SetSessHash
-            //
-            // FIXME: we cannot 100% guarantee that
-            // the request is sent immediately. So if
-            // the request is pending on a port above
-            // the secfido, the request could be
-            // encrypted and the client will fill the
-            // login because of unable to decypt the
-            // response message. However, at this
-            // point, there is no more traffic at
-            // login stage, and most likely the login
-            // response can be sent without encrypted.
-            //
             OnServiceComplete( pResp, pCallback );
             break;
         }
@@ -2601,6 +2586,10 @@ gint32 CRpcReqForwarderAuth::OnSessImplLoginComplete(
 
     return ret;
 }
+
+gint32 CRpcReqForwarderAuth::OnPostStop(
+    IEventSink* pCallback )
+{ return super::OnPostStop( pCallback ); }
 
 gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
     IEventSink* pInvTask,

@@ -1921,7 +1921,10 @@ gint32 CRpcTcpBridgeShared::OnPostStartShared(
             RunManagedTask( pTask );
 
         if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
             break;
+        }
 
     }while( 0 );
 
@@ -2005,10 +2008,10 @@ gint32 CRpcTcpBridgeProxy::OnPostStop(
         m_pGrpRfc.Clear();
 
     CRpcRouter* pParent = GetParent();
-    CRpcRouterReqFwdr* pRouter =
-        ObjPtr( pParent );
-
+    if( pParent->HasReqForwarder() )
     do{
+        CRpcRouterReqFwdr* pRouter =
+            ObjPtr( pParent );
         if( pRouter->GetState() != stateConnected )
             break;
 

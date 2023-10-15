@@ -131,8 +131,14 @@ class CRpcStmChanBase :
                 hstm, pPdoPort );
 
             if( ERROR( ret ) )
+            {
+                ret = ActiveClose( hstm, pCallback );
                 break;
+            }
 
+            if( this->GetState() == stateStopping )
+                ret = ActiveClose( hstm, pCallback );
+ 
             pPdoPort->OnEvent(
                 eventDisconn, hstm, 0, nullptr );
 
@@ -265,6 +271,13 @@ class CRpcStmChanBase :
             m_mapStm2Sess[ hstm ] =
                     { strSess, strPath };
 
+            auto itr = m_mapSessRefs.find( strSess );
+            if( itr == m_mapSessRefs.end() )
+                m_mapSessRefs[ strSess ] = 1;
+            else
+            {
+                ++itr->second;
+            }
             oLock.Unlock();
 
             ret = m_pPort->OnEvent(
@@ -1463,12 +1476,11 @@ class CFastRpcSkelSvrBase :
     std::deque< std::pair< TaskletPtr, guint64 > > m_queStartTasks;
     guint32 m_dwReservedSlots = 1;
     TaskGrpPtr m_pGrpRfc;
+    bool m_bRfcEnabled = true;
 
     public:
     typedef CFastRpcSkelBase< false > super;
-    CFastRpcSkelSvrBase( const IConfigDb* pCfg )
-        : super( pCfg ), m_pGrpRfc( nullptr, false )
-    {}
+    CFastRpcSkelSvrBase( const IConfigDb* pCfg );
 
     inline TaskGrpPtr GetGrpRfc() const
     { return m_pGrpRfc; }

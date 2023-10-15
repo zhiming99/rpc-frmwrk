@@ -448,8 +448,11 @@ class CRpcInterfaceBase :
     gint32 GetParallelGrp(
         TaskGrpPtr& pParaGrp );
 
-    TaskGrpPtr& GetTaskGroup()
-    { return m_pRootTaskGroup; }
+    TaskGrpPtr GetTaskGroup()
+    {
+        CStdRMutex oIfLock( GetLock() );
+        return m_pRootTaskGroup;
+    }
 
     bool IsMyPort( HANDLE hPort )
     {
@@ -707,6 +710,8 @@ class CRpcServices :
         EnumIfState iState ) = 0;
 
     virtual gint32 RebuildMatches();
+
+    gint32 RunManagedParaTask( TaskletPtr& pTask );
 
     public:
 
@@ -985,7 +990,7 @@ class CRpcServices :
     {
         CStdRMutex oIfLock( GetLock() );
 
-        CTasklet* pTask = static_cast
+        auto pTask = dynamic_cast
             < CTasklet* >( pFilterTask );
 
         m_queFilters.push_back( TaskletPtr( pTask ) );
@@ -998,7 +1003,7 @@ class CRpcServices :
         gint32 ret = -ENOENT;
         CStdRMutex oIfLock( GetLock() );
 
-        CTasklet* pTask = static_cast
+        auto pTask = dynamic_cast
             < CTasklet* >( pFilterTask );
 
         std::deque< TaskletPtr >::iterator itr =

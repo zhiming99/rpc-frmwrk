@@ -1120,8 +1120,6 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             guint32 dwNumThrds =
                 ( guint32 )std::max( 1U,
                 std::thread::hardware_concurrency() );
-            if( dwNumThrds > 1 )
-                dwNumThrds = ( dwNumThrds >> 1 );
             oCfg[ propMaxTaskThrd ] = dwNumThrds;
             oCfg[ propMaxIrpThrd ] = 0;
 

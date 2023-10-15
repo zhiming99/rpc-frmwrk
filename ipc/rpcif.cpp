@@ -1034,10 +1034,7 @@ gint32 CRpcInterfaceBase::StartEx(
         ret = STATUS_PENDING;
 
     if( ERROR( ret ) )
-    {
         ClearActiveTasks();
-        m_pRootTaskGroup.Clear();
-    }
 
     return ret;
 }
@@ -1145,23 +1142,6 @@ gint32 CRpcInterfaceBase::StopEx(
         if( stateStopping != GetState() )
             return ERROR_STATE;
 
-        TaskGrpPtr pRoot = m_pRootTaskGroup;
-        if( pRoot.IsEmpty() )
-        {
-            CParamList oParams;
-            ret = oParams.SetObjPtr(
-                propIfPtr, ObjPtr( this ) );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = m_pRootTaskGroup.NewObj(
-                clsid( CIfRootTaskGroup ),
-                oParams.GetCfg() ); 
-
-            if( ERROR( ret ) )
-                break;
-        }
         oIfLock.Unlock();
 
         TaskletPtr pPreStop;
@@ -1330,15 +1310,15 @@ gint32 CRpcInterfaceBase::DoStop(
             ret = -EFAULT;
             break;
         }
-        pTask->MarkPending();
-        ret = AppendAndRun( pTask );
+        CIoManager* pMgr = GetIoMgr();
+        ret = pMgr->RescheduleTask( pTask );
         if( ERROR( ret ) )
         {
             // the callback was not called
             ( *pTask )( eventCancelTask );
             break;
         }
-        ret = pTask->GetError();
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -1939,7 +1919,7 @@ gint32 CRpcInterfaceBase::ClearActiveTasks()
     gint32 ret = 0;
 
     do{
-        TaskGrpPtr pRoot = m_pRootTaskGroup;
+        TaskGrpPtr pRoot = GetTaskGroup();
         if( pRoot.IsEmpty() )
             break;
 
@@ -2014,13 +1994,13 @@ gint32 CRpcInterfaceBase::ClearPausedTasks()
     gint32 ret = 0;
     do{
         TaskletPtr pTask;
-        TaskGrpPtr pRootGrp = m_pRootTaskGroup;
+        TaskGrpPtr pRootGrp = GetTaskGroup();
         if( pRootGrp.IsEmpty() )
         {
             ret = -EFAULT;
             break;
         }
-        CIfRootTaskGroup* pRoot = m_pRootTaskGroup;
+        CIfRootTaskGroup* pRoot = pRootGrp;
 
         ret = pRoot->GetHeadTask( pTask );
         if( ERROR( ret ) )
@@ -2077,11 +2057,12 @@ gint32 CRpcInterfaceBase::AppendAndRun(
         return -EINVAL;
 
     // possibly the initialization failed
-    TaskGrpPtr pRoot = m_pRootTaskGroup;
+    TaskGrpPtr pRoot = GetTaskGroup();
     if( pRoot.IsEmpty() )
         return -EFAULT;
 
-    return pRoot->AppendAndRun( pTask );
+    CIfRootTaskGroup* prg = pRoot;
+    return prg->AppendAndRun( pTask );
 }
 
 gint32 CRpcInterfaceBase::AddAndRun(
@@ -2096,12 +2077,12 @@ gint32 CRpcInterfaceBase::AddAndRun(
     CIfRootTaskGroup* pRootTaskGroup = nullptr;
     if( true )
     {
-        pRootTaskGroup = GetTaskGroup();
-        if( pRootTaskGroup == nullptr )
+        pRootGrp = GetTaskGroup();
+        if( pRootGrp.IsEmpty() )
             return -EFAULT;
 
         // as a guard to the root group
-        pRootGrp = pRootTaskGroup;
+        pRootTaskGroup = pRootGrp;
     }
 
     gint32 ret = 0;
@@ -2255,28 +2236,7 @@ gint32 CRpcInterfaceBase::AddAndRun(
                 break;
             }
 
-            if( dwCount == 0 && bRunning )
-            {
-                pParaLock->unlock();
-                ret = ERROR_STATE;
-                DebugPrint( GetTid(),
-                    "root task is in wrong state, dwCount=%d, bRunning=%d",
-                    dwCount, bRunning );
-                break;
-            }
-            else if( dwCount > 0 && !bRunning )
-            {
-                // don't lock the io task, because it
-                // could cause deadlock
-                pIoTask->MarkPending();
-                pParaLock->unlock();
-                ret = 0;
-
-                DebugPrintEx( logInfo, GetTid(),
-                    "root task not run immediately, dwCount=%d, bRunning=%d",
-                    dwCount, bRunning );
-            }
-            else
+            if( dwCount > 0 && bRunning )
             {
                 pParaLock->unlock();
 
@@ -2301,6 +2261,35 @@ gint32 CRpcInterfaceBase::AddAndRun(
                     pIoTask->MarkPending();
                 }
                 ret = 0;
+            }
+            else if( dwCount == 0 && !bRunning )
+            {
+                pParaLock->unlock();
+                ( *pRootGrp )( eventZero );
+                ret = pIoTask->GetError();
+                if( ret == STATUS_PENDING )
+                    pIoTask->MarkPending();
+                ret = 0;
+            }
+            else if( dwCount > 0 && !bRunning )
+            {
+                // don't lock the io task, because it
+                // could cause deadlock
+                pIoTask->MarkPending();
+                pParaLock->unlock();
+                ret = 0;
+
+                DebugPrintEx( logInfo, GetTid(),
+                    "root task not run immediately, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
+            }
+            else // if( dwCount == 0 && bRunning )
+            {
+                pParaLock->unlock();
+                ret = ERROR_STATE;
+                DebugPrint( GetTid(),
+                    "root task is in wrong state, dwCount=%d, bRunning=%d",
+                    dwCount, bRunning );
             }
         }
         else if( bImmediate && bRunning && dwCount > 0 )
@@ -2739,6 +2728,10 @@ gint32 CRpcServices::OnPostStop(
     IEventSink* pCallback )
 {
 
+    guint32 dwCount = 0;
+    TaskGrpPtr pGrp = GetTaskGroup();
+    if( !pGrp.IsEmpty() )
+        dwCount = pGrp->GetTaskCount();
     CStdRMutex oIfLock( GetLock() );
     while( !m_pSeqTasks.IsEmpty() )
     {
@@ -2766,7 +2759,29 @@ gint32 CRpcServices::OnPostStop(
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
-    m_pRootTaskGroup.Clear();
+    while( !m_pRootTaskGroup.IsEmpty() )
+    {
+        pGrp = m_pRootTaskGroup;
+        oIfLock.Unlock();
+        CStdRTMutex oTaskLock( pGrp->GetLock() );
+        oIfLock.Lock();
+        if( pGrp != m_pRootTaskGroup )
+            continue;
+        dwCount = pGrp->GetTaskCount();
+        if( dwCount > 0 )
+        {
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+            ( *pGrp )( eventCancelTask );
+            oIfLock.Lock();
+            continue;
+        }
+        pGrp->SetRunning( false );
+        pGrp->SetTaskState( stateStopped );
+        pGrp->RemoveProperty( propIfPtr );
+        m_pRootTaskGroup.Clear();
+        break;
+    }
 
     return 0;
 }
@@ -4763,6 +4778,18 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg.SetBoolProp( propNonSockStm, true );
                 else
                     oCfg.SetBoolProp( propNonSockStm, false );
+
+            }
+
+            if( strIfName == "IStream" &&
+                oIfDesc.isMember( JSON_ATTR_SEQTGMGR ) &&
+                oIfDesc[ JSON_ATTR_SEQTGMGR ].isString() )
+            {
+                strVal = oIfDesc[ JSON_ATTR_SEQTGMGR ].asString();
+                if( strVal.size() > 0 && strVal == "true" )
+                    oCfg.SetBoolProp( propSeqTgMgr, true );
+                else
+                    oCfg.SetBoolProp( propSeqTgMgr, false );
             }
 
             MatchPtr pMatch;
@@ -5125,30 +5152,293 @@ gint32 CRpcServices::DoRmtModEvent(
     return ret;
 }
 
+#define CHECK_ROOTGRP \
+{\
+    TaskGrpPtr pRoot2 = GetTaskGroup(); \
+    if( pRoot2 != pRoot ) \
+        continue; \
+    EnumTaskState iState = pRoot->GetTaskState(); \
+    if( pRoot->IsStopped( iState ) ) \
+    { \
+        ret = ERROR_STATE; \
+        break; \
+    }\
+}
+
+gint32 CRpcServices::RunManagedParaTask(
+    TaskletPtr& pTask )
+{
+    if( pTask.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        TaskGrpPtr pRoot = GetTaskGroup();
+        if( pRoot.IsEmpty() ) 
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        TaskletPtr pTail;
+        bool bTail = false;
+
+        CStdRTMutex oRootLock( pRoot->GetLock() );
+
+        CHECK_ROOTGRP;
+
+        guint32 dwCount = pRoot->GetTaskCount();
+        ret = pRoot->GetTailTask( pTail );
+
+        stdrtmutex* pParaLock = nullptr;
+        CIfParallelTaskGrp* pParaGrp = nullptr;
+        if( SUCCEEDED( ret ) )
+        {
+            pParaGrp = pTail;
+            if( pParaGrp != nullptr )
+                bTail = true;
+        }
+
+        if( bTail )
+        {
+            oRootLock.Unlock();
+            pParaLock = &pParaGrp->GetLock();
+            pParaLock->lock();
+            EnumTaskState iTaskState =
+                pParaGrp->GetTaskState();
+            if( pParaGrp->IsStopped( iTaskState ) )
+            {
+                // the group has stopped
+                bTail = false;
+                oRootLock.Lock();
+                pParaLock->unlock();
+                // recheck if the taskgroup
+                // changed during the period the
+                // lock is released
+                dwCount = pRoot->GetTaskCount();
+                TaskletPtr pTail1;
+                ret = pRoot->GetTailTask( pTail1 );
+                if( SUCCEEDED( ret ) )
+                {
+                    if( pTail1 != pTail )
+                    {
+                        // something changed
+                        pParaGrp = pTail1;
+                        if( pParaGrp != nullptr )
+                            continue;
+                        // a non-paragrp added
+                        // fall through
+                    }
+                }
+                else
+                {
+                    ret = 0;
+                }
+            }
+        }
+
+        TaskletPtr pParaTask;
+        if( bTail )
+        {
+            pParaTask = pTail;
+        }
+        else
+        {
+            // add a new parallel task group
+            CCfgOpener oCfg;
+
+            ret = oCfg.SetObjPtr(
+                propIfPtr, ObjPtr( this ) );
+
+            if( ERROR( ret  ) )
+                break;
+
+            ret = pParaTask.NewObj(   
+                clsid( CIfParallelTaskGrp ),
+                oCfg.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+                
+            ret = pRoot->AppendTask( pParaTask );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( ret, "Fatal error, "
+                "can not add parallel task group" );
+                break;
+            }
+
+            pParaGrp = pParaTask;
+            oRootLock.Unlock();
+
+            pParaLock= &pParaGrp->GetLock();
+            pParaLock->lock();
+
+            EnumTaskState iTaskState =
+                pParaGrp->GetTaskState();
+
+            if( pParaGrp->IsStopped( iTaskState ) )
+            {
+                pParaLock->unlock();
+                continue;
+            }
+        }
+
+        CStdRMutex oIfLock( this->GetLock() );
+        if( this->GetState() == stateStopped )
+        {
+            pParaLock->unlock();
+            ret = ERROR_STATE;
+            break;
+        }
+
+        bool bRunning = pParaGrp->IsRunning();
+
+        // add the task to the pending queue or run it
+        // immediately
+        //
+        // running  dwcount
+        //  0       0       run root
+        //  0       1       pending
+        //  1       0       error
+        //  1       1       run root
+        ret = pParaGrp->AppendTask( pTask );
+        if( ERROR( ret ) )
+        {
+            pParaLock->unlock();
+            break;
+        }
+
+        CIfRetryTask* pRetryTask = pTask;
+        if( unlikely( pRetryTask == nullptr ) )
+        {
+            pParaLock->unlock();
+            ret = -EFAULT;
+            break;
+        }
+
+        if( dwCount > 0 && bRunning )
+        {
+            pParaLock->unlock();
+            oIfLock.Unlock();
+
+            ( *pParaGrp )( eventZero );
+            ret = pTask->GetError();
+            if( ret == STATUS_PENDING )
+            {
+                // in case the para group is
+                // running on other thread.
+                pTask->MarkPending();
+            }
+            ret = 0;
+        }
+        else if( dwCount == 0 && !bRunning )
+        {
+            pParaLock->unlock();
+            oIfLock.Unlock();
+
+            ( *pRoot )( eventZero );
+            ret = pTask->GetError();
+            if( ret == STATUS_PENDING )
+                pTask->MarkPending();
+            ret = 0;
+        }
+        else if( dwCount > 0 && !bRunning )
+        {
+            pTask->MarkPending();
+            pParaLock->unlock();
+            ret = 0;
+
+            DebugPrintEx( logInfo, GetTid(),
+                "root task not run immediately, dwCount=%d, bRunning=%d",
+                dwCount, bRunning );
+        }
+        else // if( dwCount == 0 && bRunning )
+        {
+            pParaLock->unlock();
+            ret = ERROR_STATE;
+            DebugPrint( GetTid(),
+                "root task is in wrong state, dwCount=%d, bRunning=%d",
+                dwCount, bRunning );
+        }
+        break;
+
+    }while( 1 );
+    return ret;
+}
+
 // a helper for deferred task to run in the
 // interface's taskgroup
 gint32 CRpcServices::RunManagedTask(
     IEventSink* pTask,
     const bool& bRoot )
 {
-    if( pTask == nullptr )
-        return -EINVAL;
-
-    TaskletPtr ptrTask(
-        ( CTasklet* )pTask );
-
-    if( ptrTask.IsEmpty() )
-        return -EINVAL;
-
     gint32 ret = 0;
-    if( bRoot )
-    {
-        ret = AppendAndRun( ptrTask );
-    }
-    else
-    {
-        ret = AddAndRun( ptrTask );
-    }
+    do{
+        if( pTask == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        TaskletPtr ptrTask(
+            ( CTasklet* )pTask );
+
+        if( ptrTask.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        TaskGrpPtr pRoot;
+        bool bRun = true;
+        if( likely( !bRoot ) )
+            ret = RunManagedParaTask( ptrTask );
+        else do{
+            pRoot = GetTaskGroup();
+            if( pRoot.IsEmpty() )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+            // add to root group
+            CStdRTMutex oTaskLock( pRoot->GetLock() );
+            CStdRMutex oIfLock( this->GetLock() );
+            if( this->GetState() == stateStopped )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+            CHECK_ROOTGRP;
+            if( pRoot->GetTaskCount() > 0 ||
+                pRoot->IsNoSched() )
+            {
+                bRun = false;
+                ptrTask->MarkPending();
+            }
+
+            ret = pRoot->AppendTask( ptrTask );
+            if( ERROR( ret ) )
+                break;
+
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+            if( bRun )
+            {
+                ret = ( *pRoot )( eventZero );
+                if( ret == STATUS_PENDING )
+                    ret = 0;
+            }
+            break;
+
+        }while( 1 );
+
+    }while( 0 );
+    
+    if( ERROR( ret ) )
+        DebugPrintEx( logWarning, ret,
+            "RunManagedTask failed" );
     
     return ret;
 }
@@ -5158,9 +5448,7 @@ gint32 CRpcServices::AddSeqTaskInternal(
     TaskletPtr& pTask,
     bool bLong )
 {
-    if( GetState() == stateStopped )
-        return ERROR_STATE;
-    return AddSeqTaskTempl(
+    return AddSeqTaskIf(
         this, pQueuedTasks, pTask, bLong );
 }
 
@@ -5921,7 +6209,7 @@ gint32 CInterfaceProxy::CancelReqAsync(
             break;
 
         CDeferredFuncCallBase< CIfRetryTask >* pCall = pTask;
-        ObjPtr pObj( pCall );
+        ObjPtr pObj( pWrapper );
         Variant oArg0( pObj );
         pCall->UpdateParamAt( 0, oArg0 );
 

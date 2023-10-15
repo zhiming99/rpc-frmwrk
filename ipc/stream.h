@@ -41,16 +41,11 @@ struct IStream
     UXSTREAM_MAP m_mapUxStreams;
     CRpcServices* m_pSvc = nullptr;
     bool    m_bNonSockStm = false;
+    ObjPtr  m_pSeqTgMgr;
 
     virtual gint32 CanContinue() = 0;
 
-    inline void SetInterface( CRpcServices* pSvc )
-    {
-        m_pSvc = pSvc;
-        CCfgOpenerObj oCfg( pSvc );
-        oCfg.GetBoolProp(
-            propNonSockStm, m_bNonSockStm );
-    }
+    void SetInterface( CRpcServices* pSvc );
 
     inline CRpcServices* GetInterface() const
     { return m_pSvc; }
@@ -210,6 +205,9 @@ struct IStream
     gint32 CreateSocket(
         int& fdlocal, int& fdRemote );
 
+    gint32 OnPreStopSharedParallel(
+        IEventSink* pCallback );
+
     gint32 OnPreStopShared(
         IEventSink* pCallback );
 
@@ -221,6 +219,22 @@ struct IStream
     
     inline bool IsNonSockStm() const
     { return m_bNonSockStm; }
+
+    ObjPtr GetSeqTgMgr();
+
+    gint32 AddStartTask(
+        HANDLE hChannel, TaskletPtr& pTask );
+
+    gint32 AddStopTask(
+        IEventSink* pCallback,
+        HANDLE hChannel,
+        TaskletPtr& pTask );
+
+    gint32 AddSeqTask2(
+        HANDLE hChannel, TaskletPtr& pTask );
+
+    gint32 StopSeqTgMgr(
+        IEventSink* pCallback );
 };
 
 struct IStreamServer : public IStream
@@ -309,9 +323,9 @@ class CStreamProxy :
             hChannel, byToken, pBuf );
     }
 
-    virtual gint32 OnClose(
+    gint32 OnClose(
         HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+        IEventSink* pCallback = nullptr ) override
     {
         return IStream::OnClose(
             hChannel, pCallback );
@@ -356,7 +370,7 @@ class CStreamServer :
 
     virtual gint32 OnPreStop( IEventSink* pCallback )
     {
-        return OnPreStopShared( pCallback );
+        return OnPreStopSharedParallel( pCallback );
     }
 
     virtual gint32 AcceptNewStream(
@@ -390,9 +404,9 @@ class CStreamServer :
             hChannel, byToken, pBuf );
     }
 
-    virtual gint32 OnClose(
+    gint32 OnClose(
         HANDLE hChannel,
-        IEventSink* pCallback = nullptr )
+        IEventSink* pCallback = nullptr ) override
     {
         return IStream::OnClose(
             hChannel, pCallback );
@@ -422,12 +436,12 @@ class CIfStartUxSockStmTask :
     public:
     typedef CIfInterceptTaskProxy super;
 
-    CIfStartUxSockStmTask( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CIfStartUxSockStmTask ) ); }
+    CIfStartUxSockStmTask( const IConfigDb* pCfg );
+    ~CIfStartUxSockStmTask();
 
-    gint32 RunTask();
-    gint32 OnTaskComplete( gint32 iRet );
+    gint32 RunTask() override;
+    gint32 OnTaskComplete( gint32 iRet ) override;
+    gint32 OnCancel( guint32 dwContext ) override;
 };
 
 class CIfStopUxSockStmTask :

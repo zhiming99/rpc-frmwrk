@@ -47,9 +47,6 @@ class CStreamServerRelayMH :
     gint32 ResumePreStop( IEventSink* pCallback )
     {   return super::OnPreStop( pCallback ); }
 
-    protected:
-    gint32 OnPreStop( IEventSink* pCallback );
-
     public:
     typedef CStreamRelayBase< CStreamServer > super;
 
@@ -135,6 +132,8 @@ class CStreamServerRelayMH :
     gint32 OnConnected( HANDLE hChannel ) override
     { return 0; }
 
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
 };
 
 /**
