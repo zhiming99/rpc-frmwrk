@@ -5443,6 +5443,19 @@ gint32 CRpcServices::RunManagedTask(
     return ret;
 }
 
+gint32 CRpcServices::RunManagedTask2(
+    IEventSink* pTask,
+    const bool& bRoot )
+{
+    gint32 ret = RunManagedTask( pTask, bRoot );
+    if( ERROR( ret ) && pTask != nullptr )
+    {
+        TaskletPtr ptrTask( pTask );
+        ( *ptrTask )( eventCancelTask );
+    }
+    return ret;
+}
+
 gint32 CRpcServices::AddSeqTaskInternal(
     TaskGrpPtr& pQueuedTasks,
     TaskletPtr& pTask,
