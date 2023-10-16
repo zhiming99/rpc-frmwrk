@@ -5449,10 +5449,8 @@ gint32 CRpcServices::RunManagedTask2(
 {
     gint32 ret = RunManagedTask( pTask, bRoot );
     if( ERROR( ret ) && pTask != nullptr )
-    {
-        TaskletPtr ptrTask( pTask );
-        ( *ptrTask )( eventCancelTask );
-    }
+        pTask->OnEvent( eventCancelTask,
+            -ECANCELED, 0, nullptr );
     return ret;
 }
 
