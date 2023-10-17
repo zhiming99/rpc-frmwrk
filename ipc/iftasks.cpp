@@ -104,7 +104,7 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
 
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
-            &CRpcServices::RunManagedTask,
+            &CRpcServices::RunManagedTask2,
             pTask, false );
 
         break;

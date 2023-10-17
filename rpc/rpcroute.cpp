@@ -1134,24 +1134,6 @@ gint32 CRouterStartReqFwdrProxyTask::
             // something wrong, don't move further
             pIf->RemoveInterface( pMatch );
             ret = -ret;
-            break;
-        }
-        else if( ERROR( ret ) )
-        {
-            break;
-        }
-
-        break;
-        // in case the transaction failed
-        TaskletPtr pRbTask;
-        ret = pRouter->BuildStartStopReqFwdrProxy(
-            pMatch, false, pRbTask );
-
-        if( SUCCEEDED( ret ) )
-        {
-            // it won't run if all the whole
-            // tasks succeeds
-            AddRollbackTask( pRbTask );
         }
 
     }while( 0 );
@@ -4941,16 +4923,6 @@ gint32 CRouterEnableEventRelayTask::OnTaskComplete(
             pProxy = pIf;
         }
 
-        break;
-        // in case somewhere the transaction failed,
-        // add a rollback task
-        TaskletPtr pRbTask;
-        ret = pRouter->BuildEventRelayTask(
-            pMatch, false, pRbTask );
-
-        if( SUCCEEDED( ret ) )
-            AddRollbackTask( pRbTask );
-
     }while( 0 );
 
     oParams.ClearParams();
@@ -4994,20 +4966,7 @@ gint32 CRouterAddRemoteMatchTask::AddRemoteMatchInternal(
                 // stop further actions in this
                 // transaction
                 ChangeRelation( logicOR );
-                break;
             }
-            else if( ERROR( ret ) )
-                break;
-
-            break;
-            // in case the rest transaction failed
-            // add a rollback task
-            TaskletPtr pRbTask;
-            ret = pRouter->BuildAddMatchTask(
-                pMatch, false, pRbTask );
-
-            if( SUCCEEDED( ret ) )
-                AddRollbackTask( pRbTask );
         }
         else
         {
