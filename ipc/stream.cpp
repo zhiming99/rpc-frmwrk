@@ -35,9 +35,6 @@
 namespace rpcf
 {
 
-ObjPtr IStream::GetSeqTgMgr()
-{ return m_pSeqTgMgr; }
-
 void IStream::SetInterface( CRpcServices* pSvc )
 {
     m_pSvc = pSvc;
@@ -56,6 +53,9 @@ void IStream::SetInterface( CRpcServices* pSvc )
     CStmSeqTgMgr* pSeqMgr = GetSeqTgMgr();
     pSeqMgr->SetParent( GetInterface() );
 }
+
+ObjPtr IStream::GetSeqTgMgr()
+{ return m_pSeqTgMgr; }
 
 gint32 IStream::AddStartTask(
     HANDLE hChannel, TaskletPtr& pTask )
@@ -1463,7 +1463,7 @@ gint32 IStream::CloseChannel(
 
         if( ERROR( ret ) )
         {
-            DebugPrint( ret,
+            DebugPrintEx( logInfo, ret,
                 "Error OnClose failed to add stoptask for 0x%llx @state=%d",
                 pSvc, pThisIf->GetState() );
             ( *pStopTask )( eventCancelTask );
@@ -1804,5 +1804,19 @@ gint32 GetObjIdHash(
 
     return 0;
 }
+
+template<>
+bool IsKeyInvalid( const HANDLE& key )
+{ return key == INVALID_HANDLE; }
+
+template<>
+bool IsKeyInvalid( const stdstr& key )
+{ return key.empty(); }
+
+#ifdef BUILD_64
+template<>
+bool IsKeyInvalid( const guint32& key )
+{ return ( key == 0 || key == ( guint32 )-1 ); }
+#endif
 
 }
