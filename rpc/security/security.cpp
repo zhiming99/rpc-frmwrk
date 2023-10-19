@@ -3848,7 +3848,7 @@ gint32 CRpcRouterBridgeAuth::OnPostStart(
         CIfRetryTask* pGrp = pTransGrp;
         pGrp->SetClientNotify( pRespCb );
         TaskletPtr pTask( pGrp );
-        ret = AddSeqTask( pTask );
+        ret = GetIoMgr()->RescheduleTask( pTask );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
         
