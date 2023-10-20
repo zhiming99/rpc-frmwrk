@@ -436,11 +436,11 @@ struct CSeqTaskGrpMgr : public CObjBase
                         eventTaskComp, ret, 0, nullptr );
                     return ret;
                 });
-                TaskletPtr pWrapper;
-                NEW_COMPLETE_FUNCALL( 0, pWrapper,
+                TaskletPtr pNotify;
+                NEW_COMPLETE_FUNCALL( 0, pNotify,
                     pMgr, func1, nullptr, pCallback,
                     ObjPtr( this ) );
-                pRetry->SetClientNotify( pWrapper );
+                pRetry->SetClientNotify( pNotify );
             }
             else
             {

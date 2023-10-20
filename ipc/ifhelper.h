@@ -4075,8 +4075,8 @@ class CTaskWrapper :
             ( IConfigDb* )oCfg.GetCfg() ); \
         if( ERROR( ret ) ) \
             break; \
-        CTaskWrapper* pWrapper = ptw;\
-        pWrapper->SetCompleteTask( __pTask ); \
+        CTaskWrapper* __pWrapper = ptw;\
+        __pWrapper->SetCompleteTask( __pTask ); \
         __pTask = ptw; \
         Variant oVar( __pTask ); \
         pDefer->UpdateParamAt( _pos, oVar );  \
