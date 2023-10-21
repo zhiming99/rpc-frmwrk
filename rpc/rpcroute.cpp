@@ -1045,7 +1045,7 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
         mapId2Proxies = m_mapPid2BdgeProxies;
         m_mapPid2BdgeProxies.clear();
         mapId2Server = m_mapPortId2Bdge;
-        m_mapPortId2Bdge.clear();
+        //m_mapPortId2Bdge.clear();
         mapReqProxies = m_mapReqProxies;
         m_mapReqProxies.clear();
 
@@ -1152,6 +1152,7 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
             ( *pTopGrp )( eventCancelTask );
             break;
         }
+        ret = STATUS_PENDING;
 
     }while( 0 );
 
@@ -2140,7 +2141,10 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
             {
                 ret = GetBridgeProxy( dwPortId, pIf );
                 if( ERROR( ret ) )
+                {
+                    // possibly from CKdcRelayPdo
                     break;
+                }
                 bBridge = false;
             }
 
@@ -2154,7 +2158,21 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
 
             if( bBridge && strPath == "/" )
             {
-                ret = this->AddStopTask( nullptr,
+                CCfgOpener oCtx( pEvtCtx );
+
+                IEventSink* pCb = nullptr;
+                ObjPtr pObj;
+                ret = oCtx.GetObjPtr(
+                    propEventSink, pObj );
+
+                if( SUCCEEDED( ret ) )
+                {
+                    pCb = pObj;
+                    oCtx.RemoveProperty(
+                        propEventSink );
+                }
+
+                ret = this->AddStopTask( pCb,
                     dwPortId, pDeferTask );
             }
             else if( bBridge )
@@ -2919,7 +2937,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
     TaskGrpPtr pTaskGrp;
     InterfPtr pIf;
     do{
-        if( !IsConnected() )
+        if( GetState() == stateStopped )
         {
             ret = ERROR_STATE;
             break;
@@ -4097,13 +4115,16 @@ gint32 CRpcRouterBridge::OnClose(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
+    CCfgOpener oEvtCtx;
     do{
-        CCfgOpener oEvtCtx;
         oEvtCtx[ propRouterPath ] =
             std::string( "/" );
 
         oEvtCtx[ propConnHandle ] =
             dwPortId;
+
+        oEvtCtx[ propEventSink ] =
+            ObjPtr( pCallback );
 
         InterfPtr pIf;
         ret = GetBridge( dwPortId, pIf );
