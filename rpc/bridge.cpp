@@ -2787,6 +2787,14 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
         if( ERROR( ret ) )
             break;
 
+        Variant oVar;
+        ret = this->GetProperty(
+            propPortId, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = oVar;
+
         for( auto pObj : vecMatches )
         {
             MatchPtr pMatch( pObj );
@@ -2794,7 +2802,8 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
                 ( CObjBase* )pObj );
             MatchPtr pRmtMatch;
 
-            oMatch.CopyProp( propPortId, this );
+            oMatch.SetIntProp(
+                propPortId, dwPortId );
 
             ret = pRouter->GetMatchToAdd(
                 pMatch, true, pRmtMatch );
@@ -2826,7 +2835,9 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
         }
 
         TaskletPtr pGrpTask = pTaskGrp;
-        ret = pRouter->AddSeqTask( pGrpTask, false );
+        ret = pRouter->AddSeqTask2(
+            dwPortId, pGrpTask );
+
         if( ERROR( ret ) )
         {
             ( *pGrpTask )( eventCancelTask );
@@ -4171,7 +4182,8 @@ gint32 CRpcTcpBridge::ForwardRequestInternal(
 
         if( bSeqTask )
         {
-            ret = pRouter->AddSeqTask( pTask );
+            ret = pRouter->AddSeqTask2(
+                dwPortId, pTask );
             if( ERROR( ret ) )
             {
                 ( *pTask )( eventCancelTask );
