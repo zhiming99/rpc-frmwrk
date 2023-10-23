@@ -268,6 +268,7 @@ enum EnumPropId : gint32
     propNonSockStm,     // type: a boolean value indicate whether to use non-sock stream
     propKProxy,         // type: a boolean value indicate whether the builtin-app serve as a kinit proxy
     propSeqTgMgr,       // type: a boolean value indicate whether the stream uses sequential taskgroup manager
+    propBuiltinRt,      // type: a boolean value indicate whether or not this app has builtin-router
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
