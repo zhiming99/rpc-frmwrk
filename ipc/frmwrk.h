@@ -670,6 +670,8 @@ class CIoManager : public IService
 
     inline CIoManager* GetIoMgr()
     { return this; }
+
+    bool HasBuiltinRt();
 };
 
 template<>

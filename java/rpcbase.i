@@ -1117,16 +1117,19 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
         {
             // built-in router enabled
             OpenThisLib();
-            guint32 dwNumThrds =
-                ( guint32 )std::max( 1U,
-                std::thread::hardware_concurrency() );
-            oCfg[ propMaxTaskThrd ] = dwNumThrds;
-            oCfg[ propMaxIrpThrd ] = 0;
 
             guint32 dwRole = 1;
             oCfg.GetIntProp( 101, dwRole );
             oCfg.RemoveProperty( 101 );
             
+            guint32 dwNumThrds = 4;
+            if( dwRole & 2 )
+                dwNumThrds = ( guint32 )std::max( 1U,
+                    std::thread::hardware_concurrency() );
+
+            oCfg[ propMaxTaskThrd ] = dwNumThrds;
+            oCfg[ propMaxIrpThrd ] = 0;
+
             bool bAuth = false;
             if( oCfg.exist( 102 ) )
             {
@@ -1215,11 +1218,13 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg )
             CIoManager* pMgr = *pObj;
             pMgr->SetCmdLineOpt(
                 propRouterRole, dwRole );
+            pMgr->SetCmdLineOpt(
+                propBuiltinRt, true );
             ret = pMgr->Start();
             if( ERROR( ret ) )
                 break;
 
-            if( dwRole == 1 && bAuth && bKProxy )
+            if( ( dwRole & 1 ) && bAuth && bKProxy )
             {
                 pMgr->SetCmdLineOpt(
                     propKProxy, true );

@@ -145,6 +145,7 @@ def SyncCfg() :
     srcPath = '@SRCCFG@'
     destPath= 'XXXDESTDIR'
     destObjs=[XXXOBJLIST]
+    bBuiltinRt=XXXBUILTINRT
 
     destPath = os.path.dirname(os.path.realpath(__file__)) + "/" + destPath
     try:
@@ -194,6 +195,12 @@ def SyncCfg() :
                     elem[ 'DestURL' ] = srcCfgs[ 'DestURL' ]
                 elif 'DestURL' in elem :
                     del elem[ 'DestURL' ]
+
+                if( 'PortClass' in elem and 
+                    elem[ 'PortClass' ] == 'DBusLocalPdo' and
+                    bBuiltinRt ):
+                    elem[ 'PortClass' ] = 'DBusLoopbackPdo2'
+
                 bChanged = True
 
         if bChanged : 

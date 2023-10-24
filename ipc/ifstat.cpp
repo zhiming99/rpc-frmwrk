@@ -1266,4 +1266,28 @@ gint32 CIfReqFwdrPrxyState::SubscribeEvents()
         vecEvtToSubscribe );
 }
 
+gint32 CIfReqFwdrPrxyState::SetupOpenPortParams(
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        CIoManager* pMgr = GetIoMgr();
+        if( !pMgr->HasBuiltinRt() )
+            break;
+        guint32 dwRole = 0;
+        pMgr->GetCmdLineOpt(
+            propRouterRole, dwRole );
+        if( dwRole & 2 )
+        {
+            // replace dbuslocalpdo with
+            // dbusloopbackpdo2 on the bridge side 
+            oCfg.SetStrProp( propPortClass,
+                PORT_CLASS_LOOPBACK_PDO2 );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 }

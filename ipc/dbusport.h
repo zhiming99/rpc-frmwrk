@@ -809,13 +809,14 @@ class CDBusLoopbackPdo : public CRpcPdoPort
 
     typedef CRpcPdoPort super;
 
-    CDBusLoopbackPdo (
+    CDBusLoopbackPdo(
         const IConfigDb* pCfg );
 
     ~CDBusLoopbackPdo();
 
-    virtual gint32 SendDBusMsg(
-        DBusMessage* pMsg, guint32* pdwSerial );
+    gint32 SendDBusMsg(
+        DBusMessage* pMsg,
+        guint32* pdwSerial ) override;
 
     virtual DBusHandlerResult PreDispatchMsg(
         gint32 iMsgType, DBusMessage* pMsg );
@@ -824,6 +825,30 @@ class CDBusLoopbackPdo : public CRpcPdoPort
     { return false; }
 
     gint32 SubmitIoctlCmd( IRP* pIrp );
+};
+
+class CDBusLoopbackPdo2 : public CDBusLoopbackPdo
+{
+    // registered objects on the dbus
+    std::map< std::string, gint32 > m_mapRegObjs;
+
+    public:
+    typedef CDBusLoopbackPdo super;
+
+    CDBusLoopbackPdo2(
+        const IConfigDb* pCfg )
+        : super( pCfg )
+   { SetClassId( clsid( CDBusLoopbackPdo2 ) ); }
+
+    gint32 SendDBusMsg(
+        DBusMessage* pMsg,
+        guint32* pdwSerial ) override;
+
+    gint32 SetupDBusSetting(
+        IMessageMatch* pMatch ) override;
+
+    gint32 ClearDBusSetting(
+        IMessageMatch* pMatch ) override;
 };
 
 struct CStartStopPdoCtx
@@ -1759,6 +1784,7 @@ class CDBusBusPort : public CGenericBusPortEx
     // local port attached to this bus
     gint32              m_iLocalPortId;
     gint32              m_iLpbkPortId;
+    gint32              m_iLpbkPortId2;
 
     // proxy port attached to this bus
     std::vector<gint32> m_vecProxyPortIds;

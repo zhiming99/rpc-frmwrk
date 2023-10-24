@@ -48,6 +48,7 @@ namespace rpcf
 #define PORT_CLASS_LOCALDBUS            "DBusBusPort"
 #define PORT_CLASS_RPC_TCPBUS           "RpcTcpBusPort"
 #define PORT_CLASS_LOOPBACK_PDO         "DBusLoopbackPdo"
+#define PORT_CLASS_LOOPBACK_PDO2        "DBusLoopbackPdo2"
 #define PORT_CLASS_UXSOCK_BUS           "UnixSockBusPort"
 #define PORT_CLASS_UXSOCK_STM_PDO       "UnixSockStmPdo"
 #define PORT_CLASS_DBUS_PROXY_PDO_LPBK  "DBusProxyPdoLpbk"
@@ -55,7 +56,7 @@ namespace rpcf
 #define PORT_CLASS_DBUS_STREAM_PDO      "DBusStreamPdo"
 #define PORT_CLASS_OPENSSL_FIDO         "RpcOpenSSLFido"
 #define PORT_CLASS_GMSSL_FIDO           "RpcGmSSLFido"
-#define PORT_CLASS_STMCP_PDO         "StmCpPdo"
+#define PORT_CLASS_STMCP_PDO            "StmCpPdo"
 
 // registry path for event subscription from the
 // IoManager

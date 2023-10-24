@@ -339,6 +339,8 @@ gint32 InitContext()
         CIoManager* pSvc = g_pIoMgr;
         pSvc->SetCmdLineOpt(
             propRouterRole, 1 );
+        pSvc->SetCmdLineOpt(
+            propBuiltinRt, true );
         ret = pSvc->Start();
         if( ERROR( ret ) )
         {

@@ -348,6 +348,7 @@ typedef enum : guint32
     DECL_CLSID( CThreadPools ),
     DECL_CLSID( CStmSeqTgMgr ),
     DECL_CLSID( CRouterSeqTgMgr ),
+    DECL_CLSID( CDBusLoopbackPdo2 ),
     DECL_CLSID( MaxClsid ),
 
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,

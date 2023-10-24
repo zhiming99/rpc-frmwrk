@@ -1457,6 +1457,8 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                     }
                     iClsid = clsid(
                     CRpcReqForwarderProxyAuthImpl );
+                    oIfParams[ propPortClass ] =
+                        PORT_CLASS_LOOPBACK_PDO2;
                 }
 
                 ret = pIf.NewObj( iClsid,
