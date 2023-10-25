@@ -7155,7 +7155,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
                 INDENT_UPL;
                 Wa( "{" );
                 Wa( "    fprintf( stderr," );
-                Wa( "        \"Error '-k' are not available in this build\\n\" );" );
+                Wa( "        \"Error '-k' and '-l' are not available in this build\\n\" );" );
                 Wa( "    ret = -EINVAL;" );
                 Wa( "    break;" );
                 CCOUT << "}";
@@ -7231,8 +7231,9 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "if( !g_bAuth && g_bKProxy )" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr," );
-            Wa( "    \"Error '-k' is only valid with '-a' option.\\n\" );" );
-            CCOUT << "ret = -EINVAL;";
+            Wa( "    \"Error '-k' and '-l' are only valid with '-a' option.\\n\" );" );
+            Wa( "ret = -EINVAL;" );
+            CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
         }
