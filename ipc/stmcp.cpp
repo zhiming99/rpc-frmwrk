@@ -840,12 +840,14 @@ gint32 CStmCpPdo::PostStart( IRP* pIrp )
 }
 
 gint32 CStreamQueue::RescheduleTask(
-    TaskletPtr pTask )
+    TaskletPtr& pTask )
 {
     if( pTask.IsEmpty() )
         return -EINVAL;
     CIoManager* pMgr =
         GetParent()->GetIoMgr();
+
+    return pMgr->RescheduleTask( pTask );
     
     CThreadPools& oPools =
         pMgr->GetThreadPools();

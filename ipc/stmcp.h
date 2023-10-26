@@ -91,7 +91,7 @@ public:
     inline void SetLoop( MloopPtr pLoop )
     { m_pLoop = pLoop; }
 
-    gint32 RescheduleTask( TaskletPtr pTask );
+    gint32 RescheduleTask( TaskletPtr& pTask );
 };
 
 class CStmConnPoint : public IService

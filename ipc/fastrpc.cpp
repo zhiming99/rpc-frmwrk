@@ -412,31 +412,31 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
         if( ERROR( ret ) )
             break;
 
-        CIfParallelTaskGrpRfc* pGrpRfc =
-            pIf->GetGrpRfc();
+        TaskGrpPtr pGrp = pIf->GetGrpRfc();
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
 
-        bool bQueFull = false;
-        ret = pGrpRfc->IsQueueFull( bQueFull );
-        if( ERROR( ret ) )
-            break;
-
-        if( bQueFull )
+        bool bFull = false;
+        if( true )
         {
-            CStdRTMutex oTaskLock( pGrpRfc->GetLock() );
-            CStdRMutex oIfLock( pIf->GetLock() );
+            CStdRTMutex oTaskLock(
+                pGrpRfc->GetLock() );
 
-            pGrpRfc->IsQueueFull( bQueFull );
-            if( bQueFull )
+            ret = pGrpRfc->IsQueueFull( bFull );
+            if( ERROR( ret ) )
+                break;
+            if( bFull )
             {
+                CStdRMutex oIfLock( pIf->GetLock() );
                 ret = pIf->QueueStartTask(
                     pTask, pMatch );            
                 break;
             }
+            pGrpRfc->AppendTask( pTask );
         }
 
         // add an concurrent task, and run it
         // directly.
-        ret = pIf->AddAndRun( pTask, true );
+        ret = ( *pGrpRfc )( eventZero );
         if( ERROR( ret ) )
         {
             DebugPrint( ret,

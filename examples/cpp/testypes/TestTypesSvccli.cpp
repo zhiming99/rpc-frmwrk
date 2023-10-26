@@ -9,6 +9,7 @@ using namespace rpcf;
 #include "TestTypes.h"
 #include "TestTypesSvccli.h"
 
+extern sem_t  semPendings;
 /* Async callback handler */
 gint32 CTestTypesSvc_CliImpl::Echo3Callback( 
     IConfigDb* context, gint32 iRet,
@@ -25,20 +26,21 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
         auto& count = *( ( std::atomic< int >* )val1);
         auto& failures = *( ( std::atomic< int >* )val2);
         
-        idx++;
+        int iIdx = idx++;
         if( SUCCEEDED( iRet ) )
         {
             OutputMsg( 0,
                 "Server resp( %d ): %s",
-                idx.load(), strResp.c_str() );
+                iIdx, strResp.c_str() );
         }
         else if( ERROR( iRet ) )
         {
             failures++;
             OutputMsg( iRet,
-                "Server resp( %d ): failed",
-                failures.load() );
+                "Server resp( %d ): failure %d",
+                iIdx, failures.load() );
         }
+        Sem_Post( &semPendings );
         if( --count == 0 )
         {
             CSyncCallback* pSync = nullptr;
