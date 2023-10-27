@@ -513,7 +513,7 @@ int _main( int argc, char** argv )
 //-----Your code begins here---
 
 #define MAX_PENDINGS STM_MAX_PACKETS_REPORT
-#define MAX_REQS 10000
+#define MAX_REQS 1000
 
 std::atomic< int > idx( 0 );
 std::atomic< int > count( MAX_REQS );
