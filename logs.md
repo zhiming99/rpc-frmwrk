@@ -1,4 +1,8 @@
 ---
+[`Sat Oct 28 2023 05:41:32 PM Beijing`]   
+1. Merged pull request #27 to the master branch
+2. Bumped `rpc-frmwrk` version to 0.6.0. Congratulations!
+
 [`Sun Oct 15 2023 09:53:43 PM Beijing`]   
 1. Having merged pull request #22 to the master branch.
 2. We still have a few issues (see issues) to fix before preceeding with new features development.
