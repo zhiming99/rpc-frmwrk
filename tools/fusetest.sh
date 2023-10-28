@@ -37,7 +37,7 @@ function stressTest()
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
+/bin/bash << RUNCLIENT > $basedir/logdump.txt
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
@@ -97,7 +97,7 @@ function mkDirTest()
     pydir=$basedir/fuse/examples/python
     python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
 
-/bin/bash << RUNCLIENT |& tee -a $basedir/logdump.txt
+/bin/bash << RUNCLIENT > $basedir/logdump.txt
 function singleMkdir()
 {
     idx=0
@@ -153,20 +153,44 @@ RUNCLIENT
 echo testing normal RPC
 echo $bin_dir/ridlc -f -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -f -O ./testdir ../testypes.ridl
-echo stressTest normal
+echo start stressTest normal...
 stressTest
+
+echo Check errors in logdump.txt...
+if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+    echo errors found!
+    cat $basedir/logdump.txt 
+    exit 1
+fi
+echo stressTest normal passed!
 
 echo testing RPC-over-stream
 echo $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -sf -O ./testdir ../testypes.ridl
-echo stressTest ROS
+echo start stressTest ROS...
 stressTest
+
+echo Check errors in logdump.txt...
+if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+    echo errors found!
+    cat $basedir/logdump.txt 
+    exit 1
+fi
+echo stressTest ROS passed!
 
 echo testing normal RPC via shared library
 echo $bin_dir/ridlc -lf -O ./testdir ../testypes.ridl
 $bin_dir/ridlc -lf -O ./testdir ../testypes.ridl
-echo mkDirTest normal
+echo start mkDirTest normal
 mkDirTest
+
+echo Check errors in logdump.txt...
+if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+    echo errors found!
+    cat $basedir/logdump.txt 
+    exit 1
+fi
+echo mkDirTest normal passed!
 
 echo testing RPC-over-stream via shared library
 echo $bin_dir/ridlc -lsf -O ./testdir ../testypes.ridl
@@ -177,9 +201,10 @@ mkDirTest
 echo Check errors in logdump.txt...
 if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
     echo errors found!
+    cat $basedir/logdump.txt 
     exit 1
 fi
-echo Check passed!
+echo mkDirTest ROS passed!
 
 function pytest()
 {

@@ -267,6 +267,7 @@ gint32 CIfStartRecvMsgTask2::HandleIncomingMsg2(
         if( ERROR( ret ) )
             break;
 
+        pTask->MarkPending();
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
             &CFastRpcSkelSvrBase::AddAndRunInvTask,
@@ -436,11 +437,12 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
                 break;
 
             pPara = ( ObjPtr& )oVar;
-            pPara->AppendTask( pTask );
+            ret = pPara->AppendTask( pTask );
+            if( ERROR( ret ) )
+                break;
         }
 
-        // add an concurrent task, and run it
-        // directly.
+        // add the task to concurrent taskgrp
         ret = ( *pPara )( eventZero );
         if( ERROR( ret ) )
         {
