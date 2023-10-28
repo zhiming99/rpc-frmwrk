@@ -1959,6 +1959,25 @@ CDBusBusPort::OnLpbkMsgArrival(
             return DBUS_HANDLER_RESULT_HANDLED;
     }
 
+    if( iType == DBUS_MESSAGE_TYPE_METHOD_CALL &&
+        ret == -ENOENT )
+    {
+        // reply with dbus error
+        DebugPrint( GetPortState(),
+            "Error cannot find irp for request message\n%s\n, port=%s, 0x%x",
+            ptrMsg.DumpMsg().c_str(),
+            CoGetClassName( GetClsid() ), 
+            ( LONGWORD )this );
+    }
+    else if( iType == DBUS_MESSAGE_TYPE_METHOD_RETURN &&
+        ret == -ENOENT )
+    {
+        DebugPrint( GetPortState(),
+            "Error cannot find irp for response message\n%s\n, port=%s, 0x%x",
+            ptrMsg.DumpMsg().c_str(),
+            CoGetClassName( GetClsid() ), 
+            ( LONGWORD )this );
+    }
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 

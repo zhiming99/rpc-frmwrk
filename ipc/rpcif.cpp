@@ -3101,6 +3101,35 @@ gint32 CInterfaceProxy::SendFetch_Proxy(
 
             oBuilder.CopyProp( propNonFd, pDataDesc );
 
+            // load the FetchData specific timeout
+            CReqOpener oReq1( pDataDesc );
+            CReqOpener oReq2( oBuilder.GetCfg() );
+
+            guint32 dwVal = 0;
+            bool bChange = true;
+            ret = oReq1.GetTimeoutSec( dwVal );
+            if( ERROR( ret ) )
+            {
+                bChange = false;
+                oReq2.GetTimeoutSec( dwVal );
+            }
+            else if( unlikely( dwVal >= 3600 ) )
+            {
+                dwVal = 3600;
+            }
+
+            CCfgOpenerObj oIfCfg( this );
+            ret = oIfCfg.GetIntProp(
+                propFetchTimeout, dwVal );
+            if( SUCCEEDED( ret ) )
+            {
+                bChange = true;
+                if( unlikely( dwVal >= 3600 ) )
+                    dwVal = 3600;
+            }
+
+            if( bChange )
+                oBuilder.SetTimeoutSec( dwVal );
             // well, the call option are required by
             // keep-alive, and since the content of
             // oBuilder for SEND/FETCH cannot go over
@@ -4790,6 +4819,16 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg.SetBoolProp( propSeqTgMgr, true );
                 else
                     oCfg.SetBoolProp( propSeqTgMgr, false );
+            }
+
+            if( !bServer && strIfName == "IStream" &&
+                oIfDesc.isMember( JSON_ATTR_FETCHTIMEOUT ) &&
+                oIfDesc[ JSON_ATTR_FETCHTIMEOUT ].isString() )
+            {
+                strVal = oIfDesc[ JSON_ATTR_FETCHTIMEOUT ].asString();
+                if( strVal.size() > 0 )
+                    oCfg.SetIntProp( propFetchTimeout,
+                        std::stoi( strVal ) );
             }
 
             MatchPtr pMatch;

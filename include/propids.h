@@ -269,6 +269,7 @@ enum EnumPropId : gint32
     propKProxy,         // type: a boolean value indicate whether the builtin-app serve as a kinit proxy
     propSeqTgMgr,       // type: a boolean value indicate whether the stream uses sequential taskgroup manager
     propBuiltinRt,      // type: a boolean value indicate whether or not this app has builtin-router
+    propFetchTimeout,   // type: a guint32 value as the seconds before timeout for stream channel setup
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

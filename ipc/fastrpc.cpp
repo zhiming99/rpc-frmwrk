@@ -412,15 +412,13 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
         if( ERROR( ret ) )
             break;
 
+        CIfParallelTaskGrp* pPara = nullptr;
         TaskGrpPtr pGrp = pIf->GetGrpRfc();
         CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
-
         bool bFull = false;
         if( true )
         {
-            CStdRTMutex oTaskLock(
-                pGrpRfc->GetLock() );
-
+            CStdRTMutex oLock( pGrp->GetLock() );
             ret = pGrpRfc->IsQueueFull( bFull );
             if( ERROR( ret ) )
                 break;
@@ -431,12 +429,19 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
                     pTask, pMatch );            
                 break;
             }
-            pGrpRfc->AppendTask( pTask );
+            Variant oVar;
+            ret = pGrp->GetProperty(
+                propParentTask, oVar );
+            if( ERROR( ret ) )
+                break;
+
+            pPara = ( ObjPtr& )oVar;
+            pPara->AppendTask( pTask );
         }
 
         // add an concurrent task, and run it
         // directly.
-        ret = ( *pGrpRfc )( eventZero );
+        ret = ( *pPara )( eventZero );
         if( ERROR( ret ) )
         {
             DebugPrint( ret,
@@ -530,8 +535,8 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
 
         m_pGrpRfc->AppendTask( pPHTask );
 
-        this->SetLimit(
-            STM_MAX_PACKETS_REPORT, 0,
+        this->SetLimit( 3,
+            STM_MAX_PACKETS_REPORT - 2,
             true );
 
         TaskletPtr pTask( m_pGrpRfc );

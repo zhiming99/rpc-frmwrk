@@ -43,6 +43,8 @@ class CTasklet : public ICancellableTask
     std::atomic<bool> m_bPending;
     // flag to avoid reentrancy
     std::atomic<bool> m_bInProcess;
+    std::atomic<guint8> m_byPriority = { 0 };
+
     std::atomic<guint32> m_dwCallCount;
 
     protected:
@@ -65,6 +67,12 @@ class CTasklet : public ICancellableTask
 
     guint32 GetTid()
     { return m_dwTid; }
+
+    inline std::atomic< guint8 >& GetPriority()
+    { return m_byPriority; }
+
+    inline void SetPriority( guint8 bPriority )
+    { m_byPriority = bPriority; }
 
     operator IConfigDb*()
     { return ( IConfigDb* )m_pCtx; }
