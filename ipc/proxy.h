@@ -976,6 +976,10 @@ class CRpcServices :
         IEventSink* pTask,
         const bool& bRoot = false );
 
+    gint32 RunManagedTask2(
+        IEventSink* pTask,
+        const bool& bRoot = false );
+
     gint32 AddSeqTaskInternal(
         TaskGrpPtr& pTaskGrp,
         TaskletPtr& pTask,

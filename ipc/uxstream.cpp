@@ -822,7 +822,8 @@ gint32 CIfUxListeningTask::OnTaskComplete(
 
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error, the channel will "
+        DebugPrintEx( logInfo, ret,
+            "Error, the channel will "
             "be closed from OnTaskComplete, 0x%llx @ 0x%llx",
             this, pIf );
         BufPtr pErrBuf( true );
@@ -882,7 +883,8 @@ gint32 CIfUxListeningTask::OnIrpComplete( IRP* pIrp )
 
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error, the channel will "
+        DebugPrintEx( logWarning, ret,
+            "Error, the channel will "
             "be closed from OnIrpComplete, 0x%llx @ 0x%llx",
             this, pIf );
         BufPtr pErrBuf( true );

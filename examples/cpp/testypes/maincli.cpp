@@ -339,6 +339,8 @@ gint32 InitContext()
         CIoManager* pSvc = g_pIoMgr;
         pSvc->SetCmdLineOpt(
             propRouterRole, 1 );
+        pSvc->SetCmdLineOpt(
+            propBuiltinRt, true );
         ret = pSvc->Start();
         if( ERROR( ret ) )
         {
@@ -510,13 +512,17 @@ int _main( int argc, char** argv )
 
 //-----Your code begins here---
 
+#define MAX_PENDINGS STM_MAX_PACKETS_REPORT
+#define MAX_REQS 1000
+
 std::atomic< int > idx( 0 );
-std::atomic< int > count( 1000 );
+std::atomic< int > count( MAX_REQS );
 std::atomic< int > failures( 0 );
+std::atomic< int > pendings( 0 );
 gint32 SyncEcho( CTestTypesSvc_CliImpl* pIf )
 {
     gint32 ret = 0;
-    for( int i = 0; i < 1000; i++ )
+    for( int i = 0; i < MAX_REQS; i++ )
     {
         stdstr strResp;
         ret = pIf->Echo( "Hello, World", strResp );
@@ -528,6 +534,7 @@ gint32 SyncEcho( CTestTypesSvc_CliImpl* pIf )
     return ret;
 }
 
+sem_t  semPendings;
 gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
 {
     gint32 ret = 0;
@@ -547,27 +554,31 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
             break;
         oParams.Push( ObjPtr( pSyncTask ) );
 
-        for( int i = 0; i < 1000; i++ )
+        ret = Sem_Init(
+            &semPendings, 0, MAX_PENDINGS * 2 );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwSent = 0;
+        while( dwSent < MAX_REQS )
         {
             stdstr strResp;
             stdstr strText = "Hello, World ";
-            strText += std::to_string( i );
+            strText += std::to_string( dwSent );
+            dwSent++;
             ret = pIf->Echo3( oParams.GetCfg(),
                 strText, strResp );
             if( ret == STATUS_PENDING )
+            {
+                Sem_Wait( &semPendings );
                 continue;
+            }
             count--;
             if( ERROR( ret ) )
             {
                 OutputMsg( ret,
-                    "Error sending Echo3 request, ( %d )", i );
-            }
-            else
-            {
-                OutputMsg( ret,
-                    "Succeeded Echo3 request "
-                    "immediately, ( %d ), %s",
-                    i, strResp.c_str() );
+                    "Error sending Echo3 request, ( %d )",
+                    dwSent );
             }
         }
 

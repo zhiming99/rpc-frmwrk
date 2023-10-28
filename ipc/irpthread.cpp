@@ -147,31 +147,52 @@ void CTaskQueue::AddTask( TaskletPtr& pTask )
     if( pTask.IsEmpty() )
         return;
 
+    guint8 byPriority = pTask->GetPriority();
     CStdRMutex a( m_oLock );
-    m_queTasks.push_back( pTask ); 
+    if( likely( byPriority == 0 ) ||
+        m_queTasks.size() <= 1 )
+    {
+        m_queTasks.push_back( pTask ); 
+        return;
+    }
+
+    auto itr = m_queTasks.begin();
+    while( itr != m_queTasks.end() )
+    {
+        if( (*itr)->GetPriority() >= byPriority )
+        {
+            itr++;
+            continue;
+        }
+        m_queTasks.insert( itr, pTask );
+        break;
+    }
+
+    if( itr == m_queTasks.end() )
+        m_queTasks.push_back( pTask );
+
+    return;
 }
 
 gint32 CTaskQueue::RemoveTask( TaskletPtr& pTask )
 {
-    gint32 ret = -ENOENT;
-
     if( pTask.IsEmpty() )
-    {
-        CStdRMutex a( m_oLock );
-        if( m_queTasks.empty() )
-            return ret;
+        return -EINVAL;
 
-        deque< TaskletPtr >::iterator itr;
-        itr = std::find( m_queTasks.begin(),
-            m_queTasks.end(), pTask );
+    gint32 ret = -ENOENT;
+    CStdRMutex a( m_oLock );
+    if( m_queTasks.empty() )
+        return ret;
 
-        if( itr == m_queTasks.end() )
-            return ret;
+    deque< TaskletPtr >::iterator itr;
+    itr = std::find( m_queTasks.begin(),
+        m_queTasks.end(), pTask );
 
-        m_queTasks.erase( itr );
-        ret = 0;
-        
-    }
+    if( itr == m_queTasks.end() )
+        return ret;
+
+    m_queTasks.erase( itr );
+    ret = 0;
 
     return ret;
 }
@@ -194,6 +215,7 @@ gint32 CTaskQueue::GetHead( TaskletPtr& pTask )
     if( !m_queTasks.empty() )
     {
         pTask = m_queTasks.front();
+        m_queTasks.pop_front();
         ret = 0;
     }
     return ret;
@@ -294,7 +316,6 @@ gint32 CTaskThread::ProcessTask(
 
     DumpTask( pTask );
 
-    PopHead();
     // to exhaust the queue before
     // sleep
     return 0;

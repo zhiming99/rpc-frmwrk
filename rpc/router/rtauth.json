@@ -156,7 +156,7 @@
             "comments": "this is the section for router bridge with authentication",
             "ObjectName": "RpcRouterBridgeAuthImpl",
             "BusName": "DBusBusPort_0",
-            "PortClass": "DBusLocalPdo",
+            "PortClass": "DBusLoopbackPdo2",
             "PortId": "0",
             "RequestTimeoutSec": "120",
             "KeepAliveTimeoutSec": "60",

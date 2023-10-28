@@ -2787,6 +2787,14 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
         if( ERROR( ret ) )
             break;
 
+        Variant oVar;
+        ret = this->GetProperty(
+            propPortId, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = oVar;
+
         for( auto pObj : vecMatches )
         {
             MatchPtr pMatch( pObj );
@@ -2794,7 +2802,8 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
                 ( CObjBase* )pObj );
             MatchPtr pRmtMatch;
 
-            oMatch.CopyProp( propPortId, this );
+            oMatch.SetIntProp(
+                propPortId, dwPortId );
 
             ret = pRouter->GetMatchToAdd(
                 pMatch, true, pRmtMatch );
@@ -2826,7 +2835,9 @@ gint32 CRpcTcpBridge::ClearRemoteEventsLocal(
         }
 
         TaskletPtr pGrpTask = pTaskGrp;
-        ret = pRouter->AddSeqTask( pGrpTask, false );
+        ret = pRouter->AddSeqTask2(
+            dwPortId, pGrpTask );
+
         if( ERROR( ret ) )
         {
             ( *pGrpTask )( eventCancelTask );
@@ -4171,7 +4182,8 @@ gint32 CRpcTcpBridge::ForwardRequestInternal(
 
         if( bSeqTask )
         {
-            ret = pRouter->AddSeqTask( pTask );
+            ret = pRouter->AddSeqTask2(
+                dwPortId, pTask );
             if( ERROR( ret ) )
             {
                 ( *pTask )( eventCancelTask );
@@ -5108,13 +5120,14 @@ gint32 CRpcTcpBridge::CheckHsTimeout(
         CCfgOpenerObj oCfg(
             ( CObjBase* )pTask );
 
-        guint32 dwRetries;
+        CStdRMutex oIfLock( GetLock() );
+
+        guint32 dwRetries = 0;
         ret = oCfg.GetIntProp(
             propRetries, dwRetries );
         if( ERROR( ret ) )
             break;
 
-        CStdRMutex oIfLock( GetLock() );
         if( m_bHandshaked )
         {
             if( m_bHsFailed )
@@ -5295,12 +5308,14 @@ gint32 CRpcTcpBridge::Handshake(
             TaskletPtr pTask = m_pHsTicker;
             CIfParallelTask* ppt = pTask;
             m_pHsTicker.Clear();
-            EnumTaskState iState =
-                ppt->GetTaskState();
             oIfLock.Unlock();
             CStdRTMutex oTaskLock( ppt->GetLock() );
+            EnumTaskState iState =
+                ppt->GetTaskState();
+            ppt->RemoveTimer();
             if( ppt->IsStopped( iState ) )
             {
+                oIfLock.Lock();
                 // the handshake window has closed,
                 // but the bridge is not down yet
                 m_bHsFailed = true;

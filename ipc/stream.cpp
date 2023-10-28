@@ -35,9 +35,6 @@
 namespace rpcf
 {
 
-ObjPtr IStream::GetSeqTgMgr()
-{ return m_pSeqTgMgr; }
-
 void IStream::SetInterface( CRpcServices* pSvc )
 {
     m_pSvc = pSvc;
@@ -56,6 +53,9 @@ void IStream::SetInterface( CRpcServices* pSvc )
     CStmSeqTgMgr* pSeqMgr = GetSeqTgMgr();
     pSeqMgr->SetParent( GetInterface() );
 }
+
+ObjPtr IStream::GetSeqTgMgr()
+{ return m_pSeqTgMgr; }
 
 gint32 IStream::AddStartTask(
     HANDLE hChannel, TaskletPtr& pTask )
@@ -774,6 +774,9 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
         if( ERROR( ret ) )
             break;
 
+        if( bServer )
+            pStartTask->SetPriority( 1 );
+
         ret = pStream->AddUxStream(
             ( HANDLE )pUxSvc, pUxIf );
         if( ERROR( ret ) )
@@ -915,6 +918,8 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
 
     InterfPtr pUxIf;
     ObjPtr pIf;
+    bool bUnreg = false;
+    HANDLE hcp = INVALID_HANDLE;
 
     do{
         if( SUCCEEDED( iRet ) )
@@ -1021,6 +1026,8 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
                 oDataDesc.SetQwordProp(
                     propStmConnPt, ( guint64 )pscp );
                 pscp->RegForTransfer();
+                bUnreg = true;
+                hcp = ( HANDLE )pscp;
             }
         }
         else
@@ -1088,6 +1095,12 @@ gint32 CIfStartUxSockStmTask::OnTaskComplete(
             CStreamProxy* pStm = pIf;
             pStm->OnChannelError( hUxIf, ret );
         }
+    }
+    if( ERROR( ret ) && bUnreg )
+    {
+        ObjPtr pObj;
+        CStmConnPoint::RetrieveAndUnreg(
+            hcp, pObj );
     }
     return ret;
 }
@@ -1190,6 +1203,8 @@ gint32 CStreamProxy::OpenChannel(
         return -EINVAL;
 
     gint32 ret = 0;
+    bool bUnreg = false;
+    HANDLE hcp = INVALID_HANDLE;
     fd = -1;
     do{
         CIoManager* pMgr = this->GetIoMgr();
@@ -1227,6 +1242,8 @@ gint32 CStreamProxy::OpenChannel(
             oDesc.SetQwordProp(
                 propStmConnPt, ( guint64 )pcp );
             pcp->RegForTransfer();
+            bUnreg = true;
+            hcp = ( HANDLE )pcp;
             oParams.SetObjPtr(
                 propStmConnPt, pStmCp );
         }
@@ -1255,8 +1272,6 @@ gint32 CStreamProxy::OpenChannel(
 
         if( ERROR( ret ) )
         {
-            if( !pStmCp.IsEmpty() )
-                pStmCp->Release();
             ( *pTask )( eventCancelTask );
             break;
         }
@@ -1328,6 +1343,12 @@ gint32 CStreamProxy::OpenChannel(
         {
             close( fd );
             fd = -1;
+        }
+        if( bUnreg && hcp != INVALID_HANDLE )
+        {
+            ObjPtr pObj;
+            CStmConnPoint::RetrieveAndUnreg(
+                hcp, pObj );
         }
     }
 
@@ -1463,7 +1484,7 @@ gint32 IStream::CloseChannel(
 
         if( ERROR( ret ) )
         {
-            DebugPrint( ret,
+            DebugPrintEx( logInfo, ret,
                 "Error OnClose failed to add stoptask for 0x%llx @state=%d",
                 pSvc, pThisIf->GetState() );
             ( *pStopTask )( eventCancelTask );
@@ -1804,5 +1825,19 @@ gint32 GetObjIdHash(
 
     return 0;
 }
+
+template<>
+bool IsKeyInvalid( const HANDLE& key )
+{ return key == INVALID_HANDLE; }
+
+template<>
+bool IsKeyInvalid( const stdstr& key )
+{ return key.empty(); }
+
+#ifdef BUILD_64
+template<>
+bool IsKeyInvalid( const guint32& key )
+{ return ( key == 0 || key == ( guint32 )-1 ); }
+#endif
 
 }

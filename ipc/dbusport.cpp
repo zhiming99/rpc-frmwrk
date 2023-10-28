@@ -379,7 +379,8 @@ CDBusBusPort::CDBusBusPort( const IConfigDb* pConfig )
     : super( pConfig ),
     m_pDBusConn( nullptr ),
     m_iLocalPortId( -1 ),
-    m_iLpbkPortId( -1 )
+    m_iLpbkPortId( -1 ),
+    m_iLpbkPortId2( -1 )
 {
     gint32 ret = 0;
     SetClassId( clsid( CDBusBusPort ) );
@@ -427,7 +428,8 @@ gint32 CDBusBusPort::BuildPdoPortName(
             if( strClass != PORT_CLASS_DBUS_PROXY_PDO &&
                 strClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK &&
                 strClass != PORT_CLASS_LOCALDBUS_PDO &&
-                strClass != PORT_CLASS_LOOPBACK_PDO )
+                strClass != PORT_CLASS_LOOPBACK_PDO &&
+                strClass != PORT_CLASS_LOOPBACK_PDO2 )
             {
                 // We only support to port classes
                 // RpcProxy and LocalDBusPdo
@@ -480,13 +482,16 @@ gint32 CDBusBusPort::BuildPdoPortName(
                 strPortName = strClass + "_" +
                     std::to_string( dwPortId );
             }
-            else if( strClass == PORT_CLASS_LOCALDBUS_PDO
-                || strClass == PORT_CLASS_LOOPBACK_PDO )
+            else if( strClass == PORT_CLASS_LOCALDBUS_PDO ||
+                strClass == PORT_CLASS_LOOPBACK_PDO ||
+                strClass == PORT_CLASS_LOOPBACK_PDO2 )
             {
                 if( strClass == PORT_CLASS_LOCALDBUS_PDO )
                     strPortName = strClass + string( "_0" ); 
-                else
+                else if( strClass == PORT_CLASS_LOOPBACK_PDO )
                     strPortName = strClass + string( "_1" ); 
+                else
+                    strPortName = strClass + string( "_2" ); 
             }
             else
             {
@@ -557,8 +562,10 @@ gint32 CDBusBusPort::CreatePdoPort(
             ret = CreateLocalDBusPdo(
                 pCfg, pNewPort );
         }
-        else if( strPortClass
-            == PORT_CLASS_LOOPBACK_PDO )
+        else if( ( strPortClass
+                == PORT_CLASS_LOOPBACK_PDO ) ||
+            ( strPortClass ==
+                PORT_CLASS_LOOPBACK_PDO2 ) )
         {
             ret = CreateLoopbackPdo(
                 pCfg, pNewPort );
@@ -695,6 +702,12 @@ gint32 CDBusBusPort::CreateLoopbackPdo(
         CCfgOpener oExtCfg;
         *oExtCfg.GetCfg() = *pCfg;
 
+        stdstr strPortClass;
+        ret = oExtCfg.GetStrProp(
+            propPortClass, strPortClass );
+        if( ERROR( ret ) )
+            break;
+
         ret = oExtCfg.GetIntProp(
             propPortId, dwPortId );
 
@@ -713,14 +726,24 @@ gint32 CDBusBusPort::CreateLoopbackPdo(
             break;
         }
 
+        EnumClsid iClsid;
+        if( strPortClass ==
+            PORT_CLASS_LOOPBACK_PDO )
+            iClsid = clsid( CDBusLoopbackPdo );
+        else
+            iClsid = clsid( CDBusLoopbackPdo2 );
+
+
         ret = pNewPort.NewObj(
-            clsid( CDBusLoopbackPdo ),
-            oExtCfg.GetCfg() );
+            iClsid, oExtCfg.GetCfg() );
 
         if( ERROR( ret ) )
             break;
 
-        m_iLpbkPortId = dwPortId;
+        if( iClsid == clsid( CDBusLoopbackPdo ) )
+            m_iLpbkPortId = dwPortId;
+        else
+            m_iLpbkPortId2 = dwPortId;
         // the pdo port `Start()' will be deferred
         // till the complete port stack is built.
         //
@@ -1577,6 +1600,45 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
 
         ( *pTask )( eventZero );
         ret = pTask->GetError();
+        if(  ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = GetIoMgr();
+        if( pMgr->HasBuiltinRt() )
+        {
+            guint32 dwVal = 0;
+            ret = pMgr->GetCmdLineOpt(
+                propRouterRole, dwVal );
+            if( ERROR( ret ) ||
+                ( dwVal & 2 ) == 0 )
+                break;
+        }
+
+        // create the loopback pdo2
+        ret = newCfg.SetStrProp( propPortClass,
+            PORT_CLASS_LOOPBACK_PDO2 ); 
+
+        if( ERROR( ret ) )
+            break;
+
+        pTask.Clear();
+
+        ret = pEvent.NewObj( clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
+        newCfg.SetObjPtr(
+            propEventSink, pEvent );
+
+        ret = pTask.NewObj(
+            clsid( CDBusBusPortCreatePdoTask ),
+            newCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        ( *pTask )( eventZero );
+        ret = pTask->GetError();
         if( ret == STATUS_PENDING )
             ret = 0;
 
@@ -1833,13 +1895,18 @@ CDBusBusPort::OnLpbkMsgArrival(
             break;
         }
 
+        guint32 dwLpbkPortId = m_iLpbkPortId;
+        if( m_iLpbkPortId2 != ( guint32 )-1 )
+            dwLpbkPortId = m_iLpbkPortId2;
+
         if( iType != DBUS_MESSAGE_TYPE_METHOD_CALL )
         {
             for( auto elem : m_mapId2Pdo )
             {
                 guint32 dwPortId = elem.first;
                 if( dwPortId == ( guint32 )m_iLocalPortId ||
-                    dwPortId == ( guint32 )m_iLpbkPortId )
+                    dwPortId == ( guint32 )m_iLpbkPortId ||
+                    dwPortId == ( guint32 )m_iLpbkPortId2 )
                     continue;
 
                 PortPtr& pPrxyPdo = elem.second;
@@ -1854,7 +1921,7 @@ CDBusBusPort::OnLpbkMsgArrival(
         // place the loopback port at the
         // last. To guarantee the
         // order of the message processing
-        ret = GetPdoPort( m_iLpbkPortId, pPort );
+        ret = GetPdoPort( dwLpbkPortId, pPort );
         if( ERROR( ret ) )
             break;
 
@@ -1892,6 +1959,25 @@ CDBusBusPort::OnLpbkMsgArrival(
             return DBUS_HANDLER_RESULT_HANDLED;
     }
 
+    if( iType == DBUS_MESSAGE_TYPE_METHOD_CALL &&
+        ret == -ENOENT )
+    {
+        // reply with dbus error
+        DebugPrint( GetPortState(),
+            "Error cannot find irp for request message\n%s\n, port=%s, 0x%x",
+            ptrMsg.DumpMsg().c_str(),
+            CoGetClassName( GetClsid() ), 
+            ( LONGWORD )this );
+    }
+    else if( iType == DBUS_MESSAGE_TYPE_METHOD_RETURN &&
+        ret == -ENOENT )
+    {
+        DebugPrint( GetPortState(),
+            "Error cannot find irp for response message\n%s\n, port=%s, 0x%x",
+            ptrMsg.DumpMsg().c_str(),
+            CoGetClassName( GetClsid() ), 
+            ( LONGWORD )this );
+    }
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
 }
 

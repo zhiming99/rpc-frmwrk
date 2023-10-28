@@ -87,6 +87,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusLocalPdo );
     INIT_MAP_ENTRYCFG( CDBusLoopbackMatch );
     INIT_MAP_ENTRYCFG( CDBusLoopbackPdo );
+    INIT_MAP_ENTRYCFG( CDBusLoopbackPdo2 );
     INIT_MAP_ENTRYCFG( CDBusSysMatch );
     INIT_MAP_ENTRYCFG( CDBusTransLpbkMsgTask );
     INIT_MAP_ENTRYCFG( CDriverManager );

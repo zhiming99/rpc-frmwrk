@@ -24,6 +24,24 @@
 #include "ifhelper.h"
 namespace rpcf{
 
+template< class T >
+bool IsKeyInvalid( const T& key )
+{
+    static_assert( "Type not defined" );
+    return false;
+}
+
+template<>
+bool IsKeyInvalid( const HANDLE& key );
+
+template<>
+bool IsKeyInvalid( const stdstr& key );
+
+#ifdef BUILD_64
+template<>
+bool IsKeyInvalid( const guint32& key );
+#endif
+
 struct SEQTG_ELEM
 {
     TaskGrpPtr m_pSeqTasks;
@@ -71,9 +89,9 @@ struct CSeqTaskGrpMgr : public CObjBase
         m_iMgrState = iState;
     }
 
-    gint32 AllocSeqSlot( HANDLE htg )
+    gint32 AllocSeqSlot( Handle htg )
     {
-        if( htg == 0 )
+        if( IsKeyInvalid( htg ) )
             return -EINVAL;
 
         CStdRMutex oLock( GetLock() );
@@ -93,7 +111,7 @@ struct CSeqTaskGrpMgr : public CObjBase
     gint32 AddStartTask(
         Handle htg, TaskletPtr& pTask )
     {
-        if( htg == 0 || pTask.IsEmpty() )
+        if( IsKeyInvalid( htg ) || pTask.IsEmpty() )
             return -EINVAL;
 
         gint32 ret = 0;
@@ -131,7 +149,7 @@ struct CSeqTaskGrpMgr : public CObjBase
     gint32 AddSeqTask( Handle htg,
         TaskletPtr& pTask )
     {
-        if( htg == 0 || pTask.IsEmpty() )
+        if( IsKeyInvalid( htg ) || pTask.IsEmpty() )
             return -EINVAL;
 
         gint32 ret = 0;
@@ -172,7 +190,7 @@ struct CSeqTaskGrpMgr : public CObjBase
         IEventSink* pCallback, Handle htg,
         TaskletPtr& pTask )
     {
-        if( htg == 0 || pTask.IsEmpty() )
+        if( IsKeyInvalid( htg ) )
             return -EINVAL;
 
         gint32 ret = 0;
@@ -212,13 +230,14 @@ struct CSeqTaskGrpMgr : public CObjBase
 
             oLock.Unlock();
 
-            ret = AddSeqTaskIf(
-                GetParent(),
-                pSeqTasks,
-                pTask, false );
+            if( !pTask.IsEmpty() )
+            {
+                ret = AddSeqTaskIf( GetParent(),
+                    pSeqTasks, pTask, false );
 
-            if( ERROR( ret ) )
-                break;
+                if( ERROR( ret ) )
+                    break;
+            }
 
             gint32 (*func)( ObjPtr&,
                 Handle, IEventSink*,
@@ -230,7 +249,8 @@ struct CSeqTaskGrpMgr : public CObjBase
             {
                 gint32 ret = 0;
                 do{
-                    if( ptgm.IsEmpty() || htg == 0 )
+                    if( ptgm.IsEmpty() ||
+                        IsKeyInvalid( htg ) )
                     {
                         ret = -EINVAL;
                         if( pCb != nullptr )
@@ -299,7 +319,7 @@ struct CSeqTaskGrpMgr : public CObjBase
 
     gint32 RemoveTg( Handle htg )
     {
-        if( htg == 0 )
+        if( IsKeyInvalid( htg ) )
             return -EINVAL;
         gint32 ret = 0;
         do{
@@ -416,11 +436,11 @@ struct CSeqTaskGrpMgr : public CObjBase
                         eventTaskComp, ret, 0, nullptr );
                     return ret;
                 });
-                TaskletPtr pWrapper;
-                NEW_COMPLETE_FUNCALL( 0, pWrapper,
+                TaskletPtr pNotify;
+                NEW_COMPLETE_FUNCALL( 0, pNotify,
                     pMgr, func1, nullptr, pCallback,
                     ObjPtr( this ) );
-                pRetry->SetClientNotify( pWrapper );
+                pRetry->SetClientNotify( pNotify );
             }
             else
             {

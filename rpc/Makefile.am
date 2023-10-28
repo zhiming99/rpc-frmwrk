@@ -3,7 +3,7 @@ lib_LTLIBRARIES=librpc.la
 rpc_headers= \
 conntask.h stmrelay.h \
 streammh.h tcportex.h tcpport.h rpcroute.h taskschd.h \
-readme.md
+readme.md rtseqmgr.h
 
 librpc_la_SOURCES = \
 taskschd.cpp ldbal.cpp \

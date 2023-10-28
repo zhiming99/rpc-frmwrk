@@ -2451,6 +2451,7 @@ class CRpcRouterBridge : public CRpcRouter
     std::map< std::string, InterfPtr > m_mapReqProxies;
 
     ObjPtr m_pLBGrp;
+    ObjPtr m_pSeqTgMgr;
 
     gint32 OnRmtSvrOnline(
         IEventSink* pCallback,
@@ -2893,6 +2894,26 @@ class CRpcRouterBridge : public CRpcRouter
 
     gint32 RefreshReqLimit();
 
+    // methods for seq taskgroup manager
+    ObjPtr GetSeqTgMgr();
+
+    gint32 AddStartTask(
+        guint32 dwPortId, TaskletPtr& pTask );
+
+    gint32 AddStopTask(
+        IEventSink* pCallback,
+        guint32 dwPortId,
+        TaskletPtr& pTask );
+
+    gint32 AddSeqTask2(
+        guint32 dwPortId, TaskletPtr& pTask );
+
+    gint32 StopSeqTgMgr(
+        IEventSink* pCallback );
+
+    gint32 OnClose(
+        guint32 dwPortId,
+        IEventSink* pCallback );
 };
 
 class CIfRouterMgrState : public CIfServerState

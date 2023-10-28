@@ -1130,7 +1130,9 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
         if( ERROR( ret ) )
             break;
 
-        pGrp->SetClientNotify( pCallback );
+        if( pCallback != nullptr )
+            pGrp->SetClientNotify( pCallback );
+
         for( auto elem : setBridges )
         {
             InterfPtr pIf;
@@ -1188,7 +1190,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOfflineMH(
             pGrp->MarkPending();
             TaskletPtr pGrpTask( pGrp );
             ret = DEFER_CALL( pMgr, this,
-                &CRpcServices::RunManagedTask,
+                &CRpcServices::RunManagedTask2,
                 pGrpTask, false );
 
             if( ERROR( ret ) )

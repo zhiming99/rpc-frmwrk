@@ -7155,7 +7155,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
                 INDENT_UPL;
                 Wa( "{" );
                 Wa( "    fprintf( stderr," );
-                Wa( "        \"Error '-k' are not available in this build\\n\" );" );
+                Wa( "        \"Error '-k' and '-l' are not available in this build\\n\" );" );
                 Wa( "    ret = -EINVAL;" );
                 Wa( "    break;" );
                 CCOUT << "}";
@@ -7231,8 +7231,9 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "if( !g_bAuth && g_bKProxy )" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr," );
-            Wa( "    \"Error '-k' is only valid with '-a' option.\\n\" );" );
-            CCOUT << "ret = -EINVAL;";
+            Wa( "    \"Error '-k' and '-l' are only valid with '-a' option.\\n\" );" );
+            Wa( "ret = -EINVAL;" );
+            CCOUT << "break;";
             BLOCK_CLOSE;
             NEW_LINE;
         }
@@ -7427,11 +7428,17 @@ gint32 CImplMainFunc::EmitInitContext(
         }
         else
         {
-            Wa( "guint32 dwNumThrds =" );
-            Wa( "    ( guint32 )std::max( 1U," );
-            Wa( "    std::thread::hardware_concurrency() );" );
-
-            Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
+            if( !bProxy )
+            {
+                Wa( "guint32 dwNumThrds =" );
+                Wa( "    ( guint32 )std::max( 1U," );
+                Wa( "    std::thread::hardware_concurrency() );" );
+                Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
+            }
+            else
+            {
+                Wa( "guint32 dwNumThrds = 4;" );
+            }
             Wa( "oParams[ propMaxIrpThrd ] = 0;" );
             Wa( "if( g_strDrvPath.size() )" );
             Wa( "    oParams[ propConfigPath ] = g_strDrvPath;" );
@@ -7457,6 +7464,8 @@ gint32 CImplMainFunc::EmitInitContext(
             CCOUT << "    propRouterRole, "
                 << ( bProxy ? "1 );" : "2 );" );
             NEW_LINE;
+            Wa( "pSvc->SetCmdLineOpt(" );
+            Wa( "    propBuiltinRt, true );" );
         }
 
         CCOUT << "ret = pSvc->Start();";

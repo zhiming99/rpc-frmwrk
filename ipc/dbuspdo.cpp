@@ -729,4 +729,225 @@ gint32 CDBusLoopbackPdo::SubmitIoctlCmd(
     return ret;
 }
 
+#include "ifhelper.h"
+gint32 CDBusLoopbackPdo2::ClearDBusSetting(
+    IMessageMatch* pMsgMatch )
+{
+    if( pMsgMatch == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CDBusError dbusError;
+    EnumMatchType iType = pMsgMatch->GetType();
+
+    do{
+        if( iType == matchClient )
+        {
+            ret = super::ClearDBusSetting(
+                pMsgMatch );
+            break;
+        }
+        // server will register the objPath
+        // on the dbus
+        string strObjPath;
+        CCfgOpenerObj oProps( pMsgMatch );
+        ret = oProps.GetStrProp(
+            propObjPath, strObjPath );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( strObjPath.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::replace( strObjPath.begin(),
+            strObjPath.end(), '/', '.');
+
+        if( strObjPath[ 0 ] == '.' )
+            strObjPath = strObjPath.substr( 1 );
+       
+        CStdRMutex oPortLock( GetLock() );
+        bool bRelease = false;
+
+        std::map< std::string, gint32 >::iterator
+            itr = m_mapRegObjs.find( strObjPath );
+        if( itr != m_mapRegObjs.end() )
+        {
+            gint32 iCount = --itr->second;
+            if( iCount <= 0 )
+            {
+                m_mapRegObjs.erase( itr );
+                bRelease = true;
+            }
+        }
+        oPortLock.Unlock();
+        if( bRelease )
+        {
+            CDBusBusPort *pBusPort = static_cast
+                < CDBusBusPort* >( m_pBusPort );
+
+            ret = pBusPort->
+                ReleaseBusName( strObjPath );
+        }
+
+    }while( 0 );
+
+    if( SUCCEEDED( ret ) )
+        return ret;
+
+    return ret;
+}
+
+gint32 CDBusLoopbackPdo2::SetupDBusSetting(
+        IMessageMatch* pMsgMatch )
+{
+    if( pMsgMatch == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CDBusError dbusError;
+    EnumMatchType iType = pMsgMatch->GetType();
+
+    do{
+        if( iType == matchClient )
+        {
+            ret = super::SetupDBusSetting( pMsgMatch );
+            break;
+        }
+
+        // server will register the objPath
+        // on the dbus
+        if( iType != matchServer )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        string strObjPath;
+        CCfgOpenerObj oProps( pMsgMatch );
+        ret = oProps.GetStrProp(
+            propObjPath, strObjPath );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( strObjPath.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        std::replace( strObjPath.begin(),
+            strObjPath.end(), '/', '.');
+
+        if( strObjPath[ 0 ] == '.' )
+            strObjPath = strObjPath.substr( 1 );
+       
+        CStdRMutex oPortLock( GetLock() );
+        if( m_mapRegObjs.find( strObjPath )
+            != m_mapRegObjs.end() )
+        {
+            // already registered
+            m_mapRegObjs[ strObjPath ]++;
+            break;
+        }
+        else
+        {
+            m_mapRegObjs[ strObjPath ] = 1;
+        }
+        oPortLock.Unlock();
+
+        // NOTE: Need to verify if the call will
+        // bypass the mainloop and callback we
+        // registered, so that it can be safely
+        // called, without extra steps from the
+        // dbus message callback
+        CDBusBusPort *pBusPort = static_cast
+            < CDBusBusPort* >( m_pBusPort );
+
+        ret = pBusPort->RegBusName(
+            strObjPath, 0 );
+
+        if( ERROR( ret ) ) 
+        {
+            // rollback
+            oPortLock.Lock();
+            if( m_mapRegObjs.find( strObjPath ) !=
+                m_mapRegObjs.end() )
+            {
+                gint32 iCount =
+                    --m_mapRegObjs[ strObjPath ];
+                if( iCount <= 0 )
+                    m_mapRegObjs.erase( strObjPath );
+            }
+        }
+
+    }while( 0 );
+
+    // the user interface will register itself
+    // with the registry
+    return ret;
+}
+
+gint32 CDBusLoopbackPdo2::SendDBusMsg(
+    DBusMessage* pMsg,
+    guint32* pdwSerial )
+{
+    if( pMsg == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        if( m_pBusPort->GetClsid()
+            != clsid( CDBusBusPort ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        auto pBus = static_cast< CDBusBusPort* >
+            ( m_pBusPort );
+
+        DMsgPtr pMsgPtr( pMsg );
+        pMsgPtr.SetSender(
+            LOOPBACK_DESTINATION );
+
+        gint32 dwSerial =
+            pBus->LabelMessage( pMsgPtr );
+
+        gint32 ( *func )( CDBusBusPort*,
+            DMsgPtr& ) =
+        ([]( CDBusBusPort* pBus,
+            DMsgPtr& pMsg )->gint32
+        {
+            pBus->OnLpbkMsgArrival( pMsg );
+            return 0;
+        });
+
+        TaskletPtr pTask;
+        CIoManager* pMgr = GetIoMgr();
+        ret = NEW_FUNCCALL_TASK(
+            pTask, pMgr, func, pBus, pMsgPtr );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( pdwSerial != nullptr )
+            *pdwSerial = dwSerial;
+        // FIXME: it is dangerous to call this method
+        // because the life-time of pMsg is not
+        // contained, and could cause dbus to abort if
+        // dbus_shutdown is already called. The
+        // RescheduleTaskMainLoop is a safe approach,
+        // but has bad performance.
+        ret = pMgr->RescheduleTask( pTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
 }

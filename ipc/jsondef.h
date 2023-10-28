@@ -122,4 +122,5 @@
 #define JSON_ATTR_PATCH_CFG      "PatchConfig"
 #define JSON_ATTR_BASE_CFG      "BaseConfig"
 #define JSON_ATTR_SEQTGMGR      "SeqTaskGrpMgr"
+#define JSON_ATTR_FETCHTIMEOUT  "FetchDataTimeout"
 

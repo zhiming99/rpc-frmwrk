@@ -267,6 +267,7 @@ gint32 CIfStartRecvMsgTask2::HandleIncomingMsg2(
         if( ERROR( ret ) )
             break;
 
+        pTask->MarkPending();
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
             &CFastRpcSkelSvrBase::AddAndRunInvTask,
@@ -412,31 +413,37 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
         if( ERROR( ret ) )
             break;
 
-        CIfParallelTaskGrpRfc* pGrpRfc =
-            pIf->GetGrpRfc();
-
-        bool bQueFull = false;
-        ret = pGrpRfc->IsQueueFull( bQueFull );
-        if( ERROR( ret ) )
-            break;
-
-        if( bQueFull )
+        CIfParallelTaskGrp* pPara = nullptr;
+        TaskGrpPtr pGrp = pIf->GetGrpRfc();
+        CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+        bool bFull = false;
+        if( true )
         {
-            CStdRTMutex oTaskLock( pGrpRfc->GetLock() );
-            CStdRMutex oIfLock( pIf->GetLock() );
-
-            pGrpRfc->IsQueueFull( bQueFull );
-            if( bQueFull )
+            CStdRTMutex oLock( pGrp->GetLock() );
+            ret = pGrpRfc->IsQueueFull( bFull );
+            if( ERROR( ret ) )
+                break;
+            if( bFull )
             {
+                CStdRMutex oIfLock( pIf->GetLock() );
                 ret = pIf->QueueStartTask(
                     pTask, pMatch );            
                 break;
             }
+            Variant oVar;
+            ret = pGrp->GetProperty(
+                propParentTask, oVar );
+            if( ERROR( ret ) )
+                break;
+
+            pPara = ( ObjPtr& )oVar;
+            ret = pPara->AppendTask( pTask );
+            if( ERROR( ret ) )
+                break;
         }
 
-        // add an concurrent task, and run it
-        // directly.
-        ret = pIf->AddAndRun( pTask, true );
+        // add the task to concurrent taskgrp
+        ret = ( *pPara )( eventZero );
         if( ERROR( ret ) )
         {
             DebugPrint( ret,
@@ -530,8 +537,8 @@ gint32 CFastRpcSkelSvrBase::StartRecvTasks(
 
         m_pGrpRfc->AppendTask( pPHTask );
 
-        this->SetLimit(
-            STM_MAX_PACKETS_REPORT, 0,
+        this->SetLimit( 3,
+            STM_MAX_PACKETS_REPORT - 2,
             true );
 
         TaskletPtr pTask( m_pGrpRfc );

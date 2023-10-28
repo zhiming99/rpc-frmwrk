@@ -291,9 +291,17 @@ gint32 CDBusProxyPdo::CompleteConnReq(
 
     do{
         // clear what we have saved in the m_pReqData
+        ret = pCtx->GetStatus();
+        if( ERROR( ret ) )
+            break;
+
+        if( pCtx->m_pRespData.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
 
         DMsgPtr& pMsg = *pCtx->m_pRespData;
-
         if( pMsg.IsEmpty() )
         {
             ret = -EINVAL;
@@ -547,11 +555,6 @@ gint32 CDBusProxyPdo::CompleteIoctlIrp(
             break;
         }
         
-        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
-        ret = pCtx->GetStatus();
-        if( ERROR( ret ) )
-            break;
-
         switch( pIrp->CtrlCode() )
         {
         case CTRLCODE_CONNECT:

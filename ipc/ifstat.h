@@ -410,7 +410,9 @@ class CIfReqFwdrPrxyState : public CLocalProxyState
     CIfReqFwdrPrxyState( const IConfigDb* pCfg )
         :super( pCfg )
     { SetClassId( clsid( CIfReqFwdrPrxyState ) ); }
-    virtual gint32 SubscribeEvents();
+    gint32 SubscribeEvents() override;
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg ) override;
 };
 
 class CUnixSockStmState : public CLocalProxyState

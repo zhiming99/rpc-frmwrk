@@ -34,6 +34,7 @@
 #include "stmrelay.h"
 #include "tcportex.h"
 #include "taskschd.h"
+#include "rtseqmgr.h"
 
 namespace rpcf
 {
@@ -49,6 +50,7 @@ static FactoryPtr InitClassFactory()
 
     INIT_MAP_ENTRY( COutgoingPacket );
     INIT_MAP_ENTRY( CIncomingPacket );
+    INIT_MAP_ENTRY( CRouterSeqTgMgr );
 
     INIT_MAP_ENTRYCFG( CFidoRecvDataTask );
     INIT_MAP_ENTRYCFG( CRegisteredObject );

@@ -104,7 +104,7 @@ gint32 CIfStartRecvMsgTask::HandleIncomingMsg(
 
         CIoManager* pMgr = pIf->GetIoMgr();
         ret = DEFER_CALL( pMgr, ObjPtr( pIf ),
-            &CRpcServices::RunManagedTask,
+            &CRpcServices::RunManagedTask2,
             pTask, false );
 
         break;
@@ -1422,6 +1422,11 @@ gint32 CIfTaskGroup::AppendTask(
     if( ERROR( ret ) )
         return ret;
 
+    if( m_queTasks.empty() )
+    {
+        this->SetPriority(
+            pTask->GetPriority() );
+    }
     m_queTasks.push_back( pTask );
 
     return 0;
@@ -1677,6 +1682,11 @@ gint32 CIfTaskGroup::OnChildComplete(
             break;
 
         SetHeadState( waitRunning );
+        if( m_queTasks.size() )
+        {
+            TaskletPtr& pHead = m_queTasks.front();
+            this->SetPriority( pHead->GetPriority() );
+        }
         oTaskLock.Unlock();
 
         // regain control by rescheduling this task
@@ -6337,8 +6347,6 @@ gint32 CIfParallelTaskGrpRfc::RunTaskInternal(
     std::deque< TaskletPtr > queTasksToRun;
 
     do{
-
-
         iCount = std::min( ( size_t )iCount,
             ( size_t )GetPendingCount() );
 

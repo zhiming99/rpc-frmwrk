@@ -789,7 +789,6 @@ gint32 CStreamProxyRelay::FetchData_Proxy(
             CCfgOpener oDesc( pDataDesc );
             oDesc.GetQwordProp(
                 propStmConnPt, qwStmCp );
-            ObjPtr pObj;
             ret = CStmConnPoint::RetrieveAndUnreg(
                 qwStmCp, pscp );
             if( ERROR( ret ) )

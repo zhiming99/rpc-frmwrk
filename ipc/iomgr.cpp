@@ -2248,6 +2248,14 @@ gint32 CIoManager::AppendAndRun(
     return pIf->AppendAndRun( pTask );
 }
 
+bool CIoManager::HasBuiltinRt()
+{
+    bool bBuiltinRt = false;
+    GetCmdLineOpt(
+        propBuiltinRt, bBuiltinRt );
+    return bBuiltinRt;
+}
+
 gint32 CIoMgrStopTask::operator()(
     guint32 dwContext )
 {
@@ -2680,7 +2688,7 @@ gint32 UpdateObjDesc(
         dwRole = dwVal;
 
         bool bChanged = false;
-        bool bProxy = ( dwVal == 1 );
+        bool bProxy = ( ( dwVal & 1 ) > 0 );
         bool bAuth = false;
         oCfg.GetBoolProp( 102, bAuth );
 
@@ -2873,7 +2881,7 @@ gint32 UpdateObjDesc(
             break;
 
         char szNewDesc[32];
-        if( dwRole == 2 )
+        if( dwRole & 2 )
             strcpy( szNewDesc, "/tmp/rpcfos_XXXXXX" );
         else
             strcpy( szNewDesc, "/tmp/rpcfod_XXXXXX" );

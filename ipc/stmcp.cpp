@@ -371,6 +371,8 @@ gint32 CStmConnPoint::RegForTransfer()
 gint32 CStmConnPoint::RetrieveAndUnreg(
     HANDLE hConn, ObjPtr& pConn )
 {
+    if( hConn == INVALID_HANDLE )
+        return -EINVAL;
     CStdMutex oLock( GetLock() );
     auto itr = m_mapConnPts.find( hConn );
     if( itr == m_mapConnPts.end() )
@@ -840,12 +842,14 @@ gint32 CStmCpPdo::PostStart( IRP* pIrp )
 }
 
 gint32 CStreamQueue::RescheduleTask(
-    TaskletPtr pTask )
+    TaskletPtr& pTask )
 {
     if( pTask.IsEmpty() )
         return -EINVAL;
     CIoManager* pMgr =
         GetParent()->GetIoMgr();
+
+    return pMgr->RescheduleTask( pTask );
     
     CThreadPools& oPools =
         pMgr->GetThreadPools();
