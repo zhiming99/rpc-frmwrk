@@ -35,7 +35,8 @@ function stressTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 $basedir/logdump.txt &
+    > $basedir/logdump.txt
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $basedir/logdump.txt &
 
 /bin/bash << RUNCLIENT >> $basedir/logdump.txt
 start=\$(date +%s.%N)
@@ -95,7 +96,8 @@ function mkDirTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 $basedir/logdump.txt &
+    > $basedir/logdump.txt
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $basedir/logdump.txt &
 
 /bin/bash << RUNCLIENT >> $basedir/logdump.txt
 function singleMkdir()
