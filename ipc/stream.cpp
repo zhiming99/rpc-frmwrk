@@ -1834,7 +1834,7 @@ template<>
 bool IsKeyInvalid( const stdstr& key )
 { return key.empty(); }
 
-#ifdef BUILD_64
+#if BUILD_64 == 1
 template<>
 bool IsKeyInvalid( const guint32& key )
 { return ( key == 0 || key == ( guint32 )-1 ); }

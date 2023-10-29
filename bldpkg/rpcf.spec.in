@@ -58,6 +58,9 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/rpcfgnui.py
 %{_bindir}/rpcf/updcfg.py
 %{_bindir}/rpcf/updinitcfg.py
+%{_bindir}/rpcf/krbparse.py
+%{_bindir}/rpcf/updk5cfg.py
+%{_bindir}/rpcf/updwscfg.py
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@
 @WEBSOCK_RPMFILES@
@@ -136,6 +139,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/uxstream.h
 %{_includedir}/rpcf/ipc/prxyport.h
 %{_includedir}/rpcf/ipc/fdodrv.h
+%{_includedir}/rpcf/ipc/seqtgmgr.h
 @FUSE3_RPMHEADERS@
 %{_includedir}/rpcf/ipc/fastrpc.h
 %{_includedir}/rpcf/ipc/stmport.h

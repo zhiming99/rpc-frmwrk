@@ -35,9 +35,9 @@ function stressTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 $basedir/logdump.txt &
 
-/bin/bash << RUNCLIENT > $basedir/logdump.txt
+/bin/bash << RUNCLIENT >> $basedir/logdump.txt
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
@@ -95,9 +95,9 @@ function mkDirTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 &
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 $basedir/logdump.txt &
 
-/bin/bash << RUNCLIENT > $basedir/logdump.txt
+/bin/bash << RUNCLIENT >> $basedir/logdump.txt
 function singleMkdir()
 {
     idx=0
