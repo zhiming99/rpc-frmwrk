@@ -36,9 +36,10 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
 
 #### Development
-`rpc-frmwrk` supports two approaches for distributed application development.
-1. The classic RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skelton code rapidly. Examples can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld).
-2. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridl` compiler can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And moreover `rpcfs` hosted by the `rpcrouter` provides information for runtime monitoring and management.
+`rpc-frmwrk` can generate skelton systems for different system architectures.
+1. The micro-service RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skeleton code in one second. Examples can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld). The advantage is that you can deploy new services on the fly, as well as shutting down some of them.
+2. The single-app RPC. `ridlc` can also generate skelton code in the form of the classic client/server program. The advantage is it has much better performance.
+3. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridlc` can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And moreover `rpcfs` hosted by the `rpcrouter` provides information for runtime monitoring and management.
 
 #### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
@@ -46,16 +47,14 @@ This project depends on the following 3rd-party packags at runtime:
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
 4. `cppunit-1 (for the test cases, cppunit and cppunit-devel)`   
-5. `openssl-1.1 for SSL communication.`
-6. `MIT krb5 for authentication and access control.`
+5. `openssl-1.1 for SSL communication.`(optional)
+6. `MIT krb5 for authentication and access control.`(optional)
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
-8. `python 3.5+ is required for Python support.`
-9. `Java OpenJDK 8 or higher for Java support.`
-10. `FUSE-3 for rpcfs support`
-11. `GmSSL 3.0`
+8. `python 3.5+ is required for Python support.`(optional)
+9. `Java OpenJDK 8 or higher for Java support.`(optional)
+10. `FUSE-3 for rpcfs support`(optional)
+11. `GmSSL 3.0`(optional)
 
 #### Todo
-1. Add tutorials for `ridl`
-2. Performance Tuning
-3. Adaptive flow control
+1. Please refer to [`issues`](https://github.com/zhiming99/rpc-frmwrk/issues).
 
