@@ -458,8 +458,16 @@ struct CSeqTaskGrpMgr : public CObjBase
             auto phc = dynamic_cast< HostClass* >( GetParent() );
             for( auto& elem : vecTasks )
             {
-                phc->OnClose(
+                ret = phc->OnClose(
                     elem.first, elem.second );
+                if( ERROR( ret ) )
+                    ( *elem.second )( eventCancelTask );
+            }
+
+            if( pGrp->GetTaskCount() == 0 )
+            {
+                ret = 0;
+                break;
             }
 
             if( !pSync.IsEmpty() )

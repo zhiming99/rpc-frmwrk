@@ -1887,9 +1887,6 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                 if( SUCCEEDED( iRetVal ) ||
                     iRetVal == 0x7fffffff )
                 {
-                    ret = pRouter->
-                        AddBridge( m_pServer ); 
-
                     CRpcServices* pSvr = m_pServer;
                     PortPtr pPort = pSvr->GetPort();
 
@@ -1937,12 +1934,6 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                 while( SUCCEEDED( ret ) ||
                     ret == 0x7fffffff )
                 {
-                    ret = pRouter->
-                        AddBridgeProxy( m_pProxy ); 
-                    
-                    if( ERROR( ret ) )
-                        break;
-
                     string strNode;
                     ret = oCfg.GetStrProp(
                         propNodeName, strNode );
@@ -2023,9 +2014,20 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
             }
 
             if( bServer )
+            {
                 m_pServer = pBridgeIf;
+                ret = pRouter->AddBridge(
+                    m_pServer ); 
+            }
             else
+            {
                 m_pProxy = pBridgeIf;
+                ret = pRouter->
+                    AddBridgeProxy( m_pProxy ); 
+            }
+                    
+            if( ERROR( ret ) )
+                break;
 
             ret = pBridgeIf->StartEx( this );
             if( ret == STATUS_PENDING )
@@ -2480,10 +2482,14 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
 
         // put the bridge to the stopping state to
         // block new requests
+        bool bStop = true;
         ret = pBridge->SetStateOnEvent(
             cmdShutdown );
         if( ERROR( ret ) )
-            break;
+        {
+            // the bridge already in stopping state
+            bStop = false;
+        }
 
         // remove all the remote matches
         // registered via this bridge
@@ -2520,6 +2526,7 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
             pTaskGrp->AppendTask( pTask );
         }
 
+        if( bStop )
         {
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
@@ -2987,7 +2994,7 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
             oParams.GetCfg() );
         
         pTaskGrp->SetClientNotify( pCallback );
-        pTaskGrp->SetRelation( logicOR );
+        pTaskGrp->SetRelation( logicNONE );
         pTaskGrp->AppendTask( pStopTask );
 
         oParams.Push( pIf );
