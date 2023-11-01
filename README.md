@@ -20,7 +20,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 11. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 12. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 13. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-14. [`A skelton generator for CPP, Python and Java`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+14. [`A skeleton generator for CPP, Python and Java`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 16. [`rpcfs - filesystem interface for rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 
@@ -36,9 +36,9 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 5. This [wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F) has some detail information.
 
 #### Development
-`rpc-frmwrk` can generate skelton systems for different system architectures.
+`rpc-frmwrk` can generate skeleton systems for different system architectures.
 1. The micro-service RPC. `rpc-frmwrk` has an `interface description language`, [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md) to help you to generate the skeleton code in one second. Examples can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/examples#generating-the-example-program-of-hellowld). The advantage is that you can deploy new services on the fly, as well as shutting down some of them.
-2. The single-app RPC. `ridlc` can also generate skelton code in the form of the classic client/server program. The advantage is it has much better performance.
+2. The single-app RPC. `ridlc` can also generate skeleton code in the form of the classic client/server program. The advantage is it has much better performance.
 3. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridlc` can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And moreover `rpcfs` hosted by the `rpcrouter` provides information for runtime monitoring and management.
 
 #### Runtime Dependency  
