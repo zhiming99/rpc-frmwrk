@@ -728,9 +728,11 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
 
         guint32 dwNumCores = pMgr->GetNumCores();
         bool bMultiLoop = false;
-        if( ( dwRole & 0x2 ) && m_bRfc )
+        if( ( dwRole & 0x2 ) || m_bRfc )
         {
-            dwCount = dwNumCores >> 1;
+            dwCount = std::max(
+                ( dwNumCores >> 2 ),
+                ( guint32 )2 );
         }
         else if( dwRole & 1 )
         {
@@ -743,7 +745,7 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
 
         CLoopPools& oPools = pMgr->GetLoopPools();
         ret = oPools.CreatePool( NETSOCK_TAG,
-            "SockLoop-", dwCount, 20 );
+            "SockLoop-", dwCount, 10 );
 
     }while( 0 );
 
