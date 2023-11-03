@@ -48,7 +48,7 @@ class CTimerWatchCallback2 :
     TaskletPtr m_pCallback;
     guint32 m_dwEvent = 0;
     guint32 m_dwContext = 0;
-    bool  m_bRepeat = false;
+    bool  m_bRepeat = true;
     public:
     typedef CTasklet super;
     CTimerWatchCallback2( const IConfigDb* pCfg )
@@ -83,29 +83,46 @@ class CTimerWatchCallback2 :
     }
 };
 
-struct CTokenTimerTask :
-    public CIfParallelTask
+struct ITokenBucket
+{
+    virtual gint32 AllocToken(
+        guint32& dwNumReq ) = 0;
+    virtual gint32 FreeToken(
+        guint32 dwNumReq ) = 0;
+    virtual gint32 GetMaxTokens(
+        guint32& dwMaxTokens ) const = 0;
+    virtual gint32 SetMaxTokens(
+        guint32 dwMaxTokens ) = 0;
+};
+
+struct CTokenBucketTask :
+    public CIfParallelTask,
+    public ITokenBucket
 {
     protected:
     timespec    m_tsTimestamp;
-    guint32     m_dwMaxTokens = 0;
+    guint32     m_dwMaxTokens = ( guint32 )-1;
     guint32     m_dwTokens = 0;
     PortPtr     m_pPort;
+    TaskletPtr  m_pWatchTask;
+    HANDLE      m_hWatch;
+    MloopPtr    m_pLoop;
+    guint32     m_dwIntervalMs = 0;
 
     public:
     typedef CIfParallelTask super;
 
-    CTokenTimerTask( const IConfigDb* pCfg );
+    CTokenBucketTask( const IConfigDb* pCfg );
     gint32 RunTask() override
     { return STATUS_PENDING; }
 
     bool IsDisabled()
-    { return m_dwMaxTokens == ( guint32 )-1; }
+    { return GetMaxTokens() == ( guint32 )-1; }
 
     void Disable()
     { SetMaxTokens( ( guint32 )-1 ); }
 
-    gint32 AllocToken( guint32& dwNumReq )
+    gint32 AllocToken( guint32& dwNumReq ) override
     {
         CStdRTMutex oLock( GetLock() );
         if( GetTaskState() != stateReady )
@@ -129,7 +146,7 @@ struct CTokenTimerTask :
         return 0;
     }
 
-    gint32 FreeToken( guint32 dwNumReq )
+    gint32 FreeToken( guint32 dwNumReq ) override
     {
         CStdRTMutex oLock( GetLock() );
         if( GetTaskState() != stateReady )
@@ -150,10 +167,11 @@ struct CTokenTimerTask :
 
     gint32 OnRetry() override
     {
-        if( IsDisabled() )
-            return 0;
-
+        gint32 ret = STATUS_PENDING;
         do{
+            if( IsDisabled() )
+                break;
+
             gint32 ret = FreeToken( m_dwMaxTokens );
             if( ERROR( ret ) )
                 break;
@@ -171,15 +189,35 @@ struct CTokenTimerTask :
             TaskletPtr pTask;
             ret = NEW_FUNCCALL_TASK( pTask,
                 pMgr, func, pPort, this );
+
             if( ERROR( ret ) )
                 break;
-            pMgr->RescheduleTask( pTask );
+
+            ret = pMgr->RescheduleTask( pTask );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+
         }while( 0 );
-        return STATUS_PENDING;
+
+        return ret;
+    }
+
+    gint32 OnComplete( gint32 iRet ) override
+    {
+        if( !( m_hWatch == INVALID_HANDLE ||
+            m_pLoop.IsEmpty() ) )
+        {
+            CMainIoLoop* pLoop = m_pLoop;
+            pLoop->RemoveTimerWatch( m_hWatch );
+        }
+        m_pWatchTask.Clear();
+        m_pLoop.Clear();
+        m_hWatch = INVALID_HANDLE;
+        return super::OnComplete( iRet );
     }
 
     gint32 GetMaxTokens(
-        guint32& dwMaxTokens ) const
+        guint32& dwMaxTokens ) const override
     {
         CStdRTMutex oLock( GetLock() );
         if( GetTaskState() != stateReady )
@@ -189,7 +227,7 @@ struct CTokenTimerTask :
     }
 
     gint32 SetMaxTokens(
-        guint32 dwMaxTokens )
+        guint32 dwMaxTokens ) override
     {
         CStdRTMutex oLock( GetLock() );
         if( GetTaskState() != stateReady )
@@ -197,25 +235,70 @@ struct CTokenTimerTask :
         m_dwMaxTokens = dwMaxTokens;
         return 0;
     }
-    gint32 OnCancel(
-        guint32 dwContext ) override;
 };
 
 class CRateLimiterFido : public CPort
 {
-    std::deque< IrpPtr >  m_queOutIrp;
-    std::deque< IrpPtr >  m_queInIrp;
-    TaskletPtr  m_pOutTimer;
-    TaskletPtr  m_pInTimer;
+    std::deque< IrpPtr >  m_queWriteIrp;
+    std::deque< IrpPtr >  m_queReadIrp;
 
-    HANDLE      m_hInWatch;
-    HANDLE      m_hOutWatch;
+    TaskletPtr  m_pReadTb;
+    TaskletPtr  m_pWriteTb;
+
+    IrpPtr m_pReadIrp;
+    IrpPtr m_pWriteIrp;
+    MloopPtr m_pLoop;
 
     public:
     typedef CPort super;
     CRateLimiterFido( const IConfigDb* pCfg );
-    gint32 PostStart( PIRP pIrp ) override;
-    gint32 PreStop( PIRP pIrp ) override;
+    gint32 PostStart( PIRP pIrp ) override
+    {
+        gint32 ret = 0;
+        do{
+            PortPtr pPdo;
+            ret = this->GetPdoPort( pPdo );
+            if( ERROR( ret ) )
+                break;
+            CTcpStreamPdo2* pStmPdo = pPdo;
+            CMainIoLoop* pLoop =
+                pStmPdo->GetMainLoop();
+            if( pLoop == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            m_pLoop = pLoop;
+            CParamList oParams;
+            oParams.SetPointer(
+                propObjPtr, pLoop );
+            oParams.SetIntProp(
+                propTimeoutSec, 1 );
+
+        }while( 0 );
+        return ret;
+    }
+    gint32 PreStop( PIRP pIrp ) override
+    {
+        if( !m_pWriteTb.IsEmpty() )
+        {
+            ( *m_pWriteTb )( eventCancelTask );
+            m_pWriteTb.Clear();
+        }
+        if( !m_pReadTb.IsEmpty() )
+        {
+            ( *m_pReadTb )( eventCancelTask );
+            m_pReadTb.Clear();
+        }
+
+        m_queWriteIrp.clear();
+        m_queReadIrp.clear();
+        m_pReadIrp.Clear();
+        m_pWriteIrp.Clear();
+        m_pLoop.Clear();
+        return super::PreStop( pIrp );
+    }
+
     gint32 CompleteFuncIrp( PIRP pIrp );
     gint32 OnSubmitIrp( PIRP pIrp );
 
