@@ -6580,4 +6580,309 @@ gint32 CIfParallelTaskGrpRfc::IsQueueFull(
     return ret;
 }
 
+CTimerWatchCallback2::CTimerWatchCallback2(
+    const IConfigDb* pCfg )
+    : super( pCfg )
+{
+    gint32 ret = 0;
+    SetClassId(
+        clsid( CTimerWatchCallback2 ) );
+    do{
+        CCfgOpener oCfg( pCfg );
+        oCfg.GetIntProp(
+            propEventId, m_dwEvent );
+        oCfg.GetIntProp(
+            propContext, m_dwContext );
+        ObjPtr pObj;
+        ret = oCfg.GetObjPtr(
+            propObjPtr, pObj );
+
+        if( SUCCEEDED( ret ) )
+            m_pCallback = pObj;
+
+        oCfg.GetBoolProp( 1, m_bRepeat );
+    }while( 0 );
+    return;
+}
+
+gint32 CTimerWatchCallback2::operator()(
+    guint32 dwContext )
+{
+    gint32 ret = 0;
+    CIfParallelTask* pPara = m_pCallback;
+    if( pPara == nullptr )
+        return G_SOURCE_REMOVE;
+
+    CStdRTMutex oTaskLock( pPara->GetLock() );
+    CStdRMutex oLock( m_oLock );
+    if( m_bQuit )
+        return G_SOURCE_REMOVE;
+
+    if( !m_pCallback.IsEmpty() )
+    {
+        ret = pPara->OnEvent(
+            ( EnumEventId )m_dwEvent,
+            m_dwContext, 0, nullptr );
+    }
+    if( !m_bRepeat || ERROR( ret ) )
+        return G_SOURCE_REMOVE;
+    return G_SOURCE_CONTINUE;
+}
+
+CTokenBucketTask::CTokenBucketTask(
+    const IConfigDb* pCfg ) :
+    super( pCfg )
+{
+    SetClassId( clsid( CTokenBucketTask ) );
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = pCfg->GetProperty(
+            propObjPtr, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        m_pLoop = ( ObjPtr& )oVar;
+
+        ret = pCfg->GetProperty(
+            propTimeoutSec, oVar );
+        if( ERROR( ret ) )
+            break;
+        m_dwIntervalMs = 1000 *
+            ( ( guint32& )oVar );
+
+        ret = pCfg->GetProperty(
+            propParentPtr, oVar );
+        if( ERROR( ret ) )
+            break;
+        m_pNotify = ( ObjPtr& )oVar;
+
+        ret = pCfg->GetProperty( 0, oVar );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+        m_dwMaxTokens = ( guint32& )oVar;
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error occurs in"\
+            "CTokenBucketTask's ctor" );
+        throw runtime_error( strMsg );
+    }
+}
+
+gint32 CTokenBucketTask::RunTask()
+{
+    gint32 ret = STATUS_PENDING;
+    do{
+        if( IsDisabled() )
+            break;
+        ret = EnableTimerWatch();
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CTokenBucketTask::AllocToken(
+    guint32& dwNumReq )
+{
+    CStdRTMutex oLock( GetLock() );
+    if( GetTaskState() != stateStarted )
+        return ERROR_STATE;
+
+    if( IsDisabled() )
+        return 0;
+
+    if( m_dwTokens == 0 )
+        return -ENOENT;
+
+    if( dwNumReq >= m_dwTokens )
+    {
+        dwNumReq = m_dwTokens;
+        m_dwTokens = 0;
+    }
+    else
+    {
+        m_dwTokens -= dwNumReq;
+    }
+    return 0;
+}
+
+gint32 CTokenBucketTask::FreeToken(
+    guint32 dwNumReq )
+{
+    CStdRTMutex oLock( GetLock() );
+    if( GetTaskState() != stateStarted )
+        return ERROR_STATE;
+
+    if( IsDisabled() )
+        return 0;
+
+    if( m_dwTokens == m_dwMaxTokens )
+        return ERROR_QUEUE_FULL;
+
+    m_dwTokens = std::min(
+        m_dwTokens + dwNumReq,
+        m_dwMaxTokens );
+
+    return 0;
+}
+
+gint32 CTokenBucketTask::OnRetry()
+{
+    gint32 ret = STATUS_PENDING;
+    do{
+        if( IsDisabled() )
+            break;
+
+        gint32 ret = FreeToken( m_dwMaxTokens );
+        if( ERROR( ret ) )
+            break;
+        Variant oVar;
+        ret = this->GetProperty(
+            propIoMgr, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = ( ObjPtr& )oVar;
+
+        gint32 (*func)( IEventSink*, IEventSink* ) =
+        ([]( IEventSink* pEvent,
+            IEventSink* pTokenTask )->gint32
+        {
+            pEvent->OnEvent( eventResumed,
+                0, 0, ( LONGWORD* )pTokenTask );
+            return 0;
+        });
+
+        TaskletPtr pTask;
+        ret = NEW_FUNCCALL_TASK( pTask,
+            pMgr, func, m_pNotify, this );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = pMgr->RescheduleTask( pTask );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CTokenBucketTask::OnComplete(
+    gint32 iRet )
+{
+    DisableTimerWatch();
+    m_pLoop.Clear();
+    return super::OnComplete( iRet );
+}
+
+gint32 CTokenBucketTask::GetMaxTokens(
+    guint32& dwMaxTokens ) const
+{
+    CStdRTMutex oLock( GetLock() );
+    if( GetTaskState() != stateStarted )
+        return ERROR_STATE;
+    dwMaxTokens = m_dwMaxTokens;
+    return 0;
+}
+
+gint32 CTokenBucketTask::EnableTimerWatch()
+{
+    gint32 ret = 0;
+    do{
+        CStdRTMutex oLock( this->GetLock() );
+        CParamList oParams;
+        oParams[ propEventId ] =
+            ( guint32 )eventTimeout;
+        oParams[ propContext ] =
+            ( guint32 )eventRetry;
+
+        oParams.Push( m_dwIntervalMs );
+
+        // repeatable timer
+        oParams.Push( true ); 
+
+        // start immediately
+        oParams.Push( true );
+        ret = oParams.CopyProp(
+            propIoMgr, this );
+        if( ERROR( ret ) )
+            break;
+
+        ret = m_pWatchTask.NewObj(
+            clsid( CTimerWatchCallback2 ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        HANDLE hWatch = INVALID_HANDLE;
+        ret = m_pLoop->AddTimerWatch(
+            m_pWatchTask, hWatch );
+        if( ERROR( ret ) )
+            break;
+        m_hWatch = hWatch;
+        CMainIoLoop* pLoop = m_pLoop;
+        pLoop->WakeupLoop();
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CTokenBucketTask::DisableTimerWatch()
+{
+    CStdRTMutex oLock( this->GetLock() );
+    if( !m_pWatchTask.IsEmpty() )
+    {
+        CTimerWatchCallback2* pTimer =
+            m_pWatchTask;
+        pTimer->SetQuit();
+        m_pWatchTask.Clear();
+    }
+    if( !( m_hWatch == INVALID_HANDLE ||
+        m_pLoop.IsEmpty() ) )
+    {
+        CMainIoLoop* pLoop = m_pLoop;
+        pLoop->RemoveTimerWatch( m_hWatch );
+        m_hWatch = INVALID_HANDLE;
+        pLoop->WakeupLoop();
+    }
+    return 0;
+}
+
+gint32 CTokenBucketTask::SetMaxTokens(
+    guint32 dwMaxTokens )
+{
+    CStdRTMutex oLock( GetLock() );
+    if( GetTaskState() != stateStarted )
+        return ERROR_STATE;
+    bool bDisabled = IsDisabled();
+    bool bDisable =
+        ( ( guint32 )-1 == dwMaxTokens );
+    if( bDisabled == bDisable )
+    {
+        m_dwMaxTokens = dwMaxTokens;
+        return 0;
+    }
+    gint32 ret = 0;
+    if( !bDisabled && bDisable )
+    {
+        ret = EnableTimerWatch();
+    }
+    else
+    {
+        ret = DisableTimerWatch();
+    }
+    return ret;
+}
+
 }
