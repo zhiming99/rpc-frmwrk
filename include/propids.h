@@ -270,6 +270,8 @@ enum EnumPropId : gint32
     propSeqTgMgr,       // type: a boolean value indicate whether the stream uses sequential taskgroup manager
     propBuiltinRt,      // type: a boolean value indicate whether or not this app has builtin-router
     propFetchTimeout,   // type: a guint32 value as the seconds before timeout for stream channel setup
+    propReadBps,        // type: a guint32 value as reading BPS 
+    propWriteBps,       // type: a guint32 value as writing BPS 
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

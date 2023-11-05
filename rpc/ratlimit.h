@@ -3,7 +3,7 @@
  *
  *       Filename:  ratlimit.h
  *
- *    Description:  declaration of QOS related classes 
+ *    Description:  Declarations of rate limiter related classes 
  *
  *        Version:  1.0
  *        Created:  11/01/2023 03:27:05 PM
@@ -33,7 +33,8 @@ namespace rpcf
 
 typedef enum 
 {
-    DECL_CLSID( CRateLimiterDrv ) = clsid( ClassFactoryStart ) + 100 ,
+    DECL_CLSID( CRateLimiterDrv ) =
+        clsid( ClassFactoryStart ) + 100 ,
     DECL_CLSID( CRateLimiterFido ),
 
 } EnumRatLimitClsid;
@@ -59,13 +60,20 @@ class CRateLimiterFido : public CPort
     TaskletPtr  m_pReadTb;
     TaskletPtr  m_pWriteTb;
 
-    IrpPtr m_pReadIrp;
-    IrpPtr m_pWriteIrp;
-    MloopPtr m_pLoop;
+    IrpPtr      m_pReadIrp;
+    IrpPtr      m_pWriteIrp;
+    MloopPtr    m_pLoop;
 
     public:
     typedef CPort super;
-    CRateLimiterFido( const IConfigDb* pCfg );
+    CRateLimiterFido( const IConfigDb* pCfg )
+        : super( pCfg )
+    {
+        SetClassId( clsid( CRateLimiterFido ) );
+        m_dwFlags &= ~PORTFLG_TYPE_MASK;
+        m_dwFlags |= PORTFLG_TYPE_FIDO;
+    }
+
     gint32 PostStart( PIRP pIrp ) override
     {
         gint32 ret = 0;
@@ -90,7 +98,8 @@ class CRateLimiterFido : public CPort
                 propParentPtr, this );
             oParams.SetIntProp(
                 propTimeoutSec, 1 );
-            oParams.CopyProp( 0, propReadBps, this );
+            oParams.CopyProp(
+                0, propReadBps, this );
 
             ret = m_pReadTb.NewObj(
                 clsid( CTokenBucketTask ),
@@ -98,7 +107,9 @@ class CRateLimiterFido : public CPort
             if( ERROR( ret ) )
                 break;
 
-            oParams.CopyProp( 0, propWriteBps, this );
+            oParams.CopyProp(
+                0, propWriteBps, this );
+
             ret = m_pWriteTb.NewObj(
                 clsid( CTokenBucketTask ),
                 oParams.GetCfg();
@@ -136,6 +147,8 @@ class CRateLimiterFido : public CPort
             m_pReadTb.Clear();
         }
 
+        // the irps will be released in super class's
+        // PreStop
         m_queWriteIrp.clear();
         m_queReadIrp.clear();
         m_pReadIrp.Clear();
@@ -144,13 +157,59 @@ class CRateLimiterFido : public CPort
         return super::PreStop( pIrp );
     }
 
+    gint32 ResumeWrite();
+    gint32 ResumeRead();
+
     gint32 CompleteFuncIrp( PIRP pIrp );
     gint32 OnSubmitIrp( PIRP pIrp );
 
     gint32 OnEvent( EnumEventId iEvent,
             LONGWORD dwParam1 = 0,
             LONGWORD dwParam2 = 0,
-            LONGWORD* pData = NULL  ) override;
+            LONGWORD* pData = NULL  ) override
+    {
+        gint32 ret = 0;
+        switch( iEvent )
+        {
+        case eventResumed:
+            {
+                CStdRMutex oPortLock( GetLock() );
+                guint32 dwState = GetPortState();
+                if( dwState == PORT_STATE_STOPPING ||
+                    dwState == PORT_STATE_STOPPED ||
+                    dwState == PORT_STATE_REMOVED )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
+                auto pTask = reinterpret_cast
+                    < CTokenBucketTask* >( pData );
+                guint64 qwObjId =
+                    pTask->GetObjId();
+                if( qwObjId ==
+                    m_pReadTb->GetObjId() )
+                {
+                    oPortLock.Unlock();
+                    ret = ResumeRead();
+                }
+                else if( qwObjId ==
+                    m_pWriteTb->GetObjId() )
+                {
+                    oPortLock.Unlock();
+                    ret = ResumeWrite();
+                }
+                break;
+            }
+        default:
+            {
+                ret = super::OnEvent(
+                    iEvent, dwParam1,
+                    dwParam2, pData );
+                break;
+            }
+        }
+        return ret;
+    }
 };
 
 }
