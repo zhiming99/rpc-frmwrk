@@ -550,12 +550,7 @@ class CBytesSender
     gint32 SetSendDone( gint32 iRet = 0 );
     bool IsSendDone() const;
     IrpPtr GetIrp() const
-    {
-        CPort* pPort = m_pPort;
-        if( pPort == nullptr )
-            return -EFAULT;
-        return m_pIrp;
-    }
+    { return m_pIrp; }
 
     gint32 OnSendReady( gint32 iFd );
     gint32 CancelSend( const bool& bCancelIrp );

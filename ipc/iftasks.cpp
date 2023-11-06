@@ -6702,7 +6702,7 @@ gint32 CTokenBucketTask::AllocToken(
     if( m_dwTokens == 0 )
         return -ENOENT;
 
-    if( dwNumReq >= m_dwTokens )
+    if( dwNumReq > m_dwTokens )
     {
         dwNumReq = m_dwTokens;
         m_dwTokens = 0;
