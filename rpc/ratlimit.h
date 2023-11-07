@@ -39,6 +39,38 @@ typedef enum
 
 } EnumRatLimitClsid;
 
+class CRateLimiterFido;
+class CBytesWriter
+{
+    IrpPtr m_pIrp;
+    gint32 m_iBufIdx = -1;
+    guint32 m_dwOffset = 0;
+    PortPtr m_pPort;
+    bool    m_bWrite = true;
+    guint32 m_dwBytesToSend = 0;
+    public:
+
+    CBytesWriter( CRateLimiterFido* pPdo );
+
+    gint32 SetIrpToSend(
+        IRP* pIrp, guint32 dwSize );
+
+    gint32 SendImmediate( PIRP pIrp );
+    gint32 SetSendDone( gint32 iRet = 0 );
+    bool IsSendDone() const;
+    IrpPtr GetIrp() const
+    {
+        CPort* pPort = m_pPort;
+        if( pPort == nullptr )
+            return -EFAULT;
+        return m_pIrp;
+    }
+
+    gint32 OnSendReady();
+    gint32 CancelSend( const bool& bCancelIrp );
+    gint32 Clear();
+};
+
 class CRateLimiterDrv : public CRpcTcpFidoDrv
 {
     public:
@@ -52,16 +84,17 @@ class CRateLimiterDrv : public CRpcTcpFidoDrv
         const IConfigDb* pConfig = NULL );
 };
 
+typedef std::pair< IrpPtr, guint32 > IRPQUE_ELEM;
 class CRateLimiterFido : public CPort
 {
-    std::deque< IrpPtr >  m_queWriteIrp;
-    std::deque< IrpPtr >  m_queReadIrp;
+    std::deque< IRPQUE_ELEM >  m_queWriteIrp;
+    std::deque< IRPQUE_ELEM >  m_queReadIrp;
 
     TaskletPtr  m_pReadTb;
     TaskletPtr  m_pWriteTb;
 
-    IrpPtr      m_pReadIrp;
-    IrpPtr      m_pWriteIrp;
+    CBytesWriter m_oWriter;
+
     MloopPtr    m_pLoop;
 
     public:
@@ -72,6 +105,14 @@ class CRateLimiterFido : public CPort
         SetClassId( clsid( CRateLimiterFido ) );
         m_dwFlags &= ~PORTFLG_TYPE_MASK;
         m_dwFlags |= PORTFLG_TYPE_FIDO;
+    }
+
+    TaskletPtr GetTokenTask( bool bWrite )
+    {
+        if( bWrite )
+            return m_pWriteTb;
+        else
+            return m_pReadTb;
     }
 
     gint32 PostStart( PIRP pIrp ) override
