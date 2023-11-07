@@ -1068,12 +1068,11 @@ gint32 CIfEnableEventTask::OnIrpComplete(
         return -EINVAL;
 
     gint32 ret = 0;
+    CRpcInterfaceBase* pIf = nullptr;
 
     do{
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
-
-        CRpcInterfaceBase* pIf = nullptr;
 
         ret = oParams.GetPointer(
             propIfPtr, pIf );
@@ -1104,6 +1103,11 @@ gint32 CIfEnableEventTask::OnIrpComplete(
 
     }while( 0 );
 
+    if( ERROR( ret ) && pIf != nullptr )
+        OutputMsg( ret,
+            "%s EnableEvent failed immediately",
+            CoGetClassName( pIf->GetClsid() ) );
+
     return ret;
 }
 
@@ -1111,11 +1115,11 @@ gint32 CIfEnableEventTask::RunTask()
 {
     gint32 ret = 0;
     
+    ObjPtr pObj;
     do{
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
 
-        ObjPtr pObj;
         ret = oParams.GetObjPtr( propIfPtr, pObj );
 
         if( ERROR( ret ) )
@@ -1190,6 +1194,10 @@ gint32 CIfEnableEventTask::RunTask()
         }
 
     }while( 0 );
+    if( ERROR( ret ) && !pObj.IsEmpty() )
+        OutputMsg( ret,
+            "%s EnableEvent failed immediately",
+            CoGetClassName( pObj->GetClsid() ) );
 
     return ret;
 }
