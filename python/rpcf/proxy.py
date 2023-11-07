@@ -360,9 +360,11 @@ class PyRpcServices :
 
         if ret < 0 :
             if isServer :
-                print( "Failed to start server %d(%d)" % ( os.getpid(), ret ) )
+                print( "Failed to start server %d(%d), state=%d" % 
+                    ( os.getpid(), ret, self.oInst.GetState() ) )
             else :
-                print( "Failed to start proxy %d(%d)" % ( os.getpid(), ret ) )
+                print( "Failed to start proxy %d(%d), state=%d" %
+                    ( os.getpid(), ret, self.oInst.GetState() ) )
             return ret
         else :
             if isServer :
