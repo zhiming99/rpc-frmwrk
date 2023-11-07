@@ -359,6 +359,7 @@ class PyRpcServices :
         isServer = self.IsServer()
 
         if ret < 0 :
+            self.SetError( ret )
             if isServer :
                 print( "Failed to start server %d(%d), state=%d" % 
                     ( os.getpid(), ret, self.oInst.GetState() ) )
