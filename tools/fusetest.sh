@@ -10,16 +10,19 @@ fi
 ulimit -n 8192
 ulimit -a
 
+dumpfile=$basedir/logdump.txt
 function stressTest()
 {
     pushd testdir
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
+    >$dumpfile
+
     mkdir mp mpsvr || true
-    release/TestTypessvr -m mpsvr &
+    release/TestTypessvr -m mpsvr >> $dumpfile &
     sleep 8 
-    release/TestTypescli -m mp &
+    release/TestTypescli -m mp >> $dumpfile  &
     sleep 4
 
     #make sure TestTypesSvc created
@@ -35,10 +38,9 @@ function stressTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    > $basedir/logdump.txt
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $basedir/logdump.txt &
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $dumpfile &
 
-/bin/bash << RUNCLIENT >> $basedir/logdump.txt
+/bin/bash << RUNCLIENT >> $dumpfile
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
@@ -76,9 +78,10 @@ function mkDirTest()
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
+    > $dumpfile
     mkdir mp mpsvr || true
-    hostsvr -m mpsvr &
-    hostcli -m mp &
+    hostsvr -m mpsvr >> $dumpfile &
+    hostcli -m mp >> $dumpfile &
     sleep 5 
 
     echo loading TestTypes library to server and proxy...
@@ -96,10 +99,9 @@ function mkDirTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    > $basedir/logdump.txt
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $basedir/logdump.txt &
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $dumpfile &
 
-/bin/bash << RUNCLIENT >> $basedir/logdump.txt
+/bin/bash << RUNCLIENT >> $dumpfile
 function singleMkdir()
 {
     idx=0
