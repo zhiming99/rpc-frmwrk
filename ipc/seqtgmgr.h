@@ -127,6 +127,7 @@ struct CSeqTaskGrpMgr : public CObjBase
             itr = m_mapSeqTgs.find( htg );
         }
         auto& elem = itr->second;
+        elem.m_iState = stateStarted;
         oLock.Unlock();
 
         ret = AddSeqTaskIf(
@@ -138,10 +139,6 @@ struct CSeqTaskGrpMgr : public CObjBase
         if( ERROR( ret ) )
         {
             m_mapSeqTgs.erase( htg );
-        }
-        else
-        {
-            elem.m_iState = stateStarted;
         }
         return ret;
     }
