@@ -1069,6 +1069,7 @@ gint32 CIfEnableEventTask::OnIrpComplete(
 
     gint32 ret = 0;
     CRpcInterfaceBase* pIf = nullptr;
+    IMessageMatch* pMatch = nullptr;
 
     do{
         CParamList oParams(
@@ -1082,6 +1083,11 @@ gint32 CIfEnableEventTask::OnIrpComplete(
             ret = -EFAULT;
             break;
         }
+
+        ret = oParams.GetPointer(
+            propMatchPtr, pMatch );
+        if( ERROR( ret ) )
+            break;
 
         ret = pIrp->GetStatus();
         if( unlikely( ret == -ENOTCONN ) )
@@ -1104,10 +1110,16 @@ gint32 CIfEnableEventTask::OnIrpComplete(
     }while( 0 );
 
     if( ERROR( ret ) && pIf != nullptr )
+    {
+        stdstr strMatch;
+        if( pMatch != nullptr )
+            strMatch = pMatch->ToString();
         OutputMsg( ret,
-            "%s EnableEvent failed immediately",
-            CoGetClassName( pIf->GetClsid() ) );
-
+            "%s EnableEvent OnIrpComplete failed, "
+            "match='%s'",
+            CoGetClassName( pIf->GetClsid() ),
+            strMatch.c_str() );
+    }
     return ret;
 }
 
@@ -1116,6 +1128,8 @@ gint32 CIfEnableEventTask::RunTask()
     gint32 ret = 0;
     
     ObjPtr pObj;
+    IMessageMatch* pMatch = nullptr;
+
     do{
         CParamList oParams(
             ( IConfigDb* )GetConfig() );
@@ -1140,8 +1154,6 @@ gint32 CIfEnableEventTask::RunTask()
         ret = oParams.GetBoolProp( 0, bEnable );
         if( ERROR( ret ) )
             break;
-
-        IMessageMatch* pMatch = nullptr;
 
         ret = oParams.GetPointer(
             propMatchPtr, pMatch );
@@ -1195,9 +1207,16 @@ gint32 CIfEnableEventTask::RunTask()
 
     }while( 0 );
     if( ERROR( ret ) && !pObj.IsEmpty() )
+    {
+        stdstr strMatch;
+        if( pMatch != nullptr )
+            strMatch = pMatch->ToString();
         OutputMsg( ret,
-            "%s EnableEvent failed immediately",
-            CoGetClassName( pObj->GetClsid() ) );
+            "%s EnableEvent RunTask failed, "
+            "match='%s'",
+            CoGetClassName( pObj->GetClsid() ),
+            strMatch.c_str() );
+    }
 
     return ret;
 }
