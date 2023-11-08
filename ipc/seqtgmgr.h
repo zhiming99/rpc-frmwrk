@@ -173,6 +173,9 @@ struct CSeqTaskGrpMgr : public CObjBase
             if( itr->second.m_iState != stateStarted )
             {
                 ret = ERROR_STATE;
+                OutputMsg( ret,
+                    "AddSeqTask Failed state2=%d",
+                    itr->second.m_iState );
                 break;
             }
 
@@ -184,6 +187,12 @@ struct CSeqTaskGrpMgr : public CObjBase
                 GetParent(),
                 pSeqTasks,
                 pTask, false );
+            if( ret == ERROR_STATE )
+            {
+                OutputMsg( ret,
+                    "AddSeqTaskIf Failed state3=%d",
+                    GetParent()->GetState() );
+            }
         }while( 0 );
 
         return ret;
