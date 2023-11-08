@@ -161,9 +161,9 @@ echo start stressTest normal...
 stressTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo stressTest normal passed!
@@ -175,9 +175,9 @@ echo start stressTest ROS...
 stressTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo stressTest ROS passed!
@@ -189,9 +189,9 @@ echo start mkDirTest normal
 mkDirTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo mkDirTest normal passed!
@@ -203,15 +203,16 @@ echo mkDirTest ROS
 mkDirTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo mkDirTest ROS passed!
 
 function pytest()
 {
+    > $dumpfile
     testcase=$1
     pushd $testcase
     if [ -e ./maincli.py ]; then 
@@ -239,9 +240,9 @@ function pytest()
         echo svcpt is $svcpt
         pushd ./fs
         echo release/${appname}svr -d -m ./mpsvr
-        release/${appname}svr -d -m ./mpsvr
+        release/${appname}svr -m ./mpsvr >> $dumpfile &
         sleep 2
-        echo release/${appname}cli -d -m ./mp
+        echo release/${appname}cli -m ./mp >> $dumpfile &
         release/${appname}cli -d -m ./mp
         popd
         sleep 5
@@ -267,6 +268,9 @@ function pytest()
     rm *.new
     rm -rf fs
     popd
+    if [ "x$ret" != "x0" ]; then
+        cat $dumpfile
+    fi
     return $ret
 }
 

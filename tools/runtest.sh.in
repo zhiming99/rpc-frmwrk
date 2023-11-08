@@ -345,7 +345,7 @@ elif [ "$1" == "1" ]; then
 # leaving examples
     popd
     echo start fuse test
-    bash tools/fusetest.sh || exit 10
+    bash tools/fusetest.sh || { pkill rpcrouter; cat $logfile; exit 10; }
     kill -9 `pidof rpcrouter`
 
     echo start btinrt test
