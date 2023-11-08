@@ -3474,6 +3474,8 @@ gint32 CRpcRouterBridge::RunEnableEventTask(
 
     if( ERROR( ret ) )
     {
+        OutputMsg( ret, "RunEnableEventTask failed, "
+            "match='%s'", pMatch->ToString().c_str() );
         if( !pRespTask.IsEmpty() )
         {
             CIfInterceptTaskProxy* pIcpt = pRespTask;
