@@ -158,7 +158,9 @@ struct CSeqTaskGrpMgr : public CObjBase
             if( m_iMgrState != stateStarted )
             {
                 ret = ERROR_STATE;
-                OutputMsg( ret, "AddSeqTask Failed" );
+                OutputMsg( ret,
+                    "AddSeqTask Failed state=%d",
+                    m_iMgrState );
                 break;
             }
             auto itr = m_mapSeqTgs.find( htg );
