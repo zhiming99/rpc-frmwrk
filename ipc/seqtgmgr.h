@@ -130,6 +130,13 @@ struct CSeqTaskGrpMgr : public CObjBase
         elem.m_iState = stateStarted;
         oLock.Unlock();
 
+        // FIXME: the caller should make sure no other
+        // tasks come ahead of the start task. A more
+        // reliable solution is using a taskgroup
+        // including a function to setting the
+        // 'm_iState' and the 'pTask', and add pass the
+        // taskgroup to AddSeqTaskIf. But it is not
+        // performance friendly.
         ret = AddSeqTaskIf(
             GetParent(),
             elem.m_pSeqTasks,
