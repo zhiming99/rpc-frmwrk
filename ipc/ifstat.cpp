@@ -1253,6 +1253,9 @@ gint32 CIfReqFwdrState::SubscribeEvents()
         propDBusModEvent,
     };
 
+    CIoManager* pMgr = GetIoMgr();
+    if( pMgr->HasBuiltinRt() )
+        vecEvtToSubscribe.clear();
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
 }
