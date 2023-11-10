@@ -3444,6 +3444,7 @@ gint32 CImplPyMainFunc::OutputCli(
             Wa( "    return ret" );
             Wa( "if isinstance( strNewDesc, str ) and len( strNewDesc ):" );
             Wa( "    strPath_ = strNewDesc" );
+            Wa( "    params[ 'objdesc' ] = strNewDesc" );
             Wa( "oContext = PyRpcContext( params )" );
         }
         else

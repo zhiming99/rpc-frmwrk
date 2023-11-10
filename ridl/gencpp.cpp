@@ -8039,6 +8039,10 @@ gint32 CImplMainFunc::Output()
                 Wa( "#include \"stmport.h\"" );
                 Wa( "#include \"fastrpc.h\"" );
             }
+            else if( g_bBuiltinRt )
+            {
+                Wa( "#include \"dbusport.h\"" );
+            }
             for( auto elem : vecSvcs )
             {
                 CServiceDecl* pSvc = elem;
