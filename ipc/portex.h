@@ -107,7 +107,7 @@ class CStartStopSafeBusPort :
 
         // the callback's OnIrpComplete will be called
         // when the port is started or failed
-        CEventMapHelper< CPortDriver > a( this );
+        CEventMapHelper< T > a( this );
         a.BroadcastEvent(
             eventPnp, eventPortAttached,
             PortToHandle( pNewPort ),

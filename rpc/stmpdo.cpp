@@ -815,6 +815,40 @@ gint32 CRpcTcpBusPort::PostStop( IRP* pIrp )
     return super::PostStop( pIrp );
 }
 
+gint32 CRpcTcpBusPort::SchedulePortAttachNotifTask(
+    IPort* pNewPort,
+    guint32 dwEventId,
+    IRP* pMasterIrp,
+    bool bImmediately )
+{
+    gint32 ret = 0;
+    do{
+        if( pMasterIrp != nullptr )
+        {
+            CIoManager* pMgr = GetIoMgr();
+            gint32 ( *func )( IEventSink*, CPort*, PIRP ) =
+            ([]( IEventSink* pCb, CPort* pBus,
+                PIRP pMaster )->gint32
+            {
+                CIoManager* pMgr = pBus->GetIoMgr();
+                pMgr->CompleteIrp( pMaster );
+                return 0;
+            });
+            TaskletPtr pCb;
+            ret = NEW_COMPLETE_FUNCALL( 0, pCb, pMgr,
+               func, nullptr, this, pMasterIrp  );
+            if( ERROR( ret ) )
+                break;
+            CCfgOpenerObj oPort( pNewPort );
+            oPort.SetPointer( propEventSink,
+                ( IEventSink* )pCb );
+        }
+        ret = NotifyPortAttached( pNewPort );
+
+    }while( 0 );
+    return ret;
+}
+
 CRpcTcpBusDriver::CRpcTcpBusDriver(
     const IConfigDb* pCfg )
     : super( pCfg )

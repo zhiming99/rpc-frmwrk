@@ -1206,6 +1206,12 @@ class CRpcTcpBusPort :
 
     guint32 GetConnections() const
     { return m_mapIdToAddr.size(); }
+
+    gint32 SchedulePortAttachNotifTask(
+        IPort* pNewPort,
+        guint32 dwEventId,
+        IRP* pMasterIrp = nullptr,
+        bool bImmediately = false ) override;
 };
 
 class CRpcTcpBusDriver : public CGenBusDriverEx

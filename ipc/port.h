@@ -682,7 +682,7 @@ class CGenericBusPort : public CPort
     // handler on port destroy
     gint32 OnPortStackDestroy( IRP* pIrp );
 
-    gint32 SchedulePortAttachNotifTask(
+    virtual gint32 SchedulePortAttachNotifTask(
         IPort* pNewPort,
         guint32 dwEventId,
         IRP* pMasterIrp = nullptr,
