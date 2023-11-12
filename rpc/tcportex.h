@@ -276,6 +276,7 @@ class CRpcNativeProtoFdo: public CPort
     std::deque< Stm2Ptr >  m_cycQueSend;
     std::atomic< gint32 >  m_iStmCounter;
     TaskletPtr m_pListeningTask;
+    sem_t   m_semFireSync;
 
 
     // completion handler for irp from tcpfido
@@ -307,6 +308,7 @@ class CRpcNativeProtoFdo: public CPort
     typedef CPort super;
 
     CRpcNativeProtoFdo( const IConfigDb* pCfg );
+    ~CRpcNativeProtoFdo();
     bool IsImmediateReq( IRP* pIrp );
     gint32 RemoveIrpFromMap( IRP* pIrp );
 
@@ -415,6 +417,9 @@ class CRpcNativeProtoFdo: public CPort
 
     gint32 SetListeningTask(
         TaskletPtr& pTask );
+
+    inline void WaitOnline()
+    { sem_wait( &m_semFireSync ); }
 };
 
 class CFdoListeningTask :
