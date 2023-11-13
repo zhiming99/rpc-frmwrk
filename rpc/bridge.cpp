@@ -5240,8 +5240,10 @@ gint32 CRpcTcpBridge::Handshake(
         CStdRMutex oIfLock( GetLock() );
         if( m_bHandshaked == true )
         {
+            oIfLock.Unlock();
+            PostDisconnEvent();
             ret = ERROR_STATE;
-            return ret;
+            break;
         }
 
         m_bHandshaked = true;
@@ -5310,10 +5312,9 @@ gint32 CRpcTcpBridge::Handshake(
             m_pHsTicker.Clear();
             oIfLock.Unlock();
             CStdRTMutex oTaskLock( ppt->GetLock() );
-            EnumTaskState iState =
-                ppt->GetTaskState();
+            gint32 iRet = ppt->GetError();
             ppt->RemoveTimer();
-            if( ppt->IsStopped( iState ) )
+            if( ERROR( iRet ) )
             {
                 oIfLock.Lock();
                 // the handshake window has closed,
