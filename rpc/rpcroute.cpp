@@ -1887,6 +1887,9 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                 if( SUCCEEDED( iRetVal ) ||
                     iRetVal == 0x7fffffff )
                 {
+                    ret = pRouter->AddBridge(
+                        m_pServer ); 
+
                     CRpcServices* pSvr = m_pServer;
                     PortPtr pPort = pSvr->GetPort();
 
@@ -1899,21 +1902,6 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                 }
                 else
                 {
-                    CGenericInterface* pIf = m_pServer;
-                    if( unlikely( pIf == nullptr ) )
-                        break;
-
-                    EnumEventId iEvent = cmdShutdown;
-                    EnumIfState iState = pIf->GetState();
-                    if( iState == stateStartFailed )
-                        iEvent = cmdCleanup;
-
-                    ret = pIf->SetStateOnEvent(
-                        iEvent );
-
-                    if( ERROR( ret ) )
-                        break;
-
                     // NOTE: Cannot call StopEx
                     // directly which may result
                     // in reentering this task,
@@ -1934,6 +1922,12 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
                 while( SUCCEEDED( ret ) ||
                     ret == 0x7fffffff )
                 {
+                    ret = pRouter->
+                        AddBridgeProxy( m_pProxy ); 
+
+                    if( ERROR( ret ) )
+                        break;
+
                     string strNode;
                     ret = oCfg.GetStrProp(
                         propNodeName, strNode );
@@ -1973,21 +1967,6 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
 
                 if( ERROR( ret ) )
                 {
-                    CGenericInterface* pIf = m_pProxy;
-                    if( unlikely( pIf == nullptr ) )
-                        break;
-
-                    EnumEventId iEvent = cmdShutdown;
-                    EnumIfState iState = pIf->GetState();
-                    if( iState == stateStartFailed )
-                        iEvent = cmdCleanup;
-
-                    ret = pIf->SetStateOnEvent(
-                        iEvent );
-
-                    if( ERROR( ret ) )
-                        break;
-
                     ret = this->StopIfSafe(
                         m_pProxy, iRetVal );
                     break;
@@ -2016,14 +1995,10 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
             if( bServer )
             {
                 m_pServer = pBridgeIf;
-                ret = pRouter->AddBridge(
-                    m_pServer ); 
             }
             else
             {
                 m_pProxy = pBridgeIf;
-                ret = pRouter->
-                    AddBridgeProxy( m_pProxy ); 
             }
                     
             if( ERROR( ret ) )
@@ -2045,6 +2020,58 @@ gint32 CRouterOpenBdgePortTask::RunTaskInternal(
         m_pServer.Clear();
         m_pProxy.Clear();
     }
+
+    return ret;
+}
+
+gint32 CRouterOpenBdgePortTask::StopIfSafe(
+    InterfPtr& pIf, gint32 iRetVal )
+{
+    gint32 ret = 0;
+    TaskletPtr pStopTask;
+    do{
+        CCfgOpener oCfg(
+            ( IConfigDb* )GetConfig() );
+
+        CRpcRouterBridge* pRouter = nullptr;
+        ret = oCfg.GetPointer(
+            propRouterPtr, pRouter );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = pIf;
+        CIoManager* pMgr = pSvc->GetIoMgr();
+
+        CParamList oParams;
+        oParams.SetPointer(
+            propIfPtr, ( CRpcServices*)pIf );
+
+        ret = DEFER_IFCALLEX_NOSCHED2( 
+            0, pStopTask, pIf,
+            &CRpcInterfaceBase::Shutdown, nullptr );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = 0;
+        ret = oCfg.GetIntProp(
+            propPortId, dwPortId );
+        if( ERROR( ret ) )
+            break;
+        ret = pRouter->AddStopTask(
+            nullptr, dwPortId, pStopTask );
+        if( SUCCEEDED( ret ) )
+            break;
+
+        // There is another stop task in the queue.
+        // because we have not registered the bridge
+        // with the router, the queued task cannot stop
+        // the bridge.
+        ret = pMgr->RescheduleTask( pStopTask );
+
+    }while( 0 );
+
+    if( ERROR( ret ) && !pStopTask.IsEmpty() )
+        ( *pStopTask )( eventCancelTask );
 
     return ret;
 }
@@ -2140,16 +2167,40 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
         {
             bool bBridge = true;
             InterfPtr pIf;
-            ret = GetBridge( dwPortId, pIf );
-            if( ERROR( ret ) )
+
+            PortPtr pPort, pPdo;
+            BufPtr pBuf;
+            ret = GetIoMgr()->GetPortPtr(
+                hPort, pPort );
+            if( SUCCEEDED( ret ) )
             {
-                ret = GetBridgeProxy( dwPortId, pIf );
+                ret = ( ( CPort* )pPort )->
+                    GetPdoPort( pPdo );
+
+                if( ERROR( ret ) )
+                    break;
+
+                oEvtCtx.SetPointer(
+                    propPortPtr, ( CPort* )pPort );
+
+                ret = this->GetPortProp( pPdo,
+                    propIsServer, pBuf );
+            }
+
+            if( SUCCEEDED( ret ) )
+                bBridge = ( bool& )*pBuf;
+            else
+            {
+                InterfPtr pIf;
+                ret = GetBridge( dwPortId, pIf );
                 if( ERROR( ret ) )
                 {
-                    // possibly from CKdcRelayPdo
-                    break;
+                    ret = GetBridgeProxy(
+                        dwPortId, pIf );
+                    if( ERROR( ret ) )
+                        break;
+                    bBridge = false;
                 }
-                bBridge = false;
             }
 
             ret = DEFER_IFCALLEX_NOSCHED2(
@@ -2296,23 +2347,31 @@ gint32 CRpcRouterBridge::OnRmtSvrOnline(
 
             TaskletPtr pTask;
             ret = pTask.NewObj(
-                clsid( CRouterOpenBdgePortTask  ),
+                clsid( CRouterOpenBdgePortTask ),
                 oParams.GetCfg() );
 
             if( ERROR( ret ) )
                 break;
 
-            ( *pTask )( eventZero );
-            ret = pTask->GetError();
             bRemove = false;
+            ret = ( *pTask )( eventZero );
+            if( ret != STATUS_PENDING )
+            {
+                // immediate return
+                pCallback->OnEvent(
+                    eventTaskComp, ret, 0, nullptr );
+            }
         }
 
     }while( 0 );
     if( bRemove && dwPortId > 0 )
     {
+        pCallback->OnEvent(
+            eventTaskComp, ret, 0, nullptr );
+        // remove the seqtgmgr slot
         TaskletPtr pEmpty;
-        this->AddStopTask(
-            nullptr, dwPortId, pEmpty );
+        this->AddStopTask( nullptr,
+            dwPortId, pEmpty );
     }
     return ret;
 }
@@ -2482,14 +2541,6 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
 
         // put the bridge to the stopping state to
         // block new requests
-        bool bStop = true;
-        ret = pBridge->SetStateOnEvent(
-            cmdShutdown );
-        if( ERROR( ret ) )
-        {
-            // the bridge already in stopping state
-            bStop = false;
-        }
 
         // remove all the remote matches
         // registered via this bridge
@@ -2526,12 +2577,12 @@ gint32 CRouterStopBridgeTask::DoSyncedTask(
             pTaskGrp->AppendTask( pTask );
         }
 
-        if( bStop )
+        if( true )
         {
             TaskletPtr pTask;
             ret = DEFER_IFCALLEX_NOSCHED2(
                 0, pTask, ObjPtr( pBridge ),
-                &CRpcTcpBridge::StopEx,
+                &CRpcTcpBridge::Shutdown,
                 nullptr );
             if( ERROR( ret ) )
                 break;
@@ -2677,8 +2728,6 @@ gint32 CRouterStopBridgeTask::RunTask()
             }
         }
 
-        CIoManager* pMgr = pRouter->GetIoMgr();
-        TaskletPtr pGrpTask = pParaGrp;
         if( pParaGrp->GetTaskCount() == 0 )
         {
             TaskletPtr pEmptyTask;
@@ -2687,6 +2736,7 @@ gint32 CRouterStopBridgeTask::RunTask()
         }
         else
         {
+            TaskletPtr pGrpTask = pParaGrp;
             ret = DoSyncedTask(
                 this, pvecMatchesLoc, pGrpTask );
         }
@@ -2986,6 +3036,16 @@ gint32 CRpcRouterBridge::OnRmtSvrOffline(
             hPort, nullptr, nullptr );
         if( ERROR( ret ) )
             break;
+
+        // it is important to keep the handle not be
+        // resued by malloc for new port. Otherwise,
+        // the ClosePort may close a newly created port
+        // unexpectedly
+        Variant oVar;
+        oEvtCtx.GetProperty( propPortPtr, oVar );
+        oEvtCtx.RemoveProperty( propPortPtr );
+        pStopTask->SetProperty(
+            propPortPtr, oVar );
 
         CParamList oParams;
         oParams.SetPointer( propIfPtr, this );

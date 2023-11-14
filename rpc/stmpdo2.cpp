@@ -2503,17 +2503,40 @@ gint32 CTcpStreamPdo2::GetProperty(
     gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
-    if( iProp == propRttMs )
-    {
-        CRpcConnSock* pSock = m_pConnSock;
-        guint32 dwRtt;
-        ret = pSock->GetRttTimeMs( dwRtt );
-        if( ERROR( ret ) )
-            return ret;
-        oBuf = dwRtt;
-        return 0;
-    }
-    return super::GetProperty( iProp, oBuf );
+    do{
+        if( iProp == propRttMs )
+        {
+            CStdRMutex oLock( GetLock() );
+            CRpcConnSock* pSock = m_pConnSock;
+            if( pSock == nullptr )
+                return -EFAULT;
+            guint32 dwRtt;
+            ret = pSock->GetRttTimeMs( dwRtt );
+            if( ERROR( ret ) )
+                return ret;
+            oBuf = dwRtt;
+            return 0;
+        }
+        else if( iProp == propIsServer )
+        {
+            CStdRMutex oLock( GetLock() );
+            Variant oVar;
+            ret = m_pCfgDb->GetProperty(
+                propConnParams, oVar );
+            if( ERROR( ret ) )
+                break;
+
+            IConfigDb* pConnParams =
+                ( ObjPtr& )oVar;
+            ret = pConnParams->GetProperty(
+                propIsServer, oBuf );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+            ret = super::GetProperty( iProp, oBuf );
+    }while( 0 );
+    return ret;
 }
 
 static gint32 GetCfgFile( stdstr& strFile )

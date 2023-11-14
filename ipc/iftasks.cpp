@@ -1114,7 +1114,7 @@ gint32 CIfEnableEventTask::OnIrpComplete(
         stdstr strMatch;
         if( pMatch != nullptr )
             strMatch = pMatch->ToString();
-        OutputMsg( ret,
+        DebugPrint( ret,
             "%s EnableEvent OnIrpComplete failed, "
             "match='%s'",
             CoGetClassName( pIf->GetClsid() ),
@@ -1211,10 +1211,11 @@ gint32 CIfEnableEventTask::RunTask()
         stdstr strMatch;
         if( pMatch != nullptr )
             strMatch = pMatch->ToString();
-        OutputMsg( ret,
+        DebugPrint( ret,
             "%s EnableEvent RunTask failed, "
-            "match='%s'",
+            "if='0x%llx', match='%s'",
             CoGetClassName( pObj->GetClsid() ),
+            ( CObjBase* )pObj,
             strMatch.c_str() );
     }
 
