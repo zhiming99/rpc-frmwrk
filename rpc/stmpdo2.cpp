@@ -2509,13 +2509,15 @@ gint32 CTcpStreamPdo2::GetProperty(
             CStdRMutex oLock( GetLock() );
             CRpcConnSock* pSock = m_pConnSock;
             if( pSock == nullptr )
-                return -EFAULT;
+            {
+                ret = -EFAULT;
+                break;
+            }
             guint32 dwRtt;
             ret = pSock->GetRttTimeMs( dwRtt );
             if( ERROR( ret ) )
-                return ret;
+                break;
             oBuf = dwRtt;
-            return 0;
         }
         else if( iProp == propIsServer )
         {
@@ -2530,8 +2532,6 @@ gint32 CTcpStreamPdo2::GetProperty(
                 ( ObjPtr& )oVar;
             ret = pConnParams->GetProperty(
                 propIsServer, oBuf );
-            if( ERROR( ret ) )
-                break;
         }
         else
             ret = super::GetProperty( iProp, oBuf );
