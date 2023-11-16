@@ -130,8 +130,7 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
     IConfigDb* pReqCtx )
 {
     gint32 ret = 0;
-    if( pCallback == nullptr ||
-        pIoReq == nullptr ||
+    if( pIoReq == nullptr ||
         pReqCtx == nullptr )
         return -EINVAL;
 
@@ -236,8 +235,9 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
         DebugPrintEx( logErr, ret,
             "TcpBridgeProxy Handshake failed" );
 
-    pCallback->OnEvent(
-        eventTaskComp, ret, 0, nullptr );
+    if( pCallback != nullptr )
+        pCallback->OnEvent(
+            eventTaskComp, ret, 0, nullptr );
 
     return ret;
 }
@@ -282,8 +282,8 @@ gint32 CRpcTcpBridgeProxy::Handshake(
         CCfgOpenerObj oTask(
             ( CObjBase* )pCallback ); 
 
-        ret = oTask.CopyProp(
-            propRespPtr, oResp.GetCfg() );
+        Variant oVar;
+        ret = oTask.GetProperty( propRespPtr, oVar );
 
     }while( 0 );
 
@@ -335,44 +335,8 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oCfg( pCallback );
-        IConfigDb* pResp = nullptr;
-        ret = oCfg.GetPointer(
-            propRespPtr, pResp );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oResp( pResp ); 
-        gint32 iRet = 0;
-        ret = oResp.GetIntProp(
-            propReturnValue,
-            *( guint32* )&iRet );
-        if( ERROR( ret ) )
-            break;
-
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
-        IConfigDb* pInfo = nullptr;
-        ret = oResp.GetPointer( 0, pInfo );
-        if( ERROR( ret ) )
-            break;
-
-        guint64 qwTimestamp = 0;
-        CCfgOpener oInfo( pInfo );
-        ret = oResp.GetQwordProp(
-            propTimestamp, qwTimestamp );
-        if( ERROR( ret ) )
-            break;
-
-        timespec ts;
-        clock_gettime( CLOCK_REALTIME, &ts );
-        m_oTs.SetBase(
-            ( tv.tv_sec + ts.tv_sec ) >> 1 );
-        m_oTs.SetPeer( qwTimestamp );
+        ret = OnHandshakeComplete( nullptr,
+            pRespCb, oParams.GetCfg() );
 
     }while( 0 );
 

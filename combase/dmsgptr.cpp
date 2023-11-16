@@ -45,6 +45,7 @@ std::string DMsgPtr::GetInterface() const
 
     if( pszInterface == nullptr )
     {
+        sched_yield();
         pszInterface =
             dbus_message_get_interface( m_pObj );
         if( pszInterface == nullptr )
@@ -80,6 +81,7 @@ std::string DMsgPtr::GetPath() const
 
     if( pszPath == nullptr )
     {
+        sched_yield();
         pszPath =
             dbus_message_get_interface( m_pObj );
         if( pszPath == nullptr )
