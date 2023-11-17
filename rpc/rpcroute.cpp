@@ -4194,8 +4194,9 @@ gint32 CRpcRouterBridge::OnClose(
         oEvtCtx[ propConnHandle ] =
             dwPortId;
 
-        oEvtCtx[ propEventSink ] =
-            ObjPtr( pCallback );
+        if( pCallback != nullptr )
+            oEvtCtx[ propEventSink ] =
+                ObjPtr( pCallback );
 
         InterfPtr pIf;
         ret = GetBridge( dwPortId, pIf );

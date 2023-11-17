@@ -5311,33 +5311,17 @@ gint32 CRpcTcpBridge::PostDisconnEvent()
     do{
         CCfgOpener oReqCtx;
         oReqCtx[ propRouterPath ] = "/";
-        oReqCtx.CopyProp( propConnHandle,
-            propPortId, this );
 
-        PortPtr pPort;
-        GET_TARGET_PORT( pPort ); 
-        if( ERROR( ret ) )
-            break;
+        Variant oVar;
+        this->GetProperty( propPortId, oVar );
+        oReqCtx.SetProperty(
+            propConnHandle, oVar );
 
-        BufPtr pBuf( true );
-        ret = GetPortProp( pPort,
-            propPdoPtr, pBuf );
-        if( ERROR( ret ) )
-            break;
+        guint32 dwPortId = oVar;
 
-        IPort* pPdo = ( ObjPtr& )*pBuf;
-        if( unlikely( pPdo == nullptr ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        IConfigDb* pReqCtx = oReqCtx.GetCfg();
-        CRpcRouter* pRouter = GetParent();
-        // stop the underlying port
-        pRouter->OnEvent( eventRmtSvrOffline,
-            ( LONGWORD )pReqCtx, 0,
-            ( LONGWORD* )PortToHandle( pPdo ) );
+        auto pParent = GetParent();
+        CRpcRouterBridge* prt = ObjPtr( pParent );
+        ret = prt->OnClose( dwPortId, nullptr );
 
     }while( 0 );
 

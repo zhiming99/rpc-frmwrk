@@ -353,17 +353,15 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
 gint32 CPnpManager::StartPortsInternal(
     IPort* pPort, IRP* pMastIrp )
 {
+    if( pPort == nullptr )
+        return  -EINVAL;
+
     gint32 ret = 0;
     IrpPtr pMasterIrp( pMastIrp );
     CIoManager* pMgr = GetIoMgr();
     if( pMgr->IsStopping() )
         ret = ERROR_STATE;
     else do{
-        if( pPort == nullptr )
-        {
-            ret = -EINVAL;
-            break;
-        }
 
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( nullptr );
