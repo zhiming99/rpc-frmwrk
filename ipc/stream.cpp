@@ -1710,34 +1710,9 @@ gint32 IStream::OnPreStopShared(
 {
     gint32 ret = 0;
     CRpcServices* pThis = GetInterface(); 
-    bool bNotify = true;
     auto pMgr = pThis->GetIoMgr();
 
     do{
-        gint32 (*func)( IEventSink*, IEventSink*) =
-        ([]( IEventSink* pCb, IEventSink* pNotify )->gint32
-        {
-            gint32 ret = 0;
-            if( pCb == nullptr || pNotify == 0 )
-                return -EINVAL;
-
-            CCfgOpenerObj oCbCfg( pCb );
-            IConfigDb* pResp;
-            ret = oCbCfg.GetPointer(
-                propRespPtr, pResp );
-            if( SUCCEEDED( ret ) )
-            {
-                CCfgOpener oResp( pResp );
-                oResp.GetIntProp(
-                    propReturnValue,
-                    ( guint32& )ret );
-            }
-            pNotify->OnEvent(
-                eventTaskComp, ret, 0, nullptr );
-
-            return 0;
-        });
-
         CStdRMutex oIfLock( pThis->GetLock() );
         if( m_mapUxStreams.empty() )
             break;
@@ -1748,61 +1723,36 @@ gint32 IStream::OnPreStopShared(
 
         oIfLock.Unlock();
 
-        if( vecStreams.empty() )
-            break;
-
+        gint32 arrRets[ vecStreams.size() ];
         for( int i = 0; i < vecStreams.size(); i++ )
         {
-            if( i < vecStreams.size() - 1 )
-            {
-                this->OnClose(
-                    vecStreams[ i ], nullptr );
-            }
-            else
-            {
-                TaskletPtr pFinalCb;
-                NEW_COMPLETE_FUNCALL( 0,
-                    pFinalCb, pMgr,
-                    func, nullptr, pCallback );
-                ( *pFinalCb )( eventZero );
-
-                ret = this->OnClose(
-                    vecStreams[ i ], pFinalCb );
-
-                if( SUCCEEDED( ret ) )
-                    bNotify = false;
-                else
-                    ( *pFinalCb )( eventCancelTask );
-            }
+            arrRets[ i ] = this->OnClose(
+                vecStreams[ i ], nullptr );
         }
 
     }while( 0 );
 
-    if( bNotify )
+    if( true )
     {
         // possibly there are stream stop tasks in the
         // m_pSeqTasks, so schedule a conclusion task
         // to make sure all the stop tasks are done.
-        if( SUCCEEDED( ret ) )
+        TaskletPtr pFinalCb;
+        gint32 (*func1)( IEventSink*) =
+        ([]( IEventSink* pNotify )->gint32
         {
-            TaskletPtr pFinalCb;
-            gint32 (*func1)( IEventSink*) =
-            ([]( IEventSink* pNotify )->gint32
-            {
-                pNotify->OnEvent(
-                    eventTaskComp, 0, 0, nullptr );
-                return 0;
-            });
-            NEW_FUNCCALL_TASK( pFinalCb,
-                pMgr, func1, pCallback );
-            ret = pThis->AddSeqTask( pFinalCb );
-            if( ERROR( ret ) )
-                ( *pFinalCb )( eventCancelTask );
-        }
+            pNotify->OnEvent(
+                eventTaskComp, 0, 0, nullptr );
+            return 0;
+        });
+        NEW_FUNCCALL_TASK( pFinalCb,
+            pMgr, func1, pCallback );
+        ret = pThis->AddSeqTask( pFinalCb );
+        if( ERROR( ret ) )
+            ( *pFinalCb )( eventCancelTask );
+        else
+            ret = STATUS_PENDING;
     }
-
-    if( SUCCEEDED( ret ) )
-        ret = STATUS_PENDING;
 
     return ret;
 }

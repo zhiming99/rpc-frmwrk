@@ -1787,7 +1787,7 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
         pPayload = pCtx->m_pRespData;
     }
 
-    ret = PostEvent( pPayload );
+    PostEvent( pPayload );
 
     return ret;
 }
@@ -2040,8 +2040,10 @@ gint32 CIfTcpStmTransTask::PostEvent(
     guint8 byToken = 0;
     BufPtr pNewBuf( true );
 
-    gint32 ret = RemoteToLocal(
-        pBuf, byToken, pNewBuf );
+    gint32 ret = 0;
+    if( byToken != tokError )
+        ret = RemoteToLocal(
+            pBuf, byToken, pNewBuf );
 
     if( ERROR( ret ) )
         return ret;
@@ -2070,6 +2072,11 @@ gint32 CIfTcpStmTransTask::PostEvent(
     case tokFlowCtrl:
     case tokLift:
         {
+            break;
+        }
+    case tokError:
+        {
+            // this token does not come from wire
             break;
         }
     default:

@@ -94,6 +94,10 @@ class CStreamRelayBase :
                 if( ret == STATUS_PENDING )
                     ret = 0;
             }
+            else
+            {
+                ret = -ENOENT;
+            }
 
         }while( 0 );
 
@@ -133,6 +137,10 @@ class CStreamRelayBase :
                     hChannel, pCallback );
                 if( ret == STATUS_PENDING )
                     ret = 0;
+            }
+            else
+            {
+                ret = -ENOENT;
             }
 
         }while( 0 );
