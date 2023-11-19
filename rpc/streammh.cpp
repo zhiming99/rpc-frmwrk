@@ -1735,6 +1735,10 @@ gint32 CStreamServerRelayMH::OnClose2(
             ret = OnCloseInternal(
                 hChannel, pCallback );
         }
+        else
+        {
+            ret = -ENOENT;
+        }
 
     }while( 0 );
 
