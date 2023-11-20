@@ -40,37 +40,6 @@ typedef enum
 } EnumRatLimitClsid;
 
 class CRateLimiterFido;
-class CBytesWriter
-{
-    IrpPtr m_pIrp;
-    gint32 m_iBufIdx = -1;
-    guint32 m_dwOffset = 0;
-    PortPtr m_pPort;
-    bool    m_bWrite = true;
-    guint32 m_dwBytesToSend = 0;
-    public:
-
-    CBytesWriter( CRateLimiterFido* pPdo );
-
-    gint32 SetIrpToSend(
-        IRP* pIrp, guint32 dwSize );
-
-    gint32 SendImmediate( PIRP pIrp );
-    gint32 SetSendDone( gint32 iRet = 0 );
-    bool IsSendDone() const;
-    IrpPtr GetIrp() const
-    {
-        CPort* pPort = m_pPort;
-        if( pPort == nullptr )
-            return -EFAULT;
-        return m_pIrp;
-    }
-
-    gint32 OnSendReady();
-    gint32 CancelSend( const bool& bCancelIrp );
-    gint32 Clear();
-};
-
 class CRateLimiterDrv : public CRpcTcpFidoDrv
 {
     public:
@@ -87,20 +56,66 @@ class CRateLimiterDrv : public CRpcTcpFidoDrv
 typedef std::pair< IrpPtr, guint32 > IRPQUE_ELEM;
 class CRateLimiterFido : public CPort
 {
-    std::deque< IRPQUE_ELEM >  m_queWriteIrp;
-    std::deque< IRPQUE_ELEM >  m_queReadIrp;
+    public:
+
+    class CBytesWriter
+    {
+        IrpPtr m_pIrp;
+        gint32 m_iBufIdx = -1;
+        guint32 m_dwOffset = 0;
+        CRateLimiterFido* m_pPort;
+        guint32 m_dwBytesToSend = 0;
+        public:
+
+        CBytesWriter( CRateLimiterFido* pPdo );
+        gint32 SetIrpToSend(
+            IRP* pIrp, guint32 dwSize );
+        gint32 SendImmediate( PIRP pIrp );
+        gint32 SetSendDone();
+        bool IsSendDone() const;
+        IrpPtr GetIrp() const;
+        gint32 OnSendReady();
+        gint32 CancelSend(
+            const bool& bCancelIrp );
+        gint32 Clear();
+    };
+
+    class CBytesReader
+    {
+        IrpPtr m_pIrp;
+        gint32 m_iBufIdx = -1;
+        guint32 m_dwOffset = 0;
+        CRateLimiterFido* m_pPort;
+        public:
+
+        CBytesReader( CRateLimiterFido* pPdo );
+        gint32 StartRead();
+        gint32 ReadImmediate( PIRP pIrp );
+        gint32 SetReadDone();
+        bool IsReadDone() const;
+        IrpPtr GetIrp() const;
+        gint32 OnReadReady();
+        gint32 CancelRead(
+            const bool& bCancelIrp );
+        gint32 Clear();
+    };
+
+    protected:
+    std::deque< IRPQUE_ELEM >  m_queWriteIrps;
+    std::deque< IRPQUE_ELEM >  m_queReadIrps;
 
     TaskletPtr  m_pReadTb;
     TaskletPtr  m_pWriteTb;
-
-    CBytesWriter m_oWriter;
-
     MloopPtr    m_pLoop;
+    CBytesWriter m_oWriter;
+    CBytesReader m_oReader;
 
     public:
     typedef CPort super;
-    CRateLimiterFido( const IConfigDb* pCfg )
-        : super( pCfg )
+    CRateLimiterFido( const IConfigDb* pCfg ) :
+        super( pCfg ),
+        m_oWriter( this ),
+        m_oReader( this )
     {
         SetClassId( clsid( CRateLimiterFido ) );
         m_dwFlags &= ~PORTFLG_TYPE_MASK;
@@ -115,142 +130,21 @@ class CRateLimiterFido : public CPort
             return m_pReadTb;
     }
 
-    gint32 PostStart( PIRP pIrp ) override
-    {
-        gint32 ret = 0;
-        do{
-            PortPtr pPdo;
-            ret = this->GetPdoPort( pPdo );
-            if( ERROR( ret ) )
-                break;
-            CTcpStreamPdo2* pStmPdo = pPdo;
-            CMainIoLoop* pLoop =
-                pStmPdo->GetMainLoop();
-            if( pLoop == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
-            m_pLoop = pLoop;
-            CParamList oParams;
-            oParams.SetPointer(
-                propObjPtr, pLoop );
-            oParams.SetPointer(
-                propParentPtr, this );
-            oParams.SetIntProp(
-                propTimeoutSec, 1 );
-            oParams.CopyProp(
-                0, propReadBps, this );
-
-            ret = m_pReadTb.NewObj(
-                clsid( CTokenBucketTask ),
-                oParams.GetCfg();
-            if( ERROR( ret ) )
-                break;
-
-            oParams.CopyProp(
-                0, propWriteBps, this );
-
-            ret = m_pWriteTb.NewObj(
-                clsid( CTokenBucketTask ),
-                oParams.GetCfg();
-            if( ERROR( ret ) )
-                break;
-
-            ret = ( *m_pReadTb )( eventZero );
-            if( ERROR( ret ) )
-                break;
-            ret = ( *m_pWriteTb )( eventZero );
-            if( ERROR( ret ) )
-                break;
-
-        }while( 0 );
-        if( ERROR( ret ) )
-        {
-            if( !m_pReadTb.IsEmpty() )
-                ( *m_pReadTb )( eventCancelTask );
-            if( !m_pWriteTb.IsEmpty() )
-                ( *m_pReadTb )( eventCancelTask );
-        }
-        return ret;
-    }
-
+    gint32 PostStart( PIRP pIrp ) override;
+    gint32 OnPortReady( PIRP pIrp ) override;
     gint32 PreStop( PIRP pIrp ) override
-    {
-        if( !m_pWriteTb.IsEmpty() )
-        {
-            ( *m_pWriteTb )( eventCancelTask );
-            m_pWriteTb.Clear();
-        }
-        if( !m_pReadTb.IsEmpty() )
-        {
-            ( *m_pReadTb )( eventCancelTask );
-            m_pReadTb.Clear();
-        }
-
-        // the irps will be released in super class's
-        // PreStop
-        m_queWriteIrp.clear();
-        m_queReadIrp.clear();
-        m_pReadIrp.Clear();
-        m_pWriteIrp.Clear();
-        m_pLoop.Clear();
-        return super::PreStop( pIrp );
-    }
-
     gint32 ResumeWrite();
     gint32 ResumeRead();
-
-    gint32 CompleteFuncIrp( PIRP pIrp );
-    gint32 OnSubmitIrp( PIRP pIrp );
-
+    gint32 SubmitWriteIrp( pIrp );
+    gint32 OnSubmitIrp( PIRP pIrp ) override;
+    gint32 CompleteListeningIrp( PIRP pIrp );
+    gint32 CompleteWriteIrp( PIRP pIrp );
+    gint32 CompleteIoctlIrp( PIRP pIrp ) override;
+    gint32 CompleteFuncIrp( PIRP pIrp ) override;
     gint32 OnEvent( EnumEventId iEvent,
             LONGWORD dwParam1 = 0,
             LONGWORD dwParam2 = 0,
-            LONGWORD* pData = NULL  ) override
-    {
-        gint32 ret = 0;
-        switch( iEvent )
-        {
-        case eventResumed:
-            {
-                CStdRMutex oPortLock( GetLock() );
-                guint32 dwState = GetPortState();
-                if( dwState == PORT_STATE_STOPPING ||
-                    dwState == PORT_STATE_STOPPED ||
-                    dwState == PORT_STATE_REMOVED )
-                {
-                    ret = ERROR_STATE;
-                    break;
-                }
-                auto pTask = reinterpret_cast
-                    < CTokenBucketTask* >( pData );
-                guint64 qwObjId =
-                    pTask->GetObjId();
-                if( qwObjId ==
-                    m_pReadTb->GetObjId() )
-                {
-                    oPortLock.Unlock();
-                    ret = ResumeRead();
-                }
-                else if( qwObjId ==
-                    m_pWriteTb->GetObjId() )
-                {
-                    oPortLock.Unlock();
-                    ret = ResumeWrite();
-                }
-                break;
-            }
-        default:
-            {
-                ret = super::OnEvent(
-                    iEvent, dwParam1,
-                    dwParam2, pData );
-                break;
-            }
-        }
-        return ret;
-    }
+            LONGWORD* pData ) override;
 };
 
 }

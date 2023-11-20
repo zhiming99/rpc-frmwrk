@@ -6720,6 +6720,9 @@ gint32 CTokenBucketTask::RunTask()
 gint32 CTokenBucketTask::AllocToken(
     guint32& dwNumReq )
 {
+    if( dwNumReq == 0 )
+        return -EINVAL;
+
     CStdRTMutex oLock( GetLock() );
     if( GetTaskState() != stateStarted )
         return ERROR_STATE;

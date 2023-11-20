@@ -335,8 +335,7 @@ class CPort : public IPort
     { return 0; }
     virtual gint32 OnPortStackDestroy( IRP* pIrp );
     virtual gint32 OnPortStackBuilt( IRP* pIrp );
-    virtual gint32 OnPortStackReady( IRP* pIrp )
-    { return 0; }
+    virtual gint32 OnPortStackReady( IRP* pIrp );
 
     virtual void OnPortStartFailed(
         IRP* pIrp, gint32 ret );

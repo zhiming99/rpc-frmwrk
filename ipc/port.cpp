@@ -1865,9 +1865,9 @@ gint32 CPort::PassUnknownIrp( IRP* pIrp )
 
         IPort* pLowerPort = GetLowerPort();
 
-        if( PortType( m_dwFlags ) == PORTFLG_TYPE_FIDO
-            && pLowerPort != nullptr )
+        if( pLowerPort != nullptr )
         {
+            IrpCtxPtr pCurCtx = pIrp->GetTopStack();
             // NOTE: the default behavor for
             // filter driver is to
             // pass unknown irps on to the
@@ -1878,8 +1878,11 @@ gint32 CPort::PassUnknownIrp( IRP* pIrp )
             if( ERROR( ret ) )
                 break;
 
+            IrpCtxPtr pTopCtx =
+                pIrp->GetTopStack();
+
             ret = pLowerPort->AllocIrpCtxExt(
-                pIrp->GetTopStack() );
+                pTopCtx );
 
             // save my ctx pos before let
             // the irp go
@@ -1891,6 +1894,12 @@ gint32 CPort::PassUnknownIrp( IRP* pIrp )
 
             // clean up the allocated context
             ret = pIrp->GetTopStack()->GetStatus();
+            if( SUCCEEDED( ret ) &&
+                !pTopCtx->m_pRespData.IsEmpty() )
+            {
+                pCurCtx->m_pRespData =
+                    pTopCtx->m_pRespData;
+            }
             pIrp->PopCtxStack();
             pIrp->SetCurPos( dwPos );
             pIrp->GetCurCtx()->SetStatus( ret );
@@ -3147,6 +3156,14 @@ gint32 CPort::OnPortStackBuilt( IRP* pIrp )
         ret = GetIoMgr()->AddToHandleMap( this );    
     }
     return ret;
+}
+
+gint32 CPort::OnPortStackReady( IRP* pIrp )
+{
+    if( PortType( m_dwFlags ) ==
+        PORTFLG_TYPE_FIDO )
+        return PassUnknownIrp( pIrp );
+    return 0;
 }
 
 std::string CPort::ExClassToInClass(

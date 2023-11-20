@@ -809,7 +809,17 @@ gint32 CTcpStreamPdo2::OnStmSockEvent(
         CStdRMutex oPortLock( GetLock() );
         if( m_queListeningIrps.empty() )
         {
+            bool bFull = false;
+            if( m_queEvtToRecv.size() >=
+                STM_MAX_QUEUE_SIZE )
+                bFull = true;
             m_queEvtToRecv.push_back( sse );
+            if( !bFull && m_queEvtToRecv.size() >=
+                STM_MAX_QUEUE_SIZE )
+            {
+                CRpcConnSock* pSock = m_pConnSock;
+                pSock->StopWatch( false );
+            }
         }
         else
         {
@@ -920,7 +930,13 @@ gint32 CTcpStreamPdo2::OnReceive(
         sse.m_iEvent = sseRetWithBuf;
         sse.m_iEvtSrc = GetClsid();
         
+        bool bFull = false;
+
         CStdRMutex oPortLock( GetLock() );
+        if( m_queEvtToRecv.size() >=
+            STM_MAX_QUEUE_SIZE )
+            bFull = true;
+
         m_queEvtToRecv.push_back( sse );
         if( !m_queListeningIrps.empty() )
         {
@@ -969,6 +985,13 @@ gint32 CTcpStreamPdo2::OnReceive(
             oIrpLock.Unlock();
             GetIoMgr()->CompleteIrp( pIrp );
             continue;
+        }
+
+        if( !bFull && m_queEvtToRecv.size() >=
+            STM_MAX_QUEUE_SIZE )
+        {
+            CRpcConnSock* pSock = m_pConnSock;
+            pSock->StopWatch( false );
         }
 
         break;
@@ -1959,6 +1982,10 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
             ret = STATUS_PENDING;
             break;
         }
+        bool bFull = false;
+        if( m_queEvtToRecv.size() >=
+            STM_MAX_QUEUE_SIZE )
+            bFull = true;
 
         while( !m_queEvtToRecv.empty() &&
             !m_queListeningIrps.empty() )
@@ -1990,6 +2017,14 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
             m_queListeningIrps.pop_front();
             m_queEvtToRecv.pop_front();
         }
+        if( bFull && ( m_queEvtToRecv.size() <
+            STM_MAX_QUEUE_SIZE ) )
+        {
+            CRpcConnSock* pSock = m_pConnSock;
+            if( pSock != nullptr )
+                m_pConnSock->StartWatch( false );
+        }
+            
 
     }while( 0 );
 
