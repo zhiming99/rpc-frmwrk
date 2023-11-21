@@ -729,7 +729,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         oReqCtx.CopyProp(
             propTaskId, pReqCtx );
 
-        guint32 dwAge = 0;
         if( true )
         {
             guint64 qwLocalTs = 0;
@@ -744,10 +743,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             oReqCtx.SetQwordProp(
                 propTimestamp, qwPeerTs );
 
-            guint64 qwVal =
-                m_oTs.GetAgeSec( qwLocalTs );
-            qwVal = ( abs( ( gint64 )qwVal ) );
-            dwAge = qwVal; 
         }
 
         if( !bRelay )
@@ -818,13 +813,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                     propTimeoutSec, dwtos );
             }
 
-            if( dwAge >= dwtos )
-            {
-                ret = -ETIMEDOUT;
-                break;
-            }
-
-            dwtos -= dwAge;
         }
 
         oBuilder.SetCallFlags( dwFlags );
