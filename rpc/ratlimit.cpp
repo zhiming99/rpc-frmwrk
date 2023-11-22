@@ -795,10 +795,7 @@ gint32 CRateLimiterFido::OnEvent(
     case eventResumed:
         {
             CStdRMutex oPortLock( GetLock() );
-            guint32 dwState = GetPortState();
-            if( dwState == PORT_STATE_STOPPING ||
-                dwState == PORT_STATE_STOPPED ||
-                dwState == PORT_STATE_REMOVED )
+            if( PORT_INVALID( this ) )
             {
                 ret = ERROR_STATE;
                 break;

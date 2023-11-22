@@ -136,7 +136,11 @@ gint32 CRpcConnSock::ActiveConnect()
     {
         StopWatch();
         if( SUCCEEDED( ret ) )
-            StartWatch( false );
+        {
+            CTcpStreamPdo2* pPdo =
+                ObjPtr( m_pParentPort );
+            pPdo->StartReadSock();
+        }
     }
 
     return ret;
@@ -324,11 +328,6 @@ gint32 CRpcConnSock::Start_bh()
         CStdRMutex oSockLock( GetLock() );
         if( GetState() != sockInit )
         {
-            return ERROR_STATE;
-        }
-
-        if( GetState() != sockInit )
-        {
             ret = ERROR_STATE;
             break;
         }
@@ -342,15 +341,19 @@ gint32 CRpcConnSock::Start_bh()
         if( ERROR( ret ) )
             break;
 
-        ret = StartWatch( false );
-        if( ERROR( ret ) )
-            break;
-
         ret = this->OnConnected();
         if( ERROR( ret ) )
             break;
 
         SetState( sockStarted );
+        ObjPtr pObj( m_pParentPort );
+        oSockLock.Unlock();
+
+        CTcpStreamPdo2* pPdo = pObj;
+        ret = pPdo->StartReadSock();
+        if( ERROR( ret ) )
+            break;
+
         
     }while( 0 );
 
@@ -604,10 +607,10 @@ gint32 CRpcConnSock::OnEvent(
                 }
 
                 oSockLock.Unlock();
-                // NOTE: we don't call
-                // OnDisconnected because the
-                // connection will down after that
-                // call
+                // NOTE: we don't call CRpcConnSock's
+                // OnDisconnected directly because it
+                // is dangeous to stop the sock
+                // on the timer thread.
                 CTcpStreamPdo2* pPort =
                     ObjPtr( m_pParentPort );
                 if( pPort != nullptr )
@@ -809,16 +812,12 @@ gint32 CTcpStreamPdo2::OnStmSockEvent(
         CStdRMutex oPortLock( GetLock() );
         if( m_queListeningIrps.empty() )
         {
-            bool bFull = false;
-            if( m_queEvtToRecv.size() >=
-                STM_MAX_QUEUE_SIZE )
-                bFull = true;
             m_queEvtToRecv.push_back( sse );
-            if( !bFull && m_queEvtToRecv.size() >=
-                STM_MAX_QUEUE_SIZE )
+            if( ( m_queEvtToRecv.size() >=
+                GetRecvQueSize() ) &&
+                IsReadingSock() )
             {
-                CRpcConnSock* pSock = m_pConnSock;
-                pSock->StopWatch( false );
+                StopReadSock();
             }
         }
         else
@@ -930,12 +929,7 @@ gint32 CTcpStreamPdo2::OnReceive(
         sse.m_iEvent = sseRetWithBuf;
         sse.m_iEvtSrc = GetClsid();
         
-        bool bFull = false;
-
         CStdRMutex oPortLock( GetLock() );
-        if( m_queEvtToRecv.size() >=
-            STM_MAX_QUEUE_SIZE )
-            bFull = true;
 
         m_queEvtToRecv.push_back( sse );
         if( !m_queListeningIrps.empty() )
@@ -987,11 +981,11 @@ gint32 CTcpStreamPdo2::OnReceive(
             continue;
         }
 
-        if( !bFull && m_queEvtToRecv.size() >=
-            STM_MAX_QUEUE_SIZE )
+        if( ( m_queEvtToRecv.size() >=
+            GetRecvQueSize() ) &&
+            IsReadingSock() )
         {
-            CRpcConnSock* pSock = m_pConnSock;
-            pSock->StopWatch( false );
+            StopReadSock();
         }
 
         break;
@@ -1982,11 +1976,6 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
             ret = STATUS_PENDING;
             break;
         }
-        bool bFull = false;
-        if( m_queEvtToRecv.size() >=
-            STM_MAX_QUEUE_SIZE )
-            bFull = true;
-
         while( !m_queEvtToRecv.empty() &&
             !m_queListeningIrps.empty() )
         {
@@ -2017,12 +2006,11 @@ gint32 CTcpStreamPdo2::SubmitListeningCmd(
             m_queListeningIrps.pop_front();
             m_queEvtToRecv.pop_front();
         }
-        if( bFull && ( m_queEvtToRecv.size() <
-            STM_MAX_QUEUE_SIZE ) )
+        if( ( m_queEvtToRecv.size() <
+            GetRecvQueSize() ) && 
+            !IsReadingSock() )
         {
-            CRpcConnSock* pSock = m_pConnSock;
-            if( pSock != nullptr )
-                m_pConnSock->StartWatch( false );
+            StartReadSock();
         }
             
 
@@ -2538,8 +2526,9 @@ gint32 CTcpStreamPdo2::GetProperty(
     gint32 iProp, Variant& oBuf ) const
 {
     gint32 ret = 0;
-    do{
-        if( iProp == propRttMs )
+    switch( PropIdFromInt( iProp ) )
+    {
+    case propRttMs:
         {
             CStdRMutex oLock( GetLock() );
             CRpcConnSock* pSock = m_pConnSock;
@@ -2553,8 +2542,9 @@ gint32 CTcpStreamPdo2::GetProperty(
             if( ERROR( ret ) )
                 break;
             oBuf = dwRtt;
+            break;
         }
-        else if( iProp == propIsServer )
+    case propIsServer:
         {
             CStdRMutex oLock( GetLock() );
             Variant oVar;
@@ -2567,10 +2557,63 @@ gint32 CTcpStreamPdo2::GetProperty(
                 ( ObjPtr& )oVar;
             ret = pConnParams->GetProperty(
                 propIsServer, oBuf );
+            break;
+        }
+    case propQueSize:
+        {
+            CStdRMutex oLock( GetLock() );
+            oBuf = GetRecvQueSize();
+            break;
+        }
+    default:
+        ret = super::GetProperty( iProp, oBuf );
+        break;
+    }
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::SetProperty(
+    gint32 iProp, const Variant& oVar )
+{
+    gint32 ret = 0;
+    do{
+        if( iProp == propQueSize )
+        {
+            CStdRMutex oLock( this->GetLock() );
+            m_dwRecvQueSize = oVar;
         }
         else
-            ret = super::GetProperty( iProp, oBuf );
+        {
+            ret = super::SetProperty(
+                iProp, oVar );
+        }
     }while( 0 );
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::StartReadSock()
+{
+    CStdRMutex oPortLock( GetLock() );
+    if( m_bReading )
+        return 0;
+    if( m_pConnSock.IsEmpty() )
+        return -EFAULT;
+    gint32 ret = m_pConnSock->StartWatch( false );
+    if( SUCCEEDED( ret ) )
+        m_bReading = true;
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::StopReadSock()
+{
+    CStdRMutex oPortLock( GetLock() );
+    if( !m_bReading )
+        return 0;
+    if( m_pConnSock.IsEmpty() )
+        return -EFAULT;
+    gint32 ret = m_pConnSock->StopWatch( false );
+    if( SUCCEEDED( ret ) )
+        m_bReading = false;
     return ret;
 }
 

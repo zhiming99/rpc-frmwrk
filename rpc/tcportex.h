@@ -653,6 +653,8 @@ class CTcpStreamPdo2 : public CPort
     MloopPtr    m_pLoop;
 
     gint32 SendImmediate( gint32 iFd, PIRP pIrp );
+    guint32 m_dwRecvQueSize = STM_MAX_QUEUE_SIZE;
+    bool m_bReading = false;
 
     protected:
     std::deque< IrpPtr >  m_queListeningIrps;
@@ -718,6 +720,9 @@ class CTcpStreamPdo2 : public CPort
     gint32 GetProperty( gint32 iProp,
         Variant& oBuf ) const override;
 
+    gint32 SetProperty( gint32 iProp,
+        const Variant& oVar ) override;
+
     void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
 
@@ -725,6 +730,18 @@ class CTcpStreamPdo2 : public CPort
     {
         CMainIoLoop* pLoop = m_pLoop;
         return pLoop;
+    }
+
+    inline guint32 GetRecvQueSize() const
+    { return m_dwRecvQueSize; }
+
+    gint32 StartReadSock();
+    gint32 StopReadSock();
+
+    inline bool IsReadingSock()
+    {
+        CStdRMutex oPortLock( GetLock() );
+        return m_bReading;
     }
 };
 
