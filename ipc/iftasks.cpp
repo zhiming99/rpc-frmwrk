@@ -6717,6 +6717,16 @@ gint32 CTokenBucketTask::RunTask()
     return ret;
 }
 
+gint32 CTokenBucketTask::GetTokensAvail(
+    guint32& dwTokens ) const
+{
+    CStdRTMutex oLock( GetLock() );
+    if( GetTaskState() != stateStarted )
+        return ERROR_STATE;
+    dwTokens = m_dwTokens;
+    return 0;
+}
+
 gint32 CTokenBucketTask::AllocToken(
     guint32& dwNumReq )
 {
@@ -6756,7 +6766,7 @@ gint32 CTokenBucketTask::FreeToken(
         return 0;
 
     if( m_dwTokens == m_dwMaxTokens )
-        return ERROR_QUEUE_FULL;
+        return 0;
 
     m_dwTokens = std::min(
         m_dwTokens + dwNumReq,
@@ -6772,36 +6782,12 @@ gint32 CTokenBucketTask::OnRetry()
         if( IsDisabled() )
             break;
 
-        gint32 ret = FreeToken( m_dwMaxTokens );
-        if( ERROR( ret ) )
-            break;
-        Variant oVar;
-        ret = this->GetProperty(
-            propIoMgr, oVar );
+        ret = FreeToken( m_dwMaxTokens );
         if( ERROR( ret ) )
             break;
 
-        CIoManager* pMgr = ( ObjPtr& )oVar;
-
-        gint32 (*func)( IEventSink*, IEventSink* ) =
-        ([]( IEventSink* pEvent,
-            IEventSink* pTokenTask )->gint32
-        {
-            pEvent->OnEvent( eventResumed,
-                0, 0, ( LONGWORD* )pTokenTask );
-            return 0;
-        });
-
-        TaskletPtr pTask;
-        ret = NEW_FUNCCALL_TASK( pTask,
-            pMgr, func, m_pNotify, this );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = pMgr->RescheduleTask( pTask );
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
+        m_pNotify->OnEvent( eventResumed,
+            0, 0, ( LONGWORD* )this );
 
     }while( 0 );
 

@@ -665,12 +665,12 @@ gint32 CRpcSecFido::SubmitIoctlCmd(
     {
         sse.m_iEvent = sseError;
         sse.m_iData = ret;
+        sse.m_iEvtSrc = GetClsid();
         BufPtr pInBuf( true );
         pInBuf->Resize( sizeof( sse ) );
         memcpy( pInBuf->ptr(),
             &sse, sizeof( sse ) );
         pCtx->SetRespData( pInBuf );
-        sse.m_iEvtSrc = GetClsid();
         ret = 0;
     }
 

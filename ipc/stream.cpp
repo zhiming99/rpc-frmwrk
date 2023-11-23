@@ -1484,8 +1484,9 @@ gint32 IStream::CloseChannel(
 
         if( ERROR( ret ) )
         {
-            DebugPrintEx( logInfo, ret,
-                "Error OnClose failed to add stoptask for 0x%llx @state=%d",
+            DebugPrint( ret,
+                "Error OnClose failed to add "
+                "stoptask for 0x%llx @state=%d",
                 pSvc, pThisIf->GetState() );
             ( *pStopTask )( eventCancelTask );
         }

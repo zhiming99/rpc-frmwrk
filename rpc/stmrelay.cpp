@@ -1246,7 +1246,7 @@ gint32 CIfUxListeningRelayTask::OnTaskComplete(
     {
         DebugPrint( ret, "Error, the relay "
             "channel will be closed from "
-            "OnTaskComplete" );
+            "OnTaskComplete, 0x%llx", this );
         BufPtr pCloseBuf( true );
         *pCloseBuf = tokClose;
         PostEvent( pCloseBuf );
@@ -1378,7 +1378,7 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
     {
         DebugPrint( ret, "Error, the relay "
             "channel will be closed from "
-            "OnIrpComplete" );
+            "OnIrpComplete, 0x%llx", this );
         BufPtr pCloseBuf( true );
         *pCloseBuf = tokClose;
         PostEvent( pCloseBuf );
@@ -1765,9 +1765,10 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
     if( !IsReading() )
         return ret;
 
-    BufPtr pPayload( true );
+    BufPtr pPayload;
     if( ERROR( ret ) )
     {
+        pPayload.NewObj();
         // return error to close the stream
         if( ret == ERROR_PORT_STOPPED )
         {

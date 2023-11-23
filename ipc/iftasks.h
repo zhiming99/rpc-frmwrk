@@ -1299,6 +1299,8 @@ struct CTokenBucketTask :
     gint32 FreeToken( guint32 dwNumReq );
     gint32 OnRetry() override;
     gint32 OnComplete( gint32 iRet ) override;
+    gint32 GetTokensAvail(
+        guint32& dwTokens ) const;
 
     gint32 GetMaxTokens(
         guint32& dwMaxTokens ) const;
