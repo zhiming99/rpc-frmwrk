@@ -495,6 +495,7 @@ class CPort : public IPort
     static bool CanAcceptMsg(
         guint32 dwPortState );
 
+    gint32 AddSeqTask( TaskletPtr& pTask );
 };
 
 class CIrpGateKeeper 

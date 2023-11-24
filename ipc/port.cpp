@@ -3200,6 +3200,51 @@ bool CPort::CanAcceptMsg(
         || dwPortState == PORT_STATE_BUSY_RESUME );
 }
 
+gint32 CPort::AddSeqTask(
+    TaskletPtr& pTask )
+{
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = GetProperty( propBusPortPtr, oVar );
+        if( ERROR( ret ) )
+            break;
+        CGenericBusPortEx* pBus = ( ObjPtr& )oVar;
+        if( pBus == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = GetProperty( propPdoPtr, oVar );
+        if( ERROR( ret ) )
+            break;
+        CPort* pPdo = ( ObjPtr& )oVar;
+        if( pBus->GetObjId() != GetObjId() )
+        {
+            ret = pBus->AddStartStopPortTask(
+                pPdo, pTask );
+        }
+        else
+        {
+            // a bus port
+            ret = GetProperty( propDrvPtr, oVar );
+            if( ERROR( ret ) )
+                break;
+
+            CGenBusDriverEx* pBusDrv =
+                ( ObjPtr& )oVar;
+            if( pBusDrv == nullptr )
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+            ret = pBusDrv->AddStartStopPortTask(
+                pBus, pTask );
+        }
+
+    }while( 0 );
+    return ret;
+}
 // this route is called before the port goes to
 // stopping state
 gint32 CGenericBusPort::OnPrepareStop( IRP* pIrp )
