@@ -1317,7 +1317,7 @@ gint32 CBytesSender::SendImmediate(
                         dwSize, dwTokens );
                     if( dwSize == 0 )
                     {
-                        ret = STATUS_PENDING;
+                        ret = -EDQUOT;
                         break;
                     }
                 }
@@ -1452,7 +1452,8 @@ gint32 CTcpStreamPdo2::SendImmediate(
 
     if( ERROR( ret ) && (
         ret != -ENOENT &&
-        ret != ERROR_NOT_HANDLED ) )
+        ret != ERROR_NOT_HANDLED &&
+        ret != -EDQUOT ) )
    { 
         TaskletPtr pDisTask;
         gint32 iRet = DEFER_CALL_NOSCHED(
@@ -1515,8 +1516,13 @@ gint32 CTcpStreamPdo2::OnSendReady(
             ret = 0;
             break;
         }
-
-        if( ERROR( ret ) )
+        else if( ret == -EDQUOT )
+        {
+            ret = 0;
+            pSock->StopWatch();
+            break;
+        }
+        else if( ERROR( ret ) )
         {
             pSock->StopWatch();
             break;
@@ -2185,7 +2191,8 @@ gint32 CTcpStreamPdo2::StartSend2(
 
         ret = SendImmediate( iFd, pIrpLocked );
         if( ret == ERROR_NOT_HANDLED ||
-            ret == -ENOENT )
+            ret == -ENOENT ||
+            ret == -EDQUOT )
         {
             // the irp is gone
             ret = STATUS_PENDING;
@@ -2265,8 +2272,10 @@ gint32 CTcpStreamPdo2::StartSend3()
 
         ret = SendImmediate( iFd, pIrp );
         if( ret == ERROR_NOT_HANDLED ||
-            ret == -ENOENT )
+            ret == -ENOENT ||
+            ret == -EDQUOT )
         {
+            ret = 0;
             break;
         }
         else if( ret == STATUS_PENDING )
@@ -2609,14 +2618,12 @@ gint32 CTcpStreamPdo2::OnEvent(
                 ret = ERROR_STATE;
                 break;
             }
-            TaskletPtr pTask = reinterpret_cast
+            TaskletPtr pCaller = reinterpret_cast
                 < CTokenBucketTask* >( pData );
 
-            if( pTask.IsEmpty() )
+            if( pCaller.IsEmpty() )
                 break;
 
-            auto rfunc =
-                &CTcpStreamPdo2::AdjustReadWatchState;
 
             gint32 ( *wfunc )( CRpcConnSock* ) =
                 ([]( CRpcConnSock* pSock )->gint32
@@ -2629,26 +2636,23 @@ gint32 CTcpStreamPdo2::OnEvent(
                 });
 
             if( !m_pReadTb.IsEmpty() &&
-                pTask->GetObjId() ==
+                pCaller->GetObjId() ==
                 m_pReadTb->GetObjId() )
             {
-                oPortLock.Unlock();
-                DEFER_OBJCALL_NOSCHED(
-                    pTask, this, rfunc );
+                AdjustReadWatchState();
+                break;
             }
-            else if( !m_pWriteTb.IsEmpty() &&
-                pTask->GetObjId() ==
+            if( !m_pWriteTb.IsEmpty() &&
+                pCaller->GetObjId() ==
                 m_pWriteTb->GetObjId() )
             {
-                gint32 iFd = -1;
-                ret = m_pConnSock->GetSockFd( iFd );
-                if( ERROR( ret ) )
-                    break;
                 CRpcConnSock* pSock = m_pConnSock;
+                TaskletPtr pTask;
                 NEW_FUNCCALL_TASK( pTask,
                     GetIoMgr(), wfunc, pSock );
+                // get out of the task lock
+                ret = this->AddSeqTask( pTask );
             }
-            ret = this->AddSeqTask( pTask );
             break;
         }
     default:
