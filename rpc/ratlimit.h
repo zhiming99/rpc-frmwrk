@@ -85,7 +85,10 @@ class CRateLimiterFido : public CPort
         IrpPtr m_pIrp;
         gint32 m_iBufIdx = -1;
         guint32 m_dwOffset = 0;
+        BufPtr m_pPktReading;
         CRateLimiterFido* m_pPort;
+        std::deque< BufPtr >  m_quePkts;
+
         public:
 
         CBytesReader( CRateLimiterFido* pPdo );
@@ -109,6 +112,8 @@ class CRateLimiterFido : public CPort
     MloopPtr    m_pLoop;
     CBytesWriter m_oWriter;
     CBytesReader m_oReader;
+    CRpcTcpBusPort* m_pBus = nullptr;
+    CPort*          m_pPdo = nullptr;
 
     public:
     typedef CPort super;

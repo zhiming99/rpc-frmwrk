@@ -457,6 +457,10 @@ class CRpcConnSock :
 {
     TaskletPtr m_pStartTask;
     bool m_bClient = false;
+    guint32 m_dwSockSendMax =
+        MAX_BYTES_PER_TRANSFER;
+    guint32 m_dwSockRecvMax =
+        MAX_BYTES_PER_TRANSFER;
 
     public:
 
@@ -504,6 +508,12 @@ class CRpcConnSock :
 
     inline void Refresh()
     { m_dwAgeSec = 0; }
+
+    inline guint32 GetSockSendSize() const
+    { return m_dwSockSendMax; }
+
+    inline guint32 GetSockRecvSize() const
+    { return m_dwSockRecvMax; }
 };
 
 }
@@ -658,6 +668,8 @@ class CTcpStreamPdo2 : public CPort
 
     protected:
     std::deque< IrpPtr >  m_queListeningIrps;
+    TaskletPtr  m_pReadTb;
+    TaskletPtr  m_pWriteTb;
 
     public:
 
@@ -732,7 +744,7 @@ class CTcpStreamPdo2 : public CPort
         return pLoop;
     }
 
-    inline guint32 GetRecvQueSize() const
+    inline guint32 GetMaxRecvQue() const
     { return m_dwRecvQueSize; }
 
     gint32 StartReadSock();
@@ -743,6 +755,24 @@ class CTcpStreamPdo2 : public CPort
         CStdRMutex oPortLock( GetLock() );
         return m_bReading;
     }
+
+    gint32 AdjustReadWatchState();
+
+    gint32 GetBytesToRead(
+        guint32 dwBytesReq,
+        guint32& dwBytesAvail );
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
+
+    guint32 GetSockSendSize() const;
+    guint32 GetSockRecvSize() const;
+
+    inline TaskletPtr GetWriteTokenTask()
+    { return m_pWriteTb; }
 };
 
 extern gint32 SendListenReq( CPort* pPort,

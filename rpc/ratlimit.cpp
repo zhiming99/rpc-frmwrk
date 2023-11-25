@@ -730,6 +730,9 @@ gint32 CRateLimiterFido::PreStop( PIRP pIrp )
     return ret;
 }
 
+gint32 CRateLimiterFido::ResumeRead()
+{ return m_oReader.OnReadReady(); }
+
 gint32 CRateLimiterFido::ResumeWrite()
 { return m_oWriter.OnSendReady(); }
 
@@ -776,11 +779,146 @@ gint32 CRateLimiterFido::OnSubmitIrp(
 
     return ret;
 }
+
+gint32 CRateLimiterFido::SubmitIoctlCmd(
+    IRP* pIrp )
+{
+    if( pIrp == nullptr ||
+        pIrp->GetStackSize() == 0 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    STREAM_SOCK_EVENT sse;
+
+    IrpCtxPtr pCtx = pIrp->GetTopStack();
+
+    switch( pIrp->CtrlCode() )
+    {
+    case CTRLCODE_LISTENING:
+        {
+            BufPtr pInBuf;
+            CStdRMutex oLock( this->GetLock() );
+            oLock.Unlock();
+            if( ERROR( ret ) )
+                break;
+
+            if( ret != EAGAIN )
+            {
+                DebugPrint( ret, "Received unexpected error "
+                    "in SubmitIoctlCmd" );
+                ret = -ret;
+                break;
+            }
+
+            PortPtr pLowerPort = GetLowerPort();
+            ret = pIrp->AllocNextStack(
+                pLowerPort, IOSTACK_ALLOC_COPY );
+
+            if( ERROR( ret ) )
+                break;
+
+            IrpCtxPtr pTopCtx =
+                pIrp->GetTopStack();
+
+            pLowerPort->AllocIrpCtxExt(
+                pTopCtx, pIrp );
+
+            ret = pLowerPort->SubmitIrp( pIrp );
+            if( ret == STATUS_PENDING )
+                break;
+
+            IrpCtxPtr& pCtx =
+                pIrp->GetCurCtx();
+
+            if( ERROR( ret ) )
+            {
+                pCtx->SetStatus( ret );
+                break;
+            }
+
+            BufPtr pRespBuf =
+                pTopCtx->m_pRespData;
+
+            if( unlikely( pRespBuf.IsEmpty() ) )
+            {
+                ret = -EFAULT;
+                break;
+            }
+
+            STREAM_SOCK_EVENT* psse =
+            ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
+
+            if( unlikely( psse->m_iEvent ==
+                sseError ) )
+            {
+                pCtx->SetRespData( pRespBuf );
+                pCtx->SetStatus( ret );
+            }
+            else if( unlikely( psse->m_iEvent ==
+                sseRetWithFd ) )
+            {
+                ret = -ENOTSUP;
+                pCtx->SetStatus( ret );
+            }
+            else
+            {
+                ret = CompleteListeningIrp( pIrp );
+            }
+            break;
+        }
+    default:
+        {
+            // NOTE: the default behavior for a
+            // filter driver is to pass unknown
+            // irps on to the lower driver
+            ret = PassUnknownIrp( pIrp );
+            break;
+        }
+    }
+
+    if( ERROR( ret ) &&
+        pCtx->GetCtrlCode() ==
+        CTRLCODE_LISTENING )
+    {
+        sse.m_iEvent = sseError;
+        sse.m_iData = ret;
+        sse.m_iEvtSrc = GetClsid();
+        BufPtr pInBuf( true );
+        pInBuf->Resize( sizeof( sse ) );
+        memcpy( pInBuf->ptr(),
+            &sse, sizeof( sse ) );
+        pCtx->SetRespData( pInBuf );
+        ret = 0;
+    }
+
+    return ret;
+}
  
 gint32 CRateLimiterFido::OnPortReady(
     PIRP pIrp )
 {
-    
+    gint32 ret = 0;
+    do{
+        // notify the stack all the ports are
+        // ready
+        Variant oVar;
+        ret = this->GetProperty(
+            propBusPortPtr, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        m_pBus = ( ObjPtr& )oVar;
+
+        ret = this->GetProperty(
+            propPdoPtr, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        m_pPdo = ( ObjPtr& )oVar;
+
+    }while( 0 );
+
+    return ret;
 }
 
 gint32 CRateLimiterFido::OnEvent(
@@ -800,22 +938,21 @@ gint32 CRateLimiterFido::OnEvent(
                 ret = ERROR_STATE;
                 break;
             }
+
             auto pTask = reinterpret_cast
                 < CTokenBucketTask* >( pData );
-            guint64 qwObjId =
-                pTask->GetObjId();
-            if( qwObjId ==
-                m_pReadTb->GetObjId() )
-            {
-                oPortLock.Unlock();
-                ret = ResumeRead();
-            }
-            else if( qwObjId ==
+
+            if( pTask->GetObjId() !=
                 m_pWriteTb->GetObjId() )
-            {
-                oPortLock.Unlock();
-                ret = ResumeWrite();
-            }
+                break;
+
+            oPortLock.Unlock();
+
+            TaskletPtr pTask;
+            DEFER_OBJCALL_NOSCHED( pTask, this,
+                &CRateLimiterFido::ResumeWrite );
+            ret = m_pBus->AddStartStopPortTask(
+                m_pPdo, pTask );
             break;
         }
     default:

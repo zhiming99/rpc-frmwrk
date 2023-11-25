@@ -35,6 +35,96 @@
 namespace rpcf
 {
 
+template< class T,
+    class T2 =typename std::enable_if<
+        std::is_base_of< CPort, T >::value,
+        T >::type,
+    class T3 =typename std::enable_if<
+        !std::is_base_of< CRpcServices, T >::value,
+        T >::type >
+gint32 AddSeqTaskTempl( T2* pObj,
+    TaskGrpPtr& pQueuedTasks,
+    TaskletPtr& pTask,
+    bool bLong )
+{
+    if( pTask.IsEmpty() || pObj == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        bool bNew = false;
+        TaskGrpPtr ptrSeqTasks;
+        CIoManager* pMgr = pObj->GetIoMgr();
+
+        CStdRMutex oPortLock( pObj->GetLock() );
+        if( pQueuedTasks.IsEmpty() )
+        {
+            CParamList oParams;
+            oParams[ propIoMgr ] = ObjPtr( pMgr );
+
+            ret = pQueuedTasks.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            pQueuedTasks->SetRelation(logicNONE );
+            bNew = true;
+        }
+        ptrSeqTasks = pQueuedTasks;
+        oPortLock.Unlock();
+
+        CStdRTMutex oQueueLock(
+            ptrSeqTasks->GetLock() );
+
+        oPortLock.Lock();
+        guint32 dwPortState =
+            pObj->GetPortState();
+        if( dwPortState == PORT_STATE_STOPPED ||
+            dwPortState == PORT_STATE_REMOVED )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+            
+        if( pQueuedTasks != ptrSeqTasks )
+            continue;
+
+        ret = pQueuedTasks->AppendTask( pTask );
+        if( ERROR( ret ) )
+        {
+            // the old seqTask is completed
+            pQueuedTasks.Clear();
+            continue;
+        }
+
+        pTask->MarkPending();
+        if( SUCCEEDED( ret ) && bNew )
+        {
+            // a new pQueuedTasks, add and run
+            oPortLock.Unlock();
+            oQueueLock.Unlock();
+
+            TaskletPtr pSeqTasks = pQueuedTasks;
+            ret = pMgr->RescheduleTask(
+                pSeqTasks, bLong );
+
+            break;
+        }
+        if( SUCCEEDED( ret ) && !bNew )
+        {
+            // pQueuedTasks is already running
+            // just waiting for the turn.
+        }
+        break;
+
+    }while( 1 );
+    return ret;
+}
+
+#define AddSeqTaskPort AddSeqTaskTempl< CPort, CPort >
+
 template< class T >
 class CStartStopSafeBusPort :
     public T

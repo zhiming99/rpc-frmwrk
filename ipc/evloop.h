@@ -160,7 +160,7 @@ class CEvLoop :
     {
         typedef SOURCE_HEADER super;
         bool m_bRepeat;
-        guint32 m_dwIntervalMs;
+        guint64 m_qwIntervalUs;
         guint64 m_qwAbsTimeUs;
         TIMER_SOURCE(
             CEvLoop* pLoop,
@@ -178,7 +178,7 @@ class CEvLoop :
             TIMER_SOURCE& rhs )
         {
             m_bRepeat = rhs.m_bRepeat;
-            m_dwIntervalMs = rhs.m_dwIntervalMs;
+            m_qwIntervalUs = rhs.m_qwIntervalUs;
             return *this;
         }
 
@@ -202,7 +202,7 @@ class CEvLoop :
                 return ret;
 
             m_bRepeat = bRepeat;
-            m_dwIntervalMs = dwIntervalMs;
+            m_qwIntervalUs = dwIntervalMs * 1000;
             return 0;
         }
     };
