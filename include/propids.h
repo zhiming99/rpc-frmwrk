@@ -264,14 +264,15 @@ enum EnumPropId : gint32
     propTaskRejected,   // type: a guint32 counter of the number of tasks rejected by the taskgroup
     propStmHandle,      // type: a intptr as a handle of a stream. cannot pass machine boundary
     propStmConnPt,      // type: an objptr holding a connection point for stream transfer
-    propStarter,        // type: a boolean value indicate whether this end of propStmConnPt is a connection starter
-    propNonSockStm,     // type: a boolean value indicate whether to use non-sock stream
-    propKProxy,         // type: a boolean value indicate whether the builtin-app serve as a kinit proxy
-    propSeqTgMgr,       // type: a boolean value indicate whether the stream uses sequential taskgroup manager
-    propBuiltinRt,      // type: a boolean value indicate whether or not this app has builtin-router
+    propStarter,        // type: a boolean value indicating whether this end of propStmConnPt is a connection starter
+    propNonSockStm,     // type: a boolean value indicating whether to use non-sock stream
+    propKProxy,         // type: a boolean value indicating whether the builtin-app serve as a kinit proxy
+    propSeqTgMgr,       // type: a boolean value indicating whether the stream uses sequential taskgroup manager
+    propBuiltinRt,      // type: a boolean value indicating whether or not this app has builtin-router
     propFetchTimeout,   // type: a guint32 value as the seconds before timeout for stream channel setup
-    propReadBps,        // type: a guint32 value as reading BPS 
-    propWriteBps,       // type: a guint32 value as writing BPS 
+    propEnableBps,      // type: a boolean value indicating whether to enable rate-limiter over the connection
+    propSendBps,        // type: a guint32 value as sending BPS 
+    propRecvBps,        // type: a guint32 value as receiving BPS 
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

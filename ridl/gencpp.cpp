@@ -7435,10 +7435,7 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    std::thread::hardware_concurrency() );" );
                 Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
             }
-            else
-            {
-                Wa( "guint32 dwNumThrds = 4;" );
-            }
+
             Wa( "oParams[ propMaxIrpThrd ] = 0;" );
             Wa( "if( g_strDrvPath.size() )" );
             Wa( "    oParams[ propConfigPath ] = g_strDrvPath;" );
