@@ -773,6 +773,8 @@ class CTcpStreamPdo2 : public CPort
 
     inline TaskletPtr GetWriteTokenTask()
     { return m_pWriteTb; }
+
+    gint32 StartTokenTasks();
 };
 
 extern gint32 SendListenReq( CPort* pPort,

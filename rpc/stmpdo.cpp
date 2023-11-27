@@ -36,6 +36,7 @@
 #include "reqopen.h"
 #include "jsondef.h"
 #include "ifhelper.h"
+#include "regex"
 
 namespace rpcf
 {
@@ -1061,6 +1062,60 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         oElemCfg.SetBoolProp( propHasAuth, true );
                 }
 
+                bool bEnableBps = false;
+                if( oParams.isMember( JSON_ATTR_ENABLE_BPS ) &&
+                    oParams[ JSON_ATTR_ENABLE_BPS ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_ENABLE_BPS ].asString();
+                    if( strVal == "true" )
+                    {
+                        oElemCfg.SetBoolProp( propEnableBps, true );
+                        bEnableBps = true;
+                    }
+                }
+                if( bEnableBps )
+                {
+                    const stdstr jprops[ 2 ] =
+                        { JSON_ATTR_RECVBPS, JSON_ATTR_SENDBPS };
+                    guint32 props[ 2 ] =
+                        { propRecvBps, propSendBps };
+
+                    for( int i = 0; i < 2; i++ )
+                    {
+                        const stdstr& elem = jprops[ i ];
+                        if( !oParams.isMember( elem ) ||
+                            !oParams[ elem ].isString() )
+                            continue;
+
+                        stdstr strVal = oParams[ elem ].asString();
+
+                        std::smatch s;
+                        std::regex e( "^([1-9][0-9]*)(MB|KB|GB|kb|mb|gb)?" );
+                        std::regex_match( strVal, s, e,
+                            std::regex_constants::match_not_null );
+                        do{
+                            if( s.size() < 2 )
+                                break;
+                            if( !s[ 1 ].matched )
+                                break;
+                            guint64 qwFactor = 1; 
+                            if( s.size() >= 2 && s[ 2 ].matched )
+                            {
+                                stdstr strUnit = s[ 2 ].str();
+                                if( strUnit == "MB" || strUnit == "mb" )
+                                    qwFactor = 1024*1024;
+                                else if( strUnit == "KB" || strUnit == "kb" )
+                                    qwFactor = 1024;
+                                else if( strUnit == "GB" || strUnit == "gb" )
+                                    qwFactor = ( 1024 * 1024 * 1024 );
+                            }
+                            guint64 qwBps = strtol(
+                                s[ 1 ].str().c_str(), 0, 10 ) * qwFactor; 
+                            oElemCfg.SetQwordProp( props[ i ], qwBps );
+                        }while( 0 );
+                    }
+                }
                 vecParams.push_back( ObjPtr( oElemCfg.GetCfg() ) );
             }
 
