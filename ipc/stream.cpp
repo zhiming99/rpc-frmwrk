@@ -1724,10 +1724,9 @@ gint32 IStream::OnPreStopShared(
 
         oIfLock.Unlock();
 
-        gint32 arrRets[ vecStreams.size() ];
         for( int i = 0; i < vecStreams.size(); i++ )
         {
-            arrRets[ i ] = this->OnClose(
+            this->OnClose(
                 vecStreams[ i ], nullptr );
         }
 

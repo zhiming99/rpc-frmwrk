@@ -90,6 +90,9 @@ gint32 CRpcConnSock::ActiveConnect()
     gint32 ret = 0;
     addrinfo *res = nullptr;
 
+    CTcpStreamPdo2* pPdo =
+        ObjPtr( m_pParentPort );
+
     do{
         CCfgOpener oCfg(
             ( IConfigDb* )m_pCfg );
@@ -124,7 +127,7 @@ gint32 CRpcConnSock::ActiveConnect()
         {
             // watching if the socket can write,
             // indicating the connect is done
-            StartWatch();
+            pPdo->StartWriteWatch();
             ret = STATUS_PENDING;
         }
         else
@@ -143,12 +146,10 @@ gint32 CRpcConnSock::ActiveConnect()
 
     if( ret != STATUS_PENDING )
     {
-        StopWatch();
+        pPdo->StopWriteWatch();
         if( SUCCEEDED( ret ) )
         {
-            CTcpStreamPdo2* pPdo =
-                ObjPtr( m_pParentPort );
-            pPdo->StartReadSock();
+            pPdo->StartReadWatch();
         }
     }
 
@@ -227,7 +228,6 @@ gint32 CRpcConnSock::Start()
     gint32 ret = 0;
 
     do{
-        CStdRMutex oSockLock( GetLock() );
         if( GetState() != sockInit )
             return ERROR_STATE;
 
@@ -358,7 +358,6 @@ gint32 CRpcConnSock::Start_bh()
     gint32 ret = 0;
 
     do{
-        CStdRMutex oSockLock( GetLock() );
         if( GetState() != sockInit )
         {
             ret = ERROR_STATE;
@@ -379,14 +378,13 @@ gint32 CRpcConnSock::Start_bh()
             break;
 
         SetState( sockStarted );
-        ObjPtr pObj( m_pParentPort );
-        oSockLock.Unlock();
 
-        CTcpStreamPdo2* pPdo = pObj;
-        ret = pPdo->StartReadSock();
+        CTcpStreamPdo2* pPort =
+            ObjPtr( m_pParentPort );
+
+        ret = pPort->StartReadWatch();
         if( ERROR( ret ) )
             break;
-
         
     }while( 0 );
 
@@ -447,11 +445,14 @@ gint32 CRpcConnSock::DispatchSockEvent(
         return ret;
     }
 
+
     switch( iState )
     {
     case sockInit:
         {
-            StopWatch();
+            CTcpStreamPdo2* pPort =
+                ObjPtr( m_pParentPort );
+            pPort->StopWriteWatch();
             if( m_pStartTask.IsEmpty() )
             {
                 ret = -EFAULT;
@@ -639,13 +640,16 @@ gint32 CRpcConnSock::OnEvent(
                     break;
                 }
 
+                ObjPtr ptrPort =
+                    ObjPtr( m_pParentPort );
+
+                CTcpStreamPdo2* pPort = ptrPort;
+
                 oSockLock.Unlock();
                 // NOTE: we don't call CRpcConnSock's
                 // OnDisconnected directly because it
                 // is dangeous to stop the sock
                 // on the timer thread.
-                CTcpStreamPdo2* pPort =
-                    ObjPtr( m_pParentPort );
                 if( pPort != nullptr )
                     ret = pPort->OnDisconnected();
             }
@@ -843,6 +847,11 @@ gint32 CTcpStreamPdo2::OnStmSockEvent(
     gint32 ret = 0;
     do{
         CStdRMutex oPortLock( GetLock() );
+        if( PORT_INVALID( this ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         if( m_queListeningIrps.empty() )
         {
             m_queEvtToRecv.push_back( sse );
@@ -1064,12 +1073,12 @@ gint32 CTcpStreamPdo2::AdjustReadWatchState()
 
             if( likely( bFull && IsReadingSock() ) )
             {
-                StopReadSock();
+                StopReadWatch();
             }
             else if( bFull == IsReadingSock() ) 
             {
                 // !bFull && !IsReadingSock
-                StartReadSock();
+                StartReadWatch();
             }
         }
         else
@@ -1087,9 +1096,9 @@ gint32 CTcpStreamPdo2::AdjustReadWatchState()
                 m_queEvtToRecv.size() );
 
             if( !bEmptyToken && !bFull )
-                StartReadSock();
+                StartReadWatch();
             else
-                StopReadSock();
+                StopReadWatch();
         }
 
     }while( 0 );
@@ -1200,6 +1209,12 @@ gint32 CBytesSender::SendImmediate(
             break;
         }
         CStdRMutex oPortLock( pPort->GetLock() );
+        // necessary when called from StartSend3
+        if( PORT_INVALID( pPort ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         if( m_pIrp.IsEmpty() )
         {
             ret = ERROR_NOT_HANDLED;
@@ -1417,16 +1432,17 @@ gint32 CBytesSender::OnSendReady(
         }
         CStdRMutex oPortLock( pPort->GetLock() );
         if( m_pIrp.IsEmpty() )
-            return ERROR_NOT_HANDLED;
+        {
+            ret = ERROR_NOT_HANDLED;
+            break;
+        }
 
         pIrp = m_pIrp;
         oPortLock.Unlock();
 
         CStdRMutex oIrpLock( pIrp->GetLock() );
-        if( !( pIrp == m_pIrp ) )
-            continue;
 
-        ret = m_pIrp->CanContinue(
+        ret = pIrp->CanContinue(
             IRP_STATE_READY );
 
         if( ERROR( ret ) )
@@ -1500,7 +1516,7 @@ gint32 CTcpStreamPdo2::OnSendReady(
             {
                 if( m_oSender.IsSendDone() )
                 {
-                    pSock->StopWatch();
+                    StopWriteWatch();
                     break;
                 }
             }
@@ -1520,19 +1536,16 @@ gint32 CTcpStreamPdo2::OnSendReady(
         else if( ret == -ENOENT )
         {
             ret = 0;
-            break;
         }
         else if( ret == -EDQUOT )
         {
             ret = 0;
-            pSock->StopWatch();
-            break;
+            StopWriteWatch();
         }
         else if( ERROR( ret ) )
-        {
-            pSock->StopWatch();
-            break;
-        }
+            StopWriteWatch();
+
+        break;
 
     }while( 1 );
 
@@ -1872,6 +1885,13 @@ gint32 CTcpStreamPdo2::PreStop(
                 m_pConnSock.Clear();
                 oSockLock.Unlock();
                 SetPreStopStep( pIrp, 1 );
+
+                if( !m_pReadTb.IsEmpty() )
+                    ( *m_pReadTb )( eventCancelTask );
+
+                if( !m_pWriteTb.IsEmpty() )
+                    ( *m_pWriteTb )( eventCancelTask );
+
                 ret = pSock->OnEvent(
                     eventStop, 0, 0, nullptr );
             }
@@ -1957,17 +1977,8 @@ gint32 CTcpStreamPdo2::Stop(
     pBus->ReleaseMainLoop( m_pLoop );
     m_pLoop.Clear();
 
-    if( !m_pReadTb.IsEmpty() )
-    {
-        ( *m_pReadTb )( eventCancelTask );
-        m_pReadTb.Clear();
-    }
-
-    if( !m_pWriteTb.IsEmpty() )
-    {
-        ( *m_pWriteTb )( eventCancelTask );
-        m_pWriteTb.Clear();
-    }
+    m_pReadTb.Clear();
+    m_pWriteTb.Clear();
 
     return super::Stop( pIrp );
 }
@@ -2296,7 +2307,7 @@ gint32 CTcpStreamPdo2::StartSend2(
         }
         else if( ret == STATUS_PENDING )
         {
-            pSock->StartWatch();
+            StartWriteWatch();
             break;
         }
         else if( ERROR( ret ) )
@@ -2310,10 +2321,8 @@ gint32 CTcpStreamPdo2::StartSend2(
         if( m_queWriteIrps.empty() )
             break;
 
-        // schedule a task for the rest irps it
-        // could contends with other writing
-        // threads and the OnSendReady, but it can
-        // reduce the delay time
+        // schedule a task for the rest irps queued by
+        // other writing threads or OnSendReady
         CIoManager* pMgr = GetIoMgr();
         DEFER_CALL( pMgr, ObjPtr( this ),
             &CTcpStreamPdo2::StartSend3 );
@@ -2366,6 +2375,18 @@ gint32 CTcpStreamPdo2::StartSend3()
 
         oPortLock.Unlock();
 
+        if( unlikely( pIrp.IsEmpty() ||
+            pIrp->GetStackSize() == 0 ) )
+            continue;
+
+        CStdRMutex oIrpLock( pIrp->GetLock() );
+        ret = pIrp->CanContinue( IRP_STATE_READY );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            continue;
+        }
+
         ret = SendImmediate( iFd, pIrp );
         if( ret == ERROR_NOT_HANDLED ||
             ret == -ENOENT ||
@@ -2376,7 +2397,7 @@ gint32 CTcpStreamPdo2::StartSend3()
         }
         else if( ret == STATUS_PENDING )
         {
-            pSock->StartWatch();
+            StartWriteWatch();
             break;
         }
         else if( ERROR( ret ) )
@@ -2671,7 +2692,7 @@ gint32 CTcpStreamPdo2::SetProperty(
     return ret;
 }
 
-gint32 CTcpStreamPdo2::StartReadSock()
+gint32 CTcpStreamPdo2::StartReadWatch()
 {
     CStdRMutex oPortLock( GetLock() );
     if( m_bReading )
@@ -2684,7 +2705,7 @@ gint32 CTcpStreamPdo2::StartReadSock()
     return ret;
 }
 
-gint32 CTcpStreamPdo2::StopReadSock()
+gint32 CTcpStreamPdo2::StopReadWatch()
 {
     CStdRMutex oPortLock( GetLock() );
     if( !m_bReading )
@@ -2697,6 +2718,32 @@ gint32 CTcpStreamPdo2::StopReadSock()
     return ret;
 }
 
+gint32 CTcpStreamPdo2::StartWriteWatch()
+{
+    CStdRMutex oPortLock( GetLock() );
+    if( m_bWriting )
+        return 0;
+    if( m_pConnSock.IsEmpty() )
+        return -EFAULT;
+    gint32 ret = m_pConnSock->StartWatch();
+    if( SUCCEEDED( ret ) )
+        m_bWriting = true;
+    return ret;
+}
+
+gint32 CTcpStreamPdo2::StopWriteWatch()
+{
+    CStdRMutex oPortLock( GetLock() );
+    if( !m_bWriting )
+        return 0;
+    if( m_pConnSock.IsEmpty() )
+        return -EFAULT;
+    gint32 ret = m_pConnSock->StopWatch();
+    if( SUCCEEDED( ret ) )
+        m_bWriting = false;
+    return ret;
+}
+
 gint32 CTcpStreamPdo2::OnEvent(
     EnumEventId iEvent,
     LONGWORD dwParam1,
@@ -2706,7 +2753,7 @@ gint32 CTcpStreamPdo2::OnEvent(
     gint32 ret = 0;
     switch( iEvent )
     {
-    case eventResumed:
+    case eventTokenAvail:
         {
             CStdRMutex oPortLock( GetLock() );
             if( PORT_INVALID( this ) )
@@ -2726,15 +2773,20 @@ gint32 CTcpStreamPdo2::OnEvent(
             if( pCaller.IsEmpty() )
                 break;
 
-            gint32 ( *wfunc )( CRpcConnSock* ) =
-                ([]( CRpcConnSock* pSock )->gint32
-                {
-                    gint32 ret =
-                        pSock->OnSendReady();
-                    if( ret == STATUS_PENDING )
-                        pSock->StartWatch();
-                    return 0;
-                });
+            gint32 ( *wfunc )(
+                CTcpStreamPdo2* pPort ) =
+            ([]( CTcpStreamPdo2* pPort )->gint32
+            {
+                CRpcConnSock* pSock =
+                    pPort->GetSockPtr();
+                if( pSock == nullptr )
+                    return -EFAULT;
+                gint32 ret =
+                    pSock->OnSendReady();
+                if( ret == STATUS_PENDING )
+                    pPort->StartWriteWatch();
+                return 0;
+            });
 
             if( !m_pReadTb.IsEmpty() &&
                 pCaller->GetObjId() ==
@@ -2750,7 +2802,8 @@ gint32 CTcpStreamPdo2::OnEvent(
                 CRpcConnSock* pSock = m_pConnSock;
                 TaskletPtr pTask;
                 NEW_FUNCCALL_TASK( pTask,
-                    GetIoMgr(), wfunc, pSock );
+                    GetIoMgr(), wfunc,
+                    this );
                 // get out of the task lock
                 ret = this->AddSeqTask( pTask );
             }

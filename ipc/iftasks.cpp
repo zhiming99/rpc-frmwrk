@@ -6785,7 +6785,7 @@ gint32 CTokenBucketTask::OnRetry()
         else if( ERROR( ret ) )
             break;
 
-        m_pNotify->OnEvent( eventResumed,
+        m_pNotify->OnEvent( eventTokenAvail,
             0, 0, ( LONGWORD* )this );
 
         ret = STATUS_PENDING;

@@ -665,6 +665,7 @@ class CTcpStreamPdo2 : public CPort
     gint32 SendImmediate( gint32 iFd, PIRP pIrp );
     guint32 m_dwRecvQueSize = STM_MAX_QUEUE_SIZE;
     bool m_bReading = false;
+    bool m_bWriting = false;
 
     protected:
     std::deque< IrpPtr >  m_queListeningIrps;
@@ -747,8 +748,8 @@ class CTcpStreamPdo2 : public CPort
     inline guint32 GetMaxRecvQue() const
     { return m_dwRecvQueSize; }
 
-    gint32 StartReadSock();
-    gint32 StopReadSock();
+    gint32 StartReadWatch();
+    gint32 StopReadWatch();
 
     inline bool IsReadingSock()
     {
@@ -775,6 +776,17 @@ class CTcpStreamPdo2 : public CPort
     { return m_pWriteTb; }
 
     gint32 StartTokenTasks();
+
+    gint32 StartWriteWatch();
+    gint32 StopWriteWatch();
+
+    inline bool IsWritingSock()
+    {
+        CStdRMutex oPortLock( GetLock() );
+        return m_bWriting;
+    }
+    SockPtr GetSockPtr()
+    { return m_pConnSock; }
 };
 
 extern gint32 SendListenReq( CPort* pPort,

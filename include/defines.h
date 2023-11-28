@@ -452,6 +452,9 @@ enum EnumEventId : guint32
     eventHouseClean,
     eventCancelInstead,
 
+    // a event for token bucket task
+    eventTokenAvail,
+
     eventMaxReserved = 0x10000,
     eventUserStart = 0x10001,
     eventInvalid = 0x100000,
