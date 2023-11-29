@@ -1,4 +1,8 @@
 ---
+[`Wed Nov 29  2023 10:55:41 PM Beijing`]   
+1. We have almost complete the BPS rate-limter. There are still some tests to go.
+2. Next we will have add the QPS rate-limiter. It will take very short time to get it done.
+ 
 [`Sat Oct 28 2023 05:41:32 PM Beijing`]   
 1. Merged pull request #27 to the master branch
 2. Bumped `rpc-frmwrk` version to 0.6.0. Congratulations!
