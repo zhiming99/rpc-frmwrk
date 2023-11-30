@@ -46,19 +46,143 @@ class CStreamRelayBase :
     // the irps to receive the packet from a stream
     std::map< gint32, guint32 > m_mapStmPendingBytes;
 
+    struct CQuitSync
+    {
+        CStreamRelayBase* m_pParent;
+        TaskGrpPtr m_pRoot;
+        TaskGrpPtr m_pChilds;
+        TaskletPtr m_pIdleTask;
+
+        gint32 (*m_pFunc)( IEventSink* ) =
+        ([]( IEventSink* )->gint32
+        { return 0; });
+
+        CQuitSync( CStreamRelayBase* pParent )
+        {
+            gint32 ret = 0;
+            do{
+                m_pParent = pParent;
+                CParamList oParams;
+                oParams[ propIoMgr ] =
+                    ObjPtr( pParent->GetIoMgr() );
+
+                ret = m_pRoot.NewObj(
+                    clsid( CIfTaskGroup ),
+                    oParams.GetCfg() );
+                if( ERROR( ret ) )
+                    break;
+
+                m_pRoot->SetRelation( logicNONE );
+                ret = m_pChilds.NewObj(
+                    clsid( CIfParallelTaskGrp ),
+                    oParams.GetCfg() );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = NEW_COMPLETE_FUNCALL(
+                    0, m_pIdleTask,
+                    pParent->GetIoMgr(),
+                    m_pFunc, nullptr );
+
+                if( ERROR( ret ) )
+                    break;
+
+                m_pChilds->AppendTask(
+                    m_pIdleTask );
+                TaskletPtr pChilds = m_pChilds;
+                m_pRoot->AppendTask( pChilds );
+                ( *m_pRoot )( eventZero );
+
+            }while( 0 );
+            if( ERROR( ret ) )
+            {
+                stdstr strMsg = DebugMsg( ret,
+                    "Error in CQuitSync ctor" );
+                throw std::runtime_error( strMsg );
+            }
+        }
+        ~CQuitSync()
+        {
+            m_pIdleTask.Clear();
+            m_pChilds.Clear();
+            m_pRoot.Clear();
+        }
+        gint32 AddNotify( TaskletPtr& pTask,
+            IEventSink* pCallback )
+        {
+            gint32 ret = 0;
+            do{
+                ret = NEW_COMPLETE_FUNCALL(
+                    0, pTask,
+                    m_pParent->GetIoMgr(),
+                    m_pFunc, nullptr );
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( pCallback != nullptr )
+                {
+                    CIfRetryTask* pRetry = pTask;
+                    pRetry->SetClientNotify(
+                        pCallback );
+                }
+                m_pChilds->AppendTask( pTask );
+                ret = ( *m_pChilds )( eventZero );
+
+            }while( 0 );
+            return ret;
+        }
+        
+        gint32 WaitingChildren( IEventSink* pCallback )
+        {
+            TaskletPtr pFinalCb;
+            gint32 (*func)( IEventSink*) =
+            ([]( IEventSink* pNotify )->gint32
+            {
+                pNotify->OnEvent(
+                    eventTaskComp, 0, 0, nullptr );
+                return 0;
+            });
+
+            gint32 ret = 0;
+            NEW_FUNCCALL_TASK( pFinalCb,
+                m_pParent->GetIoMgr(),
+                func, pCallback );
+
+            ret = m_pRoot->AppendTask( pFinalCb );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( m_pRoot->GetTaskState(),
+                    "something wrong with m_pRoot..." );
+                ( *pFinalCb )( eventCancelTask );
+                return ret;
+            }
+
+            m_pIdleTask->OnEvent(
+                eventTaskComp, 0, 0, nullptr );
+
+            return STATUS_PENDING;
+        }
+    };
+
+    CQuitSync m_oQuitSync;
+
     public:
 
     typedef T super;
     using IStream::OnClose;
 
-    CStreamRelayBase( const IConfigDb* pCfg )
-        : super::_MyVirtBase( pCfg ), super( pCfg )
+    CStreamRelayBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ),
+        super( pCfg ),
+        m_oQuitSync( this )
     {}
 
     // data is ready for reading
     virtual gint32 OnStmRecv(
         HANDLE hChannel, BufPtr& pBuf )
     { return 0; }
+
 
     // the local sock is closed
     gint32 OnClose( HANDLE hChannel,
@@ -70,33 +194,44 @@ class CStreamRelayBase :
 
         do{
             gint32 iStmId = -1;
+
+            TaskletPtr pNotify;
+            TaskGrpPtr& pc = m_oQuitSync.m_pChilds;
+            CStdRTMutex oTaskLock( pc->GetLock() );
+
             CStdRMutex oIfLock( this->GetLock() );
+            auto itr = m_mapHandleToStmId.find(
+                hChannel );
 
-            std::map< HANDLE, gint32 >::iterator
-                itr = m_mapHandleToStmId.find( hChannel );
-
-            if( itr != m_mapHandleToStmId.end() )
-            {
-                iStmId = itr->second;
-                RemoveBinding( hChannel, iStmId );
-            }
-            oIfLock.Unlock();
-
-            if( iStmId >= 0 )
-            {
-                CloseTcpStream( iStmId, true );
-                ret = this->CloseChannel(
-                    hChannel, pCallback );
-                // don't return pending since the
-                // caller is an IFCALL task. it may
-                // cause caller task wait endlessly
-                //
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-            }
-            else
+            if( itr == m_mapHandleToStmId.end() )
             {
                 ret = -ENOENT;
+                break;
+            }
+
+            iStmId = itr->second;
+            RemoveBinding( hChannel, iStmId );
+
+            ret = m_oQuitSync.AddNotify(
+                pNotify, pCallback );
+            if( ERROR( ret ) )
+                break;
+
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+
+            CloseTcpStream( iStmId, true );
+            ret = this->CloseChannel(
+                hChannel, pNotify );
+            // don't return pending since the
+            // caller is an IFCALL task. it may
+            // cause caller task wait endlessly
+            //
+            if( ret == STATUS_PENDING )
+                ret = 0;
+            else if( ERROR( ret ) )
+            {
+                ( *pNotify )( eventCancelTask );
             }
 
         }while( 0 );
@@ -118,29 +253,41 @@ class CStreamRelayBase :
 
         do{
             HANDLE hChannel = INVALID_HANDLE;
+
+            TaskletPtr pNotify;
+            TaskGrpPtr& pc = m_oQuitSync.m_pChilds;
+            CStdRTMutex oTaskLock( pc->GetLock() );
+
             CStdRMutex oIfLock( this->GetLock() );
-            std::map< gint32, HANDLE >::iterator
-                itr = m_mapStmIdToHandle.find( iStmId );
+            auto itr = m_mapStmIdToHandle.find(
+                iStmId );
 
-            if( itr != m_mapStmIdToHandle.end() )
-            {
-                hChannel = itr->second;
-                RemoveBinding( hChannel, iStmId );
-            }
-            oIfLock.Unlock();
-
-            // no need to send
-            if( hChannel != INVALID_HANDLE )
-            {
-                CloseTcpStream( iStmId, false );
-                ret = this->CloseChannel(
-                    hChannel, pCallback );
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-            }
-            else
+            if( itr == m_mapStmIdToHandle.end() )
             {
                 ret = -ENOENT;
+                break;
+            }
+
+            hChannel = itr->second;
+            RemoveBinding( hChannel, iStmId );
+
+            ret = m_oQuitSync.AddNotify(
+                pNotify, pCallback );
+            if( ERROR( ret ) )
+                break;
+
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+
+            // no need to send
+            CloseTcpStream( iStmId, false );
+            ret = this->CloseChannel(
+                hChannel, pNotify );
+            if( ret == STATUS_PENDING )
+                ret = 0;
+            else if( ERROR( ret ) )
+            {
+                ( *pNotify )( eventCancelTask );
             }
 
         }while( 0 );
@@ -401,6 +548,33 @@ class CStreamRelayBase :
         return ret;
     }
 
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    {
+        gint32 ret = 0;
+        auto pMgr = this->GetIoMgr();
+
+        do{
+            CStdRMutex oIfLock( this->GetLock() );
+            if( this->m_mapUxStreams.empty() )
+                break;
+
+            std::vector< HANDLE > vecStreams;
+            for( auto elem : this->m_mapUxStreams )
+                vecStreams.push_back( elem.first );
+
+            oIfLock.Unlock();
+
+            for( auto elem : vecStreams )
+                this->OnClose( elem, nullptr );
+
+        }while( 0 );
+
+        ret = m_oQuitSync.WaitingChildren(
+            pCallback );
+
+        return ret;
+    }
 };
 
 // this interface will be hosted by
@@ -442,8 +616,8 @@ class CStreamServerRelay :
     { return 0; }
 
     gint32 OnPreStop(
-        IEventSink* pContext ) override
-    { return OnPreStopShared( pContext ); }
+        IEventSink* pCallback ) override
+    { return super::OnPreStop( pCallback ); }
 };
 
 // this interface will be hosted by
@@ -515,8 +689,8 @@ class CStreamProxyRelay :
         return 0;
     }
     gint32 OnPreStop(
-        IEventSink* pContext ) override
-    { return OnPreStopShared( pContext ); }
+        IEventSink* pCallback ) override
+    { return super::OnPreStop( pCallback ); }
 };
 
 class CIfStartUxSockStmRelayTask :
