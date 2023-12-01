@@ -660,6 +660,7 @@ def DefaultIfCfg() -> dict :
     defCfg[ "ConnRecover" ]= "false"
     defCfg[ "HasAuth" ]= "false"
     defCfg[ "DestURL" ]= "https://www.example.com"
+    defCfg[ "EnableBPS" ]= "false"
     return defCfg
 
 def Update_Drv( initCfg: dict, drvFile : list,

@@ -857,6 +857,51 @@ CRpcTcpBusDriver::CRpcTcpBusDriver(
     SetClassId( clsid( CRpcTcpBusDriver ) );
 }
 
+static gint32 ParseBpsString(
+    const stdstr& strVal, guint64& qwBps )
+{
+    gint32 ret = 0;
+    do{
+        std::smatch s;
+        std::regex e( "^([1-9][0-9]*)(MB|KB|GB|kb|mb|gb)?" );
+        std::regex_match( strVal, s, e,
+            std::regex_constants::match_not_null );
+
+        if( s.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( !s[ 1 ].matched )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        guint64 qwFactor = 1; 
+        if( s.size() >= 2 && s[ 2 ].matched )
+        {
+            stdstr strUnit = s[ 2 ].str();
+            if( strUnit == "MB" || strUnit == "mb" )
+                qwFactor = 1024*1024;
+            else if( strUnit == "KB" || strUnit == "kb" )
+                qwFactor = 1024;
+            else if( strUnit == "GB" || strUnit == "gb" )
+                qwFactor = ( 1024 * 1024 * 1024 );
+            else
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+        guint64 qwDigits = strtoll(
+            s[ 1 ].str().c_str(), 0, 10 );
+        qwBps = qwDigits * qwFactor; 
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRpcTcpBusDriver::GetTcpSettings(
     IConfigDb* pCfg ) const
 {
@@ -1089,31 +1134,14 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                             continue;
 
                         stdstr strVal = oParams[ elem ].asString();
-
-                        std::smatch s;
-                        std::regex e( "^([1-9][0-9]*)(MB|KB|GB|kb|mb|gb)?" );
-                        std::regex_match( strVal, s, e,
-                            std::regex_constants::match_not_null );
-                        do{
-                            if( s.size() < 2 )
-                                break;
-                            if( !s[ 1 ].matched )
-                                break;
-                            guint64 qwFactor = 1; 
-                            if( s.size() >= 2 && s[ 2 ].matched )
-                            {
-                                stdstr strUnit = s[ 2 ].str();
-                                if( strUnit == "MB" || strUnit == "mb" )
-                                    qwFactor = 1024*1024;
-                                else if( strUnit == "KB" || strUnit == "kb" )
-                                    qwFactor = 1024;
-                                else if( strUnit == "GB" || strUnit == "gb" )
-                                    qwFactor = ( 1024 * 1024 * 1024 );
-                            }
-                            guint64 qwBps = strtol(
-                                s[ 1 ].str().c_str(), 0, 10 ) * qwFactor; 
-                            oElemCfg.SetQwordProp( props[ i ], qwBps );
-                        }while( 0 );
+                        guint64 qwBps = 0;
+                        ret = ParseBpsString( strVal, qwBps );
+                        if( ERROR( ret ) )
+                        {
+                            ret = 0;
+                            continue;
+                        }
+                        oElemCfg.SetQwordProp( props[ i ], qwBps );
                     }
                 }
                 vecParams.push_back( ObjPtr( oElemCfg.GetCfg() ) );

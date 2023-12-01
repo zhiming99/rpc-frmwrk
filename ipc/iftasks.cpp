@@ -1262,7 +1262,8 @@ gint32 CIfOpenPortTask::OnIrpComplete(
         if( ERROR( iRet ) )
         {
             DebugPrintEx( logErr, iRet,
-                "CIfOpenPortTask failed" );
+                "%s: CIfOpenPortTask failed",
+                CoGetClassName( pIf->GetClsid() ) );
             ret = iRet;
             if( !Retriable( ret ) )
             {
@@ -6687,9 +6688,8 @@ CTokenBucketTask::CTokenBucketTask(
 
         ret = pCfg->GetProperty(
             propParentPtr, oVar );
-        if( ERROR( ret ) )
-            break;
-        m_pNotify = ( ObjPtr& )oVar;
+        if( SUCCEEDED( ret ) )
+            m_pNotify = ( ObjPtr& )oVar;
 
         ret = pCfg->GetProperty( 0, oVar );
         if( ERROR( ret ) )
@@ -6785,8 +6785,11 @@ gint32 CTokenBucketTask::OnRetry()
         else if( ERROR( ret ) )
             break;
 
-        m_pNotify->OnEvent( eventTokenAvail,
-            0, 0, ( LONGWORD* )this );
+        if( !m_pNotify.IsEmpty() )
+        {
+            m_pNotify->OnEvent( eventTokenAvail,
+                0, 0, ( LONGWORD* )this );
+        }
 
         ret = STATUS_PENDING;
 

@@ -2677,18 +2677,54 @@ gint32 CTcpStreamPdo2::SetProperty(
     gint32 iProp, const Variant& oVar )
 {
     gint32 ret = 0;
-    do{
-        if( iProp == propQueSize )
+    switch( iProp ) 
+    {
+    case propRecvBps:
+        {
+            CStdRMutex oPortLock( GetLock() );
+            if( PORT_INVALID( this ) )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+            auto qwVal = ( guint64& )oVar;
+            if( m_pReadTb.IsEmpty() )
+                break;
+            TaskletPtr pTask = m_pReadTb;
+            CTokenBucketTask* pRead = m_pReadTb;
+            oPortLock.Unlock();
+            ret = pRead->SetMaxTokens( qwVal );
+            break;
+        }
+    case propSendBps:
+        {
+            CStdRMutex oPortLock( GetLock() );
+            if( PORT_INVALID( this ) )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+            auto qwVal = ( guint64& )oVar;
+            if( m_pWriteTb.IsEmpty() )
+                break;
+            TaskletPtr pTask = m_pWriteTb;
+            CTokenBucketTask* pWrite = m_pWriteTb;
+            oPortLock.Unlock();
+            ret = pWrite->SetMaxTokens( qwVal );
+            break;
+        }
+    case propQueSize:
         {
             CStdRMutex oLock( this->GetLock() );
             m_dwRecvQueSize = oVar;
+            break;
         }
-        else
+    default:
         {
             ret = super::SetProperty(
                 iProp, oVar );
         }
-    }while( 0 );
+    }
     return ret;
 }
 
