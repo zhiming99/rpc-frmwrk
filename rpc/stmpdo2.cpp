@@ -1579,8 +1579,6 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         oParams[ propIoMgr ] =
             ObjPtr( GetIoMgr() );
 
-        oParams.CopyProp( propRecvBps, pCfg );
-        oParams.CopyProp( propSendBps, pCfg );
         oParams[ propTimeoutSec ] = 1;
         oParams[ propParentPtr ] = ObjPtr( this );
         CStdRMutex oPortLock( GetLock() );

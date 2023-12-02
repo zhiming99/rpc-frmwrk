@@ -2484,10 +2484,13 @@ gint32 CDeclService2::OutputROSSkel()
         INDENT_DOWN;
         NEW_LINES( 2 );
 
+        CCOUT << "#define Clsid_C" << strSvcName << "_SvrSkel_Base Clsid_Invalid";
+        NEW_LINE;
+        NEW_LINE;
         CCOUT << "DECLARE_AGGREGATED_SKEL_SERVER(";
         INDENT_UP;
         NEW_LINE;
-        CCOUT << "C" << strSvcName << "_SvrSkel,";
+        CCOUT << "C" << strSvcName << "_SvrSkel_Base,";
         NEW_LINE;
         Wa( "CStatCountersServerSkel," );
         for( guint32 i = 0;
@@ -2505,6 +2508,35 @@ gint32 CDeclService2::OutputROSSkel()
         CCOUT << " );";
         INDENT_DOWN;
         NEW_LINES( 2 );
+
+        CCOUT << "class C" << strSvcName << "_SvrSkel :";
+        NEW_LINE;
+        CCOUT << "    public C" << strSvcName << "_SvrSkel_Base";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "public:" );
+        CCOUT << "typedef C" << strSvcName << "_SvrSkel_Base super;";
+        NEW_LINE;
+        CCOUT << "C" << strSvcName << "_SvrSkel( const IConfigDb* pCfg ):";
+        NEW_LINE;
+        Wa( "    super::virtbase( pCfg ), super( pCfg )" );
+        CCOUT << "{ SetClassId( clsid( C" << strSvcName << "_SvrSkel ) ); }";
+        NEW_LINES( 2 );
+
+        Wa( "gint32 InvokeUserMethod(" );
+        Wa( "    IConfigDb* pParams," );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "auto pSvc = this->GetStreamIf();" );
+        Wa( "gint32 ret = pSvc->AllocReqToken();" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return ret;" );
+        Wa( "return super::InvokeUserMethod(" );
+        CCOUT << "    pParams, pCallback );";
+        BLOCK_CLOSE;
+        BLOCK_CLOSE;
+        Wa( ";" );
+        NEW_LINE;
 
     }while( 0 );
 
@@ -2840,6 +2872,22 @@ gint32 CDeclServiceImpl2::OutputROS()
             Wa( "{ return STATUS_SUCCESS; }" );
             NEW_LINE;
         }
+
+        Wa( "gint32 OnPostStart(" );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "StartQpsTask();" );
+        CCOUT << "return super::OnPostStart( pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "gint32 OnPreStop(" );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "StopQpsTask();" );
+        CCOUT << "return super::OnPreStop( pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
 
         for( auto pifd : vecIfs )
         {

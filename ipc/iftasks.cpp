@@ -6742,7 +6742,7 @@ gint32 CTokenBucketTask::AllocToken(
         return ERROR_STATE;
 
     if( m_qwTokens == 0 )
-        return -ENOENT;
+        return -EDQUOT;
 
     if( qwNumReq > m_qwTokens )
     {

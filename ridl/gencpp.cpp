@@ -3663,6 +3663,34 @@ gint32 CDeclServiceImpl::Output()
             NEW_LINE;
         }
 
+        Wa( "gint32 InvokeUserMethod(" );
+        Wa( "    IConfigDb* pParams," );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "gint32 ret = AllocReqToken();" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return ret;" );
+        Wa( "return super::InvokeUserMethod(" );
+        CCOUT << "    pParams, pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "gint32 OnPostStart(" );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "StartQpsTask();" );
+        CCOUT << "return super::OnPostStart( pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "gint32 OnPreStop(" );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "StopQpsTask();" );
+        CCOUT << "return super::OnPreStop( pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
         for( guint32 i = 0;
             i < vecSMethods.size(); i++ )
         {

@@ -1,7 +1,7 @@
 /*
  * =====================================================================================
  *
- *       Filename:  swig.i
+ *       Filename:  server.i
  *
  *    Description:  the swig file as the wrapper of CJavaServerImpl class and
  *                  helper classes for Java
@@ -270,6 +270,31 @@ class CJavaServer:
         SetErrorJRet( jenv, jret, ret );
         return jret;
     } 
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    { 
+        StartQpsTask();
+        return 0;
+    }
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    { 
+        StopQpsTask();
+        return 0;
+    }
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override
+   {
+       gint32 ret = AllocReqToken();
+       if( ERROR( ret ) )
+           return ret;
+        return super::InvokeUserMethod(
+            pParams, pCallback );
+   }
 };
 
 gint32 ChainTasks(

@@ -867,7 +867,7 @@ class CPythonInterfBase : public T
         return ret;
     }
 
-    gint32 InvokeUserMethod(
+    virtual gint32 InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )
     {

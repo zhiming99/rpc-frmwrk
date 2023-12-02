@@ -36,6 +36,7 @@
 #include <fcntl.h>
 #include "jsondef.h"
 #include "dbusport.h"
+#include <limits.h>
 
 namespace rpcf
 {
@@ -4589,13 +4590,51 @@ gint32 CRpcServices::LoadObjDesc(
                 else if( strVal == "true" )
                     oCfg[ propQueuedReq ] = true;
             }
+            if( oObjElem.isMember( JSON_ATTR_ENABLE_QPS ) &&
+                oObjElem[ JSON_ATTR_ENABLE_QPS ].isString() &&
+                bServer )
+            {
+                strVal = oObjElem[ JSON_ATTR_ENABLE_QPS  ].asString(); 
+                bool bQps = false;
+                if( strVal == "false" )
+                    oCfg[ propEnableQps ] = false;
+                else if( strVal == "true" )
+                {
+                    oCfg[ propEnableQps ] = true;
+                    bQps = true;
+                }
+                if( bQps && oObjElem.isMember( JSON_ATTR_QPS ) &&
+                    oObjElem[ JSON_ATTR_QPS ].isString() )
+                {
+                    strVal = oObjElem[ JSON_ATTR_QPS ].asString(); 
+                    guint64 qwVal = std::strtoull(
+                        strVal.c_str(), nullptr, 10 );
+                    if( qwVal != ULLONG_MAX )
+                    {
+                        oCfg[ propQps ] = ( guint64 )qwVal;
+                    }
+                    else
+                    {
+                        oCfg[ propQps ] = ( guint64 )-1;
+                    }
+                }
+            }
 
             if( oObjElem.isMember( JSON_ATTR_ROUTER_ROLE ) &&
                 oObjElem[ JSON_ATTR_ROUTER_ROLE ].isString() )
             {
                 strVal = oObjElem[ JSON_ATTR_ROUTER_ROLE ].asString(); 
-                oCfg[ propRouterRole ] = ( guint32 )std::strtol(
+                guint32 dwVal = std::strtoul(
                     strVal.c_str(), nullptr, 10 );
+                if( dwVal != ULLONG_MAX )
+                {
+                    oCfg[ propRouterRole ] = ( guint32 )std::strtol(
+                        strVal.c_str(), nullptr, 10 );
+                }
+                else
+                {
+                    oCfg[ propRouterRole ] = ( guint32 )1;
+                }
             }
             else
             {
@@ -5582,6 +5621,68 @@ gint32 CRpcServices::GetPortProp(
     return ret;
 
 }
+
+gint32 CRpcServices::StartQpsTask()
+{
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = this->GetProperty(
+            propEnableQps, oVar );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+        bool bEnableQps = oVar;
+        if( !bEnableQps )
+            break;
+
+        guint64 qwQps = ( guint64 )-1;
+        ret = this->GetProperty(
+            propQps, oVar );
+        if( SUCCEEDED( ret ) )
+            qwQps = oVar;
+
+        auto pMgr = GetIoMgr();
+        CParamList oParams;
+        oParams[ propIoMgr ] = ObjPtr( pMgr );
+        oParams[ propTimeoutSec ] = 1;
+        oParams.Push( qwQps );
+
+        auto pLoop = pMgr->GetMainIoLoop();
+        oParams[ propObjPtr ] = ObjPtr( pLoop );
+
+        ret = m_pQpsTask.NewObj(
+            clsid( CTokenBucketTask ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        ret = ( *m_pQpsTask )( eventZero );
+        if( ret == STATUS_PENDING )
+            ret = STATUS_SUCCESS;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRpcServices::StopQpsTask()
+{
+    if( m_pQpsTask.IsEmpty() )
+        return 0;
+    ( *m_pQpsTask )( eventCancelTask );
+    return 0;
+}
+
+gint32 CRpcServices::AllocReqToken()
+{
+    if( m_pQpsTask.IsEmpty() )
+        return 0;
+    guint64 qwTokens = 1;
+    CTokenBucketTask* pTask = m_pQpsTask;
+    return pTask->AllocToken( qwTokens );
+}
+
 /**
 * @name DoInvoke
 * find a event handler for the event message

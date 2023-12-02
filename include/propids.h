@@ -273,6 +273,8 @@ enum EnumPropId : gint32
     propEnableBps,      // type: a boolean value indicating whether to enable rate-limiter over the connection
     propSendBps,        // type: a guint32 value as sending BPS 
     propRecvBps,        // type: a guint32 value as receiving BPS 
+    propEnableQps,      // type: a boolean value indicating whether to enable rate-limiter per query basis
+    propQps,            // type: a guint32 value as max queries per second
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

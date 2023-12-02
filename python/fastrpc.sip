@@ -246,6 +246,20 @@ class CPythonServerRosImpl
         IConfigDb* pParams,
         IEventSink* pCallback ) override;
 
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    { 
+        StartQpsTask();
+        return super::OnPostStart( pCallback );
+    }
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    { 
+        StopQpsTask();
+        return super::OnPreStop( pCallback );
+    }
+
     gint32 SendEvent(
         PyObject* pCallback,
         const std::string& strCIfName,
@@ -628,6 +642,10 @@ gint32 CPythonServerRosImpl::InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )
 {
+    gint32 ret = AllocReqToken();
+    if( ERROR( ret ) )
+        return ret;
+
     return CPythonServer::InvokeUserMethod(
         pParams, pCallback );
 }

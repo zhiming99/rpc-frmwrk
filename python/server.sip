@@ -190,6 +190,30 @@ class CPythonServer:
         return ret;
     }
 
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    { 
+        StartQpsTask();
+        return 0;
+    }
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    { 
+        StopQpsTask();
+        return 0;
+    }
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override
+   {
+       gint32 ret = AllocReqToken();
+       if( ERROR( ret ) )
+           return ret;
+        return super::InvokeUserMethod(
+            pParams, pCallback );
+   }
 };
 
 DECLARE_AGGREGATED_SERVER(
