@@ -344,6 +344,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             pUxIf.Clear();
             break;
         }
+        this->m_oQuitSync.AddNotify();
         //
         // 2. bind the uxport and the the tcp stream
         //
@@ -549,6 +550,7 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             pUxIf.Clear();
             break;
         }
+        this->m_oQuitSync.AddNotify();
         
     }while( 0 );
 
@@ -1246,7 +1248,7 @@ gint32 CIfUxListeningRelayTask::OnTaskComplete(
     {
         DebugPrint( ret, "Error, the relay "
             "channel will be closed from "
-            "OnTaskComplete" );
+            "OnTaskComplete, 0x%llx", this );
         BufPtr pCloseBuf( true );
         *pCloseBuf = tokClose;
         PostEvent( pCloseBuf );
@@ -1378,7 +1380,7 @@ gint32 CIfUxListeningRelayTask::OnIrpComplete(
     {
         DebugPrint( ret, "Error, the relay "
             "channel will be closed from "
-            "OnIrpComplete" );
+            "OnIrpComplete, 0x%llx", this );
         BufPtr pCloseBuf( true );
         *pCloseBuf = tokClose;
         PostEvent( pCloseBuf );
@@ -1765,9 +1767,10 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
     if( !IsReading() )
         return ret;
 
-    BufPtr pPayload( true );
+    BufPtr pPayload;
     if( ERROR( ret ) )
     {
+        pPayload.NewObj();
         // return error to close the stream
         if( ret == ERROR_PORT_STOPPED )
         {
@@ -1787,7 +1790,7 @@ gint32 CIfTcpStmTransTask::HandleIrpResp(
         pPayload = pCtx->m_pRespData;
     }
 
-    ret = PostEvent( pPayload );
+    PostEvent( pPayload );
 
     return ret;
 }
@@ -2040,8 +2043,10 @@ gint32 CIfTcpStmTransTask::PostEvent(
     guint8 byToken = 0;
     BufPtr pNewBuf( true );
 
-    gint32 ret = RemoteToLocal(
-        pBuf, byToken, pNewBuf );
+    gint32 ret = 0;
+    if( byToken != tokError )
+        ret = RemoteToLocal(
+            pBuf, byToken, pNewBuf );
 
     if( ERROR( ret ) )
         return ret;
@@ -2070,6 +2075,11 @@ gint32 CIfTcpStmTransTask::PostEvent(
     case tokFlowCtrl:
     case tokLift:
         {
+            break;
+        }
+    case tokError:
+        {
+            // this token does not come from wire
             break;
         }
     default:

@@ -246,6 +246,20 @@ class CJavaRpcSvc_SvrImpl
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
 
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    { 
+        StartQpsTask();
+        return super::OnPostStart( pCallback );
+    }
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    { 
+        StopQpsTask();
+        return super::OnPreStop( pCallback );
+    }
+
     gint32 InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback ) override;
@@ -631,6 +645,9 @@ gint32 CJavaRpcSvc_SvrImpl::InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )
 {
+    gint32 ret = AllocReqToken();
+    if( ERROR( ret ) )
+        return ret;
     return CJavaServer::InvokeUserMethod(
         pParams, pCallback );
 }

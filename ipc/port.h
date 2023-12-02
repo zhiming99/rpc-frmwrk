@@ -335,8 +335,7 @@ class CPort : public IPort
     { return 0; }
     virtual gint32 OnPortStackDestroy( IRP* pIrp );
     virtual gint32 OnPortStackBuilt( IRP* pIrp );
-    virtual gint32 OnPortStackReady( IRP* pIrp )
-    { return 0; }
+    virtual gint32 OnPortStackReady( IRP* pIrp );
 
     virtual void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
@@ -496,6 +495,7 @@ class CPort : public IPort
     static bool CanAcceptMsg(
         guint32 dwPortState );
 
+    gint32 AddSeqTask( TaskletPtr& pTask );
 };
 
 class CIrpGateKeeper 
@@ -682,7 +682,7 @@ class CGenericBusPort : public CPort
     // handler on port destroy
     gint32 OnPortStackDestroy( IRP* pIrp );
 
-    gint32 SchedulePortAttachNotifTask(
+    virtual gint32 SchedulePortAttachNotifTask(
         IPort* pNewPort,
         guint32 dwEventId,
         IRP* pMasterIrp = nullptr,

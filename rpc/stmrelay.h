@@ -51,14 +51,16 @@ class CStreamRelayBase :
     typedef T super;
     using IStream::OnClose;
 
-    CStreamRelayBase( const IConfigDb* pCfg )
-        : super::_MyVirtBase( pCfg ), super( pCfg )
+    CStreamRelayBase( const IConfigDb* pCfg ) :
+        super::_MyVirtBase( pCfg ),
+        super( pCfg )
     {}
 
     // data is ready for reading
     virtual gint32 OnStmRecv(
         HANDLE hChannel, BufPtr& pBuf )
     { return 0; }
+
 
     // the local sock is closed
     gint32 OnClose( HANDLE hChannel,
@@ -70,30 +72,31 @@ class CStreamRelayBase :
 
         do{
             gint32 iStmId = -1;
+
             CStdRMutex oIfLock( this->GetLock() );
+            auto itr = m_mapHandleToStmId.find(
+                hChannel );
 
-            std::map< HANDLE, gint32 >::iterator
-                itr = m_mapHandleToStmId.find( hChannel );
-
-            if( itr != m_mapHandleToStmId.end() )
+            if( itr == m_mapHandleToStmId.end() )
             {
-                iStmId = itr->second;
-                RemoveBinding( hChannel, iStmId );
+                ret = -ENOENT;
+                break;
             }
+
+            iStmId = itr->second;
+            RemoveBinding( hChannel, iStmId );
+
             oIfLock.Unlock();
 
-            if( iStmId >= 0 )
-            {
-                CloseTcpStream( iStmId, true );
-                ret = this->CloseChannel(
-                    hChannel, pCallback );
-                // don't return pending since the
-                // caller is an IFCALL task. it may
-                // cause caller task wait endlessly
-                //
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-            }
+            CloseTcpStream( iStmId, true );
+            ret = this->CloseChannel(
+                hChannel, pCallback );
+            // don't return pending since the
+            // caller is an IFCALL task. it may
+            // cause caller task wait endlessly
+            //
+            if( ret == STATUS_PENDING )
+                ret = 0;
 
         }while( 0 );
 
@@ -114,26 +117,27 @@ class CStreamRelayBase :
 
         do{
             HANDLE hChannel = INVALID_HANDLE;
-            CStdRMutex oIfLock( this->GetLock() );
-            std::map< gint32, HANDLE >::iterator
-                itr = m_mapStmIdToHandle.find( iStmId );
 
-            if( itr != m_mapStmIdToHandle.end() )
+            CStdRMutex oIfLock( this->GetLock() );
+            auto itr = m_mapStmIdToHandle.find(
+                iStmId );
+
+            if( itr == m_mapStmIdToHandle.end() )
             {
-                hChannel = itr->second;
-                RemoveBinding( hChannel, iStmId );
+                ret = -ENOENT;
+                break;
             }
+
+            hChannel = itr->second;
+            RemoveBinding( hChannel, iStmId );
+
             oIfLock.Unlock();
 
-            // no need to send
-            if( hChannel != INVALID_HANDLE )
-            {
-                CloseTcpStream( iStmId, false );
-                ret = this->CloseChannel(
-                    hChannel, pCallback );
-                if( ret == STATUS_PENDING )
-                    ret = 0;
-            }
+            CloseTcpStream( iStmId, false );
+            ret = this->CloseChannel(
+                hChannel, pCallback );
+            if( ret == STATUS_PENDING )
+                ret = 0;
 
         }while( 0 );
 
@@ -434,8 +438,8 @@ class CStreamServerRelay :
     { return 0; }
 
     gint32 OnPreStop(
-        IEventSink* pContext ) override
-    { return OnPreStopShared( pContext ); }
+        IEventSink* pCallback ) override
+    { return OnPreStopShared( pCallback ); }
 };
 
 // this interface will be hosted by
@@ -507,8 +511,8 @@ class CStreamProxyRelay :
         return 0;
     }
     gint32 OnPreStop(
-        IEventSink* pContext ) override
-    { return OnPreStopShared( pContext ); }
+        IEventSink* pCallback ) override
+    { return OnPreStopShared( pCallback ); }
 };
 
 class CIfStartUxSockStmRelayTask :

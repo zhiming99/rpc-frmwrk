@@ -319,68 +319,15 @@ class DMsgPtr : public IAutoPtr
     gint32 SetMember(
         const std::string& strMember );
 
-    std::string GetInterface() const
-    {
-        if( IsEmpty() )
-            return std::string( "" );
-
-        const char* pszInterface =
-            dbus_message_get_interface( m_pObj );
-
-        if( pszInterface == nullptr )
-            pszInterface = "";
-
-        return std::string( pszInterface );
-    }
+    std::string GetInterface() const;
 
     gint32 SetInterface(
-        const std::string& strInterface )
-    {
-        if( IsEmpty() )
-            return -EFAULT; 
+        const std::string& strInterface );
 
-        if( !IsValidDBusName( strInterface ) )
-            return -EINVAL;
-
-        if( !dbus_message_set_interface(
-            m_pObj, strInterface.c_str() ) )
-            return -ENOMEM;
-           
-        return 0; 
-    }
-
-    std::string GetPath() const
-    {
-        if( IsEmpty() )
-            return std::string( "" );
-
-        const char* pszPath =
-            dbus_message_get_path( m_pObj );
-
-        if( pszPath == nullptr )
-            pszPath = "";
-
-        return std::string( pszPath );
-    }
+    std::string GetPath() const;
 
     gint32 SetPath(
-        const std::string& strPath )
-    {
-        if( IsEmpty() )
-            return -EFAULT; 
-
-        if( strPath.empty() )
-            return -EINVAL;
-
-        if( !IsValidDBusPath( strPath ) )
-            return -EINVAL;
-
-        if( !dbus_message_set_path(
-            m_pObj, strPath.c_str() ) )
-            return -ENOMEM;
-           
-        return 0; 
-    }
+        const std::string& strPath );
 
     std::string GetSender() const
     {

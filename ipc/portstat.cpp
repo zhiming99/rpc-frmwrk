@@ -141,7 +141,9 @@ bool CPortState::IsValidSubmit(
 
 stdrmutex& CPortState::GetLock() const
 {
-    return ( stdrmutex& )m_oLock;
+    auto pPort =
+        static_cast< CPort* >( m_pPort );
+    return pPort->GetLock();
 }
 
 gint32 CPortState::CanContinue(

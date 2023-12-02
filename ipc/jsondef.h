@@ -123,4 +123,9 @@
 #define JSON_ATTR_BASE_CFG      "BaseConfig"
 #define JSON_ATTR_SEQTGMGR      "SeqTaskGrpMgr"
 #define JSON_ATTR_FETCHTIMEOUT  "FetchDataTimeout"
+#define JSON_ATTR_ENABLE_BPS    "EnableBPS"
+#define JSON_ATTR_RECVBPS       "ReceiveBPS"
+#define JSON_ATTR_SENDBPS       "SendBPS"
+#define JSON_ATTR_ENABLE_QPS    "EnableQPS"
+#define JSON_ATTR_QPS           "QPS"
 

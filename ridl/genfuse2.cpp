@@ -851,7 +851,6 @@ gint32 CDeclServiceImplFuse2::Output()
         INDENT_DOWN;
         NEW_LINE;
         BLOCK_OPEN;
-
         Wa( "public:" );
         CCOUT << "typedef "
             << strBase << " super;";
@@ -904,6 +903,22 @@ gint32 CDeclServiceImplFuse2::Output()
 
         Wa( "gint32 OnWriteResumed( HANDLE hChannel ) override" );
         CCOUT << "{ return OnWriteResumedFuse( hChannel ); } ";
+        NEW_LINES( 2 );
+
+        Wa( "gint32 OnPostStart(" );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "StartQpsTask();" );
+        CCOUT << "return super::OnPostStart( pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        Wa( "gint32 OnPreStop(" );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "StopQpsTask();" );
+        CCOUT << "return super::OnPreStop( pCallback );";
+        BLOCK_CLOSE;
         NEW_LINES( 2 );
 
         strSkel = "C";
@@ -2509,7 +2524,20 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
         NEW_LINE;
         Wa( "    super::virtbase( pCfg ), super( pCfg )" );
         CCOUT << "{ SetClassId( clsid( C" << strSvcName << "_SvrSkel ) ); }";
-        NEW_LINE;
+        NEW_LINES( 2 );
+
+        Wa( "gint32 InvokeUserMethod(" );
+        Wa( "    IConfigDb* pParams," );
+        Wa( "    IEventSink* pCallback ) override" );
+        BLOCK_OPEN;
+        Wa( "auto pSvc = this->GetStreamIf();" );
+        Wa( "gint32 ret = pSvc->AllocReqToken();" );
+        Wa( "if( ERROR( ret ) )" );
+        Wa( "    return ret;" );
+        Wa( "return super::InvokeUserMethod(" );
+        CCOUT << "    pParams, pCallback );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
 
         Wa( "// methods for active canceling" );
         Wa( "gint32 UserCancelRequest(" );

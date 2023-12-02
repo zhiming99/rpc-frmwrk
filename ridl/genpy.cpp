@@ -3444,6 +3444,7 @@ gint32 CImplPyMainFunc::OutputCli(
             Wa( "    return ret" );
             Wa( "if isinstance( strNewDesc, str ) and len( strNewDesc ):" );
             Wa( "    strPath_ = strNewDesc" );
+            Wa( "    params[ 'objdesc' ] = strNewDesc" );
             Wa( "oContext = PyRpcContext( params )" );
         }
         else
@@ -3538,6 +3539,9 @@ gint32 CImplPyMainFunc::OutputCli(
         INDENT_UPL;
         if( vecSvcs.size() == 1 )
         {
+            Wa( "ret = oProxy.GetError()" );
+            Wa( "if ret < 0 :" );
+            Wa( "    raise Exception( 'start proxy failed' )");
             Wa( "state = oProxy.oInst.GetState()" );
             Wa( "while state == cpp.stateRecovery :" );
             Wa( "    time.sleep( 1 )" );
@@ -3554,6 +3558,11 @@ gint32 CImplPyMainFunc::OutputCli(
                 stdstr strVar = "oProxy";
                 if( i > 0 )
                     strVar += std::to_string( i );
+                CCOUT << "ret = " << strVar << ".GetError()";
+                NEW_LINE;
+                Wa( "if ret < 0 :" );
+                CCOUT << "    raise Exception( 'start " << strVar <<" failed' )";
+                NEW_LINE;
                 CCOUT << "state = " << strVar << ".oInst.GetState()";
                 NEW_LINE;
                 Wa( "while state == cpp.stateRecovery :" );

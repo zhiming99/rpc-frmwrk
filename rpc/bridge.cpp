@@ -130,8 +130,7 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
     IConfigDb* pReqCtx )
 {
     gint32 ret = 0;
-    if( pCallback == nullptr ||
-        pIoReq == nullptr ||
+    if( pIoReq == nullptr ||
         pReqCtx == nullptr )
         return -EINVAL;
 
@@ -236,8 +235,9 @@ gint32 CRpcTcpBridgeProxy::OnHandshakeComplete(
         DebugPrintEx( logErr, ret,
             "TcpBridgeProxy Handshake failed" );
 
-    pCallback->OnEvent(
-        eventTaskComp, ret, 0, nullptr );
+    if( pCallback != nullptr )
+        pCallback->OnEvent(
+            eventTaskComp, ret, 0, nullptr );
 
     return ret;
 }
@@ -282,8 +282,8 @@ gint32 CRpcTcpBridgeProxy::Handshake(
         CCfgOpenerObj oTask(
             ( CObjBase* )pCallback ); 
 
-        ret = oTask.CopyProp(
-            propRespPtr, oResp.GetCfg() );
+        Variant oVar;
+        ret = oTask.GetProperty( propRespPtr, oVar );
 
     }while( 0 );
 
@@ -335,44 +335,8 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oCfg( pCallback );
-        IConfigDb* pResp = nullptr;
-        ret = oCfg.GetPointer(
-            propRespPtr, pResp );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpener oResp( pResp ); 
-        gint32 iRet = 0;
-        ret = oResp.GetIntProp(
-            propReturnValue,
-            *( guint32* )&iRet );
-        if( ERROR( ret ) )
-            break;
-
-        if( ERROR( iRet ) )
-        {
-            ret = iRet;
-            break;
-        }
-
-        IConfigDb* pInfo = nullptr;
-        ret = oResp.GetPointer( 0, pInfo );
-        if( ERROR( ret ) )
-            break;
-
-        guint64 qwTimestamp = 0;
-        CCfgOpener oInfo( pInfo );
-        ret = oResp.GetQwordProp(
-            propTimestamp, qwTimestamp );
-        if( ERROR( ret ) )
-            break;
-
-        timespec ts;
-        clock_gettime( CLOCK_REALTIME, &ts );
-        m_oTs.SetBase(
-            ( tv.tv_sec + ts.tv_sec ) >> 1 );
-        m_oTs.SetPeer( qwTimestamp );
+        ret = OnHandshakeComplete( nullptr,
+            pRespCb, oParams.GetCfg() );
 
     }while( 0 );
 
@@ -765,7 +729,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
         oReqCtx.CopyProp(
             propTaskId, pReqCtx );
 
-        guint32 dwAge = 0;
         if( true )
         {
             guint64 qwLocalTs = 0;
@@ -780,10 +743,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
             oReqCtx.SetQwordProp(
                 propTimestamp, qwPeerTs );
 
-            guint64 qwVal =
-                m_oTs.GetAgeSec( qwLocalTs );
-            qwVal = ( abs( ( gint64 )qwVal ) );
-            dwAge = qwVal; 
         }
 
         if( !bRelay )
@@ -854,13 +813,6 @@ gint32 CRpcTcpBridgeProxy::ForwardRequest(
                     propTimeoutSec, dwtos );
             }
 
-            if( dwAge >= dwtos )
-            {
-                ret = -ETIMEDOUT;
-                break;
-            }
-
-            dwtos -= dwAge;
         }
 
         oBuilder.SetCallFlags( dwFlags );
@@ -5240,8 +5192,10 @@ gint32 CRpcTcpBridge::Handshake(
         CStdRMutex oIfLock( GetLock() );
         if( m_bHandshaked == true )
         {
+            oIfLock.Unlock();
+            PostDisconnEvent();
             ret = ERROR_STATE;
-            return ret;
+            break;
         }
 
         m_bHandshaked = true;
@@ -5310,10 +5264,9 @@ gint32 CRpcTcpBridge::Handshake(
             m_pHsTicker.Clear();
             oIfLock.Unlock();
             CStdRTMutex oTaskLock( ppt->GetLock() );
-            EnumTaskState iState =
-                ppt->GetTaskState();
+            gint32 iRet = ppt->GetError();
             ppt->RemoveTimer();
-            if( ppt->IsStopped( iState ) )
+            if( ERROR( iRet ) )
             {
                 oIfLock.Lock();
                 // the handshake window has closed,
@@ -5346,33 +5299,17 @@ gint32 CRpcTcpBridge::PostDisconnEvent()
     do{
         CCfgOpener oReqCtx;
         oReqCtx[ propRouterPath ] = "/";
-        oReqCtx.CopyProp( propConnHandle,
-            propPortId, this );
 
-        PortPtr pPort;
-        GET_TARGET_PORT( pPort ); 
-        if( ERROR( ret ) )
-            break;
+        Variant oVar;
+        this->GetProperty( propPortId, oVar );
+        oReqCtx.SetProperty(
+            propConnHandle, oVar );
 
-        BufPtr pBuf( true );
-        ret = GetPortProp( pPort,
-            propPdoPtr, pBuf );
-        if( ERROR( ret ) )
-            break;
+        guint32 dwPortId = oVar;
 
-        IPort* pPdo = ( ObjPtr& )*pBuf;
-        if( unlikely( pPdo == nullptr ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        IConfigDb* pReqCtx = oReqCtx.GetCfg();
-        CRpcRouter* pRouter = GetParent();
-        // stop the underlying port
-        pRouter->OnEvent( eventRmtSvrOffline,
-            ( LONGWORD )pReqCtx, 0,
-            ( LONGWORD* )PortToHandle( pPdo ) );
+        auto pParent = GetParent();
+        CRpcRouterBridge* prt = ObjPtr( pParent );
+        ret = prt->OnClose( dwPortId, nullptr );
 
     }while( 0 );
 

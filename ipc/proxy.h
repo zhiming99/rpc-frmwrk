@@ -685,6 +685,7 @@ class CRpcServices :
     // task processing
     TaskGrpPtr             m_pSeqTasks;
     timespec               m_tsStartTime;
+    TaskletPtr             m_pQpsTask;
 
     virtual gint32 SetupReqIrp( IRP* pIrp,
         IConfigDb* pReqCall, IEventSink* pCallback );
@@ -1082,6 +1083,10 @@ class CRpcServices :
 
     inline timespec GetStartTime() const
     { return m_tsStartTime; }
+
+    gint32 AllocReqToken();
+    gint32 StartQpsTask();
+    gint32 StopQpsTask();
 
     private:
     template< class T >

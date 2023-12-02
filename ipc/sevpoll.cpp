@@ -434,9 +434,7 @@ gint32 CSimpleEvPoll::UpdateTimeMaps(
 
     if( m_bTimeRemove )
     {
-        std::vector< std::multimap< guint64, HANDLE >::iterator > vecItrs;
-        std::multimap< guint64, HANDLE >::iterator
-        itr = mapActTimers.begin();
+        auto itr = mapActTimers.begin();
         while( itr != mapActTimers.end() )
         {
             HANDLE hWatch = itr->second;
@@ -512,6 +510,7 @@ gint32 CSimpleEvPoll::UpdateTimeSource(
         if( !pTs->m_bRepeat )
         {
             pTs->Stop();
+            ret = -EINVAL;
             break;
         }
 
@@ -521,19 +520,20 @@ gint32 CSimpleEvPoll::UpdateTimeSource(
             break;
         }
 
-        // to make sure the next due time is afer
-        // the NowUsFast
-        guint64 qwIntervalUs =
-            NowUsFast() - pTs->m_qwAbsTimeUs;
-
-        guint64 nFactor = qwIntervalUs /
-            ( ( guint64 )pTs->m_dwIntervalMs * 1000 );
-
-        pTs->m_qwAbsTimeUs +=
-            pTs->m_dwIntervalMs * 1000 *
-            ( nFactor + 1 );
-
-        // printf( "nFactor is %lld\n", nFactor );
+        pTs->m_qwAbsTimeUs += pTs->m_qwIntervalUs;
+        if( NowUsFast() >= pTs->m_qwAbsTimeUs )
+        {
+            // to make sure the difference between the
+            // due time is on the multiple of
+            // m_qwIntervalUs, though some may be
+            // skipped
+            guint64 qwIntervalUs =
+                NowUsFast() - pTs->m_qwAbsTimeUs;
+            guint64 nFactor = qwIntervalUs /
+                 ( ( guint64 )pTs->m_qwIntervalUs );
+            pTs->m_qwAbsTimeUs +=
+                pTs->m_qwIntervalUs * ( nFactor + 1 );
+        }
         qwNewTimeUs = pTs->m_qwAbsTimeUs;
 
     }while( 0 );
@@ -746,7 +746,7 @@ gint32 CSimpleEvPoll::RunLoop()
         else if( ret == -ETIMEDOUT )
         {
             HandleTimeout( mapActTimers );
-            continue;
+            // continue;
         }
 
         gint32 iReadyCount = 0;
@@ -780,8 +780,11 @@ gint32 CSimpleEvPoll::RunLoop()
                 "Fatal error in mainloop" );
         }
 
-        NowUs();
-        HandleTimeout( mapActTimers );
+        if( iReadyCount == 0 )
+        {
+            NowUs();
+            HandleTimeout( mapActTimers );
+        }
         HandleIoEvents( mapActFds,
             pPollInfo, iCount, iReadyCount );
     }

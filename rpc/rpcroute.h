@@ -1842,7 +1842,8 @@ class CReqFwdrOpenRmtPortTask
     virtual gint32 RunTask();
     virtual gint32 OnTaskComplete( gint32 iRetVal );
     gint32 OnCancel( guint32 dwContext );
-    gint32 StopIfSafe( InterfPtr& pIf, gint32 iRet );
+    virtual gint32 StopIfSafe(
+        InterfPtr& pIf, gint32 iRetVal );
 };
 /**
 * @name CRouterOpenBdgePortTask
@@ -1887,10 +1888,12 @@ class CRouterOpenBdgePortTask :
         SetClassId( clsid( CRouterOpenBdgePortTask ) ); 
     }
 
-    virtual gint32 CreateInterface( InterfPtr& pIf );
-    virtual gint32 RunTaskInternal( gint32 iRetVal );
-    virtual gint32 OnServiceComplete( gint32 iRetVal )
+    gint32 CreateInterface( InterfPtr& pIf ) override;
+    gint32 RunTaskInternal( gint32 iRetVal ) override;
+    gint32 OnServiceComplete( gint32 iRetVal ) override
     { return 0; }
+    gint32 StopIfSafe(
+        InterfPtr& pIf, gint32 iRetVal ) override;
 };
 
 class CIfRollbackableTask :

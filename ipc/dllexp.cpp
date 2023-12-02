@@ -194,6 +194,8 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CIfInvokeMethodTask2 );
     INIT_MAP_ENTRYCFG( CIfStartRecvMsgTask2 );
     INIT_MAP_ENTRYCFG( CIfParallelTaskGrpRfc );
+    INIT_MAP_ENTRYCFG( CTimerWatchCallback2 );
+    INIT_MAP_ENTRYCFG( CTokenBucketTask );
 
 #ifdef _USE_LIBEV
     INIT_MAP_ENTRYCFG( CDBusLoopHooks );

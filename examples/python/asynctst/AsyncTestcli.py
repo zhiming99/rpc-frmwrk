@@ -24,7 +24,7 @@ class CIAsyncTestcli( IIAsyncTest_CliImpl ):
     '''
     def LongWaitNoParamCb( self,
         context : object, ret : int ):
-        print( "LongWaitNoParamCb completed with status " +
+        OutputMsg( "LongWaitNoParamCb completed with status " +
             str(ret) )
         self.SetError(ret)    
         self.NotifyComplete()

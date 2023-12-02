@@ -10,16 +10,19 @@ fi
 ulimit -n 8192
 ulimit -a
 
+dumpfile=$basedir/logdump.txt
 function stressTest()
 {
     pushd testdir
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
+    >$dumpfile
+
     mkdir mp mpsvr || true
-    release/TestTypessvr -m mpsvr &
+    release/TestTypessvr -m mpsvr >> $dumpfile &
     sleep 8 
-    release/TestTypescli -m mp &
+    release/TestTypescli -m mp >> $dumpfile  &
     sleep 4
 
     #make sure TestTypesSvc created
@@ -35,10 +38,9 @@ function stressTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    > $basedir/logdump.txt
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $basedir/logdump.txt &
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $dumpfile &
 
-/bin/bash << RUNCLIENT >> $basedir/logdump.txt
+/bin/bash << RUNCLIENT >> $dumpfile
 start=\$(date +%s.%N)
 for((i=0;i<200;i++));do
     python3 $pydir/testypes/maincli.py mp/connection_0/TestTypesSvc \$i &
@@ -76,9 +78,10 @@ function mkDirTest()
     cat ./cmdline
     make > /dev/null 2>&1 || exit 10
 
+    > $dumpfile
     mkdir mp mpsvr || true
-    hostsvr -m mpsvr &
-    hostcli -m mp &
+    hostsvr -m mpsvr >> $dumpfile &
+    hostcli -m mp >> $dumpfile &
     sleep 5 
 
     echo loading TestTypes library to server and proxy...
@@ -96,10 +99,9 @@ function mkDirTest()
     ls -lR ./mpsvr
 
     pydir=$basedir/fuse/examples/python
-    > $basedir/logdump.txt
-    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $basedir/logdump.txt &
+    python3 $pydir/testypes/mainsvr.py mpsvr/TestTypesSvc 0 >> $dumpfile &
 
-/bin/bash << RUNCLIENT >> $basedir/logdump.txt
+/bin/bash << RUNCLIENT >> $dumpfile
 function singleMkdir()
 {
     idx=0
@@ -159,9 +161,9 @@ echo start stressTest normal...
 stressTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo stressTest normal passed!
@@ -173,9 +175,9 @@ echo start stressTest ROS...
 stressTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo stressTest ROS passed!
@@ -187,9 +189,9 @@ echo start mkDirTest normal
 mkDirTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo mkDirTest normal passed!
@@ -201,15 +203,16 @@ echo mkDirTest ROS
 mkDirTest
 
 echo Check errors in logdump.txt...
-if grep 'Errno\|-110@0\|usage: main' $basedir/logdump.txt > /dev/null; then
+if grep 'Errno\|-110@0\|usage: main' $dumpfile > /dev/null; then
     echo errors found!
-    cat $basedir/logdump.txt 
+    cat $dumpfile 
     exit 1
 fi
 echo mkDirTest ROS passed!
 
 function pytest()
 {
+    > $dumpfile
     testcase=$1
     pushd $testcase
     if [ -e ./maincli.py ]; then 
@@ -237,9 +240,9 @@ function pytest()
         echo svcpt is $svcpt
         pushd ./fs
         echo release/${appname}svr -d -m ./mpsvr
-        release/${appname}svr -d -m ./mpsvr
+        release/${appname}svr -m ./mpsvr >> $dumpfile &
         sleep 2
-        echo release/${appname}cli -d -m ./mp
+        echo release/${appname}cli -m ./mp >> $dumpfile &
         release/${appname}cli -d -m ./mp
         popd
         sleep 5
@@ -265,6 +268,9 @@ function pytest()
     rm *.new
     rm -rf fs
     popd
+    if [ "x$ret" != "x0" ]; then
+        cat $dumpfile
+    fi
     return $ret
 }
 

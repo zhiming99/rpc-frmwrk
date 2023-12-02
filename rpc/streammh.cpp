@@ -1663,6 +1663,8 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         ret = this->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
             ( *pStartTask )( eventCancelTask );
+        else
+            this->m_oQuitSync.AddNotify();
 
     }while( 0 );
     
@@ -1734,6 +1736,10 @@ gint32 CStreamServerRelayMH::OnClose2(
             CloseTcpStream( iStmId, false );
             ret = OnCloseInternal(
                 hChannel, pCallback );
+        }
+        else
+        {
+            ret = -ENOENT;
         }
 
     }while( 0 );

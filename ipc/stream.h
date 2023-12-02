@@ -43,6 +43,89 @@ struct IStream
     bool    m_bNonSockStm = false;
     ObjPtr  m_pSeqTgMgr;
 
+    struct CQuitSync
+    {
+        guint32 m_dwCount = 1;
+        CRpcServices* m_pParent = nullptr;
+        TaskletPtr m_pFinalCb;
+
+        gint32 (*m_pFunc)( IEventSink* ) =
+        ([]( IEventSink* )->gint32
+        { return 0; });
+
+        CQuitSync() 
+        {}
+
+        ~CQuitSync()
+        { m_pFinalCb.Clear(); }
+
+        gint32 AddNotify()
+        {
+            CStdRMutex oLock( m_pParent->GetLock() );
+            m_dwCount++;
+            return 0;
+        }
+
+        void SetParent( CRpcServices* pParent )
+        { m_pParent = pParent; }
+        
+        gint32 WaitingChildren( IEventSink* pCallback )
+        {
+            TaskletPtr pFinalCb;
+            gint32 (*func)( IEventSink*) =
+            ([]( IEventSink* pNotify )->gint32
+            {
+                pNotify->OnEvent(
+                    eventTaskComp, 0, 0, nullptr );
+                return 0;
+            });
+
+            gint32 ret = 0;
+            NEW_FUNCCALL_TASK( pFinalCb,
+                m_pParent->GetIoMgr(),
+                func, pCallback );
+
+            CStdRMutex oLock( m_pParent->GetLock() );
+            m_pFinalCb = pFinalCb;
+            m_dwCount--;
+            if( m_dwCount == 0 )
+            {
+                oLock.Unlock();
+                ret = m_pParent->AddSeqTask( pFinalCb );
+                if( ERROR( ret ) )
+                {
+                    ( *pFinalCb )( eventCancelTask );
+                    return ret;
+                }
+            }
+            return STATUS_PENDING;
+        }
+
+        gint32 ReleaseNotify()
+        {
+            CStdRMutex oLock( m_pParent->GetLock() );
+            m_dwCount--;
+            if( m_dwCount == 0 &&
+                !m_pFinalCb.IsEmpty() )
+            {
+                TaskletPtr pFinalCb = m_pFinalCb;
+                oLock.Unlock();
+                gint32 ret = m_pParent->AddSeqTask(
+                    pFinalCb );
+                if( ERROR( ret ) )
+                {
+                    ( *pFinalCb )( eventCancelTask );
+                    return ret;
+                }
+                DebugPrint( ret, 
+                    "OnPreStopShared is waiting,"
+                    "quit from OnUxStreamEvent" );
+            }
+            return 0;
+        }
+
+    } m_oQuitSync;
+
     virtual gint32 CanContinue() = 0;
 
     void SetInterface( CRpcServices* pSvc );

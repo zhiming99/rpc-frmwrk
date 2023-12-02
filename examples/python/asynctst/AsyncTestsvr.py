@@ -16,7 +16,7 @@ class CIAsyncTestsvr( IIAsyncTest_SvrImpl ):
         context = None
         self.OnLongWaitComplete(
             oReqCtx, 0, strText )
-        print( "LongWait request completed " )
+        OutputMsg( "LongWait request completed " )
         return
         
     '''
@@ -29,6 +29,7 @@ class CIAsyncTestsvr( IIAsyncTest_SvrImpl ):
         the response parameters includes
         i0r : str
         '''
+        OutputMsg( "proxy says '%s' " % i0 )
         ret = self.AddTimer( 3,
             CIAsyncTestsvr.LongWaitCb,
             oReqCtx )
@@ -56,9 +57,9 @@ class CIAsyncTestsvr( IIAsyncTest_SvrImpl ):
         if oReqCtx.oContext is not None:
             timerObj = oReqCtx.oContext[ 0 ]
             ret = self.DisableTimer( timerObj )
-            print( "timer removed " + str( ret ) )
+            OutputMsg( "timer removed " + str( ret ) )
             oReqCtx.oContext = None
-            print( "LongWait request canceled with " + i0 )
+            OutputMsg( "LongWait request canceled with " + i0 )
         
     '''
     Synchronous request handler
@@ -69,10 +70,10 @@ class CIAsyncTestsvr( IIAsyncTest_SvrImpl ):
         
     def LongWait2Cb( self, oReqCtx, i1r ):
         try:
-            print( "LongWait2Cb request complete with " + i1r)
+            OutputMsg( "LongWait2Cb request complete with " + i1r)
             self.OnLongWait2Complete( oReqCtx, 0, i1r )
         except Exception as e:
-            print(str(e))
+            OutputMsg(str(e))
     '''
     Asynchronous request handler
     '''
@@ -83,11 +84,12 @@ class CIAsyncTestsvr( IIAsyncTest_SvrImpl ):
         the response parameters includes
         i1r : str
         '''
+        OutputMsg( "LongWait2 deferred a call" )
         #Another way of asynchronous processing
         ret = self.DeferCall(
             CIAsyncTestsvr.LongWait2Cb, oReqCtx, i1 )
         if ret < 0 :
-            print("DeferCall failed with error " + ret )
+            OutputMsg("DeferCall failed with error " + ret )
             return [ ret, None ]
         #return pending to wait for LongWait2Cb
         return [ 65537, ]
@@ -101,7 +103,7 @@ class CIAsyncTestsvr( IIAsyncTest_SvrImpl ):
     def OnLongWait2Canceled( self,
         oReqCtx : PyReqContext, iRet : int,
         i1 : str ):
-        print( "OnLongWait2Canceled entered " + str(iRet))
+        OutputMsg( "OnLongWait2Canceled entered " + str(iRet))
         
     
 class CAsyncTestServer(

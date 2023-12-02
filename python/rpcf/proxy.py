@@ -54,7 +54,7 @@ class ErrorCode( IntEnum ) :
     ERROR_CANNOT_COMP = np.int32( np.uint32( 0x8001000b ) )
     ERROR_USER_CANCEL = np.int32( np.uint32( 0x8001000c ) )
     ERROR_PAUSED = np.int32( np.uint32( 0x8001000d ) )
-    ERROR_NOT_IMPL = np.int32( np.uint32( 0x8001000e ) )
+    ERROR_NOT_IMPL = np.int32( np.uint32( 0x80010010 ) )
     ERROR_CANCEL_INSTEAD = np.int32( np.uint32( 0x8001000f ) )
     ERROR_QUEUE_FULL = np.int32( np.uint32( 0x8001000e ) )
 
@@ -359,10 +359,13 @@ class PyRpcServices :
         isServer = self.IsServer()
 
         if ret < 0 :
+            self.SetError( ret )
             if isServer :
-                print( "Failed to start server %d(%d)" % ( os.getpid(), ret ) )
+                print( "Failed to start server %d(%d), state=%d" % 
+                    ( os.getpid(), ret, self.oInst.GetState() ) )
             else :
-                print( "Failed to start proxy %d(%d)" % ( os.getpid(), ret ) )
+                print( "Failed to start proxy %d(%d), state=%d" %
+                    ( os.getpid(), ret, self.oInst.GetState() ) )
             return ret
         else :
             if isServer :

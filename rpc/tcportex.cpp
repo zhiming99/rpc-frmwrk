@@ -1680,11 +1680,15 @@ CRpcNativeProtoFdo::CRpcNativeProtoFdo(
         SetClassId( clsid( CRpcNativeProtoFdo ) );
         m_dwFlags &= ~PORTFLG_TYPE_MASK;
         m_dwFlags |= PORTFLG_TYPE_FDO;
+        Sem_Init( &m_semFireSync, 0, 0 );
 
     }while( 0 );
 
     return;
 }
+ 
+CRpcNativeProtoFdo::~CRpcNativeProtoFdo()
+{ sem_destroy( &m_semFireSync ); }
 
 gint32 CRpcNativeProtoFdo::AddStream(
     gint32 iStream,
@@ -2110,6 +2114,7 @@ gint32 CRpcNativeProtoFdo::OnPortStackReady(
 
     FireRmtSvrEvent(
         pPdo, eventRmtSvrOnline );
+    Sem_Post( &m_semFireSync );
 
     pIrp->GetCurCtx()->SetStatus( ret );
 
@@ -4062,7 +4067,12 @@ gint32 CFdoListeningTask::HandleIrpResp(
         gint32 iRet = pIrp->GetStatus();
         if( ERROR( iRet ) )
         {
-            ret = iRet;
+            ret = ERROR_PORT_STOPPED;
+            pPort->CancelAllIrps( ret );
+            IPort* pdo = pPort->GetBottomPort();
+            pPort->WaitOnline();
+            FireRmtSvrEvent(
+                pdo, eventRmtSvrOffline );
             break;
         }
 
@@ -4113,6 +4123,7 @@ gint32 CFdoListeningTask::HandleIrpResp(
                     pPort->CancelAllIrps( ret );
                     ret = ERROR_PORT_STOPPED;
                     IPort* pdo = pPort->GetBottomPort();
+                    pPort->WaitOnline();
                     FireRmtSvrEvent(
                         pdo, eventRmtSvrOffline );
                 }

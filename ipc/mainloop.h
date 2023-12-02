@@ -259,7 +259,7 @@ class CMainIoLoopT : public T
             ret = GetTaskQue()->GetHead( pElem ); 
             if( SUCCEEDED( ret ) )
                 vecTasks.push_back( pElem );
-            GetTaskQue()->PopHead();
+            // GetTaskQue()->PopHead();
         }
 
         std::deque< TaskletPtr > queQuitTasks =
@@ -298,7 +298,7 @@ class CMainIoLoopT : public T
                 pLoop->SetTaskDone( true );
                 break;
             }
-            pQue->PopHead();
+            // pQue->PopHead();
             oLock.Unlock();
 
             ( *pTask )( eventZero );

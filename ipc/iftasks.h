@@ -1243,4 +1243,76 @@ class CIfParallelTaskGrpRfc :
     gint32 IsQueueFull( bool& bFull ) const;
 };
 
+class CTimerWatchCallback2 :
+    public CTasklet
+{
+    TaskletPtr m_pCallback;
+    guint32 m_dwEvent = 0;
+    guint32 m_dwContext = 0;
+    bool  m_bRepeat = true;
+    stdrmutex m_oLock;
+    bool m_bQuit = false;
+    public:
+    typedef CTasklet super;
+    CTimerWatchCallback2(
+        const IConfigDb* pCfg );
+    inline void SetQuit()
+    {
+        CStdRMutex oLock( m_oLock );
+        m_bQuit = true;
+    }
+    gint32 operator()(
+        guint32 dwContext ) override;
+
+    void Reset();
+};
+
+struct CTokenBucketTask :
+    public CIfParallelTask
+{
+    protected:
+    guint64     m_qwMaxTokens = ( guint64 )-1;
+    guint64     m_qwTokens = 0;
+    EventPtr    m_pNotify;
+    TaskletPtr  m_pWatchTask;
+    HANDLE      m_hWatch;
+    MloopPtr    m_pLoop;
+    guint32     m_dwIntervalMs = 0;
+    bool        m_bTimerEnabled = false;
+
+    public:
+    typedef CIfParallelTask super;
+
+    CTokenBucketTask( const IConfigDb* pCfg );
+    gint32 RunTask() override;
+
+    inline bool IsDisabled()
+    { 
+        guint64 qwToken = 0;;
+        gint32 ret = GetMaxTokens( qwToken );
+        if( ERROR( ret ) )
+            return true;
+        return ( ( guint64 )-1 ) == qwToken;
+    }
+
+    inline void Disable()
+    { SetMaxTokens( ( guint64 )-1 ); }
+
+    gint32 AllocToken( guint64& qwNumReq );
+    gint32 FreeToken( guint64 qwNumReq );
+    gint32 OnRetry() override;
+    gint32 OnComplete( gint32 iRet ) override;
+
+    gint32 GetTokensAvail(
+        guint64& qwTokens ) const;
+
+    gint32 GetMaxTokens(
+        guint64& qwMaxTokens ) const;
+
+    gint32 EnableTimerWatch();
+    gint32 DisableTimerWatch();
+    gint32 SetMaxTokens(
+        guint64 qwMaxTokens );
+};
+
 }

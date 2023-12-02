@@ -36,6 +36,7 @@
 #include "reqopen.h"
 #include "jsondef.h"
 #include "ifhelper.h"
+#include "regex"
 
 namespace rpcf
 {
@@ -728,9 +729,11 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
 
         guint32 dwNumCores = pMgr->GetNumCores();
         bool bMultiLoop = false;
-        if( ( dwRole & 0x2 ) && m_bRfc )
+        if( ( dwRole & 0x2 ) || m_bRfc )
         {
-            dwCount = dwNumCores >> 1;
+            dwCount = std::max(
+                ( dwNumCores >> 2 ),
+                ( guint32 )2 );
         }
         else if( dwRole & 1 )
         {
@@ -743,7 +746,7 @@ gint32 CRpcTcpBusPort::CreateMLoopPool()
 
         CLoopPools& oPools = pMgr->GetLoopPools();
         ret = oPools.CreatePool( NETSOCK_TAG,
-            "SockLoop-", dwCount, 20 );
+            "SockLoop-", dwCount, 10 );
 
     }while( 0 );
 
@@ -813,11 +816,90 @@ gint32 CRpcTcpBusPort::PostStop( IRP* pIrp )
     return super::PostStop( pIrp );
 }
 
+gint32 CRpcTcpBusPort::SchedulePortAttachNotifTask(
+    IPort* pNewPort,
+    guint32 dwEventId,
+    IRP* pMasterIrp,
+    bool bImmediately )
+{
+    gint32 ret = 0;
+    do{
+        if( pMasterIrp != nullptr )
+        {
+            CIoManager* pMgr = GetIoMgr();
+            gint32 ( *func )( IEventSink*, CPort*, PIRP ) =
+            ([]( IEventSink* pCb, CPort* pBus,
+                PIRP pMaster )->gint32
+            {
+                CIoManager* pMgr = pBus->GetIoMgr();
+                pMgr->CompleteIrp( pMaster );
+                return 0;
+            });
+            TaskletPtr pCb;
+            ret = NEW_COMPLETE_FUNCALL( 0, pCb, pMgr,
+               func, nullptr, this, pMasterIrp  );
+            if( ERROR( ret ) )
+                break;
+            CCfgOpenerObj oPort( pNewPort );
+            oPort.SetPointer( propEventSink,
+                ( IEventSink* )pCb );
+        }
+        ret = NotifyPortAttached( pNewPort );
+
+    }while( 0 );
+    return ret;
+}
+
 CRpcTcpBusDriver::CRpcTcpBusDriver(
     const IConfigDb* pCfg )
     : super( pCfg )
 {
     SetClassId( clsid( CRpcTcpBusDriver ) );
+}
+
+static gint32 ParseBpsString(
+    const stdstr& strVal, guint64& qwBps )
+{
+    gint32 ret = 0;
+    do{
+        std::smatch s;
+        std::regex e( "^([1-9][0-9]*)(MB|KB|GB|kb|mb|gb)?" );
+        std::regex_match( strVal, s, e,
+            std::regex_constants::match_not_null );
+
+        if( s.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( !s[ 1 ].matched )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        guint64 qwFactor = 1; 
+        if( s.size() >= 2 && s[ 2 ].matched )
+        {
+            stdstr strUnit = s[ 2 ].str();
+            if( strUnit == "MB" || strUnit == "mb" )
+                qwFactor = 1024*1024;
+            else if( strUnit == "KB" || strUnit == "kb" )
+                qwFactor = 1024;
+            else if( strUnit == "GB" || strUnit == "gb" )
+                qwFactor = ( 1024 * 1024 * 1024 );
+            else
+            {
+                ret = -EINVAL;
+                break;
+            }
+        }
+
+        guint64 qwDigits = strtoll(
+            s[ 1 ].str().c_str(), 0, 10 );
+        qwBps = qwDigits * qwFactor; 
+
+    }while( 0 );
+    return ret;
 }
 
 gint32 CRpcTcpBusDriver::GetTcpSettings(
@@ -1025,6 +1107,43 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         oElemCfg.SetBoolProp( propHasAuth, true );
                 }
 
+                bool bEnableBps = false;
+                if( oParams.isMember( JSON_ATTR_ENABLE_BPS ) &&
+                    oParams[ JSON_ATTR_ENABLE_BPS ].isString() )
+                {
+                    string strVal =
+                        oParams[ JSON_ATTR_ENABLE_BPS ].asString();
+                    if( strVal == "true" )
+                    {
+                        oElemCfg.SetBoolProp( propEnableBps, true );
+                        bEnableBps = true;
+                    }
+                }
+                if( bEnableBps )
+                {
+                    const stdstr jprops[ 2 ] =
+                        { JSON_ATTR_RECVBPS, JSON_ATTR_SENDBPS };
+                    guint32 props[ 2 ] =
+                        { propRecvBps, propSendBps };
+
+                    for( int i = 0; i < 2; i++ )
+                    {
+                        const stdstr& elem = jprops[ i ];
+                        if( !oParams.isMember( elem ) ||
+                            !oParams[ elem ].isString() )
+                            continue;
+
+                        stdstr strVal = oParams[ elem ].asString();
+                        guint64 qwBps = 0;
+                        ret = ParseBpsString( strVal, qwBps );
+                        if( ERROR( ret ) )
+                        {
+                            ret = 0;
+                            continue;
+                        }
+                        oElemCfg.SetQwordProp( props[ i ], qwBps );
+                    }
+                }
                 vecParams.push_back( ObjPtr( oElemCfg.GetCfg() ) );
             }
 

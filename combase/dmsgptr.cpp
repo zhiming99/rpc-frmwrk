@@ -35,6 +35,80 @@
 namespace rpcf
 {
 
+std::string DMsgPtr::GetInterface() const
+{
+    if( IsEmpty() )
+        return std::string( "" );
+
+    const char* pszInterface =
+        dbus_message_get_interface( m_pObj );
+
+    if( pszInterface == nullptr )
+    {
+        sched_yield();
+        pszInterface =
+            dbus_message_get_interface( m_pObj );
+        if( pszInterface == nullptr )
+            pszInterface = "";
+    }
+
+    return std::string( pszInterface );
+}
+
+gint32 DMsgPtr::SetInterface(
+    const std::string& strInterface )
+{
+    if( IsEmpty() )
+        return -EFAULT; 
+
+    if( !IsValidDBusName( strInterface ) )
+        return -EINVAL;
+
+    if( !dbus_message_set_interface(
+        m_pObj, strInterface.c_str() ) )
+        return -ENOMEM;
+       
+    return 0; 
+}
+
+std::string DMsgPtr::GetPath() const
+{
+    if( IsEmpty() )
+        return std::string( "" );
+
+    const char* pszPath =
+        dbus_message_get_path( m_pObj );
+
+    if( pszPath == nullptr )
+    {
+        sched_yield();
+        pszPath =
+            dbus_message_get_interface( m_pObj );
+        if( pszPath == nullptr )
+            pszPath = "";
+    }
+    return std::string( pszPath );
+}
+
+gint32 DMsgPtr::SetPath(
+    const std::string& strPath )
+{
+    if( IsEmpty() )
+        return -EFAULT; 
+
+    if( strPath.empty() )
+        return -EINVAL;
+
+    if( !IsValidDBusPath( strPath ) )
+        return -EINVAL;
+
+    if( !dbus_message_set_path(
+        m_pObj, strPath.c_str() ) )
+        return -ENOMEM;
+       
+    return 0; 
+}
+
 gint32 DMsgPtr::GetArgs(
     std::vector< ARG_ENTRY >& vecArgs ) const
 {

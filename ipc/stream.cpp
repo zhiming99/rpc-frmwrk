@@ -42,6 +42,7 @@ void IStream::SetInterface( CRpcServices* pSvc )
     CCfgOpenerObj oCfg( pSvc );
     oCfg.GetBoolProp(
         propNonSockStm, m_bNonSockStm );
+    m_oQuitSync.SetParent( pSvc );
 
     bool bSeqTgMgr = false;
     gint32 ret = oCfg.GetBoolProp(
@@ -594,6 +595,8 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
         gint32 iRet = oResp[ propReturnValue ];
         if( ERROR( iRet ) )
         {
+            DebugPrint( iRet,
+                "Error returned from FetchData" );
             ret = iRet;
             break;
         }
@@ -794,6 +797,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             ( *pStartTask )( eventCancelTask );
             break;
         }
+        pStream->m_oQuitSync.AddNotify();
 
         ClearClientNotify();
 
@@ -1484,13 +1488,17 @@ gint32 IStream::CloseChannel(
 
         if( ERROR( ret ) )
         {
-            DebugPrintEx( logInfo, ret,
-                "Error OnClose failed to add stoptask for 0x%llx @state=%d",
+            DebugPrint( ret,
+                "Error OnClose failed to add "
+                "stoptask for 0x%llx @state=%d",
                 pSvc, pThisIf->GetState() );
             ( *pStopTask )( eventCancelTask );
         }
         else
+        {
+            m_oQuitSync.ReleaseNotify();
             ret = STATUS_PENDING;
+        }
 
     }while( 0 );
 
@@ -1710,34 +1718,9 @@ gint32 IStream::OnPreStopShared(
 {
     gint32 ret = 0;
     CRpcServices* pThis = GetInterface(); 
-    bool bNotify = true;
     auto pMgr = pThis->GetIoMgr();
 
     do{
-        gint32 (*func)( IEventSink*, IEventSink*) =
-        ([]( IEventSink* pCb, IEventSink* pNotify )->gint32
-        {
-            gint32 ret = 0;
-            if( pCb == nullptr || pNotify == 0 )
-                return -EINVAL;
-
-            CCfgOpenerObj oCbCfg( pCb );
-            IConfigDb* pResp;
-            ret = oCbCfg.GetPointer(
-                propRespPtr, pResp );
-            if( SUCCEEDED( ret ) )
-            {
-                CCfgOpener oResp( pResp );
-                oResp.GetIntProp(
-                    propReturnValue,
-                    ( guint32& )ret );
-            }
-            pNotify->OnEvent(
-                eventTaskComp, ret, 0, nullptr );
-
-            return 0;
-        });
-
         CStdRMutex oIfLock( pThis->GetLock() );
         if( m_mapUxStreams.empty() )
             break;
@@ -1748,61 +1731,16 @@ gint32 IStream::OnPreStopShared(
 
         oIfLock.Unlock();
 
-        if( vecStreams.empty() )
-            break;
-
         for( int i = 0; i < vecStreams.size(); i++ )
         {
-            if( i < vecStreams.size() - 1 )
-            {
-                this->OnClose(
-                    vecStreams[ i ], nullptr );
-            }
-            else
-            {
-                TaskletPtr pFinalCb;
-                NEW_COMPLETE_FUNCALL( 0,
-                    pFinalCb, pMgr,
-                    func, nullptr, pCallback );
-                ( *pFinalCb )( eventZero );
-
-                ret = this->OnClose(
-                    vecStreams[ i ], pFinalCb );
-
-                if( SUCCEEDED( ret ) )
-                    bNotify = false;
-                else
-                    ( *pFinalCb )( eventCancelTask );
-            }
+            this->OnClose(
+                vecStreams[ i ], nullptr );
         }
 
     }while( 0 );
 
-    if( bNotify )
-    {
-        // possibly there are stream stop tasks in the
-        // m_pSeqTasks, so schedule a conclusion task
-        // to make sure all the stop tasks are done.
-        if( SUCCEEDED( ret ) )
-        {
-            TaskletPtr pFinalCb;
-            gint32 (*func1)( IEventSink*) =
-            ([]( IEventSink* pNotify )->gint32
-            {
-                pNotify->OnEvent(
-                    eventTaskComp, 0, 0, nullptr );
-                return 0;
-            });
-            NEW_FUNCCALL_TASK( pFinalCb,
-                pMgr, func1, pCallback );
-            ret = pThis->AddSeqTask( pFinalCb );
-            if( ERROR( ret ) )
-                ( *pFinalCb )( eventCancelTask );
-        }
-    }
-
-    if( SUCCEEDED( ret ) )
-        ret = STATUS_PENDING;
+    ret = m_oQuitSync.WaitingChildren(
+         pCallback );
 
     return ret;
 }

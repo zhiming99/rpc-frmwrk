@@ -36,8 +36,8 @@ namespace rpcf
 {
 
 // rpc-frmwrk components, last allocation was from
-// rpc/gmsslport
-#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 90 )
+// rpc/ratlimit.h
+#define CLSIDS_ALLOCATED    ( clsid( ClassFactoryStart ) + 100 )
 
 // last allocation was from fastrpc.h
 #define PROPIDS_ALLOCATED   ( propReservedEnd + 140 )

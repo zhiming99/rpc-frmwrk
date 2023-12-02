@@ -1382,11 +1382,19 @@ gint32 CProxyPdoConnectTask::Process(
             {
                 if( bRetry )
                 {
-                    DebugPrint( ret,
-                        "Server is not up, retry in %d seconds",
-                        PROXYPDO_CONN_INTERVAL );
                     oParams.ClearParams();
-                    ret = STATUS_MORE_PROCESS_NEEDED;
+                    if( !bExpired )
+                    {
+                        DebugPrint( ret,
+                            "Server is not up, retry in %d seconds",
+                            PROXYPDO_CONN_INTERVAL );
+                        ret = STATUS_MORE_PROCESS_NEEDED;
+                    }
+                    else
+                    {
+                        DebugPrint( ret,
+                            "Master start irp expired, quit..." );
+                    }
                 }
                 else
                 {
@@ -1526,6 +1534,7 @@ gint32 CProxyPdoConnectTask::Process(
     RemoveProperty( propIrpPtr );
     RemoveProperty( propPortPtr );
     oParams.ClearParams();
+    this->RemoveTimer();
 
     return SetError( ret );
 }

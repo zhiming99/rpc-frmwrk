@@ -276,6 +276,7 @@ class CRpcNativeProtoFdo: public CPort
     std::deque< Stm2Ptr >  m_cycQueSend;
     std::atomic< gint32 >  m_iStmCounter;
     TaskletPtr m_pListeningTask;
+    sem_t   m_semFireSync;
 
 
     // completion handler for irp from tcpfido
@@ -307,6 +308,7 @@ class CRpcNativeProtoFdo: public CPort
     typedef CPort super;
 
     CRpcNativeProtoFdo( const IConfigDb* pCfg );
+    ~CRpcNativeProtoFdo();
     bool IsImmediateReq( IRP* pIrp );
     gint32 RemoveIrpFromMap( IRP* pIrp );
 
@@ -415,6 +417,9 @@ class CRpcNativeProtoFdo: public CPort
 
     gint32 SetListeningTask(
         TaskletPtr& pTask );
+
+    inline void WaitOnline()
+    { sem_wait( &m_semFireSync ); }
 };
 
 class CFdoListeningTask :
@@ -452,6 +457,10 @@ class CRpcConnSock :
 {
     TaskletPtr m_pStartTask;
     bool m_bClient = false;
+    guint32 m_dwSockSendMax =
+        MAX_BYTES_PER_TRANSFER;
+    guint32 m_dwSockRecvMax =
+        MAX_BYTES_PER_TRANSFER;
 
     public:
 
@@ -499,6 +508,12 @@ class CRpcConnSock :
 
     inline void Refresh()
     { m_dwAgeSec = 0; }
+
+    inline guint32 GetSockSendSize() const
+    { return m_dwSockSendMax; }
+
+    inline guint32 GetSockRecvSize() const
+    { return m_dwSockRecvMax; }
 };
 
 }
@@ -550,12 +565,7 @@ class CBytesSender
     gint32 SetSendDone( gint32 iRet = 0 );
     bool IsSendDone() const;
     IrpPtr GetIrp() const
-    {
-        CPort* pPort = m_pPort;
-        if( pPort == nullptr )
-            return -EFAULT;
-        return m_pIrp;
-    }
+    { return m_pIrp; }
 
     gint32 OnSendReady( gint32 iFd );
     gint32 CancelSend( const bool& bCancelIrp );
@@ -653,9 +663,14 @@ class CTcpStreamPdo2 : public CPort
     MloopPtr    m_pLoop;
 
     gint32 SendImmediate( gint32 iFd, PIRP pIrp );
+    guint32 m_dwRecvQueSize = STM_MAX_QUEUE_SIZE;
+    bool m_bReading = false;
+    bool m_bWriting = false;
 
     protected:
     std::deque< IrpPtr >  m_queListeningIrps;
+    TaskletPtr  m_pReadTb;
+    TaskletPtr  m_pWriteTb;
 
     public:
 
@@ -718,6 +733,9 @@ class CTcpStreamPdo2 : public CPort
     gint32 GetProperty( gint32 iProp,
         Variant& oBuf ) const override;
 
+    gint32 SetProperty( gint32 iProp,
+        const Variant& oVar ) override;
+
     void OnPortStartFailed(
         IRP* pIrp, gint32 ret );
 
@@ -726,6 +744,49 @@ class CTcpStreamPdo2 : public CPort
         CMainIoLoop* pLoop = m_pLoop;
         return pLoop;
     }
+
+    inline guint32 GetMaxRecvQue() const
+    { return m_dwRecvQueSize; }
+
+    gint32 StartReadWatch();
+    gint32 StopReadWatch();
+
+    inline bool IsReadingSock()
+    {
+        CStdRMutex oPortLock( GetLock() );
+        return m_bReading;
+    }
+
+    gint32 AdjustReadWatchState();
+
+    gint32 GetBytesToRead(
+        guint32 dwBytesReq,
+        guint32& dwBytesAvail );
+
+    gint32 OnEvent(
+        EnumEventId iEvent,
+        LONGWORD dwParam1,
+        LONGWORD dwParam2,
+        LONGWORD* pData );
+
+    guint32 GetSockSendSize() const;
+    guint32 GetSockRecvSize() const;
+
+    inline TaskletPtr GetWriteTokenTask()
+    { return m_pWriteTb; }
+
+    gint32 StartTokenTasks();
+
+    gint32 StartWriteWatch();
+    gint32 StopWriteWatch();
+
+    inline bool IsWritingSock()
+    {
+        CStdRMutex oPortLock( GetLock() );
+        return m_bWriting;
+    }
+    SockPtr GetSockPtr()
+    { return m_pConnSock; }
 };
 
 extern gint32 SendListenReq( CPort* pPort,

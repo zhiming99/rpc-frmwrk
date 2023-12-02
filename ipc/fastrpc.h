@@ -1019,6 +1019,8 @@ class CRpcStmChanBase :
             {
                 pCtx->SetStatus( iRet );
                 ret = iRet;
+                DebugPrint( ret,
+                    "OnStartStmComplete failed" );
             }
             else
             {

@@ -39,7 +39,7 @@ size_t GetFileSize(const std::string& path )
 
 bool IsFileNameValid( const stdstr& strFile )
 {
-    std::regex e( "^[A-Za-z0-9_][A-Za-z0-9_.]*" );
+    std::regex e( "^[A-Za-z0-9_][A-Za-z0-9_.-]*" );
     return std::regex_match( strFile, e );
 }
 

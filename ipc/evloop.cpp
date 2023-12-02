@@ -102,7 +102,7 @@ CEvLoop::TIMER_SOURCE::TIMER_SOURCE(
     : SOURCE_HEADER( pLoop, srcTimer, pCallback )
 {
     m_bRepeat = bRepeat;
-    m_dwIntervalMs = dwIntervalMs;
+    m_qwIntervalUs = dwIntervalMs * 1000;
     m_pCallback = pCallback;
 }
 
@@ -155,7 +155,7 @@ gint32 CEvLoop::TIMER_SOURCE::StartStop(
     if( bStart )
     {
         m_qwAbsTimeUs = m_pParent->NowUs()
-            + m_dwIntervalMs * 1000;
+            + m_qwIntervalUs;
     }
     return super::StartStop( bStart );
 }

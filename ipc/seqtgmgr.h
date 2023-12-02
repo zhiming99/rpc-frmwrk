@@ -115,33 +115,61 @@ struct CSeqTaskGrpMgr : public CObjBase
             return -EINVAL;
 
         gint32 ret = 0;
+        bool bAdded = false;
+
         CStdRMutex oLock( GetLock() );
         if( m_iMgrState != stateStarted )
             return ERROR_STATE;
 
+        TaskletPtr pGrpTask;
+        auto pMgr = this->GetIoMgr();
         auto itr = m_mapSeqTgs.find( htg );
         if( itr == m_mapSeqTgs.end() )
         {
             SEQTG_ELEM otg;
             m_mapSeqTgs[ htg ] = otg;
             itr = m_mapSeqTgs.find( htg );
+
+            // create the taskgroup immediately.
+            CParamList oParams; 
+            oParams.SetPointer( propIoMgr, pMgr );
+            TaskGrpPtr pGrp;
+            pGrp.NewObj(
+                clsid( CIfTaskGroup ),
+                oParams.GetCfg() );
+            pGrp->SetRelation( logicNONE );
+            pGrp->AppendTask( pTask );
+            itr->second.m_pSeqTasks = pGrp;
+            pGrpTask = pGrp;
+            bAdded = true;
         }
         auto& elem = itr->second;
+        elem.m_iState = stateStarted;
         oLock.Unlock();
 
-        ret = AddSeqTaskIf(
-            GetParent(),
-            elem.m_pSeqTasks,
-            pTask, false );
+        if( bAdded )
+        {
+            ret = pMgr->RescheduleTask( pGrpTask );
+        }
+        else
+        {
+            // FIXME: if the pTask is not added already
+            // , the caller should make sure no other
+            // tasks come ahead of the start task. A
+            // more reliable solution is using a
+            // taskgroup including a function to
+            // setting the 'm_iState' and the 'pTask',
+            // and add pass the taskgroup to
+            // AddSeqTaskIf. But it is not performance
+            // friendly.
+            ret = AddSeqTaskIf( GetParent(),
+                elem.m_pSeqTasks, pTask, false );
+        }
 
         oLock.Lock();
         if( ERROR( ret ) )
         {
             m_mapSeqTgs.erase( htg );
-        }
-        else
-        {
-            elem.m_iState = stateStarted;
         }
         return ret;
     }
@@ -158,6 +186,9 @@ struct CSeqTaskGrpMgr : public CObjBase
             if( m_iMgrState != stateStarted )
             {
                 ret = ERROR_STATE;
+                OutputMsg( ret,
+                    "AddSeqTask Failed state=%d",
+                    m_iMgrState );
                 break;
             }
             auto itr = m_mapSeqTgs.find( htg );
@@ -170,6 +201,9 @@ struct CSeqTaskGrpMgr : public CObjBase
             if( itr->second.m_iState != stateStarted )
             {
                 ret = ERROR_STATE;
+                OutputMsg( ret,
+                    "AddSeqTask Failed state2=%d",
+                    itr->second.m_iState );
                 break;
             }
 
@@ -181,6 +215,12 @@ struct CSeqTaskGrpMgr : public CObjBase
                 GetParent(),
                 pSeqTasks,
                 pTask, false );
+            if( ret == ERROR_STATE )
+            {
+                OutputMsg( ret,
+                    "AddSeqTaskIf Failed state3=%d",
+                    GetParent()->GetState() );
+            }
         }while( 0 );
 
         return ret;
@@ -458,8 +498,16 @@ struct CSeqTaskGrpMgr : public CObjBase
             auto phc = dynamic_cast< HostClass* >( GetParent() );
             for( auto& elem : vecTasks )
             {
-                phc->OnClose(
+                ret = phc->OnClose(
                     elem.first, elem.second );
+                if( ERROR( ret ) )
+                    ( *elem.second )( eventCancelTask );
+            }
+
+            if( pGrp->GetTaskCount() == 0 )
+            {
+                ret = 0;
+                break;
             }
 
             if( !pSync.IsEmpty() )
