@@ -1663,6 +1663,8 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         ret = this->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
             ( *pStartTask )( eventCancelTask );
+        else
+            this->m_oQuitSync.AddNotify();
 
     }while( 0 );
     

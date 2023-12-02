@@ -344,6 +344,7 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
             pUxIf.Clear();
             break;
         }
+        this->m_oQuitSync.AddNotify();
         //
         // 2. bind the uxport and the the tcp stream
         //
@@ -549,6 +550,7 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
             pUxIf.Clear();
             break;
         }
+        this->m_oQuitSync.AddNotify();
         
     }while( 0 );
 

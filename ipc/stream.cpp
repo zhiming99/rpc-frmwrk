@@ -42,6 +42,7 @@ void IStream::SetInterface( CRpcServices* pSvc )
     CCfgOpenerObj oCfg( pSvc );
     oCfg.GetBoolProp(
         propNonSockStm, m_bNonSockStm );
+    m_oQuitSync.SetParent( pSvc );
 
     bool bSeqTgMgr = false;
     gint32 ret = oCfg.GetBoolProp(
@@ -594,6 +595,8 @@ gint32 CIfCreateUxSockStmTask::GetResponse()
         gint32 iRet = oResp[ propReturnValue ];
         if( ERROR( iRet ) )
         {
+            DebugPrint( iRet,
+                "Error returned from FetchData" );
             ret = iRet;
             break;
         }
@@ -794,6 +797,7 @@ gint32 CIfCreateUxSockStmTask::OnTaskComplete(
             ( *pStartTask )( eventCancelTask );
             break;
         }
+        pStream->m_oQuitSync.AddNotify();
 
         ClearClientNotify();
 
@@ -1491,7 +1495,10 @@ gint32 IStream::CloseChannel(
             ( *pStopTask )( eventCancelTask );
         }
         else
+        {
+            m_oQuitSync.ReleaseNotify();
             ret = STATUS_PENDING;
+        }
 
     }while( 0 );
 
@@ -1732,27 +1739,8 @@ gint32 IStream::OnPreStopShared(
 
     }while( 0 );
 
-    if( true )
-    {
-        // possibly there are stream stop tasks in the
-        // m_pSeqTasks, so schedule a conclusion task
-        // to make sure all the stop tasks are done.
-        TaskletPtr pFinalCb;
-        gint32 (*func1)( IEventSink*) =
-        ([]( IEventSink* pNotify )->gint32
-        {
-            pNotify->OnEvent(
-                eventTaskComp, 0, 0, nullptr );
-            return 0;
-        });
-        NEW_FUNCCALL_TASK( pFinalCb,
-            pMgr, func1, pCallback );
-        ret = pThis->AddSeqTask( pFinalCb );
-        if( ERROR( ret ) )
-            ( *pFinalCb )( eventCancelTask );
-        else
-            ret = STATUS_PENDING;
-    }
+    ret = m_oQuitSync.WaitingChildren(
+         pCallback );
 
     return ret;
 }
