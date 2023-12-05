@@ -10,7 +10,7 @@ var knownTypes = {};
   knownTypes[c] = true;
 });
 
-export const parseSignature = function parseSignature(signature) {
+module.exports = function parseSignature(signature) {
   var index = 0;
   function next() {
     if (index < signature.length) {
@@ -53,9 +53,3 @@ export const parseSignature = function parseSignature(signature) {
   while ((c = next()) !== null) ret.push(parseOne(c));
   return ret;
 };
-
-// command-line test
-//console.log(JSON.stringify(module.exports(process.argv[2]), null, 4));
-//var tree = module.exports('a(ssssbbbbbbbbuasa{ss}sa{sv})a(ssssssbbssa{ss}sa{sv})a(ssssssbsassa{sv})');
-//console.log(tree);
-//console.log(fromTree(tree))

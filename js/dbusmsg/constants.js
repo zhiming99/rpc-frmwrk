@@ -1,4 +1,4 @@
-export const DBusConsts = {
+module.exports = {
   messageType: {
     invalid: 0,
     methodCall: 1,
