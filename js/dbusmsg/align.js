@@ -9,4 +9,4 @@ function align(ps, n) {
   ps._offset += pad;
 }
 
-export const align = align;
+exports.align = align;

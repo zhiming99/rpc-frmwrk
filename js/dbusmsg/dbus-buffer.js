@@ -180,4 +180,4 @@ DBusBuffer.prototype.readSimpleType = function readSimpleType(t) {
   }
 };
 
-export const DBusBuffer = DBusBuffer
+exports.DBusBuffer = DBusBuffer
