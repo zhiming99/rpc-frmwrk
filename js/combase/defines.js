@@ -1,5 +1,5 @@
 
-exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
+module.exports = class SERI_HEADER_BASE
 {
     constructor()
     {
@@ -8,4 +8,7 @@ exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
         this.bVersion = 1;
         this.bReserved = 0;
     }
+
+    static GetSeriSize()
+    { return 12 }
 }

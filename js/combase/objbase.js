@@ -1,13 +1,13 @@
-
-import { EnumClsid } from "./enums"
-exports.CObjBase=class CObjBase
+require("./enums" ).EnumClsid
+module.exports = class CObjBase
 {
     constructor()
     { this.m_dwClsid=EnumClsid.Invalid; }
-    get m_dwClsid()
-    { return this.m_dwClsid}
 
-    set m_dwClsid( dwClsid )
+    GetClsid()
+    { return this.m_dwClsid }
+
+    SetClsid( dwClsid )
     { this.m_dwClsid = dwClsid; }
 
     Serialize()
@@ -15,4 +15,4 @@ exports.CObjBase=class CObjBase
 
     Deserialize( srcBuffer )
     {}
-}
+};

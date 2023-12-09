@@ -1,4 +1,8 @@
 module.exports = {
+    constval :{
+      BUF_MAX_SIZE: (512*1024*1024),
+    },
+
     EnumTypes:{
       DataTypeMem : 0,
       DataTypeObjPtr: 1,

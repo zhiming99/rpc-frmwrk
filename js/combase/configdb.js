@@ -1,6 +1,6 @@
-import { EnumClsid } from "./enums"
-import {CObjBase} from "./objbase"
-import { SERI_HEADER_BASE } from "./defines"
+require ( "./enums" ).EnumClsid
+require ( "./objbase" ).CObjBase
+require ( "./defines" ).SERI_HEADER_BASE
 
 class SERI_HEADER extends SERI_HEADER_BASE
 {
