@@ -379,13 +379,6 @@ gint32 CRpcConnSock::Start_bh()
 
         SetState( sockStarted );
 
-        CTcpStreamPdo2* pPort =
-            ObjPtr( m_pParentPort );
-
-        ret = pPort->StartReadWatch();
-        if( ERROR( ret ) )
-            break;
-        
     }while( 0 );
 
     return ret;
@@ -1729,6 +1722,13 @@ gint32 CTcpStreamPdo2::OnPortReady(
         // point
         ret = pBus->BindPortIdAndAddr(
             dwPortId, oConnParams );
+        
+        if( ERROR( ret ) )
+            break;
+
+        //NOTE: moved from start_bh, to prevent the
+        //socket error from entering too early.
+        ret = this->StartReadWatch();
 
     }while( 0 );
 
