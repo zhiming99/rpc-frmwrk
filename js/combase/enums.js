@@ -1,6 +1,7 @@
 module.exports = {
     constval :{
       BUF_MAX_SIZE: (512*1024*1024),
+      PAGE_SIZE : 4096,
     },
 
     EnumTypes:{
@@ -28,6 +29,10 @@ module.exports = {
       CBuffer: 0x825,
       CConfigDb2: 0x917,
       CStlStrVector: 0x851,
+      CMessageMatch: 0x85e,
+      CStlObjVector: 0x8ab,
+      CClassFactory: 0x8a3,
+      CStlQwordVector: 0x900,
     },
 
     EnumPropId: {

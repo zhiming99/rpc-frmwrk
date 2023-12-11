@@ -1,5 +1,5 @@
-
-module.exports = class SERI_HEADER_BASE
+const { Buffer } = require( "buffer")
+exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
 {
     constructor()
     {
@@ -11,4 +11,21 @@ module.exports = class SERI_HEADER_BASE
 
     static GetSeriSize()
     { return 12 }
+
+    Serialize( offset, dstBuf )
+    {
+        Buffer.alloc( this.GetSeriSize())
+        dstBuf.setUint32( offset, this.dwClsid )
+        dstBuf.setUint32( offset + 4, this.dwSize )
+        dstBuf.setUint32( offset + 8, 0 )
+        dstBuf.setUint8( offset, this.bVersion )
+        return dstBuf
+    }
+    Deserialize( offset, srcBuf )
+    {
+        ov = new DataView( srcBuf.buffer, offset )
+        this.dwClsid = ov.getUint32( 0 )
+        this.dwSize = ov.getUint32( 4 )
+        this.bVersion = ov.getUint8( 8 )
+    }
 }

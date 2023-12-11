@@ -1,42 +1,57 @@
-const { unmarshall } = require("../dbusmsg/message");
-const { CConfigDb2 } = require("./configdb");
-const { EnumTypeId, constval, EnumClsid } = require("./enums");
-
-require( "./enums")
-require( "./objbase" ).CObjBase
-// import { Buffer } from "node:buffer"
-require( "../dbusmsg/test/node_modules/buffer" ).Buffer
-require( "../dbusmsg/message" ).marshall;
-require( "../dbusmsg/message" ).unmarshall;
-require ( "./defines" ).SERI_HEADER_BASE ;
+const { marshall, unmarshall } = require("../dbusmsg/message");
+const Cid = require( "./enums.js").EnumClsid
+const Tid = require( "./enums.js").EnumTypeId
+const CV = require( "./enums.js").constval
+const { CoCreateInstance } = require("./factory");
 const E = require ( 'syserrno' ).errors
+const { SERI_HEADER_BASE } = require( "./defines" );
 
-class SERI_HEADER extends SERI_HEADER_BASE
+const CObjBase = require( "./objbase" ).CObjBase
+const { Buffer } = require( "buffer" )
+
+const SERI_HEADER = class CBuffer_SERI_HEADER extends SERI_HEADER_BASE
 {
     constructor()
     {
         super()
         this.dwType = EnumTypes.DataTypeMem 
-        this.dwObjClsid = EnumClsid.Invalid
+        this.dwObjClsid = Cid.Invalid
     }
     static GetSeriSize()
-    { return SERI_HEADER_BASE.GetSeriSize() + 8 }
+    { return super.GetSeriSize() + 8 }
+
+    Serialize( offset, dstBuf )
+    {
+        super.Serialize( offset, dstBuf )
+        offset += super.GetSeriSize()
+        dstBuf.setUint32( offset, this.dwType)
+        dstBuf.setUint32( offset + 4, this.dwObjClsid)
+    }
+
+    Deserialize( offset, srcBuf )
+    {
+        super.Deserialize( offset, srcBuf )
+        offset += super.GetSeriSize()
+        this.dwType = srcBuf.getUint32( offset )
+        this.dwObjClsid = 
+            srcBuf.getUint32( offset + 4 )
+    }
 }
-module.exports = class CBuffer extends CObjBase
+exports.CBuffer = class CBuffer extends CObjBase
 {
     constructor()
     {
-        this.m_dwClsid = EnumClsid.CBuffer;
+        this.m_dwClsid = Cid.CBuffer;
         this.m_dwOffset = 0;
         this.m_arrBuf = null
         this.m_dwTail = 0
-        this.m_dwTypeId = EnumTypeId.typeNone;
+        this.m_dwTypeId = Tid.typeNone;
         this.m_value = null
     }
 
     get size()
     {
-        if( this.type !== EnumTypeId.typeByteArr )
+        if( this.type !== Tid.typeByteArr )
             return 0
         if( this.empty() )
             return 0
@@ -45,7 +60,7 @@ module.exports = class CBuffer extends CObjBase
 
     get offset()
     {
-        if( this.type !== EnumTypeId.typeByteArr )
+        if( this.type !== Tid.typeByteArr )
             return 0
         if( this.empty() )
             return 0
@@ -54,7 +69,7 @@ module.exports = class CBuffer extends CObjBase
 
     set offset( dwOffset )
     {
-        if( this.type !== EnumTypeId.typeByteArr )
+        if( this.type !== Tid.typeByteArr )
             return
         if( this.empty() )
             return 0
@@ -65,7 +80,7 @@ module.exports = class CBuffer extends CObjBase
 
     get tail()
     {
-        if( this.type !== EnumTypeId.typeByteArr )
+        if( this.type !== Tid.typeByteArr )
             return 0
         if( this.empty() )
             return 0
@@ -74,7 +89,7 @@ module.exports = class CBuffer extends CObjBase
 
     set tail( dwTail )
     {
-        if( this.type !== EnumTypeId.typeByteArr )
+        if( this.type !== Tid.typeByteArr )
             return
         if( this.empty() )
             return 0
@@ -85,7 +100,7 @@ module.exports = class CBuffer extends CObjBase
 
     get buffer()
     {
-        if( this.type !== EnumTypeId.typeByteArr )
+        if( this.type !== Tid.typeByteArr )
             return null 
         if( this.empty() )
             return null 
@@ -99,25 +114,114 @@ module.exports = class CBuffer extends CObjBase
     set type( dwType )
     { this.m_dwTypeId = dwType }
 
-    // return an arraybuffer with encoded string
-    static StrToBuffer( str )
+    static StrToBuffer( dstBuf, start, str )
     {
         const encoder = new TextEncoder();
         const encodedData = encoder.encode(str);
-        nullc = Buffer.alloc(1)
-        nullc[0] = 0
-        return Buffer.from( [encodedData, nullc] )
+        offset = start
+        dstBuf.writeUint32LE( offset, encodedData.length + 1 )
+        offset += 4
+        dstBuf.fill( encodedData, offset, offset + encodedData.length )
+        offset += encodedData.length
+        dstBuf.writeUint8( offset, 0 )
+        offset+=1
+        return offset - start
+    }
+
+    // return an arraybuffer with encoded string
+    static StrToBuffer( str )
+    {
+        arrBuf = Buffer.alloc( 4 + str.length + 1 )
+        CBuffer.StrToBuffer( arrBuf, 0, str )
+        return arrBuf
+    }
+
+    static BufferToStr( buf, offset )
+    {
+        const decoder = new TextDecoder();
+        dwSize = buf.getUint32( offset )
+        return decoder.decode(buf.slice(offset + 4))
     }
 
     static BufferToStr( buf )
     {
-        const decoder = new TextDecoder();
-        return decoder.decode(buf);
+        return this.BufferToStr( buf, 0 )
+    }
+
+    ConvertToByteArr()
+    {
+        if( this.m_value === null )
+            return
+
+        switch( this.type )
+        {
+        case Tid.typeByte:
+            {
+                this.m_arrBuf = Buffer.alloc( 1 )
+                this.m_arrBuf.writeUint8( this.m_value )
+                break
+            }
+        case Tid.typeUInt16:
+            {
+                this.m_arrBuf = Buffer.alloc( 2 )
+                this.m_arrBuf.writeUint16BE( this.m_value )
+                break
+            }
+        case Tid.typeUInt32:
+            {
+                this.m_arrBuf = Buffer.alloc( 4 )
+                this.m_arrBuf.writeUint32BE( this.m_value )
+                break
+            }
+        case Tid.typeUInt64:
+            {
+                this.m_arrBuf = Buffer.alloc( 8 )
+                this.m_arrBuf.writeUint64BE( this.m_value )
+                break
+            }
+        case Tid.typeFloat:
+            {
+                this.m_arrBuf = Buffer.alloc( 4 )
+                this.m_arrBuf.writeFloatBE( this.m_value )
+                break
+            }
+        case Tid.typeDouble:
+            {
+                this.m_arrBuf = Buffer.alloc( 8 )
+                this.m_arrBuf.writeDoubleBE( this.m_value )
+                break
+            }
+        case Tid.typeString:
+            {
+                const encoder = new TextEncoder();
+                this.m_arrBuf = encoder.encode(this.m_value);
+                break
+            }
+        case Tid.typeByteArr:
+            {
+                return
+            }
+        case Tid.typeNone:
+        default:
+            {
+                break            
+            }
+        }
+        this.m_value = null
+        this.type = Tid.typeByteArr
+        this.m_dwOffset = 0
+        if( this.m_arrBuf !== null )
+            this.m_dwTail = this.m_arrBuf.length
+        else
+            this.m_dwTail = 0
+        return
     }
 
     Resize( dwNewSize )
     {
         do{
+            this.ConvertToByteArr()
+
             if( dwNewSize === 0 )
             {
                 this.m_arrBuf = null
@@ -150,7 +254,8 @@ module.exports = class CBuffer extends CObjBase
                 this.offset = 0
                 this.m_dwTail = newBuf.length
             }
-            this.type = EnumTypeId.typeByteArr;
+            this.type = Tid.typeByteArr;
+
         }while( 0 )
         return
     }
@@ -163,66 +268,66 @@ module.exports = class CBuffer extends CObjBase
         dwType = EnumTypes.DataTypeMem 
         switch( this.type )
         {
-        case EnumTypeId.typeByteArr:
+        case Tid.typeByteArr:
             {
                 dstBuffer = this.buffer
                 break
             }
-        case EnumTypeId.typeByte:
+        case Tid.typeByte:
             {
                 dstBuffer = Buffer.alloc(1)
                 dstBuffer[0] = this.m_value
                 break
             }
-        case EnumTypeId.typeUInt16 :
+        case Tid.typeUInt16 :
             {
                 dstBuffer = Buffer.alloc(2)
                 const view = new DataView( dstBuffer.buffer )
                 view.setUint16( 0, this.m_value )
                 break
             }
-        case EnumTypeId.typeUInt32 :
+        case Tid.typeUInt32 :
             {
                 dstBuffer = Buffer.alloc(4)
                 const view = new DataView( dstBuffer.buffer )
                 view.setUint32( 0, this.m_value )
                 break
             }
-        case EnumTypeId.typeUInt64 :
+        case Tid.typeUInt64 :
             {
                 dstBuffer = Buffer.alloc(8)
                 const view = new DataView( dstBuffer.buffer )
                 view.setBigUint64( 0, this.m_value )
             }
             break
-        case EnumTypeId.typeFloat :
+        case Tid.typeFloat :
             {
                 dstBuffer = Buffer.alloc(4)
                 const view = new DataView( dstBuffer.buffer )
                 view.setFloat32( 0, this.m_value )
                 break
             }
-        case EnumTypeId.typeDouble :
+        case Tid.typeDouble :
             {
                 dstBuffer = Buffer.alloc(8)
                 const view = new DataView( dstBuffer.buffer )
                 view.setFloat64( 0, this.m_value )
                 break
             }
-        case EnumTypeId.typeString :
+        case Tid.typeString :
             {
                 dstBuffer = CBuffer.StrToBuffer(
                     this.m_value )
                 break
             }
-        case EnumTypeId.typeDMsg:
+        case Tid.typeDMsg:
             {
                 dstBuffer = marshall( this.m_value )
                 dwType = EnumTypes.DataTypeMsgPtr
                 oHdrView.SetUint32( 16, this.m_value.type )
                 break
             }
-        case EnumTypeId.typeObj:
+        case Tid.typeObj:
             {
                 dstBuffer = this.m_value.Serialize()
                 dwType = EnumTypes.DataTypeObjPtr 
@@ -232,7 +337,7 @@ module.exports = class CBuffer extends CObjBase
         default:
             throw new TypeError(`Error unknown type id ${this.type}`)
         }
-        oHdrView.setUint32( 0, EnumClsid.CBuffer )
+        oHdrView.setUint32( 0, Cid.CBuffer )
         oHdrView.setUint32( 4, dstBuffer.length )
         oHdrView.setUint32( 8, 1, true )
         oHdrView.SetUint32( 12, dwType & ( this.type << 4 ))
@@ -242,7 +347,7 @@ module.exports = class CBuffer extends CObjBase
 
     GetValue()
     {
-        if( this.type === EnumTypeId.typeByteArr )
+        if( this.type === Tid.typeByteArr )
             return this.m_arrBuf
         return this.m_value
     }
@@ -253,49 +358,49 @@ module.exports = class CBuffer extends CObjBase
     }
     SetUint8( val )
     {
-        this.type = EnumTypeId.typeByte
+        this.type = Tid.typeByte
         this.m_value = val
     }
 
     SetUint16( val )
     {
-        this.type = EnumTypeId.typeUInt16
+        this.type = Tid.typeUInt16
         this.m_value = val
     }
 
     SetUint32( val )
     {
-        this.type = EnumTypeId.typeUInt32
+        this.type = Tid.typeUInt32
         this.m_value = val
     }
 
     SetUint64( val )
     {
-        this.type = EnumTypeId.typeUInt64
+        this.type = Tid.typeUInt64
         this.m_value = val
     }
 
     SetFloat( val )
     {
-        this.type = EnumTypeId.typeFloat
+        this.type = Tid.typeFloat
         this.m_value = val
     }
 
     SetDouble( val )
     {
-        this.type = EnumTypeId.typeDouble
+        this.type = Tid.typeDouble
         this.m_value = val
     }
 
     SetMsgPtr( val )
     {
-        this.type = EnumTypeId.typeDMsg
+        this.type = Tid.typeDMsg
         this.m_value = val
     }
 
     SetObjPtr( val )
     {
-        this.type = EnumTypeId.typeObj
+        this.type = Tid.typeObj
         this.m_value = val
     }
 
@@ -312,15 +417,15 @@ module.exports = class CBuffer extends CObjBase
         if( newBuf.constructor.name !== "Buffer" )
             throw new TypeError( "Error type of input param, expecting Buffer")
 
-        if( this.type === EnumTypeId.typeNone )
+        if( this.type === Tid.typeNone )
         {
             this.m_arrBuf = newBuf
-            this.type = EnumTypeId.typeByteArr
+            this.type = Tid.typeByteArr
             return
         }
-        else if( this.type !== EnumTypeId.typeByteArr )
+        else
         {
-            throw new TypeError("Error not a bytearray")
+            this.ConvertToByteArr()
         }
 
         if( this.empty() )
@@ -346,7 +451,7 @@ module.exports = class CBuffer extends CObjBase
 
     Clear()
     {
-        this.type = EnumTypeId.typeNone
+        this.type = Tid.typeNone
         this.m_arrBuf = null
         this.m_dwOffset = this.m_dwTail = 0
         this.m_value = null
@@ -356,21 +461,11 @@ module.exports = class CBuffer extends CObjBase
     {
         offset = SERI_HEADER.GetSeriSize()
         dwSize = ov.getUint32( 4 )
-        newObj = null
-        switch( dwClsid )
-        {
-        case EnumClsid.CConfigDb2:
-            {
-                newObj = new CConfigDb2()
-                break
-            }
-        case EnumClsid.CBuffer:
-            {
+        newObj = CoCreateInstance( dwClsid )
 
-            }
-        default:
-            throw new TypeError( "Error Unknown class id" )
-        }
+        if( newObj === null )
+            throw new TypeError( "Error unknown class id")
+
         this.m_value = newObj.Deserialize(
             ov.buffer.slice( offset, dwSize ) )
     }
@@ -382,7 +477,7 @@ module.exports = class CBuffer extends CObjBase
 
         switch( dwTypeId )
         {
-        case EnumTypeId.typeByteArr:
+        case Tid.typeByteArr:
             {
                 this.m_arrBuf = Buffer.from(
                     ov.buffer.slice( offset, dwSize ) )
@@ -390,37 +485,37 @@ module.exports = class CBuffer extends CObjBase
                 this.m_dwOffset = 0
                 break
             }
-        case EnumTypeId.typeByte:
+        case Tid.typeByte:
             {
                 this.m_value = ov.getUint8( offset, 1 )
                 break
             }
-        case EnumTypeId.typeUInt16:
+        case Tid.typeUInt16:
             {
                 this.m_value = ov.getUint16( offset, 2 )
                 break
             }
-        case EnumTypeId.typeUInt32:
+        case Tid.typeUInt32:
             {
                 this.m_value = ov.getUint32( offset, 4 )
                 break
             }
-        case EnumTypeId.typeUInt64:
+        case Tid.typeUInt64:
             {
                 this.m_value = ov.getUint64( offset, 8 )
                 break
             }
-        case EnumTypeId.typeFloat:
+        case Tid.typeFloat:
             {
                 this.m_value = ov.getFloat32( offset, 4 )
                 break
             }
-        case EnumTypeId.typeDouble:
+        case Tid.typeDouble:
             {
                 this.m_value = ov.getFloat64( offset, 8 )
                 break
             }
-        case EnumTypeId.typeString:
+        case Tid.typeString:
             {
                 this.m_value =
                     BufferToStr( ov.buffer.slice( offset, dwSize ) )
@@ -434,7 +529,7 @@ module.exports = class CBuffer extends CObjBase
 
     Deserialize( srcBuffer )
     {
-        if( newCBuf.constructor.name !== "Buffer" )
+        if( srcBuffer.constructor.name !== "Buffer" )
             throw new TypeError( "Error type of input param, expecting CBuffer")
 
         this.Clear()
@@ -444,14 +539,14 @@ module.exports = class CBuffer extends CObjBase
         offset = SERI_HEADER.GetSeriSize()
         do{
             val = ov.getUint32( pos )
-            if( val !== EnumClsid.CBuffer )
+            if( val !== Cid.CBuffer )
             {
                 ret = E.EINVAL.errno
                 break
             }
             pos += 4
             dwSize = ov.getUint32( pos )
-            if( dwSize > constval.BUF_MAX_SIZE )
+            if( dwSize > CV.BUF_MAX_SIZE )
             {
                 throw new Error ( "Error invalid size to deserialize")
             }
@@ -462,18 +557,29 @@ module.exports = class CBuffer extends CObjBase
             {
                 dwTypeId = ( (val & 0xf0 ) >> 4 )
                 this.DeserializePrimeType( ov, dwTypeId )
+                this.type = dwTypeId
             }
             else if( dwType === EnumTypes.DataTypeMsgPtr )
             {
                 this.m_value = unmarshall(
                     srcBuffer.slice( offset, dwSize ) )
+                this.type = dwTypeId
             }
             else if( dwType === EnumTypes.DataTypeObjPtr )
             {
                 dwClsid = ov.getUint32( 16 )
-                this.m_value = DeserializeObj( ov, dwClsid )
+                if( dwClsid != Cid.CBuffer )
+                    this.m_value = this.DeserializeObj( ov, dwClsid )
+                else
+                {
+                    this.Deserialize(
+                        srcBuffer.slice( offset, dwSize ))
+                }
             }
-            this.type = dwTypeId
+            else
+            {
+                throw new TypeError( "Error invalid type" )
+            }
         }while( 0 )
     }
 }

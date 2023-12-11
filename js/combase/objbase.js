@@ -1,5 +1,5 @@
 require("./enums" ).EnumClsid
-module.exports = class CObjBase
+exports.CObjBase = class CObjBase
 {
     constructor()
     { this.m_dwClsid=EnumClsid.Invalid; }
