@@ -12,7 +12,7 @@ exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
     static GetSeriSize()
     { return 12 }
 
-    Serialize( offset, dstBuf )
+    Serialize( dstBuf, offset )
     {
         Buffer.alloc( this.GetSeriSize())
         dstBuf.setUint32( offset, this.dwClsid )
@@ -21,7 +21,7 @@ exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
         dstBuf.setUint8( offset, this.bVersion )
         return dstBuf
     }
-    Deserialize( offset, srcBuf )
+    Deserialize( srcBuf, offset )
     {
         ov = new DataView( srcBuf.buffer, offset )
         this.dwClsid = ov.getUint32( 0 )

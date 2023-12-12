@@ -20,17 +20,17 @@ const SERI_HEADER = class CBuffer_SERI_HEADER extends SERI_HEADER_BASE
     static GetSeriSize()
     { return super.GetSeriSize() + 8 }
 
-    Serialize( offset, dstBuf )
+    Serialize( dstBuf, offset )
     {
-        super.Serialize( offset, dstBuf )
+        super.Serialize( dstBuf, offset )
         offset += super.GetSeriSize()
         dstBuf.setUint32( offset, this.dwType)
         dstBuf.setUint32( offset + 4, this.dwObjClsid)
     }
 
-    Deserialize( offset, srcBuf )
+    Deserialize( srcBuf, offset )
     {
-        super.Deserialize( offset, srcBuf )
+        super.Deserialize( srcBuf, offset )
         offset += super.GetSeriSize()
         this.dwType = srcBuf.getUint32( offset )
         this.dwObjClsid = 
@@ -131,9 +131,11 @@ exports.CBuffer = class CBuffer extends CObjBase
     // return an arraybuffer with encoded string
     static StrToBuffer( str )
     {
-        arrBuf = Buffer.alloc( 4 + str.length + 1 )
-        CBuffer.StrToBuffer( arrBuf, 0, str )
-        return arrBuf
+        const encoder = new TextEncoder();
+        const encodedData = encoder.encode(str);
+        nullc = Buffer.alloc(1)
+        nullc[0] = 0
+        return Buffer.from( [encodedData, nullc] )
     }
 
     static BufferToStr( buf, offset )
