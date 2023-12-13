@@ -338,7 +338,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 }
             }
         }
-        oHdr.dwSize = pos
+        oHdr.dwSize = pos - SERI_HEADER_BASE.GetSeriSize()
         oHdr.Serialize( dstBuf, 0 )
         return dstBuf.slice( 0, pos )
     }
@@ -358,7 +358,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             oHdr.dwSize > CV.CFGDB_MAX_SIZE ||
             oHdr.bVersion !== 2 ||
             oHdr.dwCount > CV.CFGDB_MAX_ITEMS ||
-            oHdr.dwSize < srcBuffer.length - offset )
+            oHdr.dwSize < srcBuffer.length - offset -
+                SERI_HEADER_BASE.GetSeriSize() )
             throw new Error( "Error invalid CConfigDb2")
         pos += SERI_HEADER.GetSeriSize()
         for( i = 0; i < oHdr.dwCount; i++ )

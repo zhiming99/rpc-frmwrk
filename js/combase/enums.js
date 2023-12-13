@@ -64,5 +64,11 @@ module.exports = {
         propContinue: 12411,
         propSeriProto:12420,
         propNoReply: 12421,
-    }
+    },
+
+  EnumMatchType: {
+      matchServer : 0,
+      matchClient  : 1,
+      matchInvalid : 2,
+  }
 }
