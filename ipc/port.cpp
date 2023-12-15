@@ -3159,12 +3159,7 @@ gint32 CPort::OnPortStackBuilt( IRP* pIrp )
 }
 
 gint32 CPort::OnPortStackReady( IRP* pIrp )
-{
-    if( PortType( m_dwFlags ) ==
-        PORTFLG_TYPE_FIDO )
-        return PassUnknownIrp( pIrp );
-    return 0;
-}
+{ return 0; }
 
 std::string CPort::ExClassToInClass(
     const std::string& strPortName )
