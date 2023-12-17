@@ -666,7 +666,8 @@ void DbgFindObjs( gint32 iClsid )
         if( pObj != nullptr )
         {
             if( pObj->GetClsid() == iClsid )
-                printf( "0x%llx\n", ( CObjBase* )pObj );
+                printf( "0x%llx\n",
+                    ( LONGWORD )( CObjBase* )pObj );
         }
     }
 }
