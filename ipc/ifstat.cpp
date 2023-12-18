@@ -305,6 +305,7 @@ bool CInterfaceState::IsMyPort(
     return true;
 }
 
+#include <signal.h>
 gint32 CInterfaceState::OnPortEvent(
         EnumEventId iEvent,
         HANDLE hPort )
@@ -726,6 +727,7 @@ gint32 CInterfaceState::Stop()
 gint32 CInterfaceState::EnumProperties(
     std::vector< gint32 >& vecProps ) const
 {
+    CStdRMutex oStatLock( GetLock() );
     gint32 ret = super::EnumProperties( vecProps );
     if( ERROR( ret ) )
         return ret;
