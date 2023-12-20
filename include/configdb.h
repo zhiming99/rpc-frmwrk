@@ -1156,17 +1156,13 @@ class CCfgDbOpener< IConfigDb >
         }
         do{
             auto psrc = CCFGDB2( pSrcCfg );
-            const Variant* p =
-                psrc->GetPropertyPtr( iSrcProp );
-            if( p == nullptr )
-            {
-                ret = -ENOENT;
+            Variant p;
+            ret = psrc->GetProperty( iSrcProp, p );
+            if( ERROR( ret ) )
                 break;
-            }
 
             auto pdst = CFGDB2( m_pCfg );
-            Variant& odst = pdst->GetProperty( iProp );
-            odst = *p;
+            ret = pdst->SetProperty( iProp, p );
 
         }while( 0 );
         return ret;
