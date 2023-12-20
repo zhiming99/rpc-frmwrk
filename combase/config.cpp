@@ -89,14 +89,8 @@ gint32 CConfigDb2::GetProperty(
 gint32 CConfigDb2::SetProperty(
     gint32 iProp, const BufPtr& pBuf )
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr != m_mapProps.end() )
-        itr->second = *pBuf;
-    else
-    {
-        m_mapProps[ iProp ] = *pBuf;
-    }
-    return 0;
+    Variant oVar( *pBuf );
+    return SetProperty( iProp, oVar );
 }
 
 // get a reference to variant from the config db
@@ -168,8 +162,8 @@ gint32 CConfigDb2::GetProperty(
 gint32 CConfigDb2::SetProperty(
     gint32 iProp, const CBuffer& oBuf )
 {
-    m_mapProps[ iProp ] = oBuf;
-    return 0;
+    Variant oVar( oBuf );
+    return SetProperty( iProp, oVar );
 }
 
 gint32 CConfigDb2::GetPropertyType(

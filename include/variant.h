@@ -48,7 +48,7 @@ struct Variant
     };
 
     EnumTypeId m_iType = typeNone;
-    Variant(){ m_qwVal = 0; }
+    Variant();
     Variant( bool bVal );
     Variant( guint8 byVal );
     Variant( guint16 wVal );
@@ -95,8 +95,7 @@ struct Variant
     Variant& operator=( const CBuffer& );
     Variant& operator=( const Variant& );
     void Clear();
-    ~Variant()
-    { Clear(); }
+    ~Variant();
 
     BufPtr ToBuf() const;
 

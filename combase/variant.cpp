@@ -28,6 +28,15 @@ using namespace std;
 
 namespace rpcf
 {
+Variant::Variant()
+{
+    m_qwVal = 0;
+    m_iType = typeNone;
+}
+
+Variant::~Variant()
+{ Clear(); }
+
 Variant::Variant( bool bVal )
 {
     m_bVal = bVal;
