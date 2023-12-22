@@ -450,6 +450,7 @@ void Variant::Clear()
     case typeString:
         {
             m_strVal.~string(); 
+            m_qwVal = 0;
             break;
         }
     case typeNone:
