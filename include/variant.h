@@ -48,6 +48,7 @@ struct Variant
     };
 
     EnumTypeId m_iType = typeNone;
+    guint32 m_dwReserved = 0;
     Variant();
     Variant( bool bVal );
     Variant( guint8 byVal );
@@ -63,6 +64,7 @@ struct Variant
     Variant( const char* szVal );
     Variant( const char* szVal, guint32 dwSize );
     Variant( const Variant& );
+    Variant( Variant&& );
     Variant( const CBuffer& );
     Variant( gint8 );
     Variant( gint16 );
@@ -215,7 +217,7 @@ struct Variant
     bool operator==( const Variant& rhs ) const;
     bool operator!=( const Variant& rhs ) const
     { return !( *this == rhs ); }
-};
+} __attribute__((aligned (8)));
 
 /*template< typename T,
     typename allowed = typename std::enable_if<

@@ -704,4 +704,44 @@ gint32 CConfigDb2::EnumProperties(
     return GetPropIds( vecProps );
 }
 
+// get a reference to variant from the config db
+const Variant& CConfigDb2::GetProperty( gint32 iProp ) const
+{
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.cend() )
+    {
+        stdstr strMsg = DebugMsg(
+            -ENOENT, "no such element" );
+        throw std::out_of_range( strMsg );
+    }
+    return itr->second;
+}
+
+Variant& CConfigDb2::GetProperty( gint32 iProp )
+{ return m_mapProps[ iProp ]; }
+
+const Variant* CConfigDb2::GetPropertyPtr( gint32 iProp ) const
+{
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.cend() )
+        return nullptr;
+    return &itr->second;
+}
+
+Variant* CConfigDb2::GetPropertyPtr( gint32 iProp )
+{
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.end() )
+        return nullptr;
+    return &itr->second;
+}
+
+gint32 CConfigDb2::size() const
+{ return m_mapProps.size(); }
+
+bool CConfigDb2::exist( gint32 iProp ) const
+{ 
+    return m_mapProps.cend() != m_mapProps.find( iProp ) ;
+}
+
 }
