@@ -180,6 +180,7 @@ Variant::Variant( const Variant& rhs )
     case typeUInt16:
         m_wVal = rhs.m_wVal;
         break;
+    case typeNone:
     default:
         {
             std::string strMsg = DebugMsg(
@@ -219,7 +220,6 @@ Variant::Variant( Variant&& rhs )
         {
             new( &m_strVal ) string(
                 std::move( rhs.m_strVal ) );
-            rhs.Clear();
             break;
         }
     case typeFloat:
