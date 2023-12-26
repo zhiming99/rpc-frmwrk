@@ -24,10 +24,9 @@
  */
 #pragma once
 #include "variant.h"
-#include "configdb.h"
+#include <string>
+#include <vector>
 #define BASE_NUM_VAR 8
-
-#define std::pair< gint32, Variant > LIST_ELEM;
 
 #define ROW_COUNT( __idx ) \
     ( ( 1 << (__idx) ) * BASE_NUM_VAR )
@@ -40,219 +39,95 @@
 
 #define ROW_FIRST( __idx ) ( m_vecVarArrs[ (__idx) ] )
 
-#define LIST_LAST() \
+#define LIST_FIRST \
+    ( m_vecVarArrs.front() )
+
+#define LIST_LAST \
     ( ROW_END( m_vecVarArrs.size() - 1 ) )
 
-#define LAST_ROW() \
+#define LAST_ROW \
     ( m_vecVarArrs.back() )
 
-#define LAST_ROW_COUNT() \
+#define LAST_ROW_COUNT \
     ( ROW_COUNT( m_vecVarArrs.size() - 1 ) )
 
 #define EMPTY_ENTRY( __elem ) \
     ( __elem->first == -1 )
 
+namespace rpcf{
+
+typedef std::pair< gint32, Variant > CFG_ELEM;
+
 struct CVarList
 {
-    std::vector< LIST_ELEM* > m_vecVarArrs;
-    class iterator
+    std::vector< CFG_ELEM* > m_vecVarArrs;
+    guint32 m_dwSize = 0;
+    struct iterator
     {
         gint32 m_iIdx = -1;
-        LIST_ELEM* m_pCurVar = nullptr;
+        CFG_ELEM* m_pCurVar = nullptr;
         guint32 m_dwSize = 0;
+        CVarList* m_pParent = nullptr;
 
         iterator(){}
+        iterator( const iterator& rhs );
+        iterator( iterator&& rhs );
+        iterator( gint32 iIdx, CFG_ELEM* pCurElem );
+        iterator& operator++();
+        iterator& operator++( int );
+        bool operator==( const iterator& rhs );
+        bool operator!=( const iterator& rhs )
+        { return !( *this == rhs ); }
+        iterator& operator=( iterator&& rhs );
+        iterator& operator=( const iterator& rhs );
+        CFG_ELEM* operator->()
+        { return m_pCurVar; }
+        CFG_ELEM& operator*()
+        { return *m_pCurVar; }
+    };
+    struct const_iterator : public iterator
+    {
+        typedef iterator super;
+        const_iterator() {}
+        const_iterator( const_iterator& rhs );
+        const_iterator( const_iterator&& rhs );
+        const_iterator( gint32 iIdx, CFG_ELEM* pCurElem );
 
-        iterator( const iterator& rhs )
-        {
-            m_iIdx = rhs.m_iIdx;
-            m_pCurVar = rhs.m_pCurVar;
-        }
+        const_iterator& operator++();
+        const_iterator& operator++( int );
+        bool operator==( const_iterator& rhs );
+        bool operator!=( const_iterator& rhs )
+        { return !( *this == rhs ); }
 
-        iterator( iterator&& rhs )
-        {
-            m_iIdx = rhs.m_iIdx;
-            m_pCurVar = rhs.m_pCurVar;
-            rhs.m_pCurVar = nullptr;
-            rhs.m_iIdx = -1;
-        }
+        bool operator!=( const_iterator&& rhs )
+        { return !( *this == rhs ); }
 
-        iterator( gint32 iIdx, LIST_ELEM* pCurElem )
-        {
-            m_iIdx = iIdx;
-            m_pCurVar = pCurElem;
-        }
-
-        iterator& operator++() volatile
-        {
-            bool bFound = false;
-            while( m_iIdx < m_vecVarArrs.size() )
-            {
-                while( m_pCurVar + 1 < ROW_END( m_iIdx ) )
-                {
-                    m_pCurVar += 1;
-                    if( EMPTY_ENTRY( m_pCurVar ) )
-                        continue;
-                    bFound = true;
-                    break;
-                }
-                if( bFound )
-                    break;
-                m_iIdx++;
-                if( m_iIdx < m_vecVarArrs.size() )
-                    m_pCurVar = m_vecArrs[ m_iIdx ];
-            }
-            if( !bFound )
-            {
-                m_iIdx == -1;
-                m_pCurVar = nullptr;
-            }
-            return *this;
-        }
-
-        iterator& operator++( int ) volatile
-        {
-            bool bFound = false;
-            while( m_iIdx < m_vecVarArrs.size() )
-            {
-                while( m_pCurVar + 1 < ROW_END( m_iIdx ) )
-                {
-                    m_pCurVar += 1;
-                    if( EMPTY_ENTRY( m_pCurVar ) )
-                        continue;
-                    bFound = true;
-                    break;
-                }
-                if( bFound )
-                    break;
-                m_iIdx++;
-                if( m_iIdx < m_vecVarArrs.size() )
-                    m_pCurVar = m_vecArrs[ m_iIdx ];
-            }
-            if( !bFound )
-            {
-                m_iIdx == -1;
-                m_pCurVar = nullptr;
-            }
-            return *this;
-        }
-
-        bool operator==( const iterator& rhs )
-        {
-            if( m_iIdx == rhs.m_iIdx &&
-                m_pCurVar == rhs.m_pCurVar )
-                return true;
-            return false;
-        }
-
-        iterator& operator=( iterator&& rhs )
-        {
-            m_iIdx = rhs.m_iIdx;
-            m_pCurVar = rhs.m_pCurVar;
-            rhs.m_pCurVar = nullptr;
-            rhs.m_iIdx = -1;
-        }
-
-        iterator& operator=( const iterator& rhs )
-        {
-            m_iIdx = rhs.m_iIdx;
-            m_pCurVar = rhs.m_pCurVar;
-        }
-
-        LIST_ELEM& operator->()
+        const CFG_ELEM* operator->()
+        { return m_pCurVar; }
+        const CFG_ELEM& operator*()
         { return *m_pCurVar; }
     };
 
-    CVarList()
-    {
-        Variant* pVars = new LIST_ELEM(
-            { -1, Variant(0)})[ BASE_NUM_VAR ];
-        m_vecVarArrs.push_back( pVars );
-    }
-
-    ~CVarList()
-    {
-        clear();
-        return
-    }
-
-    void clear()
-    {
-        for( auto elem : m_vecVarArrs )
-            delete[] elem;
-        m_vecVarArrs.clear();
-        Variant* pVars = new LIST_ELEM(
-            { -1, Variant(0)})[ BASE_NUM_VAR ];
-        m_vecVarArrs.push_back( pVars );
-    }
-
-    iterator begin()
-    { return iterator( 0, m_vecArrs[ 0 ] ); }
-
-    iterator end()
-    { return iterator( -1, nullptr ); }
-
-    const iterator cbegin() const
-    { return iterator( 0, m_vecArrs[ 0 ] ); }
-
-    const iterator cend() const
-    { return iterator( -1, nullptr ); }
-
-    iterator find( gint32 iProp )
-    {
-        bool bFound = false;
-        auto itr = begin();
-        while( itr != end() )
-        {
-            if( itr->first == iProp )
-                break;
-            itr++;
-        }
-        if( bFound )
-            return itr;
-        return end();
-    }
-
-    iterator erase( gint32 iProp )
-    {
-        auto itr = find( iProp );
-        if( itr == end() )
-            return itr;
-        itr->first = -1;
-        itr->second.Clear();
-        m_dwSize--;
-        return itr++;
-    }
-
-    void add_row()
-    {
-        guint32 dwSize =
-            ROW_COUNT( m_vecVarArrs.size() );
-        LIST_ELEM* pNewRow = new LIST_ELEM(
-            { -1, Variant(0)})[ dwSize ];
-    }
-
-    size_t size()
-    { return m_dwSize; }
-
-    void push_back( const LIST_ELEM& elem )
-    {
-        bool bFound = false;
-        LIST_ELEM* pRow = LAST_ROW();
-        do{
-            for( int i = 0; i < LAST_ROW_COUNT(); i++ )
-            {
-                if( pRow->first == -1 )
-                {
-                    *pRow = elem;
-                    bFound = true;
-                    break;
-                }
-                pRow++;
-            }
-            add_row();
-
-        }while( !bFound );
-        m_dwSize++;
-    }
+    CVarList();
+    ~CVarList();
+    void clear();
+    iterator begin();
+    iterator end();
+    const iterator begin() const;
+    const iterator end() const;
+    const_iterator cbegin() const;
+    const_iterator cend() const;
+    iterator find( gint32 iProp );
+    iterator erase( gint32 iProp );
+    iterator erase( iterator itr );
+    gint32 push_row();
+    gint32 pop_row();
+    size_t size() const;
+    gint32 push_back( const CFG_ELEM& elem );
+    gint32 pop_back();
+    CFG_ELEM& back();
+    bool empty() const
+    { return ( m_dwSize == 0 ); }
 };
+
+}
