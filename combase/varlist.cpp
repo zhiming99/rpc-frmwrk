@@ -56,7 +56,7 @@ CVarList::iterator::iterator( gint32 iIdx, CFG_ELEM* pCurElem )
 CVarList::iterator& CVarList::iterator::operator++()
 {
     bool bFound = false;
-    while( m_iIdx < m_pParent->m_vecVarArrs.size() )
+    while( m_iIdx < m_pParent->m_dwRowCount )
     {
         while( m_pCurVar + 1 < ITR_ROW_END( m_iIdx ) )
         {
@@ -69,7 +69,7 @@ CVarList::iterator& CVarList::iterator::operator++()
         if( bFound )
             break;
         m_iIdx++;
-        if( m_iIdx < m_pParent->m_vecVarArrs.size() )
+        if( m_iIdx < m_pParent->m_dwRowCount )
             m_pCurVar = m_pParent->m_vecVarArrs[ m_iIdx ] - 1;
     }
     if( !bFound )
@@ -83,7 +83,7 @@ CVarList::iterator& CVarList::iterator::operator++()
 CVarList::iterator& CVarList::iterator::operator++( int )
 {
     bool bFound = false;
-    while( m_iIdx < m_pParent->m_vecVarArrs.size() )
+    while( m_iIdx < m_pParent->m_dwRowCount )
     {
         while( m_pCurVar + 1 < ITR_ROW_END( m_iIdx ) )
         {
@@ -96,7 +96,7 @@ CVarList::iterator& CVarList::iterator::operator++( int )
         if( bFound )
             break;
         m_iIdx++;
-        if( m_iIdx < m_pParent->m_vecVarArrs.size() )
+        if( m_iIdx < m_pParent->m_dwRowCount )
             m_pCurVar = m_pParent->m_vecVarArrs[ m_iIdx ] - 1;
     }
     if( !bFound )
@@ -134,15 +134,29 @@ CVarList::iterator& CVarList::iterator::operator=( const iterator& rhs )
 
 CVarList::CVarList()
 {
+    guint32 i = 0;
+    guint32 dwCount =
+        sizeof( m_vecVarArrs ) / sizeof( CFG_ELEM* );
+
+    for( ; i < dwCount; i++ )
+        m_vecVarArrs[ i ] = nullptr;
+
     CFG_ELEM* pVars = new CFG_ELEM[ BASE_NUM_VAR ];
-    m_vecVarArrs.push_back( pVars );
+    m_vecVarArrs[ m_dwRowCount++ ] = pVars;
     for( int i = 0; i < BASE_NUM_VAR; i++ )
         ( pVars++ )->first = -1;
 }
 
 CVarList::~CVarList()
 {
-    clear();
+    if( m_dwRowCount > 0 )
+    {
+        for( int i = 0; i < m_dwRowCount; i++ )
+            delete[] m_vecVarArrs[ i ];
+    }
+    m_dwRowCount = 0;
+    memset( m_vecVarArrs,
+        0, sizeof( m_vecVarArrs ) );
     return;
 }
 
@@ -150,11 +164,13 @@ void CVarList::clear()
 {
     if( empty() )
         return;
-    for( auto elem : m_vecVarArrs )
-        delete[] elem;
-    m_vecVarArrs.clear();
+    for( int i = 0; i < m_dwRowCount; i++ )
+        delete[] m_vecVarArrs[ i ];
+    memset( m_vecVarArrs,
+        0, sizeof( m_vecVarArrs ) );
+    m_dwRowCount = 0;
     CFG_ELEM* pVars = new CFG_ELEM[ BASE_NUM_VAR ];
-    m_vecVarArrs.push_back( pVars );
+    m_vecVarArrs[ m_dwRowCount++ ] = pVars;
     for( int i = 0; i < BASE_NUM_VAR; i++ )
     {
         pVars->first = -1;
@@ -248,9 +264,9 @@ CVarList::iterator CVarList::erase(
 gint32 CVarList::push_row()
 {
     guint32 dwSize =
-        ROW_COUNT( m_vecVarArrs.size() );
+        ROW_COUNT( m_dwRowCount );
     CFG_ELEM* pNewRow = new CFG_ELEM[ dwSize ];
-    m_vecVarArrs.push_back( pNewRow );
+    m_vecVarArrs[ m_dwRowCount++ ] = pNewRow;
     for( int i = 0; i < dwSize; i++ )
         ( pNewRow++ )->first = -1;
     return 0;
@@ -258,11 +274,14 @@ gint32 CVarList::push_row()
 
 gint32 CVarList::pop_row()
 {
-    if( m_vecVarArrs.size() <= 1 )
+    if( m_dwRowCount <= 1 )
         return -ENOENT;
     guint32 dwSize = LAST_ROW_COUNT;
-    CFG_ELEM* pLast = m_vecVarArrs.back();
-    m_vecVarArrs.pop_back();
+
+    m_dwRowCount--;
+    CFG_ELEM* pLast = m_vecVarArrs[ m_dwRowCount ];
+    m_vecVarArrs[ m_dwRowCount ] = nullptr;
+
     for( guint32 i = 0; i < dwSize; i++ ) 
     {
         pLast[ i ].first = -1;
@@ -386,7 +405,7 @@ CFG_ELEM& CVarList::back() {
 CVarList::const_iterator& CVarList::const_iterator::operator++()
 {
     bool bFound = false;
-    while( m_iIdx < m_pParent->m_vecVarArrs.size() )
+    while( m_iIdx < m_pParent->m_dwRowCount )
     {
         while( m_pCurVar + 1 < ITR_ROW_END( m_iIdx ) )
         {
@@ -399,7 +418,7 @@ CVarList::const_iterator& CVarList::const_iterator::operator++()
         if( bFound )
             break;
         m_iIdx++;
-        if( m_iIdx < m_pParent->m_vecVarArrs.size() )
+        if( m_iIdx < m_pParent->m_dwRowCount )
             m_pCurVar = m_pParent->m_vecVarArrs[ m_iIdx ] - 1;
     }
     if( !bFound )
@@ -414,7 +433,7 @@ CVarList::const_iterator&
 CVarList::const_iterator::operator++( int )
 {
     bool bFound = false;
-    while( m_iIdx < m_pParent->m_vecVarArrs.size() )
+    while( m_iIdx < m_pParent->m_dwRowCount )
     {
         while( m_pCurVar + 1 < ITR_ROW_END( m_iIdx ) )
         {
@@ -427,7 +446,7 @@ CVarList::const_iterator::operator++( int )
         if( bFound )
             break;
         m_iIdx++;
-        if( m_iIdx < m_pParent->m_vecVarArrs.size() )
+        if( m_iIdx < m_pParent->m_dwRowCount )
             m_pCurVar = m_pParent->m_vecVarArrs[ m_iIdx ] - 1;
     }
     if( !bFound )

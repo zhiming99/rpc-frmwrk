@@ -40,27 +40,32 @@
 #define ROW_FIRST( __idx ) ( m_vecVarArrs[ (__idx) ] )
 
 #define LIST_FIRST \
-    ( m_vecVarArrs.front() )
+    ( m_vecVarArrs[ 0 ] )
 
 #define LIST_LAST \
-    ( ROW_END( m_vecVarArrs.size() - 1 ) )
+    ( ROW_END( m_dwRowCount - 1 ) )
 
 #define LAST_ROW \
-    ( m_vecVarArrs.back() )
+    ( m_vecVarArrs[ m_dwRowCount - 1 ] )
 
 #define LAST_ROW_COUNT \
-    ( ROW_COUNT( m_vecVarArrs.size() - 1 ) )
+    ( ROW_COUNT( m_dwRowCount - 1 ) )
 
 #define EMPTY_ENTRY( __elem ) \
     ( __elem->first == -1 )
 
 namespace rpcf{
 
+#if BUILD_64==1
+typedef std::pair< gint64, Variant > CFG_ELEM;
+#else
 typedef std::pair< gint32, Variant > CFG_ELEM;
+#endif
 
 struct CVarList
 {
-    std::vector< CFG_ELEM* > m_vecVarArrs;
+    CFG_ELEM*  m_vecVarArrs[ 8 ];
+    guint32 m_dwRowCount = 0;
     guint32 m_dwSize = 0;
     struct iterator
     {
