@@ -220,7 +220,6 @@ gint32 CConfigDb2::Serialize(
     struct SERI_HEADER oHeader;
     gint32 ret = 0;
 
-    auto itr = m_mapProps.cbegin();
     oHeader.dwClsid = clsid( CConfigDb2 );
     oHeader.dwCount = m_mapProps.size();
     oHeader.bVersion = 2;
@@ -241,7 +240,7 @@ gint32 CConfigDb2::Serialize(
     pLoc += sizeof( oHeader );
     oHeader.ntoh();
 
-    itr = m_mapProps.begin();
+    auto itr = m_mapProps.cbegin();
 
     char* pEnd = oBuf.ptr() + oBuf.size();
 
@@ -577,6 +576,7 @@ gint32 CConfigDb2::Deserialize(
                     }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
+                    pLoc += sizeof( guint32 );
                     if( pLoc + len > pEnd )
                     {
                         ret = -E2BIG;
@@ -588,7 +588,7 @@ gint32 CConfigDb2::Deserialize(
                         break;
 
                     oVar = ( DBusMessage* )pMsg; 
-                    pLoc += len + sizeof( guint32 );
+                    pLoc += len;
                     break;
                 }
             case typeObj:

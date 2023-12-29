@@ -199,10 +199,10 @@ gint32 CInterfaceState::TestSetState(
 {
     CStdRMutex oStateLock( GetLock() );
     STATEMAP_KEY oKey( GetState(), iEvent );
-    std::map< STATMAP_KEY, EnumIfState >::iterator
+    std::map< STATMAP_KEY, EnumIfState >::const_iterator
         itr = m_mapState.find( oKey ); 
 
-    if( itr == m_mapState.end() )
+    if( itr == m_mapState.cend() )
         return ERROR_STATE;
 
     return 0;
@@ -216,12 +216,13 @@ gint32 CInterfaceState::SetStateOnEvent(
     CStdRMutex oStateLock( GetLock() );
 
     STATEMAP_KEY oKey( GetState(), iEvent );
-    std::map< STATMAP_KEY, EnumIfState >::iterator
+    std::map< STATMAP_KEY, EnumIfState >::const_iterator
         itr = m_mapState.find( oKey ); 
 
-    if( itr != m_mapState.end() )
+    if( itr != m_mapState.cend() )
     {
-        switch( itr->second )
+        EnumIfStat iState = itr->second;
+        switch( iState )
         {
         case stateUnknown:
             {
@@ -240,7 +241,7 @@ gint32 CInterfaceState::SetStateOnEvent(
             }
         default:
             {
-                SetStateInternal( m_mapState[ oKey ] );
+                SetStateInternal( iState );
                 ret = 0;
                 break;
             }
