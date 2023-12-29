@@ -221,7 +221,7 @@ gint32 CInterfaceState::SetStateOnEvent(
 
     if( itr != m_mapState.cend() )
     {
-        EnumIfStat iState = itr->second;
+        EnumIfState iState = itr->second;
         switch( iState )
         {
         case stateUnknown:
