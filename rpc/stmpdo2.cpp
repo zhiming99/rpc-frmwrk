@@ -933,7 +933,7 @@ gint32 CTcpStreamPdo2::OnReceive(
 
         bFirst = false;
         BufPtr pInBuf( true );
-        pInBuf->Resize( dwBytes );
+        ret = pInBuf->Resize( dwBytes );
         if( ERROR( ret ) )
             break;
 

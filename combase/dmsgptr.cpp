@@ -619,7 +619,7 @@ gint32 DMsgPtr::Deserialize(
         guint32 dwSize;
         memcpy( &dwSize, pBuf, sizeof( dwSize ) );
         dwSize = ntohl( dwSize );
-        if( dwSize > dwSizeMax )
+        if( dwSize > dwSizeMax || dwSize == 0 )
         {
             ret = -EINVAL;
             break;
