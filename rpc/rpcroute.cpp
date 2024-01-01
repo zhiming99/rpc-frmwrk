@@ -219,10 +219,9 @@ gint32 CRpcRouter::GetBridgeProxy(
             ret = -ENOENT;
             break;
         }
-        std::map< guint32, InterfPtr >::iterator 
-            itr = pMap->find( dwPortId );
+        auto itr = pMap->find( dwPortId );
 
-        if( itr == pMap->end() )
+        if( itr == pMap->cend() )
         {
             ret = -ENOENT;
             break;
@@ -322,15 +321,14 @@ gint32 CRpcRouter::AddBridgeProxy(
             break;
 
         CStdRMutex oRouterLock( GetLock() );
-        std::map< guint32, InterfPtr >::iterator 
-            itr = pMap->find( dwPortId );
-        if( itr != pMap->end() )
+        auto retpair = pMap->insert(
+            { dwPortId, InterfPtr( pIf ) } );
+
+        if( !retpair.second )
         {
             ret = -EEXIST;
             break;
         }
-
-        ( *pMap )[ dwPortId ] = InterfPtr( pIf );
 
     }while( 0 );
 
@@ -358,10 +356,9 @@ gint32 CRpcRouter::RemoveBridgeProxy(
             break;
 
         CStdRMutex oRouterLock( GetLock() );
-        std::map< guint32, InterfPtr >::iterator 
-            itr = pMap->find( dwPortId );
+        auto itr = pMap->find( dwPortId );
 
-        if( itr == pMap->end() )
+        if( itr == pMap->cend() )
         {
             ret = -ENOENT;
             break;
@@ -468,43 +465,33 @@ gint32 CRpcRouter::AddRemoveMatch(
     gint32 ret = 0;
     MatchPtr ptrMatch( pMatch );
 
-    do{
-        bool bFound = false;
-        map< MatchPtr, gint32 >::iterator
-            itr = plm->find( ptrMatch );
+    if( bAdd )
+    {
+        auto retpair = plm->insert(
+            { ptrMatch, 1 } );
 
-        if( itr != plm->end() )
-            bFound = true;
-
-        if( bAdd )
+        if( !retpair.second )
         {
-            if( !bFound )
+            ++( retpair.first->second );
+            ret = EEXIST;
+        }
+    }
+    else
+    {
+        auto itr = plm->find( ptrMatch );
+        if( itr != plm->end() )
+        {
+            --( itr->second );
+            if( itr->second <= 0 )
             {
-                ( *plm )[ ptrMatch ] = 1;
+                plm->erase( itr );
             }
             else
             {
-                ++( itr->second );
                 ret = EEXIST;
             }
         }
-        else
-        {
-            if( bFound )
-            {
-                --( itr->second );
-                if( itr->second <= 0 )
-                {
-                    plm->erase( itr );
-                }
-                else
-                {
-                    ret = EEXIST;
-                }
-            }
-        }
-
-    }while( 0 );
+    }
 
     return ret;
 }
@@ -551,10 +538,9 @@ gint32 CRpcRouterBridge::GetBridge(
             pMap = &m_mapPortId2Bdge;
         
         CStdRMutex oRouterLock( GetLock() );
-        std::map< guint32, InterfPtr >::iterator 
-            itr = pMap->find( dwPortId );
+        auto itr = pMap->find( dwPortId );
 
-        if( itr == pMap->end() )
+        if( itr == pMap->cend() )
         {
             ret = -ENOENT;
             break;
@@ -966,16 +952,11 @@ gint32 CRpcRouterBridge::AddBridge(
             break;
 
         CStdRMutex oRouterLock( GetLock() );
-        std::map< guint32, InterfPtr >::iterator 
-            itr = pMap->find( dwPortId );
+        auto retpair = pMap->insert(
+            { dwPortId, InterfPtr( pIf ) } );
 
-        if( itr != pMap->end() )
-        {
+        if( !retpair.second )
             ret = EEXIST;
-            break;
-        }
-
-        ( *pMap )[ dwPortId ] = InterfPtr( pIf );
 
     }while( 0 );
 
@@ -1004,14 +985,11 @@ gint32 CRpcRouterBridge::RemoveBridge(
             break;
 
         CStdRMutex oRouterLock( GetLock() );
-        std::map< guint32, InterfPtr >::iterator 
-            itr = pMap->find( dwPortId );
-        if( itr == pMap->end() )
-        {
+        ret = pMap->erase( dwPortId );
+        if( ret == 0 )
             ret = -ENOENT;
-            break;
-        }
-        pMap->erase( itr );
+        else
+            ret = STATUS_SUCCESS;
 
     }while( 0 );
 
@@ -3856,10 +3834,9 @@ gint32 CRpcRouterBridge::FindRefCount(
             strNode, dwPortId, dwProxyId );
 
         CStdRMutex oRouterLock( GetLock() );
-        std::map< CRegObjectBridge, gint32 >::iterator
-            itr = m_mapRefCount.find( oRegObj );
+        auto itr = m_mapRefCount.find( oRegObj );
 
-        if( itr != m_mapRefCount.end() )
+        if( itr != m_mapRefCount.cend() )
         {
             break;
         }
@@ -3892,17 +3869,14 @@ gint32 CRpcRouterBridge::AddRefCount(
             break;
 
         CStdRMutex oRouterLock( GetLock() );
-        std::map< CRegObjectBridge, gint32 >::iterator
-            itr = m_mapRefCount.find( oRegObj );
 
-        if( itr != m_mapRefCount.end() )
-        {
-            ret = ++m_mapRefCount[ oRegObj ];
-        }
+        auto retpair = m_mapRefCount.insert(
+            { oRegObj, 1 } );
+
+        if( !retpair.second )
+            ret = ++( retpair.first->second );
         else
-        {
-            ret = m_mapRefCount[ oRegObj ] = 1;
-        }
+            ret = 1;
 
     }while( 0 );
 

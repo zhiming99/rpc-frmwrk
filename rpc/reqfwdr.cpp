@@ -4910,20 +4910,25 @@ gint32 CRpcReqForwarderProxy::AddInterface(
     gint32 ret = 0;
     do{
         MatchPtr ptrMatch( pMatch );
+
+        MatchPtr ptrCopy;
+        ret = ptrCopy.NewObj(
+            clsid( CRouterRemoteMatch ) );
+        if( ERROR( ret ) )
+            break;
+        CRouterRemoteMatch* pCopy = ptrCopy;
+        pCopy->CopyMatch( pMatch);
         CStdRMutex oIfLock( GetLock() );
-        std::map< MatchPtr, IFREF >::iterator
-            itr = m_mapMatchRefs.find( ptrMatch );
+        auto retpair = m_mapMatchRefs.insert( { ptrCopy,
+           IFREF( m_vecMatches.size(), 1 ) } ); 
 
-        if( itr == m_mapMatchRefs.end() )
+        if( retpair.second )
         {
-            m_mapMatchRefs[ ptrMatch ] =
-                IFREF(m_vecMatches.size(), 1 );
-
-            m_vecMatches.push_back( ptrMatch );
+            m_vecMatches.push_back( ptrCopy );
         }
         else
         {
-            ++( itr->second.second );
+            ++( retpair.first->second.second );
             ret = EEXIST;
         }
 
@@ -4963,16 +4968,16 @@ gint32 CRpcReqForwarderProxy::RemoveInterface(
                     break;
                 }
 
-                auto it2 = m_vecMatches.end();
+                auto it2 = m_vecMatches.cend();
                 if( m_vecMatches.size() <= matchPair.first )
                 {
-                    it2 = m_vecMatches.end() - 1;
+                    it2 = m_vecMatches.cend() - 1;
                 }
                 else
                 {
-                    it2 = m_vecMatches.begin() + matchPair.first;
+                    it2 = m_vecMatches.cbegin() + matchPair.first;
                 }
-                while( it2 != m_vecMatches.begin() )
+                while( it2 != m_vecMatches.cbegin() )
                 {
                     stdstr&& strVal = ( *it2 )->ToString();
                     if( strVal == strMatch )
@@ -4987,7 +4992,7 @@ gint32 CRpcReqForwarderProxy::RemoveInterface(
                 if( bFound )
                     break;
 
-                if( it2 == m_vecMatches.begin() )
+                if( it2 == m_vecMatches.cbegin() )
                 {
                     stdstr&& strVal = ( *it2 )->ToString();
                     if( strVal == strMatch )
