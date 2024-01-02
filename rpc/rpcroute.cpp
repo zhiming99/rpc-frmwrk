@@ -2191,17 +2191,15 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
 
             if( bBridge && strPath == "/" )
             {
-                CCfgOpener oCtx( pEvtCtx );
-
                 IEventSink* pCb = nullptr;
                 ObjPtr pObj;
-                ret = oCtx.GetObjPtr(
+                ret = oEvtCtx.GetObjPtr(
                     propEventSink, pObj );
 
                 if( SUCCEEDED( ret ) )
                 {
                     pCb = pObj;
-                    oCtx.RemoveProperty(
+                    oEvtCtx.RemoveProperty(
                         propEventSink );
                 }
 
