@@ -4881,8 +4881,6 @@ gint32 CRpcReqForwarderProxy::AddInterface(
 
     gint32 ret = 0;
     do{
-        MatchPtr ptrMatch( pMatch );
-
         MatchPtr ptrCopy;
         ret = ptrCopy.NewObj(
             clsid( CRouterRemoteMatch ) );

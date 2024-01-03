@@ -486,7 +486,7 @@ class CRpcConnSock :
     virtual gint32 OnSendReady();
     virtual gint32 OnReceive();
     virtual gint32 OnConnected();
-    virtual CMainIoLoop* GetMainLoop() const override;
+    CMainIoLoop* GetMainLoop() const override;
 
     gint32 OnDisconnected();
 

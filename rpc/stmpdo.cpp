@@ -187,7 +187,7 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
                 std::to_string( dwPortId );
             break;
         }
-        else if( pCfg->exist( propConnParams ) )
+        else
         {
             // proxy side
             // ip addr must exist
@@ -200,10 +200,10 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
             CStdRMutex oPortLock( GetLock() );
             CConnParams ocps( pcp );
             PDOADDR oAddr( ocps );
-            std::map< PDOADDR, guint32 >::iterator
+            std::map< PDOADDR, guint32 >::const_iterator
                 itr = m_mapAddrToId.find( oAddr );
             
-            if( itr != m_mapAddrToId.end() )
+            if( itr != m_mapAddrToId.cend() )
             {
                 dwPortId = itr->second;
             }
@@ -214,10 +214,6 @@ gint32 CRpcTcpBusPort::BuildPdoPortName(
             oCfgOpener[ propPortId ] = dwPortId;
             strPortName = strClass + "_" +
                 std::to_string( dwPortId );
-        }
-        else
-        {
-            ret = -EINVAL;
         }
 
     }while( 0 );
@@ -435,23 +431,155 @@ gint32 CRpcTcpBusPort::PostStart(
     return ret;
 }
 
+extern void SetPnpState(
+    IRP* pIrp, guint32 state );
+
 gint32 CRpcTcpBusPort::PreStop(
     IRP* pIrp )
 {
-    // 
-    // NOTE: this routine could be repeated many
-    // times till it returns
-    // STATUS_MORE_PROCESS_NEEDED
-    //
-    gint32 ret = super::PreStop( pIrp );
-    if( ret != STATUS_MORE_PROCESS_NEEDED )
-    {
-        for( auto elem : m_vecListenSocks )
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = GetIoMgr();
+
+        if( pIrp == nullptr )
         {
-            ret = elem->Stop();
-            elem.Clear();
+            ret = -EINVAL;
+            break;
         }
-    }
+
+        IrpCtxPtr& pCtx = pIrp->GetCurCtx();
+
+        BufPtr pBuf;
+        pCtx->GetExtBuf( pBuf );
+        CGenBusPnpExt* pExt =
+            ( CGenBusPnpExt* )( *pBuf );
+
+        if( pExt->m_dwExtState == 0 )
+        {
+            pExt->m_dwExtState = 1;
+            if( ret == STATUS_PENDING )
+            {
+                break;
+            }
+            // fall through
+        }
+
+        if( pExt->m_dwExtState == 1 )
+        {
+            ret = super::PreStop( pIrp );
+
+            if( ERROR( ret ) )
+                break;
+
+            pExt->m_dwExtState = 2;
+
+            if( ret ==
+                STATUS_MORE_PROCESS_NEEDED )
+                break;
+            // fall through
+        }
+
+        if( pExt->m_dwExtState == 2 )
+        {
+            gint32 (*func)( IEventSink*,
+                CPort*, CRpcListeningSock* ) =
+            ([]( IEventSink* pCb, CPort* pBus,
+                CRpcListeningSock* pSock )->gint32
+            {
+                gint32 (*pStopSock)( IEventSink*,
+                    CRpcListeningSock* ) =
+                ([]( IEventSink* pCb,
+                    CRpcListeningSock* pSock )
+                {
+                    pSock->OnEvent( eventStop,
+                        0, 0, nullptr );
+
+                    pCb->OnEvent( eventTaskComp,
+                        0, 0, nullptr );
+                    return 0;
+                });
+
+                TaskletPtr pTask;
+                gint32 ret = NEW_FUNCCALL_TASKEX2(
+                    0, pTask, pBus->GetIoMgr(),
+                    pStopSock, pCb, pSock );
+                if( ERROR( ret ) )
+                    return ret;
+
+                CIfRetryTask* pRetry = pTask;
+                pRetry->SetClientNotify( pCb );
+                auto pLoop = pSock->GetMainLoop();
+                pLoop->AddTask( pTask );
+                return STATUS_PENDING;
+            });
+
+            TaskGrpPtr pGrp;
+            CParamList oParams;
+
+            oParams.SetPointer(
+                propIoMgr, pMgr );
+                
+            ret = pGrp.NewObj(
+                clsid( CIfTaskGroup ), 
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+
+            pGrp->SetRelation( logicNONE );
+
+            for( auto elem : m_vecListenSocks )
+            {
+                TaskletPtr pStopChild;
+                ret = NEW_FUNCCALL_TASKEX2( 0,
+                    pStopChild, this->GetIoMgr(),
+                    func, nullptr, this,
+                    ( CRpcListeningSock* )elem );
+
+                if( ERROR( ret ) )
+                    break;
+                pGrp->AppendTask( pStopChild );
+            }
+            m_vecListenSocks.clear();
+
+            TaskletPtr pCompIrp;
+            ret = DEFER_OBJCALLEX_NOSCHED( 
+                pCompIrp, this->GetIoMgr(),
+                &CIoManager::CompleteIrp,
+                pIrp );
+            if( ERROR( ret ) )
+            {
+                ( *pGrp )( eventCancelTask );
+                break;
+            }
+            pGrp->AppendTask( pCompIrp );
+            TaskletPtr pTask = pGrp;
+            ret = pMgr->RescheduleTask( pTask );
+            if( SUCCEEDED( ret ) )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
+                break;
+            }
+            ( *pGrp )( eventCancelTask );
+        }
+
+        if( pExt->m_dwExtState == 3 )
+        {
+            SetPnpState( pIrp,
+                PNP_STATE_STOP_PRE );
+            ret = 0;
+            break;
+        }
+
+        // we don't expect the PreStop
+        // will be entered again
+        ret = ERROR_STATE;
+        break;
+
+    }while( 0 );
+
+    if( ret == STATUS_PENDING )
+        ret = STATUS_MORE_PROCESS_NEEDED;
+
     return ret;
 }
 
@@ -2139,7 +2267,10 @@ gint32 CTcpStreamPdo::OnPortReady(
         if( ERROR( ret ) )
             break;
 
-        CConnParams oConnParams( pcp );
+        CParamList oConnCpy;
+        oConnCpy.Append( pcp );
+        CConnParams oConnParams(
+            oConnCpy.GetCfg() );
         if( m_pBusPort == nullptr )
         {
             ret = -EFAULT;

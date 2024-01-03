@@ -3449,9 +3449,27 @@ gint32 CRpcInterfaceServer::CloneInvTask(
     gint32 ret = 0;
     do{
         CParamList oParams;
-        oParams.CopyProp( propIfPtr, pCallback );
-        oParams.CopyProp( propMsgPtr, pCallback );
-        oParams.CopyProp( propMatchPtr, pCallback );
+        CIfInvokeMethodTask* pInv =
+            ObjPtr( pCallback );
+
+        if( pInv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oLock( pInv->GetLock() );
+        if( pInv->IsStopped(
+            pInv->GetTaskState() ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        IConfigDb* pInvCfg = pInv->GetConfig();
+        oParams.CopyProp( propIfPtr, pInvCfg );
+        oParams.CopyProp( propMsgPtr, pInvCfg );
+        oParams.CopyProp( propMatchPtr, pInvCfg );
+        oLock.Unlock();
 
         ret = pTask.NewObj(
             clsid( CIfInvokeMethodTask ),

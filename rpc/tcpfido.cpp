@@ -472,7 +472,9 @@ gint32 CRpcTcpFido::HandleSendReq(
             {
                 // the message arrives before
                 // the irp arrives here
-                DebugPrint( ret, "respmsg arrives before reqmsg" );
+                DebugPrint( ret, "respmsg arrives before "
+                    "reqmsg ctrlcode = %d",
+                    dwCtrlCode );
                 DMsgPtr pRespMsg = itr->second;
                 m_mapRespMsgs.erase( itr );
 
