@@ -1701,7 +1701,11 @@ gint32 CTcpStreamPdo2::OnPortReady(
         if( ERROR( ret ) )
             break;
 
-        CConnParams oConnParams( pcp );
+        CParamList oConnCpy;
+        oConnCpy.Append( pcp );
+        CConnParams oConnParams(
+            oConnCpy.GetCfg() );
+
         if( m_pBusPort == nullptr )
         {
             ret = -EFAULT;
@@ -1726,8 +1730,9 @@ gint32 CTcpStreamPdo2::OnPortReady(
         if( ERROR( ret ) )
             break;
 
-        //NOTE: moved from start_bh, to prevent the
-        //socket error from entering too early.
+        //NOTE: moved socket polling from start_bh to
+        //OnPortReady, to prevent the socket error from
+        //happening too early.
         ret = this->StartReadWatch();
 
     }while( 0 );

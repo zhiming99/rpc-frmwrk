@@ -491,8 +491,7 @@ gint32 CRpcTcpBusPort::PreStop(
                 ([]( IEventSink* pCb,
                     CRpcListeningSock* pSock )
                 {
-                    pSock->OnEvent( eventStop,
-                        0, 0, nullptr );
+                    pSock->Stop();
 
                     pCb->OnEvent( eventTaskComp,
                         0, 0, nullptr );
