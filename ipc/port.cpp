@@ -3952,7 +3952,8 @@ gint32 CGenericBusPort::OpenPdoPort(
             if( ERROR( ret ) )
                 break;
 
-            ret = GetIoMgr()->MakeBusRegPath(
+            auto pMgr = GetIoMgr();
+            ret = pMgr->MakeBusRegPath(
                 strPath, strBusName );
 
             if( ERROR( ret ) )
@@ -3960,15 +3961,14 @@ gint32 CGenericBusPort::OpenPdoPort(
 
             strPath += string( "/" ) + strPortName;
 
-            ret = GetIoMgr()->OpenPortByPath(
+            ret = pMgr->OpenPortByPath(
                 strPath, hPort );
 
             if( SUCCEEDED( ret ) )
             {
-                pNewPort = HandleToPort( hPort );
-                // special return code, indicating
-                // port is opened already
-                ret = EEXIST;
+                ret = pMgr->GetPortPtr( hPort, pNewPort );
+                if( SUCCEEDED( ret ) )
+                    ret = EEXIST;
                 break;
             }
             else if( ret != -ENOENT )

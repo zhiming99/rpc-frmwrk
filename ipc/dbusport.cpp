@@ -2520,16 +2520,13 @@ gint32 CDBusBusPort::AddRules(
     gint32 ret = 0;
     do{
         CStdRMutex oPortLock( GetLock() );
-        std::map< std::string, gint32 >::iterator
-            itr = m_mapRules.find( strRules );
-
-        if( itr != m_mapRules.end() )
+        auto retpair = m_mapRules.insert(
+            { strRules, 1 } );
+        if( !retpair.second )
         {
-            itr->second++;
+            retpair.first->second++;
             break;
         }
-
-        m_mapRules[ strRules ] = 1;
         oPortLock.Unlock();
 
         CDBusError dbusError;
@@ -2542,9 +2539,12 @@ gint32 CDBusBusPort::AddRules(
         {
             ret = dbusError.Errno();
             oPortLock.Lock();
-            --m_mapRules[ strRules ];
-            if( m_mapRules[ strRules ] == 0 )
-                m_mapRules.erase( strRules );
+            auto itr = m_mapRules.find( strRules );
+            if( itr != m_mapRules.end() )
+            {
+                if( --( itr->second ) == 0 )
+                    m_mapRules.erase( itr );
+            }
         }
 
     }while( 0 );
@@ -2620,11 +2620,17 @@ void CDBusBusPort::RemovePdoPort(
         guint32 iPortId )
 {
     PortPtr pPort;
-    CStdRMutex oPortLock( GetLock() );
     gint32 ret = GetPdoPort( iPortId, pPort );
-    oPortLock.Unlock();
     if( ERROR( ret ) )
         return;
+
+    EnumClsid iClsid = pPort->GetClsid();
+    if( iClsid != clsid( CDBusProxyPdoLpbk ) &&
+        iClsid != clsid( CDBusProxyPdo ) )
+    {
+        super::RemovePdoPort( iPortId );
+        return;
+    }
 
     CCfgOpenerObj oPortCfg( ( IPort* )pPort );
     IConfigDb* pConnParams;
@@ -2641,7 +2647,7 @@ void CDBusBusPort::RemovePdoPort(
     if( ERROR( ret ) )
         return;
 
-    oPortLock.Lock();
+    CStdRMutex oPortLock( GetLock() );
     super::RemovePdoPort( iPortId );
     CConnParamsProxy ocps( oConn.GetCfg() );
     m_mapAddrToId.Erase( ocps );
