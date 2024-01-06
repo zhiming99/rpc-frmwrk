@@ -4492,6 +4492,7 @@ gint32 CRpcListeningSock::Stop()
 
     pBus->ReleaseMainLoop( m_pLoop );
     m_pLoop.Clear();
+    return 0;
 }
 
 gint32 CRpcListeningSock::OnConnected()
