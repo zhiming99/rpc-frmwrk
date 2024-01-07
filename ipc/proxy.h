@@ -704,6 +704,9 @@ class CRpcServices :
     gint32 SetFuncMap( FUNC_MAP& oMap,
         EnumClsid iIfId = clsid( Invalid ) );
 
+    const FUNC_MAP* GetFuncMap(
+        EnumClsid iIfId = clsid( Invalid ) ) const;
+
     FUNC_MAP* GetFuncMap(
         EnumClsid iIfId = clsid( Invalid ) );
 
@@ -721,6 +724,9 @@ class CRpcServices :
 
     gint32 Stop() override;
 
+    const PROXY_MAP* GetProxyMap(
+        EnumClsid iIfId = clsid( Invalid ) ) const;
+
     PROXY_MAP* GetProxyMap(
         EnumClsid iIfId = clsid( Invalid ) );
 
@@ -730,12 +736,12 @@ class CRpcServices :
     gint32 GetDelegate(
         const std::string& strFunc,
         TaskletPtr& pFunc,
-        EnumClsid iIfId = clsid( Invalid ) );
+        EnumClsid iIfId = clsid( Invalid ) ) const;
 
     gint32 GetProxy(
         const std::string& strFunc,
         ObjPtr& pProxy,
-        EnumClsid iIfId = clsid( Invalid ) );
+        EnumClsid iIfId = clsid( Invalid ) ) const;
 
     typedef CRpcInterfaceBase super;
 
