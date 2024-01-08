@@ -4000,7 +4000,7 @@ gint32 CGenericBusPort::OpenPdoPort(
                 propBusName, strBusName );
 
             // pass a pointer to CIoManager
-            oExtCfg.SetPointer( propIoMgr, GetIoMgr() );
+            oExtCfg.SetPointer( propIoMgr, pMgr );
 
             // param parent port
             ret = oExtCfg.SetObjPtr(

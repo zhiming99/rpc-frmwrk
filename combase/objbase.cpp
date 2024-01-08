@@ -301,6 +301,7 @@ gint32 GetModulePath( std::string& strResult )
         "/proc/self/exe", cmd, sizeof( cmd ) - 1 );
     if( ret < 0 )
         return -errno;
+    cmd[ ret ] = 0;
     strResult = dirname( cmd );
     return 0;
 }
@@ -747,10 +748,13 @@ gint32 CObjBase::Release()
     else if( unlikely( iRef < 0 ) )
     {
         std::string strError =
-            "Release twice on invalid Object of ";
-        strError += GetClassName();
+#if BUILD_64
+            "Release twice on invalid Object @0x%llx";
+#else
+            "Release twice on invalid Object @0x%x";
+#endif
         std::string strMsg = DebugMsg(
-            ERROR_FAIL, strError );
+            ERROR_FAIL, strError, this );
         throw std::runtime_error( strMsg );
     }
 #endif

@@ -867,7 +867,8 @@ bool IsValidDBusName( const stdstr& strName )
         const char* ptr = strName.c_str();
         const char* pend = ptr + strName.size();
         if( *ptr == ':' )
-        {   ++ptr;
+        {
+            ++ptr;
             while( ptr != pend )
             {
                 if( *ptr == '.' )
@@ -892,15 +893,18 @@ bool IsValidDBusName( const stdstr& strName )
             }
             if( ptr == pend )
                 ret = true;
+            break;
         }
         else if( *ptr == '.' )
         {
             // cannot begin with '.'
             break;
         }
+        else if( unlikely( !VALID_INITIAL_NAME_CHAR( *ptr ) ) )
+            break;
 
         ++ptr;
-        while( ptr != pend )
+        while( ptr < pend )
         {
             if( *ptr == '.' )
             {

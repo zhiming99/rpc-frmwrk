@@ -122,14 +122,14 @@ struct CSeqTaskGrpMgr : public CObjBase
             return ERROR_STATE;
 
         TaskletPtr pGrpTask;
-        auto pMgr = this->GetIoMgr();
-        auto itr = m_mapSeqTgs.find( htg );
-        if( itr == m_mapSeqTgs.end() )
-        {
-            SEQTG_ELEM otg;
-            m_mapSeqTgs[ htg ] = otg;
-            itr = m_mapSeqTgs.find( htg );
+        SEQTG_ELEM otg;
 
+        auto pMgr = this->GetIoMgr();
+        auto retpair = m_mapSeqTgs.insert(
+            { htg, otg } );
+        auto itr = retpair.first;
+        if( retpair.second )
+        {
             // create the taskgroup immediately.
             CParamList oParams; 
             oParams.SetPointer( propIoMgr, pMgr );
@@ -143,6 +143,7 @@ struct CSeqTaskGrpMgr : public CObjBase
             pGrpTask = pGrp;
             bAdded = true;
         }
+
         auto& elem = itr->second;
         elem.m_iState = stateStarted;
         oLock.Unlock();
@@ -162,13 +163,16 @@ struct CSeqTaskGrpMgr : public CObjBase
             // and add pass the taskgroup to
             // AddSeqTaskIf. But it is not performance
             // friendly.
+            DebugPrint( 0, "Warning: someone else "
+                "add to the start group ahead of the "
+                "start task" );
             ret = AddSeqTaskIf( GetParent(),
                 elem.m_pSeqTasks, pTask, false );
         }
 
-        oLock.Lock();
         if( ERROR( ret ) )
         {
+            oLock.Lock();
             m_mapSeqTgs.erase( htg );
         }
         return ret;
