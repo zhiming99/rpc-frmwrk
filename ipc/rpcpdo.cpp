@@ -1961,9 +1961,9 @@ gint32 CRpcPdoPort::SetupDBusSetting(
 
                 if( ERROR( iRet ) )
                 {
+                    ret = iRet;
                     DebugPrintEx( logErr,
                         ret, "Error AddRules failed" );
-                    ret = iRet;
                 }
             }
         }

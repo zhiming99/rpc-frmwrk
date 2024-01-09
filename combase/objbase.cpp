@@ -749,9 +749,9 @@ gint32 CObjBase::Release()
     {
         std::string strError =
 #if BUILD_64
-            "Release twice on invalid Object @0x%llx";
+            "Release twice on invalid Object @0x%llx ";
 #else
-            "Release twice on invalid Object @0x%x";
+            "Release twice on invalid Object @0x%x ";
 #endif
         std::string strMsg = DebugMsg(
             ERROR_FAIL, strError, this );
