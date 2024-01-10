@@ -900,11 +900,11 @@ gint32 CDBusLoopHooks::AddWatch(
     if( iType != srcIo && iType != srcTimer )
         return -EINVAL;
 
+    CStdRMutex oLock( GetLock() );
     std::set< TaskletPtr >* pWatches = &m_setIoCbs;
     if( iType == srcTimer )
         pWatches = &m_setTimerCbs;
 
-    CStdRMutex oLock( GetLock() );
     pWatches->insert( pCallback );
 
     return 0;
