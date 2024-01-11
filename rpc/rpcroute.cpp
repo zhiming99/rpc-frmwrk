@@ -2333,17 +2333,19 @@ gint32 CRpcRouterBridge::OnRmtSvrOnline(
             ret = ( *pTask )( eventZero );
             if( ret != STATUS_PENDING )
             {
+                // Issue #46
                 // immediate return
-                pCallback->OnEvent(
-                    eventTaskComp, ret, 0, nullptr );
+                // pCallback->OnEvent(
+                //    eventTaskComp, ret, 0, nullptr );
             }
         }
 
     }while( 0 );
     if( bRemove && dwPortId > 0 )
     {
-        pCallback->OnEvent(
-            eventTaskComp, ret, 0, nullptr );
+        // Issue #46
+        // pCallback->OnEvent(
+        //    eventTaskComp, ret, 0, nullptr );
         // remove the seqtgmgr slot
         TaskletPtr pEmpty;
         this->AddStopTask( nullptr,

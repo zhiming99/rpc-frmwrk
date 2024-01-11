@@ -5189,8 +5189,9 @@ gint32 CRpcTcpBridge::DoStartHandshake(
         if( !pHsTicker.IsEmpty() )
             ( *pHsTicker )( eventCancelTask );
 
-        pCallback->OnEvent(
-            eventTaskComp, ret, 0, nullptr );
+        // Issue #46
+        // pCallback->OnEvent(
+        //     eventTaskComp, ret, 0, nullptr );
     }
 
     return ret;
