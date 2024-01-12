@@ -2587,6 +2587,16 @@ gint32 CDBusBusPort::RemoveRules(
     return ret;
 }
 
+gint32 CDBusBusPort::FindRules(
+    const std::string& strRules ) const
+{
+    CStdRMutex oPortLock( GetLock() );
+    auto itr = m_mapRules.find( strRules );
+    if( itr == m_mapRules.end() )
+        return -ENOENT;
+    return STATUS_SUCCESS;
+}
+
 gint32 CDBusBusPort::IsDBusSvrOnline(
     const std::string& strDest )
 {
