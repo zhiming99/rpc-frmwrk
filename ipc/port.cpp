@@ -3159,12 +3159,7 @@ gint32 CPort::OnPortStackBuilt( IRP* pIrp )
 }
 
 gint32 CPort::OnPortStackReady( IRP* pIrp )
-{
-    if( PortType( m_dwFlags ) ==
-        PORTFLG_TYPE_FIDO )
-        return PassUnknownIrp( pIrp );
-    return 0;
-}
+{ return 0; }
 
 std::string CPort::ExClassToInClass(
     const std::string& strPortName )
@@ -3957,7 +3952,8 @@ gint32 CGenericBusPort::OpenPdoPort(
             if( ERROR( ret ) )
                 break;
 
-            ret = GetIoMgr()->MakeBusRegPath(
+            auto pMgr = GetIoMgr();
+            ret = pMgr->MakeBusRegPath(
                 strPath, strBusName );
 
             if( ERROR( ret ) )
@@ -3965,15 +3961,14 @@ gint32 CGenericBusPort::OpenPdoPort(
 
             strPath += string( "/" ) + strPortName;
 
-            ret = GetIoMgr()->OpenPortByPath(
+            ret = pMgr->OpenPortByPath(
                 strPath, hPort );
 
             if( SUCCEEDED( ret ) )
             {
-                pNewPort = HandleToPort( hPort );
-                // special return code, indicating
-                // port is opened already
-                ret = EEXIST;
+                ret = pMgr->GetPortPtr( hPort, pNewPort );
+                if( SUCCEEDED( ret ) )
+                    ret = EEXIST;
                 break;
             }
             else if( ret != -ENOENT )
@@ -4005,7 +4000,7 @@ gint32 CGenericBusPort::OpenPdoPort(
                 propBusName, strBusName );
 
             // pass a pointer to CIoManager
-            oExtCfg.SetPointer( propIoMgr, GetIoMgr() );
+            oExtCfg.SetPointer( propIoMgr, pMgr );
 
             // param parent port
             ret = oExtCfg.SetObjPtr(

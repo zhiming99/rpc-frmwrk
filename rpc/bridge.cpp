@@ -3449,9 +3449,27 @@ gint32 CRpcInterfaceServer::CloneInvTask(
     gint32 ret = 0;
     do{
         CParamList oParams;
-        oParams.CopyProp( propIfPtr, pCallback );
-        oParams.CopyProp( propMsgPtr, pCallback );
-        oParams.CopyProp( propMatchPtr, pCallback );
+        CIfInvokeMethodTask* pInv =
+            ObjPtr( pCallback );
+
+        if( pInv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CStdRTMutex oLock( pInv->GetLock() );
+        if( pInv->IsStopped(
+            pInv->GetTaskState() ) )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        IConfigDb* pInvCfg = pInv->GetConfig();
+        oParams.CopyProp( propIfPtr, pInvCfg );
+        oParams.CopyProp( propMsgPtr, pInvCfg );
+        oParams.CopyProp( propMatchPtr, pInvCfg );
+        oLock.Unlock();
 
         ret = pTask.NewObj(
             clsid( CIfInvokeMethodTask ),
@@ -5073,7 +5091,12 @@ gint32 CRpcTcpBridge::CheckHsTimeout(
             ( CObjBase* )pTask );
 
         CStdRMutex oIfLock( GetLock() );
-
+        if( GetState() == stateStopping ||
+            GetState() == stateStopped )
+        {    
+            ret = ERROR_STATE;
+            break;
+        }    
         guint32 dwRetries = 0;
         ret = oCfg.GetIntProp(
             propRetries, dwRetries );
@@ -5171,8 +5194,9 @@ gint32 CRpcTcpBridge::DoStartHandshake(
         if( !pHsTicker.IsEmpty() )
             ( *pHsTicker )( eventCancelTask );
 
-        pCallback->OnEvent(
-            eventTaskComp, ret, 0, nullptr );
+        // Issue #46
+        // pCallback->OnEvent(
+        //     eventTaskComp, ret, 0, nullptr );
     }
 
     return ret;

@@ -199,10 +199,10 @@ gint32 CInterfaceState::TestSetState(
 {
     CStdRMutex oStateLock( GetLock() );
     STATEMAP_KEY oKey( GetState(), iEvent );
-    std::map< STATMAP_KEY, EnumIfState >::iterator
+    std::map< STATMAP_KEY, EnumIfState >::const_iterator
         itr = m_mapState.find( oKey ); 
 
-    if( itr == m_mapState.end() )
+    if( itr == m_mapState.cend() )
         return ERROR_STATE;
 
     return 0;
@@ -216,12 +216,13 @@ gint32 CInterfaceState::SetStateOnEvent(
     CStdRMutex oStateLock( GetLock() );
 
     STATEMAP_KEY oKey( GetState(), iEvent );
-    std::map< STATMAP_KEY, EnumIfState >::iterator
+    std::map< STATMAP_KEY, EnumIfState >::const_iterator
         itr = m_mapState.find( oKey ); 
 
-    if( itr != m_mapState.end() )
+    if( itr != m_mapState.cend() )
     {
-        switch( itr->second )
+        EnumIfState iState = itr->second;
+        switch( iState )
         {
         case stateUnknown:
             {
@@ -240,7 +241,7 @@ gint32 CInterfaceState::SetStateOnEvent(
             }
         default:
             {
-                SetStateInternal( m_mapState[ oKey ] );
+                SetStateInternal( iState );
                 ret = 0;
                 break;
             }
@@ -305,6 +306,7 @@ bool CInterfaceState::IsMyPort(
     return true;
 }
 
+#include <signal.h>
 gint32 CInterfaceState::OnPortEvent(
         EnumEventId iEvent,
         HANDLE hPort )
@@ -726,6 +728,7 @@ gint32 CInterfaceState::Stop()
 gint32 CInterfaceState::EnumProperties(
     std::vector< gint32 >& vecProps ) const
 {
+    CStdRMutex oStatLock( GetLock() );
     gint32 ret = super::EnumProperties( vecProps );
     if( ERROR( ret ) )
         return ret;

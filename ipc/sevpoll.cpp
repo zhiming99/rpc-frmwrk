@@ -69,6 +69,9 @@ CSimpleEvPoll::CSimpleEvPoll(
         int iFlags = fcntl( m_iPiper, F_GETFL );
         fcntl( m_iPiper, F_SETFL,
             iFlags | O_NONBLOCK );
+        iFlags = fcntl( m_iPipew, F_GETFL );
+        fcntl( m_iPipew, F_SETFL,
+            iFlags | O_NONBLOCK );
 
     }while( 0 );
 

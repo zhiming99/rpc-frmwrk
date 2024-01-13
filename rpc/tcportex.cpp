@@ -189,9 +189,11 @@ gint32 CRpcStream2::HandleReadIrp(
         }
         else
         {
-            pCtx->m_pRespData->Append(
+            ret = pCtx->m_pRespData->Append(
                 ( guint8* )pBuf->ptr(),
                 pBuf->size() );
+            if( ERROR( ret ) )
+                break;
         }
 
         guint32 dwCurSize =
@@ -330,10 +332,13 @@ gint32 CRpcStream2::GetReadIrpsToComp(
                 guint32 dwResidual = 
                     pBuf->size() - dwRecvSize;
 
-                memmove( pBuf->ptr() + dwRecvSize,
-                    pBuf->ptr(), dwResidual );
+                memmove( pBuf->ptr(),
+                    pBuf->ptr() + dwRecvSize,
+                    dwResidual );
 
-                pBuf->Resize( dwResidual );
+                ret = pBuf->Resize( dwResidual );
+                if( ERROR( ret ) )
+                    break;
                 pPacket->SetPayload( pBuf );
                 m_queBufToRecv.push_front( pPacket );
 
@@ -884,8 +889,13 @@ gint32 CRpcStream2::SetRespReadIrp(
                 {
                     guint8* pData =
                         ( guint8* )pBuf->ptr();
-                    pCtx->m_pRespData->Append(
+                    ret = pCtx->m_pRespData->Append(
                         pData, pBuf->size() );
+                    if( ERROR( ret  ) )
+                    {
+                        pCtx->SetStatus( ret );
+                        break;
+                    }
                 }
                 else
                 {

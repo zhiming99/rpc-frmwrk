@@ -1171,8 +1171,7 @@ do{ \
             "Error allocaate delegate" ); \
         throw std::runtime_error( strMsg ); \
     } \
-    _pCurMap_->insert( \
-        std::pair< std::string, TaskletPtr >( fname, pTask ) ); \
+    _pCurMap_->insert( { fname, pTask } ); \
     if( ERROR( ret ) ) \
     { \
         std::string strMsg = DebugMsg( ret, \
@@ -1236,8 +1235,7 @@ do{ \
             "Error allocaate delegate" ); \
         throw std::runtime_error( strMsg ); \
     } \
-    _pCurMap_->insert( \
-        std::pair< std::string, TaskletPtr >( fname, pTask ) ); \
+    _pCurMap_->insert( { fname, pTask } ); \
 }while( 0 )
 
 #define ADD_USER_SERVICE_HANDLER_EX( numArgs, f, fname ) \
@@ -3320,7 +3318,6 @@ namespace rpcf
             CIfRetryTask* pTask = ObjPtr( pTaskGrp ); \
             auto tup = std::make_tuple( ARGS ); \
             pTask->SetClientNotify( std::get< _pos >( tup ) ); \
-            TaskletPtr pGrp = ObjPtr( pTask ); \
             ( *pTask )( eventZero ); \
             ret = pTask->GetError(); \
         } \

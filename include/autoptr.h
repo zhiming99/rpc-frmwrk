@@ -81,7 +81,6 @@ class CAutoPtr : public IAutoPtr
         static_assert( std::is_base_of< CObjBase, T >::value,
             "CObjBase must be the super class"  );
 
-        m_pObj = nullptr;
         if( pObj != nullptr )
         {
             m_pObj = pObj;
@@ -89,6 +88,10 @@ class CAutoPtr : public IAutoPtr
             {
                 m_pObj->AddRef();
             }
+        }
+        else
+        {
+            m_pObj = nullptr;
         }
     }
 
@@ -129,10 +132,7 @@ class CAutoPtr : public IAutoPtr
     {
         m_pObj = dynamic_cast< T* >( ( U* )oInitPtr );
         if( m_pObj )
-        {
-            m_pObj->AddRef();
-        }
-        oInitPtr.Clear();
+            oInitPtr.Detach();
     }
 
     ~CAutoPtr()
@@ -295,8 +295,7 @@ class CAutoPtr : public IAutoPtr
             // and the change in ref count is not that
             // much concerned
             m_pObj = const_cast< T* >( pObj );
-            m_pObj->AddRef();
-            rhs.Clear();
+            rhs.Detach();
             return *this;
         }
         std::string strMsg = DebugMsg(

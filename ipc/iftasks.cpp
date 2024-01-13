@@ -1838,19 +1838,81 @@ gint32 CIfTaskGroup::OnCancel(
     return ret;
 }
 
-gint32 CIfTaskGroup::OnComplete( gint32 iRet )
+gint32 CIfTaskGroup::OnComplete( gint32 iRetVal )
 {
-    // CStdRTMutex oTaskLock( GetLock() );
-    // if( IsStopped( GetTaskState() ) )
-    //     return ERROR_STATE;
-
-    // SetTaskState( stateStopping );
-    // oTaskLock.Unlock();
-    gint32 ret = super::OnComplete( iRet );
+    gint32 ret = 0;
+    
     CStdRTMutex oTaskLock( GetLock() );
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
+
+    do{
+        ObjPtr pObj;
+        bool bNotify = false;
+
+        ret = oParams.GetBoolProp(
+            propNotifyClient, bNotify );
+
+        if( ERROR( ret ) )
+        {
+            bNotify = false;
+            ret = 0;
+        }
+
+        TaskGrpPtr pTaskGrp;
+        if( !m_pParentTask.IsEmpty() )
+        {
+            pTaskGrp = ObjPtr( m_pParentTask );
+            m_pParentTask.Clear();
+        }
+
+        oParams.GetObjPtr(
+            propEventSink, pObj );
+
+        oTaskLock.Unlock();
+
+        if( bNotify && IsPending() )
+        {
+            if( !pObj.IsEmpty() )
+            {
+                IEventSink* pEvent = pObj;
+                if( pEvent == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                CObjBase* pObjBase = this;
+                LONGWORD* pData =
+                    ( LONGWORD* ) pObjBase;
+                pEvent->OnEvent( eventTaskComp,
+                    iRetVal, 0, pData );
+            }
+            else
+            { 
+                // a synchronous call, trigger a
+                // semaphore
+                Sem_Post( &m_semWait );
+            }
+        }
+
+        if( !pTaskGrp.IsEmpty() )
+        {
+            pTaskGrp->OnChildComplete(
+                iRetVal, this );
+        }
+
+    }while( 0 );
+
+    // clear all the objPtr we used
+    oTaskLock.Lock();
+    oParams.RemoveProperty( propIfPtr );
+    oParams.RemoveProperty( propIrpPtr );
+    ClearClientNotify();
+
     SetTaskState( stateStopped );
     RemoveProperty( propContext );
-    return ret;
+    return SetError( iRetVal );
 }
 
 bool CIfTaskGroup::exist( TaskletPtr& pTask )

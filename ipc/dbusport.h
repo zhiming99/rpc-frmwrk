@@ -1969,6 +1969,9 @@ class CDBusBusPort : public CGenericBusPortEx
     gint32 RemoveRules(
         const std::string& strRules );
 
+    gint32 FindRules(
+        const std::string& strRules ) const;
+
     gint32 IsDBusSvrOnline(
         const std::string& strDest );
 

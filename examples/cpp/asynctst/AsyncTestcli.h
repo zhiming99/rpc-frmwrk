@@ -21,10 +21,10 @@ class CAsyncTest_CliImpl
     }
 
     inline void NotifyComplete()
-    { Sem_Wait( &m_semWait ); }
+    { Sem_Post( &m_semWait ); }
 
     inline void WaitForComplete()
-    { Sem_Post( &m_semWait ); }
+    { Sem_Wait( &m_semWait ); }
 
     inline void SetError( gint32 iError )
     { m_iError = iError; }

@@ -3195,8 +3195,9 @@ gint32 CRpcStream::GetReadIrpsToComp(
                 guint32 dwResidual = 
                     pBuf->size() - dwRecvSize;
 
-                memmove( pBuf->ptr() + dwRecvSize,
-                    pBuf->ptr(), dwResidual );
+                memmove( pBuf->ptr(),
+                    pBuf->ptr() + dwRecvSize,
+                    dwResidual );
 
                 pBuf->Resize( dwResidual );
                 pPacket->SetPayload( pBuf );
@@ -4458,10 +4459,18 @@ gint32 CRpcListeningSock::Connect()
 gint32 CRpcListeningSock::Start()
 {
     gint32 ret = 0;
+    auto pBus = static_cast
+        < CRpcTcpBusPort* >( m_pParentPort );
+    if( pBus == nullptr )
+        return -EFAULT;
 
     CStdRMutex oSockLock( GetLock() );
     if( GetState() != sockInit )
         return ERROR_STATE;
+
+    ret = pBus->AllocMainLoop( m_pLoop );
+    if( ERROR( ret ) )
+        return ret;
 
     // start listening to the port
     ret = Connect();
@@ -4469,6 +4478,20 @@ gint32 CRpcListeningSock::Start()
         return ret;
 
     SetState( sockStarted );
+    return 0;
+}
+
+gint32 CRpcListeningSock::Stop()
+{
+    gint32 ret = super::Stop();
+    CStdRMutex oSockLock( GetLock() );
+    auto pBus = static_cast
+        < CRpcTcpBusPort* >( m_pParentPort );
+    if( pBus == nullptr )
+        return -EFAULT;
+
+    pBus->ReleaseMainLoop( m_pLoop );
+    m_pLoop.Clear();
     return 0;
 }
 

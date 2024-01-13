@@ -39,7 +39,7 @@ jobs:
     - name: configure
       run: bash ./cfgsel -r
     - name: make
-      run: cat /proc/cpuinfo && make
+      run: cat /proc/cpuinfo && make -j 4
     - name: install
       run: sudo make install
     - name: cleanup for test
@@ -60,5 +60,5 @@ jobs:
     - name: install debian package tools
       run: sudo apt-get -o Acquire::Retries=3 -y install devscripts debhelper
     - name: make debian package
-      run: make deb && cd bldpkg && ls -ltr *.deb
+      run: make -j 4 deb && cd bldpkg && ls -ltr *.deb
 
