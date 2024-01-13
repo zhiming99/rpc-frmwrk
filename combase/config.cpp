@@ -79,10 +79,12 @@ CConfigDb2::~CConfigDb2()
 gint32 CConfigDb2::GetProperty(
     gint32 iProp, BufPtr& pBuf ) const
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr == m_mapProps.end() )
-        return -ENOENT;
-    pBuf = itr->second.ToBuf();
+    gint32 ret = 0;
+    Variant oVar;
+    ret = GetProperty( iProp, oVar );
+    if( ERROR( ret ) )
+        return ret;
+    pBuf = oVar.ToBuf();
     return 0;
 }
 
@@ -114,12 +116,12 @@ gint32 CConfigDb2::SetProperty(
 gint32 CConfigDb2::GetProperty(
     gint32 iProp, CBuffer& oBuf ) const
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr == m_mapProps.end() )
-        return -ENOENT;
-    const Variant& o = itr->second;
+    Variant o;
+    gint32 ret = GetProperty( iProp, o );
+    if( ERROR( ret ) )
+        return ret;
+
     EnumTypeId iType = o.GetTypeId();
-    gint32 ret = 0;
     switch( iType )
     {
     case typeByte: 

@@ -5091,7 +5091,12 @@ gint32 CRpcTcpBridge::CheckHsTimeout(
             ( CObjBase* )pTask );
 
         CStdRMutex oIfLock( GetLock() );
-
+        if( GetState() == stateStopping ||
+            GetState() == stateStopped )
+        {    
+            ret = ERROR_STATE;
+            break;
+        }    
         guint32 dwRetries = 0;
         ret = oCfg.GetIntProp(
             propRetries, dwRetries );

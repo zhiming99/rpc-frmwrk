@@ -1098,8 +1098,6 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
             CRpcRouterBridge* prt,
             TaskletPtr& pTasks )->gint32
         {
-            CRouterSeqTgMgr* pSeqMgr =
-                prt->GetSeqTgMgr();
             if( pCb != nullptr )
             {
                 CIfRetryTask* pRetry = pTasks;
@@ -1323,15 +1321,19 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
                 CIfRetryTask* pRetry = pWorker;
                 pRetry->SetClientNotify( pCb );
             }
+            ObjPtr pSeqMsg = prt->GetSeqTgMgr();
+            if( pSeqMsg.IsEmpty() )
+            {
+                ret = ( *pWorker )( eventZero );
+                return ret;
+            }
             ret = prt->AddSeqTask( pWorker, false );
             if( SUCCEEDED( ret ) )
                 ret = STATUS_PENDING;
             return ret;
         });
 
-        CParamList oIfParams;
         CIoManager* pMgr = GetIoMgr();
-        oIfParams.SetPointer( propIoMgr, pMgr );
 
         CParamList oTaskCfg;
 
@@ -1373,36 +1375,52 @@ gint32 CRpcRouterBridge::BuildStartStopReqFwdrProxy(
             }
             else
             {
-                std::string strObjDesc;
-                CCfgOpenerObj oRouterCfg( this );
-                ret = oRouterCfg.GetStrProp(
-                    propObjDescPath, strObjDesc );
-                if( ERROR( ret ) )
-                    break;
+                CStdRMutex oLock( this->GetLock() );
+                CfgPtr& pCfg = GetCfgCache( clsid(
+                    CRpcReqForwarderProxyImpl ) );
+                CParamList oIfParams;
+                if( pCfg.IsEmpty() )
+                {
+                    pCfg.NewObj();
+                    CParamList oParams( pCfg );
+                    oParams.SetPointer( propIoMgr, pMgr );
 
-                stdstr strRtName;
-                pMgr->GetRouterName( strRtName );
-                ret = oIfParams.SetStrProp(
-                    propSvrInstName, strRtName );
+                    std::string strObjDesc;
+                    CCfgOpenerObj oRouterCfg( this );
+                    ret = oRouterCfg.GetStrProp(
+                        propObjDescPath, strObjDesc );
+                    if( ERROR( ret ) )
+                        break;
 
-                if( ERROR( ret ) )
-                    break;
+                    stdstr strRtName;
+                    pMgr->GetRouterName( strRtName );
+                    ret = oParams.SetStrProp(
+                        propSvrInstName, strRtName );
 
-                oIfParams.SetIntProp( propIfStateClass,
-                    clsid( CIfReqFwdrPrxyState ) );
+                    if( ERROR( ret ) )
+                        break;
 
-                oIfParams.SetPointer(
-                    propIoMgr, pMgr );
+                    oParams.SetIntProp( propIfStateClass,
+                        clsid( CIfReqFwdrPrxyState ) );
 
-                ret = CRpcServices::LoadObjDesc(
-                    strObjDesc,
-                    OBJNAME_REQFWDR,
-                    false,
-                    oIfParams.GetCfg() );
+                    oParams.SetPointer(
+                        propIoMgr, pMgr );
 
-                if( ERROR( ret ) )
-                    break;
+                    DebugPrint( 0,
+                        "Warning, LoadObjDesc is called for %s",
+                        OBJNAME_REQFWDR );
 
+                    ret = CRpcServices::LoadObjDesc(
+                        strObjDesc,
+                        OBJNAME_REQFWDR,
+                        false, pCfg );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                }
+
+                oIfParams.Append( pCfg );
                 oIfParams.SetObjPtr(
                     propRouterPtr, ObjPtr( this ) );
 
@@ -1645,6 +1663,27 @@ gint32 CRpcRouterBridge::RefreshReqLimit()
     return ret;
 }
 
+CfgPtr& CRpcRouterBridge::GetCfgCache(
+    EnumClsid iClsid )
+{
+    if( clsid( CRpcTcpBridgeImpl ) ==
+        iClsid )
+        return m_pBridge;
+    else if( clsid( CRpcTcpBridgeAuthImpl ) ==
+        iClsid )
+        return m_pBridgeAuth;
+    else if( clsid( CRpcTcpBridgeProxyImpl ) ==
+        iClsid )
+        return m_pBridgeProxy;
+    else if( clsid( CRpcReqForwarderProxyImpl ) ==
+        iClsid )
+        return m_pReqProxy;
+    string strMsg = DebugMsg( 0,
+        "Error invalid class id "
+        "GetCfgCache" );
+    throw runtime_error( strMsg );
+}
+
 gint32 CRouterOpenBdgePortTask::CreateInterface(
     InterfPtr& pIf )
 {
@@ -1664,36 +1703,14 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
         if( ERROR( ret ) )
             break;
 
-        CCfgOpenerObj oRouterCfg( pRouter );
-
-        bool bServer = true;
-        oCfg.GetBoolProp( 0, bServer );
-
-        std::string strObjDesc;
-
-        ret = oRouterCfg.GetStrProp(
-            propObjDescPath, strObjDesc );
-        if( ERROR( ret ) )
-            break;
-
-        CParamList oParams;
-        string strRtName;
-
-        ret = oParams.CopyProp(
-            propConnParams, this );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oParams.CopyProp(
-            propSvrInstName, pRouter );
-        if( ERROR( ret ) )
-            break;
-
         IConfigDb* pConnParams = nullptr;
-        ret = oParams.GetPointer(
+        ret = oCfg.GetPointer(
             propConnParams, pConnParams );
         if( ERROR( ret ) )
             break;
+
+        bool bServer = true;
+        oCfg.GetBoolProp( 0, bServer );
 
         CConnParams oConn( pConnParams );
         bool bAuth = false;
@@ -1702,6 +1719,62 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
             bAuth = ( pRouter->HasAuth() &&
                 oConn.HasAuth() );
         }
+
+        CfgPtr* ppCfg;
+        EnumClsid iClsid = clsid( Invalid );
+        if( bServer && bAuth )
+        {
+            iClsid =
+                clsid( CRpcTcpBridgeAuthImpl );
+        }
+        else if( bServer )
+        {
+            iClsid =
+                clsid( CRpcTcpBridgeImpl );
+        }
+        else
+        {
+            iClsid =
+                clsid( CRpcTcpBridgeProxyImpl );
+        }
+
+        CCfgOpenerObj oRouterCfg( pRouter );
+
+        std::string strObjDesc;
+
+        ret = oRouterCfg.GetStrProp(
+            propObjDescPath, strObjDesc );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( pRouter->GetLock() );
+        CfgPtr& pCfg = pRouter->GetCfgCache( iClsid );
+        if( !pCfg.IsEmpty() )
+        {
+            CParamList oParams( ( IConfigDb* )pCfg );
+            ret = oParams.SetPointer(
+                propConnParams, pConnParams );
+            if( ERROR( ret ) )
+                break;
+            if( bServer )
+                oParams.CopyProp( propPortId, this );
+            ret = pIf.NewObj( iClsid, pCfg );
+            break;
+        }
+
+        pCfg.NewObj();
+        CParamList oParams( ( IConfigDb* )pCfg );
+        string strRtName;
+
+        ret = oParams.SetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.CopyProp(
+            propSvrInstName, pRouter );
+        if( ERROR( ret ) )
+            break;
 
         std::string strObjName;
         if( bAuth )
@@ -1722,8 +1795,6 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
 
         oParams.SetPointer(
             propRouterPtr, pRouter );
-
-        EnumClsid iClsid = clsid( Invalid );
 
         if( bServer )
         {
@@ -1768,7 +1839,6 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
             iClsid =
                 clsid( CRpcTcpBridgeProxyImpl );
         }
-
         ret = pIf.NewObj(
             iClsid, oParams.GetCfg() );
 
@@ -2117,23 +2187,13 @@ gint32 CRpcRouterBridge::OnRmtSvrEvent(
                     break;
             }
 
-            ObjPtr pObj;
             ret = DEFER_IFCALLEX_NOSCHED2(
-                0, pDeferTask,
-                ObjPtr( this ),
+                0, pDeferTask, ObjPtr( this ),
                 &CRpcRouterBridge::OnRmtSvrOnline,
-                pObj, pEvtCtx, hPort );
+                nullptr, pEvtCtx, hPort );
 
             if( ERROR( ret ) )
                 break;
-
-            CRouterSeqTgMgr* pSeqMgr =
-                this->GetSeqTgMgr();
-            if( pSeqMgr == nullptr )
-            {
-                ret = -EFAULT;
-                break;
-            }
 
             ret = AddStartTask( dwPortId, pDeferTask );
             if( ERROR( ret ) )
@@ -2333,23 +2393,22 @@ gint32 CRpcRouterBridge::OnRmtSvrOnline(
             ret = ( *pTask )( eventZero );
             if( ret != STATUS_PENDING )
             {
-                // Issue #46
                 // immediate return
                 // pCallback->OnEvent(
-                //    eventTaskComp, ret, 0, nullptr );
+                //     eventTaskComp, ret, 0, nullptr );
             }
         }
 
     }while( 0 );
     if( bRemove && dwPortId > 0 )
     {
-        // Issue #46
         // pCallback->OnEvent(
-        //    eventTaskComp, ret, 0, nullptr );
+        //     eventTaskComp, ret, 0, nullptr );
         // remove the seqtgmgr slot
-        TaskletPtr pEmpty;
+        TaskletPtr pDummy;
+        pDummy.NewObj( clsid( CIfDummyTask ) );
         this->AddStopTask( nullptr,
-            dwPortId, pEmpty );
+            dwPortId, pDummy );
     }
     return ret;
 }
@@ -3464,7 +3523,7 @@ gint32 CRpcRouterBridge::RunEnableEventTask(
         oParams[ propNotifyClient ] = true;
 
         ret = pTransGrp.NewObj(
-            clsid( CIfTransactGroup ),
+            clsid( CIfTaskGroup ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
@@ -3569,7 +3628,7 @@ gint32 CRpcRouterBridge::BuildDisEvtTaskGrp(
         }
 
         ret = pTaskGrp.NewObj(
-            clsid( CIfTransactGroup ),
+            clsid( CIfTaskGroup ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
