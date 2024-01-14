@@ -120,6 +120,4 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
         return true
     }
 
-    ToString()
-
 }
