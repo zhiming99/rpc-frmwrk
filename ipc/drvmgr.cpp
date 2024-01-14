@@ -51,11 +51,12 @@ static gint32 SimpleMergeCfg(
         std::vector< ARR_ATTR > vecArrs =
             { { JSON_ATTR_MODULES, JSON_ATTR_MODNAME },
             { JSON_ATTR_PORTS, JSON_ATTR_PORTCLASS },
-            { JSON_ATTR_DRIVERS, JSON_ATTR_DRVNAME } };
+            { JSON_ATTR_DRIVERS, JSON_ATTR_DRVNAME },
+            { JSON_ATTR_ARCH, JSON_ATTR_NUM_CORE },
+            };
         for( auto elem : vecArrs )
         {
-            if( !vSrc.isMember( elem.first ) ||
-                !vSrc[ elem.first ].isArray() )
+            if( !vSrc.isMember( elem.first ) )
                 continue;
             const Json::Value& oSrc = vSrc[ elem.first ];
             if( !vDest.isMember( elem.first ) ||

@@ -147,10 +147,8 @@ class CStartStopSafeBusPort :
         do{
             CStdRMutex oLock( this->GetLock() ); 
             PortPtr pPort( pChildPort );
-            std::map< PortPtr, TaskletPtr >::iterator
-                itr = this->m_mapPort2TaskGrp.find(
-                    PortPtr( pPort ) );
-            if( itr == this->m_mapPort2TaskGrp.end() )
+            auto itr = this->m_mapPort2TaskGrp.find( pPort );
+            if( itr == this->m_mapPort2TaskGrp.cend() )
             {
                 ret = -ENOENT;
                 break;

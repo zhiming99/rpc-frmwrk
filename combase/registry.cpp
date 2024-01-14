@@ -321,6 +321,7 @@ gint32 CRegistry::ListDir(
     vector<string>& vecContents ) const
 {
     gint32 ret = 0;
+    CStdRMutex a( m_oLock );
     if( m_pCurDir == NULL )
     {
         ret = -EFAULT;
@@ -328,7 +329,6 @@ gint32 CRegistry::ListDir(
     else
     {
         vecContents.clear();
-        CStdRMutex a( m_oLock );
         auto itr = m_pCurDir->m_mapChilds.begin();
 
         while( itr != m_pCurDir->m_mapChilds.end() )
@@ -611,11 +611,11 @@ gint32 CRegistry::GetProperty(
 {
 
     gint32 ret = 0;
-    if( m_pCurDir == nullptr )
-        return -EFAULT;
-
     CStdRMutex a(
         const_cast< stdrmutex& > (m_oLock ) );
+
+    if( m_pCurDir == nullptr )
+        return -EFAULT;
 
     ret = m_pCurDir->GetProperty(
         iProp, oVal );
@@ -629,10 +629,11 @@ gint32 CRegistry::SetProperty(
 {
     gint32 ret = 0;
 
+    CStdRMutex a( m_oLock );
+
     if( m_pCurDir == nullptr )
         return -EFAULT;
 
-    CStdRMutex a( m_oLock );
     ret = m_pCurDir->SetProperty(
         iProp, oVal );
 

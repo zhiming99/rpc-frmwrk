@@ -253,6 +253,7 @@ IoRequestPacket::IoRequestPacket() :
     m_IrpThrdPtr( nullptr ),
     m_iTimerId( -1 ),
     m_pMgr( nullptr ),
+    m_dwTid( rpcf::GetTid() ),
     m_dwCurPos( 0 ),
     m_pMasterIrp( nullptr ),
     m_wMinSlaves( 0 )
@@ -662,7 +663,7 @@ bool IoRequestPacket::CanComplete()
     if( IsNoComplete() )
         return false;
 
-    return ( m_dwTid != GetTid()
+    return ( m_dwTid != rpcf::GetTid()
         || IsPending() );
 }
 

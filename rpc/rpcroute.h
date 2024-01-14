@@ -2456,6 +2456,11 @@ class CRpcRouterBridge : public CRpcRouter
     ObjPtr m_pLBGrp;
     ObjPtr m_pSeqTgMgr;
 
+    CfgPtr m_pBridge;
+    CfgPtr m_pBridgeAuth;
+    CfgPtr m_pBridgeProxy;
+    CfgPtr m_pReqProxy;
+
     gint32 OnRmtSvrOnline(
         IEventSink* pCallback,
         IConfigDb* pEvtCtx,
@@ -2738,6 +2743,8 @@ class CRpcRouterBridge : public CRpcRouter
 
         return RemoveProxy( strDest, pIf );
     }
+
+    CfgPtr& GetCfgCache( EnumClsid );
 
     gint32 AddToNodePidMap(
         const std::string& strNode,

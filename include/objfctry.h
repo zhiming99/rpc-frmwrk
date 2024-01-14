@@ -82,16 +82,16 @@ class IClassFactory : public CObjBase
     virtual gint32 CreateInstance( 
         EnumClsid clsid,
         CObjBase*& pObj,
-        const IConfigDb* pCfg ) = 0;
+        const IConfigDb* pCfg ) const = 0;
     
     virtual const char* GetClassName(
-        EnumClsid iClsid ) = 0;
+        EnumClsid iClsid ) const = 0;
 
     virtual EnumClsid GetClassId(
-        const char* szClassName ) = 0;
+        const char* szClassName ) const = 0;
 
     virtual void EnumClassIds(
-        std::vector< EnumClsid >& vecClsIds ) = 0;
+        std::vector< EnumClsid >& vecClsIds ) const = 0;
 };
 
 struct cmp_str
@@ -168,19 +168,19 @@ class CClassFactory : public IClassFactory
         m_oMapObjMakers.clear();
     }
 
-    virtual gint32 CreateInstance( 
+    gint32 CreateInstance( 
         EnumClsid clsid,
         CObjBase*& pObj,
-        const IConfigDb* pCfg );
+        const IConfigDb* pCfg ) const override;
     
-    virtual const char* GetClassName(
-        EnumClsid iClsid );
+    const char* GetClassName(
+        EnumClsid iClsid ) const override;
 
-    virtual EnumClsid GetClassId(
-        const char* szClassName );
+    EnumClsid GetClassId(
+        const char* szClassName ) const override;
 
-    virtual void EnumClassIds(
-        std::vector< EnumClsid >& vecClsIds );
+    void EnumClassIds(
+        std::vector< EnumClsid >& vecClsIds ) const override;
 };
 
 typedef CAutoPtr< clsid( Invalid ), IClassFactory >    FactoryPtr;
@@ -203,13 +203,13 @@ struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
     gint32 CreateInstance( 
         EnumClsid clsid,
         CObjBase*& pObj,
-        const IConfigDb* pCfg );
+        const IConfigDb* pCfg ) const;
 
     const char* GetClassName(
-        EnumClsid iClsid );
+        EnumClsid iClsid ) const;
 
     EnumClsid GetClassId(
-        const char* pszClassName );
+        const char* pszClassName ) const;
 
     gint32 AddFactory(
         const FactoryPtr& pFactory, void* hDll );
@@ -218,7 +218,7 @@ struct CClassFactories: public CStlVector< ELEM_CLASSFACTORIES >
         FactoryPtr& pFactory );
 
     void EnumClassIds(
-        std::vector< EnumClsid >& vecClsIds );
+        std::vector< EnumClsid >& vecClsIds ) const;
 
     void Clear();
 

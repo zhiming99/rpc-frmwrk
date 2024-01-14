@@ -3066,12 +3066,9 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
         CCfgOpener oResp(
             ( IConfigDb* )pObj );
 
-        if( oResp.exist( propReturnValue ) )
-        {
-            oResp.GetIntProp( propReturnValue,
-                ( guint32& )iRetVal );
-        }
-        else
+        ret = oResp.GetIntProp( propReturnValue,
+            ( guint32& )iRetVal );
+        if( ERROR( ret ) )
         {
             if( SUCCEEDED( iRetVal ) )
                 iRetVal = -EBADMSG;
@@ -3081,8 +3078,8 @@ gint32 CReqFwdrForwardRequestTask::OnTaskComplete(
         {
             DebugPrint( iRetVal,
                 "No response message" );
-            oResp[ propReturnValue ] = -EFAULT;
-            ret = -EFAULT;
+            oResp[ propReturnValue ] = -ENOMSG;
+            ret = -ENOMSG;
         }
 
         auto psc = dynamic_cast
@@ -4869,35 +4866,10 @@ gint32 CRpcReqForwarderProxy::InitUserFuncs()
 
 gint32 CRpcReqForwarderProxy::RebuildMatches()
 {
-    do{
-        // add interface id to all the matches
-        CCfgOpenerObj oIfCfg( this );
-        guint32 dwQueSize = MAX_DBUS_REQS;
 
-        // empty all the matches, the interfaces will
-        // be added to the vector on the remote req.
-        m_vecMatches.clear();
-
-        // set the interface id for this match
-        CCfgOpenerObj oMatchCfg(
-            ( CObjBase* )m_pIfMatch );
-
-        oMatchCfg.SetBoolProp(
-            propDummyMatch, true );
-
-        oMatchCfg.SetIntProp(
-            propIid, GetClsid() );
-
-        dwQueSize = MAX_DBUS_REQS;
-
-        oMatchCfg.SetIntProp(
-            propQueSize, dwQueSize );
-
-        // also append the match for master interface
-        m_vecMatches.push_back( m_pIfMatch );
-
-    }while( 0 );
-
+    // empty all the matches, the interfaces will
+    // be added to the vector on the remote req.
+    m_vecMatches.clear();
     return 0;
 }
 
@@ -4909,21 +4881,20 @@ gint32 CRpcReqForwarderProxy::AddInterface(
 
     gint32 ret = 0;
     do{
-        MatchPtr ptrMatch( pMatch );
+        MatchPtr ptrCopy;
+        ret = ptrCopy.NewObj(
+            clsid( CRouterRemoteMatch ) );
+        if( ERROR( ret ) )
+            break;
+        CRouterRemoteMatch* pCopy = ptrCopy;
+        pCopy->CopyMatch( pMatch);
         CStdRMutex oIfLock( GetLock() );
-        std::map< MatchPtr, IFREF >::iterator
-            itr = m_mapMatchRefs.find( ptrMatch );
+        auto retpair = m_mapMatchRefs.insert(
+            { ptrCopy, IFREF( 0, 1 ) } ); 
 
-        if( itr == m_mapMatchRefs.end() )
+        if( !retpair.second )
         {
-            m_mapMatchRefs[ ptrMatch ] =
-                IFREF(m_vecMatches.size(), 1 );
-
-            m_vecMatches.push_back( ptrMatch );
-        }
-        else
-        {
-            ++( itr->second.second );
+            ++( retpair.first->second.second );
             ret = EEXIST;
         }
 
@@ -4945,67 +4916,17 @@ gint32 CRpcReqForwarderProxy::RemoveInterface(
         std::map< MatchPtr, IFREF >::iterator
             itr = m_mapMatchRefs.find( ptrMatch );
 
-        if( itr != m_mapMatchRefs.end() )
+        if( itr == m_mapMatchRefs.end() )
+            break;
+
+        --( itr->second.second );
+        if( itr->second.second <= 0 )
         {
-            --( itr->second.second );
-            if( itr->second.second <= 0 )
-            {
-                auto matchPair = itr->second;
-                m_mapMatchRefs.erase( ptrMatch );
-                CMessageMatch* pcMatch = ptrMatch;
-                stdstr strMatch = pcMatch->ToString();
-                bool bFound = false;
-
-                if( m_vecMatches.empty() )
-                {
-                    DebugPrint( ret, "match 0x%llx not found2, %s",
-                        pMatch, strMatch.c_str() );
-                    break;
-                }
-
-                auto it2 = m_vecMatches.end();
-                if( m_vecMatches.size() <= matchPair.first )
-                {
-                    it2 = m_vecMatches.end() - 1;
-                }
-                else
-                {
-                    it2 = m_vecMatches.begin() + matchPair.first;
-                }
-                while( it2 != m_vecMatches.begin() )
-                {
-                    stdstr&& strVal = ( *it2 )->ToString();
-                    if( strVal == strMatch )
-                    {
-                        m_vecMatches.erase( it2 );
-                        bFound = true;
-                        break;
-                    }
-                    it2--;
-                }
-
-                if( bFound )
-                    break;
-
-                if( it2 == m_vecMatches.begin() )
-                {
-                    stdstr&& strVal = ( *it2 )->ToString();
-                    if( strVal == strMatch )
-                    {
-                        m_vecMatches.erase( it2 );
-                        bFound = true;
-                        break;
-                    }
-                }
-
-                if( !bFound )
-                    DebugPrint( ret, "match 0x%llx not found, %s",
-                        pMatch, strMatch.c_str() );
-            }
-            else
-            {
-                ret = EEXIST;
-            }
+            m_mapMatchRefs.erase( itr );
+        }
+        else
+        {
+            ret = EEXIST;
         }
 
     }while( 0 );
@@ -5017,20 +4938,8 @@ void CRpcReqForwarderProxy::GetActiveInterfaces(
     std::vector< MatchPtr >& vecMatches ) const
 {
     CStdRMutex oIfLock( GetLock() );
-    for( auto& elem : m_vecMatches )
-    {
-        IMessageMatch* pMatch = elem; 
-        CCfgOpenerObj oMatch( pMatch );
-        bool bDummy = false;
-
-        gint32 ret = oMatch.GetBoolProp(
-            propDummyMatch, bDummy );
-
-        if( SUCCEEDED( ret ) && bDummy )
-            continue;
-
-        vecMatches.push_back( elem );
-    }
+    for( auto& elem : m_mapMatchRefs )
+        vecMatches.push_back( elem.first );
     return;
 }
 
@@ -5039,21 +4948,7 @@ gint32 CRpcReqForwarderProxy::GetActiveIfCount() const
     gint32 iCount = 0;
 
     CStdRMutex oIfLock( GetLock() );
-    for( auto elem : m_vecMatches )
-    {
-        IMessageMatch* pMatch = elem; 
-        CCfgOpenerObj oMatch( pMatch );
-        bool bDummy = false;
-
-        gint32 ret = oMatch.GetBoolProp(
-            propDummyMatch, bDummy );
-
-        if( SUCCEEDED( ret ) && bDummy )
-            continue;
-
-        ++iCount;
-    }
-    return iCount;
+    return m_mapMatchRefs.size();
 }
 
 gint32 CRpcReqForwarderProxy::OnRmtSvrEvent(

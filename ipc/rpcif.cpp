@@ -3933,16 +3933,27 @@ gint32 CRpcServices::SendMethodCall(
 FUNC_MAP* CRpcServices::GetFuncMap(
     EnumClsid iIfId )
 {
+    const CRpcServices* pThis = this;
+    auto pRet =
+        pThis->GetFuncMap( iIfId );
+    FUNC_MAP* pMap =
+        const_cast< FUNC_MAP* >( pRet );
+    return pMap;
+}
+
+const FUNC_MAP* CRpcServices::GetFuncMap(
+    EnumClsid iIfId ) const
+{
     EnumClsid iEffectiveId = iIfId;
     if( iIfId == clsid( Invalid ) )
         iEffectiveId = GetClsid();
 
-    FUNC_MAP* pMap = nullptr;
+    const FUNC_MAP* pMap = nullptr;
 
-    std::map< gint32, FUNC_MAP >::iterator itr = 
+    auto itr = 
         m_mapFuncs.find( iEffectiveId );
 
-    if( itr == m_mapFuncs.end() )
+    if( itr == m_mapFuncs.cend() )
         return nullptr;
 
     pMap = &itr->second;
@@ -3974,6 +3985,23 @@ gint32 CRpcServices::SetFuncMap(
     return 0;
 }
 
+const PROXY_MAP* CRpcServices::GetProxyMap(
+    EnumClsid iIfId ) const
+{
+    EnumClsid iEffectiveId = iIfId;
+    if( iIfId == clsid( Invalid ) )
+        iEffectiveId = GetClsid();
+
+    auto itr =
+        m_mapProxyFuncs.find( iEffectiveId );
+
+    if( itr == m_mapProxyFuncs.cend() )
+        return nullptr;
+
+    auto pMap = &itr->second;
+    return pMap;
+}
+
 PROXY_MAP* CRpcServices::GetProxyMap(
     EnumClsid iIfId )
 {
@@ -3981,13 +4009,10 @@ PROXY_MAP* CRpcServices::GetProxyMap(
     if( iIfId == clsid( Invalid ) )
         iEffectiveId = GetClsid();
 
-    std::map< gint32, PROXY_MAP >::iterator itr =
-        m_mapProxyFuncs.find( iEffectiveId );
-
-    if( itr == m_mapProxyFuncs.end() )
-        return nullptr;
-
-    PROXY_MAP* pMap = &itr->second;
+    const CRpcServices* pThis = this;
+    auto pRet = pThis->GetProxyMap( iIfId );
+    PROXY_MAP* pMap =
+        const_cast< PROXY_MAP* >( pRet );
     return pMap;
 }
 
@@ -4019,22 +4044,21 @@ gint32 CRpcServices::SetProxyMap(
 gint32 CRpcServices::GetDelegate(
     const std::string& strFunc,
     TaskletPtr& pFunc,
-    EnumClsid iIfId )
+    EnumClsid iIfId ) const
 {
     EnumClsid iEffectiveId = iIfId;
     if( iIfId == clsid( Invalid ) )
         iEffectiveId = GetClsid();
 
-    FUNC_MAP* pMap =
+    const FUNC_MAP* pMap =
         GetFuncMap( iEffectiveId );
 
     if( pMap == nullptr )
         return -ERANGE;
 
-    FUNC_MAP::iterator itrFunc =
-        pMap->find( strFunc );
+    auto itrFunc = pMap->find( strFunc );
 
-    if( itrFunc == pMap->end() )
+    if( itrFunc == pMap->cend() )
         return -ERANGE;
 
     pFunc = itrFunc->second;
@@ -4044,22 +4068,21 @@ gint32 CRpcServices::GetDelegate(
 gint32 CRpcServices::GetProxy(
     const std::string& strFunc,
     ObjPtr& pProxy,
-    EnumClsid iIfId )
+    EnumClsid iIfId ) const
 {
     EnumClsid iEffectiveId = iIfId;
     if( iIfId == clsid( Invalid ) )
         iEffectiveId = GetClsid();
 
-    PROXY_MAP* pMap =
+    auto pMap =
         GetProxyMap( iEffectiveId );
 
     if( pMap == nullptr )
         return -ERANGE;
 
-    PROXY_MAP::iterator itrFunc =
-        pMap->find( strFunc );
+    auto itrFunc = pMap->find( strFunc );
 
-    if( itrFunc == pMap->end() )
+    if( itrFunc == pMap->cend() )
         return -ERANGE;
 
     pProxy = itrFunc->second;

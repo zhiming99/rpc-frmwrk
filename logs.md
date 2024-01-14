@@ -1,5 +1,14 @@
 ---
-[`Wed Nov 29  2023 10:55:41 PM Beijing`]   
+[`Sat Jan 13 2024 10:43:32 PM Beijing`]   
+1. Merged the bugfix PR to the master branch.
+2. Next i will build a new release `0.7.0` for this major bug-fix commit.
+3. And then lets resume our development of Javascript support library.
+
+[`Sun Dec 03 2023 01:59:06 PM Beijing`]   
+1. Now merged Feature-Rate-Limiter branch to the master branch.
+2. Next I will add a Javascript Support library, which will be the bed-rock for Javascript language support.
+
+[`Wed Nov 29 2023 10:55:41 PM Beijing`]   
 1. We have almost complete the BPS rate-limter. There are still some tests to go.
 2. Next we will have add the QPS rate-limiter. It will take very short time to get it done.
  

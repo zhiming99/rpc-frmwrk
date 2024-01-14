@@ -7146,7 +7146,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             CCOUT << "case 'p':";
             INDENT_UPL;
             Wa( "{" );
-            Wa( "    std::string g_strPortNum = optarg;" );
+            Wa( "    g_strPortNum = optarg;" );
             Wa( "    guint32 dwPort = strtoul(");
             Wa( "        g_strPortNum.c_str(), nullptr, 10 );" );
             Wa( "    if( dwPort > 65535 || dwPort < 1024 )" );

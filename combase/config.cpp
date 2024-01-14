@@ -79,24 +79,20 @@ CConfigDb2::~CConfigDb2()
 gint32 CConfigDb2::GetProperty(
     gint32 iProp, BufPtr& pBuf ) const
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr == m_mapProps.end() )
-        return -ENOENT;
-    pBuf = itr->second.ToBuf();
+    gint32 ret = 0;
+    Variant oVar;
+    ret = GetProperty( iProp, oVar );
+    if( ERROR( ret ) )
+        return ret;
+    pBuf = oVar.ToBuf();
     return 0;
 }
 
 gint32 CConfigDb2::SetProperty(
     gint32 iProp, const BufPtr& pBuf )
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr != m_mapProps.end() )
-        itr->second = *pBuf;
-    else
-    {
-        m_mapProps[ iProp ] = *pBuf;
-    }
-    return 0;
+    Variant oVar( *pBuf );
+    return SetProperty( iProp, oVar );
 }
 
 // get a reference to variant from the config db
@@ -120,12 +116,12 @@ gint32 CConfigDb2::SetProperty(
 gint32 CConfigDb2::GetProperty(
     gint32 iProp, CBuffer& oBuf ) const
 {
-    auto itr = m_mapProps.find( iProp );
-    if( itr == m_mapProps.end() )
-        return -ENOENT;
-    const Variant& o = itr->second;
+    Variant o;
+    gint32 ret = GetProperty( iProp, o );
+    if( ERROR( ret ) )
+        return ret;
+
     EnumTypeId iType = o.GetTypeId();
-    gint32 ret = 0;
     switch( iType )
     {
     case typeByte: 
@@ -168,8 +164,8 @@ gint32 CConfigDb2::GetProperty(
 gint32 CConfigDb2::SetProperty(
     gint32 iProp, const CBuffer& oBuf )
 {
-    m_mapProps[ iProp ] = oBuf;
-    return 0;
+    Variant oVar( oBuf );
+    return SetProperty( iProp, oVar );
 }
 
 gint32 CConfigDb2::GetPropertyType(
@@ -226,7 +222,6 @@ gint32 CConfigDb2::Serialize(
     struct SERI_HEADER oHeader;
     gint32 ret = 0;
 
-    auto itr = m_mapProps.cbegin();
     oHeader.dwClsid = clsid( CConfigDb2 );
     oHeader.dwCount = m_mapProps.size();
     oHeader.bVersion = 2;
@@ -247,7 +242,7 @@ gint32 CConfigDb2::Serialize(
     pLoc += sizeof( oHeader );
     oHeader.ntoh();
 
-    itr = m_mapProps.begin();
+    auto itr = m_mapProps.cbegin();
 
     char* pEnd = oBuf.ptr() + oBuf.size();
 
@@ -583,6 +578,7 @@ gint32 CConfigDb2::Deserialize(
                     }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
+                    pLoc += sizeof( guint32 );
                     if( pLoc + len > pEnd )
                     {
                         ret = -E2BIG;
@@ -594,7 +590,7 @@ gint32 CConfigDb2::Deserialize(
                         break;
 
                     oVar = ( DBusMessage* )pMsg; 
-                    pLoc += len + sizeof( guint32 );
+                    pLoc += len;
                     break;
                 }
             case typeObj:
@@ -708,6 +704,46 @@ gint32 CConfigDb2::EnumProperties(
     std::vector< gint32 >& vecProps ) const 
 {
     return GetPropIds( vecProps );
+}
+
+// get a reference to variant from the config db
+const Variant& CConfigDb2::GetProperty( gint32 iProp ) const
+{
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.cend() )
+    {
+        stdstr strMsg = DebugMsg(
+            -ENOENT, "no such element" );
+        throw std::out_of_range( strMsg );
+    }
+    return itr->second;
+}
+
+Variant& CConfigDb2::GetProperty( gint32 iProp )
+{ return m_mapProps[ iProp ]; }
+
+const Variant* CConfigDb2::GetPropertyPtr( gint32 iProp ) const
+{
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.cend() )
+        return nullptr;
+    return &itr->second;
+}
+
+Variant* CConfigDb2::GetPropertyPtr( gint32 iProp )
+{
+    auto itr = m_mapProps.find( iProp );
+    if( itr == m_mapProps.end() )
+        return nullptr;
+    return &itr->second;
+}
+
+gint32 CConfigDb2::size() const
+{ return m_mapProps.size(); }
+
+bool CConfigDb2::exist( gint32 iProp ) const
+{ 
+    return m_mapProps.cend() != m_mapProps.find( iProp ) ;
 }
 
 }

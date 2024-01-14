@@ -143,36 +143,10 @@ class CConfigDb2 : public IConfigDb
         gint32 iProp, const Variant& oVar ) override;
 
     // get a reference to variant from the config db
-    const Variant& GetProperty( gint32 iProp ) const
-    {
-        auto itr = m_mapProps.find( iProp );
-        if( itr == m_mapProps.cend() )
-        {
-            stdstr strMsg = DebugMsg(
-                -ENOENT, "no such element" );
-            throw std::out_of_range( strMsg );
-        }
-        return itr->second;
-    }
-
-    Variant& GetProperty( gint32 iProp )
-    { return m_mapProps[ iProp ]; }
-
-    const Variant* GetPropertyPtr( gint32 iProp ) const
-    {
-        auto itr = m_mapProps.find( iProp );
-        if( itr == m_mapProps.cend() )
-            return nullptr;
-        return &itr->second;
-    }
-
-    Variant* GetPropertyPtr( gint32 iProp )
-    {
-        auto itr = m_mapProps.find( iProp );
-        if( itr == m_mapProps.end() )
-            return nullptr;
-        return &itr->second;
-    }
+    const Variant& GetProperty( gint32 iProp ) const;
+    Variant& GetProperty( gint32 iProp );
+    const Variant* GetPropertyPtr( gint32 iProp ) const;
+    Variant* GetPropertyPtr( gint32 iProp );
 
     gint32 GetPropIds( std::vector<gint32>& vecIds ) const;
 
@@ -180,13 +154,8 @@ class CConfigDb2 : public IConfigDb
     gint32 Serialize( CBuffer& oBuf ) const override;
     gint32 Deserialize( const char* oBuf, guint32 dwSize ) override;
 
-    gint32 size() const
-    { return m_mapProps.size(); }
-
-    bool exist( gint32 iProp ) const
-    { 
-        return m_mapProps.cend() != m_mapProps.find( iProp ) ;
-    }
+    gint32 size() const;
+    bool exist( gint32 iProp ) const;
 
     const IConfigDb& operator=( const IConfigDb& oCfg );
     gint32 Clone( const IConfigDb& oCfg );
@@ -1156,17 +1125,13 @@ class CCfgDbOpener< IConfigDb >
         }
         do{
             auto psrc = CCFGDB2( pSrcCfg );
-            const Variant* p =
-                psrc->GetPropertyPtr( iSrcProp );
-            if( p == nullptr )
-            {
-                ret = -ENOENT;
+            Variant p;
+            ret = psrc->GetProperty( iSrcProp, p );
+            if( ERROR( ret ) )
                 break;
-            }
 
             auto pdst = CFGDB2( m_pCfg );
-            Variant& odst = pdst->GetProperty( iProp );
-            odst = *p;
+            ret = pdst->SetProperty( iProp, p );
 
         }while( 0 );
         return ret;

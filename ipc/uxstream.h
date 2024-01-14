@@ -1426,38 +1426,8 @@ class CUnixSockStmProxy :
         super( pCfg )
     { SetClassId( clsid( CUnixSockStmProxy ) ); }
 
-    virtual gint32 OnPostStart(
-        IEventSink* pCallback )
-    {
-        gint32 ret = 0;
-        do{
-            ret = super::OnPostStart( pCallback );
-            if( ERROR( ret ) )
-                break;
-
-            CParamList oParams;
-            CIoManager* pMgr = GetIoMgr();
-            oParams.SetPointer( propIfPtr, this );
-            oParams.SetPointer( propIoMgr, pMgr );
-            oParams.CopyProp(
-                propKeepAliveSec, this );
-
-            TaskletPtr pTask;
-            gint32 ret = pTask.NewObj(
-                clsid( CIfDummyTask ),
-                oParams.GetCfg() );
-
-            if( ERROR( ret ) )
-                break;
-
-            ret = SendPingPong( tokPing, pTask );
-            if( ret == STATUS_PENDING )
-                ret = 0;
-
-        }while( 0 );
-
-        return ret;
-    }
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
 };
 
 class CUnixSockStmServer : 

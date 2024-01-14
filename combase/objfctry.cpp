@@ -54,7 +54,7 @@ gint32 UnloadLibrary( void* hDll )
 gint32 CClassFactory::CreateInstance( 
     EnumClsid iClsid,
     CObjBase*& pObj,
-    const IConfigDb* pCfg )
+    const IConfigDb* pCfg ) const
 {
     gint32 ret = 0;
 
@@ -81,9 +81,9 @@ gint32 CClassFactory::CreateInstance(
 }
 
 const char* CClassFactory::GetClassName(
-    EnumClsid iClsid )
+    EnumClsid iClsid ) const
 {
-    ID2NAME_MAP::iterator itr = 
+    ID2NAME_MAP::const_iterator itr = 
         m_oMapId2Name.find( iClsid );
 
     if( itr == m_oMapId2Name.end() )
@@ -93,12 +93,12 @@ const char* CClassFactory::GetClassName(
 }
 
 EnumClsid CClassFactory::GetClassId(
-    const char* szClassName )
+    const char* szClassName ) const
 {
     if( szClassName == nullptr )
         return clsid( Invalid );
 
-    NAME2ID_MAP::iterator itr = 
+    NAME2ID_MAP::const_iterator itr = 
         m_oMapName2Id.find( szClassName );
 
     if( itr == m_oMapName2Id.end() )
@@ -108,11 +108,11 @@ EnumClsid CClassFactory::GetClassId(
 }
 
 void CClassFactory::EnumClassIds(
-    std::vector< EnumClsid >& vecClsIds )
+    std::vector< EnumClsid >& vecClsIds ) const
 {
-    for( auto itr : m_oMapId2Name )
+    for( auto elem : m_oMapId2Name )
     {
-        vecClsIds.push_back( itr.first );
+        vecClsIds.push_back( elem.first );
     }
     return;
 }
@@ -137,14 +137,14 @@ CClassFactories::~CClassFactories()
 gint32 CClassFactories::CreateInstance( 
     EnumClsid clsid,
     CObjBase*& pObj,
-    const IConfigDb* pCfg )
+    const IConfigDb* pCfg ) const
 {
     gint32 ret = -ENOTSUP;
 
     // CStdRMutex oLock( GetLock() );
     // we are exposed to concurrent condition
-    MyType& vecFactories = ( *this )();
-    MyItr itr = vecFactories.begin();
+    auto& vecFactories = ( *this )();
+    auto itr = vecFactories.begin();
     while( itr != vecFactories.end() )
     {
         ret = ( itr->second )->CreateInstance(
@@ -160,13 +160,13 @@ gint32 CClassFactories::CreateInstance(
 }
 
 const char* CClassFactories::GetClassName(
-    EnumClsid iClsid )
+    EnumClsid iClsid ) const
 {
     CStdRMutex oLock( GetLock() );
 
     const char* pszName = nullptr;
-    MyType& vecFactories = ( *this )();
-    MyItr itr = vecFactories.begin();
+    auto& vecFactories = ( *this )();
+    auto itr = vecFactories.begin();
 
     while( itr != vecFactories.end() )
     {
@@ -180,15 +180,15 @@ const char* CClassFactories::GetClassName(
 }
 
 EnumClsid CClassFactories::GetClassId(
-    const char* pszClassName )
+    const char* pszClassName ) const
 {
     if( pszClassName == nullptr )
         return clsid( Invalid );
 
     CStdRMutex oLock( GetLock() );
     EnumClsid iClsid = clsid( Invalid );
-    MyType& vecFactories = ( *this )();
-    MyItr itr = vecFactories.begin();
+    auto& vecFactories = ( *this )();
+    auto itr = vecFactories.begin();
 
     while( itr != vecFactories.end() )
     {
@@ -272,11 +272,11 @@ void CClassFactories::Clear()
 }
 
 void CClassFactories::EnumClassIds(
-    std::vector< EnumClsid >& vecClsIds )
+    std::vector< EnumClsid >& vecClsIds ) const
 {
     CStdRMutex oLock( GetLock() );
-    MyType& vecFactories = ( *this) ();
-    MyItr itr = vecFactories.begin();
+    auto& vecFactories = ( *this) ();
+    auto itr = vecFactories.begin();
 
     while( itr != vecFactories.end() )
     {

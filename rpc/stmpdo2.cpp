@@ -379,13 +379,6 @@ gint32 CRpcConnSock::Start_bh()
 
         SetState( sockStarted );
 
-        CTcpStreamPdo2* pPort =
-            ObjPtr( m_pParentPort );
-
-        ret = pPort->StartReadWatch();
-        if( ERROR( ret ) )
-            break;
-        
     }while( 0 );
 
     return ret;
@@ -940,7 +933,7 @@ gint32 CTcpStreamPdo2::OnReceive(
 
         bFirst = false;
         BufPtr pInBuf( true );
-        pInBuf->Resize( dwBytes );
+        ret = pInBuf->Resize( dwBytes );
         if( ERROR( ret ) )
             break;
 
@@ -1708,7 +1701,11 @@ gint32 CTcpStreamPdo2::OnPortReady(
         if( ERROR( ret ) )
             break;
 
-        CConnParams oConnParams( pcp );
+        CParamList oConnCpy;
+        oConnCpy.Append( pcp );
+        CConnParams oConnParams(
+            oConnCpy.GetCfg() );
+
         if( m_pBusPort == nullptr )
         {
             ret = -EFAULT;
@@ -1729,6 +1726,14 @@ gint32 CTcpStreamPdo2::OnPortReady(
         // point
         ret = pBus->BindPortIdAndAddr(
             dwPortId, oConnParams );
+        
+        if( ERROR( ret ) )
+            break;
+
+        //NOTE: moved socket polling from start_bh to
+        //OnPortReady, to prevent the socket error from
+        //happening too early.
+        ret = this->StartReadWatch();
 
     }while( 0 );
 

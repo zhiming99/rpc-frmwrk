@@ -38,7 +38,7 @@ namespace rpcf
 * @{ */
 /** get the errno from the dbus error string @} */
 
-static std::unordered_map< std::string, gint32 > g_mapDBusError =
+static std::map< std::string, gint32 > g_mapDBusError =
 {
     { DBUS_ERROR_FAILED, ERROR_FAIL },
     { DBUS_ERROR_NO_MEMORY, -ENOMEM },
@@ -65,10 +65,10 @@ gint32 ErrnoFromDbusErr( const char *error )
     if( error == nullptr )
         return 0;
 
-    std::unordered_map< std::string, gint32 >::iterator
+    std::map< std::string, gint32 >::const_iterator
         itr = g_mapDBusError.find( error );
 
-    if( itr == g_mapDBusError.end() )
+    if( itr == g_mapDBusError.cend() )
         return 0;
 
     return itr->second;

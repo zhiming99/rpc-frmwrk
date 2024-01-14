@@ -1939,20 +1939,24 @@ gint32 CRpcPdoPort::SetupDBusSetting(
 
             CDBusBusPort *pBusPort = static_cast
                 < CDBusBusPort* >( m_pBusPort );
-
-            ret = pBusPort->IsDBusSvrOnline( strDest );
-            if( ERROR( ret ) )
-            {
-                DebugPrintEx( logErr, ret,
-                    "Error dbus server '%s' not online",
-                    strDest );
-                // server is not online
-                break;
-            }
             // add the match rule for the signal
             // messages
             string strRules = pMsgMatch->ToDBusRules(
                 DBUS_MESSAGE_TYPE_SIGNAL );
+
+            ret = pBusPort->FindRules( strRules );
+            if( ERROR( ret ) )
+            {
+                ret = pBusPort->IsDBusSvrOnline( strDest );
+                if( ERROR( ret ) )
+                {
+                    DebugPrintEx( logErr, ret,
+                        "Error dbus server '%s' not online",
+                        strDest );
+                    // server is not online
+                    break;
+                }
+            }
 
             if( SUCCEEDED( ret ) || ret == ENOTCONN )
             {
@@ -1961,9 +1965,9 @@ gint32 CRpcPdoPort::SetupDBusSetting(
 
                 if( ERROR( iRet ) )
                 {
+                    ret = iRet;
                     DebugPrintEx( logErr,
                         ret, "Error AddRules failed" );
-                    ret = iRet;
                 }
             }
         }

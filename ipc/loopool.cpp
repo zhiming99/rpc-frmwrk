@@ -229,6 +229,8 @@ gint32 CLoopPools::CreatePool(
     oParams.Push( strPrefix );
     oParams.Push( dwLowMark );
     oParams.Push( bAutoClean );
+    oParams.SetPointer(
+        propIoMgr, pMgr );
 
     gint32 ret = pPool.NewObj(
         clsid( CLoopPool ),

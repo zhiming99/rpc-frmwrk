@@ -28,6 +28,15 @@ using namespace std;
 
 namespace rpcf
 {
+Variant::Variant()
+{
+    m_qwVal = 0;
+    m_iType = typeNone;
+}
+
+Variant::~Variant()
+{ Clear(); }
+
 Variant::Variant( bool bVal )
 {
     m_bVal = bVal;
@@ -171,6 +180,67 @@ Variant::Variant( const Variant& rhs )
     case typeUInt16:
         m_wVal = rhs.m_wVal;
         break;
+    case typeNone:
+    default:
+        {
+            std::string strMsg = DebugMsg(
+                -EINVAL, "Invalid variant type" );
+            throw std::invalid_argument( strMsg );
+        }
+
+    }
+    m_iType = rhs.m_iType;
+}
+
+Variant::Variant( Variant&& rhs )
+{
+    switch( rhs.m_iType )
+    {
+    case typeUInt32:
+        m_dwVal = rhs.m_dwVal;
+        break;
+    case typeUInt64:
+        m_qwVal = rhs.m_qwVal;
+        break;
+    case typeObj:
+        {
+            CObjBase* p = rhs.m_pObj;
+            new ( &m_pObj )ObjPtr( p, false );
+            rhs.m_pObj.Detach();
+            break;
+        }
+    case typeByteArr:
+        {
+            CBuffer* p = rhs.m_pBuf;
+            new ( &m_pBuf )BufPtr( p, false );
+            rhs.m_pBuf.Detach();
+            break;
+        }
+    case typeString:
+        {
+            new( &m_strVal ) string(
+                std::move( rhs.m_strVal ) );
+            break;
+        }
+    case typeFloat:
+        m_fVal = rhs.m_fVal;
+        break;
+    case typeDouble:
+        m_dblVal = rhs.m_dblVal;
+        break;
+    case typeDMsg:
+        {
+            m_qwVal = 0;
+            m_pMsg = rhs.m_pMsg;
+            rhs.m_pMsg.Clear();
+            break;
+        }
+    case typeByte: 
+        m_byVal = rhs.m_byVal;
+        break;
+    case typeUInt16:
+        m_wVal = rhs.m_wVal;
+        break;
     default:
         {
             std::string strMsg = DebugMsg(
@@ -256,7 +326,49 @@ Variant& Variant::operator=(
     const Variant& rhs )
 {
     Clear();
-    new ( this )Variant( rhs );
+    switch( rhs.m_iType )
+    {
+    case typeUInt32:
+        m_dwVal = rhs.m_dwVal;
+        break;
+    case typeUInt64:
+        m_qwVal = rhs.m_qwVal;
+        break;
+    case typeObj:
+        m_pObj = rhs.m_pObj;
+        break;
+    case typeByteArr:
+        m_pBuf = rhs.m_pBuf;
+        break;
+    case typeString:
+        new( &m_strVal ) string( rhs.m_strVal );
+        break;
+    case typeFloat:
+        m_fVal = rhs.m_fVal;
+        break;
+    case typeDouble:
+        m_dblVal = rhs.m_dblVal;
+        break;
+    case typeByte: 
+        m_byVal = rhs.m_byVal;
+        break;
+    case typeUInt16:
+        m_wVal = rhs.m_wVal;
+        break;
+    case typeDMsg:
+        m_pMsg = rhs.m_pMsg;
+        break;
+    case typeNone:
+	break;
+    default:
+	{
+            std::string strMsg = DebugMsg(
+                -EINVAL, "Invalid variant type" );
+            throw std::invalid_argument( strMsg );
+            break;
+	}
+    }
+    m_iType = rhs.m_iType;
     return *this;
 }
 
@@ -367,7 +479,8 @@ Variant& Variant::operator=( const string& strVal )
         return *this;
     }
     Clear();
-    new( this ) Variant( strVal );
+    new( &m_strVal ) string( strVal );
+    m_iType = typeString;
     return *this;
 }
 
@@ -379,7 +492,8 @@ Variant& Variant::operator=( const char* szVal )
         return *this;
     }
     Clear();
-    new( this ) Variant( szVal );
+    new( &m_strVal ) string( szVal );
+    m_iType = typeString;
     return *this;
 }
 
@@ -441,6 +555,7 @@ void Variant::Clear()
     case typeString:
         {
             m_strVal.~string(); 
+            m_qwVal = 0;
             break;
         }
     case typeNone:

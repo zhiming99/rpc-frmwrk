@@ -75,14 +75,11 @@ void CIfRouterTest::setUp()
             ( guint32 )std::max( 1U,
             std::thread::hardware_concurrency() );
 
-        if( dwNumThrds > 1 )
-            dwNumThrds = ( dwNumThrds >> 1 );
-
         oParams[ propMaxTaskThrd ] = dwNumThrds;
 
         // weird, more threads will have worse
         // performance of handshake
-        oParams[ propMaxIrpThrd ] = 2;
+        oParams[ propMaxIrpThrd ] = 0;
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 

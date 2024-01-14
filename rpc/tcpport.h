@@ -675,7 +675,7 @@ typedef CAutoPtr< Clsid_Invalid, CRpcSocketBase > SockPtr;
 class CRpcListeningSock :
     public CRpcSocketBase
 {
-
+    MloopPtr    m_pLoop;
     virtual gint32 DispatchSockEvent(
         GIOCondition );
 
@@ -685,12 +685,19 @@ class CRpcListeningSock :
     CRpcListeningSock( const IConfigDb* pCfg );
 
     // commands
-    gint32 Start();
+    gint32 Start() override;
+    gint32 Stop() override;
 
     // new connection comes
     virtual gint32 OnConnected();
     virtual gint32 OnError( gint32 ret );
     gint32 Connect();
+
+    CMainIoLoop* GetMainLoop() const override
+    {
+        CMainIoLoop* pLoop = m_pLoop;
+        return pLoop;
+    }
 };
 
 class CRpcStreamSock :
