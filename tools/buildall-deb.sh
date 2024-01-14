@@ -13,7 +13,7 @@ bash net-tools procps swig default-jdk-headless cmake libcommons-cli-java ccache
 
 sudo apt-get -y install sip-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 sudo apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
-sudo apt-get -y install git;
+sudo apt-get -y install git devscripts;
 pip3 install wheel numpy || sudo apt-get -y install python3-wheel python3-numpy
 
 bash ./makerpcf.sh

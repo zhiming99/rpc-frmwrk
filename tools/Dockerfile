@@ -19,7 +19,7 @@ libfuse3-3 libfuse3-dev krb5-kdc krb5-admin-server krb5-user \
 bash net-tools procps swig openjdk-8-jdk-headless cmake libcommons-cli-java
 RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
-RUN apt-get -y install git;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
+RUN apt-get -y install git devscripts;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
 RUN cd ${home};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
 RUN pip3 install wheel numpy
 RUN cd ${HOME};git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
