@@ -34,7 +34,7 @@
 17.  [`支持国密TLS13(SM2+SM4+GCM)`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/gmsslport/README_cn.md)
 
 ## 编译`rpc-frmwrk`   
-* 请参考[`如何编译rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-build-%60rpc-frmwrk%60)给出的详细的信息和步骤.   
+* 请参考[`如何编译rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-manually-build-RPC-frmwrk)给出的详细的信息和步骤.   
 * 如果你的目标系统是Ubuntu或者Fedora, 你应该也会对安装[deb包或rpm包](https://github.com/zhiming99/rpc-frmwrk/releases/tag/0.7.0)感兴趣.
 
 ## 安装和运行
