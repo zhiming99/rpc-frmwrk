@@ -29,8 +29,8 @@ interface IEchoThings
     Echo( string strText )
         returns ( string strResp ) ;
 
-    // proxy side is asynchronous, while server side is synchronous
-    [ async_p ]EchoUnknown( bytearray pBuf )
+    // both sides are synchronous
+    EchoUnknown( bytearray pBuf )
         returns ( bytearray pResp );
 
     // both sides are synchronous
