@@ -25,35 +25,41 @@ typedef array< OBJPTR > STRMATRIX1;
 // echo different type of information
 interface IEchoThings
 {
-    // both proxy and server are asynchronous, that is return
-    // STATUS_PENDING if the request is not complete yet
+    // both sides are synchronous
     Echo( string strText )
         returns ( string strResp ) ;
 
     // proxy side is asynchronous, while server side is synchronous
-    EchoUnknown( bytearray pBuf )
+    [ async_p ]EchoUnknown( bytearray pBuf )
         returns ( bytearray pResp );
 
-    // proxy side is synchronous, while server side is asynchronous
+    // both sides are synchronous
     EchoCfg( ObjPtr pObj )
         returns ( ObjPtr pRespObj );
 
-    // both sides are synchronous
+    // proxy side is synchronous, while server side is asynchronous
     [ async_s ]EchoMany ( int32 i1, int16 i2,
         int64 i3, float i4, double i5, string szText )
         returns ( int32 i1r, int16 i2r,
             int64 i3r, float i4r,
             double i5r, string szTextr );
 
+    // proxy side is synchronous, while server side is asynchronous
     [ async_s ]EchoStruct( FILE_INFO fi ) returns ( FILE_INFO fir );
 
+    // both proxy and server are asynchronous, that is, return
+    // STATUS_PENDING if the request is not complete yet
     [ async ]EchoTypedef( STRMATRIX1 stm ) returns ( STRMATRIX1 stmr );
 
+    // both proxy and server are asynchronous
     [ async ]EchoHandle( STMHANDLE stm ) returns ( STMHANDLE stmr );
 
     // a event from server to the proxy, response list is alway empty and the
-    // server gets no feedback related to the proxy.
+    // server gets no feedback related to the proxy. event does not have
+    // asynchronous tag.
     [ event ]OnHelloWorld( string strMsg ) returns ();
+
+    // both proxy and server are asynchronous
     [ async ]EchoNoParams() returns ();
 };
 
@@ -62,6 +68,9 @@ interface IEchoThings
 */
 interface IFileTransfer 
 {
+    // hChannel specifies the open stream to use for
+    // uploading. It is obtained by API call
+    // "OpenStream"
     [ async ]UploadFile( string szFilePath,
         HSTREAM hChannel, uint64 offset,
         uint64 size )
@@ -72,6 +81,8 @@ interface IFileTransfer
         */
         returns ();
 
+    // this request has a customized timeout of 70 seconds
+    // the default timeout value is 120 seconds
     [ async_s, timeout=70 ]GetFileInfo(
         string szFileName, bool bRead )
         returns  ( FILE_INFO fi );
