@@ -1296,7 +1296,11 @@ gint32 CRpcOpenSSLFido::DoHandshake(
     if( SSL_is_init_finished( m_pSSL ) )
         return 0;
 
-    DebugPrint( 0, "Start handshake..." );
+    if( pHandshake.IsEmpty() )
+        DebugPrint( 0, "Start SSL handshake..." );
+    else
+        DebugPrint( 0, "Continue SSL handshake..." );
+
     gint32 ret = AdvanceHandshake(
         pCallback, pHandshake );
 

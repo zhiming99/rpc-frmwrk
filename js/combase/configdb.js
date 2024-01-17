@@ -8,8 +8,9 @@ const Buffer = require( "buffer")
 const { CoCreateInstance } = require("./factory.js")
 const CBuffer = require( "./cbuffer").CBuffer
 const marshall = require( "../dbusmsg/message.js").marshall
+const { CObjBase } = require( "./objbase.js" )
 
-const SERI_HEADER = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
+const SERI_HEADER_CFG = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
 {
     constructor()
     {
@@ -41,15 +42,18 @@ const SERI_HEADER = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
 
 const Pair = class Pair
 {
-    constructor()
-    {
-        this.t = Tid.typeNone
-        this.v = null
-    }
     constructor( src )
     {
-        this.t = src.t
-        this.v = src.v
+        if( src === null )
+        {
+            this.t = Tid.typeNone
+            this.v = null
+        }
+        else
+        {
+            this.t = src.t
+            this.v = src.v
+        }
     }
 }
 exports.CConfigDb2=class CConfigDb2 extends CObjBase
@@ -190,7 +194,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     Serialize()
     {
-        oHdr = new SERI_HEADER()
+        oHdr = new SERI_HEADER_CFG()
         if( this.m_dwCount > 0 )
         {
             this.SetUint32(
@@ -200,7 +204,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         dstBuf = Buffer.alloc( CV.PAGE_SIZE )
         oHdr.dwCount = this.m_props.size 
 
-        pos = SERI_HEADER.GetSeriSize()
+        pos = SERI_HEADER_CFG.GetSeriSize()
         for( const [ key, value ] of this.m_props )
         {
             if( pos + 5 > dstBuf.length )
@@ -353,7 +357,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         if( srcBuffer.length < offset )
             throw new Error( "Error buffer too small to deserialize")
 
-        oHdr = new SERI_HEADER()
+        oHdr = new SERI_HEADER_CFG()
         pos = offset
         oHdr.Deserialize( srcBuffer, pos )
         if( oHdr.dwClsid !== Cid.CConfigDb2 ||
@@ -363,12 +367,12 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             oHdr.dwSize < srcBuffer.length - offset -
                 SERI_HEADER_BASE.GetSeriSize() )
             throw new Error( "Error invalid CConfigDb2")
-        pos += SERI_HEADER.GetSeriSize()
+        pos += SERI_HEADER_CFG.GetSeriSize()
         for( i = 0; i < oHdr.dwCount; i++ )
         {
             key = srcBuffer.readUint32BE( pos )
             pos += 4
-            value = new Pair()
+            value = new Pair(null)
             value.t = srcBuffer.readUint8( pos )
             pos++
             switch( value.t )
@@ -502,6 +506,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             if( key === Pid.propParamCount )
                 this.m_dwCount = value.v
         }
-
+        return offset + oHdr.dwSize +
+            SERI_HEADER_BASE.GetSeriSize();
     }
 }

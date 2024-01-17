@@ -1,12 +1,13 @@
 const { messageType } = require("../dbusmsg/constants");
 const { CConfigDb2 } = require("./configdb");
 const { SERI_HEADER_BASE } = require("./defines");
-const CObjBase = require("./objbase");
+const {CObjBase} = require("./objbase");
 const MT = require( "./enums").EnumMatchType
 const EnumPropId = require( "./enums").EnumPropId
 require ("../dbusmsg/message")
+const Buffer = require( "buffer")
 
-const SERI_HEADER = class SERI_HEADER extends SERI_HEADER_BASE
+class SERI_HEADER_MSGMATCH extends SERI_HEADER_BASE
 {
     constructor()
     {
@@ -36,6 +37,7 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
 {
     constructor()
     {
+        this.m_dwClsid = Cid.CMessageMatch
         this.m_strObjPath = ""
         this.m_strIfName = ""
         this.m_iMatchType = MT.matchInvalid
@@ -143,4 +145,56 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
         return strAll
     }
 
+<<<<<<< HEAD
 }
+=======
+    Serialize()
+    {
+        this.m_oCfg.SetString(
+            EnumPropId.propIfName, this.m_strIfName)
+        this.m_oCfg.SetString(
+            EnumPropId.propObjPath, this.m_strObjPath )
+        
+        var oHeader = new SERI_HEADER_MSGMATCH()
+        var oCfgBuf = this.m_oCfg.Serialize()
+
+        oHeader.dwClsid = this.m_dwClsid
+        oHeader.iMatchType = this.m_iMatchType
+
+        dwTotal =
+            oCfgBuf.length + oHeader.GetSeriSize()
+
+        oHeader.dwSize = dwTotal -
+            oHeader.super().GetSeriSize()
+        
+        hdrBuf = Buffer.alloc( oHeader.GetSeriSize() )
+        oHeader.Serialize( hdrBuf, 0 )
+        return Buffer.concat( [ hdrBuf, oCfgBuf ])
+    } 
+
+    Deserialize( srcBuf, offset )
+    {
+        var oHdr = new SERI_HEADER_MSGMATCH()
+        oHdr.Deserialize( srcBuf, offset )
+        if( oHdr.dwSize + SERI_HEADER_BASE.GetSeriSize() >
+            srcBuf.length - offset )
+            throw new Error( "Error buffer too small to deserialize")
+
+        this.m_iMatchType = oHdr.iMatchType
+        if( this.m_iMatchType != MT.matchClient &&
+            this.m_iMatchType != MT.matchServer )
+            throw new Error( "Error invalid MessageMatch")
+
+        this.m_oCfg.Deserialize( srcBuf,
+            offset + SERI_HEADER_MSGMATCH.GetSeriSize() )
+        this.m_strIfName = this.m_oCfg.GetString(
+            EnumPropId.propIfName )
+        this.m_strObjPath = this.m_oCfg.GetString(
+            EnumPropId.propObjPath )
+        if( this.m_strIfName === null ||
+            this.m_strObjPath === null )
+            throw new Error( "Error invalid MessageMatch")
+        return offset + SERI_HEADER_BASE.GetSeriSize() + oHdr.dwSize
+    }
+}
+>>>>>>> f2d1dcc4 (. added 'js' directory to the build tree.)
