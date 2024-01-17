@@ -546,6 +546,7 @@ gint32 CRpcWebSockFido::ScheduleCloseTask(
         oParams.SetPointer( propPortPtr, this );
         // we have 20 seconds of patience on it
         oParams.SetIntProp( propTimeoutSec, 20 );
+        oParams.SetPointer( propIoMgr, GetIoMgr() );
 
         ret = m_vecTasks[ enumCloseTask ].NewObj(
             clsid( CWsCloseTask ),
@@ -1266,9 +1267,17 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
 }
 
 gint32 CRpcWebSockFido::DoHandshake(
-     IEventSink* pCallback )
+     IEventSink* pCallback, bool bFirst )
 {
-    DebugPrint( 0, "Start handshake..." );
+    if( bFirst )
+    {
+        DebugPrint( 0, "Start WebSocket handshake..." );
+    }
+    else
+    {
+        DebugPrint( 0, "Continue WebSocket handshake..." );
+    }
+
     return AdvanceHandshake( pCallback );
 }
 
@@ -1620,7 +1629,7 @@ gint32 CWsHandshakeTask::OnIrpComplete(
             }
         }
 
-        ret = pPort->DoHandshake( this );
+        ret = pPort->DoHandshake( this, false );
 
     }while( 0 );
 
@@ -1650,7 +1659,7 @@ gint32 CWsHandshakeTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        ret = pPort->DoHandshake( this );
+        ret = pPort->DoHandshake( this, true );
 
     }while( 0 );
 

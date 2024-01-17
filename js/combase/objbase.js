@@ -1,4 +1,4 @@
-require("./enums" ).EnumClsid
+const EnumClsid = require("./enums" ).EnumClsid
 exports.CObjBase = class CObjBase
 {
     constructor()

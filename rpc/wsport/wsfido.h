@@ -177,7 +177,8 @@ class CRpcWebSockFido : public CPort
     inline bool IsClient() const
     { return m_bClient; }
 
-    gint32 DoHandshake( IEventSink* pCallback );
+    gint32 DoHandshake(
+        IEventSink* pCallback, bool bFirst );
     gint32 ReceiveData( const BufPtr& pBuf );
 
 

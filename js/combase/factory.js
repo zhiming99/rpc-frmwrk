@@ -12,7 +12,7 @@ exports.IClassFactory = class IClassFactory extends CObjBase
     { return null }
 }
 
-class CClassFactoryBase extends IClassFactory
+class CClassFactoryBase extends exports.IClassFactory
 {
     constructor()
     {
