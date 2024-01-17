@@ -145,9 +145,6 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
         return strAll
     }
 
-<<<<<<< HEAD
-}
-=======
     Serialize()
     {
         this.m_oCfg.SetString(
@@ -197,4 +194,3 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
         return offset + SERI_HEADER_BASE.GetSeriSize() + oHdr.dwSize
     }
 }
->>>>>>> f2d1dcc4 (. added 'js' directory to the build tree.)
