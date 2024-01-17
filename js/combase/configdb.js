@@ -63,6 +63,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     Push( src )
     {
+        if( this.m_dwCount > 1024 )
+            return
         this.m_props[ this.m_dwCount ] = src
         this.m_dwCount++
     }
