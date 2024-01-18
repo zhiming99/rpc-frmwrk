@@ -126,9 +126,9 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
     IsEqual( rhs )
     {
         if( this.m_strIfName !== rhs.m_strIfName ||
-            this.m_strObjPath != rhs.m_strObjPath )
+            this.m_strObjPath !== rhs.m_strObjPath )
             return false
-        if( this.GetType() != rhs.GetType() )
+        if( this.GetType() !== rhs.GetType() )
             return false
 
         return true

@@ -2299,7 +2299,7 @@ EOF
             miscOpts = cfgVal[ 'Security' ][ 'misc' ]
             miscOpts[ 'ConfigWebServer' ] = 'true'
 
-            ret = ConfigWebServer( initFile )
+            ret = ConfigWebServer2( cfgVal )
             if ret < 0:
                 print( "Error failed to config web server " + str(ret))
                 ret = 0
