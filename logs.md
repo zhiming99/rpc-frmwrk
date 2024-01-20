@@ -1,4 +1,7 @@
 ---
+[`Sat Jan 20 2024 10:10:14 PM Beijing`]   
+1. Javascript support will be a client only implementation and completely different from the classic client implementation.
+
 [`Sat Jan 13 2024 10:43:32 PM Beijing`]   
 1. Merged the bugfix PR to the master branch.
 2. Next i will build a new release `0.7.0` for this major bug-fix commit.
