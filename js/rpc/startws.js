@@ -1,7 +1,8 @@
 
 exports.Connect = function Connect( strWsUrl )
 {
-    var socket = new WebSocket( strWsUrl );
+    socket = globalThis.g_oSock = new WebSocket( strWsUrl );
+    socket.binaryType = 'arraybuffer'
     socket.onopen = function() {
         console.log('connected!');
     };

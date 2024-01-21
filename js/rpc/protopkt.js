@@ -101,23 +101,42 @@ class CCarrierPacket
 
     GetHeader()
     { return this.m_oHeader }
+
+    static GetSeriSize()
+    { return 28 + m_oBuf.length }
+
+    Serialize()
+    {
+        hdrBuf = this.m_oHeader.Serialize()
+        return Buffer.concat([hdrBuf, this.m_oBuf ])
+    }
+
+    Deserialize( srcBuf, offset )
+    {
+        if( srcBuf.length - offset < this.m_oHeader.GetSeriSize() )
+            return -1
+        pos = this.m_oHeader.Deserialize( srcBuf, offset )
+        if( pos < 0 )
+            throw new Error( "Error deserializing packet")
+
+        if( srcBuf.length - pos < this.m_oHeader.m_dwSize )
+            return -1
+
+        this.m_oBuf = srcBuf.slice(
+            pos, pos + this.m_oHeader.m_dwSize )
+
+        return pos + this.m_oHeader.m_dwSize
+    }
+
 }
 
 exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket 
 {
     constructor()
-    {
-        super()
-        this.m_oIrp = null
-        this.m_dwBytesToSend = 0
-        this.m_dwOffset = 0
-    }
+    { super() }
 
-    SetIrp( oIrp )
-    { this.m_oIrp = oIrp }
-
-    GetIrp()
-    { return this.m_oIrp }
+    static GetSeriSize()
+    { return super.GetSeriSize() }
 
     SetBufToSend( oPayload )
     {
@@ -126,8 +145,6 @@ exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket
             throw new Error( "Error Invalid Buffer")
         super.m_oBuf = oPayload
         super.m_oHeader.m_dwSize = oPayload.length
-        this.m_dwBytesToSend = oPayload.length
-        this.m_dwOffset = 0;
     }
 
     SetHeader( oHeader )
@@ -138,5 +155,31 @@ exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket
         super.m_oHeader.m_dwSeqNo = oHeader.m_dwSeqNo
         super.m_oHeader.m_wProtoId = oHeader.m_wProtoId
         super.m_oHeader.m_dwSessId = oHeader.m_dwSessId
+    }
+
+    Send()
+    {
+        oSock = globalThis.g_oSock
+        if( oSock.readyState !== 1 )
+            throw new Error( "Error websocket is not ready")
+        oSock.send( super.Serialize() )
+    }
+}
+
+exports.CIncomingPacket = class CIncomingPacket extends CCarrierPacket 
+{
+    constructor()
+    {
+        super()
+        this.m_dwBytesToRecv = 0
+        this.m_dwOffset = 0
+    }
+
+    Receive( srcBuf, offset )
+    {
+        pos = super.Deserialize( srcBuf, offset )
+        if( pos < 0 )
+            return -1
+        return pos - offset
     }
 }
