@@ -104,7 +104,6 @@ struct CSeqTaskGrpMgr : public CObjBase
 
         SEQTG_ELEM otg;
         m_mapSeqTgs[ htg ] = otg;
-        itr = m_mapSeqTgs.find( htg );
         return 0;
     }
 

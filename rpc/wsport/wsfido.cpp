@@ -91,7 +91,10 @@ gint32 CRpcWebSockFido::EncodeAndSend(
         if( ERROR( ret ) )
             break;
 
+        CParamList oNewParams;
         BufPtr pOutBuf( true );
+        oNewParams.Push( pOutBuf );
+
         guint32 dwSize = 0;
         gint32 iIdx = 0;
         for( ; iIdx < iCount; iIdx++ )
@@ -102,6 +105,7 @@ gint32 CRpcWebSockFido::EncodeAndSend(
             if( ERROR( ret ) )
                 break;
             dwSize += pBuf->size();
+            oNewParams.Push( pBuf );
         }
 
         if( ERROR( ret ) )
@@ -142,23 +146,6 @@ gint32 CRpcWebSockFido::EncodeAndSend(
                 ( dwSize  & 0xFF );
         }
 
-        BufPtr pBuf;
-        ret = oParams.GetProperty(
-            0, pBuf );
-        if( ERROR( ret ) )
-            break;
-
-        // prepend a websocket header to the first
-        // buffer
-        ret = pOutBuf->Append(
-            ( guint8* )pBuf->ptr(),
-            pBuf->size() );
-
-        if( ERROR( ret ) )
-            break;
-
-        oParams.SetBufPtr( 0, pOutBuf );
-
         // send the encrypted copy down 
         PortPtr pLowerPort = GetLowerPort();
         pIrp->AllocNextStack(
@@ -166,7 +153,7 @@ gint32 CRpcWebSockFido::EncodeAndSend(
 
         IrpCtxPtr pCtx = pIrp->GetTopStack();
         BufPtr pNewBuf( true );
-        *pNewBuf = ObjPtr( oParams.GetCfg() );
+        *pNewBuf = ObjPtr( oNewParams.GetCfg() );
         pCtx->SetReqData( pNewBuf );
         pLowerPort->AllocIrpCtxExt(
             pCtx, ( PIRP )pIrp );
