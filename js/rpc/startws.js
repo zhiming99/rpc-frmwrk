@@ -1,3 +1,4 @@
+const {CIncomingPacket, COutgoingPacket} = require( "./protopkt")
 
 exports.Connect = function Connect( strWsUrl )
 {
@@ -7,7 +8,9 @@ exports.Connect = function Connect( strWsUrl )
         console.log('connected!');
     };
     socket.onmessage = function(event) {
-        const message = event.data;
+        oBuf = Buffer.from( event.data )
+        oInPkt = new CIncomingPacket()
+        oInPkt.Deserialize( oBuf, 0 )
         console.log(`msg arrives：${message}`);
     };
 
@@ -17,7 +20,7 @@ exports.Connect = function Connect( strWsUrl )
     return socket
 }
 
-exports.SendBuf = function sendMessageToServer( socket, message)
+exports.sendMessageToServer = function sendMessageToServer( socket, message)
 {
     if (socket.readyState === WebSocket.OPEN) {
         socket.send(message);

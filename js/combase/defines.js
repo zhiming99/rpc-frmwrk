@@ -29,3 +29,6 @@ exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
         this.bVersion = ov.getUint8( 8 )
     }
 }
+
+exports.randomInt = function randomInt( max )
+{ return Math.floor( Math.random() * max ) }

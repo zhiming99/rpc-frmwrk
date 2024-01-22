@@ -1,8 +1,10 @@
+const { EnumPktFlag } = require("../combase/enums.js")
+
 const CV = require( "../combase/enums.js" ).constval
 const Buffer = require( "buffer").Buffer
+const { decodeBlock, encodeBlock, encodeBound } = require( "lz4" )
 
-
-class CPacketHeader
+exports.CPacketHeader = class CPacketHeader
 {
     constructor()
     {
@@ -94,7 +96,10 @@ class CCarrierPacket
     { return this.m_oBuf }
 
     SetPayload( oBuf )
-    { this.m_oBuf = oBuf }
+    {
+        this.m_oBuf = oBuf
+        this.m_oHeader.m_dwSize = oBuf.length
+    }
 
     GetFlags()
     { return this.m_oHeader.m_wFlags }
@@ -127,7 +132,6 @@ class CCarrierPacket
 
         return pos + this.m_oHeader.m_dwSize
     }
-
 }
 
 exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket 
@@ -157,29 +161,60 @@ exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket
         super.m_oHeader.m_dwSessId = oHeader.m_dwSessId
     }
 
+    Serialize()
+    {
+        if( this.m_oBuf.length === 0 )
+            return null
+
+        if( ( this.m_wFlags & EnumPktFlag.flagCompress ) == 0 )
+            return super.Serialize()
+
+        var compressed = Buffer.alloc(
+            encodeBound( this.m_oBuf.length ) )
+        var byteOutput = encodeBlock( this.m_oBuf, compressed )
+
+        backBuf = this.m_oBuf
+        this.m_oBuf = compressed.slice( 0, byteOutput )
+        this.m_oHeader.m_dwSize = byteOutput
+
+        output = super.Serialize()
+
+        this.m_oBuf = backBuf
+        this.m_oHeader.m_dwSize = backBuf.length
+
+        return output
+    }
+
     Send()
     {
         oSock = globalThis.g_oSock
         if( oSock.readyState !== 1 )
             throw new Error( "Error websocket is not ready")
-        oSock.send( super.Serialize() )
+        oSock.send( this.Serialize() )
     }
 }
 
 exports.CIncomingPacket = class CIncomingPacket extends CCarrierPacket 
 {
     constructor()
-    {
-        super()
-        this.m_dwBytesToRecv = 0
-        this.m_dwOffset = 0
-    }
+    { super() }
 
-    Receive( srcBuf, offset )
+    Deserialize( srcBuf, offset )
     {
         pos = super.Deserialize( srcBuf, offset )
         if( pos < 0 )
             return -1
-        return pos - offset
+
+        if( this.m_oBuf.length === 0 )
+            return pos
+
+        if( this.m_wFlags & EnumPktFlag.flagCompress )
+        {
+            var output = Buffer.alloc( this.m_oBuf.length * 3 )
+            var byteOutput = decodeBlock( this.m_oBuf, output )
+            this.m_oBuf = output.slice( 0, byteOutput )
+            this.m_oHeader.m_dwSize = this.m_oBuf.length
+        }
+        return pos
     }
 }

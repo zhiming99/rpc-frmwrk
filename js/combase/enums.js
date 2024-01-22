@@ -70,5 +70,15 @@ module.exports = {
       matchServer : 0,
       matchClient  : 1,
       matchInvalid : 2,
-  }
+  },
+
+  EnumProtoId: {
+      protoDBusRelay : 0,
+      protoStream: 1,
+      protoControl: 2,
+  },
+
+  EnumPktFlag :{
+    flagCompress : 1,
+  },
 }
