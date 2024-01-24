@@ -2,7 +2,7 @@ const {CIncomingPacket, COutgoingPacket} = require( "./protopkt")
 
 exports.Connect = function Connect( strWsUrl )
 {
-    socket = globalThis.g_oSock = new WebSocket( strWsUrl );
+    socket = new WebSocket( strWsUrl );
     socket.binaryType = 'arraybuffer'
     socket.onopen = function() {
         console.log('connected!');
@@ -11,7 +11,7 @@ exports.Connect = function Connect( strWsUrl )
         oBuf = Buffer.from( event.data )
         oInPkt = new CIncomingPacket()
         oInPkt.Deserialize( oBuf, 0 )
-        console.log(`msg arrives：${message}`);
+        console.log(`msg arrives:${message}`);
     };
 
     socket.onclose = function() {

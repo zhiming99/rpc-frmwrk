@@ -69,7 +69,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     {
         if( this.m_dwCount > 1024 )
             return
-        this.m_props[ this.m_dwCount ] = src
+        this.m_props.set( this.m_dwCount, src )
         this.m_dwCount++
     }
 
@@ -92,21 +92,21 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     {
         if( !this.m_props.has( iProp ) )
             return Tid.typeNone
-        return this.m_props[iProp].t
+        return this.m_props.get(iProp).t
     }
 
     GetProperty( iProp )
     {
         if( !this.m_props.has( iProp ) )
             return null
-        return this.m_props[iProp].v
+        return this.m_props.get( iProp).v
     }
 
     SetProperty( iProp, val )
     {
         if( val.constructor.name !== "Pair" )
             throw new TypeError( "Error type of input param, expecting Buffer")
-        this.m_props[ iProp ]  = val
+        this.m_props.set( iProp, val )
     }
 
     SetBool( iProp, val )
@@ -139,8 +139,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     SetFloat( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeUInt64, v: val }
+        this.m_props.set( iProp,
+            { t: Tid.typeUInt64, v: val } )
     }
 
     SetDouble( iProp, val )
