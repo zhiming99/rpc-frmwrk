@@ -89,11 +89,28 @@ module.exports = {
         protoControl: 2,
     },
 
-   EnumPktFlag :{
-        flagCompress : 1,
-   },
+    EnumStmId : {
+        TCP_CONN_DEFAULT_CMD : 0,
+        TCP_CONN_DEFAULT_STM : 1,
+    },
 
-   errno : {
+    EnumStmToken : {
+        tokInvalid : 255,
+        tokData : 1,
+        tokPing : 2,
+        tokPong : 3,
+        tokClose : 4,
+        tokProgress : 5,
+        tokFlowCtrl : 6,
+        tokLift : 7,
+        tokError : 8,
+    },
+
+    EnumPktFlag :{
+        flagCompress : 1,
+    },
+
+    errno : {
         EPERM : 1,
         ENOENT : 2,
         ESRCH : 3,
