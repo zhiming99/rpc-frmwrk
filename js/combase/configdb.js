@@ -40,7 +40,7 @@ const SERI_HEADER_CFG = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
     }
 }
 
-const Pair = class Pair
+exports.Pair = class Pair
 {
     constructor( src )
     {
@@ -115,20 +115,20 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     }
     SetUint8( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeByte, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeByte, v: val } )
     }
 
     SetUint16( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeUInt16, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeUInt16, v: val } )
     }
 
     SetUint32( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeUInt32, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeUInt32, v: val } )
     }
 
     SetUint64( iProp, val )
@@ -145,14 +145,14 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     SetDouble( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeDouble, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeDouble, v: val } )
     }
 
     SetString( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeString, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeString, v: val } )
     }
 
     SetByteArr( iProp, val )
@@ -160,19 +160,19 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         if( !Buffer.isBuffer( val ) )
             throw new TypeError( "Error not a value of Buffer type" )
 
-        this.m_props[ iProp ] =
-            { t: Tid.typeByteArr, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeByteArr, v: val } )
     }
     SetMsgPtr( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeDMsg, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeDMsg, v: val } )
     }
 
     SetObjPtr( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeObj, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeObj, v: val } )
     }
 
 
@@ -194,14 +194,14 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     Serialize()
     {
-        oHdr = new SERI_HEADER_CFG()
+        var oHdr = new SERI_HEADER_CFG()
         if( this.m_dwCount > 0 )
         {
             this.SetUint32(
                 Pid.propParamCount, this.m_dwCount )
         }
 
-        dstBuf = Buffer.alloc( CV.PAGE_SIZE )
+        var dstBuf = Buffer.alloc( CV.PAGE_SIZE )
         oHdr.dwCount = this.m_props.size 
 
         pos = SERI_HEADER_CFG.GetSeriSize()

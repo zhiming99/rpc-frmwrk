@@ -27,6 +27,9 @@ exports.CDBusMessage = class CDBusMessage
         this.body = []
     }
 
+    GetType()
+    { return this.type }
+
     GetObjPath()
     { return this.path }
 

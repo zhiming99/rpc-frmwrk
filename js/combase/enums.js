@@ -4,7 +4,15 @@ module.exports = {
       BUF_MAX_SIZE: (512*1024*1024),
       MAX_BYTES_PER_TRANSFER: (1024*1024),
       CFGDB_MAX_ITEMS: 1024,
-      CFGDB_MAX_SIZE: (16*1024*1024)
+      CFGDB_MAX_SIZE: (16*1024*1024),
+      DBUS_NAME_PREFIX: "org.rpcf.",
+      IFNAME_MIN_BRIDGE: "CRpcMinBridge",
+      IFNAME_TCP_BRIDGE: "CRpcTcpBridge",
+      OBJNAME_TCP_BRIDGE: "RpcTcpBridgeImpl",
+      OBJNAME_ROUTER: "RpcRouterManagerImpl",
+      OBJNAME_ROUTER_BRIDGE: "RpcRouterBridgeImpl",
+      BRIDGE_PROXY_GREETINGS: "rpcf-bridge-proxy",
+      BRIDGE_GREETINGS: "rpcf-bridge", 
     },
 
     EnumTypes:{
@@ -64,6 +72,7 @@ module.exports = {
         propIid: 12357,
         propSysMethod: 12360,
         propDataDesc:12382,
+        propRouterName:12384,
         propCompress:12388,
         propEnableSSL:12389,
         propEnableWebSock:12390,
