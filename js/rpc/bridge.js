@@ -4,8 +4,16 @@ const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId } = requ
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
 const { CDBusMessage } = require("./dmsg")
-const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage } = require("./iomsg")
+const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, AdminCmd } = require("./iomsg")
 const { messageType } = require( "../dbusmsg/constants")
+
+function ERROR( iRet )
+{
+    return iRet < 0
+}
+
+function SUCCEEDED( iRet )
+{ return iRet === errno.STATUS_SUCCESS }
 
 exports.DBusIfName = function DBusIfName(
     strName )
@@ -51,8 +59,6 @@ exports.DBusDestination2 = function DBusDestination2(
 
     return strDest
 }
-
-
 class CPendingRequest
 {
     constructor( oReq )
@@ -61,6 +67,7 @@ class CPendingRequest
         this.m_oReject = null
         this.m_oReq = oReq
         this.m_oResp = null
+        this.m_oObject = null
     }
 
     OnTaskComplete( oResp )
@@ -83,7 +90,7 @@ class CPendingRequest
     }
 }
 
-exports.CRpcStreamBase = class CRpcStreamBase
+class CRpcStreamBase
 {
     constructor( oParent )
     {
@@ -200,7 +207,7 @@ class CRpcDefaultStream extends CRpcStreamBase
     }
 }
 
-exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
+class CRpcTcpBridgeProxy
 {
     constructor( oParent, oConnParams )
     {
@@ -216,7 +223,7 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
 
         var oIoTab = this.m_arrDispTable
         for( i = 0; i< Object.keys(IoCmd).length;i++)
-        { oIoTab.push(null) }
+        { oIoTab.push(()=>{console.log("Invalid function call")}) }
 
         oIoTab[ IoCmd.Handshake[0] ] =
             this.Handshake.bind( this )
@@ -260,23 +267,40 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
             this.m_oScanReqs, 10 * 1000 )
     }
 
-    Connect( strUrl )
+    async Connect( strUrl, oPending )
     {
-        var socket = new WebSocket( strUrl );
-        socket.binaryType = 'arraybuffer'
-        socket.onopen = ()=>{
-            this.m_oSocket = socket
-            console.log('connected!');
-        };
+        try {
+            const res = await new Promise((resolve, reject) => {
+                var socket = new WebSocket(strUrl)
+                socket.binaryType = 'arraybuffer'
+                socket.onopen = (event) => {
+                    this.m_oSocket = socket
+                    resolve(this)
+                }
 
-        socket.onmessage = (event) => {
-            this.ReceiveMessage( event.data )
-        };
+                socket.onmessage = (event_1) => {
+                    this.ReceiveMessage(event_1.data)
+                }
 
-        socket.onclose = ()=>{
-            console.log(`${this.m_oSocket} closed`);
-        };
-        return socket
+                socket.onclose = () => {
+                    console.log(`${this.m_oSocket} closed`)
+                }
+
+                socket.onerror = (event_2) => {
+                    reject(this)
+                    console.log(event_2)
+                }
+            })
+            var oMsg = new CIoReqMessage()
+            oMsg.m_iCmd = IoCmd.Handshake
+            oMsg.m_iMsgId = globalThis.g_oMsgIdx++
+            oMsg.m_iType = IoMsgType.ReqMsg
+            this.Handshake(oMsg, oPending)
+        } catch ( oProxy ) {
+            oPending.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, -errno.EFAULT )
+            oPending.m_oReject( oPending )
+        }
     }
 
     IsConnected()
@@ -288,13 +312,13 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
         return true
     }
 
-    Start()
+    Start( oPending )
     {
         var strUrl = this.m_oConnParams.GetProperty(
             EnumPropId.propDestUrl )
-        Connect( strUrl )
         this.m_iTimerId =
             setTimeout( this.m_oScanReqs )
+        return this.Connect( strUrl, oPending )
     }
 
     Stop()
@@ -309,7 +333,7 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
         this.m_oParent = null
     }
 
-    Handshake( oMsg )
+    Handshake( oMsg, oPending )
     {
         var ret = -errno.EINVAL
         var dmsg = new CDBusMessage( messageType.methodCall )
@@ -348,23 +372,22 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
             oResp.m_oResp.SetUint32(
                 EnumPropId.propReturnValue, ret )
             this.m_oParent.PostMessage( oResp )
-            return ret
+            return null
         }
-        var prom = new Promise( (resolve, reject) =>{
+        return new Promise( (resolve, reject) =>{
                 var oPending = new CPendingRequest( oMsg )
                 oPending.m_oResolve = resolve
                 oPending.m_oReject = reject
                 this.m_mapPendingReqs.set(
                     oMsg.m_iMsgId, oPending )
             }).then( ( t )=>{
-                this.OnHandshakeComplete( t.m_oReq, t.m_oResp )
+                this.OnHandshakeComplete( oPending, t.m_oResp )
             }).catch(( t )=>{
-                this.OnHandshakeComplete( t.m_oReq, t.m_oResp )
+                this.OnHandshakeComplete( oPending, t.m_oResp )
             })
-        return errno.STATUS_PENDING
     }
 
-    OnHandshakeComplete( oReq, oResp )
+    OnHandshakeComplete( oPending, oResp )
     {
         var ret = oResp.GetProperty(
             EnumPropId.propReturnValue )
@@ -372,8 +395,28 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
             return
         if( ret < 0 )
         {
-
+            oPending.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, ret )
+            oPending.m_oReject( oPending )
+            return
         }
+
+        var strGreet = oResp.GetProperty( 0 )
+        if( strGreet.substr( 0, constval.BRIDGE_GREETINGS.length ) !==
+            constval.BRIDGE_GREETINGS )
+        {
+            oPending.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, -errno.EPROTO )
+            oPending.m_oReject( oPending )
+            return
+        }
+  
+        console.log( "bridge returns " + strGreet )
+
+        oPending.m_oResp.Push(
+            {t:EnumTypeId.typeUInt32, v: this.m_dwPortId} )
+
+        oPending.m_oResolve( oPending )
     }
 
     // encode the message and send it through websocket
@@ -424,7 +467,7 @@ exports.CRpcTcpBridgeProxy = class CRpcTcpBridgeProxy
         if( oMsg.m_iCmd >= oCmdTab.length )
             return -errno.ENOTSUP
         try{
-            return oCmdTab[ oMsg.m_iCmd ].call( oMsg )
+            return oCmdTab[ oMsg.m_iCmd ]( oMsg )
         } catch( Error )
         { return  -errno.EFAULT}
     }
@@ -453,13 +496,13 @@ exports.CConnParams = class CConnParams extends CConfigDb2
     }
 }
 
-exports.CRpcRouter = class CRpcRouter
+class CRpcRouter
 {
     constructor()
     {
         this.m_mapBdgeProxies = new Map()
         this.m_mapConnParams = new Map()
-        this.m_dwPortId = 1
+        this.m_dwPortIdCounter = 1
         this.m_oWorker = self
         this.m_oWorker.onmessage =
             this.DispatchMsg.bind( this )
@@ -469,12 +512,9 @@ exports.CRpcRouter = class CRpcRouter
         this.m_arrDispTable = []
         this.m_arrDispTable.push(
             (e)=>{ console.log( "Error Invalid function")})
-        this.m_arrDispTable.push(
-            (e)=>{ console.log( "Error Invalid function")})
         var oAdminTab = this.m_arrDispTable
-        oAdminTab[ 1 ] = ( oMsg )=>{
-            this.SetConfig( oMsg )
-        }
+        oAdminTab.push( ( oMsg )=>{
+            this.SetConfig( oMsg ) } )
     }
 
     GetRouterName()
@@ -497,9 +537,13 @@ exports.CRpcRouter = class CRpcRouter
         this.PostMessage( oResp )
     }
 
-    StartBridgeProxy( oConnParams )
+    GetNewPortId()
+    { return this.m_dwPortIdCounter++ }
+
+    OpenRemotePort( oReq )
     {
-        bFound = false
+        var bFound = false
+        var oConnParams = oReq.m_oReq
         for( [ dwPortId, oConn ] of this.m_mapBdgeProxies )
         {
             if( oConn.IsEqual( oConnParams ) )
@@ -510,19 +554,70 @@ exports.CRpcRouter = class CRpcRouter
         }
 
         if( bFound )
-            return oConn
+        {
+            oRet = new CAdminRespMessage( oReq )
+            oRet.m_oResp.SetUint32(
+                EnumPropId.propReturnValue,
+                errno.STATUS_SUCCESS )
+            oRet.m_oResp.Push(
+                {t: EnumTypeId.typeUInt32, v: dwPortId})
+            this.PostMessage(oRet)
+            return null
+        }
 
-        oProxy = new CRpcTcpBridgeProxy( this, oConnParams )
-        dwPortId = this.m_dwPortId++ 
-        oProxy.SetPortId( dwPortId )
+        return new Promise( (resolve, reject)=>{
+            var oProxy = new CRpcTcpBridgeProxy(
+                this, oConnParams )
+            var dwPortId = this.GetNewPortId()
+            oProxy.SetPortId( dwPortId )
+            var oPending = new CPendingRequest( oReq )
+            oPending.m_oResolve = resolve
+            oPending.m_oReject = reject
+            oPending.m_oObject = oProxy
+            oPending.m_oResp = new CConfigDb2()
+            oProxy.Start( oPending )
+        }).then( ( t )=>{
+            this.OnOpenRemotePortComplete(
+                oPending.m_oObject,
+                oPending.m_oReq,
+                oPending.m_oResp )
+        }).catch(( t )=>{
+            this.OnOpenRemotePortComplete(
+                oPending.m_oObject,
+                oPending.m_oReq,
+                oPending.m_oResp )
+        })
+    }
 
+    OnOpenRemotePortComplete( oProxy, oReq, oResp )
+    {
+        var iRet = oResp.GetProperty(
+            EnumPropId.propReturnValue )
+        if( iRet === null || iRet === undefined )
+            return
+
+        var oRet = new CAdminRespMessage( oReq )                        
+        oRet.m_oResp = oResp
+
+        this.PostMessage( oRet )
+
+        var dwPortId = oResp.GetProperty( 0 )
+        if( ERROR( iRet ) )
+        {
+            if( dwPortId === null || dwPortId === undefined )
+                return
+            oProxy.Stop()
+            return
+        }
+        
+        // register the bridge proxy
+        var dwPortId = oResp.GetProperty( 0 )
         this.m_mapBdgeProxies.set(
             dwPortId, oProxy )
 
+        var oConnParams = oReq.m_oReq
         this.m_mapConnParams.set(
             dwPortId, oConnParams )
-
-        oProxy.Start()
     }
 
     GetProxy( key )
@@ -536,11 +631,13 @@ exports.CRpcRouter = class CRpcRouter
             {
                 strUrl = oConn.GetProperty(
                     EnumPropId.propDestUrl)
-                if( strUrl === key )
-                    oProxy = this.m_mapBdgeProxies.get( key )
+                if( strUrl !== key )
+                    continue
+                oProxy = this.m_mapBdgeProxies.get( key )
+                break
             }
         }
-        if( oProxy === undefined )
+        if( !oProxy )
             return null
         return oProxy
     }
@@ -553,7 +650,7 @@ exports.CRpcRouter = class CRpcRouter
             if( oMsg.m_iCmd >=
                 this.m_arrDispTable[ oCmdTab].length )
                 return -errno.ENOTSUP
-            return oCmdTab[ oMsg.m_iCmd ].call( oMsg )
+            return oCmdTab[ oMsg.m_iCmd ]( oMsg )
         }
         else if( oMsg.m_iType === IoMsgType.ReqMsg )
         {
@@ -568,7 +665,6 @@ exports.CRpcRouter = class CRpcRouter
                 this.PostMessage( oResp )
                 return ret
             }
-            
             return oProxy.DispatchMsg( oMsg )
         }
         return -errno.EINVAL
@@ -577,3 +673,6 @@ exports.CRpcRouter = class CRpcRouter
     PostMessage( oMsg )
     { self.postMessage( oMsg ) }
 }
+
+exports.CRpcRouter = CRpcRouter
+exports.CRpcStreamBase = CRpcStreamBase
