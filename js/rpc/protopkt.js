@@ -4,12 +4,13 @@ const CV = require( "../combase/enums.js" ).constval
 const Buffer = require( "buffer").Buffer
 const { decodeBlock, encodeBlock, encodeBound } = require( "lz4" )
 
-exports.CPacketHeader = class CPacketHeader
+class CPacketHeader
 {
     constructor()
     {
-        u8 = new Uint8Array(['P', 'H', 'd', 'r'])
-        this.m_dwMagic = new Uint32Array( u8 )[0]
+        var u8 = new Uint8Array(['P', 'H', 'd', 'r'])
+        var arrUint32 = new Uint32Array(u8)
+        this.m_dwMagic = arrUint32[0]
         this.m_dwSize = 0
         this.m_iStmId = 0
         this.m_iPeerStmId = 0
@@ -23,7 +24,7 @@ exports.CPacketHeader = class CPacketHeader
 
     Serialize()
     {
-        oBuf = Buffer.alloc( GetSeriSize() )
+        var oBuf = Buffer.alloc( CPacketHeader.GetSeriSize() )
         var pos = 0
         oBuf.writeUint32BE( this.m_dwMagic, pos )
         pos += 4
@@ -48,7 +49,7 @@ exports.CPacketHeader = class CPacketHeader
         if( srcBuf.length - offset <
             CPacketHeader.GetSeriSize() )
             return -1
-        dwMagic = srcBuf.readUInt32BE( offset )
+        var dwMagic = srcBuf.readUInt32BE( offset )
         if( this.m_dwMagic !== dwMagic )
             throw new Error( "Error invalid packets magic")
         offset += 4
@@ -71,7 +72,7 @@ exports.CPacketHeader = class CPacketHeader
         return offset
     }
 }
-
+exports.CPacketHeader = CPacketHeader
 class CCarrierPacket
 {
     constructor()
@@ -112,7 +113,7 @@ class CCarrierPacket
 
     Serialize()
     {
-        hdrBuf = this.m_oHeader.Serialize()
+        var hdrBuf = this.m_oHeader.Serialize()
         return Buffer.concat([hdrBuf, this.m_oBuf ])
     }
 
@@ -120,7 +121,7 @@ class CCarrierPacket
     {
         if( srcBuf.length - offset < this.m_oHeader.GetSeriSize() )
             return -1
-        pos = this.m_oHeader.Deserialize( srcBuf, offset )
+        var pos = this.m_oHeader.Deserialize( srcBuf, offset )
         if( pos < 0 )
             throw new Error( "Error deserializing packet")
 
@@ -134,7 +135,7 @@ class CCarrierPacket
     }
 }
 
-exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket 
+class COutgoingPacket extends CCarrierPacket 
 {
     constructor()
     { super() }
@@ -147,18 +148,18 @@ exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket
         if( oPayload === null ||
             oPayload.length === 0 )
             throw new Error( "Error Invalid Buffer")
-        super.m_oBuf = oPayload
-        super.m_oHeader.m_dwSize = oPayload.length
+        this.m_oBuf = oPayload
+        this.m_oHeader.m_dwSize = oPayload.length
     }
 
     SetHeader( oHeader )
     {
-        super.m_oHeader.m_iStmId = oHeader.m_iStmId
-        super.m_oHeader.m_iPeerStmId = oHeader.m_iPeerStmId
-        super.m_oHeader.m_wFlags = oHeader.m_wFlags
-        super.m_oHeader.m_dwSeqNo = oHeader.m_dwSeqNo
-        super.m_oHeader.m_wProtoId = oHeader.m_wProtoId
-        super.m_oHeader.m_dwSessId = oHeader.m_dwSessId
+        this.m_oHeader.m_iStmId = oHeader.m_iStmId
+        this.m_oHeader.m_iPeerStmId = oHeader.m_iPeerStmId
+        this.m_oHeader.m_wFlags = oHeader.m_wFlags
+        this.m_oHeader.m_dwSeqNo = oHeader.m_dwSeqNo
+        this.m_oHeader.m_wProtoId = oHeader.m_wProtoId
+        this.m_oHeader.m_dwSessId = oHeader.m_dwSessId
     }
 
     Serialize()
@@ -173,7 +174,7 @@ exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket
             encodeBound( this.m_oBuf.length ) )
         var byteOutput = encodeBlock( this.m_oBuf, compressed )
 
-        backBuf = this.m_oBuf
+        var backBuf = this.m_oBuf
         this.m_oBuf = compressed.slice( 0, byteOutput )
         this.m_oHeader.m_dwSize = byteOutput
 
@@ -187,21 +188,21 @@ exports.COutgoingPacket = class COutgoingPacket extends CCarrierPacket
 
     Send()
     {
-        oSock = globalThis.g_oSock
+        var oSock = globalThis.g_oSock
         if( oSock.readyState !== 1 )
             throw new Error( "Error websocket is not ready")
         oSock.send( this.Serialize() )
     }
 }
-
-exports.CIncomingPacket = class CIncomingPacket extends CCarrierPacket 
+exports.COutgoingPacket = COutgoingPacket
+class CIncomingPacket extends CCarrierPacket 
 {
     constructor()
     { super() }
 
     Deserialize( srcBuf, offset )
     {
-        pos = super.Deserialize( srcBuf, offset )
+        var pos = super.Deserialize( srcBuf, offset )
         if( pos < 0 )
             return -1
 
@@ -218,3 +219,4 @@ exports.CIncomingPacket = class CIncomingPacket extends CCarrierPacket
         return pos
     }
 }
+exports.CIncomingPacket = CIncomingPacket

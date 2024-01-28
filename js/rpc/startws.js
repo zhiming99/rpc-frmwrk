@@ -2,7 +2,7 @@ const {CIncomingPacket, COutgoingPacket} = require( "./protopkt")
 
 exports.Connect = function Connect( strWsUrl )
 {
-    socket = new WebSocket( strWsUrl );
+    var socket = new WebSocket( strWsUrl );
     socket.binaryType = 'arraybuffer'
     socket.onopen = function() {
         console.log('connected!');

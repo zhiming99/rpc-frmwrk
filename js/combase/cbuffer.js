@@ -118,7 +118,7 @@ exports.CBuffer = class CBuffer extends CObjBase
     {
         const encoder = new TextEncoder();
         const encodedData = encoder.encode(str);
-        offset = start
+        var offset = start
         dstBuf.writeUint32LE( offset, encodedData.length + 1 )
         offset += 4
         dstBuf.fill( encodedData, offset, offset + encodedData.length )
@@ -133,7 +133,7 @@ exports.CBuffer = class CBuffer extends CObjBase
     {
         const encoder = new TextEncoder();
         const encodedData = encoder.encode(str);
-        nullc = Buffer.alloc(1)
+        var nullc = Buffer.alloc(1)
         nullc[0] = 0
         return Buffer.from( [encodedData, nullc] )
     }
@@ -141,7 +141,7 @@ exports.CBuffer = class CBuffer extends CObjBase
     static BufferToStr( buf, offset )
     {
         const decoder = new TextDecoder();
-        dwSize = buf.getUint32( offset )
+        var dwSize = buf.getUint32( offset )
         return decoder.decode(buf.slice(offset + 4))
     }
 
@@ -267,7 +267,7 @@ exports.CBuffer = class CBuffer extends CObjBase
         var dstBuffer
         var header = Buffer.alloc( SERI_HEADER.GetSeriSize())
         var oHdrView = new DataView( header.buffer )
-        dwType = EnumTypes.DataTypeMem 
+        var dwType = EnumTypes.DataTypeMem 
         switch( this.type )
         {
         case Tid.typeByteArr:
@@ -461,9 +461,9 @@ exports.CBuffer = class CBuffer extends CObjBase
 
     DeserializeObj( ov, dwClsid )
     {
-        offset = SERI_HEADER.GetSeriSize()
-        dwSize = ov.getUint32( 4 )
-        newObj = CoCreateInstance( dwClsid )
+        var offset = SERI_HEADER.GetSeriSize()
+        var dwSize = ov.getUint32( 4 )
+        var newObj = CoCreateInstance( dwClsid )
 
         if( newObj === null )
             throw new TypeError( "Error unknown class id")
@@ -474,8 +474,8 @@ exports.CBuffer = class CBuffer extends CObjBase
 
     DeserializePrimeType( ov, dwTypeId )
     {
-        offset = SERI_HEADER.GetSeriSize()
-        dwSize = ov.getUint32( 4 )
+        var offset = SERI_HEADER.GetSeriSize()
+        var dwSize = ov.getUint32( 4 )
 
         switch( dwTypeId )
         {
@@ -535,29 +535,29 @@ exports.CBuffer = class CBuffer extends CObjBase
             throw new TypeError( "Error type of input param, expecting CBuffer")
 
         this.Clear()
-        pos = 0
-        ret = 0
-        ov = new DataView( srcBuffer.buffer )
-        offset = SERI_HEADER.GetSeriSize()
+        var pos = 0
+        var ret = 0
+        var ov = new DataView( srcBuffer.buffer )
+        var offset = SERI_HEADER.GetSeriSize()
         do{
-            val = ov.getUint32( pos )
+            var val = ov.getUint32( pos )
             if( val !== Cid.CBuffer )
             {
                 ret = E.EINVAL.errno
                 break
             }
             pos += 4
-            dwSize = ov.getUint32( pos )
+            var dwSize = ov.getUint32( pos )
             if( dwSize > CV.BUF_MAX_SIZE )
             {
                 throw new Error ( "Error invalid size to deserialize")
             }
 
             val = ov.getUint32( 12 )
-            dwType = ( val & 0xf )
+            var dwType = ( val & 0xf )
+            var dwTypeId = ( (val & 0xf0 ) >> 4 )
             if( dwType === EnumTypes.DataTypeMem )
             {
-                dwTypeId = ( (val & 0xf0 ) >> 4 )
                 this.DeserializePrimeType( ov, dwTypeId )
                 this.type = dwTypeId
             }
@@ -569,7 +569,7 @@ exports.CBuffer = class CBuffer extends CObjBase
             }
             else if( dwType === EnumTypes.DataTypeObjPtr )
             {
-                dwClsid = ov.getUint32( 16 )
+                var dwClsid = ov.getUint32( 16 )
                 if( dwClsid != Cid.CBuffer )
                     this.m_value = this.DeserializeObj( ov, dwClsid )
                 else

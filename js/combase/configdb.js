@@ -4,7 +4,7 @@ const Cid = require( "./enums.js").EnumClsid
 const Pid = require( "./enums.js").EnumPropId
 const Tid = require( "./enums.js").EnumTypeId
 const CV = require( "./enums.js").constval
-const Buffer = require( "buffer")
+const { Buffer } = require( "buffer")
 const { CoCreateInstance } = require("./factory.js")
 const CBuffer = require( "./cbuffer").CBuffer
 const marshall = require( "../dbusmsg/message.js").marshall
@@ -29,14 +29,14 @@ const SERI_HEADER_CFG = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
     {
         super.Serialize( dstBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        dstBuf.setUint32( offset, this.dwCount)
+        dstBuf.writeUint32BE( offset, this.dwCount)
     }
 
     Deserialize( srcBuf, offset )
     {
         super.Deserialize( srcBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        this.dwCount = srcBuf.getUint32( offset )
+        this.dwCount = srcBuf.readUint32BE( offset )
     }
 }
 
@@ -60,9 +60,16 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 {
     constructor()
     {
+        super()
         this.m_dwClsid = Cid.CConfigDb2
         this.m_props = new Map()
         this.m_dwCount = 0
+    }
+
+    Recover( oMsg )
+    {
+        this.m_props = oMsg.m_props
+        this.m_dwCount = oMsg.m_dwCount
     }
 
     Push( src )
@@ -73,10 +80,10 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         this.m_dwCount++
     }
 
-    Push( tid, val )
+    /*Push( tid, val )
     {
         this.Push( new Pair( { t : tid, v:val } ) )        
-    }
+    }*/
 
     Pop()
     {
@@ -204,7 +211,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         var dstBuf = Buffer.alloc( CV.PAGE_SIZE )
         oHdr.dwCount = this.m_props.size 
 
-        pos = SERI_HEADER_CFG.GetSeriSize()
+        var pos = SERI_HEADER_CFG.GetSeriSize()
+        var key, value
         for( const [ key, value ] of this.m_props )
         {
             if( pos + 5 > dstBuf.length )
@@ -214,6 +222,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             dstBuf.writeUint32BE( key, pos )
             pos += 4
             dstBuf.writeUint8( value.t, pos++ )
+            var dwSize = 0
             switch( value.t )
             {
             case Tid.typeByte:
@@ -289,7 +298,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                         pos += 4
                         break
                     }
-                    strBuf = CBuffer.StrToBuffer( value.v ) 
+                    var strBuf = CBuffer.StrToBuffer( value.v ) 
                     if( pos + strBuf.length > dstBuf.length )
                     {
                         dwSize = strBuf.length > CV.PAGE_SIZE ?
@@ -316,7 +325,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 }
             case Tid.typeDMsg:
                 {
-                    msgBuf = marshall( value.v )
+                    var msgBuf = marshall( value.v )
                     dwSize = msgBuf.length
                     dstBuf.writeUint32BE( dwSize + 4, pos )
                     pos += 4
@@ -334,7 +343,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                         pos += 4
                         break
                     }
-                    objBuf = value.v.Serialize() 
+                    var objBuf = value.v.Serialize() 
                     dwSize = objBuf.length
                     dstBuf.writeUint32BE( dwSize, pos )
                     pos += 4
@@ -357,8 +366,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         if( srcBuffer.length < offset )
             throw new Error( "Error buffer too small to deserialize")
 
-        oHdr = new SERI_HEADER_CFG()
-        pos = offset
+        var oHdr = new SERI_HEADER_CFG()
+        var pos = offset
         oHdr.Deserialize( srcBuffer, pos )
         if( oHdr.dwClsid !== Cid.CConfigDb2 ||
             oHdr.dwSize > CV.CFGDB_MAX_SIZE ||
@@ -370,11 +379,12 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         pos += SERI_HEADER_CFG.GetSeriSize()
         for( i = 0; i < oHdr.dwCount; i++ )
         {
-            key = srcBuffer.readUint32BE( pos )
+            var key = srcBuffer.readUint32BE( pos )
             pos += 4
-            value = new Pair(null)
+            var value = new Pair(null)
             value.t = srcBuffer.readUint8( pos )
             pos++
+            var dwSize = 0
             switch( value.t )
             {
             case Tid.typeByte:
@@ -498,7 +508,12 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                         throw new Error( "Error buffer is too small" )
                     value.v = CoCreateInstance( oHdr.dwClsid )
                     value.v.Deserialize( srcBuf, pos )
-                    pos += dwSize
+                    pos += oHdr.dwSize + oHdr.GetSeriSize()
+                    break
+                }
+            default:
+                {
+                    throw new Error( "Error unknown type")
                     break
                 }
             }

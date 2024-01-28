@@ -164,7 +164,7 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
         oHeader.dwSize = dwTotal -
             oHeader.super().GetSeriSize()
         
-        hdrBuf = Buffer.alloc( oHeader.GetSeriSize() )
+        var hdrBuf = Buffer.alloc( oHeader.GetSeriSize() )
         oHeader.Serialize( hdrBuf, 0 )
         return Buffer.concat( [ hdrBuf, oCfgBuf ])
     } 
