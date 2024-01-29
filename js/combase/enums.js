@@ -13,6 +13,9 @@ module.exports = {
       OBJNAME_ROUTER_BRIDGE: "RpcRouterBridgeImpl",
       BRIDGE_PROXY_GREETINGS: "rpcf-bridge-proxy",
       BRIDGE_GREETINGS: "rpcf-bridge", 
+      IFSTATE_OPENPORT_INTERVAL : 120,
+      IFSTATE_DEFAULT_IOREQ_TIMEOUT:120,
+      IFSTATE_OPENPORT_RETRIES: 3,
     },
 
     EnumTypes:{

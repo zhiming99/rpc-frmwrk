@@ -29,7 +29,7 @@ const SERI_HEADER_CFG = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
     {
         super.Serialize( dstBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        dstBuf.writeUint32BE( offset, this.dwCount)
+        dstBuf.writeUint32BE( this.dwCount, offset)
     }
 
     Deserialize( srcBuf, offset )
@@ -79,11 +79,6 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         this.m_props.set( this.m_dwCount, src )
         this.m_dwCount++
     }
-
-    /*Push( tid, val )
-    {
-        this.Push( new Pair( { t : tid, v:val } ) )        
-    }*/
 
     Pop()
     {
@@ -339,14 +334,13 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 {
                     if( value.v === null )
                     {
-                        dstBuf.writeUint32BE( 0 , pos )
-                        pos += 4
+                        var o = new SERI_HEADER_BASE()
+                        o.Serialize( dstBuf, pos )
+                        pos += SERI_HEADER_BASE.GetSeriSize()
                         break
                     }
                     var objBuf = value.v.Serialize() 
                     dwSize = objBuf.length
-                    dstBuf.writeUint32BE( dwSize, pos )
-                    pos += 4
                     dstBuf.fill( objBuf, pos, pos + dwSize )
                     pos += dwSize
                     break

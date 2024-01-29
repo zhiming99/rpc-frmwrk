@@ -135,7 +135,7 @@ exports.CBuffer = class CBuffer extends CObjBase
         const encodedData = encoder.encode(str);
         var nullc = Buffer.alloc(1)
         nullc[0] = 0
-        return Buffer.from( [encodedData, nullc] )
+        return Buffer.concat( [encodedData, nullc] )
     }
 
     static BufferToStr( buf, offset )

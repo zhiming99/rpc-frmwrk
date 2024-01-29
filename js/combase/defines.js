@@ -14,19 +14,18 @@ exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
 
     Serialize( dstBuf, offset )
     {
-        Buffer.alloc( SERI_HEADER_BASE.GetSeriSize())
-        dstBuf.writeUint32BE( offset, this.dwClsid )
-        dstBuf.writeUint32BE( offset + 4, this.dwSize )
-        dstBuf.writeUint32BE( offset + 8, 0 )
-        dstBuf.writeUint8( offset, this.bVersion )
+        dstBuf.writeUint32BE( this.dwClsid, offset )
+        dstBuf.writeUint32BE( this.dwSize, offset + 4)
+        dstBuf.writeUint32BE( 0, offset + 8)
+        dstBuf.writeUint8( this.bVersion, offset + 8 )
         return dstBuf
     }
     Deserialize( srcBuf, offset )
     {
-        var ov = new DataView( srcBuf.buffer, offset )
-        this.dwClsid = ov.getUint32( 0 )
-        this.dwSize = ov.getUint32( 4 )
-        this.bVersion = ov.getUint8( 8 )
+        this.dwClsid = src.readUint32BE( 0 )
+        this.dwSize = src.readUint32BE( 4 )
+        this.bVersion = ov.readUint8( 8 )
+        return offset + SERI_HEADER_BASE.GetSeriSize()
     }
 }
 

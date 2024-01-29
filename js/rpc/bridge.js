@@ -1,6 +1,6 @@
 const { Pair, CConfigDb2 } = require("../combase/configdb")
 const { randomInt } = require("../combase/defines")
-const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId } = require("../combase/enums")
+const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
 const { CDBusMessage } = require("./dmsg")
@@ -19,7 +19,7 @@ function DBusIfName(
     strName )
 {
     var strIfName = constval.DBUS_NAME_PREFIX
-    return strIfName + "interf." + strName
+    return strIfName + "Interf." + strName
 }
 exports.DBusIfName = DBusIfName
 function DBusDestination(
@@ -143,7 +143,7 @@ class CRpcStreamBase
         oOut.SetBufToSend( oBuf )
 
         // send
-        this.m_oParent.SendMessage( 
+        return this.m_oParent.SendMessage( 
             oOut.Serialize() )
     }
 }
@@ -176,8 +176,9 @@ class CRpcDefaultStream extends CRpcStreamBase
         if( oBuf === null ||
             oBuf === undefined )
             return
+        var dmsgBuf = oBuf.slice( 4, oBuf.length )
         // post the data to the main thread
-        var oMsg = unmarshall( oBuf )
+        var oMsg = unmarshall( dmsgBuf )
         var dmsg = new CDBusMessage()
         dmsg.Copy( oMsg )
         if( dmsg.GetType() === messageType.signal )
@@ -349,27 +350,51 @@ class CRpcTcpBridgeProxy
             this.m_oParent.GetRouterName(),
             constval.OBJNAME_TCP_BRIDGE ) )
             
-        // dmsg.SetSender( oMsg.m_oReq.GetProperty(
-        //     EnumPropId.propDestDBusName ))
-
         dmsg.SetSerial( oMsg.m_iMsgId )
         var oParams = new CConfigDb2()
+        var oInfo = new CConfigDb2()
         
-        oParams.SetUint64(
+        oInfo.SetUint64(
             EnumPropId.propTimestamp,
             Math.floor( Date.now() / 1000 ))
 
-        oParams.Push( new Pair(
+        oInfo.Push( new Pair(
             {t: EnumTypeId.typeString,
              v: constval.BRIDGE_PROXY_GREETINGS }) )
+
+        oParams.Push( new Pair(
+            {t: EnumTypeId.typeObj, v: oInfo }) )
+
+        var oCallOpts = new CConfigDb2()
+        oCallOpts.SetUint32(
+            EnumPropId.propCallFlags,
+            EnumCallFlags.CF_ASYNC_CALL |
+            EnumCallFlags.CF_WITH_REPLY |
+            messageType.methodCall )
+
+        oCallOpts.SetUint32(
+            EnumPropId.propTimeoutsec, 
+            constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT )
+
+        oCallOpts.SetUint32(
+            EnumPropId.propKeepAliveSec, 
+            3600 )
+
+        oParams.SetObjPtr(
+            EnumPropId.propCallOptions, oCallOpts )
         var oBuf = oParams.Serialize()
         var arrBody = []
         arrBody.push( new Pair( { t: "ay", v: oBuf }))
         dmsg.AppendFields( arrBody )
         var oBufToSend = marshall( dmsg )
+        var oBufSize = Buffer.alloc( 4 )
+        oBufSize.writeUInt32BE( oBufToSend.length )
+
         var oStream =
             this.m_mapStreams.get( EnumStmId.TCP_CONN_DEFAULT_STM )
-        ret = oStream.SendBuf( oBufToSend )
+
+        ret = oStream.SendBuf(
+            Buffer.concat([oBufSize, oBufToSend]) )
 
         if( ret < 0 )
         {

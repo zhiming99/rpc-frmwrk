@@ -1,5 +1,5 @@
-const Long = require('long');
-import parseSignature from "./signature";
+const Long= require('long');
+const parseSignature=require( "./signature" )
 
 
 // Buffer + position + global start position ( used in alignment )
@@ -180,4 +180,4 @@ DBusBuffer.prototype.readSimpleType = function readSimpleType(t) {
   }
 };
 
-// exports.DBusBuffer = DBusBuffer
+exports.DBusBuffer = DBusBuffer

@@ -8,8 +8,8 @@ class CPacketHeader
 {
     constructor()
     {
-        var u8 = new Uint8Array(['P', 'H', 'd', 'r'])
-        var arrUint32 = new Uint32Array(u8)
+        var u8 = new Uint8Array([0x50, 0x48, 0x64, 0x72])
+        var arrUint32 = new Uint32Array(u8.buffer)
         this.m_dwMagic = arrUint32[0]
         this.m_dwSize = 0
         this.m_iStmId = 0
@@ -84,7 +84,7 @@ class CCarrierPacket
     GetStreamId()
     { return this.m_oHeader.m_iStmId }
 
-    GetPeerStmId()
+    GetPeerStreamId()
     { return this.m_oHeader.m_iPeerStmId }
 
     GetProtoId()
@@ -119,7 +119,7 @@ class CCarrierPacket
 
     Deserialize( srcBuf, offset )
     {
-        if( srcBuf.length - offset < this.m_oHeader.GetSeriSize() )
+        if( srcBuf.length - offset < CPacketHeader.GetSeriSize() )
             return -1
         var pos = this.m_oHeader.Deserialize( srcBuf, offset )
         if( pos < 0 )
