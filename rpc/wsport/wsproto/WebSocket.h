@@ -34,7 +34,7 @@ enum WebSocketFrameType {
 
 	PING_FRAME=0x19,
 	PONG_FRAME=0x1A,
-    CLOSE_FRAME=0x1B,
+    CLOSE_FRAME=0x98,
 };
 
 class WebSocket

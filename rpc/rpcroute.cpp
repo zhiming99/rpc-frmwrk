@@ -1135,6 +1135,16 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
     return ret;
 }
 
+gint32 CRpcRouterBridge::OnPostStop(
+    IEventSink* pCallback )
+{
+    m_pBridge.Clear();
+    m_pBridgeAuth.Clear();
+    m_pBridgeProxy.Clear();
+    m_pReqProxy.Clear();
+    return super::OnPostStop( pCallback );
+}
+
 gint32 CRouterStartReqFwdrProxyTask::
     OnTaskCompleteStart( gint32 iRetVal )
 {

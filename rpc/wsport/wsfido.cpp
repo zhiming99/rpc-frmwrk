@@ -1734,7 +1734,15 @@ gint32 CWsCloseTask::RunTask()
             break;
 
         BufPtr pPayload( true );
-        *pPayload = dwReason;
+        if( ERROR( dwReason ) )
+        {
+            *pPayload = htons( 1011 );
+            dwReason = htonl( dwReason );
+            pPayload->Append( ( guint8* )&dwReason,
+                sizeof( guint32 ) );
+        }
+        else
+            *pPayload = htons( 1000 );
         BufPtr pOutBuf( true );
 
         ret = pPort->MakeFrame(

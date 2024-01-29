@@ -391,6 +391,14 @@ gint32 CConfigDb2::Serialize(
             {
                 BufPtr pBuf( true );
                 ObjPtr& pObj = ( ObjPtr& )oVar;
+                if( pObj.IsEmpty() )
+                {
+                    SERI_HEADER_BASE oBase;
+                    memcpy( pLoc,
+                        &oBase, sizeof( oBase ) );
+                    pLoc += sizeof( oBase );
+                    break;
+                }
                 ret = pObj->Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
@@ -441,6 +449,9 @@ gint32 CConfigDb2::Serialize(
             ret = -EINVAL;
             break;
         }
+
+        if( ERROR( ret ) )
+            break;
 
         ++itr;
     }
@@ -610,6 +621,14 @@ gint32 CConfigDb2::Deserialize(
                     }
 
                     ObjPtr pObj;
+                    if( len == 0 ||
+                        oHdr.dwClsid == clsid( Invalid ) )
+                    {
+                        oVar = pObj;
+                        pLoc += len;
+                        break;
+                    }
+
                     ret = pObj.NewObj(
                         ( EnumClsid )oHdr.dwClsid );
                     if( ERROR( ret ) )
