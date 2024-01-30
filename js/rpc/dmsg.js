@@ -1,5 +1,5 @@
 const { messageType } = require("../dbusmsg/constants")
-
+const { constval } = require("../combase/enums")
 require( "../dbusmsg/constants")
 
 exports.CDBusMessage = class CDBusMessage
@@ -121,3 +121,46 @@ exports.CDBusMessage = class CDBusMessage
         this.body = oMsg.body
     }
 }
+
+function DBusIfName(
+    strName )
+{
+    var strIfName = constval.DBUS_NAME_PREFIX
+    return strIfName + "Interf." + strName
+}
+exports.DBusIfName = DBusIfName
+function DBusDestination(
+    strModName )
+{
+    var strDest = constval.DBUS_NAME_PREFIX
+    strDest += strModName
+}
+exports.DBusDestination = DBusDestination
+
+function DBusObjPath(
+    strModName, strObjName )
+{
+    if( strModName.includes("./") )
+        return ""
+    if( strObjName.length === 0 )
+        return ""
+    var strPath = "." +
+        constval.DBUS_NAME_PREFIX +
+        strModName + ".objs." + strObjName
+
+    return strPath.replace(/\./g,'/')
+}
+exports.DBusObjPath = DBusObjPath
+
+function DBusDestination2(
+    strModName, strObjName )
+{
+    if( strModName.includes("./") )
+        return ""
+    if( strObjName.length === 0 )
+        return ""
+    return constval.DBUS_NAME_PREFIX +
+        strModName + ".objs." + strObjName
+}
+
+exports.DBusDestination2 = DBusDestination2

@@ -4,7 +4,7 @@ const Tid = require( "./enums.js").EnumTypeId
 const CV = require( "./enums.js").constval
 const { CoCreateInstance } = require("./factory");
 const E = require ( 'syserrno' ).errors
-const { SERI_HEADER_BASE } = require( "./defines" );
+const { SERI_HEADER_BASE } = require("./SERI_HEADER_BASE.js");
 
 const CObjBase = require( "./objbase" ).CObjBase
 const { Buffer } = require( "buffer" )

@@ -1,33 +1,28 @@
-const { Buffer } = require( "buffer")
-exports.SERI_HEADER_BASE = class SERI_HEADER_BASE
-{
-    constructor()
-    {
-        this.dwClsid = 0;
-        this.dwSize = 0;
-        this.bVersion = 1;
-        this.bReserved = 0;
-    }
-
-    static GetSeriSize()
-    { return 12 }
-
-    Serialize( dstBuf, offset )
-    {
-        dstBuf.writeUint32BE( this.dwClsid, offset )
-        dstBuf.writeUint32BE( this.dwSize, offset + 4)
-        dstBuf.writeUint32BE( 0, offset + 8)
-        dstBuf.writeUint8( this.bVersion, offset + 8 )
-        return dstBuf
-    }
-    Deserialize( srcBuf, offset )
-    {
-        this.dwClsid = src.readUint32BE( 0 )
-        this.dwSize = src.readUint32BE( 4 )
-        this.bVersion = ov.readUint8( 8 )
-        return offset + SERI_HEADER_BASE.GetSeriSize()
-    }
-}
+const Tid = require( "./enums.js").EnumTypeId
 
 exports.randomInt = function randomInt( max )
 { return Math.floor( Math.random() * max ) }
+
+exports.ERROR = function ( iRet )
+{
+    return iRet < 0
+}
+exports.SUCCEEDED = function ( iRet )
+{ return iRet === errno.STATUS_SUCCESS }
+
+exports.Pair = class Pair
+{
+    constructor( src )
+    {
+        if( src === null )
+        {
+            this.t = Tid.typeNone
+            this.v = null
+        }
+        else
+        {
+            this.t = src.t
+            this.v = src.v
+        }
+    }
+}

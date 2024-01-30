@@ -1,93 +1,12 @@
-const { Pair, CConfigDb2 } = require("../combase/configdb")
-const { randomInt } = require("../combase/defines")
+const { CConfigDb2 } = require("../combase/configdb")
+const { randomInt, ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
 const { CDBusMessage } = require("./dmsg")
-const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, AdminCmd } = require("./iomsg")
+const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CPendingRequest, AdminCmd } = require("./iomsg")
 const { messageType } = require( "../dbusmsg/constants")
-
-function ERROR( iRet )
-{
-    return iRet < 0
-}
-
-function SUCCEEDED( iRet )
-{ return iRet === errno.STATUS_SUCCESS }
-
-function DBusIfName(
-    strName )
-{
-    var strIfName = constval.DBUS_NAME_PREFIX
-    return strIfName + "Interf." + strName
-}
-exports.DBusIfName = DBusIfName
-function DBusDestination(
-    strModName )
-{
-    var strDest = constval.DBUS_NAME_PREFIX
-    strDest += strModName
-}
-exports.DBusDestination = DBusDestination
-
-function DBusObjPath(
-    strModName, strObjName )
-{
-    if( strModName.includes("./") )
-        return ""
-    if( strObjName.length === 0 )
-        return ""
-    var strPath = "." +
-        constval.DBUS_NAME_PREFIX +
-        strModName + ".objs." + strObjName
-
-    return strPath.replace(/\./g,'/')
-}
-exports.DBusObjPath = DBusObjPath
-
-function DBusDestination2(
-    strModName, strObjName )
-{
-    if( strModName.includes("./") )
-        return ""
-    if( strObjName.length === 0 )
-        return ""
-    return constval.DBUS_NAME_PREFIX +
-        strModName + ".objs." + strObjName
-}
-
-exports.DBusDestination2 = DBusDestination2
-
-class CPendingRequest
-{
-    constructor( oReq )
-    {
-        this.m_oResolve = null
-        this.m_oReject = null
-        this.m_oReq = oReq
-        this.m_oResp = null
-        this.m_oObject = null
-    }
-
-    OnTaskComplete( oResp )
-    {
-        if( this.m_oResolve === null )
-            return
-        this.m_oResp = oResp
-        this.m_oResolve( this )
-    }
-
-    OnCanceled( iRet )
-    {
-        if( this.m_oReject === null)
-            return
-        var oResp = new CConfigDb2()
-        oResp.SetUint32(
-            EnumPropId.propReturnValue, iRet )
-        this.m_oResp = oResp
-        this.m_oReject( this )
-    }
-}
+const { Bdge_Handshake } = require("./handshak")
 
 class CRpcStreamBase
 {
@@ -108,6 +27,18 @@ class CRpcStreamBase
         this.m_wProtoId = wProtoId
         this.m_oHeader.m_iStmId = iStmId
         this.m_oHeader.m_wProtoId = wProtoId
+        this.SendBuf = function ( oBuf )
+        {
+            var oHdr = this.m_oHeader
+            oHdr.m_dwSeqNo = this.GetSeqNo()
+            var oOut = new COutgoingPacket()
+            oOut.SetHeader( oHdr )
+            oOut.SetBufToSend( oBuf )
+
+            // send
+            return this.m_oParent.SendMessage( 
+                oOut.Serialize() )
+        }
     }
 
     GetStreamId()
@@ -134,18 +65,6 @@ class CRpcStreamBase
     GetSeqNo()
     { return this.m_dwSeqNo++ }
 
-    SendBuf( oBuf )
-    {
-        var oHdr = this.m_oHeader
-        oHdr.m_dwSeqNo = this.GetSeqNo()
-        var oOut = new COutgoingPacket()
-        oOut.SetHeader( oHdr )
-        oOut.SetBufToSend( oBuf )
-
-        // send
-        return this.m_oParent.SendMessage( 
-            oOut.Serialize() )
-    }
 }
 
 class CRpcControlStream extends CRpcStreamBase
@@ -168,7 +87,18 @@ class CRpcControlStream extends CRpcStreamBase
 class CRpcDefaultStream extends CRpcStreamBase
 {
     constructor( oParent )
-    { super( oParent ) }
+    {
+        super( oParent )
+        var origSendBuf = this.SendBuf
+        this.SendBuf = function ( dmsg )
+        {
+            var oBufToSend = marshall( dmsg )
+            var oBufSize = Buffer.alloc( 4 )
+            oBufSize.writeUInt32BE( oBufToSend.length )
+            origSendBuf(
+                Buffer.concat( [ oBufSize, oBufToSend] ) )
+        }
+    }
 
     ReceivePacket( oInPkt )
     {
@@ -226,7 +156,7 @@ class CRpcTcpBridgeProxy
         { oIoTab.push(()=>{console.log("Invalid function call")}) }
 
         oIoTab[ IoCmd.Handshake[0] ] =
-            this.Handshake.bind( this )
+            Bdge_Handshake.bind( this )
 
         var oStm = new CRpcControlStream( this )
         var iStmId = EnumStmId.TCP_CONN_DEFAULT_CMD
@@ -296,7 +226,9 @@ class CRpcTcpBridgeProxy
             oMsg.m_iCmd = IoCmd.Handshake
             oMsg.m_iMsgId = globalThis.g_iMsgIdx++
             oMsg.m_iType = IoMsgType.ReqMsg
-            this.Handshake(oMsg, oPending)
+            var oIoTab = this.m_arrDispTable
+            oIoTab[ IoCmd.Handshake[0] ](oMsg, oPending)
+
         } catch ( oProxy ) {
             oPending.m_oResp.SetUint32(
                 EnumPropId.propReturnValue, -errno.EFAULT )
@@ -332,122 +264,6 @@ class CRpcTcpBridgeProxy
             this.m_iTimerId = 0
         }
         this.m_oParent = null
-    }
-
-    Handshake( oMsg, oPending )
-    {
-        var ret = -errno.EINVAL
-        var dmsg = new CDBusMessage( messageType.methodCall )
-
-        dmsg.SetInterface( DBusIfName(
-            constval.IFNAME_MIN_BRIDGE ) )
-        dmsg.SetMember( IoCmd.Handshake[1] )
-        dmsg.SetObjPath( DBusObjPath(
-            this.m_oParent.GetRouterName(),
-            constval.OBJNAME_TCP_BRIDGE ))
-
-        dmsg.SetDestination( DBusDestination2(
-            this.m_oParent.GetRouterName(),
-            constval.OBJNAME_TCP_BRIDGE ) )
-            
-        dmsg.SetSerial( oMsg.m_iMsgId )
-        var oParams = new CConfigDb2()
-        var oInfo = new CConfigDb2()
-        
-        oInfo.SetUint64(
-            EnumPropId.propTimestamp,
-            Math.floor( Date.now() / 1000 ))
-
-        oInfo.Push( new Pair(
-            {t: EnumTypeId.typeString,
-             v: constval.BRIDGE_PROXY_GREETINGS }) )
-
-        oParams.Push( new Pair(
-            {t: EnumTypeId.typeObj, v: oInfo }) )
-
-        var oCallOpts = new CConfigDb2()
-        oCallOpts.SetUint32(
-            EnumPropId.propCallFlags,
-            EnumCallFlags.CF_ASYNC_CALL |
-            EnumCallFlags.CF_WITH_REPLY |
-            messageType.methodCall )
-
-        oCallOpts.SetUint32(
-            EnumPropId.propTimeoutsec, 
-            constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT )
-
-        oCallOpts.SetUint32(
-            EnumPropId.propKeepAliveSec, 
-            3600 )
-
-        oParams.SetObjPtr(
-            EnumPropId.propCallOptions, oCallOpts )
-        var oBuf = oParams.Serialize()
-        var arrBody = []
-        arrBody.push( new Pair( { t: "ay", v: oBuf }))
-        dmsg.AppendFields( arrBody )
-        var oBufToSend = marshall( dmsg )
-        var oBufSize = Buffer.alloc( 4 )
-        oBufSize.writeUInt32BE( oBufToSend.length )
-
-        var oStream =
-            this.m_mapStreams.get( EnumStmId.TCP_CONN_DEFAULT_STM )
-
-        ret = oStream.SendBuf(
-            Buffer.concat([oBufSize, oBufToSend]) )
-
-        if( ret < 0 )
-        {
-            var oResp = new CIoRespMessage( oMsg )
-            oResp.m_oResp.SetUint32(
-                EnumPropId.propReturnValue, ret )
-            this.m_oParent.PostMessage( oResp )
-            return null
-        }
-        return new Promise( (resolve, reject) =>{
-                var oPendingHs = new CPendingRequest( oMsg )
-                oPendingHs.m_oResolve = resolve
-                oPendingHs.m_oReject = reject
-                oPendingHs.m_oObject = oPending
-                this.m_mapPendingReqs.set(
-                    oMsg.m_iMsgId, oPendingHs )
-            }).then( ( t )=>{
-                this.OnHandshakeComplete( t.m_oObject, t.m_oResp )
-            }).catch(( t )=>{
-                this.OnHandshakeComplete( t.m_oObject, t.m_oResp )
-            })
-    }
-
-    OnHandshakeComplete( oPending, oResp )
-    {
-        var ret = oResp.GetProperty(
-            EnumPropId.propReturnValue )
-        if( ret === null || ret === undefined )
-            return
-        if( ret < 0 )
-        {
-            oPending.m_oResp.SetUint32(
-                EnumPropId.propReturnValue, ret )
-            oPending.m_oReject( oPending )
-            return
-        }
-
-        var strGreet = oResp.GetProperty( 0 )
-        if( strGreet.substr( 0, constval.BRIDGE_GREETINGS.length ) !==
-            constval.BRIDGE_GREETINGS )
-        {
-            oPending.m_oResp.SetUint32(
-                EnumPropId.propReturnValue, -errno.EPROTO )
-            oPending.m_oReject( oPending )
-            return
-        }
-  
-        console.log( "bridge returns " + strGreet )
-
-        oPending.m_oResp.Push(
-            {t:EnumTypeId.typeUInt32, v: this.m_dwPortId} )
-
-        oPending.m_oResolve( oPending )
     }
 
     // encode the message and send it through websocket

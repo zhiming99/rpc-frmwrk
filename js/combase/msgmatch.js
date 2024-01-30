@@ -1,6 +1,6 @@
 const { messageType } = require("../dbusmsg/constants");
 const { CConfigDb2 } = require("./configdb");
-const { SERI_HEADER_BASE } = require("./defines");
+const { SERI_HEADER_BASE } = require("./SERI_HEADER_BASE");
 const {CObjBase} = require("./objbase");
 const MT = require( "./enums").EnumMatchType
 const EnumPropId = require( "./enums").EnumPropId
