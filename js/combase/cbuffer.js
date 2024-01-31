@@ -2,7 +2,6 @@ const { marshall, unmarshall } = require("../dbusmsg/message");
 const Cid = require( "./enums.js").EnumClsid
 const Tid = require( "./enums.js").EnumTypeId
 const CV = require( "./enums.js").constval
-const { CoCreateInstance } = require("./factory");
 const E = require ( 'syserrno' ).errors
 const { SERI_HEADER_BASE } = require("./SERI_HEADER_BASE.js");
 
@@ -140,14 +139,16 @@ exports.CBuffer = class CBuffer extends CObjBase
 
     static BufferToStr( buf, offset )
     {
+        if( offset === undefined )
+            offset = 0
         const decoder = new TextDecoder();
-        var dwSize = buf.getUint32( offset )
-        return decoder.decode(buf.slice(offset + 4))
-    }
-
-    static BufferToStr( buf )
-    {
-        return this.BufferToStr( buf, 0 )
+        var dwSize = buf.readUint32BE( offset )
+        offset += 4
+        var str = decoder.decode(
+            buf.slice(offset, offset + dwSize - 1))
+        if( dwSize < str.length )
+            throw new Error("Error string goes beyond limit")
+        return str
     }
 
     ConvertToByteArr()
@@ -178,7 +179,7 @@ exports.CBuffer = class CBuffer extends CObjBase
         case Tid.typeUInt64:
             {
                 this.m_arrBuf = Buffer.alloc( 8 )
-                this.m_arrBuf.writeUint64BE( this.m_value )
+                this.m_arrBuf.writeBigUInt64BE( this.m_value )
                 break
             }
         case Tid.typeFloat:
@@ -463,7 +464,7 @@ exports.CBuffer = class CBuffer extends CObjBase
     {
         var offset = SERI_HEADER.GetSeriSize()
         var dwSize = ov.getUint32( 4 )
-        var newObj = CoCreateInstance( dwClsid )
+        var newObj = globalThis.CoCreateInstance( dwClsid )
 
         if( newObj === null )
             throw new TypeError( "Error unknown class id")

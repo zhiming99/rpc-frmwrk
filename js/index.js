@@ -1,4 +1,5 @@
 // index.js
+require( "./combase/factory" )
 const dmsg = require( "./dbusmsg/message.js" )
 const buffer = require( "./combase/cbuffer.js" )
 const { randomInt } = require("./combase/defines")
@@ -7,6 +8,9 @@ const { EnumPropId } = require("./combase/enums.js")
 
 globalThis.g_iMsgIdx = randomInt( 100000000 )
 require('./rpc/iomsg')
+
+const {CoCreateInstance}=require("./combase/factory")
+globalThis.CoCreateInstance=CoCreateInstance
 
 var g_count = 0
 const worker = new Worker(new URL('./rpc/ioworker.js', import.meta.url));

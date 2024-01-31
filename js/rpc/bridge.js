@@ -1,10 +1,10 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { randomInt, ERROR } = require("../combase/defines")
-const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags } = require("../combase/enums")
+const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
 const { CDBusMessage } = require("./dmsg")
-const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CPendingRequest, AdminCmd } = require("./iomsg")
+const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("./iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { Bdge_Handshake } = require("./handshak")
 
@@ -58,6 +58,9 @@ class CRpcStreamBase
 
     AgeStream( dwSec )
     { this.m_dwAgeSec += dwSec }
+
+    GetAge()
+    { return this.m_dwAgeSec }
 
     Refresh()
     { this.m_dwAgeSec = 0 }
@@ -150,6 +153,7 @@ class CRpcTcpBridgeProxy
         this.m_oSocket = null
         this.m_oParent = oParent
         this.m_arrDispTable = []
+        this.m_iState = EnumIfState.stateStarting
 
         var oIoTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoCmd).length;i++)
@@ -194,8 +198,6 @@ class CRpcTcpBridgeProxy
             this.m_iTimerId = setTimeout(
                 this.m_oScanReqs, dwIntervalMs )
         }
-        this.m_iTimerId = setTimeout(
-            this.m_oScanReqs, 10 * 1000 )
     }
 
     async Connect( strUrl, oPending )
@@ -206,6 +208,7 @@ class CRpcTcpBridgeProxy
                 socket.binaryType = 'arraybuffer'
                 socket.onopen = (event) => {
                     this.m_oSocket = socket
+                    this.m_iState = EnumIfState.stateStarted
                     resolve(this)
                 }
 
@@ -215,6 +218,13 @@ class CRpcTcpBridgeProxy
 
                 socket.onclose = () => {
                     console.log(`${this.m_oSocket} closed`)
+                    if( this.m_iState !== EnumIfState.stateStopping &&
+                        this.m_iState !== EnumIfState.stateStopped )
+                    {
+                        var oFunc = this.m_oParent.OnRmtSvrOffline.bind(
+                            this.m_oParent, this.m_dwPortId, "/")
+                        setTimeout( oFunc, 0 )
+                    }
                 }
 
                 socket.onerror = (event_2) => {
@@ -226,8 +236,9 @@ class CRpcTcpBridgeProxy
             oMsg.m_iCmd = IoCmd.Handshake
             oMsg.m_iMsgId = globalThis.g_iMsgIdx++
             oMsg.m_iType = IoMsgType.ReqMsg
-            var oIoTab = this.m_arrDispTable
-            oIoTab[ IoCmd.Handshake[0] ](oMsg, oPending)
+            oMsg.m_dwTimeLeftSec =
+                constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT * 1000
+            this.m_arrDispTable[ IoCmd.Handshake[0] ](oMsg, oPending)
 
         } catch ( oProxy ) {
             oPending.m_oResp.SetUint32(
@@ -249,21 +260,30 @@ class CRpcTcpBridgeProxy
     {
         var strUrl = this.m_oConnParams.GetProperty(
             EnumPropId.propDestUrl )
-        this.m_iTimerId =
-            setTimeout( this.m_oScanReqs )
+        this.m_iTimerId = setTimeout(
+            this.m_oScanReqs, 10 * 1000 )
         return this.Connect( strUrl, oPending )
     }
 
     Stop()
     {
-        this.m_oSocket.close()
+        var key, val
+        this.m_iState = EnumIfState.stateStopping
+        for( [ key, val ] of this.m_mapPendingReqs )
+            val.OnCanceled( -errno.ERROR_PORT_STOPPED )
+        if( this.m_mapPendingReqs.size > 0 )
+            this.m_mapPendingReqs.clear()
+        if( this.IsConnected() )
+            this.m_oSocket.close()
         this.m_oSocket = null
+
         if( this.m_iTimerId != 0 )
         {
             clearTimeout( this.m_iTimerId )
             this.m_iTimerId = 0
         }
         this.m_oParent = null
+        this.m_iState = EnumIfState.stateStopped
     }
 
     // encode the message and send it through websocket
@@ -309,6 +329,7 @@ class CRpcTcpBridgeProxy
     {
         if( oMsg.m_iType !== IoMsgType.ReqMsg )
             return -errno.EINVAL
+        console.log(oMsg)
 
         var oCmdTab = this.m_arrDispTable
         if( oMsg.m_iCmd >= oCmdTab.length )
@@ -349,6 +370,7 @@ class CRpcRouter
             this.DispatchMsg.bind( this )
 
         this.m_strRouterName = "rpcrouter"
+        this.m_strSess = ""
 
         this.m_arrDispTable = []
         var oAdminTab = this.m_arrDispTable
@@ -360,6 +382,9 @@ class CRpcRouter
 
         oAdminTab[ AdminCmd.OpenRemotePort[0]] = (oMsg)=>{
             this.OpenRemotePort( oMsg ) }
+
+        oAdminTab[ AdminCmd.CloseRemotePort[0]] = (oMsg)=>{
+            this.CloseRemotePort( oMsg ) }
     }
 
     GetRouterName()
@@ -436,7 +461,7 @@ class CRpcRouter
         if( iRet === null || iRet === undefined )
             return
 
-        var oRet = new CAdminRespMessage( oReq )                        
+        var oRet = new CAdminRespMessage( oReq )
         oRet.m_oResp = oResp
 
         this.PostMessage( oRet )
@@ -458,6 +483,72 @@ class CRpcRouter
         var oConnParams = oReq.m_oReq
         this.m_mapConnParams.set(
             dwPortId, oConnParams )
+    }
+
+    CloseRemotePort( oReq )
+    {
+        var ret = errno.STATUS_SUCCESS
+        oResp = new CAdminRespMessage( oReq )
+        try{
+            var dwPortId = oReq.m_oReq.GetProperty(
+                EnumPropId.propPortId )
+            if( dwPortId === null ||
+                dwPortId === undefined )
+            {
+                ret = -errno.EINVAL
+                throw new Error( "Error missing port id" )
+            }
+            var oProxy =
+                this.m_mapBdgeProxies.get( dwPortId )
+            if( !oProxy )
+            {
+                ret = -errno.ENOENT
+                throw new Error( "Error no such proxy" )
+            }
+
+            oProxy.Stop()
+            this.m_mapBdgeProxies.delete( dwPortId )
+            this.m_mapConnParams.delete( dwPortId )
+        }
+        catch( e )
+        {
+            oResp.m_oResp.Push(
+                {t: EnumTypeId.typeString, v: e.message })
+        }
+        finally
+        {
+            oResp.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, ret )
+            this.PostMessage( oResp )
+        }
+    }
+
+    OnRmtSvrOffline( dwPortId, strRoute )
+    {
+        try{
+            if( strRoute === "/" )
+            {
+                var oProxy =
+                    this.m_mapBdgeProxies.get( dwPortId )
+                if( !oProxy )
+                    throw new Error( "Error no such proxy" )
+
+                oProxy.Stop()
+                this.m_mapBdgeProxies.delete( dwPortId )
+                this.m_mapConnParams.delete( dwPortId )
+            }
+            var oEvt = new CIoEventMessage()
+            oEvt.m_dwPortId = dwPortId
+            oEvt.m_iCmd = IoEvent.OnRmtSvrOffline[0]
+            oEvt.m_iMsgId = globalThis.g_iMsgIdx++
+            oEvt.m_oReq.SetString(
+                EnumPropId.propRouterPath, strRoute )
+            this.PostMessage( oEvt )
+        }
+        catch( e )
+        {
+            console.log( e )
+        }
     }
 
     GetProxy( key )

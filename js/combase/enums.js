@@ -59,6 +59,7 @@ module.exports = {
         propDestIpAddr: 4106,
         propSrcTcpPort: 4107,
         propDestTcpPort: 4108,
+        propPortId: 8199,
         propPath2: 8213,
         propMsgPtr: 8220,
         propConfigPath: 12293,
@@ -289,5 +290,14 @@ module.exports = {
       CF_WITH_REPLY : 0x10,
       CF_KEEP_ALIVE : 0x20,
       CF_NON_DBUS : 0x40,
+    },
+
+    EnumIfState : {
+        stateStopped : 0,
+        stateStarting: 1,
+        stateStarted: 2,
+        stateConnected:3,
+        stateStopping: 4,
+        stateStopped : 5,
     },
 }

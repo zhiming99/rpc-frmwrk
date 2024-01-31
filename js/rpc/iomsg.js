@@ -46,6 +46,7 @@ const IoEvent = {
     Invalid : [ 0, "Invalid" ],
     OnKeepAlive : [ 1, "RpcEvt_OnKeepAlive" ],
     ForwardEvent : [ 2, "RpcEvt_ForwardEvent" ],
+    OnRmtSvrOffline : [ 3, "OnRmtSvrOffline" ],
 }
 
 exports.IoEvent = IoEvent
@@ -246,7 +247,7 @@ exports.CIoEventMessage = class CIoEventMessage extends CIoMessageBase
         super()
         this.m_iMsgId = 0
         this.m_iType = IoMsgType.EvtMsg
-        this.m_iCmd = IoCmd.ForwardEvent[0]
+        this.m_iCmd = IoEvent.Invalid
         this.m_oReq = new CConfigDb2()
     }
 }

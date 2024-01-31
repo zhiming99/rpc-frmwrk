@@ -6,7 +6,6 @@ const Pid = require( "./enums.js").EnumPropId
 const Tid = require( "./enums.js").EnumTypeId
 const CV = require( "./enums.js").constval
 const { Buffer } = require( "buffer")
-const { CoCreateInstance } = require("./factory.js")
 const CBuffer = require( "./cbuffer").CBuffer
 const marshall = require( "../dbusmsg/message.js").marshall
 const { CObjBase } = require( "./objbase.js" )
@@ -245,7 +244,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                         dstBuf = CConfigDb2.ExtendBuffer(
                             dstBuf, CV.PAGE_SIZE )
                     }
-                    dstBuf.writeUint64BE( value.v, pos )
+                    dstBuf.writeBigUInt64BE( value.v, pos )
                     pos += 8
                     break
                 }               
@@ -353,7 +352,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             oHdr.dwSize > CV.CFGDB_MAX_SIZE ||
             oHdr.bVersion !== 2 ||
             oHdr.dwCount > CV.CFGDB_MAX_ITEMS ||
-            oHdr.dwSize < srcBuf.length - offset -
+            oHdr.dwSize > srcBuf.length - offset -
                 SERI_HEADER_BASE.GetSeriSize() )
             throw new Error( "Error invalid CConfigDb2")
         pos += SERI_HEADER_CFG.GetSeriSize()
@@ -402,7 +401,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     {
                         throw new Error( "Error buffer is too small" )
                     }
-                    value.v = srcBuf.readUint64BE( pos )
+                    value.v = srcBuf.readBigUInt64BE( pos )
                     pos += 8
                     break
                 }               
@@ -429,16 +428,18 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             case Tid.typeString:
                 {
                     dwSize = srcBuf.readUint32BE( pos )
-                    pos += 4
-                    if( pos + dwSize > srcBuf.length )
+                    if( pos + 4 + dwSize > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
-                    if( dwSize = 0 )
+                    if( dwSize === 0 )
+                    {
                         value.v = ""
+                        pos += 4
+                    }
                     else
                     {
-                        value.v = CBuffer.BufferToStr(
-                            srcBuf.slice( pos, dwSize ) ) 
-                        pos += dwSize
+                        var strBuf = srcBuf.slice( pos, pos + 4 + dwSize )
+                        value.v = CBuffer.BufferToStr( strBuf ) 
+                        pos += 4 + dwSize
                     }
                     break
                 }
@@ -473,7 +474,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     }
                     if( pos + dwSize > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
-                    value.v = unmarshall( srcBuf.slice( pos, dwSize ) )
+                    value.v = unmarshall( srcBuf.slice( pos, pos + dwSize ) )
                     pos += dwSize
                     break
                 }
@@ -486,7 +487,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     tmpHdr.Deserialize( srcBuf, pos )
                     if( tmpHdr.dwSize + pos > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
-                    value.v = CoCreateInstance( tmpHdr.dwClsid )
+                    value.v = globalThis.CoCreateInstance( tmpHdr.dwClsid )
                     value.v.Deserialize( srcBuf, pos )
                     pos += tmpHdr.dwSize + SERI_HEADER_BASE.GetSeriSize()
                     break
