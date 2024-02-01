@@ -77,6 +77,8 @@ function Handshake( oMsg, oPending )
         this.m_oParent.PostMessage( oResp )
         return null
     }
+
+    oMsg.m_oReq = oParams
     return new Promise( (resolve, reject) =>{
             var oPendingHs = new CPendingRequest( oMsg )
             oPendingHs.m_oResolve = resolve
@@ -124,7 +126,15 @@ function OnHandshakeComplete( oProxy, oPending, oResp )
             EnumPropId.propSessHash )
         oProxy.m_strSess = strSess
 
-        console.log( "bridge returns " + strGreet )
+        oProxy.m_qwPeerTime = oInfo.GetProperty(
+            EnumPropId.propTimestamp )
+
+        var oInfo2 = oPending.m_oReq.m_oReq.GetProperty( 0 )
+        var qwStartTime1 = oInfo2.GetProperty(
+            EnumPropId.propTimestamp )
+        var qwStartTime2 = Math.floor( Date.now()/1000 )
+        oProxy.m_qwStartTime =
+            Math.floor( ( qwStartTime2 + qwStartTime1 ) / 2 )
 
         oOuter.m_oResp.Push(
             {t:EnumTypeId.typeUInt32, v: oProxy.m_dwPortId} )
@@ -135,6 +145,8 @@ function OnHandshakeComplete( oProxy, oPending, oResp )
         oOuter.m_oResolve( oOuter )
 
         oProxy.m_iState = EnumIfState.stateConnected
+        console.log( "Handshake completed successfully" )
+
     }
     catch( e )
     {

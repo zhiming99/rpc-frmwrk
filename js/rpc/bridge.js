@@ -1,5 +1,5 @@
 const { CConfigDb2 } = require("../combase/configdb")
-const { randomInt, ERROR } = require("../combase/defines")
+const { randomInt, ERROR, InvalFunc } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
@@ -154,10 +154,12 @@ class CRpcTcpBridgeProxy
         this.m_oParent = oParent
         this.m_arrDispTable = []
         this.m_iState = EnumIfState.stateStarting
+        this.m_qwPeerTime = 0
+        this.m_qwStartTime = 0
 
         var oIoTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoCmd).length;i++)
-        { oIoTab.push(()=>{console.log("Invalid function call")}) }
+        { oIoTab.push(InvalFunc) }
 
         oIoTab[ IoCmd.Handshake[0] ] =
             Bdge_Handshake.bind( this )
@@ -216,7 +218,7 @@ class CRpcTcpBridgeProxy
                     this.ReceiveMessage(event_1.data)
                 }
 
-                socket.onclose = () => {
+                socket.onclose = (e) => {
                     console.log(`${this.m_oSocket} closed`)
                     if( this.m_iState !== EnumIfState.stateStopping &&
                         this.m_iState !== EnumIfState.stateStopped )
@@ -375,7 +377,7 @@ class CRpcRouter
         this.m_arrDispTable = []
         var oAdminTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(AdminCmd).length;i++)
-        { oAdminTab.push(()=>{console.log("Invalid function")}) }
+        { oAdminTab.push(InvalFunc) }
 
         oAdminTab[ AdminCmd.SetConfig[0] ] = (oMsg)=>{
             this.SetConfig( oMsg ) }
@@ -547,7 +549,7 @@ class CRpcRouter
         }
         catch( e )
         {
-            console.log( e )
+            console.log( e.message )
         }
     }
 

@@ -179,7 +179,8 @@ exports.CBuffer = class CBuffer extends CObjBase
         case Tid.typeUInt64:
             {
                 this.m_arrBuf = Buffer.alloc( 8 )
-                this.m_arrBuf.writeBigUInt64BE( this.m_value )
+                this.m_arrBuf.writeBigUInt64BE(
+                    BigInt( this.m_value ) )
                 break
             }
         case Tid.typeFloat:

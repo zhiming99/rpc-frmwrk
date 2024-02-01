@@ -37,8 +37,7 @@ const IoCmd = {
     Login : [ 9, "RpcCall_Login" ],
     Handshake: [10, "RpcCall_Handshake"],
     KeepAliveRequest: [11, "RpcCall_KeepAliveRequest"],
-    StreamRead: [ 12, "StreamRead" ],
-    StreamWrite: [ 13, "StreamWrite" ],
+    StreamWrite: [ 12, "StreamWrite" ],
 }
 exports.IoCmd = IoCmd
 
@@ -47,6 +46,7 @@ const IoEvent = {
     OnKeepAlive : [ 1, "RpcEvt_OnKeepAlive" ],
     ForwardEvent : [ 2, "RpcEvt_ForwardEvent" ],
     OnRmtSvrOffline : [ 3, "OnRmtSvrOffline" ],
+    StreamRead: [ 4, "StreamRead" ],
 }
 
 exports.IoEvent = IoEvent
@@ -76,6 +76,9 @@ class CIoMessageBase
     {
         return ( this.m_iType === IoMsgType.EvtMsg )
     }
+
+    GetType()
+    { return this.m_iType }
 }
 
 exports.CAdminReqMessage = class CAdminReqMessage extends CIoMessageBase

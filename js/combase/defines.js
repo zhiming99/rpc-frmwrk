@@ -10,6 +10,9 @@ exports.ERROR = function ( iRet )
 exports.SUCCEEDED = function ( iRet )
 { return iRet === errno.STATUS_SUCCESS }
 
+exports.InvalFunc = function()
+{ console.log( "Error Invalid function" )}
+
 exports.Pair = class Pair
 {
     constructor( src )

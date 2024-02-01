@@ -77,24 +77,22 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     GetPropertyType( iProp )
     {
-        if( !this.m_props.has( iProp ) )
-            return Tid.typeNone
-        return this.m_props.get(iProp).t
+        var v = this.m_props.get(iProp).t
+        if( v === undefined )
+            v = Tid.typeNone
+        return v
     }
 
     GetProperty( iProp )
     {
-        if( !this.m_props.has( iProp ) )
-            return null
-        return this.m_props.get( iProp).v
+        var v = this.m_props.get( iProp).v
+        if( v === undefined )
+            v = null
+        return v
     }
 
     SetProperty( iProp, val )
-    {
-        if( val.constructor.name !== "Pair" )
-            throw new TypeError( "Error type of input param, expecting Buffer")
-        this.m_props.set( iProp, val )
-    }
+    { this.m_props.set( iProp, val ) }
 
     SetBool( iProp, val )
     {
@@ -120,14 +118,14 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     SetUint64( iProp, val )
     {
-        this.type = Tid.typeUInt64
-        this.m_value = val
+        this.m_props.set( iProp, 
+            { t: Tid.typeUInt64, v: val } )
     }
 
     SetFloat( iProp, val )
     {
         this.m_props.set( iProp,
-            { t: Tid.typeUInt64, v: val } )
+            { t: Tid.typeFloat, v: val } )
     }
 
     SetDouble( iProp, val )
@@ -244,7 +242,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                         dstBuf = CConfigDb2.ExtendBuffer(
                             dstBuf, CV.PAGE_SIZE )
                     }
-                    dstBuf.writeBigUInt64BE( value.v, pos )
+                    dstBuf.writeBigUInt64BE( BigInt( value.v ), pos )
                     pos += 8
                     break
                 }               
@@ -401,7 +399,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     {
                         throw new Error( "Error buffer is too small" )
                     }
-                    value.v = srcBuf.readBigUInt64BE( pos )
+                    value.v = Number( srcBuf.readBigUInt64BE( pos ) )
                     pos += 8
                     break
                 }               

@@ -299,5 +299,6 @@ module.exports = {
         stateConnected:3,
         stateStopping: 4,
         stateStopped : 5,
+        stateStartFailed: 6,
     },
 }
