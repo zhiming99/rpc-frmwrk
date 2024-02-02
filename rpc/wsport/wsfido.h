@@ -113,6 +113,7 @@ class CWsCloseTask :
 
     gint32 OnIrpComplete( IRP* pIrp );
     gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet ) override;
 };
 
 class CRpcWebSockFido : public CPort

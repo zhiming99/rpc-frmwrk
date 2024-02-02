@@ -692,23 +692,12 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
             if( !pIrp->IsIrpHolder() )
                 pIrp->PopCtxStack();
 
-            guint32 dwReason;
-            if( pDecrypted.IsEmpty() ||
-                pDecrypted->empty() )
-                dwReason = -ENOTCONN;
-            else
-            {
-                memcpy( &dwReason,
-                    pDecrypted->ptr(),
-                    sizeof( dwReason ) );
-            }
-
             bool bExpected = false;
             if( m_bCloseSent.compare_exchange_strong(
                 bExpected, true ) )
             {
                 ret = ScheduleCloseTask(
-                    pIrp, dwReason , false );
+                    pIrp, 0, false );
 
                 if( SUCCEEDED( ret ) )
                 {
@@ -1726,6 +1715,12 @@ gint32 CWsCloseTask::RunTask()
         if( ERROR( ret ) )
             break;
 
+        bool bSendClose = false;
+        ret = oParams.GetBoolProp( 1, bSendClose );
+        if( !bSendClose )
+        {
+            //break;
+        }
         CRpcWebSockFido* pPort = nullptr;
         ret = oParams.GetPointer(
             propPortPtr, pPort );
@@ -1758,6 +1753,9 @@ gint32 CWsCloseTask::RunTask()
             this, pOutBuf );
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
 
     return ret;
 }
@@ -1817,6 +1815,83 @@ gint32 CWsCloseTask::OnIrpComplete(
 
     if( ret != STATUS_PENDING )
         OnTaskComplete( ret );
+
+    return ret;
+}
+
+gint32 CWsCloseTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
+
+    CRpcWebSockFido* pPort = nullptr;
+    do{
+        IRP* pMasterIrp = nullptr;        
+
+        // the irp pending on poststart
+        ret = oParams.GetPointer(
+            propIrpPtr, pMasterIrp );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.GetPointer(
+            propPortPtr, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = nullptr;
+        ret = oParams.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock(
+            pMasterIrp->GetLock() );
+
+        ret = pMasterIrp->CanContinue(
+            IRP_STATE_READY );
+
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pCtx =
+            pMasterIrp->GetTopStack();
+
+        BufPtr pRespBuf( true );
+        ret = pRespBuf->Resize(
+            sizeof( STREAM_SOCK_EVENT ) );
+        if( ERROR( ret ) )
+            break;
+
+        STREAM_SOCK_EVENT* psse =
+        ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
+        psse->m_iEvent = sseError;
+        psse->m_iData = -ENOTCONN;
+        psse->m_iEvtSrc = GetClsid();
+        pCtx->SetStatus( STATUS_SUCCESS );
+        pCtx->SetRespData( pRespBuf );
+        oIrpLock.Unlock();
+
+        pMgr->CompleteIrp( pMasterIrp );
+
+    }while( 0 );
+
+    if( pPort != nullptr )
+    {
+        gint32 iIdx = 
+            CRpcWebSockFido::enumCloseTask;
+        pPort->ClearTask( iIdx );
+    }
+
+    oParams.ClearParams();
+    oParams.RemoveProperty( propIrpPtr );
+    oParams.RemoveProperty( propIrpPtr1 );
+    oParams.RemoveProperty( propPortPtr );
 
     return ret;
 }
