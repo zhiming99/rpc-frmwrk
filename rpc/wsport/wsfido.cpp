@@ -506,6 +506,8 @@ gint32 CRpcWebSockFido::PreStop(
     {
         ret = ScheduleCloseTask( pIrp,
             ERROR_PORT_STOPPED, true );
+        if( SUCCEEDED( ret ) )
+            return STATUS_PENDING;
     }
     return super::PreStop( pIrp );
 }
@@ -1715,12 +1717,6 @@ gint32 CWsCloseTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        bool bSendClose = false;
-        ret = oParams.GetBoolProp( 1, bSendClose );
-        if( !bSendClose )
-        {
-            //break;
-        }
         CRpcWebSockFido* pPort = nullptr;
         ret = oParams.GetPointer(
             propPortPtr, pPort );
@@ -1805,6 +1801,9 @@ gint32 CWsCloseTask::OnIrpComplete(
             break;
         }
 
+        // FIXME: the protocol requires waiting for
+        // the CLOSE_FRAME from the peer
+        //
         // don't wait for the response
         //
         // BufPtr pBuf;
@@ -1862,19 +1861,30 @@ gint32 CWsCloseTask::OnTaskComplete(
         IrpCtxPtr& pCtx =
             pMasterIrp->GetTopStack();
 
-        BufPtr pRespBuf( true );
-        ret = pRespBuf->Resize(
-            sizeof( STREAM_SOCK_EVENT ) );
-        if( ERROR( ret ) )
-            break;
+        if( pCtx->GetMajorCmd() == IRP_MJ_PNP &&
+            pCtx->GetMinorCmd() == IRP_MN_PNP_STOP )
+        {
+            ret = pPort->CPort::PreStop( pMasterIrp );
+            pCtx->SetStatus( ret );
+        }
+        else if( pCtx->GetMajorCmd() == IRP_MJ_FUNC &&
+            pCtx->GetMinorCmd() == IRP_MN_IOCTL &&
+            pCtx->GetCtrlCode() == CTRLCODE_LISTENING )
+        {
+            BufPtr pRespBuf( true );
+            ret = pRespBuf->Resize(
+                sizeof( STREAM_SOCK_EVENT ) );
+            if( ERROR( ret ) )
+                break;
 
-        STREAM_SOCK_EVENT* psse =
-        ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
-        psse->m_iEvent = sseError;
-        psse->m_iData = -ENOTCONN;
-        psse->m_iEvtSrc = GetClsid();
-        pCtx->SetStatus( STATUS_SUCCESS );
-        pCtx->SetRespData( pRespBuf );
+            STREAM_SOCK_EVENT* psse =
+            ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
+            psse->m_iEvent = sseError;
+            psse->m_iData = -ENOTCONN;
+            psse->m_iEvtSrc = GetClsid();
+            pCtx->SetStatus( STATUS_SUCCESS );
+            pCtx->SetRespData( pRespBuf );
+        }
         oIrpLock.Unlock();
 
         pMgr->CompleteIrp( pMasterIrp );
