@@ -48,6 +48,26 @@ exports.CBuffer = class CBuffer extends CObjBase
         this.m_value = null
     }
 
+    Restore( oObj )
+    {
+        if( oObj === null || oObj === undefined )
+            return
+        this.m_dwOffset = oObj.m_dwOffset;
+        this.m_arrBuf = oObj.m_arrBuf
+        this.m_dwTail = oObj.m_dwTail
+        this.m_dwTypeId = oObj.m_dwTypeId;
+        if( this.type === Tid.typeObj &&
+            oObj.m_value !== null )
+        {
+            var iClsid = oObj.m_value.GetClsid()
+            var oNewObj = globalThis.CoCreateInstance( iClsid )
+            oNewObj.Restore( this.m_value )
+            this.m_value = oNewObj
+        }
+        else
+            this.m_value = oObj.m_value
+    }
+
     get size()
     {
         if( this.type !== Tid.typeByteArr )

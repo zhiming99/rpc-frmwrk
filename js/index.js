@@ -1,48 +1,25 @@
 // index.js
-require( "./combase/factory" )
-const dmsg = require( "./dbusmsg/message.js" )
-const buffer = require( "./combase/cbuffer.js" )
 const { randomInt } = require("./combase/defines")
-const { CAdminReqMessage, AdminCmd } = require("./rpc/iomsg.js")
-const { EnumPropId } = require("./combase/enums.js")
-
+const {EnumClsid, EnumPropId} = require("./combase/enums")
 globalThis.g_iMsgIdx = randomInt( 100000000 )
-require('./rpc/iomsg')
 
 const {CoCreateInstance}=require("./combase/factory")
 globalThis.CoCreateInstance=CoCreateInstance
+const {CIoManager} = require( "./ipc/iomgr")
+const {CInterfaceProxy} = require( "./ipc/proxy")
+var oIoMgr = new CIoManager()
 
-var g_count = 0
-const worker = new Worker(new URL('./rpc/ioworker.js', import.meta.url));
-worker.onmessage=(e)=>{
-    console.log(e)
-    if( g_count > 0 )
-        return
+var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
+oParams.SetString(
+    EnumPropId.propObjInstName, "CEchoServer")
 
-    g_count += 1
-    var oMsg = new CAdminReqMessage()
-    oMsg.m_iMsgId = g_iMsgIdx++
-    oMsg.m_iCmd = AdminCmd.OpenRemotePort[0]
-    oMsg.m_oReq.SetString(
-        EnumPropId.propDestUrl,
-        "ws://example.com/chat" )
-    worker.postMessage(oMsg)
-}
-worker.onerror=(e)=>{
-    console.log(e)
-}
-worker.onmessageerror=(e)=>{
-    console.log(e)
-}
+var val = oParams.GetProperty( EnumPropId.propObjInstName )
+var oProxy = new CInterfaceProxy( oIoMgr,
+    "http://example.com/rpcf/echodesc.json",
+    "CEchoServer", oParams )
 
-//alert("hello,webpack!")
-var oMsg = new CAdminReqMessage()
-oMsg.m_iMsgId = globalThis.g_iMsgIdx++
-oMsg.m_iCmd = AdminCmd.SetConfig[0]
-oMsg.m_oReq.SetString(
-    EnumPropId.propRouterName,
-    "rpcrouter" )
-worker.postMessage(oMsg)
+oIoMgr.Start()
+oProxy.Start()
 
 
 

@@ -1,12 +1,13 @@
 const { CConfigDb2 } = require("../combase/configdb")
-const { randomInt, ERROR, InvalFunc } = require("../combase/defines")
+const { randomInt, Int32Value, ERROR, InvalFunc } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
 const { CDBusMessage } = require("./dmsg")
-const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("./iomsg")
+const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent, CAdminReqMessage } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { Bdge_Handshake } = require("./handshak")
+const { Bdge_EnableRemoteEvent } = require("./enablevtrmt")
 
 class CRpcStreamBase
 {
@@ -124,7 +125,7 @@ class CRpcDefaultStream extends CRpcStreamBase
                 return
             var oResp = new CConfigDb2()
             var iRet = dmsg.GetArgAt(0)
-            if( iRet < 0 )
+            if( Int32Value( iRet ) < 0 )
             {
                 oResp.SetUint32(
                     EnumPropId.propReturnValue, iRet )
@@ -142,6 +143,19 @@ class CRpcDefaultStream extends CRpcStreamBase
 
 class CRpcTcpBridgeProxy
 {
+    BindFunctions()
+    {
+        var oIoTab = this.m_arrDispReqTable
+        for( var i = 0; i< Object.keys(IoCmd).length;i++)
+        { oIoTab.push(InvalFunc) }
+
+        oIoTab[ IoCmd.Handshake[0] ] =
+            Bdge_Handshake.bind( this )
+
+        oIoTab[ IoCmd.EnableRemoteEvent[0]] =
+            Bdge_EnableRemoteEvent.bind( this )
+    }
+
     constructor( oParent, oConnParams )
     {
         this.m_mapStreams = new Map()
@@ -152,17 +166,13 @@ class CRpcTcpBridgeProxy
         this.m_mapPendingReqs = new Map()
         this.m_oSocket = null
         this.m_oParent = oParent
-        this.m_arrDispTable = []
+        this.m_arrDispReqTable = []
         this.m_iState = EnumIfState.stateStarting
         this.m_qwPeerTime = 0
         this.m_qwStartTime = 0
+        this.m_arrDispEvtTable = []
 
-        var oIoTab = this.m_arrDispTable
-        for( var i = 0; i< Object.keys(IoCmd).length;i++)
-        { oIoTab.push(InvalFunc) }
-
-        oIoTab[ IoCmd.Handshake[0] ] =
-            Bdge_Handshake.bind( this )
+        this.BindFunctions()
 
         var oStm = new CRpcControlStream( this )
         var iStmId = EnumStmId.TCP_CONN_DEFAULT_CMD
@@ -240,7 +250,7 @@ class CRpcTcpBridgeProxy
             oMsg.m_iType = IoMsgType.ReqMsg
             oMsg.m_dwTimeLeftSec =
                 constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT * 1000
-            this.m_arrDispTable[ IoCmd.Handshake[0] ](oMsg, oPending)
+            this.m_arrDispReqTable[ IoCmd.Handshake[0] ](oMsg, oPending)
 
         } catch ( oProxy ) {
             oPending.m_oResp.SetUint32(
@@ -333,7 +343,7 @@ class CRpcTcpBridgeProxy
             return -errno.EINVAL
         console.log(oMsg)
 
-        var oCmdTab = this.m_arrDispTable
+        var oCmdTab = this.m_arrDispReqTable
         if( oMsg.m_iCmd >= oCmdTab.length )
             return -errno.ENOTSUP
         try{
@@ -413,7 +423,7 @@ class CRpcRouter
     {
         var bFound = false
         var oConnParams = new CConnParams();
-        oConnParams.Recover( oReq.m_oReq )
+        oConnParams.Restore( oReq.m_oReq )
         var dwPortId, oConn
         for( [ dwPortId, oConn ] of this.m_mapBdgeProxies )
         {
@@ -490,7 +500,7 @@ class CRpcRouter
     CloseRemotePort( oReq )
     {
         var ret = errno.STATUS_SUCCESS
-        oResp = new CAdminRespMessage( oReq )
+        var oResp = new CAdminRespMessage( oReq )
         try{
             var dwPortId = oReq.m_oReq.GetProperty(
                 EnumPropId.propPortId )
@@ -545,6 +555,9 @@ class CRpcRouter
             oEvt.m_iMsgId = globalThis.g_iMsgIdx++
             oEvt.m_oReq.SetString(
                 EnumPropId.propRouterPath, strRoute )
+            oEvt.m_oReq.SetObjPtr(
+                EnumPropId.propConnParams,
+                oProxy.m_oConnParams )
             this.PostMessage( oEvt )
         }
         catch( e )
@@ -555,7 +568,7 @@ class CRpcRouter
 
     GetProxy( key )
     {
-        oProxy = undefined
+        var oProxy = undefined
         if( typeof key === "number" )
             oProxy = this.m_mapBdgeProxies.get( key )
         else if( typeof key === "string" )
@@ -578,19 +591,22 @@ class CRpcRouter
 
     DispatchMsg( e )
     {
-        var oMsg = e.data
-        var oReq = new CConfigDb2()
-        oReq.Recover( oMsg.m_oReq )
-        oMsg.m_oReq = oReq
-        if( oMsg.m_iType === IoMsgType.AdminReq)
+        var oOrigMsg = e.data
+        if( oOrigMsg === undefined )
+            return
+        if( oOrigMsg.m_iType === IoMsgType.AdminReq)
         {
+            var oMsg = new CAdminReqMessage()
+            oMsg.Restore( oOrigMsg )
             if( oMsg.m_iCmd >=
                 this.m_arrDispTable.length )
                 return -errno.ENOTSUP
             return this.m_arrDispTable[ oMsg.m_iCmd ]( oMsg )
         }
-        else if( oMsg.m_iType === IoMsgType.ReqMsg )
+        else if( oOrigMsg.m_iType === IoMsgType.ReqMsg )
         {
+            var oMsg = new CIoReqMessage()
+            oMsg.Restore( oOrigMsg )
             var dwPortId = oMsg.GetPortId()
             if( dwPortId === null || dwPortId === undefined )
                 return -errno.EINVAL

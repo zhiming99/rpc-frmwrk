@@ -1,7 +1,5 @@
-const CV = require( "../combase/enums.js" ).constval
-const Buffer = require( "buffer").Buffer
-const { EnumTypeId, EnumTypes, EnumPropId, EnumCallFlags } = require("../combase/enums.js");
-const { CConfigDb2 } = require("../combase/configdb");
+const { EnumPropId, EnumCallFlags } = require("./enums.js");
+const { CConfigDb2 } = require("./configdb.js");
 
 const IoMsgType =
 {
@@ -60,6 +58,26 @@ class CIoMessageBase
         this.m_oResp = null
         this.m_iType = null
         this.m_dwPortId = -1
+        this.m_iCmd = -1
+    }
+
+    Restore( oMsg ){
+        this.m_iMsgId = oMsg.m_iMsgId
+        this.m_iType = oMsg.m_iType
+        this.m_dwPortId = oMsg.m_dwPortId
+        this.m_iCmd = oMsg.m_iCmd
+        if( oMsg.m_oReq !== null )
+        {
+            var oReq = new CConfigDb2()
+            oReq.Restore( oMsg.m_oReq )
+            this.m_oReq = oReq
+        }
+        if( oMsg.m_oResp !== null )
+        {
+            var oResp = new CConfigDb2()
+            oReq.Restore( oMsg.m_oResp )
+            this.m_oResp = oResp
+        }
     }
 
     IsRequest()
@@ -79,6 +97,9 @@ class CIoMessageBase
 
     GetType()
     { return this.m_iType }
+
+    GetPortId()
+    { return this.m_dwPortId }
 }
 
 exports.CAdminReqMessage = class CAdminReqMessage extends CIoMessageBase
@@ -103,7 +124,7 @@ exports.CAdminRespMessage = class CAdminRespMessage extends CIoMessageBase
     }
 }
 
-exports.CIoReqMessage = class CIoReqMessage extends CIoMessageBase
+class CIoReqMessage extends CIoMessageBase
 {
     constructor()
     {
@@ -112,7 +133,14 @@ exports.CIoReqMessage = class CIoReqMessage extends CIoMessageBase
         this.m_iCmd = IoCmd.Invalid[0]
         this.m_dwTimeLeftSec = 0
         this.m_oReq = new CConfigDb2()
-        this.m_oReqCtx = new CConfigDb2()
+    }
+
+    Restore(oMsg)
+    {
+        if( oMsg === null || oMsg === undefined )
+            return
+        super.Restore(oMsg)
+        this.m_dwTimeLeftSec = oMsg.m_dwTimeLeftSec
     }
 
     DecTimer( delta )
@@ -220,20 +248,46 @@ exports.CIoReqMessage = class CIoReqMessage extends CIoMessageBase
             EnumPropId.propTaskId )
     }
 }
-
-exports.CIoRespMessage = class CIoRespMessage extends CIoMessageBase
+exports.CIoReqMessage = CIoReqMessage
+class CIoRespMessage extends CIoMessageBase
 {
     constructor( oReqMsg )
     {
         super()
-        this.m_iMsgId = oReqMsg.m_iMsgId
-        this.m_iType = IoMsgType.RespMsg
-        this.m_iCmd = IoCmd.Invalid[0]
-        this.m_dwTimeLeftSec = 0
-        this.m_oResp = new CConfigDb2()
-        this.m_oReqMsg = oReqMsg
+        if( oReqMsg !== undefined )
+        {
+            this.m_iMsgId = oReqMsg.m_iMsgId
+            this.m_iType = IoMsgType.RespMsg
+            this.m_iCmd = oReqMsg.m_iCmd
+            this.m_oResp = new CConfigDb2()
+            this.m_oReq = oReqMsg
+        }
+        else
+        {
+            this.m_iType = IoMsgType.RespMsg
+            this.m_oResp = new CConfigDb2()
+        }
+
     }
 
+    Restore(oMsg){
+        this.m_iMsgId = oMsg.m_iMsgId
+        this.m_iType = oMsg.m_iType
+        this.m_dwPortId = oMsg.m_dwPortId
+        this.m_iCmd = oMsg.m_iCmd
+        if( oMsg.m_oReq !== null )
+        {
+            var oReq = new CIoReqMessage()
+            oReq.Restore( oMsg.m_oReq )
+            this.m_oReq = oReq
+        }
+        if( oMsg.m_oResp !== null )
+        {
+            var oResp = new CConfigDb2()
+            oResp.Restore( oMsg.m_oResp )
+            this.m_oReq = oResp
+        }
+    }
     GetReturnValue()
     {
         if( this.m_oResp === null )
@@ -242,8 +296,8 @@ exports.CIoRespMessage = class CIoRespMessage extends CIoMessageBase
             EnumPropId.propReturnValue )
     }
 }
-
-exports.CIoEventMessage = class CIoEventMessage extends CIoMessageBase
+exports.CIoRespMessage = CIoRespMessage
+class CIoEventMessage extends CIoMessageBase
 {
     constructor()
     {
@@ -254,7 +308,7 @@ exports.CIoEventMessage = class CIoEventMessage extends CIoMessageBase
         this.m_oReq = new CConfigDb2()
     }
 }
-
+exports.CIoEventMessage = CIoEventMessage
 class CPendingRequest
 {
     constructor( oReq )

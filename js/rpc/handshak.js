@@ -4,7 +4,7 @@ const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCal
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
 const { CDBusMessage, DBusIfName, DBusObjPath, DBusDestination2 } = require("./dmsg")
-const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CPendingRequest, AdminCmd } = require("./iomsg")
+const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CPendingRequest, AdminCmd } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 
 function Handshake( oMsg, oPending )
@@ -102,7 +102,7 @@ function OnHandshakeComplete( oProxy, oPending, oResp )
 
     var oOuter = oPending.m_oObject
     try{
-        if( ret < 0 )
+        if( ERROR( ret ) )
         {
             throw new Error( "Error handshake from server")
         }

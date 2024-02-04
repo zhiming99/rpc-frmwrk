@@ -64,6 +64,7 @@ module.exports = {
         propMsgPtr: 8220,
         propConfigPath: 12293,
         propParamCount:12297,
+        propMatchPtr: 12320,
         propReturnValue: 12329,
         propCallFlags: 12331,
         propCallOptions: 12331,
@@ -75,12 +76,15 @@ module.exports = {
         propStreamId: 12341,
         propIid: 12357,
         propSysMethod: 12360,
+        propObjInstName:12368,
+        propSvrInstName:12369,
         propDataDesc:12382,
         propRouterName:12384,
         propCompress:12388,
         propEnableSSL:12389,
         propEnableWebSock:12390,
         propDestUrl: 12391,
+        propConnParams: 12393,
         propConnHandle: 12394,
         propRouterPath: 12397,
         propSessHash: 12401,
@@ -301,4 +305,12 @@ module.exports = {
         stateStopped : 5,
         stateStartFailed: 6,
     },
+
+    EnumSeriProto : {
+        seriNone : 0,
+        seriRidl : 1,
+        seriPython : 2,
+        seriJava : 3,
+        seriInvalid : 4,
+    }
 }

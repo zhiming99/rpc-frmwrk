@@ -29,3 +29,11 @@ exports.Pair = class Pair
         }
     }
 }
+
+exports.Int32Value = ( i )=>{
+    if( i < 0x80000000 )
+        return i
+    else if( i < 0x100000000 )
+        return i - 0x100000000
+    throw new Error( "Error beyond max 32-bit signed integer")
+}

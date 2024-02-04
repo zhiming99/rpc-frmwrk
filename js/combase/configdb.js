@@ -9,6 +9,7 @@ const { Buffer } = require( "buffer")
 const CBuffer = require( "./cbuffer").CBuffer
 const marshall = require( "../dbusmsg/message.js").marshall
 const { CObjBase } = require( "./objbase.js" )
+const { EnumTypeId } = require("./enums.js")
 
 const SERI_HEADER_CFG = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
 {
@@ -51,10 +52,23 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         this.m_dwCount = 0
     }
 
-    Recover( oMsg )
+    Restore( oMsg )
     {
+        if( oMsg === null || oMsg === undefined )
+            return
         this.m_props = oMsg.m_props
         this.m_dwCount = oMsg.m_dwCount
+        var key, value
+        for( [key, value] of this.m_props )
+        {
+            if( value.t === EnumTypeId.typeObj )
+            {
+                var iClsid = value.v.m_dwClsid
+                var oObj = globalThis.CoCreateInstance( iClsid )
+                oObj.Restore( value.v )
+                value.v = oObj
+            }
+        }
     }
 
     Push( src )
@@ -77,18 +91,16 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     GetPropertyType( iProp )
     {
-        var v = this.m_props.get(iProp).t
-        if( v === undefined )
-            v = Tid.typeNone
-        return v
+        if( !this.m_props.has( iProp ))
+            return Tid.typeNone
+        return this.m_props.get(iProp).t
     }
 
     GetProperty( iProp )
     {
-        var v = this.m_props.get( iProp).v
-        if( v === undefined )
-            v = null
-        return v
+        if( !this.m_props.has( iProp ))
+            return null
+        return this.m_props.get( iProp).v
     }
 
     SetProperty( iProp, val )

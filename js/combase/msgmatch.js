@@ -3,9 +3,9 @@ const { CConfigDb2 } = require("./configdb");
 const { SERI_HEADER_BASE } = require("./SERI_HEADER_BASE");
 const {CObjBase} = require("./objbase");
 const MT = require( "./enums").EnumMatchType
-const EnumPropId = require( "./enums").EnumPropId
+const {EnumPropId, EnumClsid} = require( "./enums")
 require ("../dbusmsg/message")
-const Buffer = require( "buffer")
+const {Buffer} = require( "buffer")
 
 class SERI_HEADER_MSGMATCH extends SERI_HEADER_BASE
 {
@@ -23,25 +23,61 @@ class SERI_HEADER_MSGMATCH extends SERI_HEADER_BASE
     {
         super.Serialize( dstBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        dstBuf.setUint32( offset, this.iMatchType)
+        dstBuf.writeUint32BE( this.iMatchType, offset )
     }
 
     Deserialize( srcBuf, offset )
     {
         super.Deserialize( srcBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        this.iMatchType = srcBuf.getUint32( offset )
+        this.iMatchType = srcBuf.readUint32BE( offset )
     }
 }
 exports.CMessageMatch = class CMessageMatch extends CObjBase
 {
     constructor()
     {
-        this.m_dwClsid = Cid.CMessageMatch
+        super()
+        this.m_dwClsid = EnumClsid.CMessageMatch
         this.m_strObjPath = ""
         this.m_strIfName = ""
         this.m_iMatchType = MT.matchInvalid
         this.m_oCfg = new CConfigDb2()
+    }
+
+    Restore( oObj )
+    {
+        if( oObj === null || oObj === undefined )
+            return
+        this.m_strObjPath = oObj.m_strObjPath
+        this.m_strIfName = oObj.m_strIfName
+        this.m_iMatchType = oObj.m_iMatchType
+        this.m_oCfg = new CConfigDb2()
+        if( oObj.m_oCfg !== null )
+            this.m_oCfg.Restore( oObj.m_oCfg )
+    }
+
+    SetProperty( iProp, o )
+    {
+        if( iProp === EnumPropId.propObjPath )
+        {
+            this.SetObjPath( o.v )
+        }
+        else if( iProp === EnumPropId.propIfName )
+        {
+            return this.SetIfName( o.v )
+        }
+        else
+            this.m_oCfg.SetProperty( iProp, o )
+    }
+
+    GetProperty( iProp )
+    {
+        if( iProp === EnumPropId.propObjPath )
+            return this.GetObjPath( iProp )
+        else if( iProp === EnumPropId.propIfName )
+            return this.GetIfName( iProp )
+        return this.m_oCfg.GetProperty( iProp ).v
     }
 
     GetType()
@@ -158,13 +194,14 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
         oHeader.dwClsid = this.m_dwClsid
         oHeader.iMatchType = this.m_iMatchType
 
-        dwTotal =
-            oCfgBuf.length + oHeader.GetSeriSize()
+        var dwTotal =
+            oCfgBuf.length + SERI_HEADER_MSGMATCH.GetSeriSize()
 
         oHeader.dwSize = dwTotal -
-            oHeader.super().GetSeriSize()
+            SERI_HEADER_BASE.GetSeriSize()
         
-        var hdrBuf = Buffer.alloc( oHeader.GetSeriSize() )
+        var hdrBuf = Buffer.alloc(
+            SERI_HEADER_MSGMATCH.GetSeriSize() )
         oHeader.Serialize( hdrBuf, 0 )
         return Buffer.concat( [ hdrBuf, oCfgBuf ])
     } 
