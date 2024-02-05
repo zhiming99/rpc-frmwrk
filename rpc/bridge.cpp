@@ -446,8 +446,37 @@ gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
             break;
         }
 
+        ObjPtr prmtMatch;
+        prmtMatch.NewObj(
+            clsid( CMessageMatch ) );
+
+        auto pSrcMatch = static_cast
+            < CMessageMatch* >( pMatch );
+
+        CMessageMatch* pm = prmtMatch;
+        Variant oVar;
+        ret = pSrcMatch->GetProperty(
+            propObjPath, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetObjPath( oVar );
+
+        ret = pSrcMatch->GetProperty(
+            propIfName, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetIfName( oVar );
+
+        ret = pSrcMatch->GetProperty(
+            propRouterPath, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetProperty( propRouterPath, oVar );
+
+        ret = pSrcMatch->GetProperty(
+            propDestDBusName, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetProperty( propDestDBusName, oVar );
+
         CReqBuilder oBuilder( this );
-        oBuilder.Push( ObjPtr( pMatch ) );
+        oBuilder.Push( prmtMatch );
         if( bEnable )
         {
             oBuilder.SetMethodName(

@@ -52,7 +52,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         { oEvtTab.push(InvalFunc) }
     }
 
-    InitReq( oReq )
+    InitReq( oReq, strMethodName )
     {
         oReq.SetString( EnumPropId.propRouterPath,
             this.m_strRouterName )
@@ -66,6 +66,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
            this.m_strIfName )
         oReq.SetString( EnumPropId.propObjPath,
             this.m_strObjPath )
+        if( strMethodName !== undefined)
+            oReq.SetString( EnumPropId.propMethodName,
+                strMethodName )
 
         oParams = new CConfigDb2()
         oParams.SetUint32( EnumPropId.propTimeoutsec,

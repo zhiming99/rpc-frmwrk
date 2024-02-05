@@ -1,3 +1,7 @@
+var strObjDesc = "http://example.com/rpcf/asynctstdesc.json"
+var strObjName = "AsyncTest"
+var strAppName = ""
+
 // index.js
 const { randomInt } = require("./combase/defines")
 const {EnumClsid, EnumPropId} = require("./combase/enums")
@@ -7,18 +11,16 @@ const {CoCreateInstance}=require("./combase/factory")
 globalThis.CoCreateInstance=CoCreateInstance
 const {CIoManager} = require( "./ipc/iomgr")
 const {CInterfaceProxy} = require( "./ipc/proxy")
-var oIoMgr = new CIoManager()
+var g_oIoMgr = new CIoManager()
 
 var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
 oParams.SetString(
-    EnumPropId.propObjInstName, "CEchoServer")
+    EnumPropId.propObjInstName, strObjName)
 
-var val = oParams.GetProperty( EnumPropId.propObjInstName )
-var oProxy = new CInterfaceProxy( oIoMgr,
-    "http://example.com/rpcf/echodesc.json",
-    "CEchoServer", oParams )
+var oProxy = new CInterfaceProxy( g_oIoMgr,
+    strObjDesc, strObjName, oParams )
 
-oIoMgr.Start()
+g_oIoMgr.Start()
 oProxy.Start()
 
 
