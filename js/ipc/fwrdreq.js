@@ -6,35 +6,24 @@ const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CPendingRequest, Ad
 const { messageType } = require( "../dbusmsg/constants")
 const { CIoReqMessage } = require("../combase/iomsg")
 
-exports.EnableEventLocal = function EnableEventLocal( idx )
+exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback )
 {
     var ret = 0
-    if( idx >= this.m_arrMatches.length )
-    {
-        console.log( "EnableEventLocal completed")
-        return ret
-    }
-    var oMatch = this.m_arrMatches[ idx ]
     return new Promise( ( resolve, reject )=>{
         var oMsg = new CIoReqMessage()
         oMsg.m_iMsgId = globalThis.g_iMsgIdx++
-        oMsg.m_iCmd = IoCmd.EnableRemoteEvent[0]
+        oMsg.m_iCmd = IoCmd.ForwardRequest[0]
         oMsg.m_dwPortId = this.GetPortId()
-        oMsg.m_dwTimeLeftSec = this.m_dwTimeoutSec * 1000
-        var oReq = oMsg.m_oReq
-        var oParams = new CConfigDb2()
-        oParams.SetUint32( EnumPropId.propTimeoutsec,
-            this.m_dwTimeoutSec )
-        oParams.SetUint32( EnumPropId.propKeepAliveSec,
-            this.m_dwKeepAliveSec )
-        oParams.SetUint32( EnumPropId.propCallFlags,
-            EnumPropId.propCallFlags,
-            EnumCallFlags.CF_ASYNC_CALL |
-            EnumCallFlags.CF_WITH_REPLY |
-            messageType.methodCall )
-        oReq.SetObjPtr(
-            EnumPropId.propCallOptions, oParams )
-        oReq.Push( {t: EnumTypeId.typeObj, v: oMatch})
+        oMsg.m_oReq = oReq
+        ret = oReq.GetProperty( EnumPropId.propTimeoutsec )
+        if( ret !== undefined )
+        {
+            oMsg.m_dwTimeLeftSec = ret * 1000
+        }
+        else
+        {
+            oMsg.m_dwTimeLeftSec = this.m_dwTimeoutSec * 1000
+        }
 
         var oPending = new CPendingRequest(oMsg)
         oPending.m_oReq = oMsg
@@ -55,15 +44,26 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
         idx++
         if( idx >= this.m_arrMatches.length )
             return
-        this.m_funcEnableEvent( idx )
+        try{
+            if( oCallback !== undefined )
+                oCallback( oResp )
+        } catch( e ){
+        }
     }).catch(( e )=>{
         if( e.message !== undefined)
-            console.log( `Error EnableEventLocal failed: ${e.message}` )
+        {
+            console.log( `Error ForwardRequestLocal failed: ${e.message}` )
+            var oResp = new CConfigDb2()
+            oResp.SetUint32(
+                EnumPropId.propReturnValue, -errno.EFAULT)
+            oCallback( oResp )
+        }
         else if( e.m_oResp !== undefined )
         {
+            console.log( `Error ForwardRequestLocal failed: ${e.m_oResp}` )
             var ret = e.m_oResp.GetProperty(
                 EnumPropId.propReturnValue )
-            console.log( `Error EnableEventLocal failed with error ${ret}` )
+            oCallback( e.m_Resp )
         }
     })
 }
