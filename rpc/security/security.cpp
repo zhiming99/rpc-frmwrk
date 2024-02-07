@@ -1005,7 +1005,7 @@ gint32 CRpcTcpBridgeAuth::RebuildMatches()
         pNew->Clone( pMatch );
         *itr = pNewMatch;
     }
-    return STATUS_SUCCESS;
+    return super::RebuildMatches();
 }
 
 gint32 CRpcReqForwarderProxyAuth::BuildNewMsgToFwrd(
@@ -2308,7 +2308,7 @@ gint32 CRpcTcpBridgeProxyAuth::RebuildMatches()
         pNew->Clone( pMatch );
         *itr = pNewMatch;
     }
-    return STATUS_SUCCESS;
+    return super::RebuildMatches();
 }
 
 gint32 CRpcReqForwarderAuth::OnSessImplStarted(
