@@ -1,6 +1,5 @@
-const { messageType } = require("../dbusmsg/constants")
+const { messageType, flags } = require("../dbusmsg/constants")
 const { constval } = require("../combase/enums")
-require( "../dbusmsg/constants")
 
 exports.CDBusMessage = class CDBusMessage
 {
@@ -25,6 +24,7 @@ exports.CDBusMessage = class CDBusMessage
         this.signature = ""
         this.serial = null
         this.body = []
+        this.flags = 0
     }
 
     GetType()
@@ -119,7 +119,14 @@ exports.CDBusMessage = class CDBusMessage
         this.signature = oMsg.signature 
         this.serial = oMsg.serial
         this.body = oMsg.body
+        this.flags = oMsg.flags
     }
+
+    SetNoReply()
+    { this.flags = flags.noReplyExpected }
+
+    IsNoReply()
+    { return ( this.flags & flags.noReplyExpected ) > 0 }
 }
 
 function DBusIfName(

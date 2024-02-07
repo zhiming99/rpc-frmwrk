@@ -73,7 +73,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     Push( src )
     {
-        if( this.m_dwCount > 1024 )
+        if( this.m_dwCount >= 1024 )
             return
         this.m_props.set( this.m_dwCount, src )
         this.m_dwCount++
@@ -83,11 +83,14 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     {
         if( m_dwCount == 0 )
             return null
-        val = this.m_prop[ this.m_dwCount - 1 ]
+        val = this.m_props[ this.m_dwCount - 1 ]
         this.m_props.delete( this.m_dwCount - 1 )
         this.m_dwCount--
         return val
     }
+
+    RemoveProperty( iProp )
+    { this.m_props.delete( iProp ) }
 
     GetPropertyType( iProp )
     {

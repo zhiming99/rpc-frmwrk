@@ -16,7 +16,7 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback )
         oMsg.m_dwPortId = this.GetPortId()
         oMsg.m_oReq = oReq
         ret = oReq.GetProperty( EnumPropId.propTimeoutsec )
-        if( ret !== undefined )
+        if( ret !== null )
         {
             oMsg.m_dwTimeLeftSec = ret * 1000
         }
@@ -24,10 +24,16 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback )
         {
             oMsg.m_dwTimeLeftSec = this.m_dwTimeoutSec * 1000
         }
+        var rp = oReq.GetProperty( EnumPropId.propRouterPath )
+        if( rp === null )
+            oReq.SetString( EnumPropId.propRouterPath,
+                this.m_strRouterPath )
 
-        var oPending = new CPendingRequest(oMsg)
-        oPending.m_oReq = oMsg
-        // oPending.m_dwPortId = this.GetPortId()
+        oReq.SetProperty(
+            EnumPropId.propSeqNo, oMsg.m_iMsgId)
+        oReq.SetProperty(
+            EnumPropId.propTaskId, oMsg.m_iMsgId)
+
         oPending.m_oObject = this
         oPending.m_oResolve = resolve
         oPending.m_oReject = reject

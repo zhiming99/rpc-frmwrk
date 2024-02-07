@@ -5,6 +5,7 @@ const { IoCmd, IoMsgType, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, C
 const { DBusIfName, DBusDestination, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 const { CMessageMatch } = require( "../combase/msgmatch")
 const { EnableEventLocal } = require( "./enablevt")
+const { ForwardRequestLocal } = require("./fwrdreq")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -46,6 +47,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
     BindFunctions()
     {
         this.m_funcEnableEvent = EnableEventLocal.bind( this )
+        this.m_funcForwardRequest = ForwardRequestLocal.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
