@@ -515,12 +515,14 @@ class CRpcTcpBridgeProxyAuth :
 {
     CCfgOpener m_oSecCtx;
 
+    protected:
     gint32 OnEnableComplete(
         IEventSink* pCallback,
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
 
     gint32 EnableInterfaces();
+    gint32 RebuildMatches() override;
 
     public:
     typedef CRpcTcpBridgeProxy super;
@@ -550,6 +552,7 @@ class CRpcTcpBridgeAuth :
     TaskletPtr m_pLoginTimer;
     TaskletPtr m_pSessChecker;
 
+    protected:
     gint32 OnLoginFailed(
         IEventSink* pCallback,
         gint32 iRet );
@@ -569,6 +572,7 @@ class CRpcTcpBridgeAuth :
         IConfigDb* pReqCtx );
 
     gint32 EnableInterfaces();
+    gint32 RebuildMatches() override;
 
     gint32 IsAuthRequest(
         IConfigDb* pReqCtx,
