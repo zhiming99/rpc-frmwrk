@@ -1004,6 +1004,7 @@ gint32 CRpcTcpBridgeAuth::RebuildMatches()
         CMessageMatch* pNew = pNewMatch;
         pNew->Clone( pMatch );
         *itr = pNewMatch;
+        itr++;
     }
     return super::RebuildMatches();
 }
@@ -2307,6 +2308,7 @@ gint32 CRpcTcpBridgeProxyAuth::RebuildMatches()
         CMessageMatch* pNew = pNewMatch;
         pNew->Clone( pMatch );
         *itr = pNewMatch;
+        itr++;
     }
     return super::RebuildMatches();
 }
