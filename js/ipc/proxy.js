@@ -32,15 +32,15 @@ exports.CInterfaceProxy = class CInterfaceProxy
         {
             var oVal = oParams.GetProperty(
                 EnumPropId.propSvrInstName )
-            if( oVal !== null )
+            if( oVal !== null && oVal.length > 0 )
                 this.m_strSvrName = oVal
             oVal = oParams.GetProperty(
                 EnumPropId.propObjInstName )
-            if( oVal !== null )
+            if( oVal !== null && oVal.length > 0 )
                 this.m_strObjInstName = oVal
-            else
-                this.m_strObjInstName = strObjName
         }
+        if( this.m_strObjInstName.length === 0)
+            this.m_strObjInstName = strObjName
         this.BindFunctions()
     }
 
@@ -191,19 +191,54 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
     Start()
     {
-        this.LoadObjDesc( this.m_strObjDesc).then((e)=>{
-            this.OpenRemotePort( this.m_strUrl )
-        }).then((e)=>{
-            for( var elem of this.m_arrMatches )
-            {
-                // enable remote event
-            }
-        })
+        return this.LoadObjDesc( this.m_strObjDesc).then((e)=>
+                this.OpenRemotePort( this.m_strUrl ).then((e)=>{
+                    var proms = []
+                    for( var i =0; i< this.m_arrMatches.length; i++ )
+                        proms.push( this.m_funcEnableEvent( i ) )
+                    return Promise.all( proms ).then((e)=>{
+                        var ret = 0
+                        for( var oResp of e )
+                        {
+                            ret = oResp.GetProperty(
+                                EnumPropId.propReturnValue )
+                            if( ERROR( ret ) )
+                                break
+                        }
+                        if( ERROR( ret ))
+                            return Promise.reject( ret )
+                        else
+                            return Promise.resolve( ret )
+                    })
+                }))
     }
 
     Stop( ret )
     {
-        this.m_oIoMgr.UnregisterProxy( this, ret )
+        if( this.GetPortId() === 0 )
+        {
+            this.m_oIoMgr.UnregisterProxy( this, ret )
+            return Promise.resolve(0)
+        }
+        return new Promise( (resolve, reject)=>{
+            var oMsg = new CAdminReqMessage()
+            oMsg.m_iMsgId = globalThis.g_iMsgIdx++
+            oMsg.m_iCmd = AdminCmd.CloseRemotePort[0]
+            oMsg.m_dwPortId = this.GetPortId()
+            var oPending = new CPendingRequest(oMsg)
+            oPending.m_oReq = oMsg
+            oPending.m_oObject = this
+            oPending.m_oResolve = resolve
+            oPending.m_oReject = reject
+            this.PostMessage( oPending )
+        }).then((e)=>{
+            var ret = e.m_oResp.GetProperty(EnumPropId.propReturnValue)
+            this.m_oIoMgr.UnregisterProxy( this, ret)
+            return Promise.resolve(ret)
+        }).catch((e)=>{
+            console.log(e)
+        })
+
     }
 
     OpenRemotePort( strUrl )
@@ -242,15 +277,6 @@ exports.CInterfaceProxy = class CInterfaceProxy
             this.m_dwPortId = ret
             this.m_iState = EnumIfState.stateConnected
             this.m_oIoMgr.RegisterProxy( this )
-            this.m_funcEnableEvent( 0 )
-            /*const nextTask = new Promise( (resolved, rejected)=>{
-                resolved(0)
-            }).then((e)=>{
-                this.m_funcEnableEvent( e )
-            }).catch((e)=>{
-                console.log(e)
-            })*/
-
         }).catch(( e )=>{
             this.m_iState = EnumIfState.stateStartFailed
         })

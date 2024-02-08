@@ -1,5 +1,5 @@
 const { CConfigDb2 } = require("../combase/configdb")
-const { ERROR, Int32Value } = require("../combase/defines")
+const { ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumSeriProto } = require("../combase/enums")
 const { CDBusMessage, DBusIfName, DBusObjPath, DBusDestination2 } = require("../rpc/dmsg")
 const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CPendingRequest, AdminCmd } = require("../combase/iomsg")
@@ -48,22 +48,23 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
     }).then(( e )=>{
         var ret = 0
         const oResp = e.m_oResp
-        var ret = Int32Value( oResp.GetProperty(
-            EnumPropId.propReturnValue ) )
+        var ret = oResp.GetProperty(
+            EnumPropId.propReturnValue )
         if( ret === null || ERROR( ret ) )
             throw new Error( `Error returned ${ret}` )
-        idx++
-        if( idx >= this.m_arrMatches.length )
-            return
-        this.m_funcEnableEvent( idx )
+        return Promise.resolve( oResp )
     }).catch(( e )=>{
         if( e.message !== undefined)
+        {
             console.log( `Error EnableEventLocal failed: ${e.message}` )
+            return Promise.reject( e.message )
+        }
         else if( e.m_oResp !== undefined )
         {
             var ret = e.m_oResp.GetProperty(
                 EnumPropId.propReturnValue )
             console.log( `Error EnableEventLocal failed with error ${ret}` )
+            return Promise.reject( e.m_oResp )
         }
     })
 }

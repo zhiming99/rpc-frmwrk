@@ -8,6 +8,7 @@ const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoE
 const { messageType } = require( "../dbusmsg/constants")
 const { Bdge_Handshake } = require("./handshak")
 const { Bdge_EnableRemoteEvent } = require("./enablevtrmt")
+const { Bdge_ForwardRequest } = require("./fwrdreqrmt")
 
 class CRpcStreamBase
 {
@@ -154,6 +155,9 @@ class CRpcTcpBridgeProxy
 
         oIoTab[ IoCmd.EnableRemoteEvent[0]] =
             Bdge_EnableRemoteEvent.bind( this )
+
+        oIoTab[ IoCmd.ForwardRequest[0] ] =
+            Bdge_ForwardRequest.bind(this)
     }
 
     constructor( oParent, oConnParams )
@@ -502,8 +506,7 @@ class CRpcRouter
         var ret = errno.STATUS_SUCCESS
         var oResp = new CAdminRespMessage( oReq )
         try{
-            var dwPortId = oReq.m_oReq.GetProperty(
-                EnumPropId.propPortId )
+            var dwPortId = oReq.m_dwPortId
             if( dwPortId === null ||
                 dwPortId === undefined )
             {

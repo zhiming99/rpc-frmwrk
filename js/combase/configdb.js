@@ -287,8 +287,10 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 {
                     if( value.v === null || value.v === "")
                     {
-                        dstBuf.writeUint32BE( 0, pos )
+                        dstBuf.writeUint32BE( 1, pos )
                         pos += 4
+                        dstBuf.writeUint8( 0, pos )
+                        pos += 1
                         break
                     }
                     var strBuf = CBuffer.StrToBuffer( value.v ) 
@@ -444,9 +446,11 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     if( pos + 4 + dwSize > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
                     if( dwSize === 0 )
+                        throw new Error( "Error buffer is too small" )
+                    if( dwSize === 1 )
                     {
                         value.v = ""
-                        pos += 4
+                        pos += 5
                     }
                     else
                     {

@@ -111,9 +111,9 @@ exports.CIoManager = class CIoManager
             var dwPortId = oProxy.GetPortId()
             var key, oPending
             if( ret === undefined )
-                ret = errno.ECANCELED
+                ret = -errno.ECANCELED
             var oResp = new CConfigDb2()
-            oResp.SetUint16(
+            oResp.SetUint32(
                 EnumPropId.propReturnValue, ret )
             var arrKeys = []
             for( [key, oPending] of this.m_mapPendingReqs )

@@ -349,10 +349,13 @@ gint32 CConfigDb2::Serialize(
                 memcpy( pLoc, &len, sizeof( guint32 ) );
                 len = ntohl( len );
 
-                if( len == 0 )
-                    break;
-
                 pLoc += sizeof( guint32 );
+                if( len == 1 )
+                {
+                    pLoc[ 0 ] = 0;
+                    break;
+                }
+
                 memcpy( pLoc, oVar.m_strVal.c_str(), len - 1 );
                 pLoc += len;
                 pLoc[ -1 ] = 0;
@@ -569,6 +572,11 @@ gint32 CConfigDb2::Deserialize(
                     }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
+                    if( len == 0 )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
                     pLoc += sizeof( guint32 );
                     if( pLoc + len > pEnd )
                     {

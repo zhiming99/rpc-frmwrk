@@ -3533,7 +3533,7 @@ gint32 CRpcRouterBridge::RunEnableEventTask(
         oParams[ propNotifyClient ] = true;
 
         ret = pTransGrp.NewObj(
-            clsid( CIfTaskGroup ),
+            clsid( CIfTransactGroup  ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
@@ -3638,7 +3638,7 @@ gint32 CRpcRouterBridge::BuildDisEvtTaskGrp(
         }
 
         ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
+            clsid( CIfTransactGroup  ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
