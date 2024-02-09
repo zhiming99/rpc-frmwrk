@@ -133,20 +133,6 @@ exports.CBuffer = class CBuffer extends CObjBase
     set type( dwType )
     { this.m_dwTypeId = dwType }
 
-    static StrToBuffer( dstBuf, start, str )
-    {
-        const encoder = new TextEncoder();
-        const encodedData = encoder.encode(str);
-        var offset = start
-        dstBuf.writeUint32LE( offset, encodedData.length + 1 )
-        offset += 4
-        dstBuf.fill( encodedData, offset, offset + encodedData.length )
-        offset += encodedData.length
-        dstBuf.writeUint8( offset, 0 )
-        offset+=1
-        return offset - start
-    }
-
     // return an arraybuffer with encoded string
     static StrToBuffer( str )
     {
@@ -155,6 +141,13 @@ exports.CBuffer = class CBuffer extends CObjBase
         var nullc = Buffer.alloc(1)
         nullc[0] = 0
         return Buffer.concat( [encodedData, nullc] )
+    }
+
+    static StrToBufferNoNull( str )
+    {
+        const encoder = new TextEncoder();
+        const encodedData = encoder.encode(str);
+        return Buffer.concat( [encodedData, ] )
     }
 
     static BufferToStr( buf, offset )
@@ -166,6 +159,19 @@ exports.CBuffer = class CBuffer extends CObjBase
         offset += 4
         var str = decoder.decode(
             buf.slice(offset, offset + dwSize - 1))
+        if( dwSize < str.length )
+            throw new Error("Error string goes beyond limit")
+        return str
+    }
+    static BufferToStrNoNull( buf, offset )
+    {
+        if( offset === undefined )
+            offset = 0
+        const decoder = new TextDecoder();
+        var dwSize = buf.readUint32BE( offset )
+        offset += 4
+        var str = decoder.decode(
+            buf.slice(offset, offset + dwSize))
         if( dwSize < str.length )
             throw new Error("Error string goes beyond limit")
         return str

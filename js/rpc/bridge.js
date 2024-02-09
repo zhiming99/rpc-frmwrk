@@ -115,18 +115,18 @@ class CRpcDefaultStream extends CRpcStreamBase
         // post the data to the main thread
         var oMsg = unmarshall( dmsgBuf )
         var dmsg = new CDBusMessage()
-        dmsg.Copy( oMsg )
+        dmsg.Restore( oMsg )
         if( dmsg.GetType() === messageType.signal )
             return
         else if( dmsg.GetType() === messageType.methodReturn )
         {
             var key = dmsg.GetReplySerial()
-            var oReq = this.m_oParent.FindPendingReq( key )
-            if( !oReq )
+            var oPending = this.m_oParent.FindPendingReq( key )
+            if( !oPending )
                 return
             var oResp = new CConfigDb2()
             var iRet = dmsg.GetArgAt(0)
-            if( Int32Value( iRet ) < 0 )
+            if( ERROR( iRet ) < 0 )
             {
                 oResp.SetUint32(
                     EnumPropId.propReturnValue, iRet )
@@ -134,9 +134,12 @@ class CRpcDefaultStream extends CRpcStreamBase
             else
             {
                 var oBuf = dmsg.GetArgAt(1)
-                oResp.Deserialize( oBuf, 0 )
+                if( oPending.m_oReq.m_iCmd !== IoCmd.ForwardRequest[0])
+                    oResp.Deserialize( oBuf, 0 )
+                else
+                    oResp = oBuf
             }
-            oReq.OnTaskComplete( oResp )
+            oPending.OnTaskComplete( oResp )
         }
         return
     }

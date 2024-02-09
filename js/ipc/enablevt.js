@@ -8,12 +8,9 @@ const { CIoReqMessage } = require("../combase/iomsg")
 
 exports.EnableEventLocal = function EnableEventLocal( idx )
 {
-    var ret = 0
     if( idx >= this.m_arrMatches.length )
-    {
-        console.log( "EnableEventLocal completed")
-        return ret
-    }
+        return
+
     var oMatch = this.m_arrMatches[ idx ]
     return new Promise( ( resolve, reject )=>{
         var oMsg = new CIoReqMessage()
@@ -38,20 +35,17 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
 
         var oPending = new CPendingRequest(oMsg)
         oPending.m_oReq = oMsg
-        // oPending.m_dwPortId = this.GetPortId()
         oPending.m_oObject = this
         oPending.m_oResolve = resolve
         oPending.m_oReject = reject
         this.PostMessage( oPending )
-        this.m_oIoMgr.AddPendingReq(
-            oMsg.m_iMsgId, oPending)
+        this.m_oIoMgr.AddPendingReq( oMsg.m_iMsgId, oPending)
     }).then(( e )=>{
-        var ret = 0
         const oResp = e.m_oResp
         var ret = oResp.GetProperty(
             EnumPropId.propReturnValue )
         if( ret === null || ERROR( ret ) )
-            throw new Error( `Error returned ${ret}` )
+            return Promise.reject( oResp )
         return Promise.resolve( oResp )
     }).catch(( e )=>{
         if( e.message !== undefined)

@@ -55,9 +55,12 @@ function ForwardRequest( oMsg )
         var oReqCtx = new CConfigDb2()
 
         var oInnerMsg = BuildDBusMsgToFwrd( oMsg.m_oReq )
-        if( oInnerMsg === undefined )
+        if( oInnerMsg === undefined  )
             throw new Error( "Error marshalling message")
         var oInnerBuf = marshall( oInnerMsg )
+        var oInnerTotal = Buffer.alloc( 4 + oInnerBuf.length )
+        oInnerTotal.writeUint32BE( oInnerBuf.length, 0)
+        oInnerTotal.fill( oInnerBuf, 4, 4 + oInnerBuf.length )
 
         var strRouter = oMsg.m_oReq.GetProperty(
                 EnumPropId.propRouterPath)
@@ -93,7 +96,7 @@ function ForwardRequest( oMsg )
 
         var arrBody = []
         arrBody.push( new Pair( { t: "ay", v: oCtxBuf }))
-        arrBody.push( new Pair( { t: "ay", v: oInnerBuf }))
+        arrBody.push( new Pair( { t: "ay", v: oInnerTotal }))
         arrBody.push( new Pair({t:"t", v: oMsg.m_iMsgIdLocal}))
         dmsg.AppendFields( arrBody )
         var oBufToSend = marshall( dmsg )
@@ -131,25 +134,51 @@ function ForwardRequest( oMsg )
 
 function OnForwardRequestComplete( oPending )
 {
-    var oResp = oPending.m_oResp
+    if( oPending.message !== undefined )
+    {
+        console.log( oPending )
+        return
+    }
+
+    var dmsg = new CDBusMessage()
+    dmsg.Restore( unmarshall(
+        oPending.m_oResp.slice( 4 ) ) )
+    
+    var iRet = dmsg.GetArgAt( 0 )
+    var oResp = new CConfigDb2()
+    if( ERROR( iRet ) )
+    {
+        oResp.SetUint32(
+            EnumPropId.propReturnValue, iRet )
+        ret = iRet
+    }
+    else
+    {
+        var oBuf = dmsg.GetArgAt( 1 )
+        oResp.Deserialize( oBuf, 0 )
+    }
+
     var ret = oResp.GetProperty(
         EnumPropId.propReturnValue )
     if( ret === null || ret === undefined )
         return
     try{
-        var oResp = new CIoRespMessage( oPending.m_oReq )
-        oResp.m_oResp.SetUint32(
-            EnumPropId.propReturnValue, ret )
-        oResp.m_oReq = undefined
-        this.m_oParent.PostMessage( oResp )
+        var oLocalResp = new CIoRespMessage( oPending.m_oReq )
+        oLocalResp.m_oResp = oResp
+        oLocalResp.m_oReq = undefined
+        oLocalResp.m_iMsgId = oPending.m_oReq.m_iMsgIdLocal
+        this.m_oParent.PostMessage( oLocalResp )
     }
     catch( e )
     {
     }
     finally
     {
-        this.m_mapPendingReqs.delete(
-            oPending.m_oReq.m_iMsgId )
+        if( oPending.m_oResp !== undefined )
+        {
+            this.m_mapPendingReqs.delete(
+                oPending.m_oReq.m_iMsgId )
+        }
     }
 }
 

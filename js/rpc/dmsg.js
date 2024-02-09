@@ -106,7 +106,7 @@ exports.CDBusMessage = class CDBusMessage
         return this.body[ idx ]
     }
 
-    Copy( oMsg )
+    Restore( oMsg )
     {
         this.type = oMsg.type
         this.path = oMsg.path
