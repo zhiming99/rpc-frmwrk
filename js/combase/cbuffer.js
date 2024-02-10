@@ -160,7 +160,7 @@ exports.CBuffer = class CBuffer extends CObjBase
         var str = decoder.decode(
             buf.slice(offset, offset + dwSize - 1))
         if( dwSize < str.length )
-            throw new Error("Error string goes beyond limit")
+            throw new Error("Error string size is beyond limit")
         return str
     }
     static BufferToStrNoNull( buf, offset )

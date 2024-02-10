@@ -45,6 +45,7 @@ exports.RegisterFactory = function RegisterFactory( oFactory )
 
 exports.CoCreateInstance = function CoCreateInstance( iClsid )
 {
+    var oObj = null
     for( i = 0; i < g_Factories.length; i++ )
     {
         oObj = g_Factories[i].CreateInstance(iClsid)
