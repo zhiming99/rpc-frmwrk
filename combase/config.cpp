@@ -333,7 +333,7 @@ gint32 CConfigDb2::Serialize(
             }
         case typeString:
             {
-                guint32 len = 1 + oVar.m_strVal.size(); 
+                guint32 len = oVar.m_strVal.size(); 
                 guint32 dwFree = pEnd - pLoc;
                 if( dwFree < sizeof( guint32 ) + len )
                 {
@@ -345,20 +345,17 @@ gint32 CConfigDb2::Serialize(
                         break;
                 }
 
-                len = htonl( len );
-                memcpy( pLoc, &len, sizeof( guint32 ) );
-                len = ntohl( len );
-
+                guint32 len1 = htonl( len );
+                memcpy( pLoc, &len1, sizeof( guint32 ) );
                 pLoc += sizeof( guint32 );
-                if( len == 1 )
+                if( len == 0 )
                 {
-                    pLoc[ 0 ] = 0;
+                    // empty string
                     break;
                 }
 
-                memcpy( pLoc, oVar.m_strVal.c_str(), len - 1 );
+                memcpy( pLoc, oVar.m_strVal.c_str(), len );
                 pLoc += len;
-                pLoc[ -1 ] = 0;
                 break;
             }
         case typeDMsg:
@@ -572,18 +569,18 @@ gint32 CConfigDb2::Deserialize(
                     }
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
+                    pLoc += sizeof( guint32 );
                     if( len == 0 )
                     {
-                        ret = -EINVAL;
+                        new ( &oVar ) Variant("");
                         break;
                     }
-                    pLoc += sizeof( guint32 );
                     if( pLoc + len > pEnd )
                     {
                         ret = -E2BIG;
                         break;
                     }
-                    new ( &oVar ) Variant( ( const char* )pLoc, len - 1 );
+                    new ( &oVar ) Variant( ( const char* )pLoc, len );
                     pLoc += len;
                     break;
                 }

@@ -289,11 +289,9 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     {
                         dstBuf.writeUint32BE( 1, pos )
                         pos += 4
-                        dstBuf.writeUint8( 0, pos )
-                        pos += 1
                         break
                     }
-                    var strBuf = CBuffer.StrToBuffer( value.v ) 
+                    var strBuf = CBuffer.StrToBufferNoNull( value.v ) 
                     if( pos + strBuf.length > dstBuf.length )
                     {
                         dwSize = strBuf.length > CV.PAGE_SIZE ?
@@ -446,16 +444,14 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     if( pos + 4 + dwSize > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
                     if( dwSize === 0 )
-                        throw new Error( "Error buffer is too small" )
-                    if( dwSize === 1 )
                     {
                         value.v = ""
-                        pos += 5
+                        pos += 4
                     }
                     else
                     {
                         var strBuf = srcBuf.slice( pos, pos + 4 + dwSize )
-                        value.v = CBuffer.BufferToStr( strBuf ) 
+                        value.v = CBuffer.BufferToStrNoNull( strBuf ) 
                         pos += 4 + dwSize
                     }
                     break

@@ -47,18 +47,31 @@ class CSerialBase
             'o' : this.DeserialObjPtr,
         })
     }
-    constructor( bSerial, oProxy, oBuf )
+    /**
+     * constructor of CSerialBase
+     *
+     * @param {bool}bSerialize to tell whether serialize or deserialize.
+     * @param {object}oProxy the proxy object, which is used to serialize or deserialize the stream handle
+     * @returns {undefined}
+     * @api public
+     */
+    constructor( bSerialize, oProxy )
     {
-        if( oBuf !== undefined )
-            this.m_oBuf = oBuf
-        else
-            this.m_oBuf = null
-        this.m_bSerial = bSerial
+        this.m_oBuf = null
+        this.m_bSerial = bSerialize
         if( oProxy !== undefined)
             this.m_oProxy = oProxy
         else
             this.m_oProxy = null
     }
+
+    /**
+     * Get the ridl buffer.
+     * @returns {Buffer} the accumulated ridl buffer after a set of serialization operations
+     * @api public
+     */
+    GetRidlBuf()
+    { return this.m_oBuf }
 
     SerialUint8( val )
     {
@@ -151,9 +164,9 @@ class CSerialBase
 
     SerialString( val )
     {
-        var oStrBuf = CBuffer.StrToBuffer( val )
+        var oStrBuf = CBuffer.StrToBufferNoNull( val )
         var oSizeBuf = Buffer.alloc( 4 )
-        oSizeBuf.writeUint32BE( oSizeBuf.length )
+        oSizeBuf.writeUint32BE( oStrBuf.length )
 
         if( this.m_oBuf === null )
             this.m_oBuf =
@@ -342,7 +355,7 @@ class CSerialBase
     DeserialByteArray( oBuf, offset )
     {
         var dwSize = oBuf.readUint32BE( offset )
-        if( dwSize === 0 || dwSize > CV.BUF_MAX_SIZE )
+        if( dwSize === 0 || dwSize > CV.MAX_BYTES_PER_BUFFER )
         {
             throw new Error( "Error bytearray out of range")
         }
@@ -353,14 +366,14 @@ class CSerialBase
     DeserialString( oBuf, offset )
     {
         var dwSize = oBuf.readUint32BE( offset )
-        if( dwSize === 0 || dwSize > CV.BUF_MAX_SIZE )
+        if( dwSize === 0 || dwSize > CV.MAX_BYTES_PER_BUFFER )
         {
             throw new Error( "Error bytearray size is out of range")
         }
-        var strBuf = oBuf.slice(
-            offset, offset + dwSize )
-        return [ CBuffer.BufferToStr( strBuf ),
-            offset + dwSize + 4 ]
+        var strRet = CBuffer.BufferToStrNoNull( oBuf )
+        if( strRet[ strRet.length - 1] === '\u0000' )
+            strRet = strRet.slice( 0, strRet.length - 1)
+        return [ strRet, offset + dwSize + 4 ]
     }
 
     DeserialObjPtr( oBuf, offset )
@@ -373,7 +386,7 @@ class CSerialBase
         if( oObj === null )
             throw new Error( "Error no such struct")
         var dwSize = oBuf.readUint32BE( offset + 4 )
-        if( dwSize === 0 || dwSize > CV.BUF_MAX_SIZE )
+        if( dwSize === 0 || dwSize > CV.MAX_BYTES_PER_BUFFER )
             throw new Error( "Error object size is out of range")
         oObj.Deserialize( oBuf, offset )
         return [ oObj, offset + dwSize + SERI_HEADER_BASE.GetSeriSize()]
@@ -401,7 +414,7 @@ class CSerialBase
         var dwCount = this.DeserialUint32( oBuf, offset + 4)[0]
         if( dwSize === 0 || dwCount === 0 )
             return [ [], offset + 8 ]
-        if( dwSize > CV.BUF_MAX_SIZE || dwCount > 1000000 )
+        if( dwSize > CV.MAX_BYTES_PER_BUFFER || dwCount > 1000000 )
             throw new Error( "Error array size out of range")
         offset += 8
         var arrValues
@@ -427,7 +440,7 @@ class CSerialBase
         var dwCount = this.DeserialUint32( oBuf, offset + 4)[0]
         if( dwSize === 0 || dwCount === 0 )
             return [ new Map(), offset + 8 ]
-        if( dwSize > CV.BUF_MAX_SIZE || dwCount > 1000000 )
+        if( dwSize > CV.MAX_BYTES_PER_BUFFER || dwCount > 1000000 )
             throw new Error( "Error array size out of range")
         offset += 8
 
@@ -453,3 +466,5 @@ class CSerialBase
 
     }
 }
+
+exports.CSerialBase=CSerialBase

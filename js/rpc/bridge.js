@@ -544,16 +544,19 @@ class CRpcRouter
     OnRmtSvrOffline( dwPortId, strRoute )
     {
         try{
+            var oProxy 
             if( strRoute === "/" )
             {
-                var oProxy =
+                oProxy =
                     this.m_mapBdgeProxies.get( dwPortId )
                 if( !oProxy )
-                    throw new Error( "Error no such proxy" )
-
-                oProxy.Stop()
-                this.m_mapBdgeProxies.delete( dwPortId )
-                this.m_mapConnParams.delete( dwPortId )
+                    console.log( "Error no such proxy" )
+                else
+                {
+                    oProxy.Stop()
+                    this.m_mapBdgeProxies.delete( dwPortId )
+                    this.m_mapConnParams.delete( dwPortId )
+                }
             }
             var oEvt = new CIoEventMessage()
             oEvt.m_dwPortId = dwPortId
@@ -561,9 +564,10 @@ class CRpcRouter
             oEvt.m_iMsgId = globalThis.g_iMsgIdx++
             oEvt.m_oReq.SetString(
                 EnumPropId.propRouterPath, strRoute )
-            oEvt.m_oReq.SetObjPtr(
-                EnumPropId.propConnParams,
-                oProxy.m_oConnParams )
+            if( oProxy )
+                oEvt.m_oReq.SetObjPtr(
+                    EnumPropId.propConnParams,
+                    oProxy.m_oConnParams )
             this.PostMessage( oEvt )
         }
         catch( e )

@@ -633,8 +633,9 @@ gint32 CRpcTcpBusPort::OnNewConnection(
                 ret = shutdown( iSockFd, SHUT_RDWR );
                 if( ERROR( ret ) )
                 {
-                    DebugPrint( -errno,
-                        "Error shutdown socket[%d]",
+                    DebugPrintEx( logErr, -errno,
+                        "Error connection limit reached, "
+                        "shutdown the socket[%d]",
                         iSockFd );
                 }
                 ret = close( iSockFd );

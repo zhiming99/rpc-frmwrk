@@ -3,6 +3,7 @@ module.exports = {
       PAGE_SIZE : 4096,
       BUF_MAX_SIZE: (512*1024*1024),
       MAX_BYTES_PER_TRANSFER: (1024*1024),
+      MAX_BYTES_PER_BUFFER: (16*1024*1024),
       CFGDB_MAX_ITEMS: 1024,
       CFGDB_MAX_SIZE: (16*1024*1024),
       DBUS_NAME_PREFIX: "org.rpcf.",

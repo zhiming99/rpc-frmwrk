@@ -191,26 +191,33 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
     Start()
     {
-        return this.LoadObjDesc( this.m_strObjDesc).then((e)=>
-                this.OpenRemotePort( this.m_strUrl ).then((e)=>{
-                    var proms = []
-                    for( var i =0; i< this.m_arrMatches.length; i++ )
-                        proms.push( this.m_funcEnableEvent( i ) )
-                    return Promise.all( proms ).then((e)=>{
-                        var ret = 0
-                        for( var oResp of e )
-                        {
-                            ret = oResp.GetProperty(
-                                EnumPropId.propReturnValue )
-                            if( ERROR( ret ) )
-                                break
-                        }
-                        if( ERROR( ret ))
-                            return Promise.reject( ret )
-                        else
-                            return Promise.resolve( ret )
-                    })
-                }))
+        return this.LoadObjDesc( this.m_strObjDesc).then((e)=>{
+            return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
+                var proms = []
+                for( var i =0; i< this.m_arrMatches.length; i++ )
+                    proms.push( this.m_funcEnableEvent( i ) )
+                return Promise.all( proms ).then((e)=>{
+                    var ret = 0
+                    for( var oResp of e )
+                    {
+                        ret = oResp.GetProperty(
+                            EnumPropId.propReturnValue )
+                        if( ERROR( ret ) )
+                            break
+                    }
+                    if( ERROR( ret ))
+                        return Promise.reject( ret )
+                    else
+                        return Promise.resolve( ret )
+                })
+            }).catch((e)=>{
+                console.log(e)
+                var oResp = e.m_oResp
+                var ret = oResp.GetProperty(
+                    EnumPropId.propReturnValue )
+                return Promise.resolve( errno.ERROR_STATE )
+            })
+        })
     }
 
     Stop( ret )
@@ -265,20 +272,24 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 EnumPropId.propReturnValue )
             if( ret === null || ERROR( ret ) )
             {
-                return Promise.reject( "Error OpenRemotePort failed")
+                console.log( "Error OpenRemotePort failed")
+                return Promise.reject( e )
             }
 
             ret = oResp.GetProperty(0)
             if( ret === null || ERROR( ret ))
             {
-                return Promise.reject( "Error OpenRemotePort invalid response")
+                console.log( "Error OpenRemotePort invalid response")
+                return Promise.reject( e)
             }
 
             this.m_dwPortId = ret
-            this.m_iState = EnumIfState.stateConnected
+            this.m_iState = EnumIfState.stateStarted
             this.m_oIoMgr.RegisterProxy( this )
+            return Promise.resolve( e )
         }).catch(( e )=>{
             this.m_iState = EnumIfState.stateStartFailed
+            return Promise.reject( e )
         })
     }
 

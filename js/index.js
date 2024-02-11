@@ -6,10 +6,11 @@ const { CConfigDb2 } = require("./combase/configdb")
 // index.js
 const { messageType } = require( "./dbusmsg/constants")
 const { randomInt, ERROR, USER_METHOD, Pair } = require("./combase/defines")
-const {EnumClsid, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("./combase/enums")
+const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("./combase/enums")
 globalThis.g_iMsgIdx = randomInt( 100000000 )
 
 const {CoCreateInstance}=require("./combase/factory")
+const {CSerialBase} = require("./combase/seribase")
 globalThis.CoCreateInstance=CoCreateInstance
 const {CIoManager} = require( "./ipc/iomgr")
 const {CInterfaceProxy} = require( "./ipc/proxy")
@@ -28,31 +29,35 @@ class CAsyncTestCli extends CInterfaceProxy
     {
         super( oIoMgr, strObjDesc, strObjName )
     }
-    LongWaitCallback(oResp)
+    LongWaitCallback(ret, strResp)
     {
-        var ret = oResp.GetProperty(
-            EnumPropId.propReturnValue)
         if( ERROR( ret) )
         {
             console.log( "error occurs")
             return
         }
-        var ridlBuf = oResp.GetProperty( 0 )
-        var oBuf = Buffer.from( ridlBuf )
-        var dwSize = oBuf.readUint32BE( 0 )
-        if( dwSize > oBuf.length - 4 )
-            console.log( "Error invalid string")
-        var strResp = CBuffer.BufferToStrNoNull( oBuf, 0 )
         console.log( `server returns ${strResp}`)
     }
 
-    LongWait( strText, oCallback=this.LongWaitCallback )
+    LongWait( strText, oCallback=( oResp )=>{
+        var ret = oResp.GetProperty(
+            EnumPropId.propReturnValue)
+        if( ERROR( ret ) )
+        {
+            this.LongWaitCallback( ret )
+            return
+        }
+        var ridlBuf = Buffer.from( oResp.GetProperty( 0 ) )
+        var osb = new CSerialBase( false, this )
+        var ret = osb.DeserialString( ridlBuf, 0 )
+        this.LongWaitCallback(
+            errno.STATUS_SUCCESS, ret[0] )
+    })
     {
         var oReq = new CConfigDb2()
-        var strBuf = CBuffer.StrToBufferNoNull( strText )
-        var oSizeBuf = Buffer.alloc(4)
-        oSizeBuf.writeUint32BE( strBuf.length )
-        var ridlBuf = Buffer.concat([oSizeBuf,strBuf])
+        var osb = new CSerialBase(true, this )
+        osb.SerialString( strText ) 
+        var ridlBuf = osb.GetRidlBuf()
         oReq.Push( new Pair( {t: EnumTypeId.typeByteArr, v:ridlBuf} ) )
         oReq.SetString( EnumPropId.propIfName,
             DBusIfName( "IAsyncTest") )
