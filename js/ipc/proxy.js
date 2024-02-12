@@ -6,6 +6,7 @@ const { DBusIfName, DBusDestination, DBusDestination2, DBusObjPath } = require("
 const { CMessageMatch } = require( "../combase/msgmatch")
 const { EnableEventLocal } = require( "./enablevt")
 const { ForwardRequestLocal } = require("./fwrdreq")
+const { ForwardEventLocal } = require("./fwrdevt")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -28,6 +29,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_strSender = ""
         this.m_dwTimeoutSec = 0
         this.m_dwKeepAliveSec = 0
+        this.m_mapEvtHandlers = new Map()
         if( oParams !== undefined )
         {
             var oVal = oParams.GetProperty(
@@ -52,6 +54,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
         { oEvtTab.push(InvalFunc) }
+
+        oEvtTab[ IoEvent.ForwardEvent[0]] = ForwardEventLocal.bind( this)
     }
 
     InitReq( oReq, strMethodName )
@@ -312,6 +316,25 @@ exports.CInterfaceProxy = class CInterfaceProxy
                     m_oReq.m_dwMsgId )
             }
         }
+    }
+
+    DispatchEventMsg( e )
+    {
+        // console.log( e )
+        var oEvt = new CConfigDb2()
+        oEvt.Restore( e.m_oReq )
+        var oInnerReq = oEvt.GetProperty( 0 )
+        var strIfName = oEvt.GetProperty(
+            EnumPropId.propIfName );
+        var strMember = oEvt.GetProperty(
+            EnumPropId.propMethodName );
+        if( strIfName === null || strMember === null )
+            return
+        var key = strIfName.slice( 16 ) +
+            '::' + strMember.slice( 10 )
+        var ridlBuf = oInnerReq.GetProperty( 0 )
+        this.m_mapEvtHandlers.get( key )( ridlBuf );
+        return
     }
 
     PostMessage( oPending )

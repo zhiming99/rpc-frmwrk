@@ -85,10 +85,11 @@ class CAsyncTestCli extends CInterfaceProxy
         return this.m_funcForwardRequest( oReq, oCallback )
     }
 }
-var oProxy = new CAsyncTestCli( g_oIoMgr,
+g_oIoMgr.Start()
+
+/*var oProxy = new CAsyncTestCli( g_oIoMgr,
     strObjDesc, strObjName, oParams )
 
-g_oIoMgr.Start()
 oProxy.Start().then((retval)=>{
     if( ERROR( retval ))
     {
@@ -100,8 +101,56 @@ oProxy.Start().then((retval)=>{
 }).catch((retval)=>{
     console.log(retval)
     oProxy.Stop()
+})*/
+
+strObjDesc = "http://example.com/rpcf/evtestdesc.json"
+strObjName = "EventTest"
+strAppName = "evtest"
+class CEventTestCli extends CInterfaceProxy
+{
+    constructor( oIoMgr,
+        strObjDesc, strObjName, oParams )
+    {
+        super( oIoMgr, strObjDesc, strObjName )
+        var func =( ridlBuf )=>{
+            var offset = 0
+            var arrParams = []
+            var oRidlBuf = Buffer.from( ridlBuf )
+            var osb = new CSerialBase()
+            var ret = osb.DeserialString( oRidlBuf, offset )
+            arrParams.push( ret[0 ])
+            offset += ret[1]
+            this.OnHelloWorld.apply( this, arrParams )
+        }
+        this.m_mapEvtHandlers.set(
+            "IEventTest::OnHelloWorld", func)
+    }
+
+    OnHelloWorld( strEvent )
+    {
+        console.log( Date.now() + ":" + strEvent )
+    }
+}
+
+var oProxy = new CEventTestCli( g_oIoMgr,
+    strObjDesc, strObjName, oParams )
+
+var count = 0
+oProxy.Start().then((retval)=>{
+    if( ERROR( retval ))
+    {
+        console.log(retval)
+        return
+    }
+    var func = ()=>{
+        console.log( count++ )
+        setTimeout( func, 6000 )
+     }
+    var timerId = setTimeout( func , 6000 )
+
+}).catch((retval)=>{
+    console.log(retval)
+    oProxy.Stop()
 })
-
-
 
 

@@ -9,6 +9,7 @@ const { messageType } = require( "../dbusmsg/constants")
 const { Bdge_Handshake } = require("./handshak")
 const { Bdge_EnableRemoteEvent } = require("./enablevtrmt")
 const { Bdge_ForwardRequest } = require("./fwrdreqrmt")
+const { Bdge_ForwardEvent } = require("./fwrdevtrmt")
 
 class CRpcStreamBase
 {
@@ -104,7 +105,14 @@ class CRpcDefaultStream extends CRpcStreamBase
                 Buffer.concat( [ oBufSize, oBufToSend] ) )
         }
     }
-
+    /**
+     * Receive websock frame from outside,
+     * and dispatch it to the proper handler
+     *
+     * @param {CIncomingPacket}oInPkt is the incoming packet
+     * @returns {undefined}
+     * @api public
+     */
     ReceivePacket( oInPkt )
     {
         var oBuf = oInPkt.m_oBuf
@@ -117,7 +125,16 @@ class CRpcDefaultStream extends CRpcStreamBase
         var dmsg = new CDBusMessage()
         dmsg.Restore( oMsg )
         if( dmsg.GetType() === messageType.signal )
-            return
+        {
+            var strMethod = dmsg.GetMember()
+
+            var key, value
+            for( [key, value] of Object.entries(IoEvent) )
+            {
+                if( value[1] === strMethod )
+                    this.m_oParent.m_arrDispEvtTable[ value[0]]( dmsg )
+            }
+        }
         else if( dmsg.GetType() === messageType.methodReturn )
         {
             var key = dmsg.GetReplySerial()
@@ -161,6 +178,10 @@ class CRpcTcpBridgeProxy
 
         oIoTab[ IoCmd.ForwardRequest[0] ] =
             Bdge_ForwardRequest.bind(this)
+
+        var oIoEvent = this.m_arrDispEvtTable
+        oIoEvent[ IoEvent.ForwardEvent[0]] =
+            Bdge_ForwardEvent.bind( this )
     }
 
     constructor( oParent, oConnParams )
@@ -358,7 +379,13 @@ class CRpcTcpBridgeProxy
         } catch( Error )
         { return  -errno.EFAULT}
     }
+
+    PostMessage( oMsg )
+    {
+        this.m_oParent.PostMessage( oMsg )
+    }
 }
+exports.CRpcTcpBridgeProxy=CRpcTcpBridgeProxy
 
 class CConnParams extends CConfigDb2
 {

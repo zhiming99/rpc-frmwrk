@@ -75,6 +75,14 @@ exports.CIoManager = class CIoManager
                     if( oProxy !== undefined )
                         oProxy.Stop( errno.ERROR_PORT_STOPPED)
                 }
+                else if( oMsg.m_iCmd === IoEvent.ForwardEvent[0])
+                {
+                    var oEvt = new CIoEventMessage()
+                    oEvt.Restore( oMsg )
+                    var oProxy = this.m_mapProxies.get( oEvt.m_dwPortId )
+                    if( oProxy !== undefined )
+                        oProxy.DispatchEventMsg( oMsg )
+                }
                 else
                     throw new Error( `Error unsupported Message (${oMsg})`)
             }

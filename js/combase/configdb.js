@@ -352,6 +352,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     Deserialize( srcBuf, offset )
     {
+        if( offset === undefined)
+            offset = 0
         this.m_props.clear()
         if( !Buffer.isBuffer( srcBuf ) )
             throw new TypeError( "Error invald buffer type")
