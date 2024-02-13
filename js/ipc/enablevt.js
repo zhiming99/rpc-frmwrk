@@ -1,7 +1,6 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumSeriProto } = require("../combase/enums")
-const { CDBusMessage, DBusIfName, DBusObjPath, DBusDestination2 } = require("../rpc/dmsg")
 const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CPendingRequest, AdminCmd } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { CIoReqMessage } = require("../combase/iomsg")

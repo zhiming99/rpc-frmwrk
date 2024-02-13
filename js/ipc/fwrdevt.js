@@ -7,8 +7,16 @@ const { messageType } = require( "../dbusmsg/constants")
 const { CIoReqMessage } = require("../combase/iomsg")
 const { CSerialBase } = require("../combase/seribase")
 
-exports.ForwardEventLocal = function ForwardEventLocal( oEvent )
+/**
+ * ForwardEventLocal to pass the event to the client handler
+ * @param {bool}bSerialize to tell whether serialize or deserialize.
+ * @param {object}oProxy the proxy object, which is used to serialize or deserialize the stream handle
+ * @returns {undefined}
+ * @api public
+ */
+exports.ForwardEventLocal = function ForwardEventLocal( oMsg )
 {
+    var oEvent = oMsg.m_oReq
     var strIfName = oEvent.GetProperty(
         EnumPropId.propIfName )
     var strObjPath = oEvent.GetProperty(
@@ -24,24 +32,24 @@ exports.ForwardEventLocal = function ForwardEventLocal( oEvent )
             continue
         if( elem.GetObjPath() !== strObjPath )
             continue
-        if( elem.GetSender() !== strSender )
-            continue
-        strKey = strIfName + '::' + strMethod
+        strKey = strIfName.slice( 16 ) +
+            '::' + strMethod.slice( 10 )
         break
     }
     if( strKey === "" )
         return
+    var oRmtEvt = oEvent.GetProperty( 0 );
     try{
-        var bSeriProto = oEvent.GetProperty(
+        var bSeriProto = oRmtEvt.GetProperty(
             EnumPropId.propSeriProto )
         if( bSeriProto === null )
             throw new Error( "Error serialization proto missing")
         if( bSeriProto !== EnumSeriProto.seriRidl )
             throw new Error( "Error serialization proto not supported")
-        var ridlBuf = oEvent.GetProperty( 0 )
+        var ridlBuf = oRmtEvt.GetProperty( 0 )
         if( ridlBuf === null )
             throw new Error( "Error bad event message")
-        this.m_mapEvtHandlers.get( strKey ).apply( this, [ridlBuf] )
+        this.m_mapEvtHandlers.get( strKey )( ridlBuf )
     }
     catch(e)
     {

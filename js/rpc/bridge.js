@@ -369,7 +369,6 @@ class CRpcTcpBridgeProxy
     {
         if( oMsg.m_iType !== IoMsgType.ReqMsg )
             return -errno.EINVAL
-        console.log(oMsg)
 
         var oCmdTab = this.m_arrDispReqTable
         if( oMsg.m_iCmd >= oCmdTab.length )
@@ -572,19 +571,11 @@ class CRpcRouter
     {
         try{
             var oProxy 
-            if( strRoute === "/" )
-            {
-                oProxy =
-                    this.m_mapBdgeProxies.get( dwPortId )
-                if( !oProxy )
-                    console.log( "Error no such proxy" )
-                else
-                {
-                    oProxy.Stop()
-                    this.m_mapBdgeProxies.delete( dwPortId )
-                    this.m_mapConnParams.delete( dwPortId )
-                }
-            }
+            if( strRoute !== "/" )
+                return
+            oProxy =
+                this.m_mapBdgeProxies.get( dwPortId )
+
             var oEvt = new CIoEventMessage()
             oEvt.m_dwPortId = dwPortId
             oEvt.m_iCmd = IoEvent.OnRmtSvrOffline[0]
@@ -596,6 +587,14 @@ class CRpcRouter
                     EnumPropId.propConnParams,
                     oProxy.m_oConnParams )
             this.PostMessage( oEvt )
+            if( !oProxy )
+                console.log( "Error no such proxy" )
+            else
+            {
+                oProxy.Stop()
+                this.m_mapBdgeProxies.delete( dwPortId )
+                this.m_mapConnParams.delete( dwPortId )
+            }
         }
         catch( e )
         {

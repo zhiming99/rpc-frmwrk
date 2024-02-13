@@ -139,29 +139,36 @@ function OnForwardRequestComplete( oPending )
         console.log( oPending )
         return
     }
-
-    var dmsg = new CDBusMessage()
-    dmsg.Restore( unmarshall(
-        oPending.m_oResp.slice( 4 ) ) )
-    
-    var iRet = dmsg.GetArgAt( 0 )
-    var oResp = new CConfigDb2()
-    if( ERROR( iRet ) )
+    var oResp
+    if( !( oPending.m_oResp instanceof( CConfigDb2 )) )
     {
-        oResp.SetUint32(
-            EnumPropId.propReturnValue, iRet )
-        ret = iRet
+        var dmsg = new CDBusMessage()
+        dmsg.Restore( unmarshall(
+            oPending.m_oResp.slice( 4 ) ) )
+        
+        var iRet = dmsg.GetArgAt( 0 )
+        oResp = new CConfigDb2()
+        if( ERROR( iRet ) )
+        {
+            oResp.SetUint32(
+                EnumPropId.propReturnValue, iRet )
+            ret = iRet
+        }
+        else
+        {
+            var oBuf = dmsg.GetArgAt( 1 )
+            oResp.Deserialize( oBuf, 0 )
+        }
+
+        var ret = oResp.GetProperty(
+            EnumPropId.propReturnValue )
+        if( ret === null || ret === undefined )
+            return
     }
     else
     {
-        var oBuf = dmsg.GetArgAt( 1 )
-        oResp.Deserialize( oBuf, 0 )
+        oResp = oPending.m_oResp
     }
-
-    var ret = oResp.GetProperty(
-        EnumPropId.propReturnValue )
-    if( ret === null || ret === undefined )
-        return
     try{
         var oLocalResp = new CIoRespMessage( oPending.m_oReq )
         oLocalResp.m_oResp = oResp

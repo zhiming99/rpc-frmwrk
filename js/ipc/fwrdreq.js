@@ -5,7 +5,18 @@ const { IoCmd, CPendingRequest } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { CIoReqMessage } = require("../combase/iomsg")
 
-exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback )
+/**
+ * ForwardRequestLocal will send a user request to the worker thread
+ * @param {CConfigDb2}oReq the parameters of the request
+ * @param {function}oCallback the callback when the call is completed
+ * asynchronously.
+ * @param {Object}oContext the context object is the parameter to pass to
+ * oCallback. It will have a m_qwTaskId after the ForwardRequestLocal returns,
+ * which can be used to cancel the request.
+ * @returns {Promise}
+ * @api public
+ */
+exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oContext )
 {
     var ret = 0
     return new Promise( ( resolve, reject )=>{
@@ -37,7 +48,9 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback )
         oPending.m_oObject = this
         oPending.m_oResolve = resolve
         oPending.m_oReject = reject
-        oPending.m_oCallback = oCallback
+        if( oContext !== undefined )
+            oContext.m_qwTaskId = oMsg.m_iMsgId
+        oPending.m_oCallback = oCallback.bind( this, oContext )
         this.PostMessage( oPending )
         this.m_oIoMgr.AddPendingReq( oMsg.m_iMsgId, oPending)
     }).then(( e )=>{

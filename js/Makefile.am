@@ -7,5 +7,6 @@ dbusmsg/message.js dbusmsg/signature.js dbusmsg/unmarshall.js \
 rpc/bridge.js rpc/dmsg.js combase/iomsg.js rpc/ioworker.js rpc/handshak.js \
 rpc/enablevtrmt.js ipc/enablevt.js ipc/iomgr.js ipc/proxy.js \
 rpc/fwrdreqrmt.js ipc/fwrdreq.js combase/seribase.js rpc/fwrdevtrmt.js \
-ipc/fwrdevt.js
+ipc/fwrdevt.js ipc/cancelrq.js test/asynctst.js test/actcancel.js \
+test/evtest.js
 

@@ -7,6 +7,7 @@ const { CMessageMatch } = require( "../combase/msgmatch")
 const { EnableEventLocal } = require( "./enablevt")
 const { ForwardRequestLocal } = require("./fwrdreq")
 const { ForwardEventLocal } = require("./fwrdevt")
+const { UserCancelRequest } = require("./cancelrq")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -50,6 +51,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
     {
         this.m_funcEnableEvent = EnableEventLocal.bind( this )
         this.m_funcForwardRequest = ForwardRequestLocal.bind( this )
+        this.m_funcCancelRequest = UserCancelRequest.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
@@ -243,7 +245,6 @@ exports.CInterfaceProxy = class CInterfaceProxy
             oPending.m_oReject = reject
             this.PostMessage( oPending )
         }).then((e)=>{
-            var ret = e.m_oResp.GetProperty(EnumPropId.propReturnValue)
             this.m_oIoMgr.UnregisterProxy( this, ret)
             return Promise.resolve(ret)
         }).catch((e)=>{
@@ -316,25 +317,6 @@ exports.CInterfaceProxy = class CInterfaceProxy
                     m_oReq.m_dwMsgId )
             }
         }
-    }
-
-    DispatchEventMsg( e )
-    {
-        // console.log( e )
-        var oEvt = new CConfigDb2()
-        oEvt.Restore( e.m_oReq )
-        var oInnerReq = oEvt.GetProperty( 0 )
-        var strIfName = oEvt.GetProperty(
-            EnumPropId.propIfName );
-        var strMember = oEvt.GetProperty(
-            EnumPropId.propMethodName );
-        if( strIfName === null || strMember === null )
-            return
-        var key = strIfName.slice( 16 ) +
-            '::' + strMember.slice( 10 )
-        var ridlBuf = oInnerReq.GetProperty( 0 )
-        this.m_mapEvtHandlers.get( key )( ridlBuf );
-        return
     }
 
     PostMessage( oPending )

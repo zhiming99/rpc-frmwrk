@@ -81,7 +81,7 @@ exports.CIoManager = class CIoManager
                     oEvt.Restore( oMsg )
                     var oProxy = this.m_mapProxies.get( oEvt.m_dwPortId )
                     if( oProxy !== undefined )
-                        oProxy.DispatchEventMsg( oMsg )
+                        oProxy.m_arrDispTable[ IoEvent.ForwardEvent[0] ]( oEvt )
                 }
                 else
                     throw new Error( `Error unsupported Message (${oMsg})`)
