@@ -2,24 +2,22 @@ const { CConfigDb2 } = require("../combase/configdb")
 const { messageType } = require( "../dbusmsg/constants")
 const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/defines")
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
-globalThis.g_iMsgIdx = randomInt( 100000000 )
-
 const {CoCreateInstance}=require("../combase/factory")
 const {CSerialBase} = require("../combase/seribase")
-globalThis.CoCreateInstance=CoCreateInstance
 const {CIoManager} = require( "../ipc/iomgr")
 const {CInterfaceProxy} = require( "../ipc/proxy")
 const {CBuffer} = require("../combase/cbuffer")
 const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
-var g_oIoMgr = new CIoManager()
-
-var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
-oParams.SetString(
-    EnumPropId.propObjInstName, strObjName)
 
 var strObjDesc = "http://example.com/rpcf/asynctstdesc.json"
 var strObjName = "AsyncTest"
 var strAppName = "asynctst"
+
+var strLogPrefix = strAppName + ": "
+
+var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
+oParams.SetString(
+    EnumPropId.propObjInstName, strObjName)
 
 class CAsyncTestCli extends CInterfaceProxy
 {
@@ -32,10 +30,10 @@ class CAsyncTestCli extends CInterfaceProxy
     {
         if( ERROR( ret) )
         {
-            console.log( `error occurs ${Int32Value(ret)}`)
+            console.log( strLogPrefix + `error occurs ${Int32Value(ret)}`)
             return
         }
-        console.log( `server returns ${strResp}`)
+        console.log( strLogPrefix + `server returns ${strResp}`)
     }
 
     LongWait( oContext, strText, oCallback=( oContext, oResp )=>{
@@ -90,13 +88,13 @@ class CAsyncTestCli extends CInterfaceProxy
             EnumPropId.propCallOptions, oCallOpts)
         var ret =  this.m_funcForwardRequest(
             oReq, oCallback, oContext )
-        console.log( `taskid is ${oContext.m_qwTaskId}`)
+        console.log( strLogPrefix + `taskid is ${oContext.m_qwTaskId}`)
         return ret
     }
 }
-g_oIoMgr.Start()
 
-var oProxy = new CAsyncTestCli( g_oIoMgr,
+var oProxy = new CAsyncTestCli(
+    globalThis.g_oIoMgr,
     strObjDesc, strObjName, oParams )
 
 oProxy.Start().then((retval)=>{
@@ -105,7 +103,7 @@ oProxy.Start().then((retval)=>{
         console.log(retval)
         return
     }
-    oContext = new Object()
+    var oContext = new Object()
     oProxy.LongWait( oContext, "hello, World!" )
 
 }).catch((retval)=>{

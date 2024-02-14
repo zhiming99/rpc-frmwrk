@@ -1,26 +1,16 @@
-const { CConfigDb2 } = require("../combase/configdb")
-const { messageType } = require( "../dbusmsg/constants")
-const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/defines")
+const { ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/defines")
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
-globalThis.g_iMsgIdx = randomInt( 100000000 )
-
-const {CoCreateInstance}=require("../combase/factory")
 const {CSerialBase} = require("../combase/seribase")
-globalThis.CoCreateInstance=CoCreateInstance
-const {CIoManager} = require( "../ipc/iomgr")
 const {CInterfaceProxy} = require( "../ipc/proxy")
-const {CBuffer} = require("../combase/cbuffer")
-const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
-var g_oIoMgr = new CIoManager()
+
+var strObjDesc = "http://example.com/rpcf/evtestdesc.json"
+var strObjName = "EventTest"
+var strAppName = "evtest"
 
 var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
 oParams.SetString(
     EnumPropId.propObjInstName, strObjName)
 
-
-var strObjDesc = "http://example.com/rpcf/evtestdesc.json"
-var strObjName = "EventTest"
-var strAppName = "evtest"
 
 class CEventTestCli extends CInterfaceProxy
 {
@@ -48,7 +38,8 @@ class CEventTestCli extends CInterfaceProxy
     }
 }
 
-var oProxy = new CEventTestCli( g_oIoMgr,
+var oProxy = new CEventTestCli(
+    globalThis.g_oIoMgr,
     strObjDesc, strObjName, oParams )
 
 var count = 0
@@ -67,3 +58,5 @@ oProxy.Start().then((retval)=>{
     console.log(retval)
     oProxy.Stop()
 })
+
+

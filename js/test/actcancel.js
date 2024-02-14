@@ -2,24 +2,20 @@ const { CConfigDb2 } = require("../combase/configdb")
 const { messageType } = require( "../dbusmsg/constants")
 const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/defines")
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
-globalThis.g_iMsgIdx = randomInt( 100000000 )
-
 const {CoCreateInstance}=require("../combase/factory")
 const {CSerialBase} = require("../combase/seribase")
-globalThis.CoCreateInstance=CoCreateInstance
 const {CIoManager} = require( "../ipc/iomgr")
 const {CInterfaceProxy} = require( "../ipc/proxy")
-const {CBuffer} = require("../combase/cbuffer")
 const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
-var g_oIoMgr = new CIoManager()
-g_oIoMgr.Start()
-
-var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
-oParams.SetString( EnumPropId.propObjInstName, strObjName)
 
 var strObjDesc = "http://example.com/rpcf/actcanceldesc.json"
 var strObjName = "ActiveCancel"
 var strAppName = "actcancel"
+
+var strLogPrefix = strAppName + ": "
+
+var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
+oParams.SetString( EnumPropId.propObjInstName, strObjName)
 
 class CActiveCancelCli extends CInterfaceProxy
 {
@@ -33,15 +29,15 @@ class CActiveCancelCli extends CInterfaceProxy
         var qwTaskId = oContext.m_qwTaskId
         if( ret === errno.ERROR_USER_CANCEL)
         {
-            console.log( `request ${qwTaskId} is canceled ${Int32Value(ret)}`)
+            console.log( strLogPrefix + `request ${qwTaskId} is canceled ${Int32Value(ret)}`)
             return
         }
         else if( ERROR( ret) )
         {
-            console.log( `error occurs ${Int32Value(ret)}`)
+            console.log( strLogPrefix + `error occurs ${Int32Value(ret)}`)
             return
         }
-        console.log( `server returns ${strResp}`)
+        console.log( strLogPrefix + `server successfully returns response "${strResp}"`)
     }
 
     LongWait( oContext, strText, oCallback=( oContext, oResp )=>{
@@ -96,13 +92,14 @@ class CActiveCancelCli extends CInterfaceProxy
             EnumPropId.propCallOptions, oCallOpts)
         var ret =  this.m_funcForwardRequest(
             oReq, oCallback, oContext )
-        console.log( `taskid to cancel is ${oContext.m_qwTaskId}`)
+        console.log( strLogPrefix + `taskid to cancel is ${oContext.m_qwTaskId}`)
         return ret
     }
 }
 
 var oProxy = new CActiveCancelCli(
-    g_oIoMgr, strObjDesc, strObjName, oParams )
+    globalThis.g_oIoMgr,
+    strObjDesc, strObjName, oParams )
 
 oProxy.Start().then((retval)=>{
     if( ERROR( retval ))
@@ -110,7 +107,7 @@ oProxy.Start().then((retval)=>{
         console.log(retval)
         return
     }
-    oContext = new Object()
+    var oContext = new Object()
     oProxy.LongWait( oContext, "hello, World!" )
     if( oContext.m_qwTaskId !== undefined )
     {
@@ -118,7 +115,7 @@ oProxy.Start().then((retval)=>{
             oProxy.m_funcCancelRequest(
                 oContext.m_qwTaskId,
                 (ret, qwTaskId)=>{
-                    console.log( `Canceling request ${qwTaskId} completed with status ${Int32Value(ret)}` )
+                    console.log( strLogPrefix + `Canceling request ${qwTaskId} completed with status ${Int32Value(ret)}` )
                 })
         }, 5000)
     }
