@@ -393,9 +393,9 @@ class CConnParams extends CConfigDb2
 
     IsEqual( rhs )
     {
-        rval = rhs.GetProperty(
+        var rval = rhs.GetProperty(
             EnumPropId.propDestUrl )
-        lval = this.GetProperty(
+        var lval = this.GetProperty(
             EnumPropId.propDestUrl )
         if( lval !== rval )
             return false
@@ -416,6 +416,8 @@ class CRpcRouter
 
         this.m_strRouterName = "rpcrouter"
         this.m_strSess = ""
+        this.m_bOpenPortInProgress = false
+        this.m_arrOpenPortQueue = []
 
         this.m_arrDispTable = []
         var oAdminTab = this.m_arrDispTable
@@ -454,13 +456,24 @@ class CRpcRouter
 
     OpenRemotePort( oReq )
     {
+        if( this.m_bOpenPortInProgress )
+        {
+            console.log( "new OpenRemotePort request queued")
+            this.m_arrOpenPortQueue.push( oReq )
+            return
+        }
+        this.OpenRemotePortInternal( oReq )
+    }
+
+    OpenRemotePortInternal( oReq )
+    {
         var bFound = false
         var oConnParams = new CConnParams();
         oConnParams.Restore( oReq.m_oReq )
-        var dwPortId, oConn
-        for( [ dwPortId, oConn ] of this.m_mapBdgeProxies )
+        var dwPortId, oProxy
+        for( [ dwPortId, oProxy ] of this.m_mapBdgeProxies )
         {
-            if( oConn.IsEqual( oConnParams ) )
+            if( oProxy.m_oConnParams.IsEqual( oConnParams ) )
             {
                 bFound = true
                 break
@@ -478,6 +491,8 @@ class CRpcRouter
             this.PostMessage(oRet)
             return null
         }
+
+        this.m_bOpenPortInProgress = true
 
         return new Promise( (resolve, reject)=>{
             var oProxy = new CRpcTcpBridgeProxy(
@@ -501,33 +516,51 @@ class CRpcRouter
 
     OnOpenRemotePortComplete( oProxy, oReq, oResp )
     {
-        var iRet = oResp.GetProperty(
-            EnumPropId.propReturnValue )
-        if( iRet === null || iRet === undefined )
-            return
-
-        var oRet = new CAdminRespMessage( oReq )
-        oRet.m_oResp = oResp
-
-        this.PostMessage( oRet )
-
-        var dwPortId = oResp.GetProperty( 0 )
-        if( ERROR( iRet ) )
-        {
-            if( dwPortId === null || dwPortId === undefined )
+        try{
+            var iRet = oResp.GetProperty(
+                EnumPropId.propReturnValue )
+            if( iRet === null || iRet === undefined )
                 return
-            oProxy.Stop()
-            return
-        }
-        
-        // register the bridge proxy
-        var dwPortId = oResp.GetProperty( 0 )
-        this.m_mapBdgeProxies.set(
-            dwPortId, oProxy )
 
-        var oConnParams = oReq.m_oReq
-        this.m_mapConnParams.set(
-            dwPortId, oConnParams )
+            var oRet = new CAdminRespMessage( oReq )
+            oRet.m_oResp = oResp
+
+            this.PostMessage( oRet )
+
+            var dwPortId = oResp.GetProperty( 0 )
+            if( ERROR( iRet ) )
+            {
+                if( dwPortId === null || dwPortId === undefined )
+                    return
+                oProxy.Stop()
+                return
+            }
+            
+            // register the bridge proxy
+            var dwPortId = oResp.GetProperty( 0 )
+            this.m_mapBdgeProxies.set(
+                dwPortId, oProxy )
+
+            var oConnParams = oReq.m_oReq
+            this.m_mapConnParams.set(
+                dwPortId, oConnParams )
+        }
+        finally
+        {
+            if( this.m_arrOpenPortQueue.length > 0 )
+            {
+                console.log( "resume queued OpenRemotePort request")
+                this.m_bOpenPortInProgress = true
+                var newReq = this.m_arrOpenPortQueue.shift()
+                setTimeout( ()=>{
+                    this.OpenRemotePortInternal( newReq )
+                }, 0)
+            }
+            else
+            {
+                this.m_bOpenPortInProgress = false
+            }
+        }
     }
 
     CloseRemotePort( oReq )
