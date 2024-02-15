@@ -1,7 +1,7 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { randomInt, ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
-const { IoCmd, IoMsgType, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
+const { IoCmd, IoMsgType, CIoMessageBase, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 
 exports.CIoManager = class CIoManager
 {
@@ -61,6 +61,12 @@ exports.CIoManager = class CIoManager
     PostMessage( oMsg )
     { this.m_oWorker.postMessage(oMsg) }
 
+    /**
+     * DispatchMessage dispatches the messages from the webworker to the handlers.
+     * @param {CIoMessageBase}oMsg the 'KeepAlive' message from the remote server
+     * @returns {undefined}
+     * @api public
+     */
     DispatchMessage( oMsg )
     {
         try{
@@ -71,20 +77,26 @@ exports.CIoManager = class CIoManager
                     console.log( "connection is down")
                     var oEvt = new CIoEventMessage()
                     oEvt.Restore( oMsg )
-                    var oProxy = this.m_mapProxies.get( oEvt.m_dwPortId )
-                    if( oProxy !== undefined )
-                        oProxy.Stop( errno.ERROR_PORT_STOPPED)
+                    var oProxies = this.m_mapProxies.get( oEvt.m_dwPortId )
+                    if( oProxies !== undefined )
+                    {
+                        oProxies.forEach( ( oProxy, v2, set )=>{
+                            oProxy.Stop( errno.ERROR_PORT_STOPPED)
+                        })
+                    }
                 }
-                else if( oMsg.m_iCmd === IoEvent.ForwardEvent[0])
+                else
                 {
                     var oEvt = new CIoEventMessage()
                     oEvt.Restore( oMsg )
-                    var oProxy = this.m_mapProxies.get( oEvt.m_dwPortId )
-                    if( oProxy !== undefined )
-                        oProxy.m_arrDispTable[ IoEvent.ForwardEvent[0] ]( oEvt )
+                    var oProxies = this.m_mapProxies.get( oEvt.m_dwPortId )
+                    if( oProxies !== undefined )
+                    {
+                        oProxies.forEach( ( oProxy, v2, set )=>{
+                            oProxy.m_arrDispTable[ oMsg.m_iCmd ]( oEvt )
+                        })
+                    }
                 }
-                else
-                    throw new Error( `Error unsupported Message (${oMsg})`)
             }
             else if( oMsg.m_iType === IoMsgType.AdminResp ||
                 oMsg.m_iType === IoMsgType.RespMsg )
@@ -107,7 +119,15 @@ exports.CIoManager = class CIoManager
     {
         try{
             var dwPortId = oProxy.GetPortId()
-            this.m_mapProxies.set( dwPortId, oProxy )
+            var oProxies = this.m_mapProxies.get( dwPortId )
+            if( oProxies !== undefined )
+                oProxies.add( oProxy )
+            else
+            {
+                oProxies = new Set()
+                oProxies.add( oProxy )
+                this.m_mapProxies.set( dwPortId, oProxies )
+            }
         }catch( e ) {
             console.log( "Register proxy failed")
         }
@@ -137,7 +157,9 @@ exports.CIoManager = class CIoManager
             for( key of arrKeys )
                 this.m_mapPendingReqs.delete( key )
 
-            this.m_mapProxies.delete( dwPortId )
+            var oProxies = this.m_mapProxies.delete( dwPortId )
+            if( oProxies !== undefined )
+                oProxies.delete( oProxy )
         }catch( e ) {
             console.log( "Unregister proxy failed")
         }

@@ -109,19 +109,26 @@ function ForwardRequest( oMsg )
         ret = oStream.SendBuf(
             Buffer.concat([oBufSize, oBufToSend]) )
 
-        if( ret < 0 )
-        {
-            var oResp = new CIoRespMessage( oMsg )
-            oResp.m_oResp.SetUint32(
-                EnumPropId.propReturnValue, ret )
-            this.m_oParent.PostMessage( oResp )
-            return null
-        }
-
         var oPendingEe = new CPendingRequest( oMsg )
         oPendingEe.m_oResolve = resolve
         oPendingEe.m_oReject = reject
         oPendingEe.m_oObject = this
+
+        if( ERROR( ret ) || oInnerMsg.IsNoReply() )
+        {
+            var oResp = new CConfigDb2()
+            oResp.SetUint32(
+                EnumPropId.propReturnValue, ret )
+            if( oInnerMsg.IsNoReply())
+            {
+                oResp.SetBool(
+                    EnumPropId.propNoReply, true )
+            }
+            oPendingEe.m_oResp = oResp
+            resolve( oPendingEe )
+            return
+        }
+
         this.m_mapPendingReqs.set(
             oMsg.m_iMsgId, oPendingEe )
 
@@ -168,6 +175,10 @@ function OnForwardRequestComplete( oPending )
     else
     {
         oResp = oPending.m_oResp
+        var bNoReply = oResp.GetProperty(
+            EnumPropId.propNoReply )
+        if( bNoReply === true )
+            return
     }
     try{
         var oLocalResp = new CIoRespMessage( oPending.m_oReq )
@@ -181,7 +192,7 @@ function OnForwardRequestComplete( oPending )
     }
     finally
     {
-        if( oPending.m_oResp !== undefined )
+        if( oPending.m_oReq !== undefined )
         {
             this.m_mapPendingReqs.delete(
                 oPending.m_oReq.m_iMsgId )

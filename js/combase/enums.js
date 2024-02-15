@@ -67,7 +67,7 @@ module.exports = {
         propParamCount:12297,
         propMatchPtr: 12320,
         propReturnValue: 12329,
-        propCallFlags: 12331,
+        propCallFlags: 12330,
         propCallOptions: 12331,
         propKeepAliveSec: 12332,
         propTimeoutsec: 12333,

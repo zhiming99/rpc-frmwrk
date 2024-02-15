@@ -41,7 +41,7 @@ exports.IoCmd = IoCmd
 
 const IoEvent = {
     Invalid : [ 0, "Invalid" ],
-    OnKeepAlive : [ 1, "RpcEvt_OnKeepAlive" ],
+    OnKeepAlive : [ 1, "RpcEvt_KeepAlive" ],
     ForwardEvent : [ 2, "RpcEvt_ForwardEvent" ],
     OnRmtSvrOffline : [ 3, "OnRmtSvrOffline" ],
     StreamRead: [ 4, "StreamRead" ],
@@ -131,7 +131,7 @@ class CIoReqMessage extends CIoMessageBase
         super()
         this.m_iType = IoMsgType.ReqMsg
         this.m_iCmd = IoCmd.Invalid[0]
-        this.m_dwTimeLeftSec = 0
+        this.m_dwTimerLeftMs = 0
         this.m_oReq = new CConfigDb2()
     }
 
@@ -140,28 +140,32 @@ class CIoReqMessage extends CIoMessageBase
         if( oMsg === null || oMsg === undefined )
             return
         super.Restore(oMsg)
-        this.m_dwTimeLeftSec = oMsg.m_dwTimeLeftSec
+        this.m_dwTimerLeftMs = oMsg.m_dwTimerLeftMs
     }
 
     DecTimer( delta )
     {
-        if( this.m_dwTimeLeftSec > delta )
-            this.m_dwTimeLeftSec -= delta
+        if( this.m_dwTimerLeftMs > delta )
+            this.m_dwTimerLeftMs -= delta
         else
         {
-            this.m_dwTimeLeftSec = 0
+            this.m_dwTimerLeftMs = 0
         }
-        return this.m_dwTimeLeftSec
+        return this.m_dwTimerLeftMs
     }
 
     ResetTimer()
     {
-        this.m_dwTimeLeftSec = this.GetTimeoutSec()
+        this.m_dwTimerLeftMs = this.GetTimeoutSec() * 1000
     }
 
     GetTimeoutSec()
     {
-        return this.m_oReq.GetProperty(
+        var oCallOpt = this.m_oReq.GetProperty( 
+            EnumPropId.propCallOptions )
+        if( oCallOpt === null )
+            return 0
+        return  oCallOpt.GetProperty(
                 EnumPropId.propTimeoutsec )
     }
 

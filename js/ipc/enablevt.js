@@ -16,7 +16,7 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
         oMsg.m_iMsgId = globalThis.g_iMsgIdx++
         oMsg.m_iCmd = IoCmd.EnableRemoteEvent[0]
         oMsg.m_dwPortId = this.GetPortId()
-        oMsg.m_dwTimeLeftSec = this.m_dwTimeoutSec * 1000
+        oMsg.m_dwTimerLeftMs = this.m_dwTimeoutSec * 1000
         var oReq = oMsg.m_oReq
         var oParams = new CConfigDb2()
         oParams.SetUint32( EnumPropId.propTimeoutsec,

@@ -10,6 +10,7 @@ const { Bdge_Handshake } = require("./handshak")
 const { Bdge_EnableRemoteEvent } = require("./enablevtrmt")
 const { Bdge_ForwardRequest } = require("./fwrdreqrmt")
 const { Bdge_ForwardEvent } = require("./fwrdevtrmt")
+const { Bdge_OnKeepAlive } = require("./keepalivermt")
 
 class CRpcStreamBase
 {
@@ -182,6 +183,9 @@ class CRpcTcpBridgeProxy
         var oIoEvent = this.m_arrDispEvtTable
         oIoEvent[ IoEvent.ForwardEvent[0]] =
             Bdge_ForwardEvent.bind( this )
+
+        oIoEvent[ IoEvent.OnKeepAlive[0]]  =
+            Bdge_OnKeepAlive.bind( this )
     }
 
     constructor( oParent, oConnParams )
@@ -276,7 +280,7 @@ class CRpcTcpBridgeProxy
             oMsg.m_iCmd = IoCmd.Handshake
             oMsg.m_iMsgId = globalThis.g_iMsgIdx++
             oMsg.m_iType = IoMsgType.ReqMsg
-            oMsg.m_dwTimeLeftSec =
+            oMsg.m_dwTimerLeftMs =
                 constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT * 1000
             this.m_arrDispReqTable[ IoCmd.Handshake[0] ](oMsg, oPending)
 
@@ -462,7 +466,25 @@ class CRpcRouter
             this.m_arrOpenPortQueue.push( oReq )
             return
         }
+        this.m_bOpenPortInProgress = true
         this.OpenRemotePortInternal( oReq )
+    }
+
+    UpdateOpenPortQueue()
+    {
+        if( this.m_arrOpenPortQueue.length > 0 )
+        {
+            console.log( "resume queued OpenRemotePort request")
+            this.m_bOpenPortInProgress = true
+            var newReq = this.m_arrOpenPortQueue.shift()
+            setTimeout( ()=>{
+                this.OpenRemotePortInternal( newReq )
+            }, 0)
+        }
+        else
+        {
+            this.m_bOpenPortInProgress = false
+        }
     }
 
     OpenRemotePortInternal( oReq )
@@ -489,10 +511,9 @@ class CRpcRouter
             oRet.m_oResp.Push(
                 {t: EnumTypeId.typeUInt32, v: dwPortId})
             this.PostMessage(oRet)
+            this.UpdateOpenPortQueue()
             return null
         }
-
-        this.m_bOpenPortInProgress = true
 
         return new Promise( (resolve, reject)=>{
             var oProxy = new CRpcTcpBridgeProxy(
@@ -547,19 +568,7 @@ class CRpcRouter
         }
         finally
         {
-            if( this.m_arrOpenPortQueue.length > 0 )
-            {
-                console.log( "resume queued OpenRemotePort request")
-                this.m_bOpenPortInProgress = true
-                var newReq = this.m_arrOpenPortQueue.shift()
-                setTimeout( ()=>{
-                    this.OpenRemotePortInternal( newReq )
-                }, 0)
-            }
-            else
-            {
-                this.m_bOpenPortInProgress = false
-            }
+            this.UpdateOpenPortQueue()
         }
     }
 

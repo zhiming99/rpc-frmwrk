@@ -21,8 +21,6 @@ exports.ForwardEventLocal = function ForwardEventLocal( oMsg )
         EnumPropId.propIfName )
     var strObjPath = oEvent.GetProperty(
         EnumPropId.propObjPath )
-    var strSender = oEvent.GetProperty(
-        EnumPropId.propDestDBusName )
     var strMethod = oEvent.GetProperty(
         EnumPropId.propMethodName )
     var strKey = ""

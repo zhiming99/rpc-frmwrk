@@ -8,6 +8,7 @@ const { EnableEventLocal } = require( "./enablevt")
 const { ForwardRequestLocal } = require("./fwrdreq")
 const { ForwardEventLocal } = require("./fwrdevt")
 const { UserCancelRequest } = require("./cancelrq")
+const { OnKeepAliveLocal } = require("./keepalive")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -58,6 +59,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         { oEvtTab.push(InvalFunc) }
 
         oEvtTab[ IoEvent.ForwardEvent[0]] = ForwardEventLocal.bind( this)
+        oEvtTab[ IoEvent.OnKeepAlive[0]] = OnKeepAliveLocal.bind( this)
     }
 
     InitReq( oReq, strMethodName )
