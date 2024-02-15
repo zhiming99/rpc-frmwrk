@@ -689,7 +689,10 @@ gint32 CRpcTcpBusPort::OnNewConnection(
             NI_NUMERICHOST | NI_NUMERICSERV );
 
         if( ret != 0 )
+        {
+            ret = -ret;
             break;
+        }
             
         string strSrcIp = szNode;
         if( strSrcIp.empty() )
@@ -701,28 +704,47 @@ gint32 CRpcTcpBusPort::OnNewConnection(
         guint32 dwSrcPortNum =
             std::stoi( szServ );
 
+        memset( &oAddr, 0, sizeof( oAddr ) );
+        iSize = sizeof( oAddr );
+        ret = getsockname( iSockFd,
+            ( sockaddr* )&oAddr, &iSize );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+        memset( szNode, 0, sizeof( szNode ) );
+        memset( szServ, 0, sizeof( szServ ) );
+        ret = getnameinfo( ( sockaddr* )&oAddr,
+            iSize, szNode, sizeof( szNode ),
+            szServ, sizeof( szServ ),
+            NI_NUMERICHOST | NI_NUMERICSERV );
+
+        if( ret != 0 )
+        {
+            ret = -ret;
+            break;
+        }
+        string strDestIp = szNode;
+        if( strDestIp.empty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
         guint32 dwPortId = NewPdoId();
 
-        if( ERROR( ret ) )
-            break;
-
-        ret = oCfg.SetIntProp(
+        oCfg.SetIntProp(
             propPortId, dwPortId );
 
-        if( ERROR( ret ) )
-            break;
-
-        ret = oNewConn.SetStrProp(
+        oNewConn.SetStrProp(
             propSrcIpAddr, strSrcIp );
 
-        if( ERROR( ret ) )
-            break;
-
-        ret = oNewConn.SetIntProp(
+        oNewConn.SetIntProp(
             propSrcTcpPort, dwSrcPortNum );
 
-        if( ERROR( ret ) )
-            break;
+        oNewConn.SetStrProp(
+            propDestIpAddr, strDestIp );
 
         std::string strClass;
 

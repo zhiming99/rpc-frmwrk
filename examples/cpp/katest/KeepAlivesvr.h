@@ -11,7 +11,32 @@ class CKeepAlive_SvrImpl
     typedef CKeepAlive_SvrSkel super;
     CKeepAlive_SvrImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
-    {}
+    { SetClassId( clsid(CKeepAlive_SvrImpl ) ); }
+
+    gint32 InvokeUserMethod(
+        IConfigDb* pParams,
+        IEventSink* pCallback ) override
+    {
+        gint32 ret = AllocReqToken();
+        if( ERROR( ret ) )
+            return ret;
+        return super::InvokeUserMethod(
+            pParams, pCallback );
+    }
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    {
+        StartQpsTask();
+        return super::OnPostStart( pCallback );
+    }
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    {
+        StopQpsTask();
+        return super::OnPreStop( pCallback );
+    }
 
     gint32 LongWaitCb(
         IEventSink*, IConfigDb* pReqCtx_,
