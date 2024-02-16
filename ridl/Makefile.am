@@ -2,7 +2,7 @@ SUBDIRS= rpcfs .
 
 ridlc_PROGRAMS=ridlc
 ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h \
-genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md odesctpl.json \
+genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md README_cn.md odesctpl.json \
 odesctpl2.json drvtpl.json mktpl.in synccfg.py.in pymktpl genjava.cpp genjava.h \
 genfuse.h genfuse.cpp gencpp2.h gencpp2.cpp genfuse2.h genfuse2.cpp genrpcfs.cpp
 
