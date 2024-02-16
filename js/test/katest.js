@@ -30,10 +30,10 @@ class CKeepAliveCli extends CInterfaceProxy
     {
         if( ERROR( ret) )
         {
-            console.log( strLogPrefix + `error occurs ${Int32Value(ret)}`)
+            this.DebugPrint( `error occurs ${Int32Value(ret)}`)
             return
         }
-        console.log( strLogPrefix + `server returns ${strResp}`)
+        this.DebugPrint( `server returns ${strResp}`)
     }
 
     LongWait( oContext, strText, oCallback=( oContext, oResp )=>{
@@ -89,7 +89,7 @@ class CKeepAliveCli extends CInterfaceProxy
             EnumPropId.propCallOptions, oCallOpts)
         var ret =  this.m_funcForwardRequest(
             oReq, oCallback, oContext )
-        console.log( strLogPrefix + `taskid is ${oContext.m_qwTaskId}`)
+        this.DebugPrint(`taskid is ${oContext.m_qwTaskId}`)
         return ret
     }
 }

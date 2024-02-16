@@ -45,7 +45,7 @@ function KeepAliveRequest( oOrigMsg, qwTaskId )
     var oContext = new Object()
     ForwardRequestLocal.bind( this )(
         oReq, (oContext, oResp )=>{
-            console.log( Date.now() + ": KeepAliveRequest is sent")
+            this.DebugPrint( ": KeepAliveRequest is sent")
         }, oContext )
 }
 

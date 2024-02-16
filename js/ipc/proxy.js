@@ -333,4 +333,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
         }
     }
 
+    DebugPrint( strMsg )
+    {
+        console.log( "[ " + Date.now() + "-" + this.m_strSvrName + " ]: " + strMsg  )
+    }
+
 }

@@ -29,15 +29,15 @@ class CActiveCancelCli extends CInterfaceProxy
         var qwTaskId = oContext.m_qwTaskId
         if( ret === errno.ERROR_USER_CANCEL)
         {
-            console.log( strLogPrefix + `request ${qwTaskId} is canceled ${Int32Value(ret)}`)
+            this.DebugPrint( `request ${qwTaskId} is canceled ${Int32Value(ret)}`)
             return
         }
         else if( ERROR( ret) )
         {
-            console.log( strLogPrefix + `error occurs ${Int32Value(ret)}`)
+            this.DebugPrint( `error occurs ${Int32Value(ret)}`)
             return
         }
-        console.log( strLogPrefix + `server successfully returns response "${strResp}"`)
+        this.DebugPrint( `server successfully returns response "${strResp}"`)
     }
 
     LongWait( oContext, strText, oCallback=( oContext, oResp )=>{
@@ -92,7 +92,7 @@ class CActiveCancelCli extends CInterfaceProxy
             EnumPropId.propCallOptions, oCallOpts)
         var ret =  this.m_funcForwardRequest(
             oReq, oCallback, oContext )
-        console.log( strLogPrefix + `taskid to cancel is ${oContext.m_qwTaskId}`)
+        this.DebugPrint( `taskid is ${oContext.m_qwTaskId}` )
         return ret
     }
 }
@@ -104,7 +104,7 @@ var oProxy = new CActiveCancelCli(
 oProxy.Start().then((retval)=>{
     if( ERROR( retval ))
     {
-        console.log(retval)
+        this.DebugPrint(retval)
         return
     }
     var oContext = new Object()
@@ -115,13 +115,13 @@ oProxy.Start().then((retval)=>{
             oProxy.m_funcCancelRequest(
                 oContext.m_qwTaskId,
                 (ret, qwTaskId)=>{
-                    console.log( strLogPrefix + `Canceling request ${qwTaskId} completed with status ${Int32Value(ret)}` )
+                    oProxy.DebugPrint( `Canceling request ${qwTaskId} completed with status ${Int32Value(ret)}` )
                 })
         }, 5000)
     }
 
 }).catch((retval)=>{
-    console.log(retval)
+    oProxy.DebugPrint(retval)
     oProxy.Stop()
 })
 

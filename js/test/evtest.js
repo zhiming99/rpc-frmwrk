@@ -34,7 +34,7 @@ class CEventTestCli extends CInterfaceProxy
 
     OnHelloWorld( strEvent )
     {
-        console.log( Date.now() + ":" + strEvent )
+        this.DebugPrint( strEvent )
     }
 }
 
@@ -50,7 +50,7 @@ oProxy.Start().then((retval)=>{
         return
     }
     var func = ()=>{
-        console.log( count++ )
+        oProxy.DebugPrint( count++ )
         setTimeout( func, 6000 )
     }
     var timerId = setTimeout( func , 6000 )
