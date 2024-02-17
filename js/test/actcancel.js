@@ -108,7 +108,8 @@ oProxy.Start().then((retval)=>{
         return
     }
     var oContext = new Object()
-    oProxy.LongWait( oContext, "hello, World!" )
+    oProxy.LongWait(
+        oContext, "hello, World!" )
     if( oContext.m_qwTaskId !== undefined )
     {
         setTimeout( ()=>{
@@ -116,6 +117,7 @@ oProxy.Start().then((retval)=>{
                 oContext.m_qwTaskId,
                 (ret, qwTaskId)=>{
                     oProxy.DebugPrint( `Canceling request ${qwTaskId} completed with status ${Int32Value(ret)}` )
+                    oProxy.Stop( ret )
                 })
         }, 5000)
     }

@@ -157,9 +157,28 @@ exports.CIoManager = class CIoManager
             for( key of arrKeys )
                 this.m_mapPendingReqs.delete( key )
 
-            var oProxies = this.m_mapProxies.delete( dwPortId )
+            var oProxies = this.m_mapProxies.get( dwPortId )
             if( oProxies !== undefined )
                 oProxies.delete( oProxy )
+            if( oProxies.length > 0 )
+                return Promise.resolve(0)
+
+            return new Promise( (resolve, reject)=>{
+                var oMsg = new CAdminReqMessage()
+                oMsg.m_iMsgId = globalThis.g_iMsgIdx++
+                oMsg.m_iCmd = AdminCmd.CloseRemotePort[0]
+                oMsg.m_dwPortId = dwPortId
+                var oPending = new CPendingRequest(oMsg)
+                oPending.m_oReq = oMsg
+                oPending.m_oObject = this
+                oPending.m_oResolve = resolve
+                oPending.m_oReject = reject
+                oProxy.PostMessage( oPending )
+            }).then((oPendingReq)=>{
+                this.m_mapProxies.delete(
+                    oPendingReq.m_oReq.m_dwPortId )
+            })
+
         }catch( e ) {
             console.log( "Unregister proxy failed")
         }

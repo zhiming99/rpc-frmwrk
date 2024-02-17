@@ -230,29 +230,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
     Stop( ret )
     {
-        if( this.GetPortId() === 0 )
-        {
-            this.m_oIoMgr.UnregisterProxy( this, ret )
-            return Promise.resolve(0)
-        }
-        return new Promise( (resolve, reject)=>{
-            var oMsg = new CAdminReqMessage()
-            oMsg.m_iMsgId = globalThis.g_iMsgIdx++
-            oMsg.m_iCmd = AdminCmd.CloseRemotePort[0]
-            oMsg.m_dwPortId = this.GetPortId()
-            var oPending = new CPendingRequest(oMsg)
-            oPending.m_oReq = oMsg
-            oPending.m_oObject = this
-            oPending.m_oResolve = resolve
-            oPending.m_oReject = reject
-            this.PostMessage( oPending )
-        }).then((e)=>{
-            this.m_oIoMgr.UnregisterProxy( this, ret)
-            return Promise.resolve(ret)
-        }).catch((e)=>{
-            console.log(e)
-        })
-
+        return this.m_oIoMgr.UnregisterProxy(
+            this, ret )
     }
 
     OpenRemotePort( strUrl )
