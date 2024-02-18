@@ -45,6 +45,7 @@ const IoEvent = {
     ForwardEvent : [ 2, "RpcEvt_ForwardEvent" ],
     OnRmtSvrOffline : [ 3, "OnRmtSvrOffline" ],
     StreamRead: [ 4, "StreamRead" ],
+    StreamClosed: [ 5, "StreamClosed" ],
 }
 
 exports.IoEvent = IoEvent

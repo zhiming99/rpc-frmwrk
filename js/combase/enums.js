@@ -48,6 +48,7 @@ module.exports = {
       CStlObjVector: 0x8ab,
       CClassFactory: 0x8a3,
       CStlQwordVector: 0x900,
+      IStream:0x10000003,
     },
 
     EnumPropId: {
@@ -78,6 +79,7 @@ module.exports = {
         propSeqNo: 12344,
         propIid: 12357,
         propSysMethod: 12360,
+        //propStreaming: 12363,
         propObjInstName:12368,
         propSvrInstName:12369,
         propDataDesc:12382,
@@ -92,6 +94,7 @@ module.exports = {
         propSessHash: 12401,
         propTimestamp: 12407,
         propContinue: 12411,
+        propPeerObjId:12419,
         propSeriProto:12420,
         propNoReply: 12421,
     },

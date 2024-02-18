@@ -319,7 +319,6 @@ class CRpcTcpBridgeProxy
             this.m_mapPendingReqs.clear()
         if( this.IsConnected() )
             this.m_oSocket.close()
-        this.m_oSocket = null
 
         if( this.m_iTimerId != 0 )
         {
@@ -419,7 +418,6 @@ class CRpcRouter
             this.DispatchMsg.bind( this )
 
         this.m_strRouterName = "rpcrouter"
-        this.m_strSess = ""
         this.m_bOpenPortInProgress = false
         this.m_arrOpenPortQueue = []
 

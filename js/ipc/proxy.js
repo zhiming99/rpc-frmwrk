@@ -9,6 +9,7 @@ const { ForwardRequestLocal } = require("./fwrdreq")
 const { ForwardEventLocal } = require("./fwrdevt")
 const { UserCancelRequest } = require("./cancelrq")
 const { OnKeepAliveLocal } = require("./keepalive")
+const { FetchDataLocal } = require("./fetchdat")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -32,6 +33,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_dwTimeoutSec = 0
         this.m_dwKeepAliveSec = 0
         this.m_mapEvtHandlers = new Map()
+        this.m_dwFetchDataTimeout = 0
+        this.m_setStreams = new Set()
         if( oParams !== undefined )
         {
             var oVal = oParams.GetProperty(
@@ -53,6 +56,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_funcEnableEvent = EnableEventLocal.bind( this )
         this.m_funcForwardRequest = ForwardRequestLocal.bind( this )
         this.m_funcCancelRequest = UserCancelRequest.bind( this )
+        this.m_funcFetchData = FetchDataLocal.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
@@ -96,6 +100,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
     LoadParams( o )
     {
+        var ret = errno.STATUS_SUCCESS
         var oVal
         try{
             if( this.m_strSvrName.length === 0 )
@@ -161,7 +166,17 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 var bDummy = interf[ "DummyInterface"]
                 if( bDummy !== undefined && bDummy === "true")
                     continue
-                var strIfName = DBusIfName( interf[ "InterfaceName" ] )
+                var strVal = interf[ "InterfaceName"]
+                if( strVal === "IStream" &&
+                    interf[ "FetchDataTimeout"] !== undefined )
+                {
+                    this.m_dwFetchDataTimeout = Number( interf[ "FetchDataTimeout"] )
+                }
+                else
+                {
+                    this.m_dwFetchDataTimeout = this.m_dwTimeoutSec
+                }
+                var strIfName = DBusIfName( strVal )
                 var match = new CMessageMatch()
                 match.SetType( EnumMatchType.matchClient)
                 match.SetObjPath( this.m_strObjPath )
@@ -175,20 +190,24 @@ exports.CInterfaceProxy = class CInterfaceProxy
         }
         catch(e)
         {
-
+            ret = -errno.EFAULT
         }
+        return ret
     }
 
-    LoadObjDesc( strObjDesc )
+    async LoadObjDesc( strObjDesc )
     {
-        return fetch( strObjDesc )
-        .then( response=>response.json())
-        .then( (o)=>{
-            this.LoadParams( o )
-        })
-        .catch( (e)=>{
+        try {
+            var ret = errno.STATUS_SUCCESS
+            const response = await fetch(strObjDesc)
+            const o = await response.json()
+            ret = this.LoadParams(o)
+            return Promise.resolve( ret )
+        } catch (e) {
             console.log(e.message)
-        })
+            ret = -errno.EFAULT
+            return Promise.reject( ret )
+        }
     }
 
     GetPortId()
@@ -199,7 +218,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
     Start()
     {
-        return this.LoadObjDesc( this.m_strObjDesc).then((e)=>{
+        return this.LoadObjDesc( this.m_strObjDesc).then((retval)=>{
+            if(ERROR(retval))
+                return Promise.reject(retval)
             return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
                 var proms = []
                 for( var i =0; i< this.m_arrMatches.length; i++ )
@@ -219,12 +240,15 @@ exports.CInterfaceProxy = class CInterfaceProxy
                         return Promise.resolve( ret )
                 })
             }).catch((e)=>{
-                console.log(e)
                 var oResp = e.m_oResp
                 var ret = oResp.GetProperty(
                     EnumPropId.propReturnValue )
-                return Promise.resolve( errno.ERROR_STATE )
+                this.DebugPrint("Error, EnableEvent failed (" + ret + " )")
+                return Promise.resolve( ret)
             })
+        }).catch((e)=>{
+            this.DebugPrint("Error, LoadObjDesc failed ( " + ret + " )")
+            return Promise.resolve(e)
         })
     }
 

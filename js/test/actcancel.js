@@ -104,7 +104,7 @@ var oProxy = new CActiveCancelCli(
 oProxy.Start().then((retval)=>{
     if( ERROR( retval ))
     {
-        this.DebugPrint(retval)
+        oProxy.DebugPrint("Error Start Failed")
         return
     }
     var oContext = new Object()

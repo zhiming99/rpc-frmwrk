@@ -2,6 +2,7 @@ const { CConfigDb2 } = require("../combase/configdb")
 const { randomInt, ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
 const { IoCmd, IoMsgType, CIoMessageBase, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
+const { CInterfaceProxy } = require("./proxy")
 
 exports.CIoManager = class CIoManager
 {
@@ -133,6 +134,13 @@ exports.CIoManager = class CIoManager
         }
     }
 
+    /**
+     * UnregisterProxy and release the resources associated with the proxy
+     * @param {CInterfaceProxy}oProxy the proxy to unregister with
+     * @param {number}ret the status code to pass to the pending request
+     * @returns {Promise}
+     * @api public
+     */
     UnregisterProxy( oProxy, ret )
     {
         try{
@@ -181,6 +189,7 @@ exports.CIoManager = class CIoManager
 
         }catch( e ) {
             console.log( "Unregister proxy failed")
+            return Promise.resolve( -errno.EFAULT )
         }
     }
 }
