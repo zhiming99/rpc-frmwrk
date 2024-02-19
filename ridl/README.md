@@ -1,3 +1,4 @@
+[中文](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README_cn.md)
 ### Introduction
 
 * The `ridl`, stands for `rpc idl`, as the RPC interface description language. And this module tries to deliver a rapid development tool for `rpc-frmwrk` by generating a set of skelton source files for proxy/server , as well as the configuration files, and Makefile with the input `ridl` files. It is expected to generates the skelton project for C++, Python and Java.   
