@@ -1,4 +1,4 @@
-
+[English](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md)
 ### 简介
 
 * `ridl`就是`rpc idl`的意思, 即远程调用接口描述语言. `ridlc`意即`ridl`的编译器。 本模块的目的在于提供一个`rpc-frmwrk`的快速开发工具。该工具可以通过给定的`ridl`文件快速生成骨架客户端和服务器端应用的源文件, 当然也包括该应用的配置文件和Makefile. 目前`ridlc`支持生成C++, Python和Java应用的项目骨架.   
@@ -62,7 +62,7 @@ service SimpFileSvc [ stream ]
 * **string** : 字符串类型 
 * **bytearray** : 字节数组.
 * **ObjPtr** : `rpc-frmwrk`内建的可序列化对象指针(Javascript不支持此类型)
-* **HSTREAM** : 数据流通道句柄，用于在客户端和服务器端制定数据通道的实例.
+* **HSTREAM** : 数据流句柄，用于在客户端和服务器端指定数据流的实例.
 
 三种复合类型数据包括：
 
@@ -93,12 +93,12 @@ service SimpFileSvc [ stream ]
     * **timeout** : 用以指定该`方法`必须在指定的时间内完成，否则将返回超时错误，数值的单位是秒。客户端和服务器端都会遵守这个限制。不过也可以通过设置keepalive的时长，延长请求的处理时间。
     * **noreply** : 标记该`方法`不需要发送任何信息给客户端. 在客户端，请求发送完就返回`成功状态码`。当该请求到达服务器端， 服务器会和普通请求一样处理，但不会给客户端发送任何`响应`.
     * **event** : 标记该`方法`是一个从服务器到客户端的事件。这时客户端生成的是事件处理代码，服务器端生成的是事件发送代码。`事件`处理和`请求`处理是相反的过程，而且事件是广播的属性，客户端不能给服务器发送`事件`的`响应`。
-  * **the input parameter list** or **output parameter list** 输入参数列表和输出参数列表, 这两个列表都可以为空。一个`方法`即使输出列表为空，客户端也会收到服务器的`响应`，报告该`请求`的状态码，`noreply`时除外。
+  * **输入参数列表** 和 **输出参数列表** : 输入参数列表和输出参数列表紧跟在`方法名`后面, 这两个列表都可以为空。一个`方法`即使输出列表为空，客户端也会收到服务器的`响应`，报告该`方法`的执行状态码，当然，标有`noreply`的`方法`除外。
 
-  * **duplicated method names** : 在一个接口声明中重载方法的名字在不同的语言下会产生不同的效果，所以建议不要在一个`service`的定义中使用重名的方法。
+  * **避免方法重名** : 在一个接口声明中重名的方法的不同的语言下会产生不同的效果，有的支持，有的报错。所以建议不要在一个`服务`的定义中使用重名的方法。
 
-* **service declaration** : 声明一个 `服务`。一个服务必须包含一个或多个`接口`, 用以提供逻辑完整的服务. 它包含一个 `服务标识符` 和一组`接口`的引用.
-  * **service id**: `rpc-frmwrk`会将`服务标识符`编入客户端发送的请求中的`ObjPath`字段, 用以定位远程对象。
+* **service** : 声明一个 `服务`。一个服务必须包含一个或多个`接口`, 用以提供逻辑完整的服务. 它包含一个 `服务标识符` 和一组`接口`的引用.
+  * **服务标识符**: `rpc-frmwrk`会将`服务标识符`编入客户端发送的请求中的`ObjPath`字段, 用以定位远程对象。
   * `服务`也有一些`属性`标签，来帮助编译器生成需要的代码.
     * **stream** : 该`服务`需要加入`流`的支持. 如果某个接口的方法定义中有`HSTREAM`类型的参数，那么可以不必添加此属性。
 
@@ -127,7 +127,7 @@ service SimpFileSvc [ stream ]
         -b: 生成C/S框架, 省却进程间通信，有低的延迟和较高的吞吐量。
 ```
 
-目前 `ridlc` 可以生成 C++, Python和Java的应用框架. 
+目前`ridlc`可以生成 C++, Python和Java的应用框架. 
 
 ### C++ 项目生成的文件
 
@@ -179,9 +179,9 @@ service SimpFileSvc [ stream ]
 * *DeserialMaps*, *JavaSerialBase.java*, *JavaSerialHelperS.java*, *JavaSerialHelperP.java*: 序列化的工具类。每次运行`ridlc`会重写这些文件。
 
 * *synccfg.py*: 一个python脚本用于更新程序的配置文件。
-* **运行:** 在命令行输入 `java org.rpcf.example.mainsvr` 或 `java org.rpcf.example.maincli`以启动服务器或者客户端. 注意设置CLASSPATH环境变量，确保系统可以找到`rpcbase.jar`
+* **运行:** 在命令行输入 `java org.rpcf.example.mainsvr` 或 `java org.rpcf.example.maincli`以启动服务器或者客户端. 注意设置`CLASSPATH`环境变量，确保系统可以找到`rpcbase.jar`
 
 
 ### C++, Python, 的Java客户端可以交叉访问其他语言的服务器。
-不过目前微服务架构的客户端，目前只能访问微服务架构的服务器，C/S架构的客户端可以访问两种架构的服务器。
+不过微服务架构的客户端，目前只能访问微服务架构的服务器。C/S架构的客户端可以访问两种架构的服务器。
 
