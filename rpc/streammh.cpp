@@ -1492,7 +1492,7 @@ gint32 CStreamServerRelayMH::CreateUxStream(
         if( ERROR( ret ) )
             break;
 
-        oNewCfg.CopyProp(
+        ret = oNewCfg.CopyProp(
             propTimeoutSec, pDataDesc );
 
         if( ERROR( ret ) )
