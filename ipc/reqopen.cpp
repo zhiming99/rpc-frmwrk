@@ -56,9 +56,6 @@ CReqBuilder::CReqBuilder(
                 break;
         }
 
-        CIoManager* pMgr = pIf->GetIoMgr();
-        string strModName = pMgr->GetModName();
-
         CCfgOpenerObj oSrcCfg( pIf );
         guint32 dwVal;
 
