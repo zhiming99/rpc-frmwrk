@@ -2,67 +2,72 @@ const { CConfigDb2 } = require("../combase/configdb")
 const { messageType } = require( "../dbusmsg/constants")
 const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/defines")
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
-const {CoCreateInstance}=require("../combase/factory")
 const {CSerialBase} = require("../combase/seribase")
-const {CIoManager} = require( "../ipc/iomgr")
 const {CInterfaceProxy} = require( "../ipc/proxy")
-const {CBuffer} = require("../combase/cbuffer")
 const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 
-var strObjDesc = "http://example.com/rpcf/asynctstdesc.json"
-var strObjName = "AsyncTest"
-var strAppName = "asynctst"
+var strObjDesc = "http://example.com/rpcf/stmtestdesc.json"
+var strObjName = "StreamTest"
+var strAppName = "stmtest"
 
 var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
-oParams.SetString(
-    EnumPropId.propObjInstName, strObjName)
+oParams.SetString( EnumPropId.propObjInstName, strObjName)
 
-class CAsyncTestCli extends CInterfaceProxy
+class CStreamTestCli extends CInterfaceProxy
 {
     constructor( oIoMgr,
         strObjDesc, strObjName, oParams )
     {
         super( oIoMgr, strObjDesc, strObjName )
     }
-    LongWaitCallback(oContext, ret, strResp)
+    EchoCallback(oContext, ret, i0r)
     {
         if( ERROR( ret) )
         {
             this.DebugPrint( `error occurs ${Int32Value(ret)}`)
             return
         }
-        this.DebugPrint( `server returns ${strResp}`)
+        this.DebugPrint( `server returns ${i0r}`)
     }
 
-    LongWait( oContext, strText, oCallback=( oContext, oResp )=>{
+    Echo( oContext, i0, oCallback=( oContext, oResp )=>{
         try{
             var ret = oResp.GetProperty(
                 EnumPropId.propReturnValue)
             if( ERROR( ret ) )
             {
-                this.LongWaitCallback( oContext, ret )
-                return
+                this.EchoCallback( oContext, ret )
             }
-            var args = [ oContext, ret ]
-            var ridlBuf = Buffer.from( oResp.GetProperty( 0 ) )
-            var osb = new CSerialBase( false, this )
-            var ret = osb.DeserialString( ridlBuf, 0 )
-            args.push( ret[0])
-            this.LongWaitCallback.apply( this, args )
+            else
+            {
+                var args = [ oContext, ret ]
+                var ridlBuf = Buffer.from( oResp.GetProperty( 0 ) )
+                var osb = new CSerialBase( false, this )
+                var retVal = osb.DeserialString( ridlBuf, 0 )
+                args.push( retVal[0])
+                this.EchoCallback.apply( this, args )
+            }
+            oContext.m_iRet = Int32Value( ret )
+            if( ERROR( ret ))
+                oContext.m_oReject( oContext )
+            else
+                oContext.m_oResolve( oContext )
         }
         catch( e )
         {
             console.log(e)
+            oContext.m_iRet = -errno.EFAULT
+            oContext.m_oReject( oContext )
         }
     })
     {
         var oReq = new CConfigDb2()
         var osb = new CSerialBase(true, this )
-        osb.SerialString( strText ) 
+        osb.SerialString( i0 ) 
         var ridlBuf = osb.GetRidlBuf()
         oReq.Push( new Pair( {t: EnumTypeId.typeByteArr, v:ridlBuf} ) )
         oReq.SetString( EnumPropId.propIfName,
-            DBusIfName( "IAsyncTest") )
+            DBusIfName( "IStreamTest") )
         oReq.SetString( EnumPropId.propObjPath,
             DBusObjPath( strAppName, strObjName))
         oReq.SetString( EnumPropId.propSrcDBusName,
@@ -72,15 +77,16 @@ class CAsyncTestCli extends CInterfaceProxy
         oReq.SetString( EnumPropId.propDestDBusName,
             DBusDestination2(strAppName, strObjName ))
         oReq.SetString( EnumPropId.propMethodName, 
-            USER_METHOD("LongWait"))
+            USER_METHOD("Echo"))
         var oCallOpts = new CConfigDb2()
         oCallOpts.SetUint32(
-            EnumPropId.propTimeoutSec, 97)
+            EnumPropId.propTimeoutSec, 300)
         oCallOpts.SetUint32(
-            EnumPropId.propKeepAliveSec, 48 )
+            EnumPropId.propKeepAliveSec, 3 )
         oCallOpts.SetUint32( EnumPropId.propCallFlags,
             EnumCallFlags.CF_ASYNC_CALL |
             EnumCallFlags.CF_WITH_REPLY |
+            EnumCallFlags.CF_KEEP_ALIVE |
             messageType.methodCall )
         oReq.SetObjPtr(
             EnumPropId.propCallOptions, oCallOpts)
@@ -91,7 +97,7 @@ class CAsyncTestCli extends CInterfaceProxy
     }
 }
 
-var oProxy = new CAsyncTestCli(
+var oProxy = new CStreamTestCli(
     globalThis.g_oIoMgr,
     strObjDesc, strObjName, oParams )
 
@@ -101,11 +107,25 @@ oProxy.Start().then((retval)=>{
         console.log(retval)
         return
     }
-    var oContext = new Object()
-    oProxy.LongWait( oContext, "hello, World!" )
+    return new Promise( (resolve, reject)=>{
+        var oContext = new Object()
+        oContext.m_oResolve = resolve
+        oContext.m_oReject = reject
+        return oProxy.Echo( oContext, "hello, World!" )
+    }).then((e)=>{
+        var oStmCtx = new Object()
+        oStmCtx.m_oProxy = oProxy
+        return oProxy.m_funcOpenStream( oStmCtx ).then((oCtx)=>{
+            console.log( oCtx )
+        }).catch((oCtx)=>{
+            console.log( oCtx )
+        })
+    }).catch( (e )=>
+    {
+        return e
+    })
 
-}).catch((retval)=>{
+}).then((retval)=>{
     console.log(retval)
     oProxy.Stop()
 })
-

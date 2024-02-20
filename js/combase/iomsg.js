@@ -167,7 +167,7 @@ class CIoReqMessage extends CIoMessageBase
         if( oCallOpt === null )
             return 0
         return  oCallOpt.GetProperty(
-                EnumPropId.propTimeoutsec )
+                EnumPropId.propTimeoutSec )
     }
 
     GetObjPath()

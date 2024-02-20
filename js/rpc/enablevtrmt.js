@@ -56,7 +56,7 @@ function EnableRemoteEvent( oMsg )
         oPendingEe.m_oResolve = resolve
         oPendingEe.m_oReject = reject
         oPendingEe.m_oObject = this
-        this.m_mapPendingReqs.set(
+        this.AddPendingReq(
             oMsg.m_iMsgId, oPendingEe )
 
     }).then( ( t )=>{
@@ -82,11 +82,6 @@ function OnEnableEventComplete( oPending )
     }
     catch( e )
     {
-    }
-    finally
-    {
-        this.m_mapPendingReqs.delete(
-            oPending.m_oReq.m_iMsgId )
     }
 }
 exports.Bdge_EnableRemoteEvent = EnableRemoteEvent

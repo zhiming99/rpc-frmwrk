@@ -31,7 +31,7 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
         oMsg.m_dwPortId = this.GetPortId()
         oMsg.m_oReq = oReq
         var oOpts = oReq.GetProperty( EnumPropId.propCallOptions )
-        ret = oOpts.GetProperty( EnumPropId.propTimeoutsec )
+        ret = oOpts.GetProperty( EnumPropId.propTimeoutSec )
         if( ret !== null )
         {
             oMsg.m_dwTimerLeftMs = ret * 1000

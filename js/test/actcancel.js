@@ -12,8 +12,6 @@ var strObjDesc = "http://example.com/rpcf/actcanceldesc.json"
 var strObjName = "ActiveCancel"
 var strAppName = "actcancel"
 
-var strLogPrefix = strAppName + ": "
-
 var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
 oParams.SetString( EnumPropId.propObjInstName, strObjName)
 
@@ -81,7 +79,7 @@ class CActiveCancelCli extends CInterfaceProxy
             USER_METHOD("LongWait"))
         var oCallOpts = new CConfigDb2()
         oCallOpts.SetUint32(
-            EnumPropId.propTimeoutsec, 97)
+            EnumPropId.propTimeoutSec, 97)
         oCallOpts.SetUint32(
             EnumPropId.propKeepAliveSec, 48 )
         oCallOpts.SetUint32( EnumPropId.propCallFlags,

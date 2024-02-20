@@ -18,10 +18,12 @@ function setLogger() {
         }
     }
 }
-setLogger()
+//setLogger()
 globalThis.g_oIoMgr = new CIoManager()
 globalThis.g_oIoMgr.Start()
-require( "./test/actcancel.js" )
-require( "./test/evtest.js")
-require( "./test/asynctst.js")
-require( "./test/katest.js")
+// require( "./test/actcancel.js" )
+// require( "./test/evtest.js")
+// require( "./test/asynctst.js")
+// require( "./test/katest.js")
+require( "./test/stmtest.js")
+

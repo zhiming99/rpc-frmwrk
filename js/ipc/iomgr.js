@@ -154,10 +154,9 @@ exports.CIoManager = class CIoManager
             var arrKeys = []
             for( [key, oPending] of this.m_mapPendingReqs )
             {
-                oPending.m_oResp = oResp
-                var oReq = oPending.m_oReq
-                if( oReq.m_dwPortId === dwPortId )
+                if( oPending.m_oObject === oProxy )
                 {
+                    oPending.m_oResp = oResp
                     oPending.m_oReject( oPending )
                     arrKeys.push( key )
                 }
@@ -168,7 +167,7 @@ exports.CIoManager = class CIoManager
             var oProxies = this.m_mapProxies.get( dwPortId )
             if( oProxies !== undefined )
                 oProxies.delete( oProxy )
-            if( oProxies.length > 0 )
+            if( oProxies.size > 0 )
                 return Promise.resolve(0)
 
             return new Promise( (resolve, reject)=>{

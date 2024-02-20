@@ -13,8 +13,6 @@ var strObjDesc = "http://example.com/rpcf/katestdesc.json"
 var strObjName = "KeepAlive"
 var strAppName = "katest"
 
-var strLogPrefix = strAppName + ": "
-
 var oParams = globalThis.CoCreateInstance( EnumClsid.CConfigDb2)
 oParams.SetString(
     EnumPropId.propObjInstName, strObjName)
@@ -77,7 +75,7 @@ class CKeepAliveCli extends CInterfaceProxy
             USER_METHOD("LongWait"))
         var oCallOpts = new CConfigDb2()
         oCallOpts.SetUint32(
-            EnumPropId.propTimeoutsec, 300)
+            EnumPropId.propTimeoutSec, 300)
         oCallOpts.SetUint32(
             EnumPropId.propKeepAliveSec, 3 )
         oCallOpts.SetUint32( EnumPropId.propCallFlags,

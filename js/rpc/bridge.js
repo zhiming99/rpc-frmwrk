@@ -11,83 +11,51 @@ const { Bdge_EnableRemoteEvent } = require("./enablevtrmt")
 const { Bdge_ForwardRequest } = require("./fwrdreqrmt")
 const { Bdge_ForwardEvent } = require("./fwrdevtrmt")
 const { Bdge_OnKeepAlive } = require("./keepalivermt")
-
-class CRpcStreamBase
-{
-    constructor( oParent )
-    {
-        this.m_iStmId = -1
-        this.m_iPeerStmId = -1
-        this.m_wProtoId = EnumProtoId.protoStream
-        this.m_dwSeqNo = randomInt( 0xffffffff )
-        this.m_dwAgeSec = 0
-        this.m_oHeader = new CPacketHeader()
-        this.m_oParent = oParent
-    }
-
-    SetStreamId( iStmId, wProtoId )
-    {
-        this.m_iStmId = iStmId
-        this.m_wProtoId = wProtoId
-        this.m_oHeader.m_iStmId = iStmId
-        this.m_oHeader.m_wProtoId = wProtoId
-        this.SendBuf = function ( oBuf )
-        {
-            var oHdr = this.m_oHeader
-            oHdr.m_dwSeqNo = this.GetSeqNo()
-            var oOut = new COutgoingPacket()
-            oOut.SetHeader( oHdr )
-            oOut.SetBufToSend( oBuf )
-
-            // send
-            return this.m_oParent.SendMessage( 
-                oOut.Serialize() )
-        }
-    }
-
-    GetStreamId()
-    { return this.m_iStmId }
-
-    GetProtoId()
-    { return this.m_wProtoId }
-
-    SetPeerStreamId( iPeerId )
-    {
-        this.m_iPeerStmId = iPeerId
-        this.m_oHeader.m_iPeerStmId = iPeerId
-    }
-
-    GetPeerStreamId()
-    { return this.m_iPeerStmId }
-
-    AgeStream( dwSec )
-    { this.m_dwAgeSec += dwSec }
-
-    GetAge()
-    { return this.m_dwAgeSec }
-
-    Refresh()
-    { this.m_dwAgeSec = 0 }
-
-    GetSeqNo()
-    { return this.m_dwSeqNo++ }
-
-}
+const { Bdge_OpenStream } = require( "./openstmrmt")
+const { CRpcStreamBase } = require( "./stream")
 
 class CRpcControlStream extends CRpcStreamBase
 {
     constructor( oParent )
-    { super( oParent ) }
+    {
+        super( oParent )
+        this.m_wProtoId = EnumProtoId.protoControl
+    }
 
     ReceivePacket( oInPkt )
     {
-        var oBuf = oInPkt.m_oBuf
-        if( oBuf === null ||
-            oBuf === undefined )
-            return
-        // post the data to the main thread
-        var oReq = new CConfigDb2()
-        oReq.Deserialize( oBuf, 0 )
+        try{
+            var oBuf = oInPkt.m_oBuf
+            if( oBuf === null ||
+                oBuf === undefined )
+            {
+                throw new Error( "Invalid message")
+            }
+            // post the data to the main thread
+            var oReq = new CConfigDb2()
+            oReq.Deserialize( oBuf, 0 )
+            var oCallOpt = oReq.GetProperty(
+                EnumPropId.propCallOptions )
+            var oFlags = oCallOpt.GetProperty(
+                EnumPropId.propCallFlags )
+            if( ( oFlags & messageType.methodReturn ) === 0 )
+            {
+                throw new Error( "Invalid message type")
+            }
+            var dwSeqNo = oReq.GetProperty(
+                EnumPropId.propSeqNo )
+            var oPending = this.m_oParent.FindPendingReq( dwSeqNo )
+            if( !oPending )
+            {
+                throw new Error( "unable to find the request for " + dwSeqNo )
+            }
+            oPending.OnTaskComplete( oReq )
+            this.m_oParent.RemovePendingReq( dwSeqNo )
+        }
+        catch( e )
+        {
+            console.log( "ControlStream discarded bad packet with error: " + e )
+        }
     }
 }
 
@@ -96,6 +64,7 @@ class CRpcDefaultStream extends CRpcStreamBase
     constructor( oParent )
     {
         super( oParent )
+        this.m_wProtoId = EnumProtoId.protoDBusRelay
         var origSendBuf = this.SendBuf
         this.SendBuf = function ( dmsg )
         {
@@ -144,7 +113,7 @@ class CRpcDefaultStream extends CRpcStreamBase
                 return
             var oResp = new CConfigDb2()
             var iRet = dmsg.GetArgAt(0)
-            if( ERROR( iRet ) < 0 )
+            if( ERROR( iRet ) )
             {
                 oResp.SetUint32(
                     EnumPropId.propReturnValue, iRet )
@@ -152,12 +121,23 @@ class CRpcDefaultStream extends CRpcStreamBase
             else
             {
                 var oBuf = dmsg.GetArgAt(1)
-                if( oPending.m_oReq.m_iCmd !== IoCmd.ForwardRequest[0])
-                    oResp.Deserialize( oBuf, 0 )
-                else
+                if( oPending.m_oReq.m_iCmd === IoCmd.ForwardRequest[0])
                     oResp = oBuf
+                else if( oPending.m_oReq.m_iCmd === IoCmd.FetchData[0])
+                {
+                    oResp.SetUint32( EnumPropId.propReturnValue, iRet )
+                    var oDataDesc = new CConfigDb2()
+                    oDataDesc.Deserialize( oBuf, 0 )
+                    oResp.Push( {t: EnumTypeId.typeObj, v: oDataDesc})
+                    oResp.Push( {t: EnumTypeId.typeUInt32, v:dmsg.GetArgAt(2)})
+                    oResp.Push( {t: EnumTypeId.typeUInt32, v:dmsg.GetArgAt(3)})
+                    oResp.Push( {t: EnumTypeId.typeUInt32, v:dmsg.GetArgAt(4)})
+                }
+                else
+                    oResp.Deserialize( oBuf, 0 )
             }
             oPending.OnTaskComplete( oResp )
+            this.m_oParent.RemovePendingReq( key )
         }
         return
     }
@@ -180,6 +160,9 @@ class CRpcTcpBridgeProxy
         oIoTab[ IoCmd.ForwardRequest[0] ] =
             Bdge_ForwardRequest.bind(this)
 
+        oIoTab[ IoCmd.OpenStream[0]] =
+            Bdge_OpenStream.bind(this)
+
         var oIoEvent = this.m_arrDispEvtTable
         oIoEvent[ IoEvent.ForwardEvent[0]] =
             Bdge_ForwardEvent.bind( this )
@@ -187,6 +170,9 @@ class CRpcTcpBridgeProxy
         oIoEvent[ IoEvent.OnKeepAlive[0]]  =
             Bdge_OnKeepAlive.bind( this )
     }
+
+    NewStreamId()
+    { return this.m_dwStreamId++ }
 
     constructor( oParent, oConnParams )
     {
@@ -203,6 +189,8 @@ class CRpcTcpBridgeProxy
         this.m_qwPeerTime = 0
         this.m_qwStartTime = 0
         this.m_arrDispEvtTable = []
+        this.m_mapHStream2StmId = new Map()
+        this.m_dwStreamId = 1024
 
         this.BindFunctions()
 
@@ -362,6 +350,12 @@ class CRpcTcpBridgeProxy
     FindPendingReq( key )
     { return this.m_mapPendingReqs.get( key ) }
 
+    RemovePendingReq( key )
+    { this.m_mapPendingReqs.delete( key )}
+
+    AddPendingReq( key, oPending )
+    { this.m_mapPendingReqs.set( key, oPending)}
+
     GetPortId()
     { return this.m_dwPortId }
 
@@ -385,6 +379,12 @@ class CRpcTcpBridgeProxy
     PostMessage( oMsg )
     {
         this.m_oParent.PostMessage( oMsg )
+    }
+
+    GetPeerTimestamp()
+    {
+        var qwNow = Math.floor( Date.now()/1000 )
+        return qwNow - this.m_qwStartTime + this.m_qwPeerTime
     }
 }
 exports.CRpcTcpBridgeProxy=CRpcTcpBridgeProxy

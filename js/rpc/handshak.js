@@ -46,7 +46,7 @@ function Handshake( oMsg, oPending )
         messageType.methodCall )
 
     oCallOpts.SetUint32(
-        EnumPropId.propTimeoutsec, 
+        EnumPropId.propTimeoutSec, 
         constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT )
 
     oCallOpts.SetUint32(
@@ -84,7 +84,7 @@ function Handshake( oMsg, oPending )
             oPendingHs.m_oResolve = resolve
             oPendingHs.m_oReject = reject
             oPendingHs.m_oObject = oPending
-            this.m_mapPendingReqs.set(
+            this.AddPendingReq(
                 oMsg.m_iMsgId, oPendingHs )
         }).then( ( t )=>{
             OnHandshakeComplete( this, t, t.m_oResp )
@@ -154,11 +154,6 @@ function OnHandshakeComplete( oProxy, oPending, oResp )
             EnumPropId.propReturnValue,
             ret )
         oOuter.m_oReject( oOuter )
-    }
-    finally
-    {
-        oProxy.m_mapPendingReqs.delete(
-            oPending.m_oReq.m_iMsgId )
     }
 }
 

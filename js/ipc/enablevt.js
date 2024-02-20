@@ -19,7 +19,7 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
         oMsg.m_dwTimerLeftMs = this.m_dwTimeoutSec * 1000
         var oReq = oMsg.m_oReq
         var oParams = new CConfigDb2()
-        oParams.SetUint32( EnumPropId.propTimeoutsec,
+        oParams.SetUint32( EnumPropId.propTimeoutSec,
             this.m_dwTimeoutSec )
         oParams.SetUint32( EnumPropId.propKeepAliveSec,
             this.m_dwKeepAliveSec )

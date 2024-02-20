@@ -69,9 +69,8 @@ function ForwardRequest( oMsg )
         if( oInnerMsg.IsNoReply())
             oReqCtx.SetBool( EnumPropId.propNoReply, true )
 
-        var qwNow = Math.floor( Date.now()/1000 )
         oReqCtx.SetUint64( EnumPropId.propTimestamp,
-            qwNow - this.m_qwStartTime + this.m_qwPeerTime )
+            this.GetPeerTimestamp() )
 
         oReqCtx.SetUint64(
             EnumPropId.propTaskId, oMsg.m_iMsgIdLocal )
@@ -129,7 +128,7 @@ function ForwardRequest( oMsg )
             return
         }
 
-        this.m_mapPendingReqs.set(
+        this.AddPendingReq(
             oMsg.m_iMsgId, oPendingEe )
 
     }).then( ( t )=>{
@@ -147,6 +146,13 @@ function OnForwardRequestComplete( oPending )
         return
     }
     var oResp
+    if( oPending.m_oResp === null )
+    {
+        console.log( "response is empty")
+        oPending.m_oResp = new CConfigDb2()
+        oPending.m_oResp.SetUint32(
+            EnumPropId.propReturnValue, -errno.ENOENT )
+    }
     if( !( oPending.m_oResp instanceof( CConfigDb2 )) )
     {
         var dmsg = new CDBusMessage()
@@ -189,14 +195,6 @@ function OnForwardRequestComplete( oPending )
     }
     catch( e )
     {
-    }
-    finally
-    {
-        if( oPending.m_oReq !== undefined )
-        {
-            this.m_mapPendingReqs.delete(
-                oPending.m_oReq.m_iMsgId )
-        }
     }
 }
 

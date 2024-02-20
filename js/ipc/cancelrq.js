@@ -46,7 +46,7 @@ function UserCancelRequest( qwTaskId, oUserCallback )
     oReq.Push( {t: EnumTypeId.typeUInt64, v: qwTaskId})
     var oCallOpts = new CConfigDb2()
     oCallOpts.SetUint32(
-        EnumPropId.propTimeoutsec, this.m_dwTimeoutSec)
+        EnumPropId.propTimeoutSec, this.m_dwTimeoutSec)
     oCallOpts.SetUint32(
         EnumPropId.propKeepAliveSec, this.m_dwKeepAliveSec )
     oCallOpts.SetUint32( EnumPropId.propCallFlags,

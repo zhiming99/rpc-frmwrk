@@ -9,7 +9,7 @@ const { ForwardRequestLocal } = require("./fwrdreq")
 const { ForwardEventLocal } = require("./fwrdevt")
 const { UserCancelRequest } = require("./cancelrq")
 const { OnKeepAliveLocal } = require("./keepalive")
-const { FetchDataLocal } = require("./fetchdat")
+const { OpenStreamLocal } = require("./openstm")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -56,7 +56,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_funcEnableEvent = EnableEventLocal.bind( this )
         this.m_funcForwardRequest = ForwardRequestLocal.bind( this )
         this.m_funcCancelRequest = UserCancelRequest.bind( this )
-        this.m_funcFetchData = FetchDataLocal.bind( this )
+        this.m_funcOpenStream = OpenStreamLocal.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
@@ -85,7 +85,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 strMethodName )
 
         oParams = new CConfigDb2()
-        oParams.SetUint32( EnumPropId.propTimeoutsec,
+        oParams.SetUint32( EnumPropId.propTimeoutSec,
             this.m_dwTimeoutSec )
         oParams.SetUint32( EnumPropId.propKeepAliveSec,
             this.m_dwKeepAliveSec )
@@ -247,7 +247,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 return Promise.resolve( ret)
             })
         }).catch((e)=>{
-            this.DebugPrint("Error, LoadObjDesc failed ( " + ret + " )")
+            this.DebugPrint("Error, LoadObjDesc failed ( " + e + " )")
             return Promise.resolve(e)
         })
     }
