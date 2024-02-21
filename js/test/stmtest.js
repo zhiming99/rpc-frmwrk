@@ -117,15 +117,17 @@ oProxy.Start().then((retval)=>{
         oStmCtx.m_oProxy = oProxy
         return oProxy.m_funcOpenStream( oStmCtx ).then((oCtx)=>{
             console.log( oCtx )
+            return Promise.resolve( oCtx )
         }).catch((oCtx)=>{
             console.log( oCtx )
+            return Promise.resolve( oCtx )
         })
-    }).catch( (e )=>
-    {
-        return e
+    }).catch( (e )=>{
+        console.log( e )
+        return Promise.resolve( e )
     })
 
 }).then((retval)=>{
-    console.log(retval)
+    console.log("Stopping the proxy")
     oProxy.Stop()
 })

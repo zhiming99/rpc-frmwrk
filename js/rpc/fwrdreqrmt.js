@@ -51,7 +51,6 @@ function ForwardRequest( oMsg )
         oMsg.m_iMsgIdLocal = oMsg.m_iMsgId
         oMsg.m_iMsgId = globalThis.g_iMsgIdx++
 
-        var oReq = new CConfigDb2()
         var oReqCtx = new CConfigDb2()
 
         var oInnerMsg = BuildDBusMsgToFwrd( oMsg.m_oReq )
