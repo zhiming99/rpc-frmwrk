@@ -59,7 +59,7 @@ function FetchData( oContext, oMsg )
         var dwSize = Buffer.alloc( 4 )
         dwSize.writeUint32BE( oFetchBuf.length )
         var oTotal = Buffer.concat( [ dwSize, oFetchBuf ])
-        var ret = this.m_mapStreams.get(
+        var ret = this.GetStreamById(
             EnumStmId.TCP_CONN_DEFAULT_STM ).SendBuf( oTotal )
         var oPending = new CPendingRequest()
         oPending.m_oObject = this
@@ -150,7 +150,7 @@ function OpenChannel( oContext )
         oPending.m_oReq = oMsg
         oPending.m_oContext = oContext
 
-        var oStream = this.m_mapStreams.get(
+        var oStream = this.GetStreamById(
             EnumStmId.TCP_CONN_DEFAULT_CMD )
         var ret = oStream.SendBuf( oBuf )
         if( ERROR( ret ) )
@@ -225,10 +225,10 @@ function OpenStream( oMsg )
                     var oCtx = oPending.m_oContext
                     var oStream = oCtx.m_oStream
                     oStream.m_hStream = hStream
-                    this.m_mapHStream2StmId.set(
+                    this.BindHandleStream(
                         hStream, oStream.m_iStmId ) 
                     // send message to main thread
-                    var oRespMsg = new CIoRespMessage( oCtx.m_oUserReq )
+                    var oRespMsg = new CIoRespMessage( oMsg )
                     oRespMsg.m_oResp = oResp
                     this.PostMessage( oRespMsg )
                     return Promise.resolve( oPending )
@@ -238,6 +238,7 @@ function OpenStream( oMsg )
                 })
         }).then((oPending)=>{
             console.log( "OpenStream completed successfully")
+            return Promise.resolve( oPending.m_oContext )
         }).catch((oPending)=>{
             var oCtx = oPending.m_oContext
             if( oCtx !== undefined )
@@ -245,6 +246,7 @@ function OpenStream( oMsg )
                 oCtx.m_oStream.Stop()
             }
             console.log( "OpenStream failed")
+            return Promise.resolve( oCtx )
         })
 }
 exports.Bdge_OpenStream = OpenStream

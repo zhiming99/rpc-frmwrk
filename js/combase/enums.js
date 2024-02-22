@@ -20,6 +20,9 @@ module.exports = {
       INVALID_HANDLE : 0,
       CTRLCODE_OPEN_STREAM_PDO: 0x15,
       CTRLCODE_CLOSE_STREAM_PDO: 0x16,
+      STM_MAX_PENDING_WRITE:(1*1024*1024),
+      STM_MAX_PACKETS_REPORT: 32,
+      STM_MAX_BYTES_PER_BUF: (63*1024),
     },
 
     EnumTypes:{
@@ -88,6 +91,10 @@ module.exports = {
         //propStreaming: 12363,
         propObjInstName:12368,
         propSvrInstName:12369,
+        propRxBytes:12376,
+        propTxBytes:12377,
+        propRxPkts:12378,
+        propTxPkts:12379,
         propDataDesc:12382,
         propRouterName:12384,
         propCompress:12388,
@@ -324,5 +331,12 @@ module.exports = {
         seriPython : 2,
         seriJava : 3,
         seriInvalid : 4,
-    }
+    },
+
+    EnumFCState: {
+        fcsKeep,
+        fcsFlowCtrl,
+        fcsLift,
+        fcsReport,
+    },
 }

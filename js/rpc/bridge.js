@@ -12,7 +12,7 @@ const { Bdge_ForwardRequest } = require("./fwrdreqrmt")
 const { Bdge_ForwardEvent } = require("./fwrdevtrmt")
 const { Bdge_OnKeepAlive } = require("./keepalivermt")
 const { Bdge_OpenStream } = require( "./openstmrmt")
-const { CRpcStreamBase } = require( "./stream")
+const { CRpcStreamBase, Bdge_DataConsumed } = require( "./stream")
 
 class CRpcControlStream extends CRpcStreamBase
 {
@@ -163,6 +163,9 @@ class CRpcTcpBridgeProxy
         oIoTab[ IoCmd.OpenStream[0]] =
             Bdge_OpenStream.bind(this)
 
+        oIoTab[ IoCmd.DataConsumed[0]] =
+            Bdge_DataConsumed.bind( this )
+
         var oIoEvent = this.m_arrDispEvtTable
         oIoEvent[ IoEvent.ForwardEvent[0]] =
             Bdge_ForwardEvent.bind( this )
@@ -199,7 +202,7 @@ class CRpcTcpBridgeProxy
         oStm.SetStreamId( iStmId,
             EnumProtoId.protoControl )
         oStm.SetPeerStreamId( iStmId )
-        this.m_mapStreams.set( iStmId, oStm )
+        this.AddStream( oStm )
 
         oStm = new CRpcDefaultStream( this )
         iStmId = EnumStmId.TCP_CONN_DEFAULT_STM
@@ -207,7 +210,7 @@ class CRpcTcpBridgeProxy
             EnumProtoId.protoDBusRelay )
 
         oStm.SetPeerStreamId( iStmId )
-        this.m_mapStreams.set( iStmId, oStm)
+        this.AddStream( iStmId, oStm)
         this.m_iTimerId = 0
 
         this.m_oScanReqs = ()=>{
@@ -338,7 +341,7 @@ class CRpcTcpBridgeProxy
         oInPkt.Deserialize( oBuf, 0 )
 
         var iStmId = oInPkt.GetPeerStreamId()
-        var stm = this.m_mapStreams.get( iStmId )
+        var stm = this.GetStreamById( iStmId )
         if( stm === undefined )
         {
             console.log( `cannot find stream for ${oInPkt}`)
@@ -385,6 +388,43 @@ class CRpcTcpBridgeProxy
     {
         var qwNow = Math.floor( Date.now()/1000 )
         return qwNow - this.m_qwStartTime + this.m_qwPeerTime
+    }
+
+    AddStream( oStream )
+    { 
+        this.m_mapStreams.set( oStream.m_iStmId, oStream )
+    }
+
+    GetStreamById( iStmId )
+    {
+        return this.m_mapStreams.get( iStmId )
+    }
+
+    GetStreamByHandle( hStream )
+    {
+        var iStmId = this.m_mapHStream2StmId.get( hStream )
+        if( iStmId === undefined )
+            return undefined
+        return this.m_mapStreams.get( iStmId )
+    }
+
+    RemoveStreamById( iStmId )
+    {
+        this.m_mapStreams.delete( iStmId )
+    }
+
+    RemoveStreamByHandle( hStream )
+    {
+        var iStmId = this.m_mapHStream2StmId.get( hStream )
+        if( iStmId === undefined )
+            return
+        this.RemoveStreamById( iStmId )
+        this.m_mapHStream2StmId.delete( hStream )
+    }
+
+    BindHandleStream( hStream, iStmId )
+    {
+        this.m_mapHStream2StmId.set( hStream, iStmId )
     }
 }
 exports.CRpcTcpBridgeProxy=CRpcTcpBridgeProxy
@@ -689,6 +729,8 @@ class CRpcRouter
             var oProxy = this.GetProxy( dwPortId )
             if( !oProxy )
             {
+                if( oMsg.m_bNoReply )
+                    return ret
                 var ret = -errno.ENOENT
                 var oResp = new CIoRespMessage( oMsg )
                 oResp.m_oResp.SetUint32(

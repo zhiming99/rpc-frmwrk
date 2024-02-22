@@ -9,5 +9,7 @@ rpc/enablevtrmt.js ipc/enablevt.js ipc/iomgr.js ipc/proxy.js \
 rpc/fwrdreqrmt.js ipc/fwrdreq.js combase/seribase.js rpc/fwrdevtrmt.js \
 ipc/fwrdevt.js ipc/cancelrq.js test/asynctst.js test/actcancel.js \
 test/evtest.js ipc/keepalive.js rpc/keepalivermt.js test/katest.js \
-ipc/openstm.js rpc/openstmrmt.js test/stmtest.js
+ipc/openstm.js rpc/openstmrmt.js test/stmtest.js rpc/stream.js \
+ipc/stmwrite.js ipc/stmevt.js rpc/stmwritermt.js
+
 

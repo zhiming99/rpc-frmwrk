@@ -9,7 +9,9 @@ const { ForwardRequestLocal } = require("./fwrdreq")
 const { ForwardEventLocal } = require("./fwrdevt")
 const { UserCancelRequest } = require("./cancelrq")
 const { OnKeepAliveLocal } = require("./keepalive")
-const { OpenStreamLocal } = require("./openstm")
+const { OpenStreamLocal, CloseStreamLocal } = require("./openstm")
+const { OnDataReceivedLocal, OnStreamClosedLocal, NotifyDataConsumed} = require( "./stmevt")
+const { StreamWriteLocal } = require( "./stmwrite")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -35,6 +37,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_mapEvtHandlers = new Map()
         this.m_dwFetchDataTimeout = 0
         this.m_setStreams = new Set()
+        this.m_bCompression = false
+        this.OnDataReceived = ( hStream, oBuf )=>{}
+        this.OnStmClosed = (hStream)=>{}
         if( oParams !== undefined )
         {
             var oVal = oParams.GetProperty(
@@ -57,6 +62,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_funcForwardRequest = ForwardRequestLocal.bind( this )
         this.m_funcCancelRequest = UserCancelRequest.bind( this )
         this.m_funcOpenStream = OpenStreamLocal.bind( this )
+        this.m_funcCloseStream = CloseStreamLocal.bind( this )
+        this.m_funcNotifyDataConsumed = NotifyDataConsumed.bind( this )
+        this.m_funcStreamWrite = StreamWriteLocal.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
@@ -64,6 +72,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
         oEvtTab[ IoEvent.ForwardEvent[0]] = ForwardEventLocal.bind( this)
         oEvtTab[ IoEvent.OnKeepAlive[0]] = OnKeepAliveLocal.bind( this)
+        oEvtTab[ IoEvent.StreamRead[0]] = OnDataReceivedLocal.bind( this )
+        oEvtTab[ IoEvent.StreamClosed[0]] = OnStreamClosedLocal.bind( this )
     }
 
     InitReq( oReq, strMethodName )
@@ -161,6 +171,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
             else
                 this.m_dwKeepAliveSec = Number( elem[ "KeepAliveTimeoutSec"] )
 
+            if( elem[ "Compression"] === "true")
+            { this.m_bCompression = true }
+
             for( var interf of elem[ "Interfaces"])
             {
                 var bDummy = interf[ "DummyInterface"]
@@ -254,6 +267,13 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
     Stop( ret )
     {
+        var stms = []
+        for( var hStream of this.m_setStreams )
+            stms.push( hStream )
+
+        for( var hStream of stms )
+            this.m_funcCloseStream( hStream )
+
         return this.m_oIoMgr.UnregisterProxy(
             this, ret )
     }
@@ -339,6 +359,29 @@ exports.CInterfaceProxy = class CInterfaceProxy
     DebugPrint( strMsg )
     {
         console.log( "[ " + Date.now() + "-" + this.m_strSvrName + " ]: " + strMsg  )
+    }
+
+    AddStream( hStream )
+    {
+        this.m_setStreams.add( hStream )
+        this.m_oIoMgr.RegisterStream( hStream, this )
+    }
+
+    StopStream( hStream )
+    {
+        var oMsg = new CIoReqMessage()
+        oMsg.m_iCmd = IoCmd.CloseStream[0]
+        oMsg.m_iMsgId = globalThis.g_iMsgIdx
+        oMsg.m_oReq.Push(
+            {t: EnumTypeId.typeUInt64, v: hStream})
+        this.m_oIoMgr.PostMessage( oMsg )
+    }
+
+    RemoveStream( hStream )
+    {
+        this.StopStream( hStream )
+        this.m_setStreams.delete( hStream )
+        this.m_oIoMgr.UnregisterStream( hStream )
     }
 
 }

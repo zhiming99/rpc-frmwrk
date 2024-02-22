@@ -1,6 +1,6 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { randomInt, ERROR } = require("../combase/defines")
-const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
+const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumStmToken } = require("../combase/enums")
 const { IoCmd, IoMsgType, CIoMessageBase, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 const { CInterfaceProxy } = require("./proxy")
 
@@ -11,6 +11,7 @@ exports.CIoManager = class CIoManager
         this.m_oWorker = null
         this.m_mapPendingReqs = new Map()
         this.m_mapProxies = new Map()
+        this.m_mapStreams = new Map()
     }
 
     Start()
@@ -86,7 +87,8 @@ exports.CIoManager = class CIoManager
                         })
                     }
                 }
-                else
+                else if( oMsg.m_iCmd === IoEvent.ForwardEvent[ 0 ] ||
+                    oMsg.m_iCmd === IoEvent.OnKeepAlive[0])
                 {
                     var oEvt = new CIoEventMessage()
                     oEvt.Restore( oMsg )
@@ -97,6 +99,26 @@ exports.CIoManager = class CIoManager
                             oProxy.m_arrDispTable[ oMsg.m_iCmd ]( oEvt )
                         })
                     }
+                }
+                else if( oMsg.m_iCmd === IoEvent.StreamRead[ 0 ] ||
+                    oMsg.m_iCmd === IoEvent.StreamClosed[0])
+                {
+                    var oEvt = new CIoEventMessage()
+                    oEvt.Restore( oMsg )
+                    var hStream = oMsg.m_oReq.GetProperty( 0 )
+                    if( hStream === null )
+                    {
+                        console.log( "Error invalid stream event" + oMsg)
+                        return
+                    }
+
+                    var oProxy = this.m_oIoMgr.GetStreamOwner( hStream )
+                    if( oProxy === undefined )
+                    {
+                        console.log( "Error stream event cannot find owner " + oMsg)
+                        return
+                    }
+                    oProxy.m_arrDispTable[ iCmd ]( hStream, oMsg )
                 }
             }
             else if( oMsg.m_iType === IoMsgType.AdminResp ||
@@ -115,6 +137,15 @@ exports.CIoManager = class CIoManager
             console.log( e.message )
         }
     }
+
+    RegisterStream( hStream, oProxy )
+    { this.m_mapStreams.set( hStream, oProxy ) }
+
+    UnregisterStream( hStream )
+    { this.m_mapStreams.delete( hStream ) }
+
+    GetStreamOwner( hStream )
+    { return this.m_mapStreams.get( hStream )}
 
     RegisterProxy( oProxy )
     {

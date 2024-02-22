@@ -36,6 +36,7 @@ const IoCmd = {
     Handshake: [10, "RpcCall_Handshake"],
     KeepAliveRequest: [11, "RpcCall_KeepAliveRequest"],
     StreamWrite: [ 12, "StreamWrite" ],
+    DataConsumed : [13, "DataConsumed"],
 }
 exports.IoCmd = IoCmd
 
@@ -134,6 +135,7 @@ class CIoReqMessage extends CIoMessageBase
         this.m_iCmd = IoCmd.Invalid[0]
         this.m_dwTimerLeftMs = 0
         this.m_oReq = new CConfigDb2()
+        this.m_bNoReply = false
     }
 
     Restore(oMsg)

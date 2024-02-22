@@ -4,6 +4,7 @@ const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
 const {CSerialBase} = require("../combase/seribase")
 const {CInterfaceProxy} = require( "../ipc/proxy")
+const {CBuffer} = require( "../combase/cbuffer")
 const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 
 var strObjDesc = "http://example.com/rpcf/stmtestdesc.json"
@@ -101,6 +102,22 @@ var oProxy = new CStreamTestCli(
     globalThis.g_oIoMgr,
     strObjDesc, strObjName, oParams )
 
+var oStmCtx = new Object()
+
+// stream callbacks
+oProxy.OnDataReceived = ( (hStream, oBuf )=>{
+    this.DebugPrint( `stream@${hStream} received: ` + CBuffer.BufferToStr( oBuf ) )
+    var oBuf = CBuffer.StrToBuffer( Date.now() + " proxy: Hello, world!")
+    this.m_funcStreamWrite( hStream, oBuf ).then((e)=>{
+        if( ERROR( e ))
+            this.DebugPrint( `Error ${e}`)
+    })
+}).bind( oProxy )
+
+oProxy.OnStmClosed = ((hStream, oMsg)=>{
+    this.DebugPrint( `stream@${hStream} closed ` + oMsg)
+}).bind( oProxy )
+
 oProxy.Start().then((retval)=>{
     if( ERROR( retval ))
     {
@@ -113,7 +130,6 @@ oProxy.Start().then((retval)=>{
         oContext.m_oReject = reject
         return oProxy.Echo( oContext, "hello, World!" )
     }).then((e)=>{
-        var oStmCtx = new Object()
         oStmCtx.m_oProxy = oProxy
         return oProxy.m_funcOpenStream( oStmCtx ).then((oCtx)=>{
             console.log( oCtx )
@@ -128,6 +144,8 @@ oProxy.Start().then((retval)=>{
     })
 
 }).then((retval)=>{
-    console.log("Stopping the proxy")
-    oProxy.Stop()
+    setTimeout( ()=>{
+        console.log("Stopping the proxy")
+        oProxy.Stop()
+    }, 60000 )
 })

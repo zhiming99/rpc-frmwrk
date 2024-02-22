@@ -68,6 +68,11 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 oObj.Restore( value.v )
                 value.v = oObj
             }
+            else if( value.t === EnumTypeId.typeByteArr )
+            {
+                var oBuf = Buffer.from( value.v )
+                value.v = oBuf
+            }
         }
     }
 

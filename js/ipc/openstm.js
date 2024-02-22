@@ -7,11 +7,18 @@ const { CIoReqMessage } = require("../combase/iomsg")
 const { DBusIfName } = require("../rpc/dmsg")
 const { DBusDestination2 } = require("../rpc/dmsg")
 
+/**
+ * OpenStreamLocal will open a stream channel for read/write
+ * @param {Object} oContext an object which will be returned after OpenStream is completed
+ * @returns {Object} the oContext has a member m_hStream to identify the stream
+ * opened. the m_hStream will show as a parametr in `this.OnDataReceived`, or be passed to proxy method
+ * `StreamWrite`. oContext also has a m_iRet member when error occurs.
+ * @api public
+ */
 function OpenStreamLocal( oContext )
 {
     return new Promise((resolve, reject)=>{
 
-        var dwTimeout = this.m_dwFetchDataTimeout
         var oReq = new CConfigDb2()
 
         var oCallOpts = new CConfigDb2()
@@ -94,9 +101,12 @@ function OpenStreamLocal( oContext )
                 ret = -errno.EFAULT
                 break
             }
-            this.m_setStreams.add( hStream )
-            e.m_oContext.m_hStream = hStream
-            e.m_oContext.m_iRet = 0
+            var oCtx = e.m_oContext
+            oCtx.m_hStream = hStream
+            oCtx.m_iRet = 0
+            this.AddStream( hStream )
+            // kick off the incoming stream
+            this.m_funcNotifyDataConsumed( hStream )
             return Promise.resolve( e.m_oContext)
         }while( 0 )
         if( ERROR( ret ))
@@ -117,3 +127,9 @@ function OpenStreamLocal( oContext )
 }
 
 exports.OpenStreamLocal = OpenStreamLocal
+
+function CloseStreamLocal( hStream )
+{
+    this.RemoveStream( hStream )
+}
+exports.CloseStreamLocal = CloseStreamLocal

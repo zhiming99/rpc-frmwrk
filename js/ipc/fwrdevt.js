@@ -42,12 +42,30 @@ exports.ForwardEventLocal = function ForwardEventLocal( oMsg )
             EnumPropId.propSeriProto )
         if( bSeriProto === null )
             throw new Error( "Error serialization proto missing")
-        if( bSeriProto !== EnumSeriProto.seriRidl )
-            throw new Error( "Error serialization proto not supported")
-        var ridlBuf = oRmtEvt.GetProperty( 0 )
-        if( ridlBuf === null )
-            throw new Error( "Error bad event message")
-        this.m_mapEvtHandlers.get( strKey )( ridlBuf )
+        if( bSeriProto === EnumSeriProto.seriRidl )
+        {
+            var ridlBuf = oRmtEvt.GetProperty( 0 )
+            if( ridlBuf === null )
+                throw new Error( "Error bad event message")
+            this.m_mapEvtHandlers.get( strKey )( ridlBuf )
+        }
+        else if( bSeriProto === EnumSeriProto.seriNone )
+        {
+            var arrArgs = []
+            var oCount = oRmtEvt.GetProperty(
+                EnumPropId.propParamCount )
+            if( oCount === null )
+                oCount = 0
+            for( var i = 0; i < oCount; i++ )
+            {
+                arrArgs.push( oRmtEvt.GetProperty( i ))
+            }
+            this.m_mapEvtHandlers.get( strKey ).apply( this, arrArgs )
+        }
+        else
+        {
+            this.DebugPrint( "Error unsupported serialization protocol")
+        }
     }
     catch(e)
     {
