@@ -4,7 +4,7 @@ const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
 const {CSerialBase} = require("../combase/seribase")
 const {CInterfaceProxy} = require( "../ipc/proxy")
-const {CBuffer} = require( "../combase/cbuffer")
+const {Buffer} = require( "buffer")
 const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 
 var strObjDesc = "http://example.com/rpcf/stmtestdesc.json"
@@ -105,16 +105,22 @@ var oProxy = new CStreamTestCli(
 var oStmCtx = new Object()
 
 // stream callbacks
-oProxy.OnDataReceived = ( (hStream, oBuf )=>{
-    this.DebugPrint( `stream@${hStream} received: ` + CBuffer.BufferToStr( oBuf ) )
-    var oBuf = CBuffer.StrToBuffer( Date.now() + " proxy: Hello, world!")
+oProxy.OnDataReceived = ( function (hStream, oBuf ){
+
+    const decoder = new TextDecoder();
+    var strResp = decoder.decode( oBuf )
+    strResp = strResp.replace('\0', '')
+    this.DebugPrint( `stream@${hStream} received: ` + strResp )
+    return
+    const encoder = new TextEncoder()
+    var oBuf = encoder.encode( Date.now() + " proxy: Hello, world!")
     this.m_funcStreamWrite( hStream, oBuf ).then((e)=>{
         if( ERROR( e ))
             this.DebugPrint( `Error ${e}`)
     })
 }).bind( oProxy )
 
-oProxy.OnStmClosed = ((hStream, oMsg)=>{
+oProxy.OnStmClosed = (function(hStream, oMsg){
     this.DebugPrint( `stream@${hStream} closed ` + oMsg)
 }).bind( oProxy )
 
@@ -147,5 +153,5 @@ oProxy.Start().then((retval)=>{
     setTimeout( ()=>{
         console.log("Stopping the proxy")
         oProxy.Stop()
-    }, 60000 )
+    }, 180000 )
 })

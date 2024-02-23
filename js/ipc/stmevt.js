@@ -5,7 +5,7 @@ const { IoCmd, CPendingRequest, AdminCmd, CIoEventMessage } = require("../combas
 const { CIoReqMessage } = require("../combase/iomsg")
 function NotifyDataConsumed( hStream )
 {
-    var oReq = CIoReqMessage()
+    var oReq = new CIoReqMessage()
     oReq.m_dwPortId = this.GetPortId()
     oReq.m_iCmd = IoCmd.DataConsumed[0]
     oReq.m_bNoReply = true

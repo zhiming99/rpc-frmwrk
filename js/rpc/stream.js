@@ -1,5 +1,5 @@
 const { CConfigDb2 } = require("../combase/configdb")
-const { randomInt, ERROR, SUCCEEDED } = require("../combase/defines")
+const { randomInt, ERROR, SUCCEEDED, NumberToUint32 } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumFCState, EnumTypeId, EnumStmToken, } = require("../combase/enums")
 const { CIoRespMessage, CIoEventMessage, IoEvent } = require("../combase/iomsg")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
@@ -15,16 +15,8 @@ class CRpcStreamBase
         this.m_oHeader = new CPacketHeader()
         this.m_oParent = oParent
         this.m_wProtoId = EnumProtoId.protoStream
-    }
 
-    SetStreamId( iStmId, wProtoId )
-    {
-        this.m_iStmId = iStmId
-        this.m_wProtoId = wProtoId
-        this.m_oHeader.m_iStmId = iStmId
-        this.m_oHeader.m_wProtoId = wProtoId
-        this.SendBuf = function ( oBuf )
-        {
+        this.SendBuf = (( oBuf )=>{
             var oHdr = this.m_oHeader
             oHdr.m_dwSeqNo = this.GetSeqNo()
             var oOut = new COutgoingPacket()
@@ -34,7 +26,15 @@ class CRpcStreamBase
             // send
             return this.m_oParent.SendMessage( 
                 oOut.Serialize() )
-        }
+        }).bind(this)
+    }
+
+    SetStreamId( iStmId, wProtoId )
+    {
+        this.m_iStmId = iStmId
+        this.m_wProtoId = wProtoId
+        this.m_oHeader.m_iStmId = iStmId
+        this.m_oHeader.m_wProtoId = wProtoId
     }
 
     GetStreamId()
@@ -84,9 +84,6 @@ class CFlowControl
 
     IsFlowCtrl()
     { return this.m_byFlowCtrl === 0 }
-
-    CanSend()
-    { return this.IsFlowCtrl() }
 
     IncTxBytes( dwBytes )
     {
@@ -210,7 +207,7 @@ class CFlowControl
         this.m_qwAckTxPkts = qwAckTxPkts;                                                                                                                                                                                     
                                                                                                                                                                                                                          
         if( bAboveLast != bAbove )                                                                                                                                                                                       
-            ret = DecFCCount();                                 
+            ret = this.DecFCCount();                                 
         return ret
     }
 
@@ -250,7 +247,7 @@ class CRpcStream extends CRpcStreamBase
         this.m_arrPendingWriteReqs = []
 
         var originSend = this.SendBuf
-        this.SendBuf = ( token, oBuf )=>{
+        this.SendBuf = (( token, oBuf )=>{
             var ret = 0
             switch( token )
             {
@@ -301,8 +298,11 @@ class CRpcStream extends CRpcStreamBase
                 }
             }
             return ret
-        }
+        }).bind( this )
     }
+
+    CanSend()
+    { return this.m_oFlowCtrl.IsFlowCtrl() }
 
     SetPingInterval( dwIntervalSec)
     { this.m_dwPingIntervalSec = dwIntervalSec }
@@ -331,7 +331,7 @@ class CRpcStream extends CRpcStreamBase
         {
         case EnumStmToken.tokData:
             {
-                var dwSize = oBuf.readUint32( 1 )        
+                var dwSize = oBuf.readUint32BE( 1 )        
                 if( dwSize > oBuf.length - 5 )
                 {
                     ret = -errno.ERANGE
@@ -347,17 +347,19 @@ class CRpcStream extends CRpcStreamBase
                 var fcs = this.m_oFlowCtrl.IncRxBytes(
                     oPayload.length )
                 if( fcs != EnumFCState.fcsReport)
-                    this.m_arrPendingBufs.push( oPayload )
+                    this.EnqueuePayload( oPayload )
                 else
                 {
-                    oReport = this.m_oFlowCtrl.GetReport()
-                    this.m_arrPendingBufs.push( [oPayload, oReport] )
+                    var oReport = this.m_oFlowCtrl.GetReport()
+                    this.EnqueuePayload( [oPayload, oReport] )
                 }
+                if( this.m_arrPendingBufs.length === 1 )
+                    this.PassHeadToClient()
                 break
             }
         case EnumStmToken.tokProgress:
             {
-                var dwSize = oBuf.readUint32( 1 )        
+                var dwSize = oBuf.readUint32BE( 1 )        
                 if( dwSize > oBuf.length - 5 )
                 {
                     ret = -errno.ERANGE
@@ -391,7 +393,7 @@ class CRpcStream extends CRpcStreamBase
             }
         case EnumStmToken.tokError:
             {
-                ret = oBuf.readUint32( 1 )
+                ret = oBuf.readUint32BE( 1 )
                 // fall through
             }
         case EnumStmToken.tokClose:
@@ -403,7 +405,22 @@ class CRpcStream extends CRpcStreamBase
                 if( token != EnumStmToken.tokError &&
                     token != EnumStmToken.tokClose )
                     token = EnumStmToken.tokInvalid
-                var oMsg = CIoEventMessage()
+                if( this.m_hStream === null )
+                {
+                    ret = errno.ERROR_STATE
+                    break
+                }
+                if( this.m_iPongTimer !== 0 )
+                {
+                    clearTimeout( this.m_iPongTimer )
+                    this.m_iPongTimer = 0
+                }
+                if( this.m_iPingTimer != 0 )
+                {
+                    clearTimeout( this.m_iPingTimer )
+                    this.m_iPingTimer = 0
+                }
+                var oMsg = new CIoEventMessage()
                 oMsg.m_iCmd = IoEvent.StreamClosed[0]
                 oMsg.m_dwPortId = this.m_oParent.GetPortId()
                 oMsg.m_iMsgIdx = globalThis.g_iMsgIdx++
@@ -429,13 +446,14 @@ class CRpcStream extends CRpcStreamBase
     }
 
     SendClose()
-    { this.SendBuf( EnumStmToken.tokClose)}
+    { return this.SendBuf( EnumStmToken.tokClose)}
 
     PongTimerCb()
     {
         var oBuf = Buffer.alloc( 5 )
         oBuf.writeUint8( EnumStmToken.tokError)
-        oBuf.writeUint32BE( -errno.ETIMEDOUT )
+        oBuf.writeUint32BE(
+            NumberToUint32( -errno.ETIMEDOUT ), 1 )
         this.ReceiveBuf( oBuf )
     }
 
@@ -450,6 +468,7 @@ class CRpcStream extends CRpcStreamBase
                 this.PongTimerCb.bind(this),
                 this.GetPingInterval() * 1000 )
         }
+        return ret
     }
 
     SendReport( oReport )
@@ -467,10 +486,6 @@ class CRpcStream extends CRpcStreamBase
     Start()
     {
         this.m_oParent.AddStream( this )
-        this.SendPing()
-        this.m_iPingTimer = setTimeout(
-            this.PingTimerCb.bind( this ),
-            this.GetPingInterval() * 1000 )
     }
 
     Stop()
@@ -491,14 +506,14 @@ class CRpcStream extends CRpcStreamBase
             return
         while( this.m_arrPendingWriteReqs.length > 0)
         {
-            ret = SendHeadReq()
+            ret = this.SendHeadReq()
             if( ret !== errno.STATUS_PENDING )
             {
                 var oMsg = this.m_arrPendingWriteReqs.shift()[0]
                 var oResp = new CIoRespMessage( oMsg )
                 oResp.m_oResp.SetUint32(
                     EnumPropId.propReturnValue, ret)
-                this.PostMessage( oResp )
+                this.m_oParent.PostMessage( oResp )
             }
         }
     }
@@ -531,7 +546,7 @@ class CRpcStream extends CRpcStreamBase
             }
             if( bDone )
             {
-                ret = STATUS_SUCCESS
+                ret = errno.STATUS_SUCCESS
                 break
             }
             if( iRet === errno.ERROR_QUEUE_FULL )
@@ -544,38 +559,43 @@ class CRpcStream extends CRpcStreamBase
         return ret
     }
 
+    PassHeadToClient( )
+    {
+        var oPayload = this.GetHeadPayload()
+        if( oPayload === undefined )
+            return
+        var oBuf, oReport
+        if( !Array.isArray( oPayload ) )
+        {
+            oBuf = oPayload
+        }
+        else
+        {
+            oBuf = oPayload[0]
+            oReport = oPayload[1]
+        }
+        var oMsg = new CIoEventMessage()
+        oMsg.m_iCmd = IoEvent.StreamRead[0]
+        oMsg.m_iMsgIdx = globalThis.g_iMsgIdx++
+        oMsg.m_dwPortId = this.m_oParent.GetPortId()
+        oMsg.m_oReq.Push({t: EnumTypeId.typeUInt64, v: this.m_hStream} )
+        oMsg.m_oReq.Push({t: EnumTypeId.typeByteArr, v: oBuf} )
+        this.m_oParent.PostMessage( oMsg )
+        if( oReport )
+            this.SendReport( oReport )
+    }
 }
 exports.CRpcStreamBase = CRpcStreamBase
 exports.CRpcStream = CRpcStream
 
-function DataConsumed( hStream )
+function DataConsumed( oReqMsg )
 {
+    var hStream = oReqMsg.m_oReq.GetProperty( 0 )
     var oStm = this.GetStreamByHandle( hStream )
     var oPayload = oStm.OutquePayload()
     if( oPayload === undefined )
         return
-    oPayload = oStm.GetHeadPayload()
-    if( oPayload === undefined )
-        return
-    var oBuf, oReport
-    if( !Array.isArray( oPayload ) )    
-    {
-        oBuf = oPayload
-    }
-    else
-    {
-        oBuf = oPayload[0]
-        oReport = oPayload[1]
-    }
-    var oMsg = new CIoEventMessage()
-    oMsg.m_iCmd = IoEvent.StreamRead[0]
-    oMsg.m_iMsgIdx = globalThis.g_iMsgIdx++
-    oMsg.m_dwPortId = this.m_oParent.GetPortId()
-    oMsg.m_oReq.Push({t: EnumTypeId.typeUInt64, v: this.m_hStream} )
-    oMsg.m_oReq.Push({t: EnumTypeId.typeByteArr, v: oBuf} )
-    this.m_oParent.PostMessage( oMsg )
-    if( oReport )
-        this.SendReport( oReport )
+    oStm.PassHeadToClient()
     return
 }
 exports.Bdge_DataConsumed = DataConsumed

@@ -7,14 +7,14 @@ const { CIoReqMessage } = require("../combase/iomsg")
 function StreamWrite( hStream, oBuf )
 {
     return new Promise( (resolve, reject)=>{
-        var oMsg = CIoReqMessage()
+        var oMsg = new CIoReqMessage()
         oMsg.m_iCmd = IoCmd.StreamWrite[0]
         oMsg.m_iMsgId = globalThis.g_iMsgIdx++
         oMsg.m_dwPortId = this.GetPortId()
         oMsg.m_oReq.Push( {t: EnumTypeId.typeUInt64, v: hStream })
         oMsg.m_oReq.Push( {t: EnumTypeId.typeByteArr, v: oBuf })
-        oPending.m_oReq = oMsg
         var oPending = new CPendingRequest()
+        oPending.m_oReq = oMsg
         oPending.m_oReject = reject
         oPending.m_oResolve = resolve
         oPending.m_oObject = this
@@ -32,12 +32,12 @@ function StreamWrite( hStream, oBuf )
             return reject( oPending )
         }
         this.PostMessage( oPending )
-    }).then((e)=>{
+    }).then((oPending)=>{
         return Promise.resolve( errno.STATUS_SUCCESS )
     }).catch((oPending)=>{
-        this.DebugPrint( `Error occurs when sending write request (${Int32Value(e)})` )
         var oResp = oPending.m_oResp
         var ret = oResp.GetProperty( EnumPropId.propReturnValue )
+        this.DebugPrint( `Error occurs when sending write request (${Int32Value(ret)})` )
         return Promise.resolve( ret )
     })
 }

@@ -334,9 +334,9 @@ module.exports = {
     },
 
     EnumFCState: {
-        fcsKeep,
-        fcsFlowCtrl,
-        fcsLift,
-        fcsReport,
+        fcsKeep : 0,
+        fcsFlowCtrl : 1,
+        fcsLift : 2,
+        fcsReport : 3,
     },
 }

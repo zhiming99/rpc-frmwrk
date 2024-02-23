@@ -22,6 +22,7 @@ function OpenStreamLocal( oContext )
         var oReq = new CConfigDb2()
 
         var oCallOpts = new CConfigDb2()
+        // this timeout is for the FetchData request
         oCallOpts.SetUint32( EnumPropId.propTimeoutSec,
             this.m_dwFetchDataTimeout)
 
@@ -52,11 +53,14 @@ function OpenStreamLocal( oContext )
             this.m_strRouterPath )
         oReq.SetObjPtr( EnumPropId.propTransCtx,
             oTransctx )
-        /* oReq.SetUint32(
-            EnumPropId.propTimeoutSec, dwTimeout)
+
+        // this timeout is for the stream object
+        var dwTimeout = this.m_dwTimeoutSec > 50 ?
+            50 : this.m_dwTimeoutSec
+        oReq.SetUint32( EnumPropId.propTimeoutSec,
+            dwTimeout)
         oReq.SetUint32( EnumPropId.propKeepAliveSec,
             Math.floor( dwTimeout / 2 ) )
-        */
 
         oReq.Push({t: EnumTypeId.typeUInt32,
             v: EnumProtoId.protoStream})

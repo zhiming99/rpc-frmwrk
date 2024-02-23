@@ -33,16 +33,14 @@ function EnableRemoteEvent( oMsg )
         var arrBody = []
         arrBody.push( new Pair( { t: "ay", v: oBuf }))
         dmsg.AppendFields( arrBody )
-        var oBufToSend = marshall( dmsg )
+        /*var oBufToSend = marshall( dmsg )
         var oBufSize = Buffer.alloc( 4 )
-        oBufSize.writeUInt32BE( oBufToSend.length )
+        oBufSize.writeUInt32BE( oBufToSend.length )*/
 
         var oStream = this.m_mapStreams.get(
             EnumStmId.TCP_CONN_DEFAULT_STM )
 
-        ret = oStream.SendBuf(
-            Buffer.concat([oBufSize, oBufToSend]) )
-
+        ret = oStream.SendBuf( dmsg )
         if( ret < 0 )
         {
             var oResp = new CIoRespMessage( oMsg )

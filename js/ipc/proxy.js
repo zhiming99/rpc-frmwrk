@@ -273,7 +273,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
 
         for( var hStream of stms )
             this.m_funcCloseStream( hStream )
-
+        this.m_setStreams.clear()
         return this.m_oIoMgr.UnregisterProxy(
             this, ret )
     }

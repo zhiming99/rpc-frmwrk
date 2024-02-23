@@ -20,10 +20,7 @@ function FetchData( oContext, oMsg )
         oBdgeMsg.m_iType = IoMsgType.ReqMsg
         var dwTimeoutSec =
             oCallOpt.GetProperty( EnumPropId.propTimeoutSec )
-        var dwKeepAliveSec =
-            oCallOpt.GetProperty( EnumPropId.propKeepAliveSec )
         oBdgeMsg.m_dwTimerLeftMs = dwTimeoutSec * 1000
-        oContext.m_oStream.SetPingInterval( dwTimeoutSec )
         var dmsg = new CDBusMessage()
         dmsg.SetInterface(
             oDataDesc.GetProperty( EnumPropId.propIfName) )
@@ -44,10 +41,9 @@ function FetchData( oContext, oMsg )
             this.m_strSess)
         oTransctx.SetUint64( EnumPropId.propTimestamp,
             this.GetPeerTimestamp() )
-        oDataDesc.SetUint32( EnumPropId.propTimeoutSec,
-            dwTimeoutSec)
-        oDataDesc.SetUint32( EnumPropId.propKeepAliveSec,
-            dwKeepAliveSec)
+        dwTimeoutSec = oDataDesc.GetProperty(
+            EnumPropId.propTimeoutSec )
+        oContext.m_oStream.SetPingInterval( dwTimeoutSec )
         var oBuf = oDataDesc.Serialize()
         dmsg.AppendFields( [{t: "ay", v:oBuf},
             {t: "u", v:oContext.m_oStream.GetPeerStreamId()},
@@ -55,12 +51,8 @@ function FetchData( oContext, oMsg )
             {t: "u", v:0 },
             {t: "t", v:oBdgeMsg.m_iMsgId}])
         oBdgeMsg.m_dmsg = dmsg
-        var oFetchBuf = marshall( dmsg )
-        var dwSize = Buffer.alloc( 4 )
-        dwSize.writeUint32BE( oFetchBuf.length )
-        var oTotal = Buffer.concat( [ dwSize, oFetchBuf ])
         var ret = this.GetStreamById(
-            EnumStmId.TCP_CONN_DEFAULT_STM ).SendBuf( oTotal )
+            EnumStmId.TCP_CONN_DEFAULT_STM ).SendBuf( dmsg )
         var oPending = new CPendingRequest()
         oPending.m_oObject = this
         oPending.m_oReq = oBdgeMsg
@@ -210,8 +202,8 @@ function OpenStream( oMsg )
             var oStream = new CRpcStream(this)
             oStream.SetStreamId( iStmId, dwProto)
             oStream.SetPeerStreamId( iPeerStmId )
-            oStream.Start()
             oContext.m_oStream = oStream
+            oStream.Start()
 
             return FetchData.bind( this )(oContext, oMsg ).then(
                 (oPending)=>{
@@ -231,6 +223,7 @@ function OpenStream( oMsg )
                     var oRespMsg = new CIoRespMessage( oMsg )
                     oRespMsg.m_oResp = oResp
                     this.PostMessage( oRespMsg )
+                    oStream.SendPing()
                     return Promise.resolve( oPending )
                 }).catch((oPending)=>{
                     console.log( "FetchData failed")

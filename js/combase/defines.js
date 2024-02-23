@@ -1,4 +1,5 @@
 const Tid = require( "./enums.js").EnumTypeId
+const {errno} = require( "./enums.js")
 
 exports.randomInt = function randomInt( max )
 { return Math.floor( Math.random() * max ) }
@@ -50,3 +51,6 @@ exports.SYS_METHOD = function( strName )
 {
     return "RpcCall_" + strName
 }
+
+exports.NumberToUint32= function( i )
+{ return Number( BigInt( i ) & BigInt( 0x00000000ffffffff ) ) }

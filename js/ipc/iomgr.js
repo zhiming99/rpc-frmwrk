@@ -105,26 +105,28 @@ exports.CIoManager = class CIoManager
                 {
                     var oEvt = new CIoEventMessage()
                     oEvt.Restore( oMsg )
-                    var hStream = oMsg.m_oReq.GetProperty( 0 )
-                    if( hStream === null )
+                    var hStream = oEvt.m_oReq.GetProperty( 0 )
+                    if( !hStream )
                     {
-                        console.log( "Error invalid stream event" + oMsg)
+                        console.log( "Error invalid stream event" + oEvt)
                         return
                     }
 
-                    var oProxy = this.m_oIoMgr.GetStreamOwner( hStream )
+                    var oProxy = this.GetStreamOwner( hStream )
                     if( oProxy === undefined )
                     {
-                        console.log( "Error stream event cannot find owner " + oMsg)
+                        console.log( "Error stream event cannot find owner " + oEvt)
                         return
                     }
-                    oProxy.m_arrDispTable[ iCmd ]( hStream, oMsg )
+                    oProxy.m_arrDispTable[ oEvt.m_iCmd ]( hStream, oEvt )
                 }
             }
             else if( oMsg.m_iType === IoMsgType.AdminResp ||
                 oMsg.m_iType === IoMsgType.RespMsg )
             {
                 var oPending = this.m_mapPendingReqs.get( oMsg.m_iMsgId )
+                if( oPending === undefined )
+                    throw new Error( "Error cannot find pending req for response " + oMsg)
                 var oResp = new CConfigDb2()
                 oResp.Restore( oMsg.m_oResp )
                 oPending.m_oResp = oResp
@@ -196,10 +198,12 @@ exports.CIoManager = class CIoManager
                 this.m_mapPendingReqs.delete( key )
 
             var oProxies = this.m_mapProxies.get( dwPortId )
-            if( oProxies !== undefined )
-                oProxies.delete( oProxy )
+            if( oProxies === undefined )
+                return Promise.resolve(0)
+            oProxies.delete( oProxy )
             if( oProxies.size > 0 )
                 return Promise.resolve(0)
+            this.m_mapProxies.delete( dwPortId )
 
             return new Promise( (resolve, reject)=>{
                 var oMsg = new CAdminReqMessage()
@@ -212,11 +216,9 @@ exports.CIoManager = class CIoManager
                 oPending.m_oResolve = resolve
                 oPending.m_oReject = reject
                 oProxy.PostMessage( oPending )
-            }).then((oPendingReq)=>{
-                this.m_mapProxies.delete(
-                    oPendingReq.m_oReq.m_dwPortId )
+            }).then((e)=>{
+                return Promise.resolve(0)
             })
-
         }catch( e ) {
             console.log( "Unregister proxy failed")
             return Promise.resolve( -errno.EFAULT )

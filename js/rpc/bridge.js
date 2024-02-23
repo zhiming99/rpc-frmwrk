@@ -13,6 +13,7 @@ const { Bdge_ForwardEvent } = require("./fwrdevtrmt")
 const { Bdge_OnKeepAlive } = require("./keepalivermt")
 const { Bdge_OpenStream } = require( "./openstmrmt")
 const { CRpcStreamBase, Bdge_DataConsumed } = require( "./stream")
+const { Bdge_StreamWrite } = require( "./stmwritermt")
 
 class CRpcControlStream extends CRpcStreamBase
 {
@@ -66,14 +67,13 @@ class CRpcDefaultStream extends CRpcStreamBase
         super( oParent )
         this.m_wProtoId = EnumProtoId.protoDBusRelay
         var origSendBuf = this.SendBuf
-        this.SendBuf = function ( dmsg )
-        {
+        this.SendBuf = (( dmsg )=>{
             var oBufToSend = marshall( dmsg )
             var oBufSize = Buffer.alloc( 4 )
             oBufSize.writeUInt32BE( oBufToSend.length )
-            origSendBuf(
+            return origSendBuf(
                 Buffer.concat( [ oBufSize, oBufToSend] ) )
-        }
+        }).bind(this)
     }
     /**
      * Receive websock frame from outside,
@@ -163,6 +163,9 @@ class CRpcTcpBridgeProxy
         oIoTab[ IoCmd.OpenStream[0]] =
             Bdge_OpenStream.bind(this)
 
+        oIoTab[ IoCmd.StreamWrite[0]] =
+            Bdge_StreamWrite.bind( this )
+
         oIoTab[ IoCmd.DataConsumed[0]] =
             Bdge_DataConsumed.bind( this )
 
@@ -210,7 +213,7 @@ class CRpcTcpBridgeProxy
             EnumProtoId.protoDBusRelay )
 
         oStm.SetPeerStreamId( iStmId )
-        this.AddStream( iStmId, oStm)
+        this.AddStream( oStm)
         this.m_iTimerId = 0
 
         this.m_oScanReqs = ()=>{
@@ -302,7 +305,14 @@ class CRpcTcpBridgeProxy
 
     Stop()
     {
-        var key, val
+        var hStream
+        var arrKeys = this.m_mapHStream2StmId.keys()
+        for( hStream of arrKeys )
+        {
+            var oStm = this.GetStreamByHandle( hStream )
+            oStm.Stop()
+        }
+        
         this.m_iState = EnumIfState.stateStopping
         for( [ key, val ] of this.m_mapPendingReqs )
             val.OnCanceled( -errno.ERROR_PORT_STOPPED )

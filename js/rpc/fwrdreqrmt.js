@@ -97,15 +97,14 @@ function ForwardRequest( oMsg )
         arrBody.push( new Pair( { t: "ay", v: oInnerTotal }))
         arrBody.push( new Pair({t:"t", v: oMsg.m_iMsgIdLocal}))
         dmsg.AppendFields( arrBody )
-        var oBufToSend = marshall( dmsg )
+        /*var oBufToSend = marshall( dmsg )
         var oBufSize = Buffer.alloc( 4 )
-        oBufSize.writeUInt32BE( oBufToSend.length )
+        oBufSize.writeUInt32BE( oBufToSend.length )*/
 
         var oStream = this.m_mapStreams.get(
             EnumStmId.TCP_CONN_DEFAULT_STM )
 
-        ret = oStream.SendBuf(
-            Buffer.concat([oBufSize, oBufToSend]) )
+        var ret = oStream.SendBuf( dmsg )
 
         var oPendingEe = new CPendingRequest( oMsg )
         oPendingEe.m_oResolve = resolve
