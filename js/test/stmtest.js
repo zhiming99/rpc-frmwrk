@@ -111,7 +111,6 @@ oProxy.OnDataReceived = ( function (hStream, oBuf ){
     var strResp = decoder.decode( oBuf )
     strResp = strResp.replace('\0', '')
     this.DebugPrint( `stream@${hStream} received: ` + strResp )
-    return
     const encoder = new TextEncoder()
     var oBuf = encoder.encode( Date.now() + " proxy: Hello, world!")
     this.m_funcStreamWrite( hStream, oBuf ).then((e)=>{
@@ -153,5 +152,5 @@ oProxy.Start().then((retval)=>{
     setTimeout( ()=>{
         console.log("Stopping the proxy")
         oProxy.Stop()
-    }, 180000 )
+    }, 120000 )
 })
