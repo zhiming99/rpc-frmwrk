@@ -1,4 +1,4 @@
-name: rpc-frmwrk CI scheduled
+name: rpc-frmwrk CI local
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
 jobs:
   build:
 
-    runs-on: [self-hosted, linux, x86]
+    runs-on: [self-hosted, linux, x64]
 
     steps:
     - uses: actions/checkout@v3
