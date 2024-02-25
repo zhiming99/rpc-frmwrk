@@ -375,6 +375,13 @@ gint32 CRpcTcpFido::HandleSendReq(
         }
 
         BufPtr pBuf( true );
+        if( pCtx->m_pReqData->GetDataType() !=
+            DataTypeMsgPtr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         DMsgPtr& pReq = *pCtx->m_pReqData;
         if( pReq.IsEmpty() )
         {

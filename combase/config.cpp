@@ -333,7 +333,7 @@ gint32 CConfigDb2::Serialize(
             }
         case typeString:
             {
-                guint32 len = 1 + oVar.m_strVal.size(); 
+                guint32 len = oVar.m_strVal.size(); 
                 guint32 dwFree = pEnd - pLoc;
                 if( dwFree < sizeof( guint32 ) + len )
                 {
@@ -345,17 +345,17 @@ gint32 CConfigDb2::Serialize(
                         break;
                 }
 
-                len = htonl( len );
-                memcpy( pLoc, &len, sizeof( guint32 ) );
-                len = ntohl( len );
-
-                if( len == 0 )
-                    break;
-
+                guint32 len1 = htonl( len );
+                memcpy( pLoc, &len1, sizeof( guint32 ) );
                 pLoc += sizeof( guint32 );
-                memcpy( pLoc, oVar.m_strVal.c_str(), len - 1 );
+                if( len == 0 )
+                {
+                    // empty string
+                    break;
+                }
+
+                memcpy( pLoc, oVar.m_strVal.c_str(), len );
                 pLoc += len;
-                pLoc[ -1 ] = 0;
                 break;
             }
         case typeDMsg:
@@ -391,6 +391,14 @@ gint32 CConfigDb2::Serialize(
             {
                 BufPtr pBuf( true );
                 ObjPtr& pObj = ( ObjPtr& )oVar;
+                if( pObj.IsEmpty() )
+                {
+                    SERI_HEADER_BASE oBase;
+                    memcpy( pLoc,
+                        &oBase, sizeof( oBase ) );
+                    pLoc += sizeof( oBase );
+                    break;
+                }
                 ret = pObj->Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
@@ -441,6 +449,9 @@ gint32 CConfigDb2::Serialize(
             ret = -EINVAL;
             break;
         }
+
+        if( ERROR( ret ) )
+            break;
 
         ++itr;
     }
@@ -559,12 +570,17 @@ gint32 CConfigDb2::Deserialize(
                     memcpy( &len, pLoc, sizeof( guint32 ) );
                     len = ntohl( len );
                     pLoc += sizeof( guint32 );
+                    if( len == 0 )
+                    {
+                        new ( &oVar ) Variant("");
+                        break;
+                    }
                     if( pLoc + len > pEnd )
                     {
                         ret = -E2BIG;
                         break;
                     }
-                    new ( &oVar ) Variant( ( const char* )pLoc, len - 1 );
+                    new ( &oVar ) Variant( ( const char* )pLoc, len );
                     pLoc += len;
                     break;
                 }
@@ -610,6 +626,14 @@ gint32 CConfigDb2::Deserialize(
                     }
 
                     ObjPtr pObj;
+                    if( len == 0 ||
+                        oHdr.dwClsid == clsid( Invalid ) )
+                    {
+                        oVar = pObj;
+                        pLoc += len;
+                        break;
+                    }
+
                     ret = pObj.NewObj(
                         ( EnumClsid )oHdr.dwClsid );
                     if( ERROR( ret ) )

@@ -8081,6 +8081,7 @@ gint32 CInterfaceServer::UserCancelRequest(
     // set the response for this cancel request
     CParamList oMyResp;
     oMyResp[ propReturnValue ] = ret;
+    oMyResp.Push( qwIoTaskId );
 
     SetResponse( pCallback,
         oMyResp.GetCfg() );

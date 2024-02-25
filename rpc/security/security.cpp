@@ -992,6 +992,23 @@ gint32 CRpcTcpBridgeAuth::CheckSessExpired(
     return ret;
 }
 
+gint32 CRpcTcpBridgeAuth::RebuildMatches()
+{
+    auto itr = m_vecMatches.begin();
+    while( itr != m_vecMatches.end() )
+    {
+        CMessageMatch* pMatch = *itr;
+        MatchPtr pNewMatch;
+        pNewMatch.NewObj(
+            clsid( CMessageMatch ) );
+        CMessageMatch* pNew = pNewMatch;
+        pNew->Clone( pMatch );
+        *itr = pNewMatch;
+        itr++;
+    }
+    return super::RebuildMatches();
+}
+
 gint32 CRpcReqForwarderProxyAuth::BuildNewMsgToFwrd(
     IConfigDb* pReqCtx,
     DMsgPtr& pFwrdMsg,
@@ -2277,6 +2294,23 @@ bool CRpcTcpBridgeProxyAuth::IsKdcChannel()
     if( ERROR( ret ) )
         return false;
     return bNoEnc;
+}
+
+gint32 CRpcTcpBridgeProxyAuth::RebuildMatches()
+{
+    auto itr = m_vecMatches.begin();
+    while( itr != m_vecMatches.end() )
+    {
+        CMessageMatch* pMatch = *itr;
+        MatchPtr pNewMatch;
+        pNewMatch.NewObj(
+            clsid( CMessageMatch ) );
+        CMessageMatch* pNew = pNewMatch;
+        pNew->Clone( pMatch );
+        *itr = pNewMatch;
+        itr++;
+    }
+    return super::RebuildMatches();
 }
 
 gint32 CRpcReqForwarderAuth::OnSessImplStarted(

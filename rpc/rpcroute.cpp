@@ -1135,6 +1135,16 @@ gint32 CRpcRouterBridge::OnPreStopLongWait(
     return ret;
 }
 
+gint32 CRpcRouterBridge::OnPostStop(
+    IEventSink* pCallback )
+{
+    m_pBridge.Clear();
+    m_pBridgeAuth.Clear();
+    m_pBridgeProxy.Clear();
+    m_pReqProxy.Clear();
+    return super::OnPostStop( pCallback );
+}
+
 gint32 CRouterStartReqFwdrProxyTask::
     OnTaskCompleteStart( gint32 iRetVal )
 {
@@ -3523,7 +3533,7 @@ gint32 CRpcRouterBridge::RunEnableEventTask(
         oParams[ propNotifyClient ] = true;
 
         ret = pTransGrp.NewObj(
-            clsid( CIfTaskGroup ),
+            clsid( CIfTransactGroup  ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )
@@ -3628,7 +3638,7 @@ gint32 CRpcRouterBridge::BuildDisEvtTaskGrp(
         }
 
         ret = pTaskGrp.NewObj(
-            clsid( CIfTaskGroup ),
+            clsid( CIfTransactGroup  ),
             oParams.GetCfg() );
 
         if( ERROR( ret ) )

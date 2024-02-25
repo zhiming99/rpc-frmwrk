@@ -378,6 +378,7 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf.install
                  bldpkg/rpcf-dev.install
                  examples/Makefile
+                 js/Makefile
                  test/Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile

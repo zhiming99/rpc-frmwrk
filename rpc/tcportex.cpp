@@ -1044,15 +1044,15 @@ gint32 CRpcControlStream2::GetReadIrpsToComp(
             // and right before the irp is put to
             // this map because the system is
             // heavily loaded
-            if( m_mapIrpsForResp.find( dwSeqNo )
-                == m_mapIrpsForResp.end() )
+            auto itr = m_mapIrpsForResp.find( dwSeqNo );
+            if( itr == m_mapIrpsForResp.end() )
             {
                 quePktPutback.push_back( pCfg );
                 continue;
             }
 
-            pIrp = m_mapIrpsForResp[ dwSeqNo ];
-            m_mapIrpsForResp.erase( dwSeqNo );
+            pIrp = itr->second;
+            m_mapIrpsForResp.erase( itr );
         }
 
         BufPtr pDeserialized( true );

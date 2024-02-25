@@ -446,8 +446,37 @@ gint32 CRpcTcpBridgeProxy::EnableRemoteEventInternal(
             break;
         }
 
+        ObjPtr prmtMatch;
+        prmtMatch.NewObj(
+            clsid( CMessageMatch ) );
+
+        auto pSrcMatch = static_cast
+            < CMessageMatch* >( pMatch );
+
+        CMessageMatch* pm = prmtMatch;
+        Variant oVar;
+        ret = pSrcMatch->GetProperty(
+            propObjPath, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetObjPath( oVar );
+
+        ret = pSrcMatch->GetProperty(
+            propIfName, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetIfName( oVar );
+
+        ret = pSrcMatch->GetProperty(
+            propRouterPath, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetProperty( propRouterPath, oVar );
+
+        ret = pSrcMatch->GetProperty(
+            propDestDBusName, oVar );
+        if( SUCCEEDED( ret ) )
+            pm->SetProperty( propDestDBusName, oVar );
+
         CReqBuilder oBuilder( this );
-        oBuilder.Push( ObjPtr( pMatch ) );
+        oBuilder.Push( prmtMatch );
         if( bEnable )
         {
             oBuilder.SetMethodName(
@@ -1583,9 +1612,6 @@ gint32 CRpcTcpBridgeProxy::CloseStream_Proxy(
             propStreamId, TCP_CONN_DEFAULT_CMD );
 
         oBuilder[ propProtoId ] = protoControl;
-
-        oBuilder.SetIntProp( propCmdId,
-            CTRLCODE_CLOSE_STREAM_PDO );
 
         CfgPtr pRespCfg( true );
         ret = RunIoTask( oBuilder.GetCfg(),
@@ -4958,14 +4984,23 @@ gint32 CRpcTcpBridge::SendResponse(
         if( dwFlags & CF_NON_DBUS )
         {
             *pBuf = ObjPtr( pResp );
-            ret = oReq.GetIntProp(
+            ret = oResp.GetIntProp(
                 propCmdId, dwCmdId );
-
             if( ERROR( ret ) )
                 break;
         }
         else
         {
+            gint32 iType = 0;
+            ret = pResp->GetPropertyType( 0, iType );
+            if( SUCCEEDED( ret ) && iType != typeDMsg )
+            {
+                ret = -EBADMSG;
+                break;
+            }
+            if( ERROR( ret ) )
+                break;
+
             DMsgPtr& pMsg = oResp[ 0 ];
             *pBuf = pMsg;
         }

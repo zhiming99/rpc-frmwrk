@@ -91,7 +91,10 @@ gint32 CRpcWebSockFido::EncodeAndSend(
         if( ERROR( ret ) )
             break;
 
+        CParamList oNewParams;
         BufPtr pOutBuf( true );
+        oNewParams.Push( pOutBuf );
+
         guint32 dwSize = 0;
         gint32 iIdx = 0;
         for( ; iIdx < iCount; iIdx++ )
@@ -102,6 +105,7 @@ gint32 CRpcWebSockFido::EncodeAndSend(
             if( ERROR( ret ) )
                 break;
             dwSize += pBuf->size();
+            oNewParams.Push( pBuf );
         }
 
         if( ERROR( ret ) )
@@ -142,23 +146,6 @@ gint32 CRpcWebSockFido::EncodeAndSend(
                 ( dwSize  & 0xFF );
         }
 
-        BufPtr pBuf;
-        ret = oParams.GetProperty(
-            0, pBuf );
-        if( ERROR( ret ) )
-            break;
-
-        // prepend a websocket header to the first
-        // buffer
-        ret = pOutBuf->Append(
-            ( guint8* )pBuf->ptr(),
-            pBuf->size() );
-
-        if( ERROR( ret ) )
-            break;
-
-        oParams.SetBufPtr( 0, pOutBuf );
-
         // send the encrypted copy down 
         PortPtr pLowerPort = GetLowerPort();
         pIrp->AllocNextStack(
@@ -166,7 +153,7 @@ gint32 CRpcWebSockFido::EncodeAndSend(
 
         IrpCtxPtr pCtx = pIrp->GetTopStack();
         BufPtr pNewBuf( true );
-        *pNewBuf = ObjPtr( oParams.GetCfg() );
+        *pNewBuf = ObjPtr( oNewParams.GetCfg() );
         pCtx->SetReqData( pNewBuf );
         pLowerPort->AllocIrpCtxExt(
             pCtx, ( PIRP )pIrp );
@@ -519,6 +506,8 @@ gint32 CRpcWebSockFido::PreStop(
     {
         ret = ScheduleCloseTask( pIrp,
             ERROR_PORT_STOPPED, true );
+        if( SUCCEEDED( ret ) )
+            return STATUS_PENDING;
     }
     return super::PreStop( pIrp );
 }
@@ -546,6 +535,7 @@ gint32 CRpcWebSockFido::ScheduleCloseTask(
         oParams.SetPointer( propPortPtr, this );
         // we have 20 seconds of patience on it
         oParams.SetIntProp( propTimeoutSec, 20 );
+        oParams.SetPointer( propIoMgr, GetIoMgr() );
 
         ret = m_vecTasks[ enumCloseTask ].NewObj(
             clsid( CWsCloseTask ),
@@ -704,23 +694,12 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
             if( !pIrp->IsIrpHolder() )
                 pIrp->PopCtxStack();
 
-            guint32 dwReason;
-            if( pDecrypted.IsEmpty() ||
-                pDecrypted->empty() )
-                dwReason = -ENOTCONN;
-            else
-            {
-                memcpy( &dwReason,
-                    pDecrypted->ptr(),
-                    sizeof( dwReason ) );
-            }
-
             bool bExpected = false;
             if( m_bCloseSent.compare_exchange_strong(
                 bExpected, true ) )
             {
                 ret = ScheduleCloseTask(
-                    pIrp, dwReason , false );
+                    pIrp, 0, false );
 
                 if( SUCCEEDED( ret ) )
                 {
@@ -1266,9 +1245,17 @@ gint32 CRpcWebSockFido::AdvanceHandshakeClient(
 }
 
 gint32 CRpcWebSockFido::DoHandshake(
-     IEventSink* pCallback )
+     IEventSink* pCallback, bool bFirst )
 {
-    DebugPrint( 0, "Start handshake..." );
+    if( bFirst )
+    {
+        DebugPrint( 0, "Start WebSocket handshake..." );
+    }
+    else
+    {
+        DebugPrint( 0, "Continue WebSocket handshake..." );
+    }
+
     return AdvanceHandshake( pCallback );
 }
 
@@ -1620,7 +1607,7 @@ gint32 CWsHandshakeTask::OnIrpComplete(
             }
         }
 
-        ret = pPort->DoHandshake( this );
+        ret = pPort->DoHandshake( this, false );
 
     }while( 0 );
 
@@ -1650,7 +1637,7 @@ gint32 CWsHandshakeTask::RunTask()
         if( ERROR( ret ) )
             break;
 
-        ret = pPort->DoHandshake( this );
+        ret = pPort->DoHandshake( this, true );
 
     }while( 0 );
 
@@ -1738,7 +1725,15 @@ gint32 CWsCloseTask::RunTask()
             break;
 
         BufPtr pPayload( true );
-        *pPayload = dwReason;
+        if( ERROR( dwReason ) )
+        {
+            *pPayload = htons( 1011 );
+            dwReason = htonl( dwReason );
+            pPayload->Append( ( guint8* )&dwReason,
+                sizeof( guint32 ) );
+        }
+        else
+            *pPayload = htons( 1000 );
         BufPtr pOutBuf( true );
 
         ret = pPort->MakeFrame(
@@ -1754,6 +1749,9 @@ gint32 CWsCloseTask::RunTask()
             this, pOutBuf );
 
     }while( 0 );
+
+    if( ret != STATUS_PENDING )
+        OnTaskComplete( ret );
 
     return ret;
 }
@@ -1803,6 +1801,9 @@ gint32 CWsCloseTask::OnIrpComplete(
             break;
         }
 
+        // FIXME: the protocol requires waiting for
+        // the CLOSE_FRAME from the peer
+        //
         // don't wait for the response
         //
         // BufPtr pBuf;
@@ -1813,6 +1814,94 @@ gint32 CWsCloseTask::OnIrpComplete(
 
     if( ret != STATUS_PENDING )
         OnTaskComplete( ret );
+
+    return ret;
+}
+
+gint32 CWsCloseTask::OnTaskComplete(
+    gint32 iRet )
+{
+    gint32 ret = 0;
+
+    CParamList oParams(
+        ( IConfigDb* )GetConfig() );
+
+    CRpcWebSockFido* pPort = nullptr;
+    do{
+        IRP* pMasterIrp = nullptr;        
+
+        // the irp pending on poststart
+        ret = oParams.GetPointer(
+            propIrpPtr, pMasterIrp );
+
+        if( ERROR( ret ) )
+            break;
+
+        ret = oParams.GetPointer(
+            propPortPtr, pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CIoManager* pMgr = nullptr;
+        ret = oParams.GetPointer(
+            propIoMgr, pMgr );
+
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oIrpLock(
+            pMasterIrp->GetLock() );
+
+        ret = pMasterIrp->CanContinue(
+            IRP_STATE_READY );
+
+        if( ERROR( ret ) )
+            break;
+
+        IrpCtxPtr& pCtx =
+            pMasterIrp->GetTopStack();
+
+        if( pCtx->GetMajorCmd() == IRP_MJ_PNP &&
+            pCtx->GetMinorCmd() == IRP_MN_PNP_STOP )
+        {
+            ret = pPort->CPort::PreStop( pMasterIrp );
+            pCtx->SetStatus( ret );
+        }
+        else if( pCtx->GetMajorCmd() == IRP_MJ_FUNC &&
+            pCtx->GetMinorCmd() == IRP_MN_IOCTL &&
+            pCtx->GetCtrlCode() == CTRLCODE_LISTENING )
+        {
+            BufPtr pRespBuf( true );
+            ret = pRespBuf->Resize(
+                sizeof( STREAM_SOCK_EVENT ) );
+            if( ERROR( ret ) )
+                break;
+
+            STREAM_SOCK_EVENT* psse =
+            ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
+            psse->m_iEvent = sseError;
+            psse->m_iData = -ENOTCONN;
+            psse->m_iEvtSrc = GetClsid();
+            pCtx->SetStatus( STATUS_SUCCESS );
+            pCtx->SetRespData( pRespBuf );
+        }
+        oIrpLock.Unlock();
+
+        pMgr->CompleteIrp( pMasterIrp );
+
+    }while( 0 );
+
+    if( pPort != nullptr )
+    {
+        gint32 iIdx = 
+            CRpcWebSockFido::enumCloseTask;
+        pPort->ClearTask( iIdx );
+    }
+
+    oParams.ClearParams();
+    oParams.RemoveProperty( propIrpPtr );
+    oParams.RemoveProperty( propIrpPtr1 );
+    oParams.RemoveProperty( propPortPtr );
 
     return ret;
 }

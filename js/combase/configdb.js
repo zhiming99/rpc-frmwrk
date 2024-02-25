@@ -1,15 +1,17 @@
 const { unmarshall } = require("../dbusmsg/message.js")
-const { SERI_HEADER_BASE } = require("./defines")
+const { Pair, } = require("./defines")
+const { SERI_HEADER_BASE } = require("./SERI_HEADER_BASE.js")
 const Cid = require( "./enums.js").EnumClsid
 const Pid = require( "./enums.js").EnumPropId
 const Tid = require( "./enums.js").EnumTypeId
 const CV = require( "./enums.js").constval
-const Buffer = require( "buffer")
-const { CoCreateInstance } = require("./factory.js")
+const { Buffer } = require( "buffer")
 const CBuffer = require( "./cbuffer").CBuffer
 const marshall = require( "../dbusmsg/message.js").marshall
+const { CObjBase } = require( "./objbase.js" )
+const { EnumTypeId } = require("./enums.js")
 
-const SERI_HEADER = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
+const SERI_HEADER_CFG = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
 {
     constructor()
     {
@@ -28,80 +30,89 @@ const SERI_HEADER = class CConfigDb2_SERI_HEADER extends SERI_HEADER_BASE
     {
         super.Serialize( dstBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        dstBuf.setUint32( offset, this.dwCount)
+        dstBuf.writeUint32BE( this.dwCount, offset)
     }
 
     Deserialize( srcBuf, offset )
     {
         super.Deserialize( srcBuf, offset )
         offset += SERI_HEADER_BASE.GetSeriSize()
-        this.dwCount = srcBuf.getUint32( offset )
+        this.dwCount = srcBuf.readUint32BE( offset )
     }
 }
 
-const Pair = class Pair
-{
-    constructor()
-    {
-        this.t = Tid.typeNone
-        this.v = null
-    }
-    constructor( src )
-    {
-        this.t = src.t
-        this.v = src.v
-    }
-}
+
 exports.CConfigDb2=class CConfigDb2 extends CObjBase
 {
     constructor()
     {
+        super()
         this.m_dwClsid = Cid.CConfigDb2
         this.m_props = new Map()
         this.m_dwCount = 0
     }
 
-    Push( src )
+    Restore( oMsg )
     {
-        this.m_props[ this.m_dwCount ] = src
-        this.m_dwCount++
+        if( oMsg === null || oMsg === undefined )
+            return
+        this.m_props = oMsg.m_props
+        this.m_dwCount = oMsg.m_dwCount
+        var key, value
+        for( [key, value] of this.m_props )
+        {
+            if( value.t === EnumTypeId.typeObj )
+            {
+                var iClsid = value.v.m_dwClsid
+                var oObj = globalThis.CoCreateInstance( iClsid )
+                oObj.Restore( value.v )
+                value.v = oObj
+            }
+            else if( value.t === EnumTypeId.typeByteArr )
+            {
+                var oBuf = Buffer.from( value.v )
+                value.v = oBuf
+            }
+        }
     }
 
-    Push( tid, val )
+    Push( src )
     {
-        this.Push( new Pair( { t : tid, v:val } ) )        
+        if( this.m_dwCount >= 1024 )
+            return
+        this.m_props.set( this.m_dwCount, src )
+        this.m_dwCount++
     }
 
     Pop()
     {
         if( m_dwCount == 0 )
             return null
-        val = this.m_prop[ this.m_dwCount - 1 ]
+        val = this.m_props[ this.m_dwCount - 1 ]
         this.m_props.delete( this.m_dwCount - 1 )
         this.m_dwCount--
         return val
     }
 
+    RemoveProperty( iProp )
+    { this.m_props.delete( iProp ) }
+
     GetPropertyType( iProp )
     {
-        if( !this.m_props.has( iProp ) )
+        if( !this.m_props.has( iProp ))
             return Tid.typeNone
-        return this.m_props[iProp].t
+        return this.m_props.get(iProp).t
     }
 
     GetProperty( iProp )
     {
-        if( !this.m_props.has( iProp ) )
+        if( !this.m_props.has( iProp ))
             return null
-        return this.m_props[iProp].v
+        return this.m_props.get( iProp).v
     }
 
     SetProperty( iProp, val )
-    {
-        if( val.constructor.name !== "Pair" )
-            throw new TypeError( "Error type of input param, expecting Buffer")
-        this.m_props[ iProp ]  = val
-    }
+    { this.m_props.set( iProp, val ) }
 
     SetBool( iProp, val )
     {
@@ -109,44 +120,44 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     }
     SetUint8( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeByte, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeByte, v: val } )
     }
 
     SetUint16( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeUInt16, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeUInt16, v: val } )
     }
 
     SetUint32( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeUInt32, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeUInt32, v: val } )
     }
 
     SetUint64( iProp, val )
     {
-        this.type = Tid.typeUInt64
-        this.m_value = val
+        this.m_props.set( iProp, 
+            { t: Tid.typeUInt64, v: val } )
     }
 
     SetFloat( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeUInt64, v: val }
+        this.m_props.set( iProp,
+            { t: Tid.typeFloat, v: val } )
     }
 
     SetDouble( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeDouble, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeDouble, v: val } )
     }
 
     SetString( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeString, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeString, v: val } )
     }
 
     SetByteArr( iProp, val )
@@ -154,19 +165,19 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         if( !Buffer.isBuffer( val ) )
             throw new TypeError( "Error not a value of Buffer type" )
 
-        this.m_props[ iProp ] =
-            { t: Tid.typeByteArr, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeByteArr, v: val } )
     }
     SetMsgPtr( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeDMsg, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeDMsg, v: val } )
     }
 
     SetObjPtr( iProp, val )
     {
-        this.m_props[ iProp ] =
-            { t: Tid.typeObj, v: val }
+        this.m_props.set( iProp, 
+            { t: Tid.typeObj, v: val } )
     }
 
 
@@ -188,17 +199,18 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     Serialize()
     {
-        oHdr = new SERI_HEADER()
+        var oHdr = new SERI_HEADER_CFG()
         if( this.m_dwCount > 0 )
         {
             this.SetUint32(
                 Pid.propParamCount, this.m_dwCount )
         }
 
-        dstBuf = Buffer.alloc( CV.PAGE_SIZE )
+        var dstBuf = Buffer.alloc( CV.PAGE_SIZE )
         oHdr.dwCount = this.m_props.size 
 
-        pos = SERI_HEADER.GetSeriSize()
+        var pos = SERI_HEADER_CFG.GetSeriSize()
+        var key, value
         for( const [ key, value ] of this.m_props )
         {
             if( pos + 5 > dstBuf.length )
@@ -208,6 +220,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             dstBuf.writeUint32BE( key, pos )
             pos += 4
             dstBuf.writeUint8( value.t, pos++ )
+            var dwSize = 0
             switch( value.t )
             {
             case Tid.typeByte:
@@ -249,7 +262,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                         dstBuf = CConfigDb2.ExtendBuffer(
                             dstBuf, CV.PAGE_SIZE )
                     }
-                    dstBuf.writeUint64BE( value.v, pos )
+                    dstBuf.writeBigUInt64BE( BigInt( value.v ), pos )
                     pos += 8
                     break
                 }               
@@ -279,11 +292,11 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 {
                     if( value.v === null || value.v === "")
                     {
-                        dstBuf.writeUint32BE( 0, pos )
+                        dstBuf.writeUint32BE( 1, pos )
                         pos += 4
                         break
                     }
-                    strBuf = CBuffer.StrToBuffer( value.v ) 
+                    var strBuf = CBuffer.StrToBufferNoNull( value.v ) 
                     if( pos + strBuf.length > dstBuf.length )
                     {
                         dwSize = strBuf.length > CV.PAGE_SIZE ?
@@ -310,7 +323,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 }
             case Tid.typeDMsg:
                 {
-                    msgBuf = marshall( value.v )
+                    var msgBuf = marshall( value.v )
                     dwSize = msgBuf.length
                     dstBuf.writeUint32BE( dwSize + 4, pos )
                     pos += 4
@@ -324,14 +337,13 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                 {
                     if( value.v === null )
                     {
-                        dstBuf.writeUint32BE( 0 , pos )
-                        pos += 4
+                        var o = new SERI_HEADER_BASE()
+                        o.Serialize( dstBuf, pos )
+                        pos += SERI_HEADER_BASE.GetSeriSize()
                         break
                     }
-                    objBuf = value.v.Serialize() 
+                    var objBuf = value.v.Serialize() 
                     dwSize = objBuf.length
-                    dstBuf.writeUint32BE( dwSize, pos )
-                    pos += 4
                     dstBuf.fill( objBuf, pos, pos + dwSize )
                     pos += dwSize
                     break
@@ -343,32 +355,35 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         return dstBuf.slice( 0, pos )
     }
 
-    Deserialize( srcBuffer, offset )
+    Deserialize( srcBuf, offset )
     {
+        if( offset === undefined)
+            offset = 0
         this.m_props.clear()
-        if( !Buffer.isBuffer( srcBuffer ) )
+        if( !Buffer.isBuffer( srcBuf ) )
             throw new TypeError( "Error invald buffer type")
-        if( srcBuffer.length < offset )
+        if( srcBuf.length < offset )
             throw new Error( "Error buffer too small to deserialize")
 
-        oHdr = new SERI_HEADER()
-        pos = offset
-        oHdr.Deserialize( srcBuffer, pos )
+        var oHdr = new SERI_HEADER_CFG()
+        var pos = offset
+        oHdr.Deserialize( srcBuf, pos )
         if( oHdr.dwClsid !== Cid.CConfigDb2 ||
             oHdr.dwSize > CV.CFGDB_MAX_SIZE ||
             oHdr.bVersion !== 2 ||
             oHdr.dwCount > CV.CFGDB_MAX_ITEMS ||
-            oHdr.dwSize < srcBuffer.length - offset -
+            oHdr.dwSize > srcBuf.length - offset -
                 SERI_HEADER_BASE.GetSeriSize() )
             throw new Error( "Error invalid CConfigDb2")
-        pos += SERI_HEADER.GetSeriSize()
-        for( i = 0; i < oHdr.dwCount; i++ )
+        pos += SERI_HEADER_CFG.GetSeriSize()
+        for( var i = 0; i < oHdr.dwCount; i++ )
         {
-            key = srcBuffer.readUint32BE( pos )
+            var key = srcBuf.readUint32BE( pos )
             pos += 4
-            value = new Pair()
-            value.t = srcBuffer.readUint8( pos )
+            var value = new Pair(null)
+            value.t = srcBuf.readUint8( pos )
             pos++
+            var dwSize = 0
             switch( value.t )
             {
             case Tid.typeByte:
@@ -406,7 +421,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     {
                         throw new Error( "Error buffer is too small" )
                     }
-                    value.v = srcBuf.readUint64BE( pos )
+                    value.v = Number( srcBuf.readBigUInt64BE( pos ) )
                     pos += 8
                     break
                 }               
@@ -433,16 +448,18 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             case Tid.typeString:
                 {
                     dwSize = srcBuf.readUint32BE( pos )
-                    pos += 4
-                    if( pos + dwSize > srcBuf.length )
+                    if( pos + 4 + dwSize > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
-                    if( dwSize = 0 )
+                    if( dwSize === 0 )
+                    {
                         value.v = ""
+                        pos += 4
+                    }
                     else
                     {
-                        value.v = CBuffer.BufferToStr(
-                            srcBuf.slice( pos, dwSize ) ) 
-                        pos += dwSize
+                        var strBuf = srcBuf.slice( pos, pos + 4 + dwSize )
+                        value.v = CBuffer.BufferToStrNoNull( strBuf ) 
+                        pos += 4 + dwSize
                     }
                     break
                 }
@@ -477,7 +494,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     }
                     if( pos + dwSize > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
-                    value.v = unmarshall( srcBuf.slice( pos, dwSize ) )
+                    value.v = unmarshall( srcBuf.slice( pos, pos + dwSize ) )
                     pos += dwSize
                     break
                 }
@@ -486,13 +503,18 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     if( pos + SERI_HEADER_BASE.GetSeriSize() > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
 
-                    oHdr = new SERI_HEADER_BASE()
-                    oHdr.Deserialize( srcBuf, pos )
-                    if( oHdr.dwSize + pos > srcBuf.length )
+                    var tmpHdr = new SERI_HEADER_BASE()
+                    tmpHdr.Deserialize( srcBuf, pos )
+                    if( tmpHdr.dwSize + pos > srcBuf.length )
                         throw new Error( "Error buffer is too small" )
-                    value.v = CoCreateInstance( oHdr.dwClsid )
+                    value.v = globalThis.CoCreateInstance( tmpHdr.dwClsid )
                     value.v.Deserialize( srcBuf, pos )
-                    pos += dwSize
+                    pos += tmpHdr.dwSize + SERI_HEADER_BASE.GetSeriSize()
+                    break
+                }
+            default:
+                {
+                    throw new Error( "Error unknown type")
                     break
                 }
             }
@@ -500,6 +522,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             if( key === Pid.propParamCount )
                 this.m_dwCount = value.v
         }
-
+        return offset + oHdr.dwSize +
+            SERI_HEADER_BASE.GetSeriSize();
     }
 }

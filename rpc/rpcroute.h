@@ -2924,6 +2924,9 @@ class CRpcRouterBridge : public CRpcRouter
     gint32 OnClose(
         guint32 dwPortId,
         IEventSink* pCallback );
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
 };
 
 class CIfRouterMgrState : public CIfServerState

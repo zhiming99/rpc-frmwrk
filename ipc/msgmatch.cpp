@@ -904,6 +904,25 @@ gint32 CMessageMatch::Deserialize(
     return ret;
 }
 
+gint32 CMessageMatch::Clone( CMessageMatch* rhs )
+{
+    
+    m_strObjPath = rhs->m_strObjPath;
+    m_strIfName = rhs->m_strIfName;
+    m_iMatchType = rhs->m_iMatchType;
+    if( rhs->m_pCfg.IsEmpty() )
+    {
+        m_pCfg.Clear();
+        return STATUS_SUCCESS;
+    }
+    gint32 ret = m_pCfg.NewObj(
+        clsid( CConfigDb2 ) );
+    if( ERROR( ret ) )
+        return ret;
+    *m_pCfg = *rhs->m_pCfg;
+    return STATUS_SUCCESS;
+}
+
 CProxyMsgMatch::CProxyMsgMatch( const IConfigDb* pCfg ) :
     CMessageMatch( pCfg )
 {

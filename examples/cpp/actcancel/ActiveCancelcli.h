@@ -14,7 +14,10 @@ class CActiveCancel_CliImpl
     typedef CActiveCancel_CliSkel super;
     CActiveCancel_CliImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
-    { Sem_Init( &m_semWait, 0, 0 ); }
+    {
+        SetClassId( clsid(CActiveCancel_CliImpl ) ); 
+        Sem_Init( &m_semWait, 0, 0 );
+    }
 
     // IActiveCancel
     virtual gint32 LongWaitCallback(

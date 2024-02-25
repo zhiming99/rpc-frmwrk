@@ -1,7 +1,7 @@
 const Buffer = require('safe-buffer').Buffer;
 const marshall = require('./marshall');
 const constants = require('./constants');
-const DBusBuffer = require('./dbus-buffer');
+const {DBusBuffer} = require('./dbus-buffer');
 
 const headerSignature = require('./header-signature.json');
 

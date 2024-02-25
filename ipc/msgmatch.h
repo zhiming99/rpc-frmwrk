@@ -257,6 +257,8 @@ class CMessageMatch : public IMessageMatch
 
     CfgPtr& GetCfg()
     { return m_pCfg; }
+
+    gint32 Clone( CMessageMatch* rhs );
 };
 
 class CProxyMsgMatch : public CMessageMatch

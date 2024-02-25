@@ -113,6 +113,7 @@ class CWsCloseTask :
 
     gint32 OnIrpComplete( IRP* pIrp );
     gint32 RunTask();
+    gint32 OnTaskComplete( gint32 iRet ) override;
 };
 
 class CRpcWebSockFido : public CPort
@@ -177,7 +178,8 @@ class CRpcWebSockFido : public CPort
     inline bool IsClient() const
     { return m_bClient; }
 
-    gint32 DoHandshake( IEventSink* pCallback );
+    gint32 DoHandshake(
+        IEventSink* pCallback, bool bFirst );
     gint32 ReceiveData( const BufPtr& pBuf );
 
 
