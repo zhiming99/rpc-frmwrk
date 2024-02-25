@@ -40,7 +40,7 @@ jobs:
     - name: configure
       run: bash ./cfgsel -r
     - name: make
-      run: cat /proc/cpuinfo && make -j 4
+      run: cat /proc/cpuinfo && make -j 56
     - name: install
       run: sudo make install
       
