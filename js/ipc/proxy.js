@@ -38,7 +38,20 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_dwFetchDataTimeout = 0
         this.m_setStreams = new Set()
         this.m_bCompression = false
+        /**
+         * This is the callback function when there are some bytes coming from the stream Channel.
+         * you need override this callback to process the incoming data
+         * @param {number} hStream the stream channel that has incoming data
+         * @param {Buffer} oBuf  the byte block arrived
+         * @returns {none}          
+         */
         this.OnDataReceived = ( hStream, oBuf )=>{}
+        /**
+         * This is the callback function when the stream channel is closed.
+         * override this callback when necessary.
+         * @param {number} hStream the stream channel closed
+         * @returns {none}          
+         */
         this.OnStmClosed = (hStream)=>{}
         if( oParams !== undefined )
         {

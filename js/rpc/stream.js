@@ -253,8 +253,14 @@ class CRpcStream extends CRpcStreamBase
             {
             case EnumStmToken.tokData:
                 {
-                    if( !oBuf || !this.CanSend() )
+                    if( !oBuf )
                         break
+                    if( !this.CanSend() )
+                    {
+                        console.log( "Warning: follow-control blocked the send")
+                        ret = errno.ERROR_FAIL
+                        break
+                    }
                     var hdr = Buffer.alloc( 5 )
                     hdr.writeUint8( token, 0 )
                     hdr.writeUint32BE( oBuf.length, 1 )
@@ -534,6 +540,11 @@ class CRpcStream extends CRpcStreamBase
             if( dwSize === oBuf.length )
             {
                 iRet = this.SendBuf( EnumStmToken.tokData, oBuf )
+                if( iRet === errno.ERROR_FAIL )
+                {
+                    ret = errno.STATUS_PENDING
+                    break
+                }
                 offset += dwSize
                 bDone = true
             }
@@ -542,6 +553,11 @@ class CRpcStream extends CRpcStreamBase
                 iRet = this.SendBuf(
                     EnumStmToken.tokData,
                     oBuf.slice( offset, offset + dwSize ) )
+                if( iRet === errno.ERROR_FAIL )
+                {
+                    ret = errno.STATUS_PENDING
+                    break
+                }
                 offset += dwSize
             }
             if( bDone )

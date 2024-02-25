@@ -66,7 +66,7 @@ class CStreamTestCli extends CInterfaceProxy
         var osb = new CSerialBase(true, this )
         osb.SerialString( i0 ) 
         var ridlBuf = osb.GetRidlBuf()
-        oReq.Push( new Pair( {t: EnumTypeId.typeByteArr, v:ridlBuf} ) )
+        oReq.Push( {t: EnumTypeId.typeByteArr, v:ridlBuf} )
         oReq.SetString( EnumPropId.propIfName,
             DBusIfName( "IStreamTest") )
         oReq.SetString( EnumPropId.propObjPath,
@@ -152,5 +152,5 @@ oProxy.Start().then((retval)=>{
     setTimeout( ()=>{
         console.log("Stopping the proxy")
         oProxy.Stop()
-    }, 120000 )
+    }, 60000 )
 })

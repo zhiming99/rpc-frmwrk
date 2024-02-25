@@ -6,8 +6,13 @@ module.exports = {
     mode:'development',
     entry: './src/index.js',
     output:{
-        filename:'rpc-frmwrk.js',
         path:path.resolve(__dirname,'dist'),
+        filename:'rpc-frmwrk.js',
+        globalObject: 'this',
+        library: {
+            name: 'rpcbase',
+            type: 'umd',
+        }
     },
     plugins: [
         new webpack.ProvidePlugin({

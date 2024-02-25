@@ -102,10 +102,12 @@ oProxy.Start().then((retval)=>{
         return
     }
     var oContext = new Object()
-    oProxy.LongWait( oContext, "hello, World!" )
+    return oProxy.LongWait( oContext, "hello, World!" )
 
-}).catch((retval)=>{
+}).then((retval)=>{
     console.log(retval)
     oProxy.Stop()
+}).catch((e)=>{
+
 })
 
