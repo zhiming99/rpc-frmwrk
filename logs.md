@@ -1,4 +1,7 @@
 ---
+[`Mon Feb 26 2024 05:12:31 PM Beijing`]   
+1. Merged pull request PR #49. Some parts of the JS support library are not ready yet, because they depend on the code generator. And therefore, I will write the code generator for JS next and the `seribase` and testcase `sftest` will also be delivered in this PR.
+
 [`Sat Jan 20 2024 10:10:14 PM Beijing`]   
 1. Javascript support will be a client only implementation and completely different from the classic client implementation.
 
