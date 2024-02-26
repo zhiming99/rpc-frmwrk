@@ -4,10 +4,13 @@ const { EnumPropId, errno, EnumCallFlags, EnumClsid, EnumTypeId, EnumProtoId, co
 const { IoCmd, CPendingRequest, AdminCmd, CIoEventMessage } = require("../combase/iomsg")
 const { CIoReqMessage } = require("../combase/iomsg")
 /**
- * StreamWrite will write a buffer to the stream `hStream`
+ * StreamWrite will write a buffer to the stream `hStream`. This is the
+ * synchronous call, that is, the promise will only be resolved when the buffer
+ * is sent completely.
  * @param {number} hStream the stream channel to write to
- * @param {Buffer} oBuf  the byte block to write
- * @returns {number} on Success the return value is errno.STATUS_SUCCESS, otherwise an error returned
+ * @param {Buffer} oBuf  the data block to write
+ * @returns {Promise<number>} on Success the return value is
+ * errno.STATUS_SUCCESS, otherwise an error returned
  * @api public
  */
 function StreamWrite( hStream, oBuf )

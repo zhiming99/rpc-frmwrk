@@ -65,7 +65,7 @@ exports.CIoManager = class CIoManager
 
     /**
      * DispatchMessage dispatches the messages from the webworker to the handlers.
-     * @param {CIoMessageBase}oMsg the 'KeepAlive' message from the remote server
+     * @param {CIoMessageBase}oMsg the message from the webworker
      * @returns {undefined}
      * @api public
      */
@@ -169,7 +169,7 @@ exports.CIoManager = class CIoManager
 
     /**
      * UnregisterProxy and release the resources associated with the proxy
-     * @param {CInterfaceProxy}oProxy the proxy to unregister with
+     * @param {CInterfaceProxy}oProxy the proxy to unregister with the iomgr
      * @param {number}ret the status code to pass to the pending request
      * @returns {Promise}
      * @api public

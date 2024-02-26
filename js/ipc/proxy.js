@@ -39,16 +39,19 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_setStreams = new Set()
         this.m_bCompression = false
         /**
-         * This is the callback function when there are some bytes coming from the stream Channel.
-         * you need override this callback to process the incoming data
+         * This function is called when there are data blocks coming from the
+         * stream Channel `hStream`. You need override this callback to process
+         * the incoming data blocks. If the callback returns
+         * `errno.STATUS_PENDING`, the stream receiving will be held back till
+         * function `this.m_funcNotifyDataConsumed` is called
          * @param {number} hStream the stream channel that has incoming data
          * @param {Buffer} oBuf  the byte block arrived
          * @returns {none}          
          */
         this.OnDataReceived = ( hStream, oBuf )=>{}
         /**
-         * This is the callback function when the stream channel is closed.
-         * override this callback when necessary.
+         * This function is called when the stream channel `hStream` is closed.
+         * override this callback when it is necessary.
          * @param {number} hStream the stream channel closed
          * @returns {none}          
          */

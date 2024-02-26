@@ -50,7 +50,8 @@ function KeepAliveRequest( oOrigMsg, qwTaskId )
 }
 
 /**
- * OnKeepAliveLocal to send a one-way KeepAliveRequest back to server
+ * OnKeepAliveLocal is called when server's OnKeepAlive event arrives. It will
+ * send a one-way KeepAliveRequest back to server.
  * @param {CIoEventMessage} oMsg the keepalive event message
  * @returns {undefined}
  * @api public

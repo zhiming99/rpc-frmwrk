@@ -137,10 +137,10 @@ oProxy.Start().then((retval)=>{
     }).then((e)=>{
         oStmCtx.m_oProxy = oProxy
         return oProxy.m_funcOpenStream( oStmCtx ).then((oCtx)=>{
-            console.log( oCtx )
+            console.log( "OpenStream successfully" )
             return Promise.resolve( oCtx )
         }).catch((oCtx)=>{
-            console.log( oCtx )
+            console.log( "OpenStream failed" )
             return Promise.resolve( oCtx )
         })
     }).catch( (e )=>{

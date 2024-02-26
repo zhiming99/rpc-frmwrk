@@ -76,10 +76,9 @@ class CRpcDefaultStream extends CRpcStreamBase
         }).bind(this)
     }
     /**
-     * Receive websock frame from outside,
-     * and dispatch it to the proper handler
-     *
-     * @param {CIncomingPacket}oInPkt is the incoming packet
+     * Receive data blocks from the server, and dispatch it to the proper
+     * handler
+     * @param {CIncomingPacket}oInPkt the incoming packet
      * @returns {undefined}
      * @api public
      */

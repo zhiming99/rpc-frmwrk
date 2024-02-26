@@ -2,15 +2,14 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { ERROR } = require("../combase/defines")
 const { EnumPropId, errno, EnumSeriProto } = require("../combase/enums")
-const { IoCmd, CPendingRequest } = require("../combase/iomsg")
+const { IoCmd, CPendingRequest, CIoEventMessage } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { CIoReqMessage } = require("../combase/iomsg")
 const { CSerialBase } = require("../combase/seribase")
 
 /**
- * ForwardEventLocal to pass the event to the client handler
- * @param {bool}bSerialize to tell whether serialize or deserialize.
- * @param {object}oProxy the proxy object, which is used to serialize or deserialize the stream handle
+ * ForwardEventLocal to pass the event to the client event handler
+ * @param {CIoEventMessage}oMsg the event to pass
  * @returns {undefined}
  * @api public
  */

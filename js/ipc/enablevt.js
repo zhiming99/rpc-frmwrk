@@ -38,7 +38,6 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
         oPending.m_oResolve = resolve
         oPending.m_oReject = reject
         this.PostMessage( oPending )
-        // this.m_oIoMgr.AddPendingReq( oMsg.m_iMsgId, oPending)
     }).then(( e )=>{
         const oResp = e.m_oResp
         var ret = oResp.GetProperty(

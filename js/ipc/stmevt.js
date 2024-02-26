@@ -3,6 +3,14 @@ const { ERROR, SYS_METHOD, Int32Value } = require("../combase/defines")
 const { EnumPropId, errno, EnumCallFlags, EnumClsid, EnumTypeId, EnumProtoId } = require("../combase/enums")
 const { IoCmd, CPendingRequest, AdminCmd, CIoEventMessage } = require("../combase/iomsg")
 const { CIoReqMessage } = require("../combase/iomsg")
+
+/**
+ * NotifyDataConsumed will send a message to webworker to notify the data block
+ * is handled and can move on to the next incoming data block
+ * @param {number} hStream the stream channel to notify
+ * @returns {undefined}
+ * @api public
+ */
 function NotifyDataConsumed( hStream )
 {
     var oReq = new CIoReqMessage()
@@ -15,6 +23,20 @@ function NotifyDataConsumed( hStream )
     this.m_oIoMgr.PostMessage( oReq )
 }
 
+/**
+ * OnDataReceived will be called when there is incoming data block from the
+ * stream `hStream` It will call the user provided `OnDataReceived` callback if
+ * present, and then notify the underlying webworker to move on to next incoming
+ * data block. If the user provided `OnDataReceived` callback returns
+ * STATUS_PENDING, the notifcation to the webworker won't happen, and receiving
+ * from the stream channel will be hold back till the
+ * `this.m_funcNotifyDataConsumed()` is called.
+ * @param {number} hStream the stream channel the data comes in
+ * @param {CIoEventMessage} oMsg the message from the webworker carrying the
+ * data block.
+ * @returns {undefined}
+ * @api public
+ */
 function OnDataReceived( hStream, oMsg )
 {
     var oBuf = oMsg.m_oReq.GetProperty( 1 )
@@ -28,7 +50,9 @@ function OnDataReceived( hStream, oMsg )
 }
 
 /**
- * OnStreamClosed will close the stream given by hStream
+ * OnStreamClosed will be called when the underlying stream channel is closed.
+ * it will call user provided OnStreamClosed if present, and then claim all the
+ * resources from the stream.
  * @param {number} hStream the keepalive event message
  * @param {CIoEventMessage} oMsg not used
  * @returns {undefined}

@@ -14,9 +14,9 @@ const { CIoReqMessage } = require("../combase/iomsg")
  * below for information about `oContext`. and `oResp` is a `CConfigDb2` object,
  * contains the reponse information.
  * 
- * @param {Object}oContext the context object is the parameter to pass to
- * oCallback. It will have a m_qwTaskId after the ForwardRequestLocal returns,
- * which can be used to cancel the request.
+ * @param {Object}oContext the parameter to pass to `oCallback`. It will have a
+ * m_qwTaskId after the ForwardRequestLocal returns, which can be used to cancel
+ * the request.
  * 
  * @returns {Promise}
  * @api public
@@ -84,11 +84,15 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
             oResp.SetUint32( EnumPropId.propReturnValue,
                 errno.ERROR_FAIL )
         }
+        var ret = oResp.GetProperty(
+            EnumPropId.propReturnValue )
         try{
             e.m_oCallback( oResp )
         } catch( e ){
         }
+        return Promise.resolve( ret )
     }).catch(( e )=>{
+        var ret = -errno.EFAULT 
         if( e.message !== undefined)
         {
             console.log( `Error ForwardRequestLocal failed: ${e.message}` )
@@ -100,5 +104,6 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
                 EnumPropId.propReturnValue )
             e.m_oCallback( e.m_oResp )
         }
+        return Promise.resolve( ret )
     })
 }

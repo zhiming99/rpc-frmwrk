@@ -9,10 +9,12 @@ const { DBusDestination2 } = require("../rpc/dmsg")
 
 /**
  * OpenStreamLocal will open a stream channel for read/write
- * @param {Object} oContext an object which will be returned after OpenStream is completed
- * @returns {Object} the oContext has a member m_hStream to identify the stream
- * opened. the m_hStream will show as a parametr in `this.OnDataReceived`, or be passed to proxy method
- * `StreamWrite`. oContext also has a m_iRet member when error occurs.
+ * @param {Object} oContext an object which will be returned after OpenStream is
+ * completed
+ * @returns {Promise<Object>} `oContext`, which would have a member `m_hStream`
+ * to as the opened stream. The `m_hStream` can be passed as a parametr to
+ * `OnDataReceived`, `OnStreamClosed, or be passed to proxy method
+ * `StreamWrite`. the `oContext` also has a member `m_iRet` when error occurs.
  * @api public
  */
 function OpenStreamLocal( oContext )
