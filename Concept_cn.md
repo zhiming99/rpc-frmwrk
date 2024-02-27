@@ -4,7 +4,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## RPC参与者和传输的信息
 服务器`Server`和代理`Proxy`是RPC通信中的必要的参与方。通信的一般的流程是，Proxy发出请求，叫做`Request`，Server响应请求，提供调用服务，发回结果`Response`，最后Proxy消费`Response`。Server有的时候也会主动的发出信息，叫做`Event`。Proxy发出的调用请求一般来说有明确的目的地，而且一般会有Server发出的`Response`作为响应。而Server主动发出的Event则是广播性质的，只要是订阅该事件的Proxy都会收到。不过`Event`也有特例，如`Keep-Alive`的消息是一对一的，不会广播发布。
 
-有时也会用到`Client`的说法，因为`Proxy`在`rpc-frmwrk`的上下文中，指某一个接口的代理对象，而`Client`则泛指容纳一个或多个`Proxy`实例的对象或者应用程序。
+同时也会有`Client`的用法，因为`Proxy`在`rpc-frmwrk`的上下文中，指某一个接口的代理对象，而`Client`则泛指容纳一个或多个`Proxy`实例的对象或者应用程序。
 
 ## 远程调用(RPC), 进程间调用(IPC)和进程内调用(In-Process Call)
 基于RPC-frmwrk的服务器可以同时支持这三种调用。如果服务器和客户端生成的是动态库，则只需改变配置即可完成RPC/IPC/In-Process的切换。
@@ -58,7 +58,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 流通道可用于文件传输，或者需要更灵活的传输控制的场景，如非固定格式的数据流媒体流等。
 * 流通道由客户端发起并建立，可以由任意一方随时关闭。
 
-在`简易模式`编程时，每一个流通道将体现为分别在服务器端和客户端的一对特殊的可读写文件，数据的收发体现为对文件的读写操作。用户可以通过在客户端建立一个stream文件而建立一个流通道，方式任意，如shell命令`touch stream_1`。单一连接的流通道个数缺省为32个。不过在大量连接的情况下可以进一步限制。
+在`文件模式`编程时，每一个流通道将体现为分别在服务器端和客户端的一对特殊的可读写文件，数据的收发体现为对文件的读写操作。用户可以通过在客户端建立一个stream文件而建立一个流通道，方式任意，如shell命令`touch stream_1`。单一连接的流通道个数缺省为32个。不过在大量连接的情况下可以进一步限制。
 
 ## Multihop功能和路由器路径
 当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
