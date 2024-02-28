@@ -1,5 +1,5 @@
 const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("./combase/defines")
-globalThis.g_iMsgIdx = randomInt( 100000000 )
+globalThis.g_iMsgIdx = randomInt( 0xffffffff )
 
 const {CoCreateInstance}=require("./combase/factory")
 const {CIoManager} = require( "./ipc/iomgr.js")
