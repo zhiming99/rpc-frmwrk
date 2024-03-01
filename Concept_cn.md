@@ -39,7 +39,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
     * 在任务结束时，调用预设的外部Callback，和通知所隶属的TaskGroup.
 * 任务组（TaskGroup），顾名思义，就是一组任务的集合。相当于在任务（tasklet)空间上的运算。任务组继承自任务，用作协调一组子任务的执行。这些子任务可以是并行，也可以是串行。串行时，任务组的执行逻辑可以是逻辑与，逻辑或，或者没有前后依赖关系，或者只是顺序的执行。串行执行的任务组还有另一个用处，就是同步。比起使用锁来进行同步，这个方法可以免去对关键数据上锁。由于任务组本身也是一个任务，所以它也具有任务（tasklet)所有的属性。
 * 可以说，一个调用`Request`在`rpc-frmwrk`中的存在形式，就是一个前后串联的任务链。
-* 熟悉JavaScript的同学，可以把`Tasklet`和`Promise`作个对比，两者有很多相似的地方，都是解决异步的执行的工具，都可以定制`callback`的函数，对返回结果的约定，出错的处理。当然也有很多的不同，比如`Tasklet`是运行在并发环境下，而`Promise`运行在单线程的环境中，`Tasklet`关注`Timeout`和`Canceling`两种错误，而`Promise`更侧重于一般性。`Tasklet`更直观一些，`Promise`则注重格式上的一致和优雅。
+* 熟悉JavaScript的同学，可以把`Tasklet`和`Promise`作个对比，有助于更好的理解`Tasklet`。两者有很多相似的地方，比如都是解决异步的执行的工具，都有状态的切换，都可以定制`callback`的函数，可以顺序执行，也可以并发执行，对返回结果约定，和出错的处理约定。当然也有很多的不同，比如`Tasklet`是运行在并发环境下，而`Promise`运行在单线程的环境中，`Tasklet`关注`Timeout`和`Canceling`两种错误，而`Promise`更侧重于一般性。`Tasklet`更直观一些，`Promise`则注重格式上的一致和优雅. 类似的`CParallelTaskGroup`相当于`Promise.all`。
 
 ## 取消一个RPC调用请求
 * `rpc-frwmrk`允许用户取消一个还为完成的RPC调用请求，这个请求必须已被服务器端收到，并且在等待处理结果。
