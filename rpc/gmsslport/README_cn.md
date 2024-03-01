@@ -3,7 +3,7 @@
 使用方法如下：
  * 请参考[GmSSL](https://github.com/guanzhi/GmSSL)提供的文档安装GmSSL到本地系统.
  * 生成TLSv1.3的密钥和证书，可以参考shell脚本样例[tls13demo.sh](https://github.com/guanzhi/GmSSL/blob/master/demos/scripts/tls13demo.sh)。
- * 如果想快速上手，没有耐心搞明白各种证书和密钥的关系，也可以使用`rpcfg.py`的[安全标签页](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg2.png)上的`Gen Self-Signed Keys`生成一组自签名的密钥。然后用`Save As`按钮生成分别用于服务器端和客户端的自解压安装包。在待部署的机器上运行安装包，部署密钥和配置系统。
+ * 如果想快速上手，没有耐心搞明白各种证书和密钥的关系，也可以使用`rpcfg.py`的[安全标签页](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfg2.png)上的`Gen Self-Signed Keys`生成一组自签名的密钥。然后用`Save As`按钮生成分别用于服务器端和客户端的自解压安装包。在待部署的机器上运行安装包，部署密钥和配置系统。注意，此`安装包`只部署配置和密钥，`运行程序`应该提前安装到位。
     1) 安装包的名字如下图所示   
        ![图](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/installer-name.png)
     2) 安装的命令如 `bash instcli-o-2023-04-21-49-2.sh 0`。其中参数`0`是密钥的序号，本例中序号可为0或1，小于文件名末尾的2即可。
