@@ -146,7 +146,7 @@ class CSerialBase
     { this.SerialUint8( val ) }
 
     SerialHStream( val )
-    { throw new Error( "Error support is not available yet") }
+    { this.SerialUint64( val ) }
 
     SerialByteArray( val )
     {
@@ -178,7 +178,16 @@ class CSerialBase
     }
 
     SerialObjPtr( val )
-    { throw Error( "Error not supported") }
+    {
+        var oObjBuf = val.Serialize()
+        if( this.m_oBuf === null )
+            this.m_oBuf = oObjBuf
+        else
+            this.m_oBuf = Buffer.concat(
+                [ this.m_oBuf, oObjBuf ])
+        return
+
+    }
 
     SerialStruct( val )
     {
@@ -347,10 +356,10 @@ class CSerialBase
     }
 
     DeserialBool( oBuf, offset )
-    { this.DeserialUint8( val ) }
+    { return this.DeserialUint8( val ) }
 
     DeserialHStream( oBuf, offset )
-    { throw new Error( "Error support is not available yet") }
+    { return this.DeserialUint64( oBuf, offset ) }
 
     DeserialByteArray( oBuf, offset )
     {
@@ -377,7 +386,18 @@ class CSerialBase
     }
 
     DeserialObjPtr( oBuf, offset )
-    { throw new Error( "Error not supported") }
+    {
+        var dwClsid = oBuf.readUint32BE( offset )
+        var dwSize = oBuf.readUint32BE( offset + 4 )
+        var oObj = globalThis.CoCreateInstance( dwClsid )
+        if( oObj === null )
+            throw new Error( "Error no such cobject")
+        if( dwSize === 0 || dwSize >
+            oBuf.length - offset - SERI_HEADER_BASE.GetSeriSize())
+            throw new Error( "Error object size is out of range")
+        oObj.Deserialize( oBuf, offset)
+        return [ oObj, offset + dwSize + SERI_HEADER_BASE.GetSeriSize()]
+    } 
 
     DeserialStruct( oBuf, offset )
     {
@@ -385,11 +405,8 @@ class CSerialBase
         var oObj = globalThis.CoCreateInstance( dwClsid )
         if( oObj === null )
             throw new Error( "Error no such struct")
-        var dwSize = oBuf.readUint32BE( offset + 4 )
-        if( dwSize === 0 || dwSize > CV.MAX_BYTES_PER_BUFFER )
-            throw new Error( "Error object size is out of range")
-        oObj.Deserialize( oBuf, offset )
-        return [ oObj, offset + dwSize + SERI_HEADER_BASE.GetSeriSize()]
+        var retOff = oObj.Deserialize( oBuf, offset )
+        return [ oObj, retOff ]
     }
 
     DeserialElem( oBuf, offset, sig )
@@ -468,3 +485,20 @@ class CSerialBase
 }
 
 exports.CSerialBase=CSerialBase
+
+class CStructBase extends CObjBase
+{
+    constructor( pIf )
+    {
+        super();
+        if( pIf !== undefined )
+            this.m_pIf = pIf;
+        else
+            this.m_pIf = null;
+        return;
+    }
+    SetInterface( pIf )
+    { this.m_pIf = pIf; }
+}
+
+exports.CStructBase = CStructBase
