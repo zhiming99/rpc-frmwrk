@@ -108,6 +108,10 @@ void Usage()
     printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs.\n" );
 #endif
 
+#ifdef JAVASCRIPT
+    printf( "\t-J:\tTo generate the JavaScript skelton files\n" );
+#endif
+
     printf( "\t-s:\tTo output the skelton with fastrpc support.\n" );
     printf( "\t-b:\tTo output the skelton with built-in router.\n" );
     printf( "\t-l:\tTo output a shared library.\n" );
@@ -137,6 +141,7 @@ bool g_bAsyncProxy = false;
 #include "genpy.h"
 #include "genjava.h"
 #include "getopt.h"
+#include "genjs.h"
 
 extern gint32 GenRpcFSkelton(
     const std::string& strOutPath,
@@ -177,7 +182,7 @@ int main( int argc, char** argv )
         {
 
             opt = getopt_long( argc, argv,
-                "abhvlI:O:o:pjP:L:f::s",
+                "abhvlI:O:o:pJjP:L:f::s",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -313,6 +318,13 @@ int main( int argc, char** argv )
                         "Error '-%c' is not supported by JAVA disabled\n", opt );
                     ret = -ENOTSUP;
                     bQuit = true;
+                    break;
+                }
+#endif
+#ifdef JAVASCRIPT
+            case 'J':
+                {
+                    g_strLang = "js";
                     break;
                 }
 #endif
@@ -522,6 +534,11 @@ int main( int argc, char** argv )
         else if( g_strLang == "java" )
         {
             ret = GenJavaProj(
+                g_strOutPath, strAppName, pRoot );
+        }
+        else if( g_strLang == "js" )
+        {
+            ret = GenJsProj(
                 g_strOutPath, strAppName, pRoot );
         }
         else

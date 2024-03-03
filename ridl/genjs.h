@@ -3,7 +3,8 @@
  *
  *       Filename:  genjs.h
  *
- *    Description:  declarations of proxy generator for JavaScript
+ *    Description:  Declarations of classes and functions for proxy generator
+ *                  for JavaScript
  *
  *        Version:  1.0
  *        Created:  02/28/2024 02:49:52 PM
@@ -77,7 +78,7 @@ class CJsWriter : public CWriterBase
         super( strPath, strAppName )
     {}
 
-    virtual gint32 SelectStructsFile()
+    gint32 SelectStructsFile()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
@@ -85,7 +86,7 @@ class CJsWriter : public CWriterBase
         return SelectFile( 0 );
     }
 
-    virtual gint32 SelectIndexFile()
+    gint32 SelectIndexFile()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
@@ -93,7 +94,7 @@ class CJsWriter : public CWriterBase
         return SelectFile( 1 );
     }
 
-    virtual gint32 SelectDescFile()
+    gint32 SelectDescFile()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
@@ -101,7 +102,7 @@ class CJsWriter : public CWriterBase
         return SelectFile( 2 );
     }
 
-    virtual gint32 SelectDrvFile()
+    gint32 SelectDrvFile()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
@@ -109,7 +110,7 @@ class CJsWriter : public CWriterBase
         return SelectFile( 3 );
     }
 
-    virtual gint32 SelectMakefile()
+    gint32 SelectMakefile()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
@@ -117,7 +118,7 @@ class CJsWriter : public CWriterBase
         return SelectFile( 4 );
     }
 
-    virtual gint32 SelectReadme()
+    gint32 SelectReadme()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
@@ -182,7 +183,7 @@ class CImplJsMthdProxyBase :
     CImplJsMthdProxyBase(
         CJsWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
-    gint32 OutputSync( bool bSync = true );
+    gint32 OutputSync();
     gint32 OutputAsyncCbWrapper();
     gint32 OutputEvent();
 };
@@ -208,6 +209,8 @@ class CImplJsSvcProxyBase
     CImplJsSvcProxyBase(
         CJsWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
+    gint32 EmitSvcBaseCli();
+    gint32 EmitBuildEventTable();
 };
 
 class CImplJsMthdProxy :

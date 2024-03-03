@@ -497,7 +497,7 @@ struct CPrimeType : public CAstNodeBase
             strName = "int";
             break;
         case TOK_INT16:
-            strName = "nt";
+            strName = "int";
             break;
         case TOK_FLOAT:
             strName = "float";
@@ -516,6 +516,59 @@ struct CPrimeType : public CAstNodeBase
             break;
         case TOK_OBJPTR:
             strName = "cpp.ObjPtr";
+            break;
+        case TOK_HSTREAM:
+            strName = "HSTREAM";
+            break;
+        default:
+            break;
+        }
+        return strName;
+    }
+
+    std::string ToStringJs() const
+    {
+        std::string strName;
+        switch( m_dwAttrName )
+        {
+        case TOK_STRING:
+            strName = "String";
+            break;
+        case TOK_UINT64:
+            strName = "Uint64";
+            break;
+        case TOK_INT64:
+            strName = "Int64";
+            break;
+        case TOK_UINT32:
+            strName = "Uint32";
+            break;
+        case TOK_INT32:
+            strName = "Int32";
+            break;
+        case TOK_UINT16:
+            strName = "Uint16";
+            break;
+        case TOK_INT16:
+            strName = "Int16";
+            break;
+        case TOK_FLOAT:
+            strName = "float";
+            break;
+        case TOK_DOUBLE:
+            strName = "double";
+            break;
+        case TOK_BYTE:
+            strName = "byte";
+            break;
+        case TOK_BOOL:
+            strName = "bool";
+            break;
+        case TOK_BYTEARR:
+            strName = "Uint8Array";
+            break;
+        case TOK_OBJPTR:
+            strName = "ObjPtr";
             break;
         case TOK_HSTREAM:
             strName = "HSTREAM";
