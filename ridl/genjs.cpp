@@ -448,6 +448,50 @@ static gint32 EmitSerialBySigJs(
 
     return ret;
 }
+
+static gint32 EmitFormalArgListJs(
+    CWriterBase* m_pWriter, 
+    ObjPtr& pmdecl, bool bIn )
+{
+    gint32 ret = 0;
+    do{
+        CMethodDecl* pmd = pmdecl;
+        ObjPtr pArgs = bIn ?
+            pmd->GetInArgs():pmd->GetOutArgs();
+
+        CArgListUtils oau;
+        guint32 dwCount = oau.GetArgCount( pArgs );
+        if( dwCount == 0 )
+            break;
+
+        INDENT_UPL;
+        std::vector< std::pair< stdstr, stdstr > > vecArgs;
+        ret = GetArgsAndSigs( pArgs, vecArgs );
+        if( ERROR( ret ) )
+            break;
+        for( int i = 0; i < vecArgs.size(); i++ )
+        {
+            auto& elem = vecArgs[ i ];
+            CCOUT << elem.first;
+            if( i < vecArgs.size() - 1 )
+                CCOUT << ",";
+            CArgList* pal = pArgs;
+            CFormalArg* pfa = pal->GetChild( i );
+
+            CAstNodeBase* pType = pfa->GetType();
+
+            stdstr strType = GetTypeName( pType );
+            CCOUT << " // " << strType;
+            if( i < vecArgs.size() - 1 )
+                NEW_LINE;
+        }
+        INDENT_DOWNL;
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CDeclareJsStruct::Output()
 {
     gint32 ret = 0;
@@ -1287,12 +1331,12 @@ static gint32 GenSvcFiles(
                 break;
 
             // client imlementation
-            /*ret = pWriter->SelectImplFile(
-                strCommon + "cli.py" );
+            ret = pWriter->SelectImplFile(
+                strCommon + "cli.js" );
             if( ERROR( ret ) )
             {
                 ret = pWriter->SelectImplFile(
-                    strCommon + "cli.py.new" );
+                    strCommon + "cli.js.new" );
                 if( ERROR( ret ) )
                     break;
             }
@@ -1301,7 +1345,7 @@ static gint32 GenSvcFiles(
                 pWriter, elem.second );
             ret = opsc.Output();
             if( ERROR( ret ) )
-                break; */
+                break;/* */
         }
 
     }while( 0 );
@@ -1494,30 +1538,8 @@ gint32 CImplJsMthdProxyBase::OutputSync()
         if( dwInCount > 0 )
         {
             CCOUT << strName << "( oContext, "; 
-            INDENT_UPL;
-
-            std::vector< std::pair< stdstr, stdstr > > vecArgs;
-            ret = GetArgsAndSigs( pInArgs, vecArgs );
-            if( ERROR( ret ) )
-                break;
-            for( int i = 0; i < vecArgs.size(); i++ )
-            {
-                auto& elem = vecArgs[ i ];
-                CCOUT << elem.first;
-                if( i < vecArgs.size() - 1 )
-                    CCOUT << ",";
-                CArgList* pal = pInArgs;
-                CFormalArg* pfa = pal->GetChild( i );
-
-                CAstNodeBase* pType =
-                    pfa->GetType();
-
-                stdstr strType = GetTypeName( pType );
-                CCOUT << " // " << strType;
-                if( i < vecArgs.size() - 1 )
-                    NEW_LINE;
-            }
-            INDENT_DOWNL;
+            ObjPtr pNode = m_pNode;
+            EmitFormalArgListJs( m_pWriter, pNode, true );
             Wa( ")" );
             BLOCK_OPEN;
             if( dwOutCount > 0 )
@@ -1551,7 +1573,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
         }
         else
         {
-            CCOUT << strName << "( context )";
+            CCOUT << strName << "( oContext )";
             BLOCK_OPEN;
             if( dwOutCount > 0 )
                 EmitRespList( m_pWriter, pOutArgs );
@@ -1640,7 +1662,7 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         Wa( "var ret = oResp.GetProperty( EnumPropId.propReturnValue );" );
         Wa( "if( ERROR( ret ) )" );
         BLOCK_OPEN;
-        CCOUT << "    this."<< strName << "Callback( oContext, ret );";
+        CCOUT << "this."<< strName << "Callback( oContext, ret );";
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "else" );
@@ -1693,6 +1715,7 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         CCOUT << "catch( e )";
         BLOCK_OPEN;
         CCOUT << "console.log( e );";
+        NEW_LINE;
         Wa( "oContext.m_iRet = -errno.EFAULT;" );
         Wa( "if( oContext.m_oResolve )" );
         CCOUT << "    oContext.m_oReject( oContext );";
@@ -1797,5 +1820,187 @@ gint32 CImplJsMthdProxyBase::Output()
         ret = OutputAsyncCbWrapper();
         NEW_LINE;
     }
+    return ret;
+}
+
+CImplJsSvcProxy::CImplJsSvcProxy(
+    CJsWriter* pWriter, ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'service' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CImplJsSvcProxy::OutputSvcProxyClass()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strName = m_pNode->GetName();
+        stdstr strClass = "C";
+        strClass += strName + "CliImpl";
+        CCOUT << "class " << strClass << " extends C" << strName << "clibase";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "constructor( oIoMgr, strObjDescPath, strObjName, oParams )" );
+        BLOCK_OPEN;
+        CCOUT << "super( oIoMgr, strObjDescPath, strObjName, oParams );";
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+        Wa( "// The following are callbacks and event handlers" );
+        Wa( "// which need to be filled out by you" );
+        NEW_LINE;
+
+        CArgListUtils oau;
+        std::vector< ObjPtr > vecIfs;
+        m_pNode->GetIfRefs( vecIfs );
+        if( vecIfs.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        guint32 dwCount = vecIfs.size();
+        std::vector< std::pair< ObjPtr, ObjPtr > > vecFuncs;
+        for( guint32 i = 0; i < dwCount; i++ )
+        {
+            auto& elem = vecIfs[ i ];
+            CInterfRef* pIfRef = elem;
+            ObjPtr pObj;
+            ret = pIfRef->GetIfDecl( pObj );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            CInterfaceDecl* pifd = pObj;
+            stdstr strIf = pifd->GetName();
+
+            ObjPtr pmdlsobj = pifd->GetMethodList();
+
+            CMethodDecls* pmdls = pmdlsobj;
+            for( guint32 i = 0; i < pmdls->GetCount(); i++ )
+            {
+                ObjPtr pmd = pmdls->GetChild( i );
+                if( pmd.IsEmpty() )
+                {
+                    ret = -ENOENT;
+                    break;
+                }
+                vecFuncs.push_back({ pObj, pmd });
+            }
+        }
+
+        for( guint32 i = 0; i < vecFuncs.size(); i++ )
+        {
+            auto& elem = vecFuncs[ i ];
+            CInterfaceDecl* pifd = elem.first;
+            CMethodDecl* pmd = elem.second;
+            stdstr strMethod = pmd->GetName();
+            bool bEvent = pmd->IsEvent();
+            if( !bEvent )
+                strMethod += "Callback";
+            CCOUT << "// " << pifd->GetName()
+                << "::" << strMethod;
+            NEW_LINE;
+            if( bEvent )
+            {
+                CCOUT << "// event handler";
+                NEW_LINE;
+                CCOUT << strMethod << "(";
+                ObjPtr pInArgs = pmd->GetInArgs();
+                guint32 dwInCount =
+                    oau.GetArgCount( pInArgs );
+
+                if( dwInCount > 0 )
+                {
+                    EmitFormalArgListJs(
+                        m_pWriter, elem.second, true );
+                    Wa( ")" );
+                }
+                else
+                {
+                    CCOUT << ")";
+                    NEW_LINE;
+                }
+                BLOCK_OPEN;
+                CCOUT << "// add code here";
+                BLOCK_CLOSE;
+            }
+            else
+            {
+                CCOUT << "// request callback";
+                NEW_LINE;
+
+                CCOUT << strMethod << "( oContext, ret";
+                ObjPtr pOutArgs = pmd->GetOutArgs();
+                guint32 dwOutCount =
+                    oau.GetArgCount( pOutArgs );
+
+                if( dwOutCount > 0 )
+                {
+                    CCOUT << ",";
+                    EmitFormalArgListJs(
+                        m_pWriter, elem.second, false );
+                    Wa( ")" );
+                }
+                else
+                {
+                    CCOUT << " )";
+                    NEW_LINE;
+                }
+                BLOCK_OPEN;
+                Wa( "// add code here" );
+                CCOUT << "// 'oContext' is the parameter passed to this."
+                    << pmd->GetName();
+                NEW_LINE;
+                CCOUT << "// 'ret' is the status code of the request";
+                NEW_LINE;
+                CCOUT << "// if ret == errno.STATUS_SUCCESS, the following "
+                    << "parameters are valid response from the server";
+                NEW_LINE;
+                CCOUT << "// if ret < 0, the following parameters are undefined";
+                BLOCK_CLOSE;
+            }
+            if( i < vecFuncs.size() - 1 )
+                NEW_LINES(2);
+        }
+        BLOCK_CLOSE;
+        NEW_LINES( 2 );
+        CCOUT << "exports." << strClass
+            << " = " << strClass << ";";
+        NEW_LINE;
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplJsSvcProxy::Output()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strName = m_pNode->GetName();
+        OUTPUT_BANNER( m_pWriter, m_pNode );
+        CCOUT << "const { C" << strName
+            << "clibase } = require ( './"<< strName << "clibase' )";
+        NEW_LINE;
+
+        std::vector< ObjPtr > vecIfs;
+        m_pNode->GetIfRefs( vecIfs );
+        if( vecIfs.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        ret = OutputSvcProxyClass();
+
+    }while( 0 );
+
     return ret;
 }
