@@ -39,7 +39,7 @@ gint32 GenJsProj(
 struct CJsFileSet : public IFileSet
 {
     std::string  m_strStructsJs;
-    std::string  m_strIndex;
+    std::string  m_strMainCli;
     std::string  m_strObjDesc;
     std::string  m_strDriver;
     std::string  m_strMakefile;
@@ -86,11 +86,11 @@ class CJsWriter : public CWriterBase
         return SelectFile( 0 );
     }
 
-    gint32 SelectIndexFile()
+    gint32 SelectMainFuncFile()
     {
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
-        m_strCurFile = pFiles->m_strIndex;
+        m_strCurFile = pFiles->m_strMainCli;
         return SelectFile( 1 );
     }
 
@@ -250,6 +250,21 @@ class CImplJsSvcProxy
         CJsWriter* pWriter, ObjPtr& pNode );
     gint32 Output();
     gint32 OutputSvcProxyClass();
+};
+
+class CImplJsMainFunc :
+    public CArgListUtils
+{
+    CJsWriter* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    public:
+    typedef CMethodWriter super;
+
+    CImplJsMainFunc(
+        CJsWriter* pWriter, ObjPtr& pNode );
+    gint32 Output();
+    gint32 OutputCli(
+        std::vector< ObjPtr >& vecSvcs );
 };
 
 class CExportJsReadme :

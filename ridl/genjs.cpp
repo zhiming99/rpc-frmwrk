@@ -29,7 +29,8 @@ using namespace rpcf;
 #include "gencpp2.h"
 #include "jsondef.h"
 
-stdstr g_strLibPath = "../../../js";
+stdstr g_strJsLibPath = "../../../js";
+stdstr g_strWebPath = "";
 extern stdstr g_strCmdLine;
 extern stdstr g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
@@ -73,8 +74,8 @@ CJsFileSet::CJsFileSet(
         throw std::invalid_argument( strMsg );
     }
 
-    m_strIndex =
-        strOutPath + "/" + "index.js";
+    m_strMainCli =
+        strOutPath + "/maincli.js";
 
     GEN_FILEPATH( m_strStructsJs,
         strOutPath, strAppName + "structs.js",
@@ -124,7 +125,7 @@ gint32 CJsFileSet::OpenFiles()
     m_vecFiles.push_back( std::move( pstm ) );
 
     pstm= STMPTR( new std::ofstream(
-        m_strIndex,
+        m_strMainCli,
         std::ofstream::out |
         std::ofstream::trunc ) );
 
@@ -851,10 +852,10 @@ static gint32 GenStructsFileJs(
         CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
         CCOUT << "const { CSerialBase, CStructBase } = require( '"
-            << g_strLibPath << "/combase/seribase' );";
+            << g_strJsLibPath << "/combase/seribase' );";
         NEW_LINE;
         CCOUT << "const { errno } = require( '"
-            << g_strLibPath << "/combase/enums' );";
+            << g_strJsLibPath << "/combase/enums' );";
         NEW_LINE;
 
         std::vector< ObjPtr > vecStructs;
@@ -881,7 +882,7 @@ static gint32 GenStructsFileJs(
         if( vecActStructs.size() > 0 )
         {
             CCOUT << "const { IClassFactory } = require( '"
-                << g_strLibPath << "/combase/factory')";
+                << g_strJsLibPath << "/combase/factory')";
             NEW_LINE;
         }
         CCOUT << "class C" << g_strAppName <<"Factory "
@@ -934,45 +935,39 @@ CJsExportMakefile::CJsExportMakefile(
 }
 
 static void OUTPUT_BANNER(
-    CJsWriter* m_pWriter, CServiceDecl* pSvcs )
+    CJsWriter* m_pWriter, CServiceDecl* pSvc )
 {
     EMIT_DISCLAIMER;
     CCOUT << "// " << g_strCmdLine;
     NEW_LINE;
-    CCOUT << "const { CSerialBase } = require( '"
-        << g_strLibPath << "/combase/seribase' );";
-    NEW_LINE;
-    CCOUT << "const { errno } = require( '" 
-        << g_strLibPath << "/combase/enums' );"; 
-    NEW_LINE; 
     CCOUT << "const { CConfigDb2 } = require( '"
-        << g_strLibPath <<"/combase/configdb' );";
+        << g_strJsLibPath <<"/combase/configdb' );";
     NEW_LINE;
     CCOUT << "const { messageType } = require( '"
-        << g_strLibPath << "/dbusmsg/constants' );";
+        << g_strJsLibPath << "/dbusmsg/constants' );";
     NEW_LINE;
     CCOUT << "const { randomInt, ERROR, Int32Value, USER_METHOD } = require( '"
-        << g_strLibPath <<"/combase/defines' );";
+        << g_strJsLibPath <<"/combase/defines' );";
     NEW_LINE;
     CCOUT << "const {EnumClsid, errno, EnumPropId, EnumCallFlags, "<<
         "EnumTypeId, EnumSeriProto} = require( '"
-        << g_strLibPath <<"/combase/enums' );";
+        << g_strJsLibPath <<"/combase/enums' );";
     NEW_LINE;
     CCOUT << "const {CSerialBase} = require( '"
-        << g_strLibPath <<"/combase/seribase' );";
+        << g_strJsLibPath <<"/combase/seribase' );";
     NEW_LINE;
     CCOUT << "const {CInterfaceProxy} = require( '"
-        << g_strLibPath <<"/ipc/proxy' )";
+        << g_strJsLibPath <<"/ipc/proxy' )";
     NEW_LINE;
     CCOUT << "const {Buffer} = require( 'buffer' );";
     NEW_LINE;
     CCOUT << "const { DBusIfName, DBusDestination2, DBusObjPath } = require( '"
-        << g_strLibPath << "/rpc/dmsg' );";
+        << g_strJsLibPath << "/rpc/dmsg' );";
     NEW_LINE;
     do{ 
         ObjPtr pRoot; 
         do{ 
-            pRoot = pSvcs->GetParent(); 
+            pRoot = pSvc->GetParent(); 
             if( pRoot.IsEmpty() ) 
                 break; 
         }while( pRoot->GetClsid() != 
@@ -1432,12 +1427,12 @@ gint32 GenJsProj(
         if( ERROR( ret ) )
             break;
 
-        /*CImplJsMainFunc opmf( &oWriter, pRoot );
+        CImplJsMainFunc opmf( &oWriter, pRoot );
         ret = opmf.Output();
         if( ERROR( ret ) )
             break;
 
-        oWriter.SelectReadme();
+        /*oWriter.SelectReadme();
         CExportJsReadme ordme( &oWriter, pRoot );
         ret = ordme.Output();*/
 
@@ -1843,13 +1838,20 @@ gint32 CImplJsSvcProxy::OutputSvcProxyClass()
     do{
         stdstr strName = m_pNode->GetName();
         stdstr strClass = "C";
-        strClass += strName + "CliImpl";
+        strClass += strName + "_CliImpl";
         CCOUT << "class " << strClass << " extends C" << strName << "clibase";
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "constructor( oIoMgr, strObjDescPath, strObjName, oParams )" );
         BLOCK_OPEN;
         CCOUT << "super( oIoMgr, strObjDescPath, strObjName, oParams );";
+        if( m_pNode->IsStream() )
+        {
+            NEW_LINE;
+            CCOUT << "this.OnDataReceived = this.OnDataReceivedImpl;";
+            NEW_LINE;
+            CCOUT << "this.OnStmClosed = this.OnStmClosedImpl;";
+        }
         BLOCK_CLOSE;
         NEW_LINES( 2 );
         Wa( "// The following are callbacks and event handlers" );
@@ -1970,6 +1972,32 @@ gint32 CImplJsSvcProxy::OutputSvcProxyClass()
             if( i < vecFuncs.size() - 1 )
                 NEW_LINES(2);
         }
+        if( m_pNode->IsStream() )
+        {
+            if( vecFuncs.size() )
+                NEW_LINES(2);
+            Wa( "/**" );
+            Wa( "* callback called when data arrives from the stream channel `hStream`" );
+            Wa( "* @param {number} hStream the stream channel the data comes in " );
+            Wa( "* @param {Buffer} oBuf the payload in Uint8Array or Buffer" );
+            Wa( "*/" );
+            Wa( "OnDataReceivedImpl( hStream, oBuf )" );
+            BLOCK_OPEN;
+            Wa( "// add code here" );
+            Wa( "// to handle the incoming byte stream" );
+            BLOCK_CLOSE;
+            NEW_LINES( 2 );
+
+            Wa( "/**" );
+            Wa( "* callback called when the stream channel `hStream` is closed" );
+            Wa( "* @param {number} hStream the stream channel closed ");
+            Wa( "*/" );
+            Wa( "OnStmClosedImpl( hStream )" );
+            BLOCK_OPEN;
+            Wa( "// add code here" );
+            Wa( "// to do some cleanup work if necessary" );
+            BLOCK_CLOSE;
+        }
         BLOCK_CLOSE;
         NEW_LINES( 2 );
         CCOUT << "exports." << strClass
@@ -2002,5 +2030,135 @@ gint32 CImplJsSvcProxy::Output()
 
     }while( 0 );
 
+    return ret;
+}
+
+CImplJsMainFunc::CImplJsMainFunc(
+    CJsWriter* pWriter,
+    ObjPtr& pNode )
+{
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+    if( m_pNode == nullptr )
+    {
+        std::string strMsg = DebugMsg(
+            -EFAULT, "internal error empty "
+            "'statements' node" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+gint32 CImplJsMainFunc::Output()
+{
+    gint32 ret = 0;
+    do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        m_pWriter->SelectMainFuncFile();
+
+        OUTPUT_BANNER( m_pWriter, vecSvcs[ 0 ] );
+        NEW_LINE;
+
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* pNode = elem;
+            stdstr strName = pNode->GetName();
+            CCOUT << "const { C" << strName << "_CliImpl } = "
+                << "require( './" << strName << "cli' )";
+            NEW_LINE;
+        }
+
+        NEW_LINE;
+        ret = OutputCli( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CImplJsMainFunc::OutputCli(
+    std::vector< ObjPtr >& vecSvcs )
+{
+    gint32 ret = 0;
+    do{
+        CCOUT << "var strObjDesc = '" << g_strWebPath + "/"
+            << g_strAppName << "desc.json';";
+        NEW_LINE;
+        CCOUT << "var strAppName = '" << g_strAppName << "';";
+        NEW_LINE;
+        for( guint32 i = 0;i < vecSvcs.size(); i++ )
+        {
+            CServiceDecl* pSvc = vecSvcs[ i ];
+            CCOUT << "var str" << pSvc->GetName() << "ObjName = '"
+                << pSvc->GetName() << "';";
+            NEW_LINE;
+            CCOUT << "var oParams" << i << 
+                " = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );";
+            NEW_LINE;
+            CCOUT << "oParams" << i << ".SetString( "
+                << "EnumPropId.propObjInstName, '"
+                << pSvc->GetName() << "' );";
+            NEW_LINE;
+
+            stdstr strVar = "o";
+            strVar += pSvc->GetName() + "_cli";
+            CCOUT << "var " << strVar << " = new C"
+                << pSvc->GetName() << "_CliImpl( globalThis.g_oIoMgr,";
+            NEW_LINE;
+            CCOUT << "    strObjDesc, str" << pSvc->GetName()
+                << "ObjName, oParams" << i << " );";
+            NEW_LINE;
+
+            NEW_LINE;
+            Wa( " // start the client object" );
+            
+            CCOUT << strVar << ".Start().then((retval)=>";
+            BLOCK_OPEN;
+            Wa( "if( ERROR( retval ) )" );
+            BLOCK_OPEN;
+            Wa( "console.log( retval );" );
+            CCOUT << "return;";
+            BLOCK_CLOSE;
+            
+            if( pSvc->IsStream() )
+            {
+                NEW_LINE;
+                Wa( "/* the following is sample code to open a stream channel" );
+                Wa( "var oStmCtx;" );
+                CCOUT << "oStmCtx.m_oProxy = " << strVar << ";";
+                NEW_LINE;
+                CCOUT << "return " << strVar
+                    << ".m_funcOpenStream( oStmCtx).then((oCtx)=>";
+                BLOCK_OPEN;
+                CCOUT << "console.log( 'OpenStream successfully with "
+                    << "handle=' + oCtx.m_hStream );";
+                NEW_LINE;
+                CCOUT << "return Promise.resolve( oCtx );";
+                BLOCK_CLOSE;
+                CCOUT << ").catch((oCtx)=>";
+                BLOCK_OPEN;
+                CCOUT << "console.log( 'OpenStream failed with "
+                    << "error=' + oCtx.m_iRet );";
+                NEW_LINE;
+                CCOUT << "return Promise.resolve( oCtx );";
+                BLOCK_CLOSE;
+                CCOUT << ")*/";
+            }
+            BLOCK_CLOSE;
+            CCOUT << ").catch((e)=>";
+            BLOCK_OPEN;
+            Wa( "console.log( 'Start Proxy failed' );" );
+            CCOUT << "return Promise.resolve(e);";
+            BLOCK_CLOSE;
+            CCOUT << ")";
+            NEW_LINE;
+        }
+
+    }while( 0 );
     return ret;
 }

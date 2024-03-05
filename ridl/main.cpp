@@ -35,6 +35,8 @@ extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
 extern bool g_bSemanErr;
 extern std::string g_strAppName;
+extern std::string g_strJsLibPath;
+extern std::string g_strWebPath;
 
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
@@ -79,7 +81,7 @@ void Usage()
     printf( "Options -h:\tTo print this help.\n");
 
     printf( "\t-I:\tTo specify the path to"
-        " search for the included files.\n"
+        " search for the included `ridl files'.\n"
         "\t\tAnd this option can repeat many"
         "times.\n" );
 
@@ -148,6 +150,27 @@ extern gint32 GenRpcFSkelton(
     const std::string& strAppName,
     ObjPtr pRoot );
 
+static gint32 IsValidDir( const char* szDir )
+{
+    gint32 ret = 0;
+    do{
+        struct stat sb;
+        if (lstat( optarg, &sb) == -1)
+        {
+            ret = -errno;
+            break;
+        }
+        mode_t iFlags =
+            ( sb.st_mode & S_IFMT );
+        if( iFlags != S_IFDIR )
+        {
+            ret = -ENOTDIR;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
 int main( int argc, char** argv )
 {
     gint32 ret = 0;
@@ -175,6 +198,8 @@ int main( int argc, char** argv )
         int option_index = 0;
         static struct option long_options[] = {
             {"async_proxy", no_argument, 0,  0 },
+            {"webpath", required_argument, 0,  0 },
+            {"libpath", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -194,32 +219,48 @@ int main( int argc, char** argv )
                 {
                     if( option_index == 0 )
                         g_bAsyncProxy = true;
+#ifdef JAVASCRIPT
+                    else if( option_index == 1 )
+                    {
+                        g_strWebPath = optarg;
+                    }
+                    else if( option_index == 2 )
+                    {
+                        ret = IsValidDir( optarg );
+                        if( ERROR( ret ) )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                strerror( -ret ) );
+                            bQuit = true;
+                            break;
+                        }
+                        g_strJsLibPath = optarg;
+                    }
+#endif
                     break;
                 }
             case 'O':
             case 'I' :
                 {
-                    struct stat sb;
-                    if (lstat( optarg, &sb) == -1)
-                    {
-                        ret = -errno;
-                        printf( "%s : %s\n", optarg,
-                            strerror( errno ) );
-                        bQuit = true;
-                        break;
-                    }
-                    mode_t iFlags =
-                        ( sb.st_mode & S_IFMT );
-                    if( iFlags != S_IFDIR )
+                    ret = IsValidDir( optarg );
+                    if( ret == -ENOTDIR )
                     {
                         std::string strMsg =
-                            "warning '";
+                            "Error '";
 
                         strMsg += optarg;
                         strMsg +=
                            "' is not a directory";
                         printf( "%s\n",
                             strMsg.c_str() );
+                        bQuit = true;
+                        break;
+                    }
+                    else if( ERROR( ret ) )
+                    {
+                        printf( "%s : %s\n", optarg,
+                            strerror( -ret ) );
+                        bQuit = true;
                         break;
                     }
 
