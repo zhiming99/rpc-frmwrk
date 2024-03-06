@@ -265,6 +265,8 @@ class CImplJsMainFunc :
     gint32 Output();
     gint32 OutputCli(
         std::vector< ObjPtr >& vecSvcs );
+    gint32 EmitProxySampleCode( ObjPtr& pSvc );
+        
 };
 
 class CExportJsReadme :

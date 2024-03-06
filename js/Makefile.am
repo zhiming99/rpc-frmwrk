@@ -1,4 +1,4 @@
-EXTRA_DIST=index.html index.js webpack.config.js rpc/startws.js rpc/protopkt.js \
+js_files=index.html index.js webpack.config.js rpc/startws.js rpc/protopkt.js \
 combase/configdb.js combase/factory.js combase/msgmatch.js combase/objbase.js \
 combase/cbuffer.js combase/defines.js combase/enums.js combase/SERI_HEADER_BASE.js \
 dbusmsg/LICENSE dbusmsg/align.js dbusmsg/constants.js dbusmsg/dbus-buffer.js \
@@ -12,4 +12,4 @@ test/evtest.js ipc/keepalive.js rpc/keepalivermt.js test/katest.js \
 ipc/openstm.js rpc/openstmrmt.js test/stmtest.js rpc/stream.js \
 ipc/stmwrite.js ipc/stmevt.js rpc/stmwritermt.js
 
-
+EXTRA_DIST=js_files

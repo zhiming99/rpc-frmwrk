@@ -43,9 +43,9 @@ extern stdstr GetTypeName( CAstNodeBase* pType );
 
 std::map< char, stdstr > g_mapSig2JsType =
 {
-    { '(' , "Array" },
-    { '[' , "Map" },
-    { 'O' ,"Object" },
+    { '(', "Array" },
+    { '[', "Map" },
+    { 'O', "Object" },
     { 'Q', "Uint64" },
     { 'q', "Int64" },
     { 'D', "Uint32" },
@@ -993,7 +993,7 @@ static void OUTPUT_BANNER(
             CCOUT << psd->GetName() << ", "; 
         } 
         CCOUT << "} = require( './" 
-            << g_strAppName << "structs.js' );"; 
+            << g_strAppName << "structs' );"; 
         NEW_LINE; 
     }while( 0 );
     return;
@@ -2062,6 +2062,20 @@ gint32 CImplJsMainFunc::Output()
         OUTPUT_BANNER( m_pWriter, vecSvcs[ 0 ] );
         NEW_LINE;
 
+        CCOUT << "const {CoCreateInstance}=require( '"
+            << g_strJsLibPath <<"/combase/factory' );";
+        NEW_LINE;
+        CCOUT << "const {CIoManager} = require( '"
+            << g_strJsLibPath <<"/ipc/iomgr' );";
+        NEW_LINES( 2 );
+        Wa( "// Start the iomanager" );
+        Wa( "globalThis.g_iMsgIdx = randomInt( 0xffffffff );" );
+        Wa( "globalThis.CoCreateInstance=CoCreateInstance;" );
+        Wa( "globalThis.g_oIoMgr = new CIoManager();" );
+        Wa( "globalThis.g_oIoMgr.Start()" );
+        NEW_LINE;
+        Wa( "// Start the client(s)" );
+
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* pNode = elem;
@@ -2081,13 +2095,170 @@ gint32 CImplJsMainFunc::Output()
     return ret;
 }
 
+gint32 CImplJsMainFunc::EmitProxySampleCode(
+    ObjPtr& pSvcObj )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< ObjPtr > vecIfs;
+        CServiceDecl* pSvc = pSvcObj;
+        pSvc->GetIfRefs( vecIfs );
+        if( vecIfs.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        auto& elem = vecIfs.front();
+        do{
+            CInterfRef* pIfRef = elem;
+            ObjPtr pObj;
+            ret = pIfRef->GetIfDecl( pObj );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                break;
+            }
+            CInterfaceDecl* pIf = pObj;
+            pObj = pIf->GetMethodList();
+            std::vector< ObjPtr > vecMethods;
+
+            CMethodDecls* pmds = pObj;
+            guint32 i = 0;
+            for( ; i < pmds->GetCount(); i++ )
+            {
+                ObjPtr pObj = pmds->GetChild( i );
+                vecMethods.push_back( pObj );
+            }
+            if( vecMethods.empty() )
+                break;
+
+            bool bHasEvent = false;
+            CMethodDecl* pmd = nullptr;
+            for( auto& elem : vecMethods )
+            {
+                pmd = vecMethods.front();
+                if( pmd->IsEvent() )
+                {
+                    pmd = nullptr;
+                    bHasEvent = true;
+                    continue;
+                }
+                break;
+            }
+
+            if( pmd != nullptr )
+            {
+                NEW_LINES(2);
+                Wa( "/*" );
+
+                stdstr strVar = "o";
+                strVar += pSvc->GetName() + "_cli";
+                stdstr strMName = pmd->GetName();
+                std::vector< std::pair< stdstr, stdstr >> vecArgs;
+                ObjPtr pInArgs = pmd->GetInArgs();
+                guint32 dwInCount = GetArgCount( pInArgs );
+                Wa( "* sample code to make a request" );
+                if( dwInCount == 0 )
+                {
+                    CCOUT << strVar << "." << strMName << "();";
+                }
+                else
+                {
+                    ret = GetArgsAndSigs( pInArgs, vecArgs );
+                    if( ERROR( ret ) )
+                        break;
+
+                    CCOUT << strVar << "." << strMName << "(";
+                    if( vecArgs.size() > 2 )
+                    {
+                        NEW_LINE;
+                        CCOUT << "    ";
+                    }
+                    else
+                    {
+                        CCOUT << " ";
+                    }
+                    for( int i = 0; i < vecArgs.size(); i++ )
+                    {
+                        auto& elem = vecArgs[ i ];
+                        CCOUT << elem.first;
+                        if( i < vecArgs.size() - 1 )
+                            CCOUT << ", ";
+                        else
+                            CCOUT << " );";
+                    }
+                }
+                if( !pmd->IsNoReply() )
+                {
+                    NEW_LINE;
+                    CCOUT << "* and the response goes to '" 
+                        << strVar << "." << strMName << "Callback'";
+                }
+                NEW_LINE;
+                Wa( "*/" );
+                NEW_LINE;
+                Wa( "/*" );
+                Wa( "* sample code to make a request with promise" );
+                CCOUT << "return new Promise( ( resolve, reject )=>";
+                BLOCK_OPEN;
+                Wa( "var oContext = new Object();" );
+                Wa( "oContext.m_oResolve = resolve;" );
+                Wa( "oContext.m_oReject = reject;" );
+                CCOUT << "return ";
+                if( dwInCount == 0 )
+                {
+                    CCOUT << strVar << "." << strMName
+                        << "();";
+                }
+                else
+                {
+                    CCOUT << strVar << "." << strMName << "(";
+                    if( vecArgs.size() > 2 )
+                    {
+                        NEW_LINE;
+                        CCOUT << "    ";
+                    }
+                    else
+                    {
+                        CCOUT << " ";
+                    }
+                    for( int i = 0; i < vecArgs.size(); i++ )
+                    {
+                        auto& elem = vecArgs[ i ];
+                        CCOUT << elem.first;
+                        if( i < vecArgs.size() - 1 )
+                            CCOUT << ", ";
+                        else
+                            CCOUT << " );";
+                    }
+                }
+                BLOCK_CLOSE;
+                CCOUT << ").then(( oContext)=>";
+                BLOCK_OPEN;
+                CCOUT << "console.log( 'request " << strMName 
+                    << " is done with status ' + oContext.m_iRet );";
+                BLOCK_CLOSE;
+                CCOUT << ").catch((e)=>";
+                BLOCK_OPEN;
+                CCOUT << "console.log(e);";
+                BLOCK_CLOSE;
+                CCOUT << ")";
+                NEW_LINE;
+                CCOUT << "*/";
+                NEW_LINE;
+            }
+        }while( 0 );
+    }while( 0 );
+    return ret;
+}
+
 gint32 CImplJsMainFunc::OutputCli(
     std::vector< ObjPtr >& vecSvcs )
 {
     gint32 ret = 0;
     do{
-        CCOUT << "var strObjDesc = '" << g_strWebPath + "/"
-            << g_strAppName << "desc.json';";
+        CCOUT << "var strObjDesc = '" << g_strWebPath << "';";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;
@@ -2128,7 +2299,9 @@ gint32 CImplJsMainFunc::OutputCli(
             if( pSvc->IsStream() )
             {
                 NEW_LINE;
-                Wa( "/* the following is sample code to open a stream channel" );
+                Wa( "/*" );
+                Wa( "* sample code to open a stream channel, it" );
+                Wa( "* can be done elsewhere when starting is complete" );
                 Wa( "var oStmCtx;" );
                 CCOUT << "oStmCtx.m_oProxy = " << strVar << ";";
                 NEW_LINE;
@@ -2147,8 +2320,11 @@ gint32 CImplJsMainFunc::OutputCli(
                 NEW_LINE;
                 CCOUT << "return Promise.resolve( oCtx );";
                 BLOCK_CLOSE;
-                CCOUT << ")*/";
+                CCOUT << ")";
+                NEW_LINE;
+                CCOUT << "*/";
             }
+            EmitProxySampleCode( vecSvcs[ i ] );
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;

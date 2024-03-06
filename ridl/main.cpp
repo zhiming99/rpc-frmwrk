@@ -112,6 +112,8 @@ void Usage()
 
 #ifdef JAVASCRIPT
     printf( "\t-J:\tTo generate the JavaScript skelton files\n" );
+    printf( "\t--odesc_url<url>:\tthe <url> specify the objdesc file.\n" );
+    printf( "\t--lib_path<path>:\tthe <path> specify the path to the JS support library\n" );
 #endif
 
     printf( "\t-s:\tTo output the skelton with fastrpc support.\n" );
@@ -198,8 +200,8 @@ int main( int argc, char** argv )
         int option_index = 0;
         static struct option long_options[] = {
             {"async_proxy", no_argument, 0,  0 },
-            {"webpath", required_argument, 0,  0 },
-            {"libpath", required_argument, 0,  0 },
+            {"odesc_url", required_argument, 0,  0 },
+            {"lib_path", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 

@@ -196,6 +196,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 if( bDummy !== undefined && bDummy === "true")
                     continue
                 var strVal = interf[ "InterfaceName"]
+                if( strVal === "IUnknown")
+                    continue
                 if( strVal === "IStream" &&
                     interf[ "FetchDataTimeout"] !== undefined )
                 {
