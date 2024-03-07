@@ -12,4 +12,4 @@ test/evtest.js ipc/keepalive.js rpc/keepalivermt.js test/katest.js \
 ipc/openstm.js rpc/openstmrmt.js test/stmtest.js rpc/stream.js \
 ipc/stmwrite.js ipc/stmevt.js rpc/stmwritermt.js
 
-EXTRA_DIST=js_files
+EXTRA_DIST=$(js_files)
