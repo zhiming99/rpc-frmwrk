@@ -106,6 +106,11 @@ CJsFileSet::CJsFileSet(
         false );
     m_strPath = strOutPath;
 
+    GEN_FILEPATH( m_strWebCfg, 
+        strOutPath, "webpack.config.js",
+        false );
+    m_strPath = strOutPath;
+
     gint32 ret = OpenFiles();
     if( ERROR( ret ) )
     {
@@ -168,6 +173,13 @@ gint32 CJsFileSet::OpenFiles()
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strWebCfg,
         std::ofstream::out |
         std::ofstream::trunc) );
 
@@ -1432,9 +1444,15 @@ gint32 GenJsProj(
         if( ERROR( ret ) )
             break;
 
-        /*oWriter.SelectReadme();
+        oWriter.SelectReadme();
         CExportJsReadme ordme( &oWriter, pRoot );
-        ret = ordme.Output();*/
+        ret = ordme.Output();
+        if( ERROR( ret ) )
+            break;
+
+        oWriter.SelectWebCfg();
+        CExportJsWebpack owp( &oWriter, pRoot );
+        ret = owp.Output();
 
     }while( 0 );
 
@@ -2258,6 +2276,24 @@ gint32 CImplJsMainFunc::OutputCli(
 {
     gint32 ret = 0;
     do{
+        if( vecSvcs.empty() )
+        {
+            Wa( "return undefined;" );
+            break;
+        }
+        bool bSingleSvc = ( vecSvcs.size() == 1 );
+        stdstr strReturn = "oProxy";
+        if( bSingleSvc )
+        {
+            CCOUT << "var oProxy = null;";
+        }
+        else
+        {
+            strReturn = "oProxies";
+            CCOUT << "var oProxies = [];";
+        }
+        NEW_LINE;
+
         CCOUT << "var strObjDesc = '" << g_strWebPath << "';";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
@@ -2288,13 +2324,22 @@ gint32 CImplJsMainFunc::OutputCli(
             NEW_LINE;
             Wa( " // start the client object" );
             
-            CCOUT << strVar << ".Start().then((retval)=>";
+            CCOUT << "await " << strVar << ".Start().then((retval)=>";
             BLOCK_OPEN;
             Wa( "if( ERROR( retval ) )" );
             BLOCK_OPEN;
             Wa( "console.log( retval );" );
             CCOUT << "return;";
             BLOCK_CLOSE;
+            NEW_LINE;
+            if( bSingleSvc )
+            {
+                CCOUT << strReturn << " = " << strVar << ";";
+            }
+            else
+            {
+                CCOUT << strReturn << ".push( " << strVar << " );";
+            }
             
             if( pSvc->IsStream() )
             {
@@ -2325,6 +2370,7 @@ gint32 CImplJsMainFunc::OutputCli(
                 CCOUT << "*/";
             }
             EmitProxySampleCode( vecSvcs[ i ] );
+            
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;
@@ -2334,7 +2380,295 @@ gint32 CImplJsMainFunc::OutputCli(
             CCOUT << ")";
             NEW_LINE;
         }
+        NEW_LINE;
+        CCOUT << "return " << strReturn << ";";
+        NEW_LINE;
 
     }while( 0 );
     return ret;
 }
+
+extern stdstr g_strLocale;
+gint32 CExportJsReadme::Output()
+{
+    if( g_strLocale == "en" )
+        return Output_en();
+    if( g_strLocale == "cn" )
+        return Output_cn();
+
+    return -ENOTSUP;
+}
+
+gint32 CExportJsReadme::Output_en()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### Introduction to the files:" );
+
+        CCOUT << "* **maincli.js**: "
+            << "Containing creation of the iomanager and client objects, and"
+            << "starting the client objects for rpc communications";
+        NEW_LINE;
+        CCOUT << "And you can make changes to the files to customize the program. "
+            << "The `ridlc` will not touch them if they exist in the project directory, "
+            << "when it runs again, and put the newly generated code to `maincli.js.new`.";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "cli.js**: "
+                << "Containing the declarations and definitions of all the client side "
+                << "methods that need to be implemented by you, mainly the request/event handlers, "
+                << "for service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And you need to make changes to the files to implement the "
+                << "business logics for client. "
+                << "The `ridlc` will not touch them if they exist in the project directory, "
+                << "when it runs again, and put the newly "
+                << "generated code to `"<<elem  <<"cli.js.new`.";
+            NEW_LINES( 2 );
+        }
+
+        CCOUT<< "* *" << g_strAppName << "structs.js*: "
+            << "Containing all the declarations of the struct classes "
+            << "declared in the ridl, with serialization methods implemented.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by `ridlc` without auto-backup.";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
+            << "Containing the configuration parameters for all "
+            << "the services declared in the ridl file";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by `ridlc` and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *driver.json*: "
+            << "Containing the configuration parameters for all "
+            << "the ports and drivers";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since they will be "
+            << "overwritten by `ridlc` and synccfg.js without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *Makefile*: "
+            << "The Makefile will just synchronize the configurations "
+            << "with the local system settings. And it does nothing else.";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since it will be "
+            << "overwritten by `ridlc` and synccfg.py without backup.";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *webpack.config.js*: "
+            << "the file is used by webpack to pack all the stuffs to a single"
+            << "js file '" << g_strAppName << ".js'" << " for deployment on the "
+            << "web server";
+        NEW_LINE;
+        CCOUT << "And please don't edit it, since it will be "
+            << "overwritten by `ridlc` without backup.";
+        NEW_LINES( 2 );
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* *"<< elem << "clibase.js* : "
+                << "Containing the declarations and definitions of all the client side "
+                << "utilities and helpers for the interfaces of service `" << elem << "`.";
+            NEW_LINE;
+            CCOUT << "And please don't edit them, since they will be "
+                << "overwritten by `ridlc` without backup.";
+            NEW_LINES( 2 );
+
+        }
+        CCOUT << "* *synccfg.py*: "
+            << "a small python script to synchronous settings "
+            << "with the system settings, just ignore it.";
+        NEW_LINES(2);
+        CCOUT << "**Note 1**: the files in bold text need your further implementation. "
+            << "And files in italic text do not. And of course, "
+            << "you can still customized the italic files, but be aware they "
+            << "will be rewritten after running RIDLC again.";
+        NEW_LINES(2);
+        CCOUT << "**Note 2**: Please refer to [this link](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)"
+            << "for building and installation of RPC-Frmwrk";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
+}
+
+gint32 CExportJsReadme::Output_cn()
+{
+   gint32 ret = 0; 
+   do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        std::vector< stdstr > vecSvcNames;
+        for( auto& elem : vecSvcs )
+        {
+            CServiceDecl* psd = elem;
+            if( psd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            vecSvcNames.push_back(
+                psd->GetName() );
+        }
+
+        Wa( "### 生成文件介绍:" );
+
+        CCOUT << "* **maincli.js**: "
+            << "分别包含对客户端和服务器端的程序入口`main()`函数的定义";
+        NEW_LINE;
+        CCOUT << "你可以对这两个文件作出修改，不必担心ridlc会冲掉你修改的内容。"
+            << "`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件"
+            << "名加上.new后缀。";
+        NEW_LINES( 2 );
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* **" << elem << "cli.js**: "
+                << "分别包含有关service `"<<elem
+                <<"`的服务器端和客户端的所有接口函数的声明和空的实现。"
+                << "这些接口函数需要你的进一步实现, 其中主要包括"
+                << "服务器端的请求处理和客户端的事件处理。";
+            NEW_LINE;
+            CCOUT << "你可以对这两个文件作出修改，不必担心`ridlc`会冲掉你修改的内容。"
+                << "`ridlc`再次编译时，如果发现目标目录存在该文件，会为新生成的文件"
+                << "的文件名加上.new后缀。";
+            NEW_LINES( 2 );
+        }
+
+        for( auto& elem : vecSvcNames )
+        {
+            CCOUT << "* *"<< elem << "clibase.js* : "
+                << "分别包含有关service `"<<elem
+                <<"`的客户端的所有辅助函数和底部支持功能的实现。";
+            NEW_LINE;
+            CCOUT << "这些函数和方法务必不要做进一步的修改。"
+                << "`ridlc`在下一次运行时会重写里面的内容。";
+            NEW_LINES( 2 );
+
+        }
+
+        CCOUT<< "* *" << g_strAppName << "structs.js*: "
+            << "包含一个ridl文件中声明的所有用到的struct，"
+            << "以及序列/反序列化方法的实现.";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`在下一次运行时会重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT<< "* *" << g_strAppName << "desc.json*: "
+            << "包含本应用相关的配置信息, 和所有定义的服务(service)的配置参数。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+            << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *driver.json*: "
+            << "包含本应用相关的配置信息,主要是底层的iomanager的配置信息。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *Makefile*: "
+            << "该Makefile会用当前系统配置的信息更新本目录下的json配置文件。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *webpack.config.js*: "
+            << "该文件用于使用webpack打包整个工程为一个js文件 '" << g_strAppName
+            << ".js'用于在web服务器上的部署。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`会在在下一次运行时重写里面的内容。";
+        NEW_LINES( 2 );
+
+        CCOUT << "* *synccfg.py*: "
+            << "一个小的Python脚本，用来同步本应用配置信息。";
+        NEW_LINES(2);
+        CCOUT << "**注1**: 上文中的粗体字的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
+            << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
+        NEW_LINES(2);
+        CCOUT << "**注2**: 有关配置系统搭建和设置请参考[此文。](https://github.com/zhiming99/rpc-frmwrk#building-rpc-frmwrk)。";
+        NEW_LINE;
+
+   }while( 0 );
+
+   return ret;
+}
+
+gint32 CExportJsWebpack::Output()
+{
+    gint32 ret = 0;
+    do{
+        Wa( "let path = require( 'path' );" );
+        Wa( "const webpack = require( 'webpack' );" );
+        Wa( "module.exports = " );
+        BLOCK_OPEN;
+        Wa( "// replace 'development' with 'production' for a human-unreadable version" );
+        Wa( "mode: 'development'," );
+        Wa( "entry: './maincli.js'," );
+        Wa( "output:" );
+        BLOCK_OPEN;
+        Wa( "path:path.resolve(__dirname, 'dist'),");
+        CCOUT << "filename: '" << g_strAppName << ".js',";
+        NEW_LINE;
+        Wa( "globalObject: 'this'," );
+        Wa( "library:" );
+        BLOCK_OPEN;
+        CCOUT << "name: '" << g_strAppName << "'," ;
+        NEW_LINE;
+        CCOUT << "type: 'var',";
+        BLOCK_CLOSE;
+        BLOCK_CLOSE;
+        CCOUT << ",";
+        NEW_LINE;
+        CCOUT << "plugins: [";
+        INDENT_UPL;
+        Wa( "new webpack.ProvidePlugin(" );
+        BLOCK_OPEN;
+        CCOUT << "process: 'process/browser',";
+        BLOCK_CLOSE;
+        CCOUT << "),";
+        NEW_LINE;
+        Wa( "new webpack.ProvidePlugin(" );
+        BLOCK_OPEN;
+        CCOUT << "Buffer: ['buffer', 'Buffer'],";
+        BLOCK_CLOSE;
+        CCOUT << "),";
+        INDENT_DOWNL;
+        CCOUT << "],";
+        BLOCK_CLOSE;
+
+    }while( 0 );
+    return ret;
+}
+

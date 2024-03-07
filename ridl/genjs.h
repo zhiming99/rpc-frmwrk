@@ -44,6 +44,7 @@ struct CJsFileSet : public IFileSet
     std::string  m_strDriver;
     std::string  m_strMakefile;
     std::string  m_strReadme;
+    std::string  m_strWebCfg;
 
     typedef IFileSet super;
     CJsFileSet( const std::string& strOutPath,
@@ -124,6 +125,14 @@ class CJsWriter : public CWriterBase
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
         return SelectFile( 5 );
+    }
+
+    gint32 SelectWebCfg()
+    {
+        CJsFileSet* pFiles = static_cast< CJsFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strWebCfg;
+        return SelectFile( 6 );
     }
 
 
@@ -283,3 +292,16 @@ class CExportJsReadme :
     gint32 Output_cn();
 };
 
+class CExportJsWebpack
+{
+    CWriterBase* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    public:
+    CExportJsWebpack( CWriterBase* pWriter,
+        ObjPtr& pNode )
+    {
+        m_pWriter = pWriter;
+        m_pNode = pNode;
+    }
+    gint32 Output();
+};
