@@ -29,7 +29,7 @@ using namespace rpcf;
 #include "gencpp2.h"
 #include "jsondef.h"
 
-stdstr g_strJsLibPath = "../../../js";
+stdstr g_strJsLibPath = "";
 stdstr g_strWebPath = "";
 extern stdstr g_strCmdLine;
 extern stdstr g_strAppName;
@@ -40,6 +40,21 @@ extern bool g_bRpcOverStm;
 extern gint32 GetArgsAndSigs( CArgList* pArgList,
     std::vector< std::pair< stdstr, stdstr >>& vecArgs );
 extern stdstr GetTypeName( CAstNodeBase* pType );
+
+const stdstr& GetJsLibPath()
+{
+    if( !g_strJsLibPath.empty() )
+        return g_strJsLibPath;
+
+    stdstr strPath;
+    gint32 ret = FindInstCfg(
+        "driver.json", strPath );
+    if( ERROR( ret ) )
+        return g_strJsLibPath;
+    strPath = GetDirName( strPath );
+    g_strJsLibPath = strPath + "/jslib";
+    return g_strJsLibPath;
+}
 
 std::map< char, stdstr > g_mapSig2JsType =
 {
@@ -852,6 +867,7 @@ static gint32 GenStructsFileJs(
 
     gint32 ret = 0;
     do{
+        stdstr strLibPath = GetJsLibPath();
         CStatements* pStmts = pRoot;
         if( pStmts == nullptr )
         {
@@ -864,10 +880,10 @@ static gint32 GenStructsFileJs(
         CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
         CCOUT << "const { CSerialBase, CStructBase } = require( '"
-            << g_strJsLibPath << "/combase/seribase' );";
+            << strLibPath << "/combase/seribase' );";
         NEW_LINE;
         CCOUT << "const { errno } = require( '"
-            << g_strJsLibPath << "/combase/enums' );";
+            << strLibPath << "/combase/enums' );";
         NEW_LINE;
 
         std::vector< ObjPtr > vecStructs;
@@ -894,7 +910,7 @@ static gint32 GenStructsFileJs(
         if( vecActStructs.size() > 0 )
         {
             CCOUT << "const { IClassFactory } = require( '"
-                << g_strJsLibPath << "/combase/factory')";
+                << strLibPath << "/combase/factory')";
             NEW_LINE;
         }
         CCOUT << "class C" << g_strAppName <<"Factory "
@@ -949,32 +965,33 @@ CJsExportMakefile::CJsExportMakefile(
 static void OUTPUT_BANNER(
     CJsWriter* m_pWriter, CServiceDecl* pSvc )
 {
+    stdstr strLibPath = GetJsLibPath();
     EMIT_DISCLAIMER;
     CCOUT << "// " << g_strCmdLine;
     NEW_LINE;
     CCOUT << "const { CConfigDb2 } = require( '"
-        << g_strJsLibPath <<"/combase/configdb' );";
+        << strLibPath <<"/combase/configdb' );";
     NEW_LINE;
     CCOUT << "const { messageType } = require( '"
-        << g_strJsLibPath << "/dbusmsg/constants' );";
+        << strLibPath << "/dbusmsg/constants' );";
     NEW_LINE;
     CCOUT << "const { randomInt, ERROR, Int32Value, USER_METHOD } = require( '"
-        << g_strJsLibPath <<"/combase/defines' );";
+        << strLibPath <<"/combase/defines' );";
     NEW_LINE;
     CCOUT << "const {EnumClsid, errno, EnumPropId, EnumCallFlags, "<<
         "EnumTypeId, EnumSeriProto} = require( '"
-        << g_strJsLibPath <<"/combase/enums' );";
+        << strLibPath <<"/combase/enums' );";
     NEW_LINE;
     CCOUT << "const {CSerialBase} = require( '"
-        << g_strJsLibPath <<"/combase/seribase' );";
+        << strLibPath <<"/combase/seribase' );";
     NEW_LINE;
     CCOUT << "const {CInterfaceProxy} = require( '"
-        << g_strJsLibPath <<"/ipc/proxy' )";
+        << strLibPath <<"/ipc/proxy' )";
     NEW_LINE;
     CCOUT << "const {Buffer} = require( 'buffer' );";
     NEW_LINE;
     CCOUT << "const { DBusIfName, DBusDestination2, DBusObjPath } = require( '"
-        << g_strJsLibPath << "/rpc/dmsg' );";
+        << strLibPath << "/rpc/dmsg' );";
     NEW_LINE;
     do{ 
         ObjPtr pRoot; 
@@ -2080,11 +2097,12 @@ gint32 CImplJsMainFunc::Output()
         OUTPUT_BANNER( m_pWriter, vecSvcs[ 0 ] );
         NEW_LINE;
 
+        stdstr strLibPath = GetJsLibPath();
         CCOUT << "const {CoCreateInstance}=require( '"
-            << g_strJsLibPath <<"/combase/factory' );";
+            << strLibPath <<"/combase/factory' );";
         NEW_LINE;
         CCOUT << "const {CIoManager} = require( '"
-            << g_strJsLibPath <<"/ipc/iomgr' );";
+            << strLibPath <<"/ipc/iomgr' );";
         NEW_LINES( 2 );
         Wa( "// Start the iomanager" );
         Wa( "globalThis.g_iMsgIdx = randomInt( 0xffffffff );" );
