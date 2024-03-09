@@ -608,7 +608,7 @@ esac
 case $enable_js in
     yes)
         AC_CONFIG_FILES([ js/Makefile ])
-        JS_RPMLIBS="npm, webpack," 
+        JS_RPMLIBS="npm," 
         JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
         JS_RPMPOST=""
