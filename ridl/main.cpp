@@ -76,7 +76,7 @@ void Usage()
     printf( "ridlc [options] <ridl file> \n" );
 
     printf( "\t compile the `ridl file'"
-        "and output the RPC skelton files.\n" );
+        "and output the RPC skeleton files.\n" );
 
     printf( "Options -h:\tTo print this help.\n");
 
@@ -96,28 +96,28 @@ void Usage()
         "\t\t'appname' from the ridl will be used.\n" );
 
 #ifdef PYTHON
-    printf( "\t-p:\tTo generate the Python skelton files.\n" );
+    printf( "\t-p:\tTo generate the Python skeleton files.\n" );
 #endif
 
 #ifdef JAVA
-    printf( "\t-j:\tTo generate the Java skelton files\n" );
+    printf( "\t-j:\tTo generate the Java skeleton files\n" );
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only.\n" );
 #endif
 
 #ifdef FUSE3
-    printf( "\t-f:\tTo generate cpp skelton files for rpcfs\n" );
+    printf( "\t-f:\tTo generate cpp skeleton files for rpcfs\n" );
     printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs.\n" );
 #endif
 
 #ifdef JAVASCRIPT
-    printf( "\t-J:\tTo generate the JavaScript skelton files\n" );
+    printf( "\t-J:\tTo generate the JavaScript skeleton files\n" );
     printf( "\t--odesc_url<url>:\tthe <url> specify the objdesc file.\n" );
     printf( "\t--lib_path<path>:\tthe <path> specify the path to the JS support library\n" );
 #endif
 
-    printf( "\t-s:\tTo output the skelton with fastrpc support.\n" );
-    printf( "\t-b:\tTo output the skelton with built-in router.\n" );
+    printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
+    printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
     printf( "\t-l:\tTo output a shared library.\n" );
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
@@ -552,7 +552,7 @@ int main( int argc, char** argv )
         {
             if( bFuse && g_strLang != "cpp" )
             {
-                // generating rpcfs skelton code
+                // generating rpcfs skeleton code
                 ret = GenRpcFSkelton(
                     g_strOutPath, strAppName, pRoot );
 

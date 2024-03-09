@@ -17,4 +17,5 @@ etc/rpcf/odesctpl2.json
 etc/rpcf/*.java
 etc/rpcf/*.py
 etc/rpcf/*tpl
+@JS_DEBFILES@
 

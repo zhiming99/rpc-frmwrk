@@ -3,7 +3,7 @@ Maintainer: zhiming <@PACKAGE_BUGREPORT@>
 Section:devel
 Priority:extra
 Standards-Version: 4.5.0
-Build-Depends:debhelper, autoconf, automake, pkg-config, libtool, bison, flex, gcc ( >= 5 ), libdbus-1-dev, libjsoncpp-dev, liblz4-dev, @FUSE3_DEBLIBS@ @KRB5_DEBLIBS@ @OPENSSL_DEBLIBS@ libcppunit-dev,  vim, python3, @JAVA_DEBLIBS@ @PYTHON_DEBLIBS@ devscripts, bash
+Build-Depends:debhelper, autoconf, automake, pkg-config, libtool, bison, flex, gcc ( >= 5 ), libdbus-1-dev, libjsoncpp-dev, liblz4-dev, @FUSE3_DEBLIBS@ @KRB5_DEBLIBS@ @OPENSSL_DEBLIBS@ libcppunit-dev,  vim, python3, @JAVA_DEBLIBS@ @PYTHON_DEBLIBS@ @JS_DEBLIBS@ devscripts, bash
 X-Python3-Version: >= 3.7
 Vcs-Git: https://github.com/zhiming99/rpc-frmwrk.git
 Homepage: https://github.com/zhiming99/rpc-frmwrk

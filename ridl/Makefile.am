@@ -40,7 +40,7 @@ include_ipcdir=$(top_srcdir)/ipc
 include_ridlcdir=$(top_srcdir)/ridlc
 
 link_dir=-L$(top_srcdir)/debug64/
-ridlc_CPPFLAGS= -I$(include_ipcdir) -I$(top_srcdir)/include -fPIC -DJAVASCRIPT
+ridlc_CPPFLAGS= -I$(include_ipcdir) -I$(top_srcdir)/include -fPIC
 if ENABLE_FUSE3
 ridlc_CPPFLAGS+= -DFUSE3
 endif
@@ -70,3 +70,6 @@ if ENABLE_GMSSL
 ridlc_CPPFLAGS+= -DGMSSL
 endif
 
+if ENABLE_JS
+ridlc_CPPFLAGS+= -DJAVASCRIPT
+endif
