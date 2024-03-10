@@ -1,4 +1,7 @@
 usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/librtfiles.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libecho.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libhellowrd.so*
 @PYTHON_DEBFILES@
 @JAVA_DEBFILES@
 usr/bin/rpcrouter

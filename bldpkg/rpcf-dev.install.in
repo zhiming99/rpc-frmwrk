@@ -6,7 +6,15 @@ usr/bin/rpcf/btinrtcli
 usr/bin/rpcf/ifsvrsmk
 usr/bin/rpcf/ifclismk
 usr/lib/@DEB_HOST_MULTIARCH@/lib*.la
-usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libactc.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libascsvr.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libbtinrt.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libevtst.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libstmsvr.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libinproc.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libkasvr.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libsfsvr.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libprsvr.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.la
 usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
 usr/include/rpcf/*.h
@@ -18,4 +26,3 @@ etc/rpcf/*.java
 etc/rpcf/*.py
 etc/rpcf/*tpl
 @JS_DEBFILES@
-

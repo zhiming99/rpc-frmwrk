@@ -61,13 +61,13 @@ cat << EOF >> ${DEBDIR}/postinst
 #!/bin/bash
 cd XXXX/${PACKAGE_NAME}
 pypkg=\$(compgen -G "rpcf*whl")
-pip3 install \$pypkg;
+pip3 install \$pypkg --break-system-packages
 #DEBHELPER#
 EOF
 
 cat << EOF >> ${DEBDIR}/postrm
 #!/bin/bash
-pip3 uninstall -y ${PACKAGE_NAME}
+pip3 uninstall -y ${PACKAGE_NAME} --break-system-packages
 #DEBHELPER#
 EOF
 else
