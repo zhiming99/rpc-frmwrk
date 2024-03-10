@@ -56,7 +56,7 @@ DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
-if grep -i '\<NAME="Debian'; then
+if grep -i '\<NAME="Debian' /etc/os-release; then
     force_inst='--break-system-packages'
 else
     force_inst=''
