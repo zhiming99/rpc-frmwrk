@@ -11,12 +11,12 @@ Homepage: https://github.com/zhiming99/rpc-frmwrk
 
 Package: @PACKAGE_NAME@
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, libdbus-1-3, liblz4-1, libjsoncpp1 | libjsoncpp24, libkrb5-3, @FUSE3_DEBPKGS@ @KRB5_DEBPKGS@ @OPENSSL_DEBPKGS@ libcppunit-1.15-0 | libcppunit-1.14-0, bash, expect
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, libdbus-1-3, liblz4-1, libjsoncpp1 | libjsoncpp24 | libjsoncpp25, libkrb5-3, @FUSE3_DEBPKGS@ @KRB5_DEBPKGS@ @OPENSSL_DEBPKGS@ libcppunit-1.15-0 | libcppunit-1.14-0, bash, expect
 Description: RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility. And this package contains rpcrouter, and the runtime libraries, and config tools.
 
 Package: @PACKAGE_NAME@-dev
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, libdbus-1-3, liblz4-1, libjsoncpp1 | libjsoncpp24
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, libdbus-1-3, liblz4-1, libjsoncpp1 | libjsoncpp24 | libjsoncpp25
 Description: This package contains ridlc, examples, and testcases for RPC-frmwrk.
 
 Package: @PACKAGE_NAME@-static

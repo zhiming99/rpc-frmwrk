@@ -443,7 +443,7 @@ case $enable_openssl in
         OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
         OPENSSL_CFGOPT=
         OPENSSL_DEBLIBS='libssl-dev,'
-        OPENSSL_DEBPKGS='openssl, libssl1.1, expect,'
+        OPENSSL_DEBPKGS='openssl, libssl1.1 | libssl3, expect,'
         OPENSSL_RPMLIBS='openssl-devel,'
         OPENSSL_RPMPKGS='openssl openssl-libs expect'
         enable_websock=yes
