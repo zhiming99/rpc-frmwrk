@@ -56,18 +56,24 @@ DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
+if grep -i '\<NAME="Debian'; then
+    force_inst='--break-system-packages'
+else
+    force_inst=''
+fi
+
 if [ "x$BUILD_PYTHON" == "xyes" ]; then
 cat << EOF >> ${DEBDIR}/postinst
 #!/bin/bash
 cd XXXX/${PACKAGE_NAME}
 pypkg=\$(compgen -G "rpcf*whl")
-pip3 install \$pypkg --break-system-packages
+pip3 install \$pypkg ${force_inst}
 #DEBHELPER#
 EOF
 
 cat << EOF >> ${DEBDIR}/postrm
 #!/bin/bash
-pip3 uninstall -y ${PACKAGE_NAME} --break-system-packages
+pip3 uninstall -y ${PACKAGE_NAME} ${force_inst}
 #DEBHELPER#
 EOF
 else
