@@ -2342,7 +2342,7 @@ gint32 CImplJsMainFunc::OutputCli(
             NEW_LINE;
             Wa( " // start the client object" );
             
-            CCOUT << "await " << strVar << ".Start().then((retval)=>";
+            CCOUT << strVar << ".Start().then((retval)=>";
             BLOCK_OPEN;
             Wa( "if( ERROR( retval ) )" );
             BLOCK_OPEN;
@@ -2388,7 +2388,8 @@ gint32 CImplJsMainFunc::OutputCli(
                 CCOUT << "*/";
             }
             EmitProxySampleCode( vecSvcs[ i ] );
-            
+            NEW_LINE;
+            CCOUT << "return " << strReturn << ";";
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;
@@ -2398,8 +2399,6 @@ gint32 CImplJsMainFunc::OutputCli(
             CCOUT << ")";
             NEW_LINE;
         }
-        NEW_LINE;
-        CCOUT << "return " << strReturn << ";";
         NEW_LINE;
 
     }while( 0 );
@@ -2654,6 +2653,12 @@ gint32 CExportJsWebpack::Output()
         Wa( "// replace 'development' with 'production' for a human-unreadable version" );
         Wa( "mode: 'development'," );
         Wa( "entry: './maincli.js'," );
+        CCOUT << "resolve:";
+        BLOCK_OPEN;
+        Wa( "modules: [path.resolve(__dirname," );
+        CCOUT << "    'node_modules'), 'node_modules']";
+        BLOCK_CLOSE;
+        Wa( "," );
         Wa( "output:" );
         BLOCK_OPEN;
         Wa( "path:path.resolve(__dirname, 'dist'),");

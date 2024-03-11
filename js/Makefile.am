@@ -18,9 +18,10 @@ EXTRA_DIST=$(js_files)
 
 js_confdir=$(sysconfdir)/rpcf
 dist_js_conf_DATA=rpcbase.js.tar.gz
+js_conf_DATA=rpcbase.js.tar.gz
 BUILT_SOURCES=rpcbase.js.tar.gz
 
-rpcbase.js.tar.gz:
+rpcbase.js.tar.gz: $(jslib_files)
 	tar zcf rpcbase.js.tar.gz $(jslib_files)
 
 install-data-hook:
