@@ -368,8 +368,8 @@ AC_SUBST([BITWIDTH])
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
 AC_SUBST( TSTLDFLG, '$(top_srcdir)/ipc/libipc.la $(top_srcdir)/combase/libcombase.la -lstdc++ -lcppunit \
--L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
-${COMMON_LINK_CPPUNIT}' )
+ -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
+ ${COMMON_LINK_CPPUNIT}' )
 
 PKG_PROG_PKG_CONFIG
 PKG_INSTALLDIR
