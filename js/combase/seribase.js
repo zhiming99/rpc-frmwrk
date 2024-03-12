@@ -13,39 +13,41 @@ class CSerialBase
 {
     BuildFuncMaps()
     {
-        this.m_oSerialMap = new Map( {
-            'Q' : this.SerialUint64,
-            'q' : this.SerialUint64,
-            'D' : this.SerialUint32,
-            'd' : this.SerialUint32,
-            'W' : this.SerialUint16,
-            'w' : this.SerialUint16,
-            'F' : this.SerialDouble,
-            'f' : this.SerialFloat,
-            'B' : this.SerialUint8,
-            'b' : this.SerialBool,
-            'h' : this.SerialHStream,
-            'a' : this.SerialByteArray,
-            'O' : this.SerialStruct,
-            'o' : this.SerialObjPtr,
-        })
+        this.m_oSerialMap = new Map([ 
+            ['Q' , this.SerialUint64.bind( this )],
+            ['q' , this.SerialUint64.bind( this )],
+            ['D' , this.SerialUint32.bind( this )],
+            ['d' , this.SerialUint32.bind( this )],
+            ['W' , this.SerialUint16.bind( this )],
+            ['w' , this.SerialUint16.bind( this )],
+            ['F' , this.SerialDouble.bind( this )],
+            ['f' , this.SerialFloat.bind( this )],
+            ['B' , this.SerialUint8.bind( this )],
+            ['b' , this.SerialBool.bind( this )],
+            ['h' , this.SerialHStream.bind( this )],
+            ['a' , this.SerialByteArray.bind( this )],
+            ['O' , this.SerialStruct.bind( this )],
+            ['o' , this.SerialObjPtr.bind( this )],
+            ['s' , this.SerialString.bind( this )],
+        ])
 
-        this.m_oDeserialMap = new Map( {
-            'Q' : this.DeserialUint64,
-            'q' : this.DeserialUint64,
-            'D' : this.DeserialUint32,
-            'd' : this.DeserialUint32,
-            'W' : this.DeserialUint16,
-            'w' : this.DeserialUint16,
-            'F' : this.DeserialDouble,
-            'f' : this.DeserialFloat,
-            'B' : this.DeserialUint8,
-            'b' : this.DeserialBool,
-            'h' : this.DeserialHStream,
-            'a' : this.DeserialByteArray,
-            'O' : this.DeserialStruct,
-            'o' : this.DeserialObjPtr,
-        })
+        this.m_oDeserialMap = new Map([
+            ['Q' , this.DeserialUint64.bind( this )],
+            ['q' , this.DeserialUint64.bind( this )],
+            ['D' , this.DeserialUint32.bind( this )],
+            ['d' , this.DeserialUint32.bind( this )],
+            ['W' , this.DeserialUint16.bind( this )],
+            ['w' , this.DeserialUint16.bind( this )],
+            ['F' , this.DeserialDouble.bind( this )],
+            ['f' , this.DeserialFloat.bind( this )],
+            ['B' , this.DeserialUint8.bind( this )],
+            ['b' , this.DeserialBool.bind( this )],
+            ['h' , this.DeserialHStream.bind( this )],
+            ['a' , this.DeserialByteArray.bind( this )],
+            ['O' , this.DeserialStruct.bind( this )],
+            ['o' , this.DeserialObjPtr.bind( this )],
+            ['s' , this.DeserialString.bind( this )],
+        ])
     }
     /**
      * constructor of CSerialBase
@@ -63,6 +65,7 @@ class CSerialBase
             this.m_oProxy = oProxy
         else
             this.m_oProxy = null
+        this.BuildFuncMaps();
     }
 
     /**
@@ -109,7 +112,7 @@ class CSerialBase
     SerialUint64( val )
     {
         var oBuf = Buffer.alloc( 8 )
-        oBuf.writeBigUInt64BE( val )
+        oBuf.writeBigUInt64BE( BigInt( val ) )
         if( this.m_oBuf === null )
             this.m_oBuf = oBuf
         else
@@ -222,7 +225,7 @@ class CSerialBase
         return
     }
 
-    FindContainerSig( signature, bMap )
+    static FindContainerSig( signature, bMap )
     {
         var balance = 1
         sigRest = signature.slice(1)
@@ -258,12 +261,12 @@ class CSerialBase
         return signature.slice( 0, count )
     }
 
-    FindStandaloneSig( signature )
+    static FindStandaloneSig( signature )
     {
         if( signature[0] === '(')
-            return this.FindContainerSig( signature, false )
+            return CSerialBase.FindContainerSig( signature, false )
         else if( signature[0] === '[')
-            return this.FindContainerSig( signature, true )
+            return CSerialBase.FindContainerSig( signature, true )
         return signature[0]
     }
 
@@ -287,12 +290,12 @@ class CSerialBase
             return
         }
 
-        sigKey = this.FindStandaloneSig( sigElem )
+        var sigKey = CSerialBase.FindStandaloneSig( sigElem )
         if( sigKey.length >= sigElem.length )
             throw new Error( "Error invalid map key signature")
         var sigRest = 
             sigElem.slice( sigKey.length )
-        sigValue = this.FindStandaloneSig(sigRest )
+        var sigValue = CSerialBase.FindStandaloneSig(sigRest )
         if( sigValue !== sigRest )
             throw new Error( "Error invalid map value signature")
 
@@ -342,7 +345,9 @@ class CSerialBase
     }
     DeserialUint64( oBuf, offset )
     {
-        return [ oBuf.readBigUInt64BE( offset ), offset + 8 ]
+        var qwBigInt = 
+            oBuf.readBigUInt64BE( offset );
+        return [ Number( qwBigInt ), offset + 8 ]
     }
 
     DeserialFloat( oBuf, offset )
@@ -461,12 +466,12 @@ class CSerialBase
             throw new Error( "Error array size out of range")
         offset += 8
 
-        sigKey = this.FindStandaloneSig( sigElem )
+        sigKey = CSerialBase.FindStandaloneSig( sigElem )
         if( sigKey.length >= sigElem.length )
             throw new Error( "Error invalid map key signature")
         var sigRest = 
             sigElem.slice( sigKey.length )
-        sigValue = this.FindStandaloneSig(sigRest )
+        sigValue = CSerialBase.FindStandaloneSig(sigRest )
         if( sigValue !== sigRest )
             throw new Error( "Error invalid map value signature")
 
@@ -499,6 +504,106 @@ class CStructBase extends CObjBase
     }
     SetInterface( pIf )
     { this.m_pIf = pIf; }
+
+    Restore( oVal )
+    {}
+
+    static RestoreArray( oArray, strSig )
+    {
+        if( strSig[0] !== '(' ||
+            strSig[ strSig.length - 1 ] != ')' )
+            return null;
+        const regex = /O/g;
+        var idx = strSig.search( regex );
+        if( idx === -1 )
+            return oArray;
+
+        var dwSigLen = strSig.length
+        var sigElem = strSig.slice(1, dwSigLen-1);
+        var oNewArr = [];
+        for( var i = 0; i < oArray.length; i++ )
+        {
+            oNewArr.push( 
+                CStructBase.RestoreElem( oArray[ i ], sigElem ) );
+        }
+        return oNewArr;
+    }
+
+    static RestoreMap( oMap, strSig )
+    {
+        if( strSig[0] !== '(' ||
+            strSig[ strSig.length - 1 ] != ')' )
+            return null;
+
+        const regex = /O/g;
+        var idx = strSig.search( regex );
+        if( idx === -1 )
+            return oMap;
+        
+        var dwSigLen = strSig.length
+        var sigElem = strSig.slice(1, dwSigLen-1);
+        var strKeySig = CStructBase.FindStandaloneSig( sigElem );
+        var strValSig = sigElem.slice( strKeySig.length );
+        var bRestoreKey = true, bRestoreValue = true;
+        idx = strKeySig.search( regex );
+        if( idx === -1 )
+            bRestoreKey = false;
+        idx = strValSig.search( regex );
+        if( idx === -1 )
+            bRestoreValue = false;
+
+        var oNewMap = new Map();
+        const itr = oMap.entries();
+        while( itr !== undefined )
+        {
+            var entry = itr.next();
+            var key = entry.value[0];
+            var value = entry.value[1];
+            if( bRestoreKey )
+                key = RestoreElem( key, strKeySig );
+            if( bRestoreValue )
+                value = RestoreElem( value, strKeySig );
+            oNewMap.set( key, value )
+        }
+        return oNewMap;
+    }
+
+    static RestoreStruct( oStruct, strSig )
+    {
+        if( oStruct.m_pIf !== undefined )
+            return oStruct;
+        const regex = /[0-9A-Fa-f]{8}\*/g;
+        var idx = strSig.search( regex );
+        if( idx !== 1 )
+            throw new Error( "Error unable to find clsid to restore struct")
+        var strClsid = "0x" + strSig.slice( 1, 9 );
+        var iClsid = Number( strClsid );
+        var oObj = globalThis.CoCreateInstance( iClsid );
+        oObj.Restore( oStruct );
+        return oObj;
+    }
+
+    static RestoreElem( oElem, strSig )
+    {
+        if( strSig[ 0 ] === '(')
+            return CStructBase.RestoreArray( oElem, strSig );
+        else if( strSig[ 0 ] === '[')
+            return CStructBase.RestoreMap( oElem, strSig );
+        else if( strSig[ 0 ] === 'O' )
+            return CStructBase.RestoreStruct( oElem, strSig );
+        return oElem;
+    }
+
+    static FindStandaloneSig( signature )
+    {
+        if( signature[ 0 ] === 'O' )
+        {
+            if( signature.length < 10 )
+                throw new Error( "Error bad signature '" + signature + "'");
+            return signature.slice( 0, 10 );
+        }
+        return CSerialBase.FindStandaloneSig( signature );
+    }
 }
 
 exports.CStructBase = CStructBase

@@ -45,6 +45,7 @@ struct CJsFileSet : public IFileSet
     std::string  m_strMakefile;
     std::string  m_strReadme;
     std::string  m_strWebCfg;
+    std::string  m_strHtml;
 
     typedef IFileSet super;
     CJsFileSet( const std::string& strOutPath,
@@ -135,6 +136,14 @@ class CJsWriter : public CWriterBase
         return SelectFile( 6 );
     }
 
+    gint32 SelectSampleHtml()
+    {
+        CJsFileSet* pFiles = static_cast< CJsFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strHtml;
+        return SelectFile( 7 );
+    }
+
 
     gint32 SelectImplFile(
         const std::string& strFile )
@@ -159,6 +168,7 @@ class CDeclareJsStruct
         ObjPtr& pNode );
     virtual gint32 Output();
     void OutputStructBase();
+    gint32 OutputRestore();
 };
 
 class CExportIndexJs
@@ -298,6 +308,21 @@ class CExportJsWebpack
     CStatements* m_pNode = nullptr;
     public:
     CExportJsWebpack( CWriterBase* pWriter,
+        ObjPtr& pNode )
+    {
+        m_pWriter = pWriter;
+        m_pNode = pNode;
+    }
+    gint32 Output();
+};
+
+class CExportJsSampleHtml
+{
+    public:
+    CWriterBase* m_pWriter = nullptr;
+    CStatements* m_pNode = nullptr;
+    public:
+    CExportJsSampleHtml( CWriterBase* pWriter,
         ObjPtr& pNode )
     {
         m_pWriter = pWriter;

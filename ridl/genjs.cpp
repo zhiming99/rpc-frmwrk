@@ -37,9 +37,50 @@ extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
-extern gint32 GetArgsAndSigs( CArgList* pArgList,
-    std::vector< std::pair< stdstr, stdstr >>& vecArgs );
+
 extern stdstr GetTypeName( CAstNodeBase* pType );
+extern stdstr GetTypeSig( ObjPtr& pObj );
+
+stdstr GetTypeSigJs(
+    CAstNodeBase* pNode, bool bRestore = false )
+{
+    ObjPtr pObj = pNode;
+    if( bRestore )
+        g_strLang = "java";
+    stdstr strSig = GetTypeSig( pObj );
+    if( bRestore )
+        g_strLang = "js";
+    return strSig;
+}
+
+gint32 GetArgsAndSigsJs( CArgList* pArgList,
+    std::vector< std::pair< stdstr, stdstr >>& vecArgs,
+    bool bRestore = false )
+{
+    if( pArgList == nullptr )
+        return -EINVAL;
+    gint32 ret = 0;
+    guint32 dwCount = pArgList->GetCount();
+    for( guint32 i = 0; i < dwCount; i++ )
+    {
+        ObjPtr pObj = pArgList->GetChild( i );
+        CFormalArg* pfa = pObj;
+        if( pfa == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        std::string strVarName =
+            pfa->GetName();
+
+        pObj = pfa->GetType();
+        stdstr strSig = GetTypeSigJs( pObj, bRestore );
+        vecArgs.push_back(
+            std::pair< stdstr, stdstr >
+                ( strVarName, strSig ) );
+    }
+    return ret;
+}
 
 const stdstr& GetJsLibPath()
 {
@@ -119,13 +160,16 @@ CJsFileSet::CJsFileSet(
     GEN_FILEPATH( m_strReadme, 
         strOutPath, "README.md",
         false );
-    m_strPath = strOutPath;
 
     GEN_FILEPATH( m_strWebCfg, 
         strOutPath, "webpack.config.js",
         false );
-    m_strPath = strOutPath;
 
+    GEN_FILEPATH( m_strHtml,
+        strOutPath, strAppName + ".html",
+        true );
+
+    m_strPath = strOutPath;
     gint32 ret = OpenFiles();
     if( ERROR( ret ) )
     {
@@ -195,6 +239,13 @@ gint32 CJsFileSet::OpenFiles()
 
     pstm = STMPTR( new std::ofstream(
         m_strWebCfg,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strHtml,
         std::ofstream::out |
         std::ofstream::trunc) );
 
@@ -494,7 +545,7 @@ static gint32 EmitFormalArgListJs(
 
         INDENT_UPL;
         std::vector< std::pair< stdstr, stdstr > > vecArgs;
-        ret = GetArgsAndSigs( pArgs, vecArgs );
+        ret = GetArgsAndSigsJs( pArgs, vecArgs );
         if( ERROR( ret ) )
             break;
         for( int i = 0; i < vecArgs.size(); i++ )
@@ -593,7 +644,7 @@ gint32 CDeclareJsStruct::Output()
                 ret = -EFAULT;
                 break;
             }
-            stdstr strSig = pType->GetSignature();
+            stdstr strSig = GetTypeSigJs( pType );
             BufPtr& pVal = pfd->GetVal();
 
             switch( strSig[ 0 ] )
@@ -767,7 +818,6 @@ gint32 CDeclareJsStruct::Output()
         NEW_LINE;
         Wa( "Serialize()" );
         BLOCK_OPEN;
-        NEW_LINE;
         Wa( "var osb = new CSerialBase( this.m_pIf );" );
         NEW_LINE;
         CCOUT << "osb.SerialUint32( this.GetStructId() );";
@@ -787,7 +837,7 @@ gint32 CDeclareJsStruct::Output()
                 ret = -EFAULT;
                 break;
             }
-            stdstr strSig = pType->GetSignature();
+            stdstr strSig = GetTypeSigJs( pType );
 
             stdstr strField = "this.";
             strField += strName;
@@ -833,7 +883,7 @@ gint32 CDeclareJsStruct::Output()
                 ret = -EFAULT;
                 break;
             }
-            stdstr strSig = pType->GetSignature();
+            stdstr strSig = GetTypeSigJs( pType );
             ret = EmitDeserialBySigJs(
                 m_pWriter, strSig );
             if( ERROR( ret ) )
@@ -847,15 +897,144 @@ gint32 CDeclareJsStruct::Output()
             CCOUT << "offset = ret[ 1 ]";
             NEW_LINES( 2 );
         }
+        if( ERROR( ret ) )
+            break;
 
         CCOUT << "return [ this, offset ];";
         BLOCK_CLOSE;
+        NEW_LINE;
+        ret = OutputRestore();
         BLOCK_CLOSE;
         NEW_LINE;
 
     }while( 0 );
 
     return ret;
+}
+
+gint32 CDeclareJsStruct::OutputRestore()
+{
+    gint32 ret = 0;
+    do{
+        Wa( "Restore( oVal )" );
+        BLOCK_OPEN;
+
+        ObjPtr pFields =
+            m_pNode->GetFieldList();
+
+        CFieldList* pfl = pFields;
+        guint32 dwCount = pfl->GetCount();
+        if( dwCount == 0 )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        for( guint32 i = 0; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pfl->GetChild( i );
+            CFieldDecl* pfd = pObj;
+            if( pfd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            stdstr strName = pfd->GetName();
+            CAstNodeBase* pType = pfd->GetType();
+            if( pType == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            stdstr strSig = GetTypeSigJs( pType, true );
+            BufPtr& pVal = pfd->GetVal();
+            if( i > 0 )
+                NEW_LINE;
+
+            CCOUT << "if( oVal."<< strName <<" !== undefined )";
+            INDENT_UPL;
+            switch( strSig[ 0 ] )
+            {
+            case '(' :
+                {
+                    if( strSig.find( 'O' ) == stdstr::npos )
+                    {
+                        CCOUT << "this." << strName
+                            << " = oVal."<< strName <<";";
+                    }
+                    else
+                    {
+                        CCOUT << "this." << strName
+                            << " = CStructBase.RestoreArray( oVal."
+                            << strName <<", '" << strSig << "' );";
+                    }
+                    break;
+                }
+            case '[' :
+                {
+                    if( strSig.find( 'O' ) == stdstr::npos )
+                    {
+                        CCOUT << "this." << strName
+                            << " = oVal."<< strName <<";";
+                    }
+                    else
+                    {
+                        CCOUT << "this." << strName
+                            << " = CStructBase.RestoreMap( oVal."
+                            << strName <<", '" << strSig << "' );";
+                    }
+                    break;
+                }
+
+            case 'O' :
+                {
+                    CStructRef* pstr = ObjPtr( pType );
+                    ObjPtr pObj;
+                    ret = pstr->GetStructType( pObj );
+                    if( ERROR( ret ) )
+                        break;
+                    CStructDecl* pst = pObj;
+                    CCOUT << "this." << strName
+                        << " = new " << pst->GetName() <<"(); ";
+                    NEW_LINE;
+                    CCOUT << "this." << strName
+                        << ".Restore( oVal." << strName <<" );";
+                    break;
+                }
+            case 'h':
+            case 'Q':
+            case 'q':
+            case 'D':
+            case 'd':
+            case 'W':
+            case 'w':
+            case 'b':
+            case 'B':
+            case 'f':
+            case 'F':
+            case 's':
+            case 'a':
+            case 'o':
+                {
+                    CCOUT << "this." << strName
+                        << " = oVal."<< strName <<";";
+                    break;
+                }
+            default:
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+            }
+            INDENT_DOWN;
+            if( i < dwCount - 1 )
+                NEW_LINE;
+        }
+        BLOCK_CLOSE;
+
+    }while( 0 );
+
+    return 0;
 }
 
 static gint32 GenStructsFileJs(
@@ -944,7 +1123,16 @@ static gint32 GenStructsFileJs(
 
         BLOCK_CLOSE;
         BLOCK_CLOSE;
+        NEW_LINE;
 
+        for( int i = 0; i < vecActStructs.size(); i++ )
+        {
+            CStructDecl* pStruct = vecActStructs[ i ];
+            stdstr strName = pStruct->GetName(); 
+            CCOUT << "exports." << strName << " = " << strName << ";";
+            if( i < vecActStructs.size() - 1 )
+                NEW_LINE;
+        }
     }while( 0 );
 
     NEW_LINES(2);
@@ -963,11 +1151,14 @@ CJsExportMakefile::CJsExportMakefile(
 }
 
 static void OUTPUT_BANNER(
-    CJsWriter* m_pWriter, CServiceDecl* pSvc )
+    CJsWriter* m_pWriter, CServiceDecl* pSvc, bool bDisclaimer = true )
 {
     stdstr strLibPath = GetJsLibPath();
-    EMIT_DISCLAIMER;
-    CCOUT << "// " << g_strCmdLine;
+    if( bDisclaimer )
+    {
+        EMIT_DISCLAIMER;
+        CCOUT << "// " << g_strCmdLine;
+    }
     NEW_LINE;
     CCOUT << "const { CConfigDb2 } = require( '"
         << strLibPath <<"/combase/configdb' );";
@@ -975,8 +1166,12 @@ static void OUTPUT_BANNER(
     CCOUT << "const { messageType } = require( '"
         << strLibPath << "/dbusmsg/constants' );";
     NEW_LINE;
-    CCOUT << "const { randomInt, ERROR, Int32Value, USER_METHOD } = require( '"
-        << strLibPath <<"/combase/defines' );";
+    if( bDisclaimer )
+        CCOUT << "const { randomInt, ERROR, Int32Value, USER_METHOD } = require( '"
+            << strLibPath <<"/combase/defines' );";
+    else
+        CCOUT << "const { ERROR, Int32Value, USER_METHOD } = require( '"
+            << strLibPath <<"/combase/defines' );";
     NEW_LINE;
     CCOUT << "const {EnumClsid, errno, EnumPropId, EnumCallFlags, "<<
         "EnumTypeId, EnumSeriProto} = require( '"
@@ -1470,6 +1665,14 @@ gint32 GenJsProj(
         oWriter.SelectWebCfg();
         CExportJsWebpack owp( &oWriter, pRoot );
         ret = owp.Output();
+        if( ERROR( ret ) )
+            break;
+
+        oWriter.SelectSampleHtml();
+        CExportJsSampleHtml ojsh( &oWriter, pRoot );
+        ret = ojsh.Output();
+        if( ERROR( ret ) )
+            break;
 
     }while( 0 );
 
@@ -1505,7 +1708,7 @@ static gint32 EmitRespList(
     do{
         Wa( "/*" );
         std::vector< std::pair< stdstr, stdstr > > vecArgs;
-        ret = GetArgsAndSigs( pOutArgs, vecArgs );
+        ret = GetArgsAndSigsJs( pOutArgs, vecArgs );
         if( ERROR( ret ) )
             break;
 
@@ -1578,6 +1781,65 @@ gint32 CImplJsMthdProxyBase::OutputSync()
             Wa( "var osb = new CSerialBase( this );" );
             Wa( "var ret = 0" );
             CArgList* pal = pInArgs;
+            bool bDecl = false;
+            for( guint32 i = 0; i < dwInCount; i++ )
+            {
+                // restore if necessary
+                CFormalArg* pfa = pal->GetChild( i );
+                if( pfa == nullptr )
+                    continue;
+                CAstNodeBase* pType = pfa->GetType();
+                if( pType == nullptr )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                stdstr strArg = pfa->GetName();
+                stdstr strSig = GetTypeSigJs( pType, true );
+                if( strSig.find( 'O' ) == stdstr::npos )
+                    continue;
+                if( !bDecl )
+                {
+                    bDecl = true;
+                    CCOUT << "var oBack;";
+                    NEW_LINE;
+                }
+
+                if( strSig[ 0 ] == 'O' )
+                {
+                    CCOUT << "oBack = " << strArg << ";";
+                    NEW_LINE;
+                    CStructRef* pstr = ObjPtr( pType );
+                    ObjPtr pObj;
+                    ret = pstr->GetStructType( pObj );
+                    if( ERROR( ret ) )
+                        break;
+                    CStructDecl* pst = pObj;
+                    CCOUT << strArg << " = new "
+                        << pst->GetName() << "();";
+                    NEW_LINE;
+                    CCOUT << strArg << ".Restore( oBack );";
+                }
+                else if( strSig[ 0 ] == '(' )
+                {
+                    NEW_LINE;
+                    CCOUT << "oBack = " << strArg << ";";
+                    NEW_LINE;
+                    CCOUT << strArg
+                        << " = CStructBase.RestoreArray( oBack );";
+                }
+                else if( strSig[ 0 ] == '[' )
+                {
+                    NEW_LINE;
+                    CCOUT << "oBack = " << strArg << ";";
+                    NEW_LINE;
+                    CCOUT << strArg
+                        << " = CStructBase.RestoreMap( oBack );";
+                }
+            }
+            if( bDecl )
+                NEW_LINE;
+
             for( guint32 i = 0; i < dwInCount; i++ )
             {
                 CFormalArg* pfa = pal->GetChild( i );
@@ -1589,7 +1851,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
                     ret = -EFAULT;
                     break;
                 }
-                stdstr strSig = pType->GetSignature();
+                stdstr strSig = GetTypeSigJs( pType );
                 stdstr strArg = pfa->GetName();
                 ret = EmitSerialBySigJs(
                     m_pWriter, strArg, strSig );
@@ -1718,7 +1980,7 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
                 ret = -EFAULT;
                 break;
             }
-            stdstr strSig = pType->GetSignature();
+            stdstr strSig = GetTypeSigJs( pType );
             ret = EmitDeserialBySigJs(
                 m_pWriter, strSig );
             if( ERROR( ret ) )
@@ -1799,7 +2061,7 @@ gint32 CImplJsMthdProxyBase::OutputEvent()
                     pfa->GetType();
 
                 stdstr strSig =
-                    pType->GetSignature();
+                    GetTypeSigJs( pType );
 
                 ret = EmitDeserialBySigJs(
                     m_pWriter, strSig );
@@ -2094,11 +2356,15 @@ gint32 CImplJsMainFunc::Output()
 
         m_pWriter->SelectMainFuncFile();
 
-        OUTPUT_BANNER( m_pWriter, vecSvcs[ 0 ] );
+        EMIT_DISCLAIMER;
+        CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
 
         stdstr strLibPath = GetJsLibPath();
-        CCOUT << "const {CoCreateInstance}=require( '"
+        CCOUT << "const { randomInt } = require( '"
+            << strLibPath << "/combase/defines' );";
+        NEW_LINE;
+        CCOUT << "const {CoCreateInstance, RegisterFactory}=require( '"
             << strLibPath <<"/combase/factory' );";
         NEW_LINE;
         CCOUT << "const {CIoManager} = require( '"
@@ -2107,9 +2373,12 @@ gint32 CImplJsMainFunc::Output()
         Wa( "// Start the iomanager" );
         Wa( "globalThis.g_iMsgIdx = randomInt( 0xffffffff );" );
         Wa( "globalThis.CoCreateInstance=CoCreateInstance;" );
+        Wa( "globalThis.RegisterFactory=RegisterFactory;" );
         Wa( "globalThis.g_oIoMgr = new CIoManager();" );
         Wa( "globalThis.g_oIoMgr.Start()" );
         NEW_LINE;
+
+        OUTPUT_BANNER( m_pWriter, vecSvcs[ 0 ], false );
         Wa( "// Start the client(s)" );
 
         for( auto& elem : vecSvcs )
@@ -2201,7 +2470,7 @@ gint32 CImplJsMainFunc::EmitProxySampleCode(
                 }
                 else
                 {
-                    ret = GetArgsAndSigs( pInArgs, vecArgs );
+                    ret = GetArgsAndSigsJs( pInArgs, vecArgs );
                     if( ERROR( ret ) )
                         break;
 
@@ -2307,8 +2576,8 @@ gint32 CImplJsMainFunc::OutputCli(
         }
         else
         {
-            strReturn = "oProxies";
-            CCOUT << "var oProxies = [];";
+            strReturn = "arrProxies";
+            CCOUT << "var arrProxies = [];";
         }
         NEW_LINE;
 
@@ -2389,7 +2658,8 @@ gint32 CImplJsMainFunc::OutputCli(
             }
             EmitProxySampleCode( vecSvcs[ i ] );
             NEW_LINE;
-            CCOUT << "return " << strReturn << ";";
+            CCOUT << "globalThis." << strReturn
+                << " = " << strReturn << ";";
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;
@@ -2504,6 +2774,16 @@ gint32 CExportJsReadme::Output_en()
         CCOUT << "And please don't edit it, since it will be "
             << "overwritten by `ridlc` without backup.";
         NEW_LINES( 2 );
+
+        CCOUT << "* *"<< g_strAppName <<".html*: "
+            << "This is a sample html file, to demonstrate how the webpage or external caller " 
+            << "interact with the client object.";
+        NEW_LINE;
+        CCOUT << "And if this file is already present, the ridlc will "
+            << "generate the new sample html to the `.new` file next time";
+        NEW_LINES( 2 );
+
+
         for( auto& elem : vecSvcNames )
         {
             CCOUT << "* *"<< elem << "clibase.js* : "
@@ -2628,8 +2908,15 @@ gint32 CExportJsReadme::Output_cn()
                 << "`ridlc`会在在下一次运行时重写里面的内容。";
         NEW_LINES( 2 );
 
+        CCOUT << "* *"<< g_strAppName <<".html*: "
+            << "该文件是一个例子html, 用于展示如何在页面或者打包后外部调用者如何使用客户端程序"; 
+        NEW_LINE;
+        CCOUT << "这个文件如果存在的, `ridlc`下一次编译的输出会写入`.new`文件里。";
+        NEW_LINES( 2 );
+
+
         CCOUT << "* *synccfg.py*: "
-            << "一个小的Python脚本，用来同步本应用配置信息。";
+            << "一个小的Python脚本, 用来同步本应用配置信息。";
         NEW_LINES(2);
         CCOUT << "**注1**: 上文中的粗体字的文件是需要你进一步修改的文件. 斜体字的文件则不需要。"
             << "如果仍然有修改的必要，请注意这些文件有被`ridlc`或者`synccfg.py`改写的风险。";
@@ -2695,3 +2982,60 @@ gint32 CExportJsWebpack::Output()
     return ret;
 }
 
+gint32 CExportJsSampleHtml::Output()
+{
+    gint32 ret = 0;
+    do{
+        std::vector< ObjPtr > vecSvcs;
+        ret = m_pNode->GetSvcDecls( vecSvcs );
+        if( ERROR( ret ) )
+            break;
+
+        Wa( "<!DOCTYPE html>" );
+        Wa( "<html><head><meta charset=\"utf-8\" /></head></html>" );
+        Wa( "<body>" );
+        Wa( "<p id=\"log\">Sample HTML<br /></p>" );
+        CCOUT << "<script src=\"dist/" << g_strAppName << ".js\">";
+        NEW_LINE;
+        Wa( "</script>" );
+        Wa( "<script>" );
+        CCOUT << "console.log( \"hello, " << g_strAppName << "!\");";
+        NEW_LINE;
+        Wa( "var iChecks = 0;" );
+        CCOUT << "function checkProxyState()";
+        BLOCK_OPEN;
+        stdstr strVar = "oProxy";
+
+        if( vecSvcs.size() > 1 )
+            strVar = "arrProxies";
+        CCOUT << "if( globalThis." << strVar << " === undefined )";
+        BLOCK_OPEN;
+        Wa( "setTimeout( checkProxyState, 2000 );" );
+        CCOUT << "console.log( \"Waiting RPC connection ready...\" );";
+        BLOCK_CLOSE;
+        if( vecSvcs.size() == 1 )
+        {
+            CCOUT << "else if( globalThis." << strVar << ".m_iState === 5 )";
+            BLOCK_OPEN;
+            CCOUT << "console.log( \"RPC connection is down...\" );";
+            NEW_LINE;
+            CCOUT << "globalThis.oProxy = null;";
+            BLOCK_CLOSE; 
+        }
+        CCOUT << "else";
+        BLOCK_OPEN;
+        Wa( "if( iChecks++ === 0 )" );
+        CCOUT << "    console.log( \"RPC connection ready \" + globalThis." << strVar << " );";
+        NEW_LINE;
+        CCOUT << "setTimeout( checkProxyState, 5000 );";
+        BLOCK_CLOSE;
+        BLOCK_CLOSE;
+        NEW_LINE;
+        Wa( "setTimeout( checkProxyState, 2000 );" );
+        Wa( "//# sourceURL=browsertools://custom/rpc-entry.js" );
+        Wa( "</script>" );
+        Wa( "</body>" );
+
+    }while( 0 );
+    return ret;
+}
