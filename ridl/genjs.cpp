@@ -1873,7 +1873,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
         stdstr strIfName = m_pIf->GetName();
 
         Wa( "oReq.SetString( EnumPropId.propIfName," );
-        CCOUT << "    DBusIfName( 'I" << strIfName <<"' ) );";
+        CCOUT << "    DBusIfName( '" << strIfName <<"' ) );";
         NEW_LINE;
         Wa( "oReq.SetString( EnumPropId.propObjPath," );
         Wa( "    this.m_strObjPath );" );
@@ -1884,7 +1884,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
         Wa( "oReq.SetString( EnumPropId.propDestDBusName," );
         Wa( "    this.m_strDest );" );
         Wa( "oReq.SetString( EnumPropId.propMethodName," );
-        CCOUT << "USER_METHOD(\" "<< strName << " \") );";
+        CCOUT << "USER_METHOD(\""<< strName << "\") );";
         NEW_LINE;
         Wa( "var oCallOpts = new CConfigDb2();" );
 
@@ -1954,7 +1954,11 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         Wa( "var ret = oResp.GetProperty( EnumPropId.propReturnValue );" );
         Wa( "if( ERROR( ret ) )" );
         BLOCK_OPEN;
-        CCOUT << "this."<< strName << "Callback( oContext, ret );";
+        Wa( "if( oContext.m_oCallback === undefined )" );
+        CCOUT << "    this."<< strName << "Callback( oContext, ret );";
+        NEW_LINE;
+        Wa( "else" );
+        CCOUT << "    oContext.m_oCallback.bind(this)( oContext, ret );";
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "else" );
@@ -1989,12 +1993,23 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
             CCOUT << "    throw new Error( "
                 <<"'Error failed to deserialize response for I"
                 << strIfName << "::" << strName << "' );";
+            NEW_LINE;
             Wa( "args.push( ret[ 0 ] );" );
             Wa( "offset = ret[ 1 ];" );
             if( i < dwOutCount - 1 )
                 NEW_LINE;
         }
-        CCOUT << "this." << strName << "Callback.apply( this, args );";
+        
+        Wa( "if( oContext.m_oCallback === undefined )" );
+        CCOUT << "    this." << strName << "Callback.apply( this, args );";
+        NEW_LINE;
+        Wa( "else" );
+        CCOUT << "    oContext.m_oCallback.apply( this, args );";
+        if( dwOutCount > 0 )
+        {
+            NEW_LINE;
+            CCOUT << "ret = args[ 1 ];";
+        }
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "oContext.m_iRet = Int32Value( ret );" );

@@ -214,14 +214,19 @@ class CSerialBase
         var oSizeBuf = Buffer.alloc( 8 )
         oSizeBuf.writeUInt32BE( 0, 0 )
         oSizeBuf.writeUint32BE( val.length, 4 )
-        if( this.m_oBuf === null )
-            this.m_oBuf = oSizeBuf
-        else
-            this.m_oBuf = Buffer.concat( [this.m_oBuf, oSizeBuf])
-        if( val.length === 0 )
-            return
+        var oBackBuf = this.m_oBuf
+        this.m_oBuf = oSizeBuf
+
         for( var elem of val )
             this.SerialElem( elem, sigElem )
+
+        this.m_oBuf.writeUInt32BE(
+            this.m_oBuf.length - 8 )
+        if( oBackBuf !== null )
+        {
+            this.m_oBuf =
+                Buffer.concat([oBackBuf, this.m_oBuf])
+        }
         return
     }
 
@@ -280,10 +285,10 @@ class CSerialBase
         var sigElem = sig.slice(1, dwSigLen-1)
         var oSizeBuf = Buffer.alloc( 8 )
         oSizeBuf.writeUInt32BE( 0, 0 )
-        oSizeBuf.writeUint32BE( val.length, 4 )
+        oSizeBuf.writeUint32BE( val.size, 4 )
         var oBackBuf = this.m_oBuf
         this.m_oBuf = oSizeBuf
-        if( val.length === 0 )
+        if( val.size === 0 )
         {
             if( oBackBuf.length > 0 )
                 this.m_oBuf = Buffer.concat( [oBackBuf, oSizeBuf])
@@ -307,8 +312,9 @@ class CSerialBase
         }
         this.m_oBuf.writeUInt32BE(
             this.m_oBuf.length - 8 )
-        this.m_oBuf =
-            Buffer.concat([oBackBuf, this.m_oBuf])
+        if( oBackBuf !== null )
+            this.m_oBuf =
+                Buffer.concat([oBackBuf, this.m_oBuf])
         return
     }
 
@@ -384,7 +390,7 @@ class CSerialBase
         {
             throw new Error( "Error bytearray size is out of range")
         }
-        var strRet = CBuffer.BufferToStrNoNull( oBuf )
+        var strRet = CBuffer.BufferToStrNoNull( oBuf, offset )
         if( strRet[ strRet.length - 1] === '\u0000' )
             strRet = strRet.slice( 0, strRet.length - 1)
         return [ strRet, offset + dwSize + 4 ]
@@ -411,7 +417,7 @@ class CSerialBase
         if( oObj === null )
             throw new Error( "Error no such struct")
         var retOff = oObj.Deserialize( oBuf, offset )
-        return [ oObj, retOff ]
+        return [ oObj, retOff[1] ]
     }
 
     DeserialElem( oBuf, offset, sig )
@@ -421,7 +427,7 @@ class CSerialBase
         else if( sig[0] === '[')
             return this.DeserialArray( oBuf, offset, sig )
         else
-            return this.m_oDeserialMap[ sig[0]]( oBuf, offset )
+            return this.m_oDeserialMap.get( sig[0] )( oBuf, offset )
     }
 
     DeserialArray( oBuf, offset, sig )
@@ -439,12 +445,12 @@ class CSerialBase
         if( dwSize > CV.MAX_BYTES_PER_BUFFER || dwCount > 1000000 )
             throw new Error( "Error array size out of range")
         offset += 8
-        var arrValues
+        var arrValues = []
         for( var i = 0; i < dwCount; i++ )
         {
             var ret = this.DeserialElem( oBuf, offset, sigElem )
             arrValues.push( ret[0])
-            offset += ret[1]
+            offset = ret[1]
         }
         return [arrValues, offset]
 
@@ -466,12 +472,12 @@ class CSerialBase
             throw new Error( "Error array size out of range")
         offset += 8
 
-        sigKey = CSerialBase.FindStandaloneSig( sigElem )
+        var sigKey = CSerialBase.FindStandaloneSig( sigElem )
         if( sigKey.length >= sigElem.length )
             throw new Error( "Error invalid map key signature")
         var sigRest = 
             sigElem.slice( sigKey.length )
-        sigValue = CSerialBase.FindStandaloneSig(sigRest )
+        var sigValue = CSerialBase.FindStandaloneSig(sigRest )
         if( sigValue !== sigRest )
             throw new Error( "Error invalid map value signature")
 
@@ -479,9 +485,9 @@ class CSerialBase
         for( var i = 0; i < dwCount; i++ )
         {
             var retKey = this.DeserialElem( oBuf, offset, sigKey )
-            offset += retKey[1]
+            offset = retKey[1]
             var retVal = this.DeserialElem( oBuf, offset, sigValue)
-            offset += retVal[1]
+            offset = retVal[1]
             mapValues.set( retKey[0], retVal[0])
         }
         return [mapValues, offset]
