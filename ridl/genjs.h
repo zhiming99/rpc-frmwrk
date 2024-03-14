@@ -182,13 +182,14 @@ class CExportIndexJs
     gint32 Output();
 };
 
-class CJsExportMakefile :
-    public CExportBase
+class CJsExportMakefile
 {
+    CStatements* m_pNode = nullptr;
+    CWriterBase* m_pWriter = nullptr;
     public:
-    typedef CExportBase super;
     CJsExportMakefile(
         CJsWriter* pWriter, ObjPtr& pNode );
+    gint32 Output();
 };
 
 class CImplJsMthdProxyBase :

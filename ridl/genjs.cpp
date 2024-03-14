@@ -1145,9 +1145,30 @@ static gint32 GenStructsFileJs(
 
 CJsExportMakefile::CJsExportMakefile(
     CJsWriter* pWriter, ObjPtr& pNode )
-    : super( pWriter, pNode )
 {
-    m_strFile = "./pymktpl";
+    m_pWriter = pWriter;
+    m_pNode = pNode;
+}
+
+gint32 CJsExportMakefile::Output()
+{
+    gint32 ret = 0;
+    do{
+        Wa( "update :" );
+        Wa( "\tpython3 synccfg.py" );
+        NEW_LINE;
+
+        Wa( "debug :" );
+        Wa( "\t@sed -i \"s@mode: 'production'@mode: 'development'@g\" webpack.config.js" );
+        Wa( "\twebpack" );
+        NEW_LINE;
+
+        Wa( "release :" );
+        Wa( "\t@sed -i \"s@mode: 'development'@mode: 'production'@g\" webpack.config.js" );
+        Wa( "\twebpack" );
+
+    }while( 0 );
+    return ret;
 }
 
 static void OUTPUT_BANNER(
