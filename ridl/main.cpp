@@ -112,8 +112,9 @@ void Usage()
 
 #ifdef JAVASCRIPT
     printf( "\t-J:\tTo generate the JavaScript skeleton files\n" );
-    printf( "\t--odesc_url<url>:\tthe <url> specify the objdesc file.\n" );
-    printf( "\t--lib_path<path>:\tthe <path> specify the path to the JS support library\n" );
+    printf( "\t--odesc_url=<url>: the <url> to specify path to get the object description \n" );
+    printf( "\t\tfile for JS client. This is a mandatory option when '-J' is given\n" );
+    printf( "\t--lib_path=<path>: the <path> to specify the alternative path to the JS support library\n" );
 #endif
 
     printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );

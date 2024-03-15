@@ -1159,13 +1159,13 @@ gint32 CJsExportMakefile::Output()
         NEW_LINE;
 
         Wa( "debug :" );
-        Wa( "\t@sed -i \"s@mode: 'production'@mode: 'development'@g\" webpack.config.js" );
-        Wa( "\twebpack" );
+        Wa( "\t@sed -i \"s@mode:[[:blank:]]*'production'@mode: 'development'@g\" webpack.config.js" );
+        Wa( "\tnpm exec webpack" );
         NEW_LINE;
 
         Wa( "release :" );
-        Wa( "\t@sed -i \"s@mode: 'development'@mode: 'production'@g\" webpack.config.js" );
-        Wa( "\twebpack" );
+        Wa( "\t@sed -i \"s@mode:[[:blank:]]*'development'@mode: 'production'@g\" webpack.config.js" );
+        Wa( "\tnpm exec webpack" );
 
     }while( 0 );
     return ret;
@@ -1601,6 +1601,13 @@ gint32 GenJsProj(
         strAppName.empty() ||
         pRoot.IsEmpty() )
         return -EINVAL;
+
+    if( g_strWebPath.empty() )
+    {
+        fprintf( stderr,
+            "Error missing the URL to the object description file" );
+        return -EINVAL;
+    }
 
     gint32 ret = 0;
 
@@ -2317,7 +2324,7 @@ gint32 CImplJsSvcProxy::OutputSvcProxyClass()
             Wa( "OnDataReceivedImpl( hStream, oBuf )" );
             BLOCK_OPEN;
             Wa( "// add code here" );
-            Wa( "// to handle the incoming byte stream" );
+            CCOUT << "// to handle the incoming byte stream";
             BLOCK_CLOSE;
             NEW_LINES( 2 );
 
@@ -2328,7 +2335,7 @@ gint32 CImplJsSvcProxy::OutputSvcProxyClass()
             Wa( "OnStmClosedImpl( hStream )" );
             BLOCK_OPEN;
             Wa( "// add code here" );
-            Wa( "// to do some cleanup work if necessary" );
+            CCOUT << "// to do some cleanup work if necessary";
             BLOCK_CLOSE;
         }
         BLOCK_CLOSE;
@@ -2617,7 +2624,7 @@ gint32 CImplJsMainFunc::OutputCli(
         }
         NEW_LINE;
 
-        CCOUT << "var strObjDesc = '" << g_strWebPath << "';";
+        CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;
@@ -2876,7 +2883,7 @@ gint32 CExportJsReadme::Output_cn()
         CCOUT << "* **maincli.js**: "
             << "分别包含对客户端和服务器端的程序入口`main()`函数的定义";
         NEW_LINE;
-        CCOUT << "你可以对这两个文件作出修改，不必担心ridlc会冲掉你修改的内容。"
+        CCOUT << "你可以对这两个文件作出修改, 不必担心ridlc会冲掉你修改的内容。"
             << "`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件"
             << "名加上.new后缀。";
         NEW_LINES( 2 );
@@ -2908,7 +2915,7 @@ gint32 CExportJsReadme::Output_cn()
         }
 
         CCOUT<< "* *" << g_strAppName << "structs.js*: "
-            << "包含一个ridl文件中声明的所有用到的struct，"
+            << "包含一个ridl文件中声明的所有用到的struct,"
             << "以及序列/反序列化方法的实现.";
         NEW_LINE;
         CCOUT << "这个文件务必不要做进一步的修改。"
@@ -3027,6 +3034,15 @@ gint32 CExportJsSampleHtml::Output()
         if( ERROR( ret ) )
             break;
 
+        Wa( "<!--" );
+        EMIT_DISCLAIMER_INNER( "" );
+        NEW_LINE;
+        CCOUT << "* command line: " << g_strCmdLine;
+        NEW_LINE;
+        CCOUT << "* npm dependency: browserify buffer exports " 
+            << "long lz4 process put safe-buffer stream xxhash";
+        NEW_LINE;
+        Wa( "-->" );
         Wa( "<!DOCTYPE html>" );
         Wa( "<html><head><meta charset=\"utf-8\" /></head></html>" );
         Wa( "<body>" );
