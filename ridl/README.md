@@ -1,7 +1,7 @@
 [中文](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README_cn.md)
 ### Introduction
 
-* The `ridl`, stands for `rpc idl`, as the RPC interface description language. And this module tries to deliver a rapid development tool for `rpc-frmwrk` by generating a set of skelton source files for proxy/server , as well as the configuration files, and Makefile with the input `ridl` files. It is expected to generates the skelton project for C++, Python and Java.   
+* The `ridl`, stands for `rpc idl`, as the RPC interface description language. And this module tries to deliver a rapid development tool for `rpc-frmwrk` by generating a set of skeleton source files for proxy/server , as well as the configuration files, and Makefile with the input `ridl` files. It is expected to generates the skeleton project for C++, Python Java and JavaScript.   
 * This tool helps the developer to ease the learning curve and focus efforts on business implementations. And one can still refer to the `../test` directory to manually craft an `rpc-frmwrk` applications, with the maximum flexibility and performance advantage.
 * The following code snippet is what the ridl looks like:
 
@@ -111,11 +111,16 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -O:     To specify the path for the output files. 'output' is the default path if not
                 specified
                 
-        -p:     To generate Python skelton files   
+        -p:     To generate Python skeleton files.   
 
-        -j:     To generate Java skelton files       
+        -j:     To generate Java skeleton files.    
+
+        -J:     To generate the JavaScript skelton files (client only). '-f' or '-b' options are not supported when this option is specified.   
+
+        --odesc_url=<url>
+                To specify the url where to find the object desription file for the JS client. The url must not include the name of the object description file. And it is a mandatory option for JS skelton generator.   
         
-        -f:     To generate skelton files with 'rpcfs' support. C++ or Python currently.
+        -f:     To generate skeleton files with 'rpcfs' support. C++ or Python currently.
         
         -P:     To specify the prefix for the target java package. The java package name would be
                 <prefix>.<appname>, Java only.
@@ -125,11 +130,11 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -L：    To generate the README.md in the specified language. Currently we support "cn" for
                 Chinese and "en" for English.
 
-        -s:     To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels.
-        -b:     To generate the skelton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
+        -s:     To generate the skeleton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels.
+        -b:     To generate the skeleton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
 ```
 
-Currently `ridlc` can output skelton code in C++, Python and Java. In the future, it will be able to generate code for other languages as well.
+Currently `ridlc` can output skeleton code in C++, Python and Java. In the future, it will be able to generate code for other languages as well.
 
 ### Output for C++ project
 
@@ -138,8 +143,8 @@ On a successful compile of the above sample ridl file, `ridlc` will generate the
 * **maincli.cpp, mainsvr.cpp**: as the name indicate, the two files define main function of the proxy and server respectively. Each file contains a same-name function, that is a `maincli` function in maincli.cpp and `mainsvr` in mainsvr.cpp, which is the ideal place to add your custom code.
 
 * **SimpFileSvccli.cpp, SimpFileSvccli.h, SimpFileSvcsvr.cpp, SimpFileSvcsvr.h:** the files are named with the *service id* of the *service statement* appending a `svr` or `cli`. Each individual service declaration has two pairs of `.cpp` and `.h` file, for both server/client side. The cpp file contains all the methods that user should implement to get server/proxy to work. They are mainly the same-name methods as defined in ridl file on Server side as the request handlers. 
-The amount of efforts to take are different depending on whether or not the meethod is labeled `async`. Without `async` tag, the implementation is a synchronous version and time-saving at development time. And the implementation with `async` tag takes more efforts, but has better performance. The implementation consists of two parts, one is the skelton code to serialize/deserialize parameters, schedule callbacks, setup timers, and the other part are the business logics for the user to implement, including handling response, or error condition, timeout or bad response for example. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to reduce the developing efforts.
-* *example.cpp, example.h* : the files are named with the name defined by *appname*. It contains all the skelton method declarations, and implementations.
+The amount of efforts to take are different depending on whether or not the meethod is labeled `async`. Without `async` tag, the implementation is a synchronous version and time-saving at development time. And the implementation with `async` tag takes more efforts, but has better performance. The implementation consists of two parts, one is the skeleton code to serialize/deserialize parameters, schedule callbacks, setup timers, and the other part are the business logics for the user to implement, including handling response, or error condition, timeout or bad response for example. And `rpc-frmwrk` provides rich utilities to help developing asynchronous implementation to reduce the developing efforts.
+* *example.cpp, example.h* : the files are named with the name defined by *appname*. It contains all the skeleton method declarations, and implementations.
 * *Makefile*: The make file to build the project. It has two build targets, `debug` and `release`. the debug version of image will go to the `debug` directory, and the release version of image will go to the `release` directory. During making, the communication settings are synchronized with current system settings, and usually you don't need to manually config it.
 * *exampledesc.json, driver.json:* The configuration files. `driver.json` is for `I/O manager` and `port objsects`, which is relative stable, and `exampledesc.json` contains all the things needed for the services defined in the ridl file. Everytime you have used rpcfg.py to update the settings of `rpc-frmwrk`, you need to run `make` to update the two files as well.
 * **run:** After a successful make, there will be two executables, `examplecli` and `examplesvr`. Run the server on the `bridge` side and the client on the `reqfwdr` side. If you have specified `-l` option when generating the code, the `make` command will produce a shared library named `examplelib.so` instead, which has all the functions and classes except the `main` function.
@@ -189,6 +194,7 @@ And please don't edit it, since they will be overwritten by `ridlc`.
 * *synccfg.py*: a small python script to synchronous settings with the system settings, just ignore it.
 * **run:** you can run `java org.rpcf.example.mainsvr` and `java org.rpcf.example.maincli` to start the server and client. Before the first run after running `ridlc` successfully, make sure to run `make` to update the configuration file, that is, the `exampledesc.json` file.
 
+### Output for JavaScript Project
 
 ### Interchangable client and server between C++, Python, and Java.
 You can connect the C++ server with a python client or a Python server with a Java client as long as both are generated with the same ridl file.

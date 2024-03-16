@@ -114,6 +114,11 @@ service SimpFileSvc [ stream ]
         -p: 生成Python的框架文件。   
 
         -j: 生成Java的框架文件。
+
+        -J: 生成JavaScript的客户端框架文件。此选项不支持`-f`和`-b`选项。
+
+        --odesc_url=<url> :
+            指定部署时`object description`文件的`url`。需要注意的是这个`url`不要包含文件名。这个选项是生成JS框架时的强制选项.
         
         -f: 生成`rpcfs`的框架。该框架可以直接执行，并mount为服务器或客户端的文件系统，具体信息请参考`rpcfs`的说明
         
@@ -181,7 +186,34 @@ service SimpFileSvc [ stream ]
 * *synccfg.py*: 一个python脚本用于更新程序的配置文件。
 * **运行:** 在命令行输入 `java org.rpcf.example.mainsvr` 或 `java org.rpcf.example.maincli`以启动服务器或者客户端. 注意设置`CLASSPATH`环境变量，确保系统可以找到`rpcbase.jar`
 
+### JavaScript 项目生成的文件
+* **maincli.js**: 包含建立`iomanager`和各个`proxy`对象, 以及启动`proxy`的代码。
+`ridlc`会留意这个文件作的改动。 当`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件名加上.new后缀，避免覆盖原文件。
+
+* **SimpFileSvccli.js**: 包含有关service `SimpFileSvc`的客户端的所有接口函数的声明和空的实现。这些接口函数需要你的进一步实现, 其中主要包括服务器端的请求处理和客户端的事件处理。
+你可以对这两个文件作出修改，不必担心`ridlc`会冲掉你修改的内容。`ridlc`再次编译时，如果发现目标目录存在该文件，会为新生成的文件的文件名加上.new后缀。
+
+* *SimpFileSvcclibase.js* : 分别包含有关service `SimpFileSvc`的客户端的所有辅助函数和底部支持功能的实现。
+这些函数和方法务必不要做进一步的修改。`ridlc`在下一次运行时会重写里面的内容。
+
+* *examplestructs.js*: 包含一个ridl文件中声明的所有用到的struct,以及序列/反序列化方法的实现.
+这个文件务必不要做进一步的修改。`ridlc`在下一次运行时会重写里面的内容。
+
+* *exampledesc.json*: 包含本应用相关的配置信息, 和所有定义的服务(service)的配置参数。
+这个文件务必不要做进一步的修改。`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。
+
+* *driver.json*: 包含本应用相关的配置信息,主要是底层的iomanager的配置信息。
+这个文件务必不要做进一步的修改。`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。
+
+* *Makefile*: 工程文件. 此文件有三个`target`, `update`更新配置， `debug` 指示webpack打包整个项目，保留文件的格式，便于调试。`release`指示webpack以紧凑格式打包整个项目，适用于上线文件。
+
+* *webpack.config.js*: 该文件是webpack打包整个工程的配置文件。webpack的输出为以`example.js`结尾的一组js文件。用于在web服务器上的部署。 这个文件务必不要做进一步的修改。`ridlc`会在在下一次运行时重写里面的内容。
+
+* *example.html*: 该文件是一个例子html, 用于展示如何在页面或者打包后外部调用者如何使用客户端程序, 相当于程序的入口。
+这个文件如果存在的, `ridlc`下一次编译的输出会写入`.new`文件里。
+
+* *synccfg.py*: 一个小的Python脚本, 用来同步本应用配置信息。
 
 ### C++, Python, 的Java客户端可以交叉访问其他语言的服务器。
-不过微服务架构的客户端，目前只能访问微服务架构的服务器。C/S架构的客户端可以访问两种架构的服务器。
+微服务架构的客户端，目前只能访问微服务架构的服务器。C/S架构的客户端可以访问两种架构的服务器。
 

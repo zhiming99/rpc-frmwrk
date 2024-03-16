@@ -2881,7 +2881,9 @@ gint32 CExportJsReadme::Output_cn()
         Wa( "### 生成文件介绍:" );
 
         CCOUT << "* **maincli.js**: "
-            << "分别包含对客户端和服务器端的程序入口`main()`函数的定义";
+            << "包含建立`iomanager`和各个`proxy`对象, 以及启动`proxy`的代码。"
+            << "`ridlc`会留意这个文件作的改动。 当`ridlc`再次编译时, "
+            << "如果发现目标目录存在该文件会把新生成的文件名加上.new后缀，避免覆盖原文件。";
         NEW_LINE;
         CCOUT << "你可以对这两个文件作出修改, 不必担心ridlc会冲掉你修改的内容。"
             << "`ridlc`再次编译时，如果发现目标目录存在该文件会把新生成的文件"
@@ -2937,7 +2939,9 @@ gint32 CExportJsReadme::Output_cn()
         NEW_LINES( 2 );
 
         CCOUT << "* *Makefile*: "
-            << "该Makefile会用当前系统配置的信息更新本目录下的json配置文件。";
+            << "工程文件. 此文件有三个`target`, `update`更新配置， "
+            << "`debug` 指示webpack打包整个项目，保留文件的格式，便于调试。"
+            << "`release`指示webpack以紧凑格式打包整个项目，适用于上线文件。";
         NEW_LINE;
         CCOUT << "这个文件务必不要做进一步的修改。"
                 << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";

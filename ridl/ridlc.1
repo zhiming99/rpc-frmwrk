@@ -1,6 +1,6 @@
 .\" Manpage for ridlc.
 .\" Contact woodhead99@gmail.com to correct errors or typos.
-.TH man 1 "16 Jun. 2022" "1.0" "rpc-frmwrk user manuals"
+.TH man 1 "16 Mar. 2024" "1.1" "rpc-frmwrk user manuals"
 .SH NAME
 ridlc \- ridl compiler to generate skelton code for rpc-frmwrk.
 .SH SYNOPSIS
@@ -23,6 +23,15 @@ To generate the Python skelton files.
 .BR \-j " "
 To generate the Java skelton files.
 .TP
+.BR \-J " "
+To generate the JavaScript skelton files (client only). ridlc does not support '-f'
+or '-b' options when this option is specified.
+.TP
+.BR \-\-odesc_url=<url> " "
+To specify the url where to find the object desription file for the JS client.
+The url must not include the name of the object description file. And it is a
+mandatory option for JS skelton generator. 
+.TP
 .BR \-f " "
 To generate the 'skelton files with 'rpcfs' support. C++ or Python at present.
 .TP
@@ -30,17 +39,20 @@ To generate the 'skelton files with 'rpcfs' support. C++ or Python at present.
 To specify the prefix of the Java package. This option is only effective for Java.
 .TP
 .BR \-l " "
-To build a shared library instead of a program. This option works for programms of C++ skelton
+To build a shared library instead of a program. This option works for programms
+of C++ skelton
 .TP
 .BR \-L " "\fIlang\fR
 To output the 'README.md' file in the specified language <lang>. Currently we support
 two languages, "cn" as Chinese, and "en" as English.
 .TP
 .BR \-s " "
-To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels.
+To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99%
+of communication over stream channels.
 .TP
 .BR \-b " "
-To generate the skelton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
+To generate the skelton code with a built-in `rpcrouter`, which has lower
+latency and higher throughput than stand-alone rpcrouter.
 
 
 .SH SEE ALSO
