@@ -353,7 +353,7 @@ class CSerialBase
     {
         var qwBigInt = 
             oBuf.readBigUInt64BE( offset );
-        return [ Number( qwBigInt ), offset + 8 ]
+        return [ qwBigInt, offset + 8 ]
     }
 
     DeserialFloat( oBuf, offset )

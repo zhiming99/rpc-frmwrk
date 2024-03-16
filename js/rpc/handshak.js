@@ -125,12 +125,12 @@ function OnHandshakeComplete( oProxy, oPending, oResp )
             EnumPropId.propSessHash )
         oProxy.m_strSess = strSess
 
-        oProxy.m_qwPeerTime = oInfo.GetProperty(
-            EnumPropId.propTimestamp )
+        oProxy.m_qwPeerTime = Number( oInfo.GetProperty(
+            EnumPropId.propTimestamp ) )
 
         var oInfo2 = oPending.m_oReq.m_oReq.GetProperty( 0 )
-        var qwStartTime1 = oInfo2.GetProperty(
-            EnumPropId.propTimestamp )
+        var qwStartTime1 = Number( oInfo2.GetProperty(
+            EnumPropId.propTimestamp ) )
         var qwStartTime2 = Math.floor( Date.now()/1000 )
         oProxy.m_qwStartTime =
             Math.floor( ( qwStartTime2 + qwStartTime1 ) / 2 )

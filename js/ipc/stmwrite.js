@@ -20,7 +20,7 @@ function StreamWrite( hStream, oBuf )
         oMsg.m_iCmd = IoCmd.StreamWrite[0]
         oMsg.m_iMsgId = globalThis.g_iMsgIdx++
         oMsg.m_dwPortId = this.GetPortId()
-        oMsg.m_oReq.Push( {t: EnumTypeId.typeUInt64, v: hStream })
+        oMsg.m_oReq.Push( {t: EnumTypeId.typeUInt64, v: BigInt( hStream )})
         oMsg.m_oReq.Push( {t: EnumTypeId.typeByteArr, v: oBuf })
         var oPending = new CPendingRequest()
         oPending.m_oReq = oMsg

@@ -139,7 +139,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     SetUint64( iProp, val )
     {
         this.m_props.set( iProp, 
-            { t: Tid.typeUInt64, v: val } )
+            { t: Tid.typeUInt64, v: BigInt( val )} )
     }
 
     SetFloat( iProp, val )
@@ -421,7 +421,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     {
                         throw new Error( "Error buffer is too small" )
                     }
-                    value.v = Number( srcBuf.readBigUInt64BE( pos ) )
+                    value.v = srcBuf.readBigUInt64BE( pos )
                     pos += 8
                     break
                 }               

@@ -327,7 +327,7 @@ exports.CBuffer = class CBuffer extends CObjBase
             {
                 dstBuffer = Buffer.alloc(8)
                 const view = new DataView( dstBuffer.buffer )
-                view.setBigUint64( 0, this.m_value )
+                view.setBigUint64( 0, BigInt( this.m_value ) )
             }
             break
         case Tid.typeFloat :
@@ -407,7 +407,7 @@ exports.CBuffer = class CBuffer extends CObjBase
     SetUint64( val )
     {
         this.type = Tid.typeUInt64
-        this.m_value = val
+        this.m_value = BigInt( val )
     }
 
     SetFloat( val )

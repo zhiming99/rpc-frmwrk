@@ -244,5 +244,17 @@ function OpenStream( oMsg )
 }
 exports.Bdge_OpenStream = OpenStream
 
-function CloseStream()
-{}
+function CloseStream( oMsg )
+{
+    var hStream = oMsg.m_oReq.GetProperty( 0 );
+    if( hStream !== null )
+    {
+        var oStm = this.GetStreamByHandle( hStream );
+        if( oStm )
+        {
+            oStm.Stop();
+        }
+    }
+}
+
+exports.Bdge_CloseStream = CloseStream

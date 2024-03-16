@@ -30,7 +30,7 @@ function KeepAliveRequest( oOrigMsg, qwTaskId )
             EnumPropId.propDestDBusName, val )
     oReq.SetString( EnumPropId.propMethodName, 
         SYS_METHOD("KeepAliveRequest"))
-    oReq.Push( {t: EnumTypeId.typeUInt64, v: qwTaskId})
+    oReq.Push( {t: EnumTypeId.typeUInt64, v: BigInt( qwTaskId )})
     var oCallOpts = new CConfigDb2()
     oCallOpts.SetUint32(
         EnumPropId.propTimeoutSec, 120)

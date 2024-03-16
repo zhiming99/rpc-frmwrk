@@ -3040,7 +3040,7 @@ gint32 CExportJsSampleHtml::Output()
         CCOUT << "* command line: " << g_strCmdLine;
         NEW_LINE;
         CCOUT << "* npm dependency: browserify buffer exports " 
-            << "long lz4 process put safe-buffer stream xxhash";
+            << "long lz4 process put safe-buffer stream xxhash webpack";
         NEW_LINE;
         Wa( "-->" );
         Wa( "<!DOCTYPE html>" );

@@ -18,7 +18,7 @@ function NotifyDataConsumed( hStream )
     oReq.m_iCmd = IoCmd.DataConsumed[0]
     oReq.m_bNoReply = true
     oReq.m_oReq.Push(
-        {t: EnumTypeId.typeUInt64, v: hStream})
+        {t: EnumTypeId.typeUInt64, v: BigInt( hStream )})
     oReq.m_iMsgId = globalThis.g_iMsgIdx++
     this.m_oIoMgr.PostMessage( oReq )
 }
