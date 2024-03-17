@@ -1086,14 +1086,14 @@ gint32 CBuffer::Compress(
 gint32 CBuffer::Decompress(
     guint8* pDest, guint32 dwOrigSize ) const
 {
-    guint32 dwActSize = LZ4_decompress_safe(
+    gint32 iActSize = LZ4_decompress_safe(
         ptr(), ( char* )pDest,
         size(), dwOrigSize );
 
-    if( dwActSize <= 0 )
+    if( iActSize <= 0 )
         return ERROR_FAIL;
 
-    if( dwActSize != dwOrigSize )
+    if( ( ( guint32 )iActSize ) != dwOrigSize )
         return ERROR_FAIL;
 
     return 0;

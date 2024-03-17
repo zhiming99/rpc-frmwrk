@@ -2910,7 +2910,7 @@ gint32 CExportJsReadme::Output_cn()
                 << "分别包含有关service `"<<elem
                 <<"`的客户端的所有辅助函数和底部支持功能的实现。";
             NEW_LINE;
-            CCOUT << "这些函数和方法务必不要做进一步的修改。"
+            CCOUT << "这些函数和方法不要做进一步的修改。"
                 << "`ridlc`在下一次运行时会重写里面的内容。";
             NEW_LINES( 2 );
 
@@ -2920,21 +2920,21 @@ gint32 CExportJsReadme::Output_cn()
             << "包含一个ridl文件中声明的所有用到的struct,"
             << "以及序列/反序列化方法的实现.";
         NEW_LINE;
-        CCOUT << "这个文件务必不要做进一步的修改。"
+        CCOUT << "这个文件不要做进一步的修改。"
                 << "`ridlc`在下一次运行时会重写里面的内容。";
         NEW_LINES( 2 );
 
         CCOUT<< "* *" << g_strAppName << "desc.json*: "
             << "包含本应用相关的配置信息, 和所有定义的服务(service)的配置参数。";
         NEW_LINE;
-        CCOUT << "这个文件务必不要做进一步的修改。"
+        CCOUT << "这个文件不要做进一步的修改。"
             << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
         NEW_LINES( 2 );
 
         CCOUT << "* *driver.json*: "
             << "包含本应用相关的配置信息,主要是底层的iomanager的配置信息。";
         NEW_LINE;
-        CCOUT << "这个文件务必不要做进一步的修改。"
+        CCOUT << "这个文件不要做进一步的修改。"
                 << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
         NEW_LINES( 2 );
 
@@ -2943,7 +2943,7 @@ gint32 CExportJsReadme::Output_cn()
             << "`debug` 指示webpack打包整个项目，保留文件的格式，便于调试。"
             << "`release`指示webpack以紧凑格式打包整个项目，适用于上线文件。";
         NEW_LINE;
-        CCOUT << "这个文件务必不要做进一步的修改。"
+        CCOUT << "这个文件不要做进一步的修改。"
                 << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
         NEW_LINES( 2 );
 
@@ -2951,7 +2951,7 @@ gint32 CExportJsReadme::Output_cn()
             << "该文件用于使用webpack打包整个工程为一个js文件 '" << g_strAppName
             << ".js'用于在web服务器上的部署。";
         NEW_LINE;
-        CCOUT << "这个文件务必不要做进一步的修改。"
+        CCOUT << "这个文件不要做进一步的修改。"
                 << "`ridlc`会在在下一次运行时重写里面的内容。";
         NEW_LINES( 2 );
 
@@ -3044,7 +3044,7 @@ gint32 CExportJsSampleHtml::Output()
         CCOUT << "* command line: " << g_strCmdLine;
         NEW_LINE;
         CCOUT << "* npm dependency: browserify buffer exports " 
-            << "long lz4 process put safe-buffer stream xxhash webpack";
+            << "long lz4 process put safe-buffer stream xxhash xxhashjs webpack";
         NEW_LINE;
         Wa( "-->" );
         Wa( "<!DOCTYPE html>" );

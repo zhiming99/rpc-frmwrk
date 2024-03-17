@@ -121,7 +121,7 @@ function RemoveFile()
             oStmCtx.m_strFile );
         }).then((oContext)=>{
             // the file data will come via the stream channel
-            console.log( `Removed the file ${oStmCtx.m_strFile}`);
+            console.log( `Removed the remote file ${oStmCtx.m_strFile}`);
             strState = "send-file";
             // this is a synchronous call
             // oProxy.m_funcCloseStream( oStmCtx.m_hStream );
