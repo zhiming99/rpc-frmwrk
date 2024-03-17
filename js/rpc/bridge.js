@@ -11,7 +11,7 @@ const { Bdge_EnableRemoteEvent } = require("./enablevtrmt")
 const { Bdge_ForwardRequest } = require("./fwrdreqrmt")
 const { Bdge_ForwardEvent } = require("./fwrdevtrmt")
 const { Bdge_OnKeepAlive } = require("./keepalivermt")
-const { Bdge_OpenStream } = require( "./openstmrmt")
+const { Bdge_OpenStream, Bdge_CloseStream } = require( "./openstmrmt")
 const { CRpcStreamBase, Bdge_DataConsumed } = require( "./stream")
 const { Bdge_StreamWrite } = require( "./stmwritermt")
 
@@ -161,6 +161,9 @@ class CRpcTcpBridgeProxy
 
         oIoTab[ IoCmd.OpenStream[0]] =
             Bdge_OpenStream.bind(this)
+
+        oIoTab[ IoCmd.CloseStream[0]] =
+            Bdge_CloseStream.bind(this)
 
         oIoTab[ IoCmd.StreamWrite[0]] =
             Bdge_StreamWrite.bind( this )

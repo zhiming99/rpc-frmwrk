@@ -430,7 +430,7 @@ class CRpcStream extends CRpcStreamBase
                 oMsg.m_iCmd = IoEvent.StreamClosed[0]
                 oMsg.m_dwPortId = this.m_oParent.GetPortId()
                 oMsg.m_iMsgIdx = globalThis.g_iMsgIdx++
-                oMsg.m_oReq.Push({t: EnumTypeId.typeUInt64, v: this.m_hStream} )
+                oMsg.m_oReq.Push({t: EnumTypeId.typeUInt64, v: BigInt( this.m_hStream )} )
                 oMsg.m_oReq.Push({t: EnumTypeId.typeByte, v: token} )
                 if( token === EnumStmToken.tokError )
                     oMsg.m_oReq.Push({t: EnumTypeId.typeUInt32, v: ret} )
@@ -594,7 +594,8 @@ class CRpcStream extends CRpcStreamBase
         oMsg.m_iCmd = IoEvent.StreamRead[0]
         oMsg.m_iMsgIdx = globalThis.g_iMsgIdx++
         oMsg.m_dwPortId = this.m_oParent.GetPortId()
-        oMsg.m_oReq.Push({t: EnumTypeId.typeUInt64, v: this.m_hStream} )
+        oMsg.m_oReq.Push({t: EnumTypeId.typeUInt64,
+            v: BigInt( this.m_hStream )} )
         oMsg.m_oReq.Push({t: EnumTypeId.typeByteArr, v: oBuf} )
         this.m_oParent.PostMessage( oMsg )
         if( oReport )
@@ -608,6 +609,8 @@ function DataConsumed( oReqMsg )
 {
     var hStream = oReqMsg.m_oReq.GetProperty( 0 )
     var oStm = this.GetStreamByHandle( hStream )
+    if( !oStm )
+        return
     var oPayload = oStm.OutquePayload()
     if( oPayload === undefined )
         return

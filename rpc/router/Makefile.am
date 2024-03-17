@@ -8,7 +8,7 @@ endif
 
 rpcrouter_LDADD+=../librpc.la ../../ipc/libipc.la $(COMMON_LINK) \
  ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
- -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/rpc \
+ -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/rpc \
  -L$(top_srcdir)/3rd_party 
 
 man_MANS=rpcrouter.1

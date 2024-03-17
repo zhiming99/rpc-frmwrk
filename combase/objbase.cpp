@@ -346,6 +346,15 @@ gint32 FindInstCfg(
             break;
         }
 
+        strFullPath =
+            stdstr( "/usr/local" ) + strFullPath;
+        ret = access( strFullPath.c_str(), R_OK );
+        if( ret == 0 )
+        {
+            strPath = strFullPath;
+            break;
+        }
+
         strFullPath.clear();
         ret = GetLibPath( strFullPath );
         if( ERROR( ret ) )

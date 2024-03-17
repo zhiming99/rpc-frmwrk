@@ -2,7 +2,7 @@ const { marshall, unmarshall } = require("../dbusmsg/message");
 const Cid = require( "./enums.js").EnumClsid
 const Tid = require( "./enums.js").EnumTypeId
 const CV = require( "./enums.js").constval
-const E = require ( 'syserrno' ).errors
+const E = require ( './enums.js' ).errno
 const { SERI_HEADER_BASE } = require("./SERI_HEADER_BASE.js");
 
 const CObjBase = require( "./objbase" ).CObjBase
@@ -327,7 +327,7 @@ exports.CBuffer = class CBuffer extends CObjBase
             {
                 dstBuffer = Buffer.alloc(8)
                 const view = new DataView( dstBuffer.buffer )
-                view.setBigUint64( 0, this.m_value )
+                view.setBigUint64( 0, BigInt( this.m_value ) )
             }
             break
         case Tid.typeFloat :
@@ -407,7 +407,7 @@ exports.CBuffer = class CBuffer extends CObjBase
     SetUint64( val )
     {
         this.type = Tid.typeUInt64
-        this.m_value = val
+        this.m_value = BigInt( val )
     }
 
     SetFloat( val )
@@ -571,7 +571,7 @@ exports.CBuffer = class CBuffer extends CObjBase
             var val = ov.getUint32( pos )
             if( val !== Cid.CBuffer )
             {
-                ret = E.EINVAL.errno
+                ret = E.EINVAL
                 break
             }
             pos += 4

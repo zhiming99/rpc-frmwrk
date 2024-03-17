@@ -59,15 +59,20 @@ AC_ARG_ENABLE([fuse3],
     [enable_fuse3=yes])
 
 AC_ARG_ENABLE([java],
-    [AS_HELP_STRING([--disable-java], [no generation of Java skelton code])],
+    [AS_HELP_STRING([--disable-java], [no generation of Java skeleton code])],
     [enable_java=no],
     [enable_java=yes])
 
 AC_ARG_ENABLE([python],
-    [AS_HELP_STRING([--disable-python], [no generation of python skelton code])],
+    [AS_HELP_STRING([--disable-python], [no generation of python skeleton code])],
     [enable_python=no],
     [enable_python=yes])
 
+
+AC_ARG_ENABLE([js],
+    [AS_HELP_STRING([--disable-js], [no generation of JavaScript skeleton code])],
+    [enable_js=no],
+    [enable_js=yes])
 
 AC_CHECK_PROG([swig], [swig], yes)
 
@@ -76,6 +81,15 @@ case $enable_python in
     AC_CHECK_PROG([python3], python3, yes)
     AC_CHECK_PROG([sipbuild], [sip-build], yes)
     AC_CHECK_PROG([sip4], [sip], yes)
+    ;;
+    no)
+    ;;
+esac
+
+case $enable_js in
+    yes)
+    AC_CHECK_PROG([npm], npm, yes)
+    AC_CHECK_PROG([webpack], webpack, yes)
     ;;
     no)
     ;;
@@ -354,8 +368,8 @@ AC_SUBST([BITWIDTH])
 AC_DEFINE(_GNU_SOURCE, 1,[GNU non-portable features])
 
 AC_SUBST( TSTLDFLG, '$(top_srcdir)/ipc/libipc.la $(top_srcdir)/combase/libcombase.la -lstdc++ -lcppunit \
--L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
-${COMMON_LINK_CPPUNIT}' )
+ -L$(top_srcdir)/3rd_party -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
+ ${COMMON_LINK_CPPUNIT}' )
 
 PKG_PROG_PKG_CONFIG
 PKG_INSTALLDIR
@@ -378,7 +392,6 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf.install
                  bldpkg/rpcf-dev.install
                  examples/Makefile
-                 js/Makefile
                  test/Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile
@@ -396,6 +409,7 @@ AM_CONDITIONAL([SWIG],[test x$ac_cv_prog_swig = xyes])
 AM_CONDITIONAL([ENABLE_JAVA],[test x$ac_cv_prog_javac = xyes -a x$enable_java = xyes])
 AM_CONDITIONAL([ENABLE_PYTHON],[test \( "x$ac_cv_prog_sip4" = "xyes" -o "x$ac_cv_prog_sipbuild" = "xyes" \) -a "x$enable_python" = "xyes"])
 AM_CONDITIONAL([BITWIDTH32],[test x$BITWIDTH = x32])
+AM_CONDITIONAL([ENABLE_JS],[test x$ac_cv_prog_npm = xyes -a x$enable_js=xyes ])
 
 VERSION2='$(subst .,:,$(VERSION))'
 AC_SUBST(VERSION2)
@@ -429,7 +443,7 @@ case $enable_openssl in
         OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
         OPENSSL_CFGOPT=
         OPENSSL_DEBLIBS='libssl-dev,'
-        OPENSSL_DEBPKGS='openssl, libssl1.1, expect,'
+        OPENSSL_DEBPKGS='openssl, libssl1.1 | libssl3, expect,'
         OPENSSL_RPMLIBS='openssl-devel,'
         OPENSSL_RPMPKGS='openssl openssl-libs expect'
         enable_websock=yes
@@ -590,6 +604,32 @@ case $enable_testcases in
         FEATURES+="-testcases "
     ;;
 esac
+
+case $enable_js in
+    yes)
+        AC_CONFIG_FILES([ js/Makefile ])
+        JS_RPMLIBS="npm," 
+        JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*"
+        #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
+        JS_RPMPOST=""
+        #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
+        JS_RPMPOSTUN=""
+        JS_DEBLIBS="npm, webpack,"
+        JS_DEBFILES="etc/rpcf/jslib/*"
+        JS_CFGOPT=
+        FEATURES+="+js "
+    ;;
+    no)
+        JS_RPMLIBS=
+        JS_RPMFILES=
+        JS_RPMPOST=
+        JS_DEBLIBS=
+        JS_RPMPOSTUN=
+        JS_DEBFILES=
+        JS_CFGOPT='--disable-js'
+        FEATURES+="-js "
+    ;;
+esac
 CXXFLAGS+=' -DFEATURES="\"$(FEATURES)\""'
 
 AC_SUBST([CXXFLAGS])
@@ -644,6 +684,14 @@ AC_SUBST(TEST_DEBBINS)
 AC_SUBST(TEST_RPMFILES)
 AC_SUBST(TEST_RPMBINS)
 AC_SUBST(TEST_CFGOPT)
+
+AC_SUBST(JS_RPMLIBS)
+AC_SUBST(JS_RPMFILES)
+AC_SUBST(JS_RPMPOST)
+AC_SUBST(JS_DEBLIBS)
+AC_SUBST(JS_RPMPOSTUN)
+AC_SUBST(JS_DEBFILES)
+AC_SUBST(JS_CFGOPT)
 
 AC_CANONICAL_HOST
 

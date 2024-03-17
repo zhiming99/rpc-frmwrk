@@ -196,6 +196,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 if( bDummy !== undefined && bDummy === "true")
                     continue
                 var strVal = interf[ "InterfaceName"]
+                if( strVal === "IUnknown")
+                    continue
                 if( strVal === "IStream" &&
                     interf[ "FetchDataTimeout"] !== undefined )
                 {
@@ -290,8 +292,10 @@ exports.CInterfaceProxy = class CInterfaceProxy
         for( var hStream of stms )
             this.m_funcCloseStream( hStream )
         this.m_setStreams.clear()
-        return this.m_oIoMgr.UnregisterProxy(
+        var ret = this.m_oIoMgr.UnregisterProxy(
             this, ret )
+        this.m_iState = EnumIfState.stateStopped
+        return ret
     }
 
     OpenRemotePort( strUrl )
@@ -388,8 +392,9 @@ exports.CInterfaceProxy = class CInterfaceProxy
         var oMsg = new CIoReqMessage()
         oMsg.m_iCmd = IoCmd.CloseStream[0]
         oMsg.m_iMsgId = globalThis.g_iMsgIdx
+        oMsg.m_dwPortId = this.GetPortId()
         oMsg.m_oReq.Push(
-            {t: EnumTypeId.typeUInt64, v: hStream})
+            {t: EnumTypeId.typeUInt64, v: BigInt( hStream )})
         this.m_oIoMgr.PostMessage( oMsg )
     }
 

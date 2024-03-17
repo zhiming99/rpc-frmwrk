@@ -18,6 +18,6 @@ popd
 pushd ${BASE}/rpc-frmwrk; libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`; popd
 pushd ${BASE}/rpc-frmwrk && bash cfgsel -r && make -j 4; popd;
-pushd ${BASE}/rpc-frmwrk; python3 tools/rpcfg.py; sudo make install; popd
+pushd ${BASE}/rpc-frmwrk; ${SUDO} make install; popd
 echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
-echo Congratulations! build complete.
+echo Congratulations! build complete. Please remember to run rpcfg.py to config the system.

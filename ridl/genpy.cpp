@@ -31,6 +31,7 @@ using namespace rpcf;
 
 extern std::string g_strAppName;
 extern stdstr g_strCmdLine;
+extern stdstr g_strLang;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
@@ -266,7 +267,7 @@ static gint32 EmitSerialBySig(
     return ret;
 }
 
-static gint32 GetArgsAndSigs( CArgList* pArgList,
+gint32 GetArgsAndSigs( CArgList* pArgList,
     std::vector< std::pair< stdstr, stdstr >>& vecArgs )
 {
     if( pArgList == nullptr )
@@ -331,7 +332,7 @@ gint32 EmitFormalArgListPy(
     return ret;
 }
 
-static stdstr GetTypeName( CAstNodeBase* pType )
+stdstr GetTypeName( CAstNodeBase* pType )
 {
     EnumClsid iClsid = pType->GetClsid();
     if( iClsid == clsid( CStructDecl ) )
@@ -369,13 +370,14 @@ static stdstr GetTypeName( CAstNodeBase* pType )
             "," + strElem + "]";
     }
 
-    else if( iClsid != clsid( CMapType ) )
-        return "";
-
     CPrimeType* pPrime =
         static_cast< CPrimeType* >( pType );
 
-    return pPrime->ToStringPy();
+    if( g_strLang == "py" )
+        return pPrime->ToStringPy();
+    else if( g_strLang == "js" )
+        return pPrime->ToStringJs();
+    return pPrime->ToStringCpp();
 }
 
 static gint32 EmitRespList(
@@ -1241,10 +1243,10 @@ void CImplPyMthdProxyBase::EmitOptions()
         dwTimeoutSec > dwKeepAliveSec )
     {
         CCOUT << "oOptions.SetIntProp( cpp.propTimeoutSec, " <<
-            dwTimeoutSec << " );";
+            dwTimeoutSec << " )";
         NEW_LINE;
         CCOUT << "oOptions.SetIntProp( cpp.propKeepAliveSec, " <<
-            dwKeepAliveSec << " );";
+            dwKeepAliveSec << " )";
         NEW_LINE;
     }
 }

@@ -35,6 +35,8 @@ extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
 extern bool g_bSemanErr;
 extern std::string g_strAppName;
+extern std::string g_strJsLibPath;
+extern std::string g_strWebPath;
 
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
@@ -74,12 +76,12 @@ void Usage()
     printf( "ridlc [options] <ridl file> \n" );
 
     printf( "\t compile the `ridl file'"
-        "and output the RPC skelton files.\n" );
+        "and output the RPC skeleton files.\n" );
 
     printf( "Options -h:\tTo print this help.\n");
 
     printf( "\t-I:\tTo specify the path to"
-        " search for the included files.\n"
+        " search for the included `ridl files'.\n"
         "\t\tAnd this option can repeat many"
         "times.\n" );
 
@@ -94,22 +96,29 @@ void Usage()
         "\t\t'appname' from the ridl will be used.\n" );
 
 #ifdef PYTHON
-    printf( "\t-p:\tTo generate the Python skelton files.\n" );
+    printf( "\t-p:\tTo generate the Python skeleton files.\n" );
 #endif
 
 #ifdef JAVA
-    printf( "\t-j:\tTo generate the Java skelton files\n" );
+    printf( "\t-j:\tTo generate the Java skeleton files\n" );
     printf( "\t-P:\tTo specify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only.\n" );
 #endif
 
 #ifdef FUSE3
-    printf( "\t-f:\tTo generate cpp skelton files for rpcfs\n" );
+    printf( "\t-f:\tTo generate cpp skeleton files for rpcfs\n" );
     printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs.\n" );
 #endif
 
-    printf( "\t-s:\tTo output the skelton with fastrpc support.\n" );
-    printf( "\t-b:\tTo output the skelton with built-in router.\n" );
+#ifdef JAVASCRIPT
+    printf( "\t-J:\tTo generate the JavaScript skeleton files\n" );
+    printf( "\t--odesc_url=<url>: the <url> to specify path to get the object description \n" );
+    printf( "\t\tfile for JS client. This is a mandatory option when '-J' is given\n" );
+    printf( "\t--lib_path=<path>: the <path> to specify the alternative path to the JS support library\n" );
+#endif
+
+    printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
+    printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
     printf( "\t-l:\tTo output a shared library.\n" );
     printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
     printf( "\t\tinstead of executables. This\n" );
@@ -137,11 +146,33 @@ bool g_bAsyncProxy = false;
 #include "genpy.h"
 #include "genjava.h"
 #include "getopt.h"
+#include "genjs.h"
 
 extern gint32 GenRpcFSkelton(
     const std::string& strOutPath,
     const std::string& strAppName,
     ObjPtr pRoot );
+
+static gint32 IsValidDir( const char* szDir )
+{
+    gint32 ret = 0;
+    do{
+        struct stat sb;
+        if (lstat( optarg, &sb) == -1)
+        {
+            ret = -errno;
+            break;
+        }
+        mode_t iFlags =
+            ( sb.st_mode & S_IFMT );
+        if( iFlags != S_IFDIR )
+        {
+            ret = -ENOTDIR;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
 
 int main( int argc, char** argv )
 {
@@ -170,6 +201,8 @@ int main( int argc, char** argv )
         int option_index = 0;
         static struct option long_options[] = {
             {"async_proxy", no_argument, 0,  0 },
+            {"odesc_url", required_argument, 0,  0 },
+            {"lib_path", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -177,7 +210,7 @@ int main( int argc, char** argv )
         {
 
             opt = getopt_long( argc, argv,
-                "abhvlI:O:o:pjP:L:f::s",
+                "abhvlI:O:o:pJjP:L:f::s",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -189,32 +222,48 @@ int main( int argc, char** argv )
                 {
                     if( option_index == 0 )
                         g_bAsyncProxy = true;
+#ifdef JAVASCRIPT
+                    else if( option_index == 1 )
+                    {
+                        g_strWebPath = optarg;
+                    }
+                    else if( option_index == 2 )
+                    {
+                        ret = IsValidDir( optarg );
+                        if( ERROR( ret ) )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                strerror( -ret ) );
+                            bQuit = true;
+                            break;
+                        }
+                        g_strJsLibPath = optarg;
+                    }
+#endif
                     break;
                 }
             case 'O':
             case 'I' :
                 {
-                    struct stat sb;
-                    if (lstat( optarg, &sb) == -1)
-                    {
-                        ret = -errno;
-                        printf( "%s : %s\n", optarg,
-                            strerror( errno ) );
-                        bQuit = true;
-                        break;
-                    }
-                    mode_t iFlags =
-                        ( sb.st_mode & S_IFMT );
-                    if( iFlags != S_IFDIR )
+                    ret = IsValidDir( optarg );
+                    if( ret == -ENOTDIR )
                     {
                         std::string strMsg =
-                            "warning '";
+                            "Error '";
 
                         strMsg += optarg;
                         strMsg +=
                            "' is not a directory";
                         printf( "%s\n",
                             strMsg.c_str() );
+                        bQuit = true;
+                        break;
+                    }
+                    else if( ERROR( ret ) )
+                    {
+                        printf( "%s : %s\n", optarg,
+                            strerror( -ret ) );
+                        bQuit = true;
                         break;
                     }
 
@@ -313,6 +362,13 @@ int main( int argc, char** argv )
                         "Error '-%c' is not supported by JAVA disabled\n", opt );
                     ret = -ENOTSUP;
                     bQuit = true;
+                    break;
+                }
+#endif
+#ifdef JAVASCRIPT
+            case 'J':
+                {
+                    g_strLang = "js";
                     break;
                 }
 #endif
@@ -497,7 +553,7 @@ int main( int argc, char** argv )
         {
             if( bFuse && g_strLang != "cpp" )
             {
-                // generating rpcfs skelton code
+                // generating rpcfs skeleton code
                 ret = GenRpcFSkelton(
                     g_strOutPath, strAppName, pRoot );
 
@@ -522,6 +578,11 @@ int main( int argc, char** argv )
         else if( g_strLang == "java" )
         {
             ret = GenJavaProj(
+                g_strOutPath, strAppName, pRoot );
+        }
+        else if( g_strLang == "js" )
+        {
+            ret = GenJsProj(
                 g_strOutPath, strAppName, pRoot );
         }
         else

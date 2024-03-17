@@ -2,7 +2,11 @@ const { EnumPktFlag } = require("../combase/enums.js")
 
 const CV = require( "../combase/enums.js" ).constval
 const Buffer = require( "buffer").Buffer
-const { decodeBlock, encodeBlock, encodeBound } = require( "lz4" )
+require( "./lz4" )
+
+const encodeBound = globalThis.encodeBound
+const encodeBlock = globalThis.encodeBlock
+const decodeBlock = globalThis.decodeBlock
 
 class CPacketHeader
 {
@@ -14,7 +18,10 @@ class CPacketHeader
         this.m_dwSize = 0
         this.m_iStmId = 0
         this.m_iPeerStmId = 0
-        this.m_wFlags = 0
+        if( encodeBound !== undefined )
+            this.m_wFlags = EnumPktFlag.flagCompress 
+        else
+            this.m_wFlags = 0
         this.m_wProtoId = 0
         this.m_dwSessId = 0
         this.m_dwSeqNo = 0
@@ -167,18 +174,20 @@ class COutgoingPacket extends CCarrierPacket
         if( this.m_oBuf.length === 0 )
             return null
 
-        if( ( this.m_wFlags & EnumPktFlag.flagCompress ) == 0 )
+        if( ( this.m_oHeader.m_wFlags & EnumPktFlag.flagCompress ) === 0 )
             return super.Serialize()
 
         var compressed = Buffer.alloc(
             encodeBound( this.m_oBuf.length ) )
         var byteOutput = encodeBlock( this.m_oBuf, compressed )
 
+        var bufSize = Buffer.alloc( 4 )
+        bufSize.writeUint32BE( this.m_oBuf.length )
         var backBuf = this.m_oBuf
-        this.m_oBuf = compressed.slice( 0, byteOutput )
-        this.m_oHeader.m_dwSize = byteOutput
+        this.m_oBuf = Buffer.concat( [bufSize, compressed.slice( 0, byteOutput )] )
+        this.m_oHeader.m_dwSize = byteOutput + 4
 
-        output = super.Serialize()
+        var output = super.Serialize()
 
         this.m_oBuf = backBuf
         this.m_oHeader.m_dwSize = backBuf.length
@@ -209,10 +218,15 @@ class CIncomingPacket extends CCarrierPacket
         if( this.m_oBuf.length === 0 )
             return pos
 
-        if( this.m_wFlags & EnumPktFlag.flagCompress )
+        if( this.m_oHeader.m_wFlags & EnumPktFlag.flagCompress )
         {
-            var output = Buffer.alloc( this.m_oBuf.length * 3 )
-            var byteOutput = decodeBlock( this.m_oBuf, output )
+            var actSize = this.m_oBuf.readUInt32BE(0);
+            if( actSize > CV.MAX_BYTES_PER_TRANSFER )
+                throw new Error( "Error invalid message size " + actSize )
+            var output = Buffer.alloc( actSize )
+            var byteOutput = decodeBlock( this.m_oBuf.slice( 4 ), output )
+            if( byteOutput < 0 )
+                throw new Error( "Error decompress incoming packets " + byteOutput )
             this.m_oBuf = output.slice( 0, byteOutput )
             this.m_oHeader.m_dwSize = this.m_oBuf.length
         }

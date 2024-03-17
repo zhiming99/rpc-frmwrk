@@ -5,7 +5,7 @@ if ENABLE_FUSE3
 SUBDIRS += fuse
 endif
 
-SUBDIRS += rpc ridl tools pics examples js
+SUBDIRS += rpc ridl tools pics examples
 
 SUBDIRS += test
 
@@ -26,6 +26,10 @@ if ENABLE_PYTHON
 SUBDIRS += python                                                       
 endif
 endif                          
+
+if ENABLE_JS
+SUBDIRS += js
+endif
 
 SUBDIRS += bldpkg
 

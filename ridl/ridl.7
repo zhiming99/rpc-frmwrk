@@ -20,22 +20,26 @@ support 10 basic types and 3 composite types. The basic data types are:
 .IP \fBbyte\fP
 \- 1-byte unsigned integer. It maps to 'gint8' in C++, 'int' in Python, and 'byte' in Java.
 .IP \fBint16/uint16\fP
-\- 2-byte signed integer or unsigned integer. It maps to 'gint16/guint16' in C++, 'int' in Python and 'short' in Java.
+\- 2-byte signed integer or unsigned integer. It maps to 'gint16/guint16' in
+C++, 'int' in Python, 'short' in Java, and Number in JS.
 .IP \fBint32/uint32\fP
-\- 4-byte signed integer or unsigned integer. It maps to 'gint32/guint32' in C++, 'int' in Python and 'int' in Java.
+\- 4-byte signed integer or unsigned integer. It maps to 'gint32/guint32' in
+C++, 'int' in Python, 'int' in Java, and Number in JS.
 .IP \fBint64/uint64\fP
-\- 8-byte signed integer or unsigned integer. It maps to 'gint64/guint64' in C++, 'int' in Python, and 'long' in Java.
+\- 8-byte signed integer or unsigned integer. It maps to 'gint64/guint64' in
+C++, 'int' in Python, 'long' in Java and BigInt in JS.
 .IP \fBfloat(32)/double(64)\fP
-\- Float point number. It maps to 'float/double' in C++, 'float' in Python, and 'float/double' in Java.
+\- Float point number. It maps to 'float/double' in C++, 'float' in Python, 'float/double' in Java and Number in JS.
 .IP \fBstring\fP
-\- Null terminated string. It maps to 'std::sting' in C++, 'str' in Python, and 'String' in Java.
+\- Null terminated string. It maps to 'std::sting' in C++, 'str' in Python, and 'String' in Java, and 'string' in JS.
 .IP \fBHSTREAM\fP
-\- Handle representing an active stream channel. It maps to 'HANDLE' in C++, 'int' in Python, and 'long' in Java.
+\- Handle representing an active stream channel. It maps to 'HANDLE' in C++, 'int' in Python, 'long' in Java, and BigInt in JS.
 .IP \fBbytearray\fP 
-\- Binary blob. It maps to 'BufPtr' in C++, 'bytearray' in Python and 'byte[]' in Java.
+\- Binary blob. It maps to 'BufPtr' in C++, 'bytearray' in Python, 'byte[]' in
+Java, UInt8Array in JS.
 .IP \fBObjPtr\fP
-\- \fIrpc-frmwrk\fR's built-in serializable data type. It maps to 'ObjPtr' in C++, 'cpp.ObjPtr' in Python, and 'ObjPtr'
-in Java.
+\- \fIrpc-frmwrk\fR's built-in serializable data type. It maps to 'ObjPtr' in C++, 'cpp.ObjPtr' in Python, 'ObjPtr'
+in Java and Object in JS.
 .RE
 
 And 3 composite types:

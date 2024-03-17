@@ -1,6 +1,6 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { messageType } = require( "../dbusmsg/constants")
-const { randomInt, ERROR, Int32Value, USER_METHOD, Pair } = require("../combase/defines")
+const { randomInt, ERROR, Int32Value, USER_METHOD } = require("../combase/defines")
 const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require("../combase/enums")
 const {CSerialBase} = require("../combase/seribase")
 const {CInterfaceProxy} = require( "../ipc/proxy")

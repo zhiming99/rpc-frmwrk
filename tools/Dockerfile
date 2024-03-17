@@ -16,12 +16,14 @@ libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev krb5-kdc krb5-admin-server krb5-user \
-bash net-tools procps swig openjdk-8-jdk-headless cmake libcommons-cli-java
+bash net-tools procps swig openjdk-8-jdk-headless cmake \
+libcommons-cli-java npm webpack
 RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
-RUN apt-get -y install git devscripts expect;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
-RUN cd ${home};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
+RUN apt-get -y install git devscripts debhelper expect;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
+RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
 RUN pip3 install wheel numpy
+RUN npm install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs minify
 RUN cd ${HOME};git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
