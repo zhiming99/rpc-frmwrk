@@ -22,7 +22,7 @@
 5. `对服务器的访问可以同时来自互联网, 不同进程，或者同一进程` 
 6. `通信双方上线/下线的检测和通知`
 7. `同一网络端口可以支持数目不限的多个服务端`
-8. [`数目可配的全双工流控的流通道`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
+8. [`带有全双工流控的流通道`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
 9. [`OpenSSL的支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
@@ -56,14 +56,15 @@
 1. `dbus-1.0 (dbus-devel)`
 2. `libjson-cpp (jsoncpp-devel)` 
 3. `lz4 (lz4-devel)`   
-4. `cppunit-1 仅用于测试用例的代码中`   
+4. `cppunit-1 用于测试用例的代码中`   
 5. `openssl-1.1用于支持SSL的连接.`（可选）
 6. `MIT krb5 用于用户认证.`（可选）
 7. `C++11 和 GCC 5.x+.`
 8. `Python 3.5+.`（可选）
 9. `Java OpenJDK 8+.`（可选）
-10. `FUSE-3`（可选）
-10. `GmSSL 3.0`（可选）
+10. `npm 9.0 and webpack`（可选）
+11. `FUSE-3`（可选）
+12. `GmSSL 3.0`（可选）
 
 ## TODO
 1. 请参考[`问题`](https://github.com/zhiming99/rpc-frmwrk/issues)

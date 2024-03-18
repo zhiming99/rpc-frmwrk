@@ -52,8 +52,9 @@ This project depends on the following 3rd-party packags at runtime:
 7. `c++11 is required, and make sure the GCC is 5.x or higher.`
 8. `python 3.5+ is required for Python support.`(optional)
 9. `Java OpenJDK 8 or higher for Java support.`(optional)
-10. `FUSE-3 for rpcfs support`(optional)
-11. `GmSSL 3.0`(optional)
+10. `npm 9.0 and webpack`(optional)
+11. `FUSE-3 for rpcfs support`(optional)
+12. `GmSSL 3.0`(optional)
 
 #### Todo
 1. Please refer to [`issues`](https://github.com/zhiming99/rpc-frmwrk/issues).

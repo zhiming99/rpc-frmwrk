@@ -22,8 +22,8 @@ RUN apt-get -y install sip5-tools || apt-get -y install sip-dev python3-sip pyth
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
 RUN apt-get -y install git devscripts debhelper expect;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
 RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
-RUN pip3 install wheel numpy
-RUN npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs minify webpack
+RUN apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
+RUN npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs minify webpack webpack-cli
 RUN cd ${HOME};git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
