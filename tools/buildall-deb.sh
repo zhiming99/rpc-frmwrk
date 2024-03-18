@@ -18,8 +18,8 @@ bash net-tools procps swig default-jdk-headless cmake libcommons-cli-java ccache
 
 ${SUDO} apt-get -y install sip-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 ${SUDO} apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
-${SUDO} apt-get -y install git devscripts debhelper expect screen vim npm webpack
+${SUDO} apt-get -y install git devscripts debhelper expect screen vim npm
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
-npm install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs minify
+npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs minify webpack
 
 bash ./makerpcf.sh

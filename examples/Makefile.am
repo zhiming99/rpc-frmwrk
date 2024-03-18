@@ -135,3 +135,9 @@ EXTRA_DIST += \
  $(cpptests)/rpcfs/stmtest2/StreamTestsvr.h \
  $(cpptests)/rpcfs/stmtest2/commdefs.h \
  $(cpptests)/rpcfs/stmtest2/maincli.cpp
+
+jstest=./js
+EXTRA_DIST += $(jstest)/iftest/iftest.html \
+ $(jstest)/sftest/sftest.html \
+ $(jstest)/sftest/FileTransfercli.js \
+ $(jstest)/sftest/maincli.js

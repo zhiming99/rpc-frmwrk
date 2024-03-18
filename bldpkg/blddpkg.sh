@@ -68,12 +68,14 @@ cat << EOF >> ${DEBDIR}/postinst
 cd XXXX/${PACKAGE_NAME}
 pypkg=\$(compgen -G "rpcf*whl")
 pip3 install \$pypkg ${force_inst}
+npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify
 #DEBHELPER#
 EOF
 
 cat << EOF >> ${DEBDIR}/postrm
 #!/bin/bash
 pip3 uninstall -y ${PACKAGE_NAME} ${force_inst}
+npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify
 #DEBHELPER#
 EOF
 else

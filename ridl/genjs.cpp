@@ -1159,11 +1159,13 @@ gint32 CJsExportMakefile::Output()
         NEW_LINE;
 
         Wa( "debug :" );
+        Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
         Wa( "\t@sed -i \"s@mode:[[:blank:]]*'production'@mode: 'development'@g\" webpack.config.js" );
         Wa( "\tnpm exec webpack" );
         NEW_LINE;
 
         Wa( "release :" );
+        Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
         Wa( "\t@sed -i \"s@mode:[[:blank:]]*'development'@mode: 'production'@g\" webpack.config.js" );
         Wa( "\tnpm exec webpack" );
 

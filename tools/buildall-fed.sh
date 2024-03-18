@@ -15,6 +15,6 @@ java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk swig apa
 
 ${SUDO} dnf -y install sip5 || ${SUDO} dnf -y install sip6
 ${SUDO} dnf -y install python3-wheel python3-numpy || pip3 install wheel numpy
-npm install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify
+npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify
 
 bash ./makerpcf.sh

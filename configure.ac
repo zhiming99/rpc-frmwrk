@@ -89,7 +89,6 @@ esac
 case $enable_js in
     yes)
     AC_CHECK_PROG([npm], npm, yes)
-    AC_CHECK_PROG([webpack], webpack, yes)
     ;;
     no)
     ;;
@@ -611,10 +610,10 @@ case $enable_js in
         JS_RPMLIBS="npm," 
         JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
-        JS_RPMPOST=""
+        JS_RPMPOST="npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
-        JS_RPMPOSTUN=""
-        JS_DEBLIBS="npm, webpack,"
+        JS_RPMPOSTUN="npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify"
+        JS_DEBLIBS="npm,"
         JS_DEBFILES="etc/rpcf/jslib/*"
         JS_CFGOPT=
         FEATURES+="+js "
