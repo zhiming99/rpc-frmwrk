@@ -214,6 +214,6 @@ service SimpFileSvc [ stream ]
 
 * *synccfg.py*: 一个小的Python脚本, 用来同步本应用配置信息。
 
-### C++, Python, 的Java客户端可以交叉访问其他语言的服务器。
+### C++, Python, Java和JavaScript的客户端可以交叉访问其他语言的服务器。
 微服务架构的客户端，目前只能访问微服务架构的服务器。C/S架构的客户端可以访问两种架构的服务器。
 
