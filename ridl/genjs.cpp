@@ -2804,8 +2804,13 @@ gint32 CExportJsReadme::Output_en()
         NEW_LINES( 2 );
 
         CCOUT << "* *Makefile*: "
-            << "The Makefile will just synchronize the configurations "
-            << "with the local system settings. And it does nothing else.";
+            << "The Makefile has 3 targets, `debug`, `release`, and `update`." 
+            << "`debug` and `release` will package the project to the `dist` "
+            << "directory. **So the `dist` directory, `" << g_strAppName
+            << ".html`, and `"<< g_strAppName << "desc.json` are the file set "
+            << "to deploy to the web server.** The target 'update' will update "
+            << "the content of the json files in this directory with system "
+            << "settings.";
         NEW_LINE;
         CCOUT << "And please don't edit it, since it will be "
             << "overwritten by `ridlc` and synccfg.py without backup.";
@@ -2942,8 +2947,10 @@ gint32 CExportJsReadme::Output_cn()
 
         CCOUT << "* *Makefile*: "
             << "工程文件. 此文件有三个`target`, `update`更新配置， "
-            << "`debug` 指示webpack打包整个项目，保留文件的格式，便于调试。"
-            << "`release`指示webpack以紧凑格式打包整个项目，适用于上线文件。";
+            << "`debug` 指示webpack打包整个项目, 保留文件的格式, 便于调试。"
+            << "`release`指示webpack以紧凑格式打包整个项目。"
+            << "**注意: 执行完make后生成的`dist`目录, `"<< g_strAppName << ".html`"
+            << "和`" << g_strAppName << "desc.json`是部署到web服务器的文件集合。**";
         NEW_LINE;
         CCOUT << "这个文件不要做进一步的修改。"
                 << "`ridlc`或者`synccfg.py`都会在在下一次运行时重写里面的内容。";
@@ -3045,7 +3052,7 @@ gint32 CExportJsSampleHtml::Output()
         NEW_LINE;
         CCOUT << "* command line: " << g_strCmdLine;
         NEW_LINE;
-        CCOUT << "* npm dependency: browserify buffer exports " 
+        CCOUT << "* npm dependency: browserify buffer exports minify "
             << "long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
         NEW_LINE;
         Wa( "-->" );
