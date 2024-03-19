@@ -5,7 +5,7 @@ if ! which sudo; then
 else
     SUDO="sudo"
 fi
-${SUDO} dnf -y install gcc g++ python3 flex bison libtool shtool automake autoconf \
+${SUDO} dnf -y install which gcc g++ python3 flex bison libtool shtool automake autoconf \
 make dbus-devel jsoncpp-devel lz4-devel cmake ccache lz4-libs cppunit \
 cppunit-devel dbus dbus-libs jsoncpp bash krb5-devel krb5-libs \
 python3-devel python3-pip python3-setuptools \
