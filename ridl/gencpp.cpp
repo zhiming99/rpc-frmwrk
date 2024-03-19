@@ -7803,10 +7803,11 @@ gint32 CImplMainFunc::EmitNormalMainContent(
             Wa( "ret = KProxyLoop();" );
             CCOUT << "break;";
             BLOCK_CLOSE;
+            NEW_LINE;
         }
 #endif
 
-        NEW_LINES( 2 );
+        NEW_LINE;
         CCOUT << "CRpcServices* pSvc = nullptr;";
         NEW_LINE;
         Wa( "InterfPtr pIf;" );
@@ -7827,7 +7828,8 @@ gint32 CImplMainFunc::EmitNormalMainContent(
             else
                 strClass += "_SvrImpl";
 
-            Wa( "oParams.Clear();" );
+            if( idx > 0 )
+                Wa( "oParams.Clear();" );
             Wa( "oParams[ propIoMgr ] = g_pIoMgr;" );
             NEW_LINE;
             Wa( "ret = CRpcServices::LoadObjDesc(" );
@@ -7899,6 +7901,7 @@ gint32 CImplMainFunc::EmitNormalMainContent(
                 if( idx < vecSvcs.size() - 1 )
                     NEW_LINES( 2 );
             }
+            idx++;
         }
 
         BLOCK_CLOSE;

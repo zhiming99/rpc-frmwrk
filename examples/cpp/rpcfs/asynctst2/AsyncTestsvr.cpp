@@ -113,9 +113,14 @@ gint32 CAsyncTest_SvrImpl::CreateStmSkel(
         oCfg.SetIntPtr( propStmHandle,
             ( guint32*& )hStream );
         oCfg.SetPointer( propParentPtr, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./asynctstdesc.json",
-            "AsyncTest_SvrSkel",
+            strDesc,"AsyncTest_SvrSkel",
             true, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -137,6 +142,7 @@ gint32 CAsyncTest_SvrImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CAsyncTest_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );

@@ -7,7 +7,6 @@ using namespace rpcf;
 
 ObjPtr g_pIoMgr;
 
-
 FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
@@ -50,8 +49,8 @@ gint32 InitContext()
             oParams.GetCfg() );
         if( ERROR( ret ) )
             break;
-        
-        IService* pSvc = g_pIoMgr;
+
+        CIoManager* pSvc = g_pIoMgr;
         ret = pSvc->Start();
         
     }while( 0 );
@@ -88,45 +87,49 @@ int main( int argc, char** argv)
 {
     gint32 ret = 0;
     do{
+        std::string strDesc = "./asynctstdesc.json";
         ret = InitContext();
         if( ERROR( ret ) )
             break;
         
-        InterfPtr pIf;
-        CParamList oParams;
-        oParams[ propIoMgr ] = g_pIoMgr;
-        ret = CRpcServices::LoadObjDesc(
-            "./asynctstdesc.json",
-            "AsyncTest",
-            false, oParams.GetCfg() );
-        if( ERROR( ret ) )
-            break;
-        
-        ret = pIf.NewObj(
-            clsid( CAsyncTest_CliImpl ),
-            oParams.GetCfg() );
-        if( ERROR( ret ) )
-            break;
-        
-        CAsyncTest_CliImpl* pSvc = pIf;
-        ret = pSvc->Start();
-        if( ERROR( ret ) )
-            break;
-        
-        while( pSvc->GetState()== stateRecovery )
-            sleep( 1 );
-        
-        if( pSvc->GetState() != stateConnected )
-        {
-            ret = ERROR_STATE;
-            break;
-        }
 
-        maincli( pSvc, argc, argv );
+        CRpcServices* pSvc = nullptr;
+        InterfPtr pIf;
+        do{
+            CParamList oParams;
+            oParams.Clear();
+            oParams[ propIoMgr ] = g_pIoMgr;
+            
+            ret = CRpcServices::LoadObjDesc(
+                strDesc, "AsyncTest",
+                false, oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            ret = pIf.NewObj(
+                clsid( CAsyncTest_CliImpl ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            pSvc = pIf;
+            ret = pSvc->Start();
+            if( ERROR( ret ) )
+                break;
+            while( pSvc->GetState()== stateRecovery )
+                sleep( 1 );
+            
+            if( pSvc->GetState() != stateConnected )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+        }while( 0 );
         
+        if( SUCCEEDED( ret ) )
+            ret = maincli( pIf, argc, argv );
+            
         // Stopping the object
-        ret = pSvc->Stop();
-        
+        if( !pIf.IsEmpty() )
+            pIf->Stop();
     }while( 0 );
 
     DestroyContext();
@@ -143,16 +146,28 @@ gint32 maincli(
     do{
         stdstr i0, i0r;
         i0 = "hello, LongWait";
-        ret = pIf->LongWait( i0, i0r );
+        CParamList oCtx;
+        ret = pIf->LongWait( oCtx.GetCfg(), i0, i0r );
         if( ERROR( ret ) )
         {
             OutputMsg( ret,
                 "LongWait failed with error " );
             break;
         }
-        OutputMsg( ret,
-            "LongWait completed with response %s",
-            i0r.c_str() );
+        if( ret == STATUS_PENDING )
+        {
+            // waiting for server response
+            pIf->WaitForComplete();
+            ret = pIf->GetError();
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "LongWait failed with error" );
+                break;
+            }
+            OutputMsg( ret,
+                "LongWait completed successfully" );
+        }
         
         ret = pIf->LongWaitNoParam( nullptr );
         if( ERROR( ret ) )

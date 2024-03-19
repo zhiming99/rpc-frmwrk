@@ -1,4 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
+// ridlc -s -O . ../../../asynctst.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -8,6 +9,22 @@ using namespace rpcf;
 #include "asynctst.h"
 #include "AsyncTestcli.h"
 
+/* Async callback handler */
+gint32 CAsyncTest_CliImpl::LongWaitCallback( 
+    IConfigDb* context, gint32 iRet,
+    const std::string& i0r /*[ In ]*/ )
+{
+    if( ERROR( iRet ) )
+        OutputMsg( iRet,
+            "LongWait returned with status" );
+    else
+        OutputMsg( iRet,
+            "LongWait returned with response %s", i0r.c_str() );
+
+    SetError( iRet );
+    NotifyComplete();
+    return 0;
+}
 /* Async callback handler */
 gint32 CAsyncTest_CliImpl::LongWaitNoParamCallback( 
     IConfigDb* context, gint32 iRet )
@@ -29,9 +46,14 @@ gint32 CAsyncTest_CliImpl::CreateStmSkel(
         oCfg[ propIsServer ] = false;
         oCfg.SetPointer( propParentPtr, this );
         oCfg.CopyProp( propSkelCtx, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./asynctstdesc.json",
-            "AsyncTest_SvrSkel",
+            strDesc,"AsyncTest_SvrSkel",
             false, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -51,6 +73,7 @@ gint32 CAsyncTest_CliImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CAsyncTest_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );

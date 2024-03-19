@@ -140,7 +140,7 @@ gint32 maincli(
     int argc, char** argv )
 {
     //-----Adding your code here---
-    stdstr strResp;
+    std::string strResp;
     gint32 ret = pIf->Echo(
         "Hello, World!", strResp );
     if( ERROR( ret ) )
