@@ -140,4 +140,5 @@ jstest=./js
 EXTRA_DIST += $(jstest)/iftest/iftest.html \
  $(jstest)/sftest/sftest.html \
  $(jstest)/sftest/FileTransfercli.js \
- $(jstest)/sftest/maincli.js
+ $(jstest)/sftest/maincli.js \
+ $(jstest)/hellowld/HelloWorld.html
