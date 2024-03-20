@@ -8,12 +8,18 @@ else
     enable_python="no"
 endif
 
+if ENABLE_JS
+    enable_js="yes"
+else
+    enable_js="no"
+endif
+
 debdir:
 	if [ ! -d $(DISTDIR)/debian/$(PACKAGE_NAME) ]; then \
 		mkdir -p $(DISTDIR)/debian/$(PACKAGE_NAME);\
     fi;
 	arch=$$(dpkg --print-architecture);\
-	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix) $(enable_python); then \
+	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix) $(enable_python) $(enable_js); then \
         echo error occurs && false; \
     else \
         cd $(DISTDIR);\

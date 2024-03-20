@@ -149,11 +149,11 @@ CJsFileSet::CJsFileSet(
         strOutPath, "Makefile",
         false );
 
-    /*GEN_FILEPATH( m_strMainCli,
+    GEN_FILEPATH( m_strMainCli,
         strOutPath, "maincli.js",
         true );
 
-    GEN_FILEPATH( m_strMainSvr, 
+    /*GEN_FILEPATH( m_strMainSvr, 
         strOutPath, "mainsvr.js",
         true );*/
 
@@ -1045,6 +1045,7 @@ static gint32 GenStructsFileJs(
         return -EINVAL;
 
     gint32 ret = 0;
+    bool bHasStruct = true;
     do{
         stdstr strLibPath = GetJsLibPath();
         CStatements* pStmts = pRoot;
@@ -1077,6 +1078,8 @@ static gint32 GenStructsFileJs(
         }
 
         bool bFirst = true;
+        if( vecActStructs.empty() )
+            bHasStruct = false;
         for( auto& elem : vecActStructs )
         {
             CDeclareJsStruct odps( m_pWriter, elem );
@@ -1097,36 +1100,40 @@ static gint32 GenStructsFileJs(
         NEW_LINE;
         BLOCK_OPEN;
         Wa( "constructor()" );
-        Wa( "{ super(); }" );
+        CCOUT << "{ super(); }";
 
-        Wa( "CreateInstance( iClsid )" );
-        BLOCK_OPEN;
-        std::vector< stdstr > vecClsids;
-        Wa( "switch( iClsid )" );
-        Wa( "{" );
-        for( int i = 0; i < vecActStructs.size(); i++ )
+        if( vecActStructs.size() > 0 )
         {
-            CStructDecl* pStruct = vecActStructs[ i ];
-            stdstr strName = pStruct->GetName(); 
-            stdstr strMsgId =
-                g_strAppName + "::" + strName;
-            guint32 dwMsgId = GenClsid( strMsgId );
-            stdstr strClsid = FormatClsid( dwMsgId );
-            CCOUT << "case " << strClsid << ":";
-            INDENT_UPL;
-            CCOUT << "return new " << strName << "();";
-            INDENT_DOWNL;
+            NEW_LINE;
+            Wa( "CreateInstance( iClsid )" );
+            BLOCK_OPEN;
+            std::vector< stdstr > vecClsids;
+            Wa( "switch( iClsid )" );
+            Wa( "{" );
+            for( int i = 0; i < vecActStructs.size(); i++ )
+            {
+                CStructDecl* pStruct = vecActStructs[ i ];
+                stdstr strName = pStruct->GetName(); 
+                stdstr strMsgId =
+                    g_strAppName + "::" + strName;
+                guint32 dwMsgId = GenClsid( strMsgId );
+                stdstr strClsid = FormatClsid( dwMsgId );
+                CCOUT << "case " << strClsid << ":";
+                INDENT_UPL;
+                CCOUT << "return new " << strName << "();";
+                INDENT_DOWNL;
+            }
+            Wa( "default:" );
+            Wa( "    return null;" );
+            CCOUT << "}";
+            BLOCK_CLOSE;
         }
-        Wa( "default:" );
-        Wa( "    return null;" );
-        CCOUT << "}";
-
         BLOCK_CLOSE;
-        BLOCK_CLOSE;
-        NEW_LINE;
 
         for( int i = 0; i < vecActStructs.size(); i++ )
         {
+            if( i == 0 )
+                NEW_LINE;
             CStructDecl* pStruct = vecActStructs[ i ];
             stdstr strName = pStruct->GetName(); 
             CCOUT << "exports." << strName << " = " << strName << ";";
@@ -1135,8 +1142,11 @@ static gint32 GenStructsFileJs(
         }
     }while( 0 );
 
-    NEW_LINES(2);
-    CCOUT << "globalThis.RegisterFactory( new C" << g_strAppName << "Factory() );";
+    if( bHasStruct )
+    {
+        NEW_LINES(2);
+        CCOUT << "globalThis.RegisterFactory( new C" << g_strAppName << "Factory() );";
+    }
     NEW_LINE;
 
     return ret;

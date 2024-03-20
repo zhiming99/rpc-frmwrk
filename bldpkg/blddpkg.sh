@@ -5,6 +5,7 @@ DESTDIR=$2
 pkgname=$3
 prefix=$4
 BUILD_PYTHON=$5
+BUILD_JS=$6
 
 #the script can run only on debian family of system
 os_name=`cat /etc/os-release | grep '^ID_LIKE' | awk -F '=' '{print $2}'`
@@ -62,27 +63,49 @@ else
     force_inst=''
 fi
 
+pushd ${DEBDIR}
 if [ "x$BUILD_PYTHON" == "xyes" ]; then
-cat << EOF >> ${DEBDIR}/postinst
-#!/bin/bash
+cat << EOF >> ./postinst1
 cd XXXX/${PACKAGE_NAME}
 pypkg=\$(compgen -G "rpcf*whl")
 pip3 install \$pypkg ${force_inst}
-npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli
-#DEBHELPER#
 EOF
-
-cat << EOF >> ${DEBDIR}/postrm
-#!/bin/bash
+cat << EOF >> ./postrm1
 pip3 uninstall -y ${PACKAGE_NAME} ${force_inst}
-npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli
-#DEBHELPER#
 EOF
-else
-    touch ${DEBDIR}/postrm
-    touch ${DEBDIR}/postinst
 fi
 
+if [ "x$BUILD_JS" == "xyes" ]; then
+cat << EOF >> ./postinst2
+npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli
+EOF
+cat << EOF >> ./postrm2
+npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli
+EOF
+fi
+
+if [ -f ./postinst1 -o -f ./postinst2 ];then
+    echo '#!/bin/bash' >> ./postinst
+    echo '#!/bin/bash' >> ./postrm
+    if [ -f ./postinst1 ]; then
+        cat ./postinst1 >> ./postinst
+        cat ./postrm1 >> ./postrm
+        rm ./postinst1 ./postrm1 
+    fi
+    if [ -f ./postinst2 ]; then
+        echo >> ./postinst
+        echo >> ./postrm
+        cat ./postinst2 >> ./postinst
+        cat ./postrm2 >> ./postrm
+        rm ./postinst2 ./postrm2 
+    fi
+    echo '#DEBHELPER#' >> ./postinst
+    echo '#DEBHELPER#' >> ./postrm
+else
+    touch ./postrm
+    touch ./postinst
+fi
+popd
 
 sed -i "s:ZZZZZ:\n:g" rpcf.install
 sed -i "s:ZZZZZ:\n:g" rpcf-dev.install

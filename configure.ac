@@ -394,6 +394,26 @@ AC_CONFIG_FILES([Makefile
                  test/Makefile
                  test/iftest/Makefile
                  test/btinrt/Makefile
+                 test/actcancel/Makefile
+                 test/asynctst/Makefile
+                 test/evtest/Makefile
+                 test/helloworld/Makefile
+                 test/inproc/Makefile
+                 test/prtest/Makefile
+                 test/katest/Makefile
+                 test/sftest/Makefile
+                 test/stmtest/Makefile
+                 test/smoketest/Makefile
+                 rpc/gmsslport/Makefile
+                 rpc/sslport/Makefile
+                 rpc/wsport/Makefile 
+                 rpc/wsport/wsproto/Makefile
+                 rpc/security/Makefile
+                 java/Makefile
+                 fuse/Makefile
+                 python/Makefile
+                 python/setup.py
+                 js/Makefile
                  rpcf.pc ])
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
@@ -418,8 +438,6 @@ FEATURES=
 enable_websock=no
 case $enable_gmssl in
     yes)
-        AC_CONFIG_FILES([
-             rpc/gmsslport/Makefile ])
         GMSSL_DEBFILES='usr/bin/rpcf/gmsslkey.sh'
         GMSSL_RPMFILES='%{_bindir}/rpcf/gmsslkey.shZZZZZ%{_libdir}/libgmsslpt.so*'
         GMSSL_CFGOPT=
@@ -436,8 +454,6 @@ esac
 
 case $enable_openssl in
     yes)
-        AC_CONFIG_FILES([
-             rpc/sslport/Makefile ])
         OPENSSL_DEBFILES='usr/bin/rpcf/opensslkey.shZZZZZetc/rpcf/openssl.cnf'
         OPENSSL_RPMFILES='%{_bindir}/rpcf/opensslkey.shZZZZZ%{_libdir}/libsslpt.so*ZZZZZ%{_sysconfdir}/rpcf/openssl.cnf'
         OPENSSL_CFGOPT=
@@ -462,9 +478,6 @@ esac
 
 case $enable_websock in
     yes)
-        AC_CONFIG_FILES([
-             rpc/wsport/Makefile 
-             rpc/wsport/wsproto/Makefile ])
         WEBSOCK_RPMFILES='%{_libdir}/libwspt.so*'
     ;;
     no)
@@ -474,8 +487,6 @@ esac
 
 case $enable_fuse3 in
     yes)
-        AC_CONFIG_FILES([
-             fuse/Makefile ])
         FUSE3_RPMLIBS="fuse3-devel,"
         FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so'
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
@@ -502,8 +513,6 @@ esac
 
 case $enable_krb5 in
     yes)
-        AC_CONFIG_FILES([
-             rpc/security/Makefile ])
         KRB5_RPMLIBS="krb5-devel,"
         KRB5_RPMPKGS="krb5-libs" 
         KRB5_RPMFILES="%{_libdir}/libauth.so*"
@@ -525,8 +534,6 @@ esac
 
 case $enable_java in
     yes)
-        AC_CONFIG_FILES([
-                 java/Makefile ])
         JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, swig, apache-commons-cli, " 
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
@@ -546,9 +553,6 @@ esac
 
 case $enable_python in
     yes)
-        AC_CONFIG_FILES([
-                 python/Makefile
-                 python/setup.py ])
         PYTHON_RPMLIBS="python3-devel, python3-pip, ( sip5 or sip6 )," 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
@@ -572,18 +576,6 @@ esac
 
 case $enable_testcases in
     yes)
-        AC_CONFIG_FILES([
-         test/actcancel/Makefile
-         test/asynctst/Makefile
-         test/evtest/Makefile
-         test/helloworld/Makefile
-         test/inproc/Makefile
-         test/prtest/Makefile
-         test/katest/Makefile
-         test/sftest/Makefile
-         test/stmtest/Makefile
-         test/smoketest/Makefile
-         ])
         TEST_DEBFILES='etc/rpcf/actcdesc.jsonZZZZZetc/rpcf/asyndesc.jsonZZZZZetc/rpcf/evtdesc.jsonZZZZZetc/rpcf/hwdesc.jsonZZZZZetc/rpcf/inproc.jsonZZZZZetc/rpcf/kadesc.jsonZZZZZetc/rpcf/sfdesc.jsonZZZZZetc/rpcf/stmdesc.jsonZZZZZetc/rpcf/prdesc.json'
         TEST_DEBBINS='usr/bin/rpcf/actclitstZZZZZusr/bin/rpcf/actcsvrtstZZZZZusr/bin/rpcf/asynclitstZZZZZusr/bin/rpcf/asyncsvrtstZZZZZusr/bin/rpcf/evtclitstZZZZZusr/bin/rpcf/evtsvrtstZZZZZusr/bin/rpcf/hwclismkZZZZZusr/bin/rpcf/hwsvrsmkZZZZZusr/bin/rpcf/inproctstZZZZZusr/bin/rpcf/kaclitstZZZZZusr/bin/rpcf/kasvrtstZZZZZusr/bin/rpcf/prclitstZZZZZusr/bin/rpcf/prsvrtstZZZZZusr/bin/rpcf/sfclitstZZZZZusr/bin/rpcf/sfsvrtstZZZZZusr/bin/rpcf/smoketestZZZZZusr/bin/rpcf/stmclitstZZZZZusr/bin/rpcf/stmsvrtst'
 
@@ -606,7 +598,6 @@ esac
 
 case $enable_js in
     yes)
-        AC_CONFIG_FILES([ js/Makefile ])
         JS_RPMLIBS="npm," 
         JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
