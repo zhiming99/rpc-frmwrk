@@ -141,4 +141,5 @@ EXTRA_DIST += $(jstest)/iftest/iftest.html \
  $(jstest)/sftest/sftest.html \
  $(jstest)/sftest/FileTransfercli.js \
  $(jstest)/sftest/maincli.js \
- $(jstest)/hellowld/HelloWorld.html
+ $(jstest)/hellowld/HelloWorld.html \
+ $(jstest)/hellowld/maincli.js

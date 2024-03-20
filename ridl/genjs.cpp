@@ -3097,7 +3097,7 @@ gint32 CExportJsSampleHtml::Output()
         BLOCK_CLOSE;
         NEW_LINE;
         Wa( "setTimeout( checkProxyState, 2000 );" );
-        Wa( "//# sourceURL=browsertools://custom/rpc-entry.js" );
+        Wa( "//# sourceURL=rpcf://htmlcode/checkstate.js" );
         Wa( "</script>" );
         Wa( "</body>" );
 

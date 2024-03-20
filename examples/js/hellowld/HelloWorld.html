@@ -3,18 +3,32 @@
  Copyright (C) 2024  zhiming <woodhead99@gmail.com>
  This program can be distributed under the terms of the GNU GPLv3.
 
-* command line: /usr/local/bin/ridlc -JO. --odesc_url=http://example.com/rpcf ../../hellowld.ridl 
+* command line: /usr/local/bin/ridlc -JO. -Lcn --odesc_url=http://example.com/rpcf ../../hellowld.ridl 
 * npm dependency: browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli
 -->
 <!DOCTYPE html>
 <html><head><meta charset="utf-8" /></head></html>
 <body>
-<p id="log">Sample HTML<br /></p>
+<p id="log">Hello, World!<br /></p>
+<script>
+// set a callback on RPC connection ready
+globalThis.onRpcReady=()=>{
+    console.log( "RPC connection ready " );
+    var oProxy = globalThis.oProxy;
+    var oContext = new Object();
+    oContext.m_oCallback = (oContext, ret, strResp)=>{
+        if( ret & 0x80000000 )
+            console.log( "error returned")
+        else
+            console.log( 'server response is ' + strResp );
+    }
+    return oProxy.Echo( oContext, "Hello, World!" );
+}
+//# sourceURL=rpcf://htmlcode/sendreq.js
+</script>
 <script src="dist/HelloWorld.js">
 </script>
 <script>
-console.log( "hello, HelloWorld!");
-var iChecks = 0;
 function checkProxyState(){
     if( globalThis.oProxy === undefined ){
         setTimeout( checkProxyState, 2000 );
@@ -23,33 +37,10 @@ function checkProxyState(){
         console.log( "RPC connection is down..." );
         globalThis.oProxy = null;
     }else{
-        if( iChecks++ === 0 )
-        {
-            console.log( "RPC connection ready " + globalThis.oProxy );
-            var oContext = new Object();
-            var oProxy = globalThis.oProxy;
-            return new Promise( (resolve, reject)=>{
-                oContext.m_oReject = reject;
-                oContext.m_oResolve = resolve;
-                oContext.m_oCallback = (oContext, ret, strResp)=>{
-                    if( ret & 0x80000000 )
-                        console.log( "error returned")
-                    else
-                        console.log( 'server response is ' + strResp );
-                }
-                return oProxy.Echo( oContext, "Hello, World!" );
-            }).then((e)=>{
-                console.log( "Stop the proxy")
-                oProxy.Stop();
-            }).catch( (e )=>{
-                console.log( e )
-                oProxy.Stop();
-            })
-        }
         setTimeout( checkProxyState, 5000 );
     }
 }
 setTimeout( checkProxyState, 2000 );
-//# sourceURL=browsertools://custom/rpc-entry.js
+//# sourceURL=rpcf://htmlcode/checkstate.js
 </script>
 </body>
