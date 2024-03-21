@@ -43,6 +43,7 @@ WebSocketFrameType WebSocket::parseHandshake(unsigned char* input_frame, int inp
 	headers.resize(header_end); // trim off any data we don't need after the headers
 	vector<string> headers_rows;
     explode(headers, string("\r\n"), headers_rows );
+    this->protocol.clear();
 	for(size_t i=0; i<headers_rows.size(); i++) {
 		string& header = headers_rows[i];
 		if(header.find("GET") == 0) {
