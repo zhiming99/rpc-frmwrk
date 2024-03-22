@@ -605,11 +605,12 @@ gint32 CRpcWebSockFido::CompleteListeningIrp(
 
     BufPtr pDecrypted( true );
     do{
-        BufPtr& pCurFrame = GetCurFrame();
+        BufPtr pCurFrame;
         WebSocketFrameType ret1;
 
         {
             CStdRMutex oPortLock( GetLock() );
+            pCurFrame = GetCurFrame();
             ret1 = m_oWebSock.getFrame(
                 pCurFrame, pDecrypted );
         }
