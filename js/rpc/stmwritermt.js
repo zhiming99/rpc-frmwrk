@@ -29,8 +29,9 @@ function StreamWrite( oMsg )
         }
         oStm.m_arrPendingWriteReqs.push( [ oMsg, 0])
         ret = oStm.SendHeadReq()
-        if( ret !== errno.STATUS_PENDING )
-            oStm.m_arrPendingWriteReqs.shift()
+        if( ret === errno.STATUS_PENDING )
+            return ret
+        oStm.m_arrPendingWriteReqs.shift()
         return ret
     }
     catch(e) {

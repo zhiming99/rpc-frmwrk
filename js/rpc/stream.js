@@ -115,8 +115,8 @@ class CFlowControl
             constval.STM_MAX_PACKETS_REPORT )
             bAbovePkts = true
         
-        if( bAboveLastBytes != bAboveBytes ||
-            bAboveLastPkts != bAbovePkts )
+        if( bAboveLastBytes !== bAboveBytes ||
+            bAboveLastPkts !== bAbovePkts )
         {
             ret = this.IncFCCount()
         }
@@ -153,8 +153,8 @@ class CFlowControl
             constval.STM_MAX_PACKETS_REPORT )
             bAbovePkts = true
         
-        if( bAboveLastBytes != bAboveBytes ||
-            bAboveLastPkts != bAbovePkts )
+        if( bAboveLastBytes !== bAboveBytes ||
+            bAboveLastPkts !== bAbovePkts )
         {
             ret = EnumFCState.fcsReport
             this.m_qwAckRxBytes = this.m_qwRxBytes
@@ -218,7 +218,8 @@ class CFlowControl
         var qwAckTxPkts = oReport.GetProperty(
             EnumPropId.propRxPkts )
         return this.OnReportInternal(
-            qwAckTxBytes, qwAckTxPkts)
+            Number( qwAckTxBytes ),
+            Number( qwAckTxPkts) );
     }
 
     GetReport()
@@ -257,7 +258,6 @@ class CRpcStream extends CRpcStreamBase
                         break
                     if( !this.CanSend() )
                     {
-                        console.log( "Warning: follow-control blocked the send")
                         ret = errno.ERROR_FAIL
                         break
                     }
@@ -273,7 +273,7 @@ class CRpcStream extends CRpcStreamBase
                     if( fcs !== EnumFCState.fcsFlowCtrl )
                         break
                     console.log( "Warning: follow-control activated")
-                    ret = errno.ERROR_QUEUE_FULL
+                    // ret = errno.ERROR_QUEUE_FULL
                     break
                 }
             case EnumStmToken.tokProgress:
@@ -376,9 +376,7 @@ class CRpcStream extends CRpcStreamBase
                 oReport.Deserialize( oPayload, 0 )
                 var fcs = this.m_oFlowCtrl.OnFCReport( oReport )
                 if( fcs === EnumFCState.fcsLift )
-                {
-                    this.ResumeWrite()
-                }
+                    ret = this.ResumeWrite()
                 break
             }
         case EnumStmToken.tokPong:
@@ -509,19 +507,21 @@ class CRpcStream extends CRpcStreamBase
     ResumeWrite()
     {
         if( this.m_arrPendingWriteReqs.length === 0 )
-            return
+            return 0
+        var ret = 0;
         while( this.m_arrPendingWriteReqs.length > 0)
         {
+            var offset = this.m_arrPendingWriteReqs[0][1];
             ret = this.SendHeadReq()
-            if( ret !== errno.STATUS_PENDING )
-            {
-                var oMsg = this.m_arrPendingWriteReqs.shift()[0]
-                var oResp = new CIoRespMessage( oMsg )
-                oResp.m_oResp.SetUint32(
-                    EnumPropId.propReturnValue, ret)
-                this.m_oParent.PostMessage( oResp )
-            }
+            if( ret === errno.STATUS_PENDING )
+                break;
+            var oMsg = this.m_arrPendingWriteReqs.shift()[0]
+            var oResp = new CIoRespMessage( oMsg )
+            oResp.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, ret)
+            this.m_oParent.PostMessage( oResp )
         }
+        return ret;
     }
 
     SendHeadReq()
@@ -530,46 +530,30 @@ class CRpcStream extends CRpcStreamBase
         var oMsg = this.m_arrPendingWriteReqs[0][0]
         var offset = this.m_arrPendingWriteReqs[0][1]
         var oBuf = oMsg.m_oReq.GetProperty( 1 )
-        var bDone = false
         while( offset < oBuf.length )
         {
             var dwSize = oBuf.length - offset >
                 constval.STM_MAX_BYTES_PER_BUF ?
                 constval.STM_MAX_BYTES_PER_BUF : oBuf.length - offset
-            var iRet = 0
-            if( dwSize === oBuf.length )
-            {
-                iRet = this.SendBuf( EnumStmToken.tokData, oBuf )
-                if( iRet === errno.ERROR_FAIL )
-                {
-                    ret = errno.STATUS_PENDING
-                    break
-                }
-                offset += dwSize
-                bDone = true
-            }
-            else
-            {
-                iRet = this.SendBuf(
-                    EnumStmToken.tokData,
-                    oBuf.slice( offset, offset + dwSize ) )
-                if( iRet === errno.ERROR_FAIL )
-                {
-                    ret = errno.STATUS_PENDING
-                    break
-                }
-                offset += dwSize
-            }
-            if( bDone )
-            {
-                ret = errno.STATUS_SUCCESS
-                break
-            }
-            if( iRet === errno.ERROR_QUEUE_FULL )
+
+            var iRet = this.SendBuf( EnumStmToken.tokData,
+                oBuf.slice( offset, offset + dwSize ) )
+
+            if( iRet === errno.ERROR_FAIL ||
+                iRet === errno.ERROR_QUEUE_FULL )
             {
                 this.m_arrPendingWriteReqs[0][1] = offset
                 ret = errno.STATUS_PENDING
                 break
+            }
+            if( dwSize === oBuf.length - offset )
+            {
+                ret = errno.STATUS_SUCCESS
+                break
+            }
+            else
+            {
+                offset += dwSize
             }
         }
         return ret

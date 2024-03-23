@@ -157,6 +157,8 @@ class COutgoingPacket extends CCarrierPacket
             throw new Error( "Error Invalid Buffer")
         this.m_oBuf = oPayload
         this.m_oHeader.m_dwSize = oPayload.length
+        if( oPayload.length <= 8 )
+            this.m_oHeader.m_wFlags = 0;
     }
 
     SetHeader( oHeader )
@@ -180,6 +182,12 @@ class COutgoingPacket extends CCarrierPacket
         var compressed = Buffer.alloc(
             encodeBound( this.m_oBuf.length ) )
         var byteOutput = encodeBlock( this.m_oBuf, compressed )
+        if( byteOutput === 0 )
+        {
+            console.log("warning: compress does not work properly")
+            this.m_oHeader.m_wFlags = 0
+            return super.Serialize()
+        }
 
         var bufSize = Buffer.alloc( 4 )
         bufSize.writeUint32BE( this.m_oBuf.length )

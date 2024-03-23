@@ -59,6 +59,9 @@ class CFileTransfer_SvrImpl
         HANDLE hChannel, gint32 iRet,
         BufPtr& pBuf, IConfigDb* pCtx );
 
+    gint32 OnWriteResumed( HANDLE hChannel ) override
+    { return m_oTransCtx.OnWriteResumed( hChannel ); }
+
     gint32 SendToken( HANDLE hChannel, BufPtr& pBuf )
     { return m_oTransCtx.SendToken( hChannel, pBuf ); }
 };

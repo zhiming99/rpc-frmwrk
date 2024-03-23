@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <libgen.h>
 
+#define TRANS_LIMIT ( 2048L * 1024 * 1024 )
+
 struct TransFileContext
 {
     gint32 m_iError = 0;
@@ -99,7 +101,7 @@ struct TransFileContext
                     m_iSize == 0 )
                     m_iSize = iSize - m_iOffset;
 
-                if( m_iSize > 128 * 1024 * 1024 )
+                if( m_iSize > TRANS_LIMIT )
                 {
                     ret = -ERANGE;
                     break;
@@ -361,6 +363,20 @@ struct TransferContext :
             return iRet;
         }
         return WriteFileAndRecv( hChannel, pBuf );
+    }
+
+    gint32 OnWriteResumed( HANDLE hChannel )
+    {
+        CStdRMutex oLock( GetLock() );
+        auto itr = m_mapChanToCtx.find( hChannel );
+        if( itr == m_mapChanToCtx.end() )
+            return -ENOENT;
+        auto& o = itr->second;
+
+        OutputMsg( 0, "Send Resumed with %d sent, %d to send",
+            o.m_iBytesSent, o.m_iBytesLeft );
+
+        return ReadFileAndSend( hChannel );
     }
 
     void SetError( HANDLE hChannel, gint32 iError )
