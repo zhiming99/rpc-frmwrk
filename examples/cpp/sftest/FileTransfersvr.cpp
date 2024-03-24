@@ -27,11 +27,18 @@ CFileTransfer_SvrImpl::CFileTransfer_SvrImpl(
                        m_strRootDir.c_str() ) );
             }
         }
-        char* szLogin = getenv( "USER" );
+        const char* szLogin = getenv( "USER" );
         if( szLogin == nullptr )
-            throw std::runtime_error(
-               DebugMsg( -ENOENT,
-                   "no user name!" ) );
+        {
+            uid_t uid = geteuid();
+            if( uid == 0 )
+            {
+                throw std::runtime_error(
+                   DebugMsg( -ENOENT,
+                       "no user name!" ) );
+            }
+            szLogin = "root";
+        }
         m_strRootDir += szLogin;
         if( !IsDirExist( m_strRootDir ) )
         {
