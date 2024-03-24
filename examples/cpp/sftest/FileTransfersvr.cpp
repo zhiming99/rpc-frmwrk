@@ -31,7 +31,7 @@ CFileTransfer_SvrImpl::CFileTransfer_SvrImpl(
         if( szLogin == nullptr )
         {
             uid_t uid = geteuid();
-            if( uid == 0 )
+            if( uid != 0 )
             {
                 throw std::runtime_error(
                    DebugMsg( -ENOENT,
