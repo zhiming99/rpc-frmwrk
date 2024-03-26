@@ -3062,7 +3062,7 @@ gint32 CExportJsSampleHtml::Output()
         NEW_LINE;
         CCOUT << "* command line: " << g_strCmdLine;
         NEW_LINE;
-        CCOUT << "* npm dependency: browserify buffer exports minify "
+        CCOUT << "* npm dependency: assert browserify buffer exports minify "
             << "long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
         NEW_LINE;
         Wa( "-->" );
