@@ -43,7 +43,7 @@ function KeepAliveRequest( oOrigMsg, qwTaskId )
         EnumPropId.propCallOptions, oCallOpts)
 
     var oContext = new Object()
-    ForwardRequestLocal.bind( this )(
+    return ForwardRequestLocal.bind( this )(
         oReq, (oContext, oResp )=>{
             this.DebugPrint( ": KeepAliveRequest is sent")
         }, oContext )
