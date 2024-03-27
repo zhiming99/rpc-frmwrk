@@ -27,7 +27,7 @@ function OnKeepAlive( dmsg )
         for( [key, oPending ] of this.m_mapPendingReqs )
         {
             var qwPendingTaskId = oPending.m_oReq.m_iMsgIdLocal
-            if( qwTaskId === qwPendingTaskId )
+            if( Number( qwTaskId ) === qwPendingTaskId )
             {
                 oPending.m_oReq.ResetTimer()
                 bFound = true

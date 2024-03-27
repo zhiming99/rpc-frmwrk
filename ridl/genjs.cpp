@@ -1330,9 +1330,9 @@ gint32 CImplJsSvcProxyBase::EmitBuildEventTable()
             stdstr strIfName = pifd->GetName();
             CMethodDecl* pmdecl = elem.second;
             stdstr strName = pmdecl->GetName();
-            CCOUT << "this.m_arrDispEvtTable.set( '"
+            CCOUT << "this.m_mapEvtHandlers.set( '"
                 << strIfName << "::" << strName << "', this."
-                << strName << "Wrapper );";
+                << strName << "Wrapper.bind(this) );";
             if( i < vecEvents.size() - 1 )
                 NEW_LINE;
         }
@@ -1354,21 +1354,16 @@ gint32 CImplJsSvcProxyBase::EmitSvcBaseCli()
             << " extends CInterfaceProxy";
         NEW_LINE;
         BLOCK_OPEN;
+        bool bEvent = true;
         ret = EmitBuildEventTable();
+        if( ERROR( ret ) )
+            bEvent = false;
+        ret = 0;
         CCOUT << "constructor( oIoMgr, strObjDescPath, strObjName, oParams )";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "super( oIoMgr, strObjDescPath, strObjName );";
-        if( SUCCEEDED( ret ) )
-        {
-            NEW_LINE;
-            CCOUT << "this.BuildEventTable();";
-        }
-        else
-        {
-            ret = STATUS_SUCCESS;
-        }
-        NEW_LINES( 2 );
+        NEW_LINE;
 
         std::vector< ObjPtr > vecIfs;
         psd->GetIfRefs( vecIfs );
@@ -1425,6 +1420,11 @@ gint32 CImplJsSvcProxyBase::EmitSvcBaseCli()
             }
             if( i < vecIfs.size() - 1 )
                 NEW_LINES( 2 );
+        }
+        if( bEvent )
+        {
+            NEW_LINES( 2 );
+            CCOUT << "this.BuildEventTable();";
         }
         BLOCK_CLOSE;
         BLOCK_CLOSE;
@@ -2100,7 +2100,7 @@ gint32 CImplJsMthdProxyBase::OutputEvent()
         {
             Wa( "var offset = 0;" );
             Wa( "var args = [];" );
-            Wa( "var osb = CSerialBase( this );" );
+            Wa( "var osb = new CSerialBase( this );" );
             Wa( "var ret;" );
             Wa( "var buf = ridlBuf;" );
             NEW_LINE;
@@ -2200,9 +2200,9 @@ gint32 CImplJsSvcProxy::OutputSvcProxyClass()
         if( m_pNode->IsStream() )
         {
             NEW_LINE;
-            CCOUT << "this.OnDataReceived = this.OnDataReceivedImpl;";
+            CCOUT << "this.OnDataReceived = this.OnDataReceivedImpl.bind( this );";
             NEW_LINE;
-            CCOUT << "this.OnStmClosed = this.OnStmClosedImpl;";
+            CCOUT << "this.OnStmClosed = this.OnStmClosedImpl.bind( this );";
         }
         BLOCK_CLOSE;
         NEW_LINES( 2 );

@@ -61,7 +61,7 @@ exports.OnKeepAliveLocal = function OnKeepAliveLocal( oMsg )
     try{
         var oEvent = oMsg.m_oReq
         var qwTaskId = oEvent.GetProperty( 0 );
-        var oPending = this.m_oIoMgr.GetPendingReq( qwTaskId )
+        var oPending = this.m_oIoMgr.GetPendingReq( Number( qwTaskId ) )
         if( oPending === null )
             return
         var oReq = oPending.m_oReq
