@@ -74,6 +74,7 @@ module.exports = {
         propParamCount:12297,
         propMatchPtr: 12320,
         propSubmitPdo: 12322,
+        propParentPtr: 12309,
         propContext: 12324,
         propReturnValue: 12329,
         propCallFlags: 12330,

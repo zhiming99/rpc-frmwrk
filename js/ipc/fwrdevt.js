@@ -68,6 +68,6 @@ exports.ForwardEventLocal = function ForwardEventLocal( oMsg )
     }
     catch(e)
     {
-
+        console.log( "Error in ForwardEventLocal")
     }
 }
