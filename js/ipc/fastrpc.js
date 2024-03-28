@@ -4,12 +4,10 @@ const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCal
 const { IoCmd, IoMsgType, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 const { CDBusMessage, DBusIfName, DBusDestination, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 const { CMessageMatch } = require( "../combase/msgmatch")
-const { ForwardRequestLocal } = require("./fwrdreq")
-const { ForwardEventLocal } = require("./fwrdevt")
 const { CInterfaceProxy } = require("./proxy")
 const { OpenStreamLocal, CloseStreamLocal } = require("./openstm")
-const { OnDataReceivedLocal, OnStreamClosedLocal, NotifyDataConsumed} = require( "./stmevt")
 const { StreamWriteLocal } = require( "./stmwrite")
+const { KeepAliveRequest } = require("./keepalive")
 
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { messageType } = require( "../dbusmsg/constants")
@@ -27,6 +25,27 @@ class CFastRpcChanProxy extends CInterfaceProxy
         this.OnStreamClosed = this.OnStmClosedImpl.bind(this);
         this.m_mapPendingReqs = new Map();
         this.m_funcForwardRequest = this.ForwardRequest.bind( this );
+
+        this.m_oScanReqs = ()=>{
+            var dwIntervalMs = 10 * 1000
+            var expired = []
+            var key, val
+            for( [ key, val ] of this.m_mapPendingReqs )
+            {
+                if( val.m_oReq.DecTimer( dwIntervalMs ) > 0 )
+                    continue;
+                val.OnCanceled( -errno.ETIMEDOUT )
+                expired.push( key )
+            }
+            for( key of expired )
+                this.m_mapPendingReqs.delete( key )
+
+            for( [key, val ] of this.m_mapStreams )
+                val.AgeStream( 10 )
+
+            this.m_iTimerId = setTimeout(
+                this.m_oScanReqs, dwIntervalMs )
+        }
     }
 
     OnDataReceivedImpl( hStream, oBuf )
@@ -95,8 +114,38 @@ class CFastRpcChanProxy extends CInterfaceProxy
         }
     }
 
+    OnKeepAlive( oMsg )
+    {
+        try{
+            var oEvent = oMsg.m_oReq
+            var strVal = oEvent.GetProperty(
+                EnumPropId.propIfName )
+            if( strVal !== DBusIfName( "IInterfaceServer") )
+                return;
+            strVal = oEvent.GetProperty(
+                EnumPropId.propObjPath );
+            if( strVal !== this.m_oParent.m_strObjPath )
+                return;
+            var qwTaskId = oEvent.GetProperty( 0 );
+            var oPending = this.m_mapPendingReqs.get( Number( qwTaskId ) );
+            if( oPending === null )
+                return
+            var oReq = oPending.m_oReq
+            var val = oReq.m_oReq.GetProperty(
+                EnumPropId.propObjPath )
+            if( val !== this.m_oParent.m_strObjPath )
+                return
+            KeepAliveRequest.bind( this )(
+                oReq.m_oReq, qwTaskId )
+        }
+        catch(e)
+        {
+    
+        }
+    }
     OnEventReceived( dmsg, oEvent )
     {
+        var strMethod;
         var oEvtReq = new CConfigDb2();
         var strVal = dmsg.GetSender()
         if( strVal != undefined )
@@ -106,10 +155,10 @@ class CFastRpcChanProxy extends CInterfaceProxy
         if( strVal != undefined )
             oEvtReq.SetString(
                 EnumPropId.propObjPath, strVal )
-        strVal = dmsg.GetMember()
-        if( strVal != undefined )
+        strMethod = dmsg.GetMember()
+        if( strMethod != undefined )
             oEvtReq.SetString(
-                EnumPropId.propMethodName, strVal )
+                EnumPropId.propMethodName, strMethod )
         strVal = dmsg.GetDestination() 
         if( strVal != undefined )
             oEvtReq.SetString(
@@ -131,7 +180,13 @@ class CFastRpcChanProxy extends CInterfaceProxy
         var ioEvt = new CIoEventMessage();
         var oParent = this.m_oParent;
         ioEvt.m_oReq = oEvtReq;
-        oParent.m_arrDispTable[ IoEvent.ForwardEvent[0] ]( ioEvt );
+
+        if( strMethod === IoEvent.ForwardEvent[1])
+            oParent.m_arrDispTable[ IoEvent.ForwardEvent[0] ]( ioEvt );
+        else if( strMethod === IoEvent.OnKeepAlive[1] )
+        {
+            this.OnKeepAlive( ioEvt );
+        }
     }
 
     BuildDBusMsgToFwrd( oReq )
@@ -178,9 +233,28 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 var oPending = new CPendingRequest();
                 oPending.m_oResolve = resolve;
                 oPending.m_oReject = reject;
-                oPending.m_oReq = oReq;
+                var ioReq = new CIoReqMessage();
+                ioReq.m_iCmd = IoCmd.ForwardRequest[0];
+                var oOpts = oReq.GetProperty(
+                    EnumPropId.propCallOptions );
+                ret = oOpts.GetProperty(
+                    EnumPropId.propTimeoutSec )
+                if( ret !== null )
+                {
+                    ioReq.m_dwTimerLeftMs = ret * 1000;
+                }
+                else
+                {
+                    ioReq.m_dwTimerLeftMs =
+                        this.m_oParent.m_dwTimeoutSec * 1000;
+                }
+
+                ioReq.m_oReq = oReq;
+                ioReq.m_iMsgId = dmsg.GetSerial();
+                oPending.m_oReq = ioReq;
                 oPending.m_oCallback =
                     oCallback.bind( this, oContext);
+
                 var oSizeBuf = Buffer.alloc(4);
                 oSizeBuf.writeUint32BE( oMsgBuf.length );
                 return this.m_funcStreamWrite( this.m_hStream,
@@ -217,6 +291,17 @@ class CFastRpcChanProxy extends CInterfaceProxy
         })
     }
 
+    Start()
+    {
+        return super.Start().then((e)=>{
+            this.m_iTimerId = setTimeout(
+                this.m_oScanReqs, 10 * 1000 )
+            return Promise.resolve(e);
+        }).catch((e)=>{
+            return Promise.reject(e);
+        })
+    }
+
     Stop( reason )
     {
         var arrKeys = []
@@ -236,7 +321,12 @@ class CFastRpcChanProxy extends CInterfaceProxy
         }
         for( key of arrKeys )
             this.m_mapPendingReqs.delete( key )
-        super.Stop( reason );
+        if( this.m_iTimerId !== 0 )
+        {
+            clearTimeout( this.m_iTimerId );
+            this.m_iTimerId = 0;
+        }
+        return super.Stop( reason );
     }
 }
 
@@ -311,8 +401,11 @@ class CFastRpcProxy extends CInterfaceProxy
 
     Stop( reason )
     {
-        this.m_oChanProxy.Stop( reason );
-        super.Stop( reason )
+        return this.m_oChanProxy.Stop( reason ).then((e)=>{
+            return super.Stop( reason )
+        }).catch((e)=>{
+            return super.Stop( reason )
+        })
     }
 }
 
