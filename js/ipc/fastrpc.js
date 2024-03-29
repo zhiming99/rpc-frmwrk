@@ -11,20 +11,23 @@ const { KeepAliveRequest } = require("./keepalive")
 
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { messageType } = require( "../dbusmsg/constants")
+const { createHash } = require('crypto-browserify')
 
 class CFastRpcChanProxy extends CInterfaceProxy
 {
     constructor( oMgr, strObjDesc, strObjName, oParams )
     {
-        var oParent = oParams.GetPropery(
+        super( oMgr, strObjDesc, strObjName, oParams )
+        var oParent = oParams.GetProperty(
             EnumPropId.propParentPtr)
-        if( !oOwner )
+        if( !oParent )
             throw new Error( "Error parent object is not given")
         this.m_oParent = oParent;
         this.OnDataReceived = this.OnDataReceivedImpl.bind(this);
         this.OnStreamClosed = this.OnStmClosedImpl.bind(this);
         this.m_mapPendingReqs = new Map();
         this.m_funcForwardRequest = this.ForwardRequest.bind( this );
+        this.m_hStream = null;
 
         this.m_oScanReqs = ()=>{
             var dwIntervalMs = 10 * 1000
@@ -40,9 +43,6 @@ class CFastRpcChanProxy extends CInterfaceProxy
             for( key of expired )
                 this.m_mapPendingReqs.delete( key )
 
-            for( [key, val ] of this.m_mapStreams )
-                val.AgeStream( 10 )
-
             this.m_iTimerId = setTimeout(
                 this.m_oScanReqs, dwIntervalMs )
         }
@@ -52,10 +52,11 @@ class CFastRpcChanProxy extends CInterfaceProxy
     {
         var ret = 0;
         try{
+            if( hStream != this.m_hStream )
+                return;
             var dmsg = new CDBusMessage()
             dmsg.Restore( unmarshall(
                 oBuf.slice( 4 ) ) )
-            
             var dmsg = new CDBusMessage()
             dmsg.Restore( unmarshall(
                 oPending.m_oResp.slice( 4 ) ) )
@@ -103,7 +104,16 @@ class CFastRpcChanProxy extends CInterfaceProxy
     }
 
     OnStmClosedImpl( hStream )
-    {}
+    {
+        if( hStream != this.m_hStream )
+            return;
+        setTimeout(()=>{
+            console.log(
+                "Warning: the stream channel closed");
+            this.m_oParent.Stop(
+                errno.ERROR_PORT_STOPPED );
+        }, 0 );
+    }
 
     OnRespReceived( oPending )
     {
@@ -207,9 +217,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
         dmsg.SetMember( oReq.GetProperty(
                 EnumPropId.propMethodName ) )
         oReq.RemoveProperty( EnumPropId.propMethodName )
-        dmsg.SetSerial( oReq.GetProperty(
-                EnumPropId.propSeqNo ) )
-        oReq.RemoveProperty( EnumPropId.propSeqNo )
+        dmsg.SetSerial( globalThis.g_iMsgIdx++ )
 
         var oCallOptions = oReq.GetProperty(
             EnumPropId.propCallOptions )
@@ -227,6 +235,16 @@ class CFastRpcChanProxy extends CInterfaceProxy
 
     ForwardRequest( oReq, oCallback, oContext )
     {
+        if( this.m_iState !== EnumIfState.stateStarted )
+        {
+            var oPending = new CPendingRequest();
+            oPending.m_oReq = oReq;
+            oPending.m_oCallback = oCallback;
+            oPending.m_oResp = new CConfigDb2();
+            oPending.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, errno.ERROR_STATE)
+            return Promise.reject( oPending )
+        }
         return new Promise( (resolve, reject)=>{
                 var dmsg = this.BuildDBusMsgToFwrd( oReq );
                 var oMsgBuf = marshall( dmsg );
@@ -237,7 +255,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 ioReq.m_iCmd = IoCmd.ForwardRequest[0];
                 var oOpts = oReq.GetProperty(
                     EnumPropId.propCallOptions );
-                ret = oOpts.GetProperty(
+                var ret = oOpts.GetProperty(
                     EnumPropId.propTimeoutSec )
                 if( ret !== null )
                 {
@@ -328,6 +346,26 @@ class CFastRpcChanProxy extends CInterfaceProxy
         }
         return super.Stop( reason );
     }
+
+    OpenRequestChannel()
+    {
+        var oStmCtx = new Object();
+        oStmCtx.m_oProxy = this;
+        return this.m_funcOpenStream(oStmCtx).then((oCtx)=>{
+            if( ERROR( oCtx.m_iRet ) )
+                return Promise.reject( oCtx );
+            this.m_hStream = oCtx.m_hStream;
+            return Promise.resolve( oCtx.m_iRet );
+        }).catch((e)=>{
+            this.m_iState = EnumIfState.stateStartFailed;
+            var ret = -errno.EFAULT
+            if( e.m_iRet !== undefined )
+                ret = e.m_iRet;
+            else
+                ret = -errno.EFAULT
+            return Promise.resolve( ret );
+        })
+    }
 }
 
 class CFastRpcProxy extends CInterfaceProxy
@@ -336,6 +374,28 @@ class CFastRpcProxy extends CInterfaceProxy
     {
         super( oMgr, strObjDesc, strObjName, oParams );
         var strChannName = strObjName + "_ChannelSvr";
+        if( !oParams )
+            oParams = new CConfigDb2();
+        oParams.SetObjPtr(
+            EnumPropId.propParentPtr, this )
+
+        var strSuffix = "";
+        if( this.m_strObjInstName.length > 0 )
+        {
+            strSuffix = this.m_strObjInstName;
+        }
+        else
+        {
+            strSuffix = this.m_strObjName;
+        }
+        var shasum = createHash('sha1');
+        shasum.update( strSuffix );
+        var strSum = shasum.digest( 'hex' );
+        var strObjInstName = strChannName +
+            '_' + strSum.slice( 3 * 8, 4 * 8 ).toUpperCase();
+        oParams.SetString( EnumPropId.propObjInstName,
+            strObjInstName );
+
         this.m_oChanProxy = new CFastRpcChanProxy(
             oMgr, strObjDesc, strChannName, oParams );
         this.m_funcForwardRequest =
@@ -347,39 +407,16 @@ class CFastRpcProxy extends CInterfaceProxy
     Start()
     {
         // start the channel client first
-        var oChanCb = function( retVal )
-        {
-            if( ERROR( retVal ) )
-                return retVal;
-            
-            var oStmCtx;
-            oStmCtx.m_oProxy = this;
-            return this.m_funcOpenStream(oStmCtx).then((oCtx)=>{
-                if( ERROR( oCtx.m_iRet ) )
-                    return Promise.reject( oCtx );
-                this.m_hStream = oCtx.m_hStream;
-                // start the master proxy
-                return this.super.Start();
+        var oChan = this.m_oChanProxy;
+        return oChan.Start().then((retVal)=>{
+                if( ERROR(retVal))
+                    return Promise.reject( retVal )
+                return oChan.OpenRequestChannel()
             }).then((retVal)=>{
-                if( ERROR( retVal))
-                {
-                    oStmCtx.m_iRet = retVal;
-                    return Promise.reject( oStmCtx );
-                }
-                return Promise.resolve( retVal );
-            }).catch((e)=>{
-                this.m_iState = EnumIfState.stateStartFailed;
-                var ret = -errno.EFAULT
-                if( e.m_iRet !== undefined )
-                    ret = e.m_iRet;
-                else
-                    ret = -errno.EFAULT
-                return Promise.resolve( ret );
-            })
-        }
-        return this.m_oChanProxy.Start().then(
-            oChanCb.bind( this.m_oChanProxy )
-            ).catch( (retVal)=>{
+                if( ERROR( retVal ) )
+                    return Promise.reject( retVal );
+                return CInterfaceProxy.prototype.Start.bind( this)();
+            }).catch( (retVal)=>{
                 this.m_iState = EnumIfState.stateStartFailed;
                 console.log( "Error, Channel setup failed" );
                 return Promise.resolve( retVal );
