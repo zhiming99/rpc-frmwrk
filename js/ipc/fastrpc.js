@@ -13,6 +13,139 @@ const { marshall, unmarshall } = require("../dbusmsg/message")
 const { messageType } = require( "../dbusmsg/constants")
 const { createHash } = require('crypto-browserify')
 
+class CFastRpcMsg
+{
+    constructor()
+    {
+        this.m_dwSize = 0;
+        this.m_bType = EnumTypeId.typeObj;
+        this.m_oReq = null;
+    }
+
+    Serialize()
+    {
+        var oHdr = Buffer.alloc( 8 );
+        oHdr.writeUint8( 4, this.m_bType );
+        oHdr.writeUint8( 5, 'F')
+        oHdr.writeUint8( 6, 'R')
+        oHdr.writeUint8( 7, 'M')
+        if( !this.m_oReq )
+        {
+            throw new ERROR( "Error, empty FASTRPC message" );
+        }
+
+        var oBody = this.m_oReq.Serialize();
+        var dstBuf = Buffer.concat( [ oHdr, oBody ]);
+        dstBuf.writeUint32BE( oBody.length + 4 );
+        return dstBuf;
+    }
+
+    Deserialize( oBuf, offset )
+    {
+        var dwSize = oBuf.readUint32BE( offset );
+        if( dwSize + offset + 4 > oBuf.length )
+            throw new ERROR( "Error, invalid FASTRPC message size" );
+        offset += 4;
+        var iType = oBuf.readUint8( offset )
+        if( iType !== EnumTypeId.typeObj )
+            throw new ERROR( "Error, invalid FASTRPC message type" );
+
+        offset++;
+        var szMag = [0,0,0]
+        szMag[0] = oBuf.readUint8( offset );
+        szMag[1] = oBuf.readUint8( offset + 1 );
+        szMag[2] = oBuf.readUint8( offset + 2 );
+        if( szMag[ 0 ] !== 'F' ||
+            szMag[ 1 ] !== 'R' ||
+            szMag[ 2 ] !== 'M')
+            throw new ERROR( "Error, invalid FASTRPC message magic" );
+        this.m_dwSize = dwSize;
+        this.m_bType = EnumTypeId.typeObj;
+
+        offset += 3;
+        this.m_oReq = new CConfigDb2();
+        return this.m_oReq.Deserialize( oBuf, offset )
+    }
+
+    GetType()
+    {
+        var oOpts = this.m_oReq.GetProperty(
+            EnumPropId.propCallOptions );
+        var dwFlags = oOpts.GetProperty(
+            EnumPropId.propCallFlags )
+        return ( dwFlags & 0x07 );
+    }
+
+    GetReturnValue()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propReturnValue );
+    }
+
+    IsNoReply()
+    {
+        var oOpts = this.m_oReq.GetProperty(
+            EnumPropId.propCallOptions );
+        var dwFlags = oOpts.GetProperty(
+            EnumPropId.propCallFlags )
+        if( dwFlags & EnumCallFlags.CF_WITH_REPLY )
+            return false;
+        return true;
+    }
+
+    GetSerial()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propSeqNo );
+    }
+
+    GetReplySerial()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propSeqNo2 );
+    }
+
+    GetSender()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propSrcDBusName );
+    }
+
+    GetObjPath()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propObjPath )
+    }
+
+    GetMember()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propMethodName )
+    }
+
+    GetDestination()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propDestDBusName )
+    }
+
+    GetSerial()
+    {
+        return this.m_oReq.GetProerpty(
+            EnumPropId.propSeqNo )
+    }
+
+    GetInterface()
+    {
+        return this.m_oReq.GetProperty(
+            EnumPropId.propIfName )
+    }
+
+    GetArgAt( idx )
+    {
+        return this.m_oReq.GetProperty( idx )
+    }
+}
 class CFastRpcChanProxy extends CInterfaceProxy
 {
     constructor( oMgr, strObjDesc, strObjName, oParams )
@@ -54,39 +187,20 @@ class CFastRpcChanProxy extends CInterfaceProxy
         try{
             if( hStream != this.m_hStream )
                 return;
-            var dmsg = new CDBusMessage()
-            dmsg.Restore( unmarshall(
-                oBuf.slice( 4 ) ) )
-            var dmsg = new CDBusMessage()
-            dmsg.Restore( unmarshall(
-                oPending.m_oResp.slice( 4 ) ) )
+            var dmsg = new CFastRpcMsg()
+            dmsg.Deserialize( oBuf )
             
             if( dmsg.GetType() === messageType.methodReturn )
             {
-                var iRet = dmsg.GetArgAt( 0 )
-                oResp = new CConfigDb2()
-                if( ERROR( iRet ) )
-                {
-                    oResp.SetUint32(
-                        EnumPropId.propReturnValue, iRet )
-                    ret = iRet
-                }
-                else
-                {
-                    var oBuf = dmsg.GetArgAt( 1 )
-                    oResp.Deserialize( oBuf, 0 )
-                }
-
-                var ret = oResp.GetProperty(
-                    EnumPropId.propReturnValue )
+                ret = dmsg.GetReturnValue()
                 if( ret === null || ret === undefined )
-                    return
+                    return;
 
                 var iMsgId = dmsg.GetReplySerial();
                 var oPending = this.m_mapPendingReqs.get( iMsgId );
                 if( oPending === undefined )
                     return;
-                oPending.m_oResp = oResp;
+                oPending.m_oResp = dmsg;
                 this.OnRespReceived( oPending );
             }
             else if( dmsg.GetType() === messageType.signal )
@@ -145,7 +259,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 EnumPropId.propObjPath )
             if( val !== this.m_oParent.m_strObjPath )
                 return
-            KeepAliveRequest.bind( this )(
+            KeepAliveRequest.bind( this.m_oParent )(
                 oReq.m_oReq, qwTaskId )
         }
         catch(e)
@@ -155,81 +269,23 @@ class CFastRpcChanProxy extends CInterfaceProxy
     }
     OnEventReceived( dmsg, oEvent )
     {
-        var strMethod;
-        var oEvtReq = new CConfigDb2();
-        var strVal = dmsg.GetSender()
-        if( strVal != undefined )
-            oEvtReq.SetString(
-                EnumPropId.propSrcDBusName, strVal )
-        strVal = dmsg.GetObjPath()
-        if( strVal != undefined )
-            oEvtReq.SetString(
-                EnumPropId.propObjPath, strVal )
-        strMethod = dmsg.GetMember()
-        if( strMethod != undefined )
-            oEvtReq.SetString(
-                EnumPropId.propMethodName, strMethod )
-        strVal = dmsg.GetDestination() 
-        if( strVal != undefined )
-            oEvtReq.SetString(
-                EnumPropId.propDestDBusName, strVal )
-        strVal = dmsg.GetSerial()
-        if( strVal !== undefined )
-            oEvtReq.SetUint32(
-                EnumPropId.propSeqNo, strVal )
-        strVal = dmsg.GetInterface()
-        if( strVal !== undefined )
-            oEvtReq.SetString(
-                EnumPropId.propIfName, strVal )
-
-        var oParamBuf = dmsg.GetArgAt(0)
-        var oParams = new CConfigDb2()
-        oParams.Deserialize( oParamBuf )
-        oEvtReq.Push( {t: EnumTypeId.typeObj, v:oParams })
-
+        var strMethod = dmsg.GetMember()
         var ioEvt = new CIoEventMessage();
         var oParent = this.m_oParent;
-        ioEvt.m_oReq = oEvtReq;
+        ioEvt.m_oReq = dmsg;
 
         if( strMethod === IoEvent.ForwardEvent[1])
             oParent.m_arrDispTable[ IoEvent.ForwardEvent[0] ]( ioEvt );
         else if( strMethod === IoEvent.OnKeepAlive[1] )
         {
-            this.OnKeepAlive( ioEvt );
+            this.OnKeepAlive( dmsg );
         }
     }
 
-    BuildDBusMsgToFwrd( oReq )
+    BuildFastRpcMsg( oReq )
     {
-        var dmsg = new CDBusMessage( messageType.methodCall )
-        dmsg.SetDestination(
-            oReq.GetProperty( EnumPropId.propDestDBusName ) )
-        oReq.RemoveProperty( EnumPropId.propDestDBusName)
-        dmsg.SetSender( oReq.GetProperty(
-            EnumPropId.propSrcDBusName ) )
-        oReq.RemoveProperty( EnumPropId.propSrcDBusName)
-        dmsg.SetInterface( oReq.GetProperty(
-            EnumPropId.propIfName ) )
-        oReq.RemoveProperty( EnumPropId.propIfName)
-        dmsg.SetObjPath( oReq.GetProperty(
-            EnumPropId.propObjPath ) )
-        oReq.RemoveProperty( EnumPropId.propObjPath)
-        dmsg.SetMember( oReq.GetProperty(
-                EnumPropId.propMethodName ) )
-        oReq.RemoveProperty( EnumPropId.propMethodName )
-        dmsg.SetSerial( globalThis.g_iMsgIdx++ )
-
-        var oCallOptions = oReq.GetProperty(
-            EnumPropId.propCallOptions )
-        var dwFlags = oCallOptions.GetProperty(
-            EnumPropId.propCallFlags )
-        if( ( dwFlags & EnumCallFlags.CF_WITH_REPLY ) === 0 )
-            dmsg.SetNoReply()
-
-        var oBuf = oReq.Serialize()
-        var arrBody = []
-        arrBody.push( new Pair( { t: "ay", v: oBuf }))
-        dmsg.AppendFields( arrBody )
+        var dmsg = new CFastRpcMsg()
+        dmsg.m_oReq = oReq;
         return dmsg
     }
 
@@ -246,8 +302,8 @@ class CFastRpcChanProxy extends CInterfaceProxy
             return Promise.reject( oPending )
         }
         return new Promise( (resolve, reject)=>{
-                var dmsg = this.BuildDBusMsgToFwrd( oReq );
-                var oMsgBuf = marshall( dmsg );
+                var dmsg = this.BuildFastRpcMsg( oReq );
+                var oMsgBuf = dmsg.Serialize();
                 var oPending = new CPendingRequest();
                 oPending.m_oResolve = resolve;
                 oPending.m_oReject = reject;
@@ -293,7 +349,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
                         var iMsgId = dmsg.GetSerial();
                         this.m_mapPendingReqs.set( iMsgId, oPending )
                     }
-                }).cache((e)=>{
+                }).catch((e)=>{
                     var ret = 0;
                     if( e.m_oResp === undefined )
                     {
@@ -328,6 +384,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
             reason = errno.ERROR_PORT_STOPPED;
         oResp.SetUint32(
             EnumPropId.propReturnValue, reason)
+        var key, oPending;
         for( [key, oPending] of this.m_mapPendingReqs )
         {
             if( oPending.m_oObject === oProxy )
@@ -425,6 +482,14 @@ class CFastRpcProxy extends CInterfaceProxy
 
     ForwardRequest(  oReq, oCallback, oContext )
     {
+        oReq.SetString( EnumPropId.propRouterPath,
+            this.m_strRouterPath )
+        var iMsgId = globalThis.g_iMsgIdx++;
+        oReq.SetUint32(
+            EnumPropId.propSeqNo, iMsgId )
+        oReq.SetUint64(
+            EnumPropId.propTaskId, iMsgId )
+
         return this.m_oChanProxy.ForwardRequest(
             oReq, oCallback, oContext );
     }
