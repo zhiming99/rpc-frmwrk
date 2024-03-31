@@ -1,6 +1,6 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { Pair, ERROR, InvalFunc } = require("../combase/defines")
-const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumMatchType } = require("../combase/enums")
+const { constval, errno, EnumPropId, EnumSeriProto, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumMatchType } = require("../combase/enums")
 const { IoCmd, IoMsgType, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 const { CDBusMessage, DBusIfName, DBusDestination, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 const { CMessageMatch } = require( "../combase/msgmatch")
@@ -24,11 +24,17 @@ class CFastRpcMsg
 
     Serialize()
     {
+        var strObjPath = this.m_oReq.GetProperty(
+            EnumPropId.propObjPath )
+        strObjPath += "_SvrSkel";
+        this.m_oReq.SetString(
+            EnumPropId.propObjPath, strObjPath )
+
         var oHdr = Buffer.alloc( 8 );
-        oHdr.writeUint8( 4, this.m_bType );
-        oHdr.writeUint8( 5, 'F')
-        oHdr.writeUint8( 6, 'R')
-        oHdr.writeUint8( 7, 'M')
+        oHdr.writeUint8( this.m_bType, 4 );
+        oHdr.writeUint8( 0x46, 5)
+        oHdr.writeUint8( 0x52, 6)
+        oHdr.writeUint8( 0x4d, 7)
         if( !this.m_oReq )
         {
             throw new ERROR( "Error, empty FASTRPC message" );
@@ -36,12 +42,14 @@ class CFastRpcMsg
 
         var oBody = this.m_oReq.Serialize();
         var dstBuf = Buffer.concat( [ oHdr, oBody ]);
-        dstBuf.writeUint32BE( oBody.length + 4 );
+        dstBuf.writeUint32BE( dstBuf.length - 4 );
         return dstBuf;
     }
 
     Deserialize( oBuf, offset )
     {
+        if( offset === undefined )
+            offset = 0;
         var dwSize = oBuf.readUint32BE( offset );
         if( dwSize + offset + 4 > oBuf.length )
             throw new ERROR( "Error, invalid FASTRPC message size" );
@@ -55,16 +63,32 @@ class CFastRpcMsg
         szMag[0] = oBuf.readUint8( offset );
         szMag[1] = oBuf.readUint8( offset + 1 );
         szMag[2] = oBuf.readUint8( offset + 2 );
-        if( szMag[ 0 ] !== 'F' ||
-            szMag[ 1 ] !== 'R' ||
-            szMag[ 2 ] !== 'M')
+        if( szMag[ 0 ] !== 0x46 ||
+            szMag[ 1 ] !== 0x52 ||
+            szMag[ 2 ] !== 0x4d )
             throw new ERROR( "Error, invalid FASTRPC message magic" );
         this.m_dwSize = dwSize;
         this.m_bType = EnumTypeId.typeObj;
 
         offset += 3;
         this.m_oReq = new CConfigDb2();
-        return this.m_oReq.Deserialize( oBuf, offset )
+        var ret = this.m_oReq.Deserialize( oBuf, offset )
+        if( this.GetType() === messageType.signal )
+        {
+            var strObjPath = this.m_oReq.GetProperty(
+                EnumPropId.propObjPath )
+            if( strObjPath )
+            {
+                const regex = /_SvrSkel/g;
+                var idx = strObjPath.search( regex );
+                if( idx >= 0 )
+                {
+                    this.m_oReq.SetString( EnumPropId.propObjPath,
+                        strObjPath.slice(0, idx))
+                }
+            }
+        }
+        return ret;
     }
 
     GetType()
@@ -131,7 +155,7 @@ class CFastRpcMsg
 
     GetSerial()
     {
-        return this.m_oReq.GetProerpty(
+        return this.m_oReq.GetProperty(
             EnumPropId.propSeqNo )
     }
 
@@ -202,6 +226,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
                     return;
                 oPending.m_oResp = dmsg;
                 this.OnRespReceived( oPending );
+                this.m_mapPendingReqs.delete(iMsgId);
             }
             else if( dmsg.GetType() === messageType.signal )
             {
@@ -233,7 +258,8 @@ class CFastRpcChanProxy extends CInterfaceProxy
     {
         try{
             if( oPending.m_oCallback !== undefined )
-                oPending.m_oCallback( oPending.m_oResp );
+                oPending.m_oCallback( oPending.m_oResp.m_oReq );
+            oPending.OnTaskComplete( oPending.m_oResp )
         }catch( e ){
         }
     }
@@ -270,15 +296,13 @@ class CFastRpcChanProxy extends CInterfaceProxy
     OnEventReceived( dmsg, oEvent )
     {
         var strMethod = dmsg.GetMember()
-        var ioEvt = new CIoEventMessage();
-        var oParent = this.m_oParent;
-        ioEvt.m_oReq = dmsg;
-
-        if( strMethod === IoEvent.ForwardEvent[1])
-            oParent.m_arrDispTable[ IoEvent.ForwardEvent[0] ]( ioEvt );
-        else if( strMethod === IoEvent.OnKeepAlive[1] )
+        if( strMethod === IoEvent.OnKeepAlive[1] )
         {
             this.OnKeepAlive( dmsg );
+        }
+        else
+        {
+            this.ForwardEvent( dmsg );
         }
     }
 
@@ -288,6 +312,66 @@ class CFastRpcChanProxy extends CInterfaceProxy
         dmsg.m_oReq = oReq;
         return dmsg
     }
+
+    ForwardEvent( oMsg )
+    {
+        var oParent = this.m_oParent;
+        var oEvent = oMsg.m_oReq
+        var strIfName = oEvent.GetProperty(
+            EnumPropId.propIfName )
+        var strObjPath = oEvent.GetProperty(
+            EnumPropId.propObjPath )
+        var strMethod = oEvent.GetProperty(
+            EnumPropId.propMethodName )
+        var strKey = ""
+        for( var elem of oParent.m_arrMatches )
+        {
+            if( elem.GetIfName() !== strIfName )
+                continue
+            if( elem.GetObjPath() !== strObjPath )
+                continue
+            strKey = strIfName.slice( 16 ) +
+                '::' + strMethod.slice( 10 )
+            break
+        }
+        if( strKey === "" )
+            return
+        try{
+            var bSeriProto = oEvent.GetProperty(
+                EnumPropId.propSeriProto )
+            if( bSeriProto === null )
+                throw new Error( "Error serialization proto missing")
+            if( bSeriProto === EnumSeriProto.seriRidl )
+            {
+                var ridlBuf = oEvent.GetProperty( 0 )
+                if( ridlBuf === null )
+                    throw new Error( "Error bad event message")
+                oParent.m_mapEvtHandlers.get( strKey )( ridlBuf )
+            }
+            else if( bSeriProto === EnumSeriProto.seriNone )
+            {
+                var arrArgs = []
+                var oCount = oEvent.GetProperty(
+                    EnumPropId.propParamCount )
+                if( oCount === null )
+                    oCount = 0
+                for( var i = 0; i < oCount; i++ )
+                {
+                    arrArgs.push( oRmtEvt.GetProperty( i ))
+                }
+                oParent.m_mapEvtHandlers.get( strKey ).apply( this, arrArgs )
+            }
+            else
+            {
+                this.DebugPrint( "Error unsupported serialization protocol")
+            }
+        }
+        catch(e)
+        {
+            console.log( "Error in ForwardEventLocal")
+        }
+    }
+    
 
     ForwardRequest( oReq, oCallback, oContext )
     {
@@ -329,10 +413,8 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 oPending.m_oCallback =
                     oCallback.bind( this, oContext);
 
-                var oSizeBuf = Buffer.alloc(4);
-                oSizeBuf.writeUint32BE( oMsgBuf.length );
-                return this.m_funcStreamWrite( this.m_hStream,
-                    Buffer.concat( [ oSizeBuf, oMsgBuf ]) ).then((e)=>{
+                return this.m_funcStreamWrite(
+                    this.m_hStream, oMsgBuf).then((e)=>{
                     if( ERROR( e ) )
                     {
                         oPending.OnCanceled( e );
@@ -461,6 +543,42 @@ class CFastRpcProxy extends CInterfaceProxy
             this.EnableEvent.bind( this );
     }
 
+    LoadSkelMatches( o )
+    {
+        var elem
+        var arrObjs = o['Objects']
+        var bFound = false;
+        for( elem of arrObjs )
+        {
+            if( elem[ "ObjectName"] !== this.m_strObjName + "_SvrSkel" )
+                continue
+            bFound = true;
+            break
+        }
+        if( !bFound )
+            throw new Error( "Error cannot find the svrskel object")
+
+        for( var interf of elem[ "Interfaces"])
+        {
+            var bDummy = interf[ "DummyInterface"]
+            if( bDummy !== undefined && bDummy === "true")
+                continue
+            var strVal = interf[ "InterfaceName"]
+            if( strVal === "IUnknown")
+                continue
+            var strIfName = DBusIfName( strVal )
+            var match = new CMessageMatch()
+            match.SetType( EnumMatchType.matchClient)
+            match.SetObjPath( this.m_strObjPath )
+            match.SetIfName( strIfName )
+            match.SetProperty( EnumPropId.propRouterPath,
+                new Pair({t:EnumTypeId.typeString, v:this.m_strRouterPath}) )
+            match.SetProperty( EnumPropId.propDestDBusName,
+                new Pair({t:EnumTypeId.typeString, v:this.m_strDest}) )
+            this.m_arrMatches.push( match )
+        }
+        return 0;
+    }
     Start()
     {
         // start the channel client first
@@ -473,6 +591,16 @@ class CFastRpcProxy extends CInterfaceProxy
                 if( ERROR( retVal ) )
                     return Promise.reject( retVal );
                 return CInterfaceProxy.prototype.Start.bind( this)();
+            }).then((retVal)=>{
+                // load matches from the skel object
+                if( ERROR( retVal ) )
+                    return Promise.reject( retVal );
+                var ret = errno.STATUS_SUCCESS
+                return fetch(this.m_strObjDesc).then((response)=>{
+                    return response.json().then((o)=>{
+                        return this.LoadSkelMatches(o);
+                    })
+                })
             }).catch( (retVal)=>{
                 this.m_iState = EnumIfState.stateStartFailed;
                 console.log( "Error, Channel setup failed" );
