@@ -26,6 +26,7 @@ struct TransferContext
 
 DECLARE_AGGREGATED_SERVER(
     CStreamTest_SvrBase,
+    CStatCounters_SvrBase,
     CStreamServerAsync,
     IIStreamTest_SvrApi,
     CFastRpcServerBase );
@@ -48,6 +49,20 @@ class CStreamTest_SvrImpl
     gint32 AcceptNewStream(
         IEventSink* pCb, IConfigDb* pDataDesc ) override
     { return STATUS_SUCCESS; }
+    
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override
+    {
+        StartQpsTask();
+        return super::OnPostStart( pCallback );
+    }
+
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override
+    {
+        StopQpsTask();
+        return super::OnPreStop( pCallback );
+    }
     
     virtual gint32 OnReadStreamComplete(
         HANDLE hChannel, gint32 iRet,
