@@ -184,7 +184,7 @@ class COutgoingPacket extends CCarrierPacket
         var byteOutput = encodeBlock( this.m_oBuf, compressed )
         if( byteOutput === 0 )
         {
-            console.log("warning: compress does not work properly")
+            // console.log("warning: compress does not work properly")
             this.m_oHeader.m_wFlags = 0
             return super.Serialize()
         }

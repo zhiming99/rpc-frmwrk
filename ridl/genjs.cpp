@@ -1213,8 +1213,16 @@ static void OUTPUT_BANNER(
     CCOUT << "const {CSerialBase} = require( '"
         << strLibPath <<"/combase/seribase' );";
     NEW_LINE;
-    CCOUT << "const {CInterfaceProxy} = require( '"
-        << strLibPath <<"/ipc/proxy' )";
+    if( g_bRpcOverStm )
+    {
+        CCOUT << "const {CFastRpcProxy} = require( '"
+            << strLibPath <<"/ipc/fastrpc' )";
+    }
+    else
+    {
+        CCOUT << "const {CInterfaceProxy} = require( '"
+            << strLibPath <<"/ipc/proxy' )";
+    }
     NEW_LINE;
     CCOUT << "const {Buffer} = require( 'buffer' );";
     NEW_LINE;
@@ -1350,8 +1358,16 @@ gint32 CImplJsSvcProxyBase::EmitSvcBaseCli()
         CServiceDecl* psd = m_pNode;
         stdstr strClass = "C";
         strClass += psd->GetName() + "clibase";
-        CCOUT << "class " << strClass
-            << " extends CInterfaceProxy";
+        if( g_bRpcOverStm )
+        {
+            CCOUT << "class " << strClass
+                << " extends CFastRpcProxy";
+        }
+        else
+        {
+            CCOUT << "class " << strClass
+                << " extends CInterfaceProxy";
+        }
         NEW_LINE;
         BLOCK_OPEN;
         bool bEvent = true;
@@ -1924,7 +1940,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
         Wa( "oReq.SetString( EnumPropId.propDestDBusName," );
         Wa( "    this.m_strDest );" );
         Wa( "oReq.SetString( EnumPropId.propMethodName," );
-        CCOUT << "USER_METHOD(\""<< strName << "\") );";
+        CCOUT << "    USER_METHOD(\""<< strName << "\") );";
         NEW_LINE;
         Wa( "var oCallOpts = new CConfigDb2();" );
 
@@ -2670,8 +2686,8 @@ gint32 CImplJsMainFunc::OutputCli(
             BLOCK_OPEN;
             Wa( "if( ERROR( retval ) )" );
             BLOCK_OPEN;
-            Wa( "console.log( retval );" );
-            CCOUT << "return;";
+            Wa( "globalThis.oProxy = null;" );
+            CCOUT << "return Promise.resolve( retval );";
             BLOCK_CLOSE;
             NEW_LINE;
             if( bSingleSvc )
@@ -2718,7 +2734,7 @@ gint32 CImplJsMainFunc::OutputCli(
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;
-            Wa( "console.log( 'Start Proxy failed' );" );
+            Wa( "console.log( 'Start Proxy failed ' + e );" );
             CCOUT << "return Promise.resolve(e);";
             BLOCK_CLOSE;
             CCOUT << ")";
@@ -3009,7 +3025,13 @@ gint32 CExportJsWebpack::Output()
         CCOUT << "resolve:";
         BLOCK_OPEN;
         Wa( "modules: [path.resolve(__dirname," );
-        CCOUT << "    'node_modules'), 'node_modules']";
+        CCOUT << "    'node_modules'), 'node_modules'],";
+        NEW_LINE;
+        CCOUT << "alias:";
+        BLOCK_OPEN;
+        CCOUT << "stream: require.resolve('stream-browserify'),";
+        BLOCK_CLOSE;
+        CCOUT << ",";
         BLOCK_CLOSE;
         Wa( "," );
         Wa( "output:" );
@@ -3062,8 +3084,9 @@ gint32 CExportJsSampleHtml::Output()
         NEW_LINE;
         CCOUT << "* command line: " << g_strCmdLine;
         NEW_LINE;
-        CCOUT << "* npm dependency: assert browserify buffer exports minify "
-            << "long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
+        CCOUT << "* npm dependency: assert browserify buffer exports minify vm envents crypto-browserify";
+        NEW_LINE;
+        CCOUT << "* long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
         NEW_LINE;
         Wa( "-->" );
         Wa( "<!DOCTYPE html>" );
@@ -3087,6 +3110,10 @@ gint32 CExportJsSampleHtml::Output()
         BLOCK_OPEN;
         Wa( "setTimeout( checkProxyState, 2000 );" );
         CCOUT << "console.log( \"Waiting RPC connection ready...\" );";
+        BLOCK_CLOSE;
+        CCOUT << "else if( globalThis." << strVar << " === null )";
+        BLOCK_OPEN;
+        CCOUT << "console.log( \"RPC connection is shutdown abnormally...\" );";
         BLOCK_CLOSE;
         if( vecSvcs.size() == 1 )
         {

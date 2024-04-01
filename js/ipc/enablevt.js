@@ -43,7 +43,7 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
         var ret = oResp.GetProperty(
             EnumPropId.propReturnValue )
         if( ret === null || ERROR( ret ) )
-            return Promise.reject( oResp )
+            return Promise.reject( e )
         return Promise.resolve( oResp )
     }).catch(( e )=>{
         if( e.message !== undefined)
@@ -56,7 +56,7 @@ exports.EnableEventLocal = function EnableEventLocal( idx )
             var ret = e.m_oResp.GetProperty(
                 EnumPropId.propReturnValue )
             console.log( `Error EnableEventLocal failed with error ${ret}` )
-            return Promise.reject( e.m_oResp )
+            return Promise.reject( e )
         }
     })
 }

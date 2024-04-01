@@ -26,7 +26,9 @@ class CFastRpcMsg
     {
         var strObjPath = this.m_oReq.GetProperty(
             EnumPropId.propObjPath )
-        strObjPath += "_SvrSkel";
+        if( strObjPath.length > 8 &&
+            strObjPath.slice( strObjPath.length - 8 ) !== '_SvrSkel')
+            strObjPath += "_SvrSkel";
         this.m_oReq.SetString(
             EnumPropId.propObjPath, strObjPath )
 
@@ -258,7 +260,8 @@ class CFastRpcChanProxy extends CInterfaceProxy
     {
         try{
             if( oPending.m_oCallback !== undefined )
-                oPending.m_oCallback( oPending.m_oResp.m_oReq );
+                oPending.m_oCallback(
+                    oPending.m_oResp.m_oReq );
             oPending.OnTaskComplete( oPending.m_oResp )
         }catch( e ){
         }
@@ -283,7 +286,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
             var oReq = oPending.m_oReq
             var val = oReq.m_oReq.GetProperty(
                 EnumPropId.propObjPath )
-            if( val !== this.m_oParent.m_strObjPath )
+            if( val !== this.m_oParent.m_strObjPath + "_SvrSkel" )
                 return
             KeepAliveRequest.bind( this.m_oParent )(
                 oReq.m_oReq, qwTaskId )
@@ -385,65 +388,69 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 EnumPropId.propReturnValue, errno.ERROR_STATE)
             return Promise.reject( oPending )
         }
+
+        var dmsg = this.BuildFastRpcMsg( oReq );
+        var oMsgBuf = dmsg.Serialize();
+        var ioReq = new CIoReqMessage();
+        ioReq.m_iCmd = IoCmd.ForwardRequest[0];
+        var oOpts = oReq.GetProperty(
+            EnumPropId.propCallOptions );
+        var ret = oOpts.GetProperty(
+            EnumPropId.propTimeoutSec )
+        if( ret !== null )
+        {
+            ioReq.m_dwTimerLeftMs = ret * 1000;
+        }
+        else
+        {
+            ioReq.m_dwTimerLeftMs =
+                this.m_oParent.m_dwTimeoutSec * 1000;
+        }
+
+        oContext.m_qwTaskId = dmsg.GetSerial();
+
+        ioReq.m_oReq = oReq;
+        ioReq.m_iMsgId = oCallback.m_qwTaskId;
+
         return new Promise( (resolve, reject)=>{
-                var dmsg = this.BuildFastRpcMsg( oReq );
-                var oMsgBuf = dmsg.Serialize();
-                var oPending = new CPendingRequest();
-                oPending.m_oResolve = resolve;
-                oPending.m_oReject = reject;
-                var ioReq = new CIoReqMessage();
-                ioReq.m_iCmd = IoCmd.ForwardRequest[0];
-                var oOpts = oReq.GetProperty(
-                    EnumPropId.propCallOptions );
-                var ret = oOpts.GetProperty(
-                    EnumPropId.propTimeoutSec )
-                if( ret !== null )
+            var oPending = new CPendingRequest();
+            oPending.m_oReq = ioReq;
+            oPending.m_oCallback =
+                oCallback.bind( this.m_oParent, oContext);
+            oPending.m_oResolve = resolve;
+            oPending.m_oReject = reject;
+
+            return this.m_funcStreamWrite(
+                this.m_hStream, oMsgBuf).then((e)=>{
+                if( ERROR( e ) )
                 {
-                    ioReq.m_dwTimerLeftMs = ret * 1000;
+                    oPending.OnCanceled( e );
                 }
                 else
                 {
-                    ioReq.m_dwTimerLeftMs =
-                        this.m_oParent.m_dwTimeoutSec * 1000;
+                    if( dmsg.IsNoReply() )
+                    {
+                        var oResp = new CConfigDb2();
+                        oResp.SetUint32(
+                            EnumPropId.propReturnValue, 0);
+                        return oPending.OnTaskComplete( oResp );
+                    }
+                    var iMsgId = dmsg.GetSerial();
+                    this.m_mapPendingReqs.set( iMsgId, oPending )
                 }
-
-                ioReq.m_oReq = oReq;
-                ioReq.m_iMsgId = dmsg.GetSerial();
-                oPending.m_oReq = ioReq;
-                oPending.m_oCallback =
-                    oCallback.bind( this, oContext);
-
-                return this.m_funcStreamWrite(
-                    this.m_hStream, oMsgBuf).then((e)=>{
-                    if( ERROR( e ) )
-                    {
-                        oPending.OnCanceled( e );
-                    }
-                    else
-                    {
-                        if( dmsg.IsNoReply() )
-                        {
-                            var oResp = new CConfigDb2();
-                            oResp.SetUint32(
-                                EnumPropId.propReturnValue, 0);
-                            return oPending.OnTaskComplete( oResp );
-                        }
-                        var iMsgId = dmsg.GetSerial();
-                        this.m_mapPendingReqs.set( iMsgId, oPending )
-                    }
-                }).catch((e)=>{
-                    var ret = 0;
-                    if( e.m_oResp === undefined )
-                    {
-                        ret = -errno.EFAULT;
-                    }
-                    else
-                    {
-                        ret = e.m_oResp.GetProperty(
-                            EnumPropId.propReturnValue )
-                    }
-                    oPending.OnCanceled( ret );
-                })
+            }).catch((e)=>{
+                var ret = 0;
+                if( e.m_oResp === undefined )
+                {
+                    ret = -errno.EFAULT;
+                }
+                else
+                {
+                    ret = e.m_oResp.GetProperty(
+                        EnumPropId.propReturnValue )
+                }
+                oPending.OnCanceled( ret );
+            })
         })
     }
 
@@ -539,8 +546,6 @@ class CFastRpcProxy extends CInterfaceProxy
             oMgr, strObjDesc, strChannName, oParams );
         this.m_funcForwardRequest =
             this.ForwardRequest.bind(this);
-        this.m_funcEnableEvent =
-            this.EnableEvent.bind( this );
     }
 
     LoadSkelMatches( o )
@@ -620,13 +625,6 @@ class CFastRpcProxy extends CInterfaceProxy
 
         return this.m_oChanProxy.ForwardRequest(
             oReq, oCallback, oContext );
-    }
-
-    EnableEvent( idx )
-    {
-        var oResp = CConfigDb2();
-        oResp.SetUint32( EnumPropId.propReturnValue, 0);
-        return Promise.resolve(oResp);
     }
 
     Stop( reason )

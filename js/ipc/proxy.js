@@ -275,6 +275,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 var ret = oResp.GetProperty(
                     EnumPropId.propReturnValue )
                 this.DebugPrint("Error, EnableEvent failed (" + ret + " )")
+                this.m_iState = EnumIfState.stateStartFailed
                 return Promise.resolve( ret)
             })
         }).catch((e)=>{
@@ -292,10 +293,13 @@ exports.CInterfaceProxy = class CInterfaceProxy
         for( var hStream of stms )
             this.m_funcCloseStream( hStream )
         this.m_setStreams.clear()
-        var ret = this.m_oIoMgr.UnregisterProxy(
-            this, ret )
-        this.m_iState = EnumIfState.stateStopped
-        return ret
+        return this.m_oIoMgr.UnregisterProxy(
+            this, ret ).then((e)=>{
+            this.m_iState = EnumIfState.stateStopped
+            return Promise.resolve(e);
+        }).catch((e)=>{
+            return Promise.reject(e);
+        });
     }
 
     OpenRemotePort( strUrl )

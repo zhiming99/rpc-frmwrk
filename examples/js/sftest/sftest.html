@@ -64,9 +64,9 @@ function LoadFile()
                 });
             return
         });
-        if( file.size > 0x100000 )
+        if( file.size > 0x1000000 )
         {
-            console.log( "this sample code limits tranfer file size less than 1MB." )
+            console.log( "this sample code limits the size to transfer less than 16MB." )
             return;
         }
 

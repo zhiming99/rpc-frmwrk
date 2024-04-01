@@ -86,6 +86,7 @@ module.exports = {
         propReqPtr: 12337,
         propStreamId: 12341,
         propSeqNo: 12344,
+        propSeqNo2: 12345,
         propNonFd: 12351,
         propIid: 12357,
         propSysMethod: 12360,

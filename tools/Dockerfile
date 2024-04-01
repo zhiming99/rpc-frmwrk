@@ -23,7 +23,8 @@ RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get
 RUN apt-get -y install git devscripts debhelper expect vim-tiny screen;cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'
 RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
 RUN apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
-RUN npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash xxhashjs minify webpack webpack-cli
+RUN npm -g install assert browserify buffer exports long lz4 process put \
+ safe-buffer stream xxhash xxhashjs minify webpack webpack-cli vm events crypto-browserify
 RUN cd ${HOME};git clone 'https://github.com/zhiming99/rpc-frmwrk.git'
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
