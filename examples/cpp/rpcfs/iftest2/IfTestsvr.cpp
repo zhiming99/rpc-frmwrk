@@ -1,4 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
+// ridlc -s -O . ../../../iftest.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -31,9 +32,14 @@ gint32 CIfTest_SvrImpl::CreateStmSkel(
         oCfg.SetIntPtr( propStmHandle,
             ( guint32*& )hStream );
         oCfg.SetPointer( propParentPtr, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./iftestdesc.json",
-            "IfTest_SvrSkel",
+            strDesc,"IfTest_SvrSkel",
             true, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -55,6 +61,7 @@ gint32 CIfTest_SvrImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CIfTest_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );
