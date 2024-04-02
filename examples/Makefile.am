@@ -152,3 +152,6 @@ EXTRA_DIST += $(jstest)/iftest/iftest.html \
  $(jstest)/katest/maincli.js \
  $(jstest)/stmtest/StreamTestcli.js \
  $(jstest)/stmtest/maincli.js
+ $(jstest)/player/sftest.html \
+ $(jstest)/player/FileTransfercli.js \
+ $(jstest)/player/maincli.js \
