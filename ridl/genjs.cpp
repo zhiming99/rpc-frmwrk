@@ -37,6 +37,7 @@ extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
+extern bool g_bBuiltinRt;
 
 extern stdstr GetTypeName( CAstNodeBase* pType );
 extern stdstr GetTypeSig( ObjPtr& pObj );
@@ -1378,7 +1379,7 @@ gint32 CImplJsSvcProxyBase::EmitSvcBaseCli()
         CCOUT << "constructor( oIoMgr, strObjDescPath, strObjName, oParams )";
         NEW_LINE;
         BLOCK_OPEN;
-        CCOUT << "super( oIoMgr, strObjDescPath, strObjName );";
+        CCOUT << "super( oIoMgr, strObjDescPath, strObjName, oParams );";
         NEW_LINE;
 
         std::vector< ObjPtr > vecIfs;
@@ -2656,6 +2657,17 @@ gint32 CImplJsMainFunc::OutputCli(
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strObjName = pSvc->GetName();
+            Wa( "// set the router name to connect" );
+            Wa( "globalThis.g_oIoMgr.SetRouterName(" );
+            CCOUT << "    strAppName, '" << strObjName << "', strObjDesc).then((e)=>";
+            BLOCK_OPEN;
+            CCOUT << "var strSvrName = '"<< g_strAppName<< "_rt_' + g_oIoMgr.m_strAppHash";
+            NEW_LINE;
+        }
         for( guint32 i = 0;i < vecSvcs.size(); i++ )
         {
             CServiceDecl* pSvc = vecSvcs[ i ];
@@ -2669,6 +2681,12 @@ gint32 CImplJsMainFunc::OutputCli(
                 << "EnumPropId.propObjInstName, '"
                 << pSvc->GetName() << "' );";
             NEW_LINE;
+            if( g_bBuiltinRt )
+            {
+                CCOUT << "oParams" << i << ".SetString( "
+                    << "EnumPropId.propSvrInstName, strSvrName );";
+                NEW_LINE;
+            }
 
             stdstr strVar = "o";
             strVar += pSvc->GetName() + "_cli";
@@ -2739,6 +2757,15 @@ gint32 CImplJsMainFunc::OutputCli(
             BLOCK_CLOSE;
             CCOUT << ")";
             NEW_LINE;
+        }
+        if( g_bBuiltinRt )
+        {
+            BLOCK_CLOSE;
+            CCOUT<< ").catch((e)=>";
+            BLOCK_OPEN;
+            CCOUT << "console.log( 'Error happens ' + e );";
+            BLOCK_CLOSE;
+            Wa( ");" );
         }
         NEW_LINE;
 

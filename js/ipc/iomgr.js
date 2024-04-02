@@ -3,6 +3,7 @@ const { randomInt, ERROR } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumStmToken } = require("../combase/enums")
 const { IoCmd, IoMsgType, CIoMessageBase, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 const { CInterfaceProxy } = require("./proxy")
+const { createHash } = require('crypto-browserify')
 
 exports.CIoManager = class CIoManager
 {
@@ -40,9 +41,14 @@ exports.CIoManager = class CIoManager
         var oMsg = new CAdminReqMessage()
         oMsg.m_iMsgId = globalThis.g_iMsgIdx++
         oMsg.m_iCmd = AdminCmd.SetConfig[0]
+        var strDefRtName = 'rpcrouter';
+        var strVal = oCfg.GetProperty(
+            EnumPropId.propRouterName )
+        if( strVal === null )
+            strVal = strDefRtName;
         oMsg.m_oReq.SetString(
             EnumPropId.propRouterName,
-            "rpcrouter" )
+            strVal )
         this.PostMessage( oMsg )
     }
 
@@ -222,6 +228,54 @@ exports.CIoManager = class CIoManager
         }catch( e ) {
             console.log( "Unregister proxy failed")
             return Promise.resolve( -errno.EFAULT )
+        }
+    }
+
+    async SetRouterName(
+        strAppName, strObjName, strObjDesc, strAltName )
+    {
+        try {
+            if( strAltName !== undefined )
+            {
+                var oCfg = new CConfigDb2();
+                oCfg.SetProperty(
+                    EnumPropId.propRouterName, strAltName );
+                this.SetRouterConfig( oCfg );
+                return Promise.resolve( ret )
+            }
+            var ret = errno.STATUS_SUCCESS
+            const response = await fetch(strObjDesc)
+            const o = await response.json()
+            var arrObjs = o[ "Objects" ]
+            var elem
+            for( elem of arrObjs )
+            {
+                if( elem[ "ObjectName"] !== strObjName )
+                    continue
+                break
+            }
+            if( elem["DestURL"] === undefined )
+                return Promise.reject( -errno.ENOENT );
+
+            var strToHash = "t_" + elem["DestURL"] + "_0";
+
+            var shasum = createHash('sha1');
+            shasum.update( strToHash );
+            var strSum = shasum.digest( 'hex' );
+            this.m_strAppHash = 
+                strSum.slice( 3 * 8, 4 * 8 ).toUpperCase();
+            var strRouterName = strAppName + "_rt_"
+                + this.m_strAppHash; 
+            
+            var oCfg = new CConfigDb2();
+            oCfg.SetString(
+                EnumPropId.propRouterName, strRouterName );
+            this.SetRouterConfig( oCfg );
+            return Promise.resolve( ret )
+        } catch (e) {
+            console.log(e.message)
+            ret = -errno.EFAULT
+            return Promise.reject( ret )
         }
     }
 }

@@ -6210,6 +6210,10 @@ gint32 gen_sess_hash(
     if( !sha.Result( ( guint32* )pTemp->ptr() ) )
         return ERROR_FAIL;
 
+    guint32* pDwords = ( guint32* )pTemp->ptr();
+    for( int i = 0; i < 5; i++, pDwords++ )
+        *pDwords = htonl( *pDwords );
+
     gint32 ret = BytesToString(
         ( guint8* )pTemp->ptr(),
         pTemp->size(), strSess );

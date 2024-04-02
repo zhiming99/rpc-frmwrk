@@ -496,13 +496,9 @@ class CRpcRouter
         var ret = -errno.EINVAL
         var strName = oMsg.m_oReq.GetProperty(
             EnumPropId.propRouterName )
-        if( strName.length > 0 )
+        if( strName !== null && strName.length > 0 )
             this.m_strRouterName = strName
 
-        var oRet = new CAdminRespMessage( oMsg )
-        oRet.m_oResp.SetUint32(
-            EnumPropId.propReturnValue, ret )
-        this.PostMessage( oRet )
     }
 
     GetNewPortId()
