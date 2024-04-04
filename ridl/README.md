@@ -115,7 +115,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -j:     To generate Java skeleton files.    
 
-        -J:     To generate the JavaScript skelton files (client only). '-f' or '-b' options are not supported when this option is specified.   
+        -J:     To generate the JavaScript skelton files (client only). '-f' option is not supported for JavaScript.   
 
         --odesc_url=<url>
                 To specify the url where to find the object desription file for the JS client. The url must not include the name of the object description file. And it is a mandatory option for JS skelton generator.   

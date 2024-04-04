@@ -115,7 +115,7 @@ service SimpFileSvc [ stream ]
 
         -j: 生成Java的框架文件。
 
-        -J: 生成JavaScript的客户端框架文件。此选项不支持`-f`和`-b`选项。
+        -J: 生成JavaScript的客户端框架文件。此选项不支持`-f`选项。
 
         --odesc_url=<url> :
             指定部署时`object description`文件的`url`。需要注意的是这个`url`不要包含文件名。这个选项是生成JS框架时的强制选项.
