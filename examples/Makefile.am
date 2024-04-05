@@ -142,4 +142,16 @@ EXTRA_DIST += $(jstest)/iftest/iftest.html \
  $(jstest)/sftest/FileTransfercli.js \
  $(jstest)/sftest/maincli.js \
  $(jstest)/hellowld/HelloWorld.html \
- $(jstest)/hellowld/maincli.js
+ $(jstest)/hellowld/maincli.js \
+ $(jstest)/actcancel/ActiveCancelcli.js \
+ $(jstest)/actcancel/actcancel.html \
+ $(jstest)/actcancel/maincli.js \
+ $(jstest)/evtest/EventTestcli.js \
+ $(jstest)/katest/KeepAlivecli.js \
+ $(jstest)/katest/katest.html \
+ $(jstest)/katest/maincli.js \
+ $(jstest)/stmtest/StreamTestcli.js \
+ $(jstest)/stmtest/maincli.js \
+ $(jstest)/player/sftest.html \
+ $(jstest)/player/FileTransfercli.js \
+ $(jstest)/player/maincli.js

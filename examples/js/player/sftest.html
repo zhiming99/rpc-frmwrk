@@ -9,15 +9,23 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8" /></head></html>
 <body>
-<p id="log">Sample HTML<br /></p>
+<p id="log">简单MP4播放器<br /></p>
+<p>流程：1. 客户端通过流通道上传一个文件到服务器</p>
+<p>流程：2. 客户端通过流通道再把该文件下载下来</p>
+<p>流程：3. 客户端通过MediaSource播放该文件</p>
+<p>注意：4. 文件名只能包含字母数字和下划线</p>
+<p>注意：5. 文件最大16MB</p>
+<p>注意：6. 服务器请用C++, Java, 或者Python下的例子程序“sftest”生成</p>
 
-<label for="sample file">Select a file</label>
+<label for=" file">选择文件</label>
 <input id="FileToUpload" name="FileToUpload" type="file" value="Upload" >
+<video controls></video>
+<script src="https://bundle.run/buffer@6.0.3"></script>
 
 <script>
-
+// upload and download
 var oStmCtx = new Object();
-
+var arrVideoBlock = [];
 function LoadFile()
 {
     let file = this.files[0];
@@ -66,7 +74,7 @@ function LoadFile()
         });
         if( file.size > 0x1000000 )
         {
-            console.log( "this sample code limits the size to transfer less than 16MB." )
+            console.log( "this sample code limits tranfer file size less than 16MB." )
             return;
         }
 
@@ -106,7 +114,6 @@ globalThis.oExternalCb = (ret, oProxy)=>{
     }).catch((e)=>{
         console.log( e )
     })
-
 }
 
 function RemoveFile()
@@ -130,6 +137,10 @@ function RemoveFile()
             oStmCtx.m_qwCounter = undefined;
             oStmCtx.m_strFile = undefined;
             oStmCtx.m_qwSize = undefined;
+            var oBuf = buffer.Buffer.concat(arrVideoBlock)
+            arrVideoBlock = [];
+            arrVideoBlock.push(oBuf)
+            startPlay();
         }).catch((oContext)=> 
         {
             strState = "error-occurred"
@@ -153,7 +164,8 @@ function StartDownload()
             oStmCtx.m_hStream,
             0, oStmCtx.m_qwSize );
         }).then((oContext)=>{
-            // the file data will come via the stream channel
+            // the file content will be received by
+            // OnStreamDataReceived
             console.log( "Download started...")
             console.log( oContext )
         }).catch((oContext)=> 
@@ -220,6 +232,8 @@ globalThis.OnStreamDataReceived = ( hStream, oBuf )=>{
     else if( strState === 'download-file' )
     {
         oStmCtx.m_qwCounter += BigInt( oBuf.length );
+        arrVideoBlock.push( oBuf )
+
         if( oStmCtx.m_qwCounter == oStmCtx.m_qwSize )
         {
             console.log( "Downloading file completed...");
@@ -258,4 +272,79 @@ function checkProxyState(){
 setTimeout( checkProxyState, 2000 );
 //# sourceURL=browsertools://custom/rpc-entry.js
 </script>
+
+<script>
+// player
+var videoBuffer = null
+// var mimeCodec = 'audio/mp4; codecs="mp4a.40.2"';
+var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+function registerPlayer(mediaSource) {
+    videoBuffer = mediaSource.addSourceBuffer( mimeCodec );
+    let countDownloadChunk = 0
+    var appendbuf = function(){
+        if( arrVideoBlock.length > 0 )
+        {
+            console.log( "adding buffer...")
+            var buf = arrVideoBlock.shift();
+            countDownloadChunk++
+            videoBuffer.appendBuffer(buf);
+        }
+        else
+        {
+            mediaSource.endOfStream();
+            var playPromise = myAudio.play();
+            if (playPromise !== undefined) {
+                // to make chrome happy
+                playPromise.then(function() {
+                }).catch(function(error) {
+                    console.log( error )
+                });
+            }
+        }
+    }
+
+    videoBuffer.addEventListener("updateend", appendbuf );
+
+    if( arrVideoBlock.length)
+    {
+        videoBuffer.appendBuffer( arrVideoBlock.shift() );
+    }
+    else
+    {
+        var id = setInterval(() => {
+            if( arrVideoBlock.length )
+            {
+                countDownloadChunk++;
+                videoBuffer.appendBuffer(arrVideoBlock.shift());
+                clearInterval( id );
+            }
+        }, 1000);
+    }
+}
+
+function processStream(mediaSource) {
+    registerPlayer(mediaSource)
+}
+
+var myAudio = null;
+var mediaSource = null;
+function startPlay()
+{
+    if ('MediaSource' in window && MediaSource.isTypeSupported(mimeCodec)) 
+    {
+        myAudio = document.querySelector('video');
+        mediaSource = new MediaSource();
+        mediaSource.addEventListener('sourceopen', ()=>{
+            processStream(mediaSource);
+        });
+        myAudio.src = URL.createObjectURL(mediaSource);
+    }
+    else
+    {
+        console.error( "Unsupported mime type " , mimeCodec)
+    }
+}
+//# sourceURL=browsertools://custom/player.js
+</script>
+
 </body>

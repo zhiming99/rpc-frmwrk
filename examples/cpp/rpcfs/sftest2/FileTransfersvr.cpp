@@ -252,9 +252,14 @@ gint32 CFileTransfer_SvrImpl::CreateStmSkel(
         oCfg.SetIntPtr( propStmHandle,
             ( guint32*& )hStream );
         oCfg.SetPointer( propParentPtr, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./sftestdesc.json",
-            "FileTransfer_SvrSkel",
+            strDesc,"FileTransfer_SvrSkel",
             true, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -276,6 +281,7 @@ gint32 CFileTransfer_SvrImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CFileTransfer_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );

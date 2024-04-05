@@ -76,9 +76,14 @@ gint32 CActiveCancel_SvrImpl::CreateStmSkel(
         oCfg.SetIntPtr( propStmHandle,
             ( guint32*& )hStream );
         oCfg.SetPointer( propParentPtr, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./actcanceldesc.json",
-            "ActiveCancel_SvrSkel",
+            strDesc,"ActiveCancel_SvrSkel",
             true, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -100,6 +105,7 @@ gint32 CActiveCancel_SvrImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CActiveCancel_ChannelSvr );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );

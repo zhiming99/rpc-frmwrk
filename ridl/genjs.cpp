@@ -37,6 +37,7 @@ extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
+extern bool g_bBuiltinRt;
 
 extern stdstr GetTypeName( CAstNodeBase* pType );
 extern stdstr GetTypeSig( ObjPtr& pObj );
@@ -1213,8 +1214,16 @@ static void OUTPUT_BANNER(
     CCOUT << "const {CSerialBase} = require( '"
         << strLibPath <<"/combase/seribase' );";
     NEW_LINE;
-    CCOUT << "const {CInterfaceProxy} = require( '"
-        << strLibPath <<"/ipc/proxy' )";
+    if( g_bRpcOverStm )
+    {
+        CCOUT << "const {CFastRpcProxy} = require( '"
+            << strLibPath <<"/ipc/fastrpc' )";
+    }
+    else
+    {
+        CCOUT << "const {CInterfaceProxy} = require( '"
+            << strLibPath <<"/ipc/proxy' )";
+    }
     NEW_LINE;
     CCOUT << "const {Buffer} = require( 'buffer' );";
     NEW_LINE;
@@ -1330,9 +1339,9 @@ gint32 CImplJsSvcProxyBase::EmitBuildEventTable()
             stdstr strIfName = pifd->GetName();
             CMethodDecl* pmdecl = elem.second;
             stdstr strName = pmdecl->GetName();
-            CCOUT << "this.m_arrDispEvtTable.set( '"
+            CCOUT << "this.m_mapEvtHandlers.set( '"
                 << strIfName << "::" << strName << "', this."
-                << strName << "Wrapper );";
+                << strName << "Wrapper.bind(this) );";
             if( i < vecEvents.size() - 1 )
                 NEW_LINE;
         }
@@ -1350,25 +1359,28 @@ gint32 CImplJsSvcProxyBase::EmitSvcBaseCli()
         CServiceDecl* psd = m_pNode;
         stdstr strClass = "C";
         strClass += psd->GetName() + "clibase";
-        CCOUT << "class " << strClass
-            << " extends CInterfaceProxy";
-        NEW_LINE;
-        BLOCK_OPEN;
-        ret = EmitBuildEventTable();
-        CCOUT << "constructor( oIoMgr, strObjDescPath, strObjName, oParams )";
-        NEW_LINE;
-        BLOCK_OPEN;
-        CCOUT << "super( oIoMgr, strObjDescPath, strObjName );";
-        if( SUCCEEDED( ret ) )
+        if( g_bRpcOverStm )
         {
-            NEW_LINE;
-            CCOUT << "this.BuildEventTable();";
+            CCOUT << "class " << strClass
+                << " extends CFastRpcProxy";
         }
         else
         {
-            ret = STATUS_SUCCESS;
+            CCOUT << "class " << strClass
+                << " extends CInterfaceProxy";
         }
-        NEW_LINES( 2 );
+        NEW_LINE;
+        BLOCK_OPEN;
+        bool bEvent = true;
+        ret = EmitBuildEventTable();
+        if( ERROR( ret ) )
+            bEvent = false;
+        ret = 0;
+        CCOUT << "constructor( oIoMgr, strObjDescPath, strObjName, oParams )";
+        NEW_LINE;
+        BLOCK_OPEN;
+        CCOUT << "super( oIoMgr, strObjDescPath, strObjName, oParams );";
+        NEW_LINE;
 
         std::vector< ObjPtr > vecIfs;
         psd->GetIfRefs( vecIfs );
@@ -1425,6 +1437,11 @@ gint32 CImplJsSvcProxyBase::EmitSvcBaseCli()
             }
             if( i < vecIfs.size() - 1 )
                 NEW_LINES( 2 );
+        }
+        if( bEvent )
+        {
+            NEW_LINES( 2 );
+            CCOUT << "this.BuildEventTable();";
         }
         BLOCK_CLOSE;
         BLOCK_CLOSE;
@@ -1924,7 +1941,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
         Wa( "oReq.SetString( EnumPropId.propDestDBusName," );
         Wa( "    this.m_strDest );" );
         Wa( "oReq.SetString( EnumPropId.propMethodName," );
-        CCOUT << "USER_METHOD(\""<< strName << "\") );";
+        CCOUT << "    USER_METHOD(\""<< strName << "\") );";
         NEW_LINE;
         Wa( "var oCallOpts = new CConfigDb2();" );
 
@@ -2100,7 +2117,7 @@ gint32 CImplJsMthdProxyBase::OutputEvent()
         {
             Wa( "var offset = 0;" );
             Wa( "var args = [];" );
-            Wa( "var osb = CSerialBase( this );" );
+            Wa( "var osb = new CSerialBase( this );" );
             Wa( "var ret;" );
             Wa( "var buf = ridlBuf;" );
             NEW_LINE;
@@ -2200,9 +2217,9 @@ gint32 CImplJsSvcProxy::OutputSvcProxyClass()
         if( m_pNode->IsStream() )
         {
             NEW_LINE;
-            CCOUT << "this.OnDataReceived = this.OnDataReceivedImpl;";
+            CCOUT << "this.OnDataReceived = this.OnDataReceivedImpl.bind( this );";
             NEW_LINE;
-            CCOUT << "this.OnStmClosed = this.OnStmClosedImpl;";
+            CCOUT << "this.OnStmClosed = this.OnStmClosedImpl.bind( this );";
         }
         BLOCK_CLOSE;
         NEW_LINES( 2 );
@@ -2640,6 +2657,17 @@ gint32 CImplJsMainFunc::OutputCli(
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;
+        if( g_bBuiltinRt )
+        {
+            CServiceDecl* pSvc = vecSvcs[ 0 ];
+            stdstr strObjName = pSvc->GetName();
+            Wa( "// set the router name to connect" );
+            Wa( "globalThis.g_oIoMgr.SetRouterName(" );
+            CCOUT << "    strAppName, '" << strObjName << "', strObjDesc).then((e)=>";
+            BLOCK_OPEN;
+            CCOUT << "var strSvrName = '"<< g_strAppName<< "_rt_' + g_oIoMgr.m_strAppHash";
+            NEW_LINE;
+        }
         for( guint32 i = 0;i < vecSvcs.size(); i++ )
         {
             CServiceDecl* pSvc = vecSvcs[ i ];
@@ -2653,6 +2681,12 @@ gint32 CImplJsMainFunc::OutputCli(
                 << "EnumPropId.propObjInstName, '"
                 << pSvc->GetName() << "' );";
             NEW_LINE;
+            if( g_bBuiltinRt )
+            {
+                CCOUT << "oParams" << i << ".SetString( "
+                    << "EnumPropId.propSvrInstName, strSvrName );";
+                NEW_LINE;
+            }
 
             stdstr strVar = "o";
             strVar += pSvc->GetName() + "_cli";
@@ -2670,8 +2704,8 @@ gint32 CImplJsMainFunc::OutputCli(
             BLOCK_OPEN;
             Wa( "if( ERROR( retval ) )" );
             BLOCK_OPEN;
-            Wa( "console.log( retval );" );
-            CCOUT << "return;";
+            Wa( "globalThis.oProxy = null;" );
+            CCOUT << "return Promise.resolve( retval );";
             BLOCK_CLOSE;
             NEW_LINE;
             if( bSingleSvc )
@@ -2718,11 +2752,20 @@ gint32 CImplJsMainFunc::OutputCli(
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;
-            Wa( "console.log( 'Start Proxy failed' );" );
+            Wa( "console.log( 'Start Proxy failed ' + e );" );
             CCOUT << "return Promise.resolve(e);";
             BLOCK_CLOSE;
             CCOUT << ")";
             NEW_LINE;
+        }
+        if( g_bBuiltinRt )
+        {
+            BLOCK_CLOSE;
+            CCOUT<< ").catch((e)=>";
+            BLOCK_OPEN;
+            CCOUT << "console.log( 'Error happens ' + e );";
+            BLOCK_CLOSE;
+            Wa( ");" );
         }
         NEW_LINE;
 
@@ -3009,7 +3052,13 @@ gint32 CExportJsWebpack::Output()
         CCOUT << "resolve:";
         BLOCK_OPEN;
         Wa( "modules: [path.resolve(__dirname," );
-        CCOUT << "    'node_modules'), 'node_modules']";
+        CCOUT << "    'node_modules'), 'node_modules'],";
+        NEW_LINE;
+        CCOUT << "alias:";
+        BLOCK_OPEN;
+        CCOUT << "stream: require.resolve('stream-browserify'),";
+        BLOCK_CLOSE;
+        CCOUT << ",";
         BLOCK_CLOSE;
         Wa( "," );
         Wa( "output:" );
@@ -3062,8 +3111,9 @@ gint32 CExportJsSampleHtml::Output()
         NEW_LINE;
         CCOUT << "* command line: " << g_strCmdLine;
         NEW_LINE;
-        CCOUT << "* npm dependency: browserify buffer exports minify "
-            << "long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
+        CCOUT << "* npm dependency: assert browserify buffer exports minify vm envents crypto-browserify";
+        NEW_LINE;
+        CCOUT << "* long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
         NEW_LINE;
         Wa( "-->" );
         Wa( "<!DOCTYPE html>" );
@@ -3087,6 +3137,10 @@ gint32 CExportJsSampleHtml::Output()
         BLOCK_OPEN;
         Wa( "setTimeout( checkProxyState, 2000 );" );
         CCOUT << "console.log( \"Waiting RPC connection ready...\" );";
+        BLOCK_CLOSE;
+        CCOUT << "else if( globalThis." << strVar << " === null )";
+        BLOCK_OPEN;
+        CCOUT << "console.log( \"RPC connection is shutdown abnormally...\" );";
         BLOCK_CLOSE;
         if( vecSvcs.size() == 1 )
         {

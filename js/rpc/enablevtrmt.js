@@ -71,6 +71,8 @@ function OnEnableEventComplete( oPending )
         EnumPropId.propReturnValue )
     if( ret === null || ret === undefined )
         return
+    if( ret === errno.ENOTCONN )
+        ret = -ret;
     try{
         var oResp = new CIoRespMessage( oPending.m_oReq )
         oResp.m_oResp.SetUint32(

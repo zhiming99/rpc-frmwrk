@@ -1,4 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
+// ridlc -s -O . ../../../evtest.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -10,7 +11,7 @@ using namespace rpcf;
 
 /* Event handler */
 gint32 CEventTest_CliImpl::OnHelloWorld( 
-    const std::string& strMsg )
+    const std::string& strMsg /*[ In ]*/ )
 {
     // TODO: Processing the event here
     // return code ignored
@@ -31,9 +32,14 @@ gint32 CEventTest_CliImpl::CreateStmSkel(
         oCfg[ propIsServer ] = false;
         oCfg.SetPointer( propParentPtr, this );
         oCfg.CopyProp( propSkelCtx, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./evtestdesc.json",
-            "EventTest_SvrSkel",
+            strDesc,"EventTest_SvrSkel",
             false, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -53,6 +59,7 @@ gint32 CEventTest_CliImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CEventTest_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );

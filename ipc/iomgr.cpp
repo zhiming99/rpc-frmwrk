@@ -2384,6 +2384,7 @@ static gint32 GenHashInstId(
         if( ERROR( ret ) )
             break;
 
+        dwHash = htonl( dwHash );
         ret = BytesToString( ( guint8* )&dwHash,
             sizeof( dwHash ), strHash );
 

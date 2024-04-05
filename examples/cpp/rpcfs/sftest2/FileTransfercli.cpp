@@ -1,4 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
+// ridlc -s -O . ../../../sftest.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -19,9 +20,14 @@ gint32 CFileTransfer_CliImpl::CreateStmSkel(
         oCfg[ propIsServer ] = false;
         oCfg.SetPointer( propParentPtr, this );
         oCfg.CopyProp( propSkelCtx, this );
+        std::string strDesc;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propObjDescPath, strDesc );
+        if( ERROR( ret ) )
+            break;
         ret = CRpcServices::LoadObjDesc(
-            "./sftestdesc.json",
-            "FileTransfer_SvrSkel",
+            strDesc,"FileTransfer_SvrSkel",
             false, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
@@ -41,6 +47,7 @@ gint32 CFileTransfer_CliImpl::OnPreStart(
         oCtx[ propClsid ] = clsid( 
             CFileTransfer_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
+        oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
         ret = oIfCfg.GetStrProp(
             propObjName, strInstName );

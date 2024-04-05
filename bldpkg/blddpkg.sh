@@ -77,10 +77,10 @@ fi
 
 if [ "x$BUILD_JS" == "xyes" ]; then
 cat << EOF >> ./postinst2
-npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli
+npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify
 EOF
 cat << EOF >> ./postrm2
-npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli
+npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify
 EOF
 fi
 
