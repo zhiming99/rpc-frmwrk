@@ -15,7 +15,7 @@ rpc/lz4.js ipc/fastrpc.js
 js_files=index.html index.js webpack.config.js test/evtest.js test/asynctst.js \
 test/actcancel.js test/katest.js test/stmtest.js $(jslib_files)
 
-EXTRA_DIST=$(js_files)
+EXTRA_DIST=$(js_files) README_cn.md
 
 js_confdir=$(sysconfdir)/rpcf
 dist_js_conf_DATA=rpcbase.js.tar.gz
