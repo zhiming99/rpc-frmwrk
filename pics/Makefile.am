@@ -1,3 +1,17 @@
-EXTRA_DIST=multihop.png rpc-block-diagram.png rpcfg.png rpcfg2.png rpcfg3.png \
-rpcfg4.png screenshot-2019-10-21-180941.png ridl-req-mapping.png rpcfs-cli.png \
-rpcfs-svr.png sync-async-svr.png sync-async.png
+EXTRA_DIST= \
+hellowld.png \
+hellowld-tree.png \
+installer-name.png \
+multihop.png \
+ridldatatype.png \
+ridl-req-mapping.png \
+rpc-block-diagram.png \
+rpcfg2.png \
+rpcfg3.png \
+rpcfg4.png \
+rpcfg.png \
+rpcfs-cli.png \
+rpcfs-svr.png \
+screenshot-2019-10-21-180941.png \
+sync-async.png \
+sync-async-svr.png

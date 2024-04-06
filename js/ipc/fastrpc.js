@@ -39,7 +39,7 @@ class CFastRpcMsg
         oHdr.writeUint8( 0x4d, 7)
         if( !this.m_oReq )
         {
-            throw new ERROR( "Error, empty FASTRPC message" );
+            throw new Error( "Error, empty FASTRPC message" );
         }
 
         var oBody = this.m_oReq.Serialize();
@@ -54,11 +54,11 @@ class CFastRpcMsg
             offset = 0;
         var dwSize = oBuf.readUint32BE( offset );
         if( dwSize + offset + 4 > oBuf.length )
-            throw new ERROR( "Error, invalid FASTRPC message size" );
+            throw new Error( "Error, invalid FASTRPC message size" );
         offset += 4;
         var iType = oBuf.readUint8( offset )
         if( iType !== EnumTypeId.typeObj )
-            throw new ERROR( "Error, invalid FASTRPC message type" );
+            throw new Error( "Error, invalid FASTRPC message type" );
 
         offset++;
         var szMag = [0,0,0]
@@ -68,7 +68,7 @@ class CFastRpcMsg
         if( szMag[ 0 ] !== 0x46 ||
             szMag[ 1 ] !== 0x52 ||
             szMag[ 2 ] !== 0x4d )
-            throw new ERROR( "Error, invalid FASTRPC message magic" );
+            throw new Error( "Error, invalid FASTRPC message magic" );
         this.m_dwSize = dwSize;
         this.m_bType = EnumTypeId.typeObj;
 
@@ -236,7 +236,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
             }
             else
             {
-                throw new ERROR( "unknown message");
+                throw new Error( "unknown message");
             }
 
         }catch( e ){
