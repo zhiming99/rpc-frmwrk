@@ -47,16 +47,17 @@ And 3 composite types:
 .IP \fBstruct\fP
 \- A bundle of values of different data types. It is usually used as a building
 block for other data types or as the parameter to transfer between client and
-server. It maps to 'struct' in C++, 'struct' in Python, and 'class' in Java.
+server. It maps to 'struct' in C++, 'struct' in Python, and 'class' in Java and
+JS.
 .IP \fBarray\fP
 \- An array of elements of the same type, either basic type or composite type,
 except \fIHSTREAM\fR. For example, \fIarray<int32>\fR, or \fIarray<string>\fR.
-It maps to 'std::vector' in C++, 'list' in Python, and 'array' in Java.
+It maps to 'std::vector' in C++, 'list' in Python, and 'array' in Java and JS.
 .IP \fBmap\fP
 \- A map consists of key-value paires. The key should be a comparable data type,
 and value could be any supported type except \fIHSTREAM\fR. For example,
 \fImap<string, int32>\fR, or \fImap<int64, array<int>>\fR. It maps to 'std::map'
-in C++, 'dict' in Python, and 'Map' in Java.
+in C++, 'dict' in Python, 'Map' in Java and JS.
 .RE
 
 See also the EXAMPLES section.

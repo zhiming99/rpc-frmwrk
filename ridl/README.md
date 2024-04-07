@@ -134,7 +134,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -b:     To generate the skeleton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
 ```
 
-Currently `ridlc` can output skeleton code in C++, Python and Java. In the future, it will be able to generate code for other languages as well.
+Currently `ridlc` can output skeleton code in C++, Python Java and JavaScript. In the future, it will be able to generate code for other languages as well.
 
 ### Output for C++ project
 
@@ -196,5 +196,5 @@ And please don't edit it, since they will be overwritten by `ridlc`.
 
 ### Output for JavaScript Project
 
-### Interchangable client and server between C++, Python, and Java.
+### Interchangable client and server between C++, Python, Java and JavaScript.
 You can connect the C++ server with a python client or a Python server with a Java client as long as both are generated with the same ridl file.
