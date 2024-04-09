@@ -859,11 +859,10 @@ gint32 CMessageMatch::Deserialize(
             break;
         }
 
-        SERI_HEADER* pHeader =
-            ( SERI_HEADER* )pBuf;
+        const SERI_HEADER* pHeader =
+            ( const SERI_HEADER* )pBuf;
         
         SERI_HEADER oHeader;
-        // memcpy( &oHeader, pHeader, sizeof( oHeader ) );
         oHeader = *pHeader;
         oHeader.ntoh();
 
