@@ -1,4 +1,8 @@
 ---
+[`Mon Apr 08 2024 10:28:33 PM Beijing`]   
+1. The JavaScript support is almost completed except the oAuth2 module, which is the next task to do.
+2. There is a connection bug which shows up recently and failed the workflow test, which is also urgent to fix.
+   
 [`Mon Feb 26 2024 05:12:31 PM Beijing`]   
 1. Merged pull request PR #49. Some parts of the JS support library are not ready yet, because they depend on the code generator. And therefore, I will write the code generator for JS next and the `seribase` and testcase `sftest` will also be delivered in this PR.
 
