@@ -7,7 +7,7 @@
             "BusName": "DBusBusPort_0",
             "PortClass": "DBusLocalPdo",
             "PortId": "0",
-            "RequestTimeoutSec": "120",
+            "RequestTimeoutSec": "305",
             "KeepAliveTimeoutSec": "20",
             "QueuedRequests": "false",
             "ProxyPortClass": "DBusProxyPdo",
