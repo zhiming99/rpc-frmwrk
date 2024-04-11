@@ -5508,6 +5508,9 @@ gint32 CIfInvokeMethodTask::GetTimeLeft()
     guint32 dwAge = 0;
     GetAgeSec( dwAge );
 
+    if( dwTimeoutSec <= dwAge )
+        return 0;
+
     return ( gint32 )dwTimeoutSec - dwAge;
 }
 
