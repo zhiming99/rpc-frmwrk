@@ -399,7 +399,7 @@ gint32 CTimerService::ResetTimer(
     {
         // CTimerService lives on only on
         // thread 0
-        m_pUtils->Wakeup( 0 );
+        this->WakeupLoop();
     }
 
     return ret;
@@ -436,7 +436,7 @@ gint32 CTimerService::AdjustTimer(
     {
         // CTimerService lives on only on
         // thread 0
-        m_pUtils->Wakeup( 0 );
+        this->WakeupLoop();
     }
 
     return ret;
@@ -477,7 +477,7 @@ gint32 CTimerService::RemoveTimer(
     {
         // CTimerService lives on only on
         // thread 0
-        m_pUtils->Wakeup( 0 );
+        this->WakeupLoop();
     }
 
     return ret;
@@ -525,12 +525,19 @@ gint32 CTimerService::TickTimers()
             }
             ++itr;
         }
-        if( m_vecPendingTimeouts.size() )
-            m_pUtils->Wakeup( 0 );
 
     }while( 0 );
 
     return 0;
+}
+
+void CTimerService::WakeupLoop()
+{
+    MloopPtr pLoop =
+        GetIoMgr()->GetMainIoLoop();
+    CMainIoLoop* pMain = pLoop;    
+    pMain->WakeupLoop();
+    return;
 }
 
 gint32 CTimerService::ProcessTimers()

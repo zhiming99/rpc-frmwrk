@@ -28,7 +28,7 @@ class CEventTest_CliImpl extends CEventTestclibase
     )
     {
         // add code here
-        console.log( "Server response" + strMsg )
+        this.DebugPrint( "Event from server '" + strMsg + "'")
     }
 }
 

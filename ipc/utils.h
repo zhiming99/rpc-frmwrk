@@ -420,6 +420,8 @@ class CTimerService : public IService
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
+
+    void WakeupLoop();
 };
 
 typedef CAutoPtr< clsid( CTimerService ), CTimerService > TimerSvcPtr;

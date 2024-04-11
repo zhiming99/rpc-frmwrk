@@ -5098,10 +5098,25 @@ gint32 CIfInvokeMethodTask::ResetTimer()
             ret = super::ResetTimer( m_iTimeoutId );
             break;
         }
-        guint32 dwTimeoutSec = 0;
-        GetTimeoutSec( dwTimeoutSec );
+
+        guint32 dwTimeoutSec = GetTimeLeft();
         if( dwTimeoutSec == 0 )
             break;
+
+        CRpcServices* pIf;
+        ret = oCfg.GetPointer( propIfPtr, pIf );
+        if( ERROR( ret ) )
+            break;
+
+        Variant oVar;
+        ret = pIf->GetProperty(
+            propTimeoutSec, oVar );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( dwTimeoutSec > ( guint32& )oVar )
+            dwTimeoutSec = oVar;
 
         CIoManager* pMgr = nullptr;
         GET_IOMGR( oCfg, pMgr );
@@ -5360,23 +5375,26 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
 
         guint32 dwTimeoutSec = 0;
 
+        CRpcServices* pIf = nullptr;
+        ret = oTaskCfg.GetPointer(
+            propIfPtr, pIf );
+
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwActTimer = 0;
+        CCfgOpenerObj oIfCfg( pIf );
+        ret = oIfCfg.GetIntProp(
+            propTimeoutSec, dwActTimer );
+        if( ERROR( ret ) )
+            break;
+
         ret = GetTimeoutSec( dwTimeoutSec );
         if( ERROR( ret ) || dwTimeoutSec <= 1 )
         {
             // using the timeout value from the server
             // object
-            CRpcServices* pIf = nullptr;
-            ret = oTaskCfg.GetPointer(
-                propIfPtr, pIf );
-
-            if( ERROR( ret ) )
-                break;
-
-            CCfgOpenerObj oIfCfg( pIf );
-            ret = oIfCfg.GetIntProp(
-                propTimeoutSec, dwTimeoutSec );
-            if( ERROR( ret ) )
-                break;
+            dwTimeoutSec = dwActTimer;
         }
 
         guint32 dwAge = 0;
@@ -5395,7 +5413,13 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             }
         }
 
-        ret = AddTimer( dwTimeoutSec, 
+        if( dwActTimer > dwTimeoutSec )
+            dwActTimer = dwTimeoutSec;
+
+        // If dwTimeoutSec greater than dwActTimer, the
+        // extra lifetime over dwActTimer should be
+        // extended via keepalive.
+        ret = AddTimer( dwActTimer,
             ( guint32 )eventTimeoutCancel );
 
         if( unlikely( ret < 0 ) )
