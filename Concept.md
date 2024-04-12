@@ -98,11 +98,14 @@ proxies. It is a one-way message without response.
 
 ### Streaming
 
-RPC-frmwrk supports streaming semantics, where the `Proxy` requests to
-setup a `stream channel` with the `Server` over the establised connection
-between the proxy and the server. After the channel is set up sucessfully,
-bi-directional byte stream can start. The streaming channel has better
-flow-control and more sensitive connection status awareness.
+RPC-frmwrk supports byte streams between the peers. That is, the `Proxy`
+initiates a request to setup a `stream channel` with the `Server` over the
+establised TCP connection between the proxy and the server. After the channel is
+set up sucessfully, bi-directional byte stream can flow over. The streaming
+channel has efficient flow-control and more sensitive connection status
+awareness. And the stream API is quite similiar to the file operations, in the 
+sense of read and write operations.
+
 
 Streaming transfer are for the scenarios where large data transfer is
 necessary. Normal RPC request/response has a upper limit of 1MB. When the
