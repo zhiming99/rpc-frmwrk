@@ -5396,6 +5396,9 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             // object
             dwTimeoutSec = dwActTimer;
         }
+        bool bFetchData = false;
+        oTaskCfg.GetBoolProp(
+            propFetchTimeout, bFetchData );
 
         guint32 dwAge = 0;
         ret = GetAgeSec( dwAge );
@@ -5413,7 +5416,8 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
             }
         }
 
-        if( dwActTimer > dwTimeoutSec )
+        if( dwActTimer > dwTimeoutSec ||
+            unlikely( bFetchData ) )
             dwActTimer = dwTimeoutSec;
 
         // If dwTimeoutSec greater than dwActTimer, the
@@ -5432,7 +5436,7 @@ gint32 CIfInvokeMethodTask::SetAsyncCall(
         if( dwTimeoutSec == 1 )
             break;
 
-        if( !IsKeepAlive() )
+        if( bFetchData || !IsKeepAlive() )
             break;
 
         guint32 dwKeepAliveSec = 0;

@@ -7046,7 +7046,7 @@ gint32 CInterfaceServer::DoInvoke_SendData(
                     // keep-alive settings
                     SET_RMT_TASKID(
                         ( IConfigDb* )pDataDesc, oTaskCfg );
-
+                    oTaskCfg.SetBoolProp( propFetchTimeout, 1 );
                     break;
                 }
 
