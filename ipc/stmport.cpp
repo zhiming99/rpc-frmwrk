@@ -1512,6 +1512,40 @@ gint32 CDBusStreamBusPort::PostStart(
     return ret;
 }
 
+gint32 CDBusStreamBusPort::OnPortReady(
+    IRP* pIrp )
+{
+    gint32 ret = 0;
+    do{
+        ret = super::OnPortReady( pIrp );
+        if( ERROR( ret ) )
+            break;
+        // copy the propFetchTimeout value from
+        // channel proxy
+        ObjPtr pIf = GetStreamIf();
+        if( pIf.IsEmpty() )
+            break;
+        CRpcServices* pSvc = pIf;
+        if( pSvc->IsServer() )
+            break;
+
+        Variant oVar;
+        ret = pSvc->GetProperty(
+            propFetchTimeout, oVar );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+        this->SetProperty(
+            propFetchTimeout, oVar );
+
+    }while( 0 );
+
+    pIrp->GetCurCtx()->SetStatus( ret );
+    return ret;
+}
+
 gint32 CDBusStreamBusPort::StopStreamChan(
     IRP* pIrp )
 {

@@ -186,6 +186,7 @@ class CDBusStreamBusPort :
 
     gint32 Stop( IRP* pIrp ) override;
     gint32 PostStart( IRP* pIrp ) override;
+    gint32 OnPortReady( IRP* pIrp ) override;
 
     void BindStreamPort(
         HANDLE hStream, PortPtr pPort );
