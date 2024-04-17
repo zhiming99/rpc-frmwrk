@@ -379,7 +379,7 @@ gint32 CTimerService::ResetTimer(
 {
     gint32 ret = -ENOENT;
     CStdMutex oMutex( m_oMapLock );
-    auto itr = m_vecTimers.begin();
+    auto itr = m_vecTimers.find( iTimerId );
 
     if( itr != m_vecTimers.end() )
     {
