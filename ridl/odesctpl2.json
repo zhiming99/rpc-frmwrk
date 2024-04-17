@@ -46,6 +46,8 @@
             "Compression" : "true",
             "EnableSSL" : "true",
             "EnableWS" : "false",
+            "EnableQPS": "true",
+            "QPS": "5000",
             "RouterPath" : "/",
             "Interfaces" :
             [

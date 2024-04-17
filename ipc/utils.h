@@ -174,6 +174,9 @@ class CThreadPool : public IService
     void SetMaxThreads( guint32 dwMaxThrds )
     { m_iMaxThreads = dwMaxThrds; }
 
+    inline guint32 GetMaxThreads()
+    { return m_iMaxThreads; }
+
     gint32 OnEvent( EnumEventId iEvent,
             LONGWORD dwParam1,
             LONGWORD dwParam2,
@@ -366,7 +369,8 @@ class CTimerService : public IService
 	};
 
     // timers ticking
-	std::vector< TIMER_ENTRY > m_vecTimers;
+    using TIMERMAP=std::hashmap< guint32, TIMER_ENTRY >;
+	TIMERMAP m_vecTimers;
 
     // timers timeout
 	std::vector< TIMER_ENTRY > m_vecPendingTimeouts;

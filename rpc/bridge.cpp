@@ -4686,7 +4686,12 @@ gint32 CRpcTcpBridge::SetupReqIrp(
     }
 
     if( SUCCEEDED( ret ) )
-        pIrp->SetCompleteInPlace( true );
+    {
+        auto& otp =
+            this->GetIoMgr()->GetTaskThreadPool();
+        if( otp.GetMaxThreads() > 6 )
+            pIrp->SetCompleteInPlace( false );
+    }
 
     return ret;
 }
