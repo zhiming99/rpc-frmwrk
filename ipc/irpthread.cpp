@@ -590,11 +590,10 @@ gint32 CIrpCompThread::ProcessIrp()
 
         IrpPtr pIrp;
         CStdMutex a( m_oMutex );
-        if( m_quePendingIrps.size() )
-        {
-            pIrp = m_quePendingIrps.front();
-            m_quePendingIrps.pop_front();
-        }
+        if( m_quePendingIrps.empty() )
+            break;
+        pIrp = m_quePendingIrps.front();
+        m_quePendingIrps.pop_front();
         a.Unlock();
         this->CompleteIrp( pIrp );
         m_dwIrpCount--;
@@ -620,7 +619,8 @@ gint32 CIrpCompThread::ProcessIrps()
 
         for( auto elem : quePendingIrps )
             this->CompleteIrp( elem );
-        m_dwIrpCount -= dwCount;
+        if( dwCount > 0 )
+            m_dwIrpCount -= dwCount;
 
     }while( 0 );
 
