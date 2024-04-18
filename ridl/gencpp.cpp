@@ -7451,8 +7451,8 @@ gint32 CImplMainFunc::EmitInitContext(
         }
         else if( !g_bBuiltinRt )
         {
-            Wa( "oParams[ propMaxIrpThrd ] = 0;" );
-            Wa( "oParams[ propMaxTaskThrd ] = 4;" );
+            Wa( "oParams[ propMaxIrpThrd ] = 2;" );
+            Wa( "oParams[ propMaxTaskThrd ] = 2;" );
         }
         else
         {
