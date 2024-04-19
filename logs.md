@@ -1,4 +1,7 @@
 ---
+[`Fri Apr 19 2024 08:03:05 PM Beijing`]   
+1. During this round of bugfix, We have fixed a big performance issue and doubled the throughput capacity. The issue is due to the old design of CTimerService using vector as its timer storage. When the request goes up to 10000, the searching and removal of a timer became overwhelming. After replaced it with a hashmap, the server runs like a charm. Compared to other changes for improvement in the past, this fix is small but quite effective. 
+   
 [`Mon Apr 08 2024 10:28:33 PM Beijing`]   
 1. The JavaScript support is almost completed except the oAuth2 module, which is the next task to do.
 2. There is a connection bug which shows up recently and failed the workflow test, which is also urgent to fix.
