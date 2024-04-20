@@ -327,34 +327,49 @@ gint32 CStlObjVector::Deserialize(
             break;
         }
 
-        SERI_HEADER* pHeader =
-            ( SERI_HEADER* )pBuf;
+        const SERI_HEADER* pHeader =
+            ( const SERI_HEADER* )pBuf;
 
-        pHeader->ntoh();
-        if( pHeader->dwClsid != clsid( CStlObjVector ) )
+        SERI_HEADER oHdr1;
+        memcpy( &oHdr1, pBuf,
+            sizeof( SERI_HEADER ) );
+
+        oHdr1.ntoh();
+        if( oHdr1.dwClsid !=
+            clsid( CStlObjVector ) )
         {
             ret = -EINVAL;
             break;
         }
 
         if( dwBufSize <
-            pHeader->dwSize + HEADER_NBSIZE )
+            oHdr1.dwSize + HEADER_NBSIZE )
         {
             ret = -ERANGE;
             break;
         }
 
-        if( pHeader->dwCount > MAX_ELEM_CONTAINER )
+        if( oHdr1.dwCount > MAX_ELEM_CONTAINER )
         {
             ret = -ERANGE;
             break;
         }
 
-        guint32 dwElemCount = pHeader->dwCount - 1;
+        BufPtr pHdrBuf( true );
+        pHdrBuf->Resize( sizeof( SERI_HEADER ) +
+            sizeof( guint32 ) * oHdr1.dwCount );
+
+        SERI_HEADER* pFullHdr =
+            ( SERI_HEADER* )pHdrBuf->ptr();
+        memcpy( pFullHdr, pBuf, pHdrBuf->size() );
+        SERI_HEADER& oFullHdr = *pFullHdr;
+
+        oFullHdr.ntoh( false );
+        guint32 dwElemCount = oFullHdr.dwCount - 1;
 
         const char* pStart =
             pBuf + sizeof( SERI_HEADER ) +
-            ( ALIGN_MASK + 1 ) * ( pHeader->dwCount );
+            ( ALIGN_MASK + 1 ) * ( oFullHdr.dwCount );
 
         if( pStart - pBuf > ( gint32 )dwBufSize )
         {
@@ -367,10 +382,10 @@ gint32 CStlObjVector::Deserialize(
         for( guint32 i = 0; i < dwElemCount; ++i )
         {
             guint32 dwPos =
-                pHeader->arrOffsets[ i ];
+                oFullHdr.arrOffsets[ i ];
 
             guint32 dwObjSize =
-                pHeader->arrOffsets[ i + 1 ] - dwPos;
+                oFullHdr.arrOffsets[ i + 1 ] - dwPos;
 
             const SERI_HEADER_BASE* pObjBase =
                 ( SERI_HEADER_BASE* )( pStart + dwPos );

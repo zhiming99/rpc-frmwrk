@@ -305,12 +305,15 @@ class CStlObjVector : public CStlVector< ObjPtr >
             return *this;
         }
 
-        void ntoh()
+        void ntoh( bool bNoOffset = true )
         {
             super::ntoh();
             dwCount = ntohl( dwCount );
 
             if( dwCount > MAX_ELEM_CONTAINER )
+                return;
+
+            if( bNoOffset )
                 return;
 
             guint32* pOffset = arrOffsets;

@@ -1676,22 +1676,72 @@ gint32 CRpcRouterBridge::RefreshReqLimit()
 CfgPtr& CRpcRouterBridge::GetCfgCache(
     EnumClsid iClsid )
 {
-    if( clsid( CRpcTcpBridgeImpl ) ==
-        iClsid )
-        return m_pBridge;
-    else if( clsid( CRpcTcpBridgeAuthImpl ) ==
-        iClsid )
-        return m_pBridgeAuth;
-    else if( clsid( CRpcTcpBridgeProxyImpl ) ==
-        iClsid )
-        return m_pBridgeProxy;
-    else if( clsid( CRpcReqForwarderProxyImpl ) ==
+    if( clsid( CRpcReqForwarderProxyImpl ) ==
         iClsid )
         return m_pReqProxy;
     string strMsg = DebugMsg( 0,
         "Error invalid class id "
         "GetCfgCache" );
     throw runtime_error( strMsg );
+}
+
+CfgPtr CRpcRouterBridge::GetCfgCache2(
+    EnumClsid iClsid )
+{
+    BufPtr pBuf;
+    if( clsid( CRpcTcpBridgeImpl ) ==
+        iClsid )
+        pBuf = m_pBridge;
+    else if( clsid( CRpcTcpBridgeAuthImpl ) ==
+        iClsid )
+        pBuf = m_pBridgeAuth;
+    else if( clsid( CRpcTcpBridgeProxyImpl ) ==
+        iClsid )
+        pBuf = m_pBridgeProxy;
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return CfgPtr();
+
+    CParamList oParams;
+    gint32 ret = oParams.Deserialize( pBuf );
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( 0,
+            "Error error create cfgptr "
+            "from GetCfgCache2" );
+        throw runtime_error( strMsg );
+    }
+    oParams.SetPointer(
+        propIoMgr, this->GetIoMgr() );
+    return oParams.GetCfg();
+}
+
+gint32 CRpcRouterBridge::SetCfgCache2(
+    EnumClsid iClsid, CfgPtr& pCfg )
+{
+    CParamList oParams( pCfg );
+    ObjPtr pMgr, pConnParams;
+    oParams.GetObjPtr( propIoMgr, pMgr );
+    oParams.GetObjPtr(
+        propConnParams, pConnParams );
+    oParams.RemoveProperty( propIoMgr );
+    oParams.RemoveProperty( propConnParams );
+    BufPtr pBuf( true );
+    gint32 ret = oParams.Serialize( pBuf );
+    if( ERROR( ret ) )
+        return ret;
+    if( clsid( CRpcTcpBridgeImpl ) ==
+        iClsid )
+        m_pBridge = pBuf;
+    else if( clsid( CRpcTcpBridgeAuthImpl ) ==
+        iClsid )
+        m_pBridgeAuth = pBuf;
+    else if( clsid( CRpcTcpBridgeProxyImpl ) ==
+        iClsid )
+        m_pBridgeProxy = pBuf;
+    oParams.SetObjPtr( propIoMgr, pMgr );
+    oParams.SetObjPtr(
+        propConnParams, pConnParams );
+    return 0;
 }
 
 gint32 CRouterOpenBdgePortTask::CreateInterface(
@@ -1758,7 +1808,7 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
             break;
 
         CStdRMutex oLock( pRouter->GetLock() );
-        CfgPtr& pCfg = pRouter->GetCfgCache( iClsid );
+        CfgPtr pCfg = pRouter->GetCfgCache2( iClsid );
         if( !pCfg.IsEmpty() )
         {
             CParamList oParams( ( IConfigDb* )pCfg );
@@ -1768,41 +1818,46 @@ gint32 CRouterOpenBdgePortTask::CreateInterface(
                 break;
             if( bServer )
                 oParams.CopyProp( propPortId, this );
-            ret = pIf.NewObj( iClsid, pCfg );
-            break;
+        }
+        else
+        {
+            pCfg.NewObj();
+            CParamList oParams( ( IConfigDb* )pCfg );
+            string strRtName;
+
+            ret = oParams.SetPointer(
+                propConnParams, pConnParams );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oParams.CopyProp(
+                propSvrInstName, pRouter );
+            if( ERROR( ret ) )
+                break;
+
+            std::string strObjName;
+            if( bAuth )
+                strObjName = OBJNAME_TCP_BRIDGE_AUTH;
+            else
+                strObjName = OBJNAME_TCP_BRIDGE;
+
+            oParams.SetPointer( propIoMgr, pMgr );
+
+            ret = CRpcServices::LoadObjDesc(
+                strObjDesc,
+                strObjName,
+                bServer ? true : false,
+                oParams.GetCfg() );
+
+            if( ERROR( ret ) )
+                break;
+
+            ret = pRouter->SetCfgCache2( iClsid, pCfg );
+            if( ERROR( ret ) )
+                break;
         }
 
-        pCfg.NewObj();
         CParamList oParams( ( IConfigDb* )pCfg );
-        string strRtName;
-
-        ret = oParams.SetPointer(
-            propConnParams, pConnParams );
-        if( ERROR( ret ) )
-            break;
-
-        ret = oParams.CopyProp(
-            propSvrInstName, pRouter );
-        if( ERROR( ret ) )
-            break;
-
-        std::string strObjName;
-        if( bAuth )
-            strObjName = OBJNAME_TCP_BRIDGE_AUTH;
-        else
-            strObjName = OBJNAME_TCP_BRIDGE;
-
-        oParams.SetPointer( propIoMgr, pMgr );
-
-        ret = CRpcServices::LoadObjDesc(
-            strObjDesc,
-            strObjName,
-            bServer ? true : false,
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
         oParams.SetPointer(
             propRouterPtr, pRouter );
 

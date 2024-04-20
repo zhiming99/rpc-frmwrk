@@ -4686,7 +4686,12 @@ gint32 CRpcTcpBridge::SetupReqIrp(
     }
 
     if( SUCCEEDED( ret ) )
-        pIrp->SetCompleteInPlace( true );
+    {
+        auto& otp =
+            this->GetIoMgr()->GetTaskThreadPool();
+        if( otp.GetMaxThreads() > 6 )
+            pIrp->SetCompleteInPlace( false );
+    }
 
     return ret;
 }
@@ -5249,7 +5254,7 @@ gint32 CRpcTcpBridge::Handshake(
     CParamList oResp;
     do{
         CStdRMutex oIfLock( GetLock() );
-        if( m_bHandshaked == true )
+        if( m_bHandshaked )
         {
             oIfLock.Unlock();
             PostDisconnEvent();
@@ -5334,6 +5339,7 @@ gint32 CRpcTcpBridge::Handshake(
                 ret = -ETIMEDOUT;
                 oResp[ propReturnValue ] = -ETIMEDOUT;
                 oResp.RemoveProperty( 0 );
+                oResp.RemoveProperty( propSessHash );
             }
             else
             {

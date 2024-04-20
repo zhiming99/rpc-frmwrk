@@ -123,6 +123,13 @@ class CAutoPtr : public IAutoPtr
         }
     }
 
+    CAutoPtr( CAutoPtr&& oInitPtr ) 
+    {
+        m_pObj = oInitPtr.m_pObj;
+        if( m_pObj )
+            oInitPtr.Detach();
+    }
+
     // move constructor
     template< EnumClsid iClsid2, class U,
         class T1 = typename std::enable_if<

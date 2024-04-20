@@ -522,7 +522,6 @@ class CRpcTcpBridgeProxyAuth :
         IConfigDb* pReqCtx );
 
     gint32 EnableInterfaces();
-    gint32 RebuildMatches() override;
 
     public:
     typedef CRpcTcpBridgeProxy super;
@@ -572,7 +571,6 @@ class CRpcTcpBridgeAuth :
         IConfigDb* pReqCtx );
 
     gint32 EnableInterfaces();
-    gint32 RebuildMatches() override;
 
     gint32 IsAuthRequest(
         IConfigDb* pReqCtx,

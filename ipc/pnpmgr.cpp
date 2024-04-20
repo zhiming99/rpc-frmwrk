@@ -374,7 +374,17 @@ gint32 CPnpManager::StartPortsInternal(
 
         // we can wait 2 minutes for
         // a start operation
-        pIrp->SetTimer( PORT_START_TIMEOUT_SEC, pMgr );
+        guint32 dwTimeout;
+
+        Variant oVar;
+        ret = pPort->GetProperty(
+            propOpenPortTimeout, oVar );
+        if( SUCCEEDED( ret ) )
+            dwTimeout = ( guint32& )oVar;
+        else
+            dwTimeout = PORT_START_TIMEOUT_SEC;
+
+        pIrp->SetTimer( dwTimeout, pMgr );
 
 
         if( true  )

@@ -366,7 +366,7 @@ gint32 CTimerService::AddTimer(
         te.m_dwParam = dwParam;
 
         CStdMutex oMutex( m_oMapLock );
-        m_vecTimers.push_back( te );
+        m_vecTimers[ te.m_iTimerId ] = te;
         ret = te.m_iTimerId;
 
     }while( 0 );
@@ -379,27 +379,20 @@ gint32 CTimerService::ResetTimer(
 {
     gint32 ret = -ENOENT;
     CStdMutex oMutex( m_oMapLock );
-    vector<TIMER_ENTRY>::iterator itr =
-            m_vecTimers.begin();
+    auto itr = m_vecTimers.find( iTimerId );
 
-    while( itr != m_vecTimers.end() )
+    if( itr != m_vecTimers.end() )
     {
-        TIMER_ENTRY& te = *itr;
-        ++itr;
-
-        if( te.m_iTimerId == iTimerId )
-        {
-            te.m_qwTicks = 0;
-            ret = 0;
-            break;
-        }
+        TIMER_ENTRY& te = itr->second;
+        te.m_qwTicks = 0;
+        ret = 0;
     }
 
     if( m_vecPendingTimeouts.size() )
     {
         // CTimerService lives on only on
         // thread 0
-        m_pUtils->Wakeup( 0 );
+        this->WakeupLoop();
     }
 
     return ret;
@@ -415,28 +408,20 @@ gint32 CTimerService::AdjustTimer(
 
     CStdMutex oMutex( m_oMapLock );
 
-    vector<TIMER_ENTRY>::iterator itr =
-            m_vecTimers.begin();
-
-    while( itr != m_vecTimers.end() )
+    auto itr = m_vecTimers.find( iTimerId );
+    if( itr != m_vecTimers.end() )
     {
-        TIMER_ENTRY& te = *itr;
-
-        if( te.m_iTimerId == iTimerId )
-        {
-            te.m_qwIntervalMs = SecToMs( iNewInterval );
-            te.m_qwTicks = 0;
-            ret = 0;
-            break;
-        }
-        ++itr;
+        TIMER_ENTRY& te = itr->second;
+        te.m_qwIntervalMs = SecToMs( iNewInterval );
+        te.m_qwTicks = 0;
+        ret = 0;
     }
 
     if( m_vecPendingTimeouts.size() )
     {
         // CTimerService lives on only on
         // thread 0
-        m_pUtils->Wakeup( 0 );
+        this->WakeupLoop();
     }
 
     return ret;
@@ -446,38 +431,16 @@ gint32 CTimerService::RemoveTimer(
     gint32 iTimerId )
 {
     gint32 ret = 0;
-    bool bFound = false;
 
     CStdMutex oMutex( m_oMapLock );
-    if( m_vecTimers.empty() )
-    {
+    if( 0 == m_vecTimers.erase( iTimerId ) )
         ret = -ENOENT;
-    }
-    else
-    {
-        vector<TIMER_ENTRY>::iterator itr =
-                m_vecTimers.begin();
-
-        while( itr != m_vecTimers.end() )
-        {
-            if( itr->m_iTimerId == iTimerId )
-            {
-                m_vecTimers.erase( itr );
-                bFound = true;
-                break;
-            }
-            itr++;
-        }
-
-        if( !bFound )
-            ret = -ENOENT;
-    }
 
     if( m_vecPendingTimeouts.size() )
     {
         // CTimerService lives on only on
         // thread 0
-        m_pUtils->Wakeup( 0 );
+        this->WakeupLoop();
     }
 
     return ret;
@@ -503,8 +466,7 @@ gint32 CTimerService::TickTimers()
             GetIoMgr()->GetMainIoLoop();
 
         CStdMutex oMutex( m_oMapLock );
-        vector<TIMER_ENTRY>::iterator itr =
-                m_vecTimers.begin();
+        auto itr = m_vecTimers.begin();
 
         // performance call
         guint64 qwNow = pLoop->NowUs();
@@ -514,23 +476,30 @@ gint32 CTimerService::TickTimers()
         // printf( "Interval is %d ms\n", dwInterval );
         while( itr != m_vecTimers.end() )
         {
-            itr->m_qwTicks += dwInterval;
-            if( itr->m_qwTicks
-                    >= itr->m_qwIntervalMs )
+            TIMER_ENTRY& te = itr->second;
+            te.m_qwTicks += dwInterval;
+            if( te.m_qwTicks >= te.m_qwIntervalMs )
             {
                 // due time
-                m_vecPendingTimeouts.push_back( *itr );
+                m_vecPendingTimeouts.push_back( te );
                 itr = m_vecTimers.erase( itr );
                 continue;
             }
             ++itr;
         }
-        if( m_vecPendingTimeouts.size() )
-            m_pUtils->Wakeup( 0 );
 
     }while( 0 );
 
     return 0;
+}
+
+void CTimerService::WakeupLoop()
+{
+    MloopPtr pLoop =
+        GetIoMgr()->GetMainIoLoop();
+    CMainIoLoop* pMain = pLoop;    
+    pMain->WakeupLoop();
+    return;
 }
 
 gint32 CTimerService::ProcessTimers()

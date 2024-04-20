@@ -1684,6 +1684,34 @@ gint32 CFastRpcProxyBase::OnPostStart(
         if( ERROR( ret ) )
             break;
 
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = pdrv->GetPortById(
+            GetBusId(), pPort );
+        if( ERROR( ret ) )
+            break;
+
+        Variant oVar;
+        ret = pPort->GetProperty(
+            propFetchTimeout, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            pIf->SetProperty(
+                propFetchTimeout, oVar );
+        }
         m_pSkel = pIf;
         m_pSkelObj = pIf;
         ret = pIf->StartEx( pCallback );
@@ -1904,6 +1932,9 @@ gint32 CFastRpcSkelProxyState::SetupOpenPortParams(
 
         oParams.SetStrProp(
             propBusName, strName );
+
+        oParams.CopyProp( propOpenPortTimeout,
+            propFetchTimeout, this );
 
     }while( 0 );
 

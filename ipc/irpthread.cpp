@@ -260,7 +260,7 @@ bool CTaskThread::IsRunning() const
 
 gint32 CTaskThread::GetLoadCount() const
 {
-    return m_pTaskQue->GetSize();
+    return m_dwTaskCount;
 }
 
 gint32 CTaskThread::Start()
@@ -313,6 +313,7 @@ gint32 CTaskThread::ProcessTask(
         return -EFAULT;
 
     ( *pTask )( dwContext );
+    m_dwTaskCount--;
 
     DumpTask( pTask );
 
@@ -363,17 +364,14 @@ void CTaskThread::AddTask(
 
     m_pTaskQue->AddTask( pTask );
     Sem_Post( &m_semSync );
+    m_dwTaskCount++;
 }
 
 gint32 CTaskThread::RemoveTask(
     TaskletPtr& pTask )
 {
+    m_dwTaskCount--;
     return m_pTaskQue->RemoveTask( pTask );
-}
-
-gint32 CTaskThread::PopHead()
-{
-    return  m_pTaskQue->PopHead();
 }
 
 gint32 CTaskThread::GetHead(
@@ -557,11 +555,11 @@ gint32 CIrpCompThread::AddIrp( IRP* pirp )
 
     do{
 
-        sem_wait( &m_semSlots );
         CStdMutex a( m_oMutex );
         // hold an irp reference count
         m_quePendingIrps.push_back( IrpPtr( pirp ) );
         Sem_Post( &m_semIrps );
+        m_dwIrpCount++;
 
     }while( 0 );
     return 0;
@@ -573,9 +571,8 @@ gint32 CIrpCompThread::Start()
     // last parameter. It is a interface
     // definition
     m_pServiceThread = new std::thread(
-            &CIrpCompThread::ThreadProc,
-            this,
-            ( void* )( eventIrpCompThrdCtx ) );
+        &CIrpCompThread::ThreadProc, this,
+        ( void* )( eventIrpCompThrdCtx ) );
     return 0;
 }
 
@@ -584,6 +581,25 @@ bool CIrpCompThread::IsRunning() const
     return ( m_pServiceThread != nullptr &&
         m_pServiceThread->joinable() &&
         m_bRunning );
+}
+
+gint32 CIrpCompThread::ProcessIrp()
+{
+    do{
+        std::deque<IrpPtr> quePendingIrps;
+
+        IrpPtr pIrp;
+        CStdMutex a( m_oMutex );
+        if( m_quePendingIrps.empty() )
+            break;
+        pIrp = m_quePendingIrps.front();
+        m_quePendingIrps.pop_front();
+        a.Unlock();
+        this->CompleteIrp( pIrp );
+        m_dwIrpCount--;
+
+    }while( 0 );
+    return 0;
 }
 
 gint32 CIrpCompThread::ProcessIrps()
@@ -598,13 +614,13 @@ gint32 CIrpCompThread::ProcessIrps()
         {
             quePendingIrps = m_quePendingIrps;
             m_quePendingIrps.clear();
-            for( int i = 0; i < dwCount; ++i )
-                Sem_Post( &m_semSlots );
         }
         a.Unlock();
 
         for( auto elem : quePendingIrps )
             this->CompleteIrp( elem );
+        if( dwCount > 0 )
+            m_dwIrpCount -= dwCount;
 
     }while( 0 );
 
@@ -624,7 +640,7 @@ void CIrpCompThread::ThreadProc( void* context )
         ret = Sem_Wait( &m_semIrps );
         if( ERROR( ret ) )
             break;
-        ProcessIrps();
+        ProcessIrp();
     }
 
     ProcessIrps();
@@ -653,10 +669,7 @@ CIrpCompThread::~CIrpCompThread()
 
 
 gint32 CIrpCompThread::GetLoadCount() const
-{
-    CStdMutex a( m_oMutex );
-    return m_quePendingIrps.size();
-}
+{ return m_dwIrpCount; }
 
 gint32 CIrpCompThread::Stop()
 {
@@ -861,6 +874,22 @@ gint32 CThreadPool::GetThreadByTid(
     return ret;
 }
 
+gint32 CThreadPool::GetLoadCount()
+{
+    gint32 ret = 0;
+    do{
+        // find the specified thread
+        CStdRMutex oLock( m_oLock ); 
+        auto itr = m_vecThreads.begin();
+        while( itr != m_vecThreads.end() )
+        {
+            ret += ( *itr )->GetLoadCount();
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
 gint32 CThreadPool::PutThread( IThread* pThread )
 {
     gint32 ret = 0;
@@ -1056,6 +1085,14 @@ gint32 CThreadPools::CreatePool(
     return ret;
 }
 
+gint32 CThreadPools::GetLoadCount()
+{
+    gint32 ret = 0;
+    CStdRMutex oLock( GetLock() );
+    for( auto elem : m_mapPools )
+        ret += elem.second->GetLoadCount();
+    return ret;
+}
 gint32 CThreadPools::DestroyPool( guint32 dwTag )
 {
     CStdRMutex oLock( GetLock() );

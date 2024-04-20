@@ -34,6 +34,7 @@ function OpenStreamLocal( oContext )
         oCallOpts.SetUint32( EnumPropId.propCallFlags,
             EnumCallFlags.CF_ASYNC_CALL |
             EnumCallFlags.CF_WITH_REPLY |
+            EnumCallFlags.CF_KEEP_ALIVE |
             messageType.methodCall )
 
         oReq.SetObjPtr(

@@ -45,9 +45,9 @@ class CTaskThread : public IThread
     gint32                      m_iMyTid;
     std::atomic< bool >         m_bRunning = { true };
     stdstr                      m_strName;
+    std::atomic< guint32 >      m_dwTaskCount = { 0 };
 
     gint32 GetHead( TaskletPtr& pTask );
-    gint32 PopHead();
 
     void ThreadProcWraper( void* context )
     { this->ThreadProc( context ); }
@@ -71,7 +71,7 @@ class CTaskThread : public IThread
 
     virtual void ThreadProc( void* context );
 
-    gint32 GetLoadCount() const;
+    gint32 GetLoadCount() const override final;
 
     void AddTask( TaskletPtr& pTask );
     gint32 RemoveTask( TaskletPtr& pTask );
@@ -174,6 +174,9 @@ class CThreadPool : public IService
     void SetMaxThreads( guint32 dwMaxThrds )
     { m_iMaxThreads = dwMaxThrds; }
 
+    inline guint32 GetMaxThreads()
+    { return m_iMaxThreads; }
+
     gint32 OnEvent( EnumEventId iEvent,
             LONGWORD dwParam1,
             LONGWORD dwParam2,
@@ -183,6 +186,8 @@ class CThreadPool : public IService
     gint32 GetThreadByTid(
         ThreadPtr& pThread,
         guint32 dwTid = 0 );
+
+    gint32 GetLoadCount();
 };
 
 typedef CAutoPtr< Clsid_Invalid, CThreadPool > ThrdPoolPtr;
@@ -249,6 +254,7 @@ class CThreadPools : public IService
         LONGWORD    dwParam2,
         LONGWORD*   pData ) override
     { return -ENOTSUP; }
+    gint32 GetLoadCount();
 };
 
 typedef CAutoPtr< Clsid_Invalid, CThreadPools > ThrdPoolsPtr;
@@ -267,8 +273,8 @@ class CIrpCompThread : public IThread
     std::thread                 *m_pServiceThread;
     gint32                      m_iMyTid = 0;
 
-    std::map< const IGenericInterface*, gint32 > m_mapIfs;
     std::atomic< bool >         m_bRunning = { true };
+    std::atomic< guint32 >      m_dwIrpCount = { 0 };
     
     public:
     CIrpCompThread();
@@ -288,8 +294,9 @@ class CIrpCompThread : public IThread
 
     void Join();
 
+    gint32 ProcessIrp();
     gint32 ProcessIrps();
-    gint32 GetLoadCount() const;
+    gint32 GetLoadCount() const override final;
     gint32 OnEvent(EnumEventId, LONGWORD, LONGWORD, LONGWORD*)
     { return 0;}
 
@@ -366,7 +373,8 @@ class CTimerService : public IService
 	};
 
     // timers ticking
-	std::vector< TIMER_ENTRY > m_vecTimers;
+    using TIMERMAP=std::hashmap< guint32, TIMER_ENTRY >;
+	TIMERMAP m_vecTimers;
 
     // timers timeout
 	std::vector< TIMER_ENTRY > m_vecPendingTimeouts;
@@ -420,6 +428,8 @@ class CTimerService : public IService
 
     inline CIoManager* GetIoMgr() const
     { return m_pIoMgr; }
+
+    void WakeupLoop();
 };
 
 typedef CAutoPtr< clsid( CTimerService ), CTimerService > TimerSvcPtr;
