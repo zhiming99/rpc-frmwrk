@@ -91,7 +91,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 `rpc-frmwrk`采用引用计数来管理C++对象的生命周期。所有的对象都继承自基类CObjBase。在此基础上，`rpc-frmwrk`提供了CAutoPtr进一步封装了引用计数的管理。使用CAutoPtr可以有效降低内存泄漏的风险。需要注意的是尽量避免`相互引用`的问题，也就是两个对象分别保有对方的引用计数，或者CAutoPtr。如果不能避免，要在执行析构函数前，一方要主动释放掉自己持有的对方对象的引用计数，或者指向对方的CAutoPtr变量。
 
 ## 性能
-`rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒1000-1200Requests. 
+`rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒5000 Requests. 
 
 ## 开发和调试
 * `rpc-frmwrk`通过`ridl`接口描述语言定义函数接口，和需要传输的数据结构。并通过`ridlc`生成各种语言的框架代码，配置文件，以及Makefile和Readme文件. 同一`ridl`文件生成的不同框架的客户端和服务器可以互操作。有关`ridl`语言的介绍请点击此[链接](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl)。
