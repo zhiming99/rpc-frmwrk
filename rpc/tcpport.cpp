@@ -4424,6 +4424,9 @@ gint32 CRpcListeningSock::Connect()
         if( ret == -1 )
         {
             ret = -errno;
+            DebugPrintEx( logErr, errno, 
+                "Error failed to bind address %s:%d", 
+                strIpAddr.c_str(), dwPortNum );
             break;
         }
 
@@ -4434,6 +4437,9 @@ gint32 CRpcListeningSock::Connect()
         ret = listen( m_iFd, 5 );
         if( ret == -1 )
         {
+            DebugPrintEx( logErr, errno, 
+                "Error failed to listen on %s:%d", 
+                strIpAddr.c_str(), dwPortNum );
             ret = -errno;
             break;
         }
