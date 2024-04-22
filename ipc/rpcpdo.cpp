@@ -1952,7 +1952,7 @@ gint32 CRpcPdoPort::SetupDBusSetting(
                 {
                     DebugPrintEx( logErr, ret,
                         "Error dbus server '%s' not online",
-                        strDest );
+                        strDest.c_str() );
                     // server is not online
                     break;
                 }
