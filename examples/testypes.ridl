@@ -25,7 +25,7 @@ interface ITestTypes
     [ async_p ] Echo3( string strText )
         returns ( string strResp ) ;
 
-    EchoByteArray( bytearray pBuf )
+    [ async ] EchoByteArray( bytearray pBuf )
         returns ( bytearray pRespBuf );
 
     EchoArray( array< int32 > arrInts )

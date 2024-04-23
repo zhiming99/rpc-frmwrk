@@ -31,15 +31,51 @@ gint32 CTestTypesSvc_SvrImpl::Echo3(
     strResp = strText;
     return STATUS_SUCCESS;
 }
-/* Sync Req Handler*/
-gint32 CTestTypesSvc_SvrImpl::EchoByteArray(
-    BufPtr& pBuf /*[ In ]*/,
+
+static std::atomic< guint32 > s_dwByteCount={0};
+/* Async Req Handler*/
+gint32 CTestTypesSvc_SvrImpl::EchoByteArray( 
+    IConfigDb* pContext, 
+    BufPtr& pBuf /*[ In ]*/, 
     BufPtr& pRespBuf /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    gint32 ( *comp )( CTestTypesSvc_SvrImpl*,
+        IConfigDb*, BufPtr& ) = 
+    ([]( CTestTypesSvc_SvrImpl* pIf,
+        IConfigDb* pCtx,
+        BufPtr& pBuf )
+    {
+        BufPtr pRespBuf( true );
+        // copy the input to response
+        pRespBuf->Append(
+            pBuf->ptr(), pBuf->size() - 1 );
+
+        // append a bytes count to the response.
+        char szBuf[ 16 ];
+        guint32 dwBytes =
+            s_dwByteCount += pBuf->size();
+        sprintf( szBuf, " %d", dwBytes ); 
+        pRespBuf->Append(
+            szBuf, strlen( szBuf ) + 1 );
+        // call the completion callback
+        return pIf->EchoByteArrayComplete(
+            pCtx, 0, pRespBuf );
+    });
+
+    // schedule a task to complet the request
+    // instead of return the response directly.
+    TaskletPtr pTask;
+    CIoManager* pMgr = this->GetIoMgr();
+    gint32 ret = NEW_FUNCCALL_TASK( pTask,
+        pMgr, comp, this, pContext, pBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    ret = pMgr->RescheduleTask( pTask );
+    if( ERROR( ret ) )
+        return ret;
+
+    return STATUS_PENDING;
 }
 /* Sync Req Handler*/
 gint32 CTestTypesSvc_SvrImpl::EchoArray(

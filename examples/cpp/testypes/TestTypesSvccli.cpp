@@ -53,6 +53,49 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
     }while( 0 );
     return 0;
 }
+/* Async callback handler */
+gint32 CTestTypesSvc_CliImpl::EchoByteArrayCallback( 
+    IConfigDb* context, gint32 iRet,
+    BufPtr& pRespBuf /*[ In ]*/ )
+{
+    do{
+        CCfgOpener oCtx( context );
+        guint32 *val0, *val1, *val2;
+        // counters shared with the caller function
+        oCtx.GetIntPtr( 0, val0 );
+        oCtx.GetIntPtr( 1, val1 );
+        oCtx.GetIntPtr( 2, val2 );
+        auto& idx = *( ( std::atomic< int >* )val0 );
+        auto& count = *( ( std::atomic< int >* )val1);
+        auto& failures = *( ( std::atomic< int >* )val2);
+        
+        int iIdx = idx++;
+        if( SUCCEEDED( iRet ) )
+        {
+            OutputMsg( 0,
+                "Server resp( %d ): %s",
+                iIdx, pRespBuf->ptr() );
+        }
+        else if( ERROR( iRet ) )
+        {
+            failures++;
+            OutputMsg( iRet,
+                "Server resp( %d ): failure %d",
+                iIdx, failures.load() );
+        }
+        Sem_Post( &semPendings );
+        if( --count == 0 )
+        {
+            CSyncCallback* pSync = nullptr;
+            gint32 ret = oCtx.GetPointer( 3, pSync );
+            if( ERROR( ret ) )
+                break;
+            pSync->OnEvent(
+                eventTaskComp, 0, 0, nullptr );
+        }
+    }while( 0 );
+    return 0;
+}
 /* Event handler */
 gint32 CTestTypesSvc_CliImpl::OnHelloWorld( 
     const std::string& strMsg /*[ In ]*/ )
