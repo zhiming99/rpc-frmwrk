@@ -555,13 +555,14 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
         oParams.Push( ObjPtr( pSyncTask ) );
 
         ret = Sem_Init(
-            &semPendings, 0, MAX_PENDINGS * 2 );
+            &semPendings, 0, MAX_PENDINGS );
         if( ERROR( ret ) )
             break;
 
         guint32 dwSent = 0;
         while( dwSent < MAX_REQS )
         {
+            Sem_Wait( &semPendings );
             stdstr strResp;
             stdstr strText = "Hello, World ";
             strText += std::to_string( dwSent );
@@ -573,10 +574,9 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
             ret = pIf->EchoByteArray(
                 oParams.GetCfg(), pBuf, pRespBuf );
             if( ret == STATUS_PENDING )
-            {
-                Sem_Wait( &semPendings );
                 continue;
-            }
+
+            Sem_Post( &semPendings );
             count--;
             if( ERROR( ret ) )
             {

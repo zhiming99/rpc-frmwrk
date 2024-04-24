@@ -33,6 +33,13 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
                 "Server resp( %d ): %s",
                 iIdx, strResp.c_str() );
         }
+        else if( iRet == -ETIMEDOUT )
+        {
+            failures++;
+            OutputMsg( iRet,
+                "Timeout( %d ): failure %d",
+                iIdx, failures.load() );
+        }
         else if( ERROR( iRet ) )
         {
             failures++;
