@@ -360,8 +360,8 @@ gint32 CIfStmReadWriteTask::OnFCLifted()
     if( IsStopped( dwState ) )
         return ERROR_STATE;
 
-    if( GetReqCount() > 0 )
-        Resume();
+    // if( GetReqCount() > 0 )
+    Resume( reasonFlowCtrl );
 
     gint32 ret = 0;
     if( IsLoopStarted() )
@@ -398,19 +398,47 @@ gint32 CIfStmReadWriteTask::PauseReading(
     return ret;
 }
 
-#define RESCHED_TASK \
+#define RESCHED_WRITE_TASK \
 do{ \
-    if( m_queRequests.size() ) \
-    { \
-        ret = ReRun(); \
-        if( SUCCEEDED( ret ) ) \
-            ret = STATUS_PENDING; \
-    } \
-    else \
+    if( m_queRequests.empty() )\
     { \
         Pause(); \
         ret = STATUS_PENDING; \
     } \
+    else if( unlikely( m_queRequests.size() >= \
+        STM_MAX_PACKETS_REPORT && \
+            HasOutQueLimit() ) )\
+    { \
+    } \
+    else \
+    { \
+        if( !IsPaused() ) \
+            ret = ReRun(); \
+        else \
+            ret = Resume(); \
+        if( SUCCEEDED( ret ) ) \
+            ret = STATUS_PENDING; \
+    } \
+}while( 0 )
+
+#define RESCHED_READ_TASK \
+do{ \
+    if( m_queRequests.empty() && \
+        m_queBufRead.size() >= \
+            SYNC_STM_MAX_PENDING_PKTS ) \
+    { \
+        Pause(); \
+        ret = STATUS_PENDING; \
+        break; \
+    } \
+}while( 0 )
+
+#define RESCHED_TASK \
+do{ \
+    if( IsReading() ) \
+        RESCHED_READ_TASK; \
+    else \
+        RESCHED_WRITE_TASK; \
 }while( 0 )
 
 gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
@@ -456,10 +484,7 @@ gint32 CIfStmReadWriteTask::OnWorkerIrpComplete(
             NotifyWriteResumed();
     }
 
-    if( bHead && m_queRequests.size() )
-        ReRun();
-    else if( m_queRequests.empty() )
-        Pause();
+    RESCHED_TASK;
 
     return STATUS_PENDING;
 }
@@ -548,7 +573,7 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
                 continue;
             COMPLETE_IRP( pCurIrp, ret );
         }
-        RESCHED_TASK;
+        RESCHED_WRITE_TASK;
         return STATUS_PENDING;
     }
     else do{
@@ -563,7 +588,7 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
 
         if( m_queRequests.empty() )
         {
-            RESCHED_TASK;
+            RESCHED_WRITE_TASK;
             break;
         }
 
@@ -585,7 +610,7 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
             ret = -EINVAL;
             PopWriteRequest();
             COMPLETE_IRP( pCurIrp, ret );
-            RESCHED_TASK;
+            RESCHED_WRITE_TASK;
             break;
         }
 
@@ -629,7 +654,7 @@ gint32 CIfStmReadWriteTask::OnIoIrpComplete(
         }
         oIrpLock.Unlock();
 
-        RESCHED_TASK;
+        RESCHED_WRITE_TASK;
 
     }while( 0 );
 
@@ -1270,7 +1295,7 @@ gint32 CIfStmReadWriteTask::RunTask()
                 // clear the flag to re-visit the
                 // irp later.
                 pIrp->ClearSubmited();
-                Pause();
+                Pause( reasonFlowCtrl );
                 ret = STATUS_PENDING;
                 break;
             }
@@ -1298,7 +1323,7 @@ gint32 CIfStmReadWriteTask::RunTask()
             if( ret == ERROR_QUEUE_FULL )
             {
                 pIrp->ClearSubmited();
-                Pause();
+                Pause( reasonFlowCtrl );
                 ret = STATUS_PENDING;
                 break;
             }
@@ -1790,6 +1815,36 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
     }while( 0 );
 
     return ret;
+}
+
+// pause the task from read/write
+gint32 CIfStmReadWriteTask::Pause(
+    EnumPauseReason iReason )
+{
+    if( iReason < 0 )
+        return -EINVAL;
+
+    if( IsReading() )
+        PauseReading( true );
+
+    m_arrReasons[ iReason ] = iReason;
+    return super::Pause();
+}
+
+gint32 CIfStmReadWriteTask::Resume(
+    EnumPauseReason iReason )
+{
+    if( iReason < 0 )
+        return -EINVAL;
+
+    if( IsReading() )
+        PauseReading( false );
+
+    m_arrReasons[ iReason ] = reasonInvalid;
+    if( m_arrReasons[ iReason ^ 1 ] != reasonInvalid )
+        return 0;
+
+    return super::Resume();
 }
 
 gint32 CReadWriteWatchTask::operator()(

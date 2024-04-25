@@ -53,8 +53,8 @@ class CIfUxTaskBase :
         gint32 ret = 0;
         do{
             CStdRTMutex oTaskLock( GetLock() );
-            guint32 dwState = GetTaskState();
-            if( dwState != stateStarted )
+            EnumTaskState dwState = GetTaskState();
+            if( this->IsStopped( dwState ) )
             {
                 ret = ERROR_STATE;
                 break;
@@ -110,8 +110,8 @@ class CIfUxTaskBase :
         gint32 ret = 0;
         do{
             CStdRTMutex oLock( GetLock() );
-            guint32 dwState = GetTaskState();
-            if( dwState != stateStarting )
+            EnumTaskState dwState = GetTaskState();
+            if( IsStopped( dwState ) )
             {
                 ret = ERROR_STATE;
                 break;
@@ -120,8 +120,6 @@ class CIfUxTaskBase :
             if( !IsPaused() )
                 break;
 
-            m_dwFCState = stateStarted;
-
             CCfgOpener oCfg(
                 ( IConfigDb* )GetConfig() );
 
@@ -129,6 +127,10 @@ class CIfUxTaskBase :
             ret = GET_IOMGR( oCfg, pMgr );
             if( ERROR( ret ) )
                 break;
+
+            m_dwFCState = stateStarted;
+            SetTaskState( stateStarting );
+
             oLock.Unlock();
 
             ret = DEFER_CALL( pMgr, this,
@@ -145,13 +147,19 @@ class CIfUxTaskBase :
         gint32 ret = 0;
         do{
             CStdRTMutex oLock( GetLock() );
-            SetTaskState( stateStarting );
             CCfgOpener oCfg(
                 ( IConfigDb* )GetConfig() );
+            EnumTaskState dwState = GetTaskState();
+            if( IsStopped( dwState ) )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
 
             if( IsPaused() )
                 break;
 
+            SetTaskState( stateStarting );
             CIoManager* pMgr = nullptr;
             ret = GET_IOMGR( oCfg, pMgr );
             if( ERROR( ret ) )

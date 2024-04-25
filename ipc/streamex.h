@@ -40,7 +40,7 @@ namespace rpcf
 #define CTRLCODE_WRITEMSG   0x1002
 #define CTRLCODE_WRITEBLK   0x1003
 
-#define SYNC_STM_MAX_PENDING_PKTS ( STM_MAX_PACKETS_REPORT + 2 )
+#define SYNC_STM_MAX_PENDING_PKTS ( STM_MAX_PACKETS_REPORT )
 
 #define POST_LOOP_EVENT( _hChannel, _iEvt, _ret ) \
 do{ \
@@ -73,6 +73,13 @@ enum EnumStreamEvent : guint8
     stmevtSendDone,
     stmevtLoopStart,
     stmevtCloseChan,
+};
+
+enum EnumPauseReason : gint8
+{
+    reasonInvalid = -1,
+    reasonQueLimit = 0,
+    reasonFlowCtrl = 1,
 };
 
 class CIfStmReadWriteTask :
@@ -113,6 +120,9 @@ class CIfStmReadWriteTask :
     bool    m_bDiscard = false;
     HANDLE  m_hChannel = INVALID_HANDLE;
     bool    m_bOutQueLimit = true;
+
+    EnumPauseReason m_arrReasons[ 2 ] =
+        { reasonInvalid, reasonInvalid };
 
     gint32 ReadStreamInternal(
         IEventSink* pCallback,
@@ -164,18 +174,11 @@ class CIfStmReadWriteTask :
     }
 
     // pause the task from read/write
-    gint32 Pause()
-    {
-        if( IsReading() )
-            PauseReading( true );
-        return super::Pause();
-    }
-    gint32 Resume()
-    {
-        if( IsReading() )
-            PauseReading( false );
-        return super::Resume();
-    }
+    gint32 Pause( EnumPauseReason
+        iReason = reasonQueLimit );
+
+    gint32 Resume( EnumPauseReason
+        iReason = reasonQueLimit );
 
     /**
     * @name SetDiscard
