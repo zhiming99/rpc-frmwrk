@@ -35,17 +35,17 @@ gint32 CTestTypesSvc_CliImpl::Echo3Callback(
         }
         else if( iRet == -ETIMEDOUT )
         {
-            failures++;
+            int num = ++failures;
             OutputMsg( iRet,
                 "Timeout( %d ): failure %d",
-                iIdx, failures.load() );
+                iIdx, num );
         }
         else if( ERROR( iRet ) )
         {
-            failures++;
+            int num = ++failures;
             OutputMsg( iRet,
                 "Server resp( %d ): failure %d",
-                iIdx, failures.load() );
+                iIdx, num);
         }
         Sem_Post( &semPendings );
         if( --count == 0 )
@@ -85,10 +85,10 @@ gint32 CTestTypesSvc_CliImpl::EchoByteArrayCallback(
         }
         else if( ERROR( iRet ) )
         {
-            failures++;
+            int num = ++failures;
             OutputMsg( iRet,
                 "Server resp( %d ): failure %d",
-                iIdx, failures.load() );
+                iIdx, num );
         }
         Sem_Post( &semPendings );
         if( --count == 0 )
