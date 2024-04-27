@@ -373,11 +373,12 @@ class CTimerService : public IService
 	};
 
     // timers ticking
-    using TIMERMAP=std::hashmap< guint32, TIMER_ENTRY >;
+    using TEPTR=std::unique_ptr< TIMER_ENTRY >;
+    using TIMERMAP=std::hashmap< guint32, TEPTR >;
 	TIMERMAP m_vecTimers;
 
     // timers timeout
-	std::vector< TIMER_ENTRY > m_vecPendingTimeouts;
+	std::vector< TEPTR > m_vecPendingTimeouts;
 
     CIoManager* m_pIoMgr;
     CUtilities* m_pUtils;

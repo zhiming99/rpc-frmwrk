@@ -359,15 +359,15 @@ gint32 CTimerService::AddTimer(
         return ret;
 
     do{
-        TIMER_ENTRY te;
-        te.m_qwIntervalMs = dwIntervalSec * 1000;
-        te.m_pCallback = EventPtr( pEvent );
-        te.m_qwTicks = 0;
-        te.m_dwParam = dwParam;
+        TEPTR pte( new TIMER_ENTRY );
+        pte->m_qwIntervalMs = dwIntervalSec * 1000;
+        pte->m_pCallback = EventPtr( pEvent );
+        pte->m_qwTicks = 0;
+        pte->m_dwParam = dwParam;
 
         CStdMutex oMutex( m_oMapLock );
-        m_vecTimers[ te.m_iTimerId ] = te;
-        ret = te.m_iTimerId;
+        ret = pte->m_iTimerId;
+        m_vecTimers[ pte->m_iTimerId ] = std::move( pte );
 
     }while( 0 );
 
@@ -383,16 +383,9 @@ gint32 CTimerService::ResetTimer(
 
     if( itr != m_vecTimers.end() )
     {
-        TIMER_ENTRY& te = itr->second;
+        TIMER_ENTRY& te = *( itr->second );
         te.m_qwTicks = 0;
         ret = 0;
-    }
-
-    if( m_vecPendingTimeouts.size() )
-    {
-        // CTimerService lives on only on
-        // thread 0
-        this->WakeupLoop();
     }
 
     return ret;
@@ -411,17 +404,10 @@ gint32 CTimerService::AdjustTimer(
     auto itr = m_vecTimers.find( iTimerId );
     if( itr != m_vecTimers.end() )
     {
-        TIMER_ENTRY& te = itr->second;
+        TIMER_ENTRY& te = *( itr->second );
         te.m_qwIntervalMs = SecToMs( iNewInterval );
         te.m_qwTicks = 0;
         ret = 0;
-    }
-
-    if( m_vecPendingTimeouts.size() )
-    {
-        // CTimerService lives on only on
-        // thread 0
-        this->WakeupLoop();
     }
 
     return ret;
@@ -435,13 +421,6 @@ gint32 CTimerService::RemoveTimer(
     CStdMutex oMutex( m_oMapLock );
     if( 0 == m_vecTimers.erase( iTimerId ) )
         ret = -ENOENT;
-
-    if( m_vecPendingTimeouts.size() )
-    {
-        // CTimerService lives on only on
-        // thread 0
-        this->WakeupLoop();
-    }
 
     return ret;
 }
@@ -462,26 +441,29 @@ gboolean CTimerService::TimerCallback(
 gint32 CTimerService::TickTimers()
 {
     do{
-        MloopPtr pLoop =
+        CMainIoLoop* pLoop =
             GetIoMgr()->GetMainIoLoop();
 
         CStdMutex oMutex( m_oMapLock );
-        auto itr = m_vecTimers.begin();
+        if( m_vecTimers.empty() )
+            break;
 
         // performance call
-        guint64 qwNow = pLoop->NowUs();
+        guint64 qwNow = pLoop->NowUsFast();
         guint32 dwInterval = ( guint32 )
             ( ( qwNow - m_qwTimeStamp ) / 1000 );
         m_qwTimeStamp = qwNow;
-        // printf( "Interval is %d ms\n", dwInterval );
+
+        auto itr = m_vecTimers.begin();
         while( itr != m_vecTimers.end() )
         {
-            TIMER_ENTRY& te = itr->second;
+            TIMER_ENTRY& te = *( itr->second );
             te.m_qwTicks += dwInterval;
             if( te.m_qwTicks >= te.m_qwIntervalMs )
             {
                 // due time
-                m_vecPendingTimeouts.push_back( te );
+                m_vecPendingTimeouts.push_back(
+                    std::move( itr->second ) );
                 itr = m_vecTimers.erase( itr );
                 continue;
             }
@@ -505,35 +487,22 @@ void CTimerService::WakeupLoop()
 gint32 CTimerService::ProcessTimers()
 {
     gint32 ret = 0;
-    vector<TIMER_ENTRY> tempPending;
 
     do{
-        if( 1 )
+        for( auto& elem : m_vecPendingTimeouts )
         {
-            CStdMutex oMutex( m_oMapLock );
-            if( m_vecPendingTimeouts.empty() )
+            TIMER_ENTRY& te = *elem;
+            if( !te.m_pCallback.IsEmpty() )
             {
-                break;
-            }
-            tempPending = m_vecPendingTimeouts;
-            m_vecPendingTimeouts.clear();
-        }
-
-        while( !tempPending.empty() )
-        {
-            TIMER_ENTRY* pte = &tempPending.back();
-            if( !pte->m_pCallback.IsEmpty() )
-            {
-                pte->m_pCallback->OnEvent(
+                te.m_pCallback->OnEvent(
                     eventTimeout,
-                    pte->m_dwParam,
+                    te.m_dwParam,
                     ( LONGWORD )GetIoMgr() );
             }
-            tempPending.pop_back();
         }
-        tempPending.clear();
+        m_vecPendingTimeouts.clear();
 
-    }while( 1 );
+    }while( 0 );
 
     return ret;
 }
