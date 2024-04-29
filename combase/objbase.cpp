@@ -33,6 +33,7 @@
 #include "variant.h"
 #include "objfctry.h"
 #include <unordered_map>
+#include <unordered_set>
 #include <byteswap.h>
 
 #include <memory>
@@ -648,11 +649,21 @@ struct cmp_obj
         return a->GetObjId() < b->GetObjId();
     }
 };
+
+struct hash_obj
+{
+    size_t operator()( CObjBase* a ) const
+    { return a->GetObjId(); };
+};
+
 stdmutex g_oObjListLock;
-std::set< CObjBase*, cmp_obj > g_vecObjs;
+std::unordered_set< CObjBase*, hash_obj > g_vecObjs;
 void DumpObjs( bool bAll = false)
 {
-    for( auto pObj : g_vecObjs )
+    std::set< CObjBase*, cmp_obj > setObjs;
+    for( auto pObj : g_vecObjs ) 
+        setObjs.insert( pObj );
+    for( auto pObj : setObjs )
     {
         std::string strObj;
         if( pObj != nullptr )
