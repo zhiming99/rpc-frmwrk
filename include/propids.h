@@ -276,6 +276,7 @@ enum EnumPropId : gint32
     propEnableQps,      // type: a boolean value indicating whether to enable rate-limiter per query basis
     propQps,            // type: a guint32 value as max queries per second
     propOpenPortTimeout,// type: a guint32 value as the seconds before timeout for stream channel setup
+    propQpsPolicy,      // type: a string specifying the per-session qps policy
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

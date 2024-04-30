@@ -128,4 +128,6 @@
 #define JSON_ATTR_SENDBPS       "SendBPS"
 #define JSON_ATTR_ENABLE_QPS    "EnableQPS"
 #define JSON_ATTR_QPS           "QPS"
+#define JSON_ATTR_QPS_POLICY    "QPSPolicy"
+#define JSON_VALUE_QPOL_EQUAL    "CompleteEqual"
 
