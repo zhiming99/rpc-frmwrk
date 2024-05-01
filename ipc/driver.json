@@ -574,6 +574,7 @@
         }
     ],
     "Arch": {
-        "Processors": "8"
+        "comment-1": "giving a non-zero value to limit the number of cores to use, otherwise assuming all the cores will be utilized", 
+        "Processors": "0"
     }
 }

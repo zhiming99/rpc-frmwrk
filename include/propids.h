@@ -277,6 +277,8 @@ enum EnumPropId : gint32
     propQps,            // type: a guint32 value as max queries per second
     propOpenPortTimeout,// type: a guint32 value as the seconds before timeout for stream channel setup
     propQpsPolicy,      // type: a string specifying the per-session qps policy
+    propLoopPtr,        // type: a objptr to the mainloop
+    propTag,            // type: a guint32 value as the tag of the loop from a tagged loopool
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
