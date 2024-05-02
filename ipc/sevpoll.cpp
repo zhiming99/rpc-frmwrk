@@ -783,13 +783,10 @@ gint32 CSimpleEvPoll::RunLoop()
                 "Fatal error in mainloop" );
         }
 
-        if( iReadyCount == 0 )
-        {
-            NowUs();
-            HandleTimeout( mapActTimers );
-        }
         HandleIoEvents( mapActFds,
             pPollInfo, iCount, iReadyCount );
+        NowUs();
+        HandleTimeout( mapActTimers );
     }
 
     return ret;

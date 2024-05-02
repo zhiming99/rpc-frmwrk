@@ -2937,12 +2937,16 @@ struct has_##MethodName\
     template<typename U, _rettype (U::*)( __VA_ARGS__ ) > struct SFINAE {};\
     template<typename U > static char Test(SFINAE<U, &U::MethodName>*);\
     template<typename U> static int Test(...);\
-    template< typename U, typename V = typename std::enable_if<std::is_base_of< virtbase, U >::value, U >::type > \
+    template< typename U, typename V = typename std::enable_if<std::is_base_of< virtbase, U >::value, U >::type, \
+        typename W=typename std::enable_if< !std::is_same< virtbase, U >::value, U >::type > \
     static constexpr bool InitValue() {\
-        return ( ( sizeof(Test<T>(0) ) == sizeof(char) ) || \
-            sizeof( char ) == has_##MethodName< typename T::super >::value  ); \
+        return ( ( sizeof(Test<U>(0) ) == sizeof(char) ) || \
+            sizeof( char ) == has_##MethodName< typename U::super >::value  ); \
     }\
-    template< typename U, typename V = typename std::enable_if<!std::is_base_of< virtbase, U >::value, U >::type, typename W=U > \
+    template< typename U, typename V = typename std::enable_if<!std::is_base_of< virtbase, U >::value, U >::type > \
+    static constexpr bool InitValue() { return false; }\
+    template< typename U, typename V = typename std::enable_if<std::is_same< virtbase, U >::value, U >::type, \
+        typename W=U, typename X=U > \
     static constexpr bool InitValue() { return false; }\
     public:\
     static bool const value = InitValue< T >();\
