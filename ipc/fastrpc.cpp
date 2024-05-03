@@ -32,6 +32,7 @@ using namespace rpcf;
 #include "ifhelper.h"
 #include "stmport.h"
 #include "fastrpc.h"
+#include "jsondef.h"
 
 namespace rpcf
 {
@@ -413,6 +414,26 @@ gint32 CIfStartRecvMsgTask2::StartNewRecv(
         if( ERROR( ret ) )
             break;
 
+        TaskletPtr pQpsTask = pIf->GetQpsTask();
+        if( !pQpsTask.IsEmpty() )
+        {
+            CIfRetryTask* pRetry = pQpsTask;
+            CStdRTMutex oTaskLock(
+                pRetry->GetLock() );
+
+            ret = pIf->AllocReqToken();
+            if( ERROR( ret ) )
+            {
+                CStdRMutex oIfLock(
+                    pIf->GetLock() );
+
+                ret = pIf->QueueStartTask(
+                    pTask, pMatch );            
+
+                break;
+            }
+        }
+
         CIfParallelTaskGrp* pPara = nullptr;
         TaskGrpPtr pGrp = pIf->GetGrpRfc();
         CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
@@ -596,18 +617,77 @@ gint32 CFastRpcSkelSvrBase::AddAndRunInvTask(
 
 gint32 CFastRpcSkelSvrBase::NotifyInvTaskComplete()
 {
-    CStdRMutex oIfLock( GetLock() );
-    if( m_queStartTasks.size() > 0  )
-    {
-        TaskletPtr pTask =
-            m_queStartTasks.front().first;
-        m_queStartTasks.pop_front();
-        oIfLock.Unlock();
-        gint32 ret = AddAndRun( pTask, false );
-        if( ERROR( ret ) )
-            return ret;
-    }
+    gint32 ret = 0;
+    do{
+        stdrtmutex* pmutex = nullptr;
+        stdrtmutex oFakeMutex;
+        CTokenBucketTask* pTask = GetQpsTask();
+        if( pTask != nullptr )
+        {
+            pmutex = &pTask->GetLock();
+        }
+        else
+            pmutex = &oFakeMutex;
+
+        CStdRTMutex oTaskLock( *pmutex );
+        if( pTask != nullptr )
+        {
+            ret = this->AllocReqToken();
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                break;
+            }
+        }
+        CStdRMutex oIfLock( GetLock() );
+        if( m_queStartTasks.size() > 0  )
+        {
+            TaskletPtr pTask =
+                m_queStartTasks.front().first;
+            m_queStartTasks.pop_front();
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+            ret = AddAndRun( pTask, false );
+        }
+    }while( 0 );
     return STATUS_SUCCESS;
+}
+
+gint32 CFastRpcSkelSvrBase::NotifyTokenAvailable()
+{
+    gint32 ret = STATUS_SUCCESS;
+    do{
+        bool bFull = false;
+        stdrtmutex* pmutex = nullptr;
+        stdrtmutex oFakeMutex;
+        CIfParallelTaskGrpRfc* pGrp = m_pGrpRfc;
+        if( IsRfcEnabled() )
+        {
+            pmutex = &pGrp->GetLock();
+        }
+        else
+            pmutex = &oFakeMutex;
+        CStdRTMutex oTaskLock( *pmutex );
+        if( IsRfcEnabled() )
+        {
+            ret = pGrp->IsQueueFull( bFull );
+            if( ERROR( ret ) || bFull )
+                break;
+        }
+        CStdRMutex oIfLock( GetLock() );
+        if( m_queStartTasks.size() > 0  )
+        {
+            TaskletPtr pTask =
+                m_queStartTasks.front().first;
+            m_queStartTasks.pop_front();
+            oIfLock.Unlock();
+            oTaskLock.Unlock();
+            gint32 ret = AddAndRun( pTask, false );
+            if( ERROR( ret ) )
+                break;
+        }
+    }while( 0 );
+    return ret;
 }
 
 gint32 CFastRpcSkelSvrBase::NotifySkelReady(
@@ -700,6 +780,84 @@ gint32 CFastRpcSkelSvrBase::OnKeepAliveOrig(
 
         ret = BroadcastEvent(
             okaReq.GetCfg(), pDummyTask );
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CFastRpcSkelSvrBase::OnPostStart(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = this->GetProperty(
+            propEnableQps, oVar );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+        if( !( bool& )oVar )
+        {
+            ret = 0;
+            break;
+        }
+
+        auto pMgr = this->GetIoMgr();
+        ret = pMgr->GetCmdLineOpt(
+            propBuiltinRt, oVar );
+        if( SUCCEEDED( ret ) && ( ( bool& )oVar ) )
+        {
+            // builtin-rt server
+            m_dwLoopTag = NETSOCK_TAG;
+        }
+        else
+        {
+            // micro-service server
+            m_dwLoopTag = UXSOCK_TAG;
+        }
+
+        CLoopPools& oPools = pMgr->GetLoopPools();
+        ret = oPools.AllocMainLoop(
+            m_dwLoopTag, m_pLoop );
+
+        if( ERROR( ret ) )
+        {
+            m_dwLoopTag = 0;
+            m_pLoop = pMgr->GetMainIoLoop();
+        }
+
+        ret = 0;
+        gint32 (*func)( CFastRpcSkelSvrBase*) =
+        ([]( CFastRpcSkelSvrBase* pIf )->gint32
+        {
+            CFastRpcServerBase* pSvr =
+                ObjPtr( pIf->GetStreamIf() );
+            guint64 qwTokens =
+                pSvr->GetPerSkelTokens();
+            pIf->SetMaxTokens( qwTokens );
+            if( pIf->IsRfcEnabled() )
+            {
+                pIf->NotifyTokenAvailable();
+                // DebugPrint( qwTokens, "skelsvr token " );
+            }
+            return STATUS_PENDING;
+        });
+
+        TaskletPtr pTask;
+        NEW_FUNCCALL_TASKEX( pTask,
+            this->GetIoMgr(), func, this );
+
+        oVar = ObjPtr( m_pLoop );
+        pTask->SetProperty( propLoopPtr, oVar );
+        ret = StartQpsTask( pTask );
+        if( SUCCEEDED( ret ) )
+        {
+            // start the timer
+            this->AllocReqToken();
+        }
 
     }while( 0 );
 
@@ -920,7 +1078,7 @@ gint32 CFastRpcServerBase::GetStmSkel(
 }
 
 gint32 CFastRpcServerBase::EnumStmSkels(
-    std::vector< InterfPtr >& vecIfs )
+    std::vector< InterfPtr >& vecIfs ) const
 {
     CStdRMutex oLock( GetLock() );
     if( m_mapSkelObjs.empty() )
@@ -930,6 +1088,12 @@ gint32 CFastRpcServerBase::EnumStmSkels(
         vecIfs.push_back( elem.second );
 
     return STATUS_SUCCESS;
+}
+
+guint32 CFastRpcServerBase::GetStmSkelCount() const
+{
+    CStdRMutex oLock( GetLock() );
+    return m_mapSkelObjs.size();
 }
 
 gint32 CFastRpcServerBase::OnRmtSvrEvent(
@@ -1018,6 +1182,29 @@ gint32 CFastRpcServerBase::OnRmtSvrEvent(
         TaskletPtr pTask;
         if( bOnline )
         {
+            // set qps settings
+            Variant oVar, oQpsPol;
+            gint32 iRet = this->GetProperty(
+                propEnableQps, oVar );
+            bool bQps = oVar;
+            iRet = this->GetProperty(
+                propQpsPolicy, oQpsPol );
+
+            if( bQps && SUCCEEDED( iRet ) )
+            {
+                pIf->SetProperty(
+                    propEnableQps, oVar );
+                guint64 qwMaxTokens;
+                this->GetMaxTokens( qwMaxTokens );
+                guint32 qwCount =
+                    this->GetStmSkelCount();
+
+                qwCount = qwMaxTokens / qwCount;
+                if( qwCount == 0 )
+                    qwCount = 1;
+                pIf->SetProperty(
+                    propQps, qwCount );
+            }
 
             DEFER_IFCALLEX_NOSCHED2(
                 0, pStartTask, ObjPtr( pIf ),
@@ -1232,6 +1419,28 @@ gint32 CFastRpcServerBase::OnPreStart(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CFastRpcServerBase::OnPostStart(
+    IEventSink* pCallback )
+{
+    CTokenBucketTask* ptk = m_pQpsTask;
+    if( ptk == nullptr )
+        return 0;
+    Variant oVar;
+    gint32 ret = this->GetProperty(
+        propQpsPolicy, oVar );
+    if( ERROR( ret ) )
+        return 0;
+
+    if( ( ( stdstr& )oVar ) == JSON_VALUE_QPOL_EQUAL )
+    {
+        // init per-session tokens
+        guint64 qwTokens = 0;
+        ptk->GetMaxTokens( qwTokens );
+        m_qwPerSessTokens = qwTokens;
+    }
+    return 0;
 }
 
 gint32 CFastRpcServerBase::OnPostStop(
@@ -1481,6 +1690,20 @@ gint32 CFastRpcSkelSvrBase::OnPreStop(
 {
     gint32 ret = 0;
     do{
+        StopQpsTask();
+        auto pMgr = this->GetIoMgr();
+        guint32 dwTag = 0;
+        if( !m_pLoop.IsEmpty() &&
+            m_dwLoopTag != 0 )
+        {
+            CLoopPools& oPools =
+                pMgr->GetLoopPools();
+            oPools.ReleaseMainLoop(
+                m_dwLoopTag, m_pLoop );
+        }
+        m_pLoop.Clear();
+        m_dwLoopTag = 0;
+
         HANDLE hstm = INVALID_HANDLE;
         CCfgOpenerObj oIfCfg( this );
         ret = oIfCfg.GetIntPtr(
@@ -1854,6 +2077,51 @@ gint32 CFastRpcServerBase::SetLimit(
             dwMaxPending, bNoResched );
     }
     return STATUS_SUCCESS;
+}
+
+TaskletPtr CFastRpcServerBase::GetUpdateTokenTask()
+{
+    TaskletPtr pTask;
+
+    Variant oVar, oQpsPol;
+    gint32 ret = this->GetProperty(
+        propEnableQps, oVar );
+    if( ERROR( ret ) )
+        return pTask;
+
+    bool bQps = oVar;
+    ret = this->GetProperty(
+        propQpsPolicy, oQpsPol );
+    if( ERROR( ret ) ||
+        ( ( stdstr& )oQpsPol ) !=
+            JSON_VALUE_QPOL_EQUAL )
+        return pTask;
+
+    gint32 (*func)( CFastRpcServerBase*) =
+    ([]( CFastRpcServerBase* pIf )->gint32
+    {
+        guint32 dwCount = pIf->GetStmSkelCount();
+        if( dwCount == 0 )
+            dwCount = 1;
+        guint64 qwMaxTokens = 0;
+        pIf->GetMaxTokens( qwMaxTokens );
+        if( qwMaxTokens == 0 )
+            return STATUS_PENDING;
+        guint64 qwPerSkelToken = qwMaxTokens / dwCount;
+        if( qwPerSkelToken == 0 )
+            qwPerSkelToken = 1;
+        pIf->SetPerSkelTokens( qwPerSkelToken );
+        // to keep the timer alive
+        pIf->AllocReqToken();
+        // DebugPrint( 0, "Current skel count %d, "
+        //     "tokens per skel %lld",
+        //     dwCount, qwPerSkelToken );
+        return STATUS_PENDING;
+    });
+
+    NEW_FUNCCALL_TASKEX( pTask,
+        this->GetIoMgr(), func, this );
+    return pTask;
 }
 
 gint32 CFastRpcSkelServerState::SetupOpenPortParams(

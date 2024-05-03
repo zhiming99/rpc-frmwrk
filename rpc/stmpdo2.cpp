@@ -1581,7 +1581,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
             break;
         }
 
-        oParams[ propObjPtr ] = ObjPtr( m_pLoop );
+        oParams[ propLoopPtr ] = ObjPtr( m_pLoop );
         ret = oParams.GetProperty(
             propSendBps, oVar );
         if( ERROR( ret ) )

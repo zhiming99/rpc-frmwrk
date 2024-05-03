@@ -105,7 +105,19 @@ class ISwigRosRpcSvc_SImpl
         IConfigDb* pParams,
         IEventSink* pCallback ) override
     {
-        CRpcServices* pSvc = this->GetStreamIf();
+        CRpcServices* pSvc = nullptr;
+        if( !IsRfcEnabled() )
+        {
+            if( GetQpsTask().IsEmpty() )
+                pSvc = this->GetStreamIf();
+            else
+                pSvc = this;
+
+            gint32 ret = pSvc->AllocReqToken();
+            if( ERROR( ret ) )
+                return ret;
+        }
+        pSvc = this->GetStreamIf();
         return pSvc->InvokeUserMethod(
             pParams, pCallback );
     }
@@ -249,7 +261,10 @@ class CJavaRpcSvc_SvrImpl
     gint32 OnPostStart(
         IEventSink* pCallback ) override
     { 
-        StartQpsTask();
+        TaskletPtr pTask = GetUpdateTokenTask();
+        StartQpsTask( pTask );
+        if( !pTask.IsEmpty() )
+            AllocReqToken();
         return super::OnPostStart( pCallback );
     }
 
@@ -645,9 +660,6 @@ gint32 CJavaRpcSvc_SvrImpl::InvokeUserMethod(
         IConfigDb* pParams,
         IEventSink* pCallback )
 {
-    gint32 ret = AllocReqToken();
-    if( ERROR( ret ) )
-        return ret;
     return CJavaServer::InvokeUserMethod(
         pParams, pCallback );
 }

@@ -1091,8 +1091,13 @@ class CRpcServices :
     { return m_tsStartTime; }
 
     gint32 AllocReqToken();
-    gint32 StartQpsTask();
+
+    gint32 StartQpsTask(
+        IEventSink* pNotify = nullptr );
+
     gint32 StopQpsTask();
+    gint32 SetMaxTokens( guint64 qwTokens );
+    gint32 GetMaxTokens( guint64& qwTokens ) const;
 
     private:
     template< class T >

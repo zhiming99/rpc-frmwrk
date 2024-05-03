@@ -1132,6 +1132,7 @@ class CFastRpcServerBase :
     std::hashmap< HANDLE, InterfPtr > m_mapSkelObjs;
     std::atomic< guint32 > m_dwSeqNo;
     guint32 m_dwBusId = 0xFFFFFFFF;
+    std::atomic< guint64 > m_qwPerSessTokens = {0};
 
     gint32 OnPreStartComplete(
         IEventSink* pCallback,
@@ -1157,7 +1158,9 @@ class CFastRpcServerBase :
         HANDLE hstm );
 
     gint32 EnumStmSkels(
-        std::vector< InterfPtr >& vecIfs );
+        std::vector< InterfPtr >& vecIfs ) const;
+
+    guint32 GetStmSkelCount() const;
 
     gint32 OnRmtSvrEvent(
         EnumEventId iEvent,
@@ -1188,6 +1191,9 @@ class CFastRpcServerBase :
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
 
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
     gint32 OnPostStop(
         IEventSink* pCallback ) override;
 
@@ -1201,6 +1207,15 @@ class CFastRpcServerBase :
         guint32 dwMaxRunning,
         guint32 dwMaxPending,
         bool bNoResched );
+
+    inline guint64 GetPerSkelTokens() const
+    { return m_qwPerSessTokens; }
+
+    inline void SetPerSkelTokens(
+        guint64 qwTokens )
+    { m_qwPerSessTokens = qwTokens; }
+
+    TaskletPtr GetUpdateTokenTask();
 };
 
 class CFastRpcSkelProxyBase;
@@ -1479,6 +1494,8 @@ class CFastRpcSkelSvrBase :
     guint32 m_dwReservedSlots = 1;
     TaskGrpPtr m_pGrpRfc;
     bool m_bRfcEnabled = true;
+    MloopPtr m_pLoop;
+    guint32 m_dwLoopTag = 0;
 
     public:
     typedef CFastRpcSkelBase< false > super;
@@ -1486,6 +1503,9 @@ class CFastRpcSkelSvrBase :
 
     inline TaskGrpPtr GetGrpRfc() const
     { return m_pGrpRfc; }
+
+    inline bool IsRfcEnabled() const
+    { return m_bRfcEnabled; }
 
     gint32 NotifySkelReady( PortPtr& pPort );
     inline guint32 GetPendingInvCount() const
@@ -1497,6 +1517,9 @@ class CFastRpcSkelSvrBase :
         TaskletPtr& pTask );
 
     gint32 NotifyInvTaskComplete();
+    gint32 NotifyTokenAvailable();
+    inline TaskletPtr GetQpsTask()
+    { return m_pQpsTask; }
 
     gint32 StartRecvTasks(
         std::vector< MatchPtr >& vecMatches ) override;
@@ -1519,6 +1542,10 @@ class CFastRpcSkelSvrBase :
         guint32 dwMaxRunning,
         guint32 dwMaxPending,
         bool bNoResched = false );
+
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
 };
 
 #define SUM_COUNTER( _dest, _src, _prop, _type ) \

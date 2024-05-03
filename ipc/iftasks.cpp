@@ -6766,7 +6766,7 @@ CTokenBucketTask::CTokenBucketTask(
     do{
         Variant oVar;
         ret = pCfg->GetProperty(
-            propObjPtr, oVar );
+            propLoopPtr, oVar );
         if( ERROR( ret ) )
             break;
 
@@ -6835,7 +6835,10 @@ gint32 CTokenBucketTask::AllocToken(
         return ERROR_STATE;
 
     if( m_qwTokens == 0 )
+    {
+        EnableTimerWatch();
         return -EDQUOT;
+    }
 
     if( qwNumReq > m_qwTokens )
     {
@@ -6872,16 +6875,26 @@ gint32 CTokenBucketTask::OnRetry()
 {
     gint32 ret = STATUS_PENDING;
     do{
-        ret = FreeToken( m_qwMaxTokens );
+        guint64 qwTokens;
+        this->GetMaxTokens( qwTokens );
+        ret = FreeToken( qwTokens );
         if( ret == ERROR_NOT_HANDLED )
-            DisableTimerWatch();
+            ;// DisableTimerWatch();
         else if( ERROR( ret ) )
             break;
 
         if( !m_pNotify.IsEmpty() )
         {
-            m_pNotify->OnEvent( eventTokenAvail,
-                0, 0, ( LONGWORD* )this );
+            CIfRetryTask* pTask = m_pNotify;
+            if( pTask == nullptr )
+            {
+                m_pNotify->OnEvent( eventTokenAvail,
+                    0, 0, ( LONGWORD* )this );
+            }
+            else
+            {
+                ( *pTask )( eventZero );
+            }
         }
 
         ret = STATUS_PENDING;
@@ -6897,6 +6910,15 @@ gint32 CTokenBucketTask::OnComplete(
     DisableTimerWatch();
     m_pLoop.Clear();
     m_pWatchTask.Clear();
+    if( !m_pNotify.IsEmpty() )
+    {
+        CTasklet* pTask = m_pNotify;
+        if( pTask != nullptr )
+        {
+            ( *pTask )( eventCancelTask );
+        }
+        m_pNotify.Clear();
+    }
     return super::OnComplete( iRet );
 }
 
@@ -6904,8 +6926,6 @@ gint32 CTokenBucketTask::GetMaxTokens(
     guint64& qwMaxTokens ) const
 {
     CStdRTMutex oLock( GetLock() );
-    if( GetTaskState() != stateStarted )
-        return ERROR_STATE;
     qwMaxTokens = m_qwMaxTokens;
     return 0;
 }

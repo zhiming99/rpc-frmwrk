@@ -48,6 +48,7 @@
             "EnableWS" : "false",
             "EnableQPS": "true",
             "QPS": "5000",
+            "QPSPolicy": "CompleteEqual",
             "RouterPath" : "/",
             "Interfaces" :
             [

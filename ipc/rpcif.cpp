@@ -2760,6 +2760,7 @@ gint32 CRpcServices::OnPostStop(
 
     m_pFtsMatch.Clear();
     m_pStmMatch.Clear();
+    m_pQpsTask.Clear();
     while( !m_pRootTaskGroup.IsEmpty() )
     {
         pGrp = m_pRootTaskGroup;
@@ -4626,6 +4627,11 @@ gint32 CRpcServices::LoadObjDesc(
                     oCfg[ propEnableQps ] = true;
                     bQps = true;
                 }
+                else
+                {
+                    bQps = false;
+                    oCfg[ propEnableQps ] = false;
+                }
                 if( bQps && oObjElem.isMember( JSON_ATTR_QPS ) &&
                     oObjElem[ JSON_ATTR_QPS ].isString() )
                 {
@@ -4638,8 +4644,21 @@ gint32 CRpcServices::LoadObjDesc(
                     }
                     else
                     {
-                        oCfg[ propQps ] = ( guint64 )-1;
+                        // invalid qps value, disable qps
+                        DebugPrintEx( logErr, -EINVAL,
+                            "Error, invalid QPS value, QPS is disabled" );
+                        bQps = false;
+                        oCfg[ propEnableQps ] = false;
                     }
+                }
+
+                if( bQps && oObjElem.isMember( JSON_ATTR_QPS_POLICY ) &&
+                    oObjElem[ JSON_ATTR_QPS_POLICY ].isString() )
+                {
+                    strVal =
+                        oObjElem[ JSON_ATTR_QPS_POLICY ].asString();
+                        // per-session qps policy
+                    oCfg[ propQpsPolicy ] = strVal;
                 }
             }
 
@@ -5645,7 +5664,8 @@ gint32 CRpcServices::GetPortProp(
 
 }
 
-gint32 CRpcServices::StartQpsTask()
+gint32 CRpcServices::StartQpsTask(
+    IEventSink* pNotify )
 {
     gint32 ret = 0;
     do{
@@ -5673,8 +5693,23 @@ gint32 CRpcServices::StartQpsTask()
         oParams[ propTimeoutSec ] = 1;
         oParams.Push( qwQps );
 
-        auto pLoop = pMgr->GetMainIoLoop();
-        oParams[ propObjPtr ] = ObjPtr( pLoop );
+        ObjPtr pLoop;
+        if( pNotify != nullptr )
+        {
+            oParams[ propParentPtr ] =
+                ObjPtr( pNotify );
+
+            Variant oVar;
+            ret = pNotify->GetProperty(
+                propLoopPtr, oVar );
+            if( SUCCEEDED( ret ) )
+                pLoop = oVar;
+        }
+
+        if( pLoop.IsEmpty() )
+            pLoop = pMgr->GetMainIoLoop();
+
+        oParams[ propLoopPtr ] = ObjPtr( pLoop );
 
         ret = m_pQpsTask.NewObj(
             clsid( CTokenBucketTask ),
@@ -5706,6 +5741,23 @@ gint32 CRpcServices::AllocReqToken()
     return pTask->AllocToken( qwTokens );
 }
 
+gint32 CRpcServices::SetMaxTokens(
+    guint64 qwTokens )
+{
+    if( m_pQpsTask.IsEmpty() )
+        return 0;
+    CTokenBucketTask* pTask = m_pQpsTask;
+    return pTask->SetMaxTokens( qwTokens );
+}
+
+gint32 CRpcServices::GetMaxTokens(
+    guint64& qwTokens ) const
+{
+    if( m_pQpsTask.IsEmpty() )
+        return 0;
+    CTokenBucketTask* pTask = m_pQpsTask;
+    return pTask->GetMaxTokens( qwTokens );
+}
 /**
 * @name DoInvoke
 * find a event handler for the event message
