@@ -1,4 +1,8 @@
 ---
+[`Sat May 04 2024 09:38:49 PM Beijing`]   
+1. Added a new QPS based flow-control to the `fastrpc` module, so that it can hold back receiving more requests, which in turn, slows down the client sending speed without increasing the pressure on the pending request-queue.
+2. Next, I will try to remove the dependency of dbus connection for client builtin-rt application, to reduce the requirement to the runtime environment.
+   
 [`Fri Apr 19 2024 08:03:05 PM Beijing`]   
 1. During this round of bugfix, We have fixed a big performance issue and doubled the throughput capacity. The issue is due to the old design of CTimerService using vector as its timer storage. When the request goes up to 10000, the searching and removal of a timer became overwhelming. After replaced it with a hashmap, the server runs like a charm. Compared to other changes for improvement in the past, this fix is small but quite effective. 
    
