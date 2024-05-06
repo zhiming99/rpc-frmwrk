@@ -130,8 +130,8 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -L：    To generate the README.md in the specified language. Currently we support "cn" for
                 Chinese and "en" for English.
 
-        -s:     To generate the skeleton code for `RPC-Over-Stream`, a new architecture with 99% of communication over stream channels.
-        -b:     To generate the skeleton code with a built-in `rpcrouter`, which has lower latency and higher throughput than stand-alone rpcrouter.
+        -s:     To generate the skeleton code for 'fastrpc', which using streaming channel to transport the RPC messages, with session level flow-control, smaller messages, and larger capacity of througput. The disadvantage is it requires twice the open file descriptors than a non-fastrpc application dose.
+        -b:     To generate the skeleton code with a built-in 'rpcrouter', which can start without external rpcrouter, is much more like a traditional C/S application.
 ```
 
 Currently `ridlc` can output skeleton code in C++, Python Java and JavaScript. In the future, it will be able to generate code for other languages as well.
