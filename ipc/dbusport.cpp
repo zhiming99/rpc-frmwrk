@@ -1199,11 +1199,12 @@ gint32 CDBusBusPort::SendDBusMsg(
         return ret;
 
     ret = 0;
+
     if( !dbus_connection_send(
         m_pDBusConn, pDBusMsg, pdwSerial ) )
     {
         ret = -ENOMEM;
-        DebugPrint( ret,
+        DebugPrintEx( logErr, ret,
             "dbus_connection_send failed" );
     }
     return ret;
