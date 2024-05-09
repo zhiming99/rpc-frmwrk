@@ -68,7 +68,7 @@ jobs:
       run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
 
     - name: Autobuild
-      uses: github/codeql-action/autobuild@v2
+      uses: github/codeql-action/autobuild@v3
 
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 https://git.io/JvXDl
