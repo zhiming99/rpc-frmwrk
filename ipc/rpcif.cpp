@@ -121,9 +121,11 @@ static CfgPtr InitIfProxyCfg(
     if( strPortClass ==
             PORT_CLASS_DBUS_PROXY_PDO ||
         strPortClass ==
-            PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK ||
+        strPortClass ==
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK2 )
     {
-        // CRemoteProxyState will have an extra ip
+        // CRemoteProxyState will have an ip
         // address to match
         iStateClass = clsid( CRemoteProxyState );
     }
@@ -4365,7 +4367,8 @@ gint32 CRpcServices::LoadObjDesc(
                 strVal = oObjElem[ JSON_ATTR_PROXY_PORTCLASS ].asString(); 
                 oCfg[ propPortClass ] = strVal;
                 if( strVal == PORT_CLASS_DBUS_PROXY_PDO ||
-                    strVal == PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+                    strVal == PORT_CLASS_DBUS_PROXY_PDO_LPBK ||
+                    strVal == PORT_CLASS_DBUS_PROXY_PDO_LPBK2 )
                     bProxyPdo = true;
             }
 
