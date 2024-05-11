@@ -130,6 +130,13 @@
         },
         {
             "PortType": "Pdo",
+            "PortClass": "DBusLoopbackPdo2",
+            "InternalClass": "CDBusLoopbackPdo2",
+            "PortDriver": "",
+            "BusPortClass": "DBusBusPort"
+        },
+        {
+            "PortType": "Pdo",
             "PortClass": "DBusProxyPdo",
             "InternalClass": "CDBusProxyPdo",
             "PortDriver": "",
@@ -139,6 +146,13 @@
             "PortType": "Pdo",
             "PortClass": "DBusProxyPdoLpbk",
             "InternalClass": "CDBusProxyPdoLpbk",
+            "PortDriver": "",
+            "BusPortClass": "DBusBusPort"
+        },
+        {
+            "PortType": "Pdo",
+            "PortClass": "DBusProxyPdoLpbk2",
+            "InternalClass": "CDBusProxyPdoLpbk2",
             "PortDriver": "",
             "BusPortClass": "DBusBusPort"
         },
@@ -536,7 +550,20 @@
             "FdoDriver": ""
         },
         {
+            "PortClass": "DBusLoopbackPdo",
+            "FdoDriver": ""
+        },
+        {
+            "PortClass": "DBusLoopbackPdo2",
+            "FdoDriver": ""
+        },
+        {
             "PortClass": "DBusProxyPdoLpbk",
+            "FdoDriver": "ProxyFdoDriver",
+            "Description": "This match provides a binding between the pdo and fdo"
+        },
+        {
+            "PortClass": "DBusProxyPdoLpbk2",
             "FdoDriver": "ProxyFdoDriver",
             "Description": "This match provides a binding between the pdo and fdo"
         },
