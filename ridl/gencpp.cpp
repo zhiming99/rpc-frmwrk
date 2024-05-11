@@ -6607,6 +6607,7 @@ void CImplMainFunc::EmitRtUsage(
         {
             Wa( "    \"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
             Wa( "    \"\\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\\n\"" );
+            Wa( "    \"\\t [ --nodbus to run the client without dbus session'. ]\\n\"" );
         }
         else
         {
@@ -7035,7 +7036,10 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             Wa( "    {\"router\",   required_argument, 0,  0 }," );
             Wa( "    {\"instname\", required_argument, 0,  0 }," );
             if( bProxy )
+            {
                 Wa( "    {\"sainstname\", required_argument, 0,  0 }," );
+                Wa( "    {\"nodbus\", no_argument, 0,  0 }," );
+            }
             Wa( "    {0,             0,                 0,  0 }" );
             Wa( "};            " );
             CCOUT << "while( ( opt = getopt_long( argc, argv, \""<< strOpt << "\",";
@@ -7117,6 +7121,11 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             }
             BLOCK_CLOSE;
             NEW_LINE;
+            if( bProxy )
+            {
+                Wa( "else if( iOptIdx == 5 )" );
+                Wa( "    g_bNoDBus = true;" );
+            }
             Wa( "else" );
             BLOCK_OPEN;
             Wa( "fprintf( stderr, \"Error invalid option.\\n\" );" );
@@ -7389,6 +7398,8 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "static std::string g_strIpAddr;" );
             Wa( "static std::string g_strPortNum;" );
             Wa( "static bool g_bAuth = false;" );
+            if( bProxy )
+                Wa( "static bool g_bNoDBus = false;" );
 #ifdef KRB5
             if( bProxy )
             {
@@ -7463,6 +7474,10 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    std::thread::hardware_concurrency() );" );
                 Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
             }
+            else
+            {
+                Wa( "oParams[ propMaxTaskThrd ] = 4;" );
+            }
 
             Wa( "oParams[ propMaxIrpThrd ] = 0;" );
             Wa( "if( g_strDrvPath.size() )" );
@@ -7491,6 +7506,15 @@ gint32 CImplMainFunc::EmitInitContext(
             NEW_LINE;
             Wa( "pSvc->SetCmdLineOpt(" );
             Wa( "    propBuiltinRt, true );" );
+            if( bProxy )
+            {
+                Wa( "if( g_bNoDBus )" );
+                BLOCK_OPEN;
+                Wa( "pSvc->SetCmdLineOpt(" );
+                CCOUT << "    propNoDBusConn, true );";
+                BLOCK_CLOSE;
+                NEW_LINE;
+            }
         }
 
         CCOUT << "ret = pSvc->Start();";

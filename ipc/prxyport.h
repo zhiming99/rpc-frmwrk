@@ -56,7 +56,7 @@ class CDBusProxyPdo : public CRpcPdoPort
 
     bool                m_bStopReady = false;
     TaskletPtr          m_pConnTask;
-    std::atomic< bool > m_atmInitDone;
+    std::atomic< bool > m_atmInitDone = { false };
     std::atomic< guint32 > m_atmReqSent;
     std::atomic< guint32 > m_atmRespRecv;
 
@@ -262,6 +262,7 @@ class CProxyPdoConnectTask
 
 class CDBusProxyPdoLpbk : public CDBusProxyPdo
 {
+    gint32 m_iInit = 0;
     public:
     typedef CDBusProxyPdo super;
     CDBusProxyPdoLpbk( const IConfigDb* pCfg );
@@ -269,7 +270,8 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
     gint32 SendDBusMsg( DBusMessage* pMsg,
         guint32* pdwSerial );
 
-    gint32 GetSender( std::string& strSender ) const;
+    virtual gint32 GetSender(
+        std::string& strSender ) const;
 
     virtual gint32 PackupReqMsg(
         DMsgPtr& pReqMsg,
@@ -279,6 +281,19 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
     gint32 GetProperty(
         gint32 iProp,
         Variant& oVar ) const override;
+};
+
+class CDBusProxyPdoLpbk2 : public CDBusProxyPdoLpbk
+{
+    public:
+    typedef CDBusProxyPdoLpbk super;
+
+    CDBusProxyPdoLpbk2( const IConfigDb* pCfg )
+        : super( pCfg )
+    { SetClassId( clsid( CDBusProxyPdoLpbk2 ) ); }
+
+    gint32 GetSender(
+        std::string& strSender ) const override;
 };
 
 }

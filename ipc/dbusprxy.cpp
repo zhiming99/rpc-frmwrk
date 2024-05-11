@@ -80,8 +80,8 @@ std::string CDBusProxyPdo::GetReqFwdrName() const
 }
 
 CDBusProxyPdo::CDBusProxyPdo(
-    const IConfigDb* pCfg ) : super( pCfg ),
-        m_atmInitDone( false )
+    const IConfigDb* pCfg ) :
+    super( pCfg )
 {
     SetClassId( clsid( CDBusProxyPdo ) );
     gint32 ret = 0;
@@ -96,6 +96,12 @@ CDBusProxyPdo::CDBusProxyPdo(
         ObjPtr pObj;
 
         CCfgOpener oCfg( pCfg );
+        stdstr strClass;
+        ret = oCfg.GetStrProp(
+            propPortClass, strClass );
+
+        if( strClass != PORT_CLASS_DBUS_PROXY_PDO )
+            break;;
 
         guint32* pdwValue;
 
@@ -2554,11 +2560,71 @@ CDBusProxyPdoLpbk::CDBusProxyPdoLpbk(
     super( pCfg )
 {
     SetClassId( clsid( CDBusProxyPdoLpbk ) );
-    CCfgOpener oPortCfg( ( IConfigDb* )m_pCfgDb );
-    std::string strSender;
-    GetSender( strSender );
-    oPortCfg.SetStrProp(
-        propSrcUniqName, strSender );
+    CCfgOpener oPortCfg(
+        ( IConfigDb* )m_pCfgDb );
+
+    gint32 ret = 0;
+    do{
+        if( pCfg == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        ObjPtr pObj;
+        CCfgOpener oCfg( pCfg );
+
+        m_atmReqSent = 0;
+        m_atmRespRecv = 0;
+
+        CConnParamsProxy oConnParams =
+            GetConnParams( m_pCfgDb );
+
+        if( oConnParams.IsEmpty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        m_bAuth = oConnParams.HasAuth();
+        SetConnected( false );
+
+        if( !m_pCfgDb->exist( propSingleIrp ) )
+        {
+            // the property indicates one event irp
+            // will be completed on one incoming signal
+            // message without this flag, the default
+            // behavor is to complete all the waiting
+            // irps which is waiting on that interface
+            oPortCfg.SetBoolProp(
+                propSingleIrp, true );
+        }
+
+        std::string strRouterPath;
+        ret = oPortCfg.GetStrProp(
+            propRouterPath, strRouterPath );
+
+        if( ERROR( ret ) )
+            break;
+
+        oPortCfg.CopyProp(
+            propSrcDBusName, m_pBusPort );
+
+        std::string strSender;
+        GetSender( strSender );
+        oPortCfg.SetStrProp(
+            propSrcUniqName, strSender );
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret, 
+            "fatal error, error in "
+            "CDBusProxyPdoLpbk ctor " );
+        throw std::runtime_error( strMsg );
+    }
+    return;
 }
 
 gint32 CDBusProxyPdoLpbk::GetProperty(
@@ -2585,6 +2651,26 @@ gint32 CDBusProxyPdoLpbk::GetProperty(
         }
     }
     return ret;
+}
+
+gint32 CDBusProxyPdoLpbk2::GetSender(
+    std::string& strSender ) const
+{
+    strSender = LOOPBACK_DESTINATION2;
+    strSender += ".Proxy_";
+
+    CCfgOpenerObj oCfg( this );
+    guint32 dwPortId = 0;
+    gint32 ret = oCfg.GetIntProp(
+        propPortId, dwPortId );
+
+    if( ERROR( ret ) )
+        return ret;
+
+    strSender += std::to_string(
+        dwPortId );
+
+    return 0;
 }
 
 }

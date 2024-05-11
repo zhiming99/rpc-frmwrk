@@ -694,7 +694,7 @@ class CRpcPdoPort : public IRpcPdoPort
 {
     protected:
 
-    DBusConnection* m_pDBusConn;
+    DBusConnection* m_pDBusConn = nullptr;
 
     virtual gint32 ClearDBusSetting(
         IMessageMatch* pMatch );
@@ -1795,6 +1795,7 @@ class CDBusBusPort : public CGenericBusPortEx
     MatchPtr            m_pMatchLpbkServer;
 
     std::map< std::string, gint32 > m_mapRules;
+    bool                m_bNoDBusConn = false;
 
     AddrIdMap m_mapAddrToId;
 
@@ -1811,9 +1812,20 @@ class CDBusBusPort : public CGenericBusPortEx
         const IConfigDb* pConfig,
         PortPtr& pNewPort )
     {
+        stdstr strPortClass;
+        CCfgOpener oExtCfg( pConfig );
+        gint32 ret = oExtCfg.GetStrProp(
+            propPortClass, strPortClass );
+        if( ERROR( ret ) )
+            return ret;
+        EnumClsid iClsid;
+        if( strPortClass ==
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+            iClsid = clsid( CDBusProxyPdoLpbk );
+        else
+            iClsid = clsid( CDBusProxyPdoLpbk2 );
         return CreateRpcProxyPdoShared(
-            pConfig, pNewPort,
-            clsid( CDBusProxyPdoLpbk ) );
+            pConfig, pNewPort, iClsid );
     }
 
     inline gint32 CreateRpcProxyPdo(
@@ -1980,6 +1992,10 @@ class CDBusBusPort : public CGenericBusPortEx
 
 	virtual gint32 PreStop( IRP* pIrp );
     static guint32 LabelMessage( DMsgPtr& pMsg );
+
+    inline bool IsNoDBusConn() const
+    { return m_bNoDBusConn; }
+
 };
 
 class CDBusConnFlushTask 

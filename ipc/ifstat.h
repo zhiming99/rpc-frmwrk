@@ -401,6 +401,8 @@ class CIfReqFwdrState : public CIfServerState
         :super( pCfg )
     { SetClassId( clsid( CIfReqFwdrState ) ); }
     virtual gint32 SubscribeEvents();
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg ) override;
 };
 
 class CIfReqFwdrPrxyState : public CLocalProxyState
