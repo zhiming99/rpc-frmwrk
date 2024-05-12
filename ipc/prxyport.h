@@ -285,6 +285,7 @@ class CDBusProxyPdoLpbk : public CDBusProxyPdo
 
 class CDBusProxyPdoLpbk2 : public CDBusProxyPdoLpbk
 {
+    // this class is for CK5AuthProxy only
     public:
     typedef CDBusProxyPdoLpbk super;
 
@@ -294,6 +295,8 @@ class CDBusProxyPdoLpbk2 : public CDBusProxyPdoLpbk
 
     gint32 GetSender(
         std::string& strSender ) const override;
+
+    gint32 OnQueryStop( IRP* pIrp ) override;
 };
 
 }

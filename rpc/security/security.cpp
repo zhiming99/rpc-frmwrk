@@ -1612,7 +1612,8 @@ gint32 CAuthentProxy::CreateSessImpl(
     return ret;
 }
 
-gint32 CAuthentProxy::StopSessImpl()
+gint32 CAuthentProxy::StopSessImpl(
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
     do{
@@ -1625,12 +1626,6 @@ gint32 CAuthentProxy::StopSessImpl()
         oParams.SetObjPtr(
             propIfPtr, pSessImpl );
 
-        TaskletPtr pDummy;
-        ret = pDummy.NewObj( 
-            clsid( CIfDummyTask ) );
-        if( ERROR( ret ) )
-            break;
-
         CRpcServices* pSvc = pSessImpl;
         ret = pSvc->TestSetState( cmdShutdown );
         if( ERROR( ret ) )
@@ -1641,21 +1636,26 @@ gint32 CAuthentProxy::StopSessImpl()
         ret = DEFER_CALL( GetIoMgr(),
             ObjPtr( pSvc ),
             &CRpcServices::Shutdown,
-            ( IEventSink* )pDummy );
+            pCallback );
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
     return ret;
 }
 
-gint32 CAuthentProxy::OnPostStop(
+gint32 CAuthentProxy::OnPreStop(
     IEventSink* pCallback )
 {
     // stop the auth proxy if it is still
     // in connected state.
-    StopSessImpl();
+    return StopSessImpl( pCallback );
+}
 
-    // remove the binding
+gint32 CAuthentProxy::OnPostStop(
+    IEventSink* pCallback )
+{
     m_pSessImpl.Clear();
     return 0;
 }
@@ -2939,7 +2939,7 @@ gint32 CRpcRouterReqFwdrAuth::StopProxyNoRef(
 
             CAuthentProxy* pspp = pIf;
             oRouterLock.Unlock();
-            pspp->StopSessImpl();
+            pspp->StopSessImpl( nullptr );
         }
 
     }while( 0 );
@@ -2958,17 +2958,13 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
     if( ERROR( ret ) )
         return ret;
 
-    if( ret != 1 )
-        return ret;
-
-    do{
-        ret = StopProxyNoRef( dwPortId );
-        if( ERROR( ret ) )
-            break;
-
-        ret = 1;
-
-    }while( 0 );
+    if( ret == 1 )
+    {
+        std::vector< stdstr > vecNames;
+        ClearRefCountByPortId( dwPortId, vecNames );
+        ret = 0;
+        // the last is held by the CK5AuthProxy
+    }
 
     return ret;
 }

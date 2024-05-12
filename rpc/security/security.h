@@ -253,10 +253,14 @@ class CAuthentProxy :
         return 0;
     }
 
-    gint32 OnPostStop(
-        IEventSink* pCallback );
+    gint32 OnPreStop(
+        IEventSink* pCallback ) override;
 
-    gint32 StopSessImpl();
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override;
+
+    gint32 StopSessImpl(
+        IEventSink* pCallback );
 
     static gint32 CorrectInstName(
         CIoManager* pMgr,
