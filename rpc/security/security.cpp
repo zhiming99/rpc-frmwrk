@@ -1633,11 +1633,19 @@ gint32 CAuthentProxy::StopSessImpl(
             ret = 0;
             break;
         }
+        TaskletPtr pDummy;
+        if( pCallback == nullptr )
+        {
+            pDummy.NewObj(
+                clsid( CIfDummyTask ) );
+        }
         ret = DEFER_CALL( GetIoMgr(),
             ObjPtr( pSvc ),
             &CRpcServices::Shutdown,
-            pCallback );
-        if( SUCCEEDED( ret ) )
+            pCallback == nullptr ?
+                ( IEventSink* )pDummy : pCallback );
+        if( SUCCEEDED( ret ) &&
+            pCallback != nullptr )
             ret = STATUS_PENDING;
 
     }while( 0 );
@@ -1650,12 +1658,13 @@ gint32 CAuthentProxy::OnPreStop(
 {
     // stop the auth proxy if it is still
     // in connected state.
-    return StopSessImpl( pCallback );
+    return 0;
 }
 
 gint32 CAuthentProxy::OnPostStop(
     IEventSink* pCallback )
 {
+    StopSessImpl( nullptr );
     m_pSessImpl.Clear();
     return 0;
 }
@@ -2962,7 +2971,9 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
     {
         std::vector< stdstr > vecNames;
         ClearRefCountByPortId( dwPortId, vecNames );
+        StopProxyNoRef( dwPortId );
         ret = 0;
+
         // the last is held by the CK5AuthProxy
     }
 
