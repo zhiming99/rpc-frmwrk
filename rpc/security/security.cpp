@@ -2969,9 +2969,9 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
 
     if( ret == 1 )
     {
+        StopProxyNoRef( dwPortId );
         std::vector< stdstr > vecNames;
         ClearRefCountByPortId( dwPortId, vecNames );
-        StopProxyNoRef( dwPortId );
         ret = 0;
 
         // the last is held by the CK5AuthProxy
