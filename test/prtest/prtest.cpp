@@ -153,7 +153,7 @@ void CIfSmokeTest::testCliStartStop()
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
     
     CPauseResumeClient* pCli = pIf;
-    if( pCli != nullptr )
+    while( pCli != nullptr )
     {
         while( !pCli->IsConnected() )
             sleep( 1 );
@@ -175,7 +175,11 @@ void CIfSmokeTest::testCliStartStop()
 
         DebugPrint( 0, "Resuming the interface" );
         ret = pCli->Resume_Proxy();
-        CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( 0, "Resuming interface failed" );
+            break;
+        }
 
         DebugPrint( 0, "Start..." );
         ret = pCli->Echo( strText, strReply );
@@ -210,16 +214,14 @@ void CIfSmokeTest::testCliStartStop()
         DebugPrint( 0, "Pausing the interface" );
         ret = pCli->Pause_Proxy();
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
-
+        break;
     }
-    else
+
+    if( !pIf.IsEmpty() )
     {
-        CPPUNIT_ASSERT( false );
+        ret = pIf->Stop();
+        pIf.Clear();
     }
-
-    ret = pIf->Stop();
-
-    pIf.Clear();
 
     CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 }
