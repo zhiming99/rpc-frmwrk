@@ -2678,7 +2678,10 @@ gint32 CDBusProxyPdoLpbk2::OnQueryStop(
 {
     // CK5AuthProxy don't need to send the 
     // SYS_METHOD_CLOSERMTPORT;
-    this->SetConnected( false );
+    {
+        CStdRMutex oPortLock( this->GetLock() );
+        this->SetConnected( false );
+    }
     return super::OnQueryStop( pIrp );
 }
 
