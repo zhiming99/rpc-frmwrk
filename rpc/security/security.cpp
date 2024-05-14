@@ -1658,13 +1658,12 @@ gint32 CAuthentProxy::OnPreStop(
 {
     // stop the auth proxy if it is still
     // in connected state.
-    return 0;
+    return StopSessImpl( pCallback );
 }
 
 gint32 CAuthentProxy::OnPostStop(
     IEventSink* pCallback )
 {
-    StopSessImpl( nullptr );
     m_pSessImpl.Clear();
     return 0;
 }
@@ -2969,11 +2968,9 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
 
     if( ret == 1 )
     {
-        StopProxyNoRef( dwPortId );
         std::vector< stdstr > vecNames;
         ClearRefCountByPortId( dwPortId, vecNames );
         ret = 0;
-
         // the last is held by the CK5AuthProxy
     }
 
