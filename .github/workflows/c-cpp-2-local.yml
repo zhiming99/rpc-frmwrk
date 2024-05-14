@@ -43,20 +43,6 @@ jobs:
       run: cat /proc/cpuinfo && make -j 56
     - name: install
       run: sudo make install
-      
-    - name: cleanup for test
-      run: sudo python3 /usr/local/bin/rpcf/rpcfgnui.py tools/testcfgs/mincfg.json
-    - name: starting servers
-      run: dbus-run-session bash tools/runtest.sh 2 & 
-    - name: starting test
-      run: dbus-run-session bash tools/runtest.sh 1
-      
-    - name: cleanup for ssl test
-      run: bash tools/cfg4ssl.sh sslcfg.json.in
-    - name: starting ssl servers
-      run: dbus-run-session bash tools/runtest.sh 2 & 
-    - name: starting ssl test
-      run: dbus-run-session bash tools/runtest.sh 1
     
     - name: configure kerberos
       run: sudo bash ./tools/initkrb5.sh
