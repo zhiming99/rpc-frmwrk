@@ -1656,8 +1656,7 @@ gint32 CAuthentProxy::StopSessImpl(
 gint32 CAuthentProxy::OnPreStop(
     IEventSink* pCallback )
 {
-    // stop the auth proxy if it is still
-    // in connected state.
+    // only place to stop the auth proxy 
     return StopSessImpl( pCallback );
 }
 
