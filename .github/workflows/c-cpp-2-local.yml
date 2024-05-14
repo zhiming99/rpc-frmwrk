@@ -2,9 +2,9 @@ name: rpc-frmwrk CI local
 
 on:
   push:
-    branches: [ Enhancement-less-dependency-of-dbus-connection ]
+    branches: [ master, Enhancement-less-dependency-of-dbus-connection ]
   pull_request:
-    branches: [ Enhancement-less-dependency-of-dbus-connection ]
+    branches: [ master, Enhancement-less-dependency-of-dbus-connection ]
 jobs:
   build:
 
