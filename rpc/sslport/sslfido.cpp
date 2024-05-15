@@ -742,19 +742,23 @@ gint32 CRpcOpenSSLFido::PreStop(
         if( dwStepNo == 0 )
         {
             SetPreStopStep( pIrp, 1 );
-            ret = StartSSLShutdown( pIrp );
+            ret = super::PreStop( pIrp );
             if( ret == STATUS_PENDING )
-            {
                 ret = STATUS_MORE_PROCESS_NEEDED;
+            if( ret == STATUS_MORE_PROCESS_NEEDED )
                 break;
-            }
         }
 
         ret = GetPreStopStep( pIrp, dwStepNo );
         if( dwStepNo == 1 )
         {
             SetPreStopStep( pIrp, 2 );
-            ret = super::PreStop( pIrp );
+            ret = StartSSLShutdown( pIrp );
+            if( ret == STATUS_PENDING )
+            {
+                ret = STATUS_MORE_PROCESS_NEEDED;
+                break;
+            }
         }
 
     }while( 0 );
@@ -791,6 +795,12 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
     do{
+        if( psse->m_iEvent == sseError )
+        {
+            ret = psse->m_iData;
+            break;
+        }
+
         BufPtr pEncrypted = psse->m_pInBuf;
         if( pEncrypted.IsEmpty() ||
             pEncrypted->empty() )
@@ -806,6 +816,13 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         // NOTE: SSL is not thread-safe, locking
         // is required
         CStdRMutex oPortLock( GetLock() );
+        guint32 dwState = GetPortState();
+        if( dwState == PORT_STATE_STOPPING ||
+            dwState == PORT_STATE_STOPPED )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
         ret = BIO_write( m_prbio,
             pEncrypted->ptr(),
             pEncrypted->size() );
@@ -985,7 +1002,8 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     if( ret == STATUS_PENDING )
         return ret;
 
-    if( ERROR( ret ) )
+    else if( ERROR( ret ) &&
+        psse->m_iEvent != sseError )
     {
         psse->m_iEvent = sseError;
         psse->m_iData = ret;
@@ -1313,6 +1331,7 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
 {
     gint32 ret = 0;
 
+    CStdRMutex oPortLock( this->GetLock() );
     if( !pHandshake.IsEmpty() &&
         !pHandshake->empty() )
     {
@@ -1375,6 +1394,8 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
 
         }while( 1 );
 
+        oPortLock.Unlock();
+
         if( ERROR( ret ) )
             break;
 
@@ -1417,6 +1438,8 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
             break;
         }
 
+        oPortLock.Lock();
+
         // handshake is received, repeat
  
     }while( 1 );
@@ -1431,7 +1454,8 @@ gint32 CRpcOpenSSLFido::DoShutdown(
     if( !SSL_is_init_finished( m_pSSL ) )
         return 0;
 
-    DebugPrint( 0, "Start shutdown..." );
+    DebugPrint( 0,
+        "Start shutdown...@0x%llx", this );
     // NOTE: at this moment, the lower port is
     // still in `READY' state, and able to accept
     // io requests.
@@ -2141,6 +2165,10 @@ gint32 COpenSSLShutdownTask::OnTaskComplete(
 
         if( ERROR( ret ) )
             break;
+
+        CPort* pPort = nullptr;
+        oParams.GetPointer(
+            propPortPtr, pPort );
 
         CIoManager* pMgr = nullptr;
         ret = oParams.GetPointer(

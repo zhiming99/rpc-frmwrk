@@ -262,7 +262,6 @@ class CProxyPdoConnectTask
 
 class CDBusProxyPdoLpbk : public CDBusProxyPdo
 {
-    gint32 m_iInit = 0;
     public:
     typedef CDBusProxyPdo super;
     CDBusProxyPdoLpbk( const IConfigDb* pCfg );

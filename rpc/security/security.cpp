@@ -1626,18 +1626,18 @@ gint32 CAuthentProxy::StopSessImpl(
         oParams.SetObjPtr(
             propIfPtr, pSessImpl );
 
+        TaskletPtr pDummy;
+        ret = pDummy.NewObj( 
+            clsid( CIfDummyTask ) );
+        if( ERROR( ret ) )
+            break;
+
         CRpcServices* pSvc = pSessImpl;
         ret = pSvc->TestSetState( cmdShutdown );
         if( ERROR( ret ) )
         {
             ret = 0;
             break;
-        }
-        TaskletPtr pDummy;
-        if( pCallback == nullptr )
-        {
-            pDummy.NewObj(
-                clsid( CIfDummyTask ) );
         }
         ret = DEFER_CALL( GetIoMgr(),
             ObjPtr( pSvc ),
@@ -2920,34 +2920,16 @@ gint32 CRpcRouterReqFwdrAuth::StopProxyNoRef(
             break;
         }
 
-        std::string strName =
-            pReg->GetUniqName();
-
-        PortPtr pPort = GetPort();
-        CCfgOpenerObj oPortCfg(
-            ( CObjBase* )pPort );
-
-        std::string strName2;
-        ret = oPortCfg.GetStrProp(
-            propSrcUniqName, strName2 );
-
+        // notify the authprxy to stop
+        InterfPtr pIf;
+        ret = super::GetBridgeProxy( dwPortId, pIf );
         if( ERROR( ret ) )
             break;
 
-        // the last reference is held by the
-        // authproxy, OK to remove
-        if( strName == strName2 )
-        {
-            // notify the authprxy to stop
-            InterfPtr pIf;
-            ret = super::GetBridgeProxy( dwPortId, pIf );
-            if( ERROR( ret ) )
-                break;
+        CAuthentProxy* pspp = pIf;
+        oRouterLock.Unlock();
 
-            CAuthentProxy* pspp = pIf;
-            oRouterLock.Unlock();
-            pspp->StopSessImpl( nullptr );
-        }
+        pspp->StopSessImpl( nullptr );
 
     }while( 0 );
 
