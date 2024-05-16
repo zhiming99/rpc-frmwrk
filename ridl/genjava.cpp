@@ -1533,6 +1533,11 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
             Wa( "oSaInstName.setRequired(false);" );
             Wa( "options.addOption(oSaInstName);" );
             NEW_LINE;
+            Wa( "Option oNoDBus = new Option(\"nd\", \"nodbus\", false," );
+            Wa( "    \"to start without dbus connection.\" );" );
+            Wa( "oNoDBus.setRequired(false);" );
+            Wa( "options.addOption(oNoDBus);" );
+            NEW_LINE;
         }
 
         Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
@@ -1624,6 +1629,8 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
             BLOCK_CLOSE;
             BLOCK_CLOSE;
             NEW_LINE;
+            Wa( "else if( opt.getOpt() == \"nd\" || opt.getLongOpt() == \"nodbus\" )" );
+            Wa( "    oInit.put( 112, Boolean.valueOf( true ) );" );
         }
         else
         {

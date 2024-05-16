@@ -286,6 +286,9 @@ class PyRpcContext :
                 if 'bKProxy' in oInitParams and dwRole == 1:
                     p1.SetBoolProp( 111,
                         oInitParams[ 'bKProxy' ] )
+                if 'nodbus' in oInitParams:
+                    p1.SetBoolProp( 112, True )
+
         except Exception as err:
             print( err )
             if ret == 0:
