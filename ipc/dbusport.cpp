@@ -397,6 +397,12 @@ CDBusBusPort::CDBusBusPort( const IConfigDb* pConfig )
             bSepConns = false;
     }
     m_mapAddrToId.Initialize( bSepConns );
+    bool bNoDBusConn = false;
+    pMgr->GetCmdLineOpt(
+        propNoDBusConn, bNoDBusConn );
+    bool bBuiltinRt = pMgr->HasBuiltinRt();
+    if( bBuiltinRt && bNoDBusConn )
+        m_bNoDBusConn = true;
 }
 
 CDBusBusPort::~CDBusBusPort()
@@ -427,6 +433,7 @@ gint32 CDBusBusPort::BuildPdoPortName(
 
             if( strClass != PORT_CLASS_DBUS_PROXY_PDO &&
                 strClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK &&
+                strClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK2 &&
                 strClass != PORT_CLASS_LOCALDBUS_PDO &&
                 strClass != PORT_CLASS_LOOPBACK_PDO &&
                 strClass != PORT_CLASS_LOOPBACK_PDO2 )
@@ -437,7 +444,8 @@ gint32 CDBusBusPort::BuildPdoPortName(
                 break;
             }
             if( strClass == PORT_CLASS_DBUS_PROXY_PDO ||
-                strClass == PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+                strClass == PORT_CLASS_DBUS_PROXY_PDO_LPBK ||
+                strClass == PORT_CLASS_DBUS_PROXY_PDO_LPBK2 )
             {
                 guint32 dwPortId = ( guint32 )-1;
                 if( pCfg->exist( propPortId ) )
@@ -462,9 +470,13 @@ gint32 CDBusBusPort::BuildPdoPortName(
                     if( strClass == PORT_CLASS_DBUS_PROXY_PDO )
                         oConn[ propClsid ] =
                             clsid( CDBusProxyPdo );
-                    else
+                    else if( strClass ==
+                        PORT_CLASS_DBUS_PROXY_PDO_LPBK )
                         oConn[ propClsid ] =
                             clsid( CDBusProxyPdoLpbk );
+                    else
+                        oConn[ propClsid ] =
+                            clsid( CDBusProxyPdoLpbk2 );
 
                     CStdRMutex oPortLock( GetLock() );
                     CConnParamsProxy ocps( oConn.GetCfg() );
@@ -544,8 +556,10 @@ gint32 CDBusBusPort::CreatePdoPort(
         if( ERROR( ret ) )
             break;
 
-        if( strPortClass
-            == PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+        if( strPortClass ==
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK ||
+            strPortClass ==
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK2 )
         {
             ret = CreateRpcProxyPdoLpbk(
                 pCfg, pNewPort );
@@ -802,15 +816,18 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
             break;
         }
 
-        m_pDBusConn = dbus_bus_get_private(
-            DBUS_BUS_SESSION, error );
-
-        if ( nullptr == m_pDBusConn )
+        if( !IsNoDBusConn() )
         {
-            // fatal error, we cannot run without
-            // the dbus-daemon.
-            ret = error.Errno();
-            break;
+            m_pDBusConn = dbus_bus_get_private(
+                DBUS_BUS_SESSION, error );
+
+            if ( nullptr == m_pDBusConn )
+            {
+                // fatal error, we cannot run without
+                // the dbus-daemon.
+                ret = error.Errno();
+                break;
+            }
         }
         
         ret = oCfg.SetStrProp(
@@ -823,6 +840,9 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
         
         ret = InitLpbkMatch();
         if( ERROR( ret ) )
+            break;
+
+        if( IsNoDBusConn() )
             break;
 
         // request the name for this connection
@@ -1199,11 +1219,17 @@ gint32 CDBusBusPort::SendDBusMsg(
         return ret;
 
     ret = 0;
+    if( m_pDBusConn == nullptr )
+    {
+        // it is ok for builtin-rt proxy.
+        return ret;
+    }
+
     if( !dbus_connection_send(
         m_pDBusConn, pDBusMsg, pdwSerial ) )
     {
         ret = -ENOMEM;
-        DebugPrint( ret,
+        DebugPrintEx( logErr, ret,
             "dbus_connection_send failed" );
     }
     return ret;
@@ -1284,8 +1310,10 @@ gint32 CDBusBusPort::Stop( IRP *pIrp )
 {
     CDBusConnFlushTask* pTask = m_pFlushTask;
     if( pTask != nullptr )
+    {
         pTask->Stop();
-    m_pFlushTask.Clear();
+        m_pFlushTask.Clear();
+    }
 
     gint32 ret = super::Stop( pIrp );
     // NOTE: the child ports are stopped ahead of
@@ -1430,11 +1458,13 @@ gint32 CDBusBusPort::OnPortReady( IRP* pIrp )
     }
 
     // the message is allowed to come in
-    MloopPtr pLoop = GetIoMgr()->GetMainIoLoop();
-    ret = pLoop->SetupDBusConn( m_pDBusConn );
-
-    if( ERROR( ret ) )
-        return ret;
+    if( m_pDBusConn )
+    {
+        MloopPtr pLoop = GetIoMgr()->GetMainIoLoop();
+        ret = pLoop->SetupDBusConn( m_pDBusConn );
+        if( ERROR( ret ) )
+            return ret;
+    }
 
     ret = SchedulePortsAttachNotifTask(
         vecChildren, eventPortAttached, pIrp );
@@ -1556,17 +1586,22 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
         // pdo
 
         TaskletPtr pTask;
-        pTask.NewObj(
-            clsid( CDBusBusPortCreatePdoTask ),
-            newCfg.GetCfg() );
+        if( !IsNoDBusConn() )
+        {
+            pTask.NewObj(
+                clsid( CDBusBusPortCreatePdoTask ),
+                newCfg.GetCfg() );
 
-        // although a synchrous call of this task
-        // the PORT_START process will begin after
-        // this call returns.
-        ( *pTask )( eventZero );
-        ret = pTask->GetError();
-        if(  ERROR( ret ) )
-            break;
+            // although a synchrous call of this task
+            // the PORT_START process will begin after
+            // this call returns.
+            ( *pTask )( eventZero );
+            ret = pTask->GetError();
+            if(  ERROR( ret ) )
+                break;
+        }
+
+        newCfg.RemoveProperty( propDBusConn );
 
         ret = m_pMatchDisconn.NewObj(
             clsid( CDBusDisconnMatch ),
@@ -1604,15 +1639,6 @@ gint32 CDBusBusPort::PostStart( IRP* pIrp )
             break;
 
         CIoManager* pMgr = GetIoMgr();
-        if( pMgr->HasBuiltinRt() )
-        {
-            guint32 dwVal = 0;
-            ret = pMgr->GetCmdLineOpt(
-                propRouterRole, dwVal );
-            if( ERROR( ret ) ||
-                ( dwVal & 2 ) == 0 )
-                break;
-        }
 
         // create the loopback pdo2
         ret = newCfg.SetStrProp( propPortClass,
@@ -1750,7 +1776,7 @@ gint32 CDBusTransLpbkMsgTask::operator()(
             break;
         }
 
-        if( bReq )
+        if( bReq && !pPort->IsNoDBusConn() )
         {
             ret = pPort->OnMessageArrival( pMsg );
         }
@@ -1774,7 +1800,7 @@ guint32 CDBusBusPort::LabelMessage(
     pMsg.GetSerial( dwSerial );
     if( dwSerial == 0 )
     {
-        dwSerial = dwDBusSerial++;
+        dwSerial = ++dwDBusSerial;
         pMsg.SetSerial( dwSerial );
     }
     return dwSerial;
@@ -1911,7 +1937,9 @@ CDBusBusPort::OnLpbkMsgArrival(
 
                 PortPtr& pPrxyPdo = elem.second;
                 if( pPrxyPdo->GetClsid() != 
-                    clsid( CDBusProxyPdoLpbk ) )
+                    clsid( CDBusProxyPdoLpbk ) &&
+                    pPrxyPdo->GetClsid() != 
+                    clsid( CDBusProxyPdoLpbk2 ) )
                     continue;
 
                 vecPorts.push_back( elem.second );
@@ -1968,6 +1996,7 @@ CDBusBusPort::OnLpbkMsgArrival(
             ptrMsg.DumpMsg().c_str(),
             CoGetClassName( GetClsid() ), 
             ( LONGWORD )this );
+        ReplyWithError( pMsg );
     }
     else if( iType == DBUS_MESSAGE_TYPE_METHOD_RETURN &&
         ret == -ENOENT )
@@ -2025,6 +2054,11 @@ gint32 CDBusBusPort::GetProperty(
     {
     case propSrcUniqName:
         {
+            if( IsNoDBusConn() )
+            {
+                oBuf = ":1.0823";
+                break;
+            }
             if( m_pDBusConn == nullptr )
             {
                 ret = ERROR_STATE;
@@ -2230,6 +2264,12 @@ gint32 CDBusBusPort::OnCompleteSlaveIrp(
             break;
         }
 
+        if( IsNoDBusConn() )
+        {
+            ret = 0;
+            break;
+        }
+
         if( pspc->m_mapIdToRes.find( m_iLocalPortId )
             == pspc->m_mapIdToRes.end() )
         {
@@ -2323,52 +2363,57 @@ gint32 CDBusBusPort::RegBusName(
             ret = -EINVAL;
             break;
         }
-        if( m_pDBusConn == nullptr )
+
+        if( m_pDBusConn == nullptr &&
+            !IsNoDBusConn() )
         {
             ret = ERROR_STATE;
             break;
         }
 
-        CDBusError error;
-        // request the name for this connection
-        ret = dbus_bus_request_name(
-            m_pDBusConn,
-            strName.c_str(),
-            dwFlags,
-            error );
-
-        if( ret == -1 )
+        if( m_pDBusConn )
         {
-            ret = error.Errno();
-            break;
-        }
+            CDBusError error;
+            // request the name for this connection
+            ret = dbus_bus_request_name(
+                m_pDBusConn,
+                strName.c_str(),
+                dwFlags,
+                error );
 
-        switch( ret )
-        {
-        case DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER:
-        case DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER:
-            ret = 0;
-            break;
-
-        case DBUS_REQUEST_NAME_REPLY_IN_QUEUE:
-        case DBUS_REQUEST_NAME_REPLY_EXISTS:
+            if( ret == -1 )
             {
-                ret = -EEXIST;
-                DebugPrintEx( logErr, ret,
-                "Error, cannot register dbus name, "
-                "check if there is another running"
-                " instance." );
+                ret = error.Errno();
                 break;
             }
-        default:
-            {
-                ret = ERROR_FAIL;
-                break;
-            }
-        }
 
-        if( ERROR( ret ) )
-            break;
+            switch( ret )
+            {
+            case DBUS_REQUEST_NAME_REPLY_PRIMARY_OWNER:
+            case DBUS_REQUEST_NAME_REPLY_ALREADY_OWNER:
+                ret = 0;
+                break;
+
+            case DBUS_REQUEST_NAME_REPLY_IN_QUEUE:
+            case DBUS_REQUEST_NAME_REPLY_EXISTS:
+                {
+                    ret = -EEXIST;
+                    DebugPrintEx( logErr, ret,
+                    "Error, cannot register dbus name, "
+                    "check if there is another running"
+                    " instance." );
+                    break;
+                }
+            default:
+                {
+                    ret = ERROR_FAIL;
+                    break;
+                }
+            }
+
+            if( ERROR( ret ) )
+                break;
+        }
 
         AddBusNameLpbk( strName );
 
@@ -2480,6 +2525,8 @@ gint32 CDBusBusPort::ReleaseBusName(
     gint32 ret = 0;
 
     do{
+        if( IsNoDBusConn() )
+            break;
         CDBusError dbusError;
         ret = dbus_bus_release_name(
             m_pDBusConn,
@@ -2529,6 +2576,9 @@ gint32 CDBusBusPort::AddRules(
         }
         oPortLock.Unlock();
 
+        if( IsNoDBusConn() )
+            break;
+
         CDBusError dbusError;
         dbus_bus_add_match(
             m_pDBusConn,
@@ -2572,6 +2622,8 @@ gint32 CDBusBusPort::RemoveRules(
         }
 
         oPortLock.Unlock();
+        if( IsNoDBusConn() )
+            continue;
 
         CDBusError dbusError;
         dbus_bus_remove_match( 
@@ -2603,6 +2655,8 @@ gint32 CDBusBusPort::IsDBusSvrOnline(
     gint32 ret = 0;
     do{
         CDBusError dbusError;
+        if( IsNoDBusConn() )
+            break;
         if( !dbus_bus_name_has_owner(
             m_pDBusConn,
             strDest.c_str(),
@@ -2636,6 +2690,7 @@ void CDBusBusPort::RemovePdoPort(
 
     EnumClsid iClsid = pPort->GetClsid();
     if( iClsid != clsid( CDBusProxyPdoLpbk ) &&
+        iClsid != clsid( CDBusProxyPdoLpbk2 ) &&
         iClsid != clsid( CDBusProxyPdo ) )
     {
         super::RemovePdoPort( iPortId );

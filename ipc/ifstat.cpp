@@ -1022,14 +1022,42 @@ gint32 CStmCpState::SetupOpenPortParams(
 gint32 CRemoteProxyState::SetupOpenPortParams(
         IConfigDb* pCfg )
 {
-    CParamList oCfg( pCfg );
-    oCfg.CopyProp( propConnParams, this );
+    do{
+        gint32 ret = 0;
+        CParamList oCfg( pCfg );
+        oCfg.CopyProp( propConnParams, this );
 
-    gint32 ret = oCfg.CopyProp(
-        propRouterPath, this );
+        ret = oCfg.CopyProp(
+            propRouterPath, this );
 
-    if( ERROR( ret ) )
-        oCfg.SetStrProp( propRouterPath, "/" );
+        if( ERROR( ret ) )
+            oCfg.SetStrProp( propRouterPath, "/" );
+
+        CIoManager* pMgr = GetIoMgr();
+        if( !pMgr->HasBuiltinRt() )
+            break;
+
+        bool bNoDBusConn = false;
+        pMgr->GetCmdLineOpt(
+            propNoDBusConn, bNoDBusConn );
+        if( !bNoDBusConn )
+            break;
+
+        Variant oPortClass;
+        ret = this->GetProperty(
+            propPortClass, oPortClass );
+
+        stdstr& strPort = oPortClass;
+        if( strPort != PORT_CLASS_DBUS_PROXY_PDO )
+            break;
+
+        oPortClass = PORT_CLASS_DBUS_PROXY_PDO_LPBK; 
+        this->SetProperty(
+            propPortClass, oPortClass );
+        oCfg.SetStrProp( propPortClass,
+            PORT_CLASS_DBUS_PROXY_PDO_LPBK );
+
+    }while( 0 );
 
     return 0;
 }
@@ -1261,6 +1289,26 @@ gint32 CIfReqFwdrState::SubscribeEvents()
         vecEvtToSubscribe.clear();
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
+}
+
+gint32 CIfReqFwdrState::SetupOpenPortParams(
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        CIoManager* pMgr = GetIoMgr();
+        if( !pMgr->HasBuiltinRt() )
+            break;
+        bool bNoDBusConn = false;
+        pMgr->GetCmdLineOpt(
+            propNoDBusConn, bNoDBusConn );
+        if( !bNoDBusConn )
+            break;
+        oCfg.SetStrProp( propPortClass,
+            PORT_CLASS_LOOPBACK_PDO2 );
+    }while( 0 );
+    return ret;
 }
 
 gint32 CIfReqFwdrPrxyState::SubscribeEvents()

@@ -995,6 +995,13 @@ namespace cpp
                 propRouterRole, dwRole );
             pMgr->SetCmdLineOpt(
                 propBuiltinRt, true );
+
+            if( oCfg.exist( 112 ) && ( dwRole & 1 ) )
+            {
+                pMgr->SetCmdLineOpt(
+                    propNoDBusConn, true );
+            }
+
             ret = pMgr->Start();
             if( ERROR( ret ) )
                 break;

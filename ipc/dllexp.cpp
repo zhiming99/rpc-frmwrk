@@ -171,6 +171,7 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CDBusProxyFdo );
     INIT_MAP_ENTRYCFG( CDBusProxyPdo );
     INIT_MAP_ENTRYCFG( CDBusProxyPdoLpbk );
+    INIT_MAP_ENTRYCFG( CDBusProxyPdoLpbk2 );
     INIT_MAP_ENTRYCFG( CProxyFdoListenTask );
     INIT_MAP_ENTRYCFG( CProxyFdoModOnOfflineTask );
     INIT_MAP_ENTRYCFG( CProxyFdoRmtDBusOfflineTask );

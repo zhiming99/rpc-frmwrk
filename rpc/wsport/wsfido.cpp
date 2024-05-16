@@ -496,20 +496,18 @@ gint32 CRpcWebSockFido::PreStop(
         pIrp->GetStackSize() == 0 )
         return -EINVAL;
 
-    gint32 ret = ClearTask( enumHsTask );
-    if( ERROR( ret ) )
-        return super::PreStop( pIrp );
-
+    gint32 ret = 0;
     bool bExpected = false;
     if( m_bCloseSent.compare_exchange_strong(
         bExpected, true ) )
     {
+        ClearTask( enumHsTask );
         ret = ScheduleCloseTask( pIrp,
             ERROR_PORT_STOPPED, true );
         if( SUCCEEDED( ret ) )
-            return STATUS_PENDING;
+            return STATUS_MORE_PROCESS_NEEDED;
     }
-    return super::PreStop( pIrp );
+    return 0;
 }
 
 gint32 CRpcWebSockFido::Stop( IRP* pIrp )
@@ -544,7 +542,7 @@ gint32 CRpcWebSockFido::ScheduleCloseTask(
         if( ERROR( ret ) )
             break;
 
-        GetIoMgr()->RescheduleTask(
+        ret = GetIoMgr()->RescheduleTask(
             m_vecTasks[ enumCloseTask ] );
 
     }while( 0 );
@@ -1461,6 +1459,7 @@ gint32 CWsTaskBase::OnTaskComplete(
 
     }while( 0 );
 
+    oParams.RemoveProperty( propIrpPtr );
     if( pPort != nullptr )
     {
         gint32 iIdx = -1;
@@ -1476,9 +1475,8 @@ gint32 CWsTaskBase::OnTaskComplete(
             pPort->ClearTask( iIdx );
     }
 
-    oParams.ClearParams();
-    oParams.RemoveProperty( propIrpPtr );
     oParams.RemoveProperty( propIrpPtr1 );
+    oParams.ClearParams();
     oParams.RemoveProperty( propPortPtr );
 
     return ret;
@@ -1531,6 +1529,7 @@ gint32 CWsTaskBase::OnCancel(
             ret = iRet;
         }
 
+        oParams.RemoveProperty( propIrpPtr1 );
         OnTaskComplete( ret );
 
     }while( 0 );
@@ -1891,6 +1890,7 @@ gint32 CWsCloseTask::OnTaskComplete(
 
     }while( 0 );
 
+    oParams.RemoveProperty( propIrpPtr );
     if( pPort != nullptr )
     {
         gint32 iIdx = 
@@ -1899,7 +1899,6 @@ gint32 CWsCloseTask::OnTaskComplete(
     }
 
     oParams.ClearParams();
-    oParams.RemoveProperty( propIrpPtr );
     oParams.RemoveProperty( propIrpPtr1 );
     oParams.RemoveProperty( propPortPtr );
 

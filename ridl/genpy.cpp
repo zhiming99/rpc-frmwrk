@@ -3075,6 +3075,7 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
             {
                 Wa( "\"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
                 Wa( "\"\\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\\n\"" );
+                Wa( "\"\\t [ --nodbus to start without connection to dbus, suitable for non-dbus environment'. ]\\n\"" );
             }
             else
             {
@@ -3108,7 +3109,7 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         CCOUT << "    opts, args = getopt.getopt(argv, \""<< strShort <<"\","; 
         NEW_LINE;
         if( bProxy && g_bBuiltinRt )
-            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\", \"sainstname=\" ] )";
+            CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\", \"sainstname=\", \"nodbus\" ] )";
         else if( !bProxy && g_bBuiltinRt )
             CCOUT << "        [ \"driver=\", \"objdesc=\", \"router=\", \"instname=\" ] )";
         NEW_LINE;
@@ -3181,6 +3182,11 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "            print( 'Error specifying both instname and sainstname')" );
         Wa( "            Usage()" );
         Wa( "            sys.exit( 1 )" );
+        if( bProxy && g_bBuiltinRt )
+        {
+            Wa( "    elif opt == '--nodbus':" );
+            Wa( "        params[ 'nodbus' ] = True" );
+        }
         Wa( "    elif opt in ('-h'):" );
         Wa( "        Usage()" );
         Wa( "        sys.exit( 0 )" );

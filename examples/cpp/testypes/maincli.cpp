@@ -42,6 +42,7 @@ static std::string g_strSaInstName;
 static std::string g_strIpAddr;
 static std::string g_strPortNum;
 static bool g_bAuth = false;
+static bool g_bNoDBus = false;
 static bool g_bKProxy = false;
 static bool g_bAsync = false;
 static std::string g_strUserName;
@@ -67,6 +68,7 @@ void Usage( char* szName )
         "\t [ --router <path> to specify the path to the customized 'router.json'. ]\n"
         "\t [ --instname <name> to specify the server instance name to connect'. ]\n"
         "\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\n"
+        "\t [ --nodbus to run the client without dbus session'. ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -108,6 +110,7 @@ int main( int argc, char** argv )
             {"router",   required_argument, 0,  0 },
             {"instname", required_argument, 0,  0 },
             {"sainstname", required_argument, 0,  0 },
+            {"nodbus", no_argument, 0,  0 },
             {0,             0,                 0,  0 }
         };            
         while( ( opt = getopt_long( argc, argv, "hadkl:i:p:s",
@@ -163,6 +166,8 @@ int main( int argc, char** argv )
                             break;
                         }
                     }
+                    else if( iOptIdx == 5 )
+                        g_bNoDBus = true;
                     else
                     {
                         fprintf( stderr, "Error invalid option.\n" );
@@ -187,7 +192,7 @@ int main( int argc, char** argv )
                 }
             case 'p':
                 {
-                    std::string g_strPortNum = optarg;
+                    g_strPortNum = optarg;
                     guint32 dwPort = strtoul(
                         g_strPortNum.c_str(), nullptr, 10 );
                     if( dwPort > 65535 || dwPort < 1024 )
@@ -342,6 +347,11 @@ gint32 InitContext()
             propRouterRole, 1 );
         pSvc->SetCmdLineOpt(
             propBuiltinRt, true );
+        if( g_bNoDBus )
+        {
+            pSvc->SetCmdLineOpt(
+                propNoDBusConn, true );
+        }
         ret = pSvc->Start();
         if( ERROR( ret ) )
         {

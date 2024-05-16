@@ -52,6 +52,7 @@ namespace rpcf
 #define PORT_CLASS_UXSOCK_BUS           "UnixSockBusPort"
 #define PORT_CLASS_UXSOCK_STM_PDO       "UnixSockStmPdo"
 #define PORT_CLASS_DBUS_PROXY_PDO_LPBK  "DBusProxyPdoLpbk"
+#define PORT_CLASS_DBUS_PROXY_PDO_LPBK2 "DBusProxyPdoLpbk2"
 #define PORT_CLASS_DBUS_STREAM_BUS      "DBusStreamBusPort"
 #define PORT_CLASS_DBUS_STREAM_PDO      "DBusStreamPdo"
 #define PORT_CLASS_OPENSSL_FIDO         "RpcOpenSSLFido"
@@ -138,6 +139,7 @@ inline std::string DBUS_DESTINATION(
 }
 
 #define LOOPBACK_DESTINATION   "org.rpcf.loopback"
+#define LOOPBACK_DESTINATION2   "org.rpcf.loopback2"
 
 /**
 * @name Modue name module name is used to register

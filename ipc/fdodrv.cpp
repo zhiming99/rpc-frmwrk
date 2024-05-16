@@ -155,7 +155,8 @@ gint32 CProxyFdoDriver::Probe(
             break;
 
         if( strPdoClass != PORT_CLASS_DBUS_PROXY_PDO &&
-            strPdoClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK )
+            strPdoClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK && 
+            strPdoClass != PORT_CLASS_DBUS_PROXY_PDO_LPBK2 )
         {
             // this is not a port we support
             ret = -ENOTSUP;

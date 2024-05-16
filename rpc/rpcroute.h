@@ -1666,6 +1666,8 @@ class CIfRouterState : public CIfServerState
     typedef CIfServerState super;
     CIfRouterState( const IConfigDb* pCfg );
     virtual gint32 SubscribeEvents();
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg ) override;
 };
 
 class CRpcRouterManager;
@@ -2939,6 +2941,8 @@ class CIfRouterMgrState : public CIfServerState
         : super( pCfg )
     { SetClassId( clsid( CIfRouterMgrState ) ); }
     gint32 SubscribeEvents();
+    gint32 SetupOpenPortParams(
+        IConfigDb* pCfg ) override;
 };
 
 class CRpcRouterManager : public CRpcRouter

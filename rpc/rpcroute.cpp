@@ -5631,6 +5631,26 @@ gint32 CIfRouterState::SubscribeEvents()
         vecEvtToSubscribe );
 }
 
+gint32 CIfRouterState::SetupOpenPortParams(
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        CIoManager* pMgr = GetIoMgr();
+        if( !pMgr->HasBuiltinRt() )
+            break;
+        bool bNoDBusConn = false;
+        pMgr->GetCmdLineOpt(
+            propNoDBusConn, bNoDBusConn );
+        if( !bNoDBusConn )
+            break;
+        oCfg.SetStrProp( propPortClass,
+            PORT_CLASS_LOOPBACK_PDO2 );
+    }while( 0 );
+    return ret;
+}
+
 CRpcRouterManager::CRpcRouterManager(
     const IConfigDb* pCfg ) :
     CAggInterfaceServer( pCfg ), super( pCfg )
@@ -6252,6 +6272,26 @@ gint32 CIfRouterMgrState::SubscribeEvents()
     };
     return SubscribeEventsInternal(
         vecEvtToSubscribe );
+}
+
+gint32 CIfRouterMgrState::SetupOpenPortParams(
+    IConfigDb* pCfg )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCfg( pCfg );
+        CIoManager* pMgr = GetIoMgr();
+        if( !pMgr->HasBuiltinRt() )
+            break;
+        bool bNoDBusConn = false;
+        pMgr->GetCmdLineOpt(
+            propNoDBusConn, bNoDBusConn );
+        if( !bNoDBusConn )
+            break;
+        oCfg.SetStrProp( propPortClass,
+            PORT_CLASS_LOOPBACK_PDO2 );
+    }while( 0 );
+    return ret;
 }
 
 gint32 gen_sess_hash(

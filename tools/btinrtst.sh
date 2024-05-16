@@ -20,6 +20,12 @@ if release/TestTypescli $auth --driver ./driver-cli.json; then
 else
     ret=11
 fi
+echo testing client without dbus connection
+if release/TestTypescli $auth --nodbus --driver ./driver-cli.json; then
+    ret=0
+else
+    ret=11
+fi
 pkill TestTypessvr
 popd
 exit $ret

@@ -1612,7 +1612,8 @@ gint32 CAuthentProxy::CreateSessImpl(
     return ret;
 }
 
-gint32 CAuthentProxy::StopSessImpl()
+gint32 CAuthentProxy::StopSessImpl(
+    IEventSink* pCallback )
 {
     gint32 ret = 0;
     do{
@@ -1641,21 +1642,27 @@ gint32 CAuthentProxy::StopSessImpl()
         ret = DEFER_CALL( GetIoMgr(),
             ObjPtr( pSvc ),
             &CRpcServices::Shutdown,
-            ( IEventSink* )pDummy );
+            pCallback == nullptr ?
+                ( IEventSink* )pDummy : pCallback );
+        if( SUCCEEDED( ret ) &&
+            pCallback != nullptr )
+            ret = STATUS_PENDING;
 
     }while( 0 );
 
     return ret;
 }
 
+gint32 CAuthentProxy::OnPreStop(
+    IEventSink* pCallback )
+{
+    // only place to stop the auth proxy 
+    return StopSessImpl( pCallback );
+}
+
 gint32 CAuthentProxy::OnPostStop(
     IEventSink* pCallback )
 {
-    // stop the auth proxy if it is still
-    // in connected state.
-    StopSessImpl();
-
-    // remove the binding
     m_pSessImpl.Clear();
     return 0;
 }
@@ -2913,34 +2920,16 @@ gint32 CRpcRouterReqFwdrAuth::StopProxyNoRef(
             break;
         }
 
-        std::string strName =
-            pReg->GetUniqName();
-
-        PortPtr pPort = GetPort();
-        CCfgOpenerObj oPortCfg(
-            ( CObjBase* )pPort );
-
-        std::string strName2;
-        ret = oPortCfg.GetStrProp(
-            propSrcUniqName, strName2 );
-
+        // notify the authprxy to stop
+        InterfPtr pIf;
+        ret = super::GetBridgeProxy( dwPortId, pIf );
         if( ERROR( ret ) )
             break;
 
-        // the last reference is held by the
-        // authproxy, OK to remove
-        if( strName == strName2 )
-        {
-            // notify the authprxy to stop
-            InterfPtr pIf;
-            ret = super::GetBridgeProxy( dwPortId, pIf );
-            if( ERROR( ret ) )
-                break;
+        CAuthentProxy* pspp = pIf;
+        oRouterLock.Unlock();
 
-            CAuthentProxy* pspp = pIf;
-            oRouterLock.Unlock();
-            pspp->StopSessImpl();
-        }
+        pspp->StopSessImpl( nullptr );
 
     }while( 0 );
 
@@ -2958,17 +2947,13 @@ gint32 CRpcRouterReqFwdrAuth::DecRefCount(
     if( ERROR( ret ) )
         return ret;
 
-    if( ret != 1 )
-        return ret;
-
-    do{
-        ret = StopProxyNoRef( dwPortId );
-        if( ERROR( ret ) )
-            break;
-
-        ret = 1;
-
-    }while( 0 );
+    if( ret == 1 )
+    {
+        std::vector< stdstr > vecNames;
+        ClearRefCountByPortId( dwPortId, vecNames );
+        ret = 0;
+        // the last is held by the CK5AuthProxy
+    }
 
     return ret;
 }
