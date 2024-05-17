@@ -65,6 +65,11 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * `BiuiltinRt App`是由`ridlc`生成的客户端和服务器端程序不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行代码。优点就是可以直接运行，而且性能更好，尤其客户端的程序可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
 * 当指定`ridlc -bs`时，将生成`builtin-app`并使用`FastRpc`传输RPC消息。`C++`, `Java`, `Python`都支持这两个选项。`JS`由于架构的完全不同，所以没有`builtin-rt`的选项， 不过`JS`支持`-s`,以方便连接由`-s`生成的服务器程序。
 
+## 部署
+* `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
+* `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
+* `rpcfg.py`的部署功能，可以生成`rpcrouter`的设置+密钥安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括`rpc-frmwrk`服务器设置，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的使用手册。
+
 ## Multihop功能和路由器路径
 当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
