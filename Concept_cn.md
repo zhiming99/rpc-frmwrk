@@ -60,6 +60,11 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 在`文件模式`编程时，每一个流通道将体现为分别在服务器端和客户端的一对特殊的可读写文件，数据的收发体现为对文件的读写操作。用户可以通过在客户端建立一个stream文件而建立一个流通道，方式任意，如shell命令`touch stream_1`。单一连接的流通道个数缺省为32个。不过在大量连接的情况下可以进一步限制。
 
+## `FastRpc`和`BuiltinRt App`
+* `FastRpc`是通过`Streaming Channel`传输RPC的请求，响应和事件的机制。对应的`ridlc`的选项是`-s`.这个架构的优势是，消息短小，延迟小，吞吐量大，不受DBus的瓶颈限制，而且有session级别的QPS流控。劣势是开销较大，需要三倍于普通RPC的可打开文件，并且建立连接的时间长于传统的RPC.   
+* `BiuiltinRt App`是由`ridlc`生成的客户端和服务器端程序不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行代码。优点就是可以直接运行，而且性能更好，尤其客户端的程序可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
+* 当指定`ridlc -bs`时，将生成`builtin-app`并使用`FastRpc`传输RPC消息。`C++`, `Java`, `Python`都支持这两个选项。`JS`由于架构的完全不同，所以没有`builtin-rt`的选项， 不过`JS`支持`-s`,以方便连接由`-s`生成的服务器程序。
+
 ## Multihop功能和路由器路径
 当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
