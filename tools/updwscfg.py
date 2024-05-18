@@ -232,6 +232,7 @@ def Config_Apache( initCfg : object )->int:
       ProxyPass /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyRequests off
+      ProxyWebsocketIdleTimeout 300
 </VirtualHost>
 
 '''
