@@ -217,3 +217,34 @@ service SimpFileSvc [ stream ]
 ### C++, Python, Java和JavaScript的客户端可以交叉访问其他语言的服务器。
 微服务架构的客户端，目前只能访问微服务架构的服务器。C/S架构的客户端可以访问两种架构的服务器。
 
+### `-b`选项生成的`BuiltinRt App`的命令行选项
+#### 服务器
+```
+	[ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point'. ]
+	[ -a to enable authentication. ]
+	[ -d to run as a daemon. ]
+	[ -i <ip address> to specify the ip address to bind. ]
+	[ -p <port number> to specify the tcp port number to listen on. ]
+	[ --driver <path> to specify the path to the customized 'driver.json'. ]
+	[ --objdesc <path> to specify the path to the object description file. ]
+	[ --router <path> to specify the path to the customized 'router.json'. ]
+	[ --instname <name> to specify the instance name for this server'. ]
+	[ -h this help ]
+```
+#### 客户端
+```
+	[ -a to enable authentication. ]
+	[ -d to run as a daemon. ]
+	[ -i <ip address> to specify the destination ip address. ]
+	[ -p <port number> to specify the destination tcp port. ]
+	[ -k to run as a kinit proxy. ]
+	[ -l <user name> login with the user name and then quit. ]
+	[ --driver <path> to specify the path to the customized 'driver.json'. ]
+	[ --objdesc <path> to specify the path to the object description file. ]
+	[ --router <path> to specify the path to the customized 'router.json'. ]
+	[ --instname <name> to specify the server instance name to connect'. ]
+	[ --sainstname <name> to specify the stand-alone router instance name to connect'. ]
+	[ --nodbus to run the client without dbus connection'. ]
+	[ -h this help ]
+```
+

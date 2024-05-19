@@ -3075,7 +3075,7 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
             {
                 Wa( "\"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
                 Wa( "\"\\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\\n\"" );
-                Wa( "\"\\t [ --nodbus to start without connection to dbus, suitable for non-dbus environment'. ]\\n\"" );
+                Wa( "\"\\t [ --nodbus to start without dbus connection, suitable for non-dbus environment'. ]\\n\"" );
             }
             else
             {

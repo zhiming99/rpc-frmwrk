@@ -6607,7 +6607,7 @@ void CImplMainFunc::EmitRtUsage(
         {
             Wa( "    \"\\t [ --instname <name> to specify the server instance name to connect'. ]\\n\"" );
             Wa( "    \"\\t [ --sainstname <name> to specify the stand-alone router instance name to connect'. ]\\n\"" );
-            Wa( "    \"\\t [ --nodbus to run the client without dbus session'. ]\\n\"" );
+            Wa( "    \"\\t [ --nodbus to start without dbus connection'. ]\\n\"" );
         }
         else
         {
