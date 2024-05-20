@@ -1,4 +1,8 @@
 ---
+[`Mon May 20 2024 04:41:43 PM Beijing`]   
+1. Removed builtin-rt client's dependency to dbus connection. And fixed some bugs.
+2. Next, I will add OAuth2 support for JS client.
+
 [`Sat May 04 2024 09:38:49 PM Beijing`]   
 1. Added a new QPS based flow-control to the `fastrpc` module, so that it can hold back receiving more requests, which in turn, slows down the client sending speed without increasing the pressure on the pending request-queue.
 2. Next, I will try to remove the dependency of dbus connection for client builtin-rt application, to reduce the requirement to the runtime environment.
