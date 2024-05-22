@@ -62,8 +62,8 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 ## `FastRpc`和`BuiltinRt App`
 * `FastRpc`是通过`Streaming Channel`传输RPC的请求，响应和事件的机制。对应的`ridlc`的选项是`-s`.这个架构的优势是，消息短小，延迟小，吞吐量大，不受DBus的瓶颈限制，而且有session级别的QPS流控。劣势是开销较大，需要三倍于普通RPC的可打开文件，并且建立连接的时间长于传统的RPC.   
-* `BiuiltinRt App`是由`ridlc`生成的客户端和服务器端程序不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行代码。优点就是可以直接运行，而且性能更好，尤其客户端的程序可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
-* 当指定`ridlc -bs`时，将生成`builtin-app`并使用`FastRpc`传输RPC消息。`C++`, `Java`, `Python`都支持这两个选项。`JS`由于架构的完全不同，所以没有`builtin-rt`的选项， 不过`JS`支持`-s`,以方便连接由`-s`生成的服务器程序。
+* `BiuiltinRt App`是由`ridlc`生成的客户端和服务器端程序不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行代码。优点就是可以直接运行，而且延迟小响应快。并且客户端的程序可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
+* 当指定`-bs`时，`ridlc`将生成`builtin-app`并使用`FastRpc`传输RPC消息。`ridlc`生成的`C++`, `Java`, `Python`代码框架都支持这两个选项。`JS`由于架构的完全不同，所以不支持`-b`的选项， 不过`JS`支持`-s`,以方便连接由`-s`生成的服务器程序。
 
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
