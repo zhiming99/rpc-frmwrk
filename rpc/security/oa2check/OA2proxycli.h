@@ -12,6 +12,10 @@ class COA2proxy_CliImpl :
     public COA2proxy_CliSkel,
     public IAuthenticateServer
 {
+    std::map< std::string, guint32 > m_mapSess2PortId;
+    std::map< guint32, std::string > m_mapPortId2Sess;
+    std::map< guint32, std::string > m_mapSessions; 
+
     public:
     typedef COA2proxy_CliSkel super;
     COA2proxy_CliImpl( const IConfigDb* pCfg ) :
@@ -73,10 +77,31 @@ class COA2proxy_CliImpl :
     { return 0; }
 
     gint32 IsSessExpired(
-        const std::string& strSess ) override;
+        const std::string& strSess ) override
+    { return ERROR_FALSE; }
 
     gint32 InquireSess(
         const std::string& strSess,
         CfgPtr& pInfo ) override;
+
+    // IAuthenticate methods
+    gint32 Login(
+        IEventSink* pCallback,
+        IConfigDb* pInfo, /*[ in ]*/
+        CfgPtr& pResp /*[ out ]*/
+        ) override;
+
+    gint32 MechSpecReq(
+        IEventSink* pCallback,
+        IConfigDb* pReq,/*[ in ]*/
+        CfgPtr& pResp /*[ out ]*/
+        ) override 
+    { return -ENOTSUP; }
+
+    gint32 GenSessHash(
+        stdstr strToken,
+        guint32 dwPortId,
+        std::string& strSess );
+
 };
 
