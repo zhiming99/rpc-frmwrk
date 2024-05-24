@@ -23,7 +23,7 @@ class COA2proxy_CliImpl :
     { SetClassId( clsid(COA2proxy_CliImpl ) ); }
 
     // OAuth2Proxy
-    virtual gint32 IsTokenValidCallback(
+    virtual gint32 DoLoginCallback(
         IConfigDb* context, gint32 iRet,
         bool bValid /*[ In ]*/ );
     
@@ -33,6 +33,9 @@ class COA2proxy_CliImpl :
     
     virtual gint32 RevokeUserCallback(
         IConfigDb* context, gint32 iRet );
+    
+    virtual gint32 OnOA2Event(
+        OA2EVENT& oEvent /*[ In ]*/ );
 
     virtual gint32 WrapMessage(
         const std::string& strSess,
@@ -89,7 +92,7 @@ class COA2proxy_CliImpl :
         IEventSink* pCallback,
         IConfigDb* pInfo, /*[ in ]*/
         CfgPtr& pResp /*[ out ]*/
-        ) override;
+        );
 
     gint32 MechSpecReq(
         IEventSink* pCallback,

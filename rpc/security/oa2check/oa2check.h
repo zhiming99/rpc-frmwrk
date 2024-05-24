@@ -23,7 +23,42 @@ enum EnumMyClsid
     
     DECL_IID( OAuth2Proxy ),
 
+    DECL_CLSID( timespec ) = 0xF3881ACE,
     DECL_CLSID( USER_INFO ) = 0x07A5D5B5,
+    DECL_CLSID( OA2EVENT ) = 0x7D93773C,
+};
+
+struct timespec
+    : public CStructBase
+{
+    typedef CStructBase super;
+    
+    //Message identity
+    guint32 m_dwMsgId = clsid( timespec );
+    std::string m_strMsgId = "oa2check::timespec";
+    // data members
+    guint64 tv_sec;
+    
+    // Constructor
+    timespec() : super()
+    { SetClassId( ( EnumClsid )m_dwMsgId ); }
+
+    // methods
+    gint32 Serialize(
+        BufPtr& pBuf_ ) override;
+    
+    gint32 Deserialize(
+        BufPtr& pBuf_ ) override;
+    
+    guint32 GetMsgId() const override
+    { return m_dwMsgId; }
+    
+    const std::string&
+        GetMsgName() const override
+    { return m_strMsgId; }
+    
+    timespec& operator=(
+        const timespec& rhs );
 };
 
 struct USER_INFO
@@ -38,6 +73,7 @@ struct USER_INFO
     std::string strUserId;
     std::string strUserName;
     std::string strEmail;
+    timespec tsExpireTime;
     
     // Constructor
     USER_INFO() : super()
@@ -61,6 +97,41 @@ struct USER_INFO
         const USER_INFO& rhs );
 };
 
+struct OA2EVENT
+    : public CStructBase
+{
+    typedef CStructBase super;
+    
+    //Message identity
+    guint32 m_dwMsgId = clsid( OA2EVENT );
+    std::string m_strMsgId = "oa2check::OA2EVENT";
+    // data members
+    std::string strUserId;
+    guint32 dwEventId;
+    std::string strDesc;
+    
+    // Constructor
+    OA2EVENT() : super()
+    { SetClassId( ( EnumClsid )m_dwMsgId ); }
+
+    // methods
+    gint32 Serialize(
+        BufPtr& pBuf_ ) override;
+    
+    gint32 Deserialize(
+        BufPtr& pBuf_ ) override;
+    
+    guint32 GetMsgId() const override
+    { return m_dwMsgId; }
+    
+    const std::string&
+        GetMsgName() const override
+    { return m_strMsgId; }
+    
+    OA2EVENT& operator=(
+        const OA2EVENT& rhs );
+};
+
 class IOAuth2Proxy_PImpl
     : public virtual CAggInterfaceProxy
 {
@@ -75,16 +146,16 @@ class IOAuth2Proxy_PImpl
     { return iid( OAuth2Proxy ); }
 
     //RPC Async Req Sender
-    gint32 IsTokenValid( 
+    gint32 DoLogin( 
         IConfigDb* context, 
         const std::string& strToken, 
         bool& bValid );
 
-    gint32 IsTokenValidDummy( BufPtr& pBuf_ )
+    gint32 DoLoginDummy( BufPtr& pBuf_ )
     { return STATUS_SUCCESS; }
     
     //Async callback wrapper
-    gint32 IsTokenValidCbWrapper( 
+    gint32 DoLoginCbWrapper( 
         IEventSink* pCallback, 
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
@@ -92,7 +163,7 @@ class IOAuth2Proxy_PImpl
     //RPC Async Req Callback
     //TODO: implement me by adding
     //response processing code
-    virtual gint32 IsTokenValidCallback(
+    virtual gint32 DoLoginCallback(
         IConfigDb* context, 
         gint32 iRet,bool bValid ) = 0;
     
@@ -138,6 +209,15 @@ class IOAuth2Proxy_PImpl
     virtual gint32 RevokeUserCallback(
         IConfigDb* context, 
         gint32 iRet ) = 0;
+    
+    //RPC event handler 'OnOA2Event'
+    //TODO: implement me
+    virtual gint32 OnOA2Event(
+        OA2EVENT& oEvent ) = 0;
+    
+    //RPC event handler wrapper
+    gint32 OnOA2EventWrapper(
+        IEventSink* pCallback, BufPtr& pBuf_ );
     
 };
 

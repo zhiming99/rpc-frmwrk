@@ -7,6 +7,65 @@
 using namespace rpcf;
 #include "oa2check.h"
 
+gint32 timespec::Serialize( BufPtr& pBuf_ )
+{
+    if( pBuf_.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        ret = CSerialBase::Serialize(
+            pBuf_, m_dwMsgId );
+        if( ERROR( ret ) ) break;
+        
+        ret = CSerialBase::Serialize(
+            pBuf_, tv_sec );
+        if( ERROR( ret ) ) break;
+        
+    }while( 0 );
+
+    return ret;
+    
+}
+
+gint32 timespec::Deserialize( BufPtr& pBuf_ )
+{
+    if( pBuf_.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        guint32 dwMsgId = 0;
+        ret = CSerialBase::Deserialize(
+            pBuf_, dwMsgId );
+        
+        if( ERROR( ret ) ) return ret;
+        if( m_dwMsgId != dwMsgId ) return -EINVAL;
+        
+        ret = CSerialBase::Deserialize(
+            pBuf_, tv_sec );
+        
+        if( ERROR( ret ) ) break;
+        
+    }while( 0 );
+
+    return ret;
+    
+}
+
+timespec& timespec::operator=(
+    const timespec& rhs )
+{
+    do{
+        // data members
+        if( GetObjId() == rhs.GetObjId() )
+            break;
+        
+        tv_sec = rhs.tv_sec;
+        
+    }while( 0 );
+
+    return *this;
+}
+
 gint32 USER_INFO::Serialize( BufPtr& pBuf_ )
 {
     if( pBuf_.IsEmpty() )
@@ -27,6 +86,11 @@ gint32 USER_INFO::Serialize( BufPtr& pBuf_ )
         
         ret = CSerialBase::Serialize(
             pBuf_, strEmail );
+        if( ERROR( ret ) ) break;
+        
+        tsExpireTime.SetIf( GetIf() );
+        ret = SerialStruct( 
+            pBuf_, tsExpireTime );
         if( ERROR( ret ) ) break;
         
     }while( 0 );
@@ -63,6 +127,11 @@ gint32 USER_INFO::Deserialize( BufPtr& pBuf_ )
         
         if( ERROR( ret ) ) break;
         
+        tsExpireTime.SetIf( GetIf() );
+        ret = DeserialStruct(
+            pBuf_, tsExpireTime );
+        if( ERROR( ret ) ) break;
+        
     }while( 0 );
 
     return ret;
@@ -80,6 +149,86 @@ USER_INFO& USER_INFO::operator=(
         strUserId = rhs.strUserId;
         strUserName = rhs.strUserName;
         strEmail = rhs.strEmail;
+        tsExpireTime = rhs.tsExpireTime;
+        
+    }while( 0 );
+
+    return *this;
+}
+
+gint32 OA2EVENT::Serialize( BufPtr& pBuf_ )
+{
+    if( pBuf_.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        ret = CSerialBase::Serialize(
+            pBuf_, m_dwMsgId );
+        if( ERROR( ret ) ) break;
+        
+        ret = CSerialBase::Serialize(
+            pBuf_, strUserId );
+        if( ERROR( ret ) ) break;
+        
+        ret = CSerialBase::Serialize(
+            pBuf_, dwEventId );
+        if( ERROR( ret ) ) break;
+        
+        ret = CSerialBase::Serialize(
+            pBuf_, strDesc );
+        if( ERROR( ret ) ) break;
+        
+    }while( 0 );
+
+    return ret;
+    
+}
+
+gint32 OA2EVENT::Deserialize( BufPtr& pBuf_ )
+{
+    if( pBuf_.IsEmpty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        guint32 dwMsgId = 0;
+        ret = CSerialBase::Deserialize(
+            pBuf_, dwMsgId );
+        
+        if( ERROR( ret ) ) return ret;
+        if( m_dwMsgId != dwMsgId ) return -EINVAL;
+        
+        ret = CSerialBase::Deserialize(
+            pBuf_, strUserId );
+        
+        if( ERROR( ret ) ) break;
+        
+        ret = CSerialBase::Deserialize(
+            pBuf_, dwEventId );
+        
+        if( ERROR( ret ) ) break;
+        
+        ret = CSerialBase::Deserialize(
+            pBuf_, strDesc );
+        
+        if( ERROR( ret ) ) break;
+        
+    }while( 0 );
+
+    return ret;
+    
+}
+
+OA2EVENT& OA2EVENT::operator=(
+    const OA2EVENT& rhs )
+{
+    do{
+        // data members
+        if( GetObjId() == rhs.GetObjId() )
+            break;
+        
+        strUserId = rhs.strUserId;
+        dwEventId = rhs.dwEventId;
+        strDesc = rhs.strDesc;
         
     }while( 0 );
 
@@ -91,8 +240,8 @@ gint32 IOAuth2Proxy_PImpl::InitUserFuncs()
     BEGIN_IFPROXY_MAP( OAuth2Proxy, false );
 
     ADD_USER_PROXY_METHOD_EX( 1,
-        IOAuth2Proxy_PImpl::IsTokenValidDummy,
-        "IsTokenValid" );
+        IOAuth2Proxy_PImpl::DoLoginDummy,
+        "DoLogin" );
 
     ADD_USER_PROXY_METHOD_EX( 1,
         IOAuth2Proxy_PImpl::GetUserInfoDummy,
@@ -104,10 +253,18 @@ gint32 IOAuth2Proxy_PImpl::InitUserFuncs()
 
     END_IFPROXY_MAP;
     
+    BEGIN_IFHANDLER_MAP( OAuth2Proxy );
+
+    ADD_USER_EVENT_HANDLER(
+        IOAuth2Proxy_PImpl::OnOA2EventWrapper,
+        "OnOA2Event" );
+    
+    END_IFHANDLER_MAP;
+    
     return STATUS_SUCCESS;
 }
 
-gint32 IOAuth2Proxy_PImpl::IsTokenValid( 
+gint32 IOAuth2Proxy_PImpl::DoLogin( 
     IConfigDb* context,
     const std::string& strToken,
     bool& bValid )
@@ -128,7 +285,7 @@ gint32 IOAuth2Proxy_PImpl::IsTokenValid(
         
         ret = NEW_PROXY_RESP_HANDLER2(
             pRespCb_, ObjPtr( this ), 
-            &IOAuth2Proxy_PImpl::IsTokenValidCbWrapper, 
+            &IOAuth2Proxy_PImpl::DoLoginCbWrapper, 
             nullptr, oReqCtx_.GetCfg() );
 
         if( ERROR( ret ) ) break;
@@ -152,7 +309,7 @@ gint32 IOAuth2Proxy_PImpl::IsTokenValid(
         ret = this->AsyncCall(
             ( IEventSink* )pRespCb_, 
             oOptions_.GetCfg(), pResp_,
-            "IsTokenValid",
+            "DoLogin",
             pBuf_ );
         gint32 ret2 = pRespCb_->GetError();
         if( SUCCEEDED( ret ) )
@@ -222,7 +379,7 @@ gint32 IOAuth2Proxy_PImpl::IsTokenValid(
     return ret;
 }
 //Async callback wrapper
-gint32 IOAuth2Proxy_PImpl::IsTokenValidCbWrapper( 
+gint32 IOAuth2Proxy_PImpl::DoLoginCbWrapper( 
     IEventSink* pCallback, 
     IEventSink* pIoReq,
     IConfigDb* pReqCtx )
@@ -279,7 +436,7 @@ gint32 IOAuth2Proxy_PImpl::IsTokenValidCbWrapper(
                 
             
         }
-        this->IsTokenValidCallback(
+        this->DoLoginCallback(
             context, iRet,
             bValid );
         
@@ -586,4 +743,30 @@ gint32 IOAuth2Proxy_PImpl::RevokeUserCbWrapper(
     }while( 0 );
     
     return 0;
+}
+
+gint32 IOAuth2Proxy_PImpl::OnOA2EventWrapper( 
+    IEventSink* pCallback, BufPtr& pBuf_ )
+{
+    gint32 ret = 0;
+    OA2EVENT oEvent;
+    
+    ObjPtr pDeserialIf_(this);
+    CSerialBase oDeserial_( pDeserialIf_ );
+    do{
+        guint32 dwOrigOff = pBuf_->offset();
+        oEvent.SetIf( oDeserial_.GetIf() );
+        ret = oDeserial_.DeserialStruct(
+            pBuf_, oEvent );
+        if( ERROR( ret ) ) break;
+        
+        pBuf_->SetOffset( dwOrigOff );
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        return ret;
+        
+    OnOA2Event(oEvent );
+
+    return ret;
 }

@@ -11,7 +11,7 @@ using namespace rpcf;
 
 // OAuth2Proxy Proxy
 /* Async Req Complete Handler*/
-gint32 COA2proxy_CliImpl::IsTokenValidCallback(
+gint32 COA2proxy_CliImpl::DoLoginCallback(
     IConfigDb* context, gint32 iRet,
     bool bValid /*[ In ]*/ )
 {
@@ -35,6 +35,15 @@ gint32 COA2proxy_CliImpl::RevokeUserCallback(
     IConfigDb* context, gint32 iRet )
 {
     // TODO: Process the server response here
+    // return code ignored
+    return 0;
+}
+
+/* Event Handler*/
+gint32 COA2proxy_CliImpl::OnOA2Event(
+    OA2EVENT& oEvent /*[ In ]*/ )
+{
+    // TODO: Processing the event here
     // return code ignored
     return 0;
 }
@@ -87,13 +96,13 @@ gint32 COA2proxy_CliImpl::RemoveSession(
 gint32 COA2proxy_CliImpl::IsSessExpired(
     IEventSink* pCallback,
     const std::string& strSess )
-{
-    gint32 ret = 0;
-    do{
-    }while( 0 );
+{ return ERROR_FALSE; }
 
-    return ret;
-}
+gint32 COA2proxy_CliImpl::InquireSess(
+    const std::string& strSess,
+    CfgPtr& pInfo )
+{ return ERROR_NOT_IMPL; }
+
 
 extern gint32 gen_sess_hash(
     BufPtr& pBuf,
@@ -159,5 +168,40 @@ gint32 COA2proxy_CliImpl::GenSessHash(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 COA2proxy_CliImpl::Login(
+    IEventSink* pCallback,
+    IConfigDb* pInfo,
+    CfgPtr& pResp
+    )
+{
+    gint32 ret = 0;
+    do{
+        CParamList oContext;
+        oContext.SetPointer(
+            propEventSink, pCallback );
+        Variant oToken;
+        ret = pInfo->GetProperty( 0, oToken );
+        if( ERROR( ret ) )
+            break;
+        bool bValid = false;
+        ret = this->DoLogin( oContext.GetCfg(),
+            ( stdstr& )oToken, bValid );
+        if( ret == STATUS_PENDING )
+            break;
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        if( !bValid )
+            ret = -EACCES;
+
+        oResp.SetIntProp(
+            propReturnValue, -EACCES );
+    
+    }while( 0 );
     return ret;
 }
