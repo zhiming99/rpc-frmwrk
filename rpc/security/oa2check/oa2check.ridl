@@ -1,0 +1,36 @@
+appname "oa2check";
+
+struct timespec
+{
+    uint64 tv_sec;
+};
+
+// this test demonstrates different approaches of
+// asynchronous processing with the RPC-Frmwrk support
+struct USER_INFO
+{
+    string strUserId;
+    string strUserName;
+    string strEmail;
+    timespec tsExpireTime;
+};
+
+struct OA2EVENT
+{
+    string strUserId;
+    uint32 dwEventId;
+    string strDesc;
+};
+
+interface OAuth2Proxy
+{
+    [async]DoLogin( string strToken ) returns ( bool bValid );
+    [async]GetUserInfo( string strToken ) returns ( USER_INFO ui );
+    [async]RevokeUser( string strToken ) returns();
+    [event]OnOA2Event( OA2EVENT oEvent ) returns();
+};
+
+service OA2proxy
+{
+    interface OAuth2Proxy;
+};
