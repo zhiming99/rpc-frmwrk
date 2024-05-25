@@ -6229,7 +6229,7 @@ gint32 CTaskWrapper::TransferParams(
         IConfigDb* pSrc = this->GetConfig();
         if( pSrc->exist( propRespPtr ) )
         {
-            oCfg.CopyProp( propRespPtr, pSrc );
+            // oCfg.CopyProp( propRespPtr, pSrc );
             break;
         }
 
