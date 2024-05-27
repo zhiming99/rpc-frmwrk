@@ -2407,7 +2407,7 @@ EOF
         mechList = Gtk.ListStore()
         mechList = Gtk.ListStore(int, str)
         mechList.append([1, "Kerberos"] )
-        mechList.append( [2, "Oauth2"] )
+        mechList.append( [2, "OAuth2"] )
     
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
