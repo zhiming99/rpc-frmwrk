@@ -4438,9 +4438,7 @@ gint32 CRpcServices::LoadObjDesc(
                 string strVal =
                     oObjAuth[ JSON_ATTR_AUTHMECH ].asString();
 
-                if( !( strVal == "krb5" ||
-                    strVal == "ntlm" ||
-                    strVal == "password" ) )
+                if( !( strVal == "krb5" || strVal == "OAuth2" ) )
                     break;
 
                 string strMech = strVal;
