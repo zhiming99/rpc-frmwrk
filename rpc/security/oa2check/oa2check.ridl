@@ -24,7 +24,7 @@ struct OA2EVENT
 
 interface OAuth2Proxy
 {
-    [async]DoLogin( string strToken ) returns ( bool bValid );
+    [async]DoLogin( string strToken ) returns ( USER_INFO ui );
     [async]GetUserInfo( string strToken ) returns ( USER_INFO ui );
     [async]RevokeUser( string strToken ) returns();
     [event]OnOA2Event( OA2EVENT oEvent ) returns();

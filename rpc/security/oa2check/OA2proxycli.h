@@ -14,18 +14,17 @@ class COA2proxy_CliImpl :
 {
     std::map< std::string, guint32 > m_mapSess2PortId;
     std::map< guint32, std::string > m_mapPortId2Sess;
-    std::map< guint32, std::string > m_mapSessions; 
+    std::map< guint32, ObjPtr > m_mapSessions; 
+    InterfPtr m_pRouter;
 
     public:
     typedef COA2proxy_CliSkel super;
-    COA2proxy_CliImpl( const IConfigDb* pCfg ) :
-        super::virtbase( pCfg ), super( pCfg )
-    { SetClassId( clsid(COA2proxy_CliImpl ) ); }
+    COA2proxy_CliImpl( const IConfigDb* pCfg );
 
     // OAuth2Proxy
     virtual gint32 DoLoginCallback(
         IConfigDb* context, gint32 iRet,
-        bool bValid /*[ In ]*/ );
+        USER_INFO& ui /*[ In ]*/ );
     
     virtual gint32 GetUserInfoCallback(
         IConfigDb* context, gint32 iRet,
@@ -106,5 +105,19 @@ class COA2proxy_CliImpl :
         guint32 dwPortId,
         std::string& strSess );
 
+    InterfPtr GetRouter() const
+    { return m_pRouter; }
+
+    gint32 OnPostStop(
+        IEventSink* pCb ) override
+    {
+        m_pRouter.Clear();
+        return super::OnPostStop( pCb );
+    }
+
+    gint32 BuildLoginResp(
+        IEventSink* pInv, gint32 iRet,
+        const Variant& oToken,
+        CfgPtr& pResp );
 };
 

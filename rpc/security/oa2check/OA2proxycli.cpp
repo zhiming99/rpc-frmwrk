@@ -9,14 +9,76 @@ using namespace rpcf;
 #include "oa2check.h"
 #include "OA2proxycli.h"
 
+FactoryPtr OA2CheckClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+
+    INIT_MAP_ENTRYCFG( COA2proxy_CliImpl );
+    
+    INIT_MAP_ENTRY( timespec );
+    INIT_MAP_ENTRY( USER_INFO );
+    INIT_MAP_ENTRY( OA2EVENT );
+    
+    END_FACTORY_MAPS;
+}
+
+COA2proxy_CliImpl( const IConfigDb* pCfg ) :
+    super::virtbase( pCfg ), super( pCfg )
+{
+    gint32 ret = 0;
+    do{
+        SetClassId( clsid(COA2proxy_CliImpl ) );
+        CCfgOpener oCfg( pCfg );
+        CRpcServices* pSvc = nullptr;
+        ret = oCfg.GetPointer(
+            propRouterPtr, pSvc );
+        if( ERROR( ret ) )
+            break;
+        m_pRouter = pSvc;
+
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        stdstr strMsg = DebugMsg( ret,
+            "Error in COA2proxy_CliImpl ctor" );
+        throw new std::runtime_error( strMsg );
+    }
+}
+
 // OAuth2Proxy Proxy
 /* Async Req Complete Handler*/
 gint32 COA2proxy_CliImpl::DoLoginCallback(
     IConfigDb* context, gint32 iRet,
-    bool bValid /*[ In ]*/ )
+    USER_INFO& ui /*[ In ]*/ )
 {
-    // TODO: Process the server response here
-    // return code ignored
+    gint32 ret = 0;
+    do{
+        CCfgOpener oCtx( context );
+        ret = oCtx.GetPointer(
+            propEventSink, pCb );
+        if( ERROR( ret ) )
+            break;
+        CParamList oResp;
+        oResp.SetIntProp(
+            propReturnValue, iRet );
+        if( SUCCEEDED( iRet ) )
+        {
+            ObjPtr pObj;
+            pObj.NewObj( clsid( USER_INFO ) );
+            USER_INFO* pui = pObj;
+            // ui is allocated on the stack cannot be
+            // passed on, make a copy on the heap
+            *pui = ui;
+            oResp.Push( pObj );
+            pObj = oResp.GetCfg();
+            Variant oVar( pObj );
+            pCb->SetProperty(
+                propRespPtr, oVar );
+        }
+
+        pCb->OnEvent( eventTaskComp,
+            iRet, 0, nullptr );
+    }while( 0 );
     return 0;
 }
 
@@ -96,7 +158,27 @@ gint32 COA2proxy_CliImpl::RemoveSession(
 gint32 COA2proxy_CliImpl::IsSessExpired(
     IEventSink* pCallback,
     const std::string& strSess )
-{ return ERROR_FALSE; }
+{
+    CStdRMutex oGssLock( this->GetLock() );
+    auto itr = 
+        m_mapSess2PortId.find( strSess );
+    if( itr == m_mapSess2PortId.end() )
+        return STATUS_SUCCESS;
+
+    guint32 dwPortId = itr2->second;
+    auto it2 = m_mapSessions.find( dwPortId );
+    if( it2 == m_mapSessions.end() )
+        return ERROR_FAIL;
+    
+    USER_INFO* pui = it2->second;
+    if( pui == nullptr )
+        return ERROR_FAIL;
+    timespec tv;
+    clock_gettime( CLOCK_REALTIME, &tv );
+    if( tv.tv_sec >= pui->tsExpireTime.tv_sec )
+        return STATUS_SUCCESS;
+    return ERROR_FALSE;
+}
 
 gint32 COA2proxy_CliImpl::InquireSess(
     const std::string& strSess,
@@ -171,6 +253,86 @@ gint32 COA2proxy_CliImpl::GenSessHash(
     return ret;
 }
 
+gint32 COA2proxy_CliImpl::BuildLoginResp(
+    IEventSink* pInv, gint32 iRet,
+    const Variant& oToken,
+    CfgPtr& pResp )
+{
+    gint32 ret = 0;
+    do{
+        gint32 iRet = 0;
+        CParamList oResp( pResp );
+        ret = oResp.SetIntProp(
+            propReturnValue, iRet );
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        DMsgPtr pMsg;
+        CCfgOpenerObj oInvCfg( pInv );
+        ret = oInvCfg.GetMsgPtr(
+            propMsgPtr, pMsg );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pObj;
+        ret = pMsg.GetObjArgAt( 1, pObj );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwPortId = 0;
+        CCfgOpener oReqCtx(
+            ( IConfigDb* )pObj );
+        ret = oReqCtx.GetIntProp(
+            propConnHandle, dwPortId );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pIf->GenSessHash(
+            oToken, dwPortId, strSess );
+        if( ERROR( ret ) )
+            break;
+
+        ObjPtr pui;
+        ret = oResp.Pop( pui );
+        if( ERROR( ret ) )
+            break;
+
+        oResp.SetStrProp(
+            propSessHash, strSess );
+
+        CRpcRouterBridge* pRouter =
+            static_cast< CRpcRouterBridge* >
+                ( GetRouter() );
+        if( unlikely( pRouter == nullptr ) )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        InterfPtr pBridge;
+        ret = pRouter->GetBridge(
+            dwPortId, pBridge );
+
+        if( ERROR( ret ) )
+            break;
+
+        oResp.SetQwordProp(
+            propSalt, pBridge->GetObjId() );
+
+        CStdRMutex oIfLock( pIf->GetLock() );
+        pIf->AddSession( dwPortId, strSess );
+        pIf->m_mapSessions[ dwPortId ] = pui;
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 COA2proxy_CliImpl::Login(
     IEventSink* pCallback,
     IConfigDb* pInfo,
@@ -186,22 +348,96 @@ gint32 COA2proxy_CliImpl::Login(
         ret = pInfo->GetProperty( 0, oToken );
         if( ERROR( ret ) )
             break;
+
+        oContext.SetProperty( 0, oToken );
         bool bValid = false;
-        ret = this->DoLogin( oContext.GetCfg(),
-            ( stdstr& )oToken, bValid );
-        if( ret == STATUS_PENDING )
-            break;
+
+        gint32 (*func)( IEventSink*,
+            COA2proxy_CliImpl*, IConfigDb* ) =
+        ([]( IEventSink* pTask,
+            COA2proxy_CliImpl* pIf,
+            IConfigDb* pContext )->gint32
+        {
+            gint32 ret = 0;
+            IConfigDb* pResp = nullptr;
+            IEventSink* pInv = nullptr;
+            do{
+                CCfgOpener oCtx( pContext );
+                oCtx.GetPointer(
+                    propEventSink, pInv );
+
+                CCfgOpener oCfg(
+                    pTask->GetConfig() );
+
+                ret = oCfg.GetPointer(
+                    propRespPtr, pResp );
+
+                if( ERROR( ret ) )
+                    break;
+
+                Variant oToken;
+                ret = oCtx.GetProperty( 0, oToken );
+                if( ERROR( ret ) )
+                    break;
+
+                gint32 iRet = 0;
+                CParamList oResp( pResp );
+                ret = oResp.GetIntProp(
+                    propReturnValue, iRet );
+                if( ERROR( ret ) )
+                    break;
+
+                if( ERROR( iRet ) )
+                {
+                    ret = iRet;
+                    break;
+                }
+
+                ret = this->BuildLoginResp(
+                    pInv, iRet, oToken,  pResp );
+
+            }while( 0 );
+
+            CCfgOpener oResp;
+            if( ERROR( ret ) && pResp == nullptr )
+            {
+                oResp.SetIntProp(
+                    propReturnValue, ret );
+                pResp = oResp.GetCfg();
+            }
+
+            if( pInv == nullptr )
+                return 0;
+
+            pIf->SetResponse( pInv, pResp );
+            pInv->OnEvent(
+                eventTaskComp, ret, 0, nullptr );
+
+            return ret;
+        });
+
+        TaskletPtr plcc;
+        ret = NEW_COMPLETE_FUNCALL( 0, plcc,
+            this->GetIoMgr(), func,
+            this, oContext.GetCfg() );
 
         if( ERROR( ret ) )
             break;
 
-        CCfgOpener oResp( pResp );
-        if( !bValid )
-            ret = -EACCES;
+        CCfgOpener oCtx2;
+        oCtx2.SetPointer( propEventSink,
+            ( CObjBase* )plcc );
 
-        oResp.SetIntProp(
-            propReturnValue, -EACCES );
-    
+        USER_INFO ui;
+        ret = this->DoLogin( oCtx2.GetCfg(),
+            ( stdstr& )oToken, ui );
+        if( ret == STATUS_PENDING )
+            break;
+
+        ( *plcc )( eventCancelTask );
+        this->BuildLoginResp(
+            pCallback, ret, oToken, pResp );
+
     }while( 0 );
     return ret;
 }
