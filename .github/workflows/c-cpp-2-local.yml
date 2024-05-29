@@ -6,8 +6,6 @@ on:   workflow_dispatch
   # pull_request:
   #  branches: [ master, Enhancement-less-dependency-of-dbus-connection ]
 
-
-    
 jobs:
   build:
 
