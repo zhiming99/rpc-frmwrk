@@ -1,6 +1,6 @@
 lib_LTLIBRARIES=libauth.la
 
-libauth_la_CPPFLAGS = -I$(top_srcdir)/ipc -I../ \
+libauth_la_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/ipc -I../ \
 -I$(top_srcdir)/combase -I$(top_srcdir)/rpc -I$(top_srcdir)/3rd_party
 
 if ENABLE_KRB5
