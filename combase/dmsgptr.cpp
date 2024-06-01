@@ -49,7 +49,11 @@ std::string DMsgPtr::GetInterface() const
         pszInterface =
             dbus_message_get_interface( m_pObj );
         if( pszInterface == nullptr )
+        {
             pszInterface = "";
+            DebugPrintEx( logErr, -ENOMSG,
+                "dbus_message_get_interface failed" );
+        }
     }
 
     return std::string( pszInterface );
@@ -83,9 +87,13 @@ std::string DMsgPtr::GetPath() const
     {
         sched_yield();
         pszPath =
-            dbus_message_get_interface( m_pObj );
+            dbus_message_get_path( m_pObj );
         if( pszPath == nullptr )
+        {
             pszPath = "";
+            DebugPrintEx( logErr, -ENOMSG,
+                "dbus_message_get_path failed" );
+        }
     }
     return std::string( pszPath );
 }
