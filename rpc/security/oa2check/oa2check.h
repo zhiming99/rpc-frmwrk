@@ -23,24 +23,24 @@ enum EnumMyClsid
     
     DECL_IID( OAuth2Proxy ),
 
-    DECL_CLSID( timespec ) = 0xF3881ACE,
+    DECL_CLSID( TIMESTAMP ) = 0x301137BE,
     DECL_CLSID( USER_INFO ) = 0x07A5D5B5,
     DECL_CLSID( OA2EVENT ) = 0x7D93773C,
 };
 
-struct timespec
+struct TIMESTAMP
     : public CStructBase
 {
     typedef CStructBase super;
     
     //Message identity
-    guint32 m_dwMsgId = clsid( timespec );
-    std::string m_strMsgId = "oa2check::timespec";
+    guint32 m_dwMsgId = clsid( TIMESTAMP );
+    std::string m_strMsgId = "oa2check::TIMESTAMP";
     // data members
     guint64 tv_sec;
     
     // Constructor
-    timespec() : super()
+    TIMESTAMP() : super()
     { SetClassId( ( EnumClsid )m_dwMsgId ); }
 
     // methods
@@ -57,8 +57,8 @@ struct timespec
         GetMsgName() const override
     { return m_strMsgId; }
     
-    timespec& operator=(
-        const timespec& rhs );
+    TIMESTAMP& operator=(
+        const TIMESTAMP& rhs );
 };
 
 struct USER_INFO
@@ -73,7 +73,7 @@ struct USER_INFO
     std::string strUserId;
     std::string strUserName;
     std::string strEmail;
-    timespec tsExpireTime;
+    TIMESTAMP tsExpireTime;
     
     // Constructor
     USER_INFO() : super()

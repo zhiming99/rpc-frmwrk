@@ -15,7 +15,7 @@ FactoryPtr OA2CheckClassFactory()
 
     INIT_MAP_ENTRYCFG( COA2proxy_CliImpl );
     
-    INIT_MAP_ENTRY( timespec );
+    INIT_MAP_ENTRY( TIMESTAMP );
     INIT_MAP_ENTRY( USER_INFO );
     INIT_MAP_ENTRY( OA2EVENT );
     

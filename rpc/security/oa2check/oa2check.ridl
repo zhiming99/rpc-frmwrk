@@ -1,6 +1,6 @@
 appname "oa2check";
 
-struct timespec
+struct TIMESTAMP
 {
     uint64 tv_sec;
 };
@@ -12,7 +12,7 @@ struct USER_INFO
     string strUserId;
     string strUserName;
     string strEmail;
-    timespec tsExpireTime;
+    TIMESTAMP tsExpireTime;
 };
 
 struct OA2EVENT
