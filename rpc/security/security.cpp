@@ -3663,7 +3663,7 @@ gint32 CAuthentServer::StartOA2Checker(
         InterfPtr pIf;
         ret = pIf.NewObj(
             // clsid( COA2proxy_CliImpl ),
-            clsid( invalid ),
+            clsid( Invalid ),
             oCfg.GetCfg() );
 
         if( ERROR( ret ) )
