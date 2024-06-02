@@ -31,8 +31,10 @@
 #include "k5proxy.h"
 #include <regex>
 
+#ifdef OA2
 using namespace rpcf;
 #include "oa2check/oa2check.h"
+#endif
 
 namespace rpcf
 {
@@ -3634,14 +3636,15 @@ gint32 CAuthentServer::StartOA2Checker(
     if( pCallback == nullptr )
         return -EINVAL;
 
+#ifdef OA2
     gint32 ret = 0;
     do{
         CCfgOpener oCfg;
         CIoManager* pMgr = GetIoMgr();
         oCfg.SetPointer( propIoMgr, pMgr );
 
-        // CoAddClassFactory(
-        //     OA2CheckClassFactory() );
+        CoAddClassFactory(
+            OA2CheckClassFactory() );
 
         ret = CRpcServices::LoadObjDesc(
             "./oacheck.json", "OA2proxy",
@@ -3662,8 +3665,7 @@ gint32 CAuthentServer::StartOA2Checker(
 
         InterfPtr pIf;
         ret = pIf.NewObj(
-            // clsid( COA2proxy_CliImpl ),
-            clsid( Invalid ),
+            clsid( COA2proxy_CliImpl ),
             oCfg.GetCfg() );
 
         if( ERROR( ret ) )
@@ -3686,7 +3688,7 @@ gint32 CAuthentServer::StartOA2Checker(
             ( *pRespCb )( eventCancelTask );
 
     }while( 0 );
-
+#endif
     return ret;
 }
 
@@ -3731,7 +3733,7 @@ gint32 CAuthentServer::OnPostStart(
         }
         else if( strMech == "OAuth2" )
         {
-#ifdef JS
+#ifdef OA2
             ret = StartOA2Checker( pCallback );
 #endif
         }

@@ -409,6 +409,7 @@ AC_CONFIG_FILES([Makefile
                  rpc/wsport/Makefile 
                  rpc/wsport/wsproto/Makefile
                  rpc/security/Makefile
+                 rpc/security/oa2check/Makefile
                  java/Makefile
                  fuse/Makefile
                  python/Makefile

@@ -36,10 +36,14 @@ class COA2proxy_CliImpl :
     virtual gint32 OnOA2Event(
         OA2EVENT& oEvent /*[ In ]*/ );
 
-    virtual gint32 WrapMessage(
+    gint32 WrapMessage(
         const std::string& strSess,
         BufPtr& pInMsg,
-        BufPtr& pOutMsg ) = 0;
+        BufPtr& pOutMsg ) override
+    {
+        pOutMsg = pInMsg;
+        return 0;
+    }
         
     gint32 UnwrapMessage(
         const std::string& strSess,
@@ -53,7 +57,7 @@ class COA2proxy_CliImpl :
     gint32 GetMicMsg(
         const std::string& strSess,
         BufPtr& pInMsg,
-        BufPtr& pOutMic ) override
+        BufPtr& pOutMsg ) override
     {
         pOutMsg = pInMsg;
         return 0;
@@ -67,6 +71,11 @@ class COA2proxy_CliImpl :
         return 0;
     }
 
+    gint32 AddSession( guint32 dwPortId, 
+        const std::string& strSess );
+
+    gint32 RemoveSession( guint32 dwPortId );
+
     gint32 RemoveSession(
         const std::string& strSess ) override;
 
@@ -79,8 +88,7 @@ class COA2proxy_CliImpl :
     { return 0; }
 
     gint32 IsSessExpired(
-        const std::string& strSess ) override
-    { return ERROR_FALSE; }
+        const std::string& strSess ) override;
 
     gint32 InquireSess(
         const std::string& strSess,
@@ -118,6 +126,6 @@ class COA2proxy_CliImpl :
     gint32 BuildLoginResp(
         IEventSink* pInv, gint32 iRet,
         const Variant& oToken,
-        CfgPtr& pResp );
+        IConfigDb* pResp );
 };
 
