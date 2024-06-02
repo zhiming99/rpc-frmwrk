@@ -33,6 +33,7 @@
 
 #ifdef OA2
 using namespace rpcf;
+extern FactoryPtr OA2CheckClassFactory();
 #include "oa2check/oa2check.h"
 #endif
 
@@ -3629,7 +3630,6 @@ gint32 CAuthentServer::OnStartOA2CheckerComplete(
     return ret;
 }
 
-extern FactoryPtr OA2CheckClassFactory();
 gint32 CAuthentServer::StartOA2Checker(
     IEventSink* pCallback )
 {
