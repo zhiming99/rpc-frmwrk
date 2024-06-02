@@ -250,6 +250,20 @@ gint32 COA2proxy_CliImpl::GenSessHash(
     return ret;
 }
 
+gint32 COA2proxy_CliImpl::GetSess(
+    guint32 dwPortId,
+    std::string& strSess )
+{
+    CStdRMutex oGssLock( this->GetLock() );
+    auto itr =
+        m_mapPortId2Sess.find( dwPortId );
+    if( itr == m_mapPortId2Sess.end() )
+        return -ENOENT;
+
+    strSess = itr->second;
+    return STATUS_SUCCESS;
+}
+
 gint32 COA2proxy_CliImpl::BuildLoginResp(
     IEventSink* pInv, gint32 iRet,
     const Variant& oToken,
