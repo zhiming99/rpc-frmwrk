@@ -3636,8 +3636,8 @@ gint32 CAuthentServer::StartOA2Checker(
     if( pCallback == nullptr )
         return -EINVAL;
 
-#ifdef OA2
     gint32 ret = 0;
+#ifdef OA2
     do{
         CCfgOpener oCfg;
         CIoManager* pMgr = GetIoMgr();
