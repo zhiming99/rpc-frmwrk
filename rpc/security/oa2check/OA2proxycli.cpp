@@ -22,8 +22,9 @@ FactoryPtr OA2CheckClassFactory()
     END_FACTORY_MAPS;
 }
 
-COA2proxy_CliImpl( const IConfigDb* pCfg ) :
-    super::virtbase( pCfg ), super( pCfg )
+COA2proxy_CliImpl::COA2proxy_CliImpl(
+    const IConfigDb* pCfg )
+    : super::virtbase( pCfg ), super( pCfg )
 {
     gint32 ret = 0;
     do{
@@ -54,6 +55,7 @@ gint32 COA2proxy_CliImpl::DoLoginCallback(
     gint32 ret = 0;
     do{
         CCfgOpener oCtx( context );
+        IEventSink* pCb = nullptr;
         ret = oCtx.GetPointer(
             propEventSink, pCb );
         if( ERROR( ret ) )
@@ -156,7 +158,6 @@ gint32 COA2proxy_CliImpl::RemoveSession(
 }
 
 gint32 COA2proxy_CliImpl::IsSessExpired(
-    IEventSink* pCallback,
     const std::string& strSess )
 {
     CStdRMutex oGssLock( this->GetLock() );
@@ -165,7 +166,7 @@ gint32 COA2proxy_CliImpl::IsSessExpired(
     if( itr == m_mapSess2PortId.end() )
         return STATUS_SUCCESS;
 
-    guint32 dwPortId = itr2->second;
+    guint32 dwPortId = itr->second;
     auto it2 = m_mapSessions.find( dwPortId );
     if( it2 == m_mapSessions.end() )
         return ERROR_FAIL;
@@ -185,10 +186,6 @@ gint32 COA2proxy_CliImpl::InquireSess(
     CfgPtr& pInfo )
 { return ERROR_NOT_IMPL; }
 
-
-extern gint32 gen_sess_hash(
-    BufPtr& pBuf,
-    std::string& strSess );
 
 gint32 COA2proxy_CliImpl::GenSessHash(
     stdstr strToken,
@@ -256,7 +253,7 @@ gint32 COA2proxy_CliImpl::GenSessHash(
 gint32 COA2proxy_CliImpl::BuildLoginResp(
     IEventSink* pInv, gint32 iRet,
     const Variant& oToken,
-    CfgPtr& pResp )
+    IConfigDb* pResp )
 {
     gint32 ret = 0;
     do{
@@ -293,7 +290,8 @@ gint32 COA2proxy_CliImpl::BuildLoginResp(
         if( ERROR( ret ) )
             break;
 
-        ret = pIf->GenSessHash(
+        stdstr strSess;
+        ret = this->GenSessHash(
             oToken, dwPortId, strSess );
         if( ERROR( ret ) )
             break;
@@ -325,9 +323,9 @@ gint32 COA2proxy_CliImpl::BuildLoginResp(
         oResp.SetQwordProp(
             propSalt, pBridge->GetObjId() );
 
-        CStdRMutex oIfLock( pIf->GetLock() );
-        pIf->AddSession( dwPortId, strSess );
-        pIf->m_mapSessions[ dwPortId ] = pui;
+        CStdRMutex oIfLock( this->GetLock() );
+        this->AddSession( dwPortId, strSess );
+        this->m_mapSessions[ dwPortId ] = pui;
 
     }while( 0 );
     return ret;
@@ -354,7 +352,7 @@ gint32 COA2proxy_CliImpl::Login(
 
         gint32 (*func)( IEventSink*,
             COA2proxy_CliImpl*, IConfigDb* ) =
-        ([]( IEventSink* pTask,
+        ([]( IEventSink* pWrapTask,
             COA2proxy_CliImpl* pIf,
             IConfigDb* pContext )->gint32
         {
@@ -366,7 +364,9 @@ gint32 COA2proxy_CliImpl::Login(
                 oCtx.GetPointer(
                     propEventSink, pInv );
 
-                CCfgOpener oCfg(
+                TaskletPtr pTask;
+                pTask = ObjPtr( pWrapTask );
+                CCfgOpener oCfg( (IConfigDb*)
                     pTask->GetConfig() );
 
                 ret = oCfg.GetPointer(
@@ -380,7 +380,7 @@ gint32 COA2proxy_CliImpl::Login(
                 if( ERROR( ret ) )
                     break;
 
-                gint32 iRet = 0;
+                guint32 iRet = 0;
                 CParamList oResp( pResp );
                 ret = oResp.GetIntProp(
                     propReturnValue, iRet );
@@ -389,12 +389,12 @@ gint32 COA2proxy_CliImpl::Login(
 
                 if( ERROR( iRet ) )
                 {
-                    ret = iRet;
+                    ret = ( gint32 )iRet;
                     break;
                 }
 
-                ret = this->BuildLoginResp(
-                    pInv, iRet, oToken,  pResp );
+                ret = pIf->BuildLoginResp(
+                    pInv, iRet, oToken, pResp );
 
             }while( 0 );
 
@@ -409,7 +409,8 @@ gint32 COA2proxy_CliImpl::Login(
             if( pInv == nullptr )
                 return 0;
 
-            pIf->SetResponse( pInv, pResp );
+            Variant oProp = ObjPtr( pResp );
+            pInv->SetProperty( propRespPtr, oProp );
             pInv->OnEvent(
                 eventTaskComp, ret, 0, nullptr );
 
@@ -419,7 +420,8 @@ gint32 COA2proxy_CliImpl::Login(
         TaskletPtr plcc;
         ret = NEW_COMPLETE_FUNCALL( 0, plcc,
             this->GetIoMgr(), func,
-            this, oContext.GetCfg() );
+            nullptr, this,
+            oContext.GetCfg() );
 
         if( ERROR( ret ) )
             break;
