@@ -447,12 +447,15 @@ gint32 COA2proxy_CliImpl::Login(
         USER_INFO ui;
         ret = this->DoLogin( oCtx2.GetCfg(),
             ( stdstr& )oToken, ui );
+
         if( ret == STATUS_PENDING )
             break;
 
-        ( *plcc )( eventCancelTask );
         this->BuildLoginResp(
             pCallback, ret, oToken, pResp );
+
+        if( !plcc.IsEmpty() )
+            ( *plcc )( eventCancelTask );
 
     }while( 0 );
     return ret;
