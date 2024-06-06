@@ -13,7 +13,7 @@ function setLogger() {
     console.log = function (message) {
         if (typeof message == 'object') {
             logger.innerHTML += (JSON && JSON.stringify ? JSON.stringify(message) : message) + '<br />';
-        } else {
+        } else if( typeof message == 'string' ){
             logger.innerHTML += message + '<br />';
         }
     }
