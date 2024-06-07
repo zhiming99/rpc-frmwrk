@@ -1,4 +1,9 @@
 ---
+[`Fri Jun 07 2024 11:21:11 PM Beijing`]   
+1. I'am now trying to setting up a django oauth2 server and a django app for oauth2 debugging.
+2. The oauth2 cgi will also integrate a `oa2check` server for `rpcrouter` to verify the incoming `login` request.
+3. The django `cgi` app will not go into the `rpc-frmwrk` codebase. Instead they will be placed in another repository.
+
 [`Mon May 20 2024 04:41:43 PM Beijing`]   
 1. Removed builtin-rt client's dependency to dbus connection. And fixed some bugs.
 2. Next, I will add OAuth2 support for JS client.
