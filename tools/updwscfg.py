@@ -201,7 +201,7 @@ upstream {AppName} {{
     cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf;"
     cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf ) && "
     cmdline += "rm " + cfgFile + " && echo nginx setup complete ;"
-    cmdline += "{sudo} systemctl restart nginx"
+    cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
     else:

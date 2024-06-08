@@ -152,12 +152,23 @@ if [ -f USESSL ]; then
         mkdir -p $keydir || exit 1
     fi   
     updinitcfg=`dirname $rpcfgnui`/updinitcfg.py
+    if [ -f clidx ]; then
+        clikeyidx=`cat clidx`
+    elif [ -f svridx ]; then
+        svrkeyidx=`cat svridx`
+    fi
     if [ ! -f $updinitcfg ]; then exit 1; fi
     if [ -f clientkeys-1.tar.gz  ]; then
         keyfile=clientkeys-1.tar.gz
         option="-c"
+    elif [ "x$clikeyidx" != "x" ]; then
+        keyfile=clientkeys-$clikeyidx.tar.gz
+        option="-c"
     elif [ -f serverkeys-0.tar.gz  ]; then
         keyfile=serverkeys-0.tar.gz
+        option=
+    elif [ "x$svrkeyidx" != "x" ]; then
+        keyfile=serverkeys-$svrkeyidx.tar.gz
         option=
     fi       
     tar -C $keydir -xf $keyfile || exit 1
@@ -166,6 +177,7 @@ if [ -f USESSL ]; then
     cat /dev/null > $keyfile
 fi
 
+echo setup rpc-frmwrk configurations...
 initcfg=$(pwd)/initcfg.json
 python3 $rpcfgnui $initcfg
 '''
