@@ -602,9 +602,9 @@ case $enable_js in
         JS_RPMLIBS="npm," 
         JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
-        JS_RPMPOST="npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify"
+        JS_RPMPOST="npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
-        JS_RPMPOSTUN="npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify"
+        JS_RPMPOSTUN="npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         JS_DEBLIBS="npm,"
         JS_DEBFILES="etc/rpcf/jslib/*"
         JS_CFGOPT=

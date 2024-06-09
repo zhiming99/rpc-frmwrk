@@ -3115,6 +3115,8 @@ gint32 CExportJsSampleHtml::Output()
         NEW_LINE;
         CCOUT << "* long lz4 process put safe-buffer stream xxhash xxhashjs webpack webpack-cli";
         NEW_LINE;
+        CCOUT << "* stream-browserify";
+        NEW_LINE;
         Wa( "-->" );
         Wa( "<!DOCTYPE html>" );
         Wa( "<html><head><meta charset=\"utf-8\" /></head></html>" );
