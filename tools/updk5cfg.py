@@ -269,7 +269,7 @@ def IsLocalIpAddr(
         s.listen()
         return True
     except Exception as err:
-        print(err)
+        #print(err)
         return False
     finally:
         s.close()

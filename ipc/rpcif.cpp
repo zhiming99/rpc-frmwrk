@@ -4441,9 +4441,10 @@ gint32 CRpcServices::LoadObjDesc(
                 if( !( strVal == "krb5" || strVal == "OAuth2" ) )
                     break;
 
-                string strMech = strVal;
-
+                string& strMech = strVal;
                 oAuth.SetStrProp( propAuthMech, strVal );
+                if( strMech == "OAuth2" )
+                    break;
 
                 if( oObjAuth.isMember( JSON_ATTR_SVCNAME ) &&
                     oObjAuth[ JSON_ATTR_SVCNAME ].isString() )
