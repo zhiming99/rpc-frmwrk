@@ -34,6 +34,13 @@
 #include "k5proxy.h"
 #include "kdcfdo.h"
 
+using namespace rpcf;
+
+#ifdef OA2
+#include "oa2check/oa2check.h"
+extern FactoryPtr OA2CheckClassFactory();
+#endif
+
 namespace rpcf
 {
 // mandatory part, just copy/paste'd from clsids.cpp
@@ -67,8 +74,6 @@ static FactoryPtr InitClassFactory()
 
 }
 
-using namespace rpcf;
-
 // common method for a class factory library
 extern "C"
 gint32 DllLoadFactory( FactoryPtr& pFactory )
@@ -77,5 +82,12 @@ gint32 DllLoadFactory( FactoryPtr& pFactory )
     if( pFactory.IsEmpty() )
         return -EFAULT;
 
+#ifdef OA2
+    FactoryPtr pOa2Factory =
+        OA2CheckClassFactory();
+    CClassFactory* pDestFactory = pFactory;
+    CClassFactory* pSrcFactory = pOa2Factory;
+    pDestFactory->AppendFactory( *pSrcFactory );
+#endif
     return 0;
 }

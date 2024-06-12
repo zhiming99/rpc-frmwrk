@@ -62,7 +62,8 @@ void CIfRouterTest::setUp()
 {
     gint32 ret = 0;
     do{
-        OutputMsg( 0, "Starting %s...", MODULE_NAME );
+        OutputMsg( 0, "Starting %s as %s...", MODULE_NAME,
+            ( g_dwRole & 0x2 ) ? "bridge" : "reqfwdr" );
         ret = CoInitialize( 0 );
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
