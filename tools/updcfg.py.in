@@ -86,11 +86,17 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 elem[ 'AuthInfo' ] = authInfo
             else :
                 elem.pop( 'AuthInfo', None )
+            bSSL = False
+            if elem[ 'EnableSSL' ] == 'true' :
+                bSSL = True
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
                 urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
                 if urlComp.port is None :
-                    elem[ 'PortNumber' ] = '443'
+                    if urlComp.scheme == 'https' or bSSL:
+                        elem[ 'PortNumber' ] = '443'
+                    elif urlComp.scheme == 'http' :
+                        elem[ 'PortNumber' ] = '80'
                 else :
                     elem[ 'PortNumber' ] = urlComp.port
                 if urlComp.hostname is not None:
@@ -515,12 +521,18 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
                     authInfo[ 'UserName' ] = 'kdcclient'
                     elem[ 'AuthInfo' ] = authInfo
 
+            bSSL = False
+            if elem[ 'EnableSSL' ] == 'true' :
+                bSSL = True
             elem[ 'EnableWS' ] = oConn0[ 'EnableWS' ]
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL'] = oConn0[ 'DestURL' ]
                 urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
                 if urlComp.port is None :
-                    elem[ 'PortNumber' ] = '443'
+                    if urlComp.scheme == 'https' or bSSL:
+                        elem[ 'PortNumber' ] = '443'
+                    elif urlComp.scheme == 'http' :
+                        elem[ 'PortNumber' ] = '80'
                 else :
                     elem[ 'PortNumber' ] = urlComp.port
                 if urlComp.hostname is not None:
@@ -674,6 +686,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
     else :
         return -errno.ENOENT
 
+    strMech = ""
     bGmSSL = False
     while 'Security' in initCfg :
         security = initCfg[ 'Security' ]
@@ -731,6 +744,10 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 break
             SetUsingGmSSL( drvVal, bGmSSL )
             SetVerifyPeer( drvVal, bVerifyPeer, strPort )
+        if 'AuthInfo' in security:
+            authInfo = security[ 'AuthInfo' ]
+            if 'AuthMech' in authInfo :
+                strMech = authInfo[ 'AuthMech' ]
 
         if 'misc' in security and bServer :
             misc = security[ 'misc' ]
@@ -774,6 +791,11 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 for key, val in oConn.items() :
                     if key == 'IpAddress' :
                         ifCfg[ 'BindAddr' ] = val
+                    elif key == 'HasAuth' and val == 'true' :
+                        ifCfg[ key ] = val
+                        ifCfg[ 'AuthMech' ] = strMech
+                    elif key == 'AuthMech' :
+                        pass
                     else :
                         ifCfg[ key ] = val
                 if oConn[ 'EnableWS' ] == "false" :
@@ -805,7 +827,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 if oMatch[ 'PortClass' ] != "TcpStreamPdo2":
                     continue
                 oSeq = [ "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ]
-                if bAuth :
+                if bAuth and strMech == 'krb5' :
                     oSeq.insert( 0, "RpcSecFidoDrv" )
                 if bSSL :
                     oSeq.insert( 0, "RpcWebSockFidoDrv" )
