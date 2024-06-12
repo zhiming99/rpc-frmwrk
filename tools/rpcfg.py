@@ -1583,7 +1583,13 @@ class ConfigDlg(Gtk.Dialog):
                 return
         elif name == 'Auth' :
             if IsFeatureEnabled( "krb5" ):
-                self.ToggleAuthControls( bActive )
+                it = self.mechCombo.get_active_iter()
+                if it is not None:
+                    model = self.mechCombo.get_model()
+                    row_id, name = model[it][:2]
+                    if name != 'Kerberos':
+                        return
+                    self.ToggleAuthControls( bActive )
             return
         elif name == 'GmSSL' or name == 'VerifyPeer':
             pass
@@ -1595,6 +1601,8 @@ class ConfigDlg(Gtk.Dialog):
             self.ifctx[ ifNo ].sslCheck.set_active( bActive )
             self.switch_between_ssl_gmssl( "RpcOpenSSLFido" )
             self.gmsslCheck.props.active = False
+            self.gmsslCheck.set_sensitive( False )
+            self.vfyPeerCheck.set_sensitive( False )
         elif name == 'WebSock2' :
             iNo = button.iNo
             self.nodeCtxs[ iNo ].urlEdit.set_sensitive( bActive )
@@ -1603,14 +1611,17 @@ class ConfigDlg(Gtk.Dialog):
             self.nodeCtxs[ iNo ].sslCheck.set_active( bActive )
             self.switch_between_ssl_gmssl( "RpcOpenSSLFido" )
             self.gmsslCheck.props.active = False
+            self.vfyPeerCheck.set_sensitive( False )
         elif name == 'SSL2' :
             iNo = button.iNo
             if self.nodeCtxs[ iNo ].webSock.props.active and not bActive  :
                 button.props.active = True
                 return
     def on_selection_changed(self, widget):
-        if not IsFeatureEnabled( "krb5" ):
+        if not ( IsFeatureEnabled( "krb5" ) 
+            or IsFeatureEnabled( "js" ) ):
             return
+
         it = widget.get_active_iter()
         if it is not None:
             model = widget.get_model()
@@ -1621,17 +1632,59 @@ class ConfigDlg(Gtk.Dialog):
             self.ToggleAuthControls( False )
         return
 
+    def get_hint_for_filechooser( self, btnName, button ) :
+        if button.editBox is None:
+            return None
+        strHint = None 
+        while True:
+            if btnName != "key" :
+                strHint = self.keyEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            if btnName != "cert" :
+                strHint = self.certEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            if btnName != "cacert" :
+                strHint = self.cacertEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            if btnName != "secret" :
+                strHint = self.cacertEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            return None
+
+        strHint = os.path.dirname( strHint ) + "/*"
+        return strHint
+
     def on_choose_key_clicked( self, button ) :
-        self.on_choose_file_clicked( button, True )
+        strHint = self.get_hint_for_filechooser(
+            "key", button )
+        self.on_choose_file_clicked(
+            button, True, strHint )
 
     def on_choose_cert_clicked( self, button ) :
-        self.on_choose_file_clicked( button, False )
+        strHint = self.get_hint_for_filechooser(
+            "cert", button )
+        self.on_choose_file_clicked(
+            button, False, strHint )
 
     def on_choose_cacert_clicked( self, button ) :
-        self.on_choose_file_clicked( button, False )
+        strHint = self.get_hint_for_filechooser(
+            "cacert", button )
+        self.on_choose_file_clicked(
+            button, False, strHint )
 
     def on_choose_secret_clicked( self, button ) :
-        self.on_choose_file_clicked( button, False )
+        strHint = self.get_hint_for_filechooser(
+            "secret", button )
+        self.on_choose_file_clicked(
+            button, False, strHint )
 
     def on_remove_if_clicked( self, button ) :
         ifNo = button.ifNo
@@ -1654,11 +1707,13 @@ class ConfigDlg(Gtk.Dialog):
         print( "%d, %d" % (interf.rowCount, interf.startRow) )
         self.gridNet.show_all()
 
-    def on_choose_file_clicked( self, button, bKey:bool ) :
+    def on_choose_file_clicked(
+        self, button, bKey:bool, strHint=None ) :
         if not button.editBox is None:
             strPath = button.editBox.get_text()
         dialog = Gtk.FileChooserDialog(
-            title="Please choose a file", parent=self, action=Gtk.FileChooserAction.OPEN
+            title="Please choose a file",
+            parent=self, action=Gtk.FileChooserAction.OPEN
         )
         dialog.add_buttons(
             Gtk.STOCK_CANCEL,
@@ -1666,8 +1721,11 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.STOCK_OPEN,
             Gtk.ResponseType.OK,
         )
-        if strPath is not None:
+        if strPath is not None and len( strPath ) > 0:
             dialog.set_filename( strPath )
+
+        elif strHint is not None:
+            dialog.set_filename( strHint )
 
         #self.add_filters(dialog, bKey)
 
@@ -1808,6 +1866,7 @@ class ConfigDlg(Gtk.Dialog):
                 return 3
 
             if not self.checkCfgKrb5.props.active:
+                print( "Warning " )
                 return 4
 
             strSrcPath = os.path.dirname(
@@ -2421,10 +2480,17 @@ EOF
         mechList.append([1, "Kerberos"] )
         mechList.append( [2, "OAuth2"] )
     
+        strMech = "Kerberos"
+        if "AuthMech" in authInfo :
+            strMech = authInfo[ "AuthMech" ]
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
-        mechCombo.set_active( 0 )
-        mechCombo.set_sensitive( False )
+        if strMech == "Kerberos" :
+            mechCombo.set_active( 0 )
+        else:
+            mechCombo.set_active( 1 )
+
+        mechCombo.set_sensitive( True )
         mechCombo.connect('changed', self.on_selection_changed )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
@@ -2689,7 +2755,7 @@ EOF
                         return "SSL enabled, key file is empty"
                     if len( self.certEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, cert file is empty"
-                if interf.authCheck.props.active :
+                if interf.authCheck.props.active and self.IsKrb5Enabled():
                     if len( self.realmEdit.get_text().strip() ) == 0 :
                         return "Auth enabled, but realm is empty"
                     if len( self.svcEdit.get_text().strip() ) == 0 and self.bServer :
@@ -2901,6 +2967,48 @@ EOF
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             self.DisplayError( text, second_text )
+            ret = False
+
+        return ret
+
+    def IsSSLChecked( self ) -> bool:
+        ret = 0
+        try:
+            for i in range( len( self.ifctx ) ) :
+                curVals = self.ifctx[ i ]
+                if curVals.IsEmpty() :
+                    continue
+                if curVals.sslCheck.props.active :
+                    return True
+            ret = False
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            ret = False
+
+        return ret
+
+    def IsAuthChecked( self ) -> bool:
+        ret = 0
+        try:
+            for i in range( len( self.ifctx ) ) :
+                curVals = self.ifctx[ i ]
+                if curVals.IsEmpty() :
+                    continue
+                if curVals.authCheck.props.active :
+                    return True
+            return False
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
             return -errno.EFAULT
 
         return ret
@@ -2910,39 +3018,45 @@ EOF
         try:
             elemSecs = dict()
             jsonVal[ 'Security' ] = elemSecs
-            sslFiles = dict()
-            elemSecs[ 'SSLCred' ] = sslFiles
-            sslFiles[ "KeyFile"] = self.keyEdit.get_text().strip()
-            sslFiles[ "CertFile"] = self.certEdit.get_text().strip()
-            sslFiles[ "CACertFile"] = self.cacertEdit.get_text().strip()
-            sslFiles[ "SecretFile"] = self.secretEdit.get_text().strip()
-            if self.gmsslCheck.props.active:
-                sslFiles[ "UsingGmSSL" ] = 'true'
-            else:
-                sslFiles[ "UsingGmSSL" ] = 'false'
 
-            if self.vfyPeerCheck.props.active:
-                sslFiles[ "VerifyPeer" ] = 'true'
-            else:
-                sslFiles[ "VerifyPeer" ] = 'false'
+            if self.IsSSLChecked() :
+                sslFiles = dict()
+                elemSecs[ 'SSLCred' ] = sslFiles
+                sslFiles[ "KeyFile"] = self.keyEdit.get_text().strip()
+                sslFiles[ "CertFile"] = self.certEdit.get_text().strip()
+                sslFiles[ "CACertFile"] = self.cacertEdit.get_text().strip()
+                sslFiles[ "SecretFile"] = self.secretEdit.get_text().strip()
+                if self.gmsslCheck.props.active:
+                    sslFiles[ "UsingGmSSL" ] = 'true'
+                else:
+                    sslFiles[ "UsingGmSSL" ] = 'false'
+
+                if self.vfyPeerCheck.props.active:
+                    sslFiles[ "VerifyPeer" ] = 'true'
+                else:
+                    sslFiles[ "VerifyPeer" ] = 'false'
 
             authInfo = dict()
-            elemSecs[ 'AuthInfo' ] = authInfo
+            if self.IsKrb5Enabled() :
+                elemSecs[ 'AuthInfo' ] = authInfo
 
-            authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
-            authInfo[ 'ServiceName' ] = self.GetTestKdcSvcHostName()
-            authInfo[ 'AuthMech' ] = 'krb5'
-            authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
-            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
+                authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
+                authInfo[ 'ServiceName' ] = self.GetTestKdcSvcHostName()
+                authInfo[ 'AuthMech' ] = 'krb5'
+                authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
+                authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
 
-            tree_iter = self.signCombo.get_active_iter()
-            if tree_iter is not None:
-                model = self.signCombo.get_model()
-                row_id, name = model[tree_iter][:2]
-            if row_id == 1 :
-                authInfo[ 'SignMessage' ] = 'false'
-            else:
-                authInfo[ 'SignMessage' ] = 'true'
+                tree_iter = self.signCombo.get_active_iter()
+                if tree_iter is not None:
+                    model = self.signCombo.get_model()
+                    row_id, name = model[tree_iter][:2]
+                if row_id == 1 :
+                    authInfo[ 'SignMessage' ] = 'false'
+                else:
+                    authInfo[ 'SignMessage' ] = 'true'
+            elif self.IsAuthChecked() :
+                elemSecs[ 'AuthInfo' ] = authInfo
+                authInfo[ 'AuthMech' ] = 'OAuth2'
 
             miscOpts = dict()
             elemSecs[ 'misc' ] = miscOpts
