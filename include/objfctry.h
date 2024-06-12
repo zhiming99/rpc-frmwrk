@@ -133,8 +133,8 @@ do{ \
 }while( 0 )
 
 #define END_FACTORY_MAPS \
-    FactoryPtr pFactory( FactoryPtr( new CClassFactory( \
-        oMapId2Name, oMapName2Id, oMapObjMakers ), false ) ); \
+    FactoryPtr pFactory( new CClassFactory( \
+        oMapId2Name, oMapName2Id, oMapObjMakers ), false ); \
    return pFactory; \
 }\
 
@@ -162,7 +162,8 @@ class CClassFactory : public IClassFactory
         for( auto oEntry : m_oMapObjMakers )
         {
             CObjMakerBase* pMaker = oEntry.second;
-            delete pMaker;
+            if( pMaker != nullptr )
+                delete pMaker;
         }
 
         m_oMapObjMakers.clear();
@@ -181,6 +182,8 @@ class CClassFactory : public IClassFactory
 
     void EnumClassIds(
         std::vector< EnumClsid >& vecClsIds ) const override;
+
+    gint32 AppendFactory( CClassFactory& rhs );
 };
 
 typedef CAutoPtr< clsid( Invalid ), IClassFactory >    FactoryPtr;

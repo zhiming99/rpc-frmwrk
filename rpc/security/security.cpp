@@ -33,7 +33,6 @@
 
 #ifdef OA2
 using namespace rpcf;
-extern FactoryPtr OA2CheckClassFactory();
 #include "oa2check/oa2check.h"
 #endif
 
@@ -3643,11 +3642,8 @@ gint32 CAuthentServer::StartOA2Checker(
         CIoManager* pMgr = GetIoMgr();
         oCfg.SetPointer( propIoMgr, pMgr );
 
-        CoAddClassFactory(
-            OA2CheckClassFactory() );
-
         ret = CRpcServices::LoadObjDesc(
-            "./oacheck.json", "OA2proxy",
+            "./oa2check.json", "OA2proxy",
             false, oCfg.GetCfg() );
 
         if( ERROR( ret ) )
@@ -3735,6 +3731,7 @@ gint32 CAuthentServer::OnPostStart(
         {
 #ifdef OA2
             ret = StartOA2Checker( pCallback );
+            break;
 #endif
         }
         ret = -ENOTSUP;
