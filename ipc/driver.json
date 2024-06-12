@@ -276,7 +276,8 @@
                     "EnableWS": "false",
                     "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "HasAuth": "true"
+                    "HasAuth": "true",
+                    "AuthMech" : "krb5"
                 }
             ],
             "MaxConnections": "512"
