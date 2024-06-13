@@ -3643,7 +3643,7 @@ gint32 CAuthentServer::StartOA2Checker(
         oCfg.SetPointer( propIoMgr, pMgr );
 
         ret = CRpcServices::LoadObjDesc(
-            "./oa2check.json", "OA2proxy",
+            "./oa2checkdesc.json", "OA2proxy",
             false, oCfg.GetCfg() );
 
         if( ERROR( ret ) )
