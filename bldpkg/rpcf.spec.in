@@ -76,7 +76,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/authprxy.json
 %{_sysconfdir}/rpcf/btinrt.json
 %{_sysconfdir}/rpcf/echodesc.json
-%{_sysconfdir}/rpcf/oa2check.json
+%{_sysconfdir}/rpcf/oa2checkdesc.json
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
