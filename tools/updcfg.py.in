@@ -10,6 +10,7 @@ from typing import Tuple
 from tempfile import mkstemp
 from updwscfg import IsSudoAvailable, rpcf_system
 import errno
+import socket
 
 g_passDlg = None
 def GetTestPaths( path : str= None ) :
@@ -481,7 +482,7 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
     apVal = drvFile[ 1 ]
     proxies = apVal['Objects']
     if proxies is None or len( proxies ) == 0:
-        raise Exception("bad content in authprxy.json") 
+        raise Exception("Error bad content in authprxy.json") 
 
     oConns = None
     oConn0 = None
@@ -497,6 +498,12 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         'AuthInfo' in initCfg[ 'Security' ] ):
         authInfo = deepcopy(
             initCfg[ 'Security' ][ 'AuthInfo' ] )
+
+        if 'AuthMech' not in authInfo :
+            raise Exception( "Error missing 'AuthMech' in initcfg.json" )
+        if authInfo[ 'AuthMech' ] != "krb5" :
+            return ret
+
         if bServer :
             kdcIp = authInfo[ 'KdcIp' ]
         authInfo.pop( 'KdcIp', None )
@@ -675,6 +682,20 @@ def DefaultIfCfg() -> dict :
     defCfg[ "EnableBPS" ]= "false"
     return defCfg
 
+def CheckIpAddr( addr ) :
+    try:
+        socket.inet_aton(addr)
+        return 'ipv4'
+    except socket.error:
+        pass
+
+    try:
+        socket.inet_pton(socket.AF_INET6, addr)
+        return 'ipv6'
+    except socket.error:
+        pass
+    return None
+
 def Update_Drv( initCfg: dict, drvFile : list,
     bServer : bool, destDir : str ) -> int :
 
@@ -765,12 +786,18 @@ def Update_Drv( initCfg: dict, drvFile : list,
     defCfg = DefaultIfCfg()
 
     defConn = dict()
+    defConn[ "AddrFormat" ]= "ipv4"
+    defConn[ "Protocol" ]= "native"
     defConn[ "PortNumber" ]= "4132"
-    defConn[ "IpAddress"] = "127.0.0.1" 
+    defConn[ "IpAddress"] = "127.0.0.1"
+    defConn[ "PdoClass"] = "TcpStreamPdo2"
     defConn[ "Compression" ]= "true"
     defConn[ "EnableWS" ]= "false"
     defConn[ "EnableSSL" ]= "false"
+    defConn[ "ConnRecover" ]= "false"
     defConn[ "HasAuth" ]= "false"
+    defConn[ "DestURL" ]= "https://www.example.com"
+    defConn[ "EnableBPS" ]= "false"
 
     oConns = None
     if bServer and 'Connections' not in initCfg:
@@ -791,6 +818,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 for key, val in oConn.items() :
                     if key == 'IpAddress' :
                         ifCfg[ 'BindAddr' ] = val
+                        strFormat = CheckIpAddr( val )
                     elif key == 'HasAuth' and val == 'true' :
                         ifCfg[ key ] = val
                         ifCfg[ 'AuthMech' ] = strMech
@@ -800,6 +828,20 @@ def Update_Drv( initCfg: dict, drvFile : list,
                         ifCfg[ key ] = val
                 if oConn[ 'EnableWS' ] == "false" :
                     ifCfg.pop( "DestURL", None )
+
+                if strFormat is None :
+                    strFormat = 'invalid'
+                if 'PdoClass' not in ifCfg :
+                    ifCfg[ 'PdoClass' ] = "TcpStreamPdo2"
+                if 'ConnRecover' not in ifCfg :
+                    ifCfg[ 'ConnRecover' ] = "false"
+                if 'EnableBPS' not in ifCfg :
+                    ifCfg[ 'EnableBPS' ] = "false"
+                if 'Protocol' not in ifCfg :
+                    ifCfg[ "Protocol" ] = "native"
+                if 'AddrFormat' not in ifCfg:
+                    ifCfg[ 'AddrFormat' ] = strFormat
+
                 ifList.append( ifCfg )
 
             port[ 'Parameters'] = ifList

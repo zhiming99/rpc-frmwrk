@@ -2480,12 +2480,12 @@ EOF
         mechList.append([1, "Kerberos"] )
         mechList.append( [2, "OAuth2"] )
     
-        strMech = "Kerberos"
+        strMech = "krb5"
         if "AuthMech" in authInfo :
             strMech = authInfo[ "AuthMech" ]
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
-        if strMech == "Kerberos" :
+        if strMech == "krb5" :
             mechCombo.set_active( 0 )
         else:
             mechCombo.set_active( 1 )
