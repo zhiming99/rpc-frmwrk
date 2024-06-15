@@ -62,6 +62,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/krbparse.py
 %{_bindir}/rpcf/updk5cfg.py
 %{_bindir}/rpcf/updwscfg.py
+%{_bindir}/rpcf/disablessl.py
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@
 @WEBSOCK_RPMFILES@
