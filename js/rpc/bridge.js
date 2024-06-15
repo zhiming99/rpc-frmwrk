@@ -486,6 +486,9 @@ class CRpcRouter
 
         oAdminTab[ AdminCmd.CloseRemotePort[0]] = (oMsg)=>{
             this.CloseRemotePort( oMsg ) }
+
+        oAdminTab[ AdminCmd.UpdateSessHash[0]] = (oMsg)=>{
+            this.UpdateSessHash( oMsg ) }
     }
 
     GetRouterName()
@@ -652,6 +655,30 @@ class CRpcRouter
             oResp.m_oResp.SetUint32(
                 EnumPropId.propReturnValue, ret )
             this.PostMessage( oResp )
+        }
+    }
+
+    UpdateSessHash( oReq )
+    {
+        try{
+            var dwPortId = oReq.m_dwPortId
+            if( dwPortId === null ||
+                dwPortId === undefined )
+            {
+                throw new Error( "Error missing port id" )
+            }
+            var oProxy =
+                this.m_mapBdgeProxies.get( dwPortId )
+            if( !oProxy )
+            {
+                throw new Error( "Error no such proxy" )
+            }
+            oProxy.m_strSess = oReq.m_oReq.GetProperty(0)
+            console.log( "sess hash has been updated" )
+        }
+        catch( e )
+        {
+            console.log( e.message )
         }
     }
 

@@ -1,5 +1,5 @@
 const { CConfigDb2 } = require("../combase/configdb")
-const { Pair, ERROR, InvalFunc } = require("../combase/defines")
+const { Pair, ERROR, InvalFunc, SUCCEEDED } = require("../combase/defines")
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState, EnumMatchType } = require("../combase/enums")
 const { IoCmd, IoMsgType, CAdminReqMessage, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent } = require("../combase/iomsg")
 const { DBusIfName, DBusDestination, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
@@ -12,6 +12,7 @@ const { OnKeepAliveLocal } = require("./keepalive")
 const { OpenStreamLocal, CloseStreamLocal } = require("./openstm")
 const { OnDataReceivedLocal, OnStreamClosedLocal, NotifyDataConsumed} = require( "./stmevt")
 const { StreamWriteLocal } = require( "./stmwrite")
+const { LoginLocal } = require( "./login")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -81,6 +82,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_funcCloseStream = CloseStreamLocal.bind( this )
         this.m_funcNotifyDataConsumed = NotifyDataConsumed.bind( this )
         this.m_funcStreamWrite = StreamWriteLocal.bind( this )
+        this.m_funcLogin = LoginLocal.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
@@ -247,29 +249,25 @@ exports.CInterfaceProxy = class CInterfaceProxy
     GetUrl()
     { return this.m_strUrl }
 
-    Start()
+    EnableEvents()
     {
-        return this.LoadObjDesc( this.m_strObjDesc).then((retval)=>{
-            if(ERROR(retval))
-                return Promise.reject(retval)
-            return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
-                var proms = []
-                for( var i =0; i< this.m_arrMatches.length; i++ )
-                    proms.push( this.m_funcEnableEvent( i ) )
-                return Promise.all( proms ).then((e)=>{
-                    var ret = 0
-                    for( var oResp of e )
-                    {
-                        ret = oResp.GetProperty(
-                            EnumPropId.propReturnValue )
-                        if( ERROR( ret ) )
-                            break
-                    }
-                    if( ERROR( ret ))
-                        return Promise.reject( ret )
-                    else
-                        return Promise.resolve( ret )
-                })
+        var proms = []
+        for( var i =0; i< this.m_arrMatches.length; i++ )
+            proms.push( this.m_funcEnableEvent( i ) )
+        return Promise.all( proms ).then((e)=>{
+            var ret = 0
+            for( var oResp of e )
+            {
+                ret = oResp.GetProperty(
+                    EnumPropId.propReturnValue )
+                if( ERROR( ret ) )
+                    break
+            }
+            if( ERROR( ret ))
+                return Promise.reject( ret )
+            else
+                return Promise.resolve( ret )
+
             }).catch((e)=>{
                 var oResp = e.m_oResp
                 var ret = oResp.GetProperty(
@@ -278,6 +276,32 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 this.m_iState = EnumIfState.stateStartFailed
                 return Promise.resolve( ret)
             })
+    }
+    Start()
+    {
+        return this.LoadObjDesc( this.m_strObjDesc).then((retval)=>{
+            if(ERROR(retval))
+                return Promise.reject(retval)
+            return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
+                if( globalThis.g_bAuth )
+                    return this.m_funcLogin().then((retval)=>{
+                        return this.EnableEvents().then((e)=>{
+                            return Promise.resolve(ret)
+                        }).catch((e)=>{
+                            return Promise.resolve( -errno.EFAULT )
+                        })
+                    }).catch((e)=>{
+                        this.DebugPrint("Error, Login failed ( " + e + " )")
+                        return Promise.resolve(e)
+                    })
+                else
+                    return this.EnableEvents().then((e)=>{
+                        return Promise.resolve(ret)
+                    }).catch((e)=>{
+                        this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
+                        return Promise.resolve( -errno.EFAULT )
+                    })
+                })
         }).catch((e)=>{
             this.DebugPrint("Error, LoadObjDesc failed ( " + e + " )")
             return Promise.resolve(e)
