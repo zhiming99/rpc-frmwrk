@@ -1261,7 +1261,7 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         {
                             string strVal =
                                 oParams[ JSON_ATTR_AUTHMECH ].asString();
-                            oElemCfg.SetBoolProp( propAuthMech, true );
+                            oElemCfg.SetStrProp( propAuthMech, strVal );
                         }
                         else
                         {
