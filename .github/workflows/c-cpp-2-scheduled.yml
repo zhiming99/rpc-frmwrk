@@ -89,6 +89,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
           name: logfile
-          path: ./logfile
-
+          path: |
+            ./logfile
+            ./logdump.txt
 
