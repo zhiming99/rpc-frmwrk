@@ -22,7 +22,6 @@ jobs:
       with:
           repository: zhiming99/GmSSL
           path: ./gmssl
-
     - name: update repository
       run: sudo apt-get -o Acquire::Retries=3 update
     - name: install tzdata
@@ -55,6 +54,7 @@ jobs:
     - name: starting kerberos servers
       run: dbus-run-session bash tools/runtest.sh 2 k & 
     - name: starting kerberos test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1 k
 
     - name: configure websocket
@@ -64,6 +64,7 @@ jobs:
     - name: starting websocket servers
       run: dbus-run-session bash tools/runtest.sh 2 k & 
     - name: starting websocket test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1 k
 
     - name: configure gmssl
@@ -71,7 +72,16 @@ jobs:
     - name: starting gmssl servers
       run: dbus-run-session bash tools/runtest.sh 2 k& 
     - name: starting gmssl test
+      timeout-minutes: 100 
       run: dbus-run-session bash tools/runtest.sh 1 k
     - name: cleanup gmssl files
       run: rm ./reqfwdr/driver.json && rmdir reqfwdr || true
+      
+    - name: Upload Test Results on Canceled
+      if: ${{ cancelled() }}
+      uses: actions/upload-artifact@v1
+      with:
+          name: logfile
+          path: ./logfile
 
+      
