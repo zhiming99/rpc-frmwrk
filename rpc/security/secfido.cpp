@@ -1369,20 +1369,22 @@ gint32 CRpcSecFidoDrv::Probe(
             break;
         }
 
+        Variant oVar;
+        ret = pConnParams->GetProperty(
+            propAuthMech, oVar );
+        if( SUCCEEDED( ret ) &&
+            ( ( stdstr& )oVar ) != "krb5" )
+        {
+            ret = 0;
+            pNewPort = pLowerPort;
+            break;
+        }
+
         ret = GetIoMgr()->GetCmdLineOpt(
             propHasAuth, bAuth );
         if( ERROR( ret ) || !bAuth )
         {
             ret = 0;
-            // remove the authentication
-            // information if any. the two are for
-            // this port only
-            pConnParams->RemoveProperty(
-                propHasAuth );
-
-            pConnParams->RemoveProperty(
-                propAuthInfo );
-
             pNewPort = pLowerPort;
             break;
         }
