@@ -8,7 +8,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
+    timeout-minutes: 240
     steps:
     - uses: actions/checkout@v4
       with:
@@ -83,5 +83,12 @@ jobs:
       run: dbus-run-session bash tools/runtest.sh 1
     - name: cleanup gmssl files
       run: rm ./reqfwdr/driver.json && rmdir reqfwdr || true
+
+    - name: Upload Test Results on Canceled
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+          name: logfile
+          path: ./logfile
 
 
