@@ -6,12 +6,7 @@ on:   workflow_dispatch
   # pull_request:
   #  branches: [ master, Enhancement-less-dependency-of-dbus-connection ]
 
-<<<<<<< HEAD
       
-=======
-
-    
->>>>>>> b879204c (Update c-cpp-2-local.yml)
 jobs:
   build:
 
