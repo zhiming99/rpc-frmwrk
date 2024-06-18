@@ -82,12 +82,8 @@ function ForwardRequest( oMsg )
         dmsg.SetInterface( DBusIfName(
             constval.IFNAME_MIN_BRIDGE ) )
         dmsg.SetMember( IoCmd.ForwardRequest[1] )
-        dmsg.SetObjPath( DBusObjPath(
-            this.m_oParent.GetRouterName(),
-            constval.OBJNAME_TCP_BRIDGE ))
-        dmsg.SetDestination( DBusDestination2(
-            this.m_oParent.GetRouterName(),
-            constval.OBJNAME_TCP_BRIDGE ) )
+        dmsg.SetObjPath( this.m_strObjPath )
+        dmsg.SetDestination( this.m_strDestination )
         dmsg.SetSender( DBusDestination(
             this.m_oParent.GetRouterName()))
         dmsg.SetSerial( oMsg.m_iMsgId )

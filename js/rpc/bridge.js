@@ -3,7 +3,7 @@ const { randomInt, Int32Value, ERROR, InvalFunc } = require("../combase/defines"
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
-const { CDBusMessage } = require("./dmsg")
+const { CDBusMessage, DBusIfName, DBusObjPath, DBusDestination2 } = require("./dmsg")
 const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent, CAdminReqMessage } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { Bdge_Handshake } = require("./handshak")
@@ -199,6 +199,21 @@ class CRpcTcpBridgeProxy
         this.m_arrDispEvtTable = []
         this.m_mapHStream2StmId = new Map()
         this.m_dwStreamId = 1024
+        this.m_bAuth = oConnParams.GetProperty(
+            EnumPropId.propHasAuth )
+
+        var strObj = constval.OBJNAME_TCP_BRIDGE
+        if( this.m_bAuth === true )
+            strObj = constval.OBJNAME_TCP_BRIDGEAUTH
+
+        var strRouter =
+            this.m_oParent.GetRouterName()
+
+        this.m_strObjPath = DBusObjPath(
+            strRouter, strObj )
+
+        this.m_strDestination = DBusDestination2(
+            strRouter, strObj )
 
         this.BindFunctions()
 

@@ -285,8 +285,10 @@ exports.CInterfaceProxy = class CInterfaceProxy
             return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
                 if( globalThis.g_bAuth )
                     return this.m_funcLogin().then((retval)=>{
+                        if( ERROR( retval ) )
+                            return Promise.resolve( retval )
                         return this.EnableEvents().then((e)=>{
-                            return Promise.resolve(ret)
+                            return Promise.resolve(e)
                         }).catch((e)=>{
                             return Promise.resolve( -errno.EFAULT )
                         })
@@ -333,6 +335,11 @@ exports.CInterfaceProxy = class CInterfaceProxy
         oMsg.m_iCmd = AdminCmd.OpenRemotePort[0]
         oMsg.m_oReq.SetString(
             EnumPropId.propDestUrl, strUrl)
+        var bAuth = false
+        if( globalThis.g_bAuth )
+            bAuth = globalThis.g_bAuth
+        oMsg.m_oReq.SetBool(
+            EnumPropId.propHasAuth, bAuth )
         return new Promise((resolve, reject) =>{
                 var oPending = new CPendingRequest(oMsg)
                 oPending.m_oReq = oMsg

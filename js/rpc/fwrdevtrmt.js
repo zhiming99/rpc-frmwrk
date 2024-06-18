@@ -27,9 +27,7 @@ function ForwardEvent( dmsg )
             constval.IFNAME_TCP_BRIDGE )
         if( dmsg.GetInterface() !== strIfName )
             throw new Error( "Error invalid interface")
-        var strObjPath = DBusObjPath(
-            this.m_oParent.GetRouterName(),
-            constval.OBJNAME_TCP_BRIDGE )
+        var strObjPath = this.m_strObjPath 
         if( dmsg.GetObjPath() !== strObjPath )
             throw new Error( "Error invalid Object path")
         var oInnerMsg= unmarshall( oEvtBuf.slice(4)  )

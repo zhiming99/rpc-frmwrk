@@ -14,14 +14,10 @@ function Handshake( oMsg, oPending )
 
     dmsg.SetInterface( DBusIfName(
         constval.IFNAME_MIN_BRIDGE ) )
-    dmsg.SetMember( IoCmd.Handshake[1] )
-    dmsg.SetObjPath( DBusObjPath(
-        this.m_oParent.GetRouterName(),
-        constval.OBJNAME_TCP_BRIDGE ))
 
-    dmsg.SetDestination( DBusDestination2(
-        this.m_oParent.GetRouterName(),
-        constval.OBJNAME_TCP_BRIDGE ) )
+    dmsg.SetMember( IoCmd.Handshake[1] )
+    dmsg.SetObjPath( this.m_strObjPath )
+    dmsg.SetDestination( this.m_strDestination )
         
     dmsg.SetSerial( oMsg.m_iMsgId )
     var oParams = new CConfigDb2()

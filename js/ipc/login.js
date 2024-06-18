@@ -63,12 +63,14 @@ function LoginRequest( oUserCallback )
     oReq.SetString( EnumPropId.propDestDBusName,
         DBusDestination2( "rpcrouter", "RpcRouterBridgeAuthImpl") )
     oReq.SetString( EnumPropId.propMethodName, 
-        SYS_METHOD("Login"))
-    strCookie = getCookie( 'rpcf_code' )
+        SYS_METHOD("AuthReq_Login"))
+    var strCookie = getCookie( 'rpcf_code' )
     if( strCookie === null )
         return Promise.resolve( -errno.EACCES )
+    var oInfo = new CConfigDb2()
+    oInfo.Push( {t: EnumTypeId.typeString, v: strCookie })
 
-    oReq.Push( {t: EnumTypeId.typeString, v: strCookie })
+    oReq.Push( {t: EnumTypeId.typeObj, v: oInfo })
     var oCallOpts = new CConfigDb2()
     oCallOpts.SetUint32(
         EnumPropId.propTimeoutSec, this.m_dwTimeoutSec)
