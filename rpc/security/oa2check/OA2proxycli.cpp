@@ -337,6 +337,12 @@ gint32 COA2proxy_CliImpl::BuildLoginResp(
         oResp.SetQwordProp(
             propSalt, pBridge->GetObjId() );
 
+        CCfgOpener oRespTok;
+        oRespTok.SetProperty( 0, oToken );
+        oRespTok.SetBoolProp(
+            propContinue, false ); 
+        oResp.Push( ObjPtr( oRespTok.GetCfg() ) );
+
         CStdRMutex oIfLock( this->GetLock() );
         this->AddSession( dwPortId, strSess );
         this->m_mapSessions[ dwPortId ] = pui;

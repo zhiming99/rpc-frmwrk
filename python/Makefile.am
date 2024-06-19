@@ -36,7 +36,8 @@ all:
 		if [ "x$(PKG_CONFIG_LIBDIR)" != "x" ];then export PKG_CONFIG_LIBDIR=$(PKG_CONFIG_LIBDIR);fi;\
 		if [ "x$(PKG_CONFIG_PATH)" != "x" ]; then export PKG_CONFIG_PATH=$(PKG_CONFIG_PATH);fi;\
 		if [ "x$(PKG_CONFIG_SYSROOT_DIR)" != "x" ];then export PKG_CONFIG_SYSROOT_DIR=$(PKG_CONFIG_SYSROOT_DIR);fi;\
-		export SYSROOT=$(with_sysroot);\
+		export SYSROOT=$(with_sysroot); export DBGBUILD=0;\
+        if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then export DBGBUILD=1;fi;\
         python3 build-4.9.py $(libdir); \
         rm rpcf/$(PYTHON_EXT1)*;\
         cp `pwd`/sip4build/rpcbase.so rpcf/$(PYTHON_EXT); \

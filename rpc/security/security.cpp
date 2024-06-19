@@ -408,23 +408,33 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
 
         CCfgOpener& oCtx = m_oSecCtx;
 
+        IConfigDb* pAuthInfo = nullptr;
+
+        CCfgOpenerObj oRtCfg( pRouter );
+        oRtCfg.GetPointer(
+            propAuthInfo, pAuthInfo );
+
+        if( ERROR( ret ) )
+            break;
+
         if( !bNoEnc )
         {
             oCtx.SetObjPtr(
                 propObjPtr, pAuthImpl );
 
-            IConfigDb* pAuthInfo = nullptr;
-
-            CCfgOpenerObj oRtCfg( pRouter );
-            oRtCfg.GetPointer(
-                propAuthInfo, pAuthInfo );
-
-            if( ERROR( ret ) )
-                break;
-
             oCtx.CopyProp(
                 propSignMsg, pAuthInfo );
         }
+
+        Variant oVar;
+        ret = pAuthInfo->GetProperty(
+            propAuthMech, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        bool bKrb5 = false;
+        if( ( stdstr& )oVar == "krb5" )
+            bKrb5 = true;
 
         oCtx.SetBoolProp( propNoEnc, bNoEnc );
         oCtx.SetBoolProp( propIsServer, true );
@@ -437,7 +447,7 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
 
         BufPtr pBuf( true );
         bool bFound = false;
-        while( !pPort.IsEmpty() )
+        while( !pPort.IsEmpty() && bKrb5 )
         {
             ret = GetPortProp( pPort,
                 propLowerPortPtr, pBuf );    
@@ -466,7 +476,7 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
             break;
         }
 
-        if( !bFound )
+        if( !bFound && bKrb5 )
         {
             oCtx.Clear();
             break;

@@ -100,10 +100,10 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                         elem[ 'PortNumber' ] = '80'
                 else :
                     elem[ 'PortNumber' ] = urlComp.port
-                if urlComp.hostname is not None:
-                    elem[ 'IpAddress' ] = urlComp.hostname
-                else :
-                    raise Exception( 'web socket URL is not valid' ) 
+                #if urlComp.hostname is not None:
+                #    elem[ 'IpAddress' ] = urlComp.hostname
+                #else :
+                #    raise Exception( 'web socket URL is not valid' ) 
             else :
                 elem.pop( 'DestURL', None )
 
@@ -502,6 +502,14 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         if 'AuthMech' not in authInfo :
             raise Exception( "Error missing 'AuthMech' in initcfg.json" )
         if authInfo[ 'AuthMech' ] != "krb5" :
+            #update the testcfgs
+            oConn0[ 'BindAddr' ] = oConn0[ 'IpAddress' ]
+            cfgList = [ oConn0, authInfo, drvVal ]
+            if destDir is None :
+                ret = ExportTestCfgs( cfgList )
+            else:
+                ret = ExportTestCfgsTo( cfgList, destDir )
+            oConn0.pop( 'BindAddr', None )
             return ret
 
         if bServer :

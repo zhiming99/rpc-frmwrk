@@ -85,7 +85,7 @@ class COA2proxy_CliImpl :
 
     gint32 IsNoEnc(
         const std::string& strSess ) override
-    { return 0; }
+    { return ERROR_FALSE; }
 
     gint32 IsSessExpired(
         const std::string& strSess ) override;

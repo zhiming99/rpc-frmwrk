@@ -2481,7 +2481,7 @@ EOF
         mechList.append( [2, "OAuth2"] )
     
         strMech = "krb5"
-        if "AuthMech" in authInfo :
+        if authInfo is not None and "AuthMech" in authInfo :
             strMech = authInfo[ "AuthMech" ]
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
