@@ -45,7 +45,7 @@ def ValidateName( hostname : str ) -> bool:
     allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(x) for x in hostname.split(".")) 
 
-def IsNameRegistred(
+def IsNameRegistered(
     strIpAddr : str,
     strName : str ) ->bool:
     try:
