@@ -597,13 +597,13 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
                 strSvcHost, strRealm, destPath )
 
         components = strSvcHost.split( '@' )
-        if not IsNameRegistred( components[ 1 ] ):
+        if not IsNameRegistered( strIpAddr, components[ 1 ] ):
             strCmd = AddEntryToHosts(
                 strIpAddr, components[ 1 ] )
             if len( strCmd ) > 0:
                 cmdline += ";" + strCmd
 
-        if not IsNameRegistred( strRealm ):
+        if not IsNameRegistered( strKdcIp, strRealm ):
             strCmd = AddEntryToHosts( strKdcIp,
                 "kdc." + strRealm + " " + strRealm)
             if len( strCmd ) > 0:
