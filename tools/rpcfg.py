@@ -36,6 +36,7 @@ from updwscfg import *
 from updk5cfg import *
 import re
 import platform
+import glob
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -127,6 +128,13 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
 
 def get_instcfg_content()->str :
     content='''#!/bin/bash
+if [ -f debian ]; then
+    apt-get -y install ./*.deb
+elif [ -f fedora ]; then
+    if ! dnf install ./*.rpm; then 
+        yum install ./*.rpm
+    fi
+fi
 paths=$(echo $PATH | tr ':' ' ' ) 
 for i in $paths; do
     a=$i/rpcf/rpcfgnui.py
@@ -200,7 +208,7 @@ if (($?==0)); then
 else
     echo install failed;
 fi
-rm -rf $unzipdir
+#rm -rf $unzipdir
 exit 0
 __GZFILE__
 '''
@@ -1735,6 +1743,28 @@ class ConfigDlg(Gtk.Dialog):
 
         dialog.destroy()
         
+    def on_choose_pkgdir_clicked( self, button ) :
+        while True: 
+            dialog = Gtk.FileChooserDialog(
+                title="Please choose a directory",
+                parent=self,
+                action=Gtk.FileChooserAction.SELECT_FOLDER)
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL,
+                Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN,
+                Gtk.ResponseType.OK,
+            )
+            response = dialog.run()
+            path = None 
+            if response == Gtk.ResponseType.OK:
+                path = dialog.get_filename()
+            dialog.destroy()
+            if path is None:
+                break
+            button.editBox.set_text( path )
+            break
+
     def on_choose_key_dir_clicked( self, button ) :
         dialog = SSLNumKeyDialog( self )
 
@@ -2731,6 +2761,28 @@ EOF
         grid.attach( checkKProxy, startCol + 1, startRow + 3, 1, 1)
         self.checkKProxy = checkKProxy
 
+        labelKey = Gtk.Label()
+        strDist = GetDistName()
+        if strDist == 'fedora' :
+            lblstr = 'rpm package'
+        else :
+            lblstr = 'deb package'
+        labelKey.set_text(lblstr)
+
+        labelKey.set_xalign(.5)
+        grid.attach(labelKey, startCol + 0, startRow + 4, 1, 1 )
+
+        pkgEditBox = Gtk.Entry()
+        grid.attach(pkgEditBox, startCol + 1, startRow + 4 , 1, 1 )
+        self.pkgEditBox = pkgEditBox
+
+        pkgBtn = Gtk.Button.new_with_label("...")
+        pkgBtn.connect("clicked", self.on_choose_pkgdir_clicked)
+        pkgBtn.editBox = pkgEditBox
+
+        pkgEditBox.set_tooltip_text( "path to the {}".format( lblstr ) )
+        grid.attach(pkgBtn, startCol + 2, startRow + 4, 1, 1 )
+
         return
 
     def on_sign_msg_changed(self, combo) :
@@ -3155,6 +3207,57 @@ EOF
 
         return ret
 
+    def GetNewerFile( self, strPath, pattern, bRPM )->str:
+        try:
+            curdir = os.getcwd()
+            os.chdir( strPath )
+            files = glob.glob( pattern )
+            if len( files ) == 0 :
+                return ""
+            if len( files ) == 1 :
+                return files[ 0 ]
+            if bRPM :
+                files = [s for s in files if not 'src.rpm' in s]
+            files.sort(key=lambda x: os.path.getmtime(os.path.join('', x)))
+            return files[-1]
+        finally:
+            os.chdir( curdir )
+
+    def AddInstallPackages( self, destPkg )->str :
+        cmdline = "" 
+        try:
+            strPath = self.pkgEditBox.get_text()
+            if len( strPath ) == 0:
+                raise Exception( "no package specified" )
+            
+            if not os.access( strPath, os.X_OK ):
+                raise Exception( 'Package path is not valid' )
+            strDist = GetDistName()
+            strCmd = "touch " + strDist + ";"
+            strCmd += "tar rf " + destPkg + " " + strDist + ";"
+            strCmd += "tar rf " + destPkg + " -C " + strPath + " "
+            if strDist == 'debian' :
+                 mainPkg = self.GetNewerFile(
+                     strPath, 'rpcf_*.deb', False )
+                 devPkg = self.GetNewerFile(
+                    strPath, 'rpcf-dev_*.deb', False )
+            elif strDist == 'fedora' :     
+                 devPkg = self.GetNewerFile(
+                    strPath, 'rpcf-devel-[0-9]*.deb', True )
+                 mainPkg = self.GetNewerFile(
+                    strPath, 'rpcf-[0-9]*.deb', True )
+
+            if len( mainPkg ) == 0 or len( devPkg ) == 0:
+                return cmdline
+
+            strCmd += mainPkg + " " + devPkg + ";"
+            strCmd += "rm " + strDist + ";"
+            cmdline = strCmd
+        except :
+            pass
+
+        return cmdline
+
     # create installer for keys generated outside rpcfg.py
     def CreateInstaller( self, initCfg : object,
         cfgPath : str, destPath : str,
@@ -3255,6 +3358,8 @@ EOF
             # add instcfg to destPkg
             cfgDir = os.path.dirname( cfgPath )
             cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json;"
+
+            cmdLine += self.AddInstallPackages( destPkg )
 
             bAuthFile = False
             ret = self.GenAuthInstFiles(
@@ -3469,6 +3574,7 @@ EOF
                 fp.close()
 
                 cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json instcfg.sh;"
+                cmdline += self.AddInstallPackages( obj.pkgName )
                 bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"
