@@ -129,8 +129,10 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
 def get_instcfg_content()->str :
     content='''#!/bin/bash
 if [ -f debian ]; then
+    md5sum *.deb
     apt-get -y install ./*.deb
 elif [ -f fedora ]; then
+    md5sum *.rpm
     if ! dnf install ./*.rpm; then 
         yum install ./*.rpm
     fi
@@ -208,7 +210,7 @@ if (($?==0)); then
 else
     echo install failed;
 fi
-#rm -rf $unzipdir
+rm -rf $unzipdir
 exit 0
 __GZFILE__
 '''
@@ -3251,6 +3253,8 @@ EOF
                 return cmdline
 
             strCmd += mainPkg + " " + devPkg + ";"
+            strCmd += ( "md5sum " + strPath + "/" + mainPkg + " "
+                + strPath + "/" + devPkg + ";")
             strCmd += "rm " + strDist + ";"
             cmdline = strCmd
         except :

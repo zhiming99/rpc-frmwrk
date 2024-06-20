@@ -259,8 +259,8 @@ def ChangeKeytabOwner(
         cmdline = "{sudo} chown " + strUser + " " + strKeytab + ";"
         cmdline += "{sudo} chmod 600 " + strKeytab
     except:
-        print( "getlogin failed")
-        return ""
+        print( "Warning unable to get user name, no change to keytab owner" )
+        return "true"
     return cmdline
 
 def IsLocalIpAddr(
@@ -626,6 +626,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             EnableKinitProxy( True )
 
     except Exception as err:
+        print(traceback.format_exc())
         print( err )
         if ret == 0:
             ret = -errno.EFAULT
