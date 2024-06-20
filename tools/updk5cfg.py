@@ -8,7 +8,7 @@ import socket
 import re
 from krbparse import *
 from updwscfg import IsSudoAvailable, rpcf_system
-import platform
+import traceback
 
 def GetLocalIp( strIpAddr : str )->str:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -638,6 +638,7 @@ def ConfigAuthServer( initFile : str ) -> int:
             os.path.dirname( initFile ) )
 
     except Exception as err:
+        print(traceback.format_exc())
         print( err )
         if ret == 0:
             ret = -errno.EFAULT
