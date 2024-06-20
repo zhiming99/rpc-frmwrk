@@ -253,10 +253,14 @@ def IsTestKdcSet() :
 def ChangeKeytabOwner(
     strKeytab: str,
     strUser : str = "" ) -> str:
-    if len( strUser ) == 0:
-        strUser = os.getlogin()
-    cmdline = "{sudo} chown " + strUser + " " + strKeytab + ";"
-    cmdline += "{sudo} chmod 600 " + strKeytab
+    try:
+        if len( strUser ) == 0:
+            strUser = os.getlogin()
+        cmdline = "{sudo} chown " + strUser + " " + strKeytab + ";"
+        cmdline += "{sudo} chmod 600 " + strKeytab
+    except:
+        print( "getlogin failed")
+        return ""
     return cmdline
 
 def IsLocalIpAddr(
