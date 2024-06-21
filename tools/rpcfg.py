@@ -3091,7 +3091,8 @@ EOF
                     sslFiles[ "VerifyPeer" ] = 'false'
 
             authInfo = dict()
-            if self.IsKrb5Enabled() :
+            bKrb5 = self.IsKrb5Enabled()
+            if bKrb5 :
                 elemSecs[ 'AuthInfo' ] = authInfo
 
                 authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
@@ -3126,9 +3127,9 @@ EOF
                 miscOpts[ 'TaskScheduler' ] = "RR"
             if self.checkCfgWs.props.active and self.bServer:
                 miscOpts[ 'ConfigWebServer' ] = 'true'
-            if self.checkCfgKrb5.props.active and self.bServer:
+            if bKrb5 and self.checkCfgKrb5.props.active and self.bServer:
                 miscOpts[ 'ConfigKrb5' ] = 'true'
-            if self.checkKProxy.props.active:
+            if bKrb5 and self.checkKProxy.props.active:
                 miscOpts[ 'KinitProxy' ] = 'true'
 
         except Exception as err :
