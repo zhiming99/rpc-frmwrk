@@ -11,7 +11,7 @@
   * 当运行在微服务架构下，服务端和客户端各有一个桥接的守护进程。用户开发的各个业务进程位于这两个守护进程后面，通过`Unix Socket`或者`DBus`与守护进程通信。因而具有更大的灵活性和安全性，同时减少了系统框架的复杂度和代码的耦合性。尤其当使用`简单模式`开发时，客户代码可以不用链接`rpc-frmwrk`的任何运行库。
   * 当运行在集中式服务架构下，服务端和客户端分别为两个独立的进程，此时`rpc-frmwrk`拥有更好的性能。服务端和客户端都可在`运行时`加载和启停用户开发的服务插件。
   * 在任何一种架构下，`rpc-frmwrk`提供配置工具和`运行时接口`完成对传输功能的配置，包括加密，认证，压缩，WebSocket，Multihop等功能，和运行时参数。
-* `rpc-frmwrk`十分注重传输的安全性，其设计独特的I/O模块，可以支持国密(GmSSL)和OpenSSL两种安全传输协议，亦可通过`Kerberos`提供单点登陆(SSO)服务。`rpc-frmwrk`的配置工具提供简便的密钥分发和管理工具，可以有效减轻GmSSL和OpenSSL的部署和使用的负担。
+* `rpc-frmwrk`十分注重传输的安全性，其设计独特的I/O模块，可以支持国密(GmSSL)和OpenSSL两种安全传输协议，亦可通过`Kerberos`或者`OAuth2`提供单点登陆(SSO)服务。`rpc-frmwrk`的配置工具提供简便的密钥分发和管理工具，可以有效减轻GmSSL和OpenSSL的部署和使用的负担。
 * 更多概念方面的介绍请参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept_cn.md)。
 
 ## 功能列表   
@@ -26,7 +26,7 @@
 9. [`OpenSSL的支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-12. [`基于Kerberos 5的认证功能`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
+12. [`基于Kerberos 5和OAuth2的认证功能`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 13. [`节点冗余和负载均衡`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 14. [`自动生成C++, Python和Java的框架代码`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`守护进程的图形配置工具`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
@@ -50,7 +50,7 @@
 3. [`文件模式`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统(`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会通过文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全封装了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
 
 ## 部署
-`rpc-frmwrk`的配置程序`rpcfg`可以自动生成目标机器的设置和密钥的安装程序。其设置内容可以包括`rpc-frmwrk`的系统设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用单点登陆功能时，`Kerberos`的服务器设置. 详细信息请参考`rpcfg`的[README](https://github.com/zhiming99/rpc-frmwrk/blob/master/tools/README.md).
+`rpc-frmwrk`的配置工具`rpcfg`可以自动生成目标机器的安装包。安装包可以安装`rpc-frwmwrk`的运行库及系统设置。设置内容包括`rpc-frmwrk`的运行参数设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用认证功能时，`Kerberos`的服务器设置. 详细信息请参考`rpcfg`的[README](https://github.com/zhiming99/rpc-frmwrk/blob/master/tools/README.md). 
 
 ## 第三方依赖  
 1. `dbus-1.0 (dbus-devel)`
