@@ -3246,9 +3246,9 @@ EOF
                     strPath, 'rpcf-dev_*.deb', False )
             elif strDist == 'fedora' :     
                  devPkg = self.GetNewerFile(
-                    strPath, 'rpcf-devel-[0-9]*.deb', True )
+                    strPath, 'rpcf-devel-[0-9]*.rpm', True )
                  mainPkg = self.GetNewerFile(
-                    strPath, 'rpcf-[0-9]*.deb', True )
+                    strPath, 'rpcf-[0-9]*.rpm', True )
 
             if len( mainPkg ) == 0 or len( devPkg ) == 0:
                 return cmdline
