@@ -17,6 +17,7 @@ etc/rpcf/router.json
 etc/rpcf/authprxy.json
 etc/rpcf/driver.json
 etc/rpcf/oa2checkdesc.json
+etc/rpcf/oa2check.ridl
 usr/share/man/man1/ridlc.1
 usr/share/man/man1/rpcrouter.1
 usr/share/man/man7/ridl.7

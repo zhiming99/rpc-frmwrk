@@ -1,4 +1,5 @@
-EXTRA_DIST=actcancel.ridl\
+examples_confdir= $(sysconfdir)/rpcf
+dist_examples_conf_DATA= actcancel.ridl\
  asynctst.ridl\
  evtest.ridl\
  iftest.ridl\
@@ -9,7 +10,7 @@ EXTRA_DIST=actcancel.ridl\
  testypes.ridl
 
 javatests=./java/src/org/rpcf/tests
-EXTRA_DIST+=$(javatests)/actcancel/ActiveCancelcli.java\
+EXTRA_DIST=$(javatests)/actcancel/ActiveCancelcli.java\
  $(javatests)/actcancel/ActiveCancelsvr.java\
  $(javatests)/actcancel/maincli.java\
  $(javatests)/asynctst/AsyncTestcli.java\

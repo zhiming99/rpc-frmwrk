@@ -25,4 +25,5 @@ etc/rpcf/odesctpl2.json
 etc/rpcf/*.java
 etc/rpcf/*.py
 etc/rpcf/*tpl
+etc/rpcf/*ridl
 @JS_DEBFILES@

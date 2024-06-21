@@ -78,6 +78,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/btinrt.json
 %{_sysconfdir}/rpcf/echodesc.json
 %{_sysconfdir}/rpcf/oa2checkdesc.json
+%{_sysconfdir}/rpcf/*.ridl
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
