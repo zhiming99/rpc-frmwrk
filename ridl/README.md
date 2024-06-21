@@ -118,8 +118,10 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -J:     To generate the JavaScript skelton files (client only). '-f' option is not supported for JavaScript.   
 
         --odesc_url=<url>
-                To specify the url where to find the object desription file for the JS client. The url must not include the name of the object description file. And it is a mandatory option for JS skelton generator.   
-        
+                To specify the url where to find the object desription file for the JS client. The url must not include the name of the object description file. And it is a mandatory option for JS skelton generator.
+
+        --auth  To enable 'OAuth2' authorization.
+
         -f:     To generate skeleton files with 'rpcfs' support. C++ or Python currently.
         
         -P:     To specify the prefix for the target java package. The java package name would be
