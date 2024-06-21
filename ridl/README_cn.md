@@ -119,6 +119,8 @@ service SimpFileSvc [ stream ]
 
         --odesc_url=<url> :
             指定部署时`object description`文件的`url`。需要注意的是这个`url`不要包含文件名。这个选项是生成JS框架时的强制选项.
+
+	--auth: 生成框架将进行`OAuth2`的授权认证。这个选项仅用于JS框架。
         
         -f: 生成`rpcfs`的框架。该框架可以直接执行，并mount为服务器或客户端的文件系统，具体信息请参考`rpcfs`的说明
         
@@ -220,31 +222,31 @@ service SimpFileSvc [ stream ]
 ### `-b`选项生成的`BuiltinRt App`的命令行选项
 #### 服务器
 ```
-	[ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point'. ]
-	[ -a to enable authentication. ]
-	[ -d to run as a daemon. ]
-	[ -i <ip address> to specify the ip address to bind. ]
-	[ -p <port number> to specify the tcp port number to listen on. ]
-	[ --driver <path> to specify the path to the customized 'driver.json'. ]
-	[ --objdesc <path> to specify the path to the object description file. ]
-	[ --router <path> to specify the path to the customized 'router.json'. ]
-	[ --instname <name> to specify the instance name for this server'. ]
-	[ -h this help ]
+	[ -m <mount point> 通过`rpcfs`文件系统把运行时的状态信息以虚拟文件的形式导出，导出的目录为'mount point'. ]
+	[ -a 开启认证功能. 具体是kerberos还是OAuth2,视系统配置而定 ]
+	[ -d 以守护进程的方式运行. ]
+	[ -i <ip地址> 指定服务器绑定的ip地址. ]
+	[ -p <端口号> 指定服务器服务的tcp端口号.. ]
+	[ --driver <路径名> 指定driver.json'的路径. ]
+	[ --objdesc <路径名> 指定object description 文件的路径. ]
+	[ --router <路径名> 指定router.json'文件的路径. ]
+	[ --instname <名称> 指定服务器的实例名称，缺省时，实例名称在object description文件中. ]
+	[ -h 帮助信息 ]
 ```
 #### 客户端
 ```
-	[ -a to enable authentication. ]
-	[ -d to run as a daemon. ]
-	[ -i <ip address> to specify the destination ip address. ]
-	[ -p <port number> to specify the destination tcp port. ]
-	[ -k to run as a kinit proxy. ]
-	[ -l <user name> login with the user name and then quit. ]
-	[ --driver <path> to specify the path to the customized 'driver.json'. ]
-	[ --objdesc <path> to specify the path to the object description file. ]
-	[ --router <path> to specify the path to the customized 'router.json'. ]
-	[ --instname <name> to specify the server instance name to connect'. ]
-	[ --sainstname <name> to specify the stand-alone router instance name to connect'. ]
-	[ --nodbus to run the client without dbus connection'. ]
-	[ -h this help ]
+	[ -a 开启认证功能. 具体是kerberos还是OAuth2,视系统配置而定. ]
+	[ -d 以守护进程的方式运行. ]
+	[ -i <ip地址> 指定要连接的服务器ip地址. ]
+	[ -p <端口号> 指定服务器的端口号，缺省时为4132. ]
+	[ -k 作为kinit的代理运行. ]
+	[ -l <用户名> 以'user name'登陆并退出. 指在'-k'时使用 ]
+	[ --driver <路径名> 指定driver.json'的路径.. ]
+	[ --objdesc <路径名> 指定object description文件的路径. ]
+	[ --router <路径名> 指定router.json'文件的路径. ]
+	[ --instname <名称> 指定要连接的实例名称'. ]
+	[ --sainstname <名称> 指定要连接的'rpcrouter'的实例名称. ]
+	[ --nodbus 客户端不使用dbus通信，用于没有安装dbus的环境中，如docker ]
+	[ -h 帮助信息 ]
 ```
 
