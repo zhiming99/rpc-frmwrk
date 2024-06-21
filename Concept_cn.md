@@ -68,7 +68,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
 * `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
-* `rpcfg.py`的部署功能，可以生成`rpcrouter`的设置+密钥安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括`rpc-frmwrk`服务器设置，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的使用手册。
+* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的程序，设置和密钥安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`的二进制代码，`rpc-frmwrk`服务器设置，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的[使用手册](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool)。
 
 ## Multihop功能和路由器路径
 当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
@@ -77,6 +77,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 * `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)，或者基于[WebSocket](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)的SSL连接。
 * `rpc-frmwrk`支持[Kerberos 5认证](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/security/README.md)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
+* `rpc-frmwrk`也支持OAuth2的认证，这一认证方式主要用于JS客户端的认证和授权。
 * `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。
 
 ## 负载均衡
