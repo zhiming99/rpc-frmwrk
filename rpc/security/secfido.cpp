@@ -750,6 +750,13 @@ gint32 CRpcSecFido::GetPktCached(
     if( SUCCEEDED( ret ) )
         pRetBuf = pInBuf;
 
+    if( ret == -EPROTO )
+    {
+        DebugPrintEx( logErr, ret,
+            "Error unknown magic number "
+            "in the sec packet" );
+    }
+
     return ret;
 }
 
@@ -971,6 +978,12 @@ gint32 CRpcSecFido::DecryptPkt(
         }
 
     }while( 0 );
+
+    if( ret == -EPROTO )
+    {
+        DebugPrintEx( logErr, ret,
+            "Error decrypt the kerberos packet" );
+    }
 
     return ret;
 }
