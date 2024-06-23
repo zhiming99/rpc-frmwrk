@@ -10,6 +10,7 @@ from typing import Tuple
 from tempfile import mkstemp
 from updwscfg import IsSudoAvailable, rpcf_system
 import errno
+import socket
 
 g_passDlg = None
 def GetTestPaths( path : str= None ) :
@@ -83,20 +84,31 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
             elem[ 'EnableWS' ] = ifCfg[ 'EnableWS' ]
             elem[ 'RouterPath' ] = ifCfg[ 'RouterPath' ]
             if 'HasAuth' in ifCfg and ifCfg[ 'HasAuth' ] == 'true' :
-                elem[ 'AuthInfo' ] = authInfo
+                elem[ 'AuthInfo' ] = deepcopy( authInfo )
+                if authInfo[ 'AuthMech'] == 'OAuth2':
+                    if 'OA2ChkIp' in elem['AuthInfo']:
+                        elem['AuthInfo'].pop( "OA2ChkIp")
+                    if 'OA2ChkPort' in elem['AuthInfo']:
+                        elem['AuthInfo'].pop( "OA2ChkPort")
             else :
                 elem.pop( 'AuthInfo', None )
+            bSSL = False
+            if elem[ 'EnableSSL' ] == 'true' :
+                bSSL = True
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
                 urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
                 if urlComp.port is None :
-                    elem[ 'PortNumber' ] = '443'
+                    if urlComp.scheme == 'https' or bSSL:
+                        elem[ 'PortNumber' ] = '443'
+                    elif urlComp.scheme == 'http' :
+                        elem[ 'PortNumber' ] = '80'
                 else :
                     elem[ 'PortNumber' ] = urlComp.port
-                if urlComp.hostname is not None:
-                    elem[ 'IpAddress' ] = urlComp.hostname
-                else :
-                    raise Exception( 'web socket URL is not valid' ) 
+                #if urlComp.hostname is not None:
+                #    elem[ 'IpAddress' ] = urlComp.hostname
+                #else :
+                #    raise Exception( 'web socket URL is not valid' ) 
             else :
                 elem.pop( 'DestURL', None )
 
@@ -398,11 +410,12 @@ def LoadConfigFiles( path : str) :
             paths.append( curDir + "/../ipc" )
             paths.append( curDir + "/../rpc/router" )
             paths.append( curDir + "/../rpc/security" )
+            paths.append( curDir + "/../rpc/security/oa2check" )
     else:
         paths.append( path )
     
-    count = 4
-    jsonvals = [ None ] * 4
+    count = 5
+    jsonvals = [ None ] * 5
     for strPath in paths :
         try:
             if jsonvals[ 0 ] is None :
@@ -443,6 +456,15 @@ def LoadConfigFiles( path : str) :
         except Exception as err :
             pass            
 
+        try:
+            if jsonvals[ 4 ] is None :
+                oa2desc = strPath + "/oa2checkdesc.json"
+                fp = open( oa2desc, "r" )
+                jsonvals[ 4 ] = [oa2desc, json.load(fp)]
+                fp.close()
+                count-=1
+        except Exception as err :
+            pass            
         if count == 0:
             break
 
@@ -461,8 +483,10 @@ def LoadConfigFiles( path : str) :
             fn = "router.json"
         elif idx == 2:
             fn = "rtauth.json"
-        else:
+        elif idx == 3:
             fn = "authprxy.json"
+        elif idx == 4:
+            fn = "oa2checkdesc.json"
     if fn is not None:
         raise Exception( "Error open " + fn )
             
@@ -475,7 +499,7 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
     apVal = drvFile[ 1 ]
     proxies = apVal['Objects']
     if proxies is None or len( proxies ) == 0:
-        raise Exception("bad content in authprxy.json") 
+        raise Exception("Error bad content in authprxy.json") 
 
     oConns = None
     oConn0 = None
@@ -491,6 +515,20 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         'AuthInfo' in initCfg[ 'Security' ] ):
         authInfo = deepcopy(
             initCfg[ 'Security' ][ 'AuthInfo' ] )
+
+        if 'AuthMech' not in authInfo :
+            raise Exception( "Error missing 'AuthMech' in initcfg.json" )
+        if authInfo[ 'AuthMech' ] != "krb5" :
+            #update the testcfgs
+            oConn0[ 'BindAddr' ] = oConn0[ 'IpAddress' ]
+            cfgList = [ oConn0, authInfo, drvVal ]
+            if destDir is None :
+                ret = ExportTestCfgs( cfgList )
+            else:
+                ret = ExportTestCfgsTo( cfgList, destDir )
+            oConn0.pop( 'BindAddr', None )
+            return ret
+
         if bServer :
             kdcIp = authInfo[ 'KdcIp' ]
         authInfo.pop( 'KdcIp', None )
@@ -515,12 +553,18 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
                     authInfo[ 'UserName' ] = 'kdcclient'
                     elem[ 'AuthInfo' ] = authInfo
 
+            bSSL = False
+            if elem[ 'EnableSSL' ] == 'true' :
+                bSSL = True
             elem[ 'EnableWS' ] = oConn0[ 'EnableWS' ]
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL'] = oConn0[ 'DestURL' ]
                 urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
                 if urlComp.port is None :
-                    elem[ 'PortNumber' ] = '443'
+                    if urlComp.scheme == 'https' or bSSL:
+                        elem[ 'PortNumber' ] = '443'
+                    elif urlComp.scheme == 'http' :
+                        elem[ 'PortNumber' ] = '80'
                 else :
                     elem[ 'PortNumber' ] = urlComp.port
                 if urlComp.hostname is not None:
@@ -557,6 +601,62 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         ret = ExportTestCfgsTo( cfgList, destDir )
 
     oConn0.pop( 'BindAddr', None )
+
+    return ret
+
+def Update_OA2Check( initCfg: dict, drvFile : list,
+    bServer: bool, destDir : str, drvVal : object ) -> int :
+
+    ret = 0
+    apVal = drvFile[ 1 ]
+    proxies = apVal['Objects']
+    if proxies is None or len( proxies ) == 0:
+        raise Exception("Error bad content in authprxy.json") 
+
+    authInfo = None
+    kdcIp = None
+    userName = None
+    if ( 'Security' in initCfg and
+        'AuthInfo' in initCfg[ 'Security' ] ):
+        authInfo = deepcopy(
+            initCfg[ 'Security' ][ 'AuthInfo' ] )
+
+        if 'AuthMech' not in authInfo :
+            raise Exception( "Error missing 'AuthMech' in initcfg.json" )
+
+        if authInfo[ 'AuthMech' ] != "OAuth2" :
+            return 0
+
+    if authInfo is None:
+        return 0
+
+    for proxy in proxies :
+        objName = proxy[ 'ObjectName' ]
+        if objName != 'OA2proxy':
+            continue
+        elem = proxy
+        if 'OA2ChkIp' in authInfo:
+            elem[ 'IpAddress'] = authInfo['OA2ChkIp']
+            if 'OA2ChkPort' in authInfo:
+                elem[ 'PortNumber' ] = authInfo['OA2ChkPort']
+            else:
+                elem[ 'PortNumber' ] = '4132'
+            elem[ 'ProxyPortClass' ] = 'DBusProxyPdo'
+            elem[ 'EnableSSL' ] = 'false'
+        else:
+            elem[ 'ProxyPortClass' ] = 'DBusLocalPdo'
+            elem.pop( 'IpAddress', None )
+            elem.pop( 'PortNumber', None )
+        break
+
+    if destDir is None :
+        apPath = drvFile[ 0 ]
+    else :
+        apPath = destDir + "/oa2checkdesc.json"
+
+    ret = OverwriteJsonFile( apPath, apVal )
+    if ret < 0:
+        return ret
 
     return ret
 
@@ -601,8 +701,8 @@ def Update_Rtauth( initCfg: dict, drvFile: list,
             if objName == 'RpcRouterBridgeAuthImpl' :
                 if authInfo is not None :
                     svrObj[ 'AuthInfo'] = authInfo
-                else :
-                    svrObj.pop( 'AuthInfo', None )
+                #else :
+                #    svrObj.pop( 'AuthInfo', None )
 
             if ( objName == 'RpcRouterBridgeAuthImpl' or
                  objName == 'RpcRouterBridgeImpl' ) :
@@ -663,6 +763,20 @@ def DefaultIfCfg() -> dict :
     defCfg[ "EnableBPS" ]= "false"
     return defCfg
 
+def CheckIpAddr( addr ) :
+    try:
+        socket.inet_aton(addr)
+        return 'ipv4'
+    except socket.error:
+        pass
+
+    try:
+        socket.inet_pton(socket.AF_INET6, addr)
+        return 'ipv6'
+    except socket.error:
+        pass
+    return None
+
 def Update_Drv( initCfg: dict, drvFile : list,
     bServer : bool, destDir : str ) -> int :
 
@@ -674,6 +788,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
     else :
         return -errno.ENOENT
 
+    strMech = ""
     bGmSSL = False
     while 'Security' in initCfg :
         security = initCfg[ 'Security' ]
@@ -731,6 +846,10 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 break
             SetUsingGmSSL( drvVal, bGmSSL )
             SetVerifyPeer( drvVal, bVerifyPeer, strPort )
+        if 'AuthInfo' in security:
+            authInfo = security[ 'AuthInfo' ]
+            if 'AuthMech' in authInfo :
+                strMech = authInfo[ 'AuthMech' ]
 
         if 'misc' in security and bServer :
             misc = security[ 'misc' ]
@@ -748,12 +867,18 @@ def Update_Drv( initCfg: dict, drvFile : list,
     defCfg = DefaultIfCfg()
 
     defConn = dict()
+    defConn[ "AddrFormat" ]= "ipv4"
+    defConn[ "Protocol" ]= "native"
     defConn[ "PortNumber" ]= "4132"
-    defConn[ "IpAddress"] = "127.0.0.1" 
+    defConn[ "IpAddress"] = "127.0.0.1"
+    defConn[ "PdoClass"] = "TcpStreamPdo2"
     defConn[ "Compression" ]= "true"
     defConn[ "EnableWS" ]= "false"
     defConn[ "EnableSSL" ]= "false"
+    defConn[ "ConnRecover" ]= "false"
     defConn[ "HasAuth" ]= "false"
+    defConn[ "DestURL" ]= "https://www.example.com"
+    defConn[ "EnableBPS" ]= "false"
 
     oConns = None
     if bServer and 'Connections' not in initCfg:
@@ -774,10 +899,30 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 for key, val in oConn.items() :
                     if key == 'IpAddress' :
                         ifCfg[ 'BindAddr' ] = val
+                        strFormat = CheckIpAddr( val )
+                    elif key == 'HasAuth' and val == 'true' :
+                        ifCfg[ key ] = val
+                        ifCfg[ 'AuthMech' ] = strMech
+                    elif key == 'AuthMech' :
+                        pass
                     else :
                         ifCfg[ key ] = val
                 if oConn[ 'EnableWS' ] == "false" :
                     ifCfg.pop( "DestURL", None )
+
+                if strFormat is None :
+                    strFormat = 'invalid'
+                if 'PdoClass' not in ifCfg :
+                    ifCfg[ 'PdoClass' ] = "TcpStreamPdo2"
+                if 'ConnRecover' not in ifCfg :
+                    ifCfg[ 'ConnRecover' ] = "false"
+                if 'EnableBPS' not in ifCfg :
+                    ifCfg[ 'EnableBPS' ] = "false"
+                if 'Protocol' not in ifCfg :
+                    ifCfg[ "Protocol" ] = "native"
+                if 'AddrFormat' not in ifCfg:
+                    ifCfg[ 'AddrFormat' ] = strFormat
+
                 ifList.append( ifCfg )
 
             port[ 'Parameters'] = ifList
@@ -805,7 +950,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 if oMatch[ 'PortClass' ] != "TcpStreamPdo2":
                     continue
                 oSeq = [ "RpcNatProtoFdoDrv", "RpcTcpFidoDrv" ]
-                if bAuth :
+                if bAuth and strMech == 'krb5' :
                     oSeq.insert( 0, "RpcSecFidoDrv" )
                 if bSSL :
                     oSeq.insert( 0, "RpcWebSockFidoDrv" )
@@ -889,6 +1034,12 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         drvVal = jsonFiles[ 0 ][ 1 ]
         ret = Update_AuthPrxy( initCfg,
             jsonFiles[ 3 ], bServer, destDir, drvVal )
+        if ret < 0 :
+            return ret
+
+        drvVal = jsonFiles[ 0 ][ 1 ]
+        ret = Update_OA2Check( initCfg,
+            jsonFiles[ 4 ], bServer, destDir, drvVal )
         if ret < 0 :
             return ret
 

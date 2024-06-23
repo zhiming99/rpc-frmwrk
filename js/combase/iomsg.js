@@ -19,6 +19,7 @@ const AdminCmd =
     SetConfig : [ 1, "SetConfig" ],
     OpenRemotePort : [ 2, "OpenRemotePort" ],
     CloseRemotePort : [ 3, "CloseRemotePort" ],
+    UpdateSessHash : [ 4, "UpdateSessHash" ],
 }
 exports.AdminCmd = AdminCmd
 

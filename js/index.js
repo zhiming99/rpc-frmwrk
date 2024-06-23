@@ -11,10 +11,8 @@ function setLogger() {
     if( !logger )
         return
     console.log = function (message) {
-        if (typeof message == 'object') {
+        if (typeof message == 'object'|| typeof message == 'string' ) {
             logger.innerHTML += (JSON && JSON.stringify ? JSON.stringify(message) : message) + '<br />';
-        } else {
-            logger.innerHTML += message + '<br />';
         }
     }
 }

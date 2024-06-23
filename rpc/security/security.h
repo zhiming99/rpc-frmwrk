@@ -363,7 +363,7 @@ class CAuthentServer:
     ObjPtr m_pAuthImpl;
 
     gint32 StartAuthImpl(
-            IEventSink* pCallback );
+        IEventSink* pCallback );
 
     gint32 OnStartAuthImplComplete(
         IEventSink* pCallback,
@@ -375,6 +375,13 @@ class CAuthentServer:
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
 
+    gint32 OnStartOA2CheckerComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 StartOA2Checker(
+        IEventSink* pCallback );
     public:
     typedef CAggInterfaceServer super;
     CAuthentServer( const IConfigDb* pCfg ) :

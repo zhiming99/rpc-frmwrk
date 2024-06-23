@@ -15,6 +15,8 @@ class CRpcStreamBase
         this.m_oHeader = new CPacketHeader()
         this.m_oParent = oParent
         this.m_wProtoId = EnumProtoId.protoStream
+        if( oParent.m_bCompress === false )
+            this.m_oHeader.m_wFlags = 0
 
         this.SendBuf = (( oBuf )=>{
             var oHdr = this.m_oHeader

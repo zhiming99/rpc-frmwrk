@@ -750,6 +750,13 @@ gint32 CRpcSecFido::GetPktCached(
     if( SUCCEEDED( ret ) )
         pRetBuf = pInBuf;
 
+    if( ret == -EPROTO )
+    {
+        DebugPrintEx( logErr, ret,
+            "Error unknown magic number "
+            "in the sec packet" );
+    }
+
     return ret;
 }
 
@@ -971,6 +978,12 @@ gint32 CRpcSecFido::DecryptPkt(
         }
 
     }while( 0 );
+
+    if( ret == -EPROTO )
+    {
+        DebugPrintEx( logErr, ret,
+            "Error decrypt the kerberos packet" );
+    }
 
     return ret;
 }
@@ -1369,20 +1382,22 @@ gint32 CRpcSecFidoDrv::Probe(
             break;
         }
 
+        Variant oVar;
+        ret = pConnParams->GetProperty(
+            propAuthMech, oVar );
+        if( SUCCEEDED( ret ) &&
+            ( ( stdstr& )oVar ) != "krb5" )
+        {
+            ret = 0;
+            pNewPort = pLowerPort;
+            break;
+        }
+
         ret = GetIoMgr()->GetCmdLineOpt(
             propHasAuth, bAuth );
         if( ERROR( ret ) || !bAuth )
         {
             ret = 0;
-            // remove the authentication
-            // information if any. the two are for
-            // this port only
-            pConnParams->RemoveProperty(
-                propHasAuth );
-
-            pConnParams->RemoveProperty(
-                propAuthInfo );
-
             pNewPort = pLowerPort;
             break;
         }

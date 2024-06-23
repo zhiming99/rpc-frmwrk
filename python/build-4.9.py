@@ -32,6 +32,11 @@ macros[ 'LINK' ] = os.environ['CXX']
 macros[ 'LINK_SHLIB' ] = macros[ 'LINK' ]                        
 sysroot = os.environ['SYSROOT']                                  
 
+dbgbuild = int( os.environ['DBGBUILD'] )
+if dbgbuild == 1:
+    macros[ 'CFLAGS_WARN_ON' ] = '-Wall -W -ggdb -O0 -DDEBUG'
+    macros[ 'CXXFLAGS_WARN_ON' ] = '-Wall -W -ggdb -O0 -DDEBUG'
+
 makefile = sipconfig.SIPModuleMakefile(config, build_file, export_all=1)
 makefile.dir = "./sip4build"
 makefile.extra_libs = ["combase", "ipc" ]

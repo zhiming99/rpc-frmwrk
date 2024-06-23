@@ -1254,7 +1254,24 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                     string strVal =
                         oParams[ JSON_ATTR_HASAUTH ].asString();
                     if( strVal == "true" )
+                    {
                         oElemCfg.SetBoolProp( propHasAuth, true );
+                        if( oParams.isMember( JSON_ATTR_AUTHMECH ) &&
+                            oParams[ JSON_ATTR_AUTHMECH ].isString() )
+                        {
+                            string strVal =
+                                oParams[ JSON_ATTR_AUTHMECH ].asString();
+                            oElemCfg.SetStrProp( propAuthMech, strVal );
+                        }
+                        else
+                        {
+                            ret = -ENOENT;
+                            DebugPrintEx( logErr, ret, 
+                                "Error missing AuthMech when "
+                                "authentication is enabled" );
+                            break;
+                        }
+                    }
                 }
 
                 bool bEnableBps = false;

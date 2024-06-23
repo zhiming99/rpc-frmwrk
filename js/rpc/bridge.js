@@ -3,7 +3,7 @@ const { randomInt, Int32Value, ERROR, InvalFunc } = require("../combase/defines"
 const { constval, errno, EnumPropId, EnumProtoId, EnumStmId, EnumTypeId, EnumCallFlags, EnumIfState } = require("../combase/enums")
 const { marshall, unmarshall } = require("../dbusmsg/message")
 const { CIncomingPacket, COutgoingPacket, CPacketHeader } = require("./protopkt")
-const { CDBusMessage } = require("./dmsg")
+const { CDBusMessage, DBusIfName, DBusObjPath, DBusDestination2 } = require("./dmsg")
 const { IoCmd, IoMsgType, CAdminRespMessage, CIoRespMessage, CIoReqMessage, CIoEventMessage, CPendingRequest, AdminCmd, IoEvent, CAdminReqMessage } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { Bdge_Handshake } = require("./handshak")
@@ -199,6 +199,21 @@ class CRpcTcpBridgeProxy
         this.m_arrDispEvtTable = []
         this.m_mapHStream2StmId = new Map()
         this.m_dwStreamId = 1024
+        this.m_bAuth = oConnParams.GetProperty(
+            EnumPropId.propHasAuth )
+
+        var strObj = constval.OBJNAME_TCP_BRIDGE
+        if( this.m_bAuth === true )
+            strObj = constval.OBJNAME_TCP_BRIDGEAUTH
+
+        var strRouter =
+            this.m_oParent.GetRouterName()
+
+        this.m_strObjPath = DBusObjPath(
+            strRouter, strObj )
+
+        this.m_strDestination = DBusDestination2(
+            strRouter, strObj )
 
         this.BindFunctions()
 
@@ -486,6 +501,9 @@ class CRpcRouter
 
         oAdminTab[ AdminCmd.CloseRemotePort[0]] = (oMsg)=>{
             this.CloseRemotePort( oMsg ) }
+
+        oAdminTab[ AdminCmd.UpdateSessHash[0]] = (oMsg)=>{
+            this.UpdateSessHash( oMsg ) }
     }
 
     GetRouterName()
@@ -652,6 +670,30 @@ class CRpcRouter
             oResp.m_oResp.SetUint32(
                 EnumPropId.propReturnValue, ret )
             this.PostMessage( oResp )
+        }
+    }
+
+    UpdateSessHash( oReq )
+    {
+        try{
+            var dwPortId = oReq.m_dwPortId
+            if( dwPortId === null ||
+                dwPortId === undefined )
+            {
+                throw new Error( "Error missing port id" )
+            }
+            var oProxy =
+                this.m_mapBdgeProxies.get( dwPortId )
+            if( !oProxy )
+            {
+                throw new Error( "Error no such proxy" )
+            }
+            oProxy.m_strSess = oReq.m_oReq.GetProperty(0)
+            console.log( "sess hash has been updated" )
+        }
+        catch( e )
+        {
+            console.log( e.message )
         }
     }
 

@@ -1,0 +1,33 @@
+{
+    "ClassFactories" : [],
+    "Objects" : 
+    [
+        {
+            "BusName" : "DBusBusPort_0",
+            "Compression" : "true",
+            "EnableSSL" : "true",
+            "EnableWS" : "false",
+            "Interfaces" : 
+            [
+                {
+                    "BindToClsid" : "true",
+                    "DummyInterface" : "true",
+                    "InterfaceName" : "COA2proxy_SvrImpl"
+                },
+                {
+                    "InterfaceName" : "OAuth2Proxy"
+                }
+            ],
+            "KeepAliveTimeoutSec" : "60",
+            "ObjectName" : "OA2proxy",
+            "PortClass" : "DBusLocalPdo",
+            "PortId" : "0",
+            "ProxyPortClass" : "DBusLocalPdo",
+            "QueuedRequests" : "false",
+            "RequestTimeoutSec" : "120",
+            "RouterPath" : "/"
+        }
+    ],
+    "ServerName" : "oa2check",
+    "Version" : "1.0"
+}

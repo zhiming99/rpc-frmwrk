@@ -26,15 +26,11 @@ function FetchData( oContext, oMsg )
             oDataDesc.GetProperty( EnumPropId.propIfName) )
         dmsg.SetMember(
             oDataDesc.GetProperty( EnumPropId.propMethodName))
-        dmsg.SetObjPath(
-            DBusObjPath( this.m_oParent.GetRouterName(), 
-            constval.OBJNAME_TCP_BRIDGE))
+        dmsg.SetObjPath( this.m_strObjPath )
         dmsg.SetSerial( oBdgeMsg.m_iMsgId )
         dmsg.SetSender( DBusDestination(
             this.m_oParent.GetRouterName()))
-        dmsg.SetDestination(
-            DBusDestination2( this.m_oParent.GetRouterName(), 
-            constval.OBJNAME_TCP_BRIDGE))
+        dmsg.SetDestination( this.m_strDestination )
         var oTransctx = oDataDesc.GetProperty(
             EnumPropId.propTransCtx)
         oTransctx.SetString( EnumPropId.propSessHash,

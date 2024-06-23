@@ -754,7 +754,48 @@ gint32 CDeclarePyStruct::Output()
 
             case 'O' :
                 {
-                    CCOUT << "self." << strName << " = object() ";
+                    stdstr strObjInit = "object()";
+                    do{
+                        CStructRef* pRef = ObjPtr( pType );
+                        if( pRef == nullptr )
+                            break;
+
+                        // the struct_ref node has a name
+                        // either to be the struct name or
+                        // an alias name, we need to check
+                        // both cases to find out the actual
+                        // struct name. 
+                        ObjPtr pTrueType;
+                        stdstr strTypeName = pRef->GetName();
+                        ret = g_mapDecls.GetDeclNode(
+                            strTypeName, pTrueType );
+
+                        if( SUCCEEDED( ret ) )
+                        {
+                            CStructDecl* pDecl = pTrueType;
+                            strObjInit = pDecl->GetName() + "( self )";
+                            break;
+                        }
+
+                        // this is an alias, lookup into alias map
+                        ret = g_mapAliases.GetAliasType(
+                            strTypeName, pTrueType );
+                        pRef = pTrueType;
+                        if( pRef != nullptr )
+                        {
+                            strObjInit = pRef->GetName() + "( self )";
+                            break;
+                        }
+
+                        CStructDecl* pDecl = pTrueType;
+                        if( pDecl != nullptr )
+                        {
+                            strObjInit = pDecl->GetName() + "( self )";
+                        }
+
+                    }while( 0 );
+
+                    CCOUT << "self." << strName << " = " << strObjInit ;
                     break;
                 }
             case 'h':

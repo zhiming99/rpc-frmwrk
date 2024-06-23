@@ -36,6 +36,8 @@ from updwscfg import *
 from updk5cfg import *
 import re
 import platform
+import glob
+import socket
 
 def vc_changed(stack, gparamstring):
     curTab = stack.get_visible_child_name()
@@ -100,6 +102,19 @@ def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
 
     dlg.secretEdit.set_text( "" )
 
+def CheckIpAddr( strIp ):
+    ret = False
+    try:
+        socket.inet_pton(socket.AF_INET, strIp )
+        ret = True
+    except:
+        try:
+            socket.inet_pton(socket.AF_INET6, strIp )
+            ret = True
+        except:
+            pass
+    return ret
+
 def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     dir_path += "/gmsslkey.sh"
@@ -127,6 +142,15 @@ def GenGmSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
 
 def get_instcfg_content()->str :
     content='''#!/bin/bash
+if [ -f debian ]; then
+    md5sum *.deb
+    apt-get -y install ./*.deb
+elif [ -f fedora ]; then
+    md5sum *.rpm
+    if ! dnf install ./*.rpm; then 
+        yum install ./*.rpm
+    fi
+fi
 paths=$(echo $PATH | tr ':' ' ' ) 
 for i in $paths; do
     a=$i/rpcf/rpcfgnui.py
@@ -152,12 +176,23 @@ if [ -f USESSL ]; then
         mkdir -p $keydir || exit 1
     fi   
     updinitcfg=`dirname $rpcfgnui`/updinitcfg.py
+    if [ -f clidx ]; then
+        clikeyidx=`cat clidx`
+    elif [ -f svridx ]; then
+        svrkeyidx=`cat svridx`
+    fi
     if [ ! -f $updinitcfg ]; then exit 1; fi
     if [ -f clientkeys-1.tar.gz  ]; then
         keyfile=clientkeys-1.tar.gz
         option="-c"
+    elif [ "x$clikeyidx" != "x" ]; then
+        keyfile=clientkeys-$clikeyidx.tar.gz
+        option="-c"
     elif [ -f serverkeys-0.tar.gz  ]; then
         keyfile=serverkeys-0.tar.gz
+        option=
+    elif [ "x$svrkeyidx" != "x" ]; then
+        keyfile=serverkeys-$svrkeyidx.tar.gz
         option=
     fi       
     tar -C $keydir -xf $keyfile || exit 1
@@ -166,6 +201,7 @@ if [ -f USESSL ]; then
     cat /dev/null > $keyfile
 fi
 
+echo setup rpc-frmwrk configurations...
 initcfg=$(pwd)/initcfg.json
 python3 $rpcfgnui $initcfg
 '''
@@ -336,6 +372,8 @@ class ConfigDlg(Gtk.Dialog):
             ports = drvVal['Ports']
         else :
             return None
+        if 'rpcfgopt' in drvVal:
+            confVals[ 'rpcfgopt' ] = drvVal[ 'rpcfgopt' ]
 
         bGmSSL = False
         if self.hasGmSSL and self.hasOpenSSL :
@@ -588,6 +626,7 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.ResponseType.YES )
         oInstBtn.set_tooltip_text(
             "Create configuration installers for deployment.")
+        oInstBtn.set_sensitive( bServer )
         oLoadBtn = self.get_widget_for_response(
             Gtk.ResponseType.APPLY )
         oLoadBtn.set_tooltip_text(
@@ -637,8 +676,8 @@ class ConfigDlg(Gtk.Dialog):
         #gridSec.set_row_homogeneous( True )
         gridSec.props.row_spacing = 6        
         stack.add_titled(gridSec, "GridSec", "Security")
-        self.InitSecurityPage( gridSec, 0, 0, confVals )
         self.gridSec = gridSec
+        self.InitSecurityPage( gridSec, 0, 0, confVals )
 
         if self.bServer :
             gridmh = Gtk.Grid()
@@ -682,7 +721,8 @@ class ConfigDlg(Gtk.Dialog):
         self.AddMiscOptions( grid, startCol, row, confVals )
         row = GetGridRows( grid )
         self.AddInstallerOptions( grid, startCol, row, confVals)
-        self.ToggleAuthControls( self.IsKrb5Enabled() )
+        self.ToggleAuthControls(
+            self.IsAuthChecked(), self.IsKrb5Enabled() )
 
 
     def AddNode( self, grid:Gtk.Grid, i ) :
@@ -1570,8 +1610,14 @@ class ConfigDlg(Gtk.Dialog):
                 button.props.active = True
                 return
         elif name == 'Auth' :
-            if IsFeatureEnabled( "krb5" ):
-                self.ToggleAuthControls( bActive )
+            it = self.mechCombo.get_active_iter()
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'Kerberos' and IsFeatureEnabled( "krb5" ):
+                    self.ToggleAuthControls( bActive, True )
+                elif name == 'OAuth2' and IsFeatureEnabled( "js"):
+                    self.ToggleAuthControls( bActive, False )
             return
         elif name == 'GmSSL' or name == 'VerifyPeer':
             pass
@@ -1583,6 +1629,8 @@ class ConfigDlg(Gtk.Dialog):
             self.ifctx[ ifNo ].sslCheck.set_active( bActive )
             self.switch_between_ssl_gmssl( "RpcOpenSSLFido" )
             self.gmsslCheck.props.active = False
+            self.gmsslCheck.set_sensitive( False )
+            self.vfyPeerCheck.set_sensitive( False )
         elif name == 'WebSock2' :
             iNo = button.iNo
             self.nodeCtxs[ iNo ].urlEdit.set_sensitive( bActive )
@@ -1591,35 +1639,81 @@ class ConfigDlg(Gtk.Dialog):
             self.nodeCtxs[ iNo ].sslCheck.set_active( bActive )
             self.switch_between_ssl_gmssl( "RpcOpenSSLFido" )
             self.gmsslCheck.props.active = False
+            self.vfyPeerCheck.set_sensitive( False )
         elif name == 'SSL2' :
             iNo = button.iNo
             if self.nodeCtxs[ iNo ].webSock.props.active and not bActive  :
                 button.props.active = True
                 return
     def on_selection_changed(self, widget):
-        if not IsFeatureEnabled( "krb5" ):
+        if not ( IsFeatureEnabled( "krb5" ) 
+            or IsFeatureEnabled( "js" ) ):
             return
+
         it = widget.get_active_iter()
         if it is not None:
             model = widget.get_model()
             row_id, name = model[it][:2]
+            bActive = self.IsAuthChecked()
             if name == 'Kerberos':
-                self.ToggleAuthControls( True )
-                return
-            self.ToggleAuthControls( False )
+                self.ToggleAuthControls( bActive, True )
+            else:
+                self.ToggleAuthControls( bActive, False )
         return
 
+    def get_hint_for_filechooser( self, btnName, button ) :
+        if button.editBox is None:
+            return None
+        strHint = None 
+        while True:
+            if btnName != "key" :
+                strHint = self.keyEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            if btnName != "cert" :
+                strHint = self.certEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            if btnName != "cacert" :
+                strHint = self.cacertEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            if btnName != "secret" :
+                strHint = self.cacertEdit.get_text().strip() 
+                if strHint is not None and len( strHint ) > 0:
+                    break
+
+            return None
+
+        strHint = os.path.dirname( strHint ) + "/*"
+        return strHint
+
     def on_choose_key_clicked( self, button ) :
-        self.on_choose_file_clicked( button, True )
+        strHint = self.get_hint_for_filechooser(
+            "key", button )
+        self.on_choose_file_clicked(
+            button, True, strHint )
 
     def on_choose_cert_clicked( self, button ) :
-        self.on_choose_file_clicked( button, False )
+        strHint = self.get_hint_for_filechooser(
+            "cert", button )
+        self.on_choose_file_clicked(
+            button, False, strHint )
 
     def on_choose_cacert_clicked( self, button ) :
-        self.on_choose_file_clicked( button, False )
+        strHint = self.get_hint_for_filechooser(
+            "cacert", button )
+        self.on_choose_file_clicked(
+            button, False, strHint )
 
     def on_choose_secret_clicked( self, button ) :
-        self.on_choose_file_clicked( button, False )
+        strHint = self.get_hint_for_filechooser(
+            "secret", button )
+        self.on_choose_file_clicked(
+            button, False, strHint )
 
     def on_remove_if_clicked( self, button ) :
         ifNo = button.ifNo
@@ -1630,6 +1724,8 @@ class ConfigDlg(Gtk.Dialog):
             if elem.ifNo > ifNo and not elem.IsEmpty():
                 elem.startRow -= interf.rowCount
         interf.Clear()
+        self.ToggleAuthControls(
+            self.IsAuthChecked(), self.IsKrb5Enabled() )
 
     def on_add_if_clicked( self, button ) :
         interf = InterfaceContext( len( self.ifctx) )
@@ -1642,11 +1738,13 @@ class ConfigDlg(Gtk.Dialog):
         print( "%d, %d" % (interf.rowCount, interf.startRow) )
         self.gridNet.show_all()
 
-    def on_choose_file_clicked( self, button, bKey:bool ) :
+    def on_choose_file_clicked(
+        self, button, bKey:bool, strHint=None ) :
         if not button.editBox is None:
             strPath = button.editBox.get_text()
         dialog = Gtk.FileChooserDialog(
-            title="Please choose a file", parent=self, action=Gtk.FileChooserAction.OPEN
+            title="Please choose a file",
+            parent=self, action=Gtk.FileChooserAction.OPEN
         )
         dialog.add_buttons(
             Gtk.STOCK_CANCEL,
@@ -1654,8 +1752,11 @@ class ConfigDlg(Gtk.Dialog):
             Gtk.STOCK_OPEN,
             Gtk.ResponseType.OK,
         )
-        if strPath is not None:
+        if strPath is not None and len( strPath ) > 0:
             dialog.set_filename( strPath )
+
+        elif strHint is not None:
+            dialog.set_filename( strHint )
 
         #self.add_filters(dialog, bKey)
 
@@ -1665,6 +1766,28 @@ class ConfigDlg(Gtk.Dialog):
 
         dialog.destroy()
         
+    def on_choose_pkgdir_clicked( self, button ) :
+        while True: 
+            dialog = Gtk.FileChooserDialog(
+                title="Please choose a directory",
+                parent=self,
+                action=Gtk.FileChooserAction.SELECT_FOLDER)
+            dialog.add_buttons(
+                Gtk.STOCK_CANCEL,
+                Gtk.ResponseType.CANCEL,
+                Gtk.STOCK_OPEN,
+                Gtk.ResponseType.OK,
+            )
+            response = dialog.run()
+            path = None 
+            if response == Gtk.ResponseType.OK:
+                path = dialog.get_filename()
+            dialog.destroy()
+            if path is None:
+                break
+            button.editBox.set_text( path )
+            break
+
     def on_choose_key_dir_clicked( self, button ) :
         dialog = SSLNumKeyDialog( self )
 
@@ -1796,6 +1919,7 @@ class ConfigDlg(Gtk.Dialog):
                 return 3
 
             if not self.checkCfgKrb5.props.active:
+                print( "Warning " )
                 return 4
 
             strSrcPath = os.path.dirname(
@@ -1970,7 +2094,7 @@ EOF
             strNames = comps[ 1 ] + " " + \
                 strDomain + " kdc." + strDomain
 
-            if not IsNameRegistred( strIpAddr, comps[ 1 ] ):
+            if not IsNameRegistered( strIpAddr, comps[ 1 ] ):
                 strHostEntry = AddEntryToHosts(
                     strIpAddr, strNames )
                 if strHostEntry != "":
@@ -2222,7 +2346,7 @@ EOF
                     strNewRealm.lower()+ " kdc." + \
                     strNewRealm.lower()
 
-                if not IsNameRegistred( strNewKdcIp, comps[ 1 ] ):
+                if not IsNameRegistered( strNewKdcIp, comps[ 1 ] ):
                     strCmd = AddEntryToHosts(
                         strNewKdcIp, strNames )
                     if strCmd != "" :
@@ -2348,15 +2472,28 @@ EOF
         filter_any.add_pattern("*")
         dialog.add_filter(filter_any)
 
+    def IsOAuth2Enabled( self )->bool :
+        try:
+            if not IsFeatureEnabled( "js" ):
+                return False
+            bChecked = self.IsAuthChecked()
+            if not bChecked :
+                return False
+            it = self.mechCombo.get_active_iter()
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'OAuth2':
+                    return True
+        except Exception as err:
+            print( err )
+            return False
+
     def IsKrb5Enabled( self )->bool :
         try:
             if not IsFeatureEnabled( "krb5" ):
                 return False
-            bChecked = False
-            for ctx in self.ifctx :
-                if ctx.authCheck.props.active :
-                    bChecked = True
-                    break
+            bChecked = self.IsAuthChecked()
             if not bChecked :
                 return False
             it = self.mechCombo.get_active_iter()
@@ -2369,7 +2506,8 @@ EOF
             print( err )
             return False
 
-    def ToggleAuthControls( self, bSensitive : bool ):
+    def ToggleAuthControls( self, bActive : bool, bKrb5 ):
+        bSensitive = bActive and bKrb5
         self.svcEdit.set_sensitive( bSensitive )
         self.realmEdit.set_sensitive( bSensitive )
         self.signCombo.set_sensitive( bSensitive )
@@ -2385,6 +2523,52 @@ EOF
             self.labelKProxy.set_sensitive( bSensitive )
             self.checkNoUpdRpc.set_sensitive( bSensitive )
             self.labelNoUpdRpc.set_sensitive( bSensitive )
+
+        grid = self.gridSec
+        if not bActive :
+            if bKrb5:
+                self.svcEdit.set_sensitive( False )
+                self.realmEdit.set_sensitive( False )
+            else:
+                self.oa2cEdit.set_sensitive( False )
+                self.oa2cpEdit.set_sensitive( False )
+            return
+
+        if bKrb5:
+            self.labelOa2c.set_text("")
+            self.labelOa2cp.set_text("")
+            self.oa2cEdit.set_sensitive( False )
+            self.oa2cpEdit.set_sensitive( False )
+            grid.remove( self.oa2cEdit )
+            grid.remove( self.oa2cpEdit )
+            grid.attach( self.svcEdit,
+                self.svcEdit.cpos, self.svcEdit.rpos, 2, 1 )
+            grid.attach( self.realmEdit,
+                self.realmEdit.cpos, self.realmEdit.rpos, 2, 1 )
+            self.svcEdit.show()
+            self.realmEdit.show()
+            self.svcEdit.set_sensitive( True )
+            self.realmEdit.set_sensitive( True )
+            self.labelSvc.set_text("Service Name: ")
+            self.labelRealm.set_text( "Realm: ")
+        else:
+            self.labelSvc.set_text("")
+            self.labelRealm.set_text("")
+            self.svcEdit.set_sensitive( False )
+            self.realmEdit.set_sensitive( False )
+            grid.remove( self.svcEdit )
+            grid.remove( self.realmEdit )
+            grid.attach( self.oa2cEdit,
+                self.oa2cEdit.cpos, self.oa2cEdit.rpos, 2, 1 )
+            grid.attach( self.oa2cpEdit,
+                self.oa2cpEdit.cpos, self.oa2cpEdit.rpos, 2, 1 )
+            self.oa2cEdit.show()
+            self.oa2cpEdit.show()
+            self.oa2cEdit.set_sensitive( True )
+            self.oa2cpEdit.set_sensitive( True )
+            self.labelOa2c.set_text("Checker IP: ")
+            self.labelOa2cp.set_text("Checker Port: ")
+
 
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
@@ -2407,12 +2591,19 @@ EOF
         mechList = Gtk.ListStore()
         mechList = Gtk.ListStore(int, str)
         mechList.append([1, "Kerberos"] )
-        mechList.append( [2, "Oauth2"] )
+        mechList.append( [2, "OAuth2"] )
     
+        strMech = "krb5"
+        if authInfo is not None and "AuthMech" in authInfo :
+            strMech = authInfo[ "AuthMech" ]
         mechCombo = Gtk.ComboBox.new_with_model_and_entry(mechList)
         mechCombo.set_entry_text_column(1)
-        mechCombo.set_active( 0 )
-        mechCombo.set_sensitive( False )
+        if strMech == "krb5" :
+            mechCombo.set_active( 0 )
+        else:
+            mechCombo.set_active( 1 )
+
+        mechCombo.set_sensitive( True )
         mechCombo.connect('changed', self.on_selection_changed )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
@@ -2431,6 +2622,27 @@ EOF
         svcEditBox.set_tooltip_text( "Host-based service name in " + \
             "the form 'service@hostname'" )
         grid.attach(svcEditBox, startCol + 1, startRow + 2, 2, 1 )
+        #svcEditBox.set_no_show_all( True )
+        svcEditBox.cpos = startCol + 1
+        svcEditBox.rpos = startRow + 2
+
+        labelOa2c = Gtk.Label()
+        labelOa2c.set_text("OAuth2 Checker IP: ")
+        labelOa2c.set_xalign(.5)
+        grid.attach(labelOa2c, startCol + 0, startRow + 2, 1, 1 )
+
+        strIp = ""
+        if authInfo is not None and 'OA2ChkIp' in authInfo :
+            strIp = authInfo['OA2ChkIp']
+
+        oa2cEditBox = Gtk.Entry()
+        oa2cEditBox.set_text(strIp)
+        oa2cEditBox.set_tooltip_text( "OAuth2 Checker IP " + \
+            "address. Assumes local when empty" )
+        grid.attach(oa2cEditBox, startCol + 1, startRow + 2, 2, 1 )
+        #oa2cEditBox.set_no_show_all( True )
+        oa2cEditBox.cpos = startCol + 1
+        oa2cEditBox.rpos = startRow + 2
 
         labelRealm = Gtk.Label()
         labelRealm.set_text("Realm: ")
@@ -2444,6 +2656,24 @@ EOF
         realmEditBox = Gtk.Entry()
         realmEditBox.set_text(strRealm)
         grid.attach(realmEditBox, startCol + 1, startRow + 3, 2, 1 )
+        realmEditBox.cpos = startCol + 1
+        realmEditBox.rpos = startRow + 3
+
+        labelOa2cp = Gtk.Label()
+        labelOa2cp.set_text("Port Number: ")
+        labelOa2cp.set_xalign(.5)
+        grid.attach(labelOa2cp, startCol + 0, startRow + 3, 1, 1 )
+
+        strPortNum = ""
+        if authInfo is not None and 'OA2ChkPort' in authInfo :
+            strPortNum = authInfo['OA2ChkPort']
+
+        oa2cpEditBox = Gtk.Entry()
+        oa2cpEditBox.set_text(strPortNum)
+        oa2cpEditBox.set_tooltip_text( "OAuth2 checker's port number" )
+        grid.attach(oa2cpEditBox, startCol + 1, startRow + 3, 2, 1 )
+        oa2cpEditBox.cpos = startCol + 1
+        oa2cpEditBox.rpos = startRow + 3
 
         labelSign = Gtk.Label()
         labelSign.set_text("Sign/Encrypt: ")
@@ -2545,11 +2775,17 @@ EOF
             self.checkNoUpdRpc = checkNoUpdRpc
 
         self.svcEdit = svcEditBox
+        self.labelSvc = labelSvc
+        self.oa2cEdit = oa2cEditBox
+        self.labelOa2c = labelOa2c
         self.realmEdit = realmEditBox
+        self.labelRealm = labelRealm
         self.signCombo = signCombo
         self.kdcEdit = kdcEditBox
         self.userEdit = userEditBox
         self.mechCombo = mechCombo
+        self.labelOa2cp = labelOa2cp
+        self.oa2cpEdit = oa2cpEditBox
 
     def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelMisc = Gtk.Label()
@@ -2653,6 +2889,34 @@ EOF
         grid.attach( checkKProxy, startCol + 1, startRow + 3, 1, 1)
         self.checkKProxy = checkKProxy
 
+        labelKey = Gtk.Label()
+        strDist = GetDistName()
+        if strDist == 'fedora' :
+            lblstr = 'rpm package'
+        else :
+            lblstr = 'deb package'
+        labelKey.set_text(lblstr)
+
+        labelKey.set_xalign(.5)
+        grid.attach(labelKey, startCol + 0, startRow + 4, 1, 1 )
+
+        pkgEditBox = Gtk.Entry()
+        grid.attach(pkgEditBox, startCol + 1, startRow + 4 , 1, 1 )
+        self.pkgEditBox = pkgEditBox
+
+        pkgBtn = Gtk.Button.new_with_label("...")
+        pkgBtn.connect("clicked", self.on_choose_pkgdir_clicked)
+        pkgBtn.editBox = pkgEditBox
+
+        pkgEditBox.set_tooltip_text( "path to the {}".format( lblstr ) )
+        grid.attach(pkgBtn, startCol + 2, startRow + 4, 1, 1 )
+        if not 'rpcfgopt' in confVals :
+            return
+
+        rpcfgOpt = confVals[ 'rpcfgopt' ]
+        if 'PackagePath' in rpcfgOpt:
+            pkgEditBox.set_text( rpcfgOpt[ 'PackagePath' ] )
+
         return
 
     def on_sign_msg_changed(self, combo) :
@@ -2677,15 +2941,27 @@ EOF
                         return "SSL enabled, key file is empty"
                     if len( self.certEdit.get_text().strip() ) == 0 :
                         return "SSL enabled, cert file is empty"
-                if interf.authCheck.props.active :
+                if interf.authCheck.props.active and self.IsKrb5Enabled():
                     if len( self.realmEdit.get_text().strip() ) == 0 :
-                        return "Auth enabled, but realm is empty"
+                        return "Kerberos enabled, but realm is empty"
                     if len( self.svcEdit.get_text().strip() ) == 0 and self.bServer :
-                        return "Auth enabled, but service is empty"
+                        return "Kerberos enabled, but service is empty"
                     if len( self.kdcEdit.get_text().strip() ) == 0 and self.bServer :
-                        return "Auth enabled, but kdc address is empty"
+                        return "Kerberos enabled, but kdc address is empty"
                     if len( self.userEdit.get_text().strip() ) == 0 and not self.bServer:
-                        return "Auth enabled, but user name is empty"
+                        return "Kerberos enabled, but user name is empty"
+                elif interf.authCheck.props.active and self.IsOAuth2Enabled():
+                    strIp = self.oa2cEdit.get_text().strip()
+                    if len( strIp  ) > 0 and CheckIpAddr( strIp ):
+                        pass
+                    elif len( strIp ) > 0:
+                        return "OAuth2 checker ip address is not valid"
+                    strPort = self.oa2cpEdit.get_text().strip()
+                    if len( strIp ) >0 and len( strPort  ) > 0 :
+                        dwPort = int( strPort )
+                        if dwPort > 65535:
+                            return "OAuth2 checker port number is not valid"
+
                 if len( interf.ipAddr.get_text().strip() ) == 0 :
                     return "Ip address is empty"
                 else :
@@ -2889,48 +3165,102 @@ EOF
             fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
             second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
             self.DisplayError( text, second_text )
-            return -errno.EFAULT
+            ret = False
 
         return ret
+
+    def IsSSLChecked( self ) -> bool:
+        ret = 0
+        try:
+            for i in range( len( self.ifctx ) ) :
+                curVals = self.ifctx[ i ]
+                if curVals.IsEmpty() :
+                    continue
+                if curVals.sslCheck.props.active :
+                    return True
+            ret = False
+
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+            ret = False
+
+        return ret
+
+    def IsAuthChecked( self ) -> bool:
+        try:
+            for i in range( len( self.ifctx ) ) :
+                curVals = self.ifctx[ i ]
+                if curVals.IsEmpty() :
+                    continue
+                if curVals.authCheck.props.active :
+                    return True
+        except Exception as err :
+            text = "Failed to export node:" + str( err )
+            exc_type, exc_obj, exc_tb = sys.exc_info()
+            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+            self.DisplayError( text, second_text )
+        return False
         
     def Export_Security( self, jsonVal ) -> int :
         ret = 0
         try:
             elemSecs = dict()
             jsonVal[ 'Security' ] = elemSecs
-            sslFiles = dict()
-            elemSecs[ 'SSLCred' ] = sslFiles
-            sslFiles[ "KeyFile"] = self.keyEdit.get_text().strip()
-            sslFiles[ "CertFile"] = self.certEdit.get_text().strip()
-            sslFiles[ "CACertFile"] = self.cacertEdit.get_text().strip()
-            sslFiles[ "SecretFile"] = self.secretEdit.get_text().strip()
-            if self.gmsslCheck.props.active:
-                sslFiles[ "UsingGmSSL" ] = 'true'
-            else:
-                sslFiles[ "UsingGmSSL" ] = 'false'
 
-            if self.vfyPeerCheck.props.active:
-                sslFiles[ "VerifyPeer" ] = 'true'
-            else:
-                sslFiles[ "VerifyPeer" ] = 'false'
+            if self.IsSSLChecked() :
+                sslFiles = dict()
+                elemSecs[ 'SSLCred' ] = sslFiles
+                sslFiles[ "KeyFile"] = self.keyEdit.get_text().strip()
+                sslFiles[ "CertFile"] = self.certEdit.get_text().strip()
+                sslFiles[ "CACertFile"] = self.cacertEdit.get_text().strip()
+                sslFiles[ "SecretFile"] = self.secretEdit.get_text().strip()
+                if self.gmsslCheck.props.active:
+                    sslFiles[ "UsingGmSSL" ] = 'true'
+                else:
+                    sslFiles[ "UsingGmSSL" ] = 'false'
+
+                if self.vfyPeerCheck.props.active:
+                    sslFiles[ "VerifyPeer" ] = 'true'
+                else:
+                    sslFiles[ "VerifyPeer" ] = 'false'
 
             authInfo = dict()
-            elemSecs[ 'AuthInfo' ] = authInfo
+            bKrb5 = self.IsKrb5Enabled()
+            if bKrb5 :
+                elemSecs[ 'AuthInfo' ] = authInfo
 
-            authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
-            authInfo[ 'ServiceName' ] = self.GetTestKdcSvcHostName()
-            authInfo[ 'AuthMech' ] = 'krb5'
-            authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
-            authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
+                authInfo[ 'Realm' ] = self.realmEdit.get_text().strip()
+                authInfo[ 'ServiceName' ] = self.GetTestKdcSvcHostName()
+                authInfo[ 'AuthMech' ] = 'krb5'
+                authInfo[ 'UserName' ] = self.userEdit.get_text().strip()
+                authInfo[ 'KdcIp' ] = self.kdcEdit.get_text().strip()
 
-            tree_iter = self.signCombo.get_active_iter()
-            if tree_iter is not None:
-                model = self.signCombo.get_model()
-                row_id, name = model[tree_iter][:2]
-            if row_id == 1 :
-                authInfo[ 'SignMessage' ] = 'false'
-            else:
-                authInfo[ 'SignMessage' ] = 'true'
+                tree_iter = self.signCombo.get_active_iter()
+                if tree_iter is not None:
+                    model = self.signCombo.get_model()
+                    row_id, name = model[tree_iter][:2]
+                if row_id == 1 :
+                    authInfo[ 'SignMessage' ] = 'false'
+                else:
+                    authInfo[ 'SignMessage' ] = 'true'
+            elif self.IsOAuth2Enabled() :
+                elemSecs[ 'AuthInfo' ] = authInfo
+                authInfo[ 'AuthMech' ] = 'OAuth2'
+                strIp = self.oa2cEdit.get_text()
+                strPort = self.oa2cpEdit.get_text()
+                if len( strIp ) > 0 :
+                    authInfo[ 'OA2ChkIp'] = strIp
+                    if len( strPort ) == 0:
+                        authInfo[ 'OA2ChkPort'] = "4132"
+                    else:
+                        authInfo[ 'OA2ChkPort'] = strPort
+            elif self.IsAuthChecked():
+                raise Exception( "unsupported auth mech")
 
             miscOpts = dict()
             elemSecs[ 'misc' ] = miscOpts
@@ -2946,9 +3276,9 @@ EOF
                 miscOpts[ 'TaskScheduler' ] = "RR"
             if self.checkCfgWs.props.active and self.bServer:
                 miscOpts[ 'ConfigWebServer' ] = 'true'
-            if self.checkCfgKrb5.props.active and self.bServer:
+            if bKrb5 and self.checkCfgKrb5.props.active and self.bServer:
                 miscOpts[ 'ConfigKrb5' ] = 'true'
-            if self.checkKProxy.props.active:
+            if bKrb5 and self.checkKProxy.props.active:
                 miscOpts[ 'KinitProxy' ] = 'true'
 
         except Exception as err :
@@ -3028,6 +3358,59 @@ EOF
             return -errno.EFAULT
 
         return ret
+
+    def GetNewerFile( self, strPath, pattern, bRPM )->str:
+        try:
+            curdir = os.getcwd()
+            os.chdir( strPath )
+            files = glob.glob( pattern )
+            if len( files ) == 0 :
+                return ""
+            if len( files ) == 1 :
+                return files[ 0 ]
+            if bRPM :
+                files = [s for s in files if not 'src.rpm' in s]
+            files.sort(key=lambda x: os.path.getmtime(os.path.join('', x)))
+            return files[-1]
+        finally:
+            os.chdir( curdir )
+
+    def AddInstallPackages( self, destPkg )->str :
+        cmdline = "" 
+        try:
+            strPath = self.pkgEditBox.get_text()
+            if len( strPath ) == 0:
+                raise Exception( "no package specified" )
+            
+            if not os.access( strPath, os.X_OK ):
+                raise Exception( 'Package path is not valid' )
+            strDist = GetDistName()
+            strCmd = "touch " + strDist + ";"
+            strCmd += "tar rf " + destPkg + " " + strDist + ";"
+            strCmd += "tar rf " + destPkg + " -C " + strPath + " "
+            if strDist == 'debian' :
+                 mainPkg = self.GetNewerFile(
+                     strPath, 'rpcf_*.deb', False )
+                 devPkg = self.GetNewerFile(
+                    strPath, 'rpcf-dev_*.deb', False )
+            elif strDist == 'fedora' :     
+                 devPkg = self.GetNewerFile(
+                    strPath, 'rpcf-devel-[0-9]*.rpm', True )
+                 mainPkg = self.GetNewerFile(
+                    strPath, 'rpcf-[0-9]*.rpm', True )
+
+            if len( mainPkg ) == 0 or len( devPkg ) == 0:
+                return cmdline
+
+            strCmd += mainPkg + " " + devPkg + ";"
+            strCmd += ( "md5sum " + strPath + "/" + mainPkg + " "
+                + strPath + "/" + devPkg + ";")
+            strCmd += "rm " + strDist + ";"
+            cmdline = strCmd
+        except :
+            pass
+
+        return cmdline
 
     # create installer for keys generated outside rpcfg.py
     def CreateInstaller( self, initCfg : object,
@@ -3129,6 +3512,8 @@ EOF
             # add instcfg to destPkg
             cfgDir = os.path.dirname( cfgPath )
             cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json;"
+
+            cmdLine += self.AddInstallPackages( destPkg )
 
             bAuthFile = False
             ret = self.GenAuthInstFiles(
@@ -3343,6 +3728,7 @@ EOF
                 fp.close()
 
                 cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json instcfg.sh;"
+                cmdline += self.AddInstallPackages( obj.pkgName )
                 bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"
@@ -3494,6 +3880,27 @@ EOF
 
         return ret
 
+    def SaveRpcfgOptions( self ):
+        try:
+            jsonFiles = LoadConfigFiles( None )
+            strPath = self.pkgEditBox.get_text().strip()
+            if len( strPath ) == 0:
+                return
+            if not os.access( strPath, os.X_OK ):
+                raise Exception( 'Warning Package path is not valid' )
+            jsonDrv = jsonFiles[ 0 ][ 1 ]
+            if 'rpcfgopt' not in jsonDrv:
+                rpcfgOpt = dict()
+            else:
+                rpcfgOpt = jsonDrv[ 'rpcfgopt' ]
+            rpcfgOpt[ 'PackagePath' ] = strPath
+            jsonDrv[ 'rpcfgopt' ] = rpcfgOpt
+            fp = open(jsonFiles[0][0], "w")
+            json.dump( jsonDrv, fp, indent=4)
+            fp.close()
+        except Exception as err:
+            pass
+        
     def Export_Files( self, destPath : str, bServer: bool ) -> int :
         error = self.VerifyInput()
         if error != 'success' :
@@ -3509,6 +3916,7 @@ EOF
 
             if IsInDevTree():
                 ret = Update_InitCfg( initFile, None )
+                self.SaveRpcfgOptions()
                 return ret
 
             if IsSudoAvailable():
@@ -3520,6 +3928,8 @@ EOF
             ret = Update_InitCfg( initFile, None )
             if ret < 0:
                 return ret
+
+            self.SaveRpcfgOptions()
 
             if not IsFeatureEnabled( "openssl" ):
                 return ret

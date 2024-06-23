@@ -8,7 +8,7 @@ import socket
 import re
 from krbparse import *
 from updwscfg import IsSudoAvailable, rpcf_system
-import platform
+import traceback
 
 def GetLocalIp( strIpAddr : str )->str:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -45,7 +45,7 @@ def ValidateName( hostname : str ) -> bool:
     allowed = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
     return all(allowed.match(x) for x in hostname.split(".")) 
 
-def IsNameRegistred(
+def IsNameRegistered(
     strIpAddr : str,
     strName : str ) ->bool:
     try:
@@ -253,10 +253,14 @@ def IsTestKdcSet() :
 def ChangeKeytabOwner(
     strKeytab: str,
     strUser : str = "" ) -> str:
-    if len( strUser ) == 0:
-        strUser = os.getlogin()
-    cmdline = "{sudo} chown " + strUser + " " + strKeytab + ";"
-    cmdline += "{sudo} chmod 600 " + strKeytab
+    try:
+        if len( strUser ) == 0:
+            strUser = os.getlogin()
+        cmdline = "{sudo} chown " + strUser + " " + strKeytab + ";"
+        cmdline += "{sudo} chmod 600 " + strKeytab
+    except:
+        print( "Warning unable to get user name, no change to keytab owner" )
+        return "true"
     return cmdline
 
 def IsLocalIpAddr(
@@ -269,7 +273,7 @@ def IsLocalIpAddr(
         s.listen()
         return True
     except Exception as err:
-        print(err)
+        #print(err)
         return False
     finally:
         s.close()
@@ -593,13 +597,13 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
                 strSvcHost, strRealm, destPath )
 
         components = strSvcHost.split( '@' )
-        if not IsNameRegistred( components[ 1 ] ):
+        if not IsNameRegistered( strIpAddr, components[ 1 ] ):
             strCmd = AddEntryToHosts(
                 strIpAddr, components[ 1 ] )
             if len( strCmd ) > 0:
                 cmdline += ";" + strCmd
 
-        if not IsNameRegistred( strRealm ):
+        if not IsNameRegistered( strKdcIp, strRealm ):
             strCmd = AddEntryToHosts( strKdcIp,
                 "kdc." + strRealm + " " + strRealm)
             if len( strCmd ) > 0:
@@ -622,6 +626,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
             EnableKinitProxy( True )
 
     except Exception as err:
+        print(traceback.format_exc())
         print( err )
         if ret == 0:
             ret = -errno.EFAULT
@@ -638,6 +643,7 @@ def ConfigAuthServer( initFile : str ) -> int:
             os.path.dirname( initFile ) )
 
     except Exception as err:
+        print(traceback.format_exc())
         print( err )
         if ret == 0:
             ret = -errno.EFAULT

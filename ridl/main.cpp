@@ -36,6 +36,7 @@ extern ObjPtr g_pRootNode;
 extern bool g_bSemanErr;
 extern std::string g_strAppName;
 extern std::string g_strJsLibPath;
+extern bool g_bAuth;
 extern std::string g_strWebPath;
 
 // mandatory part, just copy/paste'd from clsids.cpp
@@ -111,18 +112,20 @@ void Usage()
 #endif
 
 #ifdef JAVASCRIPT
-    printf( "\t-J:\tTo generate the JavaScript skeleton files\n" );
+    printf( "\t-J:\tTo generate the JavaScript client skeleton.\n" );
     printf( "\t--odesc_url=<url>: the <url> to specify path to get the object description \n" );
     printf( "\t\tfile for JS client. This is a mandatory option when '-J' is given\n" );
     printf( "\t--lib_path=<path>: the <path> to specify the alternative path to the JS support library\n" );
+    printf( "\t--auth: To enable OAuth2 authentication for Javascript client\n" );
 #endif
 
     printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
     printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
-    printf( "\t-l:\tTo output a shared library.\n" );
-    printf( "\t-L<lang>:\tTo output Readme in language <lang>\n" );
-    printf( "\t\tinstead of executables. This\n" );
-    printf( "\t\toption is for CPP project only.\n" );
+    printf( "\t-l:\tTo output a shared library instead of executables.\n" );
+    printf( "\t\tThis option is for CPP project only.\n" );
+    printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
+    printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
+    printf( "\t-v:\tTo print the version information.\n" );
 }
 
 static std::string g_strOutPath = "output";
@@ -203,6 +206,7 @@ int main( int argc, char** argv )
             {"async_proxy", no_argument, 0,  0 },
             {"odesc_url", required_argument, 0,  0 },
             {"lib_path", required_argument, 0,  0 },
+            {"auth", no_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -238,6 +242,10 @@ int main( int argc, char** argv )
                             break;
                         }
                         g_strJsLibPath = optarg;
+                    }
+                    else if( option_index == 3 )
+                    {
+                        g_bAuth = true;
                     }
 #endif
                     break;

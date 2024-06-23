@@ -117,6 +117,27 @@ void CClassFactory::EnumClassIds(
     return;
 }
 
+gint32 CClassFactory::AppendFactory(
+    CClassFactory& rhs )
+{
+    if( !rhs.m_oMapId2Name.empty() )
+        m_oMapId2Name.insert(
+            rhs.m_oMapId2Name.begin(),
+            rhs.m_oMapId2Name.end() );
+    if( !rhs.m_oMapName2Id.empty() )
+        m_oMapName2Id.insert(
+            rhs.m_oMapName2Id.begin(),
+            rhs.m_oMapName2Id.end() );
+    if( !rhs.m_oMapObjMakers.empty() )
+    {
+        m_oMapObjMakers.insert(
+            rhs.m_oMapObjMakers.begin(),
+            rhs.m_oMapObjMakers.end() );
+        rhs.m_oMapObjMakers.clear();
+    }
+    return 0;
+}
+
 CClassFactories::CClassFactories()
     :CStlVector<ELEM_CLASSFACTORIES>()
 {

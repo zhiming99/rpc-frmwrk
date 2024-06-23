@@ -31,6 +31,11 @@
 #include "k5proxy.h"
 #include <regex>
 
+#ifdef OA2
+using namespace rpcf;
+#include "oa2check/oa2check.h"
+#endif
+
 namespace rpcf
 {
 
@@ -403,23 +408,33 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
 
         CCfgOpener& oCtx = m_oSecCtx;
 
+        IConfigDb* pAuthInfo = nullptr;
+
+        CCfgOpenerObj oRtCfg( pRouter );
+        oRtCfg.GetPointer(
+            propAuthInfo, pAuthInfo );
+
+        if( ERROR( ret ) )
+            break;
+
         if( !bNoEnc )
         {
             oCtx.SetObjPtr(
                 propObjPtr, pAuthImpl );
 
-            IConfigDb* pAuthInfo = nullptr;
-
-            CCfgOpenerObj oRtCfg( pRouter );
-            oRtCfg.GetPointer(
-                propAuthInfo, pAuthInfo );
-
-            if( ERROR( ret ) )
-                break;
-
             oCtx.CopyProp(
                 propSignMsg, pAuthInfo );
         }
+
+        Variant oVar;
+        ret = pAuthInfo->GetProperty(
+            propAuthMech, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        bool bKrb5 = false;
+        if( ( stdstr& )oVar == "krb5" )
+            bKrb5 = true;
 
         oCtx.SetBoolProp( propNoEnc, bNoEnc );
         oCtx.SetBoolProp( propIsServer, true );
@@ -432,7 +447,7 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
 
         BufPtr pBuf( true );
         bool bFound = false;
-        while( !pPort.IsEmpty() )
+        while( !pPort.IsEmpty() && bKrb5 )
         {
             ret = GetPortProp( pPort,
                 propLowerPortPtr, pBuf );    
@@ -461,7 +476,7 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
             break;
         }
 
-        if( !bFound )
+        if( !bFound && bKrb5 )
         {
             oCtx.Clear();
             break;
@@ -510,7 +525,7 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
             propRetries, MAX_NUM_CHECK );
 
         oTaskCfg.SetIntProp(
-            propIntervalSec, 60 );
+            propIntervalSec, 360 );
 
         this->AddAndRun( m_pSessChecker );
 
@@ -3571,6 +3586,118 @@ gint32 CAuthentServer::StartAuthImpl(
     return ret;
 }
 
+gint32 CAuthentServer::OnStartOA2CheckerComplete(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pCallback == nullptr ||
+        pIoReq == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CParamList oParams;
+    CCfgOpener oReqCtx( pReqCtx );
+
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        CRpcServices* pSvc;
+        ret = oReqCtx.GetPointer(
+            propIfPtr, pSvc );
+        if( ERROR( ret ) )
+            break;
+
+        m_pAuthImpl = pSvc;
+
+    }while( 0 );
+
+    pCallback->OnEvent( eventTaskComp,
+        ret, 0, ( LONGWORD* )this );
+
+    return ret;
+}
+
+gint32 CAuthentServer::StartOA2Checker(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+#ifdef OA2
+    do{
+        CCfgOpener oCfg;
+        CIoManager* pMgr = GetIoMgr();
+        oCfg.SetPointer( propIoMgr, pMgr );
+
+        ret = CRpcServices::LoadObjDesc(
+            "./oa2checkdesc.json", "OA2proxy",
+            false, oCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        CRpcRouter* pRouter = ObjPtr( this );
+
+        oCfg.SetPointer(
+            propRouterPtr, pRouter );
+
+        ret = oCfg.CopyProp(
+            propAuthInfo, this );
+        if( ERROR( ret ) )
+            break;
+
+        InterfPtr pIf;
+        ret = pIf.NewObj(
+            clsid( COA2proxy_CliImpl ),
+            oCfg.GetCfg() );
+
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oReqCtx;
+        oReqCtx[ propIfPtr ] = ObjPtr( pIf );
+        TaskletPtr pRespCb;
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespCb, ObjPtr( this ),
+            &CAuthentServer::OnStartOA2CheckerComplete,
+            pCallback,
+            ( IConfigDb* )oReqCtx.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        m_pAuthImpl = pIf;
+        ret = pIf->StartEx( pRespCb );
+        if( ret != STATUS_PENDING )
+            ( *pRespCb )( eventCancelTask );
+
+    }while( 0 );
+#endif
+    return ret;
+}
+
 gint32 CAuthentServer::OnPostStart(
     IEventSink* pCallback )
 {
@@ -3607,6 +3734,13 @@ gint32 CAuthentServer::OnPostStart(
         {
 #ifdef KRB5
             ret = StartAuthImpl( pCallback );
+            break;
+#endif
+        }
+        else if( strMech == "OAuth2" )
+        {
+#ifdef OA2
+            ret = StartOA2Checker( pCallback );
             break;
 #endif
         }
