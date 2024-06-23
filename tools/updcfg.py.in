@@ -84,7 +84,12 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
             elem[ 'EnableWS' ] = ifCfg[ 'EnableWS' ]
             elem[ 'RouterPath' ] = ifCfg[ 'RouterPath' ]
             if 'HasAuth' in ifCfg and ifCfg[ 'HasAuth' ] == 'true' :
-                elem[ 'AuthInfo' ] = authInfo
+                elem[ 'AuthInfo' ] = deepcopy( authInfo )
+                if authInfo[ 'AuthMech'] == 'OAuth2':
+                    if 'OA2ChkIp' in elem['AuthInfo']:
+                        elem['AuthInfo'].pop( "OA2ChkIp")
+                    if 'OA2ChkPort' in elem['AuthInfo']:
+                        elem['AuthInfo'].pop( "OA2ChkPort")
             else :
                 elem.pop( 'AuthInfo', None )
             bSSL = False
@@ -405,11 +410,12 @@ def LoadConfigFiles( path : str) :
             paths.append( curDir + "/../ipc" )
             paths.append( curDir + "/../rpc/router" )
             paths.append( curDir + "/../rpc/security" )
+            paths.append( curDir + "/../rpc/security/oa2check" )
     else:
         paths.append( path )
     
-    count = 4
-    jsonvals = [ None ] * 4
+    count = 5
+    jsonvals = [ None ] * 5
     for strPath in paths :
         try:
             if jsonvals[ 0 ] is None :
@@ -450,6 +456,15 @@ def LoadConfigFiles( path : str) :
         except Exception as err :
             pass            
 
+        try:
+            if jsonvals[ 4 ] is None :
+                oa2desc = strPath + "/oa2checkdesc.json"
+                fp = open( oa2desc, "r" )
+                jsonvals[ 4 ] = [oa2desc, json.load(fp)]
+                fp.close()
+                count-=1
+        except Exception as err :
+            pass            
         if count == 0:
             break
 
@@ -468,8 +483,10 @@ def LoadConfigFiles( path : str) :
             fn = "router.json"
         elif idx == 2:
             fn = "rtauth.json"
-        else:
+        elif idx == 3:
             fn = "authprxy.json"
+        elif idx == 4:
+            fn = "oa2checkdesc.json"
     if fn is not None:
         raise Exception( "Error open " + fn )
             
@@ -587,6 +604,62 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
 
     return ret
 
+def Update_OA2Check( initCfg: dict, drvFile : list,
+    bServer: bool, destDir : str, drvVal : object ) -> int :
+
+    ret = 0
+    apVal = drvFile[ 1 ]
+    proxies = apVal['Objects']
+    if proxies is None or len( proxies ) == 0:
+        raise Exception("Error bad content in authprxy.json") 
+
+    authInfo = None
+    kdcIp = None
+    userName = None
+    if ( 'Security' in initCfg and
+        'AuthInfo' in initCfg[ 'Security' ] ):
+        authInfo = deepcopy(
+            initCfg[ 'Security' ][ 'AuthInfo' ] )
+
+        if 'AuthMech' not in authInfo :
+            raise Exception( "Error missing 'AuthMech' in initcfg.json" )
+
+        if authInfo[ 'AuthMech' ] != "OAuth2" :
+            return 0
+
+    if authInfo is None:
+        return 0
+
+    for proxy in proxies :
+        objName = proxy[ 'ObjectName' ]
+        if objName != 'OA2proxy':
+            continue
+        elem = proxy
+        if 'OA2ChkIp' in authInfo:
+            elem[ 'IpAddress'] = authInfo['OA2ChkIp']
+            if 'OA2ChkPort' in authInfo:
+                elem[ 'PortNumber' ] = authInfo['OA2ChkPort']
+            else:
+                elem[ 'PortNumber' ] = '4132'
+            elem[ 'ProxyPortClass' ] = 'DBusProxyPdo'
+            elem[ 'EnableSSL' ] = 'false'
+        else:
+            elem[ 'ProxyPortClass' ] = 'DBusLocalPdo'
+            elem.pop( 'IpAddress', None )
+            elem.pop( 'PortNumber', None )
+        break
+
+    if destDir is None :
+        apPath = drvFile[ 0 ]
+    else :
+        apPath = destDir + "/oa2checkdesc.json"
+
+    ret = OverwriteJsonFile( apPath, apVal )
+    if ret < 0:
+        return ret
+
+    return ret
+
 def Update_Rtauth( initCfg: dict, drvFile: list,
     bServer: bool, destDir : str ) -> int :
 
@@ -628,8 +701,8 @@ def Update_Rtauth( initCfg: dict, drvFile: list,
             if objName == 'RpcRouterBridgeAuthImpl' :
                 if authInfo is not None :
                     svrObj[ 'AuthInfo'] = authInfo
-                else :
-                    svrObj.pop( 'AuthInfo', None )
+                #else :
+                #    svrObj.pop( 'AuthInfo', None )
 
             if ( objName == 'RpcRouterBridgeAuthImpl' or
                  objName == 'RpcRouterBridgeImpl' ) :
@@ -961,6 +1034,12 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         drvVal = jsonFiles[ 0 ][ 1 ]
         ret = Update_AuthPrxy( initCfg,
             jsonFiles[ 3 ], bServer, destDir, drvVal )
+        if ret < 0 :
+            return ret
+
+        drvVal = jsonFiles[ 0 ][ 1 ]
+        ret = Update_OA2Check( initCfg,
+            jsonFiles[ 4 ], bServer, destDir, drvVal )
         if ret < 0 :
             return ret
 
