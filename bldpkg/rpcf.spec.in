@@ -76,6 +76,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/rtauth.json
 %{_sysconfdir}/rpcf/authprxy.json
 %{_sysconfdir}/rpcf/btinrt.json
+%{_sysconfdir}/rpcf/hwdesc.json
 %{_sysconfdir}/rpcf/echodesc.json
 %{_sysconfdir}/rpcf/oa2checkdesc.json
 %{_sysconfdir}/rpcf/*.ridl
@@ -104,6 +105,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/btinrtsvr
 %{_bindir}/rpcf/ifclismk
 %{_bindir}/rpcf/ifsvrsmk
+%{_bindir}/rpcf/hwclismk
+%{_bindir}/rpcf/hwsvrsmk
 @TEST_RPMBINS@
 %{_includedir}/rpcf/autoptr.h
 %{_includedir}/rpcf/buffer.h
