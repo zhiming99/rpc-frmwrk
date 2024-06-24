@@ -489,10 +489,10 @@ esac
 case $enable_fuse3 in
     yes)
         FUSE3_RPMLIBS="fuse3-devel,"
-        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so'
+        FUSE3_RPMFILES='%{_libdir}/libfuseif.so*ZZZZZ%{_bindir}/hostsvrZZZZZ%{_bindir}/hostcliZZZZZ%{_libdir}/rpcf/librtfiles.so*'
         FUSE3_RPMHEADERS='%{_includedir}/rpcf/ipc/fuseif.hZZZZZ%{_includedir}/rpcf/ipc/fusedefs.hZZZZZ%{_includedir}/rpcf/ipc/serijson.h'
         FUSE3_RPMPKGS="fuse3 fuse3-libs"
-        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so"
+        FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so*"
         FUSE3_DEBLIBS=" libfuse3-dev,"
         FUSE3_DEBHEADERS=
         FUSE3_DEBPKGS="fuse3,libfuse3-3,"
@@ -578,7 +578,7 @@ esac
 case $enable_testcases in
     yes)
         TEST_DEBFILES='etc/rpcf/actcdesc.jsonZZZZZetc/rpcf/asyndesc.jsonZZZZZetc/rpcf/evtdesc.jsonZZZZZetc/rpcf/inproc.jsonZZZZZetc/rpcf/kadesc.jsonZZZZZetc/rpcf/sfdesc.jsonZZZZZetc/rpcf/stmdesc.jsonZZZZZetc/rpcf/prdesc.json'
-        TEST_DEBBINS='usr/bin/rpcf/actclitstZZZZZusr/bin/rpcf/actcsvrtstZZZZZusr/bin/rpcf/asynclitstZZZZZusr/bin/rpcf/asyncsvrtstZZZZZusr/bin/rpcf/evtclitstZZZZZusr/bin/rpcf/evtsvrtstZZZZZusr/bin/rpcf/inproctstZZZZZusr/bin/rpcf/kaclitstZZZZZusr/bin/rpcf/kasvrtstZZZZZusr/bin/rpcf/prclitstZZZZZusr/bin/rpcf/prsvrtstZZZZZusr/bin/rpcf/sfclitstZZZZZusr/bin/rpcf/sfsvrtstZZZZZusr/bin/rpcf/smoketestZZZZZusr/bin/rpcf/stmclitstZZZZZusr/bin/rpcf/stmsvrtstZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libactc.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libevtst.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libstmsvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libinproc.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libkasvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libsfsvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libprsvr.so*'
+        TEST_DEBBINS='usr/bin/rpcf/actclitstZZZZZusr/bin/rpcf/actcsvrtstZZZZZusr/bin/rpcf/asynclitstZZZZZusr/bin/rpcf/asyncsvrtstZZZZZusr/bin/rpcf/evtclitstZZZZZusr/bin/rpcf/evtsvrtstZZZZZusr/bin/rpcf/inproctstZZZZZusr/bin/rpcf/kaclitstZZZZZusr/bin/rpcf/kasvrtstZZZZZusr/bin/rpcf/prclitstZZZZZusr/bin/rpcf/prsvrtstZZZZZusr/bin/rpcf/sfclitstZZZZZusr/bin/rpcf/sfsvrtstZZZZZusr/bin/rpcf/smoketestZZZZZusr/bin/rpcf/stmclitstZZZZZusr/bin/rpcf/stmsvrtstZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libactc.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libevtst.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libstmsvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libinproc.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libkasvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libsfsvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libprsvr.so*ZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/libascsvr.so*'
 
         TEST_RPMFILES='%{_sysconfdir}/rpcf/actcdesc.jsonZZZZZ%{_sysconfdir}/rpcf/asyndesc.jsonZZZZZ%{_sysconfdir}/rpcf/evtdesc.jsonZZZZZ%{_sysconfdir}/rpcf/inproc.jsonZZZZZ%{_sysconfdir}/rpcf/kadesc.jsonZZZZZ%{_sysconfdir}/rpcf/sfdesc.jsonZZZZZ%{_sysconfdir}/rpcf/stmdesc.jsonZZZZZ%{_sysconfdir}/rpcf/prdesc.json'
 
