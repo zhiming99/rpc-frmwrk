@@ -1,5 +1,4 @@
 usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
-usr/lib/@DEB_HOST_MULTIARCH@/rpcf/librtfiles.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libecho.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libhellowrd.so*
 @PYTHON_DEBFILES@
@@ -16,8 +15,8 @@ etc/rpcf/rtauth.json
 etc/rpcf/router.json
 etc/rpcf/authprxy.json
 etc/rpcf/driver.json
-etc/rpcf/oa2checkdesc.json
 usr/share/man/man1/ridlc.1
 usr/share/man/man1/rpcrouter.1
 usr/share/man/man7/ridl.7
+@JS_DEBFILES@
 

@@ -26,4 +26,4 @@ etc/rpcf/*.java
 etc/rpcf/*.py
 etc/rpcf/*tpl
 etc/rpcf/*ridl
-@JS_DEBFILES@
+@JS_DEBDEVFILES@

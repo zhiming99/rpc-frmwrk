@@ -144,7 +144,8 @@ def get_instcfg_content()->str :
     content='''#!/bin/bash
 if [ -f debian ]; then
     md5sum *.deb
-    apt-get -y install ./*.deb
+    dpkg -i --force-depends ./*.deb
+    apt-get --fix-broken install
 elif [ -f fedora ]; then
     md5sum *.rpm
     if ! dnf install ./*.rpm; then 
@@ -636,7 +637,8 @@ class ConfigDlg(Gtk.Dialog):
         self.hasGmSSL = IsFeatureEnabled( "gmssl" )
         self.hasOpenSSL = IsFeatureEnabled( "openssl" )
         self.hasSSL = ( self.hasGmSSL or self.hasOpenSSL ) 
-        self.hasAuth = IsFeatureEnabled( "krb5" )
+        self.hasAuth = ( IsFeatureEnabled( "krb5" ) or
+            IsFeatureEnabled( "js" ) )
 
         confVals = self.RetrieveInfo()
         self.confVals = confVals

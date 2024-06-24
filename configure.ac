@@ -420,7 +420,7 @@ AC_CONFIG_FILES([Makefile
 AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
 AM_CONDITIONAL([ENABLE_OPENSSL],[test x$enable_openssl = xyes])
 AM_CONDITIONAL([ENABLE_KRB5],[test x$enable_krb5 = xyes])
-AM_CONDITIONAL([ENABLE_AUTH],[test x$enable_krb5 = xyes -o x$enable_oauth2 = xyes ])
+AM_CONDITIONAL([ENABLE_AUTH],[test x$enable_krb5 = xyes -o x$enable_js = xyes ])
 AM_CONDITIONAL([ENABLE_GMSSL],[test x$enable_gmssl = xyes])
 AM_CONDITIONAL([ENABLE_FUSE3],[test x$ac_cv_lib_fuse3_fuse_mount = xyes -a x$enable_fuse3 = xyes])
 AM_CONDITIONAL([SIPBUILD],[test x$ac_cv_prog_sipbuild = xyes])
@@ -606,7 +606,8 @@ case $enable_js in
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
         JS_RPMPOSTUN="npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         JS_DEBLIBS="npm,"
-        JS_DEBFILES="etc/rpcf/jslib/*"
+        JS_DEBDEVFILES="etc/rpcf/oa2check.ridlZZZZZetc/rpcf/jslib/*"
+        JS_DEBFILES="etc/rpcf/oa2checkdesc.json"
         JS_CFGOPT=
         FEATURES+="+js "
     ;;
@@ -615,6 +616,7 @@ case $enable_js in
         JS_RPMFILES=
         JS_RPMPOST=
         JS_DEBLIBS=
+        JS_DEBDEVFILES=
         JS_RPMPOSTUN=
         JS_DEBFILES=
         JS_CFGOPT='--disable-js'
@@ -680,6 +682,7 @@ AC_SUBST(JS_RPMLIBS)
 AC_SUBST(JS_RPMFILES)
 AC_SUBST(JS_RPMPOST)
 AC_SUBST(JS_DEBLIBS)
+AC_SUBST(JS_DEBDEVFILES)
 AC_SUBST(JS_RPMPOSTUN)
 AC_SUBST(JS_DEBFILES)
 AC_SUBST(JS_CFGOPT)
