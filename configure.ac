@@ -537,7 +537,9 @@ case $enable_java in
     yes)
         JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, swig, apache-commons-cli, " 
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
+        JAVA_RPMPKGS="java-1.8.0-openjdk-headless apache-commons-cli " 
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
+        JAVA_DEBPKGS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
         JAVA_CFGOPT=
         FEATURES+="+java "
@@ -545,8 +547,10 @@ case $enable_java in
     no)
         JAVA_RPMLIBS=
         JAVA_RPMFILES=
+        JAVA_RPMPKGS=
         JAVA_DEBLIBS=
         JAVA_DEBFILES=
+        JAVA_DEBPKGS=
         JAVA_CFGOPT='--disable-java'
         FEATURES+="-java "
     ;;
@@ -554,20 +558,24 @@ esac
 
 case $enable_python in
     yes)
-        PYTHON_RPMLIBS="python3-devel, python3-pip, ( sip5 or sip6 )," 
+        PYTHON_RPMLIBS="python3-devel, python3-pip, python3-numpy, ( sip5 or sip6 )," 
+        PYTHON_RPMPKGS="python3-pip python3-numpy " 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
-        PYTHON_DEBLIBS="python3-setuptools, sip5-tools | sip-dev | sip-tools,"
+        PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-pip, sip5-tools | sip-dev | sip-tools,"
+        PYTHON_DEBPKGS="python3-dev, python3-pip," 
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=
         FEATURES+="+python "
     ;;
     no)
         PYTHON_RPMLIBS=
+        PYTHON_RPMPKGS=
         PYTHON_RPMFILES=
         PYTHON_RPMPOST=
         PYTHON_DEBLIBS=
+        PYTHON_DEBPKGS=
         PYTHON_RPMPOSTUN="hiddenvar="
         PYTHON_DEBFILES=
         PYTHON_CFGOPT='--disable-python'
@@ -659,18 +667,22 @@ AC_SUBST(KRB5_DEBPKGS)
 AC_SUBST(KRB5_CFGOPT)
 
 AC_SUBST(JAVA_RPMLIBS)
+AC_SUBST(JAVA_RPMPKGS)
 AC_SUBST(JAVA_RPMFILES)
 AC_SUBST(JAVA_DEBLIBS)
 AC_SUBST(JAVA_DEBFILES)
+AC_SUBST(JAVA_DEBPKGS)
 AC_SUBST(JAVA_CFGOPT)
 
 AC_SUBST(PYTHON_RPMLIBS)
+AC_SUBST(PYTHON_RPMPKGS)
 AC_SUBST(PYTHON_RPMFILES)
 AC_SUBST(PYTHON_RPMPOST)
 AC_SUBST(PYTHON_DEBLIBS)
 AC_SUBST(PYTHON_RPMPOSTUN)
 AC_SUBST(PYTHON_DEBFILES)
 AC_SUBST(PYTHON_CFGOPT)
+AC_SUBST(PYTHON_DEBPKGS)
 
 AC_SUBST(TEST_DEBFILES)
 AC_SUBST(TEST_DEBBINS)

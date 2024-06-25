@@ -17,7 +17,7 @@ RPC-frmwrk is a small event-driven, asynchronous RPC framework with high perform
 
 %package devel
 Summary: the @PACKAGE_NAME@ headers, libraries and tools for development purpose.
-Requires: @PACKAGE_NAME@ = @VERSION@-%{release}
+Requires: @PACKAGE_NAME@ = @VERSION@-%{release} @JAVA_RPMPKGS@ @PYTHON_RPMPKGS@ @JS_RPMPKGS@
 
 %description devel
 the @PACKAGE_NAME@ headers, libraries and tools for development purpose.

@@ -16,7 +16,7 @@ Description: RPC-frmwrk is a small event-driven, asynchronous RPC framework with
 
 Package: @PACKAGE_NAME@-dev
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, libdbus-1-3, liblz4-1, libjsoncpp1 | libjsoncpp24 | libjsoncpp25
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, @JAVA_DEBPKGS@ @PYTHON_DEBPKGS@ @JS_DEBLIBS@ libdbus-1-3, liblz4-1, libjsoncpp1 | libjsoncpp24 | libjsoncpp25
 Description: This package contains ridlc, examples, and testcases for RPC-frmwrk.
 
 Package: @PACKAGE_NAME@-static

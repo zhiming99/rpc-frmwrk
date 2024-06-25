@@ -145,7 +145,7 @@ def get_instcfg_content()->str :
 if [ -f debian ]; then
     md5sum *.deb
     dpkg -i --force-depends ./*.deb
-    apt-get --fix-broken install
+    apt-get -y --fix-broken install
 elif [ -f fedora ]; then
     md5sum *.rpm
     if ! dnf install ./*.rpm; then 
