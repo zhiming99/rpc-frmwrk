@@ -559,12 +559,12 @@ esac
 case $enable_python in
     yes)
         PYTHON_RPMLIBS="python3-devel, python3-pip, python3-numpy, ( sip5 or sip6 )," 
-        PYTHON_RPMPKGS="python3-pip python3-numpy " 
+        PYTHON_RPMPKGS="python3-pip python3-numpy (sip5 or sip6) " 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
         PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-pip, sip5-tools | sip-dev | sip-tools,"
-        PYTHON_DEBPKGS="python3-dev, python3-pip," 
+        PYTHON_DEBPKGS="python3-numpy, python3-pip, sip5-tools | sip-tools, " 
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=
         FEATURES+="+python "

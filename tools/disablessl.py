@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 import errno
 from updcfg import *
 
+bDisable = True
 def GetTestPaths2( path : str= None ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     paths = []
@@ -20,23 +21,36 @@ def GetTestPaths2( path : str= None ) :
 
 def ChangeUrlToHttp( url ):
     urlComp = urlsplit( url )
-    urlComp = urlComp._replace( scheme='http' )
-    if urlComp.port == 443 :
-        urlComp = urlComp._replace(
-            netloc = urlComp.netloc.replace(
-                str( urlComp.port ), "80" ) )
+    global bDisable
+    if bDisable:
+        urlComp = urlComp._replace( scheme='http' )
+        if urlComp.port == 443 :
+            urlComp = urlComp._replace(
+                netloc = urlComp.netloc.replace(
+                    str( urlComp.port ), "80" ) )
+    else:
+        urlComp = urlComp._replace( scheme='https' )
+        if urlComp.port == 80 :
+            urlComp = urlComp._replace(
+                netloc = urlComp.netloc.replace(
+                    str( urlComp.port ), "443" ) )
+
     return urlComp.geturl()
 
 def DisableSSLTestCfg( jsonVal ):
     try:
+        global bDisable
         objs = jsonVal[ 'Objects' ]
         for elem in objs :
-            if elem[ 'EnableSSL' ] == 'false' :
-                continue
-            elem[ 'EnableSSL' ] = 'false'
+            if bDisable:
+                if elem[ 'EnableSSL' ] == 'true' :
+                    elem[ 'EnableSSL' ] = 'false'
+            else:
+                if elem[ 'EnableSSL' ] == 'True' :
+                    elem[ 'EnableSSL' ] = 'True'
+
             if elem[ 'EnableWS' ] == 'false' :
                 continue
-
             if 'DestURL' not in elem :
                 continue
             elem[ 'DestURL' ] = ChangeUrlToHttp( 
@@ -58,12 +72,8 @@ def DisableSSLTestCfgs():
             "sfdesc.json",
             "stmdesc.json" ] )
 
-    paths = GetTestPaths2()
-    pathVal = ReadTestCfg( paths, testDescs[ 0 ] )
-    if pathVal is None :
-        paths = GetTestPaths2()
-
     ret = 0
+    paths = GetTestPaths2()
     for testDesc in testDescs :
         pathVal = ReadTestCfg( paths, testDesc )
         if pathVal is None :
@@ -130,20 +140,22 @@ def DisableSSLDrv() -> int :
     else :
         return -errno.ENOENT
 
+    global bDisable
     for port in ports :
         if port[ 'PortClass'] != 'RpcTcpBusPort' :
             continue
         for elem in port[ 'Parameters' ] :
-            if elem[ 'EnableSSL' ] == "false" :
-                continue
+            if bDisable:
+                if elem[ 'EnableSSL' ] == "true" :
+                    elem[ 'EnableSSL' ] = 'false'
+            else:
+                if elem[ 'EnableSSL' ] == "false" :
+                    elem[ 'EnableSSL' ] = 'True'
 
-            elem[ 'EnableSSL' ] = 'false'
             if elem[ 'EnableWS' ] == 'false' :
                 continue
-
             if 'DestURL' not in elem :
                 continue
-
             elem[ 'DestURL' ] = ChangeUrlToHttp( 
                 elem[ 'DestURL' ] )
         break
@@ -170,5 +182,27 @@ def DisableSSL() -> int :
 
     return ret
 
+import getopt
+def usage():
+    print( "Usage: python3 disablessl.py [-hc]" )
+    print( "\t-r: to recover ssl." )
+    print( "\t-h: to print this help" )
+
 if __name__ == "__main__":
-    DisableSSL()
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hr" )
+        for o, a in opts:
+            if o == "-h" :
+                usage()
+                sys.exit( 0 )
+            elif o == "-r":
+                bDisable = False
+            else:
+                assert False, "unhandled option"
+        DisableSSL()
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        usage()
+        sys.exit(-errno.EINVAL)
+

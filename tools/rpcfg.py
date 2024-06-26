@@ -148,8 +148,10 @@ if [ -f debian ]; then
     apt-get -y --fix-broken install
 elif [ -f fedora ]; then
     md5sum *.rpm
-    if ! dnf install ./*.rpm; then 
-        yum install ./*.rpm
+    if which dnf; then 
+        dnf -y install ./*.rpm
+    elif which yum; then
+        yum -y install ./*.rpm
     fi
 fi
 paths=$(echo $PATH | tr ':' ' ' ) 

@@ -97,14 +97,14 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 bSSL = True
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
-                urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
-                if urlComp.port is None :
-                    if urlComp.scheme == 'https' or bSSL:
-                        elem[ 'PortNumber' ] = '443'
-                    elif urlComp.scheme == 'http' :
-                        elem[ 'PortNumber' ] = '80'
-                else :
-                    elem[ 'PortNumber' ] = urlComp.port
+                #urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
+                #if urlComp.port is None :
+                #    if urlComp.scheme == 'https' or bSSL:
+                #        elem[ 'PortNumber' ] = '443'
+                #    elif urlComp.scheme == 'http' :
+                #        elem[ 'PortNumber' ] = '80'
+                #else :
+                #    elem[ 'PortNumber' ] = urlComp.port
                 #if urlComp.hostname is not None:
                 #    elem[ 'IpAddress' ] = urlComp.hostname
                 #else :
@@ -559,18 +559,18 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
             elem[ 'EnableWS' ] = oConn0[ 'EnableWS' ]
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL'] = oConn0[ 'DestURL' ]
-                urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
-                if urlComp.port is None :
-                    if urlComp.scheme == 'https' or bSSL:
-                        elem[ 'PortNumber' ] = '443'
-                    elif urlComp.scheme == 'http' :
-                        elem[ 'PortNumber' ] = '80'
-                else :
-                    elem[ 'PortNumber' ] = urlComp.port
-                if urlComp.hostname is not None:
-                    elem[ 'IpAddress' ] = urlComp.hostname
-                else :
-                    raise Exception( 'web socket URL is not valid' ) 
+                #urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
+                #if urlComp.port is None :
+                #    if urlComp.scheme == 'https' or bSSL:
+                #        elem[ 'PortNumber' ] = '443'
+                #    elif urlComp.scheme == 'http' :
+                #        elem[ 'PortNumber' ] = '80'
+                #else :
+                #    elem[ 'PortNumber' ] = urlComp.port
+                #if urlComp.hostname is not None:
+                #    elem[ 'IpAddress' ] = urlComp.hostname
+                #else :
+                #    raise Exception( 'web socket URL is not valid' ) 
 
         elif objName == 'KdcRelayServer' :
             if kdcIp is not None and bServer :
