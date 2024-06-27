@@ -715,7 +715,7 @@ gint32 CMessageMatch::SetProperty(
                 ret = -EINVAL;
                 break;
             }
-            m_strObjPath = ( stdstr& )oBuf;
+            m_strObjPath = ( const stdstr& )oBuf;
             break;
         }
     case propIfName:

@@ -2707,7 +2707,7 @@ gint32 CTcpStreamPdo2::SetProperty(
                 ret = ERROR_STATE;
                 break;
             }
-            auto qwVal = ( guint64& )oVar;
+            auto qwVal = ( const guint64& )oVar;
             if( m_pWriteTb.IsEmpty() )
                 break;
             TaskletPtr pTask = m_pWriteTb;

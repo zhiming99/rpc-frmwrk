@@ -380,7 +380,7 @@ gint32 CPort::SetProperty(
         {
             // please don't do it unless
             // you know what you are doing
-            guint32 dwPortState = ( guint32& )oBuf;
+            guint32 dwPortState = oBuf;
             ret = SetPortState( dwPortState );
             break;
         }
