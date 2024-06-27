@@ -485,7 +485,7 @@ def LoadConfigFiles( path : str) :
             fn = "rtauth.json"
         elif idx == 3:
             fn = "authprxy.json"
-        elif idx == 4 && IsFeatureEnabled( 'js' ):
+        elif idx == 4 and IsFeatureEnabled( 'js' ):
             fn = "oa2checkdesc.json"
     if fn is not None:
         raise Exception( "Error open " + fn )
