@@ -42,7 +42,7 @@ endif
 
 endif
 
-if ENABLE_AUTH
+#if ENABLE_AUTH
 SUBDIRS += security
-endif
+#endif
 

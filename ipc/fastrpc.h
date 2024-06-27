@@ -1308,7 +1308,7 @@ class CFastRpcSkelBase :
     { return m_pParent; };
 
     void SetParentIf( InterfPtr& pIf )
-    { return m_pParent = pIf; };
+    { m_pParent = pIf; };
 
     gint32 BuildBufForIrpInternal( BufPtr& pBuf,
         IConfigDb* pReqCall )

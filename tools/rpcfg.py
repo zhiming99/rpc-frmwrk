@@ -1614,6 +1614,8 @@ class ConfigDlg(Gtk.Dialog):
                 button.props.active = True
                 return
         elif name == 'Auth' :
+            if 'mechCombo' not in self:
+                return
             it = self.mechCombo.get_active_iter()
             if it is not None:
                 model = self.mechCombo.get_model()
@@ -2530,12 +2532,23 @@ EOF
 
         grid = self.gridSec
         if not bActive :
-            if bKrb5:
-                self.svcEdit.set_sensitive( False )
-                self.realmEdit.set_sensitive( False )
-            else:
-                self.oa2cEdit.set_sensitive( False )
-                self.oa2cpEdit.set_sensitive( False )
+            self.oa2cEdit.set_sensitive( False )
+            self.oa2cpEdit.set_sensitive( False )
+
+            it = self.mechCombo.get_active_iter()
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'Kerberos':
+                    self.labelSvc.set_text("Service Name: ")
+                    self.labelRealm.set_text( "Realm: ")
+                    self.labelOa2c.set_text("")
+                    self.labelOa2cp.set_text("")
+                elif name == 'OAuth2':
+                    self.labelSvc.set_text("")
+                    self.labelRealm.set_text("")
+                    self.labelOa2c.set_text("Checker IP: ")
+                    self.labelOa2cp.set_text("Checker Port: ")
             return
 
         if bKrb5:

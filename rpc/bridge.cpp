@@ -1427,7 +1427,7 @@ gint32 CRpcTcpBridgeProxy::SetupReqIrp(
             pIrpCtx->SetIoDirection( dwIoDir ); 
 
             BufPtr pBuf( true );
-            *pBuf = ( ObjPtr& )oReq.GetCfg();
+            *pBuf = ObjPtr( oReq.GetCfg() );
 
             if( ERROR( ret ) )
                 break;

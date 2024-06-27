@@ -457,7 +457,7 @@ def LoadConfigFiles( path : str) :
             pass            
 
         try:
-            if jsonvals[ 4 ] is None :
+            if jsonvals[ 4 ] is None and IsFeatureEnabled( 'js' ) :
                 oa2desc = strPath + "/oa2checkdesc.json"
                 fp = open( oa2desc, "r" )
                 jsonvals[ 4 ] = [oa2desc, json.load(fp)]
@@ -485,7 +485,7 @@ def LoadConfigFiles( path : str) :
             fn = "rtauth.json"
         elif idx == 3:
             fn = "authprxy.json"
-        elif idx == 4:
+        elif idx == 4 && IsFeatureEnabled( 'js' ):
             fn = "oa2checkdesc.json"
     if fn is not None:
         raise Exception( "Error open " + fn )
@@ -612,6 +612,9 @@ def Update_OA2Check( initCfg: dict, drvFile : list,
     proxies = apVal['Objects']
     if proxies is None or len( proxies ) == 0:
         raise Exception("Error bad content in authprxy.json") 
+
+    if not IsFeatureEnabled( 'js' ):
+        return 0
 
     authInfo = None
     kdcIp = None

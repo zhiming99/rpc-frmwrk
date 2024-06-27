@@ -496,8 +496,8 @@ gint32 CDriverManager::LoadClassFactories()
             ret = pMgr->TryLoadClassFactory( strPath );
             if( ERROR( ret ) )
             {
-                DebugPrint( ret,
-                    "Failed to load class factory %s",
+                DebugPrintEx( logErr, ret,
+                    "Error failed to load class factory %s",
                     strPath.c_str() );
                 break;
             }
@@ -573,13 +573,19 @@ gint32 CDriverManager::LoadStaticDrivers()
                 || !oDrvToLoad[ i ].isString() )
                 continue;
 
-            ret = LoadDriver( oDrvToLoad[ i ].asString() );
+            stdstr strPath =
+                oDrvToLoad[ i ].asString();
+
+            ret = LoadDriver( strPath );
             if( ret == -ENOPKG )
                 continue;
 
             if( ERROR( ret ) )
             {
                 // FIXME: bad thing happens, what to do
+                DebugPrintEx( logErr, ret,
+                    "Error failed to load static driver %s",
+                    strPath.c_str() );
                 break;
             }
         }
@@ -1268,16 +1274,16 @@ gint32 CDriverManager::BuildPortStack(
                 ret = LoadDriver( strDrvName );
                 if( ret == -ENOPKG )
                 {
-                    DebugPrint( ret,
-                        "Driver %s is not found"
+                    DebugPrintEx( logWarning, ret,
+                        "Warning driver %s is not found"
                         ", and ignored...",
                         strDrvName.c_str() );
                     continue;
                 }
                 else if( ERROR( ret ) )
                 {
-                    DebugPrint( ret,
-                        "error load Driver %s",
+                    DebugPrintEx( logErr, ret,
+                        "Error load Driver %s",
                         strDrvName.c_str() );
                     break;
                 }

@@ -516,7 +516,7 @@ case $enable_krb5 in
     yes)
         KRB5_RPMLIBS="krb5-devel,"
         KRB5_RPMPKGS="krb5-libs" 
-        KRB5_RPMFILES="%{_libdir}/libauth.so*"
+        KRB5_RPMFILES=
         KRB5_DEBLIBS="libkrb5-dev,"
         KRB5_DEBPKGS="libkrb5-3,"
         KRB5_CFGOPT=
@@ -608,7 +608,7 @@ esac
 case $enable_js in
     yes)
         JS_RPMLIBS="npm," 
-        JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*"
+        JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.json"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
         JS_RPMPOST="npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"

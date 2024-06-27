@@ -10,14 +10,14 @@ Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
 BuildRequires:  gcc, g++, python3, flex, bison, libtool, shtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @KRB5_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ @JS_RPMLIBS@ cppunit-devel
 
-Requires:       dbus dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect
+Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
 
 %package devel
 Summary: the @PACKAGE_NAME@ headers, libraries and tools for development purpose.
-Requires: @PACKAGE_NAME@ = @VERSION@-%{release} @JS_RPMPKGS@
+Requires: @PACKAGE_NAME@ = @VERSION@-%{release} @JS_RPMLIBS@
 
 %description devel
 the @PACKAGE_NAME@ headers, libraries and tools for development purpose.
@@ -78,12 +78,12 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/btinrt.json
 %{_sysconfdir}/rpcf/hwdesc.json
 %{_sysconfdir}/rpcf/echodesc.json
-%{_sysconfdir}/rpcf/oa2checkdesc.json
 %{_sysconfdir}/rpcf/*.ridl
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
+%{_libdir}/libauth.so*
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz

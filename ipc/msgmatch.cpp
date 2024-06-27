@@ -710,7 +710,7 @@ gint32 CMessageMatch::SetProperty(
     {
     case propObjPath:
         {
-            if( !IsValidDBusPath( ( stdstr& )oBuf ) )
+            if( !IsValidDBusPath( ( const stdstr& )oBuf ) )
             {
                 ret = -EINVAL;
                 break;
@@ -720,12 +720,12 @@ gint32 CMessageMatch::SetProperty(
         }
     case propIfName:
         {
-            if( !IsValidDBusName( ( stdstr& )oBuf ) )
+            if( !IsValidDBusName( ( const stdstr& )oBuf ) )
             {
                 ret = -EINVAL;
                 break;
             }
-            m_strIfName = ( stdstr& )oBuf;
+            m_strIfName = ( const stdstr& )oBuf;
             break;
         }
     case propMatchType:
