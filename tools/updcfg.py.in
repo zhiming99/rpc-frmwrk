@@ -490,7 +490,7 @@ def LoadConfigFiles( path : str) :
     if fn is not None:
         raise Exception( "Error open " + fn )
             
-    return None
+    return jsonvals
 
 def Update_AuthPrxy( initCfg: dict, drvFile : list,
     bServer: bool, destDir : str, drvVal : object ) -> int :
@@ -608,13 +608,12 @@ def Update_OA2Check( initCfg: dict, drvFile : list,
     bServer: bool, destDir : str, drvVal : object ) -> int :
 
     ret = 0
+    if not IsFeatureEnabled( 'js' ):
+        return 0
     apVal = drvFile[ 1 ]
     proxies = apVal['Objects']
     if proxies is None or len( proxies ) == 0:
         raise Exception("Error bad content in authprxy.json") 
-
-    if not IsFeatureEnabled( 'js' ):
-        return 0
 
     authInfo = None
     kdcIp = None
