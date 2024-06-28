@@ -7541,6 +7541,13 @@ gint32 CInterfaceServer::SendResponse(
         if( ERROR( ret ) )
             break;
 
+        ObjPtr pCallback = nullptr;
+        ret = oParams.GetObjPtr(
+            propEventSink, pCallback );
+
+        if( SUCCEEDED( ret ) )
+            oParams.RemoveProperty( propEventSink );
+
         bool bNonFd = false;
         if( strMethod == SYS_METHOD_SENDDATA )
         {
@@ -7734,14 +7741,10 @@ gint32 CInterfaceServer::SendResponse(
         *pBuf = pRespMsg;
         pIrpCtx->SetReqData( pBuf );
 
-        TaskletPtr pTask;
-        ret = pTask.NewObj( clsid( CIfDummyTask ) );
-
-        if( SUCCEEDED( ret ) )
+        if( !pCallback.IsEmpty() )
         {
             EventPtr pEvent;
-            pEvent = pTask;
-            // NOTE: we have fed a dummy task here
+            pEvent = pCallback;
             pIrp->SetCallback( pEvent, 0 );
         }
 
@@ -7758,6 +7761,27 @@ gint32 CInterfaceServer::SendResponse(
         if( ret == -EAGAIN )
             ret = STATUS_MORE_PROCESS_NEEDED;
 
+        if( !pCallback.IsEmpty() )
+        {
+            gint32 ( *func2 )( IEventSink*, PIRP ) =
+            ([]( IEventSink* pCb, PIRP pIrp )->gint32
+            {
+                pCb->OnEvent( eventIrpComp,
+                    ( LONGWORD )pIrp, 0, 0 );
+                pIrp->RemoveTimer();
+                pIrp->RemoveCallback();
+                return 0;
+            });
+
+            TaskletPtr pRespCall;
+            NEW_FUNCCALL_TASK( pRespCall,
+                this->GetIoMgr(), func2, 
+                ( IEventSink* )pCallback, pIrp );
+
+            ret = GetIoMgr()->RescheduleTask(
+                pRespCall );
+            break;
+        }
         pIrp->RemoveTimer();
         pIrp->RemoveCallback();
 

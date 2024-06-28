@@ -587,7 +587,7 @@ gint32 CRpcTcpBridgeAuth::OnLoginFailed(
     gint32 ret = 0;
     do{
 
-        DebugPrint( iRet, "Login failed,"
+        DebugPrintEx( logErr, iRet, "Login failed,"
             " connection is reset" );
         CRpcRouter* pRouter = GetParent();
         if( !m_pLoginTimer.IsEmpty() )
@@ -691,46 +691,72 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
         }
 
         EnableInterfaces();
-        OnServiceComplete( pResp, pCallback );
 
-        CCfgOpenerObj oIfCfg( this );
-        guint32 dwPortId = 0;
-        ret = oIfCfg.GetIntProp(
-            propPortId, dwPortId );
-        if( ERROR( ret ) )
-            break;
-
-        CAuthentServer* pAuth =
-            ObjPtr( GetParent() );
-
-        if( unlikely( pAuth == nullptr ) )
+        gint32 (*func)( IEventSink*,
+            CRpcTcpBridgeAuth* ) = ([](
+            IEventSink* pCb,
+            CRpcTcpBridgeAuth* pIf )->gint32
         {
-            ret = -EFAULT;
-            break;
-        }
+            gint32 ret = 0;
+            do{
+                CCfgOpenerObj oIfCfg( pIf );
+                guint32 dwPortId = 0;
+                ret = oIfCfg.GetIntProp(
+                    propPortId, dwPortId );
+                if( ERROR( ret ) )
+                    break;
 
-        std::string strSess;
-        ret = pAuth->GetSess( dwPortId, strSess );
+                CAuthentServer* pAuth =
+                    ObjPtr( pIf->GetParent() );
+
+                if( unlikely( pAuth == nullptr ) )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+
+                std::string strSess;
+                ret = pAuth->GetSess( dwPortId, strSess );
+                if( ERROR( ret ) )
+                    break;
+         
+                bool bNoEnc = false;
+                ret = pAuth->IsNoEnc( strSess );
+                if( SUCCEEDED( ret ) )
+                    bNoEnc = true;
+
+                ret = pIf->SetSessHash( strSess, bNoEnc );
+                if( ERROR( ret ) )
+                    break;
+
+                TaskletPtr pDummy;
+                ret = pDummy.NewObj( 
+                    clsid( CIfDummyTask ) );
+                if( ERROR( ret ) )
+                    break;
+
+                // to open the default control stream
+                ret = pIf->super::OnPostStart( pDummy );
+
+            }while( 0 );
+
+            if( ERROR( ret ) )
+                pIf->OnLoginFailed( nullptr, ret );
+
+            return 0;
+        });
+
+        TaskletPtr pSendNotify;
+        ret = NEW_COMPLETE_FUNCALL( 0, 
+            pSendNotify, this->GetIoMgr(),
+            func, nullptr, this );
         if( ERROR( ret ) )
             break;
- 
-        bool bNoEnc = false;
-        ret = pAuth->IsNoEnc( strSess );
-        if( SUCCEEDED( ret ) )
-            bNoEnc = true;
 
-        ret = SetSessHash( strSess, bNoEnc );
-        if( ERROR( ret ) )
-            break;
+        oResp.SetPointer( propEventSink,
+            ( IEventSink* )pSendNotify );
 
-        TaskletPtr pDummy;
-        ret = pDummy.NewObj( 
-            clsid( CIfDummyTask ) );
-        if( ERROR( ret ) )
-            break;
-
-        // to open the default control stream
-        ret = super::OnPostStart( pDummy );
+        OnServiceComplete( pResp, pCallback );
 
     }while( 0 );
 
