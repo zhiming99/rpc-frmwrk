@@ -6360,7 +6360,13 @@ gint32 CTaskWrapper::OnIrpComplete(
     if( pTask != nullptr )
     {
         if( m_bNoParams )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+            oCfg.SetPointer( propIrpPtr, pIrp );
             ( *pTask )( eventZero );
+            oCfg.RemoveProperty( propIrpPtr );
+        }
         else
         {
             gint32 iRet = pIrp->GetStatus();
@@ -6368,6 +6374,7 @@ gint32 CTaskWrapper::OnIrpComplete(
                 iRet, 0, ( LONGWORD* )pIrp );
         }
     }
+    pIrp->RemoveCallback();
     return 0;
 }
 

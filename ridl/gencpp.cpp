@@ -5002,8 +5002,8 @@ gint32 CImplIfMethodProxy::OutputSync()
 
                     ret = GenDeserialArgs(
                         pOutArgs, "pBuf2", true, true );
+                    NEW_LINE;
                 }
-                NEW_LINE;
             }
             CCOUT << "return ret;";
         }

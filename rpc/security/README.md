@@ -141,8 +141,14 @@ to work with `rpc-frmwrk` on such a simple network.
 3. If the service ticket expires, the session will ends in 10 minutes.
 4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
 5. Make sure the firewall not block the `kerberos` ports, especially port 88 on your `kdc` machine, for the access from service servers.
-##### 6. Using rpcfg.py 
-1.
+
 [`rpcfg.py`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool) has some useful buttons on the `security page` to make the learning process much easier by automatically setting the Kerberos environment. The taget use cases are for small business environment, where the simple authentication is enough to meet the user's requiremnt. If this is the case, deploying a working environment can be as fast as within a few minutes. For a big organization with established authentication infrastructure, it is better for you to read through the document and contact the adminstrator to find the solution.
+
+### OAuth2 support
+The `rpc-frmwrk`'s support for OAuth2 must have an external component to make oauth2 authentication happen. It is a webapp which is side by side with `rpc-frmwrk`. both are reverse proxied by a web server, such as nginx or httpd. the webapp can redirect the user browser to the oauth2 provider such as github, or wechat, or somewhere else. after the oauth2 process passes successfuly, the webapp will redirect the browser to entry of our business rpc app, for example, helloworld.html. 
+
+the client JS will pass a special code to `rpc-frmwrk` server, which will consult webapp to see if the code is valid or not. That is, the webapp has two tasks, one is to launch the oauth2 authentication process, and the other is to respond to the request from `rpc-frmwrk` to verify the access code ( not the `oauth2`'s access code ).
+
+I have set up a docker image tags `zhiming99/django-oa2cli-cgi:latest` as the example `webapp` and `zhiming99/django-oa2cli-cgi:OAuth2-Server` as the example `OAuth2` server for learning purpose. 
 
 
