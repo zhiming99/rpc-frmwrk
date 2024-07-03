@@ -1,4 +1,8 @@
 ---
+[`Wed Jul 03 2024 10:54:06 PM Beijing`]   
+1. After fixed a bug in the security module, the kerberos related test became stable now. But there is still a bug which could hang the fuse test endlessly, and I will add a logger to expose more information before I can fix it.
+2. The django server and client cgi have been uploaded. and next, i will add a docker image with springboot cgi, as the wrap up of the OAuth2 support.
+
 [`Fri Jun 07 2024 11:21:11 PM Beijing`]   
 1. I'am now trying to setting up a django oauth2 server and a django app for oauth2 debugging.
 2. The oauth2 cgi will also integrate a `oa2check` server for `rpcrouter` to verify the incoming `login` request.
