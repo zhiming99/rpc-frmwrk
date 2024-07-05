@@ -6798,6 +6798,10 @@ CTokenBucketTask::CTokenBucketTask(
             break;
         }
         m_qwMaxTokens = ( guint64& )oVar;
+        CCfgOpener oTaskCfg( ( IConfigDb* )
+            this->GetConfig() );
+        oTaskCfg.RemoveProperty(
+            propParentPtr );
 
     }while( 0 );
 
