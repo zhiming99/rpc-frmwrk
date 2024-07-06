@@ -26,7 +26,7 @@ liblogcli_la_SOURCES = LogServicecli.cpp logger.h LogServicecli.h logclibase.h
 liblogcli_la_CPPFLAGS= -I$(top_srcdir)/include -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
 liblogcli_la_LIBADD= ../ipc/libipc.la ../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L../3rd_party
 liblogcli_la_LDFLAGS= -version-info @VERSION2@
-liblogcli_ladir=$(libdir)/rpcf
+liblogcli_ladir=$(libdir)
 
 liblogcli_HEADERS = logger.h logclibase.h
 liblogclidir=$(includedir)/rpcf/ipc
