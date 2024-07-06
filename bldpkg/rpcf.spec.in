@@ -165,6 +165,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/base64.h
 %{_includedir}/rpcf/ipc/sha1.h
 %{_includedir}/rpcf/ipc/loopool.h
+%{_includedir}/rpcf/ipc/logger.h
+%{_includedir}/rpcf/ipc/logclibase.h
 %{_includedir}/rpcf/variant.h
 %{_libdir}/rpcf/lib*.so*
 
