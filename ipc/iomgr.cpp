@@ -40,6 +40,8 @@
 #include <fstream>
 #include <memory>
 
+#include "logclibase.h"
+
 namespace rpcf
 {
 
@@ -1440,7 +1442,7 @@ gint32 CIoManager::Start()
         if( ERROR( ret ) )
             break;
 
-        // let's enter the main loop. The whole
+        // let's start the main loop. The whole
         // system begin to run.
         ret = GetMainIoLoop()->Start();
         if( ERROR( ret ) )
@@ -1448,6 +1450,11 @@ gint32 CIoManager::Start()
 
         Sem_Wait( GetSyncSem() );
         ret = pTask->GetError();
+        if( ERROR( ret ) )
+            break;
+
+        m_oLogger.Start();
+        LOGINFO( this, 0, "IoMgr is started..." );
 
     }while( 0 );
 
@@ -1716,8 +1723,10 @@ gint32 CIoManager::RescheduleTaskByTid(
 gint32 CIoManager::Stop()
 {
     gint32 ret = 0;
-    CCfgOpener a;
-    a.SetPointer( propIoMgr, this );
+    DebugPrint( 0, "IoMgr is stopping..." );
+    LOGINFO( this, 0, "IoMgr is shuting down..." );
+    m_oLogger.Stop();
+
     if( true )
     {
         if( IsStopping() )
@@ -1725,14 +1734,15 @@ gint32 CIoManager::Stop()
         m_bStop = true;
     }
 
-    DebugPrint( 0, "IoMgr is stopping..." );
-
     if( m_iHcTimer != 0 )
     {
         GetUtils().GetTimerSvc().
             RemoveTimer( m_iHcTimer );
         m_iHcTimer = 0;
     }
+
+    CCfgOpener a;
+    a.SetPointer( propIoMgr, this );
 
     ret = ScheduleTask(
         clsid( CIoMgrStopTask ),
@@ -1743,7 +1753,8 @@ gint32 CIoManager::Stop()
 }
 
 CIoManager::CIoManager( const std::string& strModName ) :
-      m_strModName( strModName )
+      m_strModName( strModName ),
+      m_oLogger( this )
 {
     gint32 ret = 0;
     SetClassId( clsid( CIoManager ) );
@@ -1984,6 +1995,11 @@ CIoManager::CIoManager(
                     m_dwNumCores, dwNumCores );
             }
         }
+
+        ret = oCfg.GetBoolProp(
+            propEnableLogging, m_bLogging );
+        if( ERROR( ret ) )
+            m_bLogging = false;
 
     }while( 0 );
 }
@@ -2254,6 +2270,208 @@ bool CIoManager::HasBuiltinRt()
     GetCmdLineOpt(
         propBuiltinRt, bBuiltinRt );
     return bBuiltinRt;
+}
+
+bool CIoManager::IsLogging()
+{ return m_bLogging; }
+
+static std::vector< stdstr > s_vecLogLevel = {
+
+    "EMERG",
+    "ALERT",
+    "CRITI",
+    "ERROR",
+    "WARN",
+    "NOTE", // = 5
+    "INFO",
+};
+
+gint32 CIoManager::LogMessage(
+    guint32 dwLogLevel,
+    const char* szFile, gint32 iLineNum,
+    gint32 ret, const std::string& strFmt, ... )
+{
+    if( !IsLogging() )
+        return ERROR_STATE;
+
+    char szBuf[ 8192 ];
+    if( strFmt.size() >= sizeof( szBuf ) )
+        return -EINVAL;
+
+    gint32 iSize = sizeof( szBuf );
+    szBuf[ iSize - 1 ] = 0;
+
+    va_list argptr;
+    va_start(argptr, strFmt );
+    vsnprintf( szBuf, iSize - 1,
+        strFmt.c_str(), argptr );
+    va_end(argptr);
+
+    stdstr strFile = "[";
+    strFile += this->GetModName() + "][";
+    strFile += s_vecLogLevel[ dwLogLevel % 7 ] + "] ";
+    strFile += szFile;
+
+    stdstr strFinalMsg = DebugMsgInternal(
+        ret, szBuf, strFile.c_str(), iLineNum );
+    return m_oLogger.PushMessage( strFinalMsg );
+}
+
+void CIoManager::LoggerThread( IEventSink* pCb )
+{
+    m_oLogger.ThreadProc( pCb );
+}
+
+CLogger::CLogger( CIoManager* pMgr )
+{
+    m_pMgr = pMgr;
+    Sem_Init( &m_semMsgs, 0, 0 );
+    Sem_Init( &m_semStop, 0, 0 );
+    Sem_Init( &m_semStart, 0, 0 );
+}
+
+gint32 CLogger::ThreadProc( IEventSink* pCb )
+{
+    gint32 ret = 0;
+    ObjPtr pLogCli;
+    do{
+        ret = m_pMgr->TryLoadClassFactory(
+            "liblogcli.so" );
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oParams;
+        oParams.SetPointer( propIoMgr, m_pMgr );
+
+        ret = CRpcServices::LoadObjDesc(
+            "./loggerdesc.json", "LogService",
+            false, oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pLogCli.NewObj(
+            clsid( CLogService_CliImpl ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pSvc = pLogCli;
+        ret = pSvc->Start();
+        if( ERROR( ret ) )
+        {
+            DebugPrintEx( logErr, ret,
+                "Warning failed to start logger" );
+            break;
+        }
+        else
+        {
+            CStdRMutex oLock( GetLock() );
+            m_pLogCli = pLogCli;
+        }
+
+        Sem_Post( &m_semStart );
+        while( !m_bExit )
+        {
+            ret = Sem_TimedwaitSec( &m_semMsgs, 10 );
+
+            if( ret == -EAGAIN )
+                continue;
+
+            if( ERROR( ret ) )
+                break;
+
+            CStdRMutex oLock( GetLock() );
+            if( m_queMsgs.empty() )
+                continue;
+
+            stdstr strMsg = m_queMsgs.front();
+            m_queMsgs.pop_front();
+            oLock.Unlock();
+            this->SendLogMsg( strMsg );
+        }
+
+        while( !m_queMsgs.empty() )
+        {
+            stdstr& strMsg = m_queMsgs.front();
+            this->SendLogMsg( strMsg );
+            m_queMsgs.pop_front();
+        }
+
+        CStdRMutex oLock( GetLock() );
+        m_pLogCli.Clear();
+        pSvc->Stop();
+
+    }while( 0 );
+
+    Sem_Post( &m_semStop );
+    return 0;
+}
+
+gint32 CLogger::Start()
+{
+    TaskletPtr pTask; 
+
+    if( !m_pMgr->IsLogging() )
+        return 0;
+
+    gint32 (*func)( IEventSink*, CIoManager* ) =
+    ([]( IEventSink* pCb, CIoManager* pMgr )->gint32
+    {
+        pMgr->LoggerThread( pCb );
+        return 0;
+    });
+    gint32 ret = NEW_FUNCCALL_TASK2(
+        0, pTask, m_pMgr, func, nullptr, m_pMgr );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_pMgr->RescheduleTask( pTask, true );
+    Sem_Wait( &m_semStart );
+    return 0;
+}
+
+gint32 CLogger::Stop()
+{
+
+    CStdRMutex oLock( GetLock() );
+    if( !m_pMgr->IsLogging() ||
+        m_bExit )
+        return 0;
+    m_bExit = true;
+    Sem_Post( &m_semMsgs );
+    oLock.Unlock();
+    Sem_Wait( &m_semStop );
+    return 0;
+}
+
+gint32 CLogger::SendLogMsg(
+    const stdstr& strMsg )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( GetLock() );
+        if( !m_pMgr->IsLogging() ||
+            m_pLogCli.IsEmpty() )
+            break;
+
+        ObjPtr pLogCli = m_pLogCli;
+        ILogSvc_PImpl* pSvc = pLogCli;
+        oLock.Unlock();
+        ret = pSvc->LogMessage( strMsg );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CLogger::PushMessage(
+    const stdstr& strMsg )
+{
+    CStdRMutex oLock( GetLock() );
+    if( m_bExit )
+        return 0;
+    m_queMsgs.push_back( strMsg );
+    Sem_Post( &m_semMsgs );
+    return 0;
 }
 
 gint32 CIoMgrStopTask::operator()(

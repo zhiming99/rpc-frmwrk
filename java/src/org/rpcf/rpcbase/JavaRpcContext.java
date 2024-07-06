@@ -151,8 +151,23 @@ public class JavaRpcContext
                 }
                 if( oInit.containsKey( 111 ) )
                 {
+                    // bKproxy
                     bVal = ( Boolean )oInit.get( 111 );
                     oCfg.SetBoolProp( 111, bVal );
+                }
+
+                if( oInit.containsKey( 112 ) )
+                {
+                    // nodbus
+                    bVal = ( Boolean )oInit.get( 112 );
+                    oCfg.SetBoolProp( 112, bVal );
+                }
+
+                if( oInit.containsKey( 113 ) )
+                {
+                    // enable logging
+                    bVal = ( Boolean )oInit.get( 113 );
+                    oCfg.SetBoolProp( 113, bVal );
                 }
             }
 

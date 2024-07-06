@@ -1,9 +1,11 @@
 usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libecho.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libhellowrd.so*
+usr/lib/@DEB_HOST_MULTIARCH@/rpcf/liblogcli*.so*
 @PYTHON_DEBFILES@
 @JAVA_DEBFILES@
 usr/bin/rpcrouter
+usr/bin/rpcf_logger
 @FUSE3_DEBFILES@
 usr/bin/rpcf/*.py
 @GMSSL_DEBFILES@
@@ -13,6 +15,7 @@ etc/rpcf/rtauth.json
 etc/rpcf/router.json
 etc/rpcf/authprxy.json
 etc/rpcf/driver.json
+etc/rpcf/logger*.json
 usr/bin/rpcf/btinrtsvr
 usr/bin/rpcf/btinrtcli
 etc/rpcf/btinrt.json

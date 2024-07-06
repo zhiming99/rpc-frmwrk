@@ -867,6 +867,12 @@ namespace cpp
         if( ERROR( ret ) )
             break;
 
+        if( oCfg.exist( 113 ) )
+        {
+            oCfg.SetBoolProp(
+                propEnableLogging, true );
+        }
+
         if( !oCfg.exist( 101 ) )
         {
             ret = pObj->NewObj(

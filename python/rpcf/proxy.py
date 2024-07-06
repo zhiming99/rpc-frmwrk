@@ -35,6 +35,15 @@ import os
 from enum import IntEnum
 from typing import Union, Tuple, Optional
 
+class LogLevel :
+    logEmerg = 0
+    logAlert = 1
+    logCrit = 2
+    logErr = 3
+    logWarning = 4
+    logNotice = 5
+    logInfo = 6
+
 class ErrorCode( IntEnum ) :
     INVALID_HANDLE = np.int32( 0 )
     STATUS_SUCCESS = np.int32( 0 )
@@ -288,6 +297,8 @@ class PyRpcContext :
                         oInitParams[ 'bKProxy' ] )
                 if 'nodbus' in oInitParams:
                     p1.SetBoolProp( 112, True )
+                if 'logging' in oInitParams:
+                    p1.SetBoolProp( 113, True )
 
         except Exception as err:
             print( err )
@@ -1239,3 +1250,37 @@ class PyRpcServer( PyRpcServices ) :
 
     def IsServer( self ) :
         return True
+
+    def LogMessage( self, dwLogLevel : int,
+        ret : int, strMsg : str ) :
+        try:
+            frame = inspect.stack()[2]
+            strFile = os.path.basename( frame.filename )
+            return self.oInst.LogMessage( dwLogLevel,
+                strFile, frame.lineno,
+                ret, strMsg )
+        except Exception as err:
+            print( err )
+            return -errno.EFAULT
+
+    def LogInfo( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logInfo, ret, strMsg )
+
+    def LogAlert( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logAlert, ret, strMsg )
+
+    def LogEmerg( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logEmerg, ret, strMsg )
+
+    def LogError( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logErr, ret, strMsg )
+
+    def LogNotice( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logNotice, ret, strMsg )
+
+    def LogWarn( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logWarning, ret, strMsg )
+
+    def LogCritical( self, ret : int, strMsg : str ):
+        return self.LogMessage( LogLevel.logCrit, ret, strMsg )
+

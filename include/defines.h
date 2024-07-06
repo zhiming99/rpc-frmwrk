@@ -189,6 +189,32 @@ do{\
     ({ printf( "%s\n", \
         DebugMsg( ret, strFmt, ##__VA_ARGS__ ).c_str() );} )
 
+#define LOGMSG( _pMgr_, _level, ret, strFmt, ... ) \
+({ CIoManager* __pMgr__ = (_pMgr_); \
+   __pMgr__->LogMessage( _level, __FILENAME__, __LINE__, \
+       ret, strFmt, ##__VA_ARGS__ );} )
+
+#define LOGALERT( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logAlert, ret, strFmt, ##__VA_ARGS__ )
+
+#define LOGERR( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logErr, ret, strFmt, ##__VA_ARGS__ )
+
+#define LOGINFO( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logInfo, ret, strFmt, ##__VA_ARGS__ )
+
+#define LOGWARN( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logWarning, ret, strFmt, ##__VA_ARGS__ )
+
+#define LOGCRIT( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logCrit, ret, strFmt, ##__VA_ARGS__ )
+
+#define LOGEMERG( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logEmerg, ret, strFmt, ##__VA_ARGS__ )
+
+#define LOGNOTICE( _pMgr_, ret, strFmt, ... ) \
+    LOGMSG( _pMgr_, logNotice, ret, strFmt, ##__VA_ARGS__ )
+
 #define MAX_PENDING_MSG             20
 #define MAX_DBUS_REQS               ( MAX_PENDING_MSG * 1000 )
 

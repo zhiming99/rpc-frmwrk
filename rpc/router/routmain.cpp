@@ -52,6 +52,7 @@ static bool g_bSepConn = false;
 static std::string g_strService;
 static bool g_bDaemon = false;
 static std::string g_strMPoint;
+static bool g_bLogging = false;
 
 // two globals must be present for libfuseif.so
 ObjPtr g_pIoMgr;
@@ -81,6 +82,9 @@ void CIfRouterTest::setUp()
         // weird, more threads will have worse
         // performance of handshake
         oParams[ propMaxIrpThrd ] = 0;
+
+        if( ( g_dwRole & 0x2 ) && g_bLogging )
+            oParams[ propEnableLogging ] = true;
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
@@ -291,6 +295,11 @@ void CIfRouterTest::testSvrStartStop()
         if( ERROR( ret ) )
             break;
 
+        CIoManager* pMgr = m_pMgr;
+        LOGINFO( pMgr, 0,
+            "Starting %s as %s...", MODULE_NAME,
+            ( g_dwRole & 0x2 ) ? "bridge" : "reqfwdr" );
+
         CInterfaceServer* pSvr = pIf;
         if( g_strMPoint.empty() )
         {
@@ -331,6 +340,7 @@ void Usage( char* szName )
         "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
 #endif
         "\t [ -d to run as a daemon ]\n"
+        "\t [ -g to enable logging if the rpcrouter run as a bridge, that is '-r 2' ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
         szName );
@@ -345,7 +355,7 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:adcfs:m:v" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "hr:adcfs:m:vg" ) ) != -1 )
     {
         switch (opt)
         {
@@ -420,6 +430,11 @@ int main( int argc, char** argv )
                 Usage( argv[ 0 ] );
                 exit( 0 );
             }
+        case 'g':
+            {
+                g_bLogging = true;
+                break;
+            }
         case 'v':
             {
                 fprintf( stdout, "%s", Version() );
@@ -451,6 +466,9 @@ int main( int argc, char** argv )
         if( ERROR( ret ) )
             break;
     }
+
+    if( g_dwRole == 1 && g_bLogging )
+        ret = -EINVAL;
 
     if( ERROR( ret ) || !bRole )
     {

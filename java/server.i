@@ -274,7 +274,8 @@ class CJavaServer:
     gint32 OnPostStart(
         IEventSink* pCallback ) override
     { 
-        StartQpsTask();
+        if( m_pQpsTask.IsEmpty() )
+            return StartQpsTask();
         return 0;
     }
 

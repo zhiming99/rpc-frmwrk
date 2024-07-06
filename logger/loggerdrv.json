@@ -1,0 +1,177 @@
+{
+    "Arch" : 
+    {
+        "Processors" : "8"
+    },
+    "Drivers" : 
+    [
+        {
+            "BusClass" : "DBusBus",
+            "Description" : "This is a bus driver, and the port it creates is the DBusBusPort",
+            "DriverName" : "DBusBusDriver",
+            "DriverType" : "BusDriver",
+            "InternalClass" : "CDBusBusDriver",
+            "PortClasses" : [ "DBusBusPort" ]
+        },
+        {
+            "Description" : "This is a function port driver, and the port it creates is the DBusProxyFdo",
+            "DriverName" : "ProxyFdoDriver",
+            "DriverType" : "PortDriver",
+            "InternalClass" : "CProxyFdoDriver",
+            "PortClasses" : [ "DBusProxyFdo" ]
+        },
+        {
+            "BusClass" : "UnixSockBus",
+            "Description" : "This is a bus driver for unix stream sock, and the port it creates is the UnixSockBusPort",
+            "DriverName" : "UnixSockBusDriver",
+            "DriverType" : "BusDriver",
+            "InternalClass" : "CUnixSockBusDriver",
+            "PortClasses" : [ "UnixSockBusPort" ]
+        },
+        {
+            "BusClass" : "DBusStreamBus",
+            "Description" : "This is a bus driver, and the port created is DBusStreamBusPort",
+            "DriverName" : "DBusStreamBusDrv",
+            "DriverType" : "BusDriver",
+            "InternalClass" : "CDBusStreamBusDrv",
+            "PortClasses" : [ "DBusStreamBusPort" ]
+        }
+    ],
+    "Match" : 
+    [
+        {
+            "FdoDriver" : "",
+            "PortClass" : "DBusLocalPdo"
+        },
+        {
+            "FdoDriver" : "ProxyFdoDriver",
+            "PortClass" : "DBusProxyPdoLpbk"
+        },
+        {
+            "FdoDriver" : "ProxyFdoDriver",
+            "PortClass" : "DBusProxyPdo"
+        },
+        {
+            "FdoDriver" : "",
+            "PortClass" : "UnixSockStmPdo"
+        },
+        {
+            "FdoDriver" : "",
+            "PortClass" : "DBusStreamPdo"
+        }
+    ],
+    "Modules" : 
+    [
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "PyRpcProxy"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "PyRpcServer"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "JavaRpcProxy"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "JavaRpcServer"
+        },
+        {
+            "ClassFactories" : [ "./libfuseif.so", "./libauth.so", "./libsslpt.so", "./libwspt.so" ],
+            "DriversToLoad" : [ "DBusBusDriver", "RpcTcpBusDriver", "UnixSockBusDriver" ],
+            "ModName" : "rpcrouter",
+            "PreloadableObjects" : 
+            [
+                {
+                    "ObjectClass-1" : "RpcRouterImpl",
+                    "ObjectName-1" : "RpcRouter-0",
+                    "comment" : "remove the surfix '-1' of the field name to enable the object"
+                }
+            ]
+        },
+        {
+            "ClassFactories" : [ "./libfuseif.so" ],
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver", "DBusStreamBusDrv" ],
+            "ModName" : "hostsvr"
+        },
+        {
+            "ClassFactories" : [ "./libfuseif.so" ],
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver", "DBusStreamBusDrv" ],
+            "ModName" : "hostcli"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver" ],
+            "ModName" : "loggersvr"
+        },
+        {
+            "DriversToLoad" : [ "DBusBusDriver" ],
+            "ModName" : "loggercli"
+        }
+    ],
+    "Ports" : 
+    [
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusLocalPdo",
+            "PortClass" : "DBusLocalPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusLoopbackPdo",
+            "PortClass" : "DBusLoopbackPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusProxyPdo",
+            "PortClass" : "DBusProxyPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "BusPortClass" : "DBusBusPort",
+            "InternalClass" : "CDBusProxyPdoLpbk",
+            "PortClass" : "DBusProxyPdoLpbk",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "InternalClass" : "CDBusProxyFdo",
+            "PortClass" : "DBusProxyFdo",
+            "PortDriver" : "ProxyFdoDriver",
+            "PortType" : "Fdo"
+        },
+        {
+            "BusPortClass" : "UnixSockBusPort",
+            "InternalClass" : "CUnixSockStmPdo",
+            "PortClass" : "UnixSockStmPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "InternalClass" : "CUnixSockBusPort",
+            "PortClass" : "UnixSockBusPort",
+            "PortDriver" : "UnixSockBusDriver",
+            "PortType" : "Fdo"
+        },
+        {
+            "BusPortClass" : "DBusStreamBusPort",
+            "InternalClass" : "CDBusStreamPdo",
+            "PortClass" : "DBusStreamPdo",
+            "PortDriver" : "",
+            "PortType" : "Pdo"
+        },
+        {
+            "InternalClass" : "CDBusStreamBusPort",
+            "PortClass" : "DBusStreamBusPort",
+            "PortDriver" : "DBusStreamBusDrv",
+            "PortType" : "Fdo"
+        }
+    ],
+    "Version" : "1.0"
+}

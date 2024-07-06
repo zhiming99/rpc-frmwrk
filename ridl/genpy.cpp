@@ -3089,6 +3089,8 @@ gint32 CImplPyMainFunc::EmitUsage( bool bProxy )
         INDENT_UPL;
         Wa( "\"\\t [ -a to enable authentication ]\\n\" +" );
         Wa( "\"\\t [ -d to run as a daemon ]\\n\" +" );
+        if( !bProxy )
+            Wa( "\"\\t [ -g to enable logging ]\\n\" +" );
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
             Wa( "\"\\t [ -m to specify a directory as the mountpoint for rpcfs ]\\n\" +" );
@@ -3139,9 +3141,11 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "argv = sys.argv[1:]" );
         Wa( "try:" );
         stdstr strShort = "hadi:p:";
+        if( !bProxy )
+            strShort = "hadgi:p:";
 #ifdef FUSE3
         if( !bProxy && g_bBuiltinRt )
-            strShort = "hadi:p:m:";
+            strShort = "hadgi:p:m:";
 #endif
 #ifdef KRB5
         if( bProxy && g_bBuiltinRt )
@@ -3165,6 +3169,11 @@ gint32 CImplPyMainFunc::EmitGetOpt( bool bProxy )
         Wa( "for opt, arg in opts:" );
         Wa( "    if opt in ('-a'):" );
         Wa( "        params[ 'bAuth' ] = True" );
+        if( !bProxy )
+        {
+            Wa( "    elif opt in ('-g'):" );
+            Wa( "        params[ 'logging' ] = True" );
+        }
 
 #ifdef KRB5
         if( bProxy && g_bBuiltinRt )

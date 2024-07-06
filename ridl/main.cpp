@@ -161,7 +161,7 @@ static gint32 IsValidDir( const char* szDir )
     gint32 ret = 0;
     do{
         struct stat sb;
-        if (lstat( optarg, &sb) == -1)
+        if (lstat( szDir, &sb) == -1)
         {
             ret = -errno;
             break;
@@ -566,7 +566,12 @@ int main( int argc, char** argv )
                     g_strOutPath, strAppName, pRoot );
 
                 if( ERROR( ret ) )
+                {
+                    printf( "Error %s with rpcfs support is "
+                        "not available yet\n",
+                        g_strLang.c_str() );
                     break;
+                }
 
                 stdstr strOutPath = g_strOutPath + "/fs";
                 ret = GenCppProj(

@@ -1,0 +1,13 @@
+appname "logger";
+
+interface LogSvc
+{
+    [noreply]DebugLog( string strMsg ) returns ();
+    [noreply]LogMessage( string strMsg ) returns ();
+    [async_s]LogCritMsg( string strMsg ) returns();
+};
+
+service LogService
+{
+    interface LogSvc;
+};
