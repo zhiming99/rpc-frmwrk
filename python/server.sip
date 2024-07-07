@@ -795,8 +795,8 @@ class CPythonServer :
         auto* pImpl = dynamic_cast
             < CPythonServer* >( sipCpp );
         CIoManager* pMgr = pImpl->GetIoMgr();
-        sipRes = pMgr->LogMessage( a0,
-            a1->c_str(), a2, a3, a4->c_str() );
+        sipRes = pMgr->LogMessage(
+            a0, *a1, a2, a3, *a4 );
     %End
 };
 

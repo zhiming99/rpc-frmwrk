@@ -2287,9 +2287,9 @@ static std::vector< stdstr > s_vecLogLevel = {
 };
 
 gint32 CIoManager::LogMessage(
-    guint32 dwLogLevel,
-    const char* szFile, gint32 iLineNum,
-    gint32 ret, const std::string& strFmt, ... )
+    guint32 dwLogLevel, const std::string& szFile,
+    gint32 iLineNum, gint32 ret,
+    const std::string& strFmt, ... )
 {
     if( !IsLogging() )
         return ERROR_STATE;

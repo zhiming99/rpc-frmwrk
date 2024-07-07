@@ -703,7 +703,7 @@ class CIoManager : public IService
     bool IsLogging();
 
     gint32 LogMessage( guint32 dwLogLevel,
-        const char* szFunc, gint32 iLineNum,
+        const std::string& szFunc, gint32 iLineNum,
         gint32 ret, const std::string& strFmt, ... );
     void LoggerThread( IEventSink* pCb );
 };

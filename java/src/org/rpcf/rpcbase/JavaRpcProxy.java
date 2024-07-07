@@ -1,8 +1,4 @@
 package org.rpcf.rpcbase;
-import java.lang.String;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
 
 
 abstract public class JavaRpcProxy extends JavaRpcServiceP
@@ -12,7 +8,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         String strDesc,
         String strSvrObj )
     {
-        JRetVal jret = null;
+        JRetVal jret;
         do{
             m_pIoMgr = pIoMgr;
             CParamList oParams = new CParamList();
@@ -42,8 +38,6 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
 
         if( jret.ERROR() )
             setError( jret.getError() );
-
-        return;
     }
 
     public JRetVal sendRequest(
@@ -90,7 +84,7 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
         int seriProto )
     {
         JRetVal jret = new JRetVal();
-        int ret = 0;
+        int ret;
         do{
             CParamList oParams = new CParamList();
             ret = oParams.SetStrProp(
@@ -174,8 +168,5 @@ abstract public class JavaRpcProxy extends JavaRpcServiceP
             context, pCfg,
             ( Object )args );
     }
-
-    public boolean isServer()
-    { return false; }
 
 }

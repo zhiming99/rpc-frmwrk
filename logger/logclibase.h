@@ -3,15 +3,23 @@
  *
  *       Filename:  logclibase.h
  *
- *    Description:  
+ *    Description:  Declaration of the interface class ILogSvc_PImpl as the base class
+ *                  of the CLogService_CliImpl.
  *
  *        Version:  1.0
  *        Created:  07/03/2024 09:26:58 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:  
+ *
+ *      Copyright:  2024 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
  *
  * =====================================================================================
  */

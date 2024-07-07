@@ -618,6 +618,18 @@ class CJavaServer:
     {
         return nullptr;
     }
+
+    gint32 LogMessage( JNIEnv* jenv, guint32 dwLogLevel,
+        const std::string& strFile, guint32 dwLineNo,
+        gint32 ret, const std::string& strMsg )
+    {
+        auto pImpl = dynamic_cast
+            < CJavaServer* >( $self );
+        CIoManager* pMgr = pImpl->GetIoMgr();
+        return pMgr->LogMessage( dwLogLevel,
+            strFile, dwLineNo, ret, strMsg );
+    }
+
     }
 
     jobject CastToObjPtr( JNIEnv *jenv );
@@ -626,7 +638,9 @@ class CJavaServer:
     jobject GetPeerIdHash(
         JNIEnv *jenv,
         jlong hChannel );
+
 };
+
 %clearnodefaultctor;
 
 gint32 ChainTasks( ObjPtr& pObj1, ObjPtr& pObj2 );

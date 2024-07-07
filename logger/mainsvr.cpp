@@ -219,6 +219,7 @@ int main( int argc, char** argv )
         daemon( 1, 0 );
 
      std::signal( SIGTERM, signal_term_handler );
+     std::signal( SIGQUIT, signal_term_handler );
 
     do{
         std::string strDesc = "./loggerdesc.json";

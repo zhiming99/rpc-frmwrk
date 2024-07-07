@@ -367,6 +367,17 @@ enum // some constants
     MAX_BUF_SIZE = ( int )( 16 * 1024 * 1024 )
 };
 
+enum
+{
+    logEmerg = 0,
+    logAlert = 1,
+    logCrit = 2,
+    logErr = 3,
+    logWarning = 4,
+    logNotice = 5,
+    logInfo = 6,
+};
+
 %template(vectorVars) std::vector<Variant>;
 
 gint32 CoInitialize( gint32 iCtx );
