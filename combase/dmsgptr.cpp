@@ -32,6 +32,8 @@
 #include "configdb.h"
 #include "registry.h"
 
+extern rpcf::ObjPtr g_pIoMgr;
+
 namespace rpcf
 {
 
@@ -52,7 +54,8 @@ std::string DMsgPtr::GetInterface() const
         {
             pszInterface = "";
             DebugPrintEx( logErr, -ENOMSG,
-                "dbus_message_get_interface failed" );
+                "dbus_message_get_interface failed content='%s'",
+                this->DumpMsg().c_str() );
         }
     }
 
