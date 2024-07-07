@@ -83,7 +83,8 @@ void CIfRouterTest::setUp()
         // performance of handshake
         oParams[ propMaxIrpThrd ] = 0;
 
-        if( ( g_dwRole & 0x2 ) && g_bLogging )
+        // if( ( g_dwRole & 0x2 ) && g_bLogging )
+        if( g_bLogging )
             oParams[ propEnableLogging ] = true;
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
@@ -467,8 +468,6 @@ int main( int argc, char** argv )
             break;
     }
 
-    if( g_dwRole == 1 && g_bLogging )
-        ret = -EINVAL;
 
     if( ERROR( ret ) || !bRole )
     {
