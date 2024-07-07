@@ -355,6 +355,7 @@ struct CLogger
     sem_t   m_semStart;
     sem_t   m_semStop;
     std::atomic< bool > m_bExit = { false };
+    std::atomic< bool > m_bQuit = { false };
 
     CLogger( CIoManager* pMgr );
 

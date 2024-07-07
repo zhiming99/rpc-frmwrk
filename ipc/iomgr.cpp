@@ -2294,9 +2294,12 @@ gint32 CIoManager::LogMessage(
     if( !IsLogging() )
         return ERROR_STATE;
 
+    if( dwLogLevel >= s_vecLogLevel.size() )
+        return -EINVAL;
+
     char szBuf[ 8192 ];
     if( strFmt.size() >= sizeof( szBuf ) )
-        return -EINVAL;
+        return -E2BIG;
 
     gint32 iSize = sizeof( szBuf );
     szBuf[ iSize - 1 ] = 0;
@@ -2309,7 +2312,7 @@ gint32 CIoManager::LogMessage(
 
     stdstr strFile = "[";
     strFile += this->GetModName() + "][";
-    strFile += s_vecLogLevel[ dwLogLevel % 7 ] + "] ";
+    strFile += s_vecLogLevel[ dwLogLevel ] + "] ";
     strFile += szFile;
 
     stdstr strFinalMsg = DebugMsgInternal(
@@ -2363,46 +2366,63 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
                 "Warning failed to start logger" );
             break;
         }
-        else
-        {
-            CStdRMutex oLock( GetLock() );
-            m_pLogCli = pLogCli;
-        }
 
+        m_pLogCli = pLogCli;
         Sem_Post( &m_semStart );
+
         while( !m_bExit )
         {
-            ret = Sem_TimedwaitSec( &m_semMsgs, 10 );
+            CStdRMutex oSvcLock( pSvc->GetLock() );
+            if( pSvc->GetState() != stateConnected )
+            {
+                DebugPrintEx( logErr, ERROR_STATE,
+                    "Warning logger is offline" );
+            }
+            oSvcLock.Unlock();
 
+            ret = Sem_TimedwaitSec( &m_semMsgs, 10 );
             if( ret == -EAGAIN )
                 continue;
 
             if( ERROR( ret ) )
+            {
+                DebugPrintEx( logErr, ERROR_STATE,
+                    "Error logger internal error, "
+                    "logging disabled." );
                 break;
+            }
 
             CStdRMutex oLock( GetLock() );
             if( m_queMsgs.empty() )
                 continue;
 
-            stdstr strMsg = m_queMsgs.front();
+            stdstr strMsg = std::move(
+                m_queMsgs.front() );
             m_queMsgs.pop_front();
             oLock.Unlock();
             this->SendLogMsg( strMsg );
         }
 
-        while( !m_queMsgs.empty() )
-        {
-            stdstr& strMsg = m_queMsgs.front();
-            this->SendLogMsg( strMsg );
+        do{
+            CStdRMutex oLock( GetLock() );
+            m_bQuit = true;
+            if( m_queMsgs.empty() )
+                break;
+            stdstr strMsg = std::move(
+                m_queMsgs.front() );
             m_queMsgs.pop_front();
-        }
+            oLock.Unlock();
+            this->SendLogMsg( strMsg );
 
-        CStdRMutex oLock( GetLock() );
+        }while( 1 );
+
         m_pLogCli.Clear();
         pSvc->Stop();
 
     }while( 0 );
 
+    CStdRMutex oLock( GetLock() );
+    m_bQuit = true;
     Sem_Post( &m_semStop );
     return 0;
 }
@@ -2449,14 +2469,7 @@ gint32 CLogger::SendLogMsg(
 {
     gint32 ret = 0;
     do{
-        CStdRMutex oLock( GetLock() );
-        if( !m_pMgr->IsLogging() ||
-            m_pLogCli.IsEmpty() )
-            break;
-
-        ObjPtr pLogCli = m_pLogCli;
-        ILogSvc_PImpl* pSvc = pLogCli;
-        oLock.Unlock();
+        ILogSvc_PImpl* pSvc = m_pLogCli;
         ret = pSvc->LogMessage( strMsg );
 
     }while( 0 );
@@ -2467,7 +2480,7 @@ gint32 CLogger::PushMessage(
     const stdstr& strMsg )
 {
     CStdRMutex oLock( GetLock() );
-    if( m_bExit )
+    if( m_bExit || m_bQuit )
         return 0;
     m_queMsgs.push_back( strMsg );
     Sem_Post( &m_semMsgs );
