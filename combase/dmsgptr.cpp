@@ -54,8 +54,7 @@ std::string DMsgPtr::GetInterface() const
         {
             pszInterface = "";
             DebugPrintEx( logErr, -ENOMSG,
-                "dbus_message_get_interface failed content='%s'",
-                this->DumpMsg().c_str() );
+                "dbus_message_get_interface failed" );
         }
     }
 

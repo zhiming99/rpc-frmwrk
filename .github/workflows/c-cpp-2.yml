@@ -85,5 +85,6 @@ jobs:
           path: |
             ./logfile
             ./logdump.txt
+            ./logger.txt
 
       

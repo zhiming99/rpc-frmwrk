@@ -3031,8 +3031,17 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
         CMessageMatch* pAuthMatch =
             ( CMessageMatch* )m_pAuthMatch;
         pAuthMatch->GetIfName( strVal );
-        if( pMsg.GetInterface() != strVal )
+        stdstr strIf = std::move(
+            pMsg.GetInterface() );
+        if( strIf != strVal )
         {
+            if( strIf.empty() )
+            {
+                stdstr strFmt = __func__;
+                strFmt += " failed to GetInterface";
+                LOGERR( this->GetIoMgr(), -ENODATA, 
+                    strFmt );
+            }    
             ret = ERROR_FALSE;
             break;
         }
