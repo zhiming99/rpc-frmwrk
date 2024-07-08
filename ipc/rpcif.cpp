@@ -7938,7 +7938,15 @@ gint32 CInterfaceServer::OnKeepAliveOrig(
         }
 
         // test if the interface is paused
-        string strIfName = pMsg.GetInterface();
+        string strIfName =
+            std::move( pMsg.GetInterface() );
+        if( strIfName.empty() )
+        {
+            stdstr strFmt = __func__;
+            strFmt += " failed to GetInterface";
+            LOGERR( this->GetIoMgr(), -EBADMSG, 
+                strFmt );
+        }    
         if( IsPaused( strIfName ) )
         {
             ret = ERROR_PAUSED;

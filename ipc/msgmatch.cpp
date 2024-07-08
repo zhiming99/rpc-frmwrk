@@ -94,7 +94,8 @@ gint32 CMessageMatch::IsMyMsgBasic(
         }
 
         // test if the interface is the same
-        stdstr strIf = std::move( pMsg.GetInterface() );
+        stdstr strIf =
+            std::move( pMsg.GetInterface() );
         if( m_strIfName != strIf )
         {
             ret = ERROR_FALSE;
