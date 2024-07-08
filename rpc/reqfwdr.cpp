@@ -3513,7 +3513,16 @@ gint32 CRpcReqForwarder::ForwardEvent(
             ClearFwrdReqsByDestAddr(
                 dwPortId, strPath, pEvtMsg );
         }
-
+        {
+            stdstr strIf = pEvtMsg.GetInterface();
+            if( strIf.empty() )
+            {
+                stdstr strFmt = __func__;
+                strFmt += " failed to GetInterface";
+                LOGERR( this->GetIoMgr(), -EBADMSG, 
+                    strFmt );
+            }    
+        }
         BufPtr pBuf( true );
         ret = pEvtMsg.Serialize( *pBuf );
         if( ERROR( ret ) )

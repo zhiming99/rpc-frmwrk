@@ -1129,6 +1129,13 @@ gint32 CRpcReqForwarderProxyAuth::ForwardRequest(
     do{
         std::string strIfName;
         strIfName = pMsg.GetInterface();
+        if( strIfName.empty() )
+        {
+            stdstr strFmt = __func__;
+            strFmt += " failed to GetInterface";
+            LOGERR( this->GetIoMgr(), -EBADMSG, 
+                strFmt );
+        }    
 
         bool bAuthIf = ( strIfName ==
             DBUS_IF_NAME( "IAuthenticate" ) );
