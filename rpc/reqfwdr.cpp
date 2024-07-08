@@ -3734,6 +3734,13 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
         }
 
         strFwrdIfName = pMsg.GetInterface();
+        if( strFwrdIfName.empty() )
+        {
+            stdstr strFmt = __func__;
+            strFmt += " failed to GetInterface";
+            LOGERR( this->GetIoMgr(), -EBADMSG, 
+                strFmt );
+        }    
         if( IsPaused( strFwrdIfName ) )
         {
             ret = ERROR_PAUSED;
@@ -3789,6 +3796,10 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
             strIfName = pOrigMsg.GetInterface();
             if( strIfName.empty() )
             {
+                stdstr strFmt = __func__;
+                strFmt += " failed to GetInterface";
+                LOGERR( this->GetIoMgr(), -EBADMSG, 
+                    strFmt );
                 ret = -ENOENT;
                 break;
             }

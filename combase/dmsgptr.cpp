@@ -681,6 +681,106 @@ gint32 DMsgPtr::Clone( DBusMessage* pSrcMsg )
     return 0;
 }
 
+gint32 DMsgPtr::NewResp( DBusMessage* pReqMsg )
+{
+    gint32 ret = 0;
+
+    if( pReqMsg == nullptr )
+        return -EINVAL;
+
+    Clear();
+
+    DBusMessage* pObj =
+        dbus_message_new_method_return( pReqMsg );
+
+    if( pObj != nullptr )
+    {
+        m_pObj = pObj;
+    }
+    else
+    {
+        ret = -EFAULT;
+    }
+
+    std::string strVal;
+    DMsgPtr pReq( pReqMsg );
+
+    strVal = pReq.GetMember();
+    if( !strVal.empty() )
+        SetMember( strVal );
+
+    strVal = pReq.GetSender();
+    if( !strVal.empty() )
+        SetDestination( strVal );
+
+    strVal = pReq.GetDestination();
+    if( !strVal.empty() )
+        SetSender( strVal );
+
+    strVal = pReq.GetPath();
+    if( !strVal.empty() )
+        SetPath( strVal );
+
+    strVal = pReq.GetInterface();
+    if( !strVal.empty() )
+        SetInterface( strVal );
+    else
+    {
+        DebugPrintEx( logErr, -ENOMSG,
+            "NewResp failed to GetInterface" );
+    }
+    return ret;
+}
+
+gint32 DMsgPtr::CopyHeader( DBusMessage* pMsg )
+{
+    gint32 ret = 0;
+    do{
+        DMsgPtr pSrcMsg( pMsg );
+        gint32 iType =
+            dbus_message_get_type( pMsg );
+
+        ret = NewObj( ( EnumClsid ) iType );
+        if( ERROR( ret ) )
+            break;
+
+        SetSerial(
+            dbus_message_get_serial( pMsg ) );
+
+        ret = SetDestination(
+            pSrcMsg.GetDestination() );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strVal = pSrcMsg.GetInterface();
+        if( !strVal.empty() )
+            SetInterface( strVal );
+        else
+        {
+            DebugPrintEx( logErr, -ENOMSG,
+                "CopyHeader failed to GetInterface" );
+        }
+
+        ret = SetPath( pSrcMsg.GetPath() );
+        if( ERROR( ret ) )
+            break;
+
+        SetMember( pSrcMsg.GetMember() );
+        SetSender( pSrcMsg.GetSender() );
+
+        if( iType ==
+            DBUS_MESSAGE_TYPE_METHOD_RETURN )
+        {
+            guint32 dwSerial =
+                dbus_message_get_reply_serial( pMsg );
+            SetReplySerial( dwSerial );
+        }
+
+    }while( 0 );
+
+    return ret;
+}
+
 std::string DMsgPtr::DumpMsg() const
 {
     std::string strRet = "\n\t";

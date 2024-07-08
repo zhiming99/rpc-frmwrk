@@ -5835,6 +5835,13 @@ gint32 CInterfaceProxy::DoInvoke(
             if( !strVal.empty() )
                 oParams.SetStrProp(
                     propIfName, strVal );
+            else
+            {
+                stdstr strFmt = __func__;
+                strFmt += " failed to GetInterface";
+                LOGERR( this->GetIoMgr(), -EBADMSG, 
+                    strFmt );
+            }    
 
             strVal = pMsg.GetPath();
             if( !strVal.empty() )
@@ -7312,6 +7319,13 @@ gint32 CInterfaceServer::DoInvoke(
                 if( !strVal.empty() )
                     oParams.SetStrProp(
                         propIfName, strVal );
+                else
+                {
+                    stdstr strFmt = __func__;
+                    strFmt += " failed to GetInterface";
+                    LOGERR( this->GetIoMgr(), -EBADMSG, 
+                        strFmt );
+                }    
 
                 strVal = pMsg.GetPath();
                 if( !strVal.empty() )

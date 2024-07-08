@@ -4632,12 +4632,20 @@ gint32 CIfInvokeMethodTask::RunTask()
 
             // set the interface name in case the
             // method be called via the handler map
-            oCfg[ propIfName ] = pMsg.GetInterface();
+            stdstr strIfName = std::move( 
+                pMsg.GetInterface() );
+            if( strIfName.empty() )
+            {
+                stdstr strFmt = __func__;
+                strFmt += " failed to GetInterface";
+                LOGERR( pIf->GetIoMgr(), -EBADMSG, 
+                    strFmt );
+            }    
+            oCfg[ propIfName ] = strIfName;
             if( pIf->IsServer() )
             {
                 CInterfaceServer* pSvr = static_cast
                     < CInterfaceServer* >( pIf );
-                string strIfName = pMsg.GetInterface();
                 if( pSvr->IsPaused( strIfName ) )
                 {
                     ret = ERROR_PAUSED;
