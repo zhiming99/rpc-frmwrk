@@ -548,8 +548,16 @@ gint32 CRpcTcpBridgeAuth::IsAuthRequest(
         std::string strVal = CoGetIfNameFromIid(
             iid( IAuthenticate ), "s" );
         strVal = DBUS_IF_NAME( strVal );
-        if( pMsg.GetInterface() != strVal )
+        stdstr strIf = pMsg.GetInterface();
+        if( strIf != strVal )
         {
+            if( strIf.empty() )
+            {
+                stdstr strFmt = __func__;
+                strFmt += " failed to GetInterface";
+                LOGERR( this->GetIoMgr(), -EBADMSG, 
+                    strFmt );
+            }    
             ret = ERROR_FALSE;
             break;
         }
@@ -3039,7 +3047,7 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
             {
                 stdstr strFmt = __func__;
                 strFmt += " failed to GetInterface";
-                LOGERR( this->GetIoMgr(), -ENODATA, 
+                LOGERR( this->GetIoMgr(), -EBADMSG, 
                     strFmt );
             }    
             ret = ERROR_FALSE;
