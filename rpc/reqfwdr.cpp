@@ -3513,16 +3513,6 @@ gint32 CRpcReqForwarder::ForwardEvent(
             ClearFwrdReqsByDestAddr(
                 dwPortId, strPath, pEvtMsg );
         }
-        {
-            stdstr strIf = pEvtMsg.GetInterface();
-            if( strIf.empty() )
-            {
-                stdstr strFmt = __func__;
-                strFmt += " failed to GetInterface";
-                LOGERR( this->GetIoMgr(), -EBADMSG, 
-                    strFmt );
-            }    
-        }
         BufPtr pBuf( true );
         ret = pEvtMsg.Serialize( *pBuf );
         if( ERROR( ret ) )
@@ -3734,13 +3724,6 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
         }
 
         strFwrdIfName = pMsg.GetInterface();
-        if( strFwrdIfName.empty() )
-        {
-            stdstr strFmt = __func__;
-            strFmt += " failed to GetInterface";
-            LOGERR( this->GetIoMgr(), -EBADMSG, 
-                strFmt );
-        }    
         if( IsPaused( strFwrdIfName ) )
         {
             ret = ERROR_PAUSED;
@@ -3794,15 +3777,6 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
             okaReq.Push( ( guint32 )KATerm );
 
             strIfName = pOrigMsg.GetInterface();
-            if( strIfName.empty() )
-            {
-                stdstr strFmt = __func__;
-                strFmt += " failed to GetInterface";
-                LOGERR( this->GetIoMgr(), -EBADMSG, 
-                    strFmt );
-                ret = -ENOENT;
-                break;
-            }
             okaReq.Push( strIfName );
 
             strObjPath = pOrigMsg.GetPath();

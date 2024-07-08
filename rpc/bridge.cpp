@@ -4351,13 +4351,6 @@ gint32 CRpcInterfaceServer::DoInvoke(
                     stdstr strIf = pMsg.GetInterface();
                     if( strIf != IFNAME_FWRDREQ  )
                     {
-                        if( strIf.empty() )
-                        {
-                            stdstr strFmt = __func__;
-                            strFmt += " failed to GetInterface";
-                            LOGERR( this->GetIoMgr(),
-                                -EBADMSG, strFmt );
-                        }    
                         ret = -EINVAL;
                         break;
                     }

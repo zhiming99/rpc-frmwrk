@@ -548,16 +548,11 @@ gint32 CRpcTcpBridgeAuth::IsAuthRequest(
         std::string strVal = CoGetIfNameFromIid(
             iid( IAuthenticate ), "s" );
         strVal = DBUS_IF_NAME( strVal );
-        stdstr strIf = pMsg.GetInterface();
+        stdstr strIf =
+            std::move( pMsg.GetInterface() );
+
         if( strIf != strVal )
         {
-            if( strIf.empty() )
-            {
-                stdstr strFmt = __func__;
-                strFmt += " failed to GetInterface";
-                LOGERR( this->GetIoMgr(), -EBADMSG, 
-                    strFmt );
-            }    
             ret = ERROR_FALSE;
             break;
         }
@@ -1127,15 +1122,8 @@ gint32 CRpcReqForwarderProxyAuth::ForwardRequest(
     CRpcRouter* pRouter = GetParent();
     std::string strDest = AUTH_DEST( pRouter );
     do{
-        std::string strIfName;
-        strIfName = pMsg.GetInterface();
-        if( strIfName.empty() )
-        {
-            stdstr strFmt = __func__;
-            strFmt += " failed to GetInterface";
-            LOGERR( this->GetIoMgr(), -EBADMSG, 
-                strFmt );
-        }    
+        stdstr strIfName =
+            std::move( pMsg.GetInterface() );
 
         bool bAuthIf = ( strIfName ==
             DBUS_IF_NAME( "IAuthenticate" ) );
@@ -3050,13 +3038,6 @@ gint32 CRpcRouterReqFwdrAuth::CheckReqToFwrd(
             pMsg.GetInterface() );
         if( strIf != strVal )
         {
-            if( strIf.empty() )
-            {
-                stdstr strFmt = __func__;
-                strFmt += " failed to GetInterface";
-                LOGERR( this->GetIoMgr(), -EBADMSG, 
-                    strFmt );
-            }    
             ret = ERROR_FALSE;
             break;
         }
