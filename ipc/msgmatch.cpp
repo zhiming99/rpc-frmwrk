@@ -94,9 +94,12 @@ gint32 CMessageMatch::IsMyMsgBasic(
         }
 
         // test if the interface is the same
-        if( m_strIfName != pMsg.GetInterface() )
+        stdstr strIf = std::move(
+            pMsg.GetInterface() );
+
+        if( m_strIfName != strIf )
         {
-            ret = ERROR_FALSE;
+            ret = -EBADMSG;
             break;
         }
 
@@ -166,7 +169,14 @@ gint32 CMessageMatch::IsMyMsgIncoming(
     if( ERROR( ret ) )
         return ret;
 
-    return IsMyMsgBasic( pMessage );
+    ret = IsMyMsgBasic( pMessage );
+    if( ret == -EBADMSG )
+    {
+        DebugPrintEx( logErr, ret,
+            "%s's IsMyMsgIncoming failed",
+            CoGetClassName( this->GetClsid() ) );
+    }
+    return ret;
 }
 
 // if a event message this interface has subcribed
@@ -222,7 +232,14 @@ gint32 CMessageMatch::IsMyMsgOutgoing(
     if( ERROR( ret ) )
         return ret;
 
-    return IsMyMsgBasic( pMessage );
+    ret = IsMyMsgBasic( pMessage );
+    if( ret == -EBADMSG )
+    {
+        DebugPrintEx( logErr, ret,
+            "%s's IsMyMsgOutgoing failed",
+            CoGetClassName( this->GetClsid() ) );
+    }
+    return ret;
 }
 
 gint32 CMessageMatch::IsMyMsgBasic(

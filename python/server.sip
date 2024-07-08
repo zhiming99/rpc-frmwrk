@@ -193,7 +193,8 @@ class CPythonServer:
     gint32 OnPostStart(
         IEventSink* pCallback ) override
     { 
-        StartQpsTask();
+        if( m_pQpsTask.IsEmpty() )
+            return StartQpsTask();
         return 0;
     }
 
@@ -785,6 +786,17 @@ class CPythonServer :
         auto* pImpl = dynamic_cast
             < CPythonServer* >( sipCpp );
         sipRes = pImpl->PyDeferCall( a0, a1 );
+    %End
+    gint32 LogMessage( gint32 dwLogLevel,
+        const std::string& strFile,
+        gint32 dwLineNum, gint32 ret,
+        const std::string& strMsg );
+    %MethodCode
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
+        CIoManager* pMgr = pImpl->GetIoMgr();
+        sipRes = pMgr->LogMessage(
+            a0, *a1, a2, a3, *a4 );
     %End
 };
 

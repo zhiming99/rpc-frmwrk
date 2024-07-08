@@ -1,7 +1,4 @@
 package org.rpcf.rpcbase;
-import java.lang.String;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -10,7 +7,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
     public JavaRpcServer( ObjPtr pIoMgr,
         String strDesc, String strSvrObj )
     {
-        JRetVal jret = null;
+        JRetVal jret;
         do{
             m_pIoMgr = pIoMgr;
             CParamList oParams = new CParamList();
@@ -38,8 +35,6 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
 
         if( jret.ERROR() )
             setError( jret.getError() );
-
-        return;
     }
 
     /* callback should be the one passed to the
@@ -81,7 +76,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
             return -RC.EFAULT;
 
         List<Object> lstObj =
-            new ArrayList< Object >();
+            new ArrayList<>();
         if( pBuf != null )
             lstObj.add( pBuf );
         return getInst().OnServiceComplete(
@@ -96,7 +91,7 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         if( getInst() == null )
             return -RC.EFAULT;
         List<Object> lstObj =
-            new ArrayList< Object >();
+            new ArrayList<>();
         lstObj.add( pBuf );
         return getInst().SetResponse(
             callback, ret,
@@ -145,6 +140,35 @@ abstract public class JavaRpcServer extends JavaRpcServiceS
         ObjPtr pCtx, CfgPtr pDataDesc )
     { return 0; }
 
-    public boolean isServer()
-    { return true; }
+    public int LogMessage( int dwLogLevel,
+        int ret, String strMsg )
+    {
+        StackTraceElement[] se =
+            Thread.currentThread().getStackTrace();
+        String strFile = se[ 3 ].getFileName();
+        int lineNo = se[ 3 ].getLineNumber();
+        return getInst().LogMessage(
+            dwLogLevel, strFile, lineNo, ret, strMsg );
+    }
+
+    public int LogInfo( int ret, String strMsg )
+    { return LogMessage( RC.logInfo, ret, strMsg ); }
+
+    public int LogError( int ret, String strMsg )
+    { return LogMessage( RC.logErr, ret, strMsg ); }
+
+    public int LogAlert( int ret, String strMsg )
+    { return LogMessage( RC.logAlert, ret, strMsg ); }
+
+    public int LogWarn( int ret, String strMsg )
+    { return LogMessage( RC.logWarning, ret, strMsg ); }
+
+    public int LogCritical( int ret, String strMsg )
+    { return LogMessage( RC.logCrit, ret, strMsg ); }
+
+    public int LogEmerg( int ret, String strMsg )
+    { return LogMessage( RC.logEmerg, ret, strMsg ); }
+
+    public int LogNotice( int ret, String strMsg )
+    { return LogMessage( RC.logNotice, ret, strMsg ); }
 }

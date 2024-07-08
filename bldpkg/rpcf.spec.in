@@ -71,6 +71,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @JAVA_RPMFILES@
 @PYTHON_RPMFILES@
 %{_bindir}/rpcrouter
+%{_bindir}/rpcf_logger
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
@@ -78,12 +79,14 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/btinrt.json
 %{_sysconfdir}/rpcf/hwdesc.json
 %{_sysconfdir}/rpcf/echodesc.json
+%{_sysconfdir}/rpcf/logger*.json
 %{_sysconfdir}/rpcf/*.ridl
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*
 %{_libdir}/libipc.so*
 %{_libdir}/librpc.so*
 %{_libdir}/libauth.so*
+%{_libdir}/liblogcli.so*
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
@@ -162,6 +165,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/base64.h
 %{_includedir}/rpcf/ipc/sha1.h
 %{_includedir}/rpcf/ipc/loopool.h
+%{_includedir}/rpcf/ipc/logger.h
+%{_includedir}/rpcf/ipc/logclibase.h
 %{_includedir}/rpcf/variant.h
 %{_libdir}/rpcf/lib*.so*
 

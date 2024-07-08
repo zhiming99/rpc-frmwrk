@@ -1,10 +1,7 @@
 package org.rpcf.rpcbase;
-import java.lang.String;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
-import java.lang.ClassCastException;
 
 /*
  * Note: we need a C preprocessor to spawn the final
@@ -17,12 +14,15 @@ abstract public class JavaRpcService implements IRpcService
     protected ObjPtr m_pIoMgr = null;
     protected InstType m_oInst = null;
 
+    @Override
     public boolean IsServer;
     public abstract Map< String, IReqHandler > initMaps();
 
+    @Override
     public int getError()
     { return m_iError; }
 
+    @Override
     public void setError( int iError )
     { m_iError = iError; }
 
@@ -32,6 +32,7 @@ abstract public class JavaRpcService implements IRpcService
     public void setInst( InstType oInst )
     { m_oInst = oInst; }
 
+    @Override
     public int getState()
     {
         InstType oInst = getInst();
@@ -40,6 +41,7 @@ abstract public class JavaRpcService implements IRpcService
         return RC.stateInvalid;
     }
 
+    @Override
     public int start()
     {
         InstType oInst = getInst();
@@ -69,6 +71,7 @@ abstract public class JavaRpcService implements IRpcService
         return ret;
     }
 
+    @Override
     public int stop()
     {
         InstType oInst = getInst();
@@ -93,6 +96,7 @@ abstract public class JavaRpcService implements IRpcService
      * error code, and a timerObj if the error code is
      * STATUS_SUCCESS.
      */
+    @Override
     public JRetVal addTimer( int timeoutSec,
         Object callback,  Object context )
     {
@@ -110,6 +114,7 @@ abstract public class JavaRpcService implements IRpcService
 
     /*Remove a previously scheduled timer.
     */
+    @Override
     public int disableTimer( ObjPtr timerObj )
     {
         InstType oInst = getInst();
@@ -127,6 +132,7 @@ abstract public class JavaRpcService implements IRpcService
      * same as the response callback. The `ret' is
      * the error code of the task.
      */
+    @Override
     public int installCancelNotify( ObjPtr task,
         ICancelNotify callback,
         Object[] listArgs )
@@ -145,6 +151,7 @@ abstract public class JavaRpcService implements IRpcService
     /* called from the underlying C++ code on
      * response arrival.
      */
+    @Override
     public void handleAsyncResp( Object callback,
         int seriProto, Object listResp,
         Object context )
@@ -160,7 +167,7 @@ abstract public class JavaRpcService implements IRpcService
                     ( IAsyncRespCb )callback;
 
                 List<Object> listArgs =
-                    new ArrayList< Object >();
+                    new ArrayList<>();
 
                 int iArgNum = asyncb.getArgCount();
                 for( int i = 0; i < iArgNum + 2; i++ ) 
@@ -215,28 +222,18 @@ abstract public class JavaRpcService implements IRpcService
                 }
             }while( false );
         }
-        catch( IllegalArgumentException e )
-        {
-        }
-        catch( NullPointerException e )
-        {
-        }
-        catch( IndexOutOfBoundsException e )
-        {
-        }
-        catch( ClassCastException e )
+        catch( IllegalArgumentException | NullPointerException | IndexOutOfBoundsException | ClassCastException e )
         {
         }
         catch( Exception e )
         {
         }
-
-        return;
     }
 
     /* establish a stream channel and
      * return a handle to the channel on success
      */
+    @Override
     public JRetVal startStream( CParamList oDesc )
     {
         if( isServer() )
@@ -271,6 +268,7 @@ abstract public class JavaRpcService implements IRpcService
         return jret;
     }
 
+    @Override
     public int closeStream( long hChannel )
     {
         InstType oInst = getInst();
@@ -279,6 +277,7 @@ abstract public class JavaRpcService implements IRpcService
         return oInst.CloseStream( hChannel );
     }
 
+    @Override
     public int writeStream( long hChannel, byte[] pBuf )
     {
         InstType oInst = getInst();
@@ -287,16 +286,20 @@ abstract public class JavaRpcService implements IRpcService
         return oInst.WriteStream( hChannel, pBuf );
     }
 
+    @Override
     public void onWriteStreamComplete( int iRet,
         long hChannel, byte[] buf )
     {}
 
     IAsyncRespCb m_oWriteStmCallback = new IAsyncRespCb() {
+        @Override
         public int getArgCount()
         { return 1; }
+        @Override
         public Class<?>[] getArgTypes()
         { return new Class<?>[]{ byte[].class }; }
 
+        @Override
         public void onAsyncResp( Object oContext,
             int iRet, Object[] oParams ) 
         {
@@ -311,6 +314,7 @@ abstract public class JavaRpcService implements IRpcService
         }
     };
 
+    @Override
     public int writeStreamAsync( long hChannel,
         byte[] pBuf, IAsyncRespCb callback )
     {
@@ -321,6 +325,7 @@ abstract public class JavaRpcService implements IRpcService
             hChannel, pBuf, callback );
     }
 
+    @Override
     public int writeStreamAsync( long hChannel, byte[] pBuf )
     {
         InstType oInst = getInst();
@@ -330,6 +335,7 @@ abstract public class JavaRpcService implements IRpcService
             hChannel, pBuf, m_oWriteStmCallback );
     }
 
+    @Override
     public int writeStreamNoWait( long hChannel, byte[] pBuf )
     {
         InstType oInst = getInst();
@@ -353,6 +359,7 @@ abstract public class JavaRpcService implements IRpcService
      * hidden object to keep element 1 valid, just
      * leave it alone.
     */
+    @Override
     public JRetVal readStream( long hChannel )
     {
         InstType oInst = getInst();
@@ -366,6 +373,7 @@ abstract public class JavaRpcService implements IRpcService
             oInst.ReadStream( hChannel, 0 );
     }
 
+    @Override
     public JRetVal readStream( long hChannel, int size )
     {
         InstType oInst = getInst();
@@ -404,15 +412,19 @@ abstract public class JavaRpcService implements IRpcService
      * element2 is no longer valid.
      */
 
+    @Override
     public void onReadStreamComplete( int iRet,
         long hChannel, byte[] buf )
-    { return; }
+    {}
 
     IAsyncRespCb m_oReadStmCallback = new IAsyncRespCb() {
+        @Override
         public int getArgCount()
         { return 1; }
+        @Override
         public Class<?>[] getArgTypes()
         { return new Class<?>[]{ byte[].class }; }
+        @Override
         public void onAsyncResp( Object oContext,
             int iRet, Object[] oParams ) 
         {
@@ -427,6 +439,7 @@ abstract public class JavaRpcService implements IRpcService
         }
     };
 
+    @Override
     public JRetVal readStreamAsync( long hChannel, int size )
     {
         InstType oInst = getInst();
@@ -440,6 +453,7 @@ abstract public class JavaRpcService implements IRpcService
             hChannel, m_oReadStmCallback, size );
     }
 
+    @Override
     public JRetVal readStreamAsync( long hChannel,
         int size, IAsyncRespCb callback )
     {
@@ -459,6 +473,7 @@ abstract public class JavaRpcService implements IRpcService
      * not data bufferred, error -EAGIN will be
      * returned, and will not blocked to wait.
      */
+    @Override
     public JRetVal readStreamNoWait( long hChannel)
     {
         InstType oInst = getInst();
@@ -475,12 +490,14 @@ abstract public class JavaRpcService implements IRpcService
     /* event called when the stream `hChannel' is
      * ready
      */
+    @Override
     public int onStmReady( long hChannel )
     { return 0; }
 
     /* event called when the stream `hChannel' is
      * about to close
      */
+    @Override
     public int onStmClosing( long hChannel ) 
     { return 0; }
 
@@ -634,13 +651,14 @@ abstract public class JavaRpcService implements IRpcService
         m_mapReqHandlers = initMaps();
 
     //for event handler 
+    @Override
     public JRetVal invokeMethod( ObjPtr callback,
         String ifName, String methodName,
         int seriProto, CParamList cppargs )
     {
         JRetVal oResp = new JRetVal();
         do{
-            JRetVal jret = new JRetVal();
+            JRetVal jret;
             jret = argObjToList(
                 seriProto, cppargs );
             if( jret.ERROR() )
@@ -652,7 +670,6 @@ abstract public class JavaRpcService implements IRpcService
             Object[] argList =
                 jret.getParamArray();
 
-            boolean found = false;
             String[] nameComps =
                 methodName.split( "_" );
 
@@ -699,7 +716,7 @@ abstract public class JavaRpcService implements IRpcService
                 oResp = oMethod.invoke(
                     this, callback, argList );
             }
-            catch( IllegalArgumentException e )
+            catch( IllegalArgumentException | ClassCastException e )
             {
                 oResp.setError( -RC.EINVAL );
             }
@@ -710,10 +727,6 @@ abstract public class JavaRpcService implements IRpcService
             catch( IndexOutOfBoundsException e )
             {
                 oResp.setError( -RC.ERANGE );
-            }
-            catch( ClassCastException e )
-            {
-                oResp.setError( -RC.EINVAL );
             }
             catch( Exception e )
             {
@@ -742,6 +755,7 @@ abstract public class JavaRpcService implements IRpcService
     /* Invoke a callback function depending
      * it is bound function or not
      */
+    @Override
     public int invokeCallback( IAsyncRespCb callback,
         List< Object > listArgs )
     {
@@ -756,11 +770,7 @@ abstract public class JavaRpcService implements IRpcService
             callback.onAsyncResp(
                 context, iRet, listArgs.toArray() );
         }
-        catch( IllegalArgumentException e )
-        {
-            ret = -RC.ERANGE;
-        }
-        catch( IndexOutOfBoundsException e )
+        catch( IllegalArgumentException | IndexOutOfBoundsException | ClassCastException e )
         {
             ret = -RC.ERANGE;
         }
@@ -785,6 +795,7 @@ abstract public class JavaRpcService implements IRpcService
      * stack and provide a locking free or light
      * locking context as the current one cannot.
      */
+    @Override
     public int deferCall(
         IDeferredCall callback, Object[] args )
     {
@@ -794,6 +805,7 @@ abstract public class JavaRpcService implements IRpcService
         return oInst.DeferCall( callback, args );
     }
 
+    @Override
     public void deferCallback(
         Object callback, Object listArgs )
     {
@@ -802,9 +814,9 @@ abstract public class JavaRpcService implements IRpcService
             return;
         Object[] arrArgs = ( Object[] )listArgs;
         dc.call( arrArgs );
-        return;
     }
 
+    @Override
     public int setChanCtx(
         long hChannel, Object pCtx)
     {
@@ -815,6 +827,7 @@ abstract public class JavaRpcService implements IRpcService
             hChannel, pCtx );
     }
 
+    @Override
     public int removeChanCtx(
         long hChannel )
     {
@@ -824,6 +837,7 @@ abstract public class JavaRpcService implements IRpcService
         return oInst.RemoveChanCtx( hChannel );
     }
 
+    @Override
     public JRetVal getChanCtx( long hChannel )
     {
         InstType oInst = getInst();

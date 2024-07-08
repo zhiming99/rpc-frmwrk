@@ -1539,6 +1539,14 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
             Wa( "options.addOption(oNoDBus);" );
             NEW_LINE;
         }
+        else
+        {
+            Wa( "Option oLogging = new Option(\"g\", \"to enable logging\");" );
+            Wa( "oAuth.setRequired(false);" );
+            Wa( "options.addOption(oLogging);" );
+            NEW_LINE;
+        }
+
 
         Wa( "Option oHelp = new Option(\"h\", \"this help\");" );
         Wa( "oHelp.setRequired(false);" );
@@ -1581,6 +1589,8 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         {
             Wa( "else if( opt.getOpt() == \"m\" )" );
             Wa( "    strMPoint = opt.getValue();" );
+            Wa( "else if( opt.getOpt() == \"g\" )" );
+            Wa( "    oInit.put( 113, Boolean.valueOf( true ) );" );
         }
 #endif
         Wa( "else if( opt.getOpt() == \"xd\" || opt.getLongOpt() == \"driver\" )" );
@@ -2397,7 +2407,7 @@ gint32 GenJavaProj(
         }
 
         strClsPath += strLibPath +
-            "/rpcf/rpcbase.jar:$CLASSPATH'\033[;0m";
+            "/rpcf/rpcbase.jar:/usr/share/java/commons-cli.jar:$CLASSPATH'\033[;0m";
 
         printf("%s\n", strClsPath.c_str() );
 

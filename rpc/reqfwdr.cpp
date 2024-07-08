@@ -3513,7 +3513,6 @@ gint32 CRpcReqForwarder::ForwardEvent(
             ClearFwrdReqsByDestAddr(
                 dwPortId, strPath, pEvtMsg );
         }
-
         BufPtr pBuf( true );
         ret = pEvtMsg.Serialize( *pBuf );
         if( ERROR( ret ) )
@@ -3778,11 +3777,6 @@ gint32 CRpcReqForwarder::OnKeepAliveRelay(
             okaReq.Push( ( guint32 )KATerm );
 
             strIfName = pOrigMsg.GetInterface();
-            if( strIfName.empty() )
-            {
-                ret = -ENOENT;
-                break;
-            }
             okaReq.Push( strIfName );
 
             strObjPath = pOrigMsg.GetPath();

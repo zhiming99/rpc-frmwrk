@@ -3859,14 +3859,16 @@ gint32 AddSeqTaskTempl( T2* pObj,
 ({\
     TaskletPtr pTask_; \
     do{ \
+        IConfigDb* _pReqCtx = ( _pReqCtx_ ); \
         ret = DEFER_IFCALLEX_NOSCHED2( \
             0, pTask_, ObjPtr( pThis ), callback_, \
-            nullptr, _pReqCtx_, ##__VA_ARGS__ ); \
+            nullptr, _pReqCtx, ##__VA_ARGS__ ); \
         if( ERROR( ret ) ) \
             break; \
         ObjPtr pTaskObj = pTask_;\
-        CParamList oReqCtx( pReqCtx_ );\
-        oReqCtx.SetObjPtr( propContext, pTaskObj );\
+        CCfgOpener _oReqCtx_(\
+            ( IConfigDb* )_pReqCtx );\
+        _oReqCtx_.SetObjPtr( propContext, pTaskObj );\
         CIfDeferCallTaskEx* pTaskEx = pTask_;\
         pTaskEx->EnableTimer( _sec, eventRetry );\
     }while(0); \

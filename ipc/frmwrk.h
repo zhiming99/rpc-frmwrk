@@ -344,6 +344,31 @@ class CPortInterfaceMap : public CObjBase
     gint32 IsPortNoRef( IPort* pPort, bool& bNoRef ) const;
 };
 
+struct CLogger
+{
+    ObjPtr                  m_pLogCli;
+    CIoManager*             m_pMgr;
+
+    mutable stdrmutex m_oLock;
+    sem_t   m_semMsgs;
+    std::deque< stdstr > m_queMsgs;
+    sem_t   m_semStart;
+    sem_t   m_semStop;
+    std::atomic< bool > m_bExit = { false };
+    std::atomic< bool > m_bQuit = { false };
+
+    CLogger( CIoManager* pMgr );
+
+    stdrmutex& GetLock() const
+    { return m_oLock; }
+
+    gint32 Start();
+    gint32 Stop();
+    gint32 ThreadProc( IEventSink* pCb );
+    gint32 SendLogMsg( const stdstr& strMsg );
+    gint32 PushMessage( const stdstr& strMsg );
+};
+
 #define CONFIG_FILE "./driver.json"
 
 class CIoManager : public IService
@@ -386,6 +411,9 @@ class CIoManager : public IService
     gint32                      m_iMaxTaskThrd = 2;
 
     ObjPtr                      m_pSyncIf;
+
+    bool                        m_bLogging = false;
+    CLogger                     m_oLogger;
 
     protected:
 
@@ -672,6 +700,13 @@ class CIoManager : public IService
     { return this; }
 
     bool HasBuiltinRt();
+
+    bool IsLogging();
+
+    gint32 LogMessage( guint32 dwLogLevel,
+        const std::string& szFunc, gint32 iLineNum,
+        gint32 ret, const std::string& strFmt, ... );
+    void LoggerThread( IEventSink* pCb );
 };
 
 template<>

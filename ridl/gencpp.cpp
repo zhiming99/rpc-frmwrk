@@ -5002,8 +5002,8 @@ gint32 CImplIfMethodProxy::OutputSync()
 
                     ret = GenDeserialArgs(
                         pOutArgs, "pBuf2", true, true );
+                    NEW_LINE;
                 }
-                NEW_LINE;
             }
             CCOUT << "return ret;";
         }
@@ -6584,6 +6584,8 @@ void CImplMainFunc::EmitRtUsage(
     Wa( "    \"\\t [ -a to enable authentication. ]\\n\"" );
 #endif
     Wa( "    \"\\t [ -d to run as a daemon. ]\\n\"" );
+    if( !bProxy )
+        Wa( "    \"\\t [ -g to enable logging ]\\n\"" );
     if( g_bBuiltinRt )
     {
         if( bProxy )
@@ -7024,7 +7026,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         {
             stdstr strOpt;
             if( !bProxy )
-                strOpt = "hadm:i:p:"; 
+                strOpt = "hadgm:i:p:"; 
             else if( bFuseP )
                 strOpt = "hadkm:i:p:"; 
             else
@@ -7048,7 +7050,10 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         }
         else
         {
-            Wa( "while( ( opt = getopt( argc, argv, \"hadm:\" ) ) != -1 )" );
+            if( !bProxy )
+                Wa( "while( ( opt = getopt( argc, argv, \"hadgm:\" ) ) != -1 )" );
+            else
+                Wa( "while( ( opt = getopt( argc, argv, \"hadm:\" ) ) != -1 )" );
         }
         BLOCK_OPEN;
         Wa( "switch( opt )" );
@@ -7238,6 +7243,11 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             INDENT_DOWNL;
 #endif
         }
+        if( !bProxy )
+        {
+            Wa( "case 'g':" );
+            Wa( "    { g_bLogging = true; break; }" );
+        }
         Wa( "case 'd':" );
         Wa( "    { bDaemon = true; break; }" );
         Wa( "case 'h':" );
@@ -7388,6 +7398,8 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    bool bProxy, CRpcServices* pSvc );" );
             }
 #endif
+            if( !bProxy )
+                Wa( "static bool g_bLogging = false;" );
             Wa( "static std::string g_strDrvPath;" );
             Wa( "static std::string g_strObjDesc;" );
             Wa( "static std::string g_strRtDesc;" );
@@ -7420,8 +7432,10 @@ gint32 CImplMainFunc::EmitInitContext(
         }
         else if( bFuse )
         {
-            Wa( "static std::string g_strMPoint;" );
             Wa( "static bool g_bAuth = false;" );
+            Wa( "static std::string g_strMPoint;" );
+            if( !bProxy )
+                Wa( "static bool g_bLogging = false;" );
             EmitRtMainFunc( bProxy, m_pWriter );
             NEW_LINE;
         }
@@ -7464,6 +7478,8 @@ gint32 CImplMainFunc::EmitInitContext(
         {
             Wa( "oParams[ propMaxIrpThrd ] = 2;" );
             Wa( "oParams[ propMaxTaskThrd ] = 2;" );
+            if( bFuse )
+                Wa( "oParams[ propEnableLogging ] = g_bLogging;" );
         }
         else
         {
@@ -7473,6 +7489,7 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    ( guint32 )std::max( 1U," );
                 Wa( "    std::thread::hardware_concurrency() );" );
                 Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
+                Wa( "oParams[ propEnableLogging ] = g_bLogging;" );
             }
             else
             {
@@ -7520,11 +7537,11 @@ gint32 CImplMainFunc::EmitInitContext(
         CCOUT << "ret = pSvc->Start();";
         NEW_LINE;
         Wa( "if( ERROR( ret ) )" );
-        Wa( "    break;" );
-        NEW_LINE;
+        CCOUT << "    break;";
 
         if( g_bBuiltinRt )
         {
+            NEW_LINES( 2 );
 #ifdef KRB5
             if( bProxy )
             {

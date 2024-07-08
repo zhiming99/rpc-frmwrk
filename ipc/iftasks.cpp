@@ -4632,12 +4632,14 @@ gint32 CIfInvokeMethodTask::RunTask()
 
             // set the interface name in case the
             // method be called via the handler map
-            oCfg[ propIfName ] = pMsg.GetInterface();
+            stdstr strIfName = std::move( 
+                pMsg.GetInterface() );
+
+            oCfg[ propIfName ] = strIfName;
             if( pIf->IsServer() )
             {
                 CInterfaceServer* pSvr = static_cast
                     < CInterfaceServer* >( pIf );
-                string strIfName = pMsg.GetInterface();
                 if( pSvr->IsPaused( strIfName ) )
                 {
                     ret = ERROR_PAUSED;
@@ -6360,7 +6362,13 @@ gint32 CTaskWrapper::OnIrpComplete(
     if( pTask != nullptr )
     {
         if( m_bNoParams )
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )GetConfig() );
+            oCfg.SetPointer( propIrpPtr, pIrp );
             ( *pTask )( eventZero );
+            oCfg.RemoveProperty( propIrpPtr );
+        }
         else
         {
             gint32 iRet = pIrp->GetStatus();
@@ -6368,6 +6376,7 @@ gint32 CTaskWrapper::OnIrpComplete(
                 iRet, 0, ( LONGWORD* )pIrp );
         }
     }
+    pIrp->RemoveCallback();
     return 0;
 }
 
@@ -6791,6 +6800,10 @@ CTokenBucketTask::CTokenBucketTask(
             break;
         }
         m_qwMaxTokens = ( guint64& )oVar;
+        CCfgOpener oTaskCfg( ( IConfigDb* )
+            this->GetConfig() );
+        oTaskCfg.RemoveProperty(
+            propParentPtr );
 
     }while( 0 );
 

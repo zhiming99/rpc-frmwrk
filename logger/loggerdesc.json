@@ -1,0 +1,41 @@
+{
+    "ClassFactories" : [],
+    "Objects" : 
+    [
+        {
+            "BusName" : "DBusBusPort_0",
+            "Compression" : "true",
+            "EnableSSL" : "true",
+            "EnableWS" : "false",
+            "Interfaces" : 
+            [
+                {
+                    "BindToClsid" : "true",
+                    "DummyInterface" : "true",
+                    "InterfaceName" : "CLogService_SvrImpl"
+                },
+                {
+                    "InterfaceName" : "IInterfaceServer"
+                },
+                {
+                    "InterfaceName" : "IUnknown"
+                },
+                {
+                    "InterfaceName" : "LogSvc"
+                }
+            ],
+            "IpAddress" : "192.168.3.13",
+            "KeepAliveTimeoutSec" : "60",
+            "ObjectName" : "LogService",
+            "PortClass" : "DBusLocalPdo",
+            "PortId" : "0",
+            "ProxyPortClass-1" : "DBusProxyPdo",
+            "ProxyPortClass" : "DBusLocalPdo",
+            "QueuedRequests" : "false",
+            "RequestTimeoutSec" : "120",
+            "RouterPath" : "/"
+        }
+    ],
+    "ServerName" : "logger",
+    "Version" : "1.0"
+}
