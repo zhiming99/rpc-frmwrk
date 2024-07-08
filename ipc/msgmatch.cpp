@@ -99,7 +99,10 @@ gint32 CMessageMatch::IsMyMsgBasic(
 
         if( m_strIfName != strIf )
         {
-            ret = -EBADMSG;
+            if( strIf.empty() )
+                ret = -EBADMSG;
+            else
+                ret = ERROR_FALSE;
             break;
         }
 
