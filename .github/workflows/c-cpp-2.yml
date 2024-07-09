@@ -79,7 +79,7 @@ jobs:
       
     - name: flush logs
       if: always()
-      run: kill -3 `pidof rpcf_logger`;sleep 2
+      run: kill -3 `pidof rpcf_logger` || true;sleep 2
 
     - name: Upload Test Results on Canceled
       if: always()
