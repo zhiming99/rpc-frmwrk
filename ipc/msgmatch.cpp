@@ -172,14 +172,7 @@ gint32 CMessageMatch::IsMyMsgIncoming(
     if( ERROR( ret ) )
         return ret;
 
-    ret = IsMyMsgBasic( pMessage );
-    if( ret == -EBADMSG )
-    {
-        DebugPrintEx( logErr, ret,
-            "%s's IsMyMsgIncoming failed",
-            CoGetClassName( this->GetClsid() ) );
-    }
-    return ret;
+    return IsMyMsgBasic( pMessage );
 }
 
 // if a event message this interface has subcribed
@@ -235,14 +228,7 @@ gint32 CMessageMatch::IsMyMsgOutgoing(
     if( ERROR( ret ) )
         return ret;
 
-    ret = IsMyMsgBasic( pMessage );
-    if( ret == -EBADMSG )
-    {
-        DebugPrintEx( logErr, ret,
-            "%s's IsMyMsgOutgoing failed",
-            CoGetClassName( this->GetClsid() ) );
-    }
-    return ret;
+    return IsMyMsgBasic( pMessage );
 }
 
 gint32 CMessageMatch::IsMyMsgBasic(

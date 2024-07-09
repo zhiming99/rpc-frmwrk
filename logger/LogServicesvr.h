@@ -55,6 +55,10 @@ class CLogService_SvrImpl
         if( true )
         {
             CStdRMutex oLock( GetLock() );
+            if( m_pFile.get() != nullptr &&
+                m_pFile->good() )
+                m_pFile->flush();
+                
             if( !m_pTimer.IsEmpty() )
                 ( *m_pTimer )( eventCancelTask );
         }

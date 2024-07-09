@@ -724,11 +724,6 @@ gint32 DMsgPtr::NewResp( DBusMessage* pReqMsg )
     strVal = pReq.GetInterface();
     if( !strVal.empty() )
         SetInterface( strVal );
-    else
-    {
-        DebugPrintEx( logErr, -ENOMSG,
-            "NewResp failed to GetInterface" );
-    }
     return ret;
 }
 
@@ -752,14 +747,7 @@ gint32 DMsgPtr::CopyHeader( DBusMessage* pMsg )
         if( ERROR( ret ) )
             break;
 
-        stdstr strVal = pSrcMsg.GetInterface();
-        if( !strVal.empty() )
-            SetInterface( strVal );
-        else
-        {
-            DebugPrintEx( logErr, -ENOMSG,
-                "CopyHeader failed to GetInterface" );
-        }
+        SetInterface( pSrcMsg.GetInterface() );
 
         ret = SetPath( pSrcMsg.GetPath() );
         if( ERROR( ret ) )

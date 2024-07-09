@@ -361,7 +361,6 @@ elif [ "$1" == "1" ]; then
     bash tools/btinrtst.sh $auth || exit 11
 
     #wait rpcf_logger to flush
-    sleep 30
     kill -3 `pidof rpcf_logger`
     cat $logger
 
