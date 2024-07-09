@@ -4755,6 +4755,13 @@ gint32 CRpcRouterReqFwdr::CheckEvtToRelay(
             ret = 0;
             break;
         }
+        else if( ret == -EBADMSG )
+        {
+            stdstr strFmt = __func__;
+            strFmt += " failed to GetInterface";
+            LOGERR( this->GetIoMgr(), -EBADMSG, 
+                strFmt );
+        }    
 
         for( auto&& oPair : m_mapLocMatches )
         {

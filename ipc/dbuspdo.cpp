@@ -386,6 +386,13 @@ DBusHandlerResult CDBusLocalPdo::PreDispatchMsg(
         // dbus system message
         ret = DispatchDBusSysMsg( pMsg );
     }
+    else if( ret1 == -EBADMSG )
+    {
+        stdstr strFmt = __func__;
+        strFmt += " failed to GetInterface";
+        LOGERR( this->GetIoMgr(), -EBADMSG, 
+            strFmt );
+    }    
 
     if( ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
     {
@@ -674,6 +681,13 @@ DBusHandlerResult CDBusLoopbackPdo::PreDispatchMsg(
         // dbus system message
         ret = DispatchDBusSysMsg( pMsg );
     }
+    else if( ret1 == -EBADMSG )
+    {
+        stdstr strFmt = __func__;
+        strFmt += " failed to GetInterface";
+        LOGERR( this->GetIoMgr(), -EBADMSG, 
+            strFmt );
+    }    
 
     if( ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
     {

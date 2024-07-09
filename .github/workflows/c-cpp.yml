@@ -50,6 +50,7 @@ jobs:
       run: dbus-run-session bash tools/runtest.sh 2 & 
 
     - name: starting test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1
     - name: cleanup for ssl test
       run: bash tools/cfg4ssl.sh sslcfg.json.in
@@ -57,6 +58,7 @@ jobs:
     - name: starting ssl servers
       run: dbus-run-session bash tools/runtest.sh 2 & 
     - name: starting ssl test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1
 
     - name: install debian package tools
@@ -70,5 +72,8 @@ jobs:
           path: |
             bldpkg/rpcf_*.deb
             bldpkg/rpcf-dev_*.deb
+            ./logfile
+            ./logdump.txt
+            ./logger.txt
 
 
