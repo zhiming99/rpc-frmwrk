@@ -389,12 +389,10 @@ DBusHandlerResult CDBusLocalPdo::PreDispatchMsg(
     else if( ret1 == -EBADMSG )
     {
         DMsgPtr pMsgPtr( pMsg );
-        stdstr strIf = pMsgPtr.GetInterface();
         stdstr strFmt = __func__;
-        strFmt += " failed to GetInterface %s.%s";
+        strFmt += " failed to GetInterface %s";
         LOGERR( this->GetIoMgr(), -EBADMSG, 
-            strFmt, strIf.c_str(),
-            pMsgPtr.GetMember().c_str() );
+            strFmt, pMsgPtr.DumpMsg().c_str() );
     }    
 
     if( ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )
