@@ -1005,6 +1005,12 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
 
     }while( 1 );
 
+    if( ret == -EPROTO )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+            "CompleteListeningIrp failed" );
+    }
+
     if( ret == STATUS_PENDING )
         return ret;
 
@@ -1016,8 +1022,9 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         psse->m_pInBuf.Clear();
         psse->m_iEvtSrc = GetClsid();
         pCtx->SetRespData( pRespBuf );
-        DebugPrint( ret, "SSLFido, error detected "
-        "in CompleteListeningIrp" );
+        DebugPrintEx( logErr, ret,
+            "SSLFido, error detected "
+            "in CompleteListeningIrp" );
         ret = STATUS_SUCCESS;
     }
     pCtx->SetStatus( 0 );
