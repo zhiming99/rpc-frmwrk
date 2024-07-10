@@ -4421,7 +4421,7 @@ gint32 SendWriteReq( CPort* pPort,
     pCtx->SetIoDirection( IRP_DIR_OUT );
     pCtx->SetReqData( pBuf );
     pIrp->SetCallback(
-        ObjPtr( pCallback ), 0 );
+        EventPtr( pCallback ), 0 );
 
     pLowerPort->AllocIrpCtxExt(
         pCtx, ( PIRP )pIrp );
@@ -4465,7 +4465,7 @@ gint32 SendListenReq( CPort* pPort,
     pCtx->SetCtrlCode( CTRLCODE_LISTENING );
     pCtx->SetIoDirection( IRP_DIR_IN );
     pIrp->SetCallback(
-        ObjPtr( pCallback ), 0 );
+        EventPtr( pCallback ), 0 );
 
     pLowerPort->AllocIrpCtxExt(
         pCtx, ( PIRP )pIrp );

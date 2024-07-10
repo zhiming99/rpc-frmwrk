@@ -291,7 +291,11 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             pIrp->PopCtxStack();
 
     }while( 0 );
-
+    if( ret == -EPROTO )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+            "EncryptAndSend failed" );
+    }
     if( ret != STATUS_PENDING )
     {
         IrpCtxPtr pCtx = pIrp->GetTopStack();
@@ -348,6 +352,7 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
         return -EINVAL;
 
     gint32 ret = 0;
+    bool bRelease = false;
     do{
         CfgPtr pCfg;
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
@@ -381,6 +386,7 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
             break;
         }
 
+        bRelease = true;
         Sem_Wait( &m_semWriteSync );
 
         CStdRMutex oPortLock( GetLock() );
@@ -403,7 +409,6 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
 
             m_queWriteTasks.push_back( pTask );
             ret = STATUS_PENDING; 
-            Sem_Post( &m_semWriteSync );
             break;
         }
 
@@ -412,9 +417,10 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
         ret = EncryptAndSend(
             pIrp, pCfg, 0, 0, 0, false );
 
-        Sem_Post( &m_semWriteSync );
-
     }while( 0 );
+
+    if( bRelease )
+        Sem_Post( &m_semWriteSync );
 
     return ret;
 }
@@ -1304,6 +1310,12 @@ gint32 CRpcOpenSSLFido::AdvanceHandshake(
  
     }while( 1 );
 
+    if( ret == -EPROTO )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+            "AdvanceHandshake failed" );
+    }
+
     return ret;
 }
 
@@ -1443,6 +1455,11 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
         // handshake is received, repeat
  
     }while( 1 );
+    if( ret == -EPROTO )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+            "AdvanceShutdown failed" );
+    }
 
     return ret;
 }

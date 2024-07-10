@@ -1,4 +1,4 @@
-from numpy import ERR_CALL
+#from numpy import ERR_CALL
 from rpcf.proxy import *
 import threading as tr
 import TransFileContext
