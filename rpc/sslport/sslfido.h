@@ -142,7 +142,8 @@ class CRpcOpenSSLFido : public CPort
     gint32 CompleteWriteIrp( IRP* pIrp );
 
     gint32 CompleteIoctlIrp( IRP* pIrp );
-    gint32 CompleteListeningIrp( IRP* pIrp );
+    gint32 CompleteListeningIrp(
+        IRP* pIrp, guint32 dwCaller );
 
     gint32 StartSSLHandshake( PIRP pIrp );
 

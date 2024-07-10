@@ -291,11 +291,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             pIrp->PopCtxStack();
 
     }while( 0 );
-    if( ret == -EPROTO )
-    {
-        LOGERR( this->GetIoMgr(), ret,
-            "EncryptAndSend failed" );
-    }
     if( ret != STATUS_PENDING )
     {
         IrpCtxPtr pCtx = pIrp->GetTopStack();
@@ -559,7 +554,7 @@ gint32 CRpcOpenSSLFido::SubmitIoctlCmd(
             }
             else
             {
-                ret = CompleteListeningIrp( pIrp );
+                ret = CompleteListeningIrp( pIrp, 2 );
             }
             break;
         }
@@ -783,7 +778,7 @@ gint32 CRpcOpenSSLFido::Stop( IRP* pIrp )
 }
 
 gint32 CRpcOpenSSLFido::CompleteListeningIrp(
-    IRP* pIrp )
+    IRP* pIrp, guint32 dwCaller )
 {
     // listening request from the upper port
     if( pIrp == nullptr ||
@@ -866,27 +861,17 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
 
             if( dwNewSize > dwOldSize )
             {
-                pDecrypted->Resize( dwNewSize );
-                if( pDecrypted->size() ==
-                    dwOldSize )
-                {
-                    // realloc failed
-                    ret = -ENOMEM;
-                    break;
-                }
+                ret = pDecrypted->Resize(
+                    dwNewSize );
             }
             else if( dwOffset == dwOldSize )
             {
-                pDecrypted->Resize(
+                ret = pDecrypted->Resize(
                     dwOldSize + PAGE_SIZE );
-                if( pDecrypted->size() ==
-                    dwOldSize )
-                {
-                    // realloc failed
-                    ret = -ENOMEM;
-                    break;
-                }
             }
+
+            if( ERROR( ret ) )
+                break;
 
         }while( 1 );
 
@@ -909,13 +894,16 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                 // SSL to move on, resubmit the
                 // irp
                 pTopCtx->m_pRespData.Clear();
+                pTopCtx->SetStatus( 0 );
                 IPort* pPort = GetLowerPort();
                 ret = pPort->SubmitIrp( pIrp );
                 if( SUCCEEDED( ret ) )
                 {
+                    pTopCtx= pIrp->GetTopStack();
                     pRespBuf = pTopCtx->m_pRespData;
                     psse = ( STREAM_SOCK_EVENT* )
                         pRespBuf->ptr();
+                    dwCaller += 10;
                     continue;
                 }
 
@@ -968,6 +956,15 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
             }
         }
 
+
+        if( ret == -EPROTO )
+        {
+            LOGERR( this->GetIoMgr(), ret,
+                "CompleteListeningIrp "
+                "failed. offset=%d, caller=%d ",
+                dwOffset, dwCaller );
+
+        }
         if( ERROR( ret ) )
             break;
 
@@ -1091,7 +1088,7 @@ gint32 CRpcOpenSSLFido::CompleteIoctlIrp(
                     pCtx->SetStatus( STATUS_SUCCESS );
                     break;
                 }
-                ret = CompleteListeningIrp( pIrp );
+                ret = CompleteListeningIrp( pIrp, 1 );
             }
             break;
         }
@@ -1317,12 +1314,6 @@ gint32 CRpcOpenSSLFido::AdvanceHandshake(
  
     }while( 1 );
 
-    if( ret == -EPROTO )
-    {
-        LOGERR( this->GetIoMgr(), ret,
-            "AdvanceHandshake failed" );
-    }
-
     return ret;
 }
 
@@ -1462,11 +1453,6 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
         // handshake is received, repeat
  
     }while( 1 );
-    if( ret == -EPROTO )
-    {
-        LOGERR( this->GetIoMgr(), ret,
-            "AdvanceShutdown failed" );
-    }
 
     return ret;
 }
