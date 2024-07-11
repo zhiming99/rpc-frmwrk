@@ -108,6 +108,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
         if( ERROR( ret ) )
             break;
 
+        ERR_clear_error();
         CStdRMutex oPortLock( GetLock() );
         if( iIdx < iCount ) do{
 
@@ -795,6 +796,8 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     BufPtr pRespBuf = pTopCtx->m_pRespData;
     STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
+
+    ERR_clear_error();
     do{
         if( psse->m_iEvent == sseError )
         {
@@ -888,6 +891,13 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         {
             if( ret == -EPROTO )
             {
+                auto iErrCode = ERR_get_error();
+                char* szError = ERR_error_string(
+                    iErrCode, NULL);  
+
+                LOGERR( this->GetIoMgr(), ret,
+                    "SSL error occurs %s", szError );
+
                 LOGERR( this->GetIoMgr(), ret,
                     "CompleteListeningIrp "
                     "failed. offset=%d, caller=%d ",
