@@ -934,6 +934,13 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         }
         else if( ret == SSL_ERROR_WANT_WRITE )
         {
+            {
+                LOGWARN( this->GetIoMgr(), ret,
+                    "CompleteListeningIrp "
+                    "entered want-write, a "
+                    "buggy branch. caller=%d ",
+                    dwCaller );
+            }
             // insert a write request
             CStdRMutex oPortLock1( GetLock() );
             if( m_dwRenegStat == rngstatNormal )

@@ -2376,7 +2376,8 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
             if( pSvc->GetState() != stateConnected )
             {
                 DebugPrintEx( logErr, ERROR_STATE,
-                    "Warning logger is offline" );
+                    "Warning logger is offline, "
+                    "and waiting for it online" );
             }
             oSvcLock.Unlock();
 
