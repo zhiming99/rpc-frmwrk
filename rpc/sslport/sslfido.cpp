@@ -799,6 +799,13 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         if( psse->m_iEvent == sseError )
         {
             ret = psse->m_iData;
+            if( ret == -EPROTO )
+            {
+                LOGERR( this->GetIoMgr(), ret,
+                    "CompleteListeningIrp "
+                    "received error. caller=%d ",
+                    dwCaller );
+            }
             break;
         }
 
@@ -879,6 +886,13 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         ret = GetSSLError( m_pSSL, iNumRead );
         if( ERROR( ret ) || ERROR( iRet ) )
         {
+            if( ret == -EPROTO )
+            {
+                LOGERR( this->GetIoMgr(), ret,
+                    "CompleteListeningIrp "
+                    "failed. offset=%d, caller=%d ",
+                    dwOffset, dwCaller );
+            }
             if( SUCCEEDED( ret ) )
                 ret = iRet;
             break;
@@ -957,14 +971,6 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         }
 
 
-        if( ret == -EPROTO )
-        {
-            LOGERR( this->GetIoMgr(), ret,
-                "CompleteListeningIrp "
-                "failed. offset=%d, caller=%d ",
-                dwOffset, dwCaller );
-
-        }
         if( ERROR( ret ) )
             break;
 
