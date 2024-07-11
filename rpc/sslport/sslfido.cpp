@@ -108,7 +108,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
         if( ERROR( ret ) )
             break;
 
-        ERR_clear_error();
         CStdRMutex oPortLock( GetLock() );
         if( iIdx < iCount ) do{
 
@@ -125,6 +124,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 break;
             }
 
+            ERR_clear_error();
             gint32 n = SSL_write( m_pSSL,
                 pBuf->ptr() + dwOffset,
                 pBuf->size() - dwOffset );
@@ -797,7 +797,6 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
 
-    ERR_clear_error();
     do{
         if( psse->m_iEvent == sseError )
         {
@@ -851,6 +850,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         pDecrypted->Resize( PAGE_SIZE );
 
         do{
+            ERR_clear_error();
             iNumRead = SSL_read( m_pSSL,
                 pDecrypted->ptr() + dwOffset,
                 pDecrypted->size() - dwOffset );
@@ -1242,6 +1242,7 @@ gint32 CRpcOpenSSLFido::AdvanceHandshake(
     do{
         gint32 ret1 = 0;
 
+        ERR_clear_error();
         ret1 = SSL_do_handshake( m_pSSL );
         ret = GetSSLError( m_pSSL, ret1 );
         if( ERROR( ret ) )
@@ -1381,6 +1382,7 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
     gint32 iShutdown = 0;
     do{
         bool bRead = true;
+        ERR_clear_error();
         iShutdown = SSL_shutdown( m_pSSL );
         if( iShutdown < 0 )
         {
