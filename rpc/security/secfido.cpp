@@ -752,7 +752,7 @@ gint32 CRpcSecFido::GetPktCached(
 
     if( ret == -EPROTO )
     {
-        LOGERR( this->GetIoMgr(), ret,
+        DebugPrintEx( logErr, ret,
             "Error unknown magic number "
             "in the sec packet" );
     }
@@ -981,7 +981,7 @@ gint32 CRpcSecFido::DecryptPkt(
 
     if( ret == -EPROTO )
     {
-        LOGERR( this->GetIoMgr(), ret,
+        DebugPrintEx( logErr, ret,
             "Error decrypt the kerberos packet" );
     }
 

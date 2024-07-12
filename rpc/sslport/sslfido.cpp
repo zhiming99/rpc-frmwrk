@@ -260,7 +260,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             // all the data has been held by the
             // SSL without output, complete this
             // irp and wait till next write.
-            DebugPrint( ret,
+            DebugPrintEx( logNotice, ret,
                 "Strange, all %d bytes has "\
                 "been eaten by SSL without output",
                 dwTotal );
@@ -987,7 +987,6 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
             }
         }
 
-
         if( ERROR( ret ) )
             break;
 
@@ -1042,8 +1041,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         psse->m_pInBuf.Clear();
         psse->m_iEvtSrc = GetClsid();
         pCtx->SetRespData( pRespBuf );
-        DebugPrintEx( logErr, ret,
-            "SSLFido, error detected "
+        DebugPrint( ret, "SSLFido, error detected "
             "in CompleteListeningIrp" );
         ret = STATUS_SUCCESS;
     }

@@ -3765,13 +3765,6 @@ gint32 CRpcNativeProtoFdo::OnReceive(
                 // NOTE: we are entering a wrong
                 // state cannot recover, we need to
                 // close the stream
-                if( ret == -EPROTO )
-                {
-                    stdstr strFmt = __func__;
-                    strFmt += " fill packet failed";
-                    LOGERR( this->GetIoMgr(),
-                        ret, strFmt );
-                }
                 m_pPackReceiving.Clear();
                 break;
             }
