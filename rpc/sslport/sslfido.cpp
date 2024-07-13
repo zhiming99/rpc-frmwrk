@@ -124,6 +124,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
                 break;
             }
 
+            ERR_clear_error();
             gint32 n = SSL_write( m_pSSL,
                 pBuf->ptr() + dwOffset,
                 pBuf->size() - dwOffset );
@@ -209,15 +210,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
         if( ERROR( ret ) )
             break;
 
-        // the least size
-        guint32 dwExpSize = std::min(
-            ( dwTotal + ( guint32 )PAGE_SIZE ),
-            ( guint32 )STM_MAX_BYTES_PER_BUF );
-
-        // make the tail align to the page
-        // boundary
-        dwExpSize &= ~( PAGE_SIZE - 1 );
-
         guint32 dwOutOff = 0;
         char* pHoldBuf = GetOutBuf();
         guint32 dwHoldSize = GetOutSize();
@@ -259,7 +251,7 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             // all the data has been held by the
             // SSL without output, complete this
             // irp and wait till next write.
-            DebugPrint( ret,
+            DebugPrintEx( logNotice, ret,
                 "Strange, all %d bytes has "\
                 "been eaten by SSL without output",
                 dwTotal );
@@ -291,7 +283,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
             pIrp->PopCtxStack();
 
     }while( 0 );
-
     if( ret != STATUS_PENDING )
     {
         IrpCtxPtr pCtx = pIrp->GetTopStack();
@@ -348,6 +339,7 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
         return -EINVAL;
 
     gint32 ret = 0;
+    bool bRelease = false;
     do{
         CfgPtr pCfg;
         IrpCtxPtr& pCtx = pIrp->GetTopStack();
@@ -381,6 +373,7 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
             break;
         }
 
+        bRelease = true;
         Sem_Wait( &m_semWriteSync );
 
         CStdRMutex oPortLock( GetLock() );
@@ -403,7 +396,6 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
 
             m_queWriteTasks.push_back( pTask );
             ret = STATUS_PENDING; 
-            Sem_Post( &m_semWriteSync );
             break;
         }
 
@@ -412,9 +404,10 @@ gint32 CRpcOpenSSLFido::SubmitWriteIrp(
         ret = EncryptAndSend(
             pIrp, pCfg, 0, 0, 0, false );
 
-        Sem_Post( &m_semWriteSync );
-
     }while( 0 );
+
+    if( bRelease )
+        Sem_Post( &m_semWriteSync );
 
     return ret;
 }
@@ -553,7 +546,7 @@ gint32 CRpcOpenSSLFido::SubmitIoctlCmd(
             }
             else
             {
-                ret = CompleteListeningIrp( pIrp );
+                ret = CompleteListeningIrp( pIrp, 2 );
             }
             break;
         }
@@ -776,8 +769,26 @@ gint32 CRpcOpenSSLFido::Stop( IRP* pIrp )
     return super::Stop( pIrp );
 }
 
+#define RESUBMIT_LISTENING_IRP( _pIrp_ ) \
+({ \
+    PIRP __pIrp = ( _pIrp_ ); \
+    pTopCtx->m_pRespData.Clear(); \
+    pTopCtx->SetStatus( 0 ); \
+    IPort* pPort = GetLowerPort(); \
+    ret = pPort->SubmitIrp( __pIrp ); \
+    if( SUCCEEDED( ret ) ) \
+    { \
+        pTopCtx= __pIrp->GetTopStack(); \
+        pRespBuf = pTopCtx->m_pRespData; \
+        psse = ( STREAM_SOCK_EVENT* ) \
+            pRespBuf->ptr(); \
+        dwCaller += 10; \
+        continue; \
+    } \
+})
+
 gint32 CRpcOpenSSLFido::CompleteListeningIrp(
-    IRP* pIrp )
+    IRP* pIrp, guint32 dwCaller )
 {
     // listening request from the upper port
     if( pIrp == nullptr ||
@@ -794,10 +805,18 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     BufPtr pRespBuf = pTopCtx->m_pRespData;
     STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
+
     do{
         if( psse->m_iEvent == sseError )
         {
             ret = psse->m_iData;
+            if( ret == -EPROTO )
+            {
+                LOGERR( this->GetIoMgr(), ret,
+                    "CompleteListeningIrp "
+                    "received error. caller=%d ",
+                    dwCaller );
+            }
             break;
         }
 
@@ -840,6 +859,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         pDecrypted->Resize( PAGE_SIZE );
 
         do{
+            ERR_clear_error();
             iNumRead = SSL_read( m_pSSL,
                 pDecrypted->ptr() + dwOffset,
                 pDecrypted->size() - dwOffset );
@@ -860,27 +880,17 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
 
             if( dwNewSize > dwOldSize )
             {
-                pDecrypted->Resize( dwNewSize );
-                if( pDecrypted->size() ==
-                    dwOldSize )
-                {
-                    // realloc failed
-                    ret = -ENOMEM;
-                    break;
-                }
+                ret = pDecrypted->Resize(
+                    dwNewSize );
             }
             else if( dwOffset == dwOldSize )
             {
-                pDecrypted->Resize(
+                ret = pDecrypted->Resize(
                     dwOldSize + PAGE_SIZE );
-                if( pDecrypted->size() ==
-                    dwOldSize )
-                {
-                    // realloc failed
-                    ret = -ENOMEM;
-                    break;
-                }
             }
+
+            if( ERROR( ret ) )
+                break;
 
         }while( 1 );
 
@@ -888,6 +898,20 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         ret = GetSSLError( m_pSSL, iNumRead );
         if( ERROR( ret ) || ERROR( iRet ) )
         {
+            if( ret == -EPROTO )
+            {
+                auto iErrCode = ERR_get_error();
+                char* szError = ERR_error_string(
+                    iErrCode, NULL);  
+
+                LOGERR( this->GetIoMgr(), ret,
+                    "SSL error occurs %s", szError );
+
+                LOGERR( this->GetIoMgr(), ret,
+                    "CompleteListeningIrp "
+                    "failed. offset=%d, caller=%d ",
+                    dwOffset, dwCaller );
+            }
             if( SUCCEEDED( ret ) )
                 ret = iRet;
             break;
@@ -902,17 +926,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                 // incoming data is not enough for
                 // SSL to move on, resubmit the
                 // irp
-                pTopCtx->m_pRespData.Clear();
-                IPort* pPort = GetLowerPort();
-                ret = pPort->SubmitIrp( pIrp );
-                if( SUCCEEDED( ret ) )
-                {
-                    pRespBuf = pTopCtx->m_pRespData;
-                    psse = ( STREAM_SOCK_EVENT* )
-                        pRespBuf->ptr();
-                    continue;
-                }
-
+                RESUBMIT_LISTENING_IRP( pIrp );
                 // STATUS_PENDING goes here
             }
             else
@@ -926,6 +940,13 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         }
         else if( ret == SSL_ERROR_WANT_WRITE )
         {
+            {
+                LOGWARN( this->GetIoMgr(), ret,
+                    "CompleteListeningIrp "
+                    "entered want-write, a "
+                    "buggy branch. caller=%d ",
+                    dwCaller );
+            }
             // insert a write request
             CStdRMutex oPortLock1( GetLock() );
             if( m_dwRenegStat == rngstatNormal )
@@ -934,25 +955,29 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
             if( m_queWriteTasks.empty() )
             {
                 TaskletPtr pTask;
-                IrpPtr pIrp( true );
+                IrpPtr pWriteIrp( true );
                 PortPtr pPort = GetLowerPort();
-                pIrp->AllocNextStack( pPort );
+                pWriteIrp->AllocNextStack( pPort );
 
                 IrpCtxPtr& pCtx =
-                    pIrp->GetTopStack();
+                    pWriteIrp->GetTopStack();
 
                 pCtx->SetMajorCmd( IRP_MJ_FUNC );
                 pCtx->SetMinorCmd( IRP_MN_WRITE );
                 pPort->AllocIrpCtxExt(
-                    pCtx, ( PIRP )pIrp );
+                    pCtx, ( PIRP )pWriteIrp );
 
+                // empty buffer will make the write
+                // task to read from BIO only without
+                // encryption to check if SSL has
+                // something to send.
                 CParamList oEmptyCfg;
                 BufPtr pReqBuf( true );
                 *pReqBuf = ObjPtr(
                     oEmptyCfg.GetCfg() );
                 pCtx->SetReqData( pReqBuf );
                 ret = BuildResumeTask(
-                    pTask, pIrp, 0, 0, 0 );
+                    pTask, pWriteIrp, 0, 0, 0 );
 
                 if( ERROR( ret ) )
                     break;
@@ -960,6 +985,10 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                 m_queWriteTasks.push_back(
                     pTask );
             }
+            if( dwOffset == 0 )
+                RESUBMIT_LISTENING_IRP( pIrp );
+            else
+                ret = 0;
         }
 
         if( ERROR( ret ) )
@@ -999,6 +1028,12 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
 
     }while( 1 );
 
+    if( ret == -EPROTO )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+            "CompleteListeningIrp failed" );
+    }
+
     if( ret == STATUS_PENDING )
         return ret;
 
@@ -1011,7 +1046,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         psse->m_iEvtSrc = GetClsid();
         pCtx->SetRespData( pRespBuf );
         DebugPrint( ret, "SSLFido, error detected "
-        "in CompleteListeningIrp" );
+            "in CompleteListeningIrp" );
         ret = STATUS_SUCCESS;
     }
     pCtx->SetStatus( 0 );
@@ -1078,7 +1113,7 @@ gint32 CRpcOpenSSLFido::CompleteIoctlIrp(
                     pCtx->SetStatus( STATUS_SUCCESS );
                     break;
                 }
-                ret = CompleteListeningIrp( pIrp );
+                ret = CompleteListeningIrp( pIrp, 1 );
             }
             break;
         }
@@ -1209,6 +1244,7 @@ gint32 CRpcOpenSSLFido::AdvanceHandshake(
     do{
         gint32 ret1 = 0;
 
+        ERR_clear_error();
         ret1 = SSL_do_handshake( m_pSSL );
         ret = GetSSLError( m_pSSL, ret1 );
         if( ERROR( ret ) )
@@ -1348,6 +1384,7 @@ gint32 CRpcOpenSSLFido::AdvanceShutdown(
     gint32 iShutdown = 0;
     do{
         bool bRead = true;
+        ERR_clear_error();
         iShutdown = SSL_shutdown( m_pSSL );
         if( iShutdown < 0 )
         {

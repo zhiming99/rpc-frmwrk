@@ -388,13 +388,9 @@ DBusHandlerResult CDBusLocalPdo::PreDispatchMsg(
     }
     else if( ret1 == -EBADMSG )
     {
-        DMsgPtr pMsgPtr( pMsg );
-        stdstr strIf = pMsgPtr.GetInterface();
-        stdstr strFmt = __func__;
-        strFmt += " failed to GetInterface %s.%s";
-        LOGERR( this->GetIoMgr(), -EBADMSG, 
-            strFmt, strIf.c_str(),
-            pMsgPtr.GetMember().c_str() );
+        // this is a dbuserror message to notify the
+        // client dbus_bus_remove_match failed.
+        return DBUS_HANDLER_RESULT_HANDLED;
     }    
 
     if( ret == DBUS_HANDLER_RESULT_NOT_YET_HANDLED )

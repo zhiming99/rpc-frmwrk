@@ -46,17 +46,7 @@ std::string DMsgPtr::GetInterface() const
         dbus_message_get_interface( m_pObj );
 
     if( pszInterface == nullptr )
-    {
-        sched_yield();
-        pszInterface =
-            dbus_message_get_interface( m_pObj );
-        if( pszInterface == nullptr )
-        {
-            pszInterface = "";
-            DebugPrintEx( logErr, -ENOMSG,
-                "dbus_message_get_interface failed" );
-        }
-    }
+        pszInterface = "";
 
     return std::string( pszInterface );
 }
@@ -86,17 +76,8 @@ std::string DMsgPtr::GetPath() const
         dbus_message_get_path( m_pObj );
 
     if( pszPath == nullptr )
-    {
-        sched_yield();
-        pszPath =
-            dbus_message_get_path( m_pObj );
-        if( pszPath == nullptr )
-        {
-            pszPath = "";
-            DebugPrintEx( logErr, -ENOMSG,
-                "dbus_message_get_path failed" );
-        }
-    }
+        pszPath = "";
+
     return std::string( pszPath );
 }
 
