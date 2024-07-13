@@ -28,7 +28,7 @@
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 12. [`基于Kerberos 5和OAuth2的认证功能`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 13. [`节点冗余和负载均衡`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-14. [`自动生成C++, Python和Java的框架代码`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+14. [`自动生成C++，Python，Java或者JavaScript的框架代码`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`守护进程的图形配置工具`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 16. [`RPC文件系统rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 17.  [`支持国密TLS13(SM2+SM4+GCM)`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/gmsslport/README_cn.md)

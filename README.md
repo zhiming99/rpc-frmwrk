@@ -20,7 +20,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 11. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
 12. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 13. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-14. [`A skeleton generator for CPP, Python and Java`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
+14. [`A collection of skeleton generators for C++, Python Java, and JavaScript`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
 16. [`rpcfs - filesystem interface for rpc-frmwrk`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
 
