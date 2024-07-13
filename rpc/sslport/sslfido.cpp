@@ -210,15 +210,6 @@ gint32 CRpcOpenSSLFido::EncryptAndSend(
         if( ERROR( ret ) )
             break;
 
-        // the least size
-        guint32 dwExpSize = std::min(
-            ( dwTotal + ( guint32 )PAGE_SIZE ),
-            ( guint32 )STM_MAX_BYTES_PER_BUF );
-
-        // make the tail align to the page
-        // boundary
-        dwExpSize &= ~( PAGE_SIZE - 1 );
-
         guint32 dwOutOff = 0;
         char* pHoldBuf = GetOutBuf();
         guint32 dwHoldSize = GetOutSize();
@@ -778,6 +769,24 @@ gint32 CRpcOpenSSLFido::Stop( IRP* pIrp )
     return super::Stop( pIrp );
 }
 
+#define RESUBMIT_LISTENING_IRP( _pIrp_ ) \
+({ \
+    PIRP pIrp = ( _pIrp_ ); \
+    pTopCtx->m_pRespData.Clear(); \
+    pTopCtx->SetStatus( 0 ); \
+    IPort* pPort = GetLowerPort(); \
+    ret = pPort->SubmitIrp( pIrp ); \
+    if( SUCCEEDED( ret ) ) \
+    { \
+        pTopCtx= pIrp->GetTopStack(); \
+        pRespBuf = pTopCtx->m_pRespData; \
+        psse = ( STREAM_SOCK_EVENT* ) \
+            pRespBuf->ptr(); \
+        dwCaller += 10; \
+        continue; \
+    } \
+})
+
 gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     IRP* pIrp, guint32 dwCaller )
 {
@@ -917,20 +926,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                 // incoming data is not enough for
                 // SSL to move on, resubmit the
                 // irp
-                pTopCtx->m_pRespData.Clear();
-                pTopCtx->SetStatus( 0 );
-                IPort* pPort = GetLowerPort();
-                ret = pPort->SubmitIrp( pIrp );
-                if( SUCCEEDED( ret ) )
-                {
-                    pTopCtx= pIrp->GetTopStack();
-                    pRespBuf = pTopCtx->m_pRespData;
-                    psse = ( STREAM_SOCK_EVENT* )
-                        pRespBuf->ptr();
-                    dwCaller += 10;
-                    continue;
-                }
-
+                RESUBMIT_LISTENING_IRP( pIrp );
                 // STATUS_PENDING goes here
             }
             else
@@ -959,25 +955,29 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
             if( m_queWriteTasks.empty() )
             {
                 TaskletPtr pTask;
-                IrpPtr pIrp( true );
+                IrpPtr pWriteIrp( true );
                 PortPtr pPort = GetLowerPort();
-                pIrp->AllocNextStack( pPort );
+                pWriteIrp->AllocNextStack( pPort );
 
                 IrpCtxPtr& pCtx =
-                    pIrp->GetTopStack();
+                    pWriteIrp->GetTopStack();
 
                 pCtx->SetMajorCmd( IRP_MJ_FUNC );
                 pCtx->SetMinorCmd( IRP_MN_WRITE );
                 pPort->AllocIrpCtxExt(
-                    pCtx, ( PIRP )pIrp );
+                    pCtx, ( PIRP )pWriteIrp );
 
+                // empty buffer will make the write
+                // task to read from BIO only without
+                // encryption to check if SSL has
+                // something to send.
                 CParamList oEmptyCfg;
                 BufPtr pReqBuf( true );
                 *pReqBuf = ObjPtr(
                     oEmptyCfg.GetCfg() );
                 pCtx->SetReqData( pReqBuf );
                 ret = BuildResumeTask(
-                    pTask, pIrp, 0, 0, 0 );
+                    pTask, pWriteIrp, 0, 0, 0 );
 
                 if( ERROR( ret ) )
                     break;
@@ -985,6 +985,10 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                 m_queWriteTasks.push_back(
                     pTask );
             }
+            if( dwOffset == 0 )
+                RESUBMIT_LISTENING_IRP( pIrp );
+            else
+                ret = 0;
         }
 
         if( ERROR( ret ) )
