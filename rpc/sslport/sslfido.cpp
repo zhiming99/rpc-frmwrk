@@ -771,14 +771,14 @@ gint32 CRpcOpenSSLFido::Stop( IRP* pIrp )
 
 #define RESUBMIT_LISTENING_IRP( _pIrp_ ) \
 ({ \
-    PIRP pIrp = ( _pIrp_ ); \
+    PIRP __pIrp = ( _pIrp_ ); \
     pTopCtx->m_pRespData.Clear(); \
     pTopCtx->SetStatus( 0 ); \
     IPort* pPort = GetLowerPort(); \
-    ret = pPort->SubmitIrp( pIrp ); \
+    ret = pPort->SubmitIrp( __pIrp ); \
     if( SUCCEEDED( ret ) ) \
     { \
-        pTopCtx= pIrp->GetTopStack(); \
+        pTopCtx= __pIrp->GetTopStack(); \
         pRespBuf = pTopCtx->m_pRespData; \
         psse = ( STREAM_SOCK_EVENT* ) \
             pRespBuf->ptr(); \
