@@ -1,4 +1,8 @@
 ---
+[`Sun Jul 14 2024 09:05:35 PM Beijing`]   
+1. Fixed the endless wait issue in fuse test, which was a long pain in the neck.
+2. Next I will add a `springboot` cgi with OAuth2 support. And polish both springboot and django docker images for OAuth2.
+
 [`Wed Jul 03 2024 10:54:06 PM Beijing`]   
 1. After fixed a bug in the security module, the kerberos related test became stable now. But there is still a bug which could hang the fuse test endlessly, and I will add a logger to expose more information before I can fix it.
 2. The django server and client cgi have been uploaded. and next, i will add a docker image with springboot cgi, as the wrap up of the OAuth2 support.
