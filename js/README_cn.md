@@ -7,3 +7,9 @@
 ### 注意事项
 所有的JS例子程序的部署的链接均被设置为假想的`http://example.com/rpcf`。所以用户在开发时，务必使用`ridlc`的`--odesc_path`选项，将其替换成真实的网络地址。
 
+### 如何生成和部署JS的skelton
+我们以[hellowld.ridl](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/hellowld.ridl)为例. 假设目标网站的rpc-frmwrk服务的url为`http://172.17.0.2/rpcf`
+1. 运行`ridlc -J --odesc_url=http://172.17.0.2/rpcf --auth -O . hellowld.ridl`，生成客户端网页和JS代码。
+2. 在当前目录下运行`make`将生成目标JS文件和名为HelloWorld.html的网页和所需的JS代码。
+3. 这则命令中 `--auth`的意思是添加支持OAuth2授权的代码。如果没有，则生成不需要authorization的代码
+
