@@ -1,4 +1,4 @@
-[[English]](https://github.com/zhiming99/rpc-frmwrk/blob/master/README.md)
+[[English]](./README.md)
 # rpc-frmwrk ![badge](https://img.shields.io/badge/RPC-C%2B%2B%2C%20Java%2C%20Python-green)
 
 
@@ -12,7 +12,7 @@
   * 当运行在集中式服务架构下，服务端和客户端分别为两个独立的进程，此时`rpc-frmwrk`拥有更好的性能。服务端和客户端都可在`运行时`加载和启停用户开发的服务插件。
   * 在任何一种架构下，`rpc-frmwrk`提供配置工具和`运行时接口`完成对传输功能的配置，包括加密，认证，压缩，WebSocket，Multihop等功能，和运行时参数。
 * `rpc-frmwrk`十分注重传输的安全性，其设计独特的I/O模块，可以支持国密(GmSSL)和OpenSSL两种安全传输协议，亦可通过`Kerberos`或者`OAuth2`提供单点登陆(SSO)服务。`rpc-frmwrk`的配置工具提供简便的密钥分发和管理工具，可以有效减轻GmSSL和OpenSSL的部署和使用的负担。
-* 更多概念方面的介绍请参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept_cn.md)。
+* 更多概念方面的介绍请参考这篇[文章](./Concept_cn.md)。
 
 ## 功能列表   
 1. `同步异步请求的发送和处理`   
@@ -22,16 +22,16 @@
 5. `对服务器的访问可以同时来自互联网, 不同进程，或者同一进程` 
 6. `通信双方上线/下线的检测和通知`
 7. `同一网络端口可以支持数目不限的多个服务端`
-8. [`带有全双工流控的流通道`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#streaming)
-9. [`OpenSSL的支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
-10. [`Websocket支持`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
+8. [`带有全双工流控的流通道`](./Concept_cn.md#流(Streaming))
+9. [`OpenSSL的支持`](./rpc/sslport/Readme.md)
+10. [`Websocket支持`](./rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-12. [`基于Kerberos 5和OAuth2的认证功能`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
-13. [`节点冗余和负载均衡`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
-14. [`自动生成C++，Python，Java或者JavaScript的框架代码`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
-15. [`守护进程的图形配置工具`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
-16. [`RPC文件系统rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse/README.md)
-17.  [`支持国密TLS13(SM2+SM4+GCM)`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/gmsslport/README_cn.md)
+12. [`基于Kerberos 5和OAuth2的认证功能`](./rpc/security/README.md)
+13. [`节点冗余和负载均衡`](./Concept_cn.md#负载均衡)
+14. [`自动生成C++，Python，Java或者JavaScript的框架代码`](./ridl/README.md)
+15. [`守护进程的图形配置工具`](./tools/README.md)
+16. [`RPC文件系统rpcfs`](./fuse/README.md)
+17.  [`支持国密TLS13(SM2+SM4+GCM)`](./rpc/gmsslport/README_cn.md)
 
 ## 编译`rpc-frmwrk`   
 * 请参考[如何编译rpc-frmwrk](https://github.com/zhiming99/rpc-frmwrk/wiki/%E5%A6%82%E4%BD%95%E7%BC%96%E8%AF%91rpc%E2%80%90frmwrk)给出的详细的信息和步骤.   
@@ -39,18 +39,18 @@
 
 ## 安装，配置和运行
 1. 当你已经编译成功`rpc-frmwrk`，在源码的根目录下运行 `sudo make install`即可进行安装.
-2. 在运行之前，你需要配置`rpc-frwmrk`的守护进程。`rpcfg`是`rpc-frmwrk`的自带配置工具，它是配置`rpc-frmwrk`的强大工具，可以节省大量查找和学习时间，甚至包括一个简单的SSL密钥管理器。关于配置工具`rpcfg`，可以参考[使用说明](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md).
-3. 以微服务模式为例，运行时首先启动服务器端的守护进程，如`rpcrouter -dr 2`和客户端的守护进程，如`rpcrouter -dr 1`.  有关守护进程的详细信息请参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/router/README.md).
+2.  在运行之前，你需要配置`rpc-frwmrk`的守护进程。`rpcfg`是`rpc-frmwrk`的自带配置工具，它是配置`rpc-frmwrk`的强大工具，可以节省大量查找和学习时间，甚至包括一个简单的SSL密钥管理器。关于配置工具`rpcfg`，可以参考[使用说明](./tools/README.md).
+3. 以微服务模式为例，运行时首先启动服务器端的守护进程，如`rpcrouter -dr 2`和客户端的守护进程，如`rpcrouter -dr 1`.  有关守护进程的详细信息请参考这篇[文章](./rpc/router/README.md).
 4. 对于新用户，可以运行系统自带的`HelloWorld`来验证配置. 先在服务器端启动`helloworld`的服务器程序`hwsvrsmk`, 然后在客户端启动`hwclismk`.这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F)有更详细的介绍.
 
 ## 开发
-通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的三种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README_cn.md)
+通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的三种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
 1. `微服务模式`： `rpc-frmwrk`最早支持的的架构，用户通过运用`rpc-frmwrk`运行库提供的接口，和各种内建的工具类，执行同步，异步，超时，取消，以及`流`传输等功能，从而实现高性能的业务逻辑。`微服务模式`的可以动态的启停各个微服务，不需要中断其他的线上服务。
 2. `经典模式`：如果对性能要求较高，你也可以使用`ridlc`生成传统的C/S架构，服务器和客户端，是两个单独的程序，特点是延迟小，吞吐量大，扩展性灵活性稍弱。
-3. [`文件模式`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统(`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会通过文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全封装了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
+3. [`文件模式`](./fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统(`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会通过文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全封装了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
 
 ## 部署
-`rpc-frmwrk`的配置工具`rpcfg`可以自动生成目标机器的安装包。安装包可以安装`rpc-frwmwrk`的运行库及系统设置。设置内容包括`rpc-frmwrk`的运行参数设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用认证功能时，`Kerberos`的服务器设置. 详细信息请参考`rpcfg`的[使用说明](https://github.com/zhiming99/rpc-frmwrk/blob/master/tools/README.md). 
+`rpc-frmwrk`的配置工具`rpcfg`可以自动生成目标机器的安装包。安装包可以安装`rpc-frwmwrk`的运行库及系统设置。设置内容包括`rpc-frmwrk`的运行参数设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用认证功能时，`Kerberos`的服务器设置. 详细信息请参考`rpcfg`的[使用说明](./tools/README.md). 
 
 ## 第三方依赖  
 1. `dbus-1.0 (dbus-devel)`

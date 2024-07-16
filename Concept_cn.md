@@ -1,4 +1,4 @@
-[English](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md)
+[English](./Concept.md)
 
 # rpc-frmwrk概念和技术介绍
 RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行库和接口API通过抽象，简化，自动化，和集成，封装了分布式应用程序传输层的接口，序列化，错误处理，传输，配置以及运行时监控等功能。接下来，面向基于`rpc-frmwrk`作开发的听众，介绍一些开发过程中会碰到的概念和设计思想。
@@ -20,7 +20,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 ## 配置`rpc-frmwrk`
 * `rpc-frmwrk`的每一对Server/Proxy共享一个`对象描述文件`，该文件给出连接服务器的各种参数，认证的用户信息，或者运行时的参数。除了此文件，还有一个`driver.json`配置的文件。`driver.json`给出的是Server/Proxy运行时依赖的`I/O子系统`配置信息。不用紧张，配置文件一般情况下可以通过配置工具和`ridlc`生成的Makefile搞定，若非高级配置，不需要手工设定。
-* 关于配置工具的详细介绍，请参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool)。
+* 关于配置工具的详细介绍，请参考这篇[文章](./tools#rpc-router-config-tool)。
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。
@@ -70,15 +70,15 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
 * `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
-* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`，`rpc-frmwrk`服务器设置，密钥的分发，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的[使用手册](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool)。
+* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`，`rpc-frmwrk`服务器设置，密钥的分发，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的[使用手册](./tools#rpc-router-config-tool)。
 
 ## Multihop功能和路由器路径
 当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
 ## 安全和认证
 
-* `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)，或者基于[WebSocket](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)的SSL连接。
-* `rpc-frmwrk`支持[Kerberos 5认证](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/security/README.md)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
+* `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](./rpc/sslport/Readme.md)，或者基于[WebSocket](./rpc/wsport/Readme.md)的SSL连接。
+* `rpc-frmwrk`支持[Kerberos 5认证](./rpc/security/README.md)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
 * `rpc-frmwrk`也支持OAuth2的认证，这一认证方式主要用于JS客户端的认证和授权。
 * `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。
 
@@ -94,7 +94,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 添加，删除流通道，发送和接收字节流。
 * 导出守护进程的运行状态，和参数和计数器统计。
 * 通过mount/umount优雅的关闭服务器或者客户端。
-* 关于`rpcfs`的内容和结构可以参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/blob/master/fuse/README.md)。
+* 关于`rpcfs`的内容和结构可以参考这篇[文章](./fuse/README.md)。
 * `rpc-frmwrk`将提供支持`rpcfs`编程的框架生成工具。
 
 ## I/O子系统
@@ -107,9 +107,10 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 `rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒2500 Requests. 
 
 ## 开发和调试
-* `rpc-frmwrk`通过`ridl`接口描述语言定义函数接口，和需要传输的数据结构。并通过`ridlc`生成各种语言的框架代码，配置文件，以及Makefile和Readme文件. 同一`ridl`文件生成的不同框架的客户端和服务器可以互操作。有关`ridl`语言的介绍请点击此[链接](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl)。
+* `rpc-frmwrk`通过`ridl`接口描述语言定义函数接口，和需要传输的数据结构。并通过`ridlc`生成各种语言的框架代码，配置文件，以及Makefile和Readme文件.
+* 同一`ridl`文件生成的不同框架的客户端和服务器可以互操作。有关`ridl`语言的介绍请点击此[链接](./ridl)。
 
-* `rpc-frmwrk`内建了一套基于C++的API，对于希望进一步了解`rpc-frmwrk`接口工作原理，或者觉得ridlc生成的代码太慢，想榨取更高的性能的同学，可以参考[`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)目录下的代码。欢迎改进和优化`rpc-frmwrk`的各种建议。
+* `rpc-frmwrk`内建了一套基于C++的API，对于希望进一步了解`rpc-frmwrk`接口工作原理，或者觉得ridlc生成的代码太慢，想榨取更高的性能的同学，可以参考[`test`](./test)目录下的代码。欢迎改进和优化`rpc-frmwrk`的各种建议。
   
 * `rpc-frmwrk`的调试版提供了一套基于GDB环境的调试函数可以快速的浏览所有内存对象，是查找各种内存泄漏和运行错误的有力工具。
 

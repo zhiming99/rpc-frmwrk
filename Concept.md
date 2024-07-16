@@ -1,4 +1,4 @@
-[中文](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept_cn.md)
+[中文](./Concept_cn.md)
 
 # RPC-frmwrk Concepts Overview
 
@@ -128,14 +128,14 @@ different node. And [here](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduc
 * The RPC-frmwrk provides `ridlc`, that is, `RPC IDL compiler`, to quickly
 generate the skelton project with a user defined `ridl` file. And the skelton 
 can serve as the start point for your distributed application development.
-For detailed information, please refer to [`ridl`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl)
+For detailed information, please refer to [`ridl`](./ridl)
 
 * The RPC-frmwrk also provides a set of API to facilitate the development
 with the powerful support from `C++11`. A typical distributed RPC
 application makes up of a proxy and a server. The proxy can be developed
 with some system provided macros in most cases. And your efforts can focus
 on the implementation of the features the server delivers. It is
-recommended to refer to the sample codes in the [`test`](https://github.com/zhiming99/rpc-frmwrk/tree/master/test)
+recommended to refer to the sample codes in the [`test`](./test)
 directory as the start-point of your RPC development.
 
 
