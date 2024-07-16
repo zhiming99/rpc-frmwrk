@@ -9,7 +9,12 @@
 
 ### 部署
 #### 服务器的部署
-服务器的部署和需要使用`rpcfg.py`
+服务器的部署
+1. 运行命令`python3 /usr/bin/rpcf/rpcfg.py`
+2. 配置WebSocket，如下图
+   * [OAuth2-1](../pics/OAuth2-1_cn.png)
+3. 选择认证方法
+4. 如果是web服务器和
 
 #### 如何生成和部署JS的skeleton代码
 我们以[hellowld.ridl](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/hellowld.ridl)为例. 假设目标网站的rpc-frmwrk服务的url为`https://example.com/rpcf`
