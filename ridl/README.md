@@ -1,4 +1,4 @@
-[中文](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README_cn.md)
+[中文](./README_cn.md)
 ### Introduction
 
 * The `ridl`, stands for `rpc idl`, as the RPC interface description language. And this module tries to deliver a rapid development tool for `rpc-frmwrk` by generating a set of skeleton source files for proxy/server , as well as the configuration files, and Makefile with the input `ridl` files. It is expected to generates the skeleton project for C++, Python Java and JavaScript.   
@@ -71,7 +71,7 @@ The 3 composite types are
 * **struct**: as `FILE_INFO` shows in the above example, is a package of informations of different data types. It is used as a build block for other data types or as the parameter to transfer between proxy and server.
 
 The data types are mapped to the concrete data types of each supported languages, as shown in the following.
-![image](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridldatatype.png).
+![image](../pics/ridldatatype.png).
 
 ### Statements
 

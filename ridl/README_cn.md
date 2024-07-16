@@ -1,4 +1,4 @@
-[English](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md)
+[English](./README.md)
 ### 简介
 
 * `ridl`就是`rpc idl`的意思, 即远程调用接口描述语言. `ridlc`意即`ridl`的编译器。 本模块的目的在于提供一个`rpc-frmwrk`的快速开发工具。该工具可以通过给定的`ridl`文件快速生成骨架客户端和服务器端应用的源文件, 当然也包括该应用的配置文件和Makefile. 目前`ridlc`支持生成C++, Python和Java应用的项目骨架.   
@@ -71,7 +71,7 @@ service SimpFileSvc [ stream ]
 * **struct**: `结构体`如上面代码中的 `FILE_INFO`所示, 是一组不同类型数据的集合，可以 通过字段名称进行访问的数据类型. 
 
 上述各数据类型在`ridlc`生成目标语言的`实现`时，会转化成目标语言对应的数据类型。下图是`ridl`的数据类型和各个语言的数据类型的对照表.   
-![image](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridldatatype.png).
+![image](../pics/ridldatatype.png).
 
 ### 语句
 
