@@ -8,10 +8,11 @@
 所有的JS例子程序的部署的链接均被设置为假想的`http://example.com/rpcf`。所以用户在开发时，务必使用`ridlc`的`--odesc_path`选项，将其替换成真实的网络地址。
 
 ### 部署
+下边简要介绍部署支持JS客户端的基本流程。
 #### 服务器的部署
 服务器的配置
-1. 运行命令`python3 /usr/bin/rpcf/rpcfg.py`
-2. 配置WebSocket，如下图
+1. 运行命令`python3 /usr/bin/rpcf/rpcfg.py`，打开配置工具界面。
+2. 配置WebSocket如下图，如果无OAuth2认证，去掉`auth`旁的勾选，并跳到第四步。
    * ![OAuth2-1](../pics/OAuth2-1_cn.png)
 3. 选择认证方法
    * ![OAuth2-2](../pics/OAuth2-2_cn.png) 
@@ -19,9 +20,10 @@
 
 #### 如何生成和部署JS的skeleton代码
 我们以[hellowld.ridl](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/hellowld.ridl)为例. 假设目标网站的rpc-frmwrk服务的url为`https://example.com/rpcf`
-1. 运行`ridlc -J --odesc_url=https://example.com/rpcf --auth -O . hellowld.ridl`，生成客户端网页和JS代码。
+1. 运行`ridlc -J --odesc_url=https://example.com/rpcf --auth -O . hellowld.ridl`，生成客户端网页和JS代码。如果无OAuth2，可以删除`--auth`选项。
 2. 在当前目录下运行`make`将用`webpack`打包生成的JS代码并存放在`./dist`目录下。
-3. 将`./dist`目录,`HelloWorld.html`和`HelloWorlddesc.json`拷贝到目标目录。比如`/var/www/html/rpcf`.
+3. 将`./dist`目录,`HelloWorld.html`和`HelloWorlddesc.json`拷贝到目标目录下。该目录应该已经在`nginx`或者`apache`的配置中设置好，例如`/var/www/html/rpcf`.
 4. 在浏览器中, 打开网页`https://example.com/rpcf/HelloWorld.html`。输出结果在浏览器调试窗口的控制台中。
+5. 有关OAuth2的更多信息请参考这篇[说明](../rpc/security/README.md#oauth2-support)
 
 

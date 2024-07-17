@@ -21,6 +21,7 @@ It is not required, if your client/server program just do some IPC, as known as 
 * -m _mount point_ : To export rpcrouter's runtime information via 'rpcfs' mounted at the directory 'mount point'. The files are exported in JSON format under 'user' directory,  including 'InConnections' and 'OutConnections' at present.
 
 * -d To run `rpcrouter` as a daemon
+* -g To enable logging to the log server.
 
 #### Examples
 *   On the server side, `rpcrouter -dr 2` for non-authentication `bridge`, and `rpcrouter -adfr 2` for `bridge` with both authentication and request flow-control.

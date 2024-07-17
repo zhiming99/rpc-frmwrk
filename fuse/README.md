@@ -14,20 +14,20 @@ This module enables `rpc-frmwrk` to operate via a set of files as known as the `
   * Dynamically loading pluggable `service points` under a single mountpoint.
 
 ### The Structures of Generated `rpcfs` Filesystems.
-![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-cli.png)   
+![this screenshot](../pics/rpcfs-cli.png)   
 The above picture shows the directory hierarchy of a client side `rpcfs`. The blue texts are directories, and the white texts are regular files.   
-![this screenshot](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/rpcfs-svr.png)   
+![this screenshot](../pics/rpcfs-svr.png)   
 The above picture shows the directory hierarchy of a server side `rpcfs`. Notice the differences from the client side `rpcfs`.   
 ### A Closer Look of the Business Code Interacting With `rpcfs`
 Let's use the above generated `rpcfs` to illustrate the control flow.   
 * The following graph shows a simple synchronous client side flow chart, as well as a simple asynchronous one.   
-![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async.png)   
+![sync-async call](../pics/sync-async.png)   
 * The following graph shows a simple synchronous server side flow chart, as well as a simple asynchronouse one.   
-![sync-async call](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/sync-async-svr.png)   
+![sync-async call](../pics/sync-async-svr.png)   
 
 ### RPC Request/Response/Event format
-* A formal request consists two parts, a network-order 32bit `string length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the [`ridl file`](https://github.com/zhiming99/rpc-frmwrk/blob/master/examples/hellowld.ridl). And for detail information about `ridl language`, please refer to this [article](https://github.com/zhiming99/rpc-frmwrk/blob/master/ridl/README.md)   
-![req/resp format](https://github.com/zhiming99/rpc-frmwrk/blob/master/pics/ridl-req-mapping.png)    
+* A formal request consists two parts, a network-order 32bit `string length` followed by a JSON string, without `\0`. The following picture shows the request/response and relationships with the [`ridl file`](../examples/hellowld.ridl). And for detail information about `ridl language`, please refer to this [article](../ridl/README.md)   
+![req/resp format](../pics/ridl-req-mapping.png)    
 
 ### Using Streams
 * Stream is a binary channel between the server and the proxy. Stream files are those files created under `streams` directory, as shown in the above picture. There is a pair of stream files sharing the same name the `steams` directory on the both end of the RPC connection. The proxy side stream file is always first created, and then the server side is created. The server side cannot create the stream file on its own.

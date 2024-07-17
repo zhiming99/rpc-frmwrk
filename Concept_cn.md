@@ -20,7 +20,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 ## 配置`rpc-frmwrk`
 * `rpc-frmwrk`的每一对Server/Proxy共享一个`对象描述文件`，该文件给出连接服务器的各种参数，认证的用户信息，或者运行时的参数。除了此文件，还有一个`driver.json`配置的文件。`driver.json`给出的是Server/Proxy运行时依赖的`I/O子系统`配置信息。不用紧张，配置文件一般情况下可以通过配置工具和`ridlc`生成的Makefile搞定，若非高级配置，不需要手工设定。
-* 关于配置工具的详细介绍，请参考这篇[文章](./tools#rpc-router-config-tool)。
+* 关于配置工具的详细介绍，请参考这篇[文章](./tools/README.md#rpc-router-config-tool)。
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。
@@ -70,7 +70,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
 * `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
-* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`，`rpc-frmwrk`服务器设置，密钥的分发，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的[使用手册](./tools#rpc-router-config-tool)。
+* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`，`rpc-frmwrk`服务器设置，密钥的分发，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的[使用手册](./tools/README.md#rpc-router-config-tool)。
 
 ## Multihop功能和路由器路径
 当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
