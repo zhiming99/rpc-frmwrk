@@ -22,7 +22,7 @@
 5. `对服务器的访问可以同时来自互联网, 不同进程，或者同一进程` 
 6. `通信双方上线/下线的检测和通知`
 7. `同一网络端口可以支持数目不限的多个服务端`
-8. [`带有全双工流控的流通道`](./Concept_cn.md#流(Streaming))
+8. [`带有全双工流控的流通道`](./Concept_cn.md#流Streaming)
 9. [`OpenSSL的支持`](./rpc/sslport/Readme.md)
 10. [`Websocket支持`](./rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
