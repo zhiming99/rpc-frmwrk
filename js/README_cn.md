@@ -35,7 +35,7 @@
 1. 如果目标主机就是开发机器可忽略2,3步。
 2. 在目标主机上运行安装包，安装`rpc-frmwrk`系统，并配置系统。
 3. 把HelloWorld的服务器代码拷贝到目标主机上。
-4. 启动`rpcrouter`, 和HelloWorld的服务器
+4. 启动`rpcrouter -dr 2`或`rpcrouter -adr 2`(启用OAuth2), 和HelloWorld的服务器
 5. 将上边提到的`./dist`目录,`HelloWorld.html`和`HelloWorlddesc.json`拷贝到WebServer预设的目录下。该目录应该已经在`nginx`或者`apache`的配置中设置好，例如`/var/www/html/rpcf`.
 6. 重启web服务器。
 7. 在浏览器中, 打开网页`https://example.com/rpcf/HelloWorld.html`。输出结果在浏览器调试窗口的控制台中。
