@@ -120,11 +120,11 @@ service SimpFileSvc [ stream ]
         --odesc_url=<url> :
             指定部署时`object description`文件的`url`。需要注意的是这个`url`不要包含文件名。这个选项是生成JS框架时的强制选项.
 
-	--auth: 生成框架将进行`OAuth2`的授权认证。这个选项仅用于JS框架。
+        --auth: 生成框架将使用`OAuth2`进行授权认证。该选项仅用于JS框架。
         
-        -f: 生成`rpcfs`的框架。该框架可以直接执行，并mount为服务器或客户端的文件系统，具体信息请参考`rpcfs`的说明
+        -f: 生成支持`rpcfs`的框架。该框架代码不需要额外编写代码，可以直接执行，并mount为服务器或客户端的文件系统，具体信息请参考`rpcfs`的说明
         
-        -P: 指定目标Java包的前缀. 目标Java包的名称形如<prefix>.<appname>, 该选项仅限Java.
+        -P: 指定目标Java包的前缀. 目标Java包的名称形如<prefix>.<appname>, 该选项仅用于Java.
         
         -l: 生成的框架将构建一个shared library. 该选项只适用CPP或者rpcfs.
         
@@ -134,7 +134,7 @@ service SimpFileSvc [ stream ]
         -b: 生成传统的C/S框架, 省却本地进程间通信，有低的延迟和较高的吞吐量。
 ```
 
-目前`ridlc`可以生成 C++, Python和Java的应用框架. 
+目前`ridlc`可以生成 C++, Python，Java和JavaScript的应用框架. 
 
 ### C++ 项目生成的文件
 
