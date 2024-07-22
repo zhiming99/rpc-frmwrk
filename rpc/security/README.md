@@ -149,6 +149,6 @@ The `rpc-frmwrk`'s support for OAuth2 must have an external component to make oa
 
 In fact, the browser JS tries to establish the rpc connection with a special code from the cookie to the `rpcrouter`, which will, in turn, consult the webapp to see if the code has a legal access code. And the communication between `rpcrouter` and the webapp implies the webapp must have an embeded `rpc-frmwrk` server to accept the query from `rpcrouter`, as defined by [oa2check.ridl](./oa2check/oa2check.ridl). 
 
-I have set up a docker image tags `zhiming99/django-oa2cli-cgi:latest` as the example `webapp` and `zhiming99/django-oa2cli-cgi:OAuth2-Server` as the example `OAuth2` provider for learning purpose. If you are interested, you can pull it and give a try.
+I have set up a docker image tags `zhiming99/django-oa2cli-cgi:latest` as the example `webapp` and `zhiming99/django-oa2cli-cgi:OAuth2-Server` as the example `OAuth2` provider for learning purpose. If you are interested, you can pull it and give a try. There are `/root/readme.txt` files in each image as you can follow to start the servers.
 
 
