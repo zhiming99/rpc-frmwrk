@@ -22,6 +22,9 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * `rpc-frmwrk`的每一对Server/Proxy共享一个`对象描述文件`，该文件给出连接服务器的各种参数，认证的用户信息，或者运行时的参数。除了此文件，还有一个`driver.json`配置的文件。`driver.json`给出的是Server/Proxy运行时依赖的`I/O子系统`配置信息。不用紧张，配置文件一般情况下可以通过配置工具和`ridlc`生成的Makefile搞定，若非高级配置，不需要手工设定。
 * 关于配置工具的详细介绍，请参考这篇[文章](./tools/README.md#rpc-router-config-tool)。
 
+## rpcrouter
+* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑的C/S模式下，以动态库的形式和用户代码运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接建立，传输协议的实现，认证授权，数据流的中继，流量控制，负载均衡，以及监测数据的记录和报告，等所有RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[readme](./rpc/router/README.md).
+
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。
 * 同步调用和我们平时调用函数一样，调用的线程会一直被阻断(Blocked)，直到服务器返回结果，或者系统返回错误。此时需要查看返回值，确定调用是否成功。错误包括超时，或者队列满，或者被取消，或者其他的从服务器端返回的错误。
