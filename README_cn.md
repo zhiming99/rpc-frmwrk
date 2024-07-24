@@ -37,17 +37,17 @@
 * 请参考[如何编译rpc-frmwrk](https://github.com/zhiming99/rpc-frmwrk/wiki/%E5%A6%82%E4%BD%95%E7%BC%96%E8%AF%91rpc%E2%80%90frmwrk)给出的详细的信息和步骤.   
 * 如果你的目标系统是Ubuntu或者Fedora, 你应该也会对安装[deb包或rpm包](https://github.com/zhiming99/rpc-frmwrk/releases/tag/0.7.0)感兴趣.
 
+## 开发
+通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的三种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
+1. `微服务模式`： `rpc-frmwrk`最早支持的的架构，用户通过运用`rpc-frmwrk`运行库提供的接口，和各种内建的工具类，执行同步，异步，超时，取消，以及`流`传输等功能，从而实现高性能的业务逻辑。`微服务模式`的可以动态的启停各个微服务，不需要中断其他的线上服务。
+2. `紧凑模式`：如果对性能要求较高，你也可以使用`ridlc`生成传统的C/S架构，服务器和客户端，是两个单独的程序，特点是延迟小，吞吐量大，扩展性灵活性稍弱。
+3. [`文件模式`](./fuse/README.md#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统(`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会通过文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全封装了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
+
 ## 安装，配置和运行
 1. 当你已经编译成功`rpc-frmwrk`，在源码的根目录下运行 `sudo make install`即可进行安装.
 2.  在运行之前，你需要配置`rpc-frwmrk`的守护进程。`rpcfg`是`rpc-frmwrk`的自带配置工具，它是配置`rpc-frmwrk`的强大工具，可以节省大量查找和学习时间，甚至包括一个简单的SSL密钥管理器。关于配置工具`rpcfg`，可以参考[使用说明](./tools/README.md).
 3. 以微服务模式为例，运行时首先启动服务器端的守护进程，如`rpcrouter -dr 2`和客户端的守护进程，如`rpcrouter -dr 1`.  有关守护进程的详细信息请参考这篇[文章](./rpc/router/README.md).
 4. 对于新用户，可以运行系统自带的`HelloWorld`来验证配置. 先在服务器端启动`helloworld`的服务器程序`hwsvrsmk`, 然后在客户端启动`hwclismk`.这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F)有更详细的介绍.
-
-## 开发
-通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的三种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
-1. `微服务模式`： `rpc-frmwrk`最早支持的的架构，用户通过运用`rpc-frmwrk`运行库提供的接口，和各种内建的工具类，执行同步，异步，超时，取消，以及`流`传输等功能，从而实现高性能的业务逻辑。`微服务模式`的可以动态的启停各个微服务，不需要中断其他的线上服务。
-2. `经典模式`：如果对性能要求较高，你也可以使用`ridlc`生成传统的C/S架构，服务器和客户端，是两个单独的程序，特点是延迟小，吞吐量大，扩展性灵活性稍弱。
-3. [`文件模式`](./fuse/README.md#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem): `ridlc`编译器可以生成一对文件系统(`rpcfs`)，分别部署在服务器端和客户端. 这时，所有的`RPC`传输都会通过文件操作来完成，包括文件的读写，文件的建立删除，文件的轮询，以及目录的建立和删除，完全封装了繁琐的`回调`，`超时`和`资源回收`等技术细节，开发的内容转化为文件的操作，真正的语言中立. 特别值得一提的是，守护进程也内建了对该文件系统的接口的支持，用于提供实时的运行信息以供管理和监控.
 
 ## 部署
 `rpc-frmwrk`的配置工具`rpcfg.py`可以自动生成目标机器的安装包。安装包可以安装`rpc-frwmwrk`的运行库及系统设置。设置内容包括`rpc-frmwrk`的运行参数设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用认证功能时，`Kerberos`的服务器设置. 详细信息请参考`rpcfg.py`的[使用说明](./tools/README.md). 

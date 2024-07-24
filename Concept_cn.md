@@ -3,6 +3,9 @@
 # rpc-frmwrk概念和技术介绍
 RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行库和接口API通过抽象，简化，自动化，和集成，封装了分布式应用程序传输层的接口，序列化，错误处理，传输，配置以及运行时监控等功能。接下来，面向基于`rpc-frmwrk`作开发的听众，介绍一些开发过程中会碰到的概念和设计思想。
 
+## 设计思想
+`rpc-frmwrk`设计上，首先是一个I/O系统。通过构建一个`CRpcServices`-`CTaskGroup`-`CPort`为核心的一组对象，先行实现I/O操作的的各种基本特性，如启停操作，超时管理，取消操作，任务间同步和协调，状态管理，异步调用，和生命周期管理等。然后反复使用这一设计模式，叠代出各种所需的功能。所以`rpc-frmwrk`类似谢尔宾斯基三角形一样，可以不断累进。
+
 ## RPC参与方和传输的信息
 服务器`Server`和代理`Proxy`是RPC通信中的必要的参与方。通信的一般的流程是，Proxy发出请求，叫做`Request`，Server响应请求，提供调用服务，发回结果`Response`，最后Proxy消费`Response`。Server有的时候也会主动的发出信息，叫做`Event`。Proxy发出的调用请求一般来说有明确的目的地，而且一般会有Server发出的`Response`作为响应。而Server主动发出的Event则是广播性质的，只要是订阅该事件的Proxy都会收到。不过`Event`也有特例，如`Keep-Alive`的消息是一对一的，不会广播发布。
 
@@ -23,15 +26,19 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 关于配置工具的详细介绍，请参考这篇[文章](./tools/README.md#rpc-router-config-tool)。
 
 ## rpcrouter
-* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑的C/S模式下，以动态库的形式和用户代码运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接建立，传输协议的实现，认证授权，数据流的中继，流量控制，负载均衡，以及监测数据的记录和报告，等所有RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[readme](./rpc/router/README.md).
+* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接建立，传输协议的实现，认证授权，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md).
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。
-* 同步调用和我们平时调用函数一样，调用的线程会一直被阻断(Blocked)，直到服务器返回结果，或者系统返回错误。此时需要查看返回值，确定调用是否成功。错误包括超时，或者队列满，或者被取消，或者其他的从服务器端返回的错误。
+* 同步调用和我们平时调用函数一样，调用的线程会一直被阻塞(Blocked)，直到服务器返回结果，或者系统返回错误。此时需要查看返回值，确定调用是否成功。错误包括超时，或者队列满，或者被取消，或者其他的从服务器端返回的错误。
 
 * 异步调用当请求被发出后，调用的线程会立刻返回，不等待服务器返回结果。此时调用者需要查看返回值，确定调用的状态是正在执行(STATUS_PENDING)，或者出错。如果是正在执行中，服务器的`Response`或者系统的错误，都会从回调函数中返回。异步调用在服务器端是有流量控制的，过多的未完成的异步调用会导致新的`Request`被拒绝(ERROR_QUEUE_FULL)，直到服务端有空闲的资源时，才能恢复。
 
 * `rpc-frmwrk`在用户接口层提供基于回调函数的异步调用。如果一个rpc请求在`ridl`文件中被定义成异步的请求，`ridlc`可以自动生成必要的回调函数，简化开发过程，节省工作量。
+
+## 事件和单程请求
+* 事件是从服务器发送到客户端的消息，可以有广播型事件和单播型事件。事件没有同步和异步的概念，因为它不需要客户端返回响应消息。
+* 单程请求(no-reply)是从客户端到服务器的请求，和普通请求的不同之处在于，它不需要服务器返回响应消息。客户端发送完请求消息，就立刻返回。如果客户端十分繁忙，有可能该请求会被放入等待队列，此时客户端的调用也有可能会被阻塞上一会，直到该请求被发出，或者出错。单程请求用于客户端不关心该请求是否能够被成功执行的应用场景。
 
 ## 任务(Tasklet)和任务组(TaskGroup)
 * 任务(tasklet)源自于Linux kernel中的tasklet_struct，起初用于封装函数和函数的参数，随着开发的不断深入，任务(tasklet)也不断的添加新的功能，早已超过了tasklet的原始范畴，逐渐变成遍布`rpc-frmwrk`一个building-block。实际上，上面提到的回调函数就是由内部tasklet封装和调用的。`rpc-frmwrk`的任务(tasklet)主要包括以下的功能：
@@ -54,8 +61,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 `rpc-frmwrk`的服务器对象是一个继承自CInterfaceServer的对象，同时这个对象在DBus上进行了注册。由于DBus是`rpc-frmwrk`IPC通信的一个重要途径, 因此服务器对象的寻址中包含了`DBus`的地址信息。RPC通信地址则是在IPC地址的基础上，增加了网络地址信息。所以一个RPC服务对象的地址是一个五元组，{IP地址，TCP端口，路由器路径，对象路径，接口名称}。其中`路由器路径`请参考下面有关`multihop`的说明. `对象路径`和`接口名称`是DBus相关的信息。以上这几个参数都保存在对象描述文件中， `ridlc`根据接口定义文件（`ridl`文件）在编译的过程中自动设置。如果服务器和代理都在本地，那么进程间调用就只需对象路径和接口名称了。
 
 ## 流Streaming
-
-`rpc-frmwrk`有相当的代码用来在服务器和客户端建立流通道。流的意义在于可以传输远超过`Request`和`Response`可以接受的上限的数据。流有如下的特点：
+`rpc-frmwrk`可以在服务器和客户端建立字节流通道。流的意义在于可以传输远超过`Request`和`Response`（1MB左右)可以接受的上限的数据。流有如下的特点：
 * 流通道是全双工的
 * 单个流通道可以传输2^64个字节。
 * 流通道保证数据的收发是严格顺序的，先进先出的。
@@ -66,24 +72,23 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 在`文件模式`编程时，每一个流通道将体现为分别在服务器端和客户端的一对特殊的可读写文件，数据的收发体现为对文件的读写操作。用户可以通过在客户端建立一个stream文件而建立一个流通道，方式任意，如shell命令`touch stream_1`。单一连接的流通道个数缺省为32个。不过在大量连接的情况下可以进一步限制。
 
 ## `FastRpc`和`BuiltinRt App`
-* `FastRpc`是通过`Streaming Channel`传输RPC的请求，响应和事件的机制。对应的`ridlc`的选项是`-s`.这个架构的优势是，消息短小，延迟小，吞吐量大，不受DBus的瓶颈限制，而且有session级别的QPS流控。劣势是开销较大，需要三倍于普通RPC的可打开文件，并且建立连接的时间长于传统的RPC.   
-* `BiuiltinRt App`是由`ridlc`生成的客户端和服务器端程序不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行代码。优点就是可以直接运行，而且延迟小响应快。并且客户端的程序可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
-* 当指定`-bs`时，`ridlc`将生成`builtin-app`并使用`FastRpc`传输RPC消息。`ridlc`生成的`C++`, `Java`, `Python`代码框架都支持这两个选项。`JS`由于架构的完全不同，所以不支持`-b`的选项， 不过`JS`支持`-s`,以方便连接由`-s`生成的服务器程序。
+* `FastRpc`是通过`Streaming Channel`传输RPC的请求，响应和事件的机制。对应的`ridlc`的选项是`-s`.这个架构的优势是，消息短小，延迟小，吞吐量大，不受DBus的瓶颈限制，而且有session级别的QPS流控。劣势是占用的系统资源较大，需要三倍于普通RPC的可打开文件，并且建立连接的时间长于一般的RPC.   
+* `BiuiltinRt App`是由`ridlc`生成的紧凑模式的客户端和服务器端程序，因此不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行库。优点就是可以直接运行，而且延迟小响应快。客户端的程序还可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
+* 当指定`-bs`时，`ridlc`将生成`builtin-app`并使用`FastRpc`传输RPC消息。`ridlc`生成的`C++`, `Java`, `Python`代码框架都支持这两个选项。`JS`由于架构的完全不同，所以不支持`-b`的选项， 不过`JS`支持`-s`选项，方便连接由`-s`生成的服务器程序。
 
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
 * `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
-* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产或者嵌入式等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`，`rpc-frmwrk`服务器设置，密钥的分发，WebServer的设置和独立Kerberos的服务器的设置。详情参考`rpcfg.py`的[使用手册](./tools/README.md#rpc-router-config-tool)。
+* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产系统或者嵌入式系统等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`的运行库，用包中文件配置`rpc-frmwrk`服务器，部署密钥，配置Web服务器和Kerberos服务器。详情参考`rpcfg.py`的[使用手册](./tools/README.md#rpc-router-config-tool)。
 
-## Multihop功能和路由器路径
-当`rpc-frmwrk`以树形的级联方式部署时，可以让客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点。这时对某个节点的访问，就需要`路由器路径`来标识目的地。Multihop的配置可以使用图形配置工具完成。有关Multihop的更多信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
+## rpcrouter级联功能和路由器路径
+当`rpc-frmwrk`的级联(multihop)功能提供了透明访问不同节点上的服务的功能。当rpcrouter以树形级联(multihop)方式部署时，可以使客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点，而不用重复建立连接。这时对某个节点的访问，就需要`路由器路径`来标识目的地。级联(Multihop)的配置可以使用`rpcfg.py`配置工具完成。有关级联功能的更多技术信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
 ## 安全和认证
-
 * `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](./rpc/sslport/Readme.md)，或者基于[WebSocket](./rpc/wsport/Readme.md)的SSL连接。
 * `rpc-frmwrk`支持[Kerberos 5认证](./rpc/security/README.md)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
-* `rpc-frmwrk`也支持OAuth2的认证，这一认证方式主要用于[JS客户端](./js/README_cn.md)的认证和授权。
-* `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。
+* `rpc-frmwrk`也支持OAuth2的认证，这一认证方式主要用于[JS客户端](./js/README_cn.md)的授权。
+* `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。用户代码无需进行修改。
 
 ## 负载均衡
 `rpc-frmwrk`在Multihop的基础上支持Round-Robin负载均衡。由于`rpc-frmwrk`的对话（Session)是有状态的长链接，负载均衡是以在连接建立时进行的，一旦连接建立起来，就不再进行负载均衡，也就不存在逐个Request负载均衡。这是和RESTful架构的RPC不同之处。关于负载均衡的详细介绍可以参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance)。
