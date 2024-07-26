@@ -4,7 +4,7 @@
 RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行库和接口API通过抽象，简化，自动化，和集成，封装了分布式应用程序传输层的接口，序列化，错误处理，传输，配置以及运行时监控等功能。接下来，面向基于`rpc-frmwrk`作开发的听众，介绍一些开发过程中会碰到的概念和设计思想。
 
 ## 设计思想
-`rpc-frmwrk`设计上，首先是一个I/O系统。通过构建一个`CRpcServices`-`CTaskGroup`-`CPort`为核心的一组对象，先行实现I/O操作的的各种基本特性，如启停操作，超时管理，取消操作，任务间同步和协调，状态管理，异步调用，和生命周期管理等。然后反复使用这一设计模式，叠代出各种所需的功能。所以`rpc-frmwrk`理想进化模式将是类似谢尔宾斯基三角形一样的分形图案，可以不断累进。
+`rpc-frmwrk`设计上，首先是一个I/O系统。通过构建以`CRpcServices`-`CTaskGroup`-`CPort`为核心的一组对象，先行实现了I/O操作的的各种基本特性，如启停操作，超时管理，取消操作，任务间同步和协调，状态管理，异步调用，和生命周期管理等。然后反复使用这一设计模式，叠代出各种所需的功能。所以`rpc-frmwrk`理想进化模式可以向分形图案一样，不断演化进步。
 
 ## RPC参与方和传输的信息
 服务器`Server`和代理`Proxy`是RPC通信中的必要的参与方。通信的一般的流程是，Proxy发出请求，叫做`Request`，Server响应请求，提供调用服务，发回结果`Response`，最后Proxy消费`Response`。Server有的时候也会主动的发出信息，叫做`Event`。Proxy发出的调用请求一般来说有明确的目的地，而且一般会有Server发出的`Response`作为响应。而Server主动发出的Event则是广播性质的，只要是订阅该事件的Proxy都会收到。不过`Event`也有特例，如`Keep-Alive`的消息是一对一的，不会广播发布。
@@ -26,7 +26,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 关于配置工具的详细介绍，请参考这篇[文章](./tools/README.md#rpc-router-config-tool)。
 
 ## rpcrouter
-* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接建立，传输协议的实现，认证授权，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md).
+* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接的建立的管理，传输协议的实现，认证授权流程，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md).
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。
