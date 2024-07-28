@@ -4,7 +4,7 @@
 RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行库和接口API通过抽象，简化，自动化，和集成，封装了分布式应用程序传输层的接口，序列化，错误处理，传输，配置以及运行时监控等功能。接下来，面向基于`rpc-frmwrk`作开发的听众，介绍一些开发过程中会碰到的概念和设计思想。
 
 ## 设计思想
-`rpc-frmwrk`设计上，首先是一个I/O系统。通过构建以`CRpcServices`-`CTaskGroup`-`CPort`为核心的一组对象，先行实现了I/O操作的的各种基本特性，如启停操作，超时管理，取消操作，任务间同步和协调，状态管理，异步调用，和生命周期管理等。然后反复使用这一设计模式，叠代出各种所需的功能。所以`rpc-frmwrk`理想进化模式可以向分形图案一样，不断演化进步。
+`rpc-frmwrk`设计上，首先是一个I/O系统。通过构建以`CRpcServices`-`CTaskGroup`-`CPort`为核心的一组对象，先行实现了I/O操作的的各种基本特性，如启停操作，超时管理，取消操作，任务间同步和协调，状态管理，异步调用，和生命周期管理等。然后反复使用这一模式，迭代出各种所需的功能。所以`rpc-frmwrk`理想进化模式可以向分形图案一样，不断演化进步。
 
 ## RPC参与方和传输的信息
 服务器`Server`和代理`Proxy`是RPC通信中的必要的参与方。通信的一般的流程是，Proxy发出请求，叫做`Request`，Server响应请求，提供调用服务，发回结果`Response`，最后Proxy消费`Response`。Server有的时候也会主动的发出信息，叫做`Event`。Proxy发出的调用请求一般来说有明确的目的地，而且一般会有Server发出的`Response`作为响应。而Server主动发出的Event则是广播性质的，只要是订阅该事件的Proxy都会收到。不过`Event`也有特例，如`Keep-Alive`的消息是一对一的，不会广播发布。
@@ -79,7 +79,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
 * `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
-* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产系统或者嵌入式系统等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`的运行库，用包中文件配置`rpc-frmwrk`服务器，部署密钥，配置Web服务器和Kerberos服务器。详情参考`rpcfg.py`的[使用手册](./tools/README.md#rpc-router-config-tool)。
+* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产系统或者嵌入式系统等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`的运行库，用包中文件配置`rpc-frmwrk`服务器，部署密钥，配置Web服务器和Kerberos服务器。详情参考`rpcfg.py`的[使用手册](./tools/README.md#rpc-router-config-tool)。有关安装包的命名可以参考这篇[文章](./rpc/gmsslport/README_cn.md)。
 
 ## rpcrouter级联功能和路由器路径
 当`rpc-frmwrk`的级联(multihop)功能提供了透明访问不同节点上的服务的功能。当rpcrouter以树形级联(multihop)方式部署时，可以使客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点，而不用重复建立连接。这时对某个节点的访问，就需要`路由器路径`来标识目的地。级联(Multihop)的配置可以使用`rpcfg.py`配置工具完成。有关级联功能的更多技术信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
