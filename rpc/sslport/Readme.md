@@ -1,6 +1,6 @@
 . **The SSLPort** has implemented a filter port, as can be inserted to the port stack with the upper port to be `Native Protocol Fdo port`, `web socket Fido` or `secfido` and the bottom to be `Tcp Stream Pdo port`. It performs the `SSL handshake`, encrypts the outbound packets, decrypts the inbound packets and performs`SSL shutdown`, and the `SSL renegotiation` occationally through the SSL connection's lifecycle.   
 
-. The `SSLPort` requires OpenSSL-1.1 to work properly. It prefers to choose TLS1.2 or TLS1.3 as the communication protocol, depending on peer's capability.
+. The `SSLPort` requires OpenSSL-1.1 or higer version to work properly. It is recommended to choose TLS1.2 or TLS1.3 as the communication protocol, depending on peer's capability.
 
 . There are two approaches to deploy the keys and certificates as necessary to estabilish a SSL connection.
 
