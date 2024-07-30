@@ -1,4 +1,7 @@
 ---
+[`Mon Jul 29 2024 11:49:02 PM Beijing`]   
+1. still trying to get springboot oauth2 to work. It is much more difficult to get springboot oauth2 to work than that of django oauth2. 
+   
 [`Sun Jul 14 2024 09:05:35 PM Beijing`]   
 1. Fixed the endless wait issue in fuse test, which was a long pain in the neck.
 2. Next I will add a `springboot` cgi with OAuth2 support. And polish both springboot and django docker images for OAuth2.
