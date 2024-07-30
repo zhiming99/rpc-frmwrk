@@ -249,6 +249,9 @@ gint32 CStreamServerRelay::OnFetchDataComplete(
 
         if( ERROR( iRet ) )
         {
+            LOGERR( this->GetIoMgr(), iRet, 
+                "up stream server failed to "
+                "create the stream channel" );
             ret = iRet;
             break;
         }

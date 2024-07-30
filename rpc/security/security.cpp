@@ -765,7 +765,9 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
 
     if( ERROR( ret ) )
     {
-        DEFER_CALL_DELAY( GetIoMgr(), 1, 
+        auto pMgr = GetIoMgr();
+        LOGERR( pMgr, ret, "Login failed" );
+        DEFER_CALL_DELAY( pMgr, 1, 
             ObjPtr( this ),
             &CRpcTcpBridgeAuth::OnLoginFailed,
             nullptr, ret );
