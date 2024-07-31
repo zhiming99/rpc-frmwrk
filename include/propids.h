@@ -281,6 +281,7 @@ enum EnumPropId : gint32
     propTag,            // type: a guint32 value as the tag of the loop from a tagged loopool
     propNoDBusConn,     // type: a boolean value to indicate not to use dbus connection, usually for builtin-rt client.
     propEnableLogging,  // type: a boolean value whether to enable logger or not on the server side
+    propEmail,          // type: a string value containing a email address
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
