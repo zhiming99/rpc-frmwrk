@@ -686,15 +686,35 @@ gint32 CFuseSessionFile::UpdateContent()
 
             Json::Value oVal( Json::objectValue );
             CCfgOpener oCfg( ( IConfigDb* )pCfg );
-            oCfg.GetStrProp( propUserName, strVal );
-            oVal[ "UserName" ] = strVal;
-            oCfg.GetStrProp( propServiceName, strVal );
-            oVal[ "ServiceName" ] = strVal;
-            oCfg.GetIntProp( propTimeoutSec, dwVal );
-            oVal[ "ExpireInSec" ] = dwVal;
-            oVal[ "Mech" ] = "krb5";
+            ret = oCfg.GetStrProp(
+                propUserName, strVal );
+            if( SUCCEEDED( ret ) )
+                oVal[ "UserName" ] = strVal;
+
+            ret = oCfg.GetStrProp(
+                propServiceName, strVal );
+            if( SUCCEEDED( ret ) )
+                oVal[ "ServiceName" ] = strVal;
+
+            ret = oCfg.GetStrProp(
+                propEmail, strVal );
+            if( SUCCEEDED( ret ) )
+                oVal[ "Email" ] = strVal;
+
+            ret = oCfg.GetIntProp(
+                propTimeoutSec, dwVal );
+            if( SUCCEEDED( ret ) )
+                oVal[ "ExpireInSec" ] = dwVal;
+
+            ret = oCfg.GetStrProp(
+                propAuthMech, strVal );
+            if( ERROR( ret ) )
+                strVal = "krb5";
+            oVal[ "Mech" ] = strVal;
+
             oBridge[ "AuthInfo" ] = oVal;
             oArray.append( oBridge );
+            ret = 0;
         }
         oVal[ "Sessions" ] = oArray;
         m_strContent = Json::writeString(

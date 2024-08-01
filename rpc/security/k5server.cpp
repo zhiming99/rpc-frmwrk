@@ -1060,6 +1060,9 @@ gint32 CK5AuthServer::InquireSess(
         oCfg.SetIntProp(
             propTimeoutSec, lifetime );
 
+        oCfg.SetStrProp(
+            propAuthMech, "krb5" );
+
     }while( 0 );
 
     if( ret == -ENOENT )

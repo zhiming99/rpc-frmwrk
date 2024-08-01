@@ -184,8 +184,47 @@ gint32 COA2proxy_CliImpl::IsSessExpired(
 gint32 COA2proxy_CliImpl::InquireSess(
     const std::string& strSess,
     CfgPtr& pInfo )
-{ return ERROR_NOT_IMPL; }
+{
+    if( pInfo.IsEmpty() || strSess.empty() )
+        return -EINVAL;
 
+    CCfgOpener oInfo( ( IConfigDb* )pInfo );
+    CStdRMutex oGssLock( this->GetLock() );
+    auto itr = 
+        m_mapSess2PortId.find( strSess );
+    if( itr == m_mapSess2PortId.end() )
+        return -ENOENT;
+
+    guint32 dwPortId = itr->second;
+    auto it2 = m_mapSessions.find( dwPortId );
+    if( it2 == m_mapSessions.end() )
+        return ERROR_FAIL;
+    
+    USER_INFO* pui = it2->second;
+    if( pui == nullptr )
+        return ERROR_FAIL;
+
+    timespec tv;
+    clock_gettime( CLOCK_REALTIME, &tv );
+
+    guint32 dwTimeoutSec = 
+        pui->tsExpireTime.tv_sec - tv.tv_sec;
+
+    oInfo.SetIntProp(
+        propTimeoutSec, dwTimeoutSec );
+    oInfo.SetStrProp(
+        propUserName, pui->strUserId );
+    if( pui->strEmail.size() )
+    {
+        oInfo.SetStrProp(
+            propEmail, pui->strEmail );
+    }
+    oInfo.SetStrProp(
+        propAuthMech, "OAuth2" );
+
+    return ERROR_FALSE;
+
+}
 
 gint32 COA2proxy_CliImpl::GenSessHash(
     stdstr strToken,
