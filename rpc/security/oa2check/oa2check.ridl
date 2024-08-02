@@ -9,9 +9,9 @@ struct TIMESTAMP
 // asynchronous processing with the RPC-Frmwrk support
 struct USER_INFO
 {
-    string strUserId;
-    string strUserName;
-    string strEmail;
+    string strUserId = "";
+    string strUserName = "";
+    string strEmail = "";
     TIMESTAMP tsExpireTime;
 };
 
