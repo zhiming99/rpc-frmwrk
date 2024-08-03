@@ -41,8 +41,11 @@ public class JavaSerialImpl extends JavaSerialBase
         if( m_oInst == null )
             return -RC.EFAULT;
 
+        SwigClass o =
+            ( SwigClass )m_oInst.getInst();
+
         JRetVal jret =
-            ( JRetVal )m_oInst.GetIdHash( val );
+            ( JRetVal )o.GetIdHash( val );
         if( jret.ERROR() ) 
             return jret.getError();
 
@@ -63,8 +66,10 @@ public class JavaSerialImpl extends JavaSerialBase
             throw new NullPointerException(
                 "channel hash is empty");
 
-        long ret = m_oInst.GetChanByIdHash(
-            qwHash );
+        SwigClass o =
+            ( SwigClass )m_oInst.getInst();
+
+        long ret = o.GetChanByIdHash( qwHash );
 
         if( ret == RC.INVALID_HANDLE )
             throw new NullPointerException(

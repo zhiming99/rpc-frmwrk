@@ -1909,44 +1909,46 @@ gint32 GenSerialHelper(
     stdstr strCmd;
     const char* args[10];
     args[ 0 ] = "/usr/bin/cpp";
-    stdstr strArg5, strArg8;
+    stdstr strArg5, strArg9;
     strArg5 = "-DXXXXX=";
     strArg5 += g_strPrefix + g_strAppName;
 
-    strArg8 = strOutPath;
+    strArg9 = strOutPath;
     char* env[ 1 ] = { nullptr };
     if( bProxy )
-        strArg8 += "/JavaSerialHelperP.java";
+        strArg9 += "/JavaSerialHelperP.java";
     else
-        strArg8 += "/JavaSerialHelperS.java";
+        strArg9 += "/JavaSerialHelperS.java";
 
     if( bProxy )
     {
          args[1] = "-P";
          args[2] = "-DJavaSerialImpl=JavaSerialHelperP";
          args[3] = "-DGetIdHash=GetPeerIdHash";
-         args[4] = "-DInstType=CJavaProxy" ;
-         args[5] = strArg5.c_str();
-         args[6] = strInput.c_str();
-         args[7] = "-o";
-         args[8] = strArg8.c_str();
+         args[4] = "-DInstType=JavaRpcServiceP" ;
+         args[5] = "-DSwigClass=CJavaProxy" ;
+         args[6] = strArg5.c_str();
+         args[7] = strInput.c_str();
+         args[8] = "-o";
+         args[9] = strArg9.c_str();
     }
     else
     {
          args[1] = "-P";
          args[2] = "-DJavaSerialImpl=JavaSerialHelperS";
          args[3] = "-DGetIdHash=GetIdHashByChan";
-         args[4] = "-DInstType=CJavaServer" ;
-         args[5] = strArg5.c_str();
-         args[6] = strInput.c_str();
-         args[7] = "-o";
-         args[8] = strArg8.c_str();
+         args[4] = "-DInstType=JavaRpcServiceS" ;
+         args[5] = "-DSwigClass=CJavaServer" ;
+         args[6] = strArg5.c_str();
+         args[7] = strInput.c_str();
+         args[8] = "-o";
+         args[9] = strArg9.c_str();
     }
 
-    const char* const args2[ 10 ] = {
+    const char* const args2[ 11 ] = {
         args[0], args[1], args[2], args[3],
         args[4], args[5], args[6], 
-        args[7], args[8], nullptr
+        args[7], args[8], args[9], nullptr
         };
 
     return Execve( "/usr/bin/cpp",
@@ -2715,7 +2717,7 @@ gint32 CImplJavaMethodSvrBase::ImplSvcComplete()
             BLOCK_CLOSE;
             NEW_LINE;
             Wa( "JavaSerialHelperS _osh =" );
-            Wa( "    new JavaSerialHelperS( oHost.getInst() );" );
+            Wa( "    new JavaSerialHelperS( oHost );" );
 
             Wa( "_pBuf = new BufPtr( true );" );
             Wa( "ret = _pBuf.Resize( 1024 );" );
@@ -2800,7 +2802,7 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
         else
         {
             Wa( "JavaSerialHelperS _osh =" );
-            Wa( "    new JavaSerialHelperS( oHost.getInst() );" );
+            Wa( "    new JavaSerialHelperS( oHost );" );
             Wa( "if( oParams.length != 1 )" );
             Wa( "{ ret = -RC.EINVAL; break; }" );
             Wa( "byte[] _buf = ( byte[] )oParams[ 0 ];" );
@@ -2960,7 +2962,7 @@ gint32 CImplJavaMethodSvrBase::OutputEvent()
             BLOCK_OPEN;
 
             Wa( "JavaSerialHelperS _osh =" );
-            Wa( "    new JavaSerialHelperS( getInst() );" );
+            Wa( "    new JavaSerialHelperS( this );" );
             Wa( "BufPtr _pBuf = new BufPtr( true );" );
             Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
@@ -3022,6 +3024,10 @@ int CImplJavaSvcsvrbase::Output()
         NEW_LINE;
         Wa( "    String strDesc, String strSvrObj )" );
         Wa( "{ super( pIoMgr, strDesc, strSvrObj ); }" );
+        NEW_LINE;
+
+        Wa( "public JavaSerialBase getSerialBase()" );
+        Wa( "{ return new JavaSerialHelperS( this ); }" );
         NEW_LINE;
 
         std::vector< ObjPtr > vecAllMethods;
@@ -3387,7 +3393,7 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
         if( iInCount > 0 )
         {
             Wa( "JavaSerialHelperP _osh =" );
-            Wa( "    new JavaSerialHelperP( getInst() );" );
+            Wa( "    new JavaSerialHelperP( this );" );
             Wa( "BufPtr _pBuf = new BufPtr( true );" );
             Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
@@ -3694,7 +3700,7 @@ gint32 CImplJavaMethodCliBase::OutputEvent()
         else
         {
             Wa( "JavaSerialHelperP _osh =" );
-            Wa( "    new JavaSerialHelperP( oHost.getInst() );" );
+            Wa( "    new JavaSerialHelperP( oHost );" );
             Wa( "byte[] _buf = ( byte[] )oParams[ 0 ];" );
             ret = os.EmitByteBufferForDeserial(
                 "_buf" );
@@ -3875,6 +3881,10 @@ int CImplJavaSvcclibase::Output()
         NEW_LINE;
         Wa( "    String strDesc, String strSvrObj )" );
         Wa( "{ super( pIoMgr, strDesc, strSvrObj ); }" );
+        NEW_LINE;
+
+        Wa( "public JavaSerialBase getSerialBase()" );
+        Wa( "{ return new JavaSerialHelperP( this ); }" );
         NEW_LINE;
 
         std::vector< ObjPtr > vecAllMethods;
