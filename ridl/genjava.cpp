@@ -1429,7 +1429,51 @@ gint32 CJavaSnippet::EmitGetDescPath(
     Wa( "oFile = new File( strDescPath );" );
     Wa( "if( oFile.isFile() )" );
     Wa( "    return strDescPath;" );
-    CCOUT << "return \"\";";
+    Wa( "strDescPath = CopyResource( strName );" );
+    CCOUT << "return strDescPath;";
+    BLOCK_CLOSE;
+    NEW_LINE;
+    
+    Wa( "// copy resource from a jar to the working directory" );
+    Wa( "public static String CopyResource( String strName )" );
+    BLOCK_OPEN; 
+    Wa( "boolean bFound = false;" );
+    Wa( "String strDestPath =" );
+    Wa( "    System.getProperty( \"user.dir\" );");
+    Wa( "InputStream stream = null;" );
+    CCOUT << "String strSrcPath = \"/static/\" + strName;";
+    NEW_LINE;
+    Wa( "boolean bSync = false;" );
+    Wa( "if( strName == \"driver.json\" ||" );
+    Wa( "    strName == \"driver-cli.json\" )" );
+    Wa( "    bSync = true;" );
+    CCOUT << "try";
+    BLOCK_OPEN;
+    Wa( "stream = mainsvr.class.getResourceAsStream( strSrcPath );" );
+    Wa( "Path dstPath = Paths.get( strDestPath + \"/\" + strName );" );
+    CCOUT << "Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );";
+    NEW_LINE;
+    CCOUT << "bFound = true;";
+    NEW_LINE;
+    Wa( "if( bSync )" );
+    BLOCK_OPEN;
+    CCOUT << "String strSync = \"" << strPrefix << "synccfg.py\";";
+    NEW_LINE;
+    Wa( "stream = mainsvr.class.getResourceAsStream( strSync );" );
+    Wa( "dstPath = Paths.get( strDestPath + \"/synccfg.py\" );" );
+    Wa( "Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );" );
+    Wa( "String[] commands = { \"python3\", \"./synccfg.py\" };" );
+    CCOUT << "Process p = Runtime.getRuntime().exec(commands);";
+    BLOCK_CLOSE;
+    BLOCK_CLOSE;
+    CCOUT << "catch ( Exception e )";
+    BLOCK_OPEN;
+    CCOUT << "bFound = false;";
+    BLOCK_CLOSE;
+    NEW_LINE;
+    Wa( "if( !bFound )" );
+    Wa( "    return \"\";" );
+    CCOUT << "return strDestPath + \"/\" + strName;";
     BLOCK_CLOSE;
     NEW_LINE;
 
@@ -4290,6 +4334,33 @@ gint32 CJavaExportMakefile::Output()
 
     //printf( "%s\n", strCmdLine.c_str() );
     system( strCmdLine.c_str() );
+
+    auto pstm = STMPTR( new std::ofstream(
+        strFile,
+        std::ofstream::out |
+        std::ofstream::app) );
+
+    stdstr strBuildPath;
+    strBuildPath += g_strPrefix + g_strAppName;
+    std::replace( strBuildPath.begin(),
+        strBuildPath.end(), '.', '/' );
+    // strBuildPath.insert( strBuildPath.begin(), '.' );
+
+    auto pbak = m_pWriter->m_curFp;
+    m_pWriter->m_curFp = pstm.get();
+    NEW_LINE;
+    Wa( "jar :" );
+    Wa( "\tjavac *.java -d ./build" );
+    CCOUT << "\tcp *.py Makefile ./build/" << strBuildPath;
+    NEW_LINE;
+    Wa( "\tmkdir build/static || true" );
+    CCOUT << "\tcp *.json ./build/static";
+    NEW_LINE;
+    CCOUT << "\tcd build && find . -type f | xargs jar cf " << g_strAppName << ".jar";
+    NEW_LINE;
+
+    m_pWriter->m_curFp = pbak;
+
     return ret;
 }
 
@@ -4711,6 +4782,14 @@ gint32 CImplJavaMainCli::Output()
         Wa( "import java.io.InputStreamReader;" );
 #endif
     }
+    Wa( "import java.io.File;" );
+    Wa( "import java.io.InputStream;" );
+    Wa( "import java.nio.file.Files;" );
+    Wa( "import java.nio.file.Paths;" );
+    Wa( "import java.nio.file.Path;" );
+    Wa( "import java.nio.file.StandardCopyOption;" );
+    Wa( "import java.lang.Process;" );
+    Wa( "import java.lang.Runtime;" );
 
     gint32 ret = 0;
     do{
@@ -4916,6 +4995,16 @@ gint32 CImplJavaMainSvr::Output()
     {
         Wa( "import org.apache.commons.cli.*;" );
     }
+
+    Wa( "import java.io.File;" );
+    Wa( "import java.io.InputStream;" );
+    Wa( "import java.nio.file.Files;" );
+    Wa( "import java.nio.file.Paths;" );
+    Wa( "import java.nio.file.Path;" );
+    Wa( "import java.nio.file.StandardCopyOption;" );
+    Wa( "import java.lang.Process;" );
+    Wa( "import java.lang.Runtime;" );
+
     gint32 ret = 0;
     do{
         CCOUT << "public class mainsvr";
