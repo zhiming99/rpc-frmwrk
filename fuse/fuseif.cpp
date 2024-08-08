@@ -4285,8 +4285,13 @@ gint32 CFuseSvcServer::AddReqFiles(
         if( m_pSvcDir->GetParent() == nullptr )
             break;
 
-        fuseif_invalidate_path(
+        gint32 iRet = fuseif_invalidate_path(
             GetFuse(), m_pSvcDir.get() );
+        if( ERROR( iRet ) )
+        {
+            LOGERR( this->GetIoMgr(), iRet,
+                "Error invalidate inode" ); 
+        }
 
     }while( 0 );
     if( ERROR( ret ) )
