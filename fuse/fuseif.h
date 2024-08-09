@@ -1518,8 +1518,11 @@ class CFuseServicePoint :
 
             if( GetFuse() )
             {
-                fuseif_invalidate_path(
+                gint32 iRet = fuseif_invalidate_path(
                     GetFuse(), pDir );
+                if( ERROR( iRet ) )
+                    LOGERR( this->GetIoMgr(), iRet,
+                        "Error invalidate inode" ); 
             }
             
         }while( 0 );

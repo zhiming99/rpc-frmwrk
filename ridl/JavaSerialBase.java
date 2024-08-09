@@ -55,16 +55,8 @@ abstract public class JavaSerialBase
 
         public JavaSerialBase getSerialBase()
         {
-            JavaSerialBase osb;
-            CRpcServices oSvc =
-                ( CRpcServices )getInst();
-            if( oSvc.IsServer() )
-                osb = new JavaSerialHelperS(
-                    ( CJavaServer )oSvc );
-            else
-                osb = new JavaSerialHelperP(
-                    ( CJavaProxy )oSvc );
-            return osb;
+            IRpcService oSvc = ( IRpcService )getInst();
+            return ( JavaSerialBase )oSvc.getSerialBase();
         }
     }
 
