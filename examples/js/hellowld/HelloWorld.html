@@ -9,9 +9,12 @@
 <!DOCTYPE html>
 <html><head><meta charset="utf-8" /></head></html>
 <body>
-<p id="log">Hello, World!<br /></p>
+<p id="log">Example: Hello World<br /></p>
 <script>
 // set a callback on RPC connection ready
+// this callback will be called from the
+// 'maincli.js' when the connection to server is
+// established.
 globalThis.onRpcReady=()=>{
     console.log( "RPC connection ready " );
     var oProxy = globalThis.oProxy;
@@ -22,6 +25,7 @@ globalThis.onRpcReady=()=>{
         else
             console.log( 'server response is ' + strResp );
     }
+    //make the call to the server
     return oProxy.Echo( oContext, "Hello, World!" );
 }
 //# sourceURL=rpcf://htmlcode/sendreq.js
@@ -29,6 +33,7 @@ globalThis.onRpcReady=()=>{
 <script src="dist/HelloWorld.js">
 </script>
 <script>
+console.log( "Client will sends a message via RPC and waiting for server response...");  
 function checkProxyState(){
     if( globalThis.oProxy === undefined ){
         setTimeout( checkProxyState, 2000 );

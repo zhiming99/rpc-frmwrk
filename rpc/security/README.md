@@ -1,3 +1,4 @@
+[中文](./README_cn.md)
 ### Introduction to the rpc-frmwrk's Authentication support
 The authentication process is the process to allow only valid users to access the rpc-frmwrk's service.
 Currently the rpc-frmwrk relies only on the `Kerberos 5` authentication framework. In the future, 
@@ -93,11 +94,11 @@ to work with `rpc-frmwrk` on such a simple network.
   in our case, `rasp1/rpcf.org`. The file name is `krb5.keytab` and make sure its **ownership and access right** properly set, otherwise the `bridge` may fail to start. The The official document is at [here](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
 ##### 4. Enable authentication for `rpc-frmwrk`
-  * In the [`driver.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/ipc/driver.json), the section for `RpcTcpBusPort`,
+  * In the [`driver.json`](../../ipc/driver.json), the section for `RpcTcpBusPort`,
   you can find the configurations for each listening port. And add attribue `HasAuth:"true"` to the port, and all the incoming connections from
   that port will be authenticated first before normal `RPC` requests can be serviced.
   
-  * In the [`rtauth.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/router/rtauth.json), the section for
+  * In the [`rtauth.json`](../router/rtauth.json), the section for
   `RpcRouterBridgeAuthImpl`, you can add the authentication infomantion as the service server. It looks like 
  ```
              "AuthInfo" :
@@ -110,7 +111,7 @@ to work with `rpc-frmwrk` on such a simple network.
  ```
   * Note that the `ServiceName` is in the form of `service@host`, that is `rasp1` is the service name and `rpcf.org` is the domain name of the of the host. If your host is not registered with the DNS, put the host name to the `hosts` file. If you uses `rpcfg.py` to initialized the local Kerberos server, the tool will take care it for you.
 
-  * In the `helloworld's` description file, [`hwdesc.json`](https://github.com/zhiming99/rpc-frmwrk/blob/master/test/helloworld/hwdesc.json),
+  * In the `helloworld's` description file, [`hwdesc.json`](../../test/helloworld/hwdesc.json),
   for example, add the following lines,
   ```
             "AuthInfo" :
@@ -131,7 +132,7 @@ to work with `rpc-frmwrk` on such a simple network.
                 "SignMessage" : "true"
             }
   ```
-  * To enable SSL, please refer to this [`Readme.md`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
+  * To enable SSL, please refer to this [`Readme.md`](../sslport/Readme.md)
   
 5. Start the rpcrouter with `-a` option, which is the authentication flag.
 
@@ -142,7 +143,7 @@ to work with `rpc-frmwrk` on such a simple network.
 4. Train yourself to get used to `kinit` and `klist`, which can be used frequently as the login method. `kinit`, as mentioned above, is to use the password to get the `ticket granting ticket`, which will be used to acquire the other `sevice tickes` when the client is trying to access some service. And `klist` is to list the tickets for an account, and the tickets include both `ticket granting ticket` and `service tickets`. You can check the timestamp to know if the ticket is expired, and need to login again.
 5. Make sure the firewall not block the `kerberos` ports, especially port 88 on your `kdc` machine, for the access from service servers.
 
-[`rpcfg.py`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools#rpc-router-config-tool) has some useful buttons on the `security page` to make the learning process much easier by automatically setting the Kerberos environment. The taget use cases are for small business environment, where the simple authentication is enough to meet the user's requiremnt. If this is the case, deploying a working environment can be as fast as within a few minutes. For a big organization with established authentication infrastructure, it is better for you to read through the document and contact the adminstrator to find the solution.
+[`rpcfg.py`](../../tools/README.md#rpc-router-config-tool) has some useful buttons on the `security page` to make the learning process much easier by automatically setting the Kerberos environment. The taget use cases are for small business environment, where the simple authentication is enough to meet the user's requiremnt. If this is the case, deploying a working environment can be as fast as within a few minutes. For a big organization with established authentication infrastructure, it is better for you to read through the document and contact the adminstrator to find the solution.
 
 ### OAuth2 support
 The `rpc-frmwrk`'s support for OAuth2 must have an external component to make oauth2 authentication happen. It is a webapp which is side by side with `rpcrouter`. Both are reverse proxied by the web server, such as nginx or httpd. The webapp, as an OAuth2 client, redirects the browser to the OAuth2 provider such as github, wechat, or someone else. And after the OAuth2 authorization succeeds, the webapp will set a cookie to the browser and allow the browser to establish the connection to the `rpcrouter`, for example, via helloworld.html. If the OAuth2 fails, the subsequent connection to `rpcrouter` the  will be denied.

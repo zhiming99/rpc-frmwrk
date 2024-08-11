@@ -4285,8 +4285,13 @@ gint32 CFuseSvcServer::AddReqFiles(
         if( m_pSvcDir->GetParent() == nullptr )
             break;
 
-        fuseif_invalidate_path(
+        gint32 iRet = fuseif_invalidate_path(
             GetFuse(), m_pSvcDir.get() );
+        if( ERROR( iRet ) )
+        {
+            LOGERR( this->GetIoMgr(), iRet,
+                "Error invalidate inode" ); 
+        }
 
     }while( 0 );
     if( ERROR( ret ) )
@@ -4418,11 +4423,12 @@ gint32 CFuseSvcServer::OnStreamReadyFuse(
     HANDLE hStream )
 {
     gint32 ret = 0;
+    stdstr strSess;
     do{
+        WLOCK_TESTMNT;
         if( this->GetState() != stateConnected )
             break;
 
-        WLOCK_TESTMNT;
         ret = CreateStmFile( hStream );
         if( SUCCEEDED( ret ) )
             break;
@@ -4436,7 +4442,6 @@ gint32 CFuseSvcServer::OnStreamReadyFuse(
         if( ERROR( iRet ) )
             break;
 
-        stdstr strSess;
         CCfgOpener oCtx( ptctx ); 
         iRet = oCtx.GetStrProp(
             propSessHash, strSess );
@@ -4446,6 +4451,10 @@ gint32 CFuseSvcServer::OnStreamReadyFuse(
         DecStmCount( strSess );
 
     }while( 0 );
+    if( ERROR( ret ) )
+        LOGERR( this->GetIoMgr(), ret,
+            "Error create stream file %s",
+            strSess.c_str() );
 
     return ret;
 }
@@ -4584,6 +4593,7 @@ static gint32 fuseif_create_req(
     fuse_file_info* fi )
 {
     gint32 ret = 0;
+    CRpcServices* pSvc = nullptr;
     do{
         if( strSurffix.empty() )
         {
@@ -4596,19 +4606,19 @@ static gint32 fuseif_create_req(
             break;
         }
 
-        CRpcServices* pSvc = pDir->GetIf();
+        pSvc = pDir->GetIf();
         CFuseSvcProxy* pProxy = ObjPtr( pSvc );
         CFuseSvcServer* pSvr = ObjPtr( pSvc );
+        stdstr strName = "jreq_";
+        strName += strSurffix;
+
+        WLOCK_TESTMNT0( pDir );
         if( pSvc->GetState() != stateConnected )
         {
             ret = ERROR_STATE;
             break;
         }
 
-        stdstr strName = "jreq_";
-        strName += strSurffix;
-
-        WLOCK_TESTMNT0( pDir );
         if( pDir->GetChild( strName ) != nullptr )
         {
             ret = -EEXIST;
@@ -4635,7 +4645,13 @@ static gint32 fuseif_create_req(
         fi->nonseekable = 1;
 
     }while( 0 );
-
+    if( ERROR( ret ) && pSvc &&
+        pSvc->IsServer() )
+    {
+        LOGERR( pSvc->GetIoMgr(), ret,
+            "Error create req file req_%s",
+            strSurffix.c_str() );
+    }
     return ret;
 }
          
