@@ -18,13 +18,15 @@ OA2Lib = -L./oa2check -loa2check
 endif
 SUBDIRS += .
 
-rpcfauth_headers = k5proxy.h k5server.h kdcfdo.h secclsid.h secfido.h security.h README.md 
+rpcfauth_headers = k5proxy.h k5server.h kdcfdo.h secclsid.h secfido.h security.h
 libauth_la_SOURCES = security.cpp dllexp.cpp $(rpcfauth_headers) $(krb5_sources)
 
 libauth_ladir=$(libdir)
 
 dist_libauth_conf_DATA=
 libauth_confdir=$(sysconfdir)/rpcf
+
+EXTRA_DIST=README.md README_cn.md
 
 libauth_la_LDFLAGS = -version-info @VERSION2@
 libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc \
