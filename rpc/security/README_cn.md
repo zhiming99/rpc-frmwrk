@@ -2,7 +2,7 @@
 ### rpc-frmwrk的认证机制
 rpc-frmwrk依靠认证过程来鉴别用户身份并确定是否提供RPC服务。rpc-frmwrk可以通过两种认证协议实施认证。
 
-. Kerberos：Kerberos是一种认证协议，也可以理解成MIT开发的一款实现该协议的认证软件。Kerberos认证协议在企业应用中有广泛的
+* Kerberos：Kerberos是一种认证协议，也可以理解成MIT开发的一款实现该协议的认证软件。Kerberos认证协议在企业应用中有广泛的
 部署，比如微软的活动目录使用的就是Kerberos认证机制。该认证方式适合部署在以C/S为通讯架构的运行环境中。Kerberos协议是一种
 重型且较为复杂的认证协议，可以部署在不安全的环境中，能够有效防范报文被篡改和伪造的风险，也能够防范中间人攻击等。经过几十年的完善
 Kerberos被普遍认为是一种安全可靠的单点认证协议(SSO)。Kerberos在希腊神话中是长有三个头的狗，在Kerberos协议中代表着参加认证的三方,
@@ -11,7 +11,7 @@ KDC(认证票据发布中心), 服务提供者(rpc-frmwrk server)，和用户方
 用环境下，KDC和服务提供者可以部署到一台机器上，这时Kerberos协议退化成密码认证。即使这样，由于这个过程不传输密码相关的信息，比起普
 通的密码认证过程还是更为安全。
 
-. OAuth2：OAuth2相对Kerberos是一种比较新的认证机制，适和部署在以B/S为通讯架构的环境中。OAuth2相较于Kerberos协议简单直接。
+* OAuth2：OAuth2相对Kerberos是一种比较新的认证机制，适和部署在以B/S为通讯架构的环境中。OAuth2相较于Kerberos协议简单直接。
 rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第三方的服务器上进行，然后对使用RPC的服务进行授权。和Kerberos的三个参与者
 不同的是，OAuth2范畴中的三方是OAuth2认证方，OAuth2的资源服务器，和用户方，这个过程并没有rpc-frmwrk的参与。用户方是用户的浏览器，另
 外两个是第三方的服务器。比如你使用github的OAuth2，就是github提供的认证服务器，和资源服务器。资源服务器简单的说就是存有你的姓名，
@@ -37,7 +37,8 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
     * 选择域名，一般在安装krb5-kdc的时候，系统会提示你缺省的域名是什么。这个域并不完全等同于域名服务的域名，不过也的确会映射到域名服务中，比如
       kerberos的域名是大写的`RPCF.ORG`, 域名服务中的域名按照习惯就写成`rpcf.org`. 互联网的域名并不是必须的。没有条件的用户使用ip地址也无妨。
       不过需要在/etc/hosts中加一些条目.比如`127.0.0.1     rpcf.org`，或者在`kdc.conf`中需要互联网域名的地方，给出ip地址。
-    * 然后可以对`krb5.conf`做一些修改。krb5.conf的内容不止下面所列，如果想要详细的了解，可以查阅Kerberos的[官方文档](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_kdc.html#install-and-configure-the-master-kdc)。下面是一个`krb5.conf`的样例。
+    * 然后可以对`krb5.conf`做一些修改。krb5.conf的内容不止下面所列，如果想要详细的了解，可以查阅Kerberos的
+    [官方文档](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_kdc.html#install-and-configure-the-master-kdc)。下面是一个`krb5.conf`的样例。
 
         ```
             [logging]
@@ -69,8 +70,8 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
         ```                                                                  
     * 然后安装在KDC的机器上建立KDC的数据库。例如`sudo kdb5_util create -r rpcf.org -s`.
     * 接下来用`kadmin.local`在数据库中添加服务账号和用户账号。如添加用户名`foo`，添加成功后，系统会追加默认的域名如`rpcf.org`。所以最终的用户名是`foo@rpcf.org`。服务名也类似，比如添加`rpcrouter`， 最后的服务名是`rpcrouter@rpcf.org`。如果多台机器上都有`rpcrotuer`的服务，这时服务名也可以`rpcrouter/host1`, `rpcrouter/host2`。最终的服务名就是`rpcrouter/host1@rpcf.org`... 
-        * 这里有一点需要说明的是这个服务名是Kerberos系统识别的名字。和`rpcfg`中设置的服务名字略有不同。原因是`rpc-frmwrk`使用的是`gssapi-krb5`的程序接口，它接受的服务名是这样的`rpcrouter@host1`，且不需要追加域名。所以在配置`rpc-frmwrk`的认证信息时需要使用后者。另外`host1`,`host2`也不是随便加的，要么有公共域名与之对应，要么需要在KDC的主机的`hosts`文件里加上对`host1`, `host2`的解析。
-        * 还有一点要注意的是，一般情况下，用户账号设置密码，服务账号由于在无人值守的服务器端，密码意义不大，一般需要使用`key table`来获得认证。`key table`可以由`kadmin.local`导出。我们在后面还会提到。
+        * 这里有一点需要说明的是这个服务名是Kerberos系统识别的名字。和`rpcfg`中设置的服务名字略有不同。原因是`rpc-frmwrk`使用的是`gssapi-krb5`的程序接口，它接受的服务名是这样的`rpcrouter@host1`，且不需要追加域名。所以在配置`rpc-frmwrk`的认证信息时需要使用后者。另外`host1`,`host2`也不是随意加的，要么有互联网域名与之对应，要么需要在KDC的本地主机的`hosts`文件里加上对`host1`, `host2`的解析。
+        * 还有一点要注意的是，一般情况下，用户账号设置密码，服务账号由于在无人值守的服务器端，以交互方式输入密码的方法不实用，而是使用`key table`来获得认证。`key table`可以由`kadmin.local`导出。我们在后面还会提到。
     * 完成以上步骤之后，就启动KDC了, `/usr/sbin/krb5kdc`。
 3. 设置客户端。本文中客户端即指那些部署了`rpc-frmwrk`客户端的设备或主机。
     * 在Ubuntu上，可以运行`sudo apt install krb5-user libkrb5-3 libkrb5-dev`。
@@ -80,10 +81,10 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 
 4. 设置服务器。本文中的服务器指的是部署了`rpc-frmwrk`服务器的设备或主机。
     * 安装过程和客户端的相同。
-    * 前面提到过, 服务账号一般不用密码，所以`kinit`这个过程是不必要的。服务器需要一个用`kadmin.local`导出`rpcrouter/host1`的密码信息到一个`key table`文件`krb5.keytab`中。把这个`krb5.keytab`文件拷贝到/etc下面。请务必将此文件所有者设置成`rpcrouter`的所有者，且读写权限为`0600`。也可以在krb5.conf中设置`default_keytab_name`字段，把`key table`移到用户自己的`HOME`目录下面。有关服务器端设置的官方文档在[这里](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
+    * 前面提到过, 服务账号一般不用密码，所以`kinit`这个过程是不必要的。服务器需要一个用`kadmin.local`把`rpcrouter/host1`的凭据信息导出到一个`key table`文件中。系统默认的文件名是`krb5.keytab`。把这个`krb5.keytab`文件拷贝到/etc下面，系统会自动的加载。需要强调的是必须此文件所有者设置成`rpcrouter`的所有者，且读写权限为`0600`。也可以在krb5.conf中设置`default_keytab_name`字段，把`key table`移到用户自己的`HOME`目录下面。有关服务器端设置的官方文档在[这里](https://web.mit.edu/kerberos/krb5-devel/doc/admin/install_appl_srv.html)
 
 5. 配置`rpc-frmwrk`启用Kerberos认证
-    * 在服务器和客户端的[driver.json]文件中(../../ipc/driver.json)的`RpcTcpBusPort`字段有服务器端的监听地址和端口设置。在这些配置的后面追加`HasAuth:"true"`，将使该端口的新建连接首先进入认证登陆的流程。
+    * 在服务器和客户端的[driver.json](../../ipc/driver.json)文件中的`RpcTcpBusPort`字段有服务器端的监听地址和端口设置。在这些配置的后面追加`HasAuth:"true"`，将使该端口的新建连接首先进入认证登陆的流程。
     * 在服务器上的[rtauth.json](../router/rtauth.json)文件的`RpcRouterBridgeAuthImpl`字段，需要添加服务方的账号信息。如下面所示：
         ```
             "AuthInfo" :
@@ -100,7 +101,7 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
             {
                 "AuthMech" : "krb5",
                 "UserName" : "foo@rpcf.org",
-                "ServiceName" : "rasp1@rpcf.org",
+                "ServiceName" : "rpcrouter@host1",
                 "Realm" : "rpcf.org",
                 "SignMessage" : "true" 
             }
@@ -120,6 +121,8 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 ### OAuth2
 `rpc-frmwrk`的OAuth2支持是专门为浏览器的JS客户端开发的。OAuth2的认证过程是在Application Server，OAuth2服务器和浏览器之间进行的，认证成功后，`rpc-frmwrk`将使用Application Server发给浏览器的认证凭据向`Application Server`进行验证，如果通过验证，`rpc-frmwrk`的服务，比如`HelloWorld`将向用户提供服务。`rpc-frmwrk`选用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
 
-实际上`rpcrouter`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`application server`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
+实际上`rpc-frmwrk`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`应用服务器(application server)`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
 
-作为演示和学习用途，在`zhiming99/django-oa2cli-cgi`的镜像仓库中，有三个容器镜像，分别是`OAuth2-Server`, `latest`和`springboot-oa2check`.分别是OAuth2的服务器，django的OAuth2客户端app, 和springboot的OAuth2的客户端app。
+我们在`zhiming99/django-oa2cli-cgi`的镜像仓库中，准备了三个容器镜像，用于演示rpc-frmwrk和不同OAuth2的`实现`的整合。它们分别是`OAuth2-Server`, `latest`和`springboot-oa2check`。对应的是django的OAuth2的服务器，django的OAuth2客户端app, 和springboot的OAuth2的客户端app。用户可以通过命令行拉取，比如`docker pull zhiming99/django-oa2cli-cgi:OAuth2-Server`。
+
+django的OAuth2的客户端app使用的是标准的Authorization code认证流程，springboot的OAuth2的客户端app使用的是OAuth2结合OpenID Connect扩展协议，以提供标准化的身份信息和更安全的身份验证。
