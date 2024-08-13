@@ -16,4 +16,6 @@ screenshot-2019-10-21-180941.png \
 sync-async.png \
 sync-async-svr.png \
 OAuth2-1_cn.png \
-OAuth2-2_cn.png
+OAuth2-2_cn.png \
+gen-self-signed-key.png \
+select-auth-mech.png

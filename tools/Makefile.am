@@ -33,7 +33,7 @@ else
     openssl_cmd=true;
 endif
 
-EXTRA_DIST= $(pysources) README.md runtest.sh.in updcfg.py.in Dockerfile buildall-deb.sh buildall-fed.sh makerpcf.sh btinrtst.sh $(testcfgfiles) $(runtime_files)
+EXTRA_DIST= $(pysources) README.md README_cn.md runtest.sh.in updcfg.py.in Dockerfile buildall-deb.sh buildall-fed.sh makerpcf.sh btinrtst.sh $(testcfgfiles) $(runtime_files)
 
 docker:
 	docker build -t rpcf .
