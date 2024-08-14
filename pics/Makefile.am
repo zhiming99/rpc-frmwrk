@@ -19,7 +19,7 @@ OAuth2-1_cn.png \
 OAuth2-2_cn.png \
 gen-self-signed-key.png \
 select-auth-mech.png \
-pics/rpcfg2-1.png \
-pics/rpcfg2-2.png \
-pics/rpcfg2-3.png \
-pics/rpcfg2-4.png 
+rpcfg2-1.png \
+rpcfg2-2.png \
+rpcfg2-3.png \
+rpcfg2-4.png 
