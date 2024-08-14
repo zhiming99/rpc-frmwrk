@@ -39,7 +39,7 @@
 #include <gmssl/pem.h>
 #include <gmssl/tls.h>
 #include <gmssl/digest.h>
-#include <gmssl/gcm.h>
+//#include <gmssl/gcm.h>
 #include <gmssl/hmac.h>
 #include <gmssl/hkdf.h>
 #include <gmssl/mem.h>

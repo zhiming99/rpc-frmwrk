@@ -39,7 +39,6 @@ extern "C"{
 #include <gmssl/pem.h>
 #include <gmssl/tls.h>
 #include <gmssl/digest.h>
-#include <gmssl/gcm.h>
 #include <gmssl/hmac.h>
 #include <gmssl/hkdf.h>
 #include <gmssl/mem.h>
@@ -113,14 +112,14 @@ PIOVE prec; \
 extern "C"
 {
 int tls13_client_hello_exts_set(uint8_t *exts, size_t *extslen, size_t maxlen,
-    const SM2_POINT *client_ecdhe_public);
+    const SM2_Z256_POINT *client_ecdhe_public);
 
 int tls13_record_decrypt(const BLOCK_CIPHER_KEY *key, const uint8_t iv[12],
     const uint8_t seq_num[8], const uint8_t *enced_record, size_t enced_recordlen,
     uint8_t *record, size_t *recordlen);
 
 int tls13_server_hello_extensions_get(const uint8_t *exts, size_t extslen,
-    SM2_POINT *sm2_point);
+    SM2_Z256_POINT *sm2_point);
 
 int tls13_cipher_suite_get(int cipher_suite, const DIGEST **digest, const
     BLOCK_CIPHER **cipher);
@@ -176,7 +175,7 @@ int tls13_record_set_handshake_certificate(uint8_t *record, size_t *recordlen,
     const uint8_t *certs, size_t certslen);
 
 int tls13_process_client_hello_exts(const uint8_t *exts, size_t extslen,
-    const SM2_KEY *server_ecdhe_key, SM2_POINT *client_ecdhe_public,
+    const SM2_KEY *server_ecdhe_key, SM2_Z256_POINT *client_ecdhe_public,
     uint8_t *server_exts, size_t *server_exts_len, size_t server_exts_maxlen);
 
 
@@ -1122,7 +1121,7 @@ int TLS13::handshake_cli()
             }
 
             this->cipher_suite = cipher_suite;
-            SM2_POINT server_ecdhe_public;
+            SM2_Z256_POINT server_ecdhe_public;
             if (tls13_server_hello_extensions_get(
                 server_exts, server_exts_len,
                 &server_ecdhe_public) != 1)
@@ -1797,7 +1796,7 @@ int TLS13::handshake_svr()
             uint8_t server_exts[TLS_MAX_EXTENSIONS_SIZE];
             size_t server_exts_len;
 
-            SM2_POINT client_ecdhe_public;
+            SM2_Z256_POINT client_ecdhe_public;
 
             tls13_record_trace(stderr, record_in, recordlen_in, 0, 0);
             if (tls_record_get_handshake_client_hello(record_in,

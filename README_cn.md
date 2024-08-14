@@ -26,10 +26,10 @@
 9. [`OpenSSL的支持`](./rpc/sslport/Readme.md)
 10. [`Websocket支持`](./rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-12. [`基于Kerberos 5和OAuth2的认证功能`](./rpc/security/README.md)
+12. [`基于Kerberos 5和OAuth2的认证功能`](./rpc/security/README_cn.md)
 13. [`节点冗余和负载均衡`](./Concept_cn.md#负载均衡)
 14. [`自动生成C++，Python，Java或者JavaScript的框架代码`](./ridl/README_cn.md)
-15. [`守护进程的图形配置工具`](./tools/README.md)
+15. [`rpc-frmwrk的图形配置工具`](./tools/README_cn.md)
 16. [`RPC文件系统rpcfs`](./fuse/README.md)
 17.  [`支持国密TLS13(SM2+SM4+GCM)`](./rpc/gmsslport/README_cn.md)
 
@@ -45,7 +45,7 @@
 
 ## 安装，配置和运行
 1. 当你已经编译成功`rpc-frmwrk`，在源码的根目录下运行 `sudo make install`即可进行安装.
-2.  在运行之前，你需要配置`rpc-frwmrk`的守护进程。`rpcfg`是`rpc-frmwrk`的自带配置工具，它是配置`rpc-frmwrk`的强大工具，可以节省大量查找和学习时间，甚至包括一个简单的SSL密钥管理器。关于配置工具`rpcfg`，可以参考[使用说明](./tools/README.md).
+2. 在运行之前，你需要配置`rpc-frwmrk`的守护进程。`rpcfg`是`rpc-frmwrk`的自带配置工具，它是配置`rpc-frmwrk`的强大工具，可以节省大量查找和学习时间，甚至包括一个简单的SSL密钥管理器。关于配置工具`rpcfg`，可以参考[使用说明](./tools/README_cn.md).
 3. 以微服务模式为例，运行时首先启动服务器端的守护进程，如`rpcrouter -dr 2`和客户端的守护进程，如`rpcrouter -dr 1`.  有关守护进程的详细信息请参考这篇[文章](./rpc/router/README.md).
 4. 对于新用户，可以运行系统自带的`HelloWorld`来验证配置. 先在服务器端启动`helloworld`的服务器程序`hwsvrsmk`, 然后在客户端启动`hwclismk`.这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F)有更详细的介绍.
 

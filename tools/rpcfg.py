@@ -227,7 +227,7 @@ if (($?==0)); then
 else
     echo install failed;
 fi
-rm -rf $unzipdir
+#rm -rf $unzipdir
 exit 0
 __GZFILE__
 '''
@@ -3818,8 +3818,8 @@ EOF
 
                 rpcf_system( "mv " + installer + " " + newName )
 
-            cmdline = "cd " + curDir + " && ( rm ./USESSL > /dev/null 2>&1;" + \
-                "rm *.gz krb5.conf krb5.keytab krb5cli.keytab instcfg.sh > /dev/null 2>&1);"
+            cmdline = "cd " + curDir + " && ( rm -f ./USESSL > /dev/null 2>&1;" + \
+                "rm -f *inst*.gz krb5.conf krb5.keytab krb5cli.keytab instcfg.sh > /dev/null 2>&1);"
             #cmdline += "rm " + curDir + "/initcfg.json || true;"
             rpcf_system( cmdline )
 
