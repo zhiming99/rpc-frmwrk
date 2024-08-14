@@ -23,7 +23,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 ## 配置`rpc-frmwrk`
 * `rpc-frmwrk`的每一对Server/Proxy共享一个`对象描述文件`，该文件给出连接服务器的各种参数，认证的用户信息，或者运行时的参数。除了此文件，还有一个`driver.json`配置的文件。`driver.json`给出的是Server/Proxy运行时依赖的`I/O子系统`配置信息。不用紧张，配置文件一般情况下可以通过配置工具和`ridlc`生成的Makefile搞定，若非高级配置，不需要手工设定。
-* 关于配置工具的详细介绍，请参考这篇[文章](./tools/README.md#rpc-router-config-tool)。
+* 关于配置工具的详细介绍，请参考这篇[文章](./tools/README_cn.md#rpc-frmwrk配置工具)。
 
 ## rpcrouter
 * rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接的建立的管理，传输协议的实现，认证授权流程，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md).
@@ -61,7 +61,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 `rpc-frmwrk`的服务器对象是一个继承自CInterfaceServer的对象，同时这个对象在DBus上进行了注册。由于DBus是`rpc-frmwrk`IPC通信的一个重要途径, 因此服务器对象的寻址中包含了`DBus`的地址信息。RPC通信地址则是在IPC地址的基础上，增加了网络地址信息。所以一个RPC服务对象的地址是一个五元组，{IP地址，TCP端口，路由器路径，对象路径，接口名称}。其中`路由器路径`请参考下面有关`multihop`的说明. `对象路径`和`接口名称`是DBus相关的信息。以上这几个参数都保存在对象描述文件中， `ridlc`根据接口定义文件（`ridl`文件）在编译的过程中自动设置。如果服务器和代理都在本地，那么进程间调用就只需对象路径和接口名称了。
 
 ## 流Streaming
-`rpc-frmwrk`可以在服务器和客户端建立字节流通道。流的意义在于可以传输远超过`Request`和`Response`（1MB左右)可以接受的上限的数据。流有如下的特点：
+`rpc-frmwrk`可以在服务器和客户端建立字节流通道。流的意义在于可以传输远超过`Request`和`Response`(1MB左右)可以接受的上限的数据。流有如下的特点：
 * 流通道是全双工的
 * 单个流通道可以传输2^64个字节。
 * 流通道保证数据的收发是严格顺序的，先进先出的。
@@ -79,14 +79,14 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## 部署
 * `rpc-frmwrk`的运行程序可以通过`deb`, `rpm`包或者`tar`包进行安装。
 * `rpcfg.py`程序有简易的密钥管理功能，可以生成`openssl`和`gmssl`的自签名密钥供测试和内部使用.
-* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产系统或者嵌入式系统等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`的运行库，用包中文件配置`rpc-frmwrk`服务器，部署密钥，配置Web服务器和Kerberos服务器。详情参考`rpcfg.py`的[使用手册](./tools/README.md#rpc-router-config-tool)。有关安装包的命名可以参考这篇[文章](./rpc/gmsslport/README_cn.md)。
+* `rpcfg.py`的部署功能，可以生成`rpc-frmwrk`的安装包，以方便部署到生产系统或者嵌入式系统等没有开发环境的平台上。自动设置的内容包括安装`rpc-frmwrk`的运行库，用包中文件配置`rpc-frmwrk`服务器，部署密钥，配置Web服务器和Kerberos服务器。详情参考`rpcfg.py`的[使用手册](./tools/README_cn.md#rpc-frmwrk配置工具)。有关安装包的命名可以参考这篇[文章](./rpc/gmsslport/README_cn.md)。
 
 ## rpcrouter级联功能和路由器路径
 当`rpc-frmwrk`的级联(multihop)功能提供了透明访问不同节点上的服务的功能。当rpcrouter以树形级联(multihop)方式部署时，可以使客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点，而不用重复建立连接。这时对某个节点的访问，就需要`路由器路径`来标识目的地。级联(Multihop)的配置可以使用`rpcfg.py`配置工具完成。有关级联功能的更多技术信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
 ## 安全和认证
 * `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](./rpc/sslport/Readme.md)，或者基于[WebSocket](./rpc/wsport/Readme.md)的SSL连接。
-* `rpc-frmwrk`支持[Kerberos 5认证](./rpc/security/README.md)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
+* `rpc-frmwrk`支持[Kerberos 5认证](./rpc/security/README_cn.md#kerberos)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
 * `rpc-frmwrk`也支持OAuth2的认证，这一认证方式主要用于[JS客户端](./js/README_cn.md)的授权。
 * `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。用户代码无需进行修改。
 

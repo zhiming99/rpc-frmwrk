@@ -116,7 +116,7 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 4. 注意服务器和KDC的防火墙是否屏蔽了服务端口。
 
 ##### 使用`rpcfg.py`自动配置`rpc-frmwrk`的Kerberos设置
-在了解了一系列繁琐复杂的设置步骤并为之头疼的时候，一个好消息是在`rpcfg.py`的安全页面有着配置Kerberos信息的选项。包括自动设置KDC服务器，对于熟悉了原理的用户来说，可以快速的搭建KDC服务器。有关`rpcfg.py`的信息请参考它的[说明文档](../../tools/README.md#rpc-router-config-tool)。
+在了解了一系列繁琐复杂的设置步骤并为之头疼的时候，一个好消息是在`rpcfg.py`的安全页面有着配置Kerberos信息的选项。包括自动设置KDC服务器，对于熟悉了原理的用户来说，可以快速的搭建KDC服务器。有关`rpcfg.py`的信息请参考它的[说明文档](../../tools/README_cn.md#rpc-frmwrk配置工具)。
 
 ### OAuth2
 `rpc-frmwrk`的OAuth2支持是专门为浏览器的JS客户端开发的。OAuth2的认证过程是在Application Server，OAuth2服务器和浏览器之间进行的，认证成功后，`rpc-frmwrk`将使用Application Server发给浏览器的认证凭据向`Application Server`进行验证，如果通过验证，`rpc-frmwrk`的服务，比如`HelloWorld`将向用户提供服务。`rpc-frmwrk`选用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
