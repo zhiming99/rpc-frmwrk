@@ -190,21 +190,22 @@ if [ -f USESSL ]; then
     elif [ -f svridx ]; then
         svrkeyidx=`cat svridx`
         svrkeyidx=`expr $svrkeyidx + $1`
+    else
+        echo Error bad installer
     fi
     if [ ! -f $updinitcfg ]; then exit 1; fi
-    if [ -f clientkeys-1.tar.gz  ]; then
-        keyfile=clientkeys-1.tar.gz
-        option="-c"
-    elif [ "x$clikeyidx" != "x" ]; then
+    if [ "x$clikeyidx" != "x" ]; then
         keyfile=clientkeys-$clikeyidx.tar.gz
         option="-c"
-    elif [ -f serverkeys-0.tar.gz  ]; then
-        keyfile=serverkeys-0.tar.gz
-        option=
     elif [ "x$svrkeyidx" != "x" ]; then
         keyfile=serverkeys-$svrkeyidx.tar.gz
         option=
     fi       
+    if [ ! -f $keyfile ]; then
+        echo Error cannot find key file $keyfile
+    else
+        echo Installing $keyfile
+    fi
     tar -C $keydir -xf $keyfile || exit 1
     python3 $updinitcfg $option $keydir ./initcfg.json
     chmod 400 $keydir/*.pem
@@ -234,7 +235,7 @@ if (($?==0)); then
 else
     echo install failed;
 fi
-#rm -rf $unzipdir
+rm -rf $unzipdir
 exit 0
 __GZFILE__
 '''

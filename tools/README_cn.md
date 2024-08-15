@@ -27,7 +27,7 @@
         ![rpcfg tab2](../pics/rpcfg2-1.png)
       * 密钥文件(Key File): 密钥文件路径名。
       * 证书文件(Cert File): 密钥的证书路径名。
-      * CA证书(CA cert file)： CA的证书路径名。用于需要`互相验证(Peer Verify)`的场景。如果目标系统的/etc/ssl/certs里已经有颁发机构的证书，可以忽略此项。
+      * CA证书(CA cert file)： CA的证书路径名。用于需要`互相验证(Peer Verify)`的场景。
       * 密码文件(secret file): 密钥有密码保护时，该文件存有密钥文件的密码. 
       * 启用国密安全连接(Using GmSSL): 连接将使用GmSSL的国产的安全加密套件(SM2+SM4). OpenSSL一般使用的是RSA+AES。
       * 互相验证(Verify Peer): 在收到对方证书后，先验证证书是否合法，如不合法终止握手流程。
@@ -62,10 +62,12 @@
   * 安装包选项(Installer Options)：   
         ![rpcfg2-4.png](../pics/rpcfg2-4.png)
     * 安装包将配置nginx或者apache服务器(WS Installer): 安装包将根据本地安装的web服务器类型，配置目标机器的web服务器的SSL选项，websocket选项, 并安装服务器端或客户端密钥和证书。
-    * 安装包将安装Kerberos的设置和用户信息(Krb5 Installer): 安装信息将分为服务方的认证信息和客户端的认证信息，分别进行配置，条件是Kerberos的服务器必须在本地机器上。
+    * 安装包将安装Kerberos的设置和用户信息(Krb5 Installer): 安装信息将分为服务方的认证信息和客户端的认证信息，分别进行配置，条件是Kerberos的服务器必须在制作安装包的机器上。
     * 安装包将在客户端启用KProxy功能。
     * `rpc-frmwrk`的`rpm`或`deb`包的路径(deb/rpm package): 如果制定路径，且`rpm`或`deb`有效，安装包将打包`rpm`或者`deb`文件，并在目标机器上首先安装`rpc-frmwrk`，然后进行设置。
     * `安装包`按钮(Installer)：
         * 将生成部署用的安装包两个，一个是服务器端，一个是客户端。
-        * 安装包的名字如下图所示：   
-        ![安装包名称](../pics/installer-name.png)
+        * 携带密钥的安装包的名字如下图所示：   
+        ![安装包名称](../pics/installer-name.png)   
+        * 命令格式为`bash instcli-o-2023-4-21-49-2.sh 1`, 参数`1`是安装的密钥索引，从0开始计数，小于文件名的最后一个数字。
+        * 不携带密钥的安装包名字格式如`instsvr-2023-4-21.sh`, 命令格式为`bash instsvr-2023-4-21.sh`，无参数。
