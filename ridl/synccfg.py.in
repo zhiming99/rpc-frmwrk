@@ -113,10 +113,7 @@ def UpdateDrv( sysDrvPath : str ) :
             if keyName == "signkey.pem":
                 params[ "KeyFile" ] = dirPath + "/clientkey.pem"
                 params[ "CertFile" ] = dirPath + "/clientcert.pem"
-                if bGmSSL:
-                    params[ "CACertFile"] = dirPath + "/rootcacert.pem"
-                else:
-                    params[ "CACertFile"] = dirPath + "/certs.pem"
+                params[ "CACertFile"] = dirPath + "/certs.pem"
                 params[ "SecretFile"] = ""
 
         if 'Ports' in srcVals:
