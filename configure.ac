@@ -76,6 +76,18 @@ AC_ARG_ENABLE([js],
 
 AC_CHECK_PROG([swig], [swig], yes)
 
+case $enable_gmssl in
+    yes)
+    AS_IF(
+        [test -f "/usr/local/include/gmssl/sm2.h" -a -f "/usr/local/lib/libgmssl.a" ], 
+        [AC_MSG_RESULT([checking for gmssl... yes])],
+        [enable_gmssl=no]
+    )
+    ;;
+    no)
+    ;;
+esac
+
 case $enable_python in
     yes)
     AC_CHECK_PROG([python3], python3, yes)

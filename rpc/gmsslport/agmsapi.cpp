@@ -1156,6 +1156,10 @@ int TLS13::handshake_cli()
                 &server_ecdhe_public,
                 &server_ecdhe_public);
 
+            uint8_t share_point[64];							
+            sm2_z256_point_to_bytes(
+                &server_ecdhe_public, share_point);			
+
             /* [1]  */ tls13_hkdf_extract(hctxc.digest,
                 zeros, hctxc.psk,
                 hctxc.early_secret);
@@ -1167,8 +1171,7 @@ int TLS13::handshake_cli()
 
             /* [6]  */ tls13_hkdf_extract(
                 hctxc.digest, hctxc.handshake_secret,
-                (uint8_t *)&server_ecdhe_public,
-                hctxc.handshake_secret);
+                share_point, hctxc.handshake_secret);
 
             /* [7]  */ tls13_derive_secret(
                 hctxc.handshake_secret,
@@ -1882,6 +1885,10 @@ int TLS13::handshake_svr()
             sm2_do_ecdh(&hctxs.server_ecdhe,
                 &client_ecdhe_public, &client_ecdhe_public);
 
+            uint8_t share_point[64];							
+            sm2_z256_point_to_bytes(
+                &client_ecdhe_public, share_point);			
+
             /* 1  */ tls13_hkdf_extract(hctxs.digest,
                 zeros, hctxs.psk, hctxs.early_secret);
 
@@ -1891,10 +1898,8 @@ int TLS13::handshake_svr()
                 hctxs.handshake_secret);
 
             /* 6  */ tls13_hkdf_extract(
-                hctxs.digest,
-                hctxs.handshake_secret,
-                (uint8_t *)&client_ecdhe_public,
-                hctxs.handshake_secret);
+                hctxs.digest, hctxs.handshake_secret,
+                share_point, hctxs.handshake_secret);
 
             /* 7  */ tls13_derive_secret(
                 hctxs.handshake_secret,

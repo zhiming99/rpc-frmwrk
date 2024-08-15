@@ -7,9 +7,9 @@ testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh
 #gmssl test files
 testcfgfiles +=  \
 cfg4gmssl.sh updgmskey.py testcfgs/gmsslcfgs/signkey.pem \
-testcfgs/gmsslcfgs/certs.pem testcfgs/gmsslcfgs/cacert.pem \
+testcfgs/gmsslcfgs/certs.pem testcfgs/gmsslcfgs/signcert.pem \
 testcfgs/gmsslcfgs/clientkey.pem testcfgs/gmsslcfgs/clientcert.pem \
-testcfgs/gmsslcfgs/rootcacert.pem testcfgs/gmsslcfgs/initcfg.json.in
+testcfgs/gmsslcfgs/initcfg.json.in
 
 runtime_files= 
 

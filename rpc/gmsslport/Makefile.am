@@ -1,6 +1,6 @@
 lib_LTLIBRARIES=libgmsslpt.la
 libgmsslpt_la_SOURCES = dllexp.cpp gmsfido.cpp agmsapi.cpp agmsapi.h gmsfido.h README_cn.md
-libgmsslpt_la_CPPFLAGS = -I$(top_srcdir)/ipc -I../ -I$(top_srcdir)/combase -I$(SYSROOT)/usr/include -I/usr/local/include
+libgmsslpt_la_CPPFLAGS = -DENABLE_SHA1 -DENABLE_SHA2 -I$(top_srcdir)/ipc -I../ -I$(top_srcdir)/combase -I$(SYSROOT)/usr/include -I/usr/local/include
 
 libgmsslpt_ladir=$(libdir)
 libgmsslpt_la_LDFLAGS = -version-info @VERSION2@

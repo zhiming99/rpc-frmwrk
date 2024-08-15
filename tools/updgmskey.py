@@ -20,8 +20,8 @@ def UpdInitCfg_GmSSL( cfgPath : str, strKeyPath : str )->int:
             return -errno.ENOENT
 
         oSSLCred[ "KeyFile"] = strKeyPath + "/signkey.pem"
-        oSSLCred[ "CertFile"] = strKeyPath + "/certs.pem"
-        oSSLCred[ 'CACertFile' ] = strKeyPath + "/cacert.pem"
+        oSSLCred[ "CertFile"] = strKeyPath + "/signcert.pem"
+        oSSLCred[ 'CACertFile' ] = strKeyPath + "/certs.pem"
         oSSLCred[ 'SecretFile' ] = ""
 
         # output the console instead of overwrite the file
@@ -52,7 +52,7 @@ def UpdDrv_GmSSL( cfgPath : str, strKeyPath : str )->int :
                 continue
             sslFiles[ "KeyFile"] = strKeyPath + "/clientkey.pem"
             sslFiles[ "CertFile"] = strKeyPath + "/clientcert.pem"
-            sslFiles[ 'CACertFile' ] = strKeyPath + "/rootcacert.pem"
+            sslFiles[ 'CACertFile' ] = strKeyPath + "/certs.pem"
             sslFiles[ 'SecretFile' ] = ""
             break
 

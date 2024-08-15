@@ -75,15 +75,18 @@ if ((idx_base < 0 )); then
 fi
 
 let endidx=idx_base+numsvr
+
+chmod 600 certs.pem
+cat cacert.pem > certs.pem
+cat rootcacert.pem >> certs.pem
+
 for((i=idx_base;i<endidx;i++));do
-    chmod 600 signcert.pem signkey.pem certs.pem || true
+    chmod 600 signcert.pem signkey.pem || true
     gmssl sm2keygen -pass 1234 -out signkey.pem
     gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "server:$i" -key signkey.pem -pass 1234 -out signreq.pem
     gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
-    cat signcert.pem > certs.pem
-    cat cacert.pem >> certs.pem
-    tar zcf serverkeys-$i.tar.gz signkey.pem cacert.pem certs.pem
-    rm signreq.pem signkey.pem signcert.pem  certs.pem
+    tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
+    rm -f signreq.pem signkey.pem signcert.pem
 done
 
 function find_key_to_show()
@@ -129,7 +132,7 @@ for((i=idx_base;i<endidx;i++));do
     gmssl sm2keygen -pass 1234 -out clientkey.pem
     gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "client:$i" -key clientkey.pem -pass 1234 -out clientreq.pem
     gmssl reqsign -in clientreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out clientcert.pem
-    tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem rootcacert.pem 
+    tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem certs.pem 
     rm clientkey.pem clientreq.pem clientcert.pem
 done
 
