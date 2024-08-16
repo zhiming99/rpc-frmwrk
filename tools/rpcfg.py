@@ -2205,7 +2205,7 @@ EOF
                 self.userEdit.set_text( strUser )
                 self.kdcEdit.set_text( strIpAddr ) 
 
-            if self.checkNoUpdRpc.props.active:
+            if not self.checkNoUpdRpc.props.active:
                 tempInit = tempname()
                 ret = self.Export_InitCfg( tempInit )
                 if ret < 0 :
@@ -2386,7 +2386,7 @@ EOF
                 if ret < 0:
                     return ret
 
-            if self.checkNoUpdRpc.props.active:
+            if not self.checkNoUpdRpc.props.active:
                 tempInit = tempname()
                 ret = self.Export_InitCfg( tempInit )
                 if ret < 0 :

@@ -83,7 +83,7 @@ cat rootcacert.pem >> certs.pem
 for((i=idx_base;i<endidx;i++));do
     chmod 600 signcert.pem signkey.pem || true
     gmssl sm2keygen -pass 1234 -out signkey.pem
-    gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "server:$i" -key signkey.pem -pass 1234 -out signreq.pem
+    gmssl reqgen -C CN -ST Shaanxi -L Xian -O Yanta -OU rpcf -CN "Server-$i" -key signkey.pem -pass 1234 -out signreq.pem
     gmssl reqsign -in signreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out signcert.pem
     tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
     rm -f signreq.pem signkey.pem signcert.pem
@@ -130,7 +130,7 @@ let endidx=idx_base+numcli
 for((i=idx_base;i<endidx;i++));do
     chmod 600 clientkey.pem clientcert.pem || true
     gmssl sm2keygen -pass 1234 -out clientkey.pem
-    gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "client:$i" -key clientkey.pem -pass 1234 -out clientreq.pem
+    gmssl reqgen -C CN -ST Shaanxi -L Xian -O Yanta -OU rpcf -CN "Client-$i" -key clientkey.pem -pass 1234 -out clientreq.pem
     gmssl reqsign -in clientreq.pem -days 365 -key_usage digitalSignature -cacert cacert.pem -key cakey.pem -pass 1234 -out clientcert.pem
     tar zcf clientkeys-$i.tar.gz clientkey.pem clientcert.pem certs.pem 
     rm clientkey.pem clientreq.pem clientcert.pem

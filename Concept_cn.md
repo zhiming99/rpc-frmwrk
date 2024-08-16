@@ -26,7 +26,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 关于配置工具的详细介绍，请参考这篇[文章](./tools/README_cn.md#rpc-frmwrk配置工具)。
 
 ## rpcrouter
-* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接的建立的管理，传输协议的实现，认证授权流程，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md).
+* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接的建立的管理，传输协议的实现，认证授权流程，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md). 当服务器和客户端运行在`紧凑模式`时，也不需要rpcrouter的参与。
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。
@@ -73,7 +73,7 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 
 ## `FastRpc`和`BuiltinRt App`
 * `FastRpc`是通过`Streaming Channel`传输RPC的请求，响应和事件的机制。对应的`ridlc`的选项是`-s`.这个架构的优势是，消息短小，延迟小，吞吐量大，不受DBus的瓶颈限制，而且有session级别的QPS流控。劣势是占用的系统资源较大，需要三倍于普通RPC的可打开文件，并且建立连接的时间长于一般的RPC.   
-* `BiuiltinRt App`是由`ridlc`生成的紧凑模式的客户端和服务器端程序，因此不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行库。优点就是可以直接运行，而且延迟小响应快。客户端的程序还可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
+* `BiuiltinRt App`是由`ridlc`生成的`紧凑模式`的客户端和服务器端程序，因此不需要提前运行`rpcrouter`。对应的`ridlc`的选项是`-b`. 实际上是这类App内部加入了`rpcrouter`的运行库。优点就是可以直接运行，而且延迟小响应快。客户端的程序还可以通过`--nodbus`运行于没有dbus-daemon的系统如`docker`上的. `ridlc`客户端和服务器端程序，还整合了一些`rpcrouter`的命令行选项，可以通过`<appname> -h`查看.   
 * 当指定`-bs`时，`ridlc`将生成`builtin-app`并使用`FastRpc`传输RPC消息。`ridlc`生成的`C++`, `Java`, `Python`代码框架都支持这两个选项。`JS`由于架构的完全不同，所以不支持`-b`的选项， 不过`JS`支持`-s`选项，方便连接由`-s`生成的服务器程序。
 
 ## 部署
