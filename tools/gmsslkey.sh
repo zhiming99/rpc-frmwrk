@@ -54,7 +54,7 @@ fi
 if [ ! -f rootcakey.pem ]; then
     rm -rf *.pem
     gmssl sm2keygen -pass 1234 -out rootcakey.pem
-    gmssl certgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN ROOTCA -days 3650 -key rootcakey.pem -pass 1234 -out rootcacert.pem -key_usage keyCertSign -key_usage cRLSign -ca
+    gmssl certgen -C CN -ST Shaanxi -L Xian -O Yanta -OU rpcf -CN ROOTCA -days 3650 -key rootcakey.pem -pass 1234 -out rootcacert.pem -key_usage keyCertSign -key_usage cRLSign -ca
 fi
 
 if [ ! -f cakey.pem ]; then
@@ -64,7 +64,7 @@ if [ ! -f cakey.pem ]; then
     mv backup/* ./
     rmdir backup
     gmssl sm2keygen -pass 1234 -out cakey.pem
-    gmssl reqgen -C CN -ST Beijing -L Haidian -O PKU -OU CS -CN "Sub CA" -key cakey.pem -pass 1234 -out careq.pem
+    gmssl reqgen -C CN -ST Shaanxi -L Xian -O Yanta -OU rpcf -CN "Sub CA" -key cakey.pem -pass 1234 -out careq.pem
     gmssl reqsign -in careq.pem -days 365 -key_usage keyCertSign -ca -path_len_constraint 0 -cacert rootcacert.pem -key rootcakey.pem -pass 1234 -out cacert.pem
     rm careq.pem
 fi
