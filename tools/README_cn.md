@@ -1,14 +1,15 @@
 [English](./README.md)
 - [rpc-frmwrk配置工具](#rpc-frmwrk配置工具)
-  - [连接页](#连接页)
-  - [安全页](#安全页)
+  - [连接页(Connection)](#连接页connection)
+  - [安全页(Security)](#安全页security)
+  - [级联页(Multihop)](#级联页multihop)
 
 
 # rpc-frmwrk配置工具
 [`rpcfg.py`](./rpcfg.py)是一个配置和部署`rpc-frmwrk`的图形化工具。它能够生成`rpc-frmwrk`系统级的配置文件，如`driver.json, router.json, rtauth.json和authprxy.json`。这些文件对于`rpcrouter`或者`紧凑模式`的用户应用程序很重要。同时它也具备简单的密钥管理，Kerberos服务器的自动配置，以及nginx或者httpd的自动配置能力。并且能够生成安装rpc-frmwrk，部署密钥，配置web服务器和KDC主机的安装包，方便部署和维护。
 
 `rpcfg.py`的UI界面是一组在对话框下的标签页，我们将分别介绍`连接页`，`安全页`，`级联页`和`负载均衡页`。
-## 连接页
+## 连接页(Connection)
   连接页主要用于设置`rpc-frmwrk`服务器的ip地址，端口号，以及传输协议或者选项等。
   * 绑定地址(Binding IP): 对于服务器来说是监听的IP地址。对于客户端来说，则是需要连接的服务器地址。
   * 端口号(Listening Port): RPC服务的端口号。缺省是4132。
@@ -20,7 +21,7 @@
   * 删除网络接口(Remove Interface): 按此按钮将删除按钮上方的设置。
   * 连接页的布局:   
         ![rpcfg tab1](../pics/rpcfg.png)
-## 安全页
+## 安全页(Security)
   安全页的`安全连接文件`和`身份认证信息`两部分只有在连接页的某个网络接口启用了安全连接或者身份认证功能时，才生效。  
   * 安全连接文件   
       SSL文件是用于安全连接协议的一组密钥文件。这些密钥文件可以是从证书机构获得的密钥和证书，也可以是自行制作的在内部使用的密钥和证书。这两种证书对于`rpc-frmwrk`来说没有区别，只是第一种证书可能预先安装在了操作系统中。   
@@ -62,7 +63,7 @@
   * 安装包选项(Installer Options)：   
         ![rpcfg2-4.png](../pics/rpcfg2-4.png)
     * 配置nginx或者apache服务器(WS Installer): 安装包将根据本地安装的web服务器类型，配置目标机器的web服务器的SSL选项，websocket选项, 并安装服务器端或客户端密钥和证书。
-    * 配置Kerberos服务器和用户信息(Krb5 Installer): 安装信息将分为服务方的认证信息和客户端的认证信息，分别进行配置。不过该选项要求Kerberos的服务器，也是制作安装包的机器。
+    * 配置Kerberos服务器和用户信息(Krb5 Installer): 安装信息将分为服务方的认证信息和客户端的认证信息，分别进行配置。不过该选项要求该制作安装包的机器也是Kerberos服务器。
     * 启用KProxy功能(KProxy): 安装包将设置客户端，使得`kinit`登陆程序透过`rpcrouter`访问远端的`KDC`。
     * `rpc-frmwrk`的`rpm`或`deb`包的路径(deb/rpm package): 如果制定路径，且`rpm`或`deb`有效，安装包将打包`rpm`或者`deb`文件，并在目标机器上首先安装`rpc-frmwrk`，然后进行设置。
     * `安装包`按钮(Installer)：
@@ -71,3 +72,14 @@
         ![安装包名称](../pics/installer-name.png)   
         * 命令格式为`bash instcli-o-2023-4-21-49-2.sh 1`, 参数`1`是安装的密钥索引，从0开始计数，小于文件名的最后一个数字。
         * 不携带密钥的安装包名字格式如`instsvr-2023-4-21.sh`, 命令格式为`bash instsvr-2023-4-21.sh`，无参数。
+## 级联页(Multihop)
+   级联页设置`rpcrouter`的上游`rpcrouter`。从而可以使客户端标记有上游服务器的请求可以被继续上传，直到达到目的地。这样客户端可以在只变更参数`router path`，就可以访问到上游的服务器，而无需作任何代码上的更改。   
+       ![rpcfg3.png](../pics/rpcfg3.png)
+   * 节点名称(Node Name): 一个标识符, 不能含有字符'/'。长度不超过256字节。 
+   * 远端IP地址(Remote IP Address): 上游节点的IP地址。
+   * 端口号(Port Number): 上游节点的端口号。
+   * 启用WebSocket: 和上游node通过websocket连接。
+   * 启用本节点(Enable Node): 只有勾选此项，客户端才能访问本节点。
+   * 启用压缩功能(Compression): 对传输数据进行压缩。
+   * 启用安全连接(SSL)。
+   * 删除本节点(Remove Node X)。
