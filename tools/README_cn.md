@@ -36,7 +36,7 @@
         * 客户端密钥个数(Number of client keys): 要生成/部署的客户端密钥个数。
         * 服务器端密钥个数(Number of Server keys): 要生成/部署的服务器端密钥个数。   
             ![自签名密钥对话框](../pics/gen-self-signed-key.png)
-        * 自动生成密钥后，`密钥文件`，`证书文件`，和`CA证书`将自动替换成新生成服务器端的密钥。
+        * 自动生成密钥后，`密钥文件`，`证书文件`，和`CA证书`将自动替换成新生成服务器端的密钥和证书的路径名。客户端的密钥和证书一并产生，密钥名为clientkey.pem, 证书名为clientcert.pem, CA证书相同。同时还有serverkeys-x.tar.gz和clientkeys-x.tar.gz产生，方便手工部署密钥。如果用安装包部署密钥的话，则不用记住这些文件。
   * 身份认证信息(Auth Information)   
         ![rpcfg2-2.png](../pics/rpcfg2-2.png)
     * 认证机制(Auth Mech): 该下拉菜单目前有Kerberos和OAuth2两项。   

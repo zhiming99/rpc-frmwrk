@@ -26,7 +26,8 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 * 关于配置工具的详细介绍，请参考这篇[文章](./tools/README_cn.md#rpc-frmwrk配置工具)。
 
 ## rpcrouter
-* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`, 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接的建立的管理，传输协议的实现，认证授权流程，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README.md). 当服务器和客户端运行在`紧凑模式`时，也不需要rpcrouter的参与。
+* rpcrouter是`rpc-frmwrk`的关键组件。完成所有RPC相关的任务。rpcrouter在微服务模式下是独立的daemon程序。特别的，运行在服务器端的又称为`bridge`,
+* 运行在客户端的叫`reqfwdr`。rpcrouter在紧凑模式下，以动态库的形式和用户代码合并，并运行在同一个进程中，以获得较好的性能。rpcrouter的任务包括，连接的建立的管理，传输协议的实现，认证授权流程，数据流的中继，级联(multihop)，流量控制，负载均衡，以及监测数据的记录和报告等RPC相关的任务。当用户的服务器和客户端都运行在一台主机上时，就不需要rpcrouter的参与了。有关rpcrouter的详细使用说明可以参看rpcrouter的[README](./rpc/router/README_cn.md). 当服务器和客户端运行在`紧凑模式`时，也不需要rpcrouter的参与。
 
 ## 同步，异步和回调函数
 `rpc-frmwrk`的Proxy和Server的每个方法调用都可以指定是同步或者异步调用。

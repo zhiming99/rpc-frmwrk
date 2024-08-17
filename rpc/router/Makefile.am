@@ -1,5 +1,5 @@
 rpcrouter_PROGRAMS=rpcrouter
-rpcrouter_SOURCES=routmain.cpp routmain.h README.md rpcrouter.1
+rpcrouter_SOURCES=routmain.cpp routmain.h rpcrouter.1
 
 rpcrouter_LDADD=
 if ENABLE_FUSE3
@@ -28,6 +28,7 @@ else
 OFFSET_MACRO=
 endif
 
+EXTRA_DIST=README.md README_cn.md
 rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
 
 if ENABLE_FUSE3

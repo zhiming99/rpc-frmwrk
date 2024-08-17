@@ -1,15 +1,16 @@
+[中文](./README_cn.md)
 . **The SSLPort** has implemented a filter port, as can be inserted to the port stack with the upper port to be `Native Protocol Fdo port`, `web socket Fido` or `secfido` and the bottom to be `Tcp Stream Pdo port`. It performs the `SSL handshake`, encrypts the outbound packets, decrypts the inbound packets and performs`SSL shutdown`, and the `SSL renegotiation` occationally through the SSL connection's lifecycle.   
 
 . The `SSLPort` requires OpenSSL-1.1 or higer version to work properly. It is recommended to choose TLS1.2 or TLS1.3 as the communication protocol, depending on peer's capability.
 
 . There are two approaches to deploy the keys and certificates as necessary to estabilish a SSL connection.
 
-i) Generating the keys manually, and importing keys by telling the `rpc-frmwrk` the path of the keys with the config tool `rpcfg.py`. And repeat the steps on each target platform. The keys obtained from public CA applies the same way.
+1. Generating the keys manually, and importing keys by telling the `rpc-frmwrk` the path of the keys with the config tool `rpcfg.py`. And repeat the steps on each target platform. The keys obtained from public CA applies the same way.
 ```
 # an example command to generate keys and certs
 openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365
 ```
-ii) Using `Gen Demo Key` from the `rpcfg.py` to generate the requested number of keys and certs, and using `Save As` button to generate a config installer, which can run on the target host to deploy the keys and update the configurations automatically. The `Demo` keys and certificates are 2048-bit RSA keys in PEM format.
+2. Using `Gen Demo Key` from the `rpcfg.py` to generate the requested number of keys and certs, and using `Save As` button to generate a config installer, which can run on the target host to deploy the keys and update the configurations automatically. The `Demo` keys and certificates are 2048-bit RSA keys in PEM format.
 
 . The following section gives the detail SSL config options, that can be found in the global [driver.json](../../ipc/driver.json). 
 
