@@ -1,3 +1,4 @@
+[中文](./README_cn.md)
 #### Name
 rpcrouter - the daemon program for `rpc-frmwrk`
 

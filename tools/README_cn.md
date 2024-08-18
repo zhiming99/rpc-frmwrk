@@ -17,6 +17,7 @@
   * WebSocket： RPC连接将使用WebSocket协议传输，`WebSocket URL`编辑框里指定进行websocket通信的网络连接。注意这里使用的是https, 而不是wss。处于安全的考虑，启用websocket将强制开启SSL选项。
   * 压缩(Compression)：对传输数据进行压缩。
   * 身份认证(Auth)：对连接用户进行身份认证。具体使用Kerberos或者OAuth2在安全页进行配置。和SSL类似。所有的连接，如果启用了身份认证，那么会用同样的认证设置。
+  * 路由路径(Router Path): 客户端选项，指定服务器所在的节点。客户端建立连接的服务器是根节点'/'。隔着根服务器的第二级服务器类似'/fooNode', fooNode是第二级服务器的名称，它的设置信息必须在`级联页`能够找得到。如果还有第三级，如'/fooNode/dev1'，可以访问的前提是，应该保证在'fooNode'的级联页里有节点'dev1'的设置。
   * 添加网络接口(Add Interface): 如果还需要绑定不同的IP地址，可以使用这个按钮添加。
   * 删除网络接口(Remove Interface): 按此按钮将删除按钮上方的设置。
   * 连接页的布局:   
