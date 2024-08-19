@@ -29,12 +29,13 @@
       3. 启动CHelloWorldSvc_CliImp，连接远端的服务器。如果不成功就退出。
       4. 启动成功后，调用`maincli`, 从这里开始控制就转为用户逻辑了。这里将添加我们的代码。
       5. CHelloWorldSvc_CliImpl的类图:   
-        ```
-        CHelloWorldSvc_CliImpl          // 客户端的主要对象
+         ```
+         CHelloWorldSvc_CliImpl          // 客户端的主要对象
             CHelloWorldSvc_SvrSkel
-                CStatCounterProxy       // rpc-frmwrk的支持类，封装各种服务器端的计数器
-                IHelloWorld_PImpl       // 自动生成的服务器端的接口IHelloWorld的客户端框架，用于发送请求，参数的序列化反序列化，以及接收响应。
-        ```
+                CStatCounterProxy        // rpc-frmwrk的支持类，封装各种服务器端的计数器
+                IHelloWorld_PImpl        // 自动生成的服务器端的接口IHelloWorld的客户端框架，
+                                         // 用于发送请求，参数的序列化反序列化，以及接收响应。
+         ```
 
   * 服务端的流程如下：
       1. 初始化上下文，在这里创建和启动CIoManager对象。
@@ -42,12 +43,13 @@
       3. 启动CHelloWorldSvc_SvrImpl，进入循环等待客户端的请求。
       4. 不象`maincli`。`mainsvr`函数不需要作改动。
       5. CHelloWorldSvc_SvrImpl的类图:   
-        ```
-        CHelloWorldSvc_SvrImpl          // 用户添加ridl接口方法的地方
+         ```
+         CHelloWorldSvc_SvrImpl          // 用户添加ridl接口方法的地方
             CHelloWorldSvc_SvrSkel
-                CStatCounterServer      // rpc-frmwrk的支持类，封装各种服务器端的计数器
-                IHelloWorld_SImpl       // 自动生成的服务器端的接口IHelloWorld的服务端框架，主要作请求的分发，和参数的序列化反序列化，以及返回处理结果。
-        ```
+                CStatCounterServer       // rpc-frmwrk的支持类，封装各种服务器端的计数器
+                IHelloWorld_SImpl        // 自动生成的服务器端的接口IHelloWorld的服务端框架，
+                                         // 主要作请求的分发，和参数的序列化反序列化，以及返回处理结果。
+         ```
 
 #### 添加代码：
   现在的代码不执行任何实际的任务。离我们的项目需求还有距离。
