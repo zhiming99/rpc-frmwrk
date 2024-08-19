@@ -3,6 +3,9 @@
   - [连接页(Connection)](#连接页connection)
   - [安全页(Security)](#安全页security)
   - [级联页(Multihop)](#级联页multihop)
+- [快速构建rpc-frmwrk的方法](#快速构建rpc-frmwrk的方法)
+  - [Docker容器](#docker容器)
+  - [使用shell脚本](#使用shell脚本)
 
 
 # rpc-frmwrk配置工具
@@ -84,3 +87,13 @@
    * 启用压缩功能(Compression): 对传输数据进行压缩。
    * 启用安全连接(SSL)。
    * 删除本节点(Remove Node X)。
+
+# 快速构建rpc-frmwrk的方法
+## Docker容器
+  rpc-frmwrk提供了Dockerfile，可以快速的建立编译和运行环境。
+  * 打开一个终端，下载[Dockerfile](./Dockerfile)
+  * 在Dockerfile的下载目录，运行`docker build -t 'rpc-frmwrk' . `。
+  * 你也可以对Dockerfile做一些修改，来时应自己的使用习惯和运行环境。
+## 使用shell脚本
+  * 下载如下三个文件 [buildall-deb.sh](./buildall-deb.sh), [buildall-fed.sh](./buildall-fed.sh), 和[makerpcf.sh](./makerpcf.sh)到同一个目录下.
+  * 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。

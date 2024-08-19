@@ -1,4 +1,3 @@
-[English](./README.md)
 ### rpc-frmwrk的认证机制
 rpc-frmwrk依靠认证过程来鉴别用户身份并确定是否提供RPC服务。rpc-frmwrk可以通过两种认证协议实施认证。
 
@@ -121,6 +120,7 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 ### OAuth2
 `rpc-frmwrk`的OAuth2支持是专门为浏览器的JS客户端开发的。OAuth2的认证过程是在Application Server，OAuth2服务器和浏览器之间进行的，认证成功后，`rpc-frmwrk`将使用Application Server发给浏览器的认证凭据向`Application Server`进行验证，如果通过验证，`rpc-frmwrk`的服务，比如`HelloWorld`将向用户提供服务。`rpc-frmwrk`选用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
 
+#### 与django，Springboot整合的例子
 实际上`rpc-frmwrk`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`应用服务器(application server)`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
 
 我们在`zhiming99/django-oa2cli-cgi`的镜像仓库中，准备了三个容器镜像，用于演示rpc-frmwrk和不同OAuth2的`实现`的整合。它们分别是`OAuth2-Server`, `latest`和`springboot-oa2check`。对应的是django的OAuth2的服务器，django的OAuth2客户端app, 和springboot的OAuth2的客户端app。用户可以通过命令行拉取，比如`docker pull zhiming99/django-oa2cli-cgi:OAuth2-Server`。

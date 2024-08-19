@@ -219,8 +219,8 @@ service SimpFileSvc [ stream ]
 ### C++, Python, Java和JavaScript的客户端可以交叉访问其他语言的服务器。
 微服务架构的客户端，目前只能访问微服务架构的服务器。C/S架构的客户端可以访问两种架构的服务器。
 
-### `-b`选项生成的`BuiltinRt App`的命令行选项
-#### 服务器
+### `-b`选项生成的`紧凑模式App`的命令行选项
+#### 服务器程序的命令行选项
 ```
 	[ -m <mount point> 通过`rpcfs`文件系统把运行时的状态信息以虚拟文件的形式导出，导出的目录为'mount point'. ]
 	[ -a 开启认证功能. 具体是kerberos还是OAuth2,视系统配置而定 ]
@@ -234,7 +234,7 @@ service SimpFileSvc [ stream ]
 	[ --instname <名称> 指定服务器的实例名称，缺省时，实例名称在object description文件中. ]
 	[ -h 帮助信息 ]
 ```
-#### 客户端
+#### 客户端程序的命令行选项
 ```
 	[ -a 开启认证功能. 具体是kerberos还是OAuth2,视系统配置而定. ]
 	[ -d 以守护进程的方式运行. ]

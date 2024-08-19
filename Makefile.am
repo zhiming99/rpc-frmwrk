@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS= -I m4
-SUBDIRS=3rd_party combase ipc logger
+SUBDIRS=3rd_party combase ipc logger docs
 
 if ENABLE_FUSE3
 SUBDIRS += fuse

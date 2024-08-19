@@ -65,6 +65,7 @@
 10. `npm 9.0 and webpack`（可选）
 11. `FUSE-3`（可选）
 12. `GmSSL 3.0`（可选）
-
+## 文档
+  文档索引见[Index](./docs/index_cn.md)
 ## TODO
 1. 请参考[`问题`](https://github.com/zhiming99/rpc-frmwrk/issues)

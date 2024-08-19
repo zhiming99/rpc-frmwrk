@@ -428,6 +428,7 @@ AC_CONFIG_FILES([Makefile
                  python/setup.py
                  js/Makefile
                  logger/Makefile
+                 docs/Makefile
                  rpcf.pc ])
 
 AM_CONDITIONAL([ENABLE_TESTCASES],[test x$enable_testcases = xyes])
