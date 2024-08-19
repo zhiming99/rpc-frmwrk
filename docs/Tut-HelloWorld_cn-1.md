@@ -28,7 +28,7 @@
       2. 创建CHelloWorldSvc_CliImpl对象。这个对象对应ridl文件里的HelloWorldSvc服务。
       3. 启动CHelloWorldSvc_CliImp，连接远端的服务器。如果不成功就退出。
       4. 启动成功后，调用`maincli`, 从这里开始控制就转为用户逻辑了。这里将添加我们的代码。
-      5. CHelloWorldSvc_CliImpl的类图:
+      5. CHelloWorldSvc_CliImpl的类图:   
         ```
         CHelloWorldSvc_CliImpl          // 客户端的主要对象
             CHelloWorldSvc_SvrSkel
@@ -41,7 +41,7 @@
       2. 创建CHelloWorldSvc_SvrImpl对象。这个对象对应ridl文件里的HelloWorldSvc服务。
       3. 启动CHelloWorldSvc_SvrImpl，进入循环等待客户端的请求。
       4. 不象`maincli`。`mainsvr`函数不需要作改动。
-      5. CHelloWorldSvc_SvrImpl的类图:
+      5. CHelloWorldSvc_SvrImpl的类图:   
         ```
         CHelloWorldSvc_SvrImpl          // 用户添加ridl接口方法的地方
             CHelloWorldSvc_SvrSkel
@@ -53,7 +53,7 @@
   现在的代码不执行任何实际的任务。离我们的项目需求还有距离。
   * 代码规范
     `rpc-frmwrk`的函数一般要有返回值，返回值为POSIX定义的错误码，或者在头文件[defines.h](../include/defines.h)定义的错误码。错误码小于0。
-  * 在客户端，我们在`maincli`中添加发送字符串的功能。
+  * 在客户端，我们在`maincli`中添加发送字符串的功能。   
     ```
     gint32 maincli(
         CHelloWorldSvc_CliImpl* pIf,
@@ -72,7 +72,7 @@
       return ret;
     }
     ```
-  * 在服务端，我们需要在CHelloWorldSvc_SvrImpl实现Echo的服务器版做修改。
+  * 在服务端，我们需要在CHelloWorldSvc_SvrImpl实现Echo的服务器版做修改。   
     ```
     gint32 CHelloWorldSvc_SvrImpl::Echo(
       const std::string& strText /*[ In ]*/,  // In代表strText是输入参数
@@ -85,7 +85,7 @@
  
   * 这样我们就完成了客户端和服务端的修改。
 #### 看一眼HelloWorlddesc.json
-  HelloWorlddesc.json是客户端和服务器端的配置文件。不需要修改。
+  HelloWorlddesc.json是客户端和服务器端的配置文件。不需要修改。   
   ```
   {
       "ClassFactories": [],
