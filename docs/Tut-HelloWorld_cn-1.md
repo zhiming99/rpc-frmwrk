@@ -4,7 +4,7 @@
 * 用[ridlc](../ridl/README_cn.md#启动ridlc)生成HelloWorld项目。
 * HelloWorld服务器程序和客户端程序的结构
 * 对客户端和服务器端进行修改，完成所需要的功能。
-* 编译和运行
+* 编译，运行和检查结果。
 
 ### 项目需求
 客户端发送字符串`Hello, World!`到服务器，接受服务器的响应，并打印。
@@ -32,7 +32,7 @@
          ```
          CHelloWorldSvc_CliImpl          // 客户端的主要对象
             CHelloWorldSvc_SvrSkel
-                CStatCounterProxy        // rpc-frmwrk的支持类，封装各种服务器端的计数器
+                CStatCounterProxy        // rpc-frmwrk的支持类，封装各种客户端的计数器
                 IHelloWorld_PImpl        // 自动生成的服务器端的接口IHelloWorld的客户端框架，
                                          // 用于发送请求，参数的序列化反序列化，以及接收响应。
          ```
@@ -48,7 +48,7 @@
             CHelloWorldSvc_SvrSkel
                 CStatCounterServer       // rpc-frmwrk的支持类，封装各种服务器端的计数器
                 IHelloWorld_SImpl        // 自动生成的服务器端的接口IHelloWorld的服务端框架，
-                                         // 主要作请求的分发，和参数的序列化反序列化，以及返回处理结果。
+                                         // 主要接收请求并分发，参数的序列化反序列化，以及返回处理结果。
          ```
 
 #### 添加代码：
@@ -131,6 +131,7 @@
   }
   ```
 #### 编译
+  * 目前`rpc-frmwrk`只支持Linux，所以所有的环境都是Linux系统。Windows用户请先用WSL或者虚拟机进行操作。
   * 在命令行下，我们可以看到在`hellowld`目录下有`Makefile`。只要输入`make -j4`命令即可。如果想要debug版，就输入`make debug -j4`。
   * 编译完后会提示`Configuration updated successfully`。这表示已经和系统的设置同步了, 可以运行了。也可以手动的运行 `python3 synccfg.py`来同步。
   * 在`hellowld/release`目录下，我们应该能找到`HelloWorldsvr`和`HelloWorldcli`两个程序。
@@ -140,4 +141,3 @@
   * 在服务器端运行`release/HelloWorldsvr`。
   * 在客户端运行`release/HelloWorldcli`。
   * 当出现`Echo request succeeded with resp 'Hello, World!'(0)`时，表示项目需求已完成。
- 

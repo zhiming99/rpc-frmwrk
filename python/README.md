@@ -8,7 +8,7 @@ The Python support for RPC-Frmwrk is an API wrapper over the C++ RPC-Frmwrk. It 
 The features the python wrapper can deliver are almost the same as C/C++ RPC-Frmwrk, except the two test cases `inproctst` and the `btinrtst`, which involves in-process IPC. You can refer to the tests directory to find more details about the supported features.
 
 ### Building your Python RPC applications
-I strongly recommend you to use the `ridlc` to generate the Python skelton code, which can be the start point of your Python RPC application. The information about `ridlc` can be found [here](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl#introduction).
+I strongly recommend you to use the `ridlc` to generate the Python skelton code, which can be the start point of your Python RPC application. The information about `ridlc` can be found [here](../ridl/README.md#introduction).
 
 ### Technical Information
 At present, Python wrapper suport 3 types of serializations for data communication.
