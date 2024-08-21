@@ -67,3 +67,4 @@
 * rpc-frmwrk开发教程
   * [教程1-Hello, World!](./Tut-HelloWorld_cn-1.md)
   * [教程2-发送和接收'事件'](./Tut-SendEvent_cn-2.md)
+  * [教程3-异步请求和处理](./Tut-AsyncRequest_cn-3.md)
