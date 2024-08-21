@@ -1,4 +1,8 @@
 ---
+[`Tue Aug 20 2024 11:41:35 PM Beijing`]   
+1. Added and updated Chinese version documentation.
+2. Next, we will add a persistant registry, which will be the cornor stone for monitoring and site administration.
+
 [`Mon Jul 29 2024 11:49:02 PM Beijing`]   
 1. still trying to get springboot oauth2 to work. It is much more difficult to get springboot oauth2 to work than that of django oauth2. 
    
