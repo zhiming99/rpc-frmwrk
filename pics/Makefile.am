@@ -22,4 +22,5 @@ select-auth-mech.png \
 rpcfg2-1.png \
 rpcfg2-2.png \
 rpcfg2-3.png \
-rpcfg2-4.png 
+rpcfg2-4.png \
+new.png

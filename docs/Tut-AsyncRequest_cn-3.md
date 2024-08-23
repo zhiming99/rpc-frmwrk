@@ -1,6 +1,6 @@
 
 # C++开发教程
-## 第三节 发送和处理服务器事件
+## 第三节 异步请求和处理
 **本节要点**：   
 * 异步请求和异步处理的特点及流程
 * AsyncTest服务器程序和客户端程序的结构
@@ -32,58 +32,58 @@
           * 当使用ridlc生成框架代码时，客户端会生成以下两个方法:
               ```
               //RPC Async Req Sender
-              gint32 LongWait(                              // 发送LongWait的方法，已实现，直接调用就可以了
-                  IConfigDb* context,                       // context用于存放用户相关的参数
-                  const std::string& i0,  /*[ In ]*/        // 输入参数i0
-                  std::string& i0r /*[ Out ]*/);            // 输出参数i0r
-                                                            // 返回值需要关注
-                                                            // 返回 0， 表示该方法完成了，i0r里面是服务器的消息
-                                                            // 返回 STATUS_PENDING，表示系统已经接收了请求，然后通过下面的
-                                                            // 'LongWaitCallBack'回调函数处理服务器的返回消息
-                                                            // 返回值小于0, 表示出错了，进行出错处理。
+              gint32 LongWait(                                  // 发送LongWait的方法，已实现，直接调用就可以了
+                  IConfigDb* context,                           // context用于存放用户相关的参数
+                  const std::string& i0,  /*[ In ]*/            // 输入参数i0
+                  std::string& i0r /*[ Out ]*/);                // 输出参数i0r
+                                                                // 返回值需要关注
+                                                                // 返回 0， 表示该方法完成了，i0r里面是服务器的消息
+                                                                // 返回 STATUS_PENDING，表示系统已经接收了请求，然后通过下面的
+                                                                // 'LongWaitCallBack'回调函数处理服务器的返回消息
+                                                                // 返回值小于0, 表示出错了，进行出错处理。
 
               // IAsyncTest
-              virtual gint32 LongWaitCallback(              // 异步方法LongWait的回调函数, 命名格式是'方法名+Callback'
-                                                            // 定义在AsyncTestcli.cpp中，等待用户添加实现代码。
-                  IConfigDb* context,                       // 该参数来自上面的LongWait
-                  gint32 iRet,                              // iRet是系统给的返回值，0：成功，返回消息在i0r里面。小于0，出错，没有返回消息。
-                  const std::string& i0r /*[ In ]*/ );      // i0r是服务器端的返回消息，只有在上面的iRet为0时才有意义。
-                                                            // 注意: 当返回值时错误码时，错误的来源既可能来自服务器，也可能来自本地的代码。
+              virtual gint32 LongWaitCallback(                  // 异步方法LongWait的回调函数, 命名格式是'方法名+Callback'
+                                                                // 定义在AsyncTestcli.cpp中，等待用户添加实现代码。
+                  IConfigDb* context,                           // 该参数来自上面的LongWait
+                  gint32 iRet,                                  // iRet是系统给的返回值，0：成功，返回消息在i0r里面。小于0，出错，没有返回消息。
+                  const std::string& i0r /*[ In ]*/ );          // i0r是服务器端的返回消息，只有在上面的iRet为0时才有意义。
+                                                                // 注意: 当返回值时错误码时，错误的来源既可能来自服务器，也可能来自本地的代码。
               ```
     2. 服务器端
           * 方法LongWait有一个输入参数i0, 是字符串类型, 一个输出类型i0r, 也是字符串类型，和一个pReqCtx_参数，含义见注释。
           * 当使用ridlc生成框架代码时， 服务器端会生成以下三个方法:
             ```
-            gint32 LongWait(                              // LongWait请求的主处理方法， 定义在AsyncTestsvr.cpp中， 等待用户实现代码
-                IConfigDb* pReqCtx_,                      // LongWait请求的系统上下文，里面有一些Callback和Session信息，你也可以往里面加东西，但不要删掉
-                                                          // 或者覆盖原有的东西。
-                const std::string& i0 /*[ In ]*/,         // 输入参数 i0, 来自客户端的参数
-                std::string& i0r /*[ Out ]*/ );           // 输出参数 i0r用来放返回给客户端的参数。
-                                                          // 返回值：返回值是0时，代表告诉系统，处理成功，i0r中有返回参数
-                                                          //        返回值<0时，代表该请求出错，通知系统返回错误码给客户端。
-                                                          //        返回值是STATUS_PENDING时，代表该请求仍在处理中，后续会调用LongWaitComplete通知完成
-                                                          // 注释：有人会费解'后续调用'是什么操作，很简单，比如你把用户请求传递给一个任务或者专门的线程去处理，
-                                                          // 当处理完成后，该任务或者线程调用LongWaitComplete通知结果。当然这个阶段，你需要把pReqCtx_找个
-                                                          // 地方存起来，以便在调用LongWaitComplete的时候，可以提供该参数。
+            gint32 LongWait(                                    // LongWait请求的主处理方法， 定义在AsyncTestsvr.cpp中， 等待用户实现代码
+                IConfigDb* pReqCtx_,                            // LongWait请求的系统上下文，里面有一些Callback和Session信息，你也可以往里面加东西，但不要删掉
+                                                                // 或者覆盖原有的东西。
+                const std::string& i0 /*[ In ]*/,               // 输入参数 i0, 来自客户端的参数
+                std::string& i0r /*[ Out ]*/ );                 // 输出参数 i0r用来放返回给客户端的参数。
+                                                                // 返回值：返回值是0时，代表告诉系统，处理成功，i0r中有返回参数
+                                                                //        返回值<0时，代表该请求出错，通知系统返回错误码给客户端。
+                                                                //        返回值是STATUS_PENDING时，代表该请求仍在处理中，后续会调用LongWaitComplete通知完成
+                                                                // 注释：有人会费解'后续调用'是什么操作，很简单，比如你把用户请求传递给一个任务或者专门的线程去处理，
+                                                                // 当处理完成后，该任务或者线程调用LongWaitComplete通知结果。当然这个阶段，你需要把pReqCtx_找个
+                                                                // 地方存起来，以便在调用LongWaitComplete的时候，可以提供该参数。
 
-            gint32 LongWaitComplete(                      // LongWaitComplete是系统生成代码，相当于服务器端异步处理的收尾函数。命名格式 '方法名'+Complete.
-                                                          // 它通知系统，由用户代码调用， 通知系统向客户端返回处理结果。
-                IConfigDb* pReqCtx_,                      // pReqCtx_, 来自LongWait方法的输入参数。
-                gint32 iRet,                              // 返回值： 返回值是0时，代表该请求已完成，i0r中有返回参数
-                                                          //         返回值<0时，代表该请求出错，通知系统返回错误码给客户端。
-                                                          //         不能返回STATUS_PENDING
-                const std::string& i0r );                 // 返回参数 i0r, 只有当iRet为0时有效。其他时候忽略。
+            gint32 LongWaitComplete(                            // LongWaitComplete是系统生成代码，相当于服务器端异步处理的收尾函数。命名格式 '方法名'+Complete.
+                                                                // 它通知系统，由用户代码调用， 通知系统向客户端返回处理结果。
+                IConfigDb* pReqCtx_,                            // pReqCtx_, 来自LongWait方法的输入参数。
+                gint32 iRet,                                    // 返回值： 返回值是0时，代表该请求已完成，i0r中有返回参数
+                                                                //         返回值<0时，代表该请求出错，通知系统返回错误码给客户端。
+                                                                //         不能返回STATUS_PENDING
+                const std::string& i0r );                       // 返回参数 i0r, 只有当iRet为0时有效。其他时候忽略。
 
-            gint32 OnLongWaitCanceled(                    // OnLongWaitCanceled，当请求被系统取消时，会被调用到的方法。该方法定义在AsyncTestsvr.h中，
-                                                          // 你可以自行决定是否替换
-                                                          // 现有的打印语句，换上更有意义的代码。命名格式 'On'+'方法名'+'Cacneled'。当系统取消长时间没有调用
-                                                          // LongWaitComplete的请求时，客户端主动取消该请求时，或者发生严重错误，如连接中断时，系统会在清理未
-                                                          // 完成请求的过程中，
-                                                          // 调用此方法。此时系统已经向客户端发送了处理结果，所以不能在这里发LongWaitComplete了。此方法只是提供
-                                                          // 一个方便用户回收占用的资源的时机。
-                IConfigDb* pReqCtx,                       // 输入参数 pReqCtx, 来自LongWait的输入参数pReqCtx_
-                gint32 iRet,                              // 返回值：该返回值为一个错误码，通知错误的原因。
-                const std::string& i0 /*[ In ]*/ )        // 输入参数 i0，来自LongWait的输入参数i0。
+            gint32 OnLongWaitCanceled(                          // OnLongWaitCanceled，当请求被系统取消时，会被调用到的方法。该方法定义在AsyncTestsvr.h中，
+                                                                // 你可以自行决定是否替换
+                                                                // 现有的打印语句，换上更有意义的代码。命名格式 'On'+'方法名'+'Cacneled'。当系统取消长时间没有调用
+                                                                // LongWaitComplete的请求时，客户端主动取消该请求时，或者发生严重错误，如连接中断时，系统会在清理未
+                                                                // 完成请求的过程中，
+                                                                // 调用此方法。此时系统已经向客户端发送了处理结果，所以不能在这里发LongWaitComplete了。此方法只是提供
+                                                                // 一个方便用户回收占用的资源的时机。
+                IConfigDb* pReqCtx,                             // 输入参数 pReqCtx, 来自LongWait的输入参数pReqCtx_
+                gint32 iRet,                                    // 返回值：该返回值为一个错误码，通知错误的原因。
+                const std::string& i0 /*[ In ]*/ )              // 输入参数 i0，来自LongWait的输入参数i0。
 
             ```
 
@@ -92,15 +92,15 @@
   * 标签async_p说明该方法在客户端是异步的，在服务器端是同步的。
   * 参考上面对LongWait的客户端的方法的分析，ridlc为它生成了两个客户端方法。
     ```
-    gint32 LongWaitNoParam(                         // 已实现
+    gint32 LongWaitNoParam(                                     // 已实现
         IConfigDb* context );
 
-    gint32 LongWaitNoParamCallback(                 // 待实现
+    gint32 LongWaitNoParamCallback(                             // 待实现
         IConfigDb* context, gint32 iRet );
     ```
   * 在服务器端，ridlc生成了一个方法:
     ```
-    gint32 LongWaitNoParam();                       // 待实现，注意比较同步的服务器处理函数和异步的服务器处理函数的参数上有什么不同。
+    gint32 LongWaitNoParam();                                   // 待实现，注意比较同步的服务器处理函数和异步的服务器处理函数的参数上有什么不同。
     ```
 
  ##### [async_s]LongWait2( string i1 ) returns ( string i1r )
@@ -108,21 +108,21 @@
   * 标签async_s说明该方法在客户端是同步的，在服务器端是异步的。
   * 参考上面对LongWait的服务器端的方法的分析，ridlc为它生成了一个客户端方法。
     ```
-    gint32 LongWait2( const std::string& i1,        // 已实现, 注意比较客户端同步的接口方法和异步的接口方法在参数上有什么不同。
+    gint32 LongWait2( const std::string& i1,                    // 已实现, 注意比较客户端同步的接口方法和异步的接口方法在参数上有什么不同。
       std::string& i1r );  
     ```
   * 参考上面对LongWait的服务器端的方法的分析，ridlc为LongWait2生成了三个服务器端方法。
     ```
-    gint32 LongWait2(                               // 待实现
+    gint32 LongWait2(                                           // 待实现
         IConfigDb* pReqCtx_,
         const std::string& i1 /*[ In ]*/,
         std::string& i1r /*[ Out ]*/ );
 
-    gint32 LongWait2Complete(                       // 已实现
+    gint32 LongWait2Complete(                                   // 已实现
         IConfigDb* pReqCtx_, gint32 iRet,
         const std::string& i1r );
 
-    gint32 OnLongWait2Canceled(                     // 已实现，可替换。
+    gint32 OnLongWait2Canceled(                                 // 已实现，可替换。
         IConfigDb* pReqCtx,
         gint32 iRet,
         const std::string& i1 /*[ In ]*/ );
@@ -198,7 +198,7 @@
     ```   
     另外两个接口方法的修改方法与上面的方法相同。
 
-  * 服务器端, ridlc为LongWait产生了三个方法, 如下列代码：
+  * 服务器端, ridlc为LongWait产生的三个方法中, 只有LongWait是待实现，也就是我们要修改的重点。
     ```
       gint32 LongWait(                                          // 待实现
           IConfigDb* pReqCtx_,
@@ -215,9 +215,9 @@
         IConfigDb* pReqCtx_, gint32 iRet,
         const std::string& i0r );
     ```
-    所以对LongWait的改造是我们在服务器端要做的工作。
-    * 为了模拟一个异步处理，我们这里使用了一个定时器。 定时5秒之后完成LongWait请求。
-    * 由于定时器也要自己的回调函数，我们在CAsyncTest_SvrImpl里增加了一个LongWaitCb的定时器回调函数。
+    一下是LongWait的改造的任务列表：
+    * 为了模拟一个异步处理，我们使用了一个定时器。 约定5秒之后完成LongWait请求。
+    * 由于定时器也是异步的，也要自己的回调函数，我们在CAsyncTest_SvrImpl里增加了一个LongWaitCb的定时器回调函数。
     * 由于定时器分配了系统资源，所以我们要改写OnLongWaitCanceled, 万一请求被取消，可以释放定时器资源。
     * 这样我们有三个函数要改
       ```
@@ -272,7 +272,7 @@
         }
 
       ```
-  * 服务器端, ridlc为LongWait2同样产生了三个方法, 和LongWait类似。不再赘述。
+  * 服务器端, ridlc为LongWait2同样产生了三个方法, 和LongWait的服务器端生成方法类似。不再重复。
     这里解释一下LongWait2的模拟异步处理的实现方法。
     ```
       gint32 CAsyncTest_SvrImpl::LongWait2(
@@ -282,9 +282,10 @@
       {
           CIoManager* pMgr = GetIoMgr();
           gint32 ret = DEFER_CALL(                              // DEFER_CALL宏生成一个任务对象(CTasklet)，并加入到执行队列中
-              pMgr, this,                                       // DEFER_CALL的作用是使指定函数在当前调用栈之外执行。
-              &CAsyncTest_SvrImpl::LongWait2Cb,                 // 这个任务对象将以pReqCtx_和i1为参数，调用方法LongWait2Cb
-              pReqCtx_, i1 );                                   // 这也是异步的处理，但是和Timer不一样的是，它不需要OnLongWait2Canceled回收Timer资源。
+              pMgr, this,                                       // DEFER_CALL的作用是在当前调用栈之外，用给定的参数调用给定的函数。
+              &CAsyncTest_SvrImpl::LongWait2Cb,                 // 具体到这个任务对象, 就是在其他线程上或者退出LogWait2后，以pReqCtx_和i1为参数，
+                                                                // 调用方法LongWait2Cb。
+              pReqCtx_, i1 );                                   // 这也是异步的处理，但是和LongWait不一样的是，它不需要OnLongWait2Canceled回收资源。
 
           if( ERROR( ret ) )
               return ret;
@@ -293,9 +294,11 @@
       }
 
     ```
-  * 剩下的LongWaitNoParam的改造过程，大家可以参考代码[asynctst](../examples/cpp/asynctst/)分析和理解。
+  * 剩下的LongWaitNoParam的改造过程，大家可以参考[asynctst](../examples/cpp/asynctst/)目录下的代码，分析和理解。
 
   * 这样我们就完成了客户端和服务端的修改。
+#### 问题
+  1. 异步函数对应的必须会产生回调函数，那么就要在类里面定义新的方法，有没有更加简便的方法呢？有的，也可以使用lambda函数。在后面的课程中，我们将会讲到这个方法。
 
 #### 编译
   * 在命令行下，我们可以看到在`asynctst`目录下有`Makefile`。只要输入`make -j4`命令即可。如果想要debug版，就输入`make debug -j4`。

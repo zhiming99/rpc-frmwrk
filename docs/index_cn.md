@@ -64,7 +64,8 @@
   - [性能](../Concept_cn.md#性能)
   - [开发和调试](../Concept_cn.md#开发和调试)
   - [意见和建议](../Concept_cn.md#意见和建议)
-* rpc-frmwrk开发教程
+* rpc-frmwrk开发教程 ![new](../pics/new.png)
   * [教程1-Hello, World!](./Tut-HelloWorld_cn-1.md)
   * [教程2-发送和接收'事件'](./Tut-SendEvent_cn-2.md)
   * [教程3-异步请求和处理](./Tut-AsyncRequest_cn-3.md)
+  * [教程4-取消已发出的请求](./Tut-CancelRequest_cn-4.md)
