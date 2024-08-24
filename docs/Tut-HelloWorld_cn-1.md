@@ -25,7 +25,7 @@
   * 客户端的程序入口定义在`maincli.cpp`， 服务端的程序入口定义在`mainsvr.cpp`中。
   * 客户端的流程是这样的：
       1. 初始化上下文，在这里创建和启动CIoManager对象，这是`rpc-frmwrk`中最重要的对象。对它的访问贯穿整个程序。
-      2. 创建CHelloWorldSvc_CliImpl对象。这个对象对应ridl文件里的HelloWorldSvc服务。
+      2. 创建CHelloWorldSvc_CliImpl对象。这个对象对应ridl文件里的HelloWorldSvc服务。命名格式'C'+'服务名'+'_CliImpl'。
       3. 启动CHelloWorldSvc_CliImp，连接远端的服务器。如果不成功就退出。
       4. 启动成功后，调用`maincli`, 从这里开始控制就转为用户逻辑了。这里将添加我们的代码。
       5. CHelloWorldSvc_CliImpl的类图:   
@@ -39,7 +39,7 @@
 
   * 服务端的流程如下：
       1. 初始化上下文，在这里创建和启动CIoManager对象。
-      2. 创建CHelloWorldSvc_SvrImpl对象。这个对象对应ridl文件里的HelloWorldSvc服务。
+      2. 创建CHelloWorldSvc_SvrImpl对象。这个对象对应ridl文件里的HelloWorldSvc服务。命名格式'C'+'服务名'+'_SvrImpl'。
       3. 启动CHelloWorldSvc_SvrImpl，进入循环等待客户端的请求。
       4. 不象`maincli`。`mainsvr`函数不需要作改动。
       5. CHelloWorldSvc_SvrImpl的类图:   
@@ -141,3 +141,4 @@
   * 在服务器端运行`release/HelloWorldsvr`。
   * 在客户端运行`release/HelloWorldcli`。
   * 当出现`Echo request succeeded with resp 'Hello, World!'(0)`时，表示项目需求已完成。
+  * 我们之所以使用同一机器为的是简单。更理想的方式是在两台机器上作实验，或者在虚拟机，Docker容器里也可以。就留给大家自行练习吧。
