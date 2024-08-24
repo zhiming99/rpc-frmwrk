@@ -12,7 +12,7 @@
 ### 生成EventTest的C++项目框架
 本节课我们使用[iftest.ridl](../examples/iftest.ridl)来生成该项目框架。
 
-#### 首先，先看看该ridl里的内容和上节课的有什么差异：
+#### 首先，先看看该ridl里的内容：
   * 在接口IEchoThings上定义了一个叫`Echo`的方法，它的输入参数和输出参数都是GlobalFeatureList类型的结构。
   * `service`关键字定义了一个叫IfTest的服务，和别的服务不同之处是，服务名后面有一个`timeout`的标签。该标签指定了这个服务里的所有方法的默认超时时限是100秒。
   * 我们的重点是学习定义用于传输的复杂结构
@@ -36,11 +36,12 @@
     * 映射(map)会被ridlc在C++中转换成std::map。
     * 有关类型的对应关系可以参考。   
         ![ridl数据类型和各个语言的数据类型的对照表](../pics/ridldatatype.png)
-    * 如果要使用rpc-frmwrk自带的可以序列化的容器类，可以直接用于接口参数的类型，这时该类型在ridl里就表示成ObjPtr，不用指定具体类型。
+    * rpc-frmwrk自带了一些可以序列化的容器类，可以直接用于接口参数的类型，这些类型在ridl里就统一表示成ObjPtr，不用指定具体类型。
     * rpc-frmwrk的可序列化容器类声明在[stlcont.h](../include/stlcont.h)。
     * 最常见的rpc-frmwrk的可序列化容器是CConfigDb2, 也就函数参数里常见的`IConfigDb*`。它也可以直接用在接口的参数中, 如果想向对方
       发一个IConfigDb*类型的数据，在ridl里用ObjPtr定义这个参数或者字段。
-    * 还有一种ridl里出现的类型是HSTREAM类型，也是可序列化数据类型，它定义的是`流`的句柄，用来唯一标识一个服务器和客户端之间的`流通道`。有关它的使用，我们会在后面的课程中介绍。
+    * 还有一种ridl里出现的类型是HSTREAM类型，也是可序列化数据类型，它定义的是`流`的句柄，用来唯一标识一个服务器和客户端之间的`流通道`。
+      有关它的使用，我们会在后面的课程中介绍。
 
 #### 添加代码：
   * 在客户端，我们在`maincli`中声明和初始化两个GlobalFeatureList和GlobalFeature的变量。
