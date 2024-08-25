@@ -142,3 +142,6 @@
   * 在客户端运行`release/HelloWorldcli`。
   * 当出现`Echo request succeeded with resp 'Hello, World!'(0)`时，表示项目需求已完成。
   * 我们之所以使用同一机器为的是简单。更理想的方式是在两台机器上作实验，或者在虚拟机，Docker容器里也可以。就留给大家自行练习吧。
+
+[下一讲](./Tut-SendEvent_cn-2.md)   
+[上一讲](./Tut-Overview_cn-0.md)   

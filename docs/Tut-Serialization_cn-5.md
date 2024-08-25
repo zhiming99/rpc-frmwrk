@@ -63,3 +63,5 @@
   * 在服务器端运行`release/iftestsvr`，在客户端运行`release/iftestcli`。
   * 当客户端出现`Echo completed successfully(0)`时，表示项目的第一个目标完成。
     C++下打印结构比冗长，在例子中我们只是打印了一下结果。想看漂亮打印的，可以运行一下Python的"iftest"。
+
+[上一讲](./Tut-CancelRequest_cn-4.md)   

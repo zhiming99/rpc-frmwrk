@@ -111,3 +111,5 @@
   * 当客户端出现`received event Hello, World!(0)`时，表示项目的第一个目标完成。
   * 我们用`for((i=0;i<2;i++));do debug/evtestcli & done`启动两个`evtestcli`， 观察一下是两个客户端是否都打印了接收到的事件。这样我们的第二个目标就完成了。
  
+[下一讲](./Tut-AsyncRequest_cn-3.md)   
+[上一讲](./Tut-HelloWorld_cn-1.md)   

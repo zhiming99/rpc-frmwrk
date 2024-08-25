@@ -5,10 +5,15 @@
 * rpc-frmwrk的请求处理流程
 * rpc-frmwrk的内存管理
 
+### 目标观众
+  * 使用ridl和ridlc开发rpc-frmwrk的开发人员。
+  * 对rpc-frmwrk感兴趣或者希望改进rpc-frmwrk的技术爱好者。
+  * 对学习异步编程或者C++编程感兴趣的人们。
+
 ### rpc-frmwrk的架构和技术特点
   * rpc-frmwrk是一个分布式的系统，微服务模式下的系统块图如下图:   
      ![block-diagram](../pics/rpc-block-diagram.png)   
-  * rpc-frmwrk的各个模块是通过TCP连接，`Unix Socket`和DBus连接在一起，对于用户代码透明，可通过`rpcfg.py`或者配置文件进行设置。
+  * rpc-frmwrk的各个模块是通过TCP，`Unix Socket`和DBus连接在一起，连接类型对用户代码透明，可通过`rpcfg.py`或者配置文件进行设置。
   * 客户端和服务器端程序，以及rpcrouter都是多线程的，完全并发的环境。几乎所有线程都处于各个运行对象共享的状态。
   * ridl文件里，有个[service](../ridl/README_cn.md#语句)的概念。服务器是一个或者数个`service`实例的集合，同样客户端则是一个或者数个`service`实例集合。
   * 服务器端的`service`继承自`CInterfaceServer`，客户端的`service`继承自`CInterfaceProxy`。
@@ -20,19 +25,20 @@
     我们将在下面的课程中，看到这两种情况的应用。
   
 ### rpc-frmwrk的请求处理流程
-  * 下图是客户端RPC请求的异步处理流程。   
+  * 下图是微服务模式下客户端RPC请求的异步处理流程。   
      ![client process](../pics/client-req-process.png)   
 
-  * 下图是服务器端RPC请求的异步处理流程。   
+  * 下图是微服务模式下服务器端RPC请求的异步处理流程。   
      ![server process](../pics/server-req-process.png)   
 
 ### rpc-frmwrk的内存管理
-rpc-frmwrk定义的Class大部分基于共同的基类CObjBase，并具有唯一的32位`class id`。这使得这些类可以通过类工厂建立，并由引用技术控制对象的生命周期。
+rpc-frmwrk定义的Class大部分基于共同的基类CObjBase，并具有唯一的32位`class id`。这使得这些类可以通过类工厂建立，并由引用计数控制对象的生命周期。
 一种常用的建立对象实例的方法是使用智能指针，如ObjPtr来建立和持有rpc-frmwrk对象的所有权。比如   
 ```
 ObjPtr pObj;
 pObj.NewObj( clsid( CConfigDb2 ));
 ```
+当`pObj`退出作用域时，就释放了它所持有的类对象。
 而向`sevice`之类比较复杂的类对象，一般是有配置文件的。这类对象的建立稍微复杂一些，需要传入配置参数。
 ```
     CParamList oParams;
@@ -51,3 +57,4 @@ pObj.NewObj( clsid( CConfigDb2 ));
 ```
 
 ## 有了以上的知识，我们可以更好的理解接下来的教程了
+[下一讲](./Tut-HelloWorld_cn-1.md)
