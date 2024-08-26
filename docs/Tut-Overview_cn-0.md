@@ -4,9 +4,11 @@
 * rpc-frmwrk的架构和技术特点
 * rpc-frmwrk的请求处理流程
 * rpc-frmwrk的内存管理
+* rpc-frmwrk的Port堆栈
 
 ### 目标观众
-  * 使用ridl和ridlc开发rpc-frmwrk的开发人员。
+  * 有一定的编程基础，对C++比较熟悉，并且有开发经验的
+  * 计划使用ridl和ridlc开发rpc-frmwrk的开发人员。
   * 对rpc-frmwrk感兴趣或者希望改进rpc-frmwrk的技术爱好者。
   * 对学习异步编程或者C++编程感兴趣的人们。
 
@@ -55,6 +57,24 @@ pObj.NewObj( clsid( CConfigDb2 ));
     if( ERROR( ret ) )
         break;
 ```
+### rpc-frmwrk的线程的种类和限制
+* rpc-frmwrk的线程主要有以下两类：
+    * `event loop`线程是处理poll的事件的消息循环。一般用于处理系统的I/O事件。
+    * `TaskThread`和`TaskThreadOneshot`是处理任务队列的线程，按照FIFO的顺序处理CTasklet对象。
+* 一个rpc-frmwrk的应用程序包含如下的线程：
+    * 主线程，rpc-frmwrk的初始化线程
+    * `mainloop`，一个单独建立的`event loop`线程，专门用来分发DBus的事件和消息。
+    * `CTaskThread`，一个由单独的CTaskThreadPool管理的`TaskThread`线程。个数随处理器的个数的不同而不同，服务器端多于客户端。
+    * `UxTask-x`，由CThreadPools管理的`event loop`线程。用于Unix Socket的连接管理。rpcrouter还有`SockLoop-x`用于TCP连接管理的线程。
+    * 服务器程序的logger线程，一个专门把log信息上传给log服务器的线程。
+    * `CTaskThreadOneshot`线程，动态建立的线程，用于执行一些耗时，不能异步的操作。
+    * 除了主线程和`CTaskThreadOneshot`线程可以阻塞之外，其他的线程都只运行非阻塞任务，所以尽量不要在这些线程上长时间的等待，以防性能下降或者死锁等问题。
+
+### rpc-frmwrk的Port堆栈
+* rpc-frmwrk的Port堆栈，可以应对复杂的I/O需求。可以通过动态的插入功能性或者过滤性的Port对象，实现增加或删减传输协议，调整服务质量，过滤数据等功能。
+* Port之间通过IRP进行数据传递，并通知I/O完成，调用回调函数等。和`CInterfaceProxy`这类对象通过`CTasklet`对象执行任务和完成任务的方式十分不同。
+  不过这并不排斥Port使用Task。实际上`IRP`有一定的限制，对于多个I/O任务的管理不如`CIfTaskGroup`简便高效，所以两者会结合使用。
+* 在上面的处理流程中的绿色对象是Port堆栈上的Port对象。
 
 ## 有了以上的知识，我们可以更好的理解接下来的教程了
 [下一讲](./Tut-HelloWorld_cn-1.md)
