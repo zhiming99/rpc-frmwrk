@@ -4,7 +4,8 @@
 * rpc-frmwrk的架构和技术特点
 * rpc-frmwrk的请求处理流程
 * rpc-frmwrk的内存管理
-* rpc-frmwrk的Port堆栈
+* rpc-frmwrk的线程管理
+* rpc-frmwrk的IoManager和Port堆栈
 
 ### 目标观众
   * 有一定的编程基础，对C++比较熟悉，并且有开发经验的
@@ -57,7 +58,7 @@ pObj.NewObj( clsid( CConfigDb2 ));
     if( ERROR( ret ) )
         break;
 ```
-### rpc-frmwrk的线程的种类和限制
+### rpc-frmwrk的线程管理
 * rpc-frmwrk的线程主要有以下两类：
     * `event loop`线程是处理poll的事件的消息循环。一般用于处理系统的I/O事件。
     * `TaskThread`和`TaskThreadOneshot`是处理任务队列的线程，按照FIFO的顺序处理CTasklet对象。
@@ -70,11 +71,21 @@ pObj.NewObj( clsid( CConfigDb2 ));
     * `CTaskThreadOneshot`线程，动态建立的线程，用于执行一些耗时，不能异步的操作。
     * 除了主线程和`CTaskThreadOneshot`线程可以阻塞之外，其他的线程都只运行非阻塞任务，所以尽量不要在这些线程上长时间的等待，以防性能下降或者死锁等问题。
 
-### rpc-frmwrk的Port堆栈
-* rpc-frmwrk的Port堆栈，可以应对复杂的I/O需求。可以通过动态的插入功能性或者过滤性的Port对象，实现增加或删减传输协议，调整服务质量，过滤数据等功能。
-* Port之间通过IRP进行数据传递，并通知I/O完成，调用回调函数等。和`CInterfaceProxy`这类对象通过`CTasklet`对象执行任务和完成任务的方式十分不同。
-  不过这并不排斥Port使用Task。实际上`IRP`有一定的限制，对于多个I/O任务的管理不如`CIfTaskGroup`简便高效，所以两者会结合使用。
-* 在上面的处理流程中的绿色对象是Port堆栈上的Port对象。
+### rpc-frmwrk的IoManager和Port堆栈
+* IoManager是rpc-frmwrk架构里最关键的组件。它的职责有以下几类，
+    * 提供驱动程序管理器，负责动态加载卸载指定的Port对象。
+    * 提供即插即用管理器负责，建立，启停和销毁Port堆栈
+    * 提供注册表分类管理驱动程序和Port对象，以及事件的注册和发布。
+    * 绑定Port堆栈实例和CInterfaceProxy或者CInterfaceServer实例。
+    * 线程池的建立，管理，和销毁。
+    * 管理IRP的提交和完成流程。
+    * 定时器管理和日志提交。
+* rpc-frmwrk的Port堆栈
+    * Port堆栈是一组不同角色的Port对象按照处理的先后顺序，分工协作的I/O数据处理流水线。
+    * 可以动态的插入Port对象，实现增加或转换传输协议，调整服务质量，加密解密数据等功能。
+    * Port之间通过IRP进行数据发送和侦听，数据的接收和返回，遍历Port堆栈的处理函数，最终调用回调函数等。
+      不过这并不排斥Port使用Task。实际上`IRP`有一定的限制，对于多个I/O任务的管理不如`CIfTaskGroup`简便高效，所以两者会结合使用。
+    * 在上面的处理流程中的绿色对象是Port堆栈上的Port对象。
 
 ## 有了以上的知识，我们可以更好的理解接下来的教程了
 [下一讲](./Tut-HelloWorld_cn-1.md)
