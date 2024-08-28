@@ -71,3 +71,4 @@
   * [教程3-异步请求和处理](./Tut-AsyncRequest_cn-3.md)
   * [教程4-取消已发出的请求](./Tut-CancelRequest_cn-4.md)
   * [教程5-数据类型和序列化](./Tut-Serialization_cn-5.md)
+  * [教程6-流的概念和编程](./Tut-Stream_cn-6.md)

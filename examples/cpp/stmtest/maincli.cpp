@@ -214,6 +214,7 @@ gint32 maincli(
                 "Server says(async): %s",
                 strBuf.c_str() );
         }
+        ret = pIf->CloseStream( hChannel );
 
     }while( 0 );
 
