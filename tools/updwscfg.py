@@ -64,13 +64,17 @@ def InstallKeys( oResps : [] ) -> Tuple[ int, str ]:
         certName = 'rpcf_' + os.path.basename( certFile )
         cmdline += '{sudo} install -D -m 644 ' + certFile + ' /etc/ssl/certs/' + certName + ";"
         certPath = '/etc/ssl/certs/' + certName
-        cacertName = 'rpcf_' + os.path.basename( cacertFile )
-        cmdline += '{sudo} install -D -m 644 ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
-        cacertPath = '/etc/ssl/certs/' + cacertName
+        if cacertFile is not None and len(cacertFile) > 0:
+            cacertName = 'rpcf_' + os.path.basename( cacertFile )
+            cmdline += '{sudo} install -D -m 644 ' + cacertFile + ' /etc/ssl/certs/' + cacertName + ";"
+            cacertPath = '/etc/ssl/certs/' + cacertName
+        else :
+            cacertPath = ''
         for oResp in oResps:
             oResp[ 'KeyFile'] = keyPath
             oResp[ 'CertFile'] = certPath
-            oResp[ 'CACertFile'] = cacertPath
+            if len( cacertPath ) > 0:
+                oResp[ 'CACertFile'] = cacertPath
         return ( 0, cmdline )
     except Exception as err:
         print( err )
