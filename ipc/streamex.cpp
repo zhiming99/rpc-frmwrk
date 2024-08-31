@@ -111,8 +111,8 @@ bRet; \
         if( pCtxExt->pCallback.IsEmpty() ) \
             break; \
         if( _bCancel ) {\
-            TaskletPtr pCallback = pCtxExt->pCallback;\
-            ( *pCallback )( eventCancelTask );\
+            TaskletPtr _pCallback_ = pCtxExt->pCallback;\
+            ( *_pCallback_ )( eventCancelTask );\
         }\
         pCtxExt->pCallback.Clear(); \
     }while( 0 ); \
@@ -998,7 +998,7 @@ gint32 CIfStmReadWriteTask::ReadStreamInternal(
        pIrp->RemoveTimer();
     }
 
-    CLEAR_CALLBACK( pIrp, true );
+    CLEAR_CALLBACK( pIrp, false );
 
     return ret;
 }
@@ -1611,7 +1611,7 @@ gint32 CIfStmReadWriteTask::WriteStreamInternal(
     else if( ret == STATUS_PENDING )
         return ret;
 
-    CLEAR_CALLBACK( pIrp, true );
+    CLEAR_CALLBACK( pIrp, false );
 
     return ret;
 }
