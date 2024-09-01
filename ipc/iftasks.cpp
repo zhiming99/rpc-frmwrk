@@ -6341,17 +6341,23 @@ gint32 CTaskWrapper::OnComplete(
     gint32 iRetVal )
 {
     super::OnComplete( iRetVal );
-    m_pTask.Clear();
-    m_pMajor.Clear();
+    // m_pTask.Clear();
+    // m_pMajor.Clear();
     return iRetVal;
 }
 gint32 CTaskWrapper::OnCancel(
     guint32 dwContext )
 {
     if( !m_pTask.IsEmpty() )
-        ( *m_pTask )( eventCancelTask );
+    {
+        TaskletPtr pTask = m_pTask;
+        ( *pTask )( eventCancelTask );
+    }
     if( !m_pMajor.IsEmpty() )
+    {
+        TaskletPtr pTask = m_pTask;
         ( *m_pMajor )( eventCancelTask );
+    }
     return super::OnCancel( dwContext );
 }
 
