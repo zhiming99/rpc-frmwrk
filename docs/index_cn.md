@@ -72,3 +72,4 @@
   * [教程4-取消已发出的请求](./Tut-CancelRequest_cn-4.md)
   * [教程5-数据类型和序列化](./Tut-Serialization_cn-5.md)
   * [教程6-流的概念和编程](./Tut-Stream_cn-6.md)
+  * [教程7-异步编程进阶](./Tut-AsyncProgramming_cn-7.md)

@@ -98,7 +98,7 @@
               "PortClass": "DBusLocalPdo",          // 服务器端连接方式
               "PortId": "0",
               "ProxyPortClass": "DBusProxyPdo",     // 客户端连接reqfwdr的方式, 
-              "ProxyPortClass-1": "DBusLocalPdo",   // 如果用DBusLocalPdo，意味着服务器和客户端通过IPC连接。不走网络。
+              "ProxyPortClass-1": "DBusLocalPdo",   // 如果用DBusLocalPdo，意味着服务器和客户端通过IPC连接。不走网络，适合做本地调试。
               "BusName": "DBusBusPort_0",
               "Compression": "true",                // 压缩数据包
               "EnableSSL": "true",                  // 启用安全连接

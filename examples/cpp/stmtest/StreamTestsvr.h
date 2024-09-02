@@ -56,5 +56,11 @@ class CStreamTest_SvrImpl
     
     gint32 ReadAndReply( HANDLE hChannel );
     gint32 WriteAndReceive( HANDLE hChannel );
+
+    gint32 RunReadWriteTasks( HANDLE hChannel );
+
+    protected:
+    gint32 BuildAsyncTask( HANDLE hChannel,
+        bool bRead, TaskletPtr& pTask );
 };
 
