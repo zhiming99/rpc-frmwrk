@@ -59,7 +59,7 @@
     |8|WriteStreamAsync(HANDLE hChan, BufPtr& pBuf, IEventSink* pCb)| 异步 |向指定的流写入字节数组，长度由输入参数pBuf确定。返回STATUS_PENDING。直到参数指定的回调函数pCb被调用。|
     |9|OnReadStreamComplete(HANDLE hChan, gint32 r, BufPtr& pBuf, IEventSink* pCtx)| N/A |方法5的回调函数。r为返回值，只有当r==0时，pBuf有效。pCtx来自方法5的同名参数。|
     |10|OnWriteStreamComplete(HANDLE hChan, gint32 r, BufPtr& pBuf, IEventSink* pCtx)| N/A |方法6的回调函数。r为返回值，pCtx来自方法6的同名参数。|
-  * 流的建立和结束还有几个流事件的虚函数，可以重载以初始化或回收分配的资源。
+  * 流的建立和结束还有几个流事件的虚函数，可以重写(override)以初始化或回收分配的资源。
     | 序号 | 方法 | 服务器/客户端 | 描述 | 
     | --- | --------- | --------- |------------------|
     |1| OnStreamReady(HANDLE hChan) |都有| 流hChan准备好，可以传输数据了。|
@@ -415,7 +415,7 @@
         }
      ```
      由于异步的读写操作，这两个函数的写法不同于同步函数的写法，等待的过程由退出当前函数开始，进入回调函数结束。执行的过程，不象同步那么一目了然。
-  7. 定义一个结构TransferContext。
+  6. 最后定义一个结构TransferContext。
 
 #### 问题和思考
   可以看到WriteAndReceive和ReadAndReply的可读性不太好，那么有没有可以改进的办法呢？下一节，我们将给出另外一种异步编程的解决方案。
