@@ -106,10 +106,10 @@
             iRet = pCb->GetProperty( 0x12345, oVar );
             if( SUCCEEDED( iRet ) )
             {
-                CIfRetryTask* pTask =                           // 这个task就是执行rwFunc的那个任务，它还在任务组里等待
+                CIfRetryTask* pTask =                           // 这个pTask就是执行rwFunc的'发起任务'，它还处于等待通知状态。
                     ( ObjPtr& )oVar;
 
-                pTask->OnEvent( eventTaskComp,                  // 通知它，已经完成本次操作，任务组可以执行下一个任务了
+                pTask->OnEvent( eventTaskComp,                  // 通知该任务，已经完成本次操作，由于该任务在任务组里，所以它的完成意味着任务组可以执行下一个任务了
                     0, 0, nullptr );
                 pCb->RemoveProperty( 0x12345 );
             }
@@ -149,10 +149,10 @@
         ...
                 }
                 if( ret == STATUS_PENDING )
-                    break;                                      // 还没完成，继续等待
+                    break;                                      // 读写操作还没完成，返回STATUS_PENDING，等待通知
 
-                pCompTask->RemoveProperty( 0x12345 );
-                CParamList oResp;                               // 这里是准备返回给asyncComp的参数
+                pCompTask->RemoveProperty( 0x12345 );           // 读写操作直接完成
+                CParamList oResp;                               // 准备返回给asyncComp的参数
                 oResp.SetIntProp(
                     propReturnValue, ret );
 
