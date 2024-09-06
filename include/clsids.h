@@ -352,6 +352,8 @@ typedef enum : guint32
     DECL_CLSID( CTimerWatchCallback2 ),
     DECL_CLSID( CTokenBucketTask ),
     DECL_CLSID( CDBusProxyPdoLpbk2 ),
+    DECL_CLSID( CBlockAllocator ),
+    DECL_CLSID( CRegistryFs ),
     DECL_CLSID( MaxClsid ),
 
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
