@@ -181,6 +181,7 @@ struct CBlockGroup : public ISynchronize
     BlkBmpPtr m_pBlockMap;
     guint8 m_arrDataSec[ 0 ];
     guint32 m_dwGroupIdx = 0;
+
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
@@ -248,3 +249,22 @@ struct CBlockAllocator
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
 
+struct CRegFSInode
+{
+    guint16     m_wMode;        // file type
+    guint16     m_wuid;         // uid
+    guint32     m_dwSize;       // file size in bytes
+    guint32     m_dwmtime;      // time of last modification.
+    guint16     m_wgid;         // gid
+    guint32     m_dwFlags;      // type of file content
+    guint32     m_arrBlocks[ 15 ]; // blocks for data section.
+};
+
+struct CRegFSDirEntry
+{
+    guint32     m_dwInode;
+    guint8      m_byType;       // file type
+    guint8      m_szName[ 128 -
+                    sizeof( m_dwInode ) -
+                    sizeof( m_byType ) ]; 
+};
