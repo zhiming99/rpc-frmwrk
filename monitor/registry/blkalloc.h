@@ -107,7 +107,7 @@
 });
 
 // block address is a combination of block idx and
-// group idx. It is used by inode.
+// group idx. It is used by inode's block table.
 #define BLKADDR_TO_BLKIDX( _blk_addr ) \
     ( ( ( _blk_addr ) >>   ) & ( BLOCKS_PER_GROUP - 1 ) )
 
@@ -218,25 +218,37 @@ struct CBlockAllocator
         std::vector< guint32 >& vecBlocks );
 
     // write pBuf to dwBlockIdx, till the end of the
-    // block or the end of the pBuf
+    // block or the end of the pBuf.
+    // dwOff is the offset into the first block to
+    // write
     gint32 WriteBlock(
-        guint32 dwBlockIdx, BufPtr& pBuf );
+        guint32 dwBlockIdx, guint8* pBuf,
+        guint32 dwSize, guint32 dwOff = 0 );
 
     // write pBuf to an array of blocks, till all the
     // blocks are written or all the bytes are written
     // from the pBuf.
+    // dwOff is the offset into the first block to
+    // write
     gint32 WriteBlocks( const guint32* pBlocks,
-        guint32 dwNumBlocks, BufPtr& pBuf );
+        guint32 dwNumBlocks, guint8* pBuf,
+        guint32 dwSize, guint32 dwOff = 0 );
 
     // read block at dwBlockIdx to pBuf, till the end of the
     // block.
-    gint32 ReadBlock(
-        guint32 dwBlockIdx, BufPtr& pBuf );
+    // dwOff is the offset into the first block to
+    // read
+    gint32 ReadBlock( guint32 dwBlockIdx,
+        guint8* pBuf, guint32 dwSize,
+        guint32 dwOff = 0 );
 
     // read blocks to pBuf specified by block index
     // from pBlocks, till the end of the pBlocks.
+    // dwOff is the offset into the first block to
+    // read
     gint32 ReadBlocks( const guint32* pBlocks,
-        guint32 dwNumBlocks, BufPtr& pBuf );
+        guint32 dwNumBlocks, guint8* pBuf
+        guint32 dwSize, guint32 dwOff = 0 );
 
     gint32 AllocBlkGroup( guint32 dwNumGroups, 
         std::vector< guint32 >& vecGroups );
@@ -249,22 +261,110 @@ struct CBlockAllocator
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
 
-struct CRegFSInode
+struct RegFSInode
 {
-    guint16     m_wMode;        // file type
-    guint16     m_wuid;         // uid
-    guint32     m_dwSize;       // file size in bytes
-    guint32     m_dwmtime;      // time of last modification.
-    guint16     m_wgid;         // gid
-    guint32     m_dwFlags;      // type of file content
-    guint32     m_arrBlocks[ 15 ]; // blocks for data section.
+    // file type
+    guint16     m_wMode;
+    // file size in bytes
+    guint32     m_dwSize;
+    // time of last modification.
+    guint32     m_dwmtime;
+    // time of last access.
+    guint32     m_dwatime;
+    // uid
+    guint16     m_wuid;
+    // gid
+    guint16     m_wgid;
+    // type of file content
+    guint32     m_dwFlags;
+    // the block address for the parent directory
+    guint32     m_dwUpInode;
+    // blocks for data section.
+    guint32     m_arrBlocks[ 15 ];
+    // for small data with length less than 96 bytes.
+    union
+    {
+        Variant     m_oValue;
+        guint8      m_arrBuf[ 96 ];
+    }
 };
 
-struct CRegFSDirEntry
+#define BPNODE_SIZE ( PAGE_SIZE )
+#define BPNODE_BLKNUM ( BPNODE_SIZE / BLOCK_SIZE )
+
+#define NAME_LENGTH 96
+
+#define DIR_ENTRY_SIZE 128
+
+#define MAX_PTR_PER_NODE ( \
+    ( BPNODE_SIZE - DIR_ENTRY_SIZE ) / DIR_ENTRY_SIZE )
+
+struct RegFSBPlusNode
 {
+    guint8      m_arrKeys[ MAX_PTR_PER_NODE - 1 ][ NAME_LENGTH ]; 
+    guint32     m_arrNodeIdx[ MAX_PTR_PER_NODE ];
+    guint16     m_wNumKeys;
+    guint16     m_wNumNodeIdx;
+    guint16     m_wCurNodeIdx;
+    guint16     m_wParentIdx;
+    bool        m_bLeaf = false;
+};
+
+struct RegFSDirEntry
+{
+    // block address for the file inode
     guint32     m_dwInode;
-    guint8      m_byType;       // file type
-    guint8      m_szName[ 128 -
-                    sizeof( m_dwInode ) -
-                    sizeof( m_byType ) ]; 
+    // file type
+    guint8      m_byType;
+};
+
+struct RegFSBPlusLeaf
+    public RegFSBPlusNode
+{
+    RegFSDirEntry m_arrDirEntry[ MAX_PTR_PER_NODE - 1 ];
+    guint16     m_wNext;
+};
+
+struct KEY_SLOT {
+    stdstr strKey;
+    union{
+        // lea
+        guint32 dwNodeIdx;
+        struct{
+            guint32 dwInode;
+            guint8  byType;
+        } oLeaf;
+    }
+};
+
+struct CBPlusNode :
+    public ISynchronize 
+{
+    bool        m_bLeaf = false;
+    guint16     m_wCurNodeIdx = 0;
+    guint16     m_wParentIdx = 0;
+    std::vector< KEY_SLOT > m_vecKeys;
+    guint16     m_wHeadNodeIdx = 0;
+
+    RegFSBPlusNode m_arrNodeStore;
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
+};
+
+struct CBPlusLeaf :
+    public CBPlusNode
+{
+    guint16     m_wNextNodeIdx;
+    RegFSBPlusLeaf& m_arrLeafStore;
+    CBPlusLeaf() : CBPlusNode()
+        m_bLeaf = true,
+        m_arrLeafStore(
+            *(RegFSBPlusLeaf*)&m_arrNodeStore )
+    {}
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
 };
