@@ -138,6 +138,8 @@
 #define BLOCK_ABS( _blk_addr ) \
     ABS_ADDR( BLOCK_LA( _blk_addr ) )
 
+#define INODE_SIZE ( BLOCK_SIZE )
+
 struct ISynchronize
 {
     virtual gint32 Flush() = 0;
@@ -301,34 +303,33 @@ struct RegFSInode
 
 struct RegFSBPlusNode
 {
-    guint8      m_arrKeys[ MAX_PTR_PER_NODE - 1 ][ NAME_LENGTH ]; 
+    char*       m_arrKeys[ MAX_PTR_PER_NODE - 1 ][ NAME_LENGTH ]; 
     guint32     m_arrNodeIdx[ MAX_PTR_PER_NODE ];
-    guint16     m_wNumKeys;
-    guint16     m_wNumNodeIdx;
-    guint16     m_wCurNodeIdx;
-    guint16     m_wParentIdx;
+    guint16     m_wNumKeys = 0;
+    guint16     m_wNumNodeIdx = 0;
+    guint16     m_wCurNodeIdx = 0;
+    guint16     m_wParentIdx = 0;
     bool        m_bLeaf = false;
 };
 
 struct RegFSDirEntry
 {
     // block address for the file inode
-    guint32     m_dwInode;
+    guint32     m_dwInode = 0;
     // file type
-    guint8      m_byType;
+    guint8      m_byType = 0;
 };
 
 struct RegFSBPlusLeaf
     public RegFSBPlusNode
 {
     RegFSDirEntry m_arrDirEntry[ MAX_PTR_PER_NODE - 1 ];
-    guint16     m_wNext;
+    guint16     m_wNextLeaf = 0;
 };
 
 struct KEY_SLOT {
-    stdstr strKey;
+    const char* szKey;
     union{
-        // lea
         guint32 dwNodeIdx;
         struct{
             guint32 dwInode;
@@ -340,13 +341,8 @@ struct KEY_SLOT {
 struct CBPlusNode :
     public ISynchronize 
 {
-    bool        m_bLeaf = false;
-    guint16     m_wCurNodeIdx = 0;
-    guint16     m_wParentIdx = 0;
-    std::vector< KEY_SLOT > m_vecKeys;
-    guint16     m_wHeadNodeIdx = 0;
-
-    RegFSBPlusNode m_arrNodeStore;
+    RegFSBPlusNode m_oNodeStore;
+    std::vector< std::unique_ptr< CBPlusNode > > m_vecChilds;
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -356,15 +352,21 @@ struct CBPlusNode :
 struct CBPlusLeaf :
     public CBPlusNode
 {
-    guint16     m_wNextNodeIdx;
-    RegFSBPlusLeaf& m_arrLeafStore;
+    RegFSBPlusLeaf& m_oLeafStore;
     CBPlusLeaf() : CBPlusNode()
-        m_bLeaf = true,
-        m_arrLeafStore(
-            *(RegFSBPlusLeaf*)&m_arrNodeStore )
-    {}
+        m_oLeafStore( *(RegFSBPlusLeaf*)&m_oNodeStore )
+    { m_oLeafStore.m_bLeaf = true, }
 
+    CBPlusLeaf* m_pNextLeaf;
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
+};
+
+struct CFileEntry :
+    public ISynchronize
+{
+    RegFSInode m_oInodeStore;
+    stdstr strFileName;
+    guint32 m_dwParentInode;
 };
