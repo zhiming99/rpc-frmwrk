@@ -163,24 +163,24 @@ struct CSuperBlock : public ISynchronize
     { m_pParent = pParent; }
 };
 
-using SblkPtr = std::unique_ptr< CSuperBlock >;
+using SblkUPtr = std::unique_ptr< CSuperBlock >;
 
 struct CBlockBitmap
 {
     guint8 m_arrBytes[ BLOCKS_PER_GROUP / BYTE_BITS];
 }
-using BlkBmpPtr = std::unique_ptr< CBlockBitmap >;
+using BlkBmpUPtr = std::unique_ptr< CBlockBitmap >;
 
 struct CGroupBitmap
 {
     guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS];
 }
-using GrpBmpPtr = std::unique_ptr< CGroupBitmap >;
+using GrpBmpUPtr = std::unique_ptr< CGroupBitmap >;
 
 struct CBlockGroup : public ISynchronize
 {
     CBlockAllocator* m_pParent;
-    BlkBmpPtr m_pBlockMap;
+    BlkBmpUPtr m_pBlockMap;
     guint8 m_arrDataSec[ 0 ];
     guint32 m_dwGroupIdx = 0;
 
@@ -192,7 +192,7 @@ struct CBlockGroup : public ISynchronize
     { m_pParent = pParent; }
 }
 
-using BlkGrpPtr = std::unique_ptr< CBlockGroup >;
+using BlkGrpUPtr = std::unique_ptr< CBlockGroup >;
 
 template< guint32 BLKSIZE >
 struct CBlockAllocator
@@ -202,9 +202,9 @@ struct CBlockAllocator
     CSharedLock m_oLock;
     gint32      m_iFd;
 
-    SblkPtr     m_pSuperBlock;
-    GrpGmpPtr   m_pGroupBitmap;
-    std::hashmap< guint32, BlkGrpPtr > m_mapBlkGrps;
+    SblkUPtr     m_pSuperBlock;
+    GrpBmpUPtr   m_pGroupBitmap;
+    std::hashmap< guint32, BlkGrpUPtr > m_mapBlkGrps;
 
     CBlockAllocator( const IConfigDb* pCfg );
 
@@ -263,6 +263,8 @@ struct CBlockAllocator
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
 
+using AllocPtr = CCAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
+
 struct RegFSInode
 {
     // file type
@@ -280,9 +282,12 @@ struct RegFSInode
     // type of file content
     guint32     m_dwFlags;
     // the block address for the parent directory
-    guint32     m_dwUpInode;
+    guint32     m_dwParentInode;
     // blocks for data section.
     guint32     m_arrBlocks[ 15 ];
+
+    // blocks for extended inode
+    guint32     m_arrMetaFork[ 4 ];
     // for small data with length less than 96 bytes.
     union
     {
@@ -300,6 +305,9 @@ struct RegFSInode
 
 #define MAX_PTR_PER_NODE ( \
     ( BPNODE_SIZE - DIR_ENTRY_SIZE ) / DIR_ENTRY_SIZE )
+
+#define LEAST_NUM_CHILD ( ( MAX_PTR_PER_NODE + 1 ) >> 1 )
+#define LEASE_NUM_KEY ( LEAST_NUM_CHILD - 1 )
 
 struct RegFSBPlusNode
 {
@@ -338,16 +346,22 @@ struct KEY_SLOT {
     }
 };
 
+class CBPlusNode;
+using BPNodeUPtr = std::unique_ptr< CBPlusNode >; 
+
 struct CBPlusNode :
     public ISynchronize 
 {
     RegFSBPlusNode m_oNodeStore;
-    std::vector< std::unique_ptr< CBPlusNode > > m_vecChilds;
+    std::vector< CBPlusNode > m_vecChilds;
 
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
 };
+
+class COpenFileEntry;
+using FileSPtr = std::shared_ptr< COpenFileEntry >;
 
 struct CBPlusLeaf :
     public CBPlusNode
@@ -356,17 +370,125 @@ struct CBPlusLeaf :
     CBPlusLeaf() : CBPlusNode()
         m_oLeafStore( *(RegFSBPlusLeaf*)&m_oNodeStore )
     { m_oLeafStore.m_bLeaf = true, }
+    std::vector< FileSPtr > m_vecFiles;
 
     CBPlusLeaf* m_pNextLeaf;
+    guint32 GetFileInode( const char* szName ) const;
+
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
 };
 
-struct CFileEntry :
+struct COpenFileEntry :
     public ISynchronize
 {
+    CSharedLock m_oLock;
+
+    guint32     m_dwInodeIdx;
     RegFSInode m_oInodeStore;
-    stdstr strFileName;
-    guint32 m_dwParentInode;
+    stdstr m_strFileName;
+
+    std::atomic< guint32 > m_dwRefs;
+    FileSPtr m_pParentDir;
+
+    inline guint32 AddRef()
+    { return ++m_dwRefs; }
+    inline guint32 DecRef()
+    { return --m_dwRefs; }
+    inline guint32 GetRef() const;
+    { return m_dwRefs; }
+
+    gint32 ReadFile( guint32 dwOff,
+        guint32 size, guint8* pBuf );
+
+    gint32 WriteFile( guint32 dwOff,
+        guint32 size, guint8* pBuf );
+
+    gint32 ReadValue( Variant& oVar );
+    gint32 WriteValue( const Variant& oVar );
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
 };
+
+struct CAccessContext
+{
+    guint16 dwUid = 0xffff;
+    guint16 dwGid = 0xffff;
+};
+
+struct CDirectoryFile :
+    public COpenFileEntry
+{
+    BPNodeUPtr m_pRootNode;
+    
+    CAccessContext m_oUserAc;
+
+    inline bool IsRootDir() const
+    { m_oINodeStore.m_dwParentInode == 0; }
+
+    gint32 NewFile( const stdstr& strName,
+        guint32 dwOwner = 0,
+        guint32 dwPerm = 0 );
+
+    gint32  NewDirectory( const stdstr& strName,
+        guint32 dwOwner = 0,
+        guint32 dwPerm = 0 );
+
+    HANDLE OpenChild(
+        const stdstr& strName,
+        CAccessContext* pAc );
+
+    gint32  CloseChild( FileSPtr& pFile );
+    gint32  FindChild( const stdstr& strName ) const;
+    gint32  RemoveChild( const stdstr& strName );
+    gint32  RemoveDirectory( const stdstr& strName );
+
+    gint32  SetGid( guint16 wGid );
+    gint32  SetUid( guint16 wUid );
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
+};
+
+
+
+class CRegistryFs :
+    public IService,
+    public ISynchronize
+{
+    AllocPtr    m_pBlkAlloc;
+    FileSPtr    m_pRootDir;    
+
+    public:
+    CRegistryFs( const IConfigDb* pCfg );
+    gint32 Start() override;
+    gint32 Stop() override;
+
+    static gint32 Namei(
+        const string& strPath,
+        std::vector<stdstr>& vecNames ) const;
+
+    gint32 NewFile( const stdstr& strPath,
+        guint32 dwOwner = 0,
+        guint32 dwPerm = 0 );
+
+    gint32  NewDirectory( const stdstr& strPath,
+        guint32 dwOwner = 0,
+        guint32 dwPerm = 0 );
+
+    HANDLE OpenChild( const stdstr& strPath );
+
+    gint32  CloseChild( FileSPtr& pFile );
+    gint32  FindChild( const stdstr& strPath ) const;
+    gint32  RemoveChild( const stdstr& strPath );
+    gint32  RemoveDirectory( const stdstr& strPath );
+
+    gint32  SetGid( guint16 wGid );
+    gint32  SetUid( guint16 wUid );
+};
+
+using RegFsPtr = CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
