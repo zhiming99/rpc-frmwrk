@@ -72,8 +72,17 @@ jobs:
           path: |
             bldpkg/rpcf_*.deb
             bldpkg/rpcf-dev_*.deb
+
+    - name: flush logs
+      if: always()
+      run: kill -3 `pidof rpcf_logger` || true;sleep 2
+
+    - name: Upload Test Results on Canceled
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+          name: logfiles
+          path: |
             ./logfile
             ./logdump.txt
             ./logger.txt
-
-
