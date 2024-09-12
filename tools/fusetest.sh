@@ -80,8 +80,8 @@ function mkDirTest()
 
     > $dumpfile
     mkdir mp mpsvr || true
-    hostsvr -m mpsvr >> $dumpfile &
-    hostcli -m mp >> $dumpfile &
+    hostsvr -gm mpsvr >> $dumpfile &
+    hostcli -gm mp >> $dumpfile &
     sleep 5 
 
     echo loading TestTypes library to server and proxy...

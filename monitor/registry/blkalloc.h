@@ -517,8 +517,11 @@ class CRegistryFs :
     gint32  RemoveDirectory( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32  SetGid( guint16 wGid );
-    gint32  SetUid( guint16 wUid );
+    gint32  SetGid( guint16 wGid,
+        CAccessContext* pac = nullptr );
+
+    gint32  SetUid( guint16 wUid,
+        CAccessContext* pac = nullptr );
 };
 
 using RegFsPtr = CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;

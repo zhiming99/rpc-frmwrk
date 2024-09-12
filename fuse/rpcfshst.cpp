@@ -33,6 +33,7 @@ using namespace rpcf;
 
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
+bool g_bLogging = false;
 
 gint32 InitContext()
 {
@@ -47,6 +48,9 @@ gint32 InitContext()
 #ifdef CLIENT
         oParams.Push( "hostcli" );
 #endif
+
+        if( g_bLogging )
+            oParams[ propEnableLogging ] = true;
 
         // adjust the thread number if necessary
         oParams[ propMaxIrpThrd ] = 2;
@@ -137,6 +141,7 @@ void Usage( char* szName )
         "\t [ -a to enable authentication ]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -o \"fuse options\" ]\n"
+        "\t [ -g send logs to log server ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -146,7 +151,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hadm:" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hagdm:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -161,6 +166,8 @@ int main( int argc, char** argv)
                     }
                 case 'd':
                     { bDaemon = true; break; }
+                case 'g':
+                    { g_bLogging = true; break; }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
