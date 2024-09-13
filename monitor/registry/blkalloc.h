@@ -24,6 +24,8 @@
  */
 #include <arpa/inet.h>
 #include <stdint.h>
+#include "rpc.h"
+
 // byte offset
 // 0                             64
 // -------------------------------
@@ -167,26 +169,46 @@ using SblkUPtr = std::unique_ptr< CSuperBlock >;
 
 struct CBlockBitmap
 {
-    guint8 m_arrBytes[ BLOCKS_PER_GROUP / BYTE_BITS];
+    guint8 m_arrBytes[ BLOCKS_PER_GROUP / BYTE_BITS ];
+    guint16 m_wFreeCount;
+    inline guint32 GetFreeCount() const
+    { return m_wFreeCount; }
+    gint32 AllocBlocks( guint32 dwNumBlocks,
+        std::vector< guint32 >& vecBlocks );
+    gint32 FreeBlocks(
+        const guint32* pvecBlocks,
+        guint32 dwNumBlocks );
 }
 using BlkBmpUPtr = std::unique_ptr< CBlockBitmap >;
 
 struct CGroupBitmap
 {
-    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS];
+    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS ];
+    guint16 m_wFreeCount;
+    inline guint32 GetFreeCount() const
+    { return m_wFreeCount; }
+
+    gint32 FreeGroup( guint32 dwGrpIdx );
+    gint32 AllocGroup( guint32& dwGrpIdx );
 }
 using GrpBmpUPtr = std::unique_ptr< CGroupBitmap >;
 
 struct CBlockGroup : public ISynchronize
 {
+    guint32 m_dwGroupIdx = 0;
     CBlockAllocator* m_pParent;
     BlkBmpUPtr m_pBlockMap;
-    guint8 m_arrDataSec[ 0 ];
-    guint32 m_dwGroupIdx = 0;
+
+    CBlockGroup( guint32 dwGrpIdx )
+        : m_dwGroupIdx( dwGrpIdx )
+    {}
 
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
+
+    inline guint32 GetFreeCount() const
+    { return m_pBlockMap->GetFreeCount(); }
 
     inline void SetParent( CBlockAllocator* pParent )
     { m_pParent = pParent; }
@@ -199,7 +221,7 @@ struct CBlockAllocator
     public CObjBase,
     public ISynchronize
 {
-    CSharedLock m_oLock;
+    mutable CStdRMutex m_oLock;
     gint32      m_iFd;
 
     SblkUPtr     m_pSuperBlock;
@@ -349,7 +371,7 @@ struct KEY_SLOT {
 struct CFileImage : 
     public ISynchronize
 {
-    CSharedLock m_oLock;
+    AllocPtr m_pAlloc;
     guint32 m_dwInode;
     std::hashmap< guint32, BufPtr >& m_mapImage;
 
@@ -381,6 +403,7 @@ using BPNodeUPtr = std::unique_ptr< CBPlusNode >;
 struct CBPlusNode :
     public ISynchronize 
 {
+    AllocPtr m_pAlloc;
     RegFSBPlusNode m_oNodeStore;
     std::vector< CBPlusNode > m_vecChilds;
 
@@ -412,13 +435,21 @@ using FileSPtr = std::shared_ptr< COpenFileEntry >;
 struct COpenFileEntry :
     public ISynchronize
 {
-    guint32     m_dwInodeIdx;
-    stdstr      m_strFileName;
-    FImgSPtr    m_pFileImage;
-    guint32     m_dwPos;
+    AllocPtr        m_pAlloc;
+    guint32         m_dwInodeIdx;
+    stdstr          m_strFileName;
+    FImgSPtr        m_pFileImage;
+    guint32         m_dwPos;
+    CAccessContext  m_oUserAc;
+
+    mutable CSharedLock m_oLock;
+    inline CSharedLock& GetLock() const
+    { return m_oLock; }
 
     std::atomic< guint32 > m_dwRefs;
     FileSPtr m_pParentDir;
+
+    COpenFileEntry( AllocPtr& pAlloc );
 
     inline guint32 AddRef()
     { return ++m_dwRefs; }
@@ -427,14 +458,14 @@ struct COpenFileEntry :
     inline guint32 GetRef() const;
     { return m_dwRefs; }
 
-    gint32 ReadFile( guint32 dwOff,
+    gint32 ReadFile(
         guint32 size, guint8* pBuf );
 
-    gint32 WriteFile( guint32 dwOff,
+    gint32 WriteFile(
         guint32 size, guint8* pBuf );
 
-    gint32 ReadValue( Variant& oVar );
-    gint32 WriteValue( const Variant& oVar );
+    gint32 GetValue( Variant& oVar );
+    gint32 SetValue( const Variant& oVar );
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -452,7 +483,7 @@ struct CDirectoryFile :
 {
     BPNodeUPtr m_pRootNode;
     
-    CAccessContext m_oUserAc;
+    CDirectoryFile( AllocPtr& pAlloc );
 
     inline bool IsRootDir() const
     { m_oINodeStore.m_dwParentInode == 0; }
@@ -478,13 +509,11 @@ struct CDirectoryFile :
     gint32 Reload() override;
 };
 
-
-
 class CRegistryFs :
     public IService,
     public ISynchronize
 {
-    AllocPtr    m_pBlkAlloc;
+    AllocPtr    m_pAlloc;
     FileSPtr    m_pRootDir;    
     std::hashmap< HANDLE, FilePtr > m_mapOpenFiles;
 
@@ -522,6 +551,16 @@ class CRegistryFs :
 
     gint32  SetUid( guint16 wUid,
         CAccessContext* pac = nullptr );
+
+    gint32  SymLink( const stdstr& strSrcPath,
+        const stdstr& strDestPath,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetValue(
+        HANDLE hFile, Variant& oVar );
+
+    gint32 SetValue(
+        HANDLE hFile, Variant& oVar );
 };
 
 using RegFsPtr = CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
