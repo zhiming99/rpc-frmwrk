@@ -22,8 +22,9 @@
  *
  * =====================================================================================
  */
+
+#pragma once
 #include <arpa/inet.h>
-#include <stdint.h>
 #include "rpc.h"
 
 // byte offset
@@ -48,9 +49,10 @@
 
 #define SUPER_BLOCK_SIZE 512
 
-#define BLOCK_SHIFT 9
+#define DEFAULT_BLOCK_SIZE 512
+#define BLOCK_SIZE  ( GetBlockSize() )
 
-#define BLOCK_SIZE  ( 1 << BLOCK_SHIFT )
+#define BLOCK_SHIFT ( find_shift( BLOCK_SIZE ) - 1 )
 
 #define BLOCKS_PER_GROUP ( 64 * 1024 )
 
@@ -151,13 +153,13 @@ struct ISynchronize
 
 struct CSuperBlock : public ISynchronize
 {
-    guint32     m_dwMagic;
     guint32     m_dwMagic = htonl( *( guint32* )"regi" );
     guint32     m_dwVersion = 0x01;
-    guint32     m_dwGroupNum = 0;
-    guint32     m_dwBlkSize = BLKSIZE;
+    guint32     m_dwGroupNum = BLKGRP_NUMBER;
+    guint32     m_dwBlkSize = DEFAULT_BLOCK_SIZE;
     CBlockAllocator* m_pParent;
 
+    CSuperBlock();
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
@@ -166,6 +168,11 @@ struct CSuperBlock : public ISynchronize
 };
 
 using SblkUPtr = std::unique_ptr< CSuperBlock >;
+
+guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
+
+inline guint32 GetBlockSize()
+{ return g_dwBlockSize; }
 
 struct CBlockBitmap
 {
@@ -237,6 +244,16 @@ struct CBlockAllocator
     gint32 FreeBlocks(
         const guint32* pvecBlocks,
         guint32 dwNumBlocks );
+
+    gint32 SaveGroupBitmap(
+        const CGroupBitmap& pgbmp );
+
+    gint32 LoadGroupBitmap(
+        CGroupBitmap& gbmp );
+
+    gint32 SaveSuperBlock( char* pSb, guint32 dwSize );
+
+    gint32 LoadSuperBlock( char* pSb, guint32 dwSize ) const;
 
     gint32 AllocBlocks( guint32 dwNumBlocks,
         std::vector< guint32 >& vecBlocks );
