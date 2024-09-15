@@ -466,6 +466,9 @@ gint32 CStreamProxyRelay::OnFetchDataComplete(
 
         if( ERROR( iRet ) )
         {
+            LOGERR( this->GetIoMgr(), iRet, 
+                "remote server failed to "
+                "create the stream channel" );
             ret = iRet;
             break;
         }

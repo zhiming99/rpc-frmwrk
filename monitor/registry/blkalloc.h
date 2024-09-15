@@ -26,6 +26,7 @@
 #pragma once
 #include <arpa/inet.h>
 #include "rpc.h"
+#include <memory>
 
 // byte offset
 // 0                             64
@@ -54,7 +55,7 @@
 
 #define BLOCK_SHIFT ( find_shift( BLOCK_SIZE ) - 1 )
 
-#define BLOCKS_PER_GROUP ( 64 * 1024 )
+#define BLOCKS_PER_GROUP ( 64 * 1024 - sizeof( guint16 ) * BYTE_BITS )
 
 #define BLKBMP_BLKNUM \
     ( BLOCKS_PER_GROUP / ( BLOCK_SIZE * BYTE_BITS ) )
@@ -66,7 +67,7 @@
     ( find_shift( PAGE_SIZE ) )
 
 #define BLKGRP_NUMBER \
-    ( 1 << GROUP_SHIFT )
+    ( ( 1 << GROUP_SHIFT ) - sizeof( guint16 ) * BYTE_BITS )
 
 #define GRPBMP_BLKNUM \
     ( BLKGRP_NUMBER / ( BLOCK_SIZE * BYTE_BITS ) )
@@ -167,7 +168,7 @@ struct CSuperBlock : public ISynchronize
     { m_pParent = pParent; }
 };
 
-using SblkUPtr = std::unique_ptr< CSuperBlock >;
+using SblkUPtr = typename std::unique_ptr< CSuperBlock >;
 
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 
@@ -176,7 +177,8 @@ inline guint32 GetBlockSize()
 
 struct CBlockBitmap
 {
-    guint8 m_arrBytes[ BLOCKS_PER_GROUP / BYTE_BITS ];
+    guint8 m_arrBytes[ BLOCKS_PER_GROUP / BYTE_BITS +
+        sizeof( guint16 ) * BYTE_BITS ];
     guint16 m_wFreeCount;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
@@ -185,12 +187,13 @@ struct CBlockBitmap
     gint32 FreeBlocks(
         const guint32* pvecBlocks,
         guint32 dwNumBlocks );
-}
-using BlkBmpUPtr = std::unique_ptr< CBlockBitmap >;
+};
+using BlkBmpUPtr = typename std::unique_ptr< CBlockBitmap >;
 
 struct CGroupBitmap
 {
-    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS ];
+    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS +
+        sizeof( guint16 ) * BYTE_BITS ];
     guint16 m_wFreeCount;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
@@ -198,7 +201,7 @@ struct CGroupBitmap
     gint32 FreeGroup( guint32 dwGrpIdx );
     gint32 AllocGroup( guint32& dwGrpIdx );
 }
-using GrpBmpUPtr = std::unique_ptr< CGroupBitmap >;
+using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
 
 struct CBlockGroup : public ISynchronize
 {
@@ -219,22 +222,22 @@ struct CBlockGroup : public ISynchronize
 
     inline void SetParent( CBlockAllocator* pParent )
     { m_pParent = pParent; }
-}
+};
 
-using BlkGrpUPtr = std::unique_ptr< CBlockGroup >;
+using BlkGrpUPtr = typename std::unique_ptr< CBlockGroup >;
 
-template< guint32 BLKSIZE >
-struct CBlockAllocator
+class CBlockAllocator
     public CObjBase,
     public ISynchronize
 {
-    mutable CStdRMutex m_oLock;
-    gint32      m_iFd;
+    mutable CStdRMutex  m_oLock;
+    gint32              m_iFd;
 
-    SblkUPtr     m_pSuperBlock;
-    GrpBmpUPtr   m_pGroupBitmap;
+    SblkUPtr            m_pSuperBlock;
+    GrpBmpUPtr          m_pGroupBitmap;
     std::hashmap< guint32, BlkGrpUPtr > m_mapBlkGrps;
 
+    public:
     CBlockAllocator( const IConfigDb* pCfg );
 
     gint32 Format() override;
@@ -246,14 +249,16 @@ struct CBlockAllocator
         guint32 dwNumBlocks );
 
     gint32 SaveGroupBitmap(
-        const CGroupBitmap& pgbmp );
+        const CGroupBitmap& gbmp );
 
     gint32 LoadGroupBitmap(
         CGroupBitmap& gbmp );
 
-    gint32 SaveSuperBlock( char* pSb, guint32 dwSize );
+    gint32 SaveSuperBlock(
+        char* pSb, guint32 dwSize );
 
-    gint32 LoadSuperBlock( char* pSb, guint32 dwSize ) const;
+    gint32 LoadSuperBlock(
+        char* pSb, guint32 dwSize ) const;
 
     gint32 AllocBlocks( guint32 dwNumBlocks,
         std::vector< guint32 >& vecBlocks );
@@ -302,7 +307,7 @@ struct CBlockAllocator
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
 
-using AllocPtr = CCAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
+using AllocPtr = typename CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
 
 struct RegFSInode
 {
@@ -412,10 +417,10 @@ struct CFileImage :
     gint32 Grow( guint32 dwBlocks );
 };
 
-using FImgSPtr = std::unique_ptr< CFileImage >;
+using FImgSPtr = typename std::unique_ptr< CFileImage >;
 
 class CBPlusNode;
-using BPNodeUPtr = std::unique_ptr< CBPlusNode >; 
+using BPNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
 
 struct CBPlusNode :
     public ISynchronize 
@@ -447,7 +452,7 @@ struct CBPlusLeaf :
 };
 
 class COpenFileEntry;
-using FileSPtr = std::shared_ptr< COpenFileEntry >;
+using FileSPtr = typename std::shared_ptr< COpenFileEntry >;
 
 struct COpenFileEntry :
     public ISynchronize
@@ -580,4 +585,4 @@ class CRegistryFs :
         HANDLE hFile, Variant& oVar );
 };
 
-using RegFsPtr = CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
+using RegFsPtr = typename CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
