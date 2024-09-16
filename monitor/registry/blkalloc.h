@@ -166,7 +166,7 @@ struct CSuperBlock : public ISynchronize
     gint32 Reload() override;
     inline void SetParent( CBlockAllocator* pParent )
     { m_pParent = pParent; }
-};
+} __attribute__((aligned (8)));
 
 using SblkUPtr = typename std::unique_ptr< CSuperBlock >;
 
@@ -182,12 +182,17 @@ struct CBlockBitmap
     guint16 m_wFreeCount;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
-    gint32 AllocBlocks( guint32 dwNumBlocks,
-        std::vector< guint32 >& vecBlocks );
+
+    gint32 AllocBlocks(
+        guint32* pvecBlocks,
+        guint32& dwNumBlocks );
+
     gint32 FreeBlocks(
         const guint32* pvecBlocks,
         guint32 dwNumBlocks );
-};
+
+} __attribute__((aligned (8)));
+
 using BlkBmpUPtr = typename std::unique_ptr< CBlockBitmap >;
 
 struct CGroupBitmap
@@ -200,9 +205,11 @@ struct CGroupBitmap
 
     gint32 FreeGroup( guint32 dwGrpIdx );
     gint32 AllocGroup( guint32& dwGrpIdx );
-}
-using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
+    gint32 InitBitmap();
 
+} __attribute__((aligned (8)));
+
+using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
 struct CBlockGroup : public ISynchronize
 {
     guint32 m_dwGroupIdx = 0;
@@ -226,7 +233,9 @@ struct CBlockGroup : public ISynchronize
 
 using BlkGrpUPtr = typename std::unique_ptr< CBlockGroup >;
 
-class CBlockAllocator
+using AllocPtr = typename CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
+
+class CBlockAllocator :
     public CObjBase,
     public ISynchronize
 {
@@ -306,8 +315,6 @@ class CBlockAllocator
 
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
-
-using AllocPtr = typename CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
 
 struct RegFSInode
 {
