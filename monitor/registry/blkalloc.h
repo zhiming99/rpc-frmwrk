@@ -55,13 +55,16 @@
 
 #define BLOCK_SHIFT ( find_shift( BLOCK_SIZE ) - 1 )
 
-#define BLOCKS_PER_GROUP ( 64 * 1024 - sizeof( guint16 ) * BYTE_BITS )
+#define BLKGRP_GAP_BLKNUM ( sizeof( guint16 ) * BYTE_BITS )
+#define BLOCKS_PER_GROUP ( 64 * 1024 - BLKGRP_GAP_BLKNUM )
+#define BLOCKS_PER_GROUP_FULL ( 64 * 1024 )
 
+// blocks occupied by block bitmap.
 #define BLKBMP_BLKNUM \
-    ( BLOCKS_PER_GROUP / ( BLOCK_SIZE * BYTE_BITS ) )
+    ( BLOCKS_PER_GROUP_FULL / ( BLOCK_SIZE * BYTE_BITS ) )
 
 #define BLOCK_IDX_MASK \
-    ( BLOCKS_PER_GROUP - 1 )
+    ( BLOCKS_PER_GROUP_FULL - 1 )
 
 #define GROUP_SHIFT \
     ( find_shift( PAGE_SIZE ) )
@@ -79,10 +82,10 @@
     ( SUPER_BLOCK_SIZE )
 
 #define GROUP_SIZE \
-    ( BLOCKS_PER_GROUP * BLOCK_SIZE )
+    ( BLOCKS_PER_GROUP_FULL * BLOCK_SIZE )
 
 #define GROUP_IDX_MASK \
-    ( BLKGRP_NUMBER - 1 )
+    ( ( 1 << GROUP_SHIFT ) - 1 )
 
 // group index in a block index
 #define GROUP_IDX_SHIFT \
@@ -113,35 +116,38 @@
 
 // block address is a combination of block idx and
 // group idx. It is used by inode's block table.
-#define BLKADDR_TO_BLKIDX( _blk_addr ) \
-    ( ( ( _blk_addr ) >>   ) & ( BLOCKS_PER_GROUP - 1 ) )
+#define LA_TO_BLKIDX( _la_ ) \
+    ( ( ( _la_ ) >> BLOCK_SHIFT  ) & ( BLOCKS_PER_GROUP_FULL - 1 ) )
+
+#define GROUP_INDEX_SHIFT \
+    ( find_shift( BLOCKS_PER_GROUP_FULL ) - 1 )
 
 // get the group idx from the block addr
-#define GROUP_INDEX( _blk_addr ) \
-    ( ( _blk_addr >> BLOCK_SHIFT ) & GROUP_IDX_MASK ) 
+#define GROUP_INDEX( _blk_idx ) \
+    ( ( _blk_idx >> GROUP_INDEX_SHIFT ) & GROUP_IDX_MASK ) 
 
 // get the logical address of a group from a with a
 // block index from inode
-#define GROUP_START( _blk_addr ) \
-    ( GROUP_INDEX( _blk_addr )  * GROUP_SIZE )
+#define GROUP_START( _blk_idx ) \
+    ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE * BLOCK_SIZE )
 
 // get the logical address of a group's data section
 // from a with a block index from inode
-#define GROUP_DATA_START( _blk_addr ) \
-    ( GROUP_INDEX( _blk_addr )  * GROUP_SIZE + \
+#define GROUP_DATA_START( _blk_idx ) \
+    ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE * BLOCK_SIZE + \
     BLKBMP_BLKNUM * BLOCK_SIZE )
 
 // get the block idx from the block addr
-#define BLOCK_INDEX( _blk_addr ) \
-    ( ( _blk_addr ) & BLOCK_IDX_MASK )
+#define BLOCK_INDEX( _blk_idx ) \
+    ( ( _blk_idx ) & BLOCK_IDX_MASK )
 
 // get the logical address of a block
-#define BLOCK_LA( _blk_addr ) \
-    ( GROUP_DATA_START( _blk_addr ) + \
-    ( BLOCK_IDX( _blk_addr ) * BLOCK_SIZE ) )
+#define BLOCK_LA( _blk_idx ) \
+    ( GROUP_START( _blk_idx ) + \
+    ( BLOCK_INDEX( _blk_idx ) * BLOCK_SIZE ) )
 
-#define BLOCK_ABS( _blk_addr ) \
-    ABS_ADDR( BLOCK_LA( _blk_addr ) )
+#define BLOCK_ABS( _blk_idx ) \
+    ABS_ADDR( BLOCK_LA( _blk_idx ) )
 
 #define INODE_SIZE ( BLOCK_SIZE )
 
@@ -166,7 +172,7 @@ struct CSuperBlock : public ISynchronize
     gint32 Reload() override;
     inline void SetParent( CBlockAllocator* pParent )
     { m_pParent = pParent; }
-} __attribute__((aligned (8)));
+} ;
 
 using SblkUPtr = typename std::unique_ptr< CSuperBlock >;
 
@@ -175,13 +181,24 @@ guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 inline guint32 GetBlockSize()
 { return g_dwBlockSize; }
 
-struct CBlockBitmap
+struct CBlockBitmap :
+    public ISynchronize
 {
-    guint8 m_arrBytes[ BLOCKS_PER_GROUP / BYTE_BITS +
-        sizeof( guint16 ) * BYTE_BITS ];
+    __attribute__((aligned (8))) 
+    guint8 m_arrBytes[
+        BLOCKS_PER_GROUP_FULL / BYTE_BITS ];
+
+    CBlockAllocator* m_pAlloc;
     guint16 m_wFreeCount;
+    guint32 m_dwGroupIdx = 0;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
+
+    CBlockBitmap( CBlockAllocator* pAlloc,
+        guint32 dwGrpIdx ) :
+        m_pAlloc( pAlloc ),
+        m_dwGroupIdx( dwGrpIdx )
+    {}
 
     gint32 AllocBlocks(
         guint32* pvecBlocks,
@@ -191,34 +208,31 @@ struct CBlockBitmap
         const guint32* pvecBlocks,
         guint32 dwNumBlocks );
 
-} __attribute__((aligned (8)));
+    gint32 InitBitmap();
+
+    gint32 GetGroupIndex() const
+    { return m_dwGroupIdx; }
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
+} ;
 
 using BlkBmpUPtr = typename std::unique_ptr< CBlockBitmap >;
 
-struct CGroupBitmap
-{
-    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS +
-        sizeof( guint16 ) * BYTE_BITS ];
-    guint16 m_wFreeCount;
-    inline guint32 GetFreeCount() const
-    { return m_wFreeCount; }
-
-    gint32 FreeGroup( guint32 dwGrpIdx );
-    gint32 AllocGroup( guint32& dwGrpIdx );
-    gint32 InitBitmap();
-
-} __attribute__((aligned (8)));
-
-using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
 struct CBlockGroup : public ISynchronize
 {
-    guint32 m_dwGroupIdx = 0;
-    CBlockAllocator* m_pParent;
-    BlkBmpUPtr m_pBlockMap;
+    CBlockAllocator* m_pAlloc;
+    BlkBmpUPtr m_pBlockBitmap;
 
-    CBlockGroup( guint32 dwGrpIdx )
-        : m_dwGroupIdx( dwGrpIdx )
-    {}
+    CBlockGroup(
+        CBlockAllocator* pAlloc,
+        guint32 dwGrpIdx )
+    {
+        m_pBlockBitmap = BlkBmpUPtr(
+            new CBlockBitmap( pAlloc, dwGrpIdx ) );
+        m_pAlloc = pAlloc;
+    }
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -227,11 +241,45 @@ struct CBlockGroup : public ISynchronize
     inline guint32 GetFreeCount() const
     { return m_pBlockMap->GetFreeCount(); }
 
-    inline void SetParent( CBlockAllocator* pParent )
-    { m_pParent = pParent; }
+    inline guint32 GetGroupIndex() const
+    { return m_pBlockMap->GetGroupIndex(); }
+
+    inline gint32 AllocBlocks(
+        guint32* pvecBlocks,
+        guint32& dwNumBlocks )
+    {
+        return m_pBlockMap->AllocBlocks(
+            pvecBlocks, dwNumBlocks );
+    }
+
+    inline gint32 FreeBlocks(
+        const guint32* pvecBlocks,
+        guint32 dwNumBlocks )
+    {
+        return m_pBlockMap->FreeBlocks(
+            pvecBlocks, dwNumBlocks );
+    }
 };
 
 using BlkGrpUPtr = typename std::unique_ptr< CBlockGroup >;
+struct CGroupBitmap
+{
+    __attribute__((aligned (8)))
+    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS +
+        sizeof( guint16 ) * BYTE_BITS ];
+    guint16 m_wFreeCount;
+    inline guint32 GetFreeCount() const
+    { return m_wFreeCount; }
+
+    inline guint32 GetAllocCount() const
+    { return BLKGRP_NUMBER - m_wFreeCount; }
+
+    gint32 FreeGroup( guint32 dwGrpIdx );
+    gint32 AllocGroup( guint32& dwGrpIdx );
+    gint32 InitBitmap();
+};
+
+using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
 
 using AllocPtr = typename CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
 
@@ -246,16 +294,17 @@ class CBlockAllocator :
     GrpBmpUPtr          m_pGroupBitmap;
     std::hashmap< guint32, BlkGrpUPtr > m_mapBlkGrps;
 
+    gint32 ReadWriteBlocks(
+        bool bRead, const guint32* pBlocks,
+        guint32 dwNumBlocks, guint8* pBuf,
+        bool bContinous = false );
+
     public:
     CBlockAllocator( const IConfigDb* pCfg );
 
     gint32 Format() override;
     gint32 Flush() override;
     gint32 Reload() override;
-
-    gint32 FreeBlocks(
-        const guint32* pvecBlocks,
-        guint32 dwNumBlocks );
 
     gint32 SaveGroupBitmap(
         const CGroupBitmap& gbmp );
@@ -269,41 +318,36 @@ class CBlockAllocator :
     gint32 LoadSuperBlock(
         char* pSb, guint32 dwSize ) const;
 
-    gint32 AllocBlocks( guint32 dwNumBlocks,
-        std::vector< guint32 >& vecBlocks );
+    gint32 FreeBlocks(
+        const guint32* pvecBlocks,
+        guint32 dwNumBlocks );
+
+    gint32 AllocBlocks( 
+        guint32* pvecBlocks,
+        guint32& dwNumBlocks );
 
     // write pBuf to dwBlockIdx, till the end of the
     // block or the end of the pBuf.
-    // dwOff is the offset into the first block to
-    // write
     gint32 WriteBlock(
-        guint32 dwBlockIdx, guint8* pBuf,
-        guint32 dwSize, guint32 dwOff = 0 );
+        guint32 dwBlockIdx, const guint8* pBuf );
 
     // write pBuf to an array of blocks, till all the
     // blocks are written or all the bytes are written
     // from the pBuf.
-    // dwOff is the offset into the first block to
-    // write
     gint32 WriteBlocks( const guint32* pBlocks,
-        guint32 dwNumBlocks, guint8* pBuf,
-        guint32 dwSize, guint32 dwOff = 0 );
+        guint32 dwNumBlocks, const guint8* pBuf,
+        bool bContinous = false );
 
     // read block at dwBlockIdx to pBuf, till the end of the
     // block.
-    // dwOff is the offset into the first block to
-    // read
     gint32 ReadBlock( guint32 dwBlockIdx,
-        guint8* pBuf, guint32 dwSize,
-        guint32 dwOff = 0 );
+        guint8* pBuf );
 
     // read blocks to pBuf specified by block index
     // from pBlocks, till the end of the pBlocks.
-    // dwOff is the offset into the first block to
-    // read
     gint32 ReadBlocks( const guint32* pBlocks,
         guint32 dwNumBlocks, guint8* pBuf
-        guint32 dwSize, guint32 dwOff = 0 );
+        bool bContinous = false );
 
     gint32 AllocBlkGroup( guint32 dwNumGroups, 
         std::vector< guint32 >& vecGroups );
