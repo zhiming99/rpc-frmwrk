@@ -72,11 +72,13 @@
 #define BLKGRP_NUMBER \
     ( ( 1 << GROUP_SHIFT ) - sizeof( guint16 ) * BYTE_BITS )
 
+#define BLKGRP_NUMBER_FULL ( ( 1 << GROUP_SHIFT ) )
+
 #define GRPBMP_BLKNUM \
-    ( BLKGRP_NUMBER / ( BLOCK_SIZE * BYTE_BITS ) )
+    ( BLKGRP_NUMBER_FULL / ( BLOCK_SIZE * BYTE_BITS ) )
 
 #define GRPBMP_SIZE \
-    ( BLKGRP_NUMBER / BYTE_BITS )
+    ( BLKGRP_NUMBER_FULL / BYTE_BITS )
 
 #define GRPBMP_START \
     ( SUPER_BLOCK_SIZE )
@@ -86,10 +88,6 @@
 
 #define GROUP_IDX_MASK \
     ( ( 1 << GROUP_SHIFT ) - 1 )
-
-// group index in a block index
-#define GROUP_IDX_SHIFT \
-    ( 1 << ( find_shift( GROUP_SIZE ) ) )
 
 #define LA_ADDR( _byte_addr ) \
     ( _byte_addr - SUPER_BLOCK_SIZE - GRPBMP_SIZE )
@@ -122,7 +120,7 @@
 #define GROUP_INDEX_SHIFT \
     ( find_shift( BLOCKS_PER_GROUP_FULL ) - 1 )
 
-// get the group idx from the block addr
+// get the group idx from the block index
 #define GROUP_INDEX( _blk_idx ) \
     ( ( _blk_idx >> GROUP_INDEX_SHIFT ) & GROUP_IDX_MASK ) 
 
@@ -150,6 +148,9 @@
     ABS_ADDR( BLOCK_LA( _blk_idx ) )
 
 #define INODE_SIZE ( BLOCK_SIZE )
+#define ROOT_INODE_IDX ( BLKBMP_BLKNUM )
+
+namespace rpcf{
 
 struct ISynchronize
 {
@@ -164,14 +165,14 @@ struct CSuperBlock : public ISynchronize
     guint32     m_dwVersion = 0x01;
     guint32     m_dwGroupNum = BLKGRP_NUMBER;
     guint32     m_dwBlkSize = DEFAULT_BLOCK_SIZE;
-    CBlockAllocator* m_pParent;
+    CBlockAllocator* m_pAlloc;
 
-    CSuperBlock();
+    CSuperBlock( CBlockAllocator* pAlloc )
+        : m_pAlloc( pAlloc )
+    {}
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
-    inline void SetParent( CBlockAllocator* pParent )
-    { m_pParent = pParent; }
 } ;
 
 using SblkUPtr = typename std::unique_ptr< CSuperBlock >;
@@ -259,14 +260,15 @@ struct CBlockGroup : public ISynchronize
         return m_pBlockMap->FreeBlocks(
             pvecBlocks, dwNumBlocks );
     }
+
+    gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
 
 using BlkGrpUPtr = typename std::unique_ptr< CBlockGroup >;
 struct CGroupBitmap
 {
     __attribute__((aligned (8)))
-    guint8 m_arrBytes[ BLKGRP_NUMBER / BYTE_BITS +
-        sizeof( guint16 ) * BYTE_BITS ];
+    guint8 m_arrBytes[ BLKGRP_NUMBER_FULL ];
     guint16 m_wFreeCount;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
@@ -277,6 +279,12 @@ struct CGroupBitmap
     gint32 FreeGroup( guint32 dwGrpIdx );
     gint32 AllocGroup( guint32& dwGrpIdx );
     gint32 InitBitmap();
+    gint32 IsBlockGroupFree(
+        guint32 dwGroupIdx ) const;
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
 };
 
 using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
@@ -287,7 +295,7 @@ class CBlockAllocator :
     public CObjBase,
     public ISynchronize
 {
-    mutable CStdRMutex  m_oLock;
+    mutable stdrmutex   m_oLock;
     gint32              m_iFd;
 
     SblkUPtr            m_pSuperBlock;
@@ -299,21 +307,27 @@ class CBlockAllocator :
         guint32 dwNumBlocks, guint8* pBuf,
         bool bContinous = false );
 
+    gint32 ReadWriteFile(
+        char* pBuf, guint32 dwSize,
+        guint32 dwOff, bool bRead );
+
     public:
     CBlockAllocator( const IConfigDb* pCfg );
+    inline stdrmutex& GetLock() const
+    { return m_oLock; }
 
     gint32 Format() override;
     gint32 Flush() override;
     gint32 Reload() override;
 
     gint32 SaveGroupBitmap(
-        const CGroupBitmap& gbmp );
+        const* pbmp, guint32 dwSize );
 
     gint32 LoadGroupBitmap(
-        CGroupBitmap& gbmp );
+        char* pbmp, guint32 dwSize );
 
     gint32 SaveSuperBlock(
-        char* pSb, guint32 dwSize );
+        const char* pSb, guint32 dwSize );
 
     gint32 LoadSuperBlock(
         char* pSb, guint32 dwSize ) const;
@@ -349,47 +363,47 @@ class CBlockAllocator :
         guint32 dwNumBlocks, guint8* pBuf
         bool bContinous = false );
 
-    gint32 AllocBlkGroup( guint32 dwNumGroups, 
-        std::vector< guint32 >& vecGroups );
-
-    gint32 FreeBlkGroups( const guint32* pGroups,
-        guint32 dwNumGroups );
-
-    gint32 IsBlkGroupFree( guint32 dwGroupIdx ) const;
+    inline gint32 IsBlockGroupFree(
+        guint32 dwGroupIdx ) const
+    {
+        return m_pGroupBitmap->IsBlockGroupFree(
+            dwGroupIdx );
+    }
 
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 };
 
 struct RegFSInode
 {
-    // file type
-    guint16     m_wMode;
     // file size in bytes
     guint32     m_dwSize;
     // time of last modification.
     guint32     m_dwmtime;
     // time of last access.
     guint32     m_dwatime;
+    // file type
+    guint16     m_wMode;
     // uid
     guint16     m_wuid;
     // gid
     guint16     m_wgid;
+    // others
+    guint16     m_woid;
     // type of file content
     guint32     m_dwFlags;
     // the block address for the parent directory
     guint32     m_dwParentInode;
     // blocks for data section.
-    guint32     m_arrBlocks[ 15 ];
+    guint32     m_arrBlocks[ 16 ];
 
     // blocks for extended inode
     guint32     m_arrMetaFork[ 4 ];
+
     // for small data with length less than 96 bytes.
-    union
-    {
-        Variant     m_oValue;
-        guint8      m_arrBuf[ 96 ];
-    }
-};
+    guint8      m_arrBuf[ 95 ];
+    guint8      m_iValType;
+
+} __attribute__((aligned (8)));
 
 #define BPNODE_SIZE ( PAGE_SIZE )
 #define BPNODE_BLKNUM ( BPNODE_SIZE / BLOCK_SIZE )
@@ -445,10 +459,19 @@ struct CFileImage :
     public ISynchronize
 {
     AllocPtr m_pAlloc;
-    guint32 m_dwInode;
-    std::hashmap< guint32, BufPtr >& m_mapImage;
+    guint32 m_dwInodeIdx;
 
-    RegFSInode m_oInodeStore;
+    // mapping offset to block
+    std::hashmap< guint32, BufPtr >& m_mapBlocks;
+
+    RegFSInode  m_oInodeStore;
+    Variant     m_oValue;
+
+    CFileImage( CBlockAllocator* pAlloc,
+        guint32 dwInode ) :
+        m_pAlloc( pAlloc ),
+        m_dwInodeIdx( dwInode )
+    {}
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -464,8 +487,8 @@ struct CFileImage :
 
     gint32 WriteValue( const Variant& oVar );
 
-    gint32 Trim( guint32 dwOff );
-    gint32 Grow( guint32 dwBlocks );
+    gint32 Truncate( guint32 dwOff );
+    gint32 Extend( guint32 dwBlocks );
 };
 
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
@@ -509,10 +532,10 @@ struct COpenFileEntry :
     public ISynchronize
 {
     AllocPtr        m_pAlloc;
-    guint32         m_dwInodeIdx;
+    guint32         m_dwInodeIdx = 0;
     stdstr          m_strFileName;
     FImgSPtr        m_pFileImage;
-    guint32         m_dwPos;
+    guint32         m_dwPos = 0;
     CAccessContext  m_oUserAc;
 
     mutable CSharedLock m_oLock;
@@ -522,7 +545,14 @@ struct COpenFileEntry :
     std::atomic< guint32 > m_dwRefs;
     FileSPtr m_pParentDir;
 
-    COpenFileEntry( AllocPtr& pAlloc );
+    COpenFileEntry( AllocPtr& pAlloc,
+        guint32 dwInodeIdx ) :
+        m_pAlloc( pAlloc ),
+        m_dwInodeIdx( dwInodeIdx )
+    {
+        m_pFileImage = FImgSPtr(
+            new CFileImage( pAlloc, dwInodeIdx ));
+    }
 
     inline guint32 AddRef()
     { return ++m_dwRefs; }
@@ -637,3 +667,5 @@ class CRegistryFs :
 };
 
 using RegFsPtr = typename CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
+
+}

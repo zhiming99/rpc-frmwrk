@@ -28,6 +28,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+namespace rpcf{
+
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
     if( dwSize != 512 &&
@@ -59,7 +61,7 @@ gint32 CSuperBlock::Flush()
         p[ 1 ] = htonl( m_dwVersion );
         p[ 2 ] = htonl( m_dwBlkSize );
         p[ 3 ] = htonl( m_dwGroupNum );
-        ret = m_pParent->SaveSuperBlock(
+        ret = m_pAlloc->SaveSuperBlock(
             arrSb, sizeof( arrSb ) );
     }while( 0 );
     return ret;
@@ -77,7 +79,7 @@ gint32 CSuperBlock::Format()
         p[ 1 ] = htonl( m_dwVersion );
         p[ 2 ] = htonl( m_dwBlkSize );
         p[ 3 ] = htonl( m_dwGroupNum );
-        ret = m_pParent->SaveSuperBlock(
+        ret = m_pAlloc->SaveSuperBlock(
             arrSb, sizeof( arrSb ) );
         SetBlockSize( m_dwBlkSize );
     }while( 0 );
@@ -89,7 +91,7 @@ gint32 CSuperBlock::Reload()
     gint32 ret = 0;
     do{
         char arrSb[ SUPER_BLOCK_SIZE ];
-        ret = m_pParent->LoadSuperBlock(
+        ret = m_pAlloc->LoadSuperBlock(
             arrSb, sizeof( arrSb ) );
         if( ERROR( ret ) )
             break;
@@ -249,6 +251,94 @@ gint32 CGroupBitmap::InitBitmap()
     return 0;
 }
 
+gint32 CGroupBitmap::IsBlockGroupFree(
+    guint32 dwGrpIdx ) const
+{
+    gint32 ret = STATUS_SUCCESS;
+    do{
+        if( m_wFreeCount == BLKGRP_NUMBER )
+            break;
+
+        LONGWORD* pbmp = m_arrBytes;
+
+        constexpr int iNumBits =
+            sizeof( LONGWORD ) * BYTE_BITS;
+
+        if( dwGrpIdx >= BLKGRP_NUMBER )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint32 shift = find_shift( iNumBits );
+        guint32 dwWordIdx = ( dwGrpIdx >> shift );
+        int offset = dwGrpIdx & ( iNumBits - 1 );
+
+#if BUILD_64
+        LONGWORD a = ntohll( pbmp[ dwWordIdx ] );
+#else
+        LONGWORD a = ntohl( pbmp[ dwWordIdx ] );
+#endif
+        if( a == 0 )
+            break;
+
+        LONGWORD bit = ( 1 << offset );
+        if( a & bit )
+            ret = ERROR_FALSE;
+
+    }while( 0 );
+
+    return ret;
+}
+
+gint32 CGroupBitmap::Flush()
+{
+    gint32 ret = 0;
+    do{
+        guint16* p = ( guint16*)
+            ( m_arrBytes + sizeof( m_arrBytes );
+        p[ -1 ] = htons( m_wFreeCount );
+        ret = m_pAlloc->SaveGroupBitmap(
+            m_arrBytes, sizeof( m_arrBytes ) );
+
+    }while( 0 );
+    return ret;
+}
+gint32 CGroupBitmap::Format()
+{
+    gint32 ret = 0;
+    do{
+        m_wFreeCount = BLKGRP_NUMBER;
+        memset( m_arrBytes, 0, sizeof( m_arrBytes ) );
+        guint16* p = ( guint16*)
+            ( m_arrBytes + sizeof( m_arrBytes );
+        p[ -1 ] = htons(  m_wFreeCount );
+        ret = m_pAlloc->SaveGroupBitmap(
+            m_arrBytes, sizeof( m_arrBytes ) );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CGroupBitmap::Reload()
+{
+    gint32 ret = 0;
+    do{
+        ret = m_pAlloc->LoadGroupBitmap(
+            m_arrBytes, sizeof( m_arrBytes ) );
+        if( ERROR( ret ) )
+            break;
+        guint16* p = ( guint16*)
+            ( m_arrBytes + sizeof( m_arrBytes );
+        m_wFreeCount = htons( p[ -1 ] );
+        if( m_wFreeCount > BLKGRP_NUMBER )
+        {
+            ret = -ERANGE;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
 gint32 CBlockGroup::Flush()
 {
     gint32 ret = 0;
@@ -288,6 +378,47 @@ gint32 CBlockGroup::Reload()
             arrBlks, sizeof( arrBlks ),
             m_pBlockBitmap->m_arrBytes, true );
     }while( 0 );
+    return ret;
+}
+
+gint32 CBlockGroup::IsBlockFree(
+    guint32 dwBlkIdx )
+{
+    gint32 ret = 0;
+    if( dwBlkIdx == 0 )
+        return -EINVAL;
+    do{
+        if( m_wFreeCount ==
+            BLOCKS_PER_GROUP - BLKBMP_BLKNUM )
+            break;
+
+        LONGWORD* pbmp = m_arrBytes;
+        constexpr int iNumBits =
+            sizeof( LONGWORD ) * BYTE_BITS;
+
+        guint32 shift = find_shift( iNumBits );
+        guint32 dwWordIdx =
+            ( dwBlkIdx >> shift );
+
+        int offset =
+            dwBlkIdx & ( iNumBits - 1 );
+
+#if BUILD_64
+        LONGWORD a =
+            ntohll( pbmp[ dwWordIdx ] );
+#else
+        LONGWORD a =
+            ntohl( pbmp[ dwWordIdx ] );
+#endif
+        if( a == 0 )
+            continue;
+
+        LONGWORD bit = ( 1 << offset );
+        if( a & bit )
+            ret = ERROR_FALSE;
+
+    }while( 0 );
+
     return ret;
 }
 
@@ -485,7 +616,7 @@ gint32 CBlockBitmap::Flush()
         for( int i = 0; i < sizeof( arrBlks ); i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         guint16* p = ( guint16* )
-            &m_arrBytes[sizeof( m_arrBytes )];
+            m_arrBytes + sizeof( m_arrBytes );
         p[ -1 ] = htons( m_wFreeCount );
         ret = m_pAlloc->WriteBlocks(
             arrBlks, sizeof( arrBlks ),
@@ -546,6 +677,8 @@ CBlockAllocator::CBlockAllocator(
             break;
         }
         m_iFd = ret;
+        m_pSuperBlock.reset(
+            new CSuperBlock( this ) );
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -557,20 +690,32 @@ CBlockAllocator::CBlockAllocator(
     return ret;
 }
 
-gint32 CBlockAllocator::SaveSuperBlock(
-    char* pSb, guint32 dwSize )
+gint32 CBlockAllocator::ReadWriteFile(
+    char* pBuf, guint32 dwSize,
+    guint32 dwOff, bool bRead )
 {
     gint32 ret = 0;
     do{
+        if( pBuf == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
         CStdRMutex oLock( this->GetLock() );
-        ret = lseek( m_iFd, 0, SEEK_SET );
+        ret = lseek( m_iFd, dwOff, SEEK_SET );
         if( ERROR( ret ) )
         {
             ret = -errno;
             break;
         }
-        ret = write( m_iFd, pSb,
-            std::min( dwSize, SUPER_BLOCK_SIZE ) );
+        if( bRead )
+        {
+            ret = read( m_iFd, pBuf, dwSize );
+        }
+        else
+        {
+            ret = write( m_iFd, pBuf, dwSize );
+        }
         if( ERROR( ret ) )
         {
             ret = -errno;
@@ -579,88 +724,50 @@ gint32 CBlockAllocator::SaveSuperBlock(
 
     }while( 0 );
     return ret;
+}
+
+gint32 CBlockAllocator::SaveSuperBlock(
+    const char* pSb, guint32 dwSize )
+{
+    gint32 ret = 0;
+    if( dwSize < SUPER_BLOCK_SIZE )
+        return -EINVAL;
+    return ReadWriteFile(
+        const_cast< char* >( pSb ),
+        SUPER_BLOCK_SIZE, 0, false );
 }
 
 gint32 CBlockAllocator::LoadSuperBlock(
     char* pSb, guint32 dwSize )
 {
     gint32 ret = 0;
-    do{
-        CStdRMutex oLock( this->GetLock() );
-        ret = lseek( m_iFd, 0, SEEK_SET );
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-        ret = read( m_iFd, pSb,
-            std::min( dwSize, SUPER_BLOCK_SIZE ) );
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-
-    }while( 0 );
-    return ret;
+    if( dwSize < SUPER_BLOCK_SIZE )
+        return -EINVAL;
+    return ReadWriteFile(
+        pSb, SUPER_BLOCK_SIZE, 0, true );
 }
 
 gint32 CBlockAllocator::SaveGroupBitmap(
-    const CGroupBitmap& gbmp )
+    const* pbmp, guint32 dwSize );
 {
-    gint32 ret = 0;
-    do{
-        CStdRMutex oLock( this->GetLock() );
-        ret = lseek( m_iFd, GRPBMP_START , SEEK_SET );
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
+    if( dwSize < GRPBMP_SIZE_FULL )
+        return -EINVAL;
 
-        guint16* pCount = gbmp.m_arrBytes +
-            sizeof( gbmp.m_arrBytes ) - sizeof( guint16 )
-
-        *pCount = htons( gbmp.m_wFreeCount );
-
-        ret = write( m_iFd, gbmp.m_arrBytes,
-            sizeof( gbmp.m_arrBytes ) );
-
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-    }while( 0 );
+    gint32 ret = ReadWriteFile(
+        pbmp, GRPBMP_SIZE_FULL,
+        GRPBMP_START, false );
     return ret;
 }
 
 gint32 CBlockAllocator::LoadGroupBitmap(
-    CGroupBitmap& gbmp )
+    char* pbmp, guint32 dwSize );
 {
-    gint32 ret = 0;
-    do{
-        CStdRMutex oLock( this->GetLock() );
-        ret = lseek( m_iFd, GRPBMP_START , SEEK_SET );
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-        ret = read( m_iFd, gbmp.m_arrBytes,
-            sizeof( gbmp.m_arrBytes ) );
+    if( dwSize < GRPBMP_SIZE_FULL )
+        return -EINVAL;
 
-        if( ERROR( ret ) )
-        {
-            ret = -errno;
-            break;
-        }
-        guint16* pCount = gbmp.m_arrBytes +
-            sizeof( gbmp.m_arrBytes ) - sizeof( guint16 )
-        gbmp.m_wFreeCount = htons( *pCount );
-
-    }while( 0 );
-
+    gint32 ret = ReadWriteFile(
+        pbmp, GRPBMP_SIZE_FULL,
+        GRPBMP_START, true );
     return ret;
 }
 
@@ -681,8 +788,10 @@ gint32 CBlockAllocator::FreeBlocks(
         {
             guint32 dwBlkIdx = pvecBlocks[ i ];
             guint32 dwGrpIdx = GROUP_INDEX( dwBlkIdx );
-            if( m_pGroupBitmap->IsBlkGroupFree(
-                dwGrpIdx ) )
+            CGroupBitmap* p = m_pGroupBitmap;
+            gint32 iRet = 
+                p->IsBlockGroupFree( dwGrpIdx );
+            if( SUCCEEDED( iRet ) )
                 continue;
             auto itr = m_mapBlkGrps.find( dwGrpIdx );
             if( itr == m_mapBlkGrps.end() )
@@ -696,7 +805,8 @@ gint32 CBlockAllocator::FreeBlocks(
                 ret = pbg->FreeBlocks( arrBlks, 1 );
                 if( ERROR( ret ) )
                     break;
-                m_mapBlkGrps.insert( dwGrpIdx, pbg );
+                m_mapBlkGrps.insert(
+                    dwGrpIdx, std::move( pbg ) );
             }
         }
     }while( 0 );
@@ -749,7 +859,8 @@ gint32 CBlockAllocator::AllocBlocks(
             {
                 for( int i = 0; i < BLKGRP_NUMBER; i++ )
                 {
-                    if( IsBlkGroupFree( i ) )
+                    gint32 iRet = IsBlockGroupFree( i );
+                    if( SUCCEEDED( iRet ) )
                         continue;
                     auto itr = m_mapBlkGrps.find( i );
                     if( itr != m_mapBlkGrps.end )
@@ -763,7 +874,8 @@ gint32 CBlockAllocator::AllocBlocks(
                         dwNeed -= pbg->GetFreeCount();
                     else
                         dwNeed = 0;
-                    m_mapBlkGrps.insert( i, pbg );
+                    m_mapBlkGrps.insert(
+                        i, std::move( pbg ) );
                     if( dwNeed == 0 )
                         break;
                     if( m_mapBlkGrps.size() < 
@@ -773,7 +885,7 @@ gint32 CBlockAllocator::AllocBlocks(
                 }
             }
 
-            // allocate new blockgroup till dwNeed is 0
+            // allocate new blockgroup till dwNeed is met
             while( dwNeed > 0 )
             {
                 // all are loaded 
@@ -790,11 +902,13 @@ gint32 CBlockAllocator::AllocBlocks(
                 if( pbg->GetFreeCount() >= dwNeed )
                 {
                     dwNeed = 0;
-                    m_mapBlkGrps.insert( dwGrpIdx, pbg );
+                    m_mapBlkGrps.insert(
+                        dwGrpIdx, std::move( pbg ) );
                     break;
                 }
                 dwNeed -= pbg->GetFreeCount();
-                m_mapBlkGrps.insert( dwGrpIdx, pbg );
+                m_mapBlkGrps.insert(
+                    dwGrpIdx, std::move( pbg ) );
                 continue;
             }
             if( ERROR( ret ) )
@@ -804,6 +918,30 @@ gint32 CBlockAllocator::AllocBlocks(
     }while( 0 );
 
     return ret;
+}
+
+gint32 CBlockAllocator::ReadBlock(
+    guint32 dwBlockIdx, guint8* pBuf )
+{
+    if( dwBlockIdx == 0 || pBuf == nullptr )
+        return nullptr;
+
+    guint32 arrBlks[ 1 ] = { dwBlockIdx };
+    return ReadWriteBlocks( true,
+        arrBlks, 1, pBuf, false );
+}
+
+gint32 CBlockAllocator::WriteBlock(
+    guint32 dwBlockIdx, const guint8* pBuf )
+{
+    if( dwBlockIdx == 0 || pBuf == nullptr )
+        return nullptr;
+
+    guint32 arrBlks[ 1 ] = { dwBlockIdx };
+    return ReadWriteBlocks(
+        false, arrBlks, 1,
+        const_cast< guint8* >( pBuf ),
+        false );
 }
 
 gint32 CBlockAllocator::WriteBlocks(
@@ -829,7 +967,7 @@ gint32 CBlockAllocator::ReadBlocks(
 gint32 CBlockAllocator::ReadWriteBlocks(
     bool bRead, const guint32* pBlocks,
     guint32 dwNumBlocks, guint8* pBuf,
-    bool bContinous )
+    bool bContineous )
 {
     if( pBlocks == nullptr ||
         pBuf == nullptr ||
@@ -838,7 +976,7 @@ gint32 CBlockAllocator::ReadWriteBlocks(
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
-        if( bContinous )
+        if( bContineous )
         {
             guint32 dwDist =
                 pBlocks[ dwNumBlocks - 1 ] -
@@ -862,24 +1000,9 @@ gint32 CBlockAllocator::ReadWriteBlocks(
             guint64 off = ABS_ADDR(
                 GROUP_START( dwBlkIdx ) +
                 dwIdx * BLOCK_SIZE );
-            ret = lseek( m_iFd, off, SEEK_SET );
-            if( ret < 0 )
-            {
-                ret = -errno;
-                break;
-            }
-            if( bRead )
-            {
-                ret = read( m_iFd,
-                    pBuf, BLOCK_SIZE * dwNumBlocks );
-            }
-            else
-            {
-                ret = write( m_iFd,
-                    pBuf, BLOCK_SIZE * dwNumBlocks );
-            }
-            if( ret < 0 )
-                ret = -errno;
+            ret = ReadWriteFile( pBuf,
+                BLOCK_SIZE * dwNumBlocks, 
+                off, bRead );
             break;
         }
         for( guint32 i = 0; i < dwNumBlocks; i++ )
@@ -890,30 +1013,131 @@ gint32 CBlockAllocator::ReadWriteBlocks(
             guint64 off = ABS_ADDR(
                 GROUP_START( dwBlkIdx ) +
                 dwIdx * BLOCK_SIZE );
-            ret = lseek( m_iFd, off, SEEK_SET );
-            if( ret < 0 )
-            {
-                ret = -errno;
+            ret = ReadWriteFile(
+                pBuf + i * BLOCK_SIZE,
+                BLOCK_SIZE, off, bRead );
+            if( ERROR( ret ) )
                 break;
-            }
-            if( bRead )
-            {
-                ret = read( m_iFd,
-                    pBuf + i * BLOCK_SIZE,
-                    BLOCK_SIZE );
-            }
-            else
-            {
-                ret = write( m_iFd,
-                    pBuf + i * BLOCK_SIZE,
-                    BLOCK_SIZE );
-            }
-            if( ret < 0 )
-            {
-                ret = -errno;
-                break;
-            }
         }
     }while( 0 );
     return ret;
+}
+
+gint32 CBlockAllocator::IsBlockFree(
+    guint32 dwBlkIdx ) const
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        guint32 dwGrpIdx =
+            GROUP_INDEX( dwBlkIdx );
+        gint32 iRet = this->IsBlockGroupFree();
+        if( SUCCEEDED( iRet ) )
+        {
+            ret = -ERANGE;
+            break;
+        }
+        auto itr = m_mapBlkGrps.find( dwGrpIdx );
+        if( itr != m_mapBlkGrps.end() )
+        {
+            CBlockGroup* pGrp = itr->second.get();
+            if( pGrp == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = pGrp->IsBlockFree( dwBlkIdx );
+        }
+        else
+        {
+            BlkGrpUPtr pbg(
+                new CBlockGroup( this, dwGrpIdx ) );
+            ret = pbg->Reload();
+            if( ERROR( ret ) )
+                break;
+            ret = pGrp->IsBlockFree( dwBlkIdx );
+            m_mapBlkGrps.insert( dwGrpIdx,
+                std::move( pbg ) );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::Format()
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        ret = truncate( m_iFd, 0 );
+        if( ret < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        this->m_pSuperBlock->Format();
+        m_pGroupBitmap.reset( new CGroupBitmap() );
+        ret = m_pGroupBitmap->Format();
+        if( ERROR( ret ) )
+            break;
+        BlkGrpUPtr pbg(
+            new CBlockGroup( this, 0 ) );
+        ret = pbg->Format();
+        if( ERROR( ret ) )
+            break;
+        m_mapBlkGrps.insert(
+            0, std::move( pbg ) );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::Flush()
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        ret = this->m_pSuperBlock->Flush();
+        if( ERROR( ret ) )
+            break;
+        ret = m_pGroupBitmap->Flush();
+        if( ERROR( ret ) )
+            break;
+        for( auto elem : m_mapBlkGrps )
+        {
+            ret = elem.second->Flush();
+            if( ERROR( ret ) )
+                break;
+        }
+        if( ERROR( ret ) )
+            break;
+        ret = fsync( m_iFd );
+        if( ret < 0 )
+            ret = -errno;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::Reload()
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        ret = this->m_pSuperBlock->Reload();
+        if( ERROR( ret ) )
+            break;
+        m_pGroupBitmap.reset( new CGroupBitmap() );
+        ret = m_pGroupBitmap->Reload();
+        if( ERROR( ret ) )
+            break;
+        BlkGrpUPtr pbg(
+            new CBlockGroup( this, 0 ) );
+        ret = pbg->Reload();
+        if( ERROR( ret ) )
+            break;
+        m_mapBlkGrps.insert(
+            0, std::move( pbg ) );
+    }while( 0 );
+    return ret;
+}
+
 }
