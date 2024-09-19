@@ -381,14 +381,15 @@ struct RegFSInode
     guint32     m_dwmtime;
     // time of last access.
     guint32     m_dwatime;
+    // time of creation
+    guint32     m_dwctime;
     // file type
     guint16     m_wMode;
     // uid
     guint16     m_wuid;
     // gid
     guint16     m_wgid;
-    // others
-    guint16     m_woid;
+
     // type of file content
     guint32     m_dwFlags;
     // the block address for the parent directory
@@ -461,8 +462,8 @@ struct CFileImage :
     AllocPtr m_pAlloc;
     guint32 m_dwInodeIdx;
 
-    // mapping offset to block
-    std::hashmap< guint32, BufPtr >& m_mapBlocks;
+    // mapping offset into file to block
+    std::map< guint32, BufPtr >& m_mapBlocks;
 
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
@@ -546,13 +547,11 @@ struct COpenFileEntry :
     FileSPtr m_pParentDir;
 
     COpenFileEntry( AllocPtr& pAlloc,
-        guint32 dwInodeIdx ) :
+        guint32 dwInodeIdx, FImgSPtr& pImage ) :
         m_pAlloc( pAlloc ),
-        m_dwInodeIdx( dwInodeIdx )
-    {
-        m_pFileImage = FImgSPtr(
-            new CFileImage( pAlloc, dwInodeIdx ));
-    }
+        m_dwInodeIdx( dwInodeIdx ),
+        m_pFileImage( FImgSPtr )
+    {}
 
     inline guint32 AddRef()
     { return ++m_dwRefs; }
@@ -591,9 +590,9 @@ struct CDirectoryFile :
     inline bool IsRootDir() const
     { m_oINodeStore.m_dwParentInode == 0; }
 
-    gint32 NewFile( const stdstr& strName );
+    gint32 CreateFile( const stdstr& strName );
 
-    gint32  NewDirectory( const stdstr& strName );
+    gint32 CreateDirectory( const stdstr& strName );
 
     HANDLE OpenChild(
         const stdstr& strName,
@@ -629,10 +628,10 @@ class CRegistryFs :
         const string& strPath,
         std::vector<stdstr>& vecNames ) const;
 
-    gint32 NewFile( const stdstr& strPath,
+    gint32 CreateFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32  NewDirectory( const stdstr& strPath,
+    gint32 CreateDirectory( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
     HANDLE OpenChild( const stdstr& strPath,
