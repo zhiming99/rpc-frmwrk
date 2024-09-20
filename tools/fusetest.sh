@@ -239,10 +239,10 @@ function pytest()
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
         pushd ./fs
-        echo release/${appname}svr -d -m ./mpsvr
+        echo release/${appname}svr -gd -m ./mpsvr
         release/${appname}svr -m ./mpsvr >> $dumpfile &
         sleep 2
-        echo release/${appname}cli -m ./mp >> $dumpfile &
+        echo release/${appname}cli -gm ./mp >> $dumpfile &
         release/${appname}cli -d -m ./mp
         popd
         sleep 5
