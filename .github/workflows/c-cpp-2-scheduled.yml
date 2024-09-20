@@ -84,12 +84,16 @@ jobs:
     - name: cleanup gmssl files
       run: rm ./reqfwdr/driver.json && rmdir reqfwdr || true
 
+    - name: flush logs
+      if: always()
+      run: kill -3 `pidof rpcf_logger` || true;sleep 2
+
     - name: Upload Test Results on Canceled
       if: always()
       uses: actions/upload-artifact@v4
       with:
-          name: logfile
+          name: logfiles
           path: |
             ./logfile
             ./logdump.txt
-
+            ./logger.txt
