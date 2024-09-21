@@ -291,6 +291,8 @@ using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
 
 using AllocPtr = typename CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator >;
 
+using CONTBLKS=std::pair< guint32, guint32 >;
+
 class CBlockAllocator :
     public CObjBase,
     public ISynchronize
@@ -305,7 +307,7 @@ class CBlockAllocator :
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
         guint32 dwNumBlocks, guint8* pBuf,
-        bool bContinous = false );
+        bool bContigous = false );
 
     gint32 ReadWriteFile(
         char* pBuf, guint32 dwSize,
@@ -350,7 +352,7 @@ class CBlockAllocator :
     // from the pBuf.
     gint32 WriteBlocks( const guint32* pBlocks,
         guint32 dwNumBlocks, const guint8* pBuf,
-        bool bContinous = false );
+        bool bContigous = false );
 
     // read block at dwBlockIdx to pBuf, till the end of the
     // block.
@@ -361,7 +363,7 @@ class CBlockAllocator :
     // from pBlocks, till the end of the pBlocks.
     gint32 ReadBlocks( const guint32* pBlocks,
         guint32 dwNumBlocks, guint8* pBuf
-        bool bContinous = false );
+        bool bContigous = false );
 
     inline gint32 IsBlockGroupFree(
         guint32 dwGroupIdx ) const
@@ -371,6 +373,16 @@ class CBlockAllocator :
     }
 
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
+
+    gint32 FindContigousBlocks(
+        const guint32* pBlocks,
+        guint32 dwNumBlocks,
+        std::vector< CONTBLKS >& vecBlocks );
+
+    gint32 ReadWriteBlocks2(
+        std::vector< CONTBLKS >& vecBlocks,
+        guint8* pBuf,
+        bool bRead );
 };
 
 struct RegFSInode
@@ -395,7 +407,8 @@ struct RegFSInode
     // the block address for the parent directory
     guint32     m_dwParentInode;
     // blocks for data section.
-    guint32     m_arrBlocks[ 16 ];
+    guint32     m_arrBlocks[ 15 ];
+    guint32     m_dwReserved;
 
     // blocks for extended inode
     guint32     m_arrMetaFork[ 4 ];
@@ -418,6 +431,60 @@ struct RegFSInode
 
 #define LEAST_NUM_CHILD ( ( MAX_PTR_PER_NODE + 1 ) >> 1 )
 #define LEASE_NUM_KEY ( LEAST_NUM_CHILD - 1 )
+
+#define DIRECT_BLOCKS 13
+
+#define INDIRECT_BLOCKS \
+    ( BLOCK_SIZE / sizeof( guint32 ) )
+
+#define SEC_INDIRECT_BLOCKS \
+    ( INDIRECT_BLOCKS * INDIRECT_BLOCKS ) 
+
+#define MAX_FILE_SIZE ( BLOCK_SIZE * 13 + \
+    INDIRECT_BLOCKS * BLOCK_SIZE + \
+    SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
+
+#define WITHIN_DIRECT_BLOCK( _offset_ ) \
+    ( _offset_ >= 0 && _offset_ < INDIRECT_BLOCKS * BLOCK_SIZE )
+
+#define WITHIN_INDIRECT_BLOCK( _offset_ ) \
+    ( _offset_ >= DIRECT_BLOCKS * BLOCK_SIZE && \
+     _offset_ < SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
+
+#define WITHIN_SEC_INDIRECT_BLOCK( _offset_ ) \
+    ( _offset_ >= INDIRECT_BLOCKS * BLOCK_SIZE && \
+     _offset_ < MAX_FILE_SIZE )
+
+#define BEYOND_MAX_LIMIT( _offset_ ) \
+    ( _offset_ >= MAX_FILE_SIZE )
+
+#define INDIRECT_BLOCK_START ( DIRECT_BLOCKS * BLOCK_SIZE )
+
+#define SEC_INDIRECT_BLOCK_START \
+    ( INDIRECT_BLOCK_START + INDIRECT_BLOCKS * BLOCK_SIZE )
+
+#define BLKIDX_PER_TABLE ( BLOCK_SIZE >> 2 )
+
+#define BLKIDX_PER_TABLE_SHIFT \
+    ( find_shift( BLOCK_SIZE >> 2 ) - 1 )
+
+#define BLKIDX_PER_TABLE_MASK \
+    ( BLKIDX_PER_TABLE - 1 )
+
+#define INDIRECT_IDX  13
+#define BITD_IDX  14
+
+#define INDIRECT_BLK_IDX( _offset_ ) \
+    ( ( _offset_ - INDIRECT_BLOCK_START ) >> BLOCK_SHIFT )
+
+#define SEC_BLKIDX_TABLE_IDX( _offset_ ) \
+    ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
+        ( BLOCK_SHIFT + BLKIDX_PER_TABLE_SHIFT ) ) & \
+        BLKIDX_PER_TABLE_MASK )
+
+#define SEC_BLKIDX_IDX( _offset_ ) \
+    ( ( ( _offset_ - INDIRECT_BLOCKS * BLOCK_SIZE ) >> \
+        BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
 
 struct RegFSBPlusNode
 {
@@ -463,10 +530,28 @@ struct CFileImage :
     guint32 m_dwInodeIdx;
 
     // mapping offset into file to block
-    std::map< guint32, BufPtr >& m_mapBlocks;
+    std::map< guint32, BufPtr > m_mapBlocks;
+
+    // block index table 
+    BufPtr m_pBitBlk;
+
+    // block index table directory
+    BufPtr m_pBitdBlk;
+    // catch of the secondary block index tables
+    std::hashmap< guint32, BufPtr > m_mapSecBitBlks;
+    
 
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
+
+    mutable CSharedLock m_oLock;
+    inline CSharedLock& GetLock() const
+    { return m_oLock; }
+
+    // this lock is used under readlock
+    mutable stdrmutex m_oExclLock;
+    inline stdrmutex& GetExclLock() const
+    { return m_oExclLock; }
 
     CFileImage( CBlockAllocator* pAlloc,
         guint32 dwInode ) :
@@ -479,7 +564,15 @@ struct CFileImage :
     gint32 Reload() override;
 
     gint32 ReadFile( guint32 dwOff,
-        guint32 size, guint8* pBuf );
+        guint32& size, guint8* pBuf );
+
+    gint32 CollectBlocksForRead(
+        guint32 dwOff, guint32 dwSize,
+        std::vector< guint32 > vecBlocks );
+
+    gint32 CollectBlocksForWrite(
+        guint32 dwOff, guint32& dwSize,
+        std::vector< guint32 > vecBlocks );
 
     gint32 WriteFile( guint32 dwOff,
         guint32 size, guint8* pBuf );
@@ -489,7 +582,7 @@ struct CFileImage :
     gint32 WriteValue( const Variant& oVar );
 
     gint32 Truncate( guint32 dwOff );
-    gint32 Extend( guint32 dwBlocks );
+    gint32 Extend( guint32 dwBytes );
 };
 
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
@@ -539,10 +632,6 @@ struct COpenFileEntry :
     guint32         m_dwPos = 0;
     CAccessContext  m_oUserAc;
 
-    mutable CSharedLock m_oLock;
-    inline CSharedLock& GetLock() const
-    { return m_oLock; }
-
     std::atomic< guint32 > m_dwRefs;
     FileSPtr m_pParentDir;
 
@@ -561,7 +650,7 @@ struct COpenFileEntry :
     { return m_dwRefs; }
 
     gint32 ReadFile(
-        guint32 size, guint8* pBuf );
+        guint32& size, guint8* pBuf );
 
     gint32 WriteFile(
         guint32 size, guint8* pBuf );

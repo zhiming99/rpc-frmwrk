@@ -552,6 +552,13 @@ gint32 CBlockBitmap::AllocBlocks(
     return -ENOMEM;
 }
 
+gint32 CBlockBitmap::FreeBlock(
+    guint32 dwBlkIdx )
+{
+    if( dwBlkIdx == 0 )
+        return -EINVAL;
+    return FreeBlocks( &dwBlkIdx, 1 );
+}
 gint32 CBlockBitmap::FreeBlocks(
     const guint32* pvecBlocks,
     guint32 dwNumBlocks )
@@ -573,14 +580,14 @@ gint32 CBlockBitmap::FreeBlocks(
         {
             guint32 dwBlkIdx =
             ( pvecBlocks[ i ] & BLOCK_IDX_MASK );
+            if( dwBlkIdx == 0 )
+                continue;
 
             guint32 shift = find_shift( iNumBits );
             guint32 dwWordIdx =
                 ( dwBlkIdx >> shift );
-
             int offset =
                 dwBlkIdx & ( iNumBits - 1 );
-
 #if BUILD_64
             LONGWORD a =
                 ntohll( pbmp[ dwWordIdx ] );
@@ -947,27 +954,105 @@ gint32 CBlockAllocator::WriteBlock(
 gint32 CBlockAllocator::WriteBlocks(
     const guint32* pBlocks,
     guint32 dwNumBlocks, const guint8* pBuf,
-    bool bContinous )
+    bool bContigous )
 {
     return ReadWriteBlocks( false,
         pBlocks, dwNumBlocks,
         const_cast< guint8* >( pBuf ),
-        bContinous );
+        bContigous );
 }
 
 gint32 CBlockAllocator::ReadBlocks(
     const guint32* pBlocks,
     guint32 dwNumBlocks, guint8* pBuf,
-    bool bContinous )
+    bool bContigous )
 {
     return ReadWriteBlocks( true, pBlocks,
-        dwNumBlocks, pBuf, bContinous );
+        dwNumBlocks, pBuf, bContigous );
 }
 
+gint32 CBlockAllocator::FindContigousBlocks(
+    const guint32* pBlocks, guint32 dwNumBlocks,
+    std::vector< CONTBLKS >& vecBlocks )
+{
+    if( pBlocks == nullptr || dwNumBlocks == 0 )
+        return -EINVAL;
+    guint32 dwPrev = pBlocks[ 0 ];
+    guint32 dwBase = dwPrev;
+    guint32 dwCount = 1;
+    for( guint32 i = 1; i < dwNumBlocks - 1; i++ )
+    {
+        if( pBlocks[ i ] == dwPrev + 1 &&
+            ( pBlocks[ i ] & BLOCK_IDX_MASK ) != 0 )
+        {
+            dwCount++;
+            dwPrev += 1;
+        }
+        else if( pBlocks[ i ] == 0 && dwBase == 0 )
+        {
+            // a hole
+            dwCount++;
+            dwPrev = pBlocks[ i ];   
+        }
+        else
+        {
+            vecBlocks.push_back( { dwBase, dwCount } );
+            dwBase = dwPrev = pBlocks[ i ];
+            dwCount = 1;
+        }
+    }
+    vecBlocks.push_back( { dwBase, dwCount } );
+    return STATUS_SUCCESS;
+}
+
+gint32 CBlockAllocator::ReadWriteBlocks2(
+    std::vector< CONTBLKS >& vecBlocks,
+    guint8* pBuf,
+    bool bRead )
+{
+    gint32 ret = 0;
+    do{
+        guint32 dwOffInBuf = 0;
+        for( auto& elem : vecBlocks )
+        {
+            guint32 dwBlkIdx = elem.first;
+            guint32 dwIdx =
+                ( dwBlkIdx & BLOCK_IDX_MASK );
+            guint64 off = ABS_ADDR(
+                GROUP_START( dwBlkIdx ) +
+                dwIdx * BLOCK_SIZE );
+            if( dwBlkIdx == 0 && bRead )
+            {
+                memset( pBuf + dwOffInBuf, 0,
+                    BLOCK_SIZE * elem.second );
+                dwOffInBuf +=
+                    BLOCK_SIZE * elem.second;
+                continue;
+            }
+            else if( dwBlkIdx == 0 && bWrite )
+            {
+                ret = -ENOSPC;
+                break;
+            }
+            ret = ReadWriteFile(
+                pBuf + dwOffInBuf,
+                BLOCK_SIZE * elem.second,
+                off, bRead );
+
+            if( ERROR( ret ) )
+                break;
+
+            dwOffInBuf +=
+                BLOCK_SIZE * elem.second;
+        }
+    }while( 0 );
+    return ret;
+}
+    
 gint32 CBlockAllocator::ReadWriteBlocks(
     bool bRead, const guint32* pBlocks,
     guint32 dwNumBlocks, guint8* pBuf,
-    bool bContineous )
+    bool bContigous )
 {
     if( pBlocks == nullptr ||
         pBuf == nullptr ||
@@ -976,7 +1061,7 @@ gint32 CBlockAllocator::ReadWriteBlocks(
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
-        if( bContineous )
+        if( bContigous )
         {
             guint32 dwDist =
                 pBlocks[ dwNumBlocks - 1 ] -
@@ -988,37 +1073,29 @@ gint32 CBlockAllocator::ReadWriteBlocks(
             }
             const guint32* pLast =
                 pBlocks + dwNumBlocks - 1;
-            if( GROUP_INDEX( pBlocks[ 0 ] ) !=
+            if( GROUP_INDEX( pBlocks[ 0 ] ) ==
                 GROUP_INDEX( pLast[ 0 ] )
             {
-                ret = -EINVAL;
+                guint32 dwBlkIdx = pBlocks[ 0 ];
+                guint32 dwIdx =
+                    ( dwBlkIdx & BLOCK_IDX_MASK );
+                guint64 off = ABS_ADDR(
+                    GROUP_START( dwBlkIdx ) +
+                    dwIdx * BLOCK_SIZE );
+                ret = ReadWriteFile( pBuf,
+                    BLOCK_SIZE * dwNumBlocks, 
+                    off, bRead );
                 break;
             }
-            guint32 dwBlkIdx = pBlocks[ 0 ];
-            guint32 dwIdx =
-                ( dwBlkIdx & BLOCK_IDX_MASK );
-            guint64 off = ABS_ADDR(
-                GROUP_START( dwBlkIdx ) +
-                dwIdx * BLOCK_SIZE );
-            ret = ReadWriteFile( pBuf,
-                BLOCK_SIZE * dwNumBlocks, 
-                off, bRead );
+            // spanning the block groups
+        }
+        std::vector< CONTBLKS > vecBlocks;
+        ret = FindContigousBlocks(
+            pBlocks, dwNumBlocks, vecBlocks );
+        if( ERROR( ret ) )
             break;
-        }
-        for( guint32 i = 0; i < dwNumBlocks; i++ )
-        {
-            guint32 dwBlkIdx = pBlocks[ i ];
-            guint32 dwIdx =
-                ( dwBlkIdx & BLOCK_IDX_MASK );
-            guint64 off = ABS_ADDR(
-                GROUP_START( dwBlkIdx ) +
-                dwIdx * BLOCK_SIZE );
-            ret = ReadWriteFile(
-                pBuf + i * BLOCK_SIZE,
-                BLOCK_SIZE, off, bRead );
-            if( ERROR( ret ) )
-                break;
-        }
+        ret = ReadWriteBlocks2(
+            vecBlocks, pBuf, bRead );
     }while( 0 );
     return ret;
 }
