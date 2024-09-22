@@ -791,9 +791,19 @@ gint32 CBlockAllocator::FreeBlocks(
         // search within the cache
         guint32 dwBlocks = 0;
         gutin32 dwRest = dwNumBlocks;
-        for( guint32 i = 0; i < dwNumBlocks; i++ )
+        std::vector< CONTBLKS > vecBlks;
+        ret = FindContigousBlocks(
+            pvecBlocks, dwNumBlocks, vecBlks );
+        if( ERROR( ret ) )
+            break;
+        for( auto& elem : vecBlks )
         {
-            guint32 dwBlkIdx = pvecBlocks[ i ];
+            guint32 dwBlkIdx = elem.first;
+            if( dwBlkIdx == 0 )
+                continue;
+            guint32 arrIdxs[ elem.second ];
+            for( int i = 0; i < elem.second; i++ )
+                arrIdxs[ i ] = dwBlkIdx + i;
             guint32 dwGrpIdx = GROUP_INDEX( dwBlkIdx );
             CGroupBitmap* p = m_pGroupBitmap;
             gint32 iRet = 
@@ -808,12 +818,18 @@ gint32 CBlockAllocator::FreeBlocks(
                 ret = pbg->Reload();
                 if( ERROR( ret ) )
                     break;
-                guint32 arrBlks[ 1 ] = { dwBlkIdx };
-                ret = pbg->FreeBlocks( arrBlks, 1 );
+                ret = pbg->FreeBlocks(
+                    &arrIdxs, elem.second );
                 if( ERROR( ret ) )
                     break;
                 m_mapBlkGrps.insert(
                     dwGrpIdx, std::move( pbg ) );
+            }
+            else
+            {
+                CGroupBitmap* pbg = itr->second.get();
+                ret = pbg->FreeBlocks(
+                    arrIdxs, elem.second );
             }
         }
     }while( 0 );

@@ -447,14 +447,6 @@ struct RegFSInode
 #define WITHIN_DIRECT_BLOCK( _offset_ ) \
     ( _offset_ >= 0 && _offset_ < INDIRECT_BLOCKS * BLOCK_SIZE )
 
-#define WITHIN_INDIRECT_BLOCK( _offset_ ) \
-    ( _offset_ >= DIRECT_BLOCKS * BLOCK_SIZE && \
-     _offset_ < SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
-
-#define WITHIN_SEC_INDIRECT_BLOCK( _offset_ ) \
-    ( _offset_ >= INDIRECT_BLOCKS * BLOCK_SIZE && \
-     _offset_ < MAX_FILE_SIZE )
-
 #define BEYOND_MAX_LIMIT( _offset_ ) \
     ( _offset_ >= MAX_FILE_SIZE )
 
@@ -462,6 +454,15 @@ struct RegFSInode
 
 #define SEC_INDIRECT_BLOCK_START \
     ( INDIRECT_BLOCK_START + INDIRECT_BLOCKS * BLOCK_SIZE )
+
+#define WITHIN_INDIRECT_BLOCK( _offset_ ) \
+    ( _offset_ >= INDIRECT_BLOCK_START && \
+     _offset_ < SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
+
+// secondary indirect mapping block
+#define WITHIN_SEC_INDIRECT_BLOCK( _offset_ ) \
+    ( _offset_ >= SEC_INDIRECT_BLOCK_START  && \
+     _offset_ < MAX_FILE_SIZE )
 
 #define BLKIDX_PER_TABLE ( BLOCK_SIZE >> 2 )
 
@@ -471,7 +472,7 @@ struct RegFSInode
 #define BLKIDX_PER_TABLE_MASK \
     ( BLKIDX_PER_TABLE - 1 )
 
-#define INDIRECT_IDX  13
+#define BIT_IDX  13
 #define BITD_IDX  14
 
 #define INDIRECT_BLK_IDX( _offset_ ) \
@@ -483,7 +484,7 @@ struct RegFSInode
         BLKIDX_PER_TABLE_MASK )
 
 #define SEC_BLKIDX_IDX( _offset_ ) \
-    ( ( ( _offset_ - INDIRECT_BLOCKS * BLOCK_SIZE ) >> \
+    ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
 
 struct RegFSBPlusNode
@@ -578,11 +579,14 @@ struct CFileImage :
         guint32 size, guint8* pBuf );
 
     gint32 ReadValue( Variant& oVar );
-
     gint32 WriteValue( const Variant& oVar );
 
+    gint32 TruncBlkDirect( guint32 lablkidx );
+    gint32 TruncBlkIndirect( guint32 lablkidx );
+    gint32 TruncBlkSecIndirect( guint32 lablkidx );
+
     gint32 Truncate( guint32 dwOff );
-    gint32 Extend( guint32 dwBytes );
+    gint32 Extend( guint32 dwOff );
 };
 
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
@@ -669,19 +673,18 @@ struct CAccessContext
     guint16 dwGid = 0xffff;
 };
 
-struct CDirectoryFile :
+struct CDirFileEntry :
     public COpenFileEntry
 {
     BPNodeUPtr m_pRootNode;
     
-    CDirectoryFile( AllocPtr& pAlloc );
+    CDirFileEntry( AllocPtr& pAlloc );
 
     inline bool IsRootDir() const
     { m_oINodeStore.m_dwParentInode == 0; }
 
     gint32 CreateFile( const stdstr& strName );
-
-    gint32 CreateDirectory( const stdstr& strName );
+    gint32 CreateSubDir( const stdstr& strName );
 
     HANDLE OpenChild(
         const stdstr& strName,
@@ -689,8 +692,8 @@ struct CDirectoryFile :
 
     gint32  CloseChild( FileSPtr& pFile );
     gint32  FindChild( const stdstr& strName ) const;
-    gint32  RemoveChild( const stdstr& strName );
-    gint32  RemoveDirectory( const stdstr& strName );
+    gint32  RemoveFile( const stdstr& strName );
+    gint32  RemoveSubDir( const stdstr& strName );
 
     gint32  SetGid( guint16 wGid );
     gint32  SetUid( guint16 wUid );
