@@ -780,7 +780,8 @@ gint32 CBlockAllocator::LoadGroupBitmap(
 
 gint32 CBlockAllocator::FreeBlocks(
     const guint32* pvecBlocks,
-    guint32 dwNumBlocks )
+    guint32 dwNumBlocks,
+    bool bByteOrder )
 {
     if( pvecBlocks == nullptr ||
         dwNumBlocks == 0 )
@@ -793,7 +794,8 @@ gint32 CBlockAllocator::FreeBlocks(
         gutin32 dwRest = dwNumBlocks;
         std::vector< CONTBLKS > vecBlks;
         ret = FindContigousBlocks(
-            pvecBlocks, dwNumBlocks, vecBlks );
+            pvecBlocks, dwNumBlocks, vecBlks,
+            bByteOrder );
         if( ERROR( ret ) )
             break;
         for( auto& elem : vecBlks )
@@ -989,31 +991,41 @@ gint32 CBlockAllocator::ReadBlocks(
 
 gint32 CBlockAllocator::FindContigousBlocks(
     const guint32* pBlocks, guint32 dwNumBlocks,
-    std::vector< CONTBLKS >& vecBlocks )
+    std::vector< CONTBLKS >& vecBlocks,
+    bool bByteOrder )
 {
     if( pBlocks == nullptr || dwNumBlocks == 0 )
         return -EINVAL;
+
     guint32 dwPrev = pBlocks[ 0 ];
+
+    if( bByteOrder )
+        dwPrev = ntohl( dwPrev );
+
     guint32 dwBase = dwPrev;
     guint32 dwCount = 1;
+
     for( guint32 i = 1; i < dwNumBlocks - 1; i++ )
     {
-        if( pBlocks[ i ] == dwPrev + 1 &&
-            ( pBlocks[ i ] & BLOCK_IDX_MASK ) != 0 )
+        guint32 dwBlkIdx = pBlocks[ i ];
+        if( bByteOrder )
+            dwBlkIdx = ntohl( dwBlkIdx );
+        if( dwBlkIdx == dwPrev + 1 &&
+            ( dwBlkIdx & BLOCK_IDX_MASK ) != 0 )
         {
             dwCount++;
             dwPrev += 1;
         }
-        else if( pBlocks[ i ] == 0 && dwBase == 0 )
+        else if( dwBlkIdx == 0 && dwBase == 0 )
         {
             // a hole
             dwCount++;
-            dwPrev = pBlocks[ i ];   
+            dwPrev = dwBlkIdx;   
         }
         else
         {
             vecBlocks.push_back( { dwBase, dwCount } );
-            dwBase = dwPrev = pBlocks[ i ];
+            dwBase = dwPrev = dwBlkIdx;
             dwCount = 1;
         }
     }

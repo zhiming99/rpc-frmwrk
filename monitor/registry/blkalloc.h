@@ -336,7 +336,8 @@ class CBlockAllocator :
 
     gint32 FreeBlocks(
         const guint32* pvecBlocks,
-        guint32 dwNumBlocks );
+        guint32 dwNumBlocks,
+        bool bByteOrder = false );
 
     gint32 AllocBlocks( 
         guint32* pvecBlocks,
@@ -377,7 +378,8 @@ class CBlockAllocator :
     gint32 FindContigousBlocks(
         const guint32* pBlocks,
         guint32 dwNumBlocks,
-        std::vector< CONTBLKS >& vecBlocks );
+        std::vector< CONTBLKS >& vecBlocks,
+        bool bByteOrder = false );
 
     gint32 ReadWriteBlocks2(
         std::vector< CONTBLKS >& vecBlocks,
@@ -426,8 +428,11 @@ struct RegFSInode
 
 #define DIR_ENTRY_SIZE 128
 
-#define MAX_PTR_PER_NODE ( \
+#define MAX_PTRS_PER_NODE ( \
     ( BPNODE_SIZE - DIR_ENTRY_SIZE ) / DIR_ENTRY_SIZE )
+
+#define MAX_KEYS_PER_NODE ( MAX_PTRS_PER_NODE - 1 )
+    
 
 #define LEAST_NUM_CHILD ( ( MAX_PTR_PER_NODE + 1 ) >> 1 )
 #define LEASE_NUM_KEY ( LEAST_NUM_CHILD - 1 )
@@ -600,6 +605,7 @@ struct CBPlusNode :
     AllocPtr m_pAlloc;
     RegFSBPlusNode m_oNodeStore;
     std::vector< CBPlusNode > m_vecChilds;
+    guint32  m_dwMaxSlots = 
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -633,7 +639,6 @@ struct COpenFileEntry :
     guint32         m_dwInodeIdx = 0;
     stdstr          m_strFileName;
     FImgSPtr        m_pFileImage;
-    guint32         m_dwPos = 0;
     CAccessContext  m_oUserAc;
 
     std::atomic< guint32 > m_dwRefs;
@@ -653,18 +658,59 @@ struct COpenFileEntry :
     inline guint32 GetRef() const;
     { return m_dwRefs; }
 
-    gint32 ReadFile(
-        guint32& size, guint8* pBuf );
+    void SetParent( FileSPtr& pParent )
+    {
+        m_pParentDir = pParent;
+        m_pParentDir->AddRef();
+    }
 
-    gint32 WriteFile(
-        guint32 size, guint8* pBuf );
+    inline gint32 ReadFile( guint32 dwOff,
+        guint32& size, guint8* pBuf )
+    {
+        return m_pFileImage->ReadFile(
+            dwOff, size, pBuf );
+    }
 
-    gint32 GetValue( Variant& oVar );
-    gint32 SetValue( const Variant& oVar );
+    inline gint32 WriteFile( guint32 dwOff,
+        guint32 size, guint8* pBuf )
+    {
+        return m_pFileImage->WriteFile(
+            dwOff, size, pBuf );
+    }
+    inline gint32 ReadValue( Variant& oVar )
+    { return m_pFileImage->ReadValue( oVar ); }
 
-    gint32 Flush() override;
-    gint32 Format() override;
-    gint32 Reload() override;
+    inline gint32 WriteValue( const Variant& oVar );
+    { return m_pFileImage->WriteValue( oVar ); }
+
+    gint32 Flush() override
+    { return m_pFileImage->Flush(); }
+
+    gint32 Format() override
+    { return 0; }
+
+    gint32 Reload() override
+    { return 0; }
+
+    inline gint32 Truncate( guint32 dwOff )
+    { return m_pFileImage->Truncate( dwOff ); }
+
+    inline gint32 Open( FileSPtr& pParent,
+        FImgSPtr& pFileImg,
+        CAccessContext* pac )
+    {
+        SetParent( pParent );
+        m_pFileImage = pFileImg;
+        if( pac )
+            m_oUserAc = *pac;
+        return 0;
+    }
+
+    inline gint32 Close()
+    {
+        m_pParentDir->DecRef(); 
+        return this->Flush();
+    }
 };
 
 struct CAccessContext
@@ -683,11 +729,16 @@ struct CDirFileEntry :
     inline bool IsRootDir() const
     { m_oINodeStore.m_dwParentInode == 0; }
 
-    gint32 CreateFile( const stdstr& strName );
+    gint32 CreateFile( const stdstr& strName,
+        guint32 dwFlags, guint32 dwMode );
+
     gint32 CreateSubDir( const stdstr& strName );
 
     HANDLE OpenChild(
         const stdstr& strName,
+        FileSPtr& pParent,
+        FImgSPtr& pFile,
+        guint32 dwFlags,
         CAccessContext* pAc );
 
     gint32  CloseChild( FileSPtr& pFile );

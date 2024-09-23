@@ -994,23 +994,13 @@ gint32 CFileImage::TruncBlkIndirect(
 
         guint32 i = lablkidx;
         guint32* pbit = m_pBitBlk->ptr();
-        guint32 arrIdx[
-            BLOCK_SIZE / sizeof( guint32 ) ];
-
-        memcpy( arrIdx,
-            pbit + lablkidx * sizeof( guint32 ),
-            dwCount * sizeof( guint32 ) );
-
-        for( int i = 0; i < dwCount; i++ )
-            arridx[ i ] = ntohl( arrIdx[ i ] );
 
         ret = m_pAlloc->FreeBlocks(
-            arridx, dwCount );
+            pbit + i, dwCount, true );
 
         if( ERROR( ret ) )
             break;
 
-        i = lablkidx;
         for( ; i < lablkidx + dwCount; i++ )
             pbit[ i ] = 0;
 
@@ -1060,7 +1050,8 @@ gint32 CFileImage::TruncBlkSecIndirect(
             {
                 BufPtr& p = itr->second;
                 m_pAlloc->FreeBlocks( p->ptr(),
-                    BLKIDX_PER_TABLE );
+                    BLKIDX_PER_TABLE, true );
+                m_mapSecBitBlks.erase( itr );
             }
             else if( dwBitBlkIdx != 0 )
             {
@@ -1071,15 +1062,9 @@ gint32 CFileImage::TruncBlkSecIndirect(
                     dwBitBlkIdx, p );
                 if( ERROR( ret ) )
                     break;
-                guint32* pblkidx = arrIdx;
-                for( int j = 0;
-                    j < BLKIDX_PER_TABLE; j++ )
-                {
-                    pblkidx[ j ] = ntohl( pblkidx[ j ] );
-                }
                 ret = m_pAlloc->FreeBlocks(
-                    ( guint32* )pblkidx,
-                    BLKIDX_PER_TABLE );
+                    arrIdx, BLKIDX_PER_TABLE,
+                    true );
                 if( ERROR( ret ) )
                     break;
             }
@@ -1089,7 +1074,6 @@ gint32 CFileImage::TruncBlkSecIndirect(
                     &dwBitBlkIdx, 1 );
                 pbitd[ i ] = 0;
             }
-            m_mapSecBitBlks.erase( i );
         }
         if( true )
         {
@@ -1099,20 +1083,11 @@ gint32 CFileImage::TruncBlkSecIndirect(
             if( itr != m_mapSecBitBlks.end() )
             {
                 BufPtr& p = itr->second;
-                guint32 arrIdx[
-                    BLOCK_SIZE / sizeof( guint32 ) ];
-                guint8* p = ( guint8* )arrIdx;
-                memcpy( arrIdx, p->ptr() +
-                    dwBlkIdxIdx * sizeof( guint32 )l
-                    BLKIDX_PER_TABLE - dwBlkIdxIdx );
-                for( int i = 0;
-                    i < BLKIDX_PER_TABLE - dwBlkIdxIdx;
-                    i++ )
-                    arrIdx[ i ] = ntohl( arrIdx );
-                m_pAlloc->FreeBlocks( arrIdx,
-                    BLKIDX_PER_TABLE - dwBlkIdxIdx );
-                guint32* pblkidx = ( guint32* )p->ptr();
-                pblkidx += dwBlkIdxIdx;
+                guint32* pblkidx =
+                    p->ptr() + dwBlkIdxIdx;
+                m_pAlloc->FreeBlocks( pblkidx,
+                    BLKIDX_PER_TABLE - dwBlkIdxIdx,
+                    true );
                 for( int i = 0;
                     i < BLKIDX_PER_TABLE - dwBlkIdxIdx;
                     i++ )
@@ -1127,21 +1102,12 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 if( ERROR( ret ) )
                     break;
 
-                guint32* pbit =
-                    ( guint32* )p->ptr();
+                guint32* pbit = ( guint32* )p->ptr();
 
-                guint32 arrIdx[
-                    BLOCK_SIZE / sizeof( guint32 ) ];
-
-                memcpy( arrIdx, pbit,
-                    BLKIDX_PER_TABLE - dwBlkIdxIdx );
-                for( int i = 0;
-                    i < BLKIDX_PER_TABLE - dwBlkIdxIdx;
-                    i++ )
-                    arrIdx[ i ] = ntohl( arrIdx );
-
-                ret = m_pAlloc->FreeBlocks( arrIdx,
-                    BLKIDX_PER_TABLE - dwBlkIdxIdx );
+                ret = m_pAlloc->FreeBlocks(
+                    pbit + dwBlkIdxIdx,
+                    BLKIDX_PER_TABLE - dwBlkIdxIdx,
+                    true );
                 if( ERROR( ret ) )
                     break;
 
@@ -1159,16 +1125,18 @@ gint32 CFileImage::TruncBlkSecIndirect(
             {
                 m_pAlloc->FreeBlocks(
                     &dwBitBlkIdx, 1 );
-                pbitd[ i ] = 0;
+                pbitd[ dwBitIdx ] = 0;
             }
         }
         if( ( lablkidx << BLOCK_SHIFT ) ==
             SEC_INDIRECT_BLOCK_START )
         {
             guint32 dwBitdBlkIdx =
-                m_oInodeStore.m_arrBlocks[ BITD_IDX ];
+            m_oInodeStore.m_arrBlocks[ BITD_IDX ];
+
             ret = m_pAlloc->FreeBlocks(
                 &dwBitdBlkIdx, 1 );
+
             m_pBitdBlk.Clear();
         }
     }while( 0 );
