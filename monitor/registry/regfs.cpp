@@ -69,9 +69,6 @@ gint32 CFileImage::Reload()
         // type of file content
         m_oInodeStore.m_dwFlags =
             ntohl( pInode->m_dwFlags );
-        // the block address for the parent directory
-        m_oInodeStore.m_dwParentInode =
-            ntohl( pInode->m_dwParentInode );
         // blocks for data section.
         int count =
             sizeof( pInode->m_arrBlocks ) >> 2;
@@ -250,9 +247,6 @@ gint32 CFileImage::Format()
         // type of file content
         m_oInodeStore.m_dwFlags = 0;
 
-        // the block address for the parent directory
-        m_oInodeStore.m_dwParentInode = 0;
-
         // blocks for data section.
         m_oInodeStore.m_iValType = typeNone;
 
@@ -294,9 +288,6 @@ gint32 CFileImage::Flush()
         // type of file content
         pInode->m_dwFlags =
             htonl( m_oInodeStore.m_dwFlags );
-        // the block address for the parent directory
-        pInode->m_dwParentInode =
-            htonl( m_oInodeStore.m_dwParentInode );
         // blocks for data section.
         int count =
             sizeof( pInode->m_arrBlocks ) >> 2;
@@ -1286,6 +1277,80 @@ gint32 CFileImage::WriteValue(
     gint32 ret = 0;
     CReadLock oLock( this->GetLock() );
     m_oValue = oVar;
+    return ret;
+}
+
+gint32 CRegistryFs::CreateRootDir()
+{
+    // can only be called within the call of Format.
+    gint32 ret = 0;
+    do{
+        guint32 dwBlkIdx = 0;
+        gint32 ret = m_pAlloc->AllocBlocks(
+            &dwBlkIdx, 1 );
+        if( ERROR( ret ) )
+            break;
+        if( dwBlkIdx != ROOT_INODE_BLKIDX )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        m_pRootImg.reset( new CDirImage(
+            this, ROOT_INODE_BLKIDX, 0 ) );
+        ret = m_pRootImg->Format();
+        if( ERROR( ret ) )
+            break;
+        ret = m_pRootImg->Flush();
+        if( ERROR( ret ) )
+            break;
+        m_pRootDir.reset(
+            new CDirFileEntry(
+            m_pAlloc, m_pRootImg ) );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::OpenRootDir()
+{
+    gint32 ret = 0;
+    do{
+        m_pRootImg.reset( new CDirImage(
+            this, ROOT_INODE_BLKIDX, 0 ) );
+        ret = m_pRootImg->Reload();
+        if( ERROR( ret ) )
+            break;
+        m_pRootDir.reset(
+            new CDirFileEntry(
+            m_pAlloc, m_pRootImg ) );
+        FImgSPtr pEmpty;
+        ret = m_pRootDir->Open( pEmpty );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::Format()
+{
+    gint32 ret = 0;
+    do{
+        ret = m_pAlloc->Format();
+        if( ERROR( ret ) )
+            break;
+        ret = CreateRootDir();
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::Reload()
+{
+    gint32 ret = 0;
+    do{
+        ret = m_pAlloc->Reload();
+        if( ERROR( ret ) )
+            break;
+        ret = OpenRootDir();
+    }while( 0 );
     return ret;
 }
 

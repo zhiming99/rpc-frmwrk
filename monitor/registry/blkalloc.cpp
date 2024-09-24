@@ -456,6 +456,8 @@ gint32 CBlockBitmap::AllocBlocks(
 
     do{
         LONGWORD* pbmp = m_arrBytes;
+        guint32 dwGrpIdx =
+            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
 
         constexpr int count =
             sizeof( m_arrBytes )/sizeof( LONGWORD );
@@ -487,7 +489,7 @@ gint32 CBlockBitmap::AllocBlocks(
                     {
                         dwBlkIdx = i * iNumBits + j;
                         pvecBlocks[ dwBlocks ] =
-                            dwBlkIdx;
+                            ( dwGrpIdx | dwBlkIdx );
                         dwBlocks++;
                         a |= bit;
                         if( dwBlocks == dwNumBlocks )
@@ -518,7 +520,7 @@ gint32 CBlockBitmap::AllocBlocks(
                 {
                     dwBlkIdx = i * iNumBits + j;
                     pvecBlocks[ dwBlocks ] =
-                        dwBlkIdx;
+                        ( dwGrpIdx | dwBlkIdx );
                     dwBlocks++;
                     a |= bit;
                     if( dwBlocks == dwNumBlocks )
@@ -755,7 +757,7 @@ gint32 CBlockAllocator::LoadSuperBlock(
 }
 
 gint32 CBlockAllocator::SaveGroupBitmap(
-    const* pbmp, guint32 dwSize );
+    const* pbmp, guint32 dwSize )
 {
     if( dwSize < GRPBMP_SIZE_FULL )
         return -EINVAL;
@@ -767,7 +769,7 @@ gint32 CBlockAllocator::SaveGroupBitmap(
 }
 
 gint32 CBlockAllocator::LoadGroupBitmap(
-    char* pbmp, guint32 dwSize );
+    char* pbmp, guint32 dwSize )
 {
     if( dwSize < GRPBMP_SIZE_FULL )
         return -EINVAL;

@@ -49,6 +49,7 @@
 #define find_shift( _x ) ( ffs( _x ) - 1 )
 
 #define SUPER_BLOCK_SIZE 512
+#define REGFS_PAGE_SIZE 4096
 
 #define DEFAULT_BLOCK_SIZE 512
 #define BLOCK_SIZE  ( GetBlockSize() )
@@ -67,7 +68,7 @@
     ( BLOCKS_PER_GROUP_FULL - 1 )
 
 #define GROUP_SHIFT \
-    ( find_shift( PAGE_SIZE ) )
+    ( find_shift( REGFS_PAGE_SIZE ) )
 
 #define BLKGRP_NUMBER \
     ( ( 1 << GROUP_SHIFT ) - sizeof( guint16 ) * BYTE_BITS )
@@ -148,7 +149,10 @@
     ABS_ADDR( BLOCK_LA( _blk_idx ) )
 
 #define INODE_SIZE ( BLOCK_SIZE )
-#define ROOT_INODE_IDX ( BLKBMP_BLKNUM )
+#define ROOT_INODE_BLKIDX ( BLKBMP_BLKNUM )
+
+#define BNODE_IDX_TO_POS( _idx_ ) \
+    ( _idx_ << ( find_shift( BPNODE_SIZE ) - 1  ) )
 
 namespace rpcf{
 
@@ -407,8 +411,6 @@ struct RegFSInode
     // type of file content
     guint32     m_dwFlags;
     // the block address for the parent directory
-    guint32     m_dwParentInode;
-    // blocks for data section.
     guint32     m_arrBlocks[ 15 ];
     guint32     m_dwReserved;
 
@@ -421,20 +423,20 @@ struct RegFSInode
 
 } __attribute__((aligned (8)));
 
-#define BPNODE_SIZE ( PAGE_SIZE )
+#define BPNODE_SIZE ( REGFS_PAGE_SIZE )
 #define BPNODE_BLKNUM ( BPNODE_SIZE / BLOCK_SIZE )
 
-#define NAME_LENGTH 96
+#define REGFS_NAME_LENGTH 96
 
-#define DIR_ENTRY_SIZE 128
+// #define DIR_ENTRY_SIZE 128
 
 #define MAX_PTRS_PER_NODE ( \
-    ( BPNODE_SIZE - DIR_ENTRY_SIZE ) / DIR_ENTRY_SIZE )
+    ( BPNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
 
 #define MAX_KEYS_PER_NODE ( MAX_PTRS_PER_NODE - 1 )
     
 
-#define LEAST_NUM_CHILD ( ( MAX_PTR_PER_NODE + 1 ) >> 1 )
+#define LEAST_NUM_CHILD ( ( MAX_PTRS_PER_NODE + 1 ) >> 1 )
 #define LEASE_NUM_KEY ( LEAST_NUM_CHILD - 1 )
 
 #define DIRECT_BLOCKS 13
@@ -492,41 +494,27 @@ struct RegFSInode
     ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
 
-struct RegFSBPlusNode
-{
-    char*       m_arrKeys[ MAX_PTR_PER_NODE - 1 ][ NAME_LENGTH ]; 
-    guint32     m_arrNodeIdx[ MAX_PTR_PER_NODE ];
-    guint16     m_wNumKeys = 0;
-    guint16     m_wNumNodeIdx = 0;
-    guint16     m_wCurNodeIdx = 0;
-    guint16     m_wParentIdx = 0;
-    bool        m_bLeaf = false;
-};
-
-struct RegFSDirEntry
-{
-    // block address for the file inode
-    guint32     m_dwInode = 0;
-    // file type
-    guint8      m_byType = 0;
-};
-
-struct RegFSBPlusLeaf
-    public RegFSBPlusNode
-{
-    RegFSDirEntry m_arrDirEntry[ MAX_PTR_PER_NODE - 1 ];
-    guint16     m_wNextLeaf = 0;
-};
-
-struct KEY_SLOT {
-    const char* szKey;
+struct KEYPTR_SLOT {
+    char m_szKey[ NAME_LENGTH ];
     union{
         guint32 dwNodeIdx;
         struct{
-            guint32 dwInode;
-            guint8  byType;
+            guint32 dwInodeIdx;
+            guint8  byFileType;
+            guint8  byReserved[ 3 ];
         } oLeaf;
     }
+}__attribute__((aligned (8)));
+
+struct RegFSBPlusNode
+{
+    KEYPTR_SLOT m_arrSlots[ MAX_PTRS_PER_NODE ];
+    guint16     m_wNumKeys = 0;
+    guint16     m_wNumBNodeIdx = 0;
+    guint16     m_wBNodeIdx = 0;
+    guint16     m_wParentIdx = 0;
+    guint16     m_wNextLeaf = 0;
+    bool        m_bLeaf = false;
 };
 
 struct CFileImage : 
@@ -534,6 +522,7 @@ struct CFileImage :
 {
     AllocPtr m_pAlloc;
     guint32 m_dwInodeIdx;
+    guint32 m_dwParentInode;
 
     // mapping offset into file to block
     std::map< guint32, BufPtr > m_mapBlocks;
@@ -560,9 +549,11 @@ struct CFileImage :
     { return m_oExclLock; }
 
     CFileImage( CBlockAllocator* pAlloc,
-        guint32 dwInode ) :
+        guint32 dwInode,
+        guint32 dwParentIdx ) :
         m_pAlloc( pAlloc ),
-        m_dwInodeIdx( dwInode )
+        m_dwInodeIdx( dwInode ),
+        m_dwParentInode( dwParentIdx )
     {}
 
     gint32 Flush() override;
@@ -599,13 +590,36 @@ using FImgSPtr = typename std::unique_ptr< CFileImage >;
 class CBPlusNode;
 using BPNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
 
+struct CDirImage : 
+    public CFileImage
+{
+    typedef CFileImage super;
+    BPNodeUPtr m_pRootNode;
+
+    CDirImage( CBlockAllocator* pAlloc,
+        guint32 dwInodeIdx,
+        guint32 dwParentIdx = 0 ):
+        super( pAlloc, dwInodeIdx,
+            dwParentIdx )
+    {}
+    gint32 Format() override;
+    gint32 Reload() override;
+};
+
 struct CBPlusNode :
     public ISynchronize 
 {
-    AllocPtr m_pAlloc;
-    RegFSBPlusNode m_oNodeStore;
+    FileImage* m_pFile;
+    RegFSBPlusNode m_oBNodeStore;
     std::vector< CBPlusNode > m_vecChilds;
-    guint32  m_dwMaxSlots = 
+    guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
+    guint32 m_dwBNodeIdx = 0;
+
+    CBPlusNode( CFileImage* pFile,
+        guint32 dwBNodeIdx ) :
+        m_pFile( pFile ),
+        m_dwBNodeIdx( dwBNodeIdx )
+    {}
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -615,14 +629,22 @@ struct CBPlusNode :
 struct CBPlusLeaf :
     public CBPlusNode
 {
-    RegFSBPlusLeaf& m_oLeafStore;
+    typedef CBPlusNode super;
+    RegFSBPlusNode& m_oLeafStore;
     CBPlusLeaf() : CBPlusNode()
-        m_oLeafStore( *(RegFSBPlusLeaf*)&m_oNodeStore )
+        m_oLeafStore( m_oNodeStore )
     { m_oLeafStore.m_bLeaf = true, }
     std::vector< FImgSPtr > m_vecFiles;
 
     CBPlusLeaf* m_pNextLeaf;
-    guint32 GetFileInode( const char* szName ) const;
+    gint32 GetFileInode(
+        const char* szName,
+        guint32 dwInode ) const;
+
+    CBPlusLeaf( CFileImage* pFile,
+        guint32 dwBNodeIdx ) :
+        super( pFile, dwBNodeIdx )
+    {}
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -644,12 +666,13 @@ struct COpenFileEntry :
     std::atomic< guint32 > m_dwRefs;
     FileSPtr m_pParentDir;
 
-    COpenFileEntry( AllocPtr& pAlloc,
-        guint32 dwInodeIdx, FImgSPtr& pImage ) :
+    COpenFileEntry(
+        AllocPtr& pAlloc, FImgSPtr& pImage ) :
         m_pAlloc( pAlloc ),
-        m_dwInodeIdx( dwInodeIdx ),
         m_pFileImage( FImgSPtr )
-    {}
+    {
+        m_dwInodeIdx = pImage->m_dwInodeIdx;
+    }
 
     inline guint32 AddRef()
     { return ++m_dwRefs; }
@@ -660,8 +683,11 @@ struct COpenFileEntry :
 
     void SetParent( FileSPtr& pParent )
     {
-        m_pParentDir = pParent;
-        m_pParentDir->AddRef();
+        if( pParent )
+        {
+            m_pParentDir = pParent;
+            m_pParentDir->AddRef();
+        }
     }
 
     inline gint32 ReadFile( guint32 dwOff,
@@ -696,11 +722,9 @@ struct COpenFileEntry :
     { return m_pFileImage->Truncate( dwOff ); }
 
     inline gint32 Open( FileSPtr& pParent,
-        FImgSPtr& pFileImg,
         CAccessContext* pac )
     {
         SetParent( pParent );
-        m_pFileImage = pFileImg;
         if( pac )
             m_oUserAc = *pac;
         return 0;
@@ -722,12 +746,15 @@ struct CAccessContext
 struct CDirFileEntry :
     public COpenFileEntry
 {
-    BPNodeUPtr m_pRootNode;
+    typedef COpenFileEntry super;
     
-    CDirFileEntry( AllocPtr& pAlloc );
+    CDirFileEntry(
+        AllocPtr& pAlloc, FImgSPtr& pImage ) :
+        super( pAlloc, pImage )
+    {}
 
     inline bool IsRootDir() const
-    { m_oINodeStore.m_dwParentInode == 0; }
+    { m_pFileImage.m_dwParentInode == 0; }
 
     gint32 CreateFile( const stdstr& strName,
         guint32 dwFlags, guint32 dwMode );
@@ -760,7 +787,11 @@ class CRegistryFs :
 {
     AllocPtr    m_pAlloc;
     FileSPtr    m_pRootDir;    
+    FImgSPtr    m_pRootImg;
     std::hashmap< HANDLE, FilePtr > m_mapOpenFiles;
+
+    gint32 CreateRootDir();
+    gint32 OpenRootDir();
 
     public:
     CRegistryFs( const IConfigDb* pCfg );
@@ -806,6 +837,10 @@ class CRegistryFs :
 
     gint32 SetValue(
         HANDLE hFile, Variant& oVar );
+
+    gint32 Flush() override;
+    gint32 Format() override;
+    gint32 Reload() override;
 };
 
 using RegFsPtr = typename CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
