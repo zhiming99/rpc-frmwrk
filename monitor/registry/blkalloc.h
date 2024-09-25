@@ -48,13 +48,15 @@
 #define BYTE_BITS 8
 #define find_shift( _x ) ( ffs( _x ) - 1 )
 
-#define SUPER_BLOCK_SIZE 512
-#define REGFS_PAGE_SIZE 4096
 
-#define DEFAULT_BLOCK_SIZE 512
-#define BLOCK_SIZE  ( GetBlockSize() )
+#define DEFAULT_BLOCK_SIZE  512
+#define DEFAULT_PAGE_SIZE   PAGE_SIZE
+#define BLOCK_SIZE          ( GetBlockSize() )
+#define REGFS_PAGE_SIZE     ( GetPageSize() )
 
-#define BLOCK_SHIFT ( find_shift( BLOCK_SIZE ) - 1 )
+#define SUPER_BLOCK_SIZE    ( BLOCK_SIZE )
+
+#define BLOCK_SHIFT         ( find_shift( BLOCK_SIZE ) - 1 )
 
 #define BLKGRP_GAP_BLKNUM ( sizeof( guint16 ) * BYTE_BITS )
 #define BLOCKS_PER_GROUP ( 64 * 1024 - BLKGRP_GAP_BLKNUM )
@@ -152,7 +154,20 @@
 #define ROOT_INODE_BLKIDX ( BLKBMP_BLKNUM )
 
 #define BNODE_IDX_TO_POS( _idx_ ) \
-    ( _idx_ << ( find_shift( BPNODE_SIZE ) - 1  ) )
+    ( _idx_ << ( find_shift( BNODE_SIZE ) - 1  ) )
+
+#define MAX_BNODE_NUMBER \
+    ( MAX_FILE_SIZE / BNODE_SIZE )
+
+#define DECL_ARRAY( _array_, _size_ )\
+    BufPtr pback##_array_(true); \
+    pback##_array_->Resize( _size_ ); \
+    auto _array_ = pback##_array_->ptr(); \
+
+#define DECL_ARRAY2( _type_, _array_, _count_ )\
+    BufPtr pback##_array_(true); \
+    pback##_array_->Resize( _count_ * sizeof( _type_ ) ); \
+    auto _array_ = ( _type_* )pback##_array_->ptr(); \
 
 namespace rpcf{
 
@@ -167,8 +182,8 @@ struct CSuperBlock : public ISynchronize
 {
     guint32     m_dwMagic = htonl( *( guint32* )"regi" );
     guint32     m_dwVersion = 0x01;
-    guint32     m_dwGroupNum = BLKGRP_NUMBER;
     guint32     m_dwBlkSize = DEFAULT_BLOCK_SIZE;
+    guint32     m_dwPageSize = DEFAULT_PAGE_SIZE;
     CBlockAllocator* m_pAlloc;
 
     CSuperBlock( CBlockAllocator* pAlloc )
@@ -182,16 +197,19 @@ struct CSuperBlock : public ISynchronize
 using SblkUPtr = typename std::unique_ptr< CSuperBlock >;
 
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
+guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
 
 inline guint32 GetBlockSize()
+{ return g_dwBlockSize; }
+
+inline guint32 GetPageSize()
 { return g_dwBlockSize; }
 
 struct CBlockBitmap :
     public ISynchronize
 {
-    __attribute__((aligned (8))) 
-    guint8 m_arrBytes[
-        BLOCKS_PER_GROUP_FULL / BYTE_BITS ];
+    guint8* m_arrBytes;
+    BufPtr m_pBytes;
 
     CBlockAllocator* m_pAlloc;
     guint16 m_wFreeCount;
@@ -203,7 +221,12 @@ struct CBlockBitmap :
         guint32 dwGrpIdx ) :
         m_pAlloc( pAlloc ),
         m_dwGroupIdx( dwGrpIdx )
-    {}
+    {
+        m_pBytes.NewObj();
+        m_pBytes.Resize(
+            BLOCKS_PER_GROUP_FULL / BYTE_BITS );
+        m_arrBytes = m_pBytes->ptr();
+    }
 
     gint32 AllocBlocks(
         guint32* pvecBlocks,
@@ -217,6 +240,8 @@ struct CBlockBitmap :
 
     gint32 GetGroupIndex() const
     { return m_dwGroupIdx; }
+
+    gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -239,21 +264,27 @@ struct CBlockGroup : public ISynchronize
         m_pAlloc = pAlloc;
     }
 
-    gint32 Flush() override;
-    gint32 Format() override;
-    gint32 Reload() override;
+    gint32 Flush() override
+    { return m_pBlockBitmap->Flush(); }
+
+    gint32 Format() override
+    { return m_pBlockBitmap->Format(); }
+
+    gint32 Reload() override
+    { return m_pBlockBitmap->Reload(); }
+
 
     inline guint32 GetFreeCount() const
-    { return m_pBlockMap->GetFreeCount(); }
+    { return m_pBlockBitmap->GetFreeCount(); }
 
     inline guint32 GetGroupIndex() const
-    { return m_pBlockMap->GetGroupIndex(); }
+    { return m_pBlockBitmap->GetGroupIndex(); }
 
     inline gint32 AllocBlocks(
         guint32* pvecBlocks,
         guint32& dwNumBlocks )
     {
-        return m_pBlockMap->AllocBlocks(
+        return m_pBlockBitmap->AllocBlocks(
             pvecBlocks, dwNumBlocks );
     }
 
@@ -261,24 +292,35 @@ struct CBlockGroup : public ISynchronize
         const guint32* pvecBlocks,
         guint32 dwNumBlocks )
     {
-        return m_pBlockMap->FreeBlocks(
+        return m_pBlockBitmap->FreeBlocks(
             pvecBlocks, dwNumBlocks );
     }
 
-    gint32 IsBlockFree( guint32 dwBlkIdx ) const;
+    gint32 IsBlockFree( guint32 dwBlkIdx ) const
+    {
+        return m_pBlockBitmap->IsBlockFree(
+            dwBlkIdx );
+    }
 };
 
 using BlkGrpUPtr = typename std::unique_ptr< CBlockGroup >;
 struct CGroupBitmap
 {
-    __attribute__((aligned (8)))
-    guint8 m_arrBytes[ BLKGRP_NUMBER_FULL ];
+    guint8* m_arrBytes; //[ BLKGRP_NUMBER_FULL ];
+    BufPtr m_pBytes;
     guint16 m_wFreeCount;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
 
     inline guint32 GetAllocCount() const
     { return BLKGRP_NUMBER - m_wFreeCount; }
+
+    CGroupBitmap()
+    {
+        m_pBytes.NewObj();
+        m_pBytes.Resize( BLKGRP_NUMBER_FULL );
+        m_arrBytes = m_pBytes->ptr();
+    }
 
     gint32 FreeGroup( guint32 dwGrpIdx );
     gint32 AllocGroup( guint32& dwGrpIdx );
@@ -402,7 +444,7 @@ struct RegFSInode
     // time of creation
     guint32     m_dwctime;
     // file type
-    guint16     m_wMode;
+    guint32     m_dwMode;
     // uid
     guint16     m_wuid;
     // gid
@@ -423,18 +465,17 @@ struct RegFSInode
 
 } __attribute__((aligned (8)));
 
-#define BPNODE_SIZE ( REGFS_PAGE_SIZE )
-#define BPNODE_BLKNUM ( BPNODE_SIZE / BLOCK_SIZE )
+#define BNODE_SIZE ( REGFS_PAGE_SIZE )
+#define BNODE_BLKNUM ( BNODE_SIZE / BLOCK_SIZE )
 
 #define REGFS_NAME_LENGTH 96
 
 // #define DIR_ENTRY_SIZE 128
 
 #define MAX_PTRS_PER_NODE ( \
-    ( BPNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
+    ( BNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
 
 #define MAX_KEYS_PER_NODE ( MAX_PTRS_PER_NODE - 1 )
-    
 
 #define LEAST_NUM_CHILD ( ( MAX_PTRS_PER_NODE + 1 ) >> 1 )
 #define LEASE_NUM_KEY ( LEAST_NUM_CHILD - 1 )
@@ -493,29 +534,6 @@ struct RegFSInode
 #define SEC_BLKIDX_IDX( _offset_ ) \
     ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
-
-struct KEYPTR_SLOT {
-    char m_szKey[ NAME_LENGTH ];
-    union{
-        guint32 dwNodeIdx;
-        struct{
-            guint32 dwInodeIdx;
-            guint8  byFileType;
-            guint8  byReserved[ 3 ];
-        } oLeaf;
-    }
-}__attribute__((aligned (8)));
-
-struct RegFSBPlusNode
-{
-    KEYPTR_SLOT m_arrSlots[ MAX_PTRS_PER_NODE ];
-    guint16     m_wNumKeys = 0;
-    guint16     m_wNumBNodeIdx = 0;
-    guint16     m_wBNodeIdx = 0;
-    guint16     m_wParentIdx = 0;
-    guint16     m_wNextLeaf = 0;
-    bool        m_bLeaf = false;
-};
 
 struct CFileImage : 
     public ISynchronize
@@ -587,31 +605,49 @@ struct CFileImage :
 
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
 
+struct KEYPTR_SLOT {
+    char m_szKey[ NAME_LENGTH ];
+    union{
+        guint32 dwBNodeIdx;
+        struct{
+            guint32 dwBNodeIdx;
+            guint8  byFileType;
+            guint8  byReserved[ 3 ];
+        } oLeaf;
+    }
+}__attribute__((aligned (8)));
+
+struct RegFSBPlusNode
+{
+    BufPtr      m_pBuf;
+    std::vector< KEYPTR_SLOT* > m_vecSlots;
+    guint16     m_wNumKeys = 0;
+    guint16     m_wNumBNodeIdx = 0;
+    guint16     m_wThisBNodeIdx = 0;
+    guint16     m_wParentBNode = 0;
+    guint16     m_wNextLeaf = 0;
+    bool        m_bLeaf = false;
+
+    gint32  ntoh(
+        const guint8* pSrc,
+        guint32 dwSize );
+
+    gint32  hton(
+        guint8* pSrc,
+        guint32 dwSize ) const;
+
+    RegFSBPlusNode();
+};
+
 class CBPlusNode;
 using BPNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
-
-struct CDirImage : 
-    public CFileImage
-{
-    typedef CFileImage super;
-    BPNodeUPtr m_pRootNode;
-
-    CDirImage( CBlockAllocator* pAlloc,
-        guint32 dwInodeIdx,
-        guint32 dwParentIdx = 0 ):
-        super( pAlloc, dwInodeIdx,
-            dwParentIdx )
-    {}
-    gint32 Format() override;
-    gint32 Reload() override;
-};
 
 struct CBPlusNode :
     public ISynchronize 
 {
     FileImage* m_pFile;
     RegFSBPlusNode m_oBNodeStore;
-    std::vector< CBPlusNode > m_vecChilds;
+    std::vector< BPNodeUPtr > m_vecChilds;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
     guint32 m_dwBNodeIdx = 0;
 
@@ -619,7 +655,9 @@ struct CBPlusNode :
         guint32 dwBNodeIdx ) :
         m_pFile( pFile ),
         m_dwBNodeIdx( dwBNodeIdx )
-    {}
+    {
+        m_vecChilds.resize( MAX_PTRS_PER_NODE );
+    }
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -637,7 +675,7 @@ struct CBPlusLeaf :
     std::vector< FImgSPtr > m_vecFiles;
 
     CBPlusLeaf* m_pNextLeaf;
-    gint32 GetFileInode(
+    gint32 GetInode(
         const char* szName,
         guint32 dwInode ) const;
 
@@ -649,6 +687,23 @@ struct CBPlusLeaf :
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
+};
+
+struct CDirImage : 
+    public CFileImage
+{
+    typedef CFileImage super;
+    BPNodeUPtr m_pRootNode;
+
+    CDirImage( CBlockAllocator* pAlloc,
+        guint32 dwInodeIdx,
+        guint32 dwParentIdx = 0 ):
+        super( pAlloc, dwInodeIdx,
+            dwParentIdx )
+    {}
+    gint32 Format() override;
+    gint32 Reload() override;
+    gint32 Flush() override;
 };
 
 class COpenFileEntry;

@@ -33,8 +33,7 @@ gint32 CFileImage::Reload()
 {
     gint32 ret = 0;
     do{
-        __attribute__((aligned (8))) 
-        guint8 arrBytes[ BLOCK_SIZE ];
+        DECL_ARRAY( arrBytes, BLOCK_SIZE );
         ret = m_pAlloc->ReadBlock(
             m_dwInodeIdx, arrBytes );
         if( ERROR( ret ) )
@@ -55,8 +54,8 @@ gint32 CFileImage::Reload()
         m_oInodeStore.m_dwatime =
             oAccTime.tv_sec;
         // file type
-        m_oInodeStore.m_wMode =
-            ntohs( pInode->m_wMode );
+        m_oInodeStore.m_dwMode =
+            ntohl( pInode->m_dwMode );
         // uid
         m_oInodeStore.m_wuid =
             ntohs( pInode->m_wuid );
@@ -217,8 +216,8 @@ gint32 CFileImage::Format()
 {
     gint32 ret = 0;
     do{
-        __attribute__((aligned (8))) 
-        guint8 arrBytes[ BLOCK_SIZE ] = {0};
+        DECL_ARRAY( arrBytes, BLOCK_SIZE );
+        memset( arrBytes, 0, BLOCK_SIZE );
 
         RegFSInode* pInode = arrBytes; 
 
@@ -236,7 +235,7 @@ gint32 CFileImage::Format()
             oAccTime.tv_sec;
 
         // file type
-        m_oInodeStore.m_wMode = S_IFREG;
+        m_oInodeStore.m_dwMode = S_IFREG;
 
         // uid
         m_oInodeStore.m_wuid = 0;
@@ -259,8 +258,8 @@ gint32 CFileImage::Flush()
 {
     gint32 ret = 0;
     do{
-        __attribute__((aligned (8))) 
-        guint8 arrBytes[ BLOCK_SIZE ] = {0};
+        DECL_ARRAY( arrBytes, BLOCK_SIZE );
+        memset( arrBytes, 0, BLOCK_SIZE );
 
         auto pInode = ( RegFSInode* ) arrBytes; 
         // file size in bytes
@@ -274,8 +273,8 @@ gint32 CFileImage::Flush()
         m_oInodeStore.m_dwatime =
             oAccTime.tv_sec;
         // file type
-        pInode->m_wMode =
-            ntohs( m_oInodeStore.m_wMode );
+        pInode->m_dwMode =
+            ntohl( m_oInodeStore.m_dwMode );
         // uid
         pInode->m_wuid =
             ntohs( m_oInodeStore.m_wuid );
@@ -716,7 +715,7 @@ gint32 CFileImage::ReadFile(
             dwOff, dwSize, vecBlks );
         if( ERROR( ret ) )
             break;
-        guint8 arrBytes[ BLOCK_SIZE ];
+        DECL_ARRAY( arrBytes, BLOCK_SIZE );
 
         guint32 dwHead =
             ( dwOff & ( BLOCK_SIZE - 1 ) );
@@ -823,7 +822,7 @@ gint32 CFileImage::WriteFile(
         if( ERROR( ret ) )
             break;
 
-        guint8 arrBytes[ BLOCK_SIZE ];
+        DECL_ARRAY( arrBytes, BLOCK_SIZE );
 
         guint32 dwHead =
             ( dwOff & ( BLOCK_SIZE - 1 ) );
@@ -1254,7 +1253,8 @@ gint32 CFileImage::Extend( guint32 dwOff )
     do{
         guint32 laddr =
             ( dwOff & ~( BLOCK_SIZE - 1 ) );
-        guint8 arrBytes[ BLOCK_SIZE ] = {0};
+        DECL_ARRAY( arrBytes, BLOCK_SIZE );
+        memset( arrBytes, 0, BLOCK_SIZE );
         ret = WriteFile( laddr,
             ( dwOff & ( BLOCK_SIZE - 1 ) ),
             arrBytes );

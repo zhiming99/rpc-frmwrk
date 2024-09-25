@@ -49,6 +49,23 @@ static gint32 SetBlockSize( guint32 dwSize )
     return STATUS_SUCCESS;
 }
 
+static gint32 IsValidPageSize( guint32 dwSize )
+{
+    guint32 dwShift = find_shift( dwShift ) - 1;
+    if( dwShift <= BLOCK_SHIFT || dwShift > 16 )
+        return -EINVAL;
+    return STATUS_SUCCESS;
+}
+
+static gint32 SetPageSize( guint32 dwSize )
+{
+    gint32 ret = IsValidPageSize( dwSize );
+    if( ERROR( ret ) )
+        return ret;
+    g_wRegFsPageSize = dwSize;
+    return STATUS_SUCCESS;
+}
+
 gint32 CSuperBlock::Flush()
 {
     gint32 ret = 0;
@@ -60,7 +77,7 @@ gint32 CSuperBlock::Flush()
         p[ 0 ] = m_dwMagic;
         p[ 1 ] = htonl( m_dwVersion );
         p[ 2 ] = htonl( m_dwBlkSize );
-        p[ 3 ] = htonl( m_dwGroupNum );
+        p[ 3 ] = htonl( m_dwPageSize );
         ret = m_pAlloc->SaveSuperBlock(
             arrSb, sizeof( arrSb ) );
     }while( 0 );
@@ -71,17 +88,11 @@ gint32 CSuperBlock::Format()
 {
     gint32 ret = 0;
     do{
-        char arrSb[ SUPER_BLOCK_SIZE ];
-        memset( arrSb, 0, sizeof( arrSb ) );
-        guint32* p = ( guint32* )arrSb;
-
-        p[ 0 ] = m_dwMagic;
-        p[ 1 ] = htonl( m_dwVersion );
-        p[ 2 ] = htonl( m_dwBlkSize );
-        p[ 3 ] = htonl( m_dwGroupNum );
-        ret = m_pAlloc->SaveSuperBlock(
-            arrSb, sizeof( arrSb ) );
+        ret = this->Flush();
+        if( ERROR( ret ) )
+            break;
         SetBlockSize( m_dwBlkSize );
+        SetPageSize( m_dwPageSize );
     }while( 0 );
     return ret;
 }
@@ -111,13 +122,19 @@ gint32 CSuperBlock::Reload()
             ret = -ENOTSUP;
             break;
         }
-        ret = SetBlockSize( ntohl( p[ 2 ] ) );
+
+        guint32 dwBlkSize = ntohl( p[ 2 ] );
+        ret = SetBlockSize( dwBlkSize );
         if( ERROR( ret ) )
             break;
-        m_dwBlkSize = GetBlockSize();
-        m_dwGroupNum = ntohl( p[ 3 ] );
-        if( m_dwGroupNum > BLKGRP_NUMBER )
-            ret = -ENOTSUP;
+        m_dwBlkSize = dwBlkSize;
+
+        guint32 dwPageSize = htonl( p[ 3 ] );
+        ret = SetPageSize( dwPageSize );
+        if( ERROR( ret ) )
+            break;
+        m_dwPageSize = dwPageSize;
+
     }while( 0 );
     return ret;
 }
@@ -339,60 +356,18 @@ gint32 CGroupBitmap::Reload()
     return ret;
 }
 
-gint32 CBlockGroup::Flush()
-{
-    gint32 ret = 0;
-    do{
-        guint32 dwBlkIdx =
-            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
-        guint32 arrBlks[ BLKBMP_BLKNUM ];
-        for( int i = 0; i < BLKBMP_BLKNUM; i++ )
-            arrBlks[ i ] = dwBlkIdx + i;
-        ret = pAlloc->WriteBlocks(
-            arrBlks, sizeof( arrBlks ),
-            m_pBlockBitmap->m_arrBytes, true );
-    }while( 0 );
-    return ret;
-}
-
-gint32 CBlockGroup::Format()
-{
-    gint32 ret = 0;
-    do{
-        m_pBlockBitmap->InitBitmap();
-        ret = Flush();
-    }while( 0 );
-    return ret;
-}
-
-gint32 CBlockGroup::Reload()
-{
-    gint32 ret = 0;
-    do{
-        guint32 dwBlkIdx =
-            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
-        guint32 arrBlks[ BLKBMP_BLKNUM ];
-        for( int i = 0; i < BLKBMP_BLKNUM; i++ )
-            arrBlks[ i ] = dwBlkIdx + i;
-        ret = pAlloc->ReadBlocks(
-            arrBlks, sizeof( arrBlks ),
-            m_pBlockBitmap->m_arrBytes, true );
-    }while( 0 );
-    return ret;
-}
-
-gint32 CBlockGroup::IsBlockFree(
-    guint32 dwBlkIdx )
+gint32 CBlockBitmap::IsBlockFree(
+    guint32 dwBlkIdx ) const
 {
     gint32 ret = 0;
     if( dwBlkIdx == 0 )
         return -EINVAL;
     do{
-        if( m_wFreeCount ==
+        if( GetFreeCount() ==
             BLOCKS_PER_GROUP - BLKBMP_BLKNUM )
             break;
 
-        LONGWORD* pbmp = m_arrBytes;
+        auto pbmp = ( LONGWORD* )m_arrBytes;
         constexpr int iNumBits =
             sizeof( LONGWORD ) * BYTE_BITS;
 
@@ -427,7 +402,7 @@ gint32 CBlockBitmap::InitBitmap()
     constexpr guint32 dwOffset =
         sizeof( m_arrBytes ) - sizeof( guint16 );
     memset( m_arrBytes, 0, dwOffset );
-    guint16* pbmp = &m_arrBytes;
+    auto pbmp = ( guint16* )m_arrBytes;
     gint32 dwBytes = BLKBMP_BLKNUM / 8;
     for( int i = 0; i < dwBytes; i++ )
         pbmp[ i ] = 0xff;
@@ -621,7 +596,8 @@ gint32 CBlockBitmap::Flush()
     do{
         guint32 dwBlockIdx =
             ( m_dwGroupIdx << GROUP_SHIFT );
-        guint32 arrBlks[ BLKBMP_BLKNUM ];
+        DECL_ARRAY2( guint32,
+            arrBlks, BLKBMP_BLKNUM );
         for( int i = 0; i < sizeof( arrBlks ); i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         guint16* p = ( guint16* )
@@ -651,7 +627,8 @@ gint32 CBlockBitmap::Reload()
     do{
         guint32 dwBlockIdx =
             ( m_dwGroupIdx << GROUP_SHIFT );
-        guint32 arrBlks[ BLKBMP_BLKNUM ];
+        DECL_ARRAY2( guint32,
+            arrBlks, BLKBMP_BLKNUM );
         for( int i = 0; i < sizeof( arrBlks ); i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         ret = m_pAlloc->ReadBlocks(
@@ -805,7 +782,8 @@ gint32 CBlockAllocator::FreeBlocks(
             guint32 dwBlkIdx = elem.first;
             if( dwBlkIdx == 0 )
                 continue;
-            guint32 arrIdxs[ elem.second ];
+            DECL_ARRAY2( guint32,
+                arrIdxs, elem.second );
             for( int i = 0; i < elem.second; i++ )
                 arrIdxs[ i ] = dwBlkIdx + i;
             guint32 dwGrpIdx = GROUP_INDEX( dwBlkIdx );
