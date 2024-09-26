@@ -27,7 +27,7 @@
 namespace rpcf
 {
 
-RegFSBPlusNode::RegFSBPlusNode();
+RegFSBNode::RegFSBNode();
 {
     m_pBuf.NewObj();
     m_pBuf->Resize( BNODE_SIZE );
@@ -38,7 +38,7 @@ RegFSBPlusNode::RegFSBPlusNode();
         elem = p++;
 }
 
-RegFSBPlusNode::ntoh(
+RegFSBNode::ntoh(
     guint8* pSrc, guint32 dwSize )
 {
     gint32 ret = 0;
@@ -64,6 +64,9 @@ RegFSBPlusNode::ntoh(
             ret = -EINVAL;
             break;
         }
+        auto pFreeBNodeIdx =
+            ( guint32* )( pParams + 6 );
+        m_dwFreeBNodeIdx = ntohl( *pFreeBNodeIdx );
 
         memcpy( m_pBuf->ptr(), pSrc,
             sizeof( KEYPTR_SLOT ) *
@@ -89,7 +92,7 @@ RegFSBPlusNode::ntoh(
     return ret;
 }
 
-RegFSBPlusNode::hton(
+RegFSBNode::hton(
     guint8* pSrc, guint32 dwSize )
 {
     gint32 ret = 0;
@@ -125,6 +128,10 @@ RegFSBPlusNode::hton(
         pParams[ 3 ] = ntohs( m_wParentBNode );
         pParams[ 4 ] = ntohs( m_wNextLeaf );
         *( bool* )( pParams + 5 ) = m_bLeaf;
+        
+        guint32* pFreeBNodeIdx =
+            ( guint32* )( pParams + 6 );
+        pFreeBNodeIdx = ntohl( m_dwFreeBNodeIdx );
 
     }while( 0 );
     return ret;
@@ -252,6 +259,131 @@ gint32 CDirImage::Reload()
         ret = m_pRootNode->Reload();
         if( ERROR( ret ) )
             break;
+    }while( 0 );
+    return ret;
+}
+
+gint32 BinSearch(
+    const char* szKey,
+    CBPlusNode* pNode,
+    gint32 iOrigLower
+    gint32 iOrigUpper )
+{
+    gint32 ret = 0;
+
+    gint32 iLower = iOrigLower;
+    gint32 iUpper = iOrigUpper;
+    
+    do{
+        if( iUpper == iLower )
+        {
+            gint32 iRet = strncmp( szKey,
+                pNode->GetKey( iLower ] ),
+                REGFS_NAME_LENGTH - 1 );
+            if( iRet < 0 )
+            {
+                ret = -( iLower - 1 );
+                break;
+            }
+            if( iRet < 0 )
+            {
+                ret = - iLower;
+                break;
+            }
+            ret = iLower;    
+            break;
+        }
+        if( iUpper == iLower + 1 )
+        {
+            gint32 iRet = strncmp( szKey,
+                pNode->GetKey( iLower ] ),
+                REGFS_NAME_LENGTH - 1 );
+            if( iRet < 0 )
+            {
+                ret = -iLower;
+                break;
+            }
+            if( iRet == 0 )
+            {
+                ret = iLower;
+                break;
+            }
+            iRet = strncmp( szKey,
+                pNode->GetKey( iLower ] ),
+                REGFS_NAME_LENGTH - 1 );
+            if( iRet < 0 )
+            {
+                ret = -iUpper;
+                break;
+            }
+            else
+            {
+                ret = iUpper;
+                break;
+            }
+            break;
+        }
+        gint32 iCur =
+            ( iLower + iUpper ) >> 1;
+        iRet = strncmp( szKey,
+            pNode->GetKey( iLower ] ),
+            REGFS_NAME_LENGTH - 1 );
+        if( iRet == 0 )
+        {
+            ret = iLower;
+            break;
+        }
+        if( iRet < 0 )
+            iUpper = iCur - 1;
+        else
+            iLower = iCur + 1;
+
+        iCur = ( iLower + iUpper ) >> 1;
+
+    }while( 1 );
+
+    return ret;
+}
+
+bool CDirImage::Search( const char* szKey )
+{
+    bool ret = false;
+    do{
+        CBPlusNode* pCurNode =
+            m_pRootNode->get(); 
+
+        guint32 dwCount = 0;
+        while( !pCurNode->IsLeaf() )
+        {
+            dwCount = pCurNode->GetKeyCount();
+            gint32 i = BinSearch(
+                szKey, pCurNode, 1, dwCount );
+            if( i > 0 )
+            {
+                ret = true;
+                break;
+            }
+            i = -i;
+            pCurNode = pCurNode->GetChild( i );
+        }
+
+        dwCount = pCurNode->GetKeyCount();
+        gint32 i = BinSearch(
+            szKey, pCurNode, 1, dwCount );
+        if( i > 0 )
+            ret = true;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CDirImage::Insert( KEYPTR_SLOT* pSlot )
+{
+    gint32 ret = 0;
+    do{
+        CBPlusNode* pCurNode = m_pRootNode->get(); 
+        if( pCurNode->GetKeyCount() ==
+            MAX_KEYS_PER_NODE )
+        {}
     }while( 0 );
     return ret;
 }

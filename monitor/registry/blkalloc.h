@@ -606,7 +606,7 @@ struct CFileImage :
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
 
 struct KEYPTR_SLOT {
-    char m_szKey[ NAME_LENGTH ];
+    char szKey[ REGFS_NAME_LENGTH ];
     union{
         guint32 dwBNodeIdx;
         struct{
@@ -617,7 +617,31 @@ struct KEYPTR_SLOT {
     }
 }__attribute__((aligned (8)));
 
-struct RegFSBPlusNode
+struct FREE_BNODES
+{
+    bool bNextBNode = false;
+    guint8 byReserved;
+    guint16 wBNCount;
+    guint32 dwPrevBNode = 0;
+    guint16 arrFreeBNbmp[ 0 ];
+
+    static gint32 GetMaxCount() const
+    {
+        return BYTE_BITS * ( BNODE_SIZE - 5 );
+    }
+
+    guint32 GetCount() const
+    { return wBNCount; };
+
+    void InitBitmap()
+    {
+        memset( arrFreeBNbmp, 0,
+            GetMaxCount() / BYTE_BITS );
+    }
+
+}__attribute__((aligned (8)));
+
+struct RegFSBNode
 {
     BufPtr      m_pBuf;
     std::vector< KEYPTR_SLOT* > m_vecSlots;
@@ -627,6 +651,9 @@ struct RegFSBPlusNode
     guint16     m_wParentBNode = 0;
     guint16     m_wNextLeaf = 0;
     bool        m_bLeaf = false;
+    bool        m_bReserved = false;
+    // only valid on root node
+    guint32     m_dwFreeBNodeIdx = 0;
 
     gint32  ntoh(
         const guint8* pSrc,
@@ -636,18 +663,18 @@ struct RegFSBPlusNode
         guint8* pSrc,
         guint32 dwSize ) const;
 
-    RegFSBPlusNode();
+    RegFSBNode();
 };
 
 class CBPlusNode;
-using BPNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
+using BNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
 
 struct CBPlusNode :
     public ISynchronize 
 {
     FileImage* m_pFile;
-    RegFSBPlusNode m_oBNodeStore;
-    std::vector< BPNodeUPtr > m_vecChilds;
+    RegFSBNode m_oBNodeStore;
+    std::vector< BNodeUPtr > m_vecChilds;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
     guint32 m_dwBNodeIdx = 0;
 
@@ -662,13 +689,48 @@ struct CBPlusNode :
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
+
+    bool IsLeaf() const
+    { return m_oBNodeStore.m_bLeaf; }
+
+    guint32 GetKeyCount() const
+    { return m_oBNodeStore.m_wNumKeys; }
+
+    void SetKeyCount( guint32 wKeys )
+    {
+         m_oBNodeStore.m_wNumKeys =
+            ( guint16 )wKeys;
+    }
+
+    guint32 GetBNodeCount() const
+    { return m_oBNodeStore.m_wNumBNodeIdx; }
+
+    void SetBNodeCount( guint16 wBNode )
+    {
+        return m_oBNodeStore.m_wNumBNodeIdx =
+            wBNode;
+    }
+    const char* GetKey( gint32 idx ) const
+    {
+        if( idx >= GetKeyCount() )
+            return 
+        KEYPTR_SLOT* ps = 
+            m_oBNodeStore.m_vecSlots[ idx ];
+        return ps->szKey;
+    }
+
+    CBPlusNode* GetChild( gint32 idx ) const
+    { return m_vecChilds[ idx ].get(); }
+
+    guint32 GetFreeBNodeIdx()
+    { return m_oBNodeStore.m_dwFreeBNodeIdx; }
 };
 
 struct CBPlusLeaf :
     public CBPlusNode
 {
     typedef CBPlusNode super;
-    RegFSBPlusNode& m_oLeafStore;
+    RegFSBNode& m_oLeafStore;
     CBPlusLeaf() : CBPlusNode()
         m_oLeafStore( m_oNodeStore )
     { m_oLeafStore.m_bLeaf = true, }
@@ -693,7 +755,7 @@ struct CDirImage :
     public CFileImage
 {
     typedef CFileImage super;
-    BPNodeUPtr m_pRootNode;
+    BNodeUPtr m_pRootNode;
 
     CDirImage( CBlockAllocator* pAlloc,
         guint32 dwInodeIdx,
@@ -704,6 +766,13 @@ struct CDirImage :
     gint32 Format() override;
     gint32 Reload() override;
     gint32 Flush() override;
+
+    gint32 FreeBNode( gint32 dwBNodeIdx );
+    gint32 AllocBNode();
+
+    //B+ tree methods
+    bool Search( const char* szKey ) const;
+    gint32 Insert( const char* szKey );
 };
 
 class COpenFileEntry;
