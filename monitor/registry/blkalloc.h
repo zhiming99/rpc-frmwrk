@@ -156,6 +156,8 @@
 #define BNODE_IDX_TO_POS( _idx_ ) \
     ( _idx_ << ( find_shift( BNODE_SIZE ) - 1  ) )
 
+#define INVALID_BNODE_IDX  ( 0xFFFF )
+
 #define MAX_BNODE_NUMBER \
     ( MAX_FILE_SIZE / BNODE_SIZE )
 
@@ -601,6 +603,8 @@ struct CFileImage :
 
     gint32 Truncate( guint32 dwOff );
     gint32 Extend( guint32 dwOff );
+    inline guint32 GetSize()
+    { return m_oInodeStore.m_dwSize; }
 };
 
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
@@ -608,37 +612,13 @@ using FImgSPtr = typename std::unique_ptr< CFileImage >;
 struct KEYPTR_SLOT {
     char szKey[ REGFS_NAME_LENGTH ];
     union{
-        guint32 dwBNodeIdx;
+        guint32 dwBNodeIdx == INVALID_BNODE_IDX;
         struct{
-            guint32 dwBNodeIdx;
+            guint32 dwInodeIdx;
             guint8  byFileType;
             guint8  byReserved[ 3 ];
         } oLeaf;
     }
-}__attribute__((aligned (8)));
-
-struct FREE_BNODES
-{
-    bool bNextBNode = false;
-    guint8 byReserved;
-    guint16 wBNCount;
-    guint32 dwPrevBNode = 0;
-    guint16 arrFreeBNbmp[ 0 ];
-
-    static gint32 GetMaxCount() const
-    {
-        return BYTE_BITS * ( BNODE_SIZE - 5 );
-    }
-
-    guint32 GetCount() const
-    { return wBNCount; };
-
-    void InitBitmap()
-    {
-        memset( arrFreeBNbmp, 0,
-            GetMaxCount() / BYTE_BITS );
-    }
-
 }__attribute__((aligned (8)));
 
 struct RegFSBNode
@@ -653,7 +633,7 @@ struct RegFSBNode
     bool        m_bLeaf = false;
     bool        m_bReserved = false;
     // only valid on root node
-    guint32     m_dwFreeBNodeIdx = 0;
+    guint16     m_wFreeBNodeIdx = INVALID_BNODE_IDX;
 
     gint32  ntoh(
         const guint8* pSrc,
@@ -676,15 +656,14 @@ struct CBPlusNode :
     RegFSBNode m_oBNodeStore;
     std::vector< BNodeUPtr > m_vecChilds;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
-    guint32 m_dwBNodeIdx = 0;
+    guint32 m_dwBNodeIdx = INVALID_BNODE_IDX;
+    std::vector< FImgSPtr > m_vecFiles;
 
     CBPlusNode( CFileImage* pFile,
         guint32 dwBNodeIdx ) :
         m_pFile( pFile ),
         m_dwBNodeIdx( dwBNodeIdx )
-    {
-        m_vecChilds.resize( MAX_PTRS_PER_NODE );
-    }
+    {}
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -723,32 +702,91 @@ struct CBPlusNode :
     { return m_vecChilds[ idx ].get(); }
 
     guint32 GetFreeBNodeIdx()
-    { return m_oBNodeStore.m_dwFreeBNodeIdx; }
+    { return m_oBNodeStore.m_wFreeBNodeIdx; }
+
+    void SetFreeBNodeIdx( guint32 dwBNodeIdx )
+    { m_oBNodeStore.m_wFreeBNodeIdx = dwBNodeIdx; }
+
+    bool HasFreeBNode()
+    {
+        return m_oBNodeStore.m_wFreeBNodeIdx !=
+            INVALID_BNODE_IDX;
+    }
 };
 
-struct CBPlusLeaf :
-    public CBPlusNode
+struct FREE_BNODES
 {
-    typedef CBPlusNode super;
-    RegFSBNode& m_oLeafStore;
-    CBPlusLeaf() : CBPlusNode()
-        m_oLeafStore( m_oNodeStore )
-    { m_oLeafStore.m_bLeaf = true, }
-    std::vector< FImgSPtr > m_vecFiles;
+    guint16 m_wBNCount;
+    bool m_bNextBNode = false;
+    guint8 m_byReserved;
+    guint16 m_arrFreeBNIdx[ 0 ];
 
-    CBPlusLeaf* m_pNextLeaf;
-    gint32 GetInode(
-        const char* szName,
-        guint32 dwInode ) const;
+    static guint16 GetMaxCount() const
+    {
+        return ( ( BNODE_SIZE - 4 ) *
+            sizeof( guint16 ) );
+    }
+    guint16 GetCount() const
+    { return m_wBNCount; };
 
-    CBPlusLeaf( CFileImage* pFile,
-        guint32 dwBNodeIdx ) :
-        super( pFile, dwBNodeIdx )
+    bool IsFull()
+    { return m_wBNCount == GetMaxCount(); }
+
+    bool IsEmpty()
+    { return m_wBNCount == 0; }
+
+    guint16 GetLastBNodeIdx()
+    {
+        if( m_wBNCount > 0 )
+            return m_arrFreeBNIdx[ m_wBNCount - 1 ];
+        return INVALID_BNODE_IDX;
+    }
+    gint32 PushFreeBNode( guint16 wBNodeIdx )
+    {
+        if( IsFull() )
+            return -ENOMEM;
+        m_arrFreeBNIdx[ m_wBNCount++ ] =
+            wBNodeIdx;
+        return 0;
+    }
+
+    gint32 PopFreeBNode( guint16& wBNodeIdx )
+    {
+        if( IsEmpty() )
+            return -ENOENT;
+        wBNodeIdx = m_arrFreeBNIdx[ --m_wBNCount ];
+        return 0;
+    }
+
+    gint32 hton();
+    gint32 ntoh();
+
+}__attribute__((aligned (8)));
+
+struct CFreeBNodePool :
+    public ISynchronize
+{
+    CDirImage* m_pDir = nullptr;
+
+    CFreeBNodePool(
+        CDirImage* pDir, guint32 dwFirstFree ):
+        m_pDir( pDir )
     {}
 
-    gint32 Flush() override;
-    gint32 Format() override;
+    std::vector< std::pair< guint32, BufPtr > > m_vecFreeBNodes;
+
+    gint32 InitPoolStore(
+        guint32 dwBNodeIdx );
+
+    gint32 PutFreeBNode( guint32 dwBNodeIdx );
+    gint32 GetFreeBNode( guint32& dwBNodeIdx );
+    gint32 ReleaseFreeBNode( guint32 dwBNodeIdx );
+
+    gint32 Format() override
+    { return 0; }
+
     gint32 Reload() override;
+    gint32 Flush() override;
 };
 
 struct CDirImage : 
@@ -756,6 +794,7 @@ struct CDirImage :
 {
     typedef CFileImage super;
     BNodeUPtr m_pRootNode;
+    std::unique_ptr< CFreeBNodePool > m_pFreePool;
 
     CDirImage( CBlockAllocator* pAlloc,
         guint32 dwInodeIdx,
@@ -767,12 +806,15 @@ struct CDirImage :
     gint32 Reload() override;
     gint32 Flush() override;
 
-    gint32 FreeBNode( gint32 dwBNodeIdx );
-    gint32 AllocBNode();
-
     //B+ tree methods
     bool Search( const char* szKey ) const;
     gint32 Insert( const char* szKey );
+
+    guint32 GetHeadFreeBNode()
+    { return m_pRootNode->GetFreeBNodeIdx(); }
+
+    void SetHeadFreeBNode()
+    { return m_pRootNode->SetFreeBNodeIdx(); }
 };
 
 class COpenFileEntry;
