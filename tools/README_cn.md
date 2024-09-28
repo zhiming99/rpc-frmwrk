@@ -97,3 +97,4 @@
 ## 使用shell脚本
   * 下载如下三个文件 [buildall-deb.sh](./buildall-deb.sh), [buildall-fed.sh](./buildall-fed.sh), 和[makerpcf.sh](./makerpcf.sh)到同一个目录下.
   * 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。
+  * 你还可以在命令行下载docker镜像 `docker pull zhiming99/rpc-frmwrk:server` 和 `docker pull zhiming99/rpc-frmwrk:client`。注意运行时把服务器端容器ip地址设为`172.17.0.2`,客户端容器ip地址设成`172.17.0.3`。两个镜像里面的`/root`目录下都有`readme.md`，提供简单的提示。
