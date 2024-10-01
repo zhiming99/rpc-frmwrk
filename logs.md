@@ -1,4 +1,8 @@
 ---
+[`Tue Oct 01 2024 10:37:17 PM Beijing`]   
+1. One of the development box failed to start. Luckily enough, the hard disks are OK and the content are intact.
+2. the release `0.8.0` will be built after the `registry` PR get done.
+
 [`Tue Aug 20 2024 11:41:35 PM Beijing`]   
 1. Added and updated Chinese version documentation.
 2. Next, we will add a persistant registry, which will be the cornor stone for monitoring and site administration.
