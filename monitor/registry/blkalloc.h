@@ -474,7 +474,7 @@ struct RegFSInode
 
 // #define DIR_ENTRY_SIZE 128
 
-#define MAX_PTRS_PER_NODE ( \
+#define MAX_PTRS_PER_NODE \
     ( BNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
 
 #define MAX_KEYS_PER_NODE ( MAX_PTRS_PER_NODE - 1 )
@@ -558,6 +558,7 @@ struct CFileImage :
 
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
+    guint32     m_dwUserData;
 
     mutable CSharedLock m_oLock;
     inline CSharedLock& GetLock() const
@@ -610,7 +611,7 @@ struct CFileImage :
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
 
 struct KEYPTR_SLOT {
-    char szKey[ REGFS_NAME_LENGTH ];
+    char szKey[ REGFS_NAME_LENGTH ] = {0,};
     union{
         guint32 dwBNodeIdx == INVALID_BNODE_IDX;
         struct{
@@ -626,7 +627,7 @@ struct RegFSBNode
     BufPtr      m_pBuf;
     std::vector< KEYPTR_SLOT* > m_vecSlots;
     guint16     m_wNumKeys = 0;
-    guint16     m_wNumBNodeIdx = 0;
+    guint16     m_wNumBNodeIdx = INVALID_BNODE_IDX;
     guint16     m_wThisBNodeIdx = 0;
     guint16     m_wParentBNode = 0;
     guint16     m_wNextLeaf = 0;
@@ -643,6 +644,12 @@ struct RegFSBNode
         guint8* pSrc,
         guint32 dwSize ) const;
 
+    inline guint32 GetBNodeIndex() const
+    { return m_wThisBNodeIdx; }
+
+    inline void SetBNodeIndex( guint32 dwIdx )
+    { m_wThisBNodeIdx = dwIdx; }
+
     RegFSBNode();
 };
 
@@ -652,18 +659,18 @@ using BNodeUPtr = typename std::unique_ptr< CBPlusNode >;
 struct CBPlusNode :
     public ISynchronize 
 {
-    FileImage* m_pFile;
+    DirImage* m_pDir;
     RegFSBNode m_oBNodeStore;
-    std::vector< BNodeUPtr > m_vecChilds;
+    std::hashmap< gint32, BNodeUPtr > m_mapChilds;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
-    guint32 m_dwBNodeIdx = INVALID_BNODE_IDX;
-    std::vector< FImgSPtr > m_vecFiles;
+    std::hashmap< stdstr > m_vecFiles;
 
-    CBPlusNode( CFileImage* pFile,
+    CBPlusNode( CDirImage* pFile,
         guint32 dwBNodeIdx ) :
-        m_pFile( pFile ),
-        m_dwBNodeIdx( dwBNodeIdx )
-    {}
+        m_pDir( pFile ),
+    {
+        m_oBNodeStore.SetBNodeIndex( dwBNodeIdx );
+    }
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -671,6 +678,9 @@ struct CBPlusNode :
 
     bool IsLeaf() const
     { return m_oBNodeStore.m_bLeaf; }
+
+    void SetLeaf( bool bLeaf = false )
+    { return m_oBNodeStore.m_bLeaf = bLeaf; }
 
     guint32 GetKeyCount() const
     { return m_oBNodeStore.m_wNumKeys; }
@@ -681,14 +691,21 @@ struct CBPlusNode :
             ( guint16 )wKeys;
     }
 
+    gint32 CopyBNodeStore( CBPlusNode* pSrc,
+        guint32 dwOff, guint32 dwCount );
+
+    guint32 GetBNodeIndex() const
+    { return m_oBNodeStore.GetBNodeIndex(); }
+
     guint32 GetBNodeCount() const
     { return m_oBNodeStore.m_wNumBNodeIdx; }
 
-    void SetBNodeCount( guint16 wBNode )
+    void SetBNodeCount( guint32 dwBNode )
     {
         return m_oBNodeStore.m_wNumBNodeIdx =
-            wBNode;
+            ( guint16 )dwBNode;
     }
+
     const char* GetKey( gint32 idx ) const
     {
         if( idx >= GetKeyCount() )
@@ -699,9 +716,79 @@ struct CBPlusNode :
     }
 
     CBPlusNode* GetChild( gint32 idx ) const
-    { return m_vecChilds[ idx ].get(); }
+    {
+        if( idx >= GetBNodeCount() )
+            return nullptr;
+        KEYPTR_SLOT* ps = 
+            m_oBNodeStore.m_vecSlots[ idx ];
+        auto itr = m_mapChilds.find( ps->dwBNodeIdx );
+        if( itr == m_mapChilds.end() )
+            return nullptr;
+        return itr->second.get();
+    }
 
-    guint32 GetFreeBNodeIdx()
+    gint32 RemoveChild(
+        gint32 idx, BNodeUPtr& pChild )
+    {
+        if( idx >= GetBNodeCount() )
+            return -EINVAL;
+        KEYPTR_SLOT* ps = 
+            m_oBNodeStore.m_vecSlots[ idx ];
+        auto itr = m_mapChilds.find( ps->dwBNodeIdx );
+        if( itr == m_mapChilds.end() )
+            return -ENOENT;
+        pChild = std::move( *itr );
+        return STATUS_SUCCESS;
+    }
+
+    gint32 AddChild(
+        gint32 idx, BNodeUPtr& pChild )
+    {
+        if( idx >= GetBNodeCount() )
+            return -EINVAL;
+        if( IsLeaf() )
+            return -ENOTSUP;
+        KEYPTR_SLOT* ps = 
+            m_oBNodeStore.m_vecSlots[ idx ];
+        auto itr = m_mapChilds.find( ps->dwBNodeIdx );
+        if( itr != m_mapChilds.end() )
+            return -EEXIST;
+        itr->reset( std::move( pChild ) ); 
+        return STATUS_SUCCESS;
+    }
+
+    const KEYPTR_SLOT* GetSlot( gint32 idx ) const
+    {
+        if( idx >= GetBNodeCount() )
+            return nullptr;
+        return m_oBNodeStore.m_vecSlots[ idx ];
+    }
+
+    KEYPTR_SLOT* GetSlot( gint32 idx )
+    {
+        if( idx >= GetBNodeCount() )
+            return nullptr;
+        return m_oBNodeStore.m_vecSlots[ idx ];
+    }
+
+
+    gint32 InsertSlotAt(
+        gint32 idx, KEYPTR_SLOT* pKey );
+    {
+        if( idx < 0 || pKey == nullptr )
+            return -EINVAL;
+        auto& vec = m_oBNodeStore.m_vecSlots;
+        vec.insert( vec.begin() + idx, *pKey );
+        return STATUS_SUCCESS;
+    }
+
+    void InsertNonFull(
+        KEYPTR_SLOT* pKey );
+
+    guint32 GetChildCount()
+    { return m_oBNodeStore.m_wNumBNodeIdx; };
+
+    
     { return m_oBNodeStore.m_wFreeBNodeIdx; }
 
     void SetFreeBNodeIdx( guint32 dwBNodeIdx )
@@ -809,6 +896,22 @@ struct CDirImage :
     //B+ tree methods
     bool Search( const char* szKey ) const;
     gint32 Insert( const char* szKey );
+    gint32 Split(
+        CBPlusNode* pParent,
+        gint32 index,  
+        CBPlusNode* pNode );
+
+    gint32 PutFreeBNode(
+        CBPlusNode* pFreeNode );
+
+    gint32 GetFreeBNode( bool bLeaf,
+        BNodeUPtr& pNewNode );
+
+    gint32 ReleaseFreeBNode( guint32 dwBNodeIdx );
+    {
+        return m_pRootNode->ReleaseFreeBNode(
+            dwBNodeIdx );
+    }
 
     guint32 GetHeadFreeBNode()
     { return m_pRootNode->GetFreeBNodeIdx(); }

@@ -68,6 +68,9 @@ gint32 CFileImage::Reload()
         // type of file content
         m_oInodeStore.m_dwFlags =
             ntohl( pInode->m_dwFlags );
+
+        m_oInodeStore.m_dwUserData =
+            ntohl( pInode->m_dwUserData );
         // blocks for data section.
         int count =
             sizeof( pInode->m_arrBlocks ) >> 2;
@@ -248,6 +251,7 @@ gint32 CFileImage::Format()
 
         // blocks for data section.
         m_oInodeStore.m_iValType = typeNone;
+        m_oInodeStore.m_dwUserData = 0;
 
         // for small data with length less than 96 bytes.
     }while( 0 );
@@ -287,6 +291,8 @@ gint32 CFileImage::Flush()
         // type of file content
         pInode->m_dwFlags =
             htonl( m_oInodeStore.m_dwFlags );
+        pInode->m_dwUserData =
+            htonl( m_oInodeStore.m_dwUserData );
         // blocks for data section.
         int count =
             sizeof( pInode->m_arrBlocks ) >> 2;
