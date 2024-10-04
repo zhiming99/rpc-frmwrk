@@ -628,7 +628,7 @@ struct RegFSBNode
     BufPtr      m_pBuf;
     std::vector< KEYPTR_SLOT* > m_vecSlots;
     guint16     m_wNumKeys = 0;
-    guint16     m_wNumBNodeIdx = INVALID_BNODE_IDX;
+    guint16     m_wNumPtrs = 0;
     guint16     m_wThisBNodeIdx = INVALID_BNODE_IDX;
     guint16     m_wParentBNode = INVALID_BNODE_IDX;
     guint16     m_wNextLeaf = INVALID_BNODE_IDX;
@@ -698,11 +698,11 @@ struct CBPlusNode :
     inline guint32 DecKeyCount()
     { return --m_oBNodeStore.m_wNumKeys; }
 
-    inline guint32 IncBNodeCount()
-    { return ++m_oBNodeStore.m_wNumBNodeIdx; }
+    inline guint32 IncChildCount()
+    { return ++m_oBNodeStore.m_wNumPtrs; }
 
-    inline guint32 DecBNodeCount()
-    { return --m_oBNodeStore.m_wNumBNodeIdx; }
+    inline guint32 DecChildCount()
+    { return --m_oBNodeStore.m_wNumPtrs; }
 
     gint32 CopyBNodeStore( CBPlusNode* pSrc,
         guint32 dwOff, guint32 dwCount );
@@ -710,12 +710,12 @@ struct CBPlusNode :
     inline guint32 GetBNodeIndex() const
     { return m_oBNodeStore.GetBNodeIndex(); }
 
-    guint32 GetBNodeCount() const
-    { return m_oBNodeStore.m_wNumBNodeIdx; }
+    guint32 GetChildCount() const
+    { return m_oBNodeStore.m_wNumPtrs; }
 
-    void SetBNodeCount( guint32 dwBNode )
+    void SetChildCount( guint32 dwBNode )
     {
-        return m_oBNodeStore.m_wNumBNodeIdx =
+        return m_oBNodeStore.m_wNumPtrs =
             ( guint16 )dwBNode;
     }
 
@@ -730,7 +730,7 @@ struct CBPlusNode :
 
     FImgSPtr GetFile( gint32 idx ) const 
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return nullptr;
 
         if( !IsLeaf() )
@@ -785,7 +785,7 @@ struct CBPlusNode :
     gint32 AddFile(
         guint32 idx, FImgSPtr& pFile )
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return -EINVAL;
         if( !IsLeaf() )
             return -ENOTSUP;
@@ -797,7 +797,7 @@ struct CBPlusNode :
 
     CBPlusNode* GetChild( gint32 idx ) const
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
@@ -820,7 +820,7 @@ struct CBPlusNode :
     gint32 RemoveChild(
         guint32 idx, BNodeUPtr& pChild )
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return -EINVAL;
         if( IsLeaf() )
             return -ENOTSUP;
@@ -843,7 +843,7 @@ struct CBPlusNode :
     gint32 AddChild(
         guint32 idx, BNodeUPtr& pChild )
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return -EINVAL;
         if( IsLeaf() )
             return -ENOTSUP;
@@ -855,14 +855,14 @@ struct CBPlusNode :
 
     const KEYPTR_SLOT* GetSlot( gint32 idx ) const
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
 
     KEYPTR_SLOT* GetSlot( gint32 idx )
     {
-        if( idx >= GetBNodeCount() )
+        if( idx >= GetChildCount() )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -870,13 +870,8 @@ struct CBPlusNode :
 
     gint32 InsertSlotAt(
         gint32 idx, KEYPTR_SLOT* pKey );
-    {
-        if( idx < 0 || pKey == nullptr )
-            return -EINVAL;
-        auto& vec = m_oBNodeStore.m_vecSlots;
-        vec.insert( vec.begin() + idx, *pKey );
-        return STATUS_SUCCESS;
-    }
+
+    gint32 AppendSlot( KEYPTR_SLOT* pKey );
 
     void InsertNonFull(
         KEYPTR_SLOT* pKey );
@@ -886,7 +881,7 @@ struct CBPlusNode :
         guint32 dwSlotIdx );
 
     guint32 GetChildCount()
-    { return m_oBNodeStore.m_wNumBNodeIdx; };
+    { return m_oBNodeStore.m_wNumPtrs; };
 
     
     { return m_oBNodeStore.m_wFreeBNodeIdx; }
@@ -905,6 +900,9 @@ struct CBPlusNode :
 
     void SetNextLeaf( guint32 dwBNodeIdx )
     { m_oBNodeStore.m_wNextLeaf = ( guint16 )dwBNodeIdx; }
+
+    gint32 BinSearch( const char* szKey,
+        gint32 iOrigLower, gint32 iOrigUpper );
 };
 
 struct FREE_BNODES

@@ -24,6 +24,24 @@
  */
 
 #include "blkalloc.h"
+
+#define MIN_PTRS( _maxptrs_, _root_ ) \
+( (_root) ? 2 : \
+    ( ( (_maxptrs_) & 1 ) ? ( (_maxptrs_) + 1 ) / 2 ) : \
+    ( (_maxptrs_) / 2 ) )
+
+#define MIN_KEYS( _maxkeys_, _root_ ) \
+( (_root) ? 1 : \
+    ( ( ( (_maxkeys_) & 1 ) ? ( ( (_maxkeys_) + 1 ) / 2 - 1 ) ) : \
+    ( (_maxkeys_) / 2 - 1 ) ) )
+
+#define SPLIT_POS( _x_, _leaf_ ) \
+( ( ( (_x_) & 1 ) ? \
+    ( (_leaf_) ? ( ( (_x_)- 1 ) / 2 ) : \
+        ( ( (_x_) + 1 ) / 2 - 1 ) ) : \
+    ( (_leaf_) ? ( (_x_) / 2 ) : \
+        ( ( (_x_) / 2 ) - 1 ) ) ) - 1 ) \
+
 namespace rpcf
 {
 RegFSBNode::RegFSBNode()
@@ -37,7 +55,7 @@ RegFSBNode::RegFSBNode()
     // first
     p->szKey[ 0 ] = 0;
     m_wNumKeys = 1;
-    m_wNumBNodeIdx = 0;
+    m_wNumPtrs = 0;
     for( elem : m_vecSlots )
         elem = p++;
 }
@@ -55,12 +73,12 @@ RegFSBNode::ntoh(
             MAX_PTRS_PER_NODE;
 
         m_wNumKeys = ntohs( pParams[ 0 ] );
-        m_wNumBNodeIdx = ntohs( pParams[ 1 ] );
+        m_wNumPtrs = ntohs( pParams[ 1 ] );
         m_wThisBNodeIdx = ntohs( pParams[ 2 ] );
         m_wParentBNode = ntohs( pParams[ 3 ] );
         m_wNextLeaf = ntohs( pParams[ 4 ] );
         m_bLeaf = *( bool* )( pParams + 5 );
-        if( m_wNumBNodeIdx >= MAX_PTRS_PER_NODE ||
+        if( m_wNumPtrs >= MAX_PTRS_PER_NODE ||
             m_wNumKeys > MAX_KEYS_PER_NODE ||
             m_wParentBNode >= MAX_BNODE_NUMBER ||
             m_wNextLeaf >= MAX_BNODE_NUMBER ) 
@@ -125,7 +143,7 @@ RegFSBNode::hton(
             MAX_PTRS_PER_NODE;
 
         pParams[ 0 ] = ntohs( m_wNumKeys );
-        pParams[ 1 ] = ntohs( m_wNumBNodeIdx );
+        pParams[ 1 ] = ntohs( m_wNumPtrs );
         pParams[ 2 ] = ntohs( m_wThisBNodeIdx );
         pParams[ 3 ] = ntohs( m_wParentBNode );
         pParams[ 4 ] = ntohs( m_wNextLeaf );
@@ -157,7 +175,7 @@ gint32 CBPlusNode::Reload()
             break;
         
         for( int i = 0; i <
-            pBPNode->m_wNumBNodeIdx; i++ )
+            pBPNode->m_wNumPtrs; i++ )
         {
             KEYPTR_SLOT* p = m_vecSlots[ i ];
             guint32 dwIdx = p->wBNodeIdx;
@@ -218,9 +236,9 @@ gint32 CBPlusNode::Format()
     }while( 0 );
     return ret;
 }
-    
-gint32 CBPlusNode::InsertSlotAt(
-    gint32 idx, KEYPTR_SLOT* pKey );
+
+gint32 CBPlusNode::RemoveSlotAt(
+    gint32 idx, KEYPTR_SLOT& oKey )
 {
     if( idx < 0 || pKey == nullptr )
         return  -EINVAL;
@@ -234,11 +252,102 @@ gint32 CBPlusNode::InsertSlotAt(
             break;
         }
 
-        guint32 dwCount = 
-            m_oBNodeStore.GetKeyCount();
+        guint32 dwCount = this->GetKeyCount();
+        if( dwCount == 0 )
+        {
+            ret = -ENOMEM;
+            DebugPrint( ret,
+                "Error no key to remove" );
+            break;
+        }
+        if( idx > dwCount )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        oKey = *vec[ idx ];
+
+        guint32 i = idx;
+        for( ; i <= dwCount; i++ )
+        {
+            memcpy( vec[ i ],
+                vec[ i + 1 ], sizeof( KEYPTR_SLOT ) );
+        }
+
+        this->DecKeyCount();
+        if( !IsLeaf() )
+            this->DecChildCount();
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBPlusNode::AppendSlot(
+    KEYPTR_SLOT* pKey )
+{
+    if( pKey == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        guint32 dwCount = this->GetKeyCount();
+        if( !IsLeaf() &&
+            GetChildCount() == MAX_PTRS_PER_NODE )
+        {
+            ret = -EOVERFLOW;
+            break;
+        }
+        else if( IsLeaf() &&
+            dwCount == MAX_KEYS_PER_NODE )
+        {
+            ret = -EOVERFLOW;
+            break;
+        }
+
+        auto& vec = m_oBNodeStore.m_vecSlots;
+        if( IsLeaf() )
+        {
+            memcpy( vec[ dwCount ],
+                pKey, sizeof( KEYPTR_SLOT ) );
+        }
+        else
+        {
+            KEYPTR_SLOT oNewLast;
+            strncpy( vec[ dwCount ]->szKey,
+                pKey->szKey,
+                sizeof( pKey->szKey ) - 1 );
+            oNewLast.dwBNodeIdx = pKey->dwBNodeIdx;
+            oNewLast.szKey[ 0 ] = 0;
+            memcpy( vec[ dwCount + 1 ],
+                &oNewLast, sizeof( KEYPTR_SLOT ) );
+        }
+        this->IncKeyCount();
+        if( !IsLeaf() )
+            this->IncChildCount();
+
+    }while( 0 );
+}
+gint32 CBPlusNode::InsertSlotAt(
+    gint32 idx, KEYPTR_SLOT* pKey )
+{
+    if( idx < 0 || pKey == nullptr )
+        return  -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        auto& vec = m_oBNodeStore.m_vecSlots;
+        if( idx >= MAX_KEYS_PER_NODE )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint32 dwCount = this->GetKeyCount();
         if( dwCount >= MAX_KEYS_PER_NODE )
         {
             ret = -ENOMEM;
+            DebugPrint( ret,
+                "Error child keys overflow" );
             break;
         }
         if( idx > dwCount + 1 )
@@ -255,7 +364,7 @@ gint32 CBPlusNode::InsertSlotAt(
         memcpy( vec[ idx ],
             pKey, sizeof( KEYPTR_SLOT ) );
 
-        m_oBNodeStore.IncKeyCount();
+        this->IncKeyCount();
         if( !IsLeaf() && pKey->dwBNodeIdx !=
             INVALID_BNODE_IDX )
         {
@@ -268,8 +377,8 @@ gint32 CBPlusNode::InsertSlotAt(
                     new CBPlusNode( m_pDir, dwIdx ) );
                 ret = pNode->Reload();
             }
-            m_oBNodeStore.IncBNodeCount(
-                m_oBNodeStore.GetBNodeCount() + 1 );
+            this->IncChildCount(
+                this->GetChildCount() + 1 );
         }
 
     }while( 0 );
@@ -327,10 +436,10 @@ gint32 CBPlusNode::MoveBNodeStore(
 
         if( !IsLeaf() )
         {
-            pSrc->SetBNodeCount(
-                pSrc->GetBNodeCount() - dwCount );
-            SetBNodeCount(
-                GetBNodeCount() + dwCount );
+            pSrc->SetChildCount(
+                pSrc->GetChildCount() - dwCount );
+            SetChildCount(
+                GetKeyCount() + dwCount + 1 );
         }
 
     }while( 0 );
@@ -346,9 +455,9 @@ void CBPlusNode::InsertNonFull(
         return -EINVAL;
 
     do{
-        gint32 iRet = BinSearch(
-            pKey->szKey, this, 0,
-            this->GetKeyCount() );
+        gint32 iRet = this->BinSearch(
+            pKey->szKey, 0,
+            this->GetKeyCount() - 1 );
 
         if( iRet > 0 )
         {
@@ -356,14 +465,10 @@ void CBPlusNode::InsertNonFull(
             break;
         }
         guint32 dwIdx = ( guint32 )( -iRet );
-        bool bAfter = false;
         if( dwIdx > 0x10000 )
-        {
-            dwIdx -= 0xFFFF;
-            bAfter = true;
-        }
+            dwIdx -= 0x10000;
 
-        if( dwIdx == 0 )
+        if( dwIdx >= MAX_KEYS_PER_NODE )
         {
             ret = ERROR_FAIL;
             break;
@@ -371,13 +476,12 @@ void CBPlusNode::InsertNonFull(
 
         if( IsLeaf() )
         {
-            ret = InsertSlotAt( dwIdx, pKey->szKey );
+            ret = InsertSlotAt( dwIdx, pKey );
             break;
         }
         else
         {
             // insert to child node
-            dwIdx -= 1;
             CBPlusNode* pChild =
                 this->GetChild( dwIdx );
             if( unlikely( pChild == nullptr ) )
@@ -394,9 +498,9 @@ void CBPlusNode::InsertNonFull(
                 CBPlusNode* pNewIns =
                     this->GetChild( dwIdx + 1 );
                 gint32 iRet = strncmp( pKey->szKey,
-                    this->GetKey( dwIdx + 1 ),
+                    this->GetKey( dwIdx ),
                     REGFS_NAME_LENGTH - 1 );
-                if( iRet < 0 )
+                if( iRet >= 0 )
                     pChild = pNewIns;
             }
             ret = pChild->InsertNonFull( pKey );
@@ -416,62 +520,94 @@ gint32 CBPlusNode::Split(
         if( ERROR( ret ) )
             break;
 
-        // key to adde to the parent slot.
-        KEYPTR_SLOT oKey;
+        // key to add to the parent slot.
+        KEYPTR_SLOT oAscendKey;
 
         // pos to split
-        guint32 dwSplitPos =
-            MAX_KEYS_PER_NODE / 2;
+        guint32 dwSplitPos = SPLIT_POS(
+            MAX_PTRS_PER_NODE, IsLeaf() ) ; 
 
-        memcpy( &oKey,
-            this->GetSlot( dwSplitPos ),
-            sizeof( oKey ) );
+        KEYPTR_SLOT* pSplitKs =
+            this->GetSlot( dwSplitPos );
 
-        if( !IsLeaf() )
+        guint32 dwRightMost =
+            pSplitKs->dwBNodeIdx;
+
+        guint32 dwChilds =
+            pParent->GetChildCount();
+
+        if( dwSlotIdx < dwChilds )
         {
-            KEYPTR_SLOT* pLeftMost =
-                pNewSibling->GetSlot( 0 );
-            // copy the node idx before the key move up 
-            pLeftMost->dwBNodeIdx =
-                oKey.dwBNodeIdx;
+            KEYPTR_SLOT* pParentKs = 
+                pParent->GetSlot( dwSlotIdx );
+
+            strncpy( &oAscendKey.szKey,
+                pParentKs->szKey,
+                sizeof( oAscendKey.szKey ) );
+
+            strncpy( pParentKs->szKey,
+                pSplitKs->szKey, 
+                sizeof( oAscendKey.szKey ) );
+        }
+        else if( dwChilds == 0 )
+        {
+            KEYPTR_SLOT* pParentKs = 
+                pParent->GetSlot( 0 );
+
+            dwSlotIdx = 0;
+            // init the slot[0] of the parent
+            strncpy( pParentKs->szKey,
+                pSplitKs->szKey, 
+                sizeof( pSplitKs->szKey ) );
+            pParent->IncKeyCount();
+            pParentKs->dwBNodeIdx =
+                this->GetBNodeIndex();
+            pParent->AddChildDirect(
+                this->GetBNodeIndex(), this );
+            pParent->IncChildCount();
+            oAscendKey.szKey[ 0 ] = 0;
+        }
+        else
+        {
+            ret = ERROR_FAIL;
+            DebugPrint( ret, "Unknown situation" );
+            break;
         }
 
-        oKey.dwBNodeIdx =
+        oAscendKey.dwBNodeIdx =
             pNewSibling->GetBNodeIndex();
+
+        pSplitKs->szKey[ 0 ] = 0;
 
         CBPlusNode* pNew = pNewSibling;
         ret = pParent->AddChildDirect(
-            oKey.dwBNodeIdx, pNewSibling );
+            oAscendKey.dwBNodeIdx, pNewSibling );
         if( ERROR( ret ) )
             break;
 
         ret = pParent->InsertSlotAt(
-            dwSlotIdx + 1, &oKey );
+            dwSlotIdx + 1, &oAscendKey );
         if( ERROR( ret ) )
             break;
+
+        guint32 dwMoveStart;
+        if( !IsLeaf() )
+            dwMoveStart = dwSplitPos + 1;
+        else
+            dwMoveStart = dwSplitPos;
+
+        guint32 dwCount = 
+            MAX_PTRS_PER_NODE - dwMoveStart;
 
         ret = pNew->MoveBNodeStore(
-            this, dwSplitPos + 1,
-            MAX_PTRS_PER_NODE - dwSplitPos - 1,
-            pNew->GetKeyCount() );
+            this, dwMoveStart, dwCount,  0 );
         if( ERROR( ret ) )
             break;
 
-        if( !IsLeaf() )
-        {
-            BNodeUPtr pLeftNode;
-            ret = this->RemoveChild(
-                dwSplitPos, pLeftNode );
-            if( ERROR( ret ) )
-                break;
-            pNew->AddChild( 0, pLeftNode );
-            this->SetBNodeCount(
-                this->GetBNodeCount() - 1 );
-        }
-        else
+        if( IsLeaf() )
         {
             pNew->SetNextLeaf(
-                this->GetNextLeaf () );
+                this->GetNextLeaf() );
             this->SetNextLeaf(
                 pNew->GetBNodeIndex() );
         }
@@ -771,10 +907,76 @@ gint32 CDirImage::Reload()
     return ret;
 }
 
-gint32 BinSearch(
+gint32 CBPlusNode::StealFromRight( gint32 i )
+{
+    gint32 ret = 0;
+    do{
+        if( i == 0 || i >= MAX_PTRS_PER_NODE )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        CBPlusNode* pLeft = GetChild( i );
+        if( pLeft == nullptr )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        CBPlusNode* pRight = GetChild( i + 1 )
+        if( pRight == nullptr )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        KEYPTR_SLOT* pParentKs = GetSlot( i );
+        KEYPTR_SLOT* pRightKs = pRight->GetSlot( 0 );
+
+        KEYPTR_SLOT oSteal;
+        strncpy( oSteal.szKey, pParentKs->szKey,
+            REGFS_NAME_LENGTH - 1 );
+        strncpy( pParentKs->szKey, pRightKs->szKey,
+            REGFS_NAME_LENGTH - 1 );
+
+        if( pRight->IsLeaf() )
+        {
+            FImgPtr pFile;
+            oSteal.oLeaf = pRightKs->oLeaf;
+            ret = pRight->RemoveFileDirect(
+                oSteal.oLeaf.dwInodeIdx, pFile );
+            pRight->DecKeyCount();
+            pLeft->AppendSlot( oSteal );
+            pLeft->AddFileDirect(
+                oSteal.oLeaf.dwInodeIdx, pFile );
+            pLeft->IncKeyCount();
+        }
+        else
+        {
+            BNodeUPtr pNode;
+            oSteal.dwBNodeIdx = pRightKs->dwBNodeIdx;
+            ret = pRight->RemoveChildDirect(
+                oSteal.dwBNodeIdx, pNode );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( ret, "Error, steal failed "
+                    "with empty child pointer" );
+                break;
+            }
+            KEYPTR_SLOT oKey;
+            ret = pRight->RemoveSlotAt( 0, oKey );
+            if( ERROR( ret ) )
+                break;
+            pLeft->AddChildDirect(
+                oSteal.dwBNodeIdx, pNode );
+            pLeft->AppendSlot( oSteal );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBPlusNode::BinSearch(
     const char* szKey,
-    CBPlusNode* pNode,
-    gint32 iOrigLower
+    gint32 iOrigLower,
     gint32 iOrigUpper )
 {
     gint32 ret = 0;
@@ -786,29 +988,29 @@ gint32 BinSearch(
         if( iUpper == iLower )
         {
             gint32 iRet = strncmp( szKey,
-                pNode->GetKey( iLower ),
+                this->GetKey( iLower ),
                 REGFS_NAME_LENGTH - 1 );
             if( iRet < 0 )
-            {
-                ret = -iLower;
-                break;
-            }
-            else if( iRet > 0 )
             {
                 ret = -( iLower + 0x10000 );
                 break;
             }
-            ret = iLower;    
+            else if( iRet > 0 )
+            {
+                ret = -( iLower + 1 );
+                break;
+            }
+            ret = iLower;
             break;
         }
         else if( iUpper == iLower + 1 )
         {
             gint32 iRet = strncmp( szKey,
-                pNode->GetKey( iLower ),
+                this->GetKey( iLower ),
                 REGFS_NAME_LENGTH - 1 );
             if( iRet < 0 )
             {
-                ret = -iLower;
+                ret = -( iLower + 0x10000 );
                 break;
             }
             if( iRet == 0 )
@@ -817,11 +1019,11 @@ gint32 BinSearch(
                 break;
             }
             iRet = strncmp( szKey,
-                pNode->GetKey( iUpper ),
+                this->GetKey( iUpper ),
                 REGFS_NAME_LENGTH - 1 );
             if( iRet < 0 )
             {
-                ret = -iUpper ;
+                ret = -( iUpper + 10000 );
                 break;
             }
             else if( iRet == 0 )
@@ -831,14 +1033,14 @@ gint32 BinSearch(
             }
             else
             {
-                ret = -( iUpper + 0x10000 );
+                ret = -( iUpper + 1 );
             }
             break;
         }
         gint32 iCur =
             ( iLower + iUpper ) >> 1;
         iRet = strncmp( szKey,
-            pNode->GetKey( iLower ),
+            this->GetKey( iLower ),
             REGFS_NAME_LENGTH - 1 );
         if( iRet == 0 )
         {
@@ -868,9 +1070,9 @@ bool CDirImage::Search( const char* szKey )
         while( !pCurNode->IsLeaf() )
         {
             dwCount = pCurNode->GetKeyCount();
-            gint32 i = BinSearch(
-                szKey, pCurNode, 1, dwCount );
-            if( i > 0 )
+            gint32 i = pCurNode->BinSearch(
+                szKey, 0, dwCount - 1 );
+            if( i >= 0 )
             {
                 ret = true;
                 break;
@@ -878,14 +1080,12 @@ bool CDirImage::Search( const char* szKey )
             i = -i;
             if( i > 0x10000 )
                 i -= 0x10000;
-            else
-                i -= 1;
             pCurNode = pCurNode->GetChild( i );
         }
 
         dwCount = pCurNode->GetKeyCount();
-        gint32 i = BinSearch(
-            szKey, pCurNode, 1, dwCount );
+        gint32 i = pCurNode->BinSearch(
+            szKey, 0, dwCount - 1 );
         if( i > 0 )
             ret = true;
     }while( 0 );
@@ -905,11 +1105,8 @@ gint32 CDirImage::Insert( KEYPTR_SLOT* pSlot )
             ret = GetFreeBNode( false, pNewRoot );
             if( ERROR( ret ) )
                 break;
-            KEYPTR_SLOT oKey;
-            oKey.dwBNodeIdx =
-                pCurNode->GetBNodeIndex();
-            pNewRoot->InsertSlotAt( 0, &oKey );
-            ret = pCurNode->Split( pNewRoot, 0 );
+            ret = pCurNode->Split(
+                pNewRoot, MAX_PTRS_PER_NODE );
             if( ERROR( ret ) )
                 break;
             pNewRoot->InsertNonFull( pSlot );
