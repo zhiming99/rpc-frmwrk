@@ -464,6 +464,7 @@ struct RegFSInode
     // for small data with length less than 96 bytes.
     guint8      m_arrBuf[ 95 ];
     guint8      m_iValType;
+    guint32     m_dwUserData;
 
 } __attribute__((aligned (8)));
 
@@ -558,7 +559,6 @@ struct CFileImage :
 
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
-    guint32     m_dwUserData;
 
     mutable CSharedLock m_oLock;
     inline CSharedLock& GetLock() const
@@ -632,6 +632,7 @@ struct RegFSBNode
     guint16     m_wThisBNodeIdx = INVALID_BNODE_IDX;
     guint16     m_wParentBNode = INVALID_BNODE_IDX;
     guint16     m_wNextLeaf = INVALID_BNODE_IDX;
+    guint16     m_wPrevLeaf = INVALID_BNODE_IDX;
     bool        m_bLeaf = false;
     bool        m_bReserved = false;
     // only valid on root node
@@ -656,15 +657,15 @@ struct RegFSBNode
 
 class CBPlusNode;
 using BNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
+using ChildMap = typename std::hashmap< guint32, BNodeUPtr >;
+using FIleMap = typename std::hashmap< guint32, FImgSPtr >;
 
 struct CBPlusNode :
     public ISynchronize 
 {
     DirImage* m_pDir;
     RegFSBNode m_oBNodeStore;
-    std::hashmap< guint32, BNodeUPtr > m_mapChilds;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
-    std::hashmap< guint32, FImgSPtr > m_mapFiles;
     CBPlusNode* m_pParent = nullptr;
 
     CBPlusNode( CDirImage* pFile,
@@ -673,6 +674,19 @@ struct CBPlusNode :
     {
         m_oBNodeStore.SetBNodeIndex( dwBNodeIdx );
     }
+
+    ChildMap& GetChildMap()
+    { return m_pDir->GetChildMap(); }
+
+    const ChildMap& GetChildMap() const
+    { return m_pDir->GetChildMap(); }
+
+    inline const FileMap& GetFileMap() const
+    { return m_pDir->GetFileMap(); }
+
+    inline FileMap& GetFileMap()
+    { return m_pDir->GetFileMap(); }
+
 
     gint32 Flush() override;
     gint32 Format() override;
@@ -732,7 +746,7 @@ struct CBPlusNode :
     const char* GetKey( gint32 idx ) const
     {
         if( idx >= GetKeyCount() )
-            return 
+            return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
         return ps->szKey;
@@ -749,10 +763,12 @@ struct CBPlusNode :
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
 
-        auto itr = m_mapFiles.find(
+        auto mapFiles = GetFileMap();
+        auto itr = mapFiles.find(
             ps->oLeaf.dwInodeIdx );
 
-        if( itr == m_mapChilds.end() )
+        auto oMap = GetChildMap();
+        if( itr == oMap.end() )
             return nullptr;
         return itr->second;
     }
@@ -760,8 +776,9 @@ struct CBPlusNode :
     gint32 RemoveFileDirect (
         guint32 dwInodeIdx, FImgSPtr& pFile )
     {
-        auto itr = m_mapFiles.find( dwInodeIdx );
-        if( itr == m_mapFiles.end() )
+        auto mapFiles = GetFileMap();
+        auto itr = mapFiles.find( dwInodeIdx );
+        if( itr == mapFiles.end() )
             return -ENOENT;
         pFile = *itr;
         itr->reset();
@@ -787,8 +804,9 @@ struct CBPlusNode :
     gint32 AddFileDirect(
         guint32 dwInodeIdx, FImgSPtr& pFile )
     {
-        auto itr = m_mapFiles.find( dwInodeIdx );
-        if( itr != m_mapFiles.end() )
+        auto mapFiles = GetFileMap();
+        auto itr = mapFiles.find( dwInodeIdx );
+        if( itr != mapFiles.end() )
             return -EEXIST;
         pFile = *itr;
         itr->reset();
@@ -814,8 +832,9 @@ struct CBPlusNode :
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
-        auto itr = m_mapChilds.find( ps->dwBNodeIdx );
-        if( itr == m_mapChilds.end() )
+        const ChildMap& oMap = GetChildMap();
+        auto itr = oMap.find( ps->dwBNodeIdx );
+        if( itr == oMap.end() )
             return nullptr;
         return itr->second.get();
     }
@@ -823,8 +842,9 @@ struct CBPlusNode :
     gint32 RemoveChildDirect (
         guint32 dwBNodeIdx, BNodeUPtr& pChild )
     {
-        auto itr = m_mapChilds.find( dwBNodeIdx );
-        if( itr == m_mapChilds.end() )
+        ChildMap& oMap = GetChildMap();
+        auto itr = oMap.find( dwBNodeIdx );
+        if( itr == oMap.end() )
             return -ENOENT;
         pChild = std::move( *itr );
         pChild->SetParent( nullptr );
@@ -847,8 +867,9 @@ struct CBPlusNode :
     gint32 AddChildDirect(
         guint32 dwBNodeIdx, BNodeUPtr& pChild )
     {
-        auto itr = m_mapChilds.find( dwBNodeIdx );
-        if( itr != m_mapChilds.end() )
+        auto oMap = GetChildMap();
+        auto itr = oMap.find( dwBNodeIdx );
+        if( itr != oMap.end() )
             return -EEXIST;
         itr->reset( std::move( pChild ) );
         pChild->SetParent( this );
@@ -901,8 +922,8 @@ struct CBPlusNode :
     gint32 StealFromLeft( gint32 i );
     gint32 StealFromRight( gint32 i );
 
-    const char* GetMaxKey( guint32 dwIdx = 0 ) const;
-    const char* GetMinKey( guint32 dwIdx = 0 ) const;
+    const char* GetPredKey( guint32 dwIdx = 0 ) const;
+    const char* GetSuccKey( guint32 dwIdx = 0 ) const;
     inline guint32 GetChildCount()
     { return m_oBNodeStore.m_wNumPtrs; };
     
@@ -1010,6 +1031,8 @@ struct CDirImage :
     typedef CFileImage super;
     BNodeUPtr m_pRootNode;
     std::unique_ptr< CFreeBNodePool > m_pFreePool;
+    ChildMap m_mapChilds;
+    FileMap m_mapFiles;
 
     CDirImage( CBlockAllocator* pAlloc,
         guint32 dwInodeIdx,
@@ -1020,6 +1043,18 @@ struct CDirImage :
     gint32 Format() override;
     gint32 Reload() override;
     gint32 Flush() override;
+
+    inline const ChildMap& GetChildMap() const
+    { return m_mapChilds; }
+
+    inline ChildMap& GetChildMap()
+    { return m_mapChilds; }
+
+    inline const FileMap& GetFileMap() const
+    { return m_mapFiles; }
+
+    inline FileMap& GetFileMap()
+    { return m_mapFiles; }
 
     //B+ tree methods
     bool Search( const char* szKey ) const;
@@ -1040,6 +1075,8 @@ struct CDirImage :
         return m_pRootNode->ReleaseFreeBNode(
             dwBNodeIdx );
     }
+
+    gint32 FreeRootBNode( BNodeUPtr& pRoot );
 
     guint32 GetHeadFreeBNode()
     { return m_pRootNode->GetFreeBNodeIdx(); }

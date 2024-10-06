@@ -251,7 +251,8 @@ gint32 CFileImage::Format()
 
         // blocks for data section.
         m_oInodeStore.m_iValType = typeNone;
-        m_oInodeStore.m_dwUserData = 0;
+        m_oInodeStore.m_dwUserData =
+            INVALID_BNODE_IDX;
 
         // for small data with length less than 96 bytes.
     }while( 0 );
