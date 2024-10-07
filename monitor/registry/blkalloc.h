@@ -604,8 +604,11 @@ struct CFileImage :
 
     gint32 Truncate( guint32 dwOff );
     gint32 Extend( guint32 dwOff );
-    inline guint32 GetSize()
+    inline guint32 GetSize() const
     { return m_oInodeStore.m_dwSize; }
+
+    inline guint32 GetInodeIdx() const
+    { return m_oInodeStore.m_dwInodeIdx; }
 };
 
 using FImgSPtr = typename std::unique_ptr< CFileImage >;
@@ -767,7 +770,7 @@ struct CBPlusNode :
         auto itr = mapFiles.find(
             ps->oLeaf.dwInodeIdx );
 
-        auto oMap = GetChildMap();
+        auto& oMap = GetChildMap();
         if( itr == oMap.end() )
             return nullptr;
         return itr->second;
@@ -826,23 +829,28 @@ struct CBPlusNode :
             ps->dwInodeIdx, pFile );
     }
 
+    CBPlusNode* GetChildDirect( gint32 idx ) const
+    {
+        auto& oMap = GetChildMap();
+        auto itr = oMap.find( idx );
+        if( itr == oMap.end() )
+            return nullptr;
+        return itr->second.get();
+    }
+
     CBPlusNode* GetChild( gint32 idx ) const
     {
         if( idx >= GetChildCount() || idx < 0 )
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
-        const ChildMap& oMap = GetChildMap();
-        auto itr = oMap.find( ps->dwBNodeIdx );
-        if( itr == oMap.end() )
-            return nullptr;
-        return itr->second.get();
+        return GetChildDirect( ps->dwBNodeIdx );
     }
 
     gint32 RemoveChildDirect (
         guint32 dwBNodeIdx, BNodeUPtr& pChild )
     {
-        ChildMap& oMap = GetChildMap();
+        auto& oMap = GetChildMap();
         auto itr = oMap.find( dwBNodeIdx );
         if( itr == oMap.end() )
             return -ENOENT;
@@ -867,7 +875,7 @@ struct CBPlusNode :
     gint32 AddChildDirect(
         guint32 dwBNodeIdx, BNodeUPtr& pChild )
     {
-        auto oMap = GetChildMap();
+        auto& oMap = GetChildMap();
         auto itr = oMap.find( dwBNodeIdx );
         if( itr != oMap.end() )
             return -EEXIST;
@@ -939,7 +947,7 @@ struct CBPlusNode :
             INVALID_BNODE_IDX;
     }
 
-    gint32 GetNextLeaf() const
+    guint32 GetNextLeaf() const
     { return m_oBNodeStore.m_wNextLeaf; }
 
     void SetNextLeaf( guint32 dwBNodeIdx )
@@ -1057,7 +1065,9 @@ struct CDirImage :
     { return m_mapFiles; }
 
     //B+ tree methods
-    bool Search( const char* szKey ) const;
+    bool Search( const char* szKey,
+        FImgSPtr& pFile ) const;
+
     gint32 Insert( const char* szKey );
     gint32 Split(
         CBPlusNode* pParent,
@@ -1077,6 +1087,8 @@ struct CDirImage :
     }
 
     gint32 FreeRootBNode( BNodeUPtr& pRoot );
+    gint32 ReplaceRootBNode(
+        BNodeUPtr& pNew, BNodeUPtr& pOld );
 
     guint32 GetHeadFreeBNode()
     { return m_pRootNode->GetFreeBNodeIdx(); }
@@ -1213,6 +1225,7 @@ struct CDirFileEntry :
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
+
 };
 
 class CRegistryFs :
@@ -1239,21 +1252,21 @@ class CRegistryFs :
     gint32 CreateFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32 CreateDirectory( const stdstr& strPath,
+    gint32 MakeDir( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    HANDLE OpenChild( const stdstr& strPath,
+    HANDLE OpenFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32  CloseChild( HANDLE hFile );
+    gint32  CloseFile( HANDLE hFile );
 
-    gint32  FindChild( const stdstr& strPath,
+    gint32  FindFile( const stdstr& strPath,
         CAccessContext* pac = nullptr ) const;
 
-    gint32  RemoveChild( const stdstr& strPath,
+    gint32  RemoveFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32  RemoveDirectory( const stdstr& strPath,
+    gint32  RemoveDir( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
     gint32  SetGid( guint16 wGid,

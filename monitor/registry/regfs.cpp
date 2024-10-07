@@ -210,7 +210,7 @@ gint32 CFileImage::Reload()
             if( ERROR( ret ) )
                 break;
         }
-        // for small data with length less than 96 bytes.
+
     }while( 0 );
     return ret;
 }

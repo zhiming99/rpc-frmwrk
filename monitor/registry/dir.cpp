@@ -179,7 +179,7 @@ gint32 CBPlusNode::Reload()
         {
             KEYPTR_SLOT* p = m_vecSlots[ i ];
             guint32 dwIdx = p->wBNodeIdx;
-            auto oMap = GetChildMap();
+            auto& oMap = GetChildMap();
             auto& pNode = oMap[ dwIdx ];
             pNode.reset(
                 new CBPlusNode( m_pDir, dwIdx ) );
@@ -206,12 +206,18 @@ gint32 CBPlusNode::Flush()
         if( pBPNode->m_bLeaf )
             break;
 
-        auto oMap = GetChildMap();
-        for( auto& elem : oMap )
+        guint32 dwCount = this->GetChildCount();
+        for( gint32 i = 0; i < dwCount; i++ ) 
         {
-            ret = elem->Flush();
+            CBPlusNode* pChild =
+                this->GetChild( i );
+            ret = pChild->Flush();
             if( ERROR( ret ) )
+            {
+                DebugPrint( ret, "Error during "
+                    "BNode flushing" );
                 break;
+            }
         }
     }while( 0 );
     return ret;
@@ -369,7 +375,7 @@ gint32 CBPlusNode::InsertSlotAt(
             INVALID_BNODE_IDX )
         {
             guint32 dwIdx = p->wBNodeIdx;
-            auto oMap = GetChildMap();
+            auto& oMap = GetChildMap();
             auto itr = oMap.find( dwIdx );
             if( itr->get() == nullptr )
             {
@@ -1154,10 +1160,23 @@ const char* CBPlusNode::GetSuccKey(
     {
         DebugPrint( -EFAULT,
             "Error internal error" );
-    }
-    if( pChild->GetKeyCount() <= dwIdx )
         return nullptr;
-
+    }
+    guint32 dwCount = pChild->GetKeyCount();
+    while( dwCount <= dwIdx )
+    {
+        dwIdx -= dwCount;
+        guint32 dwNextLeaf =
+            pChild->GetNextLeaf();
+        if( dwNextLeaf == INVALID_BNODE_IDX )
+            return nullptr;
+        auto& oMap = GetChildMap();
+        auto itr = oMap.find( dwNextLeaf );
+        if( itr == oMap.end() )
+            return nullptr;
+        pChild = itr->second.get();
+        dwCount = pChild->GetKeyCount();
+    }
     return pChild->GetKey( dwIdx );
 }
 
@@ -1243,7 +1262,6 @@ gint32 CBPlusNode::MergeChilds(
         ret = m_pDir->PutFreeBNode( pNode );
         if( ERROR( ret ) )
             break;
-
         if( this->GetKeyCount() >= 
             MIN_KEYS( IsRoot() ) ) 
             break;
@@ -1260,12 +1278,29 @@ gint32 CBPlusNode::Rebalance()
     do{
         if( IsRoot() && IsLeaf() )
         {
+            // the last one is removed
             ret = m_pDir->FreeRootBNode( pRoot );
             break;
         }
         else if( IsRoot() )
         {
+            // replace the root node
+            if( this->GetKeyCount() != 0 )
+            {
+                ret = ERROR_FAIL;
+                DebugPrint( ret, "Error, not "
+                    "an expected state to "
+                    "rebalance the root node" );
+                break;
+            }
+            BNodeUPtr pNewRoot =
+                this->RemoveChild( 0, pNewRoot );
 
+            m_pDir->ReplaceRootBNode(
+                pNewRoot, pOld );
+
+            ret = m_pDir->PutFreeBNode( pOld );
+            break;
         }
 
         guint32 i = 0;
@@ -1305,15 +1340,14 @@ gint32 CBPlusNode::RebalanceChild(
             this->GetChild( idx );
 
         guint32 dwLimit = MIN_KEYS( false );
-        if( idx == 0 && GetKeyCount() == 1 )
+        guint32 dwCount = GetKeyCount();
+        if( idx == 0 && dwCount == 1 )
         {
-            if( !IsRoot() )
-            {
-                ret = ERROR_FAIL;
-                break;
-            }
+            ret = ERROR_FAIL;
+            DebugPrint( ret, "Error we should "
+                "not be here" );
         }
-        if( idx >= 0 && idx < GetKeyCount() )
+        if( idx >= 0 && idx < dwCount )
         {
             CBPlusNode* pRight =
                 this->GetChild( idx + 1 );
@@ -1328,7 +1362,7 @@ gint32 CBPlusNode::RebalanceChild(
             break;
         }
 
-        if( idx != GetKeyCount() )
+        if( idx != dwCount )
         {
             ret = -ERANGE;
             break;
@@ -1410,9 +1444,10 @@ gint32 CBPlusNode::RemoveFile(
 }
 
 bool CDirImage::Search( const char* szKey,
-    CBPlusNode*& pNode )
+    FImgSPtr& pFile )
 {
-    bool ret = false;
+    bool bRet = false;
+    gint32 ret = 0;
     do{
         pNode = nullptr;
         CBPlusNode* pCurNode =
@@ -1426,7 +1461,7 @@ bool CDirImage::Search( const char* szKey,
                 szKey, 0, dwCount - 1 );
             if( i >= 0 )
             {
-                ret = true;
+                bRet = true;
                 break;
             }
             i = -i;
@@ -1436,19 +1471,72 @@ bool CDirImage::Search( const char* szKey,
         }
 
         pNode = pCurNode;
-        if( ret )
+        if( bRet )
+        {
+            KEYPTR_SLOT* pks =
+                pNode->GetSlot( 0 );
+            dwInodeIdx = pks->oLeaf.dwInodeIdx;
+            auto& oMap = GetFileMap();
+            auto itr = oMap.find( dwInodeIdx );
+            if( itr != oMap.end )
+                pFile = itr->second;
+            else
+            {
+                pFile.reset( new CFileImage(
+                    m_pAlloc, dwInodeIdx,
+                    this->GetInodeIdx() ) );
+                ret = pFile->Reload();
+                if( ERROR( ret ) )
+                    break;
+                pNode->AddChildDirect(
+                    dwInodeIdx,  pFile );
+            }
             break;
+        }
 
         dwCount = pCurNode->GetKeyCount();
         gint32 i = pCurNode->BinSearch(
             szKey, 0, dwCount - 1 );
         if( i > 0 )
-            ret = true;
+        {
+            KEYPTR_SLOT* pks =
+                pNode->GetSlot( i );
+            dwInodeIdx =
+                pks->oLeaf.dwInodeIdx;
+            bRet = true;
+            auto& oMap = GetFileMap();
+            auto itr = oMap.find( dwInodeIdx );
+            if( itr != oMap.end )
+                pFile = itr->second;
+            else
+            {
+                pFile.reset( new CFileImage(
+                    m_pAlloc, dwInodeIdx,
+                    this->GetInodeIdx() ) );
+                ret = pFile->Reload();
+                if( ERROR( ret ) )
+                    break;
+                pNode->AddChildDirect(
+                    dwInodeIdx,  pFile );
+                
+            }
+        }
 
     }while( 0 );
-    return ret;
+    return bRet;
 }
 
+gint32 CDirImage::ReplaceRootBNode(
+    BNodeUPtr& pNew, BNodeUPtr& pOld )
+{
+    pOld = std::move( m_pRootNode );
+    m_pRootNode = std::move( pNew );
+    m_oInodeStore.m_dwUserData =
+        pNew->GetBNodeIndex();
+    m_pRootNode->SetFreeBNodeIdx(
+        pOld->GetFreeBNodeIdx() );
+    return 0;
+}
 
 gint32 CDirImage::FreeRootBNode(
     BNodeUPtr& pRoot )
