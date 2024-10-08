@@ -29,6 +29,36 @@
 namespace rpcf
 {
 
+CFileImage::CFileImage(
+    const IConfigDb* pCfg )
+{
+    do{
+        SetClassId( clsid( CFileImage ) );
+        CCfgOpener oCfg( pCfg );
+        ObjPtr pObj;
+        oCfg.GetObjPtr( 0, pObj );
+        m_pAlloc = pObj;
+        if( m_pAlloc.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        ret = oCfg.GetIntProp( 1, m_dwInodeIdx );
+        if( ERROR( ret ) )
+            break;
+        oCfg.GetIntProp( 2, m_dwParentInode );
+        if( ERROR( ret ) )
+            break;
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        string strMsg = DebugMsg( ret,
+            "Error in CFileImage ctor" );
+        throw std::runtime_error( strMsg );
+    }
+    return ret;
+}
+
 gint32 CFileImage::Reload()
 {
     gint32 ret = 0;
@@ -1284,6 +1314,35 @@ gint32 CFileImage::WriteValue(
     gint32 ret = 0;
     CReadLock oLock( this->GetLock() );
     m_oValue = oVar;
+    return ret;
+}
+
+gint32 CLinkImage::Reload()
+{
+    gint32 ret = 0;
+    do{
+        ret = super::Reload();
+        BufPtr pBuf( true );
+        guint32 dwSize = this->GetSize();
+        ret = pBuf->Resize( dwSize + 1 );
+        if( ERROR( ret ) )
+            break;
+        ret = ReadFile( 0, dwSize, pBuf );
+        if( ERROR( ret ) )
+            break;
+        auto szLink = ( const char* )pBuf->ptr();
+        szLink[ dwSize ] = 0;
+        m_strLink = szLink;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CLinkImage::Format()
+{
+    gint32 ret = super::Format();
+    if( ERROR( ret ) )
+        return ret;
+    m_oInodeStore.m_dwMode = S_IFLNK;
     return ret;
 }
 
