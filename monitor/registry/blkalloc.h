@@ -27,6 +27,8 @@
 #include <arpa/inet.h>
 #include "rpc.h"
 #include <memory>
+#include <unistd.h>
+#include <limits.h>
 
 // byte offset
 // 0                             64
@@ -156,7 +158,7 @@
 #define BNODE_IDX_TO_POS( _idx_ ) \
     ( _idx_ << ( find_shift( BNODE_SIZE ) - 1  ) )
 
-#define INVALID_BNODE_IDX  ( 0xFFFF )
+#define INVALID_BNODE_IDX  ( USHRT_MAX )
 
 #define MAX_BNODE_NUMBER \
     ( MAX_FILE_SIZE / BNODE_SIZE )
@@ -589,10 +591,10 @@ struct CFileImage :
         oCfg.GetIntProp( 2, m_dwParentInode );
     }
 
-    static gint32 Create( EnumFileType byType
-        FImgSPtr& pFile, AllocPtr& pAlloc,
-        guint32 dwInodeIdx,
-        guint32 dwParentInode, guint32 dwType )
+    static gint32 Create(
+        EnumFileType byType, FImgSPtr& pFile,
+        AllocPtr& pAlloc, guint32 dwInodeIdx,
+        guint32 dwParentInode )
     {
         CParamList oParams;
         oParams.Push( ObjPtr( pAlloc ) );
@@ -760,7 +762,7 @@ struct CBPlusNode :
     guint32 GetParentSlotIdx()
     {
         if( IsRoot() )
-            return 0;
+            return UINT_MAX;
         CBPlusNode* pParent = GetParent();
         guint32 dwCount =
             pParent->GetChildCount();
@@ -772,7 +774,7 @@ struct CBPlusNode :
                 break;
         }
         if( i == dwCount )
-            i = 0xFFFFFFFF;
+            i = UINT_MAX;
         return i;
     }
 
@@ -865,7 +867,7 @@ struct CBPlusNode :
         if( itr == mapFiles.end() )
             return -ENOENT;
         pFile = *itr;
-        itr->reset();
+        itr->Clear();
         return STATUS_SUCCESS;
     }
 
@@ -893,7 +895,7 @@ struct CBPlusNode :
         if( itr != mapFiles.end() )
             return -EEXIST;
         pFile = *itr;
-        itr->reset();
+        itr->Clear();
         return STATUS_SUCCESS;
     }
 
@@ -1205,29 +1207,59 @@ struct CDirImage :
     gint32 CreateDir( const char* szName );
     gint32 CreateLink( const char* szName,
         const char* szLink );
+    gint32 RemoveFile( const char* szName,
+        FImgSPtr& pFile );
 };
 
 class COpenFileEntry;
-using FileSPtr = typename std::shared_ptr< COpenFileEntry >;
+typedef CAutoPtr< clsid( Invalid ), COpenFileEntry > FileSPtr;
 
 struct COpenFileEntry :
-    public ISynchronize
+    public ISynchronize,
+    public CObjBase
 {
     AllocPtr        m_pAlloc;
-    guint32         m_dwInodeIdx = 0;
     stdstr          m_strFileName;
     FImgSPtr        m_pFileImage;
     CAccessContext  m_oUserAc;
 
     std::atomic< guint32 > m_dwRefs;
+    guint32 m_dwPos = 0;
     FileSPtr m_pParentDir;
 
-    COpenFileEntry(
-        AllocPtr& pAlloc, FImgSPtr& pImage ) :
-        m_pAlloc( pAlloc ),
-        m_pFileImage( FImgSPtr )
+    COpenFileEntry( const IConfigDb* pCfg )
     {
-        m_dwInodeIdx = pImage->m_dwInodeIdx;
+        SetClassId( clsid( COpenFileEntry ) );
+        CCfgOpener oCfg( pCfg );
+        ObjPtr pObj;
+        oCfg.GetObjPtr( 0, pObj );
+        m_pAlloc = pObj;
+        oCfg.GetObjPtr( 1, pObj );
+        m_pFileImage = pObj;
+    }
+
+    static gint32 Create(
+        EnumFileType byType, FileSPtr& pOpenFile,
+        FImgSPtr& pFile, AllocPtr& pAlloc )
+    {
+        CParamList oParams;
+        oParams.Push( ObjPtr( pAlloc ) );
+        oParams.Push( ObjPtr( pFile ) );
+        EnumClsid iClsid = clsid( Invalid );
+        if( byType == ftRegular )
+            iClsid = clsid( COpenFileEntry );
+        else if( bType == ftDirectory )
+            iClsid = clsid( CDirFileEntry );
+        else if( bType == ftLink )
+            iClsid = clsid( CLinkFileEntry );
+        else
+        {
+            DebugPrint( ret, "Error not a valid "
+                "type of file to create" );
+        }
+        ret = pFile.NewObj( iClsid,
+            oParams.GetCfg() );
+        return ret;
     }
 
     inline guint32 AddRef()
@@ -1246,8 +1278,8 @@ struct COpenFileEntry :
         }
     }
 
-    inline gint32 ReadFile( guint32 dwOff,
-        guint32& size, guint8* pBuf )
+    inline gint32 ReadFile( guint32& size,
+        guint8* pBuf, guint32 dwOff = UINT_MAX )
     {
         return m_pFileImage->ReadFile(
             dwOff, size, pBuf );
@@ -1262,7 +1294,7 @@ struct COpenFileEntry :
     inline gint32 ReadValue( Variant& oVar )
     { return m_pFileImage->ReadValue( oVar ); }
 
-    inline gint32 WriteValue( const Variant& oVar );
+    inline gint32 WriteValue( const Variant& oVar )
     { return m_pFileImage->WriteValue( oVar ); }
 
     gint32 Flush() override
@@ -1274,7 +1306,7 @@ struct COpenFileEntry :
     gint32 Reload() override
     { return 0; }
 
-    inline gint32 Truncate( guint32 dwOff )
+    virtual gint32 Truncate( guint32 dwOff )
     { return m_pFileImage->Truncate( dwOff ); }
 
     inline gint32 Open( FileSPtr& pParent,
@@ -1295,8 +1327,8 @@ struct COpenFileEntry :
 
 struct CAccessContext
 {
-    guint16 dwUid = 0xffff;
-    guint16 dwGid = 0xffff;
+    guint16 dwUid = USHRT_MAX;
+    guint16 dwGid = USHRT_MAX;
 };
 
 struct CDirFileEntry :
@@ -1304,10 +1336,9 @@ struct CDirFileEntry :
 {
     typedef COpenFileEntry super;
     
-    CDirFileEntry(
-        AllocPtr& pAlloc, FImgSPtr& pImage ) :
-        super( pAlloc, pImage )
-    {}
+    CDirFileEntry( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CDirFileEntry ); }
 
     inline bool IsRootDir() const
     { return m_pFileImage->IsRootDir(); }
@@ -1335,7 +1366,18 @@ struct CDirFileEntry :
     gint32 Flush() override;
     gint32 Format() override;
     gint32 Reload() override;
+};
 
+struct CLinkFileEntry:
+    public COpenFileEntry
+{
+    typedef COpenFileEntry super;
+    CLinkFileEntry( const IConfigDb* pCfg ) :
+        super( pCfg )
+    { SetClassId( clsid( CLinkFileEntry ); }
+
+    gint32 Truncate( guint32 dwOff ) override
+    { return -ENOTSUP; }
 };
 
 class CRegistryFs :
@@ -1376,6 +1418,18 @@ class CRegistryFs :
     gint32  RemoveFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
+    gint32 ReadFile( HANDLE hFile,
+        char* buffer, guint32 dwSize );
+
+    gint32 WriteFile( HANDLE hFile,
+        const char* buffer, guint32 dwSize );
+
+    gint32 Truncate(
+        HANDLE hFile, guint32 dwOff );
+
+    gint32 Seek( HANDLE hFile,
+        guint32 dwOff, guint32 whence );
+
     gint32  RemoveDir( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
@@ -1400,6 +1454,6 @@ class CRegistryFs :
     gint32 Reload() override;
 };
 
-using RegFsPtr = typename CCAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
+using RegFsPtr = typename CAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
 
 }

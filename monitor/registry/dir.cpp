@@ -35,6 +35,9 @@
 ( ( (_leaf_) ? ( MAX_PTRS_PER_NODE/2 ) : \
     ( ( MAX_PTRS_PER_NODE + 1 ) / 2 - 1 ) ) - 1 )
 
+#define COMPARE_KEY( _key1_, _key2_ ) \
+    ( strncmp( (_key1_), (_key2_), REGFS_NAME_LENGTH - 1 ) )
+
 #define COPY_KEY( _dst_, _src_ ) \
 do{ strncpy( (_dst_), (_src_), REGFS_PAGE_SIZE - 1 ); \
     (_dst_)[ REGFS_PAGE_SIZE - 1 ] = 0; \
@@ -42,6 +45,7 @@ do{ strncpy( (_dst_), (_src_), REGFS_PAGE_SIZE - 1 ); \
 
 #define CLEAR_KEY( _key_ ) \
 ( (_key_)[ 0 ] = 0, (_key_)[ REGFS_NAME_LENGTH - 1 ] = 0 )
+
 namespace rpcf
 {
 RegFSBNode::RegFSBNode()
@@ -496,12 +500,14 @@ gint32 CBPlusNode::Split(
         {
             ret = ERROR_FAIL;
             DebugPrint( ret, "Error, we "
-                "should not split a root leaf" );
+                "should not split a root leaf "
+                "in Split" );
             break;
         }
 
         if( IsRoot() )
         {
+            // non-leaf root, replace it with a new root.
             BNodeUPtr pNewRoot;
             ret = GetFreeBNode( false, pNewRoot );
             if( ERROR( ret ) )
@@ -535,7 +541,7 @@ gint32 CBPlusNode::Split(
                     pParent->GetBNodeIndex();
                 guint32 i =
                     pParent->GetParentSlotIdx();
-                if( i == ( guint32 )-1 )
+                if( i == UINT_MAX )
                 {
                     ret = -ENOENT;
                     break;
@@ -705,9 +711,8 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
             KEYPTR_SLOT* pKey =
                 pNewRoot->GetSlot( 0 );
 
-            gint32 iRet = strncmp(
-                pSlot->szKey, pKey->szKey,
-                REGFS_NAME_LENGTH - 1 );
+            gint32 iRet = COMPARE_KEY(
+                pSlot->szKey, pKey->szKey )
             if( iRet < 0 )
             {
                 ret = this->InsertNonFull(
@@ -745,7 +750,7 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
 
             // for( i = 0; i < dwCount; i++ )
             i = GetParentSlotIdx();
-            if( i == ( guint32 )-1 )
+            if( i == UINT_MAX )
             {
                 ret = -ENOENT;
                 break;
@@ -754,9 +759,8 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
                 pParent->GetChild( i + 1 );
             KEYPTR_SLOT* pChildKs =
                 pParent->GetSlot( i );
-            gint32 iRet = strncmp( pSlot->szKey,
-                pChildKs->szKey,
-                REGFS_NAME_LENGTH - 1 );
+            gint32 iRet = COMPARE_KEY(
+                pSlot->szKey, pChildKs->szKey )
             if( iRet == 0 )
             {
                 ret = -EEXIST;
@@ -1235,9 +1239,8 @@ gint32 CBPlusNode::BinSearch(
     do{
         if( iUpper == iLower )
         {
-            gint32 iRet = strncmp( szKey,
-                this->GetKey( iLower ),
-                REGFS_NAME_LENGTH - 1 );
+            gint32 iRet = COMPARE_KEY( szKey,
+                this->GetKey( iLower ) );
             if( iRet < 0 )
             {
                 ret = -( iLower + 0x10000 );
@@ -1248,14 +1251,13 @@ gint32 CBPlusNode::BinSearch(
                 ret = -( iLower + 1 );
                 break;
             }
-            ret = iLower;
+            ret = iLower + 1;
             break;
         }
         else if( iUpper == iLower + 1 )
         {
-            gint32 iRet = strncmp( szKey,
-                this->GetKey( iLower ),
-                REGFS_NAME_LENGTH - 1 );
+            gint32 iRet = COMPARE_KEY( szKey,
+                this->GetKey( iLower ) );
             if( iRet < 0 )
             {
                 ret = -( iLower + 0x10000 );
@@ -1263,12 +1265,11 @@ gint32 CBPlusNode::BinSearch(
             }
             if( iRet == 0 )
             {
-                ret = iLower;
+                ret = iLower + 1;
                 break;
             }
-            iRet = strncmp( szKey,
-                this->GetKey( iUpper ),
-                REGFS_NAME_LENGTH - 1 );
+            iRet = COMPARE_KEY( szKey,
+                this->GetKey( iUpper ) )
             if( iRet < 0 )
             {
                 ret = -( iUpper + 10000 );
@@ -1276,7 +1277,7 @@ gint32 CBPlusNode::BinSearch(
             }
             else if( iRet == 0 )
             {
-                ret = iUpper;
+                ret = iUpper + 1;
                 break;
             }
             else
@@ -1287,9 +1288,8 @@ gint32 CBPlusNode::BinSearch(
         }
         gint32 iCur =
             ( iLower + iUpper ) >> 1;
-        iRet = strncmp( szKey,
-            this->GetKey( iLower ),
-            REGFS_NAME_LENGTH - 1 );
+        iRet = COMPARE_KEY( szKey,
+            this->GetKey( iLower ) );
         if( iRet == 0 )
         {
             ret = iLower;
@@ -1452,25 +1452,16 @@ gint32 CBPlusNode::Rebalance()
             }
             BNodeUPtr pNewRoot =
                 this->RemoveChild( 0, pNewRoot );
-
             m_pDir->ReplaceRootBNode(
                 pNewRoot, pOld );
-
             ret = m_pDir->PutFreeBNode( pOld );
             break;
         }
 
-        guint32 i = 0;
+        guint32 i = GetParentSlotIdx();
         guint32 dwCount =
             pParent->GetChildCount();
-        for( ; i < dwCount; i++ )
-        {
-            CBPlusNode* pNode =
-                pParent->GetChild( i );
-            if( pNode == this )
-                break;
-        }
-        if( i == dwCount )
+        if( i == UINT_MAX )
         {
             ret = -ENOENT;
             DebugPrint( ret, "Error "
@@ -1552,13 +1543,28 @@ gint32 CBPlusNode::RemoveFile(
         {
             if( IsLeaf() )
             {
+                KEYPTR_SLOT oKey;
                 ret = this->RemoveSlotAt(
-                    idx, pFile );
+                    idx, oKey );
                 if( ERROR( ret ) )
                     break;
 
+                guint32& dwIondeIdx =
+                    oKey.oLeaf.dwInodeIdx;
+                ret = this->RemoveFileDirect(
+                    dwInodeIdx, pFile );
+                if( ERROR( ret ) )
+                {
+                    // create one for deletion
+                    CFileImage::Create(
+                        pFile, m_pAlloc, dwInodeIdx,
+                        this->GetInodeIdx() );
+                    ret = pFile->Reload();
+                    if( ERROR( ret ) )
+                        break;
+                }
                 if( GetKeyCount() >= 
-                    MIN_KEYS( IsRoot ) )
+                    MIN_KEYS( IsRoot() ) )
                     break;
                 Rebalance();
                 break;
@@ -1569,7 +1575,6 @@ gint32 CBPlusNode::RemoveFile(
                 this->GetChild( idx + 1 );
 
             guint32 dwLimit = MIN_KEYS( false );
-
             auto p = pChildSuc->GetSuccKey(1);
 
             // replace with the key of its successor
@@ -1606,11 +1611,9 @@ bool CDirImage::Search( const char* szKey,
     bool bRet = false;
     gint32 ret = 0;
     do{
-        pNode = nullptr;
-        CBPlusNode* pCurNode =
-            m_pRootNode->get(); 
-
         guint32 dwCount = 0;
+        pNode = nullptr;
+        CBPlusNode* pCurNode = m_pRootNode->get(); 
         while( !pCurNode->IsLeaf() )
         {
             dwCount = pCurNode->GetKeyCount();
@@ -1631,6 +1634,7 @@ bool CDirImage::Search( const char* szKey,
         pNode = pCurNode;
         if( bRet )
         {
+            // found in non-leaf node
             KEYPTR_SLOT* pks =
                 pNode->GetSlot( 0 );
             dwInodeIdx = pks->oLeaf.dwInodeIdx;
@@ -1640,11 +1644,14 @@ bool CDirImage::Search( const char* szKey,
                 pFile = itr->second;
             else
             {
+                // load the file if not yet
                 EnumFileType byType =
                     pks->oLeaf.byFileType;
                 ret = CFileImage::Create( byType,
                     pFile, m_pAlloc, dwInodeIdx,
                     this->GetInodeIdx() );
+                if( ERROR( ret ) )
+                    break;
                 ret = pFile->Reload();
                 if( ERROR( ret ) )
                     break;
@@ -1654,6 +1661,7 @@ bool CDirImage::Search( const char* szKey,
             break;
         }
 
+        // search through the leaf node
         dwCount = pCurNode->GetKeyCount();
         gint32 i = pCurNode->BinSearch(
             szKey, 0, dwCount - 1 );
@@ -1672,9 +1680,11 @@ bool CDirImage::Search( const char* szKey,
             {
                 EnumFileType byType =
                     pks->oLeaf.byFileType;
-                CFileImage::Create( byType,
+                ret = CFileImage::Create( byType,
                     pFile, m_pAlloc, dwInodeIdx,
                     this->GetInodeIdx() );
+                if( ERROR( ret ) )
+                    break;
                 ret = pFile->Reload();
                 if( ERROR( ret ) )
                     break;
@@ -1684,6 +1694,10 @@ bool CDirImage::Search( const char* szKey,
         }
 
     }while( 0 );
+
+    if( ERROR( ret ) )
+        DebugPrint( ret,
+            "Error occurs during Search" );
     return bRet;
 }
 
@@ -1766,8 +1780,7 @@ gint32 CDirImage::GetFreeBNode(
 }
 
 gint32 CDirImage::CreateFile(   
-    const char* szName,
-    EnumFileType iType )
+    const char* szName, EnumFileType iType )
 {
     gint32 ret = 0;
     do{
@@ -1809,21 +1822,15 @@ gint32 CDirImage::CreateFile(
     return ret;
 }
 
-gint32 CDirImage::CreateDir(
-    const char* szName )
-{
-    return CreateFile(
-        szName, ftDirectory );
-}
+gint32 CDirImage::CreateDir( const char* szName )
+{ return CreateFile( szName, ftDirectory ); }
 
 gint32 CDirImage::CreateLink(
-    const char* szName,
-    const char* szLink )
+    const char* szName, const char* szLink )
 {
     gint32 ret = 0;
     do{
-        ret = CreateFile(
-            szName, ftLink );
+        ret = CreateFile( szName, ftLink );
         if( ERROR( ret ) )
             break;
 
@@ -1834,10 +1841,29 @@ gint32 CDirImage::CreateLink(
             ret = -EFAULT;
             break;
         }
-        gint32 dwSize =
-            strlen( szLink );
+        gint32 dwSize = strlen( szLink );
         ret = pImg->WriteFile(
             0, dwSize, szLink );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CDirImage::RemoveFile(
+    const char* szKey, FImgSPtr& pFile )
+{
+    gint32 ret = 0;
+    do{
+        ret = m_pRootNode->RemoveFile(
+            szKey, pFile );
+        if( ERROR( ret ) )
+            break;
+        ret = pFile->Truncate( 0 );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwInodeIdx =
+            pFile->GetInodeIdx();
+        ret = m_pAlloc->FreeBlocks(
+            &dwInodeIdx, 1 );
     }while( 0 );
     return ret;
 }

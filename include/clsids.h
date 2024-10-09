@@ -354,6 +354,11 @@ typedef enum : guint32
     DECL_CLSID( CDBusProxyPdoLpbk2 ),
     DECL_CLSID( CBlockAllocator ),
     DECL_CLSID( CRegistryFs ),
+    DECL_CLSID( CFileImage ),
+    DECL_CLSID( CDirImage ),
+    DECL_CLSID( CLinkImage ),
+    DECL_CLSID( COpenFileEntry ),
+    DECL_CLSID( CDirFileEntry ),
     DECL_CLSID( MaxClsid ),
 
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,
