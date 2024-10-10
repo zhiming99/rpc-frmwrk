@@ -141,8 +141,8 @@ gint32 CRegistryFs::Namei(
     return ret;
 }
 
-gint32 CRegistryFs::GetDirectory(
-    const stdstr& strPath, FileSPtr& pDir )
+gint32 CRegistryFs::GetParentDir(
+    const stdstr& strPath, FImgSPtr& pDir )
 {
     gint32 ret = 0;
     do{
@@ -159,12 +159,27 @@ gint32 CRegistryFs::GetDirectory(
             break;
         }
         gint32 idx = 1;
-        for( ; idx < vecNames.size(); idx++ )
+        CDirImage* pCurDir = m_pRootImg;
+        for( ; idx < vecNames.size() - 1; idx++ )
         {
             stdstr& strCurDir = vecNames[ idx ];
-            m_pRootDir
-
+            FImgSPtr pFile;
+            CBPlusNode* pNode;
+            ret = pCurDir->Search(
+                strCurDir.c_str(), pFile, pNode );
+            if( ERROR( ret ) )
+                break
+            pCurDir = pFile;
+            if( pCurDir == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
         }
+
+        if( ERROR( ret ) )
+            break;
+        pDir = pCurDir;
     }while( 0 );
     return ret;
 }
@@ -175,9 +190,140 @@ gint32 CRegistryFs::CreateFile(
 {
     gint32 ret = 0;
     do{
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+        CDirImage* pDir = dirPtr;
+        FImgSPtr pFile;
+        ret = pDir->CreateFile(
+            strPath.c_str(), pFile );
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error create file '%s'",
+            strPath.c_str() ); 
+    }
+    return ret;
+}
+
+RFHANDLE CRegistryFs::OpenFile(
+    const stdstr& strPath,
+    CAccessContext* pac = nullptr )
+{
+    gint32 ret = 0;
+    guint64 hFile = INVALID_HANDLE;
+    do{
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+
+        CDirImage* pDir = dirPtr;
+        FImgSPtr pFile;
+        CBPlusNode* pNode = nullptr;
+        ret = pDir->Search(
+            strPath.c_str(), pFile, pNode );
+        if( ERROR( ret ) )
+            break;
+
+        FileSPtr pOpenFile;
+        ret = COpenFileEntry::Create( 
+            ftRegular, pOpenFile,
+            pFile, m_pAlloc );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pOpenFile->Open( nullptr, pac );
+
+        CStdRMutex oLock( this->GetLock() )
+        hFile = pOpenFile->GetObjId();
+        m_mapOpenFiles[ hFile ] = pOpenFile;
+        
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error create file '%s'",
+            strPath.c_str() ); 
+    }
+    return hFile;
+}
+
+gint32 CRegistryFs::CloseFile(
+    RFHANDLE hFile )
+{
+    if( hFile == INVALID_HANDLE )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() )
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr = m_mapOpenFiles.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        FileSPtr pFile = itr->second;
+        m_mapOpenFiles.erase( itr );
+        oLock.Unlock();
+
+        pFile->Close();
 
     }while( 0 );
     return ret;
+}
+
+gint32 CRegistryFs::RemoveFile(
+    const stdstr& strPath )
+{
+    gint32 ret = 0;
+    guint64 hFile = INVALID_HANDLE;
+    do{
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+
+        CDirImage* pDir = dirPtr;
+        FImgSPtr pFile;
+        CBPlusNode* pNode = nullptr;
+        ret = pDir->Search(
+            strPath.c_str(), pFile, pNode );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strFile =
+            basename( strPath.c_str() );
+
+        ret = pDir->RemoveFile( strPath.c_str() );
+        
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error create file '%s'",
+            strPath.c_str() ); 
+    }
+    return hFile;
+}
+
+gint32 CRegistryFs::ReadFile( RFHANDLE hFile,
+    char* buffer, guint32 dwSize )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( GetLock() );
+        FileSPtr pFile;
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr == m_mapOpenFiles.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pFile = itr->second;
+        oLock->Unlock();
+        ret = pFile->ReadFile( buffer, dwSize );
+    }while( 0 );
+    return 0;
 }
 
 }

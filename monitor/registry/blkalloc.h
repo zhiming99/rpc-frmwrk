@@ -173,6 +173,17 @@
     pback##_array_->Resize( _count_ * sizeof( _type_ ) ); \
     auto _array_ = ( _type_* )pback##_array_->ptr(); \
 
+#define READLOCK \
+    CReadLock( this->GetLock() ); \
+    if( this->GetState() == stateStopped ) \
+    { ret = ERROR_STATE; break; }
+
+#define WRITELOCK \
+    CWriteLock( this->GetLock() ); \
+    if( this->GetState() == stateStopped ) \
+    { ret = ERROR_STATE; break; }
+
+#define RFHANDLE    guint64
 namespace rpcf{
 
 struct ISynchronize
@@ -558,14 +569,46 @@ struct CFileImage :
     BufPtr m_pBitdBlk;
     // catch of the secondary block index tables
     std::hashmap< guint32, BufPtr > m_mapSecBitBlks;
+    guint32 m_dwOpenCount = 0;
     
 
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
+    EnumIfState m_dwState = stateStarted;
 
     mutable CSharedLock m_oLock;
     inline CSharedLock& GetLock() const
     { return m_oLock; }
+
+    inline void SetState( guint32 dwState )
+    {
+        CStdRMutex oLock( GetExclLock() );
+        m_dwState = dwState;
+    }
+
+    inline guint32 GetState() const
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return m_dwState;
+    }
+
+    inline guint32 IncOpenCount()
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return ++m_dwOpenCount;
+    }
+
+    inline guint32 DecOpenCount()
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return --m_dwOpenCount;
+    }
+
+    inline guint32 GetOpenCount()
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return m_dwOpenCount;
+    }
 
     // this lock is used under readlock
     mutable stdrmutex m_oExclLock;
@@ -654,7 +697,7 @@ struct CFileImage :
     { return m_dwInodeIdx == ROOT_INODE_BLKIDX; }
 };
 
-using FImgSPtr  = typename CAutoPtr< clsid( Invalid ), CFileImage >;
+typedef CAutoPtr< clsid( Invalid ), CFileImage > FImgSPtr;
 typedef enum : guint8
 {
     ftRegular = 1,
@@ -1203,12 +1246,19 @@ struct CDirImage :
     void SetHeadFreeBNode()
     { return m_pRootNode->SetFreeBNodeIdx(); }
 
-    gint32 CreateFile( const char* szName );
-    gint32 CreateDir( const char* szName );
+    gint32 CreateFile( const char* szName,
+        EnumFileType iType, FImgSPtr& pImg );
+
+    gint32 CreateFile( const char* szName,
+        FImgSPtr& pImg );
+
+    gint32 CreateDir( const char* szName,
+        FImgSPtr& pImg );
+
     gint32 CreateLink( const char* szName,
-        const char* szLink );
-    gint32 RemoveFile( const char* szName,
-        FImgSPtr& pFile );
+        const char* szLink, FImgSPtr& pImg );
+
+    gint32 RemoveFile( const char* szName );
 };
 
 class COpenFileEntry;
@@ -1225,7 +1275,10 @@ struct COpenFileEntry :
 
     std::atomic< guint32 > m_dwRefs;
     guint32 m_dwPos = 0;
-    FileSPtr m_pParentDir;
+    mutable stdrmutex m_oLock;
+
+    inline stdrmutex& GetLock() const
+    { return m_oLock; }
 
     COpenFileEntry( const IConfigDb* pCfg )
     {
@@ -1262,22 +1315,6 @@ struct COpenFileEntry :
         return ret;
     }
 
-    inline guint32 AddRef()
-    { return ++m_dwRefs; }
-    inline guint32 DecRef()
-    { return --m_dwRefs; }
-    inline guint32 GetRef() const;
-    { return m_dwRefs; }
-
-    void SetParent( FileSPtr& pParent )
-    {
-        if( pParent )
-        {
-            m_pParentDir = pParent;
-            m_pParentDir->AddRef();
-        }
-    }
-
     inline gint32 ReadFile( guint32& size,
         guint8* pBuf, guint32 dwOff = UINT_MAX )
     {
@@ -1285,8 +1322,8 @@ struct COpenFileEntry :
             dwOff, size, pBuf );
     }
 
-    inline gint32 WriteFile( guint32 dwOff,
-        guint32 size, guint8* pBuf )
+    inline gint32 WriteFile( guint32 size,
+        guint8* pBuf, dwOff = UINT_MAX )
     {
         return m_pFileImage->WriteFile(
             dwOff, size, pBuf );
@@ -1312,16 +1349,20 @@ struct COpenFileEntry :
     inline gint32 Open( FileSPtr& pParent,
         CAccessContext* pac )
     {
+        m_pFileImage->IncOpenCount();
+        CStdRMutex oLock( GetLock() );
         SetParent( pParent );
         if( pac )
             m_oUserAc = *pac;
         return 0;
     }
 
-    inline gint32 Close()
+    gint32 Flush();
+    gint32 Close();
     {
-        m_pParentDir->DecRef(); 
-        return this->Flush();
+        gint32 ret = Flush();
+        m_pFileImage->DecOpenCount();
+        return ret;
     }
 };
 
@@ -1348,7 +1389,7 @@ struct CDirFileEntry :
 
     gint32 CreateSubDir( const stdstr& strName );
 
-    HANDLE OpenChild(
+    RFHANDLE OpenChild(
         const stdstr& strName,
         FileSPtr& pParent,
         FImgSPtr& pFile,
@@ -1387,7 +1428,8 @@ class CRegistryFs :
     AllocPtr    m_pAlloc;
     FileSPtr    m_pRootDir;    
     FImgSPtr    m_pRootImg;
-    std::hashmap< HANDLE, FileSPtr > m_mapOpenFiles;
+    std::hashmap< guint64, FileSPtr > m_mapOpenFiles;
+    mutable stdrmutex   m_oLock;
 
     gint32 CreateRootDir();
     gint32 OpenRootDir();
@@ -1396,6 +1438,9 @@ class CRegistryFs :
     CRegistryFs( const IConfigDb* pCfg );
     gint32 Start() override;
     gint32 Stop() override;
+
+    inline stdrmutex& GetLock() const
+    { return m_oLock; }
 
     static gint32 Namei(
         const string& strPath,
@@ -1407,10 +1452,10 @@ class CRegistryFs :
     gint32 MakeDir( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    HANDLE OpenFile( const stdstr& strPath,
+    RFHANDLE OpenFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32  CloseFile( HANDLE hFile );
+    gint32  CloseFile( RFHANDLE hFile );
 
     gint32  FindFile( const stdstr& strPath,
         CAccessContext* pac = nullptr ) const;
@@ -1418,25 +1463,27 @@ class CRegistryFs :
     gint32  RemoveFile( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32 ReadFile( HANDLE hFile,
+    gint32 ReadFile( RFHANDLE hFile,
         char* buffer, guint32 dwSize );
 
-    gint32 WriteFile( HANDLE hFile,
+    gint32 WriteFile( RFHANDLE hFile,
         const char* buffer, guint32 dwSize );
 
     gint32 Truncate(
-        HANDLE hFile, guint32 dwOff );
+        RFHANDLE hFile, guint32 dwOff );
 
-    gint32 Seek( HANDLE hFile,
+    gint32 Seek( RFHANDLE hFile,
         guint32 dwOff, guint32 whence );
 
     gint32  RemoveDir( const stdstr& strPath,
         CAccessContext* pac = nullptr );
 
-    gint32  SetGid( guint16 wGid,
+    gint32  SetGid(
+        const stdstr& strPath, guint16 wGid,
         CAccessContext* pac = nullptr );
 
-    gint32  SetUid( guint16 wUid,
+    gint32  SetUid(
+        const stdstr& strPath, guint16 wUid,
         CAccessContext* pac = nullptr );
 
     gint32  SymLink( const stdstr& strSrcPath,
@@ -1444,10 +1491,10 @@ class CRegistryFs :
         CAccessContext* pac = nullptr );
 
     gint32 GetValue(
-        HANDLE hFile, Variant& oVar );
+        RFHANDLE hFile, Variant& oVar );
 
     gint32 SetValue(
-        HANDLE hFile, Variant& oVar );
+        RFHANDLE hFile, Variant& oVar );
 
     gint32 Flush() override;
     gint32 Format() override;

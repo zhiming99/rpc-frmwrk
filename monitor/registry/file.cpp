@@ -1310,7 +1310,7 @@ gint32 CFileImage::WriteValue(
     const Variant& oVar )
 {
     gint32 ret = 0;
-    CReadLock oLock( this->GetLock() );
+    CWriteLock oLock( this->GetLock() );
     m_oValue = oVar;
     return ret;
 }
@@ -1344,5 +1344,44 @@ gint32 CLinkImage::Format()
     return ret;
 }
 
+gint32 COpenFileEntry::Flush()
+{
+    CWriteLock oLock(
+        m_pFileImage->GetLock() );
+    if( m_pFileImage->GetState() == stateStopped )
+        return ERROR_STATE;
+    return m_pFileImage->Flush();
 }
 
+gint32 COpenFileEntry::ReadFile(
+    guint32& dwSize, guint8* pBuf,
+    guint32 dwOff )
+{
+    CStdRMutex oLock( GetLock() );
+    if( dwOff == UINT_MAX )
+        dwOff = m_dwPos;
+    gint32 ret = m_pFileImage->ReadFile(
+        dwOff, dwSize, pBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_dwPos += dwSize;
+    return STATUS_SUCCESS;
+}
+
+gint32 COpenFileEntry::WriteFile(
+    guint32 dwSize, guint8* pBuf, dwOff  )
+{
+    CStdRMutex oLock( GetLock() );
+    if( dwOff == UINT_MAX )
+        dwOff = m_dwPos;
+    gint32 ret = m_pFileImage->WriteFile(
+        dwOff, dwSize, pBuf );
+    if( ERROR( ret ) )
+        return ret;
+
+    m_dwPos += dwSize;
+    return STATUS_SUCCESS;
+}
+
+}

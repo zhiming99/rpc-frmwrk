@@ -1543,14 +1543,13 @@ gint32 CBPlusNode::RemoveFile(
         {
             if( IsLeaf() )
             {
-                KEYPTR_SLOT oKey;
-                ret = this->RemoveSlotAt(
-                    idx, oKey );
+                KEYPTR_SLOT* pKey = GetSlot( idx );
                 if( ERROR( ret ) )
                     break;
 
                 guint32& dwIondeIdx =
-                    oKey.oLeaf.dwInodeIdx;
+                    pSlot->oLeaf.dwInodeIdx;
+
                 ret = this->RemoveFileDirect(
                     dwInodeIdx, pFile );
                 if( ERROR( ret ) )
@@ -1563,6 +1562,30 @@ gint32 CBPlusNode::RemoveFile(
                     if( ERROR( ret ) )
                         break;
                 }
+                else
+                {
+                    if( pFile->GetOpenCount() )
+                    {
+                        DebugPrint( ret, "Error, "
+                            "the file is still "
+                            "being used" );
+                        ret = -EBUSY;
+                        break;
+                    }
+                    else if( pFile->GetState() ==
+                        stateStopped )
+                    {
+                        ret = -ENOENT;
+                        DebugPrint( ret, "Error, "
+                            "the file is being "
+                            "removed" );
+                        break;
+                    }
+                }
+
+                KEYPTR_SLOT oKey;
+                this->RemoveSlotAt( idx, oKey );
+
                 if( GetKeyCount() >= 
                     MIN_KEYS( IsRoot() ) )
                     break;
@@ -1611,6 +1634,7 @@ bool CDirImage::Search( const char* szKey,
     bool bRet = false;
     gint32 ret = 0;
     do{
+        READLOCK;
         guint32 dwCount = 0;
         pNode = nullptr;
         CBPlusNode* pCurNode = m_pRootNode->get(); 
@@ -1634,6 +1658,7 @@ bool CDirImage::Search( const char* szKey,
         pNode = pCurNode;
         if( bRet )
         {
+            CStdRMutex oExclLock( GetExclLock() );
             // found in non-leaf node
             KEYPTR_SLOT* pks =
                 pNode->GetSlot( 0 );
@@ -1667,6 +1692,7 @@ bool CDirImage::Search( const char* szKey,
             szKey, 0, dwCount - 1 );
         if( i >= 0 )
         {
+            CStdRMutex oExclLock( GetExclLock() );
             KEYPTR_SLOT* pks =
                 pNode->GetSlot( i );
             dwInodeIdx =
@@ -1779,12 +1805,12 @@ gint32 CDirImage::GetFreeBNode(
     return ret;
 }
 
-gint32 CDirImage::CreateFile(   
-    const char* szName, EnumFileType iType )
+gint32 CDirImage::CreateFile( const char* szName,
+    EnumFileType iType, FImgSPtr& pImg )
 {
     gint32 ret = 0;
     do{
-        FImgSPtr pImg;
+        WRITELOCK;
         CBPlusNode* pNode = nullptr;
         bool bRet = this->Search(
             szName, pImg, pNode );
@@ -1822,15 +1848,22 @@ gint32 CDirImage::CreateFile(
     return ret;
 }
 
-gint32 CDirImage::CreateDir( const char* szName )
-{ return CreateFile( szName, ftDirectory ); }
+gint32 CDirImage::CreateFile(
+    const char* szName, FImgSPtr& pImg )
+{ return CreateFile( szName, ftRegular, pImg ); }
 
-gint32 CDirImage::CreateLink(
-    const char* szName, const char* szLink )
+gint32 CDirImage::CreateDir(
+    const char* szName, FImgSPtr& pImg )
+{ return CreateFile( szName, ftDirectory, pImg ); }
+
+gint32 CDirImage::CreateLink( const char* szName,
+    const char* szLink, FImgSPtr& pImg )
 {
     gint32 ret = 0;
     do{
-        ret = CreateFile( szName, ftLink );
+        ret = CreateFile(
+            szName, ftLink, pImg );
+
         if( ERROR( ret ) )
             break;
 
@@ -1849,10 +1882,11 @@ gint32 CDirImage::CreateLink(
 }
 
 gint32 CDirImage::RemoveFile(
-    const char* szKey, FImgSPtr& pFile )
+    const char* szKey )
 {
     gint32 ret = 0;
     do{
+        WRITELOCK;
         ret = m_pRootNode->RemoveFile(
             szKey, pFile );
         if( ERROR( ret ) )
@@ -1864,6 +1898,7 @@ gint32 CDirImage::RemoveFile(
             pFile->GetInodeIdx();
         ret = m_pAlloc->FreeBlocks(
             &dwInodeIdx, 1 );
+        pFile->SetState( stateStopped );
     }while( 0 );
     return ret;
 }
