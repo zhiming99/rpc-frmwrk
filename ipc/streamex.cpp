@@ -1763,7 +1763,7 @@ gint32 CIfStmReadWriteTask::OnStmRecv(
         }
 
         if( m_bDiscard )
-            break;;
+            break;
 
         if( m_queRequests.empty() )
         {

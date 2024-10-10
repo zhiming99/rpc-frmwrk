@@ -80,8 +80,8 @@ function mkDirTest()
 
     > $dumpfile
     mkdir mp mpsvr || true
-    hostsvr -m mpsvr >> $dumpfile &
-    hostcli -m mp >> $dumpfile &
+    hostsvr -gm mpsvr >> $dumpfile &
+    hostcli -gm mp >> $dumpfile &
     sleep 5 
 
     echo loading TestTypes library to server and proxy...
@@ -239,10 +239,10 @@ function pytest()
         svcpt=`grep '^service' $ridlfile | awk '{print $2}'`
         echo svcpt is $svcpt
         pushd ./fs
-        echo release/${appname}svr -d -m ./mpsvr
+        echo release/${appname}svr -gd -m ./mpsvr
         release/${appname}svr -m ./mpsvr >> $dumpfile &
         sleep 2
-        echo release/${appname}cli -m ./mp >> $dumpfile &
+        echo release/${appname}cli -gm ./mp >> $dumpfile &
         release/${appname}cli -d -m ./mp
         popd
         sleep 5
