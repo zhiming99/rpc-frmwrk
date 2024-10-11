@@ -1634,7 +1634,7 @@ bool CDirImage::Search( const char* szKey,
     bool bRet = false;
     gint32 ret = 0;
     do{
-        READLOCK;
+        READ_LOCK( this );
         guint32 dwCount = 0;
         pNode = nullptr;
         CBPlusNode* pCurNode = m_pRootNode->get(); 
@@ -1718,7 +1718,6 @@ bool CDirImage::Search( const char* szKey,
                     dwInodeIdx,  pFile );
             }
         }
-
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1810,7 +1809,7 @@ gint32 CDirImage::CreateFile( const char* szName,
 {
     gint32 ret = 0;
     do{
-        WRITELOCK;
+        WRITE_LOCK( this );
         CBPlusNode* pNode = nullptr;
         bool bRet = this->Search(
             szName, pImg, pNode );
@@ -1852,9 +1851,16 @@ gint32 CDirImage::CreateFile(
     const char* szName, FImgSPtr& pImg )
 { return CreateFile( szName, ftRegular, pImg ); }
 
-gint32 CDirImage::CreateDir(
-    const char* szName, FImgSPtr& pImg )
-{ return CreateFile( szName, ftDirectory, pImg ); }
+gint32 CDirImage::CreateDir( const char* szName,
+    mode_t dwMode, FImgSPtr& pImg )
+{
+    gint32 ret = 0;
+    do{
+        CreateFile( szName, ftDirectory, pImg );
+        SetMode( dwMode );
+    }while( 0 );
+    return ret;
+}
 
 gint32 CDirImage::CreateLink( const char* szName,
     const char* szLink, FImgSPtr& pImg )
@@ -1886,7 +1892,7 @@ gint32 CDirImage::RemoveFile(
 {
     gint32 ret = 0;
     do{
-        WRITELOCK;
+        WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szKey, pFile );
         if( ERROR( ret ) )

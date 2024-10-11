@@ -70,8 +70,7 @@ gint32 CFileImage::Reload()
         RegFSInode* pInode = arrBytes; 
 
         // file size in bytes
-        m_oInodeStore.m_dwSize =
-            ntohl( pInode->m_dwSize );
+        SetSize( ntohl( pInode->m_dwSize ) );
 
         // time of last modification.
         m_oInodeStore.m_dwmtime =
@@ -180,8 +179,7 @@ gint32 CFileImage::Reload()
             ret = -ENOTSUP;
             break;
         }
-        guint32& dwSize = 
-            m_oInodeStore.m_dwSize;
+        guint32& dwSize = GetSize();
         bool bFirst = 
             WITHIN_INDIRECT_BLOCK( dwSize );
 
@@ -253,7 +251,7 @@ gint32 CFileImage::Format()
         RegFSInode* pInode = arrBytes; 
 
         // file size in bytes
-        m_oInodeStore.m_dwSize = 0;
+        SetSize( 0 );
 
         // time of last modification.
         clock_gettime( CLOCK_REALTIME, &oAccTime );
@@ -296,8 +294,7 @@ gint32 CFileImage::Flush()
 
         auto pInode = ( RegFSInode* ) arrBytes; 
         // file size in bytes
-        pInode->m_dwSize =
-            htonl( m_oInodeStore.m_dwSize );
+        pInode->m_dwSize = htonl( GetSize() );
 
         // time of last modification.
         pInode->m_dwmtime =
@@ -386,11 +383,8 @@ gint32 CFileImage::Flush()
         if( ERROR( ret ) )
             break;
 
-        if( m_oInodeStore.m_dwSize == 0 )
+        if( GetSize() == 0 )
             break;
-
-        guint32 dwSize =
-            m_oInodeStore.m_dwSize / 512;
 
         guint32 dwBlkIdx = 0;
         guint32* arrBlks =
@@ -733,18 +727,15 @@ gint32 CFileImage::ReadFile(
         return -ERANGE;
 
     do{
-        CReadLock oLock( this->GetLock() );
-        if( dwOff >= m_oInodeStore.m_dwSize )
+        READ_LOCK( this );
+        if( dwOff >= GetSize() )
         {
             dwSize = 0;
             return 0;
         }
-        if( dwOff + dwSize >
-            m_oInodeStore.m_dwSize )
-        {
-            dwSize =
-                m_oInodeStore.m_dwSize - dwOff;
-        }
+        if( dwOff + dwSize > GetSize() )
+            dwSize = GetSize() - dwOff;
+
         std::vector< guint32 > vecBlks;
         ret = CollectBlocksForRead(
             dwOff, dwSize, vecBlks );
@@ -840,7 +831,7 @@ gint32 CFileImage::ReadFile(
 }
 
 gint32 CFileImage::WriteFile(
-    guint32 dwOff, guint32 dwSize,
+    guint32 dwOff, guint32& dwSize,
     guint8* pBuf )
 {
     gint32 ret = 0;
@@ -850,7 +841,7 @@ gint32 CFileImage::WriteFile(
         return -ERANGE;
 
     do{
-        CWriteLock oLock( this->GetLock() );
+        WRITE_LOCK( this );
         std::vector< guint32 > vecBlks;
         ret = CollectBlocksForWrite(
             dwOff, dwSize, vecBlks );
@@ -956,9 +947,8 @@ gint32 CFileImage::WriteFile(
                 vecBlks.back(), arrBytes );
         }
 
-        if( dwSize + dwOff >
-            m_oInodeStore.m_dwSize )
-            m_oInodeStore.m_dwSize = dwSize + dwOff;
+        if( dwSize + dwOff > GetSize() )
+            SetSize( dwSize + dwOff );
 
         timespec mtime;
         clock_gettime( CLOCK_REALTIME, &mtime );
@@ -1175,17 +1165,16 @@ gint32 CFileImage::Truncate( guint32 dwOff )
         return -ERANGE;
 
     do{
-        CWriteLock oLock( this->GetLock() );
-        guint32& dwSize = m_oInodeStore.m_dwSize;
-        if( dwOff > dwSize )
+        WRITE_LOCK( this );
+        if( dwOff > GetSize() )
         {
             ret = Extend( dwOff );
             break;
         }
-        if( dwOff == dwSize )
+        if( dwOff == GetSize() )
             break;
 
-        guint32 dwDelta = dwSize - dwOff;
+        guint32 dwDelta = GetSize() - dwOff;
 
         guint32 dwHead =
             ( dwOff & ( BLOCK_SIZE - 1 ) );
@@ -1225,7 +1214,7 @@ gint32 CFileImage::Truncate( guint32 dwOff )
         if( dwTruncOff == UINT_MAX )
         {
             // no need to truncate
-            dwSize = dwOff;
+            SetSize( dwOff );
             break;
         }
 
@@ -1242,7 +1231,7 @@ gint32 CFileImage::Truncate( guint32 dwOff )
         }
         else if( WITHIN_INDIRECT_BLOCK( dwTruncOff ) )
         {
-            if( WITHIN_SEC_INDIRECT_BLOCK( dwSize ) )
+            if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() ) )
             {
                 ret = TruncBlkSecIndirect( dwSecStart );
                 if( ERROR( ret ) )
@@ -1254,7 +1243,7 @@ gint32 CFileImage::Truncate( guint32 dwOff )
         else
         {
             // truncate from direct block
-            if( WITHIN_SEC_INDIRECT_BLOCK( dwSize ) )
+            if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() ) )
             {
                 ret = TruncBlkSecIndirect(
                     dwSecStart );
@@ -1263,7 +1252,7 @@ gint32 CFileImage::Truncate( guint32 dwOff )
                 ret = TruncBlkIndirect(
                     dwIndStart );
             }
-            else if( WITHIN_INDIRECT_BLOCK( dwSize ) )
+            else if( WITHIN_INDIRECT_BLOCK( GetSize() ) )
             {
                 ret = TruncBlkIndirect(
                     dwIndStart );
@@ -1273,7 +1262,7 @@ gint32 CFileImage::Truncate( guint32 dwOff )
             ret = TruncBlkDirect(
                 dwTruncOff >> BLOCK_SHIFT );
         }
-        dwSize = dwOff;
+        SetSize( dwOff );
         timespec mtime;
         clock_gettime( CLOCK_REALTIME, &mtime );
         m_oInodeStore.m_dwmtime = mtime.tv_sec;
@@ -1298,11 +1287,13 @@ gint32 CFileImage::Extend( guint32 dwOff )
 }
 
 gint32 CFileImage::ReadValue(
-    Variant& oVar )
+    Variant& oVar ) const
 {
     gint32 ret = 0;
-    CReadLock oLock( this->GetLock() );
-    oVar = m_oValue;
+    do{
+        READ_LOCK( this );
+        oVar = m_oValue;
+    }while( 0 );
     return ret;
 }
 
@@ -1310,9 +1301,47 @@ gint32 CFileImage::WriteValue(
     const Variant& oVar )
 {
     gint32 ret = 0;
-    CWriteLock oLock( this->GetLock() );
-    m_oValue = oVar;
+    do{
+        WRITE_LOCK( this );
+        m_oValue = oVar;
+    }while( 0 );
     return ret;
+}
+
+void CFileImage::SetGid( gid_t wGid )
+{
+    WRITE_LOCK( this );
+    m_oInodeStore.m_wgid = ( guint16 )wGid;
+}
+
+void CFileImage::SetUid( uid_t wUid )
+{
+    WRITE_LOCK( this );
+    m_oInodeStore.m_wuid = ( guint16 )wUid;
+}
+
+void CFileImage::SetMode( mode_t dwMode )
+{
+    WRITE_LOCK( this );
+    m_oInodeStore.m_dwMode = ( guint32 )dwMode;
+}
+
+gid_t CFileImage::GetGid() const
+{
+    READ_LOCK( this );
+    return ( gid_t )m_oInodeStore.m_wgid;
+}
+
+uid_t CFileImage::GetUid() const
+{
+    READ_LOCK( this );
+    return ( uid_t )m_oInodeStore.m_wuid;
+}
+
+mode_t CFileImage::GetMode() const
+{
+    READ_LOCK( this );
+    return ( mode_t )m_oInodeStore.m_dwMode;
 }
 
 gint32 CLinkImage::Reload()
@@ -1344,44 +1373,49 @@ gint32 CLinkImage::Format()
     return ret;
 }
 
+gint32 CLinkImage::ReadLink(
+    guin8* buf, guint32& dwSize )
+{
+    guint32 dwBytes =
+        std::min( m_strLink.size(),
+            ( size_t )dwSize );
+    strcpy( buf, m_strLink.c_str(), dwBytes );
+    dwSize = dwBytes;
+    return 0;
+}
+
 gint32 COpenFileEntry::Flush()
 {
-    CWriteLock oLock(
-        m_pFileImage->GetLock() );
-    if( m_pFileImage->GetState() == stateStopped )
-        return ERROR_STATE;
-    return m_pFileImage->Flush();
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( m_pFileImage );
+        ret = m_pFileImage->Flush();
+    }while( 0 );
+    return ret;
 }
 
 gint32 COpenFileEntry::ReadFile(
     guint32& dwSize, guint8* pBuf,
     guint32 dwOff )
 {
-    CStdRMutex oLock( GetLock() );
-    if( dwOff == UINT_MAX )
-        dwOff = m_dwPos;
     gint32 ret = m_pFileImage->ReadFile(
         dwOff, dwSize, pBuf );
     if( ERROR( ret ) )
         return ret;
 
-    m_dwPos += dwSize;
     return STATUS_SUCCESS;
 }
 
 gint32 COpenFileEntry::WriteFile(
-    guint32 dwSize, guint8* pBuf, dwOff  )
+    guint32& dwSize, guint8* pBuf, dwOff  )
 {
-    CStdRMutex oLock( GetLock() );
-    if( dwOff == UINT_MAX )
-        dwOff = m_dwPos;
     gint32 ret = m_pFileImage->WriteFile(
         dwOff, dwSize, pBuf );
     if( ERROR( ret ) )
         return ret;
 
-    m_dwPos += dwSize;
     return STATUS_SUCCESS;
 }
+
 
 }
