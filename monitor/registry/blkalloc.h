@@ -181,18 +181,19 @@
 
 #define WRITE_LOCK( (_p_) ) \
     CWriteLock _oLock_( (_p_)->GetLock() ); \
-    if( (_p_)->m_dwState == stateStopped ) \
+    if( (_p_)->GetState() == stateStopped ) \
     { ret = ERROR_STATE; break; }
 
 #define UNLOCK( _p_ ) \
     _oLock_.Unlock()
 
 #define RFHANDLE    guint64
+#define FLAG_FLUSH_CHILD 0x01
 namespace rpcf{
 
 struct ISynchronize
 {
-    virtual gint32 Flush() = 0;
+    virtual gint32 Flush( guint32 dwFlags ) = 0;
     virtual gint32 Format() = 0;
     virtual gint32 Reload() = 0;
 };
@@ -208,7 +209,7 @@ struct CSuperBlock : public ISynchronize
     CSuperBlock( CBlockAllocator* pAlloc )
         : m_pAlloc( pAlloc )
     {}
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 } ;
@@ -262,7 +263,7 @@ struct CBlockBitmap :
 
     gint32 IsBlockFree( guint32 dwBlkIdx ) const;
 
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 } ;
@@ -283,8 +284,8 @@ struct CBlockGroup : public ISynchronize
         m_pAlloc = pAlloc;
     }
 
-    gint32 Flush() override
-    { return m_pBlockBitmap->Flush(); }
+    gint32 Flush( guint32 dwFlags = 0 ) override
+    { return m_pBlockBitmap->Flush( dwFlags ); }
 
     gint32 Format() override
     { return m_pBlockBitmap->Format(); }
@@ -347,7 +348,7 @@ struct CGroupBitmap
     gint32 IsBlockGroupFree(
         guint32 dwGroupIdx ) const;
 
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 };
@@ -384,7 +385,7 @@ class CBlockAllocator :
     { return m_oLock; }
 
     gint32 Format() override;
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Reload() override;
 
     gint32 SaveGroupBitmap(
@@ -664,7 +665,7 @@ struct CFileImage :
         return ret;
     }
 
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 
@@ -711,6 +712,8 @@ struct CFileImage :
     gid_t GetGid() const;
     uid_t GetUid() const;
     mode_t GetMode() const;
+    mode_t GetModeNoLock() const
+    { return ( mode_t )m_oInodeStore.m_dwMode; }
 };
 
 typedef CAutoPtr< clsid( Invalid ), CFileImage > FImgSPtr;
@@ -816,7 +819,7 @@ struct CBPlusNode :
     { return m_pDir->GetFileMap(); }
 
 
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 
@@ -955,8 +958,7 @@ struct CBPlusNode :
         auto itr = mapFiles.find( dwInodeIdx );
         if( itr != mapFiles.end() )
             return -EEXIST;
-        pFile = *itr;
-        itr->Clear();
+        itr->second = pFile;
         return STATUS_SUCCESS;
     }
 
@@ -1196,7 +1198,7 @@ struct CFreeBNodePool :
     { return 0; }
 
     gint32 Reload() override;
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
 };
 
 struct CDirImage : 
@@ -1214,7 +1216,7 @@ struct CDirImage :
 
     gint32 Format() override;
     gint32 Reload() override;
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
 
     inline const ChildMap& GetChildMap() const
     { return m_mapChilds; }
@@ -1270,7 +1272,7 @@ struct CDirImage :
         EnumFileType iType, FImgSPtr& pImg );
 
     gint32 CreateFile( const char* szName,
-        FImgSPtr& pImg );
+        mode_t dwMode, FImgSPtr& pImg );
 
     gint32 CreateDir( const char* szName,
         mode_t dwMode, FImgSPtr& pImg );
@@ -1279,6 +1281,9 @@ struct CDirImage :
         const char* szLink, FImgSPtr& pImg );
 
     gint32 RemoveFile( const char* szName );
+
+    gint32 Rename( const char* szFrom,
+        const char* szTo);
 };
 
 class COpenFileEntry;
@@ -1346,7 +1351,7 @@ struct COpenFileEntry :
     inline gint32 WriteValue( const Variant& oVar )
     { return m_pFileImage->WriteValue( oVar ); }
 
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
 
     gint32 Format() override
     { return 0; }
@@ -1413,7 +1418,7 @@ struct CDirFileEntry :
     gint32  RemoveFile( const stdstr& strName );
     gint32  RemoveSubDir( const stdstr& strName );
 
-    gint32 Flush() override;
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 };
@@ -1430,32 +1435,54 @@ struct CLinkFileEntry:
     { return -ENOTSUP; }
 };
 
+extern ObjPtr g_pIoMgr;
+
 class CRegistryFs :
     public IService,
     public ISynchronize
 {
+    ObjPtr      m_pIoMgr;
     AllocPtr    m_pAlloc;
     FileSPtr    m_pRootDir;    
     FImgSPtr    m_pRootImg;
     std::hashmap< guint64, FileSPtr > m_mapOpenFiles;
-    mutable stdrmutex   m_oLock;
+    mutable stdrmutex   m_oExclLock;
+    EnumIfState m_dwState = stateStarted;
 
     gint32 CreateRootDir();
     gint32 OpenRootDir();
+
+    CSharedLock m_oLock;
 
     public:
     CRegistryFs( const IConfigDb* pCfg );
     gint32 Start() override;
     gint32 Stop() override;
 
-    inline stdrmutex& GetLock() const
+    inline void SetState( guint32 dwState )
+    {
+        CStdRMutex oLock( GetExclLock() );
+        m_dwState = dwState;
+    }
+
+    inline guint32 GetState() const
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return m_dwState;
+    }
+
+    inline CSharedLock& GetLock() const
     { return m_oLock; }
+
+    inline stdrmutex& GetExclLock() const
+    { return m_oExclLock; }
 
     static gint32 Namei(
         const string& strPath,
         std::vector<stdstr>& vecNames ) const;
 
     gint32 CreateFile( const stdstr& strPath,
+        mode_t dwMode,
         CAccessContext* pac = nullptr );
 
     gint32 MakeDir( const stdstr& strPath,
@@ -1480,6 +1507,11 @@ class CRegistryFs :
 
     gint32 Truncate(
         RFHANDLE hFile, guint32 dwOff );
+
+    RFHANDLE OpenDir( const stdstr& strPath,
+        CAccessContext* pac = nullptr );
+
+    gint32 CloseDir( RFHANDLE hFile );
 
     gint32 RemoveDir( const stdstr& strPath,
         CAccessContext* pac = nullptr );
@@ -1516,7 +1548,10 @@ class CRegistryFs :
         const stdstr& strPath,
         char* buf, guint32& dwSize );
 
-    gint32 Flush() override;
+    gint32 Rename(
+        const char* szFrom, const char* szTo);
+
+    gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 };

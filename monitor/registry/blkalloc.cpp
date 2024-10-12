@@ -66,7 +66,7 @@ static gint32 SetPageSize( guint32 dwSize )
     return STATUS_SUCCESS;
 }
 
-gint32 CSuperBlock::Flush()
+gint32 CSuperBlock::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
@@ -308,7 +308,7 @@ gint32 CGroupBitmap::IsBlockGroupFree(
     return ret;
 }
 
-gint32 CGroupBitmap::Flush()
+gint32 CGroupBitmap::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
@@ -590,7 +590,7 @@ gint32 CBlockBitmap::FreeBlocks(
     return ret;
 }
 
-gint32 CBlockBitmap::Flush()
+gint32 CBlockBitmap::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
@@ -1176,20 +1176,20 @@ gint32 CBlockAllocator::Format()
     return ret;
 }
 
-gint32 CBlockAllocator::Flush()
+gint32 CBlockAllocator::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
-        ret = this->m_pSuperBlock->Flush();
+        ret = this->m_pSuperBlock->Flush( dwFlags );
         if( ERROR( ret ) )
             break;
-        ret = m_pGroupBitmap->Flush();
+        ret = m_pGroupBitmap->Flush( dwFlags );
         if( ERROR( ret ) )
             break;
         for( auto elem : m_mapBlkGrps )
         {
-            ret = elem.second->Flush();
+            ret = elem.second->Flush( dwFlags );
             if( ERROR( ret ) )
                 break;
         }

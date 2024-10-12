@@ -46,6 +46,9 @@ do{ strncpy( (_dst_), (_src_), REGFS_PAGE_SIZE - 1 ); \
 #define CLEAR_KEY( _key_ ) \
 ( (_key_)[ 0 ] = 0, (_key_)[ REGFS_NAME_LENGTH - 1 ] = 0 )
 
+#define FILE_TYPE( _dwMode_ ) \
+( ( (_dwMode_) & S_IFMT ) )
+
 namespace rpcf
 {
 RegFSBNode::RegFSBNode()
@@ -196,7 +199,7 @@ gint32 CBPlusNode::Reload()
     return ret;
 }
 
-gint32 CBPlusNode::Flush()
+gint32 CBPlusNode::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
@@ -215,7 +218,7 @@ gint32 CBPlusNode::Flush()
         {
             CBPlusNode* pChild =
                 this->GetChild( i );
-            ret = pChild->Flush();
+            ret = pChild->Flush( dwFlags );
             if( ERROR( ret ) )
             {
                 DebugPrint( ret, "Error during "
@@ -671,23 +674,18 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
             ret = BinSearch(
                 pSlot->szKey, 0, dwCount );
             if( ret < 0 )
+            {
                  ret = -ret;
+                 if( ret >= 0x10000 )
+                     ret -= 0x10000;
+            }
             pChild = this->GetChild( ret );
             pChild->Insert( pSlot );
             break;
         }
         else if( !bFull )
         {
-            ret = BinSearch(
-                pSlot->szKey, 0, dwCount );
-            if( ret < 0 )
-                 ret = -ret;
-            else if( ret >= 0 )
-            {
-                ret = -EEXIST;
-                break;
-            }
-            ret = this->InsertSlotAt( pSlot );
+            ret = this->InsertNonFull( pSlot );
             break;
         }
         else if( IsRoot() )
@@ -884,7 +882,7 @@ gint32 CFreeBNodePool::InitPoolStore(
     return ret;
 }
 
-gint32 CFreeBNodePool::Flush()
+gint32 CFreeBNodePool::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     guint32 dwBNodeIdx =
@@ -1007,17 +1005,28 @@ gint32 CFreeBNodePool::GetFreeBNode(
     return ret;
 }
 
-gint32 CDirImage::Flush()
+gint32 CDirImage::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
-        ret = super::Flush();
+        ret = super::Flush( dwFlags );
         if( ERROR( ret ) )
             break;
-        ret = m_pRootNode->Flush();
+        ret = m_pRootNode->Flush( dwFlags );
         if( ERROR( ret ) )
             break;
-        ret = m_pFreePool->Flush();
+        ret = m_pFreePool->Flush( dwFlags );
+        if( ERROR( ret ) )
+            break;
+        if( dwFlags & FLAG_FLUSH_CHILD )
+        {
+            for( auto& elem : m_mapFiles )
+            {
+                ret = elem->Flush( dwFlags );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
     }while( 0 );
     return ret;
 }
@@ -1534,7 +1543,7 @@ gint32 CBPlusNode::RemoveFile(
     const char* szKey, FImgSPtr& pFile )
 {
     gint32 ret = 0;
-    if( szKey == nullptr )
+    if( szKey == nullptr || szKey[ 0 ] == 0 )
         return -EINVAL;
     do{
         gint32 idx = BinSearch( szKey,
@@ -1804,8 +1813,10 @@ gint32 CDirImage::GetFreeBNode(
     return ret;
 }
 
-gint32 CDirImage::CreateFile( const char* szName,
-    EnumFileType iType, FImgSPtr& pImg )
+gint32 CDirImage::CreateFile(
+    const char* szName,
+    EnumFileType iType,
+    FImgSPtr& pImg )
 {
     gint32 ret = 0;
     do{
@@ -1848,8 +1859,17 @@ gint32 CDirImage::CreateFile( const char* szName,
 }
 
 gint32 CDirImage::CreateFile(
-    const char* szName, FImgSPtr& pImg )
-{ return CreateFile( szName, ftRegular, pImg ); }
+    const char* szName,
+    mode_t dwMode,
+    FImgSPtr& pImg )
+{
+    gint32 ret = 0;
+    do{
+        CreateFile( szName, ftRegular, pImg );
+        SetMode( dwMode );
+    }while( 0 );
+    return ret;
+}
 
 gint32 CDirImage::CreateDir( const char* szName,
     mode_t dwMode, FImgSPtr& pImg )
@@ -1905,6 +1925,37 @@ gint32 CDirImage::RemoveFile(
         ret = m_pAlloc->FreeBlocks(
             &dwInodeIdx, 1 );
         pFile->SetState( stateStopped );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CDirImage::Rename(
+    const char* szFrom, const char* szTo)
+{
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        ret = m_pRootNode->RemoveFile(
+            szFrom, pFile );
+        if( ERROR( ret ) )
+            break;
+
+        KEYPTR_SLOT oKey;
+        COPY_KEY( oKey.szKey, szTo );
+        oKey.oLeaf.dwInodeIdx =
+            pFile->GetInodeIdx();
+        guint32 dwMode = pFile->GetModeNoLock();
+        if( FILE_TYPE( dwMode ) == S_IFREG )
+            oKey.oLeaf.byFileType = ftRegular;
+        else if( FILE_TYPE( dwMode ) == S_IFLNK )
+            oKey.oLeaf.byFileType = ftLink;
+        else if( FILE_TYPE( dwMode ) == S_IFDIR )
+            oKey.oLeaf.byFileType = ftDirectory;
+        ret = m_pRootNode->Insert( oKey );
+        if( ERROR( ret ) )
+            break;
+        ret = m_pRootNode->AddFileDirect(
+            oKey.oLeaf.dwInodeIdx, pFile );
     }while( 0 );
     return ret;
 }

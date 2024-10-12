@@ -285,7 +285,7 @@ gint32 CFileImage::Format()
     return ret;
 }
 
-gint32 CFileImage::Flush()
+gint32 CFileImage::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
@@ -1310,38 +1310,60 @@ gint32 CFileImage::WriteValue(
 
 void CFileImage::SetGid( gid_t wGid )
 {
-    WRITE_LOCK( this );
-    m_oInodeStore.m_wgid = ( guint16 )wGid;
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        m_oInodeStore.m_wgid = ( guint16 )wGid;
+    }while( 0 );
 }
 
 void CFileImage::SetUid( uid_t wUid )
 {
-    WRITE_LOCK( this );
-    m_oInodeStore.m_wuid = ( guint16 )wUid;
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        m_oInodeStore.m_wuid = ( guint16 )wUid;
+    }while( 0 );
 }
 
 void CFileImage::SetMode( mode_t dwMode )
 {
-    WRITE_LOCK( this );
-    m_oInodeStore.m_dwMode = ( guint32 )dwMode;
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        m_oInodeStore.m_dwMode =
+            ( guint32 )dwMode;
+    }while( 0 );
 }
 
 gid_t CFileImage::GetGid() const
 {
-    READ_LOCK( this );
-    return ( gid_t )m_oInodeStore.m_wgid;
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        return ( gid_t )m_oInodeStore.m_wgid;
+    }while( 0 );
+    return ret;
 }
 
 uid_t CFileImage::GetUid() const
 {
-    READ_LOCK( this );
-    return ( uid_t )m_oInodeStore.m_wuid;
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        return ( uid_t )m_oInodeStore.m_wuid;
+    }while( 0 );
+    return ret;
 }
 
 mode_t CFileImage::GetMode() const
 {
-    READ_LOCK( this );
-    return ( mode_t )m_oInodeStore.m_dwMode;
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        return GetModeNoLock();
+    }while( 0 );
+    return ret;
 }
 
 gint32 CLinkImage::Reload()
@@ -1384,12 +1406,12 @@ gint32 CLinkImage::ReadLink(
     return 0;
 }
 
-gint32 COpenFileEntry::Flush()
+gint32 COpenFileEntry::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
         WRITE_LOCK( m_pFileImage );
-        ret = m_pFileImage->Flush();
+        ret = m_pFileImage->Flush( dwFlags );
     }while( 0 );
     return ret;
 }
