@@ -52,9 +52,17 @@ CRegistryFs::CRegistryFs(
 }
 gint32 CRegistryFs::Start()
 {
+    return this->Reload();
 }
+
 gint32 CRegistryFs::Stop()
 {
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        ret = this->Flush();
+    }while( 0 );
+    return ret;
 }
 
 gint32 CRegistryFs::CreateRootDir()
@@ -274,8 +282,9 @@ gint32 CRegistryFs::GetParentDir(
 
 gint32 CRegistryFs::CreateFile(
     const stdstr& strPath,
-    mode_t dwMode,
-    CAccessContext* pac = nullptr )
+    mode_t dwMode, guint32 dwFlags,
+    RFHANDLE hFile,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -290,6 +299,23 @@ gint32 CRegistryFs::CreateFile(
             strPath.c_str(), dwMode, pFile );
         if( ERROR( ret ) )
             break;
+
+        FileSPtr pOpenFile;
+        ret = COpenFileEntry::Create( 
+            ftRegular, pOpenFile,
+            pFile, m_pAlloc );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pOpenFile->Open( nullptr, pac );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( this->GetExclLock() )
+        pOpenFile->SetFlags( dwFlags );
+        hFile = pOpenFile->GetObjId();
+        m_mapOpenFiles[ hFile ] = pOpenFile;
+
     }while( 0 );
     if( ERROR( ret ) )
     {
@@ -299,12 +325,13 @@ gint32 CRegistryFs::CreateFile(
     return ret;
 }
 
-RFHANDLE CRegistryFs::OpenFile(
+gint32 CRegistryFs::OpenFile(
     const stdstr& strPath,
-    CAccessContext* pac = nullptr )
+    guint32 dwFlags,
+    RFHANDLE& hFile,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
-    guint64 hFile = INVALID_HANDLE;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
@@ -328,8 +355,11 @@ RFHANDLE CRegistryFs::OpenFile(
             break;
 
         ret = pOpenFile->Open( nullptr, pac );
+        if( ERROR( ret ) )
+            break;
 
         CStdRMutex oLock( this->GetExclLock() )
+        pOpenFile->SetFlags( dwFlags );
         hFile = pOpenFile->GetObjId();
         m_mapOpenFiles[ hFile ] = pOpenFile;
         
@@ -339,7 +369,7 @@ RFHANDLE CRegistryFs::OpenFile(
         DebugPrint( ret, "Error create file '%s'",
             strPath.c_str() ); 
     }
-    return hFile;
+    return ret;
 }
 
 gint32 CRegistryFs::CloseFile(
@@ -427,8 +457,7 @@ gint32 CRegistryFs::ReadFile( RFHANDLE hFile,
 }
 
 gint32 CRegistryFs::WriteFile( RFHANDLE hFile,
-    char* buffer, guint32& dwSize,
-    guint32 dwOff )
+    char* buffer, guint32& dwSize, guint32 dwOff )
 {
     gint32 ret = 0;
     do{
@@ -472,7 +501,7 @@ gint32 CRegistryFs::Truncate(
 
 gint32 CRegistryFs::RemoveDir(
     const stdstr& strPath,
-    CAccessContext* pac = nullptr )
+    CAccessContext* pac )
 {
     gint32 ret = 0; 
     do{
@@ -493,25 +522,26 @@ gint32 CRegistryFs::RemoveDir(
         std::string strDir =
             basename( strPath.c_str() );
 
-        READ_LOCK( pFile );
-        if( pFile->GetOpenCount() )
         {
-            ret = -EBUSY;
-            DebugPrint( ret, "Error '%s' "
-                "is being used",
-                strDir.c_str() );
-            break;
-        }
+            READ_LOCK( pFile );
+            if( pFile->GetOpenCount() )
+            {
+                ret = -EBUSY;
+                DebugPrint( ret, "Error '%s' "
+                    "is being used",
+                    strDir.c_str() );
+                break;
+            }
 
-        CDirImage* pRemove = pFile;
-        CBPlusNode* pRoot =
-            pRemove->GetRootNode();
-        if( pRoot->GetKeyCount() > 0 )
-        {
-            ret = -ENOTEMPTY;
-            break;
+            CDirImage* pRemove = pFile;
+            CBPlusNode* pRoot =
+                pRemove->GetRootNode();
+            if( pRoot->GetKeyCount() > 0 )
+            {
+                ret = -ENOTEMPTY;
+                break;
+            }
         }
-        UNLOCK( pFile );
         ret = pDir->RemoveFile( strDir.c_str() );
 
     }while( 0 );
@@ -520,7 +550,7 @@ gint32 CRegistryFs::RemoveDir(
 
 gint32 CRegistryFs::SetGid(
     const stdstr& strPath, gid_t wGid,
-    CAccessContext* pac = nullptr )
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -549,7 +579,7 @@ gint32 CRegistryFs::SetGid(
 
 gint32 CRegistryFs::SetUid(
     const stdstr& strPath, uid_t wUid,
-    CAccessContext* pac = nullptr )
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -683,7 +713,7 @@ gint32 CRegistryFs::SetValue(
 gint32 CRegistryFs::SymLink(
     const stdstr& strTarget,
     const stdstr& strLinkPath,
-    CAccessContext* pac = nullptr );
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -756,7 +786,7 @@ gint32 CRegistryFs::ReadLink(
 
 gint32 CRegistryFs::MakeDir(
     const stdstr& strPath, mode_t dwMode,
-    CAccessContext* pac = nullptr );
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -787,7 +817,7 @@ gint32 CRegistryFs::MakeDir(
 
 gint32 CRegistryFs::Chmod(
     const stdstr& strPath, mode_t dwMode,
-    CAccessContext* pac = nullptr );
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -817,7 +847,7 @@ gint32 CRegistryFs::Chmod(
 }
 
 gint32 CRegistryFs::Rename(
-    const stdstr& strFrom, const stdstr& strTo)
+    const stdstr& strFrom, const stdstr& strTo )
 {
     gint32 ret = 0;
     do{
@@ -845,6 +875,77 @@ gint32 CRegistryFs::Rename(
 
     }while( 0 );
     return ret;
+}
+
+gint32 CRegistryFs::GetFile(
+    RFHANDLE hFile, FileSPtr& pFile )
+{
+    if( hFile == INVALID_HANDLE )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetExclLock() )
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr = m_mapOpenFiles.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pFile = itr->second;
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::Access(
+    const stdstr& strPath, guint32 dwFlags )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strLinkPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strFile =
+            basename( strPath.c_str() );
+
+        CDirImage* pDir = dirPtr;
+        FImgSPtr pFile;
+        CBPlusNode* pNode = nullptr;
+        ret = pDir->Search(
+            strFile.c_str(), pFile, pNode );
+        if( ERROR( ret ) )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        mode_t dwMode = pFile->GetMode();
+
+        ret = -EACCES;
+        bool bReq =
+           (  ( flags & W_OK ) != 0 );
+        bool bCur =
+           ( ( dwMode & S_IWUSR ) != 0 );
+
+        if( !bCur && bReq )
+            break;
+
+        bReq = (  ( flags & R_OK ) != 0 );
+        bCur = ( ( dwMode & S_IRUSR ) != 0 );
+        if( !bCur && bReq )
+            break;
+
+        bReq = ( ( flags & X_OK ) != 0 );
+        bCur = ( ( dwMode & S_IXUSR ) != 0 );
+        if( !bCur && bReq )
+            break;
+        ret = 0;
+
+    }while( 0 );
+    return ret;
+
 }
 
 }

@@ -676,6 +676,15 @@ CBlockAllocator::CBlockAllocator(
     return ret;
 }
 
+CBlockAllocator::~CBlockAllocator()
+{
+    if( m_iFd >= 0 )
+    {
+        close( m_iFd );
+        m_iFd = -1;
+    }
+}
+
 gint32 CBlockAllocator::ReadWriteFile(
     char* pBuf, guint32 dwSize,
     guint32 dwOff, bool bRead )

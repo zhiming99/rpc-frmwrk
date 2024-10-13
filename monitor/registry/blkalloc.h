@@ -189,6 +189,7 @@
 
 #define RFHANDLE    guint64
 #define FLAG_FLUSH_CHILD 0x01
+#define FLAG_FLUSH_DATAONLY 0x02
 namespace rpcf{
 
 struct ISynchronize
@@ -381,6 +382,8 @@ class CBlockAllocator :
 
     public:
     CBlockAllocator( const IConfigDb* pCfg );
+    ~CBlockAllocator();
+
     inline stdrmutex& GetLock() const
     { return m_oLock; }
 
@@ -453,6 +456,8 @@ class CBlockAllocator :
         bool bRead );
 };
 
+#define VALUE_SIZE 95
+
 struct RegFSInode
 {
     // file size in bytes
@@ -480,7 +485,7 @@ struct RegFSInode
     guint32     m_arrMetaFork[ 4 ];
 
     // for small data with length less than 96 bytes.
-    guint8      m_arrBuf[ 95 ];
+    guint8      m_arrBuf[ VALUE_SIZE ];
     guint8      m_iValType;
     guint32     m_dwUserData;
 
@@ -555,6 +560,7 @@ struct RegFSInode
 #define SEC_BLKIDX_IDX( _offset_ ) \
     ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
+
 
 struct CFileImage : 
     public ISynchronize,
@@ -902,25 +908,32 @@ struct CBPlusNode :
         return ps->szKey;
     }
 
+    FImgSPtr GetFileDirect( gint32 idx ) const 
+    {
+        FImgSPtr pEmpty;
+        auto mapFiles = GetFileMap();
+        auto itr = mapFiles.find( idx );
+
+        auto& oMap = GetChildMap();
+        if( itr == oMap.end() )
+            return pEmpty;
+        return itr->second;
+    }
+
     FImgSPtr GetFile( gint32 idx ) const 
     {
+        FImgSPtr pEmpty;
         if( idx >= GetChildCount() )
-            return nullptr;
+            return pEmpty;
 
         if( !IsLeaf() )
-            return nullptr;
+            return pEmpty;
 
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
 
-        auto mapFiles = GetFileMap();
-        auto itr = mapFiles.find(
+        return GetFileDirect(
             ps->oLeaf.dwInodeIdx );
-
-        auto& oMap = GetChildMap();
-        if( itr == oMap.end() )
-            return nullptr;
-        return itr->second;
     }
 
     gint32 RemoveFileDirect (
@@ -1230,6 +1243,11 @@ struct CDirImage :
     inline FileMap& GetFileMap()
     { return m_mapFiles; }
 
+    inline guint32 GetRootKeyCount() const 
+    { 
+        CStdRMutex oLock( GetExclLock() );
+        return m_pRootNode->GetKeyCount();
+    }
     inline CBPlusNode* GetRootNode() const
     { return m_pRootNode.get(); }
     // B+ tree methods
@@ -1297,6 +1315,7 @@ struct COpenFileEntry :
     stdstr          m_strFileName;
     FImgSPtr        m_pFileImage;
     CAccessContext  m_oUserAc;
+    guint32         m_dwFlags;
 
     std::atomic< guint32 > m_dwPos = 0;
     mutable stdrmutex m_oLock;
@@ -1373,7 +1392,7 @@ struct COpenFileEntry :
         return 0;
     }
 
-    inline gint32 Close();
+    inline gint32 Close()
     {
         gint32 ret = Flush();
         m_pFileImage->DecOpenCount();
@@ -1381,6 +1400,11 @@ struct COpenFileEntry :
         SetParent( nullptr );
         return ret;
     }
+    inline void SetFlags( guint32 dwFlags )
+    {   m_dwFlags = dwFlags; }
+
+    inline guint32 GetFlags() const
+    {   return m_dwFlags; }
 };
 
 struct CAccessContext
@@ -1482,14 +1506,19 @@ class CRegistryFs :
         std::vector<stdstr>& vecNames ) const;
 
     gint32 CreateFile( const stdstr& strPath,
-        mode_t dwMode,
+        mode_t dwMode, guint32 dwFlags,
+        RFHANDLE hFile,
         CAccessContext* pac = nullptr );
 
     gint32 MakeDir( const stdstr& strPath,
         mode_t dwMode,
         CAccessContext* pac = nullptr );
 
+    gint32 GetFile( RFHANDLE hFile,
+        FileSPtr& pFile );
+
     RFHANDLE OpenFile( const stdstr& strPath,
+        guint32 dwFlags, RFHANDLE& hFile,
         CAccessContext* pac = nullptr );
 
     gint32 CloseFile( RFHANDLE hFile );
@@ -1554,8 +1583,11 @@ class CRegistryFs :
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
+
+    gint32 Access( const stdstr& strPath,
+        guint32 dwFlags );
 };
 
-using RegFsPtr = typename CAutoPtr< clsid( CRegistryFs ), CRegistryFs >;
+typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegfsPtr;
 
 }

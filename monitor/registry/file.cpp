@@ -160,18 +160,17 @@ gint32 CFileImage::Reload()
             }
         case typeString:
             {
-                char szBuf[ sizeof(
-                    RegFSInode::m_arrBuf ) ];
+                char szBuf[ VALUE_SIZE ];
 
                 guint32 len = strnlen(
                     pInode->m_arrBuf,
-                    sizeof( szBuf ) - 1 );
+                    VALUE_SIZE - 1 );
 
                 memcpy( szBuf,
                     m_oInodeStore.m_arrBuf,
                     len );
 
-                szBuf[ len + 1 ] = 0;
+                szBuf[ len ] = 0;
                 m_oValue = ( const char* )szBuf;
                 break;
             }
@@ -193,7 +192,7 @@ gint32 CFileImage::Reload()
             BufPtr& p = m_pBitdBlk;
             p->Resize( BLOCK_SIZE );
             guint32* arrBlks =
-                m_oInodeStore.m_arrBuf;
+                m_oInodeStore.m_arrBlocks;
             guint32 dwBlkIdx =
                 arrBlks[ BITD_IDX ];
             if( dwBlkIdx == 0 )
@@ -218,7 +217,7 @@ gint32 CFileImage::Reload()
             BufPtr& p = m_pBitBlk;
             p->Resize( BLOCK_SIZE );
             guint32* arrBlks =
-                m_oInodeStore.m_arrBuf;
+                m_oInodeStore.m_arrBlocks;
             guint32 dwBlkIdx =
                 arrBlks[ BIT_IDX ];
             if( dwBlkIdx == 0 )
@@ -291,97 +290,102 @@ gint32 CFileImage::Flush( guint32 dwFlags )
     do{
         DECL_ARRAY( arrBytes, BLOCK_SIZE );
         memset( arrBytes, 0, BLOCK_SIZE );
+        bool bMeta = true;
+        if( !( dwFlags & FLAG_FLUSH_DATAONLY ) )
+            bMeta = false;
 
-        auto pInode = ( RegFSInode* ) arrBytes; 
-        // file size in bytes
-        pInode->m_dwSize = htonl( GetSize() );
-
-        // time of last modification.
-        pInode->m_dwmtime =
-            htonl( m_oInodeStore.m_dwmtime );
-        // time of last access.
-        m_oInodeStore.m_dwatime =
-            oAccTime.tv_sec;
-        // file type
-        pInode->m_dwMode =
-            ntohl( m_oInodeStore.m_dwMode );
-        // uid
-        pInode->m_wuid =
-            ntohs( m_oInodeStore.m_wuid );
-        // gid
-        pInode->m_wgid =
-            ntohs( m_oInodeStore.m_wgid );
-        // others
-        pInode->m_woid =
-            ntohs( m_oInodeStore.m_woid );
-        // type of file content
-        pInode->m_dwFlags =
-            htonl( m_oInodeStore.m_dwFlags );
-        pInode->m_dwUserData =
-            htonl( m_oInodeStore.m_dwUserData );
-        // blocks for data section.
-        int count =
-            sizeof( pInode->m_arrBlocks ) >> 2;
-        for( int i = 0; i < count; i++ )
-            pInode->m_arrBlocks[ i ] = 
-                htonl( m_oInodeStore.m_arrBlocks[ i ] );
-
-        // blocks for extended inode
-        count =
-            sizeof( pInode->m_arrMetaFork ) >> 2;
-        for( int i = 0; i < count; i++ )
-            pInode->m_arrMetaFork[ i ] =
-              htonl( m_oInodeStore.m_arrMetaFork[ i ] );
- 
-        pInode->m_iValType = m_oValue.GetTypeId();
-        switch( m_oValue.GetTypeId() )
+        if( bMeta )
         {
-        case typeByte:
-            {
-                pInode->m_arrBuf[ 0 ] =
-                    m_oValue.m_byVal;
-                break;
-            }
-        case typeUInt16:
-            {
-                auto p =
-                    ( guint16* )pIonde->m_arrBuf;
-                *p = htons( m_oValue.m_wVal );
-                break;
-            }
-        case typeUInt32:
-        case typeFloat:
-            {
-                auto p =
-                    ( guint32* )pIonde->m_arrBuf;
-                *p = htons( m_oValue.m_dwVal );
-                break;
-            }
-        case typeUInt64:
-        case typeDouble:
-            {
-                auto p =
-                    ( guint64* )pIonde->m_arrBuf;
-                *p = htonll( m_oValue.m_qwVal );
-                break;
-            }
-        case typeString:
-            {
-                guint32 dwMax =
-                    sizeof( pInode->m_arrBuf ) - 1;
-                strcpy( pInode->m_arrBuf, 
-                    m_oValue.m_strVal.substr(
-                        0, dwMax ).c_str() );
-                break;
-            }
-        default:
-            break;
-        }
+            auto pInode = ( RegFSInode* ) arrBytes; 
+            // file size in bytes
+            pInode->m_dwSize = htonl( GetSize() );
 
-        ret = m_pAlloc->WriteBlock(
-            m_dwInodeIdx, arrBytes );
-        if( ERROR( ret ) )
-            break;
+            // time of last modification.
+            pInode->m_dwmtime =
+                htonl( m_oInodeStore.m_dwmtime );
+            // time of last access.
+            m_oInodeStore.m_dwatime =
+                oAccTime.tv_sec;
+            // file type
+            pInode->m_dwMode =
+                ntohl( m_oInodeStore.m_dwMode );
+            // uid
+            pInode->m_wuid =
+                ntohs( m_oInodeStore.m_wuid );
+            // gid
+            pInode->m_wgid =
+                ntohs( m_oInodeStore.m_wgid );
+            // others
+            pInode->m_woid =
+                ntohs( m_oInodeStore.m_woid );
+            // type of file content
+            pInode->m_dwFlags =
+                htonl( m_oInodeStore.m_dwFlags );
+            pInode->m_dwUserData =
+                htonl( m_oInodeStore.m_dwUserData );
+            // blocks for data section.
+            int count =
+                sizeof( pInode->m_arrBlocks ) >> 2;
+            for( int i = 0; i < count; i++ )
+                pInode->m_arrBlocks[ i ] = 
+                    htonl( m_oInodeStore.m_arrBlocks[ i ] );
+
+            // blocks for extended inode
+            count =
+                sizeof( pInode->m_arrMetaFork ) >> 2;
+            for( int i = 0; i < count; i++ )
+                pInode->m_arrMetaFork[ i ] =
+                  htonl( m_oInodeStore.m_arrMetaFork[ i ] );
+     
+            pInode->m_iValType = m_oValue.GetTypeId();
+            switch( m_oValue.GetTypeId() )
+            {
+            case typeByte:
+                {
+                    pInode->m_arrBuf[ 0 ] =
+                        m_oValue.m_byVal;
+                    break;
+                }
+            case typeUInt16:
+                {
+                    auto p =
+                        ( guint16* )pIonde->m_arrBuf;
+                    *p = htons( m_oValue.m_wVal );
+                    break;
+                }
+            case typeUInt32:
+            case typeFloat:
+                {
+                    auto p =
+                        ( guint32* )pIonde->m_arrBuf;
+                    *p = htons( m_oValue.m_dwVal );
+                    break;
+                }
+            case typeUInt64:
+            case typeDouble:
+                {
+                    auto p =
+                        ( guint64* )pIonde->m_arrBuf;
+                    *p = htonll( m_oValue.m_qwVal );
+                    break;
+                }
+            case typeString:
+                {
+                    guint32 dwMax = VALUE_SIZE - 1;
+                    strcpy( pInode->m_arrBuf, 
+                        m_oValue.m_strVal.substr(
+                            0, dwMax ).c_str() );
+                    break;
+                }
+            default:
+                break;
+            }
+
+            ret = m_pAlloc->WriteBlock(
+                m_dwInodeIdx, arrBytes );
+            if( ERROR( ret ) )
+                break;
+        }
 
         if( GetSize() == 0 )
             break;

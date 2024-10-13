@@ -1559,7 +1559,7 @@ gint32 CBPlusNode::RemoveFile(
                 guint32& dwIondeIdx =
                     pSlot->oLeaf.dwInodeIdx;
 
-                ret = this->RemoveFileDirect(
+                ret = this->GetFileDirect(
                     dwInodeIdx, pFile );
                 if( ERROR( ret ) )
                 {
@@ -1571,26 +1571,42 @@ gint32 CBPlusNode::RemoveFile(
                     if( ERROR( ret ) )
                         break;
                 }
-                else
+
+                if( pFile->GetOpenCount() )
                 {
-                    if( pFile->GetOpenCount() )
-                    {
-                        DebugPrint( ret, "Error, "
-                            "the file is still "
-                            "being used" );
-                        ret = -EBUSY;
-                        break;
-                    }
-                    else if( pFile->GetState() ==
-                        stateStopped )
-                    {
-                        ret = -ENOENT;
-                        DebugPrint( ret, "Error, "
-                            "the file is being "
-                            "removed" );
-                        break;
-                    }
+                    DebugPrint( ret, "Error, "
+                        "the file is still "
+                        "being used" );
+                    ret = -EBUSY;
+                    break;
                 }
+                else if( pFile->GetState() ==
+                    stateStopped )
+                {
+                    ret = -ENOENT;
+                    DebugPrint( ret, "Error, "
+                        "the file is being "
+                        "removed" );
+                    break;
+                }
+
+                CDirImage* pSubDir = pFile;
+                while( pSubDir != nullptr )
+                {
+                    READLOCK( pSubDir );
+                    ret = pSubDir->GetRootKeyCount();
+                    if( ret > 0 )
+                    {
+                        ret = -ENOTEMPTY;
+                        DebugPrint( ret, "Error, "
+                            "the directory is not "
+                            "empty to remove" );
+                    }
+                    break;
+                }
+
+                this->RemoveFileDirect(
+                    dwInodeIdx, pFile );
 
                 KEYPTR_SLOT oKey;
                 this->RemoveSlotAt( idx, oKey );
@@ -1893,13 +1909,6 @@ gint32 CDirImage::CreateLink( const char* szName,
         if( ERROR( ret ) )
             break;
 
-        bool bRet = this->Search(
-            szName, pImg, pNode );
-        if( !bRet )
-        {
-            ret = -EFAULT;
-            break;
-        }
         gint32 dwSize = strlen( szLink );
         ret = pImg->WriteFile(
             0, dwSize, szLink );
