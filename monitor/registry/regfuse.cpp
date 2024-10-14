@@ -22,7 +22,10 @@
  *
  * =====================================================================================
  */
-#define FUSE_USE_VERSION 31
+#define FUSE_USE_VERSION FUSE_VERSION
+#if BUILD_64 == 0
+#define _FILE_OFFSET_BITS 64
+#endif
 
 #define _GNU_SOURCE
 
@@ -47,7 +50,9 @@
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
+#include "blkalloc.h"
 
+using namespace rpcf;
 
 static int fill_dir_plus = 0;
 
@@ -74,10 +79,21 @@ static void *regfs_init(struct fuse_conn_info *conn,
 static int regfs_getattr(const char *path, struct stat *stbuf,
 		       struct fuse_file_info *fi)
 {
-	(void) fi;
+    gint32 ret = -EACCES;
+    do{
+        CRegistryFs* pfs = g_pRegfs;
+        ret = pfs->GetAttr( path, stbuf );
+
+    }while( 0 );
+
+    return ret;
+}
+
+static int regfs_statfs(const char *path, struct statvfs *stbuf)
+{
 	int res;
 
-	res = lstat(path, stbuf);
+	res = statvfs(path, stbuf);
 	if (res == -1)
 		return -errno;
 
@@ -88,25 +104,8 @@ static int regfs_access(const char *path, int mask)
 {
     gint32 ret = -EACCES;
     do{
-        guint32 dwMode = GetMode();
-        bool bReq =
-           (  ( flags & W_OK ) != 0 );
-        bool bCur =
-           ( ( dwMode & S_IWUSR ) != 0 );
-        if( !bCur && bReq )
-            break;
-
-        bReq = (  ( flags & R_OK ) != 0 );
-        bCur = ( ( dwMode & S_IRUSR ) != 0 );
-        if( !bCur && bReq )
-            break;
-
-        bReq = (  ( flags & X_OK ) != 0 );
-        bCur = ( ( dwMode & S_IXUSR ) != 0 );
-        if( !bCur && bReq )
-            break;
-
-        ret = 0;
+        CRegistryFs* pfs = g_pRegfs;
+        ret = pfs->Access( path, mask );
 
     }while( 0 );
 
@@ -128,25 +127,42 @@ static int regfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	DIR *dp;
 	struct dirent *de;
 
-	(void) offset;
 	(void) fi;
 	(void) flags;
+    gint32 ret = 0;
+    do{
+        stdstr strPath = path;
+        CRegistryFs* pfs = g_pRegfs;
 
-	dp = opendir(path);
-	if (dp == NULL)
-		return -errno;
+        ret = pfs->OpenDir(path, R_OK, hFile, nullptr );
+        if( ERROR( ret ) )
+            break; 
 
-	while ((de = readdir(dp)) != NULL) {
-		struct stat st;
-		memset(&st, 0, sizeof(st));
-		st.st_ino = de->d_ino;
-		st.st_mode = de->d_type << 12;
-		if (filler(buf, de->d_name, &st, 0, fill_dir_plus))
-			break;
-	}
+        std::vector< KEYPTR_SLOT > vecDirEnt;
+        ret = pfs->ReadDir( hFile, vecDirEnt );
+        if( ERROR( ret ) )
+            break;
 
-	closedir(dp);
-	return 0;
+        off_t i = offset;
+        for( ;i < vecDirEnt.size(); i++ )
+        {
+            auto& elem =  vecDirEnt[ i ];
+            struct stat st;
+            memset(&st, 0, sizeof(st));
+            st.st_ino = elem.oLeaf.dwInodeIdx;
+            if( elem.oLeaf.byFileType == ftRegular )
+                st.st_mode = S_IFREG;
+            else if( elem.oLeaf.byFileType == ftDirectory )
+                st.st_mode = S_IFDIR;
+            else if( elem.oLeaf.byFileType == ftLink )
+                st.st_mode = S_IFLNK;
+            if( filler( buf,
+                elem.szKey, &st, 0, fill_dir_plus) )
+                break;
+        }
+        ret = pfs->CloseFile( hFile );
+    }
+	return ret;
 }
 
 static int regfs_mkdir(const char *path, mode_t mode)
@@ -178,7 +194,7 @@ static int regfs_symlink(const char *from, const char *to)
     return  pfs->SymLink( strFrom, strTo );
 }
 
-static int regfs_rename(const char *from,
+static int regfs_rename( const char *from,
     const char *to, unsigned int flags)
 {
     if( flags )
@@ -192,27 +208,28 @@ static int regfs_rename(const char *from,
 static int regfs_chmod(const char *path, mode_t mode,
 		     struct fuse_file_info *fi)
 {
-	(void) fi;
-	int res;
+    gint32 ret = -EACCES;
+    do{
+        CRegistryFs* pfs = g_pRegfs;
+        ret = pfs->Chmod( path, mode, nullptr );
 
-	res = chmod(path, mode);
-	if (res == -1)
-		return -errno;
+    }while( 0 );
 
-	return 0;
+    return ret;
 }
 
 static int regfs_chown(const char *path, uid_t uid, gid_t gid,
 		     struct fuse_file_info *fi)
 {
-	(void) fi;
-	int res;
+    gint32 ret = -EACCES;
+    do{
+        CRegistryFs* pfs = g_pRegfs;
+        ret = pfs->Chown(
+            path, uid, gid, nullptr );
 
-	res = lchown(path, uid, gid);
-	if (res == -1)
-		return -errno;
+    }while( 0 );
 
-	return 0;
+    return ret;
 }
 
 static int regfs_truncate(const char *path, off_t size,
@@ -240,22 +257,6 @@ static int regfs_truncate(const char *path, off_t size,
 
 	return ret;
 }
-
-#ifdef HAVE_UTIMENSAT
-static int regfs_utimens(const char *path, const struct timespec ts[2],
-		       struct fuse_file_info *fi)
-{
-	(void) fi;
-	int res;
-
-	/* don't use utime/utimes since they follow symlinks */
-	res = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
-	if (res == -1)
-		return -errno;
-
-	return 0;
-}
-#endif
 
 static int regfs_create(const char *path, mode_t mode,
     struct fuse_file_info *fi)
@@ -335,17 +336,6 @@ static int regfs_write(const char *path,
     }while( 0 );
 
 	return ret;
-}
-
-static int regfs_statfs(const char *path, struct statvfs *stbuf)
-{
-	int res;
-
-	res = statvfs(path, stbuf);
-	if (res == -1)
-		return -errno;
-
-	return 0;
 }
 
 static int regfs_release(const char *path, struct fuse_file_info *fi)
@@ -488,7 +478,7 @@ static const struct fuse_operations regfs_oper = {
 	.create 	= regfs_create,
 	.read		= regfs_read,
 	.write		= regfs_write,
-	.statfs		= regfs_statfs,
+//	.statfs		= regfs_statfs,
 	.release	= regfs_release,
 	.fsync		= regfs_fsync,
 #ifdef HAVE_SETXATTR
@@ -497,6 +487,7 @@ static const struct fuse_operations regfs_oper = {
 	.listxattr	= regfs_listxattr,
     .removexattr = regfs_removexattr,
 #endif
+    .opendir    = regfs_opendir,
 };
 
 ObjPtr g_pIoMgr;

@@ -358,6 +358,9 @@ gint32 CRegistryFs::OpenFile(
         if( ERROR( ret ) )
             break;
 
+        if( dwFlags & O_TRUNC )
+            pFile->Truncate( 0 );
+
         CStdRMutex oLock( this->GetExclLock() )
         pOpenFile->SetFlags( dwFlags );
         hFile = pOpenFile->GetObjId();
@@ -846,6 +849,39 @@ gint32 CRegistryFs::Chmod(
     return ret;
 }
 
+gint32 CRegistryFs::Chown(
+    const stdstr& strPath,
+    uid_t dwUid, gid_t dwGid,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strLinkPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strFile =
+            basename( strPath.c_str() );
+
+        CDirImage* pDir = dirPtr;
+        FImgSPtr pFile;
+        CBPlusNode* pNode = nullptr;
+        ret = pDir->Search(
+            strFile.c_str(), pFile, pNode );
+        if( ERROR( ret ) )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pFile->SetUid( dwUid );
+        pFile->SetGid( dwGid );
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRegistryFs::Rename(
     const stdstr& strFrom, const stdstr& strTo )
 {
@@ -921,31 +957,76 @@ gint32 CRegistryFs::Access(
             ret = -ENOENT;
             break;
         }
-        mode_t dwMode = pFile->GetMode();
 
-        ret = -EACCES;
-        bool bReq =
-           (  ( flags & W_OK ) != 0 );
-        bool bCur =
-           ( ( dwMode & S_IWUSR ) != 0 );
-
-        if( !bCur && bReq )
-            break;
-
-        bReq = (  ( flags & R_OK ) != 0 );
-        bCur = ( ( dwMode & S_IRUSR ) != 0 );
-        if( !bCur && bReq )
-            break;
-
-        bReq = ( ( flags & X_OK ) != 0 );
-        bCur = ( ( dwMode & S_IXUSR ) != 0 );
-        if( !bCur && bReq )
-            break;
-        ret = 0;
+        READ_LOCK( pFile );
+        ret = pFile->CheckAccess( dwFlags );
 
     }while( 0 );
     return ret;
+}
 
+gint32 CRegistryFs::OpenDir(
+    const stdstr& strPath,
+    mode_t dwMode, RFHANDLE hFile,
+    CAccessContext* pac )
+{
+    return OpenFile( strPath,
+        R_OK, dwMode, hFile, pac );
+}
+
+gint32 CRegistryFs::ReadDir( RFHANDLE hDir,
+    std::vector< KEYPTR_SLOT > vecDirEnt )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        CStdRMutex oLock( GetExclLock() );
+        FileSPtr pFile;
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr == m_mapOpenFiles.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pFile = itr->second;
+        oLock->Unlock();
+        ret = pFile->ListDir( vecDirEnt );
+        if( ERROR( ret ) )
+            break;
+    }while( 0 );
+    return 0;
+}
+
+gint32 CRegistryFs::GetAttr(
+    const stdstr& strPath,
+    struct stat& stBuf )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strLinkPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+
+        std::string strFile =
+            basename( strPath.c_str() );
+
+        CDirImage* pDir = dirPtr;
+        FImgSPtr pFile;
+        CBPlusNode* pNode = nullptr;
+        ret = pDir->Search(
+            strFile.c_str(), pFile, pNode );
+        if( ERROR( ret ) )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        ret = pFile->GetAttr( stBuf );
+
+    }while( 0 );
+    return ret;
 }
 
 }

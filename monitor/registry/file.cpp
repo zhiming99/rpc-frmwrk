@@ -1345,7 +1345,7 @@ gid_t CFileImage::GetGid() const
     gint32 ret = 0;
     do{
         READ_LOCK( this );
-        return ( gid_t )m_oInodeStore.m_wgid;
+        return GetGidNoLock(); 
     }while( 0 );
     return ret;
 }
@@ -1355,7 +1355,7 @@ uid_t CFileImage::GetUid() const
     gint32 ret = 0;
     do{
         READ_LOCK( this );
-        return ( uid_t )m_oInodeStore.m_wuid;
+        return GetUidNoLock();
     }while( 0 );
     return ret;
 }
@@ -1366,6 +1366,77 @@ mode_t CFileImage::GetMode() const
     do{
         READ_LOCK( this );
         return GetModeNoLock();
+    }while( 0 );
+    return ret;
+}
+
+gint32 CFileImage::GetAttr( struct stat& stBuf )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        stbuf.st_uid = this->GetUidNoLock();
+        stbuf.st_gid = this->GetGidNoLock();
+        stbuf.st_atime = m_oInodeStore.m_dwatime;
+        stbuf.st_mtime = m_oInodeStore.m_dwmtime;
+        stbuf.st_mode = this->GetModeNoLock();
+        stbuf.st_ino = this->GetInodeIdx();
+
+    }while( 0 );
+    return ret;
+}
+gint32 CDirImage::CheckAccess(
+    mode_t dwReq )
+{
+    gint32 ret = 0;
+    do{
+        mode_t dwMode = this->GetModeNoLock();
+        uid_t dwUid = this->GetUidNoLock();
+        gid_t dwGid = this->GetGidNoLock();
+
+        uid_t dwCurUid = geteuid();
+        gid_t dwCurGid = getegid();
+
+        guint32 dwWriteFlag;
+        guint32  dwExeFlag;
+        if( dwCurUid == dwUid )
+        {
+            dwReadFlag = S_IRUSR;
+            dwWriteFlag = S_IWUSR;
+            dwWriteFlag = S_IXUSR;
+        }
+        else if( dwCurGid == dwGid )
+        {
+            dwReadFlag = S_IRGRP;
+            dwWriteFlag = S_IWGRP;
+            dwWriteFlag = S_IXGRP;
+        }
+        else
+        {
+            dwReadFlag = S_IROTH;
+            dwWriteFlag = S_IWOTH;
+            dwWriteFlag = S_IXOTH;
+        }
+
+        ret = -EACCES;
+        bool bReq =
+           (  ( dwReq & W_OK ) != 0 );
+        bool bCur =
+           ( ( dwMode & dwWriteFlag ) != 0 );
+
+        if( !bCur && bReq )
+            break;
+
+        bReq = (  ( dwReq & R_OK ) != 0 );
+        bCur = ( ( dwMode & dwReadFlag ) != 0 );
+        if( !bCur && bReq )
+            break;
+
+        bReq = ( ( dwReq & X_OK ) != 0 );
+        bCur = ( ( dwMode & dwExeFlag ) != 0 );
+        if( !bCur && bReq )
+            break;
+        ret = 0;
     }while( 0 );
     return ret;
 }

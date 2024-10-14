@@ -718,8 +718,18 @@ struct CFileImage :
     gid_t GetGid() const;
     uid_t GetUid() const;
     mode_t GetMode() const;
-    mode_t GetModeNoLock() const
+
+    inline mode_t GetModeNoLock() const
     { return ( mode_t )m_oInodeStore.m_dwMode; }
+
+    inline uid_t GetGidNoLock() const
+    { return ( uid_t )m_oInodeStore.m_wgid; }
+
+    inline uid_t GetUidNoLock() const
+    { return ( uid_t )m_oInodeStore.m_wuid; }
+
+
+    gint32 CheckAccess( mode_t dwMode );
 };
 
 typedef CAutoPtr< clsid( Invalid ), CFileImage > FImgSPtr;
@@ -1302,6 +1312,8 @@ struct CDirImage :
 
     gint32 Rename( const char* szFrom,
         const char* szTo);
+    gint32 ListDir(
+        std::vector< KEYPTR_SLOT > vecDirEnt ) const;
 };
 
 class COpenFileEntry;
@@ -1573,6 +1585,11 @@ class CRegistryFs :
         const stdstr& strPath, mode_t dwMode,
         CAccessContext* pac = nullptr );
 
+    gint32 Chown(
+        const stdstr& strPath,
+        uid_t dwUid, gid_t dwGid,
+        CAccessContext* pac = nullptr )
+
     gint32 ReadLink(
         const stdstr& strPath,
         char* buf, guint32& dwSize );
@@ -1586,6 +1603,16 @@ class CRegistryFs :
 
     gint32 Access( const stdstr& strPath,
         guint32 dwFlags );
+
+    gint32 GetAttr( const stdstr& strPath,
+        struct stat& stBuf );
+
+    gint32 ReadDir( RFHANDLE hDir,
+        std::vector< KEYPTR_SLOT > vecDirEnt );
+
+    gint32 OpenDir( const stdstr strPath,
+        mode_t dwMode,
+        CAccessContext* pac = nullptr );
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegfsPtr;

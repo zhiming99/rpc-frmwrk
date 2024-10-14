@@ -70,8 +70,10 @@ gint32 CSuperBlock::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
-        char arrSb[ SUPER_BLOCK_SIZE ];
-        memset( arrSb, 0, sizeof( arrSb ) );
+        BufPtr pBuf( true );
+        pBuf->Resize( SUPER_BLOCK_SIZE );
+        char *arrSb = pBuf->ptr();
+        memset( arrSb, 0, SUPER_BLOCK_SIZE );
         guint32* p = ( guint32* )arrSb;
 
         p[ 0 ] = m_dwMagic;
@@ -79,7 +81,7 @@ gint32 CSuperBlock::Flush( guint32 dwFlags )
         p[ 2 ] = htonl( m_dwBlkSize );
         p[ 3 ] = htonl( m_dwPageSize );
         ret = m_pAlloc->SaveSuperBlock(
-            arrSb, sizeof( arrSb ) );
+            arrSb, SUPER_BLOCK_SIZE );
     }while( 0 );
     return ret;
 }
@@ -101,9 +103,11 @@ gint32 CSuperBlock::Reload()
 {
     gint32 ret = 0;
     do{
-        char arrSb[ SUPER_BLOCK_SIZE ];
+        BufPtr pBuf( true );
+        pBuf->Resize( SUPER_BLOCK_SIZE );
+        char *arrSb = pBuf->ptr();
         ret = m_pAlloc->LoadSuperBlock(
-            arrSb, sizeof( arrSb ) );
+            arrSb, SUPER_BLOCK_SIZE );
         if( ERROR( ret ) )
             break;
 
@@ -598,14 +602,17 @@ gint32 CBlockBitmap::Flush( guint32 dwFlags )
             ( m_dwGroupIdx << GROUP_SHIFT );
         DECL_ARRAY2( guint32,
             arrBlks, BLKBMP_BLKNUM );
-        for( int i = 0; i < sizeof( arrBlks ); i++ )
+        guint32 i = 0;
+        guint32 dwCount = BLKBMP_BLKNUM;
+        guint32 dwSize =
+            dwCount * sizeof( guint32 );
+        for( ; i < dwCount  i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         guint16* p = ( guint16* )
-            m_arrBytes + sizeof( m_arrBytes );
+            ( m_arrBytes + dwSize );
         p[ -1 ] = htons( m_wFreeCount );
         ret = m_pAlloc->WriteBlocks(
-            arrBlks, sizeof( arrBlks ),
-            m_arrBytes, true );
+            arrBlks, dwCount, m_arrBytes, true );
         if( ERROR( ret ) )
             break;
     }while( 0 );
@@ -629,15 +636,19 @@ gint32 CBlockBitmap::Reload()
             ( m_dwGroupIdx << GROUP_SHIFT );
         DECL_ARRAY2( guint32,
             arrBlks, BLKBMP_BLKNUM );
-        for( int i = 0; i < sizeof( arrBlks ); i++ )
+        guint32 i = 0;
+        guint32 dwCount = BLKBMP_BLKNUM;
+        guint32 dwSize =
+            dwCount * sizeof( guint32 );
+        for( ; i < dwCount; i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         ret = m_pAlloc->ReadBlocks(
-            arrBlks, sizeof( arrBlks ),
+            arrBlks, dwCount,
             m_arrBytes, true );
         if( ERROR( ret ) )
             break;
         guint16* p = ( guint16* )
-            &m_arrBytes[sizeof( m_arrBytes )];
+            &m_arrBytes[ dwSize ];
         m_wFreeCount = ntohs( p[ -1 ] );
     }while( 0 );
 

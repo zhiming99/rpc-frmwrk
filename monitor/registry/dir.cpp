@@ -1874,6 +1874,7 @@ gint32 CDirImage::CreateFile(
     return ret;
 }
 
+
 gint32 CDirImage::CreateFile(
     const char* szName,
     mode_t dwMode,
@@ -1881,9 +1882,55 @@ gint32 CDirImage::CreateFile(
 {
     gint32 ret = 0;
     do{
-        CreateFile( szName, ftRegular, pImg );
+        ret = CheckAccess( W_OK | X_OK );
+        if( ERROR( ret ) )
+            break;
+
+        ret = CreateFile(
+            szName, ftRegular, pImg );
+
         SetMode( dwMode );
     }while( 0 );
+    return ret;
+}
+
+gint32 CDirImage::ListDir(
+    std::vector< KEYPTR_SLOT > vecDirEnt ) const
+{
+    bool bRet = false;
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        guint32 dwCount = 0;
+        pNode = nullptr;
+        CBPlusNode* pCurNode = m_pRootNode->get(); 
+        while( !pCurNode->IsLeaf() )
+            pCurNode = pCurNode->GetChild( 0 );
+
+        while( pCurNode != nullptr )
+        {
+            guint32 i = 0;
+            for( ;i < pCurNode->GetKeyCount(); i++ )
+            {
+                KEYPTR_SLOT* pKey =
+                    pCurNode->GetSlot( i );
+                vecDirEnt.push_back( *pKey );
+            }
+            guint32 dwBNodeIdx =
+                pCurNode->GetNextLeaf();
+
+            if( dwBNodeIdx == INVALID_BNODE_IDX )
+                break;
+
+            pCurNode = this->GetChildDirect(
+                dwBNodeIdx );
+        }
+
+    }while( 0 );
+
+    if( ERROR( ret ) )
+        DebugPrint( ret,
+            "Error occurs during Search" );
     return ret;
 }
 
