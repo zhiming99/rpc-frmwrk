@@ -189,7 +189,7 @@ gint32 CRegistryFs::Stop()
 
 gint32 CRegistryFs::Namei(
     const stdstr& strPath,
-    std::vector<stdstr>& vecNames ) const
+    std::vector<stdstr>& vecNames )
 {
     gint32 ret = 0;
     do{
@@ -970,8 +970,8 @@ gint32 CRegistryFs::OpenDir(
     mode_t dwMode, RFHANDLE hFile,
     CAccessContext* pac )
 {
-    return OpenFile( strPath,
-        R_OK, dwMode, hFile, pac );
+    return OpenFile(
+        strPath, R_OK, hFile, pac );
 }
 
 gint32 CRegistryFs::ReadDir( RFHANDLE hDir,

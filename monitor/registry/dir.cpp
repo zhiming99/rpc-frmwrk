@@ -1653,6 +1653,24 @@ gint32 CBPlusNode::RemoveFile(
     return ret;
 }
 
+guint32 CDirImage::GetRootKeyCount() const 
+{ 
+    CStdRMutex oLock( GetExclLock() );
+    return m_pRootNode->GetKeyCount();
+}
+
+gint32 CDirImage::ReleaseFreeBNode(
+    guint32 dwBNodeIdx )
+{
+    return m_pRootNode->ReleaseFreeBNode(
+        dwBNodeIdx );
+}
+guint32 CDirImage::GetHeadFreeBNode()
+{ return m_pRootNode->GetFreeBNodeIdx(); }
+
+void CDirImage::SetHeadFreeBNode()
+{ return m_pRootNode->SetFreeBNodeIdx(); }
+
 bool CDirImage::Search( const char* szKey,
     FImgSPtr& pFile, CBPlusNode*& pNode )
 {

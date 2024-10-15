@@ -359,6 +359,7 @@ typedef enum : guint32
     DECL_CLSID( CLinkImage ),
     DECL_CLSID( COpenFileEntry ),
     DECL_CLSID( CDirFileEntry ),
+    DECL_CLSID( CLinkFileEntry ),
     DECL_CLSID( MaxClsid ),
 
     DECL_CLSID( ClassFactoryStart ) = 0x02000000,

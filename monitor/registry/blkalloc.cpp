@@ -754,13 +754,14 @@ gint32 CBlockAllocator::LoadSuperBlock(
 }
 
 gint32 CBlockAllocator::SaveGroupBitmap(
-    const* pbmp, guint32 dwSize )
+    const char* pbmp, guint32 dwSize )
 {
     if( dwSize < GRPBMP_SIZE_FULL )
         return -EINVAL;
 
     gint32 ret = ReadWriteFile(
-        pbmp, GRPBMP_SIZE_FULL,
+        const_cast< char* >( pbmp ), 
+        GRPBMP_SIZE_FULL,
         GRPBMP_START, false );
     return ret;
 }

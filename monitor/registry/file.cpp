@@ -1514,5 +1514,19 @@ gint32 COpenFileEntry::WriteFile(
     return STATUS_SUCCESS;
 }
 
-
+gint32 COpenFileEntry::GetOpenFile(
+    RFHANDLE hFile, FileSPtr pFile )
+{
+    FileSPtr pFile;
+    do{
+        CStdRMutex oLock( pfs->GetExclLock() );
+        auto itr = pfs->m_mapOpenFiles.find( hFile );
+        if( itr == pfs->m_mapOpenFiles.end() )
+        {
+            ret = -EBADF;
+            break;
+        }
+        pFile = itr->second;
+    }while( 0 );
+    return 
 }

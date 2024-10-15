@@ -27,7 +27,7 @@
 #define _FILE_OFFSET_BITS 64
 #endif
 
-#define _GNU_SOURCE
+//#define _GNU_SOURCE
 
 #ifdef linux
 /* For pread()/pwrite()/utimensat() */
@@ -50,11 +50,20 @@
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
+#include "rpc.h"
+using namespace rpcf;
 #include "blkalloc.h"
 
-using namespace rpcf;
-
+static RegFsPtr g_pRegfs;
 static int fill_dir_plus = 0;
+static std::string g_strMPoint;
+static std::string g_strRegFsFile;
+static bool g_bFormat = false;
+
+ObjPtr g_pIoMgr;
+std::set< guint32 > g_setMsgIds;
+static bool g_bLogging = false;
+
 
 static void *regfs_init(struct fuse_conn_info *conn,
 		      struct fuse_config *cfg)
@@ -82,7 +91,7 @@ static int regfs_getattr(const char *path, struct stat *stbuf,
     gint32 ret = -EACCES;
     do{
         CRegistryFs* pfs = g_pRegfs;
-        ret = pfs->GetAttr( path, stbuf );
+        ret = pfs->GetAttr( path, *stbuf );
 
     }while( 0 );
 
@@ -112,11 +121,13 @@ static int regfs_access(const char *path, int mask)
     return ret;
 }
 
-static int regfs_readlink(const char *path, char *buf, size_t size)
+static int regfs_readlink(
+    const char *path, char *buf, size_t size)
 {
     stdstr strPath = path;
     CRegistryFs* pfs = g_pRegfs;
-    return pfs->ReadLink( strPath, buf, size );
+    guint32 dwSize = size;
+    return pfs->ReadLink( strPath, buf, dwSize );
 }
 
 
@@ -134,7 +145,9 @@ static int regfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         stdstr strPath = path;
         CRegistryFs* pfs = g_pRegfs;
 
-        ret = pfs->OpenDir(path, R_OK, hFile, nullptr );
+        RFHANDLE hFile = INVALID_HANDLE;
+        ret = pfs->OpenDir(
+            strPath, R_OK, hFile, nullptr );
         if( ERROR( ret ) )
             break; 
 
@@ -156,12 +169,12 @@ static int regfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                 st.st_mode = S_IFDIR;
             else if( elem.oLeaf.byFileType == ftLink )
                 st.st_mode = S_IFLNK;
-            if( filler( buf,
-                elem.szKey, &st, 0, fill_dir_plus) )
+            if( filler( buf, elem.szKey, &st, 0,
+                ( fuse_fill_dir_flags )0 ) )
                 break;
         }
         ret = pfs->CloseFile( hFile );
-    }
+    }while( 0 );
 	return ret;
 }
 
@@ -169,7 +182,7 @@ static int regfs_mkdir(const char *path, mode_t mode)
 {
     stdstr strPath = path;
     CRegistryFs* pfs = g_pRegfs;
-    return  pfs->MakeDir( strPath, dwMode );
+    return  pfs->MakeDir( strPath, mode );
 }
 
 static int regfs_unlink(const char *path)
@@ -241,7 +254,7 @@ static int regfs_truncate(const char *path, off_t size,
         CRegistryFs* pfs = g_pRegfs;
         RFHANDLE hFile;
         if( fi != nullptr )
-            ret = pfs->Truncate( fi->fh, size ),
+            ret = pfs->Truncate( fi->fh, size );
         else
         {
             ret = pfs->OpenFile( strPath,
@@ -309,8 +322,9 @@ static int regfs_read(const char *path,
             break;
         }
         CRegistryFs* pfs = g_pRegfs;
+        guint32 dwSize = size;
         ret = pfs->ReadFile(
-            hFile, buf, size, offset );
+            hFile, buf, dwSize, offset );
 
     }while( 0 );
 
@@ -330,8 +344,9 @@ static int regfs_write(const char *path,
             break;
         }
         CRegistryFs* pfs = g_pRegfs;
+        guint32 dwSize = size;
         ret = pfs->WriteFile(
-            hFile, buf, size, offset );
+            hFile, buf, dwSize, offset );
 
     }while( 0 );
 
@@ -374,15 +389,10 @@ static int regfs_fsync(const char *path, int isdatasync,
         guint32 dwFlags = FLAG_FLUSH_DATAONLY;
         CRegistryFs* pfs = g_pRegfs;
         READ_LOCK( pfs );
-        CStdRMutex oLock( this->GetExclLock() )
-        auto itr = m_mapOpenFiles.find( hFile );
-        if( itr == m_mapOpenFiles.end() )
-        {
-            ret = -EBADF;
+        FileSPtr pOpen;
+        ret = pfs->GetOpenFile( hFile, pOpen );
+        if( ERROR( ret ) )
             break;
-        }
-        oLock.Unlock();
-        COpenFileEntry* pOpen = itr->second;
         ret = pOpen->Flush( dwFlags );
 
     }while( 0 );
@@ -390,7 +400,6 @@ static int regfs_fsync(const char *path, int isdatasync,
 	return ret;
 }
 
-#ifdef HAVE_SETXATTR
 /* xattr operations are optional and can safely be left unimplemented */
 static int regfs_setxattr(const char *path, const char *name, const char *value,
 			size_t size, int flags)
@@ -456,45 +465,51 @@ static int regfs_listxattr(const char *path, char *list, size_t size)
 static int regfs_removexattr(const char *path, const char *name)
 { return -ENOTSUP; }
 
-#endif /* HAVE_SETXATTR */
+static int regfs_opendir(
+    const char* path, fuse_file_info* fi )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPath = path;
+        CRegistryFs* pfs = g_pRegfs;
+        RFHANDLE hFile;
+        ret = pfs->OpenDir( strPath,
+            fi->flags, hFile, nullptr );
+        if( ERROR( ret ) )
+            break;
+        fi->fh = hFile;
+    }while( 0 );
+    return STATUS_SUCCESS;
+}
 
 static const struct fuse_operations regfs_oper = {
-	.init           = regfs_init,
 	.getattr	= regfs_getattr,
-	.access		= regfs_access,
 	.readlink	= regfs_readlink,
-	.readdir	= regfs_readdir,
 	.mkdir		= regfs_mkdir,
-	.symlink	= regfs_symlink,
 	.unlink		= regfs_unlink,
 	.rmdir		= regfs_rmdir,
+	.symlink	= regfs_symlink,
 	.rename		= regfs_rename,
 //	.link		= regfs_link,
 	.chmod		= regfs_chmod,
 	.chown		= regfs_chown,
 	.truncate	= regfs_truncate,
-#endif
 	.open		= regfs_open,
-	.create 	= regfs_create,
 	.read		= regfs_read,
 	.write		= regfs_write,
 //	.statfs		= regfs_statfs,
 	.release	= regfs_release,
 	.fsync		= regfs_fsync,
-#ifdef HAVE_SETXATTR
 	.setxattr	= regfs_setxattr,
 	.getxattr	= regfs_getxattr,
 	.listxattr	= regfs_listxattr,
-    .removexattr = regfs_removexattr,
-#endif
+//    .removexattr = regfs_removexattr,
     .opendir    = regfs_opendir,
+	.readdir	= regfs_readdir,
+	.init       = regfs_init,
+	.access		= regfs_access,
+	.create 	= regfs_create,
 };
-
-ObjPtr g_pIoMgr;
-RegFsPtr g_pRegfs;
-
-std::set< guint32 > g_setMsgIds;
-bool g_bLogging = false;
 
 gint32 InitContext()
 {
@@ -562,9 +577,10 @@ int _main( int argc, char** argv)
         return ret;
     }
     do{ 
-        CParamList oParams.SetStrProp(
-            propConfigPath, g_strMPoint );
-        ret = g_pRegfs->NewObj(
+        CParamList oParams;
+        oParams.SetStrProp(
+            propConfigPath, g_strRegFsFile );
+        ret = g_pRegfs.NewObj(
             clsid( CRegistryFs ),
             oParams.GetCfg() );
         if( ERROR( ret ) )
@@ -588,7 +604,7 @@ int _main( int argc, char** argv)
 
         g_pRegfs->Stop();
         if( ret > 0 )
-            ret = -iRet;
+            ret = -ret;
 
         g_pRegfs.Clear();
 
@@ -598,8 +614,6 @@ int _main( int argc, char** argv)
     return ret;
 }
 
-static std::string g_strMPoint;
-static bool g_bFormat = false;
 void Usage( char* szName )
 {
     fprintf( stderr,
