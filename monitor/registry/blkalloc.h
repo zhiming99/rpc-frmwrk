@@ -71,6 +71,9 @@
 #define BLKBMP_BLKNUM \
     ( BLOCKS_PER_GROUP_FULL / ( BLOCK_SIZE * BYTE_BITS ) )
 
+#define BLKBMP_SIZE \
+    ( BLOCKS_PER_GROUP_FULL / BYTE_BITS )
+
 #define BLOCK_IDX_MASK \
     ( BLOCKS_PER_GROUP_FULL - 1 )
 
@@ -193,7 +196,7 @@
 #define FLAG_FLUSH_CHILD 0x01
 #define FLAG_FLUSH_DATAONLY 0x02
 
-extern ObjPtr g_pIoMgr;
+extern rpcf::ObjPtr g_pIoMgr;
 
 namespace rpcf{
 
@@ -224,8 +227,8 @@ struct CSuperBlock : public ISynchronize
 
 using SblkUPtr = typename std::unique_ptr< CSuperBlock >;
 
-guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
-guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
+extern guint32 g_dwBlockSize;
+extern guint32 g_dwRegFsPageSize;
 
 inline guint32 GetBlockSize()
 { return g_dwBlockSize; }
@@ -256,6 +259,8 @@ struct CBlockBitmap :
         m_arrBytes = ( guint8* )m_pBytes->ptr();
     }
 
+    gint32 FreeBlock( guint32 dwBlkIdx );
+
     gint32 AllocBlocks(
         guint32* pvecBlocks,
         guint32& dwNumBlocks );
@@ -274,7 +279,7 @@ struct CBlockBitmap :
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
-} ;
+};
 
 using BlkBmpUPtr = typename std::unique_ptr< CBlockBitmap >;
 
@@ -331,6 +336,8 @@ struct CBlockGroup : public ISynchronize
     }
 };
 
+typedef CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator > AllocPtr;
+
 using BlkGrpUPtr = typename std::unique_ptr< CBlockGroup >;
 struct CGroupBitmap :
     public ISynchronize
@@ -338,16 +345,18 @@ struct CGroupBitmap :
     guint8* m_arrBytes; //[ BLKGRP_NUMBER_FULL ];
     BufPtr m_pBytes;
     guint16 m_wFreeCount;
+    AllocPtr m_pAlloc;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
 
     inline guint32 GetAllocCount() const
     { return BLKGRP_NUMBER - m_wFreeCount; }
 
-    CGroupBitmap()
+    CGroupBitmap( AllocPtr pAlloc ) :
+        m_pAlloc( pAlloc )
     {
         m_pBytes.NewObj();
-        m_pBytes->Resize( BLKGRP_NUMBER_FULL );
+        m_pBytes->Resize( GRPBMP_SIZE );
         m_arrBytes = ( guint8* )m_pBytes->ptr();
     }
 
@@ -362,11 +371,9 @@ struct CGroupBitmap :
     gint32 Reload() override;
 };
 
-using GrpBmpUPtr = typename std::unique_ptr< CGroupBitmap >;
+typedef std::unique_ptr< CGroupBitmap > GrpBmpUPtr;
 
-typedef CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator > AllocPtr;
-
-using CONTBLKS=std::pair< guint32, guint32 >;
+typedef std::pair< guint32, guint32 > CONTBLKS;
 
 class CBlockAllocator :
     public CObjBase,
@@ -409,7 +416,7 @@ class CBlockAllocator :
         const char* pSb, guint32 dwSize );
 
     gint32 LoadSuperBlock(
-        char* pSb, guint32 dwSize ) const;
+        char* pSb, guint32 dwSize );
 
     gint32 FreeBlocks(
         const guint32* pvecBlocks,
@@ -418,7 +425,7 @@ class CBlockAllocator :
 
     gint32 AllocBlocks( 
         guint32* pvecBlocks,
-        guint32& dwNumBlocks );
+        guint32 dwNumBlocks );
 
     // write pBuf to dwBlockIdx, till the end of the
     // block or the end of the pBuf.
@@ -749,6 +756,7 @@ struct CFileImage :
 
 
     gint32 CheckAccess( mode_t dwMode );
+    gint32 GetAttr( struct stat& stBuf );
 };
 
 struct CLinkImage :
@@ -1451,6 +1459,12 @@ struct CDirFileEntry :
     gint32  FindChild( const stdstr& strName ) const;
     gint32  RemoveFile( const stdstr& strName );
     gint32  RemoveSubDir( const stdstr& strName );
+    gint32  ListDir(
+        std::vector< KEYPTR_SLOT > vecDirEnt ) const
+    {   
+        CDirImage* pImg = m_pFileImage;
+        return pImg->ListDir( vecDirEnt );
+    }
 
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
@@ -1528,7 +1542,7 @@ class CRegistryFs :
     gint32 GetFile( RFHANDLE hFile,
         FileSPtr& pFile );
 
-    RFHANDLE OpenFile( const stdstr& strPath,
+    gint32 OpenFile( const stdstr& strPath,
         guint32 dwFlags, RFHANDLE& hFile,
         CAccessContext* pac = nullptr );
 
@@ -1609,9 +1623,12 @@ class CRegistryFs :
     gint32 ReadDir( RFHANDLE hDir,
         std::vector< KEYPTR_SLOT > vecDirEnt );
 
-    gint32 OpenDir( const stdstr strPath,
+    gint32 OpenDir( const stdstr& strPath,
         mode_t dwMode, RFHANDLE hDir,
         CAccessContext* pac = nullptr );
+
+    gint32 GetParentDir(
+        const stdstr& strPath, FImgSPtr& pDir );
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;
