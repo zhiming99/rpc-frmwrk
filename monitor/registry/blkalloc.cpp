@@ -1064,7 +1064,7 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
                 break;
             }
             ret = ReadWriteFile(
-                pBuf + dwOffInBuf,
+                ( char* )pBuf + dwOffInBuf,
                 BLOCK_SIZE * elem.second,
                 off, bRead );
 
@@ -1085,7 +1085,7 @@ gint32 CBlockAllocator::ReadWriteBlocks(
 {
     if( pBlocks == nullptr ||
         pBuf == nullptr ||
-        dwNumBlocks = 0 )
+        dwNumBlocks == 0 )
         return -EINVAL;
     gint32 ret = 0;
     do{
@@ -1103,7 +1103,7 @@ gint32 CBlockAllocator::ReadWriteBlocks(
             const guint32* pLast =
                 pBlocks + dwNumBlocks - 1;
             if( GROUP_INDEX( pBlocks[ 0 ] ) ==
-                GROUP_INDEX( pLast[ 0 ] )
+                GROUP_INDEX( pLast[ 0 ] ) )
             {
                 guint32 dwBlkIdx = pBlocks[ 0 ];
                 guint32 dwIdx =
@@ -1111,7 +1111,8 @@ gint32 CBlockAllocator::ReadWriteBlocks(
                 guint64 off = ABS_ADDR(
                     GROUP_START( dwBlkIdx ) +
                     dwIdx * BLOCK_SIZE );
-                ret = ReadWriteFile( pBuf,
+                ret = ReadWriteFile(
+                    ( char* )pBuf,
                     BLOCK_SIZE * dwNumBlocks, 
                     off, bRead );
                 break;
@@ -1130,14 +1131,15 @@ gint32 CBlockAllocator::ReadWriteBlocks(
 }
 
 gint32 CBlockAllocator::IsBlockFree(
-    guint32 dwBlkIdx ) const
+    guint32 dwBlkIdx )
 {
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
         guint32 dwGrpIdx =
             GROUP_INDEX( dwBlkIdx );
-        gint32 iRet = this->IsBlockGroupFree();
+        gint32 iRet = this->IsBlockGroupFree(
+            dwGrpIdx );
         if( SUCCEEDED( iRet ) )
         {
             ret = -ERANGE;
@@ -1156,12 +1158,12 @@ gint32 CBlockAllocator::IsBlockFree(
         }
         else
         {
-            BlkGrpUPtr pbg(
-                new CBlockGroup( this, dwGrpIdx ) );
+            BlkGrpUPtr pbg( new CBlockGroup(
+                this, dwGrpIdx ) );
             ret = pbg->Reload();
             if( ERROR( ret ) )
                 break;
-            ret = pGrp->IsBlockFree( dwBlkIdx );
+            ret = pbg->IsBlockFree( dwBlkIdx );
             m_mapBlkGrps.insert(
                 { dwGrpIdx, std::move( pbg ) } );
         }
@@ -1175,14 +1177,15 @@ gint32 CBlockAllocator::Format()
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
-        ret = truncate( m_iFd, 0 );
+        ret = ftruncate( m_iFd, 0 );
         if( ret < 0 )
         {
             ret = -errno;
             break;
         }
         this->m_pSuperBlock->Format();
-        m_pGroupBitmap.reset( new CGroupBitmap( this ) );
+        m_pGroupBitmap.reset(
+            new CGroupBitmap( this ) );
         ret = m_pGroupBitmap->Format();
         if( ERROR( ret ) )
             break;
@@ -1208,7 +1211,7 @@ gint32 CBlockAllocator::Flush( guint32 dwFlags )
         ret = m_pGroupBitmap->Flush( dwFlags );
         if( ERROR( ret ) )
             break;
-        for( auto elem : m_mapBlkGrps )
+        for( auto& elem : m_mapBlkGrps )
         {
             ret = elem.second->Flush( dwFlags );
             if( ERROR( ret ) )

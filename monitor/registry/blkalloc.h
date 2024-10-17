@@ -329,7 +329,7 @@ struct CBlockGroup : public ISynchronize
             pvecBlocks, dwNumBlocks );
     }
 
-    gint32 IsBlockFree( guint32 dwBlkIdx ) const
+    gint32 IsBlockFree( guint32 dwBlkIdx )
     {
         return m_pBlockBitmap->IsBlockFree(
             dwBlkIdx );
@@ -457,7 +457,7 @@ class CBlockAllocator :
             dwGroupIdx );
     }
 
-    gint32 IsBlockFree( guint32 dwBlkIdx ) const;
+    gint32 IsBlockFree( guint32 dwBlkIdx );
 
     gint32 FindContigousBlocks(
         const guint32* pBlocks,
@@ -911,7 +911,7 @@ struct CDirImage :
 
     gint32 ReleaseFreeBNode( guint32 dwBNodeIdx );
     guint32 GetHeadFreeBNode();
-    void SetHeadFreeBNode();
+    void SetHeadFreeBNode( guint32 dwBNodeIdx );
 
     gint32 CreateFile( const char* szName,
         EnumFileType iType, FImgSPtr& pImg );
@@ -931,6 +931,11 @@ struct CDirImage :
         const char* szTo);
     gint32 ListDir(
         std::vector< KEYPTR_SLOT > vecDirEnt ) const;
+
+    guint32 GetFreeBNodeIdx() const;
+
+    void SetFreeBNodeIdx(
+        guint32 dwBNodeIdx );
 };
 
 struct CBPlusNode :
@@ -1216,8 +1221,11 @@ struct CBPlusNode :
 
     gint32 AppendSlot( KEYPTR_SLOT* pKey );
 
-    void InsertNonFull(
-        KEYPTR_SLOT* pKey );
+    gint32 MoveBNodeStore(
+        CBPlusNode* pSrc, guint32 dwSrcOff,
+        guint32 dwCount, guint32 dwDstOff );
+
+    gint32 InsertNonFull( KEYPTR_SLOT* pKey );
 
     gint32 Split(
         CBPlusNode* pParent,
@@ -1272,6 +1280,8 @@ struct CBPlusNode :
 
     gint32 Insert( KEYPTR_SLOT* pSlot );
 
+    gint32 MergeChilds(
+        gint32 iPred, gint32 iSucc );
 };
 
 struct FREE_BNODES
@@ -1318,8 +1328,8 @@ struct FREE_BNODES
         return 0;
     }
 
-    gint32 hton();
-    gint32 ntoh();
+    gint32 hton( guint8* pDest, guint32 dwSize );
+    gint32 ntoh( guint8* pSrc, guint32 dwSize );
 
 }__attribute__((aligned (8)));
 
