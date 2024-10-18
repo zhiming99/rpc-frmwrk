@@ -1041,4 +1041,21 @@ gint32 CRegistryFs::GetAttr(
     return ret;
 }
 
+gint32 CRegistryFs::GetOpenFile(
+    RFHANDLE hFile, FileSPtr& pFile )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( GetExclLock() );
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr == m_mapOpenFiles.end() )
+        {
+            ret = -EBADF;
+            break;
+        }
+        pFile = itr->second;
+    }while( 0 );
+    return ret;
+}
+
 }

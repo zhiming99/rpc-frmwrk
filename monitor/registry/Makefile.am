@@ -1,11 +1,14 @@
+link_dir=$(top_srcdir)/combase/
+include_ipcdir=$(top_srcdir)/ipc
+
 if ENABLE_FUSE3
 rfmount_PROGRAMS=rfmount
 rfmount_SOURCES=regfuse.cpp
 
 rfmount_LDADD=
-rfmount_LDADD+=-L$(top_srcdir)/fuse ../../fuse/libfuseif.la libregfs.la
+rfmount_LDADD+=libregfs.la
 
-rfmount_LDADD+=../../ipc/libipc.la $(COMMON_LINK) \
+rfmount_LDADD+=../../ipc/libipc.la $(COMMON_LINK_FUSE3) \
  ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
  -L$(top_srcdir)/3rd_party 
@@ -14,10 +17,6 @@ rfmount_LDADD+=../../ipc/libipc.la $(COMMON_LINK) \
 
 rfmountconfdir= $(sysconfdir)/rpcf
 rfmountdir=$(bindir)
-
-link_dir=$(top_srcdir)/combase/
-
-include_ipcdir=$(top_srcdir)/ipc
 
 if BITWIDTH32
 OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
@@ -29,6 +28,7 @@ rfmount_CPPFLAGS= -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
 
 include_fusedir=$(top_srcdir)/fuse
 rfmount_CPPFLAGS+=-I$(include_fusedir) -DFUSE3
+rfmount_LDFLAGS=-rdynamic
 endif
 
 #EXTRA_DIST=README.md README_cn.md
@@ -42,4 +42,3 @@ libregfs_la_LDFLAGS= -version-info @VERSION2@
 libregfs_ladir=$(libdir)/rpcf
 libregfsdir=$(includedir)/rpcf/ipc
 
-rfmount_LDFLAGS=-rdynamic
