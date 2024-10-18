@@ -7028,9 +7028,9 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             if( !bProxy )
                 strOpt = "hadgm:i:p:"; 
             else if( bFuseP )
-                strOpt = "hadkm:i:p:"; 
+                strOpt = "hadgkm:i:p:"; 
             else
-                strOpt = "hadkl:i:p:";
+                strOpt = "hadgkl:i:p:";
             Wa( "gint32 iOptIdx = 0;" );
             Wa( "struct option arrLongOptions[] = {" );
             Wa( "    {\"driver\",   required_argument, 0,  0 }," );
@@ -7050,10 +7050,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
         }
         else
         {
-            if( !bProxy )
-                Wa( "while( ( opt = getopt( argc, argv, \"hadgm:\" ) ) != -1 )" );
-            else
-                Wa( "while( ( opt = getopt( argc, argv, \"hadm:\" ) ) != -1 )" );
+            Wa( "while( ( opt = getopt( argc, argv, \"hadgm:\" ) ) != -1 )" );
         }
         BLOCK_OPEN;
         Wa( "switch( opt )" );
@@ -7243,7 +7240,7 @@ gint32 CImplMainFunc::EmitRtMainFunc(
             INDENT_DOWNL;
 #endif
         }
-        if( !bProxy )
+        if( bFuse || g_bBuiltinRt )
         {
             Wa( "case 'g':" );
             Wa( "    { g_bLogging = true; break; }" );
@@ -7398,8 +7395,7 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    bool bProxy, CRpcServices* pSvc );" );
             }
 #endif
-            if( !bProxy )
-                Wa( "static bool g_bLogging = false;" );
+            Wa( "static bool g_bLogging = false;" );
             Wa( "static std::string g_strDrvPath;" );
             Wa( "static std::string g_strObjDesc;" );
             Wa( "static std::string g_strRtDesc;" );
@@ -7434,8 +7430,7 @@ gint32 CImplMainFunc::EmitInitContext(
         {
             Wa( "static bool g_bAuth = false;" );
             Wa( "static std::string g_strMPoint;" );
-            if( !bProxy )
-                Wa( "static bool g_bLogging = false;" );
+            Wa( "static bool g_bLogging = false;" );
             EmitRtMainFunc( bProxy, m_pWriter );
             NEW_LINE;
         }
@@ -7478,8 +7473,6 @@ gint32 CImplMainFunc::EmitInitContext(
         {
             Wa( "oParams[ propMaxIrpThrd ] = 2;" );
             Wa( "oParams[ propMaxTaskThrd ] = 2;" );
-            if( bFuse )
-                Wa( "oParams[ propEnableLogging ] = g_bLogging;" );
         }
         else
         {
@@ -7489,7 +7482,6 @@ gint32 CImplMainFunc::EmitInitContext(
                 Wa( "    ( guint32 )std::max( 1U," );
                 Wa( "    std::thread::hardware_concurrency() );" );
                 Wa( "oParams[ propMaxTaskThrd ] = dwNumThrds;" );
-                Wa( "oParams[ propEnableLogging ] = g_bLogging;" );
             }
             else
             {
@@ -7500,6 +7492,8 @@ gint32 CImplMainFunc::EmitInitContext(
             Wa( "if( g_strDrvPath.size() )" );
             Wa( "    oParams[ propConfigPath ] = g_strDrvPath;" );
         }
+        if( bFuse || g_bBuiltinRt )
+            Wa( "oParams[ propEnableLogging ] = g_bLogging;" );
         NEW_LINE;
 
         CCOUT << "ret = g_pIoMgr.NewObj(";
