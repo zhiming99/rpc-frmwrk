@@ -34,6 +34,7 @@ static FactoryPtr InitClassFactory()
     BEGIN_FACTORY_MAPS;
 
     INIT_MAP_ENTRYCFG( CRegistryFs );
+    INIT_MAP_ENTRYCFG( CBlockAllocator );
     INIT_MAP_ENTRYCFG( COpenFileEntry );
     INIT_MAP_ENTRYCFG( CDirFileEntry );
     INIT_MAP_ENTRYCFG( CLinkFileEntry );

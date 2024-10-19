@@ -37,6 +37,7 @@ CRegistryFs::CRegistryFs(
 {
     gint32 ret = 0;
     do{
+        SetClassId( clsid( CRegistryFs ) );
         ret = m_pAlloc.NewObj(
             clsid( CBlockAllocator ), pCfg );
         if( ERROR( ret ) )
@@ -49,6 +50,10 @@ CRegistryFs::CRegistryFs(
             "Error in CRegistryFs ctor" );
         throw std::runtime_error( strMsg );
     }
+}
+
+CRegistryFs::~CRegistryFs()
+{
 }
 
 gint32 CRegistryFs::CreateRootDir()
@@ -129,7 +134,11 @@ gint32 CRegistryFs::Reload()
     do{
         ret = m_pAlloc->Reload();
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error, Loading "
+                "Registry filesystem" );
             break;
+        }
         ret = OpenRootDir();
     }while( 0 );
     return ret;
@@ -221,7 +230,7 @@ gint32 CRegistryFs::GetParentDir(
             ret = -EINVAL;
             DebugPrint( ret, "Error, relative "
                 "path '%s' not allowed",
-                elem.c_str() );
+                strPath.c_str() );
             break;
         }
         gint32 idx = 1;

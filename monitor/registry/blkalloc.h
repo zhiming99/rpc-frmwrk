@@ -64,7 +64,7 @@
 
 #define SUPER_BLOCK_SIZE    ( BLOCK_SIZE )
 
-#define BLOCK_SHIFT         ( find_shift( BLOCK_SIZE ) - 1 )
+#define BLOCK_SHIFT         ( find_shift( BLOCK_SIZE ) )
 
 #define BLKGRP_GAP_BLKNUM ( sizeof( guint16 ) * BYTE_BITS )
 #define BLOCKS_PER_GROUP ( 64 * 1024 - BLKGRP_GAP_BLKNUM )
@@ -237,7 +237,7 @@ inline guint32 GetBlockSize()
 { return g_dwBlockSize; }
 
 inline guint32 GetPageSize()
-{ return g_dwBlockSize; }
+{ return g_dwRegFsPageSize; }
 
 struct CBlockBitmap :
     public ISynchronize
@@ -348,14 +348,14 @@ struct CGroupBitmap :
     guint8* m_arrBytes; //[ BLKGRP_NUMBER_FULL ];
     BufPtr m_pBytes;
     guint16 m_wFreeCount;
-    AllocPtr m_pAlloc;
+    CBlockAllocator* m_pAlloc;
     inline guint32 GetFreeCount() const
     { return m_wFreeCount; }
 
     inline guint32 GetAllocCount() const
     { return BLKGRP_NUMBER - m_wFreeCount; }
 
-    CGroupBitmap( AllocPtr pAlloc ) :
+    CGroupBitmap( CBlockAllocator* pAlloc ) :
         m_pAlloc( pAlloc )
     {
         m_pBytes.NewObj();
@@ -537,10 +537,10 @@ struct RegFSInode
     SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
 
 #define WITHIN_DIRECT_BLOCK( _offset_ ) \
-    ( _offset_ >= 0 && _offset_ < INDIRECT_BLOCKS * BLOCK_SIZE )
+    ( ( _offset_ ) >= 0 && ( _offset_ ) < INDIRECT_BLOCKS * BLOCK_SIZE )
 
 #define BEYOND_MAX_LIMIT( _offset_ ) \
-    ( _offset_ >= MAX_FILE_SIZE )
+    ( ( _offset_ ) >= MAX_FILE_SIZE )
 
 #define INDIRECT_BLOCK_START ( DIRECT_BLOCKS * BLOCK_SIZE )
 
@@ -548,13 +548,13 @@ struct RegFSInode
     ( INDIRECT_BLOCK_START + INDIRECT_BLOCKS * BLOCK_SIZE )
 
 #define WITHIN_INDIRECT_BLOCK( _offset_ ) \
-    ( _offset_ >= INDIRECT_BLOCK_START && \
-     _offset_ < SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
+    ( ( _offset_ ) >= INDIRECT_BLOCK_START && \
+     ( _offset_ ) < SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
 
 // secondary indirect mapping block
 #define WITHIN_SEC_INDIRECT_BLOCK( _offset_ ) \
-    ( _offset_ >= SEC_INDIRECT_BLOCK_START  && \
-     _offset_ < MAX_FILE_SIZE )
+    ( ( _offset_ ) >= SEC_INDIRECT_BLOCK_START  && \
+     ( _offset_ ) < MAX_FILE_SIZE )
 
 #define BLKIDX_PER_TABLE ( BLOCK_SIZE >> 2 )
 
@@ -568,15 +568,15 @@ struct RegFSInode
 #define BITD_IDX  14
 
 #define INDIRECT_BLK_IDX( _offset_ ) \
-    ( ( _offset_ - INDIRECT_BLOCK_START ) >> BLOCK_SHIFT )
+    ( ( ( _offset_ ) - INDIRECT_BLOCK_START ) >> BLOCK_SHIFT )
 
 #define SEC_BLKIDX_TABLE_IDX( _offset_ ) \
-    ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
+    ( ( ( ( _offset_ ) - SEC_INDIRECT_BLOCK_START ) >> \
         ( BLOCK_SHIFT + BLKIDX_PER_TABLE_SHIFT ) ) & \
         BLKIDX_PER_TABLE_MASK )
 
 #define SEC_BLKIDX_IDX( _offset_ ) \
-    ( ( ( _offset_ - SEC_INDIRECT_BLOCK_START ) >> \
+    ( ( ( ( _offset_ ) - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
 
 typedef enum : guint8
@@ -1393,7 +1393,7 @@ struct COpenFileEntry :
             DebugPrint( ret, "Error not a valid "
                 "type of file to create" );
         }
-        ret = pFile.NewObj( iClsid,
+        ret = pOpenFile.NewObj( iClsid,
             oParams.GetCfg() );
         return ret;
     }
@@ -1498,6 +1498,7 @@ class CRegistryFs :
 
     public:
     CRegistryFs( const IConfigDb* pCfg );
+    ~CRegistryFs();
     gint32 Start() override;
     gint32 Stop() override;
 

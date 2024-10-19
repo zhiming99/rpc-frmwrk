@@ -93,9 +93,6 @@ gint32 CSuperBlock::Format()
 {
     gint32 ret = 0;
     do{
-        ret = this->Flush();
-        if( ERROR( ret ) )
-            break;
         SetBlockSize( m_dwBlkSize );
         SetPageSize( m_dwPageSize );
     }while( 0 );
@@ -152,36 +149,26 @@ gint32 CGroupBitmap::FreeGroup( guint32 dwGrpIdx )
     do{
         if( m_wFreeCount == BLKGRP_NUMBER )
             break;
-        LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
+        guint8* pbmp = m_arrBytes;
 
-        constexpr int iNumBits =
-            sizeof( LONGWORD ) * BYTE_BITS;
-
+        constexpr guint32 dwNumBits = BYTE_BITS;
         if( dwGrpIdx >= BLKGRP_NUMBER )
         {
             ret = -EINVAL;
             break;
         }
 
-        guint32 shift = find_shift( iNumBits );
-        guint32 dwWordIdx = ( dwGrpIdx >> shift );
-        int offset = dwGrpIdx & ( iNumBits - 1 );
+        guint32 shift = find_shift( dwNumBits );
+        guint32 dwByteIdx = ( dwGrpIdx >> shift );
+        guint32 dwOffset =
+            dwGrpIdx & ( dwNumBits - 1 );
 
-#if BUILD_64
-        LONGWORD a = ntohll( pbmp[ dwWordIdx ] );
-#else
-        LONGWORD a = ntohl( pbmp[ dwWordIdx ] );
-#endif
+        guint8& a = pbmp[ dwByteIdx ];
         if( a == 0 )
             break;
 
-        LONGWORD bit = ( 1 << offset );
+        guint8 bit = ( 1 << dwOffset );
         a &= ( ~bit );
-#if BUILD_64
-        pbmp[ dwWordIdx ] = htonll( a );
-#else
-        pbmp[ dwWordIdx ] = htonl( a );
-#endif
         m_wFreeCount++;
 
     }while( 0 );
@@ -196,61 +183,67 @@ gint32 CGroupBitmap::AllocGroup( guint32& dwGrpIdx )
     gint32 ret = 0;
     LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
 
-    int count =
-        GRPBMP_SIZE/sizeof( LONGWORD );
+    guint32 dwCount =
+        GRPBMP_SIZE / sizeof( LONGWORD );
 
     bool bFound = false;
-    for( int i = 0; i < count; i++ )
+    guint8 bit = 1;
+    constexpr guint32 dwNumBits = BYTE_BITS;
+    for( guint32 i = 0; i < dwCount; i++ )
     {
-#if BUILD_64
-        LONGWORD a = ntohll( *pbmp );
-#else
-        LONGWORD a = ntohl( *pbmp );
-#endif
-        constexpr int iNumBits =
-            sizeof( LONGWORD ) * BYTE_BITS;
-        if( i < count - 1 )
+        LONGWORD& b = *pbmp;
+        guint32 dwByteIdx = i * sizeof( LONGWORD );
+        guint32 j = dwByteIdx;
+        guint32 dwEnd =
+            dwByteIdx + sizeof( LONGWORD );
+        if( i < dwCount - 1 )
         {
-            if( a == ULONG_MAX )
+            if( b == ( ( LONGWORD )-1 ) )
             {
                 pbmp++;
                 continue;
             }
-            LONGWORD bit = 1;
-            for( int j = 0; j < iNumBits; j++ )
+            for( ; j < dwEnd; j++ )
+                if( m_arrBytes[ j ] != UCHAR_MAX )
+                    break;
+            if( j == dwEnd )
+                break;
+            dwByteIdx = j;
+            auto& a = m_arrBytes[ dwByteIdx ];
+            for( j = 0; j < dwNumBits; j++ )
             {
                 if( ( a & bit ) == 0 )
                 {
-                    dwGrpIdx = i * iNumBits + j;
+                    dwGrpIdx =
+                        dwByteIdx * dwNumBits + j;
                     bFound = true;
                     a |= bit;
-#if BUILD_64
-                    *pbmp = htonll( a );
-#else
-                    *pbmp = htonl( a );
-#endif
                     break;
                 }
                 bit <<= 1;
             }
             break;
         }
-        a &= ( ULONG_MAX >> 16 );
-        if( a == ( ULONG_MAX >> 16 ) )
+        dwEnd -= sizeof( guint16 );
+        for(; j < dwEnd; j++ )
+            if( m_arrBytes[ j ] != UCHAR_MAX )
+                break;
+
+        if( j == dwEnd )
             break;
-        guint64 bit = 1;
-        for( int j = 0; j < iNumBits - 16; j++ )
+
+        dwByteIdx = j;
+        auto& a = m_arrBytes[ dwByteIdx ];
+        if( a == UCHAR_MAX )
+            break;
+        for( j = 0; j < dwNumBits; j++ )
         {
             if( ( a & bit ) == 0 )
             {
-                dwGrpIdx = i * iNumBits + j;
+                dwGrpIdx =
+                    dwByteIdx * dwNumBits + j;
                 bFound = true;
                 a |= bit;
-#if BUILD_64
-                *pbmp = htonll( a );
-#else
-                *pbmp = htonl( a );
-#endif
                 break;
             }
             bit <<= 1;
@@ -283,11 +276,8 @@ gint32 CGroupBitmap::IsBlockGroupFree(
         if( m_wFreeCount == BLKGRP_NUMBER )
             break;
 
-        LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
-
-        constexpr int iNumBits =
-            sizeof( LONGWORD ) * BYTE_BITS;
-
+        guint8* pbmp = m_arrBytes;
+        constexpr int iNumBits = BYTE_BITS;
         if( dwGrpIdx >= BLKGRP_NUMBER )
         {
             ret = -EINVAL;
@@ -295,18 +285,11 @@ gint32 CGroupBitmap::IsBlockGroupFree(
         }
 
         guint32 shift = find_shift( iNumBits );
-        guint32 dwWordIdx = ( dwGrpIdx >> shift );
+        guint32 dwByteIdx = ( dwGrpIdx >> shift );
         int offset = dwGrpIdx & ( iNumBits - 1 );
 
-#if BUILD_64
-        LONGWORD a = ntohll( pbmp[ dwWordIdx ] );
-#else
-        LONGWORD a = ntohl( pbmp[ dwWordIdx ] );
-#endif
-        if( a == 0 )
-            break;
-
-        LONGWORD bit = ( 1 << offset );
+        guint8& a = pbmp[ dwByteIdx ];
+        guint8 bit = ( 1 << offset );
         if( a & bit )
             ret = ERROR_FALSE;
 
@@ -374,28 +357,17 @@ gint32 CBlockBitmap::IsBlockFree(
             BLOCKS_PER_GROUP - BLKBMP_BLKNUM )
             break;
 
-        auto pbmp = ( LONGWORD* )m_arrBytes;
-        constexpr int iNumBits =
-            sizeof( LONGWORD ) * BYTE_BITS;
+        auto pbmp = m_arrBytes;
+        constexpr guint32 dwNumBits = BYTE_BITS;
 
-        guint32 shift = find_shift( iNumBits );
-        guint32 dwWordIdx =
-            ( dwBlkIdx >> shift );
+        guint32 shift = find_shift( dwNumBits );
+        guint32 dwByteIdx = ( dwBlkIdx >> shift );
 
-        int offset =
-            dwBlkIdx & ( iNumBits - 1 );
+        guint32 dwOffset =
+            dwBlkIdx & ( dwNumBits - 1 );
 
-#if BUILD_64
-        LONGWORD a =
-            ntohll( pbmp[ dwWordIdx ] );
-#else
-        LONGWORD a =
-            ntohl( pbmp[ dwWordIdx ] );
-#endif
-        if( a == 0 )
-            continue;
-
-        LONGWORD bit = ( 1 << offset );
+        guint8& a = pbmp[ dwByteIdx ];
+        guint8 bit = ( 1 << dwOffset );
         if( a & bit )
             ret = ERROR_FALSE;
 
@@ -409,16 +381,26 @@ gint32 CBlockBitmap::InitBitmap()
     guint32 dwOffset =
         BLKBMP_SIZE - sizeof( guint16 );
     memset( m_arrBytes, 0, dwOffset );
-    auto pbmp = ( guint16* )m_arrBytes;
     gint32 dwBytes = BLKBMP_BLKNUM / 8;
     for( int i = 0; i < dwBytes; i++ )
-        pbmp[ i ] = 0xff;
+        m_arrBytes[ i ] = 0xff;
 
-    for( int i = 0; i < ( BLKBMP_BLKNUM & 0x07 ); i++ )
-        pbmp[ dwBytes ] |= ( 1 << i );
-
-    m_wFreeCount = BLOCKS_PER_GROUP - BLKBMP_BLKNUM;
-    pbmp[ dwOffset ] = htons( m_wFreeCount );
+    guint32 dwCount = ( BLKBMP_BLKNUM & 0x07 );
+    if( dwCount )
+    {
+        guint8 bit = 1;
+        guint8& byTail = m_arrBytes[ dwBytes ];
+        while( dwCount-- )
+        {
+            byTail |= bit;
+            bit <<= 1;
+        }
+    }
+    m_wFreeCount =
+        BLOCKS_PER_GROUP - BLKBMP_BLKNUM;
+    auto pbmp = ( guint16* )
+        ( m_arrBytes + dwOffset );
+    *pbmp = htons( m_wFreeCount );
     return 0;
 }
 
@@ -426,13 +408,13 @@ gint32 CBlockBitmap::AllocBlocks(
     guint32* pvecBlocks,
     guint32& dwNumBlocks )
 {
-    if( m_wFreeCount == 0 )
-        return -ENOMEM;
-
     if( pvecBlocks == nullptr ||
         dwNumBlocks == 0 )
         return -EINVAL;
     
+    if( m_wFreeCount == 0 )
+        return -ENOMEM;
+
     gint32 ret = 0;
     guint32 dwBlocks = 0;
     bool bFull = false;
@@ -441,34 +423,44 @@ gint32 CBlockBitmap::AllocBlocks(
         guint32 dwGrpIdx =
             ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
 
-        int count =
+        guint32 dwCount =
             BLKBMP_SIZE/sizeof( LONGWORD );
 
         guint32 dwBlkIdx = 0;
-        for( int i = 0;
-            i < count && dwBlocks < dwNumBlocks;
+        constexpr guint32 dwNumBits = BYTE_BITS;
+
+        for( guint32 i = 0;
+            i < dwCount && dwBlocks < dwNumBlocks;
             i++ )
         {
-#if BUILD_64
-            LONGWORD a = ntohll( *pbmp );
-#else
-            LONGWORD a = ntohl( *pbmp );
-#endif
-            LONGWORD bit = 1;
-            constexpr int iNumBits =
-                sizeof( LONGWORD ) * BYTE_BITS;
-            if( i < count - 1 )
+            LONGWORD& b = *pbmp;
+            guint8 bit = 1;
+
+            guint32 dwByteIdx = i * sizeof( LONGWORD );
+            guint32 j = dwByteIdx;
+            guint32 dwEnd =
+                dwByteIdx + sizeof( LONGWORD );
+
+            if( i < dwCount - 1 )
             {
-                if( a == ULONG_MAX )
+                if( b == ( ( LONGWORD )-1 ) )
                 {
                     pbmp++;
                     continue;
                 }
-                for( int j = 0; j < iNumBits; j++ )
+                for(; j < dwEnd; j++ )
+                    if( m_arrBytes[ j ] != UCHAR_MAX )
+                        break;
+                if( j == dwEnd )
+                    break;
+                dwByteIdx = j;
+                auto& a = m_arrBytes[ dwByteIdx ];
+                for( j = 0; j < dwNumBits; j++ )
                 {
                     if( ( a & bit ) == 0 )
                     {
-                        dwBlkIdx = i * iNumBits + j;
+                        dwBlkIdx =
+                            dwByteIdx * dwNumBits + j;
                         pvecBlocks[ dwBlocks ] =
                             ( dwGrpIdx | dwBlkIdx );
                         dwBlocks++;
@@ -481,25 +473,29 @@ gint32 CBlockBitmap::AllocBlocks(
                     }
                     bit <<= 1;
                 }
-#if BUILD_64
-                *pbmp = htonll( a );
-#else
-                *pbmp = htonl( a );
-#endif
                 if( bFull )
                     break;
                 pbmp++;
                 continue;
             }
 
-            a &= ( ULONG_MAX >> 16 );
-            if( a == ( ULONG_MAX >> 16 ) )
+            dwEnd -= sizeof( guint16 );
+            for(; j < dwEnd; j++ )
+                if( m_arrBytes[ j ] != UCHAR_MAX )
+                    break;
+
+            if( j == dwEnd )
                 break;
-            for( int j = 0; j < iNumBits - 16; j++ )
+
+            dwByteIdx = j;
+            auto& a = m_arrBytes[ dwByteIdx ];
+
+            for( j = 0; j < dwNumBits; j++ )
             {
                 if( ( a & bit ) == 0 )
                 {
-                    dwBlkIdx = i * iNumBits + j;
+                    dwBlkIdx =
+                        dwByteIdx * dwNumBits + j;
                     pvecBlocks[ dwBlocks ] =
                         ( dwGrpIdx | dwBlkIdx );
                     dwBlocks++;
@@ -512,24 +508,17 @@ gint32 CBlockBitmap::AllocBlocks(
                 }
                 bit <<= 1;
             }
-#if BUILD_64
-            *pbmp = htonll( a );
-#else
-            *pbmp = htonl( a );
-#endif
         }
-
     }while( 0 );
 
+    dwNumBlocks = dwBlocks;
+    m_wFreeCount -= dwBlocks;
     if( bFull )
     {
-        m_wFreeCount -= dwNumBlocks;
         return STATUS_SUCCESS;
     }
     else if( dwBlocks < dwNumBlocks )
     {
-        dwNumBlocks -= dwBlocks;
-        m_wFreeCount -= dwNumBlocks;
         return STATUS_MORE_PROCESS_NEEDED;
     }
     return -ENOMEM;
@@ -556,38 +545,28 @@ gint32 CBlockBitmap::FreeBlocks(
             break;
 
         LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
-        constexpr int iNumBits =
-            sizeof( LONGWORD ) * BYTE_BITS;
+        constexpr guint32 dwNumBits = BYTE_BITS;
 
-        for( int i = 0; i < dwNumBlocks; i++ )
+        for( guint32 i = 0; i < dwNumBlocks; i++ )
         {
             guint32 dwBlkIdx =
             ( pvecBlocks[ i ] & BLOCK_IDX_MASK );
             if( dwBlkIdx == 0 )
                 continue;
 
-            guint32 shift = find_shift( iNumBits );
-            guint32 dwWordIdx =
+            guint32 shift = find_shift( dwNumBits );
+            guint32 dwByteIdx =
                 ( dwBlkIdx >> shift );
-            int offset =
-                dwBlkIdx & ( iNumBits - 1 );
-#if BUILD_64
-            LONGWORD a =
-                ntohll( pbmp[ dwWordIdx ] );
-#else
-            LONGWORD a =
-                ntohl( pbmp[ dwWordIdx ] );
-#endif
+
+            guint32 offset =
+                dwBlkIdx & ( dwNumBits - 1 );
+
+            guint8& a = m_arrBytes[ dwByteIdx ];
             if( a == 0 )
                 continue;
 
-            LONGWORD bit = ( 1 << offset );
+            guint8 bit = ( 1 << offset );
             a &= ( ~bit );
-#if BUILD_64
-            pbmp[ dwWordIdx ] = htonll( a );
-#else
-            pbmp[ dwWordIdx ] = htonl( a );
-#endif
             m_wFreeCount++;
         }
 
@@ -607,7 +586,7 @@ gint32 CBlockBitmap::Flush( guint32 dwFlags )
         guint32 i = 0;
         guint32 dwCount = BLKBMP_BLKNUM;
         guint32 dwSize =
-            dwCount * sizeof( guint32 );
+            dwCount * BLOCK_SIZE;
         for( ; i < dwCount; i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         guint16* p = ( guint16* )
@@ -617,6 +596,7 @@ gint32 CBlockBitmap::Flush( guint32 dwFlags )
             arrBlks, dwCount, m_arrBytes, true );
         if( ERROR( ret ) )
             break;
+        ret = 0;
     }while( 0 );
 
     return ret;
@@ -662,6 +642,7 @@ CBlockAllocator::CBlockAllocator(
 {
     gint32 ret = 0;
     do{
+        SetClassId( clsid( CBlockAllocator ) );
         stdstr strPath;
         CCfgOpener oCfg( pCfg );
         ret = oCfg.GetStrProp(

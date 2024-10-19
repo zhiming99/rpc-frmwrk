@@ -65,6 +65,7 @@ std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
 
 
+static void Usage( const char* szName );
 static void *regfs_init(struct fuse_conn_info *conn,
 		      struct fuse_config *cfg)
 {
@@ -518,18 +519,13 @@ gint32 InitContext()
         return ret;
     do{
         CParamList oParams;
-#ifdef SERVER
-        oParams.Push( "hostsvr" );
-#endif
-#ifdef CLIENT
-        oParams.Push( "hostcli" );
-#endif
+        oParams.Push( "regfsmnt" );
 
         if( g_bLogging )
             oParams[ propEnableLogging ] = true;
 
         // adjust the thread number if necessary
-        oParams[ propMaxIrpThrd ] = 2;
+        oParams[ propMaxIrpThrd ] = 0;
         oParams[ propMaxTaskThrd ] = 2;
 
         ret = g_pIoMgr.NewObj(
@@ -570,14 +566,16 @@ gint32 DestroyContext()
 int _main( int argc, char** argv)
 {
     gint32 ret = 0;
-    ret = InitContext();
-    if( ERROR( ret ) ) 
-    {
-        DestroyContext();
-        return ret;
-    }
     do{ 
         CParamList oParams;
+        if( g_strRegFsFile.empty() )
+        {
+            ret = -EINVAL;
+            OutputMsg( ret, "Error no "
+                "registry path specified" );
+            Usage( "regfsmnt" );
+            break;
+        }
         oParams.SetStrProp(
             propConfigPath, g_strRegFsFile );
         ret = g_pRegfs.NewObj(
@@ -589,20 +587,21 @@ int _main( int argc, char** argv)
         if( g_bFormat )
         {
             ret = g_pRegfs->Format();
+            if( SUCCEEDED( ret ) )
+                ret = g_pRegfs->Flush();
+        }
+        else
+        {
+            ret = g_pRegfs->Start();
             if( ERROR( ret ) )
                 break;
-            ret = g_pRegfs->Flush();
-            break;
+
+            ret = fuse_main(
+                argc, argv, &regfs_oper,
+                ( CRegistryFs* )g_pRegfs );
+
+            g_pRegfs->Stop();
         }
-        ret = g_pRegfs->Start();
-        if( ERROR( ret ) )
-            break;
-
-        ret = fuse_main(
-            argc, argv, &regfs_oper,
-            ( CRegistryFs* )g_pRegfs );
-
-        g_pRegfs->Stop();
         if( ret > 0 )
             ret = -ret;
 
@@ -610,23 +609,21 @@ int _main( int argc, char** argv)
 
     }while( 0 );
 
-    DestroyContext();
     return ret;
 }
 
-void Usage( char* szName )
+static void Usage( const char* szName )
 {
     fprintf( stderr,
-        "Usage: %s [OPTION]\n"
+        "Usage: %s [OPTIONS]\n"
         "\t [ -m <mount point> to export runtime information via 'rpcfs' at "\
         "the directory 'mount point' ]\n"
 
-        "\t [ -f <regfs file> the path to the file containing the registry " \
-        "filesystem or empty file to format]\n"
+        "\t [ -f <regfs file> the path to the registry filesystem]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -o \"fuse options\" ]\n"
         "\t [ -g send logs to log server ]\n"
-        "\t [ -i format the filesystem as contained in the specified file]\n"
+        "\t [ -i FORMAT the filesystem as specified by '-f' option]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -636,7 +633,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hgdf:m:" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hgdif:m:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -701,7 +698,15 @@ int main( int argc, char** argv)
             if( ret < 0 )
             { ret = -errno; break; }
         }
+        ret = InitContext();
+        if( ERROR( ret ) ) 
+        {
+            DestroyContext();
+            break;
+        }
         ret = _main( argcf, argvf );
+        pArgBuf.Clear();
+        DestroyContext();
     }while( 0 );
     return ret;
 }

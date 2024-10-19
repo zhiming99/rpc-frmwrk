@@ -238,7 +238,7 @@ gint32 CBPlusNode::Format()
     gint32 ret = 0;
     do{
         __attribute__((aligned (8)))
-        guint8 arrBytes[ BNODE_SIZE ];
+        guint8 arrBytes[ BNODE_SIZE ] = { 0 };
         auto pBPNode = &m_oBNodeStore;
         ret = pBPNode->hton(
             arrBytes, BNODE_SIZE );
@@ -252,6 +252,7 @@ gint32 CBPlusNode::Format()
 
         if( ERROR( ret ) )
             break;
+        ret = 0;
 
     }while( 0 );
     return ret;

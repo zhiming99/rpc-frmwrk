@@ -241,11 +241,6 @@ gint32 CFileImage::Format()
 {
     gint32 ret = 0;
     do{
-        DECL_ARRAY( arrBytes, BLOCK_SIZE );
-        memset( arrBytes, 0, BLOCK_SIZE );
-
-        auto pInode = ( RegFSInode* )arrBytes; 
-
         // file size in bytes
         SetSize( 0 );
 
@@ -277,6 +272,17 @@ gint32 CFileImage::Format()
         m_oInodeStore.m_dwUserData =
             INVALID_BNODE_IDX;
 
+        memset( m_oInodeStore.m_arrBlocks, 0,
+            sizeof( m_oInodeStore.m_arrBlocks ) );
+
+        m_oInodeStore.m_dwReserved = 0;
+        memset( m_oInodeStore.m_arrMetaFork, 0,
+        sizeof( m_oInodeStore.m_arrMetaFork ) );
+
+        memset( m_oInodeStore.m_arrBuf, 0,
+            sizeof( m_oInodeStore.m_arrBuf ) );
+
+        m_oInodeStore.m_dwUserData = 0;
         // for small data with length less than 96 bytes.
     }while( 0 );
     return ret;
@@ -439,6 +445,7 @@ gint32 CFileImage::CollectBlocksForRead(
     do{
         guint32 dwLead =
             ( dwOff >> BLOCK_SHIFT );
+
         guint32 dwTail =
             ( ( dwOff + dwSize + BLOCK_SIZE - 1 ) >>
                 BLOCK_SHIFT );
@@ -449,15 +456,17 @@ gint32 CFileImage::CollectBlocksForRead(
         guint32 dw2IndIdx =
             m_oInodeStore.m_arrBlocks[ BITD_IDX ];
 
-        for( int i = dwLead; i < dwTail + 1; i++ )
+        for( int i = dwLead; i < dwTail; i++ )
         {
             bool bFirst =
-                WITHIN_INDIRECT_BLOCK( i );
+                WITHIN_INDIRECT_BLOCK( i * BLOCK_SIZE );
             bool bSec = 
-                WITHIN_SEC_INDIRECT_BLOCK( i );
+                WITHIN_SEC_INDIRECT_BLOCK( i * BLOCK_SIZE );
 
-            if( WITHIN_DIRECT_BLOCK( i ) )
+            if( WITHIN_DIRECT_BLOCK( i * BLOCK_SIZE ) )
             {
+                // if the block is not allocated, push
+                // a zero
                 vecBlocks.push_back(
                     m_oInodeStore.m_arrBlocks[ i ] );
             }
@@ -561,23 +570,38 @@ gint32 CFileImage::CollectBlocksForWrite(
             ( ( dwOff + dwSize + BLOCK_SIZE - 1 ) >>
             BLOCK_SHIFT );
 
+
         guint32 dwIndirectIdx =
             m_oInodeStore.m_arrBlocks[ BIT_IDX ];
 
         guint32 dw2IndIdx =
             m_oInodeStore.m_arrBlocks[ BITD_IDX ];
 
-        for( int i = dwLead; i < dwTail + 1; i++ )
+        for( int i = dwLead; i < dwTail; i++ )
         {
             bool bFirst =
-                WITHIN_INDIRECT_BLOCK( i );
+                WITHIN_INDIRECT_BLOCK( i * BLOCK_SIZE );
             bool bSec = 
-                WITHIN_SEC_INDIRECT_BLOCK( i );
+                WITHIN_SEC_INDIRECT_BLOCK( i * BLOCK_SIZE );
 
-            if( WITHIN_DIRECT_BLOCK( i ) )
+            if( WITHIN_DIRECT_BLOCK( i * BLOCK_SIZE ) )
             {
-                vecBlocks.push_back(
-                    m_oInodeStore.m_arrBlocks[ i ] );
+                guint32 dwDirectIdx =
+                    m_oInodeStore.m_arrBlocks[ i ];
+                if( dwDirectIdx == 0 )
+                {
+                    ret = m_pAlloc->AllocBlocks( 
+                        &dwDirectIdx, 1 );
+                    if( ERROR( ret ) )
+                        break;
+                    BufPtr p( true ); 
+                    p->Resize( BLOCK_SIZE );
+                    memset( p->ptr(), 0, BLOCK_SIZE );
+                    guint32* arrBlks =
+                        m_oInodeStore.m_arrBlocks;
+                    arrBlks[ i ] = dwDirectIdx;
+                }
+                vecBlocks.push_back( dwDirectIdx );
             }
             else if( bFirst )
             {
@@ -754,7 +778,7 @@ gint32 CFileImage::ReadFile(
         if( dwOff >= GetSize() )
         {
             dwSize = 0;
-            return 0;
+            break;
         }
         if( dwOff + dwSize > GetSize() )
             dwSize = GetSize() - dwOff;
