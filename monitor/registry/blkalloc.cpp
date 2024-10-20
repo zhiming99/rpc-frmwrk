@@ -54,7 +54,7 @@ static gint32 SetBlockSize( guint32 dwSize )
 
 static gint32 IsValidPageSize( guint32 dwSize )
 {
-    guint32 dwShift = find_shift( dwShift ) - 1;
+    guint32 dwShift = find_shift( dwSize );
     if( dwShift <= BLOCK_SHIFT || dwShift > 16 )
         return -EINVAL;
     return STATUS_SUCCESS;
@@ -621,14 +621,14 @@ gint32 CBlockBitmap::Reload()
         guint32 i = 0;
         guint32 dwCount = BLKBMP_BLKNUM;
         guint32 dwSize =
-            dwCount * sizeof( guint32 );
+            dwCount * BLOCK_SIZE;
         for( ; i < dwCount; i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         ret = m_pAlloc->ReadBlocks(
-            arrBlks, dwCount,
-            m_arrBytes, true );
+            arrBlks, dwCount, m_arrBytes, true );
         if( ERROR( ret ) )
             break;
+        ret = 0;
         guint16* p = ( guint16* )
             &m_arrBytes[ dwSize ];
         m_wFreeCount = ntohs( p[ -1 ] );
@@ -988,7 +988,7 @@ gint32 CBlockAllocator::FindContigousBlocks(
     guint32 dwBase = dwPrev;
     guint32 dwCount = 1;
 
-    for( guint32 i = 1; i < dwNumBlocks - 1; i++ )
+    for( guint32 i = 1; i < dwNumBlocks; i++ )
     {
         guint32 dwBlkIdx = pBlocks[ i ];
         if( bByteOrder )
@@ -1007,7 +1007,8 @@ gint32 CBlockAllocator::FindContigousBlocks(
         }
         else
         {
-            vecBlocks.push_back( { dwBase, dwCount } );
+            vecBlocks.push_back(
+                { dwBase, dwCount } );
             dwBase = dwPrev = dwBlkIdx;
             dwCount = 1;
         }
@@ -1021,8 +1022,8 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
     guint8* pBuf, bool bRead )
 {
     gint32 ret = 0;
+    guint32 dwOff = 0;
     do{
-        guint32 dwOffInBuf = 0;
         for( auto& elem : vecBlocks )
         {
             guint32 dwBlkIdx = elem.first;
@@ -1033,9 +1034,9 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
                 dwIdx * BLOCK_SIZE );
             if( dwBlkIdx == 0 && bRead )
             {
-                memset( pBuf + dwOffInBuf, 0,
+                memset( pBuf + dwOff, 0,
                     BLOCK_SIZE * elem.second );
-                dwOffInBuf +=
+                dwOff +=
                     BLOCK_SIZE * elem.second;
                 continue;
             }
@@ -1045,18 +1046,19 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
                 break;
             }
             ret = ReadWriteFile(
-                ( char* )pBuf + dwOffInBuf,
+                ( char* )pBuf + dwOff,
                 BLOCK_SIZE * elem.second,
                 off, bRead );
 
             if( ERROR( ret ) )
                 break;
 
-            dwOffInBuf +=
-                BLOCK_SIZE * elem.second;
+            dwOff += BLOCK_SIZE * elem.second;
         }
     }while( 0 );
-    return ret;
+    if( ERROR( ret ) )
+        return ret;
+    return dwOff;
 }
     
 gint32 CBlockAllocator::ReadWriteBlocks(
@@ -1170,8 +1172,13 @@ gint32 CBlockAllocator::Format()
         ret = m_pGroupBitmap->Format();
         if( ERROR( ret ) )
             break;
+        guint32 dwGrpIdx = 0xFFFFFFFF;
+        ret = m_pGroupBitmap->AllocGroup(
+            dwGrpIdx );
+        if( ERROR( ret ) )
+            break;
         BlkGrpUPtr pbg(
-            new CBlockGroup( this, 0 ) );
+            new CBlockGroup( this, dwGrpIdx ) );
         ret = pbg->Format();
         if( ERROR( ret ) )
             break;

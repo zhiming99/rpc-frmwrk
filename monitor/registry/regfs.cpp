@@ -77,7 +77,7 @@ gint32 CRegistryFs::CreateRootDir()
         ret = m_pRootImg->Format();
         if( ERROR( ret ) )
             break;
-        ret = m_pRootImg->Flush();
+        // ret = m_pRootImg->Flush();
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
             m_pRootImg, m_pAlloc );
@@ -565,6 +565,11 @@ gint32 CRegistryFs::SetGid(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            m_pRootImg->SetGid( wGid );
+            break;
+        }
         FImgSPtr dirPtr;
         ret = GetParentDir( strPath, dirPtr );
         if( ERROR( ret ) )
@@ -594,6 +599,11 @@ gint32 CRegistryFs::SetUid(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            m_pRootImg->SetUid( wUid );
+            break;
+        }
         FImgSPtr dirPtr;
         ret = GetParentDir( strPath, dirPtr );
         if( ERROR( ret ) )
@@ -622,6 +632,11 @@ gint32 CRegistryFs::GetGid(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            gid = m_pRootImg->GetUid();
+            break;
+        }
         FImgSPtr dirPtr;
         ret = GetParentDir( strPath, dirPtr );
         if( ERROR( ret ) )
@@ -637,7 +652,7 @@ gint32 CRegistryFs::GetGid(
             strFile.c_str(), pFile, pNode );
         if( ERROR( ret ) )
             break;
-        pFile->GetGid();
+        gid = pFile->GetGid();
     }while( 0 );
     return ret;
 }
@@ -648,6 +663,11 @@ gint32 CRegistryFs::GetUid(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            uid = m_pRootImg->GetUid();
+            break;
+        }
         FImgSPtr dirPtr;
         ret = GetParentDir( strPath, dirPtr );
         if( ERROR( ret ) )
@@ -948,6 +968,13 @@ gint32 CRegistryFs::Access(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
+        if( strPath == "/" )
+        {
+            READ_LOCK( m_pRootImg );
+            ret = m_pRootImg->CheckAccess(
+                dwFlags );
+            break;
+        }
         ret = GetParentDir( strPath, dirPtr );
         if( ERROR( ret ) )
             break;
@@ -965,7 +992,6 @@ gint32 CRegistryFs::Access(
             ret = -ENOENT;
             break;
         }
-
         {
             READ_LOCK( pFile );
             ret = pFile->CheckAccess( dwFlags );
@@ -977,11 +1003,55 @@ gint32 CRegistryFs::Access(
 
 gint32 CRegistryFs::OpenDir(
     const stdstr& strPath,
-    mode_t dwMode, RFHANDLE hFile,
+    mode_t dwMode, RFHANDLE& hFile,
     CAccessContext* pac )
 {
-    return OpenFile(
-        strPath, R_OK, hFile, pac );
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr pFile;
+        if( strPath == "/" )
+        {
+            pFile = m_pRootImg;
+        }
+        else
+        {
+            FImgSPtr dirPtr;
+            ret = GetParentDir( strPath, dirPtr );
+            if( ERROR( ret ) )
+                break;
+
+            CDirImage* pDir = dirPtr;
+            CBPlusNode* pNode = nullptr;
+            ret = pDir->Search(
+                strPath.c_str(), pFile, pNode );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        FileSPtr pOpenFile;
+        ret = COpenFileEntry::Create( 
+            ftDirectory, pOpenFile,
+            pFile, m_pAlloc );
+        if( ERROR( ret ) )
+            break;
+
+        FileSPtr pEmpty;
+        ret = pOpenFile->Open( pEmpty, pac );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( this->GetExclLock() );
+        hFile = pOpenFile->GetObjId();
+        m_mapOpenFiles[ hFile ] = pOpenFile;
+        
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error create file '%s'",
+            strPath.c_str() ); 
+    }
+    return ret;
 }
 
 gint32 CRegistryFs::ReadDir( RFHANDLE hDir,
@@ -1025,6 +1095,11 @@ gint32 CRegistryFs::GetAttr(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            ret = m_pRootImg->GetAttr( stBuf );
+            break;
+        }
         FImgSPtr dirPtr;
         ret = GetParentDir( strPath, dirPtr );
         if( ERROR( ret ) )

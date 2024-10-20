@@ -593,14 +593,13 @@ int _main( int argc, char** argv)
         else
         {
             ret = g_pRegfs->Start();
-            if( ERROR( ret ) )
-                break;
-
-            ret = fuse_main(
-                argc, argv, &regfs_oper,
-                ( CRegistryFs* )g_pRegfs );
-
-            g_pRegfs->Stop();
+            if( SUCCEEDED( ret ) )
+            {
+                ret = fuse_main(
+                    argc, argv, &regfs_oper,
+                    ( CRegistryFs* )g_pRegfs );
+                g_pRegfs->Stop();
+            }
         }
         if( ret > 0 )
             ret = -ret;
@@ -615,15 +614,13 @@ int _main( int argc, char** argv)
 static void Usage( const char* szName )
 {
     fprintf( stderr,
-        "Usage: %s [OPTIONS]\n"
-        "\t [ -m <mount point> to export runtime information via 'rpcfs' at "\
-        "the directory 'mount point' ]\n"
-
-        "\t [ -f <regfs file> the path to the registry filesystem]\n"
+        "Usage: %s [OPTIONS] <regfs path> [<mount point>]\n"
+        "\t [ <regfs path> the path to the file containing regfs  ]\n"
+        "\t [ <mount point> the directory to mount regfs ]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -o \"fuse options\" ]\n"
         "\t [ -g send logs to log server ]\n"
-        "\t [ -i FORMAT the filesystem as specified by '-f' option]\n"
+        "\t [ -i FORMAT the regfs ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -633,7 +630,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hgdif:m:" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hgdi" ) ) != -1 )
         {
             switch( opt )
             {
@@ -646,10 +643,6 @@ int main( int argc, char** argv)
                     }
                 case 'f':
                     {
-                        g_strRegFsFile = optarg;
-                        if( g_strMPoint.size() > REG_MAX_NAME - 1 )
-                            ret = -ENAMETOOLONG;
-                        break;
                     }
                 case 'd':
                     { bDaemon = true; break; }
@@ -665,6 +658,74 @@ int main( int argc, char** argv)
         if( ERROR( ret ) )
             break;
 
+        if( optind >= argc )
+        {
+            ret = -EINVAL;
+            OutputMsg( ret, "Error missing "
+                "'regfs path' and 'mount point'" );
+            Usage( argv[ 0 ] );
+            break;
+        }
+
+        g_strRegFsFile = argv[ optind ];
+        if( g_strRegFsFile.size() > REG_MAX_PATH - 1 )
+        {
+            ret = -ENAMETOOLONG;
+            break;
+        }
+
+        ret = access( g_strRegFsFile.c_str(),
+            R_OK | W_OK );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        if( !g_bFormat )
+        {
+            optind++;
+            if( optind >= argc )
+            {
+                ret = -EINVAL;
+                OutputMsg( ret,
+                    "Error missing 'mount point'" );
+                Usage( argv[ 0 ] );
+                break;
+            }
+
+            g_strMPoint = argv[ optind ];
+            if( g_strMPoint.size() > REG_MAX_PATH - 1 )
+            {
+                ret = -ENAMETOOLONG;
+                break;
+            }
+
+            struct stat sb;
+            if( lstat( g_strMPoint.c_str(), &sb ) == -1 )
+            if( ret == -1 )
+            {
+                ret = -EINVAL;
+                OutputMsg( ret,
+                    "Error mount path unaccessable" );
+                Usage( argv[ 0 ] );
+                ret = -errno;
+                break;
+            }
+            mode_t iFlags =
+                ( sb.st_mode & S_IFMT );
+
+            if( iFlags != S_IFDIR )
+            {
+                ret = -EINVAL;
+                OutputMsg( ret,
+                    "Error mount point is not a "
+                    "directory" );
+                Usage( argv[ 0 ] );
+                ret = -errno;
+                break;
+            }
+        }
         // using fuse
         std::vector< std::string > strArgv;
         strArgv.push_back( argv[ 0 ] );

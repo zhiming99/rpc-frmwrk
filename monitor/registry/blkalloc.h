@@ -132,7 +132,7 @@
     ( ( ( _la_ ) >> BLOCK_SHIFT  ) & ( BLOCKS_PER_GROUP_FULL - 1 ) )
 
 #define GROUP_INDEX_SHIFT \
-    ( find_shift( BLOCKS_PER_GROUP_FULL ) - 1 )
+    ( find_shift( BLOCKS_PER_GROUP_FULL ) )
 
 // get the group idx from the block index
 #define GROUP_INDEX( _blk_idx ) \
@@ -165,7 +165,7 @@
 #define ROOT_INODE_BLKIDX ( BLKBMP_BLKNUM )
 
 #define BNODE_IDX_TO_POS( _idx_ ) \
-    ( _idx_ << ( find_shift( BNODE_SIZE ) - 1  ) )
+    ( _idx_ << find_shift( BNODE_SIZE ) )
 
 #define INVALID_BNODE_IDX  ( USHRT_MAX )
 
@@ -214,7 +214,7 @@ class CBlockAllocator;
 
 struct CSuperBlock : public ISynchronize
 {
-    guint32     m_dwMagic = htonl( *( guint32* )"regi" );
+    guint32     m_dwMagic =  *( guint32* )"regi";
     guint32     m_dwVersion = 0x01;
     guint32     m_dwBlkSize = DEFAULT_BLOCK_SIZE;
     guint32     m_dwPageSize = DEFAULT_PAGE_SIZE;
@@ -559,7 +559,7 @@ struct RegFSInode
 #define BLKIDX_PER_TABLE ( BLOCK_SIZE >> 2 )
 
 #define BLKIDX_PER_TABLE_SHIFT \
-    ( find_shift( BLOCK_SIZE >> 2 ) - 1 )
+    ( find_shift( BLOCK_SIZE >> 2 ) )
 
 #define BLKIDX_PER_TABLE_MASK \
     ( BLKIDX_PER_TABLE - 1 )
@@ -712,6 +712,9 @@ struct CFileImage :
     gint32 WriteFile( guint32 dwOff,
         guint32& dwSize, guint8* pBuf );
 
+    gint32 WriteFileNoLock( guint32 dwOff,
+        guint32& dwSize, guint8* pBuf );
+
     gint32 ReadValue( Variant& oVar ) const;
     gint32 WriteValue( const Variant& oVar );
 
@@ -828,9 +831,7 @@ struct CFreeBNodePool :
     public ISynchronize
 {
     CDirImage* m_pDir = nullptr;
-
-    CFreeBNodePool(
-        CDirImage* pDir, guint32 dwFirstFree ):
+    CFreeBNodePool( CDirImage* pDir ):
         m_pDir( pDir )
     {}
 
@@ -859,9 +860,7 @@ struct CDirImage :
     ChildMap m_mapChilds;
     FileMap m_mapFiles;
 
-    CDirImage( const IConfigDb* pCfg ) :
-        super( pCfg )
-    { SetClassId( clsid( CDirImage ) ); }
+    CDirImage( const IConfigDb* pCfg );
 
     gint32 Format() override;
     gint32 Reload() override;
@@ -886,10 +885,8 @@ struct CDirImage :
     // Search through this dir to find the key, if
     // found, return pFile, otherwise, return the leaf
     // node pNode where the key should be inserted.
-    bool Search(
-        const char* szKey,
-        FImgSPtr& pFile,
-        CBPlusNode*& pNode );
+    gint32 Search( const char* szKey,
+        FImgSPtr& pFile, CBPlusNode*& pNode );
 
     gint32 Split(
         CBPlusNode* pParent,
@@ -1621,7 +1618,7 @@ class CRegistryFs :
         std::vector< KEYPTR_SLOT > vecDirEnt );
 
     gint32 OpenDir( const stdstr& strPath,
-        mode_t dwMode, RFHANDLE hDir,
+        mode_t dwMode, RFHANDLE& hDir,
         CAccessContext* pac = nullptr );
 
     gint32 GetParentDir(
