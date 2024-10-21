@@ -1,0 +1,43 @@
+link_dir=$(top_srcdir)/combase/
+include_ipcdir=$(top_srcdir)/ipc
+
+if ENABLE_FUSE3
+regfsmnt_PROGRAMS=regfsmnt
+regfsmnt_SOURCES=regfuse.cpp
+
+regfsmnt_LDADD=
+regfsmnt_LDADD+=libregfs.la
+
+regfsmnt_LDADD+=../../ipc/libipc.la $(COMMON_LINK_FUSE3) \
+ ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
+ -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
+ -L$(top_srcdir)/3rd_party 
+
+#man_MANS=regfsmnt.1
+
+regfsmntconfdir= $(sysconfdir)/rpcf
+regfsmntdir=$(bindir)
+
+if BITWIDTH32
+OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
+else
+OFFSET_MACRO=
+endif
+
+regfsmnt_CPPFLAGS= -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
+
+regfsmnt_CPPFLAGS+= -DFUSE3
+regfsmnt_LDFLAGS=-rdynamic
+endif
+
+#EXTRA_DIST=README.md README_cn.md
+
+libregfs_la_LTLIBRARIES=libregfs.la
+libregfs_la_SOURCES = regfs.cpp blkalloc.h blkalloc.cpp dir.cpp file.cpp dllexp.cpp
+libregfs_la_CPPFLAGS= -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
+libregfs_HEADERS=
+libregfs_la_LIBADD= ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L../../3rd_party
+libregfs_la_LDFLAGS= -version-info @VERSION2@
+libregfs_ladir=$(libdir)
+libregfsdir=$(includedir)/rpcf/ipc
+
