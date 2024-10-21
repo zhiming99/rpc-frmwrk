@@ -505,7 +505,7 @@ struct RegFSInode
     // for small data with length less than 96 bytes.
     guint8      m_arrBuf[ VALUE_SIZE ];
     guint8      m_iValType;
-    guint32     m_dwUserData;
+    guint32     m_dwRootBNode;
 
 } __attribute__((aligned (8)));
 
@@ -757,6 +757,7 @@ struct CFileImage :
 
     gint32 CheckAccess( mode_t dwMode );
     gint32 GetAttr( struct stat& stBuf );
+    void SetTimes( const struct timespec tv[ 2 ] );
 };
 
 struct CLinkImage :
@@ -881,6 +882,10 @@ struct CDirImage :
     guint32 GetRootKeyCount() const;
     inline CBPlusNode* GetRootNode() const
     { return m_pRootNode.get(); }
+
+    gint32 SearchNoLock( const char* szKey,
+        FImgSPtr& pFile, CBPlusNode*& pNode );
+
     // B+ tree methods
     // Search through this dir to find the key, if
     // found, return pFile, otherwise, return the leaf
@@ -1109,7 +1114,7 @@ struct CBPlusNode :
         auto itr = mapFiles.find( dwInodeIdx );
         if( itr != mapFiles.end() )
             return -EEXIST;
-        itr->second = pFile;
+        mapFiles[ dwInodeIdx ] = pFile;
         return STATUS_SUCCESS;
     }
 
@@ -1198,14 +1203,17 @@ struct CBPlusNode :
     inline const KEYPTR_SLOT* GetSlot(
         gint32 idx ) const
     {
-        if( idx >= GetChildCount() )
+        if( IsLeaf() && idx >= GetKeyCount() )
+            return nullptr;
+        if( !IsLeaf() && idx >= GetChildCount() )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
 
     inline KEYPTR_SLOT* GetSlot( gint32 idx )
     {
-        if( idx >= GetChildCount() )
+        if( ( IsLeaf() && idx >= GetKeyCount() ) ||
+            ( !IsLeaf() && idx >= GetChildCount() ) )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -1430,15 +1438,21 @@ struct COpenFileEntry :
 
     inline gint32 Close()
     {
-        gint32 ret = Flush();
-        m_pFileImage->DecOpenCount();
-        return ret;
+        guint32 dwCount = 
+            m_pFileImage->DecOpenCount();
+        if( dwCount == 0 )
+            return Flush();
+        return 0;
     }
+
     inline void SetFlags( guint32 dwFlags )
     {   m_dwFlags = dwFlags; }
 
     inline guint32 GetFlags() const
     {   return m_dwFlags; }
+
+    inline void SetTimes( const struct timespec tv[ 2 ] )
+    { m_pFileImage->SetTimes( tv ); }
 };
 
 struct CDirFileEntry :
@@ -1615,7 +1629,7 @@ class CRegistryFs :
         struct stat& stBuf );
 
     gint32 ReadDir( RFHANDLE hDir,
-        std::vector< KEYPTR_SLOT > vecDirEnt );
+        std::vector< KEYPTR_SLOT >& vecDirEnt );
 
     gint32 OpenDir( const stdstr& strPath,
         mode_t dwMode, RFHANDLE& hDir,

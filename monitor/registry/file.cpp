@@ -93,8 +93,8 @@ gint32 CFileImage::Reload()
         m_oInodeStore.m_dwFlags =
             ntohl( pInode->m_dwFlags );
 
-        m_oInodeStore.m_dwUserData =
-            ntohl( pInode->m_dwUserData );
+        m_oInodeStore.m_dwRootBNode =
+            ntohl( pInode->m_dwRootBNode );
         // blocks for data section.
         int count =
             sizeof( pInode->m_arrBlocks ) >> 2;
@@ -237,7 +237,9 @@ gint32 CFileImage::Reload()
             if( ERROR( ret ) )
                 break;
         }
-
+        if( ERROR( ret ) )
+            break;
+        ret = 0;
     }while( 0 );
     return ret;
 }
@@ -261,22 +263,19 @@ gint32 CFileImage::Format()
             oAccTime.tv_sec;
 
         // file type
-        m_oInodeStore.m_dwMode = S_IFREG;
+        m_oInodeStore.m_dwMode =
+            ( S_IFREG | 0660 );
 
         // uid
-        m_oInodeStore.m_wuid = 0;
+        m_oInodeStore.m_wuid = geteuid();
 
         // gid
-        m_oInodeStore.m_wgid = 0;
+        m_oInodeStore.m_wgid = getegid();
 
         // type of file content
         m_oInodeStore.m_dwFlags = 0;
 
         // blocks for data section.
-        m_oInodeStore.m_iValType = typeNone;
-        m_oInodeStore.m_dwUserData =
-            INVALID_BNODE_IDX;
-
         memset( m_oInodeStore.m_arrBlocks, 0,
             sizeof( m_oInodeStore.m_arrBlocks ) );
 
@@ -287,7 +286,9 @@ gint32 CFileImage::Format()
         memset( m_oInodeStore.m_arrBuf, 0,
             sizeof( m_oInodeStore.m_arrBuf ) );
 
-        m_oInodeStore.m_dwUserData = 0;
+        m_oInodeStore.m_iValType = typeNone;
+        m_oInodeStore.m_dwRootBNode =
+            INVALID_BNODE_IDX;
         // for small data with length less than 96 bytes.
     }while( 0 );
     return ret;
@@ -320,18 +321,18 @@ gint32 CFileImage::Flush( guint32 dwFlags )
                 oAccTime.tv_sec;
             // file type
             pInode->m_dwMode =
-                ntohl( m_oInodeStore.m_dwMode );
+                htonl( m_oInodeStore.m_dwMode );
             // uid
             pInode->m_wuid =
-                ntohs( m_oInodeStore.m_wuid );
+                htons( m_oInodeStore.m_wuid );
             // gid
             pInode->m_wgid =
-                ntohs( m_oInodeStore.m_wgid );
+                htons( m_oInodeStore.m_wgid );
             // type of file content
             pInode->m_dwFlags =
                 htonl( m_oInodeStore.m_dwFlags );
-            pInode->m_dwUserData =
-                htonl( m_oInodeStore.m_dwUserData );
+            pInode->m_dwRootBNode =
+                htonl( m_oInodeStore.m_dwRootBNode );
             // blocks for data section.
             int count =
                 sizeof( pInode->m_arrBlocks ) >> 2;
@@ -1420,6 +1421,37 @@ void CFileImage::SetMode( mode_t dwMode )
         m_oInodeStore.m_dwMode =
             ( guint32 )dwMode;
     }while( 0 );
+    return;
+}
+
+void CFileImage::SetTimes(
+    const struct timespec tv[ 2 ] )
+{
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        auto& s = m_oInodeStore;
+        for( int i = 0; i < 2; i++ )
+        {
+            if( tv[ i ].tv_nsec == UTIME_OMIT )
+                continue;
+            if( tv[ i ].tv_nsec != UTIME_NOW )
+            {
+                if( i == 0 )
+                    s.m_dwatime = tv[ i ].tv_sec;
+                else
+                    s.m_dwmtime = tv[ i ].tv_sec;
+                continue;
+            }
+            timespec ot;
+            clock_gettime( CLOCK_REALTIME, &ot );
+            if( i == 0 )
+                s.m_dwatime = ot.tv_sec;
+            else
+                s.m_dwmtime = ot.tv_sec;
+        }
+    }while( 0 );
+    return;
 }
 
 gid_t CFileImage::GetGid() const
@@ -1463,6 +1495,8 @@ gint32 CFileImage::GetAttr( struct stat& stBuf )
         stBuf.st_mtime = m_oInodeStore.m_dwmtime;
         stBuf.st_mode = this->GetModeNoLock();
         stBuf.st_ino = this->GetInodeIdx();
+        stBuf.st_size = this->GetSize();
+        stBuf.st_blksize = BLOCK_SIZE;
 
     }while( 0 );
     return ret;
@@ -1486,19 +1520,19 @@ gint32 CFileImage::CheckAccess(
         {
             dwReadFlag = S_IRUSR;
             dwWriteFlag = S_IWUSR;
-            dwWriteFlag = S_IXUSR;
+            dwExeFlag = S_IXUSR;
         }
         else if( dwCurGid == dwGid )
         {
             dwReadFlag = S_IRGRP;
             dwWriteFlag = S_IWGRP;
-            dwWriteFlag = S_IXGRP;
+            dwExeFlag = S_IXGRP;
         }
         else
         {
             dwReadFlag = S_IROTH;
             dwWriteFlag = S_IWOTH;
-            dwWriteFlag = S_IXOTH;
+            dwExeFlag = S_IXOTH;
         }
 
         ret = -EACCES;
@@ -1550,7 +1584,8 @@ gint32 CLinkImage::Format()
     gint32 ret = super::Format();
     if( ERROR( ret ) )
         return ret;
-    m_oInodeStore.m_dwMode = S_IFLNK;
+    m_oInodeStore.m_dwMode =
+        ( S_IFLNK | 0777 );
     return ret;
 }
 

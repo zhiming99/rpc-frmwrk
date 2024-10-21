@@ -326,6 +326,9 @@ static int regfs_read(const char *path,
         guint32 dwSize = size;
         ret = pfs->ReadFile(
             hFile, buf, dwSize, offset );
+        if( ERROR( ret ) )
+            break;
+        ret = dwSize;
 
     }while( 0 );
 
@@ -348,11 +351,17 @@ static int regfs_write(const char *path,
         guint32 dwSize = size;
         ret = pfs->WriteFile(
             hFile, buf, dwSize, offset );
+        if( SUCCEEDED( ret ) )
+            ret = dwSize;
 
     }while( 0 );
 
 	return ret;
 }
+
+static int regfs_flush( const char *path,
+    struct fuse_file_info *fi )
+{ return 0; }
 
 static int regfs_release(const char *path, struct fuse_file_info *fi)
 {
@@ -395,6 +404,42 @@ static int regfs_fsync(const char *path, int isdatasync,
         if( ERROR( ret ) )
             break;
         ret = pOpen->Flush( dwFlags );
+
+    }while( 0 );
+
+	return ret;
+}
+
+static int regfs_utimens( const char * path,
+    const struct timespec tv[2],
+    struct fuse_file_info *fi)
+{
+	/* Just a stub.	 This method is optional and can safely be left
+	   unimplemented */
+    gint32 ret = 0;
+    do{
+        CRegistryFs* pfs = g_pRegfs;
+        RFHANDLE hFile;
+        if( fi == nullptr ||
+            fi->fh == INVALID_HANDLE )
+        {
+            stdstr strPath = path;
+            ret = pfs->OpenFile( strPath,
+                O_RDONLY, hFile, nullptr );
+            if( ERROR( ret ) )
+                break;
+        }
+        else
+        {
+            hFile = fi->fh;
+        }
+        guint32 dwFlags = FLAG_FLUSH_DATAONLY;
+        READ_LOCK( pfs );
+        FileSPtr pOpen;
+        ret = pfs->GetOpenFile( hFile, pOpen );
+        if( ERROR( ret ) )
+            break;
+        pOpen->SetTimes( tv );
 
     }while( 0 );
 
@@ -499,6 +544,7 @@ static const struct fuse_operations regfs_oper = {
 	.read		= regfs_read,
 	.write		= regfs_write,
 //	.statfs		= regfs_statfs,
+    .flush      = regfs_flush,
 	.release	= regfs_release,
 	.fsync		= regfs_fsync,
 	.setxattr	= regfs_setxattr,
@@ -510,6 +556,7 @@ static const struct fuse_operations regfs_oper = {
 	.init       = regfs_init,
 	.access		= regfs_access,
 	.create 	= regfs_create,
+	.utimens 	= regfs_utimens,
 };
 
 gint32 InitContext()
@@ -526,7 +573,7 @@ gint32 InitContext()
 
         // adjust the thread number if necessary
         oParams[ propMaxIrpThrd ] = 0;
-        oParams[ propMaxTaskThrd ] = 2;
+        oParams[ propMaxTaskThrd ] = 1;
 
         ret = g_pIoMgr.NewObj(
             clsid( CIoManager ),
@@ -588,7 +635,11 @@ int _main( int argc, char** argv)
         {
             ret = g_pRegfs->Format();
             if( SUCCEEDED( ret ) )
+            {
                 ret = g_pRegfs->Flush();
+                OutputMsg( ret, "Formatting "
+                    "completed successfully" );
+            }
         }
         else
         {
@@ -607,6 +658,11 @@ int _main( int argc, char** argv)
         g_pRegfs.Clear();
 
     }while( 0 );
+    if( ERROR( ret ) )
+    {
+        OutputMsg( ret, "Warning, regfs quitting "
+            "with error" );
+    }
 
     return ret;
 }
@@ -730,6 +786,7 @@ int main( int argc, char** argv)
         std::vector< std::string > strArgv;
         strArgv.push_back( argv[ 0 ] );
         strArgv.push_back( "-f" );
+        strArgv.push_back( "-d" );
         strArgv.push_back( g_strMPoint );
         int argcf = strArgv.size();
         char* argvf[ 100 ];

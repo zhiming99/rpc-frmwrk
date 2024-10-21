@@ -296,9 +296,11 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
         CDirImage* pDir = dirPtr;
+        std::string strFile =
+            basename( strPath.c_str() );
         FImgSPtr pFile;
         ret = pDir->CreateFile(
-            strPath.c_str(), dwMode, pFile );
+            strFile.c_str(), dwMode, pFile );
         if( ERROR( ret ) )
             break;
 
@@ -342,11 +344,14 @@ gint32 CRegistryFs::OpenFile(
         if( ERROR( ret ) )
             break;
 
+        std::string strFile =
+            basename( strPath.c_str() );
+
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
         CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strPath.c_str(), pFile, pNode );
+            strFile.c_str(), pFile, pNode );
         if( ERROR( ret ) )
             break;
 
@@ -1055,7 +1060,7 @@ gint32 CRegistryFs::OpenDir(
 }
 
 gint32 CRegistryFs::ReadDir( RFHANDLE hDir,
-    std::vector< KEYPTR_SLOT > vecDirEnt )
+    std::vector< KEYPTR_SLOT >& vecDirEnt )
 {
     gint32 ret = 0;
     do{
