@@ -1018,7 +1018,7 @@ gint32 CFreeBNodePool::ReleaseFreeBNode(
         if( dwPos + BNODE_SIZE >=
             m_pDir->GetSize() )
         {
-            ret = m_pDir->Truncate( dwPos );
+            ret = m_pDir->TruncateNoLock( dwPos );
             break;
         }
         ret = ERROR_FAIL;
@@ -1346,7 +1346,7 @@ gint32 CBPlusNode::BinSearch(
                 this->GetKey( iUpper ) );
             if( iRet < 0 )
             {
-                ret = -( iUpper + 10000 );
+                ret = -( iUpper + 0x10000 );
                 break;
             }
             else if( iRet == 0 )
@@ -1694,8 +1694,11 @@ gint32 CBPlusNode::RemoveFile(
                 KEYPTR_SLOT oKey;
                 this->RemoveSlotAt( idx, oKey );
 
+                if( IsRoot() )
+                    break;
+
                 if( GetKeyCount() >= 
-                    MIN_KEYS( IsRoot() ) )
+                    MIN_KEYS( false ) )
                     break;
                 Rebalance();
                 break;
@@ -1906,7 +1909,7 @@ gint32 CDirImage::FreeRootBNode(
     do{
         pRoot = std::move( m_pRootNode );
         PutFreeBNode( pRoot.get() );
-        ret = this->Truncate( 0 );
+        ret = this->TruncateNoLock( 0 );
         if( ERROR( ret ) )
             break;
 

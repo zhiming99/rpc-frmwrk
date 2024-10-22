@@ -526,8 +526,7 @@ struct RegFSInode
 
 #define DIRECT_BLOCKS 13
 
-#define INDIRECT_BLOCKS \
-    ( BLOCK_SIZE / sizeof( guint32 ) )
+#define INDIRECT_BLOCKS ( BLOCK_SIZE >> 2 )
 
 #define SEC_INDIRECT_BLOCKS \
     ( INDIRECT_BLOCKS * INDIRECT_BLOCKS ) 
@@ -537,7 +536,7 @@ struct RegFSInode
     SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
 
 #define WITHIN_DIRECT_BLOCK( _offset_ ) \
-    ( ( _offset_ ) >= 0 && ( _offset_ ) < INDIRECT_BLOCKS * BLOCK_SIZE )
+    ( ( _offset_ ) >= 0 && ( _offset_ ) < DIRECT_BLOCKS * BLOCK_SIZE )
 
 #define BEYOND_MAX_LIMIT( _offset_ ) \
     ( ( _offset_ ) >= MAX_FILE_SIZE )
@@ -722,6 +721,7 @@ struct CFileImage :
     gint32 TruncBlkIndirect( guint32 lablkidx );
     gint32 TruncBlkSecIndirect( guint32 lablkidx );
 
+    gint32 TruncateNoLock( guint32 dwOff );
     gint32 Truncate( guint32 dwOff );
     gint32 Extend( guint32 dwOff );
 
@@ -1082,12 +1082,12 @@ struct CBPlusNode :
     gint32 RemoveFileDirect (
         guint32 dwInodeIdx, FImgSPtr& pFile )
     {
-        auto mapFiles = GetFileMap();
+        auto& mapFiles = GetFileMap();
         auto itr = mapFiles.find( dwInodeIdx );
         if( itr == mapFiles.end() )
             return -ENOENT;
         pFile = itr->second;
-        itr->second.Clear();
+        mapFiles.erase( itr );
         return STATUS_SUCCESS;
     }
 
@@ -1158,6 +1158,7 @@ struct CBPlusNode :
             return -ENOENT;
         pChild->SetParent( nullptr );
         pChild = std::move( itr->second );
+        oMap.erase( itr );
         return STATUS_SUCCESS;
     }
 
@@ -1540,7 +1541,7 @@ class CRegistryFs :
 
     gint32 CreateFile( const stdstr& strPath,
         mode_t dwMode, guint32 dwFlags,
-        RFHANDLE hFile,
+        RFHANDLE& hFile,
         CAccessContext* pac = nullptr );
 
     gint32 MakeDir( const stdstr& strPath,

@@ -285,7 +285,7 @@ gint32 CRegistryFs::GetParentDir(
 gint32 CRegistryFs::CreateFile(
     const stdstr& strPath,
     mode_t dwMode, guint32 dwFlags,
-    RFHANDLE hFile,
+    RFHANDLE& hFile,
     CAccessContext* pac )
 {
     gint32 ret = 0;
@@ -421,23 +421,16 @@ gint32 CRegistryFs::RemoveFile(
         if( ERROR( ret ) )
             break;
 
-        CDirImage* pDir = dirPtr;
-        FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
-        ret = pDir->Search(
-            strPath.c_str(), pFile, pNode );
-        if( ERROR( ret ) )
-            break;
-
         std::string strFile =
             basename( strPath.c_str() );
 
-        ret = pDir->RemoveFile( strPath.c_str() );
+        CDirImage* pDir = dirPtr;
+        ret = pDir->RemoveFile( strFile.c_str() );
         
     }while( 0 );
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error remove file '%s'",
+        DebugPrint( ret, "Error removing file '%s'",
             strPath.c_str() ); 
     }
     return ret;
@@ -1026,10 +1019,13 @@ gint32 CRegistryFs::OpenDir(
             if( ERROR( ret ) )
                 break;
 
+            std::string strFile =
+                basename( strPath.c_str() );
+
             CDirImage* pDir = dirPtr;
             CBPlusNode* pNode = nullptr;
             ret = pDir->Search(
-                strPath.c_str(), pFile, pNode );
+                strFile.c_str(), pFile, pNode );
             if( ERROR( ret ) )
                 break;
         }

@@ -673,8 +673,8 @@ static void Usage( const char* szName )
         "Usage: %s [OPTIONS] <regfs path> [<mount point>]\n"
         "\t [ <regfs path> the path to the file containing regfs  ]\n"
         "\t [ <mount point> the directory to mount regfs ]\n"
+        "\t [ -u to enable fuse to dump debug information ]\n"
         "\t [ -d to run as a daemon ]\n"
-        "\t [ -o \"fuse options\" ]\n"
         "\t [ -g send logs to log server ]\n"
         "\t [ -i FORMAT the regfs ]\n"
         "\t [ -h this help ]\n", szName );
@@ -683,29 +683,22 @@ static void Usage( const char* szName )
 int main( int argc, char** argv)
 {
     bool bDaemon = false;
+    bool bDebug = false;
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hgdi" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hgdiu" ) ) != -1 )
         {
             switch( opt )
             {
-                case 'm':
-                    {
-                        g_strMPoint = optarg;
-                        if( g_strMPoint.size() > REG_MAX_NAME - 1 )
-                            ret = -ENAMETOOLONG;
-                        break;
-                    }
-                case 'f':
-                    {
-                    }
                 case 'd':
                     { bDaemon = true; break; }
                 case 'g':
                     { g_bLogging = true; break; }
                 case 'i':
                     { g_bFormat = true; break; }
+                case 'u':
+                    { bDebug = true; break; }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
@@ -786,7 +779,8 @@ int main( int argc, char** argv)
         std::vector< std::string > strArgv;
         strArgv.push_back( argv[ 0 ] );
         strArgv.push_back( "-f" );
-        strArgv.push_back( "-d" );
+        if( bDebug )
+            strArgv.push_back( "-d" );
         strArgv.push_back( g_strMPoint );
         int argcf = strArgv.size();
         char* argvf[ 100 ];

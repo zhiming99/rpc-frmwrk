@@ -467,12 +467,13 @@ gint32 CFileImage::CollectBlocksForRead(
 
         for( int i = dwLead; i < dwTail; i++ )
         {
+            guint32 dwCurPos = i * BLOCK_SIZE;
             bool bFirst =
-                WITHIN_INDIRECT_BLOCK( i * BLOCK_SIZE );
+                WITHIN_INDIRECT_BLOCK( dwCurPos );
             bool bSec = 
-                WITHIN_SEC_INDIRECT_BLOCK( i * BLOCK_SIZE );
+                WITHIN_SEC_INDIRECT_BLOCK( dwCurPos );
 
-            if( WITHIN_DIRECT_BLOCK( i * BLOCK_SIZE ) )
+            if( WITHIN_DIRECT_BLOCK( dwCurPos ) )
             {
                 // if the block is not allocated, push
                 // a zero
@@ -502,15 +503,14 @@ gint32 CFileImage::CollectBlocksForRead(
                     ( guint32* )p->ptr();
 
                 guint32 dwBlkIdx = ntohl(
-                pbis[ INDIRECT_BLK_IDX( dwOff ) ] );
+                pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] );
 
-                vecBlocks.push_back(
-                    ntohl( dwBlkIdx ) );
+                vecBlocks.push_back( dwBlkIdx );
             }
             else if( bSec )
             {
                 guint32 dwBitIdx =
-                    SEC_BLKIDX_TABLE_IDX( i );
+                    SEC_BLKIDX_TABLE_IDX( dwCurPos );
 
                 auto p = ( guint32* )
                     m_pBitdBlk->ptr();    
@@ -588,12 +588,13 @@ gint32 CFileImage::CollectBlocksForWrite(
 
         for( int i = dwLead; i < dwTail; i++ )
         {
+            guint32 dwCurPos = i * BLOCK_SIZE;
             bool bFirst =
-                WITHIN_INDIRECT_BLOCK( i * BLOCK_SIZE );
+                WITHIN_INDIRECT_BLOCK( dwCurPos );
             bool bSec = 
-                WITHIN_SEC_INDIRECT_BLOCK( i * BLOCK_SIZE );
+                WITHIN_SEC_INDIRECT_BLOCK( dwCurPos );
 
-            if( WITHIN_DIRECT_BLOCK( i * BLOCK_SIZE ) )
+            if( WITHIN_DIRECT_BLOCK( dwCurPos ) )
             {
                 guint32 dwDirectIdx =
                     m_oInodeStore.m_arrBlocks[ i ];
@@ -643,8 +644,8 @@ gint32 CFileImage::CollectBlocksForWrite(
                 guint32* pbis =
                     ( guint32* )p->ptr();
 
-                guint32 dwBlkIdx = ntohl(
-                    pbis[ INDIRECT_BLK_IDX( dwOff ) ] );
+                guint32 dwBlkIdx = ntohl( pbis[
+                    INDIRECT_BLK_IDX( dwCurPos ) ] );
 
                 if( dwBlkIdx == 0 )
                 {
@@ -652,12 +653,11 @@ gint32 CFileImage::CollectBlocksForWrite(
                         &dwBlkIdx, 1 );
                     if( ERROR( ret ) )
                         break;
-                    pbis[ INDIRECT_BLK_IDX( dwOff ) ] =
+                    pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] =
                         htonl( dwBlkIdx );
                 }
 
-                vecBlocks.push_back(
-                    ntohl( dwBlkIdx ) );
+                vecBlocks.push_back( dwBlkIdx );
             }
             else if( bSec )
             {
@@ -681,7 +681,7 @@ gint32 CFileImage::CollectBlocksForWrite(
                         0, m_pBitdBlk->size() );
                 }
                 guint32 dwBitIdx =
-                    SEC_BLKIDX_TABLE_IDX( i );
+                    SEC_BLKIDX_TABLE_IDX( dwCurPos );
                 auto p = ( guint32* )m_pBitdBlk->ptr();    
                 guint32 dwBitBlkIdx =
                     ntohl( p[ dwBitIdx ] );
@@ -706,7 +706,9 @@ gint32 CFileImage::CollectBlocksForWrite(
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, pBuf } );
                 }
-                guint32 dwIdx2 = SEC_BLKIDX_IDX( i );
+                guint32 dwIdx2 =
+                    SEC_BLKIDX_IDX( dwCurPos );
+
                 auto itr = m_mapSecBitBlks.find( 
                     dwBitIdx );
                 if( itr != m_mapSecBitBlks.end() )
@@ -726,7 +728,7 @@ gint32 CFileImage::CollectBlocksForWrite(
                         &dwBlkIdx, 1 );
                     if( ERROR( ret ) )
                         break;
-                    pblk[ INDIRECT_BLK_IDX( dwOff ) ] =
+                    pblk[ dwIdx2 ] =
                         htonl( dwBlkIdx );
                     vecBlocks.push_back( dwBlkIdx );
                     continue;
@@ -754,6 +756,8 @@ gint32 CFileImage::CollectBlocksForWrite(
                             &dwBlkIdx, 1 );
                         if( ERROR( ret ) )
                             break;
+                        pblk[ dwIdx2 ] =
+                            htonl( dwBlkIdx );
                     }
                     vecBlocks.push_back( dwBlkIdx );
                     m_mapSecBitBlks.insert(
@@ -1247,11 +1251,19 @@ gint32 CFileImage::TruncBlkSecIndirect(
 gint32 CFileImage::Truncate( guint32 dwOff )
 {
     gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        ret = TruncateNoLock( dwOff );
+    }while( 0 );
+    return ret;
+}
+gint32 CFileImage::TruncateNoLock( guint32 dwOff )
+{
+    gint32 ret = 0;
     if( BEYOND_MAX_LIMIT( dwOff ) )
         return -ERANGE;
 
     do{
-        WRITE_LOCK( this );
         if( dwOff > GetSize() )
         {
             ret = Extend( dwOff );
@@ -1495,8 +1507,12 @@ gint32 CFileImage::GetAttr( struct stat& stBuf )
         stBuf.st_mtime = m_oInodeStore.m_dwmtime;
         stBuf.st_mode = this->GetModeNoLock();
         stBuf.st_ino = this->GetInodeIdx();
-        stBuf.st_size = this->GetSize();
-        stBuf.st_blksize = BLOCK_SIZE;
+
+        guint32 fs = this->GetSize();
+        guint32 bs = BLOCK_SIZE;
+        stBuf.st_size = fs;
+        stBuf.st_blksize = bs;
+        stBuf.st_blocks = ( fs + bs - 1 ) / bs;
 
     }while( 0 );
     return ret;
