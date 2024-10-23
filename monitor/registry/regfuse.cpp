@@ -263,9 +263,9 @@ static int regfs_truncate(const char *path, off_t size,
             if( ERROR( ret ) )
                 break;
             ret = pfs->Truncate( hFile, size );
+            pfs->CloseFile( hFile );
             if( ERROR( ret ) )
                 break;
-            pfs->CloseFile( hFile );
         }
     }while( 0 );
 
@@ -420,6 +420,7 @@ static int regfs_utimens( const char * path,
     do{
         CRegistryFs* pfs = g_pRegfs;
         RFHANDLE hFile;
+        bool bClose = false;
         if( fi == nullptr ||
             fi->fh == INVALID_HANDLE )
         {
@@ -428,6 +429,7 @@ static int regfs_utimens( const char * path,
                 O_RDONLY, hFile, nullptr );
             if( ERROR( ret ) )
                 break;
+            bClose = true;
         }
         else
         {
@@ -437,9 +439,10 @@ static int regfs_utimens( const char * path,
         READ_LOCK( pfs );
         FileSPtr pOpen;
         ret = pfs->GetOpenFile( hFile, pOpen );
-        if( ERROR( ret ) )
-            break;
-        pOpen->SetTimes( tv );
+        if( SUCCEEDED( ret ) )
+            pOpen->SetTimes( tv );
+        if( bClose )
+            pfs->CloseFile( hFile );
 
     }while( 0 );
 

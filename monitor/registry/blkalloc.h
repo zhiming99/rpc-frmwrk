@@ -481,11 +481,11 @@ struct RegFSInode
     // file size in bytes
     guint32     m_dwSize;
     // time of last modification.
-    guint32     m_dwmtime;
+    timespec    m_mtime;
     // time of last access.
-    guint32     m_dwatime;
+    timespec    m_atime;
     // time of creation
-    guint32     m_dwctime;
+    timespec    m_ctime;
     // file type
     guint32     m_dwMode;
     // uid
@@ -529,14 +529,10 @@ struct RegFSInode
 #define INDIRECT_BLOCKS ( BLOCK_SIZE >> 2 )
 
 #define SEC_INDIRECT_BLOCKS \
-    ( INDIRECT_BLOCKS * INDIRECT_BLOCKS ) 
+    ({ int _blks_ = INDIRECT_BLOCKS; _blks_*_blks_;}) 
 
-#define MAX_FILE_SIZE ( BLOCK_SIZE * 13 + \
-    INDIRECT_BLOCKS * BLOCK_SIZE + \
-    SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
-
-#define WITHIN_DIRECT_BLOCK( _offset_ ) \
-    ( ( _offset_ ) >= 0 && ( _offset_ ) < DIRECT_BLOCKS * BLOCK_SIZE )
+#define MAX_FILE_SIZE ( ( 13 + INDIRECT_BLOCKS + \
+    SEC_INDIRECT_BLOCKS ) * BLOCK_SIZE )
 
 #define BEYOND_MAX_LIMIT( _offset_ ) \
     ( ( _offset_ ) >= MAX_FILE_SIZE )
@@ -546,9 +542,12 @@ struct RegFSInode
 #define SEC_INDIRECT_BLOCK_START \
     ( INDIRECT_BLOCK_START + INDIRECT_BLOCKS * BLOCK_SIZE )
 
+#define WITHIN_DIRECT_BLOCK( _offset_ ) \
+    ( ( _offset_ ) < INDIRECT_BLOCK_START )
+
 #define WITHIN_INDIRECT_BLOCK( _offset_ ) \
     ( ( _offset_ ) >= INDIRECT_BLOCK_START && \
-     ( _offset_ ) < SEC_INDIRECT_BLOCKS * BLOCK_SIZE )
+     ( _offset_ ) < SEC_INDIRECT_BLOCK_START  )
 
 // secondary indirect mapping block
 #define WITHIN_SEC_INDIRECT_BLOCK( _offset_ ) \
@@ -569,7 +568,7 @@ struct RegFSInode
 #define INDIRECT_BLK_IDX( _offset_ ) \
     ( ( ( _offset_ ) - INDIRECT_BLOCK_START ) >> BLOCK_SHIFT )
 
-#define SEC_BLKIDX_TABLE_IDX( _offset_ ) \
+#define SEC_BIT_IDX( _offset_ ) \
     ( ( ( ( _offset_ ) - SEC_INDIRECT_BLOCK_START ) >> \
         ( BLOCK_SHIFT + BLKIDX_PER_TABLE_SHIFT ) ) & \
         BLKIDX_PER_TABLE_MASK )
@@ -589,8 +588,8 @@ class CFileImage;
 typedef CAutoPtr< clsid( Invalid ), CFileImage > FImgSPtr;
 
 struct CFileImage : 
-    public ISynchronize,
-    public CObjBase
+    public CObjBase,
+    public ISynchronize
 {
     AllocPtr m_pAlloc;
     guint32 m_dwInodeIdx;
@@ -1352,8 +1351,8 @@ struct CAccessContext
 };
 
 struct COpenFileEntry :
-    public ISynchronize,
-    public CObjBase
+    public CObjBase,
+    public ISynchronize
 {
     AllocPtr        m_pAlloc;
     stdstr          m_strFileName;

@@ -73,13 +73,19 @@ gint32 CFileImage::Reload()
         SetSize( ntohl( pInode->m_dwSize ) );
 
         // time of last modification.
-        m_oInodeStore.m_dwmtime =
-            ntohl( pInode->m_dwmtime );
+        m_oInodeStore.m_mtime.tv_sec =
+            ntohl( pInode->m_mtime.tv_sec );
+        m_oInodeStore.m_mtime.tv_nsec =
+            ntohl( pInode->m_mtime.tv_nsec );
+
+        m_oInodeStore.m_ctime.tv_sec =
+            ntohl( pInode->m_ctime.tv_sec );
+        m_oInodeStore.m_ctime.tv_nsec =
+            ntohl( pInode->m_ctime.tv_nsec );
         // time of last access.
         timespec oAccTime;
         clock_gettime( CLOCK_REALTIME, &oAccTime );
-        m_oInodeStore.m_dwatime =
-            oAccTime.tv_sec;
+        m_oInodeStore.m_atime = oAccTime;
         // file type
         m_oInodeStore.m_dwMode =
             ntohl( pInode->m_dwMode );
@@ -255,12 +261,9 @@ gint32 CFileImage::Format()
         timespec oAccTime;
         clock_gettime( CLOCK_REALTIME, &oAccTime );
 
-        m_oInodeStore.m_dwatime =
-            oAccTime.tv_sec;
-        m_oInodeStore.m_dwmtime =
-            oAccTime.tv_sec;
-        m_oInodeStore.m_dwctime =
-            oAccTime.tv_sec;
+        m_oInodeStore.m_atime = oAccTime;
+        m_oInodeStore.m_mtime = oAccTime;
+        m_oInodeStore.m_ctime = oAccTime;
 
         // file type
         m_oInodeStore.m_dwMode =
@@ -311,14 +314,20 @@ gint32 CFileImage::Flush( guint32 dwFlags )
             pInode->m_dwSize = htonl( GetSize() );
 
             // time of last modification.
-            pInode->m_dwmtime =
-                htonl( m_oInodeStore.m_dwmtime );
+            pInode->m_mtime.tv_sec =
+                htonl( m_oInodeStore.m_mtime.tv_sec );
+            pInode->m_mtime.tv_nsec =
+                htonl( m_oInodeStore.m_mtime.tv_nsec );
+
+            pInode->m_ctime.tv_sec =
+                htonl( m_oInodeStore.m_ctime.tv_sec );
+            pInode->m_ctime.tv_nsec =
+                htonl( m_oInodeStore.m_ctime.tv_nsec );
             // time of last access.
             timespec oAccTime;
             clock_gettime(
                 CLOCK_REALTIME, &oAccTime );
-            m_oInodeStore.m_dwatime =
-                oAccTime.tv_sec;
+            m_oInodeStore.m_atime = oAccTime;
             // file type
             pInode->m_dwMode =
                 htonl( m_oInodeStore.m_dwMode );
@@ -510,7 +519,7 @@ gint32 CFileImage::CollectBlocksForRead(
             else if( bSec )
             {
                 guint32 dwBitIdx =
-                    SEC_BLKIDX_TABLE_IDX( dwCurPos );
+                    SEC_BIT_IDX( dwCurPos );
 
                 auto p = ( guint32* )
                     m_pBitdBlk->ptr();    
@@ -523,7 +532,8 @@ gint32 CFileImage::CollectBlocksForRead(
                     continue;
                 }
                 CStdRMutex oExclLock( GetExclLock() );
-                guint32 dwIdx2 = SEC_BLKIDX_IDX( i );
+                guint32 dwIdx2 =
+                    SEC_BLKIDX_IDX( dwCurPos );
                 auto itr = m_mapSecBitBlks.find( 
                     dwBitIdx );
                 if( itr != m_mapSecBitBlks.end() )
@@ -681,7 +691,8 @@ gint32 CFileImage::CollectBlocksForWrite(
                         0, m_pBitdBlk->size() );
                 }
                 guint32 dwBitIdx =
-                    SEC_BLKIDX_TABLE_IDX( dwCurPos );
+                    SEC_BIT_IDX( dwCurPos );
+
                 auto p = ( guint32* )m_pBitdBlk->ptr();    
                 guint32 dwBitBlkIdx =
                     ntohl( p[ dwBitIdx ] );
@@ -692,6 +703,10 @@ gint32 CFileImage::CollectBlocksForWrite(
                         &dwBitBlkIdx, 1 );
                     if( ERROR( ret ) )
                         break;
+                    DebugPrint( ret, "Allocated "
+                        "secondary bit directory at %d",
+                        dwBitBlkIdx );
+
                     BufPtr pBuf( true );
                     pBuf->Resize( BLOCK_SIZE );
                     memset( pBuf->ptr(), 0, pBuf->size() );
@@ -953,6 +968,11 @@ gint32 CFileImage::WriteFileNoLock(
                 ( guint8* )arrBytes );
             if( ERROR( ret ) )
                 break;
+            if( ret < BLOCK_SIZE )
+            {
+                DebugPrint( ret, "read block "
+                    "returned less bytes" );
+            }
             memcpy( arrBytes,
                 pBuf + BLOCK_SIZE * ( dwBlocks - 1 ),
                 dwTail );
@@ -1037,7 +1057,8 @@ gint32 CFileImage::WriteFileNoLock(
 
         timespec mtime;
         clock_gettime( CLOCK_REALTIME, &mtime );
-        m_oInodeStore.m_dwmtime = mtime.tv_sec;
+        m_oInodeStore.m_mtime = mtime;
+        m_oInodeStore.m_ctime = mtime;
 
     }while( 0 );
     return ret;
@@ -1073,26 +1094,26 @@ gint32 CFileImage::TruncBlkIndirect(
 {
     gint32 ret = 0;
     do{
-        if( lablkidx >= BLKIDX_PER_TABLE )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( !WITHIN_INDIRECT_BLOCK(
-            ( lablkidx << BLOCK_SHIFT ) ) ) 
-        {
-            ret = -EINVAL;
-            break;
-        }
         if( m_pBitBlk.IsEmpty() )
         {
             ret = -EFAULT;
             break;
         }
-        guint32 dwCount = 
-            BLKIDX_PER_TABLE - lablkidx;
 
-        guint32 i = lablkidx;
+        guint32 dwIndStart =
+            ( INDIRECT_BLOCK_START >> BLOCK_SHIFT);
+
+        guint32 i = lablkidx - dwIndStart;
+        guint32 dwCount = std::min(
+            ( ( GetSize() + BLOCK_SIZE - 1 ) >> BLOCK_SHIFT ) - lablkidx,
+            BLKIDX_PER_TABLE - i );
+
+        if( i >= BLKIDX_PER_TABLE )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
         auto pbit = ( guint32* )m_pBitBlk->ptr();
 
         ret = m_pAlloc->FreeBlocks(
@@ -1101,11 +1122,11 @@ gint32 CFileImage::TruncBlkIndirect(
         if( ERROR( ret ) )
             break;
 
-        for( ; i < lablkidx + dwCount; i++ )
-            pbit[ i ] = 0;
+        guint32 j = i;
+        for( ; j < i + dwCount; j++ )
+            pbit[ j ] = 0;
 
-        if( ( lablkidx << BLOCK_SHIFT ) ==
-            INDIRECT_BLOCK_START )
+        if( i == 0 )
         {
             guint32 dwBitdBlkIdx =
                 m_oInodeStore.m_arrBlocks[ BIT_IDX ];
@@ -1122,38 +1143,58 @@ gint32 CFileImage::TruncBlkSecIndirect(
 {
     gint32 ret = 0;
     do{
-        if( !WITHIN_SEC_INDIRECT_BLOCK(
-            ( lablkidx << BLOCK_SHIFT ) ) ) 
-        {
-            ret = -EINVAL;
-            break;
-        }
         if( m_pBitdBlk.IsEmpty() )
         {
             ret = -EFAULT;
             break;
         }
 
-        guint32 dwBitIdx = SEC_BLKIDX_TABLE_IDX(
-            ( lablkidx << BLOCK_SHIFT ) );
+        guint32 dwByteStart =
+            ( lablkidx << BLOCK_SHIFT );
+        guint32 dwSecStart =
+            SEC_INDIRECT_BLOCK_START;
 
-        guint32 dwBlkIdxIdx = SEC_BLKIDX_IDX(
-            ( lablkidx << BLOCK_SHIFT ) );
+        guint32 dwByteEnd = GetSize();
+
+        guint32 dwBitIdx =
+            SEC_BIT_IDX( dwByteStart );
+
+        guint32 dwBlkIdxIdx =
+            SEC_BLKIDX_IDX( dwByteStart );
+
+        guint32 dwBitEndIdx = SEC_BIT_IDX(
+            dwByteEnd + BLOCK_SIZE - 1 );
+
+        guint32 dwBlkEndIdxIdx = SEC_BLKIDX_IDX(
+            dwByteEnd + BLOCK_SIZE - 1 );
+
+        guint32 dwBitCount = std::min(
+            dwBitEndIdx - dwBitIdx + 1,
+            BLKIDX_PER_TABLE - dwBitIdx );
+
+        guint32 dwLastBlkIdxCount =
+            dwBitEndIdx > dwBitIdx ? dwBlkEndIdxIdx : 
+            dwBlkEndIdxIdx - dwBlkIdxIdx; 
+
+        auto pbitd = ( guint32* ) m_pBitdBlk->ptr();
 
         guint32 i = dwBitIdx + 1;
-        auto pbitd = ( guint32* )
-            m_pBitdBlk->ptr();
-
-        for( ; i < BLKIDX_PER_TABLE; i++ )
+        for( ; i < dwBitCount; i++ )
         {
-            guint32 dwBitBlkIdx = pbitd[ i ];
+            guint32 dwBitBlkIdx = ntohl( pbitd[ i ] );
+            guint32 dwBlksToFree;
+            if( i < dwBitCount - 1 )
+                dwBlksToFree = BLKIDX_PER_TABLE;
+            else
+                dwBlksToFree = dwLastBlkIdxCount;
+
             auto itr = m_mapSecBitBlks.find( i );
             if( itr != m_mapSecBitBlks.end() )
             {
                 auto p = ( guint32* )
                     itr->second->ptr();
                 m_pAlloc->FreeBlocks( p,
-                    BLKIDX_PER_TABLE, true );
+                    dwBlksToFree, true );
                 m_mapSecBitBlks.erase( itr );
             }
             else if( dwBitBlkIdx != 0 )
@@ -1166,8 +1207,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 if( ERROR( ret ) )
                     break;
                 ret = m_pAlloc->FreeBlocks(
-                    arrIdx, BLKIDX_PER_TABLE,
-                    true );
+                    arrIdx, dwBlksToFree, true );
                 if( ERROR( ret ) )
                     break;
             }
@@ -1180,8 +1220,18 @@ gint32 CFileImage::TruncBlkSecIndirect(
         }
         if( true )
         {
-            // the last block index table
-            guint32 dwBitBlkIdx = pbitd[ dwBitIdx ];
+            // the first block-index-table
+            guint32 dwBlksToFree;
+            if( dwBitCount == 1 )
+                dwBlksToFree = dwLastBlkIdxCount;
+            else
+            {
+                dwBlksToFree =
+                    BLKIDX_PER_TABLE - dwBlkIdxIdx;
+            }
+            guint32 dwBitBlkIdx =
+                ntohl( pbitd[ dwBitIdx ] );
+
             auto itr = m_mapSecBitBlks.find( dwBitIdx );
             if( itr != m_mapSecBitBlks.end() )
             {
@@ -1189,12 +1239,10 @@ gint32 CFileImage::TruncBlkSecIndirect(
                     itr->second->ptr();
 
                 guint32* pblkidx = p + dwBlkIdxIdx;
-                m_pAlloc->FreeBlocks( pblkidx,
-                    BLKIDX_PER_TABLE - dwBlkIdxIdx,
-                    true );
-                for( int i = 0;
-                    i < BLKIDX_PER_TABLE - dwBlkIdxIdx;
-                    i++ )
+                m_pAlloc->FreeBlocks(
+                    pblkidx, dwBlksToFree, true );
+                guint32 i = dwBlkIdxIdx;
+                for( ; i < dwBlksToFree; i++ )
                     pblkidx[ i ] = 0;
             }
             else if( dwBitBlkIdx != 0 )
@@ -1211,15 +1259,14 @@ gint32 CFileImage::TruncBlkSecIndirect(
 
                 ret = m_pAlloc->FreeBlocks(
                     pbit + dwBlkIdxIdx,
-                    BLKIDX_PER_TABLE - dwBlkIdxIdx,
-                    true );
+                    dwBlksToFree, true );
                 if( ERROR( ret ) )
                     break;
 
                 if( dwBlkIdxIdx > 0 )
                 {
-                    for( int j = dwBlkIdxIdx;
-                        j < BLKIDX_PER_TABLE; j++ )
+                    guint32 j = dwBlkIdxIdx;
+                    for(; j < dwBlksToFree; j++ )
                         pbit[ j ] = 0;
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, p } );
@@ -1233,15 +1280,13 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 pbitd[ dwBitIdx ] = 0;
             }
         }
-        if( ( lablkidx << BLOCK_SHIFT ) ==
+        if( dwByteStart ==
             SEC_INDIRECT_BLOCK_START )
         {
             guint32 dwBitdBlkIdx =
             m_oInodeStore.m_arrBlocks[ BITD_IDX ];
-
             ret = m_pAlloc->FreeBlocks(
                 &dwBitdBlkIdx, 1 );
-
             m_pBitdBlk.Clear();
         }
     }while( 0 );
@@ -1287,7 +1332,7 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
         if( dwHead > 0 )
         {
             dwBytes -= std::min(
-                ( dwOff & ( BLOCK_SIZE - 1 ) ),
+                ( BLOCK_SIZE - dwHead ),
                 dwDelta );
         }
 
@@ -1298,23 +1343,15 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
                 ( ~( BLOCK_SIZE - 1 ) ) );
         }
 
-        if( dwBytes > BLOCK_SIZE )
-        {
-            guint32 dwBlks = 
-                ( dwBytes >> BLOCK_SHIFT );
-            dwBlocks += dwBlks;
-            dwBytes &= ( BLOCK_SIZE - 1 );
-        }
-
-        if( dwTail > 0 && dwBytes > 0 )
-            dwBlocks++;
-
         if( dwTruncOff == UINT_MAX )
         {
             // no need to truncate
             SetSize( dwOff );
             break;
         }
+
+        guint32 dwTruncIdx = 
+            ( dwTruncOff >> BLOCK_SHIFT );
 
         guint32 dwSecStart =
         ( SEC_INDIRECT_BLOCK_START >> BLOCK_SHIFT );
@@ -1324,8 +1361,7 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
 
         if( WITHIN_SEC_INDIRECT_BLOCK( dwTruncOff ) )
         {
-            ret = TruncBlkSecIndirect(
-                dwTruncOff >> BLOCK_SHIFT );
+            ret = TruncBlkSecIndirect( dwTruncIdx );
         }
         else if( WITHIN_INDIRECT_BLOCK( dwTruncOff ) )
         {
@@ -1335,12 +1371,11 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
                 if( ERROR( ret ) )
                     break;
             }
-            ret = TruncBlkIndirect(
-                dwTruncOff >> BLOCK_SHIFT );
+            ret = TruncBlkIndirect( dwTruncIdx );
         }
         else
         {
-            // truncate from direct block
+            // truncate from secondary blocks to direct blocks
             if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() ) )
             {
                 ret = TruncBlkSecIndirect(
@@ -1357,13 +1392,13 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
                 if( ERROR( ret ) )
                     break;
             }
-            ret = TruncBlkDirect(
-                dwTruncOff >> BLOCK_SHIFT );
+            ret = TruncBlkDirect( dwTruncIdx );
         }
         SetSize( dwOff );
         timespec mtime;
         clock_gettime( CLOCK_REALTIME, &mtime );
-        m_oInodeStore.m_dwmtime = mtime.tv_sec;
+        m_oInodeStore.m_mtime = mtime;
+        m_oInodeStore.m_ctime = mtime;
 
     }while( 0 );
     return ret;
@@ -1450,17 +1485,17 @@ void CFileImage::SetTimes(
             if( tv[ i ].tv_nsec != UTIME_NOW )
             {
                 if( i == 0 )
-                    s.m_dwatime = tv[ i ].tv_sec;
+                    s.m_atime = tv[ i ];
                 else
-                    s.m_dwmtime = tv[ i ].tv_sec;
+                    s.m_mtime = tv[ i ];
                 continue;
             }
             timespec ot;
             clock_gettime( CLOCK_REALTIME, &ot );
             if( i == 0 )
-                s.m_dwatime = ot.tv_sec;
+                s.m_atime = ot;
             else
-                s.m_dwmtime = ot.tv_sec;
+                s.m_mtime = ot;
         }
     }while( 0 );
     return;
@@ -1503,8 +1538,9 @@ gint32 CFileImage::GetAttr( struct stat& stBuf )
         READ_LOCK( this );
         stBuf.st_uid = this->GetUidNoLock();
         stBuf.st_gid = this->GetGidNoLock();
-        stBuf.st_atime = m_oInodeStore.m_dwatime;
-        stBuf.st_mtime = m_oInodeStore.m_dwmtime;
+        stBuf.st_atim = m_oInodeStore.m_atime;
+        stBuf.st_mtim = m_oInodeStore.m_mtime;
+        stBuf.st_ctim = m_oInodeStore.m_ctime;
         stBuf.st_mode = this->GetModeNoLock();
         stBuf.st_ino = this->GetInodeIdx();
 
