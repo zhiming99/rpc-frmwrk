@@ -1032,12 +1032,16 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             guint64 off = ABS_ADDR(
                 GROUP_START( dwBlkIdx ) +
                 dwIdx * BLOCK_SIZE );
+            size_t qs = BLOCK_SIZE * elem.second;
+            if( qs > MAX_FILE_SIZE )
+            {
+                ret = -ERANGE;
+                break;
+            }
             if( dwBlkIdx == 0 && bRead )
             {
-                memset( pBuf + dwOff, 0,
-                    BLOCK_SIZE * elem.second );
-                dwOff +=
-                    BLOCK_SIZE * elem.second;
+                memset( pBuf + dwOff, 0, qs );
+                dwOff += qs;
                 continue;
             }
             else if( dwBlkIdx == 0 && !bRead )
@@ -1053,7 +1057,7 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             if( ERROR( ret ) )
                 break;
 
-            dwOff += BLOCK_SIZE * elem.second;
+            dwOff += qs;
         }
     }while( 0 );
     if( ERROR( ret ) )
