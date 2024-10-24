@@ -465,7 +465,7 @@ gint32 CFileImage::CollectBlocksForRead(
             ( dwOff >> BLOCK_SHIFT );
 
         guint32 dwTail =
-            ( ( dwOff + dwSize + BLOCK_SIZE - 1 ) >>
+            ( ( dwOff + dwSize + BLOCK_MASK ) >>
                 BLOCK_SHIFT );
 
         guint32 dwIndirectIdx =
@@ -586,7 +586,7 @@ gint32 CFileImage::CollectBlocksForWrite(
         guint32 dwLead =
             ( dwOff >> BLOCK_SHIFT );
         guint32 dwTail =
-            ( ( dwOff + dwSize + BLOCK_SIZE - 1 ) >>
+            ( ( dwOff + dwSize + BLOCK_MASK ) >>
             BLOCK_SHIFT );
 
 
@@ -819,11 +819,11 @@ gint32 CFileImage::ReadFile(
         DECL_ARRAY( arrBytes, BLOCK_SIZE );
 
         guint32 dwHead =
-            ( dwOff & ( BLOCK_SIZE - 1 ) );
+            ( dwOff & BLOCK_MASK );
 
         guint32 dwTail =
             ( ( dwOff + dwSize ) &
-                ( BLOCK_SIZE - 1 ) );
+                BLOCK_MASK );
 
         guint32 dwBlocks = vecBlks.size();
         if( dwHead == 0 && dwTail == 0 )
@@ -928,7 +928,7 @@ gint32 CFileImage::WriteFileNoLock(
     if( pBuf == nullptr )
         return -EINVAL;
     if( BEYOND_MAX_LIMIT( dwOff + dwSize ) )
-        return -ERANGE;
+        return -EFBIG;
 
     do{
         std::vector< guint32 > vecBlks;
@@ -940,11 +940,11 @@ gint32 CFileImage::WriteFileNoLock(
         DECL_ARRAY( arrBytes, BLOCK_SIZE );
 
         guint32 dwHead =
-            ( dwOff & ( BLOCK_SIZE - 1 ) );
+            ( dwOff & BLOCK_MASK );
 
         guint32 dwTail =
             ( ( dwOff + dwSize ) &
-                ( BLOCK_SIZE - 1 ) );
+                BLOCK_MASK );
 
         guint32 dwBlocks = vecBlks.size();
         if( dwHead == 0 && dwTail == 0 )
@@ -1105,7 +1105,7 @@ gint32 CFileImage::TruncBlkIndirect(
 
         guint32 i = lablkidx - dwIndStart;
         guint32 dwCount = std::min(
-            ( ( GetSize() + BLOCK_SIZE - 1 ) >> BLOCK_SHIFT ) - lablkidx,
+            ( ( GetSize() + BLOCK_MASK ) >> BLOCK_SHIFT ) - lablkidx,
             BLKIDX_PER_TABLE - i );
 
         if( i >= BLKIDX_PER_TABLE )
@@ -1163,10 +1163,10 @@ gint32 CFileImage::TruncBlkSecIndirect(
             SEC_BLKIDX_IDX( dwByteStart );
 
         guint32 dwBitEndIdx = SEC_BIT_IDX(
-            dwByteEnd + BLOCK_SIZE - 1 );
+            dwByteEnd + BLOCK_MASK );
 
         guint32 dwBlkEndIdxIdx = SEC_BLKIDX_IDX(
-            dwByteEnd + BLOCK_SIZE - 1 );
+            dwByteEnd + BLOCK_MASK );
 
         guint32 dwBitCount = std::min(
             dwBitEndIdx - dwBitIdx + 1,
@@ -1320,10 +1320,10 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
         guint32 dwDelta = GetSize() - dwOff;
 
         guint32 dwHead =
-            ( dwOff & ( BLOCK_SIZE - 1 ) );
+            ( dwOff & BLOCK_MASK );
 
         guint32 dwTail = ( ( dwOff + dwDelta ) &
-                ( BLOCK_SIZE - 1 ) );
+                BLOCK_MASK );
 
         guint32 dwBlocks = 0;
         guint32 dwBytes = dwDelta;
@@ -1339,8 +1339,8 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
         if( dwBytes > 0 )
         {
             dwTruncOff =
-                ( ( dwOff + BLOCK_SIZE - 1 ) &
-                ( ~( BLOCK_SIZE - 1 ) ) );
+                ( ( dwOff + BLOCK_MASK ) &
+                ( ~BLOCK_MASK ) );
         }
 
         if( dwTruncOff == UINT_MAX )
@@ -1409,11 +1409,11 @@ gint32 CFileImage::Extend( guint32 dwOff )
     gint32 ret = 0;
     do{
         guint32 laddr =
-            ( dwOff & ~( BLOCK_SIZE - 1 ) );
+            ( dwOff & ~BLOCK_MASK );
         DECL_ARRAY( arrBytes, BLOCK_SIZE );
         memset( arrBytes, 0, BLOCK_SIZE );
         guint32 dwBlkOff =
-            ( dwOff & ( BLOCK_SIZE - 1 ) );
+            ( dwOff & BLOCK_MASK );
         ret = WriteFileNoLock( laddr, dwBlkOff,
             ( guint8* )arrBytes );
     }while( 0 );

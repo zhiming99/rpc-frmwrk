@@ -519,16 +519,16 @@ gint32 CRegistryFs::RemoveDir(
         if( ERROR( ret ) )
             break;
 
+        std::string strDir =
+            basename( strPath.c_str() );
+
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
         CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strPath.c_str(), pFile, pNode );
+            strDir.c_str(), pFile, pNode );
         if( ERROR( ret ) )
             break;
-
-        std::string strDir =
-            basename( strPath.c_str() );
 
         {
             READ_LOCK( pFile );

@@ -1032,7 +1032,8 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             guint64 off = ABS_ADDR(
                 GROUP_START( dwBlkIdx ) +
                 dwIdx * BLOCK_SIZE );
-            size_t qs = BLOCK_SIZE * elem.second;
+            size_t qs = ( ( size_t )
+                BLOCK_SIZE ) * elem.second;
             if( qs > MAX_FILE_SIZE )
             {
                 ret = -ERANGE;

@@ -65,6 +65,7 @@
 #define SUPER_BLOCK_SIZE    ( BLOCK_SIZE )
 
 #define BLOCK_SHIFT         ( find_shift( BLOCK_SIZE ) )
+#define BLOCK_MASK         ( BLOCK_SIZE - 1 )
 
 #define BLKGRP_GAP_BLKNUM ( sizeof( guint16 ) * BYTE_BITS )
 #define BLOCKS_PER_GROUP ( 64 * 1024 - BLKGRP_GAP_BLKNUM )
@@ -516,8 +517,8 @@ struct RegFSInode
 
 // #define DIR_ENTRY_SIZE 128
 
-#define MAX_PTRS_PER_NODE \
-    ( BNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
+#define MAX_PTRS_PER_NODE 5
+    // ( BNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
 
 #define MAX_KEYS_PER_NODE ( MAX_PTRS_PER_NODE - 1 )
 
@@ -934,6 +935,10 @@ struct CDirImage :
 
     void SetFreeBNodeIdx(
         guint32 dwBNodeIdx );
+
+#ifdef DEBUG
+    gint32 PrintBNode();
+#endif
 };
 
 struct CBPlusNode :
@@ -992,10 +997,13 @@ struct CBPlusNode :
     inline void SetParent( CBPlusNode* pParent )
     { m_pParent = pParent; }
 
+    inline const CBPlusNode* GetParent() const
+    { return m_pParent; }
+
     inline CBPlusNode* GetParent()
     { return m_pParent; }
 
-    bool IsRoot()
+    bool IsRoot() const
     { return m_pParent == nullptr; }
 
     bool IsLeaf() const
@@ -1155,7 +1163,7 @@ struct CBPlusNode :
         auto itr = oMap.find( dwBNodeIdx );
         if( itr == oMap.end() )
             return -ENOENT;
-        pChild->SetParent( nullptr );
+        itr->second->SetParent( nullptr );
         pChild = std::move( itr->second );
         oMap.erase( itr );
         return STATUS_SUCCESS;
@@ -1182,7 +1190,7 @@ struct CBPlusNode :
         if( itr != oMap.end() )
             return -EEXIST;
         pChild->SetParent( this );
-        itr->second = std::move( pChild );
+        oMap[ dwBNodeIdx ] = std::move( pChild );
         return STATUS_SUCCESS;
     }
 
@@ -1203,6 +1211,14 @@ struct CBPlusNode :
     inline const KEYPTR_SLOT* GetSlot(
         gint32 idx ) const
     {
+        if( IsRoot() )
+        {
+            if( IsLeaf() && idx >= MAX_KEYS_PER_NODE )
+                return nullptr;
+            if( !IsLeaf() && idx >= MAX_PTRS_PER_NODE )
+                return nullptr;
+            return m_oBNodeStore.m_vecSlots[ idx ];
+        }
         if( IsLeaf() && idx >= GetKeyCount() )
             return nullptr;
         if( !IsLeaf() && idx >= GetChildCount() )
@@ -1212,6 +1228,14 @@ struct CBPlusNode :
 
     inline KEYPTR_SLOT* GetSlot( gint32 idx )
     {
+        if( IsRoot() )
+        {
+            if( IsLeaf() && idx >= MAX_KEYS_PER_NODE )
+                return nullptr;
+            if( !IsLeaf() && idx >= MAX_PTRS_PER_NODE )
+                return nullptr;
+            return m_oBNodeStore.m_vecSlots[ idx ];
+        }
         if( ( IsLeaf() && idx >= GetKeyCount() ) ||
             ( !IsLeaf() && idx >= GetChildCount() ) )
             return nullptr;
@@ -1290,6 +1314,11 @@ struct CBPlusNode :
         gint32 iPred, gint32 iSucc );
     gint32 Rebalance();
     gint32 RebalanceChild( guint32 idx );
+#ifdef DEBUG
+    gint32 PrintTree(
+        std::vector< std::pair< guint32, stdstr > >& vecLines,
+        guint32 dwLevel );
+#endif
 };
 
 struct FREE_BNODES
