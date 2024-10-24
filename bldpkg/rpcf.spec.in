@@ -72,6 +72,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @PYTHON_RPMFILES@
 %{_bindir}/rpcrouter
 %{_bindir}/rpcf_logger
+%{_bindir}/regfsmnt
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
@@ -87,6 +88,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/librpc.so*
 %{_libdir}/libauth.so*
 %{_libdir}/liblogcli.so*
+%{_libdir}/libregfs.so*
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
