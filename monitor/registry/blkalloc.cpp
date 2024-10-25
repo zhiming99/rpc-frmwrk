@@ -336,7 +336,7 @@ gint32 CGroupBitmap::Reload()
             break;
         guint16* p = ( guint16*)
             ( m_arrBytes + GRPBMP_SIZE );
-        m_wFreeCount = htons( p[ -1 ] );
+        m_wFreeCount = ntohs( p[ -1 ] );
         if( m_wFreeCount > BLKGRP_NUMBER )
         {
             ret = -ERANGE;

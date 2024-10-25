@@ -1128,11 +1128,12 @@ gint32 CFileImage::TruncBlkIndirect(
 
         if( i == 0 )
         {
-            guint32 dwBitdBlkIdx =
+            guint32& dwBitBlkIdx =
                 m_oInodeStore.m_arrBlocks[ BIT_IDX ];
             ret = m_pAlloc->FreeBlocks(
-                &dwBitdBlkIdx, 1 );
+                &dwBitBlkIdx, 1 );
             m_pBitBlk.Clear();
+            dwBitBlkIdx = 0;
         }
     }while( 0 );
     return ret;
@@ -1283,11 +1284,12 @@ gint32 CFileImage::TruncBlkSecIndirect(
         if( dwByteStart ==
             SEC_INDIRECT_BLOCK_START )
         {
-            guint32 dwBitdBlkIdx =
+            guint32& dwBitdBlkIdx =
             m_oInodeStore.m_arrBlocks[ BITD_IDX ];
             ret = m_pAlloc->FreeBlocks(
                 &dwBitdBlkIdx, 1 );
             m_pBitdBlk.Clear();
+            dwBitdBlkIdx = 0;
         }
     }while( 0 );
     return ret;

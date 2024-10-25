@@ -938,6 +938,7 @@ struct CDirImage :
 
 #ifdef DEBUG
     gint32 PrintBNode();
+    gint32 PrintBNodeNoLock();
 #endif
 };
 
@@ -1213,15 +1214,15 @@ struct CBPlusNode :
     {
         if( IsRoot() )
         {
-            if( IsLeaf() && idx >= MAX_KEYS_PER_NODE )
+            if( IsLeaf() && idx > MAX_KEYS_PER_NODE )
                 return nullptr;
-            if( !IsLeaf() && idx >= MAX_PTRS_PER_NODE )
+            if( !IsLeaf() && idx > MAX_PTRS_PER_NODE )
                 return nullptr;
             return m_oBNodeStore.m_vecSlots[ idx ];
         }
-        if( IsLeaf() && idx >= GetKeyCount() )
+        if( IsLeaf() && idx > GetKeyCount() )
             return nullptr;
-        if( !IsLeaf() && idx >= GetChildCount() )
+        if( !IsLeaf() && idx > GetChildCount() )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -1230,14 +1231,14 @@ struct CBPlusNode :
     {
         if( IsRoot() )
         {
-            if( IsLeaf() && idx >= MAX_KEYS_PER_NODE )
+            if( IsLeaf() && idx > MAX_KEYS_PER_NODE )
                 return nullptr;
-            if( !IsLeaf() && idx >= MAX_PTRS_PER_NODE )
+            if( !IsLeaf() && idx > MAX_PTRS_PER_NODE )
                 return nullptr;
             return m_oBNodeStore.m_vecSlots[ idx ];
         }
-        if( ( IsLeaf() && idx >= GetKeyCount() ) ||
-            ( !IsLeaf() && idx >= GetChildCount() ) )
+        if( ( IsLeaf() && idx > GetKeyCount() ) ||
+            ( !IsLeaf() && idx > GetChildCount() ) )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -1255,11 +1256,9 @@ struct CBPlusNode :
         CBPlusNode* pSrc, guint32 dwSrcOff,
         guint32 dwCount, guint32 dwDstOff );
 
-    gint32 InsertNonFull( KEYPTR_SLOT* pKey );
+    gint32 InsertOnly( KEYPTR_SLOT* pKey );
 
-    gint32 Split(
-        CBPlusNode* pParent,
-        guint32 dwSlotIdx );
+    gint32 Split( guint32 dwParentSlotIdx );
 
     gint32 StealFromLeft( gint32 i );
     gint32 StealFromRight( gint32 i );
