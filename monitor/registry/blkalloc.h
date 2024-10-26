@@ -1313,6 +1313,7 @@ struct CBPlusNode :
         gint32 iPred, gint32 iSucc );
     gint32 Rebalance();
     gint32 RebalanceChild( guint32 idx );
+    gint32 ShiftKeyPtr( guint32 dwIdx );
 #ifdef DEBUG
     gint32 PrintTree(
         std::vector< std::pair< guint32, stdstr > >& vecLines,
@@ -1328,10 +1329,8 @@ struct FREE_BNODES
     guint16 m_arrFreeBNIdx[ 0 ];
 
     static guint16 GetMaxCount()
-    {
-        return ( ( BNODE_SIZE - 4 ) *
-            sizeof( guint16 ) );
-    }
+    { return ( ( BNODE_SIZE - 4 ) >> 1 ); }
+
     guint16 GetCount() const
     { return m_wBNCount; };
 

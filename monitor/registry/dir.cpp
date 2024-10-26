@@ -503,7 +503,8 @@ gint32 CBPlusNode::MoveBNodeStore(
             SetKeyCount( GetKeyCount() + dwCount - 1 );
             pSrcNode->SetChildCount(
                 pSrcNode->GetChildCount() - dwCount );
-            this->SetChildCount( dwCount );
+            this->SetChildCount(
+                this->GetChildCount() + dwCount );
         }
 
     }while( 0 );
@@ -1135,7 +1136,7 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
 {
     gint32 ret = 0;
     do{
-        if( i < 0 || i >= MAX_PTRS_PER_NODE - 1 )
+        if( i < 0 || i >= MAX_KEYS_PER_NODE )
         {
             ret = -EINVAL;
             break;
@@ -1168,15 +1169,18 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
             COPY_KEY( pParentKs->szKey,
                 pRightKs2->szKey );
 
+            KEYPTR_SLOT oKey;
+            ret = pRight->RemoveSlotAt( 0, oKey );
+            if( ERROR( ret ) )
+                break;
+
             FImgSPtr pFile;
-            oSteal.oLeaf = pRightKs->oLeaf;
+            oSteal.oLeaf = oKey.oLeaf;
             ret = pRight->RemoveFileDirect(
                 oSteal.oLeaf.dwInodeIdx, pFile );
-            pRight->DecKeyCount();
             pLeft->AppendSlot( &oSteal );
             pLeft->AddFileDirect(
                 oSteal.oLeaf.dwInodeIdx, pFile );
-            pLeft->IncKeyCount();
         }
         else
         {
@@ -1415,6 +1419,38 @@ const char* CBPlusNode::GetPredKey(
         pChild->GetKeyCount() - 1 - dwIdx );
 }
 
+gint32 CBPlusNode::ShiftKeyPtr(
+    guint32 dwIdx )
+{
+    // remove a key by shifting its sibling keys to the
+    // key's slot, and remove a ptr as the key's
+    // successor by shifting the sibling's child to the
+    // right ajacent slot.
+    guint32 dwCount = GetKeyCount();
+    if( dwIdx >= dwCount || IsLeaf() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        guint32 i = dwIdx;
+        for( ; i < dwCount; i++ )
+        {
+            KEYPTR_SLOT* pSlot = GetSlot( i );
+            KEYPTR_SLOT* pNext = GetSlot( i + 1 );
+            COPY_KEY( pSlot->szKey, pNext->szKey );
+        }
+        i = dwIdx + 1;
+        for( ; i < dwCount + 1; i++ )
+        {
+            KEYPTR_SLOT* pSlot = GetSlot( i );
+            KEYPTR_SLOT* pNext = GetSlot( i + 1 );
+            pSlot->dwBNodeIdx = pNext->dwBNodeIdx;
+        }
+        DecKeyCount();
+        DecChildCount();
+    }while( 0 );
+    return ret;
+}
+
 gint32 CBPlusNode::MergeChilds(
     gint32 iPred, gint32 iSucc )
 {
@@ -1440,7 +1476,7 @@ gint32 CBPlusNode::MergeChilds(
         if( pPred->IsLeaf() )
         {
             ret = pPred->MoveBNodeStore( pSucc,
-                0, pSucc->GetKeyCount() + 1,
+                0, pSucc->GetKeyCount(),
                 pPred->GetKeyCount() );
             if( ERROR( ret ) )
                 break;
@@ -1452,7 +1488,7 @@ gint32 CBPlusNode::MergeChilds(
             KEYPTR_SLOT* pPredKs =
                 this->GetSlot( iPred );    
             KEYPTR_SLOT* pLast = pPred->GetSlot(
-                this->GetChildCount() );
+                this->GetKeyCount() );
             COPY_KEY(
                 pLast->szKey, pPredKs->szKey );
             pPred->IncKeyCount();
@@ -1463,17 +1499,16 @@ gint32 CBPlusNode::MergeChilds(
                 break;
         }
 
-        KEYPTR_SLOT oSuccKs;
-        this->RemoveSlotAt( iSucc, oSuccKs );
-        if( iSucc == this->GetKeyCount() )
-        {
-            KEYPTR_SLOT* pPredKs =
-                this->GetSlot( iPred );    
-            CLEAR_KEY( pPredKs->szKey );
-        }
+        KEYPTR_SLOT* pSuccKs =
+            this->GetSlot( iSucc );
+        guint32 dwBNodeIdx = pSuccKs->dwBNodeIdx;
+        ret = ShiftKeyPtr( iPred );
+        if( ERROR( ret ) )
+            break;
+
         BNodeUPtr pNode;
         this->RemoveChildDirect(
-            oSuccKs.dwBNodeIdx, pNode );
+            dwBNodeIdx, pNode );
 
         ret = m_pDir->PutFreeBNode(
             pNode.get() );
@@ -1563,10 +1598,9 @@ gint32 CBPlusNode::RebalanceChild(
             CBPlusNode* pRight =
                 this->GetChild( idx + 1 );
             if( pRight != nullptr &&
-                pRight->GetKeyCount() >= dwLimit )
+                pRight->GetKeyCount() > dwLimit )
             {
-                ret = this->StealFromRight(
-                    idx + 1 );
+                ret = StealFromRight( idx  );
                 break;
             }
             ret = MergeChilds( idx, idx + 1 );
@@ -1582,7 +1616,7 @@ gint32 CBPlusNode::RebalanceChild(
         CBPlusNode* pLeft =
             this->GetChild( idx - 1 );
         if( pLeft != nullptr &&
-            pLeft->GetKeyCount() >= dwLimit )
+            pLeft->GetKeyCount() > dwLimit )
         {
             ret = this->StealFromLeft( idx + 1 );
             break;
