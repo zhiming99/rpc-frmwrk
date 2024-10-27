@@ -210,13 +210,13 @@ gint32 CBPlusNode::Reload()
             KEYPTR_SLOT* p =
                pBPNode->m_vecSlots[ i ];
             guint32 dwIdx = p->dwBNodeIdx;
-            auto& oMap = GetChildMap();
-            auto& pNode = oMap[ dwIdx ];
+            BNodeUPtr pNode;
             pNode.reset(
                 new CBPlusNode( m_pDir, dwIdx ) );
             ret = pNode->Reload();
             if( ERROR( ret ) )
                 break;
+            ret = this->AddChild( i, pNode );
         }
         if( ERROR( ret ) )
             break;
@@ -429,10 +429,14 @@ gint32 CBPlusNode::InsertSlotAt(
             auto itr = oMap.find( dwIdx );
             if( itr->second.get() == nullptr )
             {
-                auto& pNode = oMap[ dwIdx ];
-                pNode.reset(
+                BNodeUPtr pNode(
                     new CBPlusNode( m_pDir, dwIdx ) );
                 ret = pNode->Reload();
+                if( SUCCEEDED( ret ) )
+                {
+                    this->AddChildDirect(
+                        dwIdx, pNode);
+                }
             }
             this->IncChildCount();
         }
@@ -469,7 +473,8 @@ gint32 CBPlusNode::MoveBNodeStore(
             {
                 FImgSPtr pFile;
                 gint32 iRet =
-                    pSrcNode->RemoveFile( i, pFile );
+                    pSrcNode->RemoveFile(
+                        i + dwSrcOff, pFile );
                 if( ERROR( iRet ) )
                     continue;
                 this->AddFileDirect(
@@ -824,6 +829,7 @@ gint32 FREE_BNODES::hton(
         0xff, ( GetMaxCount() - m_wBNCount ) *
         sizeof( guint16 ) );
     plhs->m_wBNCount = htons( m_wBNCount );
+    plhs->m_bNextBNode = m_bNextBNode;
     return 0;
 }
 
@@ -837,11 +843,16 @@ gint32 FREE_BNODES::ntoh(
     m_wBNCount = ntohs( prhs->m_wBNCount );
     if( m_wBNCount > GetMaxCount() )
         return -EINVAL;
-    for( guint32 i = 0; i < m_wBNCount; i++ )
+    m_bNextBNode = prhs->m_bNextBNode;
+    guint32 i = 0;
+    guint32 dwCount = GetMaxCount();
+    for( ; i < m_wBNCount; i++ )
     {
         m_arrFreeBNIdx[ i ] =
             ntohs( prhs->m_arrFreeBNIdx[ i ] );
     }
+    memset( m_arrFreeBNIdx + i, 0xff, 
+        ( ( dwCount - m_wBNCount ) << 1 ) );
     return 0;
 }
 
@@ -867,8 +878,7 @@ gint32 CFreeBNodePool::Reload()
         BufPtr pBuf( true );        
         pBuf->Resize( BNODE_SIZE );
         auto pfb = ( FREE_BNODES* )pBuf->ptr();
-        ret = pfb->ntoh(
-            arrBytes, BNODE_SIZE );
+        ret = pfb->ntoh( arrBytes, BNODE_SIZE );
         if( ERROR( ret ) )
             break;
         m_vecFreeBNodes.push_back(
@@ -960,8 +970,7 @@ gint32 CFreeBNodePool::PutFreeBNode(
         if( m_pDir->GetHeadFreeBNode() ==
             INVALID_BNODE_IDX )
         {
-            ret = InitPoolStore(
-                dwBNodeIdx );
+            ret = InitPoolStore( dwBNodeIdx );
             break;
         }
         do{
@@ -978,6 +987,7 @@ gint32 CFreeBNodePool::PutFreeBNode(
             {
                 guint32 dwNewPool =
                     pfb->GetLastBNodeIdx();
+                pfb->m_bNextBNode = true;
                 ret = InitPoolStore( dwNewPool );
                 if( ERROR( ret ) )
                     break;
@@ -1488,7 +1498,7 @@ gint32 CBPlusNode::MergeChilds(
             KEYPTR_SLOT* pPredKs =
                 this->GetSlot( iPred );    
             KEYPTR_SLOT* pLast = pPred->GetSlot(
-                this->GetKeyCount() );
+                pPred->GetKeyCount() );
             COPY_KEY(
                 pLast->szKey, pPredKs->szKey );
             pPred->IncKeyCount();
@@ -1712,12 +1722,15 @@ gint32 CBPlusNode::RemoveFile(
                 KEYPTR_SLOT oKey;
                 this->RemoveSlotAt( idx, oKey );
 
-                if( IsRoot() )
-                    break;
-
                 if( GetKeyCount() >= 
                     MIN_KEYS( false ) )
                     break;
+
+                if( IsRoot() )
+                {
+                    // m_pDir->ReleaseFreePool();
+                    break;
+                }
                 Rebalance();
                 break;
             }
@@ -1848,8 +1861,7 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
                 szKey, 0, dwCount - 1 );
             if( i >= 0 )
             {
-                iRet = STATUS_SUCCESS;
-                pCurNode = pCurNode->GetChild( i );
+                pCurNode = pCurNode->GetChild( i + 1 );
                 continue;
             }
             i = -i;

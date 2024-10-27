@@ -1122,6 +1122,12 @@ struct CBPlusNode :
         auto itr = mapFiles.find( dwInodeIdx );
         if( itr != mapFiles.end() )
             return -EEXIST;
+        if( pFile.IsEmpty() )
+        {
+            DebugPrint( -EFAULT, "Error the "
+            "file object to add is empty" );
+            return -EFAULT;
+        }
         mapFiles[ dwInodeIdx ] = pFile;
         return STATUS_SUCCESS;
     }
@@ -1204,6 +1210,15 @@ struct CBPlusNode :
             return -ENOTSUP;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
+
+        if( pChild->GetBNodeIndex() !=
+            ps->dwBNodeIdx )
+        {
+            DebugPrint( -EINVAL, "Error the "
+                "child to add is not the "
+                "expected one" );
+            return -EINVAL;
+        }
 
         return AddChildDirect(
             ps->dwBNodeIdx, pChild );
@@ -1342,16 +1357,17 @@ struct FREE_BNODES
 
     guint16 GetLastBNodeIdx()
     {
+        guint16* p = m_arrFreeBNIdx;
         if( m_wBNCount > 0 )
-            return m_arrFreeBNIdx[ m_wBNCount - 1 ];
+            return p[ m_wBNCount - 1 ];
         return INVALID_BNODE_IDX;
     }
     gint32 PushFreeBNode( guint16 wBNodeIdx )
     {
         if( IsFull() )
             return -ENOMEM;
-        m_arrFreeBNIdx[ m_wBNCount++ ] =
-            wBNodeIdx;
+        guint16* p = m_arrFreeBNIdx;
+        p[ m_wBNCount++ ] = wBNodeIdx;
         return 0;
     }
 
@@ -1359,7 +1375,8 @@ struct FREE_BNODES
     {
         if( IsEmpty() )
             return -ENOENT;
-        wBNodeIdx = m_arrFreeBNIdx[ --m_wBNCount ];
+        guint16* p = m_arrFreeBNIdx;
+        wBNodeIdx = p[ --m_wBNCount ];
         return 0;
     }
 

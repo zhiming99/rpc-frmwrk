@@ -995,13 +995,13 @@ gint32 CFileImage::WriteFileNoLock(
                 vecBlks.front(),
                 ( guint8* )arrBytes );
 
-            if( dwBlocks == 1 )
-                break;
-
-            ret = m_pAlloc->WriteBlocks(
-                vecBlks.data() + 1,
-                vecBlks.size() - 1,
-                pBuf + ( BLOCK_SIZE - dwHead ) );
+            if( dwBlocks > 1 )
+            {
+                ret = m_pAlloc->WriteBlocks(
+                    vecBlks.data() + 1,
+                    vecBlks.size() - 1,
+                    pBuf + ( BLOCK_SIZE - dwHead ) );
+            }
         }
         else //( dwHead > 0 && dwTail > 0 )
         {
@@ -1013,15 +1013,16 @@ gint32 CFileImage::WriteFileNoLock(
                 break;
             if( dwBlocks == 1 )
             {
+                // write heading bytes
                 memcpy( arrBytes + dwHead,
                     pBuf, dwSize );
                 ret = m_pAlloc->WriteBlock(
                     vecBlks.front(),
                     ( guint8* )arrBytes );
-                break;
             }
             else
             {
+                // write heading bytes
                 memcpy( arrBytes + dwHead, pBuf,
                     ( BLOCK_SIZE - dwHead ) );
                 ret = m_pAlloc->WriteBlock(
@@ -1031,6 +1032,7 @@ gint32 CFileImage::WriteFileNoLock(
             }
             if( dwBlocks > 2 )
             {
+                // write the trunk blocks
                 ret = m_pAlloc->WriteBlocks(
                     vecBlks.data() + 1,
                     dwBlocks - 2, pCur );
@@ -1038,15 +1040,19 @@ gint32 CFileImage::WriteFileNoLock(
                     break;
                 pCur += ( dwBlocks - 2 ) * BLOCK_SIZE;
             }
-            ret = m_pAlloc->ReadBlock(
-                vecBlks.back(),
-                ( guint8* )arrBytes );
-            if( ERROR( ret ) )
-                break;
-            memcpy( arrBytes, pCur, dwTail );
-            ret = m_pAlloc->WriteBlock(
-                vecBlks.back(), 
-                ( guint8* )arrBytes );
+            if( dwBlocks > 1 )
+            {
+                // write the trailing bytes
+                ret = m_pAlloc->ReadBlock(
+                    vecBlks.back(),
+                    ( guint8* )arrBytes );
+                if( ERROR( ret ) )
+                    break;
+                memcpy( arrBytes, pCur, dwTail );
+                ret = m_pAlloc->WriteBlock(
+                    vecBlks.back(), 
+                    ( guint8* )arrBytes );
+            }
         }
 
         if( ERROR( ret ) )
