@@ -1419,16 +1419,20 @@ struct COpenFileEntry :
         m_pAlloc = pObj;
         oCfg.GetObjPtr( 1, pObj );
         m_pFileImage = pObj;
+        oCfg.GetStrProp( 2, m_strFileName );
     }
 
     static gint32 Create(
         EnumFileType byType, FileSPtr& pOpenFile,
-        FImgSPtr& pFile, AllocPtr& pAlloc )
+        FImgSPtr& pFile, AllocPtr& pAlloc,
+        const stdstr& strFile )
     {
         gint32 ret = 0;
         CParamList oParams;
         oParams.Push( ObjPtr( pAlloc ) );
         oParams.Push( ObjPtr( pFile ) );
+        oParams.Push( strFile );
+
         EnumClsid iClsid = clsid( Invalid );
         if( byType == ftRegular )
             iClsid = clsid( COpenFileEntry );

@@ -388,7 +388,7 @@ gint32 CBPlusNode::InsertSlotAt(
     do{
         guint32 dwCount;
         bool bKey = ( pKey->szKey[ 0 ] != 0 );
-        if( bKey )
+        if( IsLeaf() )
             dwCount = this->GetKeyCount();
         else
             dwCount = this->GetChildCount();
@@ -399,8 +399,10 @@ gint32 CBPlusNode::InsertSlotAt(
             break;
         }
 
-        if( ( bKey && dwCount >= MAX_KEYS_PER_NODE + 1 ) ||
-            ( !bKey && dwCount >= MAX_PTRS_PER_NODE + 1 ) )
+        if( ( IsLeaf() &&
+                dwCount >= MAX_KEYS_PER_NODE + 1 ) ||
+            ( !IsLeaf() &&
+                dwCount >= MAX_PTRS_PER_NODE + 1 ) )
         {
             ret = -ENOMEM;
             DebugPrint( ret,
@@ -1597,7 +1599,7 @@ gint32 CBPlusNode::RebalanceChild(
 
         guint32 dwLimit = MIN_KEYS( false );
         guint32 dwCount = GetKeyCount();
-        if( idx == 0 && dwCount == 1 )
+        if( idx == 0 && dwCount == 1 && !IsRoot() )
         {
             ret = ERROR_FAIL;
             DebugPrint( ret, "Error we should "

@@ -80,7 +80,7 @@ gint32 CRegistryFs::CreateRootDir()
         // ret = m_pRootImg->Flush();
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
-            m_pRootImg, m_pAlloc );
+            m_pRootImg, m_pAlloc, stdstr( "/" ) );
         if( ERROR( ret ) )
             break;
 
@@ -103,7 +103,7 @@ gint32 CRegistryFs::OpenRootDir()
 
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
-            m_pRootImg, m_pAlloc );
+            m_pRootImg, m_pAlloc, stdstr( "/" ) );
         if( ERROR( ret ) )
             break;
 
@@ -307,7 +307,7 @@ gint32 CRegistryFs::CreateFile(
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
-            pFile, m_pAlloc );
+            pFile, m_pAlloc, strFile );
         if( ERROR( ret ) )
             break;
 
@@ -358,7 +358,7 @@ gint32 CRegistryFs::OpenFile(
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
-            pFile, m_pAlloc );
+            pFile, m_pAlloc, strFile );
         if( ERROR( ret ) )
             break;
 
@@ -1008,9 +1008,11 @@ gint32 CRegistryFs::OpenDir(
     do{
         READ_LOCK( this );
         FImgSPtr pFile;
+        stdstr strFile; 
         if( strPath == "/" )
         {
             pFile = m_pRootImg;
+            strFile = "/";
         }
         else
         {
@@ -1019,8 +1021,7 @@ gint32 CRegistryFs::OpenDir(
             if( ERROR( ret ) )
                 break;
 
-            std::string strFile =
-                basename( strPath.c_str() );
+            strFile = basename( strPath.c_str() );
 
             CDirImage* pDir = dirPtr;
             CBPlusNode* pNode = nullptr;
@@ -1033,7 +1034,7 @@ gint32 CRegistryFs::OpenDir(
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftDirectory, pOpenFile,
-            pFile, m_pAlloc );
+            pFile, m_pAlloc, strFile );
         if( ERROR( ret ) )
             break;
 
