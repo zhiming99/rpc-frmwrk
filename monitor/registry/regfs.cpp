@@ -107,8 +107,7 @@ gint32 CRegistryFs::OpenRootDir()
         if( ERROR( ret ) )
             break;
 
-        FileSPtr pEmpty;
-        ret = m_pRootDir->Open( pEmpty, nullptr );
+        ret = m_pRootDir->Open( nullptr );
         RFHANDLE hFile = m_pRootDir->GetObjId();
         m_mapOpenFiles[ hFile ] = m_pRootDir;
 
@@ -176,14 +175,19 @@ gint32 CRegistryFs::Stop()
     gint32 ret = 0;
     do{
         WRITE_LOCK( this );
+        if( m_mapOpenFiles.size() )
+            DebugPrint( m_mapOpenFiles.size(),
+                "there are some open files to close" );
+        for( auto& elem : m_mapOpenFiles )
+        {
+            FileSPtr pOpen = elem.second;
+            pOpen->Close();
+        }
+        m_pRootDir->Close();
+        m_mapOpenFiles.clear();
         ret = Flush( FLAG_FLUSH_CHILD );
         if( ERROR( ret ) )
             break;
-        m_pRootDir->Close();
-        RFHANDLE hDir =
-            m_pRootDir->GetObjId();
-        
-        m_mapOpenFiles.erase( hDir );
         SetState( stateStopped );
     }while( 0 );
     return ret;
@@ -311,8 +315,7 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
-        FileSPtr pEmpty;
-        ret = pOpenFile->Open( pEmpty, pac );
+        ret = pOpenFile->Open( pac );
         if( ERROR( ret ) )
             break;
 
@@ -362,8 +365,7 @@ gint32 CRegistryFs::OpenFile(
         if( ERROR( ret ) )
             break;
 
-        FileSPtr pEmpty;
-        ret = pOpenFile->Open( pEmpty, pac );
+        ret = pOpenFile->Open( pac );
         if( ERROR( ret ) )
             break;
 
@@ -425,12 +427,14 @@ gint32 CRegistryFs::RemoveFile(
             basename( strPath.c_str() );
 
         CDirImage* pDir = dirPtr;
-        ret = pDir->RemoveFile( strFile.c_str() );
+        ret = pDir->RemoveFile(
+            strFile.c_str() );
         
     }while( 0 );
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error removing file '%s'",
+        DebugPrint( ret,
+            "Error removing file '%s'",
             strPath.c_str() ); 
     }
     return ret;
@@ -530,26 +534,6 @@ gint32 CRegistryFs::RemoveDir(
         if( ERROR( ret ) )
             break;
 
-        {
-            READ_LOCK( pFile );
-            if( pFile->GetOpenCount() )
-            {
-                ret = -EBUSY;
-                DebugPrint( ret, "Error '%s' "
-                    "is being used",
-                    strDir.c_str() );
-                break;
-            }
-
-            CDirImage* pRemove = pFile;
-            CBPlusNode* pRoot =
-                pRemove->GetRootNode();
-            if( pRoot->GetKeyCount() > 0 )
-            {
-                ret = -ENOTEMPTY;
-                break;
-            }
-        }
         ret = pDir->RemoveFile( strDir.c_str() );
 
     }while( 0 );
@@ -1038,8 +1022,7 @@ gint32 CRegistryFs::OpenDir(
         if( ERROR( ret ) )
             break;
 
-        FileSPtr pEmpty;
-        ret = pOpenFile->Open( pEmpty, pac );
+        ret = pOpenFile->Open( pac );
         if( ERROR( ret ) )
             break;
 

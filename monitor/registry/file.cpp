@@ -1562,7 +1562,7 @@ gint32 CFileImage::GetAttr( struct stat& stBuf )
     return ret;
 }
 gint32 CFileImage::CheckAccess(
-    mode_t dwReq )
+    mode_t dwReq, const CAccessContext* pac ) const
 {
     gint32 ret = 0;
     do{
@@ -1570,8 +1570,19 @@ gint32 CFileImage::CheckAccess(
         uid_t dwUid = this->GetUidNoLock();
         gid_t dwGid = this->GetGidNoLock();
 
-        uid_t dwCurUid = geteuid();
-        gid_t dwCurGid = getegid();
+        uid_t dwCurUid;
+        gid_t dwCurGid;
+
+        if( pac == nullptr )
+        {
+            dwCurUid = geteuid();
+            dwCurGid = getegid();
+        }
+        else
+        {
+            dwCurGid = pac->dwGid;
+            dwCurUid = pac->dwUid;
+        }
 
         guint32 dwReadFlag;
         guint32 dwWriteFlag;
@@ -1614,6 +1625,33 @@ gint32 CFileImage::CheckAccess(
         if( !bCur && bReq )
             break;
         ret = 0;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CFileImage::FreeBlocksNoLock()
+{
+    // completely remove the file image from the
+    // storage.
+    gint32 ret = 0;
+    do{
+        ret = this->TruncateNoLock( 0 );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwInodeIdx =
+            this->GetInodeIdx();
+        ret = m_pAlloc->FreeBlocks(
+            &dwInodeIdx, 1 );
+        this->m_dwState = stateStopped;
+    }while( 0 );
+    return ret;
+}
+gint32 CFileImage::FreeBlocks()
+{
+    gint32 ret = 0;
+    do{
+        CWriteLock oLock( GetLock() );
+        ret = FreeBlocksNoLock();
     }while( 0 );
     return ret;
 }
@@ -1693,6 +1731,56 @@ gint32 COpenFileEntry::WriteFile(
         return ret;
 
     return STATUS_SUCCESS;
+}
+
+gint32 COpenFileEntry::Open(
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        if( true )
+        {
+            FImgSPtr& p = m_pFileImage;
+            CReadLock oLock( p->GetLock() );
+            CStdRMutex _oLock( p->GetExclLock() );
+            if( p->IsStopped() || p->IsStopping())
+            {
+                ret = -ENOENT;
+                break;
+            }
+            p->IncOpenCount();
+        }
+        CStdRMutex oLock( GetLock() );
+        if( pac )
+            m_oUserAc = *pac;
+    }while( 0 );
+    return ret;
+}
+
+gint32 COpenFileEntry::Close()
+{
+    gint32 ret = 0;
+    do{
+        FImgSPtr& p = m_pFileImage;
+        CWriteLock oLock(
+            p->GetLock() );
+        guint32 dwCount =
+            --p->m_dwOpenCount;
+        if( dwCount > 0 )
+            break;
+        EnumIfState& dwState = p->m_dwState;
+        if( dwState == stateStopping )
+        {
+            ret = p->FreeBlocksNoLock();
+            break;
+        }
+        if( dwState == stateStopped )
+            break;
+        oLock.Unlock();
+        ret = this->Flush();
+
+    }while( 0 );
+    return ret;
 }
 
 }

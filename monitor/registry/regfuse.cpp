@@ -190,6 +190,12 @@ static int regfs_unlink(const char *path)
 {
     stdstr strPath = path;
     CRegistryFs* pfs = g_pRegfs;
+    if( strcmp( path, "/" ) == 0 )
+    {
+        DebugPrint( -EACCES, "Error, cannot "
+            "remove root directory." );
+        return -EACCES;
+    }
     return  pfs->RemoveFile( strPath );
 }
 
@@ -197,6 +203,12 @@ static int regfs_rmdir(const char *path)
 {
     stdstr strPath = path;
     CRegistryFs* pfs = g_pRegfs;
+    if( strcmp( path, "/" ) == 0 )
+    {
+        DebugPrint( -EACCES, "Error, cannot "
+            "remove root directory." );
+        return -EACCES;
+    }
     return  pfs->RemoveDir( strPath );
 }
 

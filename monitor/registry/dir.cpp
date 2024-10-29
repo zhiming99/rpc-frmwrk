@@ -1685,26 +1685,8 @@ gint32 CBPlusNode::RemoveFile(
                         break;
                 }
 
-                if( pFile->GetOpenCount() )
-                {
-                    DebugPrint( ret, "Error, "
-                        "the file is still "
-                        "being used" );
-                    ret = -EBUSY;
-                    break;
-                }
-                else if( pFile->GetState() ==
-                    stateStopped )
-                {
-                    ret = -ENOENT;
-                    DebugPrint( ret, "Error, "
-                        "the file is being "
-                        "removed" );
-                    break;
-                }
-
                 CDirImage* pSubDir = pFile;
-                while( pSubDir != nullptr )
+                if( pSubDir != nullptr )
                 {
                     READ_LOCK( pSubDir );
                     ret = pSubDir->GetRootKeyCount();
@@ -1714,8 +1696,32 @@ gint32 CBPlusNode::RemoveFile(
                         DebugPrint( ret, "Error, "
                             "the directory is not "
                             "empty to remove" );
+                        break;
                     }
-                    break;
+                }
+
+                bool bBusy = false;
+                {
+                    READ_LOCK( pFile );
+                    CStdRMutex oLock(
+                        pFile->GetExclLock() );
+                    if( pFile->GetOpenCount() )
+                    {
+                        DebugPrint( ret, "Warning, "
+                            "the file is still "
+                            "being used" );
+                        pFile->SetState( stateStopping );
+                        bBusy = true;
+                    }
+                    else if( pFile->IsStopped() ||
+                        pFile->IsStopping() )
+                    {
+                        ret = -ENOENT;
+                        DebugPrint( ret, "Error, "
+                            "the file is being "
+                            "removed" );
+                        break;
+                    }
                 }
 
                 this->RemoveFileDirect(
@@ -1728,12 +1734,14 @@ gint32 CBPlusNode::RemoveFile(
                     MIN_KEYS( false ) )
                     break;
 
-                if( IsRoot() )
+                if( !IsRoot() )
                 {
-                    // m_pDir->ReleaseFreePool();
-                    break;
+                    ret = Rebalance();
+                    if( ERROR( ret ) )
+                        break;
                 }
-                Rebalance();
+                if( bBusy )
+                    ret = -EBUSY;
                 break;
             }
             KEYPTR_SLOT* pChildKs =
@@ -2190,16 +2198,20 @@ gint32 CDirImage::RemoveFile(
         WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szKey, pFile );
+        if( ret == -EBUSY )
+        {
+            // the file is removed from the directory
+            // but not removed from the storage.
+            // And the COpenFileEntry object held the
+            // references to this file image.
+            ret = 0;
+            break;
+        }
         if( ERROR( ret ) )
             break;
-        ret = pFile->Truncate( 0 );
-        if( ERROR( ret ) )
-            break;
-        guint32 dwInodeIdx =
-            pFile->GetInodeIdx();
-        ret = m_pAlloc->FreeBlocks(
-            &dwInodeIdx, 1 );
-        pFile->SetState( stateStopped );
+
+        ret = pFile->FreeBlocks();
+
     }while( 0 );
     return ret;
 }
@@ -2269,5 +2281,25 @@ gint32 CDirImage::PrintBNodeNoLock()
     return ret;
 }
 #endif
+
+gint32  CDirFileEntry::ListDir(
+    std::vector< KEYPTR_SLOT >& vecDirEnt ) const
+{   
+    gint32 ret = 0;
+    do{
+        CDirImage* pImg = m_pFileImage;
+        {
+            READ_LOCK( pImg );
+            CStdRMutex oLock(
+                pImg->GetExclLock() );
+            ret = pImg->CheckAccess(
+                R_OK, &m_oUserAc );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = pImg->ListDir( vecDirEnt );
+    }while( 0 );
+    return ret;
+}
 
 }

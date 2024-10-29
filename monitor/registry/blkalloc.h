@@ -185,12 +185,12 @@
 
 #define READ_LOCK( _p_ ) \
     CReadLock _oLock_( (_p_)->GetLock() ); \
-    if( (_p_)->GetState() == stateStopped ) \
+    if( (_p_)->IsStopped() ) \
     { ret = ERROR_STATE; break; }
 
 #define WRITE_LOCK( _p_ ) \
     CWriteLock _oLock_( (_p_)->GetLock() ); \
-    if( (_p_)->GetState() == stateStopped ) \
+    if( (_p_)->IsStoppedNoLock() ) \
     { ret = ERROR_STATE; break; }
 
 #define UNLOCK( _p_ ) \
@@ -488,11 +488,11 @@ struct RegFSInode
     // time of creation
     timespec    m_ctime;
     // file type
-    guint32     m_dwMode;
+    mode_t     m_dwMode;
     // uid
-    guint16     m_wuid;
+    uid_t       m_wuid;
     // gid
-    guint16     m_wgid;
+    gid_t       m_wgid;
 
     // type of file content
     guint32     m_dwFlags;
@@ -517,8 +517,8 @@ struct RegFSInode
 
 // #define DIR_ENTRY_SIZE 128
 
-#define MAX_PTRS_PER_NODE 5
-    // ( BNODE_SIZE / sizeof( KEYPTR_SLOT ) - 1 )
+#define MAX_PTRS_PER_NODE \
+    ( BNODE_SIZE / sizeof( KEYPTR_SLOT ) - 2 )
 
 #define MAX_KEYS_PER_NODE ( MAX_PTRS_PER_NODE - 1 )
 
@@ -578,6 +578,12 @@ struct RegFSInode
     ( ( ( ( _offset_ ) - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
 
+struct CAccessContext
+{
+    uid_t dwUid = USHRT_MAX;
+    gid_t dwGid = USHRT_MAX;
+};
+
 typedef enum : guint8
 {
     ftRegular = 1,
@@ -612,6 +618,7 @@ struct CFileImage :
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
     EnumIfState m_dwState = stateStarted;
+    std::atomic< bool > m_bRemoved = {false};
 
     mutable CSharedLock m_oLock;
     inline CSharedLock& GetLock() const
@@ -627,6 +634,21 @@ struct CFileImage :
     {
         CStdRMutex oLock( GetExclLock() );
         return ( guint32 )m_dwState;
+    }
+
+    inline bool IsStopped() const
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return m_dwState == stateStopped;
+    }
+
+    inline bool IsStoppedNoLock() const
+    { return m_dwState == stateStopped; }
+
+    inline bool IsStopping()
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return m_dwState == stateStopping;
     }
 
     inline guint32 IncOpenCount()
@@ -755,9 +777,13 @@ struct CFileImage :
     { return ( uid_t )m_oInodeStore.m_wuid; }
 
 
-    gint32 CheckAccess( mode_t dwMode );
+    gint32 CheckAccess( mode_t dwMode,
+        const CAccessContext* pac = nullptr ) const;
+
     gint32 GetAttr( struct stat& stBuf );
     void SetTimes( const struct timespec tv[ 2 ] );
+    gint32 FreeBlocks();
+    gint32 FreeBlocksNoLock();
 };
 
 struct CLinkImage :
@@ -1388,12 +1414,6 @@ struct FREE_BNODES
 class COpenFileEntry;
 typedef CAutoPtr< clsid( Invalid ), COpenFileEntry > FileSPtr;
 
-struct CAccessContext
-{
-    guint16 dwUid = USHRT_MAX;
-    guint16 dwGid = USHRT_MAX;
-};
-
 struct COpenFileEntry :
     public CObjBase,
     public ISynchronize
@@ -1445,6 +1465,7 @@ struct COpenFileEntry :
             ret = -ENOTSUP;
             DebugPrint( ret, "Error not a valid "
                 "type of file to create" );
+            return ret;
         }
         ret = pOpenFile.NewObj( iClsid,
             oParams.GetCfg() );
@@ -1474,24 +1495,9 @@ struct COpenFileEntry :
     virtual gint32 Truncate( guint32 dwOff )
     { return m_pFileImage->Truncate( dwOff ); }
 
-    inline gint32 Open( FileSPtr& pParent,
-        CAccessContext* pac )
-    {
-        m_pFileImage->IncOpenCount();
-        CStdRMutex oLock( GetLock() );
-        if( pac )
-            m_oUserAc = *pac;
-        return 0;
-    }
+    gint32 Open( CAccessContext* pac );
 
-    inline gint32 Close()
-    {
-        guint32 dwCount = 
-            m_pFileImage->DecOpenCount();
-        if( dwCount == 0 )
-            return Flush();
-        return 0;
-    }
+    gint32 Close();
 
     inline void SetFlags( guint32 dwFlags )
     {   m_dwFlags = dwFlags; }
@@ -1519,11 +1525,7 @@ struct CDirFileEntry :
 
     gint32  RemoveFile( const stdstr& strName );
     gint32  ListDir(
-        std::vector< KEYPTR_SLOT >& vecDirEnt ) const
-    {   
-        CDirImage* pImg = m_pFileImage;
-        return pImg->ListDir( vecDirEnt );
-    }
+        std::vector< KEYPTR_SLOT >& vecDirEnt ) const;
 };
 
 struct CLinkFileEntry:
@@ -1560,6 +1562,15 @@ class CRegistryFs :
     ~CRegistryFs();
     gint32 Start() override;
     gint32 Stop() override;
+
+    inline bool IsStopped() const
+    {
+        CStdRMutex oLock( GetExclLock() );
+        return m_dwState == stateStopped;
+    }
+
+    inline bool IsStoppedNoLock() const
+    { return m_dwState == stateStopped; }
 
     inline void SetState( guint32 dwState )
     {
