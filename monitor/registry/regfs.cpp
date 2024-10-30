@@ -80,7 +80,8 @@ gint32 CRegistryFs::CreateRootDir()
         // ret = m_pRootImg->Flush();
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
-            m_pRootImg, m_pAlloc, stdstr( "/" ) );
+            m_pRootImg, m_pAlloc,
+            stdstr( "/" ) );
         if( ERROR( ret ) )
             break;
 
@@ -103,7 +104,8 @@ gint32 CRegistryFs::OpenRootDir()
 
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
-            m_pRootImg, m_pAlloc, stdstr( "/" ) );
+            m_pRootImg, m_pAlloc,
+            stdstr( "/" ) );
         if( ERROR( ret ) )
             break;
 
@@ -263,9 +265,8 @@ gint32 CRegistryFs::GetParentDir(
                 continue;
             }
             FImgSPtr pFile;
-            CBPlusNode* pNode;
             ret = pCurDir->Search(
-                strCurDir.c_str(), pFile, pNode );
+                strCurDir.c_str(), pFile );
             if( ERROR( ret ) )
                 break;
             if( pCurDir == nullptr )
@@ -311,7 +312,7 @@ gint32 CRegistryFs::CreateFile(
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
-            pFile, m_pAlloc, strFile );
+            pFile, m_pAlloc, strPath );
         if( ERROR( ret ) )
             break;
 
@@ -352,16 +353,15 @@ gint32 CRegistryFs::OpenFile(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
 
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
-            pFile, m_pAlloc, strFile );
+            pFile, m_pAlloc, strPath );
         if( ERROR( ret ) )
             break;
 
@@ -404,8 +404,18 @@ gint32 CRegistryFs::CloseFile(
         FileSPtr pFile = itr->second;
         m_mapOpenFiles.erase( itr );
         oLock.Unlock();
-
-        pFile->Close();
+        ret = pFile->Close();
+        if( ret != STATUS_MORE_PROCESS_NEEDED )
+            break;
+        const stdstr& strPath = pFile->GetPath();
+        FImgSPtr dirPtr;
+        ret = GetParentDir( strPath, dirPtr );
+        if( ERROR( ret ) )
+            break;
+        std::string strFile =
+            basename( strPath.c_str() );
+        CDirImage* pDir = dirPtr;
+        ret = pDir->UnloadFile( strFile.c_str() );
 
     }while( 0 );
     return ret;
@@ -528,9 +538,8 @@ gint32 CRegistryFs::RemoveDir(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strDir.c_str(), pFile, pNode );
+            strDir.c_str(), pFile );
         if( ERROR( ret ) )
             break;
 
@@ -562,9 +571,8 @@ gint32 CRegistryFs::SetGid(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
 
@@ -596,9 +604,8 @@ gint32 CRegistryFs::SetUid(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
 
@@ -629,9 +636,8 @@ gint32 CRegistryFs::GetGid(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
         gid = pFile->GetGid();
@@ -660,9 +666,8 @@ gint32 CRegistryFs::GetUid(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
         uid = pFile->GetUid();
@@ -686,9 +691,8 @@ gint32 CRegistryFs::GetValue(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
         ret = pFile->ReadValue( oVar );
@@ -712,9 +716,8 @@ gint32 CRegistryFs::SetValue(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
         ret = pFile->WriteValue( oVar );
@@ -740,9 +743,8 @@ gint32 CRegistryFs::SymLink(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( SUCCEEDED( ret ) )
         {
             ret = -EEXIST;
@@ -777,9 +779,8 @@ gint32 CRegistryFs::ReadLink(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
         {
             ret = -ENOENT;
@@ -814,9 +815,8 @@ gint32 CRegistryFs::MakeDir(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( SUCCEEDED( ret ) )
         {
             ret = -EEXIST;
@@ -845,9 +845,8 @@ gint32 CRegistryFs::Chmod(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
         {
             ret = -ENOENT;
@@ -877,9 +876,8 @@ gint32 CRegistryFs::Chown(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
         {
             ret = -ENOENT;
@@ -908,9 +906,8 @@ gint32 CRegistryFs::Rename(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
         {
             ret = -ENOENT;
@@ -966,9 +963,8 @@ gint32 CRegistryFs::Access(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
         {
             ret = -ENOENT;
@@ -1008,9 +1004,8 @@ gint32 CRegistryFs::OpenDir(
             strFile = basename( strPath.c_str() );
 
             CDirImage* pDir = dirPtr;
-            CBPlusNode* pNode = nullptr;
             ret = pDir->Search(
-                strFile.c_str(), pFile, pNode );
+                strFile.c_str(), pFile );
             if( ERROR( ret ) )
                 break;
         }
@@ -1018,7 +1013,7 @@ gint32 CRegistryFs::OpenDir(
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftDirectory, pOpenFile,
-            pFile, m_pAlloc, strFile );
+            pFile, m_pAlloc, strPath );
         if( ERROR( ret ) )
             break;
 
@@ -1095,9 +1090,8 @@ gint32 CRegistryFs::GetAttr(
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
-        CBPlusNode* pNode = nullptr;
         ret = pDir->Search(
-            strFile.c_str(), pFile, pNode );
+            strFile.c_str(), pFile );
         if( ERROR( ret ) )
         {
             ret = -ENOENT;

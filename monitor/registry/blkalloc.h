@@ -142,12 +142,12 @@
 // get the logical address of a group from a with a
 // block index from inode
 #define GROUP_START( _blk_idx ) \
-    ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE * BLOCK_SIZE )
+    ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE )
 
 // get the logical address of a group's data section
 // from a with a block index from inode
 #define GROUP_DATA_START( _blk_idx ) \
-    ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE * BLOCK_SIZE + \
+    ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE + \
     BLKBMP_BLKNUM * BLOCK_SIZE )
 
 // get the block idx from the block addr
@@ -199,6 +199,7 @@
 #define RFHANDLE    guint64
 #define FLAG_FLUSH_CHILD 0x01
 #define FLAG_FLUSH_DATAONLY 0x02
+#define FLAG_FLUSH_FREEIMG 0x04
 
 extern rpcf::ObjPtr g_pIoMgr;
 
@@ -730,7 +731,7 @@ struct CFileImage :
         guint32 dwOff, guint32 dwSize,
         std::vector< guint32 >& vecBlocks );
 
-    gint32 WriteFile( guint32 dwOff,
+    virtual gint32 WriteFile( guint32 dwOff,
         guint32& dwSize, guint8* pBuf );
 
     gint32 WriteFileNoLock( guint32 dwOff,
@@ -799,6 +800,8 @@ struct CLinkImage :
 
     gint32 Reload() override;
     gint32 Format() override;
+    gint32 WriteFile( guint32 dwOff,
+        guint32& dwSize, guint8* pBuf ) override;
 };
 
 
@@ -917,7 +920,7 @@ struct CDirImage :
     // found, return pFile, otherwise, return the leaf
     // node pNode where the key should be inserted.
     gint32 Search( const char* szKey,
-        FImgSPtr& pFile, CBPlusNode*& pNode );
+        FImgSPtr& pFile );
 
     gint32 Split(
         CBPlusNode* pParent,
@@ -961,6 +964,8 @@ struct CDirImage :
 
     void SetFreeBNodeIdx(
         guint32 dwBNodeIdx );
+
+    gint32 UnloadFile( const char* szName );
 
 #ifdef DEBUG
     gint32 PrintBNode();
@@ -1359,6 +1364,7 @@ struct CBPlusNode :
     gint32 PrintTree(
         std::vector< std::pair< guint32, stdstr > >& vecLines,
         guint32 dwLevel );
+    gint32 PrintTree();
 #endif
 };
 
@@ -1419,7 +1425,7 @@ struct COpenFileEntry :
     public ISynchronize
 {
     AllocPtr        m_pAlloc;
-    stdstr          m_strFileName;
+    stdstr          m_strPath;
     FImgSPtr        m_pFileImage;
     CAccessContext  m_oUserAc;
     guint32         m_dwFlags;
@@ -1439,7 +1445,7 @@ struct COpenFileEntry :
         m_pAlloc = pObj;
         oCfg.GetObjPtr( 1, pObj );
         m_pFileImage = pObj;
-        oCfg.GetStrProp( 2, m_strFileName );
+        oCfg.GetStrProp( 2, m_strPath );
     }
 
     static gint32 Create(
@@ -1507,6 +1513,9 @@ struct COpenFileEntry :
 
     inline void SetTimes( const struct timespec tv[ 2 ] )
     { m_pFileImage->SetTimes( tv ); }
+
+    inline const stdstr& GetPath() const
+    { return m_strPath; }
 };
 
 struct CDirFileEntry :

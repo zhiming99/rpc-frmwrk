@@ -1191,8 +1191,15 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
             ret = pRight->RemoveFileDirect(
                 oSteal.oLeaf.dwInodeIdx, pFile );
             pLeft->AppendSlot( &oSteal );
-            pLeft->AddFileDirect(
+            if( SUCCEEDED( ret ) )
+            {
+                pLeft->AddFileDirect(
                 oSteal.oLeaf.dwInodeIdx, pFile );
+            }
+            else
+            {
+                ret = 0;
+            }
         }
         else
         {
@@ -1262,8 +1269,13 @@ gint32 CBPlusNode::StealFromLeft( gint32 i )
                 oSteal.oLeaf.dwInodeIdx, pFile );
             pLeft->DecKeyCount();
             pRight->InsertSlotAt( 0, &oSteal );
-            pRight->AddFileDirect(
-                oSteal.oLeaf.dwInodeIdx, pFile );
+            if( SUCCEEDED( ret ) )
+                pRight->AddFileDirect(
+                    oSteal.oLeaf.dwInodeIdx, pFile );
+            else
+            {
+                ret = 0;
+            }
             pRight->IncKeyCount();
         }
         else
@@ -1822,6 +1834,28 @@ gint32 CBPlusNode::PrintTree(
     }while( 0 );
     return ret;
 }
+
+gint32 CBPlusNode::PrintTree()
+{
+    gint32 ret = 0;
+    do{
+        std::vector< std::pair< guint32, stdstr > > vecLines;
+        vecLines.resize( 100 );
+        for( auto elem : vecLines )
+            elem.first = 0;
+        guint32 dwSibIdx = 0;
+        ret = this->PrintTree( vecLines, 0 );
+        for( auto elem : vecLines )
+        {
+            if( elem.first == 0 )
+                break;
+            printf( "%s\n",
+                elem.second.c_str() );
+        }
+    }while( 0 );
+    return ret;
+}
+
 #endif
 guint32 CDirImage::GetRootKeyCount() const 
 { 
@@ -1932,7 +1966,7 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
         {
             CStdRMutex oExclLock( GetExclLock() );
             KEYPTR_SLOT* pks =
-                pNode->GetSlot( i );
+                pCurNode->GetSlot( i );
             auto& dwInodeIdx =
                 pks->oLeaf.dwInodeIdx;
             iRet = STATUS_SUCCESS;
@@ -1953,7 +1987,7 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
                 ret = pFile->Reload();
                 if( ERROR( ret ) )
                     break;
-                ret = pNode->AddFileDirect(
+                ret = pCurNode->AddFileDirect(
                     dwInodeIdx,  pFile );
             }
         }
@@ -1969,11 +2003,12 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
 }
 
 gint32 CDirImage::Search( const char* szKey,
-    FImgSPtr& pFile, CBPlusNode*& pNode )
+    FImgSPtr& pFile )
 {
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        CBPlusNode* pNode = nullptr;
         ret = SearchNoLock(
             szKey, pFile, pNode );
         if( ret == ERROR_FALSE )
@@ -2185,6 +2220,8 @@ gint32 CDirImage::CreateLink( const char* szName,
         guint32 dwSize = strlen( szLink );
         ret = pImg->WriteFile(
             0, dwSize, ( guint8* )szLink );
+        if( ret > 0 )
+            ret = 0;
     }while( 0 );
     return ret;
 }
@@ -2211,6 +2248,31 @@ gint32 CDirImage::RemoveFile(
             break;
 
         ret = pFile->FreeBlocks();
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CDirImage::UnloadFile(
+    const char* szName )
+{
+    gint32 ret = 0;
+    do{
+        FImgSPtr pFile;
+        WRITE_LOCK( this );
+        CBPlusNode* pNode;
+        ret = this->SearchNoLock(
+            szName, pFile, pNode );
+        if( ERROR( ret ) )
+            break;
+        if( pNode == nullptr )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        FImgSPtr pUnload;
+        ret = pNode->RemoveFileDirect( 
+            pFile->GetInodeIdx(), pUnload );
 
     }while( 0 );
     return ret;

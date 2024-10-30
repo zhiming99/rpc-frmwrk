@@ -297,6 +297,18 @@ static int regfs_create(const char *path, mode_t mode,
         if( ERROR( ret ) )
             break;
         fi->fh = hFile;
+        if( strncmp( path, "/arch/arm/mach-pxa", 18 ) == 0 )
+        {
+            struct stat stBuf;
+            ret = pfs->GetAttr(
+                "/alpha/Kbuild", stBuf );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( ret, "Error, fs corrupted "
+                    "after creation of %s", path );
+            }
+            ret = 0;
+        }
 
     }while( 0 );
 
@@ -377,8 +389,6 @@ static int regfs_flush( const char *path,
 
 static int regfs_release(const char *path, struct fuse_file_info *fi)
 {
-	/* Just a stub.	 This method is optional and can safely be left
-	   unimplemented */
     gint32 ret = 0;
     do{
         RFHANDLE hFile = fi->fh;
@@ -688,10 +698,11 @@ static void Usage( const char* szName )
         "Usage: %s [OPTIONS] <regfs path> [<mount point>]\n"
         "\t [ <regfs path> the path to the file containing regfs  ]\n"
         "\t [ <mount point> the directory to mount regfs ]\n"
-        "\t [ -u to enable fuse to dump debug information ]\n"
+        "\t [ -c to delegate the kernel for access check ]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -g send logs to log server ]\n"
         "\t [ -i FORMAT the regfs ]\n"
+        "\t [ -u to enable fuse to dump debug information ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -699,13 +710,16 @@ int main( int argc, char** argv)
 {
     bool bDaemon = false;
     bool bDebug = false;
+    bool bKernelCheck = false;
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hgdiu" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "chgdiu" ) ) != -1 )
         {
             switch( opt )
             {
+                case 'c':
+                    { bKernelCheck = true; break; }
                 case 'd':
                     { bDaemon = true; break; }
                 case 'g':
@@ -796,6 +810,11 @@ int main( int argc, char** argv)
         strArgv.push_back( "-f" );
         if( bDebug )
             strArgv.push_back( "-d" );
+        if( bKernelCheck )
+        {
+            strArgv.push_back( "-o" );
+            strArgv.push_back( "default_permissions" );
+        }
         strArgv.push_back( g_strMPoint );
         int argcf = strArgv.size();
         char* argvf[ 100 ];

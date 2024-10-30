@@ -71,6 +71,11 @@ gint32 CFileImage::Reload()
 
         // file size in bytes
         SetSize( ntohl( pInode->m_dwSize ) );
+        if( GetSize() > MAX_FILE_SIZE )
+        {
+            ret = -ERANGE;
+            break;
+        }
 
         // time of last modification.
         m_oInodeStore.m_mtime.tv_sec =
@@ -444,6 +449,9 @@ gint32 CFileImage::Flush( guint32 dwFlags )
             m_pAlloc->WriteBlock( elem.first,
                 ( guint8* )elem.second->ptr() );
         }
+
+        ret = 0;
+
     }while( 0 );
     return ret;
 }
@@ -1699,12 +1707,32 @@ gint32 CLinkImage::ReadLink(
     return 0;
 }
 
+gint32 CLinkImage::WriteFile(
+    guint32 dwOff, guint32& dwSize,
+    guint8* pBuf )
+{
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        ret = WriteFileNoLock(
+            dwOff, dwSize, pBuf );
+        if( ERROR( ret ) )
+            break;
+        ret = 0;
+        auto szLink = ( const char* )pBuf;
+        m_strLink = stdstr( szLink, dwSize );
+    }while( 0 );
+    return ret;
+}
+
 gint32 COpenFileEntry::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
         WRITE_LOCK( m_pFileImage );
         ret = m_pFileImage->Flush( dwFlags );
+        if( ERROR( ret ) )
+            break;
     }while( 0 );
     return ret;
 }
@@ -1762,10 +1790,8 @@ gint32 COpenFileEntry::Close()
     gint32 ret = 0;
     do{
         FImgSPtr& p = m_pFileImage;
-        CWriteLock oLock(
-            p->GetLock() );
-        guint32 dwCount =
-            --p->m_dwOpenCount;
+        CWriteLock oLock( p->GetLock() );
+        guint32 dwCount = --p->m_dwOpenCount;
         if( dwCount > 0 )
             break;
         EnumIfState& dwState = p->m_dwState;
@@ -1778,6 +1804,8 @@ gint32 COpenFileEntry::Close()
             break;
         oLock.Unlock();
         ret = this->Flush();
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_MORE_PROCESS_NEEDED;
 
     }while( 0 );
     return ret;
