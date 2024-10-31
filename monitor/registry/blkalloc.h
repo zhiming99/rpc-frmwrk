@@ -389,7 +389,7 @@ class CBlockAllocator :
 
     SblkUPtr            m_pSuperBlock;
     GrpBmpUPtr          m_pGroupBitmap;
-    std::hashmap< guint32, BlkGrpUPtr > m_mapBlkGrps;
+    std::map< guint32, BlkGrpUPtr > m_mapBlkGrps;
 
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
