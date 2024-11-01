@@ -595,6 +595,8 @@ typedef enum : guint8
 class CFileImage;
 typedef CAutoPtr< clsid( Invalid ), CFileImage > FImgSPtr;
 
+class CDirImage;
+
 struct CFileImage : 
     public CObjBase,
     public ISynchronize
@@ -614,7 +616,7 @@ struct CFileImage :
     // catch of the secondary block index tables
     std::hashmap< guint32, BufPtr > m_mapSecBitBlks;
     guint32 m_dwOpenCount = 0;
-    
+    CDirImage* m_pParentDir = nullptr;
 
     RegFSInode  m_oInodeStore;
     Variant     m_oValue;
@@ -691,13 +693,15 @@ struct CFileImage :
     static gint32 Create(
         EnumFileType byType, FImgSPtr& pFile,
         AllocPtr& pAlloc, guint32 dwInodeIdx,
-        guint32 dwParentInode )
+        guint32 dwParentInode,
+        FImgSPtr pDir )
     {
         gint32 ret = 0;
         CParamList oParams;
         oParams.Push( ObjPtr( pAlloc ) );
         oParams.Push( dwInodeIdx );
         oParams.Push( dwParentInode );
+        oParams.Push( ObjPtr( pDir ) );
         EnumClsid iClsid = clsid( Invalid );
         if( byType == ftRegular )
             iClsid = clsid( CFileImage );
@@ -785,6 +789,12 @@ struct CFileImage :
     void SetTimes( const struct timespec tv[ 2 ] );
     gint32 FreeBlocks();
     gint32 FreeBlocksNoLock();
+
+    inline CDirImage* GetParentDir()
+    { return m_pParentDir; }
+
+    inline const CDirImage* GetParentDir() const
+    { return m_pParentDir; }
 };
 
 struct CLinkImage :
@@ -966,6 +976,7 @@ struct CDirImage :
         guint32 dwBNodeIdx );
 
     gint32 UnloadFile( const char* szName );
+    gint32 UnloadDirImage();
 
 #ifdef DEBUG
     gint32 PrintBNode();
@@ -1516,6 +1527,12 @@ struct COpenFileEntry :
 
     inline const stdstr& GetPath() const
     { return m_strPath; }
+
+    inline FImgSPtr& GetImage()
+    { return m_pFileImage; }
+
+    inline const FImgSPtr& GetImage() const
+    { return m_pFileImage; }
 };
 
 struct CDirFileEntry :
@@ -1622,6 +1639,7 @@ class CRegistryFs :
         guint32 dwFlags, RFHANDLE& hFile,
         CAccessContext* pac = nullptr );
 
+    gint32 CloseFileNoLock( RFHANDLE hFile );
     gint32 CloseFile( RFHANDLE hFile );
 
     gint32 RemoveFile( const stdstr& strPath,

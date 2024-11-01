@@ -146,16 +146,27 @@ static int regfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         stdstr strPath = path;
         CRegistryFs* pfs = g_pRegfs;
 
+        bool bClose = false;
         RFHANDLE hFile = INVALID_HANDLE;
-        ret = pfs->OpenDir(
-            strPath, R_OK, hFile, nullptr );
-        if( ERROR( ret ) )
-            break; 
+        if( fi && fi->fh )
+            hFile = fi->fh;
+        else
+        {
+            ret = pfs->OpenDir(
+                strPath, R_OK, hFile, nullptr );
+            if( ERROR( ret ) )
+                break; 
+            bClose = true;
+        }
 
         std::vector< KEYPTR_SLOT > vecDirEnt;
         ret = pfs->ReadDir( hFile, vecDirEnt );
         if( ERROR( ret ) )
+        {
+            if( bClose )
+                pfs->CloseFile( hFile );
             break;
+        }
 
         off_t i = offset;
         for( ;i < vecDirEnt.size(); i++ )
@@ -174,7 +185,30 @@ static int regfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                 ( fuse_fill_dir_flags )0 ) )
                 break;
         }
+        if( bClose )
+            pfs->CloseFile( hFile );
+
+    }while( 0 );
+	return ret;
+}
+
+static int regfs_releasedir(
+    const char *path, struct fuse_file_info* fi )
+{
+    gint32 ret = 0;
+    do{
+        CRegistryFs* pfs = g_pRegfs;
+        bool bClose = false;
+        RFHANDLE hFile = INVALID_HANDLE;
+        if( fi && fi->fh )
+            hFile = fi->fh;
+        else
+        {
+            ret = -EINVAL;
+            break;
+        }
         ret = pfs->CloseFile( hFile );
+
     }while( 0 );
 	return ret;
 }
@@ -196,7 +230,7 @@ static int regfs_unlink(const char *path)
             "remove root directory." );
         return -EACCES;
     }
-    return  pfs->RemoveFile( strPath );
+    return pfs->RemoveFile( strPath );
 }
 
 static int regfs_rmdir(const char *path)
@@ -297,18 +331,6 @@ static int regfs_create(const char *path, mode_t mode,
         if( ERROR( ret ) )
             break;
         fi->fh = hFile;
-        if( strncmp( path, "/arch/arm/mach-pxa", 18 ) == 0 )
-        {
-            struct stat stBuf;
-            ret = pfs->GetAttr(
-                "/alpha/Kbuild", stBuf );
-            if( ERROR( ret ) )
-            {
-                DebugPrint( ret, "Error, fs corrupted "
-                    "after creation of %s", path );
-            }
-            ret = 0;
-        }
 
     }while( 0 );
 
@@ -578,6 +600,7 @@ static const struct fuse_operations regfs_oper = {
 //    .removexattr = regfs_removexattr,
     .opendir    = regfs_opendir,
 	.readdir	= regfs_readdir,
+    .releasedir = regfs_releasedir,
 	.init       = regfs_init,
 	.access		= regfs_access,
 	.create 	= regfs_create,

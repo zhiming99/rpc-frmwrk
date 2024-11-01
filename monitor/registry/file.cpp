@@ -48,6 +48,8 @@ CFileImage::CFileImage( const IConfigDb* pCfg )
         oCfg.GetIntProp( 2, m_dwParentInode );
         if( ERROR( ret ) )
             break;
+        oCfg.GetPointer( 3, m_pParentDir );
+
     }while( 0 );
     if( ERROR( ret ) )
     {
@@ -193,10 +195,10 @@ gint32 CFileImage::Reload()
             break;
 
         bool bFirst = 
-            WITHIN_INDIRECT_BLOCK( dwSize );
+            WITHIN_INDIRECT_BLOCK( dwSize - 1 );
 
         bool bSec = 
-            WITHIN_SEC_INDIRECT_BLOCK( dwSize );
+            WITHIN_SEC_INDIRECT_BLOCK( dwSize - 1 );
 
         if( bSec )
         {
@@ -711,9 +713,9 @@ gint32 CFileImage::CollectBlocksForWrite(
                         &dwBitBlkIdx, 1 );
                     if( ERROR( ret ) )
                         break;
-                    DebugPrint( ret, "Allocated "
-                        "secondary bit directory at %d",
-                        dwBitBlkIdx );
+                    // DebugPrint( ret, "Allocated "
+                    //     "secondary bit directory at %d",
+                    //    dwBitBlkIdx );
 
                     BufPtr pBuf( true );
                     pBuf->Resize( BLOCK_SIZE );
@@ -1090,12 +1092,16 @@ gint32 CFileImage::TruncBlkDirect( guint32 lablkidx )
         }
         guint32* arrBlks =
             m_oInodeStore.m_arrBlocks;
+        guint32 dwCount =
+            ( ( GetSize() + BLOCK_MASK ) >> BLOCK_SHIFT);
+        dwCount = std::min(
+            BIT_IDX - lablkidx, dwCount );
         ret = m_pAlloc->FreeBlocks(
             arrBlks + lablkidx,
-            BIT_IDX - lablkidx );
+            dwCount );
         if( ERROR( ret ) )
             break;
-        for( int i = lablkidx; i < BIT_IDX; i++ )
+        for( int i = lablkidx; i < lablkidx + dwCount; i++ )
             arrBlks[ i ] = 0;
 
     }while( 0 );
@@ -1121,6 +1127,9 @@ gint32 CFileImage::TruncBlkIndirect(
         guint32 dwCount = std::min(
             ( ( GetSize() + BLOCK_MASK ) >> BLOCK_SHIFT ) - lablkidx,
             BLKIDX_PER_TABLE - i );
+
+        if( dwCount == 0 )
+            break;
 
         if( i >= BLKIDX_PER_TABLE )
         {
@@ -1381,7 +1390,7 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
         }
         else if( WITHIN_INDIRECT_BLOCK( dwTruncOff ) )
         {
-            if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() ) )
+            if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() - 1 ) )
             {
                 ret = TruncBlkSecIndirect( dwSecStart );
                 if( ERROR( ret ) )
@@ -1392,7 +1401,7 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
         else
         {
             // truncate from secondary blocks to direct blocks
-            if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() ) )
+            if( WITHIN_SEC_INDIRECT_BLOCK( GetSize() - 1 ) )
             {
                 ret = TruncBlkSecIndirect(
                     dwSecStart );
@@ -1401,7 +1410,7 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
                 ret = TruncBlkIndirect(
                     dwIndStart );
             }
-            else if( WITHIN_INDIRECT_BLOCK( GetSize() ) )
+            else if( WITHIN_INDIRECT_BLOCK( GetSize() - 1 ) )
             {
                 ret = TruncBlkIndirect(
                     dwIndStart );

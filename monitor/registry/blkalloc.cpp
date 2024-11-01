@@ -271,7 +271,7 @@ gint32 CGroupBitmap::InitBitmap()
 gint32 CGroupBitmap::IsBlockGroupFree(
     guint32 dwGrpIdx ) const
 {
-    gint32 ret = STATUS_SUCCESS;
+    gint32 ret = 0;
     do{
         if( m_wFreeCount == BLKGRP_NUMBER )
             break;
@@ -580,7 +580,7 @@ gint32 CBlockBitmap::Flush( guint32 dwFlags )
     gint32 ret = 0;
     do{
         guint32 dwBlockIdx =
-            ( m_dwGroupIdx << GROUP_SHIFT );
+            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
         DECL_ARRAY2( guint32,
             arrBlks, BLKBMP_BLKNUM );
         guint32 i = 0;
@@ -615,13 +615,12 @@ gint32 CBlockBitmap::Reload()
     gint32 ret = 0;
     do{
         guint32 dwBlockIdx =
-            ( m_dwGroupIdx << GROUP_SHIFT );
+            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
         DECL_ARRAY2( guint32,
             arrBlks, BLKBMP_BLKNUM );
         guint32 i = 0;
         guint32 dwCount = BLKBMP_BLKNUM;
-        guint32 dwSize =
-            dwCount * BLOCK_SIZE;
+        guint32 dwSize = dwCount * BLOCK_SIZE;
         for( ; i < dwCount; i++ )
             arrBlks[ i ] = dwBlockIdx + i;
         ret = m_pAlloc->ReadBlocks(
@@ -760,6 +759,7 @@ gint32 CBlockAllocator::LoadGroupBitmap(
     return ret;
 }
 
+static guint32 dwTotalFree = 0;
 gint32 CBlockAllocator::FreeBlocks(
     const guint32* pvecBlocks,
     guint32 dwNumBlocks,
@@ -771,6 +771,7 @@ gint32 CBlockAllocator::FreeBlocks(
     gint32 ret = 0;
     do{
         CStdRMutex oLock( GetLock() );
+        dwTotalFree+= dwNumBlocks;
         // search within the cache
         guint32 dwBlocks = 0;
         guint32 dwRest = dwNumBlocks;
@@ -1227,17 +1228,27 @@ gint32 CBlockAllocator::Reload()
         ret = this->m_pSuperBlock->Reload();
         if( ERROR( ret ) )
             break;
-        m_pGroupBitmap.reset( new CGroupBitmap( this ) );
+        m_pGroupBitmap.reset(
+            new CGroupBitmap( this ) );
         ret = m_pGroupBitmap->Reload();
         if( ERROR( ret ) )
             break;
-        BlkGrpUPtr pbg(
-            new CBlockGroup( this, 0 ) );
-        ret = pbg->Reload();
-        if( ERROR( ret ) )
-            break;
-        m_mapBlkGrps.insert(
-            { 0, std::move( pbg ) } );
+
+        CGroupBitmap* pgb = m_pGroupBitmap.get();
+        for( int i = 0; i < BLKGRP_NUMBER; i++ )
+        {
+            gint32 iRet =
+                pgb->IsBlockGroupFree( i );
+            if( SUCCEEDED( iRet ) )
+                continue;
+            BlkGrpUPtr pbg(
+                new CBlockGroup( this, i ) );
+            ret = pbg->Reload();
+            if( ERROR( ret ) )
+                break;
+            m_mapBlkGrps.insert(
+                { i, std::move( pbg ) } );
+        }
     }while( 0 );
     return ret;
 }

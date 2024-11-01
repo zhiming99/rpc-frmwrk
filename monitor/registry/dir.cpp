@@ -1690,7 +1690,8 @@ gint32 CBPlusNode::RemoveFile(
 
                     CFileImage::Create( byType,
                         pFile, pAlloc, dwInodeIdx,
-                        m_pDir->GetInodeIdx() );
+                        m_pDir->GetInodeIdx(),
+                        ObjPtr( m_pDir ) );
 
                     ret = pFile->Reload();
                     if( ERROR( ret ) )
@@ -1944,7 +1945,8 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
                 AllocPtr pAlloc = GetAlloc();
                 ret = CFileImage::Create( byType,
                     pFile, pAlloc, dwInodeIdx,
-                    this->GetInodeIdx() );
+                    this->GetInodeIdx(),
+                    ObjPtr( this ) );
                 if( ERROR( ret ) )
                     break;
                 ret = pFile->Reload();
@@ -1981,7 +1983,8 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
                 AllocPtr pAlloc = GetAlloc();
                 ret = CFileImage::Create( byType,
                     pFile, pAlloc, dwInodeIdx,
-                    this->GetInodeIdx() );
+                    this->GetInodeIdx(),
+                    ObjPtr( this ) );
                 if( ERROR( ret ) )
                     break;
                 ret = pFile->Reload();
@@ -2114,7 +2117,8 @@ gint32 CDirImage::CreateFile(
             break;
         ret = Create( iType,
             pImg, m_pAlloc, dwInodeIdx,
-            this->GetInodeIdx() );
+            this->GetInodeIdx(),
+            ObjPtr( this ) );
         if( ERROR( ret ) )
             break;
 
@@ -2220,6 +2224,9 @@ gint32 CDirImage::CreateLink( const char* szName,
         guint32 dwSize = strlen( szLink );
         ret = pImg->WriteFile(
             0, dwSize, ( guint8* )szLink );
+        if( ERROR( ret ) )
+            break;
+        ret = pImg->Flush();
         if( ret > 0 )
             ret = 0;
     }while( 0 );
@@ -2253,6 +2260,46 @@ gint32 CDirImage::RemoveFile(
     return ret;
 }
 
+gint32 CDirImage::UnloadDirImage()
+{
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        auto itr = m_mapFiles.begin();
+        while( itr != m_mapFiles.end() )
+        {
+            CFileImage* pFile = itr->second;
+            CDirImage* pDir = itr->second;
+
+            WRITE_LOCK( pFile );
+            if( pFile == nullptr )
+            {
+                itr = m_mapFiles.erase( itr );
+            }
+            else if( pFile->GetOpenCount() > 0 )
+            {
+                ret = -EBUSY;
+                itr++;
+            }
+            else if( pDir == nullptr )
+            {
+                // file or link
+                pFile->Flush();    
+                itr = m_mapFiles.erase( itr );
+            }
+            else
+            {
+                // dir
+                ret = -EBUSY;
+                itr++;
+            }
+        }
+        this->Flush();
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CDirImage::UnloadFile(
     const char* szName )
 {
@@ -2270,6 +2317,14 @@ gint32 CDirImage::UnloadFile(
             ret = -ENOENT;
             break;
         }
+        CDirImage* pDir = pFile;
+        if( pDir != nullptr )
+        {
+            ret = pDir->UnloadDirImage();
+            if( ERROR( ret ) )
+                break;
+        }
+
         FImgSPtr pUnload;
         ret = pNode->RemoveFileDirect( 
             pFile->GetInodeIdx(), pUnload );

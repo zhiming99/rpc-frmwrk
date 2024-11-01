@@ -73,7 +73,8 @@ gint32 CRegistryFs::CreateRootDir()
         }
         ret = CFileImage::Create( ftDirectory,
             m_pRootImg, m_pAlloc,
-            ROOT_INODE_BLKIDX, 0 );
+            ROOT_INODE_BLKIDX, 0,
+            ObjPtr() );
         ret = m_pRootImg->Format();
         if( ERROR( ret ) )
             break;
@@ -95,7 +96,8 @@ gint32 CRegistryFs::OpenRootDir()
     do{
         ret = CFileImage::Create( ftDirectory,
             m_pRootImg, m_pAlloc,
-            ROOT_INODE_BLKIDX, 0 );
+            ROOT_INODE_BLKIDX, 0,
+            ObjPtr() );
         if( ERROR( ret ) )
             break;
         ret = m_pRootImg->Reload();
@@ -386,14 +388,13 @@ gint32 CRegistryFs::OpenFile(
     return ret;
 }
 
-gint32 CRegistryFs::CloseFile(
+gint32 CRegistryFs::CloseFileNoLock(
     RFHANDLE hFile )
 {
     if( hFile == INVALID_HANDLE )
         return -EINVAL;
     gint32 ret = 0;
     do{
-        READ_LOCK( this );
         CStdRMutex oLock( this->GetExclLock() );
         auto itr = m_mapOpenFiles.find( hFile );
         if( itr == m_mapOpenFiles.end() )
@@ -407,16 +408,34 @@ gint32 CRegistryFs::CloseFile(
         ret = pFile->Close();
         if( ret != STATUS_MORE_PROCESS_NEEDED )
             break;
+
         const stdstr& strPath = pFile->GetPath();
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
-        if( ERROR( ret ) )
-            break;
+        FImgSPtr pImg = pFile->GetImage();
+        CDirImage* pDir = pImg->GetParentDir();
+        if( pDir == nullptr )
+        {
+            ret = GetParentDir( strPath, dirPtr );
+            if( ERROR( ret ) )
+                break;
+            pDir = dirPtr;
+        }
+
         std::string strFile =
             basename( strPath.c_str() );
-        CDirImage* pDir = dirPtr;
-        ret = pDir->UnloadFile( strFile.c_str() );
+        pDir->UnloadFile( strFile.c_str() );
 
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::CloseFile(
+    RFHANDLE hFile )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        ret = CloseFileNoLock( hFile );
     }while( 0 );
     return ret;
 }
