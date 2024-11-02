@@ -5,6 +5,7 @@ usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libhellowrd.so*
 @JAVA_DEBFILES@
 usr/bin/rpcrouter
 usr/bin/rpcf_logger
+usr/bin/regfsmnt
 @FUSE3_DEBFILES@
 usr/bin/rpcf/*.py
 @GMSSL_DEBFILES@

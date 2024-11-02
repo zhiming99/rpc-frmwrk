@@ -428,6 +428,7 @@ AC_CONFIG_FILES([Makefile
                  python/setup.py
                  js/Makefile
                  logger/Makefile
+                 monitor/registry/Makefile
                  docs/Makefile
                  rpcf.pc ])
 
