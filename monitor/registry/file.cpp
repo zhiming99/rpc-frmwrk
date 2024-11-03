@@ -28,6 +28,36 @@
 namespace rpcf
 {
 
+gint32 CFileImage::Create(
+    EnumFileType byType, FImgSPtr& pFile,
+    AllocPtr& pAlloc, guint32 dwInodeIdx,
+    guint32 dwParentInode,
+    FImgSPtr pDir )
+{
+    gint32 ret = 0;
+    CParamList oParams;
+    oParams.Push( ObjPtr( pAlloc ) );
+    oParams.Push( dwInodeIdx );
+    oParams.Push( dwParentInode );
+    oParams.Push( ObjPtr( pDir ) );
+    EnumClsid iClsid = clsid( Invalid );
+    if( byType == ftRegular )
+        iClsid = clsid( CFileImage );
+    else if( byType == ftDirectory )
+        iClsid = clsid( CDirImage );
+    else if( byType == ftLink )
+        iClsid = clsid( CLinkImage );
+    else
+    {
+        ret = -ENOTSUP;
+        DebugPrint( ret, "Error not a valid "
+            "type of file to create" );
+    }
+    ret = pFile.NewObj( iClsid,
+        oParams.GetCfg() );
+    return ret;
+}
+
 CFileImage::CFileImage( const IConfigDb* pCfg )
 {
     gint32 ret = 0;
@@ -1746,32 +1776,97 @@ gint32 COpenFileEntry::Flush( guint32 dwFlags )
     return ret;
 }
 
+gint32 COpenFileEntry::Create(
+    EnumFileType byType, FileSPtr& pOpenFile,
+    FImgSPtr& pFile, AllocPtr& pAlloc,
+    const stdstr& strFile )
+{
+    gint32 ret = 0;
+    CParamList oParams;
+    oParams.Push( ObjPtr( pAlloc ) );
+    oParams.Push( ObjPtr( pFile ) );
+    oParams.Push( strFile );
+
+    EnumClsid iClsid = clsid( Invalid );
+    if( byType == ftRegular )
+        iClsid = clsid( COpenFileEntry );
+    else if( byType == ftDirectory )
+        iClsid = clsid( CDirFileEntry );
+    else if( byType == ftLink )
+        iClsid = clsid( CLinkFileEntry );
+    else
+    {
+        ret = -ENOTSUP;
+        DebugPrint( ret, "Error not a valid "
+            "type of file to create" );
+        return ret;
+    }
+    ret = pOpenFile.NewObj( iClsid,
+        oParams.GetCfg() );
+    return ret;
+}
+
+gint32 COpenFileEntry::Truncate( guint32 dwOff )
+{
+    gint32 ret = 0;
+    do{
+        if( m_oUserAc.IsInitialized() )
+        {
+            FImgSPtr& p = m_pFileImage;
+            READ_LOCK( p );
+            gint32 ret = p->CheckAccess(
+                W_OK, &m_oUserAc );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = m_pFileImage->Truncate( dwOff );
+    }while( 0 );
+    return ret;
+}
+
 gint32 COpenFileEntry::ReadFile(
     guint32& dwSize, guint8* pBuf,
     guint32 dwOff )
 {
-    gint32 ret = m_pFileImage->ReadFile(
-        dwOff, dwSize, pBuf );
-    if( ERROR( ret ) )
-        return ret;
+    gint32 ret = 0;
+    do{
+        if( m_oUserAc.IsInitialized() )
+        {
+            READ_LOCK( m_pFileImage );
+            ret = m_pFileImage->CheckAccess(
+                R_OK, &m_oUserAc );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = m_pFileImage->ReadFile(
+            dwOff, dwSize, pBuf );
+    }while( 0 );
 
-    return STATUS_SUCCESS;
+    return ret;
 }
 
 gint32 COpenFileEntry::WriteFile(
     guint32& dwSize, guint8* pBuf,
     guint32 dwOff  )
 {
-    gint32 ret = m_pFileImage->WriteFile(
-        dwOff, dwSize, pBuf );
-    if( ERROR( ret ) )
-        return ret;
-
-    return STATUS_SUCCESS;
+    gint32 ret = 0;
+    do{
+        if( m_oUserAc.IsInitialized() )
+        {
+            READ_LOCK( m_pFileImage );
+            ret = m_pFileImage->CheckAccess(
+                W_OK, &m_oUserAc );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = m_pFileImage->WriteFile(
+            dwOff, dwSize, pBuf );
+    }while( 0 );
+    return ret;
 }
 
 gint32 COpenFileEntry::Open(
-    CAccessContext* pac )
+    guint32 dwFlags, CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -1780,10 +1875,29 @@ gint32 COpenFileEntry::Open(
             FImgSPtr& p = m_pFileImage;
             CReadLock oLock( p->GetLock() );
             CStdRMutex _oLock( p->GetExclLock() );
-            if( p->IsStopped() || p->IsStopping())
+            if( p->IsStopped() || p->IsStopping() )
             {
                 ret = -ENOENT;
                 break;
+            }
+            if( pac != nullptr )
+            {
+                guint32 dwReq = 0;
+                dwFlags |= O_ACCMODE;
+                if( dwFlags == O_RDONLY )
+                    dwReq = R_OK;
+                else if( dwFlags = O_WRONLY )
+                    dwReq = W_OK;
+                else if( dwFlags = O_RDWR )
+                    dwReq = W_OK | R_OK;
+                else
+                {
+                    ret = -EACCES;
+                    break;
+                }
+                ret = p->CheckAccess( dwReq, pac );
+                if( ERROR( ret ) )
+                    break;
             }
             p->IncOpenCount();
         }

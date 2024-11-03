@@ -1071,6 +1071,7 @@ CDirImage::CDirImage( const IConfigDb* pCfg ) :
     m_pFreePool.reset(
         new CFreeBNodePool( this ) );
 }
+
 gint32 CDirImage::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
@@ -2094,6 +2095,39 @@ gint32 CDirImage::GetFreeBNode(
     return ret;
 }
 
+gint32 CDirImage::InsertFile(
+    const char* szName,
+    FImgSPtr& pImg )
+{
+    if( szName == nullptr || pImg.IsEmpty() )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        WRITE_LOCK( this );
+        CBPlusNode* pNode = nullptr;
+        gint32 iRet = this->SearchNoLock(
+            szName, pImg, pNode );
+        if( SUCCEEDED( iRet ) )
+        {
+            ret = -EEXIST;
+            break;
+        }
+        guint32 dwInodeIdx = pImg->GetInodeIdx();
+        KEYPTR_SLOT oKey;
+        COPY_KEY( oKey.szKey, szName );
+        oKey.oLeaf.byFileType = pImg->GetType();
+        oKey.oLeaf.dwInodeIdx = dwInodeIdx;
+        ret = pNode->Insert( &oKey );
+        if( ERROR( ret ) )
+            break;
+        ret = pNode->AddFileDirect(
+            dwInodeIdx, pImg );
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CDirImage::CreateFile(
     const char* szName,
     EnumFileType iType,
@@ -2233,12 +2267,11 @@ gint32 CDirImage::CreateLink( const char* szName,
     return ret;
 }
 
-gint32 CDirImage::RemoveFile(
-    const char* szKey )
+gint32 CDirImage::RemoveFileNoFree(
+    const char* szKey, FImgSPtr& pFile )
 {
     gint32 ret = 0;
     do{
-        FImgSPtr pFile;
         WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szKey, pFile );
@@ -2254,6 +2287,19 @@ gint32 CDirImage::RemoveFile(
         if( ERROR( ret ) )
             break;
 
+    }while( 0 );
+    return ret;
+}
+
+gint32 CDirImage::RemoveFile(
+    const char* szKey )
+{
+    gint32 ret = 0;
+    do{
+        FImgSPtr pFile;
+        ret = RemoveFileNoFree( szKey, pFile );
+        if( ERROR( ret ) )
+            break;
         ret = pFile->FreeBlocks();
 
     }while( 0 );
@@ -2334,7 +2380,7 @@ gint32 CDirImage::UnloadFile(
 }
 
 gint32 CDirImage::Rename(
-    const char* szFrom, const char* szTo)
+    const char* szFrom, const char* szTo )
 {
     gint32 ret = 0;
     do{
@@ -2349,13 +2395,7 @@ gint32 CDirImage::Rename(
         COPY_KEY( oKey.szKey, szTo );
         oKey.oLeaf.dwInodeIdx =
             pFile->GetInodeIdx();
-        guint32 dwMode = pFile->GetModeNoLock();
-        if( FILE_TYPE( dwMode ) == S_IFREG )
-            oKey.oLeaf.byFileType = ftRegular;
-        else if( FILE_TYPE( dwMode ) == S_IFLNK )
-            oKey.oLeaf.byFileType = ftLink;
-        else if( FILE_TYPE( dwMode ) == S_IFDIR )
-            oKey.oLeaf.byFileType = ftDirectory;
+        oKey.oLeaf.byFileType = pFile->GetType();
         ret = m_pRootNode->Insert( &oKey );
         if( ERROR( ret ) )
             break;

@@ -579,10 +579,17 @@ struct RegFSInode
     ( ( ( ( _offset_ ) - SEC_INDIRECT_BLOCK_START ) >> \
         BLOCK_SHIFT ) & BLKIDX_PER_TABLE_MASK )
 
+#define INVALID_UID USHRT_MAX
+#define INVALID_GID USHRT_MAX
 struct CAccessContext
 {
-    uid_t dwUid = USHRT_MAX;
-    gid_t dwGid = USHRT_MAX;
+    uid_t dwUid = INVALID_UID;
+    gid_t dwGid = INVALID_GID;
+    bool IsInitialized() const
+    {
+        return ( dwUid != INVALID_UID && 
+            dwGid != INVALID_GID );
+    }
 };
 
 typedef enum : guint8
@@ -694,31 +701,7 @@ struct CFileImage :
         EnumFileType byType, FImgSPtr& pFile,
         AllocPtr& pAlloc, guint32 dwInodeIdx,
         guint32 dwParentInode,
-        FImgSPtr pDir )
-    {
-        gint32 ret = 0;
-        CParamList oParams;
-        oParams.Push( ObjPtr( pAlloc ) );
-        oParams.Push( dwInodeIdx );
-        oParams.Push( dwParentInode );
-        oParams.Push( ObjPtr( pDir ) );
-        EnumClsid iClsid = clsid( Invalid );
-        if( byType == ftRegular )
-            iClsid = clsid( CFileImage );
-        else if( byType == ftDirectory )
-            iClsid = clsid( CDirImage );
-        else if( byType == ftLink )
-            iClsid = clsid( CLinkImage );
-        else
-        {
-            ret = -ENOTSUP;
-            DebugPrint( ret, "Error not a valid "
-                "type of file to create" );
-        }
-        ret = pFile.NewObj( iClsid,
-            oParams.GetCfg() );
-        return ret;
-    }
+        FImgSPtr pDir );
 
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
@@ -795,6 +778,9 @@ struct CFileImage :
 
     inline const CDirImage* GetParentDir() const
     { return m_pParentDir; }
+
+    virtual EnumFileType GetType() const
+    { return ftRegular; }
 };
 
 struct CLinkImage :
@@ -812,6 +798,8 @@ struct CLinkImage :
     gint32 Format() override;
     gint32 WriteFile( guint32 dwOff,
         guint32& dwSize, guint8* pBuf ) override;
+    EnumFileType GetType() const override final
+    { return ftLink; }
 };
 
 
@@ -951,6 +939,9 @@ struct CDirImage :
     guint32 GetHeadFreeBNode();
     void SetHeadFreeBNode( guint32 dwBNodeIdx );
 
+    gint32 InsertFile(
+        const char* szName, FImgSPtr& pImg );
+
     gint32 CreateFile( const char* szName,
         EnumFileType iType, FImgSPtr& pImg );
 
@@ -962,6 +953,9 @@ struct CDirImage :
 
     gint32 CreateLink( const char* szName,
         const char* szLink, FImgSPtr& pImg );
+
+    gint32 RemoveFileNoFree(
+        const char* szKey, FImgSPtr& pFile );
 
     gint32 RemoveFile( const char* szName );
 
@@ -982,6 +976,10 @@ struct CDirImage :
     gint32 PrintBNode();
     gint32 PrintBNodeNoLock();
 #endif
+
+    EnumFileType GetType() const override final
+    { return ftDirectory; }
+
 };
 
 struct CBPlusNode :
@@ -1462,32 +1460,7 @@ struct COpenFileEntry :
     static gint32 Create(
         EnumFileType byType, FileSPtr& pOpenFile,
         FImgSPtr& pFile, AllocPtr& pAlloc,
-        const stdstr& strFile )
-    {
-        gint32 ret = 0;
-        CParamList oParams;
-        oParams.Push( ObjPtr( pAlloc ) );
-        oParams.Push( ObjPtr( pFile ) );
-        oParams.Push( strFile );
-
-        EnumClsid iClsid = clsid( Invalid );
-        if( byType == ftRegular )
-            iClsid = clsid( COpenFileEntry );
-        else if( byType == ftDirectory )
-            iClsid = clsid( CDirFileEntry );
-        else if( byType == ftLink )
-            iClsid = clsid( CLinkFileEntry );
-        else
-        {
-            ret = -ENOTSUP;
-            DebugPrint( ret, "Error not a valid "
-                "type of file to create" );
-            return ret;
-        }
-        ret = pOpenFile.NewObj( iClsid,
-            oParams.GetCfg() );
-        return ret;
-    }
+        const stdstr& strFile );
 
     gint32 ReadFile( guint32& size,
         guint8* pBuf, guint32 dwOff = UINT_MAX );
@@ -1509,10 +1482,9 @@ struct COpenFileEntry :
     gint32 Reload() override
     { return 0; }
 
-    virtual gint32 Truncate( guint32 dwOff )
-    { return m_pFileImage->Truncate( dwOff ); }
+    virtual gint32 Truncate( guint32 dwOff );
 
-    gint32 Open( CAccessContext* pac );
+    gint32 Open( guint32 dwFlags, CAccessContext* pac );
 
     gint32 Close();
 
@@ -1656,9 +1628,6 @@ class CRegistryFs :
     gint32 Truncate(
         RFHANDLE hFile, guint32 dwOff );
 
-    RFHANDLE OpenDir( const stdstr& strPath,
-        CAccessContext* pac = nullptr );
-
     gint32 CloseDir( RFHANDLE hFile );
 
     gint32 RemoveDir( const stdstr& strPath,
@@ -1673,20 +1642,24 @@ class CRegistryFs :
         CAccessContext* pac = nullptr );
 
     gint32 GetGid(
-        const stdstr& strPath, gid_t& gid );
+        const stdstr& strPath, gid_t& gid,
+        CAccessContext* pac = nullptr );
 
     gint32 GetUid(
-        const stdstr& strPath, uid_t& uid );
+        const stdstr& strPath, uid_t& uid,
+        CAccessContext* pac = nullptr );
 
     gint32 SymLink( const stdstr& strSrcPath,
         const stdstr& strDestPath,
         CAccessContext* pac = nullptr );
 
     gint32 GetValue(
-        const stdstr&, Variant& oVar );
+        const stdstr&, Variant& oVar,
+        CAccessContext* pac = nullptr );
 
     gint32 SetValue(
-        const stdstr&, Variant& oVar );
+        const stdstr&, Variant& oVar,
+        CAccessContext* pac = nullptr );
 
     gint32 Chmod(
         const stdstr& strPath, mode_t dwMode,
@@ -1699,30 +1672,35 @@ class CRegistryFs :
 
     gint32 ReadLink(
         const stdstr& strPath,
-        char* buf, guint32& dwSize );
+        char* buf, guint32& dwSize,
+        CAccessContext* pac = nullptr );
 
     gint32 Rename(
-        const stdstr& szFrom, const stdstr& szTo);
+        const stdstr& szFrom, const stdstr& szTo,
+        CAccessContext* pac = nullptr );
 
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
 
     gint32 Access( const stdstr& strPath,
-        guint32 dwFlags );
+        guint32 dwFlags,
+        CAccessContext* pac = nullptr );
 
     gint32 GetAttr( const stdstr& strPath,
-        struct stat& stBuf );
+        struct stat& stBuf,
+        CAccessContext* pac = nullptr );
 
     gint32 ReadDir( RFHANDLE hDir,
         std::vector< KEYPTR_SLOT >& vecDirEnt );
 
     gint32 OpenDir( const stdstr& strPath,
-        mode_t dwMode, RFHANDLE& hDir,
+        guint32 dwFlags, RFHANDLE& hDir,
         CAccessContext* pac = nullptr );
 
     gint32 GetParentDir(
-        const stdstr& strPath, FImgSPtr& pDir );
+        const stdstr& strPath, FImgSPtr& pDir,
+        CAccessContext* pac = nullptr );
 
     gint32 OnEvent( EnumEventId iEvent,
         LONGWORD dwParam1,

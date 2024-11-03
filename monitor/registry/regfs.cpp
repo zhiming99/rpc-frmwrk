@@ -111,7 +111,9 @@ gint32 CRegistryFs::OpenRootDir()
         if( ERROR( ret ) )
             break;
 
-        ret = m_pRootDir->Open( nullptr );
+        ret = m_pRootDir->Open(
+            O_RDONLY, nullptr );
+
         RFHANDLE hFile = m_pRootDir->GetObjId();
         m_mapOpenFiles[ hFile ] = m_pRootDir;
 
@@ -225,7 +227,8 @@ gint32 CRegistryFs::Namei(
 }
 
 gint32 CRegistryFs::GetParentDir(
-    const stdstr& strPath, FImgSPtr& pDir )
+    const stdstr& strPath, FImgSPtr& pDir,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -266,6 +269,14 @@ gint32 CRegistryFs::GetParentDir(
                 vecDirs.pop_back();
                 continue;
             }
+            if( pac != nullptr )
+            {
+                READ_LOCK( pCurDir );
+                ret = pCurDir->CheckAccess(
+                    X_OK, pac );
+                if( ERROR( ret ) )
+                    break;
+            }
             FImgSPtr pFile;
             ret = pCurDir->Search(
                 strCurDir.c_str(), pFile );
@@ -299,7 +310,8 @@ gint32 CRegistryFs::CreateFile(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
         CDirImage* pDir = dirPtr;
@@ -318,7 +330,7 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
-        ret = pOpenFile->Open( pac );
+        ret = pOpenFile->Open( dwFlags, pac );
         if( ERROR( ret ) )
             break;
 
@@ -346,7 +358,8 @@ gint32 CRegistryFs::OpenFile(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -367,7 +380,7 @@ gint32 CRegistryFs::OpenFile(
         if( ERROR( ret ) )
             break;
 
-        ret = pOpenFile->Open( pac );
+        ret = pOpenFile->Open( dwFlags, pac );
         if( ERROR( ret ) )
             break;
 
@@ -448,7 +461,8 @@ gint32 CRegistryFs::RemoveFile(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -548,7 +562,8 @@ gint32 CRegistryFs::RemoveDir(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -561,6 +576,14 @@ gint32 CRegistryFs::RemoveDir(
             strDir.c_str(), pFile );
         if( ERROR( ret ) )
             break;
+
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pDir->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
 
         ret = pDir->RemoveFile( strDir.c_str() );
 
@@ -581,7 +604,8 @@ gint32 CRegistryFs::SetGid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -595,6 +619,13 @@ gint32 CRegistryFs::SetGid(
         if( ERROR( ret ) )
             break;
 
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         pFile->SetGid( wGid );
 
     }while( 0 );
@@ -614,7 +645,8 @@ gint32 CRegistryFs::SetUid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -628,6 +660,13 @@ gint32 CRegistryFs::SetUid(
         if( ERROR( ret ) )
             break;
 
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         pFile->SetUid( wUid );
 
     }while( 0 );
@@ -635,7 +674,8 @@ gint32 CRegistryFs::SetUid(
 }
 
 gint32 CRegistryFs::GetGid(
-    const stdstr& strPath, gid_t& gid )
+    const stdstr& strPath, gid_t& gid,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -646,7 +686,8 @@ gint32 CRegistryFs::GetGid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -659,13 +700,21 @@ gint32 CRegistryFs::GetGid(
             strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( R_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         gid = pFile->GetGid();
     }while( 0 );
     return ret;
 }
 
 gint32 CRegistryFs::GetUid(
-    const stdstr& strPath, uid_t& uid )
+    const stdstr& strPath, uid_t& uid,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -676,7 +725,8 @@ gint32 CRegistryFs::GetUid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -689,19 +739,28 @@ gint32 CRegistryFs::GetUid(
             strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( R_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         uid = pFile->GetUid();
     }while( 0 );
     return ret;
 }
 
 gint32 CRegistryFs::GetValue(
-   const stdstr& strPath, Variant& oVar )
+   const stdstr& strPath, Variant& oVar,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -714,19 +773,28 @@ gint32 CRegistryFs::GetValue(
             strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( R_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = pFile->ReadValue( oVar );
     }while( 0 );
     return ret;
 }
 
 gint32 CRegistryFs::SetValue(
-   const stdstr& strPath, Variant& oVar )
+   const stdstr& strPath, Variant& oVar,
+   CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -739,6 +807,13 @@ gint32 CRegistryFs::SetValue(
             strFile.c_str(), pFile );
         if( ERROR( ret ) )
             break;
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = pFile->WriteValue( oVar );
     }while( 0 );
     return ret;
@@ -753,7 +828,8 @@ gint32 CRegistryFs::SymLink(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strLinkPath, dirPtr );
+        ret = GetParentDir(
+            strLinkPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -773,6 +849,14 @@ gint32 CRegistryFs::SymLink(
             break;
         }
         FImgSPtr pLink;
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pDir->CheckAccess(
+                W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = pDir->CreateLink(
             strFile.c_str(),
             strTarget.c_str(), pLink );
@@ -783,13 +867,15 @@ gint32 CRegistryFs::SymLink(
 
 gint32 CRegistryFs::ReadLink(
     const stdstr& strLink,
-    char* buf, guint32& dwSize )
+    char* buf, guint32& dwSize,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strLink, dirPtr );
+        ret = GetParentDir(
+            strLink, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -811,6 +897,14 @@ gint32 CRegistryFs::ReadLink(
             ret = -EINVAL;
             break;
         }
+        if( pac )
+        {
+            READ_LOCK( pLink );
+            ret = pLink->CheckAccess(
+                R_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = pLink->ReadLink(
             ( guint8* )buf, dwSize );
     }while( 0 );
@@ -825,7 +919,8 @@ gint32 CRegistryFs::MakeDir(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -841,8 +936,16 @@ gint32 CRegistryFs::MakeDir(
             ret = -EEXIST;
             break;
         }
-        ret = pDir->CreateDir( strFile.c_str(),
-            dwMode, pFile );
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pDir->CheckAccess(
+                W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = pDir->CreateDir(
+            strFile.c_str(), dwMode, pFile );
     }while( 0 );
     return ret;
 }
@@ -855,7 +958,8 @@ gint32 CRegistryFs::Chmod(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -870,6 +974,14 @@ gint32 CRegistryFs::Chmod(
         {
             ret = -ENOENT;
             break;
+        }
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess(
+                W_OK, pac );
+            if( ERROR( ret ) )
+                break;
         }
         pFile->SetMode( dwMode );
 
@@ -886,7 +998,8 @@ gint32 CRegistryFs::Chown(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -902,6 +1015,13 @@ gint32 CRegistryFs::Chown(
             ret = -ENOENT;
             break;
         }
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         pFile->SetUid( dwUid );
         pFile->SetGid( dwGid );
 
@@ -910,19 +1030,26 @@ gint32 CRegistryFs::Chown(
 }
 
 gint32 CRegistryFs::Rename(
-    const stdstr& strFrom, const stdstr& strTo )
+    const stdstr& strFrom, const stdstr& strTo,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir( strFrom, dirPtr );
+        ret = GetParentDir(
+            strFrom, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
             basename( strFrom.c_str() );
-
+        stdstr strDirName = 
+            GetDirName( strFrom );
+        stdstr strDstDirName = 
+            GetDirName( strTo );
+        stdstr strDstFile = 
+            basename( strTo.c_str() );
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
         ret = pDir->Search(
@@ -932,8 +1059,41 @@ gint32 CRegistryFs::Rename(
             ret = -ENOENT;
             break;
         }
-        ret = pDir->Rename(
-            strFile.c_str(), strTo.c_str() );
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pDir->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        if( strDstDirName == strDirName )
+        {
+            ret = pDir->Rename(
+            strFile.c_str(), strDstFile.c_str() );
+            break;
+        }
+
+        FImgSPtr dstDirPtr;
+        ret = GetParentDir(
+            strTo, dstDirPtr, pac );
+        if( ERROR( ret ) )
+            break;
+
+        CDirImage* pDstDir = dstDirPtr;
+        if( pac )
+        {
+            READ_LOCK( pDstDir );
+            ret = pDstDir->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        FImgSPtr pDstFile;
+        ret = pDir->RemoveFileNoFree(
+            strFile.c_str(), pDstFile );
+        if( ERROR( ret ) )
+            break;
+        ret = pDstDir->InsertFile(
+            strDstFile.c_str(), pDstFile );
 
     }while( 0 );
     return ret;
@@ -960,7 +1120,8 @@ gint32 CRegistryFs::GetFile(
 }
 
 gint32 CRegistryFs::Access(
-    const stdstr& strPath, guint32 dwFlags )
+    const stdstr& strPath, guint32 dwFlags,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -970,10 +1131,11 @@ gint32 CRegistryFs::Access(
         {
             READ_LOCK( m_pRootImg );
             ret = m_pRootImg->CheckAccess(
-                dwFlags );
+                dwFlags, pac );
             break;
         }
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -991,7 +1153,8 @@ gint32 CRegistryFs::Access(
         }
         {
             READ_LOCK( pFile );
-            ret = pFile->CheckAccess( dwFlags );
+            ret = pFile->CheckAccess(
+                dwFlags, pac );
         }
 
     }while( 0 );
@@ -1000,7 +1163,7 @@ gint32 CRegistryFs::Access(
 
 gint32 CRegistryFs::OpenDir(
     const stdstr& strPath,
-    mode_t dwMode, RFHANDLE& hFile,
+    guint32 dwFlags, RFHANDLE& hFile,
     CAccessContext* pac )
 {
     gint32 ret = 0;
@@ -1016,7 +1179,8 @@ gint32 CRegistryFs::OpenDir(
         else
         {
             FImgSPtr dirPtr;
-            ret = GetParentDir( strPath, dirPtr );
+            ret = GetParentDir(
+                strPath, dirPtr, pac );
             if( ERROR( ret ) )
                 break;
 
@@ -1036,7 +1200,7 @@ gint32 CRegistryFs::OpenDir(
         if( ERROR( ret ) )
             break;
 
-        ret = pOpenFile->Open( pac );
+        ret = pOpenFile->Open( O_RDONLY, pac );
         if( ERROR( ret ) )
             break;
 
@@ -1089,7 +1253,8 @@ gint32 CRegistryFs::ReadDir( RFHANDLE hDir,
 
 gint32 CRegistryFs::GetAttr(
     const stdstr& strPath,
-    struct stat& stBuf )
+    struct stat& stBuf,
+    CAccessContext* pac )
 {
     gint32 ret = 0;
     do{
@@ -1100,7 +1265,8 @@ gint32 CRegistryFs::GetAttr(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir( strPath, dirPtr );
+        ret = GetParentDir(
+            strPath, dirPtr, pac );
         if( ERROR( ret ) )
             break;
 
@@ -1117,6 +1283,14 @@ gint32 CRegistryFs::GetAttr(
             break;
         }
 
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pFile->CheckAccess(
+                R_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = pFile->GetAttr( stBuf );
 
     }while( 0 );
