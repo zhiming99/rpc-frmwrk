@@ -887,6 +887,12 @@ gint32 CFreeBNodePool::Reload()
             { dwBNodeIdx, pBuf } );
         if( !pfb->IsFull() )
             break;
+        if( m_vecFreeBNodes.size() >
+            ( MAX_FILE_SIZE / BNODE_SIZE ) )
+        {
+            ret = -EOVERFLOW;
+            break;
+        }
         dwBNodeIdx = pfb->GetLastBNodeIdx();
     }while( dwBNodeIdx != INVALID_BNODE_IDX );
     return ret;

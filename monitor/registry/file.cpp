@@ -967,8 +967,16 @@ gint32 CFileImage::WriteFileNoLock(
     gint32 ret = 0;
     if( pBuf == nullptr )
         return -EINVAL;
-    if( BEYOND_MAX_LIMIT( dwOff + dwSize ) )
+
+    if( BEYOND_MAX_LIMIT( dwOff ) )
         return -EFBIG;
+
+    if( BEYOND_MAX_LIMIT( dwOff + dwSize ) )
+    {
+        dwSize = MAX_FILE_SIZE - dwOff;
+        if( dwSize == 0 )
+            return -EFBIG;
+    }
 
     do{
         std::vector< guint32 > vecBlks;
@@ -1634,13 +1642,14 @@ gint32 CFileImage::CheckAccess(
         guint32 dwReadFlag;
         guint32 dwWriteFlag;
         guint32 dwExeFlag;
-        if( dwCurUid == dwUid )
+        if( dwCurUid == dwUid || dwCurUid == 0 )
         {
             dwReadFlag = S_IRUSR;
             dwWriteFlag = S_IWUSR;
             dwExeFlag = S_IXUSR;
         }
-        else if( dwCurGid == dwGid )
+        else if( dwCurGid == dwGid ||
+            dwCurGid == 0 )
         {
             dwReadFlag = S_IRGRP;
             dwWriteFlag = S_IWGRP;

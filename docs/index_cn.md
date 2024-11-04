@@ -39,6 +39,7 @@
 * [JavaScript框架的介绍](../js/README_cn.md)
 * [rpcfs文件系统介绍](../fuse/README.md)
 * [rpc模块的架构](../rpc/readme.md)
+* [注册表模块介绍](../monitor/registry/README_cn.md)
 * [概念和名词解释](../Concept_cn.md)
   - [设计思想](../Concept_cn.md#设计思想)
   - [RPC参与方和传输的信息](../Concept_cn.md#rpc参与方和传输的信息)
