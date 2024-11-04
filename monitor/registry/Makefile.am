@@ -30,7 +30,7 @@ regfsmnt_CPPFLAGS+= -DFUSE3
 regfsmnt_LDFLAGS=-rdynamic
 endif
 
-#EXTRA_DIST=README.md README_cn.md
+EXTRA_DIST=README_cn.md
 
 libregfs_la_LTLIBRARIES=libregfs.la
 libregfs_la_SOURCES = regfs.cpp blkalloc.h blkalloc.cpp dir.cpp file.cpp dllexp.cpp
