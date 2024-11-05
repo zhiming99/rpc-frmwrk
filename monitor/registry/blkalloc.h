@@ -1379,9 +1379,9 @@ struct CBPlusNode :
 
 struct FREE_BNODES
 {
-    guint16 m_wBNCount;
+    guint16 m_wBNCount = 0;
     bool m_bNextBNode = false;
-    guint8 m_byReserved;
+    guint8 m_byReserved = 0;
     guint16 m_arrFreeBNIdx[ 0 ];
 
     static guint16 GetMaxCount()
@@ -1417,7 +1417,9 @@ struct FREE_BNODES
         if( IsEmpty() )
             return -ENOENT;
         guint16* p = m_arrFreeBNIdx;
-        wBNodeIdx = p[ --m_wBNCount ];
+        wBNodeIdx = p[ m_wBNCount ];
+        p[ m_wBNCount ] = INVALID_BNODE_IDX;
+        --m_wBNCount;
         return 0;
     }
 

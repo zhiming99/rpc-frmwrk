@@ -822,6 +822,9 @@ gint32 FREE_BNODES::hton(
     if( pDest == nullptr || dwSize == 0 )
         return -EINVAL;
     auto plhs = ( FREE_BNODES* )pDest;
+    if( m_wBNCount > GetMaxCount() )
+        return -EOVERFLOW;
+
     for( guint32 i = 0; i < m_wBNCount; i++ )
     {
         plhs->m_arrFreeBNIdx[ i ] =
@@ -832,6 +835,7 @@ gint32 FREE_BNODES::hton(
         sizeof( guint16 ) );
     plhs->m_wBNCount = htons( m_wBNCount );
     plhs->m_bNextBNode = m_bNextBNode;
+    plhs->m_byReserved = 0;
     return 0;
 }
 
@@ -847,14 +851,13 @@ gint32 FREE_BNODES::ntoh(
         return -EINVAL;
     m_bNextBNode = prhs->m_bNextBNode;
     guint32 i = 0;
-    guint32 dwCount = GetMaxCount();
     for( ; i < m_wBNCount; i++ )
     {
         m_arrFreeBNIdx[ i ] =
             ntohs( prhs->m_arrFreeBNIdx[ i ] );
     }
-    memset( m_arrFreeBNIdx + i, 0xff, 
-        ( ( dwCount - m_wBNCount ) << 1 ) );
+    memset( m_arrFreeBNIdx + m_wBNCount, 0xff, 
+        ( ( GetMaxCount() - m_wBNCount ) * 2 ) );
     return 0;
 }
 
@@ -885,14 +888,15 @@ gint32 CFreeBNodePool::Reload()
             break;
         m_vecFreeBNodes.push_back(
             { dwBNodeIdx, pBuf } );
-        if( !pfb->IsFull() )
-            break;
-        if( m_vecFreeBNodes.size() >
+        if( m_vecFreeBNodes.size() >=
             ( MAX_FILE_SIZE / BNODE_SIZE ) )
         {
             ret = -EOVERFLOW;
             break;
         }
+        if( !pfb->IsFull() ||
+            !pfb->m_bNextBNode )
+            break;
         dwBNodeIdx = pfb->GetLastBNodeIdx();
     }while( dwBNodeIdx != INVALID_BNODE_IDX );
     return ret;
@@ -910,7 +914,6 @@ gint32 CFreeBNodePool::InitPoolStore(
         auto pfb = ( FREE_BNODES* )pBuf->ptr();
         pfb->m_wBNCount = 0;
         pfb->m_bNextBNode = false;
-        guint16 i = 0;
         guint32 dwCount = pfb->GetMaxCount();
 
         memset( pfb->m_arrFreeBNIdx,
@@ -1057,6 +1060,14 @@ gint32 CFreeBNodePool::GetFreeBNode(
             if( pfb->IsEmpty() )
             {
                 m_vecFreeBNodes.pop_back();
+                if( m_vecFreeBNodes.size() )
+                {
+                    auto& newLast =
+                        m_vecFreeBNodes.back();
+                    pfb = ( FREE_BNODES* )
+                        newLast.second->ptr();
+                    pfb->m_bNextBNode = false;
+                }
                 continue;
             }
             guint16 wBNodeIdx;
@@ -2151,7 +2162,7 @@ gint32 CDirImage::CreateFile(
             break;
         }
         guint32 dwInodeIdx = 0;
-        gint32 ret = m_pAlloc->AllocBlocks(
+        ret = m_pAlloc->AllocBlocks(
             &dwInodeIdx, 1 );
         if( ERROR( ret ) )
             break;
@@ -2336,7 +2347,7 @@ gint32 CDirImage::UnloadDirImage()
             else if( pDir == nullptr )
             {
                 // file or link
-                pFile->Flush();    
+                pFile->Flush();
                 itr = m_mapFiles.erase( itr );
             }
             else

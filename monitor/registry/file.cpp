@@ -128,10 +128,10 @@ gint32 CFileImage::Reload()
             ntohl( pInode->m_dwMode );
         // uid
         m_oInodeStore.m_wuid =
-            ntohs( pInode->m_wuid );
+            ntohl( pInode->m_wuid );
         // gid
         m_oInodeStore.m_wgid =
-            ntohs( pInode->m_wgid );
+            ntohl( pInode->m_wgid );
         // type of file content
         m_oInodeStore.m_dwFlags =
             ntohl( pInode->m_dwFlags );
@@ -364,16 +364,22 @@ gint32 CFileImage::Flush( guint32 dwFlags )
             timespec oAccTime;
             clock_gettime(
                 CLOCK_REALTIME, &oAccTime );
-            m_oInodeStore.m_atime = oAccTime;
+
+            m_oInodeStore.m_atime.tv_sec =
+                htonl( oAccTime.tv_sec );
+
+            pInode->m_ctime.tv_nsec =
+                htonl( oAccTime.tv_nsec );
+
             // file type
             pInode->m_dwMode =
                 htonl( m_oInodeStore.m_dwMode );
             // uid
             pInode->m_wuid =
-                htons( m_oInodeStore.m_wuid );
+                htonl( m_oInodeStore.m_wuid );
             // gid
             pInode->m_wgid =
-                htons( m_oInodeStore.m_wgid );
+                htonl( m_oInodeStore.m_wgid );
             // type of file content
             pInode->m_dwFlags =
                 htonl( m_oInodeStore.m_dwFlags );
@@ -1224,19 +1230,19 @@ gint32 CFileImage::TruncBlkSecIndirect(
         guint32 dwBlkIdxIdx =
             SEC_BLKIDX_IDX( dwByteStart );
 
-        guint32 dwBitEndIdx = SEC_BIT_IDX(
-            dwByteEnd + BLOCK_MASK );
+        guint32 dwBitEndIdx =
+            SEC_BIT_IDX( dwByteEnd - 1 );
 
-        guint32 dwBlkEndIdxIdx = SEC_BLKIDX_IDX(
-            dwByteEnd + BLOCK_MASK );
+        guint32 dwBlkEndIdxIdx =
+            SEC_BLKIDX_IDX( dwByteEnd - 1 );
 
         guint32 dwBitCount = std::min(
             dwBitEndIdx - dwBitIdx + 1,
             BLKIDX_PER_TABLE - dwBitIdx );
 
         guint32 dwLastBlkIdxCount =
-            dwBitEndIdx > dwBitIdx ? dwBlkEndIdxIdx : 
-            dwBlkEndIdxIdx - dwBlkIdxIdx; 
+            dwBitEndIdx > dwBitIdx ? dwBlkEndIdxIdx + 1: 
+            dwBlkEndIdxIdx - dwBlkIdxIdx + 1;
 
         auto pbitd = ( guint32* ) m_pBitdBlk->ptr();
 
@@ -1823,7 +1829,7 @@ gint32 COpenFileEntry::Truncate( guint32 dwOff )
         {
             FImgSPtr& p = m_pFileImage;
             READ_LOCK( p );
-            gint32 ret = p->CheckAccess(
+            ret = p->CheckAccess(
                 W_OK, &m_oUserAc );
             if( ERROR( ret ) )
                 break;

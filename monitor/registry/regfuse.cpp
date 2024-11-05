@@ -777,7 +777,7 @@ int main( int argc, char** argv)
 
         ret = access( g_strRegFsFile.c_str(),
             R_OK | W_OK );
-        if( ret == -1 )
+        if( ret == -1 && !g_bFormat )
         {
             ret = -errno;
             break;
