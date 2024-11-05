@@ -543,6 +543,11 @@
                 "DBusBusDriver",
                 "UnixSockBusDriver"
             ]
+        },
+        {
+            "ClassFactories" : [ "./libregfs.so" ],
+            "DriversToLoad" : [ "DBusBusDriver" ],
+            "ModName" : "regfsmnt"
         }
     ],
     "Match": [
