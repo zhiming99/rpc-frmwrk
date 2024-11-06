@@ -1,4 +1,8 @@
 ---
+[`Wed Nov 06 2024 08:36:50 PM Beijing`]   
+1. The registry PR has been merged.
+2. I will add support to user management and access controll as are also the support modules for the monitor in the next task.
+  
 [`Tue Oct 01 2024 10:37:17 PM Beijing`]   
 1. One of the development box failed to start. Luckily enough, the hard disks are OK and the content are intact.
 2. the release `0.8.0` will be built after the `registry` PR get done.
