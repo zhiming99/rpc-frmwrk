@@ -708,9 +708,8 @@ gint32 CFuseSessionFile::UpdateContent()
 
             ret = oCfg.GetStrProp(
                 propAuthMech, strVal );
-            if( ERROR( ret ) )
-                strVal = "krb5";
-            oVal[ "Mech" ] = strVal;
+            if( SUCCEEDED( ret ) )
+                oVal[ "Mech" ] = strVal;
 
             oBridge[ "AuthInfo" ] = oVal;
             oArray.append( oBridge );
