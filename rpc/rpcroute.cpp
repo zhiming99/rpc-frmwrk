@@ -23,7 +23,6 @@
  * =====================================================================================
  */
 
-#include "sha1.h"
 #include "configdb.h"
 #include "defines.h"
 #include "proxy.h"
@@ -6295,25 +6294,10 @@ gint32 CIfRouterMgrState::SetupOpenPortParams(
 }
 
 gint32 gen_sess_hash(
-    BufPtr& pBuf,
-    std::string& strSess )
+    BufPtr& pBuf, std::string& strSess )
 {
-    BufPtr pTemp( true );
-    pTemp->Resize( 20 );
-    SHA1 sha;
-    sha.Input( pBuf->ptr(), pBuf->size());
-    if( !sha.Result( ( guint32* )pTemp->ptr() ) )
-        return ERROR_FAIL;
-
-    guint32* pDwords = ( guint32* )pTemp->ptr();
-    for( int i = 0; i < 5; i++, pDwords++ )
-        *pDwords = htonl( *pDwords );
-
-    gint32 ret = BytesToString(
-        ( guint8* )pTemp->ptr(),
-        pTemp->size(), strSess );
-
-    return ret;
+    return GenShaHash( pBuf->ptr(),
+        pBuf->size(), strSess );
 }
 
 gint32 AppendConnParams(

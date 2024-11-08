@@ -120,6 +120,15 @@ gint32 FASTRPC_MSG::Deserialize( CBuffer& oBuf )
 
     return ret;
 }
+
+bool CRpcStmChanCli::IsLocalStream() const
+{
+    CLocalProxyState* p = this->m_pIfStat;
+    if( p != nullptr )
+        return true;
+    return false;
+}
+
 gint32 CRpcStmChanSvr::AcceptNewStream(
     IEventSink* pCallback,
     IConfigDb* pDataDesc )

@@ -218,65 +218,6 @@ gint32 NormalizeIpAddrEx(
         strAddr, strRet, bDomain );
 }
 
-/**
-* @name ByteToHexChar
-* @{ */
-/** 
- * pRet must be a ptr to a byte array * of 2 bytes or longer @}
- * byte contains the binary byte to convert
- * the return value is stored in two chars, that is,
- * the higher 4 bits are converted to a hex digit in pRet[ 0 ],
- * and the lower 4 bits are converted to a hex digit in
- * pRet[ 1 ] */
-
-static void BinToHexChar( guint8 byte, guint8* pRet )
-{
-    if( pRet == nullptr )
-        return;
-
-    if( ( byte & 0x0F ) < 0x0A )
-        pRet[ 1 ] = ( byte & 0x0F ) + 0x30;
-    else
-        pRet[ 1 ] = ( byte & 0x0F ) - 9 + 0x40;
-    
-    if( ( byte & 0xF0 ) < 0xA0 )
-        pRet[ 0 ] = ( byte >> 4 ) + 0x30;
-    else
-        pRet[ 0 ] = ( byte >> 4 ) - 9 + 0x40;
-
-    return;
-}
-
-
-gint32 BytesToString(
-    const guint8* bytes,
-    guint32 dwSize,
-    string& strRet )
-{
-    if( bytes == nullptr
-        || dwSize == 0
-        || dwSize > 1024 )
-    {
-        return -EINVAL;
-    }
-
-    guint8* pszRet =
-        ( guint8* )alloca( dwSize * 2 + 1 );
-
-    pszRet[ dwSize * 2 ] = 0;
-
-    for( guint32 i = 0; i < dwSize * 2; i += 2 )
-    {
-        BinToHexChar(
-            bytes[ ( i >> 1 ) ],
-            pszRet + i );
-    }
-
-    strRet = ( char* )pszRet;
-
-    return 0;
-}
-
 gint32 IpAddrToByteStr(
     const string& strIpAddr,
     string& strRet )

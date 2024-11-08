@@ -118,6 +118,7 @@ gint64 GetRandom()
     return ( qwHighVal << 32 )  + dwLowVal;
 }
 
+// Generate a 32bit hash using the sha1hash
 gint32 GenStrHash(
     const stdstr& strMsg, guint32& dwHash )
 {
@@ -566,6 +567,86 @@ int Sem_Wait_Wakable( sem_t* psem )
         break;
 
     }while( 1 );
+
+    return ret;
+}
+
+/**
+* @name ByteToHexChar
+* @{ */
+/** 
+ * pRet must be a ptr to a byte array * of 2 bytes or longer @}
+ * byte contains the binary byte to convert
+ * the return value is stored in two chars, that is,
+ * the higher 4 bits are converted to a hex digit in pRet[ 0 ],
+ * and the lower 4 bits are converted to a hex digit in
+ * pRet[ 1 ] */
+
+static void BinToHexChar( guint8 byte, guint8* pRet )
+{
+    if( pRet == nullptr )
+        return;
+
+    if( ( byte & 0x0F ) < 0x0A )
+        pRet[ 1 ] = ( byte & 0x0F ) + 0x30;
+    else
+        pRet[ 1 ] = ( byte & 0x0F ) - 9 + 0x40;
+    
+    if( ( byte & 0xF0 ) < 0xA0 )
+        pRet[ 0 ] = ( byte >> 4 ) + 0x30;
+    else
+        pRet[ 0 ] = ( byte >> 4 ) - 9 + 0x40;
+
+    return;
+}
+
+
+gint32 BytesToString( const guint8* bytes,
+    guint32 dwSize, stdstr& strRet )
+{
+    if( bytes == nullptr
+        || dwSize == 0
+        || dwSize > 1024 )
+    {
+        return -EINVAL;
+    }
+
+    guint8* pszRet =
+        ( guint8* )alloca( dwSize * 2 + 1 );
+
+    pszRet[ dwSize * 2 ] = 0;
+
+    for( guint32 i = 0; i < dwSize * 2; i += 2 )
+    {
+        BinToHexChar(
+            bytes[ ( i >> 1 ) ],
+            pszRet + i );
+    }
+
+    strRet = ( char* )pszRet;
+
+    return 0;
+}
+
+// Generate a sha1 hash and return a string of 40
+// characters.
+gint32 GenShaHash(
+    const char* pBuf, guint32 dwSize,
+    std::string& strSess )
+{
+    SHA1 sha;
+    char arrBytes[ 20 ];
+    char* pTemp = arrBytes;
+    sha.Input( pBuf, dwSize);
+    if( !sha.Result( ( guint32* )pTemp ) )
+        return ERROR_FAIL;
+
+    guint32* pDwords = ( guint32* )pTemp;
+    for( int i = 0; i < 5; i++, pDwords++ )
+        *pDwords = htonl( *pDwords );
+
+    gint32 ret = BytesToString( ( guint8* )pTemp,
+        sizeof( arrBytes ), strSess );
 
     return ret;
 }

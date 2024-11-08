@@ -331,7 +331,16 @@ gint32 Execve(
 
 using stdstr = std::string;
 
+gint32 BytesToString(
+    const guint8* bytes,
+    guint32 dwSize,
+    std::string& strRet );
+
 // genenerate a 32bit hash
+gint32 GenShaHash(
+    const char* pBuf, guint32 dwSize,
+    std::string& strSess );
+
 gint32 GenStrHash( const stdstr& strMsg,
     guint32& dwHash );
 

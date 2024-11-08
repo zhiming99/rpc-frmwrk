@@ -1188,20 +1188,63 @@ gint32 CDBusStreamPdo::PostStart(
         oReqCtx[ propIrpPtr ] = ObjPtr( pIrp );
         oReqCtx[ propPortPtr ] = ObjPtr( this );
 
+        CRpcStreamChannelCli* pStmCli =
+            GetStreamIf();
+
         TaskletPtr pRespCb;
         ret = NEW_PROXY_RESP_HANDLER2(
-            pRespCb, GetStreamIf(), 
+            pRespCb, pStmCli, 
             &CRpcStreamChannelCli::OnStartStmComplete,
             ( IEventSink* )nullptr,
             ( IConfigDb* )oReqCtx.GetCfg() );
         if( ERROR( ret ) )
             break;
 
+        IConfigDb* pDesc = nullptr;
         CCfgOpener oDesc;
         HANDLE hstm = INVALID_HANDLE;
+        if( pStmCli->IsLocalStream() )
+        {
+            CCfgOpener oTransCtx;
+            stdstr strProps;
+            stdstr strHash;
+            Variant oVar;
+            ret = pStmCli->GetProperty(
+                propDestDBusName, oVar );
+            if( SUCCEEDED( ret ) )
+                strProps.append( oVar.m_strVal );
+
+            ret = pStmCli->GetProperty(
+                propObjPath, oVar );
+            if( SUCCEEDED( ret ) )
+                strProps.append( oVar.m_strVal );
+
+            ret = pStmCli->GetProperty(
+                propSrcUniqName, oVar );
+            if( SUCCEEDED( ret ) )
+                strProps.append( oVar.m_strVal );
+
+            strProps.append(
+                std::to_string( getpid() ) );
+
+            ret = GenShaHash( strProps.c_str(),
+                strProps.size(), strHash );
+            if( ERROR( ret ) )
+                break;
+            strProps = "DBus";
+            strProps += strHash;
+
+            oTransCtx.SetStrProp(
+                propSessHash, strProps );
+            oTransCtx.SetStrProp(
+                propRouterPath, "/" );
+            oDesc.SetPointer( propTransCtx,
+                ( IConfigDb* )oTransCtx.GetCfg() );
+            pDesc = oDesc.GetCfg();
+        }
 
         ret = pstm->StartStream(
-            hstm, nullptr, pRespCb );
+            hstm, pDesc, pRespCb );
 
         if( ret == STATUS_PENDING )
         {

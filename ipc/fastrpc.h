@@ -1073,6 +1073,7 @@ class CRpcStmChanCli :
     CRpcStmChanCli( const IConfigDb* pCfg )
         : _MyVirtBase( pCfg ), super( pCfg )
     {}
+    bool IsLocalStream() const;
 };
 
 class CRpcStmChanSvr :
