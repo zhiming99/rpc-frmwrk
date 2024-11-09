@@ -43,10 +43,10 @@
 * 当怀疑传输出现问题时，可以通过dbus-monitor查看通信状态和通信内容，定位问题发生的环节。一般会用到下面的几条命令:
   * 查看本地服务器或者客户端注册的dbus destination   
     `dbus-send --session --dest=org.freedesktop.DBus --type=method_call --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames | grep rpcf`
-  * 监视服务器或者客户端同`rpcrouter`的通信, 注意interface即为`ridl`文件里定义的interface名称加上`org.rpcf.interf.`, path为`ridl`文件里定义的appname(TestTypes)和service名称(TestTypesSvc)的组合。   
+  * 监视服务器或者客户端同`rpcrouter`的通信, 注意interface即为`ridl`文件里定义的interface名称加上`org.rpcf.interf.`, path为[`ridl`](../ridl/README_cn.md)文件里定义的appname(TestTypes)和service名称(TestTypesSvc)的组合。   
     `dbus-monitor interface='org.rpcf.Interf.IStream',path='/org/rpcf/TestTypes/objs/TestTypesSvc'`
 
-### 使用wireshark观察网络传输
+### 使用wireshark查看网络传输
 * wireshark是一款强大的网络调试工具，可以用来查看`rpcrouter`之间的通信状况。它的使用方法不在这里赘述。唯一需要强调的是使用wireshark时，需关闭SSL支持，否则观察到的数据包均为加密的数据包。
 
 ### 代码审查是查找bug十分重要手段
