@@ -115,6 +115,9 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## DBus的作用
 DBus是一个本地的消息总线，似乎和RPC关系不大。实际上，`rpc-frmwrk`的服务器预想的运行环境下，不仅会接受来自远程互联网的请求，也会接收到本地服务器的请求，以及转发一些请求到其他的服务器进程。虽然这些服务器也可以使用TCP进行传输，但是比起DBus这类轻量级的IPC传输，就显得笨拙低效了。因此DBus就充当了本地间的通信的通道。服务器端，DBus是必须的组件，而客户端则可以运行在没有DBus的环境中。
 
+## driver.json
+`driver.json`文件是IoManager的配置文件，在rpc-frmwrk安装时，会在系统里有一份缺省的配置文件。如果当前目录下，没有`driver.json`,那么IoManager会使用系统的`driver.json`。需要注意的是，`rpcrouter`等系统程序应该一直使用系统的`driver.json`。如果启动`rpcrouter`的目录下有同名的`driver.json`,可能会导致`rpcrouter`不能启动。
+
 ## 性能
 `rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒2500 Requests. 
 
