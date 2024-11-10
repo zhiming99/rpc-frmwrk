@@ -130,6 +130,9 @@
       "Version": "1.0"
   }
   ```
+#### driver.json
+  * `driver.json`是IoManager的配置文件，这里的`driver.json`不同于系统的`driver.json`，它只用于启动`HellWorldsvr`和`HelloWorldcli`，这个文件里有关于`HelloWorldsvr`和`HelloWorldcli`启动的信息，这是系统`driver.json`中没有的，所以如果把HelloWord目录下的`driver.json`删掉，使用系统的`driver.json`，会无法启动。
+  * 同样`rpcrouter`等系统程序，不要在`HelloWorld`这样的有`driver.json`的目录下运行，否则它会使用当前目录下的`driver.json`，而无法启动。
 #### 编译
   * 目前`rpc-frmwrk`只支持Linux，所以所有的环境都是Linux系统。Windows用户请先用WSL或者虚拟机进行操作。
   * 在命令行下，我们可以看到在`hellowld`目录下有`Makefile`。只要输入`make -j4`命令即可。如果想要debug版，就输入`make debug -j4`。
