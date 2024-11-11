@@ -116,7 +116,15 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 DBus是一个本地的消息总线，似乎和RPC关系不大。实际上，`rpc-frmwrk`的服务器预想的运行环境下，不仅会接受来自远程互联网的请求，也会接收到本地服务器的请求，以及转发一些请求到其他的服务器进程。虽然这些服务器也可以使用TCP进行传输，但是比起DBus这类轻量级的IPC传输，就显得笨拙低效了。因此DBus就充当了本地间的通信的通道。服务器端，DBus是必须的组件，而客户端则可以运行在没有DBus的环境中。
 
 ## driver.json
-`driver.json`文件是IoManager的配置文件，在rpc-frmwrk安装时，会在系统里有一份缺省的配置文件。如果当前目录下，没有`driver.json`,那么IoManager会使用系统的`driver.json`。需要注意的是，`rpcrouter`等系统程序应该一直使用系统的`driver.json`。如果启动`rpcrouter`的目录下有同名的`driver.json`,可能会导致`rpcrouter`不能启动。
+`driver.json`文件是IoManager的配置文件，在rpc-frmwrk安装时，会在系统里有一份缺省的配置文件。`driver.json`包括四类配置
+* 驱动程序数组：每一个数组元素是一个驱动程序的名称，类型，和支持的端口类。驱动程序可以动态或者静态的创建端口对象，并管理这些对象。
+* 端口数组：每一个数组元素是一个端口类的名称，类型。端口对象可以由驱动程序建立，或者由总线类(Bus Port)的端口创建。数组元素中会指定创建该端口对象的是驱动程序还是总线端口。有些端口对象，如RpcTcpBusPort会指定TCP的连接信息还有TCP连接上的服务设置。
+* 模块数组：系统的driver.json包含系统程序的启动时需加载的驱动程序，工厂类，或者静态库。系统程序包括`rpcrouter`, `rpcf_logger`, `regfsmnt`。和一些例子程序，比如HelloWorld的程序等。`ridlc`没有用到IoManager，所以也就不需要`driver.json` 
+* `匹配`数组：匹配数组的元素用来告诉`pdo`类的端口对象建立起来后，它前端的功能`fdo`和过滤器`fido`等端口对象的加载顺序。
+  
+注意事项：
+* `driver.json`除了系统目录下的，也会由`ridlc`为生成的客户端和服务器端程序生成。这个版本的`driver.json`只包含一些该服务器端和客户端相关的配置，所以这个版本可以启动客户端和服务器端的程序，但是不能用来启动`rpc-frmwrk`系统的程序。
+* 如果当前目录下，如果没有`driver.json`,那么IoManager会使用系统的`driver.json`。需要注意的是，`rpcrouter`等系统程序应该一直使用系统的`driver.json`。如果启动`rpcrouter`的目录下有同名的`driver.json`，除非有意而为之，会导致`rpcrouter`不能启动。
 
 ## 性能
 `rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒2500 Requests. 
