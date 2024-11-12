@@ -1,4 +1,8 @@
 ---
+[`Tue Nov 12 2024 09:18:59 PM Beijing`]   
+1. I will take a few days to enable HTTPS connection between the OAuth2 server and oa2cli_cgi.
+2. And then trying to add user management module and an OAuth2 login tool for non-JS rpc-frmwrk applications.
+
 [`Wed Nov 06 2024 08:36:50 PM Beijing`]   
 1. The registry PR has been merged.
 2. I will add support to user management and access controll as are also the support modules for the monitor in the next task.
