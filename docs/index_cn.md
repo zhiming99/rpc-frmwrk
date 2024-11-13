@@ -62,6 +62,7 @@
   - [I/O子系统](../Concept_cn.md#io子系统)
   - [内存管理](../Concept_cn.md#内存管理)
   - [DBus的作用](../Concept_cn.md#dbus的作用)
+  - [driver.json](../Concept_cn.md#driverjson)
   - [性能](../Concept_cn.md#性能)
   - [开发和调试](../Concept_cn.md#开发和调试)
   - [意见和建议](../Concept_cn.md#意见和建议)
