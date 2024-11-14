@@ -88,6 +88,7 @@ if [ ! -f rootcakey.pem ]; then
     openssl req -new -sha256 -x509 -days 3650 -config ${SSLCNF} -extensions v3_ca -key rootcakey.pem -out rootcacert.pem -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=ROOTCA/emailAddress=woodhead99@gmail.com"
 fi
 
+echo generating certs.pem
 if [ ! -f cakey.pem ]; then
     mkdir backup
     mv -f rootca*.pem backup/
@@ -96,8 +97,8 @@ if [ ! -f cakey.pem ]; then
     rmdir backup
 
     openssl genrsa -out cakey.pem ${bitwidth}
-    openssl req -new -sha256 -key cakey.pem  -out careq.pem -days 365 -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Sub CA/emailAddress=woodhead99@gmail.com"
-    openssl ca -days 365 -cert rootcacert.pem -keyfile rootcakey.pem -md sha256 -extensions v3_ca -config ${SSLCNF} -in careq.pem -out cacert.pem
+    openssl req -new -sha256 -key cakey.pem  -out careq.pem -days 1095 -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Sub CA/emailAddress=woodhead99@gmail.com"
+    openssl ca -days 1095 -cert rootcacert.pem -keyfile rootcakey.pem -md sha256 -extensions v3_ca -config ${SSLCNF} -in careq.pem -out cacert.pem
     rm careq.pem
     cat cacert.pem > certs.pem
     cat rootcacert.pem >> certs.pem
@@ -108,6 +109,7 @@ if ((idx_base < 0 )); then
     exit 1
 fi
 
+echo generating server keys
 let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
     chmod 600 signcert.pem signkey.pem || true
@@ -152,6 +154,7 @@ function find_key_to_show()
     fi
 }
 
+echo generating client keys
 #keep the first generated server keys as the current server keys in the directory
 startkey=0
 find_key_to_show 1
