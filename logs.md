@@ -1,4 +1,7 @@
 ---
+[`Fri Nov 15 2024 23:37:59 PM Beijing`]   
+1. Fixed some bugs in the oauth2 docker images. And added https version of oauth2 docker images.
+   
 [`Tue Nov 12 2024 09:18:59 PM Beijing`]   
 1. I will take a few days to enable HTTPS connection between the OAuth2 server and oa2cli_cgi.
 2. And then trying to add user management module and an OAuth2 login tool for non-JS rpc-frmwrk applications.
