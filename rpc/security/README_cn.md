@@ -124,5 +124,13 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 实际上`rpc-frmwrk`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`应用服务器(application server)`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
 
 我们在`zhiming99/django-oa2cli-cgi`的镜像仓库中，准备了三个容器镜像，用于演示rpc-frmwrk和不同OAuth2的`实现`的整合。它们分别是`OAuth2-Server`, `latest`和`springboot-oa2check`。对应的是django的OAuth2的服务器，django的OAuth2客户端app, 和springboot的OAuth2的客户端app。用户可以通过命令行拉取，比如`docker pull zhiming99/django-oa2cli-cgi:OAuth2-Server`。
+注意：这三个容器为学习用途，没有启用https. 
 
 django的OAuth2的客户端app使用的是标准的Authorization code认证流程，springboot的OAuth2的客户端app使用的是OAuth2结合OpenID Connect扩展协议，以提供标准化的身份信息和更安全的身份验证。
+
+容器的使用方法：
+* 首先要运行容器`OAuth2-Server`，作为OAuth2的认证服务器。
+* 然后如果要跑django和rpc-frmwrk整合的服务器，就启动标有`latest`的容器。
+* 如果要跑springboot的rpc-frmwrk整合的服务器，就启动标有`springboot-oa2check`的容器。
+ 
+注：仓库中还有三个后缀为https的容器，分别对应这三个容器的https版本，使用方法同上。
