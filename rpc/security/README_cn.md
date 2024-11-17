@@ -132,5 +132,11 @@ django的OAuth2的客户端app使用的是标准的Authorization code认证流�
 * 首先要运行容器`OAuth2-Server`，作为OAuth2的认证服务器。
 * 然后如果要跑django和rpc-frmwrk整合的服务器，就启动标有`latest`的容器。
 * 如果要跑springboot的rpc-frmwrk整合的服务器，就启动标有`springboot-oa2check`的容器。
- 
+
+常见的问题：
+* 忘记设置ip地址。`OAuth2-Server`的地址被指定为172.17.0.3，而另两个运行rpc-frmwrk的服务器应该为172.17.0.2.
+* 使用https版本时，浏览器提示不安全证书是由于容器使用的是自签名证书，选择信任该证书即可。
+* 务必在运行rpc-frmwrk的容器内修改/etc/hosts， 添加上 '172.17.0.3  Server-0'。
+* rpc-frmwrk的输出在浏览器的调试器的控制台窗口，firefox和chrome可以按F12，显示该窗口。
+
 注：仓库中还有三个后缀为https的容器，分别对应这三个容器的https版本，使用方法同上。
