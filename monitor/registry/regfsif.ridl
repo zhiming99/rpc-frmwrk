@@ -1,0 +1,347 @@
+struct AccessContext
+{
+    uint32 uid;
+    uint32 gid;
+};
+struct TimeSpec
+{
+	uint32 tv_sec = 0;
+	uint32 tv_nsec = 0;
+};
+
+struct FileStat
+{
+    uint32      st_dev = 0;      /* ID of device containing file */
+    uint32      st_ino = 0;      /* Inode number */
+    uint32      st_mode = 0;     /* File type and mode */
+    uint32      st_nlink = 0;    /* Number of hard links */
+    uint32      st_uid = 0;      /* User ID of owner */
+    uint32      st_gid = 0;      /* Group ID of owner */
+    uint32      st_rdev = 0;     /* Device ID (if special file) */
+    uint32      st_size = 0;     /* Total size, in bytes */
+    uint32      st_blksize = 0;  /* Block size for filesystem I/O */
+    uint32      st_blocks = 0;   /* Number of 512 B blocks allocated */
+
+    TimeSpec  st_atim;  /* Time of last access */
+    TimeSpec  st_mtim;  /* Time of last modification */
+    TimeSpec  st_ctim;  /* Time of last status change */
+};
+
+// the inprocess version of interface for registry without
+// AccessContext, using by registry tools
+interface IRegFsLocal
+{
+    CreateFile( string strPath,
+        uint32 dwMode, uint32 dwFlags )
+    returns( uint64 hFile );
+
+    MakeDir(
+        string strPath, uint32 dwMode )
+    returns();
+
+    OpenFile(
+        string strPath, uint32 dwFlags )
+    returns( uint64 hFile );
+
+    CloseFile( uint64 hFile )
+    returns();
+
+    RemoveFile( string strPath )
+    returns();
+
+    ReadFile( uint64 hFile,
+        uint32 dwSize, uint32 dwOff )
+    returns( bytearray buffer );
+
+    WriteFile( uint64 hFile,
+        bytearray buffer, uint32 dwOff )
+    returns( uint32 dwSizeWrite );
+
+    Truncate(
+        uint64 hFile, uint32 dwOff )
+    returns();
+
+    CloseDir( uint64 hFile )
+    returns();
+
+    RemoveDir( string strPath )
+    returns();
+
+    SetGid(
+        string strPath, uint32 wGid )
+    returns();
+
+    SetUid(
+        string strPath, uint32 wUid )
+    returns();
+
+    GetGid( string strPath )
+    returns( uint32 gid );
+
+    GetUid( string strPath )
+    returns( uint32 uid );
+
+    SymLink( string strSrcPath,
+        string strDestPath )
+    returns();
+
+    GetValue( string strPath )
+    returns(string strJson);
+
+    SetValue(
+        string strPath, string strJson )
+    returns();
+
+    Chmod(
+        string strPath, uint32 dwMode )
+    returns();
+
+    Chown(
+        string strPath,
+        uint32 dwUid, uint32 dwGid )
+    returns();
+
+    ReadLink( string strPath )
+    returns( bytearray buf );
+
+    Rename(
+        string szFrom, string szTo )
+    returns();
+
+    Flush( uint32 dwFlags )
+    returns();
+
+    Access(
+        string strPath, uint32 dwFlags )
+    returns();
+
+    GetAttr( string strPath )
+    returns ( FileStat oStat );
+
+    ReadDir( uint64 hDir )
+    returns( array< FileStat > vecDirEnt );
+
+    OpenDir(
+        string strPath, uint32 dwFlags )
+    returns( uint64 hDir );
+
+    ExecBat( string strJson )
+    returns ();
+};
+
+// this is for server to expose a registry interface
+interface IRegistryFs
+{
+    CreateFile( string strPath, uint32 dwMode,
+        uint32 dwFlags, AccessContext ac )
+    returns( uint64 hFile );
+
+    MakeDir( string strPath, uint32 dwMode,
+        AccessContext uid )
+    returns();
+
+    OpenFile( string strPath,
+        uint32 dwFlags, AccessContext ac )
+    returns( uint64 hFile );
+
+    CloseFile( uint64 hFile )
+    returns();
+
+    RemoveFile( string strPath,
+        AccessContext ac )
+    returns();
+
+    ReadFile( uint64 hFile,
+        uint32 dwSize, uint32 dwOff )
+    returns( bytearray buffer );
+
+    WriteFile( uint64 hFile,
+        bytearray buffer, uint32 dwOff )
+    returns( uint32 dwSizeWrite );
+
+    Truncate( uint64 hFile, uint32 dwOff )
+    returns();
+
+    CloseDir( uint64 hFile )
+    returns();
+
+    RemoveDir( string strPath,
+        AccessContext* ac )
+    returns();
+
+    SetGid(
+        string strPath, uint32 wGid,
+        AccessContext pac )
+    returns();
+
+    SetUid(
+        string strPath, uint32 wUid,
+        AccessContext pac )
+    returns();
+
+    GetGid(
+        string strPath, AccessContext ac )
+    returns( uint32 gid );
+
+    GetUid(
+        string strPath, AccessContext ac )
+    returns( uint32 uid );
+
+    SymLink( string strSrcPath,
+        string strDestPath, AccessContext ac )
+    returns();
+
+    GetValue( string strPath,
+        AccessContext ac )
+    returns( string strJson );
+
+    SetValue(
+        string strPath, string strJson,
+        AccessContext ac )
+    returns();
+
+    Chmod(
+        string strPath, uint32 dwMode,
+        AccessContext ac )
+    returns();
+
+    Chown(
+        string strPath,
+        uint32 dwUid, uint32 dwGid,
+        AccessContext ac )
+    returns();
+
+    ReadLink(
+        string strPath,
+        AccessContext ac )
+    returns( bytearray buf );
+
+    Rename(
+        string szFrom, string szTo,
+        AccessContext ac )
+    returns();
+
+    Flush( uint32 dwFlags )
+    returns();
+
+    Access( string strPath,
+        uint32 dwFlags,
+        AccessContext ac )
+    returns();
+
+    GetAttr( string strPath,
+        AccessContext ac )
+    returns ( FileStat oStat );
+
+    ReadDir( uint64 hDir )
+    returns( array< FileStat > vecDirEnt );
+
+    OpenDir( string strPath,
+        uint32 dwFlags, AccessContext ac )
+    returns( uint64 hDir );
+
+    ExecBat( string strJson )
+    returns ();
+};
+
+// this is a registry interface for client side
+// applications
+interface IRegFsRemote
+{
+    [async_p]CreateFile( string strPath,
+        uint32 dwMode, uint32 dwFlags )
+    returns( uint64 hFile );
+
+    [async_p]MakeDir(
+        string strPath, uint32 dwMode )
+    returns();
+
+    [async_p]OpenFile(
+        string strPath, uint32 dwFlags )
+    returns( uint64 hFile );
+
+    [async_p]CloseFile( uint64 hFile )
+    returns();
+
+    [async_p]RemoveFile( string strPath )
+    returns();
+
+    [async_p]ReadFile( uint64 hFile,
+        uint32 dwSize, uint32 dwOff )
+    returns( bytearray buffer );
+
+    [async_p]WriteFile( uint64 hFile,
+        bytearray buffer, uint32 dwOff )
+    returns( uint32 dwSizeWrite );
+
+    [async_p]Truncate(
+        uint64 hFile, uint32 dwOff )
+    returns();
+
+    [async_p]CloseDir( uint64 hFile )
+    returns();
+
+    [async_p]RemoveDir( string strPath )
+    returns();
+
+    [async_p]SetGid(
+        string strPath, uint32 wGid )
+    returns();
+
+    [async_p]SetUid(
+        string strPath, uint32 wUid )
+    returns();
+
+    [async_p]GetGid( string strPath )
+    returns( uint32 gid );
+
+    [async_p]GetUid( string strPath )
+    returns( uint32 uid );
+
+    [async_p]SymLink( string strSrcPath,
+        string strDestPath )
+    returns();
+
+    [async_p]GetValue( string strPath )
+    returns(string strJson);
+
+    [async_p]SetValue(
+        string strPath, string strJson )
+    returns();
+
+    [async_p]Chmod(
+        string strPath, uint32 dwMode )
+    returns();
+
+    [async_p]Chown(
+        string strPath,
+        uint32 dwUid, uint32 dwGid )
+    returns();
+
+    [async_p]ReadLink( string strPath )
+    returns( bytearray buf );
+
+    [async_p]Rename(
+        string szFrom, string szTo )
+    returns();
+
+    [async_p]Flush( uint32 dwFlags )
+    returns();
+
+    [async_p]Access(
+        string strPath, uint32 dwFlags )
+    returns();
+
+    [async_p]GetAttr( string strPath )
+    returns ( FileStat oStat );
+
+    [async_p]ReadDir( uint64 hDir )
+    returns( array< FileStat > vecDirEnt );
+
+    [async_p]OpenDir(
+        string strPath, uint32 dwFlags )
+    returns( uint64 hDir );
+
+    [async_p]ExecBat( string strJson )
+    returns ();
+};

@@ -1634,7 +1634,8 @@ gint32 CFileImage::CheckAccess(
         uid_t dwCurUid;
         gid_t dwCurGid;
 
-        if( pac == nullptr )
+        if( pac == nullptr ||
+            !pac->IsInitialized() )
         {
             dwCurUid = geteuid();
             dwCurGid = getegid();

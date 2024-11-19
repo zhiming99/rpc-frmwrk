@@ -24,6 +24,7 @@
  */
 
 #include "blkalloc.h"
+#include "RegFsSvcLocalsvr.h"
 
 namespace rpcf
 {
@@ -41,6 +42,11 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CFileImage );
     INIT_MAP_ENTRYCFG( CDirImage );
     INIT_MAP_ENTRYCFG( CLinkImage );
+
+    INIT_MAP_ENTRYCFG( CRegFsSvcLocal_SvrImpl );
+
+    INIT_MAP_ENTRY( TimeSpec );
+    INIT_MAP_ENTRY( FileStat );
 
     END_FACTORY_MAPS;
 };
