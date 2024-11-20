@@ -10,6 +10,166 @@
 
 namespace rpcf
 {
+
+gint32 VarToJson( const Variant& oVar,
+    stdstr& strJson )
+{
+    gint32 ret = 0;
+    Json::StreamWriterBuilder oBuilder;
+    oBuilder["commentStyle"] = "None";
+    Json::Value oVal( Json::objectValue );
+    oVal[ "t" ] = oVar.GetTypeId();
+    char buf[ 64 ];
+    switch( oVar.GetTypeId() )
+    {
+    case typeByte:
+        {
+            snprintf( buf, sizeof( buf ),
+                "%hhn", oVar.m_byVal );
+            oVal[ "v" ] = buf;
+            break;
+        }
+    case typeUInt16:
+        {
+            snprintf( buf, sizeof( buf ),
+                "%hn", oVar.m_wVal );
+            oVal[ "v" ] = buf;
+            break;
+        }
+    case typeUInt32:
+        {
+            snprintf( buf, sizeof( buf ),
+                "%ld", oVar.m_dwVal );
+            oVal[ "v" ] = buf;
+            break;
+        }
+    case typeUInt64:
+        {
+            snprintf( buf, sizeof( buf ),
+                "%lld", oVar.m_qwVal );
+            oVal[ "v" ] = buf;
+            break;
+        }
+    case typeFloat:
+        {
+            snprintf( buf, sizeof( buf ),
+                "%.7f", oVar.m_fVal );
+            oVal[ "v" ] = buf;
+            break;
+        }
+    case typeDouble:
+        {
+            snprintf( buf, sizeof( buf ),
+                "%.15g", oVar.m_dblVal );
+            oVal[ "v" ] = buf;
+            break;
+        }
+    case typeString:
+        {
+            oVal[ "v" ] = oVar.m_strVal;
+            break;
+        }
+    case typeNone:
+        break;
+    case typeDMsg:
+    case typeObj:
+    case typeByteArr:
+    default:
+        ret = -ENOTSUP;
+        break;
+    }
+    if( ERROR( ret ) )
+        return ret;
+    strJson = Json::writeString(
+            oBuilder, oVal );
+    return ret;
+}
+
+gint32 JsonToVar( const stdstr& strJson,
+    Variant& oVar )
+{
+    gint32 ret = 0;
+    do{
+        Json::CharReaderBuilder oBuilder;
+        Json::CharReader* pReader =
+            oBuilder.newCharReader();
+        Json::Value oVal;
+        if( !pReader->parse( strJson.c_str(),
+            strJson.c_str() + strJson.size(),
+            &oVal, nullptr ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( !oVal.isMember( "t" ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( !oVal.isMember( "v" ) )
+        {
+            oVar.m_iType = typeNone;
+            break;
+        }
+
+        guint32 dwType = oVal[ "t" ].asInt();
+        switch( ( EnumTypeId )dwType )
+        {
+        case typeByte:
+            {
+                oVar.m_byVal =
+                    ( guint8 )oVal[ "v" ].asUInt();
+                break;
+            }
+        case typeUInt16:
+            {
+                oVar.m_wVal =
+                    ( guint16 )oVal[ "v" ].asUInt();
+                break;
+            }
+        case typeUInt32:
+            {
+                oVar.m_dwVal =
+                    oVal[ "v" ].asUInt();
+                break;
+            }
+        case typeUInt64:
+            {
+                oVar.m_qwVal =
+                    oVal[ "v" ].asUInt64();
+                break;
+            }
+        case typeFloat:
+            {
+                oVar.m_qwVal =
+                    oVal[ "v" ].asFloat();
+                break;
+            }
+        case typeDouble:
+            {
+                oVar.m_qwVal =
+                    oVal[ "v" ].asDouble();
+                break;
+            }
+        case typeString:
+            {
+                oVar.m_strVal =
+                    oVal[ "v" ].asString();
+                break;
+            }
+        case typeDMsg:
+        case typeObj:
+        case typeByteArr:
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+        if( ERROR( ret ) )
+            break;
+    }while( 0 );
+    return ret;
+}
+
 CRegFsSvcLocal_SvrImpl::CRegFsSvcLocal_SvrImpl(
     const IConfigDb* pCfg ) :
     super::virtbase( pCfg ), super( pCfg )
@@ -196,7 +356,11 @@ gint32 CRegFsSvcLocal_SvrImpl::Truncate(
 /* Sync Req Handler*/
 gint32 CRegFsSvcLocal_SvrImpl::CloseDir(
     guint64 hFile /*[ In ]*/ )
-{ return ERROR_NOT_IMPL; }
+{ 
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    return m_pRegFs->CloseFile( hFile );
+}
 
 /* Sync Req Handler*/
 gint32 CRegFsSvcLocal_SvrImpl::RemoveDir(
@@ -272,6 +436,7 @@ gint32 CRegFsSvcLocal_SvrImpl::GetValue(
         strPath, oVar );
     if( ERROR( ret ) )
         return ret;
+    ret = VarToJson( oVar, strJson );
     return ret;
 }
 
@@ -280,10 +445,16 @@ gint32 CRegFsSvcLocal_SvrImpl::SetValue(
     const std::string& strPath /*[ In ]*/,
     const std::string& strJson /*[ In ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    Variant oVar;
+    gint32 ret = JsonToVar( strJson, oVar );
+    if( ERROR( ret ) )
+        return ret;
+    ret = m_pRegFs->GetValue( strPath, oVar );
+    if( ERROR( ret ) )
+        return ret;
+    return ret;
 }
 
 /* Sync Req Handler*/
@@ -291,10 +462,9 @@ gint32 CRegFsSvcLocal_SvrImpl::Chmod(
     const std::string& strPath /*[ In ]*/,
     guint32 dwMode /*[ In ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    return m_pRegFs->Chmod( strPath, dwMode );
 }
 
 /* Sync Req Handler*/
@@ -303,10 +473,10 @@ gint32 CRegFsSvcLocal_SvrImpl::Chown(
     guint32 dwUid /*[ In ]*/,
     guint32 dwGid /*[ In ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    return m_pRegFs->Chown(
+        strPath, dwUid, dwGid );
 }
 
 /* Sync Req Handler*/
@@ -314,31 +484,51 @@ gint32 CRegFsSvcLocal_SvrImpl::ReadLink(
     const std::string& strPath /*[ In ]*/,
     BufPtr& buf /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    do{
+        struct stat stBuf;
+        ret = m_pRegFs->GetAttr( strPath, stBuf );
+        if( ERROR( ret ) )
+            break;
+        if( stBuf.st_size == 0 ||
+            stBuf.st_size > MAX_FILE_SIZE )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        BufPtr pBuf( true );
+        ret = pBuf->Resize( stBuf.st_size );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwSize = pBuf->size();
+        ret = m_pRegFs->ReadLink(
+            strPath, pBuf->ptr(), dwSize );
+        if( dwSize < pBuf->size() )
+            pBuf->Resize( dwSize );
+        buf = pBuf;
+    }while( 0 );
+    return ret;
 }
 
 /* Sync Req Handler*/
 gint32 CRegFsSvcLocal_SvrImpl::Rename(
-    const std::string& szFrom /*[ In ]*/,
-    const std::string& szTo /*[ In ]*/ )
+    const std::string& strFrom /*[ In ]*/,
+    const std::string& strTo /*[ In ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    return m_pRegFs->Rename( strFrom, strTo );
 }
 
 /* Sync Req Handler*/
 gint32 CRegFsSvcLocal_SvrImpl::Flush(
     guint32 dwFlags /*[ In ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    return m_pRegFs->Flush( FLAG_FLUSH_CHILD );
 }
 
 /* Sync Req Handler*/
@@ -346,10 +536,9 @@ gint32 CRegFsSvcLocal_SvrImpl::Access(
     const std::string& strPath /*[ In ]*/,
     guint32 dwFlags /*[ In ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    return m_pRegFs->Access( strPath, dwFlags );
 }
 
 /* Sync Req Handler*/
@@ -357,10 +546,31 @@ gint32 CRegFsSvcLocal_SvrImpl::GetAttr(
     const std::string& strPath /*[ In ]*/,
     FileStat& oStat /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    struct stat stBuf;
+    gint32 ret = m_pRegFs->GetAttr(
+        strPath, stBuf ); 
+    if( ERROR( ret ) )
+        return ret;
+    oStat.st_dev = stBuf.st_dev;
+    oStat.st_ino = stBuf.st_ino;
+    oStat.st_mode = stBuf.st_mode;
+    oStat.st_nlink = stBuf.st_nlink;
+    oStat.st_uid = stBuf.st_uid;
+    oStat.st_gid = stBuf.st_gid;
+    oStat.st_rdev = stBuf.st_rdev;
+    oStat.st_size = stBuf.st_size;
+    oStat.st_blksize = stBuf.st_blksize;
+    oStat.st_blocks = stBuf.st_blocks;
+
+    oStat.st_atim.tv_sec = stBuf.st_atim.tv_sec;
+    oStat.st_atim.tv_nsec = stBuf.st_atim.tv_nsec;
+    oStat.st_mtim.tv_sec = stBuf.st_mtim.tv_sec;
+    oStat.st_mtim.tv_nsec = stBuf.st_mtim.tv_nsec;
+    oStat.st_ctim.tv_sec = stBuf.st_ctim.tv_sec;
+    oStat.st_ctim.tv_nsec = stBuf.st_ctim.tv_nsec;
+    return ret;
 }
 
 /* Sync Req Handler*/
@@ -368,10 +578,30 @@ gint32 CRegFsSvcLocal_SvrImpl::ReadDir(
     guint64 hDir /*[ In ]*/,
     std::vector<FileStat>& vecDirEnt /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    gint32 ret = 0;
+    std::vector< KEYPTR_SLOT > vecEnt;
+    ret = m_pRegFs->ReadDir( hDir, vecEnt );
+    if( ERROR( ret ) )
+        return ret;
+    vecDirEnt.resize( vecEnt.size() );
+    for( int i = 0; i < vecEnt.size(); i++ )
+    {
+        FileStat& st = vecDirEnt[ i ];
+        auto& elem = vecEnt[ i ];
+        st.st_ino = elem.oLeaf.dwInodeIdx;
+        if( elem.oLeaf.byFileType == ftRegular )
+            st.st_mode = S_IFREG;
+        else if( elem.oLeaf.byFileType == ftDirectory )
+            st.st_mode = S_IFDIR;
+        else if( elem.oLeaf.byFileType == ftLink )
+            st.st_mode = S_IFLNK;
+        guint32 dwLen = strnlen(
+            elem.szKey, sizeof( elem.szKey ) );
+        st.st_name.append( elem.szKey, dwLen );    
+    }
+    return ret;
 }
 
 /* Sync Req Handler*/
@@ -380,10 +610,15 @@ gint32 CRegFsSvcLocal_SvrImpl::OpenDir(
     guint32 dwFlags /*[ In ]*/,
     guint64& hDir /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here 
-    // return code can be an Error or
-    // STATUS_SUCCESS
-    return ERROR_NOT_IMPL;
+    if( m_pRegFs.IsEmpty() )
+        return -EFAULT;
+    RFHANDLE hFile = INVALID_HANDLE;
+    gint32 ret = m_pRegFs->OpenDir(
+        strPath, dwFlags, hFile );
+    if( ERROR( ret ) )
+        return ret;
+    hDir = hFile;
+    return ret;
 }
 
 /* Sync Req Handler*/

@@ -1314,4 +1314,25 @@ gint32 CRegistryFs::GetOpenFile(
     return ret;
 }
 
+gint32 CRegistryFs::GetSize(
+    RFHANDLE hFile, guint32 dwSize ) const
+{
+    gint32 ret = 0;
+    do{
+        FileSPtr pFile;
+        CStdRMutex oLock( GetExclLock() );
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr == m_mapOpenFiles.end() )
+        {
+            ret = -EBADF;
+            break;
+        }
+        pFile = itr->second;
+        oLock.Unlock();
+        FImgSPtr pImg = pFile->GetImage();
+        dwSize = pImg->GetSize();
+    }while( 0 );
+    return ret;
+}
+
 }

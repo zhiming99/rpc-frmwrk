@@ -22,9 +22,10 @@ struct FileStat
     uint32      st_blksize = 0;  /* Block size for filesystem I/O */
     uint32      st_blocks = 0;   /* Number of 512 B blocks allocated */
 
-    TimeSpec  st_atim;  /* Time of last access */
-    TimeSpec  st_mtim;  /* Time of last modification */
-    TimeSpec  st_ctim;  /* Time of last status change */
+    TimeSpec    st_atim;  /* Time of last access */
+    TimeSpec    st_mtim;  /* Time of last modification */
+    TimeSpec    st_ctim;  /* Time of last status change */
+    string      st_name = ""; /* file name */
 };
 
 // the inprocess version of interface for registry without

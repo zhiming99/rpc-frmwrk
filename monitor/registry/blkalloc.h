@@ -1709,6 +1709,9 @@ class CRegistryFs :
         LONGWORD dwParam2,
         LONGWORD* pData ) override
     { return -ENOTSUP; }
+
+    gint32 GetSize(
+        RFHANDLE hFile, guint32 dwSize ) const;
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

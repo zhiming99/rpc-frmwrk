@@ -84,6 +84,7 @@ struct FileStat
     TimeSpec st_atim;
     TimeSpec st_mtim;
     TimeSpec st_ctim;
+    std::string st_name = "";
     
     // Constructor
     FileStat() : super()

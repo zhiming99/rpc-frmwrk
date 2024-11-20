@@ -143,6 +143,10 @@ gint32 FileStat::Serialize( BufPtr& pBuf_ )
             pBuf_, st_ctim );
         if( ERROR( ret ) ) break;
         
+        ret = CSerialBase::Serialize(
+            pBuf_, st_name );
+        if( ERROR( ret ) ) break;
+        
     }while( 0 );
 
     return ret;
@@ -227,6 +231,11 @@ gint32 FileStat::Deserialize( BufPtr& pBuf_ )
             pBuf_, st_ctim );
         if( ERROR( ret ) ) break;
         
+        ret = CSerialBase::Deserialize(
+            pBuf_, st_name );
+        
+        if( ERROR( ret ) ) break;
+        
     }while( 0 );
 
     return ret;
@@ -254,6 +263,7 @@ FileStat& FileStat::operator=(
         st_atim = rhs.st_atim;
         st_mtim = rhs.st_mtim;
         st_ctim = rhs.st_ctim;
+        st_name = rhs.st_name;
         
     }while( 0 );
 
