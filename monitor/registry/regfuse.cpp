@@ -671,6 +671,7 @@ int _main( int argc, char** argv)
             Usage( "regfsmnt" );
             break;
         }
+        oParams.Push( g_bFormat );
         oParams.SetStrProp(
             propConfigPath, g_strRegFsFile );
         ret = g_pRegfs.NewObj(

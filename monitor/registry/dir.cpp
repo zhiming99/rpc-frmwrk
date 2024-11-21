@@ -2206,7 +2206,11 @@ gint32 CDirImage::CreateFile(
         ret = CreateFile(
             szName, ftRegular, pImg );
 
-        pImg->SetMode( dwMode );
+        guint32 dwActMode = pImg->GetMode();
+        dwMode &= 0777;
+        dwActMode &= ~0777;
+        dwActMode |= dwMode;
+        pImg->SetMode( dwActMode );
     }while( 0 );
     return ret;
 }

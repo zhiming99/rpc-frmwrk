@@ -422,6 +422,7 @@ gint32 CRegistryFs::CloseFileNoLock(
         if( ret != STATUS_MORE_PROCESS_NEEDED )
             break;
 
+        ret = 0;
         const stdstr& strPath = pFile->GetPath();
         FImgSPtr dirPtr;
         FImgSPtr pImg = pFile->GetImage();
