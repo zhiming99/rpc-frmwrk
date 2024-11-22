@@ -1899,7 +1899,7 @@ gint32 COpenFileEntry::Open(
             if( pac != nullptr )
             {
                 guint32 dwReq = 0;
-                dwFlags |= O_ACCMODE;
+                dwFlags &= ~O_ACCMODE;
                 if( dwFlags == O_RDONLY )
                     dwReq = R_OK;
                 else if( dwFlags = O_WRONLY )
