@@ -25,21 +25,21 @@ gint32 VarToJson( const Variant& oVar,
     case typeByte:
         {
             snprintf( buf, sizeof( buf ),
-                "%hhn", oVar.m_byVal );
+                "%d", oVar.m_byVal );
             oVal[ "v" ] = buf;
             break;
         }
     case typeUInt16:
         {
             snprintf( buf, sizeof( buf ),
-                "%hn", oVar.m_wVal );
+                "%d", oVar.m_wVal );
             oVal[ "v" ] = buf;
             break;
         }
     case typeUInt32:
         {
             snprintf( buf, sizeof( buf ),
-                "%ld", oVar.m_dwVal );
+                "%d", oVar.m_dwVal );
             oVal[ "v" ] = buf;
             break;
         }
