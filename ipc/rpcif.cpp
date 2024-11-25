@@ -4444,48 +4444,71 @@ gint32 CRpcServices::LoadObjDesc(
                 string& strMech = strVal;
                 oAuth.SetStrProp( propAuthMech, strVal );
                 if( strMech == "OAuth2" )
-                    break;
+                {
+                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_CLIENTID ) &&
+                        oObjAuth[ JSON_ATTR_OAUTH2_CLIENTID ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_CLIENTID ].asString();
+                        oAuth.SetStrProp( propClientId, strVal );
+                    }
 
-                if( oObjAuth.isMember( JSON_ATTR_SVCNAME ) &&
-                    oObjAuth[ JSON_ATTR_SVCNAME ].isString() )
-                {
-                    strVal = oObjAuth[ JSON_ATTR_SVCNAME ].asString();
-                    oAuth.SetStrProp( propServiceName, strVal );
-                }
+                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_REDIRECT ) &&
+                        oObjAuth[ JSON_ATTR_OAUTH2_REDIRECT ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_REDIRECT ].asString();
+                        oAuth.SetStrProp( propRedirectUrl, strVal );
+                    }
 
-                if( oObjAuth.isMember( JSON_ATTR_REALM ) &&
-                    oObjAuth[ JSON_ATTR_REALM ].isString() )
-                {
-                    strVal = oObjAuth[ JSON_ATTR_REALM ].asString();
-                    oAuth.SetStrProp( propRealm, strVal );
+                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_AUTHURL ) &&
+                        oObjAuth[ JSON_ATTR_OAUTH2_AUTHURL ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_AUTHURL ].asString();
+                        oAuth.SetStrProp( propAuthUrl, strVal );
+                    }
                 }
+                else
+                {    
+                    if( oObjAuth.isMember( JSON_ATTR_SVCNAME ) &&
+                        oObjAuth[ JSON_ATTR_SVCNAME ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_SVCNAME ].asString();
+                        oAuth.SetStrProp( propServiceName, strVal );
+                    }
 
-                strVal.clear();
-                if( oObjAuth.isMember( JSON_ATTR_SIGN_MSG ) &&
-                    oObjAuth[ JSON_ATTR_SIGN_MSG ].isString() )
-                {
-                    strVal = oObjAuth[ JSON_ATTR_SIGN_MSG ].asString();
-                    if( strVal.size() > 0 && strVal == "true" )
-                        oAuth.SetBoolProp( propSignMsg, true );
-                    else
-                        oAuth.SetBoolProp( propSignMsg, false );
-                }
+                    if( oObjAuth.isMember( JSON_ATTR_REALM ) &&
+                        oObjAuth[ JSON_ATTR_REALM ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_REALM ].asString();
+                        oAuth.SetStrProp( propRealm, strVal );
+                    }
 
-                strVal.clear();
-                if( oObjAuth.isMember( JSON_ATTR_USERNAME ) &&
-                    oObjAuth[ JSON_ATTR_USERNAME ].isString() )
-                {
-                    strVal = oObjAuth[ JSON_ATTR_USERNAME ].asString();
-                    if( strVal.size() > 0 )
-                        oAuth.SetStrProp( propUserName, strVal );
-                }
-                if( strVal.empty() && !bServer )
-                {
-                    char* szVal = getenv( "LOGNAME" );
-                    if( szVal != nullptr )
-                        strVal = szVal;
-                    if( strVal.size() > 0 )
-                        oAuth.SetStrProp( propUserName, strVal );
+                    strVal.clear();
+                    if( oObjAuth.isMember( JSON_ATTR_SIGN_MSG ) &&
+                        oObjAuth[ JSON_ATTR_SIGN_MSG ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_SIGN_MSG ].asString();
+                        if( strVal.size() > 0 && strVal == "true" )
+                            oAuth.SetBoolProp( propSignMsg, true );
+                        else
+                            oAuth.SetBoolProp( propSignMsg, false );
+                    }
+
+                    strVal.clear();
+                    if( oObjAuth.isMember( JSON_ATTR_USERNAME ) &&
+                        oObjAuth[ JSON_ATTR_USERNAME ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_USERNAME ].asString();
+                        if( strVal.size() > 0 )
+                            oAuth.SetStrProp( propUserName, strVal );
+                    }
+                    if( strVal.empty() && !bServer )
+                    {
+                        char* szVal = getenv( "LOGNAME" );
+                        if( szVal != nullptr )
+                            strVal = szVal;
+                        if( strVal.size() > 0 )
+                            oAuth.SetStrProp( propUserName, strVal );
+                    }
                 }
                 break;
             }

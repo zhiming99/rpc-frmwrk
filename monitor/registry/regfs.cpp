@@ -1139,6 +1139,8 @@ gint32 CRegistryFs::Access(
         FImgSPtr dirPtr;
         if( strPath == "/" )
         {
+            if( dwFlags == F_OK )
+                break;
             READ_LOCK( m_pRootImg );
             ret = m_pRootImg->CheckAccess(
                 dwFlags, pac );
@@ -1161,6 +1163,8 @@ gint32 CRegistryFs::Access(
             ret = -ENOENT;
             break;
         }
+        if( dwFlags == F_OK )
+            break;
         {
             READ_LOCK( pFile );
             ret = pFile->CheckAccess(

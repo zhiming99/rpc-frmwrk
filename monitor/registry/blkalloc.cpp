@@ -673,6 +673,11 @@ CBlockAllocator::CBlockAllocator(
         m_iFd = ret;
         m_pSuperBlock.reset(
             new CSuperBlock( this ) );
+        if( bFormat )
+        {
+            Variant oVar( bFormat );
+            this->SetProperty( 0, oVar );
+        }
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -1257,6 +1262,22 @@ gint32 CBlockAllocator::Reload()
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
+        bool bFormat = false;
+        Variant oVar;
+        ret = this->GetProperty( 0, oVar );
+        if( SUCCEEDED( ret ) )
+            bFormat = oVar;
+
+        ret = 0;
+        if( bFormat )
+        {
+            ret = this->Format();
+            if( ERROR( ret ) )
+                break;
+            ret = this->Flush();
+            break;
+        }
+
         ret = this->m_pSuperBlock->Reload();
         if( ERROR( ret ) )
             break;
