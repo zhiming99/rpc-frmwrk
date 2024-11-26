@@ -1619,7 +1619,7 @@ class ConfigDlg(Gtk.Dialog):
                 button.props.active = True
                 return
         elif name == 'Auth' :
-            if 'mechCombo' not in self:
+            if not hasattr( self, "mechCombo" ):
                 return
             it = self.mechCombo.get_active_iter()
             if it is not None:
@@ -2539,6 +2539,9 @@ EOF
         if not bActive :
             self.oa2cEdit.set_sensitive( False )
             self.oa2cpEdit.set_sensitive( False )
+            self.authUrlEdit.set_sensitive( False )
+            self.clientIdEdit.set_sensitive( False )
+            self.redirUrlEdit.set_sensitive( False )
 
             it = self.mechCombo.get_active_iter()
             if it is not None:
@@ -2547,13 +2550,27 @@ EOF
                 if name == 'Kerberos':
                     self.labelSvc.set_text("Service Name: ")
                     self.labelRealm.set_text( "Realm: ")
+                    self.labelSign.set_text("Sign/Encrypt: ")
+                    self.labelUser.set_text("User Name: ")
+                    self.labelKdc.set_text("KDC Address: ")
+
                     self.labelOa2c.set_text("")
                     self.labelOa2cp.set_text("")
+                    self.labelAuthUrl.set_text("")
+                    self.labelClientId.set_text("")
+                    self.labelRedirUrl.set_text("")
                 elif name == 'OAuth2':
                     self.labelSvc.set_text("")
                     self.labelRealm.set_text("")
+                    self.labelSign.set_text("")
+                    self.labelUser.set_text("")
+                    self.labelKdc.set_text("")
+
                     self.labelOa2c.set_text("Checker IP: ")
                     self.labelOa2cp.set_text("Checker Port: ")
+                    self.labelAuthUrl.set_text("Auth URL")
+                    self.labelClientId.set_text("Client ID")
+                    self.labelRedirUrl.set_text("Redirect URL")
             return
 
         if bKrb5:
@@ -2561,36 +2578,97 @@ EOF
             self.labelOa2cp.set_text("")
             self.oa2cEdit.set_sensitive( False )
             self.oa2cpEdit.set_sensitive( False )
+            self.authUrlEdit.set_sensitive( False )
+            self.clientIdEdit.set_sensitive( False )
+            self.redirUrlEdit.set_sensitive( False )
             grid.remove( self.oa2cEdit )
             grid.remove( self.oa2cpEdit )
+            grid.remove( self.authUrlEdit )
+            grid.remove( self.clientIdEdit )
+            grid.remove( self.redirUrlEdit )
+
+            self.labelOa2c.set_text("")
+            self.labelOa2cp.set_text("")
+            self.labelAuthUrl.set_text("")
+            self.labelClientId.set_text("")
+            self.labelRedirUrl.set_text("")
+
             grid.attach( self.svcEdit,
                 self.svcEdit.cpos, self.svcEdit.rpos, 2, 1 )
             grid.attach( self.realmEdit,
                 self.realmEdit.cpos, self.realmEdit.rpos, 2, 1 )
+            grid.attach( self.signCombo,
+                self.signCombo.cpos, self.signCombo.rpos, 1, 1 )
+            grid.attach( self.kdcEdit,
+                self.kdcEdit.cpos, self.kdcEdit.rpos, 2, 1 )
+            grid.attach( self.userEdit,
+                self.userEdit.cpos, self.userEdit.rpos, 2, 1 )
+        
             self.svcEdit.show()
             self.realmEdit.show()
+            self.signCombo.show()
+            self.kdcEdit.show()
+            self.userEdit.show()
             self.svcEdit.set_sensitive( True )
             self.realmEdit.set_sensitive( True )
+            self.kdcEdit.set_sensitive( True )
+            self.userEdit.set_sensitive( True )
+            self.signCombo.set_sensitive( True )
+
             self.labelSvc.set_text("Service Name: ")
             self.labelRealm.set_text( "Realm: ")
+            self.labelSign.set_text("Sign/Encrypt: ")
+            self.labelUser.set_text("User Name: ")
+            self.labelKdc.set_text("KDC Address: ")
         else:
             self.labelSvc.set_text("")
             self.labelRealm.set_text("")
             self.svcEdit.set_sensitive( False )
             self.realmEdit.set_sensitive( False )
+            self.kdcEdit.set_sensitive( False )
+            self.signCombo.set_sensitive( False )
+            self.userEdit.set_sensitive( False )
+
             grid.remove( self.svcEdit )
             grid.remove( self.realmEdit )
+            grid.remove( self.signCombo )
+            grid.remove( self.userEdit )
+            grid.remove( self.kdcEdit )
+
+            self.labelSvc.set_text("")
+            self.labelRealm.set_text("")
+            self.labelSign.set_text("")
+            self.labelUser.set_text("")
+            self.labelKdc.set_text("")
+
             grid.attach( self.oa2cEdit,
                 self.oa2cEdit.cpos, self.oa2cEdit.rpos, 2, 1 )
             grid.attach( self.oa2cpEdit,
                 self.oa2cpEdit.cpos, self.oa2cpEdit.rpos, 2, 1 )
+            grid.attach( self.authUrlEdit,
+                self.authUrlEdit.cpos, self.authUrlEdit.rpos, 2, 1 )
+            grid.attach( self.clientIdEdit,
+                self.clientIdEdit.cpos, self.clientIdEdit.rpos, 2, 1 )
+            grid.attach( self.redirUrlEdit,
+                self.redirUrlEdit.cpos, self.redirUrlEdit.rpos, 2, 1 )
+
             self.oa2cEdit.show()
             self.oa2cpEdit.show()
+            self.authUrlEdit.show()
+            self.clientIdEdit.show()
+            self.redirUrlEdit.show()
+
             self.oa2cEdit.set_sensitive( True )
             self.oa2cpEdit.set_sensitive( True )
+            self.authUrlEdit.set_sensitive( True )
+            self.clientIdEdit.set_sensitive( True )
+            self.redirUrlEdit.set_sensitive( True )
+
             self.labelOa2c.set_text("Checker IP: ")
             self.labelOa2cp.set_text("Checker Port: ")
-
+            self.labelAuthUrl.set_text("Auth URL")
+            self.labelClientId.set_text("Client ID")
+            self.labelRedirUrl.set_text("Redirect URL")
 
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
@@ -2615,6 +2693,7 @@ EOF
         mechList.append([1, "Kerberos"] )
         mechList.append( [2, "OAuth2"] )
     
+        # ComboBox for Auth Mechanism
         strMech = "krb5"
         if authInfo is not None and "AuthMech" in authInfo :
             strMech = authInfo[ "AuthMech" ]
@@ -2629,7 +2708,7 @@ EOF
         mechCombo.connect('changed', self.on_selection_changed )
         grid.attach(mechCombo, startCol + 1, startRow + 1, 1, 1 )
 
-
+        # krb5 service name
         labelSvc = Gtk.Label()
         labelSvc.set_text("Service Name: ")
         labelSvc.set_xalign(.5)
@@ -2644,10 +2723,10 @@ EOF
         svcEditBox.set_tooltip_text( "Host-based service name in " + \
             "the form 'service@hostname'" )
         grid.attach(svcEditBox, startCol + 1, startRow + 2, 2, 1 )
-        #svcEditBox.set_no_show_all( True )
         svcEditBox.cpos = startCol + 1
         svcEditBox.rpos = startRow + 2
 
+        # OAuth2 Checker IP addr, leave empty to use local IPC
         labelOa2c = Gtk.Label()
         labelOa2c.set_text("OAuth2 Checker IP: ")
         labelOa2c.set_xalign(.5)
@@ -2662,10 +2741,10 @@ EOF
         oa2cEditBox.set_tooltip_text( "OAuth2 Checker IP " + \
             "address. Assumes local when empty" )
         grid.attach(oa2cEditBox, startCol + 1, startRow + 2, 2, 1 )
-        #oa2cEditBox.set_no_show_all( True )
         oa2cEditBox.cpos = startCol + 1
         oa2cEditBox.rpos = startRow + 2
 
+        # krb5 realm
         labelRealm = Gtk.Label()
         labelRealm.set_text("Realm: ")
         labelRealm.set_xalign(.5)
@@ -2681,6 +2760,7 @@ EOF
         realmEditBox.cpos = startCol + 1
         realmEditBox.rpos = startRow + 3
 
+        # OAuth2 oa2check ip addr
         labelOa2cp = Gtk.Label()
         labelOa2cp.set_text("Port Number: ")
         labelOa2cp.set_xalign(.5)
@@ -2697,6 +2777,7 @@ EOF
         oa2cpEditBox.cpos = startCol + 1
         oa2cpEditBox.rpos = startRow + 3
 
+        # krb5 sign/encrypt message
         labelSign = Gtk.Label()
         labelSign.set_text("Sign/Encrypt: ")
         labelSign.set_xalign(.5)
@@ -2719,7 +2800,30 @@ EOF
         signCombo.set_active(idx)
 
         grid.attach( signCombo, startCol + 1, startRow + 4, 1, 1 )
+        signCombo.cpos = startCol + 1
+        signCombo.rpos = startRow + 4
 
+        # OAuth2 authUrl
+        labelAuthUrl = Gtk.Label()
+        labelAuthUrl.set_text("Auth URL: ")
+        labelAuthUrl.set_xalign(.5)
+        grid.attach(labelAuthUrl, startCol + 0, startRow + 4, 1, 1 )
+        labelAuthUrl.cpos = startCol
+        labelAuthUrl.rpos = startRow + 4
+
+        strAuthUrl = ""
+        try:
+            strAuthUrl = authInfo[ 'AuthUrl']
+        except Exception as err :
+            pass
+
+        authUrlEditBox = Gtk.Entry()
+        authUrlEditBox.set_text(strAuthUrl)
+        grid.attach(authUrlEditBox, startCol + 1, startRow + 4, 2, 1 )
+        authUrlEditBox.cpos = startCol + 1
+        authUrlEditBox.rpos = startRow + 4
+
+        # krb5 kdc ip address
         labelKdc = Gtk.Label()
         labelKdc.set_text("KDC Address: ")
         labelKdc.set_xalign(.5)
@@ -2727,15 +2831,37 @@ EOF
 
         strKdcIp = ""
         try:
-            if 'kdcAddr' in confVals :
-                strKdcIp = confVals[ 'kdcAddr']
+            strKdcIp = authInfo[ 'kdcAddr']
         except Exception as err :
             pass
 
         kdcEditBox = Gtk.Entry()
         kdcEditBox.set_text(strKdcIp)
         grid.attach(kdcEditBox, startCol + 1, startRow + 5, 2, 1 )
+        kdcEditBox.cpos = startCol + 1
+        kdcEditBox.rpos = startRow + 5
 
+        # OAuth2 ClientId
+        labelClientId = Gtk.Label()
+        labelClientId.set_text("Client ID: ")
+        labelClientId.set_xalign(.5)
+        grid.attach(labelClientId, startCol + 0, startRow + 5, 1, 1 )
+        labelClientId.cpos = startCol
+        labelClientId.rpos = startRow + 5
+
+        strClientId = ""
+        try:
+            strClientId = authInfo[ 'ClientId']
+        except Exception as err :
+            pass
+
+        clientIdEditBox = Gtk.Entry()
+        clientIdEditBox.set_text(strClientId)
+        grid.attach(clientIdEditBox, startCol + 1, startRow + 5, 2, 1 )
+        clientIdEditBox.cpos = startCol + 1
+        clientIdEditBox.rpos = startRow + 5
+
+        # krb5 user name
         labelUser = Gtk.Label()
         labelUser.set_text("User Name: ")
         labelUser.set_xalign(.5)
@@ -2743,7 +2869,6 @@ EOF
 
         strUser = ""
         try:
-            authInfo = confVals[ 'AuthInfo']
             strUser = authInfo[ 'UserName']
         except Exception as err :
             pass
@@ -2751,7 +2876,30 @@ EOF
         userEditBox = Gtk.Entry()
         userEditBox.set_text(strUser)
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
+        userEditBox.cpos = startCol + 1
+        userEditBox.rpos = startRow + 6
 
+        # OAuth2 Redirect Url
+        labelRedirUrl = Gtk.Label()
+        labelRedirUrl.set_text("Redirect URL: ")
+        labelRedirUrl.set_xalign(.5)
+        grid.attach(labelRedirUrl, startCol + 0, startRow + 6, 1, 1 )
+        labelRedirUrl.cpos = startCol
+        labelRedirUrl.rpos = startRow + 6
+
+        strRedirUrl = ""
+        try:
+            strRedirUrl = authInfo[ 'RedirectUrl']
+        except Exception as err :
+            pass
+
+        redirUrlEditBox = Gtk.Entry()
+        redirUrlEditBox.set_text(strRedirUrl)
+        grid.attach(redirUrlEditBox, startCol + 1, startRow + 6, 2, 1 )
+        redirUrlEditBox.cpos = startCol + 1
+        redirUrlEditBox.rpos = startRow + 6
+
+        # krb5 Disable/Enable KProxy
         if IsKinitProxyEnabled():
             btnText = "Disable KProxy"
         else:
@@ -2796,18 +2944,29 @@ EOF
             checkNoUpdRpc.set_tooltip_text( toolTip3 )
             self.checkNoUpdRpc = checkNoUpdRpc
 
+        self.mechCombo = mechCombo
+
         self.svcEdit = svcEditBox
         self.labelSvc = labelSvc
-        self.oa2cEdit = oa2cEditBox
-        self.labelOa2c = labelOa2c
         self.realmEdit = realmEditBox
         self.labelRealm = labelRealm
         self.signCombo = signCombo
+        self.labelSign = labelSign
         self.kdcEdit = kdcEditBox
+        self.labelKdc = labelKdc
         self.userEdit = userEditBox
-        self.mechCombo = mechCombo
-        self.labelOa2cp = labelOa2cp
+        self.labelUser = labelUser
+
+        self.oa2cEdit = oa2cEditBox
+        self.labelOa2c = labelOa2c
         self.oa2cpEdit = oa2cpEditBox
+        self.labelOa2cp = labelOa2cp
+        self.authUrlEdit = authUrlEditBox
+        self.labelAuthUrl = labelAuthUrl
+        self.clientIdEdit = clientIdEditBox
+        self.labelClientId = labelClientId
+        self.redirUrlEdit = redirUrlEditBox
+        self.labelRedirUrl = labelRedirUrl
 
     def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelMisc = Gtk.Label()
@@ -3281,6 +3440,15 @@ EOF
                         authInfo[ 'OA2ChkPort'] = "4132"
                     else:
                         authInfo[ 'OA2ChkPort'] = strPort
+                strAuthUrl = self.authUrlEdit.get_text()
+                if len( strAuthUrl ):
+                    authInfo[ 'AuthUrl' ] = strAuthUrl
+                strClientId = self.clientIdEdit.get_text()
+                if len( strClientId ):
+                    authInfo[ 'ClientId' ] = strClientId
+                strRedirUrl = self.redirUrlEdit.get_text()
+                if len( strRedirUrl ):
+                    authInfo[ 'RedirectUrl' ] = strRedirUrl
             elif self.IsAuthChecked():
                 raise Exception( "unsupported auth mech")
 
