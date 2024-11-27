@@ -183,6 +183,8 @@ CRegFsSvcLocal_SvrImpl::CRegFsSvcLocal_SvrImpl(
         if( ERROR( ret ) )
             break;
 
+        oParams.CopyProp( 0, pCfg );
+
         oParams.SetPointer(
             propIoMgr, this->GetIoMgr() );
         ret = m_pRegFs.NewObj(

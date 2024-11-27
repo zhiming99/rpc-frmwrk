@@ -360,16 +360,11 @@ gint32 CFileImage::Flush( guint32 dwFlags )
                 htonl( m_oInodeStore.m_ctime.tv_sec );
             pInode->m_ctime.tv_nsec =
                 htonl( m_oInodeStore.m_ctime.tv_nsec );
-            // time of last access.
-            timespec oAccTime;
-            clock_gettime(
-                CLOCK_REALTIME, &oAccTime );
 
-            m_oInodeStore.m_atime.tv_sec =
-                htonl( oAccTime.tv_sec );
-
-            pInode->m_ctime.tv_nsec =
-                htonl( oAccTime.tv_nsec );
+            pInode->m_atime.tv_sec =
+                htonl( m_oInodeStore.m_atime.tv_sec );
+            pInode->m_atime.tv_nsec =
+                htonl( m_oInodeStore.m_atime.tv_nsec );
 
             // file type
             pInode->m_dwMode =
@@ -949,6 +944,7 @@ gint32 CFileImage::ReadFile(
                 break;
             memcpy( pCur, arrBytes, dwTail );
         }
+        UpdateAtime();
 
     }while( 0 );
     return ret;
@@ -963,6 +959,9 @@ gint32 CFileImage::WriteFile(
         WRITE_LOCK( this );
         ret = WriteFileNoLock(
             dwOff, dwSize, pBuf );
+
+        UpdateMtime();
+
     }while( 0 );
     return ret;
 }
@@ -1114,11 +1113,6 @@ gint32 CFileImage::WriteFileNoLock(
 
         if( dwSize + dwOff > GetSize() )
             SetSize( dwSize + dwOff );
-
-        timespec mtime;
-        clock_gettime( CLOCK_REALTIME, &mtime );
-        m_oInodeStore.m_mtime = mtime;
-        m_oInodeStore.m_ctime = mtime;
 
     }while( 0 );
     return ret;
@@ -1464,12 +1458,11 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
             ret = TruncBlkDirect( dwTruncIdx );
         }
         SetSize( dwOff );
-        timespec mtime;
-        clock_gettime( CLOCK_REALTIME, &mtime );
-        m_oInodeStore.m_mtime = mtime;
-        m_oInodeStore.m_ctime = mtime;
 
     }while( 0 );
+    if( SUCCEEDED( ret ) )
+        UpdateMtime();
+
     return ret;
 }
 
@@ -1507,6 +1500,7 @@ gint32 CFileImage::WriteValue(
     do{
         WRITE_LOCK( this );
         m_oValue = oVar;
+        UpdateMtime();
     }while( 0 );
     return ret;
 }
@@ -1517,6 +1511,7 @@ void CFileImage::SetGid( gid_t wGid )
     do{
         WRITE_LOCK( this );
         m_oInodeStore.m_wgid = ( guint16 )wGid;
+        UpdateCtime();
     }while( 0 );
 }
 
@@ -1526,6 +1521,7 @@ void CFileImage::SetUid( uid_t wUid )
     do{
         WRITE_LOCK( this );
         m_oInodeStore.m_wuid = ( guint16 )wUid;
+        UpdateCtime();
     }while( 0 );
 }
 
@@ -1536,6 +1532,7 @@ void CFileImage::SetMode( mode_t dwMode )
         WRITE_LOCK( this );
         m_oInodeStore.m_dwMode =
             ( guint32 )dwMode;
+        UpdateCtime();
     }while( 0 );
     return;
 }
@@ -1759,6 +1756,7 @@ gint32 CLinkImage::ReadLink(
     strncpy( ( char* )buf,
         m_strLink.c_str(), dwBytes );
     dwSize = dwBytes;
+    UpdateAtime();
     return 0;
 }
 
@@ -1776,6 +1774,7 @@ gint32 CLinkImage::WriteFile(
         ret = 0;
         auto szLink = ( const char* )pBuf;
         m_strLink = stdstr( szLink, dwSize );
+        UpdateMtime();
     }while( 0 );
     return ret;
 }

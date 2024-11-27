@@ -2034,6 +2034,7 @@ gint32 CDirImage::Search( const char* szKey,
             szKey, pFile, pNode );
         if( ret == ERROR_FALSE )
             ret = -ENOENT;
+        UpdateAtime();
     }while( 0 );
     return ret;
 }
@@ -2206,6 +2207,8 @@ gint32 CDirImage::CreateFile(
         ret = CreateFile(
             szName, ftRegular, pImg );
 
+        UpdateMtime();
+
         guint32 dwActMode = pImg->GetMode();
         dwMode &= 0777;
         dwActMode &= ~0777;
@@ -2216,7 +2219,7 @@ gint32 CDirImage::CreateFile(
 }
 
 gint32 CDirImage::ListDir(
-    std::vector< KEYPTR_SLOT >& vecDirEnt ) const
+    std::vector< KEYPTR_SLOT >& vecDirEnt )
 {
     bool bRet = false;
     gint32 ret = 0;
@@ -2246,6 +2249,7 @@ gint32 CDirImage::ListDir(
                 dwBNodeIdx );
         }
 
+        UpdateAtime();
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -2261,6 +2265,7 @@ gint32 CDirImage::CreateDir( const char* szName,
     do{
         CreateFile( szName, ftDirectory, pImg );
         pImg->SetMode( S_IFDIR | dwMode );
+        UpdateMtime();
     }while( 0 );
     return ret;
 }
@@ -2276,6 +2281,7 @@ gint32 CDirImage::CreateLink( const char* szName,
         if( ERROR( ret ) )
             break;
 
+        UpdateMtime();
         guint32 dwSize = strlen( szLink );
         ret = pImg->WriteFile(
             0, dwSize, ( guint8* )szLink );
@@ -2322,6 +2328,7 @@ gint32 CDirImage::RemoveFile(
         if( ERROR( ret ) )
             break;
         ret = pFile->FreeBlocks();
+        UpdateMtime();
 
     }while( 0 );
     return ret;
@@ -2422,6 +2429,7 @@ gint32 CDirImage::Rename(
             break;
         ret = m_pRootNode->AddFileDirect(
             oKey.oLeaf.dwInodeIdx, pFile );
+        UpdateMtime();
     }while( 0 );
     return ret;
 }
@@ -2461,7 +2469,7 @@ gint32 CDirImage::PrintBNodeNoLock()
 #endif
 
 gint32  CDirFileEntry::ListDir(
-    std::vector< KEYPTR_SLOT >& vecDirEnt ) const
+    std::vector< KEYPTR_SLOT >& vecDirEnt )
 {   
     gint32 ret = 0;
     do{

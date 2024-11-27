@@ -2525,6 +2525,7 @@ EOF
         self.kdcEdit.set_sensitive( bSensitive )
         self.userEdit.set_sensitive( bSensitive )
         self.btnEnaKProxy.set_sensitive( bSensitive )
+
         if self.bServer:
             self.updKrb5Btn.set_sensitive( bSensitive )
             self.initKrb5Btn.set_sensitive( bSensitive )
@@ -2542,6 +2543,7 @@ EOF
             self.authUrlEdit.set_sensitive( False )
             self.clientIdEdit.set_sensitive( False )
             self.redirUrlEdit.set_sensitive( False )
+            self.scopeEdit.set_sensitive( False )
 
             it = self.mechCombo.get_active_iter()
             if it is not None:
@@ -2559,6 +2561,7 @@ EOF
                     self.labelAuthUrl.set_text("")
                     self.labelClientId.set_text("")
                     self.labelRedirUrl.set_text("")
+                    self.labelScope.set_text("")
                 elif name == 'OAuth2':
                     self.labelSvc.set_text("")
                     self.labelRealm.set_text("")
@@ -2568,9 +2571,10 @@ EOF
 
                     self.labelOa2c.set_text("Checker IP: ")
                     self.labelOa2cp.set_text("Checker Port: ")
-                    self.labelAuthUrl.set_text("Auth URL")
-                    self.labelClientId.set_text("Client ID")
-                    self.labelRedirUrl.set_text("Redirect URL")
+                    self.labelAuthUrl.set_text("Auth URL: ")
+                    self.labelClientId.set_text("Client ID: ")
+                    self.labelRedirUrl.set_text("Redirect URL: ")
+                    self.labelScope.set_text("Scope: ")
             return
 
         if bKrb5:
@@ -2581,17 +2585,21 @@ EOF
             self.authUrlEdit.set_sensitive( False )
             self.clientIdEdit.set_sensitive( False )
             self.redirUrlEdit.set_sensitive( False )
+            self.scopeEdit.set_sensitive( False )
+
             grid.remove( self.oa2cEdit )
             grid.remove( self.oa2cpEdit )
             grid.remove( self.authUrlEdit )
             grid.remove( self.clientIdEdit )
             grid.remove( self.redirUrlEdit )
+            grid.remove( self.scopeEdit )
 
             self.labelOa2c.set_text("")
             self.labelOa2cp.set_text("")
             self.labelAuthUrl.set_text("")
             self.labelClientId.set_text("")
             self.labelRedirUrl.set_text("")
+            self.labelScope.set_text("")
 
             grid.attach( self.svcEdit,
                 self.svcEdit.cpos, self.svcEdit.rpos, 2, 1 )
@@ -2603,17 +2611,23 @@ EOF
                 self.kdcEdit.cpos, self.kdcEdit.rpos, 2, 1 )
             grid.attach( self.userEdit,
                 self.userEdit.cpos, self.userEdit.rpos, 2, 1 )
+            grid.attach( self.btnEnaKProxy,
+                self.btnEnaKProxy.cpos, self.btnEnaKProxy.rpos, 2, 1 )
         
             self.svcEdit.show()
             self.realmEdit.show()
             self.signCombo.show()
             self.kdcEdit.show()
             self.userEdit.show()
+            self.btnEnaKProxy.show()
+
             self.svcEdit.set_sensitive( True )
             self.realmEdit.set_sensitive( True )
             self.kdcEdit.set_sensitive( True )
             self.userEdit.set_sensitive( True )
             self.signCombo.set_sensitive( True )
+            self.btnEnaKProxy.set_sensitive(True)
+            self.svcEdit.set_sensitive( True )
 
             self.labelSvc.set_text("Service Name: ")
             self.labelRealm.set_text( "Realm: ")
@@ -2628,12 +2642,14 @@ EOF
             self.kdcEdit.set_sensitive( False )
             self.signCombo.set_sensitive( False )
             self.userEdit.set_sensitive( False )
+            self.btnEnaKProxy.set_sensitive( False )
 
             grid.remove( self.svcEdit )
             grid.remove( self.realmEdit )
             grid.remove( self.signCombo )
             grid.remove( self.userEdit )
             grid.remove( self.kdcEdit )
+            grid.remove( self.btnEnaKProxy )
 
             self.labelSvc.set_text("")
             self.labelRealm.set_text("")
@@ -2651,24 +2667,29 @@ EOF
                 self.clientIdEdit.cpos, self.clientIdEdit.rpos, 2, 1 )
             grid.attach( self.redirUrlEdit,
                 self.redirUrlEdit.cpos, self.redirUrlEdit.rpos, 2, 1 )
+            grid.attach( self.scopeEdit,
+                self.scopeEdit.cpos, self.scopeEdit.rpos, 2, 1 )
 
             self.oa2cEdit.show()
             self.oa2cpEdit.show()
             self.authUrlEdit.show()
             self.clientIdEdit.show()
             self.redirUrlEdit.show()
+            self.scopeEdit.show()
 
             self.oa2cEdit.set_sensitive( True )
             self.oa2cpEdit.set_sensitive( True )
             self.authUrlEdit.set_sensitive( True )
             self.clientIdEdit.set_sensitive( True )
             self.redirUrlEdit.set_sensitive( True )
+            self.scopeEdit.set_sensitive( True )
 
             self.labelOa2c.set_text("Checker IP: ")
             self.labelOa2cp.set_text("Checker Port: ")
-            self.labelAuthUrl.set_text("Auth URL")
-            self.labelClientId.set_text("Client ID")
-            self.labelRedirUrl.set_text("Redirect URL")
+            self.labelAuthUrl.set_text("Auth URL: ")
+            self.labelClientId.set_text("Client ID: ")
+            self.labelRedirUrl.set_text("Redirect URL: ")
+            self.labelScope.set_text("Scope: ")
 
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
@@ -2909,6 +2930,28 @@ EOF
         btnEnaKProxy.set_tooltip_text( "Enable/Disable kinit proxy on this host" )
         grid.attach( btnEnaKProxy , startCol + 1, startRow + 7, 2, 1 )
         self.btnEnaKProxy = btnEnaKProxy
+        btnEnaKProxy.cpos = startCol + 1
+        btnEnaKProxy.rpos = startRow + 7
+
+        # OAuth2 Scope
+        labelScope = Gtk.Label()
+        labelScope.set_text("Auth URL: ")
+        labelScope.set_xalign(.5)
+        grid.attach(labelScope, startCol + 0, startRow + 7, 1, 1 )
+        labelScope.cpos = startCol
+        labelScope.rpos = startRow + 7
+
+        strScope = ""
+        try:
+            strScope = authInfo[ 'Scope']
+        except Exception as err :
+            pass
+
+        scopeEditBox = Gtk.Entry()
+        scopeEditBox.set_text(strScope)
+        grid.attach(scopeEditBox, startCol + 1, startRow + 7, 2, 1 )
+        scopeEditBox.cpos = startCol + 1
+        scopeEditBox.rpos = startRow + 7
 
         if self.bServer:
 
@@ -2967,6 +3010,8 @@ EOF
         self.labelClientId = labelClientId
         self.redirUrlEdit = redirUrlEditBox
         self.labelRedirUrl = labelRedirUrl
+        self.scopeEdit = scopeEditBox
+        self.labelScope = labelScope
 
     def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelMisc = Gtk.Label()
@@ -3449,6 +3494,9 @@ EOF
                 strRedirUrl = self.redirUrlEdit.get_text()
                 if len( strRedirUrl ):
                     authInfo[ 'RedirectUrl' ] = strRedirUrl
+                strScope = self.scopeEdit.get_text()
+                if len( strScope ):
+                    authInfo[ 'Scope' ] = strScope
             elif self.IsAuthChecked():
                 raise Exception( "unsupported auth mech")
 

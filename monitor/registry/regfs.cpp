@@ -43,6 +43,12 @@ CRegistryFs::CRegistryFs(
         if( ERROR( ret ) )
             break;
 
+        Variant oVar;
+        ret = pCfg->GetProperty( 0, oVar );
+        if( SUCCEEDED( ret ) )
+            m_bFormat = oVar;
+        ret = 0;
+
     }while( 0 );
     if( ERROR( ret ) )
     {
@@ -168,7 +174,10 @@ gint32 CRegistryFs::Start()
     gint32 ret = 0;
     do{
         WRITE_LOCK( this );
-        ret = Reload();
+        if( unlikely( m_bFormat ) )
+            ret = Format();
+        else
+            ret = Reload();
         if( ERROR( ret ) )
             break;
         SetState( stateStarted );
