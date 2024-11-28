@@ -1731,9 +1731,8 @@ gint32 CBPlusNode::RemoveFile(
                     }
                 }
 
-                bool bBusy = false;
                 {
-                    READ_LOCK( pFile );
+                    // READ_LOCK( pFile );
                     CStdRMutex oLock(
                         pFile->GetExclLock() );
                     if( pFile->GetOpenCount() )
@@ -1742,7 +1741,6 @@ gint32 CBPlusNode::RemoveFile(
                             "the file is still "
                             "being used" );
                         pFile->SetState( stateStopping );
-                        bBusy = true;
                     }
                     else if( pFile->IsStopped() ||
                         pFile->IsStopping() )
@@ -1771,8 +1769,6 @@ gint32 CBPlusNode::RemoveFile(
                     if( ERROR( ret ) )
                         break;
                 }
-                if( bBusy )
-                    ret = -EBUSY;
                 break;
             }
             KEYPTR_SLOT* pChildKs =
@@ -2413,6 +2409,7 @@ gint32 CDirImage::Rename(
     gint32 ret = 0;
     do{
         FImgSPtr pFile;
+        FImgSPtr pDstFile;
         WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szFrom, pFile );
@@ -2425,11 +2422,24 @@ gint32 CDirImage::Rename(
             pFile->GetInodeIdx();
         oKey.oLeaf.byFileType = pFile->GetType();
         ret = m_pRootNode->Insert( &oKey );
+        if( ERROR( ret ) && ret != -EEXIST )
+            break;
+        else if( ret == -EEXIST )
+        {
+            ret = m_pRootNode->RemoveFile(
+                szTo, pDstFile );
+            if( ERROR( ret ) )
+                break;
+            pDstFile->FreeBlocks();
+        }
+        ret = m_pRootNode->Insert( &oKey );
         if( ERROR( ret ) )
             break;
         ret = m_pRootNode->AddFileDirect(
             oKey.oLeaf.dwInodeIdx, pFile );
         UpdateMtime();
+        if( SUCCEEDED( ret ) )
+            pFile->SetState( stateStarted );
     }while( 0 );
     return ret;
 }

@@ -1113,6 +1113,17 @@ gint32 CRegistryFs::Rename(
             break;
         ret = pDstDir->InsertFile(
             strDstFile.c_str(), pDstFile );
+        if( SUCCEEDED( ret ) )
+            break;
+        if( ERROR( ret ) && ret != -EEXIST )
+            break;
+        ret = pDstDir->RemoveFile(
+            strDstFile.c_str() );
+        if( ERROR( ret ) )
+            break;
+        pDstFile->SetState( stateStarted );
+        ret = pDstDir->InsertFile(
+            strDstFile.c_str(), pDstFile );
 
     }while( 0 );
     return ret;
