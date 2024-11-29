@@ -260,8 +260,7 @@ def MainEntryCli() :
             return ret
         
         print( "start to work here..." )
-        strPath_ = os.path.dirname( os.path.realpath( __file__) )
-        strPath_ += '/RegistryFsdesc.json'
+        strPath_ = './oinitdesc.json'
 
         # start a cpp server
         oCfg = cpp.CParamList()
