@@ -4,13 +4,11 @@ all:
 bindir=${PWD}/usr/bin/rpcf
 etcdir=${PWD}/etc/rpcf
 install:
-	ls -R
 	if [ ! -d ${bindir} ];then mkdir -p ${bindir};fi
 	install -m 0644 dist/oinit-*.whl ${bindir}
 	if [ ! -d ${etcdir} ];then mkdir -p ${etcdir};fi
-	install -m 0644 oinitdesc.json ${etcdir}
+	install -m 0644 oinit/oinitdesc.json ${etcdir}
 
 distclean:
-	ls -R ${bindir}
 	rm ${bindir}/* || true
 	rm ${etcdir}/* || true
