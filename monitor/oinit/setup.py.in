@@ -12,7 +12,8 @@ kwargs = {
       'url':'@PACKAGE_URL@',
       'license':'GPL-3.0',
       'include_package_data' : True,
-      'zip_safe' : False  
+      'zip_safe' : False,
+      'package_data':{'oinit': ['oinitdesc.json','README.md', 'README_cn.md']}
 }
 
 setup(**kwargs)

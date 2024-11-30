@@ -1,0 +1,15 @@
+#!/bin/bash
+nodev=""
+norpcf=""
+if [ ! -f /usr/local/bin/regfsmnt ]; then
+    echo cannot find regfsmnt
+    nodev="true"
+fi
+if ! dpkg -l | grep rpcf; then
+    norpcf="true"
+fi
+if [[ "x$nodev" == "xtrue" && "x$norpcf" == "xtrue" ]]; then
+    echo Error cannot find rpc-frmwrk installation
+    exit 1
+fi
+

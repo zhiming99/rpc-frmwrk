@@ -29,6 +29,7 @@ redirectUrl = None
 scope = None
 cEncrypt = ""
 bRemove = False
+bFirefox = False
 
 def IsEncrypt()->bool:
     global cEncrypt
@@ -181,7 +182,12 @@ def GetOA2ParamsFromReg( oReg : CRegFsSvcLocalProxy )->list:
             oReg.CloseDir(hDir)
 
 def OAuth2Login( oRegistry : CRegFsSvcLocalProxy ) -> int:
-    global authUrl, clientId, redirectUrl, scope, cEncrypt
+    global authUrl
+    global clientId
+    global redirectUrl
+    global scope
+    global cEncrypt
+    global bFirefox
     try:
         if authUrl is None or clientId is None or redirectUrl is None or scope is None:
             authUrl, clientId, redirectUrl, scope  = \
@@ -189,7 +195,7 @@ def OAuth2Login( oRegistry : CRegFsSvcLocalProxy ) -> int:
             if authUrl is None:
                 return -errno.ENODATA
 
-        ret = fetch_rpcf_code(
+        ret = fetch_rpcf_code( bFirefox,
             authUrl, clientId, redirectUrl, scope )
         if ERROR( ret ) :
             return ret[0]
@@ -424,7 +430,7 @@ def usage():
 
 def maincli( oProxy: CRegFsSvcLocalProxy ):
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "c:d:ehr" )
+        opts, args = getopt.getopt(sys.argv[1:], "c:d:efhr" )
     except getopt.GetoptError as err:
         # print help information and exit:
         print(err)  # will print something like "option -a not recognized"
@@ -437,6 +443,7 @@ def maincli( oProxy: CRegFsSvcLocalProxy ):
     global scope
     global cEncrypt
     global bRemove
+    global bFirefox
 
     bHasOptions = False
     for o, a in opts:
@@ -454,6 +461,8 @@ def maincli( oProxy: CRegFsSvcLocalProxy ):
                 scope = "profile+email"
         elif o == "-e":
             cEncrypt = "z"
+        elif o == "-f":
+            bFirefox = True
         elif o == "-r":
             RemoveFromReg( oProxy )
             bRemove = True

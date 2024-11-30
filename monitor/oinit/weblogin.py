@@ -5,9 +5,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
  
 # open the browser
-def fetch_rpcf_code( authUrl:str, clientId : str, redirectUrl:str, scope:str ):
+def fetch_rpcf_code( bFirefox:bool, authUrl:str, clientId : str, redirectUrl:str, scope:str ):
     try:
-        driver = webdriver.Firefox()
+        if bFirefox:
+            driver = webdriver.Firefox()
+        else:
+            driver = webdriver.Chrome()
         targetUrl = authUrl + \
             "?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}".format(
             client_id=clientId, redirect_uri=redirectUrl, scope=scope)

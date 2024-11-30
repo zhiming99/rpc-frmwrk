@@ -1,0 +1,14 @@
+#!/bin/bash
+if grep 'debian' /etc/os-release; then
+    force="t"
+else
+    force="f"
+fi
+if [ -f /usr/bin/rpcf/oinit*.whl ]; then
+    if force=="t"; then
+        option="--break-system-packages"
+    else
+        option=""
+    fi
+    pip3 install ${option} /usr/bin/rpcf/oinit*.whl 
+fi
