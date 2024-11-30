@@ -1,5 +1,5 @@
 EXTRA_DIST=RegFsSvcLocalcli.py RegFsSvcLocalclibase.py oinitdesc.json RegistryFsstructs.py encdec.py oinit.py seribase.py weblogin.py __init__.py __main__.py setup.py.in \
-debian/control debian/compat debian/rules debian/copyright debian/postinst debian/preinst debian/prerm debian/changelog Makefile.deb README.md README_cn.md
+debian/python3-oinit.install debian/control debian/compat debian/rules debian/copyright debian/postinst debian/preinst debian/prerm debian/changelog Makefile.deb README.md README_cn.md
 
 deb:
 	echo buiding debian package...
