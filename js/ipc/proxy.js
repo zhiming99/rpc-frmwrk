@@ -351,7 +351,6 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 this.m_oIoMgr.AddPendingReq(
                     oMsg.m_iMsgId, oPending)
         }).then(( e )=>{
-            var ret = 0
             const oResp = e.m_oResp
             var ret = oResp.GetProperty(
                 EnumPropId.propReturnValue )

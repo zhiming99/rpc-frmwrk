@@ -74,9 +74,9 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
     GetProperty( iProp )
     {
         if( iProp === EnumPropId.propObjPath )
-            return this.GetObjPath( iProp )
+            return this.GetObjPath()
         else if( iProp === EnumPropId.propIfName )
-            return this.GetIfName( iProp )
+            return this.GetIfName()
         return this.m_oCfg.GetProperty( iProp ).v
     }
 

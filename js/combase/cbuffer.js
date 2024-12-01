@@ -40,6 +40,7 @@ exports.CBuffer = class CBuffer extends CObjBase
 {
     constructor()
     {
+        super()
         this.m_dwClsid = Cid.CBuffer;
         this.m_dwOffset = 0;
         this.m_arrBuf = null
@@ -91,7 +92,7 @@ exports.CBuffer = class CBuffer extends CObjBase
         if( this.type !== Tid.typeByteArr )
             return
         if( this.empty() )
-            return 0
+            return
         if( dwOffset < 0 || dwOffset > this.m_dwTail )
             return
         this.m_dwOffset = dwOffset
@@ -111,7 +112,7 @@ exports.CBuffer = class CBuffer extends CObjBase
         if( this.type !== Tid.typeByteArr )
             return
         if( this.empty() )
-            return 0
+            return
         if( dwTail > this.m_arrBuf.length || dwTail <= 0 )
             return
         this.m_dwTail = dwTail

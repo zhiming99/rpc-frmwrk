@@ -167,7 +167,7 @@ do{\
 #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
 
 #define DebugMsg( ret, strFmt, ... ) \
- DebugMsgEx( __FILENAME__, __LINE__, ret, strFmt, ##__VA_ARGS__ )
+ DebugMsgEx( __FILENAME__, __LINE__, strFmt, ret, ##__VA_ARGS__ )
 
 #ifdef DEBUG
 #define DebugPrint( ret, strFmt, ... ) \
@@ -192,7 +192,7 @@ do{\
 #define LOGMSG( _pMgr_, _level, ret, strFmt, ... ) \
 ({ CIoManager* __pMgr__ = (_pMgr_); \
    __pMgr__->LogMessage( _level, __FILENAME__, __LINE__, \
-       ret, strFmt, ##__VA_ARGS__ );} )
+       strFmt, ret, ##__VA_ARGS__ );} )
 
 #define LOGALERT( _pMgr_, ret, strFmt, ... ) \
     LOGMSG( _pMgr_, logAlert, ret, strFmt, ##__VA_ARGS__ )
@@ -274,7 +274,7 @@ extern std::string DebugMsgInternal(
 
 extern std::string DebugMsgEx(
     const char* szFunc, gint32 iLineNum,
-    gint32 ret, const std::string& strFmt, ... );
+    const std::string& strFmt, gint32 ret, ... );
 
 extern gint32 ErrnoFromDbusErr( const char *error );
 

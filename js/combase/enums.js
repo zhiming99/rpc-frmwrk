@@ -325,7 +325,7 @@ module.exports = {
         stateStarted: 2,
         stateConnected:3,
         stateStopping: 4,
-        stateStopped : 5,
+        stateReserved : 5,
         stateStartFailed: 6,
     },
 

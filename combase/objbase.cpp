@@ -73,7 +73,7 @@ std::string DebugMsgInternal(
 
 std::string DebugMsgEx(
     const char* szFunc, gint32 iLineNum,
-    gint32 ret, const std::string& strFmt, ... ) 
+    const std::string& strFmt, gint32 ret, ... ) 
 {
     char szBuf[ MAX_DUMP_SIZE ];
 
@@ -84,7 +84,7 @@ std::string DebugMsgEx(
     szBuf[ iSize - 1 ] = 0;
 
     va_list argptr;
-    va_start(argptr, strFmt );
+    va_start(argptr, ret );
     vsnprintf( szBuf, iSize - 1, strFmt.c_str(), argptr );
     va_end(argptr);
 

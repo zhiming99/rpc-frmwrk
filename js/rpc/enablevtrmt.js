@@ -69,11 +69,11 @@ function OnEnableEventComplete( oPending )
     if( ret === errno.ENOTCONN )
         ret = -ret;
     try{
-        var oResp = new CIoRespMessage( oPending.m_oReq )
-        oResp.m_oResp.SetUint32(
+        var oRespToLocal = new CIoRespMessage( oPending.m_oReq )
+        oRespToLocal.m_oResp.SetUint32(
             EnumPropId.propReturnValue, ret )
-        oResp.m_oReq = undefined
-        this.m_oParent.PostMessage( oResp )
+        oRespToLocal.m_oReq = undefined
+        this.m_oParent.PostMessage( oRespToLocal )
     }
     catch( e )
     {

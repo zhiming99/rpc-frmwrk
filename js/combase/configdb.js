@@ -515,7 +515,6 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             default:
                 {
                     throw new Error( "Error unknown type")
-                    break
                 }
             }
             this.SetProperty( key, value )

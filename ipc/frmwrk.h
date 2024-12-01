@@ -705,7 +705,7 @@ class CIoManager : public IService
 
     gint32 LogMessage( guint32 dwLogLevel,
         const std::string& szFunc, gint32 iLineNum,
-        gint32 ret, const std::string& strFmt, ... );
+        const std::string& strFmt, gint32 ret, ... );
     void LoggerThread( IEventSink* pCb );
 };
 

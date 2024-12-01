@@ -10,8 +10,8 @@
 `python3 -m oinit [options] [<auth url> <client id> <redirect url> <scope>]`
 #### 命令行选项
 * **-d** <对象描述文件>。从给定的`对象描述文件`中查找登录信息。
-* **-c 1** 使用示例容器“django_oa2check_https”进行OAuth2登录。
-* **-c 2** 使用示例容器“springboot_oa2check_https”进行OAuth2登录。
+* **-c 1** 使用示例容器[`django_oa2check_https`](../rpc/security/README_cn.md#oauth2)进行OAuth2登录。
+* **-c 2** 使用示例容器[`springboot_oa2check_https`](../../rpc/security/README_cn.md#oauth2)进行OAuth2登录。
 * **-e** 加密本次登陆获得的凭据。
 * **-r** 从存储的登录信息列表中删除。
 * **-f** 默认情况下，oinit 使用“chrome”进行登录。如果指定了 `-f`，oinit将使用firefox执行登录。

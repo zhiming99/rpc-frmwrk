@@ -78,7 +78,7 @@ class CIoMessageBase
         if( oMsg.m_oResp !== null )
         {
             var oResp = new CConfigDb2()
-            oReq.Restore( oMsg.m_oResp )
+            oResp.Restore( oMsg.m_oResp )
             this.m_oResp = oResp
         }
     }

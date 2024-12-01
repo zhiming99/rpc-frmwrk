@@ -56,8 +56,8 @@ class CStreamTest_CliImpl extends CStreamTestclibase
         strResp = strResp.replace('\0', '')
         this.DebugPrint( `stream@${hStream} received: ` + strResp )
         const encoder = new TextEncoder()
-        var oBuf = encoder.encode( Date.now() + " proxy: Hello, world!")
-        this.m_funcStreamWrite( hStream, oBuf ).then((e)=>{
+        var oNewMsge = encoder.encode( Date.now() + " proxy: Hello, world!")
+        this.m_funcStreamWrite( hStream, oNewMsge ).then((e)=>{
             if( ERROR( e ))
                 this.DebugPrint( `Error ${e}`)
         });
