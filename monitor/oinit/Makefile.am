@@ -1,5 +1,5 @@
 EXTRA_DIST=RegFsSvcLocalcli.py RegFsSvcLocalclibase.py oinitdesc.json RegistryFsstructs.py encdec.py oinit.py seribase.py weblogin.py __init__.py __main__.py setup.py.in \
-debian/python3-oinit.install debian/control debian/compat debian/rules debian/copyright debian/postinst debian/preinst debian/prerm debian/changelog Makefile.deb README.md README_cn.md
+debian/control debian/rules debian/copyright debian/postinst debian/preinst debian/prerm Makefile.deb README.md README_cn.md
 
 rev=0
 PACKAGE_NAME=python3-oinit
@@ -8,6 +8,7 @@ deb:
 	echo buiding debian package...
 	if [ ! -d debpkg/debian ]; then mkdir -p debpkg/debian;fi;
 	echo "10" > debpkg/debian/compat
+	echo 'usr/bin/rpcf/*.whl' > debpkg/debian/python3-oinit.install
 	cp debian/{control,rules,copyright,preinst,postinst,python3-oinit.install,prerm} debpkg/debian/
 	if [ ! -d debpkg/oinit ]; then mkdir -p debpkg/oinit;fi; cp *.py debpkg/oinit;mv debpkg/oinit/setup.py debpkg/
 	cp oinitdesc.json debpkg/oinit;cp Makefile.deb debpkg/Makefile;cp *.md debpkg/oinit/
