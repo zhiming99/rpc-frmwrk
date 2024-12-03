@@ -203,7 +203,7 @@ def OAuth2Login( oRegistry : CRegFsSvcLocalProxy ) -> int:
         h = hl.sha1()
         h.update(
             (authUrl + clientId + redirectUrl + scope ).encode() )
-        fileName = cEncrypt + h.hexdigest()
+        fileName = cEncrypt + h.hexdigest().upper()
         oData = dict()
         oData['oCookie'] = oCookie
         oData['AuthUrl'] = authUrl
@@ -274,7 +274,7 @@ def MainEntryCli() :
         oCfg.SetObjPtr( cpp.propIoMgr, ctx.pIoMgr )
         strHome = str( Path.home() )
 
-        cfgFile = strHome + "/.rpcf/registry.dat"
+        cfgFile = strHome + "/.rpcf/clientreg.dat"
         strRpcfDir = strHome + "/.rpcf"
         bFormat = False
         if not os.path.exists( strRpcfDir ):

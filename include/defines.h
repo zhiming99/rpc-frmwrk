@@ -336,6 +336,10 @@ gint32 BytesToString(
     guint32 dwSize,
     std::string& strRet );
 
+gint32 HexStringToBytes(
+    const char* szHex, guint32 dwSize,
+    guint8* pBuf );
+
 // genenerate a 32bit hash
 gint32 GenShaHash(
     const char* pBuf, guint32 dwSize,
@@ -343,6 +347,8 @@ gint32 GenShaHash(
 
 gint32 GenStrHash( const stdstr& strMsg,
     guint32& dwHash );
+
+stdstr GetHomeDir();
 
 const char* Version();
 // Event ids for the IEventSink

@@ -661,6 +661,17 @@ class CRpcReqForwarderAuth :
         IEventSink* pInvTask,
         IConfigDb* pReqCtx );
 
+    gint32 GetLatestHash(
+        ObjPtr& pRegistry,
+        stdstr& strHash );
+
+    gint32 GetCookieByHash(
+        IConfigDb* pConnParams,
+        const stdstr& strHash );
+
+    gint32 CheckOAuth2Params(
+        IConfigDb* pConnParams );
+
     public:
     typedef CRpcReqForwarder super;
     CRpcReqForwarderAuth( const IConfigDb* pCfg ) :

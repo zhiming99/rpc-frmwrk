@@ -9,7 +9,7 @@ deb:
 	if [ ! -d debpkg/debian ]; then mkdir -p debpkg/debian;fi;
 	echo "10" > debpkg/debian/compat
 	echo 'usr/bin/rpcf/*.whl' > debpkg/debian/python3-oinit.install
-	cp debian/{control,rules,copyright,preinst,postinst,python3-oinit.install,prerm} debpkg/debian/
+	cp debian/{control,rules,copyright,preinst,postinst,prerm} debpkg/debian/
 	if [ ! -d debpkg/oinit ]; then mkdir -p debpkg/oinit;fi; cp *.py debpkg/oinit;mv debpkg/oinit/setup.py debpkg/
 	cp oinitdesc.json debpkg/oinit;cp Makefile.deb debpkg/Makefile;cp *.md debpkg/oinit/
 	pushd debpkg;DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME) "$(PACKAGE_NAME)-$(VERSION)-$(rev) released";\

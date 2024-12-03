@@ -110,6 +110,7 @@
 #define JSON_ATTR_OAUTH2_AUTHURL    "AuthUrl"
 #define JSON_ATTR_OAUTH2_CLIENTID    "ClientId"
 #define JSON_ATTR_OAUTH2_REDIRECT    "RedirectUrl"
+#define JSON_ATTR_OAUTH2_SCOPE    "Scope"
 
 // SSL options
 // string

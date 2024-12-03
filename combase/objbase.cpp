@@ -571,6 +571,50 @@ int Sem_Wait_Wakable( sem_t* psem )
     return ret;
 }
 
+static guint8 HexCharToByte( const char arrHex[ 2 ] )
+{
+    guint8 ret = 0;
+    const char* p = arrHex;
+
+    if( *p >= '0' && *p <= '9' )
+        ret = *p - 0x30;
+    else if( *p >= 'A' && *p <= 'F' )
+        ret = *p - 0x37;
+    else if( *p >= 'a' && *p <= 'f' )
+        ret = *p - 0x57;
+    
+    ret <<= 4;
+    p++;
+
+    if( *p >= '0' && *p <= '9' )
+        ret |= *p - 0x30;
+    else if( *p >= 'A' && *p <= 'F' )
+        ret |= *p - 0x37;
+    else if( *p >= 'a' && *p <= 'f' )
+        ret |= *p - 0x57;
+    return ret;
+}
+
+gint32 HexStringToBytes(
+    const char* szHex,
+    guint32 dwSize, guint8* pBuf )
+{
+    if( ( dwSize & 1 ) == 1 )
+        return -EINVAL;
+
+    if( pBuf == nullptr )
+        return -EINVAL;
+
+    const char* pSrc = szHex;
+    guint8* pDest = pBuf;
+    for( size_t i = 0; i < dwSize/2; i++ )
+    {
+       *pDest++= HexCharToByte( pSrc ); 
+       pSrc += 2;
+    }
+    return 0;
+}
+
 /**
 * @name ByteToHexChar
 * @{ */
@@ -1188,6 +1232,13 @@ gint32 CSharedLock::TryLockWrite()
         return 0;
     }
     return -EFAULT;
+}
+
+#include <pwd.h>
+stdstr GetHomeDir()
+{
+    struct passwd* pwd = getpwuid( getuid() );
+    return stdstr( pwd->pw_dir );
 }
 
 }
