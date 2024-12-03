@@ -62,9 +62,6 @@ class COAuth2LoginProxy :
     const EnumClsid GetIid() const
     { return iid( IAuthenticate ); }
 
-    virtual bool IsConnected(
-        const char* szDestAddr = nullptr );
-
     virtual gint32 InitUserFuncs();
 
     gint32 DoLogin(

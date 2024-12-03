@@ -14,7 +14,7 @@ SUBDIRS =
 if ENABLE_JS
 libauth_la_CPPFLAGS += -DOA2 -I../../monitor/registry
 SUBDIRS += oa2check
-OA2Lib = -L./oa2check -loa2check
+OA2Lib = -L./oa2check -loa2check $(COMMON_LINK_SSL)
 OA2Login = ../../monitor/registry/libregfs.la
 OA2_sources = oa2proxy.cpp
 OA2_headers = oa2proxy.h
