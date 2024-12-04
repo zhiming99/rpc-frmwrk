@@ -200,41 +200,77 @@ gint32 COAuth2LoginProxy::DecryptCookie(
             break;
 
         stdstr strHome = GetHomeDir();
-        strHome += "/.rpcf/";
+        strHome += "/.rpcf/openssl/";
+        std::vector< stdstr > vecKeys = {
+             "clientkey.pem", "signkey.pem" };
 
-        stdstr strKeyPath =
-            strHome + "openssl/clientkey.pem";
-
-        FILE *pri_fp = fopen(
-            strKeyPath.c_str(), "r");
-
-        EVP_PKEY *pri_pkey =
-            PEM_read_PrivateKey(
-                pri_fp, NULL, NULL, NULL);
-
-        fclose(pri_fp);
-
-        EVP_PKEY_CTX *dctx =
-            EVP_PKEY_CTX_new(pri_pkey, NULL);
-        EVP_PKEY_decrypt_init(dctx);
-
-        size_t dec_len;
-        EVP_PKEY_decrypt(dctx, NULL, &dec_len,
-            ( guint8* )pEnc->ptr(),
-            pEnc->size() );
-
-        std::vector<unsigned char>
-            dec_data(dec_len);
         BufPtr pDec( true );
-        pDec->Resize( dec_len );
+        size_t dec_len = 0;
+        for( auto& elem : vecKeys )
+        {
+            stdstr strKeyPath = strHome + elem;
+            FILE *pri_fp = fopen(
+                strKeyPath.c_str(), "r");
 
-        EVP_PKEY_decrypt(
-            dctx, ( guint8* )pDec->ptr(),
-            &dec_len, ( guint8* )pEnc->ptr(),
-            pEnc->size());
-        EVP_PKEY_CTX_free(dctx);
-        strCookie.append(
-            pDec->ptr(), dec_len );
+            if( pri_fp == nullptr )
+                continue;
+
+            EVP_PKEY *pri_pkey =
+                PEM_read_PrivateKey(
+                    pri_fp, NULL, NULL, NULL);
+
+            fclose(pri_fp);
+
+            EVP_PKEY_CTX *dctx =
+                EVP_PKEY_CTX_new(pri_pkey, NULL);
+            EVP_PKEY_decrypt_init(dctx);
+            ret = EVP_PKEY_CTX_set_rsa_padding(
+                dctx, RSA_PKCS1_OAEP_PADDING );
+            if( ret <= 0 )
+            {
+                ret = -EFAULT;
+                continue;
+            }
+            ret = EVP_PKEY_CTX_set_rsa_oaep_md(
+                dctx, EVP_sha256() );
+            if( ret <= 0 )
+            {
+                ret = -EFAULT;
+                continue;
+            }
+
+            ret = EVP_PKEY_decrypt(dctx, NULL,
+                &dec_len, ( guint8* )pEnc->ptr(),
+                pEnc->size() );
+            if( ret <= 0 )
+                continue;
+
+            std::vector<unsigned char>
+                dec_data(dec_len);
+            pDec->Resize( dec_len );
+
+            ret = EVP_PKEY_decrypt(
+                dctx, ( guint8* )pDec->ptr(),
+                &dec_len, ( guint8* )pEnc->ptr(),
+                pEnc->size());
+            if( ret <= 0 )
+            {
+                unsigned long error = ERR_get_error(); 
+                // Get a human-readable error string
+                char error_string[256];
+                ERR_error_string(error, error_string);
+                OutputMsg(0, "Error message: %s\n", error_string);
+            }
+            EVP_PKEY_CTX_free(dctx);
+            if( ret > 0 )
+                break;
+        }
+
+        if( ret > 0 )
+            strCookie.append(
+                pDec->ptr(), dec_len );
+        else
+            ret = -EACCES;
     }while( 0 );
     return ret;
 }
@@ -279,6 +315,10 @@ gint32 COAuth2LoginProxy::OAuth2Login(
                 if( ERROR( ret ) )
                     break;
                 pIf->SetSess( strSess );
+                DebugPrint( 0, "Sess hash is %s",
+                    strSess.c_str() );
+                Variant oVar( false );
+                pIf->SetProperty( propNoEnc, oVar );
             }while( 0 );
             pLoginCb->OnEvent( eventTaskComp,
                 ret, 0, nullptr );

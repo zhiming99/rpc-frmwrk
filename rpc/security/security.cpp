@@ -1287,10 +1287,14 @@ gint32 CRpcReqForwarderAuth::GetLatestHash(
         for( auto& elem : vecDirEnt )
         {
             struct stat stBuf;
+            stdstr strFile =
+                strPath + "/" + elem.szKey;
             ret = pRegfs->GetAttr(
-                elem.szKey, stBuf ); 
+                strFile, stBuf ); 
+
             if( ERROR( ret ) )
                 continue;
+
             if( stBuf.st_mtim.tv_sec > tv.tv_sec )
             {
                 tv = stBuf.st_mtim;
@@ -1396,18 +1400,28 @@ gint32 CRpcReqForwarderAuth::GetCookieByHash(
             ret = -EBADMSG;
         }
         delete pReader;
-        if( !valConfig.isMember( "name" ) )
+        if( !valConfig.isMember( "oCookie" ) ||
+            !valConfig[ "oCookie" ].isObject() )
         {
             ret = -ENOENT;
             break;
         }
-        if( valConfig[ "name" ].asString() !=
+        Json::Value& oCookie =
+            valConfig[ "oCookie" ];
+
+        if( !oCookie.isMember( "name" ) ||
+            !oCookie[ "name" ].isString() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        if( oCookie[ "name" ].asString() !=
             "rpcf_code" )
         {
             ret = -ENOENT;
             break;
         }
-        if( !valConfig.isMember( "value" ) )
+        if( !oCookie.isMember( "value" ) )
         {
             ret = -ENOENT;
             break;
@@ -1418,7 +1432,7 @@ gint32 CRpcReqForwarderAuth::GetCookieByHash(
             propAuthInfo, oVar );
         IConfigDb* pAuthInfo = ( ObjPtr& )oVar;
         oVar =
-            valConfig[ "value" ].asString();
+            oCookie[ "value" ].asString();
         if( strHash[ 0 ] != 'z' )
         {
             pAuthInfo->SetProperty(
@@ -1747,6 +1761,26 @@ gint32 CAuthentProxy::BuildLoginTask(
 
             pTask = pLoginTask;
             break;
+#endif
+        }
+        else if( strMech == "OAuth2" )
+        {
+#ifdef OA2
+            TaskletPtr pLoginTask;
+            ret = DEFER_IFCALLEX2_NOSCHED2(
+                0, pLoginTask, ObjPtr( pIf ),
+                &COAuth2LoginProxy::DoLogin,
+                nullptr );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfRetryTask* pRetryTask = pLoginTask;
+            pRetryTask->SetClientNotify( pCallback );
+
+            pTask = pLoginTask;
+            break;
+
 #endif
         }
 
@@ -2497,6 +2531,13 @@ gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
         ret = 0;
         if( strHash.empty() )
             break;
+
+        if( strHash.substr( 0, 4 ) == "AUoa" )
+        {
+            // OAuth2
+            EnableInterfaces();
+            break;
+        }
 
         CAuthentProxy* psp = ObjPtr( this );
         ObjPtr pSessImpl;

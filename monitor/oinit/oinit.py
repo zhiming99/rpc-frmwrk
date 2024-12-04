@@ -240,7 +240,7 @@ def SaveCookie( oRegistry : CRegFsSvcLocalProxy,
             byteEnc = Encrypt_Bytes( strCookie.encode() )
             if byteEnc is None:
                 raise Exception( "Error encrypting the file") 
-            oData['oCookie']['value'] = byteEnc.hex()
+            oData['oCookie']['value'] = byteEnc.hex().upper()
 
         strCookie = json.dumps( oData )
         byteCookie = strCookie.encode()
