@@ -139,9 +139,9 @@ exports.DBusIfName = DBusIfName
 function DBusDestination(
     strModName )
 {
-    var strDest = constval.DBUS_NAME_PREFIX
-    strDest += strModName
+    return constval.DBUS_NAME_PREFIX + strModName
 }
+
 exports.DBusDestination = DBusDestination
 
 function DBusObjPath(

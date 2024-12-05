@@ -565,15 +565,13 @@ exports.CBuffer = class CBuffer extends CObjBase
 
         this.Clear()
         var pos = 0
-        var ret = 0
         var ov = new DataView( srcBuffer.buffer )
         var offset = SERI_HEADER.GetSeriSize()
         do{
             var val = ov.getUint32( pos )
             if( val !== Cid.CBuffer )
             {
-                ret = E.EINVAL
-                break
+                throw new TypeError( "Error unknown class id, expecting CBuffer")
             }
             pos += 4
             var dwSize = ov.getUint32( pos )

@@ -1500,7 +1500,7 @@ gint32 CFileImage::WriteValue(
     do{
         WRITE_LOCK( this );
         m_oValue = oVar;
-        UpdateMtime();
+        UpdateCtime();
     }while( 0 );
     return ret;
 }

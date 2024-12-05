@@ -103,7 +103,8 @@ def GetObjType( var ) :
         return cpp.typeUInt64
     elif isinstance( var, np.float32 ) :
         return cpp.typeFloat
-    elif isinstance( var, np.float64 ) :
+    elif isinstance( var, np.float64 ) or \
+        isinstance( var, float ) :
         return cpp.typeDouble
     elif ( isinstance( var, np.int16 ) or
         isinstance( var, np.uint16 ) ) :
@@ -115,9 +116,8 @@ def GetObjType( var ) :
         return cpp.typeString
     elif isinstance( var, cpp.ObjPtr ) :
         return cpp.typeObj
-    elif isinstance( var, bytearray ) :
-        return cpp.typeByteArr
-    elif isinstance( var, bytes ) :
+    elif isinstance( var, bytearray ) or \
+        isinstance( var, bytes ) :
         return cpp.typeByteArr
     elif isinstance( var, np.bool ) :
         return cpp.typeByte
@@ -129,8 +129,6 @@ def GetObjType( var ) :
             return cpp.typeUInt32
         elif arch == '64bit' :
             return cpp.typeUInt64
-    elif isinstance( var, float ) :
-        return cpp.typeDouble
     return cpp.typeNone
 
 def GetTypeObj( typeid ) :

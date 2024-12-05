@@ -112,7 +112,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
             oReq.SetString( EnumPropId.propMethodName,
                 strMethodName )
 
-        oParams = new CConfigDb2()
+        var oParams = new CConfigDb2()
         oParams.SetUint32( EnumPropId.propTimeoutSec,
             this.m_dwTimeoutSec )
         oParams.SetUint32( EnumPropId.propKeepAliveSec,

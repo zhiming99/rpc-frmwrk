@@ -35,7 +35,7 @@ function EnableRemoteEvent( oMsg )
         var oStream = this.m_mapStreams.get(
             EnumStmId.TCP_CONN_DEFAULT_STM )
 
-        ret = oStream.SendBuf( dmsg )
+        var ret = oStream.SendBuf( dmsg )
         if( ret < 0 )
         {
             var oResp = new CIoRespMessage( oMsg )

@@ -109,7 +109,7 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
 
     ToDBusRules( iMsgType )
     {
-        strRules = "type="
+        var strRules = "type="
         switch( iMsgType  )
         {
         case messageType.signal:
@@ -138,20 +138,20 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
                 strRules = ""
             }
         }
-        strMatch = ""
+        var strMatch = ""
         if( strRules.length > 0 )
             strMatch = strRules
-        strIfName = this.GetIfName()
+        var strIfName = this.GetIfName()
         if( strIfName.length > 0 )
             strMatch += ",interface='" +
                 strIfName + "'"
 
-        strPath = this.GetObjPath()
+        var strPath = this.GetObjPath()
         if( strPath.length > 0 )
             strMatch += ",path='" +
                 strPath + "'"
 
-        strMethod = this.m_oCfg(
+        var strMethod = this.m_oCfg(
             EnumPropId.propMethodName )
         if( strMethod !== null )
             strMatch += ",member='" +
@@ -172,7 +172,8 @@ exports.CMessageMatch = class CMessageMatch extends CObjBase
 
     ToString()
     {
-        strAll = this.ToDBusRules( messageType.invalid )
+        var strAll = this.ToDBusRules(
+            messageType.invalid )
         strAll += ",match="
         if( this.GetType() == MT.matchClient )
             strAll += "matchClient"

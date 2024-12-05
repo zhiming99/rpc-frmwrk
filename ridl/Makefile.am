@@ -7,7 +7,8 @@ odesctpl2.json drvtpl.json mktpl.in synccfg.py.in pymktpl genjava.cpp genjava.h 
 genfuse.h genfuse.cpp gencpp2.h gencpp2.cpp genfuse2.h genfuse2.cpp genrpcfs.cpp \
 genjs.cpp genjs.h
 
-EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java JavaSerialImpl.java
+javatest=javatest/org/rpcf/fulltest
+EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java JavaSerialImpl.java $(javatest)/SimpFileSvccli.java $(javatest)/SimpFileSvcsvr.java $(javatest)/StreamSvccli.java $(javatest)/StreamSvcsvr.java $(javatest)/maincli.java $(javatest)/mainsvr.java
 
 nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py
 

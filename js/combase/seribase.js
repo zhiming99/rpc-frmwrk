@@ -233,7 +233,7 @@ class CSerialBase
     static FindContainerSig( signature, bMap )
     {
         var balance = 1
-        sigRest = signature.slice(1)
+        var sigRest = signature.slice(1)
         var count = 1
         var openChar, closeChar
         if( bMap )
