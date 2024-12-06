@@ -118,28 +118,26 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 在了解了一系列繁琐复杂的设置步骤并为之头疼的时候，一个好消息是在`rpcfg.py`的安全页面有着配置Kerberos信息的选项。包括自动设置KDC服务器，对于熟悉了原理的用户来说，可以快速的搭建KDC服务器。有关`rpcfg.py`的信息请参考它的[说明文档](../../tools/README_cn.md#rpc-frmwrk配置工具)。
 
 ### OAuth2
-`rpc-frmwrk`的OAuth2支持是可用于C++, Python和Java的客户端， 也可用于浏览器中的JS客户端开发的。OAuth2的认证过程是在Application Server，OAuth2服务器和浏览器之间进行的，认证成功后，`rpc-frmwrk`将使用Application Server发给浏览器的认证凭据向`Application Server`进行验证，如果通过验证，`rpc-frmwrk`的服务，比如`HelloWorld`将向用户提供服务。`rpc-frmwrk`选用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
+`rpc-frmwrk`的OAuth2支持可用于C++, Python和Java的客户端， 也可用于浏览器中的JS客户端。OAuth2的认证过程是在`Web应用服务器`(`django`或`springboot`)，OAuth2服务器和浏览器三者之间进行的。认证成功后，`rpc-frmwrk`的客户端将使用`web应用服务器`发给浏览器的认证凭据(cookie)向rpc-frmwrk的`rpcrouter`进行验证。如果通过验证，`rpc-frmwrk`的服务器，比如`HelloWorld`将向获得允许，向用户提供服务。`rpc-frmwrk`使用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
 
 #### OAuth2认证在非JS客户端的使用方法
 OAuth2设计上是在浏览器运行的，所以对与非浏览器的应用，需要执行一个特殊的命令`oinit`进行登陆，然后客户端就可以正常工作了。这一点和`Kerberos`的客户端使用方式类似，Kerberos使用`kinit`进行登陆。关于`oinit`的使用方法，请参考oinit的[使用说明](../../monitor/oinit/README_cn.md)。
 
 #### 与django，Springboot整合的例子
-实际上`rpc-frmwrk`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`应用服务器(application server)`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
+实际上`rpc-frmwrk`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`Web应用服务器`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
 
-我们在`zhiming99/django-oa2cli-cgi`的镜像仓库中，准备了三个容器镜像，用于演示rpc-frmwrk和不同OAuth2的`实现`的整合。它们分别是`OAuth2-Server`, `django-oa2check`和`springboot-oa2check`。对应的是django的OAuth2的服务器，django的OAuth2客户端app, 和springboot的OAuth2的客户端app。用户可以通过命令行拉取，比如`docker pull zhiming99/django-oa2cli-cgi:OAuth2-Server`。
-注意：这三个容器为学习用途，没有启用https. 
+我们在`zhiming99/django-oa2cli-cgi`的镜像仓库中，准备了三个容器镜像，用于演示rpc-frmwrk和不同OAuth2的`实现`的整合。它们分别是`OAuth2-Server`, `django-oa2check`和`springboot-oa2check`。对应的是django的OAuth2的服务器，django的OAuth2客户端app, 和springboot的OAuth2的客户端app。用户可以通过命令行拉取，比如`docker pull zhiming99/django-oa2cli-cgi:OAuth2-Server`。   
+**注意**：这三个容器为学习用途，没有启用https. 仓库中还有三个后缀为https的容器，分别对应这三个容器启用https的版本，使用方法同上。
 
 django的OAuth2的客户端app使用的是标准的Authorization code认证流程，springboot的OAuth2的客户端app使用的是OAuth2结合OpenID Connect扩展协议，以提供标准化的身份信息和更安全的身份验证。
 
-容器的使用方法：
+##### 容器的使用方法：
 * 首先要运行容器`OAuth2-Server`，作为OAuth2的认证服务器。
 * 然后如果要跑django和rpc-frmwrk整合的服务器，就启动标有`django-oa2check`的容器。
 * 如果要跑springboot的rpc-frmwrk整合的服务器，就启动标有`springboot-oa2check`的容器。
 
-常见的问题：
+##### 使用中的常见问题：
 * 忘记设置ip地址。`OAuth2-Server`的地址被指定为172.17.0.3，而另两个运行rpc-frmwrk的服务器应该为172.17.0.2.
-* 使用https版本时，浏览器提示不安全证书是由于容器使用的是自签名证书，选择信任该证书即可。
-* 务必在运行整合rpc-frmwrk的容器内修改`/etc/hosts`， 添加上 '172.17.0.3  Server-0'。
-* rpc-frmwrk的输出在浏览器的调试器的控制台窗口，firefox和chrome可以按F12，显示该窗口。
-
-注：仓库中还有三个后缀为https的容器，分别对应这三个容器的https版本，使用方法同上。
+* 使用https版本时，浏览器提示不安全证书。这是由于容器使用的是自签名证书，须选择信任该证书即可。
+* 务必在运行`django`或者`springboot`的容器里的`/etc/hosts`文件中， 添加'172.17.0.3  Server-0'。
+* JS版`HelloWorld`的输出在浏览器的调试器的控制台窗口中，firefox和chrome可以按F12，显示该窗口。
