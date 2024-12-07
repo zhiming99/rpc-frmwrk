@@ -38,6 +38,7 @@ using namespace rpcf;
 
 #ifdef OA2
 #include "oa2check/oa2check.h"
+#include "oa2proxy.h"
 extern FactoryPtr OA2CheckClassFactory();
 #endif
 
@@ -67,6 +68,10 @@ static FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CKrb5InitHook );
     INIT_MAP_ENTRYCFG( CRemoteProxyStateAuth );
     INIT_MAP_ENTRYCFG( CKdcRelayProxyStat );
+#endif
+
+#ifdef OA2
+    INIT_MAP_ENTRYCFG( COAuth2LoginProxyImpl );
 #endif
 
     END_FACTORY_MAPS;

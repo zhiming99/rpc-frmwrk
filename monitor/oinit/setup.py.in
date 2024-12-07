@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+from setuptools import setup, find_packages
+import importlib.machinery
+version='@VERSION@'
+kwargs = {
+      'name':'oinit',
+      'version':version,
+      'description':'This package provides the interface library for Python script to interact with "rpc-frmwrk"',
+      'packages': find_packages(),
+      'author': 'zhiming',
+      'author_email':'@PACKAGE_BUGREPORT@',
+      'url':'@PACKAGE_URL@',
+      'license':'GPL-3.0',
+      'include_package_data' : True,
+      'zip_safe' : False,
+      'package_data':{'oinit': ['oinitdesc.json','README.md', 'README_cn.md']}
+}
+
+setup(**kwargs)

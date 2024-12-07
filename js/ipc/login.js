@@ -37,7 +37,7 @@ function LoginRequestCb( oContext, oResp )
     if( ERROR( ret ))
         return
 
-    strHash = oResp.GetProperty(
+    var strHash = oResp.GetProperty(
         EnumPropId.propSessHash )
     if( !strHash )
         return

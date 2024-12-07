@@ -1,4 +1,3 @@
-#from numpy import ERR_CALL
 from rpcf.proxy import *
 import threading as tr
 import TransFileContext
@@ -94,9 +93,7 @@ class TransferContext :
             pret = self.m_oInst.ReadStreamAsync2(
                 hChannel, iSizeRecv )
             ret = pret[ 0 ]
-            if ret < 0:
-                break
-            elif ret == ErrorCode.STATUS_PENDING:
+            if ret < 0 or ret == ErrorCode.STATUS_PENDING:
                 break
             buf = pret[1]
         

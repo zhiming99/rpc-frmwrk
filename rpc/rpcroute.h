@@ -252,7 +252,7 @@ class CRpcInterfaceProxy :
     public IRpcEventRelay
 {
     protected:
-    CRpcRouter  *m_pParent;
+    CRpcRouter  *m_pParent = nullptr;
 
     gint32 OnKeepAliveRelay(
         IEventSink* pTask );
@@ -289,7 +289,7 @@ class CRpcInterfaceServer :
     // common methods in both the CRpcReqForwarder
     // and CRpcTcpBridge 
     protected:
-    CRpcRouter  *m_pParent;
+    CRpcRouter  *m_pParent = nullptr;
 
     virtual gint32 BuildBufForIrpFwrdEvt(
         BufPtr& pBuf,
@@ -1679,7 +1679,7 @@ class CRpcRouter :
 
     mutable stdrmutex   m_oLock;
     std::vector< EnumPropId >   m_vecTopicList;
-    CRpcRouter*         m_pParent;
+    CRpcRouter*         m_pParent = nullptr;
 
     protected:
     std::map< guint32, InterfPtr > m_mapPid2BdgeProxies;

@@ -627,7 +627,7 @@ class CJavaServer:
             < CJavaServer* >( $self );
         CIoManager* pMgr = pImpl->GetIoMgr();
         return pMgr->LogMessage( dwLogLevel,
-            strFile, dwLineNo, ret, strMsg );
+            strFile, dwLineNo, strMsg, ret );
     }
 
     }

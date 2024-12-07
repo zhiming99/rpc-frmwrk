@@ -1,0 +1,10 @@
+#!/bin/bash
+if [ -f /usr/bin/rpcf/oinit*.whl ]; then
+    if force=="t"; then
+        option="--break-system-packages"
+    else
+        option=""
+    fi
+    echo pip3 uninstall ${option} oinit
+    pip3 uninstall ${option} oinit
+fi
