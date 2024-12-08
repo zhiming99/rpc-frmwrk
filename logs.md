@@ -1,4 +1,8 @@
 ---
+[`Sun Dec 08 2024 08:55:48 PM Beijing`]   
+1. There is one last task to complete before we merge the pull request, to add an RPM package for `oinit`.
+2. The next task will be the upgrade to `0.8.0`, and then, we add some `usr management tool` to monitor.
+
 [`Fri Nov 15 2024 23:37:59 PM Beijing`]   
 1. Fixed some bugs in the oauth2 docker images. And added https version of oauth2 docker images.
    
