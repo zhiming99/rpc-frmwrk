@@ -100,7 +100,7 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
         else if( e.m_oCallback !== undefined )
         {
             console.log( `Error ForwardRequestLocal failed: ${e.m_oResp}` )
-            var ret = e.m_oResp.GetProperty(
+            ret = e.m_oResp.GetProperty(
                 EnumPropId.propReturnValue )
             e.m_oCallback( e.m_oResp )
         }

@@ -50,8 +50,8 @@ class CActiveCancelCli extends CInterfaceProxy
             var args = [ oContext, ret ]
             var ridlBuf = Buffer.from( oResp.GetProperty( 0 ) )
             var osb = new CSerialBase( false, this )
-            var ret = osb.DeserialString( ridlBuf, 0 )
-            args.push( ret[0])
+            var strResp = osb.DeserialString( ridlBuf, 0 )
+            args.push( strResp[0])
             this.LongWaitCallback.apply( this, args )
         }
         catch( e )

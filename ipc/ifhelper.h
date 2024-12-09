@@ -437,7 +437,7 @@ namespace rpcf
 template< int N >
 struct _DummyClass_
 {
-    static void PackExp( std::vector< Variant >& vec, ... )
+    static void PackExp( std::vector< Variant >* vec, ... )
     { 
         va_list va;
         // NOTE: this is an approach to make both
@@ -449,7 +449,7 @@ struct _DummyClass_
         for( int i = 0; i < N; ++i )
         {
             Variant oVar = va_arg( va, Variant );
-            vec.push_back( oVar );
+            vec->push_back( oVar );
         }
         va_end( va );
         return;
@@ -462,7 +462,7 @@ inline void PackParams(
 {
     // note that the last arg is inserted first
     _DummyClass_< sizeof...( args )>::PackExp(
-        vec, ( PackageTo( args ) ) ... );
+        &vec, ( PackageTo( args ) ) ... );
 }
 
 // proxy related classes

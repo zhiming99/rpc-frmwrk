@@ -38,12 +38,13 @@ function StreamWrite( oMsg )
         
     }
     finally{
-        if( ret === errno.STATUS_PENDING )
-            return
-        var oResp = new CIoRespMessage( oMsg )
-        oResp.m_oResp.SetUint32(
-            EnumPropId.propReturnValue, ret)
-        this.PostMessage( oResp )
+        if( ret !== errno.STATUS_PENDING )
+        {
+            var oResp = new CIoRespMessage( oMsg )
+            oResp.m_oResp.SetUint32(
+                EnumPropId.propReturnValue, ret)
+            this.PostMessage( oResp )
+        }
     }
 
 }

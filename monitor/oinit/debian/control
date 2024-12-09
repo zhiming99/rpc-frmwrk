@@ -1,0 +1,16 @@
+Source: python3-oinit
+Maintainer: zhiming <woodhead99@gmail.com>
+Section:devel
+Priority:extra
+Standards-Version: 4.5.0
+Build-Depends:debhelper, python3, devscripts, bash, debhelper, dh-virtualenv, dh-python
+X-Python3-Version: >= 3.7
+Vcs-Git: https://github.com/zhiming99/rpc-frmwrk.git
+Homepage: https://github.com/zhiming99/rpc-frmwrk
+
+
+Package: python3-oinit
+Architecture: any
+Depends: python3 (>=3.7), ${python:Depends}, bash, python3-selenium
+Recommends: rpcf
+Description: oinit is a small OAuth2 login tool for rpc-frmwrk's non-js client.

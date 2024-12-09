@@ -272,17 +272,10 @@ gint32 CRegistry::Namei(
     string strTemp = strPath;
     while( strTemp.size() )
     {
-        size_t pos;
-        pos = strTemp.rfind( '/' );
+        size_t pos = strTemp.rfind( '/' );
         if( pos == string::npos )
         {
             vecComponents.push_back( strTemp );
-            break;
-        }
-        else if( pos < 0 )
-        {
-            // error occurs
-            ret = -EFAULT;
             break;
         }
 

@@ -112,7 +112,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
             oReq.SetString( EnumPropId.propMethodName,
                 strMethodName )
 
-        oParams = new CConfigDb2()
+        var oParams = new CConfigDb2()
         oParams.SetUint32( EnumPropId.propTimeoutSec,
             this.m_dwTimeoutSec )
         oParams.SetUint32( EnumPropId.propKeepAliveSec,
@@ -351,7 +351,6 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 this.m_oIoMgr.AddPendingReq(
                     oMsg.m_iMsgId, oPending)
         }).then(( e )=>{
-            var ret = 0
             const oResp = e.m_oResp
             var ret = oResp.GetProperty(
                 EnumPropId.propReturnValue )

@@ -30,10 +30,13 @@
 #include "security.h"
 #include "k5proxy.h"
 #include <regex>
+#include "blkalloc.h"
 
 #ifdef OA2
 using namespace rpcf;
 #include "oa2check/oa2check.h"
+#define CLI_REG "clientreg.dat"
+#include "oa2proxy.h"
 #endif
 
 namespace rpcf
@@ -1248,6 +1251,257 @@ gint32 CRpcReqForwarderAuth::OpenRemotePort(
     return ret;
 }
 
+gint32 CRpcReqForwarderAuth::GetLatestHash(
+    ObjPtr& pRegistry,
+    stdstr& strHash )
+{
+    gint32 ret = 0;
+    RFHANDLE hDir = 0;
+    bool bClose = false;
+    CRegistryFs* pRegfs = pRegistry;
+    do{
+        stdstr strPath = "/cookies";
+        ret = pRegfs->OpenDir(
+            strPath, R_OK, hDir );
+        if( ERROR( ret ) )
+            break;
+        bClose = true;
+        std::vector< KEYPTR_SLOT > vecDirEnt;
+        ret = pRegfs->ReadDir( hDir, vecDirEnt );
+        if( ERROR( ret ) )
+            break;
+        if( vecDirEnt.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        stdstr strVal;
+        if( vecDirEnt.size() == 1 )
+        {
+            strVal = vecDirEnt[ 0 ].szKey;
+            break;
+        }
+
+        struct timespec tv = { 0, 0 };
+        for( auto& elem : vecDirEnt )
+        {
+            struct stat stBuf;
+            stdstr strFile =
+                strPath + "/" + elem.szKey;
+            ret = pRegfs->GetAttr(
+                strFile, stBuf ); 
+
+            if( ERROR( ret ) )
+                continue;
+
+            if( stBuf.st_mtim.tv_sec > tv.tv_sec )
+            {
+                tv = stBuf.st_mtim;
+                strVal = elem.szKey;
+            }
+            else if( stBuf.st_mtim.tv_sec == tv.tv_sec &&
+                stBuf.st_mtim.tv_nsec > tv.tv_nsec )
+            {
+                strVal = elem.szKey;
+                tv = stBuf.st_mtim;
+            }
+        }
+        if( tv.tv_sec == 0 )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        strHash = strVal;
+
+    }while( 0 );
+    if( bClose )
+        pRegfs->CloseFile( hDir );
+
+    return ret;
+}
+
+gint32 CRpcReqForwarderAuth::GetCookieByHash(
+    IConfigDb* pConnParams,
+    const stdstr& strHashOrigin )
+{
+    gint32 ret = 0;
+    RegFsPtr pRegfs;
+    bool bStop = false;
+    do{
+        CParamList oParams;
+        stdstr strHome = GetHomeDir();
+        strHome += "/.rpcf/";
+        oParams.SetStrProp(
+            propConfigPath, strHome + CLI_REG );
+        ret = pRegfs.NewObj(
+            clsid( CRegistryFs ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+        ret = pRegfs->Start();
+        if( ERROR( ret ) )
+            break;
+        bStop = true;
+        RFHANDLE hFile;
+        stdstr strPath = "/cookies/";
+        bool bTryEnc = true;
+        stdstr strHash = strHashOrigin;
+        if( strHash.empty() )
+        {
+            ObjPtr pReg = pRegfs;
+            ret = GetLatestHash( pReg, strHash );
+            if( ERROR( ret ) )
+                break;
+            bTryEnc = false;
+        }
+        stdstr strFile = strPath + strHash;
+        struct stat stBuf;
+        ret = pRegfs->GetAttr( strFile, stBuf );
+        if( ERROR( ret ) && !bTryEnc )
+        {
+            break;
+        }
+        else if( ERROR( ret ) && bTryEnc )
+        {
+            strFile = strPath + "z" + strHash;
+            ret = pRegfs->GetAttr( strFile, stBuf );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        ret = pRegfs->OpenFile(
+            strFile, R_OK, hFile );
+        if( ERROR( ret ) )
+            break;
+        BufPtr pBuf( true );
+        ret = pBuf->Resize( stBuf.st_size );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwSize = stBuf.st_size;
+        ret = pRegfs->ReadFile(
+            hFile, pBuf->ptr(), dwSize, 0 );
+        if( ERROR( ret ) )
+            break;
+
+        Json::Value valConfig;
+        Json::CharReaderBuilder oBuilder;
+        Json::CharReader* pReader = nullptr;
+        pReader = oBuilder.newCharReader();
+        if( pReader == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        if( !pReader->parse( pBuf->ptr(),
+            pBuf->ptr() + pBuf->size(),
+            &valConfig, nullptr ) )
+        {
+            ret = -EBADMSG;
+        }
+        delete pReader;
+        if( !valConfig.isMember( "oCookie" ) ||
+            !valConfig[ "oCookie" ].isObject() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        Json::Value& oCookie =
+            valConfig[ "oCookie" ];
+
+        if( !oCookie.isMember( "name" ) ||
+            !oCookie[ "name" ].isString() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        if( oCookie[ "name" ].asString() !=
+            "rpcf_code" )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        if( !oCookie.isMember( "value" ) )
+        {
+            ret = -ENOENT;
+            break;
+        }
+ 
+        Variant oVar;
+        pConnParams->GetProperty(
+            propAuthInfo, oVar );
+        IConfigDb* pAuthInfo = ( ObjPtr& )oVar;
+        oVar =
+            oCookie[ "value" ].asString();
+        if( strHash[ 0 ] != 'z' )
+        {
+            pAuthInfo->SetProperty(
+                propCookie, oVar );
+            break;
+        }
+        else
+        {
+            pAuthInfo->SetProperty(
+                propEncCookie, oVar );
+        }
+    }while( 0 );
+    if( bStop )
+        pRegfs->Stop();
+    return ret;
+}
+
+gint32 CRpcReqForwarderAuth::CheckOAuth2Params(
+    IConfigDb* pConnParams )
+{
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        pConnParams->GetProperty(
+            propAuthInfo, oVar );
+        IConfigDb* pCfg = ( ObjPtr& )oVar;
+        pCfg->GetProperty(
+            propAuthMech, oVar );
+        if( ( ( stdstr& )oVar ) != "OAuth2" )
+        {
+            ret = ERROR_FALSE;
+            break;
+        }
+        stdstr strAuthUrl, strClientId;
+        stdstr strRedirUrl, strScope;
+
+        CCfgOpener oai( pCfg );
+        gint32 ret1 = oai.GetStrProp(
+            propAuthUrl, strAuthUrl );
+
+        gint32 ret2 = oai.GetStrProp(
+            propClientId, strClientId );
+
+        gint32 ret3 = oai.GetStrProp(
+            propRedirectUrl, strRedirUrl );
+
+        gint32 ret4 = oai.GetStrProp(
+            propScope, strScope );
+        if( ERROR( ret1 ) || ERROR( ret2 ) ||
+            ERROR( ret3 ) || ERROR( ret4 ) )
+        {
+            ret = GetCookieByHash(
+                pConnParams, "" );
+        }
+        else
+        {
+            stdstr strVal = strAuthUrl +
+                strClientId + strRedirUrl + strScope;
+            stdstr strHash;
+            GenShaHash( strVal.c_str(),
+                strVal.size(), strHash );
+             ret = GetCookieByHash(
+                pConnParams, strHash );   
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRpcReqForwarderAuth::LocalLoginInternal(
     IEventSink* pCallback,
     IConfigDb* pCfg,
@@ -1284,6 +1538,15 @@ gint32 CRpcReqForwarderAuth::LocalLoginInternal(
             ret = -EINVAL;
             break;
         }
+
+#ifdef OA2
+        ret = CheckOAuth2Params( pConnParams );
+        if( ret == ERROR_FALSE )
+            ret = 0;
+        if( ERROR( ret ) )
+            break;
+#endif
+
         std::string strSender;
         ret = oCfg.GetStrProp(
             propSrcDBusName, strSender );
@@ -1500,6 +1763,26 @@ gint32 CAuthentProxy::BuildLoginTask(
             break;
 #endif
         }
+        else if( strMech == "OAuth2" )
+        {
+#ifdef OA2
+            TaskletPtr pLoginTask;
+            ret = DEFER_IFCALLEX2_NOSCHED2(
+                0, pLoginTask, ObjPtr( pIf ),
+                &COAuth2LoginProxy::DoLogin,
+                nullptr );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfRetryTask* pRetryTask = pLoginTask;
+            pRetryTask->SetClientNotify( pCallback );
+
+            pTask = pLoginTask;
+            break;
+
+#endif
+        }
 
         ret = -ENOTSUP;
 
@@ -1604,6 +1887,10 @@ gint32 CAuthentProxy::CreateSessImpl(
         std::string strObjName;
         if( strMech == "krb5" )
             strObjName = OBJNAME_AUTHSVR;
+        else if( strMech == "OAuth2" )
+        {
+            strObjName = "OAuth2LoginServer";
+        }
         else
         {
             ret = -ENOTSUP;
@@ -1630,28 +1917,39 @@ gint32 CAuthentProxy::CreateSessImpl(
         oCfg.SetPointer(
             propRouterPtr, pRouter );
 
+        ret = CorrectInstName(
+            pMgr, oCfg.GetCfg() );
+
+        oCfg.SetIntProp( propIfStateClass,
+            clsid( CRemoteProxyStateAuth ) );
+
+        InterfPtr pIf;
         if( strMech == "krb5" )
         {
 #ifdef KRB5
-            ret = CorrectInstName(
-                pMgr, oCfg.GetCfg() );
-
             // use a special ifstate
-            oCfg.SetIntProp( propIfStateClass,
-                clsid( CRemoteProxyStateAuth ) );
-
-            InterfPtr pIf;
             ret = pIf.NewObj(
                 clsid( CAuthentProxyK5Impl ),
                 oCfg.GetCfg() );
 
             if( SUCCEEDED( ret ) )
                 pImpl = pIf;
-            break;
 #endif
         }
-
-        ret = -ENOTSUP;
+        else if( strMech == "OAuth2" )
+        {
+#ifdef OA2
+            ret = pIf.NewObj(
+                clsid( COAuth2LoginProxyImpl ),
+                oCfg.GetCfg() );
+            if( SUCCEEDED( ret ) )
+                pImpl = pIf;
+#endif
+        }
+        else
+        {
+            ret = -ENOTSUP;
+        }
 
     }while( 0 );
 
@@ -2233,6 +2531,13 @@ gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
         ret = 0;
         if( strHash.empty() )
             break;
+
+        if( strHash.substr( 0, 4 ) == "AUoa" )
+        {
+            // OAuth2
+            EnableInterfaces();
+            break;
+        }
 
         CAuthentProxy* psp = ObjPtr( this );
         ObjPtr pSessImpl;
@@ -2908,6 +3213,28 @@ gint32 CRpcRouterReqFwdrAuth::IsEqualConn(
                 ret = ERROR_FALSE;
                 break;
             }
+        }
+        else if( strMech == "OAuth2" )
+        {
+            ret = oAuth1.IsEqualProp(
+                propAuthUrl, pAuth2 );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oAuth1.IsEqualProp(
+                propClientId, pAuth2 );
+            if( ERROR( ret ) )
+                break;
+
+            ret = oAuth1.IsEqualProp(
+                propRedirectUrl, pAuth2 );
+            if( ERROR( ret ) )
+                break;
+                
+            ret = oAuth1.IsEqualProp(
+                propScope, pAuth2 );
+            if( ERROR( ret ) )
+                break;
         }
 
         ret = 0;
@@ -3763,20 +4090,20 @@ gint32 CAuthentServer::OnPostStart(
         if( ERROR( ret ) )
             break;
 
+#ifdef KRB5
         if( strMech == "krb5" )
         {
-#ifdef KRB5
             ret = StartAuthImpl( pCallback );
             break;
-#endif
         }
-        else if( strMech == "OAuth2" )
-        {
+#endif
 #ifdef OA2
+        if( strMech == "OAuth2" )
+        {
             ret = StartOA2Checker( pCallback );
             break;
-#endif
         }
+#endif
         ret = -ENOTSUP;
 
     }while( 0 );

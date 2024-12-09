@@ -479,7 +479,6 @@ static int regfs_utimens( const char * path,
         {
             hFile = fi->fh;
         }
-        guint32 dwFlags = FLAG_FLUSH_DATAONLY;
         READ_LOCK( pfs );
         FileSPtr pOpen;
         ret = pfs->GetOpenFile( hFile, pOpen );
@@ -671,6 +670,7 @@ int _main( int argc, char** argv)
             Usage( "regfsmnt" );
             break;
         }
+        oParams.Push( g_bFormat );
         oParams.SetStrProp(
             propConfigPath, g_strRegFsFile );
         ret = g_pRegfs.NewObj(
@@ -764,13 +764,14 @@ int main( int argc, char** argv)
             ret = -EINVAL;
             OutputMsg( ret, "Error missing "
                 "'regfs path' and 'mount point'" );
-            Usage( argv[ 0 ] );
             break;
         }
 
         g_strRegFsFile = argv[ optind ];
         if( g_strRegFsFile.size() > REG_MAX_PATH - 1 )
         {
+            OutputMsg( ret,
+                "Error file name too long" );
             ret = -ENAMETOOLONG;
             break;
         }
@@ -780,6 +781,8 @@ int main( int argc, char** argv)
         if( ret == -1 && !g_bFormat )
         {
             ret = -errno;
+            OutputMsg( ret,
+                "Error invalid registry file" );
             break;
         }
 
@@ -799,6 +802,8 @@ int main( int argc, char** argv)
             if( g_strMPoint.size() > REG_MAX_PATH - 1 )
             {
                 ret = -ENAMETOOLONG;
+                OutputMsg( ret,
+                    "Error invalid mount point" );
                 break;
             }
 
@@ -871,6 +876,7 @@ int main( int argc, char** argv)
         if( ERROR( ret ) ) 
         {
             DestroyContext();
+            OutputMsg( ret, "Error start regfsmnt" );
             break;
         }
         ret = _main( argcf, argvf );

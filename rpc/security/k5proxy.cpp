@@ -1779,6 +1779,7 @@ gint32 CK5AuthProxy::RebuildMatches()
             == strIfName )
         {
             pMatch = elem;
+            break;
         }
     }
 
