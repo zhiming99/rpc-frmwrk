@@ -431,6 +431,7 @@ AC_CONFIG_FILES([Makefile
                  monitor/registry/Makefile
                  monitor/oinit/Makefile
                  monitor/oinit/setup.py
+                 monitor/oinit/oinit.spec
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])
