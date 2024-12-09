@@ -118,10 +118,10 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 在了解了一系列繁琐复杂的设置步骤并为之头疼的时候，一个好消息是在`rpcfg.py`的安全页面有着配置Kerberos信息的选项。包括自动设置KDC服务器，对于熟悉了原理的用户来说，可以快速的搭建KDC服务器。有关`rpcfg.py`的信息请参考它的[说明文档](../../tools/README_cn.md#rpc-frmwrk配置工具)。
 
 ### OAuth2
-`rpc-frmwrk`的OAuth2支持可用于C++, Python和Java的客户端， 也可用于浏览器中的JS客户端。OAuth2的认证过程是在`Web应用服务器`(`django`或`springboot`)，OAuth2服务器和浏览器三者之间进行的。认证成功后，`rpc-frmwrk`的客户端将使用`web应用服务器`发给浏览器的认证凭据(cookie)向rpc-frmwrk的`rpcrouter`进行验证。如果通过验证，`rpc-frmwrk`的服务器，比如`HelloWorld`将向获得允许，向用户提供服务。`rpc-frmwrk`使用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
+`rpc-frmwrk`的OAuth2支持主要用于浏览器中的JS客户端，也可用于C++, Python和Java的客户端。OAuth2的认证过程是在`Web应用服务器`(`django`或`springboot`)，OAuth2服务器和浏览器三者之间进行的。认证成功后，`rpc-frmwrk`的客户端将使用`web应用服务器`发给浏览器的认证凭据(cookie)向rpc-frmwrk的`rpcrouter`进行验证。如果通过验证，`rpc-frmwrk`的服务器，比如`HelloWorld`将向获得允许，向用户提供服务。`rpc-frmwrk`使用的是`Authorization code`的认证方式。有关OAuth2的认证流程，在网上十分丰富，这里就不做详细介绍了。
 
 #### OAuth2认证在非JS客户端的使用方法
-OAuth2设计上是在浏览器运行的，所以对与非浏览器的应用，需要执行一个特殊的命令`oinit`进行登陆，然后客户端就可以正常工作了。这一点和`Kerberos`的客户端使用方式类似，Kerberos使用`kinit`进行登陆。关于`oinit`的使用方法，请参考oinit的[使用说明](../../monitor/oinit/README_cn.md)。
+OAuth2设计上是在浏览器运行的，所以大家对JS下OAuth2的认证界面和流程应该十分的熟悉。而对于非浏览器的`rpc-frmwrk`应用，在初次启动客户端之前，则需要执行一个特殊的命令`oinit`进行登陆，然后客户端才能正常工作。这一点和`Kerberos`的客户端使用方式非常相似。不过，启动客户端前也不必每次都需要`oinit`登陆，这取决于`oauth2`颁发的`auth token`的有效时间。关于`oinit`的使用方法，请参考`oinit`的[使用说明](../../monitor/oinit/README_cn.md)。
 
 #### 与django，Springboot整合的例子
 实际上`rpc-frmwrk`和`application server`的通信是通过[oa2check.ridl](./oa2check/oa2check.ridl)的接口完成的。我们在`Web应用服务器`比如`django`或者`springboot`的`app`中整合一个`oa2check`的服务器，就可以轻松的进行验证工作了。
