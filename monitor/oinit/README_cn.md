@@ -2,7 +2,13 @@
 **oinit** 是一个OAuth2登陆工具，用于从非 JS 客户端（例如 C++、Python 或 Java 客户端）使用 `OAuth2 授权码`方式登录到 rpc-frmwrk 服务器。
 它可以记住下次登录的登录信息和凭据，方便下次使用。也可以从命令行清理过期的登录信息。
 
-### 从命令行调用 oinit
+### 安装
+`oinit`是一个Python脚本工具。它和`rpc-frmwrk`的其他组件安装不太相同，不能通过`make install`的方式安装。它的安装有两种方式
+1. 通过deb包或者rpm包安装。在代码树的monitor/oinit下，运行`make deb`或者`make rpm`即可在`output`目录下获得安装包。然后用`dpkg`或者`rpm`命令行工具进行安装。
+2. 通过wheel包安装。在代码树的monitor/oinit下，运行`make wheel`，即可在`output`下获得wheel安装包。然后使用`pip`安装。
+3. `oinit`未能整合到`rpc-frmwrk`的一键安装的架构下面，原因是它的依赖比较独特，而且不同的平台对安装的要求也和`rpc-frmwrk`的`make install`相差较大。
+
+### 从命令行运行`oinit`
 #### 命令格式
 * 如果是python脚本    
 `python3 oinit.py [options] [<auth url> <client id> <redirect url> <scope>]`

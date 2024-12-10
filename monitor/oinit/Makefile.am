@@ -9,6 +9,7 @@ PACKAGE_NAME=python3-oinit
 deb:
 	echo buiding debian package...
 	if [ ! -d debpkg/debian ]; then mkdir -p debpkg/debian;fi;
+	rm debpkg/debian/* -rf;
 	echo "10" > debpkg/debian/compat
 	echo 'usr/bin/rpcf/*.whl' > debpkg/debian/python3-oinit.install
 	cp debian/{control,rules,copyright,preinst,postinst,prerm} debpkg/debian/
@@ -16,6 +17,7 @@ deb:
 	cp oinitdesc.json debpkg/oinit;cp Makefile.deb debpkg/Makefile;cp *.md debpkg/oinit/
 	pushd debpkg;DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME) "$(PACKAGE_NAME)-$(VERSION)-$(rev) released";\
  dpkg-buildpackage -us -uc;popd
+	if [ -d output ]; then rm output/python3-oinit*deb;fi
 	if [ ! -d output ]; then mkdir output; fi; mv python3-oinit* output/
 	echo deb package is generated in 'output' directory.
 
@@ -30,6 +32,7 @@ rpm:
 	cp oinit.spec $${HOME}/oinitrpm/SPECS
 	pushd $${HOME}/oinitrpm/;if rpmbuild -bb --define "_topdir `pwd`" SPECS/oinit.spec; then cp ./RPMS/noarch/*.rpm $(abs_builddir);fi;popd
 	rm -rf $${HOME}/oinitrpm; rm -rf rpmpkg
+	if [ -d output ]; then rm output/python3-oinit*rpm;fi
 	if [ ! -d output ]; then mkdir output; fi; mv python3-oinit*.rpm output/
 	echo rpm package is generated in 'output' directory.
 
