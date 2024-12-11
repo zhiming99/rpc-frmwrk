@@ -30,9 +30,9 @@
 #include "security.h"
 #include "k5proxy.h"
 #include <regex>
-#include "blkalloc.h"
 
 #ifdef OA2
+#include "blkalloc.h"
 using namespace rpcf;
 #include "oa2check/oa2check.h"
 #define CLI_REG "clientreg.dat"
@@ -1251,6 +1251,7 @@ gint32 CRpcReqForwarderAuth::OpenRemotePort(
     return ret;
 }
 
+#ifdef OA2
 gint32 CRpcReqForwarderAuth::GetLatestHash(
     ObjPtr& pRegistry,
     stdstr& strHash )
@@ -1501,6 +1502,7 @@ gint32 CRpcReqForwarderAuth::CheckOAuth2Params(
     }while( 0 );
     return ret;
 }
+#endif
 
 gint32 CRpcReqForwarderAuth::LocalLoginInternal(
     IEventSink* pCallback,

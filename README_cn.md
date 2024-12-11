@@ -1,5 +1,5 @@
 [[English]](./README.md)
-# rpc-frmwrk ![badge](https://img.shields.io/badge/RPC-C%2B%2B%2C%20Java%2C%20Python-green)
+# rpc-frmwrk ![new badge](https://img.shields.io/badge/RPC-C%2B%2B%2CPython%2CJava%2CJS(0.8.0)-green)
 
 
 ## 概述

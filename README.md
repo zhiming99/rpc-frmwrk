@@ -1,5 +1,5 @@
 [[中文]](https://github.com/zhiming99/rpc-frmwrk/blob/master/README_cn.md)
-# rpc-frmwrk ![badge](https://img.shields.io/badge/RPC-C%2B%2B%2C%20Java%2C%20Python-green)
+# rpc-frmwrk ![new badge](https://img.shields.io/badge/RPC-C%2B%2B%2CPython%2CJava%2CJS(0.8.0)-green)
 
 This is an asynchronous and event-driven RPC implementation for embeded system with small system footprint. It is targeting at both IOT platforms and mainstream servers with high-throughput and high availability. It features highly easy to use with a versatile skeleton generator, to generate C++, Python, Java or JavaScript skeleton code instantly. Welcome to use!
 
