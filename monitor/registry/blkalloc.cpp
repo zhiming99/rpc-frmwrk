@@ -109,13 +109,20 @@ gint32 CSuperBlock::Reload()
         ret = m_pAlloc->LoadSuperBlock(
             arrSb, SUPER_BLOCK_SIZE );
         if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error LoadSuperBlock" );
             break;
+        }
 
         if( arrSb[ 0 ] != 'r' ||
             arrSb[ 1 ] != 'e' ||
             arrSb[ 2 ] != 'g' ||
             arrSb[ 3 ] != 'i' )
         {
+            DebugPrint( ret,
+                "Error invalid magic number '%s' "
+                "in SuperBlock", arrSb );
             ret = -EINVAL;
             break;
         }
@@ -648,14 +655,21 @@ CBlockAllocator::CBlockAllocator(
             propConfigPath, strPath );
         if( ERROR( ret ) )
             break;
+        bool bFormat = false;
+        oCfg.GetBoolProp( 0, bFormat );
+        guint32 dwFlags = O_RDWR;
+        if( bFormat )
+            dwFlags |= O_CREAT;
         ret = open( strPath.c_str(),
-            O_CREAT | O_RDWR,
-            00600 );
+            dwFlags, 00600 );
         if( ERROR( ret ) )
         {
             ret = -errno;
             break;
         }
+        DebugPrint( ret,
+            "Info: registry path %s",
+            strPath.c_str() );
         m_iFd = ret;
         m_pSuperBlock.reset(
             new CSuperBlock( this ) );
@@ -720,9 +734,14 @@ gint32 CBlockAllocator::SaveSuperBlock(
     gint32 ret = 0;
     if( dwSize < SUPER_BLOCK_SIZE )
         return -EINVAL;
-    return ReadWriteFile(
+    ret = ReadWriteFile(
         const_cast< char* >( pSb ),
         SUPER_BLOCK_SIZE, 0, false );
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 0 )
+        ret = -ENODATA;
+    return ret;
 }
 
 gint32 CBlockAllocator::LoadSuperBlock(
@@ -731,8 +750,13 @@ gint32 CBlockAllocator::LoadSuperBlock(
     gint32 ret = 0;
     if( dwSize < SUPER_BLOCK_SIZE )
         return -EINVAL;
-    return ReadWriteFile(
+    ret = ReadWriteFile(
         pSb, SUPER_BLOCK_SIZE, 0, true );
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 0 )
+        ret = -ENODATA;
+    return ret;
 }
 
 gint32 CBlockAllocator::SaveGroupBitmap(
@@ -744,6 +768,10 @@ gint32 CBlockAllocator::SaveGroupBitmap(
     gint32 ret = ReadWriteFile(
         const_cast< char* >( pbmp ), 
         GRPBMP_SIZE, GRPBMP_START, false );
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 0 )
+        ret = -ENODATA;
     return ret;
 }
 
@@ -756,6 +784,10 @@ gint32 CBlockAllocator::LoadGroupBitmap(
     gint32 ret = ReadWriteFile(
         pbmp, GRPBMP_SIZE,
         GRPBMP_START, true );
+    if( ERROR( ret ) )
+        return ret;
+    if( ret == 0 )
+        ret = -ENODATA;
     return ret;
 }
 

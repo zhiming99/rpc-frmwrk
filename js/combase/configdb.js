@@ -61,6 +61,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
         var key, value
         for( [key, value] of this.m_props )
         {
+            if( key === null || value === null )
+                continue
             if( value.t === EnumTypeId.typeObj )
             {
                 var iClsid = value.v.m_dwClsid
@@ -88,7 +90,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
     {
         if( m_dwCount == 0 )
             return null
-        val = this.m_props[ this.m_dwCount - 1 ]
+        var val = this.m_props[ this.m_dwCount - 1 ]
         this.m_props.delete( this.m_dwCount - 1 )
         this.m_dwCount--
         return val
@@ -186,8 +188,8 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
 
     ClearParams()
     {
-        count = this.GetCount()
-        for(i=0;i<count;i++)
+        var count = this.GetCount()
+        for(var i=0;i<count;i++)
             Pop()
     }
 
@@ -515,7 +517,6 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
             default:
                 {
                     throw new Error( "Error unknown type")
-                    break
                 }
             }
             this.SetProperty( key, value )

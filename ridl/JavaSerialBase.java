@@ -201,7 +201,7 @@ abstract public class JavaSerialBase
         if(buf == null || offset == null || val == null)
             return -RC.EINVAL;
 
-        int ret = 0;
+        int ret;
         switch( strSig.charAt( 0 ) )
         {
         case 'Q':
@@ -215,6 +215,7 @@ abstract public class JavaSerialBase
             {
                 ret = serialHStreamArr(
                     buf, offset, ( long[] )val );
+                break;
             }
         case 'D':
         case 'd':

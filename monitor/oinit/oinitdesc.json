@@ -1,0 +1,39 @@
+{
+    "Objects": [
+        {
+            "BusName": "DBusBusPort_0",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "Interfaces": [
+                {
+                    "BindToClsid": "true",
+                    "DummyInterface": "true",
+                    "InterfaceName": "CRegFsSvcLocal_SvrImpl"
+                },
+                {
+                    "InterfaceName": "IInterfaceServer"
+                },
+                {
+                    "InterfaceName": "IRegFsLocal"
+                }
+            ],
+            "IpAddress": "127.0.0.1",
+            "KeepAliveTimeoutSec": "60",
+            "ObjectName": "RegFsSvcLocal",
+            "PortClass": "DBusLoopbackPdo2",
+            "PortId": "0",
+            "ProxyPortClass-1": "DBusProxyPdo",
+            "ProxyPortClass": "DBusLoopbackPdo2",
+            "QueuedRequests": "false",
+            "RequestTimeoutSec": "120",
+            "RouterPath": "/",
+            "PortNumber": "4132"
+        }
+    ],
+    "ServerName": "RegistryFs",
+    "Version": "1.0",
+    "ClassFactories": [
+        "./libregfs.so"
+    ]
+}

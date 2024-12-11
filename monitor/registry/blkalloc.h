@@ -697,6 +697,29 @@ struct CFileImage :
 
     CFileImage( const IConfigDb* pCfg );
 
+    inline void UpdateMtime()
+    {
+        timespec mtime;
+        clock_gettime( CLOCK_REALTIME, &mtime );
+        this->m_oInodeStore.m_mtime = mtime;
+        this->m_oInodeStore.m_atime = mtime;
+        this->m_oInodeStore.m_ctime = mtime;
+    }
+
+    inline void UpdateCtime()
+    {
+        timespec ctime;
+        clock_gettime( CLOCK_REALTIME, &ctime );
+        this->m_oInodeStore.m_ctime = ctime;
+    }
+
+    inline void UpdateAtime()
+    {
+        timespec atime;
+        clock_gettime( CLOCK_REALTIME, &atime );
+        this->m_oInodeStore.m_atime = atime;
+    }
+
     static gint32 Create(
         EnumFileType byType, FImgSPtr& pFile,
         AllocPtr& pAlloc, guint32 dwInodeIdx,
@@ -962,7 +985,7 @@ struct CDirImage :
     gint32 Rename( const char* szFrom,
         const char* szTo);
     gint32 ListDir(
-        std::vector< KEYPTR_SLOT >& vecDirEnt ) const;
+        std::vector< KEYPTR_SLOT >& vecDirEnt );
 
     guint32 GetFreeBNodeIdx() const;
 
@@ -1525,7 +1548,7 @@ struct CDirFileEntry :
 
     gint32  RemoveFile( const stdstr& strName );
     gint32  ListDir(
-        std::vector< KEYPTR_SLOT >& vecDirEnt ) const;
+        std::vector< KEYPTR_SLOT >& vecDirEnt );
 };
 
 struct CLinkFileEntry:
@@ -1551,6 +1574,7 @@ class CRegistryFs :
     std::hashmap< guint64, FileSPtr > m_mapOpenFiles;
     mutable stdrmutex   m_oExclLock;
     EnumIfState m_dwState = stateStarted;
+    bool        m_bFormat = false;
 
     gint32 CreateRootDir();
     gint32 OpenRootDir();
@@ -1709,6 +1733,9 @@ class CRegistryFs :
         LONGWORD dwParam2,
         LONGWORD* pData ) override
     { return -ENOTSUP; }
+
+    gint32 GetSize(
+        RFHANDLE hFile, guint32 dwSize ) const;
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

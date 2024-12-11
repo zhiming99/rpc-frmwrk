@@ -1,0 +1,6 @@
+appname "RegistryFs";
+include "regfsif.ridl"
+service RegFsSvcLocal
+{
+    interface IRegFsLocal;
+};

@@ -1731,9 +1731,8 @@ gint32 CBPlusNode::RemoveFile(
                     }
                 }
 
-                bool bBusy = false;
                 {
-                    READ_LOCK( pFile );
+                    // READ_LOCK( pFile );
                     CStdRMutex oLock(
                         pFile->GetExclLock() );
                     if( pFile->GetOpenCount() )
@@ -1742,7 +1741,6 @@ gint32 CBPlusNode::RemoveFile(
                             "the file is still "
                             "being used" );
                         pFile->SetState( stateStopping );
-                        bBusy = true;
                     }
                     else if( pFile->IsStopped() ||
                         pFile->IsStopping() )
@@ -1771,8 +1769,6 @@ gint32 CBPlusNode::RemoveFile(
                     if( ERROR( ret ) )
                         break;
                 }
-                if( bBusy )
-                    ret = -EBUSY;
                 break;
             }
             KEYPTR_SLOT* pChildKs =
@@ -2034,6 +2030,7 @@ gint32 CDirImage::Search( const char* szKey,
             szKey, pFile, pNode );
         if( ret == ERROR_FALSE )
             ret = -ENOENT;
+        UpdateAtime();
     }while( 0 );
     return ret;
 }
@@ -2206,13 +2203,19 @@ gint32 CDirImage::CreateFile(
         ret = CreateFile(
             szName, ftRegular, pImg );
 
-        pImg->SetMode( dwMode );
+        UpdateMtime();
+
+        guint32 dwActMode = pImg->GetMode();
+        dwMode &= 0777;
+        dwActMode &= ~0777;
+        dwActMode |= dwMode;
+        pImg->SetMode( dwActMode );
     }while( 0 );
     return ret;
 }
 
 gint32 CDirImage::ListDir(
-    std::vector< KEYPTR_SLOT >& vecDirEnt ) const
+    std::vector< KEYPTR_SLOT >& vecDirEnt )
 {
     bool bRet = false;
     gint32 ret = 0;
@@ -2242,6 +2245,7 @@ gint32 CDirImage::ListDir(
                 dwBNodeIdx );
         }
 
+        UpdateAtime();
     }while( 0 );
 
     if( ERROR( ret ) )
@@ -2257,6 +2261,7 @@ gint32 CDirImage::CreateDir( const char* szName,
     do{
         CreateFile( szName, ftDirectory, pImg );
         pImg->SetMode( S_IFDIR | dwMode );
+        UpdateMtime();
     }while( 0 );
     return ret;
 }
@@ -2272,6 +2277,7 @@ gint32 CDirImage::CreateLink( const char* szName,
         if( ERROR( ret ) )
             break;
 
+        UpdateMtime();
         guint32 dwSize = strlen( szLink );
         ret = pImg->WriteFile(
             0, dwSize, ( guint8* )szLink );
@@ -2318,6 +2324,7 @@ gint32 CDirImage::RemoveFile(
         if( ERROR( ret ) )
             break;
         ret = pFile->FreeBlocks();
+        UpdateMtime();
 
     }while( 0 );
     return ret;
@@ -2402,6 +2409,7 @@ gint32 CDirImage::Rename(
     gint32 ret = 0;
     do{
         FImgSPtr pFile;
+        FImgSPtr pDstFile;
         WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szFrom, pFile );
@@ -2414,10 +2422,24 @@ gint32 CDirImage::Rename(
             pFile->GetInodeIdx();
         oKey.oLeaf.byFileType = pFile->GetType();
         ret = m_pRootNode->Insert( &oKey );
+        if( ERROR( ret ) && ret != -EEXIST )
+            break;
+        else if( ret == -EEXIST )
+        {
+            ret = m_pRootNode->RemoveFile(
+                szTo, pDstFile );
+            if( ERROR( ret ) )
+                break;
+            pDstFile->FreeBlocks();
+        }
+        ret = m_pRootNode->Insert( &oKey );
         if( ERROR( ret ) )
             break;
         ret = m_pRootNode->AddFileDirect(
             oKey.oLeaf.dwInodeIdx, pFile );
+        UpdateMtime();
+        if( SUCCEEDED( ret ) )
+            pFile->SetState( stateStarted );
     }while( 0 );
     return ret;
 }
@@ -2457,7 +2479,7 @@ gint32 CDirImage::PrintBNodeNoLock()
 #endif
 
 gint32  CDirFileEntry::ListDir(
-    std::vector< KEYPTR_SLOT >& vecDirEnt ) const
+    std::vector< KEYPTR_SLOT >& vecDirEnt )
 {   
     gint32 ret = 0;
     do{

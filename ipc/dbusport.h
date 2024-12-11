@@ -1462,6 +1462,121 @@ class CConnParamsProxy : public CConnParams
                     break;
                 }
             }
+            else if( strVal1 == "OAuth2" )
+            {
+                gint32 iRet;
+                iRet = oAuth1.GetStrProp(
+                    propAuthUrl, strVal1 );
+                if( ERROR( iRet ) )
+                {
+                    ret = false;
+                    break;
+                }
+
+                iRet = oAuth2.GetStrProp(
+                    propAuthUrl, strVal2 );
+                if( ERROR( iRet ) )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+
+                iRet = oAuth1.GetStrProp(
+                    propClientId, strVal1 );
+                if( ERROR( iRet ) )
+                {
+                    ret = true;
+                    break;
+                }
+
+                iRet = oAuth2.GetStrProp(
+                    propClientId, strVal2 );
+                if( ERROR( iRet ) )
+                {
+                    ret = false;
+                    break;
+                }
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+
+                iRet = oAuth1.GetStrProp(
+                    propRedirectUrl, strVal1 );
+                if( ERROR( iRet ) )
+                {
+                    ret = true;
+                    break;
+                }
+
+                iRet = oAuth2.GetStrProp(
+                    propRedirectUrl, strVal2 );
+                if( ERROR( iRet ) )
+                {
+                    ret = false;
+                    break;
+                }
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+
+                iRet = oAuth1.GetStrProp(
+                    propScope, strVal1 );
+                if( ERROR( iRet ) )
+                {
+                    ret = true;
+                    break;
+                }
+
+                oAuth2.GetStrProp(
+                    propScope, strVal2 );
+                if( ERROR( iRet ) )
+                {
+                    ret = false;
+                    break;
+                }
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+            }
 
             ret = false;
 

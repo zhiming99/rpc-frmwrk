@@ -6,7 +6,6 @@ const {CIoManager} = require( "./ipc/iomgr.js")
 globalThis.CoCreateInstance=CoCreateInstance
 
 function setLogger() {
-    var old = console.log;
     var logger = document.getElementById('log');
     if( !logger )
         return

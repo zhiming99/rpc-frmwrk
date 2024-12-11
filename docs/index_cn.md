@@ -29,6 +29,7 @@
       - [更多的信息](../rpc/security/README_cn.md#更多的信息)
       - [使用`rpcfg.py`自动配置`rpc-frmwrk`的Kerberos设置](../rpc/security/README_cn.md#使用rpcfgpy自动配置rpc-frmwrk的kerberos设置)
     - [OAuth2](../rpc/security/README_cn.md#oauth2)
+      - [OAuth2认证在非JS客户端的使用方法](../rpc/security/README_cn.md#oauth2认证在非js客户端的使用方法)
       - [与django，Springboot整合的例子](../rpc/security/README_cn.md#与djangospringboot整合的例子)
 * [rpcrouter用户手册](../rpc/router/README_cn.md)
 * [OpenSSL技术说明](../rpc/sslport/README_cn.md)

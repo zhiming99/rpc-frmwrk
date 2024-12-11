@@ -35,7 +35,7 @@ function EnableRemoteEvent( oMsg )
         var oStream = this.m_mapStreams.get(
             EnumStmId.TCP_CONN_DEFAULT_STM )
 
-        ret = oStream.SendBuf( dmsg )
+        var ret = oStream.SendBuf( dmsg )
         if( ret < 0 )
         {
             var oResp = new CIoRespMessage( oMsg )
@@ -69,11 +69,11 @@ function OnEnableEventComplete( oPending )
     if( ret === errno.ENOTCONN )
         ret = -ret;
     try{
-        var oResp = new CIoRespMessage( oPending.m_oReq )
-        oResp.m_oResp.SetUint32(
+        var oRespToLocal = new CIoRespMessage( oPending.m_oReq )
+        oRespToLocal.m_oResp.SetUint32(
             EnumPropId.propReturnValue, ret )
-        oResp.m_oReq = undefined
-        this.m_oParent.PostMessage( oResp )
+        oRespToLocal.m_oReq = undefined
+        this.m_oParent.PostMessage( oRespToLocal )
     }
     catch( e )
     {

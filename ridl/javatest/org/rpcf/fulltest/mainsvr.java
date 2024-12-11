@@ -4,7 +4,7 @@ import org.rpcf.rpcbase.*;
 import java.nio.charset.StandardCharsets;
 import java.lang.String;
 import java.util.concurrent.TimeUnit;
-
+import java.util.Arrays;
 public class mainsvr
 {
     public static JavaRpcContext m_oCtx;
@@ -87,7 +87,7 @@ public class mainsvr
                     }
                     // the first message
                     byte[] buf = ( byte[]) jret.getAt( 0 );
-                    String strMsg = buf.toString();
+                    String strMsg = Arrays.toString(buf);
                     rpcbase.JavaOutputMsg( "received msg " + strMsg );
                     buf = "greeting from server".getBytes(StandardCharsets.UTF_8);
                     oStmSvr.writeStream( oStmSvr.m_hChannel, buf );
@@ -164,7 +164,7 @@ public class mainsvr
                             rpcbase.JavaOutputMsg( "receiving ACK failed" );
                         else {
                             byte[] buf = ( byte[]) jret.getAt(0);
-                            rpcbase.JavaOutputMsg(buf.toString());
+                            rpcbase.JavaOutputMsg(Arrays.toString(buf));
                         }
                     }
                     else if( oStmSvr.m_curSize < 0 )

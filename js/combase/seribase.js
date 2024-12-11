@@ -233,7 +233,7 @@ class CSerialBase
     static FindContainerSig( signature, bMap )
     {
         var balance = 1
-        sigRest = signature.slice(1)
+        var sigRest = signature.slice(1)
         var count = 1
         var openChar, closeChar
         if( bMap )
@@ -559,17 +559,14 @@ class CStructBase extends CObjBase
             bRestoreValue = false;
 
         var oNewMap = new Map();
-        const itr = oMap.entries();
-        while( itr !== undefined )
+        for( const [ key, value ] of oMap )
         {
-            var entry = itr.next();
-            var key = entry.value[0];
-            var value = entry.value[1];
+            var newKey, newVal;
             if( bRestoreKey )
-                key = RestoreElem( key, strKeySig );
+                newKey = RestoreElem( key, strKeySig );
             if( bRestoreValue )
-                value = RestoreElem( value, strKeySig );
-            oNewMap.set( key, value )
+                newVal = RestoreElem( value, strKeySig );
+            oNewMap.set( newKey, newVal )
         }
         return oNewMap;
     }

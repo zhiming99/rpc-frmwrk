@@ -43,6 +43,12 @@ CRegistryFs::CRegistryFs(
         if( ERROR( ret ) )
             break;
 
+        Variant oVar;
+        ret = pCfg->GetProperty( 0, oVar );
+        if( SUCCEEDED( ret ) )
+            m_bFormat = oVar;
+        ret = 0;
+
     }while( 0 );
     if( ERROR( ret ) )
     {
@@ -168,7 +174,10 @@ gint32 CRegistryFs::Start()
     gint32 ret = 0;
     do{
         WRITE_LOCK( this );
-        ret = Reload();
+        if( unlikely( m_bFormat ) )
+            ret = Format();
+        else
+            ret = Reload();
         if( ERROR( ret ) )
             break;
         SetState( stateStarted );
@@ -330,6 +339,15 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
+        CAccessContext oac;
+        if( pac == nullptr )
+        {
+            // to check conflict between dwMode and dwFlags
+            oac.dwUid = pFile->GetUid();
+            oac.dwGid = pFile->GetGid();
+            pac = &oac;
+        }
+
         ret = pOpenFile->Open( dwFlags, pac );
         if( ERROR( ret ) )
             break;
@@ -422,6 +440,7 @@ gint32 CRegistryFs::CloseFileNoLock(
         if( ret != STATUS_MORE_PROCESS_NEEDED )
             break;
 
+        ret = 0;
         const stdstr& strPath = pFile->GetPath();
         FImgSPtr dirPtr;
         FImgSPtr pImg = pFile->GetImage();
@@ -1094,6 +1113,17 @@ gint32 CRegistryFs::Rename(
             break;
         ret = pDstDir->InsertFile(
             strDstFile.c_str(), pDstFile );
+        if( SUCCEEDED( ret ) )
+            break;
+        if( ERROR( ret ) && ret != -EEXIST )
+            break;
+        ret = pDstDir->RemoveFile(
+            strDstFile.c_str() );
+        if( ERROR( ret ) )
+            break;
+        pDstFile->SetState( stateStarted );
+        ret = pDstDir->InsertFile(
+            strDstFile.c_str(), pDstFile );
 
     }while( 0 );
     return ret;
@@ -1129,6 +1159,8 @@ gint32 CRegistryFs::Access(
         FImgSPtr dirPtr;
         if( strPath == "/" )
         {
+            if( dwFlags == F_OK )
+                break;
             READ_LOCK( m_pRootImg );
             ret = m_pRootImg->CheckAccess(
                 dwFlags, pac );
@@ -1151,6 +1183,8 @@ gint32 CRegistryFs::Access(
             ret = -ENOENT;
             break;
         }
+        if( dwFlags == F_OK )
+            break;
         {
             READ_LOCK( pFile );
             ret = pFile->CheckAccess(
@@ -1310,6 +1344,27 @@ gint32 CRegistryFs::GetOpenFile(
             break;
         }
         pFile = itr->second;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::GetSize(
+    RFHANDLE hFile, guint32 dwSize ) const
+{
+    gint32 ret = 0;
+    do{
+        FileSPtr pFile;
+        CStdRMutex oLock( GetExclLock() );
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr == m_mapOpenFiles.end() )
+        {
+            ret = -EBADF;
+            break;
+        }
+        pFile = itr->second;
+        oLock.Unlock();
+        FImgSPtr pImg = pFile->GetImage();
+        dwSize = pImg->GetSize();
     }while( 0 );
     return ret;
 }

@@ -303,6 +303,11 @@ namespace cpp
             CObjBase::GetActCount() );
     %End
 
+    guint32 CoGetClassId( const std::string& );
+    %MethodCode
+    sipRes = cpp::CoGetClassId( a0->c_str() );
+    %End
+
     class CObjBase
     {
         public:
@@ -324,6 +329,9 @@ namespace cpp
         ObjPtr();
         ObjPtr( cpp::CObjBase* pObj, bool bAddRef );
         ~ObjPtr();
+
+        void Clear();
+
         gint32 NewObj( guint32 iNewClsid,
             cpp::IConfigDb* pCfg );
         %MethodCode

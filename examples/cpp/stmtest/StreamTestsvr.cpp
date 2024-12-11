@@ -44,7 +44,7 @@ gint32 CStreamTest_SvrImpl::Echo(
         if( ERROR( ret ) ) \
             ptc = nullptr; \
     };\
-    ( TransferContext* )ptc;\
+    reinterpret_cast< TransferContext* >( ptc );\
 })
 
 gint32 CStreamTest_SvrImpl::OnReadStreamComplete(
