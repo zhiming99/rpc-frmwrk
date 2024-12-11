@@ -1,10 +1,15 @@
 #!/bin/bash
-if [ -f /usr/bin/rpcf/oinit*.whl ]; then
-    if force=="t"; then
+if grep 'debian' /etc/os-release; then
+    force="t"
+else
+    force="f"
+fi
+if [ -f /usr/lib/rpcf/oinit*.whl ]; then
+    if [[ "$force" == "t" ]]; then
         option="--break-system-packages"
     else
         option=""
     fi
     echo pip3 uninstall ${option} oinit
-    pip3 uninstall ${option} oinit
+    pip3 uninstall -y ${option} oinit
 fi

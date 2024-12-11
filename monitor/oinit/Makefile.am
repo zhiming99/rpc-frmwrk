@@ -8,16 +8,16 @@ PACKAGE_NAME=python3-oinit
 
 deb:
 	echo buiding debian package...
-	if [ ! -d debpkg/debian ]; then mkdir -p debpkg/debian;fi;
-	rm debpkg/debian/* -rf;
+	if [ -d debpkg ]; then rm -rf debpkg; fi
+	mkdir -p debpkg/debian
 	echo "10" > debpkg/debian/compat
-	echo 'usr/bin/rpcf/*.whl' > debpkg/debian/python3-oinit.install
+	echo 'usr/lib/rpcf/*.whl' > debpkg/debian/python3-oinit.install
 	cp debian/{control,rules,copyright,preinst,postinst,prerm} debpkg/debian/
 	if [ ! -d debpkg/oinit ]; then mkdir -p debpkg/oinit;fi; cp *.py debpkg/oinit;mv debpkg/oinit/setup.py debpkg/
 	cp oinitdesc.json debpkg/oinit;cp Makefile.deb debpkg/Makefile;cp *.md debpkg/oinit/
 	pushd debpkg;DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME) "$(PACKAGE_NAME)-$(VERSION)-$(rev) released";\
  dpkg-buildpackage -us -uc;popd
-	if [ -d output ]; then rm output/python3-oinit*deb;fi
+	if [ -d output ]; then rm output/python3-oinit*deb > /dev/null || true;fi
 	if [ ! -d output ]; then mkdir output; fi; mv python3-oinit* output/
 	echo deb package is generated in 'output' directory.
 
