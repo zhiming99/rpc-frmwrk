@@ -3,7 +3,7 @@ Maintainer: zhiming <woodhead99@gmail.com>
 Section:devel
 Priority:extra
 Standards-Version: 4.5.0
-Build-Depends:debhelper, python3, devscripts, bash, debhelper, dh-virtualenv, dh-python
+Build-Depends:debhelper, python3, devscripts, bash
 X-Python3-Version: >= 3.7
 Vcs-Git: https://github.com/zhiming99/rpc-frmwrk.git
 Homepage: https://github.com/zhiming99/rpc-frmwrk
