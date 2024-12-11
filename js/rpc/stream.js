@@ -513,7 +513,6 @@ class CRpcStream extends CRpcStreamBase
         var ret = 0;
         while( this.m_arrPendingWriteReqs.length > 0)
         {
-            var offset = this.m_arrPendingWriteReqs[0][1];
             ret = this.SendHeadReq()
             if( ret === errno.STATUS_PENDING )
                 break;

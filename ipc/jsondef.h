@@ -107,6 +107,10 @@
 #define JSON_ATTR_SVRSTAT_CLASS     "ServerStateClass"
 #define JSON_ATTR_PROXYSTAT_CLASS     "ProxyStateClass"
 #define JSON_ATTR_ENABLE_RFC    "EnableRFC"
+#define JSON_ATTR_OAUTH2_AUTHURL    "AuthUrl"
+#define JSON_ATTR_OAUTH2_CLIENTID    "ClientId"
+#define JSON_ATTR_OAUTH2_REDIRECT    "RedirectUrl"
+#define JSON_ATTR_OAUTH2_SCOPE    "Scope"
 
 // SSL options
 // string

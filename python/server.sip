@@ -796,7 +796,7 @@ class CPythonServer :
             < CPythonServer* >( sipCpp );
         CIoManager* pMgr = pImpl->GetIoMgr();
         sipRes = pMgr->LogMessage(
-            a0, *a1, a2, a3, *a4 );
+            a0, *a1, a2, *a4, a3 );
     %End
 };
 

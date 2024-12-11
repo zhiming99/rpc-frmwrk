@@ -78,7 +78,7 @@ class CIoMessageBase
         if( oMsg.m_oResp !== null )
         {
             var oResp = new CConfigDb2()
-            oReq.Restore( oMsg.m_oResp )
+            oResp.Restore( oMsg.m_oResp )
             this.m_oResp = oResp
         }
     }
@@ -211,7 +211,7 @@ class CIoReqMessage extends CIoMessageBase
 
     GetCallFlags()
     {
-        opt = this.m_oReq.GetProperty(
+        var opt = this.m_oReq.GetProperty(
             EnumPropId.propCallOptions )
         return opt.GetProperty(
             EnumPropId.propCallFlags )
@@ -222,7 +222,7 @@ class CIoReqMessage extends CIoMessageBase
 
     HasReply()
     {
-        flags = this.GetCallFlags()
+        var flags = this.GetCallFlags()
         if( flags & EnumCallFlags.CF_WITH_REPLY )
             return true
         return false

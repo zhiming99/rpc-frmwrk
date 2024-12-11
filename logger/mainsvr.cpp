@@ -270,7 +270,7 @@ int main( int argc, char** argv )
             strFile += pMgr->GetModName() + "][INFO] ";
             strFile += __FILE__;
             stdstr strMsg = DebugMsgEx( strFile.c_str(),
-                __LINE__, 0, "Logger started successfully" );
+                __LINE__, "Logger started successfully", 0 );
             pLogSvc->LogMessage( strMsg );
             ret = mainsvr( pIf, argc, argv );
         }
@@ -283,7 +283,7 @@ int main( int argc, char** argv )
             strFile += pMgr->GetModName() + "][INFO] ";
             strFile += __FILE__;
             stdstr strMsg = DebugMsgEx( strFile.c_str(),
-                __LINE__, 0, "Logger stopped" );
+                __LINE__, "Logger stopped", 0 );
             pLogSvc->LogMessage( strMsg );
         }
     }while( 0 );

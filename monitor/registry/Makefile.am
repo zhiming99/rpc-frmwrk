@@ -30,10 +30,11 @@ regfsmnt_CPPFLAGS+= -DFUSE3
 regfsmnt_LDFLAGS=-rdynamic
 endif
 
-EXTRA_DIST=README_cn.md
+EXTRA_DIST=README_cn.md regfsif.ridl regfs.ridl
 
 libregfs_la_LTLIBRARIES=libregfs.la
-libregfs_la_SOURCES = regfs.cpp blkalloc.h blkalloc.cpp dir.cpp file.cpp dllexp.cpp
+libregfs_la_SOURCES = regfs.cpp blkalloc.h blkalloc.cpp dir.cpp file.cpp \
+dllexp.cpp RegistryFs.cpp RegistryFs.h RegFsSvcLocalsvr.h RegFsSvcLocalsvr.cpp
 libregfs_la_CPPFLAGS= -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
 libregfs_HEADERS=
 libregfs_la_LIBADD= ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L../../3rd_party

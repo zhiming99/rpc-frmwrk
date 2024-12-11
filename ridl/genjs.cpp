@@ -3125,6 +3125,7 @@ gint32 CExportJsSampleHtml::Output()
         Wa( "<p id=\"log\">Sample HTML<br /></p>" );
         CCOUT << "<script src=\"dist/" << g_strAppName << ".js\">";
         NEW_LINE;
+        Wa( "<p id=\"rpcf_load_notify\"><br /></p>" );
         Wa( "</script>" );
         Wa( "<script>" );
         if( g_bAuth )

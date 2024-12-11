@@ -27,8 +27,9 @@ debdir:
     fi
 
 deb:
-	if [ "x$(DESTDIR)" == "x" ]; \
-        then echo done && false; \
+	if [ "x$(DESTDIR)" == "x" ]; then \
+        echo 'please call this target from the master Makefile in the parent directory' \
+        && false; \
 	else \
         if which debuild; then \
             make debdir DESTDIR=$(DESTDIR);\
@@ -51,9 +52,17 @@ deb:
             mv $$i $${i%%.ddeb}.$${debian_ver}.ddeb; \
         done;\
     fi;
+if ENABLE_JS
+	make -C ../monitor/oinit deb
+	cp ../monitor/oinit/output/python3-oinit*.deb .
+endif
 
 rpm:
 	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree
 	make -C .. dist
 	cp ../$(PACKAGE_NAME)-$(VERSION).tar.gz $${HOME}/rpmbuild/SOURCES
 	bash ./bldrpm.sh $$(pwd)/../ $(PACKAGE_NAME) $(host_cpu)
+if ENABLE_JS
+	make -C ../monitor/oinit rpm
+	cp ../monitor/oinit/output/python3-oinit*.rpm .
+endif

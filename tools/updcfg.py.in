@@ -97,18 +97,18 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 bSSL = True
             if elem[ 'EnableWS' ] == 'true' :
                 elem[ 'DestURL' ] = ifCfg[ 'DestURL' ]
-                #urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
-                #if urlComp.port is None :
-                #    if urlComp.scheme == 'https' or bSSL:
-                #        elem[ 'PortNumber' ] = '443'
-                #    elif urlComp.scheme == 'http' :
-                #        elem[ 'PortNumber' ] = '80'
-                #else :
-                #    elem[ 'PortNumber' ] = urlComp.port
-                #if urlComp.hostname is not None:
-                #    elem[ 'IpAddress' ] = urlComp.hostname
-                #else :
-                #    raise Exception( 'web socket URL is not valid' ) 
+                urlComp = urlparse( elem[ 'DestURL' ], scheme='https' )
+                if urlComp.port is None :
+                    if urlComp.scheme == 'https' or bSSL:
+                        elem[ 'PortNumber' ] = '443'
+                    elif urlComp.scheme == 'http' :
+                        elem[ 'PortNumber' ] = '80'
+                else :
+                    elem[ 'PortNumber' ] = urlComp.port
+                if urlComp.hostname is not None:
+                    elem[ 'IpAddress' ] = urlComp.hostname
+                else :
+                    raise Exception( 'web socket URL is not valid' ) 
             else :
                 elem.pop( 'DestURL', None )
 
@@ -973,6 +973,8 @@ def Update_Drv( initCfg: dict, drvFile : list,
                     oFactories.append( './libfuseif.so' )
                 if bAuth :
                     oFactories.append ( './libauth.so' )
+                    if strMech == 'OAuth2':
+                        oFactories.append ( './libregfs.so' )
                 if bSSL:
                     if bGmSSL:
                         oFactories.append( './libgmsslpt.so' )

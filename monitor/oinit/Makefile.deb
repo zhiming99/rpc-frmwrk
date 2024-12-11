@@ -1,0 +1,10 @@
+all:
+	python3 setup.py bdist_wheel
+
+libdir=${PWD}/usr/lib/rpcf
+install:
+	if [ ! -d ${libdir} ];then mkdir -p ${libdir};fi
+	install -m 0644 dist/oinit-*.whl ${libdir}
+
+distclean:
+	rm ${libdir}/* || true

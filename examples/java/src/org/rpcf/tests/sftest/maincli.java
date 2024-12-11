@@ -34,16 +34,18 @@ public class maincli
             return strDescPath;
         return "";
     }
+    @SuppressWarnings("empty-statement")
     public static byte[] getMD5(String strPath)
     {
         byte[] digest;
         try{
             byte[] buf = new byte[1024];
             MessageDigest md = MessageDigest.getInstance("MD5");
-            InputStream is = Files.newInputStream(Paths.get(strPath));
-            DigestInputStream dis = new DigestInputStream(is, md);
-            while(dis.read(buf,0,buf.length) != -1);
-            digest = md.digest();
+            try (InputStream is = Files.newInputStream(Paths.get(strPath));
+            DigestInputStream dis = new DigestInputStream(is, md)) {
+                while(dis.read(buf,0,buf.length) != -1);
+                digest = md.digest();
+            }
         }catch(IOException | NoSuchAlgorithmException e){
             return null;
         }
