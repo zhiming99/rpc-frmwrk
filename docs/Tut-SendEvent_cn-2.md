@@ -1,4 +1,4 @@
-# C++开发教程
+# rpc-frmwrk开发教程
 ## 第二节 发送和处理服务器事件
 **本节要点**：   
 * 用[ridlc](../ridl/README_cn.md#启动ridlc)生成EventTest项目。

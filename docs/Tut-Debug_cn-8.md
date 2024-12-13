@@ -1,4 +1,4 @@
-# C++开发教程
+# rpc-frmwrk开发教程
 ## 第八节 调试
 **本节要点**：   
 * 本文介绍一些rpc-frmwrk程序的调试手段和技巧, 尤其是查找程序崩溃，泄漏，或者死锁等问题时的应对之策。
@@ -56,3 +56,4 @@
 Python和Java的服务器和客户端，分别会调用rpc-frmwrk的运行库，因此通过`gdb python3`或者`gdb java`也可以进行底层逻辑的调试。
 
 [上一讲](./Tut-AsyncProgramming_cn-7.md)   
+[下一讲](./Tut-HowToBuild_cn-9.md)

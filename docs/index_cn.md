@@ -77,3 +77,4 @@
   * [教程6-流的概念和编程](./Tut-Stream_cn-6.md)
   * [教程7-异步编程进阶](./Tut-AsyncProgramming_cn-7.md)
   * [教程8-调试](./Tut-Debug_cn-8.md)
+  * [教程9-如何编译rpc-frmwrk](./Tut-HowToBuild_cn-9.md)
