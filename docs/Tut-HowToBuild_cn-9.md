@@ -41,12 +41,12 @@
 6. 如果你的机器十分强大，可以考虑在make命令后加`-j n`(n is number of parallel tasks)，可以加快编译速度. 
 
 ### 在树梅派上编译`rpc-frmwrk`:
-* 过程同X86上的编译。树梅派一般资源有限，所以Java, JS的支持都会关闭。配置上采用`bash cfgsel -r  --disable-js --disable-java`。树莓派上，编译时执行`make`就够了，不要`make -j4`, 后者有时候会死机。
+* 过程同X86上的编译。树梅派一般资源有限，所以Java, JS的支持都会关闭。配置上采用`bash cfgsel -r  --disable-js --disable-java`。树莓派上，编译时执行`make`即可，使用`make -j4`，有时会死机。
 
 ### 交叉编译
 * 目前还未成功过。
 
 ### 已知问题
-* 由于各个linux的发行版繁杂，不能一一测试，可能会导致编译时出现错误
+* 由于各个linux的发行版繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈。
 
 [上一讲](./Tut-Debug_cn-8.md)   
