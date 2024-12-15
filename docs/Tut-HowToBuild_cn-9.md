@@ -6,6 +6,7 @@
 ## 另一种快速编译`rpc-frmwrk`的途径
 1. 下载如下三个文件 [buildall-deb.sh](../tools/buildall-deb.sh), [buildall-fed.sh](../tools/buildall-fed.sh), 和[makerpcf.sh](../tools/makerpcf.sh)到同一个目录下.
 2. 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。
+3. 我们还提供一个树莓派的的编译脚本[buildall-rasp.sh](../tools/buildall-rasp.sh)，和[makerpcf-rasp.sh](../tools/makerpcf-rasp.sh)。它主要是裁减了几个比较占资源的功能模块，以降低下载失败的概率，和加快编译速度。
 
 ## 硬核编译`rpc-frmwrk`的方法
 ### 搭建编译环境
@@ -47,6 +48,6 @@
 * 目前还未成功过。
 
 ### 已知问题
-* 由于各个linux的发行版繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈。
+* 由于各个linux的发行版繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈，我们会尽快修复。
 
 [上一讲](./Tut-Debug_cn-8.md)   
