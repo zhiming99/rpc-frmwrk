@@ -29,7 +29,7 @@ jobs:
     - name: pip install
       run: pip3 install numpy wheel
     - name: install sip
-      run: sudo apt-get -y install sip5-tools || sudo apt-get -y install sip-dev python3-sip python3-sip-dev || true; sudo apt-get -y install fuse3 libfuse3-3 libfuse3-dev || true; sudo apt-get -y install libjsoncpp1 libjsoncpp-dev || sudo apt-get -y install libjsoncpp25 libjsoncpp-dev 
+      run: sudo apt-get -y install sip5-tools || sudo apt-get -y install sip-tools python3-sip python3-sip-dev || true; sudo apt-get -y install fuse3 libfuse3-3 libfuse3-dev || true; sudo apt-get -y install libjsoncpp1 libjsoncpp-dev || sudo apt-get -y install libjsoncpp25 libjsoncpp-dev 
     - name: npm install
       run: npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash minify xxhashjs webpack webpack-cli vm events crypto-browserify stream-browserify
 
