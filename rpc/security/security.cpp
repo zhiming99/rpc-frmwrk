@@ -34,7 +34,7 @@
 #ifdef OA2
 #include "blkalloc.h"
 using namespace rpcf;
-#include "oa2check/oa2check.h"
+#include "oa2check/OA2proxycli.h"
 #define CLI_REG "clientreg.dat"
 #include "oa2proxy.h"
 #endif
@@ -593,8 +593,12 @@ gint32 CRpcTcpBridgeAuth::OnLoginFailed(
     gint32 ret = 0;
     do{
 
+        stdstr strMsg = "Error Login: ";
+        DumpConnParams( strMsg );
+        strMsg += "Login=false";
+        LOGERR( GetIoMgr(), iRet, strMsg );
         DebugPrintEx( logErr, iRet, "Login failed,"
-            " connection is reset" );
+            " connection will be reset" );
         CRpcRouter* pRouter = GetParent();
         if( !m_pLoginTimer.IsEmpty() )
             ( *m_pLoginTimer )( eventCancelTask );
@@ -603,6 +607,91 @@ gint32 CRpcTcpBridgeAuth::OnLoginFailed(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CRpcTcpBridgeAuth::DumpConnParams(
+    stdstr& strMsg )
+{
+    gint32 ret = 0;
+    do{
+        IConfigDb* pConnParams;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetPointer(
+            propConnParams, pConnParams );
+        if( ERROR( ret ) )
+            break;
+        CConnParams oConn( pConnParams );
+        stdstr strVal = oConn.GetSrcIpAddr();
+        strMsg += stdstr( "SrcIp=" ) +
+            strVal + ",";
+        guint32 dwVal = oConn.GetSrcPortNum();
+        strMsg += stdstr( "SrcPort=" ) +
+                std::to_string( dwVal ) + ",";
+        strVal = oConn.GetDestIpAddr();
+        strMsg += stdstr( "DestIp=" ) +
+            strVal + ",";
+        dwVal = oConn.GetDestPortNum();
+        strMsg += stdstr( "DestPort=" ) +
+                std::to_string( dwVal ) + ",";
+        strVal = oConn.GetRouterPath();
+        strMsg += stdstr( "RouterPath=" ) +
+            strVal + ",";
+        bool bVal = oConn.IsSSL();
+        if( bVal )
+            strMsg += stdstr( "SSL=true," );
+        else
+            strMsg += stdstr( "SSL=false," );
+        bVal = oConn.IsWebSocket();
+        if( bVal )
+            strMsg += stdstr( "WebSock=true," );
+        else
+            strMsg += stdstr( "WebSock=false," );
+        if( bVal )
+        {
+            strVal = oConn.GetUrl();
+            strMsg += stdstr( "Url=" ) +
+                strVal + ",";
+        }
+
+    }while( 0 );
+    return 0;
+}
+
+gint32 CRpcTcpBridgeAuth::LogSuccessfuleLogin(
+    const stdstr& strSess,
+    IConfigDb* pUserInfo )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strMsg = "Session ";
+        strMsg += strSess + ": ";
+        CCfgOpener oInfo( pUserInfo );
+        stdstr strVal;
+        ret = oInfo.GetStrProp(
+            propUserName, strVal );
+        if( SUCCEEDED( ret ) )
+            strMsg += stdstr( "UserName=" ) +
+                strVal + ",";
+        guint32 dwVal = 0;
+        ret = oInfo.GetIntProp(
+            propTimeoutSec, dwVal );
+        if( SUCCEEDED( ret ) )
+            strMsg += stdstr( "Lifetime=" ) +
+                std::to_string( dwVal ) + ",";
+        if( strSess.substr( 0, 4 ) == "AUoa" )
+            strMsg += stdstr( "Auth=OAuth2," );
+        else if( strSess.substr( 0, 2 ) == "AU" )
+            strMsg += stdstr( "Auth=krb5," );
+        else
+            strMsg += stdstr( "Auth=none," );
+        strVal.clear();
+        DumpConnParams( strVal );
+        if( strVal.size() )
+            strMsg += strVal;
+        strMsg += "Login=true";
+        LOGINFO( GetIoMgr(), 0, strMsg );
+    }while( 0 );
     return ret;
 }
 
@@ -735,6 +824,15 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
                 if( ERROR( ret ) )
                     break;
 
+                CCfgOpener oInfo;
+                ret = pAuth->InquireSess(
+                    strSess, oInfo.GetCfg() );
+                if( SUCCEEDED( ret ) )
+                {
+                    pIf->LogSuccessfuleLogin(
+                        strSess, oInfo.GetCfg() );
+                }
+
                 TaskletPtr pDummy;
                 ret = pDummy.NewObj( 
                     clsid( CIfDummyTask ) );
@@ -769,7 +867,6 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
     if( ERROR( ret ) )
     {
         auto pMgr = GetIoMgr();
-        LOGERR( pMgr, ret, "Login failed" );
         DEFER_CALL_DELAY( pMgr, 1, 
             ObjPtr( this ),
             &CRpcTcpBridgeAuth::OnLoginFailed,
@@ -3575,6 +3672,79 @@ gint32 CAuthentServer::Login(
             ret = -EFAULT;
             break;
         }
+        if( pObj->GetState() == stateStopped )
+        {
+            Variant oVar;
+            ret = this->GetProperty(
+                propAuthInfo, oVar );
+            if( ERROR( ret ) )
+                break;
+            ObjPtr pObj = oVar;
+            ret = pObj->GetProperty(
+                propAuthMech, oVar );
+            if( ERROR( ret ) )
+                break;
+            if( ( ( stdstr& )oVar ) == "OAuth2" )
+            {
+#ifdef OA2
+                // restart the checker, OAuth2 checker
+                // may drop offline if inactivity lasts
+                // over two minutes.
+                DebugPrintEx( logErr, 0,
+                    "Reconnect the oa2checker" );
+                gint32 (*pLogin)(
+                    IEventSink* pThisTask,
+                    CAuthentServer*,
+                    IEventSink*, IConfigDb* ) =
+                ([]( IEventSink* pThisTask,
+                    CAuthentServer* pSvr,
+                    IEventSink* pCb,
+                    IConfigDb* pInfo )->gint32
+                {
+                    gint32 ret = 0;
+                    CCfgOpener oResp;
+                    CParamList oParams;
+                    ObjPtr pObj;
+                    ret = pSvr->GetAuthImpl( pObj );
+                    if( ERROR( ret ) )
+                        return ret;
+                    COA2proxy_CliImpl* pAuth = pObj;
+                    ret = pAuth->Login(
+                        pCb, pInfo, oResp.GetCfg() );
+                    if( ret == STATUS_PENDING )
+                        return 0;
+                    oParams.SetIntProp(
+                        propReturnValue, ret );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        ObjPtr pObj = oResp.GetCfg();
+                        oParams.Push( pObj );
+                    }
+                    pSvr->OnServiceComplete(
+                        oParams.GetCfg(), pCb );
+                    return 0;
+                });
+                TaskletPtr pLoginTask;
+                ret = NEW_COMPLETE_FUNCALL( 0,
+                    pLoginTask, this->GetIoMgr(),
+                    pLogin, nullptr, this,
+                    pCallback, pInfo );
+                if( ERROR( ret ) )
+                    break;
+                ret = StartOA2Checker( pLoginTask );
+                if( ret != STATUS_PENDING )
+                    ( *pLoginTask )( eventCancelTask );
+                if( ERROR( ret ) ||
+                    ret == STATUS_PENDING )
+                    break;
+#endif
+            }
+            else
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+        }
 
         IAuthenticate* pAuth =
         dynamic_cast< IAuthenticate* >
@@ -3996,7 +4166,7 @@ gint32 CAuthentServer::OnStartOA2CheckerComplete(
     }while( 0 );
 
     pCallback->OnEvent( eventTaskComp,
-        ret, 0, ( LONGWORD* )this );
+        ret, 0, ( LONGWORD* )pIoReq );
 
     return ret;
 }

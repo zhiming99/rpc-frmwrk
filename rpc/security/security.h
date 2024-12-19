@@ -592,6 +592,13 @@ class CRpcTcpBridgeAuth :
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
 
+    gint32 DumpConnParams(
+        stdstr& strMsg );
+
+    gint32 LogSuccessfuleLogin(
+        const stdstr& strSess,
+        IConfigDb* pUserInfo );
+
     public:
     typedef CRpcTcpBridge super;
     CRpcTcpBridgeAuth( const IConfigDb* pCfg ) :
