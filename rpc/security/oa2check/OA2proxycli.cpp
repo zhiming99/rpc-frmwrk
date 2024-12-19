@@ -222,7 +222,7 @@ gint32 COA2proxy_CliImpl::InquireSess(
     oInfo.SetStrProp(
         propAuthMech, "OAuth2" );
 
-    return ERROR_FALSE;
+    return 0;
 
 }
 
@@ -493,7 +493,7 @@ gint32 COA2proxy_CliImpl::Login(
         ret = this->DoLogin( oCtx2.GetCfg(),
             ( stdstr& )oToken, ui );
 
-        if( ret == STATUS_PENDING )
+        if( ret == STATUS_PENDING || ERROR( ret ) )
             break;
 
         this->BuildLoginResp(
