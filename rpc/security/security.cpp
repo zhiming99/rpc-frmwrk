@@ -1413,6 +1413,9 @@ gint32 CRpcReqForwarderAuth::GetLatestHash(
         strHash = strVal;
 
     }while( 0 );
+    if( ERROR( ret ) )
+        OutputMsg( ret, "Error cannot find valid "
+            "credential to login" );
     if( bClose )
         pRegfs->CloseFile( hDir );
 
@@ -1594,6 +1597,11 @@ gint32 CRpcReqForwarderAuth::CheckOAuth2Params(
                 strVal.size(), strHash );
              ret = GetCookieByHash(
                 pConnParams, strHash );   
+        }
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error cannot find valid "
+                "credential to login" );
         }
 
     }while( 0 );
