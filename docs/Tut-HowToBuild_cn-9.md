@@ -20,8 +20,8 @@
 8. 从`https://github.com/zhiming99/rpc-frmwrk.git`下载`rpc-frmwrk`的代码树。
 9. 在代码的根目录下，运行如下命令初始化编译环境。
     * `libtoolize` 
-    * 运行`automake --add-missing`生成主`Makefile.in`.
     * 运行`autoreconf`生成`config.h.in`.
+    * 运行`automake --add-missing`生成主`Makefile.in`.
     * 运行`autoconf`生成脚本`configure`.
 ### 根据需求裁减所需的功能模块
 `rpc-frmwrk`目前支持四种语言，两种安全认证方式，两种SSL连接。所以对于不在需求范围的语言和功能，可以进行一些裁减。可裁减的模块有一定的依赖关系，因此在裁减时需要注意。  
