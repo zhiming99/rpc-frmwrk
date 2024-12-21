@@ -47,7 +47,8 @@ CRpcTcpBusPort::CRpcTcpBusPort(
     const IConfigDb* pCfg )
     : super( pCfg )
 {
-    m_atmPdoId = ( guint32 )GetRandom();
+    m_atmPdoId =
+        ( ( ( guint32 )GetRandom() ) >> 1 );
     SetClassId( clsid( CRpcTcpBusPort ) );
     CCfgOpener oCfg( pCfg );
     gint32 ret = oCfg.GetIntProp(

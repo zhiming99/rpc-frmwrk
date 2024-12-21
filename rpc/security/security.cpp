@@ -3682,19 +3682,9 @@ gint32 CAuthentServer::Login(
         }
         if( pObj->GetState() == stateStopped )
         {
-            Variant oVar;
-            ret = this->GetProperty(
-                propAuthInfo, oVar );
-            if( ERROR( ret ) )
-                break;
-            ObjPtr pObj = oVar;
-            ret = pObj->GetProperty(
-                propAuthMech, oVar );
-            if( ERROR( ret ) )
-                break;
-            if( ( ( stdstr& )oVar ) == "OAuth2" )
-            {
 #ifdef OA2
+            if( GetAuthMech() == "OAuth2" )
+            {
                 // restart the checker, OAuth2 checker
                 // may drop offline if inactivity lasts
                 // over two minutes.
@@ -3745,9 +3735,9 @@ gint32 CAuthentServer::Login(
                 if( ERROR( ret ) ||
                     ret == STATUS_PENDING )
                     break;
-#endif
             }
             else
+#endif
             {
                 ret = ERROR_STATE;
                 break;
@@ -4270,6 +4260,7 @@ gint32 CAuthentServer::OnPostStart(
         if( ERROR( ret ) )
             break;
 
+        m_strMech = strMech;
 #ifdef KRB5
         if( strMech == "krb5" )
         {
