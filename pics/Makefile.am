@@ -25,4 +25,5 @@ rpcfg2-3.png \
 rpcfg2-4.png \
 new.png \
 client-req-process.png \
-server-req-process.png 
+server-req-process.png \
+dumpobjs.png
