@@ -26,7 +26,7 @@ RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
 #RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
 # && source .bashrc && nvm install 20 && node -v
 
-RUN apt-get -y install sip5-tools || apt-get -y install sip-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
+RUN apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
 RUN apt-get -y install git devscripts debhelper expect vim screen tmux npm iputils-ping; \
  cd ${HOME} && git clone 'https://github.com/zhiming99/GmSSL.git'

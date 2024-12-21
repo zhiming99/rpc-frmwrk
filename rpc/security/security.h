@@ -361,6 +361,7 @@ class CAuthentServer:
     public IAuthenticateServer
 {
     ObjPtr m_pAuthImpl;
+    stdstr m_strMech;
 
     gint32 StartAuthImpl(
         IEventSink* pCallback );
@@ -398,6 +399,9 @@ class CAuthentServer:
         vecIids.push_back( iid( IAuthenticateServer ) );
         return 0;
     }
+
+    inline stdstr GetAuthMech() const
+    { return m_strMech; }
 
     gint32 QueryInterface( EnumClsid iid, void*& pIf ) override
     {
@@ -591,6 +595,13 @@ class CRpcTcpBridgeAuth :
         IEventSink* pCallback,
         IEventSink* pIoReq,
         IConfigDb* pReqCtx );
+
+    gint32 DumpConnParams(
+        stdstr& strMsg );
+
+    gint32 LogSuccessfuleLogin(
+        const stdstr& strSess,
+        IConfigDb* pUserInfo );
 
     public:
     typedef CRpcTcpBridge super;

@@ -4465,6 +4465,13 @@ gint32 CRpcServices::LoadObjDesc(
                         strVal = oObjAuth[ JSON_ATTR_OAUTH2_AUTHURL ].asString();
                         oAuth.SetStrProp( propAuthUrl, strVal );
                     }
+
+                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_SCOPE ) &&
+                        oObjAuth[ JSON_ATTR_OAUTH2_SCOPE ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_SCOPE ].asString();
+                        oAuth.SetStrProp( propScope, strVal );
+                    }
                 }
                 else
                 {    

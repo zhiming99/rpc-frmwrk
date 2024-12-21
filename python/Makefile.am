@@ -46,11 +46,11 @@ all:
 
 genpipopt:
 	$(eval pipopt=$(shell os_name=$$(cat /etc/issue | awk '{print $$1}');\
-    os_version=$$(cat /etc/issue | awk '{print $$3}');\
     if [ "x$${os_name}" == "xDebian" ]; then \
+        os_version=$$(cat /etc/issue | awk '{print $$3}');\
         echo $$(if (($${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
     elif [ "x$${os_name}" == "xUbuntu" ]; then \
-        os_version=$$(echo $${os_version} | awk -F'.' "{print $$1}"); \
+        os_version=$$(cat /etc/issue | awk '{print $$2}' | awk -F'.' '{print $$1}');\
         echo $$(if (($${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
     fi))
 	@if [ "x${pipopt}" != "x" ]; then \
