@@ -362,6 +362,7 @@ class CAuthentServer:
 {
     ObjPtr m_pAuthImpl;
     stdstr m_strMech;
+    TaskGrpPtr m_pLoginTasks;
 
     gint32 StartAuthImpl(
         IEventSink* pCallback );
@@ -428,14 +429,24 @@ class CAuthentServer:
         gint32 dwPortId,
         std::string& strSess );
 
-    inline gint32 GetAuthImpl(
-        ObjPtr& pAuthImpl ) const
-    {
-        if( m_pAuthImpl.IsEmpty() )
-            return -EFAULT;
-        pAuthImpl = m_pAuthImpl;
-        return 0;
+    gint32 GetAuthImpl(
+        ObjPtr& pAuthImpl );
+
+    inline ObjPtr GetAuthImplNoLock()
+    { return m_pAuthImpl; }
+
+    gint32 SetAuthImpl(
+        ObjPtr pAuthImpl );
+
+    inline TaskGrpPtr GetPendingLogins()
+    { 
+        TaskGrpPtr pTask = m_pLoginTasks;
+        m_pLoginTasks.Clear();
+        return pTask;
     }
+
+    gint32 QueueLoginTask(
+        TaskletPtr& pTask );
 
     virtual gint32 Login(
         IEventSink* pCallback,

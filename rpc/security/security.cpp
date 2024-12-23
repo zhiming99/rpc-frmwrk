@@ -3667,6 +3667,176 @@ gint32 CAuthentServer::InitUserFuncs()
     return 0;
 }
 
+gint32 CAuthentServer::SetAuthImpl(
+    ObjPtr pAuthImpl )
+{
+    guint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        if( !m_pAuthImpl.IsEmpty() )
+        {
+            ret = -EEXIST;
+            break;
+        }
+        m_pAuthImpl = pAuthImpl;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAuthentServer::GetAuthImpl(
+    ObjPtr& pAuthImpl )
+{
+    guint32 ret = 0;
+    do{
+        if( GetAuthMech() != "OAuth2" )
+        {
+            pAuthImpl = m_pAuthImpl;
+            break;
+        }
+        CStdRMutex oLock( this->GetLock() );
+        if( GetState() != stateConnected )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        if( m_pAuthImpl.IsEmpty() )
+        {
+            ret = -EAGAIN;
+            break;
+        }
+        CRpcServices* pSvc = m_pAuthImpl;
+        if( pSvc->GetState() != stateStopped )
+        {
+            pAuthImpl = m_pAuthImpl;
+            break;
+        }
+
+        m_pAuthImpl.Clear();
+        int (*func)( IEventSink*,
+            CAuthentServer* ) =
+        ([]( IEventSink* pCb,
+            CAuthentServer* pSvr )->gint32
+        {
+            gint32 ret = 0;
+            do{
+                CCfgOpenerObj oCfg( pCb );
+                IConfigDb* pResp;
+                ret = oCfg.GetPointer(
+                    propRespPtr, pResp );
+                if( ERROR( ret ) )
+                    break;
+                CCfgOpener oResp( pResp );
+                gint32 iRet = 0;
+                ret = oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& )iRet );
+                if( ERROR( ret ) )
+                    break;
+                if( ERROR( iRet ) )
+                {
+                    ret = iRet;
+                    break;
+                }
+            }while( 0 );
+            do{
+                CStdRMutex oLock( pSvr->GetLock() );
+                if( pSvr->GetState() != stateConnected &&
+                    SUCCEEDED( ret ) )
+                    ret = ERROR_STATE;
+                TaskGrpPtr pg =
+                    pSvr->GetPendingLogins();
+                EnumTaskState s = pg->GetTaskState();
+                bool bHasLogin = ( !pg.IsEmpty() &&
+                    !pg->IsStopped( s ) );
+                ObjPtr pImpl = pSvr->GetAuthImplNoLock();
+                oLock.Unlock();
+                if( ERROR( ret ) && bHasLogin )
+                {
+                    ( *pg )( eventCancelTask );
+                    break;
+                }
+                else if( bHasLogin )
+                {
+                    IEventSink* pTask = pg;
+                    CRpcServices* pSvc = pImpl;
+                    if( pSvc )
+                        ret = pSvc->RunManagedTask2(
+                            pTask );
+                    else
+                        ret = -EFAULT;
+                    if( ERROR( ret ) )
+                        ( *pg )( eventCancelTask );
+                }
+            }while( 0 );
+            return 0;
+        });
+        TaskletPtr pCompTask;
+        ret = NEW_COMPLETE_FUNCALL( 0, 
+            pCompTask, this->GetIoMgr(),
+            func, nullptr, this ); 
+        if( ERROR( ret ) )
+            break;
+        ret = StartOA2Checker( pCompTask );
+        if( ERROR( ret ) )
+            ( *pCompTask )( eventCancelTask );
+        // notify to queue the login task
+        ret = -EAGAIN;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAuthentServer::QueueLoginTask(
+    TaskletPtr& pTask )
+{
+    guint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        if( GetState() != stateConnected )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        if( !m_pAuthImpl.IsEmpty() )
+        {
+            CRpcServices* pImpl = m_pAuthImpl;
+            ret = pImpl->RunManagedTask2( pTask );
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_PENDING;
+            break;
+        }
+        CIfTaskGroup* pg = m_pLoginTasks;
+        if( pg == nullptr ||
+            pg->IsStopped( pg->GetTaskState() ) )
+        {
+            CCfgOpener oParams;
+            oParams.SetPointer(
+                propIfPtr, this );
+            ret = m_pLoginTasks.NewObj(
+                clsid( CIfParallelTaskGrp ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            m_pLoginTasks->AppendTask( pTask );
+            ret = STATUS_PENDING;
+            break;
+        }
+        else
+        {
+            if( m_pLoginTasks->GetTaskCount() > 20 )
+            {
+                ret = -ENOMEM;
+                break;
+            }
+            ret = m_pLoginTasks->AppendTask( pTask );
+            if( ERROR( ret ) )
+                break;
+            ret = STATUS_PENDING;
+        }
+        
+    }while( 0 );
+    return ret;
+}
+
 gint32 CAuthentServer::Login(
     IEventSink* pCallback,
     IConfigDb* pInfo, /*[ in ]*/
@@ -3674,13 +3844,9 @@ gint32 CAuthentServer::Login(
 {
     gint32 ret = 0;
     do{
-        CRpcServices* pObj = m_pAuthImpl;
-        if( pObj == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        if( pObj->GetState() == stateStopped )
+        ObjPtr pObj;
+        ret = this->GetAuthImpl( pObj );
+        if( ret == -EAGAIN )
         {
 #ifdef OA2
             if( GetAuthMech() == "OAuth2" )
@@ -3691,11 +3857,9 @@ gint32 CAuthentServer::Login(
                 DebugPrintEx( logErr, 0,
                     "Reconnect the oa2checker" );
                 gint32 (*pLogin)(
-                    IEventSink* pThisTask,
                     CAuthentServer*,
                     IEventSink*, IConfigDb* ) =
-                ([]( IEventSink* pThisTask,
-                    CAuthentServer* pSvr,
+                ([]( CAuthentServer* pSvr,
                     IEventSink* pCb,
                     IConfigDb* pInfo )->gint32
                 {
@@ -3723,18 +3887,18 @@ gint32 CAuthentServer::Login(
                     return 0;
                 });
                 TaskletPtr pLoginTask;
-                ret = NEW_COMPLETE_FUNCALL( 0,
+                ret = NEW_FUNCCALL_TASKEX(
                     pLoginTask, this->GetIoMgr(),
-                    pLogin, nullptr, this,
-                    pCallback, pInfo );
+                    pLogin, this, pCallback, pInfo );
                 if( ERROR( ret ) )
                     break;
-                ret = StartOA2Checker( pLoginTask );
-                if( ret != STATUS_PENDING )
+                ret = QueueLoginTask( pLoginTask );
+                if( ERROR( ret ) )
+                {
                     ( *pLoginTask )( eventCancelTask );
-                if( ERROR( ret ) ||
-                    ret == STATUS_PENDING )
-                    break;
+                    ret = -EACCES;
+                }
+                break;
             }
             else
 #endif
@@ -3744,9 +3908,10 @@ gint32 CAuthentServer::Login(
             }
         }
 
+        CRpcServices* pSvc = pObj;
         IAuthenticate* pAuth =
         dynamic_cast< IAuthenticate* >
-                ( pObj );
+                ( pSvc );
 
         if( unlikely( pAuth == nullptr ) )
         {
@@ -4047,7 +4212,7 @@ gint32 CAuthentServer::OnStartAuthImplComplete(
         if( ERROR( ret ) )
             break;
 
-        m_pAuthImpl = pSvc;
+        SetAuthImpl( ObjPtr( pSvc ) );
 
     }while( 0 );
 
@@ -4159,9 +4324,19 @@ gint32 CAuthentServer::OnStartOA2CheckerComplete(
         if( ERROR( ret ) )
             break;
 
-        m_pAuthImpl = pSvc;
+        SetAuthImpl( ObjPtr( pSvc ) );
 
     }while( 0 );
+    if( ERROR( ret ) )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+        "Error, oa2checker failed to start, "
+        "login stop working" );
+
+        DebugPrintEx( logErr, ret,
+            "Error, oa2checker failed to start, " 
+            "login stop working" );
+    }
 
     pCallback->OnEvent( eventTaskComp,
         ret, 0, ( LONGWORD* )pIoReq );
@@ -4218,7 +4393,7 @@ gint32 CAuthentServer::StartOA2Checker(
         if( ERROR( ret ) )
             break;
 
-        m_pAuthImpl = pIf;
+        // m_pAuthImpl = pIf;
         ret = pIf->StartEx( pRespCb );
         if( ret != STATUS_PENDING )
             ( *pRespCb )( eventCancelTask );
@@ -4233,8 +4408,9 @@ gint32 CAuthentServer::OnPostStart(
 {
     gint32 ret = 0;
     do{
-        // supercede the service name with the
+        // replace the service name with the
         // service name from the command line
+        // if specified.
         IConfigDb* pAuth = nullptr;
         CCfgOpenerObj oCfg( this );
 
@@ -4332,28 +4508,69 @@ gint32 CAuthentServer::OnPreStopComplete(
 gint32 CAuthentServer::OnPreStop(
     IEventSink* pCallback )
 {
-    if( m_pAuthImpl.IsEmpty() )
-        return -EINVAL;
+    gint32 ret = 0;
 
     TaskletPtr pRespCb;
-    gint32 ret = NEW_PROXY_RESP_HANDLER2(
+    ret = NEW_PROXY_RESP_HANDLER2(
         pRespCb, ObjPtr( this ),
         &CAuthentServer::OnPreStopComplete,
         pCallback, nullptr );
     if( ERROR( ret ) )
         return ret;
 
-    CRpcServices* pSvc = m_pAuthImpl;
-    if( pSvc->GetState() == stateConnected )
+    if( GetAuthMech() != "OAuth2" )
     {
-        ret = pSvc->Shutdown( pRespCb );
+        if( m_pAuthImpl.IsEmpty() )
+            return -EINVAL;
+
+        CRpcServices* pSvc = m_pAuthImpl;
+        CStdRMutex oLock( pSvc->GetLock() );
+        if( pSvc->GetState() != stateStopped &&
+            pSvc->GetState() != stateStopping )
+        {
+            oLock.Unlock();
+            ret = pSvc->Shutdown( pRespCb );
+            if( ret != STATUS_PENDING )
+                ( *pRespCb )( eventCancelTask );
+        }
+
         if( ret != STATUS_PENDING )
-            ( *pRespCb )( eventCancelTask );
+            m_pAuthImpl.Clear();
+        return ret;
     }
-
-    if( ret != STATUS_PENDING )
-        m_pAuthImpl.Clear();
-
+    do{
+        ObjPtr pImpl;
+        CStdRMutex oLock( GetLock() );
+        pImpl = m_pAuthImpl;
+        CRpcServices* pSvc = pImpl;
+        if( pSvc == nullptr )
+        {
+            TaskGrpPtr pg = GetPendingLogins();
+            if( pg.IsEmpty()  ||
+                pg->IsStopped( pg->GetTaskState() ) )
+            {
+                break;
+            }
+            else if( !pg.IsEmpty() &&
+                !pg->IsStopped( pg->GetTaskState() ) )
+            {
+                oLock.Unlock();
+                ( *pg )( eventCancelTask );
+                break;
+            }
+        }
+        CStdRMutex oIfLock( pSvc->GetLock() );
+        if( pSvc->GetState() != stateStopped &&
+            pSvc->GetState() != stateStopping )
+        {
+            oIfLock.Unlock();
+            oLock.Unlock();
+            ret = pSvc->Shutdown( pRespCb );
+            if( ret != STATUS_PENDING )
+                ( *pRespCb )( eventCancelTask );
+            break;
+        }
+    }while( 0 );
     return ret;
 }
 
