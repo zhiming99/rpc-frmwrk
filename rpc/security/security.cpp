@@ -3158,16 +3158,116 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
         // just to check if the token exchange is
         // done. if failed, the invoke task will
         // be completed here.
-        ret = NEW_PROXY_RESP_HANDLER2(
-            pRespCb1, ObjPtr( this ),
-            &CRpcReqForwarderAuth::OnSessImplStarted,
-            pInvTask, pReqCtx );
-        if( ERROR( ret ) )
-            break;
+        gint32 (*pLoginCb)( IEventSink*,
+            CRpcReqForwarderAuth*,
+            CRpcServices*,
+            IEventSink*, IConfigDb* ) =
+        ([](IEventSink* pCb,
+            CRpcReqForwarderAuth* pFwdr,
+            CRpcServices* pAuthImpl,
+            IEventSink* pInvTask,
+            IConfigDb* pReqCtx )->gint32
+        {
+            if( pInvTask == nullptr ||
+                pReqCtx == nullptr )
+                return -EINVAL;
+
+            gint32 ret = 0;
+            CParamList oParams;
+            CCfgOpener oReqCtx( pReqCtx );
+            do{
+                pFwdr->SetStartCtx( nullptr );
+                CCfgOpenerObj oReq( pCb );
+                IConfigDb* pResp = nullptr;
+                ret = oReq.GetPointer(
+                    propRespPtr, pResp );
+                if( ERROR( ret ) )
+                    break;
+
+                CCfgOpener oResp( pResp );
+                gint32 iRet = 0;
+                ret = oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& ) iRet );
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( ERROR( iRet ) )
+                {
+                    ret = iRet;
+                    break;
+                }
+
+            }while( 0 );
+
+            if( ERROR( ret ) )
+            do{
+                gint32 iRet = 0;
+                IConfigDb* pConn;
+                iRet = oReqCtx.GetPointer(
+                    propConnParams, pConn );
+                if( ERROR( iRet ) )
+                    break;
+
+                CRpcRouterReqFwdr* pRouter =
+                    static_cast< CRpcRouterReqFwdr* >
+                        ( pFwdr->GetParent() );
+                InterfPtr pProxy;
+                iRet = pRouter->GetBridgeProxy(
+                    pConn, pProxy );
+                if( ERROR( iRet ) )
+                    break;
+                CRpcServices* pSvc = pProxy;
+                PortPtr pPort = pSvc->GetPort();
+                Variant oVar;
+                iRet = pPort->GetProperty(
+                    propPdoId, oVar );
+                if( ERROR( iRet ) )
+                    break;
+                guint32 dwPortId = oVar;
+                stdstr strSender;
+                stdstr strUniq;
+                pPort = pAuthImpl->GetPort();
+                iRet = pPort->GetProperty(
+                    propSrcDBusName, oVar );
+                if( ERROR( iRet ) )
+                    break;
+                strSender = ( stdstr& )oVar;
+                iRet = pPort->GetProperty(
+                    propSrcUniqName, oVar );
+                if( ERROR( iRet ) )
+                    break;
+                strUniq = ( stdstr& )oVar;
+                TaskletPtr pDummy;
+                pDummy.NewObj( clsid(CIfDummyTask)  );
+                iRet = pFwdr->StopBridgeProxy( pDummy,
+                    dwPortId, strUniq, strSender );
+                if( ERROR( iRet ) )
+                    break;
+
+            }while( 0 );
+
+            if( ERROR( ret ) )
+            {
+                oParams[ propReturnValue ] = ret;
+                pFwdr->OnServiceComplete(
+                    oParams.GetCfg(), pInvTask );
+            }
+            if( ret == STATUS_PENDING )
+                ret = 0;
+
+            return ret;
+        });
+
+        TaskletPtr pCheckResp;
+        ret = NEW_COMPLETE_FUNCALL( 0, pCheckResp,
+            GetIoMgr(), pLoginCb, nullptr,
+            this, pIf, pInvTask, pReqCtx );
 
         TaskletPtr pLoginTask;
         ret = CAuthentProxy::BuildLoginTask(
-            pIf, pRespCb1, pLoginTask );
+            pIf, pCheckResp, pLoginTask );
 
         if( ERROR( ret ) )
             break;
@@ -3194,7 +3294,7 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
 
         if( ERROR( ret ) )    
             break;
-       
+
         CIfTransactGroup* pTractGrp = pTaskGrp; 
         pTractGrp->AddRollback( pStopIf );
         pTask = ObjPtr( pTaskGrp );
