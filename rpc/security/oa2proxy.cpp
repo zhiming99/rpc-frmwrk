@@ -302,8 +302,12 @@ gint32 COAuth2LoginProxy::OAuth2Login(
                     break;
 
                 CCfgOpener oResp( pResp );
-                gint32 iRet = oResp.GetIntProp(
-                    propReturnValue, ( guint32& )ret );
+                gint32 iRet = 0;
+                ret = oResp.GetIntProp(
+                    propReturnValue, ( guint32& )iRet );
+                if( ERROR( ret ) )
+                    break;
+
                 if( ERROR( iRet ) )
                 {
                     ret = iRet;

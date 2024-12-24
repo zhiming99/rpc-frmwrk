@@ -499,7 +499,7 @@ class ConfigDlg(Gtk.Dialog):
         for proxy in proxies :
             try:
                 if proxy[ 'ObjectName'] == 'KdcRelayServer' :
-                    confVals[ 'kdcAddr'] = proxy[ 'IpAddress']
+                    confVals['AuthInfo'][ 'kdcAddr'] = proxy[ 'IpAddress']
                     break
             except Exception as err :
                 pass
@@ -2271,7 +2271,7 @@ EOF
 
             if authInfo[ 'Realm' ] !=  strNewRealm :
                 bChangeRealm = True
-            if self.confVals[ 'kdcAddr' ] != strNewKdcIp :
+            if self.confVals['AuthInfo'][ 'kdcAddr' ] != strNewKdcIp :
                 bChangeKdc = True
 
             if not bChangeKdc and not bChangeUser and \

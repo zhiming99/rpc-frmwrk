@@ -102,6 +102,41 @@
                     "DummyInterface": "true"
                 }
             ]
+        },
+        {
+            "ObjectName": "OAuth2LoginServer",
+            "BusName": "DBusBusPort_0",
+            "PortClass": "DBusLocalPdo",
+            "PortId": "0",
+            "RequestTimeoutSec": "120",
+            "KeepAliveTimeoutSec": "60",
+            "QueuedRequests": "false",
+            "ProxyPortClass": "DBusProxyPdoLpbk2",
+            "comment-1": "IpAddress is the ip address of the server",
+            "IpAddress": "127.0.0.1",
+            "Compression": "true",
+            "EnableSSL": "false",
+            "EnableWS": "false",
+            "RouterPath": "/",
+            "note-1": "the AuthInfo for this object is determined at runtime",
+            "HasAuth": "false",
+            "RemoteModName": "rpcrouter",
+            "RemoteObjName": "RpcRouterBridgeAuthImpl",
+            "Interfaces": [
+                {
+                    "Comment-0": "the following attributes are mandatory",
+                    "InterfaceName": "COAuth2LoginServer",
+                    "BindToClsid": "true",
+                    "Comment-2": "Don't register this match",
+                    "DummyInterface": "true"
+                },
+                {
+                    "InterfaceName": "IAuthenticate",
+                    "Pausable": "false",
+                    "DummyInterface": "true"
+                }
+            ],
+            "PortNumber": "4132"
         }
     ],
     "ClassFactories": [
