@@ -3203,6 +3203,10 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
 
             if( ERROR( ret ) )
             do{
+                // on error, actively disconnect to
+                // avoid reusing this connection by
+                // other login activities, before this
+                // login returns.
                 gint32 iRet = 0;
                 IConfigDb* pConn;
                 iRet = oReqCtx.GetPointer(
@@ -3226,25 +3230,27 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
                 if( ERROR( iRet ) )
                     break;
                 guint32 dwPortId = oVar;
-                stdstr strSender;
-                stdstr strUniq;
                 pPort = pAuthImpl->GetPort();
                 iRet = pPort->GetProperty(
                     propSrcDBusName, oVar );
                 if( ERROR( iRet ) )
                     break;
-                strSender = ( stdstr& )oVar;
+                stdstr strSender = oVar;
                 iRet = pPort->GetProperty(
                     propSrcUniqName, oVar );
                 if( ERROR( iRet ) )
                     break;
-                strUniq = ( stdstr& )oVar;
+                stdstr strUniq = oVar;
                 TaskletPtr pDummy;
                 pDummy.NewObj( clsid(CIfDummyTask)  );
                 iRet = pFwdr->StopBridgeProxy( pDummy,
                     dwPortId, strUniq, strSender );
                 if( ERROR( iRet ) )
+                {
+                    DebugPrint( iRet,
+                        "Active disconnection failed" );
                     break;
+                }
 
             }while( 0 );
 
@@ -3254,8 +3260,6 @@ gint32 CRpcReqForwarderAuth::BuildStartAuthProxyTask(
                 pFwdr->OnServiceComplete(
                     oParams.GetCfg(), pInvTask );
             }
-            if( ret == STATUS_PENDING )
-                ret = 0;
 
             return ret;
         });
