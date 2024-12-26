@@ -4445,32 +4445,11 @@ gint32 CRpcServices::LoadObjDesc(
                 oAuth.SetStrProp( propAuthMech, strVal );
                 if( strMech == "OAuth2" )
                 {
-                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_CLIENTID ) &&
-                        oObjAuth[ JSON_ATTR_OAUTH2_CLIENTID ].isString() )
-                    {
-                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_CLIENTID ].asString();
-                        oAuth.SetStrProp( propClientId, strVal );
-                    }
-
-                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_REDIRECT ) &&
-                        oObjAuth[ JSON_ATTR_OAUTH2_REDIRECT ].isString() )
-                    {
-                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_REDIRECT ].asString();
-                        oAuth.SetStrProp( propRedirectUrl, strVal );
-                    }
-
                     if( oObjAuth.isMember( JSON_ATTR_OAUTH2_AUTHURL ) &&
                         oObjAuth[ JSON_ATTR_OAUTH2_AUTHURL ].isString() )
                     {
                         strVal = oObjAuth[ JSON_ATTR_OAUTH2_AUTHURL ].asString();
                         oAuth.SetStrProp( propAuthUrl, strVal );
-                    }
-
-                    if( oObjAuth.isMember( JSON_ATTR_OAUTH2_SCOPE ) &&
-                        oObjAuth[ JSON_ATTR_OAUTH2_SCOPE ].isString() )
-                    {
-                        strVal = oObjAuth[ JSON_ATTR_OAUTH2_SCOPE ].asString();
-                        oAuth.SetStrProp( propScope, strVal );
                     }
                 }
                 else

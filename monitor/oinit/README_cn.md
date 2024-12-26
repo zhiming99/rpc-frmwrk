@@ -11,9 +11,9 @@
 ### 从命令行运行`oinit`
 #### 命令格式
 * 如果是python脚本    
-`python3 oinit.py [options] [<auth url> <client id> <redirect url> <scope>]`
+`python3 oinit.py [options] [<auth url>]`
 * 如果是安装了`python3-oinit` deb包，您可以使用以下命令   
-`python3 -m oinit [options] [<auth url> <client id> <redirect url> <scope>]`
+`python3 -m oinit [options] [<auth url>]`
 #### 命令行选项
 * **-d** <对象描述文件>。从给定的`对象描述文件`中查找登录信息。
 * **-c 1** 使用示例容器[`django_oa2check_https`](../rpc/security/README_cn.md#oauth2)进行OAuth2登录。
@@ -22,7 +22,8 @@
 * **-r** 从存储的登录信息列表中删除。
 * **-f** 默认情况下，oinit 使用“chrome”进行登录。如果指定了 `-f`，oinit将使用firefox执行登录。
 #### 命令行参数
-命令行参数包括“auth url”、“client id”、“redirect url”和“scope”。如果命令行只有这四个参数，没有上面的命令行选项，oinit将使用这四个参数进行OAuth2登录。
+命令行参数包括`auth url`。如果命令行只有这一个参数，没有上面的命令行选项，oinit将使用这一个参数进行OAuth2登录。
+`auth url`是一个部署好的rpc-frmwrk的JS应用的登陆链接。这个网页将引导进入OAuth2的登录页面，登陆成功后，返回至该部署好的JS应用页面。可以参考上面提到的示例容器中部署的JS应用, JS应用的网页在`/var/www/html/rpcf`下。
 另外，如果没有给出选项或参数，oinit将尝试使用注册表中存储的登录信息执行OAuth2登录。实际上，并不需要每次都使用本工具登陆，因为很多OAuth2的服务器的登陆凭据的有效期可能有几天。
 
 ### 依赖

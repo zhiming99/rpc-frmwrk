@@ -1567,31 +1567,20 @@ gint32 CRpcReqForwarderAuth::CheckOAuth2Params(
             ret = ERROR_FALSE;
             break;
         }
-        stdstr strAuthUrl, strClientId;
-        stdstr strRedirUrl, strScope;
+        stdstr strAuthUrl;
 
         CCfgOpener oai( pCfg );
         gint32 ret1 = oai.GetStrProp(
             propAuthUrl, strAuthUrl );
 
-        gint32 ret2 = oai.GetStrProp(
-            propClientId, strClientId );
-
-        gint32 ret3 = oai.GetStrProp(
-            propRedirectUrl, strRedirUrl );
-
-        gint32 ret4 = oai.GetStrProp(
-            propScope, strScope );
-        if( ERROR( ret1 ) || ERROR( ret2 ) ||
-            ERROR( ret3 ) || ERROR( ret4 ) )
+        if( ERROR( ret1 ) )
         {
             ret = GetCookieByHash(
                 pConnParams, "" );
         }
         else
         {
-            stdstr strVal = strAuthUrl +
-                strClientId + strRedirUrl + strScope;
+            stdstr strVal = strAuthUrl;
             stdstr strHash;
             GenShaHash( strVal.c_str(),
                 strVal.size(), strHash );
@@ -3431,21 +3420,6 @@ gint32 CRpcRouterReqFwdrAuth::IsEqualConn(
                 propAuthUrl, pAuth2 );
             if( ERROR( ret ) )
                 break;
-
-            ret = oAuth1.IsEqualProp(
-                propClientId, pAuth2 );
-            if( ERROR( ret ) )
-                break;
-
-            ret = oAuth1.IsEqualProp(
-                propRedirectUrl, pAuth2 );
-            if( ERROR( ret ) )
-                break;
-                
-            ret = oAuth1.IsEqualProp(
-                propScope, pAuth2 );
-            if( ERROR( ret ) )
-                break;
         }
 
         ret = 0;
@@ -4434,11 +4408,11 @@ gint32 CAuthentServer::OnStartOA2CheckerComplete(
     if( ERROR( ret ) )
     {
         LOGERR( this->GetIoMgr(), ret,
-        "Error, oa2checker failed to start, "
+        "Error, failed to connect to oa2checker, "
         "login stop working" );
 
         DebugPrintEx( logErr, ret,
-            "Error, oa2checker failed to start, " 
+            "Error, failed to connect to oa2checker, " 
             "login stop working" );
     }
 
