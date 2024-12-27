@@ -89,6 +89,10 @@ void CIfRouterTest::setUp()
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
+        oParams[ propSearchLocal ] = false;
+        oParams[ propConfigPath ] =
+            "nothispath/driver.json";
+
         ret = m_pMgr.NewObj(
             clsid( CIoManager ),
             oParams.GetCfg() );
@@ -341,7 +345,7 @@ void Usage( char* szName )
         "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
 #endif
         "\t [ -d to run as a daemon ]\n"
-        "\t [ -g to enable logging if the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -g to enable logging when the rpcrouter run as a bridge, that is '-r 2' ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
         szName );

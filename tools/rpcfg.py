@@ -2831,7 +2831,7 @@ EOF
 
         oa2sslCheck = Gtk.CheckButton()
         oa2sslCheck.set_tooltip_text(
-            "Enable SSL between the oa2checker server and client" )
+            "Enable SSL between the oa2checker server and the bridge" )
 
         if authInfo is not None and 'OA2SSL' in authInfo :
             if authInfo['OA2SSL'] == 'true':

@@ -288,6 +288,7 @@ enum EnumPropId : gint32
     propScope,          // type: a string value containing the oauth2 scope
     propCookie,         // type: a string value containing the oauth2 login code
     propEncCookie,      // type: a string value containing the encrypted oauth2 login code
+    propSearchLocal,    // type: a boolean value to indicate whether to search the local directory for a file
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
