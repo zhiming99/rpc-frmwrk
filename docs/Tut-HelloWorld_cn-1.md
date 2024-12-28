@@ -137,6 +137,7 @@
   * 目前`rpc-frmwrk`只支持Linux，所以所有的环境都是Linux系统。Windows用户请先用WSL或者虚拟机进行操作。
   * 在命令行下，我们可以看到在`hellowld`目录下有`Makefile`。只要输入`make -j4`命令即可。如果想要debug版，就输入`make debug -j4`。
   * 编译完后会提示`Configuration updated successfully`。这表示已经和系统的设置同步了, 可以运行了。也可以手动的运行 `python3 synccfg.py`来同步。
+  * **需要注意的是，如果使用`rpcfg.py`更新完系统设置，也必须再运行一下`python3 synccfg.py`来更新本项目的设置。否则就会出现连接失败或者其他奇怪的问题。**
   * 在`hellowld/release`目录下，我们应该能找到`HelloWorldsvr`和`HelloWorldcli`两个程序。
 
 #### 运行
