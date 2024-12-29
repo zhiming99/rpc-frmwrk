@@ -1580,6 +1580,9 @@ gint32 CRpcReqForwarderAuth::CheckOAuth2Params(
         }
         else
         {
+            OutputMsg( 0, "Login with credential "
+                "from '%s'",
+                strAuthUrl.c_str() );
             stdstr strVal = strAuthUrl;
             stdstr strHash;
             GenShaHash( strVal.c_str(),

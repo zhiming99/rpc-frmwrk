@@ -36,8 +36,8 @@
 2. 在目标主机上运行安装包，安装`rpc-frmwrk`系统，并配置系统。
 3. 把HelloWorld的服务器程序`HelloWorldsvr`拷贝到目标主机上。
 4. 启动`rpcrouter -dr 2`或`rpcrouter -adr 2`(启用OAuth2), 和`HelloWorldsvr`.
-5. 将上边提到的`./dist`目录,`HelloWorld.html`和`HelloWorlddesc.json`拷贝到WebServer预设的目录下。该目录应该已经在`nginx`或者`apache`的配置中设置好，例如`/var/www/html/rpcf`.
-6. 重启web服务器。
+5. 将上边提到的`./dist`目录,以及`HelloWorld.html`，`HelloWorlddesc.json`文件拷贝到WebServer预设的目录下。该目录应该已经在`nginx`或者`apache`的配置中设置好，例如`/var/www/html/rpcf`.
+6. 重启web服务器`nginx -s reload`。
 7. 在浏览器中, 打开网页`https://example.com/rpcf/HelloWorld.html`。输出结果在浏览器调试窗口的控制台中。
 8. 有关OAuth2的更多信息请参考这篇[说明](../rpc/security/README_cn.md#oauth2)
 
