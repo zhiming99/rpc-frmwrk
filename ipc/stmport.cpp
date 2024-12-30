@@ -289,8 +289,8 @@ gint32 CDBusStreamPdo::HandleSendReq( IRP* pIrp )
                 // m_mapSerial2Resp ahead of
                 // sending.
                 CStdRMutex oPortLock( GetLock() );
-                m_mapSerial2Resp[ dwSerial ] =
-                    IrpPtr( pIrp );
+                m_mapSerial2Resp.insert(
+                    { dwSerial, IrpPtr( pIrp )} );
             }
 
             ret = SendDBusMsg( pIrp, pMsg );
@@ -519,7 +519,8 @@ gint32 CDBusStreamPdo::CompleteSendReq(
                 m_mapRespMsgs.find( dwSerial );
             if( itr == m_mapRespMsgs.end() )
             {
-                m_mapSerial2Resp[ dwSerial ] = pIrp;
+                m_mapSerial2Resp.insert(
+                    { dwSerial, IrpPtr( pIrp )} );
                 ret = STATUS_PENDING;
             }
             else

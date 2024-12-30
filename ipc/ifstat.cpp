@@ -657,6 +657,19 @@ gint32 CInterfaceState::OpenPortInternal(
         // unrecoverable error
  
     }while( 0 );
+    if( ERROR( ret ) )
+    {
+        const char* pszClass =
+            CoGetClassName( this->GetClsid() );
+        if( pszClass )
+            OutputMsg( ret,
+                "Error OpenPort from %s",
+                pszClass );
+        else
+            OutputMsg( ret,
+                "Error OpenPort from "
+                "CInterfaceState" );
+    }
 
     return ret;
 }
@@ -1162,7 +1175,9 @@ gint32 CRemoteProxyState::OpenPort(
             break;
 
     }while( 0 );
-
+    if( ERROR( ret ) )
+        OutputMsg( ret, "Error OpenPort from "
+            "CRemoteProxyState" );
     return ret;
 }
 
@@ -1268,6 +1283,9 @@ gint32 CTcpBdgePrxyState::OpenPort(
             break;
 
     }while( 0 );
+    if( ERROR( ret ) )
+        OutputMsg( ret, "Error OpenPort from "
+            "CTcpBdgePrxyState" );
 
     return ret;
 }

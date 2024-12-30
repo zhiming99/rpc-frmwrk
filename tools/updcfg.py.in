@@ -405,7 +405,7 @@ def LoadConfigFiles( path : str) :
     curDir = dir_path
     if path is None:
         if parent_dir == "rpcf" :
-            paths.append( "." )
+            #paths.append( "." )
             paths.append( curDir + "/../../etc/rpcf" )
             paths.append( "/etc/rpcf")
         else:

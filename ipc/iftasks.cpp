@@ -1129,6 +1129,7 @@ gint32 CIfEnableEventTask::RunTask()
     
     ObjPtr pObj;
     IMessageMatch* pMatch = nullptr;
+    bool bEnable = true;
 
     do{
         CParamList oParams(
@@ -1146,7 +1147,6 @@ gint32 CIfEnableEventTask::RunTask()
             break;
         }
 
-        bool bEnable = true;
         bool bDummy = false;
 
         // note: we do not use pop, because we want to
@@ -1206,14 +1206,16 @@ gint32 CIfEnableEventTask::RunTask()
         }
 
     }while( 0 );
-    if( ERROR( ret ) && !pObj.IsEmpty() )
+    if( ERROR( ret ) &&
+        !pObj.IsEmpty() && bEnable )
     {
         stdstr strMatch;
         if( pMatch != nullptr )
             strMatch = pMatch->ToString();
-        DebugPrint( ret,
-            "%s EnableEvent RunTask failed, "
-            "if='0x%llx', match='%s'",
+        stdstr strFmt; 
+        strFmt = "%s EnableEvent RunTask failed, "
+            "if='0x%llx', match='%s'";
+        DebugPrint( ret, strFmt,
             CoGetClassName( pObj->GetClsid() ),
             ( CObjBase* )pObj,
             strMatch.c_str() );
