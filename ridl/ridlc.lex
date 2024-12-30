@@ -533,6 +533,7 @@ std::map< std::string, yytokentype >
         { "map", TOK_MAP },
         { "ObjPtr", TOK_OBJPTR },
         { "HSTREAM", TOK_HSTREAM },
+        { "variant", TOK_VARIANT },
 
         // flags
         { "async", TOK_ASYNC },

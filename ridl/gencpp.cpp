@@ -56,7 +56,8 @@ std::map< gint32, char > g_mapTypeSig =
     { TOK_STRING, 's' },
     { TOK_BYTEARR, 'a' },
     { TOK_OBJPTR, 'o' },
-    { TOK_STRUCT, 'O' }
+    { TOK_STRUCT, 'O' },
+    { TOK_VARIANT, 'v' }
 };
 
 gint32 CArgListUtils::GetArgCount(
@@ -102,7 +103,8 @@ gint32 CArgListUtils::ToStringInArgs(
             {
                 CPrimeType* pType = pObj;
                 guint32 dwName = pType->GetName();
-                if( dwName == TOK_STRING )
+                if( dwName == TOK_STRING ||
+                    dwName == TOK_VARIANT )
                 {
                     strType = std::string( "const " ) +
                         pType->ToStringCpp() + "&";
@@ -2032,6 +2034,16 @@ gint32 CDeclareStruct::Output()
         CCOUT << "BufPtr& pBuf_ ) override;"; 
         INDENT_DOWNL;
         NEW_LINE;
+        CCOUT<< "gint32 Serialize(";
+        INDENT_UPL;
+        CCOUT << "CBuffer& oBuf_ ) const override;";
+        INDENT_DOWNL;
+        NEW_LINE;
+        CCOUT << "gint32 Deserialize(";
+        INDENT_UPL;
+        CCOUT << "const CBuffer& oBuf_ ) override;"; 
+        INDENT_DOWNL;
+        NEW_LINE;
         Wa( "guint32 GetMsgId() const override" );
         Wa( "{ return m_dwMsgId; }" );
         NEW_LINE;
@@ -2810,11 +2822,11 @@ gint32 CDeclInterfSvr::OutputAsync(
         if( dwCount > 0 )
         {
             strDecl += ",";
-            CCOUT << ",";
         }
 
         if( dwInCount > 0 )
         {
+            CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
@@ -3985,6 +3997,22 @@ gint32 CImplSerialStruct::OutputSerial()
         Wa( "return ret;" );
 
         BLOCK_CLOSE;
+        NEW_LINES( 2 );
+
+        CCOUT << "gint32 " << m_pNode->GetName()
+            << "::" << "Serialize( CBuffer& oBuf_ ) const";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "BufPtr pBuf( &oBuf_ );" );
+        CCOUT << "auto pThis = const_cast< " <<
+            m_pNode->GetName() << "* >( this );";
+        NEW_LINE;
+        Wa( "guint32 dwOff = oBuf_.offset();" );
+        Wa( "gint32 ret = pThis->Serialize( pBuf );" );
+        Wa( "if( ERROR( ret ) ) return ret;" );
+        Wa( "oBuf_.SetOffset( dwOff );" );
+        Wa( "return 0;" );
+        BLOCK_CLOSE;
         NEW_LINE;
 
     }while( 0 );
@@ -4040,6 +4068,16 @@ gint32 CImplSerialStruct::OutputDeserial()
 
         Wa( "return ret;" );
 
+        BLOCK_CLOSE;
+        NEW_LINES(2);
+
+        CCOUT << "gint32 " << m_pNode->GetName()
+            << "::" << "Deserialize( ";
+        CCOUT << "const CBuffer& oBuf_ )";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "BufPtr pBuf( const_cast< CBuffer* >( &oBuf_ ) );" );
+        CCOUT << "return this->Deserialize( pBuf );";
         BLOCK_CLOSE;
         NEW_LINE;
 
@@ -4496,6 +4534,18 @@ gint32 CEmitSerialCode::OutputSerial(
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
+            case 'v':
+                {
+                    if( strObj.empty() )
+                        CCOUT << "ret = CSerialBase::Serialize(";
+                    else
+                        CCOUT << "ret = " << strObj << "Serialize(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << " );";
+                    INDENT_DOWNL;
+                    Wa( "if( ERROR( ret ) ) break;" );
+                    break;
+                }
             default:
                 {
                     ret = -EINVAL;
@@ -4607,6 +4657,19 @@ gint32 CEmitSerialCode::OutputDeserial(
             case 's':
             case 'a':
             case 'o':
+                {
+                    if( strObj.empty() )
+                        CCOUT << "ret = CSerialBase::Deserialize(";
+                    else
+                        CCOUT << "ret = " << strObj << "Deserialize(";
+                    INDENT_UPL;
+                    CCOUT << strBuf << ", " << strName << " );";
+                    INDENT_DOWNL;
+                    NEW_LINE;
+                    Wa( "if( ERROR( ret ) ) break;" );
+                    break;
+                }
+            case 'v':
                 {
                     if( strObj.empty() )
                         CCOUT << "ret = CSerialBase::Deserialize(";

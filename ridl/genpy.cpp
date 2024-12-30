@@ -55,7 +55,8 @@ std::map< char, stdstr > g_mapSig2PyType =
     { 's', "str" },
     { 'a', "bytearray" },
     { 'o', "cpp.ObjPtr" },
-    { 'h', "int" }
+    { 'h', "int" },
+    { 'v', "Variant" },
 };
 
 static gint32 EmitDeserialBySig(
@@ -63,80 +64,86 @@ static gint32 EmitDeserialBySig(
     const stdstr& strSig )
 {
     gint32 ret = 0;
-    std::ofstream& ofp = *pWriter->m_curFp;
+    // std::ofstream& ofp = *pWriter->m_curFp;
+    CWriterBase* m_pWriter = pWriter;
     switch( strSig[ 0 ] )
     {
     case '(' :
         {
-            ofp << "ret = osb.DeserialArray( buf, offset, \""
+            CCOUT << "ret = osb.DeserialArray( buf, offset, \""
                 << strSig << "\" )";
             break;
         }
     case '[' :
         {
-            ofp << "ret = osb.DeserialMap( buf, offset, \""
+            CCOUT << "ret = osb.DeserialMap( buf, offset, \""
                 << strSig << "\" )";
             break;
         }
 
     case 'O' :
         {
-            ofp << "ret = osb.DeserialStruct( buf, offset"
+            CCOUT << "ret = osb.DeserialStruct( buf, offset"
                 << " )";
             break;
         }
     case 'Q':
     case 'q':
         {
-            ofp << "ret = osb.DeserialInt64( buf, offset )";
+            CCOUT << "ret = osb.DeserialInt64( buf, offset )";
             break;
         }
     case 'D':
     case 'd':
         {
-            ofp << "ret = osb.DeserialInt32( buf, offset )";
+            CCOUT << "ret = osb.DeserialInt32( buf, offset )";
             break;
         }
     case 'W':
     case 'w':
         {
-            ofp << "ret = osb.DeserialInt16( buf, offset )";
+            CCOUT << "ret = osb.DeserialInt16( buf, offset )";
             break;
         }
     case 'b':
     case 'B':
         {
-            ofp << "ret = osb.DeserialInt8( buf, offset )";
+            CCOUT << "ret = osb.DeserialInt8( buf, offset )";
             break;
         }
     case 'f':
         {
-            ofp << "ret = osb.DeserialFloat( buf, offset )";
+            CCOUT << "ret = osb.DeserialFloat( buf, offset )";
             break;
         }
     case 'F':
         {
-            ofp << "ret = osb.DeserialDouble( buf, offset )";
+            CCOUT << "ret = osb.DeserialDouble( buf, offset )";
             break;
         }
     case 's':
         {
-            ofp << "ret = osb.DeserialString( buf, offset )";
+            CCOUT << "ret = osb.DeserialString( buf, offset )";
             break;
         }
     case 'a':
         {
-            ofp << "ret = osb.DeserialBuf( buf, offset )";
+            CCOUT << "ret = osb.DeserialBuf( buf, offset )";
             break;
         }
     case 'o':
         {
-            ofp << "ret = osb.DeserialObjPtr( buf, offset )";
+            CCOUT << "ret = osb.DeserialObjPtr( buf, offset )";
             break;
         }
     case 'h':
         {
-            ofp << "ret = osb.DeserialHStream( buf, offset )";
+            CCOUT << "ret = osb.DeserialHStream( buf, offset )";
+            break;
+        }
+    case 'v':
+        {
+            CCOUT << "ret = osb.DeserialVariant( buf, offset )";
             break;
         }
     default:
@@ -146,7 +153,7 @@ static gint32 EmitDeserialBySig(
         }
     }
     if( SUCCEEDED( ret ) )
-        pWriter->NewLine();
+        NEW_LINE;
 
     return ret;
 }
@@ -158,100 +165,127 @@ static gint32 EmitSerialBySig(
     bool bNoRet = false )
 {
     gint32 ret = 0;
-    std::ofstream& ofp = *pWriter->m_curFp;
+    // std::ofstream& ofp = *pWriter->m_curFp;
+    CWriterBase* m_pWriter = pWriter;
     switch( strSig[ 0 ] )
     {
     case '(' :
         {
-            ofp << "ret = osb.SerialArray( buf, "
+            CCOUT << "ret = osb.SerialArray( buf, "
                 << strField << ", \"" << strSig << "\" )";
-            pWriter->NewLine();
-            ofp << "if ret < 0 :";
-            pWriter->NewLine();
+            NEW_LINE;
+            CCOUT << "if ret < 0 :";
+            NEW_LINE;
             if( bNoRet )
-                ofp << "    break";
+                CCOUT << "    break";
             else
-                ofp << "    return ret";
+                CCOUT << "    return ret";
             break;
         }
     case '[' :
         {
-            ofp << "ret = osb.SerialMap( buf, "
+            CCOUT << "ret = osb.SerialMap( buf, "
                 << strField << ", \"" << strSig << "\" )";
-            pWriter->NewLine();
-            ofp << "if ret < 0 :";
-            pWriter->NewLine();
+            NEW_LINE;
+            CCOUT << "if ret < 0 :";
+            NEW_LINE;
             if( bNoRet )
-                ofp << "    break";
+                CCOUT << "    break";
             else
-                ofp << "    return ret";
+                CCOUT << "    return ret";
             break;
         }
 
     case 'O' :
         {
-            ofp << "ret = osb.SerialStruct( buf, " << strField << " )";
-            pWriter->NewLine();
-            ofp << "if ret < 0 :";
-            pWriter->NewLine();
+            CCOUT << "ret = osb.SerialStruct( buf, " << strField << " )";
+            NEW_LINE;
+            CCOUT << "if ret < 0 :";
+            NEW_LINE;
             if( bNoRet )
-                ofp << "    break";
+                CCOUT << "    break";
             else
-                ofp << "    return ret";
+                CCOUT << "    return ret";
             break;
         }
     case 'Q':
     case 'q':
         {
-            ofp << "osb.SerialInt64( buf, " << strField << " )";
+            CCOUT << "osb.SerialInt64( buf, " << strField << " )";
             break;
         }
     case 'D':
     case 'd':
         {
-            ofp << "osb.SerialInt32( buf, " << strField << " )";
+            CCOUT << "osb.SerialInt32( buf, " << strField << " )";
             break;
         }
     case 'W':
     case 'w':
         {
-            ofp << "osb.SerialInt16( buf, " << strField << " )";
+            CCOUT << "osb.SerialInt16( buf, " << strField << " )";
             break;
         }
     case 'b':
     case 'B':
         {
-            ofp << "osb.SerialInt8( buf, " << strField << " )";
+            CCOUT << "osb.SerialInt8( buf, " << strField << " )";
             break;
         }
     case 'f':
         {
-            ofp << "osb.SerialFloat( buf, " << strField << " )";
+            CCOUT << "osb.SerialFloat( buf, " << strField << " )";
             break;
         }
     case 'F':
         {
-            ofp << "osb.SerialDouble( buf, " << strField << " )";
+            CCOUT << "osb.SerialDouble( buf, " << strField << " )";
             break;
         }
     case 's':
         {
-            ofp << "osb.SerialString( buf, " << strField << " )";
+            CCOUT << "osb.SerialString( buf, " << strField << " )";
             break;
         }
     case 'a':
         {
-            ofp << "osb.SerialBuf( buf, " << strField << " )";
+            CCOUT << "osb.SerialBuf( buf, " << strField << " )";
             break;
         }
     case 'o':
         {
-            ofp << "osb.SerialObjPtr( buf, " << strField << " )";
+            CCOUT << "ret = osb.SerialObjPtr( buf, " << strField << " )";
+            NEW_LINE;
+            CCOUT << "if ret < 0 :";
+            NEW_LINE;
+            if( bNoRet )
+                CCOUT << "    break";
+            else
+                CCOUT << "    return ret";
             break;
         }
     case 'h':
         {
-            ofp << "osb.SerialHStream( buf, " << strField << " )";
+            CCOUT << "ret = osb.SerialHStream( buf, " << strField << " )";
+            NEW_LINE;
+            CCOUT << "if ret < 0 :";
+            NEW_LINE;
+            if( bNoRet )
+                CCOUT << "    break";
+            else
+                CCOUT << "    return ret";
+            break;
+        }
+    case 'v':
+        {
+            CCOUT << "ret = osb.SerialVariant( buf, " << strField << " )";
+            NEW_LINE;
+            CCOUT << "if ret < 0 :";
+            NEW_LINE;
+            if( bNoRet )
+                CCOUT << "    break";
+            else
+                CCOUT << "    return ret";
             break;
         }
     default:
@@ -262,7 +296,7 @@ static gint32 EmitSerialBySig(
     }
 
     if( SUCCEEDED( ret ) )
-        pWriter->NewLine();
+        NEW_LINE;
 
     return ret;
 }
@@ -937,6 +971,11 @@ gint32 CDeclarePyStruct::Output()
                     CCOUT << "self." << strName << " = None";
                     break;
                 }
+            case 'v':
+                {
+                    CCOUT << "self." << strName << " = None";
+                    break;
+                }
             default:
                 {
                     ret = -EINVAL;
@@ -1062,9 +1101,13 @@ static gint32 GenStructsFilePy(
                 break;
             strSeribase = strPath;
         }
-        stdstr strCmd = "cp ";
-        strCmd += strSeribase + " " + m_pWriter->GetOutPath();
-        system( strCmd.c_str() );
+        if( strSeribase != m_pWriter->GetOutPath() )
+        {
+            stdstr strCmd = "cp ";
+            strCmd += strSeribase +
+                " " + m_pWriter->GetOutPath();
+            system( strCmd.c_str() );
+        }
 
         m_pWriter->SelectStructsFile();
         EMIT_DISCLAIMER_PY;
@@ -1072,6 +1115,7 @@ static gint32 GenStructsFilePy(
         NEW_LINE;
         Wa( "from rpcf.proxy import PyRpcServices" );
         Wa( "from seribase import CSerialBase" );
+        Wa( "from seribase import Variant" );
         Wa( "import errno" );
 
         NEW_LINE;
@@ -1328,7 +1372,7 @@ gint32 CImplPyMthdProxyBase::OutputSync( bool bSync )
             Wa( "osb = CSerialBase( self )" );
             Wa( "buf = bytearray()" );
             Wa( "ret = 0" );
-            Wa( "while True:" );
+            CCOUT << "while True:";
             INDENT_UPL;
 
             bool bCheck = false;
@@ -1646,6 +1690,7 @@ CImplPySvcProxyBase::CImplPySvcProxyBase(
     Wa( "from rpcf.rpcbase import *" ); \
     Wa( "from rpcf.proxy import *" );\
     Wa( "from seribase import CSerialBase" );\
+    Wa( "from seribase import Variant" );\
     CCOUT << "from " << g_strAppName << "structs import *"; \
     NEW_LINE; \
     Wa( "import errno" ); \
@@ -2065,7 +2110,7 @@ gint32 CImplPyMthdSvrBase::OutputSync( bool bSync )
         Wa( "buf = bytearray()" );
         Wa( "iRet = ret[ 0 ]" );
         Wa( "ret = 0" );
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
         CArgList* poutal = pOutArgs;
         bool bCheck = false;
@@ -2172,7 +2217,7 @@ gint32 CImplPyMthdSvrBase::OutputAsyncCompHandler()
         Wa( "osb = CSerialBase( self )" );
         Wa( "buf = bytearray()" );
         Wa( "ret = 0" );
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
         guint32 i = 0;
         bool bCheck = false;
@@ -2315,7 +2360,7 @@ gint32 CImplPyMthdSvrBase::OutputEvent()
         NEW_LINE;
         Wa( "osb = CSerialBase( self )" );
         Wa( "buf = bytearray()" );
-        Wa( "while True:" );
+        CCOUT << "while True:";
         INDENT_UPL;
         guint32 i = 0;
         CArgList* pArgList = pInArgs;

@@ -25,6 +25,7 @@
 #include "rpc.h"
 #include <vector>
 #include <map>
+#include "variant.h"
 
 #define DATATYPE_COMP_MASK 0x300UL
 #define MAX_ELEM_COUNT  1000000
@@ -155,6 +156,21 @@ class CSerialBase
         T& val1 = const_cast<T&>(val);
         val1.m_pIf = GetIf();
         return val1.Serialize( pBuf );
+    }
+
+    template< typename T,
+        typename T2=typename std::enable_if<
+            std::is_base_of<Variant, T>::value, T >::type,
+        typename T3 = T,
+        typename T4 = T,
+        typename T5 = T,
+        typename T6 = T,
+        typename T7 = T >
+    gint32 SerialElem(
+        BufPtr& pBuf, const T& val,
+        const char* szSignature )
+    {
+        return val.Serialize( pBuf );
     }
 
     template< typename T >
@@ -705,6 +721,9 @@ template<>
 gint32 CSerialBase::Serialize< BufPtr >(
     BufPtr& pBuf, const BufPtr& val );
 
+template<>
+gint32 CSerialBase::Serialize< Variant >(
+    BufPtr& pBuf, const Variant& val );
 
 template<>
 gint32 CSerialBase::Deserialize< bool >(
@@ -766,4 +785,7 @@ template<>
 gint32 CSerialBase::Deserialize< BufPtr >(
     BufPtr& pBuf, BufPtr& val );
 
+template<>
+gint32 CSerialBase::Deserialize< Variant >(
+    BufPtr& pBuf, Variant& val );
 }

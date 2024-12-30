@@ -24,6 +24,7 @@
  */
 #include "variant.h"
 #include "dmsgptr.h"
+#include "seribase.h"
 using namespace std;
 
 namespace rpcf
@@ -659,6 +660,150 @@ bool Variant::operator==(
     case typeNone:
         ret = true;
         break;
+    }
+    return ret;
+}
+
+gint32 Variant::Deserialize(
+    BufPtr& pBuf, void* psb )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    Clear();
+    CSerialBase oBackup;
+    CSerialBase& osb = *( CSerialBase* )psb;
+    if( psb == nullptr )
+        osb = oBackup;
+
+    char bType = *pBuf->ptr();
+    EnumTypeId iType = (EnumTypeId) bType;
+    m_iType = iType;
+
+    gint32 ret = 0;
+    guint32 dwOldOff = pBuf->offset();
+    pBuf->SetOffset( dwOldOff + 1 );
+
+    switch( iType )
+    {
+    case typeByte:
+        ret = osb.Deserialize( pBuf, m_byVal ); 
+        break;
+    case typeUInt16:
+        ret = osb.Deserialize( pBuf, m_wVal );
+        break;
+    case typeUInt32:
+        ret = osb.Deserialize( pBuf, m_dwVal );
+        break;
+    case typeUInt64:
+        ret = osb.Deserialize( pBuf, m_qwVal );
+        break;
+    case typeFloat:
+        ret = osb.Deserialize( pBuf, m_fVal );
+        break;
+    case typeDouble:
+        ret = osb.Deserialize( pBuf, m_dblVal );
+        break;
+    case typeObj:
+        {
+            guint32 dwOff = pBuf->offset();
+            ret = osb.Deserialize( pBuf, m_pObj );
+            if( SUCCEEDED( ret ) )
+                break;
+            pBuf->SetOffset( dwOff );
+            guint32 dwClsid;
+            memcpy( &dwClsid,
+                pBuf->ptr(), sizeof( dwClsid ) );
+            dwClsid = ntohl( dwClsid );
+            if( dwClsid <= clsid( UserClsidStart ) )
+                break;
+            ObjPtr pStruct;
+            ret = pStruct.NewObj(
+                ( EnumClsid )dwClsid );
+            if( ERROR( ret ) )
+                break;
+            ret = pStruct->Deserialize( *pBuf );
+            if( SUCCEEDED( ret ) )
+                m_pObj = pStruct;
+            break;
+        }
+    case typeByteArr:
+        ret = osb.Deserialize( pBuf, m_pBuf );
+        break;
+    case typeString:
+        ret = osb.Deserialize( pBuf, m_strVal );
+        break;
+    case typeNone:
+    case typeDMsg:
+    default:
+        ret = -ENOTSUP;
+    }
+    return ret;
+}
+
+gint32 Variant::Serialize(
+    BufPtr& pBuf, void* psb ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+
+    CSerialBase oBackup;
+    CSerialBase& osb = *( CSerialBase* )psb;
+    if( psb == nullptr )
+        osb = oBackup;
+
+    auto iType = m_iType;
+
+    gint32 ret = 0;
+    APPEND( pBuf, &m_iType, 1 );
+
+    switch( iType )
+    {
+    case typeByte:
+        ret = osb.Serialize( pBuf, m_byVal ); 
+        break;
+    case typeUInt16:
+        ret = osb.Serialize( pBuf, m_wVal );
+        break;
+    case typeUInt32:
+        ret = osb.Serialize( pBuf, m_dwVal );
+        break;
+    case typeUInt64:
+        ret = osb.Serialize( pBuf, m_qwVal );
+        break;
+    case typeFloat:
+        ret = osb.Serialize( pBuf, m_fVal );
+        break;
+    case typeDouble:
+        ret = osb.Serialize( pBuf, m_dblVal );
+        break;
+    case typeObj:
+        if( m_pObj->GetClsid() <= clsid( UserClsidStart ))
+            ret = osb.Serialize( pBuf, m_pObj );
+        else
+        {
+            CStructBase* psb = dynamic_cast
+                < CStructBase* >( ( CObjBase* )m_pObj );
+            if( psb != nullptr )
+                ret = psb->Serialize( pBuf );
+            else
+            {
+                ret = -EFAULT;
+                DebugPrint( ret,
+                    "Error, unknown type to serialize" );
+            }
+        }
+        break;
+    case typeByteArr:
+        ret = osb.Serialize( pBuf, m_pBuf );
+        break;
+    case typeString:
+        ret = osb.Serialize( pBuf, m_strVal );
+        break;
+    case typeNone:
+    case typeDMsg:
+    default:
+        ret = -ENOTSUP;
     }
     return ret;
 }
