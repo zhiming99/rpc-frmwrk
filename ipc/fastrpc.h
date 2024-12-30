@@ -1143,8 +1143,10 @@ class CFastRpcServerBase :
     public:
     typedef IFBASE3( false ) super;
     CFastRpcServerBase( const IConfigDb* pCfg ) :
-        super( pCfg ), m_dwSeqNo( 0 ) 
-    {}
+        super( pCfg )
+    {
+        m_dwSeqNo = GetRandom();
+    }
 
     inline gint32 NewSeqNo()
     { return m_dwSeqNo++; }
@@ -1237,8 +1239,11 @@ class CFastRpcProxyBase :
     typedef IFBASE3( true ) super;
 
     CFastRpcProxyBase( const IConfigDb* pCfg ):
-        super( pCfg ), m_pSkelObj( nullptr ) 
-    {}
+        super( pCfg ),
+        m_pSkelObj( nullptr )
+    {
+        m_dwSeqNo = GetRandom();
+    }
 
     inline gint32 NewSeqNo()
     { return m_dwSeqNo++; }
