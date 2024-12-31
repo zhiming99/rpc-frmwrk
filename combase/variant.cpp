@@ -665,16 +665,17 @@ bool Variant::operator==(
 }
 
 gint32 Variant::Deserialize(
-    BufPtr& pBuf, void* psb )
+    BufPtr& pBuf, void* p )
 {
     if( pBuf.IsEmpty() || pBuf->empty() )
         return -EINVAL;
 
     Clear();
     CSerialBase oBackup;
-    CSerialBase& osb = *( CSerialBase* )psb;
+    auto psb = ( CSerialBase* )p;
     if( psb == nullptr )
-        osb = oBackup;
+        psb = &oBackup;
+    CSerialBase& osb = *psb;
 
     char bType = *pBuf->ptr();
     EnumTypeId iType = (EnumTypeId) bType;
@@ -706,17 +707,15 @@ gint32 Variant::Deserialize(
         break;
     case typeObj:
         {
-            guint32 dwOff = pBuf->offset();
-            ret = osb.Deserialize( pBuf, m_pObj );
-            if( SUCCEEDED( ret ) )
-                break;
-            pBuf->SetOffset( dwOff );
             guint32 dwClsid;
             memcpy( &dwClsid,
                 pBuf->ptr(), sizeof( dwClsid ) );
             dwClsid = ntohl( dwClsid );
             if( dwClsid <= clsid( UserClsidStart ) )
+            {
+                ret = osb.Deserialize( pBuf, m_pObj );
                 break;
+            }
             ObjPtr pStruct;
             ret = pStruct.NewObj(
                 ( EnumClsid )dwClsid );

@@ -170,7 +170,7 @@ class CSerialBase
         BufPtr& pBuf, const T& val,
         const char* szSignature )
     {
-        return val.Serialize( pBuf );
+        return val.Serialize( pBuf, this );
     }
 
     template< typename T >
@@ -417,6 +417,21 @@ class CSerialBase
     {
         val.m_pIf = GetIf();
         return val.Deserialize( pBuf );
+    }
+
+    template< typename T,
+        typename T2=typename std::enable_if<
+            std::is_base_of<Variant, T>::value, T >::type,
+        typename T3 = T,
+        typename T4 = T,
+        typename T5 = T,
+        typename T6 = T,
+        typename T7 = T >
+    gint32 DeserialElem(
+        BufPtr& pBuf, T& val,
+        const char* szSignature )
+    {
+        return val.Deserialize( pBuf, this );
     }
 
     template< typename T >
