@@ -29,6 +29,9 @@
 
 #define DATATYPE_COMP_MASK 0x300UL
 #define MAX_ELEM_COUNT  1000000
+
+#define SERIAL_STRUCT_MAGIC ( ( guint32 )0x73747275 )
+
 namespace rpcf
 {
 

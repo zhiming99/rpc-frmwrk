@@ -77,7 +77,8 @@ std::map< char, stdstr > CJTypeHelper::m_mapSig2JTp {
     { 's', "String" },
     { 'a', "byte[]" },
     { 'o', "ObjPtr" },
-    { 'h', "long" }
+    { 'h', "long" },
+    { 'v' ,"JVariant" },
 };
 
 std::map< char, stdstr > CJTypeHelper::m_mapSig2DefVal
@@ -98,7 +99,8 @@ std::map< char, stdstr > CJTypeHelper::m_mapSig2DefVal
     { 's', "\"\"" },
     { 'a', "null" },
     { 'o', "null" },
-    { 'h', "0" }
+    { 'h', "0" },
+    { 'v', "null" }
 };
 
 std::string GetTypeSigJava( ObjPtr& pObj )
@@ -699,6 +701,10 @@ gint32 CJavaSnippet::EmitSerialArgs(
                 CCOUT << "ret = _osh.serialStruct( _pBuf, _offset, "
                     << strName << " );";
                 break;
+            case 'v':
+                CCOUT << "ret = _osh.serialVariant( _pBuf, _offset, "
+                    << strName << " );";
+                break;
             case '(':
                 CCOUT << "ret = _osh.serialArray( _pBuf, _offset, "
                     << strName << ", \"" << strSig << "\");";
@@ -800,6 +806,9 @@ gint32 CJavaSnippet::EmitDeserialArgs(
                 break;
             case 'o':
                 CCOUT << strName << " = _osh.deserialObjPtr( _bbuf );";
+                break;
+            case 'v':
+                CCOUT << strName << " = _osh.deserialVariant( _bbuf );";
                 break;
             case 'O':
                 CCOUT << strName << " = ";
@@ -1072,6 +1081,10 @@ gint32 CJavaSnippet::EmitSerialFields(
                 CCOUT << "ret = _osh.serialObjPtr( _pBuf, _offset, "
                     << strName << " );";
                 break;
+            case 'v':
+                CCOUT << "ret = _osh.serialVariant( _pBuf, _offset, "
+                    << strName << " );";
+                break;
             case 'O':
                 CCOUT << "ret = _osh.serialStruct( _pBuf, _offset, "
                     << strName << " );";
@@ -1170,6 +1183,9 @@ gint32 CJavaSnippet::EmitDeserialFields(
                 break;
             case 'o':
                 CCOUT << strName << " = _osh.deserialObjPtr( _bbuf );";
+                break;
+            case 'v':
+                CCOUT << strName << " = ("<<strTypeText<<") _osh.deserialVariant( _bbuf );";
                 break;
             case 'O':
                 CCOUT << strName << " = ("<<strTypeText<<") _osh.deserialStruct( _bbuf );";
@@ -2026,9 +2042,12 @@ gint32 GenSerialBase(
         args[4], args[5], nullptr 
         };
 
-    return Execve( "/usr/bin/cpp",
+    ret = Execve( "/usr/bin/cpp",
         const_cast< char* const*>( args2 ),
         env );    
+    if( ret < 0 )
+        ret = -errno;
+    return ret;
 }
 
 gint32 GenSerialBaseFiles(
@@ -2052,6 +2071,20 @@ gint32 GenSerialBaseFiles(
         ret = GenSerialBase(
             strSeriBase,
             strDstSeriBase );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strJVariant;
+        ret = FindFullPath(
+            "JVariant.java", strJVariant );
+        if( ERROR( ret ) )
+            break;
+        stdstr strDstJVariant =
+            pWriter->GetOutPath();
+        strDstJVariant += "/JVariant.java";
+        ret = GenSerialBase(
+            strJVariant,
+            strDstJVariant );
         if( ERROR( ret ) )
             break;
 
@@ -2453,7 +2486,9 @@ gint32 GenJavaProj(
         }
 
         strClsPath += strLibPath +
-            "/rpcf/rpcbase.jar:/usr/share/java/commons-cli.jar:$CLASSPATH'\033[;0m";
+            "/rpcf/rpcbase.jar:"
+            "/usr/share/java/commons-cli.jar:"
+            "./:$CLASSPATH'\033[;0m";
 
         printf("%s\n", strClsPath.c_str() );
 
@@ -4174,6 +4209,12 @@ gint32 CDeclareStructJava::Output()
         CCOUT << "do";
         BLOCK_OPEN;
         CCOUT << "ret = _osh.serialInt32( _pBuf,"
+            << " _offset, " << SERIAL_STRUCT_MAGICSTR_PY << " );";
+        NEW_LINE;
+        Wa( "if( RC.ERROR( ret ) )" );
+        Wa( "    break;" );
+        NEW_LINE;
+        CCOUT << "ret = _osh.serialInt32( _pBuf,"
             << " _offset, " << "getStructId() );";
         NEW_LINE;
         Wa( "if( RC.ERROR( ret ) )" );
@@ -4199,6 +4240,10 @@ gint32 CDeclareStructJava::Output()
         Wa( "try{" );
         CCOUT << "do";
         BLOCK_OPEN;
+        Wa( "int _magicId = _osh.deserialInt32( _bbuf );" );
+        CCOUT << "if( _magicId != "<< SERIAL_STRUCT_MAGICSTR_PY << " )";
+        NEW_LINE;
+        Wa( "    break;" );
         Wa( "int _structId = _osh.deserialInt32( _bbuf );" );
         Wa( "if( _structId != getStructId() )" );
         Wa( "    break;" );

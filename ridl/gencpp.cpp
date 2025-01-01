@@ -3977,6 +3977,13 @@ gint32 CImplSerialStruct::OutputSerial()
 
         CCOUT << "ret = CSerialBase::Serialize(";
         INDENT_UPL;
+        CCOUT << "pBuf_, "<< SERIAL_STRUCT_MAGICSTR << " );";
+        INDENT_DOWNL;
+        Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        CCOUT << "ret = CSerialBase::Serialize(";
+        INDENT_UPL;
         CCOUT << "pBuf_, m_dwMsgId );";
         INDENT_DOWNL;
         Wa( "if( ERROR( ret ) ) break;" );
@@ -4049,14 +4056,32 @@ gint32 CImplSerialStruct::OutputDeserial()
             break;
         }
 
+        Wa( "guint32 dwMagic;" );
+        CCOUT << "ret = CSerialBase::Deserialize(";
+        INDENT_UPL;
+        CCOUT << "pBuf_, dwMagic );";
+        INDENT_DOWNL;
+        Wa( "if( ERROR( ret ) ) break;" );
+        CCOUT << "if( dwMagic != " <<
+            SERIAL_STRUCT_MAGICSTR << " )";
+        NEW_LINE;
+        BLOCK_OPEN;
+        Wa( "ret = -EBADMSG;" );
+        CCOUT<< "break;";
+        BLOCK_CLOSE;
+        NEW_LINE;
+
         Wa( "guint32 dwMsgId = 0;" );
         CCOUT << "ret = CSerialBase::Deserialize(";
         INDENT_UPL;
         CCOUT << "pBuf_, dwMsgId );";
         INDENT_DOWNL;
-        NEW_LINE;
-        Wa( "if( ERROR( ret ) ) return ret;" );
-        Wa( "if( m_dwMsgId != dwMsgId ) return -EINVAL;" );
+        Wa( "if( ERROR( ret ) ) break;" );
+        Wa( "if( m_dwMsgId != dwMsgId )" );
+        BLOCK_OPEN;
+        Wa( "ret = -EBADMSG;" );
+        CCOUT<< "break;";
+        BLOCK_CLOSE;
         NEW_LINE;
 
         CEmitSerialCode odesc( m_pWriter, pFields );

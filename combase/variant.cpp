@@ -684,7 +684,6 @@ gint32 Variant::Deserialize(
     gint32 ret = 0;
     guint32 dwOldOff = pBuf->offset();
     pBuf->SetOffset( dwOldOff + 1 );
-
     switch( iType )
     {
     case typeByte:
@@ -707,23 +706,26 @@ gint32 Variant::Deserialize(
         break;
     case typeObj:
         {
-            guint32 dwClsid;
-            memcpy( &dwClsid,
-                pBuf->ptr(), sizeof( dwClsid ) );
-            dwClsid = ntohl( dwClsid );
-            if( dwClsid <= clsid( UserClsidStart ) )
+            guint32 arrValues[ 2 ];
+            memcpy( arrValues,
+                pBuf->ptr(), sizeof( guint32 ) * 2 );
+            guint32 *p = arrValues;
+            *p = ntohl( *p );
+            if( *p == SERIAL_STRUCT_MAGIC )
+            {
+                p++; *p = ntohl( *p );
+                ObjPtr pStruct;
+                ret = pStruct.NewObj( ( EnumClsid )*p );
+                if( ERROR( ret ) )
+                    break;
+                ret = pStruct->Deserialize( *pBuf );
+                if( SUCCEEDED( ret ) )
+                    m_pObj = pStruct;
+            }
+            else
             {
                 ret = osb.Deserialize( pBuf, m_pObj );
-                break;
             }
-            ObjPtr pStruct;
-            ret = pStruct.NewObj(
-                ( EnumClsid )dwClsid );
-            if( ERROR( ret ) )
-                break;
-            ret = pStruct->Deserialize( *pBuf );
-            if( SUCCEEDED( ret ) )
-                m_pObj = pStruct;
             break;
         }
     case typeByteArr:
@@ -733,6 +735,7 @@ gint32 Variant::Deserialize(
         ret = osb.Deserialize( pBuf, m_strVal );
         break;
     case typeNone:
+        break;
     case typeDMsg:
     default:
         ret = -ENOTSUP;
@@ -777,19 +780,24 @@ gint32 Variant::Serialize(
         ret = osb.Serialize( pBuf, m_dblVal );
         break;
     case typeObj:
-        if( m_pObj->GetClsid() <= clsid( UserClsidStart ))
-            ret = osb.Serialize( pBuf, m_pObj );
-        else
         {
-            CStructBase* psb = dynamic_cast
-                < CStructBase* >( ( CObjBase* )m_pObj );
-            if( psb != nullptr )
-                ret = psb->Serialize( pBuf );
+            CStructBase* pStruct = m_pObj;
+            if( pStruct != nullptr )
+            {
+                CStructBase* psb = dynamic_cast
+                    < CStructBase* >( ( CObjBase* )m_pObj );
+                if( psb != nullptr )
+                    ret = psb->Serialize( pBuf );
+                else
+                {
+                    ret = -EFAULT;
+                    DebugPrint( ret,
+                        "Error, unknown type to serialize" );
+                }
+            }
             else
             {
-                ret = -EFAULT;
-                DebugPrint( ret,
-                    "Error, unknown type to serialize" );
+                ret = osb.Serialize( pBuf, m_pObj );
             }
         }
         break;
@@ -800,6 +808,7 @@ gint32 Variant::Serialize(
         ret = osb.Serialize( pBuf, m_strVal );
         break;
     case typeNone:
+        break;
     case typeDMsg:
     default:
         ret = -ENOTSUP;

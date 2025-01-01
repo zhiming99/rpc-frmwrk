@@ -8,7 +8,11 @@ genfuse.h genfuse.cpp gencpp2.h gencpp2.cpp genfuse2.h genfuse2.cpp genrpcfs.cpp
 genjs.cpp genjs.h
 
 javatest=javatest/org/rpcf/fulltest
-EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java JavaSerialImpl.java $(javatest)/SimpFileSvccli.java $(javatest)/SimpFileSvcsvr.java $(javatest)/StreamSvccli.java $(javatest)/StreamSvcsvr.java $(javatest)/maincli.java $(javatest)/mainsvr.java
+EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py \
+pytest/StreamSvcsvr.py pytest/StreamSvccli.py pytest/maincli.py \
+pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java \
+JavaSerialImpl.java JVariant.java $(javatest)/SimpFileSvccli.java \
+ $(javatest)/SimpFileSvcsvr.java $(javatest)/StreamSvccli.java $(javatest)/StreamSvcsvr.java $(javatest)/maincli.java $(javatest)/mainsvr.java
 
 nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py
 
@@ -34,7 +38,8 @@ synccfg.py : synccfg.py.in
 ridlc_LDADD=$(COMMON_LINK) ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
-ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java
+ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py \
+pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java JVariant.java
 ridlc_confdir=$(sysconfdir)/rpcf
 
 include_ipcdir=$(top_srcdir)/ipc

@@ -51,11 +51,14 @@ class Variant :
             return -errno.EFAULT
         osb = self.osb
         iType = self.iType
-        if iType not in self.mapType2Sig:
-            return -errno.ENOTSUP
-        osb.SerialInt8( buf, iType )
-        sig = self.mapType2Sig[ iType ]
-        return osb.SerialElem( buf, self.val, sig )
+        if iType in self.mapType2Sig:
+            osb.SerialInt8( buf, iType )
+            sig = self.mapType2Sig[ iType ]
+            return osb.SerialElem( buf, self.val, sig )
+        elif iType == cpp.typeNone:
+            osb.SerialInt8( buf, iType )
+            return 0
+        return -errno.ENOTSUP
 
     def Deserialize( self, buf, offset )->Tuple[ int, int ]:
         if self.osb is None:
@@ -65,17 +68,24 @@ class Variant :
         iType = ret[ 0 ]
         newOff = ret[ 1 ]
         if iType != cpp.typeObj:
-            if iType not in self.mapType2Sig:
+            if iType in self.mapType2Sig:
+                sig = self.mapType2Sig[ iType ]
+                val = osb.DeserialElem( buf, newOff, sig )
+            elif iType ==  cpp.typeNone:
+                self.iType = iType
+                return ( 0, newOff )
+            else:
                 return ( None, offset )
-            sig = self.mapType2Sig[ iType ]
-            val = osb.DeserialElem( buf, newOff, sig )
-        else:
-            val = osb.DeserialStruct( buf, newOff )
-            if val[ 0 ] is None:
+        elif iType == cpp.typeObj:
+            ret = osb.DeserialInt32( buf, newOff );
+            if ret[ 0 ] == 0x73747275:
+                val = osb.DeserialStruct( buf, newOff )
+                if val[ 0 ] is None:
+                    return ( None, offset )
+            else:
                 val = osb.DeserialObjPtr( buf, newOff )
                 if val[ 0 ] is None:
                     return ( None, offset )
-
         self.iType = iType
         self.val = val[ 0 ]
         return ( 0, val[ 1 ] )
@@ -357,7 +367,7 @@ class CSerialBase :
         return ( listRet[ 1 ], listRet[ 2 ] ) 
 
     def DeserialStruct( self, buf : bytearray, offset : int ) -> Tuple[ object, int ] :
-        ret = struct.unpack_from( "!I", buf, offset )
+        ret = self.DeserialInt32( buf, offset + 4 )
         structId = ret[ 0 ]
         structInst = CStructFactoryBase.Create( structId, self.pIf )
         ret = structInst.Deserialize( buf, offset )

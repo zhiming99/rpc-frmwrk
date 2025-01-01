@@ -991,6 +991,8 @@ gint32 CDeclarePyStruct::Output()
         NEW_LINE;
         Wa( "osb = CSerialBase( self.pIf )" );
         NEW_LINE;
+        CCOUT << "osb.SerialInt32( buf, " << SERIAL_STRUCT_MAGICSTR_PY << " )";
+        NEW_LINE;
         CCOUT << "osb.SerialInt32( buf, " << strName << ".GetStructId() )";
         NEW_LINE;
         for( i = 0; i < dwCount; i++ )
@@ -1027,6 +1029,17 @@ gint32 CDeclarePyStruct::Output()
         NEW_LINE;
         Wa( "osb = CSerialBase( self.pIf )" );
         NEW_LINE;
+        CCOUT << "ret = osb.DeserialInt32( buf, offset )";
+        NEW_LINE;
+        Wa( "if ret[ 0 ] is None :" );
+        Wa( "    return ( -errno.ENOENT, 0 )" );
+        CCOUT << "if ret[ 0 ] != " << SERIAL_STRUCT_MAGICSTR_PY <<" :";
+        NEW_LINE;
+        CCOUT << "    return ( -errno.EBADMSG, 0 )";
+        NEW_LINE;
+        Wa( "offset = ret[ 1 ]" );
+        NEW_LINE;
+
         CCOUT << "ret = osb.DeserialInt32( buf, offset )";
         NEW_LINE;
         Wa( "if ret[ 0 ] is None :" );
@@ -1091,21 +1104,18 @@ static gint32 GenStructsFilePy(
             break;
         }
 
-        stdstr strSeribase = "./seribase.py";
-        ret = access( strSeribase.c_str(), F_OK );
-        if( ret == -1 )
+        stdstr strCmd = "rm ";
+        stdstr strSeribase =
+        m_pWriter->GetOutPath() +  "/seribase.py";
+        strCmd += strSeribase + ";cp ";
         {
             stdstr strPath;
-            ret = FindInstCfg( strSeribase, strPath );
+            ret = FindInstCfg(
+                "./seribase.py", strPath );
             if( ERROR( ret ) )
                 break;
-            strSeribase = strPath;
-        }
-        if( strSeribase != m_pWriter->GetOutPath() )
-        {
-            stdstr strCmd = "cp ";
-            strCmd += strSeribase +
-                " " + m_pWriter->GetOutPath();
+            strCmd +=
+                strPath + " " + strSeribase;
             system( strCmd.c_str() );
         }
 

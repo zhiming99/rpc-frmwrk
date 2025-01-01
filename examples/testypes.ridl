@@ -45,9 +45,11 @@ interface ITestTypes
     EchoStream( HSTREAM hstm )
         returns ( HSTREAM hstmr );
 
-    // EchoVariant( variant var1, variant var2 )
-    //     returns ( variant rvar1, variant rvar2 );
+    EchoVariant( variant var1, variant var2 )
+        returns ( variant rvar1, variant rvar2 );
 
+    EchoVarArray( array< variant > arrVars )
+        returns ( array< variant > rarrVars );
     // Note that event method does not have response.
     [ event ]OnHelloWorld( string strMsg ) returns ();
 };

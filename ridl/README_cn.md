@@ -63,6 +63,7 @@ service SimpFileSvc [ stream ]
 * **bytearray** : 字节数组.
 * **ObjPtr** : `rpc-frmwrk`内建的可序列化对象指针(Javascript不支持此类型)
 * **HSTREAM** : 数据流句柄，用于在客户端和服务器端指定数据流的实例.
+* **variant** : 动态类型。通过内部的类型标志，来指示当前存储的数据类型。可支持除HSTREAM和variant之外的基本数据类型，当数据类型是typeNone时，该变量无数据。
 
 三种复合类型数据包括：
 
