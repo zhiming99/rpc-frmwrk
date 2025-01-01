@@ -23,10 +23,16 @@
  * =====================================================================================
 '''
 from typing import Tuple
+from rpcf.rpcbase import *
 import errno
 import json
 import base64
 
+class Variant :
+    def __init__( self ) :
+        self.iType = cpp.typeNone 
+        self.val = None
+    
 class CSerialBase :
 
     def __init__( self ) :
@@ -67,6 +73,36 @@ class CSerialBase :
 
     def SerialStruct( self, val : object ) -> Tuple[ int, dict ]:
         return val.Serialize()
+
+    def SerialVariant( self, val : Variant )->dict :
+        ret = dict()
+        iType = val.iType
+        if iType == cpp.typeByte:
+            oVal = self.SerialInt8( val.val )
+        elif iType == cpp.typeUInt16:
+            oVal = self.SerialInt16( val.val )
+        elif iType == cpp.typeUInt32:
+            oVal = self.SerialInt32( val.val )
+        elif iType == cpp.typeUInt64:
+            oVal = self.SerialInt64( val.val )
+        elif iType == cpp.typeFloat:
+            oVal = self.SerialFloat( val.val )
+        elif iType == cpp.typeDouble:
+            oVal = self.SerialDouble( val.val )
+        elif iType == cpp.typeString:
+            oVal = self.SerialString( val.val )
+        elif iType == cpp.typeObj:
+            oVal = self.SerialStruct( val.val )
+        elif iType == cpp.typeNone:
+            oVal = None
+        else:
+            raise Exception( "unsupported datatype by rpcfs" )
+        if oVal is None:
+            raise Exception( "Error occurs in SerialVariant" )
+
+        ret[ 'v' ] = oVal
+        ret[ 't'] = iType
+        return ret
 
     def SerialArray( self, val : list, sig: str ) -> Tuple[ int, list ]:
         sigLen = len( sig )
@@ -156,6 +192,33 @@ class CSerialBase :
 
     def DeserialBuf( self, val : str ) -> bytearray:
         return base64.b64decode( val )
+
+    def DeserialVariant( self, val : dict )->Variant:
+        iType = val[ 't' ]
+        if iType == cpp.typeByte:
+            oVal = self.DeserialInt8( val[ 'v' ] )
+        elif iType == cpp.typeUInt16:
+            oVal = self.DeserialInt16( val[ 'v' ] )
+        elif iType == cpp.typeUInt32:
+            oVal = self.DeserialInt32( val[ 'v' ] )
+        elif iType == cpp.typeUInt64:
+            oVal = self.DeserialInt64( val[ 'v' ] )
+        elif iType == cpp.typeFloat:
+            oVal = self.DeserialFloat( val[ 'v' ] )
+        elif iType == cpp.typeDouble:
+            oVal = self.DeserialDouble( val[ 'v' ] )
+        elif iType == cpp.typeString:
+            oVal = self.DeserialString( val[ 'v' ] )
+        elif iType == cpp.typeObj:
+            oVal = self.DeserialStruct( val[ 'v' ] )
+        elif iType == cpp.typeNone:
+            oVal = None
+        else:
+            raise Exception( "unsupport data type by rpcfs" )
+        var = Variant()
+        var.val = oVal
+        var.iType = iType
+        return var
         
     def DeserialObjPtr( self, val : object )->object:
         raise Exception( "ObjPtr is not supported by rpcfs" )

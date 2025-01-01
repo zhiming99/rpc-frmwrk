@@ -139,6 +139,11 @@ static gint32 EmitSerialBySig(
             CCOUT << strDest << " = osb.SerialHStream( " << strField << " )";
             break;
         }
+    case 'v':
+        {
+            CCOUT << strDest << " = osb.SerialVariant( " << strField << " )";
+            break;
+        }
     default:
         {
             ret = -EINVAL;
@@ -245,6 +250,11 @@ static gint32 EmitDeserialBySig(
             CCOUT << strDest << " = osb.DeserialHStream( " << strSrc <<" )";
             break;
         }
+    case 'v':
+        {
+            CCOUT << strDest << " = osb.DeserialVariant( " << strSrc <<" )";
+            break;
+        }
     default:
         {
             ret = -EINVAL;
@@ -344,6 +354,7 @@ gint32 EmitImports(
     Wa( "import sys" );
     Wa( "from rpcf import iolib" );
     Wa( "from rpcf import serijson" );
+    Wa( "from rpcf.serijson import Variant" );
     Wa( "import errno" );
     Wa( "from rpcf.proxy import ErrorCode as Err" );
     Wa( "from typing import Union, Tuple, Optional" );
@@ -947,6 +958,11 @@ gint32 CDeclarePyStruct2::Output()
                     CCOUT << "self." << strName << " = None";
                     break;
                 }
+            case 'v':
+                {
+                    CCOUT << "self." << strName << " = None";
+                    break;
+                }
             default:
                 {
                     ret = -EINVAL;
@@ -1125,6 +1141,7 @@ static gint32 GenStructsFilePy2(
         CCOUT << "# " << g_strCmdLine;
         NEW_LINE;
         Wa( "from rpcf import serijson" );
+        Wa( "from rpcf.serijson import Variant" );
         Wa( "from rpcf.proxy import ErrorCode as Err" );
         Wa( "from typing import Tuple" );
         Wa( "import errno" );
