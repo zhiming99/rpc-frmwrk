@@ -94,6 +94,9 @@ class CJsonSerialBase : public CSerialBase
     gint32 SerializeStruct(
         BufPtr& pBuf, const Value& val );
 
+    gint32 SerializeVariant(
+        BufPtr& pBuf, const Value& val );
+
     gint32 SerializeArray(
         BufPtr& pBuf, const Value& val,
         const char* szSignature );
@@ -142,6 +145,9 @@ class CJsonSerialBase : public CSerialBase
         BufPtr& pBuf, Value& val );
 
     gint32 DeserializeStruct(
+        BufPtr& pBuf, Value& val );
+
+    gint32 DeserializeVariant(
         BufPtr& pBuf, Value& val );
 
     gint32 DeserializeArray(

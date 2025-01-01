@@ -230,6 +230,102 @@ gint32 CJsonSerialBase::SerializeStruct(
     return ret;
 }
 
+gint32 CJsonSerialBase::SerializeVariant(
+    BufPtr& pBuf, const Value& val )
+{
+    gint32 ret = 0;
+    do{
+        if( !val.isObject() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        if( !( val.isMember( "t" ) &&
+            val[ "t" ].isUInt() ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        guint32 dwTypeId = val[ "t" ].asUInt(); 
+        if( dwTypeId != typeNone ||
+            !val.isMember( "v" ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        const Value& subVal = val[ "v" ];
+        ret = this->SerializeByte(
+            pBuf, dwTypeId );
+        if( ERROR( ret ) )
+            break;
+
+        switch( dwTypeId )
+        {
+        case typeByte: 
+            {
+                ret = SerializeByte( pBuf, subVal );
+                break;
+            }
+        case typeUInt16:
+            {
+                ret = SerializeUShort( pBuf, subVal );
+                break;
+            }
+        case typeUInt32:
+            {
+                ret = SerializeUInt( pBuf, subVal );
+                break;
+            }
+        case typeUInt64:
+            {
+                ret = SerializeUInt64( pBuf, subVal );
+                break;
+            } 
+        case typeFloat:
+            {
+                ret = SerializeUInt64( pBuf, subVal );
+                break;
+            } 
+        case typeDouble:
+            {
+                ret = SerializeUInt64( pBuf, subVal );
+                break;
+            } 
+        case typeString:
+            {
+                ret = SerializeUInt64( pBuf, subVal );
+                break;
+            } 
+        case typeObj:
+            {
+                if( subVal.isObject() )
+                    ret = SerializeStruct( pBuf, subVal );
+                else
+                    ret = SerializeObjPtr( pBuf, subVal );
+                break;
+            } 
+        case typeByteArr:
+            {
+                ret = SerializeByteArray( pBuf, subVal );
+                break;
+            } 
+        case typeNone:
+            { break; }
+        case typeDMsg:
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CJsonSerialBase::SerializeArray(
     BufPtr& pBuf, const Value& val,
     const char* szSignature )
@@ -450,8 +546,7 @@ gint32 CJsonSerialBase::SerializeFromStr(
         }
     case 'o':
         {
-            ret = SerializeObjPtr(
-                pBuf, val );
+            ret = SerializeObjPtr( pBuf, val );
             break;
         }
     case 'O':
@@ -466,6 +561,11 @@ gint32 CJsonSerialBase::SerializeFromStr(
                 break;
             }
             ret = SerializeStruct( pBuf, valKey );
+            break;
+        }
+    case 'v':
+        {
+            ret = SerializeVariant( pBuf, val );
             break;
         }
     default:
@@ -602,76 +702,69 @@ gint32 CJsonSerialBase::SerializeElem(
     case 'Q':
     case 'q':
         {
-            ret = SerializeUInt64(
-                pBuf, val );
+            ret = SerializeUInt64( pBuf, val );
             break;
         }
     case 'D':
     case 'd':
         {
-            ret = SerializeUInt(
-                pBuf, val );
+            ret = SerializeUInt( pBuf, val );
             break;
         }
     case 'W':
     case 'w':
         {
-            ret = SerializeUShort(
-                pBuf, val );
+            ret = SerializeUShort( pBuf, val );
             break;
         }
     case 'f':
         {
-            ret = SerializeFloat(
-                pBuf, val );
+            ret = SerializeFloat( pBuf, val );
             break;
         }
     case 'F':
         {
-            ret = SerializeDouble(
-                pBuf, val );
+            ret = SerializeDouble( pBuf, val );
             break;
         }
     case 'b':
         {
-            ret = SerializeBool(
-                pBuf, val );
+            ret = SerializeBool( pBuf, val );
             break;
         }
     case 'B':
         {
-            ret = SerializeByte(
-                pBuf, val );
+            ret = SerializeByte( pBuf, val );
             break;
         }
     case 'h':
         {
-            ret = SerializeHStream(
-                pBuf, val );
+            ret = SerializeHStream( pBuf, val );
             break;
         }
     case 's':
         {
-            ret = SerializeString(
-                pBuf, val );
+            ret = SerializeString( pBuf, val );
             break;
         }
     case 'a':
         {
-            ret = SerializeByteArray(
-                pBuf, val );
+            ret = SerializeByteArray( pBuf, val );
             break;
         }
     case 'o':
         {
-            ret = SerializeObjPtr(
-                pBuf, val );
+            ret = SerializeObjPtr( pBuf, val );
             break;
         }
     case 'O':
         {
-            ret = SerializeStruct(
-                pBuf, val );
+            ret = SerializeStruct( pBuf, val );
+            break;
+        }
+    case 'v':
+        {
+            ret = SerializeVariant( pBuf, val );
             break;
         }
     default:
@@ -875,16 +968,25 @@ gint32 CJsonSerialBase::DeserializeStruct(
     gint32 ret = 0;
     do{
 
+        guint32 dwMagicId = 0;
         guint32 dwMsgId = 0;
-        if( pBuf->size() < sizeof( dwMsgId ) )
+        if( pBuf->size() < sizeof( guint32 ) * 2)
         {
             ret = -ERANGE;
             break;
         }
+        memcpy( &dwMagicId, pBuf->ptr(),
+            sizeof( dwMagicId ) );
+        dwMagicId = ntohl( dwMagicId );
+        if( dwMagicId != SERIAL_STRUCT_MAGIC )
+        {
+            ret = -EBADMSG;
+            break;
+        }
 
-        memcpy( &dwMsgId, pBuf->ptr(),
+        memcpy( &dwMsgId,
+            pBuf->ptr() + sizeof( guint32 ),
             sizeof( dwMsgId ) );
-
         dwMsgId = ntohl( dwMsgId );
         if( g_setMsgIds.find( dwMsgId ) ==
             g_setMsgIds.end() )
@@ -905,6 +1007,136 @@ gint32 CJsonSerialBase::DeserializeStruct(
 
     }while( 0 );
 
+    return ret;
+}
+
+gint32 CJsonSerialBase::DeserializeVariant(
+    BufPtr& pBuf, Value& val )
+{
+    gint32 ret = 0;
+    do{
+        guint8 iType;
+        ret = Deserialize( pBuf, iType );
+        if( ERROR( ret ) )
+            break;
+
+        Json::Value oValue;
+        switch( iType )
+        {
+        case typeByte: 
+            {
+                ret = DeserializeByte( pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            }
+        case typeUInt16:
+            {
+                ret = DeserializeUShort( pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            }
+        case typeUInt32:
+            {
+                ret = DeserializeUInt( pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            }
+        case typeUInt64:
+            {
+                ret = DeserializeUInt64( pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            } 
+        case typeFloat:
+            {
+                ret = Deserialize( pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            } 
+        case typeDouble:
+            {
+                ret = DeserializeDouble(
+                    pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            }
+        case typeString:
+            {
+                ret = DeserializeString( pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            } 
+        case typeObj:
+            {
+                guint32 dwMagicId = 0;
+                guint32 dwMsgId = 0;
+                if( pBuf->size() < sizeof( guint32 ) * 2)
+                {
+                    ret = -ERANGE;
+                    break;
+                }
+
+                memcpy( &dwMagicId, pBuf->ptr(),
+                    sizeof( dwMagicId ) );
+                dwMagicId = ntohl( dwMagicId );
+                if( dwMagicId != SERIAL_STRUCT_MAGIC )
+                {
+                    ret = DeserializeObjPtr(
+                        pBuf, oValue );
+                    if( ERROR( ret ) )
+                        break;
+                    val[ "v" ] = oValue;
+                    break;
+                }
+                else
+                {
+                    ret = DeserializeStruct(
+                        pBuf, oValue );
+                    if( ERROR( ret ) )
+                        break;
+                    val[ "v" ] = oValue;
+                    break;
+
+                }
+                break;
+            } 
+        case typeByteArr:
+            {
+                ret = DeserializeByteArray(
+                    pBuf, oValue );
+                if( ERROR( ret ) )
+                    break;
+                val[ "v" ] = oValue;
+                break;
+            } 
+        case typeNone:
+            { break; }
+        case typeDMsg:
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+        if( ERROR( ret ) )
+            break;
+        val[ "t" ] = iType;
+
+    }while( 0 );
     return ret;
 }
 
@@ -1146,70 +1378,59 @@ gint32 CJsonSerialBase::DeserializeElem(
     case 'Q':
     case 'q':
         {
-            ret = DeserializeUInt64(
-                pBuf, val );
+            ret = DeserializeUInt64( pBuf, val );
             break;
         }
     case 'D':
     case 'd':
         {
-            ret = DeserializeUInt(
-                pBuf, val );
+            ret = DeserializeUInt( pBuf, val );
             break;
         }
     case 'W':
     case 'w':
         {
-            ret = DeserializeUShort(
-                pBuf, val );
+            ret = DeserializeUShort( pBuf, val );
             break;
         }
     case 'f':
         {
-            ret = DeserializeFloat(
-                pBuf, val );
+            ret = DeserializeFloat( pBuf, val );
             break;
         }
     case 'F':
         {
-            ret = DeserializeDouble(
-                pBuf, val );
+            ret = DeserializeDouble( pBuf, val );
             break;
         }
     case 'b':
         {
-            ret = DeserializeBool(
-                pBuf, val );
+            ret = DeserializeBool( pBuf, val );
             break;
         }
     case 'B':
         {
-            ret = DeserializeByte(
-                pBuf, val );
+            ret = DeserializeByte( pBuf, val );
             break;
         }
     case 'h':
         {
-            ret = DeserializeHStream(
-                pBuf, val );
+            ret = DeserializeHStream( pBuf, val );
             break;
         }
     case 's':
         {
-            ret = DeserializeString(
-                pBuf, val );
+            ret = DeserializeString( pBuf, val );
             break;
         }
     case 'a':
         {
-            ret = DeserializeByteArray(
-                pBuf, val );
+            ret = DeserializeByteArray( pBuf, val );
             break;
         }
     case 'o':
         {
-            ret = DeserializeObjPtr(
-                pBuf, val );
+            ret = DeserializeObjPtr( pBuf, val );
             break;
         }
     case 'O':
@@ -1219,8 +1440,12 @@ gint32 CJsonSerialBase::DeserializeElem(
                 ret = -EINVAL;
                 break;
             }
-            ret = DeserializeStruct(
-                pBuf, val );
+            ret = DeserializeStruct( pBuf, val );
+            break;
+        }
+    case 'v':
+        {
+            ret = DeserializeVariant( pBuf, val );
             break;
         }
     default:
