@@ -249,7 +249,7 @@ gint32 CJsonSerialBase::SerializeVariant(
         }
 
         guint32 dwTypeId = val[ "t" ].asUInt(); 
-        if( dwTypeId != typeNone ||
+        if( dwTypeId == typeNone ||
             !val.isMember( "v" ) )
         {
             ret = -EINVAL;
@@ -286,17 +286,17 @@ gint32 CJsonSerialBase::SerializeVariant(
             } 
         case typeFloat:
             {
-                ret = SerializeUInt64( pBuf, subVal );
+                ret = SerializeFloat( pBuf, subVal );
                 break;
             } 
         case typeDouble:
             {
-                ret = SerializeUInt64( pBuf, subVal );
+                ret = SerializeDouble( pBuf, subVal );
                 break;
             } 
         case typeString:
             {
-                ret = SerializeUInt64( pBuf, subVal );
+                ret = SerializeString( pBuf, subVal );
                 break;
             } 
         case typeObj:

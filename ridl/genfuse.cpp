@@ -391,7 +391,7 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
         guint32 i = 0;
         guint32 dwCount = m_pArgs->GetCount();
 
-        Wa( "Json::Value _oMember, _oVal;" );
+        Wa( "Json::Value _oMember;" );
 
         for( ; i < dwCount; i++ )
         {
@@ -486,10 +486,9 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUInt64( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oVal );";
+                        <<", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    Wa( "_oMember = _oVal.asInt64();" );
                     break;
                 }
             case 'D':
@@ -509,10 +508,9 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUInt( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oVal );";
+                        <<", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    Wa( "_oMember = _oVal.asInt();" );
                     break;
                 }
             case 'W':
@@ -532,10 +530,9 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUShort( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oVal );";
+                        <<", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    Wa( "_oMember = _oVal.asInt();" );
                     break;
                 }
             case 'f':
@@ -638,10 +635,11 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
 
             CCOUT << "val_[ \"" << strName
                 << "\" ] = _oMember;";
-            NEW_LINE;
-            CCOUT << "_oMember = 0;";
             if( i + 1 < dwCount )
                 NEW_LINE;
+            // CCOUT << "_oMember = 0;";
+            // if( i + 1 < dwCount )
+            //    NEW_LINE;
         }
     }while( 0 );
 

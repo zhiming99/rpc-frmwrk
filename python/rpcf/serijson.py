@@ -92,7 +92,10 @@ class CSerialBase :
         elif iType == cpp.typeString:
             oVal = self.SerialString( val.val )
         elif iType == cpp.typeObj:
-            oVal = self.SerialStruct( val.val )
+            iRet, oVal = self.SerialStruct( val.val )
+            if iRet < 0:
+                raise Exception(
+                    "Serialize struct failed " + str( ret ) )
         elif iType == cpp.typeNone:
             oVal = None
         else:
@@ -210,7 +213,10 @@ class CSerialBase :
         elif iType == cpp.typeString:
             oVal = self.DeserialString( val[ 'v' ] )
         elif iType == cpp.typeObj:
-            oVal = self.DeserialStruct( val[ 'v' ] )
+            ret, oVal = self.DeserialStruct( val[ 'v' ] )
+            if ret < 0 :
+                raise Exception(
+                    "Error Deserialize struct failed " + str(ret) )
         elif iType == cpp.typeNone:
             oVal = None
         else:
@@ -315,7 +321,8 @@ class CSerialBase :
         's' : SerialString,    # TOK_STRING,
         'a' : SerialBuf,    # TOK_BYTEARR,
         'o' : SerialObjPtr,    # TOK_OBJPTR,
-        'O' : SerialStruct  # TOK_STRUCT,
+        'O' : SerialStruct,  # TOK_STRUCT,
+        'v' : SerialVariant,  # TOK_VARIANT,
     }
 
     DeserialElemOpt = {
@@ -333,7 +340,8 @@ class CSerialBase :
         's' : DeserialString,    # TOK_STRING,
         'a' : DeserialBuf,    # TOK_BYTEARR,
         'o' : DeserialObjPtr,    # TOK_OBJPTR,
-        'O' : DeserialStruct  # TOK_STRUCT,
+        'O' : DeserialStruct,  # TOK_STRUCT,
+        'v' : DeserialVariant,  # TOK_VARIANT,
     }
 
 g_mapStructs = dict()

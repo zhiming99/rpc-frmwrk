@@ -3,6 +3,7 @@
 import sys
 from rpcf import iolib
 from rpcf import serijson
+from rpcf.rpcbase import *
 from rpcf.serijson import Variant
 import errno
 from rpcf.proxy import ErrorCode as Err
@@ -190,7 +191,48 @@ class CITestTypessvr( IITestTypes_SvrImpl ):
         stmfp.write(inBuf)
         stmfp.close()
         return [ 0, [hstm] ]
+ 
+    '''
+    Synchronous request handler
+    within which to run the business logic.
+    Returning Err.STATUS_PENDING for an
+    asynchronous operation and returning other
+    error code will complete the request. if the
+    method returns STATUS_PENDING, make sure to
+    call "self.EchoVariantCompleteCb" later to
+    complete the request. Otherwise, the client
+    will get a timeout error. The return value is a
+    list, with the first element as error code and
+    the second element as a list of the response
+    parameters.
+    '''
+    def EchoVariant( self, reqId : object,
+        var1 : Variant,
+        var2 : Variant
+        ) -> Tuple[ int, list ] :
+
+        return [ 0, [ var1, var2] ]
         
+    '''
+    Synchronous request handler
+    within which to run the business logic.
+    Returning Err.STATUS_PENDING for an
+    asynchronous operation and returning other
+    error code will complete the request. if the
+    method returns STATUS_PENDING, make sure to
+    call "self.EchoVarArrayCompleteCb" later to
+    complete the request. Otherwise, the client
+    will get a timeout error. The return value is a
+    list, with the first element as error code and
+    the second element as a list of the response
+    parameters.
+    '''
+    def EchoVarArray( self, reqId : object,
+        arrVars : list
+        ) -> Tuple[ int, list ] :
+        #Implement this method here
+        return [ 0, [ arrVars,] ]
+               
     
 class CTestTypesSvcServer(
     CITestTypessvr ) :
