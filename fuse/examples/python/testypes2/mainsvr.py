@@ -99,7 +99,7 @@ def mainsvr() :
         '''
         counter = 0
         while True:
-            #oSvr.OnHelloWorld( "hello, proxy! " + str( counter ) )
+            oSvr.OnHelloWorld( "hello, proxy! " + str( counter ) )
             counter += 1
             time.sleep( 5 )
             
