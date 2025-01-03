@@ -298,7 +298,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
                     })
                 else
                     return this.EnableEvents().then((e)=>{
-                        return Promise.resolve(ret)
+                        return Promise.resolve(e)
                     }).catch((e)=>{
                         this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
                         return Promise.resolve( -errno.EFAULT )
