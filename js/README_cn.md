@@ -11,7 +11,8 @@
 相较于其他语言的开发，JS的流程相对复杂一些，因为涉及两种语言。我们以[hellowld.ridl](../examples/hellowld.ridl)为例. 假设目标网站的rpc-frmwrk服务的url为`https://example.com/rpcf`。
 1. 在HelloWorld的JS例子程序的[目录](../examples/js/hellowld)下运行`ridlc -J --odesc_url=https://example.com/rpcf -O . ../../hellowld.ridl`，生成客户端网页和JS代码。如果需要OAuth2，加上选项`--auth`。
 2. 在当前目录下运行`make`将用`webpack`打包生成的JS代码并存放在`./dist`目录下。
-3. HelloWorld服务器代码我们可以在C++的例子程序[HelloWorld](../examples/cpp/hellowld)的目录下运行 `ridlc -O . ../../hellowld.ridl`生成完整的项目源文件。然后输入`make release`生成可执行文件`HelloWorldsvr`。
+3. 如果想生成debug版本，运行`make debug`,生成可调试的JS代码。
+4. HelloWorld服务器代码我们可以在C++的例子程序[HelloWorld](../examples/cpp/hellowld)的目录下运行 `ridlc -O . ../../hellowld.ridl`生成完整的项目源文件。然后输入`make release`生成可执行文件`HelloWorldsvr`。
 
 ### 部署
 下边简要介绍部署支持JS客户端的基本流程。rpc-frmwrk的服务器和web服务器既可以部署在同一台机器上，也可以在不同的机器上。
@@ -25,7 +26,7 @@
 #### 服务器的部署
 服务器的配置的设置
 1. 运行命令`python3 /usr/bin/rpcf/rpcfg.py`，打开配置工具界面。
-2. 配置WebSocket如下图，如果无OAuth2认证，去掉`auth`旁的勾选，并跳到第四步。
+2. 配置WebSocket如下图，如果无OAuth2认证，去掉`auth`旁的勾选，并跳到第四步
    * ![OAuth2-1](../pics/OAuth2-1_cn.png)
 3. 选择认证方法
    * ![OAuth2-2](../pics/OAuth2-2_cn.png) 
