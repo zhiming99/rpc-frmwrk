@@ -732,6 +732,7 @@ gint32 Variant::Deserialize(
         ret = osb.Deserialize( pBuf, m_pBuf );
         break;
     case typeString:
+        new ( &m_strVal )string();
         ret = osb.Deserialize( pBuf, m_strVal );
         break;
     case typeNone:

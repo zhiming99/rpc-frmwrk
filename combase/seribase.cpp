@@ -405,7 +405,7 @@ gint32 CSerialBase::Deserialize< std::string >(
     guint32 dwBytes = 
         std::min( dwCount, pBuf->size() );
 
-    new ( &val )stdstr( pBuf->ptr(), dwBytes );
+    val.append( pBuf->ptr(), dwBytes );
     pBuf->IncOffset( dwBytes );
     return STATUS_SUCCESS;
 }
