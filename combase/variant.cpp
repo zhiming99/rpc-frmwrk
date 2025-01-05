@@ -672,7 +672,8 @@ gint32 Variant::Deserialize(
 
     Clear();
     CSerialBase oBackup;
-    auto psb = ( CSerialBase* )p;
+    auto psb =
+        reinterpret_cast< CSerialBase* >( p );
     if( psb == nullptr )
         psb = &oBackup;
     CSerialBase& osb = *psb;
@@ -745,15 +746,17 @@ gint32 Variant::Deserialize(
 }
 
 gint32 Variant::Serialize(
-    BufPtr& pBuf, void* psb ) const
+    BufPtr& pBuf, void* p ) const
 {
     if( pBuf.IsEmpty() )
         return -EINVAL;
 
     CSerialBase oBackup;
-    CSerialBase& osb = *( CSerialBase* )psb;
+    auto psb = 
+        reinterpret_cast< CSerialBase* >( p );
     if( psb == nullptr )
-        osb = oBackup;
+        psb = &oBackup;
+    CSerialBase& osb = *psb;
 
     auto iType = m_iType;
 
