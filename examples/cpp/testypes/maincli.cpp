@@ -654,6 +654,28 @@ gint32 TestVariant( CTestTypesSvc_CliImpl* pIf )
         DebugPrint( ret,
             "Server resp variant array: %s",
             pf->szFileName.c_str() );
+
+        std::map< stdstr, Variant > mapVars;
+        std::map< stdstr, Variant > rmapVars;
+
+        mapVars[ "haha" ] =  var1;
+        mapVars[ "bobo" ] =  var2;
+        mapVars[ "cici" ] =  var3;
+        ret = pIf->EchoVarMap(
+            mapVars, rmapVars );
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error echo variant map" );
+            break;
+        }
+        Variant& oVar4 = rmapVars["cici"];
+        pfi = (ObjPtr&)oVar4;
+        pf = pfi;
+        OutputMsg( ret,
+            "Server resp variant map: %s",
+            pf->szFileName.c_str() );
+
     }
     return ret;
 }

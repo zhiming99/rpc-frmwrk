@@ -235,6 +235,14 @@ def maincli() :
             raise Exception( "EchoVarArray failed with error %d"%error )
         print( "EchoVarArray resp is %s" % iRet[1][0][1].val.szFileName)
 
+        reqId += 1
+        mapVars = {"haha":var1, "bobo":var2}
+        iRet = oProxy.EchoVarMap( reqId, mapVars)
+        if iRet[0] < 0:
+            error = iRet[0]
+            raise Exception( "EchoVarMap failed with error %d"%error )
+        print( "EchoVarMap resp is %s" % iRet[1][0]["bobo"].val.szFileName)
+
     except Exception as err:
         print( err )
         if error < 0 :

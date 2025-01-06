@@ -164,6 +164,14 @@ gint32 CTestTypesSvc_SvrImpl::EchoVarArray(
     rarrVars = arrVars;
     return STATUS_SUCCESS;
 }
+/* Sync Req Handler*/
+gint32 CTestTypesSvc_SvrImpl::EchoVarMap(
+    std::map<std::string,Variant>& mapVars /*[ In ]*/,
+    std::map<std::string,Variant>& rmapVars /*[ Out ]*/ )
+{
+    rmapVars = mapVars;
+    return STATUS_SUCCESS;
+}
 /* RPC event sender */
 gint32 CTestTypesSvc_SvrImpl::OnHelloWorld(
     const std::string& strMsg /*[ In ]*/ )

@@ -399,6 +399,7 @@ gint32 CSerialBase::Deserialize< std::string >(
     if( ERROR( ret ) )
         return ret;
 
+    val.clear();
     if( dwCount == 0 )
         return ret;
 

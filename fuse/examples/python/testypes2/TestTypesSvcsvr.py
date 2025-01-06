@@ -233,7 +233,27 @@ class CITestTypessvr( IITestTypes_SvrImpl ):
         #Implement this method here
         return [ 0, [ arrVars,] ]
                
-    
+        
+    '''
+    Synchronous request handler
+    within which to run the business logic.
+    Returning Err.STATUS_PENDING for an
+    asynchronous operation and returning other
+    error code will complete the request. if the
+    method returns STATUS_PENDING, make sure to
+    call "self.EchoVarMapCompleteCb" later to
+    complete the request. Otherwise, the client
+    will get a timeout error. The return value is a
+    list, with the first element as error code and
+    the second element as a list of the response
+    parameters.
+    '''
+    def EchoVarMap( self, reqId : object,
+        mapVars : map
+        ) -> Tuple[ int, list ] :
+        return [ 0, [mapVars,] ]
+        
+        
 class CTestTypesSvcServer(
     CITestTypessvr ) :
     def __init__( self, strSvcPoint : str, num : int ) :

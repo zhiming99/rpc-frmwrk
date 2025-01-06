@@ -50,6 +50,10 @@ interface ITestTypes
 
     EchoVarArray( array< variant > arrVars )
         returns ( array< variant > rarrVars );
+
+    EchoVarMap( map< string, variant > mapVars )
+        returns ( map< string, variant > rmapVars );
+
     // Note that event method does not have response.
     [ event ]OnHelloWorld( string strMsg ) returns ();
 };
