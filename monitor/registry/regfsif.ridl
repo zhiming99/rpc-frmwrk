@@ -249,100 +249,100 @@ interface IRegistryFs
 // applications
 interface IRegFsRemote
 {
-    [async_p]CreateFile( string strPath,
+    CreateFile( string strPath,
         uint32 dwMode, uint32 dwFlags )
     returns( uint64 hFile );
 
-    [async_p]MakeDir(
+    MakeDir(
         string strPath, uint32 dwMode )
     returns();
 
-    [async_p]OpenFile(
+    OpenFile(
         string strPath, uint32 dwFlags )
     returns( uint64 hFile );
 
-    [async_p]CloseFile( uint64 hFile )
+    CloseFile( uint64 hFile )
     returns();
 
-    [async_p]RemoveFile( string strPath )
+    RemoveFile( string strPath )
     returns();
 
-    [async_p]ReadFile( uint64 hFile,
+    ReadFile( uint64 hFile,
         uint32 dwSize, uint32 dwOff )
     returns( bytearray buffer );
 
-    [async_p]WriteFile( uint64 hFile,
+    WriteFile( uint64 hFile,
         bytearray buffer, uint32 dwOff )
     returns( uint32 dwSizeWrite );
 
-    [async_p]Truncate(
+    Truncate(
         uint64 hFile, uint32 dwOff )
     returns();
 
-    [async_p]CloseDir( uint64 hFile )
+    CloseDir( uint64 hFile )
     returns();
 
-    [async_p]RemoveDir( string strPath )
+    RemoveDir( string strPath )
     returns();
 
-    [async_p]SetGid(
+    SetGid(
         string strPath, uint32 wGid )
     returns();
 
-    [async_p]SetUid(
+    SetUid(
         string strPath, uint32 wUid )
     returns();
 
-    [async_p]GetGid( string strPath )
+    GetGid( string strPath )
     returns( uint32 gid );
 
-    [async_p]GetUid( string strPath )
+    GetUid( string strPath )
     returns( uint32 uid );
 
-    [async_p]SymLink( string strSrcPath,
+    SymLink( string strSrcPath,
         string strDestPath )
     returns();
 
-    [async_p]GetValue( string strPath )
+    GetValue( string strPath )
     returns(string strJson);
 
-    [async_p]SetValue(
+    SetValue(
         string strPath, string strJson )
     returns();
 
-    [async_p]Chmod(
+    Chmod(
         string strPath, uint32 dwMode )
     returns();
 
-    [async_p]Chown(
+    Chown(
         string strPath,
         uint32 dwUid, uint32 dwGid )
     returns();
 
-    [async_p]ReadLink( string strPath )
+    ReadLink( string strPath )
     returns( bytearray buf );
 
-    [async_p]Rename(
+    Rename(
         string szFrom, string szTo )
     returns();
 
-    [async_p]Flush( uint32 dwFlags )
+    Flush( uint32 dwFlags )
     returns();
 
-    [async_p]Access(
+    Access(
         string strPath, uint32 dwFlags )
     returns();
 
-    [async_p]GetAttr( string strPath )
+    GetAttr( string strPath )
     returns ( FileStat oStat );
 
-    [async_p]ReadDir( uint64 hDir )
+    ReadDir( uint64 hDir )
     returns( array< FileStat > vecDirEnt );
 
-    [async_p]OpenDir(
+    OpenDir(
         string strPath, uint32 dwFlags )
     returns( uint64 hDir );
 
-    [async_p]ExecBat( string strJson )
+    ExecBat( string strJson )
     returns ();
 };
