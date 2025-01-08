@@ -2286,12 +2286,10 @@ gint32 CDeclInterfProxy::OutputAsync(
         NEW_LINE;
 
         CCOUT << "IConfigDb* context";
-        bool bComma = false;
         if( dwInCount + dwOutCount == 0 )
-            CCOUT << " ";
+            CCOUT << "";
         if( dwInCount > 0 )
         {
-            bComma = true;
             CCOUT << ", ";
             NEW_LINE;
             GenFormInArgs( pInArgs );
@@ -2306,7 +2304,7 @@ gint32 CDeclInterfProxy::OutputAsync(
             CCOUT << " ";
         }
 
-        CCOUT << ");";
+        CCOUT << " );";
         INDENT_DOWN;
 
         if( pmd->IsSerialize() && dwInCount > 0 )
@@ -5127,22 +5125,17 @@ gint32 CImplIfMethodProxy::OutputAsync()
         CCOUT << "IConfigDb* context";
         // gen the param list
         if( dwInCount + dwOutCount == 0 )
-            CCOUT << " ";
-        bool bComma = false;
+            CCOUT << "";
         if( dwInCount > 0 )
         {
-            bComma = true;
             CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
         if( dwOutCount > 0 )
         {
-            if( bComma )
-            {
-                CCOUT << ",";
-                NEW_LINE;
-            }
+            CCOUT << ",";
+            NEW_LINE;
             GenFormOutArgs( pOutArgs );
         }
     

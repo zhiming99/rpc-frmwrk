@@ -139,4 +139,10 @@ $(OBJ_DIR)/%.d : %.cpp
 	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
 	@rm -f $@.tmp
 
-.PHONY: clean
+sync:
+	@python3 ./synccfg.py
+	@if [ -d debug ]; then cp *.json debug;fi
+	@if [ -d release ]; then cp *.json release;fi
+	@echo sync configuration done
+
+.PHONY: clean sync

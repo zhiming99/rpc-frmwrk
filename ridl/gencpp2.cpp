@@ -290,30 +290,22 @@ gint32 CDeclInterfProxy2::OutputAsyncROSSkel(
         NEW_LINE;
 
         CCOUT << "IConfigDb* context";
-        bool bComma = false;
         if( dwInCount + dwOutCount == 0 )
-            CCOUT << " ";
+            CCOUT << "";
         if( dwInCount > 0 )
         {
-            bComma = true;
             CCOUT << ", ";
             NEW_LINE;
             GenFormInArgs( pInArgs );
-            if( dwOutCount == 0 )
-                CCOUT << " ";
         }
         if( dwOutCount > 0 )
         {
-            if( bComma )
-            {
-                CCOUT << ", ";
-                NEW_LINE;
-            }
+            CCOUT << ", ";
+            NEW_LINE;
             GenFormOutArgs( pOutArgs );
-            CCOUT << " ";
         }
 
-        CCOUT << ");";
+        CCOUT << " );";
         INDENT_DOWN;
 
         if( pmd->IsSerialize() && dwInCount > 0 )
@@ -633,27 +625,22 @@ gint32 CDeclInterfProxy2::OutputAsyncROS(
         NEW_LINE;
 
         CCOUT << "IConfigDb* context";
-        bool bComma = false;
         if( dwInCount + dwOutCount == 0 )
-            CCOUT << " ";
+            CCOUT << "";
         if( dwInCount > 0 )
         {
-            bComma = true;
             CCOUT << ", ";
             NEW_LINE;
             GenFormInArgs( pInArgs );
-            if( dwOutCount == 0 )
-                CCOUT << " ";
         }
         if( dwOutCount > 0 )
         {
             CCOUT << ", ";
             NEW_LINE;
             GenFormOutArgs( pOutArgs );
-            CCOUT << " ";
         }
 
-        CCOUT << ")";
+        CCOUT << " )";
         INDENT_DOWNL;
         BLOCK_OPEN;
         Wa( "auto pIf = GetSkelPtr();" );
@@ -1153,11 +1140,11 @@ gint32 CDeclInterfSvr2::OutputAsyncROS(
         if( dwCount > 0 )
         {
             strDecl += ",";
-            CCOUT << ",";
         }
 
         if( dwInCount > 0 )
         {
+            CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
@@ -1363,11 +1350,11 @@ gint32 CDeclInterfSvr2::OutputAsyncROSImpl(
         if( dwCount > 0 )
         {
             strDecl += ",";
-            CCOUT << ",";
         }
 
         if( dwInCount > 0 )
         {
+            CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs, true );
         }
@@ -1681,11 +1668,11 @@ gint32 CDeclInterfSvr2::OutputAsyncROSSkel(
         if( dwCount > 0 )
         {
             strDecl += ",";
-            CCOUT << ",";
         }
 
         if( dwInCount > 0 )
         {
+            CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
@@ -1874,30 +1861,22 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
         CCOUT << "gint32 " << strClass << "::"
             << strMethod << "( ";
         INDENT_UPL;
-        if( dwInCount > 0 )
+        if( dwInCount + dwOutCount > 0 )
         {
-            bool bComma = false;
             CCOUT << "IConfigDb* pContext";
             if( dwInCount > 0 )
             {
-                bComma = true;
                 CCOUT << ", ";
                 NEW_LINE;
                 GenFormInArgs( pInArgs, true );
-                if( dwOutCount == 0 )
-                    CCOUT << " ";
             }
             if( dwOutCount > 0 )
             {
-                if( bComma )
-                {
-                    CCOUT << ", ";
-                    NEW_LINE;
-                }
+                CCOUT << ", ";
+                NEW_LINE;
                 GenFormOutArgs( pOutArgs, true );
-                CCOUT << " ";
             }
-            CCOUT << ")";
+            CCOUT << " )";
         }
         else
             CCOUT << "IConfigDb* pContext )";
@@ -2023,7 +2002,7 @@ gint32 CImplIfMethodSvr2::OutputSyncROSSkel()
         Wa( "if( pApi == nullptr )" );
         Wa( "    return -EFAULT;" );
         CCOUT << "return pApi->" << strName << "(";
-        if( dwInCount == 0 )
+        if( dwCount == 0 )
         {
             CCOUT << ");";
         }
@@ -2117,11 +2096,11 @@ gint32 CImplIfMethodSvr2::OutputAsyncROSSkel()
         if( dwCount > 0 )
         {
             strDecl += ",";
-            CCOUT << ",";
         }
 
         if( dwInCount > 0 )
         {
+            CCOUT << ",";
             NEW_LINE;
             GenFormInArgs( pInArgs );
         }
@@ -2145,7 +2124,7 @@ gint32 CImplIfMethodSvr2::OutputAsyncROSSkel()
         Wa( "if( pApi == nullptr )" );
         Wa( "    return -EFAULT;" );
         CCOUT << "return pApi->" << strName << "(";
-        if( dwInCount == 0 )
+        if( dwCount == 0 )
         {
             INDENT_UPL;
             CCOUT << "pReqCtx_ );";
@@ -2154,7 +2133,7 @@ gint32 CImplIfMethodSvr2::OutputAsyncROSSkel()
         else
         {
             INDENT_UPL;
-            CCOUT << "pReqCtx_,";
+            CCOUT << "pReqCtx_, ";
             GenActParams( pInArgs, pOutArgs, false );
             CCOUT << " );";
             INDENT_DOWN;
