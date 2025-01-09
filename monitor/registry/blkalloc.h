@@ -1114,7 +1114,7 @@ struct CBPlusNode :
 
     const char* GetKey( gint32 idx ) const
     {
-        if( idx >= GetKeyCount() )
+        if( idx >= ( gint32 )GetKeyCount() )
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
@@ -1137,7 +1137,7 @@ struct CBPlusNode :
         gint32 idx, FImgSPtr& pFile ) const 
     {
         FImgSPtr pEmpty;
-        if( idx >= GetChildCount() )
+        if( idx >= ( gint32 )GetChildCount() )
             return -EINVAL;
 
         if( !IsLeaf() )
@@ -1219,7 +1219,8 @@ struct CBPlusNode :
 
     CBPlusNode* GetChild( gint32 idx ) const
     {
-        if( idx >= GetChildCount() || idx < 0 )
+        if( idx >= ( gint32 )GetChildCount() ||
+            idx < 0 )
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
@@ -1292,15 +1293,19 @@ struct CBPlusNode :
     {
         if( IsRoot() )
         {
-            if( IsLeaf() && idx > MAX_KEYS_PER_NODE )
+            if( IsLeaf() && idx >
+                ( gint32 )MAX_KEYS_PER_NODE )
                 return nullptr;
-            if( !IsLeaf() && idx > MAX_PTRS_PER_NODE )
+            if( !IsLeaf() && idx >
+                ( gint32 )MAX_PTRS_PER_NODE )
                 return nullptr;
             return m_oBNodeStore.m_vecSlots[ idx ];
         }
-        if( IsLeaf() && idx > GetKeyCount() )
+        if( IsLeaf() &&
+            idx > ( gint32 )GetKeyCount() )
             return nullptr;
-        if( !IsLeaf() && idx > GetChildCount() )
+        if( !IsLeaf() &&
+            idx > ( gint32 )GetChildCount() )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -1309,14 +1314,18 @@ struct CBPlusNode :
     {
         if( IsRoot() )
         {
-            if( IsLeaf() && idx > MAX_KEYS_PER_NODE )
+            if( IsLeaf() && idx > 
+                ( gint32 )MAX_KEYS_PER_NODE )
                 return nullptr;
-            if( !IsLeaf() && idx > MAX_PTRS_PER_NODE )
+            if( !IsLeaf() && idx >
+                ( gint32 )MAX_PTRS_PER_NODE )
                 return nullptr;
             return m_oBNodeStore.m_vecSlots[ idx ];
         }
-        if( ( IsLeaf() && idx > GetKeyCount() ) ||
-            ( !IsLeaf() && idx > GetChildCount() ) )
+        if( ( IsLeaf() && idx >
+            ( gint32 )GetKeyCount() ) ||
+            ( !IsLeaf() && idx >
+            ( gint32 )GetChildCount() ) )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
