@@ -829,8 +829,12 @@ gint32 CRpcTcpBridgeAuth::OnLoginComplete(
                     strSess, oInfo.GetCfg() );
                 if( SUCCEEDED( ret ) )
                 {
+                    ObjPtr pObj( oInfo.GetCfg() );
                     pIf->LogSuccessfuleLogin(
-                        strSess, oInfo.GetCfg() );
+                        strSess, pObj );
+                    Variant oVar( pObj );
+                    pIf->SetProperty(
+                        propLoginInfo, oVar );
                 }
 
                 TaskletPtr pDummy;
@@ -1065,6 +1069,10 @@ gint32 CRpcTcpBridgeAuth::FetchData_Filter(
         if( ERROR( ret ) )
             break;
 
+        ret = oTransCtx.CopyProp(
+            propLoginInfo, this );
+        if( ERROR( ret ) )
+            break;
         // ret = super::FetchData_Server(
         //     pDataDesc, fd, dwOffset,
         //     dwSize, pCallback );
