@@ -73,6 +73,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcrouter
 %{_bindir}/rpcf_logger
 %{_bindir}/regfsmnt
+%{_bindir}/appmon*
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
@@ -81,6 +82,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/hwdesc.json
 %{_sysconfdir}/rpcf/echodesc.json
 %{_sysconfdir}/rpcf/logger*.json
+%{_sysconfdir}/rpcf/appmon*.json
 %{_sysconfdir}/rpcf/*.ridl
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*

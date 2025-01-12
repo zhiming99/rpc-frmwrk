@@ -16,6 +16,7 @@ appmonsvr_LDADD= ./libappmon.a \
 
 appmoncli_LDADD=$(appmonsvr_LDADD)
 
+appmonconf_DATA=appmondesc.json appmon.ridl
 appmonconfdir=$(sysconfdir)/rpcf
 appmondir=$(bindir)
 
@@ -35,9 +36,9 @@ endif
 appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
 appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 
-EXTRA_DIST=appmon.ridl appmondesc.json
+EXTRA_DIST=appmon.ridl
 
-lib_LIBRARIES=libappmon.a
+noinst_LIBRARIES=libappmon.a
 libappmon_a_SOURCES = appmon.cpp appmon.h 
 libappmon_a_CPPFLAGS= -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
 libappmon_a_HEADERS=
@@ -46,3 +47,11 @@ libappmon_a_HEADERS=
 #libappmon_ladir=$(libdir)
 libappmon_adir=./
 
+appmon.ridl:../registry/regfsif.ridl
+
+appmon.cpp appmon.h appmondesc.json AppMonitorsvr.cpp AppMonitorsvr.h: appmon.ridl
+	@cp Makefile Makefile_
+	../../ridl/.libs/ridlc -sO . ./appmon.ridl
+	@python3 synccfg.py
+	@mv Makefile_ Makefile
+    

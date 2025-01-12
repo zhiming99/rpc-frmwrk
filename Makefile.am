@@ -5,7 +5,7 @@ if ENABLE_FUSE3
 SUBDIRS += fuse
 endif
 
-SUBDIRS += monitor rpc ridl tools pics examples 
+SUBDIRS += ridl monitor rpc tools pics examples 
 
 SUBDIRS += test
 

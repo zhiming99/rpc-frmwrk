@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ridlc -sO . ./appmon.ridl 
+// ../../ridl/.libs/ridlc -sO . ./appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -9,277 +9,304 @@ using namespace rpcf;
 #include "appmon.h"
 #include "AppMonitorsvr.h"
 
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::CreateFile(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::CreateFile( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwMode /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/,
+    guint32 dwFlags /*[ In ]*/, 
     guint64& hFile /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'CreateFileComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::MakeDir(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::MakeDir( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwMode /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'MakeDirComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::OpenFile(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::OpenFile( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/,
+    guint32 dwFlags /*[ In ]*/, 
     guint64& hFile /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'OpenFileComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::CloseFile(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::CloseFile( 
+    IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'CloseFileComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::RemoveFile(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::RemoveFile( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'RemoveFileComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::ReadFile(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::ReadFile( 
+    IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/,
     guint32 dwSize /*[ In ]*/,
-    guint32 dwOff /*[ In ]*/,
+    guint32 dwOff /*[ In ]*/, 
     BufPtr& buffer /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'ReadFileComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::WriteFile(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::WriteFile( 
+    IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/,
     BufPtr& buffer /*[ In ]*/,
-    guint32 dwOff /*[ In ]*/,
+    guint32 dwOff /*[ In ]*/, 
     guint32& dwSizeWrite /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'WriteFileComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::Truncate(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::Truncate( 
+    IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/,
     guint32 dwOff /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'TruncateComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::CloseDir(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::CloseDir( 
+    IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'CloseDirComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::RemoveDir(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::RemoveDir( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'RemoveDirComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetGid(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SetGid( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 wGid /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SetGidComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetUid(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SetUid( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 wUid /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SetUidComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetGid(
-    const std::string& strPath /*[ In ]*/,
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetGid( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/, 
     guint32& gid /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'GetGidComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetUid(
-    const std::string& strPath /*[ In ]*/,
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetUid( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/, 
     guint32& uid /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'GetUidComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::SymLink(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SymLink( 
+    IConfigDb* pContext, 
     const std::string& strSrcPath /*[ In ]*/,
     const std::string& strDestPath /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SymLinkComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetValue(
-    const std::string& strPath /*[ In ]*/,
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetValue( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/, 
     std::string& strJson /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'GetValueComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetValue(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SetValue( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     const std::string& strJson /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SetValueComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::Chmod(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::Chmod( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwMode /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'ChmodComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::Chown(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::Chown( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwUid /*[ In ]*/,
     guint32 dwGid /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'ChownComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::ReadLink(
-    const std::string& strPath /*[ In ]*/,
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::ReadLink( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/, 
     BufPtr& buf /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'ReadLinkComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::Rename(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::Rename( 
+    IConfigDb* pContext, 
     const std::string& szFrom /*[ In ]*/,
     const std::string& szTo /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'RenameComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::Flush(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::Flush( 
+    IConfigDb* pContext, 
     guint32 dwFlags /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'FlushComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::Access(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::Access( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwFlags /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'AccessComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetAttr(
-    const std::string& strPath /*[ In ]*/,
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetAttr( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/, 
     FileStat& oStat /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'GetAttrComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::ReadDir(
-    guint64 hDir /*[ In ]*/,
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::ReadDir( 
+    IConfigDb* pContext, 
+    guint64 hDir /*[ In ]*/, 
     std::vector<FileStat>& vecDirEnt /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'ReadDirComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::OpenDir(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::OpenDir( 
+    IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/,
+    guint32 dwFlags /*[ In ]*/, 
     guint64& hDir /*[ Out ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'OpenDirComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
-/* Sync Req Handler*/
-gint32 CAppMonitor_SvrImpl::ExecBat(
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::ExecBat( 
+    IConfigDb* pContext, 
     const std::string& strJson /*[ In ]*/ )
 {
-    // TODO: Process the sync request here
-    // return code can be an Error or
-    // STATUS_SUCCESS
+    // TODO: Emit an async operation here.
+    // And make sure to call 'ExecBatComplete'
+    // when the service is done
     return ERROR_NOT_IMPL;
 }
 /* Async Req Handler*/

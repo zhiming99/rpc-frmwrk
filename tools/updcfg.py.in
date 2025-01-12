@@ -224,7 +224,7 @@ def ExtraUpdateBtinrt(
 
 
 def ExportTestCfgsTo( cfgList:list, destPath:str ):
-    testDescs = [ 'echodesc.json', 'btinrt.json' ]
+    testDescs = [ 'echodesc.json', 'btinrt.json', 'appmondesc.json' ]
     if IsFeatureEnabled( 'testcases' ):
         testDescs.extend(  [ "actcdesc.json",
             "asyndesc.json",
@@ -268,7 +268,7 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
     return ret
 
 def ExportTestCfgs( cfgList:list ):
-    testDescs = [ 'echodesc.json', 'btinrt.json' ]
+    testDescs = [ 'echodesc.json', 'btinrt.json', 'appmondesc.json' ]
     if IsFeatureEnabled( 'testcases' ):
         testDescs.extend(  [ "actcdesc.json",
             "asyndesc.json",

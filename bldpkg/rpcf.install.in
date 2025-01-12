@@ -6,6 +6,7 @@ usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libhellowrd.so*
 usr/bin/rpcrouter
 usr/bin/rpcf_logger
 usr/bin/regfsmnt
+usr/bin/appmon*
 @FUSE3_DEBFILES@
 usr/bin/rpcf/*.py
 @GMSSL_DEBFILES@
@@ -16,6 +17,7 @@ etc/rpcf/router.json
 etc/rpcf/authprxy.json
 etc/rpcf/driver.json
 etc/rpcf/logger*.json
+etc/rpcf/appmon*.json
 usr/bin/rpcf/btinrtsvr
 usr/bin/rpcf/btinrtcli
 etc/rpcf/btinrt.json

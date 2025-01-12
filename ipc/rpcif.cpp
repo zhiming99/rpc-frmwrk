@@ -7184,6 +7184,9 @@ gint32 CInterfaceServer::CheckReqCtx(
         oTaskCfg.CopyProp(
             propSessHash, pReqCtx );
 
+        oTaskCfg.CopyProp(
+            propLoginInfo, pReqCtx );
+
         CCfgOpener oReqCtx( pReqCtx );
         oTaskCfg.CopyProp(
             propTimestamp, pReqCtx );
