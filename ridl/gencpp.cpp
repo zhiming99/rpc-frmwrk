@@ -8371,7 +8371,8 @@ gint32 CExportBase::Output()
         std::string strMsg = strerror( -ret );
         DebugPrintEx( logErr, ret,
             "error open file `%s', %s\n", 
-            m_strFile, strMsg.c_str() );
+            m_strFile.c_str(),
+            strMsg.c_str() );
     }
 
     return ret;

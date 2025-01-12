@@ -50,8 +50,8 @@ libappmon_adir=./
 appmon.ridl:../registry/regfsif.ridl
 
 appmon.cpp appmon.h appmondesc.json AppMonitorsvr.cpp AppMonitorsvr.h: appmon.ridl
-	@cp Makefile Makefile_
+	@if [ -f Makefile ]; then cp Makefile Makefile_; fi
 	LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl
 	@python3 synccfg.py
-	@mv Makefile_ Makefile
+	@if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi
     

@@ -46,7 +46,7 @@ gint32 VarToJson( const Variant& oVar,
     case typeUInt64:
         {
             snprintf( buf, sizeof( buf ),
-                "%lld", oVar.m_qwVal );
+                "%llu", oVar.m_qwVal );
             oVal[ "v" ] = buf;
             break;
         }
