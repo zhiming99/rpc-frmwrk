@@ -51,7 +51,7 @@ appmon.ridl:../registry/regfsif.ridl
 
 appmon.cpp appmon.h appmondesc.json AppMonitorsvr.cpp AppMonitorsvr.h: appmon.ridl
 	@cp Makefile Makefile_
-	../../ridl/.libs/ridlc -sO . ./appmon.ridl
+	LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl
 	@python3 synccfg.py
 	@mv Makefile_ Makefile
     
