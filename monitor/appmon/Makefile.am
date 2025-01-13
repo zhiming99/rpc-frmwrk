@@ -47,13 +47,24 @@ libappmon_a_HEADERS=
 #libappmon_ladir=$(libdir)
 libappmon_adir=./
 
-appmon.ridl:../registry/regfsif.ridl
+headers=appmon.h AppMonitorsvr.h AppMonitorcli.h appmondesc.json 
+sources= appmon.cpp AppMonitorsvr.cpp mainsvr.cpp maincli.cpp AppMonitorcli.cpp 
 
-appmon.cpp appmon.h appmondesc.json AppMonitorsvr.cpp AppMonitorsvr.h: appmon.ridl
-	@cp ../../ridl/{mktpl,drvtpl.json,odesctpl2.json,synccfg.py} . || true
-	@if [ -f Makefile ]; then cp Makefile Makefile_; fi
-	LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl
-	@python3 synccfg.py || true
-	@if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi
-	@rm mktpl odesctpl2.json drvtpl.json || true
-    
+$(sources):$(headers)
+
+$(headers): appmon.ridl ../registry/regfsif.ridl
+
+appmon.ridl:
+	@if [ -f ./appmon.cpp -a -f ./appmon.h ];then exit 0; \
+    else if ! which ridlc > /dev/null; then \
+        if [ ! -f ./mktpl ];then \
+            cp ../../ridl/{mktpl,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
+        fi;\
+    fi || true; \
+	if [ -f Makefile ]; then mv Makefile Makefile_; fi; \
+	LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl; \
+	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
+	if [ -f ./mktpl ];then rm -f mktpl odesctpl2.json drvtpl.json;fi || true; \
+    fi
+
+.PHONY: appmon.ridl
