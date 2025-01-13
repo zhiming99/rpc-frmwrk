@@ -48,23 +48,24 @@ libappmon_a_HEADERS=
 libappmon_adir=./
 
 headers=appmon.h AppMonitorsvr.h AppMonitorcli.h appmondesc.json 
-sources= appmon.cpp AppMonitorsvr.cpp mainsvr.cpp maincli.cpp AppMonitorcli.cpp 
+sources=appmon.cpp AppMonitorsvr.cpp mainsvr.cpp maincli.cpp AppMonitorcli.cpp 
 
 $(sources):$(headers)
 
 $(headers): appmon.ridl ../registry/regfsif.ridl
 
 appmon.ridl:
-	@if [ -f ./appmon.cpp -a -f ./appmon.h ];then exit 0; \
-    else if ! which ridlc > /dev/null; then \
+	bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
+    if((bexit==0));then exit 0;fi; \
+    if ! which ridlc > /dev/null; then \
         if [ ! -f ./mktpl ];then \
             cp ../../ridl/{mktpl,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
         fi;\
     fi || true; \
-	if [ -f Makefile ]; then mv Makefile Makefile_; fi; \
+	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
 	LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl odesctpl2.json drvtpl.json;fi || true; \
-    fi
+    ls
 
 .PHONY: appmon.ridl
