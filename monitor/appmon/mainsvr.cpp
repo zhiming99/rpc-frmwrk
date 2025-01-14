@@ -47,6 +47,8 @@ using namespace rpcf;
 #include "AppMonitorsvr.h"
 #include "blkalloc.h"
 
+#define USER_REGISTRY   "usereg.dat"
+#define APP_REGISTRY    "appreg.dat"
 static stdstr g_strMPoint;
 static bool g_bFuse = false;
 
@@ -364,7 +366,7 @@ int main( int argc, char** argv)
             break;
 
         stdstr strHomeDir = GetHomeDir();
-        g_strUserReg = strHomeDir + "/.rpcf/usereg.dat";
+        g_strUserReg = strHomeDir + "/.rpcf/" + USER_REGISTRY;
         ret = access( g_strUserReg.c_str(),
             R_OK | W_OK );
         if( ret == -1 )
@@ -376,7 +378,7 @@ int main( int argc, char** argv)
             break;
         }
 
-        g_strAppReg = strHomeDir + "/.rpcf/appreg.dat";
+        g_strAppReg = strHomeDir + "/.rpcf/" + APP_REGISTRY;
         ret = access( g_strAppReg.c_str(),
             R_OK | W_OK );
         if( ret == -1 )
