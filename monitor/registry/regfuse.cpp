@@ -505,15 +505,20 @@ static int regfs_setxattr(const char *path, const char *name, const char *value,
         }
         if( size > VALUE_SIZE - 1 )
         {
-            ret = EINVAL;
+            ret = -EOVERFLOW;
             break;
         }
         stdstr strPath = path;
-        Variant oVar = value;
+        Variant oVar;
+        stdstr strAttr( value, size );
+        ret = oVar.DeserializeFromJson(
+            strAttr.c_str() );
+        if( ERROR( ret ) )
+            break;
         g_pRegfs->SetValue( strPath, oVar );
 
     }while( 0 );
-	return 0;
+	return ret;
 }
 
 static int regfs_getxattr(const char *path, const char *name, char *value,
@@ -526,26 +531,29 @@ static int regfs_getxattr(const char *path, const char *name, char *value,
             ret = -ENOTSUP;
             break;
         }
-        if( size > VALUE_SIZE - 1 )
-        {
-            ret = EINVAL;
-            break;
-        }
         stdstr strPath = path;
         Variant oVar;
         ret = g_pRegfs->GetValue( strPath, oVar );
         if( ERROR( ret ) )
             break;
-        if( oVar.GetTypeId() != typeString )
+
+        stdstr strAttr;
+        ret = oVar.SerializeToJson( strAttr );
+        if( ERROR( ret ) )
+            break;
+        if( size == 0 )
         {
-            ret = -ENODATA;
+            ret = strAttr.size();
             break;
         }
-        strncpy( value,
-            oVar.m_strVal.c_str(), size );
-
+        if( strAttr.size() < size )
+            strcpy( value, strAttr.c_str() );
+        else
+            strncpy( value,
+                strAttr.c_str(), size );
+        ret = std::min( strAttr.size(), size );
     }while( 0 );
-	return 0;
+	return ret;
 }
 
 static int regfs_listxattr(const char *path, char *list, size_t size)

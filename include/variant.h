@@ -220,6 +220,12 @@ struct Variant
 
     gint32 Serialize( BufPtr& pBuf, void* psb = nullptr ) const;
     gint32 Deserialize( BufPtr& pBuf, void* psb = nullptr );
+
+    gint32 SerializeToJson(
+        stdstr& strJson, void* psb = nullptr ) const;
+    gint32 DeserializeFromJson(
+        const stdstr& strJson, void* psb = nullptr );
+
 } __attribute__((aligned (8)));
 
 /*template< typename T,
