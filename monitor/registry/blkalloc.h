@@ -198,8 +198,11 @@
 
 #define RFHANDLE    guint64
 #define FLAG_FLUSH_CHILD 0x01
-#define FLAG_FLUSH_DATAONLY 0x02
-#define FLAG_FLUSH_FREEIMG 0x04
+#define FLAG_FLUSH_DATA 0x02
+#define FLAG_FLUSH_INODE 0x04
+#define FLAG_FLUSH_FREEIMG 0x08
+#define FLAG_FLUSH_DEFAULT \
+    ( FLAG_FLUSH_DATA | FLAG_FLUSH_INODE )
 
 extern rpcf::ObjPtr g_pIoMgr;
 
@@ -726,7 +729,8 @@ struct CFileImage :
         guint32 dwParentInode,
         FImgSPtr pDir );
 
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
     gint32 Format() override;
     gint32 Reload() override;
 
@@ -915,7 +919,8 @@ struct CDirImage :
 
     gint32 Format() override;
     gint32 Reload() override;
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
 
     inline const ChildMap& GetChildMap() const
     { return m_mapChilds; }
@@ -1508,7 +1513,8 @@ struct COpenFileEntry :
     inline gint32 WriteValue( const Variant& oVar )
     { return m_pFileImage->WriteValue( oVar ); }
 
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
 
     gint32 Format() override
     { return 0; }
@@ -1714,7 +1720,9 @@ class CRegistryFs :
         const stdstr& szFrom, const stdstr& szTo,
         CAccessContext* pac = nullptr );
 
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
+
     gint32 Format() override;
     gint32 Reload() override;
 

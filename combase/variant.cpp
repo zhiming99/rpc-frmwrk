@@ -963,7 +963,8 @@ gint32 Variant::DeserializeFromJson(
             break;
         }
 
-        if( !oValue.isMember( "t" ) ||
+        if( !oValue.isObject() ||
+            !oValue.isMember( "t" ) ||
             !oValue[ "t" ].isInt() )
         {
             ret = -EINVAL;

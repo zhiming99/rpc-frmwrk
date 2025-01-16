@@ -54,6 +54,7 @@
 using namespace rpcf;
 #include "blkalloc.h"
 
+#define XATTR_NAME  "user.regfs"
 static RegFsPtr g_pRegfs;
 static int fill_dir_plus = 0;
 static std::string g_strMPoint;
@@ -440,7 +441,7 @@ static int regfs_fsync(const char *path, int isdatasync,
             ret = -EBADF;
             break;
         }
-        guint32 dwFlags = FLAG_FLUSH_DATAONLY;
+        guint32 dwFlags = FLAG_FLUSH_DATA;
         CRegistryFs* pfs = g_pRegfs;
         READ_LOCK( pfs );
         FileSPtr pOpen;
@@ -498,7 +499,7 @@ static int regfs_setxattr(const char *path, const char *name, const char *value,
 {
     gint32 ret = 0;
     do{
-        if( strcmp( name, "user.regfs" ) )
+        if( strcmp( name, XATTR_NAME ) )
         {
             ret = -ENOTSUP;
             break;
@@ -526,7 +527,7 @@ static int regfs_getxattr(const char *path, const char *name, char *value,
 {
     gint32 ret = 0;
     do{
-        if( strcmp( name, "user.regfs" ) )
+        if( strcmp( name, XATTR_NAME ) )
         {
             ret = -ENOTSUP;
             break;
@@ -558,8 +559,14 @@ static int regfs_getxattr(const char *path, const char *name, char *value,
 
 static int regfs_listxattr(const char *path, char *list, size_t size)
 {
-    strcpy( list, "user.regfs" );
-	return 1;
+    size_t dwSize = strlen( XATTR_NAME );
+    if( size == 0 )
+        return dwSize + 1;
+    if( dwSize < size )
+        strcpy( list, XATTR_NAME );
+    else
+        strncpy( list, XATTR_NAME, size );
+	return dwSize + 1;
 }
 
 static int regfs_removexattr(const char *path, const char *name)

@@ -200,7 +200,8 @@ gint32 CRegistryFs::Stop()
         }
         m_pRootDir->Close();
         m_mapOpenFiles.clear();
-        ret = Flush( FLAG_FLUSH_CHILD );
+        ret = Flush( FLAG_FLUSH_CHILD |
+            FLAG_FLUSH_DEFAULT );
         if( ERROR( ret ) )
             break;
         SetState( stateStopped );

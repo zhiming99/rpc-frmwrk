@@ -530,7 +530,8 @@ gint32 CRegFsSvcLocal_SvrImpl::Flush(
 {
     if( m_pRegFs.IsEmpty() )
         return -EFAULT;
-    return m_pRegFs->Flush( FLAG_FLUSH_CHILD );
+    return m_pRegFs->Flush(
+        FLAG_FLUSH_CHILD | FLAG_FLUSH_DEFAULT );
 }
 
 /* Sync Req Handler*/
