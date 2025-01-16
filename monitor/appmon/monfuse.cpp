@@ -645,7 +645,7 @@ static int monfs_fsync(const char *path, int isdatasync,
             ret = -EACCES;
             break;
         }
-        guint32 dwFlags = FLAG_FLUSH_DATAONLY;
+        guint32 dwFlags = FLAG_FLUSH_DATA;
         READ_LOCK( pfs );
         FileSPtr pOpen;
         ret = pfs->GetOpenFile( hFile, pOpen );
