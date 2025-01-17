@@ -854,7 +854,9 @@ gint32 Variant::SerializeToJson(
             oVal[ "v" ] = m_dwVal;
             break;
         case typeUInt64:
-            oVal[ "v" ] = m_qwVal;
+            using JUInt64 = Json::Value::UInt64;
+            oVal[ "v" ] =
+                ( const JUInt64& )m_qwVal;
             break;
         case typeFloat:
             oVal[ "v" ] = m_fVal;
