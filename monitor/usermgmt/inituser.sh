@@ -50,10 +50,13 @@ if ! getfattr -n 'user.regfs' ./gidcount; then
 fi
 
 if [ ! -d users ]; then
-    mkdir -p users groups/admin krbusers oa2users sausers
+    mkdir -p users groups/admin/users groups/default/users krbusers oa2users sausers
     touch groups/admin/gid
+    touch groups/default/gid
     gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./gidcount
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/admin/gid
+    gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/default/gid
 fi
 echo initialization completed.
 cd ..

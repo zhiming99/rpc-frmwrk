@@ -62,6 +62,9 @@ using namespace rpcf;
 #define  USER_INODE_OFFSET \
     ( BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
 
+#define  USER_DIR   "usereg"
+#define  APP_DIR    "appreg"
+
 extern RegFsPtr g_pAppRegfs, g_pUserRegfs;
 
 static void *monfs_init(struct fuse_conn_info *conn,
@@ -87,7 +90,7 @@ static void *monfs_init(struct fuse_conn_info *conn,
 static int GetFs( const char* path,
     RegFsPtr& pFs, stdstr& strNewPath )
 {
-    if( strncmp( path, "/apps", 5 ) == 0 )
+    if( strncmp( path, "/"APP_DIR, 5 ) == 0 )
     {
         if( path[ 5 ] != 0 )
             strNewPath = path + 5;
@@ -98,7 +101,7 @@ static int GetFs( const char* path,
     }
     else if( path[ 1 ] == 0 && path[0]=='/' )
         return 0;
-    else if( strncmp( path, "/users", 6 ) == 0 )
+    else if( strncmp( path, "/"USER_DIR, 6 ) == 0 )
     {
         if( path[ 6 ] != 0 )
             strNewPath = path + 6;
@@ -254,7 +257,7 @@ static int monfs_readdir(const char *path,
         {
             // prepare the content of root directory
             KEYPTR_SLOT ks;
-            strcpy( ks.szKey, "apps" );
+            strcpy( ks.szKey, APP_DIR );
             struct stat stBuf;
             ret = g_pAppRegfs->GetAttr(
                 "/", stBuf );
@@ -265,7 +268,7 @@ static int monfs_readdir(const char *path,
             vecDirEnt.push_back( ks );
 
             ks.szKey[ 0 ] = 0;
-            strcpy( ks.szKey, "users" );
+            strcpy( ks.szKey, USER_DIR );
             ret = g_pUserRegfs->GetAttr(
                 "/", stBuf );
             if( ERROR( ret ) )
@@ -345,8 +348,8 @@ static int monfs_unlink(const char *path)
     gint32 ret = 0;
     do{
         if( strcmp( path, "/" ) == 0 ||
-            strcmp( path, "/users" ) == 0 ||
-            strcmp( path, "/apps" ) == 0 )
+            strcmp( path, "/"USER_DIR ) == 0 ||
+            strcmp( path, "/"APP_DIR ) == 0 )
         {
             DebugPrint( -EACCES, "Error, cannot "
                 "remove root directory." );
@@ -364,8 +367,8 @@ static int monfs_rmdir(const char *path)
     gint32 ret = 0;
     do{
         if( strcmp( path, "/" ) == 0 ||
-            strcmp( path, "/users" ) == 0 ||
-            strcmp( path, "/apps" ) == 0 )
+            strcmp( path, "/"USER_DIR ) == 0 ||
+            strcmp( path, "/"APP_DIR ) == 0 )
         {
             DebugPrint( -EACCES, "Error, cannot "
                 "remove root directory." );

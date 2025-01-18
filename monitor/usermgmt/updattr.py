@@ -9,11 +9,14 @@ def setJsonXattr(filePath, attrName, data):
         os.setxattr(filePath, attrName, data.encode('utf-8'))
         fcntl.flock(file, fcntl.LOCK_UN)
 
-def listXattrs(filePath):
+def listXattrs(filePath, valOnly=False):
     attrs = os.listxattr(filePath)
     for attr in attrs:
         value = os.getxattr(filePath, attr).decode('utf-8')
-        print(f"{attr}: {value}")
+        if not valOnly:
+            print(f"{attr}: {value}")
+        else:
+            print(f"{value}")
 
 def updateJsonXattr(filePath, attrName, updates):
     if not os.path.exists(filePath):
@@ -44,6 +47,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manage JSON data in file extended attributes.")
     parser.add_argument('filePath', help="Path to the file.")
     parser.add_argument('-l', '--list', action='store_true', help="List all attributes and their values.")
+    parser.add_argument('-v', '--listvalue', action='store_true', help="List values only.")
     parser.add_argument('-u', '--update', nargs=2, metavar=('ATTR_NAME', 'UPDATES'), help="Update a JSON attribute.")
     parser.add_argument('-a', '--add', nargs=2, metavar=('ATTR_NAME', 'VALUE'), type=str, help="Add an integer value to an attribute.")
 
@@ -51,6 +55,8 @@ if __name__ == "__main__":
 
     if args.list:
         listXattrs(args.filePath)
+    elif args.listvalue:
+        listXattrs(args.filePath, True)
     elif args.update:
         attrName, updates = args.update
         updateJsonXattr(args.filePath, attrName, updates)
