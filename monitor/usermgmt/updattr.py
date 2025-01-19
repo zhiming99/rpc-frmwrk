@@ -11,6 +11,8 @@ def setJsonXattr(filePath, attrName, data):
 
 def listXattrs(filePath, valOnly=False):
     attrs = os.listxattr(filePath)
+    if len( attrs ) == 0:
+        print("None")
     for attr in attrs:
         value = os.getxattr(filePath, attr).decode('utf-8')
         if not valOnly:

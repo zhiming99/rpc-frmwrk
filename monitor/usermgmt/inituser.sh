@@ -17,7 +17,7 @@ if [ ! -f usereg.dat ]; then
 else
    echo "you are going to format the user registry, continue ( y/n )?(default: yes)"
    read answer
-   if [[ "x$answer" == "xy" || "x$answer" == "xyes" || "x$answer" == "x" ]]; then
+   if [ "x$answer" == "xy" ] || ["x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
        mv usereg.dat usereg.dat.bak
        regfsmnt -i ./usereg.dat || exit $?
    else
@@ -50,7 +50,7 @@ if ! getfattr -n 'user.regfs' ./gidcount; then
 fi
 
 if [ ! -d users ]; then
-    mkdir -p users groups/admin/users groups/default/users krbusers oa2users sausers
+    mkdir -p users groups/admin/users groups/default/users krb5users oa2users sausers uids gids
     touch groups/admin/gid
     touch groups/default/gid
     gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
