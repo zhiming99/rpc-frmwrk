@@ -14,10 +14,12 @@ def listXattrs(filePath, valOnly=False):
     if len( attrs ) == 0:
         print("None")
     for attr in attrs:
-        value = os.getxattr(filePath, attr).decode('utf-8')
+        jsonData = os.getxattr(filePath, attr).decode('utf-8')
         if not valOnly:
-            print(f"{attr}: {value}")
+            print(f"{attr}: {jsonData}")
         else:
+            jsonValue = json.loads(jsonData)
+            value = jsonValue['v']
             print(f"{value}")
 
 def updateJsonXattr(filePath, attrName, updates):
