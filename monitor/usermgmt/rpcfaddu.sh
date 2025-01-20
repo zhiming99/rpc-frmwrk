@@ -1,5 +1,4 @@
 #!/bin/bash
-#!/bin/bash
  
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
@@ -28,19 +27,20 @@ EOF
 }
      
 force="false"
+askPass=0
 while getopts $OPTIONS opt; do
     case "$opt" in
-    -k) krb5user=$2
+    k) krb5user=$2
         ;;
-    -o) oa2user=$2
+    o) oa2user=$2
         ;;
-    -p) askPass=1
+    p) askPass=1
         ;;
-    -g) group=$2
+    g) group=$2
         ;;
-    -f) force="true"
+    f) force="true"
         ;;
-    -h)
+    h)
         Usage
         exit 0
         ;;
@@ -48,38 +48,48 @@ while getopts $OPTIONS opt; do
         echo "Invalid option: -$OPTARG >&2"
         exit 1
         ;;
-    esac done
+    esac
+done
                                                                                                   
 shift $((OPTIND-1))
 
-if [  "$@" == "" ]; then
+if [  "x$@" == "x" ]; then
    echo "Error user name is not specified"
    Usage
+   exit 1
 fi
 mp=`mount | grep regfsmnt`
-if [ "$mp" == "" ];then
+if [ "x$mp" == "x" ];then
     appmp=`mount | grep appmnt`
 fi
 mt=0
-if [ "$mp" == "" ] && [ "$appmp" == "" ]; then
+if [ "x$mp" == "x" ] && [ "x$appmp" == "x" ]; then
     mt=2
-elif [ "$appmp" != "" ]; then
+elif [ "x$appmp" != "x" ]; then
     mt=1
 else
     mt=0
 fi
 base=$HOME/.rpcf
-if [ -f $base/usereg.dat ]; then
+if [ ! -f $base/usereg.dat ]; then
     echo "Error, did not find the user registry file."
     echo "you may want to use 'inituser.sh' to initialize one first"
+    exit 1
 fi
 if (( $mt == 2 ));then
-    rootdir="$base/testmnt"
-    mkdir -p $rootdir
+    rootdir="$base/mprpcfaddu"
+    if [ -d $rootdir ]; then
+        mkdir -p $rootdir
+    fi
     if ! regfsmnt -d $base/usereg.dat $rootdir; then
         echo "Error, failed to mount usereg.dat"
         exit 1
     fi
+
+    while ! mountpoint $rootdir > /dev/null ; do
+        sleep 1
+    done
+    echo mounted usereg.dat...
 elif (( $mt == 1 ));then
     rootdir=`echo $appmp | awk '{print $3}'`
     if [ ! -d "$rootdir/usereg/users" ]; then
@@ -96,23 +106,25 @@ elif (( $mt == 0 ));then
 fi
 
 # check if group is valid if specified
-if [ "$group" != "" ]; then
+if [ "x$group" != "x" ]; then
     if [ ! -d $rootdir/groups/$group ]; then
         echo "Error the group specified does not exist."
         exit 1
     fi
 else
-    group = "default"
+    group="default"
 fi
 
 pushd $rootdir
+ls -R .
+echo start adding user $@ ...
 for uname in "$@"; do
-    if [ -d ./users/$uname ] && [ "$force" == "true" ]; then
-        echo "Error the user already exists"
+    if [ -d ./users/$uname ] && [ "$force" == "false" ]; then
+        echo "Error user '$uname' already exists"
         exit 1
     fi
     mkdir -p ./users/$uname || [ "$force" == "true" ]
-    udir=./users/$uname
+    udir=$rootdir/users/$uname
     if [ ! -f $udir/uid ];then
         touch $udir/uid
         uidval=`python3 ${updattr} -a 'user.regfs' 1 ./uidcount`
@@ -128,27 +140,40 @@ for uname in "$@"; do
     mkdir $udir/groups
     # link the user to the group's users dir
     # and link the group to the user's groups dir
-    gidval=`python3 $updattr -v $roodir/groups/$group/gid`
-    ln -s ./groups/$group $udir/groups/$gidval
-    ln -s $udir ./groups/$group/users/$uidval
-    ln -s $udir ./uids/$uidval
+    gidval=`python3 $updattr -v ./groups/$group/gid`
 
-    if [ "$krb5user" != "" ]; then
-        touch $udir/krb5user
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$krb5user\"}" $udir/krb5user
-        if [ ! -d ./krb5users/$krb5user ]; then
-            mkdir ./krb5users/$krb5user
+    echo setup links to groups
+    touch $udir/groups/$gidval
+    echo python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$group\"}" $udir/groups/$gidval
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$group\"}" $udir/groups/$gidval
+
+    touch $rootdir/groups/$group/users/$uidval
+    file=$rootdir/groups/$group/users/$uidval
+    echo python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
+
+    touch $rootdir/uids/$uidval
+    file=$rootdir/uids/$uidval
+    echo python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
+
+    if [ "x$krb5user" != "x" ]; then
+        if [ ! -d $udir/krb5users ];then
+            mkdir $udir/krb5users
         fi
-        ln -s $udir ./krb5users/$krb5user/$uidval
+        touch $udir/krb5users/$krb5users
+        if [ ! -f ./krb5users/$krb5user ]; then
+            touch ./krb5users/$krb5user
+        fi
+        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./krb5users/$krb5user
     fi
 
-    if [ "$oa2user" != "" ]; then
-        touch $udir/oa2user
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$oa2user\"}" $udir/oa2user
-        if [ ! -d ./oa2users/$oa2user ]; then
-            mkdir ./oa2users/$oa2user
+    if [ "x$oa2user" != "x" ]; then
+        if [ ! -d $udir/oa2users ];then
+            mkdir $udir/oa2users
         fi
-        ln -s $udir ./oa2users/$oa2user/$uidval
+        touch $udir/oa2users/$oa2user
+        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./oa2users/$oa2user
     fi
 
     if (( $askPass == 1 )); then
@@ -168,3 +193,9 @@ for uname in "$@"; do
     fi
 done
 popd
+if (( $mt == 2 )); then
+    if [ -d $rootdir ]; then
+        umount $rootdir
+        rmdir $rootdir
+    fi
+fi
