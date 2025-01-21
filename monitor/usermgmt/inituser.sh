@@ -1,7 +1,8 @@
 #!/bin/bash
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
-echo $updattr
+pubfuncs=${script_dir}/pubfuncs.sh
+
 if ! which regfsmnt; then
     echo cannot find program 'regfsmnt'. You may want \
         to install rpc-frmwrk first
@@ -49,14 +50,12 @@ if ! getfattr -n 'user.regfs' ./gidcount; then
     exit $?
 fi
 
+source $pubfuncs
+
 if [ ! -d users ]; then
-    mkdir -p users groups/admin/users groups/default/users krb5users oa2users sausers uids gids
-    touch groups/admin/gid
-    touch groups/default/gid
-    gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/admin/gid > /dev/null
-    gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/default/gid > /dev/null
+    mkdir -p users groups krb5users oa2users sausers uids gids
+    add_group "admin"
+    add_group "default"
 fi
 echo initialization completed.
 cd ..

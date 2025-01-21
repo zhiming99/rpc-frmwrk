@@ -2,6 +2,7 @@
  
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
+pubfuncs=${script_dir}/pubfuncs.sh
   
 OPTIONS="afk:o:g:hp"
    
@@ -59,52 +60,9 @@ if [  "x$@" == "x" ]; then
    Usage
    exit 1
 fi
-mp=`mount | grep regfsmnt`
-if [ "x$mp" == "x" ];then
-    appmp=`mount | grep appmnt`
-fi
-mt=0
-if [ "x$mp" == "x" ] && [ "x$appmp" == "x" ]; then
-    mt=2
-elif [ "x$appmp" != "x" ]; then
-    mt=1
-else
-    mt=0
-fi
-base=$HOME/.rpcf
-if [ ! -f $base/usereg.dat ]; then
-    echo "Error, did not find the user registry file."
-    echo "you may want to use 'inituser.sh' to initialize one first"
-    exit 1
-fi
-if (( $mt == 2 ));then
-    rootdir="$base/mprpcfaddu"
-    if [ -d $rootdir ]; then
-        mkdir -p $rootdir
-    fi
-    if ! regfsmnt -d $base/usereg.dat $rootdir; then
-        echo "Error, failed to mount usereg.dat"
-        exit 1
-    fi
 
-    while ! mountpoint $rootdir > /dev/null ; do
-        sleep 1
-    done
-    echo mounted usereg.dat...
-elif (( $mt == 1 ));then
-    rootdir=`echo $appmp | awk '{print $3}'`
-    if [ ! -d "$rootdir/usereg/users" ]; then
-        echo "Error cannot find the mount point of user registry"
-        exit 1
-    fi
-    rootdir="$rootdir/usereg"
-elif (( $mt == 0 ));then
-    rootdir=`echo $mp | awk '{print $3}'`
-    if [ ! -d "$rootdir/users" ]; then
-        echo "Error cannot find the mount point of user registry"
-        exit 1
-    fi
-fi
+source $pubfuncs
+check_user_mount
 
 # check if group is valid if specified
 if [ "x$group" != "x" ]; then
@@ -117,7 +75,6 @@ else
 fi
 
 pushd $rootdir
-ls -R .
 echo start adding user $@ ...
 for uname in "$@"; do
     if [ -d ./users/$uname ] && [ "$force" == "false" ]; then
@@ -162,42 +119,14 @@ for uname in "$@"; do
 
     # link the user to the group's users dir
     # and link the group to the user's groups dir
-    gidval=`python3 $updattr -v ./groups/$group/gid`
-
-    echo setup links to groups
-    touch $udir/groups/$gidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$group\"}" $udir/groups/$gidval > /dev/null
-    echo $group > $udir/groups/$gidval
-
-    touch $rootdir/groups/$group/users/$uidval
-    file=$rootdir/groups/$group/users/$uidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file > /dev/null
-    echo $uname > $file
-
-    touch $rootdir/uids/$uidval
-    file=$rootdir/uids/$uidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file > /dev/null
-    echo $uname > $file
+    join_group $group $uname
 
     if [ "x$krb5user" != "x" ]; then
-        if [ ! -d $udir/krb5users ];then
-            mkdir $udir/krb5users
-        fi
-        touch $udir/krb5users/$krb5users
-        if [ ! -f ./krb5users/$krb5user ]; then
-            touch ./krb5users/$krb5user
-        fi
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./krb5users/$krb5user > /dev/null
-        echo $uname > ./krb5users/$krb5user
+        assoc_krb5user $krb5user $uname
     fi
 
     if [ "x$oa2user" != "x" ]; then
-        if [ ! -d $udir/oa2users ];then
-            mkdir $udir/oa2users
-        fi
-        touch $udir/oa2users/$oa2user
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./oa2users/$oa2user > /dev/null
-        echo $uname > ./krb5users/$oa2user
+        assoc_oa2user $oa2user $uname
     fi
 
 done
@@ -208,3 +137,4 @@ if (( $mt == 2 )); then
         rmdir $rootdir
     fi
 fi
+echo "adding user(s) $@ done"
