@@ -3,7 +3,7 @@
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
   
-OPTIONS="afk:o:g:h"
+OPTIONS="afk:o:g:hp"
    
 
 function Usage()
@@ -45,7 +45,8 @@ while getopts $OPTIONS opt; do
         exit 0
         ;;
     \?)
-        echo "Invalid option: -$OPTARG >&2"
+        echo $OPTARG >&2
+        Usage
         exit 1
         ;;
     esac
@@ -128,54 +129,17 @@ for uname in "$@"; do
     if [ ! -f $udir/uid ];then
         touch $udir/uid
         uidval=`python3 ${updattr} -a 'user.regfs' 1 ./uidcount`
-        python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid
+        python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid > /dev/null
+        echo $uidval > $udir/uid
     else
         uidval=`python3 ${updattr} -v $udir/uid`
         if [ "$uidval" == "None" ]; then
             #uid was not set due to last failure
             uidval=`python3 ${updattr} -a 'user.regfs' 1 ./uidcount`
-            python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid
+            python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid > /dev/null
+            echo $uidval > $udir/uid
         fi
     fi
-    mkdir $udir/groups
-    # link the user to the group's users dir
-    # and link the group to the user's groups dir
-    gidval=`python3 $updattr -v ./groups/$group/gid`
-
-    echo setup links to groups
-    touch $udir/groups/$gidval
-    echo python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$group\"}" $udir/groups/$gidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$group\"}" $udir/groups/$gidval
-
-    touch $rootdir/groups/$group/users/$uidval
-    file=$rootdir/groups/$group/users/$uidval
-    echo python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
-
-    touch $rootdir/uids/$uidval
-    file=$rootdir/uids/$uidval
-    echo python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file
-
-    if [ "x$krb5user" != "x" ]; then
-        if [ ! -d $udir/krb5users ];then
-            mkdir $udir/krb5users
-        fi
-        touch $udir/krb5users/$krb5users
-        if [ ! -f ./krb5users/$krb5user ]; then
-            touch ./krb5users/$krb5user
-        fi
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./krb5users/$krb5user
-    fi
-
-    if [ "x$oa2user" != "x" ]; then
-        if [ ! -d $udir/oa2users ];then
-            mkdir $udir/oa2users
-        fi
-        touch $udir/oa2users/$oa2user
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./oa2users/$oa2user
-    fi
-
     if (( $askPass == 1 )); then
         touch $udir/passwd
         echo -n Password:
@@ -188,9 +152,54 @@ for uname in "$@"; do
             echo you can change the password later with rpcfmodu
             exit 1
         fi
-        passhash= `echo -n $password | sha1sum | awk '{print $1}'`
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $udir/passwd
+        passhash=`echo -n $password | sha1sum | awk '{print $1}'`
+        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $udir/passwd > /dev/null 
     fi
+
+    if [ ! -d $udir/groups ]; then
+        mkdir $udir/groups
+    fi
+
+    # link the user to the group's users dir
+    # and link the group to the user's groups dir
+    gidval=`python3 $updattr -v ./groups/$group/gid`
+
+    echo setup links to groups
+    touch $udir/groups/$gidval
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$group\"}" $udir/groups/$gidval > /dev/null
+    echo $group > $udir/groups/$gidval
+
+    touch $rootdir/groups/$group/users/$uidval
+    file=$rootdir/groups/$group/users/$uidval
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file > /dev/null
+    echo $uname > $file
+
+    touch $rootdir/uids/$uidval
+    file=$rootdir/uids/$uidval
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" $file > /dev/null
+    echo $uname > $file
+
+    if [ "x$krb5user" != "x" ]; then
+        if [ ! -d $udir/krb5users ];then
+            mkdir $udir/krb5users
+        fi
+        touch $udir/krb5users/$krb5users
+        if [ ! -f ./krb5users/$krb5user ]; then
+            touch ./krb5users/$krb5user
+        fi
+        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./krb5users/$krb5user > /dev/null
+        echo $uname > ./krb5users/$krb5user
+    fi
+
+    if [ "x$oa2user" != "x" ]; then
+        if [ ! -d $udir/oa2users ];then
+            mkdir $udir/oa2users
+        fi
+        touch $udir/oa2users/$oa2user
+        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$uname\"}" ./oa2users/$oa2user > /dev/null
+        echo $uname > ./krb5users/$oa2user
+    fi
+
 done
 popd
 if (( $mt == 2 )); then

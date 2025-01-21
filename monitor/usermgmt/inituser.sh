@@ -54,9 +54,9 @@ if [ ! -d users ]; then
     touch groups/admin/gid
     touch groups/default/gid
     gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/admin/gid
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/admin/gid > /dev/null
     gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/default/gid
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$gidval}" ./groups/default/gid > /dev/null
 fi
 echo initialization completed.
 cd ..
