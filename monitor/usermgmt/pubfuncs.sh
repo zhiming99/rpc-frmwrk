@@ -69,11 +69,16 @@ function add_group()
     fi
 
     _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid #> /dev/null
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid > /dev/null
     echo $_gidval > ./groups/$_group/gid
     touch ./gids/$_gidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$_group\"}" ./gids/$_gidval #> /dev/null
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$_group\"}" ./gids/$_gidval > /dev/null
     echo $_group > ./gids/$_gidval
+
+    touch ./groups/$_group/date
+    datestr=$(date)
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" ./groups/$_group/date > /dev/null
+    echo $datestr > ./groups/$_group/date
 }
 
 function join_group()
@@ -134,6 +139,10 @@ function leave_group()
     if [ ! -d $_udir ]; then
         echo Error invalid user name
         return 1
+    fi
+
+    if [ "$_group" == "default" ]; then
+        echo Error cannot leave default group
     fi
 
     if [ ! -d $_gdir ]; then
@@ -265,7 +274,7 @@ function list_groups_user()
         return 1
     fi
     _gdir=./users/$_uname/groups
-    for i in $_gdir; do
+    for i in $_gdir/*; do
         _gname=`cat $i`
         echo $_gname $i
     done
@@ -279,7 +288,7 @@ function list_users_group()
     fi
     _gname=$1
     _udir=./groups/$_gname/users
-    for i in $_udir; do
+    for i in $_udir/*; do
         _uname=`cat $i`
         echo $_uname $i
     done
@@ -305,4 +314,207 @@ function enable_user()
     _uname=$1
     _udir=./users/$_uname
     rm $_udir/disabled
+}
+
+function remove_user()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing user name
+        return 1
+    fi
+    _uname=$1
+    _udir=./users/$_uname
+
+    _uidval=`python3 $updattr -v $_udir/uid`
+
+    for i in $_udir/groups/*; do
+        _gidval=`basename $i`
+        _group=`python3 $updattr -v ./gids/$_gidval`
+        rm ./groups/$_group/users/$_uidval
+    done
+
+    rm -f ./uids/$_uidval
+    if [ -d $_udir/krb5users ]; then
+        for i in $_udir/krb5users/*; do
+            _krb5user=`basename $i`
+            rm ./krb5users/$_krb5user
+        done
+    fi
+
+    if [ -d $_udir/oa2users ]; then
+        for i in $_udir/oa2users/*; do
+            _oa2user=`basename $i`
+            rm ./oa2users/$_oa2user
+        done
+    fi
+
+    rm -rf $_udir
+    echo removed user $_uname
+}
+
+function remove_group()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing group name
+        return 1
+    fi
+    _group=$1
+    _gdir=./groups/$_group
+
+    _gidval=`python3 $updattr -v $_gdir/gid`
+    if [ ! -d $_gdir/users ]; then
+        rm -rf $_gdir
+        echo group $_group is removed
+        return 0
+    fi
+
+    for i in $_gdir/users/*; do
+        _uidval=`basename $i`
+        _uname=`python3 $updattr -v ./uids/$_uidval`
+        rm ./users/$_uname/groups/$_gidval
+    done
+
+    rm -rf $_gdir
+    echo removed user $_group
+}
+
+function show_user()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing user name
+        return 1
+    fi
+    _uname=$1
+    _udir=./users/$_uname
+    echo $_uname :
+    echo uid: `python3 $updattr -v $_udir/uid`
+    echo created on `cat $_udir/date`
+    if [ -f $_udir/disabled ]; then
+        echo "status: disabled"
+    else
+        echo "status: enabled"
+    fi
+    grouparr=
+    for i in $_udir/groups/*; do
+        grouparr+=`python3 $updattr -v $i`
+        grouparr+=" "
+    done
+    echo groups joined: $grouparr
+
+    grouparr=
+    if [ -d $_udir/krb5users ]; then
+        for i in $_udir/krb5users/*; do
+            _kname=`basename $i`
+            grouparr+=$_kname
+            grouparr+=" "
+        done
+    fi
+    if [ "x$grouparr" != "x" ]; then
+        echo krb5users: $grouparr
+    fi
+
+    grouparr=
+    if [ -d $_udir/oa2users ]; then
+        for i in $_udir/oa2users/*; do
+            _oname=`basename $i`
+            grouparr+=$_oname
+            grouparr+=" "
+        done
+    fi
+    if [ "x$grouparr" != "x" ]; then
+        echo oa2users: $grouparr
+    fi
+    
+    if [ -f $_udir/passwd ]; then
+        echo password: set
+    else
+        echo password: not set
+    fi
+}
+
+function show_group()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing group name
+        return 1
+    fi
+    _group=$1
+    _gdir=./groups/$_group
+
+    _gidval=`python3 $updattr -v $_gdir/gid`
+    echo group $_group:
+    echo gid: $_gidval
+
+    if [ ! -d $_gdir/users ]; then
+        return 0
+    fi
+
+    _users=
+    for _uidval in $_gdir/users/*; do
+        _uname=`python3 $updattr -v $_uidval`
+        _users+=$_uname
+        _users+=" "
+    done
+    if [ "x$_users" != "x" ]; then
+        echo member: $_users
+    else
+        echo member: none
+    fi
+    return 0
+}
+
+function show_krb5_assoc()
+{
+    for i in ./krb5users/*; do
+        _krb5user=`basename $i`
+        _uname=`python3 $updattr -v $i`
+        echo $_krb5user "--->" $_uname
+    done
+}
+
+function show_oauth2_assoc()
+{
+    for i in ./oa2users/*; do
+        _oa2user=`basename $i`
+        _uname=`python3 $updattr -v $i`
+        echo $_oa2user "--->" $_uname
+    done
+}
+
+function set_password()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing user name
+        return 1
+    fi
+
+    _uname=$1 
+    _udir=./users/$_uname
+
+    touch $_udir/passwd
+    echo -n Password:
+    read -s password
+    echo
+    echo -n Enter again:
+    read -s password1
+    if [ "$password1" != "$password" ]; then
+        echo Error the password was not enterred correctly
+        echo you can change the password later with rpcfmodu
+        exit 1
+    fi
+    passhash=`echo -n $password | sha1sum | awk '{print $1}'`
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $_udir/passwd > /dev/null 
+    passhash=
+}
+
+function clear_password()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing user name
+        return 1
+    fi
+
+    _uname=$1 
+    _udir=./users/$_uname
+    rm -f $_udir/passwd
 }

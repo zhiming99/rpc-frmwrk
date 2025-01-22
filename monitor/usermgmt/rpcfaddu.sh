@@ -98,19 +98,7 @@ for uname in "$@"; do
         fi
     fi
     if (( $askPass == 1 )); then
-        touch $udir/passwd
-        echo -n Password:
-        read -s password
-        echo
-        echo -n Enter again:
-        read -s password1
-        if [ "$password1" != "$password" ]; then
-            echo Error the password was not enterred correctly
-            echo you can change the password later with rpcfmodu
-            exit 1
-        fi
-        passhash=`echo -n $password | sha1sum | awk '{print $1}'`
-        python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $udir/passwd > /dev/null 
+        set_password $uname
     fi
 
     if [ ! -d $udir/groups ]; then
@@ -128,7 +116,10 @@ for uname in "$@"; do
     if [ "x$oa2user" != "x" ]; then
         assoc_oa2user $oa2user $uname
     fi
-
+    datestr=`date` 
+    touch $udir/date
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" $udir/date > /dev/null 
+    echo $datestr > $udir/date
 done
 popd
 if (( $mt == 2 )); then
