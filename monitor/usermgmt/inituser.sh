@@ -9,7 +9,7 @@ if ! which regfsmnt; then
     exit 1
 fi
 
-pushd ${HOME}
+pushd ${HOME} > /dev/null
 if [ ! -d .rpcf ]; then mkdir .rpcf; fi
 cd .rpcf
 if [ ! -d ./testmnt ]; then mkdir ./testmnt; fi
@@ -53,7 +53,7 @@ fi
 source $pubfuncs
 
 if [ ! -d users ]; then
-    mkdir -p users groups krb5users oa2users sausers uids gids
+    mkdir -p users groups krb5users oa2users uids gids
     add_group "admin"
     add_group "default"
 fi
@@ -61,4 +61,4 @@ echo initialization completed.
 cd ..
 fusermount3 -u ./testmnt
 rmdir ./testmnt
-popd
+popd > /dev/null

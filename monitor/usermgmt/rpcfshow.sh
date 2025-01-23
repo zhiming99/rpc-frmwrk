@@ -59,7 +59,7 @@ fi
 source $pubfuncs
 check_user_mount
 
-pushd $rootdir
+pushd $rootdir > /dev/null
 if [ "x$show" == "xuser" ]; then
     for uname in "$@"; do
         show_user $uname
@@ -73,5 +73,5 @@ elif [ "x$show" == "xkrb5" ]; then
 elif [ "x$show" == "xOAuth2" ]; then
     show_oauth2_assoc
 fi
-popd
+popd > /dev/null
 

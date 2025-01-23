@@ -40,10 +40,10 @@ fi
 source $pubfuncs
 check_user_mount
 
-pushd $rootdir
+pushd $rootdir > /dev/null
 echo start removing user $@ ...
 for uname in "$@"; do
     remove_user $uname
 done
-popd
+popd > /dev/null
 

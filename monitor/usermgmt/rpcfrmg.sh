@@ -40,11 +40,11 @@ fi
 source $pubfuncs
 check_user_mount
 
-pushd $rootdir
+pushd $rootdir > /dev/null
 echo start remove groups $@ ...
 for group in "$@"; do
-    remove_user $group
+    remove_group $group
 done
-popd
+popd > /dev/null
 
 

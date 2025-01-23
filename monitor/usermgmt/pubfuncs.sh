@@ -1,4 +1,17 @@
 #!/bin/bash
+function is_dir_empty()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing path to test
+        return 1
+    fi
+    if [ -z "$( ls -A $1 )" ]; then
+        return 0
+    else
+        return 1 
+    fi
+}
+
 function check_user_mount()
 {
 #this function export 'mt' 'base' and 'rootdir'
@@ -94,6 +107,16 @@ function join_group()
     _udir=./users/$_uname
     _gdir=./groups/$_group
 
+    if [ ! -f $_udir/uid ] ; then
+        echo user "$_uname" is not valid
+        return 1
+    fi
+
+    if [ ! -f $_gdir/gid ] ; then
+        echo group "$_group" does not exist
+        return 1
+    fi
+
     if [ ! -d $_udir/groups ]; then
         mkdir -p $_udir/groups
     fi
@@ -180,6 +203,11 @@ function assoc_krb5user()
     _uname=$2
     _udir=./users/$_uname
 
+    if [ ! -f $_udir/uid ]; then
+        echo Error user $_uname is not valid
+        exit 1
+    fi
+
     if [ ! -d $_udir/krb5users ];then
         mkdir $_udir/krb5users
     fi
@@ -201,6 +229,11 @@ function assoc_oa2user()
     _oa2user=$1
     _uname=$2
     _udir=./users/$_uname
+
+    if [ ! -f $_udir/uid ]; then
+        echo Error user $_uname is not valid
+        exit 1
+    fi
 
     if [ ! -d $_udir/oa2users ];then
         mkdir $_udir/oa2users
@@ -274,6 +307,9 @@ function list_groups_user()
         return 1
     fi
     _gdir=./users/$_uname/groups
+    if is_dir_empty $_gdir; then
+        return 0
+    fi
     for i in $_gdir/*; do
         _gname=`cat $i`
         echo $_gname $i
@@ -288,6 +324,9 @@ function list_users_group()
     fi
     _gname=$1
     _udir=./groups/$_gname/users
+    if is_dir_empty $_udir; then
+        return 0
+    fi
     for i in $_udir/*; do
         _uname=`cat $i`
         echo $_uname $i
@@ -327,21 +366,22 @@ function remove_user()
 
     _uidval=`python3 $updattr -v $_udir/uid`
 
-    for i in $_udir/groups/*; do
-        _gidval=`basename $i`
-        _group=`python3 $updattr -v ./gids/$_gidval`
-        rm ./groups/$_group/users/$_uidval
-    done
+    if ! is_dir_empty $_udir/groups; then
+        for i in $_udir/groups/*; do
+            _group=`python3 $updattr -v $i`
+            rm ./groups/$_group/users/$_uidval
+        done
+    fi
 
     rm -f ./uids/$_uidval
-    if [ -d $_udir/krb5users ]; then
+    if [ -d $_udir/krb5users ] && ! is_dir_empty $_udir/krb5users; then
         for i in $_udir/krb5users/*; do
             _krb5user=`basename $i`
             rm ./krb5users/$_krb5user
         done
     fi
 
-    if [ -d $_udir/oa2users ]; then
+    if [ -d $_udir/oa2users ] && ! is_dir_empty $_udir/oa2users; then
         for i in $_udir/oa2users/*; do
             _oa2user=`basename $i`
             rm ./oa2users/$_oa2user
@@ -361,6 +401,11 @@ function remove_group()
     _group=$1
     _gdir=./groups/$_group
 
+    if [ "x$_group" == "xdefault" ] || [ "x$_group" == "xadmin" ]; then
+        echo Error cannot remove $_group
+        exit 1
+    fi
+
     _gidval=`python3 $updattr -v $_gdir/gid`
     if [ ! -d $_gdir/users ]; then
         rm -rf $_gdir
@@ -368,12 +413,15 @@ function remove_group()
         return 0
     fi
 
-    for i in $_gdir/users/*; do
-        _uidval=`basename $i`
-        _uname=`python3 $updattr -v ./uids/$_uidval`
-        rm ./users/$_uname/groups/$_gidval
-    done
+    if ! is_dir_empty $_gdir/users; then
+        for i in $_gdir/users/*; do
+            _uidval=`basename $i`
+            _uname=`python3 $updattr -v ./uids/$_uidval`
+            rm ./users/$_uname/groups/$_gidval
+        done
+    fi
 
+    rm ./gids/$_gidval
     rm -rf $_gdir
     echo removed user $_group
 }
@@ -386,7 +434,11 @@ function show_user()
     fi
     _uname=$1
     _udir=./users/$_uname
-    echo $_uname :
+    if [ ! -d $_udir ]; then
+        echo Error user $_uname does not exist
+        return 1
+    fi
+    echo user name: $_uname
     echo uid: `python3 $updattr -v $_udir/uid`
     echo created on `cat $_udir/date`
     if [ -f $_udir/disabled ]; then
@@ -395,14 +447,18 @@ function show_user()
         echo "status: enabled"
     fi
     grouparr=
-    for i in $_udir/groups/*; do
-        grouparr+=`python3 $updattr -v $i`
-        grouparr+=" "
-    done
-    echo groups joined: $grouparr
+    if ! is_dir_empty $_udir/groups; then
+        for i in $_udir/groups/*; do
+            grouparr+=`python3 $updattr -v $i`
+            grouparr+=" "
+        done
+        echo groups joined: $grouparr
+    else
+        echo groups joined: none
+    fi
 
     grouparr=
-    if [ -d $_udir/krb5users ]; then
+    if [ -d $_udir/krb5users ] && ! is_dir_empty $_udir/krb5users; then
         for i in $_udir/krb5users/*; do
             _kname=`basename $i`
             grouparr+=$_kname
@@ -414,7 +470,7 @@ function show_user()
     fi
 
     grouparr=
-    if [ -d $_udir/oa2users ]; then
+    if [ -d $_udir/oa2users ] && ! is_dir_empty $_udir/oa2users; then
         for i in $_udir/oa2users/*; do
             _oname=`basename $i`
             grouparr+=$_oname
@@ -441,30 +497,37 @@ function show_group()
     _group=$1
     _gdir=./groups/$_group
 
+    if [ ! -d $_gdir ]; then
+        echo Error group "$_group" does not exist
+        return 1
+    fi
     _gidval=`python3 $updattr -v $_gdir/gid`
-    echo group $_group:
+    echo group name: $_group
     echo gid: $_gidval
 
     if [ ! -d $_gdir/users ]; then
         return 0
     fi
 
+    if is_dir_empty $_gdir/users; then
+        echo member\(s\): none
+        return 0
+    fi
     _users=
     for _uidval in $_gdir/users/*; do
         _uname=`python3 $updattr -v $_uidval`
         _users+=$_uname
         _users+=" "
     done
-    if [ "x$_users" != "x" ]; then
-        echo member: $_users
-    else
-        echo member: none
-    fi
+    echo member\(s\): $_users
     return 0
 }
 
 function show_krb5_assoc()
 {
+    if is_dir_empty ./krb5users; then
+        return 0
+    fi
     for i in ./krb5users/*; do
         _krb5user=`basename $i`
         _uname=`python3 $updattr -v $i`
@@ -474,6 +537,9 @@ function show_krb5_assoc()
 
 function show_oauth2_assoc()
 {
+    if is_dir_empty ./oa2users; then
+        return 0
+    fi
     for i in ./oa2users/*; do
         _oa2user=`basename $i`
         _uname=`python3 $updattr -v $i`
@@ -491,16 +557,22 @@ function set_password()
     _uname=$1 
     _udir=./users/$_uname
 
+    if [ ! -f $_udir/uid ]; then
+        echo Error user $_uname is not valid
+        return 1
+    fi
+
     touch $_udir/passwd
     echo -n Password:
     read -s password
     echo
     echo -n Enter again:
     read -s password1
+    echo
     if [ "$password1" != "$password" ]; then
         echo Error the password was not enterred correctly
         echo you can change the password later with rpcfmodu
-        exit 1
+        return 1
     fi
     passhash=`echo -n $password | sha1sum | awk '{print $1}'`
     python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $_udir/passwd > /dev/null 
@@ -516,5 +588,10 @@ function clear_password()
 
     _uname=$1 
     _udir=./users/$_uname
+
+    if [ ! -d $_udir/uid ]; then
+        echo Error user $_uname is not valid
+        return 1
+    fi
     rm -f $_udir/passwd
 }

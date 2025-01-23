@@ -90,7 +90,7 @@ static void *monfs_init(struct fuse_conn_info *conn,
 static int GetFs( const char* path,
     RegFsPtr& pFs, stdstr& strNewPath )
 {
-    if( strncmp( path, "/"APP_DIR, 5 ) == 0 )
+    if( strncmp( path, "/" APP_DIR, 5 ) == 0 )
     {
         if( path[ 5 ] != 0 )
             strNewPath = path + 5;
@@ -101,7 +101,7 @@ static int GetFs( const char* path,
     }
     else if( path[ 1 ] == 0 && path[0]=='/' )
         return 0;
-    else if( strncmp( path, "/"USER_DIR, 6 ) == 0 )
+    else if( strncmp( path, "/" USER_DIR, 6 ) == 0 )
     {
         if( path[ 6 ] != 0 )
             strNewPath = path + 6;
@@ -348,8 +348,8 @@ static int monfs_unlink(const char *path)
     gint32 ret = 0;
     do{
         if( strcmp( path, "/" ) == 0 ||
-            strcmp( path, "/"USER_DIR ) == 0 ||
-            strcmp( path, "/"APP_DIR ) == 0 )
+            strcmp( path, "/" USER_DIR ) == 0 ||
+            strcmp( path, "/" APP_DIR ) == 0 )
         {
             DebugPrint( -EACCES, "Error, cannot "
                 "remove root directory." );
@@ -367,8 +367,8 @@ static int monfs_rmdir(const char *path)
     gint32 ret = 0;
     do{
         if( strcmp( path, "/" ) == 0 ||
-            strcmp( path, "/"USER_DIR ) == 0 ||
-            strcmp( path, "/"APP_DIR ) == 0 )
+            strcmp( path, "/" USER_DIR ) == 0 ||
+            strcmp( path, "/" APP_DIR ) == 0 )
         {
             DebugPrint( -EACCES, "Error, cannot "
                 "remove root directory." );

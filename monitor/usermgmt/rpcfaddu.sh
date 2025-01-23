@@ -74,7 +74,7 @@ else
     group="default"
 fi
 
-pushd $rootdir
+pushd $rootdir > /dev/null
 echo start adding user $@ ...
 for uname in "$@"; do
     if [ -d ./users/$uname ] && [ "$force" == "false" ]; then
@@ -121,7 +121,7 @@ for uname in "$@"; do
     python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" $udir/date > /dev/null 
     echo $datestr > $udir/date
 done
-popd
+popd > /dev/null
 if (( $mt == 2 )); then
     if [ -d $rootdir ]; then
         umount $rootdir

@@ -64,7 +64,7 @@ fi
 source $pubfuncs
 check_user_mount
 
-pushd $rootdir
+pushd $rootdir > /dev/null
 
 echo start modifying user\(s\) $@ ...
 
@@ -98,6 +98,8 @@ for uname in "$@"; do
         fi
     fi
 done
-popd
-
+if (( $?==0 )); then
+    echo done
+fi
+popd > /dev/null
 

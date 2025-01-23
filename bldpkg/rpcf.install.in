@@ -20,6 +20,7 @@ etc/rpcf/logger*.json
 etc/rpcf/appmon*.json
 usr/bin/rpcf/btinrtsvr
 usr/bin/rpcf/btinrtcli
+usr/bin/rpcf/*.sh
 etc/rpcf/btinrt.json
 usr/bin/rpcf/ifsvrsmk
 usr/bin/rpcf/ifclismk
