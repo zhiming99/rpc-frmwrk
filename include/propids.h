@@ -290,6 +290,8 @@ enum EnumPropId : gint32
     propEncCookie,      // type: a string value containing the encrypted oauth2 login code
     propSearchLocal,    // type: a boolean value to indicate whether to search the local directory for a file
     propLoginInfo,      // type: a configdb object containing user information for the connection
+    propUid,            // type: a integer as the user identifier from the registry fs
+    propGid,            // type: a integer as the group identifier from the registry fs
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

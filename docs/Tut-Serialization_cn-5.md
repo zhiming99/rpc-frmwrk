@@ -10,7 +10,7 @@
 2. 发送和接收一个结构(struct)数据
 
 ### 生成EventTest的C++项目框架
-本节课我们使用[iftest.ridl](../examples/iftest.ridl)来生成该项目框架。
+本节课我们使用[iftest.ridl](../examples/iftest.ridl)来生成该[项目框架](../examples/cpp/iftest/)。
 
 #### 首先，先看看该ridl里的内容：
   * 在接口IEchoThings上定义了一个叫`Echo`的方法，它的输入参数和输出参数都是GlobalFeatureList类型的结构。

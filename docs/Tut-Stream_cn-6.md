@@ -7,7 +7,7 @@
 客户端和服务器端使用流收发消息，并打印。
 
 ### 生成stmtest的C++项目框架
-我们使用[stmtest.ridl](../examples/stmtest.ridl)来生成该项目框架。
+我们使用[stmtest.ridl](../examples/stmtest.ridl)来生成该[项目框架](../examples/cpp/stmtest/)。
 #### 首先，先看看该ridl里的内容：
   * 唯一需要注意的是在`service`名字后面有一个标stream的tag。它的含义是这个`service`需要使用流。
   * 如果该`service`的接口方法里有HSTREAM类型的参数，那么这个`service`也会自动的开启流的功能，不用显式的标出。

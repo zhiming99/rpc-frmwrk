@@ -4,8 +4,17 @@
 // to get your rpc server work
 #pragma once
 #include "appmon.h"
+#include <unordered_set>
 
 #define Clsid_CAppMonitor_SvrBase    Clsid_Invalid
+
+struct CFlockHelper
+{
+    gint32 m_iFd = -1;
+    public:
+    CFlockHelper( gint32 iFd, bool bRead = true );
+    ~CFlockHelper();
+};
 
 DECLARE_AGGREGATED_SERVER(
     CAppMonitor_SvrBase,
@@ -23,6 +32,8 @@ class CAppMonitor_SvrImpl
     CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(CAppMonitor_SvrImpl ) ); }
+    using UID2GIDS = std::hashmap< guint32, std::unordered_set< guint32 > >;
+    UID2GIDS m_mapUid2Gids;
 
     /* The following 3 methods are important for */
     /* streaming transfer. rewrite them if necessary */
@@ -37,14 +48,7 @@ class CAppMonitor_SvrImpl
     { return STATUS_SUCCESS; }
     
     gint32 OnPostStart(
-        IEventSink* pCallback ) override
-    {
-        TaskletPtr pTask = GetUpdateTokenTask();
-        StartQpsTask( pTask );
-        if( !pTask.IsEmpty() )
-            AllocReqToken();
-        return super::OnPostStart( pCallback );
-    }
+        IEventSink* pCallback ) override;
 
     gint32 OnPreStop(
         IEventSink* pCallback ) override
@@ -613,9 +617,9 @@ class CAppMonitor_SvrImpl
         std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override;
     gint32 CreateStmSkel(
         HANDLE, guint32, InterfPtr& ) override;
-    
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
+    gint32 LoadUserGrpsMap();
 };
 
 class CAppMonitor_ChannelSvr
@@ -628,5 +632,7 @@ class CAppMonitor_ChannelSvr
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(
         CAppMonitor_ChannelSvr ) ); }
+
+    gint32 OnStreamReady( HANDLE hstm ) override;
 };
 

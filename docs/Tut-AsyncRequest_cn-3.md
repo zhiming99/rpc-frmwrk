@@ -13,7 +13,7 @@
 3. 运行并检查结果。
 
 ### 生成AsyncTest的C++项目框架
-本节课我们使用[asynctst.ridl](../examples/asynctst.ridl)来生成该项目框架。
+本节课我们使用[asynctst.ridl](../examples/asynctst.ridl)来生成该[项目框架](../examples/cpp/asynctst)。
 阅读理解本文时，结合asynctst目录下的代码，效果会更好
 异步编程复杂很多。但是为什么要用异步编程呢，因为它很快!
 

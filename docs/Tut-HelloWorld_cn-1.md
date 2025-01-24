@@ -10,7 +10,7 @@
 客户端发送字符串`Hello, World!`到服务器，接受服务器的响应，并打印。
 
 ### 生成HelloWorld的C++项目框架
-我们使用[hellowld.ridl](../examples/hellowld.ridl)来生成该项目框架。
+我们使用[hellowld.ridl](../examples/hellowld.ridl)来生成该[项目框架](../examples/cpp/hellowld/)。
 #### 首先，先看看该ridl里的内容：
   * appname 应用名`HelloWorld`，ridl编译器会以该名称加后缀的方式命名一些生成文件，和一些变量。
   * 在接口IHelloWorld上定义了一个叫`Echo`的方法，它的输入参数`strText`是一个字符串，`returns`关键字后面跟的是输出参数`strResp`，也是一个字符串。

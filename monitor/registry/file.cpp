@@ -1661,7 +1661,10 @@ gint32 CFileImage::CheckAccess(
         }
         else
         {
-            dwCurGid = pac->dwGid;
+            if( pac->IsMemberOf( dwGid ) )
+                dwCurGid = dwGid;
+            else
+                dwCurGid = GID_DEFAULT;
             dwCurUid = pac->dwUid;
         }
 

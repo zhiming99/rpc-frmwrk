@@ -13,6 +13,8 @@
   * 对rpc-frmwrk感兴趣或者希望改进rpc-frmwrk的技术爱好者。
   * 对学习异步编程或者C++编程感兴趣的人们。
 
+### 本教程的样例代码均在此[目录](../examples/cpp)
+
 ### rpc-frmwrk的架构和技术特点
   * rpc-frmwrk是一个分布式的系统，微服务模式下的系统块图如下图:   
      ![block-diagram](../pics/rpc-block-diagram.png)   

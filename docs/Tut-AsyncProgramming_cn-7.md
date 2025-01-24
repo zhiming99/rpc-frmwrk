@@ -8,7 +8,7 @@
 * 使用任务组和任务改写上一节的ReadAndReply和WriteAndReceive。
 
 ### 生成stmtest的C++项目框架
-我们仍然使用[stmtest.ridl](../examples/stmtest.ridl)作为本节课的用例。
+我们仍然使用[stmtest.ridl](../examples/stmtest.ridl)作为本节课的[用例](../examples/cpp/stmtest/)。
 
 #### 异步编程和任务组的关系
 由于rpc-frmwrk是一个完全异步的框架，所以服务器端的代码应尽量多的使用非阻塞的方式，也就是异步的调用方式，否则性能问题和死锁问题都会随之产生。

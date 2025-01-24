@@ -8,6 +8,31 @@ using namespace rpcf;
 #include "fastrpc.h"
 #include "appmon.h"
 #include "AppMonitorsvr.h"
+#include <fcntl.h>
+#include <sys/file.h>
+#include "blkalloc.h"
+
+extern RegFsPtr g_pAppRegfs;
+extern RegFsPtr g_pUserRegfs;
+
+CFlockHelper::CFlockHelper(
+    gint32 iFd, bool bRead )
+{
+    m_iFd = iFd;
+    if( m_iFd < 0 )
+        return;
+    if( bRead )
+        flock( m_iFd, LOCK_SH );
+    else
+        flock( m_iFd, LOCK_EX );
+}
+
+CFlockHelper::~CFlockHelper()
+{
+    if( m_iFd == -1 )
+        return;
+    flock( m_iFd, LOCK_UN );
+}
 
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::CreateFile( 
@@ -523,6 +548,182 @@ gint32 CAppMonitor_SvrImpl::OnPreStart(
         oIfCfg.SetPointer( propSkelCtx,
             ( IConfigDb* )oCtx.GetCfg() );
         ret = super::OnPreStart( pCallback );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
+{
+    gint32 ret = 0;
+    do{
+        CRegistryFs* pfs = g_pUserRegfs;
+        gint32 iFd = g_pUserRegfs->GetFd();
+        CFlockHelper oFlock( iFd );
+        RFHANDLE hDir = INVALID_HANDLE;
+        ret = pfs->OpenDir( "/users/", 0, hDir );
+        if( ERROR( ret ) )
+            break;
+        std::vector<KEYPTR_SLOT> vecDirEnt;
+        ret = pfs->ReadDir( hDir, vecDirEnt );
+        if( ERROR( ret ) )
+            break;
+        if( vecDirEnt.empty() )
+            break;
+        pfs->CloseFile( hDir );
+        for( auto& ks : vecDirEnt )
+        {
+            stdstr strPath = "/users/";
+            strPath += ks.szKey;
+            Variant oVar;
+            ret = pfs->GetValue(
+                strPath + "/uid", oVar );
+            if( ERROR( ret ) )
+                continue;
+            guint32 dwUid( oVar );
+            std::vector< KEYPTR_SLOT > vecGrpEnt;
+            std::unordered_set< guint32 > setGids;
+            strPath = "/users/";
+            strPath += ks.szKey;
+            strPath += "/groups";
+
+            RFHANDLE hGrps = INVALID_HANDLE;
+            ret = pfs->OpenDir( strPath, 0, hGrps );
+            if( ERROR( ret ) )
+                break;
+            std::vector<KEYPTR_SLOT> vecGidEnt;
+            ret = pfs->ReadDir( hGrps, vecGidEnt );
+            if( ERROR( ret ) )
+            {
+                pfs->CloseFile( hGrps );
+                continue;
+            }
+            for( auto& ks2 : vecGidEnt )
+            {
+                guint32 dwGid = std::strtol(
+                    ks2.szKey, nullptr, 10 );
+                setGids.insert( dwGid );
+            }
+            ret = pfs->CloseFile( hGrps );
+            m_mapUid2Gids.insert(
+                { dwUid, setGids });
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAppMonitor_SvrImpl::OnPostStart(
+    IEventSink* pCallback )
+{
+    TaskletPtr pTask = GetUpdateTokenTask();
+    StartQpsTask( pTask );
+    if( !pTask.IsEmpty() )
+        AllocReqToken();
+
+    gint32 ret = LoadUserGrpsMap();
+    if( ERROR( ret ) )
+        return ret;
+
+    return super::OnPostStart( pCallback );
+}
+
+gint32 CAppMonitor_ChannelSvr::OnStreamReady(
+    HANDLE hstm )
+{
+    gint32 ret = super::OnStreamReady( hstm );
+    if( ERROR( ret ) )
+        return ret;
+    do{
+
+        // add a uid to the login info
+        gint32 iMech = 0;
+        stdstr strName;
+        if( true )
+        {
+            SESS_INFO osi;
+            CReadLock oLock( this->GetSharedLock() );
+            ret = GetSessInfo( hstm, osi );
+            if( ERROR( ret ) )
+                break;
+            stdstr strAuth =
+                osi.m_strSessHash.substr( 0, 4 );
+            if( strAuth.substr( 0, 2 ) != "AU" )
+                break;
+            if( strAuth == "AUoa" )
+                iMech = 1;
+            else if( strAuth == "AUsa" )
+                iMech = 2;
+
+            CCfgOpener oCfg(
+                ( IConfigDb* )osi.m_pLoginInfo );
+            ret = oCfg.GetStrProp(
+                propUserName, strName );
+            if( ERROR( ret ) )
+            {
+                ret = -EACCES;
+                break;
+            }
+        }
+        CRegistryFs* pReg = g_pUserRegfs;
+        gint32 iFd = pReg->GetFd();
+        if( iFd < 0 )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+
+        Variant oVar;
+        stdstr strPath;
+        if( true )
+        {
+            CFlockHelper oFlock( iFd );
+            if( iMech == 0 )
+            {
+                strPath = "/krb5users/";
+                strPath += strName;
+                Variant oVar;
+                ret = pReg->GetValue( strPath, oVar );
+                if( ERROR( ret ) )
+                {
+                    ret = -EACCES;
+                    break;
+                }
+            }
+            else if( iMech == 1 )
+            {
+                strPath = "/oa2users/";
+                strPath += strName;
+                ret = pReg->GetValue( strPath, oVar );
+                if( ERROR( ret ) )
+                {
+                    ret = -EACCES;
+                    break;
+                }
+            }
+            stdstr strUname( ( stdstr& )oVar );
+            strPath = "/users/";
+            strPath += strUname + "/uid";
+            ret = pReg->GetValue( strPath, oVar );
+            if( ERROR( ret ) )
+                break;
+        }
+        guint32 dwUid( ( guint32& )oVar );
+        if( true )
+        {
+            SESS_INFO osi;
+            CWriteLock oLock( GetSharedLock() );
+            ret = GetSessInfo( hstm, osi );
+            if( ERROR( ret ) )
+                break;
+            CCfgOpener oCfg(
+                ( IConfigDb* )osi.m_pLoginInfo );
+            ret = oCfg.SetIntProp( propUid, dwUid );
+            if( ERROR( ret ) )
+            {
+                ret = -EACCES;
+                break;
+            }
+        }
+
     }while( 0 );
     return ret;
 }

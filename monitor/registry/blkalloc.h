@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unordered_set>
 
 // byte offset
 // 0                             64
@@ -204,6 +205,8 @@
 #define FLAG_FLUSH_DEFAULT \
     ( FLAG_FLUSH_DATA | FLAG_FLUSH_INODE )
 
+#define GID_ADMIN       80000
+#define GID_DEFAULT     80001
 extern rpcf::ObjPtr g_pIoMgr;
 
 namespace rpcf{
@@ -388,7 +391,7 @@ class CBlockAllocator :
     public ISynchronize
 {
     mutable stdrmutex   m_oLock;
-    gint32              m_iFd;
+    gint32              m_iFd = -1;
 
     SblkUPtr            m_pSuperBlock;
     GrpBmpUPtr          m_pGroupBitmap;
@@ -477,6 +480,9 @@ class CBlockAllocator :
         std::vector< CONTBLKS >& vecBlocks,
         guint8* pBuf,
         bool bRead );
+
+    gint32 GetFd() const
+    { return m_iFd; }
 };
 
 #define VALUE_SIZE 95
@@ -588,10 +594,19 @@ struct CAccessContext
 {
     uid_t dwUid = INVALID_UID;
     gid_t dwGid = INVALID_GID;
-    bool IsInitialized() const
+    const std::unordered_set< gint32 >* m_pGids = nullptr;
+    inline bool IsInitialized() const
     {
-        return ( dwUid != INVALID_UID && 
-            dwGid != INVALID_GID );
+        return ( dwUid != INVALID_UID );
+    }
+    inline bool IsMemberOf( gint32 gid ) const
+    {
+        if( dwGid == gid )
+            return true;
+        if( m_pGids != nullptr &&
+            m_pGids->find( gid ) != m_pGids->end() )
+            return true;
+        return false;
     }
 };
 
@@ -1751,8 +1766,11 @@ class CRegistryFs :
         LONGWORD* pData ) override
     { return -ENOTSUP; }
 
-    gint32 GetSize(
-        RFHANDLE hFile, guint32 dwSize ) const;
+    gint32 GetSize( RFHANDLE hFile,
+        guint32 dwSize ) const;
+
+    gint32 GetFd() const
+    { return m_pAlloc->GetFd(); }
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

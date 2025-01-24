@@ -10,7 +10,7 @@
 2. 观察服务器返回的消息和错误码。
 
 ### 生成ActiveCancel的C++项目框架
-本节课我们使用[actcancel.ridl](../examples/actcancel.ridl)来生成该项目框架。
+本节课我们使用[actcancel.ridl](../examples/actcancel.ridl)来生成该[项目框架](../examples/cpp/actcancel/)。
 
 #### ridl文件解析
   * 在接口IActiveCancel上定义了一个叫`LongWait`的方法，该方法和上一节`异步请求`的方法基本一样。
