@@ -64,6 +64,7 @@ static bool g_bFormat = false;
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
+static bool g_bLocal = false;
 
 
 static void Usage( const char* szName );
@@ -630,8 +631,10 @@ gint32 InitContext()
         CParamList oParams;
         oParams.Push( "regfsmnt" );
 
-        if( g_bLogging )
-            oParams[ propEnableLogging ] = true;
+        oParams[ propEnableLogging ] = g_bLogging;
+        oParams[ propSearchLocal ] = g_bLocal;
+        oParams[ propConfigPath ] =
+            "invalidpath/driver.json";
 
         // adjust the thread number if necessary
         oParams[ propMaxIrpThrd ] = 0;
@@ -645,6 +648,11 @@ gint32 InitContext()
 
         IService* pSvc = g_pIoMgr;
         ret = pSvc->Start();
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error start io manager" );
+        }
 
     }while( 0 );
 
@@ -752,7 +760,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "chgdiu" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "chgdiul" ) ) != -1 )
         {
             switch( opt )
             {
@@ -766,6 +774,8 @@ int main( int argc, char** argv)
                     { g_bFormat = true; break; }
                 case 'u':
                     { bDebug = true; break; }
+                case 'l':
+                    { g_bLocal = true; break; }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }

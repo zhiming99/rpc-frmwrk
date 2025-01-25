@@ -53,6 +53,7 @@ static std::string g_strService;
 static bool g_bDaemon = false;
 static std::string g_strMPoint;
 static bool g_bLogging = false;
+static bool g_bLocal = false;
 
 // two globals must be present for libfuseif.so
 ObjPtr g_pIoMgr;
@@ -84,14 +85,13 @@ void CIfRouterTest::setUp()
         oParams[ propMaxIrpThrd ] = 0;
 
         // if( ( g_dwRole & 0x2 ) && g_bLogging )
-        if( g_bLogging )
-            oParams[ propEnableLogging ] = true;
+        oParams[ propEnableLogging ] = g_bLogging;
 
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
-        oParams[ propSearchLocal ] = false;
+        oParams[ propSearchLocal ] = g_bLocal;
         oParams[ propConfigPath ] =
-            "nothispath/driver.json";
+            "invalidpath/driver.json";
 
         ret = m_pMgr.NewObj(
             clsid( CIoManager ),
@@ -360,7 +360,7 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:adcfs:m:vg" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "hr:adcfs:m:vgl" ) ) != -1 )
     {
         switch (opt)
         {
@@ -444,6 +444,11 @@ int main( int argc, char** argv )
             {
                 fprintf( stdout, "%s", Version() );
                 exit( 0 );
+            }
+        case 'l':
+            {
+                g_bLocal = true;
+                break;
             }
         default: /*  '?' */
             ret = -EINVAL;

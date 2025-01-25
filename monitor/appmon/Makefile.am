@@ -55,7 +55,7 @@ $(sources):$(headers)
 $(headers): appmon.ridl ../registry/regfsif.ridl
 
 appmon.ridl:
-	bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
+	@bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
     if((bexit==0));then exit 0;fi; \
     if ! which ridlc > /dev/null; then \
         if [ ! -f ./mktpl ];then \

@@ -560,7 +560,7 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
         gint32 iFd = g_pUserRegfs->GetFd();
         CFlockHelper oFlock( iFd );
         RFHANDLE hDir = INVALID_HANDLE;
-        ret = pfs->OpenDir( "/users/", 0, hDir );
+        ret = pfs->OpenDir( "/users", 0, hDir );
         if( ERROR( ret ) )
             break;
         std::vector<KEYPTR_SLOT> vecDirEnt;

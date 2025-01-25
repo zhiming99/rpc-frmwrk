@@ -90,10 +90,12 @@ static void *monfs_init(struct fuse_conn_info *conn,
 static int GetFs( const char* path,
     RegFsPtr& pFs, stdstr& strNewPath )
 {
-    if( strncmp( path, "/" APP_DIR, 5 ) == 0 )
+    constexpr guint32 u = sizeof( USER_DIR );
+    constexpr guint32 a = sizeof( APP_DIR );
+    if( strncmp( path, "/" APP_DIR, a ) == 0 )
     {
-        if( path[ 5 ] != 0 )
-            strNewPath = path + 5;
+        if( path[ a ] != 0 )
+            strNewPath = path + a;
         else
             strNewPath = "/";
         pFs = g_pAppRegfs;
@@ -101,10 +103,11 @@ static int GetFs( const char* path,
     }
     else if( path[ 1 ] == 0 && path[0]=='/' )
         return 0;
-    else if( strncmp( path, "/" USER_DIR, 6 ) == 0 )
+    else if(
+        strncmp( path, "/" USER_DIR, u ) == 0 )
     {
-        if( path[ 6 ] != 0 )
-            strNewPath = path + 6;
+        if( path[ u ] != 0 )
+            strNewPath = path + u;
         else
             strNewPath = "/";
         pFs = g_pUserRegfs;
@@ -155,10 +158,26 @@ static int monfs_getattr(const char *path,
         GETFS( path )
         if( ifs == 0 )
         {
+            pfs = g_pAppRegfs;
+            ret = pfs->GetAttr( "/", *stbuf );
+            stbuf->st_uid = 0;
+            stbuf->st_gid = GID_ADMIN;
+            stbuf->st_mode = ( S_IFDIR | 0555 );
+            stbuf->st_ino = 0;
+
+            guint32 fs = BNODE_SIZE;
+            guint32 bs = BLOCK_SIZE;
+            stbuf->st_size = fs;
+            stbuf->st_blksize = bs;
+            stbuf->st_blocks = ( fs + bs - 1 ) / bs;
             break;
         }
         ret = pfs->GetAttr( strPath, *stbuf );
+        if( strPath != "/" )
+            break;
 
+        if( ifs == 2 )
+            stbuf->st_ino += MAX_FS_SIZE;
     }while( 0 );
 
     return ret;

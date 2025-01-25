@@ -207,6 +207,10 @@
 
 #define GID_ADMIN       80000
 #define GID_DEFAULT     80001
+
+#define MAX_FS_SIZE     \
+    ( ( BLOCKS_PER_GROUP * BLKGRP_NUMBER ) + SUPER_BLOCK_SIZE + GRPBMP_BLKNUM  )
+
 extern rpcf::ObjPtr g_pIoMgr;
 
 namespace rpcf{

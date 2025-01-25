@@ -62,6 +62,7 @@ ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
 static bool g_bFormat = false;
+static bool g_bLocal = false;
 static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
 static InterfPtr g_pSvcIf;
@@ -118,8 +119,10 @@ gint32 InitContext()
         CParamList oParams;
         oParams.Push( "appmonsvr" );
 
-        if( g_bLogging )
-            oParams[ propEnableLogging ] = true;
+        oParams[ propEnableLogging ] = g_bLogging;
+        oParams[ propSearchLocal ] = g_bLocal;
+        oParams[ propConfigPath ] =
+            "invalidpath/driver.json";
 
         // adjust the thread number if necessary
         oParams[ propMaxIrpThrd ] = 0;
@@ -215,8 +218,9 @@ gint32 ServiceMain( CAppMonitor_SvrImpl* pIf )
 {
     gint32 ret = 0;
     signal( SIGINT, SignalHandler );
+    signal( SIGQUIT, SignalHandler );
     signal( SIGHUP, SignalHandler );
-    while( pIf->IsConnected() || !g_bExit )
+    while( pIf->IsConnected() && !g_bExit )
         sleep( 1 );
     ret = STATUS_SUCCESS;
     return ret;
@@ -274,7 +278,7 @@ int _main( int argc, char** argv)
         }
 #endif
     }while( 0 );
-    if( ERROR( ret ) )
+    if( true )
     {
         if( dwStop > 0 )
         {
@@ -305,7 +309,6 @@ static void Usage( const char* szName )
 {
     fprintf( stderr,
         "Usage: %s [OPTIONS] <mount point> \n"
-        "\t [ -c to delegate the kernel for access check ]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -g send logs to log server ]\n"
         "\t [ -i FORMAT the app-reg file]\n"
@@ -345,7 +348,7 @@ int main( int argc, char** argv)
         bool bDaemon = false;
         bool bDebug = false;
         int opt = 0;
-        while( ( opt = getopt( argc, argv, "hgdiu" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hgdiul" ) ) != -1 )
         {
             switch( opt )
             {
@@ -357,6 +360,8 @@ int main( int argc, char** argv)
                     { g_bFormat = true; break; }
                 case 'u':
                     { bDebug = true; break; }
+                case 'l':
+                    { g_bLocal = true; break; }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
@@ -366,27 +371,30 @@ int main( int argc, char** argv)
             break;
 
         stdstr strHomeDir = GetHomeDir();
-        g_strUserReg = strHomeDir + "/.rpcf/" + USER_REGISTRY;
+        g_strUserReg =
+            strHomeDir + "/.rpcf/" USER_REGISTRY;
         ret = access( g_strUserReg.c_str(),
             R_OK | W_OK );
         if( ret == -1 )
         {
             ret = -errno;
             OutputMsg( ret,
-                "Error invalid registry file, "
+                "Error invalid user registry file, "
                 "you may want to format it first" );
             break;
         }
 
-        g_strAppReg = strHomeDir + "/.rpcf/" + APP_REGISTRY;
+        g_strAppReg =
+            strHomeDir + "/.rpcf/" APP_REGISTRY;
         ret = access( g_strAppReg.c_str(),
             R_OK | W_OK );
         if( ret == -1 )
         {
             ret = -errno;
             OutputMsg( ret,
-                "Error invalid registry file, "
-                "you may want to format it first" );
+                "Error invalid application registry "
+                "file, you may want to format it "
+                "first" );
             break;
         }
 
