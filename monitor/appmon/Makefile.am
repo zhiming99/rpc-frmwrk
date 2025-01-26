@@ -63,7 +63,10 @@ appmon.ridl:
         fi;\
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
-	LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl; \
+    if [ -f ../../ridl/.libs/ridlc ]; then \
+        LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../ridl/.libs/ridlc -sO . ./appmon.ridl; \
+    else \
+        echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl odesctpl2.json drvtpl.json;fi || true; \
     ls
