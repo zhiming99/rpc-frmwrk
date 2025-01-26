@@ -598,7 +598,7 @@ struct CAccessContext
 {
     uid_t dwUid = INVALID_UID;
     gid_t dwGid = INVALID_GID;
-    const std::unordered_set< gint32 >* m_pGids = nullptr;
+    IntSetPtr m_pGids = nullptr;
     inline bool IsInitialized() const
     {
         return ( dwUid != INVALID_UID );
@@ -607,8 +607,8 @@ struct CAccessContext
     {
         if( dwGid == gid )
             return true;
-        if( m_pGids != nullptr &&
-            m_pGids->find( gid ) != m_pGids->end() )
+        if( !m_pGids.IsEmpty() &&
+            (*m_pGids)().find( gid ) != (*m_pGids)().end() )
             return true;
         return false;
     }

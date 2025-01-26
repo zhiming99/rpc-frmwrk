@@ -11,11 +11,11 @@ function Usage()
 cat << EOF
 Usage: $0 [-hugko] <user name|group name> 
     this command show the infomation about the object
-    -u: show user information
-    -g: show group information
-    -k: show krb5 associations
-    -o: show OAuth2 associations
-    -h: print this help
+    -u: shows user information
+    -g: shows group information
+    -k: shows the binding between kerberos principal and the local user <user name>.
+    -o: shows the binding between OAuth2 account and the local user <user name>.
+    -h: prints this help
 EOF
 }
      
@@ -75,3 +75,9 @@ elif [ "x$show" == "xOAuth2" ]; then
 fi
 popd > /dev/null
 
+if (( $mt == 2 )); then
+    if [ -d $rootdir ]; then
+        umount $rootdir
+        rmdir $rootdir > /dev/null 2>&1
+    fi
+fi

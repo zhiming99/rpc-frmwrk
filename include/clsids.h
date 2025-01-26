@@ -330,7 +330,7 @@ typedef enum : guint32
     DECL_CLSID( CFuseRootServer ),
     DECL_CLSID( CLoopPool ),
     DECL_CLSID( CLoopPools ),
-    DECL_CLSID( Reserved2 ),
+    DECL_CLSID( CStlIntSet ),
     DECL_CLSID( CFastRpcSkelProxyState ),
     DECL_CLSID( CFastRpcSkelServerState ),
     DECL_CLSID( CFastRpcProxyState ),

@@ -46,3 +46,9 @@ for group in "$@"; do
     add_group $group
 done
 popd
+if (( $mt == 2 )); then
+    if [ -d $rootdir ]; then
+        umount $rootdir
+        rmdir $rootdir > /dev/null 2>&1
+    fi
+fi

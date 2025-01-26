@@ -448,9 +448,15 @@ function show_user()
     fi
     grouparr=
     if ! is_dir_empty $_udir/groups; then
-        for i in $_udir/groups/*; do
+        _arr=( $_udir/groups/* )
+        _count=${#_arr[@]}
+        _index=0
+        for i in "${_arr[@]}"; do
             grouparr+=`python3 $updattr -v $i`
-            grouparr+=" "
+            if (( _index < _count-1));then
+                grouparr+=", "
+            fi
+            ((_index++))
         done
         echo groups joined: $grouparr
     else
@@ -459,10 +465,16 @@ function show_user()
 
     grouparr=
     if [ -d $_udir/krb5users ] && ! is_dir_empty $_udir/krb5users; then
-        for i in $_udir/krb5users/*; do
+        _arr=( $_udir/krb5users/* )
+        _count=${#_arr[@]}
+        _index=0
+        for i in "${_arr[@]}"; do
             _kname=`basename $i`
             grouparr+=$_kname
-            grouparr+=" "
+            if (( _index < _count-1));then
+                grouparr+=", "
+            fi
+            ((_index++))
         done
     fi
     if [ "x$grouparr" != "x" ]; then
@@ -471,10 +483,16 @@ function show_user()
 
     grouparr=
     if [ -d $_udir/oa2users ] && ! is_dir_empty $_udir/oa2users; then
-        for i in $_udir/oa2users/*; do
+        _arr=( $_udir/oa2users/* )
+        _count=${#_arr[@]}
+        _index=0
+        for i in "${_arr[@]}"; do
             _oname=`basename $i`
             grouparr+=$_oname
-            grouparr+=" "
+            if (( _index < _count-1));then
+                grouparr+=", "
+            fi
+            ((_index++))
         done
     fi
     if [ "x$grouparr" != "x" ]; then
@@ -514,10 +532,16 @@ function show_group()
         return 0
     fi
     _users=
-    for _uidval in $_gdir/users/*; do
+    _arr=( $_gdir/users/* )
+    _count=${#_arr[@]}
+    _index=0
+    for _uidval in "${_arr[@]}"; do
         _uname=`python3 $updattr -v $_uidval`
         _users+=$_uname
-        _users+=" "
+        if (( _index < _count-1 ));then
+            _users+=", "
+        fi
+        ((_index++))
     done
     echo member\(s\): $_users
     return 0

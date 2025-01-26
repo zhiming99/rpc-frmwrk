@@ -1,0 +1,117 @@
+.TH RPCFMODU.SH 1 "January 2025" "1.0" "User Commands"
+.SH NAME
+rpcfmodu.sh \- Modify user attributes in the user registry
+
+.SH SYNOPSIS
+.B rpcfmodu.sh
+[\-hip] [-k krb5 principal ] [-o Oauth2 user name ] [-g group name ]
+.I <user name>
+
+.SH DESCRIPTION
+The
+.B rpcfmodu.sh
+script modifies the attributes of a user in the user registry. The user name must be specified as an argument.
+
+.SH OPTIONS
+.TP
+.B \-h
+Prints the help message and exits.
+.TP
+.B \-k
+.I <krb5 principal>
+Associates the Kerberos principal with the specified user name.
+.TP
+.B \-o
+.I <OAuth2 user name>
+Associates the OAuth2 account name with the specified user name.
+.TP
+.B \-g
+.I <group name>
+Adds the specified user name to the specified group.
+.TP
+.B \-p
+Sets the password for the specified user name.
+.TP
+.B \-i
+Inverts the operation on options '-k', '-o', '-g', and '-p'. That is:
+.RS
+.IP \-ik
+Unassociates the Kerberos user name from the specified user name.
+.IP \-io
+Unassociates the OAuth2 user name from the specified user name.
+.IP \-ig
+Removes the specified user name from the specified group.
+.IP \-ip
+Clears the password for the specified user name.
+.RE
+
+.SH USAGE
+To modify user attributes, run the script with the appropriate options and user name:
+
+.EX
+$ rpcfmodu.sh -k krb5user username
+.EE
+
+.SH EXAMPLES
+.TP
+Associate a Kerberos user name "john_kerberos" with a user named "john":
+.EX
+$ rpcfmodu.sh -k john_kerberos john
+.EE
+
+.TP
+Associate an OAuth2 user name "john_oauth2" with a user named "john":
+.EX
+$ rpcfmodu.sh -o john_oauth2 john
+.EE
+
+.TP
+Add a user named "john" to the "developers" group:
+.EX
+$ rpcfmodu.sh -g developers john
+.EE
+
+.TP
+Set the password for a user named "john":
+.EX
+$ rpcfmodu.sh -p john
+.EE
+
+.TP
+Unassociate a Kerberos user name "john_kerberos" from a user named "john":
+.EX
+$ rpcfmodu.sh -ik john_kerberos john
+.EE
+
+.TP
+Unassociate an OAuth2 user name "john_oauth2" from a user named "john":
+.EX
+$ rpcfmodu.sh -io john_oauth2 john
+.EE
+
+.TP
+Remove a user named "john" from the "developers" group:
+.EX
+$ rpcfmodu.sh -ig developers john
+.EE
+
+.TP
+Clear the password for a user named "john":
+.EX
+$ rpcfmodu.sh -ip john
+.EE
+
+.TP
+Display the help message:
+.EX
+$ rpcfmodu.sh -h
+.EE
+
+.SH REFERENCE
+https://github.com/zhiming99/rpc-frmwrk/tree/master/monitor/usermgmt
+
+.SH AUTHOR
+Written by zhiming <woodhead99@gmail.com>.
+
+.SH COPYRIGHT
+Copyright © 2025 zhiming. All rights reserved.

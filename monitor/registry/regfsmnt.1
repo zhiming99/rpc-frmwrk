@@ -1,0 +1,71 @@
+.TH REGFSMNT 1 "January 2025" "1.0" "User Commands"
+.SH NAME
+regfsmnt \- Mount and manage the registry file system
+
+.SH SYNOPSIS
+.B regfsmnt
+[\-cdgiu]
+.I <regfs path>
+[
+.I <mount point>
+]
+
+.SH DESCRIPTION
+The
+.B regfsmnt
+command mounts and manages the registry file system (regfs). It takes the path to the file containing the regfs and an optional mount point as arguments.
+
+.SH OPTIONS
+.TP
+.B \-c
+Delegates the kernel for access checks.
+.TP
+.B \-d
+Runs the command as a daemon.
+.TP
+.B \-g
+Sends logs to the log server.
+.TP
+.B \-i
+Formats the regfs.
+.TP
+.B \-u
+Enables FUSE to dump debug information.
+
+.SH USAGE
+To mount and manage the registry file system, run the command with the appropriate options and arguments:
+
+.EX
+$ regfsmnt [OPTIONS] <regfs path> [<mount point>]
+.EE
+
+.SH EXAMPLES
+.TP
+Mount the registry file system from "regfs.dat" to "/mnt/regfs":
+.EX
+$ regfsmnt regfs.dat /mnt/regfs
+.EE
+
+.TP
+Run the command as a daemon and mount the registry file system:
+.EX
+$ regfsmnt -d regfs.dat /mnt/regfs
+.EE
+
+.TP
+Format the registry file system:
+.EX
+$ regfsmnt -i regfs.dat
+.EE
+
+.TP
+Enable FUSE to dump debug information:
+.EX
+$ regfsmnt -u regfs.dat /mnt/regfs
+.EE
+
+.SH AUTHOR
+Written by zhiming.
+
+.SH COPYRIGHT
+Copyright © 2025 zhiming. All rights reserved.

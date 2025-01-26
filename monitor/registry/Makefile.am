@@ -13,7 +13,7 @@ regfsmnt_LDADD+=../../ipc/libipc.la $(COMMON_LINK_FUSE3) \
  -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
  -L$(top_srcdir)/3rd_party 
 
-#man_MANS=regfsmnt.1
+man_MANS=regfsmnt.1
 
 regfsmntconfdir= $(sysconfdir)/rpcf
 regfsmntdir=$(bindir)
@@ -30,7 +30,7 @@ regfsmnt_CPPFLAGS+= -DFUSE3
 regfsmnt_LDFLAGS=-rdynamic
 endif
 
-EXTRA_DIST=README_cn.md regfsif.ridl regfs.ridl
+EXTRA_DIST=README_cn.md regfsif.ridl regfs.ridl regfsmnt.1
 
 libregfs_la_LTLIBRARIES=libregfs.la
 libregfs_la_SOURCES = regfs.cpp blkalloc.h blkalloc.cpp dir.cpp file.cpp \

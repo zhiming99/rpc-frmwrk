@@ -1,0 +1,80 @@
+.TH UPDATTR.PY 1 "January 2025" "1.0" "User Commands"
+.SH NAME
+updattr.py \- Manage JSON data in file extended attributes for registry file system.
+
+.SH SYNOPSIS
+.B updattr.py
+[\-l | \-v | \-u
+.I <ATTR_NAME> <UPDATES>
+| \-a
+.I <ATTR_NAME> <VALUE>
+]
+.I <filePath>
+
+.SH DESCRIPTION
+The
+.B updattr.py
+script manages JSON data in file extended attributes. It can list attributes, update JSON attributes, and add integer values to attributes. Currently, updattr.py supports only one attribute 'user.regfs'.
+
+.SH OPTIONS
+.TP
+.B \-l, \--list
+Lists all attributes and their values.
+.TP
+.B \-v, \--listvalue
+Lists values only.
+.TP
+.B \-u, \--update
+.I <ATTR_NAME> <UPDATES>
+Updates a JSON attribute with the specified updates.
+.TP
+.B \-a, \--add
+.I <ATTR_NAME> <VALUE>
+Adds an integer value to the specified attribute.
+
+.SH USAGE
+To manage JSON data in file extended attributes, run the script with the appropriate options and file path:
+
+.EX
+$ updattr.py -l filePath
+.EE
+
+.SH EXAMPLES
+.TP
+List all attributes and their values for a file:
+.EX
+$ updattr.py -l /path/to/file
+.EE
+
+.TP
+List values only for a file:
+.EX
+$ updattr.py -v /path/to/file
+.EE
+
+.TP
+Update a JSON attribute "attrName" with updates '{"key": "value"}' for a file:
+.EX
+$ updattr.py -u attrName '{"key": "value"}' /path/to/file
+.EE
+
+.TP
+Add an integer value 10 to an attribute "attrName" for a file:
+.EX
+$ updattr.py -a attrName 10 /path/to/file
+.EE
+
+.TP
+Display the help message:
+.EX
+$ updattr.py -h
+.EE
+
+.SH REFERENCE
+https://github.com/zhiming99/rpc-frmwrk/tree/master/monitor/usermgmt
+
+.SH AUTHOR
+Written by zhiming <woodhead99@gmail.com>.
+
+.SH COPYRIGHT
+Copyright © 2025 zhiming. All rights reserved.

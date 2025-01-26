@@ -47,3 +47,9 @@ for uname in "$@"; do
 done
 popd > /dev/null
 
+if (( $mt == 2 )); then
+    if [ -d $rootdir ]; then
+        umount $rootdir
+        rmdir $rootdir > /dev/null 2>&1
+    fi
+fi

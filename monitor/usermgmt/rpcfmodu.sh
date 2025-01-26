@@ -71,16 +71,16 @@ echo start modifying user\(s\) $@ ...
 for uname in "$@"; do
     if [ "x$krb5user" != "x" ]; then
         if (( $inverse == 0 )); then
-            assoc_krbuser $krb5user $uname
+            assoc_krb5user $krb5user $uname
         else
-            unassoc_krbuser $krb5user $uname
+            unassoc_krb5user $krb5user $uname
         fi
     fi
     if [ "x$oa2user" != "x" ]; then
         if (( $inverse == 0 )); then
-            assoc_krbuser $oa2user $uname
+            assoc_oa2user $oa2user $uname
         else
-            unassoc_krbuser $oa2user $uname
+            unassoc_oa2user $oa2user $uname
         fi
     fi
     if [ "x$group" != "x" ]; then
@@ -103,3 +103,9 @@ if (( $?==0 )); then
 fi
 popd > /dev/null
 
+if (( $mt == 2 )); then
+    if [ -d $rootdir ]; then
+        umount $rootdir
+        rmdir $rootdir > /dev/null 2>&1
+    fi
+fi

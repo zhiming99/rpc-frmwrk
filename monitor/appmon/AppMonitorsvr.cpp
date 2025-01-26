@@ -552,6 +552,17 @@ gint32 CAppMonitor_SvrImpl::OnPreStart(
     return ret;
 }
 
+bool CAppMonitor_SvrImpl::IsUserValid(
+    guint32 dwUid ) const
+{
+    bool ret = false;
+    CStdRMutex oLock( this->GetLock() );
+    auto itr = m_mapUid2Gids.find( dwUid );
+    if( itr != m_mapUid2Gids.cend() )
+        ret = true;
+    return ret;
+}
+
 gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
 {
     gint32 ret = 0;
@@ -579,9 +590,18 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
                 strPath + "/uid", oVar );
             if( ERROR( ret ) )
                 continue;
+
+            // check if user disabled
+            struct stat stbuf;
+            ret = pfs->GetAttr(
+                strPath + "/disabled", stbuf );
+            if( SUCCEEDED( ret ) )
+                continue;
+
             guint32 dwUid( oVar );
             std::vector< KEYPTR_SLOT > vecGrpEnt;
-            std::unordered_set< guint32 > setGids;
+            IntSetPtr psetGids;
+            psetGids.NewObj( clsid( CStlIntSet ) );
             strPath = "/users/";
             strPath += ks.szKey;
             strPath += "/groups";
@@ -601,11 +621,12 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
             {
                 guint32 dwGid = std::strtol(
                     ks2.szKey, nullptr, 10 );
-                setGids.insert( dwGid );
+                ( *psetGids )().insert( dwGid );
             }
             ret = pfs->CloseFile( hGrps );
+            CStdRMutex oLock( this->GetLock() );
             m_mapUid2Gids.insert(
-                { dwUid, setGids });
+                { dwUid, psetGids });
         }
     }while( 0 );
     return ret;

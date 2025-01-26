@@ -27,13 +27,15 @@ DECLARE_AGGREGATED_SERVER(
 class CAppMonitor_SvrImpl
     : public CAppMonitor_SvrBase
 {
+    protected:
+    using UID2GIDS = std::hashmap< guint32, IntSetPtr >;
+    UID2GIDS m_mapUid2Gids;
+
     public:
     typedef CAppMonitor_SvrBase super;
     CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(CAppMonitor_SvrImpl ) ); }
-    using UID2GIDS = std::hashmap< guint32, std::unordered_set< guint32 > >;
-    UID2GIDS m_mapUid2Gids;
 
     /* The following 3 methods are important for */
     /* streaming transfer. rewrite them if necessary */
@@ -620,6 +622,7 @@ class CAppMonitor_SvrImpl
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
     gint32 LoadUserGrpsMap();
+    bool IsUserValid( guint32 dwUid ) const;
 };
 
 class CAppMonitor_ChannelSvr

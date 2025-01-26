@@ -28,5 +28,10 @@ etc/rpcf/echodesc.json
 usr/share/man/man1/ridlc.1
 usr/share/man/man1/rpcrouter.1
 usr/share/man/man7/ridl.7
+usr/share/man/man1/rpcfaddu.1
+usr/share/man/man1/rpcfmodu.1
+usr/share/man/man1/rpcfshow.1
+usr/share/man/man1/updattr.1
+usr/share/man/man1/regfsmnt.1
 @JS_DEBFILES@
 
