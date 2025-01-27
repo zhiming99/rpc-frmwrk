@@ -4,27 +4,30 @@ script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
 pubfuncs=${script_dir}/pubfuncs.sh
   
-OPTIONS="hik:o:g:p"
+OPTIONS="hidk:o:g:p"
 
 function Usage()
 {
 cat << EOF
-Usage: $0 [-hik:o:g:p] <user name> 
+Usage: $0 [-hidk:o:g:p] <user name> 
     this command modify the attributes of user
     -k <krb5 user name> assocate the kerberos user name to <user name>
     -o <OAuth2 user name> assocate the OAuth2 user name to <user name>
     -g <group name> add <user name> to the group <group name>
     -p set the password for <user name>
+    -d disable the user
     -i inverse the operation on options '-k' '-o' '-g' '-p'. That is
         '-ik" to unassociate the kerberos name with <user name>
         '-io" to unassociate the OAuth2 name with <user name>
         '-ig" to delete <user name> from the group.
         '-ip' to clear the password for <user name>
+        '-id' to enable the user.
     -h: print this help
 EOF
 }
 askPass=0     
 inverse=0
+disableu=0
 while getopts $OPTIONS opt; do
     case "$opt" in
     k)
@@ -40,6 +43,8 @@ while getopts $OPTIONS opt; do
         group=$2
         ;;
     i)  inverse=1
+        ;;
+    d)  disableu=1
         ;;
     h)
         Usage
@@ -95,6 +100,13 @@ for uname in "$@"; do
             set_password $uname
         else
             clear_password $uname
+        fi
+    fi
+    if (( $disableu == 1 )); then
+        if (( $inverse == 0 ));then
+            disable_user $uname
+        else
+            enable_user $uname
         fi
     fi
 done

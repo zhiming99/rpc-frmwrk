@@ -352,7 +352,37 @@ function enable_user()
     fi
     _uname=$1
     _udir=./users/$_uname
+    if [ ! -f $_udir/disabled ]; then
+        echo user $_uname already enabled
+        return 0
+    fi
     rm $_udir/disabled
+}
+
+function disable_group()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing group name
+        return 1
+    fi
+    _group=$1
+    _gdir=./groups/$_group
+    touch $_gdir/disabled
+}
+
+function enable_group()
+{
+    if [ "x$1" == "x" ] ; then
+        echo Error missing group name
+        return 1
+    fi
+    _group=$1
+    _gdir=./groups/$_group
+    if [ ! -f $_gdir/disabled ]; then
+        echo group $_group already enabled
+        return 0
+    fi
+    rm -f $_gdir/disabled
 }
 
 function remove_user()
