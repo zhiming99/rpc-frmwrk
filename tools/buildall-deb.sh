@@ -15,7 +15,7 @@ liblz4-dev openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev \
 bash net-tools procps swig default-jdk-headless cmake libcommons-cli-java ccache
 
-${SUDO} apt-get -y install sip-tools || apt-get -y install sip-dev python3-sip python3-sip-dev || true
+${SUDO} apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 ${SUDO} apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim npm
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy

@@ -1,4 +1,7 @@
 ---
+[`Sun Dec 22 2024 11:05:47 PM Beijing`]    
+1. Encountered login issues about `OAuth2`, we need to address it first.
+
 [`Sun Dec 16 2024 21:26:48 PM Beijing`]   
 1. next we will move on to implement the `user management tools`.
 

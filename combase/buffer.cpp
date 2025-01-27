@@ -454,7 +454,7 @@ gint32 CBuffer::ResizeWithOffset( guint32 dwSize )
         }
         else
         {
-            if( unlikely( bArrBuf ) )
+            if( unlikely( bArrBuf || pBase != m_pData ) )
             {
                 ret = ERROR_STATE;
                 break;
@@ -569,6 +569,13 @@ gint32 CBuffer::Resize( guint32 dwSize )
             }
             else
             {
+                if( unlikely( m_pData != ptr() ) )
+                {
+                    ret = ERROR_STATE;
+                    DebugPrint( ret, "Error the pointer to "
+                        "realloc not at the block beginning" );
+                    break;
+                }
                 char* pNewBuf = ( char* )realloc( ptr(), dwSize );
                 if( pNewBuf != nullptr )
                 {

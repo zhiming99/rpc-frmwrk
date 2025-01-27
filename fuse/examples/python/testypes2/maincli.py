@@ -3,6 +3,8 @@
 import sys
 from rpcf import iolib
 from rpcf import serijson
+from rpcf.rpcbase import *
+from rpcf.serijson import Variant
 import errno
 from rpcf.proxy import ErrorCode as Err
 from typing import Union, Tuple, Optional
@@ -192,6 +194,7 @@ def maincli() :
         stmfp.write(binBuf[0:8*1024])
 
         #stream handle is the same as the file name of the stream
+        reqId += 1
         iRet = oProxy.EchoStream( reqId, hstmIn )
         if iRet[ 0 ] < 0:
             error = iRet[0]
@@ -211,6 +214,34 @@ def maincli() :
         bufsize = len( binBuf )
         print(binBuf[ bufsize - 128 : bufsize ])
         print( 'EchoStream completed with %s' % hstmr, os.getpid() )
+
+        reqId += 1
+        var1=Variant()
+        var1.iType = cpp.typeString
+        var1.val = "Hello, World!"
+        var2=Variant()
+        var2.iType = cpp.typeObj
+        var2.val = FILE_INFO()
+        iRet = oProxy.EchoVariant( reqId, var1, var2 )
+        if iRet[0] < 0:
+            error = iRet[0]
+            raise Exception( "EchoVariant failed with error %d"%error )
+        print( "EchoVariant resp is %s" % iRet[1][0].val)
+
+        reqId +=1
+        iRet = oProxy.EchoVarArray( reqId, [var1, var2])
+        if iRet[0] < 0:
+            error = iRet[0]
+            raise Exception( "EchoVarArray failed with error %d"%error )
+        print( "EchoVarArray resp is %s" % iRet[1][0][1].val.szFileName)
+
+        reqId += 1
+        mapVars = {"haha":var1, "bobo":var2}
+        iRet = oProxy.EchoVarMap( reqId, mapVars)
+        if iRet[0] < 0:
+            error = iRet[0]
+            raise Exception( "EchoVarMap failed with error %d"%error )
+        print( "EchoVarMap resp is %s" % iRet[1][0]["bobo"].val.szFileName)
 
     except Exception as err:
         print( err )

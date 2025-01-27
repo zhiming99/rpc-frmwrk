@@ -145,6 +145,33 @@ gint32 CTestTypesSvc_SvrImpl::EchoStream(
     // STATUS_SUCCESS
     return ERROR_NOT_IMPL;
 }
+/* Sync Req Handler*/
+gint32 CTestTypesSvc_SvrImpl::EchoVariant(
+    const Variant& var1 /*[ In ]*/,
+    const Variant& var2 /*[ In ]*/,
+    Variant& rvar1 /*[ Out ]*/,
+    Variant& rvar2 /*[ Out ]*/ )
+{
+    rvar1 = var1;
+    rvar2 = var2;
+    return STATUS_SUCCESS;
+}
+/* Sync Req Handler*/
+gint32 CTestTypesSvc_SvrImpl::EchoVarArray(
+    std::vector<Variant>& arrVars /*[ In ]*/,
+    std::vector<Variant>& rarrVars /*[ Out ]*/ )
+{
+    rarrVars = arrVars;
+    return STATUS_SUCCESS;
+}
+/* Sync Req Handler*/
+gint32 CTestTypesSvc_SvrImpl::EchoVarMap(
+    std::map<std::string,Variant>& mapVars /*[ In ]*/,
+    std::map<std::string,Variant>& rmapVars /*[ Out ]*/ )
+{
+    rmapVars = mapVars;
+    return STATUS_SUCCESS;
+}
 /* RPC event sender */
 gint32 CTestTypesSvc_SvrImpl::OnHelloWorld(
     const std::string& strMsg /*[ In ]*/ )

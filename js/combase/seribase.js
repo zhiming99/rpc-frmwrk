@@ -9,6 +9,121 @@ const { CBuffer } = require( "./cbuffer")
 const { CObjBase } = require( "./objbase.js" )
 const { EnumTypeId } = require("./enums.js")
 
+class Variant
+{
+    constructor( osb = null )
+    {
+        this.m_iType = EnumTypeId.typeNone
+        this.m_val = null
+        this.m_osb = osb
+    }
+
+    SetOsb( osb )
+    { this.m_osb = osb }
+
+
+    Serialize()
+    {
+        this.m_osb.SerialUint8( this.m_iType )
+        switch( this.m_iType )
+        {
+        case EnumTypeId.typeByte:
+            this.m_osb.SerialUint8( this.m_val )
+            break
+        case EnumTypeId.typeUInt16:
+            this.m_osb.SerialUint16( this.m_val )
+            break
+        case EnumTypeId.typeUInt32:
+            this.m_osb.SerialUint32( this.m_val )
+            break
+        case EnumTypeId.typeUInt64:
+            this.m_osb.SerialUint64( this.m_val )
+            break
+        case EnumTypeId.typeFloat:
+            this.m_osb.SerialFloat( this.m_val )
+            break
+        case EnumTypeId.typeDouble:
+            this.m_osb.SerialDouble( this.m_val )
+            break
+        case EnumTypeId.typeByteArr:
+            this.m_osb.SerialByteArray( this.m_val )
+            break
+        case EnumTypeId.typeString:
+            this.m_osb.SerialString( this.m_val )
+            break
+        case EnumTypeId.typeObj:
+            if( this.m_val instanceof CStructBase )
+                this.m_osb.SerialStruct( this.m_val )
+            else
+                this.m_osb.SerialObjPtr( this.m_val )
+            break
+        case EnumTypeId.typeNone:
+            break
+        default:
+            throw new Error( "Error unknown type to serialize")
+        }
+    }
+
+    Deserialize( srcBuf, offset )
+    {
+        var ret = this.m_osb.DeserialUint8(
+                srcBuf, offset )
+        this.m_iType = ret[0]
+        offset = ret[1]
+        switch( this.m_iType )
+        {
+        case EnumTypeId.typeByte:
+            ret = this.m_osb.DeserialUint8( srcBuf, offset )
+            break
+        case EnumTypeId.typeUInt16:
+            ret = this.m_osb.DeserialUint16( srcBuf, offset )
+            break
+        case EnumTypeId.typeUInt32:
+            ret = this.m_osb.DeserialUint32( srcBuf, offset )
+            break
+        case EnumTypeId.typeUInt64:
+            ret = this.m_osb.DeserialUint64( srcBuf, offset )
+            break
+        case EnumTypeId.typeFloat:
+            ret = this.m_osb.DeserialFloat( srcBuf, offset )
+            break
+        case EnumTypeId.typeDouble:
+            ret = this.m_osb.DeserialDouble( srcBuf, offset )
+            break
+        case EnumTypeId.typeByteArr:
+            ret = this.m_osb.DeserialByteArray( srcBuf, offset )
+            break
+        case EnumTypeId.typeString:
+            ret = this.m_osb.DeserialString( srcBuf, offset )
+            break
+        case EnumTypeId.typeObj:
+            ret = this.m_osb.DeserialUint32( srcBuf, offset )
+            if( ret[ 0 ] === 0x73747275 )
+                ret = this.m_osb.DeserialStruct( srcBuf, offset )
+            else
+                ret = this.m_osb.DeserialObjPtr( srcBuf, offset )
+            break
+        case EnumTypeId.typeNone:
+            return [ this, offset ]
+        default:
+            throw new Error( "Error unknown type to serialize")
+        }
+        this.m_val = ret[0]
+        return [ this, ret[1]]
+    }
+
+    static Restore( oVal )
+    {
+        var oVar = new Variant()
+        if( oVal.m_iType !== undefined )
+            oVar.m_iType = oVal.m_iType
+        if( oVal.m_val !== undefined )
+            oVar.m_val = oVal.m_val
+        return oVar
+    }
+}
+
+exports.Variant = Variant
 class CSerialBase
 {
     BuildFuncMaps()
@@ -29,6 +144,7 @@ class CSerialBase
             ['O' , this.SerialStruct.bind( this )],
             ['o' , this.SerialObjPtr.bind( this )],
             ['s' , this.SerialString.bind( this )],
+            ['v' , this.SerialVariant.bind( this )],
         ])
 
         this.m_oDeserialMap = new Map([
@@ -47,6 +163,7 @@ class CSerialBase
             ['O' , this.DeserialStruct.bind( this )],
             ['o' , this.DeserialObjPtr.bind( this )],
             ['s' , this.DeserialString.bind( this )],
+            ['v' , this.DeserialVariant.bind( this )],
         ])
     }
     /**
@@ -200,6 +317,13 @@ class CSerialBase
         else
             this.m_oBuf = Buffer.concat(
                 [ this.m_oBuf, oBuf ])
+        return
+    }
+
+    SerialVariant( val )
+    {
+        val.SetOsb( this )
+        val.Serialize()
         return
     }
 
@@ -412,12 +536,19 @@ class CSerialBase
 
     DeserialStruct( oBuf, offset )
     {
-        var dwClsid = oBuf.readUint32BE( offset )
+        var dwClsid = oBuf.readUint32BE( offset + 4 )
         var oObj = globalThis.CoCreateInstance( dwClsid )
         if( oObj === null )
             throw new Error( "Error no such struct")
         var retOff = oObj.Deserialize( oBuf, offset )
         return [ oObj, retOff[1] ]
+    }
+
+    DeserialVariant( oBuf, offset )
+    {
+        var oVar = new Variant( this )    
+        var ret = oVar.Deserialize( oBuf, offset )
+        return [ oVar, ret[1] ]
     }
 
     DeserialElem( oBuf, offset, sig )
@@ -594,6 +725,8 @@ class CStructBase extends CObjBase
             return CStructBase.RestoreMap( oElem, strSig );
         else if( strSig[ 0 ] === 'O' )
             return CStructBase.RestoreStruct( oElem, strSig );
+        else if( strSig[ 0 ] === 'v' )
+            return Variant.Restore( oElem );
         return oElem;
     }
 

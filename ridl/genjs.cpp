@@ -117,7 +117,8 @@ std::map< char, stdstr > g_mapSig2JsType =
     { 's', "String" },
     { 'a', "Uint8Array" },
     { 'o', "ObjPtr" },
-    { 'h', "HStream" }
+    { 'h', "HStream" },
+    { 'v', "Variant" },
 };
 
 CJsFileSet::CJsFileSet(
@@ -425,6 +426,11 @@ static gint32 EmitDeserialBySigJs(
             CCOUT << "ret = osb.DeserialHStream( buf, offset );";
             break;
         }
+    case 'v':
+        {
+            CCOUT << "ret = osb.DeserialVariant( buf, offset );";
+            break;
+        }
     default:
         {
             ret = -EINVAL;
@@ -515,6 +521,11 @@ static gint32 EmitSerialBySigJs(
     case 'h':
         {
             CCOUT << "osb.SerialHStream( " << strField << " )";
+            break;
+        }
+    case 'v':
+        {
+            CCOUT << "osb.SerialVariant( " << strField << " )";
             break;
         }
     default:
@@ -807,6 +818,11 @@ gint32 CDeclareJsStruct::Output()
                     CCOUT << "this." << strName << " = null;";
                     break;
                 }
+            case 'v':
+                {
+                    CCOUT << "this." << strName << " = new Variant();";
+                    break;
+                }
             default:
                 {
                     ret = -EINVAL;
@@ -821,6 +837,8 @@ gint32 CDeclareJsStruct::Output()
         Wa( "Serialize()" );
         BLOCK_OPEN;
         Wa( "var osb = new CSerialBase( this.m_pIf );" );
+        NEW_LINE;
+        CCOUT << "osb.SerialUint32( "<< SERIAL_STRUCT_MAGICSTR_PY << " );";
         NEW_LINE;
         CCOUT << "osb.SerialUint32( this.GetStructId() );";
         NEW_LINE;
@@ -858,6 +876,12 @@ gint32 CDeclareJsStruct::Output()
         Wa( "var ret;" );
         Wa( "var osb = new CSerialBase( this.m_pIf );" );
         NEW_LINE;
+        CCOUT << "ret = osb.DeserialUint32( buf, offset );";
+        NEW_LINE;
+        CCOUT << "if( ret[ 0 ] != " << SERIAL_STRUCT_MAGICSTR_PY << " )";
+        NEW_LINE;
+        Wa( "    throw new Error( 'Error invalid magic number' );" );
+        Wa( "offset += 4;" );
         CCOUT << "ret = osb.DeserialUint32( buf, offset );";
         NEW_LINE;
         Wa( "if( ret === null )" );
@@ -1017,6 +1041,7 @@ gint32 CDeclareJsStruct::OutputRestore()
             case 's':
             case 'a':
             case 'o':
+            case 'v':
                 {
                     CCOUT << "this." << strName
                         << " = oVal."<< strName <<";";
@@ -1061,7 +1086,7 @@ static gint32 GenStructsFileJs(
         EMIT_DISCLAIMER;
         CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
-        CCOUT << "const { CSerialBase, CStructBase } = require( '"
+        CCOUT << "const { CSerialBase, CStructBase, Variant } = require( '"
             << strLibPath << "/combase/seribase' );";
         NEW_LINE;
         CCOUT << "const { errno } = require( '"
@@ -1166,20 +1191,26 @@ gint32 CJsExportMakefile::Output()
 {
     gint32 ret = 0;
     do{
-        Wa( "update :" );
-        Wa( "\tpython3 synccfg.py" );
-        NEW_LINE;
-
-        Wa( "debug :" );
-        Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
-        Wa( "\t@sed -i \"s@mode:[[:blank:]]*'production'@mode: 'development'@g\" webpack.config.js" );
-        Wa( "\tnpm exec webpack" );
-        NEW_LINE;
-
-        Wa( "release :" );
+        Wa( "all:" );
+        Wa( "\trm -r dist;mkdir dist" );
         Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
         Wa( "\t@sed -i \"s@mode:[[:blank:]]*'development'@mode: 'production'@g\" webpack.config.js" );
         Wa( "\tnpm exec webpack" );
+        Wa( "\tpython3 synccfg.py" );
+        Wa( "\t@echo please see 'README.md' for information about deployment." );
+
+        Wa( "sync:" );
+        Wa( "\tpython3 synccfg.py" );
+        NEW_LINE;
+
+        Wa( "debug:" );
+        Wa( "\trm -r dist;mkdir dist" );
+        Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
+        Wa( "\t@sed -i \"s@mode:[[:blank:]]*'production'@mode: 'development'@g\" webpack.config.js" );
+        Wa( "\tnpm exec webpack" );
+        Wa( "\tpython3 synccfg.py" );
+        Wa( "\t@echo please see 'README.md' for information about deployment." );
+        NEW_LINE;
 
     }while( 0 );
     return ret;
@@ -1212,7 +1243,7 @@ static void OUTPUT_BANNER(
         "EnumTypeId, EnumSeriProto} = require( '"
         << strLibPath <<"/combase/enums' );";
     NEW_LINE;
-    CCOUT << "const {CSerialBase} = require( '"
+    CCOUT << "const {CSerialBase, Variant} = require( '"
         << strLibPath <<"/combase/seribase' );";
     NEW_LINE;
     if( g_bRpcOverStm )

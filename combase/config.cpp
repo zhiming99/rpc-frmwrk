@@ -203,7 +203,7 @@ void CConfigDb2::RemoveAll()
 #define RESIZE_BUF( _Size, _Ret ) \
 do{ \
     guint32 dwLocOff = pLoc - oBuf.ptr(); \
-    oBuf.Resize( ( _Size + dwOrigOff ) ); \
+    oBuf.Resize( ( _Size ) ); \
     if( oBuf.ptr() == nullptr ) \
     { \
         _Ret = -ENOMEM; \

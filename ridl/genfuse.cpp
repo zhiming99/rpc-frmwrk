@@ -354,6 +354,19 @@ gint32 CEmitSerialCodeFuse::OutputSerial(
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
+            case 'v':
+                {
+                    Wa( "if( !_oMember.isObject() )" );
+                    Wa( "{ ret = -EINVAL; break; }" );
+                    CCOUT << "ret = " << strObj
+                        << "SerializeVariant(";
+                    NEW_LINE;
+                    CCOUT << "    " << strBuf
+                        << ", _oMember );";
+                    NEW_LINE;
+                    Wa( "if( ERROR( ret ) ) break;" );
+                    break;
+                }
             default:
                 {
                     ret = -EINVAL;
@@ -378,7 +391,7 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
         guint32 i = 0;
         guint32 dwCount = m_pArgs->GetCount();
 
-        Wa( "Json::Value _oMember, _oVal;" );
+        Wa( "Json::Value _oMember;" );
 
         for( ; i < dwCount; i++ )
         {
@@ -416,6 +429,7 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                     NEW_LINE;
                     CCOUT << "    " << strBuf << ", _oMember, \""
                         << strSig << "\" );";
+                    NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
                     NEW_LINE;
                     break;
@@ -472,10 +486,9 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUInt64( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oVal );";
+                        <<", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    Wa( "_oMember = _oVal.asInt64();" );
                     break;
                 }
             case 'D':
@@ -495,10 +508,9 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUInt( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oVal );";
+                        <<", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    Wa( "_oMember = _oVal.asInt();" );
                     break;
                 }
             case 'W':
@@ -518,10 +530,9 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                         << "DeserializeUShort( ";
                     NEW_LINE;
                     CCOUT << "    " <<  strBuf
-                        <<", _oVal );";
+                        <<", _oMember );";
                     NEW_LINE;
                     Wa( "if( ERROR( ret ) ) break;" );
-                    Wa( "_oMember = _oVal.asInt();" );
                     break;
                 }
             case 'f':
@@ -601,6 +612,17 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
                     Wa( "if( ERROR( ret ) ) break;" );
                     break;
                 }
+            case 'v':
+                {
+                    CCOUT << "ret = " << strObj
+                        << "DeserializeVariant( ";
+                    NEW_LINE;
+                    CCOUT << "    " <<  strBuf
+                        <<", _oMember );";
+                    NEW_LINE;
+                    Wa( "if( ERROR( ret ) ) break;" );
+                    break;
+                }
             default:
                 {
                     ret = -EINVAL;
@@ -613,10 +635,11 @@ gint32 CEmitSerialCodeFuse::OutputDeserial(
 
             CCOUT << "val_[ \"" << strName
                 << "\" ] = _oMember;";
-            NEW_LINE;
-            CCOUT << "_oMember = 0;";
             if( i + 1 < dwCount )
                 NEW_LINE;
+            // CCOUT << "_oMember = 0;";
+            // if( i + 1 < dwCount )
+            //    NEW_LINE;
         }
     }while( 0 );
 
@@ -888,6 +911,11 @@ gint32 CImplSerialStruct::OutputSerialFuse()
         BLOCK_OPEN;
 
         Wa( "ret = CSerialBase::Serialize(" );
+        Wa( "    pBuf_, SERIAL_STRUCT_MAGIC );" );
+        Wa( "if( ERROR( ret ) ) break;" );
+        NEW_LINE;
+
+        Wa( "ret = CSerialBase::Serialize(" );
         Wa( "    pBuf_, m_dwMsgId );" );
         Wa( "if( ERROR( ret ) ) break;" );
         NEW_LINE;
@@ -929,7 +957,7 @@ gint32 CImplSerialStruct::OutputDeserialFuse()
         CCOUT << "gint32 " << m_pNode->GetName()
             << "::" << "JsonDeserialize( ";
         NEW_LINE;
-        CCOUT << "BufPtr& pBuf_, Json::Value& destVal )";
+        CCOUT << "    BufPtr& pBuf_, Json::Value& destVal )";
         NEW_LINE;
         BLOCK_OPEN;
         CCOUT << "if( pBuf_.IsEmpty() )";
@@ -951,6 +979,16 @@ gint32 CImplSerialStruct::OutputDeserialFuse()
             ret = -ENOENT;
             break;
         }
+
+        Wa( "guint32 dwMagicId = 0;" );
+        CCOUT << "ret = CSerialBase::Deserialize(";
+        NEW_LINE;
+        CCOUT << "    pBuf_, dwMagicId );";
+        NEW_LINE;
+        Wa( "if( ERROR( ret ) ) return ret;" );
+        Wa( "if( dwMagicId != SERIAL_STRUCT_MAGIC )" );
+        Wa( "    return -EINVAL;" );
+        NEW_LINE;
 
         Wa( "guint32 dwMsgId = 0;" );
         CCOUT << "ret = CSerialBase::Deserialize(";

@@ -608,6 +608,78 @@ gint32 AsyncEcho( CTestTypesSvc_CliImpl* pIf )
     return ret;
 }
 
+gint32 TestVariant( CTestTypesSvc_CliImpl* pIf )
+{
+    gint32 ret = 0;
+    for( int i = 0; i < 10; i++ )
+    {
+        ObjPtr pfi;
+        pfi.NewObj( clsid( FILE_INFO ) );
+
+        Variant var1, rvar1, var2, rvar2;
+        var1 = pfi;
+        var2 = "Hello, World";
+
+        ret = pIf->EchoVariant(
+            var1, var2, rvar1, rvar2 );
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error echo variant with string" );
+            break;
+        }
+        OutputMsg( ret,
+            "Server resp variant: %s",
+            (( stdstr& )rvar2 ).c_str() );
+
+        std::vector< Variant > arrVars;
+        std::vector< Variant > rarrVars;
+        arrVars.push_back( var1 );
+        arrVars.push_back( var2 );
+        pfi.NewObj( clsid( FILE_INFO ) );
+        FILE_INFO* pf = pfi;
+        pf->szFileName = "test3.dat";
+        Variant var3( pfi );
+        arrVars.push_back( var3 );
+
+        ret = pIf->EchoVarArray( arrVars, rarrVars );
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error echo variant array" );
+            break;
+        }
+        pfi = ( ObjPtr& )rarrVars[ 2 ];
+        pf = pfi;
+        DebugPrint( ret,
+            "Server resp variant array: %s",
+            pf->szFileName.c_str() );
+
+        std::map< stdstr, Variant > mapVars;
+        std::map< stdstr, Variant > rmapVars;
+
+        mapVars[ "haha" ] =  var1;
+        mapVars[ "bobo" ] =  var2;
+        mapVars[ "cici" ] =  var3;
+        ret = pIf->EchoVarMap(
+            mapVars, rmapVars );
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error echo variant map" );
+            break;
+        }
+        Variant& oVar4 = rmapVars["cici"];
+        pfi = (ObjPtr&)oVar4;
+        pf = pfi;
+        OutputMsg( ret,
+            "Server resp variant map: %s",
+            pf->szFileName.c_str() );
+
+    }
+    return ret;
+}
+
 gint32 maincli( CTestTypesSvc_CliImpl* pIf, int argc, char** argv )
 {
     gint32 ret = 0;
@@ -621,5 +693,7 @@ gint32 maincli( CTestTypesSvc_CliImpl* pIf, int argc, char** argv )
     else
         OutputMsg( ret,
             "Echo test is failed");
+
+    ret = TestVariant( pIf );
     return ret;
 }

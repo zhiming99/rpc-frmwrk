@@ -68,6 +68,7 @@ struct SESS_INFO
 {
     stdstr m_strSessHash;
     stdstr m_strRouterPath;
+    ObjPtr m_pLoginInfo;
 };
 
 template< bool bProxy >
@@ -256,6 +257,18 @@ class CRpcStmChanBase :
                 propRouterPath, strPath );
             if( ERROR( ret ) )
                 break;
+            bool bAuth = false;
+            if( strSess.substr( 0, 2 ) == "AU" )
+                bAuth = true;
+
+            ObjPtr pLogin;
+            ret = oCtx.GetObjPtr(
+                propLoginInfo, pLogin );
+            if( bAuth && ERROR( ret ) )
+            {
+                ret = -EACCES;
+                break;
+            }
 
             CWriteLock oLock( this->GetSharedLock() );
 
@@ -269,7 +282,7 @@ class CRpcStmChanBase :
             UNREFERENCED( bufElem );
 
             m_mapStm2Sess[ hstm ] =
-                    { strSess, strPath };
+                    { strSess, strPath, pLogin };
 
             auto itr = m_mapSessRefs.find( strSess );
             if( itr == m_mapSessRefs.end() )
@@ -481,6 +494,9 @@ class CRpcStmChanBase :
 
             oReqCtx.SetIntPtr( propStmHandle,
                 ( guint32* )hstm );
+
+            oReqCtx.SetObjPtr( propLoginInfo,
+                si.m_pLoginInfo );
 
             timespec ts;
             clock_gettime( CLOCK_REALTIME, &ts );
@@ -1143,8 +1159,10 @@ class CFastRpcServerBase :
     public:
     typedef IFBASE3( false ) super;
     CFastRpcServerBase( const IConfigDb* pCfg ) :
-        super( pCfg ), m_dwSeqNo( 0 ) 
-    {}
+        super( pCfg )
+    {
+        m_dwSeqNo = GetRandom();
+    }
 
     inline gint32 NewSeqNo()
     { return m_dwSeqNo++; }
@@ -1237,8 +1255,11 @@ class CFastRpcProxyBase :
     typedef IFBASE3( true ) super;
 
     CFastRpcProxyBase( const IConfigDb* pCfg ):
-        super( pCfg ), m_pSkelObj( nullptr ) 
-    {}
+        super( pCfg ),
+        m_pSkelObj( nullptr )
+    {
+        m_dwSeqNo = GetRandom();
+    }
 
     inline gint32 NewSeqNo()
     { return m_dwSeqNo++; }

@@ -22,8 +22,15 @@
  *
  * =====================================================================================
  */
+#include "rpc.h"
+#include <json/json.h>
 #include "variant.h"
 #include "dmsgptr.h"
+#include "seribase.h"
+
+using namespace rpcf;
+#include "base64.h"
+
 using namespace std;
 
 namespace rpcf
@@ -660,6 +667,420 @@ bool Variant::operator==(
         ret = true;
         break;
     }
+    return ret;
+}
+
+gint32 Variant::Deserialize(
+    BufPtr& pBuf, void* p )
+{
+    if( pBuf.IsEmpty() || pBuf->empty() )
+        return -EINVAL;
+
+    Clear();
+    CSerialBase oBackup;
+    auto psb =
+        reinterpret_cast< CSerialBase* >( p );
+    if( psb == nullptr )
+        psb = &oBackup;
+    CSerialBase& osb = *psb;
+
+    char bType = *pBuf->ptr();
+    EnumTypeId iType = (EnumTypeId) bType;
+    m_iType = iType;
+
+    gint32 ret = 0;
+    guint32 dwOldOff = pBuf->offset();
+    pBuf->SetOffset( dwOldOff + 1 );
+    switch( iType )
+    {
+    case typeByte:
+        ret = osb.Deserialize( pBuf, m_byVal ); 
+        break;
+    case typeUInt16:
+        ret = osb.Deserialize( pBuf, m_wVal );
+        break;
+    case typeUInt32:
+        ret = osb.Deserialize( pBuf, m_dwVal );
+        break;
+    case typeUInt64:
+        ret = osb.Deserialize( pBuf, m_qwVal );
+        break;
+    case typeFloat:
+        ret = osb.Deserialize( pBuf, m_fVal );
+        break;
+    case typeDouble:
+        ret = osb.Deserialize( pBuf, m_dblVal );
+        break;
+    case typeObj:
+        {
+            guint32 arrValues[ 2 ];
+            memcpy( arrValues,
+                pBuf->ptr(), sizeof( guint32 ) * 2 );
+            guint32 *p = arrValues;
+            *p = ntohl( *p );
+            if( *p == SERIAL_STRUCT_MAGIC )
+            {
+                p++; *p = ntohl( *p );
+                ObjPtr pStruct;
+                ret = pStruct.NewObj( ( EnumClsid )*p );
+                if( ERROR( ret ) )
+                    break;
+                ret = pStruct->Deserialize( *pBuf );
+                if( SUCCEEDED( ret ) )
+                    m_pObj = pStruct;
+            }
+            else
+            {
+                ret = osb.Deserialize( pBuf, m_pObj );
+            }
+            break;
+        }
+    case typeByteArr:
+        ret = osb.Deserialize( pBuf, m_pBuf );
+        break;
+    case typeString:
+        new ( &m_strVal )string();
+        ret = osb.Deserialize( pBuf, m_strVal );
+        break;
+    case typeNone:
+        break;
+    case typeDMsg:
+    default:
+        ret = -ENOTSUP;
+    }
+    return ret;
+}
+
+gint32 Variant::Serialize(
+    BufPtr& pBuf, void* p ) const
+{
+    if( pBuf.IsEmpty() )
+        return -EINVAL;
+
+    CSerialBase oBackup;
+    auto psb = 
+        reinterpret_cast< CSerialBase* >( p );
+    if( psb == nullptr )
+        psb = &oBackup;
+    CSerialBase& osb = *psb;
+
+    auto iType = m_iType;
+
+    gint32 ret = 0;
+    APPEND( pBuf, &m_iType, 1 );
+
+    switch( iType )
+    {
+    case typeByte:
+        ret = osb.Serialize( pBuf, m_byVal ); 
+        break;
+    case typeUInt16:
+        ret = osb.Serialize( pBuf, m_wVal );
+        break;
+    case typeUInt32:
+        ret = osb.Serialize( pBuf, m_dwVal );
+        break;
+    case typeUInt64:
+        ret = osb.Serialize( pBuf, m_qwVal );
+        break;
+    case typeFloat:
+        ret = osb.Serialize( pBuf, m_fVal );
+        break;
+    case typeDouble:
+        ret = osb.Serialize( pBuf, m_dblVal );
+        break;
+    case typeObj:
+        {
+            CStructBase* pStruct = m_pObj;
+            if( pStruct != nullptr )
+            {
+                CStructBase* psb = dynamic_cast
+                    < CStructBase* >( ( CObjBase* )m_pObj );
+                if( psb != nullptr )
+                    ret = psb->Serialize( pBuf );
+                else
+                {
+                    ret = -EFAULT;
+                    DebugPrint( ret,
+                        "Error, unknown type to serialize" );
+                }
+            }
+            else
+            {
+                ret = osb.Serialize( pBuf, m_pObj );
+            }
+        }
+        break;
+    case typeByteArr:
+        ret = osb.Serialize( pBuf, m_pBuf );
+        break;
+    case typeString:
+        ret = osb.Serialize( pBuf, m_strVal );
+        break;
+    case typeNone:
+        break;
+    case typeDMsg:
+    default:
+        ret = -ENOTSUP;
+    }
+    return ret;
+}
+
+gint32 Variant::SerializeToJson(
+    stdstr& strJson, void* p ) const
+{
+    CSerialBase oBackup;
+    auto psb = 
+        reinterpret_cast< CSerialBase* >( p );
+    if( psb == nullptr )
+        psb = &oBackup;
+    CSerialBase& osb = *psb;
+    gint32 ret = 0;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "";
+        Json::Value oVal( Json::objectValue );
+
+        switch( m_iType )
+        {
+        case typeByte:
+            oVal[ "v" ] = m_byVal;
+            break;
+        case typeUInt16:
+            oVal[ "v" ] = m_wVal;
+            break;
+        case typeUInt32:
+            oVal[ "v" ] = m_dwVal;
+            break;
+        case typeUInt64:
+            using JUInt64 = Json::Value::UInt64;
+            oVal[ "v" ] =
+                ( const JUInt64& )m_qwVal;
+            break;
+        case typeFloat:
+            oVal[ "v" ] = m_fVal;
+            break;
+        case typeDouble:
+            oVal[ "v" ] = m_dblVal;
+            break;
+        case typeString:
+            oVal[ "v" ] = m_strVal;
+            break;
+        case typeObj:
+            {
+                CStructBase* pStruct = m_pObj;
+                BufPtr pBuf( true );
+                if( pStruct != nullptr )
+                {
+                    CStructBase* psb = dynamic_cast
+                        < CStructBase* >( ( CObjBase* )m_pObj );
+                    if( psb != nullptr )
+                        ret = psb->Serialize( pBuf );
+                    else
+                    {
+                        ret = -EFAULT;
+                        DebugPrint( ret,
+                            "Error, unknown type to serialize" );
+                    }
+                    pBuf->SetOffset( 0 );
+                }
+                else
+                {
+                    ret = m_pObj->Serialize( *pBuf );
+                }
+                if( ERROR( ret ) )
+                    break;
+                BufPtr pNewBuf( true );
+                ret = base64_encode(
+                    ( guint8*) pBuf->ptr(),
+                    pBuf->size(),
+                    pNewBuf );
+                if( ERROR( ret ) )
+                    break;
+                oVal[ "v" ] = pNewBuf->ptr();
+            }
+            break;
+        case typeByteArr:
+            {
+                BufPtr pBuf( true );
+                BufPtr pNewBuf( true );
+                ret = osb.Serialize( pBuf, m_pBuf );
+                if( ERROR( ret ) )
+                    break;
+                ret = base64_encode(
+                    ( guint8*) pBuf->ptr(),
+                    pBuf->size(),
+                    pNewBuf );
+                if( ERROR( ret ) )
+                    break;
+                oVal[ "v" ] = pNewBuf->ptr();
+                break;
+            }
+        case typeNone:
+            break;
+        case typeDMsg:
+        default:
+            ret = -ENOTSUP;
+        }
+        if( ERROR( ret ) )
+            break;
+
+        oVal[ "t" ] = m_iType;
+        strJson = Json::writeString(
+            oBuilder, oVal );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 Variant::DeserializeFromJson(
+    const stdstr& strJson, void* p )
+{
+    gint32 ret = 0;
+    do{
+        guint8 iType;
+        CSerialBase oBackup;
+        auto psb =
+            reinterpret_cast< CSerialBase* >( p );
+        if( psb == nullptr )
+            psb = &oBackup;
+        CSerialBase& osb = *psb;
+
+        Json::CharReaderBuilder oBuilder;
+        std::shared_ptr< Json::CharReader >
+            pReader( oBuilder.newCharReader() );
+        if( pReader == nullptr )
+        {
+            ret = -ENOMEM;
+            break;
+        }
+
+        Json::Value oValue;
+        if( !pReader->parse( strJson.c_str(),
+            strJson.c_str() + strJson.size(),
+            &oValue, nullptr ) )
+        {
+            ret = -EBADMSG;
+            break;
+        }
+
+        if( !oValue.isObject() ||
+            !oValue.isMember( "t" ) ||
+            !oValue[ "t" ].isInt() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        Clear();
+        iType = oValue[ "t" ].asInt();
+        if( iType == typeNone )
+        {
+            m_iType = ( EnumTypeId )iType;
+            break;
+        }
+
+        if( !oValue.isMember( "v" ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        Json::Value& val = oValue;
+        switch( iType )
+        {
+        case typeByte: 
+            {
+                m_byVal = ( guint8 )val[ "v" ].asUInt();
+                break;
+            }
+        case typeUInt16:
+            {
+                m_wVal = ( guint16 )val[ "v" ].asUInt();
+                break;
+            }
+        case typeUInt32:
+            {
+                m_dwVal = val[ "v" ].asUInt();
+                break;
+            }
+        case typeUInt64:
+            {
+                m_qwVal = val[ "v" ].asUInt64();
+                break;
+            } 
+        case typeFloat:
+            {
+                m_fVal = val[ "v" ].asFloat();
+                break;
+            } 
+        case typeDouble:
+            {
+                m_dblVal = val[ "v" ].asDouble();
+                break;
+            }
+        case typeString:
+            {
+                new ( &m_strVal ) string( 
+                    val[ "v" ].asString() );
+                break;
+            } 
+        case typeByteArr:
+            {
+                stdstr strBuf = val[ "v" ].asString();
+                BufPtr pBuf( true );
+                ret = base64_decode( strBuf.c_str(),
+                    strBuf.size(), pBuf );
+                if( ERROR( ret ) )
+                    break;
+                m_pBuf = pBuf;
+                break;
+            } 
+        case typeObj:
+            {
+                stdstr strBuf = val[ "v" ].asString();
+                BufPtr pBuf( true );
+                ret = base64_decode( strBuf.c_str(),
+                    strBuf.size(), pBuf );
+                if( ERROR( ret ) )
+                    break;
+
+                guint32 dwMagicId = 0;
+                guint32 dwMsgId = 0;
+                if( pBuf->size() < sizeof( guint32 ) * 2)
+                {
+                    ret = -ERANGE;
+                    break;
+                }
+
+                memcpy( &dwMagicId, pBuf->ptr(),
+                    sizeof( dwMagicId ) );
+                dwMagicId = ntohl( dwMagicId );
+                if( dwMagicId != SERIAL_STRUCT_MAGIC )
+                {
+                    ret = osb.Deserialize(
+                        pBuf, m_pObj );
+                }
+                else
+                {
+                    ret = osb.Deserialize(
+                        pBuf, m_pObj );
+                }
+                break;
+            } 
+        case typeDMsg:
+        default:
+            {
+                ret = -ENOTSUP;
+                break;
+            }
+        }
+        if( ERROR( ret ) )
+            break;
+        m_iType = ( EnumTypeId )iType;
+
+    }while( 0 );
     return ret;
 }
 

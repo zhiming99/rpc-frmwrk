@@ -191,7 +191,7 @@ gint32 CSerialBase::Serialize< ObjPtr >(
         return ret;
 
     guint32 i = pNewBuf->size();
-    if( i >= MAX_BYTES_PER_BUFFER )
+    if( i == 0 || i >= MAX_BYTES_PER_BUFFER )
         return -ERANGE;
 
     APPEND( pBuf, pNewBuf->ptr(),
@@ -225,6 +225,12 @@ gint32 CSerialBase::Serialize< BufPtr >(
     APPEND( pBuf, val->ptr(), val->size() );
     return STATUS_SUCCESS;
 }
+
+// variant
+template<>
+gint32 CSerialBase::Serialize< Variant >(
+    BufPtr& pBuf, const Variant& val )
+{ return val.Serialize( pBuf, this ); }
 
 template<>
 gint32 CSerialBase::Deserialize< bool >(
@@ -393,7 +399,7 @@ gint32 CSerialBase::Deserialize< std::string >(
     if( ERROR( ret ) )
         return ret;
 
-    val = "";
+    val.clear();
     if( dwCount == 0 )
         return ret;
 
@@ -487,6 +493,13 @@ gint32 CSerialBase::Deserialize< BufPtr >(
 
     pBuf->IncOffset( i );
     return STATUS_SUCCESS;
+}
+
+template<>
+gint32 CSerialBase::Deserialize< Variant >(
+    BufPtr& pBuf, Variant& val )
+{
+    return val.Deserialize( pBuf, this );
 }
 
 }

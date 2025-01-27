@@ -467,6 +467,9 @@ struct CPrimeType : public CAstNodeBase
         case TOK_HSTREAM:
             strName = "HSTREAM";
             break;
+        case TOK_VARIANT:
+            strName = "Variant";
+            break;
         default:
             break;
         }
@@ -520,6 +523,9 @@ struct CPrimeType : public CAstNodeBase
         case TOK_HSTREAM:
             strName = "HSTREAM";
             break;
+        case TOK_VARIANT:
+            strName = "object";
+            break;
         default:
             break;
         }
@@ -572,6 +578,9 @@ struct CPrimeType : public CAstNodeBase
             break;
         case TOK_HSTREAM:
             strName = "HSTREAM";
+            break;
+        case TOK_VARIANT:
+            strName = "Variant";
             break;
         default:
             break;

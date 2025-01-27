@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unordered_set>
 
 // byte offset
 // 0                             64
@@ -198,8 +199,17 @@
 
 #define RFHANDLE    guint64
 #define FLAG_FLUSH_CHILD 0x01
-#define FLAG_FLUSH_DATAONLY 0x02
-#define FLAG_FLUSH_FREEIMG 0x04
+#define FLAG_FLUSH_DATA 0x02
+#define FLAG_FLUSH_INODE 0x04
+#define FLAG_FLUSH_FREEIMG 0x08
+#define FLAG_FLUSH_DEFAULT \
+    ( FLAG_FLUSH_DATA | FLAG_FLUSH_INODE )
+
+#define GID_ADMIN       80000
+#define GID_DEFAULT     80001
+
+#define MAX_FS_SIZE     \
+    ( ( BLOCKS_PER_GROUP * BLKGRP_NUMBER ) + SUPER_BLOCK_SIZE + GRPBMP_BLKNUM  )
 
 extern rpcf::ObjPtr g_pIoMgr;
 
@@ -385,7 +395,7 @@ class CBlockAllocator :
     public ISynchronize
 {
     mutable stdrmutex   m_oLock;
-    gint32              m_iFd;
+    gint32              m_iFd = -1;
 
     SblkUPtr            m_pSuperBlock;
     GrpBmpUPtr          m_pGroupBitmap;
@@ -474,6 +484,9 @@ class CBlockAllocator :
         std::vector< CONTBLKS >& vecBlocks,
         guint8* pBuf,
         bool bRead );
+
+    gint32 GetFd() const
+    { return m_iFd; }
 };
 
 #define VALUE_SIZE 95
@@ -585,10 +598,19 @@ struct CAccessContext
 {
     uid_t dwUid = INVALID_UID;
     gid_t dwGid = INVALID_GID;
-    bool IsInitialized() const
+    IntSetPtr m_pGids = nullptr;
+    inline bool IsInitialized() const
     {
-        return ( dwUid != INVALID_UID && 
-            dwGid != INVALID_GID );
+        return ( dwUid != INVALID_UID );
+    }
+    inline bool IsMemberOf( gint32 gid ) const
+    {
+        if( dwGid == gid )
+            return true;
+        if( !m_pGids.IsEmpty() &&
+            (*m_pGids)().find( gid ) != (*m_pGids)().end() )
+            return true;
+        return false;
     }
 };
 
@@ -726,7 +748,8 @@ struct CFileImage :
         guint32 dwParentInode,
         FImgSPtr pDir );
 
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
     gint32 Format() override;
     gint32 Reload() override;
 
@@ -915,7 +938,8 @@ struct CDirImage :
 
     gint32 Format() override;
     gint32 Reload() override;
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
 
     inline const ChildMap& GetChildMap() const
     { return m_mapChilds; }
@@ -1114,7 +1138,7 @@ struct CBPlusNode :
 
     const char* GetKey( gint32 idx ) const
     {
-        if( idx >= GetKeyCount() )
+        if( idx >= ( gint32 )GetKeyCount() )
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
@@ -1137,7 +1161,7 @@ struct CBPlusNode :
         gint32 idx, FImgSPtr& pFile ) const 
     {
         FImgSPtr pEmpty;
-        if( idx >= GetChildCount() )
+        if( idx >= ( gint32 )GetChildCount() )
             return -EINVAL;
 
         if( !IsLeaf() )
@@ -1219,7 +1243,8 @@ struct CBPlusNode :
 
     CBPlusNode* GetChild( gint32 idx ) const
     {
-        if( idx >= GetChildCount() || idx < 0 )
+        if( idx >= ( gint32 )GetChildCount() ||
+            idx < 0 )
             return nullptr;
         KEYPTR_SLOT* ps = 
             m_oBNodeStore.m_vecSlots[ idx ];
@@ -1292,15 +1317,19 @@ struct CBPlusNode :
     {
         if( IsRoot() )
         {
-            if( IsLeaf() && idx > MAX_KEYS_PER_NODE )
+            if( IsLeaf() && idx >
+                ( gint32 )MAX_KEYS_PER_NODE )
                 return nullptr;
-            if( !IsLeaf() && idx > MAX_PTRS_PER_NODE )
+            if( !IsLeaf() && idx >
+                ( gint32 )MAX_PTRS_PER_NODE )
                 return nullptr;
             return m_oBNodeStore.m_vecSlots[ idx ];
         }
-        if( IsLeaf() && idx > GetKeyCount() )
+        if( IsLeaf() &&
+            idx > ( gint32 )GetKeyCount() )
             return nullptr;
-        if( !IsLeaf() && idx > GetChildCount() )
+        if( !IsLeaf() &&
+            idx > ( gint32 )GetChildCount() )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -1309,14 +1338,18 @@ struct CBPlusNode :
     {
         if( IsRoot() )
         {
-            if( IsLeaf() && idx > MAX_KEYS_PER_NODE )
+            if( IsLeaf() && idx > 
+                ( gint32 )MAX_KEYS_PER_NODE )
                 return nullptr;
-            if( !IsLeaf() && idx > MAX_PTRS_PER_NODE )
+            if( !IsLeaf() && idx >
+                ( gint32 )MAX_PTRS_PER_NODE )
                 return nullptr;
             return m_oBNodeStore.m_vecSlots[ idx ];
         }
-        if( ( IsLeaf() && idx > GetKeyCount() ) ||
-            ( !IsLeaf() && idx > GetChildCount() ) )
+        if( ( IsLeaf() && idx >
+            ( gint32 )GetKeyCount() ) ||
+            ( !IsLeaf() && idx >
+            ( gint32 )GetChildCount() ) )
             return nullptr;
         return m_oBNodeStore.m_vecSlots[ idx ];
     }
@@ -1499,7 +1532,8 @@ struct COpenFileEntry :
     inline gint32 WriteValue( const Variant& oVar )
     { return m_pFileImage->WriteValue( oVar ); }
 
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
 
     gint32 Format() override
     { return 0; }
@@ -1705,7 +1739,9 @@ class CRegistryFs :
         const stdstr& szFrom, const stdstr& szTo,
         CAccessContext* pac = nullptr );
 
-    gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 Flush( guint32 dwFlags =
+        FLAG_FLUSH_DEFAULT ) override;
+
     gint32 Format() override;
     gint32 Reload() override;
 
@@ -1734,8 +1770,11 @@ class CRegistryFs :
         LONGWORD* pData ) override
     { return -ENOTSUP; }
 
-    gint32 GetSize(
-        RFHANDLE hFile, guint32 dwSize ) const;
+    gint32 GetSize( RFHANDLE hFile,
+        guint32 dwSize ) const;
+
+    gint32 GetFd() const
+    { return m_pAlloc->GetFd(); }
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

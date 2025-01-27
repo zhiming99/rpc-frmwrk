@@ -254,6 +254,7 @@ gint32 CheckNameDup(
 %token TOK_HSTREAM
 %token TOK_ARRAY
 %token TOK_MAP
+%token TOK_VARIANT
 
 // keywords
 %token TOK_INTERFACE
@@ -368,6 +369,7 @@ prime_type :
       | TOK_BOOL
       | TOK_BYTEARR
       | TOK_HSTREAM
+      | TOK_VARIANT
     ;
 prime_type : TOK_OBJPTR
     {

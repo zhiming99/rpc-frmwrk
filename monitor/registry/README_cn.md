@@ -35,4 +35,11 @@
   `regfsmnt abc.reg ./mountpont`
 
 #### 相关配置文件
-无
+```
+driver.json
+```
+
+#### 命令手册
+```
+regfsmnt(1)
+```

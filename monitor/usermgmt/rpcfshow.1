@@ -1,0 +1,68 @@
+.TH RPCFSHOW.SH 1 "January 2025" "1.0" "User Commands"
+.SH NAME
+rpcfshow.sh \- Show user or group information from the user registry
+
+.SH SYNOPSIS
+.B rpcfshow.sh
+[\-ugko]
+.I <name>
+
+.SH DESCRIPTION
+The
+.B rpcfshow.sh
+script shows information about users or groups from the user registry. The name of the user or group must be specified as an argument.
+
+.SH OPTIONS
+.TP
+.B \-u
+Show information about a user.
+.TP
+.B \-g
+Show information about a group.
+.TP
+.B \-k
+Show Kerberos user associations.
+.TP
+.B \-o
+Show OAuth2 user associations.
+
+.SH USAGE
+To show information, run the script with the appropriate option and name:
+
+.EX
+$ rpcfshow.sh -u username
+.EE
+
+.SH EXAMPLES
+.TP
+Show information about a user named "john":
+.EX
+$ rpcfshow.sh -u john
+.EE
+
+.TP
+Show information about a group named "developers":
+.EX
+$ rpcfshow.sh -g developers
+.EE
+
+.TP
+Show Kerberos user associations:
+.EX
+$ rpcfshow.sh -k
+.EE
+
+.TP
+Show OAuth2 user associations:
+.EX
+$ rpcfshow.sh -o
+.EE
+
+.SH REFERENCE
+https://github.com/zhiming99/rpc-frmwrk/tree/master/monitor/usermgmt
+
+.SH AUTHOR
+Written by zhiming <woodhead99@gmail.com>.
+
+.SH COPYRIGHT
+Copyright © 2025 zhiming. All rights reserved.

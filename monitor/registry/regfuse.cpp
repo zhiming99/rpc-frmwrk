@@ -54,6 +54,7 @@
 using namespace rpcf;
 #include "blkalloc.h"
 
+#define XATTR_NAME  "user.regfs"
 static RegFsPtr g_pRegfs;
 static int fill_dir_plus = 0;
 static std::string g_strMPoint;
@@ -63,6 +64,7 @@ static bool g_bFormat = false;
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
+static bool g_bLocal = false;
 
 
 static void Usage( const char* szName );
@@ -440,7 +442,7 @@ static int regfs_fsync(const char *path, int isdatasync,
             ret = -EBADF;
             break;
         }
-        guint32 dwFlags = FLAG_FLUSH_DATAONLY;
+        guint32 dwFlags = FLAG_FLUSH_DATA;
         CRegistryFs* pfs = g_pRegfs;
         READ_LOCK( pfs );
         FileSPtr pOpen;
@@ -498,22 +500,27 @@ static int regfs_setxattr(const char *path, const char *name, const char *value,
 {
     gint32 ret = 0;
     do{
-        if( strcmp( name, "user.regfs" ) )
+        if( strcmp( name, XATTR_NAME ) )
         {
             ret = -ENOTSUP;
             break;
         }
         if( size > VALUE_SIZE - 1 )
         {
-            ret = EINVAL;
+            ret = -EOVERFLOW;
             break;
         }
         stdstr strPath = path;
-        Variant oVar = value;
+        Variant oVar;
+        stdstr strAttr( value, size );
+        ret = oVar.DeserializeFromJson(
+            strAttr.c_str() );
+        if( ERROR( ret ) )
+            break;
         g_pRegfs->SetValue( strPath, oVar );
 
     }while( 0 );
-	return 0;
+	return ret;
 }
 
 static int regfs_getxattr(const char *path, const char *name, char *value,
@@ -521,14 +528,9 @@ static int regfs_getxattr(const char *path, const char *name, char *value,
 {
     gint32 ret = 0;
     do{
-        if( strcmp( name, "user.regfs" ) )
+        if( strcmp( name, XATTR_NAME ) )
         {
             ret = -ENOTSUP;
-            break;
-        }
-        if( size > VALUE_SIZE - 1 )
-        {
-            ret = EINVAL;
             break;
         }
         stdstr strPath = path;
@@ -536,22 +538,36 @@ static int regfs_getxattr(const char *path, const char *name, char *value,
         ret = g_pRegfs->GetValue( strPath, oVar );
         if( ERROR( ret ) )
             break;
-        if( oVar.GetTypeId() != typeString )
+
+        stdstr strAttr;
+        ret = oVar.SerializeToJson( strAttr );
+        if( ERROR( ret ) )
+            break;
+        if( size == 0 )
         {
-            ret = -ENODATA;
+            ret = strAttr.size();
             break;
         }
-        strncpy( value,
-            oVar.m_strVal.c_str(), size );
-
+        if( strAttr.size() < size )
+            strcpy( value, strAttr.c_str() );
+        else
+            strncpy( value,
+                strAttr.c_str(), size );
+        ret = std::min( strAttr.size(), size );
     }while( 0 );
-	return 0;
+	return ret;
 }
 
 static int regfs_listxattr(const char *path, char *list, size_t size)
 {
-    strcpy( list, "user.regfs" );
-	return 1;
+    size_t dwSize = strlen( XATTR_NAME );
+    if( size == 0 )
+        return dwSize + 1;
+    if( dwSize < size )
+        strcpy( list, XATTR_NAME );
+    else
+        strncpy( list, XATTR_NAME, size );
+	return dwSize + 1;
 }
 
 static int regfs_removexattr(const char *path, const char *name)
@@ -615,8 +631,10 @@ gint32 InitContext()
         CParamList oParams;
         oParams.Push( "regfsmnt" );
 
-        if( g_bLogging )
-            oParams[ propEnableLogging ] = true;
+        oParams[ propEnableLogging ] = g_bLogging;
+        oParams[ propSearchLocal ] = g_bLocal;
+        oParams[ propConfigPath ] =
+            "invalidpath/driver.json";
 
         // adjust the thread number if necessary
         oParams[ propMaxIrpThrd ] = 0;
@@ -630,6 +648,11 @@ gint32 InitContext()
 
         IService* pSvc = g_pIoMgr;
         ret = pSvc->Start();
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error start io manager" );
+        }
 
     }while( 0 );
 
@@ -737,7 +760,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "chgdiu" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "chgdiul" ) ) != -1 )
         {
             switch( opt )
             {
@@ -751,6 +774,8 @@ int main( int argc, char** argv)
                     { g_bFormat = true; break; }
                 case 'u':
                     { bDebug = true; break; }
+                case 'l':
+                    { g_bLocal = true; break; }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }

@@ -6,6 +6,7 @@
 - [快速构建rpc-frmwrk的方法](#快速构建rpc-frmwrk的方法)
   - [Docker容器](#docker容器)
   - [使用shell脚本](#使用shell脚本)
+  - [注意事项](#注意事项)
 
 
 # rpc-frmwrk配置工具
@@ -98,3 +99,6 @@
   * 下载如下三个文件 [buildall-deb.sh](./buildall-deb.sh), [buildall-fed.sh](./buildall-fed.sh), 和[makerpcf.sh](./makerpcf.sh)到同一个目录下.
   * 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。
   * 你还可以在命令行下载docker镜像 `docker pull zhiming99/rpc-frmwrk:server` 和 `docker pull zhiming99/rpc-frmwrk:client`。注意运行时把服务器端容器ip地址设为`172.17.0.2`,客户端容器ip地址设成`172.17.0.3`。两个镜像里面的`/root`目录下都有`readme.md`，提供简单的提示。这两个容器设置的是使用websoket，所以在容器里需要启动nginx。
+
+## 注意事项
+当你使用`rpcfg.py`更新完系统设置后，务必回到你的项目目录下，使用`make sync`命令更新本项目的设置。否则会出现连接失败或者其他奇怪的问题。

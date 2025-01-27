@@ -46,7 +46,7 @@ gint32 VarToJson( const Variant& oVar,
     case typeUInt64:
         {
             snprintf( buf, sizeof( buf ),
-                "%lld", oVar.m_qwVal );
+                "%lu", oVar.m_qwVal );
             oVal[ "v" ] = buf;
             break;
         }
@@ -530,7 +530,8 @@ gint32 CRegFsSvcLocal_SvrImpl::Flush(
 {
     if( m_pRegFs.IsEmpty() )
         return -EFAULT;
-    return m_pRegFs->Flush( FLAG_FLUSH_CHILD );
+    return m_pRegFs->Flush(
+        FLAG_FLUSH_CHILD | FLAG_FLUSH_DEFAULT );
 }
 
 /* Sync Req Handler*/

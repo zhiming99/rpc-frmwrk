@@ -57,16 +57,16 @@ typedef enum {
 enum EnumTypeId
 {
     typeNone = 0,
-    typeByte, 
+    typeByte,
     typeUInt16,
     typeUInt32,
     typeUInt64,
-    typeFloat,
+    typeFloat = 5,
     typeDouble,
     typeString,
     typeDMsg,
     typeObj,
-    typeByteArr,
+    typeByteArr = 10,
 };
 
 

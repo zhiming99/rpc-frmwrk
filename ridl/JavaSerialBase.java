@@ -379,6 +379,19 @@ abstract public class JavaSerialBase
         return ret;
     }
 
+    public int serialVariant( BufPtr buf, int[] offset, ISerializable val )
+    {
+        if( buf == null || offset == null )
+            return -RC.EINVAL;
+        if( val == null )
+            return -RC.EINVAL;
+
+        int ret = 0;
+        val.setInst( getInst() );
+        ret = val.serialize( buf, offset );
+        return ret;
+    }
+
     public int serialArray( BufPtr buf,
         int[] offset, Object val, String sig )
     {
@@ -794,18 +807,29 @@ abstract public class JavaSerialBase
         return pNewObj;
     }
 
+    public JVariant deserialVariant( ByteBuffer buf )
+    {
+        JVariant oVar = new JVariant();
+        oVar.setInst( getInst() );
+        oVar.deserialize( buf );
+        return oVar;
+    }
+
     public ISerializable deserialStruct( ByteBuffer buf )
     {
         if( buf == null )
             throw new IllegalArgumentException();
         int curPos = buf.position();
+        int iMagic = buf.getInt();
+        if( iMagic != 0x73747275 )
+            throw new IllegalArgumentException();
         int id = buf.getInt();
-        buf.position( curPos );
         ISerializable oStruct =
             StructFactory.create( id );
         if( oStruct == null )
             throw new NullPointerException();
 
+        buf.position( curPos );
         oStruct.setInst( getInst() );
         oStruct.deserialize( buf );
         return oStruct;
@@ -1209,6 +1233,9 @@ abstract public class JavaSerialBase
         m.put( 'O', new ISerialElem() {
             public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialStruct,    # TOK_STRUCT
             { return serialStruct( buf, offset, (ISerializable)elem ); } } );
+        m.put( 'v', new ISerialElem() {
+            public int serialize( BufPtr buf, int[] offset, Object elem ) // SerialStruct,    # TOK_STRUCT
+            { return serialVariant( buf, offset, (ISerializable)elem ); } } );
         return m;
     }
 
@@ -1281,6 +1308,11 @@ abstract public class JavaSerialBase
             public Object deserialize( ByteBuffer buf ) // DeserialStruct  # TOK_STRUCT,
             { return deserialStruct( buf ); } }; 
         m.put( 'O', ent );
+
+        ent = new IDeserialElem() {
+            public Object deserialize( ByteBuffer buf ) // DeserialStruct  # TOK_STRUCT,
+            { return deserialVariant( buf ); } }; 
+        m.put( 'v', ent );
 
         return m;
     }

@@ -11,7 +11,7 @@
 2. 观察广播事件的效果。
 
 ### 生成EventTest的C++项目框架
-本节课我们使用[evtest.ridl](../examples/evtest.ridl)来生成该项目框架。
+本节课我们使用[evtest.ridl](../examples/evtest.ridl)来生成该[项目框架](../examples/cpp/evtest/)。
 
 #### 首先，先看看该ridl里的内容和上节课的有什么差异：
   * 在接口IEventTest上定义了一个叫`OnHelloWorld`的方法，它的输入参数`strMsg`是一个字符串，strMsg将作为事件内容，从服务器发向客户端，`returns`关键字后面没有输出参数。

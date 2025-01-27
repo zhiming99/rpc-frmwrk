@@ -31,6 +31,7 @@
 #include <atomic>
 #include <algorithm>
 #include <set>
+#include <unordered_set>
 #include "clsids.h"
 #include "propids.h"
 #include "autoptr.h"
@@ -583,18 +584,19 @@ class CStlEventMap:
 
 typedef CAutoPtr< clsid( CStlEventMap ), CStlEventMap > EvtMapPtr;
 
-template< typename Val_ >
+#define stdset std::set
+template< typename Val_, typename SetType=stdset<Val_> >
 class CStlSet : public CObjBase
 {
     protected:
 
-    std::set< Val_ > m_setElems;
+    SetType m_setElems;
     stdrmutex m_oLock;
 
     public:
     typedef CObjBase super;
-    typedef typename std::set< Val_ >::iterator MyItr;
-    typedef typename std::set< Val_ > MySet;
+    typedef typename SetType::iterator MyItr;
+    typedef SetType MySet;
 
 
     CStlSet()
@@ -604,11 +606,11 @@ class CStlSet : public CObjBase
     { m_setElems.clear(); }
 
     // a functor to return the container
-    const std::set< Val_ >& operator()() const
-    { return ( std::set< Val_ >& )m_setElems; }
+    const SetType& operator()() const
+    { return ( SetType& )m_setElems; }
 
-    std::set< Val_ >& operator()()
-    { return ( std::set< Val_ >& )m_setElems; }
+    SetType& operator()()
+    { return ( SetType& )m_setElems; }
 
     gint32 Serialize(
         CBuffer& oBuf ) const
@@ -649,5 +651,19 @@ public:
 };
 
 typedef CAutoPtr< clsid( CStlStringSet ), CStlStringSet > StrSetPtr;
+
+using stlintset = CStlSet< gint32, std::unordered_set< gint32 > >;
+class CStlIntSet : public stlintset
+{
+public:
+    typedef gint32 ElemType;
+
+    CStlIntSet() : stlintset()
+    { SetClassId( clsid( CStlIntSet ) ); }
+
+    ~CStlIntSet()
+    {;}
+};
+typedef CAutoPtr< clsid( CStlIntSet ), CStlIntSet > IntSetPtr;
 
 }

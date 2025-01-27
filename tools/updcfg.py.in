@@ -90,6 +90,8 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                         elem['AuthInfo'].pop( "OA2ChkIp")
                     if 'OA2ChkPort' in elem['AuthInfo']:
                         elem['AuthInfo'].pop( "OA2ChkPort")
+                    if 'OA2SSL' in elem['AuthInfo']:
+                        elem['AuthInfo'].pop( "OA2SSL")
             else :
                 elem.pop( 'AuthInfo', None )
             bSSL = False
@@ -222,7 +224,7 @@ def ExtraUpdateBtinrt(
 
 
 def ExportTestCfgsTo( cfgList:list, destPath:str ):
-    testDescs = [ 'echodesc.json', 'btinrt.json' ]
+    testDescs = [ 'echodesc.json', 'btinrt.json', 'appmondesc.json' ]
     if IsFeatureEnabled( 'testcases' ):
         testDescs.extend(  [ "actcdesc.json",
             "asyndesc.json",
@@ -266,7 +268,7 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
     return ret
 
 def ExportTestCfgs( cfgList:list ):
-    testDescs = [ 'echodesc.json', 'btinrt.json' ]
+    testDescs = [ 'echodesc.json', 'btinrt.json', 'appmondesc.json' ]
     if IsFeatureEnabled( 'testcases' ):
         testDescs.extend(  [ "actcdesc.json",
             "asyndesc.json",
@@ -403,7 +405,7 @@ def LoadConfigFiles( path : str) :
     curDir = dir_path
     if path is None:
         if parent_dir == "rpcf" :
-            paths.append( "." )
+            #paths.append( "." )
             paths.append( curDir + "/../../etc/rpcf" )
             paths.append( "/etc/rpcf")
         else:
@@ -644,7 +646,10 @@ def Update_OA2Check( initCfg: dict, drvFile : list,
             else:
                 elem[ 'PortNumber' ] = '4132'
             elem[ 'ProxyPortClass' ] = 'DBusProxyPdo'
-            elem[ 'EnableSSL' ] = 'false'
+            if 'OA2SSL' in authInfo:
+                elem[ 'EnableSSL' ] = authInfo[ 'OA2SSL' ]
+            else:
+                elem[ 'EnableSSL' ] = 'false'
         else:
             elem[ 'ProxyPortClass' ] = 'DBusLocalPdo'
             elem.pop( 'IpAddress', None )
@@ -702,7 +707,15 @@ def Update_Rtauth( initCfg: dict, drvFile: list,
             objName = svrObj[ 'ObjectName']
             if objName == 'RpcRouterBridgeAuthImpl' :
                 if authInfo is not None :
-                    svrObj[ 'AuthInfo'] = authInfo
+                    ai2 = deepcopy( authInfo )
+                    if ai2[ 'AuthMech'] == 'OAuth2':
+                        if 'OA2ChkIp' in ai2:
+                            ai2.pop( "OA2ChkIp")
+                        if 'OA2ChkPort' in ai2:
+                            ai2.pop( "OA2ChkPort")
+                        if 'OA2SSL' in ai2:
+                            ai2.pop( "OA2SSL")
+                    svrObj[ 'AuthInfo'] = ai2
                 #else :
                 #    svrObj.pop( 'AuthInfo', None )
 

@@ -21,12 +21,14 @@
 * 详细的GDB的命令行帮助，可以在GDB的命令行下，使用`help`命令加上需要了解的命令名。如`help break`.
 
 ### rpc-frmwrk的GDB辅助工具
-* rpc-frmwrk有以下几个工具提供额外的调试信息   
+* rpc-frmwrk有以下几个工具提供额外的调试信息。   
 
 | 序号 | 命令 | 例子| 描述 | 
 | -------- | --------- | --------- |------------------|
-| 1 | 打印已创建的所有对象 | call DumpObjs(0) | DumpObjs是rpc-frmwrk内建的函数，可以打印当前所有未销毁的CObject对象和其子类，对于查找内存泄漏，检查对象状态很有用处。如果发现某些object超出预期的数量，则可断定存在内存泄漏|
-| 2 | 打印指定类名的对象| call DbgFindCN( "CIoManager" ) | 打印所有CIoManager的实例的地址|
+| 1 | 打印已创建的所有对象 | call DumpObjs(0) | DumpObjs是rpc-frmwrk内建的函数，可以打印当前所有未销毁的CObject对象和其子类，对于查找内存泄漏，检查对象状态很有用处。如果发现某些object超出预期的数量，则可断定存在内存泄漏。|
+| 2 | 打印指定类名的对象| call DbgFindCN( "CIoManager" ) | 打印所有CIoManager的实例的地址。|
+* 下图是`DumpObjs`的示例   
+  ![dumpobjs](../pics/dumpobjs.png)
 * rpc-frmwrk的线程命名有别于其他的系统线程. 标有MainLoop，CTaskThread, SockLoop, UxLoop的线程为rpc-frwmrk线程池里的线程。
   
  ```
@@ -37,7 +39,7 @@
  ```
 
 ### 使用Valgrind查找泄漏和崩溃点
-* 对于复杂程序的崩溃和泄漏，有时GDB也显得力不从心。此时也可以尝试使用valgrind来查找泄漏和崩溃点。valgrind对读写野指针，double-free等方面还是十分准确的。缺点就是很慢，对于并发的bug，改变时序有可能bug就不出现了。不过valgrind是在不能确定bug发生地点时很有力的工具。
+* 对于复杂程序的崩溃和泄漏，有时GDB也显得力不从心。此时也可以尝试使用valgrind来查找泄漏和崩溃点。valgrind对读写野指针，double-free等方面还是十分准确的。valgrind的缺点也很明显，即执行慢，对于并发性质的bug，改变时序易导致bug难以重现。总的来说，valgrind是在不易确定bug发生地点的情况下，有必要一试的调试工具。
 
 ### 使用dbus-monitor查看dbus通信
 * 当怀疑传输出现问题时，可以通过dbus-monitor查看通信状态和通信内容，定位问题发生的环节。一般会用到下面的几条命令:
@@ -52,7 +54,7 @@
 ### 代码审查是查找bug十分重要手段
 * 当用其他的工具查找bug时，代码审查也应该同时进行。虽然代码审查很慢，很费时间，但是困难的bug往往是在结合所有工具的调查结果和代码审查，最终被定位的。不应过分依赖某一种手段或者方法。
 
-### Python和Java的服务器和客户端也可以使用GDB进行调试。
+### Python和Java的服务器和客户端也可以使用GDB进行调试
 Python和Java的服务器和客户端，分别会调用rpc-frmwrk的运行库，因此通过`gdb python3`或者`gdb java`也可以进行底层逻辑的调试。
 
 [上一讲](./Tut-AsyncProgramming_cn-7.md)   

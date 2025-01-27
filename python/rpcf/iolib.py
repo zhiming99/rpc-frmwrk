@@ -76,7 +76,10 @@ def recvResp( respfp : object)->[int, list] :
         print( os.getpid(),
             "iolib.recvResp", err, ": ", respfp )
         if error == 0 :
-            error = -errno.EFAULT
+            if isinstance( err, OSError ):
+                error = err.errno
+            else:
+                error = -errno.EFAULT
         return [ error, None ]
     
 def sendReq( reqfp : object, reqObj : object ) -> int:

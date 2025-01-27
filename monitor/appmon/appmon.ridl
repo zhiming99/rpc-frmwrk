@@ -1,0 +1,64 @@
+appname "appmon";
+include "../registry/regfsif.ridl";
+
+struct KeyValue
+{
+    string strKey;
+    variant oValue;
+};
+
+interface IAppMonitor
+{
+    [async]RegisterListener(
+        HSTREAM hStream,
+        array<string> arrApps )
+    returns();
+
+    [async]RemoveListener(
+        HSTREAM hStream )
+    returns();
+
+    [async_s]ListApps()
+    returns( array<string> arrApps );
+
+    [async_s]ListPoints( string strAppPath)
+    returns( array<string> arrPoints );
+    
+    [async_s]ListAttributes( string strPtPath)
+    returns( array<string> arrAttributes );
+
+    [async_s]SetPointValue(
+        string strPtPath, variant value )
+    returns();
+
+    [async_s]GetPointValue( string strPtPath )
+    returns( variant rvalue );
+    
+    [async_s]SetAttrValue(
+        string strAttrPath, variant value )
+    returns();
+
+    [async_s]GetAttrValue( string strAttrPath )
+    returns( variant rvalue );
+
+    [async_s]SetPointValues(
+        array<KeyValue> arrValues ) 
+    returns();
+
+    [async_s]GetPointValues(
+        array< string > arrPtPaths )
+    returns( array< KeyValue > arrKeyVals );
+
+    [ event ]OnPointChanged(
+        string strPtPath, variant value ) 
+    returns();
+
+    [ event ]OnPointsChanged( array< KeyValue > arrKVs ) 
+    returns();
+};
+
+service AppMonitor
+{
+    interface IRegFsRemote;
+    interface IAppMonitor;
+};

@@ -63,6 +63,8 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf/updk5cfg.py
 %{_bindir}/rpcf/updwscfg.py
 %{_bindir}/rpcf/disablessl.py
+%{_bindir}/rpcf/updattr.py
+%{_bindir}/rpcf/*.sh
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@
 @WEBSOCK_RPMFILES@
@@ -73,6 +75,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcrouter
 %{_bindir}/rpcf_logger
 %{_bindir}/regfsmnt
+%{_bindir}/appmon*
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
@@ -81,6 +84,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/hwdesc.json
 %{_sysconfdir}/rpcf/echodesc.json
 %{_sysconfdir}/rpcf/logger*.json
+%{_sysconfdir}/rpcf/appmon*.json
 %{_sysconfdir}/rpcf/*.ridl
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*
@@ -92,6 +96,11 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
+%{_mandir}/man1/rpcfaddu.1
+%{_mandir}/man1/rpcfmodu.1
+%{_mandir}/man1/rpcfshow.1
+%{_mandir}/man1/updattr.1
+%{_mandir}/man1/regfsmnt.1
 
 %files devel
 %{_bindir}/ridlc

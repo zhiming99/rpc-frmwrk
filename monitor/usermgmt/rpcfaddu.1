@@ -1,0 +1,92 @@
+.TH RPCFADDU.SH 1 "January 2025" "1.0" "User Commands"
+.SH NAME
+rpcfaddu.sh \- Add a new user to the user registry
+
+.SH SYNOPSIS
+.B rpcfaddu.sh
+[\-hpf]
+[\-k
+.I <kerberos user>
+]
+[\-o
+.I <OAuth2 user>
+]
+[\-g
+.I <group>
+]
+.I <user name>
+
+.SH DESCRIPTION
+The
+.B rpcfaddu.sh
+script adds a new user to the user registry. The user name must be specified as an argument and must be a valid Linux user name.
+
+.SH OPTIONS
+.TP
+.B \-h
+Prints the help message and exits.
+.TP
+.B \-f
+Forces adding a user whether the user exists or not.
+.TP
+.B \-p
+Asks for a password.
+.TP
+.B \-k
+.I <kerberos user>
+Associates a Kerberos user name to the specified user name. When logging in via Kerberos, the Kerberos user is mapped to the specified user name for accessing the app monitor.
+.TP
+.B \-o
+.I <OAuth2 user>
+Associates an OAuth2 user name to the specified user name. When logging in via OAuth2, the OAuth2 user is mapped to the specified user name for accessing the app monitor.
+.TP
+.B \-g
+.I <group>
+Groups the user into the specified group. The group must be a valid group. If not specified, the user will be added to the 'default' group. The user can join other groups using the 'rpcfmodu' command.
+
+.SH USAGE
+To add a new user, run the script with the user name as an argument:
+
+.EX
+$ rpcfaddu.sh username
+.EE
+
+.SH EXAMPLES
+.TP
+Add a new user named "john" to the default group:
+.EX
+$ rpcfaddu.sh john
+.EE
+
+.TP
+Add a new user named "john" to the "developers" group:
+.EX
+$ rpcfaddu.sh -g developers john
+.EE
+
+.TP
+Add a new user named "john" with a Kerberos user association:
+.EX
+$ rpcfaddu.sh -k john_kerberos john
+.EE
+
+.TP
+Add a new user named "john" with an OAuth2 user association:
+.EX
+$ rpcfaddu.sh -o john_oauth2 john
+.EE
+
+.TP
+Display the help message:
+.EX
+$ rpcfaddu.sh -h
+.EE
+
+.SH REFERENCE
+https://github.com/zhiming99/rpc-frmwrk/tree/master/monitor/usermgmt
+
+.SH AUTHOR
+Written by zhiming.
+
+.SH COPYRIGHT
+Copyright © 2025 zhiming. All rights reserved.

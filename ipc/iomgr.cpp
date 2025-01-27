@@ -1951,6 +1951,14 @@ CIoManager::CIoManager(
                 dwMaxThrds );
         }
 
+        bool bSearchLocal;
+        ret = oCfg.GetBoolProp(
+            propSearchLocal, bSearchLocal );
+        if( ERROR( ret ) )
+            bSearchLocal = true;
+        this->SetCmdLineOpt(
+            propSearchLocal, bSearchLocal );
+
         CCfgOpener oDrvCfg;
         oDrvCfg.SetPointer( propIoMgr, this );
         ret = oDrvCfg.CopyProp(
@@ -2126,8 +2134,7 @@ gint32 CIoManager::TryLoadClassFactory(
 
 gint32 CIoManager::TryFindDescFile(
     const std::string& strFileName,
-    std::string& strPath,
-    bool bSkipLocal )
+    std::string& strPath )
 {
     gint32 ret = 0;
     do{
@@ -2137,7 +2144,12 @@ gint32 CIoManager::TryFindDescFile(
         std::string strFile =
             basename( strFileName.c_str() );
 
-        if( !bSkipLocal )
+        bool bSearchLocal = false;
+        ret = this->GetCmdLineOpt(
+            propSearchLocal, bSearchLocal );
+        if( ERROR( ret ) )
+            bSearchLocal = true;
+        if( bSearchLocal )
         {
             stdstr strLocal = "./" + strFile;
             ret = access( strLocal.c_str(), R_OK );

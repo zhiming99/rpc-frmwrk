@@ -322,6 +322,9 @@ class CCppWriter : public CWriterBase
 
 #define CCOUT ( ( std::ofstream& ) ( *m_pWriter->m_curFp ) )
 
+#define SERIAL_STRUCT_MAGICSTR  "( ( guint32 )0x73747275 )"
+#define SERIAL_STRUCT_MAGICSTR_PY  "( 0x73747275 )"
+
 class CHeaderPrologue
 {
     CCppWriter* m_pWriter = nullptr;

@@ -157,26 +157,25 @@ gint32 CFileImage::Reload()
         case typeByte:
             {
                 m_oValue =
-                    m_oInodeStore.m_arrBuf[ 0 ];
+                    pInode->m_arrBuf[ 0 ];
                 break;
             }
         case typeUInt16:
             {
                 m_oValue = ntohs( *( ( guint16* )
-                    m_oInodeStore.m_arrBuf ) );
+                    pInode->m_arrBuf ) );
                 break;
             }
         case typeUInt32:
             {
                 m_oValue = ntohl( *( ( guint32* )
-                    m_oInodeStore.m_arrBuf ) );
+                    pInode->m_arrBuf ) );
                 break;
             }
         case typeUInt64:
             {
                 guint64 qwVal;
-                memcpy( &qwVal,
-                    m_oInodeStore.m_arrBuf,
+                memcpy( &qwVal, pInode->m_arrBuf,
                     sizeof( qwVal ) );
                 m_oValue = ntohll( qwVal );
                 break;
@@ -184,15 +183,14 @@ gint32 CFileImage::Reload()
         case typeFloat:
             {
                 guint32 dwVal = ntohl( *( ( guint32* )
-                    m_oInodeStore.m_arrBuf ) );
+                    pInode->m_arrBuf ) );
                 m_oValue = *( ( float* )&dwVal );
                 break;
             }
         case typeDouble:
             {
                 guint64 qwVal;
-                memcpy( &qwVal,
-                    m_oInodeStore.m_arrBuf,
+                memcpy( &qwVal, pInode->m_arrBuf,
                     sizeof( qwVal ) );
                 qwVal = ntohll( qwVal );
                 m_oValue = *( ( double* )&qwVal );
@@ -206,8 +204,7 @@ gint32 CFileImage::Reload()
                     ( char* )pInode->m_arrBuf,
                     VALUE_SIZE - 1 );
 
-                memcpy( szBuf,
-                    m_oInodeStore.m_arrBuf,
+                memcpy( szBuf, pInode->m_arrBuf,
                     len );
 
                 szBuf[ len ] = 0;
@@ -340,11 +337,18 @@ gint32 CFileImage::Flush( guint32 dwFlags )
     do{
         DECL_ARRAY( arrBytes, BLOCK_SIZE );
         memset( arrBytes, 0, BLOCK_SIZE );
-        bool bMeta = true;
-        if( ( dwFlags & FLAG_FLUSH_DATAONLY ) )
-            bMeta = false;
+        bool bInode, bData;
+        if( ( dwFlags & FLAG_FLUSH_INODE ) )
+            bInode = true;
+        else
+            bInode = false;
 
-        if( bMeta )
+        if( dwFlags & FLAG_FLUSH_DATA )
+            bData = true;
+        else
+            bData = false;
+
+        if( bInode )
         {
             auto pInode = ( RegFSInode* ) arrBytes; 
             // file size in bytes
@@ -415,7 +419,7 @@ gint32 CFileImage::Flush( guint32 dwFlags )
                 {
                     auto p =
                         ( guint32* )pInode->m_arrBuf;
-                    *p = htons( m_oValue.m_dwVal );
+                    *p = htonl( m_oValue.m_dwVal );
                     break;
                 }
             case typeUInt64:
@@ -444,6 +448,9 @@ gint32 CFileImage::Flush( guint32 dwFlags )
             if( ERROR( ret ) )
                 break;
         }
+
+        if( !bData )
+            break;
 
         if( GetSize() == 0 )
             break;
@@ -1501,6 +1508,9 @@ gint32 CFileImage::WriteValue(
         WRITE_LOCK( this );
         m_oValue = oVar;
         UpdateCtime();
+        ret = this->Flush( FLAG_FLUSH_INODE );
+        if( ERROR( ret ) )
+            break;
     }while( 0 );
     return ret;
 }
@@ -1512,6 +1522,9 @@ void CFileImage::SetGid( gid_t wGid )
         WRITE_LOCK( this );
         m_oInodeStore.m_wgid = ( guint16 )wGid;
         UpdateCtime();
+        ret = this->Flush( FLAG_FLUSH_INODE );
+        if( ERROR( ret ) )
+            break;
     }while( 0 );
 }
 
@@ -1522,6 +1535,9 @@ void CFileImage::SetUid( uid_t wUid )
         WRITE_LOCK( this );
         m_oInodeStore.m_wuid = ( guint16 )wUid;
         UpdateCtime();
+        ret = this->Flush( FLAG_FLUSH_INODE );
+        if( ERROR( ret ) )
+            break;
     }while( 0 );
 }
 
@@ -1533,6 +1549,9 @@ void CFileImage::SetMode( mode_t dwMode )
         m_oInodeStore.m_dwMode =
             ( guint32 )dwMode;
         UpdateCtime();
+        ret = this->Flush( FLAG_FLUSH_INODE );
+        if( ERROR( ret ) )
+            break;
     }while( 0 );
     return;
 }
@@ -1563,6 +1582,9 @@ void CFileImage::SetTimes(
             else
                 s.m_mtime = ot;
         }
+        ret = this->Flush( FLAG_FLUSH_INODE );
+        if( ERROR( ret ) )
+            break;
     }while( 0 );
     return;
 }
@@ -1639,7 +1661,10 @@ gint32 CFileImage::CheckAccess(
         }
         else
         {
-            dwCurGid = pac->dwGid;
+            if( pac->IsMemberOf( dwGid ) )
+                dwCurGid = dwGid;
+            else
+                dwCurGid = GID_DEFAULT;
             dwCurUid = pac->dwUid;
         }
 

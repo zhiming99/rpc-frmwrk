@@ -3,6 +3,7 @@
 import sys
 from rpcf import iolib
 from rpcf import serijson
+from rpcf.serijson import Variant
 import errno
 from rpcf.proxy import ErrorCode as Err
 from typing import Union, Tuple, Optional

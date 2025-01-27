@@ -27,6 +27,131 @@ from rpcf.rpcbase import *
 import struct
 import errno
 from rpcf.proxy import *
+
+class Variant :
+    mapType2Sig = {
+        cpp.typeUInt64 : 'Q',   # TOK_UINT64,
+        cpp.typeUInt32 : 'D',   # TOK_UINT32,
+        cpp.typeUInt16 : 'W',   # TOK_UINT16,
+        cpp.typeFloat :  'f',    # TOK_FLOAT,
+        cpp.typeDouble:  'F',    # TOK_DOUBLE,
+        cpp.typeByte :   'b',     # TOK_BYTE,
+        cpp.typeString:  's',    # TOK_STRING,
+        cpp.typeByteArr: 'a',   # TOK_BYTEARR,
+        cpp.typeObj:     'O',       # TOK_STRUCT,
+    }
+
+    def __init__( self, osb : Union[ "CSerialBase", None ] = None ) :
+        self.iType = cpp.typeNone
+        self.val = None
+        self.osb = osb
+
+    def Serialize( self, buf : bytearray )->int :
+        if self.osb is None:
+            return -errno.EFAULT
+        osb = self.osb
+        iType = self.iType
+        if iType in self.mapType2Sig:
+            osb.SerialInt8( buf, iType )
+            sig = self.mapType2Sig[ iType ]
+            return osb.SerialElem( buf, self.val, sig )
+        elif iType == cpp.typeNone:
+            osb.SerialInt8( buf, iType )
+            return 0
+        return -errno.ENOTSUP
+
+    def Deserialize( self, buf, offset )->Tuple[ int, int ]:
+        if self.osb is None:
+            return ( None, offset ) 
+        osb = self.osb
+        ret = osb.DeserialInt8( buf, offset )
+        iType = ret[ 0 ]
+        newOff = ret[ 1 ]
+        if iType != cpp.typeObj:
+            if iType in self.mapType2Sig:
+                sig = self.mapType2Sig[ iType ]
+                val = osb.DeserialElem( buf, newOff, sig )
+            elif iType ==  cpp.typeNone:
+                self.iType = iType
+                return ( 0, newOff )
+            else:
+                return ( None, offset )
+        elif iType == cpp.typeObj:
+            ret = osb.DeserialInt32( buf, newOff );
+            if ret[ 0 ] == 0x73747275:
+                val = osb.DeserialStruct( buf, newOff )
+                if val[ 0 ] is None:
+                    return ( None, offset )
+            else:
+                val = osb.DeserialObjPtr( buf, newOff )
+                if val[ 0 ] is None:
+                    return ( None, offset )
+        self.iType = iType
+        self.val = val[ 0 ]
+        return ( 0, val[ 1 ] )
+
+    def SetBool( self, val ):
+        self.iType = cpp.typeByte
+        if val is True:
+            self.val = 1
+        else:
+            self.val = 0
+
+    def SetByte( self, val ):
+        self.iType = cpp.typeByte
+        self.val = val
+
+    def SetUInt16( self, val ):
+        self.iType = cpp.typeUInt16
+        self.val = val
+
+    def SetInt16( self, val ):
+        self.SetUInt16( val )
+
+    def SetUInt32( self, val ):
+        self.iType = cpp.typeUInt32
+        self.val = val
+
+    def SetInt32( self, val ):
+        self.SetUInt32( val )
+
+    def SetUInt64( self, val ):
+        self.iType = cpp.typeUInt64
+        self.val = val
+
+    def SetInt64( self, val ):
+        self.SetUInt64( val )
+
+    def SetFloat( self, val ):
+        self.iType = cpp.typeFloat
+        self.val = val
+
+    def SetDouble( self, val ):
+        self.iType = cpp.typeDouble
+        self.val = val
+
+    def SetStruct( self, val ):
+        self.iType = cpp.typeObj
+        self.val = val
+
+    def SetObjPtr( self, val ):
+        self.iType = cpp.typeObj
+        self.val = val
+
+    def SetByteArray( self, val ):
+        self.iType = cpp.typeByteArr
+        self.val = val
+
+    def SetString( self, val ):
+        self.iType = cpp.typeString
+        self.val = val
+
+    def GetType( self ):
+        return self.iType
+
+    def GetVal( self ):
+        return self.val
+
 class CSerialBase :
 
     def __init__( self, pIf : PyRpcServices = None ) :
@@ -88,7 +213,15 @@ class CSerialBase :
 
     def SerialStruct( self, buf: bytearray, val : object ) -> int:
         try:
-            val.pIf = self.pIf
+            val.osb = self
+            return val.Serialize( buf )
+        except :
+            return -errno.EFAULT
+
+    def SerialVariant( self, buf: bytearray, val : Variant ) -> int:
+        try:
+            if val.osb is None:
+                val.osb = self
             return val.Serialize( buf )
         except :
             return -errno.EFAULT
@@ -163,8 +296,10 @@ class CSerialBase :
         if sig[ 0 ] == '[' :
             return self.SerialMap( buf, val, sig )
 
-        self.SerialElemOpt[ sig[ 0 ] ]( self, buf, val )
-        return 0
+        ret = self.SerialElemOpt[ sig[ 0 ] ]( self, buf, val )
+        if ret is None:
+            return 0
+        return ret
 
     def DeserialInt64( self, buf : bytearray, offset : int ) -> Tuple[ int, int ] :
         val = struct.unpack_from( "!Q", buf, offset )
@@ -232,13 +367,20 @@ class CSerialBase :
         return ( listRet[ 1 ], listRet[ 2 ] ) 
 
     def DeserialStruct( self, buf : bytearray, offset : int ) -> Tuple[ object, int ] :
-        ret = struct.unpack_from( "!I", buf, offset )
+        ret = self.DeserialInt32( buf, offset + 4 )
         structId = ret[ 0 ]
         structInst = CStructFactoryBase.Create( structId, self.pIf )
         ret = structInst.Deserialize( buf, offset )
         if ret[ 0 ] < 0 :
             return ( None, 0 )
         return ( structInst, ret[ 1 ] )
+
+    def DeserialVariant( self, buf : bytearray, offset : int ) -> Tuple[ Variant, int ]:
+        var = Variant( self )
+        ret = var.Deserialize( buf, offset )
+        if ret[ 0 ] < 0:
+            return ( None, 0 )
+        return ( var, ret[ 1 ] )
 
     def DeserialArray( self, buf : bytearray, offset : int, sig : str )-> Tuple[list, int ]:
         sigLen = len( sig )
@@ -325,7 +467,8 @@ class CSerialBase :
         's' : SerialString,    # TOK_STRING,
         'a' : SerialBuf,    # TOK_BYTEARR,
         'o' : SerialObjPtr,    # TOK_OBJPTR,
-        'O' : SerialStruct  # TOK_STRUCT,
+        'O' : SerialStruct,  # TOK_STRUCT,
+        'v' : SerialVariant # TOK_VARIANT
     }
 
     DeserialElemOpt = {
@@ -343,7 +486,8 @@ class CSerialBase :
         's' : DeserialString,    # TOK_STRING,
         'a' : DeserialBuf,    # TOK_BYTEARR,
         'o' : DeserialObjPtr,    # TOK_OBJPTR,
-        'O' : DeserialStruct  # TOK_STRUCT,
+        'O' : DeserialStruct,  # TOK_STRUCT,
+        'v' : DeserialVariant # TOK_VARIANT
     }
 
 g_mapStructs = dict()

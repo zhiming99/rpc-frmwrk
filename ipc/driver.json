@@ -548,6 +548,21 @@
             "ClassFactories" : [ "./libregfs.so" ],
             "DriversToLoad" : [ "DBusBusDriver" ],
             "ModName" : "regfsmnt"
+        },
+        {
+            "ClassFactories" : [ "./libregfs.so" ],
+            "DriversToLoad" : [
+                "DBusBusDriver",
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv" ],
+            "ModName" : "appmonsvr"
+        },
+        {
+            "DriversToLoad" : [
+                "DBusBusDriver",
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv" ],
+            "ModName" : "appmoncli"
         }
     ],
     "Match": [

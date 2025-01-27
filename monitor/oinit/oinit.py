@@ -24,9 +24,6 @@ from datetime import datetime
 import signal
 bExit = False
 authUrl = None
-clientId = None
-redirectUrl = None
-scope = None
 cEncrypt = ""
 bRemove = False
 bFirefox = False
@@ -64,22 +61,13 @@ def LoadParam( oReg: CRegFsSvcLocalProxy, strPath: str) ->list:
         bytesRead = ret[1][0]
         o = json.loads(bytesRead)
         global authUrl
-        global clientId
-        global redirectUrl
-        global scope
         if 'AuthUrl' in o:
             authUrl = o['AuthUrl']
-        if 'ClientId' in o:
-            clientId = o['ClientId']
-        if 'RedirectUrl' in o:
-            redirectUrl = o['RedirectUrl']
-        if 'Scope' in o:
-            scope = o['Scope']
-        if authUrl is None or clientId is None or redirectUrl is None or scope is None:
-            return [None] * 4
-        return [authUrl, clientId, redirectUrl, scope]
+        if authUrl is None :
+            return [None] 
+        return [authUrl]
     except Exception as err:
-        return [None] * 4
+        return [None]
     finally:
         if hFile is not None:
             oReg.CloseFile( hFile )
@@ -105,13 +93,11 @@ def GetOA2ParamsFromDesc( fileName : str )->list:
                 continue
             if not "AuthUrl" in oAuth:
                 continue
-            if not "Scope" in oAuth:
-                continue
-            return [oAuth["AuthUrl"], oAuth["ClientId"], oAuth["RedirectUrl"], oAuth[ "Scope"]]
+            return [oAuth["AuthUrl"]]
         raise Exception( "Error OAuth2 parameters not found")
     except Exception as err:
         print( err )
-        return [None] * 4
+        return [None]
     finally:
         if file is not None:
             file.close()
@@ -157,8 +143,9 @@ def GetOA2ParamsFromReg( oReg : CRegFsSvcLocalProxy )->list:
             else:
                 prefix = "clr "
             idx+=1
-            print( prefix + " {time} {idx}: [AuthUrl]={authUrl},[ClientId]={clientId},[RedirectUrl]={redirectUrl}, [Scope]={scope}".format(
-                  time=str(mtime), idx=idx, authUrl=quad[0], clientId=quad[1],redirectUrl=[quad[2]], scope=[quad[3]]) )
+            print( prefix + " {time} {idx}: [AuthUrl]={authUrl}".format(
+                  time=str(mtime), idx=idx,
+                  authUrl=quad[0] ) )
 
         if len( oFileList ) == 0:
             raise Exception("no login info in storage")
@@ -176,40 +163,32 @@ def GetOA2ParamsFromReg( oReg : CRegFsSvcLocalProxy )->list:
 
     except Exception as err:
         print( err )
-        return [None] * 4
+        return [None]
     finally:
         if hDir is not None:
             oReg.CloseDir(hDir)
 
 def OAuth2Login( oRegistry : CRegFsSvcLocalProxy ) -> int:
     global authUrl
-    global clientId
-    global redirectUrl
-    global scope
     global cEncrypt
     global bFirefox
     try:
-        if authUrl is None or clientId is None or redirectUrl is None or scope is None:
-            authUrl, clientId, redirectUrl, scope  = \
+        if authUrl is None:
+            authUrl, = \
                 GetOA2ParamsFromReg( oRegistry )
             if authUrl is None:
                 return -errno.ENODATA
 
-        ret = fetch_rpcf_code( bFirefox,
-            authUrl, clientId, redirectUrl, scope )
+        ret = fetch_rpcf_code( bFirefox, authUrl )
         if ERROR( ret ) :
             return ret[0]
         oCookie = ret[1]
         h = hl.sha1()
-        h.update(
-            (authUrl + clientId + redirectUrl + scope ).encode() )
+        h.update( ( authUrl ).encode() )
         fileName = cEncrypt + h.hexdigest().upper()
         oData = dict()
         oData['oCookie'] = oCookie
         oData['AuthUrl'] = authUrl
-        oData['ClientId'] = clientId
-        oData['RedirectUrl'] = redirectUrl
-        oData['Scope'] = scope
         return SaveCookie( oRegistry, oData, fileName )
     except Exception as err:
         print( err )
@@ -388,8 +367,9 @@ def RemoveFromReg( oReg : CRegFsSvcLocalProxy )->list:
             else:
                 prefix = "clr "
             idx+=1
-            print( prefix + " {time} {idx}: [AuthUrl]={authUrl},[ClientId]={clientId},[RedirectUrl]={redirectUrl}, [Scope]={scope}".format(
-                  time=str(mtime), idx=idx, authUrl=quad[0], clientId=quad[1],redirectUrl=[quad[2]], scope=[quad[3]]) )
+            print( prefix + " {time} {idx}: [AuthUrl]={authUrl}".format(
+                  time=str(mtime), idx=idx,
+                  authUrl=quad[0] ) )
 
         if len( oFileList ) == 0:
             raise Exception("Info no login info in storage")
@@ -415,15 +395,14 @@ def RemoveFromReg( oReg : CRegFsSvcLocalProxy )->list:
 
 import getopt
 def usage():
-    print( "Usage: python3 oinit.py [options] [<auth url> <client id> <redirect url> <scope>]" )
+    print( "Usage: python3 oinit.py [options] [<auth url>]" )
     print( "\t To perform an OAuth2 authorization code login to an rpc-frmwrk server for rpc-frmwrk non-js clients." )
     print( "\t -d <description file>. To find the login information from the given desc file")
     print( "\t -c 1 Using the example container 'django_oa2check_https' for OAuth2 login")
     print( "\t -c 2 Using the example container 'springboot_oa2check_https' for OAuth2 login")
     print( "\t -e to encrypt the login cookie in the storage")
     print( "\t -r to remove from a list of stored login information.")
-    print(" \t If " +
-         "'authorize url', 'client id', 'redirect url' and 'scope' are specified, " +
+    print(" \t If 'authorize url'is specified, " +
          "oinit.py will use the four to perform the OAuth2 login" )
     print( "\t If neither options nor parameters are given, oinit will try to use the stored login info " + \
           "in the registry to perform the OAuth2 login.")
@@ -439,9 +418,6 @@ def maincli( oProxy: CRegFsSvcLocalProxy ):
         return -errno.EINVAL
 
     global authUrl
-    global clientId
-    global redirectUrl
-    global scope
     global cEncrypt
     global bRemove
     global bFirefox
@@ -449,17 +425,10 @@ def maincli( oProxy: CRegFsSvcLocalProxy ):
     bHasOptions = False
     for o, a in opts:
         if o == "-d" :
-            authUrl, clientId, redirectUrl, scope = \
+            authUrl, = \
                 GetOA2ParamsFromDesc( a )
         elif o == "-c" :
-            clientId = "IpCMFeunGnjKb0FhSMxnI4MWH8tEycSTpIlQkFP3"
-            authUrl ="https://172.17.0.3/o/authorize/"
-            if int( a ) == 1:
-                redirectUrl = "https://172.17.0.2/oa2check/callback/"
-                scope = "read+write"
-            elif int( a ) == 2:
-                redirectUrl = "https://172.17.0.2/login/oauth2/code/oa2check"
-                scope = "profile+email"
+            authUrl ="https://172.17.0.2"
         elif o == "-e":
             cEncrypt = "z"
         elif o == "-f":
@@ -477,11 +446,8 @@ def maincli( oProxy: CRegFsSvcLocalProxy ):
 
     argc = len( args )
 
-    if not bHasOptions and argc == 4:
+    if not bHasOptions and argc == 1:
         authUrl = args[0]
-        clientId = args[1]
-        redirectUrl = args[2]
-        scope = args[3]
     elif bHasOptions and argc > 0:
         print( "Error, found unexpected parameters")
         usage()
