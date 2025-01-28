@@ -1,4 +1,8 @@
 ---
+[`Tue Jan 28 2025 04:58:34 PM Beijing`]   
+1. Finished the PR for `user management tools`.
+2. Next we will implement the major function of `appmon`, that is, to monitor the `rpc-frmwrk` applications state at runtime.
+
 [`Sun Dec 22 2024 11:05:47 PM Beijing`]    
 1. Encountered login issues about `OAuth2`, we need to address it first.
 
