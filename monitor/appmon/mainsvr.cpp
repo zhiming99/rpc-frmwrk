@@ -44,8 +44,8 @@
 using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
-#include "AppMonitorsvr.h"
 #include "blkalloc.h"
+#include "AppMonitorsvr.h"
 
 #define USER_REGISTRY   "usereg.dat"
 #define APP_REGISTRY    "appreg.dat"
@@ -169,7 +169,8 @@ gint32 RunSvcObj()
 {
     gint32 ret = 0;
     do{
-        std::string strDesc = "./appmondesc.json";
+        std::string strDesc =
+            "invalidpath/appmondesc.json";
         
         CRpcServices* pSvc = nullptr;
         InterfPtr pIf;

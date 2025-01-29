@@ -6,11 +6,11 @@
 using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
+#include "blkalloc.h"
 #include "appmon.h"
 #include "AppMonitorsvr.h"
 #include <fcntl.h>
 #include <sys/file.h>
-#include "blkalloc.h"
 
 extern RegFsPtr g_pAppRegfs;
 extern RegFsPtr g_pUserRegfs;
@@ -34,6 +34,81 @@ CFlockHelper::~CFlockHelper()
     flock( m_iFd, LOCK_UN );
 }
 
+gint32 CAppMonitor_SvrImpl::GetLoginInfo(
+    IConfigDb* pCtx, CfgPtr& pInfo ) const
+{
+    gint32 ret = 0;
+    do{
+        IEventSink* pTask;
+        CCfgOpener oCfg( pCtx );
+        ret = oCfg.GetPointer(
+            propEventSink, pTask );
+        if( ERROR( ret ) )
+            break;
+        Variant oVar;
+        ret = pTask->GetProperty(
+            propLoginInfo, oVar );
+        if( ERROR( ret ) )
+            break;
+        pInfo = ( ObjPtr& )oVar;
+        if( pInfo.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAppMonitor_SvrImpl::GetUid(
+    IConfigDb* pInfo, guint32& dwUid ) const
+{
+    Variant oVar;
+    gint32 ret = pInfo->GetProperty(
+        propUid, oVar );
+    if( ERROR( ret ) )
+        return ret;
+    dwUid = ( guint32& )oVar; 
+    return STATUS_SUCCESS;
+}
+
+gint32 CAppMonitor_SvrImpl::GetAccessContext(
+    IConfigDb* pReqCtx,
+    CAccessContext& oac ) const
+{
+    gint32 ret = 0;
+    do{
+        CfgPtr pInfo;
+        ret = GetLoginInfo( pReqCtx, pInfo );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwUid = 0;
+        ret = GetUid( pInfo, dwUid );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( this->GetLock() );
+        auto itr = m_mapUid2Gids.find( dwUid );
+        if( itr == m_mapUid2Gids.end() )
+        {
+            ret = -EACCES;
+            break;
+        }
+        oac.dwUid = dwUid;
+        oac.pGids = itr->second;
+
+    }while( 0 );
+    return ret;
+}
+
+#define GETAC( _pContext ) \
+        CAccessContext oac; \
+        ret = GetAccessContext( ( _pContext ), oac ); \
+        if( ret == -EACCES ) \
+            break; \
+        if( ret != -ENOENT && ERROR( ret ) ) \
+            break
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::CreateFile( 
     IConfigDb* pContext, 
@@ -42,10 +117,13 @@ gint32 CAppMonitor_SvrImpl::CreateFile(
     guint32 dwFlags /*[ In ]*/, 
     guint64& hFile /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'CreateFileComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->CreateFile( strPath,
+            dwMode, dwFlags, hFile, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::MakeDir( 
@@ -53,10 +131,13 @@ gint32 CAppMonitor_SvrImpl::MakeDir(
     const std::string& strPath /*[ In ]*/,
     guint32 dwMode /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'MakeDirComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->MakeDir(
+            strPath, dwMode, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::OpenFile( 
@@ -65,31 +146,36 @@ gint32 CAppMonitor_SvrImpl::OpenFile(
     guint32 dwFlags /*[ In ]*/, 
     guint64& hFile /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'OpenFileComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->OpenFile(
+            strPath, dwFlags, hFile, &oac );
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::CloseFile( 
     IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'CloseFileComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    return m_pAppRegfs->CloseFile( hFile );
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::RemoveFile( 
     IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'RemoveFileComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->RemoveFile(
+            strPath, &oac );
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ReadFile( 
     IConfigDb* pContext, 
@@ -98,10 +184,20 @@ gint32 CAppMonitor_SvrImpl::ReadFile(
     guint32 dwOff /*[ In ]*/, 
     BufPtr& buffer /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ReadFileComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    if( dwSize == 0 ||
+        dwSize > MAX_BYTES_PER_TRANSFER )
+        return -EINVAL;
+
+    if( buffer.IsEmpty() )
+        buffer.NewObj();
+
+    gint32 ret = buffer->Resize( dwSize );
+    if( ERROR( ret ) )
+        return ret;
+
+    return m_pAppRegfs->ReadFile(
+        hFile, buffer->ptr(),
+        dwSize, dwOff );
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::WriteFile( 
@@ -111,10 +207,11 @@ gint32 CAppMonitor_SvrImpl::WriteFile(
     guint32 dwOff /*[ In ]*/, 
     guint32& dwSizeWrite /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'WriteFileComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    dwSizeWrite = buffer->size();
+    return m_pAppRegfs->WriteFile(
+        hFile, buffer->ptr(),
+        dwSizeWrite, dwOff );
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::Truncate( 
@@ -122,30 +219,29 @@ gint32 CAppMonitor_SvrImpl::Truncate(
     guint64 hFile /*[ In ]*/,
     guint32 dwOff /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'TruncateComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    return m_pAppRegfs->Truncate(
+        hFile, dwOff );
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::CloseDir( 
     IConfigDb* pContext, 
     guint64 hFile /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'CloseDirComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    return m_pAppRegfs->CloseFile( hFile );
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::RemoveDir( 
     IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'RemoveDirComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->RemoveDir(
+            strPath, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetGid( 
@@ -153,10 +249,13 @@ gint32 CAppMonitor_SvrImpl::SetGid(
     const std::string& strPath /*[ In ]*/,
     guint32 wGid /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetGidComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->SetGid(
+            strPath, wGid, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetUid( 
@@ -164,10 +263,13 @@ gint32 CAppMonitor_SvrImpl::SetUid(
     const std::string& strPath /*[ In ]*/,
     guint32 wUid /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetUidComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->SetGid(
+            strPath, wUid, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetGid( 
@@ -175,10 +277,13 @@ gint32 CAppMonitor_SvrImpl::GetGid(
     const std::string& strPath /*[ In ]*/, 
     guint32& gid /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetGidComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->GetGid(
+            strPath, gid, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetUid( 
@@ -186,10 +291,13 @@ gint32 CAppMonitor_SvrImpl::GetUid(
     const std::string& strPath /*[ In ]*/, 
     guint32& uid /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetUidComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->GetGid(
+            strPath, uid, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SymLink( 
@@ -197,43 +305,95 @@ gint32 CAppMonitor_SvrImpl::SymLink(
     const std::string& strSrcPath /*[ In ]*/,
     const std::string& strDestPath /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SymLinkComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->SymLink(
+            strSrcPath, strDestPath, &oac );
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetValue( 
+gint32 CAppMonitor_SvrImpl::GetValue2( 
     IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/, 
     std::string& strJson /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = GetValue(
+            pContext, strPath, oVar );
+        if( ERROR( ret ) )
+            break;
+        ret = oVar.SerializeToJson( strJson );
+        if( ERROR( ret ) )
+            break;
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetValue( 
+gint32 CAppMonitor_SvrImpl::SetValue2( 
     IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     const std::string& strJson /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = oVar.DeserializeFromJson( strJson );
+        if( ERROR( ret ) )
+            break;
+        ret = this->SetValue(
+            pContext, strPath, oVar );
+    }while( 0 );
+    return ret;
 }
+
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetValue( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/, 
+    Variant& rvar /*[ Out ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->GetValue(
+            strPath, rvar, &oac );
+    }while( 0 );
+    return ret;
+}
+
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SetValue( 
+    IConfigDb* pContext, 
+    const std::string& strPath /*[ In ]*/,
+    const Variant& var /*[ In ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->SetValue(
+            strPath, var, &oac );
+    }while( 0 );
+    return ret;
+}
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::Chmod( 
     IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwMode /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ChmodComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->Chmod(
+            strPath, dwMode, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::Chown( 
@@ -242,10 +402,13 @@ gint32 CAppMonitor_SvrImpl::Chown(
     guint32 dwUid /*[ In ]*/,
     guint32 dwGid /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ChownComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->Chown(
+            strPath, dwUid, dwGid, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ReadLink( 
@@ -253,10 +416,30 @@ gint32 CAppMonitor_SvrImpl::ReadLink(
     const std::string& strPath /*[ In ]*/, 
     BufPtr& buf /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ReadLinkComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        if( buf.IsEmpty() )
+            buf.NewObj();
+        struct stat stbuf;
+        ret = m_pAppRegfs->GetAttr(
+            strPath, stbuf );
+        if( ERROR( ret ) )
+            break;
+        if( stbuf.st_size == 0 ||
+            stbuf.st_size >= MAX_FILE_SIZE )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        guint32 dwSize = stbuf.st_size;
+        ret = buf->Resize( dwSize );
+        if( ERROR( ret ) )
+            break;
+        ret = m_pAppRegfs->ReadLink(
+            strPath, buf->ptr(), dwSize, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::Rename( 
@@ -264,31 +447,36 @@ gint32 CAppMonitor_SvrImpl::Rename(
     const std::string& szFrom /*[ In ]*/,
     const std::string& szTo /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'RenameComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->Rename(
+            szFrom, szTo, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::Flush( 
     IConfigDb* pContext, 
     guint32 dwFlags /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'FlushComplete'
-    // when the service is done
+    //return m_pAppRegfs->Flush( dwFlags );
     return ERROR_NOT_IMPL;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::Access( 
     IConfigDb* pContext, 
     const std::string& strPath /*[ In ]*/,
     guint32 dwFlags /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'AccessComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->Access(
+            strPath, dwFlags, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetAttr( 
@@ -296,10 +484,45 @@ gint32 CAppMonitor_SvrImpl::GetAttr(
     const std::string& strPath /*[ In ]*/, 
     FileStat& oStat /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetAttrComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        struct stat stbuf;
+        ret = m_pAppRegfs->GetAttr(
+            strPath, stbuf , &oac );
+        if( ERROR( ret ) )
+            break;
+
+        oStat.st_dev = stbuf.st_dev;
+        oStat.st_ino = stbuf.st_ino;
+        oStat.st_mode = stbuf.st_mode;
+        oStat.st_nlink = stbuf.st_nlink;
+        oStat.st_uid = stbuf.st_uid;
+        oStat.st_gid = stbuf.st_gid;
+        oStat.st_rdev = stbuf.st_rdev;
+        oStat.st_size = stbuf.st_size;
+        oStat.st_blksize = stbuf.st_blksize;
+        oStat.st_blocks = stbuf.st_blocks;
+
+        oStat.st_atim.tv_sec =
+            stbuf.st_atim.tv_sec;
+        oStat.st_atim.tv_nsec =
+            stbuf.st_atim.tv_nsec;
+
+        oStat.st_mtim.tv_sec =
+            stbuf.st_mtim.tv_sec;
+        oStat.st_mtim.tv_nsec =
+            stbuf.st_mtim.tv_nsec;
+
+        oStat.st_ctim.tv_sec =
+            stbuf.st_ctim.tv_sec;
+        oStat.st_ctim.tv_nsec =
+            stbuf.st_ctim.tv_nsec;
+
+        oStat.st_name =
+            basename( strPath.c_str() );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ReadDir( 
@@ -307,10 +530,29 @@ gint32 CAppMonitor_SvrImpl::ReadDir(
     guint64 hDir /*[ In ]*/, 
     std::vector<FileStat>& vecDirEnt /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ReadDirComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = m_pAppRegfs->ReadDir(
+            hDir, vecks );
+        if( ERROR( ret ) )
+            break;
+        for( auto& ks : vecks )
+        {
+            FileStat oStat;
+            oStat.st_name = ks.szKey;
+            oStat.st_ino = ks.oLeaf.dwInodeIdx;
+            guint32 dwMode = 0;
+            if( ks.oLeaf.byFileType == ftDirectory )
+                dwMode |= S_IFDIR;
+            else if( ks.oLeaf.byFileType == ftRegular )
+                dwMode |= S_IFREG;
+            else if( ks.oLeaf.byFileType == ftLink )
+                dwMode |= S_IFLNK;
+            vecDirEnt.push_back( oStat );
+        }
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::OpenDir( 
@@ -319,10 +561,13 @@ gint32 CAppMonitor_SvrImpl::OpenDir(
     guint32 dwFlags /*[ In ]*/, 
     guint64& hDir /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'OpenDirComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        ret = m_pAppRegfs->OpenDir(
+            strPath, dwFlags, hDir, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ExecBat( 
@@ -334,6 +579,7 @@ gint32 CAppMonitor_SvrImpl::ExecBat(
     // when the service is done
     return ERROR_NOT_IMPL;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::RegisterListener( 
     IConfigDb* pContext, 

@@ -525,7 +525,9 @@ gint32 CRegistryFs::ReadFile( RFHANDLE hFile,
             break;
         ret = dwSize;
     }while( 0 );
-    return 0;
+    if( ERROR( ret ) )
+        return ret;
+    return STATUS_SUCCESS;
 }
 
 gint32 CRegistryFs::WriteFile( RFHANDLE hFile,
@@ -550,7 +552,9 @@ gint32 CRegistryFs::WriteFile( RFHANDLE hFile,
         ret = pFile->WriteFile(
             dwSize, ( guint8* )pBuf, dwOff );
     }while( 0 );
-    return 0;
+    if( ERROR( ret ) )
+        return ret;
+    return STATUS_SUCCESS;
 }
 
 gint32 CRegistryFs::Truncate(
@@ -806,7 +810,8 @@ gint32 CRegistryFs::GetValue(
 }
 
 gint32 CRegistryFs::SetValue(
-   const stdstr& strPath, Variant& oVar,
+   const stdstr& strPath,
+   const Variant& oVar,
    CAccessContext* pac )
 {
     gint32 ret = 0;

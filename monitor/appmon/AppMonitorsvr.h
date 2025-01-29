@@ -16,6 +16,10 @@ struct CFlockHelper
     ~CFlockHelper();
 };
 
+
+#include "blkalloc.h"
+extern RegFsPtr g_pAppRegfs;
+
 DECLARE_AGGREGATED_SERVER(
     CAppMonitor_SvrBase,
     CStatCounters_SvrBase,
@@ -31,10 +35,18 @@ class CAppMonitor_SvrImpl
     using UID2GIDS = std::hashmap< guint32, IntSetPtr >;
     UID2GIDS m_mapUid2Gids;
 
+    gint32 GetLoginInfo(
+        IConfigDb* pCtx, CfgPtr& pInfo ) const;
+
+    gint32 GetUid( IConfigDb* pInfo,
+        guint32& dwUid ) const;
+
+    RegFsPtr m_pAppRegfs;
     public:
     typedef CAppMonitor_SvrBase super;
     CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :
-        super::virtbase( pCfg ), super( pCfg )
+        super::virtbase( pCfg ), super( pCfg ),
+        m_pAppRegfs( g_pAppRegfs )
     { SetClassId( clsid(CAppMonitor_SvrImpl ) ); }
 
     /* The following 3 methods are important for */
@@ -285,6 +297,35 @@ class CAppMonitor_SvrImpl
         const std::string& strSrcPath /*[ In ]*/,
         const std::string& strDestPath /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
+    gint32 OnGetValue2Canceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetValue2' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetValue2(
+        IConfigDb* pReqCtx_,
+        const std::string& strPath /*[ In ]*/,
+        std::string& strJson /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnSetValue2Canceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPath /*[ In ]*/,
+        const std::string& strJson /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'SetValue2' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 SetValue2(
+        IConfigDb* pReqCtx_,
+        const std::string& strPath /*[ In ]*/,
+        const std::string& strJson /*[ In ]*/ ) override;
+    //RPC Async Req Cancel Handler
     gint32 OnGetValueCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         const std::string& strPath /*[ In ]*/ ) override
@@ -297,12 +338,12 @@ class CAppMonitor_SvrImpl
     gint32 GetValue(
         IConfigDb* pReqCtx_,
         const std::string& strPath /*[ In ]*/,
-        std::string& strJson /*[ Out ]*/ ) override;
+        Variant& rvar /*[ Out ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnSetValueCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         const std::string& strPath /*[ In ]*/,
-        const std::string& strJson /*[ In ]*/ ) override
+        const Variant& var /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
             "request 'SetValue' is canceled." );
@@ -312,7 +353,7 @@ class CAppMonitor_SvrImpl
     gint32 SetValue(
         IConfigDb* pReqCtx_,
         const std::string& strPath /*[ In ]*/,
-        const std::string& strJson /*[ In ]*/ ) override;
+        const Variant& var /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnChmodCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
@@ -623,6 +664,9 @@ class CAppMonitor_SvrImpl
         IEventSink* pCallback ) override;
     gint32 LoadUserGrpsMap();
     bool IsUserValid( guint32 dwUid ) const;
+    gint32 GetAccessContext(
+        IConfigDb* pReqCtx,
+        CAccessContext& oac ) const;
 };
 
 class CAppMonitor_ChannelSvr

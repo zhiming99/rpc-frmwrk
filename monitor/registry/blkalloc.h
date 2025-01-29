@@ -598,7 +598,7 @@ struct CAccessContext
 {
     uid_t dwUid = INVALID_UID;
     gid_t dwGid = INVALID_GID;
-    IntSetPtr m_pGids = nullptr;
+    IntSetPtr pGids = nullptr;
     inline bool IsInitialized() const
     {
         return ( dwUid != INVALID_UID );
@@ -607,8 +607,8 @@ struct CAccessContext
     {
         if( dwGid == gid )
             return true;
-        if( !m_pGids.IsEmpty() &&
-            (*m_pGids)().find( gid ) != (*m_pGids)().end() )
+        if( !pGids.IsEmpty() &&
+            (*pGids)().find( gid ) != (*pGids)().end() )
             return true;
         return false;
     }
@@ -1717,8 +1717,8 @@ class CRegistryFs :
         const stdstr&, Variant& oVar,
         CAccessContext* pac = nullptr );
 
-    gint32 SetValue(
-        const stdstr&, Variant& oVar,
+    gint32 SetValue( const stdstr&,
+        const Variant& oVar,
         CAccessContext* pac = nullptr );
 
     gint32 Chmod(
