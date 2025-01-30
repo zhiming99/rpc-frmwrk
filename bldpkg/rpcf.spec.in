@@ -96,11 +96,11 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
-%{_mandir}/man1/rpcfaddu.1
-%{_mandir}/man1/rpcfmodu.1
-%{_mandir}/man1/rpcfshow.1
-%{_mandir}/man1/updattr.1
-%{_mandir}/man1/regfsmnt.1
+%{_mandir}/man1/rpcfaddu.1.gz
+%{_mandir}/man1/rpcfmodu.1.gz
+%{_mandir}/man1/rpcfshow.1.gz
+%{_mandir}/man1/updattr.1.gz
+%{_mandir}/man1/regfsmnt.1.gz
 
 %files devel
 %{_bindir}/ridlc
@@ -113,6 +113,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/synccfg.py
 %{_sysconfdir}/rpcf/JavaSerialBase.java
 %{_sysconfdir}/rpcf/JavaSerialImpl.java
+%{_sysconfdir}/rpcf/JVariant.java
 @JS_RPMFILES@
 %{_libdir}/pkgconfig/rpcf.pc
 %{_bindir}/rpcf/btinrtcli

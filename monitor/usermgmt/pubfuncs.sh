@@ -20,7 +20,7 @@ function check_user_mount()
 # rootdir is the mount point of the usereg.dat
     mp=`mount | grep regfsmnt`
     if [ "x$mp" == "x" ];then
-        appmp=`mount | grep appmnt`
+        appmp=`mount | grep appmonsvr`
     fi
     mt=0
     if [ "x$mp" == "x" ] && [ "x$appmp" == "x" ]; then
@@ -52,6 +52,7 @@ function check_user_mount()
         echo mounted usereg.dat...
     elif (( $mt == 1 ));then
         rootdir=`echo $appmp | awk '{print $3}'`
+        echo find mount at $rootdir...
         if [ ! -d "$rootdir/usereg/users" ]; then
             echo "Error cannot find the mount point of user registry"
             exit 1
@@ -59,6 +60,7 @@ function check_user_mount()
         rootdir="$rootdir/usereg"
     elif (( $mt == 0 ));then
         rootdir=`echo $mp | awk '{print $3}'`
+        echo find mount at $rootdir...
         if [ ! -d "$rootdir/users" ]; then
             echo "Error cannot find the mount point of user registry"
             exit 1
@@ -628,7 +630,9 @@ function set_password()
         echo you can change the password later with rpcfmodu
         return 1
     fi
-    passhash=`echo -n $password | sha1sum | awk '{print $1}'`
+    salt=`tr -dc A-Za-z0-9 </dev/urandom | head -c 13; echo`
+    firsthash=`echo -n $password$salt | sha256sum | awk '{print $1}'`
+    passhash=`echo -n $firsthash-$salt`
     python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $_udir/passwd > /dev/null 
     passhash=
 }

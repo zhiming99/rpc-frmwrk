@@ -744,7 +744,7 @@ static int monfs_setxattr(const char *path, const char *name, const char *value,
         }
         if( size > VALUE_SIZE - 1 )
         {
-            ret = EINVAL;
+            ret = -EOVERFLOW;
             break;
         }
         GETFS( path );
@@ -753,7 +753,12 @@ static int monfs_setxattr(const char *path, const char *name, const char *value,
             ret = -ENOTSUP;
             break;
         }
-        Variant oVar = value;
+        Variant oVar;
+        stdstr strAttr( value, size );
+        ret = oVar.DeserializeFromJson(
+            strAttr.c_str() );
+        if( ERROR( ret ) )
+            break;
         pfs->SetValue( strPath, oVar );
 
     }while( 0 );
@@ -771,11 +776,6 @@ static int monfs_getxattr(
             ret = -ENOTSUP;
             break;
         }
-        if( size > VALUE_SIZE - 1 )
-        {
-            ret = EINVAL;
-            break;
-        }
         GETFS( path );
         if( ifs == 0 )
         {
@@ -786,13 +786,18 @@ static int monfs_getxattr(
         ret = pfs->GetValue( strPath, oVar );
         if( ERROR( ret ) )
             break;
-        if( oVar.GetTypeId() != typeString )
+
+        stdstr strAttr;
+        ret = oVar.SerializeToJson( strAttr );
+        if( ERROR( ret ) )
+            break;
+        if( size == 0 )
         {
-            ret = -ENODATA;
+            ret = strAttr.size();
             break;
         }
-        strncpy( value,
-            oVar.m_strVal.c_str(), size );
+        ret = std::min( strAttr.size(), size );
+        strncpy( value, strAttr.c_str(), ret );
 
     }while( 0 );
 	return ret;
@@ -800,8 +805,12 @@ static int monfs_getxattr(
 
 static int monfs_listxattr(const char *path, char *list, size_t size)
 {
-    strcpy( list, "user.regfs" );
-	return 1;
+    constexpr auto dwSize = sizeof( "user.regfs" );
+    if( size == 0 )
+        return dwSize;
+    size = std::min( size, dwSize );
+    strncpy( list, "user.regfs", size );
+	return size;
 }
 
 static int monfs_opendir(

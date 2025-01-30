@@ -38,7 +38,7 @@ CLoopPool::CLoopPool( const IConfigDb* pCfg )
 
     m_dwTag = oParams[ 0 ];
     m_dwMaxLoops = oParams[ 1 ];
-    m_strPrefix = (stdstr&)oParams[ 2 ];
+    m_strPrefix = (const stdstr&)oParams[ 2 ];
 
     oParams.GetIntProp( 3, m_dwLowMark );
     oParams.GetBoolProp( 4, m_bAutoClean );
