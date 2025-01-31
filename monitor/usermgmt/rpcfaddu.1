@@ -6,10 +6,10 @@ rpcfaddu.sh \- Add a new user to the user registry
 .B rpcfaddu.sh
 [\-hpf]
 [\-k
-.I <kerberos user>
+.I <krb5 principal>
 ]
 [\-o
-.I <OAuth2 user>
+.I <OAuth2 user name>
 ]
 [\-g
 .I <group>
@@ -33,12 +33,12 @@ Forces adding a user whether the user exists or not.
 Asks for a password.
 .TP
 .B \-k
-.I <kerberos user>
-Associates a Kerberos user name to the specified user name. When logging in via Kerberos, the Kerberos user is mapped to the specified user name for accessing the app monitor.
+.I <krb5 principal>
+Associates a Kerberos principal to the specified user name. When logging in via Kerberos, the Kerberos principal is mapped to the specified user name for accessing the app monitor. You can associate more than 1 krb5 principal to a single <user name>.
 .TP
 .B \-o
-.I <OAuth2 user>
-Associates an OAuth2 user name to the specified user name. When logging in via OAuth2, the OAuth2 user is mapped to the specified user name for accessing the app monitor.
+.I <OAuth2 user name>
+Associates an OAuth2 user name to the specified user name. When logging in via OAuth2, the OAuth2 user is mapped to the specified user name for accessing the app monitor. You can associate more than 1 'OAuth2 user name' to a single <user name>.
 .TP
 .B \-g
 .I <group>
@@ -65,13 +65,13 @@ $ rpcfaddu.sh -g developers john
 .EE
 
 .TP
-Add a new user named "john" with a Kerberos user association:
+Add a new user named "john" with a krb5 principal:
 .EX
-$ rpcfaddu.sh -k john_kerberos john
+$ rpcfaddu.sh -k 'john@rpcf.org' john
 .EE
 
 .TP
-Add a new user named "john" with an OAuth2 user association:
+Add a new user named "john" with an OAuth2 user name:
 .EX
 $ rpcfaddu.sh -o john_oauth2 john
 .EE
