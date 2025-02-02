@@ -1762,6 +1762,7 @@ class CRegistryFs :
 
     gint32 GetParentDir(
         const stdstr& strPath, FImgSPtr& pDir,
+        stdstr* pstrNormPath = nullptr,
         CAccessContext* pac = nullptr );
 
     gint32 OnEvent( EnumEventId iEvent,

@@ -53,7 +53,7 @@ gint32 CAppMonitor_SvrImpl::GetLoginInfo(
         pInfo = ( ObjPtr& )oVar;
         if( pInfo.IsEmpty() )
         {
-            ret = -EFAULT;
+            ret = -ENOENT;
             break;
         }
     }while( 0 );

@@ -57,8 +57,25 @@ interface IAppMonitor
     returns();
 };
 
+interface IUserManager
+{
+    [async_s]GetUidByOAuth2Name( string strOA2Name )
+    returns( int32 dwUid );
+    [async_s]GetUidByKrb5Name( string strKrb5Name )
+    returns( int32 dwUid );
+    [async_s]GetUidByUserName( string strUserName )
+    returns( int32 dwUid );
+    [async_s]GetPasswordSalt( int32 dwUid )
+    returns( string strSalt );
+};
+
 service AppMonitor
 {
     interface IRegFsRemote;
     interface IAppMonitor;
+};
+
+service SimpleAuth
+{
+    interface IUserManager;
 };

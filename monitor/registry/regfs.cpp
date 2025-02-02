@@ -215,11 +215,86 @@ gint32 CRegistryFs::Namei(
 {
     gint32 ret = 0;
     do{
-        ret = CRegistry::Namei(
-            strPath, vecNames );
+        gint32 ret = 0;
+
+        if( strPath.empty() ||
+            strPath.size() > REG_MAX_PATH )
+        {
+            return -EINVAL;
+        }
+
+        bool bBack = false;
+        stdstr strTemp = strPath;
+        while( strTemp.size() )
+        {
+            size_t pos = strTemp.rfind( '/' );
+            if( pos == stdstr::npos )
+            {
+                if( strTemp == ".." )
+                {
+                    // not allowed 
+                    ret = -EINVAL;
+                    break;
+                }
+                vecNames.push_back( strTemp );
+                break;
+            }
+
+            if( pos > 0 && ( pos + 1 == strTemp.size() ) )
+            {
+                // remove repeated '/'
+                strTemp.erase( pos );
+                continue;
+            }
+            else if( pos == 0 && ( 1 == strTemp.size() ) )
+            {
+                // the last root '/'
+                vecNames.push_back( strTemp );
+                break;
+            }
+
+            stdstr strName = strTemp.substr( pos + 1 );
+            if( strName != "." )
+                vecNames.push_back( strName );
+
+            if( !bBack && strName == ".." )
+                bBack = true;
+
+            if( pos > 0 )
+                strTemp.erase( pos );
+            else
+            {
+                // keep the root directory
+                strTemp.erase( pos + 1 );
+            }
+        }
 
         if( ERROR( ret ) )
             break;
+
+        if( vecNames.size() > 1 )
+            reverse( vecNames.begin(), vecNames.end() );
+
+        auto itr = vecNames.begin();
+        while( bBack && itr != vecNames.end() )
+        {
+            if( ( *itr ).size() != 2 ||
+                ( *itr ) != ".." )
+            {
+                itr++;
+                continue;
+            }
+            if( itr - vecNames.begin() <= 1 )
+            {
+                itr = vecNames.erase( itr );
+                continue;
+            }
+            itr = vecNames.erase( itr - 1, itr );
+        }
+
+        if( ERROR( ret ) )
+            break;
+
         for( auto& elem : vecNames )
         {
             if( !VALIDATE_NAME( elem ) )
@@ -238,6 +313,7 @@ gint32 CRegistryFs::Namei(
 
 gint32 CRegistryFs::GetParentDir(
     const stdstr& strPath, FImgSPtr& pDir,
+    stdstr* pstrNormPath,
     CAccessContext* pac )
 {
     gint32 ret = 0;
@@ -259,26 +335,10 @@ gint32 CRegistryFs::GetParentDir(
         std::vector< FImgSPtr > vecDirs;
         vecDirs.push_back( m_pRootImg );
         FImgSPtr curDir = m_pRootImg;
-        for( ; idx < vecNames.size() - 1; idx++ )
+        guint32 dwCount = vecNames.size() - 1;
+        for( ; idx < dwCount; idx++ )
         {
             stdstr& strCurDir = vecNames[ idx ];
-            if( strCurDir == "." )
-                continue;
-            if( strCurDir == ".." )
-            {
-                if( vecDirs.empty() )
-                {
-                    ret = -ENOTDIR;
-                    DebugPrint( ret, "Error, "
-                        "invalid path '%s'",
-                        strPath.c_str() );
-                    break;
-                }
-                curDir = vecDirs.back();
-                pCurDir = curDir;
-                vecDirs.pop_back();
-                continue;
-            }
             if( pac != nullptr )
             {
                 READ_LOCK( pCurDir );
@@ -301,7 +361,17 @@ gint32 CRegistryFs::GetParentDir(
             pCurDir = pFile;
             curDir = pFile;
         }
-
+        if( pstrNormPath )
+        {
+            stdstr& strRet = *pstrNormPath;
+            strRet = vecNames[ 0 ];
+            for( int i = 1; i < vecNames.size(); i++ )
+            {
+                strRet += vecNames[ i ];
+                if( i < vecNames.size() - 1 )
+                    strRet.push_back( '/' );
+            }
+        }
         vecDirs.clear();
         if( ERROR( ret ) )
             break;
@@ -320,13 +390,14 @@ gint32 CRegistryFs::CreateFile(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
         CDirImage* pDir = dirPtr;
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
         FImgSPtr pFile;
         ret = pDir->CreateFile(
             strFile.c_str(), dwMode, pFile );
@@ -377,13 +448,14 @@ gint32 CRegistryFs::OpenFile(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -444,11 +516,14 @@ gint32 CRegistryFs::CloseFileNoLock(
         ret = 0;
         const stdstr& strPath = pFile->GetPath();
         FImgSPtr dirPtr;
+        stdstr strNormPath;
         FImgSPtr pImg = pFile->GetImage();
         CDirImage* pDir = pImg->GetParentDir();
         if( pDir == nullptr )
         {
-            ret = GetParentDir( strPath, dirPtr );
+            // don't use normalized path deliberately.
+            ret = GetParentDir(
+                strPath, dirPtr );
             if( ERROR( ret ) )
                 break;
             pDir = dirPtr;
@@ -481,13 +556,14 @@ gint32 CRegistryFs::RemoveFile(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         ret = pDir->RemoveFile(
@@ -586,13 +662,14 @@ gint32 CRegistryFs::RemoveDir(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strDir =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -628,13 +705,19 @@ gint32 CRegistryFs::SetGid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
+        if( strNormPath == "/" )
+        {
+            m_pRootImg->SetGid( wGid );
+            break;
+        }
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -669,13 +752,19 @@ gint32 CRegistryFs::SetUid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
+        if( strNormPath == "/" )
+        {
+            m_pRootImg->SetUid( wUid );
+            break;
+        }
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -706,17 +795,23 @@ gint32 CRegistryFs::GetGid(
         READ_LOCK( this );
         if( strPath == "/" )
         {
-            gid = m_pRootImg->GetUid();
+            gid = m_pRootImg->GetGid();
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
+        if( strNormPath == "/" )
+        {
+            gid = m_pRootImg->GetGid();
+            break;
+        }
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -749,13 +844,19 @@ gint32 CRegistryFs::GetUid(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
+        if( strNormPath == "/" )
+        {
+            uid = m_pRootImg->GetUid();
+            break;
+        }
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -783,13 +884,14 @@ gint32 CRegistryFs::GetValue(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -818,13 +920,14 @@ gint32 CRegistryFs::SetValue(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -853,13 +956,14 @@ gint32 CRegistryFs::SymLink(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strLinkPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strLinkPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strLinkPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -899,13 +1003,14 @@ gint32 CRegistryFs::ReadLink(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strLink, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strLink,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strLink.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -944,13 +1049,14 @@ gint32 CRegistryFs::MakeDir(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -983,13 +1089,14 @@ gint32 CRegistryFs::Chmod(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -1023,13 +1130,14 @@ gint32 CRegistryFs::Chown(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -1062,19 +1170,15 @@ gint32 CRegistryFs::Rename(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strFrom, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strFrom,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
-
         std::string strFile =
-            basename( strFrom.c_str() );
+            basename( strNormPath.c_str() );
         stdstr strDirName = 
-            GetDirName( strFrom );
-        stdstr strDstDirName = 
-            GetDirName( strTo );
-        stdstr strDstFile = 
-            basename( strTo.c_str() );
+            GetDirName( strNormPath );
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
         ret = pDir->Search(
@@ -1091,18 +1195,23 @@ gint32 CRegistryFs::Rename(
             if( ERROR( ret ) )
                 break;
         }
-        if( strDstDirName == strDirName )
-        {
-            ret = pDir->Rename(
-            strFile.c_str(), strDstFile.c_str() );
-            break;
-        }
 
         FImgSPtr dstDirPtr;
-        ret = GetParentDir(
-            strTo, dstDirPtr, pac );
+        stdstr strNormPath1;
+        ret = GetParentDir( strTo,
+            dstDirPtr, &strNormPath1, pac );
         if( ERROR( ret ) )
             break;
+        stdstr strDstDirName = 
+            GetDirName( strNormPath1 );
+        stdstr strDstFile = 
+            basename( strNormPath1.c_str() );
+        if( strDstDirName == strDirName )
+        {
+            ret = pDir->Rename( strFile.c_str(),
+                strDstFile.c_str() );
+            break;
+        }
 
         CDirImage* pDstDir = dstDirPtr;
         if( pac )
@@ -1163,6 +1272,7 @@ gint32 CRegistryFs::Access(
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
+        stdstr strNormPath;
         if( strPath == "/" )
         {
             if( dwFlags == F_OK )
@@ -1172,13 +1282,13 @@ gint32 CRegistryFs::Access(
                 dwFlags, pac );
             break;
         }
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;
@@ -1219,12 +1329,14 @@ gint32 CRegistryFs::OpenDir(
         else
         {
             FImgSPtr dirPtr;
-            ret = GetParentDir(
-                strPath, dirPtr, pac );
+            stdstr strNormPath;
+            ret = GetParentDir( strPath,
+                dirPtr, &strNormPath, pac );
             if( ERROR( ret ) )
                 break;
 
-            strFile = basename( strPath.c_str() );
+            strFile = basename(
+                strNormPath.c_str() );
 
             CDirImage* pDir = dirPtr;
             ret = pDir->Search(
@@ -1305,13 +1417,14 @@ gint32 CRegistryFs::GetAttr(
             break;
         }
         FImgSPtr dirPtr;
-        ret = GetParentDir(
-            strPath, dirPtr, pac );
+        stdstr strNormPath;
+        ret = GetParentDir( strPath,
+            dirPtr, &strNormPath, pac );
         if( ERROR( ret ) )
             break;
 
         std::string strFile =
-            basename( strPath.c_str() );
+            basename( strNormPath.c_str() );
 
         CDirImage* pDir = dirPtr;
         FImgSPtr pFile;

@@ -13,6 +13,7 @@ usr/bin/rpcf/*.py
 @OPENSSL_DEBFILES@
 @TEST_DEBFILES@
 etc/rpcf/rtauth.json
+etc/rpcf/blist.json
 etc/rpcf/router.json
 etc/rpcf/authprxy.json
 etc/rpcf/driver.json

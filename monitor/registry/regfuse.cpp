@@ -838,7 +838,8 @@ int main( int argc, char** argv)
             {
                 ret = -EINVAL;
                 OutputMsg( ret,
-                    "Error mount path unaccessable" );
+                    "Error mount point '%s' unaccessable",
+                    g_strMPoint.c_str() );
                 Usage( argv[ 0 ] );
                 ret = -errno;
                 break;
@@ -850,8 +851,8 @@ int main( int argc, char** argv)
             {
                 ret = -EINVAL;
                 OutputMsg( ret,
-                    "Error mount point is not a "
-                    "directory" );
+                    "Error mount point '%s' is not a "
+                    "directory", g_strMPoint.c_str() );
                 Usage( argv[ 0 ] );
                 ret = -errno;
                 break;

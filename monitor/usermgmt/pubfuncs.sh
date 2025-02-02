@@ -38,7 +38,7 @@ function check_user_mount()
     fi
     if (( $mt == 2 ));then
         rootdir="$base/mprpcfaddu"
-        if [ -d $rootdir ]; then
+        if [ ! -d $rootdir ]; then
             mkdir -p $rootdir
         fi
         if ! regfsmnt -d $base/usereg.dat $rootdir; then

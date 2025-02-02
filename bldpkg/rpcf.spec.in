@@ -10,7 +10,7 @@ Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
 BuildRequires:  gcc, g++, python3, flex, bison, libtool, shtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @KRB5_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ @JS_RPMLIBS@ cppunit-devel
 
-Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect
+Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect attr
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -85,6 +85,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_sysconfdir}/rpcf/echodesc.json
 %{_sysconfdir}/rpcf/logger*.json
 %{_sysconfdir}/rpcf/appmon*.json
+%{_sysconfdir}/rpcf/blist.json
 %{_sysconfdir}/rpcf/*.ridl
 @TEST_RPMFILES@
 %{_libdir}/libcombase.so*

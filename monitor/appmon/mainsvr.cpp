@@ -46,6 +46,7 @@ using namespace rpcf;
 #include "fastrpc.h"
 #include "blkalloc.h"
 #include "AppMonitorsvr.h"
+#include "SimpleAuthsvr.h"
 
 #define USER_REGISTRY   "usereg.dat"
 #define APP_REGISTRY    "appreg.dat"
@@ -65,7 +66,7 @@ static bool g_bFormat = false;
 static bool g_bLocal = false;
 static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
-static InterfPtr g_pSvcIf;
+static std::vector< InterfPtr > g_vecIfs;
 
 void SignalHandler( int signum )
 {
@@ -87,6 +88,9 @@ FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CAppMonitor_SvrImpl );
     INIT_MAP_ENTRYCFG( CAppMonitor_SvrSkel );
     INIT_MAP_ENTRYCFG( CAppMonitor_ChannelSvr );
+    INIT_MAP_ENTRYCFG( CSimpleAuth_SvrImpl );
+    INIT_MAP_ENTRYCFG( CSimpleAuth_SvrSkel );
+    INIT_MAP_ENTRYCFG( CSimpleAuth_ChannelSvr );
     
     INIT_MAP_ENTRY( TimeSpec );
     INIT_MAP_ENTRY( FileStat );
@@ -163,7 +167,9 @@ gint32 DestroyContext()
     return STATUS_SUCCESS;
 }
 
-gint32 ServiceMain( CAppMonitor_SvrImpl* pIf );
+gint32 ServiceMain(
+    CAppMonitor_SvrImpl* pIf,
+    CSimpleAuth_SvrImpl* pIf1 );
 
 gint32 RunSvcObj()
 {
@@ -174,6 +180,7 @@ gint32 RunSvcObj()
         
         CRpcServices* pSvc = nullptr;
         InterfPtr pIf;
+        std::vector< InterfPtr > vecIfs;
         do{
             CParamList oParams;
             oParams[ propIoMgr ] = g_pIoMgr;
@@ -190,6 +197,31 @@ gint32 RunSvcObj()
                 break;
             pSvc = pIf;
             ret = pSvc->Start();
+            vecIfs.push_back( pIf );
+            if( ERROR( ret ) )
+                break;
+            if( pSvc->GetState()!= stateConnected )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            oParams.Clear();
+            oParams[ propIoMgr ] = g_pIoMgr;
+            
+            ret = CRpcServices::LoadObjDesc(
+                strDesc, "SimpleAuth",
+                true, oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            ret = pIf.NewObj(
+                clsid( CSimpleAuth_SvrImpl ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            pSvc = pIf;
+            ret = pSvc->Start();
+            vecIfs.push_back( pIf );
             if( ERROR( ret ) )
                 break;
             if( pSvc->GetState()!= stateConnected )
@@ -198,31 +230,45 @@ gint32 RunSvcObj()
                 break;
             }
         }while( 0 );
+        
+        g_vecIfs = vecIfs;
         if( ERROR( ret ) )
             break;
+
         if( !g_bFuse ) 
-            ret = ServiceMain( pIf );
-        else
         {
-            g_pSvcIf = pIf;
-            break;
+            ret = ServiceMain(
+                vecIfs[0], vecIfs[1] );
         }
-        // Stopping the object
-        if( !pIf.IsEmpty() )
-            pIf->Stop();
+
     }while( 0 );
+
+    if( ERROR( ret ) )
+    {
+        // Stopping the objects
+        for( auto& pInterf : g_vecIfs )
+            pInterf->Stop();
+        g_vecIfs.clear();
+    }
 
     return ret;
 }
 
-gint32 ServiceMain( CAppMonitor_SvrImpl* pIf )
+gint32 ServiceMain(
+    CAppMonitor_SvrImpl* pIf,
+    CSimpleAuth_SvrImpl* pIf1 )
 {
     gint32 ret = 0;
     signal( SIGINT, SignalHandler );
     signal( SIGQUIT, SignalHandler );
     signal( SIGHUP, SignalHandler );
-    while( pIf->IsConnected() && !g_bExit )
+    while( !g_bExit )
+    {
+        if( !pIf->IsConnected() ||
+            !pIf1->IsConnected() )
+            break;
         sleep( 1 );
+    }
     ret = STATUS_SUCCESS;
     return ret;
 }
@@ -271,11 +317,9 @@ int _main( int argc, char** argv)
             if( ERROR( ret ) )
                 break;
             ret = FuseMain( argc, argv );
-            if( !g_pSvcIf.IsEmpty() )
-            {
-                g_pSvcIf->Stop();
-                g_pSvcIf.Clear();
-            }
+            for( auto pIf : g_vecIfs )
+                pIf->Stop();
+            g_vecIfs.clear();
         }
 #endif
     }while( 0 );
@@ -381,7 +425,9 @@ int main( int argc, char** argv)
             ret = -errno;
             OutputMsg( ret,
                 "Error invalid user registry file, "
-                "you may want to format it first" );
+                "you may want to format '%s' first with "
+                "'regfsmnt' command",
+                g_strUserReg.c_str() );
             break;
         }
 
@@ -394,8 +440,9 @@ int main( int argc, char** argv)
             ret = -errno;
             OutputMsg( ret,
                 "Error invalid application registry "
-                "file, you may want to format it "
-                "first" );
+                "file '%s', you may want to format it "
+                "first with 'regfsmnt' command",
+                g_strAppReg.c_str() );
             break;
         }
 
