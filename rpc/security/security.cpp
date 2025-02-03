@@ -4866,8 +4866,6 @@ gint32 CRpcRouterBridgeAuth::FilterMatchBlockList(
     IMessageMatch* pMatch )
 {
     gint32 ret = 0;
-    char *szModName = nullptr;
-    char *szObjName = nullptr;
     do{
         Variant oVar;
         ret = pMatch->GetProperty( propObjPath, oVar );
@@ -4875,6 +4873,13 @@ gint32 CRpcRouterBridgeAuth::FilterMatchBlockList(
             break;
         constexpr auto dwPrefix =
             sizeof( DBUS_NAME_PREFIX );
+        stdstr& strObjPath = ( stdstr& )oVar;
+        if( strObjPath.substr( 0, dwPrefix ) !=
+            "/org/rpcf/" )
+        {
+            ret = -EINVAL;
+            break;
+        }
         auto strPath =
             ( ( stdstr& )oVar ).substr( dwPrefix );
         auto pos1 = strPath.find_first_of( '/' );
@@ -4925,10 +4930,6 @@ gint32 CRpcRouterBridgeAuth::FilterMatchBlockList(
             break;
         }
     }while( 0 );
-    if( szModName != nullptr )
-        free( szModName );
-    if( szObjName != nullptr )
-        free( szObjName );
     return ret;
 }
 
