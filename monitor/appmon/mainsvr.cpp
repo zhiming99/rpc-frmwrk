@@ -426,7 +426,7 @@ int main( int argc, char** argv)
             OutputMsg( ret,
                 "Error invalid user registry file, "
                 "you may want to format '%s' first with "
-                "'regfsmnt' command",
+                "'inituser.sh' command",
                 g_strUserReg.c_str() );
             break;
         }
@@ -441,7 +441,7 @@ int main( int argc, char** argv)
             OutputMsg( ret,
                 "Error invalid application registry "
                 "file '%s', you may want to format it "
-                "first with 'regfsmnt' command",
+                "first with 'initappreg.sh' command",
                 g_strAppReg.c_str() );
             break;
         }
