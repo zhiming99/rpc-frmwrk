@@ -3,9 +3,23 @@
 function backup_registry()
 {
     _regname=$1
+    _backup=$2
+    if [ -z $_regname ] || [ -z $_backup ]; then
+        echo Error missing parameters
+        return 22
+    fi
     if [ ! -f $_regname ]; then
         echo Error "$_regname" is not a valid file
         return 2
+    fi
+    if [ -f $_backup ]; then
+        echo will erase the content of "$_backup", 'continue(Y/n)'?
+        read answer
+        if [ "x$answer" == "xy" ] || ["x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
+            >$_backup
+        else
+            exit 0
+        fi
     fi
     if [ ! -d backdir_0x123 ]; then
         if ! mkdir backdir_0x123; then
@@ -17,29 +31,31 @@ function backup_registry()
     if ! regfsmnt -d $_regname backdir_0x123; then
         return $?
     fi
-
     while ! mountpoint ./backdir_0x123; do
         sleep 1
     done
+
     pushd backdir_0x123 > /dev/null
     tar cf ../bktar123.tar --xattrs .
     popd > /dev/null
     umount backdir_0x123
-    regfsmnt -i $_regname.bak
+    sleep 1
 
-    if ! regfsmnt -d $_regname.bak backdir_0x123; then
+    regfsmnt -i $_backup
+    if ! regfsmnt -d $_backup backdir_0x123; then
         return $?
     fi
     while ! mountpoint ./backdir_0x123; do
         sleep 1
     done
+
     pushd backdir_0x123 > /dev/null
     tar xf ../bktar123.tar
     popd > /dev/null
     umount backdir_0x123
     rm bktar123.tar
     rm -rf backdir_0x123
-    echo completed with backup file "$_regname.bak"
+    echo completed with backup file "$_backup"
 }
 
 function is_dir_empty()
