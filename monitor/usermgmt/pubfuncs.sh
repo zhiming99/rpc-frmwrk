@@ -1,4 +1,47 @@
 #!/bin/bash
+
+function backup_registry()
+{
+    _regname=$1
+    if [ ! -f $_regname ]; then
+        echo Error "$_regname" is not a valid file
+        return 2
+    fi
+    if [ ! -d backdir_0x123 ]; then
+        if ! mkdir backdir_0x123; then
+            echo Error cannot create temporary directory for backup purpose.
+            return $?
+        fi
+    fi
+
+    if ! regfsmnt -d $_regname backdir_0x123; then
+        return $?
+    fi
+
+    while ! mountpoint ./backdir_0x123; do
+        sleep 1
+    done
+    pushd backdir_0x123 > /dev/null
+    tar cf ../bktar123.tar --xattrs .
+    popd > /dev/null
+    umount backdir_0x123
+    regfsmnt -i $_regname.bak
+
+    if ! regfsmnt -d $_regname.bak backdir_0x123; then
+        return $?
+    fi
+    while ! mountpoint ./backdir_0x123; do
+        sleep 1
+    done
+    pushd backdir_0x123 > /dev/null
+    tar xf ../bktar123.tar
+    popd > /dev/null
+    umount backdir_0x123
+    rm bktar123.tar
+    rm -rf backdir_0x123
+    echo completed with backup file "$_regname.bak"
+}
+
 function is_dir_empty()
 {
     if [ "x$1" == "x" ] ; then
