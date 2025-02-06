@@ -1,19 +1,24 @@
 {
     "BlockList": [
         {
-            "RouterPath" : "/",
+            "RouterPath" : ".*",
             "ObjectName" : "LogService",
             "ModName"    : "logger"
         },
         {
-            "RouterPath" : "/",
+            "RouterPath" : ".*",
             "ObjectName" : "SimpleAuth.*",
             "ModName" : "appmon"
         },
         {
-            "RouterPath" : "/",
+            "RouterPath" : ".*",
             "ObjectName" : "oa2check.*",
             "ModName" : "oa2check"
+        },
+        {
+            "RouterPath" : ".*",
+            "ObjectName" : "AppManager.*",
+            "ModName" : "appmon"
         }
     ]
 }
