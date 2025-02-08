@@ -2196,9 +2196,12 @@ gint32 CDirImage::CreateFile(
 {
     gint32 ret = 0;
     do{
-        ret = CheckAccess( W_OK | X_OK );
-        if( ERROR( ret ) )
-            break;
+        {
+            READ_LOCK( this );
+            ret = CheckAccess( W_OK | X_OK );
+            if( ERROR( ret ) )
+                break;
+        }
 
         ret = CreateFile(
             szName, ftRegular, pImg );
@@ -2486,8 +2489,6 @@ gint32  CDirFileEntry::ListDir(
         CDirImage* pImg = m_pFileImage;
         {
             READ_LOCK( pImg );
-            CStdRMutex oLock(
-                pImg->GetExclLock() );
             ret = pImg->CheckAccess(
                 R_OK, &m_oUserAc );
             if( ERROR( ret ) )

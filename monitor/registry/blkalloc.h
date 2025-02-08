@@ -723,6 +723,7 @@ struct CFileImage :
     {
         timespec mtime;
         clock_gettime( CLOCK_REALTIME, &mtime );
+        CStdRMutex oLock( GetExclLock() );
         this->m_oInodeStore.m_mtime = mtime;
         this->m_oInodeStore.m_atime = mtime;
         this->m_oInodeStore.m_ctime = mtime;
@@ -732,6 +733,7 @@ struct CFileImage :
     {
         timespec ctime;
         clock_gettime( CLOCK_REALTIME, &ctime );
+        CStdRMutex oLock( GetExclLock() );
         this->m_oInodeStore.m_ctime = ctime;
     }
 
@@ -739,6 +741,7 @@ struct CFileImage :
     {
         timespec atime;
         clock_gettime( CLOCK_REALTIME, &atime );
+        CStdRMutex oLock( GetExclLock() );
         this->m_oInodeStore.m_atime = atime;
     }
 
@@ -1776,6 +1779,48 @@ class CRegistryFs :
 
     gint32 GetFd() const
     { return m_pAlloc->GetFd(); }
+
+    gint32 GetFileImage(
+        RFHANDLE hDir, const stdstr&,
+        FImgSPtr& pFile, mode_t,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetDirImage(
+        RFHANDLE hDir, FImgSPtr& pDir );
+
+    gint32 GetValue( RFHANDLE hDir,
+        const stdstr&, Variant& oVar,
+        CAccessContext* pac = nullptr );
+
+    gint32 SetValue(
+        RFHANDLE hDir, const stdstr&,
+        const Variant& oVar,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetAttr(
+        RFHANDLE hDir, const stdstr&,
+        struct stat& stBuf,
+        CAccessContext* pac = nullptr );
+
+    gint32 Access(
+        RFHANDLE hDir, const stdstr&,
+        guint32 dwFlags,
+        CAccessContext* pac = nullptr );
+
+    gint32 RemoveFile(
+        RFHANDLE hDir, const stdstr&,
+        CAccessContext* pac = nullptr );
+
+    gint32 Truncate(
+        const stdstr& strPath,
+        guint32 dwsize = 0,
+        CAccessContext* pac = nullptr );
+
+    gint32 OpenFile(
+        RFHANDLE hDir, const stdstr&,
+        guint32 dwFlags,
+        RFHANDLE& hFile,
+        CAccessContext* pac = nullptr );
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

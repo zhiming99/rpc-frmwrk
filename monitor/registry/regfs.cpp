@@ -464,6 +464,7 @@ gint32 CRegistryFs::OpenFile(
         if( ERROR( ret ) )
             break;
 
+        EnumFileType ft = pFile->GetType();
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
@@ -475,7 +476,10 @@ gint32 CRegistryFs::OpenFile(
         if( ERROR( ret ) )
             break;
 
-        if( dwFlags & O_TRUNC )
+        if( ( dwFlags & O_TRUNC ) &&
+            ( ft == ftRegular ) &&
+            ( ( dwFlags & O_WRONLY ) ||
+                ( dwFlags & O_RDWR ) ) )
             pFile->Truncate( 0 );
 
         CStdRMutex oLock( this->GetExclLock() );
@@ -486,7 +490,7 @@ gint32 CRegistryFs::OpenFile(
     }while( 0 );
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error create file '%s'",
+        DebugPrint( ret, "Error open file '%s'",
             strPath.c_str() ); 
     }
     return ret;
@@ -911,6 +915,54 @@ gint32 CRegistryFs::GetValue(
     return ret;
 }
 
+gint32 CRegistryFs::GetDirImage(
+    RFHANDLE hDir, FImgSPtr& pDir )
+{
+    gint32 ret = 0;
+    do{
+        FileSPtr ptrDir;
+        ret = GetOpenFile( hDir, ptrDir );
+        CDirFileEntry* pDirEnt = ptrDir;
+        if( pDirEnt == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        pDir = pDirEnt->GetImage();
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::GetFileImage(
+    RFHANDLE hDir, const stdstr& strFile,
+    FImgSPtr& pFile, mode_t dwMode,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    if( hDir == INVALID_HANDLE ||
+        strFile.empty() )
+        return -EINVAL;
+    do{
+        FImgSPtr ptrDir;
+        ret = GetDirImage( hDir, ptrDir );
+        if( ERROR( ret ) )
+            break;
+        CDirImage* pDir = ptrDir;
+        ret = pDir->Search(
+            strFile.c_str(), pFile );
+        if( ERROR( ret ) )
+            break;
+        if( pac )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( dwMode, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRegistryFs::SetValue(
    const stdstr& strPath,
    const Variant& oVar,
@@ -1299,8 +1351,7 @@ gint32 CRegistryFs::Access(
             ret = -ENOENT;
             break;
         }
-        if( dwFlags == F_OK )
-            break;
+        if( dwFlags != F_OK )
         {
             READ_LOCK( pFile );
             ret = pFile->CheckAccess(
@@ -1363,7 +1414,7 @@ gint32 CRegistryFs::OpenDir(
     }while( 0 );
     if( ERROR( ret ) )
     {
-        DebugPrint( ret, "Error create file '%s'",
+        DebugPrint( ret, "Error open directory '%s'",
             strPath.c_str() ); 
     }
     return ret;
@@ -1485,6 +1536,177 @@ gint32 CRegistryFs::GetSize(
         FImgSPtr pImg = pFile->GetImage();
         dwSize = pImg->GetSize();
     }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::GetValue(
+    RFHANDLE hDir, const stdstr& strFile,
+    Variant& oVar, CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr pFile;
+        ret = GetFileImage( hDir, strFile,
+            pFile, R_OK, pac );
+        if( ERROR( ret ) )
+            break;
+        ret = pFile->ReadValue( oVar );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::SetValue(
+    RFHANDLE hDir, const stdstr& strFile,
+    const Variant& oVar,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr pFile;
+        ret = GetFileImage( hDir, strFile,
+            pFile, W_OK, pac );
+        if( ERROR( ret ) )
+            break;
+        ret = pFile->WriteValue( oVar );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::GetAttr(
+    RFHANDLE hDir, const stdstr& strFile,
+    struct stat& stBuf,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr pFile;
+        ret = GetFileImage( hDir, strFile,
+            pFile, R_OK, pac );
+        if( ERROR( ret ) )
+            break;
+        ret = pFile->GetAttr( stBuf );
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::Access(
+    RFHANDLE hDir, const stdstr& strFile,
+    guint32 dwFlags,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr pFile;
+        ret = GetFileImage( hDir, strFile,
+            pFile, R_OK, pac );
+        if( ERROR( ret ) )
+            break;
+        if( dwFlags != F_OK )
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess(
+                dwFlags, pac );
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::RemoveFile(
+    RFHANDLE hDir, const stdstr& strFile,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr ptrDir;
+        ret = GetDirImage( hDir, ptrDir );
+        if( ERROR( ret ) )
+            break;
+        CDirImage* pDir = ptrDir;
+        ret = pDir->CheckAccess(
+            W_OK | X_OK, pac );
+        if( ERROR( ret ) )
+            break;
+        ret = pDir->RemoveFile(
+            strFile.c_str() );
+    }while( 0 );
+    return ret;
+}
+gint32 CRegistryFs::OpenFile(
+    RFHANDLE hDir, const stdstr& strFile,
+    guint32 dwFlags,
+    RFHANDLE& hFile,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr pFile;
+
+        ret = GetFileImage( hDir,
+            strFile, pFile, F_OK, pac );
+        if( ERROR( ret ) )
+            break;
+
+        EnumFileType ft = pFile->GetType();
+        FileSPtr pOpenFile;
+        ret = COpenFileEntry::Create( 
+            ftRegular, pOpenFile,
+            pFile, m_pAlloc, strFile );
+        if( ERROR( ret ) )
+            break;
+
+        ret = pOpenFile->Open( dwFlags, pac );
+        if( ERROR( ret ) )
+            break;
+
+        if( ( dwFlags & O_TRUNC ) &&
+            ( ft == ftRegular ) &&
+            ( ( dwFlags & O_WRONLY ) ||
+                ( dwFlags & O_RDWR ) ) )
+        {
+            pFile->Truncate( 0 );
+        }
+
+        CStdRMutex oLock( this->GetExclLock() );
+        pOpenFile->SetFlags( dwFlags );
+        hFile = pOpenFile->GetObjId();
+        m_mapOpenFiles[ hFile ] = pOpenFile;
+        
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error open file '%s'",
+            strFile.c_str() ); 
+    }
+    return ret;
+}
+
+gint32 CRegistryFs::Truncate(
+    const stdstr& strPath,
+    guint32 dwOff,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        RFHANDLE hFile = INVALID_HANDLE;
+        ret = OpenFile( strPath,
+            O_WRONLY, hFile, pac );
+        if( ERROR( ret ) )
+            break;
+        ret = Truncate( hFile, dwOff );
+        CloseFile( hFile );
+
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error truncate file '%s'",
+            strPath.c_str() ); 
+    }
     return ret;
 }
 
