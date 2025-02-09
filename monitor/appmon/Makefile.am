@@ -2,12 +2,12 @@ link_dir=$(top_srcdir)/combase/
 include_ipcdir=$(top_srcdir)/ipc
 
 appmon_PROGRAMS=appmonsvr appmoncli
-appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h \
+appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h monconst.h \
 SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h
 if ENABLE_FUSE3
 appmonsvr_SOURCES+=monfuse.cpp
 endif
-appmoncli_SOURCES=maincli.cpp AppMonitorcli.cpp AppMonitorcli.h \
+appmoncli_SOURCES=maincli.cpp AppMonitorcli.cpp AppMonitorcli.h  monconst.h\
 SimpleAuthcli.cpp SimpleAuthcli.h AppManagercli.cpp AppManagercli.h
 
 appmonsvr_LDADD= ./libappmon.a \
@@ -50,9 +50,9 @@ libappmon_a_HEADERS=
 libappmon_adir=./
 
 headers=appmon.h AppMonitorsvr.h AppMonitorcli.h appmondesc.json \
-SimpleAuthcli.h SimpleAuthsvr.h
+SimpleAuthcli.h SimpleAuthsvr.h AppManagercli.h AppManagersvr.h monconst.h
 sources=appmon.cpp AppMonitorsvr.cpp mainsvr.cpp maincli.cpp AppMonitorcli.cpp \
-SimpleAuthcli.cpp SimpleAuthsvr.cpp
+SimpleAuthcli.cpp SimpleAuthsvr.cpp AppManagercli.cpp AppManagersvr.cpp
 
 $(sources):$(headers)
 
