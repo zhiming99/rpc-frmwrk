@@ -80,6 +80,8 @@ CFileImage::CFileImage( const IConfigDb* pCfg )
             break;
         oCfg.GetPointer( 3, m_pParentDir );
 
+        oCfg.GetStrProp( propObjName, m_strName );
+
     }while( 0 );
     if( ERROR( ret ) )
     {

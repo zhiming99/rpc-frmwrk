@@ -1710,10 +1710,10 @@ gint32 CBPlusNode::RemoveFile(
                         pFile, pAlloc, dwInodeIdx,
                         m_pDir->GetInodeIdx(),
                         ObjPtr( m_pDir ) );
-
                     ret = pFile->Reload();
                     if( ERROR( ret ) )
                         break;
+                    pFile->SetName( pSlot->szKey );
                 }
 
                 CDirImage* pSubDir = pFile;
@@ -1942,7 +1942,8 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
         if( SUCCEEDED( iRet ) )
         {
             CStdRMutex oExclLock( GetExclLock() );
-            // found in non-leaf node
+            // since found in non-leaf node, the first
+            // leaf is the target
             KEYPTR_SLOT* pks =
                 pNode->GetSlot( 0 );
             auto& dwInodeIdx =
@@ -1968,6 +1969,7 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
                     break;
                 pNode->AddFileDirect(
                     dwInodeIdx, pFile );
+                pFile->SetName( pks->szKey );
             }
             break;
         }
@@ -2006,6 +2008,7 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
                     break;
                 ret = pCurNode->AddFileDirect(
                     dwInodeIdx,  pFile );
+                pFile->SetName( pks->szKey );
             }
         }
     }while( 0 );
@@ -2135,6 +2138,7 @@ gint32 CDirImage::InsertFile(
         ret = pNode->Insert( &oKey );
         if( ERROR( ret ) )
             break;
+        pImg->SetName( szName );
         ret = pNode->AddFileDirect(
             dwInodeIdx, pImg );
 
@@ -2181,6 +2185,7 @@ gint32 CDirImage::CreateFile(
         ret = pNode->Insert( &oKey );
         if( ERROR( ret ) )
             break;
+        pImg->SetName( szName );
         ret = pNode->AddFileDirect(
             dwInodeIdx, pImg );
 
@@ -2438,6 +2443,7 @@ gint32 CDirImage::Rename(
         ret = m_pRootNode->Insert( &oKey );
         if( ERROR( ret ) )
             break;
+        pFile->SetName( oKey.szKey );
         ret = m_pRootNode->AddFileDirect(
             oKey.oLeaf.dwInodeIdx, pFile );
         UpdateMtime();

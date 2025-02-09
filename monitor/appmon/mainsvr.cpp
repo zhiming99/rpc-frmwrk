@@ -45,6 +45,7 @@ using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
 #include "blkalloc.h"
+#include "AppManagersvr.h"
 #include "AppMonitorsvr.h"
 #include "SimpleAuthsvr.h"
 
@@ -66,7 +67,7 @@ static bool g_bFormat = false;
 static bool g_bLocal = false;
 static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
-static std::vector< InterfPtr > g_vecIfs;
+std::vector< InterfPtr > g_vecIfs;
 
 void SignalHandler( int signum )
 {
@@ -85,6 +86,9 @@ FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
 
+    INIT_MAP_ENTRYCFG( CAppManager_SvrImpl );
+    INIT_MAP_ENTRYCFG( CAppManager_SvrSkel );
+    INIT_MAP_ENTRYCFG( CAppManager_ChannelSvr );
     INIT_MAP_ENTRYCFG( CAppMonitor_SvrImpl );
     INIT_MAP_ENTRYCFG( CAppMonitor_SvrSkel );
     INIT_MAP_ENTRYCFG( CAppMonitor_ChannelSvr );
@@ -92,8 +96,6 @@ FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CSimpleAuth_SvrSkel );
     INIT_MAP_ENTRYCFG( CSimpleAuth_ChannelSvr );
     
-    INIT_MAP_ENTRY( TimeSpec );
-    INIT_MAP_ENTRY( FileStat );
     INIT_MAP_ENTRY( KeyValue );
     
     END_FACTORY_MAPS;
@@ -168,8 +170,9 @@ gint32 DestroyContext()
 }
 
 gint32 ServiceMain(
-    CAppMonitor_SvrImpl* pIf,
-    CSimpleAuth_SvrImpl* pIf1 );
+    CAppManager_SvrImpl* pIf,
+    CAppMonitor_SvrImpl* pIf1,
+    CSimpleAuth_SvrImpl* pIf2 );
 
 gint32 RunSvcObj()
 {
@@ -183,6 +186,30 @@ gint32 RunSvcObj()
         std::vector< InterfPtr > vecIfs;
         do{
             CParamList oParams;
+            oParams[ propIoMgr ] = g_pIoMgr;
+            
+            ret = CRpcServices::LoadObjDesc(
+                strDesc, "AppManager",
+                true, oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            ret = pIf.NewObj(
+                clsid( CAppManager_SvrImpl ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            pSvc = pIf;
+            ret = pSvc->Start();
+            vecIfs.push_back( pIf );
+            if( ERROR( ret ) )
+                break;
+            if( pSvc->GetState()!= stateConnected )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            oParams.Clear();
             oParams[ propIoMgr ] = g_pIoMgr;
             
             ret = CRpcServices::LoadObjDesc(
@@ -238,7 +265,9 @@ gint32 RunSvcObj()
         if( !g_bFuse ) 
         {
             ret = ServiceMain(
-                vecIfs[0], vecIfs[1] );
+                vecIfs[0],
+                vecIfs[1],
+                vecIfs[2]);
         }
 
     }while( 0 );
@@ -255,8 +284,9 @@ gint32 RunSvcObj()
 }
 
 gint32 ServiceMain(
-    CAppMonitor_SvrImpl* pIf,
-    CSimpleAuth_SvrImpl* pIf1 )
+    CAppManager_SvrImpl* pIf,
+    CAppMonitor_SvrImpl* pIf1,
+    CSimpleAuth_SvrImpl* pIf2 )
 {
     gint32 ret = 0;
     signal( SIGINT, SignalHandler );
@@ -265,7 +295,8 @@ gint32 ServiceMain(
     while( !g_bExit )
     {
         if( !pIf->IsConnected() ||
-            !pIf1->IsConnected() )
+            !pIf1->IsConnected() ||
+            !pIf2->IsConnected() )
             break;
         sleep( 1 );
     }

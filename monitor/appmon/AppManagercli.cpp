@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ridlc -sO . ./appmon.ridl 
+// ../../ridl/.libs/ridlc -sO . ./appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -7,10 +7,10 @@ using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
 #include "appmon.h"
-#include "AppMonitorcli.h"
+#include "AppManagercli.h"
 
 /* Event handler */
-gint32 CAppMonitor_CliImpl::OnPointChanged( 
+gint32 CAppManager_CliImpl::OnPointChanged( 
     const std::string& strPtPath /*[ In ]*/,
     const Variant& value /*[ In ]*/ )
 {
@@ -18,13 +18,29 @@ gint32 CAppMonitor_CliImpl::OnPointChanged(
     return STATUS_SUCCESS;
 }
 /* Event handler */
-gint32 CAppMonitor_CliImpl::OnPointsChanged( 
+gint32 CAppManager_CliImpl::OnPointsChanged( 
     std::vector<KeyValue>& arrKVs /*[ In ]*/ )
 {
     // TODO: Process the event here
     return STATUS_SUCCESS;
 }
-gint32 CAppMonitor_CliImpl::CreateStmSkel(
+/* Async callback handler */
+gint32 CAppManager_CliImpl::ClaimAppInstsCallback( 
+    IConfigDb* context, gint32 iRet )
+{
+    // TODO: Process the server response here
+    // return code ignored
+    return 0;
+}
+/* Async callback handler */
+gint32 CAppManager_CliImpl::FreeAppInstsCallback( 
+    IConfigDb* context, gint32 iRet )
+{
+    // TODO: Process the server response here
+    // return code ignored
+    return 0;
+}
+gint32 CAppManager_CliImpl::CreateStmSkel(
     InterfPtr& pIf )
 {
     gint32 ret = 0;
@@ -42,17 +58,17 @@ gint32 CAppMonitor_CliImpl::CreateStmSkel(
         if( ERROR( ret ) )
             break;
         ret = CRpcServices::LoadObjDesc(
-            strDesc,"AppMonitor_SvrSkel",
+            strDesc,"AppManager_SvrSkel",
             false, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
         ret = pIf.NewObj(
-            clsid( CAppMonitor_CliSkel ),
+            clsid( CAppManager_CliSkel ),
             oCfg.GetCfg() );
     }while( 0 );
     return ret;
 }
-gint32 CAppMonitor_CliImpl::OnPreStart(
+gint32 CAppManager_CliImpl::OnPreStart(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
@@ -60,7 +76,7 @@ gint32 CAppMonitor_CliImpl::OnPreStart(
         CCfgOpener oCtx;
         CCfgOpenerObj oIfCfg( this );
         oCtx[ propClsid ] = clsid( 
-            CAppMonitor_ChannelCli );
+            CAppManager_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
         oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
@@ -75,7 +91,7 @@ gint32 CAppMonitor_CliImpl::OnPreStart(
             break;
         char szBuf[ 16 ];
         sprintf( szBuf, "_%08X", dwHash );
-        strInstName = "AppMonitor_ChannelSvr";
+        strInstName = "AppManager_ChannelSvr";
         oCtx[ 0 ] = strInstName;
         strInstName += szBuf;
         oCtx[ propObjInstName ] = strInstName;

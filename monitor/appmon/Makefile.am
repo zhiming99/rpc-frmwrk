@@ -3,12 +3,12 @@ include_ipcdir=$(top_srcdir)/ipc
 
 appmon_PROGRAMS=appmonsvr appmoncli
 appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h \
-SimpleAuthsvr.cpp SimpleAuthsvr.h
+SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h
 if ENABLE_FUSE3
 appmonsvr_SOURCES+=monfuse.cpp
 endif
 appmoncli_SOURCES=maincli.cpp AppMonitorcli.cpp AppMonitorcli.h \
-SimpleAuthcli.cpp SimpleAuthcli.h
+SimpleAuthcli.cpp SimpleAuthcli.h AppManagercli.cpp AppManagercli.h
 
 appmonsvr_LDADD= ./libappmon.a \
 ../registry/libregfs.la ../../ipc/libipc.la $(COMMON_LINK_FUSE3) \

@@ -1173,8 +1173,7 @@ class CFastRpcServerBase :
     gint32 AddStmSkel(
         HANDLE hstm, InterfPtr& pIf );
 
-    gint32 RemoveStmSkel(
-        HANDLE hstm );
+    virtual gint32 RemoveStmSkel( HANDLE hstm );
 
     gint32 EnumStmSkels(
         std::vector< InterfPtr >& vecIfs ) const;

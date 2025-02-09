@@ -6,6 +6,7 @@
 using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
+#include "blkalloc.h"
 #include "appmon.h"
 #include "AppMonitorsvr.h"
 #include "SimpleAuthsvr.h"

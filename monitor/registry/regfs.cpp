@@ -91,6 +91,7 @@ gint32 CRegistryFs::CreateRootDir()
             stdstr( "/" ) );
         if( ERROR( ret ) )
             break;
+        m_pRootImg->SetName( "/" );
 
     }while( 0 );
     return ret;
@@ -120,6 +121,7 @@ gint32 CRegistryFs::OpenRootDir()
         ret = m_pRootDir->Open(
             O_RDONLY, nullptr );
 
+        m_pRootImg->SetName( "/" );
         RFHANDLE hFile = m_pRootDir->GetObjId();
         m_mapOpenFiles[ hFile ] = m_pRootDir;
 
@@ -399,6 +401,14 @@ gint32 CRegistryFs::CreateFile(
         std::string strFile =
             basename( strNormPath.c_str() );
         FImgSPtr pFile;
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pDir->CheckAccess(
+                W_OK | X_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = pDir->CreateFile(
             strFile.c_str(), dwMode, pFile );
         if( ERROR( ret ) )
@@ -518,21 +528,19 @@ gint32 CRegistryFs::CloseFileNoLock(
             break;
 
         ret = 0;
-        const stdstr& strPath = pFile->GetPath();
         FImgSPtr dirPtr;
         stdstr strNormPath;
         FImgSPtr pImg = pFile->GetImage();
         CDirImage* pDir = pImg->GetParentDir();
         if( pDir == nullptr )
         {
-            // don't use normalized path deliberately.
-            ret = GetParentDir(
-                strPath, dirPtr );
-            if( ERROR( ret ) )
-                break;
-            pDir = dirPtr;
+            ret = -EFAULT;
+            OutputMsg( ret, "Error ,Internal error " 
+                "occurs during closing file" ); 
+            break;
         }
 
+        const stdstr& strPath = pFile->GetPath();
         std::string strFile =
             basename( strPath.c_str() );
         pDir->UnloadFile( strFile.c_str() );
@@ -1706,6 +1714,164 @@ gint32 CRegistryFs::Truncate(
     {
         DebugPrint( ret, "Error truncate file '%s'",
             strPath.c_str() ); 
+    }
+    return ret;
+}
+
+gint32 CRegistryFs::SetGid(
+    RFHANDLE hFile, gid_t wGid,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FileSPtr pFileEnt;
+        ret = GetOpenFile( hFile, pFileEnt );
+        if( ERROR( ret ) )
+            break;
+        FImgSPtr pFile = pFileEnt->GetImage();
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        pFile->SetGid( wGid );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::SetUid(
+    RFHANDLE hFile, uid_t wUid,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FileSPtr pFileEnt;
+        ret = GetOpenFile( hFile, pFileEnt );
+        if( ERROR( ret ) )
+            break;
+        FImgSPtr pFile = pFileEnt->GetImage();
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        pFile->SetUid( wUid );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::GetGid(
+    RFHANDLE hFile, gid_t& gid,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FileSPtr pFileEnt;
+        ret = GetOpenFile( hFile, pFileEnt );
+        if( ERROR( ret ) )
+            break;
+        FImgSPtr pFile = pFileEnt->GetImage();
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        gid = pFile->GetGid( );
+
+    }while( 0 );
+    return ret;
+}
+gint32 CRegistryFs::GetUid(
+    RFHANDLE hFile, uid_t& uid,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FileSPtr pFileEnt;
+        ret = GetOpenFile( hFile, pFileEnt );
+        if( ERROR( ret ) )
+            break;
+        FImgSPtr pFile = pFileEnt->GetImage();
+        {
+            READ_LOCK( pFile );
+            ret = pFile->CheckAccess( W_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        uid = pFile->GetUid();
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRegistryFs::CreateFile(
+    RFHANDLE hDir, const stdstr& strFile,
+    mode_t dwMode, guint32 dwFlags,
+    RFHANDLE& hFile,
+    CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        FImgSPtr ptrDir;
+        ret = GetDirImage( hDir, ptrDir );
+        if( ERROR( ret ) )
+            break;
+
+        FImgSPtr pFile;
+        CDirImage* pDir = ptrDir;
+        if( pac )
+        {
+            READ_LOCK( pDir );
+            ret = pDir->CheckAccess(
+                W_OK | X_OK, pac );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = pDir->CreateFile(
+            strFile.c_str(), dwMode, pFile );
+        if( ERROR( ret ) )
+            break;
+
+        FileSPtr pOpenFile;
+        ret = COpenFileEntry::Create( 
+            ftRegular, pOpenFile,
+            pFile, m_pAlloc, strFile );
+        if( ERROR( ret ) )
+            break;
+
+        CAccessContext oac;
+        if( pac == nullptr )
+        {
+            // to check conflict between dwMode and dwFlags
+            oac.dwUid = pFile->GetUid();
+            oac.dwGid = pFile->GetGid();
+            pac = &oac;
+        }
+
+        ret = pOpenFile->Open( dwFlags, pac );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( this->GetExclLock() );
+        pOpenFile->SetFlags( dwFlags );
+        hFile = pOpenFile->GetObjId();
+        m_mapOpenFiles[ hFile ] = pOpenFile;
+
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        DebugPrint( ret, "Error create file '%s'",
+            strFile.c_str() ); 
     }
     return ret;
 }

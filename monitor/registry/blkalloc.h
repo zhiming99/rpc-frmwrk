@@ -652,6 +652,8 @@ struct CFileImage :
     EnumIfState m_dwState = stateStarted;
     std::atomic< bool > m_bRemoved = {false};
 
+    stdstr      m_strName;
+
     mutable CSharedLock m_oLock;
     inline CSharedLock& GetLock() const
     { return m_oLock; }
@@ -661,6 +663,12 @@ struct CFileImage :
         CStdRMutex oLock( GetExclLock() );
         m_dwState = ( EnumIfState )dwState;
     }
+
+    inline void SetName( const stdstr& strName )
+    { m_strName = strName; }
+
+    inline const stdstr& GetName() const
+    { return m_strName; }
 
     inline guint32 GetState() const
     {
@@ -1819,6 +1827,28 @@ class CRegistryFs :
     gint32 OpenFile(
         RFHANDLE hDir, const stdstr&,
         guint32 dwFlags,
+        RFHANDLE& hFile,
+        CAccessContext* pac = nullptr );
+
+    gint32 SetGid(
+        RFHANDLE hFile, gid_t wGid,
+        CAccessContext* pac = nullptr );
+
+    gint32 SetUid(
+        RFHANDLE hFile, uid_t wUid,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetGid(
+        RFHANDLE hFile, gid_t& gid,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetUid(
+        RFHANDLE hFile, uid_t& uid,
+        CAccessContext* pac = nullptr );
+
+    gint32 CreateFile(
+        RFHANDLE hDir, const stdstr& strFile,
+        mode_t dwMode, guint32 dwFlags,
         RFHANDLE& hFile,
         CAccessContext* pac = nullptr );
 };

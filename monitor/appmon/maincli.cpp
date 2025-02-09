@@ -19,12 +19,10 @@ FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CAppMonitor_CliImpl );
     INIT_MAP_ENTRYCFG( CAppMonitor_CliSkel );
     INIT_MAP_ENTRYCFG( CAppMonitor_ChannelCli );
-    INIT_MAP_ENTRYCFG( CSimpleAuth_CliImpl );
-    INIT_MAP_ENTRYCFG( CSimpleAuth_CliSkel );
-    INIT_MAP_ENTRYCFG( CSimpleAuth_ChannelCli );
+    // INIT_MAP_ENTRYCFG( CSimpleAuth_CliImpl );
+    // INIT_MAP_ENTRYCFG( CSimpleAuth_CliSkel );
+    // INIT_MAP_ENTRYCFG( CSimpleAuth_ChannelCli );
     
-    INIT_MAP_ENTRY( TimeSpec );
-    INIT_MAP_ENTRY( FileStat );
     INIT_MAP_ENTRY( KeyValue );
     
     END_FACTORY_MAPS;
@@ -91,7 +89,6 @@ gint32 DestroyContext()
 
 gint32 maincli(
     CAppMonitor_CliImpl* pIf,
-    CSimpleAuth_CliImpl* pIf1,
     int argc, char** argv );
 
 int main( int argc, char** argv )
@@ -134,38 +131,11 @@ int main( int argc, char** argv )
                 break;
             }
 
-            oParams.Clear();
-            oParams[ propIoMgr ] = g_pIoMgr;
-            
-            ret = CRpcServices::LoadObjDesc(
-                strDesc, "SimpleAuth",
-                false, oParams.GetCfg() );
-            if( ERROR( ret ) )
-                break;
-            ret = pIf.NewObj(
-                clsid( CSimpleAuth_CliImpl ),
-                oParams.GetCfg() );
-            if( ERROR( ret ) )
-                break;
-            pSvc = pIf;
-            ret = pSvc->Start();
-            vecIfs.push_back( pIf );
-            if( ERROR( ret ) )
-                break;
-            while( pSvc->GetState()== stateRecovery )
-                sleep( 1 );
-            
-            if( pSvc->GetState() != stateConnected )
-            {
-                ret = ERROR_STATE;
-                break;
-            }
         }while( 0 );
         
         if( SUCCEEDED( ret ) )
             ret = maincli(
                 vecIfs[ 0 ],
-                vecIfs[ 1 ],
                 argc, argv );
             
         // Stopping the objects
@@ -180,7 +150,6 @@ int main( int argc, char** argv )
 //-----Your code begins here---
 gint32 maincli(
     CAppMonitor_CliImpl* pIf,
-    CSimpleAuth_CliImpl* pIf1,
     int argc, char** argv )
 {
     //-----Adding your code here---

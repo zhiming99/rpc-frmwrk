@@ -7,21 +7,12 @@ struct KeyValue
     variant oValue;
 };
 
-interface IAppMonitor
+interface IAppStore
 {
-    [async]RegisterListener(
-        HSTREAM hStream,
-        array<string> arrApps )
-    returns();
-
-    [async]RemoveListener(
-        HSTREAM hStream )
-    returns();
-
     [async_s]ListApps()
     returns( array<string> arrApps );
 
-    [async_s]ListPoints( string strAppPath)
+    [async_s]ListPoints( string strAppName)
     returns( array<string> arrPoints );
     
     [async_s]ListAttributes( string strPtPath)
@@ -57,6 +48,27 @@ interface IAppMonitor
     returns();
 };
 
+interface IAppMonitor
+{
+    [async_s]RegisterListener(
+        array<string> arrApps )
+    returns();
+
+    [async_s]RemoveListener()
+    returns();
+};
+
+interface IDataProducer
+{
+    [async]ClaimAppInsts(
+        array< string > arrApps )
+    returns();
+
+    [async]FreeAppInsts(
+        array< string > arrApps )
+    returns();
+};
+
 interface IUserManager
 {
     [async_s]GetUidByOAuth2Name( string strOA2Name )
@@ -69,9 +81,15 @@ interface IUserManager
     returns( string strSalt );
 };
 
+service AppManager
+{
+    interface IAppStore;
+    interface IDataProducer;
+};
+
 service AppMonitor
 {
-    interface IRegFsRemote;
+    interface IAppStore;
     interface IAppMonitor;
 };
 

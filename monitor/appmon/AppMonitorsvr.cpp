@@ -9,11 +9,25 @@ using namespace rpcf;
 #include "blkalloc.h"
 #include "appmon.h"
 #include "AppMonitorsvr.h"
+#include "AppManagersvr.h"
 #include <fcntl.h>
 #include <sys/file.h>
+#include "monconst.h"
 
 extern RegFsPtr g_pAppRegfs;
 extern RegFsPtr g_pUserRegfs;
+
+extern gint32 GetMonitorToNotify(
+    CFastRpcServerBase* pIf,
+    RegFsPtr pAppReg,
+    const stdstr& strAppName,
+    std::vector< HANDLE > vecStms );
+
+extern gint32 GetCurStream(
+    CFastRpcServerBase* pIf,
+    IConfigDb* pReqCtx, HANDLE& hstm );
+
+extern InterfPtr GetAppManager();
 
 CFlockHelper::CFlockHelper(
     gint32 iFd, bool bRead )
@@ -32,6 +46,18 @@ CFlockHelper::~CFlockHelper()
     if( m_iFd == -1 )
         return;
     flock( m_iFd, LOCK_UN );
+}
+
+CFileHandle::~CFileHandle()
+{
+    if( m_hFile != INVALID_HANDLE &&
+        !m_pFs.IsEmpty() )
+    {
+        CRegistryFs* pfs = m_pFs;
+        pfs->CloseFile( m_hFile );
+        m_hFile = INVALID_HANDLE;
+    }
+    m_pFs.Clear();
 }
 
 gint32 CAppMonitor_SvrImpl::GetLoginInfo(
@@ -109,507 +135,47 @@ gint32 CAppMonitor_SvrImpl::GetAccessContext(
         if( ret != -ENOENT && ERROR( ret ) ) \
             break
 
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::CreateFile( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwMode /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/, 
-    guint64& hFile /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->CreateFile( strPath,
-            dwMode, dwFlags, hFile, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::MakeDir( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwMode /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->MakeDir(
-            strPath, dwMode, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::OpenFile( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/, 
-    guint64& hFile /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->OpenFile(
-            strPath, dwFlags, hFile, &oac );
-    }while( 0 );
-    return ret;
-}
 
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::CloseFile( 
-    IConfigDb* pContext, 
-    guint64 hFile /*[ In ]*/ )
-{
-    return m_pAppRegfs->CloseFile( hFile );
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::RemoveFile( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->RemoveFile(
-            strPath, &oac );
-    }while( 0 );
-    return ret;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::ReadFile( 
-    IConfigDb* pContext, 
-    guint64 hFile /*[ In ]*/,
-    guint32 dwSize /*[ In ]*/,
-    guint32 dwOff /*[ In ]*/, 
-    BufPtr& buffer /*[ Out ]*/ )
-{
-    if( dwSize == 0 ||
-        dwSize > MAX_BYTES_PER_TRANSFER )
-        return -EINVAL;
-
-    if( buffer.IsEmpty() )
-        buffer.NewObj();
-
-    gint32 ret = buffer->Resize( dwSize );
-    if( ERROR( ret ) )
-        return ret;
-
-    return m_pAppRegfs->ReadFile(
-        hFile, buffer->ptr(),
-        dwSize, dwOff );
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::WriteFile( 
-    IConfigDb* pContext, 
-    guint64 hFile /*[ In ]*/,
-    BufPtr& buffer /*[ In ]*/,
-    guint32 dwOff /*[ In ]*/, 
-    guint32& dwSizeWrite /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    dwSizeWrite = buffer->size();
-    return m_pAppRegfs->WriteFile(
-        hFile, buffer->ptr(),
-        dwSizeWrite, dwOff );
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::Truncate( 
-    IConfigDb* pContext, 
-    guint64 hFile /*[ In ]*/,
-    guint32 dwOff /*[ In ]*/ )
-{
-    return m_pAppRegfs->Truncate(
-        hFile, dwOff );
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::CloseDir( 
-    IConfigDb* pContext, 
-    guint64 hFile /*[ In ]*/ )
-{
-    return m_pAppRegfs->CloseFile( hFile );
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::RemoveDir( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->RemoveDir(
-            strPath, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetGid( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 wGid /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->SetGid(
-            strPath, wGid, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetUid( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 wUid /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->SetGid(
-            strPath, wUid, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetGid( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/, 
-    guint32& gid /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->GetGid(
-            strPath, gid, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetUid( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/, 
-    guint32& uid /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->GetGid(
-            strPath, uid, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::SymLink( 
-    IConfigDb* pContext, 
-    const std::string& strSrcPath /*[ In ]*/,
-    const std::string& strDestPath /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->SymLink(
-            strSrcPath, strDestPath, &oac );
-    }while( 0 );
-    return ret;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetValue2( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/, 
-    std::string& strJson /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        Variant oVar;
-        ret = GetValue(
-            pContext, strPath, oVar );
-        if( ERROR( ret ) )
-            break;
-        ret = oVar.SerializeToJson( strJson );
-        if( ERROR( ret ) )
-            break;
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetValue2( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    const std::string& strJson /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        Variant oVar;
-        ret = oVar.DeserializeFromJson( strJson );
-        if( ERROR( ret ) )
-            break;
-        ret = this->SetValue(
-            pContext, strPath, oVar );
-    }while( 0 );
-    return ret;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetValue( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/, 
-    Variant& rvar /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->GetValue(
-            strPath, rvar, &oac );
-    }while( 0 );
-    return ret;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::SetValue( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    const Variant& var /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->SetValue(
-            strPath, var, &oac );
-    }while( 0 );
-    return ret;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::Chmod( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwMode /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->Chmod(
-            strPath, dwMode, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::Chown( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwUid /*[ In ]*/,
-    guint32 dwGid /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->Chown(
-            strPath, dwUid, dwGid, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::ReadLink( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/, 
-    BufPtr& buf /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        if( buf.IsEmpty() )
-            buf.NewObj();
-        struct stat stbuf;
-        ret = m_pAppRegfs->GetAttr(
-            strPath, stbuf );
-        if( ERROR( ret ) )
-            break;
-        if( stbuf.st_size == 0 ||
-            stbuf.st_size >= MAX_FILE_SIZE )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        guint32 dwSize = stbuf.st_size;
-        ret = buf->Resize( dwSize );
-        if( ERROR( ret ) )
-            break;
-        ret = m_pAppRegfs->ReadLink(
-            strPath, buf->ptr(), dwSize, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::Rename( 
-    IConfigDb* pContext, 
-    const std::string& szFrom /*[ In ]*/,
-    const std::string& szTo /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->Rename(
-            szFrom, szTo, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::Flush( 
-    IConfigDb* pContext, 
-    guint32 dwFlags /*[ In ]*/ )
-{
-    //return m_pAppRegfs->Flush( dwFlags );
-    return ERROR_NOT_IMPL;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::Access( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->Access(
-            strPath, dwFlags, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::GetAttr( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/, 
-    FileStat& oStat /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        struct stat stbuf;
-        ret = m_pAppRegfs->GetAttr(
-            strPath, stbuf , &oac );
-        if( ERROR( ret ) )
-            break;
-
-        oStat.st_dev = stbuf.st_dev;
-        oStat.st_ino = stbuf.st_ino;
-        oStat.st_mode = stbuf.st_mode;
-        oStat.st_nlink = stbuf.st_nlink;
-        oStat.st_uid = stbuf.st_uid;
-        oStat.st_gid = stbuf.st_gid;
-        oStat.st_rdev = stbuf.st_rdev;
-        oStat.st_size = stbuf.st_size;
-        oStat.st_blksize = stbuf.st_blksize;
-        oStat.st_blocks = stbuf.st_blocks;
-
-        oStat.st_atim.tv_sec =
-            stbuf.st_atim.tv_sec;
-        oStat.st_atim.tv_nsec =
-            stbuf.st_atim.tv_nsec;
-
-        oStat.st_mtim.tv_sec =
-            stbuf.st_mtim.tv_sec;
-        oStat.st_mtim.tv_nsec =
-            stbuf.st_mtim.tv_nsec;
-
-        oStat.st_ctim.tv_sec =
-            stbuf.st_ctim.tv_sec;
-        oStat.st_ctim.tv_nsec =
-            stbuf.st_ctim.tv_nsec;
-
-        oStat.st_name =
-            basename( strPath.c_str() );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::ReadDir( 
-    IConfigDb* pContext, 
-    guint64 hDir /*[ In ]*/, 
-    std::vector<FileStat>& vecDirEnt /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        std::vector< KEYPTR_SLOT > vecks;
-        ret = m_pAppRegfs->ReadDir(
-            hDir, vecks );
-        if( ERROR( ret ) )
-            break;
-        for( auto& ks : vecks )
-        {
-            FileStat oStat;
-            oStat.st_name = ks.szKey;
-            oStat.st_ino = ks.oLeaf.dwInodeIdx;
-            guint32 dwMode = 0;
-            if( ks.oLeaf.byFileType == ftDirectory )
-                dwMode |= S_IFDIR;
-            else if( ks.oLeaf.byFileType == ftRegular )
-                dwMode |= S_IFREG;
-            else if( ks.oLeaf.byFileType == ftLink )
-                dwMode |= S_IFLNK;
-            vecDirEnt.push_back( oStat );
-        }
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::OpenDir( 
-    IConfigDb* pContext, 
-    const std::string& strPath /*[ In ]*/,
-    guint32 dwFlags /*[ In ]*/, 
-    guint64& hDir /*[ Out ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        GETAC( pContext );
-        ret = m_pAppRegfs->OpenDir(
-            strPath, dwFlags, hDir, &oac );
-    }while( 0 );
-    return ret;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::ExecBat( 
-    IConfigDb* pContext, 
-    const std::string& strJson /*[ In ]*/ )
-{
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ExecBatComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
-}
-
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::RegisterListener( 
-    IConfigDb* pContext, 
-    HANDLE hStream_h /*[ In ]*/,
-    std::vector<std::string>& arrApps /*[ In ]*/ )
-{
-    // TODO: Emit an async operation here.
-    // And make sure to call 'RegisterListenerComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
-}
-/* Async Req Handler*/
-gint32 CAppMonitor_SvrImpl::RemoveListener( 
-    IConfigDb* pContext, 
-    HANDLE hStream_h /*[ In ]*/ )
-{
-    // TODO: Emit an async operation here.
-    // And make sure to call 'RemoveListenerComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
-}
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ListApps( 
     IConfigDb* pContext, 
     std::vector<std::string>& arrApps /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ListAppsComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    RFHANDLE hDir = INVALID_HANDLE;
+    do{
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR;
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = m_pAppRegfs->OpenDir(
+            strPath, O_RDONLY, hDir, &oac );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle(
+            m_pAppRegfs, hDir );
+        ret = m_pAppRegfs->ReadDir(
+            hDir, vecks );
+        if( ERROR( ret ) )
+            break;
+        if( vecks.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        for( auto& elem : vecks )
+        {
+            ret = m_pAppRegfs->Access(
+                hDir, elem.szKey,
+                R_OK| X_OK, &oac );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            arrApps.push_back( elem.szKey );
+        }
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ListPoints( 
@@ -617,43 +183,133 @@ gint32 CAppMonitor_SvrImpl::ListPoints(
     const std::string& strAppPath /*[ In ]*/, 
     std::vector<std::string>& arrPoints /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ListPointsComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    RFHANDLE hDir = INVALID_HANDLE;
+    do{
+        if( strAppPath.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath+= strAppPath;
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = m_pAppRegfs->OpenDir(
+            strPath, O_RDONLY, hDir, &oac );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle(
+            m_pAppRegfs, hDir );
+        ret = m_pAppRegfs->ReadDir(
+            hDir, vecks );
+        if( ERROR( ret ) )
+            break;
+        if( vecks.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        for( auto& elem : vecks )
+        {
+            ret = m_pAppRegfs->Access(
+                hDir, elem.szKey,
+                R_OK | X_OK, &oac );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            arrPoints.push_back( elem.szKey );
+        }
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ListAttributes( 
     IConfigDb* pContext, 
     const std::string& strPtPath /*[ In ]*/, 
     std::vector<std::string>& arrAttributes /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'ListAttributesComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    RFHANDLE hDir = INVALID_HANDLE;
+    do{
+        if( strPtPath.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strPtPath;
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = m_pAppRegfs->OpenDir(
+            strPath, O_RDONLY, hDir, &oac );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle(
+            m_pAppRegfs, hDir );
+        ret = m_pAppRegfs->ReadDir(
+            hDir, vecks );
+        if( ERROR( ret ) )
+            break;
+        if( vecks.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        for( auto& elem : vecks )
+            arrAttributes.push_back( elem.szKey );
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetPointValue( 
     IConfigDb* pContext, 
     const std::string& strPtPath /*[ In ]*/,
     const Variant& value /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetPointValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strPtPath;
+        ret = m_pAppRegfs->SetValue(
+            strPath, value, &oac );
+        if( ERROR( ret ) )
+            break;
+
+        HANDLE hcurStm = INVALID_HANDLE;
+        GetCurStream( this, pContext, hcurStm );
+
+        CAppManager_SvrImpl* pm = GetAppManager();
+        pm->NotifyValChange(
+            strPtPath, value, hcurStm );
+
+        this->OnPointChangedInternal(
+            strPtPath, value, hcurStm );
+
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetPointValue( 
     IConfigDb* pContext, 
     const std::string& strPtPath /*[ In ]*/, 
     Variant& rvalue /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetPointValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strPtPath;
+        ret = m_pAppRegfs->GetValue(
+            strPath, rvalue, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetAttrValue( 
@@ -661,10 +317,15 @@ gint32 CAppMonitor_SvrImpl::SetAttrValue(
     const std::string& strAttrPath /*[ In ]*/,
     const Variant& value /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetAttrValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strAttrPath;
+        ret = m_pAppRegfs->SetValue(
+            strPath, value, &oac );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetAttrValue( 
@@ -672,11 +333,17 @@ gint32 CAppMonitor_SvrImpl::GetAttrValue(
     const std::string& strAttrPath /*[ In ]*/, 
     Variant& rvalue /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetAttrValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strAttrPath;
+        ret = m_pAppRegfs->GetValue(
+            strPath, rvalue, &oac );
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetPointValues( 
     IConfigDb* pContext, 
@@ -699,26 +366,48 @@ gint32 CAppMonitor_SvrImpl::GetPointValues(
     return ERROR_NOT_IMPL;
 }
 /* RPC event sender */
-gint32 CAppMonitor_SvrImpl::OnPointChanged(
+gint32 CAppMonitor_SvrImpl::OnPointChangedInternal(
     const std::string& strPtPath /*[ In ]*/,
-    const Variant& value /*[ In ]*/ )
+    const Variant& value /*[ In ]*/,
+    HANDLE hcurStm )
 {
-    std::vector< InterfPtr > vecSkels;
-    gint32 ret = this->EnumStmSkels( vecSkels );
-    if( ERROR( ret ) )
-        return ret;
-    for( auto& elem : vecSkels )
-    {
-        CAppMonitor_SvrSkel* pSkel = elem;
-        ret = pSkel->IIAppMonitor_SImpl::OnPointChanged(
-            strPtPath,
-            value );
-    }
+    gint32 ret = 0;
+    do{
+        auto pos =
+            strPtPath.find_first_of( '/' );
+        if( pos == stdstr::npos )
+            break;
+        stdstr strApp =
+            strPtPath.substr( 0, pos );
+
+        // notify the monitors
+        std::vector< HANDLE > vecStms;
+        ret = GetMonitorToNotify( this,
+            m_pAppRegfs, strApp, vecStms );
+        if( ERROR( ret ) )
+            break;
+
+        for( auto& elem : vecStms )
+        {
+            if( hcurStm == elem )
+                continue;
+            InterfPtr ptrSkel;
+            gint32 iRet =
+                GetStmSkel( elem, ptrSkel );
+            if( ERROR( iRet ) )
+                break;
+            CAppMonitor_SvrSkel* pSkel = ptrSkel;
+            pSkel->IIAppStore_SImpl::OnPointChanged(
+                strPtPath, value );
+        }
+    }while( 0 );
     return ret;
 }
+
 /* RPC event sender */
-gint32 CAppMonitor_SvrImpl::OnPointsChanged(
-    std::vector<KeyValue>& arrKVs /*[ In ]*/ )
+gint32 CAppMonitor_SvrImpl::OnPointsChangedInternal(
+    std::vector<KeyValue>& arrKVs /*[ In ]*/,
+    HANDLE hcurStm )
 {
     std::vector< InterfPtr > vecSkels;
     gint32 ret = this->EnumStmSkels( vecSkels );
@@ -727,11 +416,174 @@ gint32 CAppMonitor_SvrImpl::OnPointsChanged(
     for( auto& elem : vecSkels )
     {
         CAppMonitor_SvrSkel* pSkel = elem;
-        ret = pSkel->IIAppMonitor_SImpl::OnPointsChanged(
+        ret = pSkel->IIAppStore_SImpl::OnPointsChanged(
             arrKVs );
     }
     return ret;
 }
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::RegisterListener( 
+    IConfigDb* pContext, 
+    std::vector<std::string>& arrApps /*[ In ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        HANDLE hstm;
+        ret = GetCurStream( this, pContext, hstm );
+        if( ERROR( ret ) )
+            break;
+
+        GETAC( pContext );
+        stdstr strPath = "/" APPS_ROOT_DIR;
+        std::vector< KEYPTR_SLOT > vecks;
+        RFHANDLE hDir = INVALID_HANDLE;
+        ret = m_pAppRegfs->OpenDir(
+            strPath, O_RDONLY, hDir, &oac );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle(
+            m_pAppRegfs, hDir );
+
+        std::vector< stdstr > vecValidApps;
+        auto itr1 = arrApps.begin();
+        while( itr1 != arrApps.end() )
+        {
+            ret = m_pAppRegfs->Access(
+                hDir, itr1->c_str(),
+                R_OK | X_OK, &oac );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+                continue;
+            }
+            vecValidApps.push_back( *itr1 );
+        }
+
+        stdstr strStmFile = std::to_string( hstm );
+        for( auto& elem : vecValidApps )
+        {
+            stdstr strAppPath =
+                strPath + "/" + elem;
+            stdstr strStmPath = strAppPath + "/" 
+                MONITOR_STREAM_DIR + "/" +
+                strStmFile;
+            guint32 dwUid = 0, dwGid = 0;
+            ret = m_pAppRegfs->GetUid(
+                strAppPath, dwUid );
+            if( ERROR( ret ) )
+                continue;
+            ret = m_pAppRegfs->GetGid(
+                strAppPath, dwGid );
+            if( ERROR( ret ) )
+                continue;
+            HANDLE hFile = INVALID_HANDLE;
+            ret = m_pAppRegfs->CreateFile(
+                strStmFile, 0640, O_RDWR,
+                hFile );
+            if( ERROR( ret ) )
+                continue;
+
+            CFileHandle oHandle(
+                m_pAppRegfs, hFile );
+            m_pAppRegfs->SetUid( hFile, dwUid );
+            m_pAppRegfs->SetGid( hFile, dwGid );
+        }
+        ret = 0;
+        CStdRMutex oLock( GetLock() );
+        auto itr = m_mapListeners.find( hstm );
+        StrSetPtr pStrSet;
+        if( itr == m_mapListeners.end() )
+        {
+            ret = pStrSet.NewObj();
+            if( ERROR( ret ) )
+                break;
+            m_mapListeners.insert(
+                { hstm, pStrSet } );
+        }
+        else
+        {
+            pStrSet = itr->second;
+        }
+        for( auto& elem : vecValidApps )
+            ( *pStrSet )().insert( elem );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAppMonitor_SvrImpl::RemoveListenerInternal(
+    HANDLE hstm, CAccessContext* pac )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPath = "/" APPS_ROOT_DIR;
+
+        RFHANDLE hDir = INVALID_HANDLE;
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = m_pAppRegfs->OpenDir(
+            strPath, O_RDONLY, hDir, pac );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle(
+            m_pAppRegfs, hDir );
+
+        CStdRMutex oLock( GetLock() );
+        auto itr = m_mapListeners.find( hstm );
+        StrSetPtr pStrSet;
+        if( itr == m_mapListeners.end() )
+            break;
+        pStrSet = itr->second;
+        m_mapListeners.erase( itr );
+        oLock.Unlock();
+
+        stdstr strStmFile = std::to_string( hstm );
+        for( auto& elem : ( *pStrSet )() )
+        {
+            stdstr strAppPath =
+                strPath + "/" + elem;
+            stdstr strStmPath = strAppPath + "/" 
+                MONITOR_STREAM_DIR + "/" +
+                strStmFile;
+            ret = m_pAppRegfs->RemoveFile(
+                strStmFile, pac );
+            if( ERROR( ret ) )
+                DebugPrint( ret, "Error, filed to "
+                    "remove listener %s",
+                    strStmFile );
+        }
+    }while( 0 );
+    return ret;
+}
+
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::RemoveListener( 
+    IConfigDb* pContext )
+{
+    gint32 ret = 0;
+    do{
+        HANDLE hstm;
+        ret = GetCurStream( this, pContext, hstm );
+        if( ERROR( ret ) )
+            break;
+
+        GETAC( pContext );
+        ret = RemoveListenerInternal( hstm, &oac );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAppMonitor_SvrImpl::RemoveStmSkel(
+    HANDLE hstm )
+{
+    gint32 ret = 0;
+    do{
+        RemoveListenerInternal( hstm, nullptr );
+        ret = super::RemoveStmSkel( hstm );
+    }while( 0 );
+    return ret;
+}
+
 gint32 CAppMonitor_SvrImpl::CreateStmSkel(
     HANDLE hStream, guint32 dwPortId, InterfPtr& pIf )
 {
@@ -994,3 +846,4 @@ gint32 CAppMonitor_ChannelSvr::OnStreamReady(
     }while( 0 );
     return ret;
 }
+

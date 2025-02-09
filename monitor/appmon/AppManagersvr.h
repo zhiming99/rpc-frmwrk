@@ -5,66 +5,51 @@
 #pragma once
 #include "appmon.h"
 #include "blkalloc.h"
-#include <unordered_set>
+#define Clsid_CAppManager_SvrBase    Clsid_Invalid
 
-#define Clsid_CAppMonitor_SvrBase    Clsid_Invalid
-
-struct CFlockHelper
+typedef enum : guint32
 {
-    gint32 m_iFd = -1;
-    public:
-    CFlockHelper( gint32 iFd, bool bRead = true );
-    ~CFlockHelper();
-};
+    ptInvalid = 0xffffffff,
+    ptOutput = 0,
+    ptInput = 1,
+    ptSetPoint = 2,
+} EnumPointType;
 
-struct CFileHandle
-{
-    RFHANDLE m_hFile = INVALID_HANDLE;
-    ObjPtr m_pFs;
-    public:
-    CFileHandle( ObjPtr pFs, RFHANDLE hFile )
-    { m_hFile = hFile; m_pFs = pFs; }
-    ~CFileHandle();
-};
+DECLARE_AGGREGATED_SERVER(
+    CAppManager_SvrBase,
+    CStatCounters_SvrBase,
+    IIAppStore_SvrApi,
+    IIDataProducer_SvrApi,
+    CFastRpcServerBase );
 
 extern rpcf::RegFsPtr g_pAppRegfs;
 
-DECLARE_AGGREGATED_SERVER(
-    CAppMonitor_SvrBase,
-    CStatCounters_SvrBase,
-    IIAppStore_SvrApi,
-    IIAppMonitor_SvrApi,
-    CFastRpcServerBase );
-
-class CAppMonitor_SvrImpl
-    : public CAppMonitor_SvrBase
+class CAppManager_SvrImpl
+    : public CAppManager_SvrBase
 {
     protected:
-    using UID2GIDS = std::hashmap< guint32, IntSetPtr >;
-    UID2GIDS m_mapUid2Gids;
-
-    std::hashmap< HANDLE, StrSetPtr > m_mapListeners;
-
-    gint32 GetLoginInfo(
-        IConfigDb* pCtx, CfgPtr& pInfo ) const;
-
-    gint32 GetUid( IConfigDb* pInfo,
-        guint32& dwUid ) const;
 
     RegFsPtr m_pAppRegfs;
-
-    gint32 RemoveListenerInternal(
-        HANDLE hstm, CAccessContext* pac );
+    std::hashmap< HANDLE, StrSetPtr > m_mapAppOwners;
 
     public:
-    typedef CAppMonitor_SvrBase super;
-    CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :
+    typedef CAppManager_SvrBase super;
+    CAppManager_SvrImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg ),
         m_pAppRegfs( g_pAppRegfs )
-    { SetClassId( clsid(CAppMonitor_SvrImpl ) ); }
+    { SetClassId( clsid(CAppManager_SvrImpl ) ); }
+
+    bool IsAppOnline( const stdstr& strAppName );
 
     gint32 OnPostStart(
-        IEventSink* pCallback ) override;
+        IEventSink* pCallback ) override
+    {
+        TaskletPtr pTask = GetUpdateTokenTask();
+        StartQpsTask( pTask );
+        if( !pTask.IsEmpty() )
+            AllocReqToken();
+        return super::OnPostStart( pCallback );
+    }
 
     gint32 OnPreStop(
         IEventSink* pCallback ) override
@@ -72,8 +57,6 @@ class CAppMonitor_SvrImpl
         StopQpsTask();
         return super::OnPreStop( pCallback );
     }
-
-    gint32 RemoveStmSkel( HANDLE hstm ) override;
 
     //RPC Async Req Cancel Handler
     gint32 OnListAppsCanceled(
@@ -200,71 +183,64 @@ class CAppMonitor_SvrImpl
         IConfigDb* pReqCtx_,
         std::vector<std::string>& arrPtPaths /*[ In ]*/,
         std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ ) override;
-
-    gint32 OnPointChangedInternal(
-        const std::string& strPtPath /*[ In ]*/,
-        const Variant& value /*[ In ]*/,
-        HANDLE hcurStm = INVALID_HANDLE );
-
     gint32 OnPointChanged(
         const std::string& strPtPath /*[ In ]*/,
-        const Variant& value /*[ In ]*/ ) override
-    { return OnPointChangedInternal( strPtPath, value ); }
-
-    gint32 OnPointsChangedInternal(
-        std::vector<KeyValue>& arrKVs /*[ In ]*/,
-        HANDLE hcurStm = INVALID_HANDLE );
-
+        const Variant& value /*[ In ]*/ ) override;
     gint32 OnPointsChanged(
-        std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override
-    { return OnPointsChangedInternal( arrKVs ); }
+        std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
-    gint32 OnRegisterListenerCanceled(
+    gint32 OnClaimAppInstsCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         std::vector<std::string>& arrApps /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
-            "request 'RegisterListener' is canceled." );
+            "request 'ClaimAppInsts' is canceled." );
         return STATUS_SUCCESS;
     }
     //RPC Async Req Handler
-    gint32 RegisterListener(
+    gint32 ClaimAppInsts(
         IConfigDb* pReqCtx_,
         std::vector<std::string>& arrApps /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
-    gint32 OnRemoveListenerCanceled(
-        IConfigDb* pReqCtx_, gint32 iRet ) override
+    gint32 OnFreeAppInstsCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        std::vector<std::string>& arrApps /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
-            "request 'RemoveListener' is canceled." );
+            "request 'FreeAppInsts' is canceled." );
         return STATUS_SUCCESS;
     }
+
+    gint32 FreeAppInstsInternal( HANDLE hstm,
+        std::vector<stdstr>& arrApps );
+
     //RPC Async Req Handler
-    gint32 RemoveListener(
-        IConfigDb* pReqCtx_ ) override;
+    gint32 FreeAppInsts(
+        IConfigDb* pReqCtx_,
+        std::vector<std::string>& arrApps /*[ In ]*/ ) override;
     gint32 CreateStmSkel(
         HANDLE, guint32, InterfPtr& ) override;
     
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
-    gint32 LoadUserGrpsMap();
-    bool IsUserValid( guint32 dwUid ) const;
-    gint32 GetAccessContext(
-        IConfigDb* pReqCtx,
-        CAccessContext& oac ) const;
+
+    gint32 NotifyValChange(
+        const stdstr strPtPath,
+        const Variant& value,
+        RFHANDLE hcurStm );
+
+    gint32 RemoveStmSkel( HANDLE hstm ) override;
 };
 
-class CAppMonitor_ChannelSvr
+class CAppManager_ChannelSvr
     : public CRpcStreamChannelSvr
 {
     public:
     typedef CRpcStreamChannelSvr super;
-    CAppMonitor_ChannelSvr(
+    CAppManager_ChannelSvr(
         const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(
-        CAppMonitor_ChannelSvr ) ); }
-
-    gint32 OnStreamReady( HANDLE hstm ) override;
+        CAppManager_ChannelSvr ) ); }
 };
 
