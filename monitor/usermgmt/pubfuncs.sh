@@ -394,6 +394,34 @@ function list_users_group()
     done
 }
 
+function list_users()
+{
+    _udir=./users
+    if is_dir_empty $_udir; then
+        echo None
+        return 0
+    fi
+    pushd $_udir > /dev/null
+    for i in *; do
+        echo $i
+    done
+    popd > /dev/null
+}
+
+function list_groups()
+{
+    _gdir=./groups
+    if is_dir_empty $_gdir; then
+        echo no groups
+        return 0
+    fi
+    pushd $_gdir > /dev/null
+    for i in *; do
+        echo $i
+    done
+    popd > /dev/null
+}
+
 function disable_user()
 {
     if [ "x$1" == "x" ] ; then

@@ -33,6 +33,8 @@ appmonsvr_LDFLAGS=-rdynamic
 
 if ENABLE_FUSE3
 appmonsvr_CPPFLAGS+= -DFUSE3
+dist_appmonscr_SCRIPTS=initappreg.sh appfuncs.sh
+appmonscrdir=$(bindir)/rpcf
 endif
 
 appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)

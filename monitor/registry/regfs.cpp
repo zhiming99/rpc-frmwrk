@@ -1148,6 +1148,21 @@ gint32 CRegistryFs::Chmod(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            {
+                READ_LOCK( m_pRootImg );
+                if( pac != nullptr )
+                {
+                    ret = m_pRootImg->CheckAccess(
+                        W_OK, pac );
+                    if( ERROR( ret ) )
+                        break;
+                }
+            }
+            m_pRootImg->SetMode( dwMode );
+            break;
+        }
         FImgSPtr dirPtr;
         stdstr strNormPath;
         ret = GetParentDir( strPath,
@@ -1189,6 +1204,22 @@ gint32 CRegistryFs::Chown(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( strPath == "/" )
+        {
+            {
+                READ_LOCK( m_pRootImg );
+                if( pac != nullptr )
+                {
+                    ret = m_pRootImg->CheckAccess(
+                        W_OK, pac );
+                    if( ERROR( ret ) )
+                        break;
+                }
+            }
+            m_pRootImg->SetUid( dwUid );
+            m_pRootImg->SetGid( dwGid );
+            break;
+        }
         FImgSPtr dirPtr;
         stdstr strNormPath;
         ret = GetParentDir( strPath,
