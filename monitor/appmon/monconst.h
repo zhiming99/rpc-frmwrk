@@ -28,3 +28,8 @@
 #define OWNER_STREAM_FILE   "owner_stream"
 #define POINT_TYPE_FILE     "ptype"
 #define OUTPUT_LINKS_DIR    "ptrs"
+#define OUTPUT_PULSE        "pulse"
+#define OUTPUT_LATCH        "latch"
+#define POINTS_DIR        "points"
+#define VALUE_FILE        "value"
+#define USER_ROOT_DIR     "users"

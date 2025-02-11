@@ -17,7 +17,7 @@ if [ ! -d ./testmnt ]; then mkdir ./testmnt; fi
 if [ -f usereg.dat ]; then
    echo "you are going to format the user registry, continue ( y/n )?(default: yes)"
    read answer
-   if [ "x$answer" == "xy" ] || ["x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
+   if [ "x$answer" == "xy" ] || [ "x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
        mv usereg.dat usereg.dat.bak
    else
        exit 0

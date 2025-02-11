@@ -65,7 +65,7 @@ if [ ! -d ./testmnt ]; then mkdir ./testmnt; fi
 if [ -f appreg.dat ]; then
    echo "you are going to format the application registry, continue ( y/n )?(default: yes)"
    read answer
-   if [ "x$answer" == "xy" ] || ["x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
+   if [ "x$answer" == "xy" ] || [ "x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
        mv appreg.dat appreg.dat.bak
        regfsmnt -i ./appreg.dat || exit $?
    else

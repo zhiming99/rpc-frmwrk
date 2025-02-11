@@ -1497,6 +1497,11 @@ gint32 CFileImage::ReadValue(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( m_oValue.GetTypeId() == typeNone )
+        {
+            ret = -ENODATA;
+            break;
+        }
         oVar = m_oValue;
     }while( 0 );
     return ret;
@@ -1507,6 +1512,12 @@ gint32 CFileImage::WriteValue(
 {
     gint32 ret = 0;
     do{
+        EnumTypeId iType = oVar.GetTypeId();
+        if( iType >= typeByteArr )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
         WRITE_LOCK( this );
         m_oValue = oVar;
         UpdateCtime();

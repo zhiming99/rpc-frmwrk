@@ -46,6 +46,12 @@ gint32 GetPointType(
     return ret;
 }
 
+gint32 SplitPath( const stdstr& strPath,
+    std::vector< stdstr >& vecComp )
+{
+    return CRegistryFs::Namei( strPath, vecComp );
+}
+
 gint32 GetMonitorToNotify(
     CFastRpcServerBase* pIf,
     RegFsPtr pAppReg,
@@ -177,8 +183,7 @@ gint32 GetInputToNotify(
             strPath, O_RDONLY, hDir );
         if( ERROR( ret ) )
             break;
-        CFileHandle oHandle(
-            pAppReg, hDir );
+        CFileHandle oHandle( pAppReg, hDir );
         ret = pAppReg->ReadDir( hDir, vecks );
         if( ERROR( ret ) )
             break;
@@ -341,12 +346,15 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
         if( ERROR( ret ) )
             break;
 
-        auto pos =
-            strPtPath.find_first_of( '/' );
-        if( pos == stdstr::npos )
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
             break;
-        stdstr strApp =
-            strPtPath.substr( 0, pos );
+        }
+
+        const stdstr& strApp = vecComps[ 0 ];
 
         gint32 iRet = 0;
         if( dwType == ptOutput )
@@ -401,9 +409,42 @@ gint32 CAppManager_SvrImpl::SetPointValue(
     gint32 ret = 0;
     do{
         stdstr strPath = "/" APPS_ROOT_DIR "/";
-        strPath += strPtPath;
+        Variant oOrigin;
+
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        RFHANDLE hPtDir;
+
+        ret = m_pAppRegfs->OpenDir( strPath +
+            strApp + POINTS_DIR "/" + strPoint,
+            O_RDONLY, hPtDir );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle(
+            m_pAppRegfs, hPtDir );
+
+        ret = m_pAppRegfs->Access(
+            hPtDir, OUTPUT_PULSE, F_OK );
+        if( ERROR( ret ) )
+        {
+            ret = m_pAppRegfs->GetValue( hPtDir,
+                VALUE_FILE, oOrigin );
+            if( SUCCEEDED( ret ) &&
+                oOrigin == value )
+                break;
+            ret = 0;
+        }
         ret = m_pAppRegfs->SetValue(
-            strPath, value );
+            hPtDir, VALUE_FILE, value );
         if( ERROR( ret ) )
             break;
 
@@ -428,10 +469,14 @@ gint32 CAppManager_SvrImpl::GetPointValue(
     const std::string& strPtPath /*[ In ]*/, 
     Variant& rvalue /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetPointValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strPtPath;
+        ret = m_pAppRegfs->GetValue(
+            strPath, rvalue );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetAttrValue( 
@@ -439,10 +484,10 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
     const std::string& strAttrPath /*[ In ]*/,
     const Variant& value /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetAttrValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    stdstr strPath = "/" APPS_ROOT_DIR "/";
+    strPath += strAttrPath;
+    return m_pAppRegfs->SetValue(
+        strPath, value );
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::GetAttrValue( 
@@ -450,32 +495,61 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
     const std::string& strAttrPath /*[ In ]*/, 
     Variant& rvalue /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetAttrValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    stdstr strPath = "/" APPS_ROOT_DIR "/";
+    strPath += strAttrPath;
+    return m_pAppRegfs->GetValue(
+        strPath, rvalue );
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetPointValues( 
     IConfigDb* pContext, 
     std::vector<KeyValue>& arrValues /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetPointValuesComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        guint32 dwCount = 0;
+        for( auto& elem : arrValues )
+        {
+            ret = SetPointValue( pContext,
+                elem.strKey, elem.oValue );
+            if( ERROR( ret ) )
+                dwCount++;
+        }
+        if( dwCount )
+        {
+            ret = ( gint32 )dwCount;
+            ret = -ret;
+        }
+    }while( 0 );
+    return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::GetPointValues( 
     IConfigDb* pContext, 
     std::vector<std::string>& arrPtPaths /*[ In ]*/, 
     std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetPointValuesComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        for( auto& elem : arrPtPaths )
+        {
+            Variant rval;
+            ret = GetPointValue( pContext, elem, rval );
+            if( SUCCEEDED( ret ) )
+            {
+                KeyValue okv;
+                okv.strKey = elem;
+                okv.oValue = rval;
+                arrKeyVals.push_back( okv );
+            }
+        }
+    }while( 0 );
+    if( arrKeyVals.empty() )
+        return -ENOENT;
+    return ret;
 }
+
 /* RPC event sender */
 gint32 CAppManager_SvrImpl::OnPointChanged(
     const std::string& strPtPath /*[ In ]*/,

@@ -403,7 +403,8 @@ function list_users()
     fi
     pushd $_udir > /dev/null
     for i in *; do
-        echo $i
+        _uidval=`python3 ${updattr} -v $i/uid`
+        echo $i:$_uidval
     done
     popd > /dev/null
 }
@@ -417,7 +418,8 @@ function list_groups()
     fi
     pushd $_gdir > /dev/null
     for i in *; do
-        echo $i
+        _gidval=`python3 ${updattr} -v $i/gid`
+        echo $i:$_gidval
     done
     popd > /dev/null
 }

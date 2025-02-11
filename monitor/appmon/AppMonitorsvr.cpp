@@ -29,6 +29,10 @@ extern gint32 GetCurStream(
 
 extern InterfPtr GetAppManager();
 
+extern gint32 SplitPath(
+    const stdstr& strPath,
+    std::vector< stdstr >& vecComp );
+
 CFlockHelper::CFlockHelper(
     gint32 iFd, bool bRead )
 {
@@ -128,13 +132,14 @@ gint32 CAppMonitor_SvrImpl::GetAccessContext(
 }
 
 #define GETAC( _pContext ) \
-        CAccessContext oac; \
+        CAccessContext oac, *pac; \
         ret = GetAccessContext( ( _pContext ), oac ); \
         if( ret == -EACCES ) \
             break; \
         if( ret != -ENOENT && ERROR( ret ) ) \
-            break
-
+            break; \
+        else if( ret == -ENOENT ) pac = nullptr; \
+        else pac = &oac;
 
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::ListApps( 
@@ -148,7 +153,7 @@ gint32 CAppMonitor_SvrImpl::ListApps(
         stdstr strPath = "/" APPS_ROOT_DIR;
         std::vector< KEYPTR_SLOT > vecks;
         ret = m_pAppRegfs->OpenDir(
-            strPath, O_RDONLY, hDir, &oac );
+            strPath, O_RDONLY, hDir, pac );
         if( ERROR( ret ) )
             break;
         CFileHandle oHandle(
@@ -166,7 +171,7 @@ gint32 CAppMonitor_SvrImpl::ListApps(
         {
             ret = m_pAppRegfs->Access(
                 hDir, elem.szKey,
-                R_OK| X_OK, &oac );
+                R_OK| X_OK, pac );
             if( ERROR( ret ) )
             {
                 ret = 0;
@@ -196,7 +201,7 @@ gint32 CAppMonitor_SvrImpl::ListPoints(
         strPath+= strAppPath;
         std::vector< KEYPTR_SLOT > vecks;
         ret = m_pAppRegfs->OpenDir(
-            strPath, O_RDONLY, hDir, &oac );
+            strPath, O_RDONLY, hDir, pac );
         if( ERROR( ret ) )
             break;
         CFileHandle oHandle(
@@ -214,7 +219,7 @@ gint32 CAppMonitor_SvrImpl::ListPoints(
         {
             ret = m_pAppRegfs->Access(
                 hDir, elem.szKey,
-                R_OK | X_OK, &oac );
+                R_OK | X_OK, pac );
             if( ERROR( ret ) )
             {
                 ret = 0;
@@ -245,7 +250,7 @@ gint32 CAppMonitor_SvrImpl::ListAttributes(
         strPath += strPtPath;
         std::vector< KEYPTR_SLOT > vecks;
         ret = m_pAppRegfs->OpenDir(
-            strPath, O_RDONLY, hDir, &oac );
+            strPath, O_RDONLY, hDir, pac );
         if( ERROR( ret ) )
             break;
         CFileHandle oHandle(
@@ -275,9 +280,40 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
     do{
         GETAC( pContext );
         stdstr strPath = "/" APPS_ROOT_DIR "/";
-        strPath += strPtPath;
+        Variant oOrigin;
+
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        RFHANDLE hPtDir;
+
+        ret = m_pAppRegfs->OpenDir( strPath +
+            strApp + "/" POINTS_DIR "/" + strPoint,
+            O_RDONLY, hPtDir, pac );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle( m_pAppRegfs, hPtDir );
+        ret = m_pAppRegfs->Access( hPtDir, 
+            OUTPUT_PULSE, F_OK, pac );
+        if( ERROR( ret ) )
+        {
+            ret = m_pAppRegfs->GetValue( hPtDir,
+                VALUE_FILE, oOrigin );
+            if( SUCCEEDED( ret ) &&
+                oOrigin == value )
+                break;
+            ret = 0;
+        }
         ret = m_pAppRegfs->SetValue(
-            strPath, value, &oac );
+            hPtDir, VALUE_FILE, value, pac );
         if( ERROR( ret ) )
             break;
 
@@ -303,11 +339,10 @@ gint32 CAppMonitor_SvrImpl::GetPointValue(
 {
     gint32 ret = 0;
     do{
-        GETAC( pContext );
-        stdstr strPath = "/" APPS_ROOT_DIR "/";
-        strPath += strPtPath;
-        ret = m_pAppRegfs->GetValue(
-            strPath, rvalue, &oac );
+        stdstr strAttrPath =
+            strPtPath + "/" VALUE_FILE;
+        ret = GetAttrValue(
+            pContext, strAttrPath, rvalue );
     }while( 0 );
     return ret;
 }
@@ -321,12 +356,26 @@ gint32 CAppMonitor_SvrImpl::SetAttrValue(
     do{
         GETAC( pContext );
         stdstr strPath = "/" APPS_ROOT_DIR "/";
-        strPath += strAttrPath;
+
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strAttrPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        const stdstr& strAttr = vecComps[ 2 ];
+        stdstr strAttrVal =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/" + strAttr; 
         ret = m_pAppRegfs->SetValue(
-            strPath, value, &oac );
+            strAttrVal, value, pac );
     }while( 0 );
     return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetAttrValue( 
     IConfigDb* pContext, 
@@ -337,9 +386,22 @@ gint32 CAppMonitor_SvrImpl::GetAttrValue(
     do{
         GETAC( pContext );
         stdstr strPath = "/" APPS_ROOT_DIR "/";
-        strPath += strAttrPath;
-        ret = m_pAppRegfs->GetValue(
-            strPath, rvalue, &oac );
+
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strAttrPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        const stdstr& strAttr = vecComps[ 2 ];
+        stdstr strAttrVal =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/" + strAttr; 
+        ret = m_pAppRegfs->SetValue(
+            strAttrVal, rvalue, pac );
     }while( 0 );
     return ret;
 }
@@ -349,10 +411,23 @@ gint32 CAppMonitor_SvrImpl::SetPointValues(
     IConfigDb* pContext, 
     std::vector<KeyValue>& arrValues /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetPointValuesComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        guint32 dwCount = 0;
+        for( auto& elem : arrValues )
+        {
+            ret = SetPointValue( pContext,
+                elem.strKey, elem.oValue );
+            if( ERROR( ret ) )
+                dwCount++;
+        }
+        if( dwCount )
+        {
+            ret = ( gint32 )dwCount;
+            ret = -ret;
+        }
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetPointValues( 
@@ -360,11 +435,26 @@ gint32 CAppMonitor_SvrImpl::GetPointValues(
     std::vector<std::string>& arrPtPaths /*[ In ]*/, 
     std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetPointValuesComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    do{
+        for( auto& elem : arrPtPaths )
+        {
+            Variant rval;
+            ret = GetPointValue( pContext, elem, rval );
+            if( SUCCEEDED( ret ) )
+            {
+                KeyValue okv;
+                okv.strKey = elem;
+                okv.oValue = rval;
+                arrKeyVals.push_back( okv );
+            }
+        }
+    }while( 0 );
+    if( arrKeyVals.empty() )
+        return -ENOENT;
+    return ret;
 }
+
 /* RPC event sender */
 gint32 CAppMonitor_SvrImpl::OnPointChangedInternal(
     const std::string& strPtPath /*[ In ]*/,
@@ -376,7 +466,10 @@ gint32 CAppMonitor_SvrImpl::OnPointChangedInternal(
         auto pos =
             strPtPath.find_first_of( '/' );
         if( pos == stdstr::npos )
+        {
+            ret = -EINVAL;
             break;
+        }
         stdstr strApp =
             strPtPath.substr( 0, pos );
 
@@ -438,7 +531,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
         std::vector< KEYPTR_SLOT > vecks;
         RFHANDLE hDir = INVALID_HANDLE;
         ret = m_pAppRegfs->OpenDir(
-            strPath, O_RDONLY, hDir, &oac );
+            strPath, O_RDONLY, hDir, pac );
         if( ERROR( ret ) )
             break;
         CFileHandle oHandle(
@@ -450,7 +543,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
         {
             ret = m_pAppRegfs->Access(
                 hDir, itr1->c_str(),
-                R_OK | X_OK, &oac );
+                R_OK | X_OK, pac );
             if( ERROR( ret ) )
             {
                 ret = 0;
@@ -567,7 +660,7 @@ gint32 CAppMonitor_SvrImpl::RemoveListener(
             break;
 
         GETAC( pContext );
-        ret = RemoveListenerInternal( hstm, &oac );
+        ret = RemoveListenerInternal( hstm, pac );
 
     }while( 0 );
     return ret;
@@ -669,19 +762,19 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
         gint32 iFd = g_pUserRegfs->GetFd();
         CFlockHelper oFlock( iFd );
         RFHANDLE hDir = INVALID_HANDLE;
-        ret = pfs->OpenDir( "/users", 0, hDir );
+        ret = pfs->OpenDir( "/" USER_ROOT_DIR, 0, hDir );
         if( ERROR( ret ) )
             break;
+        CFileHandle oHandle( pfs, hDir );
         std::vector<KEYPTR_SLOT> vecDirEnt;
         ret = pfs->ReadDir( hDir, vecDirEnt );
         if( ERROR( ret ) )
             break;
         if( vecDirEnt.empty() )
             break;
-        pfs->CloseFile( hDir );
         for( auto& ks : vecDirEnt )
         {
-            stdstr strPath = "/users/";
+            stdstr strPath = "/" USER_ROOT_DIR "/";
             strPath += ks.szKey;
             Variant oVar;
             ret = pfs->GetValue(
@@ -700,7 +793,7 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
             std::vector< KEYPTR_SLOT > vecGrpEnt;
             IntSetPtr psetGids;
             psetGids.NewObj( clsid( CStlIntSet ) );
-            strPath = "/users/";
+            strPath = "/" USER_ROOT_DIR "/";
             strPath += ks.szKey;
             strPath += "/groups";
 
@@ -708,6 +801,7 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
             ret = pfs->OpenDir( strPath, 0, hGrps );
             if( ERROR( ret ) )
                 break;
+            CFileHandle oHandle( pfs, hGrps );
             std::vector<KEYPTR_SLOT> vecGidEnt;
             ret = pfs->ReadDir( hGrps, vecGidEnt );
             if( ERROR( ret ) )
@@ -721,7 +815,6 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
                     ks2.szKey, nullptr, 10 );
                 ( *psetGids )().insert( dwGid );
             }
-            ret = pfs->CloseFile( hGrps );
             CStdRMutex oLock( this->GetLock() );
             m_mapUid2Gids.insert(
                 { dwUid, psetGids });
