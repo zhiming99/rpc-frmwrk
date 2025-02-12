@@ -2347,6 +2347,7 @@ gint32 CDeclInterfProxy::OutputAsync(
             CCOUT << "IConfigDb* context, ";
             NEW_LINE;
             CCOUT << "gint32 iRet,";
+            NEW_LINE;
             strDecl += ",";
             GenFormInArgs( pOutArgs );
             CCOUT << " ) = 0;";

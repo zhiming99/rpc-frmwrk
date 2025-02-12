@@ -200,7 +200,8 @@ class CAppManager_SvrImpl
     //RPC Async Req Handler
     gint32 ClaimAppInsts(
         IConfigDb* pReqCtx_,
-        std::vector<std::string>& arrApps /*[ In ]*/ ) override;
+        std::vector<std::string>& arrApps /*[ In ]*/,
+        std::vector<KeyValue>& arrInitKVs /*[ Out ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnFreeAppInstsCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,

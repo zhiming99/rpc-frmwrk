@@ -56,6 +56,8 @@ class CAppMonitor_SvrImpl
     gint32 RemoveListenerInternal(
         HANDLE hstm, CAccessContext* pac );
 
+    bool IsAppRegistered( HANDLE hstm,
+        const stdstr& strApp ) const;
     public:
     typedef CAppMonitor_SvrBase super;
     CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :

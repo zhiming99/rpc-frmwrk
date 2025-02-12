@@ -270,6 +270,24 @@ gint32 CAppMonitor_SvrImpl::ListAttributes(
     return ret;
 }
 
+bool CAppMonitor_SvrImpl::IsAppRegistered(
+    HANDLE hstm, const stdstr& strApp ) const
+{
+    bool ret = false;
+    if( hstm == INVALID_HANDLE )
+        return ret;
+    do{
+        CStdRMutex oLock( GetLock() );
+        auto itr = m_mapListeners.find( hstm );
+        if( itr == m_mapListeners.end() )
+            break;
+        StrSetPtr pStrSet = itr->second;
+        auto itr2 = ( *pStrSet )().find( strApp );
+        if( itr2 != ( *pStrSet )().end() )
+            ret = true;
+    }while( 0 );
+    return ret;
+}
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetPointValue( 
     IConfigDb* pContext, 
@@ -290,10 +308,15 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
             break;
         }
 
+        HANDLE hcurStm = INVALID_HANDLE;
+        GetCurStream( this, pContext, hcurStm );
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
-        RFHANDLE hPtDir;
 
+        if( !IsAppRegistered( hcurStm, strApp ) )
+            break;
+
+        RFHANDLE hPtDir;
         ret = m_pAppRegfs->OpenDir( strPath +
             strApp + "/" POINTS_DIR "/" + strPoint,
             O_RDONLY, hPtDir, pac );
@@ -316,9 +339,6 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
             hPtDir, VALUE_FILE, value, pac );
         if( ERROR( ret ) )
             break;
-
-        HANDLE hcurStm = INVALID_HANDLE;
-        GetCurStream( this, pContext, hcurStm );
 
         CAppManager_SvrImpl* pm = GetAppManager();
         pm->NotifyValChange(
@@ -419,16 +439,12 @@ gint32 CAppMonitor_SvrImpl::SetPointValues(
             ret = SetPointValue( pContext,
                 elem.strKey, elem.oValue );
             if( ERROR( ret ) )
-                dwCount++;
-        }
-        if( dwCount )
-        {
-            ret = ( gint32 )dwCount;
-            ret = -ret;
+                break;
         }
     }while( 0 );
     return ret;
 }
+
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetPointValues( 
     IConfigDb* pContext, 

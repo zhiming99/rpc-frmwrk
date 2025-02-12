@@ -26,7 +26,8 @@ gint32 CAppManager_CliImpl::OnPointsChanged(
 }
 /* Async callback handler */
 gint32 CAppManager_CliImpl::ClaimAppInstsCallback( 
-    IConfigDb* context, gint32 iRet )
+    IConfigDb* context, gint32 iRet,
+    std::vector<KeyValue>& arrInitKVs /*[ In ]*/ )
 {
     // TODO: Process the server response here
     // return code ignored

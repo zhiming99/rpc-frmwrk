@@ -62,7 +62,7 @@ interface IDataProducer
 {
     [async]ClaimAppInsts(
         array< string > arrApps )
-    returns();
+    returns( array< KeyValue > arrInitKVs );
 
     [async]FreeAppInsts(
         array< string > arrApps )

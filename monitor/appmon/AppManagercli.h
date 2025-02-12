@@ -42,7 +42,8 @@ class CAppManager_CliImpl
     // RPC Async Req Callback
     gint32 ClaimAppInstsCallback(
         IConfigDb* context, 
-        gint32 iRet ) override;
+        gint32 iRet,
+        std::vector<KeyValue>& arrInitKVs /*[ In ]*/ ) override;
     // RPC Async Req Callback
     gint32 FreeAppInstsCallback(
         IConfigDb* context, 

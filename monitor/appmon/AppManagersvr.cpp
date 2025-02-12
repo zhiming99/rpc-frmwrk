@@ -471,10 +471,10 @@ gint32 CAppManager_SvrImpl::GetPointValue(
 {
     gint32 ret = 0;
     do{
-        stdstr strPath = "/" APPS_ROOT_DIR "/";
-        strPath += strPtPath;
-        ret = m_pAppRegfs->GetValue(
-            strPath, rvalue );
+        stdstr strAttrPath =
+            strPtPath + "/" VALUE_FILE;
+        ret = GetAttrValue(
+            pContext, strAttrPath, rvalue );
     }while( 0 );
     return ret;
 }
@@ -484,10 +484,26 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
     const std::string& strAttrPath /*[ In ]*/,
     const Variant& value /*[ In ]*/ )
 {
-    stdstr strPath = "/" APPS_ROOT_DIR "/";
-    strPath += strAttrPath;
-    return m_pAppRegfs->SetValue(
-        strPath, value );
+    gint32 ret = 0;
+    do{
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strAttrPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        const stdstr& strAttr = vecComps[ 2 ];
+        stdstr strAttrVal =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/" + strAttr; 
+        ret = m_pAppRegfs->SetValue(
+            strAttrVal, value );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::GetAttrValue( 
@@ -495,10 +511,27 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
     const std::string& strAttrPath /*[ In ]*/, 
     Variant& rvalue /*[ Out ]*/ )
 {
-    stdstr strPath = "/" APPS_ROOT_DIR "/";
-    strPath += strAttrPath;
-    return m_pAppRegfs->GetValue(
-        strPath, rvalue );
+    gint32 ret = 0;
+    do{
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strAttrPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        const stdstr& strAttr = vecComps[ 2 ];
+        stdstr strAttrVal =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/" + strAttr; 
+        ret = m_pAppRegfs->SetValue(
+            strAttrVal, rvalue );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetPointValues( 
@@ -513,12 +546,7 @@ gint32 CAppManager_SvrImpl::SetPointValues(
             ret = SetPointValue( pContext,
                 elem.strKey, elem.oValue );
             if( ERROR( ret ) )
-                dwCount++;
-        }
-        if( dwCount )
-        {
-            ret = ( gint32 )dwCount;
-            ret = -ret;
+                break;
         }
     }while( 0 );
     return ret;
@@ -587,7 +615,8 @@ gint32 CAppManager_SvrImpl::OnPointsChanged(
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::ClaimAppInsts( 
     IConfigDb* pContext, 
-    std::vector<std::string>& arrApps /*[ In ]*/ )
+    std::vector<std::string>& arrApps /*[ In ]*/, 
+    std::vector<KeyValue>& arrInitKVs /*[ Out ]*/ )
 {
     gint32 ret = 0;
     do{
@@ -597,24 +626,82 @@ gint32 CAppManager_SvrImpl::ClaimAppInsts(
             break;
         for( auto& elem : arrApps )
         {
+            ret = GetOwnerStream( this,
+                m_pAppRegfs, elem, hstm );
+            if( ERROR( ret ) )
+            {
+                ret = 0;
+            }
+            else
+            {
+                InterfPtr ptrIf;
+                gint32 iRet = GetStmSkel(
+                    hstm, ptrIf );
+                if( SUCCEEDED( iRet ) )
+                {
+                    ret = -EEXIST;
+                    break;
+                }
+            }
+        }
+        if( ERROR( ret ) )
+            break;
+        for( auto& elem : arrApps )
+        {
             ret = SetOwnerStream(
                 m_pAppRegfs, elem, hstm );
-            if( SUCCEEDED( ret ) )
+            if( ERROR( ret ) )
+                break;
+            CStdRMutex oLock( GetLock() );
+            auto itr = m_mapAppOwners.find( hstm );
+            StrSetPtr pStrSet;
+            if( itr == m_mapAppOwners.end() )
             {
-                CStdRMutex oLock( GetLock() );
-                auto itr = m_mapAppOwners.find( hstm );
-                StrSetPtr pStrSet;
-                if( itr == m_mapAppOwners.end() )
-                {
-                    pStrSet.NewObj();
-                    ( *pStrSet )().insert( elem );
-                    m_mapAppOwners.insert(
-                        { hstm, pStrSet } );
-                }
-                else
-                {
-                    ( *itr->second )().insert( elem );
-                }
+                pStrSet.NewObj();
+                ( *pStrSet )().insert( elem );
+                m_mapAppOwners.insert(
+                    { hstm, pStrSet } );
+            }
+            else
+            {
+                ( *itr->second )().insert( elem );
+            }
+            oLock.Unlock();
+            RFHANDLE hPtDir = INVALID_HANDLE;
+            stdstr strDir = "/" APPS_ROOT_DIR "/";
+            strDir += elem + "/" POINTS_DIR "/";
+            ret = m_pAppRegfs->OpenDir(
+                strDir , O_RDONLY, hPtDir );
+            if( ERROR( ret ) )
+                continue;
+            CFileHandle oHandle(
+                m_pAppRegfs, hPtDir );
+
+            std::vector< KEYPTR_SLOT > vecks;
+            ret = m_pAppRegfs->ReadDir(
+                hPtDir, vecks );
+
+            if( ERROR( ret ) )
+                continue;
+
+            for( auto& elem2 : vecks )
+            {
+                stdstr strLoad = elem2.szKey;
+                strLoad += "/" LOAD_ON_START;
+                ret = m_pAppRegfs->Access(
+                    hPtDir, strLoad, F_OK );
+                if( ERROR( ret ) )
+                    continue;
+                Variant oVar;
+                ret = m_pAppRegfs->GetValue(
+                    hPtDir, VALUE_FILE, oVar );
+                if( ERROR( ret ) )
+                    continue;
+                KeyValue kv;
+                kv.strKey =
+                    elem + "/" + elem2.szKey;
+                kv.oValue = oVar;
+                arrInitKVs.push_back( kv );
             }
         }
     }while( 0 );

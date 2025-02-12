@@ -687,6 +687,7 @@ gint32 CDeclInterfProxy2::OutputAsyncROS(
             CCOUT << "IConfigDb* context, ";
             NEW_LINE;
             CCOUT << "gint32 iRet,";
+            NEW_LINE;
             strDecl += ",";
             GenFormInArgs( pOutArgs );
             CCOUT << " ) = 0;";
@@ -821,6 +822,7 @@ gint32 CDeclInterfProxy2::OutputAsyncROSImpl(
             CCOUT << "IConfigDb* context, ";
             NEW_LINE;
             CCOUT << "gint32 iRet,";
+            NEW_LINE;
             strDecl += ",";
             GenFormInArgs( pOutArgs, true );
             CCOUT << " ) override;";
