@@ -366,6 +366,40 @@ gint32 CAppMonitor_SvrImpl::GetPointValue(
     }while( 0 );
     return ret;
 }
+
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SetLargePointValue( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/,
+    BufPtr& value /*[ In ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SetLargePointValueComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetLargePointValue( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/, 
+    BufPtr& value /*[ Out ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'GetLargePointValueComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::SubscribeStreamPoint( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/,
+    HANDLE hstm_h /*[ In ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SubscribeStreamPointComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetAttrValue( 
     IConfigDb* pContext, 

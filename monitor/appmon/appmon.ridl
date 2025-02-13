@@ -24,7 +24,19 @@ interface IAppStore
 
     [async_s]GetPointValue( string strPtPath )
     returns( variant rvalue );
-    
+
+    [async_s]SetLargePointValue(
+        string strPtPath, bytearray value )
+    returns();
+
+    [async_s]GetLargePointValue(
+        string strPtPath )
+    returns( bytearray value );
+
+    [async_s]SubscribeStreamPoint(
+        string strPtPath, HSTREAM hstm )
+    returns();
+
     [async_s]SetAttrValue(
         string strAttrPath, variant value )
     returns();
@@ -44,7 +56,8 @@ interface IAppStore
         string strPtPath, variant value ) 
     returns();
 
-    [ event ]OnPointsChanged( array< KeyValue > arrKVs ) 
+    [ event ]OnPointsChanged(
+        array< KeyValue > arrKVs ) 
     returns();
 };
 
@@ -81,13 +94,13 @@ interface IUserManager
     returns( string strSalt );
 };
 
-service AppManager
+service AppManager [stream] 
 {
     interface IAppStore;
     interface IDataProducer;
 };
 
-service AppMonitor
+service AppMonitor [stream]
 {
     interface IAppStore;
     interface IAppMonitor;

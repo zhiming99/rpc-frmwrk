@@ -32,6 +32,7 @@ extern rpcf::RegFsPtr g_pAppRegfs;
 DECLARE_AGGREGATED_SERVER(
     CAppMonitor_SvrBase,
     CStatCounters_SvrBase,
+    CStreamServerAsync,
     IIAppStore_SvrApi,
     IIAppMonitor_SvrApi,
     CFastRpcServerBase );
@@ -65,6 +66,18 @@ class CAppMonitor_SvrImpl
         m_pAppRegfs( g_pAppRegfs )
     { SetClassId( clsid(CAppMonitor_SvrImpl ) ); }
 
+    /* The following 3 methods are important for */
+    /* streaming transfer. rewrite them if necessary */
+    gint32 OnStreamReady( HANDLE hChannel ) override
+    { return super::OnStreamReady( hChannel ); } 
+    
+    gint32 OnStmClosing( HANDLE hChannel ) override
+    { return super::OnStmClosing( hChannel ); }
+    
+    gint32 AcceptNewStream(
+        IEventSink* pCb, IConfigDb* pDataDesc ) override
+    { return STATUS_SUCCESS; }
+    
     gint32 OnPostStart(
         IEventSink* pCallback ) override;
 
@@ -146,6 +159,50 @@ class CAppMonitor_SvrImpl
         IConfigDb* pReqCtx_,
         const std::string& strPtPath /*[ In ]*/,
         Variant& rvalue /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnSetLargePointValueCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/,
+        BufPtr& value /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'SetLargePointValue' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 SetLargePointValue(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        BufPtr& value /*[ In ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnGetLargePointValueCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetLargePointValue' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetLargePointValue(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        BufPtr& value /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnSubscribeStreamPointCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hstm_h /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'SubscribeStreamPoint' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 SubscribeStreamPoint(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hstm_h /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnSetAttrValueCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,

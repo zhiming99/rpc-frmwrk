@@ -18,6 +18,7 @@ typedef enum : guint32
 DECLARE_AGGREGATED_SERVER(
     CAppManager_SvrBase,
     CStatCounters_SvrBase,
+    CStreamServerAsync,
     IIAppStore_SvrApi,
     IIDataProducer_SvrApi,
     CFastRpcServerBase );
@@ -39,6 +40,18 @@ class CAppManager_SvrImpl
         m_pAppRegfs( g_pAppRegfs )
     { SetClassId( clsid(CAppManager_SvrImpl ) ); }
 
+    /* The following 3 methods are important for */
+    /* streaming transfer. rewrite them if necessary */
+    gint32 OnStreamReady( HANDLE hChannel ) override
+    { return super::OnStreamReady( hChannel ); } 
+    
+    gint32 OnStmClosing( HANDLE hChannel ) override
+    { return super::OnStmClosing( hChannel ); }
+    
+    gint32 AcceptNewStream(
+        IEventSink* pCb, IConfigDb* pDataDesc ) override
+    { return STATUS_SUCCESS; }
+    
     bool IsAppOnline( const stdstr& strAppName );
 
     gint32 OnPostStart(
@@ -128,6 +141,50 @@ class CAppManager_SvrImpl
         const std::string& strPtPath /*[ In ]*/,
         Variant& rvalue /*[ Out ]*/ ) override;
     //RPC Async Req Cancel Handler
+    gint32 OnSetLargePointValueCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/,
+        BufPtr& value /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'SetLargePointValue' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 SetLargePointValue(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        BufPtr& value /*[ In ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnGetLargePointValueCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetLargePointValue' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetLargePointValue(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        BufPtr& value /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnSubscribeStreamPointCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hstm_h /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'SubscribeStreamPoint' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 SubscribeStreamPoint(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hstm_h /*[ In ]*/ ) override;
+    //RPC Async Req Cancel Handler
     gint32 OnSetAttrValueCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         const std::string& strAttrPath /*[ In ]*/,
@@ -185,9 +242,11 @@ class CAppManager_SvrImpl
         std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ ) override;
     gint32 OnPointChanged(
         const std::string& strPtPath /*[ In ]*/,
-        const Variant& value /*[ In ]*/ ) override;
+        const Variant& value /*[ In ]*/ ) override
+    { return ERROR_NOT_IMPL; }
     gint32 OnPointsChanged(
-        std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override;
+        std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override
+    { return ERROR_NOT_IMPL; }
     //RPC Async Req Cancel Handler
     gint32 OnClaimAppInstsCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,

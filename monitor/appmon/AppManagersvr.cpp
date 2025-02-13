@@ -478,6 +478,40 @@ gint32 CAppManager_SvrImpl::GetPointValue(
     }while( 0 );
     return ret;
 }
+
+/* Async Req Handler*/
+gint32 CAppManager_SvrImpl::SetLargePointValue( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/,
+    BufPtr& value /*[ In ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SetLargePointValueComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
+/* Async Req Handler*/
+gint32 CAppManager_SvrImpl::GetLargePointValue( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/, 
+    BufPtr& value /*[ Out ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'GetLargePointValueComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
+/* Async Req Handler*/
+gint32 CAppManager_SvrImpl::SubscribeStreamPoint( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/,
+    HANDLE hstm_h /*[ In ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'SubscribeStreamPointComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetAttrValue( 
     IConfigDb* pContext, 
@@ -578,40 +612,6 @@ gint32 CAppManager_SvrImpl::GetPointValues(
     return ret;
 }
 
-/* RPC event sender */
-gint32 CAppManager_SvrImpl::OnPointChanged(
-    const std::string& strPtPath /*[ In ]*/,
-    const Variant& value /*[ In ]*/ )
-{
-    std::vector< InterfPtr > vecSkels;
-    gint32 ret = this->EnumStmSkels( vecSkels );
-    if( ERROR( ret ) )
-        return ret;
-    for( auto& elem : vecSkels )
-    {
-        CAppManager_SvrSkel* pSkel = elem;
-        ret = pSkel->IIAppStore_SImpl::OnPointChanged(
-            strPtPath,
-            value );
-    }
-    return ret;
-}
-/* RPC event sender */
-gint32 CAppManager_SvrImpl::OnPointsChanged(
-    std::vector<KeyValue>& arrKVs /*[ In ]*/ )
-{
-    std::vector< InterfPtr > vecSkels;
-    gint32 ret = this->EnumStmSkels( vecSkels );
-    if( ERROR( ret ) )
-        return ret;
-    for( auto& elem : vecSkels )
-    {
-        CAppManager_SvrSkel* pSkel = elem;
-        ret = pSkel->IIAppStore_SImpl::OnPointsChanged(
-            arrKVs );
-    }
-    return ret;
-}
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::ClaimAppInsts( 
     IConfigDb* pContext, 
