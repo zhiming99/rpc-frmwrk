@@ -29,6 +29,7 @@ using namespace rpcf;
 #include "lexer.h"
 #include "astnode.h"
 #include <memory>
+#include <stdlib.h>
 
 #define FUSE_PROXY  1
 #define FUSE_SERVER 2
@@ -278,17 +279,46 @@ gint32 CheckNameDup(
 %parse-param { char const *file_name };
 %initial-action
 {
-    YYLTYPE2* pLtype = ( YYLTYPE2* )&@$;
-    pLtype->initialize( file_name );
-    FILECTX* pfc = new FILECTX( file_name );
-    g_vecBufs.push_back(
-        std::unique_ptr< FILECTX >( pfc ) );
-    yyin = pfc->m_fp;
-    char szBuf[ 256 ];
-    gint32 ret = fread( szBuf, 1, 256, yyin );
-    if( ret == 0 )
-        ret = ferror( yyin );
-    rewind( yyin );
+    gint32 ret = 0;
+    do{
+        YYLTYPE2* pLtype = ( YYLTYPE2* )&@$;
+        pLtype->initialize( file_name );
+        FILECTX* pfc = nullptr;
+        if( file_name[ 0 ] != '/' )
+        {
+            char* path = realpath(
+                file_name, nullptr );
+
+            if( path == nullptr )
+            {
+                stdstr strMsg =
+                    "cannot find the file ";
+                strMsg = strMsg + "'" + file_name + "'";
+                OutputMsg( -ENOENT, strMsg );
+                ret = -ENOENT;
+                break;
+            }
+            else
+            {
+                pfc = new FILECTX( path );
+                free( path );
+            }
+        }
+        else
+        {
+            pfc = new FILECTX( file_name );
+        }
+        g_vecBufs.push_back(
+            std::unique_ptr< FILECTX >( pfc ) );
+        yyin = pfc->m_fp;
+        char szBuf[ 256 ];
+        ret = fread( szBuf, 1, 256, yyin );
+        if( ret == 0 )
+            ret = ferror( yyin );
+        rewind( yyin );
+    }while( 0 );
+    if( ERROR( ret ) )
+        YYERROR;
 };
 
 
