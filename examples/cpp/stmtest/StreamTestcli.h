@@ -4,6 +4,13 @@
 #pragma once
 #include "stmtest.h"
 #include "commdefs.h"
+#include "IStreamTestcli.h"
+
+DECLARE_AGGREGATED_PROXY(
+    CStreamTest_CliSkel,
+    CStatCountersProxy,
+    CStreamProxyAsync,
+    IIStreamTest_PImpl );
 
 class CStreamTest_CliImpl
     : public CStreamTest_CliSkel

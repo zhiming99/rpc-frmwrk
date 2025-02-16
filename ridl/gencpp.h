@@ -94,6 +94,8 @@ struct CFileSet : public IFileSet
     std::string  m_strMainCli;
     std::string  m_strMainSvr;
     std::string  m_strReadme;
+    std::string  m_strStruct;
+    std::string  m_strStructHdr;
 
     typedef IFileSet super;
 
@@ -103,6 +105,8 @@ struct CFileSet : public IFileSet
     virtual gint32 OpenFiles();
     virtual gint32 AddSvcImpl(
         const std::string& strSvcName );
+    gint32 AddIfImpl(
+        const std::string& strIfName );
     ~CFileSet()
     {}
 };
@@ -196,8 +200,13 @@ struct CWriterBase
 
     gint32 AddSvcImpl(
         const std::string& strSvcName )
+    { return m_pFiles->AddSvcImpl( strSvcName ); }
+
+    gint32 AddIfImpl(
+        const std::string& strIfName )
     {
-        return m_pFiles->AddSvcImpl( strSvcName );
+        auto pFiles = ( CFileSet* )m_pFiles.get();
+        return pFiles->AddIfImpl( strIfName );
     }
 
     const stdstr& GetCurFile() const
@@ -286,6 +295,20 @@ class CCppWriter : public CWriterBase
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
         return SelectFile( 7 );
+    }
+    inline gint32 SelectStruct()
+    {
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strStruct;
+        return SelectFile( 8 );
+    }
+    inline gint32 SelectStructHdr()
+    {
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strStructHdr;
+        return SelectFile( 9 );
     }
 
     inline gint32 SelectImplFile(
@@ -544,7 +567,7 @@ class CDeclService
     CDeclService( CCppWriter* pWriter,
         ObjPtr& pNode );
 
-    gint32 Output();
+    gint32 Output( bool bProxy );
 };
 
 using ABSTE = std::pair< std::string, ObjPtr >;
@@ -558,7 +581,7 @@ class CDeclServiceImpl :
     public:
     typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer );
+        ObjPtr& pNode, bool bProxy );
 
     gint32 FindAbstMethod(
         std::vector< ABSTE >& vecMethods,
@@ -581,8 +604,8 @@ class CImplServiceImpl :
     public:
     typedef CDeclServiceImpl super;
     CImplServiceImpl( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer )
-        : super( pWriter, pNode, bServer )
+        ObjPtr& pNode, bool bProxy )
+        : super( pWriter, pNode, bProxy )
     {}
 
     gint32 Output() override;
@@ -704,8 +727,8 @@ class CImplClassFactory
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
     public:
-    CImplClassFactory(
-        CCppWriter* pWriter, ObjPtr& pNode, bool bServer );
+    CImplClassFactory( CCppWriter* pWriter,
+        ObjPtr& pNode, bool bProxy );
     virtual gint32 Output();
 
     inline bool IsServer() const

@@ -544,7 +544,7 @@ gint32 CDeclServiceImplFuse2::Output()
             vecPMethods.empty() )
             break;
 
-        EMIT_DISCLAIMER;
+        /*EMIT_DISCLAIMER;
         CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
         Wa( "// Your task is to implement the following classes" );
@@ -565,14 +565,14 @@ gint32 CDeclServiceImplFuse2::Output()
         }
         std::string strAppName = pStmts->GetName();
         CCOUT << "#include \"" << strAppName << ".h\"" ;
-        NEW_LINES( 2 );
+        NEW_LINES( 2 );*/
 
         auto pWriter = static_cast
             < CCppWriter* >( m_pWriter );
 
         ObjPtr pNode = m_pNode;
         CDeclServiceFuse2 ods( pWriter, pNode );
-        ods.OutputROS( IsServer() );
+        ods.OutputROS( !IsServer() );
 
         std::string strClass, strBase, strSkel;
         if( !vecPMethods.empty() && !IsServer() )
@@ -1771,7 +1771,7 @@ gint32 CImplServiceImplFuse2::Output()
             BLOCK_CLOSE;
             NEW_LINE;
 
-            NEW_LINE;
+            /*NEW_LINE;
             Wa( "extern gint32 BuildJsonReq2(" );
             Wa( "    IConfigDb* pReqCtx_," );
             Wa( "    const Json::Value& oJsParams," );
@@ -1780,7 +1780,7 @@ gint32 CImplServiceImplFuse2::Output()
             Wa( "    gint32 iRet," );
             Wa( "    std::string& strReq," );
             Wa( "    bool bProxy," );
-            Wa( "    bool bResp );" );
+            Wa( "    bool bResp );" );*/
             NEW_LINE;
 
             // implement OnReqComplete
@@ -1888,7 +1888,7 @@ gint32 CImplServiceImplFuse2::OutputROSSkel()
             BLOCK_CLOSE;
             NEW_LINE;
 
-            Wa( "extern gint32 GetSvrCtxId(" );
+            /*Wa( "extern gint32 GetSvrCtxId(" );
             Wa( "    IEventSink* pCb, stdstr& strCtxId );" );
             NEW_LINE;
 
@@ -1901,7 +1901,7 @@ gint32 CImplServiceImplFuse2::OutputROSSkel()
             Wa( "    std::string& strReq," );
             Wa( "    bool bProxy," );
             Wa( "    bool bResp );" );
-            NEW_LINE;
+            NEW_LINE;*/
 
             CCOUT << "gint32 " << strClassName
                 << "::UserCancelRequest(";
@@ -2406,7 +2406,7 @@ gint32 CImplMainFuncFuse2::Output()
 
             ObjPtr pRoot( m_pNode );
             CImplClassFactoryFuse2 oicf(
-                m_pWriter, pRoot, !bProxy );
+                m_pWriter, pRoot, bProxy );
 
             ret = oicf.Output();
             if( ERROR( ret ) )
@@ -2430,7 +2430,7 @@ gint32 CImplMainFuncFuse2::Output()
     return ret;
 }
 
-gint32 CDeclServiceFuse2::OutputROSSkel()
+gint32 CDeclServiceFuse2::OutputROSSkel( bool bProxy )
 {
     guint32 ret = STATUS_SUCCESS;
     do{
@@ -2444,51 +2444,55 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
             break;
         }
 
-        CCOUT << "#define Clsid_C" << strSvcName << "_CliSkel_Base Clsid_Invalid";
-        NEW_LINE;
-        CCOUT << "DECLARE_AGGREGATED_SKEL_PROXY(";
-        INDENT_UP;
-        NEW_LINE;
-
-        CCOUT << "C" << strSvcName << "_CliSkel_Base,";
-        NEW_LINE;
-        Wa( "CStatCountersProxySkel," );
-        for( guint32 i = 0;
-            i < vecIfs.size(); i++ )
+        if( bProxy )
         {
-            CInterfRef* pifr = vecIfs[ i ];
-            std::string strName = pifr->GetName();
-            CCOUT << "I" << strName << "_PImpl";
-            if( i + 1 < vecIfs.size() )
+            CCOUT << "#define Clsid_C" << strSvcName << "_CliSkel_Base Clsid_Invalid";
+            NEW_LINE;
+            CCOUT << "DECLARE_AGGREGATED_SKEL_PROXY(";
+            INDENT_UP;
+            NEW_LINE;
+
+            CCOUT << "C" << strSvcName << "_CliSkel_Base,";
+            NEW_LINE;
+            Wa( "CStatCountersProxySkel," );
+            for( guint32 i = 0;
+                i < vecIfs.size(); i++ )
             {
-                CCOUT << ",";
-                NEW_LINE;
+                CInterfRef* pifr = vecIfs[ i ];
+                std::string strName = pifr->GetName();
+                CCOUT << "I" << strName << "_PImpl";
+                if( i + 1 < vecIfs.size() )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
             }
+            CCOUT << " );";
+            INDENT_DOWNL;
+            NEW_LINE;
+
+            CCOUT << "class C" << strSvcName << "_CliSkel :";
+            NEW_LINE;
+            CCOUT << "    public C" << strSvcName << "_CliSkel_Base";
+            NEW_LINE;
+            BLOCK_OPEN;
+            Wa( "public:" );
+            CCOUT << "typedef C" << strSvcName << "_CliSkel_Base super;";
+            NEW_LINE;
+            CCOUT << "C" << strSvcName << "_CliSkel( const IConfigDb* pCfg ):";
+            NEW_LINE;
+            Wa( "    super::virtbase( pCfg ), super( pCfg )" );
+            CCOUT << "{ SetClassId( clsid( C" << strSvcName << "_CliSkel ) ); }";
+            NEW_LINE;
+
+            Wa( "gint32 CustomizeRequest(" );
+            Wa( "    IConfigDb* pReqCfg," );
+            CCOUT << "    IEventSink* pCallback ) override;";
+            BLOCK_CLOSE;
+            Wa( ";" );
+            NEW_LINE;
+            break;
         }
-        CCOUT << " );";
-        INDENT_DOWNL;
-        NEW_LINE;
-
-        CCOUT << "class C" << strSvcName << "_CliSkel :";
-        NEW_LINE;
-        CCOUT << "    public C" << strSvcName << "_CliSkel_Base";
-        NEW_LINE;
-        BLOCK_OPEN;
-        Wa( "public:" );
-        CCOUT << "typedef C" << strSvcName << "_CliSkel_Base super;";
-        NEW_LINE;
-        CCOUT << "C" << strSvcName << "_CliSkel( const IConfigDb* pCfg ):";
-        NEW_LINE;
-        Wa( "    super::virtbase( pCfg ), super( pCfg )" );
-        CCOUT << "{ SetClassId( clsid( C" << strSvcName << "_CliSkel ) ); }";
-        NEW_LINE;
-
-        Wa( "gint32 CustomizeRequest(" );
-        Wa( "    IConfigDb* pReqCfg," );
-        CCOUT << "    IEventSink* pCallback ) override;";
-        BLOCK_CLOSE;
-        Wa( ";" );
-        NEW_LINE;
 
         CCOUT << "#define Clsid_C" << strSvcName << "_SvrSkel_Base Clsid_Invalid";
         NEW_LINE;
@@ -2578,7 +2582,7 @@ gint32 CDeclServiceFuse2::OutputROSSkel()
     return ret;
 }
 
-gint32 CDeclServiceFuse2::OutputROS( bool bServer )
+gint32 CDeclServiceFuse2::OutputROS( bool bProxy )
 {
     guint32 ret = STATUS_SUCCESS;
     do{
@@ -2592,7 +2596,7 @@ gint32 CDeclServiceFuse2::OutputROS( bool bServer )
             break;
         }
 
-        if( !bServer )
+        if( bProxy )
         {
             CCOUT << "#define Clsid_C" << strSvcName
                 << "_CliBase    Clsid_Invalid";

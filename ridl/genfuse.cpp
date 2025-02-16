@@ -1546,7 +1546,7 @@ gint32 CDeclServiceImplFuse::Output()
             vecPMethods.empty() )
             break;
 
-        EMIT_DISCLAIMER;
+        /*EMIT_DISCLAIMER;
         CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
         Wa( "// Your task is to implement the following classes" );
@@ -1568,6 +1568,7 @@ gint32 CDeclServiceImplFuse::Output()
         std::string strAppName = pStmts->GetName();
         CCOUT << "#include \"" << strAppName << ".h\"" ;
         NEW_LINES( 2 );
+        */
 
         std::string strClass, strBase;
         if( !vecPMethods.empty() && !IsServer() )
@@ -3055,7 +3056,7 @@ gint32 CImplServiceImplFuse::OutputUCRSvr()
         BLOCK_CLOSE;
         NEW_LINES(2);
 
-        Wa( "extern gint32 BuildJsonReq(" );
+        /*Wa( "extern gint32 BuildJsonReq(" );
         Wa( "    IConfigDb* pReqCtx_," );
         Wa( "    const Json::Value& oJsParams," );
         Wa( "    const std::string& strMethod," );
@@ -3064,7 +3065,7 @@ gint32 CImplServiceImplFuse::OutputUCRSvr()
         Wa( "    std::string& strReq," );
         Wa( "    bool bProxy," );
         Wa( "    bool bResp );" );
-        NEW_LINE;
+        NEW_LINE;*/
 
         CCOUT << "gint32 " << strClassName
             << "::UserCancelRequest(";
@@ -3591,7 +3592,7 @@ gint32 CImplServiceImplFuse::Output()
             BLOCK_CLOSE;
             NEW_LINE;
 
-            NEW_LINE;
+            /*NEW_LINE;
             Wa( "extern gint32 BuildJsonReq(" );
             Wa( "    IConfigDb* pReqCtx_," );
             Wa( "    const Json::Value& oJsParams," );
@@ -3601,7 +3602,7 @@ gint32 CImplServiceImplFuse::Output()
             Wa( "    std::string& strReq," );
             Wa( "    bool bProxy," );
             Wa( "    bool bResp );" );
-            NEW_LINE;
+            NEW_LINE; */
 
             // implement OnReqComplete
             CCOUT << "gint32 " << strClass;
@@ -4007,7 +4008,7 @@ gint32 CImplMainFuncFuse::Output()
 
             ObjPtr pRoot( m_pNode );
             CImplClassFactory oicf(
-                m_pWriter, pRoot, !bProxy );
+                m_pWriter, pRoot, bProxy );
 
             ret = oicf.Output();
             if( ERROR( ret ) )

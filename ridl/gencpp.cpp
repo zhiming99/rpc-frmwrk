@@ -808,6 +808,16 @@ CFileSet::CFileSet(
         strOutPath, "README.md",
         false );
 
+    GEN_FILEPATH( m_strStruct,
+        strOutPath,
+        strAppName + "struct.cpp",
+        false );
+
+    GEN_FILEPATH( m_strStructHdr,
+        strOutPath,
+        strAppName + "struct.h",
+        false );
+
     gint32 ret = OpenFiles();
     if( ERROR( ret ) )
     {
@@ -870,6 +880,20 @@ gint32 CFileSet::OpenFiles()
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strStruct,
+        std::ofstream::out |
+        std::ofstream::trunc) );
+
+    m_vecFiles.push_back( std::move( pstm ) );
+
+    pstm = STMPTR( new std::ofstream(
+        m_strStructHdr,
         std::ofstream::out |
         std::ofstream::trunc) );
 
@@ -973,6 +997,63 @@ gint32 CFileSet::AddSvcImpl(
     return ret;
 }
 
+gint32 CFileSet::AddIfImpl(
+    const std::string& strIfName )
+{
+    if( strIfName.empty() )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        gint32 idx = m_vecFiles.size();
+
+        std::string strHeader = m_strPath +
+            "/" + strIfName + "svr.h";
+        std::string strCliHeader = m_strPath +
+            "/" + strIfName + "cli.h";
+        std::string strCpp = m_strPath +
+            "/" + strIfName + "svr.cpp";
+        std::string strCliCpp = m_strPath +
+            "/" + strIfName + "cli.cpp";
+
+        STMPTR pstm( new std::ofstream(
+            strHeader,
+            std::ofstream::out |
+            std::ofstream::trunc ) );
+
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strIfName + "svr.h" ] = idx;
+
+        pstm = STMPTR( new std::ofstream(
+            strCliHeader,
+            std::ofstream::out |
+            std::ofstream::trunc ) );
+
+        idx += 1;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strIfName + "cli.h" ] = idx;
+
+        pstm = STMPTR( new std::ofstream(
+            strCpp,
+            std::ofstream::out |
+            std::ofstream::trunc) );
+
+        idx += 1;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strIfName + "svr.cpp" ] = idx;
+
+        pstm = STMPTR( new std::ofstream(
+            strCliCpp,
+            std::ofstream::out |
+            std::ofstream::trunc) );
+
+        idx += 1;
+        m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp[ strIfName + "cli.cpp" ] = idx;
+
+    }while( 0 );
+
+    return ret;
+}
 IFileSet::~IFileSet()
 {
     for( auto& elem : m_vecFiles )
@@ -1068,6 +1149,18 @@ gint32 CHeaderPrologue::Output()
     return STATUS_SUCCESS;
 }
 
+#define EMIT_COMMON_INC_HDR( _pWriter ) \
+{ \
+    CCppWriter* m_pWriter = ( _pWriter ); \
+    EMIT_DISCLAIMER; \
+    CCOUT << "// " << g_strCmdLine; \
+    NEW_LINE; \
+    Wa( "#pragma once" ); \
+    CCOUT << "#include \"" << \
+        g_strAppName << ".h\""; \
+    NEW_LINE; \
+}
+
 gint32 GenHeaderFile(
     CCppWriter* pWriter, ObjPtr& pRoot )
 {
@@ -1081,6 +1174,7 @@ gint32 GenHeaderFile(
             pWriter, pRoot );
     }
 
+    CCppWriter* m_pWriter = pWriter;
     gint32 ret = 0;
     do{
         pWriter->SelectHeaderFile();
@@ -1092,13 +1186,16 @@ gint32 GenHeaderFile(
         if( ERROR( ret ) )
             break;
 
-        CDeclareClassIds odci(
-            pWriter, pRoot );
+        CDeclareClassIds odci( pWriter, pRoot );
 
         ret = odci.Output();
         if( ERROR( ret ) )
             break;
 
+        CCOUT << "#include \""
+            << g_strAppName << "struct.h\"";
+        NEW_LINE;
+            
         CStatements* pStmts = pRoot;
         if( pStmts == nullptr )
         {
@@ -1106,99 +1203,116 @@ gint32 GenHeaderFile(
             break;
         }
 
+        if( bFuse )
+        {
+            Wa( "gint32 BuildJsonReq(" );
+            Wa( "    IConfigDb* pReqCtx_," );
+            Wa( "    const Json::Value& oJsParams," );
+            Wa( "    const std::string& strMethod," );
+            Wa( "    const std::string& strIfName, " );
+            Wa( "    gint32 iRet," );
+            Wa( "    std::string& strReq," );
+            Wa( "    bool bProxy," );
+            Wa( "    bool bResp );" );
+            NEW_LINE;
+        }
+
+        pWriter->SelectStructHdr();
+        EMIT_COMMON_INC_HDR( pWriter );
+        NEW_LINE;
         for( guint32 i = 0;
             i < pStmts->GetCount(); i++ )
         {
             ObjPtr pObj = pStmts->GetChild( i );
             guint32 dwClsid =
                 ( guint32 )pObj->GetClsid();
-            switch( dwClsid )
+            if( dwClsid == clsid( CStructDecl ) )
             {
-            case clsid( CTypedefDecl ):
-                {
-                    CDeclareTypedef odt(
-                        pWriter, pObj );
-                    ret = odt.Output();
+                CStructDecl* psd = pObj;
+                if( psd->RefCount() == 0 )
+                    continue;
+                CDeclareStruct ods(
+                    pWriter, pObj );
+                ret = ods.Output();
+                if( ERROR( ret ) )
                     break;
-                }
-            case clsid( CStructDecl ) :
-                {
-                    CStructDecl* psd = pObj;
-                    if( psd->RefCount() == 0 )
-                        break;
-                    CDeclareStruct ods(
-                        pWriter, pObj );
-                    ret = ods.Output();
-                    break;
-                }
-            case clsid( CInterfaceDecl ):
-                {
-                    CInterfaceDecl* pNode = pObj;
-                    if( pNode == nullptr )
-                    {
-                        ret = -EFAULT;
-                        break;
-                    }
-
-                    if( pNode->RefCount() == 0 )
-                        break;
-
-                    if( bFuseP )
-                    {
-                        CDeclInterfProxyFuse odip(
-                            pWriter, pObj );
-                        ret = odip.Output();
-                        if( ERROR( ret ) )
-                            break;
-                    }
-                    else
-                    {
-                        CDeclInterfProxy odip(
-                            pWriter, pObj );
-                        ret = odip.Output();
-                        if( ERROR( ret ) )
-                            break;
-                    }
-
-                    if( bFuseS )
-                    {
-                        CDeclInterfSvrFuse odis(
-                            pWriter, pObj );
-
-                        ret = odis.Output();
-                    }
-                    else
-                    {
-                        CDeclInterfSvr odis(
-                            pWriter, pObj );
-
-                        ret = odis.Output();
-                    }
-                    break;
-                }
-            case clsid( CServiceDecl ):
-                {
-                    CDeclService ods(
-                        pWriter, pObj );
-                    ret = ods.Output();
-                    if( ERROR( ret ) )
-                        break;
-                    break;
-                }
-            case clsid( CAppName ) :
-            case clsid( CConstDecl ) :
-                {
-                    break;
-                }
-            default:
-                {
-                    ret = -ENOTSUP;
-                    break;
-                }
             }
+            else if( dwClsid == clsid( CTypedefDecl ) )
+            {
+                CDeclareTypedef odt( pWriter, pObj );
+                ret = odt.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+        if( ERROR( ret ) )
+            break;
+
+        for( guint32 i = 0;
+            i < pStmts->GetCount(); i++ )
+        {
+            ObjPtr pObj = pStmts->GetChild( i );
+            guint32 dwClsid =
+                ( guint32 )pObj->GetClsid();
+
+            if( dwClsid != clsid( CInterfaceDecl ) )
+                continue;
+
+            CInterfaceDecl* pNode = pObj;
+            if( pNode == nullptr )
+                continue;
+
+            if( pNode->RefCount() == 0 )
+                continue;
+
+            stdstr strIfName = pNode->GetName();
+            pWriter->AddIfImpl( strIfName );
+            ret = pWriter->SelectImplFile(
+                strIfName + "cli.h" );
             if( ERROR( ret ) )
                 break;
+
+            EMIT_COMMON_INC_HDR( pWriter );
+            NEW_LINE;
+            if( bFuseP )
+            {
+                CDeclInterfProxyFuse odip(
+                    pWriter, pObj );
+                ret = odip.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+            else
+            {
+                CDeclInterfProxy odip(
+                    pWriter, pObj );
+                ret = odip.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
+
+            ret = pWriter->SelectImplFile(
+                strIfName + "svr.h" );
+            if( ERROR( ret ) )
+                break;
+            EMIT_COMMON_INC_HDR( pWriter );
+            NEW_LINE;
+            if( bFuseS )
+            {
+                CDeclInterfSvrFuse odis(
+                    pWriter, pObj );
+
+                ret = odis.Output();
+            }
+            else
+            {
+                CDeclInterfSvr odis(
+                    pWriter, pObj );
+                ret = odis.Output();
+            }
         }
+        if( ERROR( ret ) )
+            break;
 
         std::vector< ObjPtr > vecSvcs;
         ret = pStmts->GetSvcDecls( vecSvcs );
@@ -1221,6 +1335,14 @@ gint32 GenHeaderFile(
 
         for( auto& elem : vecSvcNames )
         {
+            ObjPtr pObj = elem.second;
+            CServiceDecl* psd = pObj;
+
+            std::vector< ObjPtr > vecIfs;
+            ret = psd->GetIfRefs( vecIfs );
+            if( ERROR( ret ) )
+                break;
+
             // server declarations
             ret = pWriter->SelectImplFile(
                 elem.first + "svr.h" ); 
@@ -1231,10 +1353,28 @@ gint32 GenHeaderFile(
                     elem.first + "svr.h.new" );
             }
 
+            EMIT_COMMON_INC_HDR( pWriter );
+            for( auto& pIf : vecIfs )
+            {
+                CInterfRef* pifr = pIf;
+                if( pifr == nullptr )
+                    continue;
+                NEW_LINE;
+                pifr->GetName();
+                CCOUT << "#include \"" <<
+                    pifr->GetName() << "svr.h\"";
+            }
+            NEW_LINES( 2 );
+
+            CDeclService ods( pWriter, pObj );
+            ret = ods.Output( false );
+            if( ERROR( ret ) )
+                break;
+
             if( bFuseS )
             {
                 CDeclServiceImplFuse osi(
-                    pWriter, elem.second, true );
+                    pWriter, elem.second, false );
 
                 ret = osi.Output();
                 if( ERROR( ret ) )
@@ -1243,14 +1383,13 @@ gint32 GenHeaderFile(
             else
             {
                 CDeclServiceImpl osi(
-                    pWriter, elem.second, true );
+                    pWriter, elem.second, false );
 
                 ret = osi.Output();
                 if( ERROR( ret ) )
                     break;
             }
 
-            // client declarations
             ret = pWriter->SelectImplFile(
                 elem.first + "cli.h" ); 
 
@@ -1260,10 +1399,30 @@ gint32 GenHeaderFile(
                     elem.first + "cli.h.new" );
             }
 
+            EMIT_COMMON_INC_HDR( pWriter );
+
+            for( auto& pIf : vecIfs )
+            {
+                CInterfRef* pifr = pIf;
+                if( pifr == nullptr )
+                    continue;
+                NEW_LINE;
+                pifr->GetName();
+                CCOUT << "#include \"" <<
+                    pifr->GetName() << "cli.h\"";
+            }
+            NEW_LINES( 2 );
+
+            // client declarations
+            CDeclService ods2( pWriter, pObj );
+            ret = ods2.Output( true );
+            if( ERROR( ret ) )
+                break;
+
             if( bFuseP )
             {
                 CDeclServiceImplFuse osi2(
-                    pWriter, elem.second, false );
+                    pWriter, elem.second, true );
 
                 ret = osi2.Output();
                 if( ERROR( ret ) )
@@ -1272,7 +1431,7 @@ gint32 GenHeaderFile(
             else
             {
                 CDeclServiceImpl osi2(
-                    pWriter, elem.second, false );
+                    pWriter, elem.second, true );
 
                 ret = osi2.Output();
                 if( ERROR( ret ) )
@@ -1295,7 +1454,7 @@ gint32 GenHeaderFile(
             if( bFuseS )
             {
                 CImplServiceImplFuse oisi(
-                    pWriter, elem.second, true );
+                    pWriter, elem.second, false );
 
                 ret = oisi.Output();
                 if( ERROR( ret ) )
@@ -1304,7 +1463,7 @@ gint32 GenHeaderFile(
             else
             {
                 CImplServiceImpl oisi(
-                    pWriter, elem.second, true );
+                    pWriter, elem.second, false );
 
                 ret = oisi.Output();
                 if( ERROR( ret ) )
@@ -1327,7 +1486,7 @@ gint32 GenHeaderFile(
             if( bFuseP )
             {
                 CImplServiceImplFuse oisi2(
-                    pWriter, elem.second, false );
+                    pWriter, elem.second, true );
 
                 ret = oisi2.Output();
                 if( ERROR( ret ) )
@@ -1336,7 +1495,7 @@ gint32 GenHeaderFile(
             else
             {
                 CImplServiceImpl oisi2(
-                    pWriter, elem.second, false );
+                    pWriter, elem.second, true );
 
                 ret = oisi2.Output();
                 if( ERROR( ret ) )
@@ -1397,6 +1556,18 @@ extern gint32 EmitBuildJsonReq(
 extern gint32 EmitBuildJsonReq2( 
     CWriterBase* m_pWriter );
 
+#define EMIT_COMMON_INC_CPP \
+{ \
+    EMIT_DISCLAIMER; \
+    CCOUT << "// " << g_strCmdLine; \
+    NEW_LINE; \
+    Wa( "#include \"rpc.h\"" ); \
+    Wa( "#include \"iftasks.h\"" ); \
+    Wa( "using namespace rpcf;" ); \
+    CCOUT << "#include \"" << strName << ".h\""; \
+    NEW_LINE; \
+}
+
 gint32 GenCppFile(
     CCppWriter* m_pWriter, ObjPtr& pRoot )
 {
@@ -1423,15 +1594,7 @@ gint32 GenCppFile(
 
         std::string strName = pStmts->GetName();
 
-        EMIT_DISCLAIMER;
-        CCOUT << "// " << g_strCmdLine;
-        NEW_LINE;
-        Wa( "#include \"rpc.h\"" );
-        Wa( "#include \"iftasks.h\"" );
-
-        Wa( "using namespace rpcf;" );
-        CCOUT << "#include \"" << strName << ".h\"";
-        NEW_LINE;
+        EMIT_COMMON_INC_CPP;
         std::vector< ObjPtr > vecSvcs;
         pStmts->GetSvcDecls( vecSvcs );
         NEW_LINE;
@@ -1443,20 +1606,35 @@ gint32 GenCppFile(
             if( ERROR( ret ) )
                 break;
 
-            if( g_bRpcOverStm )
-            {
-                ret = EmitBuildJsonReq2(
-                    m_pWriter );
-            }
-            else
-            {
-                ret = EmitBuildJsonReq(
-                    m_pWriter );
-            }
+            ret = EmitBuildJsonReq(
+                m_pWriter );
             if( ERROR( ret ) )
                 break;
             NEW_LINE;
         }
+
+        m_pWriter->SelectStruct();
+        EMIT_COMMON_INC_CPP;
+        for( guint32 i = 0;
+            i < pStmts->GetCount(); i++ )
+        {
+            ObjPtr pObj = pStmts->GetChild( i );
+            guint32 dwClsid =
+                ( guint32 )pObj->GetClsid();
+            if( dwClsid != clsid( CStructDecl ) )
+                continue;
+            CStructDecl* psd = pObj;
+            if( psd->RefCount() == 0 )
+                continue;
+            CImplSerialStruct oiss(
+                m_pWriter, pObj );
+            ret = oiss.Output();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( ERROR( ret ) )
+            break;
 
         for( guint32 i = 0;
             i < pStmts->GetCount(); i++ )
@@ -1464,129 +1642,108 @@ gint32 GenCppFile(
             ObjPtr pObj = pStmts->GetChild( i );
             guint32 dwClsid =
                 ( guint32 )pObj->GetClsid();
-            switch( dwClsid )
+            if( dwClsid != clsid( CInterfaceDecl ) )
+                continue;
+
+            CAstNodeBase* pNode = pObj;
+            if( pNode == nullptr )
+                continue;
+
+            CInterfaceDecl* pifd = pObj;
+
+            if( pifd->RefCount() == 0 )
+                continue;
+
+            stdstr strIfName = pifd->GetName();
+            m_pWriter->SelectImplFile(
+                strIfName + "cli.cpp" );
+            EMIT_COMMON_INC_CPP;
+            CCOUT << "#include \"" << strIfName << "cli.h\"";
+            NEW_LINE;
+            if( bFuseP )
             {
-            case clsid( CStructDecl ) :
+                CImplIufProxyFuse oiufp(
+                    m_pWriter, pObj );
+                oiufp.Output();
+            }
+            else
+            {
+                CImplIufProxy oiufp(
+                    m_pWriter, pObj );
+                oiufp.Output();
+            }
+
+            ObjPtr pmdlobj =
+                pifd->GetMethodList();
+
+            if( pmdlobj.IsEmpty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            CMethodDecls* pmdl = pmdlobj;
+            for( guint32 i = 0;
+                i < pmdl->GetCount(); i++ )
+            {
+                ObjPtr pmd = pmdl->GetChild( i );
+                if( bFuseP )
                 {
-                    CStructDecl* psd = pObj;
-                    if( psd->RefCount() == 0 )
+                    CImplIfMethodProxyFuse oiimp(
+                        m_pWriter, pmd );
+                    ret = oiimp.Output();
+                    if( ERROR( ret ) )
                         break;
-                    CImplSerialStruct oiss(
-                        m_pWriter, pObj );
-                    ret = oiss.Output();
-                    break;
                 }
-            case clsid( CInterfaceDecl ):
+                else
                 {
-                    CAstNodeBase* pNode = pObj;
-                    if( pNode == nullptr )
-                    {
-                        ret = -EFAULT;
+                    CImplIfMethodProxy oiimp(
+                        m_pWriter, pmd );
+                    ret = oiimp.Output();
+                    if( ERROR( ret ) )
                         break;
-                    }
-
-                    CInterfaceDecl* pifd = pObj;
-
-                    if( pifd->RefCount() == 0 )
-                        break;
-
-                    if( bFuseP )
-                    {
-                        CImplIufProxyFuse oiufp(
-                            m_pWriter, pObj );
-                        oiufp.Output();
-                    }
-                    else
-                    {
-                        CImplIufProxy oiufp(
-                            m_pWriter, pObj );
-                        oiufp.Output();
-                    }
-
-                    ObjPtr pmdlobj =
-                        pifd->GetMethodList();
-
-                    if( pmdlobj.IsEmpty() )
-                    {
-                        ret = -ENOENT;
-                        break;
-                    }
-
-                    CMethodDecls* pmdl = pmdlobj;
-                    for( guint32 i = 0;
-                        i < pmdl->GetCount(); i++ )
-                    {
-                        ObjPtr pmd = pmdl->GetChild( i );
-                        if( bFuseP )
-                        {
-                            CImplIfMethodProxyFuse oiimp(
-                                m_pWriter, pmd );
-                            ret = oiimp.Output();
-                            if( ERROR( ret ) )
-                                break;
-                        }
-                        else
-                        {
-                            CImplIfMethodProxy oiimp(
-                                m_pWriter, pmd );
-                            ret = oiimp.Output();
-                            if( ERROR( ret ) )
-                                break;
-                        }
-                    }
-
-                    if( bFuseS )
-                    {
-                        CImplIufSvrFuse oiufs(
-                            m_pWriter, pObj );
-                        oiufs.Output();
-                    }
-                    else
-                    {
-                        CImplIufSvr oiufs(
-                            m_pWriter, pObj );
-                        oiufs.Output();
-                    }
-
-                    for( guint32 i = 0;
-                        i < pmdl->GetCount(); i++ )
-                    {
-                        ObjPtr pmd = pmdl->GetChild( i );
-                        if( bFuseS )
-                        {
-                            CImplIfMethodSvrFuse oiims(
-                                m_pWriter, pmd );
-                            ret = oiims.Output();
-                            if( ERROR( ret ) )
-                                break;
-                        }
-                        else
-                        {
-                            CImplIfMethodSvr oiims(
-                                m_pWriter, pmd );
-                            ret = oiims.Output();
-                            if( ERROR( ret ) )
-                                break;
-                        }
-                    }
-
-                    break;
-                }
-            case clsid( CServiceDecl ):
-            case clsid( CTypedefDecl ):
-            case clsid( CAppName ) :
-            case clsid( CConstDecl ) :
-                {
-                    break;
-                }
-            default:
-                {
-                    ret = -ENOTSUP;
-                    break;
                 }
             }
-            if( ERROR( ret ) )
-                break;
+
+            m_pWriter->SelectImplFile(
+                strIfName + "svr.cpp" );
+            EMIT_COMMON_INC_CPP;
+            CCOUT << "#include \"" << strIfName << "svr.h\"";
+            NEW_LINE;
+            if( bFuseS )
+            {
+                CImplIufSvrFuse oiufs(
+                    m_pWriter, pObj );
+                oiufs.Output();
+            }
+            else
+            {
+                CImplIufSvr oiufs(
+                    m_pWriter, pObj );
+                oiufs.Output();
+            }
+
+            for( guint32 i = 0;
+                i < pmdl->GetCount(); i++ )
+            {
+                ObjPtr pmd = pmdl->GetChild( i );
+                if( bFuseS )
+                {
+                    CImplIfMethodSvrFuse oiims(
+                        m_pWriter, pmd );
+                    ret = oiims.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplIfMethodSvr oiims(
+                        m_pWriter, pmd );
+                    ret = oiims.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+            }
         }
 
         if( ERROR( ret ) )
@@ -2867,15 +3024,12 @@ CDeclService::CDeclService(
     }
 }
 
-gint32 CDeclService::Output()
+gint32 CDeclService::Output( bool bProxy )
 {
     guint32 ret = STATUS_SUCCESS;
     do{
         std::string strSvcName =
             m_pNode->GetName();
-        CCOUT << "DECLARE_AGGREGATED_PROXY(";
-        INDENT_UP;
-        NEW_LINE;
 
         std::vector< ObjPtr > vecIfs;
         m_pNode->GetIfRefs( vecIfs );
@@ -2885,31 +3039,39 @@ gint32 CDeclService::Output()
             break;
         }
 
-        CCOUT << "C" << strSvcName << "_CliSkel,";
-        NEW_LINE;
-        Wa( "CStatCountersProxy," );
-        if( bFuseP )
+        if( bProxy )
         {
-            Wa( "CStreamProxyFuse," );
-            Wa( "CFuseSvcProxy," );
-        }
-        else if( m_pNode->IsStream() )
-            Wa( "CStreamProxyAsync," );
-        for( guint32 i = 0;
-            i < vecIfs.size(); i++ )
-        {
-            CInterfRef* pifr = vecIfs[ i ];
-            std::string strName = pifr->GetName();
-            CCOUT << "I" << strName << "_PImpl";
-            if( i + 1 < vecIfs.size() )
+            CCOUT << "DECLARE_AGGREGATED_PROXY(";
+            INDENT_UP;
+            NEW_LINE;
+
+            CCOUT << "C" << strSvcName << "_CliSkel,";
+            NEW_LINE;
+            Wa( "CStatCountersProxy," );
+            if( bFuseP )
             {
-                CCOUT << ",";
-                NEW_LINE;
+                Wa( "CStreamProxyFuse," );
+                Wa( "CFuseSvcProxy," );
             }
+            else if( m_pNode->IsStream() )
+                Wa( "CStreamProxyAsync," );
+            for( guint32 i = 0;
+                i < vecIfs.size(); i++ )
+            {
+                CInterfRef* pifr = vecIfs[ i ];
+                std::string strName = pifr->GetName();
+                CCOUT << "I" << strName << "_PImpl";
+                if( i + 1 < vecIfs.size() )
+                {
+                    CCOUT << ",";
+                    NEW_LINE;
+                }
+            }
+            CCOUT << " );";
+            INDENT_DOWN;
+            NEW_LINES( 2 );
+            break;
         }
-        CCOUT << " );";
-        INDENT_DOWN;
-        NEW_LINES( 2 );
 
         CCOUT << "DECLARE_AGGREGATED_SERVER(";
         INDENT_UP;
@@ -3295,7 +3457,7 @@ gint32 CSetStructRefs::SetStructRefs()
 
 CDeclServiceImpl::CDeclServiceImpl(
     CCppWriter* pWriter,
-    ObjPtr& pNode, bool bServer )
+    ObjPtr& pNode, bool bProxy )
     : super( pWriter )
 {
     m_pNode = pNode;
@@ -3306,7 +3468,7 @@ CDeclServiceImpl::CDeclServiceImpl(
             "'service' node" );
         throw std::runtime_error( strMsg );
     }
-    m_bServer = bServer;
+    m_bServer = !bProxy;
 }
 
 gint32 CDeclServiceImpl::FindAbstMethod(
@@ -3533,7 +3695,7 @@ gint32 CDeclServiceImpl::Output()
             vecPMethods.empty() )
             break;
 
-        EMIT_DISCLAIMER;
+        /*EMIT_DISCLAIMER;
         CCOUT << "// " << g_strCmdLine;
         NEW_LINE;
         Wa( "// Your task is to implement the following classes" );
@@ -3555,6 +3717,7 @@ gint32 CDeclServiceImpl::Output()
         std::string strAppName = pStmts->GetName();
         CCOUT << "#include \"" << strAppName << ".h\"" ;
         NEW_LINES( 2 );
+        */
 
         std::string strClass, strBase;
         if( !vecPMethods.empty() && !IsServer() )
@@ -6447,7 +6610,7 @@ gint32 CImplIfMethodSvr::OutputAsync()
 CImplClassFactory::CImplClassFactory(
     CCppWriter* pWriter,
     ObjPtr& pNode,
-    bool bServer )
+    bool bProxy )
 {
     m_pWriter = pWriter;
     m_pNode = pNode;
@@ -6458,7 +6621,7 @@ CImplClassFactory::CImplClassFactory(
             "'statements' node" );
         throw std::runtime_error( strMsg );
     }
-    m_bServer = bServer;
+    m_bServer = !bProxy;
 }
 
 gint32 CImplClassFactory::Output()
@@ -8234,13 +8397,13 @@ gint32 CImplMainFunc::Output()
             if( g_bRpcOverStm )
             {
                 CImplClassFactory2 oicf(
-                    m_pWriter, pRoot, !bProxy );
+                    m_pWriter, pRoot, bProxy );
                 ret = oicf.OutputROS();
             }
             else
             {
                 CImplClassFactory oicf(
-                    m_pWriter, pRoot, !bProxy );
+                    m_pWriter, pRoot, bProxy );
                 ret = oicf.Output();
             }
 
@@ -8408,6 +8571,33 @@ gint32 CExportMakefile::Output()
             strAppName + ".cpp ";
 
         std::string strObjClient, strObjServer;
+        std::string strObjSkel;
+
+        strObjSkel += 
+            std::string( "$(OBJ_DIR)/" ) +
+            strAppName + "struct.o ";
+
+        std::vector< ObjPtr > vecIfs;
+        m_pNode->GetIfDecls( vecIfs );
+        for( int i = 0; i < vecIfs.size(); ++i )
+        {
+            auto& elem = vecIfs[ i ];
+            CInterfaceDecl* pifd = elem;
+            if( pifd == nullptr )
+                continue;
+
+            if( pifd->RefCount() == 0 )
+                continue;
+
+            strObjSkel +=
+                std::string( "$(OBJ_DIR)/" ) +
+                pifd->GetName() + "cli.o ";
+
+            strObjSkel +=
+                std::string( "$(OBJ_DIR)/" ) +
+                pifd->GetName() + "svr.o ";
+        }
+
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* psd = elem;
@@ -8425,6 +8615,10 @@ gint32 CExportMakefile::Output()
                 psd->GetName() + "svr.o ";
         }
 
+        stdstr strStruct =
+            std::string( "$(OBJ_DIR)/" ) +
+            strAppName + "struct.cpp";
+
         std::string strClient =
             strAppName + "cli";
 
@@ -8434,6 +8628,12 @@ gint32 CExportMakefile::Output()
         std::string strLib = "lib";
         strLib += strAppName + ".so";
 
+        std::string strLibsvr = "lib";
+        strLibsvr += strAppName + "svr.so";
+
+        std::string strLibcli = "lib";
+        strLibcli += strAppName + "cli.so";
+
         std::string strCmdLine =
             "s:XXXSRCS:";
 
@@ -8442,7 +8642,12 @@ gint32 CExportMakefile::Output()
         strCmdLine += strCpps + ":;" +
             "s:XXXCLI:" + strClient + ":;" +
             "s:XXXSVR:" + strServer + ":; " +
+            "s:XXXLIBSVR:" + strLibsvr + ":; " +
+            "s:XXXLIBCLI:" + strLibcli + ":; " +
             "s:XXXLIB:" + strLib + ":; " +
+            "s:XXXSTATIC:" + std::string( "$(OBJ_DIR)/" ) +
+                "lib" + strAppName + "skel.a:; " +
+            "s:XXXSKELOBJS:" + strObjSkel + ":; " +
             "s:XXXOBJSSVR:" + strObjServer + ":; " +
             "s:XXXOBJSCLI:" + strObjClient + ":; ";
 
@@ -9166,8 +9371,23 @@ gint32 CExportReadme::Output_en()
             NEW_LINES( 2 );
         }
 
-        CCOUT<< "* *" << g_strAppName << ".cpp*, *" << g_strAppName <<".h*: "
-            << "Containing all the implementations of the helpers "
+        std::vector< ObjPtr > vecIfs;
+        ret = m_pNode->GetIfDecls( vecIfs );
+        if( ERROR( ret ) )
+            break;
+        CCOUT<< "* *" << g_strAppName << ".cpp*, *" << g_strAppName <<".h*";
+        for( auto& elem : vecIfs )
+        {
+            CInterfaceDecl* pifd = elem;
+            if( pifd->RefCount() == 0 )
+                continue;
+            stdstr strIfName = pifd->GetName();
+            CCOUT << ", *" << strIfName << "svr.h* "
+                << ", *" << strIfName << "svr.cpp* "
+                << ", *" << strIfName << "cli.h* "
+                << ", *" << strIfName << "cli.cpp* ";
+        }
+        CCOUT << ": Containing all the implementations of the helpers "
             << "and utilities for each declared interfaces, for "
             << "both client and server.";
         NEW_LINE;
@@ -9275,9 +9495,32 @@ gint32 CExportReadme::Output_cn()
             NEW_LINES( 2 );
         }
 
-        CCOUT<< "* *" << g_strAppName << ".h*, *" << g_strAppName <<".cpp*: "
-                << "分别包含有ridl中声明所有的的service的"
-                << "服务器端和客户端的所有辅助函数和底部支持功能的声明和实现。";
+        std::vector< ObjPtr > vecIfs;
+        ret = m_pNode->GetIfDecls( vecIfs );
+        if( ERROR( ret ) )
+            break;
+        CCOUT<< "* *" << g_strAppName << ".cpp*, *" << g_strAppName <<".h*";
+        for( auto& elem : vecIfs )
+        {
+            CInterfaceDecl* pifd = elem;
+            if( pifd->RefCount() == 0 )
+                continue;
+            stdstr strIfName = pifd->GetName();
+            CCOUT << ", *" << strIfName << "svr.h* "
+                << ", *" << strIfName << "svr.cpp* "
+                << ", *" << strIfName << "cli.h* "
+                << ", *" << strIfName << "cli.cpp* ";
+        }
+        CCOUT<< ": 分别包含有ridl中声明的并引用到的接口的"
+                << "所有辅助函数和底部支持功能的声明和实现。";
+        NEW_LINE;
+        CCOUT << "这个文件务必不要做进一步的修改。"
+                << "`ridlc`在下一次运行时会重写里面的内容。";
+        NEW_LINES( 2 );
+        
+        CCOUT<< "* *" << g_strAppName << "struct.h*, *" << g_strAppName <<"struct.cpp*: "
+                << "分别包含有ridl中声明的并引用到的结构的"
+                << "所有辅助函数和底部支持功能的声明和实现。也包括ridlc中typedef定义的各种数据类型";
         NEW_LINE;
         CCOUT << "这个文件务必不要做进一步的修改。"
                 << "`ridlc`在下一次运行时会重写里面的内容。";

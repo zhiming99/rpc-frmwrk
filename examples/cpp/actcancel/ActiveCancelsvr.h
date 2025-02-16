@@ -5,6 +5,13 @@
 #pragma once
 #include "actcancel.h"
 
+#include "IActiveCancelsvr.h"
+
+DECLARE_AGGREGATED_SERVER(
+    CActiveCancel_SvrSkel,
+    CStatCountersServer,
+    IIActiveCancel_SImpl );
+
 class CActiveCancel_SvrImpl
     : public CActiveCancel_SvrSkel
 {
