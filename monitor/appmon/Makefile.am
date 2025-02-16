@@ -43,7 +43,12 @@ appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 EXTRA_DIST=appmon.ridl
 
 noinst_LIBRARIES=libappmon.a
-libappmon_a_SOURCES = appmon.cpp appmon.h 
+libappmon_a_SOURCES = appmon.cpp appmon.h appmonstruct.h appmonstruct.cpp \
+IAppStorecli.h IAppStorecli.cpp IAppStoresvr.h IAppStoresvr.cpp IAppMonitorcli.h \
+IAppMonitorcli.cpp IAppMonitorsvr.h IAppMonitorsvr.cpp IDataProducercli.h \
+IDataProducercli.cpp IDataProducersvr.h IDataProducersvr.cpp IUserManagercli.h \
+IUserManagercli.cpp IUserManagersvr.h IUserManagersvr.cpp 
+
 libappmon_a_CPPFLAGS= $(appmonsvr_CPPFLAGS)
 libappmon_a_HEADERS=
 #libappmon_la_LIBADD= ../registry/libregfs.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L../../3rd_party
