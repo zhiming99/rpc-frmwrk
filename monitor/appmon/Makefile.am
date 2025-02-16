@@ -43,13 +43,13 @@ appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 EXTRA_DIST=appmon.ridl
 
 noinst_LIBRARIES=libappmon.a
-libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStorecli.cpp IAppStoresvr.cpp IAppMonitorcli.cpp IAppMonitorsvr.cpp IDataProducercli.cpp IDataProducersvr.cpp IUserManagercli.cpp IUserManagersvr.cpp appmondesc.json
+libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStorecli.cpp IAppStoresvr.cpp IAppMonitorcli.cpp IAppMonitorsvr.cpp IDataProducercli.cpp IDataProducersvr.cpp IUserManagercli.cpp IUserManagersvr.cpp appmondesc.json IUserManagersvr.h IUserManagercli.h IDataProducersvr.h IDataProducercli.h IAppMonitorsvr.h IAppMonitorcli.h IAppStoresvr.h IAppStorecli.h appmon.h appmonstruct.h 
 libappmon_a_CPPFLAGS= $(appmonsvr_CPPFLAGS)
-libappmon_a_HEADERS= IUserManagersvr.h IUserManagercli.h IDataProducersvr.h IDataProducercli.h IAppMonitorsvr.h IAppMonitorcli.h IAppStoresvr.h IAppStorecli.h appmon.h appmonstruct.h 
+libappmon_a_HEADERS=
 #libappmon_la_LIBADD= ../registry/libregfs.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L../../3rd_party
 #libappmon_la_LDFLAGS= -version-info @VERSION2@
 #libappmon_ladir=$(libdir)
-libappmon_adir=./
+libappmon_adir=$(includedir)/rpcf/appmon
 
 headers=$(libappmon_a_HEADERS) AppMonitorsvr.h AppMonitorcli.h SimpleAuthcli.h SimpleAuthsvr.h AppManagercli.h AppManagersvr.h monconst.h
 
