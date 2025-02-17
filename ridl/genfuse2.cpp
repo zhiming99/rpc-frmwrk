@@ -2357,13 +2357,17 @@ gint32 CImplMainFuncFuse2::Output()
             strSuffix = "svr";
         {
             bool bProxy = m_bProxy;
-            if( bProxy )
+            if( bProxy && bGenClient )
             {
                 m_pWriter->SelectMainCli();
             }
-            else
+            else if( !bProxy && bGenServer )
             {
                 m_pWriter->SelectMainSvr();
+            }
+            else
+            {
+                break;
             }
 
             EMIT_DISCLAIMER;
@@ -2379,23 +2383,24 @@ gint32 CImplMainFuncFuse2::Output()
             {
                 CServiceDecl* pSvc = elem;
                 bool bNewLine = false;
-                if( bProxy || g_bMklib )
+                if( ( bProxy || g_bMklib ) && bGenClient )
                 {
                     CCOUT << "#include \""
                         << pSvc->GetName() << "cli.h\"";
-                    bNewLine = true;
+                    NEW_LINE;
                 }
-                if( !bProxy )
+                if( !bProxy && bGenServer )
                 {
-                    if( bNewLine )
-                        NEW_LINE;
                     CCOUT << "#include \""
                         << pSvc->GetName() << "svr.h\"";
+                    NEW_LINE;
                 }
-                NEW_LINE;
             }
             if( g_bMklib && bProxy )
-                break;
+            {
+                if( !bGenClient || bGenServer )
+                    break;
+            }
 
             NEW_LINES( 1 );
             if( g_bMklib )
@@ -2691,7 +2696,7 @@ gint32 CImplClassFactoryFuse2::Output()
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
-            if( IsServer() )
+            if( IsServer() && bGenServer )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( ";
                 CCOUT << "C" << pSvc->GetName()
@@ -2707,7 +2712,7 @@ gint32 CImplClassFactoryFuse2::Output()
                     << "_ChannelSvr );";
                 NEW_LINE;
             }
-            if( !IsServer() || g_bMklib )
+            if( ( !IsServer() || g_bMklib ) && bGenClient )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( ";
                 CCOUT << "C" << pSvc->GetName()

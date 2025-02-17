@@ -12,7 +12,7 @@ etc/rpcf/odesctpl.json
 etc/rpcf/odesctpl2.json
 etc/rpcf/*.java
 etc/rpcf/*.py
-etc/rpcf/*tpl
+etc/rpcf/mktpl*
 etc/rpcf/*ridl
 usr/bin/rpcf/hwsvrsmk
 usr/bin/rpcf/hwclismk

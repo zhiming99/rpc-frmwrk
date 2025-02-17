@@ -122,6 +122,8 @@ void Usage()
     printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
     printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
     printf( "\t-l:\tTo output a shared library instead of executables.\n" );
+    printf( "\t--server:\tTo generate skeleton code for server only.\n" );
+    printf( "\t--client:\tTo generate skeleton code for client only.\n" );
     printf( "\t\tThis option is for CPP project only.\n" );
     printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
     printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
@@ -134,7 +136,6 @@ std::string g_strTarget;
 bool g_bNewSerial = true;
 stdstr g_strLang = "cpp";
 stdstr g_strLocale ="en";
-guint32 g_dwFlags = 0;
 stdstr g_strCmdLine;
 bool g_bBuiltinRt = false;
 
@@ -150,6 +151,7 @@ bool g_bAsyncProxy = false;
 #include "genjava.h"
 #include "getopt.h"
 #include "genjs.h"
+guint32 g_dwFlags = GEN_BOTH;
 
 extern gint32 GenRpcFSkelton(
     const std::string& strOutPath,
@@ -207,6 +209,8 @@ int main( int argc, char** argv )
             {"odesc_url", required_argument, 0,  0 },
             {"lib_path", required_argument, 0,  0 },
             {"auth", no_argument, 0,  0 },
+            {"server", no_argument, 0,  0 },
+            {"client", no_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -247,7 +251,27 @@ int main( int argc, char** argv )
                     {
                         g_bAuth = true;
                     }
+#else
+                    else if( option_index == 1 ||
+                        option_index == 2 ||
+                        option_index == 3 )
+                    {
+                        printf( "%s : %s\n", optarg,
+                            "Error option is invalid "
+                            "since JS is disabled" );
+                    }
+                    bQuit = true;
+                    ret = -EINVAL;
+                    break;
 #endif
+                    else if( option_index == 4 )
+                    {
+                        g_dwFlags &= ~GEN_CLIENT;
+                    }
+                    else if( option_index == 5 )
+                    {
+                        g_dwFlags &= ~GEN_SERVER;
+                    }
                     break;
                 }
             case 'O':
@@ -411,14 +435,14 @@ int main( int argc, char** argv )
                     // make a shared lib for FUSE integration
                     if( optarg == nullptr )
                     {
-                        g_dwFlags = FUSE_BOTH;
+                        g_dwFlags |= FUSE_BOTH;
                         break;
                     }
                     char ch = optarg[ 0 ];
                     if( ch == 's' )
-                        g_dwFlags = FUSE_SERVER;
+                        g_dwFlags |= FUSE_SERVER;
                     else if( ch == 'p' )
-                        g_dwFlags = FUSE_PROXY;
+                        g_dwFlags |= FUSE_PROXY;
                     else
                     {
                         fprintf( stderr,

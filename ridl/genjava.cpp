@@ -1811,7 +1811,6 @@ gint32 CJavaFileSet::AddSvcImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
         std::string strExt = ".java";
         std::string strSvrJava = m_strPath +
             "/" + strSvcName + "svr.java";
@@ -1845,35 +1844,36 @@ gint32 CJavaFileSet::AddSvcImpl(
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrJava ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strSvrJava.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strCliJava,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliJava ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliJava.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strCliJavaBase,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliJavaBase ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliJavaBase.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strSvrJavaBase,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrJavaBase ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strSvrJavaBase.c_str() ),
+            std::move( pstm ) } );
 
     }while( 0 );
 
@@ -1887,7 +1887,6 @@ gint32 CJavaFileSet::AddStructImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
         std::string strStructJava = m_strPath +
             "/" + strStructName + ".java";
 
@@ -1896,8 +1895,9 @@ gint32 CJavaFileSet::AddStructImpl(
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strStructJava ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strStructJava.c_str() ),
+            std::move( pstm ) } );
 
     }while( 0 );
 
@@ -1912,7 +1912,9 @@ void CJavaFileSet::OpenFile(
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( strName.c_str() ),
+        std::move( pstm ) } );
 }
 
 gint32 CJavaFileSet::OpenFiles()
@@ -1932,12 +1934,7 @@ gint32 CJavaFileSet::OpenFiles()
 
 CJavaFileSet::~CJavaFileSet()
 {
-    for( auto& elem : m_vecFiles )
-    {
-        if( elem != nullptr )
-            elem->close();
-    }
-    m_vecFiles.clear();
+    m_mapSvcImp.clear();
 }
 
 gint32 FindFullPath(

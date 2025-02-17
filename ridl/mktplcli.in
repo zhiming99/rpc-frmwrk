@@ -1,0 +1,143 @@
+#!/usr/bin/make
+
+SHELL := /bin/bash
+CC:=$(CROSS_COMPILE)gcc
+CPP:=$(CROSS_COMPILE)g++
+LD:=$(CROSS_COMPILE)ld
+AR:=$(CROSS_COMPILE)ar
+AS:=$(CROSS_COMPILE)as
+STRIP:=$(CROSS_COMPILE)strip
+
+mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
+BASE:=$(abspath $(dir $(mkfile_path)) )
+
+C_FLAGS:=$(CFLAGS) -Wall -c -D_GNU_SOURCE
+C_DEFINES+=-D_USE_LIBEV=1
+
+PKG_CONFIG_PATH=@PKG_CONFIG_PATH@
+
+COMMON_INCLUDE:=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags dbus-1 jsoncpp rpcf)
+
+C_INCLUDE:=-I./ $(COMMON_INCLUDE)
+
+BITWIDTH:=@BITWIDTH@
+
+DEBUG_FLAGS:=-D_DEBUG=1 -DDEBUG -ggdb
+RELEASE_FLAGS:= -D_DEBUG=0 -DRELEASE -O2 -ggdb -fno-strict-aliasing
+
+ifeq ($(BITWIDTH),32)
+FUSE_DEFINES:=XXXDEFINES
+else
+FUSE_DEFINES:=
+endif
+
+DBG_DIR:=debug
+RLS_DIR:=release
+
+OBJ_DIR:=$(BASE)/$(RLS_DIR)
+OUTPUT_DIR:=$(OBJ_DIR)
+
+ifeq ($(MAKECMDGOALS),) 
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),debug) 
+	C_FLAGS+=$(DEBUG_FLAGS)
+	OBJ_DIR:=$(BASE)/$(DBG_DIR)
+	OUTPUT_DIR:=$(OBJ_DIR)
+else ifeq ($(MAKECMDGOALS),all) 
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),release)
+	C_FLAGS+=$(RELEASE_FLAGS)
+	C_DEFINES+=-DPRODUCTION 
+else ifeq ($(MAKECMDGOALS),debug_clean)
+	OUTPUT_DIR:=$(BASE)/$(DBG_DIR)
+	OBJ_DIR:=./$(DBG_DIR)
+else ifeq ($(MAKECMDGOALS),release_clean)
+endif
+
+C_DEFINES+=$(FUSE_DEFINES)
+
+DIST_LIB_DIR = @DIST_LIB_DIR@
+RTFILES:=XXXRTFILES
+FUSE_LIB:=XXXFUSE
+COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs dbus-1 jsoncpp rpcf)
+LINKER_OPTION:=$(RTFILES) $(COMMON_LINK) $(FUSE_LIB) -ldl -lstdc++ -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
+
+TARGET_CLI:=XXXCLI
+TARGET_SO:=XXXLIB
+STATIC_LIB:=XXXSTATIC
+TARGET_SO_CLI:=XXXLIBCLI
+
+MKLIB:=XXXMKLIB
+
+ifeq ($(MKLIB),)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_CLI)
+else ifeq ($(MKLIB),1)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SO_CLI)
+CPP_FLAGS+=-fPIC
+endif
+
+OBJS_CLI:= $(OBJ_DIR)/maincli.o XXXOBJSCLI
+
+SKELETON_OBJS:=XXXSKELOBJS
+
+SOURCES:=XXXSRCS
+OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
+
+MUTE_CLEAN:=2>/dev/null || true
+
+all: $(TARGET)
+debug: $(TARGET)
+release: $(TARGET)
+
+debug_clean: do_clean
+release_clean: do_clean
+
+clean:
+	make debug_clean
+	make release_clean
+
+do_clean:
+	-@rm $(OBJ_DIR)/*.d $(MUTE_CLEAN)
+	-@rm $(OUTPUT_DIR)/$(TARGET_CLI) $(MUTE_CLEAN)
+	-@rm $(OBJS2) $(MUTE_CLEAN)
+	-@rm $(OBJS_CLI) $(MUTE_CLEAN)
+	-@rm $(STATIC_LIB) $(MUTE_CLEAN)
+
+-include $(OBJS2:%.o=%.d) $(OBJS_CLI:.o=.d) $(SKELETON_OBJS:.o=.d)
+
+$(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJS_CLI) $(STATIC_LIB)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJS_CLI) $(STATIC_LIB) $(LINKER_OPTION)
+	@python3 ./synccfg.py
+	@cp *.json $(OUTPUT_DIR)
+
+$(OUTPUT_DIR)/$(TARGET_SO_CLI) : $(OBJS_CLI) $(STATIC_LIB)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJS_CLI) $(STATIC_LIB) $(LINKER_OPTION) -shared
+
+$(STATIC_LIB) : $(SKELETON_OBJS) $(OBJS2) 
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(AR) rcs -o $@ $(SKELETON_OBJS) $(OBJS2)
+
+$(OBJ_DIR)/%.o : %.cpp
+	@echo Building file: $@
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $<
+
+$(OBJ_DIR)/%.d : %.cpp
+	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
+	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $@
+	@mv -f $@ $@.tmp
+	@sed -e 's|.*:|$(OBJ_DIR)/$*.o:|' < $@.tmp > $@
+	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
+	@rm -f $@.tmp
+
+sync:
+	@python3 ./synccfg.py
+	@if [ -d debug ]; then cp *.json debug;fi
+	@if [ -d release ]; then cp *.json release;fi
+	@echo sync configuration done
+
+.PHONY: clean sync

@@ -614,49 +614,63 @@ gint32 CPyFileSet2::OpenFiles()
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strStructsPy.c_str() ),
+        std::move( pstm ) } );
 
     pstm= STMPTR( new std::ofstream(
         m_strInitPy,
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strInitPy.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMakefile,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMakefile.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMainCli,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMainCli.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMainSvr,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMainSvr.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strIfImpl,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strIfImpl.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strReadme.c_str() ),
+        std::move( pstm ) } );
 
     return STATUS_SUCCESS;
 }
@@ -668,7 +682,6 @@ gint32 CPyFileSet2::AddSvcImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
         std::string strExt = ".py";
         std::string strSvrPy = m_strPath +
             "/" + strSvcName + "svr.py";
@@ -696,17 +709,18 @@ gint32 CPyFileSet2::AddSvcImpl(
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrPy ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strSvrPy.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strCliPy,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliPy ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliPy.c_str() ),
+            std::move( pstm ) } );
 
     }while( 0 );
 

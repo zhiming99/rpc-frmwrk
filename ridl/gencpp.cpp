@@ -834,70 +834,87 @@ gint32 CFileSet::OpenFiles()
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    const char* szFile =
+        basename( m_strAppHeader.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     pstm = STMPTR( new std::ofstream(
         m_strAppCpp,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strAppCpp.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     pstm = STMPTR( new std::ofstream(
         m_strObjDesc,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strObjDesc.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     pstm = STMPTR( new std::ofstream(
         m_strDriver,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strDriver.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     pstm = STMPTR( new std::ofstream(
         m_strMakefile,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strMakefile.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
-    pstm = STMPTR( new std::ofstream(
-        m_strMainCli,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( bGenClient )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strMainCli,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+        szFile = basename( m_strMainCli.c_str() );
+        m_mapSvcImp[ szFile ] = std::move( pstm );
+    }
 
-    pstm = STMPTR( new std::ofstream(
-        m_strMainSvr,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( bGenServer )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strMainSvr,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+        szFile = basename( m_strMainSvr.c_str() );
+        m_mapSvcImp[ szFile ] = std::move( pstm );
+    }
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strReadme.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     pstm = STMPTR( new std::ofstream(
         m_strStruct,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strStruct.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     pstm = STMPTR( new std::ofstream(
         m_strStructHdr,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    szFile = basename( m_strStructHdr.c_str() );
+    m_mapSvcImp[ szFile ] = std::move( pstm );
 
     return STATUS_SUCCESS;
 }
@@ -909,7 +926,6 @@ gint32 CFileSet::AddSvcImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
         std::string strExt = ".cpp";
         std::string strExtHdr = ".h";
         std::string strCliExt = ".cpp";
@@ -957,40 +973,42 @@ gint32 CFileSet::AddSvcImpl(
                 strSvcName + "cli.h.new";
         }
 
-        STMPTR pstm( new std::ofstream(
-            strHeader,
-            std::ofstream::out |
-            std::ofstream::trunc ) );
+        if( bGenServer )
+        {
+            STMPTR pstm( new std::ofstream(
+                strHeader,
+                std::ofstream::out |
+                std::ofstream::trunc ) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + "svr" + strExtHdr ] = idx;
+            m_mapSvcImp[ strSvcName + "svr" + strExtHdr ] =
+                std::move( pstm );
 
-        pstm = STMPTR( new std::ofstream(
-            strCliHeader,
-            std::ofstream::out |
-            std::ofstream::trunc ) );
+            pstm = STMPTR( new std::ofstream(
+                strCpp,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + "cli" + strCliExtHdr ] = idx;
+            m_mapSvcImp[ strSvcName + "svr" + strExt ] =
+                std::move( pstm );
+        }
+        if( bGenClient )
+        {
+            STMPTR pstm = STMPTR( new std::ofstream(
+                strCliHeader,
+                std::ofstream::out |
+                std::ofstream::trunc ) );
 
-        pstm = STMPTR( new std::ofstream(
-            strCpp,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+            m_mapSvcImp[ strSvcName + "cli" + strCliExtHdr ] =
+                std::move( pstm );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + "svr" + strExt ] = idx;
+            pstm = STMPTR( new std::ofstream(
+                strCliCpp,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        pstm = STMPTR( new std::ofstream(
-            strCliCpp,
-            std::ofstream::out |
-            std::ofstream::trunc) );
-
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvcName + "cli" + strCliExt ] = idx;
+            m_mapSvcImp[ strSvcName + "cli" + strCliExt ] =
+                std::move( pstm );
+        }
 
     }while( 0 );
 
@@ -1004,8 +1022,6 @@ gint32 CFileSet::AddIfImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
-
         std::string strHeader = m_strPath +
             "/" + strIfName + "svr.h";
         std::string strCliHeader = m_strPath +
@@ -1015,40 +1031,43 @@ gint32 CFileSet::AddIfImpl(
         std::string strCliCpp = m_strPath +
             "/" + strIfName + "cli.cpp";
 
-        STMPTR pstm( new std::ofstream(
-            strHeader,
-            std::ofstream::out |
-            std::ofstream::trunc ) );
+        if( bGenServer )
+        {
+            STMPTR pstm( new std::ofstream(
+                strHeader,
+                std::ofstream::out |
+                std::ofstream::trunc ) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strIfName + "svr.h" ] = idx;
+            m_mapSvcImp[ strIfName + "svr.h" ] =
+                std::move( pstm );
 
-        pstm = STMPTR( new std::ofstream(
-            strCliHeader,
-            std::ofstream::out |
-            std::ofstream::trunc ) );
+            pstm = STMPTR( new std::ofstream(
+                strCpp,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strIfName + "cli.h" ] = idx;
+            m_mapSvcImp[ strIfName + "svr.cpp" ] =
+                std::move( pstm );
+        }
 
-        pstm = STMPTR( new std::ofstream(
-            strCpp,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenClient )
+        {
+            STMPTR pstm = STMPTR( new std::ofstream(
+                strCliHeader,
+                std::ofstream::out |
+                std::ofstream::trunc ) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strIfName + "svr.cpp" ] = idx;
+            m_mapSvcImp[ strIfName + "cli.h" ] =
+                std::move( pstm );
 
-        pstm = STMPTR( new std::ofstream(
-            strCliCpp,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+            pstm = STMPTR( new std::ofstream(
+                strCliCpp,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strIfName + "cli.cpp" ] = idx;
+            m_mapSvcImp[ strIfName + "cli.cpp" ] =
+                std::move( pstm );
+        }
 
     }while( 0 );
 
@@ -1056,12 +1075,7 @@ gint32 CFileSet::AddIfImpl(
 }
 IFileSet::~IFileSet()
 {
-    for( auto& elem : m_vecFiles )
-    {
-        if( elem != nullptr )
-            elem->close();
-    }
-    m_vecFiles.clear();
+    m_mapSvcImp.clear();
 }
 
 gint32 SetStructRefs( ObjPtr& pRoot )
@@ -1177,7 +1191,9 @@ gint32 GenHeaderFile(
     CCppWriter* m_pWriter = pWriter;
     gint32 ret = 0;
     do{
-        pWriter->SelectHeaderFile();
+        ret = pWriter->SelectHeaderFile();
+        if( ERROR( ret ) )
+            break;
 
         CHeaderPrologue oHeader(
             pWriter, pRoot );
@@ -1217,7 +1233,9 @@ gint32 GenHeaderFile(
             NEW_LINE;
         }
 
-        pWriter->SelectStructHdr();
+        ret = pWriter->SelectStructHdr();
+        if( ERROR( ret ) )
+            break;
         EMIT_COMMON_INC_HDR( pWriter );
         NEW_LINE;
         for( guint32 i = 0;
@@ -1267,48 +1285,55 @@ gint32 GenHeaderFile(
 
             stdstr strIfName = pNode->GetName();
             pWriter->AddIfImpl( strIfName );
-            ret = pWriter->SelectImplFile(
-                strIfName + "cli.h" );
-            if( ERROR( ret ) )
-                break;
 
-            EMIT_COMMON_INC_HDR( pWriter );
-            NEW_LINE;
-            if( bFuseP )
+            if( bGenClient )
             {
-                CDeclInterfProxyFuse odip(
-                    pWriter, pObj );
-                ret = odip.Output();
+                ret = pWriter->SelectImplFile(
+                    strIfName + "cli.h" );
                 if( ERROR( ret ) )
                     break;
+
+                EMIT_COMMON_INC_HDR( pWriter );
+                NEW_LINE;
+                if( bFuseP )
+                {
+                    CDeclInterfProxyFuse odip(
+                        pWriter, pObj );
+                    ret = odip.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CDeclInterfProxy odip(
+                        pWriter, pObj );
+                    ret = odip.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
-            else
+
+            if( bGenServer )
             {
-                CDeclInterfProxy odip(
-                    pWriter, pObj );
-                ret = odip.Output();
+                ret = pWriter->SelectImplFile(
+                    strIfName + "svr.h" );
                 if( ERROR( ret ) )
                     break;
-            }
+                EMIT_COMMON_INC_HDR( pWriter );
+                NEW_LINE;
+                if( bFuseS )
+                {
+                    CDeclInterfSvrFuse odis(
+                        pWriter, pObj );
 
-            ret = pWriter->SelectImplFile(
-                strIfName + "svr.h" );
-            if( ERROR( ret ) )
-                break;
-            EMIT_COMMON_INC_HDR( pWriter );
-            NEW_LINE;
-            if( bFuseS )
-            {
-                CDeclInterfSvrFuse odis(
-                    pWriter, pObj );
-
-                ret = odis.Output();
-            }
-            else
-            {
-                CDeclInterfSvr odis(
-                    pWriter, pObj );
-                ret = odis.Output();
+                    ret = odis.Output();
+                }
+                else
+                {
+                    CDeclInterfSvr odis(
+                        pWriter, pObj );
+                    ret = odis.Output();
+                }
             }
         }
         if( ERROR( ret ) )
@@ -1343,202 +1368,214 @@ gint32 GenHeaderFile(
             if( ERROR( ret ) )
                 break;
 
-            // server declarations
-            ret = pWriter->SelectImplFile(
-                elem.first + "svr.h" ); 
-
-            if( ERROR( ret ) )
+            if( bGenServer )
             {
+                // server declarations
                 ret = pWriter->SelectImplFile(
-                    elem.first + "svr.h.new" );
-            }
+                    elem.first + "svr.h" ); 
 
-            EMIT_COMMON_INC_HDR( pWriter );
-            for( auto& pIf : vecIfs )
-            {
-                CInterfRef* pifr = pIf;
-                if( pifr == nullptr )
-                    continue;
-                NEW_LINE;
-                pifr->GetName();
-                CCOUT << "#include \"" <<
-                    pifr->GetName() << "svr.h\"";
-            }
-            NEW_LINES( 2 );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "svr.h.new" );
+                }
 
-            CDeclService ods( pWriter, pObj );
-            ret = ods.Output( false );
-            if( ERROR( ret ) )
-                break;
+                EMIT_COMMON_INC_HDR( pWriter );
+                for( auto& pIf : vecIfs )
+                {
+                    CInterfRef* pifr = pIf;
+                    if( pifr == nullptr )
+                        continue;
+                    NEW_LINE;
+                    pifr->GetName();
+                    CCOUT << "#include \"" <<
+                        pifr->GetName() << "svr.h\"";
+                }
+                NEW_LINES( 2 );
 
-            if( bFuseS )
-            {
-                CDeclServiceImplFuse osi(
-                    pWriter, elem.second, false );
-
-                ret = osi.Output();
+                CDeclService ods( pWriter, pObj );
+                ret = ods.Output( false );
                 if( ERROR( ret ) )
                     break;
-            }
-            else
-            {
-                CDeclServiceImpl osi(
-                    pWriter, elem.second, false );
 
-                ret = osi.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
+                if( bFuseS )
+                {
+                    CDeclServiceImplFuse osi(
+                        pWriter, elem.second, false );
 
-            ret = pWriter->SelectImplFile(
-                elem.first + "cli.h" ); 
+                    ret = osi.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CDeclServiceImpl osi(
+                        pWriter, elem.second, false );
 
-            if( ERROR( ret ) )
-            {
+                    ret = osi.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                /* svr implementions*/
                 ret = pWriter->SelectImplFile(
-                    elem.first + "cli.h.new" );
-            }
+                    elem.first + "svr.cpp" ); 
 
-            EMIT_COMMON_INC_HDR( pWriter );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "svr.cpp.new" );
+                }
 
-            for( auto& pIf : vecIfs )
-            {
-                CInterfRef* pifr = pIf;
-                if( pifr == nullptr )
-                    continue;
-                NEW_LINE;
-                pifr->GetName();
-                CCOUT << "#include \"" <<
-                    pifr->GetName() << "cli.h\"";
-            }
-            NEW_LINES( 2 );
-
-            // client declarations
-            CDeclService ods2( pWriter, pObj );
-            ret = ods2.Output( true );
-            if( ERROR( ret ) )
-                break;
-
-            if( bFuseP )
-            {
-                CDeclServiceImplFuse osi2(
-                    pWriter, elem.second, true );
-
-                ret = osi2.Output();
                 if( ERROR( ret ) )
                     break;
+
+                if( bFuseS )
+                {
+                    CImplServiceImplFuse oisi(
+                        pWriter, elem.second, false );
+
+                    ret = oisi.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplServiceImpl oisi(
+                        pWriter, elem.second, false );
+
+                    ret = oisi.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
-            else
+
+            if( bGenClient )
             {
-                CDeclServiceImpl osi2(
-                    pWriter, elem.second, true );
-
-                ret = osi2.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            /* svr implementions*/
-            ret = pWriter->SelectImplFile(
-                elem.first + "svr.cpp" ); 
-
-            if( ERROR( ret ) )
-            {
+                // client declarations
                 ret = pWriter->SelectImplFile(
-                    elem.first + "svr.cpp.new" );
-            }
+                    elem.first + "cli.h" ); 
 
-            if( ERROR( ret ) )
-                break;
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "cli.h.new" );
+                }
 
-            if( bFuseS )
-            {
-                CImplServiceImplFuse oisi(
-                    pWriter, elem.second, false );
+                EMIT_COMMON_INC_HDR( pWriter );
 
-                ret = oisi.Output();
+                for( auto& pIf : vecIfs )
+                {
+                    CInterfRef* pifr = pIf;
+                    if( pifr == nullptr )
+                        continue;
+                    NEW_LINE;
+                    pifr->GetName();
+                    CCOUT << "#include \"" <<
+                        pifr->GetName() << "cli.h\"";
+                }
+                NEW_LINES( 2 );
+
+                CDeclService ods2( pWriter, pObj );
+                ret = ods2.Output( true );
                 if( ERROR( ret ) )
                     break;
-            }
-            else
-            {
-                CImplServiceImpl oisi(
-                    pWriter, elem.second, false );
 
-                ret = oisi.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
+                if( bFuseP )
+                {
+                    CDeclServiceImplFuse osi2(
+                        pWriter, elem.second, true );
 
-            /* client implementions*/
-            ret = pWriter->SelectImplFile(
-                elem.first + "cli.cpp" ); 
+                    ret = osi2.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CDeclServiceImpl osi2(
+                        pWriter, elem.second, true );
 
-            if( ERROR( ret ) )
-            {
+                    ret = osi2.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                /* client implementions*/
                 ret = pWriter->SelectImplFile(
-                    elem.first + "cli.cpp.new" );
-            }
+                    elem.first + "cli.cpp" ); 
 
-            if( ERROR( ret ) )
-                break;
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "cli.cpp.new" );
+                }
 
-            if( bFuseP )
-            {
-                CImplServiceImplFuse oisi2(
-                    pWriter, elem.second, true );
-
-                ret = oisi2.Output();
                 if( ERROR( ret ) )
                     break;
-            }
-            else
-            {
-                CImplServiceImpl oisi2(
-                    pWriter, elem.second, true );
 
-                ret = oisi2.Output();
-                if( ERROR( ret ) )
-                    break;
+                if( bFuseP )
+                {
+                    CImplServiceImplFuse oisi2(
+                        pWriter, elem.second, true );
+
+                    ret = oisi2.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplServiceImpl oisi2(
+                        pWriter, elem.second, true );
+
+                    ret = oisi2.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
         }
 
         if( !vecSvcNames.empty() )
         {
             // client side
-            if( bFuseP )
+            if( bGenClient )
             {
-                CImplMainFuncFuse omf(
-                    pWriter, pRoot, true );
-                ret = omf.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-            else
-            {
-                CImplMainFunc omf(
-                    pWriter, pRoot, true );
-                ret = omf.Output();
-                if( ERROR( ret ) )
-                    break;
+                if( bFuseP )
+                {
+                    CImplMainFuncFuse omf(
+                        pWriter, pRoot, true );
+                    ret = omf.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplMainFunc omf(
+                        pWriter, pRoot, true );
+                    ret = omf.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
 
             // server side
-            if( bFuseS )
+            if( bGenServer )
             {
-                CImplMainFuncFuse omf(
-                    pWriter, pRoot, false );
-                ret = omf.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-            else
-            {
-                CImplMainFunc omf(
-                    pWriter, pRoot, false );
-                ret = omf.Output();
-                if( ERROR( ret ) )
-                    break;
+                if( bFuseS )
+                {
+                    CImplMainFuncFuse omf(
+                        pWriter, pRoot, false );
+                    ret = omf.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplMainFunc omf(
+                        pWriter, pRoot, false );
+                    ret = omf.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
         }
 
@@ -1655,26 +1692,7 @@ gint32 GenCppFile(
                 continue;
 
             stdstr strIfName = pifd->GetName();
-            m_pWriter->SelectImplFile(
-                strIfName + "cli.cpp" );
-            EMIT_COMMON_INC_CPP;
-            CCOUT << "#include \"" << strIfName << "cli.h\"";
-            NEW_LINE;
-            if( bFuseP )
-            {
-                CImplIufProxyFuse oiufp(
-                    m_pWriter, pObj );
-                oiufp.Output();
-            }
-            else
-            {
-                CImplIufProxy oiufp(
-                    m_pWriter, pObj );
-                oiufp.Output();
-            }
-
-            ObjPtr pmdlobj =
-                pifd->GetMethodList();
+            ObjPtr pmdlobj = pifd->GetMethodList();
 
             if( pmdlobj.IsEmpty() )
             {
@@ -1683,65 +1701,91 @@ gint32 GenCppFile(
             }
 
             CMethodDecls* pmdl = pmdlobj;
-            for( guint32 i = 0;
-                i < pmdl->GetCount(); i++ )
+            if( bGenClient )
             {
-                ObjPtr pmd = pmdl->GetChild( i );
+                m_pWriter->SelectImplFile(
+                    strIfName + "cli.cpp" );
+                EMIT_COMMON_INC_CPP;
+                CCOUT << "#include \""
+                    << strIfName << "cli.h\"";
+                NEW_LINE;
                 if( bFuseP )
                 {
-                    CImplIfMethodProxyFuse oiimp(
-                        m_pWriter, pmd );
-                    ret = oiimp.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufProxyFuse oiufp(
+                        m_pWriter, pObj );
+                    oiufp.Output();
                 }
                 else
                 {
-                    CImplIfMethodProxy oiimp(
-                        m_pWriter, pmd );
-                    ret = oiimp.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufProxy oiufp(
+                        m_pWriter, pObj );
+                    oiufp.Output();
+                }
+
+                for( guint32 i = 0;
+                    i < pmdl->GetCount(); i++ )
+                {
+                    ObjPtr pmd = pmdl->GetChild( i );
+                    if( bFuseP )
+                    {
+                        CImplIfMethodProxyFuse oiimp(
+                            m_pWriter, pmd );
+                        ret = oiimp.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CImplIfMethodProxy oiimp(
+                            m_pWriter, pmd );
+                        ret = oiimp.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
                 }
             }
 
-            m_pWriter->SelectImplFile(
-                strIfName + "svr.cpp" );
-            EMIT_COMMON_INC_CPP;
-            CCOUT << "#include \"" << strIfName << "svr.h\"";
-            NEW_LINE;
-            if( bFuseS )
+            if( bGenServer )
             {
-                CImplIufSvrFuse oiufs(
-                    m_pWriter, pObj );
-                oiufs.Output();
-            }
-            else
-            {
-                CImplIufSvr oiufs(
-                    m_pWriter, pObj );
-                oiufs.Output();
-            }
-
-            for( guint32 i = 0;
-                i < pmdl->GetCount(); i++ )
-            {
-                ObjPtr pmd = pmdl->GetChild( i );
+                m_pWriter->SelectImplFile(
+                    strIfName + "svr.cpp" );
+                EMIT_COMMON_INC_CPP;
+                CCOUT << "#include \""
+                    << strIfName << "svr.h\"";
+                NEW_LINE;
                 if( bFuseS )
                 {
-                    CImplIfMethodSvrFuse oiims(
-                        m_pWriter, pmd );
-                    ret = oiims.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufSvrFuse oiufs(
+                        m_pWriter, pObj );
+                    oiufs.Output();
                 }
                 else
                 {
-                    CImplIfMethodSvr oiims(
-                        m_pWriter, pmd );
-                    ret = oiims.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufSvr oiufs(
+                        m_pWriter, pObj );
+                    oiufs.Output();
+                }
+
+                for( guint32 i = 0;
+                    i < pmdl->GetCount(); i++ )
+                {
+                    ObjPtr pmd = pmdl->GetChild( i );
+                    if( bFuseS )
+                    {
+                        CImplIfMethodSvrFuse oiims(
+                            m_pWriter, pmd );
+                        ret = oiims.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CImplIfMethodSvr oiims(
+                            m_pWriter, pmd );
+                        ret = oiims.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
                 }
             }
         }
@@ -6658,14 +6702,14 @@ gint32 CImplClassFactory::Output()
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
-            if( IsServer() )
+            if( IsServer() && bGenServer )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( ";
                 CCOUT << "C" << pSvc->GetName()
                     << "_SvrImpl );";
                 NEW_LINE;
             }
-            if( !IsServer() || g_bMklib )
+            if( ( !IsServer() || g_bMklib ) && bGenClient )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( ";
                 CCOUT << "C" << pSvc->GetName()
@@ -8325,15 +8369,19 @@ gint32 CImplMainFunc::Output()
             bool bProxy = m_bProxy;
             std::string strClass =
                 std::string( "C" ) + strSvcName;
-            if( bProxy )
+            if( bProxy && bGenClient )
             {
                 strClass += "_CliImpl";
                 m_pWriter->SelectMainCli();
             }
-            else
+            else if( !bProxy && bGenServer )
             {
                 strClass += "_SvrImpl";
                 m_pWriter->SelectMainSvr();
+            }
+            else
+            {
+                break;
             }
 
             EMIT_DISCLAIMER;
@@ -8355,23 +8403,26 @@ gint32 CImplMainFunc::Output()
             {
                 CServiceDecl* pSvc = elem;
                 bool bNewLine = false;
-                if( bProxy || g_bMklib )
+                if( ( bProxy || g_bMklib ) && bGenClient )
                 {
                     CCOUT << "#include \""
                         << pSvc->GetName() << "cli.h\"";
-                    bNewLine = true;
+                    NEW_LINE;
                 }
-                if( !bProxy )
+                if( !bProxy && bGenServer )
                 {
-                    if( bNewLine )
-                        NEW_LINE;
                     CCOUT << "#include \""
                         << pSvc->GetName() << "svr.h\"";
+                    NEW_LINE;
                 }
-                NEW_LINE;
+                else
+                    continue;
             }
             if( g_bMklib && bProxy )
-                break;
+            {
+                if( !bGenClient || bGenServer )
+                    break;
+            }
 
             NEW_LINES( 1 );
             if( g_bMklib )
@@ -8546,7 +8597,14 @@ CExportMakefile::CExportMakefile(
     CCppWriter* pWriter,
     ObjPtr& pNode )
     : super( pWriter, pNode )
-{ m_strFile = "./mktpl"; }
+{
+    if( bGenBoth )
+        m_strFile = "./mktpl";
+    else if( bGenServer )
+        m_strFile = "./mktplsvr";
+    else if( bGenClient )
+        m_strFile = "./mktplcli";
+}
 
 gint32 CExportMakefile::Output()
 {
@@ -8589,13 +8647,18 @@ gint32 CExportMakefile::Output()
             if( pifd->RefCount() == 0 )
                 continue;
 
-            strObjSkel +=
-                std::string( "$(OBJ_DIR)/" ) +
-                pifd->GetName() + "cli.o ";
-
-            strObjSkel +=
-                std::string( "$(OBJ_DIR)/" ) +
-                pifd->GetName() + "svr.o ";
+            if( bGenClient )
+            {
+                strObjSkel +=
+                    std::string( "$(OBJ_DIR)/" ) +
+                    pifd->GetName() + "cli.o ";
+            }
+            if( bGenServer )
+            {
+                strObjSkel +=
+                    std::string( "$(OBJ_DIR)/" ) +
+                    pifd->GetName() + "svr.o ";
+            }
         }
 
         for( auto& elem : vecSvcs )

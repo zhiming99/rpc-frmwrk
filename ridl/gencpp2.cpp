@@ -3245,53 +3245,58 @@ gint32 GenHeaderFileROS(
 
             stdstr strIfName = pNode->GetName();
             pWriter->AddIfImpl( strIfName );
-            ret = pWriter->SelectImplFile(
-                strIfName + "cli.h" );
-            if( ERROR( ret ) )
-                break;
-
-            EMIT_COMMON_INC_HDR( pWriter );
-            NEW_LINE;
-            if( bFuseP )
+            if( bGenClient )
             {
-                CDeclInterfProxyFuse2 odip(
-                    pWriter, pObj );
-                ret = odip.Output();
+                ret = pWriter->SelectImplFile(
+                    strIfName + "cli.h" );
                 if( ERROR( ret ) )
                     break;
+
+                EMIT_COMMON_INC_HDR( pWriter );
+                NEW_LINE;
+                if( bFuseP )
+                {
+                    CDeclInterfProxyFuse2 odip(
+                        pWriter, pObj );
+                    ret = odip.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CDeclInterfProxy2 odip(
+                        pWriter, pObj );
+                    ret = odip.OutputROSSkel();
+                    if( ERROR( ret ) )
+                        break;
+                    ret = odip.OutputROS();
+                }
             }
-            else
+            if( bGenServer )
             {
-                CDeclInterfProxy2 odip(
-                    pWriter, pObj );
-                ret = odip.OutputROSSkel();
+                ret = pWriter->SelectImplFile(
+                    strIfName + "svr.h" );
                 if( ERROR( ret ) )
                     break;
-                ret = odip.OutputROS();
-            }
+                EMIT_COMMON_INC_HDR( pWriter );
+                NEW_LINE;
+                if( bFuseS )
+                {
+                    CDeclInterfSvrFuse2 odis(
+                        pWriter, pObj );
 
-            ret = pWriter->SelectImplFile(
-                strIfName + "svr.h" );
-            if( ERROR( ret ) )
-                break;
-            EMIT_COMMON_INC_HDR( pWriter );
-            NEW_LINE;
-            if( bFuseS )
-            {
-                CDeclInterfSvrFuse2 odis(
-                    pWriter, pObj );
+                    ret = odis.Output();
+                }
+                else
+                {
+                    CDeclInterfSvr2 odis(
+                        pWriter, pObj );
 
-                ret = odis.Output();
-            }
-            else
-            {
-                CDeclInterfSvr2 odis(
-                    pWriter, pObj );
-
-                ret = odis.OutputROSSkel();
-                if( ERROR( ret ) )
-                    break;
-                ret = odis.OutputROS();
+                    ret = odis.OutputROSSkel();
+                    if( ERROR( ret ) )
+                        break;
+                    ret = odis.OutputROS();
+                }
             }
         }
 
@@ -3326,221 +3331,232 @@ gint32 GenHeaderFileROS(
             ret = psd->GetIfRefs( vecIfs );
             if( ERROR( ret ) )
                 break;
+            if( bGenServer )
+            {
+                // server declarations
+                ret = pWriter->SelectImplFile(
+                    elem.first + "svr.h" ); 
 
-            // server declarations
-            ret = pWriter->SelectImplFile(
-                elem.first + "svr.h" ); 
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "svr.h.new" );
+                }
 
-            if( ERROR( ret ) )
+                EMIT_COMMON_INC_HDR( pWriter );
+                for( auto& pIf : vecIfs )
+                {
+                    CInterfRef* pifr = pIf;
+                    if( pifr == nullptr )
+                        continue;
+                    NEW_LINE;
+                    pifr->GetName();
+                    CCOUT << "#include \"" <<
+                        pifr->GetName() << "svr.h\"";
+                }
+                NEW_LINES( 2 );
+
+
+                if( bFuseS )
+                {
+                    CDeclServiceFuse2 ods(
+                        pWriter, pObj );
+                    ret = ods.OutputROSSkel( false );
+                    if( ERROR( ret ) )
+                        break;
+
+                    CDeclServiceImplFuse2 osi(
+                        pWriter, elem.second, false );
+
+                    ret = osi.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CDeclService2 ods(
+                        pWriter, pObj );
+                    ret = ods.OutputROSSkel( false );
+                    if( ERROR( ret ) )
+                        break;
+
+                    CDeclServiceImpl2 osi(
+                        pWriter, elem.second, false );
+
+                    ret = osi.OutputROS();
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                /* svr implementions*/
+                ret = pWriter->SelectImplFile(
+                    elem.first + "svr.cpp" ); 
+
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "svr.cpp.new" );
+                }
+
+                if( ERROR( ret ) )
+                    break;
+
+                if( bFuseS )
+                {
+                    CImplServiceImplFuse2 oisi(
+                        pWriter, elem.second, false );
+
+                    ret = oisi.Output();
+                    if( ERROR( ret ) )
+                        break;
+                    oisi.OutputROSSkel();
+                }
+                else
+                {
+                    CImplServiceImpl2 oisi(
+                        pWriter, elem.second, false );
+
+                    ret = oisi.OutputROS();
+                    if( ERROR( ret ) )
+                        break;
+                }
+            }
+
+            if( bGenClient )
             {
                 ret = pWriter->SelectImplFile(
-                    elem.first + "svr.h.new" );
-            }
+                    elem.first + "cli.h" ); 
 
-            EMIT_COMMON_INC_HDR( pWriter );
-            for( auto& pIf : vecIfs )
-            {
-                CInterfRef* pifr = pIf;
-                if( pifr == nullptr )
-                    continue;
-                NEW_LINE;
-                pifr->GetName();
-                CCOUT << "#include \"" <<
-                    pifr->GetName() << "svr.h\"";
-            }
-            NEW_LINES( 2 );
-
-
-            if( bFuseS )
-            {
-                CDeclServiceFuse2 ods(
-                    pWriter, pObj );
-                ret = ods.OutputROSSkel( false );
                 if( ERROR( ret ) )
-                    break;
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "cli.h.new" );
+                }
 
-                CDeclServiceImplFuse2 osi(
-                    pWriter, elem.second, false );
+                // client declarations
+                EMIT_COMMON_INC_HDR( pWriter );
 
-                ret = osi.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-            else
-            {
-                CDeclService2 ods(
-                    pWriter, pObj );
-                ret = ods.OutputROSSkel( false );
-                if( ERROR( ret ) )
-                    break;
+                for( auto& pIf : vecIfs )
+                {
+                    CInterfRef* pifr = pIf;
+                    if( pifr == nullptr )
+                        continue;
+                    NEW_LINE;
+                    pifr->GetName();
+                    CCOUT << "#include \"" <<
+                        pifr->GetName() << "cli.h\"";
+                }
+                NEW_LINES( 2 );
 
-                CDeclServiceImpl2 osi(
-                    pWriter, elem.second, false );
+                if( bFuseP )
+                {
+                    CDeclServiceFuse2 ods(
+                        pWriter, pObj );
+                    ret = ods.OutputROSSkel( true );
+                    if( ERROR( ret ) )
+                        break;
 
-                ret = osi.OutputROS();
-                if( ERROR( ret ) )
-                    break;
-            }
+                    CDeclServiceImplFuse2 osi2(
+                        pWriter, elem.second, true );
 
-            ret = pWriter->SelectImplFile(
-                elem.first + "cli.h" ); 
+                    ret = osi2.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CDeclService2 ods(
+                        pWriter, pObj );
+                    ret = ods.OutputROSSkel( true );
+                    if( ERROR( ret ) )
+                        break;
 
-            if( ERROR( ret ) )
-            {
+                    CDeclServiceImpl2 osi2(
+                        pWriter, elem.second, true );
+
+                    ret = osi2.OutputROS();
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                /* client implementions*/
                 ret = pWriter->SelectImplFile(
-                    elem.first + "cli.h.new" );
-            }
+                    elem.first + "cli.cpp" ); 
 
-            EMIT_COMMON_INC_HDR( pWriter );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        elem.first + "cli.cpp.new" );
+                }
 
-            for( auto& pIf : vecIfs )
-            {
-                CInterfRef* pifr = pIf;
-                if( pifr == nullptr )
-                    continue;
-                NEW_LINE;
-                pifr->GetName();
-                CCOUT << "#include \"" <<
-                    pifr->GetName() << "cli.h\"";
-            }
-            NEW_LINES( 2 );
-
-            // client declarations
-            if( bFuseP )
-            {
-                CDeclServiceFuse2 ods(
-                    pWriter, pObj );
-                ret = ods.OutputROSSkel( true );
                 if( ERROR( ret ) )
                     break;
 
-                CDeclServiceImplFuse2 osi2(
-                    pWriter, elem.second, true );
+                if( bFuseP )
+                {
+                    CImplServiceImplFuse2 oisi2(
+                        pWriter, elem.second, true );
 
-                ret = osi2.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-            else
-            {
-                CDeclService2 ods(
-                    pWriter, pObj );
-                ret = ods.OutputROSSkel( true );
-                if( ERROR( ret ) )
-                    break;
+                    ret = oisi2.Output();
+                    if( ERROR( ret ) )
+                        break;
 
-                CDeclServiceImpl2 osi2(
-                    pWriter, elem.second, true );
+                    oisi2.OutputROSSkel();
+                }
+                else
+                {
+                    CImplServiceImpl2 oisi2(
+                        pWriter, elem.second, true );
 
-                ret = osi2.OutputROS();
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            /* svr implementions*/
-            ret = pWriter->SelectImplFile(
-                elem.first + "svr.cpp" ); 
-
-            if( ERROR( ret ) )
-            {
-                ret = pWriter->SelectImplFile(
-                    elem.first + "svr.cpp.new" );
-            }
-
-            if( ERROR( ret ) )
-                break;
-
-            if( bFuseS )
-            {
-                CImplServiceImplFuse2 oisi(
-                    pWriter, elem.second, false );
-
-                ret = oisi.Output();
-                if( ERROR( ret ) )
-                    break;
-                oisi.OutputROSSkel();
-            }
-            else
-            {
-                CImplServiceImpl2 oisi(
-                    pWriter, elem.second, false );
-
-                ret = oisi.OutputROS();
-                if( ERROR( ret ) )
-                    break;
-            }
-
-            /* client implementions*/
-            ret = pWriter->SelectImplFile(
-                elem.first + "cli.cpp" ); 
-
-            if( ERROR( ret ) )
-            {
-                ret = pWriter->SelectImplFile(
-                    elem.first + "cli.cpp.new" );
-            }
-
-            if( ERROR( ret ) )
-                break;
-
-            if( bFuseP )
-            {
-                CImplServiceImplFuse2 oisi2(
-                    pWriter, elem.second, true );
-
-                ret = oisi2.Output();
-                if( ERROR( ret ) )
-                    break;
-
-                oisi2.OutputROSSkel();
-            }
-            else
-            {
-                CImplServiceImpl2 oisi2(
-                    pWriter, elem.second, true );
-
-                ret = oisi2.OutputROS();
-                if( ERROR( ret ) )
-                    break;
+                    ret = oisi2.OutputROS();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
         }
 
         if( !vecSvcNames.empty() )
         {
             // client side
-            if( bFuseP )
+            if( bGenClient )
             {
-                CImplMainFuncFuse2 omf(
-                    pWriter, pRoot, true );
-                ret = omf.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-            else
-            {
-                CImplMainFunc2 omf(
-                    pWriter, pRoot, true );
-                ret = omf.OutputROS();
-                if( ERROR( ret ) )
-                    break;
+                if( bFuseP )
+                {
+                    CImplMainFuncFuse2 omf(
+                        pWriter, pRoot, true );
+                    ret = omf.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplMainFunc2 omf(
+                        pWriter, pRoot, true );
+                    ret = omf.OutputROS();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
 
             // server side
-            if( bFuseS )
+            if( bGenServer )
             {
-                CImplMainFuncFuse2 omf(
-                    pWriter, pRoot, false );
-                ret = omf.Output();
-                if( ERROR( ret ) )
-                    break;
-            }
-            else
-            {
-                CImplMainFunc2 omf(
-                    pWriter, pRoot, false );
-                ret = omf.OutputROS();
-                if( ERROR( ret ) )
-                    break;
+                if( bFuseS )
+                {
+                    CImplMainFuncFuse2 omf(
+                        pWriter, pRoot, false );
+                    ret = omf.Output();
+                    if( ERROR( ret ) )
+                        break;
+                }
+                else
+                {
+                    CImplMainFunc2 omf(
+                        pWriter, pRoot, false );
+                    ret = omf.OutputROS();
+                    if( ERROR( ret ) )
+                        break;
+                }
             }
         }
 
@@ -3646,24 +3662,6 @@ gint32 GenCppFileROS(
                 continue;
 
             stdstr strIfName = pifd->GetName();
-            m_pWriter->SelectImplFile(
-                strIfName + "cli.cpp" );
-            EMIT_COMMON_INC_CPP;
-            CCOUT << "#include \"" << strIfName << "cli.h\"";
-            NEW_LINE;
-            if( bFuseP )
-            {
-                CImplIufProxyFuse2 oiufp(
-                    m_pWriter, pObj );
-                oiufp.Output();
-            }
-            else
-            {
-                CImplIufProxy oiufp(
-                    m_pWriter, pObj );
-                oiufp.Output();
-            }
-
             ObjPtr pmdlobj =
                 pifd->GetMethodList();
 
@@ -3674,65 +3672,89 @@ gint32 GenCppFileROS(
             }
 
             CMethodDecls* pmdl = pmdlobj;
-            for( guint32 i = 0;
-                i < pmdl->GetCount(); i++ )
+            if( bGenClient )
             {
-                ObjPtr pmd = pmdl->GetChild( i );
+                m_pWriter->SelectImplFile(
+                    strIfName + "cli.cpp" );
+                EMIT_COMMON_INC_CPP;
+                CCOUT << "#include \"" << strIfName << "cli.h\"";
+                NEW_LINE;
                 if( bFuseP )
                 {
-                    CImplIfMethodProxyFuse2 oiimp(
-                        m_pWriter, pmd );
-                    ret = oiimp.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufProxyFuse2 oiufp(
+                        m_pWriter, pObj );
+                    oiufp.Output();
                 }
                 else
                 {
-                    CImplIfMethodProxy2 oiimp(
-                        m_pWriter, pmd );
-                    ret = oiimp.OutputROSSkel();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufProxy oiufp(
+                        m_pWriter, pObj );
+                    oiufp.Output();
+                }
+
+                for( guint32 i = 0;
+                    i < pmdl->GetCount(); i++ )
+                {
+                    ObjPtr pmd = pmdl->GetChild( i );
+                    if( bFuseP )
+                    {
+                        CImplIfMethodProxyFuse2 oiimp(
+                            m_pWriter, pmd );
+                        ret = oiimp.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CImplIfMethodProxy2 oiimp(
+                            m_pWriter, pmd );
+                        ret = oiimp.OutputROSSkel();
+                        if( ERROR( ret ) )
+                            break;
+                    }
                 }
             }
 
-            m_pWriter->SelectImplFile(
-                strIfName + "svr.cpp" );
-            EMIT_COMMON_INC_CPP;
-            CCOUT << "#include \"" << strIfName << "svr.h\"";
-            NEW_LINE;
-            if( bFuseS )
+            if( bGenServer )
             {
-                CImplIufSvrFuse2 oiufs(
-                    m_pWriter, pObj );
-                oiufs.Output();
-            }
-            else
-            {
-                CImplIufSvr oiufs(
-                    m_pWriter, pObj );
-                oiufs.Output();
-            }
-
-            for( guint32 i = 0;
-                i < pmdl->GetCount(); i++ )
-            {
-                ObjPtr pmd = pmdl->GetChild( i );
+                m_pWriter->SelectImplFile(
+                    strIfName + "svr.cpp" );
+                EMIT_COMMON_INC_CPP;
+                CCOUT << "#include \"" << strIfName << "svr.h\"";
+                NEW_LINE;
                 if( bFuseS )
                 {
-                    CImplIfMethodSvrFuse2 oiims(
-                        m_pWriter, pmd );
-                    ret = oiims.Output();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufSvrFuse2 oiufs(
+                        m_pWriter, pObj );
+                    oiufs.Output();
                 }
                 else
                 {
-                    CImplIfMethodSvr2 oiims(
-                        m_pWriter, pmd );
-                    ret = oiims.OutputROSSkel();
-                    if( ERROR( ret ) )
-                        break;
+                    CImplIufSvr oiufs(
+                        m_pWriter, pObj );
+                    oiufs.Output();
+                }
+
+                for( guint32 i = 0;
+                    i < pmdl->GetCount(); i++ )
+                {
+                    ObjPtr pmd = pmdl->GetChild( i );
+                    if( bFuseS )
+                    {
+                        CImplIfMethodSvrFuse2 oiims(
+                            m_pWriter, pmd );
+                        ret = oiims.Output();
+                        if( ERROR( ret ) )
+                            break;
+                    }
+                    else
+                    {
+                        CImplIfMethodSvr2 oiims(
+                            m_pWriter, pmd );
+                        ret = oiims.OutputROSSkel();
+                        if( ERROR( ret ) )
+                            break;
+                    }
                 }
             }
         }
@@ -4114,7 +4136,7 @@ gint32 CImplClassFactory2::OutputROS()
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* pSvc = elem;
-            if( IsServer() )
+            if( IsServer() && bGenServer )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( C"
                     << pSvc->GetName()
@@ -4129,7 +4151,7 @@ gint32 CImplClassFactory2::OutputROS()
                     << "_ChannelSvr );";
                 NEW_LINE;
             }
-            if( !IsServer() || g_bMklib )
+            if( ( !IsServer() || g_bMklib ) && bGenClient )
             {
                 CCOUT << "INIT_MAP_ENTRYCFG( C"
                     << pSvc->GetName()

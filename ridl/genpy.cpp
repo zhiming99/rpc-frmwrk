@@ -527,56 +527,72 @@ gint32 CPyFileSet::OpenFiles()
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strStructsPy.c_str() ),
+            std::move( pstm ) } );
 
     pstm= STMPTR( new std::ofstream(
         m_strInitPy,
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strInitPy.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strObjDesc,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strObjDesc.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strDriver,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strDriver.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMakefile,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMakefile.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMainCli,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMainCli.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMainSvr,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMainSvr.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strReadme.c_str() ),
+        std::move( pstm ) } );
 
     return STATUS_SUCCESS;
 }
@@ -588,7 +604,6 @@ gint32 CPyFileSet::AddSvcImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
         std::string strExt = ".py";
         std::string strSvrPy = m_strPath +
             "/" + strSvcName + "svr.py";
@@ -622,35 +637,36 @@ gint32 CPyFileSet::AddSvcImpl(
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrPy ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strSvrPy.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strCliPy,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliPy ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliPy.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strCliPyBase,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliPyBase ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliPyBase.c_str() ),
+            std::move( pstm ) } );
 
         pstm = STMPTR( new std::ofstream(
             strSvrPyBase,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrPyBase ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strSvrPyBase.c_str() ),
+            std::move( pstm ) } );
 
     }while( 0 );
 
@@ -659,12 +675,7 @@ gint32 CPyFileSet::AddSvcImpl(
 
 CPyFileSet::~CPyFileSet()
 {
-    for( auto& elem : m_vecFiles )
-    {
-        if( elem != nullptr )
-            elem->close();
-    }
-    m_vecFiles.clear();
+    m_mapSvcImp.clear();
 }
 
 CDeclarePyStruct::CDeclarePyStruct(

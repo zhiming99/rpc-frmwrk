@@ -64,7 +64,7 @@ appmon.ridl:
     if((bexit==0));then exit 0;fi; \
     if ! which ridlc > /dev/null; then \
         if [ ! -f ./mktpl ];then \
-            cp ../../ridl/{mktpl,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
+            cp ../../ridl/{mktpl,mktplsvr,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
         fi;\
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
@@ -73,7 +73,7 @@ appmon.ridl:
     else \
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
-	if [ -f ./mktpl ];then rm -f mktpl odesctpl2.json drvtpl.json;fi || true; \
+	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
     ls
 
 .PHONY: appmon.ridl
