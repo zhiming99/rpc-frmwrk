@@ -2906,6 +2906,11 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
         NEW_LINE;
         CCOUT << "    ( " << strSvc << "svrbase )oOuterObj;";
         NEW_LINE;
+        if( iInCount > 0 || iOutCount > 0 )
+        {
+            Wa( "JavaSerialHelperS _osh =" );
+            Wa( "    new JavaSerialHelperS( oHost );" );
+        }
         if( iInCount == 0 )
         {
             CCOUT << "ret = oHost." << strName << "( _oReqCtx );";
@@ -2913,8 +2918,6 @@ gint32 CImplJavaMethodSvrBase::ImplInvoke()
         }
         else
         {
-            Wa( "JavaSerialHelperS _osh =" );
-            Wa( "    new JavaSerialHelperS( oHost );" );
             Wa( "if( oParams.length != 1 )" );
             Wa( "{ ret = -RC.EINVAL; break; }" );
             Wa( "byte[] _buf = ( byte[] )oParams[ 0 ];" );
@@ -3447,7 +3450,9 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
     gint32 ret = 0;
     stdstr strName = m_pNode->GetName();
     ObjPtr pInArgs = m_pNode->GetInArgs();
+    ObjPtr pOutArgs = m_pNode->GetOutArgs();
     gint32 iInCount = GetArgCount( pInArgs );
+    gint32 iOutCount = GetArgCount( pOutArgs );
     CInterfaceDecl* pIf = m_pIf;
     stdstr strIfName = pIf->GetName();
     CJavaSnippet os( m_pWriter );
@@ -3502,10 +3507,13 @@ gint32 CImplJavaMethodCliBase::OutputReqSender()
         Wa( "try{" );
         CCOUT << "do";
         BLOCK_OPEN;
-        if( iInCount > 0 )
+        if( iInCount > 0 || iOutCount > 0 )
         {
             Wa( "JavaSerialHelperP _osh =" );
             Wa( "    new JavaSerialHelperP( this );" );
+        }
+        if( iInCount > 0 )
+        {
             Wa( "BufPtr _pBuf = new BufPtr( true );" );
             Wa( "ret = _pBuf.Resize( 1024 );" );
             Wa( "if( RC.ERROR( ret ) )" );
@@ -5376,6 +5384,22 @@ gint32 CImplDeserialArray::Output()
             stdstr sigElem;
             CAstNodeBase* pNode = pValType;
             if( pNode == nullptr )
+                continue;
+
+            // skip unreferenced struct
+            CStructRef* psr = pValType;
+            CStructDecl* psd = pValType;
+            if( psr )
+            {
+                ObjPtr pst;
+                ret = psr->GetStructType( pst );
+                if( ERROR( ret ) )
+                    break;
+                CStructDecl* psd1 = pst;
+                if( psd1->RefCount() == 0 )
+                    continue;
+            }
+            else if( psd && psd->RefCount() )
                 continue;
 
             sigElem = pNode->GetSignature();
