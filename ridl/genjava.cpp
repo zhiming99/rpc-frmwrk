@@ -49,6 +49,7 @@ extern std::string g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern guint32 GenClsid( const std::string& strName );
 extern gint32 SyncCfg( const stdstr& strPath );
+extern guint32 g_dwFlags;
 
 std::map< stdstr, stdstr > CJTypeHelper::m_mapTypeCvt {
     { "long", "Long" },
@@ -1428,8 +1429,10 @@ gint32 CJavaSnippet::EmitGetDescPath(
     Wa( "public static String getDescPath( String strName )" );
     BLOCK_OPEN;
     Wa( "String strDescPath =" );
-    CCOUT << "    " << ( bProxy ? "maincli" : "mainsvr" )
-    << ".class.getProtectionDomain().getCodeSource().getLocation().getPath();";
+    stdstr strMain( bProxy ? "maincli" : "mainsvr" );
+    CCOUT << "    " << strMain
+        << ".class.getProtectionDomain()."
+        << "getCodeSource().getLocation().getPath();";
     NEW_LINE;
     stdstr strPrefix = "/";
     strPrefix += g_strPrefix + g_strAppName + "/";
@@ -1465,7 +1468,9 @@ gint32 CJavaSnippet::EmitGetDescPath(
     Wa( "    bSync = true;" );
     CCOUT << "try";
     BLOCK_OPEN;
-    Wa( "stream = mainsvr.class.getResourceAsStream( strSrcPath );" );
+    CCOUT << "stream = "<< strMain
+        << ".class.getResourceAsStream( strSrcPath );";
+    NEW_LINE;
     Wa( "Path dstPath = Paths.get( strDestPath + \"/\" + strName );" );
     CCOUT << "Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );";
     NEW_LINE;
@@ -1475,7 +1480,9 @@ gint32 CJavaSnippet::EmitGetDescPath(
     BLOCK_OPEN;
     CCOUT << "String strSync = \"" << strPrefix << "synccfg.py\";";
     NEW_LINE;
-    Wa( "stream = mainsvr.class.getResourceAsStream( strSync );" );
+    CCOUT << "stream = " << strMain
+        << ".class.getResourceAsStream( strSync );";
+    NEW_LINE;
     Wa( "dstPath = Paths.get( strDestPath + \"/synccfg.py\" );" );
     Wa( "Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );" );
     Wa( "String[] commands = { \"python3\", \"./synccfg.py\" };" );
@@ -1839,41 +1846,47 @@ gint32 CJavaFileSet::AddSvcImpl(
                 strSvcName + "cli.java.new";
         }
 
-        STMPTR pstm( new std::ofstream(
-            strSvrJava,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenServer )
+        {
+            STMPTR pstm( new std::ofstream(
+                strSvrJava,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_mapSvcImp.insert(
-            { basename( strSvrJava.c_str() ),
-            std::move( pstm ) } );
+            m_mapSvcImp.insert(
+                { basename( strSvrJava.c_str() ),
+                std::move( pstm ) } );
 
-        pstm = STMPTR( new std::ofstream(
-            strCliJava,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+            pstm = STMPTR( new std::ofstream(
+                strSvrJavaBase,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_mapSvcImp.insert(
-            { basename( strCliJava.c_str() ),
-            std::move( pstm ) } );
+            m_mapSvcImp.insert(
+                { basename( strSvrJavaBase.c_str() ),
+                std::move( pstm ) } );
+        }
 
-        pstm = STMPTR( new std::ofstream(
-            strCliJavaBase,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenClient )
+        {
+            STMPTR pstm = STMPTR( new std::ofstream(
+                strCliJava,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_mapSvcImp.insert(
-            { basename( strCliJavaBase.c_str() ),
-            std::move( pstm ) } );
+            m_mapSvcImp.insert(
+                { basename( strCliJava.c_str() ),
+                std::move( pstm ) } );
 
-        pstm = STMPTR( new std::ofstream(
-            strSvrJavaBase,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+            pstm = STMPTR( new std::ofstream(
+                strCliJavaBase,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_mapSvcImp.insert(
-            { basename( strSvrJavaBase.c_str() ),
-            std::move( pstm ) } );
+            m_mapSvcImp.insert(
+                { basename( strCliJavaBase.c_str() ),
+                std::move( pstm ) } );
+        }
 
     }while( 0 );
 
@@ -1923,8 +1936,10 @@ gint32 CJavaFileSet::OpenFiles()
     this->OpenFile( m_strObjDesc );
     this->OpenFile( m_strDriver );
     this->OpenFile( m_strMakefile );
-    this->OpenFile( m_strMainCli );
-    this->OpenFile( m_strMainSvr );
+    if( bGenClient )
+        this->OpenFile( m_strMainCli );
+    if( bGenServer )
+        this->OpenFile( m_strMainSvr );
     this->OpenFile( m_strReadme );
     this->OpenFile( m_strDeserialMap );
     this->OpenFile( m_strDeserialArray );
@@ -2107,18 +2122,26 @@ gint32 GenSerialBaseFiles(
             break;
         }
 
-        ret = GenSerialHelper(
-            strSeriImpl,
-            pWriter->GetOutPath(),
-            true );
+        if( bGenClient )
+        {
+            ret = GenSerialHelper(
+                strSeriImpl,
+                pWriter->GetOutPath(),
+                true );
 
-        if( ERROR( ret ) )
-            break;
+            if( ERROR( ret ) )
+                break;
+        }
 
-        ret = GenSerialHelper(
-            strSeriImpl,
-            pWriter->GetOutPath(),
-            false );
+        if( bGenServer )
+        {
+            ret = GenSerialHelper(
+                strSeriImpl,
+                pWriter->GetOutPath(),
+                false );
+            if( ERROR( ret ) )
+                break;
+        }
 
     }while( 0 );
     
@@ -2205,7 +2228,9 @@ gint32 GenSvcFiles(
         if( ERROR( ret ) )
             break;
 
-        std::vector< std::pair< std::string, ObjPtr > > vecSvcNames;
+        using SVC_ELEM =
+            std::pair< std::string, ObjPtr>;
+        std::vector< SVC_ELEM > vecSvcNames;
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* psd = elem;
@@ -2221,63 +2246,68 @@ gint32 GenSvcFiles(
 
         for( auto& elem : vecSvcNames )
         {
-            // client base imlementation
             stdstr strCommon =
                 pWriter->GetOutPath() +
                 "/" + elem.first; 
 
-            pWriter->SelectImplFile(
-                strCommon + "clibase.java" ); 
-
-            CImplJavaSvcclibase ojspb(
-                pWriter, elem.second );
-            ret = ojspb.Output();
-            if( ERROR( ret ) )
-                break;
-
-            // server base imlementation
-            pWriter->SelectImplFile(
-                strCommon + "svrbase.java" );
-
-            CImplJavaSvcsvrbase ojssb(
-                pWriter, elem.second );
-            ret = ojssb.Output();
-            if( ERROR( ret ) )
-                break;
-
-            // server imlementation
-            ret = pWriter->SelectImplFile(
-                strCommon + "svr.java" );
-            if( ERROR( ret ) )
+            if( bGenClient )
             {
+                // client base imlementation
+                pWriter->SelectImplFile(
+                    strCommon + "clibase.java" ); 
+
+                CImplJavaSvcclibase ojspb(
+                    pWriter, elem.second );
+                ret = ojspb.Output();
+                if( ERROR( ret ) )
+                    break;
+
+                // client imlementation
                 ret = pWriter->SelectImplFile(
-                    strCommon + "svr.java.new" );
+                    strCommon + "cli.java" );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        strCommon + "cli.java.new" );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                CImplJavaSvcCli opsc(
+                    pWriter, elem.second );
+                ret = opsc.Output();
                 if( ERROR( ret ) )
                     break;
             }
-
-            CImplJavaSvcSvr opss(
-                pWriter, elem.second );
-            ret = opss.Output();
-            if( ERROR( ret ) )
-                break;
-
-            // client imlementation
-            ret = pWriter->SelectImplFile(
-                strCommon + "cli.java" );
-            if( ERROR( ret ) )
+            if( bGenServer )
             {
+                // server base imlementation
+                pWriter->SelectImplFile(
+                    strCommon + "svrbase.java" );
+
+                CImplJavaSvcsvrbase ojssb(
+                    pWriter, elem.second );
+                ret = ojssb.Output();
+                if( ERROR( ret ) )
+                    break;
+
+                // server imlementation
                 ret = pWriter->SelectImplFile(
-                    strCommon + "cli.java.new" );
+                    strCommon + "svr.java" );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        strCommon + "svr.java.new" );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                CImplJavaSvcSvr opss(
+                    pWriter, elem.second );
+                ret = opss.Output();
                 if( ERROR( ret ) )
                     break;
             }
-
-            CImplJavaSvcCli opsc(
-                pWriter, elem.second );
-            ret = opsc.Output();
-            if( ERROR( ret ) )
-                break;
         }
 
     }while( 0 );
@@ -2427,28 +2457,34 @@ gint32 GenJavaProj(
             break;
         }
 
-        oWriter.SelectMainCli();
-        CImplJavaMainCli ojmc( &oWriter, pRoot );
-        ret = ojmc.Output();
-        if( ERROR( ret ) )
+        if( bGenClient )
         {
-            stdstr strName = "maincli.java";
-            OutputMsg( ret,
-                "error generating %s.",
-                strName.c_str() );
-            break;
+            oWriter.SelectMainCli();
+            CImplJavaMainCli ojmc( &oWriter, pRoot );
+            ret = ojmc.Output();
+            if( ERROR( ret ) )
+            {
+                stdstr strName = "maincli.java";
+                OutputMsg( ret,
+                    "error generating %s.",
+                    strName.c_str() );
+                break;
+            }
         }
 
-        oWriter.SelectMainSvr();
-        CImplJavaMainSvr ojms( &oWriter, pRoot );
-        ret = ojms.Output();
-        if( ERROR( ret ) )
+        if( bGenServer )
         {
-            stdstr strName = "mainsvr.java";
-            OutputMsg( ret,
-                "error generating %s.",
-                strName.c_str() );
-            break;
+            oWriter.SelectMainSvr();
+            CImplJavaMainSvr ojms( &oWriter, pRoot );
+            ret = ojms.Output();
+            if( ERROR( ret ) )
+            {
+                stdstr strName = "mainsvr.java";
+                OutputMsg( ret,
+                    "error generating %s.",
+                    strName.c_str() );
+                break;
+            }
         }
 
         ret = GenStructFilesJava( &oWriter, pRoot );

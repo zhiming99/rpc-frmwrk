@@ -39,6 +39,7 @@ extern gint32 GenInitFile(
 extern std::map< char, stdstr > g_mapSig2PyType;
 extern gint32 EmitFormalArgListPy(
     CWriterBase* pWriter, CArgList* pInArgs );
+extern guint32 g_dwFlags;
 
 static gint32 EmitSerialBySig(
     CWriterBase* m_pWriter,
@@ -636,23 +637,29 @@ gint32 CPyFileSet2::OpenFiles()
         { basename( m_strMakefile.c_str() ),
         std::move( pstm ) } );
 
-    pstm = STMPTR( new std::ofstream(
-        m_strMainCli,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( bGenClient )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strMainCli,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_mapSvcImp.insert(
-        { basename( m_strMainCli.c_str() ),
-        std::move( pstm ) } );
+        m_mapSvcImp.insert(
+            { basename( m_strMainCli.c_str() ),
+            std::move( pstm ) } );
+    }
 
-    pstm = STMPTR( new std::ofstream(
-        m_strMainSvr,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( bGenServer )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strMainSvr,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_mapSvcImp.insert(
-        { basename( m_strMainSvr.c_str() ),
-        std::move( pstm ) } );
+        m_mapSvcImp.insert(
+            { basename( m_strMainSvr.c_str() ),
+            std::move( pstm ) } );
+    }
 
     pstm = STMPTR( new std::ofstream(
         m_strIfImpl,
@@ -704,23 +711,29 @@ gint32 CPyFileSet2::AddSvcImpl(
                 strSvcName + "cli.py.new";
         }
 
-        STMPTR pstm( new std::ofstream(
-            strSvrPy,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenServer )
+        {
+            STMPTR pstm( new std::ofstream(
+                strSvrPy,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_mapSvcImp.insert(
-            { basename( strSvrPy.c_str() ),
-            std::move( pstm ) } );
+            m_mapSvcImp.insert(
+                { basename( strSvrPy.c_str() ),
+                std::move( pstm ) } );
+        }
 
-        pstm = STMPTR( new std::ofstream(
-            strCliPy,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenClient )
+        {
+            STMPTR pstm = STMPTR( new std::ofstream(
+                strCliPy,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_mapSvcImp.insert(
-            { basename( strCliPy.c_str() ),
-            std::move( pstm ) } );
+            m_mapSvcImp.insert(
+                { basename( strCliPy.c_str() ),
+                std::move( pstm ) } );
+        }
 
     }while( 0 );
 
@@ -1271,44 +1284,49 @@ static gint32 GenSvcFiles2(
 
         for( auto& elem : vecSvcNames )
         {
-            // client base imlementation
             stdstr strCommon =
                 pWriter->GetOutPath() +
                 "/" + elem.first; 
 
             // server imlementation
-            ret = pWriter->SelectImplFile(
-                strCommon + "svr.py" );
-            if( ERROR( ret ) )
+            if( bGenServer )
             {
                 ret = pWriter->SelectImplFile(
-                    strCommon + "svr.py.new" );
+                    strCommon + "svr.py" );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        strCommon + "svr.py.new" );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                CImplPySvcSvr2 opss(
+                    pWriter, elem.second );
+                ret = opss.Output();
                 if( ERROR( ret ) )
                     break;
             }
-
-            CImplPySvcSvr2 opss(
-                pWriter, elem.second );
-            ret = opss.Output();
-            if( ERROR( ret ) )
-                break;
 
             // client imlementation
-            ret = pWriter->SelectImplFile(
-                strCommon + "cli.py" );
-            if( ERROR( ret ) )
+            if( bGenClient )
             {
                 ret = pWriter->SelectImplFile(
-                    strCommon + "cli.py.new" );
+                    strCommon + "cli.py" );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        strCommon + "cli.py.new" );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                CImplPySvcProxy2 opsc(
+                    pWriter, elem.second );
+                ret = opsc.Output();
                 if( ERROR( ret ) )
                     break;
             }
-
-            CImplPySvcProxy2 opsc(
-                pWriter, elem.second );
-            ret = opsc.Output();
-            if( ERROR( ret ) )
-                break;
         }
 
     }while( 0 );
@@ -1439,19 +1457,25 @@ gint32 CImplPyInterfaces2::Output()
             if( pifd->RefCount() == 0 )
                 continue;
 
-            CImplPyIfSvrBase2 oifps(
-                m_pWriter, elem );
+            if( bGenServer )
+            {
+                CImplPyIfSvrBase2 oifps(
+                    m_pWriter, elem );
 
-            ret = oifps.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = oifps.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
 
-            CImplPyIfProxyBase2 oifpp(
-                m_pWriter, elem );
+            if( bGenClient )
+            {
+                CImplPyIfProxyBase2 oifpp(
+                    m_pWriter, elem );
 
-            ret = oifpp.Output();
-            if( ERROR( ret ) )
-                break;
+                ret = oifpp.Output();
+                if( ERROR( ret ) )
+                    break;
+            }
         }
 
     }while( 0 );
@@ -3656,55 +3680,63 @@ gint32 CImplPyMainFunc2::Output()
             break;
         }
 
-        m_pWriter->SelectMainCli();
-        EmitImports( m_pWriter );
-        CCOUT << "from " << g_strAppName << "structs import *";
-        NEW_LINE;
-        CCOUT << "from ifimpl import *";
-        NEW_LINE;
-
-        Wa( "import os" );
-        Wa( "import time" );
-        Wa( "import threading" );
-        Wa( "import select" );
-
-        for( auto& elem : vecSvcs )
+        if( bGenClient )
         {
-            CServiceDecl* pNode = elem;
-            stdstr strName = pNode->GetName();
-            CCOUT << "from " << strName << "cli"
-                << " import " << "C" << strName
-                << "Proxy";
+            m_pWriter->SelectMainCli();
+            EmitImports( m_pWriter );
+            CCOUT << "from " << g_strAppName
+                << "structs import *";
             NEW_LINE;
+            CCOUT << "from ifimpl import *";
+            NEW_LINE;
+
+            Wa( "import os" );
+            Wa( "import time" );
+            Wa( "import threading" );
+            Wa( "import select" );
+
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pNode = elem;
+                stdstr strName = pNode->GetName();
+                CCOUT << "from " << strName << "cli"
+                    << " import " << "C" << strName
+                    << "Proxy";
+                NEW_LINE;
+            }
+            ret = OutputCli( vecSvcs );
+            if( ERROR( ret ) )
+                break;
         }
-        ret = OutputCli( vecSvcs );
-        if( ERROR( ret ) )
-            break;
 
-        m_pWriter->SelectMainSvr();
-        EmitImports( m_pWriter );
-        CCOUT << "from " << g_strAppName << "structs import *";
-        NEW_LINE;
-        CCOUT << "from ifimpl import *";
-        NEW_LINE;
-
-        Wa( "import os" );
-        Wa( "import time" );
-        Wa( "import threading" );
-        Wa( "import select" );
-
-        for( auto& elem : vecSvcs )
+        if( bGenServer )
         {
-            CServiceDecl* pNode = elem;
-            stdstr strName = pNode->GetName();
-            CCOUT << "from " << strName << "svr"
-                << " import " << "C" << strName
-                << "Server";
+            m_pWriter->SelectMainSvr();
+            EmitImports( m_pWriter );
+            CCOUT << "from " << g_strAppName
+                << "structs import *";
             NEW_LINE;
+            CCOUT << "from ifimpl import *";
+            NEW_LINE;
+
+            Wa( "import os" );
+            Wa( "import time" );
+            Wa( "import threading" );
+            Wa( "import select" );
+
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pNode = elem;
+                stdstr strName = pNode->GetName();
+                CCOUT << "from " << strName << "svr"
+                    << " import " << "C" << strName
+                    << "Server";
+                NEW_LINE;
+            }
+            ret = OutputSvr( vecSvcs );
+            if( ERROR( ret ) )
+                break;
         }
-        ret = OutputSvr( vecSvcs );
-        if( ERROR( ret ) )
-            break;
 
     }while( 0 );
 
