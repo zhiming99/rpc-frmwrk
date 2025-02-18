@@ -106,9 +106,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %files devel
 %{_bindir}/ridlc
 %{_sysconfdir}/rpcf/drvtpl.json
-%{_sysconfdir}/rpcf/mktpl
-%{_sysconfdir}/rpcf/mktplcli
-%{_sysconfdir}/rpcf/mktplsvr
+%{_sysconfdir}/rpcf/mktpl*
 %{_sysconfdir}/rpcf/odesctpl.json
 %{_sysconfdir}/rpcf/odesctpl2.json
 %{_sysconfdir}/rpcf/pymktpl
