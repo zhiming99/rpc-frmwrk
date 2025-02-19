@@ -30,6 +30,7 @@ using namespace rpcf;
 #include "astnode.h"
 #include <memory>
 #include <stdlib.h>
+#include <set>
 
 #define FUSE_PROXY  1
 #define FUSE_SERVER 2
@@ -89,6 +90,7 @@ extern std::vector<
 
 extern bool g_bNewSerial;
 extern bool g_dwFlags;
+extern std::set< stdstr > g_setServices;
 
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
@@ -338,15 +340,16 @@ statements : statement ';'
         g_pRootNode = pNode;
     }
     ;
-statements : statement ';' statements
+statements : statements statement ';'
     {
-        ObjPtr pNode = *$3;
-        CStatements* pstmts = pNode;
-        ObjPtr& pstmt = *$1;
-        pstmts->InsertChild( pstmt );
-        BufPtr pBuf( true );
-        *pBuf = pNode;
-        $$ = pBuf;
+        ObjPtr pNode = *$1;
+        if( !$2.IsEmpty() && !$2->empty() )
+        {
+            CStatements* pstmts = pNode;
+            ObjPtr& pstmt = *$2;
+            pstmts->AddChild( pstmt );
+        }
+        $$ = $1;
         CLEAR_RSYMBS;
         g_pRootNode = pNode;
     }
@@ -1217,8 +1220,8 @@ interf_ref : TOK_INTERFACE TOK_IDENT
         }
         if( !pTemp.IsEmpty() )
         {
-            CInterfaceDecl* pifd = pTemp;
-            pifd->AddRef();
+            // CInterfaceDecl* pifd = pTemp;
+            // pifd->AddRef();
             ENABLE_STREAM( pTemp, pifr );
         }
         pifr->SetName( strName );
@@ -1280,6 +1283,15 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         pNode.NewObj( clsid( CServiceDecl ) );
         CServiceDecl* psd = pNode;
         std::string strName = *$2;
+        if( !g_setServices.empty() &&
+            g_setServices.find( strName ) ==
+            g_setServices.end() )
+        {
+            BufPtr pBuf( true );
+            $$ = pBuf;
+            CLEAR_RSYMBS;
+            break;
+        }
         ObjPtr pTemp;
         gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
@@ -1309,6 +1321,31 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
             ret = 0;
         }
         ObjPtr& pifrs = *$5;
+        CInterfRefs* pifrsp = pifrs;
+        std::vector< ObjPtr > vecIfs;
+        ret = pifrsp->GetIfRefs( vecIfs );
+        if( ERROR( ret ) )
+        {
+            std::string strMsg = "service '"; 
+            strMsg += strName + "'";
+            strMsg += " has no interface";
+            PrintMsg( -EINVAL, strMsg.c_str() );
+            ret = -EINVAL;
+            g_bSemanErr = true;
+        }
+        else
+        {
+            for( auto& elem : vecIfs )
+            {
+                CInterfRef* pifr = elem;
+                ObjPtr pObj;
+                ret = pifr->GetIfDecl( pObj );
+                if( ERROR( ret ) )
+                    continue;
+                CInterfaceDecl* pifd = pObj;
+                pifd->AddRef();
+            }
+        }
         psd->SetInterfList( pifrs );
 
         ENABLE_STREAM( pifrs, psd );

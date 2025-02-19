@@ -30,6 +30,7 @@
 using namespace rpcf;
 #include "astnode.h" 
 #include "ridlc.h"
+#include <set>
 
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
@@ -38,6 +39,7 @@ extern std::string g_strAppName;
 extern std::string g_strJsLibPath;
 extern bool g_bAuth;
 extern std::string g_strWebPath;
+std::set< stdstr > g_setServices;
 
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
@@ -124,6 +126,7 @@ void Usage()
     printf( "\t-l:\tTo output a shared library instead of executables.\n" );
     printf( "\t--server:\tTo generate skeleton code for server only.\n" );
     printf( "\t--client:\tTo generate skeleton code for client only.\n" );
+    printf( "\t--services <service list>:\tTo generate skeleton code for the specified services.The services are seperated with ','.\n" );
     printf( "\t\tThis option is for CPP project only.\n" );
     printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
     printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
@@ -211,6 +214,7 @@ int main( int argc, char** argv )
             {"auth", no_argument, 0,  0 },
             {"server", no_argument, 0,  0 },
             {"client", no_argument, 0,  0 },
+            {"services", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -271,6 +275,42 @@ int main( int argc, char** argv )
                     else if( option_index == 5 )
                     {
                         g_dwFlags &= ~GEN_SERVER;
+                    }
+                    else if( option_index == 6 )
+                    {
+                        stdstr strSvcs = optarg;
+                        if( strSvcs.size() > REG_MAX_PATH )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error parameter is too long " );
+                            ret = -ERANGE;
+                            break;
+                        }
+                        std::regex s("^[a-zA-Z_][a-zA-Z0-9_]*$");
+                        size_t start = 0;
+                        size_t pos = strSvcs.find_first_of(
+                            ',', start );
+                        while( pos != stdstr::npos )
+                        {
+                            stdstr strSvc =
+                                strSvcs.substr( start, pos );
+                            if( !std::regex_match( strSvc, s) )
+                            {
+                                printf( "%s : %s\n", strSvc.c_str(),
+                                    "Error invalid service name " );
+                                ret = -EINVAL;
+                                break;
+                            }
+                            g_setServices.insert( strSvc );
+                            start = pos + 1;
+                            if( start >= strSvcs.size() )
+                                break;
+                            pos = strSvcs.find_first_of(
+                                ',', start );
+                        }
+                        if( start < strSvcs.size() )
+                            g_setServices.insert(
+                                strSvcs.substr( start ) );
                     }
                     break;
                 }

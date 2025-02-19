@@ -134,6 +134,8 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
 
         -s:     To generate the skeleton code for 'fastrpc', which using streaming channel to transport the RPC messages, with session level flow-control, smaller messages, and larger capacity of througput. The disadvantage is it requires twice the open file descriptors than a non-fastrpc application dose.
         -b:     To generate the skeleton code with a built-in 'rpcrouter', which can start without external rpcrouter, is much more like a traditional C/S application.
+        --server --client: To generate skeleton code server-only or client only.
+        --services <service list>: To generate skeleton code for the specified services, and ignore others. The service list contains one or more service names, seperated by ',' without white spece.
 ```
 
 Currently `ridlc` can output skeleton code in C++, Python Java and JavaScript. In the future, it will be able to generate code for other languages as well.

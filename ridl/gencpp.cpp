@@ -1917,69 +1917,74 @@ gint32 CDeclareClassIds::Output()
     std::string strVal = strAppName;
     for( auto& elem : vecNames )
         strVal += elem;
-
-    guint32 dwClsid = GenClsid( strVal );
-    stdstr strClsid = FormatClsid( dwClsid );
+    stdstr strClsid;
+    guint32 dwClsid = 0;
     for( auto& elem : vecSvcs )
     {
         CServiceDecl* pSvc = elem;
         if( pSvc == nullptr )
             continue;
 
-        std::string strSvcName =
-            pSvc->GetName();
-        
-        if( bFirst )
+        stdstr strSvcName = pSvc->GetName();
+        stdstr strFix = strAppName + strSvcName;
+
+        if( bGenClient )
         {
-            CCOUT << "DECL_CLSID( "
-                << "C" << strSvcName
-                << "_CliSkel"
-                << " ) = "
-                << strClsid
-                << ",";
+            dwClsid = GenClsid( strFix + "_CliSkel" );
+            strClsid = FormatClsid( dwClsid );
+            CCOUT << "DECL_CLSID( C"
+                << strSvcName << "_CliSkel ) = "
+                << strClsid << ",";
+            NEW_LINE;
 
-            bFirst = false;
+            dwClsid = GenClsid( strFix + "_CliImpl" );
+            strClsid = FormatClsid( dwClsid );
+            CCOUT << "DECL_CLSID( C"
+                << strSvcName << "_CliImpl ) = "
+                << strClsid << ",";
+            NEW_LINE;
         }
-        else
+
+        if( bGenServer )
         {
-            CCOUT << "DECL_CLSID( "
-                << "C" << strSvcName
-                << "_CliSkel" << " ),";
+            dwClsid = GenClsid( strFix + "_SvrSkel" );
+            strClsid = FormatClsid( dwClsid );
+            CCOUT << "DECL_CLSID( C"
+                << strSvcName << "_SvrSkel ) = "
+                << strClsid <<",";
+            NEW_LINE;
+
+            dwClsid = GenClsid( strFix + "_SvrImpl" );
+            strClsid = FormatClsid( dwClsid );
+            CCOUT << "DECL_CLSID( C"
+                << strSvcName << "_SvrImpl ) = "
+                << strClsid << ",";
+            NEW_LINE;
         }
-
-        NEW_LINE;
-
-        CCOUT << "DECL_CLSID( "
-            << "C" << strSvcName
-            << "_SvrSkel" << " ),";
-
-        NEW_LINE;
-
-        CCOUT << "DECL_CLSID( "
-            << "C" << strSvcName
-            << "_CliImpl" << " ),";
-
-        NEW_LINE;
-
-        CCOUT << "DECL_CLSID( "
-            << "C" << strSvcName
-            << "_SvrImpl" << " ),";
-
-        NEW_LINE;
 
         if( g_bRpcOverStm )
         {
-            CCOUT << "DECL_CLSID( "
-                << "C" << strSvcName
-                << "_ChannelCli" << " ),";
+            if( bGenClient )
+            {
+                dwClsid = GenClsid(
+                    strFix + "_ChannelCli" );
+                strClsid = FormatClsid( dwClsid );
+                CCOUT << "DECL_CLSID( C"
+                    << strSvcName << "_ChannelCli ) = "
+                    << strClsid << ",";
+                NEW_LINE;
+            }
 
-            NEW_LINE;
-
-            CCOUT << "DECL_CLSID( "
-                << "C" << strSvcName
-                << "_ChannelSvr" << " ),";
-
-            NEW_LINE;
+            if( bGenServer )
+            {
+                dwClsid = GenClsid(
+                    strFix + "_ChannelSvr" );
+                strClsid = FormatClsid( dwClsid );
+                CCOUT << "DECL_CLSID( C"
+                    << strSvcName << "_ChannelSvr ) = "
+                    << strClsid << ",";
+                NEW_LINE;
+            }
         }
     }
 
@@ -1996,12 +2001,13 @@ gint32 CDeclareClassIds::Output()
         if( pifd->RefCount() == 0 )
             continue;
 
-        std::string strIfName =
-            pifd->GetName();
-        
+        stdstr strIfName = pifd->GetName();
+        stdstr strName = strAppName + strIfName;
+        guint32 dwClsid = GenClsid( strName  );
+        strClsid = FormatClsid( dwClsid );
         CCOUT << "DECL_IID( "
-            << strIfName
-            << " ),";
+            << strIfName << " ) = "
+            << strClsid << ",";
         if( i < vecIfs.size() - 1 )
             NEW_LINE;
     }
