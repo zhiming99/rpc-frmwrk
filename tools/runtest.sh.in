@@ -360,8 +360,6 @@ elif [ "$1" == "1" ]; then
     echo start btinrt test
     bash tools/btinrtst.sh $auth || exit 11
 
-    echo start ridlc test
-    bash tools/ridlctst.sh || exit $?
     #wait rpcf_logger to flush
     kill -3 `pidof rpcf_logger`
     cat $logger

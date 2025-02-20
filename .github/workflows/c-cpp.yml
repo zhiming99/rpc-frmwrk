@@ -61,6 +61,9 @@ jobs:
       timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1
 
+    - name: testing ridlc
+      run: bash tools/ridlctst.sh
+
     - name: install debian package tools
       run: sudo apt-get -o Acquire::Retries=3 -y install devscripts debhelper
     - name: make debian package
