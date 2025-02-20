@@ -1,5 +1,5 @@
 appname "appmon";
-include "../registry/regfsif.ridl";
+// include "../registry/regfsif.ridl";
 
 struct KeyValue
 {

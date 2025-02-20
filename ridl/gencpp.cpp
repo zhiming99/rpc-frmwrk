@@ -1131,6 +1131,92 @@ gint32 SetStructRefs( ObjPtr& pRoot )
     return ret;
 }
 
+gint32 OverrideIfSyncMode( ObjPtr& pNode,
+    const stdstr& strMethod, guint32 dwSyncMode )
+{
+    gint32 ret = 0;
+    if( pNode.IsEmpty() )
+        return -EINVAL;
+    do{
+        CInterfaceDecl* pifd = pNode;
+        ObjPtr pmdlobj = pifd->GetMethodList();
+
+        if( pmdlobj.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        CMethodDecls* pmds = pmdlobj;
+        guint32 i = 0;
+        pmds->GetCount();
+        guint32 dwCount = pmds->GetCount();
+        for( ; i < dwCount; i++ )
+        {
+            ObjPtr pObj = pmds->GetChild( i );
+            CMethodDecl* pmd = pObj;
+            if( pmd == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            if( !strMethod.empty() &&
+                strMethod != pmd->GetName() )
+                continue;
+            ObjPtr pal = pmd->GetAttrList();
+            if( pal.IsEmpty() )
+            {
+                 ret = pal.NewObj(
+                    clsid( CAttrExps ) );
+                 if( ERROR( ret ) )
+                     continue;
+                 CAttrExps* paes = pal;
+                 ObjPtr pChild;
+                 ret = pChild.NewObj( clsid( CAttrExp ) );
+                 if( ERROR( ret ) )
+                     continue;
+                 CAttrExp* pae = pChild;
+                 pae->SetName( dwSyncMode );
+                 paes->AddChild( pChild );
+                 pmd->SetAttrList( pal );
+            }
+            else
+            {
+                CAttrExps* paes = pal;
+                guint32 dwCount = paes->GetCount();
+                bool bFound = false;
+                for( guint32 i = 0; i < dwCount; i++ )
+                {
+                    ObjPtr pChild = paes->GetChild( i );
+                    if( pChild.IsEmpty() )
+                        break;
+                    CAttrExp* pae = pChild;
+                    guint32 dwName = pae->GetName();
+                    if( dwName == TOK_ASYNC ||
+                        dwName == TOK_ASYNCP ||
+                        dwName == TOK_ASYNCS ||
+                        dwName == TOK_SYNC )
+                    {
+                        pae->SetName( dwSyncMode );
+                        bFound = true;
+                    }
+                }
+                if( !bFound )
+                {
+                     ObjPtr pChild;
+                     ret = pChild.NewObj(
+                        clsid( CAttrExp ) );
+                     if( ERROR( ret ) )
+                         continue;
+                     CAttrExp* pae = pChild;
+                     pae->SetName( dwSyncMode );
+                     paes->AddChild( pChild );
+                }
+            }
+        }
+    }while( 0 );
+    return ret;
+}
+ 
 gint32 CHeaderPrologue::Output()
 {
     EMIT_DISCLAIMER;
@@ -1928,7 +2014,7 @@ gint32 CDeclareClassIds::Output()
         stdstr strSvcName = pSvc->GetName();
         stdstr strFix = strAppName + strSvcName;
 
-        if( bGenClient )
+        // if( bGenClient )
         {
             dwClsid = GenClsid( strFix + "_CliSkel" );
             strClsid = FormatClsid( dwClsid );
@@ -1945,7 +2031,7 @@ gint32 CDeclareClassIds::Output()
             NEW_LINE;
         }
 
-        if( bGenServer )
+        // if( bGenServer )
         {
             dwClsid = GenClsid( strFix + "_SvrSkel" );
             strClsid = FormatClsid( dwClsid );
@@ -1964,7 +2050,7 @@ gint32 CDeclareClassIds::Output()
 
         if( g_bRpcOverStm )
         {
-            if( bGenClient )
+            // if( bGenClient )
             {
                 dwClsid = GenClsid(
                     strFix + "_ChannelCli" );
@@ -1975,7 +2061,7 @@ gint32 CDeclareClassIds::Output()
                 NEW_LINE;
             }
 
-            if( bGenServer )
+            // if( bGenServer )
             {
                 dwClsid = GenClsid(
                     strFix + "_ChannelSvr" );
@@ -5930,14 +6016,11 @@ gint32 CImplIfMethodSvr::OutputSync()
             << strMethod << "Wrapper( ";
         INDENT_UPL;
         CCOUT << "IEventSink* pCallback";
-        if( dwCount == 0 )
-        {
-        }
-        else if( bSerial )
+        if( bSerial && dwInCount > 0 )
         {
             CCOUT << ", BufPtr& pBuf_";
         }
-        else
+        else if( dwInCount > 0 )
         {
             CCOUT << ",";
             NEW_LINE;

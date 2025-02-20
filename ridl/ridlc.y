@@ -41,6 +41,7 @@ ObjPtr g_pRootNode;
 CAliasMap g_mapAliases;
 std::string g_strAppName;
 std::map< std::string, BufPtr > g_mapConsts;
+extern std::map< stdstr, std::pair< stdstr, guint32 > > g_mapIfSync;
 
 bool g_bSemanErr = false;
 
@@ -220,11 +221,15 @@ do{ \
         pDest_->EnableSerialize(); \
 }while( 0 )
 
-gint32 CheckNameDup(
+extern gint32 CheckNameDup(
     ObjPtr& pInArgs,
     ObjPtr& pOutArgs,
     std::string& strDupName );
 
+extern gint32 OverrideIfSyncMode(
+    ObjPtr& pIf,
+    const stdstr& strMethod,
+    guint32 dwSyncMod );
 %}
 
 %define api.value.type {BufPtr}
@@ -272,6 +277,7 @@ gint32 CheckNameDup(
 %token TOK_ASYNC
 %token TOK_ASYNCP
 %token TOK_ASYNCS
+%token TOK_SYNC
 %token TOK_STREAM
 %token TOK_EVENT
 %token TOK_TIMEOUT
@@ -1197,6 +1203,13 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
         *pBuf = pNode;
         $$ = pBuf;
         g_mapDecls.AddDeclNode( strName, pNode );
+        auto itr = g_mapIfSync.find( strName );
+        if( itr != g_mapIfSync.end() )
+        {
+            OverrideIfSyncMode( pNode,
+                itr->second.first,
+                itr->second.second );
+        }
         CLEAR_RSYMBS;
     }
     ;

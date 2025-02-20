@@ -64,9 +64,11 @@ To generate skeleton code for server only.
 .BR \-\-client " "
 To generate skeleton code for client only.
 .TP
-.BR \-\-services " "\fIservice list\fR
+.BR \-\-services " "\fIservice_list\fR
 To generate skeleton code for the specified services. The services are separated with ',' and no white spaces.
-
+.TP
+.BR \-\-sync_mode " "\fI<interface_name> =<async|async_s|async_p|sync>\fR
+To override the synchronization mode defined in the ridl file with the specified one for the given interface. The <interface name> can be followed with a method name such as \fI<interface_name>.<method_name>\fR to further narrowing the overriding scope to a single method.
 
 .SH SEE ALSO
 ridl(7), rpcrouter(1)

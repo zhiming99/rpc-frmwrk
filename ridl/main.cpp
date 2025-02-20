@@ -39,7 +39,12 @@ extern std::string g_strAppName;
 extern std::string g_strJsLibPath;
 extern bool g_bAuth;
 extern std::string g_strWebPath;
+// service filter
 std::set< stdstr > g_setServices;
+
+// interface async mode to overrid
+using SYNC_ELEM=std::pair< stdstr, guint32 >;
+std::map< stdstr, SYNC_ELEM > g_mapIfSync;
 
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
@@ -127,6 +132,7 @@ void Usage()
     printf( "\t--server:\tTo generate skeleton code for server only.\n" );
     printf( "\t--client:\tTo generate skeleton code for client only.\n" );
     printf( "\t--services <service list>:\tTo generate skeleton code for the specified services.The services are seperated with ','.\n" );
+    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tTo override synchronize mode in the ridl file with the specified one.\n" );
     printf( "\t\tThis option is for CPP project only.\n" );
     printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
     printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
@@ -215,6 +221,7 @@ int main( int argc, char** argv )
             {"server", no_argument, 0,  0 },
             {"client", no_argument, 0,  0 },
             {"services", required_argument, 0,  0 },
+            {"sync_mode", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -284,6 +291,7 @@ int main( int argc, char** argv )
                             printf( "%s : %s\n", optarg,
                                 "Error parameter is too long " );
                             ret = -ERANGE;
+                            bQuit = true;
                             break;
                         }
                         std::regex s("^[a-zA-Z_][a-zA-Z0-9_]*$");
@@ -299,6 +307,7 @@ int main( int argc, char** argv )
                                 printf( "%s : %s\n", strSvc.c_str(),
                                     "Error invalid service name " );
                                 ret = -EINVAL;
+                                bQuit = true;
                                 break;
                             }
                             g_setServices.insert( strSvc );
@@ -311,6 +320,94 @@ int main( int argc, char** argv )
                         if( start < strSvcs.size() )
                             g_setServices.insert(
                                 strSvcs.substr( start ) );
+                    }
+                    else if( option_index == 7 )
+                    {
+                        stdstr strSyncIf = optarg;
+                        if( strSyncIf.size() > REG_MAX_PATH )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error parameter is too long " );
+                            ret = -ERANGE;
+                            bQuit = true;
+                            break;
+                        }
+                        std::regex
+                        e("(^[a-zA-Z_][a-zA-Z0-9_]*)(\\.[a-zA-Z_][a-zA-Z0-9_]*)?(=)"
+                            "(async|async_p|async_s|sync)");
+                        std::smatch m;
+                        std::regex_match( strSyncIf, m, e);
+                        auto it = m.begin() + 1;
+                        if( it == m.end() )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error invalid interface name" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                        stdstr strIfName = *it;
+                        it++;
+                        if( it == m.end() )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error missing sync mode" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                        stdstr strVal = *it;
+                        if( strVal.empty() )
+                        {
+                            it++;
+                            strVal = *it;
+                        }
+                        stdstr strMethod = "";
+                        if( strVal[0] == '.' )
+                        {
+                            strMethod += strVal.substr( 1 );
+                            it++;
+                            strVal = *it;
+                        }
+                        if( strVal[0] == '=' )
+                        {
+                            it++;
+                        }
+                        else
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error invalid sync override expression" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                        stdstr strSync = *it;
+                        if( strSync == "async" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod,TOK_ASYNC } });
+                        else if( strSync == "async_p" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCP } } );
+                        else if( strSync == "async_s" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCS } } );
+                        else if( strSync == "sync" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_SYNC } } );
+                        else if( strSync == "sync_s" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCP } } );
+                        else if( strSync == "sync_p" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCS } } );
+                        else
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error invalid sync mode" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
                     }
                     break;
                 }

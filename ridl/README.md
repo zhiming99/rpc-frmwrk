@@ -136,6 +136,7 @@ The above example shows most of the statements ridl supports. ridl now has 7 typ
         -b:     To generate the skeleton code with a built-in 'rpcrouter', which can start without external rpcrouter, is much more like a traditional C/S application.
         --server --client: To generate skeleton code server-only or client only.
         --services <service list>: To generate skeleton code for the specified services, and ignore others. The service list contains one or more service names, seperated by ',' without white spece.
+        --sync_mode <interface name>=<async|async_s|async_p|sync>: To override the synchronization mode defined in the ridl with the specified one. You can append a [.<method name>], such as IAppInterface.DoCalculation, so that to precisely specify the synchronization mode for a single method.
 ```
 
 Currently `ridlc` can output skeleton code in C++, Python Java and JavaScript. In the future, it will be able to generate code for other languages as well.
