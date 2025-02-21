@@ -165,9 +165,11 @@ rm -rf *.cpp *.h *.new
 echo testing sync_mode 1
 echo ridlc --server --sync_mode IUserManager=async --sync_mode IAppStore.ListApps=sync --services AppManager,SimpleAuth -l -O . ../monitor/appmon/appmon.ridl
 ridlc --server --sync_mode IUserManager=async --sync_mode IAppStore.ListApps=sync --services AppManager,SimpleAuth -l -O . ${a[1]}
+make debug -j4 >templog 2>&1 || cat templog  && exit 1
 
 rm -rf *.cpp *.h *.new
 echo testing sync_mode 2
 echo ridlc --client --sync_mode IUserManager=async --sync_mode IAppStore=async_p --services AppManager,SimpleAuth -l -O . ${a[1]}
-ridlc --client --sync_mode IUserManager=async --sync_mode IAppStore=async_p --services AppManager,SimpleAuth -l -O . ${a[1]} >templog 2>&1 || cat templog; exit 1
+ridlc --client --sync_mode IUserManager=async --sync_mode IAppStore=async_p --services AppManager,SimpleAuth -l -O . ${a[1]}
+make debug -j4 >templog 2>&1 || cat templog && exit 1
 popd
