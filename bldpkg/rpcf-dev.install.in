@@ -2,7 +2,6 @@ usr/bin/ridlc
 @TEST_DEBBINS@
 @FUSE3_DEBHEADERS@
 usr/lib/@DEB_HOST_MULTIARCH@/lib*.la
-usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libbtinrt.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.la
 usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
 usr/include/rpcf/*.h
@@ -15,7 +14,4 @@ etc/rpcf/*.py
 etc/rpcf/mktpl*
 etc/rpcf/pymktpl
 etc/rpcf/*ridl
-usr/bin/rpcf/hwsvrsmk
-usr/bin/rpcf/hwclismk
-etc/rpcf/hwdesc.json
 @JS_DEBDEVFILES@

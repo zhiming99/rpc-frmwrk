@@ -68,21 +68,31 @@ def GetPyTestPaths() :
         "/../python/tests/sftest" )
     return paths
 
-def UpdateTestCfg( jsonVal, cfgList:list ):
+def UpdateTestCfg( pathVal, cfgList:list ):
     try:
         ifCfg = cfgList[ 0 ]
         authInfo = cfgList[ 1 ]
+        jsonVal = pathVal[1]
         if not 'Objects' in jsonVal :
             return
 
+        fileName = os.path.basename( pathVal[ 0 ] )
+        oConns = cfgList[ 3 ]
         objs = jsonVal[ 'Objects' ]
         for elem in objs :
-            elem[ 'IpAddress' ] = ifCfg[ 'BindAddr' ]
+            if fileName == 'hwdesc.json' and len( oConns ) >= 2:
+                ifCfg = oConns[ 1 ]
+            elif fileName == 'btinrt.json' and len( oConns ) >= 3:
+                ifCfg = oConns[ 2 ]
+            elem[ 'IpAddress' ] = ifCfg[ 'IpAddress' ]
             elem[ 'PortNumber' ] = ifCfg[ 'PortNumber' ]
             elem[ 'Compression' ] = ifCfg[ 'Compression' ]
             elem[ 'EnableSSL' ] = ifCfg[ 'EnableSSL' ]
             elem[ 'EnableWS' ] = ifCfg[ 'EnableWS' ]
-            elem[ 'RouterPath' ] = ifCfg[ 'RouterPath' ]
+            if 'RouterPath' in ifCfg:
+                elem[ 'RouterPath' ] = ifCfg[ 'RouterPath' ]
+            else:
+                elem[ 'RouterPath' ] = "/"
             if 'HasAuth' in ifCfg and ifCfg[ 'HasAuth' ] == 'true' :
                 elem[ 'AuthInfo' ] = deepcopy( authInfo )
                 if authInfo[ 'AuthMech'] == 'OAuth2':
@@ -115,7 +125,7 @@ def UpdateTestCfg( jsonVal, cfgList:list ):
                 elem.pop( 'DestURL', None )
 
     except Exception as err:
-        print( "Error UpdateTestCfg", file=sys.stderr )
+        print( "Error UpdateTestCfg", err, file=sys.stderr )
 
     return
 
@@ -224,12 +234,11 @@ def ExtraUpdateBtinrt(
 
 
 def ExportTestCfgsTo( cfgList:list, destPath:str ):
-    testDescs = [ 'echodesc.json', 'btinrt.json', 'appmondesc.json' ]
+    testDescs = [ 'echodesc.json', 'hwdesc.json', 'btinrt.json', 'appmondesc.json' ]
     if IsFeatureEnabled( 'testcases' ):
         testDescs.extend(  [ "actcdesc.json",
             "asyndesc.json",
             "evtdesc.json",
-            "hwdesc.json",
             "kadesc.json",
             "prdesc.json",
             "sfdesc.json",
@@ -245,7 +254,7 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
         pathVal = ReadTestCfg( paths, testDesc )
         if pathVal is None :
             continue
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        UpdateTestCfg( pathVal, cfgList )
 
         if testDesc == "btinrt.json" :
             ExtraUpdateBtinrt( cfgList[ 2 ], pathVal[ 1 ] )
@@ -261,19 +270,18 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
     paths = GetPyTestPaths()
     pathVal = ReadTestCfg( paths, 'sfdesc.json' )
     if pathVal is not None :
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        UpdateTestCfg( pathVal, cfgList )
         ret = WriteTestCfg(
             destPath + "/sfdesc-py.json",
             pathVal[ 1 ] )
     return ret
 
 def ExportTestCfgs( cfgList:list ):
-    testDescs = [ 'echodesc.json', 'btinrt.json', 'appmondesc.json' ]
+    testDescs = [ 'echodesc.json', 'hwdesc.json', 'btinrt.json', 'appmondesc.json' ]
     if IsFeatureEnabled( 'testcases' ):
         testDescs.extend(  [ "actcdesc.json",
             "asyndesc.json",
             "evtdesc.json",
-            "hwdesc.json",
             "kadesc.json",
             "prdesc.json",
             "sfdesc.json",
@@ -285,7 +293,7 @@ def ExportTestCfgs( cfgList:list ):
         pathVal = ReadTestCfg( paths, testDesc )
         if pathVal is None :
             continue
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        UpdateTestCfg( pathVal, cfgList )
 
         if testDesc == "btinrt.json" :
             ExtraUpdateBtinrt( cfgList[ 2 ], pathVal[ 1 ] )
@@ -300,7 +308,7 @@ def ExportTestCfgs( cfgList:list ):
     paths = GetPyTestPaths()
     pathVal = ReadTestCfg( paths, 'sfdesc.json' )
     if pathVal is not None :
-        UpdateTestCfg( pathVal[ 1 ], cfgList )
+        UpdateTestCfg( pathVal, cfgList )
         ret = WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
     return ret
 
@@ -413,11 +421,14 @@ def LoadConfigFiles( path : str) :
             paths.append( curDir + "/../rpc/router" )
             paths.append( curDir + "/../rpc/security" )
             paths.append( curDir + "/../rpc/security/oa2check" )
+            paths.append( curDir + "/../test/iftest" )
+            paths.append( curDir + "/../test/btinrt" )
+            paths.append( curDir + "/../test/helloworld" )
     else:
         paths.append( path )
     
-    count = 5
-    jsonvals = [ None ] * 5
+    count = 8
+    jsonvals = [ None ] * 8
     for strPath in paths :
         try:
             if jsonvals[ 0 ] is None :
@@ -467,6 +478,37 @@ def LoadConfigFiles( path : str) :
                 count-=1
         except Exception as err :
             pass            
+
+        try:
+            if jsonvals[ 5 ] is None :
+                echodesc = strPath + "/echodesc.json"
+                fp = open( echodesc, "r" )
+                jsonvals[ 5 ] = [echodesc, json.load(fp)]
+                fp.close()
+                count-=1
+        except Exception as err :
+            pass            
+
+        try:
+            if jsonvals[ 6 ] is None :
+                hwdesc = strPath + "/hwdesc.json"
+                fp = open( hwdesc, "r" )
+                jsonvals[ 6 ] = [hwdesc, json.load(fp)]
+                fp.close()
+                count-=1
+        except Exception as err :
+            pass            
+
+        try:
+            if jsonvals[ 7 ] is None :
+                btinrtdesc = strPath + "/btinrt.json"
+                fp = open( btinrtdesc, "r" )
+                jsonvals[ 7 ] = [btinrtdesc, json.load(fp)]
+                fp.close()
+                count-=1
+        except Exception as err :
+            pass            
+
         if count == 0:
             break
 
@@ -489,6 +531,12 @@ def LoadConfigFiles( path : str) :
             fn = "authprxy.json"
         elif idx == 4 and IsFeatureEnabled( 'js' ):
             fn = "oa2checkdesc.json"
+        elif idx == 5 :
+            fn = "echodesc.json"
+        elif idx == 6:
+            fn = "hwdesc.json"
+        elif idx == 7:
+            fn = "btinrt.json"
     if fn is not None:
         raise Exception( "Error open " + fn )
             
@@ -523,7 +571,7 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         if authInfo[ 'AuthMech' ] != "krb5" :
             #update the testcfgs
             oConn0[ 'BindAddr' ] = oConn0[ 'IpAddress' ]
-            cfgList = [ oConn0, authInfo, drvVal ]
+            cfgList = [ oConn0, authInfo, drvVal, oConns ]
             if destDir is None :
                 ret = ExportTestCfgs( cfgList )
             else:
@@ -596,7 +644,7 @@ def Update_AuthPrxy( initCfg: dict, drvFile : list,
         authInfo[ 'UserName' ] = userName
 
     oConn0[ 'BindAddr' ] = oConn0[ 'IpAddress' ]
-    cfgList = [ oConn0, authInfo, drvVal ]
+    cfgList = [ oConn0, authInfo, drvVal, oConns ]
     if destDir is None :
         ret = ExportTestCfgs( cfgList )
     else:
@@ -911,6 +959,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
             for i in range( len( oConns ) ) :
                 ifCfg = dict()
                 oConn = oConns[ i ]
+                bBindAddr = True
                 for key, val in oConn.items() :
                     if key == 'IpAddress' :
                         ifCfg[ 'BindAddr' ] = val
@@ -920,6 +969,8 @@ def Update_Drv( initCfg: dict, drvFile : list,
                         ifCfg[ 'AuthMech' ] = strMech
                     elif key == 'AuthMech' :
                         pass
+                    elif key == 'BindTo' and val == 'false':
+                        bBindAddr = False
                     else :
                         ifCfg[ key ] = val
                 if oConn[ 'EnableWS' ] == "false" :
@@ -927,6 +978,11 @@ def Update_Drv( initCfg: dict, drvFile : list,
 
                 if strFormat is None :
                     strFormat = 'invalid'
+                if not bBindAddr :
+                    if strFormat != 'ipv6':
+                        ifCfg[ 'BindAddr' ] = '0.0.0.0'
+                    else:
+                        ifCfg[ 'BindAddr' ] = '::/0'
                 if 'PdoClass' not in ifCfg :
                     ifCfg[ 'PdoClass' ] = "TcpStreamPdo2"
                 if 'ConnRecover' not in ifCfg :
