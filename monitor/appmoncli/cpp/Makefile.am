@@ -45,9 +45,9 @@ $(sources):$(headers)
 
 $(headers): appmon.ridl
 
-appmon.ridl: ../../appmon/appmon.ridl
+appmon.ridl:
 	bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
-    if((bexit==0));then exit 0;fi; \
+    if((bexit==0));then echo all files are ready;exit 0;fi; \
     if ! which ridlc > /dev/null; then \
         if [ ! -f ./mktpl ];then \
             cp ../../../ridl/{mktpl,mktplsvr,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
@@ -55,10 +55,11 @@ appmon.ridl: ../../appmon/appmon.ridl
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
     if [ -f ../../../ridl/.libs/ridlc ]; then \
-        LD_LIBRARY_PATH=../../combase/.libs:$${LD_LIBRARY_PATH} ../../../ridl/.libs/ridlc --client -slO . ../../appmon/appmon.ridl; \
+        LD_LIBRARY_PATH=../../../combase/.libs:$${LD_LIBRARY_PATH} ../../../ridl/.libs/ridlc --client -slO . ../../appmon/appmon.ridl; \
     else \
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
-	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true;
+	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
+    ls
 
 .PHONY: appmon.ridl
