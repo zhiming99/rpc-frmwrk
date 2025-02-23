@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ../../ridl/.libs/ridlc -sO . ./appmon.ridl 
+// ../../../ridl/.libs/ridlc --client -slO . ../../appmon/appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"

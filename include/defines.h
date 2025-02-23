@@ -65,7 +65,6 @@
 #endif
 #endif
 
-#define HANDLE                  uintptr_t
 #define PortToHandle( ptr )     reinterpret_cast<HANDLE>( ( IPort* )ptr )
 #define HandleToPort( handle )  reinterpret_cast< IPort* >( handle )
 #define INVALID_HANDLE          ( ( HANDLE )0 )
@@ -242,6 +241,8 @@ do{\
 
 namespace rpcf
 {
+
+typedef uintptr_t   HANDLE;
 
 #include <poll.h>
 enum GIOCondition

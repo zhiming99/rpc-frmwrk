@@ -232,6 +232,16 @@ def ExtraUpdateBtinrt(
     except Exception as err:
         pass
 
+def ExtraUpdateAppmon( destVal : object ):
+    try:
+        objs = destVal[ 'Objects' ]
+        for elem in objs :
+            objName = elem[ 'ObjectName' ]
+            if 'AppManager' in objName or 'SimpleAuth' in objName:
+                if not '_SvrSkel' in objName:
+                    elem[ 'ProxyPortClass' ] = 'DBusLocalPdo'
+    except Exception as err:
+        print( err )
 
 def ExportTestCfgsTo( cfgList:list, destPath:str ):
     testDescs = [ 'echodesc.json', 'hwdesc.json', 'btinrt.json', 'appmondesc.json' ]
@@ -258,6 +268,9 @@ def ExportTestCfgsTo( cfgList:list, destPath:str ):
 
         if testDesc == "btinrt.json" :
             ExtraUpdateBtinrt( cfgList[ 2 ], pathVal[ 1 ] )
+
+        elif testDesc == 'appmondesc.json':
+            ExtraUpdateAppmon( pathVal[ 1 ] )
 
         ret = WriteTestCfg(
             destPath + "/" + testDesc,
@@ -297,6 +310,9 @@ def ExportTestCfgs( cfgList:list ):
 
         if testDesc == "btinrt.json" :
             ExtraUpdateBtinrt( cfgList[ 2 ], pathVal[ 1 ] )
+
+        elif testDesc == 'appmondesc.json':
+            ExtraUpdateAppmon( pathVal[ 1 ] )
 
         ret = WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
         if ret < 0 :
