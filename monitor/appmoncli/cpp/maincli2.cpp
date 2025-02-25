@@ -8,7 +8,6 @@ using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
 #include "AppManagercli.h"
-// #include "AppMonitorcli.h"
 #include "SimpleAuthcli.h"
 
 extern ObjPtr g_pIoMgr;
@@ -20,9 +19,6 @@ FactoryPtr InitClassFactory()
     INIT_MAP_ENTRYCFG( CAppManager_CliImpl );
     INIT_MAP_ENTRYCFG( CAppManager_CliSkel );
     INIT_MAP_ENTRYCFG( CAppManager_ChannelCli );
-    // INIT_MAP_ENTRYCFG( CAppMonitor_CliImpl );
-    // INIT_MAP_ENTRYCFG( CAppMonitor_CliSkel );
-    // INIT_MAP_ENTRYCFG( CAppMonitor_ChannelCli );
     INIT_MAP_ENTRYCFG( CSimpleAuth_CliImpl );
     INIT_MAP_ENTRYCFG( CSimpleAuth_CliSkel );
     INIT_MAP_ENTRYCFG( CSimpleAuth_ChannelCli );
