@@ -1,4 +1,4 @@
-SUBDIRS=registry appmon usermgmt
+SUBDIRS=registry appmon usermgmt appmoncli
 if ENABLE_JS
 SUBDIRS += oinit
 endif

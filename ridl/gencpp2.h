@@ -135,8 +135,8 @@ class CDeclService2 :
         super( pWriter, pNode )
     {}
 
-    virtual gint32 OutputROSSkel();
-    virtual gint32 OutputROS( bool bServer ); 
+    virtual gint32 OutputROSSkel( bool bProxy );
+    virtual gint32 OutputROS( bool bProxy ); 
 };
 
 class CDeclServiceImpl2 :
@@ -145,8 +145,8 @@ class CDeclServiceImpl2 :
     public: 
     typedef CDeclServiceImpl super;
     CDeclServiceImpl2( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer ) :
-        super( pWriter, pNode, bServer)
+        ObjPtr& pNode, bool bProxy ) :
+        super( pWriter, pNode, bProxy)
     {}
     gint32 OutputROS();
 };
@@ -157,8 +157,8 @@ class CImplServiceImpl2 :
     public: 
     typedef CImplServiceImpl super;
     CImplServiceImpl2( CCppWriter* pWriter,
-        ObjPtr& pNod, bool bServer ) :
-        super( pWriter, pNod, bServer )
+        ObjPtr& pNod, bool bProxy ) :
+        super( pWriter, pNod, bProxy )
     {}
     gint32 OutputROS(); 
 };
@@ -204,8 +204,8 @@ class CImplClassFactory2 :
     public:
     typedef CImplClassFactory super;
     CImplClassFactory2(
-        CCppWriter* pWriter, ObjPtr& pNode, bool bServer )
-        : super( pWriter, pNode, bServer )
+        CCppWriter* pWriter, ObjPtr& pNode, bool bProxy )
+        : super( pWriter, pNode, bProxy )
     {}
     gint32 OutputROS();
 };

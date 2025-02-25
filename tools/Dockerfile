@@ -16,7 +16,7 @@ libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev krb5-kdc krb5-admin-server krb5-user \
-bash net-tools procps swig cmake \
+bash net-tools procps swig cmake attr \
 libcommons-cli-java curl figlet
 RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
     openjdk-11-jdk-headless || apt-get install -y openjdk-17-jdk-headless 

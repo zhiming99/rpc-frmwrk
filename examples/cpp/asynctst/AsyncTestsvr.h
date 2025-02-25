@@ -2,10 +2,15 @@
 // Copyright (C) 2024  zhiming <woodhead99@gmail.com>
 // This program can be distributed under the terms of the GNU GPLv3.
 // ridlc -O ./asynctst ../asynctst.ridl 
-// Your task is to implement the following classes
-// to get your rpc server work
 #pragma once
 #include "asynctst.h"
+
+#include "IAsyncTestsvr.h"
+
+DECLARE_AGGREGATED_SERVER(
+    CAsyncTest_SvrSkel,
+    CStatCountersServer,
+    IIAsyncTest_SImpl );
 
 class CAsyncTest_SvrImpl
     : public CAsyncTest_SvrSkel

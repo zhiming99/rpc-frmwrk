@@ -303,11 +303,18 @@ interface IRegFsRemote
         string strDestPath )
     returns();
 
-    [async_s]GetValue( string strPath )
+    [async_s]GetValue2( string strPath )
     returns(string strJson);
 
-    [async_s]SetValue(
+    [async_s]SetValue2(
         string strPath, string strJson )
+    returns();
+
+    [async_s]GetValue( string strPath )
+    returns(variant rvar);
+
+    [async_s]SetValue(
+        string strPath, variant var )
     returns();
 
     [async_s]Chmod(

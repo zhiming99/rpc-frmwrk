@@ -36,6 +36,7 @@ extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
+extern guint32 g_dwFlags;
 
 std::map< char, stdstr > g_mapSig2PyType =
 {
@@ -527,56 +528,78 @@ gint32 CPyFileSet::OpenFiles()
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strStructsPy.c_str() ),
+            std::move( pstm ) } );
 
     pstm= STMPTR( new std::ofstream(
         m_strInitPy,
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strInitPy.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strObjDesc,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strObjDesc.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strDriver,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strDriver.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMakefile,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMakefile.c_str() ),
+        std::move( pstm ) } );
 
-    pstm = STMPTR( new std::ofstream(
-        m_strMainCli,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( bGenClient )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strMainCli,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp.insert(
+            { basename( m_strMainCli.c_str() ),
+            std::move( pstm ) } );
+    }
 
-    pstm = STMPTR( new std::ofstream(
-        m_strMainSvr,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( bGenServer )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strMainSvr,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+        m_mapSvcImp.insert(
+            { basename( m_strMainSvr.c_str() ),
+            std::move( pstm ) } );
+    }
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strReadme.c_str() ),
+        std::move( pstm ) } );
 
     return STATUS_SUCCESS;
 }
@@ -588,7 +611,6 @@ gint32 CPyFileSet::AddSvcImpl(
         return -EINVAL;
     gint32 ret = 0;
     do{
-        gint32 idx = m_vecFiles.size();
         std::string strExt = ".py";
         std::string strSvrPy = m_strPath +
             "/" + strSvcName + "svr.py";
@@ -617,40 +639,47 @@ gint32 CPyFileSet::AddSvcImpl(
                 strSvcName + "cli.py.new";
         }
 
-        STMPTR pstm( new std::ofstream(
-            strSvrPy,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenServer )
+        {
+            STMPTR pstm( new std::ofstream(
+                strSvrPy,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrPy ] = idx;
+            m_mapSvcImp.insert(
+                { basename( strSvrPy.c_str() ),
+                std::move( pstm ) } );
 
-        pstm = STMPTR( new std::ofstream(
-            strCliPy,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+            pstm = STMPTR( new std::ofstream(
+                strSvrPyBase,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliPy ] = idx;
+            m_mapSvcImp.insert(
+                { basename( strSvrPyBase.c_str() ),
+                std::move( pstm ) } );
+        }
 
-        pstm = STMPTR( new std::ofstream(
-            strCliPyBase,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+        if( bGenClient )
+        {
+            STMPTR pstm = STMPTR( new std::ofstream(
+                strCliPy,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliPyBase ] = idx;
+            m_mapSvcImp.insert(
+                { basename( strCliPy.c_str() ),
+                std::move( pstm ) } );
 
-        pstm = STMPTR( new std::ofstream(
-            strSvrPyBase,
-            std::ofstream::out |
-            std::ofstream::trunc) );
+            pstm = STMPTR( new std::ofstream(
+                strCliPyBase,
+                std::ofstream::out |
+                std::ofstream::trunc) );
 
-        idx += 1;
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strSvrPyBase ] = idx;
+            m_mapSvcImp.insert(
+                { basename( strCliPyBase.c_str() ),
+                std::move( pstm ) } );
+        }
 
     }while( 0 );
 
@@ -659,12 +688,7 @@ gint32 CPyFileSet::AddSvcImpl(
 
 CPyFileSet::~CPyFileSet()
 {
-    for( auto& elem : m_vecFiles )
-    {
-        if( elem != nullptr )
-            elem->close();
-    }
-    m_vecFiles.clear();
+    m_mapSvcImp.clear();
 }
 
 CDeclarePyStruct::CDeclarePyStruct(
@@ -1765,7 +1789,10 @@ static gint32 GenSvcFiles(
         if( ERROR( ret ) )
             break;
 
-        std::vector< std::pair< std::string, ObjPtr > > vecSvcNames;
+        using SVC_ELEM=
+            std::pair< std::string, ObjPtr >;
+
+        std::vector< SVC_ELEM > vecSvcNames;
         for( auto& elem : vecSvcs )
         {
             CServiceDecl* psd = elem;
@@ -1786,58 +1813,63 @@ static gint32 GenSvcFiles(
                 pWriter->GetOutPath() +
                 "/" + elem.first; 
 
-            pWriter->SelectImplFile(
-                strCommon + "clibase.py" ); 
-
-            CImplPySvcProxyBase opspb(
-                pWriter, elem.second );
-            ret = opspb.Output();
-            if( ERROR( ret ) )
-                break;
-
-            // server base imlementation
-            pWriter->SelectImplFile(
-                strCommon + "svrbase.py" );
-
-            CImplPySvcSvrBase opssb(
-                pWriter, elem.second );
-            ret = opssb.Output();
-            if( ERROR( ret ) )
-                break;
-
-            // server imlementation
-            ret = pWriter->SelectImplFile(
-                strCommon + "svr.py" );
-            if( ERROR( ret ) )
+            if( bGenClient )
             {
+                pWriter->SelectImplFile(
+                    strCommon + "clibase.py" ); 
+
+                CImplPySvcProxyBase opspb(
+                    pWriter, elem.second );
+                ret = opspb.Output();
+                if( ERROR( ret ) )
+                    break;
+
+                // client imlementation
                 ret = pWriter->SelectImplFile(
-                    strCommon + "svr.py.new" );
+                    strCommon + "cli.py" );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        strCommon + "cli.py.new" );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                CImplPySvcProxy opsc(
+                    pWriter, elem.second );
+                ret = opsc.Output();
                 if( ERROR( ret ) )
                     break;
             }
-
-            CImplPySvcSvr opss(
-                pWriter, elem.second );
-            ret = opss.Output();
-            if( ERROR( ret ) )
-                break;
-
-            // client imlementation
-            ret = pWriter->SelectImplFile(
-                strCommon + "cli.py" );
-            if( ERROR( ret ) )
+            if( bGenServer )
             {
+                // server base imlementation
+                pWriter->SelectImplFile(
+                    strCommon + "svrbase.py" );
+
+                CImplPySvcSvrBase opssb(
+                    pWriter, elem.second );
+                ret = opssb.Output();
+                if( ERROR( ret ) )
+                    break;
+
+                // server imlementation
                 ret = pWriter->SelectImplFile(
-                    strCommon + "cli.py.new" );
+                    strCommon + "svr.py" );
+                if( ERROR( ret ) )
+                {
+                    ret = pWriter->SelectImplFile(
+                        strCommon + "svr.py.new" );
+                    if( ERROR( ret ) )
+                        break;
+                }
+
+                CImplPySvcSvr opss(
+                    pWriter, elem.second );
+                ret = opss.Output();
                 if( ERROR( ret ) )
                     break;
             }
-
-            CImplPySvcProxy opsc(
-                pWriter, elem.second );
-            ret = opsc.Output();
-            if( ERROR( ret ) )
-                break;
         }
 
     }while( 0 );
@@ -4119,35 +4151,41 @@ gint32 CImplPyMainFunc::Output()
         if( ERROR( ret ) )
             break;
 
-        m_pWriter->SelectMainCli();
-        OUTPUT_BANNER();
-        for( auto& elem : vecSvcs )
+        if( bGenClient )
         {
-            CServiceDecl* pNode = elem;
-            stdstr strName = pNode->GetName();
-            CCOUT << "from " << strName << "cli"
-                << " import " << "C" << strName
-                << "Proxy";
-            NEW_LINE;
+            m_pWriter->SelectMainCli();
+            OUTPUT_BANNER();
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pNode = elem;
+                stdstr strName = pNode->GetName();
+                CCOUT << "from " << strName << "cli"
+                    << " import " << "C" << strName
+                    << "Proxy";
+                NEW_LINE;
+            }
+            ret = OutputCli( vecSvcs );
+            if( ERROR( ret ) )
+                break;
         }
-        ret = OutputCli( vecSvcs );
-        if( ERROR( ret ) )
-            break;
 
-        m_pWriter->SelectMainSvr();
-        OUTPUT_BANNER();
-        for( auto& elem : vecSvcs )
+        if( bGenServer )
         {
-            CServiceDecl* pNode = elem;
-            stdstr strName = pNode->GetName();
-            CCOUT << "from " << strName << "svr"
-                << " import " << "C" << strName
-                << "Server";
-            NEW_LINE;
+            m_pWriter->SelectMainSvr();
+            OUTPUT_BANNER();
+            for( auto& elem : vecSvcs )
+            {
+                CServiceDecl* pNode = elem;
+                stdstr strName = pNode->GetName();
+                CCOUT << "from " << strName << "svr"
+                    << " import " << "C" << strName
+                    << "Server";
+                NEW_LINE;
+            }
+            ret = OutputSvr( vecSvcs );
+            if( ERROR( ret ) )
+                break;
         }
-        ret = OutputSvr( vecSvcs );
-        if( ERROR( ret ) )
-            break;
 
     }while( 0 );
 

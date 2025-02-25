@@ -258,6 +258,7 @@ class InterfaceContext :
         self.enabled = None
         self.startRow = 0
         self.rowCount = 0
+        self.bindTo = None
     
     def IsEmpty( self ) :
         return self.ipAddr is None
@@ -504,6 +505,7 @@ class ConfigDlg(Gtk.Dialog):
             except Exception as err :
                 pass
 
+        # oa2checkdesc.json
         oaVal = jsonFiles[ 4 ][ 1 ]
         proxies = oaVal['Objects']
         if proxies is None :
@@ -522,8 +524,8 @@ class ConfigDlg(Gtk.Dialog):
         self.jsonFiles = jsonFiles
 
         authUser = ""
-        paths = GetTestPaths()
-        pathVal = ReadTestCfg( paths, "echodesc.json" )
+        # echodesc.json
+        pathVal = jsonFiles[ 5 ]
         if pathVal is not None :
             jsonVal = pathVal[ 1 ]
             try:
@@ -535,9 +537,10 @@ class ConfigDlg(Gtk.Dialog):
                         authUser = authInfo[ 'UserName' ]
                         break
 
-                    if not self.bServer :
-                        if svrObj[ "ProxyPortClass"] != "DBusProxyPdo" :
-                            continue
+                    portClass = svrObj[ "ProxyPortClass"]
+                    if  ( portClass == "DBusProxyPdo" ) or (
+                        portClass == "DBusProxyPdoLpbk" ) or ( 
+                        portClass == "DBusProxyPdoLpbk2" ) :
 
                         if 'AuthInfo' in svrObj :
                             authInfo = svrObj['AuthInfo']
@@ -1229,12 +1232,9 @@ class ConfigDlg(Gtk.Dialog):
             startRow = GetGridRows( grid )
         
         labelIp = Gtk.Label()
-        if self.bServer :
-            strText = '<span foreground="red">Binding IP: </span>'
-            labelIp.set_markup(strText)
-            #labelIp.set_markup("<mark>Binding IP: </mark>")
-        else :    
-            labelIp.set_text("Server IP: ")
+
+        strText = '<span foreground="red">Server Addr: </span>'
+        labelIp.set_markup(strText)
 
         labelIp.set_xalign(.5)
         grid.attach(labelIp, startCol, startRow, 1, 1 )
@@ -1249,18 +1249,43 @@ class ConfigDlg(Gtk.Dialog):
         except Exception as err :
             pass
         ipEditBox.set_text(ipAddr)
-        ipEditBox.set_tooltip_text( "Enter an IP address or a domain name. " +
-            "And don't use '0.0.0.0', because the IP address will " +
-            "also go to the proxy config and is invalid to connect to" )
+        ipEditBox.set_tooltip_text( "Enter an IP address or a domain name " +
+            "the client will connect to." )
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
         self.ifctx[ ifNo ].ipAddr = ipEditBox
 
+        if self.bServer:
+            checkBindTo = Gtk.CheckButton(label="Bind to")
+            grid.attach( checkBindTo, startCol + 3, startRow + 0, 1, 1)
+            self.ifctx[ ifNo ].bindTo = checkBindTo
+            toolTip = "Uncheck this box will force server to listen to 0.0.0.0 instead of this address. "
+            checkBindTo.set_tooltip_text( toolTip )
+            checkBindTo.connect(
+                "toggled", self.on_button_toggled, "bindTo")
+            checkBindTo.iNo = ifNo
+            checkBindTo.props.active = True
+            if ipAddr == '0.0.0.0' or ipAddr == '::/0' or (
+                ipAddr == '0000:0000:0000:0000:0000:0000:0000:0000/0' ) :
+                checkBindTo.props.active = False
+                if ifNo == 0 :
+                    jsonVal = self.jsonFiles[ 5 ][ 1 ]
+                elif ifNo == 1:
+                    jsonVal = self.jsonFiles[ 6 ][ 1 ]
+                elif ifNo == 2:
+                    jsonVal = self.jsonFiles[ 7 ][ 1 ]
+                try:
+                    svrObj = jsonVal[ 'Objects' ][ 0 ]
+                    ipAddr = svrObj[ 'IpAddress' ]
+                    ipEditBox.set_text( ipAddr )
+                except Exception as err:
+                    print( err )
+
         labelPort = Gtk.Label()
         if self.bServer :
-            strText = '<span foreground="red">Listening Port: </span>'
+            strText = '<span foreground="red">Service Port: </span>'
             labelPort.set_markup( strText )
         else:
-            labelPort.set_text("Server Port: ")
+            labelPort.set_text("Service Port: ")
 
         labelPort.set_xalign(1)
         grid.attach(labelPort, startCol + 0, startRow + 1, 1, 1 )
@@ -1672,6 +1697,10 @@ class ConfigDlg(Gtk.Dialog):
             if self.nodeCtxs[ iNo ].webSock.props.active and not bActive  :
                 button.props.active = True
                 return
+        elif name == 'bindTo' :
+            iNo = button.iNo
+            return
+
     def on_selection_changed(self, widget):
         if not ( IsFeatureEnabled( "krb5" ) 
             or IsFeatureEnabled( "js" ) ):
@@ -3309,6 +3338,10 @@ EOF
                 elem = dict()
                 strIp = curVals.ipAddr.get_text().strip()
                 elem[ 'IpAddress' ] = strIp
+                if self.bServer and curVals.bindTo.props.active :
+                    elem[ 'BindTo' ] = 'true'
+                elif self.bServer:
+                    elem[ 'BindTo' ] = 'false'
                 strPort = curVals.port.get_text().strip()
                 elem[ 'PortNumber' ] = curVals.port.get_text().strip()
                 if curVals.compress.props.active :

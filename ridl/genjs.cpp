@@ -189,70 +189,90 @@ gint32 CJsFileSet::OpenFiles()
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strStructsJs.c_str() ),
+        std::move( pstm ) } );
 
     pstm= STMPTR( new std::ofstream(
         m_strMainCli,
         std::ofstream::out |
         std::ofstream::trunc ) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMainCli.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strObjDesc,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strObjDesc.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strDriver,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strDriver.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMakefile,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMakefile.c_str() ),
+        std::move( pstm ) } );
 
     /*pstm = STMPTR( new std::ofstream(
         m_strMainCli,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strMainCli.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strMainSvr,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );*/
+    m_mapSvcImp.insert(
+        { basename( m_strMainSvr.c_str() ),
+        std::move( pstm ) } );*/
 
     pstm = STMPTR( new std::ofstream(
         m_strReadme,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strReadme.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strWebCfg,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strWebCfg.c_str() ),
+        std::move( pstm ) } );
 
     pstm = STMPTR( new std::ofstream(
         m_strHtml,
         std::ofstream::out |
         std::ofstream::trunc) );
 
-    m_vecFiles.push_back( std::move( pstm ) );
+    m_mapSvcImp.insert(
+        { basename( m_strHtml.c_str() ),
+        std::move( pstm ) } );
 
     return STATUS_SUCCESS;
 }
@@ -279,23 +299,23 @@ gint32 CJsFileSet::AddSvcImpl(
                 strSvcName + "cli.js.new";
         }
 
-        gint32 idx = m_vecFiles.size();
         STMPTR pstm = STMPTR( new std::ofstream(
             strCliJs,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliJs ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliJs.c_str() ),
+            std::move( pstm ) } );
 
-        idx += 1;
         pstm = STMPTR( new std::ofstream(
             strCliJsBase,
             std::ofstream::out |
             std::ofstream::trunc) );
 
-        m_vecFiles.push_back( std::move( pstm ) );
-        m_mapSvcImp[ strCliJsBase ] = idx;
+        m_mapSvcImp.insert(
+            { basename( strCliJsBase.c_str() ),
+            std::move( pstm ) } );
 
     }while( 0 );
 
@@ -303,14 +323,8 @@ gint32 CJsFileSet::AddSvcImpl(
 }
 
 CJsFileSet::~CJsFileSet()
-{
-    for( auto& elem : m_vecFiles )
-    {
-        if( elem != nullptr )
-            elem->close();
-    }
-    m_vecFiles.clear();
-}
+{ m_mapSvcImp.clear(); }
+
 CDeclareJsStruct::CDeclareJsStruct(
     CJsWriter* pWriter,
     ObjPtr& pNode )

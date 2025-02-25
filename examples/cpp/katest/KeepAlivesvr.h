@@ -4,6 +4,13 @@
 #pragma once
 #include "katest.h"
 
+#include "IKeepAlivesvr.h"
+
+DECLARE_AGGREGATED_SERVER(
+    CKeepAlive_SvrSkel,
+    CStatCountersServer,
+    IIKeepAlive_SImpl );
+
 class CKeepAlive_SvrImpl
     : public CKeepAlive_SvrSkel
 {

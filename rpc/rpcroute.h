@@ -2776,7 +2776,7 @@ class CRpcRouterBridge : public CRpcRouter
         bool bEnable,
         TaskletPtr& pTask );
 
-    gint32 RunEnableEventTask(
+    virtual gint32 RunEnableEventTask(
         IEventSink* pCallback,
         IMessageMatch* pMatch );
 
