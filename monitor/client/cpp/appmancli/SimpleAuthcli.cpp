@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ../../ridl/.libs/ridlc -sO . ./appmon.ridl 
+// ../../../../ridl/.libs/ridlc --sync_mode IAppStore=async_p --services=AppManager,SimpleAuth --client -slO . ../../../../monitor/appmon/appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -7,41 +7,45 @@ using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
 #include "appmon.h"
-#include "AppManagercli.h"
+#include "SimpleAuthcli.h"
 
-/* Event handler */
-gint32 CAppManager_CliImpl::OnPointChanged( 
-    const std::string& strPtPath /*[ In ]*/,
-    const Variant& value /*[ In ]*/ )
-{
-    // TODO: Process the event here
-    return STATUS_SUCCESS;
-}
-/* Event handler */
-gint32 CAppManager_CliImpl::OnPointsChanged( 
-    std::vector<KeyValue>& arrKVs /*[ In ]*/ )
-{
-    // TODO: Process the event here
-    return STATUS_SUCCESS;
-}
 /* Async callback handler */
-gint32 CAppManager_CliImpl::ClaimAppInstsCallback( 
+gint32 CSimpleAuth_CliImpl::GetUidByOAuth2NameCallback( 
     IConfigDb* context, gint32 iRet,
-    std::vector<KeyValue>& arrInitKVs /*[ In ]*/ )
+    gint32 dwUid /*[ In ]*/ )
 {
     // TODO: Process the server response here
     // return code ignored
     return 0;
 }
 /* Async callback handler */
-gint32 CAppManager_CliImpl::FreeAppInstsCallback( 
-    IConfigDb* context, gint32 iRet )
+gint32 CSimpleAuth_CliImpl::GetUidByKrb5NameCallback( 
+    IConfigDb* context, gint32 iRet,
+    gint32 dwUid /*[ In ]*/ )
 {
     // TODO: Process the server response here
     // return code ignored
     return 0;
 }
-gint32 CAppManager_CliImpl::CreateStmSkel(
+/* Async callback handler */
+gint32 CSimpleAuth_CliImpl::GetUidByUserNameCallback( 
+    IConfigDb* context, gint32 iRet,
+    gint32 dwUid /*[ In ]*/ )
+{
+    // TODO: Process the server response here
+    // return code ignored
+    return 0;
+}
+/* Async callback handler */
+gint32 CSimpleAuth_CliImpl::GetPasswordSaltCallback( 
+    IConfigDb* context, gint32 iRet,
+    const std::string& strSalt /*[ In ]*/ )
+{
+    // TODO: Process the server response here
+    // return code ignored
+    return 0;
+}
+gint32 CSimpleAuth_CliImpl::CreateStmSkel(
     InterfPtr& pIf )
 {
     gint32 ret = 0;
@@ -59,17 +63,17 @@ gint32 CAppManager_CliImpl::CreateStmSkel(
         if( ERROR( ret ) )
             break;
         ret = CRpcServices::LoadObjDesc(
-            strDesc,"AppManager_SvrSkel",
+            strDesc,"SimpleAuth_SvrSkel",
             false, oCfg.GetCfg() );
         if( ERROR( ret ) )
             break;
         ret = pIf.NewObj(
-            clsid( CAppManager_CliSkel ),
+            clsid( CSimpleAuth_CliSkel ),
             oCfg.GetCfg() );
     }while( 0 );
     return ret;
 }
-gint32 CAppManager_CliImpl::OnPreStart(
+gint32 CSimpleAuth_CliImpl::OnPreStart(
     IEventSink* pCallback )
 {
     gint32 ret = 0;
@@ -77,7 +81,7 @@ gint32 CAppManager_CliImpl::OnPreStart(
         CCfgOpener oCtx;
         CCfgOpenerObj oIfCfg( this );
         oCtx[ propClsid ] = clsid( 
-            CAppManager_ChannelCli );
+            CSimpleAuth_ChannelCli );
         oCtx.CopyProp( propObjDescPath, this );
         oCtx.CopyProp( propSvrInstName, this );
         stdstr strInstName;
@@ -92,7 +96,7 @@ gint32 CAppManager_CliImpl::OnPreStart(
             break;
         char szBuf[ 16 ];
         sprintf( szBuf, "_%08X", dwHash );
-        strInstName = "AppManager_ChannelSvr";
+        strInstName = "SimpleAuth_ChannelSvr";
         oCtx[ 0 ] = strInstName;
         strInstName += szBuf;
         oCtx[ propObjInstName ] = strInstName;

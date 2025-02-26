@@ -434,8 +434,9 @@ AC_CONFIG_FILES([Makefile
                  monitor/oinit/oinit.spec
                  monitor/usermgmt/Makefile
                  monitor/appmon/Makefile
-                 monitor/appmoncli/Makefile
-                 monitor/appmoncli/cpp/Makefile
+                 monitor/client/Makefile
+                 monitor/client/cpp/appmancli/Makefile
+                 monitor/client/cpp/appmoncli/Makefile
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])

@@ -24,6 +24,7 @@ def GetTestPaths( path : str= None ) :
         curDir += "/../test/"
         paths.append( curDir + "iftest" )
         paths.append( curDir + "btinrt" )
+        paths.append( '../monitor/appmon' )
         if IsFeatureEnabled( 'testcases' ):
             paths.append( curDir + "actcancel" )
             paths.append( curDir + "asynctst" )
