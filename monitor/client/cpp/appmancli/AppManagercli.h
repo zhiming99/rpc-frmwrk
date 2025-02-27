@@ -8,26 +8,164 @@
 #include "IAppStorecli.h"
 #include "IDataProducercli.h"
 
-DECLARE_AGGREGATED_SKEL_PROXY(
-    CAppManager_CliSkel,
-    CStatCountersProxySkel,
-    IIAppStore_PImpl,
-    IIDataProducer_PImpl );
+gint32 GetAppManagercli(
+    CIoManager* pMgr, InterfPtr& pCli );
 
-#define Clsid_CAppManager_CliBase    Clsid_Invalid
+gint32 CreateAppManagercli( CIoManager* pMgr,
+    IEventSink* pCallback, IConfigDb* pCfg );
 
-DECLARE_AGGREGATED_PROXY(
-    CAppManager_CliBase,
-    CStatCounters_CliBase,
-    CStreamProxyAsync,
-    IIAppStore_CliApi,
-    IIDataProducer_CliApi,
-    CFastRpcProxyBase );
+gint32 DestroyAppManagercli(
+    CIoManager* pMgr,
+    IEventSink* pCallback );
 
 using PTCHGCB=void* (*)( IConfigDb* pContext,
     const std::string& strPtPath, const Variant& oVar );
 
-struct IAsyncCallbacks
+template< typename ToCreate, EnumClsid iClsid >
+gint32 AsyncCreateIf( CIoManager* pMgr,
+    IEventSink* pCallback, IConfigDb* pCfg,
+    const stdstr& strDesc,
+    const stdstr& strObjName,
+    bool bServer )
+{
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf;
+        CParamList oParams;
+        if( pCfg != nullptr )
+        {
+            CCfgOpener oCfg( pCfg );
+            CIoManager* pMgr2;
+            ret = oCfg.GetPointer( propIoMgr, pMgr2 );
+            if( ERROR( ret ) )
+                oCfg.SetPointer( propIoMgr, pMgr );
+        }
+        else
+        {
+            oParams.SetPointer( propIoMgr, pMgr );
+            pCfg = oParams.GetCfg();
+        }
+        CfgPtr ptrCfg( pCfg );
+        ret = CRpcServices::LoadObjDesc( strDesc,
+            strObjName, bServer, ptrCfg );
+        if( ERROR( ret ) )
+            break;
+        ret = pIf.NewObj( iClsid,
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+
+        gint32 (*pChecker)( IEventSink*,
+            ToCreate*, IEventSink*,
+            IConfigDb* ) = ([]( IEventSink* pTask,
+            ToCreate* pIf,
+            IEventSink* pCb, IConfigDb* pCfg )->gint32
+        {
+            gint32 ret = 0;
+            do{
+                CCfgOpenerObj oReq( pTask );
+                IConfigDb* pResp = nullptr;
+                ret = oReq.GetPointer(
+                    propRespPtr, pResp );
+                if( ERROR( ret ) )
+                    break;
+                CCfgOpener oResp( pResp );
+                gint32 iRet = 0;
+                ret = oResp.GetIntProp(
+                    propReturnValue,
+                    ( guint32& ) iRet );
+                if( ERROR( ret ) )
+                    break;
+                if( ERROR( iRet ) )
+                {
+                    ret = iRet;
+                    break;
+                }
+            }while( 0 );
+            if( pCb == nullptr )
+                return ret;
+
+            CCfgOpener oCfg;
+            oCfg.SetIntProp( propReturnValue, ret );
+            if( SUCCEEDED( ret ) )
+                oCfg.SetPointer( 0, pIf );
+            ObjPtr pobjIf( oCfg.GetCfg() );
+            Variant oVar( pobjIf );
+            pCb->SetProperty( propRespPtr, oVar );
+            pCb->OnEvent( eventTaskComp,
+                ret, 0, nullptr );
+
+            return ret;
+        });
+
+        TaskletPtr pStartCb;
+        ret = NEW_COMPLETE_FUNCALL( 0,
+            pStartCb, pMgr, pChecker,
+            nullptr, pIf, pCallback, pCfg );
+        if( ERROR( ret ) )
+            break;
+
+        gint32 (*pStart)( IEventSink*,
+            ToCreate*, IEventSink* ) = ([](
+            IEventSink* pTask, ToCreate* pIf,
+            IEventSink* pCallback )->gint32
+        {
+            gint32 ret = 0;
+            do{
+                ret = pIf->StartEx( pCallback );
+                if( ERROR( ret ) )
+                {
+                    pIf->Stop();
+                    break;
+                }
+
+                if( ret == STATUS_PENDING )
+                    break;
+
+                if( pCallback == nullptr )
+                    break;
+
+                CCfgOpener oCfg;
+                oCfg.SetIntProp( propReturnValue, ret );
+                if( SUCCEEDED( ret ) )
+                    oCfg.SetPointer( 0, pIf );
+                ObjPtr pobjIf( oCfg.GetCfg() );
+                Variant oVar( pobjIf );
+                pCallback->SetProperty( propRespPtr, oVar );
+                ObjPtr pObj( pCallback );
+                CIfRetryTask* pRetry( pObj );
+                pRetry->ClearClientNotify();
+                pRetry->OnEvent( eventTaskComp,
+                    ret, 0, nullptr );
+            }while( 0 );
+            return ret;
+        });
+
+        TaskletPtr pStartTask;
+        ret = NEW_FUNCCALL_TASKEX2( 0, 
+            pStartTask, pMgr, pStart,
+            nullptr, pIf,
+            ( IEventSink* )pStartCb );
+        if( ERROR( ret ) )
+            break;
+
+        CIfRetryTask* pRetry = pStartCb;
+        pRetry->SetClientNotify( pStartTask );
+
+        ret = pMgr->AddSeqTask( pStartTask );
+        if( ERROR( ret ) )
+        {
+            pRetry->ClearClientNotify();
+            ( *pStartTask )( eventCancelTask );
+            ( *pStartCb )( eventCancelTask );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+class CAppManager_CliImpl;
+struct IAsyncAMCallbacks
 {
     // RPC Async Req Callback
     virtual gint32 ListAppsCallback(
@@ -119,15 +257,33 @@ struct IAsyncCallbacks
         gint32 iRet )
     { return 0;}
 
-    virtual gint32 OnSvrOffline(
-        IConfigDb* context )
+    virtual gint32 OnSvrOffline( IConfigDb* context,
+        CAppManager_CliImpl* pIf )
     { return 0; }
 };
+
+using PACBS=std::shared_ptr<IAsyncAMCallbacks>;
+
+DECLARE_AGGREGATED_SKEL_PROXY(
+    CAppManager_CliSkel,
+    CStatCountersProxySkel,
+    IIAppStore_PImpl,
+    IIDataProducer_PImpl );
+
+#define Clsid_CAppManager_CliBase    Clsid_Invalid
+
+DECLARE_AGGREGATED_PROXY(
+    CAppManager_CliBase,
+    CStatCounters_CliBase,
+    CStreamProxyAsync,
+    IIAppStore_CliApi,
+    IIDataProducer_CliApi,
+    CFastRpcProxyBase );
 
 class CAppManager_CliImpl
     : public CAppManager_CliBase
 {
-    IAsyncCallbacks* m_pAsyncCbs = nullptr;
+    PACBS m_pAsyncCbs;
     CfgPtr m_pContext;
     public:
 
@@ -146,14 +302,15 @@ class CAppManager_CliImpl
     { return super::OnStmClosing( hChannel ); }
 
     inline void SetAsyncCallbacks(
-        IAsyncCallbacks* pCbs, const CfgPtr& pcontext )
+        PACBS& pCbs, const CfgPtr& pcontext )
     {
+        CStdRMutex  oLock( GetLock() );
         m_pAsyncCbs = pCbs;
         m_pContext = pcontext;
     };
 
     inline gint32 GetAsyncCallbacks(
-        IAsyncCallbacks*& pCbs, CfgPtr& pContext ) const
+        PACBS& pCbs, CfgPtr& pContext ) const
     {
         CStdRMutex  oLock( GetLock() );
         if( m_pAsyncCbs == nullptr )
@@ -162,6 +319,24 @@ class CAppManager_CliImpl
         pContext = m_pContext;
         return 0;
     }
+
+    inline gint32 GetAsyncCallbacks(
+        PACBS& pCbs ) const
+    {
+        CStdRMutex  oLock( GetLock() );
+        if( m_pAsyncCbs == nullptr )
+            return -EINVAL;
+        pCbs = m_pAsyncCbs;
+        return 0;
+    }
+
+    inline void ClearCallbacks(
+        PACBS& pCbs, const CfgPtr& pcontext )
+    {
+        CStdRMutex  oLock( GetLock() );
+        m_pAsyncCbs.reset();
+        m_pContext.Clear();
+    };
     
     // RPC Async Req Callback
     gint32 ListAppsCallback(

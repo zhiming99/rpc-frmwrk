@@ -22,7 +22,9 @@
  *
  * =====================================================================================
  */
+#include "rpc.h"
 
+using namespace rpcf;
 #include "routmain.h"
 #include "ifhelper.h"
 #include "frmwrk.h"

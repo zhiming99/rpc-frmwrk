@@ -27,6 +27,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include <rpc.h>
+using namespace rpcf;
 #include "routmain.h"
 #include <ifhelper.h>
 #include <frmwrk.h>
@@ -54,6 +56,7 @@ static bool g_bDaemon = false;
 static std::string g_strMPoint;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
+static bool g_bMonitoring = false;
 
 // two globals must be present for libfuseif.so
 ObjPtr g_pIoMgr;
@@ -135,6 +138,19 @@ void CIfRouterTest::setUp()
                 "./librpc.so" );
             if( ERROR( ret ) )
                 break;
+
+            if( g_bMonitoring )
+            {
+                ret = pSvc->TryLoadClassFactory(
+                    "./libappmancli.so" );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error, cannot find "
+                        "monitoring module" );
+                    break;
+                }
+            }
 
             ret = pSvc->Start();
         }
@@ -346,6 +362,8 @@ void Usage( char* szName )
 #endif
         "\t [ -d to run as a daemon ]\n"
         "\t [ -g to enable logging when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -o to enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -l to use the driver.json in current directory instead of the default one ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
         szName );
@@ -444,6 +462,11 @@ int main( int argc, char** argv )
             {
                 fprintf( stdout, "%s", Version() );
                 exit( 0 );
+            }
+        case 'o':
+            {
+                g_bMonitoring = true;
+                break;
             }
         case 'l':
             {

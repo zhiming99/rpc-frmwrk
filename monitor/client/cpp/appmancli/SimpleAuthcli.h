@@ -7,6 +7,48 @@
 
 #include "IUserManagercli.h"
 
+gint32 GetSimpleAuthcli(
+    CIoManager* pMgr, InterfPtr& pCli );
+
+gint32 DestroySimpleAuthcli(
+    CIoManager* pMgr, IEventSink* pCallback );
+
+gint32 CreateSimpleAuthcli( CIoManager* pMgr,
+    IEventSink* pCallback, IConfigDb* pCfg );
+
+class CSimpleAuth_CliImpl;
+struct IAsyncSACallbacks
+{
+    // RPC Async Req Callback
+    virtual gint32 GetUidByOAuth2NameCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        gint32 dwUid /*[ In ]*/ )
+    { return 0; }
+    // RPC Async Req Callback
+    virtual gint32 GetUidByKrb5NameCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        gint32 dwUid /*[ In ]*/ )
+    { return 0; }
+    // RPC Async Req Callback
+    virtual gint32 GetUidByUserNameCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        gint32 dwUid /*[ In ]*/ )
+    { return 0; }
+    // RPC Async Req Callback
+    virtual gint32 GetPasswordSaltCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        const std::string& strSalt /*[ In ]*/ )
+    { return 0; }
+    virtual void OnSvrOffline( IConfigDb* context,
+        CSimpleAuth_CliImpl* pIf );
+};
+
+using PSAACBS=std::shared_ptr<IAsyncSACallbacks>;
+
 DECLARE_AGGREGATED_SKEL_PROXY(
     CSimpleAuth_CliSkel,
     CStatCountersProxySkel,
@@ -23,11 +65,50 @@ DECLARE_AGGREGATED_PROXY(
 class CSimpleAuth_CliImpl
     : public CSimpleAuth_CliBase
 {
+    PSAACBS m_pAsyncCbs;
+    CfgPtr m_pContext;
     public:
     typedef CSimpleAuth_CliBase super;
     CSimpleAuth_CliImpl( const IConfigDb* pCfg ) :
         super::virtbase( pCfg ), super( pCfg )
     { SetClassId( clsid(CSimpleAuth_CliImpl ) ); }
+
+    inline gint32 GetAsyncCallbacks(
+        PSAACBS& pCbs, CfgPtr& pContext ) const
+    {
+        CStdRMutex  oLock( GetLock() );
+        if( m_pAsyncCbs == nullptr )
+            return -EINVAL;
+        pCbs = m_pAsyncCbs;
+        pContext = m_pContext;
+        return 0;
+    }
+
+    inline gint32 GetAsyncCallbacks(
+        PSAACBS& pCbs ) const
+    {
+        CStdRMutex  oLock( GetLock() );
+        if( m_pAsyncCbs == nullptr )
+            return -EINVAL;
+        pCbs = m_pAsyncCbs;
+        return 0;
+    }
+
+    inline void SetAsyncCallbacks(
+        PSAACBS& pCbs, const CfgPtr& pcontext )
+    {
+        CStdRMutex  oLock( GetLock() );
+        m_pAsyncCbs = pCbs;
+        m_pContext = pcontext;
+    };
+
+    inline void ClearCallbacks(
+        PSAACBS& pCbs, const CfgPtr& pcontext )
+    {
+        CStdRMutex  oLock( GetLock() );
+        m_pAsyncCbs.reset();
+        m_pContext.Clear();
+    };
 
     // RPC Async Req Callback
     gint32 GetUidByOAuth2NameCallback(

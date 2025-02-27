@@ -28,13 +28,10 @@
 #include <iostream>
 #include <unistd.h>
 
-#include <rpc.h>
 #include <cppunit/TestFixture.h>
 #include <cppunit/extensions/HelperMacros.h>
 
 #define MODULE_NAME MODNAME_RPCROUTER
-
-using namespace rpcf;
 
 class CIfRouterTest :
     public CppUnit::TestFixture
