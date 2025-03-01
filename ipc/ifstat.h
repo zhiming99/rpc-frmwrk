@@ -460,4 +460,6 @@ class CDummyInterfaceState : public CLocalProxyState
     { return 0; }
 };
 
+const char* IfStateToString(
+    EnumIfState dwState );
 }

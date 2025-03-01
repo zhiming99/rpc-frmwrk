@@ -1851,6 +1851,9 @@ class CRegistryFs :
         mode_t dwMode, guint32 dwFlags,
         RFHANDLE& hFile,
         CAccessContext* pac = nullptr );
+
+    gint32 GetAttr( RFHANDLE hFile,
+        struct stat& stBuf );
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

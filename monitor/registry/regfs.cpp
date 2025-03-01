@@ -607,6 +607,12 @@ gint32 CRegistryFs::ReadFile( RFHANDLE hFile,
         }
         pFile = itr->second;
         oLock.Unlock();
+        guint32 dwFlags = pFile->GetFlags();
+        if( dwFlags & O_WRONLY )
+        {
+            ret = -EACCES;
+            break;
+        }
         ret = pFile->ReadFile(
             dwSize, ( guint8* )buffer, dwOff );
         if( ERROR( ret ) )
@@ -635,8 +641,13 @@ gint32 CRegistryFs::WriteFile( RFHANDLE hFile,
         }
         pFile = itr->second;
         oLock.Unlock();
-        char* pBuf =
-            const_cast< char* >( buffer );
+        char* pBuf = const_cast< char* >( buffer );
+        guint32 dwFlags = pFile->GetFlags();
+        if( ( dwFlags & O_ACCMODE ) == 0 )
+        {
+            ret = -EACCES;
+            break;
+        }
         ret = pFile->WriteFile(
             dwSize, ( guint8* )pBuf, dwOff );
     }while( 0 );
@@ -1631,6 +1642,28 @@ gint32 CRegistryFs::GetAttr(
     return ret;
 }
 
+gint32 CRegistryFs::GetAttr(
+    RFHANDLE hFile, struct stat& stBuf )
+{
+    gint32 ret = 0;
+    do{
+        READ_LOCK( this );
+        CStdRMutex oLock( GetExclLock() );
+        FileSPtr pFile;
+        auto itr = m_mapOpenFiles.find( hFile );
+        if( itr == m_mapOpenFiles.end() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+        pFile = itr->second;
+        oLock.Unlock();
+        FImgSPtr pImg( pFile->GetImage() );
+        ret = pImg->GetAttr( stBuf );
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRegistryFs::Access(
     RFHANDLE hDir, const stdstr& strFile,
     guint32 dwFlags,
@@ -1711,8 +1744,8 @@ gint32 CRegistryFs::OpenFile(
             pFile->Truncate( 0 );
         }
 
-        CStdRMutex oLock( this->GetExclLock() );
         pOpenFile->SetFlags( dwFlags );
+        CStdRMutex oLock( this->GetExclLock() );
         hFile = pOpenFile->GetObjId();
         m_mapOpenFiles[ hFile ] = pOpenFile;
         

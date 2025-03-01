@@ -52,3 +52,25 @@ class CIfRouterTest :
     CfgPtr InitRouterCfg( guint32 dwRole );
 };
 
+namespace rpcf
+{
+gint32 DumpBdgeList(
+    CRpcRouterBridge* pRouter,
+    stdstr& strOutput );
+
+gint32 DumpBdgeProxyList(
+    CRpcRouter* pRouter,
+    stdstr& strOutput );
+
+gint32 DumpSessions(
+    CRpcRouterBridge* pRouter,
+    stdstr& strOutput );
+
+gint32 DumpReqProxyList(
+    CRpcRouterBridge* pRouter,
+    stdstr& strOutput );
+
+gint32 DumpReqFwdrInfo(
+    CRpcRouter* pRouter,
+    stdstr& strOutput );
+}

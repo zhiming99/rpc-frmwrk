@@ -101,9 +101,6 @@ gint32 AddSvcPoint(
     EnumClsid iClsid,
     bool bProxy );
 
-const char* IfStateToString(
-    EnumIfState dwState );
-
 #define CFuseMutex  CStdRMutex
 
 using DIR_SPTR=CHILD_TYPE;
