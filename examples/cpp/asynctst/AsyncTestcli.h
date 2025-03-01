@@ -7,6 +7,13 @@
 #pragma once
 #include "asynctst.h"
 
+#include "IAsyncTestcli.h"
+
+DECLARE_AGGREGATED_PROXY(
+    CAsyncTest_CliSkel,
+    CStatCountersProxy,
+    IIAsyncTest_PImpl );
+
 class CAsyncTest_CliImpl
     : public CAsyncTest_CliSkel
 {

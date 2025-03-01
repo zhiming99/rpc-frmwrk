@@ -92,8 +92,8 @@ class CDeclServiceImplFuse :
     public:
     typedef CDeclServiceImpl super;
     CDeclServiceImplFuse( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer ) :
-        super( pWriter, pNode, bServer )
+        ObjPtr& pNode, bool bProxy ) :
+        super( pWriter, pNode, bProxy )
     {}
 
     gint32 Output() override;
@@ -167,8 +167,8 @@ class CImplServiceImplFuse :
     public:
     typedef CDeclServiceImplFuse super;
     CImplServiceImplFuse( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer )
-        : super( pWriter, pNode, bServer )
+        ObjPtr& pNode, bool bProxy )
+        : super( pWriter, pNode, bProxy )
     {}
     gint32 Output() override;
     gint32 OutputUCRSvr();

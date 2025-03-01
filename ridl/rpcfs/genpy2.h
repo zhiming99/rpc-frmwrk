@@ -71,7 +71,7 @@ class CPyWriter2 : public CPyWriter
         auto pFiles = static_cast< CPyFileSet2* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMakefile;
-        return SelectFile( 2 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectMainCli() override
@@ -79,7 +79,7 @@ class CPyWriter2 : public CPyWriter
         auto pFiles = static_cast< CPyFileSet2* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainCli;
-        return SelectFile( 3 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectMainSvr() override
@@ -87,7 +87,7 @@ class CPyWriter2 : public CPyWriter
         auto pFiles = static_cast< CPyFileSet2* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainSvr;
-        return SelectFile( 4 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectIfImpl()
@@ -95,7 +95,7 @@ class CPyWriter2 : public CPyWriter
         auto pFiles = static_cast< CPyFileSet2* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strIfImpl;
-        return SelectFile( 5 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectReadme() override
@@ -103,7 +103,7 @@ class CPyWriter2 : public CPyWriter
         auto pFiles = static_cast< CPyFileSet2* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
-        return SelectFile( 6 );
+        return SelectImplFile( m_strCurFile );
     }
 };
 

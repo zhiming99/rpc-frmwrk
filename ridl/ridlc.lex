@@ -28,6 +28,8 @@
 #include "rpc.h"
 #include <math.h>
 #include <memory>
+#include <limits.h>
+#include <stdlib.h>
 
 using namespace rpcf;
 
@@ -98,13 +100,15 @@ yytokentype IsKeyword( char* szKeyword );
 gint32 IsAllZero( char* szText );
 
 #define DebugPrintMsg( ret, szMsg ) \
-    DebugPrintEx( logErr, ret, \
-        "%s(%d): %s", curpath().c_str(), \
-        yylineno, szMsg );
+    if( g_vecBufs.size() ) \
+        DebugPrintEx( logErr, ret, \
+            "%s(%d): %s", curpath().c_str(), \
+            yylineno, szMsg );
 
 #define PrintMsgInternal( ret, szHead, szMsg ) \
-    printf( "%s(%d): %s: %s(%d)\n", curpath().c_str(), \
-        yylineno, szHead, szMsg, ret );
+    if( g_vecBufs.size() ) \
+        printf( "%s(%d): %s: %s(%d)\n", curpath().c_str(), \
+            yylineno, szHead, szMsg, ret );
 
 #define PrintMsg( ret, szMsg ) \
     PrintMsgInternal( ret, "error", szMsg )
@@ -202,6 +206,34 @@ HexDig [0-9a-fA-F]
             PrintAndQuit( ret, "Expect \"" );
         }
 
+        if( strFile[ 0 ] == '/' )
+        {
+            yyin = TryOpenFile( strFile );
+            if ( !yyin )
+            {
+                PrintAndQuit(
+                    -errno, strerror( errno ) );
+            }
+        }
+        else
+        {
+            //relative path
+            char* pPath = realpath(
+                strFile.c_str(), nullptr );
+
+            if( pPath == nullptr )
+            {
+                stdstr& strTop =
+                    g_vecBufs.back()->m_strPath;
+                strFile = GetDirName(
+                    strTop ) + "/" + strFile;
+            }
+            else
+            {
+                strFile = pPath;
+                free( pPath );
+            }
+        }
         yyin = TryOpenFile( strFile.c_str() );
         if ( !yyin )
         {

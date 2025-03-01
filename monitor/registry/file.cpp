@@ -80,6 +80,8 @@ CFileImage::CFileImage( const IConfigDb* pCfg )
             break;
         oCfg.GetPointer( 3, m_pParentDir );
 
+        oCfg.GetStrProp( propObjName, m_strName );
+
     }while( 0 );
     if( ERROR( ret ) )
     {
@@ -1495,6 +1497,11 @@ gint32 CFileImage::ReadValue(
     gint32 ret = 0;
     do{
         READ_LOCK( this );
+        if( m_oValue.GetTypeId() == typeNone )
+        {
+            ret = -ENODATA;
+            break;
+        }
         oVar = m_oValue;
     }while( 0 );
     return ret;
@@ -1505,6 +1512,12 @@ gint32 CFileImage::WriteValue(
 {
     gint32 ret = 0;
     do{
+        EnumTypeId iType = oVar.GetTypeId();
+        if( iType >= typeByteArr )
+        {
+            ret = -ENOTSUP;
+            break;
+        }
         WRITE_LOCK( this );
         m_oValue = oVar;
         UpdateCtime();
@@ -1520,7 +1533,7 @@ void CFileImage::SetGid( gid_t wGid )
     gint32 ret = 0;
     do{
         WRITE_LOCK( this );
-        m_oInodeStore.m_wgid = ( guint16 )wGid;
+        m_oInodeStore.m_wgid = wGid;
         UpdateCtime();
         ret = this->Flush( FLAG_FLUSH_INODE );
         if( ERROR( ret ) )
@@ -1533,7 +1546,7 @@ void CFileImage::SetUid( uid_t wUid )
     gint32 ret = 0;
     do{
         WRITE_LOCK( this );
-        m_oInodeStore.m_wuid = ( guint16 )wUid;
+        m_oInodeStore.m_wuid = wUid;
         UpdateCtime();
         ret = this->Flush( FLAG_FLUSH_INODE );
         if( ERROR( ret ) )

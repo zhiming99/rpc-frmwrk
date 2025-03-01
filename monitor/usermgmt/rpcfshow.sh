@@ -4,17 +4,19 @@ script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
 pubfuncs=${script_dir}/pubfuncs.sh
   
-OPTIONS="hugko"
+OPTIONS="hugkolr"
 
 function Usage()
 {
 cat << EOF
-Usage: $0 [-hugko] <user name|group name> 
+Usage: $0 [-hlugko] <user name|group name> 
     this command show the infomation about the object
     -u: shows user information
     -g: shows group information
     -k: shows the binding between kerberos principal and the local user <user name>.
     -o: shows the binding between OAuth2 account and the local user <user name>.
+    -l: list users
+    -r: list groups
     -h: prints this help
 EOF
 }
@@ -28,6 +30,10 @@ while getopts $OPTIONS opt; do
     k)  show="krb5"
         ;;
     o)  show="OAuth2"
+        ;;
+    l)  show="listusers"
+        ;;
+    r)  show="listgroups"
         ;;
     h)
         Usage
@@ -72,6 +78,10 @@ elif [ "x$show" == "xkrb5" ]; then
     show_krb5_assoc
 elif [ "x$show" == "xOAuth2" ]; then
     show_oauth2_assoc
+elif [ "x$show" == "xlistusers" ]; then
+    list_users
+elif [ "x$show" == "xlistgroups" ]; then
+    list_groups
 fi
 popd > /dev/null
 

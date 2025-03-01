@@ -4,6 +4,13 @@
 #pragma once
 #include "sftest.h"
 #include "transctx.h"
+#include "IFileTransfersvr.h"
+
+DECLARE_AGGREGATED_SERVER(
+    CFileTransfer_SvrSkel,
+    CStatCountersServer,
+    CStreamServerAsync,
+    IIFileTransfer_SImpl );
 
 class CFileTransfer_SvrImpl
     : public CFileTransfer_SvrSkel

@@ -1362,4 +1362,38 @@ gint32 CIfReqFwdrPrxyState::SetupOpenPortParams(
     return ret;
 }
 
+const char* IfStateToString( EnumIfState dwState )
+{
+    switch( dwState )
+    {
+    case stateStopped:
+        return "Stopped";
+    case stateStarting:
+        return "Starting";
+    case stateStarted:
+        return "Started";
+    case stateConnected:
+        return "Connected";
+    case stateRecovery:
+        return "Recovery";
+    case statePaused:
+        return "Paused";
+    case stateUnknown:
+        return "Unknown";
+    case stateStopping:
+        return "Stopping";
+    case statePausing:
+        return "Pausing";
+    case stateResuming:
+        return "Resuming";
+    case stateIoDone:
+        return "IoDone";
+    case stateStartFailed:
+        return "StartFailed";
+    case stateInvalid:
+    default:
+        return "Invalid";
+    }
+}
+
 }

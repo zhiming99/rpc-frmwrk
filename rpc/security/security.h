@@ -921,16 +921,29 @@ class CRpcRouterReqFwdrAuth :
     gint32 StopProxyNoRef( guint32 dwPortId );
 };
 
+using ADDR_ELEM=std::tuple<stdstr, stdstr, stdstr>;
+
 class CRpcRouterBridgeAuth :
     public CRpcRouterBridge,
     public CRpcRouterAuthShared
 {
+    protected:
+
+    std::vector< ADDR_ELEM > m_vecBlockList;
+    std::vector< ADDR_ELEM > m_vecWhiteList;
+
+    gint32 LoadBlockList();
+
     public:
+
     typedef CRpcRouterBridge super;
     CRpcRouterBridgeAuth( const IConfigDb* pCfg )
         : CAggInterfaceServer( pCfg ), super( pCfg ),
         CRpcRouterAuthShared( this )
     {}
+
+    gint32 FilterMatchBlockList(
+        IMessageMatch* pMatch );
 
     virtual gint32 CheckReqToRelay(
         IConfigDb* pReqCtx,
@@ -955,6 +968,10 @@ class CRpcRouterBridgeAuth :
 
     virtual gint32 OnPostStart(
         IEventSink* pCallback );
+
+    gint32 RunEnableEventTask(
+        IEventSink* pCallback,
+        IMessageMatch* pMatch ) override;
 
     gint32 OnStartRfpaComplete(
         IEventSink* pCallback,

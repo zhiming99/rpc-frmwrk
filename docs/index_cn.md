@@ -21,7 +21,7 @@
     - [`-b`选项生成的`紧凑模式app`的命令行选项](../ridl/README_cn.md#-b选项生成的紧凑模式app的命令行选项)
       - [服务器程序的命令行选项](../ridl/README_cn.md#服务器程序的命令行选项)
       - [客户端程序的命令行选项](../ridl/README_cn.md#客户端程序的命令行选项)
-* [wiki怎样编译rpc-frmwrk](https://github.com/zhiming99/rpc-frmwrk/wiki/%E5%A6%82%E4%BD%95%E7%BC%96%E8%AF%91rpc%E2%80%90frmwrk)
+* [如何编译rpc-frmwrk](../docs/Tut-HowToBuild_cn-9.md)
 * [rpc-frmwrk的认证机制](../rpc/security/README_cn.md#rpc-frmwrk的认证机制)
     - [Kerberos](../rpc/security/README_cn.md#kerberos)
       - [Kerberos在rpc-frmwrk的认证流程中负责的功能](../rpc/security/README_cn.md#kerberos在rpc-frmwrk的认证流程中负责的功能)

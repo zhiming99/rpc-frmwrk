@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ridlc -sO . ./appmon.ridl 
+// ../../../ridl/.libs/ridlc --client -slO . ../../appmon/appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -9,22 +9,6 @@ using namespace rpcf;
 #include "appmon.h"
 #include "AppMonitorcli.h"
 
-/* Async callback handler */
-gint32 CAppMonitor_CliImpl::RegisterListenerCallback( 
-    IConfigDb* context, gint32 iRet )
-{
-    // TODO: Process the server response here
-    // return code ignored
-    return 0;
-}
-/* Async callback handler */
-gint32 CAppMonitor_CliImpl::RemoveListenerCallback( 
-    IConfigDb* context, gint32 iRet )
-{
-    // TODO: Process the server response here
-    // return code ignored
-    return 0;
-}
 /* Event handler */
 gint32 CAppMonitor_CliImpl::OnPointChanged( 
     const std::string& strPtPath /*[ In ]*/,

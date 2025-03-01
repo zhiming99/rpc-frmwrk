@@ -292,6 +292,7 @@ enum EnumPropId : gint32
     propLoginInfo,      // type: a configdb object containing user information for the connection
     propUid,            // type: a integer as the user identifier from the registry fs
     propGid,            // type: a integer as the group identifier from the registry fs
+    propCmdLine,        // type: a string as the command line of current process
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

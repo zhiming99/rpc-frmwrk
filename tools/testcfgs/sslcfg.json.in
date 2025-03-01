@@ -2,6 +2,7 @@
     "Connections": [
         {
             "IpAddress": "127.0.0.1",
+            "BindTo": "false",
             "PortNumber": "4132",
             "Compression": "true",
             "EnableSSL": "true",

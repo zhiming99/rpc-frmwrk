@@ -4760,6 +4760,9 @@ gint32 CRpcRouterBridgeAuth::OnPostStart(
         if( ERROR( ret ) )
             break;
 
+        ret = LoadBlockList();
+        if( ERROR( ret ) )
+            break;
         // NOTE:this match does not have
         // propPortId, so cannot be enabled to
         // receive events on.  For the reqfwdr
@@ -4810,6 +4813,139 @@ gint32 CRpcRouterBridgeAuth::OnPostStart(
         
     }while( 0 );
 
+    return ret;
+}
+
+#include "jsondef.h"
+gint32 CRpcRouterBridgeAuth::LoadBlockList()
+{
+    gint32 ret = 0;
+    do{
+        stdstr strPath;
+        auto pMgr = GetIoMgr();
+        ret = pMgr->TryFindDescFile(
+            "invalidpath/blist.json",
+            strPath );
+        if( ERROR( ret ) )
+            break;
+        Json::Value blist;
+        ret = ReadJsonCfgFile( strPath, blist );
+        if( ERROR( ret ) )
+            break;
+        if( !blist.isObject() ||
+            !blist.isMember( "BlockList" ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        Json::Value arrAddrs = blist[ "BlockList" ];
+        for( int i = 0; i < arrAddrs.size(); i++ )
+        {
+            Json::Value& oElem = arrAddrs[ i ];
+            if( !oElem.isObject() ||
+                !oElem.isMember( JSON_ATTR_OBJNAME ) || 
+                !oElem.isMember( JSON_ATTR_MODNAME ) ||
+                !oElem.isMember( JSON_ATTR_ROUTER_PATH ) )
+            {
+               ret = -EINVAL;
+               break;
+            }
+            m_vecBlockList.push_back(
+                { oElem[ JSON_ATTR_ROUTER_PATH ].asString(),
+                oElem[ JSON_ATTR_MODNAME ].asString(),
+                oElem[ JSON_ATTR_OBJNAME ].asString() } );
+        }
+    }while( 0 );
+    if( ERROR( ret ) )
+        OutputMsg( ret, "Error loading block-list file" );
+    return ret;
+}
+    
+#include <stdio.h>
+gint32 CRpcRouterBridgeAuth::FilterMatchBlockList(
+    IMessageMatch* pMatch )
+{
+    gint32 ret = 0;
+    do{
+        Variant oVar;
+        ret = pMatch->GetProperty( propObjPath, oVar );
+        if( ERROR( ret ) )
+            break;
+        constexpr auto dwPrefix =
+            sizeof( DBUS_NAME_PREFIX );
+        stdstr& strObjPath = ( stdstr& )oVar;
+        if( strObjPath.substr( 0, dwPrefix ) !=
+            "/org/rpcf/" )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        auto strPath =
+            ( ( stdstr& )oVar ).substr( dwPrefix );
+        auto pos1 = strPath.find_first_of( '/' );
+        if( pos1 == stdstr::npos )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        stdstr strMod =
+            strPath.substr( 0, pos1 );
+
+        pos1 = strPath.find_first_not_of( '/', pos1 );
+        if( pos1 == stdstr::npos )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        auto pos2 = strPath.find_first_of(
+            '/', pos1 );
+        if( pos2 == stdstr::npos )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( strPath.substr( pos1, pos2 - pos1 ) != "objs" )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        pos1 = strPath.find_first_not_of( '/', pos2 );
+        if( pos1 == stdstr::npos )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        stdstr strObj = strPath.substr( pos1 );
+        for( auto& elem : m_vecBlockList )
+        {
+            if( strMod != std::get<1>( elem ) )
+                continue;
+            auto& strBlkObj = std::get<2>( elem );
+            if( strObj.size() < strBlkObj.size() )
+                continue;
+            if( strBlkObj != strObj.substr(
+                0, strBlkObj.size() ) )
+                continue;
+            ret = -EACCES;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CRpcRouterBridgeAuth::RunEnableEventTask(
+    IEventSink* pCallback,
+    IMessageMatch* pMatch )
+{
+    gint32 ret = 0;
+    do{
+        ret = FilterMatchBlockList( pMatch );
+        if( ERROR( ret ) )
+            break;
+        ret = super::RunEnableEventTask(
+            pCallback, pMatch );
+
+    }while( 0 );
     return ret;
 }
 

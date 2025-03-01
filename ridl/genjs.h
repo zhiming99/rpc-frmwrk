@@ -85,7 +85,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strStructsJs;
-        return SelectFile( 0 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectMainFuncFile()
@@ -93,7 +93,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainCli;
-        return SelectFile( 1 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectDescFile()
@@ -101,7 +101,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strObjDesc;
-        return SelectFile( 2 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectDrvFile()
@@ -109,7 +109,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDriver;
-        return SelectFile( 3 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectMakefile()
@@ -117,7 +117,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMakefile;
-        return SelectFile( 4 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectReadme()
@@ -125,7 +125,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
-        return SelectFile( 5 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectWebCfg()
@@ -133,7 +133,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strWebCfg;
-        return SelectFile( 6 );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 SelectSampleHtml()
@@ -141,19 +141,7 @@ class CJsWriter : public CWriterBase
         CJsFileSet* pFiles = static_cast< CJsFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strHtml;
-        return SelectFile( 7 );
-    }
-
-
-    gint32 SelectImplFile(
-        const std::string& strFile )
-    {
-        auto itr = m_pFiles->m_mapSvcImp.find( strFile );
-        if( itr == m_pFiles->m_mapSvcImp.end() )
-            return -ENOENT;
-        gint32 idx = itr->second;
-        m_strCurFile = strFile;
-        return SelectFile( idx );
+        return SelectImplFile( m_strCurFile );
     }
 };
 
