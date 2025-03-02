@@ -7,8 +7,7 @@
 
 #include "IUserManagercli.h"
 
-gint32 GetSimpleAuthcli(
-    CIoManager* pMgr, InterfPtr& pCli );
+gint32 GetSimpleAuthcli( InterfPtr& pCli );
 
 gint32 DestroySimpleAuthcli(
     CIoManager* pMgr, IEventSink* pCallback );

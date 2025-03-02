@@ -449,6 +449,7 @@ gint32 CFileImage::Flush( guint32 dwFlags )
                 m_dwInodeIdx, ( guint8* )arrBytes );
             if( ERROR( ret ) )
                 break;
+            ret = 0;
         }
 
         if( !bData )
@@ -491,8 +492,6 @@ gint32 CFileImage::Flush( guint32 dwFlags )
             m_pAlloc->WriteBlock( elem.first,
                 ( guint8* )elem.second->ptr() );
         }
-
-        ret = 0;
 
     }while( 0 );
     return ret;
@@ -1513,7 +1512,12 @@ gint32 CFileImage::WriteValue(
     gint32 ret = 0;
     do{
         EnumTypeId iType = oVar.GetTypeId();
-        if( iType >= typeByteArr )
+        if( iType == typeNone )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( iType >= typeDMsg )
         {
             ret = -ENOTSUP;
             break;

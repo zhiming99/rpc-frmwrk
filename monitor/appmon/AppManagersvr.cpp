@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ../../ridl/.libs/ridlc -sO . ./appmon.ridl 
+// ../../ridl/.libs/ridlc --server -sO . ./appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -137,7 +137,6 @@ gint32 SetOwnerStream(
     gint32 ret = 0;
     RFHANDLE hDir = INVALID_HANDLE;
     do{
-        HANDLE hStm = INVALID_HANDLE;
         stdstr strPath = "/" APPS_ROOT_DIR "/";
         strPath += strAppName;
         strPath += "/" OWNER_STREAM_FILE;
@@ -340,12 +339,6 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
 {
     gint32 ret = 0;
     do{
-        EnumPointType dwType;
-        ret = GetPointType( m_pAppRegfs,
-            strPtPath, dwType );
-        if( ERROR( ret ) )
-            break;
-
         std::vector< stdstr > vecComps;
         ret = SplitPath( strPtPath, vecComps );
         if( ERROR( ret ) )
@@ -355,6 +348,16 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
         }
 
         const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+
+        EnumPointType dwType;
+        stdstr strPath = strApp + 
+            "/" POINTS_DIR "/" + strPoint;
+
+        ret = GetPointType( m_pAppRegfs, 
+            strPath, dwType );
+        if( ERROR( ret ) )
+            break;
 
         gint32 iRet = 0;
         if( dwType == ptOutput )
@@ -362,7 +365,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
             // notify the input app
             std::vector< STM_POINT > vecStms;
             iRet = GetInputToNotify( this,
-                m_pAppRegfs, strPtPath, vecStms );
+                m_pAppRegfs, strPath, vecStms );
             if( ERROR( iRet ) )
                 break;
             for( auto& elem : vecStms )
@@ -394,7 +397,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
                 break;
             CAppManager_SvrSkel* pSkel = ptrSkel;
             pSkel->IIAppStore_SImpl::OnPointChanged(
-                strPtPath, value );
+                strPath, value );
         }while( 0 );
     }while( 0 );
     return ret;
@@ -424,7 +427,7 @@ gint32 CAppManager_SvrImpl::SetPointValue(
         RFHANDLE hPtDir;
 
         ret = m_pAppRegfs->OpenDir( strPath +
-            strApp + POINTS_DIR "/" + strPoint,
+            strApp + "/" POINTS_DIR "/" + strPoint,
             O_RDONLY, hPtDir );
         if( ERROR( ret ) )
             break;
@@ -485,10 +488,34 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
     const std::string& strPtPath /*[ In ]*/,
     BufPtr& value /*[ In ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'SetLargePointValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    if( value.IsEmpty() || value->empty() )
+        return -EINVAL;
+    do{
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        stdstr strAttrVal =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/" VALUE_FILE; 
+        RFHANDLE hFile;
+        ret = m_pAppRegfs->OpenFile(
+            strAttrVal, O_WRONLY | O_TRUNC, hFile );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle( m_pAppRegfs, hFile );
+        guint32 dwSize = value->size();
+        ret = m_pAppRegfs->WriteFile( hFile,
+            value->ptr(), dwSize, 0 );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::GetLargePointValue( 
@@ -496,10 +523,48 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
     const std::string& strPtPath /*[ In ]*/, 
     BufPtr& value /*[ Out ]*/ )
 {
-    // TODO: Emit an async operation here.
-    // And make sure to call 'GetLargePointValueComplete'
-    // when the service is done
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    if( value.IsEmpty() )
+        value.NewObj();
+    do{
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPoint = vecComps[ 1 ];
+        stdstr strAttrVal =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/" VALUE_FILE; 
+        RFHANDLE hFile;
+        ret = m_pAppRegfs->OpenFile(
+            strAttrVal, O_RDONLY, hFile );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle( m_pAppRegfs, hFile );
+        struct stat st;
+        ret = m_pAppRegfs->GetAttr( hFile, st );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwSize = st.st_size;
+        if( dwSize == 0 )
+        {
+            ret = -ENODATA;
+            break;
+        }
+        ret = value->Resize( dwSize );
+        if( ERROR( ret ) )
+            break;
+        ret = m_pAppRegfs->ReadFile( hFile,
+            value->ptr(), dwSize, 0 );
+        if( dwSize < st.st_size )
+            ret = value->Resize( dwSize );
+    }while( 0 );
+    return ret;
 }
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SubscribeStreamPoint( 
@@ -562,7 +627,7 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" + strAttr; 
-        ret = m_pAppRegfs->SetValue(
+        ret = m_pAppRegfs->GetValue(
             strAttrVal, rvalue );
     }while( 0 );
     return ret;
@@ -613,98 +678,109 @@ gint32 CAppManager_SvrImpl::GetPointValues(
 }
 
 /* Async Req Handler*/
-gint32 CAppManager_SvrImpl::ClaimAppInsts( 
+gint32 CAppManager_SvrImpl::ClaimAppInst( 
     IConfigDb* pContext, 
-    std::vector<std::string>& arrApps /*[ In ]*/, 
-    std::vector<KeyValue>& arrInitKVs /*[ Out ]*/ )
+    const std::string& strAppName /*[ In ]*/,
+    std::vector<KeyValue>& arrPtToSet /*[ In ]*/, 
+    std::vector<KeyValue>& arrPtToGet /*[ Out ]*/ )
 {
     gint32 ret = 0;
+    bool bOwnerSet = false;
     do{
-        HANDLE hstm;
+        HANDLE hstm, hOwner;
         ret = GetCurStream( this, pContext, hstm );
         if( ERROR( ret ) )
             break;
-        for( auto& elem : arrApps )
+        ret = GetOwnerStream( this,
+            m_pAppRegfs, strAppName, hOwner );
+        if( ERROR( ret ) )
         {
-            ret = GetOwnerStream( this,
-                m_pAppRegfs, elem, hstm );
-            if( ERROR( ret ) )
+            ret = 0;
+        }
+        else
+        {
+            InterfPtr ptrIf;
+            gint32 iRet = GetStmSkel(
+                hOwner, ptrIf );
+            if( SUCCEEDED( iRet ) )
             {
-                ret = 0;
-            }
-            else
-            {
-                InterfPtr ptrIf;
-                gint32 iRet = GetStmSkel(
-                    hstm, ptrIf );
-                if( SUCCEEDED( iRet ) )
-                {
-                    ret = -EEXIST;
-                    break;
-                }
+                // already occupied
+                ret = -EEXIST;
+                break;
             }
         }
+
+        ret = SetOwnerStream(
+            m_pAppRegfs, strAppName, hstm );
         if( ERROR( ret ) )
             break;
-        for( auto& elem : arrApps )
+
+        bOwnerSet = true;
+        CStdRMutex oLock( GetLock() );
+        auto itr = m_mapAppOwners.find( hstm );
+        StrSetPtr pAppSet;
+        if( itr == m_mapAppOwners.end() )
         {
-            ret = SetOwnerStream(
-                m_pAppRegfs, elem, hstm );
-            if( ERROR( ret ) )
-                break;
-            CStdRMutex oLock( GetLock() );
-            auto itr = m_mapAppOwners.find( hstm );
-            StrSetPtr pStrSet;
-            if( itr == m_mapAppOwners.end() )
-            {
-                pStrSet.NewObj();
-                ( *pStrSet )().insert( elem );
-                m_mapAppOwners.insert(
-                    { hstm, pStrSet } );
-            }
-            else
-            {
-                ( *itr->second )().insert( elem );
-            }
-            oLock.Unlock();
-            RFHANDLE hPtDir = INVALID_HANDLE;
-            stdstr strDir = "/" APPS_ROOT_DIR "/";
-            strDir += elem + "/" POINTS_DIR "/";
-            ret = m_pAppRegfs->OpenDir(
-                strDir , O_RDONLY, hPtDir );
-            if( ERROR( ret ) )
+            pAppSet.NewObj();
+            ( *pAppSet )().insert( strAppName );
+            m_mapAppOwners.insert(
+                { hstm, pAppSet } );
+        }
+        else
+        {
+            auto& setApps = ( *itr->second )();
+            setApps.insert( strAppName );
+        }
+        oLock.Unlock();
+
+        RFHANDLE hPtDir = INVALID_HANDLE;
+        stdstr strDir = "/" APPS_ROOT_DIR "/";
+        strDir += strAppName + "/" POINTS_DIR "/";
+
+        ret = m_pAppRegfs->OpenDir(
+            strDir, O_RDONLY, hPtDir );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle(
+            m_pAppRegfs, hPtDir );
+
+        for( auto& elem : arrPtToSet )
+        {
+            m_pAppRegfs->SetValue( hPtDir,
+                elem.strKey + "/" VALUE_FILE, 
+                elem.oValue );
+        }
+
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = m_pAppRegfs->ReadDir( hPtDir, vecks );
+        if( ERROR( ret ) )
+            break;;
+
+        for( auto& elem : vecks )
+        {
+            stdstr strLoad = elem.szKey;
+            strLoad += "/" LOAD_ON_START;
+            gint32 iRet = m_pAppRegfs->Access(
+                hPtDir, strLoad, F_OK );
+            if( ERROR( iRet ) )
                 continue;
-            CFileHandle oHandle(
-                m_pAppRegfs, hPtDir );
-
-            std::vector< KEYPTR_SLOT > vecks;
-            ret = m_pAppRegfs->ReadDir(
-                hPtDir, vecks );
-
-            if( ERROR( ret ) )
+            Variant oVar;
+            iRet = m_pAppRegfs->GetValue( hPtDir,
+                strLoad + "/" VALUE_FILE, oVar );
+            if( ERROR( iRet ) )
                 continue;
-
-            for( auto& elem2 : vecks )
-            {
-                stdstr strLoad = elem2.szKey;
-                strLoad += "/" LOAD_ON_START;
-                ret = m_pAppRegfs->Access(
-                    hPtDir, strLoad, F_OK );
-                if( ERROR( ret ) )
-                    continue;
-                Variant oVar;
-                ret = m_pAppRegfs->GetValue(
-                    hPtDir, VALUE_FILE, oVar );
-                if( ERROR( ret ) )
-                    continue;
-                KeyValue kv;
-                kv.strKey =
-                    elem + "/" + elem2.szKey;
-                kv.oValue = oVar;
-                arrInitKVs.push_back( kv );
-            }
+            KeyValue kv;
+            kv.strKey = elem.szKey;
+            kv.oValue = oVar;
+            arrPtToGet.push_back( kv );
         }
     }while( 0 );
+    if( ERROR( ret ) && bOwnerSet )
+    {
+        ret = SetOwnerStream( m_pAppRegfs,
+            strAppName, INVALID_HANDLE );
+    }
     return ret;
 }
 

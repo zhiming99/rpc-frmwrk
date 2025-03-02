@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ../../ridl/.libs/ridlc -sO . ./appmon.ridl 
+// ../../ridl/.libs/ridlc --server -sO . ./appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -513,15 +513,15 @@ gint32 CAppMonitor_SvrImpl::OnPointChangedInternal(
 {
     gint32 ret = 0;
     do{
-        auto pos =
-            strPtPath.find_first_of( '/' );
-        if( pos == stdstr::npos )
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
         {
             ret = -EINVAL;
             break;
         }
-        stdstr strApp =
-            strPtPath.substr( 0, pos );
+
+        const stdstr& strApp = vecComps[ 0 ];
 
         // notify the monitors
         std::vector< HANDLE > vecStms;

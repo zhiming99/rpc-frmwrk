@@ -1,5 +1,5 @@
 /****BACKUP YOUR CODE BEFORE RUNNING RIDLC***/
-// ../../../../ridl/.libs/ridlc --sync_mode IAppStore=async_p --services=AppManager,SimpleAuth --client -slO . ../../../../monitor/appmon/appmon.ridl 
+// ../../../../ridl/.libs/ridlc --sync_mode IAppStore=async_p --sync_mode IUserManager=async_p --services=AppManager,SimpleAuth --client -slO . ../../../../monitor/appmon/appmon.ridl 
 // Implement the following methods
 // to get the RPC proxy/server work
 #include "rpc.h"
@@ -12,8 +12,7 @@ using namespace rpcf;
 
 ObjPtr g_pSAcli;
 stdrmutex g_oSALock;
-gint32 GetSimpleAuthcli(
-    CIoManager* pMgr, InterfPtr& pCli )
+gint32 GetSimpleAuthcli( InterfPtr& pCli )
 {
     gint32 ret = 0;
     do{
@@ -34,7 +33,7 @@ gint32 DestroySimpleAuthcli(
     gint32 ret = 0;
     do{
         InterfPtr pCli;
-        ret = GetSimpleAuthcli( pMgr, pCli );
+        ret = GetSimpleAuthcli( pCli );
         if( ERROR( ret ) )
             break;
 

@@ -41,6 +41,7 @@ using namespace rpcf;
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/HelperMacros.h>
+#include <signal.h>
 
 #define MAX_BYTES_MPOINT  REG_MAX_NAME
 
@@ -57,11 +58,16 @@ static std::string g_strMPoint;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
 static bool g_bMonitoring = false;
+std::atomic< bool > g_bExit = { false };
 
-// two globals must be present for libfuseif.so
+// the following two globals must be present for
+// libfuseif.so
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
+
+void SignalHandler( int signum )
+{ g_bExit = true; }
 
 void CIfRouterTest::setUp()
 {
@@ -324,8 +330,13 @@ void CIfRouterTest::testSvrStartStop()
         CInterfaceServer* pSvr = pIf;
         if( g_strMPoint.empty() )
         {
+            signal( SIGINT, SignalHandler );
             while( pSvr->IsConnected() )
+            {
                 sleep( 1 );
+                if( g_bExit )
+                    break;
+            }
         }
 #ifdef FUSE3
         else

@@ -73,9 +73,9 @@ interface IAppMonitor
 
 interface IDataProducer
 {
-    [async]ClaimAppInsts(
-        array< string > arrApps )
-    returns( array< KeyValue > arrInitKVs );
+    [async]ClaimAppInst( string strAppName,
+        array< KeyValue > arrPtToSet )
+    returns( array< KeyValue > arrPtToGet );
 
     [async]FreeAppInsts(
         array< string > arrApps )

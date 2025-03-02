@@ -91,11 +91,16 @@ echo adding application rpcrouter1
 add_application rpcrouter1
 
 add_point rpcrouter1 rpt_timer input i
-set_attr_value rpcrouter1 rpt_timer unit "$(jsonval 's' 'sec' )"
+set_attr_value rpcrouter1 rpt_timer unit "$(jsonval 'i' 0 )"
 
-add_point rpcrouter1 sessions output s
-add_point rpcrouter1 bdge_list output s
+#point contents are in json
+add_point rpcrouter1 sessions output blob
+add_point rpcrouter1 bdge_list output blob
+add_point rpcrouter1 bdge_proxy_list output blob
+add_point rpcrouter1 req_proxy_list output blob 
+
 add_point rpcrouter1 max_conn  setpoint i
+add_point rpcrouter1 conn_count  setpoint i
 add_point rpcrouter1 max_bps  setpoint i
 add_point rpcrouter1 obj_count  output i
 add_point rpcrouter1 pending_tasks  output i
@@ -111,21 +116,29 @@ echo adding application timer1
 add_application timer1
 add_point timer1 clock1 output i
 add_link timer1 clock1 rpcrouter1 rpt_timer
+set_attr_value timer1 clock1 pulse "$(jsonval 'i' 1 )"
 
 add_point timer1 interval1 setpoint i
 set_attr_value timer1 interval1 uint "$(jsonval 's' 'sec' )"
+set_point_value timer1 interval1 "$(jsonval 'i' 10)"
 
 add_point timer1 clock2 output i
+set_attr_value timer1 clock2 pulse "$(jsonval 'i' 1 )"
 add_point timer1 interval2 setpoint i
 set_attr_value timer1 interval2 uint "$(jsonval 's' 'sec' )"
+set_point_value timer1 interval2 "$(jsonval 'i' 10)"
 
 add_point timer1 clock3 output i
+set_attr_value timer1 clock3 pulse "$(jsonval 'i' 1 )"
 add_point timer1 interval3 setpoint i
 set_attr_value timer1 interval3 uint "$(jsonval 's' 'sec' )"
+set_point_value timer1 interval3 "$(jsonval 'i' 10)"
 
 add_point timer1 clock4 output i
+set_attr_value timer1 clock4 pulse "$(jsonval 'i' 1 )"
 add_point timer1 interval4 setpoint i
 set_attr_value timer1 interval4 uint "$(jsonval 's' 'sec' )"
+set_point_value timer1 interval4 "$(jsonval 'i' 10)"
 
 add_point timer1 restart input i
 add_point timer1 cmdline setpoint s 

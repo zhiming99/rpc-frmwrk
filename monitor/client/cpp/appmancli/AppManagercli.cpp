@@ -11,8 +11,7 @@ using namespace rpcf;
 
 InterfPtr g_pAppManCli;
 stdrmutex g_oAMLock;
-gint32 GetAppManagercli(
-    CIoManager* pMgr, InterfPtr& pCli )
+gint32 GetAppManagercli( InterfPtr& pCli )
 {
     gint32 ret = 0;
     do{
@@ -100,13 +99,12 @@ gint32 CreateAppManagercli( CIoManager* pMgr,
 }
 
 gint32 DestroyAppManagercli(
-    CIoManager* pMgr,
-    IEventSink* pCallback )
+    CIoManager* pMgr, IEventSink* pCallback )
 {
     gint32 ret = 0;
     do{
         InterfPtr pCli;
-        ret = GetAppManagercli( pMgr, pCli );
+        ret = GetAppManagercli( pCli );
         if( ERROR( ret ) )
             break;
 
@@ -311,16 +309,16 @@ gint32 CAppManager_CliImpl::OnPointsChanged(
 }
 
 /* Async callback handler */
-gint32 CAppManager_CliImpl::ClaimAppInstsCallback( 
+gint32 CAppManager_CliImpl::ClaimAppInstCallback( 
     IConfigDb* context, gint32 iRet,
-    std::vector<KeyValue>& arrInitKVs /*[ In ]*/ )
+    std::vector<KeyValue>& arrPtToGet /*[ In ]*/ )
 {
     PACBS pCbs;
     gint32 ret = GetAsyncCallbacks( pCbs );
     if( ERROR( ret ) )
         return ret;
-    return pCbs->ClaimAppInstsCallback(
-        context, iRet, arrInitKVs );
+    return pCbs->ClaimAppInstCallback(
+        context, iRet, arrPtToGet );
 }
 
 /* Async callback handler */
