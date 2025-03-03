@@ -329,8 +329,7 @@ class CAppManager_CliImpl
         return 0;
     }
 
-    inline void ClearCallbacks(
-        PACBS& pCbs, const CfgPtr& pcontext )
+    inline void ClearCallbacks()
     {
         CStdRMutex  oLock( GetLock() );
         m_pAsyncCbs.reset();

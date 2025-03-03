@@ -1140,6 +1140,8 @@ class CFastRpcProxyState :
         return SubscribeEventsInternal(
             vecEvtToSubscribe );
     }
+    gint32 OpenPort(
+        IEventSink* pCallback ) override;
 };
 
 class CFastRpcServerBase :
