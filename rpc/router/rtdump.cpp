@@ -641,7 +641,10 @@ gint32 DumpSessions(
             ( void*& )pas );
 
         if( ERROR( ret ) )
+        {
             pas = nullptr;
+            ret = 0;
+        }
 
         Json::Value oArray( Json::arrayValue );
         guint32 dwVal = 0;

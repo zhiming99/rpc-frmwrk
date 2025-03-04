@@ -25,6 +25,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
     IEventSink* pCallback, IConfigDb* pCfg,
     const stdstr& strDesc,
     const stdstr& strObjName,
+    InterfPtr& pNewIf,
     bool bServer )
 {
     gint32 ret = 0;
@@ -49,8 +50,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
             strObjName, bServer, ptrCfg );
         if( ERROR( ret ) )
             break;
-        ret = pIf.NewObj( iClsid,
-            oParams.GetCfg() );
+        ret = pIf.NewObj( iClsid, ptrCfg );
         if( ERROR( ret ) )
             break;
 
@@ -157,6 +157,11 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
             pRetry->ClearClientNotify();
             ( *pStartTask )( eventCancelTask );
             ( *pStartCb )( eventCancelTask );
+        }
+        if( SUCCEEDED( ret ) )
+        {
+            pNewIf = pIf;
+            ret = STATUS_PENDING;
         }
 
     }while( 0 );

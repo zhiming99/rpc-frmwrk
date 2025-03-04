@@ -42,6 +42,7 @@ using namespace rpcf;
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/HelperMacros.h>
 #include <signal.h>
+#include "getopt.h"
 
 #define MAX_BYTES_MPOINT  REG_MAX_NAME
 
@@ -58,13 +59,17 @@ static std::string g_strMPoint;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
 static bool g_bMonitoring = false;
-std::atomic< bool > g_bExit = { false };
+std::atomic< bool > g_bExit={false};
 
 // the following two globals must be present for
 // libfuseif.so
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
+
+extern gint32 StartAppManCli(
+    CRpcServices* prt );
+extern gint32 StopAppManCli();
 
 void SignalHandler( int signum )
 { g_bExit = true; }
@@ -327,6 +332,13 @@ void CIfRouterTest::testSvrStartStop()
             "Starting %s as %s...", MODULE_NAME,
             ( g_dwRole & 0x2 ) ? "bridge" : "reqfwdr" );
 
+        if( g_bMonitoring )
+        {
+            ret = StartAppManCli( pIf );
+            if( ERROR( ret ) )
+                break;
+        }
+
         CInterfaceServer* pSvr = pIf;
         if( g_strMPoint.empty() )
         {
@@ -348,6 +360,9 @@ void CIfRouterTest::testSvrStartStop()
 #endif
 
     }while( 0 );
+
+    if( g_bMonitoring )
+        StopAppManCli();
 
     if( !pIf.IsEmpty() )
         pIf->Stop();
@@ -389,10 +404,24 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:adcfs:m:vgl" ) ) != -1 )
+
+    int option_index = 0;
+    struct option long_options[] = {
+        {"monitor", no_argument, 0,  0 },
+        {0, 0,  0,  0 } };
+
+    while( ( opt = getopt_long(
+        argc, argv, "hr:adcfs:m:vglo",
+        long_options, &option_index ) ) != -1 )
     {
         switch (opt)
         {
+        case 0:
+            {
+                if( option_index == 0 )
+                    g_bMonitoring = true;
+                break;
+            }
         case 'r':
             {
                 g_dwRole = ( guint32 )atoi( optarg );
@@ -511,10 +540,19 @@ int main( int argc, char** argv )
             break;
     }
 
-
     if( ERROR( ret ) || !bRole )
     {
         Usage( argv[ 0 ] );
+        exit( -ret );
+    }
+
+    if( ( g_dwRole & 2 ) == 0 &&
+        g_bMonitoring )
+    {
+        fprintf( stderr,
+            "Error '-o' is only available with "
+            "'-r 2'\n" );
+        ret = -EINVAL;
         exit( -ret );
     }
 

@@ -6,7 +6,6 @@ usr/lib/@DEB_HOST_MULTIARCH@/rpcf/lib*.la
 usr/lib/@DEB_HOST_MULTIARCH@/pkgconfig/rpcf.pc
 usr/include/rpcf/*.h
 usr/include/rpcf/ipc/*.h
-usr/include/rpcf/moncli/*.h
 etc/rpcf/drvtpl.json
 etc/rpcf/odesctpl.json
 etc/rpcf/odesctpl2.json

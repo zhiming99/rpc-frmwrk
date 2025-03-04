@@ -60,11 +60,6 @@ gint32 CreateAppManagercli( CIoManager* pMgr,
 
                 ObjPtr pIf;
                 ret = oResp.GetObjPtr( 0, pIf );
-                if( SUCCEEDED( ret ) )
-                {
-                    CStdRMutex oLock( g_oAMLock );
-                    g_pAppManCli = pIf;
-                }
             }while( 0 );
             if( ptrResp.IsEmpty() )
             {
@@ -89,7 +84,7 @@ gint32 CreateAppManagercli( CIoManager* pMgr,
             clsid( CAppManager_CliImpl )>(
             pMgr, pStartCb, pCfg,
             "./appmondesc.json", "AppManager",
-            false );
+            g_pAppManCli, false );
 
         if( ERROR( ret ) )
             ( *pStartCb )( eventCancelTask );
@@ -142,7 +137,11 @@ gint32 DestroyAppManagercli(
             OutputMsg( ret,
                 "Error stop CSimpleAuth_CliImpl" );
         }
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
     }while( 0 );
+    if( ret != STATUS_PENDING )
+        g_pAppManCli.Clear();
     return ret;
 }
 

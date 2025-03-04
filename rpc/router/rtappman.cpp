@@ -38,6 +38,8 @@ using namespace rpcf;
 #include "AppManagercli.h"
 #include "rtappman.h"
 
+extern std::atomic< bool > g_bExit;
+
 namespace rpcf
 {
 
@@ -64,7 +66,12 @@ gint32 CreateAppManSync( CIoManager* pMgr,
         if( SUCCEEDED( ret ) )
         {
             Variant oVar;
-            ret = pSync->GetProperty( 0, oVar );
+            ret = pSync->GetProperty(
+                propRespPtr, oVar );
+            if( ERROR( ret ) )
+                break;
+            IConfigDb* pCfg = ( ObjPtr& )oVar;
+            ret = pCfg->GetProperty( 0, oVar );
             if( ERROR( ret ) )
                 break;
             pAppMan = ( ObjPtr& )oVar;
@@ -81,6 +88,7 @@ gint32 GetPointValuesToUpdate(
     do{
         KeyValue okv;
         okv.strKey = RTAPPNAME "/" O_SESSION;
+        okv.oValue = 0;
         veckv.push_back( okv );
         CRpcRouterBridge* prb = pRouter;
         CRpcRouter* prt = pRouter;
@@ -90,18 +98,21 @@ gint32 GetPointValuesToUpdate(
             veckv.back().oValue = strVal;
 
         okv.strKey = RTAPPNAME "/" O_BDGE_LIST;
+        okv.oValue = 0;
         veckv.push_back( okv );
         ret = DumpBdgeList( prb, strVal );
         if( SUCCEEDED( ret ) )
             veckv.back().oValue = strVal;
 
         okv.strKey = RTAPPNAME "/" O_BPROXY_LIST;
+        okv.oValue = 0;
         veckv.push_back( okv );
         ret = DumpBdgeProxyList( prt, strVal );
         if( SUCCEEDED( ret ) )
             veckv.back().oValue = strVal;
 
         okv.strKey = RTAPPNAME "/" O_RPROXY_LIST;
+        okv.oValue = 0;
         veckv.push_back( okv );
         ret = DumpReqProxyList( prb, strVal );
         if( SUCCEEDED( ret ) )
@@ -211,13 +222,43 @@ gint32 CAsyncAMCallbacks::FreeAppInstsCallback(
 gint32 CAsyncAMCallbacks::OnSvrOffline(
     IConfigDb* context,
     CAppManager_CliImpl* pIf )
-{ return 0; }
-
-gint32 StartAppManCli( CRpcRouter* prt )
 {
-    InterfPtr pIf( prt );
+    g_bExit = true;
+    return 0;
+}
+
+}
+
+gint32 StartAppManCli( CRpcServices* pSvc )
+{
     gint32 ret = 0;
+    if( pSvc == nullptr )
+        return -EINVAL;
+
     do{
+        CRpcRouterManager* prtm = ObjPtr( pSvc );
+        std::vector< InterfPtr > vecRouters;
+        prtm->GetRouters( vecRouters );
+        if( vecRouters.empty() )
+            break;
+
+        InterfPtr pIf;
+        CRpcRouterBridge* prt = nullptr;
+        for( auto& elem : vecRouters )
+        {
+            prt = elem;
+            if( prt != nullptr )
+            {
+                pIf = elem;
+                break;
+            }
+        }
+        if( prt == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
         InterfPtr pAppMan;
         CParamList oParams;
         oParams.SetPointer( propIfPtr, prt );
@@ -265,16 +306,24 @@ gint32 StopAppManCli()
             ( IEventSink* )pTask );
         std::vector< stdstr > vecApps;
         vecApps.push_back( RTAPPNAME );
-        ret = pamc->FreeAppInsts(
-            oParams.GetCfg(), vecApps );
-        if( ret == STATUS_PENDING )
+
+        PACBS pCbs;
+        CfgPtr pContext;
+        ret = pamc->GetAsyncCallbacks(
+            pCbs, pContext );
+        if( SUCCEEDED( ret ) )
         {
-            CSyncCallback* pSync = pTask;
-            pSync->WaitForComplete();
-            ret = pSync->GetError();
-            if( ERROR( ret ) )
-                OutputMsg( ret,
-                "Error FreeAppInsts" );
+            ret = pamc->FreeAppInsts(
+                oParams.GetCfg(), vecApps );
+            if( ret == STATUS_PENDING )
+            {
+                CSyncCallback* pSync = pTask;
+                pSync->WaitForComplete();
+                ret = pSync->GetError();
+                if( ERROR( ret ) )
+                    OutputMsg( ret,
+                    "Error FreeAppInsts" );
+            }
         }
     }
     ret = DestroyAppManagercli(
@@ -283,4 +332,3 @@ gint32 StopAppManCli()
     return ret;
 }
 
-}

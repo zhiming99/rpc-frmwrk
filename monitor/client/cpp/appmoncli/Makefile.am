@@ -4,18 +4,18 @@ mon_dir=$(top_srcdir)/monitor
 top_dir=$(top_srcdir)
 
 lib_LTLIBRARIES=libappmoncli.la
-libappmoncli_la_SOURCES= maincli.cpp AppMonitorcli.cpp appmon.cpp appmonstruct.cpp IAppStorecli.cpp IAppMonitorcli.cpp
+libappmoncli_la_SOURCES= maincli.cpp AppMonitorcli.cpp appmon.cpp appmonstruct.cpp IAppStorecli.cpp IAppMonitorcli.cpp AppMonitorcli.h 
 libappmoncli_la_CPPFLAGS= -I. -I$(mon_dir)/registry -I$(mon_dir)/appmon -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO)
 
 EXTRA_DIST=
 
-libappmoncli_la_HEADERS=AppMonitorcli.h IAppMonitorcli.h IAppStorecli.h
+libappmoncli_la_HEADERS=
 libappmoncli_ladir=$(includedir)/rpcf/moncli
 
 libappmoncli_la_LIBADD= $(mon_dir)/registry/libregfs.la $(top_srcdir)/ipc/libipc.la $(top_srcdir)/combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L$(top_srcdir)/3rd_party
 libappmoncli_la_LDFLAGS= -rdynamic -version-info @VERSION2@
 
-headers=$(libappmoncli_la_HEADERS) appmon.h appmonstruct.h
+headers=$(libappmoncli_la_HEADERS) appmon.h appmonstruct.h IAppMonitorcli.h IAppStorecli.h
 sources=$(libappmoncli_la_SOURCES) AppMonitorcli.cpp maincli.cpp
 
 $(sources):$(headers)

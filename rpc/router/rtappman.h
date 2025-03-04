@@ -41,11 +41,6 @@
 
 namespace rpcf
 {
-gint32 CreateAppManSync(
-    CIoManager* pMgr,
-    IConfigDb* pCfg,
-    InterfPtr& pAppMan );
-
 struct CAsyncAMCallbacks : public IAsyncAMCallbacks
 {
     InterfPtr m_pRtBdge;

@@ -1692,7 +1692,8 @@ class CStatCountersProxySkel:
         if( ERROR( ret ) )
             return ret;
 
-        return super::OnPreStart( pCallback );
+        return this->RegisterFilter( m_pMsgFilter );
+        //return super::OnPreStart( pCallback );
     }
 
     gint32 OnPostStop(

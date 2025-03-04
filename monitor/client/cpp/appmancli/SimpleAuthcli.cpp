@@ -10,7 +10,7 @@ using namespace rpcf;
 #include "SimpleAuthcli.h"
 #include "AppManagercli.h"
 
-ObjPtr g_pSAcli;
+InterfPtr g_pSAcli;
 stdrmutex g_oSALock;
 gint32 GetSimpleAuthcli( InterfPtr& pCli )
 {
@@ -69,7 +69,11 @@ gint32 DestroySimpleAuthcli(
             OutputMsg( ret,
                 "Error stop CSimpleAuth_CliImpl" );
         }
+        if( SUCCEEDED( ret ) )
+            ret = STATUS_PENDING;
     }while( 0 );
+    if( ret != STATUS_PENDING )
+        g_pSAcli.Clear();
     return ret;
 }
 gint32 CreateSimpleAuthcli( CIoManager* pMgr,
@@ -134,7 +138,7 @@ gint32 CreateSimpleAuthcli( CIoManager* pMgr,
             clsid( CSimpleAuth_CliImpl )>(
             pMgr, pStartCb, pCfg,
             "./appmondesc.json", "SimpleAuth",
-            false );
+            g_pSAcli, false );
 
         if( ERROR( ret ) )
             ( *pStartCb )( eventCancelTask );
