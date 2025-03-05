@@ -3257,7 +3257,7 @@ namespace rpcf
 
 // _pos is the position for the callback 'pCallback', which must be present in the
 // ARGS, otherwise the macro does not compile.
-#define ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( _pos, _MethodName, rettype, PARAMS, ARGS ) \
+#define ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( _pos, _nofail, _MethodName, rettype, PARAMS, ARGS ) \
     private: \
     DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
     gint32 AsyncInterf##_MethodName( NumberSequence<>  ) \
@@ -3295,6 +3295,8 @@ namespace rpcf
         oParams[ propIfPtr ] = ObjPtr( this );\
         gint32 ret = pTaskGrp.NewObj(\
             clsid( CIfTaskGroup ),oParams.GetCfg() );\
+        if( _nofail ) \
+            pTaskGrp->SetRelation( logicNONE );\
         _vec.push_back( []( ThisType* p, PARAMS ){ return p->virtbase::_MethodName( ARGS ); } ); \
         if( ERROR( ret ) ) \
             return ret; \
@@ -3347,7 +3349,7 @@ struct CAggregatedServer
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPostStart, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, false, OnPostStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
@@ -3359,7 +3361,7 @@ struct CAggregatedServer
     ITERATE_IF_VIRT_METHODS_IMPL( AddStopTasks, gint32,
         VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
 
-    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPreStop, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, true, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32,
@@ -3514,7 +3516,7 @@ struct CAggregatedProxy
     ITERATE_IF_VIRT_METHODS_IMPL( OnPreStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPostStart, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, false, OnPostStart, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     ITERATE_IF_VIRT_METHODS_IMPL( OnPostStop, gint32,
@@ -3523,7 +3525,7 @@ struct CAggregatedProxy
     ITERATE_IF_VIRT_METHODS_IMPL( AddStartTasks, gint32,
         VA_LIST( IEventSink* pTaskGrp ), VA_LIST( pTaskGrp ) )
 
-    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, OnPreStop, gint32,
+    ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, true, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
     ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32,

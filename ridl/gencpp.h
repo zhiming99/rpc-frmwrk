@@ -749,6 +749,8 @@ class CImplMainFunc :
         ObjPtr& pNode,
         bool bProxy );
     gint32 Output();
+    static gint32 EmitDeclIoMgr(
+        bool bProxy, CCppWriter* pWriter );
     static gint32 EmitInitContext(
         bool bProxy, CCppWriter* pWriter );
     static gint32 EmitInitRouter(

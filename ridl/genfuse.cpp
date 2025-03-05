@@ -4005,11 +4005,7 @@ gint32 CImplMainFuncFuse::Output()
             }
 
             NEW_LINES( 1 );
-            if( g_bMklib )
-                Wa( "extern ObjPtr g_pIoMgr;" );
-            else
-                Wa( "ObjPtr g_pIoMgr;" );
-            NEW_LINE;
+            EmitDeclIoMgr( bProxy, m_pWriter );
 
             ObjPtr pRoot( m_pNode );
             CImplClassFactory oicf(
@@ -4032,4 +4028,19 @@ gint32 CImplMainFuncFuse::Output()
     }while( 0 );
 
     return ret;
+}
+
+gint32 CImplMainFuncFuse::EmitDeclIoMgr(
+    bool bProxy, CCppWriter* m_pWriter )
+
+{
+    do{
+        if( g_bMklib )
+            Wa( "extern ObjPtr g_pIoMgr;" );
+        else
+        {
+            Wa( "ObjPtr g_pIoMgr;" );
+        }
+    }while( 0 );
+    return 0;
 }

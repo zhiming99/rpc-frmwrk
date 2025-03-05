@@ -38,8 +38,6 @@ using namespace rpcf;
 #include "AppManagercli.h"
 #include "rtappman.h"
 
-extern std::atomic< bool > g_bExit;
-
 namespace rpcf
 {
 
@@ -223,13 +221,15 @@ gint32 CAsyncAMCallbacks::OnSvrOffline(
     IConfigDb* context,
     CAppManager_CliImpl* pIf )
 {
-    g_bExit = true;
+    kill( getpid(), SIGINT );
     return 0;
 }
 
 }
 
-gint32 StartAppManCli( CRpcServices* pSvc )
+gint32 StartAppManCli(
+    CRpcServices* pSvc,
+    InterfPtr& pAppMan )
 {
     gint32 ret = 0;
     if( pSvc == nullptr )

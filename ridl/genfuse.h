@@ -228,6 +228,8 @@ class CImplMainFuncFuse :
         ObjPtr& pNode,
         bool bProxy );
     virtual gint32 Output();
+    static gint32 EmitDeclIoMgr(
+        bool bProxy, CCppWriter* pWriter );
     inline static gint32 EmitInitContext(
         bool bProxy, CCppWriter* pWriter )
     { 

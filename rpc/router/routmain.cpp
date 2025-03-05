@@ -68,7 +68,7 @@ std::set< guint32 > g_setMsgIds;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
 
 extern gint32 StartAppManCli(
-    CRpcServices* prt );
+    CRpcServices* prt, InterfPtr& pAppMan );
 extern gint32 StopAppManCli();
 
 void SignalHandler( int signum )
@@ -332,9 +332,10 @@ void CIfRouterTest::testSvrStartStop()
             "Starting %s as %s...", MODULE_NAME,
             ( g_dwRole & 0x2 ) ? "bridge" : "reqfwdr" );
 
+        InterfPtr pAppMan;
         if( g_bMonitoring )
         {
-            ret = StartAppManCli( pIf );
+            ret = StartAppManCli( pIf, pAppMan );
             if( ERROR( ret ) )
                 break;
         }
@@ -342,13 +343,15 @@ void CIfRouterTest::testSvrStartStop()
         CInterfaceServer* pSvr = pIf;
         if( g_strMPoint.empty() )
         {
-            signal( SIGINT, SignalHandler );
+            auto oldh = signal(
+                SIGINT, SignalHandler );
             while( pSvr->IsConnected() )
             {
                 sleep( 1 );
                 if( g_bExit )
                     break;
             }
+            signal( SIGINT, oldh );
         }
 #ifdef FUSE3
         else

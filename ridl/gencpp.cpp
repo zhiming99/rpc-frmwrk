@@ -6854,6 +6854,38 @@ CImplMainFunc::CImplMainFunc(
     m_bProxy = bProxy;
 }
 
+gint32 CImplMainFunc::EmitDeclIoMgr(
+    bool bProxy, CCppWriter* m_pWriter )
+{
+    do{
+        if( g_bMklib )
+            Wa( "extern ObjPtr g_pIoMgr;" );
+        else
+        {
+            Wa( "ObjPtr g_pIoMgr;" );
+#ifdef FUSE3
+            // NOTE: although the proxy program
+            // does not need g_setMsgIds, but it
+            // links with libfuseif.so which
+            // requires g_setMsgIds. It is strange
+            // that gcc 12 can successfully link
+            // without g_setMsgIds for the client
+            // program, but gcc 13 fails.
+            if( g_bBuiltinRt )
+                Wa( "std::set< guint32 > g_setMsgIds;" );
+#endif
+            if( bProxy )
+                break;
+            Wa( "#include <signal.h>" );
+            Wa( "#include <stdlib.h>" );
+            Wa( "std::atomic< bool > g_bExit( false );" );
+            Wa( "void SignalHandler( int signum )" );
+            Wa( "{ g_bExit = true; }" );
+        }
+    }while( 0 );
+    return 0;
+}
+
 gint32 CImplMainFunc::EmitInitRouter(
     bool bProxy, CCppWriter* m_pWriter )
 {
@@ -7349,9 +7381,9 @@ void CImplMainFunc::EmitKProxyLoop(
 {
     Wa( "#include <signal.h>" );
     Wa( "#include <stdlib.h>" );
-    Wa( "std::atomic< bool > s_bExit( false );" );
+    Wa( "std::atomic< bool > g_bExit( false );" );
     Wa( "void SignalHandler( int signum )" );
-    Wa( "{ s_bExit = true; }" );
+    Wa( "{ g_bExit = true; }" );
     NEW_LINE;
 
     Wa( "int KProxyLoop()" );
@@ -7365,7 +7397,7 @@ void CImplMainFunc::EmitKProxyLoop(
     BLOCK_CLOSE;
     NEW_LINE;
     Wa( "signal( SIGINT, SignalHandler );" );
-    Wa( "while( !s_bExit )" );
+    Wa( "while( !g_bExit )" );
     Wa( "    sleep( 3 );" );
     Wa( "printf( \"\\n\" );" );
     CCOUT << "return 0;";
@@ -8350,6 +8382,8 @@ gint32 CImplMainFunc::EmitNormalMainContent(
 
 #define EMIT_CHECK_AND_SLEEP( _bComment ) \
 do{ \
+    Wa( "auto iOldSig = " );\
+    Wa( "    signal( SIGINT, SignalHandler );" ); \
     if( vecSvcs.size() == 1 ) \
     { \
         if( _bComment ) \
@@ -8357,7 +8391,7 @@ do{ \
             Wa( "// replace 'sleep' with your code for" ); \
             Wa( "// advanced control" ); \
         } \
-        CCOUT << "while( pIf->IsConnected() )"; \
+        CCOUT << "while( pIf->IsConnected() && !g_bExit )"; \
         INDENT_UPL; \
         CCOUT << "sleep( 1 );"; \
         INDENT_DOWNL; \
@@ -8370,7 +8404,7 @@ do{ \
             Wa( "// replace 'sleep' with your code for" ); \
             Wa( "// advanced control" ); \
         } \
-        Wa( "while( true )" ); \
+        Wa( "while( !g_bExit )" ); \
         BLOCK_OPEN; \
         for( size_t i = 0; i < vecSvcs.size(); i++ ) \
         { \
@@ -8386,6 +8420,8 @@ do{ \
         NEW_LINE; \
         CCOUT << "ret = STATUS_SUCCESS;"; \
     } \
+    NEW_LINE;\
+    CCOUT << "signal( SIGINT, iOldSig );";\
 }while( 0 )
 
 gint32 CImplMainFunc::EmitUserMainContent(
@@ -8513,24 +8549,8 @@ gint32 CImplMainFunc::Output()
                     break;
             }
 
-            NEW_LINES( 1 );
-            if( g_bMklib )
-                Wa( "extern ObjPtr g_pIoMgr;" );
-            else
-            {
-                Wa( "ObjPtr g_pIoMgr;" );
-#ifdef FUSE3
-                // NOTE: although the proxy program
-                // does not need g_setMsgIds, but it
-                // links with libfuseif.so which
-                // requires g_setMsgIds. It is strange
-                // that gcc 12 can successfully link
-                // without g_setMsgIds for the client
-                // program, but gcc 13 fails.
-                if( g_bBuiltinRt )
-                    Wa( "std::set< guint32 > g_setMsgIds;" );
-#endif
-            }
+            NEW_LINE;
+            EmitDeclIoMgr( bProxy, m_pWriter );
             NEW_LINE;
 
             ObjPtr pRoot( m_pNode );
