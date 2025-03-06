@@ -364,6 +364,15 @@ void CIfRouterTest::testSvrStartStop()
 
     }while( 0 );
 
+    if( g_dwRole & 0x2 )
+    {
+        LOGINFO( m_pMgr, ret, "bridge is stopping" );
+    }
+    else
+    {
+        LOGINFO( m_pMgr, ret, "reqfwdr is stopping" );
+    }
+
     if( g_bMonitoring )
         StopAppManCli();
 
