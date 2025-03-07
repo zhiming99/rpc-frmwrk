@@ -34,3 +34,6 @@
 #define VALUE_FILE          "value"
 #define USER_ROOT_DIR       "users"
 #define LOAD_ON_START       "load_on_start"
+#define DATA_TYPE           "datatype"
+#define PID_FILE            "pid"
+

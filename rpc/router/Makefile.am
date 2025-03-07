@@ -35,7 +35,7 @@ rpcrouter_CPPFLAGS= -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO
 librtfiles_la_LTLIBRARIES=librtfiles.la
 librtfiles_la_SOURCES = rtdump.cpp rtappman.cpp rtappman.h
 librtfiles_la_LIBADD= $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la ../../rpc/librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L../../3rd_party
-librtfiles_la_CPPFLAGS= -I$(top_srcdir)/monitor/client/cpp/appmancli -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
+librtfiles_la_CPPFLAGS= -I$(top_srcdir)/monitor/client/cpp/appmancli -I$(top_srcdir)/monitor/appmon -I$(include_rpcdir) -I$(include_ipcdir) -fPIC $(OFFSET_MACRO)
 
 if ENABLE_FUSE3
 include_fusedir=$(top_srcdir)/fuse

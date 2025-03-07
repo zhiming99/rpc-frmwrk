@@ -169,7 +169,7 @@ gint32 GetInputToNotify(
     CFastRpcServerBase* pIf,
     RegFsPtr pAppReg,
     const stdstr& strPtPath,
-    std::vector< STM_POINT  > vecStms )
+    std::vector< STM_POINT  >& vecStms )
 {
     gint32 ret = 0;
     RFHANDLE hDir = INVALID_HANDLE;
@@ -199,16 +199,22 @@ gint32 GetInputToNotify(
             if( ERROR( ret ) )
                 continue;
 
-            stdstr strInPath(
-                "/" APPS_ROOT_DIR "/" );
-            strInPath += ( stdstr& )oVar;
+            std::vector< stdstr > vecComps;
+            ret = SplitPath(
+                ( stdstr& )oVar, vecComps );
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
 
             HANDLE hstm;
-            ret = GetOwnerStream(
-                pIf, pAppReg, strInPath, hstm );
+            ret = GetOwnerStream( pIf,
+                pAppReg, vecComps[ 0 ], hstm );
             if( ERROR( ret ) )
                 break;
-            vecStms.push_back( { hstm, strInPath } );
+            vecStms.push_back(
+                { hstm, ( stdstr& )oVar  } );
         }
     }while( 0 );
     return ret;
@@ -414,6 +420,7 @@ gint32 CAppManager_SvrImpl::SetPointValue(
         stdstr strPath = "/" APPS_ROOT_DIR "/";
         Variant oOrigin;
 
+        auto& pfs = m_pAppRegfs;
         std::vector< stdstr > vecComps;
         ret = SplitPath( strPtPath, vecComps );
         if( ERROR( ret ) )
@@ -426,27 +433,31 @@ gint32 CAppManager_SvrImpl::SetPointValue(
         const stdstr& strPoint = vecComps[ 1 ];
         RFHANDLE hPtDir;
 
-        ret = m_pAppRegfs->OpenDir( strPath +
+        if( !IsAppOwner( pContext, strApp ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+        ret = pfs->OpenDir( strPath +
             strApp + "/" POINTS_DIR "/" + strPoint,
             O_RDONLY, hPtDir );
         if( ERROR( ret ) )
             break;
 
-        CFileHandle oHandle(
-            m_pAppRegfs, hPtDir );
+        CFileHandle oHandle( pfs, hPtDir );
 
-        ret = m_pAppRegfs->Access(
+        ret = pfs->Access(
             hPtDir, OUTPUT_PULSE, F_OK );
         if( ERROR( ret ) )
         {
-            ret = m_pAppRegfs->GetValue( hPtDir,
+            ret = pfs->GetValue( hPtDir,
                 VALUE_FILE, oOrigin );
             if( SUCCEEDED( ret ) &&
                 oOrigin == value )
                 break;
             ret = 0;
         }
-        ret = m_pAppRegfs->SetValue(
+        ret = pfs->SetValue(
             hPtDir, VALUE_FILE, value );
         if( ERROR( ret ) )
             break;
@@ -502,6 +513,11 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
         }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
+        if( !IsAppOwner( pContext, strApp ) )
+        {
+            ret = -EACCES;
+            break;
+        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" VALUE_FILE; 
@@ -537,6 +553,12 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
         }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
+
+        if( !IsAppOwner( pContext, strApp ) )
+        {
+            ret = -EACCES;
+            break;
+        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" VALUE_FILE; 
@@ -596,6 +618,11 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
+        if( !IsAppOwner( pContext, strApp ) )
+        {
+            ret = -EACCES;
+            break;
+        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" + strAttr; 
@@ -624,6 +651,11 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
+        if( !IsAppOwner( pContext, strApp ) )
+        {
+            ret = -EACCES;
+            break;
+        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" + strAttr; 
@@ -632,20 +664,101 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
     }while( 0 );
     return ret;
 }
+
+bool CAppManager_SvrImpl::IsAppOwner(
+    IConfigDb* pContext,
+    const stdstr& strAppName )
+{
+    gint32 ret = 0;
+    do{
+        HANDLE hstm, hOwner;
+        ret = GetCurStream( this, pContext, hstm );
+        if( ERROR( ret ) )
+            break;
+        ret = GetOwnerStream( this,
+            m_pAppRegfs, strAppName, hOwner );
+        if( ERROR( ret ) )
+            break;
+
+        if( hstm != hOwner )
+        {
+            ret = -EACCES;
+            break;
+        }
+    }while( 0 );
+    if( ERROR( ret ) )
+        return false;
+    return true;
+}
+
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetPointValues( 
     IConfigDb* pContext, 
+    const std::string& strAppName /*[ In ]*/,
     std::vector<KeyValue>& arrValues /*[ In ]*/ )
 {
     gint32 ret = 0;
     do{
-        guint32 dwCount = 0;
+        auto& pfs = m_pAppRegfs;
+        if( !IsAppOwner( pContext, strAppName ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+        RFHANDLE hPtDir = INVALID_HANDLE;
+        stdstr strDir = "/" APPS_ROOT_DIR "/";
+        strDir += strAppName + "/" POINTS_DIR "/";
+
+        ret = pfs->OpenDir(
+            strDir, O_RDONLY, hPtDir );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle( pfs, hPtDir );
+
         for( auto& elem : arrValues )
         {
-            ret = SetPointValue( pContext,
-                elem.strKey, elem.oValue );
+            stdstr strPath =
+                elem.strKey + "/" VALUE_FILE;
+
+            auto iType = elem.oValue.GetTypeId();
+            if( iType < typeDMsg )
+            {
+                stdstr strPtName =
+                    strAppName + "/" + elem.strKey;
+                ret = SetPointValue( pContext,
+                    strPtName, elem.oValue );
+            }
+            else do{
+                BufPtr& pBuf = elem.oValue;
+                guint32 dwSize = pBuf->size();
+                if( dwSize > MAX_FILE_SIZE )
+                {
+                    ret = -ERANGE;
+                    break;
+                }
+                RFHANDLE hFile;
+                ret = pfs->OpenFile( hPtDir,
+                    strPath, O_WRONLY | O_TRUNC,
+                    hFile );
+                if( ERROR( ret ) )
+                    break;
+                CFileHandle ofh( pfs, hFile );
+                if( iType != typeByteArr )
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+                ret = pfs->WriteFile( hFile,
+                    pBuf->ptr(), dwSize, 0 );
+            }while( 0 );
             if( ERROR( ret ) )
-                break;
+            {
+                OutputMsg( ret,
+                    "Error SetPointValue %s/%s",
+                    strAppName.c_str(),
+                    elem.strKey.c_str() );
+            }
         }
     }while( 0 );
     return ret;
@@ -654,26 +767,101 @@ gint32 CAppManager_SvrImpl::SetPointValues(
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::GetPointValues( 
     IConfigDb* pContext, 
+    const std::string& strAppName /*[ In ]*/,
     std::vector<std::string>& arrPtPaths /*[ In ]*/, 
     std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ )
 {
     gint32 ret = 0;
     do{
+        auto& pfs = m_pAppRegfs;
+        if( !IsAppOwner( pContext, strAppName ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+        RFHANDLE hPtDir = INVALID_HANDLE;
+        stdstr strDir = "/" APPS_ROOT_DIR "/";
+        strDir += strAppName + "/" POINTS_DIR "/";
+
+        ret = pfs->OpenDir(
+            strDir, O_RDONLY, hPtDir );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle( pfs, hPtDir );
         for( auto& elem : arrPtPaths )
         {
-            Variant rval;
-            ret = GetPointValue( pContext, elem, rval );
-            if( SUCCEEDED( ret ) )
+            stdstr strFile =
+                elem + "/" VALUE_FILE;
+
+            KeyValue kv;
+            kv.strKey = elem;
+
+            stdstr strType =
+                elem + "/" DATA_TYPE;
+            Variant dt;
+            ret = pfs->GetValue(
+                hPtDir, strType, dt );
+            if( ERROR( ret ) )
             {
-                KeyValue okv;
-                okv.strKey = elem;
-                okv.oValue = rval;
-                arrKeyVals.push_back( okv );
+                OutputMsg( ret,
+                    "Error get data type %s/%s",
+                    strAppName.c_str(),
+                    elem.c_str() );
             }
+            auto iType = ( guint32& )dt;
+            if( iType < typeDMsg )
+            {
+                ret = pfs->GetValue( hPtDir,
+                    strFile, kv.oValue );
+            }
+            else if( iType == typeByteArr )
+            do{
+                RFHANDLE hFile;
+                ret = pfs->OpenFile( hPtDir,
+                    strFile, O_RDONLY, hFile );
+                if( ERROR( ret ) )
+                    break;
+                CFileHandle ofh( pfs, hFile );
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+                BufPtr pBuf( true );
+
+                struct stat st;
+                ret = pfs->GetAttr( hFile, st );
+                if( ERROR( ret ) )
+                    break;
+                guint32 dwSize = st.st_size;
+                if( dwSize == 0 )
+                {
+                    ret = -ENODATA;
+                    break;
+                }
+                ret = pBuf->Resize( dwSize );
+                if( ERROR( ret ) )
+                    break;
+                ret = pfs->ReadFile( hFile,
+                    pBuf->ptr(), dwSize, 0 );
+                if( ERROR( ret ) )
+                    break;
+                kv.oValue = pBuf;
+            }while( 0 );
+            else
+            {
+                ret = -ENOTSUP;
+            }
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "Error SetPointValue %s/%s",
+                    strAppName.c_str(),
+                    elem.c_str() );
+            }
+            arrKeyVals.push_back( kv );
         }
+        ret = 0;
     }while( 0 );
-    if( arrKeyVals.empty() )
-        return -ENOENT;
     return ret;
 }
 
@@ -686,13 +874,14 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
 {
     gint32 ret = 0;
     bool bOwnerSet = false;
+    auto& pfs = m_pAppRegfs;
     do{
         HANDLE hstm, hOwner;
         ret = GetCurStream( this, pContext, hstm );
         if( ERROR( ret ) )
             break;
         ret = GetOwnerStream( this,
-            m_pAppRegfs, strAppName, hOwner );
+            pfs, strAppName, hOwner );
         if( ERROR( ret ) )
         {
             ret = 0;
@@ -711,7 +900,7 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
         }
 
         ret = SetOwnerStream(
-            m_pAppRegfs, strAppName, hstm );
+            pfs, strAppName, hstm );
         if( ERROR( ret ) )
             break;
 
@@ -733,52 +922,48 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
         }
         oLock.Unlock();
 
-        RFHANDLE hPtDir = INVALID_HANDLE;
-        stdstr strDir = "/" APPS_ROOT_DIR "/";
-        strDir += strAppName + "/" POINTS_DIR "/";
-
-        ret = m_pAppRegfs->OpenDir(
-            strDir, O_RDONLY, hPtDir );
+        ret = this->SetPointValues(
+            pContext, strAppName, arrPtToSet );
         if( ERROR( ret ) )
             break;
 
-        CFileHandle oHandle(
-            m_pAppRegfs, hPtDir );
+        RFHANDLE hPtsDir = INVALID_HANDLE;
+        stdstr strDir = "/" APPS_ROOT_DIR "/";
+        strDir += strAppName + "/" POINTS_DIR "/";
 
-        for( auto& elem : arrPtToSet )
-        {
-            m_pAppRegfs->SetValue( hPtDir,
-                elem.strKey + "/" VALUE_FILE, 
-                elem.oValue );
-        }
-
-        std::vector< KEYPTR_SLOT > vecks;
-        ret = m_pAppRegfs->ReadDir( hPtDir, vecks );
+        std::vector< stdstr > vecPoints;
+        ret = pfs->OpenDir(
+            strDir, O_RDONLY, hPtsDir );
         if( ERROR( ret ) )
-            break;;
+            break;
 
+        CFileHandle oHandle( pfs, hPtsDir );
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = pfs->ReadDir( hPtsDir, vecks );
+        if( ERROR( ret ) )
+            break;
         for( auto& elem : vecks )
         {
             stdstr strLoad = elem.szKey;
             strLoad += "/" LOAD_ON_START;
-            gint32 iRet = m_pAppRegfs->Access(
-                hPtDir, strLoad, F_OK );
+            gint32 iRet = pfs->Access(
+                hPtsDir, strLoad, F_OK );
             if( ERROR( iRet ) )
                 continue;
-            Variant oVar;
-            iRet = m_pAppRegfs->GetValue( hPtDir,
-                strLoad + "/" VALUE_FILE, oVar );
-            if( ERROR( iRet ) )
-                continue;
-            KeyValue kv;
-            kv.strKey = elem.szKey;
-            kv.oValue = oVar;
-            arrPtToGet.push_back( kv );
+            vecPoints.push_back(
+                stdstr( elem.szKey ) );
         }
+        if( vecPoints.empty() )
+            break;
+
+        ret = this->GetPointValues(
+            pContext, strAppName,
+            vecPoints, arrPtToGet );
+
     }while( 0 );
     if( ERROR( ret ) && bOwnerSet )
     {
-        ret = SetOwnerStream( m_pAppRegfs,
+        ret = SetOwnerStream( pfs,
             strAppName, INVALID_HANDLE );
     }
     return ret;

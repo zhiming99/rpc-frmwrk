@@ -45,10 +45,12 @@ interface IAppStore
     returns( variant rvalue );
 
     [async_s]SetPointValues(
+        string strAppName,
         array<KeyValue> arrValues ) 
     returns();
 
     [async_s]GetPointValues(
+        string strAppName,
         array< string > arrPtPaths )
     returns( array< KeyValue > arrKeyVals );
 

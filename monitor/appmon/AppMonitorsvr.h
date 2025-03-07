@@ -93,7 +93,7 @@ class CAppMonitor_SvrImpl
     gint32 RemoveListenerInternal(
         HANDLE hstm, CAccessContext* pac );
 
-    bool IsAppRegistered( HANDLE hstm,
+    bool IsAppSubscribed( HANDLE hstm,
         const stdstr& strApp ) const;
     public:
     typedef CAppMonitor_SvrBase super;
@@ -271,6 +271,7 @@ class CAppMonitor_SvrImpl
     //RPC Async Req Cancel Handler
     gint32 OnSetPointValuesCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<KeyValue>& arrValues /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
@@ -280,10 +281,12 @@ class CAppMonitor_SvrImpl
     //RPC Async Req Handler
     gint32 SetPointValues(
         IConfigDb* pReqCtx_,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<KeyValue>& arrValues /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnGetPointValuesCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<std::string>& arrPtPaths /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
@@ -293,6 +296,7 @@ class CAppMonitor_SvrImpl
     //RPC Async Req Handler
     gint32 GetPointValues(
         IConfigDb* pReqCtx_,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<std::string>& arrPtPaths /*[ In ]*/,
         std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ ) override;
 

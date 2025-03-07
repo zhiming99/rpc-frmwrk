@@ -257,6 +257,7 @@ class CAppManager_SvrImpl
     //RPC Async Req Cancel Handler
     gint32 OnSetPointValuesCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<KeyValue>& arrValues /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
@@ -266,10 +267,12 @@ class CAppManager_SvrImpl
     //RPC Async Req Handler
     gint32 SetPointValues(
         IConfigDb* pReqCtx_,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<KeyValue>& arrValues /*[ In ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnGetPointValuesCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<std::string>& arrPtPaths /*[ In ]*/ ) override
     {
         DebugPrintEx( logErr, iRet,
@@ -279,6 +282,7 @@ class CAppManager_SvrImpl
     //RPC Async Req Handler
     gint32 GetPointValues(
         IConfigDb* pReqCtx_,
+        const std::string& strAppName /*[ In ]*/,
         std::vector<std::string>& arrPtPaths /*[ In ]*/,
         std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ ) override;
     gint32 OnPointChanged(
@@ -333,6 +337,10 @@ class CAppManager_SvrImpl
         RFHANDLE hcurStm );
 
     gint32 RemoveStmSkel( HANDLE hstm ) override;
+
+    bool IsAppOwner(
+        IConfigDb* pContext,
+        const stdstr& strAppName );
 };
 
 class CAppManager_ChannelSvr

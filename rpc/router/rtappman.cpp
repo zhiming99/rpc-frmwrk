@@ -36,6 +36,7 @@
 using namespace rpcf;
 #include "routmain.h"
 #include "AppManagercli.h"
+#include "monconst.h"
 #include "rtappman.h"
 
 namespace rpcf
@@ -85,7 +86,8 @@ gint32 GetPointValuesToUpdate(
     gint32 ret = 0;
     do{
         KeyValue okv;
-        okv.strKey = RTAPPNAME "/" O_SESSION;
+        BufPtr pBuf( true );
+        okv.strKey = O_SESSION;
         okv.oValue = 0;
         veckv.push_back( okv );
         CRpcRouterBridge* prb = pRouter;
@@ -93,31 +95,58 @@ gint32 GetPointValuesToUpdate(
         stdstr strVal;
         ret = DumpSessions( prb, strVal );
         if( SUCCEEDED( ret ) )
-            veckv.back().oValue = strVal;
+        {
+            ret = pBuf->Append( strVal.c_str(),
+                strVal.size());
+            if( SUCCEEDED( ret ) )
+                veckv.back().oValue = pBuf;
+            pBuf.Clear();
+        }
 
-        okv.strKey = RTAPPNAME "/" O_BDGE_LIST;
+        pBuf.NewObj();
+        okv.strKey = O_BDGE_LIST;
         okv.oValue = 0;
         veckv.push_back( okv );
         ret = DumpBdgeList( prb, strVal );
         if( SUCCEEDED( ret ) )
-            veckv.back().oValue = strVal;
+        {
+            ret = pBuf->Append( strVal.c_str(),
+                strVal.size());
+            if( SUCCEEDED( ret ) )
+                veckv.back().oValue = pBuf;
+            pBuf.Clear();
+        }
 
-        okv.strKey = RTAPPNAME "/" O_BPROXY_LIST;
+        pBuf.NewObj();
+        okv.strKey = O_BPROXY_LIST;
         okv.oValue = 0;
         veckv.push_back( okv );
         ret = DumpBdgeProxyList( prt, strVal );
         if( SUCCEEDED( ret ) )
-            veckv.back().oValue = strVal;
+        {
+            ret = pBuf->Append( strVal.c_str(),
+                strVal.size());
+            if( SUCCEEDED( ret ) )
+                veckv.back().oValue = pBuf;
+            pBuf.Clear();
+        }
 
-        okv.strKey = RTAPPNAME "/" O_RPROXY_LIST;
+        pBuf.NewObj();
+        okv.strKey = O_RPROXY_LIST;
         okv.oValue = 0;
         veckv.push_back( okv );
         ret = DumpReqProxyList( prb, strVal );
         if( SUCCEEDED( ret ) )
-            veckv.back().oValue = strVal;
+        {
+            ret = pBuf->Append( strVal.c_str(),
+                strVal.size());
+            if( SUCCEEDED( ret ) )
+                veckv.back().oValue = pBuf;
+            pBuf.Clear();
+        }
 
         timespec ts = prt->GetStartTime();
-        okv.strKey = RTAPPNAME "/" O_UPTIME;
+        okv.strKey = O_UPTIME;
         timespec ts2;
         ret = clock_gettime( CLOCK_REALTIME, &ts2 );
         if( SUCCEEDED( ret ) )
@@ -130,10 +159,9 @@ gint32 GetPointValuesToUpdate(
         
         guint32 dwObjs = ( guint32 )
             CObjBase::GetActCount();
-        okv.strKey = RTAPPNAME "/" O_OBJ_COUNT;
+        okv.strKey = O_OBJ_COUNT;
         okv.oValue = dwObjs;
         veckv.push_back( okv );
-
 
     }while( 0 );
     return ret;
@@ -170,7 +198,7 @@ gint32 CAsyncAMCallbacks::OnPointChanged(
         CCfgOpener oCfg;
         oCfg.SetPointer( propIfPtr, pamc );
         ret = pamc->SetPointValues(
-            oCfg.GetCfg(), veckv );
+            oCfg.GetCfg(), RTAPPNAME, veckv );
         if( ret == STATUS_PENDING )
             ret = 0;
     }while( 0 );
@@ -221,7 +249,6 @@ gint32 CAsyncAMCallbacks::OnSvrOffline(
     IConfigDb* context,
     CAppManager_CliImpl* pIf )
 {
-    kill( getpid(), SIGINT );
     return 0;
 }
 
@@ -267,6 +294,9 @@ gint32 StartAppManCli(
         if( ERROR( ret ) )
             break;
         PACBS pacbs( new CAsyncAMCallbacks );
+        auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
+        pcacbs->SetRouterBridge( pIf );
+
         CParamList oParams2;
         oParams2.SetPointer( propIfPtr, prt );
         CAppManager_CliImpl* pamc = pAppMan;
@@ -282,6 +312,12 @@ gint32 StartAppManCli(
                 "Error getting point values" );
             break;
         }
+
+        KeyValue okv;
+        okv.strKey = PID_FILE;
+        okv.oValue = ( guint32 )getpid();
+        veckv.push_back( okv );
+
         ret = pamc->ClaimAppInst(
             oParams2.GetCfg(),
             RTAPPNAME, veckv, rveckv );

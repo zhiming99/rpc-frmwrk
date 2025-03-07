@@ -270,7 +270,7 @@ gint32 CAppMonitor_SvrImpl::ListAttributes(
     return ret;
 }
 
-bool CAppMonitor_SvrImpl::IsAppRegistered(
+bool CAppMonitor_SvrImpl::IsAppSubscribed(
     HANDLE hstm, const stdstr& strApp ) const
 {
     bool ret = false;
@@ -313,7 +313,7 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
-        if( !IsAppRegistered( hcurStm, strApp ) )
+        if( !IsAppSubscribed( hcurStm, strApp ) )
             break;
 
         RFHANDLE hPtDir;
@@ -463,6 +463,7 @@ gint32 CAppMonitor_SvrImpl::GetAttrValue(
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::SetPointValues( 
     IConfigDb* pContext, 
+    const std::string& strAppName /*[ In ]*/,
     std::vector<KeyValue>& arrValues /*[ In ]*/ )
 {
     gint32 ret = 0;
@@ -482,6 +483,7 @@ gint32 CAppMonitor_SvrImpl::SetPointValues(
 /* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::GetPointValues( 
     IConfigDb* pContext, 
+    const std::string& strAppName /*[ In ]*/,
     std::vector<std::string>& arrPtPaths /*[ In ]*/, 
     std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ )
 {

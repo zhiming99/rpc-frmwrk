@@ -1776,6 +1776,12 @@ class CRegistryFs :
         stdstr* pstrNormPath = nullptr,
         CAccessContext* pac = nullptr );
 
+    gint32 GetParentDir(
+        RFHANDLE hDir,
+        const stdstr& strPath, FImgSPtr& pDir,
+        stdstr* pstrNormPath = nullptr,
+        CAccessContext* pac = nullptr );
+
     gint32 OnEvent( EnumEventId iEvent,
         LONGWORD dwParam1,
         LONGWORD dwParam2,
@@ -1854,6 +1860,9 @@ class CRegistryFs :
 
     gint32 GetAttr( RFHANDLE hFile,
         struct stat& stBuf );
+
+    gint32 GetPathFromHandle(
+        RFHANDLE hFile, stdstr& strPath );
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

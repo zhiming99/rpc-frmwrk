@@ -1732,7 +1732,7 @@ gint32 CBPlusNode::RemoveFile(
                 }
 
                 {
-                    // READ_LOCK( pFile );
+                    READ_LOCK( pFile );
                     CStdRMutex oLock(
                         pFile->GetExclLock() );
                     if( pFile->GetOpenCount() )
@@ -2331,8 +2331,11 @@ gint32 CDirImage::RemoveFile(
         ret = RemoveFileNoFree( szKey, pFile );
         if( ERROR( ret ) )
             break;
-        ret = pFile->FreeBlocks();
         UpdateMtime();
+
+        WRITE_LOCK( pFile );
+        if( pFile->GetOpenCount() == 0 )
+            ret = pFile->FreeBlocksNoLock();
 
     }while( 0 );
     return ret;
