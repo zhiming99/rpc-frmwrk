@@ -60,6 +60,7 @@ static bool g_bLogging = false;
 static bool g_bLocal = false;
 static bool g_bMonitoring = false;
 std::atomic< bool > g_bExit={false};
+std::atomic< bool > g_bMonOff ={false};
 
 // the following two globals must be present for
 // libfuseif.so
@@ -72,7 +73,12 @@ extern gint32 StartAppManCli(
 extern gint32 StopAppManCli();
 
 void SignalHandler( int signum )
-{ g_bExit = true; }
+{
+    if( signum == SIGINT )
+        g_bExit = true;
+    else if( signum == SIGUSR1 )
+        g_bMonOff = true;
+}
 
 void CIfRouterTest::setUp()
 {
@@ -337,7 +343,11 @@ void CIfRouterTest::testSvrStartStop()
         {
             ret = StartAppManCli( pIf, pAppMan );
             if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "Error unable to "
+                    "connect to monitor server" );
                 break;
+            }
         }
 
         CInterfaceServer* pSvr = pIf;
@@ -345,22 +355,27 @@ void CIfRouterTest::testSvrStartStop()
         {
             auto oldh = signal(
                 SIGINT, SignalHandler );
+            auto oldh2 = signal(
+                SIGUSR1, SignalHandler );
             while( pSvr->IsConnected() )
             {
                 sleep( 1 );
                 if( g_bExit )
                     break;
+                if( g_bMonOff )
+                    break;
             }
             signal( SIGINT, oldh );
+            signal( SIGUSR1, oldh2 );
         }
-#ifdef FUSE3
         else
         {
+#ifdef FUSE3
            ret = MountAndLoop( pSvr );
-        }
 #else
-        ret = -ENOTSUP;
+           ret = -ENOTSUP;
 #endif
+        }
 
     }while( 0 );
 

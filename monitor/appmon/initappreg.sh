@@ -105,7 +105,8 @@ add_point rpcrouter1 max_bps  setpoint i
 add_point rpcrouter1 obj_count  output i
 add_point rpcrouter1 pending_tasks  output i
 add_point rpcrouter1 restart input i
-add_point rpcrouter1 cmdline setpoint s 
+add_point rpcrouter1 cmdline setpoint blob
+set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -agor 2')"
 add_point rpcrouter1 pid output i 
 
 add_point rpcrouter1 uptime output i

@@ -368,7 +368,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
         gint32 iRet = 0;
         if( dwType == ptOutput )
         do{
-            // notify the input app
+            // notify the app of the input point
             std::vector< STM_POINT > vecStms;
             iRet = GetInputToNotify( this,
                 m_pAppRegfs, strPath, vecStms );
@@ -386,8 +386,8 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
                     elem.second, value );
             }
         }while( 0 );
-        else do{
-            // notify the owner app
+        do{
+            // notify the owner app of the point
             HANDLE hstm = INVALID_HANDLE;
             iRet = GetOwnerStream(
                 this, m_pAppRegfs, strApp, hstm );
@@ -718,9 +718,6 @@ gint32 CAppManager_SvrImpl::SetPointValues(
 
         for( auto& elem : arrValues )
         {
-            stdstr strPath =
-                elem.strKey + "/" VALUE_FILE;
-
             auto iType = elem.oValue.GetTypeId();
             if( iType < typeDMsg )
             {
@@ -729,7 +726,8 @@ gint32 CAppManager_SvrImpl::SetPointValues(
                 ret = SetPointValue( pContext,
                     strPtName, elem.oValue );
             }
-            else do{
+            else if( iType == typeByteArr )
+            do{
                 BufPtr& pBuf = elem.oValue;
                 guint32 dwSize = pBuf->size();
                 if( dwSize > MAX_FILE_SIZE )
@@ -737,6 +735,10 @@ gint32 CAppManager_SvrImpl::SetPointValues(
                     ret = -ERANGE;
                     break;
                 }
+
+                stdstr strPath =
+                    elem.strKey + "/" VALUE_FILE;
+
                 RFHANDLE hFile;
                 ret = pfs->OpenFile( hPtDir,
                     strPath, O_WRONLY | O_TRUNC,
@@ -752,6 +754,10 @@ gint32 CAppManager_SvrImpl::SetPointValues(
                 ret = pfs->WriteFile( hFile,
                     pBuf->ptr(), dwSize, 0 );
             }while( 0 );
+            else
+            {
+                ret = -ENOTSUP;
+            }
             if( ERROR( ret ) )
             {
                 OutputMsg( ret,

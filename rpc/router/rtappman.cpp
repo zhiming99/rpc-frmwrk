@@ -196,7 +196,7 @@ gint32 CAsyncAMCallbacks::OnPointChanged(
 
         CAppManager_CliImpl* pamc = pIf;
         CCfgOpener oCfg;
-        oCfg.SetPointer( propIfPtr, pamc );
+        oCfg.SetPointer( propRouterPtr, pamc );
         ret = pamc->SetPointValues(
             oCfg.GetCfg(), RTAPPNAME, veckv );
         if( ret == STATUS_PENDING )
@@ -249,6 +249,7 @@ gint32 CAsyncAMCallbacks::OnSvrOffline(
     IConfigDb* context,
     CAppManager_CliImpl* pIf )
 {
+    kill( getpid(), SIGUSR1 );
     return 0;
 }
 
@@ -288,7 +289,7 @@ gint32 StartAppManCli(
 
         InterfPtr pAppMan;
         CParamList oParams;
-        oParams.SetPointer( propIfPtr, prt );
+        oParams.SetPointer( propRouterPtr, prt );
         ret = CreateAppManSync( prt->GetIoMgr(),
             oParams.GetCfg(), pAppMan );
         if( ERROR( ret ) )
@@ -298,10 +299,10 @@ gint32 StartAppManCli(
         pcacbs->SetRouterBridge( pIf );
 
         CParamList oParams2;
-        oParams2.SetPointer( propIfPtr, prt );
+        oParams2.SetPointer( propRouterPtr, prt );
         CAppManager_CliImpl* pamc = pAppMan;
         pamc->SetAsyncCallbacks(
-            pacbs, oParams2.GetCfg() );
+            pacbs, oParams.GetCfg() );
 
         std::vector< KeyValue > veckv;
         std::vector< KeyValue > rveckv;
@@ -362,9 +363,9 @@ gint32 StopAppManCli()
             }
         }
     }
+    pamc->ClearCallbacks();
     ret = DestroyAppManagercli(
         pamc->GetIoMgr(), nullptr );
-    pamc->ClearCallbacks();
     return ret;
 }
 
