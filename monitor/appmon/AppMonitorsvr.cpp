@@ -21,7 +21,7 @@ extern gint32 GetMonitorToNotify(
     CFastRpcServerBase* pIf,
     RegFsPtr pAppReg,
     const stdstr& strAppName,
-    std::vector< HANDLE > vecStms );
+    std::vector< HANDLE >& vecStms );
 
 extern gint32 GetCurStream(
     CFastRpcServerBase* pIf,
@@ -872,6 +872,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
                 continue;
             }
             vecValidApps.push_back( *itr1 );
+            itr1++;
         }
 
         stdstr strStmFile = std::to_string( hstm );
@@ -880,7 +881,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
             stdstr strAppPath =
                 strPath + "/" + elem;
             stdstr strStmPath = strAppPath + "/" 
-                MONITOR_STREAM_DIR + "/" +
+                MONITOR_STREAM_DIR "/" +
                 strStmFile;
             guint32 dwUid = 0, dwGid = 0;
             ret = m_pAppRegfs->GetUid(
@@ -893,7 +894,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
                 continue;
             HANDLE hFile = INVALID_HANDLE;
             ret = m_pAppRegfs->CreateFile(
-                strStmFile, 0640, O_RDWR,
+                strStmPath, 0640, O_RDWR,
                 hFile );
             if( ERROR( ret ) )
                 continue;

@@ -56,7 +56,7 @@ gint32 GetMonitorToNotify(
     CFastRpcServerBase* pIf,
     RegFsPtr pAppReg,
     const stdstr& strAppName,
-    std::vector< HANDLE > vecStms )
+    std::vector< HANDLE >& vecStms )
 {
     gint32 ret = 0;
     RFHANDLE hDir = INVALID_HANDLE;

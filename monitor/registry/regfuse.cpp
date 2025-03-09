@@ -22,6 +22,7 @@
  *
  * =====================================================================================
  */
+
 #define FUSE_USE_VERSION FUSE_VERSION
 #if BUILD_64 == 0
 #define _FILE_OFFSET_BITS 64
@@ -68,6 +69,8 @@ static bool g_bLocal = false;
 
 
 static void Usage( const char* szName );
+
+#ifdef FUSE3
 static void *regfs_init(struct fuse_conn_info *conn,
 		      struct fuse_config *cfg)
 {
@@ -621,6 +624,7 @@ static const struct fuse_operations regfs_oper = {
 	.create 	= regfs_create,
 	.utimens 	= regfs_utimens,
 };
+#endif
 
 gint32 InitContext()
 {
@@ -714,6 +718,7 @@ int _main( int argc, char** argv)
         }
         else
         {
+#ifdef FUSE3
             ret = g_pRegfs->Start();
             if( SUCCEEDED( ret ) )
             {
@@ -722,6 +727,7 @@ int _main( int argc, char** argv)
                     ( CRegistryFs* )g_pRegfs );
                 g_pRegfs->Stop();
             }
+#endif
         }
         if( ret > 0 )
             ret = -ret;
