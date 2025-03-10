@@ -961,11 +961,11 @@ gint32 CAppMonitor_SvrImpl::RemoveListenerInternal(
                 MONITOR_STREAM_DIR + "/" +
                 strStmFile;
             ret = m_pAppRegfs->RemoveFile(
-                strStmFile, pac );
+                strStmPath, pac );
             if( ERROR( ret ) )
                 DebugPrint( ret, "Error, filed to "
                     "remove listener %s",
-                    strStmFile );
+                    strStmFile.c_str() );
         }
     }while( 0 );
     return ret;
