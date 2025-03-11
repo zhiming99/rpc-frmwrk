@@ -5,7 +5,7 @@ top_dir=$(top_srcdir)
 
 lib_LTLIBRARIES=libappmancli.la
 libappmancli_la_SOURCES= maincli.cpp AppManagercli.cpp SimpleAuthcli.cpp appmon.cpp appmonstruct.cpp IAppStorecli.cpp IDataProducercli.cpp IUserManagercli.cpp AppManagercli.h SimpleAuthcli.h
-libappmancli_la_CPPFLAGS= -I. -I$(mon_dir)/registry -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO) 
+libappmancli_la_CPPFLAGS= -I. -I$(mon_dir)/appmon -I$(mon_dir)/registry -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO) 
 
 EXTRA_DIST=
 

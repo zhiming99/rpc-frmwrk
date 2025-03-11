@@ -20,6 +20,16 @@ gint32 DestroyAppManagercli(
 using PTCHGCB=void* (*)( IConfigDb* pContext,
     const std::string& strPtPath, const Variant& oVar );
 
+struct IAsyncAMCallbacks;
+using PACBS=std::shared_ptr<IAsyncAMCallbacks>;
+
+gint32 StartStdAppManCli( CRpcServices* pSvc,
+    const std::string& strAppInst,
+    InterfPtr& pAppMan,
+    PACBS& pacbsIn );
+
+gint32 StopStdAppManCli();
+
 template< typename ToCreate, EnumClsid iClsid >
 gint32 AsyncCreateIf( CIoManager* pMgr,
     IEventSink* pCallback, IConfigDb* pCfg,
@@ -171,6 +181,20 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
 class CAppManager_CliImpl;
 struct IAsyncAMCallbacks
 {
+    InterfPtr m_pIf;
+    inline void SetInterface( InterfPtr& pIf )
+    { m_pIf = pIf; }
+
+    virtual gint32 GetPointValuesToUpdate(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv )
+    { return 0; } 
+
+    virtual gint32 SetInitPointValues(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv )
+    { return 0; } 
+
     // RPC Async Req Callback
     virtual gint32 ListAppsCallback(
         IConfigDb* context, 
@@ -266,7 +290,47 @@ struct IAsyncAMCallbacks
     { return 0; }
 };
 
-using PACBS=std::shared_ptr<IAsyncAMCallbacks>;
+struct CAsyncStdAMCallbacks : public IAsyncAMCallbacks
+{
+    gint32 GetPointValuesToUpdate(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override
+    { return 0; }
+
+    // RPC Async Req Callback
+    gint32 SetPointValuesCallback(
+        IConfigDb* context, 
+        gint32 iRet ) override
+    { return 0; }
+
+    // RPC Async Req Callback
+    gint32 GetPointValueCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        const Variant& rvalue /*[ In ]*/ )  override
+    { return 0; }
+
+    //RPC event handler 'OnPointChanged'
+    gint32 OnPointChanged(
+        IConfigDb* context, 
+        const std::string& strPtPath /*[ In ]*/,
+        const Variant& value /*[ In ]*/ ) override;
+
+    // RPC Async Req Callback
+    gint32 ClaimAppInstCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        std::vector<KeyValue>& arrPtToGet /*[ In ]*/ ) override;
+
+    // RPC Async Req Callback
+    gint32 FreeAppInstsCallback(
+        IConfigDb* context, 
+        gint32 iRet ) override;
+
+    gint32 OnSvrOffline(
+        IConfigDb* context,
+        CAppManager_CliImpl* pIf ) override;
+};
 
 DECLARE_AGGREGATED_SKEL_PROXY(
     CAppManager_CliSkel,

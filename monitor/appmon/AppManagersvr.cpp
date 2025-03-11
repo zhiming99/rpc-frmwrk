@@ -403,7 +403,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
                 break;
             CAppManager_SvrSkel* pSkel = ptrSkel;
             pSkel->IIAppStore_SImpl::OnPointChanged(
-                strPath, value );
+                strPtPath, value );
         }while( 0 );
     }while( 0 );
     return ret;

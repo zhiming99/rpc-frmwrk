@@ -39,47 +39,10 @@
 #define I_RESTART   "restart"
 #define O_UPTIME   "uptime"
 
-namespace rpcf
+struct CAsyncAMCallbacks : public CAsyncStdAMCallbacks
 {
-struct CAsyncAMCallbacks : public IAsyncAMCallbacks
-{
-    InterfPtr m_pRtBdge;
-    inline void SetRouterBridge( InterfPtr& pRtBdge )
-    { m_pRtBdge = pRtBdge; }
-
-    // RPC Async Req Callback
-    gint32 SetPointValuesCallback(
-        IConfigDb* context, 
-        gint32 iRet ) override
-    { return 0; }
-
-    // RPC Async Req Callback
-    gint32 GetPointValueCallback(
-        IConfigDb* context, 
-        gint32 iRet,
-        const Variant& rvalue /*[ In ]*/ )  override
-    { return 0; }
-
-    //RPC event handler 'OnPointChanged'
-    gint32 OnPointChanged(
-        IConfigDb* context, 
-        const std::string& strPtPath /*[ In ]*/,
-        const Variant& value /*[ In ]*/ ) override;
-
-    // RPC Async Req Callback
-    gint32 ClaimAppInstCallback(
-        IConfigDb* context, 
-        gint32 iRet,
-        std::vector<KeyValue>& arrPtToGet /*[ In ]*/ ) override;
-
-    // RPC Async Req Callback
-    gint32 FreeAppInstsCallback(
-        IConfigDb* context, 
-        gint32 iRet ) override;
-
-    gint32 OnSvrOffline(
-        IConfigDb* context,
-        CAppManager_CliImpl* pIf ) override;
+    gint32 GetPointValuesToUpdate(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override;
 };
 
-}

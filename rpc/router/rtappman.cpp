@@ -31,55 +31,11 @@
 #include "rpcroute.h"
 #include "fastrpc.h"
 
-#include "signal.h"
-
 using namespace rpcf;
 #include "routmain.h"
-#include "AppManagercli.h"
-#include "monconst.h"
 #include "rtappman.h"
 
-namespace rpcf
-{
-
-gint32 CreateAppManSync( CIoManager* pMgr,
-    IConfigDb* pCfg, InterfPtr& pAppMan )
-{
-    gint32 ret = 0;
-    do{
-        TaskletPtr pTask;
-        ret = pTask.NewObj(
-            clsid( CSyncCallback ) );
-        if( ERROR( ret ) )
-            break;
-        CSyncCallback* pSync = pTask;
-        ret = CreateAppManagercli(
-            pMgr, pTask, pCfg );
-        if( ret == STATUS_PENDING )
-        {
-            ret = pSync->WaitForComplete();
-            if( ERROR( ret ) )
-                break;
-            ret = pSync->GetError();
-        }
-        if( SUCCEEDED( ret ) )
-        {
-            Variant oVar;
-            ret = pSync->GetProperty(
-                propRespPtr, oVar );
-            if( ERROR( ret ) )
-                break;
-            IConfigDb* pCfg = ( ObjPtr& )oVar;
-            ret = pCfg->GetProperty( 0, oVar );
-            if( ERROR( ret ) )
-                break;
-            pAppMan = ( ObjPtr& )oVar;
-        }
-    }while( 0 );
-    return ret;
-}
-
-gint32 GetPointValuesToUpdate(
+gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
 {
@@ -167,97 +123,8 @@ gint32 GetPointValuesToUpdate(
     return ret;
 }
 
-//RPC event handler 'OnPointChanged'
-gint32 CAsyncAMCallbacks::OnPointChanged(
-    IConfigDb* context, 
-    const std::string& strPtPath /*[ In ]*/,
-    const Variant& value /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        if( strPtPath != "rpcrouter1/rpt_timer" )
-        {
-            ret = -ENOTSUP;
-            break;
-        }
-        if( ( ( guint32& )value ) != 1 )
-            break;
-
-        std::vector< KeyValue > veckv;
-        ret = GetPointValuesToUpdate(
-            m_pRtBdge, veckv );
-        if( ERROR( ret ) )
-            break;
-
-        InterfPtr pIf;
-        ret = GetAppManagercli( pIf );
-        if( ERROR( ret ) )
-            break;
-
-        CAppManager_CliImpl* pamc = pIf;
-        CCfgOpener oCfg;
-        oCfg.SetPointer( propRouterPtr, pamc );
-        ret = pamc->SetPointValues(
-            oCfg.GetCfg(), RTAPPNAME, veckv );
-        if( ret == STATUS_PENDING )
-            ret = 0;
-    }while( 0 );
-    return ret;
-}
-
-// RPC Async Req Callback
-gint32 CAsyncAMCallbacks::ClaimAppInstCallback(
-    IConfigDb* context, 
-    gint32 iRet,
-    std::vector<KeyValue>& arrPtToGet /*[ In ]*/ )
-{
-    gint32 ret = 0;
-    do{
-        if( ERROR( iRet ) )
-        {
-            OutputMsg( iRet, "Error ClaimAppInst" );
-            kill( getpid(), SIGINT );
-            break;
-        }
-        OutputMsg( iRet, "Successfully claimed "
-            "application " RTAPPNAME );
-    }while( 0 );
-    return ret;
-}
-
-gint32 CAsyncAMCallbacks::FreeAppInstsCallback(
-    IConfigDb* context, 
-    gint32 iRet )
-{
-    if( context == nullptr )
-        return -EINVAL;
-    gint32 ret = 0;
-    do{
-        CCfgOpener oCfg( context );
-        CSyncCallback* pSync = nullptr;
-        ret = oCfg.GetPointer(
-            propEventSink, pSync );
-        if( ERROR( ret ) )
-            break;
-        pSync->OnEvent(
-            eventTaskComp, iRet, 0, nullptr );
-    }while( 0 );
-    return ret;
-}
-
-gint32 CAsyncAMCallbacks::OnSvrOffline(
-    IConfigDb* context,
-    CAppManager_CliImpl* pIf )
-{
-    kill( getpid(), SIGUSR1 );
-    return 0;
-}
-
-}
-
 gint32 StartAppManCli(
-    CRpcServices* pSvc,
-    InterfPtr& pAppMan )
+    CRpcServices* pSvc, InterfPtr& pAppMan )
 {
     gint32 ret = 0;
     if( pSvc == nullptr )
@@ -287,41 +154,11 @@ gint32 StartAppManCli(
             break;
         }
 
-        InterfPtr pAppMan;
-        CParamList oParams;
-        oParams.SetPointer( propRouterPtr, prt );
-        ret = CreateAppManSync( prt->GetIoMgr(),
-            oParams.GetCfg(), pAppMan );
-        if( ERROR( ret ) )
-            break;
         PACBS pacbs( new CAsyncAMCallbacks );
         auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
-        pcacbs->SetRouterBridge( pIf );
 
-        CParamList oParams2;
-        oParams2.SetPointer( propRouterPtr, prt );
-        CAppManager_CliImpl* pamc = pAppMan;
-        pamc->SetAsyncCallbacks(
-            pacbs, oParams.GetCfg() );
-
-        std::vector< KeyValue > veckv;
-        std::vector< KeyValue > rveckv;
-        ret = GetPointValuesToUpdate( pIf, veckv);
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "Error getting point values" );
-            break;
-        }
-
-        KeyValue okv;
-        okv.strKey = PID_FILE;
-        okv.oValue = ( guint32 )getpid();
-        veckv.push_back( okv );
-
-        ret = pamc->ClaimAppInst(
-            oParams2.GetCfg(),
-            RTAPPNAME, veckv, rveckv );
+        ret = StartStdAppManCli(
+            pIf, RTAPPNAME, pAppMan, pacbs );
         
     }while( 0 );
     return ret;
@@ -329,43 +166,6 @@ gint32 StartAppManCli(
 
 gint32 StopAppManCli()
 {
-    InterfPtr pIf;
-    gint32 ret = GetAppManagercli( pIf );
-    if( ERROR( ret ) )
-        return ret;
-    CAppManager_CliImpl* pamc = pIf;
-    if( pamc->GetState() == stateConnected )
-    {
-        TaskletPtr pTask;
-        pTask.NewObj( clsid( CSyncCallback ) );
-        CParamList oParams;
-        oParams.SetPointer( propEventSink,
-            ( IEventSink* )pTask );
-        std::vector< stdstr > vecApps;
-        vecApps.push_back( RTAPPNAME );
-
-        PACBS pCbs;
-        CfgPtr pContext;
-        ret = pamc->GetAsyncCallbacks(
-            pCbs, pContext );
-        if( SUCCEEDED( ret ) )
-        {
-            ret = pamc->FreeAppInsts(
-                oParams.GetCfg(), vecApps );
-            if( ret == STATUS_PENDING )
-            {
-                CSyncCallback* pSync = pTask;
-                pSync->WaitForComplete();
-                ret = pSync->GetError();
-                if( ERROR( ret ) )
-                    OutputMsg( ret,
-                    "Error FreeAppInsts" );
-            }
-        }
-    }
-    pamc->ClearCallbacks();
-    ret = DestroyAppManagercli(
-        pamc->GetIoMgr(), nullptr );
-    return ret;
+    return StopStdAppManCli();
 }
 
