@@ -1560,8 +1560,7 @@ class CJavaInterfBase : public T
         return pNewObj;
     }
 
-    gint32 JavaOnPostStop(
-        JNIEnv *jenv, HANDLE hChannel )
+    gint32 JavaOnPostStop( JNIEnv *jenv )
     {
         gint32 ret = 0;
         do{
@@ -1593,16 +1592,13 @@ class CJavaInterfBase : public T
     gint32 OnPostStop(
         IEventSink* pCallback ) override
     {
-        if( hChannel == INVALID_HANDLE )
-            return -EINVAL;
-
         bool bAttach = false;
         JNIEnv *jenv = nullptr;
         gint32 ret = GetJavaEnv( jenv, bAttach );
         if( ERROR( ret ) )
             return ret;
 
-        JavaOnPostStop( jenv, hChannel );
+        JavaOnPostStop( jenv );
         if( bAttach )
             PutJavaEnv();
 
