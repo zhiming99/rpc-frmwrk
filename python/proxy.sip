@@ -221,7 +221,8 @@ class CPythonInterfBase : public T
             PyObject* pPyCb = ( PyObject* )pCb;
             PyObject* pPyCtx = ( PyObject* )pCtx;
 
-            PyObject_CallMethod( pHost,
+            PyObject* pPyRet =
+                PyObject_CallMethod( pHost,
                 "TimerCallback", "(OO)",
                 pPyCb, pPyCtx );
 
@@ -230,6 +231,9 @@ class CPythonInterfBase : public T
 
             if( pPyCtx != nullptr )
                 Py_DECREF( pPyCtx );
+
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
 
         }while( 0 );
 
@@ -342,10 +346,9 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            pNpVal =
-            PyObject_CallMethod( pHost,
-                "GetNumpyValue", "(iO)",
-                iType, pyInt );
+            pNpVal = PyObject_CallMethod(
+                pHost, "GetNumpyValue",
+                "(iO)", iType, pyInt );
 
         }while( 0 );
         return ret;
@@ -566,6 +569,8 @@ class CPythonInterfBase : public T
 
             ret = ( EnumTypeId )
                 PyLong_AsLong( pRet );
+
+            Py_DECREF( pRet );
 
         }while( 0 );
 
@@ -1106,10 +1111,12 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            PyObject_CallMethod(
+            PyObject* pPyRet = PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
                  "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
 
         }while( 0 );
 
@@ -1184,10 +1191,12 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            PyObject_CallMethod(
+            PyObject* pPyRet = PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
                  "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
 
         }while( 0 );
 
@@ -1313,10 +1322,13 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            PyObject_CallMethod( pHost,
-                "HandleAsyncResp", "(OiOO)",
+            PyObject* pPyRet = PyObject_CallMethod(
+                pHost, "HandleAsyncResp", "(OiOO)",
                 pPyCb, dwSeriProto,
                 pPyResp, pContext );
+
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
 
         }while( 0 );
 
@@ -1442,10 +1454,12 @@ class CPythonInterfBase : public T
             PyList_SetItem( pPyResp, 0, pPyRet );
             // element 1 is not replaced with the
             // the true response parameters.
-            PyObject_CallMethod(
+            pPyRet = PyObject_CallMethod(
                  pHost, "HandleAsyncResp", 
                  "(OiOO)", pPyCb, seriNone,
                  pPyResp, Py_None );
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
         }
 
         if( pPyCb )
@@ -1502,9 +1516,13 @@ class CPythonInterfBase : public T
                 sizeof( guint32 ) )
                 strFmt = "(i)";
 
-            PyObject_CallMethod(
+            PyObject* pPyRet = PyObject_CallMethod(
                  pHost, "OnStmReady", 
                  strFmt.c_str(), hChannel );
+
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
+
         }while( 0 );
         PyGILState_Release( gstate );
         return ret;
@@ -1529,9 +1547,12 @@ class CPythonInterfBase : public T
                 sizeof( guint32 ) )
                 strFmt = "(i)";
 
-            PyObject_CallMethod(
+            PyObject* pPyRet = PyObject_CallMethod(
                  pHost, "OnStmClosing", 
                  strFmt.c_str(), hChannel );
+
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
 
         }while( 0 );
 
@@ -1555,9 +1576,12 @@ class CPythonInterfBase : public T
             if( ERROR( ret ) )
                 break;
 
-            PyObject_CallMethod(
+            PyObject* pPyRet = PyObject_CallMethod(
                  pHost, "DeferCallback", 
                  "OO", pPyCb, pPyArgs );
+
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
 
         }while( 0 );
         if( pPyCb != nullptr &&
@@ -1595,6 +1619,30 @@ class CPythonInterfBase : public T
         Py_INCREF( pPyCb );
         Py_INCREF( pPyArgs );
         return ret;
+    }
+
+    gint32 OnPostStop( IEventSink* pCallback )
+    {
+        gint32 ret = 0;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        do{
+            PyObject* pHost = nullptr;
+            CCfgOpenerObj oCfg( this );
+            ret = oCfg.GetIntPtr( propPyObj,
+                ( guint32*& )pHost );
+            if( ERROR( ret ) )
+                break;
+            PyObject* pPyRet =
+                PyObject_CallMethod(
+                 pHost, "OnPostStop", nullptr );
+
+            if( pPyRet != nullptr )
+                Py_DECREF( pPyRet );
+
+        }while( 0 );
+        PyGILState_Release( gstate );
+        return 0;
     }
 };
 

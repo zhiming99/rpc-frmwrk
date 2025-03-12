@@ -1559,6 +1559,55 @@ class CJavaInterfBase : public T
             delete ppObj;
         return pNewObj;
     }
+
+    gint32 JavaOnPostStop(
+        JNIEnv *jenv, HANDLE hChannel )
+    {
+        gint32 ret = 0;
+        do{
+            jobject pHost = nullptr;
+            ret = GetJavaHost( pHost );
+            if( ERROR( ret ) )
+                break;
+
+            jclass cls =
+                jenv->GetObjectClass( pHost );
+
+            jmethodID onPostStop = jenv->GetMethodID(
+                cls, "onPostStop", "()I" );
+
+            if( onPostStop == nullptr )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            jenv->CallIntMethod(
+                pHost, onPostStop );
+
+        }while( 0 );
+
+        return ret;
+    }
+
+    gint32 OnPostStop(
+        IEventSink* pCallback ) override
+    {
+        if( hChannel == INVALID_HANDLE )
+            return -EINVAL;
+
+        bool bAttach = false;
+        JNIEnv *jenv = nullptr;
+        gint32 ret = GetJavaEnv( jenv, bAttach );
+        if( ERROR( ret ) )
+            return ret;
+
+        JavaOnPostStop( jenv, hChannel );
+        if( bAttach )
+            PutJavaEnv();
+
+        return ret;
+    }
 };
 
 class CJavaProxy :
