@@ -4038,6 +4038,17 @@ inline gint32 NewDeferredFuncCall( TaskletPtr& pCallback,
     _ret; \
 })
 
+#define ADD_TIMER_FUNC( __pTask, _interval, pMgr, func, ... ) \
+({ \
+    gint32 _ret = NewDeferredFuncCall( __pTask, pMgr, ( CIfInterceptTaskProxy*)nullptr, func , ##__VA_ARGS__ );\
+    if( SUCCEEDED( _ret ) ) \
+    { \
+        CDeferredFuncCallBase< CIfInterceptTaskProxy >* pDefer = __pTask; \
+        _ret = pDefer->EnableTimer( _interval, eventRetry ); \
+    } \
+    _ret; \
+})
+
 class CTaskWrapper :
     public CGenericCallback< CIfInterceptTaskProxy >
 {

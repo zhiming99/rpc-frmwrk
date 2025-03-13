@@ -10,8 +10,11 @@
 
 gint32 GetAppManagercli( InterfPtr& pCli );
 
-gint32 CreateAppManagercli( CIoManager* pMgr,
-    IEventSink* pCallback, IConfigDb* pCfg );
+/*gint32 CreateAppManagercli(
+    CIoManager* pMgr,
+    IEventSink* pCallback,
+    IConfigDb* pCfg );
+*/
 
 gint32 DestroyAppManagercli(
     CIoManager* pMgr,
@@ -63,7 +66,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
         ret = pIf.NewObj( iClsid, ptrCfg );
         if( ERROR( ret ) )
             break;
-
+        pNewIf = pIf;
         gint32 (*pChecker)( IEventSink*,
             ToCreate*, IEventSink*,
             IConfigDb* ) = ([]( IEventSink* pTask,
@@ -96,8 +99,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
 
             CCfgOpener oCfg;
             oCfg.SetIntProp( propReturnValue, ret );
-            if( SUCCEEDED( ret ) )
-                oCfg.SetPointer( 0, pIf );
+            oCfg.SetPointer( 0, pIf );
             ObjPtr pobjIf( oCfg.GetCfg() );
             Variant oVar( pobjIf );
             pCb->SetProperty( propRespPtr, oVar );
@@ -136,8 +138,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
 
                 CCfgOpener oCfg;
                 oCfg.SetIntProp( propReturnValue, ret );
-                if( SUCCEEDED( ret ) )
-                    oCfg.SetPointer( 0, pIf );
+                oCfg.SetPointer( 0, pIf );
                 ObjPtr pobjIf( oCfg.GetCfg() );
                 Variant oVar( pobjIf );
                 pCallback->SetProperty( propRespPtr, oVar );
@@ -170,7 +171,6 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
         }
         if( SUCCEEDED( ret ) )
         {
-            pNewIf = pIf;
             ret = STATUS_PENDING;
         }
 
@@ -330,6 +330,10 @@ struct CAsyncStdAMCallbacks : public IAsyncAMCallbacks
     gint32 OnSvrOffline(
         IConfigDb* context,
         CAppManager_CliImpl* pIf ) override;
+
+    gint32 ScheduleReconnect(
+        IConfigDb* pContext,
+        CAppManager_CliImpl* pOldIf );
 };
 
 DECLARE_AGGREGATED_SKEL_PROXY(

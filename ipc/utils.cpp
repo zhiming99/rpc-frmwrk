@@ -579,6 +579,30 @@ gint32 CTimerService::Stop()
 
         m_dwTimerId = 0;
     }
+    do{
+        decltype( m_vecTimers ) vecTimers;
+        if( true )
+        {
+            CStdMutex oMutex( m_oMapLock );
+            if( m_vecTimers.empty() )
+                break;
+            for( auto& elem : m_vecTimers )
+                vecTimers.insert( std::move( elem ) ); 
+            m_vecTimers.clear();
+        }
+        for( auto& elem : vecTimers )
+        {
+            TIMER_ENTRY& te = *elem.second;
+            if( !te.m_pCallback.IsEmpty() )
+            {
+                te.m_pCallback->OnEvent(
+                    eventCancelTask,
+                    -ECANCELED, 0,
+                    ( LONGWORD* )nullptr );
+            }
+        }
+        
+    }while( 0 );
     return 0;
 }
 

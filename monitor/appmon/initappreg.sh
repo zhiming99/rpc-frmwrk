@@ -105,6 +105,7 @@ add_point rpcrouter1 max_bps  setpoint i
 add_point rpcrouter1 obj_count  output i
 add_point rpcrouter1 pending_tasks  output i
 add_point rpcrouter1 restart input i
+set_attr_value rpcrouter1 restart pulse "$(jsonval 'i' 1 )"
 add_point rpcrouter1 cmdline setpoint blob
 set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -agor 2')"
 add_point rpcrouter1 pid output i 
@@ -142,6 +143,7 @@ set_attr_value timer1 interval4 uint "$(jsonval 's' 'sec' )"
 set_point_value timer1 interval4 "$(jsonval 'i' 10)"
 
 add_point timer1 restart input i
+set_attr_value timer restart pulse "$(jsonval 'i' 1 )"
 add_point timer1 cmdline setpoint s 
 add_point timer1 pid output i 
 

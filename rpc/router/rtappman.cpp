@@ -157,7 +157,10 @@ gint32 StartAppManCli(
         PACBS pacbs( new CAsyncAMCallbacks );
         auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
 
-        ret = StartStdAppManCli(
+        // ignore the return status
+        // in order to allowing reconnection if the
+        // appmonsvr is not online yet
+        StartStdAppManCli(
             pIf, RTAPPNAME, pAppMan, pacbs );
         
     }while( 0 );

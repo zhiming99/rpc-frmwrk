@@ -362,8 +362,6 @@ void CIfRouterTest::testSvrStartStop()
                 sleep( 1 );
                 if( g_bExit )
                     break;
-                if( g_bMonOff )
-                    break;
             }
             signal( SIGINT, oldh );
             signal( SIGUSR1, oldh2 );
