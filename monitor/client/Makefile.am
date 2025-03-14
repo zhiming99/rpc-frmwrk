@@ -1,1 +1,1 @@
-SUBDIRS=cpp/appmancli cpp/appmoncli
+SUBDIRS=cpp/appmancli

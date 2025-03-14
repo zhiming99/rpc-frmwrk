@@ -101,7 +101,8 @@ add_point rpcrouter1 req_proxy_list output blob
 
 add_point rpcrouter1 max_conn  setpoint i
 add_point rpcrouter1 conn_count  setpoint i
-add_point rpcrouter1 max_bps  setpoint i
+add_point rpcrouter1 max_recv_bps  setpoint i
+add_point rpcrouter1 max_send_bps  setpoint i
 add_point rpcrouter1 obj_count  output i
 add_point rpcrouter1 pending_tasks  output i
 add_point rpcrouter1 restart input i

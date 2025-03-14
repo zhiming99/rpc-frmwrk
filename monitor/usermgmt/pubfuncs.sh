@@ -127,34 +127,6 @@ function check_user_mount()
     fi
 }
 
-function add_group()
-{
-#this function assume the current directory is the root dir of the user registry
-#and it requires one parameter: the group name
-    echo adding group $1
-    _group=$1
-    if [ -d ./groups/$_group ]; then
-        return 1
-    fi
-
-    mkdir -p ./groups/$_group/users
-    if ! touch ./groups/$_group/gid; then
-        echo Error failed to create  groups/$_group/gid $?
-    fi
-
-    _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid > /dev/null
-    echo $_gidval > ./groups/$_group/gid
-    touch ./gids/$_gidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$_group\"}" ./gids/$_gidval > /dev/null
-    echo $_group > ./gids/$_gidval
-
-    touch ./groups/$_group/date
-    datestr=$(date)
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" ./groups/$_group/date > /dev/null
-    echo $datestr > ./groups/$_group/date
-}
-
 function join_group()
 {
 # join_group <group name> <user name>
@@ -250,6 +222,35 @@ function leave_group()
     rm $_udir/groups/$_gidval
     rm $_gdir/users/$_uidval
     rm ./uids/$_uidval
+}
+
+function add_group()
+{
+#this function assume the current directory is the root dir of the user registry
+#and it requires one parameter: the group name
+    echo adding group $1
+    _group=$1
+    if [ -d ./groups/$_group ]; then
+        return 1
+    fi
+
+    mkdir -p ./groups/$_group/users
+    if ! touch ./groups/$_group/gid; then
+        echo Error failed to create  groups/$_group/gid $?
+    fi
+
+    _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid > /dev/null
+    echo $_gidval > ./groups/$_group/gid
+    touch ./gids/$_gidval
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$_group\"}" ./gids/$_gidval > /dev/null
+    echo $_group > ./gids/$_gidval
+
+    touch ./groups/$_group/date
+    datestr=$(date)
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" ./groups/$_group/date > /dev/null
+    echo $datestr > ./groups/$_group/date
+    join_group $_group admin
 }
 
 function assoc_krb5user()

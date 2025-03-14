@@ -414,7 +414,7 @@ function rm_point()
     return 0
 }
 
-function rm_application()
+function remove_application()
 {
     _curdir=`pwd`
     _appname=$1
@@ -473,3 +473,64 @@ function list_points()
     popd > /dev/null
 }
 
+# add a standard app : add_stdapp <app inst name> [<owner> <group>]
+function add_stdapp()
+{
+    _instname=$1
+    if [ -f ./apps/$_instname ]; then
+        echo Error application $_instname already exist
+        return 1
+    fi
+
+    $_user=$2
+    $_group=$2
+
+    if [ -z $_user ]; then
+        _user='admin'
+    fi
+    if [ -z $_group ]; then
+        _group='admin'
+    fi
+
+    _uid=`bash $rpcfshow -u $_user | grep 'uid:' | awk '{print $2}'`
+    _gid=`bash $rpcfshow -g $_group | grep 'gid:' | awk '{print $2}'`
+    if [ -z $_uid ] || [ -z $_gid ]; then
+        echo "Error the given user/group not valid"
+        exit 22
+    fi
+
+    mkdir -p ./apps/$_instname
+    pushd ./apps/$_instname > /dev/null
+
+    #owner stream is for input event from data producer
+    touch owner_stream
+    python3 $updattr -u 'user.regfs' "$(jsonval i 0)" owner_stream > /dev/null
+
+    #notify_streams is for monitors
+    mkdir points notify_streams
+
+    touch birth_time
+    echo $(date) > birth_time
+    popd > /dev/null
+
+    add_point $_instname rpt_timer input i
+    set_attr_value $_instname rpt_timer unit "$(jsonval 'i' 0 )"
+    add_point $_instname obj_count output i
+    add_point $_instname max_rqs setpoint i
+    add_point $_instname cur_rqs output i
+    add_point $_instname max_streams_per_session setpoint i
+    add_point $_instname pending_tasks  output i
+    add_point $_instname restart input i
+    set_attr_value $_instname restart pulse "$(jsonval 'i' 1 )"
+    add_point $_instname cmdline setpoint blob
+    add_point $_instname pid output i 
+    add_point $_instname working_dir  setpoint blob
+
+    add_point $_instname uptime output i
+    set_attr_value $_instname uptime unit "$(jsonval 's' 'sec' )"
+
+    chown $_uid:$_gid -R ./apps/$_instname
+    find . -type f -exec chmod ug+rw,o+r '{}' ';'
+    find . -type d -exec chmod ug+rwx,o+rx '{}' ';'
+    chmod -R o-rwx ./apps/$_instname/points/restart
+}
