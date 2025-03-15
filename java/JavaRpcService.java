@@ -850,5 +850,13 @@ abstract public class JavaRpcService implements IRpcService
         return ( JRetVal )oInst.GetChanCtx(
             hChannel );
     }
+
+    @Override
+    public int onPostStop()
+    {
+        System.out.println(
+            "Service is stopped" );
+        return 0;
+    }
 }
 

@@ -798,6 +798,7 @@ gint32 CRpcTcpBusPort::GetProperty(
         Variant& oBuf ) const
 {
     gint32 ret = 0;
+    CStdRMutex oPortLock( GetLock() );
     switch( iProp )
     {
     case propSrcDBusName:
@@ -831,6 +832,7 @@ gint32 CRpcTcpBusPort::SetProperty(
         const Variant& oBuf )
 {
     gint32 ret = 0;
+    CStdRMutex oPortLock( GetLock() );
     switch( iProp )
     {
     case propSrcDBusName:

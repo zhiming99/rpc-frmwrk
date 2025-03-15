@@ -5,7 +5,7 @@ ridlc_SOURCES= gencpp.cpp astnode.cpp main.cpp astnode.h gencpp.h idlclsid.h \
 genpy.cpp genpy.h fulltest.ridl tinyif.ridl README.md README_cn.md odesctpl.json \
 odesctpl2.json drvtpl.json mktpl.in synccfg.py.in pymktpl genjava.cpp genjava.h \
 genfuse.h genfuse.cpp gencpp2.h gencpp2.cpp genfuse2.h genfuse2.cpp genrpcfs.cpp \
-genjs.cpp genjs.h
+genjs.cpp genjs.h mktplsvr.in mktplcli.in
 
 javatest=javatest/org/rpcf/fulltest
 EXTRA_DIST=ridlc.y ridlc.lex pytest/SimpFileSvcsvr.py pytest/SimpFileSvccli.py \
@@ -14,13 +14,13 @@ pytest/mainsvr.py ridlc.1 ridl.7 seribase.py JavaSerialBase.java \
 JavaSerialImpl.java JVariant.java $(javatest)/SimpFileSvccli.java \
  $(javatest)/SimpFileSvcsvr.java $(javatest)/StreamSvccli.java $(javatest)/StreamSvcsvr.java $(javatest)/maincli.java $(javatest)/mainsvr.java
 
-nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py
+nodist_ridlc_SOURCES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl synccfg.py mktplsvr mktplsvr
 
-BUILT_SOURCES=ridlc.cpp lexer.cpp mktpl synccfg.py 
+BUILT_SOURCES=ridlc.cpp lexer.cpp mktpl synccfg.py mktplsvr mktplcli
 
 man_MANS=ridlc.1 ridl.7
 
-CLEANFILES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl
+CLEANFILES = ridlc.cpp lexer.cpp ridlc.h lexer.h mktpl mktplsvr mktplcli
 
 lexer.cpp lexer.h : ridlc.lex
 	flex ridlc.lex
@@ -31,6 +31,12 @@ ridlc.cpp ridlc.h : ridlc.y
 mktpl : mktpl.in
 	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g;s,[@]BITWIDTH[@],$(BITWIDTH),g;' mktpl.in > mktpl
 
+mktplsvr : mktplsvr.in
+	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g;s,[@]BITWIDTH[@],$(BITWIDTH),g;' mktplsvr.in > mktplsvr
+
+mktplcli : mktplcli.in
+	sed -e 's,[@]PKG_CONFIG_PATH[@],$(pkgconfigdir),g;s,[@]DIST_LIB_DIR[@],$(libdir),g;s,[@]BITWIDTH[@],$(BITWIDTH),g;' mktplcli.in > mktplcli
+
 synccfg.py : synccfg.py.in
 	sed -e 's,[@]SRCCFG[@],$(ridlc_confdir)/echodesc.json,g' synccfg.py.in > synccfg.py
 	sed -i -e 's,[@]BINPATH[@],$(bindir)/rpcf,g' synccfg.py
@@ -38,7 +44,7 @@ synccfg.py : synccfg.py.in
 ridlc_LDADD=$(COMMON_LINK) ../combase/libcombase.la ./rpcfs/libgenrpcfs.a -lutils -lstdc++ -ljsoncpp -L../combase -L../ipc -L../3rd_party
 ridlcdir=$(bindir)
 
-ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl seribase.py \
+ridlc_conf_DATA=odesctpl.json odesctpl2.json drvtpl.json mktpl mktplsvr mktplcli seribase.py \
 pymktpl synccfg.py JavaSerialBase.java JavaSerialImpl.java JVariant.java
 ridlc_confdir=$(sysconfdir)/rpcf
 

@@ -53,8 +53,8 @@ class CDeclServiceImplFuse2 :
     public:
     typedef CDeclServiceImplFuse super;
     CDeclServiceImplFuse2( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer ) :
-        super( pWriter, pNode, bServer )
+        ObjPtr& pNode, bool bProxy ) :
+        super( pWriter, pNode, bProxy )
     {} 
     gint32 Output() override;
 };
@@ -90,8 +90,8 @@ class CImplServiceImplFuse2 :
     public:
     typedef CImplServiceImplFuse super;
     CImplServiceImplFuse2( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer ) :
-        super( pWriter, pNode, bServer )
+        ObjPtr& pNode, bool bProxy ) :
+        super( pWriter, pNode, bProxy )
     {} 
     gint32 Output() override;
     gint32 OutputROSSkel();
@@ -146,8 +146,8 @@ class CDeclServiceFuse2 :
         super( pWriter, pNode )
     {} 
 
-    gint32 OutputROS( bool bServer ) override;
-    gint32 OutputROSSkel() override;
+    gint32 OutputROS( bool bProxy ) override;
+    gint32 OutputROSSkel( bool bProxy ) override;
 };
 
 class CImplClassFactoryFuse2 :
@@ -156,8 +156,8 @@ class CImplClassFactoryFuse2 :
     public:
     typedef CImplClassFactory super;
     CImplClassFactoryFuse2(
-        CCppWriter* pWriter, ObjPtr& pNode, bool bServer )
-        : super( pWriter, pNode, bServer )
+        CCppWriter* pWriter, ObjPtr& pNode, bool bProxy )
+        : super( pWriter, pNode, bProxy )
     {}
     gint32 Output() override;
 };

@@ -256,7 +256,7 @@
                     "Protocol": "native",
                     "comment-2": "port 4132 will accept native non-websocket connection",
                     "PortNumber": "4132",
-                    "BindAddr": "127.0.0.1",
+                    "BindAddr": "0.0.0.0",
                     "comment": "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
                     "PdoClass": "TcpStreamPdo2",
                     "Compression": "true",
@@ -441,7 +441,8 @@
             "DriversToLoad": [
                 "DBusBusDriver",
                 "RpcTcpBusDriver",
-                "UnixSockBusDriver"
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv"
             ],
             "PreloadableObjects": [
                 {
@@ -482,7 +483,8 @@
             "DriversToLoad": [
                 "DBusBusDriver",
                 "RpcTcpBusDriver",
-                "UnixSockBusDriver"
+                "UnixSockBusDriver",
+                "DBusStreamBusDrv"
             ],
             "PreloadableObjects": [
                 {

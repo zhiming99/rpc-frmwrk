@@ -11,7 +11,7 @@ STRIP:=$(CROSS_COMPILE)strip
 mkfile_path:=$(abspath $(lastword $(MAKEFILE_LIST)))
 BASE:=$(abspath $(dir $(mkfile_path)) )
 
-C_FLAGS:=$(CFLAGS) -Wall -c -D_GNU_SOURCE -pthread
+C_FLAGS:=$(CFLAGS) -Wall -c -D_GNU_SOURCE
 C_DEFINES+=-D_USE_LIBEV=1
 
 PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -59,25 +59,31 @@ endif
 C_DEFINES+=$(FUSE_DEFINES)
 
 DIST_LIB_DIR = /usr/local/lib
+RTFILES:=
 FUSE_LIB:=
 COMMON_LINK=$(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs dbus-1 jsoncpp rpcf)
-LINKER_OPTION:=$(COMMON_LINK) $(FUSE_LIB) -ldl -lstdc++ -lpthread -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
+LINKER_OPTION:=$(RTFILES) $(COMMON_LINK) $(FUSE_LIB) -ldl -lstdc++ -Wl,-rpath=$(DIST_LIB_DIR) -Wl,-rpath=$(DIST_LIB_DIR)/rpcf
 
 TARGET_SVR:=sftestsvr
 TARGET_CLI:=sftestcli
 TARGET_SO:=libsftest.so
+STATIC_LIB:=$(OBJ_DIR)/libsftestskel.a
+TARGET_SO_SVR:=libsftestsvr.so
+TARGET_SO_CLI:=libsftestcli.so
 
 MKLIB:=
 
 ifeq ($(MKLIB),)
 TARGET:=$(OUTPUT_DIR)/$(TARGET_SVR) $(OUTPUT_DIR)/$(TARGET_CLI)
 else ifeq ($(MKLIB),1)
-TARGET:=$(OUTPUT_DIR)/$(TARGET_SO)
+TARGET:=$(OUTPUT_DIR)/$(TARGET_SO) $(OUTPUT_DIR)/$(TARGET_SO_CLI) $(OUTPUT_DIR)/$(TARGET_SO_SVR)  
 CPP_FLAGS+=-fPIC
 endif
 
-OBJS_SVR:= mainsvr.o $(OBJ_DIR)/FileTransfersvr.o 
-OBJS_CLI:= maincli.o $(OBJ_DIR)/FileTransfercli.o 
+OBJS_SVR:= $(OBJ_DIR)/mainsvr.o $(OBJ_DIR)/FileTransfersvr.o 
+OBJS_CLI:= $(OBJ_DIR)/maincli.o $(OBJ_DIR)/FileTransfercli.o 
+
+SKELETON_OBJS:=$(OBJ_DIR)/sfteststruct.o $(OBJ_DIR)/IFileTransfercli.o $(OBJ_DIR)/IFileTransfersvr.o 
 
 SOURCES:=sftest.cpp transctx.cpp
 OBJS2:=$(SOURCES:%.cpp=$(OBJ_DIR)/%.o)
@@ -100,37 +106,46 @@ do_clean:
 	-@rm $(OUTPUT_DIR)/$(TARGET_SVR) $(MUTE_CLEAN)
 	-@rm $(OUTPUT_DIR)/$(TARGET_CLI) $(MUTE_CLEAN)
 	-@rm $(OBJS2) $(MUTE_CLEAN)
-	-@rm $(OBJ_DIR)/$(OBJS_SVR) $(MUTE_CLEAN)
-	-@rm $(OBJ_DIR)/$(OBJS_CLI) $(MUTE_CLEAN)
+	-@rm $(OBJS_SVR) $(MUTE_CLEAN)
+	-@rm $(OBJS_CLI) $(MUTE_CLEAN)
+	-@rm $(STATIC_LIB) $(MUTE_CLEAN)
 
--include $(OBJS2:%.o=%.d) $(OBJS_SVR:%.o=(OBJ_DIR)/%.d) $(OBJS_CLI:%.o=(OBJ_DIR)/%.d)
+-include $(OBJS2:%.o=%.d) $(OBJS_SVR:.o=.d) $(OBJS_CLI:.o=.d) $(SKELETON_OBJS:.o=.d)
 
-$(OUTPUT_DIR)/$(TARGET_SVR) : $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+$(OUTPUT_DIR)/$(TARGET_SVR) : $(OBJS_SVR) $(STATIC_LIB)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION)
+	$(CC) -o $@ $(OBJS_SVR) $(STATIC_LIB) $(LINKER_OPTION)
 
-$(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2)
+$(OUTPUT_DIR)/$(TARGET_CLI) : $(OBJS_CLI) $(STATIC_LIB)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJS2) $(LINKER_OPTION)
+	$(CC) -o $@ $(OBJS_CLI) $(STATIC_LIB) $(LINKER_OPTION)
 	@python3 ./synccfg.py
 	@cp *.json $(OUTPUT_DIR)
 
-$(OUTPUT_DIR)/$(TARGET_SO) : $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+$(OUTPUT_DIR)/$(TARGET_SO) : $(OBJS_CLI) $(OBJS_SVR) $(STATIC_LIB)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_CLI) $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION) -shared
+	$(CC) -o $@ $(OBJS_CLI) $(OBJS_SVR) $(STATIC_LIB) $(LINKER_OPTION) -shared
 	@python3 ./synccfg.py
 	@cp *.json $(OUTPUT_DIR)
 
-$(OUTPUT_DIR)/$(TARGET_LIB) : $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2)
+$(OUTPUT_DIR)/$(TARGET_SO_CLI) : $(OBJS_CLI) $(STATIC_LIB)
 	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
-	$(CC) -o $@ $(OBJ_DIR)/$(OBJS_SVR) $(OBJS2) $(LINKER_OPTION)
+	$(CC) -o $@ $(OBJS_CLI) $(STATIC_LIB) $(LINKER_OPTION) -shared
 
-$(OBJ_DIR)/%.o : %.cpp transctx.h
+$(OUTPUT_DIR)/$(TARGET_SO_SVR) : $(OBJS_SVR) $(STATIC_LIB)
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(CC) -o $@ $(OBJS_SVR) $(STATIC_LIB) $(LINKER_OPTION) -shared
+
+$(STATIC_LIB) : $(SKELETON_OBJS) $(OBJS2) 
+	@if [ ! -d $(OUTPUT_DIR) ]; then mkdir -p $(OUTPUT_DIR);fi
+	$(AR) rcs -o $@ $(SKELETON_OBJS) $(OBJS2)
+
+$(OBJ_DIR)/%.o : %.cpp
 	@echo Building file: $@
 	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
 	$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -o $@ $<
 
-$(OBJ_DIR)/%.d : %.cpp transctx.h
+$(OBJ_DIR)/%.d : %.cpp
 	@if [ ! -d $(OBJ_DIR) ]; then mkdir -p $(OBJ_DIR);fi
 	@$(CPP) $(C_DEFINES) $(C_FLAGS) $(CPP_FLAGS) $(C_INCLUDE) -MM $*.cpp > $@
 	@mv -f $@ $@.tmp
@@ -138,4 +153,10 @@ $(OBJ_DIR)/%.d : %.cpp transctx.h
 	@sed -e 's/.*://' -e 's/\\$$//' < $@.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >> $@
 	@rm -f $@.tmp
 
-.PHONY: clean
+sync:
+	@python3 ./synccfg.py
+	@if [ -d debug ]; then cp *.json debug;fi
+	@if [ -d release ]; then cp *.json release;fi
+	@echo sync configuration done
+
+.PHONY: clean sync

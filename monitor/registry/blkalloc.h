@@ -598,7 +598,7 @@ struct CAccessContext
 {
     uid_t dwUid = INVALID_UID;
     gid_t dwGid = INVALID_GID;
-    IntSetPtr m_pGids = nullptr;
+    IntSetPtr pGids = nullptr;
     inline bool IsInitialized() const
     {
         return ( dwUid != INVALID_UID );
@@ -607,8 +607,8 @@ struct CAccessContext
     {
         if( dwGid == gid )
             return true;
-        if( !m_pGids.IsEmpty() &&
-            (*m_pGids)().find( gid ) != (*m_pGids)().end() )
+        if( !pGids.IsEmpty() &&
+            (*pGids)().find( gid ) != (*pGids)().end() )
             return true;
         return false;
     }
@@ -652,6 +652,8 @@ struct CFileImage :
     EnumIfState m_dwState = stateStarted;
     std::atomic< bool > m_bRemoved = {false};
 
+    stdstr      m_strName;
+
     mutable CSharedLock m_oLock;
     inline CSharedLock& GetLock() const
     { return m_oLock; }
@@ -661,6 +663,12 @@ struct CFileImage :
         CStdRMutex oLock( GetExclLock() );
         m_dwState = ( EnumIfState )dwState;
     }
+
+    inline void SetName( const stdstr& strName )
+    { m_strName = strName; }
+
+    inline const stdstr& GetName() const
+    { return m_strName; }
 
     inline guint32 GetState() const
     {
@@ -723,6 +731,7 @@ struct CFileImage :
     {
         timespec mtime;
         clock_gettime( CLOCK_REALTIME, &mtime );
+        CStdRMutex oLock( GetExclLock() );
         this->m_oInodeStore.m_mtime = mtime;
         this->m_oInodeStore.m_atime = mtime;
         this->m_oInodeStore.m_ctime = mtime;
@@ -732,6 +741,7 @@ struct CFileImage :
     {
         timespec ctime;
         clock_gettime( CLOCK_REALTIME, &ctime );
+        CStdRMutex oLock( GetExclLock() );
         this->m_oInodeStore.m_ctime = ctime;
     }
 
@@ -739,6 +749,7 @@ struct CFileImage :
     {
         timespec atime;
         clock_gettime( CLOCK_REALTIME, &atime );
+        CStdRMutex oLock( GetExclLock() );
         this->m_oInodeStore.m_atime = atime;
     }
 
@@ -1717,8 +1728,8 @@ class CRegistryFs :
         const stdstr&, Variant& oVar,
         CAccessContext* pac = nullptr );
 
-    gint32 SetValue(
-        const stdstr&, Variant& oVar,
+    gint32 SetValue( const stdstr&,
+        const Variant& oVar,
         CAccessContext* pac = nullptr );
 
     gint32 Chmod(
@@ -1762,6 +1773,13 @@ class CRegistryFs :
 
     gint32 GetParentDir(
         const stdstr& strPath, FImgSPtr& pDir,
+        stdstr* pstrNormPath = nullptr,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetParentDir(
+        RFHANDLE hDir,
+        const stdstr& strPath, FImgSPtr& pDir,
+        stdstr* pstrNormPath = nullptr,
         CAccessContext* pac = nullptr );
 
     gint32 OnEvent( EnumEventId iEvent,
@@ -1775,6 +1793,76 @@ class CRegistryFs :
 
     gint32 GetFd() const
     { return m_pAlloc->GetFd(); }
+
+    gint32 GetFileImage(
+        RFHANDLE hDir, const stdstr&,
+        FImgSPtr& pFile, mode_t,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetDirImage(
+        RFHANDLE hDir, FImgSPtr& pDir );
+
+    gint32 GetValue( RFHANDLE hDir,
+        const stdstr&, Variant& oVar,
+        CAccessContext* pac = nullptr );
+
+    gint32 SetValue(
+        RFHANDLE hDir, const stdstr&,
+        const Variant& oVar,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetAttr(
+        RFHANDLE hDir, const stdstr&,
+        struct stat& stBuf,
+        CAccessContext* pac = nullptr );
+
+    gint32 Access(
+        RFHANDLE hDir, const stdstr&,
+        guint32 dwFlags,
+        CAccessContext* pac = nullptr );
+
+    gint32 RemoveFile(
+        RFHANDLE hDir, const stdstr&,
+        CAccessContext* pac = nullptr );
+
+    gint32 Truncate(
+        const stdstr& strPath,
+        guint32 dwsize = 0,
+        CAccessContext* pac = nullptr );
+
+    gint32 OpenFile(
+        RFHANDLE hDir, const stdstr&,
+        guint32 dwFlags,
+        RFHANDLE& hFile,
+        CAccessContext* pac = nullptr );
+
+    gint32 SetGid(
+        RFHANDLE hFile, gid_t wGid,
+        CAccessContext* pac = nullptr );
+
+    gint32 SetUid(
+        RFHANDLE hFile, uid_t wUid,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetGid(
+        RFHANDLE hFile, gid_t& gid,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetUid(
+        RFHANDLE hFile, uid_t& uid,
+        CAccessContext* pac = nullptr );
+
+    gint32 CreateFile(
+        RFHANDLE hDir, const stdstr& strFile,
+        mode_t dwMode, guint32 dwFlags,
+        RFHANDLE& hFile,
+        CAccessContext* pac = nullptr );
+
+    gint32 GetAttr( RFHANDLE hFile,
+        struct stat& stBuf );
+
+    gint32 GetPathFromHandle(
+        RFHANDLE hFile, stdstr& strPath );
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;

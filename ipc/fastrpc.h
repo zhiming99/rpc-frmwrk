@@ -1140,6 +1140,8 @@ class CFastRpcProxyState :
         return SubscribeEventsInternal(
             vecEvtToSubscribe );
     }
+    gint32 OpenPort(
+        IEventSink* pCallback ) override;
 };
 
 class CFastRpcServerBase :
@@ -1173,8 +1175,7 @@ class CFastRpcServerBase :
     gint32 AddStmSkel(
         HANDLE hstm, InterfPtr& pIf );
 
-    gint32 RemoveStmSkel(
-        HANDLE hstm );
+    virtual gint32 RemoveStmSkel( HANDLE hstm );
 
     gint32 EnumStmSkels(
         std::vector< InterfPtr >& vecIfs ) const;
@@ -1691,7 +1692,8 @@ class CStatCountersProxySkel:
         if( ERROR( ret ) )
             return ret;
 
-        return super::OnPreStart( pCallback );
+        return this->RegisterFilter( m_pMsgFilter );
+        //return super::OnPreStart( pCallback );
     }
 
     gint32 OnPostStop(

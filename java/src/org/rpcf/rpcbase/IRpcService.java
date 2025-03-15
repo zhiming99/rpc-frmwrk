@@ -134,5 +134,6 @@ public interface IRpcService
     JRetVal getChanCtx( long hChannel ) ;
     boolean isServer();
     Object getSerialBase();
+    int onPostStop();
 }
 

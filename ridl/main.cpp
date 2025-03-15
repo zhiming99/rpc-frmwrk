@@ -30,6 +30,7 @@
 using namespace rpcf;
 #include "astnode.h" 
 #include "ridlc.h"
+#include <set>
 
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
@@ -38,6 +39,12 @@ extern std::string g_strAppName;
 extern std::string g_strJsLibPath;
 extern bool g_bAuth;
 extern std::string g_strWebPath;
+// service filter
+std::set< stdstr > g_setServices;
+
+// interface async mode to overrid
+using SYNC_ELEM=std::pair< stdstr, guint32 >;
+std::map< stdstr, SYNC_ELEM > g_mapIfSync;
 
 // mandatory part, just copy/paste'd from clsids.cpp
 static FactoryPtr InitClassFactory()
@@ -122,6 +129,10 @@ void Usage()
     printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
     printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
     printf( "\t-l:\tTo output a shared library instead of executables.\n" );
+    printf( "\t--server:\tTo generate skeleton code for server only.\n" );
+    printf( "\t--client:\tTo generate skeleton code for client only.\n" );
+    printf( "\t--services <service list>:\tTo generate skeleton code for the specified services.The services are seperated with ','.\n" );
+    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tTo override synchronize mode in the ridl file with the specified one.\n" );
     printf( "\t\tThis option is for CPP project only.\n" );
     printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
     printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
@@ -134,7 +145,6 @@ std::string g_strTarget;
 bool g_bNewSerial = true;
 stdstr g_strLang = "cpp";
 stdstr g_strLocale ="en";
-guint32 g_dwFlags = 0;
 stdstr g_strCmdLine;
 bool g_bBuiltinRt = false;
 
@@ -150,6 +160,7 @@ bool g_bAsyncProxy = false;
 #include "genjava.h"
 #include "getopt.h"
 #include "genjs.h"
+guint32 g_dwFlags = GEN_BOTH;
 
 extern gint32 GenRpcFSkelton(
     const std::string& strOutPath,
@@ -207,6 +218,10 @@ int main( int argc, char** argv )
             {"odesc_url", required_argument, 0,  0 },
             {"lib_path", required_argument, 0,  0 },
             {"auth", no_argument, 0,  0 },
+            {"server", no_argument, 0,  0 },
+            {"client", no_argument, 0,  0 },
+            {"services", required_argument, 0,  0 },
+            {"sync_mode", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -247,7 +262,153 @@ int main( int argc, char** argv )
                     {
                         g_bAuth = true;
                     }
+#else
+                    else if( option_index == 1 ||
+                        option_index == 2 ||
+                        option_index == 3 )
+                    {
+                        printf( "%s : %s\n", optarg,
+                            "Error option is invalid "
+                            "since JS is disabled" );
+                    }
+                    bQuit = true;
+                    ret = -EINVAL;
+                    break;
 #endif
+                    else if( option_index == 4 )
+                    {
+                        g_dwFlags &= ~GEN_CLIENT;
+                    }
+                    else if( option_index == 5 )
+                    {
+                        g_dwFlags &= ~GEN_SERVER;
+                    }
+                    else if( option_index == 6 )
+                    {
+                        stdstr strSvcs = optarg;
+                        if( strSvcs.size() > REG_MAX_PATH )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error parameter is too long " );
+                            ret = -ERANGE;
+                            bQuit = true;
+                            break;
+                        }
+                        std::regex s("^[a-zA-Z_][a-zA-Z0-9_]*$");
+                        size_t start = 0;
+                        size_t pos = strSvcs.find_first_of(
+                            ',', start );
+                        while( pos != stdstr::npos )
+                        {
+                            stdstr strSvc =
+                                strSvcs.substr( start, pos );
+                            if( !std::regex_match( strSvc, s) )
+                            {
+                                printf( "%s : %s\n", strSvc.c_str(),
+                                    "Error invalid service name " );
+                                ret = -EINVAL;
+                                bQuit = true;
+                                break;
+                            }
+                            g_setServices.insert( strSvc );
+                            start = pos + 1;
+                            if( start >= strSvcs.size() )
+                                break;
+                            pos = strSvcs.find_first_of(
+                                ',', start );
+                        }
+                        if( start < strSvcs.size() )
+                            g_setServices.insert(
+                                strSvcs.substr( start ) );
+                    }
+                    else if( option_index == 7 )
+                    {
+                        stdstr strSyncIf = optarg;
+                        if( strSyncIf.size() > REG_MAX_PATH )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error parameter is too long " );
+                            ret = -ERANGE;
+                            bQuit = true;
+                            break;
+                        }
+                        std::regex
+                        e("(^[a-zA-Z_][a-zA-Z0-9_]*)(\\.[a-zA-Z_][a-zA-Z0-9_]*)?(=)"
+                            "(async|async_p|async_s|sync)");
+                        std::smatch m;
+                        std::regex_match( strSyncIf, m, e);
+                        auto it = m.begin() + 1;
+                        if( it == m.end() )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error invalid interface name" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                        stdstr strIfName = *it;
+                        it++;
+                        if( it == m.end() )
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error missing sync mode" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                        stdstr strVal = *it;
+                        if( strVal.empty() )
+                        {
+                            it++;
+                            strVal = *it;
+                        }
+                        stdstr strMethod = "";
+                        if( strVal[0] == '.' )
+                        {
+                            strMethod += strVal.substr( 1 );
+                            it++;
+                            strVal = *it;
+                        }
+                        if( strVal[0] == '=' )
+                        {
+                            it++;
+                        }
+                        else
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error invalid sync override expression" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                        stdstr strSync = *it;
+                        if( strSync == "async" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod,TOK_ASYNC } });
+                        else if( strSync == "async_p" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCP } } );
+                        else if( strSync == "async_s" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCS } } );
+                        else if( strSync == "sync" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_SYNC } } );
+                        else if( strSync == "sync_s" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCP } } );
+                        else if( strSync == "sync_p" )
+                            g_mapIfSync.insert( { strIfName,
+                                { strMethod, TOK_ASYNCS } } );
+                        else
+                        {
+                            printf( "%s : %s\n", optarg,
+                                "Error invalid sync mode" );
+                            ret = -EINVAL;
+                            bQuit = true;
+                            break;
+                        }
+                    }
                     break;
                 }
             case 'O':
@@ -411,14 +572,14 @@ int main( int argc, char** argv )
                     // make a shared lib for FUSE integration
                     if( optarg == nullptr )
                     {
-                        g_dwFlags = FUSE_BOTH;
+                        g_dwFlags |= FUSE_BOTH;
                         break;
                     }
                     char ch = optarg[ 0 ];
                     if( ch == 's' )
-                        g_dwFlags = FUSE_SERVER;
+                        g_dwFlags |= FUSE_SERVER;
                     else if( ch == 'p' )
-                        g_dwFlags = FUSE_PROXY;
+                        g_dwFlags |= FUSE_PROXY;
                     else
                     {
                         fprintf( stderr,

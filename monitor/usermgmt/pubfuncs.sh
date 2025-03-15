@@ -1,4 +1,63 @@
 #!/bin/bash
+
+function backup_registry()
+{
+    _regname=$1
+    _backup=$2
+    if [ -z $_regname ] || [ -z $_backup ]; then
+        echo Error missing parameters
+        return 22
+    fi
+    if [ ! -f $_regname ]; then
+        echo Error "$_regname" is not a valid file
+        return 2
+    fi
+    if [ -f $_backup ]; then
+        echo will erase the content of "$_backup", 'continue(Y/n)'?
+        read answer
+        if [ "x$answer" == "xy" ] || ["x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
+            >$_backup
+        else
+            exit 0
+        fi
+    fi
+    if [ ! -d backdir_0x123 ]; then
+        if ! mkdir backdir_0x123; then
+            echo Error cannot create temporary directory for backup purpose.
+            return $?
+        fi
+    fi
+
+    if ! regfsmnt -d $_regname backdir_0x123; then
+        return $?
+    fi
+    while ! mountpoint ./backdir_0x123; do
+        sleep 1
+    done
+
+    pushd backdir_0x123 > /dev/null
+    tar cf ../bktar123.tar --xattrs .
+    popd > /dev/null
+    umount backdir_0x123
+    sleep 1
+
+    regfsmnt -i $_backup
+    if ! regfsmnt -d $_backup backdir_0x123; then
+        return $?
+    fi
+    while ! mountpoint ./backdir_0x123; do
+        sleep 1
+    done
+
+    pushd backdir_0x123 > /dev/null
+    tar xf ../bktar123.tar
+    popd > /dev/null
+    umount backdir_0x123
+    rm bktar123.tar
+    rm -rf backdir_0x123
+    echo completed with backup file "$_backup"
+}
+
 function is_dir_empty()
 {
     if [ "x$1" == "x" ] ; then
@@ -20,7 +79,7 @@ function check_user_mount()
 # rootdir is the mount point of the usereg.dat
     mp=`mount | grep regfsmnt`
     if [ "x$mp" == "x" ];then
-        appmp=`mount | grep appmnt`
+        appmp=`mount | grep appmonsvr`
     fi
     mt=0
     if [ "x$mp" == "x" ] && [ "x$appmp" == "x" ]; then
@@ -38,7 +97,7 @@ function check_user_mount()
     fi
     if (( $mt == 2 ));then
         rootdir="$base/mprpcfaddu"
-        if [ -d $rootdir ]; then
+        if [ ! -d $rootdir ]; then
             mkdir -p $rootdir
         fi
         if ! regfsmnt -d $base/usereg.dat $rootdir; then
@@ -52,6 +111,7 @@ function check_user_mount()
         echo mounted usereg.dat...
     elif (( $mt == 1 ));then
         rootdir=`echo $appmp | awk '{print $3}'`
+        echo find mount at $rootdir...
         if [ ! -d "$rootdir/usereg/users" ]; then
             echo "Error cannot find the mount point of user registry"
             exit 1
@@ -59,39 +119,12 @@ function check_user_mount()
         rootdir="$rootdir/usereg"
     elif (( $mt == 0 ));then
         rootdir=`echo $mp | awk '{print $3}'`
+        echo find mount at $rootdir...
         if [ ! -d "$rootdir/users" ]; then
             echo "Error cannot find the mount point of user registry"
             exit 1
         fi
     fi
-}
-
-function add_group()
-{
-#this function assume the current directory is the root dir of the user registry
-#and it requires one parameter: the group name
-    echo adding group $1
-    _group=$1
-    if [ -d ./groups/$_group ]; then
-        return 1
-    fi
-
-    mkdir -p ./groups/$_group/users
-    if ! touch ./groups/$_group/gid; then
-        echo Error failed to create  groups/$_group/gid $?
-    fi
-
-    _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
-    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid > /dev/null
-    echo $_gidval > ./groups/$_group/gid
-    touch ./gids/$_gidval
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$_group\"}" ./gids/$_gidval > /dev/null
-    echo $_group > ./gids/$_gidval
-
-    touch ./groups/$_group/date
-    datestr=$(date)
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" ./groups/$_group/date > /dev/null
-    echo $datestr > ./groups/$_group/date
 }
 
 function join_group()
@@ -189,6 +222,35 @@ function leave_group()
     rm $_udir/groups/$_gidval
     rm $_gdir/users/$_uidval
     rm ./uids/$_uidval
+}
+
+function add_group()
+{
+#this function assume the current directory is the root dir of the user registry
+#and it requires one parameter: the group name
+    echo adding group $1
+    _group=$1
+    if [ -d ./groups/$_group ]; then
+        return 1
+    fi
+
+    mkdir -p ./groups/$_group/users
+    if ! touch ./groups/$_group/gid; then
+        echo Error failed to create  groups/$_group/gid $?
+    fi
+
+    _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
+    python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid > /dev/null
+    echo $_gidval > ./groups/$_group/gid
+    touch ./gids/$_gidval
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$_group\"}" ./gids/$_gidval > /dev/null
+    echo $_group > ./gids/$_gidval
+
+    touch ./groups/$_group/date
+    datestr=$(date)
+    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" ./groups/$_group/date > /dev/null
+    echo $datestr > ./groups/$_group/date
+    join_group $_group admin
 }
 
 function assoc_krb5user()
@@ -331,6 +393,36 @@ function list_users_group()
         _uname=`cat $i`
         echo $_uname $i
     done
+}
+
+function list_users()
+{
+    _udir=./users
+    if is_dir_empty $_udir; then
+        echo None
+        return 0
+    fi
+    pushd $_udir > /dev/null
+    for i in *; do
+        _uidval=`python3 ${updattr} -v $i/uid`
+        echo $i:$_uidval
+    done
+    popd > /dev/null
+}
+
+function list_groups()
+{
+    _gdir=./groups
+    if is_dir_empty $_gdir; then
+        echo no groups
+        return 0
+    fi
+    pushd $_gdir > /dev/null
+    for i in *; do
+        _gidval=`python3 ${updattr} -v $i/gid`
+        echo $i:$_gidval
+    done
+    popd > /dev/null
 }
 
 function disable_user()
@@ -628,7 +720,9 @@ function set_password()
         echo you can change the password later with rpcfmodu
         return 1
     fi
-    passhash=`echo -n $password | sha1sum | awk '{print $1}'`
+    salt=`tr -dc A-Za-z0-9 </dev/urandom | head -c 13; echo`
+    firsthash=`echo -n $password$salt | sha256sum | awk '{print $1}'`
+    passhash=`echo -n $firsthash-$salt`
     python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $_udir/passwd > /dev/null 
     passhash=
 }

@@ -7243,6 +7243,9 @@ gint32 CInterfaceServer::CheckReqCtx(
         oTaskCfg.CopyProp(
             propStmHandle, pReqCtx );
 
+        oTaskCfg.CopyProp(
+            propLoginInfo, pReqCtx );
+
         CIfInvokeMethodTask* pInv =
             ObjPtr( pCallback );
 

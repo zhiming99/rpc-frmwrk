@@ -2332,4 +2332,48 @@ gint32 CStatCounters_CliBase::GetCounter2(
     return ret;
 }
 
+ 
+gint32 CFastRpcProxyState::OpenPort(
+    IEventSink* pCallback )
+{
+    // let's prepare the parameters
+    gint32 ret = OpenPortInternal( pCallback );
+    if( ret == STATUS_PENDING || ERROR( ret ) )
+        return ret;
+    do{
+
+        PortPtr pPort;
+        ret = GetIoMgr()->GetPortPtr(
+            GetHandle(), pPort );
+
+        if( ERROR( ret ) )
+            break;
+        
+        if( pPort->GetClsid() ==
+            clsid( CDBusLocalPdo ) )
+            break;
+
+        CPort* pcp = pPort;
+        PortPtr pPdo;
+        ret = pcp->GetPdoPort( pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        ret = CopyProp( propConnHandle,
+            ( CObjBase*)pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        ret = CopyProp( propConnParams,
+            ( CObjBase*)pPdo );
+        if( ERROR( ret ) )
+            break;
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        OutputMsg( ret, "Error OpenPort from "
+            "CFastRpcProxyState" );
+    return ret;
+}
+
 }

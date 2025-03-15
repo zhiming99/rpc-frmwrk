@@ -2,6 +2,7 @@
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
 pubfuncs=${script_dir}/pubfuncs.sh
+addu=${script_dir}/rpcfaddu.sh
 
 if ! which regfsmnt; then
     echo cannot find program 'regfsmnt'. You may want \
@@ -13,23 +14,28 @@ pushd ${HOME} > /dev/null
 if [ ! -d .rpcf ]; then mkdir .rpcf; fi
 cd .rpcf
 if [ ! -d ./testmnt ]; then mkdir ./testmnt; fi
-if [ ! -f usereg.dat ]; then
-   touch usereg.dat;
-else
+if [ -f usereg.dat ]; then
    echo "you are going to format the user registry, continue ( y/n )?(default: yes)"
    read answer
-   if [ "x$answer" == "xy" ] || ["x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
+   if [ "x$answer" == "xy" ] || [ "x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
        mv usereg.dat usereg.dat.bak
-       regfsmnt -i ./usereg.dat || exit $?
    else
        exit 0
-    fi
+   fi
 fi
 
+regfsmnt -i ./usereg.dat || exit $?
+
 regfsmnt -d ./usereg.dat ./testmnt
+ticks=10
 while ! mountpoint ./testmnt > /dev/null ; do
     echo waiting fs ready...
     sleep 1
+    (( ticks-- ))
+    if (( $ticks == 0 )); then
+        echo Error failed to mount appreg.dat
+        exit 110
+    fi
 done
 
 
@@ -62,3 +68,6 @@ cd ..
 fusermount3 -u ./testmnt
 rmdir ./testmnt
 popd > /dev/null
+
+echo adding user 'admin'
+bash $addu admin

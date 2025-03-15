@@ -431,10 +431,6 @@ class CRpcInterfaceBase :
     gint32 SetReqQueSize(
         IMessageMatch* pMatch, guint32 dwSize );
 
-    gint32 QueueStopTask(
-        CRpcInterfaceBase* pIf,
-        IEventSink* pCallback  );
-
     public:
 
     typedef CRpcBaseOperations super;
@@ -442,6 +438,10 @@ class CRpcInterfaceBase :
     CRpcInterfaceBase( const IConfigDb* pCfg )
         :super( pCfg )
     {;}
+
+    gint32 QueueStopTask(
+        CRpcInterfaceBase* pIf,
+        IEventSink* pCallback  );
 
     gint32 ClearActiveTasks();
     gint32 ClearPausedTasks();

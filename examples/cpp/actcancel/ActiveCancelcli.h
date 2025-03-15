@@ -4,6 +4,13 @@
 #pragma once
 #include "actcancel.h"
 
+#include "IActiveCancelcli.h"
+
+DECLARE_AGGREGATED_PROXY(
+    CActiveCancel_CliSkel,
+    CStatCountersProxy,
+    IIActiveCancel_PImpl );
+
 class CActiveCancel_CliImpl
     : public CActiveCancel_CliSkel
 {

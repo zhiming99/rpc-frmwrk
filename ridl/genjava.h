@@ -90,7 +90,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strFactory;
-        return SelectFile( 0 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectDescFile()
@@ -98,7 +98,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strObjDesc;
-        return SelectFile( 1 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectDrvFile()
@@ -106,7 +106,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDriver;
-        return SelectFile( 2 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectMakefile()
@@ -114,7 +114,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMakefile;
-        return SelectFile( 3 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectMainCli()
@@ -122,7 +122,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainCli;
-        return SelectFile( 4 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectMainSvr()
@@ -130,7 +130,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainSvr;
-        return SelectFile( 5 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectReadme()
@@ -138,7 +138,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
-        return SelectFile( 6 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectDeserialMap()
@@ -146,7 +146,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDeserialMap;
-        return SelectFile( 7 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectDeserialArray()
@@ -154,19 +154,7 @@ class CJavaWriter : public CWriterBase
         CJavaFileSet* pFiles = static_cast< CJavaFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDeserialArray;
-        return SelectFile( 8 );
-    }
-
-    inline gint32 SelectImplFile(
-        const std::string& strFile )
-    {
-        decltype( m_pFiles->m_mapSvcImp )::iterator itr =
-        m_pFiles->m_mapSvcImp.find( strFile );
-        if( itr == m_pFiles->m_mapSvcImp.end() )
-            return -ENOENT;
-        gint32 idx = itr->second;
-        m_strCurFile = strFile;
-        return SelectFile( idx );
+        return SelectImplFile( m_strCurFile );
     }
 
     gint32 AddStructImpl(

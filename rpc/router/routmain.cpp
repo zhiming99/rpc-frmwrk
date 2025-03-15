@@ -27,10 +27,12 @@
 #include <unistd.h>
 #include <limits.h>
 
-#include "routmain.h"
+#include <rpc.h>
+using namespace rpcf;
 #include <ifhelper.h>
 #include <frmwrk.h>
 #include <rpcroute.h>
+#include "routmain.h"
 
 #ifdef FUSE3
 #include <fuseif.h>
@@ -39,6 +41,8 @@
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 #include <cppunit/extensions/HelperMacros.h>
+#include <signal.h>
+#include "getopt.h"
 
 #define MAX_BYTES_MPOINT  REG_MAX_NAME
 
@@ -54,11 +58,27 @@ static bool g_bDaemon = false;
 static std::string g_strMPoint;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
+static bool g_bMonitoring = false;
+std::atomic< bool > g_bExit={false};
+std::atomic< bool > g_bMonOff ={false};
 
-// two globals must be present for libfuseif.so
+// the following two globals must be present for
+// libfuseif.so
 ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 char g_szKeyPass[ SSL_PASS_MAX + 1 ] = {0};
+
+extern gint32 StartAppManCli(
+    CRpcServices* prt, InterfPtr& pAppMan );
+extern gint32 StopAppManCli();
+
+void SignalHandler( int signum )
+{
+    if( signum == SIGINT )
+        g_bExit = true;
+    else if( signum == SIGUSR1 )
+        g_bMonOff = true;
+}
 
 void CIfRouterTest::setUp()
 {
@@ -135,6 +155,19 @@ void CIfRouterTest::setUp()
                 "./librpc.so" );
             if( ERROR( ret ) )
                 break;
+
+            if( g_bMonitoring )
+            {
+                ret = pSvc->TryLoadClassFactory(
+                    "./libappmancli.so" );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error, cannot find "
+                        "monitoring module" );
+                    break;
+                }
+            }
 
             ret = pSvc->Start();
         }
@@ -305,22 +338,56 @@ void CIfRouterTest::testSvrStartStop()
             "Starting %s as %s...", MODULE_NAME,
             ( g_dwRole & 0x2 ) ? "bridge" : "reqfwdr" );
 
+        InterfPtr pAppMan;
+        if( g_bMonitoring )
+        {
+            ret = StartAppManCli( pIf, pAppMan );
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "Error unable to "
+                    "connect to monitor server" );
+                break;
+            }
+        }
+
         CInterfaceServer* pSvr = pIf;
         if( g_strMPoint.empty() )
         {
+            auto oldh = signal(
+                SIGINT, SignalHandler );
+            auto oldh2 = signal(
+                SIGUSR1, SignalHandler );
             while( pSvr->IsConnected() )
+            {
                 sleep( 1 );
+                if( g_bExit )
+                    break;
+            }
+            signal( SIGINT, oldh );
+            signal( SIGUSR1, oldh2 );
         }
-#ifdef FUSE3
         else
         {
+#ifdef FUSE3
            ret = MountAndLoop( pSvr );
-        }
 #else
-        ret = -ENOTSUP;
+           ret = -ENOTSUP;
 #endif
+        }
 
     }while( 0 );
+
+    if( g_dwRole & 0x2 )
+    {
+        LOGINFO( m_pMgr, ret, "bridge is stopping" );
+    }
+    else
+    {
+        LOGINFO( m_pMgr, ret, "reqfwdr is stopping" );
+    }
+
+    if( g_bMonitoring )
+        StopAppManCli();
 
     if( !pIf.IsEmpty() )
         pIf->Stop();
@@ -346,6 +413,8 @@ void Usage( char* szName )
 #endif
         "\t [ -d to run as a daemon ]\n"
         "\t [ -g to enable logging when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -o to enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -l to use the driver.json in current directory instead of the default one ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
         szName );
@@ -360,10 +429,24 @@ int main( int argc, char** argv )
     int opt = 0;
     int ret = 0;
     bool bRole = false;
-    while( ( opt = getopt( argc, argv, "hr:adcfs:m:vgl" ) ) != -1 )
+
+    int option_index = 0;
+    struct option long_options[] = {
+        {"monitor", no_argument, 0,  0 },
+        {0, 0,  0,  0 } };
+
+    while( ( opt = getopt_long(
+        argc, argv, "hr:adcfs:m:vglo",
+        long_options, &option_index ) ) != -1 )
     {
         switch (opt)
         {
+        case 0:
+            {
+                if( option_index == 0 )
+                    g_bMonitoring = true;
+                break;
+            }
         case 'r':
             {
                 g_dwRole = ( guint32 )atoi( optarg );
@@ -445,6 +528,11 @@ int main( int argc, char** argv )
                 fprintf( stdout, "%s", Version() );
                 exit( 0 );
             }
+        case 'o':
+            {
+                g_bMonitoring = true;
+                break;
+            }
         case 'l':
             {
                 g_bLocal = true;
@@ -477,10 +565,19 @@ int main( int argc, char** argv )
             break;
     }
 
-
     if( ERROR( ret ) || !bRole )
     {
         Usage( argv[ 0 ] );
+        exit( -ret );
+    }
+
+    if( ( g_dwRole & 2 ) == 0 &&
+        g_bMonitoring )
+    {
+        fprintf( stderr,
+            "Error '-o' is only available with "
+            "'-r 2'\n" );
+        ret = -EINVAL;
         exit( -ret );
     }
 

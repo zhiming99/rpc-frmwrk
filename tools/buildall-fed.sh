@@ -10,7 +10,7 @@ make dbus-devel jsoncpp-devel lz4-devel cmake ccache lz4-libs cppunit \
 cppunit-devel dbus dbus-libs jsoncpp bash krb5-devel krb5-libs \
 python3-devel python3-pip python3-setuptools \
 openssl-devel openssl openssl-libs expect \
-fuse3-devel fuse3 fuse3-libs npm vim screen git \
+fuse3-devel fuse3 fuse3-libs npm vim screen git attr \
 java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk swig apache-commons-cli \
 
 ${SUDO} dnf -y install sip5 || ${SUDO} dnf -y install sip6

@@ -29,6 +29,8 @@ using namespace rpcf;
 #include "lexer.h"
 #include "astnode.h"
 #include <memory>
+#include <stdlib.h>
+#include <set>
 
 #define FUSE_PROXY  1
 #define FUSE_SERVER 2
@@ -39,6 +41,7 @@ ObjPtr g_pRootNode;
 CAliasMap g_mapAliases;
 std::string g_strAppName;
 std::map< std::string, BufPtr > g_mapConsts;
+extern std::map< stdstr, std::pair< stdstr, guint32 > > g_mapIfSync;
 
 bool g_bSemanErr = false;
 
@@ -88,6 +91,7 @@ extern std::vector<
 
 extern bool g_bNewSerial;
 extern bool g_dwFlags;
+extern std::set< stdstr > g_setServices;
 
 void yyerror( YYLTYPE *locp,
     char const* szFile, char const *msg );
@@ -217,11 +221,15 @@ do{ \
         pDest_->EnableSerialize(); \
 }while( 0 )
 
-gint32 CheckNameDup(
+extern gint32 CheckNameDup(
     ObjPtr& pInArgs,
     ObjPtr& pOutArgs,
     std::string& strDupName );
 
+extern gint32 OverrideIfSyncMode(
+    ObjPtr& pIf,
+    const stdstr& strMethod,
+    guint32 dwSyncMod );
 %}
 
 %define api.value.type {BufPtr}
@@ -269,6 +277,7 @@ gint32 CheckNameDup(
 %token TOK_ASYNC
 %token TOK_ASYNCP
 %token TOK_ASYNCS
+%token TOK_SYNC
 %token TOK_STREAM
 %token TOK_EVENT
 %token TOK_TIMEOUT
@@ -278,17 +287,46 @@ gint32 CheckNameDup(
 %parse-param { char const *file_name };
 %initial-action
 {
-    YYLTYPE2* pLtype = ( YYLTYPE2* )&@$;
-    pLtype->initialize( file_name );
-    FILECTX* pfc = new FILECTX( file_name );
-    g_vecBufs.push_back(
-        std::unique_ptr< FILECTX >( pfc ) );
-    yyin = pfc->m_fp;
-    char szBuf[ 256 ];
-    gint32 ret = fread( szBuf, 1, 256, yyin );
-    if( ret == 0 )
-        ret = ferror( yyin );
-    rewind( yyin );
+    gint32 ret = 0;
+    do{
+        YYLTYPE2* pLtype = ( YYLTYPE2* )&@$;
+        pLtype->initialize( file_name );
+        FILECTX* pfc = nullptr;
+        if( file_name[ 0 ] != '/' )
+        {
+            char* path = realpath(
+                file_name, nullptr );
+
+            if( path == nullptr )
+            {
+                stdstr strMsg =
+                    "cannot find the file ";
+                strMsg = strMsg + "'" + file_name + "'";
+                OutputMsg( -ENOENT, strMsg );
+                ret = -ENOENT;
+                break;
+            }
+            else
+            {
+                pfc = new FILECTX( path );
+                free( path );
+            }
+        }
+        else
+        {
+            pfc = new FILECTX( file_name );
+        }
+        g_vecBufs.push_back(
+            std::unique_ptr< FILECTX >( pfc ) );
+        yyin = pfc->m_fp;
+        char szBuf[ 256 ];
+        ret = fread( szBuf, 1, 256, yyin );
+        if( ret == 0 )
+            ret = ferror( yyin );
+        rewind( yyin );
+    }while( 0 );
+    if( ERROR( ret ) )
+        YYERROR;
 };
 
 
@@ -308,15 +346,16 @@ statements : statement ';'
         g_pRootNode = pNode;
     }
     ;
-statements : statement ';' statements
+statements : statements statement ';'
     {
-        ObjPtr pNode = *$3;
-        CStatements* pstmts = pNode;
-        ObjPtr& pstmt = *$1;
-        pstmts->InsertChild( pstmt );
-        BufPtr pBuf( true );
-        *pBuf = pNode;
-        $$ = pBuf;
+        ObjPtr pNode = *$1;
+        if( !$2.IsEmpty() && !$2->empty() )
+        {
+            CStatements* pstmts = pNode;
+            ObjPtr& pstmt = *$2;
+            pstmts->AddChild( pstmt );
+        }
+        $$ = $1;
         CLEAR_RSYMBS;
         g_pRootNode = pNode;
     }
@@ -1164,6 +1203,13 @@ interf_decl : TOK_INTERFACE TOK_IDENT '{' method_decls '}'
         *pBuf = pNode;
         $$ = pBuf;
         g_mapDecls.AddDeclNode( strName, pNode );
+        auto itr = g_mapIfSync.find( strName );
+        if( itr != g_mapIfSync.end() )
+        {
+            OverrideIfSyncMode( pNode,
+                itr->second.first,
+                itr->second.second );
+        }
         CLEAR_RSYMBS;
     }
     ;
@@ -1187,8 +1233,8 @@ interf_ref : TOK_INTERFACE TOK_IDENT
         }
         if( !pTemp.IsEmpty() )
         {
-            CInterfaceDecl* pifd = pTemp;
-            pifd->AddRef();
+            // CInterfaceDecl* pifd = pTemp;
+            // pifd->AddRef();
             ENABLE_STREAM( pTemp, pifr );
         }
         pifr->SetName( strName );
@@ -1250,6 +1296,15 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
         pNode.NewObj( clsid( CServiceDecl ) );
         CServiceDecl* psd = pNode;
         std::string strName = *$2;
+        if( !g_setServices.empty() &&
+            g_setServices.find( strName ) ==
+            g_setServices.end() )
+        {
+            BufPtr pBuf( true );
+            $$ = pBuf;
+            CLEAR_RSYMBS;
+            break;
+        }
         ObjPtr pTemp;
         gint32 ret = g_mapDecls.GetDeclNode(
             strName, pTemp );
@@ -1279,6 +1334,31 @@ service_decl : TOK_SERVICE TOK_IDENT attr_list '{' interf_refs '}'
             ret = 0;
         }
         ObjPtr& pifrs = *$5;
+        CInterfRefs* pifrsp = pifrs;
+        std::vector< ObjPtr > vecIfs;
+        ret = pifrsp->GetIfRefs( vecIfs );
+        if( ERROR( ret ) )
+        {
+            std::string strMsg = "service '"; 
+            strMsg += strName + "'";
+            strMsg += " has no interface";
+            PrintMsg( -EINVAL, strMsg.c_str() );
+            ret = -EINVAL;
+            g_bSemanErr = true;
+        }
+        else
+        {
+            for( auto& elem : vecIfs )
+            {
+                CInterfRef* pifr = elem;
+                ObjPtr pObj;
+                ret = pifr->GetIfDecl( pObj );
+                if( ERROR( ret ) )
+                    continue;
+                CInterfaceDecl* pifd = pObj;
+                pifd->AddRef();
+            }
+        }
         psd->SetInterfList( pifrs );
 
         ENABLE_STREAM( pifrs, psd );

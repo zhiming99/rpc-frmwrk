@@ -26,7 +26,7 @@ libauth_la_SOURCES = security.cpp dllexp.cpp $(rpcfauth_headers) $(krb5_sources)
 
 libauth_ladir=$(libdir)
 
-dist_libauth_conf_DATA=
+dist_libauth_conf_DATA=blist.json
 libauth_confdir=$(sysconfdir)/rpcf
 
 EXTRA_DIST=README.md README_cn.md

@@ -949,6 +949,14 @@ class PyRpcServices :
     def DeferCallback( self, callback, listArgs ) :
         self.InvokeCallback( callback, listArgs )
 
+    def OnPostStop( self ) :
+        '''
+        this event is triggered when the rpc connection
+        is down either server or client.
+        override this method for better stop control.
+        '''
+        print( "service is stopped" )
+
 class PyRpcProxy( PyRpcServices ) :
 
     def __init__( self, pIoMgr, strDesc, strSvrObj ) :

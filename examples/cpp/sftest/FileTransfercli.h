@@ -4,6 +4,13 @@
 #pragma once
 #include "sftest.h"
 #include "transctx.h"
+#include "IFileTransfercli.h"
+
+DECLARE_AGGREGATED_PROXY(
+    CFileTransfer_CliSkel,
+    CStatCountersProxy,
+    CStreamProxyAsync,
+    IIFileTransfer_PImpl );
 
 class CFileTransfer_CliImpl
     : public CFileTransfer_CliSkel

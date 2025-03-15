@@ -1,5 +1,5 @@
 appname "appmon";
-include "../registry/regfsif.ridl";
+// include "../registry/regfsif.ridl";
 
 struct KeyValue
 {
@@ -7,21 +7,12 @@ struct KeyValue
     variant oValue;
 };
 
-interface IAppMonitor
+interface IAppStore
 {
-    [async]RegisterListener(
-        HSTREAM hStream,
-        array<string> arrApps )
-    returns();
-
-    [async]RemoveListener(
-        HSTREAM hStream )
-    returns();
-
     [async_s]ListApps()
     returns( array<string> arrApps );
 
-    [async_s]ListPoints( string strAppPath)
+    [async_s]ListPoints( string strAppName)
     returns( array<string> arrPoints );
     
     [async_s]ListAttributes( string strPtPath)
@@ -33,7 +24,19 @@ interface IAppMonitor
 
     [async_s]GetPointValue( string strPtPath )
     returns( variant rvalue );
-    
+
+    [async_s]SetLargePointValue(
+        string strPtPath, bytearray value )
+    returns();
+
+    [async_s]GetLargePointValue(
+        string strPtPath )
+    returns( bytearray value );
+
+    [async_s]SubscribeStreamPoint(
+        string strPtPath, HSTREAM hstm )
+    returns();
+
     [async_s]SetAttrValue(
         string strAttrPath, variant value )
     returns();
@@ -42,10 +45,12 @@ interface IAppMonitor
     returns( variant rvalue );
 
     [async_s]SetPointValues(
+        string strAppName,
         array<KeyValue> arrValues ) 
     returns();
 
     [async_s]GetPointValues(
+        string strAppName,
         array< string > arrPtPaths )
     returns( array< KeyValue > arrKeyVals );
 
@@ -53,12 +58,57 @@ interface IAppMonitor
         string strPtPath, variant value ) 
     returns();
 
-    [ event ]OnPointsChanged( array< KeyValue > arrKVs ) 
+    [ event ]OnPointsChanged(
+        array< KeyValue > arrKVs ) 
     returns();
 };
 
-service AppMonitor
+interface IAppMonitor
 {
-    interface IRegFsRemote;
+    [async_s]RegisterListener(
+        array<string> arrApps )
+    returns();
+
+    [async_s]RemoveListener()
+    returns();
+};
+
+interface IDataProducer
+{
+    [async]ClaimAppInst( string strAppName,
+        array< KeyValue > arrPtToSet )
+    returns( array< KeyValue > arrPtToGet );
+
+    [async]FreeAppInsts(
+        array< string > arrApps )
+    returns();
+};
+
+interface IUserManager
+{
+    [async_s]GetUidByOAuth2Name( string strOA2Name )
+    returns( int32 dwUid );
+    [async_s]GetUidByKrb5Name( string strKrb5Name )
+    returns( int32 dwUid );
+    [async_s]GetUidByUserName( string strUserName )
+    returns( int32 dwUid );
+    [async_s]GetPasswordSalt( int32 dwUid )
+    returns( string strSalt );
+};
+
+service AppManager [stream] 
+{
+    interface IAppStore;
+    interface IDataProducer;
+};
+
+service AppMonitor [stream]
+{
+    interface IAppStore;
     interface IAppMonitor;
+};
+
+service SimpleAuth
+{
+    interface IUserManager;
 };

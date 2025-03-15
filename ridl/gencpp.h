@@ -42,9 +42,17 @@ do{ \
 #define FUSE_SERVER 2
 #define FUSE_BOTH   3
 
+#define GEN_SERVER    ( ( guint32 )4 )
+#define GEN_CLIENT    ( ( guint32 )8 )
+#define GEN_BOTH      ( ( guint32 )( 4 | 8 ) )
+
 #define bFuseP ( ( g_dwFlags & FUSE_PROXY ) > 0 )
 #define bFuseS ( ( g_dwFlags & FUSE_SERVER ) > 0 )
-#define bFuse ( ( g_dwFlags & FUSE_BOTH ) > 0 )
+#define bFuse ( ( g_dwFlags & FUSE_BOTH ) == FUSE_BOTH )
+
+#define bGenServer ( ( g_dwFlags & GEN_SERVER) > 0 )
+#define bGenClient ( ( g_dwFlags & GEN_CLIENT ) > 0 )
+#define bGenBoth ( ( g_dwFlags & GEN_BOTH ) == GEN_BOTH )
 
 guint32 GenClsid(
     const std::string& strName );
@@ -69,8 +77,7 @@ typedef std::unique_ptr< std::ifstream > STMIPTR;
 struct IFileSet
 {
     std::string  m_strPath;
-    std::map< std::string, gint32 > m_mapSvcImp;
-    std::vector< STMPTR > m_vecFiles;
+    std::map< std::string, STMPTR > m_mapSvcImp;
 
     IFileSet( const stdstr& strOutPath )
     { m_strPath = strOutPath; }
@@ -94,6 +101,8 @@ struct CFileSet : public IFileSet
     std::string  m_strMainCli;
     std::string  m_strMainSvr;
     std::string  m_strReadme;
+    std::string  m_strStruct;
+    std::string  m_strStructHdr;
 
     typedef IFileSet super;
 
@@ -103,6 +112,8 @@ struct CFileSet : public IFileSet
     virtual gint32 OpenFiles();
     virtual gint32 AddSvcImpl(
         const std::string& strSvcName );
+    gint32 AddIfImpl(
+        const std::string& strIfName );
     ~CFileSet()
     {}
 };
@@ -178,17 +189,6 @@ struct CWriterBase
         AppendText( "}" );
     }
 
-    guint32 SelectFile( guint32 idx )
-    {
-        if( idx >= m_pFiles->m_vecFiles.size() )
-            return -ERANGE;
-        if( idx < 0 )
-            return -ERANGE;
-        m_curFp = m_pFiles->
-            m_vecFiles[ idx ].get();
-        return STATUS_SUCCESS;
-    }
-
     void reset()
     {
         m_dwIndent = 0;
@@ -196,8 +196,13 @@ struct CWriterBase
 
     gint32 AddSvcImpl(
         const std::string& strSvcName )
+    { return m_pFiles->AddSvcImpl( strSvcName ); }
+
+    gint32 AddIfImpl(
+        const std::string& strIfName )
     {
-        return m_pFiles->AddSvcImpl( strSvcName );
+        auto pFiles = ( CFileSet* )m_pFiles.get();
+        return pFiles->AddIfImpl( strIfName );
     }
 
     const stdstr& GetCurFile() const
@@ -205,6 +210,18 @@ struct CWriterBase
 
     const stdstr& GetOutPath() const
     { return m_pFiles->GetOutPath(); }
+
+    inline gint32 SelectImplFile(
+        const std::string& strFile )
+    {
+        auto itr = m_pFiles->m_mapSvcImp.find(
+            basename( strFile.c_str() ) );
+        if( itr == m_pFiles->m_mapSvcImp.end() )
+            return -ENOENT;
+        m_strCurFile = strFile;
+        m_curFp = itr->second.get();
+        return 0;
+    }
 };
 
 class CCppWriter : public CWriterBase
@@ -229,7 +246,7 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strAppHeader;
-        return SelectFile( 0 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectCppFile()
@@ -237,7 +254,7 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strAppCpp;
-        return SelectFile( 1 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectDescFile()
@@ -245,7 +262,7 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strObjDesc;
-        return SelectFile( 2 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectDrvFile()
@@ -253,7 +270,7 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDriver;
-        return SelectFile( 3 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectMakefile()
@@ -261,7 +278,9 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMakefile;
-        return SelectFile( 4 );
+        
+        return SelectImplFile( m_strCurFile );
+
     }
 
     inline gint32 SelectMainCli()
@@ -269,7 +288,7 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainCli;
-        return SelectFile( 5 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectMainSvr()
@@ -277,7 +296,7 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainSvr;
-        return SelectFile( 6 );
+        return SelectImplFile( m_strCurFile );
     }
 
     inline gint32 SelectReadme()
@@ -285,20 +304,23 @@ class CCppWriter : public CWriterBase
         CFileSet* pFiles = static_cast< CFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
-        return SelectFile( 7 );
+        return SelectImplFile( m_strCurFile );
+    }
+    inline gint32 SelectStruct()
+    {
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strStruct;
+        return SelectImplFile( m_strCurFile );
+    }
+    inline gint32 SelectStructHdr()
+    {
+        CFileSet* pFiles = static_cast< CFileSet* >
+            ( m_pFiles.get() );
+        m_strCurFile = pFiles->m_strStructHdr;
+        return SelectImplFile( m_strCurFile );
     }
 
-    inline gint32 SelectImplFile(
-        const std::string& strFile )
-    {
-        decltype( m_pFiles->m_mapSvcImp )::iterator itr =
-        m_pFiles->m_mapSvcImp.find( strFile );
-        if( itr == m_pFiles->m_mapSvcImp.end() )
-            return -ENOENT;
-        gint32 idx = itr->second;
-        m_strCurFile = strFile;
-        return SelectFile( idx );
-    }
 };
 
 #define INDENT_UP   m_pWriter->IndentUp()
@@ -544,7 +566,7 @@ class CDeclService
     CDeclService( CCppWriter* pWriter,
         ObjPtr& pNode );
 
-    gint32 Output();
+    gint32 Output( bool bProxy );
 };
 
 using ABSTE = std::pair< std::string, ObjPtr >;
@@ -558,7 +580,7 @@ class CDeclServiceImpl :
     public:
     typedef CMethodWriter super;
     CDeclServiceImpl( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer );
+        ObjPtr& pNode, bool bProxy );
 
     gint32 FindAbstMethod(
         std::vector< ABSTE >& vecMethods,
@@ -581,8 +603,8 @@ class CImplServiceImpl :
     public:
     typedef CDeclServiceImpl super;
     CImplServiceImpl( CCppWriter* pWriter,
-        ObjPtr& pNode, bool bServer )
-        : super( pWriter, pNode, bServer )
+        ObjPtr& pNode, bool bProxy )
+        : super( pWriter, pNode, bProxy )
     {}
 
     gint32 Output() override;
@@ -704,8 +726,8 @@ class CImplClassFactory
     CCppWriter* m_pWriter = nullptr;
     CStatements* m_pNode = nullptr;
     public:
-    CImplClassFactory(
-        CCppWriter* pWriter, ObjPtr& pNode, bool bServer );
+    CImplClassFactory( CCppWriter* pWriter,
+        ObjPtr& pNode, bool bProxy );
     virtual gint32 Output();
 
     inline bool IsServer() const
@@ -727,6 +749,8 @@ class CImplMainFunc :
         ObjPtr& pNode,
         bool bProxy );
     gint32 Output();
+    static gint32 EmitDeclIoMgr(
+        bool bProxy, CCppWriter* pWriter );
     static gint32 EmitInitContext(
         bool bProxy, CCppWriter* pWriter );
     static gint32 EmitInitRouter(

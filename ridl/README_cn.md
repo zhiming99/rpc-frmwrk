@@ -132,7 +132,13 @@ service SimpFileSvc [ stream ]
         -L<lang>： 指定生成的README.md的语言。 目前lang可以是"cn"中文，或者"en"英文. 
 
         -s: 生成的微服务框架通过Unix Socket进行进程间通信，与缺省时通过DBus进行通信不同, 有较小的请求包和更快的请求响应，同时在流量可以进行session级别的控制。不过对打开文件的个数要求是DBus通信的两倍。
+
         -b: 生成的服务器和客户端框架，不需要rpcrouter进行中转, 省却本地进程间通信，有低的延迟和较高的吞吐量。
+
+        --server, --client: 只生成服务器端或者客户端的框架代码。
+
+        --services <service list>: 只为<service list>中指定的那些`service`，生成框架代码，忽略没有指定的`service`。service的名称由`,`隔开且无空格。
+        --sync_mode <interface name>=<async|async_s|async_p|sync>: 本选项将使用命令行给定的同步模式替换ridl文件中指定的同步模式。这里<interface name>后面可以跟一个[.<method name>],以便更加精确的控制每个接口方法的同步模式。比如IAppInterface.DoCalculate。
 ```
 
 目前`ridlc`可以生成 C++, Python，Java和JavaScript的应用框架. 

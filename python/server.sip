@@ -184,6 +184,7 @@ class CPythonServer:
 
             Py_DECREF( pPyObj );
             Py_DECREF( pPyCtx );
+            Py_DECREF( pPyRet );
 
         }while( 0 );
         PyGILState_Release( gstate );

@@ -285,7 +285,7 @@ gint32 CRegistry::Namei(
             strTemp.erase( pos );
             continue;
         }
-        else if( pos == 0 && ( pos + 1 == strTemp.size() ) )
+        else if( pos == 0 && ( 1 == strTemp.size() ) )
         {
             // the last root '/'
             vecComponents.push_back( strTemp );

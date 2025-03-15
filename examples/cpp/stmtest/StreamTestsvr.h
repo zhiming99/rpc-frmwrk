@@ -4,6 +4,13 @@
 #pragma once
 #include "stmtest.h"
 #include "commdefs.h"
+#include "IStreamTestsvr.h"
+
+DECLARE_AGGREGATED_SERVER(
+    CStreamTest_SvrSkel,
+    CStatCountersServer,
+    CStreamServerAsync,
+    IIStreamTest_SImpl );
 
 struct TransferContext
 {

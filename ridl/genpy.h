@@ -83,7 +83,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strStructsPy;
-        return SelectFile( 0 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectInitFile()
@@ -91,7 +91,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strInitPy;
-        return SelectFile( 1 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectDescFile()
@@ -99,7 +99,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strObjDesc;
-        return SelectFile( 2 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectDrvFile()
@@ -107,7 +107,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strDriver;
-        return SelectFile( 3 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectMakefile()
@@ -115,7 +115,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMakefile;
-        return SelectFile( 4 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectMainCli()
@@ -123,7 +123,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainCli;
-        return SelectFile( 5 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectMainSvr()
@@ -131,7 +131,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strMainSvr;
-        return SelectFile( 6 );
+        return SelectImplFile( m_strCurFile );
     }
 
     virtual gint32 SelectReadme()
@@ -139,20 +139,7 @@ class CPyWriter : public CWriterBase
         CPyFileSet* pFiles = static_cast< CPyFileSet* >
             ( m_pFiles.get() );
         m_strCurFile = pFiles->m_strReadme;
-        return SelectFile( 7 );
-    }
-
-
-    gint32 SelectImplFile(
-        const std::string& strFile )
-    {
-        decltype( m_pFiles->m_mapSvcImp )::iterator itr =
-        m_pFiles->m_mapSvcImp.find( strFile );
-        if( itr == m_pFiles->m_mapSvcImp.end() )
-            return -ENOENT;
-        gint32 idx = itr->second;
-        m_strCurFile = strFile;
-        return SelectFile( idx );
+        return SelectImplFile( m_strCurFile );
     }
 };
 
