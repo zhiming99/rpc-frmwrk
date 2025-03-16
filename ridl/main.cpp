@@ -643,6 +643,18 @@ int main( int argc, char** argv )
         }
 
         std::string strFile = argv[ optind ];
+        if( strFile.size() > REG_MAX_PATH )
+        {
+            printf( "File name too long\n" );
+            break;
+        }
+        ret = access( strFile.c_str(), F_OK );
+        if( ERROR( ret ) )
+        {
+            printf( "Unable to find the file to "
+                "compile\n" );
+            break;
+        }
 
         if( argv[ optind + 1 ] != nullptr )
         {
