@@ -648,11 +648,12 @@ int main( int argc, char** argv )
             printf( "File name too long\n" );
             break;
         }
-        ret = access( strFile.c_str(), F_OK );
-        if( ERROR( ret ) )
+
+        char* pszFile = realpath(
+            strFile.c_str(), nullptr );
+        if( pszFile == nullptr )
         {
-            printf( "Unable to find the file to "
-                "compile\n" );
+            ret = -errno;
             break;
         }
 
@@ -664,12 +665,15 @@ int main( int argc, char** argv )
         }
 
         try {
-            ret = yyparse( strFile.c_str() );
+            ret = yyparse( pszFile );
         }
         catch (std::exception& e)
         {
             printf( "%s\n", e.what() );
         }
+
+        free( pszFile );
+        pszFile = nullptr;
 
         if( g_pRootNode.IsEmpty() )
         {
