@@ -642,6 +642,13 @@ int main( int argc, char** argv )
             break;
         }
 
+        if( argv[ optind + 1 ] != nullptr )
+        {
+            printf( "too many arguments\n" );
+            Usage();
+            break;
+        }
+
         std::string strFile = argv[ optind ];
         if( strFile.size() > REG_MAX_PATH )
         {
@@ -654,13 +661,6 @@ int main( int argc, char** argv )
         if( pszFile == nullptr )
         {
             ret = -errno;
-            break;
-        }
-
-        if( argv[ optind + 1 ] != nullptr )
-        {
-            printf( "too many arguments\n" );
-            Usage();
             break;
         }
 

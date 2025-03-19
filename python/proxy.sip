@@ -203,6 +203,123 @@ class CPythonInterfBase : public T
         return ret;
     }
 
+    gint32 ConvertVarToPyObj(
+        Variant& oVar, PyObject*& pObj )
+    {
+        gint32 ret = 0;
+        EnumTypeId iType = oVar.GetTypeId();
+        if( iType == typeNone )
+        {
+            pObj = Py_None;
+            return ret;
+        }
+        do{
+            switch( iType )
+            {
+            case typeByte: 
+                {
+                    auto val = ( guint8& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeUInt16:
+                {
+                    auto val = ( guint16& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeUInt32:
+                {
+                    auto val = ( guint32& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeUInt64:
+                {
+                    auto val = ( guint64& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLongLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeFloat:
+                {
+                    auto val = ( float& )oVar;
+                    PyObject* pTemp =
+                        PyFloat_FromDouble( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeDouble:
+                {
+                    auto val = ( double& )oVar;
+                    PyObject* pTemp =
+                        PyFloat_FromDouble( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeString:
+                {
+                    auto val = ( stdstr& )oVar;
+                    pObj =
+                        PyUnicode_FromString( val.c_str() );
+                    break;
+                }
+            case typeObj:
+                {
+                    auto val = &( ObjPtr& )oVar;
+                    pObj = sipConvertFromNewType(
+                        val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                    break;
+                }
+            case typeByteArr:
+                {
+                    auto pBuf = ( BufPtr& )oVar;
+                    if( pBuf.IsEmpty() || pBuf->empty() )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    PyObject* pView = PyMemoryView_FromMemory(
+                        pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                    if( pView == nullptr )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+
+                    pObj = PyByteArray_FromObject( pView );
+                    Py_DECREF( pView );
+                    break;
+                }
+            case typeDMsg:
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+            default:
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+            }
+
+        }while( 0 );
+        return ret;
+    }
+
     gint32 TimerCallback(
         IEventSink* pCallback,
         intptr_t pCb,
