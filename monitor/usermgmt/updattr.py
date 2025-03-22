@@ -14,7 +14,10 @@ def listXattrs(filePath, valOnly=False):
     if len( attrs ) == 0:
         print("None")
     for attr in attrs:
-        jsonData = os.getxattr(filePath, attr).decode('utf-8')
+        try:
+            jsonData = os.getxattr(filePath, attr).decode('utf-8')
+        except Exception as err:
+            continue
         if not valOnly:
             print(f"{attr}: {jsonData}")
         else:

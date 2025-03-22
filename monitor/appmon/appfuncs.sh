@@ -270,13 +270,33 @@ function set_point_value()
 {
 # $1 app name 
 # $2 point name
-# $3 point point value
+# $3 point value
 # $4 datatype
     _appname=$1
     _ptname=$2
     _value=$3
     _dt=$4
     if set_attr_value $_appname $_ptname value "$_value" $_dt; then
+        _ptpath=./apps/$_appname/points/$_ptname
+        _dtnum=$(str2type $_dt)
+        python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_dtnum}" $_ptpath/datatype > /dev/null
+    fi
+    return $?
+}
+
+function set_large_point_value()
+{
+# $1 app name 
+# $2 point name
+# $3 point value file
+# $4 datatype
+    _appname=$1
+    _ptname=$2
+    _value=$3
+    _dt=$4
+    if set_attr_blob $_appname $_ptname value "$_value" $_dt; then
+        _ptpath=./apps/$_appname/points/$_ptname
+        _dtnum=$(str2type $_dt)
         python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_dtnum}" $_ptpath/datatype > /dev/null
     fi
     return $?
@@ -371,6 +391,73 @@ function set_attr_value()
     return $?
 }
 
+function get_attr_value()
+{
+# #1 app name 
+# $2 point name
+# $3 attr name
+    _appname=$1
+    _ptname=$2
+    _attr=$3
+    _dt=$4
+
+    if [ -z $_appname ] || [ -z $_ptname ] || [ -z $_attr ] || [ -z $_dt ];then
+        echo Error invalid get_attr_value parameters
+        return 22
+    fi
+    _ptpath=./apps/$_appname/points/$_ptname 
+    if [ ! -d $_ptpath ]; then
+        echo Error set_attr_value point "$_ptpath" not exist
+        return 2
+    fi
+    _dtnum=$(str2type $_dt)
+    if [ -z $_dtnum ]; then
+        echo Error bad data type $_dt@$_appname/$_ptname
+        return 22
+    fi
+    if (( $_dtnum <= 7 ));then
+        python3 $updattr -v 'user.regfs' $_ptpath/$_attr > /dev/null
+    else
+        cat $_ptpath/$_attr
+    fi
+    return $?
+}
+
+function set_attr_blob()
+{
+# #1 app name 
+# $2 point name
+# $3 attr name
+# $4 attr file
+# $5 datatype
+    _appname=$1
+    _ptname=$2
+    _attr=$3
+    _file=$4
+    _dt=$5
+
+    if [ -z $_appname ] || [ -z $_ptname ] || [ -z "$_file" ] || [ -z $_dt ] || [ -z $_attr ];then
+        echo Error set_attr_blob invalid parameters
+        return 22
+    fi
+    if [ ! -f $_file ]; then
+        echo Error set_attr_blob invalid value file
+        return -2
+    fi
+    _ptpath=./apps/$_appname/points/$_ptname 
+    if [ ! -d $_ptpath ]; then
+        echo Error set_attr_blob point "$_ptpath" not exist
+        return 2
+    fi
+    _dtnum=$(str2type $_dt)
+    if [[ -z $_dtnum ]] || (( $_dtnum <= 7 )) ; then
+        echo Error set_attr_blob bad data type $_dt@$_appname/$_ptname
+        return 22
+    fi
+    cat $_file > $_ptpath/$_attr
+    return $?
+}
+
 function rm_attribute()
 {
 # #1 app name 
@@ -386,6 +473,13 @@ function rm_attribute()
         echo Error invalid set_attr_value parameters
         return 22
     fi
+
+    arrAttrBase=("value" "datatype" "unit" "ptype" "ptrcount" )
+    if [[ " ${arrAttrBase[*]} " =~ [[:space:]]${_attr}[[:space:]] ]]; then
+        echo Error point "$_attr" is baseline point, and cannot be removed
+        return 13
+    fi
+
     _ptpath=./apps/$_appname/points/$_ptname/$_attr 
     if [ ! -f $_ptpath ]; then
         return 0
@@ -473,6 +567,14 @@ function rm_point()
     fi
     pushd $__ptpath > /dev/null
 
+    arrBasePts=( "rpt_timer" "obj_count" "max_qps" "cur_qps"
+    "max_streams_per_session" "pending_tasks" "restart" "cmdline" "pid" "working_dir" "uptime" )
+
+    if [[ " ${arrBasePts[*]} " =~ [[:space:]]${__ptname}[[:space:]] ]]; then
+        echo Error point "$__ptname" is baseline point, and cannot be removed
+        return 13
+    fi
+
     if [ ! -f setpoint ] && [ -d ptrs ]; then
         if ! is_dir_empty ptrs; then
             cd ptrs
@@ -548,6 +650,76 @@ function show_point()
         _output+=`cat $_pt/value`
     fi
     echo $_output
+}
+
+function show_links()
+{
+    if is_dir_empty .; then
+        echo no links
+        return 0
+    fi
+    pushd ptrs > /dev/null
+    echo link:
+    for i in *; do
+        if (( _ptype==0 )); then
+            echo -e '\t' $_appname/$_pt '-->' `python3 $updattr -v $i`
+        else
+            echo -e '\t' `python3 $updattr -v $i` '-->' $_appname/$_pt
+        fi
+    done
+    popd > /dev/null
+}
+
+function show_point_detail()
+{
+    _appname=$1
+    _pt=$2
+    if [[ -z $_appname ]] || [[ -z $_pt ]]; then
+        echo Error show_point_detail missing application/point name
+        return 22
+    fi
+    _ptpath=./apps/$_appname/points/$_pt
+    if is_dir_empty $_ptpath; then
+        echo Error the point content is empty
+        return 2
+    fi
+    _dt=$(python3 $updattr -v $_ptpath/datatype)
+    _dtname=$(type2str $_dt)
+    _output=$_appname/$_pt":"
+    _mode=`ls -l $_ptpath/value|awk '{print $1}'`
+    _output+=" "$_mode
+    _output+=" "$(cat $_ptpath/ptype)" "$_dtname" val="
+    if (( $_dt <= 7 )); then
+        _output+=`python3 $updattr -v $_ptpath/value 2>/dev/null`
+    else
+        _output+=`cat $_ptpath/value`
+    fi
+    _ptype=$(python3 $updattr -v $_ptpath/ptype)
+    echo $_output
+    pushd $_ptpath > /dev/null
+    for i in *; do
+        if [[ "$i" == "value" ]] || [[ "$i" == "datatype" ]]; then
+            continue
+        fi
+        if [ ! -f $i ]; then
+            continue
+        fi
+        _val=$(python3 $updattr -v $i)
+        if [ -z "$_val" ]; then
+            fileSize=`stat -c %s $i`
+            if (($fileSize > 0 )); then
+                _val=`cat $i`
+            else
+                _val="None"
+            fi
+        fi
+        echo -e '\t' $i: $_val
+    done
+    if [ -d ptrs ]; then
+        show_links $1 $2
+    fi
+
+    popd > /dev/null
 }
 
 function print_owner()
@@ -730,8 +902,8 @@ function add_stdapp()
     add_point $_instname rpt_timer input i
     set_attr_value $_instname rpt_timer unit "$(jsonval 'i' 0 )" i
     add_point $_instname obj_count output i
-    add_point $_instname max_rqs setpoint i
-    add_point $_instname cur_rqs output i
+    add_point $_instname max_qps setpoint i
+    add_point $_instname cur_qps output i
     add_point $_instname max_streams_per_session setpoint i
     add_point $_instname pending_tasks  output i
     add_point $_instname restart input i
