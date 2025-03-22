@@ -31,7 +31,7 @@ done
                                                                                                   
 shift $((OPTIND-1))
 
-if [  "x$@" == "x" ]; then
+if [[  "x$@" == "x" ]]; then
    echo "Error group name is not specified"
    Usage
    exit 1

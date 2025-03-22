@@ -938,6 +938,7 @@ gint32 Variant::DeserializeFromJson(
     const stdstr& strJson, void* p )
 {
     gint32 ret = 0;
+    try{
     do{
         guint8 iType;
         CSerialBase oBackup;
@@ -1081,6 +1082,16 @@ gint32 Variant::DeserializeFromJson(
         m_iType = ( EnumTypeId )iType;
 
     }while( 0 );
+    }
+    catch( const std::exception& e )
+    {
+        OutputMsg( -EFAULT,
+            "Error exception %s", e.what() );
+    }
+    catch( ... )
+    {
+        ret = -EFAULT;
+    }
     return ret;
 }
 
