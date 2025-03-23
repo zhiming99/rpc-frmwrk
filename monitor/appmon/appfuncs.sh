@@ -323,12 +323,12 @@ function add_link()
         echo Error 
         return 22
     fi
-    _ptype=$(python3 $updattr -v $_outpath/ptype > /dev/null)
+    _ptype=$(python3 $updattr -v $_outpath/ptype)
     if (($_ptype != 0 )); then
         echo Output point is not 'output' type
         return 22
     fi
-    _ptype=$(python3 $updattr -v $_inpath/ptype > /dev/null)
+    _ptype=$(python3 $updattr -v $_inpath/ptype)
     if (($_ptype != 1 )); then
         echo input point is not 'input' type
         return 22
@@ -339,18 +339,35 @@ function add_link()
     inid=`python3 ${updattr} -a 'user.regfs' 1 $_inpath/ptrcount`
     outid=`python3 ${updattr} -a 'user.regfs' 1 $_outpath/ptrcount`
 
+    if [ ! -d $_inpath/ptrs ]; then
+        mkdir $_inpath/ptrs
+    fi
+    chmod o+w $_inpath/ptrs
     echo $linkout > $_inpath/ptrs/ptr$inid
+    fileSize=`stat -c %s $_inpath/ptrs/ptr$inid`
+    if (( $fileSize == 0 )); then
+        echo failed to write to $_inpath/ptrs/ptr$inid
+    fi
     len=${#linkout}
     if (( len < 95 ));then
-        echo python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkout)" $_inpath/ptrs/ptr$inid
-        python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkout)" $_inpath/ptrs/ptr$inid
+        python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkout)" $_inpath/ptrs/ptr$inid > /dev/null
     fi
+    chmod o-w $_inpath/ptrs
 
+    if [ ! -d $_outpath/ptrs ]; then
+        mkdir $_outpath/ptrs
+    fi
+    chmod o+w $_outpath/ptrs
     echo $linkin > $_outpath/ptrs/ptr$outid
+    fileSize=`stat -c %s $_outpath/ptrs/ptr$outid`
+    if (( $fileSize == 0 )); then
+        echo failed to write to $_outpath/ptrs/ptr$outid
+    fi
     len=${#linkout}
     if (( len < 95 ));then
-        python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkin)" $_outpath/ptrs/ptr$outid
+        python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkin)" $_outpath/ptrs/ptr$outid > /dev/null
     fi
+    chmod o-w $_outpath/ptrs
 }
 
 function set_attr_value()
@@ -503,52 +520,59 @@ function rm_link()
         echo Error missing parameters
         return 22
     fi
-    _ptrpath="./apps/$_appname/points/$_ptname/ptrs/"
+    _ptrpath="./apps/$_appname/points/$_ptname/ptrs"
     if [ ! -d $_ptrpath ]; then
         echo Error internal error
+        return 2
     fi
     if is_dir_empty $_ptrpath; then 
         echo there is no link to delete for "$_appname:$_ptname"
+    else
+        link2="$_appname2/$_ptname2"
+        chmod o+w $_ptrpath
+        pushd $_ptrpath > /dev/null
+        for i in *; do
+            _peerlink=`python3 $updattr -v $i`
+            if [ -z $_peerlink ]; then
+                continue
+            fi
+            if [[ "$_peerlink" != "$link2" ]]; then
+                continue
+            fi
+            rm $i
+            python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
+        done
+        popd > /dev/null
+        chmod o-w $_ptrpath
     fi
 
-    link2="$_appname2/$_ptname2"
-
-    pushd $_ptrpath > /dev/null
-    for i in *; do
-        _peerlink=`cat $i`
-        if [ -z $_peerlink ]; then
-            continue
-        fi
-        if [ "$_peerlink" != "$link2" ]; then
-            continue
-        fi
-        rm -f $i
-        break
-    done
-    popd > /dev/null
-
     link="$_appname/$_ptname"
-    _ptrpath2="./apps/$_appname2/points/$_ptname2/ptrs/"
+    _ptrpath2="./apps/$_appname2/points/$_ptname2/ptrs"
     if [ ! -d $_ptrpath2 ]; then
         echo Error internal error
+        return 2
     fi
     if is_dir_empty $_ptrpath2; then 
         echo there is no link to delete for "$_appname2:$_ptname2"
+        return 0
+    else
+        chmod o+w $_ptrpath2
+        pushd $_ptrpath2 > /dev/null
+        for i in *; do
+            _peerlink=`python3 $updattr -v $i`
+            if [ -z $_peerlink ]; then
+                continue
+            fi
+            if [[ "$_peerlink" != "$link" ]]; then
+                continue
+            fi
+            rm $i
+            python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
+        done
+        popd > /dev/null
+        chmod o-w $_ptrpath2
     fi
-
-    pushd $_ptrpath2 > /dev/null
-    for i in *; do
-        _peerlink=`cat $i`
-        if [ -z $_peerlink ]; then
-            continue
-        fi
-        if [ "$_peerlink" != "$link" ]; then
-            continue
-        fi
-        rm -f $i
-        break
-    done
-    popd > /dev/null
+    return 0
 }
 
 function rm_point()
@@ -654,8 +678,8 @@ function show_point()
 
 function show_links()
 {
-    if is_dir_empty .; then
-        echo no links
+    if is_dir_empty ptrs; then
+        echo links: None
         return 0
     fi
     pushd ptrs > /dev/null
@@ -707,7 +731,7 @@ function show_point_detail()
         _val=$(python3 $updattr -v $i)
         if [ -z "$_val" ]; then
             fileSize=`stat -c %s $i`
-            if (($fileSize > 0 )); then
+            if (( $fileSize > 0 )); then
                 _val=`cat $i`
             else
                 _val="None"
@@ -755,7 +779,6 @@ function list_points()
     fi
     _appdir=./apps/$_appname
     if [ ! -d $_appdir ]; then
-        echo haha
         echo Error invalid application "$_appname"
         return 22
     fi
