@@ -501,12 +501,12 @@ abstract public class JavaRpcService implements IRpcService
     public int onStmClosing( long hChannel ) 
     { return 0; }
 
-    /* Convert the arguments in the `pObj' c++
-     * object to a list of python object.
+    /* Convert the arguments in the `oParams' from c++
+     * object to a list of java object.
      *
      * The return value is a two element list. The
      * first element is the error code and the second
-     * element is a list of python object. The second
+     * element is a list of java object. The second
      * element should be None if error occurs during
      * the conversion.
      */
@@ -857,6 +857,64 @@ abstract public class JavaRpcService implements IRpcService
         System.out.println(
             "Service is stopped" );
         return 0;
+    }
+
+    public JRetVal getProperty( int iProp )
+    {
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            jret.setError( -RC.EFAULT );
+            return jret;
+        }
+        return ( JRetVal )oInst.GetProperty( iProp );
+    }
+
+    public int setProperty( int iProp, Object oVal )
+    {
+        InstType oInst = getInst();
+        if( oInst == null )
+        {
+            JRetVal jret = new JRetVal();
+            return -RC.EFAULT;
+        }
+        Variant oVar = new Variant();
+        if( oVal instanceof Byte )
+        {
+            Byte bval = ( Byte )oVal;
+            oVar.SetByte( bval.byteValue() );
+        }
+        else if( oVal instanceof Integer )
+        {
+            Integer ival = ( Integer )oVal;
+            oVar.SetInt( ival.intValue() );
+        }
+        else if( oVal instanceof Boolean )
+        {
+            oVar.SetByte( (byte)
+                (( (Boolean)oVal ) ? 1 : 0) );
+        }
+        else if( oVal instanceof Short )
+        {
+            Short sval = ( Short )oVal;
+            oVar.SetShort( sval.shortValue() );
+        }
+        else if( oVal instanceof Float )
+        {
+            Float fval = ( Float ) oVal;
+            oVar.SetFloat( fval.floatValue() );
+        }
+        else if( oVal instanceof Double )
+        {
+            Double dval = ( Double )oVal;
+            oVar.SetDouble( dval.doubleValue() );
+        }
+        else if( oVal instanceof String )
+            oVar.SetString( ( String )oVal );
+        else if( oVal instanceof byte[] )
+            oVar.SetByteArray( ( byte[] )oVal );
+        return oInst.SetProperty( iProp, oVar );
     }
 }
 

@@ -2408,6 +2408,34 @@ class CJavaInterfBase
             ( HANDLE )hChannel, nullptr );
     }
 
+    jobject GetProperty(
+        JNIEnv *jenv, jint dwPropId )
+    {
+        gint32 ret = 0;
+        jobject jret = NewJRet( jenv );
+        do{
+            Variant oVar;
+            ret = $self->GetProperty(
+                dwPropId, oVar );
+            if( ERROR( ret ) )
+                break;
+            CParamList oResp;
+            oResp.Push( oVar );
+            ret = $self->FillList( jenv,
+                ( IConfigDb* )oResp.GetCfg(),
+                jret );
+        }while( 0 );
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
+    }
+
+    gint32 SetProperty( JNIEnv* jenv,
+        jint dwPropId, Variant& oVar )
+    {
+        return $self->SetProperty(
+            dwPropId, oVar );
+    }
+
     }
 
     jobject AddTimer(

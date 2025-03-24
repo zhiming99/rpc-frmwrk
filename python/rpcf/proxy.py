@@ -1257,6 +1257,12 @@ class PyRpcServer( PyRpcServices ) :
     def IsServer( self ) :
         return True
 
+    def GetProperty( self, propid : int )->Tuple[int,object]:
+        return self.oInst.GetProperty( propid )
+
+    def SetProperty( self, propid : int, val : object )->int:
+        return self.oInst.SetProperty( propid, val )
+
     def LogMessage( self, dwLogLevel : int,
         ret : int, strMsg : str ) :
         try:

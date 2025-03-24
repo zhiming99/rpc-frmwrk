@@ -799,6 +799,63 @@ class CPythonServer :
         sipRes = pMgr->LogMessage(
             a0, *a1, a2, *a4, a3 );
     %End
+
+    PyObject* GetProperty( gint32 dwPropId );
+    %MethodCode
+    PyObject* pResp = PyList_New( 3 );
+    sipRes = pResp;
+    gint32 ret = 0;
+    do{
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        Variant oVar;
+        ret = pImpl->GetProperty( a0, oVar );
+        if( ERROR( ret ) )
+            break;
+        PyObject* pPyProp = nullptr;
+        ret = pImpl->ConvertVarToPyObj( oVar, pPyProp );
+        if( ERROR( ret ) )
+            break;
+        PyList_SetItem( pResp, 1, pPyProp );
+        if( oVar.GetTypeId() == typeByteArr )
+        {
+            auto val = &( ObjPtr& )oVar;
+            PyObject* pObj = sipConvertFromNewType(
+                val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+            PyList_SetItem( pResp, 2, pObj );
+        }
+    }while( 0 );
+    PyList_SetItem( pResp, 0,
+        PyLong_FromLong( ret ) );
+    %End
+
+    gint32 SetProperty(
+        gint32 dwPropId, PyObject* pyProp );
+    %MethodCode
+    gint32 ret = 0;
+    do{
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
+        if( pImpl == nullptr || a1 == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+        Variant oVar;
+        ret = pImpl->ConvertPyObjToVar( a1, oVar );
+        if( ERROR( ret ) )
+            break;
+        ret = pImpl->SetProperty( a0, oVar );
+    }while( 0 );
+    sipRes = ret;
+    %End
 };
 
 gint32 ChainTasks(
