@@ -875,10 +875,8 @@ abstract public class JavaRpcService implements IRpcService
     {
         InstType oInst = getInst();
         if( oInst == null )
-        {
-            JRetVal jret = new JRetVal();
             return -RC.EFAULT;
-        }
+
         Variant oVar = new Variant();
         if( oVal instanceof Byte )
         {

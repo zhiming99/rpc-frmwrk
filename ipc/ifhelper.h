@@ -3122,14 +3122,14 @@ struct has_##MethodName\
         return ret; \
     }
 
-#define ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( _MethodName, rettype, PARAMS, ARGS ) \
+#define ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( _MethodName, rettype, cv_qualifier, PARAMS, ARGS ) \
     private: \
     DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
-    gint32 Interf##_MethodName( NumberSequence<>  ) \
+    gint32 Interf##_MethodName( NumberSequence<>  ) cv_qualifier \
     { return -ENOENT; } \
     template < int N > \
     gint32 Interf##_MethodName( \
-         NumberSequence< N >, PARAMS ) \
+         NumberSequence< N >, PARAMS ) cv_qualifier \
     { \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
         if( has_##_MethodName< ClassName >::value ) \
@@ -3138,7 +3138,7 @@ struct has_##MethodName\
     } \
     template < int N, int M, int...S > \
     gint32 Interf##_MethodName( \
-        NumberSequence< N, M, S... >, PARAMS ) \
+        NumberSequence< N, M, S... >, PARAMS ) cv_qualifier \
     { \
         using ClassName = typename std::tuple_element< N, std::tuple<Types...>>::type; \
         if( has_##_MethodName< ClassName >::value ) \
@@ -3149,7 +3149,7 @@ struct has_##MethodName\
         return Interf##_MethodName( NumberSequence<M, S...>(), ARGS ); \
     } \
     public: \
-    virtual rettype _MethodName( PARAMS ) \
+    rettype _MethodName( PARAMS ) cv_qualifier override \
     { \
         gint32 ret = 0;\
         if( sizeof...( Types ) ) \
@@ -3330,6 +3330,9 @@ namespace rpcf
         return ret; \
     }
 
+#define CV_NONE
+#define CV_CONST const
+
 template< typename ServerBase, typename...Types >
 struct CAggregatedServer
     : Types...
@@ -3364,8 +3367,16 @@ struct CAggregatedServer
     ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, true, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32,
+    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32, CV_NONE,
         VA_LIST( EnumClsid iid, void*& pIf ), VA_LIST( iid, pIf ) )
+
+    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( GetProperty, gint32, CV_CONST,
+        VA_LIST( gint32 iPropId, Variant& oVar ),
+        VA_LIST( iPropId, oVar ) )
+
+    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( SetProperty, gint32, CV_NONE,
+        VA_LIST( gint32 iPropId, const Variant& oVar ),
+        VA_LIST( iPropId, oVar ) )
 
     const EnumClsid GetIid() const
     { return this->GetClsid(); }
@@ -3528,7 +3539,7 @@ struct CAggregatedProxy
     ITERATE_IF_VIRT_METHODS_ASYNC_IMPL( 0, true, OnPreStop, gint32,
         VA_LIST( IEventSink* pCallback ), VA_LIST( pCallback ) )
 
-    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32,
+    ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( QueryInterface, gint32, CV_NONE,
         VA_LIST( EnumClsid iid, void*& pIf ), VA_LIST( iid, pIf ) )
 
     const EnumClsid GetIid() const
