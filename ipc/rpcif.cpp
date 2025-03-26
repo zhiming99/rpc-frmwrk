@@ -7859,6 +7859,7 @@ gint32 CInterfaceServer::BroadcastEvent(
             break;
         }
 
+        this->IncCounter( propEventCount );
         ret = RunIoTask( pReqCall,
             pRespCfg, pCallback );
 
