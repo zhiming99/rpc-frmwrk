@@ -25,6 +25,7 @@
 #pragma once
 
 #include "stream.h"
+#include "counters.h"
 
 namespace rpcf
 {
@@ -346,6 +347,8 @@ class CUnixSockStream:
     // TaskletPtr m_pWriteUxStmTask;
 
     // bool        m_bFirstPing = true;
+    guint64     m_qwLastRxBytes = 0;
+    guint64     m_qwLastTxBytes = 0;
 
     CFlowControl m_oFlowCtrl;
 
@@ -764,6 +767,7 @@ class CUnixSockStream:
                 *pRptBuf = ObjPtr( pProgress );
                 SendUxStreamEvent( tokData, pRptBuf );
                 ret = 0;
+                ReportByteStat( true );
             }
             else
             {
@@ -877,6 +881,7 @@ class CUnixSockStream:
             {
                 ret = ERROR_FAIL;
             }
+            ReportByteStat( false );
 
         }while( 0 );
 
@@ -1377,12 +1382,105 @@ class CUnixSockStream:
         IEventSink* pContext ) override
     { return 0; }
 
+    gint32 ReportByteStat( bool bRx )
+    {
+        gint32 ret = 0;
+        do{
+            InterfPtr pParent;
+            this->GetParent( pParent );
+            if( pParent.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            guint64 qwRx, qwTx, qwVal;
+            this->GetBytesTransfered(
+                qwRx, qwTx );
+
+            if( qwRx == 0 && qwTx == 0 )
+                break;
+
+            if( pParent->IsServer() )
+            {
+                CStatCountersServer* psc =
+                    pParent;
+
+                if( psc == nullptr )
+                    break;
+
+                guint64 qwInc =
+                    qwRx - m_qwLastRxBytes;
+                if( qwInc && bRx )
+                {
+                    psc->GetCounter2(
+                        propRxBytes, qwVal );
+                    qwVal += qwInc;
+                    m_qwLastRxBytes = qwRx;
+                    psc->SetCounter(
+                        propRxBytes, qwVal );
+                }
+
+                qwInc = qwTx - m_qwLastTxBytes;
+                if( qwInc && !bRx )
+                {
+                    psc->GetCounter2(
+                        propTxBytes, qwVal );
+                    qwVal += qwInc;
+                    m_qwLastTxBytes = qwTx;
+                    psc->SetCounter(
+                        propTxBytes, qwVal );
+                }
+            }
+            else
+            {
+                CStatCountersProxy* psc =
+                    pParent;
+
+                if( psc == nullptr )
+                    break;
+
+                guint64 qwInc =
+                    qwRx - m_qwLastRxBytes;
+                if( qwInc && bRx )
+                {
+                    psc->GetCounter2(
+                        propRxBytes, qwVal );
+                    qwVal += qwInc;
+                    m_qwLastRxBytes = qwRx;
+                    psc->SetCounter(
+                        propRxBytes, qwVal );
+                }
+
+                qwInc = qwTx - m_qwLastTxBytes;
+                if( qwInc && !bRx )
+                {
+                    psc->GetCounter2(
+                        propTxBytes, qwVal );
+                    qwVal += qwInc;
+                    m_qwLastTxBytes = qwTx;
+                    psc->SetCounter(
+                        propTxBytes, qwVal );
+                }
+            }
+
+        }while( 0 );
+
+        return ret;
+    }
+    gint32 ReportByteStat()
+    {
+        ReportByteStat( true );
+        ReportByteStat( false );
+        return 0;
+    }
+
     virtual gint32 OnPreStop(
         IEventSink* pCallback ) override
     {
         gint32 ret = 0;
 
         do{
+            ReportByteStat();
             if( !m_pPingTicker.IsEmpty() )
                 ( *m_pPingTicker )( eventCancelTask );
 

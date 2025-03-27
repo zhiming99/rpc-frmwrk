@@ -159,12 +159,16 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
         if( ERROR( ret ) )
             break;
 
+        Variant oVar;
+        ret = this->GetProperty(
+            propStmPerSess, oVar );
+        if( ERROR( ret ) )
+            oVar = MAX_REQCHAN_PER_SESS;
         CWriteLock oLock( this->GetSharedLock() );
         auto itr = m_mapSessRefs.find( strSess );
         if( itr != m_mapSessRefs.end() )
         {
-            if( itr->second >=
-                MAX_REQCHAN_PER_SESS )
+            if( itr->second >= ( guint32& )oVar )
             {
                 ret = -ERANGE;
                 DebugPrintEx( logErr, ret,
@@ -2131,6 +2135,209 @@ TaskletPtr CFastRpcServerBase::GetUpdateTokenTask()
     NEW_FUNCCALL_TASKEX( pTask,
         this->GetIoMgr(), func, this );
     return pTask;
+}
+
+gint32 CFastRpcServerBase::GetStmChanSvr(
+    InterfPtr& pIf ) const
+{
+    gint32 ret = 0;
+    do{
+        ObjPtr pDrv;
+        auto oDrvMgr =
+            GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = pdrv->GetPortById(
+            GetBusId(), pPort );
+        if( ERROR( ret ) )
+            break;
+        CDBusStreamBusPort* pBus = pPort;
+        pIf = pBus->GetStreamIf();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+gint32 CFastRpcServerBase::GetProperty(
+    gint32 iProp, Variant& oVal ) const
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propStmPerSess:
+        {
+            InterfPtr pChan;
+            ret = GetStmChanSvr( pChan );
+            if( ERROR( ret ) )
+                break;
+            Variant oVar;
+            ret = pChan->GetProperty(
+                propStmPerSess, oVar );
+            if( ERROR( ret ) )
+                oVal = MAX_REQCHAN_PER_SESS;
+            ret = 0;
+            break;
+        }
+    case propRxBytes:
+    case propTxBytes:
+        {
+            auto psc = ( CStatCountersServer* )this;
+            if( !psc )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            guint32 qwStmBytes = 0;
+            psc->GetCounter2( iProp, qwStmBytes );
+            guint32 qwCmdBytes = 0;
+
+            do{
+                InterfPtr pChan;
+                ret = GetStmChanSvr( pChan );
+                if( ERROR( ret ) )
+                    break;
+                CStatCountersServer* psc = pChan;
+                if( psc )
+                {
+                    psc->GetCounter2(
+                        iProp, qwCmdBytes );
+                }
+            }while( 0 );
+            oVal = qwStmBytes + qwCmdBytes;
+            ret = 0;
+            break;
+        }
+    case propFailureCount:
+    case propMsgRespCount:
+    case propMsgCount:
+        {
+            auto psc = ( CStatCountersServer* )this;
+            if( !psc )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            guint32 dwVal = 0;
+            ret = psc->GetCounter2( iProp, dwVal );
+            if( SUCCEEDED( ret ) )
+                oVal = dwVal;
+            break;
+        }
+    case propObjCount:
+        oVal = CObjBase::GetActCount();
+        break;
+    case propQps:
+        {
+            Variant bEnable;
+            ret = super::GetProperty(
+                propEnableQps, bEnable );
+            if( ERROR( ret ) || !(bool& )bEnable )
+            {
+                oVal = ( guint32 )0;
+                ret = 0;
+            }
+            else
+            {
+                ret = super::GetProperty(
+                    propQps, oVal );
+            }
+        }
+    default:
+        ret = -ENOENT;
+        break;
+    }
+    return ret;
+}
+
+gint32 CFastRpcServerBase::SetProperty(
+    gint32 iProp, const Variant& oVal )
+{
+    gint32 ret = 0;
+    switch( iProp )
+    {
+    case propRxBytes:
+    case propTxBytes:
+    case propFailureCount:
+    case propMsgRespCount:
+    case propObjCount:
+    case propMsgCount:
+        break;
+    case propStmPerSess:
+        {
+            InterfPtr pChan;
+            ret = GetStmChanSvr( pChan );
+            if( ERROR( ret ) )
+                break;
+            auto dwCount = ( guint32& )oVal;
+            if( MAX_REQCHAN_PER_SESS > dwCount )
+                dwCount = MAX_REQCHAN_PER_SESS;
+            Variant oVar( dwCount );
+            pChan->SetProperty(
+                propStmPerSess, oVar );
+            ret = 0;
+            break;
+        }
+    case propQps:
+        {
+            Variant bEnable;
+            ret = super::GetProperty(
+                propEnableQps, bEnable );
+            if( ERROR( ret ) ||
+                !(bool& )bEnable )
+            {
+                // don't try further
+                ret = 0;
+                break;
+            }
+            super::SetProperty( propQps, oVal );
+            SetMaxTokens( ( guint64& )oVal );
+            break;
+        }
+    default:
+        ret = -ENOENT;
+        break;
+    }
+    return ret;
+}
+
+gint32 CFastRpcServerBase::SetMaxTokens(
+    guint64 qwMaxTokens )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< InterfPtr > vecIfs;
+        ret = EnumStmSkels( vecIfs );
+        if( ERROR( ret ) )
+            break;
+
+        guint64 qwPerSkelToken =
+            qwMaxTokens / vecIfs.size();
+        if( qwPerSkelToken == 0 )
+            qwPerSkelToken = 1;
+
+        this->SetPerSkelTokens( qwPerSkelToken );
+        for( auto& elem : vecIfs )
+        {
+            CFastRpcSkelSvrBase* pSkel = elem;
+            pSkel->SetMaxTokens( qwPerSkelToken );
+        }
+
+    }while( 0 );
+    return ret;
 }
 
 gint32 CFastRpcSkelServerState::SetupOpenPortParams(

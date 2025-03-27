@@ -1236,6 +1236,17 @@ class CFastRpcServerBase :
     { m_qwPerSessTokens = qwTokens; }
 
     TaskletPtr GetUpdateTokenTask();
+
+    gint32 GetProperty( gint32 iProp,
+        Variant& pVal ) const override;
+
+    gint32 SetProperty( gint32 iProp,
+        const Variant& pVal ) override;
+
+    gint32 SetMaxTokens(
+        guint64 qwTokens ) override;
+
+    gint32 GetStmChanSvr( InterfPtr& pIf ) const;
 };
 
 class CFastRpcSkelProxyBase;
@@ -1709,12 +1720,6 @@ class CStatCountersProxySkel:
                 break;
 
             SUM_COUNTER(
-                ppsc, psc, propRxBytes, guint64 );
-
-            SUM_COUNTER(
-                ppsc, psc, propTxBytes, guint64 );
-
-            SUM_COUNTER(
                 ppsc, psc, propMsgCount, guint32 );
 
             SUM_COUNTER(
@@ -1754,12 +1759,6 @@ class CStatCountersServerSkel:
 
             if( psc == nullptr || ppsc == nullptr )
                 break;
-
-            SUM_COUNTER(
-                ppsc, psc, propRxBytes, guint64 );
-
-            SUM_COUNTER(
-                ppsc, psc, propTxBytes, guint64 );
 
             SUM_COUNTER(
                 ppsc, psc, propMsgCount, guint32 );
@@ -1813,10 +1812,12 @@ class CStatCounters_CliBase:
 
 DECLARE_AGGREGATED_SERVER(
      CRpcStreamChannelSvr,
+     CStatCountersServer,
      CRpcStmChanSvr ); 
 
 DECLARE_AGGREGATED_PROXY(
     CRpcStreamChannelCli,
+    CStatCountersProxy,
     CRpcStmChanCli );
 
 #define DECLARE_AGGREGATED_SKEL_PROXY( ClassName, ...) \

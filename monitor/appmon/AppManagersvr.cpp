@@ -216,6 +216,8 @@ gint32 GetInputToNotify(
             vecStms.push_back(
                 { hstm, ( stdstr& )oVar  } );
         }
+        if( vecStms.size() )
+            ret = 0;
     }while( 0 );
     return ret;
 }

@@ -1096,7 +1096,7 @@ class CRpcServices :
         IEventSink* pNotify = nullptr );
 
     gint32 StopQpsTask();
-    gint32 SetMaxTokens( guint64 qwTokens );
+    virtual gint32 SetMaxTokens( guint64 qwTokens );
     gint32 GetMaxTokens( guint64& qwTokens ) const;
 
     private:

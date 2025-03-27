@@ -294,6 +294,12 @@ enum EnumPropId : gint32
     propGid,            // type: a integer as the group identifier from the registry fs
     propCmdLine,        // type: a string as the command line of current process
 
+    // monitor related properties
+    propObjCount = 0x4000,
+    propPendingTasks,
+    propStmPerSess,
+    propCurQps,
+
     propReservedEnd = 0x10000000,
     propInvalid = -1, 
 };
