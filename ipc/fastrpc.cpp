@@ -163,7 +163,10 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
         ret = this->GetProperty(
             propStmPerSess, oVar );
         if( ERROR( ret ) )
+        {
             oVar = MAX_REQCHAN_PER_SESS;
+            ret = 0;
+        }
         CWriteLock oLock( this->GetSharedLock() );
         auto itr = m_mapSessRefs.find( strSess );
         if( itr != m_mapSessRefs.end() )
