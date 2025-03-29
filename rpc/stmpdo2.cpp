@@ -1568,6 +1568,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         if( !bEnabled )
             break;
 
+        CCfgOpener oConn( pCfg );
         CParamList oParams;
         oParams[ propIoMgr ] =
             ObjPtr( GetIoMgr() );
@@ -1582,7 +1583,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         }
 
         oParams[ propLoopPtr ] = ObjPtr( m_pLoop );
-        ret = oParams.GetProperty(
+        ret = oConn.GetProperty(
             propSendBps, oVar );
         if( ERROR( ret ) )
             oVar = ( guint64 )-1;
@@ -1594,7 +1595,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.GetProperty(
+        ret = oConn.GetProperty(
             propRecvBps, oVar );
         if( ERROR( ret ) )
             oVar = ( guint64 )-1;
