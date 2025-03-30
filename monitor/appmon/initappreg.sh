@@ -124,6 +124,9 @@ add_point rpcrouter1 pid output i
 add_point rpcrouter1 uptime output i
 set_attr_value rpcrouter1 uptime unit "$(jsonval 's' 'sec' )" s
 
+add_point rpcrouter1 rx_bytes output qword
+add_point rpcrouter1 tx_bytes output qword
+
 
 echo adding application timer1
 add_application timer1

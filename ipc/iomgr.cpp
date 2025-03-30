@@ -1024,6 +1024,25 @@ gint32 CIoManager::GetPortProp(
 
     return ret;
 }
+    
+gint32 CIoManager::SetPortProp(
+    HANDLE hPort,
+    gint32 iProp,
+    BufPtr& pBuf )
+{
+    if( hPort == INVALID_HANDLE )
+        return -EINVAL;
+
+    PortPtr pPort;
+    gint32 ret = GetPortPtr( hPort, pPort );
+    if( ERROR( ret ) )
+        return ret;
+
+    CCfgOpenerObj oCfg( ( CObjBase* )pPort );
+    ret = oCfg.SetProperty( iProp, pBuf );
+
+    return ret;
+}
 
 gint32 CIoManager::MakeBusRegPath(
     std::string& strPath,

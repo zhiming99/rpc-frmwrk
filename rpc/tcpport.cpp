@@ -650,6 +650,78 @@ gint32 CRpcSocketBase::GetAsyncErr() const
     return ret;
 }
 
+gint32 CRpcSocketBase::SetProperty(
+    gint32 iProp, const Variant& oBuf )
+{
+    gint32 ret = 0;
+    CStdRMutex oSockLock( GetLock() );
+    switch( iProp )
+    {
+    case propSendBps:
+    case propRecvBps:
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )m_pCfg );
+            IConfigDb* pConn = nullptr;
+            ret = oCfg.GetPointer(
+                propConnParams, pConn );
+            if( ERROR( ret ) )
+                break;
+            ret = pConn->SetProperty(
+                iProp, oBuf );
+            break;
+        }
+    default:
+        {
+            if( m_pCfg.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = m_pCfg->SetProperty(
+                iProp, oBuf );
+            break;
+       }
+    }
+    return ret;
+}
+
+gint32 CRpcSocketBase::GetProperty(
+    gint32 iProp, Variant& oBuf ) const
+{
+    gint32 ret = 0;
+    CStdRMutex oSockLock( GetLock() );
+    switch( iProp )
+    {
+    case propSendBps:
+    case propRecvBps:
+        {
+            CCfgOpener oCfg(
+                ( IConfigDb* )m_pCfg );
+            IConfigDb* pConn = nullptr;
+            ret = oCfg.GetPointer(
+                propConnParams, pConn );
+            if( ERROR( ret ) )
+                break;
+            ret = pConn->GetProperty(
+                iProp, oBuf );
+            break;
+        }
+    default:
+        {
+            if( m_pCfg.IsEmpty() )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ret = m_pCfg->GetProperty(
+                iProp, oBuf );
+            break;
+       }
+    }
+    return ret;
+}
+
 gint32 CRpcStreamSock::GetStreamByPeerId(
     gint32 iPeerId, StmPtr& pStm )
 {

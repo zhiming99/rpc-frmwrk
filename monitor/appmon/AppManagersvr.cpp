@@ -435,7 +435,7 @@ gint32 CAppManager_SvrImpl::SetPointValue(
         const stdstr& strPoint = vecComps[ 1 ];
         RFHANDLE hPtDir;
 
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -515,7 +515,7 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
         }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -556,7 +556,7 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -620,7 +620,7 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -653,7 +653,7 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -667,32 +667,6 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
     return ret;
 }
 
-bool CAppManager_SvrImpl::IsAppOwner(
-    IConfigDb* pContext,
-    const stdstr& strAppName )
-{
-    gint32 ret = 0;
-    do{
-        HANDLE hstm, hOwner;
-        ret = GetCurStream( this, pContext, hstm );
-        if( ERROR( ret ) )
-            break;
-        ret = GetOwnerStream( this,
-            m_pAppRegfs, strAppName, hOwner );
-        if( ERROR( ret ) )
-            break;
-
-        if( hstm != hOwner )
-        {
-            ret = -EACCES;
-            break;
-        }
-    }while( 0 );
-    if( ERROR( ret ) )
-        return false;
-    return true;
-}
-
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetPointValues( 
     IConfigDb* pContext, 
@@ -702,7 +676,7 @@ gint32 CAppManager_SvrImpl::SetPointValues(
     gint32 ret = 0;
     do{
         auto& pfs = m_pAppRegfs;
-        if( !IsAppOwner( pContext, strAppName ) )
+        if( !IsAppOnline( strAppName ) )
         {
             ret = -EACCES;
             break;
@@ -782,7 +756,7 @@ gint32 CAppManager_SvrImpl::GetPointValues(
     gint32 ret = 0;
     do{
         auto& pfs = m_pAppRegfs;
-        if( !IsAppOwner( pContext, strAppName ) )
+        if( !IsAppOnline( strAppName ) )
         {
             ret = -EACCES;
             break;

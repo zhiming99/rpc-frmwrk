@@ -337,10 +337,6 @@ class CAppManager_SvrImpl
         RFHANDLE hcurStm );
 
     gint32 RemoveStmSkel( HANDLE hstm ) override;
-
-    bool IsAppOwner(
-        IConfigDb* pContext,
-        const stdstr& strAppName );
 };
 
 class CAppManager_ChannelSvr

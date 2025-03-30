@@ -99,7 +99,11 @@ function str2type()
         ;;
     b | byte) echo 1
         ;;
+    w | word) echo 2
+        ;;
     i | int) echo 3
+        ;;
+    q | qword) echo 4
         ;;
     f | float) echo 5
         ;;
@@ -127,7 +131,11 @@ function type2str()
     case "$1" in
     1) echo byte
         ;;
+    2) echo word 
+        ;;
     3) echo int
+        ;;
+    4) echo qword
         ;;
     5) echo float
         ;;
@@ -168,7 +176,11 @@ function jsonval()
         ;;
     "b" | "byte") _t=1
         ;;
+    "w" | "word") _t=2
+        ;;
     "i" | "int") _t=3
+        ;;
+    "q" | "qword") _t=4
         ;;
     "f" | "float") _t=5
         ;;
@@ -592,7 +604,8 @@ function rm_point()
     pushd $__ptpath > /dev/null
 
     arrBasePts=( "rpt_timer" "obj_count" "max_qps" "cur_qps"
-    "max_streams_per_session" "pending_tasks" "restart" "cmdline" "pid" "working_dir" "uptime" )
+    "max_streams_per_session" "pending_tasks" "restart" "cmdline" "pid" "working_dir" "uptime" 
+    "rx_bytes" "tx_bytes" "failure_count" "resp_count" "req_count" )
 
     if [[ " ${arrBasePts[*]} " =~ [[:space:]]${__ptname}[[:space:]] ]]; then
         echo Error point "$__ptname" is baseline point, and cannot be removed
@@ -934,6 +947,12 @@ function add_stdapp()
     add_point $_instname cmdline setpoint blob
     add_point $_instname pid output i 
     add_point $_instname working_dir  setpoint blob
+
+    add_point $_instname rx_bytes output qword
+    add_point $_instname tx_bytes output qword
+    add_point $_instname failure_count output i
+    add_point $_instname resp_count output i
+    add_point $_instname req_count output i
 
     add_point $_instname uptime output i
     set_attr_value $_instname uptime unit "$(jsonval 's' 'sec' )" s

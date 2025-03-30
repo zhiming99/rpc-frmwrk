@@ -6114,6 +6114,24 @@ gint32 CRpcRouterManager::GetProperty(
     gint32 ret = 0;
     switch( iProp )
     {
+    case propRecvBps:
+    case propSendBps:
+        {
+            PortPtr pBus;
+            ret = GetTcpBusPort( pBus );
+            if( ERROR( ret ) )
+                break;
+            IPort* pPort = pBus;
+            HANDLE hPort = PortToHandle( pPort );
+            CIoManager* pMgr = GetIoMgr();
+            BufPtr pBuf( true );
+            ret = pMgr->GetPortProp(
+                hPort, iProp, pBuf );
+            if( ERROR( ret ) )
+                break;
+            oBuf = ( guint64& )pBuf;
+            break;
+        }
     case propMaxConns:
     case propMaxReqs:
         {
@@ -6152,6 +6170,22 @@ gint32 CRpcRouterManager::SetProperty(
     gint32 ret = 0;
     switch( iProp )
     {
+    case propRecvBps:
+    case propSendBps:
+        {
+            PortPtr pBus;
+            ret = GetTcpBusPort( pBus );
+            if( ERROR( ret ) )
+                break;
+            IPort* pPort = pBus;
+            HANDLE hPort = PortToHandle( pPort );
+            CIoManager* pMgr = GetIoMgr();
+            BufPtr pBuf( true );
+            *pBuf = ( guint64& )oBuf;
+            ret = pMgr->SetPortProp(
+                hPort, iProp, pBuf );
+            break;
+        }
     case propMaxReqs:
     case propMaxPendings:
         {

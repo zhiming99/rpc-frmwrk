@@ -589,27 +589,11 @@ class CRpcSocketBase : public IService
 
     gint32 GetAsyncErr() const;
 
-    virtual gint32 SetProperty(
-        gint32 iProp, const Variant& oBuf )
-    {
-        CStdRMutex oSockLock( GetLock() );
-        if( m_pCfg.IsEmpty() )
-            return -EFAULT;
+    gint32 SetProperty( gint32 iProp,
+        const Variant& oBuf ) override;
 
-        return m_pCfg->SetProperty(
-            iProp, oBuf );
-    }
-
-    virtual gint32 GetProperty(
-        gint32 iProp, Variant& oBuf ) const override
-    {
-        CStdRMutex oSockLock( GetLock() );
-        if( m_pCfg.IsEmpty() )
-            return -EFAULT;
-
-        return m_pCfg->GetProperty(
-            iProp, oBuf );
-    }
+    gint32 GetProperty( gint32 iProp,
+        Variant& oBuf ) const override;
 
     virtual gint32 RemoveProperty(
         gint32 iProp )

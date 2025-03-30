@@ -54,7 +54,9 @@
 #endif
 #include "rpc.h"
 using namespace rpcf;
+#include "fastrpc.h"
 #include "blkalloc.h"
+#include "AppManagersvr.h"
 
 #ifdef FUSE3
 
@@ -65,6 +67,7 @@ using namespace rpcf;
 #define  USER_DIR   "usereg"
 #define  APP_DIR    "appreg"
 
+extern InterfPtr GetAppManager();
 extern RegFsPtr g_pAppRegfs, g_pUserRegfs;
 
 static void *monfs_init(struct fuse_conn_info *conn,
@@ -731,6 +734,35 @@ static int monfs_utimens( const char * path,
 	return ret;
 }
 
+bool IsSetPointValue(
+    const char* szPath,
+    RegFsPtr& pfs,
+    stdstr& strPtPath )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< stdstr > vecComps;
+        ret = pfs->Namei( szPath, vecComps );
+        if( ERROR( ret ) )
+            break;
+        
+        if( vecComps.size() == 6 &&
+            vecComps[ 0 ] == APP_DIR &&
+            vecComps[ 1 ] == "apps" &&
+            vecComps[ 3 ] == "points" &&
+            vecComps[ 5 ] == "value" )
+        {
+            strPtPath = vecComps[ 1 ] + "/" +
+                vecComps[ 4 ];
+            break;
+        }
+        ret = ERROR_FALSE;
+    }while( 0 );
+    if( ERROR( ret ) )
+        return false;
+    return true;
+}
+
 /* xattr operations are optional and can safely be left unimplemented */
 static int monfs_setxattr(const char *path, const char *name, const char *value,
 			size_t size, int flags)
@@ -759,7 +791,20 @@ static int monfs_setxattr(const char *path, const char *name, const char *value,
             strAttr.c_str() );
         if( ERROR( ret ) )
             break;
-        pfs->SetValue( strPath, oVar );
+        stdstr strPt;
+        if( IsSetPointValue( path, pfs, strPt ) )
+        {
+            InterfPtr pam = GetAppManager();
+            CAppManager_SvrImpl* pAM = pam;
+            if( pAM != nullptr )
+            {
+                CCfgOpener oCfg;
+                ret = pAM->SetPointValue(
+                    oCfg.GetCfg(), strPt, oVar );
+                break;
+            }
+        }
+        ret = pfs->SetValue( strPath, oVar );
 
     }while( 0 );
 	return ret;
