@@ -2929,13 +2929,19 @@ gint32 CInterfaceProxy::ProxyCall(
     InputCount< iNumInput > a( ( oParams.GetCfg() ) ); \
     ProxyCall( &a, strMethod, ##__VA_ARGS__ );} )
 
+#define CV_NONE
+#define CV_CONST const
+
 #define DEFINE_HAS_METHOD( MethodName, _rettype, ... ) \
+    DEFINE_HAS_METHOD2( MethodName, _rettype, CV_NONE, ##__VA_ARGS__ )
+
+#define DEFINE_HAS_METHOD2( MethodName, _rettype, _cv_qualifier, ... ) \
 template< typename T > \
 struct has_##MethodName\
 {\
     private:\
-    template<typename U, _rettype (U::*)( __VA_ARGS__ ) > struct SFINAE {};\
-    template<typename U > static char Test(SFINAE<U, &U::MethodName>*);\
+    template<typename U, _rettype (U::*)( __VA_ARGS__ ) _cv_qualifier> struct SFINAE {};\
+    template<typename U > static char Test(SFINAE<U, &U::MethodName>*) ;\
     template<typename U> static int Test(...);\
     template< typename U, typename V = typename std::enable_if<std::is_base_of< virtbase, U >::value, U >::type, \
         typename W=typename std::enable_if< !std::is_same< virtbase, U >::value, U >::type > \
@@ -3124,7 +3130,7 @@ struct has_##MethodName\
 
 #define ITERATE_IF_VIRT_METHODS_TILL_SUCCESS( _MethodName, rettype, cv_qualifier, PARAMS, ARGS ) \
     private: \
-    DEFINE_HAS_METHOD( _MethodName, rettype, PARAMS ); \
+    DEFINE_HAS_METHOD2( _MethodName, rettype, cv_qualifier, PARAMS ); \
     gint32 Interf##_MethodName( NumberSequence<>  ) cv_qualifier \
     { return -ENOENT; } \
     template < int N > \
@@ -3329,9 +3335,6 @@ namespace rpcf
         } \
         return ret; \
     }
-
-#define CV_NONE
-#define CV_CONST const
 
 template< typename ServerBase, typename...Types >
 struct CAggregatedServer
