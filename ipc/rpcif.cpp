@@ -233,11 +233,11 @@ gint32 CRpcBaseOperations::AddPortProps()
     {
         // for proxy, we get a sender name from the
         // port
-        BufPtr pBuf( true );
+        Variant oVar;
         ret = GetIoMgr()->GetPortProp(
             GetPortHandle(),
             propSrcDBusName,
-            pBuf );
+            oVar );
 
         if( SUCCEEDED( ret ) )
         {
@@ -250,18 +250,18 @@ gint32 CRpcBaseOperations::AddPortProps()
                 // should be obtained from the
                 // server name and the object name
                 ret = this->SetProperty(
-                    propSrcDBusName, *pBuf );
+                    propSrcDBusName, oVar );
             }
         }
-        pBuf->Resize( 0 );
+        oVar.Clear();
         ret = GetIoMgr()->GetPortProp(
             GetPortHandle(),
             propSrcUniqName,
-            pBuf );
+            oVar );
         if( SUCCEEDED( ret ) )
         {
             ret = this->SetProperty(
-                propSrcUniqName, *pBuf );
+                propSrcUniqName, oVar );
         }
 
     }

@@ -496,6 +496,8 @@ class CPort : public IPort
         guint32 dwPortState );
 
     gint32 AddSeqTask( TaskletPtr& pTask );
+    inline IPort* GetBusPort() const
+    { return m_pBusPort; }
 };
 
 class CIrpGateKeeper 

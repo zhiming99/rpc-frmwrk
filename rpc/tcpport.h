@@ -1115,6 +1115,7 @@ class CRpcTcpBusPort :
     using PDOADDR = CConnParams;
     std::map< guint32, PDOADDR > m_mapIdToAddr;
     std::map< PDOADDR, guint32 > m_mapAddrToId;
+    std::atomic< guint64 > m_qwRxBytes={0}, m_qwTxBytes={0};
 
     gint32 CreateTcpStreamPdo(
         IConfigDb* pConfig,
@@ -1203,6 +1204,12 @@ class CRpcTcpBusPort :
         guint32 dwEventId,
         IRP* pMasterIrp = nullptr,
         bool bImmediately = false ) override;
+
+    void IncRxBytes( guint32 dwInc )
+    { m_qwRxBytes += dwInc; }
+
+    void IncTxBytes( guint32 dwInc )
+    { m_qwTxBytes += dwInc; }
 };
 
 class CRpcTcpBusDriver : public CGenBusDriverEx

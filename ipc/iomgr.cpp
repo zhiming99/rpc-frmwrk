@@ -1009,7 +1009,7 @@ gint32 CIoManager::OpenPortByRef(
 gint32 CIoManager::GetPortProp(
     HANDLE hPort,
     gint32 iProp,
-    BufPtr& pBuf )
+    Variant& oVar ) const
 {
     if( hPort == INVALID_HANDLE )
         return -EINVAL;
@@ -1019,8 +1019,7 @@ gint32 CIoManager::GetPortProp(
     if( ERROR( ret ) )
         return ret;
 
-    CCfgOpenerObj oCfg( ( CObjBase* )pPort );
-    ret = oCfg.GetProperty( iProp, pBuf );
+    ret = pPort->GetProperty( iProp, oVar );
 
     return ret;
 }
@@ -1028,7 +1027,7 @@ gint32 CIoManager::GetPortProp(
 gint32 CIoManager::SetPortProp(
     HANDLE hPort,
     gint32 iProp,
-    BufPtr& pBuf )
+    const Variant& oVar )
 {
     if( hPort == INVALID_HANDLE )
         return -EINVAL;
@@ -1038,8 +1037,7 @@ gint32 CIoManager::SetPortProp(
     if( ERROR( ret ) )
         return ret;
 
-    CCfgOpenerObj oCfg( ( CObjBase* )pPort );
-    ret = oCfg.SetProperty( iProp, pBuf );
+    ret = pPort->SetProperty( iProp, oVar );
 
     return ret;
 }

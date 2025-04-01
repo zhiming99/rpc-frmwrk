@@ -109,11 +109,12 @@ add_point rpcrouter1 bdge_proxy_list output blob
 add_point rpcrouter1 req_proxy_list output blob 
 
 add_point rpcrouter1 max_conn  setpoint i
-add_point rpcrouter1 conn_count  setpoint i
+add_point rpcrouter1 conn_count  output i
 add_point rpcrouter1 max_recv_bps  setpoint i
 add_point rpcrouter1 max_send_bps  setpoint i
 add_point rpcrouter1 obj_count  output i
 add_point rpcrouter1 pending_tasks  output i
+add_point rpcrouter1 max_pending_tasks setpoint i
 add_point rpcrouter1 restart input i
 set_attr_value rpcrouter1 restart pulse "$(jsonval 'i' 1 )" i
 add_point rpcrouter1 cmdline setpoint blob

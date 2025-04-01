@@ -119,7 +119,73 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
         okv.oValue = dwObjs;
         veckv.push_back( okv );
 
+        CRpcRouterManager* prtmgr =
+            ObjPtr( prb->GetParent() );
+        if( prtmgr == nullptr )
+            break;
+        Variant oVar;
+        ret = prtmgr->GetProperty(
+            propRxBytes, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.strKey = O_RXBYTE;
+            okv.oValue = oVar;
+            veckv.push_back( okv );
+        }
+
+        ret = prtmgr->GetProperty(
+            propTxBytes, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.strKey = O_TXBYTE;
+            okv.oValue = oVar;
+            veckv.push_back( okv );
+        }
+
+        ret = prtmgr->GetProperty(
+            propMaxConns, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.strKey = S_MAX_CONN;
+            okv.oValue = oVar;
+            veckv.push_back( okv );
+        }
+
+        ret = prtmgr->GetProperty(
+            propMaxPendings, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.strKey = S_MAX_PENDINGS;
+            okv.oValue = oVar;
+            veckv.push_back( okv );
+        }
+
+        ret = prtmgr->GetProperty(
+            propSendBps, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.strKey = S_MAX_SENDBPS;
+            okv.oValue = oVar;
+            veckv.push_back( okv );
+        }
+
+        ret = prtmgr->GetProperty(
+            propRecvBps, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.strKey = S_MAX_RECVBPS;
+            okv.oValue = oVar;
+            veckv.push_back( okv );
+        }
+
+        okv.strKey = O_CONNECTIONS;
+        okv.oValue = ( guint32 )
+            prb->GetBridgeCount();
+        veckv.push_back( okv );
+
     }while( 0 );
+    if( veckv.size() && ERROR( ret ) )
+        ret = 0;
     return ret;
 }
 

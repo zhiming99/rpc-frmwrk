@@ -801,6 +801,16 @@ gint32 CRpcTcpBusPort::GetProperty(
     CStdRMutex oPortLock( GetLock() );
     switch( iProp )
     {
+    case propRxBytes:
+        {
+            oBuf = ( guint64 )m_qwRxBytes;
+            break;
+        }
+    case propTxBytes:
+        {
+            oBuf = ( guint64 )m_qwTxBytes;
+            break;
+        }
     case propSendBps:
     case propRecvBps:
         {
@@ -844,6 +854,9 @@ gint32 CRpcTcpBusPort::SetProperty(
     CStdRMutex oPortLock( GetLock() );
     switch( iProp )
     {
+    case propRxBytes:
+    case propTxBytes:
+        break;
     case propSendBps:
     case propRecvBps:
         {
