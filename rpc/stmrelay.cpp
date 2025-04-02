@@ -2063,8 +2063,9 @@ gint32 CIfTcpStmTransTask::PostEvent(
     {
     case tokData:
         {
-            guint32 dwSize = pNewBuf->size();
-            oHelper.IncTxBytes( dwSize );
+            // IncTxBytes is done in WriteStream
+            // guint32 dwSize = pNewBuf->size();
+            // oHelper.IncTxBytes( dwSize );
             ret = oHelper.ForwardToLocal(
                 byToken, pNewBuf );
             break;

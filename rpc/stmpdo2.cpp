@@ -960,11 +960,10 @@ gint32 CTcpStreamPdo2::OnReceive(
             "received(%d) is less than expected(%d)",
                 ret, dwBytes );
             pInBuf->Resize( ret );
-            dwBytes = ret;
         }
 
+        pBus->IncRxBytes( ret );
         ret = 0;
-        pBus->IncRxBytes( dwBytes );
 
         sse.m_pInBuf = pInBuf;
         sse.m_iEvent = sseRetWithBuf;
