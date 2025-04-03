@@ -2181,6 +2181,34 @@ gint32 CFastRpcServerBase::GetProperty(
     gint32 ret = 0;
     switch( iProp )
     {
+    case propPendingTasks:
+        {
+            gint32 ret = 0;
+            std::vector< InterfPtr > vecIfs;
+            ret = EnumStmSkels( vecIfs );
+            if( ERROR( ret ) )
+                break;
+            guint32 dwTasks = 0;
+            for( auto& elem : vecIfs )
+            {
+                CFastRpcSkelSvrBase* pSkel = elem;
+                TaskGrpPtr pGrp = pSkel->GetGrpRfc();
+                if( pGrp.IsEmpty() )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
+                CIfParallelTaskGrpRfc* pGrpRfc = pGrp;
+                dwTasks += pGrpRfc->GetTaskCount();
+            }
+            oVal = dwTasks;
+            break;
+        }
+    case propConnections:
+        {
+            oVal = GetStmSkelCount();
+            break;
+        }
     case propStmPerSess:
         {
             InterfPtr pChan;
@@ -2258,6 +2286,7 @@ gint32 CFastRpcServerBase::GetProperty(
                 ret = super::GetProperty(
                     propQps, oVal );
             }
+            break;
         }
     default:
         ret = -ENOENT;

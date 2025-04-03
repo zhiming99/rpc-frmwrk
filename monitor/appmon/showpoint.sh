@@ -46,14 +46,17 @@ fi
 pushd $rootdir > /dev/null
 
 appname=$1
-ptname=$2
-if [ -z $appname ] || [ -z $ptname ]; then
-   echo "Error app/point names are not specified"
+
+if [ -z $appname ] ; then
+   echo "Error app names are not specified"
     Usage
     exit 22
 fi
 
-show_point_detail $appname $ptname
+shift
+for ptname in "$@"; do
+    show_point_detail $appname $ptname
+done
 
 popd > /dev/null
 if (( $mt == 2 )); then
