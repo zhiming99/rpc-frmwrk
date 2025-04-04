@@ -587,7 +587,7 @@ function rm_link()
     return 0
 }
 
-function rm_point()
+function rm_point_nocheck()
 {
     __curdir=`pwd`
     __appname=$1
@@ -602,16 +602,6 @@ function rm_point()
         return 2
     fi
     pushd $__ptpath > /dev/null
-
-    arrBasePts=( "rpt_timer" "obj_count" "max_qps" "cur_qps"
-    "max_streams_per_session" "pending_tasks" "restart" "cmdline" "pid" "working_dir" "uptime" 
-    "rx_bytes" "tx_bytes" "failure_count" "resp_count" "req_count" )
-
-    if [[ " ${arrBasePts[*]} " =~ [[:space:]]${__ptname}[[:space:]] ]]; then
-        echo Error point "$__ptname" is baseline point, and cannot be removed
-        return 13
-    fi
-
     if [ ! -f setpoint ] && [ -d ptrs ]; then
         if ! is_dir_empty ptrs; then
             cd ptrs
@@ -620,8 +610,8 @@ function rm_point()
                 if [ -z $__peerlink ]; then
                     continue
                 fi
-                __peerapp=`awk -F'/' '{print $1}'` $i
-                __peerpt=`awk -F'/' '{print $2}'` $i
+                __peerapp=`awk -F'/' '{print $1}' $i`
+                __peerpt=`awk -F'/' '{print $2}' $i`
                 pushd $__curdir > /dev/null
                 rm_link $__appname $__ptname $__peerapp $__peerpt
                 popd > /dev/null
@@ -633,6 +623,25 @@ function rm_point()
     rm -rf $__ptname
     popd > /dev/null
     return 0
+}
+
+function rm_point()
+{
+    __curdir=`pwd`
+    __appname=$1
+    __ptname=$2
+
+    arrBasePts=( "rpt_timer" "obj_count" "max_qps" "cur_qps"
+    "max_streams_per_session" "pending_tasks" "restart" "cmdline" "pid" "working_dir" "uptime" 
+    "rx_bytes" "tx_bytes" "failure_count" "resp_count" "req_count" "vmsize_kb"
+    "cpu_load" "open_files" "conn_count" )
+
+    if [[ " ${arrBasePts[*]} " =~ [[:space:]]${__ptname}[[:space:]] ]]; then
+        echo Error point "$__ptname" is baseline point, and cannot be removed
+        return 13
+    fi
+    rm_point_nocheck $1 $2
+    return $?
 }
 
 function remove_application()
@@ -651,7 +660,7 @@ function remove_application()
     pushd ./apps/$_appname/points > /dev/null
     for i in *; do
         pushd $_curdir > /dev/null
-        rm_point $_appname $i
+        rm_point_nocheck $_appname $i
         popd > /dev/null
     done
     popd > /dev/null
@@ -684,7 +693,12 @@ function show_point()
     if (( $_dt <= 7 )); then
         _output+=`python3 $updattr -v $_pt/value 2>/dev/null`
     else
-        _output+=`cat $_pt/value`
+        _fileSize=`stat -c %s $i`
+        if (( $_fileSize > 0 )); then
+            _output+=`cat $_pt/value`
+        else
+            _output+="None"
+        fi
     fi
     echo $_output
 }
@@ -953,6 +967,10 @@ function add_stdapp()
     add_point $_instname failure_count output i
     add_point $_instname resp_count output i
     add_point $_instname req_count output i
+    add_point $_instname vmsize_kb  output q
+    add_point $_instname cpu_load  output f
+    add_point $_instname open_files  output i
+    add_point $_instname conn_count  output i
 
     add_point $_instname uptime output i
     set_attr_value $_instname uptime unit "$(jsonval 's' 'sec' )" s

@@ -118,9 +118,12 @@ add_point rpcrouter1 max_pending_tasks setpoint i
 add_point rpcrouter1 restart input i
 set_attr_value rpcrouter1 restart pulse "$(jsonval 'i' 1 )" i
 add_point rpcrouter1 cmdline setpoint blob
-echo set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -agor 2')"
 set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -agor 2')" blob
 add_point rpcrouter1 pid output i 
+add_point rpcrouter1 vmsize_kb output q
+add_point rpcrouter1 cpu_load output f
+add_point rpcrouter1 open_files  output i
+add_point rpcrouter1 working_dir  setpoint blob
 
 add_point rpcrouter1 uptime output i
 set_attr_value rpcrouter1 uptime unit "$(jsonval 's' 'sec' )" s
