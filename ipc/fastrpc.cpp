@@ -2228,7 +2228,10 @@ gint32 CFastRpcServerBase::GetProperty(
     case propRxBytes:
     case propTxBytes:
         {
-            auto psc = ( CStatCountersServer* )this;
+            auto pSvc = const_cast
+                < CFastRpcServerBase* >( this );
+            auto psc = dynamic_cast
+                < CStatCounters_SvrBase*>( pSvc );
             if( !psc )
             {
                 ret = -EFAULT;
@@ -2258,7 +2261,10 @@ gint32 CFastRpcServerBase::GetProperty(
     case propMsgRespCount:
     case propMsgCount:
         {
-            auto psc = ( CStatCountersServer* )this;
+            auto pSvc = const_cast
+                < CFastRpcServerBase* >( this );
+            auto psc = dynamic_cast
+                < CStatCounters_SvrBase*>( pSvc );
             if( !psc )
             {
                 ret = -EFAULT;

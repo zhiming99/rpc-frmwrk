@@ -8,6 +8,31 @@
 #include "IAppStorecli.h"
 #include "IDataProducercli.h"
 
+#define I_TIMER "rpt_timer"
+#define O_SESSION "sessions"
+#define S_MAX_CONN "max_conn"
+#define O_CONNECTIONS     "conn_count"
+#define S_MAX_RECVBPS  "max_rbps"
+#define S_MAX_SENDBPS  "max_sbps"
+#define O_OBJ_COUNT "obj_count"
+#define O_PENDINGS "pending_tasks"
+#define S_MAX_PENDINGS "max_pending_tasks"
+#define O_PID       "pid"
+#define S_CMDLINE   "cmdline"
+#define I_RESTART   "restart"
+#define O_UPTIME    "uptime"
+#define O_RXBYTE    "rx_bytes"
+#define O_TXBYTE    "tx_bytes"
+#define O_VMSIZE_KB "vmsize_kb"
+#define O_WORKING_DIR "working_dir"
+#define O_RESP_COUNT "resp_count"
+#define O_FAIL_COUNT "failure_count"
+#define O_REQ_COUNT  "req_count"
+#define S_MAX_QPS  "max_qps"
+#define S_MAX_STM_PER_SESS  "max_streams_per_session"
+#define O_CPU_LOAD  "cpu_load"
+#define O_OPEN_FILES     "open_files"
+
 gint32 GetAppManagercli( InterfPtr& pCli );
 
 /*gint32 CreateAppManagercli(
@@ -294,8 +319,7 @@ struct CAsyncStdAMCallbacks : public IAsyncAMCallbacks
 {
     gint32 GetPointValuesToUpdate(
         InterfPtr& pIf,
-        std::vector< KeyValue >& veckv ) override
-    { return 0; }
+        std::vector< KeyValue >& veckv ) override;
 
     // RPC Async Req Callback
     gint32 SetPointValuesCallback(

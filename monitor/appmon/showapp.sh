@@ -53,6 +53,13 @@ fi
 pushd $rootdir > /dev/null
 
 for appname in "$@"; do
+    owner_stream=`python3 $updattr -v ./apps/$appname/owner_stream`
+    if [[ -z "$owner_stream" ]] || (( $owner_stream == 0 )); then
+        echo status: offline
+    else
+        echo "status: online"
+        echo "stream: $owner_stream"
+    fi
     if ! list_points $appname; then
         break
     fi

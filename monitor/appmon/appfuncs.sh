@@ -445,7 +445,7 @@ function get_attr_value()
         return 22
     fi
     if (( $_dtnum <= 7 ));then
-        python3 $updattr -v 'user.regfs' $_ptpath/$_attr > /dev/null
+        python3 $updattr -v $_ptpath/$_attr > /dev/null
     else
         cat $_ptpath/$_attr
     fi

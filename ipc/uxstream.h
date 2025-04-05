@@ -1393,7 +1393,7 @@ class CUnixSockStream:
                 ret = -EFAULT;
                 break;
             }
-            guint64 qwRx, qwTx, qwVal;
+            guint64 qwRx, qwTx, qwVal = 0;
             this->GetBytesTransfered(
                 qwRx, qwTx );
 

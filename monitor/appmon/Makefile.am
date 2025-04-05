@@ -22,6 +22,9 @@ appmonconf_DATA=appmondesc.json appmon.ridl
 appmonconfdir=$(sysconfdir)/rpcf
 appmondir=$(bindir)
 
+appmonincdir=$(includedir)/rpcf/appmancli
+appmoninc_HEADERS=appmon.h monconst.h appmonstruct.h
+
 if BITWIDTH32
 OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
 else
@@ -42,7 +45,7 @@ endif
 #appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
 #appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 
-EXTRA_DIST=appmon.ridl
+EXTRA_DIST=appmon.ridl upddesc.py
 
 noinst_LIBRARIES=libappmon.a
 libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp IAppMonitorsvr.cpp IDataProducersvr.cpp IUserManagersvr.cpp appmondesc.json IUserManagersvr.h IDataProducersvr.h IAppMonitorsvr.h IAppStoresvr.h appmon.h appmonstruct.h 
@@ -76,6 +79,8 @@ appmon.ridl:
     else \
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
-	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true;
+	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
+    sed -i 's/EnumMyClsid/EnumAMClsid/' appmon.h ;\
+    python3 upddesc.py
 
 .PHONY: appmon.ridl

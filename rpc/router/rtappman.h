@@ -24,25 +24,9 @@
 #pragma once
 #include "AppManagercli.h"
 #define RTAPPNAME "rpcrouter1"
-#define I_TIMER "rpt_timer"
-#define O_SESSION "sessions"
 #define O_BDGE_LIST "bdge_list"
 #define O_BPROXY_LIST "bdge_proxy_list"
 #define O_RPROXY_LIST "req_proxy_list"
-
-#define S_MAX_CONN "max_conn"
-#define O_CONNECTIONS     "conn_count"
-#define S_MAX_RECVBPS  "max_rbps"
-#define S_MAX_SENDBPS  "max_sbps"
-#define O_OBJ_COUNT "obj_count"
-#define O_PENDINGS "pending_tasks"
-#define S_MAX_PENDINGS "max_pending_tasks"
-#define O_PID       "pid"
-#define S_CMDLINE   "cmdline"
-#define I_RESTART   "restart"
-#define O_UPTIME    "uptime"
-#define O_RXBYTE    "rx_bytes"
-#define O_TXBYTE    "tx_bytes"
 
 struct CAsyncAMCallbacks : public CAsyncStdAMCallbacks
 {

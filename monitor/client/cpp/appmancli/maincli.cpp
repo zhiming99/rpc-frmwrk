@@ -12,7 +12,7 @@ using namespace rpcf;
 
 extern ObjPtr g_pIoMgr;
 
-FactoryPtr InitClassFactory()
+FactoryPtr InitClassFactoryAMCli()
 {
     BEGIN_FACTORY_MAPS;
 
@@ -31,7 +31,7 @@ FactoryPtr InitClassFactory()
 extern "C"
 gint32 DllLoadFactory( FactoryPtr& pFactory )
 {
-    pFactory = InitClassFactory();
+    pFactory = InitClassFactoryAMCli();
     if( pFactory.IsEmpty() )
         return -EFAULT;
     return STATUS_SUCCESS;

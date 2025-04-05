@@ -31,6 +31,8 @@ using namespace rpcf;
 #include "astnode.h" 
 #include "ridlc.h"
 #include <set>
+#include <iostream>
+#include <sstream>
 
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
@@ -41,6 +43,8 @@ extern bool g_bAuth;
 extern std::string g_strWebPath;
 // service filter
 std::set< stdstr > g_setServices;
+extern std::vector<stdstr> g_vecMonApps;
+extern bool g_bMonitoring;
 
 // interface async mode to overrid
 using SYNC_ELEM=std::pair< stdstr, guint32 >;
@@ -127,12 +131,14 @@ void Usage()
 #endif
 
     printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
+    printf( "\t-m <app name1, app name2,...>:\tTo generate code for monitoring support. '-s' option must be present.\n" );
     printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
     printf( "\t-l:\tTo output a shared library instead of executables.\n" );
     printf( "\t--server:\tTo generate skeleton code for server only.\n" );
     printf( "\t--client:\tTo generate skeleton code for client only.\n" );
     printf( "\t--services <service list>:\tTo generate skeleton code for the specified services.The services are seperated with ','.\n" );
-    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tTo override synchronize mode in the ridl file with the specified one.\n" );
+    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tTo override sync-tag of the methods "
+    "from the specified interface defined in the ridl file with <interface name>.\n" );
     printf( "\t\tThis option is for CPP project only.\n" );
     printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
     printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
@@ -229,7 +235,7 @@ int main( int argc, char** argv )
         {
 
             opt = getopt_long( argc, argv,
-                "abhvlI:O:o:pJjP:L:f::s",
+                "abhvlm:I:O:o:pJjP:L:f::s",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -617,6 +623,15 @@ int main( int argc, char** argv )
                     bQuit = true;
                     break;
                 }
+            case 'm':
+                {
+                    g_bMonitoring = true;
+                    std::istringstream iss(optarg);
+                    std::string token;
+                    while( std::getline(iss, token, ',') )
+                        g_vecMonApps.push_back(token);
+                    break;
+                }
             case '?' :
             case ':' :
             case 'h' :
@@ -635,10 +650,19 @@ int main( int argc, char** argv )
         if( bQuit )
             break;
 
+        if( g_bMonitoring && !g_bRpcOverStm )
+        {
+            printf( "'-s' option must be present to support monitoring\n" );
+            Usage();
+            ret = -1;
+            break;
+        }
+
         if( argv[ optind ] == nullptr )
         {
             printf( "Missing file to compile\n" );
             Usage();
+            ret = -ENOENT;
             break;
         }
 
@@ -646,6 +670,7 @@ int main( int argc, char** argv )
         {
             printf( "too many arguments\n" );
             Usage();
+            ret = -EINVAL;
             break;
         }
 
@@ -653,6 +678,7 @@ int main( int argc, char** argv )
         if( strFile.size() > REG_MAX_PATH )
         {
             printf( "File name too long\n" );
+            ret = -ENAMETOOLONG;
             break;
         }
 

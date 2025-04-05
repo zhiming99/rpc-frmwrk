@@ -43,6 +43,8 @@ extern stdstr g_strLang;
 extern guint32 g_dwFlags;
 extern stdstr g_strTarget;
 extern bool g_bBuiltinRt;
+std::vector<stdstr> g_vecMonApps;
+bool g_bMonitoring = false;
 
 gint32 EmitOnPreStart( 
     CWriterBase* m_pWriter,
@@ -3805,6 +3807,11 @@ gint32 CExportObjDesc2::OutputROS()
             m_pNode->GetName();
 
         oVal[ JSON_ATTR_SVRNAME ] = strAppName;
+        if( g_bMonitoring )
+        {
+            Json::Value oLib( "libappmancli.so" );
+            oVal[ JSON_ATTR_CLSFACTORY ].append( oLib );
+        }
 
         Json::Value oElemTmpl;
 

@@ -786,8 +786,11 @@ std::unordered_set< CObjBase*, hash_obj > g_vecObjs;
 void DumpObjs( bool bAll = false)
 {
     std::set< CObjBase*, cmp_obj > setObjs;
-    for( auto pObj : g_vecObjs ) 
-        setObjs.insert( pObj );
+    {
+        CStdMutex oLock( g_oObjListLock );
+        for( auto pObj : g_vecObjs ) 
+            setObjs.insert( pObj );
+    }
     for( auto pObj : setObjs )
     {
         std::string strObj;
@@ -844,6 +847,12 @@ CObjBase::CObjBase()
     m_qwObjId = NewObjId();
     ++m_atmObjCount;
     m_dwMagic = *( guint32* )"ObjB";
+#ifdef DEBUG
+    {
+        CStdMutex oLock( g_oObjListLock );
+        g_vecObjs.insert( this );
+    }
+#endif
 }
 
 // copy constructor
@@ -856,6 +865,10 @@ CObjBase::CObjBase( const CObjBase& rhs )
 CObjBase::~CObjBase()
 {
     --m_atmObjCount;
+#ifdef DEBUG
+    CStdMutex oLock( g_oObjListLock );
+    g_vecObjs.erase( this );
+#endif
 }
 
 gint32 CObjBase::SetClassId(
@@ -867,17 +880,7 @@ gint32 CObjBase::SetClassId(
 
 gint32 CObjBase::AddRef()
 {
-#ifdef DEBUG
-    gint32 ret = ++m_atmRefCount;  
-    if( ret == 1 )
-    {
-        CStdMutex oLock( g_oObjListLock );
-        g_vecObjs.insert( this );
-    }
-    return ret;
-#else
     return ++m_atmRefCount;
-#endif
 }
 
 gint32 CObjBase::DecRef()
@@ -889,15 +892,7 @@ gint32 CObjBase::Release()
 {
     gint32 iRef = --m_atmRefCount;
     if( iRef == 0 )
-    {
-#ifdef DEBUG
-        {
-            CStdMutex oLock( g_oObjListLock );
-            g_vecObjs.erase( this );
-        }
-#endif
         delete this;
-    }
 #ifdef DEBUG
     else if( unlikely( iRef < 0 ) )
     {

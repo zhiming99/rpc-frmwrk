@@ -35,6 +35,11 @@ using namespace rpcf;
 #include "routmain.h"
 #include "rtappman.h"
 
+extern guint64 GetVmSize();
+extern gint32 GetOpenFileCount(
+    gint32 pid, guint32& dwCount );
+float GetCpuUsage();
+
 gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
@@ -182,6 +187,38 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
         okv.oValue = ( guint32 )
             prb->GetBridgeCount();
         veckv.push_back( okv );
+
+        okv.strKey = O_VMSIZE_KB;
+        okv.oValue = GetVmSize();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OPEN_FILES;
+        guint32 dwCount = 0;
+        ret = GetOpenFileCount(
+            getpid(), dwCount );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.oValue = dwCount;
+            veckv.push_back( okv );
+        }
+
+        okv.strKey = O_CPU_LOAD;
+        okv.oValue = GetCpuUsage();
+        veckv.push_back( okv );
+
+        okv.strKey = O_WORKING_DIR;
+        char szPath[PATH_MAX];
+        if( getcwd( szPath, sizeof(szPath)) != nullptr)
+        {        
+            BufPtr pBuf( true );
+            ret = pBuf->Append( szPath,
+                strlen( szPath ) );
+            if( SUCCEEDED( ret ) )
+            {
+                okv.oValue = pBuf;
+                veckv.push_back( okv );
+            }
+        }
 
     }while( 0 );
     if( veckv.size() && ERROR( ret ) )

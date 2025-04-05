@@ -124,7 +124,7 @@ gint32 DumpStream(
 
         if( pSvc->IsServer() )
         {
-            CUnixSockStmServerRelay* pSvr = pUxStream; 
+            CUnixSockStmServer* pSvr = pUxStream; 
             guint64 qwRxBytes, qwTxBytes;
             pSvr->GetBytesTransfered(
                 qwRxBytes, qwTxBytes );
@@ -331,15 +331,19 @@ gint32 DumpBdgeList(
                 {
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
+                    CUnixSockStmProxyRelay* pux = elem; 
+                    guint64 qwRxBytes, qwTxBytes;
+                    pux->GetBytesTransfered(
+                        qwRxBytes, qwTxBytes );
                     oStreams.append( oVal  );
-                    qwRxTotal += oVal[ "BytesToClient" ].asUInt64();
-                    qwTxTotal += oVal[ "BytesToServer" ].asUInt64();
+                    qwRxTotal += qwRxBytes;
+                    qwTxTotal += qwTxBytes;
                 }
                 oBridge[ "Streams" ] = oStreams;
                 oBridge[ "BytesToClient" ] =
-                    ( Json::UInt64 )qwRxTotal;
-                oBridge[ "BytesToServer" ] =
                     ( Json::UInt64 )qwTxTotal;
+                oBridge[ "BytesToServer" ] =
+                    ( Json::UInt64 )qwRxTotal;
             }
 
             guint64 qwRxTotalR = 0, qwTxTotalR = 0;
@@ -356,14 +360,18 @@ gint32 DumpBdgeList(
                     Json::Value oVal( Json::objectValue );
                     DumpStream( elem, oVal );
                     oStreams.append( oVal  );
-                    qwRxTotalR += oVal[ "BytesToClient" ].asUInt64();
-                    qwTxTotalR += oVal[ "BytesToServer" ].asUInt64();
+                    CUnixSockStmProxyRelay* pux = elem; 
+                    guint64 qwRxBytes, qwTxBytes;
+                    pux->GetBytesTransfered(
+                        qwRxBytes, qwTxBytes );
+                    qwRxTotalR += qwRxBytes;
+                    qwTxTotalR += qwTxBytes;
                 }
                 oBridge[ "StreamsRelay" ] = oStreams;
                 oBridge[ "BytesRelayCli" ] =
-                    ( Json::UInt64 )qwRxTotalR;
-                oBridge[ "BytesRelayRx" ] =
                     ( Json::UInt64 )qwTxTotalR;
+                oBridge[ "BytesRelayRx" ] =
+                    ( Json::UInt64 )qwRxTotalR;
             }
             pStat->GetCounter2( propRxBytes, qwVal );
             oBridge[ "BytesThruToCli" ] = ( Json::UInt64 )
@@ -392,7 +400,6 @@ gint32 DumpBdgeList(
 
         qwVal = 0;
         psc->GetCounter2( propRxBytes, qwVal );
-        qwRouterRx += qwVal;
         oVal[ "TotalBytesToCli" ] =
             ( Json::UInt64 )( qwRouterRx + qwVal );
 

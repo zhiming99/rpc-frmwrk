@@ -982,6 +982,8 @@ gint32 CAppManager_SvrImpl::FreeAppInstsInternal(
             for( auto& elem : oSet )
                 vecValidApps.push_back( elem );
             oSet.clear();
+            if( vecValidApps.size() )
+                arrApps = vecValidApps;
         }
         if( oSet.empty() )
             m_mapAppOwners.erase( itr );
@@ -1089,7 +1091,21 @@ gint32 CAppManager_SvrImpl::RemoveStmSkel(
         std::vector< stdstr > vecApps;
         // an empty array will put all the owned
         // apps offline
-        FreeAppInstsInternal( hstm, vecApps );
+        ret = FreeAppInstsInternal(
+            hstm, vecApps );
+        if( SUCCEEDED( ret ) )
+        {
+            // unexpected disconnection, make a log
+            for( auto elem : vecApps )
+            {
+                LOGERR( GetIoMgr(), -ECONNABORTED, 
+                    "%s@%llx goes offline unexpected",
+                    elem.c_str(), hstm );
+                DebugPrint( -ECONNABORTED,
+                    "%s@%llx goes offline unexpected",
+                    elem.c_str(), hstm );
+            }
+        }
         ret = super::RemoveStmSkel( hstm );
     }while( 0 );
     return ret;

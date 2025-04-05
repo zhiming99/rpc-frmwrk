@@ -11,6 +11,12 @@ using namespace rpcf;
 #include "monconst.h"
 #include "signal.h"
 
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <limits.h>
+#include <dirent.h>
+
 #define PROP_TARGET_IF 0x1234
 #define PROP_APP_NAME 0x1235
 #define RECONNECT_INTERVAL 10
@@ -530,11 +536,6 @@ gint32 ClaimApp( CRpcServices* pSvc,
             break;
         }
 
-        KeyValue okv;
-        okv.strKey = PID_FILE;
-        okv.oValue = ( guint32 )getpid();
-        veckv.push_back( okv );
-
         ret = pamc->ClaimAppInst(
             oParams.GetCfg(),
             strAppInst, veckv, rveckv );
@@ -908,3 +909,249 @@ gint32 CAsyncStdAMCallbacks::ScheduleReconnect(
     return ret;
 }
 
+guint64 GetVmSize()
+{
+    std::ifstream oFile("/proc/self/status");
+    stdstr strLine;
+    guint64 qwVmSizeKb = 0;
+
+    while( std::getline( oFile, strLine ) )
+    {
+        if (strLine.substr(0, 7) == "VmSize:")
+        {
+            std::istringstream iss(strLine.substr(7));
+            iss >> qwVmSizeKb;
+            break;
+        }
+    }
+    return qwVmSizeKb;
+}
+
+struct CPUData {
+    guint64 user = 0;
+    guint64 nice = 0;
+    guint64 system = 0;
+    guint64 idle = 0;
+    guint64 iowait = 0;
+    guint64 irq = 0;
+    guint64 softirq = 0;
+    guint64 steal = 0;
+    guint64 guest = 0;
+    guint64 guest_nice = 0;
+};
+
+static CPUData GetCPUData() {
+    std::ifstream file("/proc/stat");
+    std::string line;
+    std::getline(file, line);
+    std::istringstream iss(line);
+    std::string cpu;
+    CPUData data;
+    iss >> cpu >> data.user >>
+        data.nice >> data.system >>
+        data.idle >> data.iowait >>
+        data.irq >> data.softirq >>
+        data.steal >> data.guest >>
+        data.guest_nice;
+    return data;
+}
+
+static CPUData GetProcessCPUData(int pid) {
+    std::ifstream file(
+        "/proc/" + std::to_string(pid) + "/stat");
+    std::string line;
+    std::getline(file, line);
+    std::istringstream iss(line);
+    CPUData data;
+    std::string temp;
+    for (int i = 1; i <= 13; ++i) {
+        iss >> temp;
+    }
+    iss >> data.user >> data.system;
+    return data;
+}
+
+static float CalculateCpuUsage(
+    CPUData prev_cpu, CPUData current_cpu,
+    CPUData prev_process,
+    CPUData current_process)
+{
+    guint64 total_diff =
+        (current_cpu.user - prev_cpu.user) +
+        (current_cpu.nice - prev_cpu.nice) +
+        (current_cpu.system - prev_cpu.system) +
+        (current_cpu.idle - prev_cpu.idle) +
+        (current_cpu.iowait - prev_cpu.iowait) +
+        (current_cpu.irq - prev_cpu.irq) +
+        (current_cpu.softirq - prev_cpu.softirq) +
+        (current_cpu.steal - prev_cpu.steal) +
+        (current_cpu.guest - prev_cpu.guest) +
+        (current_cpu.guest_nice - prev_cpu.guest_nice);
+
+    guint64 process_diff =
+        (current_process.user - prev_process.user) +
+        (current_process.system - prev_process.system);
+
+    if (total_diff == 0)
+        return 0.0f;
+
+    return (float)process_diff * 100.0f / (float)total_diff;
+}
+
+float GetCpuUsage()
+{
+    static CPUData oPrevData;
+    static CPUData oPrevProcData;
+    CPUData oCurData = GetCPUData();
+    CPUData oCurProcData =
+        GetProcessCPUData( getpid() );
+    float ret = CalculateCpuUsage(
+        oPrevData, oCurData,
+        oPrevProcData, oCurProcData);
+    oPrevData = oCurData;
+    oPrevProcData = oCurProcData;
+    return ret;
+}
+
+gint32 GetOpenFileCount(
+    gint32 pid, guint32& dwCount )
+{
+    std::stringstream oPath;
+    oPath << "/proc/" << pid << "/fd";
+    std::string strPath = oPath.str();
+
+    DIR *dir = opendir( strPath.c_str() );
+    if (!dir)
+        return -errno;
+
+    dwCount = 0;
+    struct dirent *entry;
+    while( ( entry = readdir(dir) ) != nullptr )
+    {
+        if (entry->d_type == DT_REG ||
+            entry->d_type == DT_LNK)
+            dwCount++;
+    }
+    closedir( dir );
+    return 0;
+}
+
+gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
+    InterfPtr& pIf,
+    std::vector< KeyValue >& veckv )
+{
+    gint32 ret = 0;
+    do{
+        CFastRpcServerBase* pSvr = pIf;
+        if( pSvr == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        KeyValue okv;
+        okv.strKey = O_CONNECTIONS;
+        okv.oValue = ( guint32 )
+            pSvr->GetStmSkelCount();;
+        veckv.push_back( okv );
+
+        okv.strKey = O_VMSIZE_KB;
+        okv.oValue = GetVmSize();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OBJ_COUNT;
+        okv.oValue = CObjBase::GetActCount();
+        veckv.push_back( okv );
+
+        okv.strKey = O_PENDINGS;
+        ret = pIf->GetProperty(
+            propPendingTasks, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_RXBYTE;
+        ret = pIf->GetProperty(
+            propRxBytes, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_TXBYTE;
+        ret = pIf->GetProperty(
+            propTxBytes, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        timespec ts = pSvr->GetStartTime();
+        okv.strKey = O_UPTIME;
+        timespec ts2;
+        ret = clock_gettime( CLOCK_REALTIME, &ts2 );
+        if( SUCCEEDED( ret ) )
+        {
+            guint32 dwUptime =
+                ts2.tv_sec - ts.tv_sec;
+            okv.oValue = dwUptime;
+            veckv.push_back( okv );
+        }
+
+        okv.strKey = O_FAIL_COUNT;
+        ret = pIf->GetProperty(
+            propFailureCount, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_REQ_COUNT;
+        ret = pIf->GetProperty(
+            propMsgCount, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_RESP_COUNT;
+        ret = pIf->GetProperty(
+            propMsgRespCount, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_CPU_LOAD;
+        okv.oValue = GetCpuUsage();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OPEN_FILES;
+        guint32 dwCount = 0;
+        ret = GetOpenFileCount(
+            getpid(), dwCount );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.oValue = dwCount;
+            veckv.push_back( okv );
+        }
+
+        okv.strKey = O_PID;
+        okv.oValue = ( guint32 )getpid();
+        veckv.push_back( okv );
+
+        okv.strKey = S_MAX_QPS;
+        ret = pSvr->GetProperty(
+            propQps, okv.oValue );
+        veckv.push_back( okv );
+
+        okv.strKey = S_MAX_STM_PER_SESS;
+        ret = pSvr->GetProperty(
+            propStmPerSess, okv.oValue );
+        veckv.push_back( okv );
+
+        okv.strKey = O_WORKING_DIR;
+        char szPath[PATH_MAX];
+        if( getcwd( szPath, sizeof(szPath)) != nullptr)
+        {        
+            BufPtr pBuf( true );
+            ret = pBuf->Append( szPath,
+                strlen( szPath ) );
+            if( SUCCEEDED( ret ) )
+            {
+                okv.oValue = pBuf;
+                veckv.push_back( okv );
+            }
+        }
+        ret = 0;
+    }while( 0 );
+    return ret;
+}
