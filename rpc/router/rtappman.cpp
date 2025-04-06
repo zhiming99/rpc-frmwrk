@@ -35,11 +35,6 @@ using namespace rpcf;
 #include "routmain.h"
 #include "rtappman.h"
 
-extern guint64 GetVmSize();
-extern gint32 GetOpenFileCount(
-    gint32 pid, guint32& dwCount );
-float GetCpuUsage();
-
 gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
