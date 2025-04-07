@@ -949,7 +949,7 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
             veckv.push_back( okv );
 
         ret = pIf->GetProperty(
-            propUptime, okv.oValue;
+            propUptime, okv.oValue );
         if( SUCCEEDED( ret ) )
             veckv.push_back( okv );
 
