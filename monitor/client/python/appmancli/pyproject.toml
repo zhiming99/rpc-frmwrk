@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "appmancli"
+version = "1.0.0"
+description = "A Python client for managing AppManager."
+authors = [
+    { name = "zhiming", email = "woodhead99@gmail.com" }
+]
+readme = "README.md"
+keywords = ["rpc", "appmanager", "client"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+license = "GPL-3.0-or-later"
+dependencies = [
+    "rpcf",  # Assuming rpcf is a Python package
+    "json",  # Standard library, no need to install
+    "typing",  # Standard library, no need to install
+]
+
+[tool.setuptools]
+packages = ["appmancli"]
+
+[tool.setuptools.package-data]
+"appmancli" = ["README.md"]
+
+[project.scripts]
+start_appmancli = "maincli:StartAppManagercli"
+
+[project.urls]
+Homepage = "https://github.com/zhiming99/rpc-frmwrk"

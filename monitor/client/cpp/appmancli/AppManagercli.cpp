@@ -948,17 +948,10 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
         if( SUCCEEDED( ret ) )
             veckv.push_back( okv );
 
-        timespec ts = pSvr->GetStartTime();
-        okv.strKey = O_UPTIME;
-        timespec ts2;
-        ret = clock_gettime( CLOCK_REALTIME, &ts2 );
+        ret = pIf->GetProperty(
+            propUptime, okv.oValue;
         if( SUCCEEDED( ret ) )
-        {
-            guint32 dwUptime =
-                ts2.tv_sec - ts.tv_sec;
-            okv.oValue = dwUptime;
             veckv.push_back( okv );
-        }
 
         okv.strKey = O_FAIL_COUNT;
         ret = pIf->GetProperty(
@@ -999,12 +992,14 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
         okv.strKey = S_MAX_QPS;
         ret = pSvr->GetProperty(
             propQps, okv.oValue );
-        veckv.push_back( okv );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
 
         okv.strKey = S_MAX_STM_PER_SESS;
         ret = pSvr->GetProperty(
             propStmPerSess, okv.oValue );
-        veckv.push_back( okv );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
 
         okv.strKey = O_WORKING_DIR;
         char szPath[PATH_MAX];

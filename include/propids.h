@@ -299,6 +299,7 @@ enum EnumPropId : gint32
     propPendingTasks,
     propStmPerSess,
     propCurQps,
+    propUptime,
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

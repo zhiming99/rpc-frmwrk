@@ -802,7 +802,7 @@ class CPythonServer :
 
     PyObject* GetProperty( gint32 dwPropId );
     %MethodCode
-    PyObject* pResp = PyList_New( 3 );
+    PyObject* pResp = PyList_New( 2 );
     sipRes = pResp;
     gint32 ret = 0;
     do{
@@ -815,6 +815,8 @@ class CPythonServer :
             break;
         }
 
+        PyList_SetItem( pResp, 1, Py_None );
+
         Variant oVar;
         ret = pImpl->GetProperty( a0, oVar );
         if( ERROR( ret ) )
@@ -823,17 +825,20 @@ class CPythonServer :
         ret = pImpl->ConvertVarToPyObj( oVar, pPyProp );
         if( ERROR( ret ) )
             break;
-        PyList_SetItem( pResp, 1, pPyProp );
+        PyObject* pParams = PyList_New( 2 );
+        PyList_SetItem( pParams, 0, pPyProp );
         if( oVar.GetTypeId() == typeByteArr )
         {
             auto val = &( ObjPtr& )oVar;
             PyObject* pObj = sipConvertFromNewType(
                 val,sipType_cpp_ObjPtr, SIP_NULLPTR );
-            PyList_SetItem( pResp, 2, pObj );
+            PyList_SetItem( pParams, 1, pObj );
         }
+        else
+            PyList_SetItem( pParams, 1, Py_None );
+        PyList_SetItem( pResp, 1, pParams );
     }while( 0 );
-    PyList_SetItem( pResp, 0,
-        PyLong_FromLong( ret ) );
+    PyList_SetItem( pResp, 0, PyLong_FromLong( ret ) );
     %End
 
     gint32 SetProperty(

@@ -2181,6 +2181,15 @@ gint32 CFastRpcServerBase::GetProperty(
     gint32 ret = 0;
     switch( iProp )
     {
+    case propUptime:
+        {
+            timespec ts = this->GetStartTime();
+            timespec ts2;
+            clock_gettime( CLOCK_REALTIME, &ts2 );
+            oVal = ( guint32 )
+                ( ts2.tv_sec - ts.tv_sec );
+            break;
+        }
     case propPendingTasks:
         {
             gint32 ret = 0;

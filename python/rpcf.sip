@@ -245,7 +245,18 @@ namespace cpp
         propDestIpAddr,
         propDestTcpPort
         propSrcIpAddr,
-        propSrcTcpPort
+        propSrcTcpPort,
+        propPendingTasks,
+
+        propConnections,
+        propStmPerSess,
+        propRxBytes,
+        propTxBytes,
+        propFailureCount,
+        propMsgRespCount,
+        propMsgCount,
+        propObjCount,
+        propQps,
     };
 
     enum // EnumIfState
@@ -1295,6 +1306,43 @@ namespace cpp
                 strNewDrv.c_str() );
             PyTuple_SetItem( listResp, 1, pStr );
         }
+        sipRes = listResp;
+    }while( 0 );
+    %End
+
+    guint64 GetVmSize();
+    %MethodCode
+    sipRes = GetVmSize();
+    %End
+
+    float GetCpuUsage();
+    %MethodCode
+    sipRes = GetCpuUsage();
+    %End
+
+    PyObject* GetOpenFileCount( gint32 pid );
+    %MethodCode
+    do{
+        guint32 dwCount = 0;
+        gint32 ret = GetOpenFileCount( a0, dwCount );
+        PyObject* listResp = PyTuple_New( 2 );
+        if( listResp == nullptr )
+        {
+            sipRes = Py_None;
+            break;
+        }
+        PyObject* pRet = PyLong_FromLong( ret );
+        PyObject* pParams = Py_None;
+        if( SUCCEEDED( ret ) )
+        {
+            pParams = PyTuple_New( 1 );
+            PyObject* pCount =
+                PyLong_FromLong( dwCount );
+            PyTuple_SetItem(
+                pParams, 0, pCount );
+        }
+        PyTuple_SetItem( listResp, 0, pRet );
+        PyTuple_SetItem( listResp, 1, pParams );
         sipRes = listResp;
     }while( 0 );
     %End
