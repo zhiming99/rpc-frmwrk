@@ -403,20 +403,20 @@ void Usage( char* szName )
     fprintf( stderr,
         "Usage: %s [ -r <role number, 1: reqfwrd, 2: bridge>, mandatory ]\n"
 #ifdef AUTH
-        "\t [ -a to enable authentication ]\n"
+        "\t [ -a Enable authentication ]\n"
         "\t [ -s < Service Name for authentication, valid for role 2, and ignored for role 1 > ]\n"
 #endif
-        "\t [ -c to establish a seperate connection to the same bridge per client, only for role 1 ]\n"
-        "\t [ -f to enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
+        "\t [ -c Establish a seperate connection to the same bridge per client, only for role 1 ]\n"
+        "\t [ -f Enable request-based flow control on the gateway bridge, ignore it if no massive connections ]\n"
 #ifdef FUSE3
-        "\t [ -m <mount point> to export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
+        "\t [ -m <mount point> Export runtime information via 'rpcfs' at the directory 'mount point' ]\n"
 #endif
-        "\t [ -d to run as a daemon ]\n"
-        "\t [ -g to enable logging when the rpcrouter run as a bridge, that is '-r 2' ]\n"
-        "\t [ -o to enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
-        "\t [ -l to use the driver.json in current directory instead of the default one ]\n"
-        "\t [ -v version information ]\n"
-        "\t [ -h this help ]\n",
+        "\t [ -d Run as a daemon ]\n"
+        "\t [ -g Enable logging when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -o Enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ -l Use the driver.json in current directory instead of the default one ]\n"
+        "\t [ -v Version information ]\n"
+        "\t [ -h This help ]\n",
         szName );
 }
 

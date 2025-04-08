@@ -90,59 +90,59 @@ void Usage()
     printf( "\t compile the `ridl file'"
         "and output the RPC skeleton files.\n" );
 
-    printf( "Options -h:\tTo print this help.\n");
+    printf( "Options -h:\tprint this help.\n");
 
-    printf( "\t-I:\tTo specify the path to"
+    printf( "\t-I:\tSpecify the path to"
         " search for the included `ridl files'.\n"
         "\t\tAnd this option can repeat many"
         "times.\n" );
 
-    printf( "\t-O:\tTo specify the path for\n"
+    printf( "\t-O:\tSpecify the path for\n"
         "\t\tthe output files. 'output' is the \n"
         "\t\tdefault path if not specified.\n" );
 
-    printf( "\t-o:\tTo specify the file name as\n"
+    printf( "\t-o:\tSpecify the file name as\n"
         "\t\tthe base of the target image. That is,\n"
         "\t\tthe <name>cli for client and <name>svr\n"
         "\t\tfor server. If not specified, the\n"
         "\t\t'appname' from the ridl will be used.\n" );
 
 #ifdef PYTHON
-    printf( "\t-p:\tTo generate the Python skeleton files.\n" );
+    printf( "\t-p:\tGenerate the Python skeleton files.\n" );
 #endif
 
 #ifdef JAVA
-    printf( "\t-j:\tTo generate the Java skeleton files\n" );
-    printf( "\t-P:\tTo specify the Java package name prefix.\n" );
+    printf( "\t-j:\tGenerate the Java skeleton files\n" );
+    printf( "\t-P:\tSpecify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only.\n" );
 #endif
 
 #ifdef FUSE3
-    printf( "\t-f:\tTo generate cpp skeleton files for rpcfs\n" );
-    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs.\n" );
+    printf( "\t-f:\tGenerate cpp skeleton files for rpcfs\n" );
+    printf( "\t--async_proxy:\tGenerate the asynchronous proxy for rpcfs.\n" );
 #endif
 
 #ifdef JAVASCRIPT
-    printf( "\t-J:\tTo generate the JavaScript client skeleton.\n" );
+    printf( "\t-J:\tGenerate the JavaScript client skeleton.\n" );
     printf( "\t--odesc_url=<url>: the <url> to specify path to get the object description \n" );
     printf( "\t\tfile for JS client. This is a mandatory option when '-J' is given\n" );
     printf( "\t--lib_path=<path>: the <path> to specify the alternative path to the JS support library\n" );
-    printf( "\t--auth: To enable OAuth2 authentication for Javascript client\n" );
+    printf( "\t--auth: Enable OAuth2 authentication for Javascript client\n" );
 #endif
 
-    printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
-    printf( "\t-m <app name1, app name2,...>:\tTo generate code for monitoring support. '-s' option must be present.\n" );
-    printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
-    printf( "\t-l:\tTo output a shared library instead of executables.\n" );
-    printf( "\t--server:\tTo generate skeleton code for server only.\n" );
-    printf( "\t--client:\tTo generate skeleton code for client only.\n" );
-    printf( "\t--services <service list>:\tTo generate skeleton code for the specified services.The services are seperated with ','.\n" );
-    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tTo override sync-tag of the methods "
+    printf( "\t-s:\tOutput the skeleton with fastrpc support.\n" );
+    printf( "\t-m <app name>:\tGenerate code for monitoring support. <app name> is the app's directory in the app registry. '-s' option must be present.\n" );
+    printf( "\t-b:\tOutput the skeleton with built-in router.\n" );
+    printf( "\t-l:\tOutput a shared library instead of executables.\n" );
+    printf( "\t--server:\tGenerate skeleton code for server only.\n" );
+    printf( "\t--client:\tGenerate skeleton code for client only.\n" );
+    printf( "\t--services <service list>:\tGenerate skeleton code for the specified services.The services are seperated with ','.\n" );
+    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tOverride sync-tag of the methods "
     "from the specified interface defined in the ridl file with <interface name>.\n" );
     printf( "\t\tThis option is for CPP project only.\n" );
-    printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
-    printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
-    printf( "\t-v:\tTo print the version information.\n" );
+    printf( "\t-L<lang>:Output Readme in language <lang>.\n" );
+    printf( "\t\t<lang> Can be 'cn' or 'en' for now.\n" );
+    printf( "\t-v:\tPrint the version information.\n" );
 }
 
 static std::string g_strOutPath = "output";
