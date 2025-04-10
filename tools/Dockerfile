@@ -11,7 +11,7 @@ CMD bash /root/initkrb5.sh || exit 1
 #login with principal zhiming
 CMD kinit -k -t /etc/krb5.keytab zhiming || exit 2
 
-RUN apt-get install -y --fix-missing gcc g++ python3 python3-dev python3-pip flex bison \
+RUN apt-get install -y --fix-missing gcc g++ python3 python3-dev python3-pip python3-build flex bison \
 libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
