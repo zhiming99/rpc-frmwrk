@@ -43,13 +43,13 @@ appmancli/__init__.py:
 # Install the Python package using pip
 install:
 	if command -v lsb_release >/dev/null 2>&1; then \
-        PLATFORM=$$(lsb_release -is 2>/dev/null || echo "unknown"); \
+        PLATFORM=$$(lsb_release -is 2>/dev/null || echo "Unknown"); \
         if [[ " $${PLATFORM[@]} " =~ " Ubuntu " ]]; then \
-            PLATFORM= "Ubuntu"; \
+            PLATFORM="Ubuntu"; \
         elif [[ " $${PLATFORM[@]} " =~ " Debian " ]]; then  \
             PLATFORM="Debian"; \
         else \
-            PLATFORM="unknown"; \
+            PLATFORM="Unknown"; \
         fi; \
     else \
         PLATFORM=$$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"'); \
@@ -64,21 +64,21 @@ install:
     fi; \
 	if [[ "x$${SUDO_USER}" != "x" ]]; then \
         echo su -c 'pip3 install $${pipopt} dist/*.whl' $${SUDO_USER}; \
-        su -c "pip3 install $${pipopt} dist/*.whl" $${SUDO_USER}; \
+        su -c "pip3 install $${pipopt} dist/*.whl" $${SUDO_USER} || true; \
     else \
-        pip3 install $${pipopt} dist/*.whl;\
+        pip3 install $${pipopt} dist/*.whl || true;\
     fi
 
 # Uninstall the Python package
 uninstall:
 	if command -v lsb_release >/dev/null 2>&1; then \
-        PLATFORM=$$(lsb_release -is 2>/dev/null || echo "unknown"); \
+        PLATFORM=$$(lsb_release -is 2>/dev/null || echo "Unknown"); \
         if [[ " $${PLATFORM[@]} " =~ " Ubuntu " ]]; then \
             PLATFORM= "Ubuntu"; \
         elif [[ " $${PLATFORM[@]} " =~ " Debian " ]]; then  \
             PLATFORM="Debian"; \
         else \
-            PLATFORM="unknown"; \
+            PLATFORM="Unknown"; \
         fi; \
     else \
         PLATFORM=$$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"'); \

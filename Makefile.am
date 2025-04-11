@@ -5,16 +5,6 @@ if ENABLE_FUSE3
 SUBDIRS += fuse
 endif
 
-SUBDIRS += ridl monitor rpc tools pics examples 
-
-SUBDIRS += test
-
-if SWIG
-if ENABLE_JAVA
-SUBDIRS += java
-endif
-endif
-
 if SIPBUILD
 if ENABLE_PYTHON
 SUBDIRS += python
@@ -26,6 +16,16 @@ if ENABLE_PYTHON
 SUBDIRS += python                                                       
 endif
 endif                          
+
+SUBDIRS += ridl monitor rpc tools pics examples 
+
+SUBDIRS += test
+
+if SWIG
+if ENABLE_JAVA
+SUBDIRS += java
+endif
+endif
 
 if ENABLE_JS
 SUBDIRS += js
