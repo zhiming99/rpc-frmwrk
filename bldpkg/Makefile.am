@@ -56,6 +56,8 @@ if ENABLE_JS
 	make -C ../monitor/oinit deb
 	cp ../monitor/oinit/output/python3-oinit*.deb .
 endif
+	make -C ../monitor/client/python deb
+	cp ../monitor/client/python/python3-appmoncli*.deb .
 
 rpm:
 	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree

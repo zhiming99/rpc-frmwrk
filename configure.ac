@@ -436,6 +436,10 @@ AC_CONFIG_FILES([Makefile
                  monitor/appmon/Makefile
                  monitor/client/Makefile
                  monitor/client/cpp/appmancli/Makefile
+                 monitor/client/python/build_deb.sh
+                 monitor/client/python/appmancli/pyproject.toml
+                 monitor/client/python/Makefile
+                 monitor/client/python/appmancli/Makefile
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])
@@ -581,12 +585,12 @@ esac
 
 case $enable_python in
     yes)
-        PYTHON_RPMLIBS="python3-devel, python3-pip, python3-numpy, ( sip5 or sip6 )," 
+        PYTHON_RPMLIBS="python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 )," 
         PYTHON_RPMPKGS="python3-pip python3-numpy (sip5 or sip6) " 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
-        PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-pip, sip5-tools | sip-tools | sip-dev,"
+        PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,"
         PYTHON_DEBPKGS="python3-numpy, python3-pip, sip5-tools | sip-tools, " 
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=

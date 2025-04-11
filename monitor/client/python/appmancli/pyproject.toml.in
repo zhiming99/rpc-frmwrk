@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "appmancli"
-version = "1.0.0"
+version = "@VERSION@"
 description = "A Python client for managing AppManager."
 authors = [
     { name = "zhiming", email = "woodhead99@gmail.com" }
@@ -17,9 +17,7 @@ classifiers = [
 ]
 license = "GPL-3.0-or-later"
 dependencies = [
-    "rpcf",  # Assuming rpcf is a Python package
-    "json",  # Standard library, no need to install
-    "typing",  # Standard library, no need to install
+    "rpcf >= @VERSION@",
 ]
 
 [tool.setuptools]
@@ -32,4 +30,4 @@ packages = ["appmancli"]
 start_appmancli = "maincli:StartAppManagercli"
 
 [project.urls]
-Homepage = "https://github.com/zhiming99/rpc-frmwrk"
+Homepage = "@PACKAGE_URL@"

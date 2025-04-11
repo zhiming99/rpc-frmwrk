@@ -15,7 +15,7 @@ deb:
 	cp debian/{control,rules,copyright,preinst,postinst,prerm} debpkg/debian/
 	if [ ! -d debpkg/oinit ]; then mkdir -p debpkg/oinit;fi; cp *.py debpkg/oinit;mv debpkg/oinit/setup.py debpkg/
 	cp oinitdesc.json debpkg/oinit;cp Makefile.deb debpkg/Makefile;cp *.md debpkg/oinit/
-	pushd debpkg;DEBEMAIL="zhiming <woodhead99@gmail.com>" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME) "$(PACKAGE_NAME)-$(VERSION)-$(rev) released";\
+	pushd debpkg;DEBEMAIL="zhiming $(PACKAGE_BUGREPORT)" dch --create -v $(VERSION)-$(rev) --package $(PACKAGE_NAME) "$(PACKAGE_NAME)-$(VERSION)-$(rev) released";\
  dpkg-buildpackage -us -uc;popd
 	if [ -d output ]; then rm output/python3-oinit*deb > /dev/null || true;fi
 	if [ ! -d output ]; then mkdir output; fi; mv python3-oinit* output/

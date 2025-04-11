@@ -1,1 +1,1 @@
-SUBDIRS=cpp/appmancli
+SUBDIRS=cpp/appmancli python
