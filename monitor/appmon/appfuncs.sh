@@ -676,7 +676,12 @@ function list_applications()
     fi
     pushd ./apps > /dev/null
     for i in *; do
-        echo $i
+        owner_stream=`python3 $updattr -v ./$i/owner_stream`
+        if [[ -z "$owner_stream" ]] || (( $owner_stream == 0 )); then
+            echo $i: offline
+        else
+            echo "$i: online"
+        fi
     done
     popd > /dev/null
 }

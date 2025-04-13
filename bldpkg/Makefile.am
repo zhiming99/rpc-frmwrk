@@ -68,3 +68,5 @@ if ENABLE_JS
 	make -C ../monitor/oinit rpm
 	cp ../monitor/oinit/output/python3-oinit*.rpm .
 endif
+	make -C ../monitor/client/python rpm
+	cp ../monitor/client/python/python3-appmoncli*.rpm .
