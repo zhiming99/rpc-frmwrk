@@ -829,9 +829,9 @@ class CPythonServer :
         PyList_SetItem( pParams, 0, pPyProp );
         if( oVar.GetTypeId() == typeByteArr )
         {
-            auto val = &( ObjPtr& )oVar;
+            auto val = &( BufPtr& )oVar;
             PyObject* pObj = sipConvertFromNewType(
-                val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                val,sipType_cpp_BufPtr, Py_None );
             PyList_SetItem( pParams, 1, pObj );
         }
         else

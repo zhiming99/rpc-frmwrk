@@ -513,7 +513,7 @@ class PyRpcServices :
     def GetObjType( self, pObj ) :
         return GetObjType( pObj )
 
-    def GetNumpyValue( typeid, val ) :
+    def GetNumpyValue( self, typeid, val ) :
         return GetNpValue( typeid, val )
 
     ''' establish a stream channel and
@@ -1257,7 +1257,7 @@ class PyRpcServer( PyRpcServices ) :
     def IsServer( self ) :
         return True
 
-    def GetProperty( self, propid : int )->Tuple[int,object]:
+    def GetProperty( self, propid : int )->Tuple[int,list]:
         return self.oInst.GetProperty( propid )
 
     def SetProperty( self, propid : int, val : object )->int:

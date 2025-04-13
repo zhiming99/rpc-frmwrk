@@ -257,6 +257,7 @@ namespace cpp
         propMsgCount,
         propObjCount,
         propQps,
+        propUptime,
     };
 
     enum // EnumIfState

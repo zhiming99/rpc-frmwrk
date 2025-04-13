@@ -59,7 +59,7 @@ def GetPointValuesToUpdate(
 
     ret = cpp.GetCpuUsage()
     kvValue = KeyValue()
-    kvValue.strKey = 'cpu_usage'
+    kvValue.strKey = 'cpu_load'
     kvValue.oValue = Variant()
     kvValue.oValue.iType = cpp.typeFloat
     kvValue.oValue.val = ret

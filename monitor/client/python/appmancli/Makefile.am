@@ -12,7 +12,7 @@ all: appmancli/__init__.py dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl
 	cp dist/appmancli*.whl ../dist
 
 # Build the Python wheel package
-dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl:
+dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py
 	python3 -m build --wheel .
 
 appmancli/__init__.py:

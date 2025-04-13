@@ -16,13 +16,30 @@ import time
 import threading
 
 retryInterval = 10
+bExited = False
+
+def IsExit() -> bool:
+    return amc.bExit
 
 def StartAppManagercli( oTarget : PyRpcServer,
-    oCtx: PyRpcContext, strAppInst: str ) -> int:
-    threading.Thread(
-        target=AMThreadProc,
-        args=( oTarget, oCtx, strAppInst ),
-        name='AppManagercli' ).start()
+    oCtx: PyRpcContext, strAppInst: str,
+    bNewThread : bool = True ) -> int:
+    if bNewThread:
+        threading.Thread(
+            target=AMThreadProc,
+            args=( oTarget, oCtx, strAppInst ),
+            name='AppManagercli' ).start()
+    else:
+        ret = AMThreadProc( oTarget, oCtx, strAppInst )
+        if ret < 0:
+            print( "Error in AppManagercli thread" )
+            return ret
+    return 0
+
+def StopAppManagercli() -> int:
+    amc.bExit = True
+    while not bExited:
+        time.sleep( 1 )
     return 0
 
 def AMThreadProc( oTarget : PyRpcServer,
@@ -31,7 +48,7 @@ def AMThreadProc( oTarget : PyRpcServer,
     while not amc.bExit:
         print( "start AppManangecli..." )
         # using a fake path to force using system default config
-        strPath_ += 'invalidpath/appmondesc.json'
+        strPath_ = 'invalidpath/appmondesc.json'
         oProxy_AppManager = amc.CAppManagerProxy( oCtx.pIoMgr,
             strPath_, 'AppManager' )
         ret = oProxy_AppManager.GetError()
@@ -61,7 +78,8 @@ def AMThreadProc( oTarget : PyRpcServer,
 
         print( f"Connection is lost to the monitor server, reconnect in {retryInterval} seconds..." )
         time.sleep( retryInterval )
-        
+    global bExited
+    bExited = True    
     return ret
     
 #------customize the method below for your own purpose----
