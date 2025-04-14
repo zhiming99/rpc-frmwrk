@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "appmancli"
 version = "@VERSION@"
-description = "A Python client for managing AppManager."
+description = "An IPC client to AppManager for Python."
 authors = [
     { name = "zhiming", email = "woodhead99@gmail.com" }
 ]
