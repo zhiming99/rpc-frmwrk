@@ -9,69 +9,66 @@ from seribase import CSerialBase
 from seribase import Variant
 from appmonstructs import *
 from AppManagerclibase import *
-import errno
+import queue
 
 bExit = False
-
-def GetPointValuesToUpdate(
-    oTarget: PyRpcServer,
-    arrKvs : list ) -> Tuple[ int, list ]:
-
-    blPoints = dict()
-    blPoints={cpp.propRxBytes: ('rx_bytes', cpp.typeUInt64),
-            cpp.propTxBytes: ('tx_bytes', cpp.typeUInt64),
-            cpp.propQps: ('max_qps', cpp.typeUInt64),
-            cpp.propMsgCount: ('req_count', cpp.typeUInt32),
-            cpp.propMsgRespCount: ('resp_count', cpp.typeUInt32),
-            cpp.propFailureCount: ('failure_count', cpp.typeUInt32),
-            cpp.propStmPerSess: ('max_streams_per_session', cpp.typeUInt32),
-            cpp.propPendingTasks: ('pending_tasks', cpp.typeUInt32),
-            cpp.propUptime: ('uptime', cpp.typeUInt32),
-            cpp.propConnections: ('conn_count', cpp.typeUInt32),
-            cpp.propObjCount: ('obj_count', cpp.typeUInt32) }
-
-    for key, value in blPoints.items():
-        ret = oTarget.GetProperty( key )
-        if ret[0] == 0:
-            kvValue = KeyValue()
-            kvValue.strKey = value[0]
-            kvValue.oValue = Variant()
-            kvValue.oValue.iType = value[1]
-            kvValue.oValue.val = ret[1][0]
-            arrKvs.append( kvValue )
-
-    ret = cpp.GetVmSize()
-    kvValue = KeyValue()
-    kvValue.strKey = 'vmsize_kb'
-    kvValue.oValue = Variant()
-    kvValue.oValue.iType = cpp.typeUInt64
-    kvValue.oValue.val = ret
-    arrKvs.append( kvValue )
-
-    ret = cpp.GetOpenFileCount(os.getpid())
-    if ret[0] == 0:
-        kvValue = KeyValue()
-        kvValue.strKey = 'open_files'
-        kvValue.oValue = Variant()
-        kvValue.oValue.iType = cpp.typeUInt32
-        kvValue.oValue.val = ret[1][0]
-        arrKvs.append( kvValue )
-
-    ret = cpp.GetCpuUsage()
-    kvValue = KeyValue()
-    kvValue.strKey = 'cpu_load'
-    kvValue.oValue = Variant()
-    kvValue.oValue.iType = cpp.typeFloat
-    kvValue.oValue.val = ret
-    arrKvs.append( kvValue )
+oTaskQue = queue.Queue()
 
 class CIAppStorecli( IIAppStore_CliImpl ):
 
-    '''
-    Event handler
-    Add code here to process the event
-    '''
-    def OnPointChanged( self,
+    def GetPointValuesToUpdate( self,
+        oTarget: PyRpcServer,
+        arrKvs : list ) -> Tuple[ int, list ]:
+
+        blPoints = dict()
+        blPoints={cpp.propRxBytes: ('rx_bytes', cpp.typeUInt64),
+                cpp.propTxBytes: ('tx_bytes', cpp.typeUInt64),
+                cpp.propQps: ('max_qps', cpp.typeUInt64),
+                cpp.propMsgCount: ('req_count', cpp.typeUInt32),
+                cpp.propMsgRespCount: ('resp_count', cpp.typeUInt32),
+                cpp.propFailureCount: ('failure_count', cpp.typeUInt32),
+                cpp.propStmPerSess: ('max_streams_per_session', cpp.typeUInt32),
+                cpp.propPendingTasks: ('pending_tasks', cpp.typeUInt32),
+                cpp.propUptime: ('uptime', cpp.typeUInt32),
+                cpp.propConnections: ('conn_count', cpp.typeUInt32),
+                cpp.propObjCount: ('obj_count', cpp.typeUInt32) }
+
+        for key, value in blPoints.items():
+            ret = oTarget.GetProperty( key )
+            if ret[0] == 0:
+                kvValue = KeyValue()
+                kvValue.strKey = value[0]
+                kvValue.oValue = Variant()
+                kvValue.oValue.iType = value[1]
+                kvValue.oValue.val = ret[1][0]
+                arrKvs.append( kvValue )
+
+        ret = cpp.GetVmSize()
+        kvValue = KeyValue()
+        kvValue.strKey = 'vmsize_kb'
+        kvValue.oValue = Variant()
+        kvValue.oValue.iType = cpp.typeUInt64
+        kvValue.oValue.val = ret
+        arrKvs.append( kvValue )
+
+        ret = cpp.GetOpenFileCount(os.getpid())
+        if ret[0] == 0:
+            kvValue = KeyValue()
+            kvValue.strKey = 'open_files'
+            kvValue.oValue = Variant()
+            kvValue.oValue.iType = cpp.typeUInt32
+            kvValue.oValue.val = ret[1][0]
+            arrKvs.append( kvValue )
+
+        ret = cpp.GetCpuUsage()
+        kvValue = KeyValue()
+        kvValue.strKey = 'cpu_load'
+        kvValue.oValue = Variant()
+        kvValue.oValue.iType = cpp.typeFloat
+        kvValue.oValue.val = ret
+        arrKvs.append( kvValue )
+
+    def OnPointChangedWorker( self,
         strPtPath : str,
         value : Variant
         ) :
@@ -85,11 +82,26 @@ class CIAppStorecli( IIAppStore_CliImpl ):
                 return
             if strPtName == 'rpt_timer':
                 arrKVs = []
-                GetPointValuesToUpdate( self.m_oTarget, arrKVs )
+                self.GetPointValuesToUpdate( self.m_oTarget, arrKVs )
                 self.SetPointValues( self.m_strAppInst, arrKVs )
                 return
         finally:
             pass
+        return
+    '''
+    Event handler
+    Add code here to process the event
+    '''
+    def OnPointChanged( self,
+        strPtPath : str,
+        value : Variant
+        ) :
+        try:
+            task = lambda:self.OnPointChangedWorker(
+                strPtPath, value )
+            oTaskQue.put( task )
+        except Exception as err:
+            print( "Error in OnPointChanged: ", err )
         return
         
     '''

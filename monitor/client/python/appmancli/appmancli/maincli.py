@@ -14,6 +14,7 @@ import AppManagercli as amc
 import os
 import time
 import threading
+import queue
 
 retryInterval = 10
 bExited = False
@@ -74,7 +75,9 @@ def AMThreadProc( oTarget : PyRpcServer,
         except Exception as err:
             print( err )
         finally:
-            oProxy.__exit__()
+            oProxy.__doexit__()
+            if amc.bExit:
+                break
 
         print( f"Connection is lost to the monitor server, reconnect in {retryInterval} seconds..." )
         time.sleep( retryInterval )
@@ -89,7 +92,8 @@ def maincli(
 
     arrKvs = []
 
-    amc.GetPointValuesToUpdate( oProxy.m_oTarget, arrKvs )
+    oProxy.GetPointValuesToUpdate(
+        oProxy.m_oTarget, arrKvs )
 
     kvPid = KeyValue()
     kvPid.strKey = 'pid'
@@ -105,17 +109,16 @@ def maincli(
     workdir.oValue.val = os.getcwd().encode()
     arrKvs.append( workdir )
 
-    cmdLine = str()
+    cmdLine = "python3"
     for i in sys.argv:
-        cmdLine += i + ' '
+        cmdLine += ' ' + i
 
-    if len( cmdLine ) < 95:
-        kvCmdLine = KeyValue()
-        kvCmdLine.strKey = 'cmdline'
-        kvCmdLine.oValue = Variant()
-        kvCmdLine.oValue.iType = cpp.typeString
-        kvCmdLine.oValue.val = cmdLine
-        arrKvs.append( kvCmdLine )
+    kvCmdLine = KeyValue()
+    kvCmdLine.strKey = 'cmdline'
+    kvCmdLine.oValue = Variant()
+    kvCmdLine.oValue.iType = cpp.typeByteArr
+    kvCmdLine.oValue.val = cmdLine.encode()
+    arrKvs.append( kvCmdLine )
 
     ret = oProxy.ClaimAppInst( strAppInst, arrKvs )
     if ret[ 0 ] < 0:
@@ -130,7 +133,11 @@ def maincli(
             return ret[ 0 ]
 
     while not amc.bExit:
-        time.sleep( 1 )
+        try:
+            task = amc.oTaskQue.get(timeout=1)
+            task()
+        except queue.Empty:
+            pass
         if cpp.stateConnected != oProxy.oInst.GetState():
             break
 

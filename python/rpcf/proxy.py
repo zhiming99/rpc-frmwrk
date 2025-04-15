@@ -348,13 +348,16 @@ class PyRpcContext :
         self.Start( self.oInitParams )
         return self
 
+    def __doexit__( self ):
+        self.Stop()
+        self.DestroyRpcCtx()
+
     def __exit__( self, type, val, traceback ) :
         if self.status < 0:
             print( os.getpid(), "__exit__():",
                 type, val, traceback,
                 self.status )
-        self.Stop()
-        self.DestroyRpcCtx()
+        self.__doexit__();
 
 class PyRpcServices :
     def GetError( self ) :
@@ -397,11 +400,14 @@ class PyRpcServices :
         self.Start()
         return self
 
-    def __exit__( self, type, val, traceback ) :
+    def __doexit__( self ):
         self.Stop()
         self.oInst = None
         self.oObj = None
         self.pIoMgr = None
+
+    def __exit__( self, type, val, traceback ) :
+        self.__doexit__()
 
     def TimerCallback( self, callback, context )->None :
         sig =signature( callback )

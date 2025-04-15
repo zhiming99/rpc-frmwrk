@@ -37,6 +37,8 @@ extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
 extern guint32 g_dwFlags;
+extern bool g_bMonitoring;
+extern std::vector<stdstr> g_vecMonApps;
 
 std::map< char, stdstr > g_mapSig2PyType =
 {
@@ -3897,6 +3899,10 @@ gint32 CImplPyMainFunc::OutputSvr(
             ret = -EINVAL;
             break;
         }
+        if( g_bMonitoring )
+        {
+            Wa( "from appmancli import maincli as amc" );
+        }
         Wa("import os" );
         CCOUT << "import time";
         NEW_LINE;
@@ -4054,6 +4060,12 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
+        if( g_bMonitoring )
+        {
+            Wa( "amc.StartAppManagercli( oServer," );
+            CCOUT << "    oContext, \"" << g_vecMonApps[ 0 ] << "\" )";
+            NEW_LINE;
+        }
 #ifdef FUSE3
         if( g_bBuiltinRt )
         {
@@ -4087,6 +4099,11 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_DOWNL;
         Wa( "except Exception as err:" );
         Wa( "    print( err )" );
+        if( g_bMonitoring )
+        {
+            Wa( "finally:" );
+            Wa( "    amc.StopAppManagercli()" );
+        }
         INDENT_DOWNL;
         Wa( "print( \"Server loop ended...\" )" );
         if( vecSvcs.size() == 1 )
