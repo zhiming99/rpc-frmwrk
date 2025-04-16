@@ -272,7 +272,7 @@ function add_point()
         mkdir ptrs || true
         touch ptrcount
         if ! setfattr -n 'user.regfs' -v '{ "t": 3, "v":0 }' ./ptrcount > /dev/null; then
-            exit $?
+            return $?
         fi
     fi
     popd > /dev/null
@@ -981,8 +981,8 @@ function add_stdapp()
     set_attr_value $_instname uptime unit "$(jsonval 's' 'sec' )" s
 
     chown $_uid:$_gid -R ./apps/$_instname
-    find . -type f -exec chmod ug+rw,o+r '{}' ';'
-    find . -type d -exec chmod ug+rwx,o+rx '{}' ';'
-    chmod o-wx ./apps/$_instname/points/restart
+    find ./apps/$_instname -type f -exec chmod ug+rw,o+r '{}' ';'
+    find ./apps/$_instname -type d -exec chmod ug+rwx,o+rx '{}' ';'
+    chmod -R o-wx ./apps/$_instname/points/restart
     return 0
 }

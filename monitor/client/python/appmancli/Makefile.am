@@ -12,7 +12,7 @@ all: appmancli/__init__.py dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl
 	cp dist/appmancli*.whl ../dist
 
 # Build the Python wheel package
-dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py
+dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py appmancli/apptimer.py
 	python3 -m build --wheel .
 
 appmancli/__init__.py:
@@ -37,7 +37,7 @@ appmancli/__init__.py:
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
-    rm -f *.new;\
+    rm -f *.new; rm -f appmondesc.json driver.json *.md cmdline synccfg.py;\
     popd
 
 # Install the Python package using pip

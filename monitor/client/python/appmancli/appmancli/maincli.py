@@ -18,46 +18,77 @@ import queue
 
 retryInterval = 10
 bExited = False
+oAppManagercli = None
 
 def IsExit() -> bool:
     return amc.bExit
 
+def GetAppManagercli() -> amc.CAppManagerProxy:
+    """
+    Returns the AppManager proxy instance.
+
+    Returns:
+        amc.CAppManagerProxy: The AppManager proxy instance.
+    """
+    return oAppManagercli
+
 def StartAppManagercli( oTarget : PyRpcServer,
     oCtx: PyRpcContext, strAppInst: str,
+    funcCreateProxy : callable = None,
     bNewThread : bool = True ) -> int:
+    """
+    oTarget: is the target server object to monitor
+
+    funcCreateProxy: is a callable function
+    that returns a new instance of the proxy inherited from CAppManagerProxy
+
+    strAppInst: is the application instance name, as has been created in the application registry
+    """
     if bNewThread:
         threading.Thread(
             target=AMThreadProc,
-            args=( oTarget, oCtx, strAppInst ),
+            args=( oTarget, oCtx, strAppInst, funcCreateProxy ),
             name='AppManagercli' ).start()
     else:
-        ret = AMThreadProc( oTarget, oCtx, strAppInst )
+        ret = AMThreadProc( oTarget,
+            oCtx, strAppInst, funcCreateProxy )
         if ret < 0:
             print( "Error in AppManagercli thread" )
             return ret
     return 0
 
 def StopAppManagercli() -> int:
+    """
+    Stops the AppManager client gracefully.
+
+    Returns:
+        int: Always returns 0 to indicate successful termination.
+    """
     amc.bExit = True
     while not bExited:
         time.sleep( 1 )
     return 0
 
 def AMThreadProc( oTarget : PyRpcServer,
-        oCtx: PyRpcContext, strAppInst: str ) -> int:
+        oCtx: PyRpcContext, strAppInst: str,
+        funcCreateProxy : callable = None ) -> int:
     ret = 0
     while not amc.bExit:
         print( "start AppManangecli..." )
         # using a fake path to force using system default config
         strPath_ = 'invalidpath/appmondesc.json'
-        oProxy_AppManager = amc.CAppManagerProxy( oCtx.pIoMgr,
-            strPath_, 'AppManager' )
+        if funcCreateProxy is None:
+            oProxy_AppManager = amc.CAppManagerProxy( oCtx.pIoMgr,
+                strPath_, 'AppManager' )
+        else:
+            oProxy_AppManager = funcCreateProxy() 
         ret = oProxy_AppManager.GetError()
         if ret < 0 :
             print( "monitor server is not online, reconnect scheduled..." )
             time.sleep( retryInterval )
             continue
-        
+        global oAppManagercli
+        oAppManagercli = oProxy_AppManager
         oProxy = oProxy_AppManager
         oProxy.m_oTarget = oTarget
         oProxy.m_strAppInst = strAppInst
@@ -78,6 +109,7 @@ def AMThreadProc( oTarget : PyRpcServer,
             oProxy.__doexit__()
             if amc.bExit:
                 break
+            oAppManagercli = None
 
         print( f"Connection is lost to the monitor server, reconnect in {retryInterval} seconds..." )
         time.sleep( retryInterval )

@@ -28,6 +28,7 @@ packages = ["appmancli"]
 
 [project.scripts]
 start_appmancli = "maincli:StartAppManagercli"
+start_timer = "apptimer:StartTimer"
 
 [project.urls]
 Homepage = "@PACKAGE_URL@"

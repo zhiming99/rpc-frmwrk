@@ -133,7 +133,7 @@ add_point rpcrouter1 tx_bytes output qword
 
 
 echo adding application timer1
-add_application timer1
+add_stdapp timer1
 add_point timer1 clock1 output i
 add_link timer1 clock1 rpcrouter1 rpt_timer
 set_attr_value timer1 clock1 pulse "$(jsonval 'i' 1 )" i
@@ -160,15 +160,16 @@ add_point timer1 interval4 setpoint i
 set_attr_value timer1 interval4 uint "$(jsonval 's' 'sec' )" s
 set_point_value timer1 interval4 "$(jsonval 'i' 10)" i
 
-add_point timer1 restart input i
-set_attr_value timer1 restart pulse "$(jsonval 'i' 1 )" i
-add_point timer1 cmdline setpoint s 
-add_point timer1 pid output i 
+#add_point timer1 restart input i
+#set_attr_value timer1 restart pulse "$(jsonval 'i' 1 )" i
+#add_point timer1 cmdline setpoint s 
+#add_point timer1 pid output i 
+
 
 # setting access mode and owners
-chown $uid:$gid -R ./apps/rpcrouter1 ./apps/timer1
-find . -type f -exec chmod ug+rw,o+r '{}' ';'
-find . -type d -exec chmod ug+rwx,o+rx '{}' ';'
+chown $uid:$gid -R ./apps/rpcrouter1
+find ./apps/rpcrouter1 -type f -exec chmod ug+rw,o+r '{}' ';'
+find ./apps/rpcrouter1 -type d -exec chmod ug+rwx,o+rx '{}' ';'
 chmod -R o-rwx ./apps/rpcrouter1/points/restart
 
 #leaving approot

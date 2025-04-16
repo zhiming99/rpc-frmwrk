@@ -33,15 +33,16 @@ class CIAppStorecli( IIAppStore_CliImpl ):
                 cpp.propConnections: ('conn_count', cpp.typeUInt32),
                 cpp.propObjCount: ('obj_count', cpp.typeUInt32) }
 
-        for key, value in blPoints.items():
-            ret = oTarget.GetProperty( key )
-            if ret[0] == 0:
-                kvValue = KeyValue()
-                kvValue.strKey = value[0]
-                kvValue.oValue = Variant()
-                kvValue.oValue.iType = value[1]
-                kvValue.oValue.val = ret[1][0]
-                arrKvs.append( kvValue )
+        if oTarget is not None:
+            for key, value in blPoints.items():
+                ret = oTarget.GetProperty( key )
+                if ret[0] == 0:
+                    kvValue = KeyValue()
+                    kvValue.strKey = value[0]
+                    kvValue.oValue = Variant()
+                    kvValue.oValue.iType = value[1]
+                    kvValue.oValue.val = ret[1][0]
+                    arrKvs.append( kvValue )
 
         ret = cpp.GetVmSize()
         kvValue = KeyValue()
