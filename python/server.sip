@@ -829,10 +829,19 @@ class CPythonServer :
         PyList_SetItem( pParams, 0, pPyProp );
         if( oVar.GetTypeId() == typeByteArr )
         {
-            auto val = &( BufPtr& )oVar;
-            PyObject* pObj = sipConvertFromNewType(
-                val,sipType_cpp_BufPtr, Py_None );
-            PyList_SetItem( pParams, 1, pObj );
+            BufPtr* ppBuf =
+                new BufPtr( oVar.m_pBuf );
+            PyObject* pPyBufBak =
+                sipConvertFromNewType(
+                ppBuf,sipType_cpp_BufPtr, Py_None );
+            if( unlikely( pPyBufBak == nullptr ) )
+            {
+                ret = -ENOMEM;
+                delete ppBuf;
+                Py_DECREF( pParams );
+                break;
+            }
+            PyList_SetItem( pParams, 1, pPyBufBak );
         }
         else
             PyList_SetItem( pParams, 1, Py_None );
