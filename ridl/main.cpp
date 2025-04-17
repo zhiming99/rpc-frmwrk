@@ -662,13 +662,6 @@ int main( int argc, char** argv )
             break;
         }
         
-        if( g_strLang != "java" && g_strPrefix.size() )
-        {
-            printf( "'-P' option can only be used with Java language\n" );
-            Usage();
-            ret = -1;
-            break;
-        }
         if( g_strLang != "java" && g_strPkgName.size() )
         {
             printf( "'--pkgname' option can only be used with Java language\n" );
