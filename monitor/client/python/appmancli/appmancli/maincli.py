@@ -98,8 +98,6 @@ def AMThreadProc( oTarget : PyRpcServer,
             if ret < 0 :
                 raise Exception( 'start proxy failed' )
             state = oProxy.oInst.GetState()
-            if amc.bExit:
-                break
             if state != cpp.stateConnected:
                 continue
             ret = maincli( oProxy, strAppInst )
@@ -107,9 +105,10 @@ def AMThreadProc( oTarget : PyRpcServer,
             print( err )
         finally:
             oProxy.__doexit__()
+            oAppManagercli = None
+            oProxy = None
             if amc.bExit:
                 break
-            oAppManagercli = None
 
         print( f"Connection is lost to the monitor server, reconnect in {retryInterval} seconds..." )
         time.sleep( retryInterval )
@@ -173,6 +172,7 @@ def maincli(
         if cpp.stateConnected != oProxy.oInst.GetState():
             break
 
+    amc.oTaskQue.queue.clear()
     if oProxy.oInst.GetState() == cpp.stateConnected:
         oProxy.FreeAppInsts( [ strAppInst, ] )
     return ret[ 0 ] 

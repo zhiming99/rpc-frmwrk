@@ -93,21 +93,12 @@ def TimerLoop() -> int:
         value = Variant()
         value.iType = cpp.typeUInt32
         value.val = 1
-        oProxy = amc.GetAppManagercli()
-        if oProxy is None :
-            if amc.IsExit():
-                break
-            print( "Error AppManagercli is None, waiting for reconnection" )
-            continue
         try:
-            ret = oProxy.SetPointValue(
-                "timer1/clock1", value )
-            if ret[ 0 ] < 0 :
-                print( "Error setpoint value" )
-                continue
-            print( "Info send clock1", str( dwTicks ) )
+            amp.oTaskQue.put( lambda: amc.GetAppManagercli().SetPointValue(
+                "timer1/clock1", value ) and 
+                print( f"Info send clock1 {dwTicks}" ) )
         except Exception as err:
-            print( "Error in SetPointValue", err )
+            print( f"Error in SetPointValue {err}" )
             continue
         finally:    
             if amc.IsExit():

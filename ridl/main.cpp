@@ -45,6 +45,7 @@ extern std::string g_strWebPath;
 std::set< stdstr > g_setServices;
 extern std::vector<stdstr> g_vecMonApps;
 extern bool g_bMonitoring;
+extern std::string g_strPkgName;
 
 // interface async mode to overrid
 using SYNC_ELEM=std::pair< stdstr, guint32 >;
@@ -134,14 +135,14 @@ void Usage()
     printf( "\t-m <app name>:\tGenerate code for monitoring support. <app name> is the app's directory in the app registry. '-s' option must be present.\n" );
     printf( "\t-b:\tOutput the skeleton with built-in router.\n" );
     printf( "\t-l:\tOutput a shared library instead of executables.\n" );
-    printf( "\t--server:\tGenerate skeleton code for server only.\n" );
-    printf( "\t--client:\tGenerate skeleton code for client only.\n" );
-    printf( "\t--services <service list>:\tGenerate skeleton code for the specified services.The services are seperated with ','.\n" );
-    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tOverride sync-tag of the methods "
+    printf( "\t--server: Generate skeleton code for server only.\n" );
+    printf( "\t--client: Generate skeleton code for client only.\n" );
+    printf( "\t--services <service list>: Generate skeleton code for the specified services.The services are seperated with ','.\n" );
+    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>: Override sync-tag of the methods "
     "from the specified interface defined in the ridl file with <interface name>.\n" );
-    printf( "\t\tThis option is for CPP project only.\n" );
-    printf( "\t-L<lang>:Output Readme in language <lang>.\n" );
-    printf( "\t\t<lang> Can be 'cn' or 'en' for now.\n" );
+    printf( "\tThis option is for CPP project only.\n" );
+    printf( "\t--pkgname <package name> specify a full qualified java package name for the java project, otherwise, the default package name is used.\n" );
+    printf( "\t-L<lang>:Output Readme in language <lang>, as can be 'cn' or 'en' for now.\n" );
     printf( "\t-v:\tPrint the version information.\n" );
 }
 
@@ -228,6 +229,7 @@ int main( int argc, char** argv )
             {"client", no_argument, 0,  0 },
             {"services", required_argument, 0,  0 },
             {"sync_mode", required_argument, 0,  0 },
+            {"pkgname", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -415,6 +417,11 @@ int main( int argc, char** argv )
                             break;
                         }
                     }
+                    else if( option_index == 8 )
+                    {
+                        g_strPkgName = optarg;
+                        break;
+                    }
                     break;
                 }
             case 'O':
@@ -521,12 +528,9 @@ int main( int argc, char** argv )
                 }
             case 'P':
                 {
-                    if( g_strLang == "java" )
-                    {
-                        g_strPrefix = optarg;
-                        if( g_strPrefix.back() != '.' )
-                            g_strPrefix.append( 1, '.' );
-                    }
+                    g_strPrefix = optarg;
+                    if( g_strPrefix.back() != '.' )
+                        g_strPrefix.append( 1, '.' );
                     break;
                 }
 #else
@@ -653,6 +657,21 @@ int main( int argc, char** argv )
         if( g_bMonitoring && !g_bRpcOverStm )
         {
             printf( "'-s' option must be present to support monitoring\n" );
+            Usage();
+            ret = -1;
+            break;
+        }
+        
+        if( g_strLang != "java" && g_strPrefix.size() )
+        {
+            printf( "'-P' option can only be used with Java language\n" );
+            Usage();
+            ret = -1;
+            break;
+        }
+        if( g_strLang != "java" && g_strPkgName.size() )
+        {
+            printf( "'--pkgname' option can only be used with Java language\n" );
             Usage();
             ret = -1;
             break;
