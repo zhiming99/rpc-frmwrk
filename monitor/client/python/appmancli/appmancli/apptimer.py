@@ -6,8 +6,8 @@ from rpcf.rpcbase import *
 from rpcf.proxy import *
 from seribase import Variant
 
-import AppManagercli as amp
-import maincli as amc
+import maincli
+from maincli import amc
 import os
 import time
 
@@ -20,7 +20,7 @@ def SigHandler( signum, frame ):
     global bExit
     bExit = True
 
-class CAppTimerProxy( amp.CAppManagerProxy ):
+class CAppTimerProxy( amc.CAppManagerProxy ):
     def __init__( self, pIoMgr, strPath, strName ):
         super().__init__( pIoMgr, strPath, strName )
 
@@ -32,6 +32,18 @@ class CAppTimerProxy( amp.CAppManagerProxy ):
             print( 'interval changed to', interval )
             return
         super().OnPointChangedWorker(strPtPath, value)
+
+    def OnPointChanged( self,
+        strPtPath : str,
+        value : Variant
+        ) :
+        try:
+            task = ( CAppTimerProxy.OnPointChangedWorker,
+                strPtPath, value )
+            amc.oTaskQue.put( task )
+        except Exception as err:
+            print( "Error in OnPointChanged: ", err )
+        return
 
 def StartTimer() :
     ret = 0
@@ -46,19 +58,19 @@ def StartTimer() :
             print( os.getpid(), 
                 "Error start PyRpcContext %d" % ret )
         try: 
-            amc.StartAppManagercli( None,
+            maincli.StartAppManagercli( None,
                 oContext, 'timer1', 
                 funcCreateProxy=lambda:
                     CAppTimerProxy( ctx.pIoMgr,
                     "invalidpath/appmondesc.json",
                     'AppManager' ) )
-            while amc.GetAppManagercli() is None:
+            while maincli.GetAppManagercli() is None:
                 time.sleep( 1 )
             ret = TimerLoop()
         except Exception as err:
             print( err )
         finally:
-            amc.StopAppManagercli()
+            maincli.StopAppManagercli()
             
     oContext = None
     os.chdir(oOldPath)
@@ -71,7 +83,7 @@ def TimerLoop() -> int:
     Calling a proxy method like
     oProxy.ListApps()
     '''
-    oProxy = amc.GetAppManagercli()
+    oProxy = maincli.GetAppManagercli()
     ret = oProxy.GetPointValue(
         "timer1/interval1" )
     if ret[ 0 ] < 0:
@@ -94,14 +106,15 @@ def TimerLoop() -> int:
         value.iType = cpp.typeUInt32
         value.val = 1
         try:
-            amp.oTaskQue.put( lambda: amc.GetAppManagercli().SetPointValue(
-                "timer1/clock1", value ) and 
-                print( f"Info send clock1 {dwTicks}" ) )
+            oTask = ( CAppTimerProxy.SetPointValue,
+                "timer1/clock1", value )
+            amc.oTaskQue.put( oTask )
+            print( f"Info send clock1 {dwTicks}" )
         except Exception as err:
             print( f"Error in SetPointValue {err}" )
             continue
         finally:    
-            if amc.IsExit():
+            if maincli.IsExit():
                 print( "Received exit request from appmonsvr")
                 break
 

@@ -87,11 +87,14 @@ def AMThreadProc( oTarget : PyRpcServer,
             print( "monitor server is not online, reconnect scheduled..." )
             time.sleep( retryInterval )
             continue
+
+        amc.oTaskQue.queue.clear()
         global oAppManagercli
         oAppManagercli = oProxy_AppManager
         oProxy = oProxy_AppManager
         oProxy.m_oTarget = oTarget
         oProxy.m_strAppInst = strAppInst
+
         try:
             oProxy.__enter__()
             ret = oProxy.GetError()
@@ -166,13 +169,14 @@ def maincli(
     while not amc.bExit:
         try:
             task = amc.oTaskQue.get(timeout=1)
-            task()
+            if isinstance( task, tuple ):
+                func, strPtPath, value = task
+                func( oProxy, strPtPath, value )
         except queue.Empty:
             pass
         if cpp.stateConnected != oProxy.oInst.GetState():
             break
 
-    amc.oTaskQue.queue.clear()
     if oProxy.oInst.GetState() == cpp.stateConnected:
         oProxy.FreeAppInsts( [ strAppInst, ] )
     return ret[ 0 ] 

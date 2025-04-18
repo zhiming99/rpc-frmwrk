@@ -376,17 +376,17 @@ class PyRpcServices :
         if ret < 0 :
             self.SetError( ret )
             if isServer :
-                print( "Failed to start server %d(%d), state=%d" % 
+                OutputMsg( "Failed to start server %d(%d), state=%d" % 
                     ( os.getpid(), ret, self.oInst.GetState() ) )
             else :
-                print( "Failed to start proxy %d(%d), state=%d" %
+                OutputMsg( "Failed to start proxy %d(%d), state=%d" %
                     ( os.getpid(), ret, self.oInst.GetState() ) )
             return ret
         else :
             if isServer :
-                print( "Server started..." )
+                OutputMsg( "Server started..." )
             else :
-                print( "Proxy started..." )
+                OutputMsg( "Proxy started..." )
 
         oCheck = self.oInst.GetPyHost()
         return ret
@@ -961,7 +961,7 @@ class PyRpcServices :
         is down either server or client.
         override this method for better stop control.
         '''
-        print( "service is stopped" )
+        OutputMsg( "service is stopped" )
 
 class PyRpcProxy( PyRpcServices ) :
 

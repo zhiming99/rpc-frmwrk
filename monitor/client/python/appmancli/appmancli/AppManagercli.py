@@ -86,19 +86,16 @@ class CIAppStorecli( IIAppStore_CliImpl ):
                 self.GetPointValuesToUpdate( self.m_oTarget, arrKVs )
                 self.SetPointValues( self.m_strAppInst, arrKVs )
                 return
-        finally:
-            pass
+        except Exception as err:
+            OutputMsg( f"Error in OnPointChangedWorker: {err}" )
         return
-    '''
-    Event handler
-    Add code here to process the event
-    '''
+
     def OnPointChanged( self,
         strPtPath : str,
         value : Variant
         ) :
         try:
-            task = lambda:self.OnPointChangedWorker(
+            task = ( CAppManagerProxy.OnPointChangedWorker,
                 strPtPath, value )
             oTaskQue.put( task )
         except Exception as err:
@@ -115,7 +112,8 @@ class CIAppStorecli( IIAppStore_CliImpl ):
         return
 
     def OnPostStop(self):
-        print("remote server is offline")
+        OutputMsg("AppManagercli is shutdown")
+        oTaskQue.queue.clear()
         return 0
         
     
