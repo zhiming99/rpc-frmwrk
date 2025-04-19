@@ -86,6 +86,7 @@ class CPythonInterfBase : public T
         gint32 ret = 0;
         if( pBuf.IsEmpty() || pBuf->empty() )
         {
+            Py_INCREF( Py_None );
             pObj = Py_None;
             return ret;
         }
@@ -210,6 +211,7 @@ class CPythonInterfBase : public T
         EnumTypeId iType = oVar.GetTypeId();
         if( iType == typeNone )
         {
+            Py_INCREF( Py_None );
             pObj = Py_None;
             return ret;
         }
@@ -440,8 +442,7 @@ class CPythonInterfBase : public T
                  break;
 
             Py_INCREF( pCb );
-            if( pCtx != nullptr &&
-                pCtx != Py_None )
+            if( pCtx != nullptr )
                 Py_INCREF( pCtx );
 
             pTimer = pTask;
@@ -1218,6 +1219,7 @@ class CPythonInterfBase : public T
                 if( SUCCEEDED( iRet ) )
                     PyList_SetItem( pPyResp,
                         0, PyLong_FromLong( ret ) );
+                Py_INCREF( Py_None );
                 PyList_SetItem( pPyResp, 1, Py_None );
             }
 
@@ -1372,7 +1374,10 @@ class CPythonInterfBase : public T
 
             ret = oReqCtx.GetIntPtr( 4, ptrVal );
             if( ERROR( ret ) )
+            {
+                Py_INCREF( Py_None );
                 pContext = Py_None;
+            }
             else
                 pContext = ( PyObject* )ptrVal;
 
@@ -1465,12 +1470,13 @@ class CPythonInterfBase : public T
  
     PyObject* GetChanCtx( HANDLE hChannel )
     {
-        PyObject* sipRes = Py_None;
+        PyObject* sipRes = nullptr;
+        gint32 ret = 0;
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
             CfgPtr pCtx;
-            gint32 ret = this->GetContext(
+            ret = this->GetContext(
                 hChannel, pCtx );
             if( ERROR( ret ) )
                 break;
@@ -1483,7 +1489,11 @@ class CPythonInterfBase : public T
             Py_INCREF( sipRes );
 
         }while( 0 );
-
+        if( ERROR( ret ) )
+        {
+            Py_INCREF( Py_None );
+            sipRes = Py_None;
+        }
         return sipRes;
     }
 
@@ -1514,15 +1524,13 @@ class CPythonInterfBase : public T
                 PyObject* pOld = ( PyObject* )ptr;
                 if( pOld == pCtx )
                     break;
-                if( pOld != nullptr &&
-                    pOld != Py_None )
+                if( pOld != nullptr )
                     Py_DECREF( pOld );
                 oCfg.RemoveProperty( propChanCtx );
             }
             ret = 0;
 
-            if( pCtx == nullptr ||
-                pCtx == Py_None )
+            if( pCtx == nullptr )
                 break;
 
             oCfg.SetIntPtr(
@@ -1701,12 +1709,10 @@ class CPythonInterfBase : public T
                 Py_DECREF( pPyRet );
 
         }while( 0 );
-        if( pPyCb != nullptr &&
-            pPyCb != Py_None )
+        if( pPyCb != nullptr )
             Py_DECREF( pPyCb );
 
-        if( pPyArgs != nullptr &&
-            pPyArgs != Py_None )
+        if( pPyArgs != nullptr )
             Py_DECREF( pPyArgs );
 
         PyGILState_Release( gstate );

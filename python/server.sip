@@ -815,8 +815,6 @@ class CPythonServer :
             break;
         }
 
-        PyList_SetItem( pResp, 1, Py_None );
-
         Variant oVar;
         ret = pImpl->GetProperty( a0, oVar );
         if( ERROR( ret ) )
@@ -843,8 +841,6 @@ class CPythonServer :
             }
             PyList_SetItem( pParams, 1, pPyBufBak );
         }
-        else
-            PyList_SetItem( pParams, 1, Py_None );
         PyList_SetItem( pResp, 1, pParams );
     }while( 0 );
     PyList_SetItem( pResp, 0, PyLong_FromLong( ret ) );

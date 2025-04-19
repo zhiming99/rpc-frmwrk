@@ -89,11 +89,11 @@ def AMThreadProc( oTarget : PyRpcServer,
             continue
 
         amc.oTaskQue.queue.clear()
-        global oAppManagercli
-        oAppManagercli = oProxy_AppManager
         oProxy = oProxy_AppManager
         oProxy.m_oTarget = oTarget
         oProxy.m_strAppInst = strAppInst
+        global oAppManagercli
+        oAppManagercli = oProxy
 
         try:
             oProxy.__enter__()
@@ -107,8 +107,8 @@ def AMThreadProc( oTarget : PyRpcServer,
         except Exception as err:
             print( err )
         finally:
-            oProxy.__doexit__()
             oAppManagercli = None
+            oProxy.__doexit__()
             oProxy = None
             if amc.bExit:
                 break
