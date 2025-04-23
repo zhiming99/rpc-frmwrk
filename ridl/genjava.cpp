@@ -2083,7 +2083,7 @@ gint32 GenSerialBaseFiles(
             "JavaSerialBase.java", strSeriBase );
         if( ERROR( ret ) )
         {
-            OutputMsg( "Error not found "
+            OutputMsg( ret, "Error not found "
                 "JavaSerialBase.java" );
             break;
         }
