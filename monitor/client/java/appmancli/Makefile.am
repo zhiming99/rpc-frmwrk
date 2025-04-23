@@ -44,14 +44,14 @@ genautofile:
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
     if [ -f $(top_dir)/ridl/.libs/ridlc ]; then \
         echo bobo $(ridlfile);\
-        cp synccfg.py $(javasrcpath); ls $(javasrcpath);\
+        cp synccfg.py $(javasrcpath);\
         echo LD_LIBRARY_PATH=$(top_dir)/combase/.libs$${LD_LIBRARY_PATH} \
         $(top_dir)/ridl/.libs/ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync \
         --services=AppManager --client --pkgname=org.rpcf.appmancli -jslO . $(ridlfile); \
         LD_LIBRARY_PATH=$(top_dir)/combase/.libs$${LD_LIBRARY_PATH} \
         $(top_dir)/ridl/.libs/ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync \
         --services=AppManager --client --pkgname=org.rpcf.appmancli -jslO . $(ridlfile); \
-        rm $(javasrcpath)/synccfg.py;\
+        ls $(javasrcpath);\
     else \
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
