@@ -38,7 +38,7 @@ genautofile:
     if(($$bexit==0));then echo all files are ready;exit 0;fi; \
     if ! which ridlc > /dev/null; then \
         if [ ! -f ./mktpl ];then \
-            cp $(top_dir)/ridl/{mktpl,mktplsvr,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
+            cp $(top_dir)/ridl/{mktpl,pymktpl,mktplsvr,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
         fi;\
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
@@ -53,7 +53,7 @@ genautofile:
     else \
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
-	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
+	if [ -f ./mktpl ];then rm -f mktpl pymktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
     rm -f *.new; rm -f appmondesc.json driver.json *.md cmdline synccfg.py;
 
 # Install the Python package using pip
