@@ -2082,7 +2082,11 @@ gint32 GenSerialBaseFiles(
         ret = FindFullPath(
             "JavaSerialBase.java", strSeriBase );
         if( ERROR( ret ) )
+        {
+            OutputMsg( "Error not found "
+                "JavaSerialBase.java" );
             break;
+        }
 
         stdstr strDstSeriBase =
             pWriter->GetOutPath();
@@ -2165,7 +2169,9 @@ gint32 GenStructFilesJava(
 
     gint32 ret = 0;
     do{
-        GenSerialBaseFiles( pWriter );
+        ret = GenSerialBaseFiles( pWriter );
+        if( ERROR( ret ) )
+            break;
         CStatements* pStmts = pRoot;
         if( unlikely( pStmts == nullptr ) )
         {
