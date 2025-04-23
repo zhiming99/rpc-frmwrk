@@ -6,6 +6,7 @@ pkgname=$3
 prefix=$4
 BUILD_PYTHON=$5
 BUILD_JS=$6
+BUILD_JAVA=$7
 
 #the script can run only on debian family of system
 os_name=`cat /etc/os-release | grep '^ID_LIKE' | awk -F '=' '{print $2}'`
@@ -84,7 +85,30 @@ npm -g remove assert browserify buffer exports long lz4 process put safe-buffer 
 EOF
 fi
 
-if [ -f ./postinst1 -o -f ./postinst2 ];then
+if [ "x$BUILD_JAVA" == "xyes" ]; then
+cat << EOF >> './postinst3'
+INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
+pushd $(INSTALL_DIR) > /dev/null
+rpcbasejar=$(compgen -G "rpcbase*jar")
+rm -f rpcbase.jar
+ln -s $rpcbasejar rpcbase.jar
+appmanclijar=$(compgen -G "appmancli*jar")
+rm -f appmancli.jar
+ln -s $appmanclijar appmancli.jar
+popd > /dev/null
+EOF
+
+cat << EOF >> './prerm'
+#!/bin/bash
+INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
+pushd $(INSTALL_DIR) > /dev/null
+rm -f rpcbase.jar
+rm -f appmancli.jar
+popd > /dev/null
+EOF
+fi
+
+if [ -f ./postinst1 -o -f ./postinst2 -o -f ./postinst3 ];then
     echo '#!/bin/bash' >> ./postinst
     echo '#!/bin/bash' >> ./postrm
     if [ -f ./postinst1 ]; then
@@ -99,8 +123,16 @@ if [ -f ./postinst1 -o -f ./postinst2 ];then
         cat ./postrm2 >> ./postrm
         rm ./postinst2 ./postrm2 
     fi
+    if [ -f ./postinst3 ];then
+        echo >> ./postinst
+        cat ./postinst3 >> ./postinst
+        rm ./postinst3
+    fi
     echo '#DEBHELPER#' >> ./postinst
     echo '#DEBHELPER#' >> ./postrm
+    if [ -f ./prerm ]; then
+        echo '#DEBHELPER#' >> ./prerm
+    fi
 else
     touch ./postrm
     touch ./postinst

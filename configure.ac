@@ -441,6 +441,7 @@ AC_CONFIG_FILES([Makefile
                  monitor/client/python/appmancli/pyproject.toml
                  monitor/client/python/Makefile
                  monitor/client/python/appmancli/Makefile
+                 monitor/client/java/appmancli/Makefile
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])
@@ -564,7 +565,7 @@ esac
 case $enable_java in
     yes)
         JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, swig, apache-commons-cli, " 
-        JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
+        JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/*.jar"
         JAVA_RPMPKGS="java-1.8.0-openjdk-headless apache-commons-cli " 
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
         JAVA_DEBPKGS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "

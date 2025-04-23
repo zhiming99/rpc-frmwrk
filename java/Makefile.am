@@ -21,17 +21,27 @@ librpcbaseJNI_ladir=$(libdir)
 librpcbaseJNI_la_LDFLAGS = -version-info @VERSION2@
 librpcbaseJNI_la_LIBADD = -L$(top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/3rd_party $(fuse3_lib) ../ipc/libipc.la ../combase/libcombase.la -lpthread -ldl $(COMMON_LINK) 
 
-javawrapper_DATA=rpcbase.jar
+jarname=rpcbase-@VERSION@.jar
+javawrapper_DATA=$(jarname)
 javawrapperdir=$(libdir)/rpcf
+
+install-data-hook:
+	if [[ -z "$(DESTDIR)" ]]; then \
+        if [ ! -d $(javawrapperdir) ]; then mkdir -p $(javawrapperdir); fi ;\
+        pushd $(javawrapperdir); if [ -f rpcbase.jar -o -L rpcbase.jar ]; then rm -f rpcbase.jar;fi;ln -s $(javawrapper_DATA) rpcbase.jar;popd; \
+    fi
+
+uninstall-local:
+	if [ -d $(javawrapperdir ) ]; then pushd $(javawrapperdir); if [ -f rpcbase.jar -o -L rpcbase.jar ]; then rm rpcbase.jar;else echo bobo;fi;popd;fi
 
 rpcbasejava = JavaRpcService.java $(rpcbasedir)/JRetVal.java $(rpcbasedir)/Helpers.java $(rpcbasedir)/JavaRpcContext.java $(rpcbasedir)/JavaReqContext.java $(rpcbasedir)/RC.java $(rpcbasedir)/JavaRpcServer.java $(rpcbasedir)/JavaRpcProxy.java $(rpcbasedir)/IRpcService.java
 EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i fastrpc.i fuseif.i
 
-rpcbase.jar: rpcbase_wrap.cpp $(rpcbasejava) Makefile.am
+$(jarname): rpcbase_wrap.cpp $(rpcbasejava) Makefile.am
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServer -DIsServer="isServer(){ return true;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceS.java
 	cpp -P -DJavaRpcService=JavaRpcServiceP -DInstType=CJavaProxy -DIsServer="isServer(){ return false;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceP.java
 	javac src/org/rpcf/rpcbase/*.java
-	cd src;jar -cf ../rpcbase.jar org/rpcf/rpcbase/*.class
+	cd src;jar -cf ../$(jarname) org/rpcf/rpcbase/*.class;cd ..;rm -f rpcbase.jar;ln -s $(jarname) rpcbase.jar;
 
 rpcbase_wrap.cpp:rpcbase.i proxy.i server.i fastrpc.i $(fuse3_src)
 	swig -c++ -java $(fuse3_macro) -package org.rpcf.rpcbase -outdir src/org/rpcf/rpcbase -o rpcbase_wrap.cpp rpcbase.i

@@ -4451,7 +4451,7 @@ gint32 CJavaExportMakefile::Output()
     NEW_LINE;
     stdstr strPkgName( GetPackageName() );
     CCOUT << "\tcd build && find . -type f | xargs jar cf " <<
-        basename( strPkgName.c_str() ) << ".jar";
+        basename( strBuildPath.c_str() ) << "-" << VERSION_STRING <<".jar";
     NEW_LINE;
 
     m_pWriter->m_curFp = pbak;

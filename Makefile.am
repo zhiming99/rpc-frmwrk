@@ -17,7 +17,7 @@ SUBDIRS += python
 endif
 endif                          
 
-SUBDIRS += ridl monitor rpc tools pics examples 
+SUBDIRS += ridl 
 
 SUBDIRS += test
 
@@ -31,6 +31,7 @@ if ENABLE_JS
 SUBDIRS += js
 endif
 
+SUBDIRS += monitor rpc tools pics examples 
 SUBDIRS += bldpkg
 
 EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE README_cn.md Concept_cn.md
