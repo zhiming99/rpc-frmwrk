@@ -78,33 +78,35 @@ fi
 
 if [ "x$BUILD_JS" == "xyes" ]; then
 cat << EOF >> ./postinst2
-npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify
+echo "\e[33mnpm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify\e[0m"
 EOF
 cat << EOF >> ./postrm2
-npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify
+echo  "\e[33mnpm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify\e[0m"
 EOF
 fi
 
 if [ "x$BUILD_JAVA" == "xyes" ]; then
-cat << EOF >> './postinst3'
+cat << 'EOF' >> ./postinst3
+echo INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
 INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
-pushd $(INSTALL_DIR) > /dev/null
+pushd $INSTALL_DIR
 rpcbasejar=$(compgen -G "rpcbase*jar")
 rm -f rpcbase.jar
 ln -s $rpcbasejar rpcbase.jar
 appmanclijar=$(compgen -G "appmancli*jar")
 rm -f appmancli.jar
 ln -s $appmanclijar appmancli.jar
-popd > /dev/null
+popd
 EOF
 
-cat << EOF >> './prerm'
+cat << 'EOF' >> ./prerm
 #!/bin/bash
+echo INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
 INSTALL_DIR=$(dpkg-query -L $DPKG_MAINTSCRIPT_PACKAGE | grep 'rpcbase.*jar' | head -n 1 | xargs dirname)
-pushd $(INSTALL_DIR) > /dev/null
+pushd $INSTALL_DIR
 rm -f rpcbase.jar
 rm -f appmancli.jar
-popd > /dev/null
+popd
 EOF
 fi
 

@@ -2513,6 +2513,16 @@ gint32 GenJavaProj(
         if( ERROR( ret ) )
             break;
 
+        bool bDev = false;
+        size_t pos = strLibPath.find( "rpc-frmwrk/combase" );
+        if( pos != std::string::npos )
+        {
+            // we are running on a development tree.
+            strLibPath = strLibPath.substr( 0, pos + 11 );
+            strLibPath += "java/rpcbase.jar:";
+            bDev = true;
+        }
+
         stdstr strClsPath;
         if( g_strLocale == "cn" )
         {
@@ -2531,9 +2541,11 @@ gint32 GenJavaProj(
             "'export CLASSPATH=";
         }
 
-        strClsPath += strLibPath +
-            "/rpcf/rpcbase.jar:"
-            "/usr/share/java/commons-cli.jar:"
+        strClsPath += strLibPath;
+        if( !bDev )
+            strClsPath += "/rpcf/rpcbase.jar:";
+        
+        strClsPath += "/usr/share/java/commons-cli.jar:"
             "./:$CLASSPATH'\033[;0m";
 
         printf("%s\n", strClsPath.c_str() );
