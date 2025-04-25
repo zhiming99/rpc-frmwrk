@@ -61,7 +61,7 @@
 6. `MIT krb5 用于用户认证.`（可选）
 7. `C++11 和 GCC 5.x+.`
 8. `Python 3.5+.`（可选）
-9. `Java OpenJDK 8+.`（可选）
+9. `Java OpenJDK 9+.`（可选）
 10. `npm 9.0 and webpack`（可选）
 11. `FUSE-3`（可选）
 12. `GmSSL 3.0`（可选）
