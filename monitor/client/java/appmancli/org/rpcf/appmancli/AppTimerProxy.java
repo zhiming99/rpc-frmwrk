@@ -9,14 +9,6 @@ import java.lang.String;
 import org.rpcf.rpcbase.*;
 
 import java.util.concurrent.Callable;
-import java.io.File;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.lang.Process;
-import java.lang.Runtime;
 
 import org.rpcf.rpcbase.JavaReqContext;
 import org.rpcf.rpcbase.ObjPtr;
@@ -44,64 +36,19 @@ public class AppTimerProxy extends AppManagercli
         if (!appName.equals(this.m_strAppInst)) return;
 
         if (pointName.equals("interval1") ) {
-            m_iInterval = ( Integer)value.val;
+            setInterval( ( Integer )value.val );
             return;
         }
         super.OnPointChanged( oReqCtx, strPtPath, value);
     }
 
-    public void setInterval( int i )
+    public synchronized void setInterval( int i )
     { m_iInterval = i; }
 
+    public synchronized int getInterval()
+    { return m_iInterval; }
+
     public static JavaRpcContext m_oCtx;
-    public static String getDescPath( String strName )
-    {
-        String strDescPath =
-                maincli.class.getProtectionDomain().getCodeSource().getLocation().getPath();
-        String strDescPath2 = strDescPath + "/org/rpcf/appmancli/" + strName;
-        File oFile = new File( strDescPath2 );
-        if( oFile.isFile() )
-            return strDescPath2;
-        strDescPath += "/" + strName;
-        oFile = new File( strDescPath );
-        if( oFile.isFile() )
-            return strDescPath;
-        strDescPath = CopyResource( strName );
-        return strDescPath;
-    }
-    // copy resource from a jar to the working directory
-    public static String CopyResource( String strName )
-    {
-        boolean bFound = false;
-        String strDestPath =
-                System.getProperty( "user.dir" );
-        InputStream stream = null;
-        String strSrcPath = "/static/" + strName;
-        boolean bSync = false;
-        if( strName.equals( "driver.json" ) ||
-                strName.equals( "driver-cli.json" ) )
-            bSync = true;
-        try{
-            stream = maincli.class.getResourceAsStream( strSrcPath );
-            Path dstPath = Paths.get( strDestPath + "/" + strName );
-            Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );
-            bFound = true;
-            if( bSync )
-            {
-                String strSync = "/org/rpcf/appmancli/synccfg.py";
-                stream = maincli.class.getResourceAsStream( strSync );
-                dstPath = Paths.get( strDestPath + "/synccfg.py" );
-                Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );
-                String[] commands = { "python3", "./synccfg.py" };
-                Process p = Runtime.getRuntime().exec(commands);
-            }
-        }catch ( Exception e ){
-            bFound = false;
-        }
-        if( !bFound )
-            return "";
-        return strDestPath + "/" + strName;
-    }
     public static void main(String[] args )
     {
         int ret = 0;
@@ -121,7 +68,7 @@ public class AppTimerProxy extends AppManagercli
                 ()->new AppTimerProxy(m_oCtx.getIoMgr(),
                 "invalidpath/appmondesc.json",
                 "AppManager");
-            ret = maincli.startAppManagercli(
+            ret = MainThread.startAppManagercli(
                 null, m_oCtx, "timer1",
                 oCreateFunc, true );
             if( RC.ERROR( ret ) )
@@ -132,7 +79,7 @@ public class AppTimerProxy extends AppManagercli
         }
         finally
         {
-            maincli.stopAppManagercli();
+            MainThread.stopAppManagercli();
             rpcbase.JavaOutputMsg(
                     "Quit with status: " + ret);
             if( m_oCtx != null )
@@ -140,37 +87,43 @@ public class AppTimerProxy extends AppManagercli
             System.exit( -ret );
         }
     }
+    public static AppManagercli waitConnected()
+    {
+        AppManagercli oProxy = null;
+        do {
+            oProxy = MainThread.getAppmangercli();
+            if( oProxy != null )
+                break;
+            MainThread.WaitSeconds(1);
+            if( MainThread.isExit() )
+                return null;
+        }while (oProxy == null);
+        return oProxy;
+    }
     // ------customize this method for your own purpose----
     public static int timerLoop()
     {
-        AppManagercli oProxy = null;
-        while (oProxy == null) {
-            oProxy = maincli.getAppmangercli();
-            if( oProxy != null )
-                break;
-            maincli.WaitSeconds(1);
-            if( maincli.isExit() )
-                break;
-        }
-        AppTimerProxy oTimer = ( AppTimerProxy ) oProxy;
-        JRetVal jRetVal = oProxy.GetPointValue("timer1/interval1");
+        AppTimerProxy oTimer = ( AppTimerProxy ) waitConnected();
+        JRetVal jRetVal = oTimer.GetPointValue("timer1/interval1");
         if( jRetVal.SUCCEEDED()) {
             JVariant oVar = (JVariant) jRetVal.getAt(0);
             oTimer.setInterval( ( Integer )oVar.val );
+            rpcbase.JavaOutputMsg("Info interval changed to " + oVar.val );
         }
 
         int iTicks =0;
-        while( !maincli.isExit() )
+        while( !MainThread.isExit() )
         {
-            maincli.WaitSeconds(1);
+            MainThread.WaitSeconds(1);
             iTicks += 1;
-            if( iTicks % oTimer.m_iInterval > 0 )
+            if( iTicks % oTimer.getInterval() > 0 )
                 continue;
             JVariant oVar = new JVariant();
             oVar.iType = rpcbaseConstants.typeUInt32;
             oVar.val = ( Integer )1;
-            maincli.addTask( oProxy1 -> oProxy1.SetPointValue("timer1/clock1", oVar));
+            MainThread.addTask(oProxy1 -> oProxy1.SetPointValue("timer1/clock1", oVar));
             rpcbase.JavaOutputMsg("Info send clock1 " + iTicks );
+            waitConnected();
         }
         return RC.STATUS_SUCCESS;
     }

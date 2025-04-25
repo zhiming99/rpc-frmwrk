@@ -1061,6 +1061,41 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
     return pCfg;
 }
 
+jobject TryFindDescFile(
+    JNIEnv* jenv, ObjPtr* ppObj,
+    const std::string& strFileName )
+{
+    if( jenv == nullptr )
+        return nullptr;
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = *ppObj;
+        if( pMgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        stdstr strPath;
+        ret = pMgr->TryFindDescFile(
+            strFileName, strPath );
+        if( ERROR( ret ) )
+            break;
+        jstring jval =
+            jenv->NewStringUTF(strPath.c_str());
+        if( jval == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        AddElemToJRet( jenv, jret, jval );
+    }while( 0 );
+    SetErrorJRet( jenv, jret, ret );
+    return jret;
+}
+
 static void* g_pLibHandle = nullptr;
 gint32 OpenThisLib()
 {
@@ -3161,6 +3196,10 @@ CfgPtr* CastToCfg( ObjPtr* pObj );
 ObjPtr* StartIoMgr( CfgPtr& pCfg );
 
 gint32 StopIoMgr( ObjPtr* pObj );
+
+jobject TryFindDescFile(
+    JNIEnv* jenv, ObjPtr* ppObj,
+    const std::string& strFileName );
 
 %newobject CastToSvc;
 IService* CastToSvc(

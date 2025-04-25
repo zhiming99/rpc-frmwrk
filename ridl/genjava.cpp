@@ -52,6 +52,9 @@ extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 g_dwFlags;
 stdstr g_strPkgName;
 
+extern bool g_bMonitoring;
+extern std::vector<stdstr> g_vecMonApps;
+
 std::map< stdstr, stdstr > CJTypeHelper::m_mapTypeCvt {
     { "long", "Long" },
     { "int", "Integer" },
@@ -2514,13 +2517,21 @@ gint32 GenJavaProj(
             break;
 
         bool bDev = false;
-        size_t pos = strLibPath.find( "rpc-frmwrk/combase" );
+        size_t pos = strLibPath.find(
+            "rpc-frmwrk/combase" );
+
+        stdstr strDevRoot;
+        stdstr strInstDir;
         if( pos != std::string::npos )
         {
+            strDevRoot =
+                strLibPath.substr( 0, pos + 11 );
             // we are running on a development tree.
-            strLibPath = strLibPath.substr( 0, pos + 11 );
-            strLibPath += "java/rpcbase.jar:";
             bDev = true;
+        }
+        else
+        {
+            strInstDir = strLibPath;
         }
 
         stdstr strClsPath;
@@ -2537,14 +2548,28 @@ gint32 GenJavaProj(
             strClsPath =
             "\033[1;33mMake sure to add "
             "'rpcbase.jar' to environment "
-            "variable CLASSPATH, as\n"
+            "variable CLASSPATH, like\n"
             "'export CLASSPATH=";
         }
 
-        strClsPath += strLibPath;
         if( !bDev )
-            strClsPath += "/rpcf/rpcbase.jar:";
-        
+            strClsPath +=
+                strInstDir + "/rpcf/rpcbase.jar:";
+        else
+            strClsPath += strDevRoot +
+                "java/rpcbase-" VERSION_STRING ".jar:";
+
+        if( g_bMonitoring && !g_bBuiltinRt )
+        {
+            if( !bDev )
+                strClsPath += strInstDir +
+                    "/rpcf/appmancli.jar:";
+            else
+                strClsPath += strDevRoot +
+                    "/monitor/client/java/"
+                    "appmancli/appmancli-"
+                    VERSION_STRING ".jar:";
+        }
         strClsPath += "/usr/share/java/commons-cli.jar:"
             "./:$CLASSPATH'\033[;0m";
 
@@ -5117,6 +5142,10 @@ gint32 CImplJavaMainSvr::Output()
     Wa( "import java.nio.file.StandardCopyOption;" );
     Wa( "import java.lang.Process;" );
     Wa( "import java.lang.Runtime;" );
+    if( g_bMonitoring && !g_bBuiltinRt )
+    {
+        Wa( "import org.rpcf.appmancli.MainThread;" );
+    }
 
     gint32 ret = 0;
     do{
@@ -5243,6 +5272,14 @@ gint32 CImplJavaMainSvr::Output()
             }
         }
         NEW_LINE;
+        if( g_bMonitoring && !g_bBuiltinRt )
+        {
+            Wa( "MainThread.startAppManagercli(" );
+            CCOUT <<  "    oSvc, m_oCtx, \""
+                << g_vecMonApps[ 0 ]
+                << "\", null, true);";
+            NEW_LINE;
+        }
 
 #ifdef FUSE3
         if( g_bBuiltinRt )
@@ -5287,6 +5324,9 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINE;
         Wa( "finally" );
         BLOCK_OPEN;
+        if( g_bMonitoring && !g_bBuiltinRt )
+            Wa( "MainThread.stopAppManagercli();" );
+
         Wa( "rpcbase.JavaOutputMsg(" );
         Wa( "    \"Quit with status: \" + ret);" );
         if( vecSvcs.size() == 1 )

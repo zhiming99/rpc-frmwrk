@@ -1604,6 +1604,15 @@ class CJavaInterfBase : public T
 
         return ret;
     }
+
+    jobject TryFindDescFile(
+        JNIEnv* jenv,
+        const std::string& strFileName )
+    {
+        ObjPtr pMgr( this->GetIoMgr() );
+        return ::TryFindDescFile( jenv,
+            &pMgr, strFileName );
+    }
 };
 
 class CJavaProxy :
@@ -2464,6 +2473,9 @@ class CJavaInterfBase
     jobject GetChanCtx(
         JNIEnv *jenv, jlong hChannel );
 
+    jobject TryFindDescFile(
+        JNIEnv* jenv,
+        const std::string& strFileName );
 };
 
 %template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxyBase>;

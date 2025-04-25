@@ -3899,7 +3899,7 @@ gint32 CImplPyMainFunc::OutputSvr(
             ret = -EINVAL;
             break;
         }
-        if( g_bMonitoring )
+        if( g_bMonitoring && !g_bBuiltinRt )
         {
             Wa( "from appmancli import maincli as amc" );
         }
@@ -4060,7 +4060,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_UPL;
         CCOUT << "try:";
         INDENT_UPL;
-        if( g_bMonitoring )
+        if( g_bMonitoring && !g_bBuiltinRt )
         {
             Wa( "amc.StartAppManagercli( oServer," );
             CCOUT << "    oContext, \"" << g_vecMonApps[ 0 ] << "\" )";
@@ -4099,7 +4099,7 @@ gint32 CImplPyMainFunc::OutputSvr(
         INDENT_DOWNL;
         Wa( "except Exception as err:" );
         Wa( "    print( err )" );
-        if( g_bMonitoring )
+        if( g_bMonitoring && !g_bBuiltinRt )
         {
             Wa( "finally:" );
             Wa( "    amc.StopAppManagercli()" );

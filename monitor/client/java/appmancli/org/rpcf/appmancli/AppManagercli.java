@@ -94,7 +94,7 @@ public class AppManagercli extends AppManagerclibase
         }
         long vmsize = rpcbase.GetVmSize().longValue();
         okv = new KeyValue();
-        okv.strKey = "vm_size";
+        okv.strKey = "vmsize_kb";
         okv.oValue = new JVariant();
         okv.oValue.iType = rpcbaseConstants.typeUInt64;
         okv.oValue.val = vmsize;
@@ -125,7 +125,7 @@ public class AppManagercli extends AppManagerclibase
             if (!appName.equals(this.m_strAppInst)) return;
 
             if (pointName.equals("restart") && value.val.equals(1)) {
-                maincli.setExit();
+                MainThread.setExit();
                 return;
             }
 
@@ -134,7 +134,7 @@ public class AppManagercli extends AppManagerclibase
                 this.getPointValuesToUpdate(
                     this.m_oTarget, keyValues);
 
-                if( !maincli.addTask(oProxy ->
+                if( !MainThread.addTask(oProxy ->
                     oProxy.SetPointValues(this.m_strAppInst, keyValues.toArray(new KeyValue[0]))) )
                     rpcbase.JavaOutputMsg("Error add task to task loop " +
                             this.m_strAppInst + " " + strPtPath );

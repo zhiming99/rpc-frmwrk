@@ -4,22 +4,12 @@
 // /usr/local/bin/ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync --services=AppManager --client --pkgname=org.rpcf.appmancli -jlsO . ../../../../monitor/appmon/appmon.ridl 
 package org.rpcf.appmancli;
 import org.rpcf.rpcbase.*;
-import java.util.Map;
-import java.util.HashMap;
-import java.lang.String;
-import java.nio.ByteBuffer;
+
 import java.lang.String;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.io.File;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.lang.Process;
-import java.lang.Runtime;
 import java.util.ArrayList;
 
 import java.util.concurrent.BlockingQueue;
@@ -29,7 +19,7 @@ import java.util.concurrent.Callable;
 
 import static org.rpcf.rpcbase.rpcbaseJNI.JavaOutputMsg;
 
-public class maincli
+public class MainThread
 {
     static public boolean m_bExited = false;
     static public synchronized void setExited()
@@ -54,7 +44,7 @@ public class maincli
 
     static void WaitSeconds( int seconds ) {
         try {
-            TimeUnit.SECONDS.sleep(1);
+            TimeUnit.SECONDS.sleep(seconds);
         } catch (InterruptedException e) {
         }
     }
@@ -64,7 +54,7 @@ public class maincli
     public static String getDescPath( String strName )
     {
         String strDescPath =
-            maincli.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+            MainThread.class.getProtectionDomain().getCodeSource().getLocation().getPath();
         String strDescPath2 = strDescPath + "/org/rpcf/appmancli/" + strName;
         File oFile = new File( strDescPath2 );
         if( oFile.isFile() )
@@ -73,41 +63,7 @@ public class maincli
         oFile = new File( strDescPath );
         if( oFile.isFile() )
             return strDescPath;
-        strDescPath = CopyResource( strName );
         return strDescPath;
-    }
-    // copy resource from a jar to the working directory
-    public static String CopyResource( String strName )
-    {
-        boolean bFound = false;
-        String strDestPath =
-            System.getProperty( "user.dir" );
-        InputStream stream = null;
-        String strSrcPath = "/static/" + strName;
-        boolean bSync = false;
-        if( strName.equals( "driver.json" ) ||
-            strName.equals( "driver-cli.json" ) )
-            bSync = true;
-        try{
-            stream = maincli.class.getResourceAsStream( strSrcPath );
-            Path dstPath = Paths.get( strDestPath + "/" + strName );
-            Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );
-            bFound = true;
-            if( bSync )
-            {
-                String strSync = "/org/rpcf/appmancli/synccfg.py";
-                stream = maincli.class.getResourceAsStream( strSync );
-                dstPath = Paths.get( strDestPath + "/synccfg.py" );
-                Files.copy( stream, dstPath, StandardCopyOption.REPLACE_EXISTING );
-                String[] commands = { "python3", "./synccfg.py" };
-                Process p = Runtime.getRuntime().exec(commands);
-            }
-        }catch ( Exception e ){
-            bFound = false;
-        }
-        if( !bFound )
-            return "";
-        return strDestPath + "/" + strName;
     }
     static public int startAppManagercli(
          JavaRpcServer oTarget,
@@ -138,11 +94,21 @@ public class maincli
         AppManagercli oSvc = null;
         while( !isExit() ) {
             try {
-                String strDescPath =
-                        getDescPath("appmondesc.json");
+                String strDescPath;
+                Object oRet = rpcbase.TryFindDescFile(
+                    oCtx.getIoMgr(),"invalidpath/appmondesc.json");
+                System.out.println(oRet.toString());
+                JRetVal jRetVal = ( JRetVal)oRet;
+                if(jRetVal.ERROR())
+                {
+                    JavaOutputMsg("Error cannot find 'appmondesc.json'");
+                    ret = jRetVal.getError();
+                    break;
+                }
+                strDescPath = (String) jRetVal.getAt(0);
                 if (strDescPath.isEmpty()) {
                     ret = -RC.ENOENT;
-                    return ret;
+                    break;
                 }
                 // create the proxy object
                 if( oCreateFunc != null ) {
@@ -234,6 +200,10 @@ public class maincli
             }
             if( task != null ) {
                 task.accept( oProxy );
+            }
+            int state = oProxy.getState();
+            if( state != rpcbaseConstants.stateConnected ) {
+                break;
             }
         }
         if( oProxy.getState() == rpcbaseConstants.stateConnected ) {
