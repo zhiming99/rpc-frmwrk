@@ -170,7 +170,7 @@ public class MainThread
         okv.strKey = "pid";
         okv.oValue = new JVariant();
         okv.oValue.iType = rpcbaseConstants.typeUInt32;
-        okv.oValue.val = (int)ProcessHandle.current().pid();
+        okv.oValue.val = rpcbase.GetPid();
         arrKvs.add(okv);
 
         okv = new KeyValue();

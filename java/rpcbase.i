@@ -1563,6 +1563,10 @@ jobject UpdateDrvCfg(
     }while( 0 );
     return jret; 
 }
+
+int GetPid()
+{ return getpid(); }
+
 %}
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
@@ -3592,6 +3596,8 @@ jobject UpdateDrvCfg(
     JNIEnv *jenv,
     const std::string& strDriver,
     CfgPtr& pCfg );
+
+int GetPid();
 
 jobject GetOpenFileCount( JNIEnv* jenv );
 
