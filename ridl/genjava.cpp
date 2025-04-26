@@ -50,6 +50,10 @@ extern gint32 SetStructRefs( ObjPtr& pRoot );
 extern guint32 GenClsid( const std::string& strName );
 extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 g_dwFlags;
+stdstr g_strPkgName;
+
+extern bool g_bMonitoring;
+extern std::vector<stdstr> g_vecMonApps;
 
 std::map< stdstr, stdstr > CJTypeHelper::m_mapTypeCvt {
     { "long", "Long" },
@@ -103,6 +107,13 @@ std::map< char, stdstr > CJTypeHelper::m_mapSig2DefVal
     { 'h', "0" },
     { 'v', "null" }
 };
+
+stdstr GetPackageName()
+{
+    if( g_strPkgName.empty() )
+        return g_strPrefix + g_strAppName;
+    return g_strPkgName;
+}
 
 std::string GetTypeSigJava( ObjPtr& pObj )
 {
@@ -1353,7 +1364,7 @@ gint32 CJavaSnippet::EmitBanner()
     EMIT_DISCLAIMER;
     CCOUT << "// " << g_strCmdLine;
     NEW_LINE;
-    CCOUT << "package " << g_strPrefix << g_strAppName << ";";
+    CCOUT << "package " << GetPackageName() << ";";
     NEW_LINE;
     Wa( "import org.rpcf.rpcbase.*;" );
     Wa( "import java.util.Map;" );
@@ -1435,7 +1446,7 @@ gint32 CJavaSnippet::EmitGetDescPath(
         << "getCodeSource().getLocation().getPath();";
     NEW_LINE;
     stdstr strPrefix = "/";
-    strPrefix += g_strPrefix + g_strAppName + "/";
+    strPrefix += GetPackageName() + "/";
     std::replace( strPrefix.begin(),
         strPrefix.end(), '.', '/' );
     CCOUT << "String strDescPath2 = strDescPath + "
@@ -1463,8 +1474,8 @@ gint32 CJavaSnippet::EmitGetDescPath(
     CCOUT << "String strSrcPath = \"/static/\" + strName;";
     NEW_LINE;
     Wa( "boolean bSync = false;" );
-    Wa( "if( strName == \"driver.json\" ||" );
-    Wa( "    strName == \"driver-cli.json\" )" );
+    Wa( "if( strName.equals( \"driver.json\" ) ||" );
+    Wa( "    strName.equals( \"driver-cli.json\" ) )" );
     Wa( "    bSync = true;" );
     CCOUT << "try";
     BLOCK_OPEN;
@@ -1507,7 +1518,7 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
 {
     gint32 ret = 0;
     do{
-        stdstr strCmd = g_strPrefix + g_strAppName + ".";
+        stdstr strCmd = GetPackageName() + ".";
         if( bProxy )
             strCmd += "maincli";
         else
@@ -1643,39 +1654,39 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
         Wa( "for( Option opt : actOpts )" );
         BLOCK_OPEN; 
         Wa( "boolean bCheck = false;" );
-        Wa( "if( opt.getOpt() == \"a\" )" );
+        Wa( "if( opt.getOpt().equals( \"a\" ) )" );
         Wa( "    oInit.put( 102, Boolean.valueOf( true ) );" );
-        Wa( "else if( opt.getOpt() == \"d\" )" );
+        Wa( "else if( opt.getOpt().equals( \"d\" ) )" );
         Wa( "    oInit.put( 103, Boolean.valueOf( true ) );" );
-        Wa( "else if( opt.getOpt() == \"i\" )" );
+        Wa( "else if( opt.getOpt().equals( \"i\" ) )" );
         Wa( "    oInit.put( 109, opt.getValue() );" );
-        Wa( "else if( opt.getOpt() == \"p\" )" );
+        Wa( "else if( opt.getOpt().equals( \"p\" ) )" );
         Wa( "    oInit.put( 110, opt.getValue() );" );
 #ifdef FUSE3
         if( !bProxy )
         {
-            Wa( "else if( opt.getOpt() == \"m\" )" );
+            Wa( "else if( opt.getOpt().equals( \"m\" ) )" );
             Wa( "    strMPoint = opt.getValue();" );
-            Wa( "else if( opt.getOpt() == \"g\" )" );
+            Wa( "else if( opt.getOpt().equals( \"g\" ) )" );
             Wa( "    oInit.put( 113, Boolean.valueOf( true ) );" );
         }
 #endif
-        Wa( "else if( opt.getOpt() == \"xd\" || opt.getLongOpt() == \"driver\" )" );
+        Wa( "else if( opt.getOpt().equals( \"xd\" ) || opt.getLongOpt().equals( \"driver\" ) )" );
         Wa( "{ bCheck = true; strCfgPath = opt.getValue(); oInit.put( 105, strCfgPath ); }" );
-        Wa( "else if( opt.getOpt() == \"xr\" || opt.getLongOpt() == \"router\" )" );
+        Wa( "else if( opt.getOpt().equals( \"xr\" ) || opt.getLongOpt().equals( \"router\" ) )" );
         Wa( "{ bCheck = true; oInit.put( 106, opt.getValue() ); }" );
-        Wa( "else if( opt.getOpt() == \"xo\" || opt.getLongOpt() == \"objdesc\" )" );
+        Wa( "else if( opt.getOpt().equals( \"xo\" ) || opt.getLongOpt().equals( \"objdesc\" ) )" );
         Wa( "{ bCheck = true; strDescPath = opt.getValue(); }" );
         if( bProxy )
         {
 #ifdef KRB5
-            Wa( "else if( opt.getOpt() == \"k\" )" );
+            Wa( "else if( opt.getOpt().equals( \"k\" ) )" );
             BLOCK_OPEN;
             Wa( "oInit.put( 111, Boolean.valueOf( true ) );" );
             CCOUT << "bKProxy = true;";
             BLOCK_CLOSE;
             NEW_LINE;
-            Wa( "else if( opt.getOpt() == \"l\" )" );
+            Wa( "else if( opt.getOpt().equals( \"l\" ) )" );
             BLOCK_OPEN;
             Wa( "oInit.put( 111, Boolean.valueOf( true ) );" );
             Wa( "strUserName = opt.getValue();" );
@@ -1684,7 +1695,7 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
             NEW_LINE;
 #endif
 
-            Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
+            Wa( "else if( opt.getOpt().equals( \"xi\" ) || opt.getLongOpt().equals( \"instname\" ) )" );
             BLOCK_OPEN;
             Wa( "oInit.put( 107, opt.getValue() );" );
             Wa( "if( oInit.containsKey( 108 ) )" );
@@ -1695,7 +1706,7 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
             BLOCK_CLOSE;
             BLOCK_CLOSE;
             NEW_LINE;
-            Wa( "else if( opt.getOpt() == \"xs\" || opt.getLongOpt() == \"sainstname\" )" );
+            Wa( "else if( opt.getOpt().equals( \"xs\" ) || opt.getLongOpt().equals( \"sainstname\" ) )" );
             BLOCK_OPEN;
             Wa( "oInit.put( 108, opt.getValue() );" );
             Wa( "if( oInit.containsKey( 107 ) )" );
@@ -1706,15 +1717,15 @@ gint32 CJavaSnippet::EmitGetOpt( bool bProxy )
             BLOCK_CLOSE;
             BLOCK_CLOSE;
             NEW_LINE;
-            Wa( "else if( opt.getOpt() == \"nd\" || opt.getLongOpt() == \"nodbus\" )" );
+            Wa( "else if( opt.getOpt().equals( \"nd\" ) || opt.getLongOpt().equals( \"nodbus\" ) )" );
             Wa( "    oInit.put( 112, Boolean.valueOf( true ) );" );
         }
         else
         {
-            Wa( "else if( opt.getOpt() == \"xi\" || opt.getLongOpt() == \"instname\" )" );
+            Wa( "else if( opt.getOpt().equals( \"xi\" ) || opt.getLongOpt().equals( \"instname\" ) )" );
             Wa( "{ oInit.put( 107, opt.getValue() ); }" );
         }
-        Wa( "else if( opt.getOpt() == \"h\" )" );
+        Wa( "else if( opt.getOpt().equals( \"h\" ) )" );
         BLOCK_OPEN; 
         CCOUT << "formatter.printHelp( \""<< strCmd <<"\", options);";
         NEW_LINE;
@@ -1983,7 +1994,7 @@ gint32 GenSerialHelper(
     args[ 0 ] = "/usr/bin/cpp";
     stdstr strArg5, strArg9;
     strArg5 = "-DXXXXX=";
-    strArg5 += g_strPrefix + g_strAppName;
+    strArg5 += GetPackageName();
 
     strArg9 = strOutPath;
     char* env[ 1 ] = { nullptr };
@@ -2038,7 +2049,7 @@ gint32 GenSerialBase(
     args[ 0 ] = "/usr/bin/cpp";
     stdstr strArg5, strArg8;
     strArg5 = "-DXXXXX=";
-    strArg5 += g_strPrefix + g_strAppName;
+    strArg5 += GetPackageName();
 
     strArg8 = strOutPath;
     char* env[ 1 ] = { nullptr };
@@ -2074,7 +2085,11 @@ gint32 GenSerialBaseFiles(
         ret = FindFullPath(
             "JavaSerialBase.java", strSeriBase );
         if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error not found "
+                "JavaSerialBase.java" );
             break;
+        }
 
         stdstr strDstSeriBase =
             pWriter->GetOutPath();
@@ -2157,7 +2172,9 @@ gint32 GenStructFilesJava(
 
     gint32 ret = 0;
     do{
-        GenSerialBaseFiles( pWriter );
+        ret = GenSerialBaseFiles( pWriter );
+        if( ERROR( ret ) )
+            break;
         CStatements* pStmts = pRoot;
         if( unlikely( pStmts == nullptr ) )
         {
@@ -2330,11 +2347,10 @@ gint32 GenJavaProj(
 
     do{
         struct stat sb;
-        stdstr strPkgPath = g_strPrefix;
+        stdstr strPkgPath = GetPackageName();
         std::replace( strPkgPath.begin(),
             strPkgPath.end(), '.', '/' );
         strPkgPath += "/";
-        strPkgPath += g_strAppName;
 
         if( szOutPath == "output" )
             strOutPath = strPkgPath;
@@ -2500,6 +2516,24 @@ gint32 GenJavaProj(
         if( ERROR( ret ) )
             break;
 
+        bool bDev = false;
+        size_t pos = strLibPath.find(
+            "rpc-frmwrk/combase" );
+
+        stdstr strDevRoot;
+        stdstr strInstDir;
+        if( pos != std::string::npos )
+        {
+            strDevRoot =
+                strLibPath.substr( 0, pos + 11 );
+            // we are running on a development tree.
+            bDev = true;
+        }
+        else
+        {
+            strInstDir = strLibPath;
+        }
+
         stdstr strClsPath;
         if( g_strLocale == "cn" )
         {
@@ -2514,13 +2548,29 @@ gint32 GenJavaProj(
             strClsPath =
             "\033[1;33mMake sure to add "
             "'rpcbase.jar' to environment "
-            "variable CLASSPATH, as\n"
+            "variable CLASSPATH, like\n"
             "'export CLASSPATH=";
         }
 
-        strClsPath += strLibPath +
-            "/rpcf/rpcbase.jar:"
-            "/usr/share/java/commons-cli.jar:"
+        if( !bDev )
+            strClsPath +=
+                strInstDir + "/rpcf/rpcbase.jar:";
+        else
+            strClsPath += strDevRoot +
+                "java/rpcbase-" VERSION_STRING ".jar:";
+
+        if( g_bMonitoring && !g_bBuiltinRt )
+        {
+            if( !bDev )
+                strClsPath += strInstDir +
+                    "/rpcf/appmancli.jar:";
+            else
+                strClsPath += strDevRoot +
+                    "/monitor/client/java/"
+                    "appmancli/appmancli-"
+                    VERSION_STRING ".jar:";
+        }
+        strClsPath += "/usr/share/java/commons-cli.jar:"
             "./:$CLASSPATH'\033[;0m";
 
         printf("%s\n", strClsPath.c_str() );
@@ -4426,8 +4476,8 @@ gint32 CJavaExportMakefile::Output()
         std::ofstream::out |
         std::ofstream::app) );
 
-    stdstr strBuildPath;
-    strBuildPath += g_strPrefix + g_strAppName;
+    stdstr strBuildPath(
+        GetPackageName() );
     std::replace( strBuildPath.begin(),
         strBuildPath.end(), '.', '/' );
     // strBuildPath.insert( strBuildPath.begin(), '.' );
@@ -4442,7 +4492,9 @@ gint32 CJavaExportMakefile::Output()
     Wa( "\tmkdir build/static || true" );
     CCOUT << "\tcp *.json ./build/static";
     NEW_LINE;
-    CCOUT << "\tcd build && find . -type f | xargs jar cf " << g_strAppName << ".jar";
+    stdstr strPkgName( GetPackageName() );
+    CCOUT << "\tcd build && find . -type f | xargs jar cf " <<
+        basename( strBuildPath.c_str() ) << "-" << VERSION_STRING <<".jar";
     NEW_LINE;
 
     m_pWriter->m_curFp = pbak;
@@ -5090,6 +5142,10 @@ gint32 CImplJavaMainSvr::Output()
     Wa( "import java.nio.file.StandardCopyOption;" );
     Wa( "import java.lang.Process;" );
     Wa( "import java.lang.Runtime;" );
+    if( g_bMonitoring && !g_bBuiltinRt )
+    {
+        Wa( "import org.rpcf.appmancli.MainThread;" );
+    }
 
     gint32 ret = 0;
     do{
@@ -5216,6 +5272,14 @@ gint32 CImplJavaMainSvr::Output()
             }
         }
         NEW_LINE;
+        if( g_bMonitoring && !g_bBuiltinRt )
+        {
+            Wa( "MainThread.startAppManagercli(" );
+            CCOUT <<  "    oSvc, m_oCtx, \""
+                << g_vecMonApps[ 0 ]
+                << "\", null, true);";
+            NEW_LINE;
+        }
 
 #ifdef FUSE3
         if( g_bBuiltinRt )
@@ -5241,7 +5305,7 @@ gint32 CImplJavaMainSvr::Output()
                         << ".getInst(), \"" << strName << "\" );";
                 NEW_LINE;
             }
-            stdstr strCmd = g_strPrefix + g_strAppName + ".";
+            stdstr strCmd = GetPackageName() + ".";
             strCmd += "mainsvr";
             Wa( "rpcbase.fuseif_mainloop(" );
             CCOUT << "    \"" << strCmd << "\",";
@@ -5260,6 +5324,9 @@ gint32 CImplJavaMainSvr::Output()
         NEW_LINE;
         Wa( "finally" );
         BLOCK_OPEN;
+        if( g_bMonitoring && !g_bBuiltinRt )
+            Wa( "MainThread.stopAppManagercli();" );
+
         Wa( "rpcbase.JavaOutputMsg(" );
         Wa( "    \"Quit with status: \" + ret);" );
         if( vecSvcs.size() == 1 )

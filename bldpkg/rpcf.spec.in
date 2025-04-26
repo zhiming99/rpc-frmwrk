@@ -94,6 +94,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/libauth.so*
 %{_libdir}/liblogcli.so*
 %{_libdir}/libregfs.so*
+%{_libdir}/libappmancli.so*
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz
@@ -181,6 +182,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_includedir}/rpcf/ipc/logger.h
 %{_includedir}/rpcf/ipc/logclibase.h
 %{_includedir}/rpcf/variant.h
+%{_includedir}/rpcf/appmancli/*.h
 %{_libdir}/rpcf/lib*.so*
 
 %files static
@@ -190,10 +192,13 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %post
 @PYTHON_RPMPOST@
 @JS_RPMPOST@
+@JAVA_RPMPOST@
 
 %postun
 @PYTHON_RPMPOSTUN@ @PACKAGE_NAME@
 @JS_RPMPOSTUN@
+@JAVA_RPMPOSTUN@
+
 
 
 %changelog

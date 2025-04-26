@@ -273,15 +273,15 @@ bool CInterfaceState::IsMyPort(
     do{
         // check if the port is what we
         // are waiting for
-        BufPtr pBuf( true );
+        Variant oVar;
 
         ret = pMgr->GetPortProp(
-            hPort, propPortClass, pBuf );
+            hPort, propPortClass, oVar );
 
         if( ERROR( ret ) )
             break;
 
-        string strPortClass = *pBuf;
+        auto& strPortClass = ( stdstr& )oVar;
         string strDesiredClass;
 
         CCfgOpenerObj oCfg( this );

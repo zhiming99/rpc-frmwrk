@@ -1341,7 +1341,7 @@ class CUnixSockStmRelayBase :
         return ret;
     }
 
-    gint32 ReportByteStat()
+    /*gint32 ReportByteStat()
     {
         gint32 ret = 0;
         do{
@@ -1403,11 +1403,11 @@ class CUnixSockStmRelayBase :
         }while( 0 );
 
         return ret;
-    }
+    }*/
 
     virtual gint32 OnPreStop( IEventSink* pCallback ) 
     {
-        ReportByteStat();
+        // ReportByteStat();
         if( this->GetPortHandle() == INVALID_HANDLE )
         {
             CCfgOpenerObj oIfCfg( this );

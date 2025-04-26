@@ -7,68 +7,76 @@ ridlc \- ridl compiler to generate skelton code for rpc-frmwrk.
 ridlc [options] <ridl file>
 .SH DESCRIPTION
 .BR ridlc
-parses the given ridl file and generate a set of skelton code in the
+Parses the given ridl file and generate a set of skelton code in the
 specified language, Python or C++ at present.
 .SH OPTIONS
 .TP
 .BR \-I " "\fIpath\fR
-To specify the path to search for the included files. This option can repeat many times.
+Specify the path to search for the included files. This option can repeat many times.
 .TP
 .BR \-O " "\fIpath\fR
-To specify the path to store the generated files.
+Specify the path to store the generated files.
 .TP
 .BR \-p " "
-To generate the Python skelton files.
+Generate the Python skelton files.
 .TP
 .BR \-j " "
-To generate the Java skelton files.
+Generate the Java skelton files.
 .TP
 .BR \-J " "
-To generate the JavaScript skelton files (client only). ridlc does not support '-f'
+Generate the JavaScript skelton files (client only). ridlc does not support '-f'
 when this option is specified.
 .TP
 .BR \-\-odesc_url=<url> " "
-To specify the url where to find the object desription file for the JS client.
+Specify the url where to find the object desription file for the JS client.
 The url must not include the name of the object description file. And it is a
 mandatory option for JS skelton generator. 
 .TP
 .BR \-\-auth " "
-To generate the JS client with OAuth2 authorization. This option works with
+Generate the JS client with OAuth2 authorization. This option works with
  '-J' option only.
 .TP
 .BR \-f " "
-To generate the 'skelton files with 'rpcfs' support. C++ or Python at present.
+Generate the 'skelton files with 'rpcfs' support. C++ or Python at present.
 .TP
 .BR \-P " "\fIprefix\fR
-To specify the prefix of the Java package. This option is only effective for Java.
+Specify the prefix of the Java package. This option is only effective for Java.
 .TP
 .BR \-l " "
-To build a shared library instead of a program. This option works for programms
+Build a shared library instead of a program. This option works for programms
 of C++ skelton
 .TP
 .BR \-L " "\fIlang\fR
-To output the 'README.md' file in the specified language <lang>. Currently we support
+Output the 'README.md' file in the specified language <lang>. Currently we support
 two languages, "cn" as Chinese, and "en" as English.
 .TP
 .BR \-s " "
-To generate the skelton code for `RPC-Over-Stream`, a new architecture with 99%
+Generate the skelton code for `RPC-Over-Stream`, a new architecture with 99%
 of communication over stream channels.
 .TP
 .BR \-b " "
-To generate the skelton code with a built-in `rpcrouter`, which has lower
+Generate the skelton code with a built-in `rpcrouter`, which has lower
 latency and higher throughput than stand-alone rpcrouter.
 .TP
+.BR \-m " "\fI<app instance name>\fR
+Generate the skelton code with the monitoring support, for the registered application <app instance name>. 
+You can register an application with the monitor's utility 'addapp.sh'. Currently this option works only
+with '-s' option. Note: the <app instance name> is not the 'appname' as is used in the ridl file.
+.TP
 .BR \-\-server " "
-To generate skeleton code for server only.
+Generate skeleton code for server only.
 .TP
 .BR \-\-client " "
-To generate skeleton code for client only.
+Generate skeleton code for client only.
 .TP
 .BR \-\-services " "\fIservice_list\fR
-To generate skeleton code for the specified services. The services are separated with ',' and no white spaces.
+Generate skeleton code for the specified services. The services are separated with ',' and no white spaces.
 .TP
 .BR \-\-sync_mode " "\fI<interface_name> =<async|async_s|async_p|sync>\fR
-To override the synchronization mode defined in the ridl file with the specified one for the given interface. The <interface name> can be followed with a method name such as \fI<interface_name>.<method_name>\fR to further narrowing the overriding scope to a single method.
+Override the synchronization mode defined in the ridl file with the specified one for the given interface. The <interface name> can be followed with a method name such as \fI<interface_name>.<method_name>\fR to further narrowing the overriding scope to a single method.
+.TP
+.BR \-\-pkgname " "\fI<package name>\fR
+Specify a full qualified Java package name for current Java skeleton code. Otherwise, the default package name is used, which is in the format 'org.rpcf.<appname>'
 
 .SH SEE ALSO
 ridl(7), rpcrouter(1)

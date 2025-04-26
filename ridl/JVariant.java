@@ -7,7 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import org.rpcf.rpcbase.*;
 
-class JVariant extends JavaSerialBase.ISerializable
+public class JVariant extends JavaSerialBase.ISerializable
 {
     public int iType = rpcbase.typeNone;
     public Object val = null;

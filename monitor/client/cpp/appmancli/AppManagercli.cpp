@@ -10,6 +10,7 @@ using namespace rpcf;
 #include "AppManagercli.h"
 #include "monconst.h"
 #include "signal.h"
+#include <limits.h>
 
 #define PROP_TARGET_IF 0x1234
 #define PROP_APP_NAME 0x1235
@@ -530,11 +531,6 @@ gint32 ClaimApp( CRpcServices* pSvc,
             break;
         }
 
-        KeyValue okv;
-        okv.strKey = PID_FILE;
-        okv.oValue = ( guint32 )getpid();
-        veckv.push_back( okv );
-
         ret = pamc->ClaimAppInst(
             oParams.GetCfg(),
             strAppInst, veckv, rveckv );
@@ -908,3 +904,117 @@ gint32 CAsyncStdAMCallbacks::ScheduleReconnect(
     return ret;
 }
 
+gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
+    InterfPtr& pIf,
+    std::vector< KeyValue >& veckv )
+{
+    gint32 ret = 0;
+    do{
+        CFastRpcServerBase* pSvr = pIf;
+        if( pSvr == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        KeyValue okv;
+        okv.strKey = O_CONNECTIONS;
+        okv.oValue = ( guint32 )
+            pSvr->GetStmSkelCount();;
+        veckv.push_back( okv );
+
+        okv.strKey = O_VMSIZE_KB;
+        okv.oValue = GetVmSize();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OBJ_COUNT;
+        okv.oValue = CObjBase::GetActCount();
+        veckv.push_back( okv );
+
+        okv.strKey = O_PENDINGS;
+        ret = pIf->GetProperty(
+            propPendingTasks, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_RXBYTE;
+        ret = pIf->GetProperty(
+            propRxBytes, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_TXBYTE;
+        ret = pIf->GetProperty(
+            propTxBytes, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        ret = pIf->GetProperty(
+            propUptime, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_FAIL_COUNT;
+        ret = pIf->GetProperty(
+            propFailureCount, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_REQ_COUNT;
+        ret = pIf->GetProperty(
+            propMsgCount, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_RESP_COUNT;
+        ret = pIf->GetProperty(
+            propMsgRespCount, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_CPU_LOAD;
+        okv.oValue = GetCpuUsage();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OPEN_FILES;
+        guint32 dwCount = 0;
+        ret = GetOpenFileCount(
+            getpid(), dwCount );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.oValue = dwCount;
+            veckv.push_back( okv );
+        }
+
+        okv.strKey = O_PID;
+        okv.oValue = ( guint32 )getpid();
+        veckv.push_back( okv );
+
+        okv.strKey = S_MAX_QPS;
+        ret = pSvr->GetProperty(
+            propQps, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = S_MAX_STM_PER_SESS;
+        ret = pSvr->GetProperty(
+            propStmPerSess, okv.oValue );
+        if( SUCCEEDED( ret ) )
+            veckv.push_back( okv );
+
+        okv.strKey = O_WORKING_DIR;
+        char szPath[PATH_MAX];
+        if( getcwd( szPath, sizeof(szPath)) != nullptr)
+        {        
+            BufPtr pBuf( true );
+            ret = pBuf->Append( szPath,
+                strlen( szPath ) );
+            if( SUCCEEDED( ret ) )
+            {
+                okv.oValue = pBuf;
+                veckv.push_back( okv );
+            }
+        }
+        ret = 0;
+    }while( 0 );
+    return ret;
+}

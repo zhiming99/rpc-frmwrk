@@ -799,6 +799,73 @@ class CPythonServer :
         sipRes = pMgr->LogMessage(
             a0, *a1, a2, *a4, a3 );
     %End
+
+    PyObject* GetProperty( gint32 dwPropId );
+    %MethodCode
+    PyObject* pResp = PyList_New( 2 );
+    sipRes = pResp;
+    gint32 ret = 0;
+    do{
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
+
+        if( pImpl == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        Variant oVar;
+        ret = pImpl->GetProperty( a0, oVar );
+        if( ERROR( ret ) )
+            break;
+        PyObject* pPyProp = nullptr;
+        ret = pImpl->ConvertVarToPyObj( oVar, pPyProp );
+        if( ERROR( ret ) )
+            break;
+        PyObject* pParams = PyList_New( 2 );
+        PyList_SetItem( pParams, 0, pPyProp );
+        if( oVar.GetTypeId() == typeByteArr )
+        {
+            BufPtr* ppBuf =
+                new BufPtr( oVar.m_pBuf );
+            PyObject* pPyBufBak =
+                sipConvertFromNewType(
+                ppBuf,sipType_cpp_BufPtr, Py_None );
+            if( unlikely( pPyBufBak == nullptr ) )
+            {
+                ret = -ENOMEM;
+                delete ppBuf;
+                Py_DECREF( pParams );
+                break;
+            }
+            PyList_SetItem( pParams, 1, pPyBufBak );
+        }
+        PyList_SetItem( pResp, 1, pParams );
+    }while( 0 );
+    PyList_SetItem( pResp, 0, PyLong_FromLong( ret ) );
+    %End
+
+    gint32 SetProperty(
+        gint32 dwPropId, PyObject* pyProp );
+    %MethodCode
+    gint32 ret = 0;
+    do{
+        auto* pImpl = dynamic_cast
+            < CPythonServer* >( sipCpp );
+        if( pImpl == nullptr || a1 == nullptr ) 
+        {
+            ret = -EFAULT;
+            break;
+        }
+        Variant oVar;
+        ret = pImpl->ConvertPyObjToVar( a1, oVar );
+        if( ERROR( ret ) )
+            break;
+        ret = pImpl->SetProperty( a0, oVar );
+    }while( 0 );
+    sipRes = ret;
+    %End
 };
 
 gint32 ChainTasks(

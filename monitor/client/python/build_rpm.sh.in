@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Variables
+PACKAGE_NAME="python3-appmoncli"
+VERSION="@VERSION@"
+RELEASE="1"
+ARCHITECTURE="noarch"
+SUMMARY="A Python client for managing AppManager."
+LICENSE="GPL-3.0-or-later"
+MAINTAINER="@PACKAGE_BUGREPORT@"
+HOMEPAGE="@PACKAGE_URL@"
+WHEEL_FILE=$(ls dist/app*.whl)
+
+# Check if the wheel file exists
+if [ ! -f "$WHEEL_FILE" ]; then
+    echo "Error: Wheel file not found in the 'dist/' directory. Build the wheel first using 'python3 -m build'."
+    exit 1
+fi
+
+# Create the directory structure for the RPM package
+RPM_BUILD_DIR=$(mktemp -d)
+mkdir -p "$RPM_BUILD_DIR/BUILD"
+mkdir -p "$RPM_BUILD_DIR/RPMS"
+mkdir -p "$RPM_BUILD_DIR/SOURCES"
+mkdir -p "$RPM_BUILD_DIR/SPECS"
+mkdir -p "$RPM_BUILD_DIR/SRPMS"
+mkdir -p "$RPM_BUILD_DIR/BUILDROOT/usr/lib/rpcf"
+
+# Copy the wheel file to the SOURCES directory
+cp "$WHEEL_FILE" "$RPM_BUILD_DIR/SOURCES/"
+
+# Create the spec file
+cat <<EOF > "$RPM_BUILD_DIR/SPECS/$PACKAGE_NAME.spec"
+Name:           $PACKAGE_NAME
+Version:        $VERSION
+Release:        $RELEASE
+Summary:        $SUMMARY
+License:        $LICENSE
+URL:            $HOMEPAGE
+BuildArch:      $ARCHITECTURE
+Requires:       python3, python3-pip
+
+%description
+$SUMMARY
+
+%prep
+
+%build
+
+%install
+mkdir -p %{buildroot}/usr/lib/rpcf
+cp %{_sourcedir}/app*.whl %{buildroot}/usr/lib/rpcf
+
+%post
+pip3 install /usr/lib/rpcf/app*.whl
+
+%preun
+pip3 uninstall -y $PACKAGE_NAME
+
+%files
+/usr/lib/rpcf/app*.whl
+
+%changelog
+* $(date +"%a %b %d %Y") $MAINTAINER - $VERSION-$RELEASE
+- Initial RPM package
+EOF
+
+# Build the RPM package
+rpmbuild --define "_topdir $RPM_BUILD_DIR" -ba "$RPM_BUILD_DIR/SPECS/$PACKAGE_NAME.spec"
+
+# Copy the RPM package to the current directory
+cp "$RPM_BUILD_DIR/RPMS/$ARCHITECTURE/$PACKAGE_NAME-$VERSION-$RELEASE.$ARCHITECTURE.rpm" .
+
+# Clean up
+rm -rf "$RPM_BUILD_DIR"
+
+echo "RPM package built successfully: $PACKAGE_NAME-$VERSION-$RELEASE.$ARCHITECTURE.rpm"

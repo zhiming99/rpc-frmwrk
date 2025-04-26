@@ -2960,6 +2960,8 @@ class CRpcRouterManager : public CRpcRouter
     gint32 GetMaxConns(
         guint32& dwMaxConns ) const;
 
+    gint32 SetMaxConns( guint32 dwMaxConns );
+
     gint32 GetTcpBusPort(
         PortPtr& pPort ) const;
 

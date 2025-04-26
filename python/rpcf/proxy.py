@@ -348,13 +348,16 @@ class PyRpcContext :
         self.Start( self.oInitParams )
         return self
 
+    def __doexit__( self ):
+        self.Stop()
+        self.DestroyRpcCtx()
+
     def __exit__( self, type, val, traceback ) :
         if self.status < 0:
             print( os.getpid(), "__exit__():",
                 type, val, traceback,
                 self.status )
-        self.Stop()
-        self.DestroyRpcCtx()
+        self.__doexit__();
 
 class PyRpcServices :
     def GetError( self ) :
@@ -373,17 +376,17 @@ class PyRpcServices :
         if ret < 0 :
             self.SetError( ret )
             if isServer :
-                print( "Failed to start server %d(%d), state=%d" % 
+                OutputMsg( "Failed to start server %d(%d), state=%d" % 
                     ( os.getpid(), ret, self.oInst.GetState() ) )
             else :
-                print( "Failed to start proxy %d(%d), state=%d" %
+                OutputMsg( "Failed to start proxy %d(%d), state=%d" %
                     ( os.getpid(), ret, self.oInst.GetState() ) )
             return ret
         else :
             if isServer :
-                print( "Server started..." )
+                OutputMsg( "Server started..." )
             else :
-                print( "Proxy started..." )
+                OutputMsg( "Proxy started..." )
 
         oCheck = self.oInst.GetPyHost()
         return ret
@@ -397,11 +400,14 @@ class PyRpcServices :
         self.Start()
         return self
 
-    def __exit__( self, type, val, traceback ) :
+    def __doexit__( self ):
         self.Stop()
         self.oInst = None
         self.oObj = None
         self.pIoMgr = None
+
+    def __exit__( self, type, val, traceback ) :
+        self.__doexit__()
 
     def TimerCallback( self, callback, context )->None :
         sig =signature( callback )
@@ -513,7 +519,7 @@ class PyRpcServices :
     def GetObjType( self, pObj ) :
         return GetObjType( pObj )
 
-    def GetNumpyValue( typeid, val ) :
+    def GetNumpyValue( self, typeid, val ) :
         return GetNpValue( typeid, val )
 
     ''' establish a stream channel and
@@ -955,7 +961,7 @@ class PyRpcServices :
         is down either server or client.
         override this method for better stop control.
         '''
-        print( "service is stopped" )
+        OutputMsg( "service is stopped" )
 
 class PyRpcProxy( PyRpcServices ) :
 
@@ -1256,6 +1262,12 @@ class PyRpcServer( PyRpcServices ) :
 
     def IsServer( self ) :
         return True
+
+    def GetProperty( self, propid : int )->Tuple[int,list]:
+        return self.oInst.GetProperty( propid )
+
+    def SetProperty( self, propid : int, val : object )->int:
+        return self.oInst.SetProperty( propid, val )
 
     def LogMessage( self, dwLogLevel : int,
         ret : int, strMsg : str ) :

@@ -6863,12 +6863,14 @@ gint32 CTokenBucketTask::AllocToken(
 
     if( qwNumReq > m_qwTokens )
     {
+        m_qwTotalAlloced += m_qwTokens;
         qwNumReq = m_qwTokens;
         m_qwTokens = 0;
     }
     else
     {
         m_qwTokens -= qwNumReq;
+        m_qwTotalAlloced += qwNumReq;
     }
     if( !m_bTimerEnabled )
         EnableTimerWatch();

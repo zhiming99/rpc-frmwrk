@@ -39,6 +39,8 @@ extern stdstr g_strLang;
 extern guint32 g_dwFlags;
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
+extern std::vector<stdstr> g_vecMonApps;
+extern bool g_bMonitoring;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -8312,6 +8314,19 @@ gint32 CImplMainFunc::EmitNormalMainContent(
             CCOUT << "if( ERROR( ret ) )";
             NEW_LINE;
             CCOUT << "    break;";
+            if( g_bMonitoring &&
+                g_bRpcOverStm && !bProxy )
+            {
+                NEW_LINE;
+                Wa( "PACBS pacbsIn;" );
+                Wa( "InterfPtr pAppMan;" );
+                Wa( "ret = StartStdAppManCli(" );
+                CCOUT << "    pSvc, \"" << g_vecMonApps[ 0 ] << "\", pAppMan, pacbsIn );";
+                NEW_LINE;
+                Wa( "if( ERROR( ret ) )" );
+                CCOUT << "    break;";
+            }
+
             if( bProxy )
             {
                 NEW_LINE;
@@ -8358,6 +8373,11 @@ gint32 CImplMainFunc::EmitNormalMainContent(
         CallUserMainFunc( vecSvcs );
         INDENT_DOWNL;
 
+        if( g_bMonitoring &&
+            g_bRpcOverStm && !bProxy )
+        {
+            Wa( "StopStdAppManCli();" );
+        }
         if( vecSvcs.size() == 1 )
         {
             Wa( "// Stopping the object" );
@@ -8523,6 +8543,11 @@ gint32 CImplMainFunc::Output()
             else if( g_bBuiltinRt )
             {
                 Wa( "#include \"dbusport.h\"" );
+            }
+            if( g_bMonitoring &&
+                g_bRpcOverStm && !bProxy )
+            {
+                Wa( "#include \"appmancli/AppManagercli.h\"" );
             }
             for( auto elem : vecSvcs )
             {
@@ -8843,9 +8868,13 @@ gint32 CExportMakefile::Output()
         {
             strCmdLine +="s:XXXRTFILES:-lrtfiles -lrpc -rdynamic:; ";
         }
+        else if( g_bMonitoring )
+        {
+            strCmdLine +="s:XXXRTFILES:-lappmancli:;";
+        }
         else
         {
-            strCmdLine +="s:XXXRTFILES::; ";
+            strCmdLine +="s:XXXRTFILES::;";
         }
 
         if( g_bMklib )

@@ -1604,6 +1604,15 @@ class CJavaInterfBase : public T
 
         return ret;
     }
+
+    jobject TryFindDescFile(
+        JNIEnv* jenv,
+        const std::string& strFileName )
+    {
+        ObjPtr pMgr( this->GetIoMgr() );
+        return ::TryFindDescFile( jenv,
+            &pMgr, strFileName );
+    }
 };
 
 class CJavaProxy :
@@ -2408,6 +2417,34 @@ class CJavaInterfBase
             ( HANDLE )hChannel, nullptr );
     }
 
+    jobject GetProperty(
+        JNIEnv *jenv, jint dwPropId )
+    {
+        gint32 ret = 0;
+        jobject jret = NewJRet( jenv );
+        do{
+            Variant oVar;
+            ret = $self->GetProperty(
+                dwPropId, oVar );
+            if( ERROR( ret ) )
+                break;
+            CParamList oResp;
+            oResp.Push( oVar );
+            ret = $self->FillList( jenv,
+                ( IConfigDb* )oResp.GetCfg(),
+                jret );
+        }while( 0 );
+        SetErrorJRet( jenv, jret, ret );
+        return jret;
+    }
+
+    gint32 SetProperty( JNIEnv* jenv,
+        jint dwPropId, Variant& oVar )
+    {
+        return $self->SetProperty(
+            dwPropId, oVar );
+    }
+
     }
 
     jobject AddTimer(
@@ -2436,6 +2473,9 @@ class CJavaInterfBase
     jobject GetChanCtx(
         JNIEnv *jenv, jlong hChannel );
 
+    jobject TryFindDescFile(
+        JNIEnv* jenv,
+        const std::string& strFileName );
 };
 
 %template(CJavaInterfBaseP) CJavaInterfBase<CJavaProxyBase>;

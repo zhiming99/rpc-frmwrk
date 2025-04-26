@@ -436,6 +436,12 @@ AC_CONFIG_FILES([Makefile
                  monitor/appmon/Makefile
                  monitor/client/Makefile
                  monitor/client/cpp/appmancli/Makefile
+                 monitor/client/python/build_deb.sh
+                 monitor/client/python/build_rpm.sh
+                 monitor/client/python/appmancli/pyproject.toml
+                 monitor/client/python/Makefile
+                 monitor/client/python/appmancli/Makefile
+                 monitor/client/java/appmancli/Makefile
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])
@@ -559,8 +565,10 @@ esac
 case $enable_java in
     yes)
         JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, swig, apache-commons-cli, " 
-        JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/rpcbase.jar"
+        JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/*.jar"
         JAVA_RPMPKGS="java-1.8.0-openjdk-headless apache-commons-cli " 
+        JAVA_RPMPOST="pushd %{_libdir}/rpcf;if [[[ -f rpcbase-${VERSION}.jar ]]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION}.jar rpcbase.jar;fi;if [[[ -f appmancli-${VERSION}.jar ]]];then rm -f appmancli.jar; ln -s appmancli-${VERSION}.jar appmancli.jar;fi;popd;"
+        JAVA_RPMPOSTUN="pushd %{_libdir}/rpcf;rm -f rpcbase.jar appmancli.jar;popd;"
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
         JAVA_DEBPKGS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
@@ -571,6 +579,8 @@ case $enable_java in
         JAVA_RPMLIBS=
         JAVA_RPMFILES=
         JAVA_RPMPKGS=
+        JAVA_RPMPOST=
+        JAVA_RPMPOSTUN=
         JAVA_DEBLIBS=
         JAVA_DEBFILES=
         JAVA_DEBPKGS=
@@ -581,12 +591,12 @@ esac
 
 case $enable_python in
     yes)
-        PYTHON_RPMLIBS="python3-devel, python3-pip, python3-numpy, ( sip5 or sip6 )," 
+        PYTHON_RPMLIBS="python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 )," 
         PYTHON_RPMPKGS="python3-pip python3-numpy (sip5 or sip6) " 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
-        PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-pip, sip5-tools | sip-tools | sip-dev,"
+        PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,"
         PYTHON_DEBPKGS="python3-numpy, python3-pip, sip5-tools | sip-tools, " 
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=
@@ -633,9 +643,9 @@ case $enable_js in
         JS_RPMLIBS="npm," 
         JS_RPMFILES="%{_sysconfdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.json"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
-        JS_RPMPOST="npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
+        JS_RPMPOST="echo npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
-        JS_RPMPOSTUN="npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
+        JS_RPMPOSTUN="echo npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         JS_DEBLIBS="npm,"
         JS_DEBDEVFILES="etc/rpcf/oa2check.ridlZZZZZetc/rpcf/jslib/*"
         JS_DEBFILES="etc/rpcf/oa2checkdesc.json"
@@ -696,6 +706,8 @@ AC_SUBST(JAVA_DEBLIBS)
 AC_SUBST(JAVA_DEBFILES)
 AC_SUBST(JAVA_DEBPKGS)
 AC_SUBST(JAVA_CFGOPT)
+AC_SUBST(JAVA_RPMPOST)
+AC_SUBST(JAVA_RPMPOSTUN)
 
 AC_SUBST(PYTHON_RPMLIBS)
 AC_SUBST(PYTHON_RPMPKGS)

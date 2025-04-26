@@ -801,6 +801,25 @@ gint32 CRpcTcpBusPort::GetProperty(
     CStdRMutex oPortLock( GetLock() );
     switch( iProp )
     {
+    case propRxBytes:
+        {
+            oBuf = ( guint64 )m_qwRxBytes;
+            break;
+        }
+    case propTxBytes:
+        {
+            oBuf = ( guint64 )m_qwTxBytes;
+            break;
+        }
+    case propSendBps:
+    case propRecvBps:
+        {
+            // temporarily using the first sock
+            auto s = m_vecListenSocks.front();
+            oPortLock.Unlock();
+            ret = s->GetProperty( iProp, oBuf );
+            break;
+        }
     case propSrcDBusName:
     case propSrcUniqName:
         {
@@ -835,6 +854,25 @@ gint32 CRpcTcpBusPort::SetProperty(
     CStdRMutex oPortLock( GetLock() );
     switch( iProp )
     {
+    case propRxBytes:
+    case propTxBytes:
+        break;
+    case propSendBps:
+    case propRecvBps:
+        {
+            // temporarily using the first sock
+            std::vector< SockPtr > vecSocks =
+                m_vecListenSocks;
+            std::vector< PortPtr > vecPorts;
+            ret = EnumPdoPorts( vecPorts );
+            oPortLock.Unlock();
+            Variant oVar;
+            for( auto& s : vecSocks )
+                s->SetProperty( iProp, oBuf );
+            for( auto& p : vecPorts )
+                p->SetProperty( iProp, oBuf );
+            break;
+        }
     case propSrcDBusName:
     case propSrcUniqName:
         {
@@ -1319,6 +1357,7 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
             }
 
             oCfg.SetObjPtr( propConnParams, ObjPtr( pParams ) );
+            break;
         }
 
     }while( 0 );

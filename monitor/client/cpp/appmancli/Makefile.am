@@ -9,7 +9,8 @@ libappmancli_la_CPPFLAGS= -I. -I$(mon_dir)/appmon -I$(mon_dir)/registry -I$(top_
 
 EXTRA_DIST=
 
-#libappmancli_ladir=$(includedir)/rpcf/moncli
+appmancliincdir=$(includedir)/rpcf/appmancli
+appmancliinc_HEADERS=SimpleAuthcli.h AppManagercli.h IUserManagercli.h IDataProducercli.h IAppStorecli.h
 
 libappmancli_la_LIBADD= $(mon_dir)/registry/libregfs.la $(top_srcdir)/ipc/libipc.la $(top_srcdir)/combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L$(top_srcdir)/3rd_party
 libappmancli_la_LDFLAGS= -rdynamic -version-info @VERSION2@

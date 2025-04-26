@@ -77,7 +77,7 @@ function check_user_mount()
 # mt is the mount type
 # base is the base directory of the rpcf config directory
 # rootdir is the mount point of the usereg.dat
-    mp=`mount | grep regfsmnt`
+    mp=`mount | grep '^regfsmnt' | awk '{print $3}'`
     if [ "x$mp" == "x" ];then
         appmp=`mount | grep appmonsvr`
     fi
@@ -93,38 +93,38 @@ function check_user_mount()
     if [ ! -f $base/usereg.dat ]; then
         echo "Error, did not find the user registry file."
         echo "you may want to use 'inituser.sh' to initialize one first"
-        exit 1
+        return 1
     fi
-    if (( $mt == 2 ));then
-        rootdir="$base/mprpcfaddu"
-        if [ ! -d $rootdir ]; then
-            mkdir -p $rootdir
-        fi
-        if ! regfsmnt -d $base/usereg.dat $rootdir; then
-            echo "Error, failed to mount usereg.dat"
-            exit 1
-        fi
-
-        while ! mountpoint $rootdir > /dev/null ; do
-            sleep 1
-        done
-        echo mounted usereg.dat...
-    elif (( $mt == 1 ));then
+    if (( $mt == 1 ));then
         rootdir=`echo $appmp | awk '{print $3}'`
-        echo find mount at $rootdir...
-        if [ ! -d "$rootdir/usereg/users" ]; then
-            echo "Error cannot find the mount point of user registry"
-            exit 1
+        if [ -d "$rootdir/usereg/users" ]; then
+            rootdir="$rootdir/usereg"
+            #echo find mount at $rootdir...
+            return 0
         fi
-        rootdir="$rootdir/usereg"
     elif (( $mt == 0 ));then
-        rootdir=`echo $mp | awk '{print $3}'`
-        echo find mount at $rootdir...
-        if [ ! -d "$rootdir/users" ]; then
-            echo "Error cannot find the mount point of user registry"
-            exit 1
-        fi
+        mp+=" invalidpath"
+        for rootdir in $mp; do
+            if [ -d "$rootdir/users" ]; then
+                #echo find mount at $rootdir...
+                return 0
+            fi
+        done
     fi
+    mt=2
+    rootdir="$base/mprpcfaddu"
+    if [ ! -d $rootdir ]; then
+        mkdir -p $rootdir
+    fi
+    if ! regfsmnt -d $base/usereg.dat $rootdir; then
+        echo "Error, failed to mount usereg.dat"
+        return 1
+    fi
+
+    while ! mountpoint $rootdir > /dev/null ; do
+        sleep 1
+    done
+    echo mounted usereg.dat...
 }
 
 function join_group()
@@ -557,8 +557,14 @@ function show_user()
     _uname=$1
     _udir=./users/$_uname
     if [ ! -d $_udir ]; then
-        echo Error user $_uname does not exist
-        return 1
+        _uid=$1
+        if [ ! -f ./uids/$_uid ]; then
+            echo Error user $_uname does not exist
+            return 1
+        else
+            _uname=`python3 $updattr -v ./uids/$_uid`
+            _udir=./users/$_uname
+        fi
     fi
     echo user name: $_uname
     echo uid: `python3 $updattr -v $_udir/uid`
@@ -638,8 +644,14 @@ function show_group()
     _gdir=./groups/$_group
 
     if [ ! -d $_gdir ]; then
-        echo Error group "$_group" does not exist
-        return 1
+        _gid=$1
+        if [ ! -f ./gids/$_gid ]; then
+            echo Error group $_group does not exist
+            return 1
+        else
+            _group=`python3 $updattr -v ./gids/$_gid`
+            _gdir=./groups/$_group
+        fi
     fi
     _gidval=`python3 $updattr -v $_gdir/gid`
     echo group name: $_group

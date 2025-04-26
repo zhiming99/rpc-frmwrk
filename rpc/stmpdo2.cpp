@@ -899,7 +899,7 @@ gint32 CTcpStreamPdo2::OnReceive(
 
     gint32 ret = 0;
     bool bFirst = true;
-    // DebugPrint( 0, "probe: recv tcp msg" );
+    auto pBus = ( CRpcTcpBusPort* )GetBusPort();
     do{
         STREAM_SOCK_EVENT sse;
         guint32 dwBytes = 0;
@@ -956,13 +956,14 @@ gint32 CTcpStreamPdo2::OnReceive(
         }
         else if( ret != ( gint32 )dwBytes )
         {
-            DebugPrint( 0, "Surprise!!!, the #bytes"
-            "received is not as expected" );
+            DebugPrint( 0, "Surprise!!!, the #bytes "
+            "received(%d) is less than expected(%d)",
+                ret, dwBytes );
+            pInBuf->Resize( ret );
         }
-        else
-        {
-            ret = 0;
-        }
+
+        pBus->IncRxBytes( ret );
+        ret = 0;
 
         sse.m_pInBuf = pInBuf;
         sse.m_iEvent = sseRetWithBuf;
@@ -1201,6 +1202,8 @@ gint32 CBytesSender::SendImmediate(
             ret = -EFAULT;
             break;
         }
+        auto pBus = ( CRpcTcpBusPort* )
+            pPort->GetBusPort();
         CStdRMutex oPortLock( pPort->GetLock() );
         // necessary when called from StartSend3
         if( PORT_INVALID( pPort ) )
@@ -1347,11 +1350,12 @@ gint32 CBytesSender::SendImmediate(
                 break;
             }
 
+            pBus->IncTxBytes( ret );
             if( pWriteTb != nullptr )
             {
-                guint64 qwSize = dwSize;
+                guint64 qwSize = ( guint64 )ret;
                 pWriteTb->AllocToken( qwSize );
-                dwSize = qwSize;
+                // dwSize = qwSize;
             }
 
             guint32 dwMaxSize = pBuf->size();
@@ -1568,6 +1572,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         if( !bEnabled )
             break;
 
+        CCfgOpener oConn( pCfg );
         CParamList oParams;
         oParams[ propIoMgr ] =
             ObjPtr( GetIoMgr() );
@@ -1582,7 +1587,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         }
 
         oParams[ propLoopPtr ] = ObjPtr( m_pLoop );
-        ret = oParams.GetProperty(
+        ret = oConn.GetProperty(
             propSendBps, oVar );
         if( ERROR( ret ) )
             oVar = ( guint64 )-1;
@@ -1594,7 +1599,7 @@ gint32 CTcpStreamPdo2::StartTokenTasks()
         if( ERROR( ret ) )
             break;
 
-        ret = oParams.GetProperty(
+        ret = oConn.GetProperty(
             propRecvBps, oVar );
         if( ERROR( ret ) )
             oVar = ( guint64 )-1;

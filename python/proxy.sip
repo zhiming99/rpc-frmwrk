@@ -86,6 +86,7 @@ class CPythonInterfBase : public T
         gint32 ret = 0;
         if( pBuf.IsEmpty() || pBuf->empty() )
         {
+            Py_INCREF( Py_None );
             pObj = Py_None;
             return ret;
         }
@@ -170,6 +171,124 @@ class CPythonInterfBase : public T
                 }
             case typeByteArr:
                 {
+                    if( pBuf.IsEmpty() || pBuf->empty() )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    PyObject* pView = PyMemoryView_FromMemory(
+                        pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                    if( pView == nullptr )
+                    {
+                        ret = -EFAULT;
+                        break;
+                    }
+
+                    pObj = PyByteArray_FromObject( pView );
+                    Py_DECREF( pView );
+                    break;
+                }
+            case typeDMsg:
+                {
+                    ret = -ENOTSUP;
+                    break;
+                }
+            default:
+                {
+                    ret = -EINVAL;
+                    break;
+                }
+            }
+
+        }while( 0 );
+        return ret;
+    }
+
+    gint32 ConvertVarToPyObj(
+        Variant& oVar, PyObject*& pObj )
+    {
+        gint32 ret = 0;
+        EnumTypeId iType = oVar.GetTypeId();
+        if( iType == typeNone )
+        {
+            Py_INCREF( Py_None );
+            pObj = Py_None;
+            return ret;
+        }
+        do{
+            switch( iType )
+            {
+            case typeByte: 
+                {
+                    auto val = ( guint8& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeUInt16:
+                {
+                    auto val = ( guint16& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeUInt32:
+                {
+                    auto val = ( guint32& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeUInt64:
+                {
+                    auto val = ( guint64& )oVar;
+                    PyObject* pTemp =
+                        PyLong_FromLongLong( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeFloat:
+                {
+                    auto val = ( float& )oVar;
+                    PyObject* pTemp =
+                        PyFloat_FromDouble( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeDouble:
+                {
+                    auto val = ( double& )oVar;
+                    PyObject* pTemp =
+                        PyFloat_FromDouble( val );
+                    ret = GetNumpyValue(
+                        iType, pTemp, pObj );
+                    break;
+                }
+            case typeString:
+                {
+                    auto val = ( stdstr& )oVar;
+                    pObj =
+                        PyUnicode_FromString( val.c_str() );
+                    break;
+                }
+            case typeObj:
+                {
+                    auto val = &( ObjPtr& )oVar;
+                    pObj = sipConvertFromNewType(
+                        val,sipType_cpp_ObjPtr, SIP_NULLPTR );
+                    break;
+                }
+            case typeByteArr:
+                {
+                    auto pBuf = ( BufPtr& )oVar;
                     if( pBuf.IsEmpty() || pBuf->empty() )
                     {
                         ret = -EINVAL;
@@ -323,8 +442,7 @@ class CPythonInterfBase : public T
                  break;
 
             Py_INCREF( pCb );
-            if( pCtx != nullptr &&
-                pCtx != Py_None )
+            if( pCtx != nullptr )
                 Py_INCREF( pCtx );
 
             pTimer = pTask;
@@ -1101,6 +1219,7 @@ class CPythonInterfBase : public T
                 if( SUCCEEDED( iRet ) )
                     PyList_SetItem( pPyResp,
                         0, PyLong_FromLong( ret ) );
+                Py_INCREF( Py_None );
                 PyList_SetItem( pPyResp, 1, Py_None );
             }
 
@@ -1255,7 +1374,10 @@ class CPythonInterfBase : public T
 
             ret = oReqCtx.GetIntPtr( 4, ptrVal );
             if( ERROR( ret ) )
+            {
+                Py_INCREF( Py_None );
                 pContext = Py_None;
+            }
             else
                 pContext = ( PyObject* )ptrVal;
 
@@ -1348,12 +1470,13 @@ class CPythonInterfBase : public T
  
     PyObject* GetChanCtx( HANDLE hChannel )
     {
-        PyObject* sipRes = Py_None;
+        PyObject* sipRes = nullptr;
+        gint32 ret = 0;
         do{
             if( hChannel == INVALID_HANDLE )
                 break;
             CfgPtr pCtx;
-            gint32 ret = this->GetContext(
+            ret = this->GetContext(
                 hChannel, pCtx );
             if( ERROR( ret ) )
                 break;
@@ -1366,7 +1489,11 @@ class CPythonInterfBase : public T
             Py_INCREF( sipRes );
 
         }while( 0 );
-
+        if( ERROR( ret ) )
+        {
+            Py_INCREF( Py_None );
+            sipRes = Py_None;
+        }
         return sipRes;
     }
 
@@ -1397,15 +1524,13 @@ class CPythonInterfBase : public T
                 PyObject* pOld = ( PyObject* )ptr;
                 if( pOld == pCtx )
                     break;
-                if( pOld != nullptr &&
-                    pOld != Py_None )
+                if( pOld != nullptr )
                     Py_DECREF( pOld );
                 oCfg.RemoveProperty( propChanCtx );
             }
             ret = 0;
 
-            if( pCtx == nullptr ||
-                pCtx == Py_None )
+            if( pCtx == nullptr )
                 break;
 
             oCfg.SetIntPtr(
@@ -1584,12 +1709,10 @@ class CPythonInterfBase : public T
                 Py_DECREF( pPyRet );
 
         }while( 0 );
-        if( pPyCb != nullptr &&
-            pPyCb != Py_None )
+        if( pPyCb != nullptr )
             Py_DECREF( pPyCb );
 
-        if( pPyArgs != nullptr &&
-            pPyArgs != Py_None )
+        if( pPyArgs != nullptr )
             Py_DECREF( pPyArgs );
 
         PyGILState_Release( gstate );

@@ -1279,6 +1279,7 @@ struct CTokenBucketTask :
     MloopPtr    m_pLoop;
     guint32     m_dwIntervalMs = 0;
     bool        m_bTimerEnabled = false;
+    guint64     m_qwTotalAlloced = 0;
 
     public:
     typedef CIfParallelTask super;
@@ -1313,6 +1314,9 @@ struct CTokenBucketTask :
     gint32 DisableTimerWatch();
     gint32 SetMaxTokens(
         guint64 qwMaxTokens );
+
+    inline guint64 GetTokensAlloced() const
+    { return m_qwTotalAlloced; }
 };
 
 }

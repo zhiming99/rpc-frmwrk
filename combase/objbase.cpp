@@ -41,6 +41,9 @@
 #include <array>
 #include "sha1.h"
 
+#include <fstream>
+#include <sstream>
+#include <dirent.h>
 
 #define MAX_DUMP_SIZE 512
 
@@ -786,8 +789,11 @@ std::unordered_set< CObjBase*, hash_obj > g_vecObjs;
 void DumpObjs( bool bAll = false)
 {
     std::set< CObjBase*, cmp_obj > setObjs;
-    for( auto pObj : g_vecObjs ) 
-        setObjs.insert( pObj );
+    {
+        CStdMutex oLock( g_oObjListLock );
+        for( auto pObj : g_vecObjs ) 
+            setObjs.insert( pObj );
+    }
     for( auto pObj : setObjs )
     {
         std::string strObj;
@@ -844,6 +850,12 @@ CObjBase::CObjBase()
     m_qwObjId = NewObjId();
     ++m_atmObjCount;
     m_dwMagic = *( guint32* )"ObjB";
+#ifdef DEBUG
+    {
+        CStdMutex oLock( g_oObjListLock );
+        g_vecObjs.insert( this );
+    }
+#endif
 }
 
 // copy constructor
@@ -856,6 +868,10 @@ CObjBase::CObjBase( const CObjBase& rhs )
 CObjBase::~CObjBase()
 {
     --m_atmObjCount;
+#ifdef DEBUG
+    CStdMutex oLock( g_oObjListLock );
+    g_vecObjs.erase( this );
+#endif
 }
 
 gint32 CObjBase::SetClassId(
@@ -867,17 +883,7 @@ gint32 CObjBase::SetClassId(
 
 gint32 CObjBase::AddRef()
 {
-#ifdef DEBUG
-    gint32 ret = ++m_atmRefCount;  
-    if( ret == 1 )
-    {
-        CStdMutex oLock( g_oObjListLock );
-        g_vecObjs.insert( this );
-    }
-    return ret;
-#else
     return ++m_atmRefCount;
-#endif
 }
 
 gint32 CObjBase::DecRef()
@@ -889,15 +895,7 @@ gint32 CObjBase::Release()
 {
     gint32 iRef = --m_atmRefCount;
     if( iRef == 0 )
-    {
-#ifdef DEBUG
-        {
-            CStdMutex oLock( g_oObjListLock );
-            g_vecObjs.erase( this );
-        }
-#endif
         delete this;
-    }
 #ifdef DEBUG
     else if( unlikely( iRef < 0 ) )
     {
@@ -1248,6 +1246,134 @@ stdstr GetHomeDir()
 {
     struct passwd* pwd = getpwuid( getuid() );
     return stdstr( pwd->pw_dir );
+}
+
+
+guint64 GetVmSize()
+{
+    std::ifstream oFile("/proc/self/status");
+    stdstr strLine;
+    guint64 qwVmSizeKb = 0;
+
+    while( std::getline( oFile, strLine ) )
+    {
+        if (strLine.substr(0, 7) == "VmSize:")
+        {
+            std::istringstream iss(strLine.substr(7));
+            iss >> qwVmSizeKb;
+            break;
+        }
+    }
+    return qwVmSizeKb;
+}
+
+struct CPUData {
+    guint64 user = 0;
+    guint64 nice = 0;
+    guint64 system = 0;
+    guint64 idle = 0;
+    guint64 iowait = 0;
+    guint64 irq = 0;
+    guint64 softirq = 0;
+    guint64 steal = 0;
+    guint64 guest = 0;
+    guint64 guest_nice = 0;
+};
+
+static CPUData GetCPUData() {
+    std::ifstream file("/proc/stat");
+    std::string line;
+    std::getline(file, line);
+    std::istringstream iss(line);
+    std::string cpu;
+    CPUData data;
+    iss >> cpu >> data.user >>
+        data.nice >> data.system >>
+        data.idle >> data.iowait >>
+        data.irq >> data.softirq >>
+        data.steal >> data.guest >>
+        data.guest_nice;
+    return data;
+}
+
+static CPUData GetProcessCPUData(int pid) {
+    std::ifstream file(
+        "/proc/" + std::to_string(pid) + "/stat");
+    std::string line;
+    std::getline(file, line);
+    std::istringstream iss(line);
+    CPUData data;
+    std::string temp;
+    for (int i = 1; i <= 13; ++i) {
+        iss >> temp;
+    }
+    iss >> data.user >> data.system;
+    return data;
+}
+
+static float CalculateCpuUsage(
+    CPUData prev_cpu, CPUData current_cpu,
+    CPUData prev_process,
+    CPUData current_process)
+{
+    guint64 total_diff =
+        (current_cpu.user - prev_cpu.user) +
+        (current_cpu.nice - prev_cpu.nice) +
+        (current_cpu.system - prev_cpu.system) +
+        (current_cpu.idle - prev_cpu.idle) +
+        (current_cpu.iowait - prev_cpu.iowait) +
+        (current_cpu.irq - prev_cpu.irq) +
+        (current_cpu.softirq - prev_cpu.softirq) +
+        (current_cpu.steal - prev_cpu.steal) +
+        (current_cpu.guest - prev_cpu.guest) +
+        (current_cpu.guest_nice - prev_cpu.guest_nice);
+
+    guint64 process_diff =
+        (current_process.user - prev_process.user) +
+        (current_process.system - prev_process.system);
+
+    if (total_diff == 0)
+        return 0.0f;
+
+    return (float)process_diff * 100.0f / (float)total_diff;
+}
+
+float GetCpuUsage()
+{
+    static CPUData oPrevData;
+    static CPUData oPrevProcData;
+    CPUData oCurData = GetCPUData();
+    CPUData oCurProcData =
+        GetProcessCPUData( getpid() );
+    float ret = CalculateCpuUsage(
+        oPrevData, oCurData,
+        oPrevProcData, oCurProcData);
+    oPrevData = oCurData;
+    oPrevProcData = oCurProcData;
+    return ret;
+}
+
+gint32 GetOpenFileCount(
+    gint32 pid, guint32& dwCount )
+{
+    std::stringstream oPath;
+    oPath << "/proc/" << pid << "/fd";
+    std::string strPath = oPath.str();
+
+    DIR *dir = opendir( strPath.c_str() );
+    if (!dir)
+        return -errno;
+
+    dwCount = 0;
+    struct dirent *entry;
+    while( ( entry = readdir(dir) ) != nullptr )
+    {
+        if (entry->d_type == DT_REG ||
+            entry->d_type == DT_LNK)
+            dwCount++;
+    }
+    closedir( dir );
+    return 0;
 }
 
 }

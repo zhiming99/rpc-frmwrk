@@ -31,16 +31,16 @@ disableu=0
 while getopts $OPTIONS opt; do
     case "$opt" in
     k)
-        krb5user=$2
+        krb5user=${OPTARG}
         ;;
     o)
-        oa2user=$2
+        oa2user=${OPTARG}
         ;;
     p)
         askPass=1
         ;;
     g)
-        group=$2
+        group=${OPTARG}
         ;;
     i)  inverse=1
         ;;
@@ -60,7 +60,7 @@ done
                                                                                                   
 shift $((OPTIND-1))
 
-if [  "x$@" == "x" ]; then
+if [[  "x$@" == "x" ]]; then
    echo "Error user name is not specified"
    Usage
    exit 1

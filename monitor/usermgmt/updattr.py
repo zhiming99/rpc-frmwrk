@@ -4,7 +4,7 @@ import fcntl
 import argparse
 
 def setJsonXattr(filePath, attrName, data):
-    with open(filePath, 'w') as file:
+    with open(filePath, 'r+') as file:
         fcntl.flock(file, fcntl.LOCK_EX)
         os.setxattr(filePath, attrName, data.encode('utf-8'))
         fcntl.flock(file, fcntl.LOCK_UN)
@@ -14,7 +14,10 @@ def listXattrs(filePath, valOnly=False):
     if len( attrs ) == 0:
         print("None")
     for attr in attrs:
-        jsonData = os.getxattr(filePath, attr).decode('utf-8')
+        try:
+            jsonData = os.getxattr(filePath, attr).decode('utf-8')
+        except Exception as err:
+            continue
         if not valOnly:
             print(f"{attr}: {jsonData}")
         else:

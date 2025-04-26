@@ -83,18 +83,34 @@ enum // EnumEventId
     eventRmtSvrOffline,
 };
 
-%javaconst(0)    propIfPtr;
-%javaconst(0)    propParamCount;
-%javaconst(0)    propIoMgr;
-%javaconst(0)    propPyObj;
-%javaconst(0)    propIfName;
-%javaconst(0)    propMethodName;
-%javaconst(0)    propSysMethod;
-%javaconst(0)    propSeriProto;
-%javaconst(0)    propNoReply;
-%javaconst(0)    propTimeoutSec;
-%javaconst(0)    propKeepAliveSec;
-%javaconst(0)    propConfigPath;
+%javaconst(0)       propIfPtr;
+%javaconst(0)       propParamCount;
+%javaconst(0)       propIoMgr;
+%javaconst(0)       propPyObj;
+%javaconst(0)       propIfName;
+%javaconst(0)       propMethodName;
+%javaconst(0)       propSysMethod;
+%javaconst(0)       propSeriProto;
+%javaconst(0)       propNoReply;
+%javaconst(0)       propTimeoutSec;
+%javaconst(0)       propKeepAliveSec;
+%javaconst(0)       propConfigPath;
+%javaconst(0)       propObjDescPath;
+%javaconst(0)       propDestIpAddr;
+%javaconst(0)       propDestTcpPort;
+%javaconst(0)       propSrcIpAddr;
+%javaconst(0)       propSrcTcpPort;
+%javaconst(0)       propRxBytes;
+%javaconst(0)       propTxBytes;
+%javaconst(0)       propQps;
+%javaconst(0)       propMsgCount;
+%javaconst(0)       propMsgRespCount;
+%javaconst(0)       propFailureCount;
+%javaconst(0)       propStmPerSess;
+%javaconst(0)       propPendingTasks;
+%javaconst(0)       propUptime;
+%javaconst(0)       propConnections;
+%javaconst(0)       propObjCount;
 
 typedef int32_t EnumPropId;
 enum // EnumPropId
@@ -115,7 +131,18 @@ enum // EnumPropId
     propDestIpAddr,
     propDestTcpPort,
     propSrcIpAddr,
-    propSrcTcpPort
+    propSrcTcpPort,
+    propRxBytes,
+    propTxBytes,
+    propQps,
+    propMsgCount,
+    propMsgRespCount,
+    propFailureCount,
+    propStmPerSess,
+    propPendingTasks,
+    propUptime,
+    propConnections,
+    propObjCount,
 };
 
 typedef int32_t EnumIfState;
@@ -922,6 +949,34 @@ jobject GetJniString(JNIEnv *jenv, const stdstr& message )
         stringClass, ctor, bytes, charset);
 }
 
+jobject GetOpenFileCount( JNIEnv* jenv )
+{
+    if( jenv == nullptr )
+        return nullptr;
+
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    do{
+        guint32 dwCount;
+        gint32 ret = cpp::GetOpenFileCount(
+            getpid(), dwCount );
+
+        SetErrorJRet(
+            jenv, jret, ret );
+        if( ERROR( ret ) )
+            break;
+
+        jobject jcount =
+            NewInt( jenv, dwCount );
+
+        AddElemToJRet(
+            jenv, jret, jcount );
+    }while( 0 );
+    return jret; 
+}
+
+
 bool IsArray( JNIEnv *jenv, jobject pObj )
 {
     jclass Class_class = 
@@ -1004,6 +1059,41 @@ CfgPtr* CastToCfg( ObjPtr* pObj )
         new CfgPtr( cfgPtr, true );
 
     return pCfg;
+}
+
+jobject TryFindDescFile(
+    JNIEnv* jenv, ObjPtr* ppObj,
+    const std::string& strFileName )
+{
+    if( jenv == nullptr )
+        return nullptr;
+    jobject jret = NewJRet( jenv );
+    if( jret == nullptr )
+        return nullptr;
+    gint32 ret = 0;
+    do{
+        CIoManager* pMgr = *ppObj;
+        if( pMgr == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        stdstr strPath;
+        ret = pMgr->TryFindDescFile(
+            strFileName, strPath );
+        if( ERROR( ret ) )
+            break;
+        jstring jval =
+            jenv->NewStringUTF(strPath.c_str());
+        if( jval == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        AddElemToJRet( jenv, jret, jval );
+    }while( 0 );
+    SetErrorJRet( jenv, jret, ret );
+    return jret;
 }
 
 static void* g_pLibHandle = nullptr;
@@ -1473,6 +1563,10 @@ jobject UpdateDrvCfg(
     }while( 0 );
     return jret; 
 }
+
+int GetPid()
+{ return getpid(); }
+
 %}
 
 %typemap(in,numinputs=0) JNIEnv *jenv "$1 = jenv;"
@@ -3107,6 +3201,10 @@ ObjPtr* StartIoMgr( CfgPtr& pCfg );
 
 gint32 StopIoMgr( ObjPtr* pObj );
 
+jobject TryFindDescFile(
+    JNIEnv* jenv, ObjPtr* ppObj,
+    const std::string& strFileName );
+
 %newobject CastToSvc;
 IService* CastToSvc(
     JNIEnv *jenv, ObjPtr* pObj );
@@ -3498,5 +3596,12 @@ jobject UpdateDrvCfg(
     JNIEnv *jenv,
     const std::string& strDriver,
     CfgPtr& pCfg );
+
+int GetPid();
+
+jobject GetOpenFileCount( JNIEnv* jenv );
+
+guint64 GetVmSize();
+float GetCpuUsage();
 
 %include "proxy.i"

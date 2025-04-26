@@ -14,12 +14,18 @@ else
     enable_js="no"
 endif
 
+if ENABLE_JAVA
+    enable_java="yes"
+else
+    enable_java="no"
+endif
+
 debdir:
 	if [ ! -d $(DISTDIR)/debian/$(PACKAGE_NAME) ]; then \
 		mkdir -p $(DISTDIR)/debian/$(PACKAGE_NAME);\
     fi;
 	arch=$$(dpkg --print-architecture);\
-	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix) $(enable_python) $(enable_js); then \
+	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix) $(enable_python) $(enable_js) $(enable_java); then \
         echo error occurs && false; \
     else \
         cd $(DISTDIR);\
@@ -56,6 +62,8 @@ if ENABLE_JS
 	make -C ../monitor/oinit deb
 	cp ../monitor/oinit/output/python3-oinit*.deb .
 endif
+	make -C ../monitor/client/python deb
+	cp ../monitor/client/python/python3-appmoncli*.deb .
 
 rpm:
 	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree
@@ -66,3 +74,5 @@ if ENABLE_JS
 	make -C ../monitor/oinit rpm
 	cp ../monitor/oinit/output/python3-oinit*.rpm .
 endif
+	make -C ../monitor/client/python rpm
+	cp ../monitor/client/python/python3-appmoncli*.rpm .

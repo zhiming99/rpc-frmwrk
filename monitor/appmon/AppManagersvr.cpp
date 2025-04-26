@@ -216,6 +216,8 @@ gint32 GetInputToNotify(
             vecStms.push_back(
                 { hstm, ( stdstr& )oVar  } );
         }
+        if( vecStms.size() )
+            ret = 0;
     }while( 0 );
     return ret;
 }
@@ -433,7 +435,7 @@ gint32 CAppManager_SvrImpl::SetPointValue(
         const stdstr& strPoint = vecComps[ 1 ];
         RFHANDLE hPtDir;
 
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -513,7 +515,7 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
         }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -554,7 +556,7 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -618,7 +620,7 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -651,7 +653,7 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
-        if( !IsAppOwner( pContext, strApp ) )
+        if( !IsAppOnline( strApp ) )
         {
             ret = -EACCES;
             break;
@@ -665,32 +667,6 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
     return ret;
 }
 
-bool CAppManager_SvrImpl::IsAppOwner(
-    IConfigDb* pContext,
-    const stdstr& strAppName )
-{
-    gint32 ret = 0;
-    do{
-        HANDLE hstm, hOwner;
-        ret = GetCurStream( this, pContext, hstm );
-        if( ERROR( ret ) )
-            break;
-        ret = GetOwnerStream( this,
-            m_pAppRegfs, strAppName, hOwner );
-        if( ERROR( ret ) )
-            break;
-
-        if( hstm != hOwner )
-        {
-            ret = -EACCES;
-            break;
-        }
-    }while( 0 );
-    if( ERROR( ret ) )
-        return false;
-    return true;
-}
-
 /* Async Req Handler*/
 gint32 CAppManager_SvrImpl::SetPointValues( 
     IConfigDb* pContext, 
@@ -700,7 +676,7 @@ gint32 CAppManager_SvrImpl::SetPointValues(
     gint32 ret = 0;
     do{
         auto& pfs = m_pAppRegfs;
-        if( !IsAppOwner( pContext, strAppName ) )
+        if( !IsAppOnline( strAppName ) )
         {
             ret = -EACCES;
             break;
@@ -780,7 +756,7 @@ gint32 CAppManager_SvrImpl::GetPointValues(
     gint32 ret = 0;
     do{
         auto& pfs = m_pAppRegfs;
-        if( !IsAppOwner( pContext, strAppName ) )
+        if( !IsAppOnline( strAppName ) )
         {
             ret = -EACCES;
             break;
@@ -1006,6 +982,8 @@ gint32 CAppManager_SvrImpl::FreeAppInstsInternal(
             for( auto& elem : oSet )
                 vecValidApps.push_back( elem );
             oSet.clear();
+            if( vecValidApps.size() )
+                arrApps = vecValidApps;
         }
         if( oSet.empty() )
             m_mapAppOwners.erase( itr );
@@ -1113,7 +1091,21 @@ gint32 CAppManager_SvrImpl::RemoveStmSkel(
         std::vector< stdstr > vecApps;
         // an empty array will put all the owned
         // apps offline
-        FreeAppInstsInternal( hstm, vecApps );
+        ret = FreeAppInstsInternal(
+            hstm, vecApps );
+        if( SUCCEEDED( ret ) )
+        {
+            // unexpected disconnection, make a log
+            for( auto elem : vecApps )
+            {
+                LOGERR( GetIoMgr(), -ECONNABORTED, 
+                    "%s@%llx goes offline unexpected",
+                    elem.c_str(), hstm );
+                DebugPrint( -ECONNABORTED,
+                    "%s@%llx goes offline unexpected",
+                    elem.c_str(), hstm );
+            }
+        }
         ret = super::RemoveStmSkel( hstm );
     }while( 0 );
     return ret;

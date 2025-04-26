@@ -619,7 +619,12 @@ class CIoManager : public IService
     gint32 GetPortProp(
         HANDLE hPort,
         gint32 iProp,
-        BufPtr& pBuf );
+        Variant& oVar ) const;
+
+    gint32 SetPortProp(
+        HANDLE hPort,
+        gint32 iProp,
+        const Variant& oVar );
 
     gint32 RemoveTask(
         TaskletPtr& pTask );

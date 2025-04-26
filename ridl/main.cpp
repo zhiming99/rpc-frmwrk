@@ -31,6 +31,8 @@ using namespace rpcf;
 #include "astnode.h" 
 #include "ridlc.h"
 #include <set>
+#include <iostream>
+#include <sstream>
 
 extern CDeclMap g_mapDecls;
 extern ObjPtr g_pRootNode;
@@ -41,6 +43,9 @@ extern bool g_bAuth;
 extern std::string g_strWebPath;
 // service filter
 std::set< stdstr > g_setServices;
+extern std::vector<stdstr> g_vecMonApps;
+extern bool g_bMonitoring;
+extern std::string g_strPkgName;
 
 // interface async mode to overrid
 using SYNC_ELEM=std::pair< stdstr, guint32 >;
@@ -86,57 +91,59 @@ void Usage()
     printf( "\t compile the `ridl file'"
         "and output the RPC skeleton files.\n" );
 
-    printf( "Options -h:\tTo print this help.\n");
+    printf( "Options -h:\tprint this help.\n");
 
-    printf( "\t-I:\tTo specify the path to"
+    printf( "\t-I:\tSpecify the path to"
         " search for the included `ridl files'.\n"
         "\t\tAnd this option can repeat many"
         "times.\n" );
 
-    printf( "\t-O:\tTo specify the path for\n"
+    printf( "\t-O:\tSpecify the path for\n"
         "\t\tthe output files. 'output' is the \n"
         "\t\tdefault path if not specified.\n" );
 
-    printf( "\t-o:\tTo specify the file name as\n"
+    printf( "\t-o:\tSpecify the file name as\n"
         "\t\tthe base of the target image. That is,\n"
         "\t\tthe <name>cli for client and <name>svr\n"
         "\t\tfor server. If not specified, the\n"
         "\t\t'appname' from the ridl will be used.\n" );
 
 #ifdef PYTHON
-    printf( "\t-p:\tTo generate the Python skeleton files.\n" );
+    printf( "\t-p:\tGenerate the Python skeleton files.\n" );
 #endif
 
 #ifdef JAVA
-    printf( "\t-j:\tTo generate the Java skeleton files\n" );
-    printf( "\t-P:\tTo specify the Java package name prefix.\n" );
+    printf( "\t-j:\tGenerate the Java skeleton files\n" );
+    printf( "\t-P:\tSpecify the Java package name prefix.\n" );
     printf( "\t\tThis option is for Java only.\n" );
 #endif
 
 #ifdef FUSE3
-    printf( "\t-f:\tTo generate cpp skeleton files for rpcfs\n" );
-    printf( "\t--async_proxy:\tTo generate the asynchronous proxy for rpcfs.\n" );
+    printf( "\t-f:\tGenerate cpp skeleton files for rpcfs\n" );
+    printf( "\t--async_proxy:\tGenerate the asynchronous proxy for rpcfs.\n" );
 #endif
 
 #ifdef JAVASCRIPT
-    printf( "\t-J:\tTo generate the JavaScript client skeleton.\n" );
+    printf( "\t-J:\tGenerate the JavaScript client skeleton.\n" );
     printf( "\t--odesc_url=<url>: the <url> to specify path to get the object description \n" );
     printf( "\t\tfile for JS client. This is a mandatory option when '-J' is given\n" );
     printf( "\t--lib_path=<path>: the <path> to specify the alternative path to the JS support library\n" );
-    printf( "\t--auth: To enable OAuth2 authentication for Javascript client\n" );
+    printf( "\t--auth: Enable OAuth2 authentication for Javascript client\n" );
 #endif
 
-    printf( "\t-s:\tTo output the skeleton with fastrpc support.\n" );
-    printf( "\t-b:\tTo output the skeleton with built-in router.\n" );
-    printf( "\t-l:\tTo output a shared library instead of executables.\n" );
-    printf( "\t--server:\tTo generate skeleton code for server only.\n" );
-    printf( "\t--client:\tTo generate skeleton code for client only.\n" );
-    printf( "\t--services <service list>:\tTo generate skeleton code for the specified services.The services are seperated with ','.\n" );
-    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>:\tTo override synchronize mode in the ridl file with the specified one.\n" );
-    printf( "\t\tThis option is for CPP project only.\n" );
-    printf( "\t-L<lang>:To output Readme in language <lang>.\n" );
-    printf( "\t\t<lang> can be 'cn' or 'en' for now.\n" );
-    printf( "\t-v:\tTo print the version information.\n" );
+    printf( "\t-s:\tOutput the skeleton with fastrpc support.\n" );
+    printf( "\t-m <app name>:\tGenerate code for monitoring support. <app name> is the app's directory in the app registry. '-s' option must be present.\n" );
+    printf( "\t-b:\tOutput the skeleton with built-in router.\n" );
+    printf( "\t-l:\tOutput a shared library instead of executables.\n" );
+    printf( "\t--server: Generate skeleton code for server only.\n" );
+    printf( "\t--client: Generate skeleton code for client only.\n" );
+    printf( "\t--services <service list>: Generate skeleton code for the specified services.The services are seperated with ','.\n" );
+    printf( "\t--sync_mode <interface name>[.<method name>]=<async|async_p|async_s|sync>: Override sync-tag of the methods "
+    "from the specified interface defined in the ridl file with <interface name>.\n" );
+    printf( "\tThis option is for CPP project only.\n" );
+    printf( "\t--pkgname <package name> specify a full qualified java package name for the java project, otherwise, the default package name is used.\n" );
+    printf( "\t-L<lang>:Output Readme in language <lang>, as can be 'cn' or 'en' for now.\n" );
+    printf( "\t-v:\tPrint the version information.\n" );
 }
 
 static std::string g_strOutPath = "output";
@@ -222,6 +229,7 @@ int main( int argc, char** argv )
             {"client", no_argument, 0,  0 },
             {"services", required_argument, 0,  0 },
             {"sync_mode", required_argument, 0,  0 },
+            {"pkgname", required_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -229,7 +237,7 @@ int main( int argc, char** argv )
         {
 
             opt = getopt_long( argc, argv,
-                "abhvlI:O:o:pJjP:L:f::s",
+                "abhvlm:I:O:o:pJjP:L:f::s",
                 long_options, &option_index );
 
             if( opt == -1 )
@@ -409,6 +417,11 @@ int main( int argc, char** argv )
                             break;
                         }
                     }
+                    else if( option_index == 8 )
+                    {
+                        g_strPkgName = optarg;
+                        break;
+                    }
                     break;
                 }
             case 'O':
@@ -515,12 +528,9 @@ int main( int argc, char** argv )
                 }
             case 'P':
                 {
-                    if( g_strLang == "java" )
-                    {
-                        g_strPrefix = optarg;
-                        if( g_strPrefix.back() != '.' )
-                            g_strPrefix.append( 1, '.' );
-                    }
+                    g_strPrefix = optarg;
+                    if( g_strPrefix.back() != '.' )
+                        g_strPrefix.append( 1, '.' );
                     break;
                 }
 #else
@@ -617,6 +627,15 @@ int main( int argc, char** argv )
                     bQuit = true;
                     break;
                 }
+            case 'm':
+                {
+                    g_bMonitoring = true;
+                    std::istringstream iss(optarg);
+                    std::string token;
+                    while( std::getline(iss, token, ',') )
+                        g_vecMonApps.push_back(token);
+                    break;
+                }
             case '?' :
             case ':' :
             case 'h' :
@@ -635,10 +654,35 @@ int main( int argc, char** argv )
         if( bQuit )
             break;
 
+        if( g_bMonitoring && !g_bRpcOverStm )
+        {
+            printf( "'-s' option must be present to support monitoring\n" );
+            Usage();
+            ret = -1;
+            break;
+        }
+        
+        if( g_strLang != "java" && g_strPkgName.size() )
+        {
+            printf( "'--pkgname' option can only be used with Java language\n" );
+            Usage();
+            ret = -1;
+            break;
+        }
+
         if( argv[ optind ] == nullptr )
         {
             printf( "Missing file to compile\n" );
             Usage();
+            ret = -ENOENT;
+            break;
+        }
+
+        if( argv[ optind + 1 ] != nullptr )
+        {
+            printf( "too many arguments\n" );
+            Usage();
+            ret = -EINVAL;
             break;
         }
 
@@ -646,6 +690,7 @@ int main( int argc, char** argv )
         if( strFile.size() > REG_MAX_PATH )
         {
             printf( "File name too long\n" );
+            ret = -ENAMETOOLONG;
             break;
         }
 
@@ -654,13 +699,6 @@ int main( int argc, char** argv )
         if( pszFile == nullptr )
         {
             ret = -errno;
-            break;
-        }
-
-        if( argv[ optind + 1 ] != nullptr )
-        {
-            printf( "too many arguments\n" );
-            Usage();
             break;
         }
 

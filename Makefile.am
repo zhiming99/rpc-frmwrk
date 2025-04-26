@@ -5,16 +5,6 @@ if ENABLE_FUSE3
 SUBDIRS += fuse
 endif
 
-SUBDIRS += ridl monitor rpc tools pics examples 
-
-SUBDIRS += test
-
-if SWIG
-if ENABLE_JAVA
-SUBDIRS += java
-endif
-endif
-
 if SIPBUILD
 if ENABLE_PYTHON
 SUBDIRS += python
@@ -27,10 +17,21 @@ SUBDIRS += python
 endif
 endif                          
 
+SUBDIRS += ridl 
+
+SUBDIRS += test
+
+if SWIG
+if ENABLE_JAVA
+SUBDIRS += java
+endif
+endif
+
 if ENABLE_JS
 SUBDIRS += js
 endif
 
+SUBDIRS += monitor rpc tools pics examples 
 SUBDIRS += bldpkg
 
 EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE README_cn.md Concept_cn.md

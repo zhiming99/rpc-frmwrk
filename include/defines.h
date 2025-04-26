@@ -352,6 +352,12 @@ gint32 GenStrHash( const stdstr& strMsg,
 stdstr GetHomeDir();
 
 const char* Version();
+
+guint64 GetVmSize();
+float GetCpuUsage();
+gint32 GetOpenFileCount(
+    gint32 pid, guint32& dwCount );
+
 // Event ids for the IEventSink
 enum EnumEventId : guint32
 {

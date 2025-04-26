@@ -1,0 +1,87 @@
+#!/bin/bash
+#python3 -m build --wheel appmancli
+
+# Variables
+PACKAGE_NAME="python3-appmoncli"
+VERSION="@VERSION@"
+ARCHITECTURE="all"
+MAINTAINER="@PACKAGE_BUGREPORT@"
+DESCRIPTION="Python client libriaries for AppMonitor."
+HOMEPAGE="@PACKAGE_URL@"
+WHEEL_FILE=$(ls dist/*.whl)
+
+# Check if the wheel file exists
+if [ ! -f "$WHEEL_FILE" ]; then
+    echo "Error: Wheel file not found in the 'dist/' directory. Build the wheel first using 'python3 -m build'."
+    exit 1
+fi
+
+# Detect the platform
+if command -v lsb_release >/dev/null 2>&1; then
+    PLATFORM=$(lsb_release -is 2>/dev/null || echo "unknown")
+    # Handle cases where lsb_release outputs "no lsb modules are available"
+    if [[ " ${PLATFORM[@]} " =~ " Ubuntu " ]]; then
+        PLATFORM= "Ubuntu"
+    elif [[ " ${PLATFORM[@]} " =~ " Debian " ]]; then 
+        PLATFORM="Debian"
+    else
+        PLATFORM="unknown"
+    fi
+else
+    # Fallback to /etc/os-release if lsb_release is not available
+    PLATFORM=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+fi
+
+# Determine the pip3 install command
+pipoptions=
+if [[ "$PLATFORM" == "Ubuntu" || "$PLATFORM" == "Debian" ]]; then
+    pipoptions="--break-system-packages"
+fi
+
+PIP_INSTALL_CMD="pip3 install $pipoptions /usr/lib/rpcf/app*.whl"
+PIP_UNINST_CMD="pip3 uninstall -y $pipoptions appmancli"
+
+# Create the directory structure for the Debian package
+DEB_DIR="${PACKAGE_NAME}_${VERSION}"
+mkdir -p "$DEB_DIR/DEBIAN"
+mkdir -p "$DEB_DIR/usr/lib/rpcf"
+mkdir -p "$DEB_DIR/usr/bin"
+
+# Create the control file
+cat <<EOF > "$DEB_DIR/DEBIAN/control"
+Package: $PACKAGE_NAME
+Version: $VERSION
+Architecture: $ARCHITECTURE
+Maintainer: $MAINTAINER
+Description: $DESCRIPTION
+Homepage: $HOMEPAGE
+Depends: python3, python3-pip
+EOF
+
+# Create the postinst script to install the wheel
+cat <<EOF > "$DEB_DIR/DEBIAN/postinst"
+#!/bin/bash
+set -e
+$PIP_INSTALL_CMD
+EOF
+chmod 755 "$DEB_DIR/DEBIAN/postinst"
+
+# Create the prerm script to uninstall the Python module
+cat <<EOF > "$DEB_DIR/DEBIAN/prerm"
+#!/bin/bash
+set -e
+$PIP_UNINST_CMD
+EOF
+chmod 755 "$DEB_DIR/DEBIAN/prerm"
+
+# Copy the wheel file to the package directory
+echo haha cp "$WHEEL_FILE" "$DEB_DIR/usr/lib/rpcf"
+cp "$WHEEL_FILE" "$DEB_DIR/usr/lib/rpcf"
+
+# Build the Debian package
+dpkg-deb --build "$DEB_DIR"
+
+# Clean up
+rm -rf "$DEB_DIR"
+
+echo "Debian package built successfully: ${PACKAGE_NAME}_${VERSION}.deb"

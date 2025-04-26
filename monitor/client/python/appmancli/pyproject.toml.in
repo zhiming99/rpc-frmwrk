@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "appmancli"
+version = "@VERSION@"
+description = "An IPC client to AppManager for Python."
+authors = [
+    { name = "zhiming", email = "woodhead99@gmail.com" }
+]
+readme = "README.md"
+keywords = ["rpc", "appmanager", "client"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+license = "GPL-3.0-or-later"
+dependencies = [
+    "rpcf >= @VERSION@",
+]
+
+[tool.setuptools]
+packages = ["appmancli"]
+
+[tool.setuptools.package-data]
+"appmancli" = ["README.md"]
+
+[project.scripts]
+start_appmancli = "maincli:StartAppManagercli"
+start_timer = "apptimer:StartTimer"
+
+[project.urls]
+Homepage = "@PACKAGE_URL@"

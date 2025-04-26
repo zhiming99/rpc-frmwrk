@@ -589,27 +589,11 @@ class CRpcSocketBase : public IService
 
     gint32 GetAsyncErr() const;
 
-    virtual gint32 SetProperty(
-        gint32 iProp, const Variant& oBuf )
-    {
-        CStdRMutex oSockLock( GetLock() );
-        if( m_pCfg.IsEmpty() )
-            return -EFAULT;
+    gint32 SetProperty( gint32 iProp,
+        const Variant& oBuf ) override;
 
-        return m_pCfg->SetProperty(
-            iProp, oBuf );
-    }
-
-    virtual gint32 GetProperty(
-        gint32 iProp, Variant& oBuf ) const override
-    {
-        CStdRMutex oSockLock( GetLock() );
-        if( m_pCfg.IsEmpty() )
-            return -EFAULT;
-
-        return m_pCfg->GetProperty(
-            iProp, oBuf );
-    }
+    gint32 GetProperty( gint32 iProp,
+        Variant& oBuf ) const override;
 
     virtual gint32 RemoveProperty(
         gint32 iProp )
@@ -1131,6 +1115,7 @@ class CRpcTcpBusPort :
     using PDOADDR = CConnParams;
     std::map< guint32, PDOADDR > m_mapIdToAddr;
     std::map< PDOADDR, guint32 > m_mapAddrToId;
+    std::atomic< guint64 > m_qwRxBytes={0}, m_qwTxBytes={0};
 
     gint32 CreateTcpStreamPdo(
         IConfigDb* pConfig,
@@ -1219,6 +1204,12 @@ class CRpcTcpBusPort :
         guint32 dwEventId,
         IRP* pMasterIrp = nullptr,
         bool bImmediately = false ) override;
+
+    void IncRxBytes( guint32 dwInc )
+    { m_qwRxBytes += dwInc; }
+
+    void IncTxBytes( guint32 dwInc )
+    { m_qwTxBytes += dwInc; }
 };
 
 class CRpcTcpBusDriver : public CGenBusDriverEx

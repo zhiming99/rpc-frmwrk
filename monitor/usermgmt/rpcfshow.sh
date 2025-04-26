@@ -55,7 +55,7 @@ if [ "x$show" == "x" ]; then
    exit 1
 fi
 
-if [  "x$@" == "x" ] && ( [ "x$show" == "xuser" ] || [ "x$show" == "xgroup" ] ); then
+if [[  "x$@" == "x" ]] && ( [ "x$show" == "xuser" ] || [ "x$show" == "xgroup" ] ); then
    echo "Error user/group name is not specified"
    Usage
    exit 1

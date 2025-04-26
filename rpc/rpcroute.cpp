@@ -6114,6 +6114,35 @@ gint32 CRpcRouterManager::GetProperty(
     gint32 ret = 0;
     switch( iProp )
     {
+    case propRxBytes:
+    case propTxBytes:
+    case propRecvBps:
+    case propSendBps:
+        {
+            PortPtr pBus;
+            ret = GetTcpBusPort( pBus );
+            if( ERROR( ret ) )
+                break;
+            IPort* pPort = pBus;
+            HANDLE hPort = PortToHandle( pPort );
+            CIoManager* pMgr = GetIoMgr();
+            Variant oVar;
+            ret = pMgr->GetPortProp(
+                hPort, iProp, oVar );
+            if( ERROR( ret ) )
+                break;
+            oBuf = ( guint64& )oVar;
+            break;
+        }
+    case propMaxConns:
+        {
+            guint32 dwMaxConn = 0;
+            ret = GetMaxConns( dwMaxConn );
+            if( ERROR( ret ) )
+                break;
+            oBuf = dwMaxConn;
+            break;
+        }
     case propMaxReqs:
         {
             oBuf = ( m_dwMaxConns << 1 );
@@ -6136,8 +6165,7 @@ gint32 CRpcRouterManager::GetProperty(
         }
     default:
         {
-            ret = super::GetProperty(
-                iProp, oBuf );
+            ret = -ENOENT;
             break;
         }
     }
@@ -6151,16 +6179,36 @@ gint32 CRpcRouterManager::SetProperty(
     gint32 ret = 0;
     switch( iProp )
     {
+    case propRxBytes:
+    case propTxBytes:
+    case propRecvBps:
+    case propSendBps:
+        {
+            PortPtr pBus;
+            ret = GetTcpBusPort( pBus );
+            if( ERROR( ret ) )
+                break;
+            IPort* pPort = pBus;
+            HANDLE hPort = PortToHandle( pPort );
+            CIoManager* pMgr = GetIoMgr();
+            ret = pMgr->SetPortProp(
+                hPort, iProp, oBuf );
+            break;
+        }
     case propMaxReqs:
     case propMaxPendings:
         {
             ret = -EINVAL;
             break;
         }
+    case propMaxConns:
+        {
+            ret = SetMaxConns( ( guint32& )oBuf );
+            break;
+        }
     default:
         {
-            ret = super::SetProperty(
-                iProp, oBuf );
+            ret = -ENOENT;
             break;
         }
     }
@@ -6249,19 +6297,38 @@ gint32 CRpcRouterManager::GetMaxConns(
         IPort* pPort = pBus;
         HANDLE hPort = PortToHandle( pPort );
         CIoManager* pMgr = GetIoMgr();
-        BufPtr pBuf( true );
+        Variant oVar;
         ret = pMgr->GetPortProp(
-            hPort, propMaxConns, pBuf );
+            hPort, propMaxConns, oVar );
         if( ERROR( ret ) )
             break;
-
-        dwMaxConns = *pBuf;
-
+        dwMaxConns = oVar;
     }while( 0 );
 
     return ret;
 }
 
+gint32 CRpcRouterManager::SetMaxConns(
+    guint32 dwMaxConns )
+{
+    gint32 ret = 0;
+    do{
+        m_dwMaxConns = dwMaxConns;
+        PortPtr pBus;
+        ret = GetTcpBusPort( pBus );
+        if( ERROR( ret ) )
+            break;
+
+        IPort* pPort = pBus;
+        HANDLE hPort = PortToHandle( pPort );
+        CIoManager* pMgr = GetIoMgr();
+        Variant oVar( dwMaxConns );
+        ret = pMgr->SetPortProp(
+            hPort, propMaxConns, oVar );
+    }while( 0 );
+
+    return ret;
+}
 gint32 CIfRouterMgrState::SubscribeEvents()
 {
     vector< EnumPropId > vecEvtToSubscribe = {
