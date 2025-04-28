@@ -278,10 +278,10 @@ int main( int argc, char** argv )
                         printf( "%s : %s\n", optarg,
                             "Error option is invalid "
                             "since JS is disabled" );
+                        bQuit = true;
+                        ret = -EINVAL;
+                        break;
                     }
-                    bQuit = true;
-                    ret = -EINVAL;
-                    break;
 #endif
                     else if( option_index == 4 )
                     {
