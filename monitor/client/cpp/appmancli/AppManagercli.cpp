@@ -502,7 +502,9 @@ gint32 ClaimApp( CRpcServices* pSvc,
 {
     gint32 ret = 0;
     do{
-        InterfPtr pIf = pSvc;
+        InterfPtr pIf;
+        if( pSvc != nullptr )
+            pIf = pSvc;
 
         PACBS pacbs;
         if( pacbsIn )
@@ -551,8 +553,8 @@ gint32 StartStdAppManCli(
     PACBS& pacbsIn )
 {
     gint32 ret = 0;
-    if( pSvc == nullptr )
-        return -EINVAL;
+    // if( pSvc == nullptr )
+    //     return -EINVAL;
 
     do{
         InterfPtr pAppMan;
