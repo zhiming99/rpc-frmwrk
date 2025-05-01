@@ -76,6 +76,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf_logger
 %{_bindir}/regfsmnt
 %{_bindir}/appmon*
+%{_bindir}/rpcf/apptimer
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json

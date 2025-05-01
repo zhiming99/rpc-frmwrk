@@ -91,11 +91,11 @@ gint32 CreateAppManagercli(
             break;
 
         InterfPtr pNewIf;
-        ret = AsyncCreateIf <CAppManager_CliImpl,
+        ret = AsyncCreateIf<CAppManager_CliImpl,
             clsid( CAppManager_CliImpl )>(
             pMgr, pStartCb, pCfg,
-            "./appmondesc.json", "AppManager",
-            pNewIf, false );
+            "invalidpath/appmondesc.json",
+            "AppManager", pNewIf, false );
         pAppMan = pNewIf;
         if( ERROR( ret ) )
             ( *pStartCb )( eventCancelTask );

@@ -438,7 +438,7 @@ AC_CONFIG_FILES([Makefile
                  monitor/client/cpp/appmancli/Makefile
                  monitor/client/python/build_deb.sh
                  monitor/client/python/build_rpm.sh
-                 monitor/client/python/appmancli/pyproject.toml
+                 monitor/client/python/appmancli/setup.py
                  monitor/client/python/Makefile
                  monitor/client/python/appmancli/Makefile
                  monitor/client/java/appmancli/Makefile

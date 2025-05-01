@@ -1,7 +1,7 @@
 # Define the main target for building the Python wheel package
 .PHONY: all clean distclean install uninstall
 
-EXTRA_DIST=appmancli/AppManagercli.py appmancli/maincli.py pyproject.toml.in appmancli/apptimer.py
+EXTRA_DIST=appmancli/AppManagercli.py appmancli/maincli.py pyproject.toml.in appmancli/apptimer.py setup.py.in
 
 top_dir=$(abs_top_srcdir)
 ridlfile=$(top_dir)/monitor/appmon/appmon.ridl
@@ -13,7 +13,8 @@ all: appmancli/__init__.py dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl
 
 # Build the Python wheel package
 dist/appmancli-$(PACKAGE_VERSION)-py3-none-any.whl: appmancli/AppManagercli.py appmancli/maincli.py appmancli/apptimer.py
-	python3 -m build --wheel .
+	python3 setup.py bdist_wheel
+#python3 -m build --wheel .
 
 appmancli/__init__.py:
 	@pushd appmancli; \

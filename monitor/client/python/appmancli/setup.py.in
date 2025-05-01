@@ -1,0 +1,24 @@
+from setuptools import setup, find_packages
+import importlib.machinery
+version='@VERSION@'
+kwargs = {
+      'name':'appmancli',
+      'version':version,
+      'description': "An IPC client to AppManager for Python.",
+      'packages': ["appmancli"],
+      'author': 'zhiming',
+      'author_email':'@PACKAGE_BUGREPORT@',
+      'url':'@PACKAGE_URL@',
+      'license':'GPL-3.0',
+      #'include_package_data' : True,
+      'zip_safe' : False,
+      #'package_data':{'appmancli': []}
+      'entry_points':{
+        'console_scripts': [
+            'start_appmancli = maincli:StartAppManagercli',
+            'start_timer = apptimer:StartTimer',
+        ] },
+}
+
+setup(**kwargs)
+
