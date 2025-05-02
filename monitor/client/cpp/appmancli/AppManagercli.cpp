@@ -533,6 +533,8 @@ gint32 ClaimApp( CRpcServices* pSvc,
             break;
         }
 
+        pacbs->GetPointValuesToInit( pIf, veckv);
+
         ret = pamc->ClaimAppInst(
             oParams.GetCfg(),
             strAppInst, veckv, rveckv );

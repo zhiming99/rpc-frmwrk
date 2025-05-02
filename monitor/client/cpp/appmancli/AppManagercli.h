@@ -215,6 +215,11 @@ struct IAsyncAMCallbacks
         std::vector< KeyValue >& veckv )
     { return 0; } 
 
+    virtual gint32 GetPointValuesToInit(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv )
+    { return 0; } 
+
     virtual gint32 SetInitPointValues(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv )

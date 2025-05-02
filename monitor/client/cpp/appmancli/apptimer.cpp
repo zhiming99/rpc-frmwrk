@@ -15,7 +15,9 @@ ObjPtr g_pIoMgr;
 #include <stdlib.h>
 #include <limits.h>
 
-std::atomic< bool > g_bExit( false );
+static std::atomic< bool > g_bExit( false );
+static bool g_bLogging = false;
+
 void SignalHandler( int signum )
 {
     if( signum == SIGINT )
@@ -48,6 +50,39 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
         return ret;
    }
 
+    gint32 GetPointValuesToInit(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override
+    {
+        gint32 ret = 0;
+        KeyValue okv;
+        okv.strKey = O_WORKING_DIR;
+        char szPath[PATH_MAX];
+        if( getcwd( szPath, sizeof(szPath)) != nullptr)
+        {        
+            BufPtr pBuf( true );
+            ret = pBuf->Append( szPath,
+                strlen( szPath ) );
+            if( SUCCEEDED( ret ) )
+            {
+                okv.oValue = pBuf;
+                veckv.push_back( okv );
+            }
+        }
+        veckv.push_back( okv );
+        okv.strKey = S_CMDLINE;
+        {
+            BufPtr pBuf( true );
+            const char* szCmd = "apptimer -gd";
+            ret = pBuf->Append(
+                szCmd, strlen( szCmd ) );
+            if( SUCCEEDED( ret ) )
+            {
+                okv.oValue = pBuf;
+                veckv.push_back( okv );
+            }
+        }
+    }
     gint32 SetPointValueCallback( 
         IConfigDb* context, gint32 iRet )
     { return 0; }
@@ -89,6 +124,7 @@ gint32 InitContext()
         CParamList oParams;
         oParams.Push( "appmonsvr" );
         oParams[ propSearchLocal ] = false;
+        oParams[ propEnableLogging ] = g_bLogging;
 
         // adjust the thread number if necessary
         oParams[ propMaxIrpThrd ] = 0;
@@ -125,12 +161,46 @@ gint32 DestroyContext()
     return STATUS_SUCCESS;
 }
 
+static void Usage( const char* szName )
+{
+    fprintf( stderr,
+        "Usage: %s [OPTIONS] <mount point> \n"
+        "\t [ -d to run as a daemon ]\n"
+        "\t [ -g send logs to log server ]\n"
+        "\t [ -h this help ]\n", szName );
+}
+
 gint32 TimerLoop();
 
 int main( int argc, char** argv )
 {
     gint32 ret = 0;
     do{
+        bool bDaemon = false;
+        int opt = 0;
+        while( ( opt = getopt( argc, argv, "hdg" ) ) != -1 )
+        {
+            switch( opt )
+            {
+                case 'd':
+                    { bDaemon = true; break; }
+                case 'g':
+                    { g_bLogging = true; break; }
+                case 'h':
+                default:
+                    { Usage( argv[ 0 ] ); exit( 0 ); }
+            }
+        }
+        if( ERROR( ret ) )
+            break;
+
+        if( bDaemon )
+        {
+            ret = daemon( 1, 0 );
+            if( ret < 0 )
+            { ret = -errno; break; }
+        }
+
         ret = InitContext();
         if( ERROR( ret ) )
             break;
@@ -140,10 +210,11 @@ int main( int argc, char** argv )
             "libappmancli.so" );
         if( ERROR( ret ) )
             break;
-        InterfPtr pIf;
 
+        InterfPtr pIf;
         PACBS pacbsIn( new CAsyncTimerCallbacks );
         InterfPtr pAppMan;
+        // the pIf is just a placeholder, not for real.
         pIf = pMgr->GetSyncIf();
         ret = StartStdAppManCli(
             pIf, "timer1", pAppMan, pacbsIn );
