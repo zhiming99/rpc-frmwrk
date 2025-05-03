@@ -82,6 +82,7 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                 veckv.push_back( okv );
             }
         }
+        return 0;
     }
     gint32 SetPointValueCallback( 
         IConfigDb* context, gint32 iRet )
@@ -231,6 +232,18 @@ int main( int argc, char** argv )
     return ret;
 }
 
+// Function to wait for a specified number of seconds
+// (supports fractional seconds)
+void WaitForSeconds(double seconds)
+{
+    struct timeval tv;
+    // Extract integer part of seconds
+    tv.tv_sec = static_cast<int>(seconds);
+    // Extract fractional part of seconds
+    tv.tv_usec = static_cast<int>((seconds - tv.tv_sec) * 1e6);
+    select(0, nullptr, nullptr, nullptr, &tv);
+}
+
 //-----Your code begins here---
 gint32 TimerLoop()
 {
@@ -248,7 +261,7 @@ gint32 TimerLoop()
         if( ERROR( ret ) )
         {
             ret = 0;
-            sleep( 1 );
+            WaitForSeconds( 1 );
             continue;
         }
         CAppManager_CliImpl* pam = pProxy;
@@ -256,36 +269,19 @@ gint32 TimerLoop()
         CCfgOpener oCfg;
         if( dwTicks % g_dwInterval )
         {
-            sleep( 1 );
+            WaitForSeconds( 1 );
             continue;
         }
         oCfg.SetIntProp( propContext, 2 );
         Variant var( ( guint32 )1);
         pam->SetPointValue( oCfg.GetCfg(),
-            "timer/clock1", var );
+            "timer1/clock1", var );
         OutputMsg( 0, 
             "Info send clock1 %d",
             dwTicks );
 
-        PACBS pcbs;
-        CfgPtr pContext;
-        ret = pam->GetAsyncCallbacks(
-            pcbs, pContext );
-        if( SUCCEEDED( ret ) )
-        {
-            InterfPtr pEmpty;
-            std::vector< KeyValue > veckv;
-            pcbs->GetPointValuesToUpdate(
-                pEmpty, veckv );
-            if( veckv.size() )
-            {
-                CCfgOpener oCfg;
-                pam->SetPointValues( oCfg.GetCfg(),
-                    "timer1", veckv );
-            }
-        }
 
-        sleep( 1 );
+        WaitForSeconds( 1 );
     }
 
     ret = STATUS_SUCCESS;

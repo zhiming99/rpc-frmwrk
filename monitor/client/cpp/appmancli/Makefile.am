@@ -44,7 +44,7 @@ appmon.ridl:
 apptimer_PROGRAMS=apptimer
 apptimer_SOURCES=apptimer.cpp
 apptimer_LDADD=libappmancli.la $(top_srcdir)/ipc/libipc.la $(top_srcdir)/combase/libcombase.la -lpthread -ldl $(COMMON_LINK) -L$(top_srcdir)/3rd_party
-apptimer_CPPFLAGS= -I. -I$(include_dir) -fPIC $(OFFSET_MACRO)
+apptimer_CPPFLAGS= -I. -I$(mon_dir)/appmon -I$(mon_dir)/registry -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO)
 apptimer_LDFLAGS=-rdynamic
 apptimerdir=$(bindir)/rpcf
 
