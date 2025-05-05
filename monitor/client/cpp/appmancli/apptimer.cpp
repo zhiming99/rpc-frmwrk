@@ -55,35 +55,41 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
         std::vector< KeyValue >& veckv ) override
     {
         gint32 ret = 0;
-        KeyValue okv;
-        okv.strKey = O_WORKING_DIR;
-        char szPath[PATH_MAX];
-        if( getcwd( szPath, sizeof(szPath)) != nullptr)
-        {        
-            BufPtr pBuf( true );
-            ret = pBuf->Append( szPath,
-                strlen( szPath ) );
-            if( SUCCEEDED( ret ) )
-            {
-                okv.oValue = pBuf;
-                veckv.push_back( okv );
+        do{
+            KeyValue okv;
+            char szPath[PATH_MAX];
+            if( getcwd( szPath, sizeof(szPath)) != nullptr)
+            {        
+                okv.strKey = O_WORKING_DIR;
+                BufPtr pBuf( true );
+                ret = pBuf->Append( szPath,
+                    strlen( szPath ) );
+                if( SUCCEEDED( ret ) )
+                {
+                    okv.oValue = pBuf;
+                    veckv.push_back( okv );
+                }
             }
-        }
-        veckv.push_back( okv );
-        okv.strKey = S_CMDLINE;
-        {
+
+            okv.strKey = S_CMDLINE;
+            stdstr strModPath;
+            ret = GetModulePath( strModPath );
+            if( ERROR( ret ) )
+                break;
+            strModPath += "/apptimer -d";
             BufPtr pBuf( true );
-            const char* szCmd = "apptimer -gd";
             ret = pBuf->Append(
-                szCmd, strlen( szCmd ) );
-            if( SUCCEEDED( ret ) )
-            {
-                okv.oValue = pBuf;
-                veckv.push_back( okv );
-            }
-        }
+                strModPath.c_str(),
+                strModPath.size() );
+            if( ERROR( ret ) )
+                break;
+            okv.oValue = pBuf;
+            veckv.push_back( okv );
+
+        }while( 0 );
         return 0;
     }
+
     gint32 SetPointValueCallback( 
         IConfigDb* context, gint32 iRet )
     { return 0; }
@@ -279,7 +285,6 @@ gint32 TimerLoop()
         OutputMsg( 0, 
             "Info send clock1 %d",
             dwTicks );
-
 
         WaitForSeconds( 1 );
     }
