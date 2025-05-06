@@ -91,11 +91,11 @@ gint32 CreateAppManagercli(
             break;
 
         InterfPtr pNewIf;
-        ret = AsyncCreateIf <CAppManager_CliImpl,
+        ret = AsyncCreateIf<CAppManager_CliImpl,
             clsid( CAppManager_CliImpl )>(
             pMgr, pStartCb, pCfg,
-            "./appmondesc.json", "AppManager",
-            pNewIf, false );
+            "invalidpath/appmondesc.json",
+            "AppManager", pNewIf, false );
         pAppMan = pNewIf;
         if( ERROR( ret ) )
             ( *pStartCb )( eventCancelTask );
@@ -502,7 +502,9 @@ gint32 ClaimApp( CRpcServices* pSvc,
 {
     gint32 ret = 0;
     do{
-        InterfPtr pIf = pSvc;
+        InterfPtr pIf;
+        if( pSvc != nullptr )
+            pIf = pSvc;
 
         PACBS pacbs;
         if( pacbsIn )
@@ -531,6 +533,8 @@ gint32 ClaimApp( CRpcServices* pSvc,
             break;
         }
 
+        pacbs->GetPointValuesToInit( pIf, veckv);
+
         ret = pamc->ClaimAppInst(
             oParams.GetCfg(),
             strAppInst, veckv, rveckv );
@@ -551,8 +555,8 @@ gint32 StartStdAppManCli(
     PACBS& pacbsIn )
 {
     gint32 ret = 0;
-    if( pSvc == nullptr )
-        return -EINVAL;
+    // if( pSvc == nullptr )
+    //     return -EINVAL;
 
     do{
         InterfPtr pAppMan;

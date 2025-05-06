@@ -23,7 +23,7 @@ $(sources):$(headers)
 $(headers):appmon.ridl
 
 appmon.ridl:
-	bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
+	@bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
     if((bexit==0));then echo all files are ready;exit 0;fi; \
     if ! which ridlc > /dev/null; then \
         if [ ! -f ./mktpl ];then \
@@ -40,5 +40,15 @@ appmon.ridl:
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
     ls -x
+
+apptimer.cpp: $(lib_LTLIBRARIES)
+
+apptimer_PROGRAMS=apptimer
+apptimer_SOURCES=apptimer.cpp
+apptimer_LDADD=libappmancli.la $(top_srcdir)/ipc/libipc.la \
+$(top_srcdir)/combase/libcombase.la -lutils -lstdc++ -lpthread -ldl $(COMMON_LINK) -L$(top_srcdir)/3rd_party -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc
+apptimer_CPPFLAGS= -I. -I$(mon_dir)/appmon -I$(mon_dir)/registry -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO)
+apptimer_LDFLAGS=-rdynamic
+apptimerdir=$(bindir)/rpcf
 
 .PHONY: appmon.ridl

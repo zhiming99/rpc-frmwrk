@@ -20,7 +20,7 @@
 8. 从`https://github.com/zhiming99/rpc-frmwrk.git`下载`rpc-frmwrk`的代码树。
 9. 在代码的根目录下，运行如下命令初始化编译环境。
     * `libtoolize` 
-    * 运行`autoreconf`生成`config.h.in`.
+    * 运行`autoreconf --force --install`生成`config.h.in`.
     * 运行`automake --add-missing`生成主`Makefile.in`.
     * 运行`autoconf`生成脚本`configure`.
 ### 根据需求裁减所需的功能模块

@@ -33,5 +33,9 @@ struct CAsyncAMCallbacks : public CAsyncStdAMCallbacks
     gint32 GetPointValuesToUpdate(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override;
+
+    gint32 GetPointValuesToInit(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override;
 };
 
