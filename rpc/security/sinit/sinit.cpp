@@ -100,14 +100,13 @@ std::string GetClientRegPath()
     return strCliReg;
 }
 
-std::string GetPubKeyPath()
+std::string GetPubKeyPath( bool bGmSSL )
 {
     stdstr strPath = GetHomeDir();
-#ifdef OPENSSL
-    strPath += "/.rpcf/openssl/clientcert.pem" ;
-#elif defined( GMSSL )
-    strPath += "/.rpcf/gmssl/clientcert.pem" ;
-#endif
+    if( bGmSSL )
+        strPath += "/.rpcf/gmssl/clientcert.pem" ;
+    else
+        strPath += "/.rpcf/openssl/clientcert.pem" ;
     return strPath;
 }
 
@@ -219,7 +218,6 @@ gint32 MakeDirIfNotExist(
             strDir.c_str(), 0700 );
     return ret;
 }
-
 
 gint32 GetDefaultCredential( stdstr& strDefault )
 {
