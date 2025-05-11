@@ -3,15 +3,22 @@
  *
  *       Filename:  encdec.cpp
  *
- *    Description:  
+ *    Description:  Encryption and decryption functions using OpenSSL
  *
  *        Version:  1.0
  *        Created:  05/07/2025 11:25:59 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
- *         Author:  YOUR NAME (), 
+ *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:  
+ *
+ *      Copyright:  2025 Ming Zhi( woodhead99@gmail.com )
+ *
+ *        License:  This program is free software; you can redistribute it
+ *                  and/or modify it under the terms of the GNU General Public
+ *                  License version 3.0 as published by the Free Software
+ *                  Foundation at 'http://www.gnu.org/licenses/gpl-3.0.html'
  *
  * =====================================================================================
  */
@@ -22,17 +29,25 @@
 using namespace rpcf;
 extern std::string GetPubKeyPath( bool bGmSSL );
 
-extern "C"{
-
 #ifdef OPENSSL
+extern "C"{
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
-#endif
-
 }
 
-#ifdef OPENSSL
+gint32 GenSha2Hash_OpenSSL(
+    const stdstr& strData, stdstr& strHash )
+{
+
+    guint8 finalHash[ SHA256_DIGEST_LENGTH ];
+    SHA256(reinterpret_cast<const guint8*>(strData.data()),
+        strData.size(), finalHash);
+    gint32 ret = BytesToString(finalHash,
+        SHA256_DIGEST_LENGTH, strHash );
+    return ret;
+}
+
 // Combine strPassword and SHA256(strSalt), then hash again
 std::string GenPasswordSaltHash_OpenSSL(
     const std::string& strPassword,
@@ -42,15 +57,13 @@ std::string GenPasswordSaltHash_OpenSSL(
     stdstr strSaltHash;
     std::string strRet;
 
-    GenShaHash( strSalt.c_str(),
-        strSalt.size(), strSaltHash );
-    std::string combined = strPassword + strSaltHash;
-    unsigned char finalHash[ SHA256_DIGEST_LENGTH ];
-    SHA256(reinterpret_cast<const unsigned char*>(combined.data()),
-        combined.size(), finalHash);
+    GenSha2Hash_OpenSSL( strSalt, strSaltHash );
 
-    BytesToString(finalHash,
-        SHA256_DIGEST_LENGTH, strRet );
+    stdstr strPassHash;
+    GenSha2Hash_OpenSSL( strPassword, strPassHash );
+
+    std::string combined = strPassHash + strSaltHash;
+    GenSha2Hash_OpenSSL( combined, strRet );
     return strRet;
 }
 
@@ -158,160 +171,6 @@ int EncryptWithPubKey_OpenSSL(
     if( pPubKey )
         EVP_PKEY_free( pPubKey );
 
-    return ret;
-}
-#endif
-
-#ifdef GMSSL
-extern "C"
-{
-#include <gmssl/rand.h>
-#include <gmssl/x509.h>
-#include <gmssl/error.h>
-#include <gmssl/sm2.h>
-#include <gmssl/sm3.h>
-#include <gmssl/sm4.h>
-#include <gmssl/pem.h>
-#include <gmssl/tls.h>
-#include <gmssl/digest.h>
-#include <gmssl/hmac.h>
-#include <gmssl/hkdf.h>
-#include <gmssl/mem.h>
-}
-
-std::string GenPasswordSaltHash_GmSSL(
-    const std::string& strPassword,
-    const std::string& strSalt )
-{
-    guint32 dwHash = 0;
-    stdstr strSaltHash;
-    std::string strRet;
-
-    GenShaHash( strSalt.c_str(),
-        strSalt.size(), strSaltHash );
-
-    gint32 ret = 0;
-    std::string combined = strPassword + strSaltHash;
-    do{
-        unsigned char dgst[ 32 ];
-        SM3_DIGEST_CTX sm3_ctx;
-        if( sm3_digest_init(&sm3_ctx, NULL, 0) != 1 )
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        if (sm3_digest_update(&sm3_ctx,
-            (uint8_t *)combined.c_str(),
-            combined.size()) != 1) 
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        if (sm3_digest_finish( &sm3_ctx, dgst ) != 1)
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        memset( &sm3_ctx, 0, sizeof( sm3_ctx ) );
-        BytesToString(
-            dgst, sizeof( dgst ), strRet );
-    }while( 0 );
-    return strRet;
-}
-
-int EncryptWithPubKey_GmSSL(
-    const std::string& strPassword,
-    const std::string& strSalt,
-    BufPtr& pEncrypted )
-{
-    gint32 ret = 0;
-    SM2_ENC_CTX ctx;
-    stdstr strPassHash;
-    do {
-        strPassHash = GenPasswordSaltHash_GmSSL(
-            strPassword, strSalt );
-        if( strPassHash.empty() )
-        {
-            std::cerr << "Cannot failed to generate "
-                "password hash.\n";
-            ret = ERROR_FAIL;
-            break;
-        }
-        uint8_t cert[18192];
-        size_t certlen = 0;
-        stdstr strPath = GetPubKeyPath( true );
-        FILE* pFp = fopen( strPath.c_str(), "r" );
-        if (!pFp) {
-            std::cerr << "Error cannot open public "
-                "key file.\n";
-            ret = -errno;
-            break;
-        }
-        ret = x509_cert_from_pem(
-            cert, &certlen, sizeof(cert), pFp );
-        fclose(pFp);
-        if( ret != 1 )
-        {
-            if( ret < 0 )
-            {
-                std::cerr << "Error read certificate\n";
-                break;
-            }
-            ret = 0;
-            break;
-        }
-
-        SM2_KEY key;
-
-        ret = x509_cert_get_subject_public_key(
-            cert, certlen, &key);
-        if( ret != 1 )
-        {
-            std::cerr << "Cannot extract public "
-                "key from certificate.\n";
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        ret = sm2_encrypt_init( &ctx );
-        if( ret != 1 )
-        {
-            std::cerr << "Error sm2_encrypt_init failed.\n";
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        if( sm2_encrypt_update( &ctx,
-             reinterpret_cast<const unsigned char*>(strPassHash.data()),
-             strPassHash.size() ) <= 0 )
-         {
-            std::cerr << "Error sm2_encrypt_update failed.\n";
-            ret = -1;
-            break;
-        }
-
-        if( pEncrypted.IsEmpty() )
-            pEncrypted.NewObj();
-
-        ret = pEncrypted->Resize(
-            SM2_MAX_CIPHERTEXT_SIZE );
-        if( ERROR( ret ) )
-            break;
-        size_t outlen = pEncrypted->size();
-        ret = sm2_encrypt_finish( &ctx, &key,
-            reinterpret_cast<unsigned char*>( pEncrypted->ptr() ),
-            &outlen );
-        if( ret != 1 )
-        {
-            std::cerr << "Error encryption failed\n";
-            ret = ERROR_FAIL;
-            break;
-        }
-        ret = pEncrypted->Resize( outlen );
-    } while (0);
-    gmssl_secure_clear( &ctx, sizeof( ctx ) );
-    strPassHash.assign( strPassHash.size(), ' ' );
     return ret;
 }
 #endif
