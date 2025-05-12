@@ -351,9 +351,9 @@ gint32 StoreCredential(
         RegFsPtr pfs = GetFs();
         RFHANDLE hFile = INVALID_HANDLE;
         stdstr strCred =  g_strCredDir +
-            "/" + strUserName + ".cred";
+            "/" + strUserName;
 
-        ret = OpenFileForWrite( strCred,
+        ret = OpenFileForWrite( strCred + ".cred",
             O_TRUNC | O_WRONLY, hFile );
         if( ERROR( ret ) )
             break;
@@ -363,7 +363,7 @@ gint32 StoreCredential(
         pfs->CloseFile( hFile );
         if( ERROR( ret ) )
         {
-            pfs->RemoveFile( strCred );
+            pfs->RemoveFile( strCred + ".cred" );
             std::cout << "Error failed to store "
                 << "credential for user: "
                 << strUserName << "\n";
@@ -371,7 +371,12 @@ gint32 StoreCredential(
         }
         std::cout << "Credential stored for user: "
             << strUserName << "\n";
-
+#if !defined( OPENSSL ) && defined( GMSSL )
+        hFile = INVALID_HANDLE;
+        OpenFileForWrite( strCred + ".gmssl",
+            O_TRUNC | O_WRONLY, hFile );
+        pfs->CloseFile( hFile );
+#endif
         // If this is the only credential, set as default
         std::vector<std::string> vecUsers;
         ret = ListCredentialFiles( vecUsers );
@@ -388,16 +393,19 @@ void RemoveCredential(
     const std::string& strUserName )
 {
     std::string strFilePath =  g_strCredDir +
-        "/" + strUserName + ".cred";
+        "/" + strUserName;
 
     RegFsPtr pfs = GetFs();
     std::string strDefault;
     GetDefaultCredential( strDefault );
 
-    if( pfs->RemoveFile( strFilePath ) == 0 )
+    if( pfs->RemoveFile( strFilePath + ".cred" ) == 0 )
     {
         std::cout << "Credential removed for user: "
             << strUserName << "\n";
+#if !defined( OPENSSL ) && defined( GMSSL )
+        pfs->RemoveFile( strFilePath + ".gmssl" );
+#endif
         // If removed credential is default, set new
         // default
         if( strUserName == strDefault )
