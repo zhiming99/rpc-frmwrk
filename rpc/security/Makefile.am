@@ -19,7 +19,7 @@ OA2Login = ../../monitor/registry/libregfs.la
 OA2_sources = oa2proxy.cpp
 OA2_headers = oa2proxy.h
 endif
-SUBDIRS += .
+SUBDIRS += sinit .
 
 rpcfauth_headers = k5proxy.h k5server.h kdcfdo.h secclsid.h secfido.h security.h $(OA2_headers)
 libauth_la_SOURCES = security.cpp dllexp.cpp $(rpcfauth_headers) $(krb5_sources) $(OA2_sources)
