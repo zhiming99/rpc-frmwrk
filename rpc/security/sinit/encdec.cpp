@@ -135,8 +135,8 @@ int EncryptWithPubKey_OpenSSL(
 
         size_t outlen = 0;
         if( EVP_PKEY_encrypt( pCtx, nullptr, &outlen,
-             reinterpret_cast<const unsigned char*>(strPassword.data()),
-             strPassword.size() ) <= 0 )
+             reinterpret_cast<const unsigned char*>(strHash.data()),
+             strHash.size() ) <= 0 )
          {
             std::cerr << "EVP_PKEY_encrypt "
                 "(size query) failed.\n";
@@ -153,8 +153,8 @@ int EncryptWithPubKey_OpenSSL(
         if (EVP_PKEY_encrypt(pCtx,
             reinterpret_cast<unsigned char*>(pEncrypted->ptr()),
             &outlen,
-            reinterpret_cast<const unsigned char*>(strPassword.data()),
-            strPassword.size() ) <= 0 )
+            reinterpret_cast<const unsigned char*>(strHash.data()),
+            strHash.size() ) <= 0 )
         {
             char* szError = ERR_error_string(
                 ERR_get_error(), nullptr);
