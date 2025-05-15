@@ -7,11 +7,11 @@ using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
 #include "appmon.h"
-#include "SimpleAuthcli.h"
 #include "AppManagercli.h"
 
 InterfPtr g_pSAcli;
 stdrmutex g_oSALock;
+#include "SimpleAuthcli.h"
 gint32 GetSimpleAuthcli( InterfPtr& pCli )
 {
     gint32 ret = 0;
@@ -77,7 +77,8 @@ gint32 DestroySimpleAuthcli(
     return ret;
 }
 gint32 CreateSimpleAuthcli( CIoManager* pMgr,
-    IEventSink* pCallback, IConfigDb* pCfg )
+    EnumClsid iClsid, IEventSink* pCallback,
+    IConfigDb* pCfg )
 {
     gint32 ret = 0;
     do{
@@ -134,10 +135,9 @@ gint32 CreateSimpleAuthcli( CIoManager* pMgr,
         if( ERROR( ret ) )
             break;
 
-        ret = AsyncCreateIf<CSimpleAuth_CliImpl,
-            clsid( CSimpleAuth_CliImpl )>(
-            pMgr, pStartCb, pCfg,
-            "./appmondesc.json", "SimpleAuth",
+        ret = AsyncCreateIf<CSimpleAuth_CliImpl>(
+            pMgr, pStartCb, pCfg, iClsid,
+            "invalidpath/appmondesc.json", "SimpleAuth",
             g_pSAcli, false );
 
         if( ERROR( ret ) )
@@ -194,6 +194,20 @@ gint32 CSimpleAuth_CliImpl::GetPasswordSaltCallback(
         return ret;
     return pCbs->GetPasswordSaltCallback(
         context, iRet, strSalt );
+}
+
+/* Async callback handler */
+gint32 CSimpleAuth_CliImpl::CheckClientTokenCallback( 
+    IConfigDb* context, gint32 iRet,
+    ObjPtr& oInfo /*[ In ]*/ )
+{
+    PSAACBS pCbs;
+    gint32 ret = GetAsyncCallbacks( pCbs );
+    if( ERROR( ret ) )
+        return ret;
+    return pCbs->CheckClientTokenCallback(
+        context, iRet, oInfo );
+    return 0;
 }
 
 gint32 CSimpleAuth_CliImpl::CreateStmSkel(

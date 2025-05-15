@@ -133,6 +133,22 @@ class CSimpleAuth_SvrImpl
         IConfigDb* pReqCtx_,
         gint32 dwUid /*[ In ]*/,
         std::string& strSalt /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnCheckClientTokenCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        ObjPtr& oClientInfo /*[ In ]*/,
+        ObjPtr& oSvrInfo /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'CheckClientToken' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 CheckClientToken(
+        IConfigDb* pReqCtx_,
+        ObjPtr& oClientInfo /*[ In ]*/,
+        ObjPtr& oSvrInfo /*[ In ]*/,
+        ObjPtr& oInfo /*[ Out ]*/ ) override;
     gint32 CreateStmSkel(
         HANDLE, guint32, InterfPtr& ) override;
     

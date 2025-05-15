@@ -4438,7 +4438,7 @@ gint32 CRpcServices::LoadObjDesc(
                 string strVal =
                     oObjAuth[ JSON_ATTR_AUTHMECH ].asString();
 
-                if( !( strVal == "krb5" || strVal == "OAuth2" ) )
+                if( !( strVal == "krb5" || strVal == "OAuth2" || strVal == "SimpAuth" ) )
                     break;
 
                 string& strMech = strVal;
@@ -4452,8 +4452,8 @@ gint32 CRpcServices::LoadObjDesc(
                         oAuth.SetStrProp( propAuthUrl, strVal );
                     }
                 }
-                else
-                {    
+                else if( strMech == "krb5" )
+                {
                     if( oObjAuth.isMember( JSON_ATTR_SVCNAME ) &&
                         oObjAuth[ JSON_ATTR_SVCNAME ].isString() )
                     {
@@ -4494,6 +4494,17 @@ gint32 CRpcServices::LoadObjDesc(
                             strVal = szVal;
                         if( strVal.size() > 0 )
                             oAuth.SetStrProp( propUserName, strVal );
+                    }
+                }
+                else if( strMech == "SimpAuth" )
+                {
+                    if( oObjAuth.isMember( JSON_ATTR_USERNAME ) &&
+                        oObjAuth[ JSON_ATTR_USERNAME ].isString() )
+                    {
+                        strVal = oObjAuth[ JSON_ATTR_USERNAME ].asString();
+                        if( strVal.size() > 0 )
+                            oAuth.SetStrProp( propUserName, strVal );
+                        // otherwise using the default user
                     }
                 }
                 break;

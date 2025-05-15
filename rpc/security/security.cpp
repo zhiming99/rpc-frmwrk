@@ -39,6 +39,10 @@ using namespace rpcf;
 #include "oa2proxy.h"
 #endif
 
+#include "fastrpc.h"
+#include "stmport.h"
+#include "sacheck.h"
+
 namespace rpcf
 {
 
@@ -681,6 +685,8 @@ gint32 CRpcTcpBridgeAuth::LogSuccessfuleLogin(
                 std::to_string( dwVal ) + ",";
         if( strSess.substr( 0, 4 ) == "AUoa" )
             strMsg += stdstr( "Auth=OAuth2," );
+        if( strSess.substr( 0, 4 ) == "AUsa" )
+            strMsg += stdstr( "Auth=SimpAuth," );
         else if( strSess.substr( 0, 2 ) == "AU" )
             strMsg += stdstr( "Auth=krb5," );
         else
@@ -1993,10 +1999,16 @@ gint32 CAuthentProxy::CreateSessImpl(
 
         std::string strObjName;
         if( strMech == "krb5" )
+        {
             strObjName = OBJNAME_AUTHSVR;
+        }
         else if( strMech == "OAuth2" )
         {
             strObjName = "OAuth2LoginServer";
+        }
+        else if( strMech == "SimpAuth" )
+        {
+            strObjName = "SimpAuthLoginServer";
         }
         else
         {
@@ -2052,6 +2064,14 @@ gint32 CAuthentProxy::CreateSessImpl(
             if( SUCCEEDED( ret ) )
                 pImpl = pIf;
 #endif
+        }
+        else if( strMech == "SimpAuth" )
+        {
+            ret = pIf.NewObj(
+                clsid( CSimpAuthLoginProxyImpl ),
+                oCfg.GetCfg() );
+            if( SUCCEEDED( ret ) )
+                pImpl = pIf;
         }
         else
         {
@@ -2639,9 +2659,10 @@ gint32 CRpcTcpBridgeProxyAuth::SetSessHash(
         if( strHash.empty() )
             break;
 
-        if( strHash.substr( 0, 4 ) == "AUoa" )
+        if( strHash.substr( 0, 4 ) == "AUoa" ||
+            strHash.substr( 0, 4 ) == "AUsa" )
         {
-            // OAuth2
+            // OAuth2 or SimpAuth
             EnableInterfaces();
             break;
         }
@@ -3777,7 +3798,8 @@ gint32 CAuthentServer::GetAuthImpl(
 {
     guint32 ret = 0;
     do{
-        if( GetAuthMech() != "OAuth2" )
+        stdstr strMech = GetAuthMech();
+        if( strMech == "krb5" )
         {
             pAuthImpl = m_pAuthImpl;
             break;
@@ -3865,7 +3887,10 @@ gint32 CAuthentServer::GetAuthImpl(
             func, nullptr, this ); 
         if( ERROR( ret ) )
             break;
-        ret = StartOA2Checker( pCompTask );
+        if( strMech == "OAuth2" )
+            ret = StartOA2Checker( pCompTask );
+        else if( strMech == "SimpAuth" )
+            ret = StartSimpAuthCli( pCompTask );
         if( ERROR( ret ) )
             ( *pCompTask )( eventCancelTask );
         // notify to queue the login task
@@ -3937,14 +3962,24 @@ gint32 CAuthentServer::Login(
         ret = this->GetAuthImpl( pObj );
         if( ret == -EAGAIN )
         {
-#ifdef OA2
-            if( GetAuthMech() == "OAuth2" )
+            stdstr strMech = GetAuthMech();
+            gint32 dwMech = 0;
+            if( strMech == "OAuth2" )
+                dwMech = 1;
+            else if( strMech == "SimpAuth" )
+                dwMech = 2;
+            if( dwMech )
             {
                 // restart the checker, OAuth2 checker
                 // may drop offline if inactivity lasts
                 // over two minutes.
-                DebugPrintEx( logErr, 0,
-                    "Reconnect the oa2checker" );
+                if( dwMech == 1 )
+                    DebugPrintEx( logErr, 0,
+                        "Reconnect the oa2checker" );
+                else
+                    DebugPrintEx( logErr, 0,
+                        "Reconnect the saclient" );
+
                 gint32 (*pLogin)(
                     CAuthentServer*,
                     IEventSink*, IConfigDb* ) =
@@ -3990,7 +4025,6 @@ gint32 CAuthentServer::Login(
                 break;
             }
             else
-#endif
             {
                 ret = ERROR_STATE;
                 break;
@@ -4492,6 +4526,107 @@ gint32 CAuthentServer::StartOA2Checker(
     return ret;
 }
 
+gint32 CAuthentServer::OnStartSimpAuthCliComplete(
+    IEventSink* pCallback,
+    IEventSink* pIoReq,
+    IConfigDb* pReqCtx )
+{
+    if( pCallback == nullptr ||
+        pIoReq == nullptr ||
+        pReqCtx == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    CParamList oParams;
+    CCfgOpener oReqCtx( pReqCtx );
+
+    do{
+        CCfgOpenerObj oReq( pIoReq );
+        IConfigDb* pResp = nullptr;
+        ret = oReq.GetPointer(
+            propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oResp( pResp );
+        gint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue,
+            ( guint32& ) iRet );
+
+        if( ERROR( ret ) )
+            break;
+
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+
+        InterfPtr pIf;
+        ret = GetSimpleAuthcli( pIf );
+        if( ERROR( ret ) )
+            break;
+        SetAuthImpl( ObjPtr( pIf ) );
+
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        LOGERR( this->GetIoMgr(), ret,
+        "Error, failed to connect to SimpleAuthServer, "
+        "login stop working" );
+
+        DebugPrintEx( logErr, ret,
+            "Error, failed to connect to SimpleAuthServer, " 
+            "login stop working" );
+    }
+
+    pCallback->OnEvent( eventTaskComp,
+        ret, 0, ( LONGWORD* )pIoReq );
+
+    return ret;
+}
+
+gint32 CAuthentServer::StartSimpAuthCli(
+    IEventSink* pCallback )
+{
+    if( pCallback == nullptr )
+        return -EINVAL;
+
+    gint32 ret = 0;
+
+    do{
+        CCfgOpener oCfg;
+        CIoManager* pMgr = GetIoMgr();
+        CRpcRouter* pRouter = ObjPtr( this );
+
+        oCfg.SetPointer(
+            propRouterPtr, pRouter );
+
+        ret = oCfg.CopyProp(
+            propAuthInfo, this );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oReqCtx;
+        TaskletPtr pRespCb;
+        ret = NEW_PROXY_RESP_HANDLER2(
+            pRespCb, ObjPtr( this ),
+            &CAuthentServer::OnStartSimpAuthCliComplete,
+            pCallback,
+            ( IConfigDb* )oReqCtx.GetCfg() );
+        if( ERROR( ret ) )
+            break;
+        ret = CSimpleAuthCliWrapper::Create(
+            pMgr, pRespCb, oCfg.GetCfg() );
+
+        if( ret != STATUS_PENDING )
+            ( *pRespCb )( eventCancelTask );
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CAuthentServer::OnPostStart(
     IEventSink* pCallback )
 {
@@ -4540,6 +4675,13 @@ gint32 CAuthentServer::OnPostStart(
             break;
         }
 #endif
+        if( strMech == "SimpAuth" )
+        {
+            ret = pMgr->TryLoadClassFactory(
+                "./libappmancli.so" );
+            ret = StartSimpAuthCli( pCallback );
+            break;
+        }
         ret = -ENOTSUP;
 
     }while( 0 );

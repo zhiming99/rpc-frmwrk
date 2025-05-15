@@ -384,6 +384,15 @@ class CAuthentServer:
 
     gint32 StartOA2Checker(
         IEventSink* pCallback );
+
+    gint32 OnStartSimpAuthCliComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 StartSimpAuthCli(
+        IEventSink* pCallback );
+
     public:
     typedef CAggInterfaceServer super;
     CAuthentServer( const IConfigDb* pCfg ) :

@@ -1670,6 +1670,8 @@ class ConfigDlg(Gtk.Dialog):
                     self.ToggleAuthControls( bActive, True )
                 elif name == 'OAuth2' and IsFeatureEnabled( "js"):
                     self.ToggleAuthControls( bActive, False )
+                elif name == 'SimpAuth' :
+                    self.ToggleAuthControls( bActive, False )
             return
         elif name == 'GmSSL' or name == 'VerifyPeer':
             pass
@@ -2562,6 +2564,21 @@ EOF
             print( err )
             return False
 
+    def IsSimpAuthEnabled( self )->bool :
+        try:
+            bChecked = self.IsAuthChecked()
+            if not bChecked :
+                return False
+            it = self.mechCombo.get_active_iter()
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'SimpAuth':
+                    return True
+        except Exception as err:
+            print( err )
+            return False
+
     def ToggleAuthControls( self, bActive : bool, bKrb5 ):
         bSensitive = bActive and bKrb5
         self.svcEdit.set_sensitive( bSensitive )
@@ -2581,14 +2598,18 @@ EOF
             self.checkNoUpdRpc.set_sensitive( bSensitive )
             self.labelNoUpdRpc.set_sensitive( bSensitive )
 
+        bOAuth2 = False
+        bSimpAuth = False
         grid = self.gridSec
+        it = self.mechCombo.get_active_iter()
         if not bActive :
             self.oa2cEdit.set_sensitive( False )
             self.oa2cpEdit.set_sensitive( False )
             self.authUrlEdit.set_sensitive( False )
             self.oa2sslCheck.set_sensitive( False )
 
-            it = self.mechCombo.get_active_iter()
+            self.sauserEdit.set_sensitive( False )
+
             if it is not None:
                 model = self.mechCombo.get_model()
                 row_id, name = model[it][:2]
@@ -2603,6 +2624,11 @@ EOF
                     self.labelOa2cp.set_text("")
                     self.labelAuthUrl.set_text("")
                     self.labelOA2ssl.set_text("")
+
+                    self.labelSAUser.set_text("")
+                    grid.remove( self.oa2cEdit )
+                    grid.remove( self.sauserEdit )
+
                 elif name == 'OAuth2':
                     self.labelSvc.set_text("")
                     self.labelRealm.set_text("")
@@ -2610,13 +2636,44 @@ EOF
                     self.labelUser.set_text("")
                     self.labelKdc.set_text("")
 
+                    self.labelSAUser.set_text("")
+
                     self.labelOa2c.set_text("Checker IP: ")
                     self.labelOa2cp.set_text("Checker Port: ")
                     self.labelAuthUrl.set_text("Auth URL: ")
                     self.labelOA2ssl.set_text("Enable SSL: ")
+                    grid.remove( self.svcEdit )
+                    grid.remove( self.sauserEdit )
+
+                elif name == "SimpAuth" :
+                    # using kerberos's edit to fill the empty
+                    # rows
+                    self.labelRealm.set_text( "Realm: ")
+                    self.labelSign.set_text("Sign/Encrypt: ")
+                    self.labelUser.set_text("User Name: ")
+                    self.labelKdc.set_text("KDC Address: ")
+                    self.labelSvc.set_text( "" )
+
+                    self.labelOa2c.set_text("")
+                    self.labelOa2cp.set_text("")
+                    self.labelAuthUrl.set_text("")
+                    self.labelOA2ssl.set_text("")
+
+                    grid.remove( self.svcEdit )
+                    grid.remove( self.oa2cEdit )
+
+                    self.labelSAUser.set_text("SA User Name: ")
+
             self.mechCombo.set_sensitive( False )
             return
         else:
+            if it is not None:
+                model = self.mechCombo.get_model()
+                row_id, name = model[it][:2]
+                if name == 'OAuth2':
+                    bOAuth2 = True
+                elif name == 'SimpAuth':
+                    bSimpAuth = True
             self.mechCombo.set_sensitive( True )
 
         if bKrb5:
@@ -2632,10 +2689,14 @@ EOF
             grid.remove( self.authUrlEdit )
             grid.remove( self.oa2sslCheck )
 
+            grid.remove( self.sauserEdit )
+
             self.labelOa2c.set_text("")
             self.labelOa2cp.set_text("")
             self.labelAuthUrl.set_text("")
             self.labelOA2ssl.set_text("")
+
+            self.labelSAUser.set_text("")
 
             grid.attach( self.svcEdit,
                 self.svcEdit.cpos, self.svcEdit.rpos, 2, 1 )
@@ -2670,7 +2731,7 @@ EOF
             self.labelSign.set_text("Sign/Encrypt: ")
             self.labelUser.set_text("User Name: ")
             self.labelKdc.set_text("KDC Address: ")
-        else:
+        elif bOAuth2:
             self.labelSvc.set_text("")
             self.labelRealm.set_text("")
             self.svcEdit.set_sensitive( False )
@@ -2687,11 +2748,15 @@ EOF
             grid.remove( self.kdcEdit )
             grid.remove( self.btnEnaKProxy )
 
+            grid.remove( self.sauserEdit )
+
             self.labelSvc.set_text("")
             self.labelRealm.set_text("")
             self.labelSign.set_text("")
             self.labelUser.set_text("")
             self.labelKdc.set_text("")
+
+            self.labelSAUser.set_text("")
 
             grid.attach( self.oa2cEdit,
                 self.oa2cEdit.cpos, self.oa2cEdit.rpos, 2, 1 )
@@ -2716,6 +2781,46 @@ EOF
             self.labelOa2cp.set_text("Checker Port: ")
             self.labelAuthUrl.set_text("Auth URL: ")
             self.labelOA2ssl.set_text("Enable SSL: ")
+        elif bSimpAuth:
+            if self.svcEdit.is_sensitive():
+                self.svcEdit.set_sensitive( False )
+                self.realmEdit.set_sensitive( False )
+                self.kdcEdit.set_sensitive( False )
+                self.signCombo.set_sensitive( False )
+                self.userEdit.set_sensitive( False )
+                self.btnEnaKProxy.set_sensitive( False )
+
+                self.labelOa2c.set_text("")
+                self.labelOa2cp.set_text("")
+                self.labelAuthUrl.set_text("")
+                self.labelOA2ssl.set_text("")
+
+            elif self.oa2cEdit.is_sensitive():
+                self.oa2cEdit.set_sensitive( False )
+                self.oa2cpEdit.set_sensitive( False )
+                self.authUrlEdit.set_sensitive( False )
+                self.oa2sslCheck.set_sensitive( False )
+
+                self.labelSvc.set_text("")
+                self.labelRealm.set_text("")
+                self.labelSign.set_text("")
+                self.labelUser.set_text("")
+                self.labelKdc.set_text("")
+
+
+            self.labelSvc.set_text("")
+            self.labelOa2c.set_text("")
+
+            grid.remove( self.svcEdit )
+            grid.remove( self.oa2cEdit )
+
+            grid.attach( self.sauserEdit,
+                self.sauserEdit.cpos,
+                self.sauserEdit.rpos, 2, 1 )
+            self.sauserEdit.show()
+            self.sauserEdit.set_sensitive( True )
+            self.labelSAUser.set_text( "SA User Name: " )
+
 
     def AddAuthCred( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelAuthCred = Gtk.Label()
@@ -2739,6 +2844,7 @@ EOF
         mechList = Gtk.ListStore(int, str)
         mechList.append([1, "Kerberos"] )
         mechList.append( [2, "OAuth2"] )
+        mechList.append( [3, "SimpAuth"] )
     
         # ComboBox for Auth Mechanism
         strMech = "krb5"
@@ -2748,8 +2854,10 @@ EOF
         mechCombo.set_entry_text_column(1)
         if strMech == "krb5" :
             mechCombo.set_active( 0 )
-        else:
+        elif strMech == "OAuth2":
             mechCombo.set_active( 1 )
+        elif strMech == "SimpAuth":
+            mechCombo.set_active( 2 )
 
         mechCombo.set_sensitive( True )
         mechCombo.connect('changed', self.on_selection_changed )
@@ -2775,7 +2883,7 @@ EOF
 
         # OAuth2 Checker IP addr, leave empty to use local IPC
         labelOa2c = Gtk.Label()
-        labelOa2c.set_text("OAuth2 Checker IP: ")
+        labelOa2c.set_text("Checker IP: ")
         labelOa2c.set_xalign(.5)
         grid.attach(labelOa2c, startCol + 0, startRow + 2, 1, 1 )
 
@@ -2918,7 +3026,8 @@ EOF
 
         strUser = ""
         try:
-            strUser = authInfo[ 'UserName']
+            if strMech == "krb5":
+                strUser = authInfo[ 'UserName']
         except Exception as err :
             pass
 
@@ -2940,6 +3049,29 @@ EOF
         self.btnEnaKProxy = btnEnaKProxy
         btnEnaKProxy.cpos = startCol + 1
         btnEnaKProxy.rpos = startRow + 7
+
+        # SimpAuth user name
+        labelSAUser = Gtk.Label()
+        labelSAUser.set_text("SA User Name: ")
+        labelSAUser.set_xalign(.5)
+        grid.attach(labelSAUser, startCol + 0, startRow + 2, 1, 1 )
+
+        strUser = ""
+        try:
+            if strMech == "SimpAuth":
+                strUser = authInfo[ 'UserName']
+        except Exception as err :
+            pass
+
+        sauserEditBox = Gtk.Entry()
+        sauserEditBox.set_text( strUser )
+        sauserEditBox.set_tooltip_text(
+            "SimpAuth User Name for client login with. " +
+            "It affects client settings only." )
+
+        grid.attach(sauserEditBox, startCol + 1, startRow + 2, 2, 1 )
+        sauserEditBox.cpos = startCol + 1
+        sauserEditBox.rpos = startRow + 2
 
         if self.bServer:
 
@@ -2996,6 +3128,9 @@ EOF
         self.labelAuthUrl = labelAuthUrl
         self.oa2sslCheck = oa2sslCheck
         self.labelOA2ssl = labelOA2ssl
+
+        self.sauserEdit = sauserEditBox
+        self.labelSAUser = labelSAUser
 
     def AddMiscOptions( self, grid:Gtk.Grid, startCol, startRow, confVals : dict ) :
         labelMisc = Gtk.Label()
@@ -3465,7 +3600,7 @@ EOF
             elif self.IsOAuth2Enabled() :
                 elemSecs[ 'AuthInfo' ] = authInfo
                 authInfo[ 'AuthMech' ] = 'OAuth2'
-                strIp = self.oa2cEdit.get_text()
+                strIp = self.oa2cEdit.get_text().strip()
                 strPort = self.oa2cpEdit.get_text()
                 if len( strIp ) > 0 :
                     authInfo[ 'OA2ChkIp'] = strIp
@@ -3480,6 +3615,13 @@ EOF
                     authInfo[ 'OA2SSL' ] = "true"
                 else:
                     authInfo[ 'OA2SSL' ] = "false"
+            elif self.IsSimpAuthEnabled() :
+                elemSecs[ 'AuthInfo' ] = authInfo
+                authInfo[ 'AuthMech' ] = 'SimpAuth'
+                strUser = self.sauserEdit.get_text().strip()
+                if len( strUser ) > 0 :
+                    authInfo[ 'UserName' ] = strUser
+                    
 
             elif self.IsAuthChecked():
                 raise Exception( "unsupported auth mech")

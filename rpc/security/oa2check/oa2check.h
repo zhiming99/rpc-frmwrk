@@ -14,7 +14,7 @@
     p##_name.NewObj( clsid( _type ) );\
     _type& _name=*(_type*)p##_name;
 
-enum EnumMyClsid
+enum EnumOA2Clsid
 {
     DECL_CLSID( COA2proxy_CliSkel ) = 0x697B13BB,
     DECL_CLSID( COA2proxy_SvrSkel ),
