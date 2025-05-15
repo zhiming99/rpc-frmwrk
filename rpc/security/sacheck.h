@@ -44,7 +44,11 @@ class CSimpleAuthCliWrapper :
         InterfPtr m_pThis;
         gint32 CheckClientTokenCallback( 
             IConfigDb* context, gint32 iRet,
-            ObjPtr& oInfo /*[ In ]*/ ) override;
+            ObjPtr& oInfo /*[ In ]*/ ) override
+        { return 0; }
+        void OnSvrOffline( IConfigDb*,
+            CSimpleAuth_CliImpl* ) override
+        {}
     };
 
     static gint32 Create( CIoManager* pMgr,
@@ -61,6 +65,15 @@ class CSimpleAuthCliWrapper :
         CfgPtr& pResp ) override/*[ out ]*/
     { return -ENOTSUP; }
 
+    gint32 WrapMessage(
+        const std::string& strSess,
+        BufPtr& pInMsg,
+        BufPtr& pOutMsg ) override
+    {
+        pOutMsg = pInMsg;
+        return 0;
+    }
+        
     gint32 UnwrapMessage(
         const std::string& strSess,
         BufPtr& pInMsg,
@@ -90,7 +103,8 @@ class CSimpleAuthCliWrapper :
     { return ERROR_FALSE; }
 
     gint32 IsSessExpired(
-        const std::string& strSess ) override;
+        const std::string& strSess ) override
+    { return false; }
 
     gint32 InquireSess(
         const std::string& strSess,
@@ -100,6 +114,13 @@ class CSimpleAuthCliWrapper :
         stdstr strToken,
         guint32 dwPortId,
         std::string& strSess );
+
+    gint32 RemoveSession(
+        const std::string& strSess ) override;
+
+    gint32 GetSess(
+        guint32 dwPortId,
+        std::string& strSess ) override;
 
     InterfPtr GetRouter() const
     { return m_pRouter; }

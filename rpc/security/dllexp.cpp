@@ -41,6 +41,9 @@ using namespace rpcf;
 #include "oa2proxy.h"
 extern FactoryPtr OA2CheckClassFactory();
 #endif
+#include "fastrpc.h"
+#include "sacheck.h"
+#include "saproxy.h"
 
 namespace rpcf
 {
@@ -73,6 +76,9 @@ static FactoryPtr InitClassFactory()
 #ifdef OA2
     INIT_MAP_ENTRYCFG( COAuth2LoginProxyImpl );
 #endif
+
+    INIT_MAP_ENTRYCFG( CSimpleAuthCliWrapper );
+    INIT_MAP_ENTRYCFG( CSimpAuthLoginProxyImpl );
 
     END_FACTORY_MAPS;
 };

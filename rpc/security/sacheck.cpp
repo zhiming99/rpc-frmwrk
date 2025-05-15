@@ -78,4 +78,40 @@ CSimpleAuthCliWrapper::CSimpleAuthCliWrapper(
     }
 }
 
+gint32 CSimpleAuthCliWrapper::Login(
+    IEventSink* pCallback,
+    IConfigDb* pInfo, /*[ in ]*/
+    CfgPtr& pResp ) /*[ out ]*/
+{
+    return ERROR_NOT_IMPL;
+}
+
+gint32 CSimpleAuthCliWrapper::InquireSess(
+    const std::string& strSess,
+    CfgPtr& pInfo )
+{
+    return ERROR_NOT_IMPL;
+}
+
+gint32 CSimpleAuthCliWrapper::GenSessHash(
+    stdstr strToken,
+    guint32 dwPortId,
+    std::string& strSess )
+{
+    return ERROR_NOT_IMPL;
+}
+
+gint32 CSimpleAuthCliWrapper::RemoveSession(
+    const std::string& strSess )
+{
+    return ERROR_NOT_IMPL;
+}
+
+gint32 CSimpleAuthCliWrapper::GetSess(
+    guint32 dwPortId,
+    std::string& strSess )
+{
+    return ERROR_NOT_IMPL;
+}
+
 }

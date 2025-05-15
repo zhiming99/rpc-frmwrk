@@ -47,7 +47,8 @@ struct IAsyncSACallbacks
     { return 0; }
 
     virtual void OnSvrOffline( IConfigDb* context,
-        CSimpleAuth_CliImpl* pIf );
+        CSimpleAuth_CliImpl* pIf )
+    { return; }
 };
 
 using PSAACBS=std::shared_ptr<IAsyncSACallbacks>;
