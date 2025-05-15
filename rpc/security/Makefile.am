@@ -35,5 +35,6 @@ EXTRA_DIST=README.md README_cn.md
 libauth_la_LDFLAGS = -version-info @VERSION2@
 libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc \
  -L$(top_srcdir)/3rd_party -lutils $(OA2Lib) $(OA2Login)\
-../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK_KRB5) 
+../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK_KRB5) \
+ $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la
 
