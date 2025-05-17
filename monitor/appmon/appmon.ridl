@@ -94,6 +94,9 @@ interface IUserManager
     returns( int32 dwUid );
     [async_s]GetPasswordSalt( int32 dwUid )
     returns( string strSalt );
+    [async_s]CheckClientToken(
+        ObjPtr pClientInfo, ObjPtr pSvrInfo )
+    returns( ObjPtr pInfo );
 };
 
 service AppManager [stream] 

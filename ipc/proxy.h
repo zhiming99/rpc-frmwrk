@@ -626,6 +626,9 @@ struct CTimestampProxy :
     void SetPeer( guint64 qwTs )
     { m_qwPeerBaseSec = qwTs; }
 
+    guint64 GetPeer() const
+    { return m_qwPeerBaseSec; }
+
     // for relay
     guint64 GetPeerTimestamp(
         guint64 qwTimestampSec ) const

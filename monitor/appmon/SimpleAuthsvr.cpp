@@ -67,7 +67,18 @@ gint32 CSimpleAuth_SvrImpl::GetPasswordSalt(
     // when the service is done
     return ERROR_NOT_IMPL;
 }
-
+/* Async Req Handler*/
+gint32 CSimpleAuth_SvrImpl::CheckClientToken( 
+    IConfigDb* pContext, 
+    ObjPtr& oClientInfo /*[ In ]*/,
+    ObjPtr& oSvrInfo /*[ In ]*/, 
+    ObjPtr& oInfo /*[ Out ]*/ )
+{
+    // TODO: Emit an async operation here.
+    // And make sure to call 'CheckClientTokenComplete'
+    // when the service is done
+    return ERROR_NOT_IMPL;
+}
 gint32 CSimpleAuth_SvrImpl::CreateStmSkel(
     HANDLE hStream, guint32 dwPortId, InterfPtr& pIf )
 {
