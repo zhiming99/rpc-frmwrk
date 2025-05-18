@@ -109,7 +109,7 @@ class COA2proxy_CliImpl :
     { return -ENOTSUP; }
 
     gint32 GenSessHash(
-        stdstr strToken,
+        const stdstr& strToken,
         guint32 dwPortId,
         std::string& strSess );
 

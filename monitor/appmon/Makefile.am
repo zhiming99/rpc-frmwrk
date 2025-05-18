@@ -16,6 +16,14 @@ appmonsvr_LDADD= ./libappmon.a \
  -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
  -L$(top_srcdir)/3rd_party 
 
+if ENABLE_OPENSSL
+appmonsvr_LDADD+= $(COMMON_LINK_SSL)
+endif
+
+if ENABLE_GMSSL
+appmonsvr_LDADD+= -L$(libdir) -lgmssl 
+endif
+
 #appmoncli_LDADD=$(appmonsvr_LDADD)
 
 appmonconf_DATA=appmondesc.json appmon.ridl

@@ -1234,6 +1234,10 @@ gint32 CAppMonitor_ChannelSvr::OnStreamReady(
                     break;
                 }
             }
+            else if( iMech == 2 )
+            {
+                oVar = strName;
+            }
             stdstr strUname( ( stdstr& )oVar );
             strPath = "/users/";
             strPath += strUname + "/uid";

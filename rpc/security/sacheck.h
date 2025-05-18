@@ -29,27 +29,29 @@
 namespace rpcf
 {
 
+struct CSacwCallbacks : IAsyncSACallbacks
+{
+    InterfPtr m_pThis;
+    gint32 CheckClientTokenCallback( 
+        IConfigDb* context, gint32 iRet,
+        ObjPtr& oInfo /*[ In ]*/ ) override;
+    void OnSvrOffline( IConfigDb*,
+        CSimpleAuth_CliImpl* ) override;
+};
+
 class CSimpleAuthCliWrapper :
     public CSimpleAuth_CliImpl,
     public IAuthenticateServer
 {
     InterfPtr m_pRouter;
 
+    std::map< std::string, guint32 > m_mapSess2PortId;
+    std::map< guint32, std::string > m_mapPortId2Sess;
+    std::map< guint32, ObjPtr > m_mapSessions; 
+
     public:
     typedef CSimpleAuth_CliImpl super;
     CSimpleAuthCliWrapper( const IConfigDb* pCfg );
-
-    struct CSacwCallbacks : IAsyncSACallbacks
-    {
-        InterfPtr m_pThis;
-        gint32 CheckClientTokenCallback( 
-            IConfigDb* context, gint32 iRet,
-            ObjPtr& oInfo /*[ In ]*/ ) override
-        { return 0; }
-        void OnSvrOffline( IConfigDb*,
-            CSimpleAuth_CliImpl* ) override
-        {}
-    };
 
     static gint32 Create( CIoManager* pMgr,
         IEventSink* pCallback, IConfigDb* pCfg );
@@ -103,20 +105,25 @@ class CSimpleAuthCliWrapper :
     { return ERROR_FALSE; }
 
     gint32 IsSessExpired(
-        const std::string& strSess ) override
-    { return false; }
+        const std::string& strSess ) override;
+
+    gint32 AddSession( guint32 dwPortId, 
+        const std::string& strSess,
+        CfgPtr& pSessInfo );
 
     gint32 InquireSess(
         const std::string& strSess,
         CfgPtr& pInfo ) override;
 
     gint32 GenSessHash(
-        stdstr strToken,
+        const stdstr& strToken,
         guint32 dwPortId,
         std::string& strSess );
 
     gint32 RemoveSession(
-        const std::string& strSess ) override;
+        const stdstr& strSess ) override;
+
+    gint32 RemoveSession( guint32 dwPortId );
 
     gint32 GetSess(
         guint32 dwPortId,

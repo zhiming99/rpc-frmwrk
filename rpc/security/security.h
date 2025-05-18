@@ -438,6 +438,8 @@ class CAuthentServer:
         gint32 dwPortId,
         std::string& strSess );
 
+    gint32 StartNewAuthImpl();
+
     gint32 GetAuthImpl(
         ObjPtr& pAuthImpl );
 

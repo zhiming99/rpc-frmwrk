@@ -15,7 +15,7 @@ SUBDIRS =
 if ENABLE_JS
 libauth_la_CPPFLAGS += -DOA2 -I../../monitor/registry
 SUBDIRS += oa2check
-OA2Lib = -L./oa2check -loa2check $(COMMON_LINK_SSL)
+OA2Lib = -L./oa2check -loa2check 
 OA2Login = ../../monitor/registry/libregfs.la
 OA2_sources = oa2proxy.cpp
 OA2_headers = oa2proxy.h
@@ -36,5 +36,13 @@ libauth_la_LDFLAGS = -version-info @VERSION2@
 libauth_la_LIBADD = -L$(top_srcdir)/combase -L.. -L$(top_srcdir)/ipc \
  -L$(top_srcdir)/3rd_party -lutils $(OA2Lib) $(OA2Login)\
 ../librpc.la ../../ipc/libipc.la ../../combase/libcombase.la -lpthread -ldl $(COMMON_LINK_KRB5) \
- $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la
+ $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la 
+
+if ENABLE_OPENSSL
+libauth_la_LIBADD += $(COMMON_LINK_SSL)
+endif
+
+if ENABLE_GMSSL
+libauth_la_LIBADD += -lgmssl
+endif
 
