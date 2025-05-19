@@ -495,7 +495,7 @@ void Usage(const char* szProg) {
               << "  -s <userName>   Store credential for userName\n"
               << "  -p <password>   Password (if omitted, will prompt)\n"
               << "  -r <userName>   Remove credential for userName\n"
-              << "  -l              List all stored usernames\n";
+              << "  -l              List all stored credentials\n";
 }
 
 gint32 CheckRegistry()

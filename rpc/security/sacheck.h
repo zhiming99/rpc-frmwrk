@@ -56,6 +56,9 @@ class CSimpleAuthCliWrapper :
     static gint32 Create( CIoManager* pMgr,
         IEventSink* pCallback, IConfigDb* pCfg );
 
+    static gint32 Destroy( CIoManager* pMgr,
+        IEventSink* pCallback );
+
     gint32 Login(
         IEventSink* pCallback,
         IConfigDb* pInfo, /*[ in ]*/

@@ -10,8 +10,9 @@
 gint32 GetSimpleAuthcli( InterfPtr& pCli );
 
 gint32 DestroySimpleAuthcli(
-    CIoManager* pMgr, IEventSink* pCallback );
-
+    CIoManager* pMgr,
+    IEventSink* pCallback,
+    bool bSeq = true );
 
 class CSimpleAuth_CliImpl;
 struct IAsyncSACallbacks
@@ -106,8 +107,7 @@ class CSimpleAuth_CliImpl
         m_pContext = pcontext;
     };
 
-    inline void ClearCallbacks(
-        PSAACBS& pCbs, const CfgPtr& pcontext )
+    inline void ClearCallbacks()
     {
         CStdRMutex  oLock( GetLock() );
         m_pAsyncCbs.reset();

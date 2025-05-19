@@ -38,6 +38,7 @@ using namespace rpcf;
 #define CLI_REG "clientreg.dat"
 #include "oa2proxy.h"
 #endif
+#include "saproxy.h"
 
 #include "fastrpc.h"
 #include "stmport.h"
@@ -1896,6 +1897,24 @@ gint32 CAuthentProxy::BuildLoginTask(
 
 #endif
         }
+        else if( strMech == "SimpAuth" )
+        {
+            TaskletPtr pLoginTask;
+            ret = DEFER_IFCALLEX2_NOSCHED2(
+                0, pLoginTask, ObjPtr( pIf ),
+                &CSimpAuthLoginProxyImpl::DoLogin,
+                nullptr );
+
+            if( ERROR( ret ) )
+                break;
+
+            CIfRetryTask* pRetryTask = pLoginTask;
+            pRetryTask->SetClientNotify( pCallback );
+
+            pTask = pLoginTask;
+            break;
+        }
+
 
         ret = -ENOTSUP;
 
@@ -3856,9 +3875,10 @@ gint32 CAuthentServer::StartNewAuthImpl()
                     ret = ERROR_STATE;
                 TaskGrpPtr pg =
                     pSvr->GetPendingLogins();
-                EnumTaskState s = pg->GetTaskState();
+
                 bool bHasLogin = ( !pg.IsEmpty() &&
-                    !pg->IsStopped( s ) );
+                    !pg->IsStopped( pg->GetTaskState() ) );
+
                 ObjPtr pImpl = pSvr->GetAuthImplNoLock();
                 oLock.Unlock();
                 if( ERROR( ret ) && bHasLogin )
@@ -3868,11 +3888,7 @@ gint32 CAuthentServer::StartNewAuthImpl()
                 }
                 else if( ERROR( iRet ) )
                 {
-                    OutputMsg( iRet,
-                        "Error start the AuthImpl "
-                        "failed, retry is "
-                        "scheduled in 10 seconds" );
-                    RetryStartAuthImpl( pSvr );
+                    // retry is already scheduled.
                     break;
                 }
                 else if( bHasLogin )
@@ -4629,7 +4645,7 @@ gint32 CAuthentServer::OnStartSimpAuthCliComplete(
         DebugPrintEx( logErr, ret,
             "Warning, failed to connect to SimpleAuthServer, " 
             "retry is scheduled..." );
-        ret = RetryStartAuthImpl( this );
+        RetryStartAuthImpl( this );
     }
 
     pCallback->OnEvent( eventTaskComp,
@@ -4730,7 +4746,23 @@ gint32 CAuthentServer::OnPostStart(
         {
             ret = pMgr->TryLoadClassFactory(
                 "./libappmancli.so" );
-            ret = StartSimpAuthCli( pCallback );
+
+            gint32 (*func)( IEventSink*, IEventSink* ) =
+            ([]( IEventSink* pTask, IEventSink* pCb )->gint32
+            {
+                // ignore the failure if happened.
+                pCb->OnEvent(
+                    eventTaskComp, 0, 0, nullptr );
+                return 0;
+            });
+
+            TaskletPtr pCb;
+            ret = NEW_COMPLETE_FUNCALL( 0, 
+                pCb, this->GetIoMgr(),
+                func, nullptr, pCallback );
+            if( ERROR( ret ) )
+                break;
+            ret = StartSimpAuthCli( pCb );
             break;
         }
         ret = -ENOTSUP;
@@ -4800,7 +4832,8 @@ gint32 CAuthentServer::OnPreStop(
     if( ERROR( ret ) )
         return ret;
 
-    if( GetAuthMech() != "OAuth2" )
+    stdstr strMech = GetAuthMech();
+    if( strMech == "krb5" )
     {
         if( m_pAuthImpl.IsEmpty() )
             return -EINVAL;
@@ -4820,6 +4853,7 @@ gint32 CAuthentServer::OnPreStop(
             m_pAuthImpl.Clear();
         return ret;
     }
+    else if( strMech == "OAuth2" )
     do{
         ObjPtr pImpl;
         CStdRMutex oLock( GetLock() );
@@ -4853,6 +4887,12 @@ gint32 CAuthentServer::OnPreStop(
             break;
         }
     }while( 0 );
+    else if( strMech == "SimpAuth" )
+    {
+        m_pAuthImpl.Clear();
+        ret = CSimpleAuthCliWrapper::Destroy(
+            GetIoMgr(), pCallback );
+    }
     return ret;
 }
 

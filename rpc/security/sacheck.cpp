@@ -53,7 +53,7 @@ gint32 CSimpleAuthCliWrapper::Create(
 
         ret = NEW_FUNCCALL_TASKEX2( 1, pDestroy,
             pMgr, DestroySimpleAuthcli, pMgr,
-            ( IEventSink* )nullptr );
+            ( IEventSink* )nullptr, false );
         if( ERROR( ret ) )
             break;
 
@@ -124,6 +124,20 @@ gint32 CSimpleAuthCliWrapper::Create(
         ( *pGrp )( eventCancelTask );
 
     return ret;
+}
+
+gint32 CSimpleAuthCliWrapper::Destroy(
+    CIoManager* pMgr,
+    IEventSink* pCallback )
+{
+    TaskletPtr pDummy;
+    if( pCallback == nullptr )
+    {
+        pDummy.NewObj( clsid( CIfDummyTask ) );    
+        pCallback = pDummy;
+    }
+    return DestroySimpleAuthcli(
+        pMgr, pCallback, false );
 }
 
 CSimpleAuthCliWrapper::CSimpleAuthCliWrapper(

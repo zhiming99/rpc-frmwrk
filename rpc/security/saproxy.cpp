@@ -173,7 +173,7 @@ gint32 CSimpAuthLoginProxy::DoLogin(
         // run this task on a standalone thread
         CIoManager* pMgr = GetIoMgr();
         ret = pMgr->RescheduleTask(
-            pDeferTask, true );
+            pDeferTask, false );
 
         if( ERROR( ret ) )
         {
@@ -284,13 +284,14 @@ static gint32 DecryptKey_OpenSSL( RegFsPtr& pfs,
                 ret = -EFAULT;
                 continue;
             }
-            ret = EVP_PKEY_CTX_set_rsa_oaep_md(
+
+            /*ret = EVP_PKEY_CTX_set_rsa_oaep_md(
                 dctx, EVP_sha256() );
             if( ret <= 0 )
             {
                 ret = -EFAULT;
                 continue;
-            }
+            }*/
 
             ret = EVP_PKEY_decrypt(dctx, NULL,
                 &dec_len, ( guint8* )pEncKey->ptr(),
@@ -314,6 +315,7 @@ static gint32 DecryptKey_OpenSSL( RegFsPtr& pfs,
                 ERR_error_string(error, error_string);
                 OutputMsg(0, "Error message: %s\n", error_string);
             }
+            pDec->Resize( dec_len );
             EVP_PKEY_CTX_free(dctx);
             if( ret > 0 )
                 break;
