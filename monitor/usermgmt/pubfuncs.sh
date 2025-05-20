@@ -733,9 +733,9 @@ function set_password()
         return 1
     fi
     #salt=`tr -dc A-Za-z0-9 </dev/urandom | head -c 13; echo`
-    salt=`echo -n $_uname | sha256sum | awk '{print $1}'`
-    firsthash=`echo -n $password | sha256sum | awk '{print $1}'`
-    passhash=`echo -n $firsthash$salt | sha256sum | awk '{print $1}'`
+    salt=`echo -n $_uname | sha256sum | awk '{print $1}' | tr '[:lower:]' '[:upper:]'`
+    firsthash=`echo -n $password | sha256sum | awk '{print $1}' | tr '[:lower:]' '[:upper:]'`
+    passhash=`echo -n $firsthash$salt | sha256sum | awk '{print $1}' | tr '[:lower:]' '[:upper:]'`
     python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$passhash\"}" $_udir/passwd > /dev/null 
     passhash=
 }

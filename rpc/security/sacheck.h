@@ -136,11 +136,7 @@ class CSimpleAuthCliWrapper :
     { return m_pRouter; }
 
     gint32 OnPostStop(
-        IEventSink* pCb ) override
-    {
-        m_pRouter.Clear();
-        return super::OnPostStop( pCb );
-    }
+        IEventSink* pCb ) override;
 };
 
 }

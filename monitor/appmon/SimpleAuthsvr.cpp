@@ -296,11 +296,14 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             ret = -EACCES;
             break;
         }
-        CCfgOpener oRetInfo;
+        CParamList oRetInfo;
         oRetInfo.SetQwordProp(
             propTimestamp, qwTs2 );
         oRetInfo.SetStrProp(
             propUserName, strUser );
+        oRetInfo.SetBoolProp(
+            propContinue, false );
+        pRetInfo = oRetInfo.GetCfg();
 
     }while( 0 );
     return ret;

@@ -112,12 +112,18 @@ gint32 CSimpleAuthCliWrapper::Create(
 
         CIfRetryTask* pRetry = pComp;
         pRetry->SetClientNotify( pCreate );
+        pCreate->MarkPending();
 
         pGrp->AppendTask( pCreate );
         TaskletPtr pTask = pGrp;
         ret = pMgr->RescheduleTask( pTask );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
+        else if( ERROR( ret ) )
+        {
+            pRetry->ClearClientNotify();
+            ( *pComp )( eventCancelTask );
+        }
 
     }while( 0 );
     if( ERROR( ret ) && !pGrp.IsEmpty() )
@@ -176,7 +182,7 @@ CSimpleAuthCliWrapper::CSimpleAuthCliWrapper(
 
 gint32 CSacwCallbacks::CheckClientTokenCallback( 
     IConfigDb* context, gint32 iRet,
-    ObjPtr& oInfo /*[ In ]*/ )
+    ObjPtr& pInfo /*[ In ]*/ )
 {
     gint32 ret = 0;
     if( context == nullptr )
@@ -222,9 +228,6 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
 
         oResp[ propSessHash ] = strSess;
 
-        oCtx.RemoveProperty( propReqPtr );
-        oCtx.RemoveProperty( propEventSink );
-        oCtx.RemoveProperty( propGmSSL );
         timespec ts;
         clock_gettime( CLOCK_REALTIME, &ts );
         guint64 qwTs = ts.tv_sec;
@@ -235,16 +238,17 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
         oResp.CopyProp( propSalt,
             ( IConfigDb* )oCtx.GetCfg() );
         CStdRMutex oIfLock( psac->GetLock() );
-        CfgPtr pCfg = oCtx.GetCfg();
+        CfgPtr pSess( context );
         psac->AddSession(
-            dwPortId, strSess, pCfg );
+            dwPortId, strSess, pSess );
+        oResp.Push( pInfo );
 
     }while( 0 );
     oResp[ propReturnValue ] = ret;
     Variant oVar( ObjPtr( oResp.GetCfg() ) );
     pCb->SetProperty( propRespPtr, oVar );
-    pCb->OnEvent(
-        eventTaskComp, iRet, 0, nullptr );
+    pCb->OnEvent( eventTaskComp,
+        iRet, 0, nullptr );
     oCtx.RemoveProperty( propEventSink );
     return ret;
 }
@@ -252,7 +256,33 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
 void CSacwCallbacks::OnSvrOffline(
     IConfigDb* context,
     CSimpleAuth_CliImpl* pIf )
-{ return; }
+{
+    return;
+}
+gint32 CSimpleAuthCliWrapper::OnPostStop(
+    IEventSink* pCb )
+{
+    CAuthentServer* prt = this->GetRouter();
+    if( prt == nullptr )
+        return ERROR_STATE;
+    gint32 (*func)( CAuthentServer* ) =
+    ([]( CAuthentServer* prt )
+    {
+        ObjPtr pAuth;
+        // a probe to check whether to reconnect.
+        prt->GetAuthImpl( pAuth );
+        return 0;
+    });
+    CIoManager* pMgr = GetIoMgr();
+    TaskletPtr pReconn;
+    gint32 ret = NEW_FUNCCALL_TASKEX( pReconn,
+        pMgr, func, prt );
+    if( SUCCEEDED( ret ) )
+        pMgr->AddSeqTask( pReconn );
+    ret = super::OnPostStop( pCb );
+    m_pRouter.Clear();
+    return ret;
+}
 
 gint32 CSimpleAuthCliWrapper::Login(
     IEventSink* pCallback,
@@ -424,7 +454,7 @@ gint32 CSimpleAuthCliWrapper::InquireSess(
     auto itr = 
         m_mapSess2PortId.find( strSess );
     if( itr == m_mapSess2PortId.end() )
-        return STATUS_SUCCESS;
+        return ERROR_FAIL;
 
     guint32 dwPortId = itr->second;
     auto it2 = m_mapSessions.find( dwPortId );

@@ -167,7 +167,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
                 pCallback->SetProperty( propRespPtr, oVar );
                 ObjPtr pObj( pCallback );
                 CIfRetryTask* pRetry( pObj );
-                pRetry->ClearClientNotify();
+                // pRetry->ClearClientNotify();
                 pRetry->OnEvent( eventTaskComp,
                     ret, 0, nullptr );
             }while( 0 );
@@ -184,6 +184,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
 
         CIfRetryTask* pRetry = pStartCb;
         pRetry->SetClientNotify( pStartTask );
+        pRetry->MarkPending();
 
         ret = pMgr->AddSeqTask( pStartTask );
         if( ERROR( ret ) )
