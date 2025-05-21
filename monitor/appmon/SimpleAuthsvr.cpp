@@ -10,6 +10,7 @@ using namespace rpcf;
 #include "appmon.h"
 #include "AppMonitorsvr.h"
 #include "SimpleAuthsvr.h"
+#include "encdec.h"
 
 extern RegFsPtr GetRegFs( bool bUser );
 
@@ -68,106 +69,6 @@ gint32 CSimpleAuth_SvrImpl::GetPasswordSalt(
     // And make sure to call 'GetPasswordSaltComplete'
     // when the service is done
     return ERROR_NOT_IMPL;
-}
-
-#include <openssl/evp.h>
-#include <cstring>
-
-// Decrypts AES-GCM block in pToken using pKey.
-// Returns 0 on success, negative error code on failure.
-// The decrypted plaintext will be written to outPlaintext.
-gint32 DecryptAesGcmBlock_OpenSSL(
-    const BufPtr& pKey,
-    const BufPtr& pToken,
-    BufPtr& outPlaintext )
-{
-    if( pKey.IsEmpty() || pToken.IsEmpty() )
-        return -EINVAL;
-    if( pKey->size() != 32 )
-        return -EINVAL; // AES-256-GCM
-
-    const size_t iv_len = 12;
-    const size_t tag_len = 16;
-    if( pToken->size() <= iv_len + tag_len )
-        return -EINVAL;
-
-    const uint8_t* key =
-        (const uint8_t*)pKey->ptr();
-
-    const uint8_t* token =
-        (const uint8_t*)pToken->ptr();
-
-    const uint8_t* iv = token;
-    const uint8_t* ciphertext = token + iv_len;
-
-    size_t ciphertext_len =
-        pToken->size() - iv_len - tag_len;
-
-    const uint8_t* tag =
-        token + pToken->size() - tag_len;
-
-    if( outPlaintext.IsEmpty() )
-        outPlaintext.NewObj();
-
-    outPlaintext->Resize(ciphertext_len);
-
-    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) return -ENOMEM;
-
-    int ret = 0;
-    int len = 0;
-    int plaintext_len = 0;
-
-    do {
-        if( 1 != EVP_DecryptInit_ex( ctx,
-            EVP_aes_256_gcm(), NULL, NULL, NULL) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        if( 1 != EVP_CIPHER_CTX_ctrl( ctx,
-            EVP_CTRL_GCM_SET_IVLEN, iv_len, NULL))
-        {
-            ret = -EFAULT;
-            break;
-        }
-        if( 1 != EVP_DecryptInit_ex( ctx,
-            NULL, NULL, key, iv))
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        if( 1 != EVP_DecryptUpdate( ctx,
-            ( guint8* )outPlaintext->ptr(), &len,
-            ciphertext, ciphertext_len ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        plaintext_len = len;
-        if (1 != EVP_CIPHER_CTX_ctrl( ctx,
-            EVP_CTRL_GCM_SET_TAG,
-            tag_len, (void*)tag ) )
-        {
-            ret = -EFAULT;
-            break;
-        }
-        int rv = EVP_DecryptFinal_ex( ctx,
-            ( guint8* )outPlaintext->ptr() + len,
-            &len);
-        if( rv <= 0 )
-        {
-            ret = -EACCES; // Authentication failed
-            break;
-        }
-        plaintext_len += len;
-        outPlaintext->Resize( plaintext_len );
-    } while (0);
-
-    EVP_CIPHER_CTX_free(ctx);
-    return ret;
 }
 
 /* Async Req Handler*/
@@ -235,10 +136,8 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
         }
 
         BufPtr pOutBuf;
-        if( bGmSSL )
-            break;
-        ret = DecryptAesGcmBlock_OpenSSL(
-            pKey, pToken, pOutBuf );
+        ret = DecryptAesGcmBlock(
+            pKey, pToken, pOutBuf, bGmSSL );
         if( ERROR( ret ) )
             break;
 

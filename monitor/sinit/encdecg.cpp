@@ -26,7 +26,8 @@
 #include <iostream>
 #include <string>
 #include <rpc.h>
-using namespace rpcf;
+namespace rpcf
+{
 extern std::string GetPubKeyPath( bool bGmSSL );
 
 #ifdef GMSSL
@@ -83,23 +84,11 @@ std::string GenPasswordSaltHash_GmSSL(
 }
 
 int EncryptWithPubKey_GmSSL(
-    const std::string& strPassword,
-    const std::string& strSalt,
-    BufPtr& pEncrypted )
+    BufPtr& pBlock, BufPtr& pEncrypted )
 {
     gint32 ret = 0;
     SM2_ENC_CTX ctx;
-    stdstr strPassHash;
     do {
-        strPassHash = GenPasswordSaltHash_GmSSL(
-            strPassword, strSalt );
-        if( strPassHash.empty() )
-        {
-            std::cerr << "Cannot failed to generate "
-                "password hash.\n";
-            ret = ERROR_FAIL;
-            break;
-        }
         uint8_t cert[18192];
         size_t certlen = 0;
         stdstr strPath = GetPubKeyPath( true );
@@ -145,8 +134,8 @@ int EncryptWithPubKey_GmSSL(
         }
 
         if( sm2_encrypt_update( &ctx,
-             reinterpret_cast<const unsigned char*>(strPassHash.data()),
-             strPassHash.size() ) <= 0 )
+             ( guint8* )pBlock->ptr(),
+             pBlock->size() ) <= 0 )
          {
             std::cerr << "Error sm2_encrypt_update failed.\n";
             ret = -1;
@@ -173,7 +162,30 @@ int EncryptWithPubKey_GmSSL(
         ret = pEncrypted->Resize( outlen );
     } while (0);
     gmssl_secure_clear( &ctx, sizeof( ctx ) );
-    strPassHash.assign( strPassHash.size(), ' ' );
     return ret;
 }
+
+// Encrypts pToken using AES-256-GCM with key pKey
+// Output: [12-byte IV][ciphertext][16-byte tag]
+gint32 EncryptAesGcmBlock_GmSSL(const BufPtr& pToken,
+    const BufPtr& pKey, BufPtr& pEncrypted )
+{
+    return ERROR_NOT_IMPL;
+}
+
+gint32 DecryptWithPrivKey_GmSSL(
+    const BufPtr& pEncKey, BufPtr& pKey )
+{
+    return ERROR_NOT_IMPL;
+}
+
+gint32 DecryptAesGcmBlock_GmSSL(
+    const BufPtr& pKey,
+    const BufPtr& pToken,
+    BufPtr& outPlaintext )
+{
+    return ERROR_NOT_IMPL;
+}
 #endif
+
+}

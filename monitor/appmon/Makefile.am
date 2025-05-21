@@ -14,15 +14,8 @@ appmonsvr_LDADD= ./libappmon.a \
 ../registry/libregfs.la ../../ipc/libipc.la $(COMMON_LINK_FUSE3) \
  ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
- -L$(top_srcdir)/3rd_party 
-
-if ENABLE_OPENSSL
-appmonsvr_LDADD+= $(COMMON_LINK_SSL)
-endif
-
-if ENABLE_GMSSL
-appmonsvr_LDADD+= -L$(libdir) -lgmssl 
-endif
+ -L$(top_srcdir)/3rd_party \
+ $(top_srcdir)/monitor/sinit/librpcfenc.la
 
 #appmoncli_LDADD=$(appmonsvr_LDADD)
 
@@ -39,7 +32,7 @@ else
 OFFSET_MACRO=
 endif
 
-appmonsvr_CPPFLAGS= -I../registry -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
+appmonsvr_CPPFLAGS= -I../registry -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(top_srcdir)/monitor/sinit
 appmonsvr_LDFLAGS=-rdynamic
 
 if ENABLE_FUSE3

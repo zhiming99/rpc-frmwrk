@@ -33,6 +33,7 @@ using namespace rpcf;
 #include "oa2proxy.h"
 #include "saproxy.h"
 #include "blkalloc.h"
+#include "encdec.h"
 
 #define SIMPAUTH_DIR "simpleauth"
 
@@ -242,94 +243,6 @@ static gint32 GetDefaultUser(
     return ret;
 }
 
-static gint32 DecryptKey_OpenSSL( RegFsPtr& pfs,
-    const BufPtr& pEncKey, BufPtr& pKey )
-{
-    gint32 ret = 0;
-    do{
-        if( pEncKey.IsEmpty() || pEncKey->empty() )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        stdstr strHome = GetHomeDir();
-        strHome += "/.rpcf/openssl/";
-        std::vector< stdstr > vecKeys = { "clientkey.pem" };
-
-        BufPtr pDec( true );
-        size_t dec_len = 0;
-        for( auto& elem : vecKeys )
-        {
-            stdstr strKeyPath = strHome + elem;
-            FILE *pri_fp = fopen(
-                strKeyPath.c_str(), "r");
-
-            if( pri_fp == nullptr )
-                continue;
-
-            EVP_PKEY *pri_pkey =
-                PEM_read_PrivateKey(
-                    pri_fp, NULL, NULL, NULL);
-
-            fclose(pri_fp);
-
-            EVP_PKEY_CTX *dctx =
-                EVP_PKEY_CTX_new(pri_pkey, NULL);
-            EVP_PKEY_decrypt_init(dctx);
-            ret = EVP_PKEY_CTX_set_rsa_padding(
-                dctx, RSA_PKCS1_OAEP_PADDING );
-            if( ret <= 0 )
-            {
-                ret = -EFAULT;
-                continue;
-            }
-
-            /*ret = EVP_PKEY_CTX_set_rsa_oaep_md(
-                dctx, EVP_sha256() );
-            if( ret <= 0 )
-            {
-                ret = -EFAULT;
-                continue;
-            }*/
-
-            ret = EVP_PKEY_decrypt(dctx, NULL,
-                &dec_len, ( guint8* )pEncKey->ptr(),
-                pEncKey->size() );
-            if( ret <= 0 )
-                continue;
-
-            std::vector<unsigned char>
-                dec_data(dec_len);
-            pDec->Resize( dec_len );
-
-            ret = EVP_PKEY_decrypt(
-                dctx, ( guint8* )pDec->ptr(),
-                &dec_len, ( guint8* )pEncKey->ptr(),
-                pEncKey->size());
-            if( ret <= 0 )
-            {
-                unsigned long error = ERR_get_error(); 
-                // Get a human-readable error string
-                char error_string[256];
-                ERR_error_string(error, error_string);
-                OutputMsg(0, "Error message: %s\n", error_string);
-            }
-            pDec->Resize( dec_len );
-            EVP_PKEY_CTX_free(dctx);
-            if( ret > 0 )
-                break;
-        }
-
-        if( ret > 0 )
-            pKey = pDec;
-
-        else
-            ret = -EACCES;
-    }while( 0 );
-    return ret;
-}
-
 static std::string GetClientRegPath()
 {
     stdstr strCliReg = GetHomeDir();
@@ -405,8 +318,8 @@ gint32 GetPassHash( stdstr& strUser,
             break;
 
         BufPtr pTextHash;
-        ret = DecryptKey_OpenSSL(
-            pfs, pEncKey, pTextHash );
+        ret = DecryptWithPrivKey(
+            pEncKey, pTextHash );
         if( ERROR( ret ) )
         {
             OutputMsg( ret,
@@ -434,98 +347,6 @@ gint32 GetPassHash( stdstr& strUser,
     }while( 0 );
     if( !pfs.IsEmpty() )
         pfs->Stop();
-    return ret;
-}
-#include <openssl/rand.h>
-
-// Encrypts pToken using AES-256-GCM with key pKey
-// Output: [12-byte IV][ciphertext][16-byte tag]
-gint32 EncryptToken(const BufPtr& pToken,
-    const BufPtr& pKey, BufPtr& pEncrypted)
-{
-    if( pToken.IsEmpty() ||
-        pKey.IsEmpty() ||
-        pKey->size() != 32)
-        return -EINVAL;
-
-    const int nIvLen = 12;
-    const int nTagLen = 16;
-    unsigned char iv[nIvLen];
-    if(RAND_bytes(iv, nIvLen) != 1)
-        return -EFAULT;
-
-    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-    if (!ctx)
-        return -ENOMEM;
-
-    gint32 ret = 0;
-    int len = 0;
-    int ciphertext_len = 0;
-    unsigned char tag[nTagLen];
-
-    do {
-        if( EVP_EncryptInit_ex( ctx,
-            EVP_aes_256_gcm(),
-            NULL, NULL, NULL) != 1)
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        if (EVP_EncryptInit_ex(ctx, NULL, NULL,
-            ( guint8* )pKey->ptr(), iv ) != 1 )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        std::vector<unsigned char>
-            ciphertext( pToken->size() + nTagLen );
-
-        if( EVP_EncryptUpdate(ctx,
-            ciphertext.data(), &len,
-           ( unsigned char* )pToken->ptr(),
-           pToken->size()) != 1)
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        ciphertext_len = len;
-
-        if( EVP_EncryptFinal_ex(ctx,
-            ciphertext.data() + len, &len) != 1)
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        ciphertext_len += len;
-
-        if( EVP_CIPHER_CTX_ctrl( ctx,
-            EVP_CTRL_GCM_GET_TAG,
-            nTagLen, tag) != 1)
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-
-        // Output: [IV][ciphertext][tag]
-        pEncrypted.NewObj();
-
-        pEncrypted->Resize(
-            nIvLen + ciphertext_len + nTagLen );
-
-        memcpy(pEncrypted->ptr(), iv, nIvLen );
-
-        memcpy(pEncrypted->ptr() + nIvLen,
-            ciphertext.data(), ciphertext_len );
-
-        memcpy( pEncrypted->ptr() + nIvLen +
-            ciphertext_len, tag, nTagLen);
-
-        ret = nIvLen + ciphertext_len + nTagLen;
-
-    } while (0);
-
-    EVP_CIPHER_CTX_free(ctx);
     return ret;
 }
 
@@ -576,8 +397,8 @@ gint32 CSimpAuthLoginProxy::BuildLoginInfo(
             break;
 
         BufPtr pEncrypted;
-        ret = EncryptToken(
-            pToken, pKey, pEncrypted );
+        ret = EncryptAesGcmBlock( pToken,
+            pKey, pEncrypted, bGmSSL );
 
         if( ERROR( ret ) )
         {

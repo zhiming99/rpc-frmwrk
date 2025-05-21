@@ -39,6 +39,7 @@
 #include "proxy.h"
 using namespace rpcf;
 #include "blkalloc.h"
+#include "encdec.h"
 
 #define SIMPAUTH_DIR "simpleauth"
 std::atomic< bool > g_bExit = { false };
@@ -73,11 +74,6 @@ void EnableEchoing(
         TCSANOW, &oOldSettings );
 }
 
-gint32 EncryptWithPubKey(
-    const std::string& strData,
-    const std::string& strSalt,
-    BufPtr& pEncrypted );
-
 const std::string g_strPubKey = "clientkey.pem";
 const std::string g_strCliReg;
 
@@ -98,16 +94,6 @@ std::string GetClientRegPath()
     stdstr strCliReg = GetHomeDir();
     strCliReg += "/.rpcf/clientreg.dat";
     return strCliReg;
-}
-
-std::string GetPubKeyPath( bool bGmSSL )
-{
-    stdstr strPath = GetHomeDir();
-    if( bGmSSL )
-        strPath += "/.rpcf/gmssl/clientcert.pem" ;
-    else
-        strPath += "/.rpcf/openssl/clientcert.pem" ;
-    return strPath;
 }
 
 gint32 InitContext()
@@ -335,8 +321,15 @@ gint32 StoreCredential(
     gint32 ret = 0;
     BufPtr pBuf( true );
     do{
-        ret = EncryptWithPubKey(
-            strPassword, strUserName, pBuf );
+        stdstr strHash = GenPasswordSaltHash(
+            strPassword, strUserName );
+        if( ERROR( ret ) )
+            break;
+        BufPtr pData( true );
+        pData->Append(
+            strHash.c_str(), strHash.size() );
+
+        ret = EncryptWithPubKey( pData, pBuf );
         if( ERROR( ret ) )
         {
             std::cerr 

@@ -422,7 +422,6 @@ AC_CONFIG_FILES([Makefile
                  rpc/wsport/wsproto/Makefile
                  rpc/security/Makefile
                  rpc/security/oa2check/Makefile
-                 rpc/security/sinit/Makefile
                  java/Makefile
                  fuse/Makefile
                  python/Makefile
@@ -433,6 +432,7 @@ AC_CONFIG_FILES([Makefile
                  monitor/oinit/Makefile
                  monitor/oinit/setup.py
                  monitor/oinit/oinit.spec
+                 monitor/sinit/Makefile
                  monitor/usermgmt/Makefile
                  monitor/appmon/Makefile
                  monitor/client/Makefile
