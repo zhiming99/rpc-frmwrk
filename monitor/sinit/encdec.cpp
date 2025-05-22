@@ -278,7 +278,7 @@ gint32 EncryptAesGcmBlock_OpenSSL(
         memcpy( pEncrypted->ptr() + nIvLen +
             ciphertext_len, tag, nTagLen);
 
-        ret = nIvLen + ciphertext_len + nTagLen;
+        // ret = nIvLen + ciphertext_len + nTagLen;
 
     } while (0);
 

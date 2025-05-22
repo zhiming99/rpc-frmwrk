@@ -406,13 +406,79 @@ gint32 CSimpAuthLoginProxy::BuildLoginInfo(
                 "Error encrypting the token" );
             break;
         }
-        ret = pEncrypted->Resize( ret );
-        if( ERROR( ret ) )
-            break;
         CParamList oInfo( ( IConfigDb* )pInfo );
         oInfo.SetStrProp( propUserName, strUser2 );
         oInfo.Push( pEncrypted );
         oInfo.SetBoolProp( propGmSSL, bGmSSL );
+
+        CCfgOpener oCtx;
+        oCtx.SetStrProp( propUserName, strUser2 );
+        oCtx.SetProperty( propSessHash, oVar );
+        oCtx.SetQwordProp( propTimestamp, qwTs );
+        oInfo.SetPointer( propContext,
+            ( IConfigDb* )oCtx.GetCfg() );
+
+    }while( 0 );
+    return ret;
+}
+
+static gint32 CheckServerToken(
+    IConfigDb* pReq, BufPtr pSvrToken )
+{
+    gint32 ret = 0;
+    if( pReq == nullptr || pSvrToken.IsEmpty() )
+        return -EINVAL;
+    do{
+        CCfgOpener oReq( pReq );
+        stdstr strUser;
+        ret = oReq.GetStrProp(
+            propUserName, strUser );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strSess;
+        ret = oReq.GetStrProp(
+            propSessHash, strSess );
+        if( ERROR( ret ) )
+            break;
+
+        guint64 qwTs; 
+        ret = oReq.GetQwordProp(
+            propTimestamp, qwTs );
+        if( ERROR( ret ) )
+            break;
+
+        qwTs++;
+        BufPtr pOrig( true );
+        pOrig->Append(
+            ( guint8* )&qwTs, sizeof( qwTs ) );
+        pOrig->Append(
+            strUser.c_str(), strUser.size() );
+        pOrig->Append(
+            strSess.c_str(), strSess.size() );
+
+        bool bGmSSL = false;
+        BufPtr pPass;
+        ret = GetPassHash(
+            strUser, pPass, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pText;
+        ret = DecryptAesGcmBlock(
+            pPass, pSvrToken, pText, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        if( pText->size() != pOrig->size() )
+        {
+            ret = -EACCES;
+            break;
+        }
+        ret = memcmp( pText->ptr(),
+            pOrig->ptr(), pText->size() );
+        if( ret != 0 )
+            ret = -EACCES;
 
     }while( 0 );
     return ret;
@@ -425,13 +491,14 @@ gint32 CSimpAuthLoginProxy::SimpAuthLogin(
     gint32 ret = 0;
     do{
         CCfgOpener oResp;
-        gint32 (*func)(CTasklet*,
-            IEventSink*, CSimpAuthLoginProxy* ) =
+        gint32 (*func)(CTasklet*, IEventSink*,
+            CSimpAuthLoginProxy*, IConfigDb* ) =
         ([]( CTasklet* pCb,
             IEventSink* pLoginCb,
-            CSimpAuthLoginProxy* pIf )->gint32
+            CSimpAuthLoginProxy* pIf,
+            IConfigDb* pReq )->gint32
         {
-            if( pCb == nullptr )
+            if( pCb == nullptr || pReq == nullptr )
                 return -EINVAL;
 
             gint32 ret = 0;
@@ -456,6 +523,33 @@ gint32 CSimpAuthLoginProxy::SimpAuthLogin(
                     ret = iRet;
                     break;
                 }
+
+                IConfigDb* pInfo;
+                ret = oResp.GetPointer( 0, pInfo );
+                if( ERROR( ret ) )
+                {
+                    ret = -EACCES;
+                    break;
+                }
+
+                Variant oVar;
+                ret = pInfo->GetProperty( 0, oVar );
+                if( ERROR( ret ) )
+                {
+                    ret = -EACCES;
+                    break;
+                }
+
+                BufPtr& pSvrToken = ( BufPtr& )oVar;
+                if( pSvrToken.IsEmpty() )
+                {
+                    ret = -EACCES;
+                    break;
+                }
+                ret = CheckServerToken( pReq, pSvrToken );
+                if( ERROR( ret ) )
+                    break;
+
                 stdstr strSess;
                 ret = oResp.GetStrProp(
                     propSessHash, strSess );
@@ -464,7 +558,7 @@ gint32 CSimpAuthLoginProxy::SimpAuthLogin(
                 pIf->SetSess( strSess );
                 DebugPrint( 0, "Sess hash is %s",
                     strSess.c_str() );
-                Variant oVar( false );
+                oVar = ( bool )false;
                 pIf->SetProperty( propNoEnc, oVar );
             }while( 0 );
             pLoginCb->OnEvent( eventTaskComp,
@@ -472,10 +566,15 @@ gint32 CSimpAuthLoginProxy::SimpAuthLogin(
             return 0;
         });
 
+        ObjPtr pCtx;
+        CCfgOpener oInfo( pInfo );
+        oInfo.GetObjPtr( propContext, pCtx );
+        oInfo.RemoveProperty( propContext );
+        
         TaskletPtr pLoginCb;
         ret = NEW_COMPLETE_FUNCALL( 0,
-            pLoginCb, this->GetIoMgr(),
-            func, nullptr, pCallback, this );
+            pLoginCb, this->GetIoMgr(), func,
+            nullptr, pCallback, this, pCtx );
         if( ERROR( ret ) )
             break;
 

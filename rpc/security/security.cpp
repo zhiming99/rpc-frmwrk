@@ -4060,7 +4060,14 @@ gint32 CAuthentServer::Login(
                     ret = pSvr->GetAuthImpl( pObj );
                     if( ERROR( ret ) )
                         return ret;
-                    COA2proxy_CliImpl* pAuth = pObj;
+                    COA2proxy_CliImpl* pAuth1 = pObj;
+                    CSimpleAuthCliWrapper* pAuth2 = pObj;
+                    IAuthenticateServer* pAuth; 
+                    if( pAuth1 != nullptr )
+                        pAuth = pAuth1;
+                    else
+                        pAuth = pAuth2;
+
                     ret = pAuth->Login(
                         pCb, pInfo, oResp.GetCfg() );
                     if( ret == STATUS_PENDING )

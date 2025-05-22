@@ -195,7 +195,21 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             ret = -EACCES;
             break;
         }
+        qwTs1+=1;
+        BufPtr pTokBuf( true ), pRetBuf;
+        pTokBuf->Append(
+            ( char* )&qwTs1, sizeof( qwTs1 ) );
+        pTokBuf->Append(
+            strUser.c_str(), strUser.size() );
+        pTokBuf->Append(
+            strVal2.c_str(), strVal2.size() );
+        ret = EncryptAesGcmBlock(
+            pTokBuf, pKey, pRetBuf, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
         CParamList oRetInfo;
+        oRetInfo.Push( pRetBuf );
         oRetInfo.SetQwordProp(
             propTimestamp, qwTs2 );
         oRetInfo.SetStrProp(

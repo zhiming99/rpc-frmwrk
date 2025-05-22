@@ -116,7 +116,7 @@ gint32 CSimpleAuthCliWrapper::Create(
 
         pGrp->AppendTask( pCreate );
         TaskletPtr pTask = pGrp;
-        ret = pMgr->RescheduleTask( pTask );
+        ret = pMgr->AddAndRun( pTask, false );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
         else if( ERROR( ret ) )
@@ -405,6 +405,7 @@ gint32 CSimpleAuthCliWrapper::Login(
 
             oResp.SetQwordProp(
                 propSalt, pIf->GetObjId() );
+            oResp.Push( ObjPtr( pResp ) );
             CStdRMutex oIfLock( this->GetLock() );
             AddSession( dwPortId,
                 strSess, oCtx.GetCfg() );
