@@ -29,6 +29,7 @@
 namespace rpcf
 {
 extern std::string GetPubKeyPath( bool bGmSSL );
+extern std::string GetPrivKeyPath( bool bGmSSL );
 
 #ifdef GMSSL
 extern "C"
@@ -165,18 +166,139 @@ int EncryptWithPubKey_GmSSL(
     return ret;
 }
 
-// Encrypts pToken using AES-256-GCM with key pKey
-// Output: [12-byte IV][ciphertext][16-byte tag]
-gint32 EncryptAesGcmBlock_GmSSL(const BufPtr& pToken,
-    const BufPtr& pKey, BufPtr& pEncrypted )
+gint32 DecryptWithPrivKey_GmSSL(
+    const BufPtr& pEncypted, BufPtr& pDecrypted )
 {
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    if( pEncypted.IsEmpty() ||
+        pEncypted->empty() )
+        return -EINVAL;
+    FILE* keyfp = nullptr;
+    SM2_KEY key;
+    SM2_DEC_CTX ctx;
+    do{
+        size_t inlen, outlen;
+        stdstr strPemPass( "1234" );
+
+        stdstr strKeyPath = GetPrivKeyPath( true );
+        FILE *keyfp = fopen(
+            strKeyPath.c_str(), "r");
+
+        if( keyfp == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        ret = sm2_private_key_info_decrypt_from_pem(
+            &key, strPemPass.c_str(), keyfp );
+        if( ret != 1 )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        ret = sm2_decrypt_init( &ctx );
+        if( ret != 1 )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        inlen = pEncypted->size();
+        ret = sm2_decrypt_update( &ctx,
+            ( guint8* )pEncypted->ptr(), inlen ); 
+        if( ret != 1 )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        if( pDecrypted.IsEmpty() )
+        {
+            ret = pDecrypted.NewObj();
+            if( ERROR( ret ) )
+                break;
+        }
+
+        ret = pDecrypted->Resize(
+            SM2_MAX_CIPHERTEXT_SIZE );
+        if( ERROR( ret ) )
+            break;
+        outlen = pDecrypted->size();
+        ret = sm2_decrypt_finish( &ctx, &key,
+            ( guint8* )pDecrypted->ptr(),
+            &outlen );
+        if( ret != 1 )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+
+        ret = pDecrypted->Resize( outlen );
+        
+    }while( 0 );
+    if( keyfp != nullptr )
+    {
+        fclose( keyfp );
+        keyfp = nullptr;
+    }
+    gmssl_secure_clear( &key, sizeof( key ) );
+    gmssl_secure_clear( &ctx, sizeof( ctx ) );
+
+    return ret;
 }
 
-gint32 DecryptWithPrivKey_GmSSL(
-    const BufPtr& pEncKey, BufPtr& pKey )
+// Encrypts pToken using SM4-GCM with key pKey
+// Output: [12-byte IV][4-byte AAD][ciphertext][16-byte tag]
+gint32 EncryptAesGcmBlock_GmSSL(
+    const BufPtr& pToken,
+    const BufPtr& pKey, BufPtr& pEncrypted )
 {
-    return ERROR_NOT_IMPL;
+    if( pToken.IsEmpty() ||
+        pKey.IsEmpty() ||
+        pKey->size() != 32)
+        return -EINVAL;
+
+    gint32 ret = 0;
+    guint8 iv[ 12 ];
+    guint8 tag[ 16 ] = { 0 };
+    guint8 aad[ 4 ];
+    SM4_KEY sm4key;
+
+    do{
+        if( pEncrypted.IsEmpty() )
+            pEncrypted.NewObj();
+        ret = pEncrypted->Resize(
+            pToken->size() + 32 );
+        if( ERROR( ret ) )
+            break;
+        rand_bytes( iv, sizeof( iv ) );
+        rand_bytes( aad, sizeof( aad ) );
+        sm4_set_encrypt_key( &sm4key,
+            ( guint8* )pKey->ptr() );
+        memcpy( pEncrypted->ptr(),
+            iv, sizeof( iv ) );
+        memcpy( pEncrypted->ptr() + sizeof( iv ),
+            aad, sizeof( aad ) );
+        pEncrypted->SetOffset(
+            sizeof( iv ) + sizeof( aad ) );
+
+        ret = sm4_gcm_encrypt(&sm4key, iv,
+            sizeof( iv ), aad, sizeof( aad ),
+            ( guint8* )pToken->ptr(),
+            pToken->size(),
+            ( guint8* )pEncrypted->ptr(),
+            sizeof( tag ), tag );
+
+        if( ret != 1 )
+        {
+            ret =ERROR_FAIL;
+            break;
+        }
+        memcpy( pEncrypted->ptr() + pToken->size(),
+            tag, sizeof( tag ) );
+
+    }while( 0 );
+    gmssl_secure_clear( &sm4key, sizeof(sm4key ) );
+    return ret;
 }
 
 gint32 DecryptAesGcmBlock_GmSSL(
@@ -186,6 +308,7 @@ gint32 DecryptAesGcmBlock_GmSSL(
 {
     return ERROR_NOT_IMPL;
 }
+
 #endif
 
 }
