@@ -231,7 +231,7 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
         timespec ts;
         clock_gettime( CLOCK_REALTIME, &ts );
         guint64 qwTs = ts.tv_sec;
-        qwTs << 32;
+        qwTs <<= 32;
         qwTs += ts.tv_nsec;
         oCtx.SetQwordProp( propTimestamp, qwTs );
 
@@ -399,7 +399,7 @@ gint32 CSimpleAuthCliWrapper::Login(
             timespec ts;
             clock_gettime( CLOCK_REALTIME, &ts );
             qwTs = ts.tv_sec;
-            qwTs << 32;
+            qwTs <<= 32;
             qwTs += ts.tv_nsec;
             oCtx.SetQwordProp( propTimestamp, qwTs );
 

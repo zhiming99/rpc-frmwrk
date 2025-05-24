@@ -488,6 +488,14 @@ stdstr GenPasswordSaltHash_GmSSL(
     const std::string& strSalt );
 #endif
 
+#define OUTPUT_GMSSL_ERROR \
+    OutputMsg( ret, "Error GmSSL support is " \
+    "not enabled in this build" )
+
+#define OUTPUT_OPENSSL_ERROR \
+    OutputMsg( ret, "Error OpenSSL support is " \
+    "not enabled in this build" )
+
 gint32 EncryptWithPubKey(
     BufPtr& pBlock,
     BufPtr& pEncrypted,
@@ -502,6 +510,7 @@ gint32 EncryptWithPubKey(
                 pBlock, pEncrypted );
 #else
             ret = -ENOTSUP;
+            OUTPUT_GMSSL_ERROR;
 #endif
         }
         else
@@ -511,11 +520,10 @@ gint32 EncryptWithPubKey(
                 pBlock, pEncrypted );
 #else
             ret = -ENOTSUP;
+            OUTPUT_OPENSSL_ERROR;
 #endif
         }
     }while( 0 );
-    if( ret == -ENOTSUP )
-        std::cerr << "No crypto library defined.\n";
     return ret;
 }
 
@@ -532,6 +540,7 @@ gint32 EncryptAesGcmBlock(
             pBlock, pKey, pEncrypted );
 #else
         ret = -ENOTSUP;
+        OUTPUT_GMSSL_ERROR;
 #endif
     else
 #ifdef OPENSSL
@@ -539,6 +548,7 @@ gint32 EncryptAesGcmBlock(
             pBlock, pKey, pEncrypted );
 #else
         ret = -ENOTSUP;
+        OUTPUT_OPENSSL_ERROR;
 #endif
     return ret;
 }
@@ -555,6 +565,7 @@ gint32 DecryptWithPrivKey(
             pEncrypted, pBlock );
 #else
         ret = -ENOTSUP;
+        OUTPUT_GMSSL_ERROR;
 #endif
     else
 #ifdef OPENSSL
@@ -562,6 +573,7 @@ gint32 DecryptWithPrivKey(
             pEncrypted, pBlock );
 #else
         ret = -ENOTSUP;
+        OUTPUT_OPENSSL_ERROR;
 #endif
     return ret;
 }
@@ -579,6 +591,7 @@ gint32 DecryptAesGcmBlock(
             pKey, pToken, outPlaintext );
 #else
         ret = -ENOTSUP;
+        OUTPUT_GMSSL_ERROR;
 #endif
     else
 #ifdef OPENSSL
@@ -586,6 +599,7 @@ gint32 DecryptAesGcmBlock(
             pKey, pToken, outPlaintext );
 #else
         ret = -ENOTSUP;
+        OUTPUT_OPENSSL_ERROR;
 #endif
     return ret;
 }
@@ -602,6 +616,7 @@ gint32 GenSha2Hash(
             strData, strHash );
 #else
         ret = -ENOTSUP;
+        OUTPUT_GMSSL_ERROR;
 #endif
     else
 #ifdef OPENSSL
@@ -609,6 +624,7 @@ gint32 GenSha2Hash(
             strData, strHash );
 #else
         ret = -ENOTSUP;
+        OUTPUT_OPENSSL_ERROR;
 #endif
     return ret;
 }

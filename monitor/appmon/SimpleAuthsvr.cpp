@@ -216,6 +216,8 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             propUserName, strUser );
         oRetInfo.SetBoolProp(
             propContinue, false );
+        oRetInfo.SetBoolProp(
+            propGmSSL, bGmSSL );
         pRetInfo = oRetInfo.GetCfg();
 
     }while( 0 );

@@ -255,16 +255,15 @@ gint32 GetPassHash( stdstr& strUser,
 {
     gint32 ret = 0;
     RegFsPtr pfs;
-    do{
-        stdstr strCliReg = GetHomeDir();
-        strCliReg += "/.rpcf/clientreg.dat";
+    stdstr strCliReg = GetClientRegPath();
 
+    do{
         const stdstr strCredDir =
             "/" SIMPAUTH_DIR "/credentials";
 
         CParamList oParams;
-        oParams.SetStrProp( propConfigPath,
-            GetClientRegPath() );
+        oParams.SetStrProp(
+            propConfigPath, strCliReg );
         ret = pfs.NewObj(
             clsid( CRegistryFs ),
             oParams.GetCfg() );
@@ -314,12 +313,9 @@ gint32 GetPassHash( stdstr& strUser,
         else
             bGmSSL = false;
 
-        if( bGmSSL )
-            break;
-
         BufPtr pTextHash;
         ret = DecryptWithPrivKey(
-            pEncKey, pTextHash );
+            pEncKey, pTextHash, bGmSSL );
         if( ERROR( ret ) )
         {
             OutputMsg( ret,
@@ -422,8 +418,8 @@ gint32 CSimpAuthLoginProxy::BuildLoginInfo(
     return ret;
 }
 
-static gint32 CheckServerToken(
-    IConfigDb* pReq, BufPtr pSvrToken )
+static gint32 CheckServerToken( IConfigDb* pReq,
+    BufPtr pSvrToken, bool bGmSSL )
 {
     gint32 ret = 0;
     if( pReq == nullptr || pSvrToken.IsEmpty() )
@@ -457,10 +453,10 @@ static gint32 CheckServerToken(
         pOrig->Append(
             strSess.c_str(), strSess.size() );
 
-        bool bGmSSL = false;
+        bool bGmSSL2 = false;
         BufPtr pPass;
         ret = GetPassHash(
-            strUser, pPass, bGmSSL );
+            strUser, pPass, bGmSSL2 );
         if( ERROR( ret ) )
             break;
 
@@ -533,6 +529,12 @@ gint32 CSimpAuthLoginProxy::SimpAuthLogin(
                 }
 
                 Variant oVar;
+
+                bool bGmSSL = false;
+                ret = pInfo->GetProperty( propGmSSL, oVar );
+                if( SUCCEEDED( ret ) )
+                    bGmSSL = ( bool& )oVar;
+
                 ret = pInfo->GetProperty( 0, oVar );
                 if( ERROR( ret ) )
                 {
@@ -540,13 +542,15 @@ gint32 CSimpAuthLoginProxy::SimpAuthLogin(
                     break;
                 }
 
-                BufPtr& pSvrToken = ( BufPtr& )oVar;
+                BufPtr pSvrToken = ( BufPtr& )oVar;
                 if( pSvrToken.IsEmpty() )
                 {
                     ret = -EACCES;
                     break;
                 }
-                ret = CheckServerToken( pReq, pSvrToken );
+
+                ret = CheckServerToken(
+                    pReq, pSvrToken, bGmSSL );
                 if( ERROR( ret ) )
                     break;
 

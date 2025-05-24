@@ -293,8 +293,10 @@ gint32 EncryptAesGcmBlock_GmSSL(
             ret =ERROR_FAIL;
             break;
         }
+        ret = 0;
         memcpy( pEncrypted->ptr() + pToken->size(),
             tag, sizeof( tag ) );
+        pEncrypted->SetOffset( 0 );
 
     }while( 0 );
     gmssl_secure_clear( &sm4key, sizeof(sm4key ) );
@@ -304,9 +306,59 @@ gint32 EncryptAesGcmBlock_GmSSL(
 gint32 DecryptAesGcmBlock_GmSSL(
     const BufPtr& pKey,
     const BufPtr& pToken,
-    BufPtr& outPlaintext )
+    BufPtr& pDecrypted )
 {
-    return ERROR_NOT_IMPL;
+    gint32 ret = 0;
+    guint8 iv[ 12 ];
+    guint8 tag[ 16 ] = { 0 };
+    guint8 aad[ 4 ];
+    SM4_KEY sm4key;
+
+    if( pToken.IsEmpty() ||
+        pKey.IsEmpty() ||
+        pKey->size() != 32)
+        return -EINVAL;
+
+    if( pToken->size() <=
+        sizeof( iv ) + sizeof( aad ) + sizeof( tag ) )
+        return -EINVAL;
+
+    do{
+        if( pDecrypted.IsEmpty() )
+            pDecrypted.NewObj();
+        ret = pDecrypted->Resize(
+            pToken->size() - 32 );
+        if( ERROR( ret ) )
+            break;
+
+        memcpy( iv, pToken->ptr(), sizeof( iv ) );
+        gint32 iOffset = sizeof( iv );
+        memcpy( aad, pToken->ptr() + iOffset, sizeof( aad ) );
+        void* ptag =
+            pToken->ptr() + pToken->size() - 16;
+        memcpy( tag, ptag, sizeof( tag ) );
+        sm4_set_encrypt_key( &sm4key,
+            ( guint8* )pKey->ptr() );
+        pToken->SetOffset(
+            sizeof( iv ) + sizeof( aad ) );
+
+        ret = sm4_gcm_decrypt(&sm4key, iv,
+            sizeof( iv ), aad, sizeof( aad ),
+            ( guint8* )pToken->ptr(),
+            pToken->size() - sizeof( tag ),
+            tag, sizeof( tag ),
+            ( guint8* )pDecrypted->ptr() );
+
+        if( ret != 1 )
+        {
+            ret =ERROR_FAIL;
+            break;
+        }
+        ret = 0;
+
+    }while( 0 );
+    gmssl_secure_clear( &sm4key, sizeof(sm4key ) );
+    return ret;
 }
 
 #endif
