@@ -77,6 +77,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/regfsmnt
 %{_bindir}/appmon*
 %{_bindir}/rpcf/apptimer
+%{_bindir}/rpcf/sinit
 %{_sysconfdir}/rpcf/driver.json
 %{_sysconfdir}/rpcf/router.json
 %{_sysconfdir}/rpcf/rtauth.json
@@ -96,6 +97,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/liblogcli.so*
 %{_libdir}/libregfs.so*
 %{_libdir}/libappmancli.so*
+%{_libdir}/librpcfenc.so*
 %{_mandir}/man1/ridlc.1.gz
 %{_mandir}/man1/rpcrouter.1.gz
 %{_mandir}/man7/ridl.7.gz

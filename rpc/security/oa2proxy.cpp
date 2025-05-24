@@ -407,16 +407,9 @@ gint32 COAuth2LoginProxy::StartLogin(
         CParamList oParams;
         CCfgOpener oResp;
         oParams.Push( strCookie );
-        ret = OAuth2Login(
-            pCallback, oParams.GetCfg() );
+        ret = OAuth2Login( pCallback,
+            oParams.GetCfg() );
 
-        if( SUCCEEDED( ret ) )
-        {
-            std::string strSess;
-            GetSess( strSess );
-            DebugPrint( 0, "Sess hash is %s",
-                strSess.c_str() );
-        }
     }while( 0 );
     return ret;
 }

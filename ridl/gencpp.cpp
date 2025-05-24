@@ -1976,7 +1976,8 @@ gint32 CDeclareClassIds::Output()
     gint32 ret = STATUS_SUCCESS;
 
     NEW_LINE;
-    Wa( "enum EnumMyClsid" );
+    CCOUT << "enum Enum"<< g_strAppName << "Clsid";
+    NEW_LINE;
     BLOCK_OPEN;
     std::vector< ObjPtr > vecSvcs;
     ret = m_pStmts->GetSvcDecls( vecSvcs );

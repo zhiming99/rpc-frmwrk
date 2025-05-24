@@ -892,7 +892,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
                 strAppPath, dwGid );
             if( ERROR( ret ) )
                 continue;
-            HANDLE hFile = INVALID_HANDLE;
+            RFHANDLE hFile = INVALID_HANDLE;
             ret = m_pAppRegfs->CreateFile(
                 strStmPath, 0640, O_RDWR,
                 hFile );
@@ -1233,6 +1233,10 @@ gint32 CAppMonitor_ChannelSvr::OnStreamReady(
                     ret = -EACCES;
                     break;
                 }
+            }
+            else if( iMech == 2 )
+            {
+                oVar = strName;
             }
             stdstr strUname( ( stdstr& )oVar );
             strPath = "/users/";

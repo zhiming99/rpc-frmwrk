@@ -68,6 +68,24 @@ static bool g_bLocal = false;
 static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
 std::vector< InterfPtr > g_vecIfs;
+static stdrmutex g_oRegLock;
+
+RegFsPtr GetRegFs( bool bUser )
+{
+    CStdRMutex oLock( g_oRegLock );
+    if( bUser )
+        return g_pUserRegfs;
+    return g_pAppRegfs;
+}
+
+void SetRegFs( RegFsPtr& pRegfs, bool bUser )
+{
+    CStdRMutex oLock( g_oRegLock );
+    if( bUser )
+        g_pUserRegfs = pRegfs;
+    else
+        g_pAppRegfs = pRegfs;
+}
 
 void SignalHandler( int signum )
 {
@@ -356,19 +374,30 @@ int _main( int argc, char** argv)
     }while( 0 );
     if( true )
     {
+        RegFsPtr pEmpty;
         if( dwStop > 0 )
         {
-            g_pUserRegfs->Stop();
+            RegFsPtr pRegfs = GetRegFs( true );
+            SetRegFs( pEmpty, true );
+            if( !pRegfs.IsEmpty() )
+            {
+                pRegfs->Stop();
+                pRegfs.Clear();
+            }
             if( ret > 0 )
                 ret = -ret;
-            g_pUserRegfs.Clear();
         }
         if( dwStop > 1 )
         {
-            g_pAppRegfs->Stop();
+            RegFsPtr pRegfs = GetRegFs( false );
+            SetRegFs( pEmpty, false );
+            if( !pRegfs.IsEmpty() )
+            {
+                pRegfs->Stop();
+                pRegfs.Clear();
+            }
             if( ret > 0 )
                 ret = -ret;
-            g_pAppRegfs.Clear();
         }
     }
 

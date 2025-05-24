@@ -384,6 +384,15 @@ class CAuthentServer:
 
     gint32 StartOA2Checker(
         IEventSink* pCallback );
+
+    gint32 OnStartSimpAuthCliComplete(
+        IEventSink* pCallback,
+        IEventSink* pIoReq,
+        IConfigDb* pReqCtx );
+
+    gint32 StartSimpAuthCli(
+        IEventSink* pCallback );
+
     public:
     typedef CAggInterfaceServer super;
     CAuthentServer( const IConfigDb* pCfg ) :
@@ -428,6 +437,8 @@ class CAuthentServer:
     gint32 GetSessionByPortId(
         gint32 dwPortId,
         std::string& strSess );
+
+    gint32 StartNewAuthImpl();
 
     gint32 GetAuthImpl(
         ObjPtr& pAuthImpl );

@@ -227,7 +227,7 @@ gint32 COA2proxy_CliImpl::InquireSess(
 }
 
 gint32 COA2proxy_CliImpl::GenSessHash(
-    stdstr strToken,
+    const stdstr& strToken,
     guint32 dwPortId,
     std::string& strSess )
 {

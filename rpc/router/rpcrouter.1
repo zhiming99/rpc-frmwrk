@@ -17,25 +17,25 @@ if both are on the same host.
 .SH OPTIONS
 .TP
 .BR \-r " "\fInum\fR
-To specify the role the rpcrouter plays.
+Specify the role the rpcrouter plays.
 1 to run as a \fIreqfwdr\fR on the client side.
 2 to run as a \fIbridge\fR on the server side.
 It is a mandatory option, and must be present to invoke the rpcrouter.
 
 .TP
 .BR \-a
-To enable the authentication between \fIreqfwdr\fR and \fIbridge\fR.
+Enable the authentication between \fIreqfwdr\fR and \fIbridge\fR.
 And Kerberos is only supported authentication mechanism so far.
 Make sure both sides have this option, otherwise the connection request will be
 rejected.
 
 .TP
 .BR \-c
-To establish a seperate connection to the remote \fIbridge\fR for each proxy.  It is an option for \fIreqfwdr\fR only. The seperate connections has both advantages and disadvantages. The pros is that each connection has its own quota of concurrency, without sharing with other proxy instances. the disadvangage is that it requires a full connection setup, which has the probability to timeout if the number connection requests are high.
+Establish a seperate connection to the remote \fIbridge\fR for each proxy.  It is an option for \fIreqfwdr\fR only. The seperate connections has both advantages and disadvantages. The pros is that each connection has its own quota of concurrency, without sharing with other proxy instances. the disadvangage is that it requires a full connection setup, which has the probability to timeout if the number connection requests are high.
 
 .TP
 .BR \-f
-To enable the request-based flow control. The \fIbridge\fR with this option,
+Enable the request-based flow control. The \fIbridge\fR with this option,
 will limit the outstanding requests to 2 * connections,
 and buffered requests to 4 * connections.
 And requests beyond this limit will be rejected with error ERROR_QUEUE_FULL.
@@ -47,21 +47,25 @@ for light weight traffic.
 
 .TP
 .BR \-m <mount point>
-To export rpcrouter's runtime information via 'rpcfs' mounted at the directory
+Export rpcrouter's runtime information via 'rpcfs' mounted at the directory
  'mount point'. The files are exported in Json format under the 'users' directory, including
  'InConnections', and 'OutConnections' at present. 
 
 .TP
 .BR \-g
-To enable logging message to the logger.
+Enable logging message to the logger.
+
+.TP
+.BR \-o
+Enable monitoring when the rpcrouter run as a bridge, that is '-r 2'
 
 .TP
 .BR \-d
-To run rpcrouter as a daemon.
+Run rpcrouter as a daemon.
 
 .TP
 .BR \-v
-To print version information.
+Print version information.
 
 .SH RELATED CONFIGURATION FILES
 router.json, rtauth.json, authprxy.json, driver.json
