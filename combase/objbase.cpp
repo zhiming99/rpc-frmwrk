@@ -1376,4 +1376,58 @@ gint32 GetOpenFileCount(
     return 0;
 }
 
+CProcessLock::CProcessLock(
+    const stdstr& strLockPath,
+    bool bRemove )
+{
+    gint32 ret = 0;
+    do{
+        m_bRemove = bRemove;
+        m_strLockFile = strLockPath + ".lock";
+        m_iFd = open( m_strLockFile.c_str(),
+            O_CREAT | O_RDWR, 0600);
+        if( m_iFd < 0 )
+        {
+            OutputMsg( errno,
+                "Failed to open lock file: %s",
+                m_strLockFile.c_str());
+            ret = -errno;
+            break;
+        }
+        struct flock lock;
+        memset(&lock, 0, sizeof(lock));
+        lock.l_type = F_WRLCK;
+        lock.l_whence = SEEK_SET;
+        lock.l_start = 0;
+        lock.l_len = 0;
+        ret = fcntl( m_iFd, F_SETLKW, &lock );
+        if( ret < 0 )
+        {
+            OutputMsg(errno,
+                "Failed to acquire lock on file: %s",
+                m_strLockFile.c_str());
+            ret = -errno;
+            break;
+        }
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        stdstr strMsg = DebugMsg( ret,
+            "Error in CProcessLock ctor" );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+CProcessLock::~CProcessLock()
+{
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_UNLCK;
+    fcntl( m_iFd, F_SETLK, &lock );
+    close( m_iFd );
+    m_iFd = -1;
+    if( m_bRemove )
+        unlink( m_strLockFile.c_str() ); 
+}
+
 }

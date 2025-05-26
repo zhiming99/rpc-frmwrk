@@ -3820,8 +3820,10 @@ static gint32 RetryStartAuthImpl(
     gint32 (*sn)( CAuthentServer*) =
     ([]( CAuthentServer* pSvr )->gint32
     {
+        CIoManager* pMgr = pSvr->GetIoMgr();
         CStdRMutex oLock( pSvr->GetLock() );
-        if( pSvr->GetState() != stateConnected )
+        if( pSvr->GetState() != stateConnected ||
+            pMgr->IsStopping() )
         {
             TaskGrpPtr pg =
                 pSvr->GetPendingLogins();

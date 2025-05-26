@@ -1063,6 +1063,7 @@ gint32 CRpcInterfaceBase::QueueStopTask(
         ret = pMgr->AddSeqTask( pStopTask );
         if( ERROR( ret ) )
         {
+            pRetry->ClearClientNotify();
             (*pStopTask)( eventCancelTask );
             break;
         }

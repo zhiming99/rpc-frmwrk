@@ -116,15 +116,19 @@ gint32 DestroyAppManagercli(
         if( ERROR( ret ) )
             break;
 
-        if( pCli->GetState() == stateStopped )
-            break;
+        {
+            CRpcServices* pSvc = pCli;
+            CStdRMutex oIfLock( pSvc->GetLock() );
+            EnumIfState iState = pSvc->GetState();
+            if( iState == stateStopped )
+                break;
+        }
 
         if( pCallback == nullptr )
         {
             ret = pCli->Stop();
             break;
         }
-        TaskletPtr pStopTask;
         if( pCli->GetState() != stateStopping )
         {
             gint32 (*func)( IEventSink*,
@@ -141,6 +145,7 @@ gint32 DestroyAppManagercli(
                 g_pAppManCli.Clear();
                 return 0;
             });
+            TaskletPtr pStopTask;
             ret = NEW_COMPLETE_FUNCALL( 0, pStopTask,
                 pMgr, func, nullptr, pCallback );
             if( ERROR( ret ) )
@@ -166,15 +171,16 @@ gint32 DestroyAppManagercli(
                 g_pAppManCli.Clear();
                 return 0;
             });
-            ret = NEW_FUNCCALL_TASKEX( pStopTask,
+            TaskletPtr pWaitTask;
+            ret = NEW_FUNCCALL_TASKEX( pWaitTask,
                 pMgr, func, pCallback );
             if( ERROR( ret ) )
                 break;
             CRpcServices* pSvc = pCli;
-            ret = pMgr->AddSeqTask( pStopTask, false );
+            ret = pMgr->AddSeqTask( pWaitTask, false );
             if( ERROR( ret ) )
             {
-                ( *pStopTask )( eventCancelTask );
+                ( *pWaitTask )( eventCancelTask );
                 OutputMsg( ret,
                     "Error stop CAppManager_CliImpl" );
             }
@@ -183,7 +189,10 @@ gint32 DestroyAppManagercli(
             ret = STATUS_PENDING;
     }while( 0 );
     if( ret != STATUS_PENDING )
+    {
+        CStdRMutex oLock( g_oAMLock );
         g_pAppManCli.Clear();
+    }
     return ret;
 }
 

@@ -539,16 +539,20 @@ gint32 EncryptAesGcmBlock(
         ret = EncryptAesGcmBlock_GmSSL(
             pBlock, pKey, pEncrypted );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_GMSSL_ERROR;
+    }
 #endif
     else
 #ifdef OPENSSL
         ret = EncryptAesGcmBlock_OpenSSL(
             pBlock, pKey, pEncrypted );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_OPENSSL_ERROR;
+    }
 #endif
     return ret;
 }
@@ -564,16 +568,20 @@ gint32 DecryptWithPrivKey(
         ret = DecryptWithPrivKey_GmSSL(
             pEncrypted, pBlock );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_GMSSL_ERROR;
+    }
 #endif
     else
 #ifdef OPENSSL
         ret = DecryptWithPrivKey_OpenSSL(
             pEncrypted, pBlock );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_OPENSSL_ERROR;
+    }
 #endif
     return ret;
 }
@@ -590,16 +598,20 @@ gint32 DecryptAesGcmBlock(
         ret = DecryptAesGcmBlock_GmSSL(
             pKey, pToken, outPlaintext );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_GMSSL_ERROR;
+    }
 #endif
     else
 #ifdef OPENSSL
         ret = DecryptAesGcmBlock_OpenSSL(
             pKey, pToken, outPlaintext );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_OPENSSL_ERROR;
+    }
 #endif
     return ret;
 }
@@ -615,16 +627,20 @@ gint32 GenSha2Hash(
         ret = GenSha2Hash_GmSSL(
             strData, strHash );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_GMSSL_ERROR;
+    }
 #endif
     else
 #ifdef OPENSSL
         ret = GenSha2Hash_OpenSSL(
             strData, strHash );
 #else
+    {
         ret = -ENOTSUP;
         OUTPUT_OPENSSL_ERROR;
+    }
 #endif
     return ret;
 }

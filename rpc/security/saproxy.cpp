@@ -257,92 +257,100 @@ gint32 GetPassHash( stdstr& strUser,
     RegFsPtr pfs;
     stdstr strCliReg = GetClientRegPath();
 
-    do{
-        const stdstr strCredDir =
-            "/" SIMPAUTH_DIR "/credentials";
+    try{
+        CProcessLock oProcLock( strCliReg );
+        do{
+            const stdstr strCredDir =
+                "/" SIMPAUTH_DIR "/credentials";
 
-        CParamList oParams;
-        oParams.SetStrProp(
-            propConfigPath, strCliReg );
-        ret = pfs.NewObj(
-            clsid( CRegistryFs ),
-            oParams.GetCfg() );
-        if( ERROR( ret ) )
-            break;
+            CParamList oParams;
+            oParams.SetStrProp(
+                propConfigPath, strCliReg );
+            ret = pfs.NewObj(
+                clsid( CRegistryFs ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
 
-        ret = pfs->Start();
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret, "Error start the registry "
-            "and you may want to format the registry "
-            "with command 'regfsmnt -i %s' first",
-            strCliReg.c_str() );
-            break;
-        }
-
-        if( strUser.empty() )
-        {
-            ret = GetDefaultUser( pfs, strUser );
+            ret = pfs->Start();
             if( ERROR( ret ) )
             {
-                OutputMsg( ret, "Error cannot find "
-                    "default user to login with" );
+                OutputMsg( ret, "Error start the registry "
+                "and you may want to format the registry "
+                "with command 'regfsmnt -i %s' first",
+                strCliReg.c_str() );
                 break;
             }
-        }
-        stdstr strPath =
-            strCredDir + "/" + strUser;
 
-        BufPtr pEncKey;
-        ret = ReadRegFile( pfs,
-            strPath + ".cred", pEncKey );
+            if( strUser.empty() )
+            {
+                ret = GetDefaultUser( pfs, strUser );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret, "Error cannot find "
+                        "default user to login with" );
+                    break;
+                }
+            }
+            stdstr strPath =
+                strCredDir + "/" + strUser;
 
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "Error read the key file %s",
-                ( strPath + ".cred" ).c_str() );
-            break;
-        }
+            BufPtr pEncKey;
+            ret = ReadRegFile( pfs,
+                strPath + ".cred", pEncKey );
 
-        BufPtr pEmpty;
-        ret = ReadRegFile( pfs,
-            strPath + ".gmssl", pEmpty );
-        if( SUCCEEDED( ret ) )
-            bGmSSL = true;
-        else
-            bGmSSL = false;
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "Error read the key file %s",
+                    ( strPath + ".cred" ).c_str() );
+                break;
+            }
 
-        BufPtr pTextHash;
-        ret = DecryptWithPrivKey(
-            pEncKey, pTextHash, bGmSSL );
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "Error decrypt the key file %s",
-                ( strPath + ".cred" ).c_str() );
-            break;
-        }
-        BufPtr pBinHash( true );
-        ret = pBinHash->Resize(
-            pTextHash->size() / 2 );
-        if( ERROR( ret ) )
-            break;
-        ret = HexStringToBytes(
-            pTextHash->ptr(), pTextHash->size(),
-            ( guint8* )pBinHash->ptr() );
-        if( ERROR( ret ) )
-            break;
-        if( pBinHash->size() != 32 )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        pPassHash = pBinHash;
+            BufPtr pEmpty;
+            ret = ReadRegFile( pfs,
+                strPath + ".gmssl", pEmpty );
+            if( SUCCEEDED( ret ) )
+                bGmSSL = true;
+            else
+                bGmSSL = false;
 
-    }while( 0 );
-    if( !pfs.IsEmpty() )
-        pfs->Stop();
+            BufPtr pTextHash;
+            ret = DecryptWithPrivKey(
+                pEncKey, pTextHash, bGmSSL );
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "Error decrypt the key file %s",
+                    ( strPath + ".cred" ).c_str() );
+                break;
+            }
+            BufPtr pBinHash( true );
+            ret = pBinHash->Resize(
+                pTextHash->size() / 2 );
+            if( ERROR( ret ) )
+                break;
+            ret = HexStringToBytes(
+                pTextHash->ptr(), pTextHash->size(),
+                ( guint8* )pBinHash->ptr() );
+            if( ERROR( ret ) )
+                break;
+            if( pBinHash->size() != 32 )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            pPassHash = pBinHash;
+
+        }while( 0 );
+        if( !pfs.IsEmpty() )
+            pfs->Stop();
+    }
+    catch( std::runtime_error& e )
+    {
+        if( ret >= 0 )
+            ret = -EFAULT;
+    }
     return ret;
 }
 

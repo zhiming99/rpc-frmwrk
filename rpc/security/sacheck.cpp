@@ -441,7 +441,7 @@ gint32 CSimpleAuthCliWrapper::IsSessExpired(
     guint64 qwTs;
     oCtx.GetQwordProp( propTimestamp, qwTs );
     if( tv.tv_sec >=
-        ( ( qwTs >> 32 ) + 3600 * 48 ) )
+        ( ( qwTs >> 32 ) + 3600 * 24 ) )
         return STATUS_SUCCESS;
     return ERROR_FALSE;
 }
@@ -468,6 +468,11 @@ gint32 CSimpleAuthCliWrapper::InquireSess(
 
     oInfo.CopyProp( propUserName, pui );
     oInfo.SetStrProp( propAuthMech, "SimpAuth" );
+    oInfo.SetStrProp( propSessHash, strSess );
+    oInfo.CopyProp( propConnHandle, pui );
+    oInfo.CopyProp( propTimestamp, pui );
+    oInfo.CopyProp( propUid, pui );
+    oInfo.CopyProp( propGid, pui );
     return STATUS_SUCCESS;
 }
 
