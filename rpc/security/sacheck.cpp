@@ -235,6 +235,10 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
         qwTs += ts.tv_nsec;
         oCtx.SetQwordProp( propTimestamp, qwTs );
 
+        oCtx.CopyProp( propTimestamp, pInfo );
+        oCtx.MoveProp( propUid, pInfo );
+        oCtx.MoveProp( propGid, pInfo );
+
         oResp.CopyProp( propSalt,
             ( IConfigDb* )oCtx.GetCfg() );
         CStdRMutex oIfLock( psac->GetLock() );

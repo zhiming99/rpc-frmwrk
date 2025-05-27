@@ -4898,7 +4898,8 @@ gint32 CAuthentServer::OnPreStop(
     }while( 0 );
     else if( strMech == "SimpAuth" )
     {
-        m_pAuthImpl.Clear();
+        ObjPtr pEmpty;
+        SetAuthImpl( pEmpty );
         ret = CSimpleAuthCliWrapper::Destroy(
             GetIoMgr(), pCallback );
     }
