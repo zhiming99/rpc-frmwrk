@@ -236,8 +236,6 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
         oCtx.SetQwordProp( propTimestamp, qwTs );
 
         oCtx.CopyProp( propTimestamp, pInfo );
-        oCtx.MoveProp( propUid, pInfo );
-        oCtx.MoveProp( propGid, pInfo );
 
         oResp.CopyProp( propSalt,
             ( IConfigDb* )oCtx.GetCfg() );
@@ -475,8 +473,6 @@ gint32 CSimpleAuthCliWrapper::InquireSess(
     oInfo.SetStrProp( propSessHash, strSess );
     oInfo.CopyProp( propConnHandle, pui );
     oInfo.CopyProp( propTimestamp, pui );
-    oInfo.CopyProp( propUid, pui );
-    oInfo.CopyProp( propGid, pui );
     return STATUS_SUCCESS;
 }
 

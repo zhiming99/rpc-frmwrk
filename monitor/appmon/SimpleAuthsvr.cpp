@@ -109,11 +109,10 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             break;
         }
         stdstr strPath = "/users/";
-        strPath += strUser;
+        strPath += strUser + "/passwd";
 
         Variant oVar;
-        ret = pfs->GetValue(
-            strPath + "/passwd", oVar );
+        ret = pfs->GetValue( strPath, oVar );
         if( ERROR( ret ) )
         {
             ret = -EACCES;
@@ -141,34 +140,6 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             pKey, pToken, pOutBuf, bGmSSL );
         if( ERROR( ret ) )
             break;
-
-        ret = pfs->GetValue(
-            strPath + "/uid", oVar );
-        if( ERROR( ret ) )
-            break;
-
-        guint32 dwUid = oVar;        
-        std::vector< KEYPTR_SLOT > vecks;
-        RFHANDLE hDir = INVALID_HANDLE;
-        ret = pfs->OpenDir(
-            strPath + "/groups", O_RDONLY, hDir );
-        if( ERROR( ret ) )
-            break;
-
-        ret = pfs->ReadDir( hDir, vecks );
-        pfs->CloseFile( hDir );
-        if( ERROR( ret ) )
-        {
-            hDir = INVALID_HANDLE;
-            break;
-        }
-
-        IntVecPtr pGids( true );
-        for( auto& elem : vecks )
-        {
-            ( *pGids )().push_back(
-                atoi( elem.szKey ) );
-        }
 
         CCfgOpener oCliInfo;
         ret = oCliInfo.Deserialize( pOutBuf );
@@ -247,10 +218,6 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             propContinue, false );
         oRetInfo.SetBoolProp(
             propGmSSL, bGmSSL );
-        oRetInfo.SetIntProp(
-            propUid, dwUid );
-        oRetInfo.SetObjPtr(
-            propGid, ObjPtr( pGids ) );
         pRetInfo = oRetInfo.GetCfg();
 
     }while( 0 );
