@@ -59,12 +59,12 @@ gint32 GetMonitorToNotify(
     std::vector< HANDLE >& vecStms )
 {
     gint32 ret = 0;
-    RFHANDLE hDir = INVALID_HANDLE;
     do{
         stdstr strPath = "/" APPS_ROOT_DIR "/";
         strPath += strAppName;
         strPath += "/" MONITOR_STREAM_DIR;
         std::vector< KEYPTR_SLOT > vecks;
+        RFHANDLE hDir = INVALID_HANDLE;
         ret = pAppReg->OpenDir(
             strPath, O_RDONLY, hDir );
         if( ERROR( ret ) )
@@ -94,8 +94,6 @@ gint32 GetMonitorToNotify(
                 hDir, elem.szKey );
         }
     }while( 0 );
-    if( hDir != INVALID_HANDLE )
-        pAppReg->CloseFile( hDir );
     return ret;
 }
 
@@ -174,8 +172,8 @@ gint32 GetInputToNotify(
     std::vector< STM_POINT  >& vecStms )
 {
     gint32 ret = 0;
-    RFHANDLE hDir = INVALID_HANDLE;
     do{
+        RFHANDLE hDir = INVALID_HANDLE;
         stdstr strPath = "/" APPS_ROOT_DIR "/";
         strPath += strPtPath;
         strPath += "/" OUTPUT_LINKS_DIR;
@@ -221,8 +219,6 @@ gint32 GetInputToNotify(
         if( vecStms.size() )
             ret = 0;
     }while( 0 );
-    if( hDir != INVALID_HANDLE )
-        pAppReg->CloseFile( hDir );
     return ret;
 }
 
@@ -243,10 +239,10 @@ gint32 CAppManager_SvrImpl::ListApps(
     std::vector<std::string>& arrApps /*[ Out ]*/ )
 {
     gint32 ret = 0;
-    RFHANDLE hDir = INVALID_HANDLE;
     do{
         stdstr strPath = "/" APPS_ROOT_DIR;
         std::vector< KEYPTR_SLOT > vecks;
+        RFHANDLE hDir = INVALID_HANDLE;
         ret = m_pAppRegfs->OpenDir(
             strPath, O_RDONLY, hDir );
         if( ERROR( ret ) )
@@ -265,8 +261,6 @@ gint32 CAppManager_SvrImpl::ListApps(
         for( auto& elem : vecks )
             arrApps.push_back( elem.szKey );
     }while( 0 );
-    if( hDir != INVALID_HANDLE )
-        m_pAppRegfs->CloseFile( hDir );
     return ret;
 }
 
@@ -305,8 +299,6 @@ gint32 CAppManager_SvrImpl::ListPoints(
         for( auto& elem : vecks )
             arrPoints.push_back( elem.szKey );
     }while( 0 );
-    if( hDir != INVALID_HANDLE )
-        m_pAppRegfs->CloseFile( hDir );
     return ret;
 }
 
@@ -317,7 +309,6 @@ gint32 CAppManager_SvrImpl::ListAttributes(
     std::vector<std::string>& arrAttributes /*[ Out ]*/ )
 {
     gint32 ret = 0;
-    RFHANDLE hDir = INVALID_HANDLE;
     do{
         if( strPtPath.empty() )
         {
@@ -327,6 +318,7 @@ gint32 CAppManager_SvrImpl::ListAttributes(
         stdstr strPath = "/" APPS_ROOT_DIR "/";
         strPath += strPtPath;
         std::vector< KEYPTR_SLOT > vecks;
+        RFHANDLE hDir = INVALID_HANDLE;
         ret = m_pAppRegfs->OpenDir(
             strPath, O_RDONLY, hDir );
         if( ERROR( ret ) )
@@ -345,8 +337,6 @@ gint32 CAppManager_SvrImpl::ListAttributes(
         for( auto& elem : vecks )
             arrAttributes.push_back( elem.szKey );
     }while( 0 );
-    if( hDir != INVALID_HANDLE )
-        m_pAppRegfs->CloseFile( hDir );
     return ret;
 }
 
@@ -428,7 +418,6 @@ gint32 CAppManager_SvrImpl::SetPointValue(
     const Variant& value /*[ In ]*/ )
 {
     gint32 ret = 0;
-    RFHANDLE hPtDir = INVALID_HANDLE;
     auto& pfs = m_pAppRegfs;
     do{
         stdstr strPath = "/" APPS_ROOT_DIR "/";
@@ -450,6 +439,7 @@ gint32 CAppManager_SvrImpl::SetPointValue(
             ret = -EACCES;
             break;
         }
+        RFHANDLE hPtDir = INVALID_HANDLE;
         ret = pfs->OpenDir( strPath +
             strApp + "/" POINTS_DIR "/" + strPoint,
             O_RDONLY, hPtDir );
@@ -486,8 +476,6 @@ gint32 CAppManager_SvrImpl::SetPointValue(
             strPtPath, value, hcurStm );
 
     }while( 0 );
-    if( hPtDir != INVALID_HANDLE )
-        pfs->CloseFile( hPtDir );
     return ret;
 }
 
@@ -686,7 +674,6 @@ gint32 CAppManager_SvrImpl::SetPointValues(
     std::vector<KeyValue>& arrValues /*[ In ]*/ )
 {
     gint32 ret = 0;
-    RFHANDLE hPtDir = INVALID_HANDLE;
     auto& pfs = m_pAppRegfs;
     do{
         if( !IsAppOnline( strAppName ) )
@@ -697,6 +684,7 @@ gint32 CAppManager_SvrImpl::SetPointValues(
         stdstr strDir = "/" APPS_ROOT_DIR "/";
         strDir += strAppName + "/" POINTS_DIR "/";
 
+        RFHANDLE hPtDir = INVALID_HANDLE;
         ret = pfs->OpenDir(
             strDir, O_RDONLY, hPtDir );
         if( ERROR( ret ) )
@@ -755,8 +743,6 @@ gint32 CAppManager_SvrImpl::SetPointValues(
             }
         }
     }while( 0 );
-    if( hPtDir != INVALID_HANDLE )
-        pfs->CloseFile( hPtDir );
     return ret;
 }
 
@@ -768,7 +754,6 @@ gint32 CAppManager_SvrImpl::GetPointValues(
     std::vector<KeyValue>& arrKeyVals /*[ Out ]*/ )
 {
     gint32 ret = 0;
-    RFHANDLE hPtDir = INVALID_HANDLE;
     auto& pfs = m_pAppRegfs;
     do{
         if( !IsAppOnline( strAppName ) )
@@ -779,6 +764,7 @@ gint32 CAppManager_SvrImpl::GetPointValues(
         stdstr strDir = "/" APPS_ROOT_DIR "/";
         strDir += strAppName + "/" POINTS_DIR "/";
 
+        RFHANDLE hPtDir = INVALID_HANDLE;
         ret = pfs->OpenDir(
             strDir, O_RDONLY, hPtDir );
         if( ERROR( ret ) )
@@ -858,8 +844,6 @@ gint32 CAppManager_SvrImpl::GetPointValues(
         }
         ret = 0;
     }while( 0 );
-    if( hPtDir != INVALID_HANDLE )
-        pfs->CloseFile( hPtDir );
     return ret;
 }
 
@@ -873,7 +857,6 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
     gint32 ret = 0;
     bool bOwnerSet = false;
     auto& pfs = m_pAppRegfs;
-    RFHANDLE hPtsDir = INVALID_HANDLE;
     do{
         HANDLE hstm, hOwner;
         ret = GetCurStream( this, pContext, hstm );
@@ -930,6 +913,7 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
         strDir += strAppName + "/" POINTS_DIR "/";
 
         std::vector< stdstr > vecPoints;
+        RFHANDLE hPtsDir = INVALID_HANDLE;
         ret = pfs->OpenDir(
             strDir, O_RDONLY, hPtsDir );
         if( ERROR( ret ) )
@@ -959,8 +943,6 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
             vecPoints, arrPtToGet );
 
     }while( 0 );
-    if( hPtsDir != INVALID_HANDLE )
-        pfs->CloseFile( hPtsDir );
     if( ERROR( ret ) && bOwnerSet )
     {
         ret = SetOwnerStream( pfs,
