@@ -2545,7 +2545,7 @@ EOF
                     return True
         except Exception as err:
             print( err )
-            return False
+        return False
 
     def IsKrb5Enabled( self )->bool :
         try:
@@ -2562,7 +2562,7 @@ EOF
                     return True
         except Exception as err:
             print( err )
-            return False
+        return False
 
     def IsSimpAuthEnabled( self )->bool :
         try:
@@ -2577,7 +2577,7 @@ EOF
                     return True
         except Exception as err:
             print( err )
-            return False
+        return False
 
     def ToggleAuthControls( self, bActive : bool, bKrb5 ):
         bSensitive = bActive and bKrb5
@@ -2804,7 +2804,7 @@ EOF
                 self.labelSvc.set_text("")
                 self.labelRealm.set_text("")
                 self.labelSign.set_text("")
-                self.labelUser.set_text("")
+                #self.labelUser.set_text("")
                 self.labelKdc.set_text("")
 
 
@@ -2994,6 +2994,7 @@ EOF
 
         kdcEditBox = Gtk.Entry()
         kdcEditBox.set_text(strKdcIp)
+        kdcEditBox.set_tooltip_text( "KDC IP address or hostname" )
         grid.attach(kdcEditBox, startCol + 1, startRow + 5, 2, 1 )
         kdcEditBox.cpos = startCol + 1
         kdcEditBox.rpos = startRow + 5
@@ -3029,13 +3030,14 @@ EOF
             if strMech == "krb5":
                 strUser = authInfo[ 'UserName']
         except Exception as err :
-            pass
+            strUser = ""
 
         userEditBox = Gtk.Entry()
         userEditBox.set_text(strUser)
         grid.attach(userEditBox, startCol + 1, startRow + 6, 2, 1 )
         userEditBox.cpos = startCol + 1
         userEditBox.rpos = startRow + 6
+        userEditBox.set_tooltip_text( "Kerberos user name" )
 
         # krb5 Disable/Enable KProxy
         if IsKinitProxyEnabled():
@@ -3171,13 +3173,16 @@ EOF
         self.tsCheck = tsCheck
  
         btnText = "Config WebServer"
-        if not IsNginxInstalled() and \
-            not IsApacheInstalled() :
-            return
-
         updWsBtn = Gtk.Button.new_with_label( btnText )
         updWsBtn.connect("clicked", self.on_update_ws_settings )
         updWsBtn.set_tooltip_text( "Config the local WebServer" )
+        if not IsNginxInstalled() and \
+            not IsApacheInstalled() :
+            updWsBtn.set_sensitive( False )
+            updWsBtn.set_tooltip_text(
+                "Cannot detect local WebServer. You can install " +
+                "'Nginx' or 'httpd' to enable this button" )
+
         grid.attach( updWsBtn, startCol + 1, startRow + 3, 2, 1 )
 
         return

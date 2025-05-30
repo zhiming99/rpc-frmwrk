@@ -192,6 +192,20 @@ exports.CInterfaceProxy = class CInterfaceProxy
             if( elem[ "Compression"] === "true")
             { this.m_bCompression = true }
 
+            if( elem[ "AuthInfo"] !== undefined )
+            {
+                var oAuth = elem[ "AuthInfo" ]
+                if( oAuth[ "AuthMech"] === "krb5")
+                    throw new Error(
+                        `Error krb5 authentication is not supported in this version`)
+                if( oAuth[ "AuthMech"] === "SimpAuth" ||
+                    oAuth[ "AuthMech" ] === "OAuth2" )
+                {
+                    globalThis.g_bAuth = true
+                    globalThis.g_strAuthMech = oAuth[ "AuthMech" ]
+                }
+            }
+
             for( var interf of elem[ "Interfaces"])
             {
                 var bDummy = interf[ "DummyInterface"]
@@ -277,14 +291,142 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 return Promise.resolve( ret)
             })
     }
+
+    GetLoginCredentialFromInput()
+    {
+        return new Promise((resolve) => {
+            // Create modal background
+            const modalBg = document.createElement('div');
+            modalBg.style.position = 'fixed';
+            modalBg.style.top = 0;
+            modalBg.style.left = 0;
+            modalBg.style.width = '100vw';
+            modalBg.style.height = '100vh';
+            modalBg.style.background = 'rgba(0,0,0,0.3)';
+            modalBg.style.display = 'flex';
+            modalBg.style.alignItems = 'center';
+            modalBg.style.justifyContent = 'center';
+            modalBg.style.zIndex = 9999;
+
+            // Create modal form
+            const modal = document.createElement('div');
+            modal.style.background = '#fff';
+            modal.style.padding = '24px';
+            modal.style.borderRadius = '8px';
+            modal.style.boxShadow = '0 2px 12px rgba(0,0,0,0.2)';
+            modal.innerHTML = `
+                <h3>Login</h3>
+                <form id="loginForm" autocomplete="off">
+                    <div style="margin-bottom:10px;">
+                        <input id="loginUser" type="text" placeholder="Username" style="width:200px;padding:6px;" required />
+                    </div>
+                    <div style="margin-bottom:10px;">
+                        <input id="loginPass" type="password" placeholder="Password" style="width:200px;padding:6px;" required />
+                    </div>
+                    <div style="text-align:right;">
+                        <button type="submit" style="margin-right:8px;">OK</button>
+                        <button type="button" id="loginCancel">Cancel</button>
+                    </div>
+                </form>
+            `;
+            modalBg.appendChild(modal);
+            document.body.appendChild(modalBg);
+
+            // Focus username input
+            setTimeout(() => document.getElementById('loginUser').focus(), 0);
+
+            // Handle form submit
+            modal.querySelector('#loginForm').onsubmit = function(e) {
+                e.preventDefault();
+                const user = document.getElementById('loginUser').value;
+                const pass = document.getElementById('loginPass').value;
+                document.body.removeChild(modalBg);
+                resolve({ userName: user, password: pass });
+            };
+
+            // Handle cancel
+            modal.querySelector('#loginCancel').onclick = function() {
+                document.body.removeChild(modalBg);
+                resolve(null);
+            };
+        });
+    }
+
+    async generateSHA256Hash( input )
+    {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(input);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        return hashHex;
+    }
+
+    async generateSHA256Block( input )
+    {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(input);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        return hashBuffer;
+    }
+
     Start()
     {
         return this.LoadObjDesc( this.m_strObjDesc).then((retval)=>{
             if(ERROR(retval))
                 return Promise.reject(retval)
+            if( globalThis.g_bAuth &&
+                globalThis.g_strAuthMech === "SimpAuth" )
+            {
+                return this.GetLoginCredentialFromInput().then((oCred)=>{
+                    if( oCred === null )
+                    {
+                        this.DebugPrint("Error, Login canceled by user")
+                        return Promise.reject( -errno.EFAULT )
+                    }
+                    this.m_strUserName = oCred.userName
+                    return this.generateSHA256Hash( oCred.password ).then((hash)=>{
+                        this.m_strKey = hash.toUpperCase()
+                        return this.generateSHA256Hash( oCred.userName ).then((userHash)=>{
+                            this.m_strKey += userHash.toUpperCase() 
+                            return this.generateSHA256Hash( this.m_strKey ).then((finalHash)=>{
+                                return this.m_strKey = finalHash.toUpperCase().then(()=>{
+                                    this.DebugPrint(`SHA256 hash of '${this.m_strUserName}' is: ${this.m_strKey}`);
+                                    return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
+                                        if( globalThis.g_bAuth )
+                                            return this.m_funcLogin( oCred, e.m_oResp ).then((retval)=>{
+                                                if( ERROR( retval ) )
+                                                    return Promise.resolve( retval )
+                                                return this.EnableEvents().then((e)=>{
+                                                    return Promise.resolve(e)
+                                                }).catch((e)=>{
+                                                    return Promise.resolve( -errno.EFAULT )
+                                                })
+                                            }).catch((e)=>{
+                                                this.DebugPrint("Error, Login failed ( " + e + " )")
+                                                return Promise.resolve(e)
+                                            })
+                                        else
+                                            return this.EnableEvents().then((e)=>{
+                                                return Promise.resolve(e)
+                                            }).catch((e)=>{
+                                                this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
+                                                return Promise.resolve( -errno.EFAULT )
+                                            })
+                                    })
+                                })
+                            })
+                        })
+                    }).catch((e)=>{
+                        this.DebugPrint("Error, GetLoginCredentialFromInput failed ( " + e + " )")
+                        return Promise.reject( -errno.EFAULT )
+                    })
+                })
+            }
+
             return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
                 if( globalThis.g_bAuth )
-                    return this.m_funcLogin().then((retval)=>{
+                    return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
                         if( ERROR( retval ) )
                             return Promise.resolve( retval )
                         return this.EnableEvents().then((e)=>{

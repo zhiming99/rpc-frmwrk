@@ -137,6 +137,13 @@ function OnHandshakeComplete( oProxy, oPending, oResp )
         oOuter.m_oResp.SetUint32(
             EnumPropId.propReturnValue,
             ret )
+        oOuter.m_oResp.SetString(
+            EnumPropId.propSessHash,
+            oProxy.m_strSess )
+        oOuter.m_oResp.SetUint64(
+            EnumPropId.propTimestamp,
+            oInfo.GetProperty( EnumPropId.propTimestamp ) )
+
         oOuter.m_oResolve( oOuter )
 
         oProxy.m_iState = EnumIfState.stateConnected

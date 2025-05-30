@@ -84,14 +84,19 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
             oResp.SetUint32( EnumPropId.propReturnValue,
                 errno.ERROR_FAIL )
         }
-        var ret = oResp.GetProperty(
-            EnumPropId.propReturnValue )
+        var ret;
         try{
-            e.m_oCallback( oResp )
-        } catch( e ){
+            ret = e.m_oCallback( oResp )
+        } catch( err ){
+        }
+        if( ret === undefined || ret === null )
+        {
+            ret = oResp.GetProperty(
+                EnumPropId.propReturnValue )
         }
         return Promise.resolve( ret )
     }).catch(( e )=>{
+        var oResp = e.m_oResp
         var ret = -errno.EFAULT 
         if( e.message !== undefined)
         {
@@ -100,9 +105,12 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
         else if( e.m_oCallback !== undefined )
         {
             console.log( `Error ForwardRequestLocal failed: ${e.m_oResp}` )
-            ret = e.m_oResp.GetProperty(
-                EnumPropId.propReturnValue )
-            e.m_oCallback( e.m_oResp )
+            ret = e.m_oCallback( oResp )
+            if( ret === undefined || ret === null )
+            {
+                ret = oResp.GetProperty(
+                    EnumPropId.propReturnValue )
+            }
         }
         return Promise.resolve( ret )
     })
