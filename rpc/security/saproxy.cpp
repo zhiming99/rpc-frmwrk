@@ -452,7 +452,7 @@ static gint32 CheckServerToken( IConfigDb* pReq,
         if( ERROR( ret ) )
             break;
 
-        qwTs++;
+        qwTs = htonll( qwTs + 1 );
         BufPtr pOrig( true );
         pOrig->Append(
             ( guint8* )&qwTs, sizeof( qwTs ) );

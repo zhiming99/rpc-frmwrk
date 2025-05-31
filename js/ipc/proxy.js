@@ -390,30 +390,32 @@ exports.CInterfaceProxy = class CInterfaceProxy
                         return this.generateSHA256Hash( oCred.userName ).then((userHash)=>{
                             this.m_strKey += userHash.toUpperCase() 
                             return this.generateSHA256Hash( this.m_strKey ).then((finalHash)=>{
-                                return this.m_strKey = finalHash.toUpperCase().then(()=>{
-                                    this.DebugPrint(`SHA256 hash of '${this.m_strUserName}' is: ${this.m_strKey}`);
-                                    return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
-                                        if( globalThis.g_bAuth )
-                                            return this.m_funcLogin( oCred, e.m_oResp ).then((retval)=>{
-                                                if( ERROR( retval ) )
-                                                    return Promise.resolve( retval )
-                                                return this.EnableEvents().then((e)=>{
-                                                    return Promise.resolve(e)
-                                                }).catch((e)=>{
-                                                    return Promise.resolve( -errno.EFAULT )
-                                                })
-                                            }).catch((e)=>{
-                                                this.DebugPrint("Error, Login failed ( " + e + " )")
-                                                return Promise.resolve(e)
-                                            })
-                                        else
+                                this.m_strKey = finalHash.toUpperCase()
+                                this.DebugPrint(`SHA256 hash of '${this.m_strUserName}' is: ${this.m_strKey}`);
+                                return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
+                                    if( globalThis.g_bAuth )
+                                        return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
+                                            if( ERROR( retval ) )
+                                                return Promise.resolve( retval )
                                             return this.EnableEvents().then((e)=>{
                                                 return Promise.resolve(e)
                                             }).catch((e)=>{
-                                                this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
                                                 return Promise.resolve( -errno.EFAULT )
                                             })
-                                    })
+                                        }).catch((e)=>{
+                                            this.DebugPrint("Error, Login failed ( " + e + " )")
+                                            return Promise.resolve(-errno.EFAULT)
+                                        })
+                                    else
+                                        return this.EnableEvents().then((e)=>{
+                                            return Promise.resolve(e)
+                                        }).catch((e)=>{
+                                            this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
+                                            return Promise.resolve( -errno.EFAULT )
+                                        })
+                                }).catch((e)=>{
+                                    this.DebugPrint("Error, OpenRemotePort failed ( " + e + " )")
+                                    return Promise.resolve(-errno.EFAULT)
                                 })
                             })
                         })

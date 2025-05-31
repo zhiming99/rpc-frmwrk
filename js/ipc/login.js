@@ -1,7 +1,7 @@
 const { CConfigDb2 } = require("../combase/configdb")
 const { ERROR, SYS_METHOD, SUCCEEDED } = require("../combase/defines")
 const { errno, EnumPropId, EnumTypeId, EnumCallFlags } = require("../combase/enums")
-const { AdminCmd } = require("../combase/iomsg")
+const { AdminCmd, CIoReqMessage } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
 const { DBusIfName, DBusDestination2, DBusObjPath } = require("../rpc/dmsg")
 function UpdateSessHash( strHash )
@@ -65,11 +65,10 @@ function bigintToUint8Array(bigInt) {
 
 function LoginRequestCb_SimpAuth( oContext, oResp )
 {
-    var ret = 0
     var oUserCb = oContext.m_oUserCb
     var ret = oResp.GetProperty(
         EnumPropId.propReturnValue)
-    if( ret === null )
+    if( ERROR( ret ) )
     {
         ret = errno.ERROR_FAIL;
         if( oUserCb )
@@ -77,14 +76,22 @@ function LoginRequestCb_SimpAuth( oContext, oResp )
         return Promise.resolve( ret )
     }
 
-    var qwTs = oContext.m_oReq.GetProperty(
-        EnumPropId.propTimestamp) + 1
-    var tokenBuf = Buffer.concat(
-        [ Buffer.from( bigintToUint8Array( qwTs ) ),
-        oContext.m_oReq.GetProperty( EnumPropId.propUserName ).encode(),
-        oContext.m_strSessHash.encode() ] )
+    var qwTs = oContext.m_oToken.GetProperty(
+        EnumPropId.propTimestamp )
+    var strUser =
+        oContext.m_oToken.GetProperty( EnumPropId.propUserName )
+    var strSess = 
+        oContext.m_oToken.GetProperty( EnumPropId.propSessHash )
+    qwTs = BigInt( Number( qwTs ) + 1 )
+    var qwTsBuf = bigintToUint8Array( qwTs )
+    if( qwTsBuf.length < 8 )
+        qwTsBuf = Buffer.concat( [ Buffer.alloc( 8 - qwTsBuf.length, 0 ), qwTsBuf ] )
 
-    var oSvrToken = oResp.GetProperty( 0 )
+    var tokenBuf = Buffer.concat(
+        [ qwTsBuf, Buffer.from( strUser, 'utf8' ), Buffer.from( strSess, 'utf8' ) ] )
+
+    var oSvrInfo = oResp.GetProperty( 0 )
+    var oSvrToken = oSvrInfo.GetProperty( 0 )
     var iv = oSvrToken.slice( 0, 12)
 
     const pRawKey = Buffer.from(this.m_strKey, 'hex')
@@ -130,12 +137,12 @@ function LoginRequestCb_SimpAuth( oContext, oResp )
 
 function LoginRequestCb( oContext, oResp )
 {
-    if( globalThis.g_strAuthType === "OAuth2" )
+    if( globalThis.g_strAuthMech === "OAuth2" )
     {
         return LoginRequestCb_OAuth2.bind( this )(
             oContext, oResp )
     }
-    else if( globalThis.g_strAuthType === "SimpAuth" )
+    else if( globalThis.g_strAuthMech === "SimpAuth" )
     {
         return LoginRequestCb_SimpAuth.bind( this )(
             oContext, oResp )
@@ -185,7 +192,7 @@ function LoginRequest_OAuth2( oUserCallback )
         oReq, LoginRequestCb, oContext )
 }
 
-function LoginRequest_SimpAuth( oUserCallback, oHsInfo )
+function LoginRequest_SimpAuth( oUserCallback, oHsInfo, oCred )
 {
     var oReq = new CConfigDb2()
     oReq.SetString( EnumPropId.propIfName,
@@ -199,19 +206,20 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo )
     oReq.SetString( EnumPropId.propMethodName, 
         SYS_METHOD("AuthReq_Login"))
 
+    var strUser = this.m_strUserName
     var oInfo = new CConfigDb2()
     oInfo.SetBool( EnumPropId.propGmSSL, false )
     oInfo.SetString( EnumPropId.propUserName, strUser )
 
     var oToken = new CConfigDb2()
     oToken.SetString( EnumPropId.propSessHash,
-        oHsInfo.GetString( EnumPropId.propSessHash ) )
-    oToken.SetString( EnumPropId.propTimestamp,
-        oHsInfo.GetString( EnumPropId.propTimestamp ) )
+        oHsInfo.GetProperty( EnumPropId.propSessHash ) )
+    oToken.SetUint64( EnumPropId.propTimestamp,
+        oHsInfo.GetProperty( EnumPropId.propTimestamp ) )
     oToken.SetString( EnumPropId.propUserName, strUser )
 
     oReq.Push( {t: EnumTypeId.typeObj, v: oInfo })
-    oInfo.Push( {t: EnumTypeId.typeObj, v: oToken })
+    // oInfo.Push( {t: EnumTypeId.typeObj, v: oToken })
     var ciphertxt = oToken.Serialize()
 
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -220,7 +228,9 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo )
         "raw", pRawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"] ).then((pKey) => {
         return crypto.subtle.encrypt( {name: "AES-GCM", iv:iv},
             pKey, ciphertxt ).then((encrypted) => {
-            oInfo.Push( {t: EnumTypeId.typeByteArr, v: encrypted } )
+            var oAesBuf = Buffer.concat(
+                [ Buffer.from(iv), Buffer.from(encrypted) ] )
+            oInfo.Push( {t: EnumTypeId.typeByteArr, v: oAesBuf } )
             var oCallOpts = new CConfigDb2()
             oCallOpts.SetUint32(
                 EnumPropId.propTimeoutSec, this.m_dwTimeoutSec)
@@ -235,8 +245,9 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo )
             var oContext = new Object()
             oContext.m_oUserCb = oUserCallback
             oContext.m_oReq = oReq
-            oContext.m_strSessHash = oHsInfo.GetString(
+            oContext.m_strSessHash = oHsInfo.GetProperty(
                 EnumPropId.propSessHash )
+            oContext.m_oToken = oToken
 
             return this.m_funcForwardRequest(
                 oReq, LoginRequestCb, oContext )
@@ -252,16 +263,17 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo )
 
 function LoginRequest( oUserCallback, oResp )
 {
-    if( globalThis.g_strAuthType === "OAuth2" )
+    if( globalThis.g_strAuthMech === "OAuth2" )
     {
         return LoginRequest_OAuth2.bind( this )(
             oUserCallback )
     }
-    else if( globalThis.g_strAuthType === "SimpAuth" )
+    else if( globalThis.g_strAuthMech === "SimpAuth" )
     {
         return LoginRequest_SimpAuth.bind( this )(
-            oUserCallback, oHsInfo )
+            oUserCallback, oResp )
     }
+    return Promise.resolve( -errno.ENOTSUP ) 
 }
 
 exports.LoginLocal = LoginRequest

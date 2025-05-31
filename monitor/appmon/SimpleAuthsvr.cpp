@@ -195,7 +195,7 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             ret = -EACCES;
             break;
         }
-        qwTs1+=1;
+        qwTs1 = htonll( qwTs1 + 1 );
         BufPtr pTokBuf( true ), pRetBuf;
         pTokBuf->Append(
             ( char* )&qwTs1, sizeof( qwTs1 ) );

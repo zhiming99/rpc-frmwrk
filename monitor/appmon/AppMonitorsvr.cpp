@@ -1129,9 +1129,9 @@ gint32 CAppMonitor_SvrImpl::LoadAssocMaps(
         RFHANDLE hDir = INVALID_HANDLE;
         stdstr strAssocDir;
         if( iAuthMech == 0 )
-            strAssocDir = KRB5_ASSOC_DIR;
+            strAssocDir = "/" KRB5_ASSOC_DIR;
         else if( iAuthMech == 1 )
-            strAssocDir = OA2_ASSOC_DIR;
+            strAssocDir = "/" OA2_ASSOC_DIR;
         else
         {
             ret = -EINVAL;
