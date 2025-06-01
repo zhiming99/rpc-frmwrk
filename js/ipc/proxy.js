@@ -391,7 +391,6 @@ exports.CInterfaceProxy = class CInterfaceProxy
                             this.m_strKey += userHash.toUpperCase() 
                             return this.generateSHA256Hash( this.m_strKey ).then((finalHash)=>{
                                 this.m_strKey = finalHash.toUpperCase()
-                                this.DebugPrint(`SHA256 hash of '${this.m_strUserName}' is: ${this.m_strKey}`);
                                 return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
                                     if( globalThis.g_bAuth )
                                         return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{

@@ -111,6 +111,10 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
         stdstr strPath = "/users/";
         strPath += strUser + "/passwd";
 
+        stdstr strVal2;
+        ret = osi.GetStrProp(
+            propSessHash, strVal2 );
+
         Variant oVar;
         ret = pfs->GetValue( strPath, oVar );
         if( ERROR( ret ) )
@@ -118,13 +122,21 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
             ret = -EACCES;
             break;
         }
-        stdstr& strKey = oVar;
-        BufPtr pKey( true );
-        if( strKey.size() != 64 )
+        stdstr& strHash = oVar;
+        if( strHash.size() != 64 )
         {
             ret = -EINVAL;
             break;
         }
+
+        strHash += strVal2;
+        stdstr strKey;
+        ret = GenSha2Hash(
+            strHash, strKey, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pKey( true );
         pKey->Resize( strKey.size() / 2 );
         ret = HexStringToBytes(
             strKey.c_str(), strKey.size(),
@@ -152,9 +164,6 @@ gint32 CSimpleAuth_SvrImpl::CheckClientToken(
         if( ERROR( ret ) )
             break;
 
-        stdstr strVal2;
-        ret = osi.GetStrProp(
-            propSessHash, strVal2 );
         if( strVal1.empty() || strVal1 != strVal2 )
         {
             ret = -EACCES;

@@ -94,45 +94,52 @@ function LoginRequestCb_SimpAuth( oContext, oResp )
     var oSvrToken = oSvrInfo.GetProperty( 0 )
     var iv = oSvrToken.slice( 0, 12)
 
-    const pRawKey = Buffer.from(this.m_strKey, 'hex')
-    return crypto.subtle.importKey(
-        "raw", pRawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]).then((pKey) => {
-        return crypto.subtle.decrypt( {name: "AES-GCM", iv:iv }, pKey, oSvrToken.slice( 12 ) )
-            .then((decrypted) => {
-                if( tokenBuf.compare( Buffer.from( decrypted ) ) !== 0 )
-                {
-                    if( oUserCb)
+    return this.generateSHA256Hash( this.m_strKey + strSess ).then((strKey) => {
+        const pRawKey = Buffer.from(strKey, 'hex')
+        return crypto.subtle.importKey(
+            "raw", pRawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]).then((pKey) => {
+            return crypto.subtle.decrypt( {name: "AES-GCM", iv:iv }, pKey, oSvrToken.slice( 12 ) )
+                .then((decrypted) => {
+                    if( tokenBuf.compare( Buffer.from( decrypted ) ) !== 0 )
+                    {
+                        if( oUserCb)
+                            oUserCb( -errno.EACCES )
+                        return Promise.resolve( -errno.EACCES )
+                    }
+                    var strHash = oResp.GetProperty(
+                        EnumPropId.propSessHash )
+                    if( !strHash )
+                    {
+                        ret = -errno.EACCES
+                        oResp.SetUint32( propReturnValue, ret )
+                    }
+                    else
+                    {
+                        UpdateSessHash.bind( this )( strHash )
+                    }
+                    for( var i = 0; i < this.m_strKey.length; i++ )
+                        this.m_strKey[i] = ' '
+                    if( oUserCb )
+                        oUserCb( ret )
+                    return Promise.resolve( ret )
+                }).catch((err) => {
+                    console.error("Login failed:", err);
+                    if( oUserCb )
                         oUserCb( -errno.EACCES )
                     return Promise.resolve( -errno.EACCES )
-                }
-                var strHash = oResp.GetProperty(
-                    EnumPropId.propSessHash )
-                if( !strHash )
-                {
-                    ret = -errno.EACCES
-                    oResp.SetUint32( propReturnValue, ret )
-                }
-                else
-                {
-                    UpdateSessHash.bind( this )( strHash )
-                }
-                for( var i = 0; i < this.m_strKey.length; i++ )
-                    this.m_strKey[i] = ' '
-                if( oUserCb )
-                    oUserCb( ret )
-                return Promise.resolve( ret )
-            }).catch((err) => {
-                console.error("Login failed:", err);
-                if( oUserCb )
-                    oUserCb( -errno.EACCES )
-                return Promise.resolve( -errno.EACCES )
-            })
+                })
+        }).catch((err) => {
+            console.error("Key import failed:", err);
+            if( oUserCb )
+                oUserCb( -errno.EACCES )
+            return Promise.resolve( -errno.EACCES )
+        });
     }).catch((err) => {
-        console.error("Key import failed:", err);
+        console.error("SHA256 hash generation failed:", err);
         if( oUserCb )
             oUserCb( -errno.EACCES )
         return Promise.resolve( -errno.EACCES )
-    });
+    })
 }
 
 function LoginRequestCb( oContext, oResp )
@@ -212,8 +219,8 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo, oCred )
     oInfo.SetString( EnumPropId.propUserName, strUser )
 
     var oToken = new CConfigDb2()
-    oToken.SetString( EnumPropId.propSessHash,
-        oHsInfo.GetProperty( EnumPropId.propSessHash ) )
+    var strSess = oHsInfo.GetProperty( EnumPropId.propSessHash )
+    oToken.SetString( EnumPropId.propSessHash, strSess )
     oToken.SetUint64( EnumPropId.propTimestamp,
         oHsInfo.GetProperty( EnumPropId.propTimestamp ) )
     oToken.SetString( EnumPropId.propUserName, strUser )
@@ -222,43 +229,48 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo, oCred )
     // oInfo.Push( {t: EnumTypeId.typeObj, v: oToken })
     var ciphertxt = oToken.Serialize()
 
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const pRawKey = Buffer.from(this.m_strKey, 'hex')
-    return crypto.subtle.importKey(
-        "raw", pRawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"] ).then((pKey) => {
-        return crypto.subtle.encrypt( {name: "AES-GCM", iv:iv},
-            pKey, ciphertxt ).then((encrypted) => {
-            var oAesBuf = Buffer.concat(
-                [ Buffer.from(iv), Buffer.from(encrypted) ] )
-            oInfo.Push( {t: EnumTypeId.typeByteArr, v: oAesBuf } )
-            var oCallOpts = new CConfigDb2()
-            oCallOpts.SetUint32(
-                EnumPropId.propTimeoutSec, this.m_dwTimeoutSec)
-            oCallOpts.SetUint32(
-                EnumPropId.propKeepAliveSec, this.m_dwKeepAliveSec )
-            oCallOpts.SetUint32( EnumPropId.propCallFlags,
-                EnumCallFlags.CF_ASYNC_CALL |
-                EnumCallFlags.CF_WITH_REPLY |
-                messageType.methodCall )
-            oReq.SetObjPtr(
-                EnumPropId.propCallOptions, oCallOpts)
-            var oContext = new Object()
-            oContext.m_oUserCb = oUserCallback
-            oContext.m_oReq = oReq
-            oContext.m_strSessHash = oHsInfo.GetProperty(
-                EnumPropId.propSessHash )
-            oContext.m_oToken = oToken
+    return this.generateSHA256Hash( this.m_strKey + strSess ).then((strKey) => {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const pRawKey = Buffer.from(strKey, 'hex')
+        return crypto.subtle.importKey(
+            "raw", pRawKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"] ).then((pKey) => {
+            return crypto.subtle.encrypt( {name: "AES-GCM", iv:iv},
+                pKey, ciphertxt ).then((encrypted) => {
+                var oAesBuf = Buffer.concat(
+                    [ Buffer.from(iv), Buffer.from(encrypted) ] )
+                oInfo.Push( {t: EnumTypeId.typeByteArr, v: oAesBuf } )
+                var oCallOpts = new CConfigDb2()
+                oCallOpts.SetUint32(
+                    EnumPropId.propTimeoutSec, this.m_dwTimeoutSec)
+                oCallOpts.SetUint32(
+                    EnumPropId.propKeepAliveSec, this.m_dwKeepAliveSec )
+                oCallOpts.SetUint32( EnumPropId.propCallFlags,
+                    EnumCallFlags.CF_ASYNC_CALL |
+                    EnumCallFlags.CF_WITH_REPLY |
+                    messageType.methodCall )
+                oReq.SetObjPtr(
+                    EnumPropId.propCallOptions, oCallOpts)
+                var oContext = new Object()
+                oContext.m_oUserCb = oUserCallback
+                oContext.m_oReq = oReq
+                oContext.m_strSessHash = oHsInfo.GetProperty(
+                    EnumPropId.propSessHash )
+                oContext.m_oToken = oToken
 
-            return this.m_funcForwardRequest(
-                oReq, LoginRequestCb, oContext )
+                return this.m_funcForwardRequest(
+                    oReq, LoginRequestCb, oContext )
+            }).catch((err) => {
+                console.error("Login failed:", err);
+                return Promise.resolve( -errno.EACCES )
+            })
         }).catch((err) => {
-            console.error("Login failed:", err);
+            console.error("Key import failed:", err);
             return Promise.resolve( -errno.EACCES )
-        })
+        });
     }).catch((err) => {
-        console.error("Key import failed:", err);
+        console.error("SHA256 hash generation failed:", err);
         return Promise.resolve( -errno.EACCES )
-    });
+    })
 }
 
 function LoginRequest( oUserCallback, oResp )

@@ -251,7 +251,9 @@ static std::string GetClientRegPath()
 }
 
 gint32 GetPassHash( stdstr& strUser,
-    BufPtr& pPassHash, bool& bGmSSL )
+    BufPtr& pPassHash,
+    const stdstr& strSalt,
+    bool& bGmSSL )
 {
     gint32 ret = 0;
     RegFsPtr pfs;
@@ -325,13 +327,24 @@ gint32 GetPassHash( stdstr& strUser,
                     ( strPath + ".cred" ).c_str() );
                 break;
             }
+
+            stdstr strHash( pTextHash->ptr(),
+                pTextHash->size() );
+
+            strHash += strSalt;
+            stdstr strKey;
+            ret = GenSha2Hash(
+                strHash, strKey, bGmSSL );
+            if( ERROR( ret ) )
+                break;
+
             BufPtr pBinHash( true );
             ret = pBinHash->Resize(
-                pTextHash->size() / 2 );
+                strKey.size() / 2 );
             if( ERROR( ret ) )
                 break;
             ret = HexStringToBytes(
-                pTextHash->ptr(), pTextHash->size(),
+                strKey.c_str(), strKey.size(),
                 ( guint8* )pBinHash->ptr() );
             if( ERROR( ret ) )
                 break;
@@ -359,14 +372,6 @@ gint32 CSimpAuthLoginProxy::BuildLoginInfo(
 {
     gint32 ret = 0;
     do{
-        BufPtr pKey;
-        bool bGmSSL = false;
-        stdstr strUser2 = strUser;
-        ret = GetPassHash(
-            strUser2, pKey, bGmSSL );
-        if( ERROR( ret ) )
-            break;
-
         Variant oVar;
         ret = this->GetProperty(
             propConnHandle, oVar );
@@ -380,6 +385,14 @@ gint32 CSimpAuthLoginProxy::BuildLoginInfo(
             break;
         ret = pIf->GetProperty(
             propSessHash, oVar );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pKey;
+        bool bGmSSL = false;
+        stdstr strUser2 = strUser;
+        ret = GetPassHash(
+            strUser2, pKey, oVar, bGmSSL );
         if( ERROR( ret ) )
             break;
 
@@ -463,8 +476,8 @@ static gint32 CheckServerToken( IConfigDb* pReq,
 
         bool bGmSSL2 = false;
         BufPtr pPass;
-        ret = GetPassHash(
-            strUser, pPass, bGmSSL2 );
+        ret = GetPassHash( strUser,
+            pPass, strSess, bGmSSL2 );
         if( ERROR( ret ) )
             break;
 

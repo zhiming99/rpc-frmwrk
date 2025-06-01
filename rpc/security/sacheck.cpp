@@ -235,8 +235,6 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
         qwTs += ts.tv_nsec;
         oCtx.SetQwordProp( propTimestamp, qwTs );
 
-        oCtx.CopyProp( propTimestamp, pInfo );
-
         oResp.CopyProp( propSalt,
             ( IConfigDb* )oCtx.GetCfg() );
         CStdRMutex oIfLock( psac->GetLock() );
@@ -250,7 +248,7 @@ gint32 CSacwCallbacks::CheckClientTokenCallback(
     Variant oVar( ObjPtr( oResp.GetCfg() ) );
     pCb->SetProperty( propRespPtr, oVar );
     pCb->OnEvent( eventTaskComp,
-        iRet, 0, nullptr );
+        ret, 0, nullptr );
     oCtx.RemoveProperty( propEventSink );
     return ret;
 }
