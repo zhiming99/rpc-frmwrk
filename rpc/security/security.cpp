@@ -3802,11 +3802,6 @@ gint32 CAuthentServer::SetAuthImpl(
     guint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
-        if( !m_pAuthImpl.IsEmpty() )
-        {
-            ret = -EEXIST;
-            break;
-        }
         m_pAuthImpl = pAuthImpl;
     }while( 0 );
     return ret;
@@ -4591,7 +4586,6 @@ gint32 CAuthentServer::StartOA2Checker(
         if( ERROR( ret ) )
             break;
 
-        // m_pAuthImpl = pIf;
         ret = pIf->StartEx( pRespCb );
         if( ret != STATUS_PENDING )
             ( *pRespCb )( eventCancelTask );
@@ -4737,6 +4731,19 @@ gint32 CAuthentServer::OnPostStart(
             break;
 
         m_strMech = strMech;
+
+        gint32 (*func)(
+            IEventSink*, IEventSink* ) =
+        ([]( IEventSink* pTask,
+            IEventSink* pCb )->gint32
+        {
+            // ignore if failure occur and retry
+            // restarting in the background
+            pCb->OnEvent(
+                eventTaskComp, 0, 0, nullptr );
+            return 0;
+        });
+
 #ifdef KRB5
         if( strMech == "krb5" )
         {
@@ -4747,23 +4754,21 @@ gint32 CAuthentServer::OnPostStart(
 #ifdef OA2
         if( strMech == "OAuth2" )
         {
-            ret = StartOA2Checker( pCallback );
+            TaskletPtr pCb;
+            ret = NEW_COMPLETE_FUNCALL( 0, 
+                pCb, this->GetIoMgr(),
+                func, nullptr, pCallback );
+            if( ERROR( ret ) )
+                break;
+
+            ret = StartOA2Checker( pCb );
             break;
         }
 #endif
         if( strMech == "SimpAuth" )
         {
-            ret = pMgr->TryLoadClassFactory(
+            pMgr->TryLoadClassFactory(
                 "./libappmancli.so" );
-
-            gint32 (*func)( IEventSink*, IEventSink* ) =
-            ([]( IEventSink* pTask, IEventSink* pCb )->gint32
-            {
-                // ignore the failure if happened.
-                pCb->OnEvent(
-                    eventTaskComp, 0, 0, nullptr );
-                return 0;
-            });
 
             TaskletPtr pCb;
             ret = NEW_COMPLETE_FUNCALL( 0, 
