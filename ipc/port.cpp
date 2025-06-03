@@ -805,7 +805,7 @@ gint32 CCancelIrpsTask::operator()(
         if( pMasterIrp == nullptr )
             break;
 
-        pMgr->CompleteIrp( pMasterIrp );
+        //pMgr->CompleteIrp( pMasterIrp );
 
     }while( 0 );
 
