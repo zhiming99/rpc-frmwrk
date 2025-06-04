@@ -3258,7 +3258,11 @@ EOF
         pkgBtn.connect("clicked", self.on_choose_pkgdir_clicked)
         pkgBtn.editBox = pkgEditBox
 
-        pkgEditBox.set_tooltip_text( "path to the {}".format( lblstr ) )
+        pkgEditBox.set_tooltip_text(
+            "Path to the rpc-frmwrk {} ".format( lblstr ) +
+            "and the installer will install the package " +
+            "on the target system. And leave it empty if " +
+            "not necessary." )
         grid.attach(pkgBtn, startCol + 2, startRow + 4, 1, 1 )
         if not 'rpcfgopt' in confVals :
             return

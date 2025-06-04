@@ -74,6 +74,7 @@ void EnableEchoing(
         TCSANOW, &oOldSettings );
 }
 
+bool g_bGmSSL = false;
 const std::string g_strPubKey = "clientkey.pem";
 const std::string g_strCliReg;
 
@@ -278,7 +279,8 @@ void RemoveDefaultCredential() {
 }
 
 gint32 ListCredentialFiles(
-     std::vector<std::string>& vecUserNames )
+     std::vector<std::string>& vecUserNames,
+     std::set< std::string >* psetGmSSL = nullptr )
 {
     gint32 ret = 0;
     RegFsPtr pfs = GetFs();
@@ -298,10 +300,19 @@ gint32 ListCredentialFiles(
             if (strName.length() < 5 )
                 continue;
             size_t iExtPos = strName.length() - 5;
-            if( strName.substr(iExtPos) != ".cred")
+            if( strName.substr(iExtPos) == ".cred")
+            {
+                vecUserNames.push_back(
+                    strName.substr( 0, iExtPos ) );
                 continue;
-            vecUserNames.push_back(
-                strName.substr( 0, iExtPos ) );
+            }
+            iExtPos--; 
+            if( strName.substr(iExtPos) == ".gmssl" &&
+                psetGmSSL != nullptr )
+            {
+                ( *psetGmSSL ).insert(
+                    strName.substr( 0, iExtPos ) );
+            }
         }
     }while( 0 );
     if( hDir != INVALID_HANDLE )
@@ -322,14 +333,21 @@ gint32 StoreCredential(
     BufPtr pBuf( true );
     do{
         stdstr strHash = GenPasswordSaltHash(
-            strPassword, strUserName );
+            strPassword, strUserName, g_bGmSSL );
+        if( strHash.empty() )
+        {
+            std::cerr 
+                << "Error generating hash.\n";
+            break;
+        }
+        BufPtr pData( true );
+        ret = pData->Append(
+            strHash.c_str(), strHash.size() );
         if( ERROR( ret ) )
             break;
-        BufPtr pData( true );
-        pData->Append(
-            strHash.c_str(), strHash.size() );
 
-        ret = EncryptWithPubKey( pData, pBuf );
+        ret = EncryptWithPubKey(
+            pData, pBuf, g_bGmSSL );
         if( ERROR( ret ) )
         {
             std::cerr 
@@ -364,12 +382,20 @@ gint32 StoreCredential(
         }
         std::cout << "Credential stored for user: "
             << strUserName << "\n";
-#if !defined( OPENSSL ) && defined( GMSSL )
-        hFile = INVALID_HANDLE;
-        OpenFileForWrite( strCred + ".gmssl",
-            O_TRUNC | O_WRONLY, hFile );
-        pfs->CloseFile( hFile );
-#endif
+        if( g_bGmSSL )
+        {
+            hFile = INVALID_HANDLE;
+            // create a tag
+            ret = OpenFileForWrite(
+                strCred + ".gmssl",
+                O_TRUNC | O_WRONLY, hFile );
+            if( SUCCEEDED( ret ) )
+                pfs->CloseFile( hFile );
+        }
+        else
+        {
+            pfs->RemoveFile( strCred + ".gmssl" );
+        }
         // If this is the only credential, set as default
         std::vector<std::string> vecUsers;
         ret = ListCredentialFiles( vecUsers );
@@ -396,9 +422,9 @@ void RemoveCredential(
     {
         std::cout << "Credential removed for user: "
             << strUserName << "\n";
-#if !defined( OPENSSL ) && defined( GMSSL )
+
+        // remove the gmssl tag if exists
         pfs->RemoveFile( strFilePath + ".gmssl" );
-#endif
         // If removed credential is default, set new
         // default
         if( strUserName == strDefault )
@@ -437,16 +463,34 @@ void ListCredentials()
         return;
     }
 
+    std::set< std::string > setGtag;
     std::vector<std::string> vecUsers;
-        ListCredentialFiles( vecUsers );
+    ret = ListCredentialFiles(
+        vecUsers, &setGtag );
+    if( ERROR( ret ) )
+    {
+        std::cout << "Error failed to list credentials\n";
+        return;
+    }
 
     std::cout << "Stored users:\n";
     for (size_t i = 0; i < vecUsers.size(); ++i)
     {
         std::string star =
             (vecUsers[i] == strDefault) ? "*" : " ";
-        std::cout << " " << star
-            << " " << vecUsers[i] << "\n";
+        if( setGtag.empty() )
+        {
+            std::cout << " " << star
+                << "  " << vecUsers[i] << "\n";
+            continue;
+        }
+        auto itr = setGtag.find( vecUsers[ i ] );
+        if( itr == setGtag.end() )
+            std::cout << " " << star
+                << "  " << vecUsers[i] << "\n";
+        else
+            std::cout << " " << star
+                << "g " << vecUsers[i] << "\n";
     }
 }
 
@@ -478,8 +522,9 @@ void ChangeDefUser( const stdstr& strNewDef )
     }
 }
 
-void Usage(const char* szProg) {
-    std::cout << "Usage: " << szProg << " -s <userName> [-p <password>]\n"
+void Usage(const char* szProg)
+{
+    std::cout << "Usage: " << szProg << " [-g] -s <userName> [-p <password>]\n"
               << "       " << szProg << " -r <userName>\n"
               << "       " << szProg << " -d <userName>\n"
               << "       " << szProg << " -l\n"
@@ -487,8 +532,11 @@ void Usage(const char* szProg) {
               << "  -d <userName>   Set <userName> as the default credential\n"
               << "  -s <userName>   Store credential for userName\n"
               << "  -p <password>   Password (if omitted, will prompt)\n"
-              << "  -r <userName>   Remove credential for userName\n"
-              << "  -l              List all stored credentials\n";
+              << "  -r <userName>   Remove credential of userName\n"
+              << "  -l              List the users of each stored credentials."
+                  "[*] is the default user, [g] indicates the credential is"
+                  "GmSSL credential. \n"
+              << "  -g              Use GmSSL to encrypt the key hash, should be used with '-s' option\n";
 }
 
 gint32 CheckRegistry()
@@ -546,7 +594,7 @@ int main( int nArgc, char* pszArgv[] )
     gint32 ret = 0;
     std::string strUserName, strPassword, strNewDef;
 
-    while( (nOpt = getopt(nArgc, pszArgv, "d:s:p:r:lh" ) ) != -1 )
+    while( (nOpt = getopt(nArgc, pszArgv, "d:s:p:r:glh" ) ) != -1 )
     {
         switch (nOpt) {
             case 'd':
@@ -567,6 +615,9 @@ int main( int nArgc, char* pszArgv[] )
             case 'l':
                 bDoList = true;
                 break;
+            case 'g':
+                g_bGmSSL = true;
+                break;
             case 'h':
             default:
                 Usage(pszArgv[0]);
@@ -578,125 +629,140 @@ int main( int nArgc, char* pszArgv[] )
         signal( SIGINT, SignalHandler );
     termios oOldSettings;
     DisableEchoing( oOldSettings );
-    do{
-        ret = InitContext();
-        if( ERROR( ret ) )
-            break;
 
-        ret = StartRegistry();
-        if( ERROR( ret ) )
-            break;
-
-        ret = CheckRegistry();
-        if( ERROR( ret ) )
-            break;
-
-        if( bDoStore )
-        {
-            if( strUserName.empty() )
-            {
-                std::cerr << "UserName required for store.\n";
-                Usage(pszArgv[0]);
-                ret = -EINVAL;
+    try{
+        CProcessLock oLock( GetClientRegPath() );
+        do{
+            ret = InitContext();
+            if( ERROR( ret ) )
                 break;
-            }
-            gint32 iRetries = 0;
-            while( strPassword.empty() && iRetries < 3 )
-            {
-                stdstr strPassword1;
-                std::cout << "Enter password: ";
-                char ch = 0;
-                while( ( ch = getc( stdin ) ) != '\n' )
-                {
-                    if( ch == EOF || g_bExit )
-                    {
-                        DebugPrint( ( int )g_bExit,
-                            "set retry to 3" );
-                        iRetries = 3;
-                        break;
-                    }
 
-                    strPassword.append( 1, ch );
-                }
-                if( iRetries >= 3 || g_bExit )
+            ret = StartRegistry();
+            if( ERROR( ret ) )
+                break;
+
+            ret = CheckRegistry();
+            if( ERROR( ret ) )
+                break;
+
+            if( bDoStore )
+            {
+                if( strUserName.empty() )
+                {
+                    std::cerr << "UserName required for store.\n";
+                    Usage(pszArgv[0]);
+                    ret = -EINVAL;
                     break;
-
-                std::cout << "\nReenter password: ";
-                while( ( ch = getc( stdin ) ) != '\n' )
+                }
+                gint32 iRetries = 0;
+                while( strPassword.empty() && iRetries < 3 )
                 {
-                    if( ch == EOF || g_bExit )
+                    stdstr strPassword1;
+                    std::cout << "Enter password: ";
+                    char ch = 0;
+                    while( ( ch = getc( stdin ) ) != '\n' )
                     {
-                        DebugPrint( ( int )g_bExit,
-                            "set retry to 3" );
-                        iRetries = 3;
-                        break;
+                        if( ch == EOF || g_bExit )
+                        {
+                            DebugPrint( ( int )g_bExit,
+                                "set retry to 3" );
+                            iRetries = 3;
+                            break;
+                        }
+
+                        strPassword.append( 1, ch );
                     }
-                    strPassword1.append( 1, ch );
-                }
-                if( iRetries >= 3 || g_bExit )
-                    break;
+                    if( iRetries >= 3 || g_bExit )
+                        break;
 
-                std::cout << "\n";
-                if( strPassword1 != strPassword )
+                    std::cout << "\nReenter password: ";
+                    while( ( ch = getc( stdin ) ) != '\n' )
+                    {
+                        if( ch == EOF || g_bExit )
+                        {
+                            DebugPrint( ( int )g_bExit,
+                                "set retry to 3" );
+                            iRetries = 3;
+                            break;
+                        }
+                        strPassword1.append( 1, ch );
+                    }
+                    if( iRetries >= 3 || g_bExit )
+                        break;
+
+                    std::cout << "\n";
+                    if( strPassword1 != strPassword )
+                    {
+                        strPassword.clear();
+                        std::cout << "Error the passwords do "
+                            "not match, retry.\n";
+                        iRetries++;
+                    }
+                }
+                if( g_bExit )
                 {
-                    strPassword.clear();
-                    std::cout << "Error the passwords do "
-                        "not match, retry.\n";
-                    iRetries++;
+                    std::cout << "Canceled on user input\n";
+                    break;
                 }
-            }
-            if( g_bExit )
-            {
-                std::cout << "Canceled on user input\n";
-                break;
-            }
 
-            if( iRetries >= 3 || strPassword.empty() )
-            {
-                std::cout << "Error failed to set password\n";
-                break;
+                if( iRetries >= 3 || strPassword.empty() )
+                {
+                    std::cout << "Error failed to set password\n";
+                    break;
+                }
+                StoreCredential(
+                    strUserName, strPassword );
             }
-            StoreCredential(
-                strUserName, strPassword );
-        }
-        else if( bDoRemove )
-        {
-            if( strUserName.empty() )
+            else if( bDoRemove )
             {
-                std::cerr <<
-                    "UserName required for remove.\n";
+                if( strUserName.empty() )
+                {
+                    std::cerr <<
+                        "UserName required for remove.\n";
+                    Usage(pszArgv[0]);
+                    ret = -EINVAL;
+                    break;
+                }
+                RemoveCredential(strUserName);
+            }
+            else if( bDoList )
+            {
+                ListCredentials();
+            }
+            else if( bChgDef )
+            {
+                if( strNewDef.empty() )
+                {
+                    std::cerr <<
+                        "New default UserName required "
+                        "for change.\n";
+                    Usage(pszArgv[0]);
+                    ret = -EINVAL;
+                    break;
+                }
+                ChangeDefUser( strNewDef );
+            }
+            else
+            {
                 Usage(pszArgv[0]);
                 ret = -EINVAL;
                 break;
             }
-            RemoveCredential(strUserName);
-        }
-        else if( bDoList )
-        {
-            ListCredentials();
-        }
-        else if( bChgDef )
-        {
-            if( strNewDef.empty() )
-            {
-                std::cerr <<
-                    "New default UserName required "
-                    "for change.\n";
-                Usage(pszArgv[0]);
-                ret = -EINVAL;
-                break;
-            }
-            ChangeDefUser( strNewDef );
-        }
-        else
-        {
-            Usage(pszArgv[0]);
-            ret = -EINVAL;
-            break;
-        }
-    }while( 0 );
-    StopRegistry();
-    DestroyContext();
+        }while( 0 );
+        StopRegistry();
+        DestroyContext();
+    }
+    catch( const std::runtime_error& e )
+    {
+        std::cerr << "Error accquiring the process lock, "
+            << e.what() <<"\n";
+        ret = -EFAULT;
+    }
+    catch( ... )
+    {
+        std::cerr << "Unknown exception occurred.\n";
+        ret = -EFAULT;
+    }
     EnableEchoing( oOldSettings );
     signal( SIGINT, iOldSig );
     return ret;
