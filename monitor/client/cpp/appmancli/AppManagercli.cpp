@@ -537,7 +537,7 @@ gint32 ClaimApp( CRpcServices* pSvc,
             pIf, veckv);
         if( ERROR( ret ) )
         {
-            OutputMsg( ret,
+            DebugPrint( ret,
                 "Error getting point values" );
             break;
         }
