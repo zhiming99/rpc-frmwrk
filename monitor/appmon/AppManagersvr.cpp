@@ -948,6 +948,13 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
         ret = SetOwnerStream( pfs,
             strAppName, INVALID_HANDLE );
     }
+    if( SUCCEEDED( ret ) )
+    {
+        DebugPrint( 0, "App %s is online",
+            strAppName.c_str() );
+        LOGINFO( this->GetIoMgr(), 0,
+            "App %s is online", strAppName.c_str() );
+    }
     return ret;
 }
 
@@ -993,6 +1000,10 @@ gint32 CAppManager_SvrImpl::FreeAppInstsInternal(
         {
             SetOwnerStream( m_pAppRegfs,
                 elem, INVALID_HANDLE );
+            DebugPrint( 0, "App %s is offline",
+                elem.c_str() );
+            LOGINFO( this->GetIoMgr(), 0,
+                "App %s is offline", elem.c_str() );
         }
 
     }while( 0 );
