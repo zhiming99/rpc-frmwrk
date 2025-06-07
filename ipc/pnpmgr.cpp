@@ -253,12 +253,6 @@ gint32 CPnpMgrStartPortCompletionTask::operator()(
         if( ERROR( ret ) )
             break;
 
-        if( pMgr == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
         iRet = pIrp->GetStatus();
 
         ret2 = oCfg.GetObjPtr( propPortPtr, pPort );
@@ -359,9 +353,7 @@ gint32 CPnpManager::StartPortsInternal(
     gint32 ret = 0;
     IrpPtr pMasterIrp( pMastIrp );
     CIoManager* pMgr = GetIoMgr();
-    if( pMgr->IsStopping() )
-        ret = ERROR_STATE;
-    else do{
+    do{
 
         IrpPtr pIrp( true );
         pIrp->AllocNextStack( nullptr );
@@ -464,6 +456,9 @@ gint32 CPnpManager::StartPortsInternal(
             ret = pCPort->MakeAssocIrp( pMasterIrp, pIrp );
             break;
         }
+
+        if( pMgr->IsStopping() )
+            ret = ERROR_STATE;
 
         // no check of the port existance, because
         // we are sure it exists

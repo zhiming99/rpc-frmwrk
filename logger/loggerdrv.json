@@ -102,11 +102,11 @@
             "ModName" : "hostcli"
         },
         {
-            "DriversToLoad" : [ "DBusBusDriver" ],
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver", "DBusStreamBusDrv" ],
             "ModName" : "loggersvr"
         },
         {
-            "DriversToLoad" : [ "DBusBusDriver" ],
+            "DriversToLoad" : [ "DBusBusDriver", "UnixSockBusDriver", "DBusStreamBusDrv" ],
             "ModName" : "loggercli"
         }
     ],

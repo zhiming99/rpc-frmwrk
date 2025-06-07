@@ -885,4 +885,16 @@ struct CLocalLock
 typedef CLocalLock< true > CReadLock;
 typedef CLocalLock< false > CWriteLock;
 
+struct CProcessLock
+{
+    gint32 m_iFd = -1;
+    stdstr m_strLockFile;
+    bool m_bRemove = false;
+
+    CProcessLock(
+        const stdstr& strLockPath,
+        bool bRemove = true );
+    ~CProcessLock();
+};
+
 }

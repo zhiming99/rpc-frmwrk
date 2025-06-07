@@ -88,6 +88,7 @@ module.exports = {
         propStreamId: 12341,
         propSeqNo: 12344,
         propSeqNo2: 12345,
+        propUserName: 12350,
         propNonFd: 12351,
         propIid: 12357,
         propSysMethod: 12360,
@@ -115,6 +116,7 @@ module.exports = {
         propPeerObjId:12419,
         propSeriProto:12420,
         propNoReply: 12421,
+        propGmSSL: 12467,
     },
 
     EnumMatchType: {

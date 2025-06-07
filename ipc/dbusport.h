@@ -1493,7 +1493,38 @@ class CConnParamsProxy : public CConnParams
                     break;
                 }
             }
+            else if( strVal1 == "SimpAuth" )
+            {
+                gint32 iRet;
+                iRet = oAuth1.GetStrProp(
+                    propUserName, strVal1 );
+                if( ERROR( iRet ) )
+                {
+                    ret = false;
+                    break;
+                }
 
+                iRet = oAuth2.GetStrProp(
+                    propUserName, strVal2 );
+                if( ERROR( iRet ) )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 < strVal2 )
+                {
+                    ret = true;
+                    break;
+                }
+
+                if( strVal1 > strVal2 )
+                {
+                    ret = false;
+                    break;
+                }
+                break;
+            }
             ret = false;
 
         }while( 0 );

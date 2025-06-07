@@ -1059,7 +1059,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
                     oFactories.append( './libfuseif.so' )
                 if bAuth :
                     oFactories.append ( './libauth.so' )
-                    if strMech == 'OAuth2':
+                    if strMech == 'OAuth2' or strMech == 'SimpAuth':
                         oFactories.append ( './libregfs.so' )
                 if bSSL:
                     if bGmSSL:

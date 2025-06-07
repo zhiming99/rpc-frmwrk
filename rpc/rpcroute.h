@@ -1467,6 +1467,9 @@ class CRpcTcpBridgeProxy :
     inline guint64 GetStartSec() const
     { return m_oTs.m_qwLocalBaseSec; }
 
+    inline guint64 GetPeerStartSec() const
+    { return m_oTs.GetPeer(); };
+
     // the method to do cleanup when the client is
     // down
     gint32 ClearRemoteEvents(

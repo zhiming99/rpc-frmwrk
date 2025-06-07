@@ -735,23 +735,23 @@ gint32 CRpcOpenSSLFido::PreStop(
         if( dwStepNo == 0 )
         {
             SetPreStopStep( pIrp, 1 );
-            ret = super::PreStop( pIrp );
-            if( ret == STATUS_PENDING )
-                ret = STATUS_MORE_PROCESS_NEEDED;
-            if( ret == STATUS_MORE_PROCESS_NEEDED )
-                break;
-        }
-
-        ret = GetPreStopStep( pIrp, dwStepNo );
-        if( dwStepNo == 1 )
-        {
-            SetPreStopStep( pIrp, 2 );
             ret = StartSSLShutdown( pIrp );
             if( ret == STATUS_PENDING )
             {
                 ret = STATUS_MORE_PROCESS_NEEDED;
                 break;
             }
+        }
+
+        ret = GetPreStopStep( pIrp, dwStepNo );
+        if( dwStepNo == 1 )
+        {
+            SetPreStopStep( pIrp, 2 );
+            ret = super::PreStop( pIrp );
+            if( ret == STATUS_PENDING )
+                ret = STATUS_MORE_PROCESS_NEEDED;
+            if( ret == STATUS_MORE_PROCESS_NEEDED )
+                break;
         }
 
     }while( 0 );

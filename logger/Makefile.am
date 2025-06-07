@@ -4,7 +4,7 @@ rpcf_logger_SOURCES=mainsvr.cpp logsvrbase.cpp LogServicesvr.cpp logger.h LogSer
 rpcf_logger_LDADD=../ipc/libipc.la $(COMMON_LINK) \
  ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
- -L$(top_srcdir)/3rd_party 
+ -L$(top_srcdir)/3rd_party $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la 
 
 rpcf_loggerconfdir= $(sysconfdir)/rpcf
 dist_rpcf_loggerconf_DATA= loggerdesc.json loggerdrv.json
@@ -19,7 +19,7 @@ OFFSET_MACRO=
 endif
 EXTRA_DIST= logger.ridl
 
-rpcf_logger_CPPFLAGS= -I$(top_srcdir)/include -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
+rpcf_logger_CPPFLAGS= -I$(top_srcdir)/include -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(top_srcdir)/monitor/client/cpp/appmancli
 
 liblogcli_la_LTLIBRARIES=liblogcli.la
 liblogcli_la_SOURCES = LogServicecli.cpp logger.h LogServicecli.h logclibase.h

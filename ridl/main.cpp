@@ -39,7 +39,7 @@ extern ObjPtr g_pRootNode;
 extern bool g_bSemanErr;
 extern std::string g_strAppName;
 extern std::string g_strJsLibPath;
-extern bool g_bAuth;
+// extern bool g_bAuth;
 extern std::string g_strWebPath;
 // service filter
 std::set< stdstr > g_setServices;
@@ -128,7 +128,7 @@ void Usage()
     printf( "\t--odesc_url=<url>: the <url> to specify path to get the object description \n" );
     printf( "\t\tfile for JS client. This is a mandatory option when '-J' is given\n" );
     printf( "\t--lib_path=<path>: the <path> to specify the alternative path to the JS support library\n" );
-    printf( "\t--auth: Enable OAuth2 authentication for Javascript client\n" );
+    // printf( "\t--auth: Enable OAuth2 authentication for Javascript client\n" );
 #endif
 
     printf( "\t-s:\tOutput the skeleton with fastrpc support.\n" );
@@ -265,10 +265,6 @@ int main( int argc, char** argv )
                             break;
                         }
                         g_strJsLibPath = optarg;
-                    }
-                    else if( option_index == 3 )
-                    {
-                        g_bAuth = true;
                     }
 #else
                     else if( option_index == 1 ||

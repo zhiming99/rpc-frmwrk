@@ -142,7 +142,7 @@ def Config_Nginx( initCfg : object ) -> int:
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
-    root /usr/share/nginx/html;
+    root {RootPath};
 
     location /{AppName} {{
         proxy_set_header        Host $host;
@@ -162,6 +162,9 @@ def Config_Nginx( initCfg : object ) -> int:
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+    }}
+
+    location /rpcf {{
     }}
 
     error_page 404 /404.html;
@@ -187,6 +190,17 @@ upstream {AppName} {{
     ret, keyCmds = InstallKeys( oResps )
     if ret < 0:
         pass
+
+    with open('/etc/nginx/sites-available/default') as f:
+        for line in f:
+            m = re.search(r'root\s+([^\s;]*html)', line)
+            if m:
+                strRootPath = m.group(1)
+                break 
+
+    if not strRootPath:
+        strRootPath = '/usr/share/nginx/html'
+
     cmdline += keyCmds
     cfgFile = "/tmp/rpcf_nginx.conf"
     fp = open( cfgFile, "w" )
@@ -197,7 +211,8 @@ upstream {AppName} {{
             ServerName = o['ServerName'],
             AppName = o['AppName'],
             CertFile = o['CertFile'],
-            KeyFile = o['KeyFile']
+            KeyFile = o['KeyFile'],
+            RootPath = strRootPath
             )
         fp.write( cfg )
     fp.close()
@@ -237,6 +252,14 @@ def Config_Apache( initCfg : object )->int:
       ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyRequests off
       ProxyWebsocketIdleTimeout 300
+
+      Alias /rpcf /var/www/rpcf
+      <Directory /var/www/rpcf>
+          Options Indexes FollowSymLinks
+          AllowOverride None
+          Require all granted
+      </Directory>
+
 </VirtualHost>
 
 '''

@@ -40,7 +40,7 @@ EXTRA_DIST = $(rpcbasejava) rpcbase.i proxy.i server.i fastrpc.i fuseif.i
 $(jarname): rpcbase_wrap.cpp $(rpcbasejava) Makefile.am
 	cpp -P -DJavaRpcService=JavaRpcServiceS -DInstType=CJavaServer -DIsServer="isServer(){ return true;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceS.java
 	cpp -P -DJavaRpcService=JavaRpcServiceP -DInstType=CJavaProxy -DIsServer="isServer(){ return false;}" JavaRpcService.java -o $(rpcbasedir)/JavaRpcServiceP.java
-	javac src/org/rpcf/rpcbase/*.java
+	pushd src/org/rpcf/rpcbase/; rm -f CJavaProxyImpl.java CJavaServerImpl.java;javac *.java;popd
 	cd src;jar -cf ../$(jarname) org/rpcf/rpcbase/*.class;cd ..;rm -f rpcbase.jar;ln -s $(jarname) rpcbase.jar;
 
 rpcbase_wrap.cpp:rpcbase.i proxy.i server.i fastrpc.i $(fuse3_src)

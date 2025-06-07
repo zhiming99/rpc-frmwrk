@@ -10,8 +10,27 @@
 #include <fstream>
 #include "logsvrbase.h"
 
+#include "rpc.h"
+using namespace rpcf;
+#include "stmport.h"
+#include "fastrpc.h"
+
+#include "AppManagercli.h"
+
 namespace rpcf
 {
+
+struct CAsyncLoggerAMCallbacks :
+    public CAsyncStdAMCallbacks
+{
+    gint32 GetPointValuesToUpdate(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override;
+
+    gint32 GetPointValuesToInit(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override;
+};
 
 typedef std::unique_ptr< std::ofstream > STMPTR;
 class CLogService_SvrImpl

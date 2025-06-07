@@ -1887,11 +1887,12 @@ gint32 CImplIfMethodSvr2::OutputAsyncROS()
 
         INDENT_DOWNL;
         BLOCK_OPEN;
-        Wa( "// TODO: Emit an async operation here." );
+        Wa( "// TODO: Either finish the operation before return or" );
+        Wa( "// start an async operation by returning STATUS_PENDING." );
         CCOUT << "// And make sure to call '"
             << strMethod << "Complete'";
         NEW_LINE;
-        Wa( "// when the service is done" );
+        Wa( "// when the async operation is done." );
         CCOUT << "return ERROR_NOT_IMPL;";
         BLOCK_CLOSE;
         NEW_LINE;

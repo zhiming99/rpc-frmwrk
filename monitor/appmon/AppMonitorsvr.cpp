@@ -93,13 +93,55 @@ gint32 CAppMonitor_SvrImpl::GetLoginInfo(
 gint32 CAppMonitor_SvrImpl::GetUid(
     IConfigDb* pInfo, guint32& dwUid ) const
 {
+    gint32 ret = 0;
     Variant oVar;
-    gint32 ret = pInfo->GetProperty(
-        propUid, oVar );
-    if( ERROR( ret ) )
-        return ret;
-    dwUid = ( guint32& )oVar; 
-    return STATUS_SUCCESS;
+    do{
+        ret = pInfo->GetProperty(
+            propAuthMech, oVar );
+        if( ERROR( ret ) )
+            break;
+        stdstr strAuthMech = oVar;
+        ret = pInfo->GetProperty(
+            propUserName, oVar );
+        if( ERROR( ret ) )
+            break;
+        stdstr strUser = oVar;
+        CStdRMutex oLock( this->GetLock() );
+        if( strAuthMech == "SimpAuth" )
+        {
+            auto itr =
+                m_mapName2Uid.find( strUser );
+            if( itr == m_mapName2Uid.end() )
+            {
+                ret = -EACCES;
+                break;
+            }
+            dwUid = itr->second;
+        }
+        else if( strAuthMech == "krb5" )
+        {
+            auto itr =
+                m_mapKrb5Name2Uid.find( strUser );
+            if( itr == m_mapKrb5Name2Uid.end() )
+            {
+                ret = -EACCES;
+                break;
+            }
+            dwUid = itr->second;
+        }
+        else if( strAuthMech == "OAuth2" )
+        {
+            auto itr =
+                m_mapOA2Name2Uid.find( strUser );
+            if( itr == m_mapOA2Name2Uid.end() )
+            {
+                ret = -EACCES;
+                break;
+            }
+            dwUid = itr->second;
+        }
+    }while( 0 );
+    return ret;
 }
 
 gint32 CAppMonitor_SvrImpl::GetAccessContext(
@@ -892,7 +934,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
                 strAppPath, dwGid );
             if( ERROR( ret ) )
                 continue;
-            HANDLE hFile = INVALID_HANDLE;
+            RFHANDLE hFile = INVALID_HANDLE;
             ret = m_pAppRegfs->CreateFile(
                 strStmPath, 0640, O_RDWR,
                 hFile );
@@ -1077,6 +1119,59 @@ bool CAppMonitor_SvrImpl::IsUserValid(
     return ret;
 }
 
+gint32 CAppMonitor_SvrImpl::LoadAssocMaps(
+    RegFsPtr& pfs, int iAuthMech )
+{
+    gint32 ret = 0;
+    do{
+        CRegistryFs* pfs = g_pUserRegfs;
+        gint32 iFd = g_pUserRegfs->GetFd();
+        RFHANDLE hDir = INVALID_HANDLE;
+        stdstr strAssocDir;
+        if( iAuthMech == 0 )
+            strAssocDir = "/" KRB5_ASSOC_DIR;
+        else if( iAuthMech == 1 )
+            strAssocDir = "/" OA2_ASSOC_DIR;
+        else
+        {
+            ret = -EINVAL;
+            break;
+        }
+        ret = pfs->OpenDir( strAssocDir, 0, hDir );
+        if( ERROR( ret ) )
+            break;
+        CFileHandle oHandle( pfs, hDir );
+        std::vector<KEYPTR_SLOT> vecDirEnt;
+        ret = pfs->ReadDir( hDir, vecDirEnt );
+        if( ERROR( ret ) )
+            break;
+        if( vecDirEnt.empty() )
+            break;
+        for( auto& ks : vecDirEnt )
+        {
+            stdstr strPath = strAssocDir + "/";
+            Variant oVar;
+            ret = pfs->GetValue(
+                hDir, ks.szKey, oVar );
+            if( ERROR( ret ) )
+                continue;
+
+            CStdRMutex oLock( this->GetLock() );
+            auto itr = m_mapName2Uid.find(
+                ( stdstr& )oVar );
+            if( itr == m_mapName2Uid.end() )
+                continue;
+            if( iAuthMech == 0 )
+                m_mapKrb5Name2Uid.insert(
+                    { ks.szKey, itr->second } );
+            else if( iAuthMech == 1 )
+                m_mapOA2Name2Uid.insert(
+                    { ks.szKey, itr->second } );
+        }
+    }while( 0 );
+    return ret;
+}
+
 gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
 {
     gint32 ret = 0;
@@ -1128,10 +1223,8 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
             std::vector<KEYPTR_SLOT> vecGidEnt;
             ret = pfs->ReadDir( hGrps, vecGidEnt );
             if( ERROR( ret ) )
-            {
-                pfs->CloseFile( hGrps );
                 continue;
-            }
+
             for( auto& ks2 : vecGidEnt )
             {
                 guint32 dwGid = std::strtol(
@@ -1141,7 +1234,18 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
             CStdRMutex oLock( this->GetLock() );
             m_mapUid2Gids.insert(
                 { dwUid, psetGids });
+            m_mapName2Uid.insert(
+                { ks.szKey, dwUid } );
         }
+
+        ret = LoadAssocMaps( g_pUserRegfs, 0 );
+        if( ERROR( ret ) )
+            break;
+
+        ret = LoadAssocMaps( g_pUserRegfs, 1 );
+        if( ERROR( ret ) )
+            break;
+
     }while( 0 );
     return ret;
 }
@@ -1233,6 +1337,10 @@ gint32 CAppMonitor_ChannelSvr::OnStreamReady(
                     ret = -EACCES;
                     break;
                 }
+            }
+            else if( iMech == 2 )
+            {
+                oVar = strName;
             }
             stdstr strUname( ( stdstr& )oVar );
             strPath = "/users/";
