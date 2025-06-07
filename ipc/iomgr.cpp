@@ -2489,7 +2489,7 @@ gint32 CLogger::SendLogMsg()
         oLock.Unlock();
 
         ret = pSvc->LogMessage( strMsg );
-        CStdRMutex oLock( GetLock() );
+        oLock.Lock();
         if( SUCCEEDED( ret ) && m_queMsgs.size() )
             continue;
         if( SUCCEEDED( ret ) && m_queMsgs.empty() )
@@ -2509,7 +2509,7 @@ gint32 CLogger::PushMessage(
     CStdRMutex oLock( GetLock() );
     if( m_bExit || m_bQuit )
         return 0;
-    if( m_queMsg.empty()  )
+    if( m_queMsgs.empty()  )
         Sem_Post( &m_semMsgs );
     m_queMsgs.push_back( strMsg );
     if( m_queMsgs.size() > 200 )
