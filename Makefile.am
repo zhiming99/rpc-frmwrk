@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS= -I m4
-SUBDIRS=3rd_party combase ipc logger docs
+SUBDIRS=3rd_party combase ipc docs
 
 if ENABLE_FUSE3
 SUBDIRS += fuse
@@ -31,7 +31,7 @@ if ENABLE_JS
 SUBDIRS += js
 endif
 
-SUBDIRS += monitor rpc tools pics examples 
+SUBDIRS += monitor logger rpc tools pics examples 
 SUBDIRS += bldpkg
 
 EXTRA_DIST= README.md cfgsel Concept.md logs.md LICENSE README_cn.md Concept_cn.md
