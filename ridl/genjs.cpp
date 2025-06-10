@@ -90,12 +90,11 @@ const stdstr& GetJsLibPath()
         return g_strJsLibPath;
 
     stdstr strPath;
-    gint32 ret = FindInstCfg(
-        "driver.json", strPath );
+    gint32 ret = GetLibPath(
+        strPath, "libcombase.so" );
     if( ERROR( ret ) )
         return g_strJsLibPath;
-    strPath = GetDirName( strPath );
-    g_strJsLibPath = strPath + "/jslib";
+    g_strJsLibPath = strPath + "/rpcf/jslib";
     return g_strJsLibPath;
 }
 
