@@ -1355,7 +1355,8 @@ gint32 CFastRpcServerBase::OnPreStartComplete(
             ret = -EFAULT;
             break;
         }
-        pdrv->BindNameBus( strName, dwBusId );
+        pdrv->BindNameBus(
+            strName + "_s", dwBusId );
 
     }while( 0 );
 
@@ -1430,7 +1431,8 @@ gint32 CFastRpcServerBase::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        pdrv->BindNameBus( strName, dwBusId );
+        pdrv->BindNameBus(
+            strName + "_s", dwBusId );
 
     }while( 0 );
 
@@ -1491,7 +1493,7 @@ gint32 CFastRpcServerBase::OnPostStop(
         if( ERROR( ret ) )
             break;
 
-        pdrv->RemoveBinding( strName );
+        pdrv->RemoveBinding( strName + "_s" );
 
         CDBusStreamBusPort* pBus = pPort;
         ret = pdrv->DestroyPortSynced( 
@@ -1817,7 +1819,8 @@ gint32 CFastRpcProxyBase::OnPreStartComplete(
             ret = -EFAULT;
             break;
         }
-        pdrv->BindNameBus( strName, dwBusId );
+        pdrv->BindNameBus(
+            strName + "_p" , dwBusId );
 
     }while( 0 );
 
@@ -1897,7 +1900,8 @@ gint32 CFastRpcProxyBase::OnPreStart(
         if( ERROR( ret ) )
             break;
 
-        pdrv->BindNameBus( strName, dwBusId );
+        pdrv->BindNameBus(
+            strName + "_p", dwBusId );
 
     }while( 0 );
 
@@ -2017,7 +2021,7 @@ gint32 CFastRpcProxyBase::OnPostStop(
         if( ERROR( ret ) )
             break;
 
-        ret = pdrv->RemoveBinding( strName );
+        ret = pdrv->RemoveBinding( strName  + "_p" );
         if( ERROR( ret ) )
         {
             // someone else has removed the binding
