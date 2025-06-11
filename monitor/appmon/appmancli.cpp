@@ -106,6 +106,7 @@ struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
             okv.oValue = qwVal;
             veckv.push_back( okv );
 
+            okv.strKey = O_UPTIME;
             ret = pSvr->GetProperty(
                 propUptime, okv.oValue );
             if( SUCCEEDED( ret ) )
