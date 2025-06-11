@@ -33,6 +33,9 @@
 #define O_CPU_LOAD  "cpu_load"
 #define O_OPEN_FILES     "open_files"
 
+#define PROP_TARGET_IF 0x1234
+#define PROP_APP_NAME 0x1235
+
 gint32 GetAppManagercli( InterfPtr& pCli );
 
 /*gint32 CreateAppManagercli(

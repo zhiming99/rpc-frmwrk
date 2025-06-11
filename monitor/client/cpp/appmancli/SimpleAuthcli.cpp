@@ -323,6 +323,14 @@ gint32 CSimpleAuth_CliImpl::OnPreStart(
     return ret;
 }
 
+gint32 CSimpleAuth_CliImpl::OnPostStart(
+    IEventSink* pCallback )
+{
+    LOGINFO( this->GetIoMgr(), 0, 
+        "CSimpleAuth_CliImpl started" );
+    return super::OnPostStart( pCallback );
+}
+
 gint32 CSimpleAuth_CliImpl::OnPostStop(
     IEventSink* pCallback )
 {

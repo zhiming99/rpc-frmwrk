@@ -12,8 +12,6 @@ using namespace rpcf;
 #include "signal.h"
 #include <limits.h>
 
-#define PROP_TARGET_IF 0x1234
-#define PROP_APP_NAME 0x1235
 #define RECONNECT_INTERVAL 10
 
 InterfPtr g_pAppManCli;
@@ -961,6 +959,7 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
         if( SUCCEEDED( ret ) )
             veckv.push_back( okv );
 
+        okv.strKey = O_UPTIME;
         ret = pIf->GetProperty(
             propUptime, okv.oValue );
         if( SUCCEEDED( ret ) )

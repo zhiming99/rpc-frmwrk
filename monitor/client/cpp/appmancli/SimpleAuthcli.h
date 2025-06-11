@@ -145,6 +145,9 @@ class CSimpleAuth_CliImpl
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
 
+    gint32 OnPostStart(
+        IEventSink* pCallback ) override;
+
     gint32 OnPostStop(
         IEventSink* pCallback ) override;
 

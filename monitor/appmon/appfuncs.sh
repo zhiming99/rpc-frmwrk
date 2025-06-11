@@ -983,6 +983,8 @@ function add_stdapp()
     chown $_uid:$_gid -R ./apps/$_instname
     find ./apps/$_instname -type f -exec chmod ug+rw,o+r '{}' ';'
     find ./apps/$_instname -type d -exec chmod ug+rwx,o+rx '{}' ';'
-    chmod -R o-wx ./apps/$_instname/points/restart
+    chmod -R o-rwx ./apps/$_instname/points/restart
+    chmod -R o+w ./apps/$_instname/notify_streams
+    add_link timer1 clock1 $_instname rpt_timer
     return 0
 }
