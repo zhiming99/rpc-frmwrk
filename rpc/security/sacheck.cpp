@@ -37,7 +37,8 @@ namespace rpcf
 gint32 CSimpleAuthCliWrapper::Create(
     CIoManager* pMgr,
     IEventSink* pCallback,
-    IConfigDb* pCfg )
+    IConfigDb* pCfg,
+    InterfPtr& pOldIf )
 {
     gint32 ret = 0;
     TaskGrpPtr pGrp;
@@ -103,10 +104,33 @@ gint32 CSimpleAuthCliWrapper::Create(
             break;
 
         TaskletPtr pCreate;
-        ret = NEW_FUNCCALL_TASKEX( pCreate, pMgr,
-            CreateSimpleAuthcli, pMgr,
+        gint32 (*pcw)( CIoManager*, EnumClsid,
+            IEventSink*, IConfigDb*, InterfPtr& ) =
+        ([]( CIoManager* pMgr, EnumClsid iClsid,
+            IEventSink* pCallback, IConfigDb* pCfg,
+            InterfPtr& pOldIf )->gint32
+        {
+            gint32 ret = CreateSimpleAuthcli(
+                pMgr, iClsid, pCallback, pCfg );
+            if( ERROR( ret ) )
+                return ret;
+            if( pOldIf.IsEmpty() )
+                return ret;
+            InterfPtr pNewIf;
+            gint32 iRet = GetSimpleAuthcli( pNewIf );
+            if( SUCCEEDED( iRet ) )
+            {
+                CSimpleAuthCliWrapper* pOld = pOldIf;
+                CSimpleAuthCliWrapper* pNew = pNewIf;
+                if( pOld && pNew )
+                    pOld->TransferSessions( pNew );
+            }
+            return ret;
+        });
+        ret = NEW_FUNCCALL_TASKEX(
+            pCreate, pMgr, pcw, pMgr,
             clsid( CSimpleAuthCliWrapper ),
-            pComp, pCfg );
+            pComp, pCfg, pOldIf );
         if( ERROR( ret ) )
             break;
 
@@ -596,6 +620,18 @@ gint32 CSimpleAuthCliWrapper::GetSess(
 
     strSess = itr->second;
     return STATUS_SUCCESS;
+}
+
+void CSimpleAuthCliWrapper::TransferSessions(
+    CSimpleAuthCliWrapper* pTarget )
+{
+    pTarget->m_mapSess2PortId = m_mapSess2PortId;
+    pTarget->m_mapPortId2Sess = m_mapPortId2Sess;
+    pTarget->m_mapSessions = m_mapSessions;
+    m_mapSessions.clear();
+    m_mapPortId2Sess.clear();
+    m_mapSess2PortId.clear();
+    return;
 }
 
 }

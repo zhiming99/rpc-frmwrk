@@ -3808,12 +3808,13 @@ gint32 CAuthentServer::SetAuthImpl(
 }
 
 static gint32 RetryStartAuthImpl(
-    CAuthentServer* pSvr )
+    CAuthentServer* pSvr,
+    InterfPtr& pOldIf )
 {
     gint32 ret = 0;
 
-    gint32 (*sn)( CAuthentServer*) =
-    ([]( CAuthentServer* pSvr )->gint32
+    gint32 (*sn)( CAuthentServer*, InterfPtr& ) =
+    ([]( CAuthentServer* pSvr, InterfPtr& pOldIf  )->gint32
     {
         CIoManager* pMgr = pSvr->GetIoMgr();
         CStdRMutex oLock( pSvr->GetLock() );
@@ -3827,16 +3828,17 @@ static gint32 RetryStartAuthImpl(
             return 0;
         }
         oLock.Unlock();
-        pSvr->StartNewAuthImpl();
+        pSvr->StartNewAuthImpl( pOldIf );
         return 0;
     });
     TaskletPtr pTimer;
     ret = ADD_TIMER_FUNC( pTimer, 10,
-        pSvr->GetIoMgr(), sn, pSvr );
+        pSvr->GetIoMgr(), sn, pSvr, pOldIf );
     return ret;
 }
 
-gint32 CAuthentServer::StartNewAuthImpl()
+gint32 CAuthentServer::StartNewAuthImpl(
+    InterfPtr& pOldIf )
 {
     gint32 ret = 0;
     do{
@@ -3914,7 +3916,8 @@ gint32 CAuthentServer::StartNewAuthImpl()
         if( strMech == "OAuth2" )
             ret = StartOA2Checker( pCompTask );
         else if( strMech == "SimpAuth" )
-            ret = StartSimpAuthCli( pCompTask );
+            ret = StartSimpAuthCli(
+                pCompTask, pOldIf );
         if( ERROR( ret ) )
             ( *pCompTask )( eventCancelTask );
     }while( 0 );
@@ -3926,6 +3929,7 @@ gint32 CAuthentServer::GetAuthImpl(
 {
     guint32 ret = 0;
     do{
+        InterfPtr pOldIf;
         stdstr strMech = GetAuthMech();
         if( strMech == "krb5" )
         {
@@ -3950,10 +3954,11 @@ gint32 CAuthentServer::GetAuthImpl(
             break;
         }
 
+        pOldIf = m_pAuthImpl;
         m_pAuthImpl.Clear();
         oLock.Unlock();
 
-        ret = StartNewAuthImpl();
+        ret = StartNewAuthImpl( pOldIf );
 
         // notify to queue the login task
         if( ret == STATUS_PENDING )
@@ -4124,7 +4129,12 @@ gint32 CAuthentServer::IsNoEnc(
 {
     gint32 ret = 0;
     do{
-        CRpcServices* pObj = m_pAuthImpl;
+        ObjPtr pIf;
+        ret = GetAuthImpl( pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pObj = pIf;
         if( pObj == nullptr )
         {
             ret = -EFAULT;
@@ -4153,7 +4163,12 @@ gint32 CAuthentServer::GetSess(
 {
     gint32 ret = 0;
     do{
-        CRpcServices* pObj = m_pAuthImpl;
+        ObjPtr pIf;
+        ret = GetAuthImpl( pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pObj = pIf;
         if( pObj == nullptr )
         {
             ret = -EFAULT;
@@ -4338,7 +4353,12 @@ gint32 CAuthentServer::InquireSess(
 {
     gint32 ret = 0;
     do{
-        CRpcServices* pObj = m_pAuthImpl;
+        ObjPtr pIf;
+        ret = GetAuthImpl( pIf );
+        if( ERROR( ret ) )
+            break;
+
+        CRpcServices* pObj = pIf;
         if( pObj == nullptr )
         {
             ret = -EFAULT;
@@ -4608,8 +4628,10 @@ gint32 CAuthentServer::OnStartSimpAuthCliComplete(
     gint32 ret = 0;
     CParamList oParams;
     CCfgOpener oReqCtx( pReqCtx );
+    InterfPtr pIf;
 
     do{
+        GetSimpleAuthcli( pIf );
         CCfgOpenerObj oReq( pIoReq );
         IConfigDb* pResp = nullptr;
         ret = oReq.GetPointer(
@@ -4632,10 +4654,11 @@ gint32 CAuthentServer::OnStartSimpAuthCliComplete(
             break;
         }
 
-        InterfPtr pIf;
-        ret = GetSimpleAuthcli( pIf );
-        if( ERROR( ret ) )
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
             break;
+        }
         SetAuthImpl( ObjPtr( pIf ) );
 
     }while( 0 );
@@ -4648,7 +4671,7 @@ gint32 CAuthentServer::OnStartSimpAuthCliComplete(
         DebugPrintEx( logErr, ret,
             "Warning, failed to connect to SimpleAuthServer, " 
             "retry is scheduled..." );
-        RetryStartAuthImpl( this );
+        RetryStartAuthImpl( this, pIf );
     }
 
     pCallback->OnEvent( eventTaskComp,
@@ -4658,7 +4681,8 @@ gint32 CAuthentServer::OnStartSimpAuthCliComplete(
 }
 
 gint32 CAuthentServer::StartSimpAuthCli(
-    IEventSink* pCallback )
+    IEventSink* pCallback,
+    InterfPtr& pOldIf )
 {
     if( pCallback == nullptr )
         return -EINVAL;
@@ -4688,7 +4712,7 @@ gint32 CAuthentServer::StartSimpAuthCli(
         if( ERROR( ret ) )
             break;
         ret = CSimpleAuthCliWrapper::Create(
-            pMgr, pRespCb, oCfg.GetCfg() );
+            pMgr, pRespCb, oCfg.GetCfg(), pOldIf );
 
         if( ret != STATUS_PENDING )
             ( *pRespCb )( eventCancelTask );
@@ -4776,7 +4800,8 @@ gint32 CAuthentServer::OnPostStart(
                 func, nullptr, pCallback );
             if( ERROR( ret ) )
                 break;
-            ret = StartSimpAuthCli( pCb );
+            InterfPtr pEmpty;
+            ret = StartSimpAuthCli( pCb, pEmpty );
             break;
         }
         ret = -ENOTSUP;
@@ -4929,8 +4954,15 @@ gint32 CAuthentServer::RemoveSession(
 gint32 CAuthentServer::IsSessExpired(
     const std::string& strSess )
 {
-    CRpcServices* pSvc = m_pAuthImpl;
+    ObjPtr pIf;
+    gint32 ret = GetAuthImpl( pIf );
+    if( ERROR( ret ) )
+    {
+        // yes sess expired
+        return STATUS_SUCCESS;
+    }
 
+    CRpcServices* pSvc = pIf;
     IAuthenticateServer* pAuth =
     dynamic_cast< IAuthenticateServer* >
             ( pSvc );

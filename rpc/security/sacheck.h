@@ -54,7 +54,8 @@ class CSimpleAuthCliWrapper :
     CSimpleAuthCliWrapper( const IConfigDb* pCfg );
 
     static gint32 Create( CIoManager* pMgr,
-        IEventSink* pCallback, IConfigDb* pCfg );
+        IEventSink* pCallback, IConfigDb* pCfg,
+        InterfPtr& pOldIf );
 
     static gint32 Destroy( CIoManager* pMgr,
         IEventSink* pCallback );
@@ -137,6 +138,9 @@ class CSimpleAuthCliWrapper :
 
     gint32 OnPostStop(
         IEventSink* pCb ) override;
+
+    void TransferSessions(
+        CSimpleAuthCliWrapper* pTarget );
 };
 
 }

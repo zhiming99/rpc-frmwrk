@@ -127,5 +127,8 @@ class COA2proxy_CliImpl :
         IEventSink* pInv, gint32 iRet,
         const Variant& oToken,
         IConfigDb* pResp );
+
+    void TransferSessions(
+        COA2proxy_CliImpl* pTarget );
 };
 

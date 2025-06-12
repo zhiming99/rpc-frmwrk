@@ -391,7 +391,8 @@ class CAuthentServer:
         IConfigDb* pReqCtx );
 
     gint32 StartSimpAuthCli(
-        IEventSink* pCallback );
+        IEventSink* pCallback,
+        InterfPtr& pOldIf );
 
     public:
     typedef CAggInterfaceServer super;
@@ -438,7 +439,8 @@ class CAuthentServer:
         gint32 dwPortId,
         std::string& strSess );
 
-    gint32 StartNewAuthImpl();
+    gint32 StartNewAuthImpl(
+        InterfPtr& pOldIf );
 
     gint32 GetAuthImpl(
         ObjPtr& pAuthImpl );
