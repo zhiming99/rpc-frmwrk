@@ -18,7 +18,7 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 9. [`Both OpenSSL and GmSSL support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/sslport/Readme.md)
 10. [`Websocket support`](https://github.com/zhiming99/rpc-frmwrk/blob/master/rpc/wsport/Readme.md)
 11. [`Object access via Multihop routing`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-12. [`Authentication support with Kerberos 5`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
+12. [`Authentication support for Kerberos, OAuth2 and SimpAuth(password)`](https://github.com/zhiming99/rpc-frmwrk/tree/master/rpc/security/README.md)
 13. [`Node Redudancy/Load Balance`](https://github.com/zhiming99/rpc-frmwrk/blob/master/Concept.md#load-balance--node-redudancy)
 14. [`A collection of skeleton generators for C++, Python Java, and JavaScript`](https://github.com/zhiming99/rpc-frmwrk/tree/master/ridl/README.md)
 15. [`A GUI config tool for rpcrouter`](https://github.com/zhiming99/rpc-frmwrk/tree/master/tools/README.md)
