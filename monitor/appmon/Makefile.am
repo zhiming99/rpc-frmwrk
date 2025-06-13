@@ -3,7 +3,8 @@ include_ipcdir=$(top_srcdir)/ipc
 
 appmon_PROGRAMS=appmonsvr
 appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h monconst.h \
-SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h
+SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h \
+appmancli.cpp
 if ENABLE_FUSE3
 appmonsvr_SOURCES+=monfuse.cpp
 endif
@@ -11,10 +12,12 @@ endif
 #SimpleAuthcli.cpp AppManagercli.cpp 
 
 appmonsvr_LDADD= ./libappmon.a \
+ $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la \
 ../registry/libregfs.la ../../ipc/libipc.la $(COMMON_LINK_FUSE3) \
  ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
- -L$(top_srcdir)/3rd_party 
+ -L$(top_srcdir)/3rd_party \
+ $(top_srcdir)/monitor/sinit/librpcfenc.la
 
 #appmoncli_LDADD=$(appmonsvr_LDADD)
 
@@ -31,7 +34,7 @@ else
 OFFSET_MACRO=
 endif
 
-appmonsvr_CPPFLAGS= -I../registry -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
+appmonsvr_CPPFLAGS= -I../registry -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(top_srcdir)/monitor/sinit
 appmonsvr_LDFLAGS=-rdynamic
 
 if ENABLE_FUSE3

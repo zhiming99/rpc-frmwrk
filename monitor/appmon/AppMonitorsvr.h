@@ -77,6 +77,11 @@ class CAppMonitor_SvrImpl
     : public CAppMonitor_SvrBase
 {
     protected:
+
+    std::hashmap< stdstr, gint32 > m_mapOA2Name2Uid;
+    std::hashmap< stdstr, gint32 > m_mapKrb5Name2Uid;
+    std::hashmap< stdstr, gint32 > m_mapName2Uid;
+
     using UID2GIDS = std::hashmap< guint32, IntSetPtr >;
     UID2GIDS m_mapUid2Gids;
 
@@ -95,6 +100,12 @@ class CAppMonitor_SvrImpl
 
     bool IsAppSubscribed( HANDLE hstm,
         const stdstr& strApp ) const;
+
+    gint32 LoadAssocMaps(
+        RegFsPtr& pfs, int iAuthMech );
+
+    gint32 LoadUserGrpsMap();
+
     public:
     typedef CAppMonitor_SvrBase super;
     CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :
@@ -346,7 +357,6 @@ class CAppMonitor_SvrImpl
     
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
-    gint32 LoadUserGrpsMap();
     bool IsUserValid( guint32 dwUid ) const;
     gint32 GetAccessContext(
         IConfigDb* pReqCtx,

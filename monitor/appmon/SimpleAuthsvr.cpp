@@ -10,6 +10,9 @@ using namespace rpcf;
 #include "appmon.h"
 #include "AppMonitorsvr.h"
 #include "SimpleAuthsvr.h"
+#include "encdec.h"
+
+extern RegFsPtr GetRegFs( bool bUser );
 
 #define GETAC( _pContext ) \
     CAccessContext oac; \
@@ -66,6 +69,168 @@ gint32 CSimpleAuth_SvrImpl::GetPasswordSalt(
     // And make sure to call 'GetPasswordSaltComplete'
     // when the service is done
     return ERROR_NOT_IMPL;
+}
+
+/* Async Req Handler*/
+gint32 CSimpleAuth_SvrImpl::CheckClientToken( 
+    IConfigDb* pContext, 
+    ObjPtr& pCliInfo /*[ In ]*/,
+    ObjPtr& pSvrInfo /*[ In ]*/, 
+    ObjPtr& pRetInfo /*[ Out ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpener oci( ( IConfigDb* )pCliInfo );
+        CCfgOpener osi( ( IConfigDb* )pSvrInfo );
+
+        bool bGmSSL = false;
+        ret = oci.GetBoolProp( propGmSSL, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pToken;
+        ret = oci.GetBufPtr( 0, pToken );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strUser;
+        ret = oci.GetStrProp(
+            propUserName, strUser );
+        if( ERROR( ret ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        RegFsPtr pfs = GetRegFs( true );
+        if( pfs.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        stdstr strPath = "/users/";
+        strPath += strUser + "/passwd";
+
+        stdstr strVal2;
+        ret = osi.GetStrProp(
+            propSessHash, strVal2 );
+
+        Variant oVar;
+        ret = pfs->GetValue( strPath, oVar );
+        if( ERROR( ret ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+        stdstr& strHash = oVar;
+        if( strHash.size() != 64 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        strHash += strVal2;
+        stdstr strKey;
+        ret = GenSha2Hash(
+            strHash, strKey, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        BufPtr pKey( true );
+        pKey->Resize( strKey.size() / 2 );
+        ret = HexStringToBytes(
+            strKey.c_str(), strKey.size(),
+            ( guint8* )pKey->ptr() );
+        if( ERROR( ret ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        BufPtr pOutBuf;
+        ret = DecryptAesGcmBlock(
+            pKey, pToken, pOutBuf, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpener oCliInfo;
+        ret = oCliInfo.Deserialize( pOutBuf );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strVal1;
+        ret = oCliInfo.GetStrProp(
+            propSessHash, strVal1 );
+        if( ERROR( ret ) )
+            break;
+
+        if( strVal1.empty() || strVal1 != strVal2 )
+        {
+            ret = -EACCES;
+            break;
+        }
+        ret = oCliInfo.GetStrProp(
+            propUserName, strVal1 );
+        if( ERROR( ret ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        if( strVal1.empty() || strVal1 != strUser )
+        {
+            ret = -EACCES;
+            break;
+        }
+        
+        guint64 qwTs1, qwTs2;
+        ret = oCliInfo.GetQwordProp(
+            propTimestamp, qwTs1 );
+        if( ERROR( ret ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+
+        ret = osi.GetQwordProp(
+            propTimestamp, qwTs2 );
+        if( ERROR( ret ) )
+        {
+            ret = -EACCES;
+            break;
+        }
+        if( qwTs2 != qwTs1 )
+        {
+            ret = -EACCES;
+            break;
+        }
+        qwTs1 = htonll( qwTs1 + 1 );
+        BufPtr pTokBuf( true ), pRetBuf;
+        pTokBuf->Append(
+            ( char* )&qwTs1, sizeof( qwTs1 ) );
+        pTokBuf->Append(
+            strUser.c_str(), strUser.size() );
+        pTokBuf->Append(
+            strVal2.c_str(), strVal2.size() );
+        ret = EncryptAesGcmBlock(
+            pTokBuf, pKey, pRetBuf, bGmSSL );
+        if( ERROR( ret ) )
+            break;
+
+        CParamList oRetInfo;
+        oRetInfo.Push( pRetBuf );
+        oRetInfo.SetQwordProp(
+            propTimestamp, qwTs2 );
+        oRetInfo.SetStrProp(
+            propUserName, strUser );
+        oRetInfo.SetBoolProp(
+            propContinue, false );
+        oRetInfo.SetBoolProp(
+            propGmSSL, bGmSSL );
+        pRetInfo = oRetInfo.GetCfg();
+
+    }while( 0 );
+    return ret;
 }
 
 gint32 CSimpleAuth_SvrImpl::CreateStmSkel(

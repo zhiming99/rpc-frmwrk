@@ -365,7 +365,7 @@ struct CLogger
     gint32 Start();
     gint32 Stop();
     gint32 ThreadProc( IEventSink* pCb );
-    gint32 SendLogMsg( const stdstr& strMsg );
+    gint32 SendLogMsg();
     gint32 PushMessage( const stdstr& strMsg );
 };
 

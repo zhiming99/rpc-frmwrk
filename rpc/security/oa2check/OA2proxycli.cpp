@@ -227,7 +227,7 @@ gint32 COA2proxy_CliImpl::InquireSess(
 }
 
 gint32 COA2proxy_CliImpl::GenSessHash(
-    stdstr strToken,
+    const stdstr& strToken,
     guint32 dwPortId,
     std::string& strSess )
 {
@@ -505,3 +505,16 @@ gint32 COA2proxy_CliImpl::Login(
     }while( 0 );
     return ret;
 }
+
+void COA2proxy_CliImpl::TransferSessions(
+    COA2proxy_CliImpl* pTarget )
+{
+    pTarget->m_mapSess2PortId = m_mapSess2PortId;
+    pTarget->m_mapPortId2Sess = m_mapPortId2Sess;
+    pTarget->m_mapSessions = m_mapSessions;
+    m_mapSessions.clear();
+    m_mapPortId2Sess.clear();
+    m_mapSess2PortId.clear();
+    return;
+}
+

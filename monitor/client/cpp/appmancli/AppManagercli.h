@@ -33,6 +33,9 @@
 #define O_CPU_LOAD  "cpu_load"
 #define O_OPEN_FILES     "open_files"
 
+#define PROP_TARGET_IF 0x1234
+#define PROP_APP_NAME 0x1235
+
 gint32 GetAppManagercli( InterfPtr& pCli );
 
 /*gint32 CreateAppManagercli(
@@ -58,9 +61,10 @@ gint32 StartStdAppManCli( CRpcServices* pSvc,
 
 gint32 StopStdAppManCli();
 
-template< typename ToCreate, EnumClsid iClsid >
+template< typename ToCreate >
 gint32 AsyncCreateIf( CIoManager* pMgr,
     IEventSink* pCallback, IConfigDb* pCfg,
+    EnumClsid iClsid,
     const stdstr& strDesc,
     const stdstr& strObjName,
     InterfPtr& pNewIf,
@@ -73,10 +77,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
         if( pCfg != nullptr )
         {
             CCfgOpener oCfg( pCfg );
-            CIoManager* pMgr2;
-            ret = oCfg.GetPointer( propIoMgr, pMgr2 );
-            if( ERROR( ret ) )
-                oCfg.SetPointer( propIoMgr, pMgr );
+            oCfg.SetPointer( propIoMgr, pMgr );
         }
         else
         {
@@ -169,7 +170,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
                 pCallback->SetProperty( propRespPtr, oVar );
                 ObjPtr pObj( pCallback );
                 CIfRetryTask* pRetry( pObj );
-                pRetry->ClearClientNotify();
+                // pRetry->ClearClientNotify();
                 pRetry->OnEvent( eventTaskComp,
                     ret, 0, nullptr );
             }while( 0 );
@@ -186,6 +187,7 @@ gint32 AsyncCreateIf( CIoManager* pMgr,
 
         CIfRetryTask* pRetry = pStartCb;
         pRetry->SetClientNotify( pStartTask );
+        pRetry->MarkPending();
 
         ret = pMgr->AddSeqTask( pStartTask );
         if( ERROR( ret ) )

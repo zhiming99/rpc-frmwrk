@@ -121,6 +121,9 @@ service SimpFileSvc [ stream ]
         --odesc_url=<url> :
             指定部署时`object description`文件的`url`。需要注意的是这个`url`不要包含文件名。这个选项是生成JS框架时的强制选项.
 
+        --lib_path=<path>
+            指定rpc-frmwrk的Jslib的路径，每个生成的Js文件中的require语句将使用此路径指定所需要的模块文件。
+
         --auth: 生成框架将使用`OAuth2`进行授权认证。该选项仅用于JS框架。
         
         -f: 生成支持`rpcfs`的框架。该框架代码不需要额外编写代码，可以直接执行，并mount为服务器或客户端的文件系统，具体信息请参考`rpcfs`的说明

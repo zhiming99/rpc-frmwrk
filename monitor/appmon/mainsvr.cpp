@@ -65,9 +65,31 @@ std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
 static bool g_bFormat = false;
 static bool g_bLocal = false;
+stdstr g_strCmd;
 static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
 std::vector< InterfPtr > g_vecIfs;
+static stdrmutex g_oRegLock;
+
+extern gint32 StartLocalAppMancli();
+extern gint32 StopLocalAppMancli();
+
+RegFsPtr GetRegFs( bool bUser )
+{
+    CStdRMutex oLock( g_oRegLock );
+    if( bUser )
+        return g_pUserRegfs;
+    return g_pAppRegfs;
+}
+
+void SetRegFs( RegFsPtr& pRegfs, bool bUser )
+{
+    CStdRMutex oLock( g_oRegLock );
+    if( bUser )
+        g_pUserRegfs = pRegfs;
+    else
+        g_pAppRegfs = pRegfs;
+}
 
 void SignalHandler( int signum )
 {
@@ -262,6 +284,9 @@ gint32 RunSvcObj()
         if( ERROR( ret ) )
             break;
 
+        ret = StartLocalAppMancli();
+        if( ERROR( ret ) )
+            break;
         if( !g_bFuse ) 
         {
             ret = ServiceMain(
@@ -353,22 +378,35 @@ int _main( int argc, char** argv)
             g_vecIfs.clear();
         }
 #endif
+        StopLocalAppMancli();
+
     }while( 0 );
     if( true )
     {
+        RegFsPtr pEmpty;
         if( dwStop > 0 )
         {
-            g_pUserRegfs->Stop();
+            RegFsPtr pRegfs = GetRegFs( true );
+            SetRegFs( pEmpty, true );
+            if( !pRegfs.IsEmpty() )
+            {
+                pRegfs->Stop();
+                pRegfs.Clear();
+            }
             if( ret > 0 )
                 ret = -ret;
-            g_pUserRegfs.Clear();
         }
         if( dwStop > 1 )
         {
-            g_pAppRegfs->Stop();
+            RegFsPtr pRegfs = GetRegFs( false );
+            SetRegFs( pEmpty, false );
+            if( !pRegfs.IsEmpty() )
+            {
+                pRegfs->Stop();
+                pRegfs.Clear();
+            }
             if( ret > 0 )
                 ret = -ret;
-            g_pAppRegfs.Clear();
         }
     }
 
@@ -445,6 +483,14 @@ int main( int argc, char** argv)
         }
         if( ERROR( ret ) )
             break;
+
+        g_strCmd.clear();
+        for( int i = 0; i < argc; i++ )
+        {
+            g_strCmd.append( argv[ i ] );
+            if( i < argc - 1 )
+                g_strCmd.append( " " );
+        }
 
         stdstr strHomeDir = GetHomeDir();
         g_strUserReg =
@@ -559,13 +605,7 @@ int main( int argc, char** argv)
         }
         if( g_bRestart )
         {
-            stdstr strCmd; 
-            for( int i = 0; i < argc; i++ )
-            {
-                strCmd.append( argv[ i ] );
-                strCmd.append( " " );
-            }
-            system( strCmd.c_str() );
+            system( g_strCmd.c_str() );
         }
         break;
     }while( true );

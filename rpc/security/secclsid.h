@@ -43,6 +43,8 @@ typedef enum
     DECL_CLSID( CRemoteProxyStateAuth ),
     DECL_CLSID( CKdcRelayProxyStat ),
     DECL_CLSID( COAuth2LoginProxyImpl ),
+    DECL_CLSID( CSimpAuthLoginProxyImpl ),
+    DECL_CLSID( CSimpleAuthCliWrapper ),
 
     DECL_IID( CRpcReqForwarderAuth ) = clsid( ReservedIidStart ) + 210,
 

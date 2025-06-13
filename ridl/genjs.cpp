@@ -31,7 +31,7 @@ using namespace rpcf;
 
 stdstr g_strJsLibPath = "";
 stdstr g_strWebPath = "";
-bool g_bAuth = false;
+// bool g_bAuth = false;
 extern stdstr g_strCmdLine;
 extern stdstr g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
@@ -90,12 +90,11 @@ const stdstr& GetJsLibPath()
         return g_strJsLibPath;
 
     stdstr strPath;
-    gint32 ret = FindInstCfg(
-        "driver.json", strPath );
+    gint32 ret = GetLibPath(
+        strPath, "libcombase.so" );
     if( ERROR( ret ) )
         return g_strJsLibPath;
-    strPath = GetDirName( strPath );
-    g_strJsLibPath = strPath + "/jslib";
+    g_strJsLibPath = strPath + "/rpcf/jslib";
     return g_strJsLibPath;
 }
 
@@ -3173,10 +3172,8 @@ gint32 CExportJsSampleHtml::Output()
         Wa( "<p id=\"rpcf_load_notify\"><br /></p>" );
         Wa( "</script>" );
         Wa( "<script>" );
-        if( g_bAuth )
-            Wa( "globalThis.g_bAuth = true" );
-        else
-            Wa( "globalThis.g_bAuth = false" );
+        Wa( "globalThis.g_bAuth = false" );
+        Wa( "globalThis.g_strAuthMech = \"\"" );
 
         CCOUT << "console.log( \"hello, " << g_strAppName << "!\");";
         NEW_LINE;

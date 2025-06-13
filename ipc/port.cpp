@@ -868,12 +868,9 @@ gint32 CPort::PreStop( IRP* pIrp )
             oParams.SetPointer(
                 propIoMgr, GetIoMgr() );
 
-            pObj = IrpPtr( pIrp );
-            ret = oParams.SetObjPtr(
-                propIrpPtr, pObj );
-
-            if( ERROR( ret ) )
-                break;
+            /*pObj = IrpPtr( pIrp );
+            oParams.SetObjPtr(
+                propIrpPtr, pObj );*/
 
             TaskletPtr pTask;
             ret = pTask.NewObj(

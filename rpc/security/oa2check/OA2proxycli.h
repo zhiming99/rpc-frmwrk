@@ -109,7 +109,7 @@ class COA2proxy_CliImpl :
     { return -ENOTSUP; }
 
     gint32 GenSessHash(
-        stdstr strToken,
+        const stdstr& strToken,
         guint32 dwPortId,
         std::string& strSess );
 
@@ -127,5 +127,8 @@ class COA2proxy_CliImpl :
         IEventSink* pInv, gint32 iRet,
         const Variant& oToken,
         IConfigDb* pResp );
+
+    void TransferSessions(
+        COA2proxy_CliImpl* pTarget );
 };
 

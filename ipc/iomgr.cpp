@@ -2387,6 +2387,12 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
         if( ERROR( ret ) )
             break;
 
+        {
+            CStdRMutex oLock( GetLock() );
+            m_pLogCli = pLogCli;
+            Sem_Post( &m_semStart );
+        }
+
         CRpcServices* pSvc = pLogCli;
         ret = pSvc->Start();
         if( ERROR( ret ) )
@@ -2396,23 +2402,11 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
             break;
         }
 
-        m_pLogCli = pLogCli;
-        Sem_Post( &m_semStart );
-
         while( !m_bExit )
         {
-            CStdRMutex oSvcLock( pSvc->GetLock() );
-            if( pSvc->GetState() != stateConnected )
-            {
-                DebugPrintEx( logErr, ERROR_STATE,
-                    "Warning logger is offline, "
-                    "and waiting for it online" );
-            }
-            oSvcLock.Unlock();
-
             ret = Sem_TimedwaitSec( &m_semMsgs, 10 );
             if( ret == -EAGAIN )
-                continue;
+                ret = 0;
 
             if( ERROR( ret ) )
             {
@@ -2422,36 +2416,25 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
                 break;
             }
 
-            CStdRMutex oLock( GetLock() );
-            if( m_queMsgs.empty() )
+            CStdRMutex oSvcLock( pSvc->GetLock() );
+            if( pSvc->GetState() != stateConnected )
+            {
+                DebugPrintEx( logErr, ERROR_STATE,
+                    "Warning logger is offline, "
+                    "and waiting for it online" );
                 continue;
-
-            stdstr strMsg = std::move(
-                m_queMsgs.front() );
-            m_queMsgs.pop_front();
-            oLock.Unlock();
-            this->SendLogMsg( strMsg );
+            }
+            oSvcLock.Unlock();
+            this->SendLogMsg();
         }
 
-        do{
-            CStdRMutex oLock( GetLock() );
-            m_bQuit = true;
-            if( m_queMsgs.empty() )
-                break;
-            stdstr strMsg = std::move(
-                m_queMsgs.front() );
-            m_queMsgs.pop_front();
-            oLock.Unlock();
-            this->SendLogMsg( strMsg );
-
-        }while( 1 );
-
-        m_pLogCli.Clear();
+        this->SendLogMsg();
         pSvc->Stop();
 
     }while( 0 );
 
     CStdRMutex oLock( GetLock() );
+    m_pLogCli.Clear();
     m_bQuit = true;
     Sem_Post( &m_semStop );
     return 0;
@@ -2467,6 +2450,7 @@ gint32 CLogger::Start()
     gint32 (*func)( IEventSink*, CIoManager* ) =
     ([]( IEventSink* pCb, CIoManager* pMgr )->gint32
     {
+        SetThreadName( "Loggercli" );
         pMgr->LoggerThread( pCb );
         return 0;
     });
@@ -2489,20 +2473,39 @@ gint32 CLogger::Stop()
         return 0;
     m_bExit = true;
     Sem_Post( &m_semMsgs );
+    if( m_pLogCli.IsEmpty() || m_bQuit )
+        return 0;
     oLock.Unlock();
     Sem_Wait( &m_semStop );
     return 0;
 }
 
-gint32 CLogger::SendLogMsg(
-    const stdstr& strMsg )
+gint32 CLogger::SendLogMsg()
 {
     gint32 ret = 0;
+    ILogSvc_PImpl* pSvc = m_pLogCli;
     do{
-        ILogSvc_PImpl* pSvc = m_pLogCli;
-        ret = pSvc->LogMessage( strMsg );
+        bool bEmpty = true;
+        CStdRMutex oLock( GetLock() );
+        if( m_queMsgs.empty() )
+            break;
+        stdstr strMsg = std::move(
+            m_queMsgs.front() );
+        m_queMsgs.pop_front();
+        oLock.Unlock();
 
-    }while( 0 );
+        ret = pSvc->LogMessage( strMsg );
+        oLock.Lock();
+        if( SUCCEEDED( ret ) && m_queMsgs.size() )
+            continue;
+        if( SUCCEEDED( ret ) && m_queMsgs.empty() )
+            break;
+        if( m_bExit || m_bQuit )
+            break;
+        m_queMsgs.push_front( strMsg );
+        break;
+
+    }while( 1 );
     return ret;
 }
 
@@ -2512,8 +2515,11 @@ gint32 CLogger::PushMessage(
     CStdRMutex oLock( GetLock() );
     if( m_bExit || m_bQuit )
         return 0;
+    if( m_queMsgs.empty()  )
+        Sem_Post( &m_semMsgs );
     m_queMsgs.push_back( strMsg );
-    Sem_Post( &m_semMsgs );
+    if( m_queMsgs.size() > 200 )
+        m_queMsgs.pop_front();
     return 0;
 }
 

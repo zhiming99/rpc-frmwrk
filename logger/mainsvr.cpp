@@ -93,23 +93,24 @@ using namespace rpcf;
 gint32 mainsvr( CLogService_SvrImpl* pIf, int argc, char** argv );
 
 static bool g_bDaemon = false;
+static bool g_bMonitoring = false;
+
 static std::atomic<bool> g_bExit={ false };
 stdstr g_strFile = "";
+
+void SignalHandler( int signum )
+{ if( signum == SIGINT ) g_bExit = true; }
 
 void Usage( char* szName )
 {
     fprintf( stderr,
         "Usage: %s <option>\n"
         "\t [ -O <path> to output log to the file at given 'path' ]\n"
+        "\t [ -o enable monitoring ]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",
         szName );
-}
-
-void signal_term_handler( int signal )
-{
-    g_bExit = true;
 }
 
 static gint32 IsValidFile( const char* szPath )
@@ -156,8 +157,8 @@ static gint32 GetDefLogFile( stdstr& strFile )
         strPath += "/log.txt";
     }while( 0 );
 
-    if( ERROR( ret ) )
-        strPath = "";
+    if( SUCCEEDED( ret ) )
+        strFile = strPath;
 
     return ret;
 }
@@ -169,7 +170,7 @@ int main( int argc, char** argv )
     int opt = 0;
     bool bRole = false;
     stdstr strLogFile;
-    while( ( opt = getopt( argc, argv, "O:hdv" ) ) != -1 )
+    while( ( opt = getopt( argc, argv, "O:hdov" ) ) != -1 )
     {
         switch (opt)
         {
@@ -183,6 +184,11 @@ int main( int argc, char** argv )
                     break;
                 }
                 strLogFile = optarg;
+                break;
+            }
+        case 'o':
+            {
+                g_bMonitoring = true;
                 break;
             }
         case 'd':
@@ -218,8 +224,7 @@ int main( int argc, char** argv )
     if( g_bDaemon )
         daemon( 1, 0 );
 
-     std::signal( SIGTERM, signal_term_handler );
-     std::signal( SIGQUIT, signal_term_handler );
+     std::signal( SIGQUIT, SignalHandler );
 
     do{
         std::string strDesc = "./loggerdesc.json";
@@ -259,8 +264,22 @@ int main( int argc, char** argv )
                 ret = ERROR_STATE;
                 break;
             }
+
+            if( g_bMonitoring )
+            {
+                CIoManager* pMgr = g_pIoMgr;
+                ret = pMgr->TryLoadClassFactory(
+                    "invalidpath/libappmancli.so" );
+                if( ERROR( ret ) )
+                    break;
+                PACBS pacbsIn( new CAsyncLoggerAMCallbacks() );
+                InterfPtr pAppMan;
+                ret = StartStdAppManCli( pSvc,
+                    "loggersvr1", pAppMan, pacbsIn );
+            }
+
         }while( 0 );
-        
+
         CIoManager* pMgr = g_pIoMgr;
         CLogService_SvrImpl* pLogSvc = pIf;
 
@@ -286,6 +305,9 @@ int main( int argc, char** argv )
                 __LINE__, "Logger stopped", 0 );
             pLogSvc->LogMessage( strMsg );
         }
+
+        if( g_bMonitoring )
+            StopStdAppManCli();
     }while( 0 );
 
     DestroyContext();
@@ -296,11 +318,17 @@ int main( int argc, char** argv )
 gint32 mainsvr( CLogService_SvrImpl* pIf, int argc, char** argv )
 {
     gint32 ret = 0;
+    auto iOldSig = 
+        signal( SIGINT, SignalHandler );
+    auto iOldSig2 = 
+        signal( SIGUSR1, SignalHandler );
     // replace 'sleep' with your code for
     // advanced control
     while( pIf->IsConnected() && !g_bExit )
         sleep( 1 );
     ret = STATUS_SUCCESS;
+    signal( SIGINT, iOldSig );
+    signal( SIGUSR1, iOldSig2 );
     return ret;
 }
 

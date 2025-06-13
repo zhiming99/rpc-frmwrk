@@ -36,4 +36,6 @@
 #define LOAD_ON_START       "load_on_start"
 #define DATA_TYPE           "datatype"
 #define PID_FILE            "pid"
+#define KRB5_ASSOC_DIR       "krb5users"
+#define OA2_ASSOC_DIR       "oa2users"
 

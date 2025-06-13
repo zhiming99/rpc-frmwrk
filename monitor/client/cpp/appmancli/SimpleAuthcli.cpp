@@ -7,11 +7,11 @@ using namespace rpcf;
 #include "stmport.h"
 #include "fastrpc.h"
 #include "appmon.h"
-#include "SimpleAuthcli.h"
 #include "AppManagercli.h"
 
 InterfPtr g_pSAcli;
 stdrmutex g_oSALock;
+#include "SimpleAuthcli.h"
 gint32 GetSimpleAuthcli( InterfPtr& pCli )
 {
     gint32 ret = 0;
@@ -27,8 +27,11 @@ gint32 GetSimpleAuthcli( InterfPtr& pCli )
     }while( 0 );
     return ret;
 }
+
 gint32 DestroySimpleAuthcli(
-    CIoManager* pMgr, IEventSink* pCallback )
+    CIoManager* pMgr,
+    IEventSink* pCallback,
+    bool bSeq )
 {
     gint32 ret = 0;
     do{
@@ -36,18 +39,23 @@ gint32 DestroySimpleAuthcli(
         ret = GetSimpleAuthcli( pCli );
         if( ERROR( ret ) )
             break;
-
-        if( pCli->GetState() == stateStopping ||
-            pCli->GetState() == stateStopped )
-            break;
+        EnumIfState iState;
+        {
+            CRpcServices* pSvc = pCli;
+            CStdRMutex oIfLock( pSvc->GetLock() );
+            iState = pSvc->GetState();
+            if( iState == stateStopped )
+                break;
+        }
 
         if( pCallback == nullptr )
         {
             ret = pCli->Stop();
             break;
         }
-        gint32 (*func)( IEventSink* pCb ) =
-        ([]( IEventSink* pCb )->gint32
+
+        gint32 (*func)( IEventSink*, IEventSink* pCb ) =
+        ([]( IEventSink* pTask, IEventSink* pCb )->gint32
         {
             if( pCb != nullptr )
                 pCb->OnEvent(
@@ -56,28 +64,71 @@ gint32 DestroySimpleAuthcli(
             g_pSAcli.Clear();
             return 0;
         });
-        TaskletPtr pStopTask;
-        ret = NEW_FUNCCALL_TASKEX(
-            pStopTask, pMgr, func, pCallback );
-        if( ERROR( ret ) )
-            break;
-        CRpcServices* pSvc = pCli;
-        ret = pSvc->QueueStopTask( pCli, pStopTask );
-        if( ERROR( ret ) )
+
+        if( iState != stateStopping )
         {
-            ( *pStopTask )( eventCancelTask );
-            OutputMsg( ret,
-                "Error stop CSimpleAuth_CliImpl" );
+            TaskletPtr pStopCb;
+            ret = NEW_COMPLETE_FUNCALL( 0, pStopCb,
+                pMgr, func, nullptr, pCallback );
+            if( ERROR( ret ) )
+                break;
+
+            CRpcServices* pSvc = pCli;
+            if( bSeq )
+            {
+                ret = pSvc->QueueStopTask( pCli, pStopCb );
+            }
+            else
+            {
+                ret = pSvc->Shutdown( pStopCb );
+            }
+            if( ERROR( ret ) )
+            {
+                ( *pStopCb )( eventCancelTask );
+                OutputMsg( ret,
+                    "Error stop CSimpleAuth_CliImpl" );
+            }
+        }
+        else
+        {
+            // wait it complete
+            gint32 (*func)( IEventSink* )
+            ([]( IEventSink* pCb )->gint32
+            {
+                pCb && pCb->OnEvent( eventTaskComp,
+                        0, 0, nullptr );
+                CStdRMutex oLock( g_oSALock );
+                g_pSAcli.Clear();
+                return 0;
+            });
+            TaskletPtr pWaitTask;
+            ret = NEW_FUNCCALL_TASKEX( pWaitTask,
+                pMgr, func, pCallback );
+            if( ERROR( ret ) )
+                break;
+            CRpcServices* pSvc = pCli;
+            ret = pMgr->AddSeqTask( pWaitTask, false );
+            if( ERROR( ret ) )
+            {
+                ( *pWaitTask )( eventCancelTask );
+                OutputMsg( ret,
+                    "Error stop CSimpleAuth_CliImpl" );
+            }
         }
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
     }while( 0 );
     if( ret != STATUS_PENDING )
+    {
+        CStdRMutex oLock( g_oSALock );
         g_pSAcli.Clear();
+    }
     return ret;
 }
+
 gint32 CreateSimpleAuthcli( CIoManager* pMgr,
-    IEventSink* pCallback, IConfigDb* pCfg )
+    EnumClsid iClsid, IEventSink* pCallback,
+    IConfigDb* pCfg )
 {
     gint32 ret = 0;
     do{
@@ -134,10 +185,9 @@ gint32 CreateSimpleAuthcli( CIoManager* pMgr,
         if( ERROR( ret ) )
             break;
 
-        ret = AsyncCreateIf<CSimpleAuth_CliImpl,
-            clsid( CSimpleAuth_CliImpl )>(
-            pMgr, pStartCb, pCfg,
-            "./appmondesc.json", "SimpleAuth",
+        ret = AsyncCreateIf<CSimpleAuth_CliImpl>(
+            pMgr, pStartCb, pCfg, iClsid,
+            "invalidpath/appmondesc.json", "SimpleAuth",
             g_pSAcli, false );
 
         if( ERROR( ret ) )
@@ -194,6 +244,20 @@ gint32 CSimpleAuth_CliImpl::GetPasswordSaltCallback(
         return ret;
     return pCbs->GetPasswordSaltCallback(
         context, iRet, strSalt );
+}
+
+/* Async callback handler */
+gint32 CSimpleAuth_CliImpl::CheckClientTokenCallback( 
+    IConfigDb* context, gint32 iRet,
+    ObjPtr& oInfo /*[ In ]*/ )
+{
+    PSAACBS pCbs;
+    gint32 ret = GetAsyncCallbacks( pCbs );
+    if( ERROR( ret ) )
+        return ret;
+    return pCbs->CheckClientTokenCallback(
+        context, iRet, oInfo );
+    return 0;
 }
 
 gint32 CSimpleAuth_CliImpl::CreateStmSkel(
@@ -259,6 +323,14 @@ gint32 CSimpleAuth_CliImpl::OnPreStart(
     return ret;
 }
 
+gint32 CSimpleAuth_CliImpl::OnPostStart(
+    IEventSink* pCallback )
+{
+    LOGINFO( this->GetIoMgr(), 0, 
+        "CSimpleAuth_CliImpl started" );
+    return super::OnPostStart( pCallback );
+}
+
 gint32 CSimpleAuth_CliImpl::OnPostStop(
     IEventSink* pCallback )
 {
@@ -273,6 +345,7 @@ gint32 CSimpleAuth_CliImpl::OnPostStop(
         if( ERROR( ret ) )
             break;
         pCbs->OnSvrOffline( pContext, this );
+        this->ClearCallbacks();
     }while( 0 );
     return ret;
 }

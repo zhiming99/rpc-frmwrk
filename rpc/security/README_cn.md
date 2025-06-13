@@ -1,5 +1,5 @@
 ### rpc-frmwrk的认证机制
-rpc-frmwrk依靠认证过程来鉴别用户身份并确定是否提供RPC服务。rpc-frmwrk可以通过两种认证协议实施认证。
+rpc-frmwrk依靠认证过程来鉴别用户身份并确定是否提供RPC服务。rpc-frmwrk可以通过三种认证协议实施认证。
 
 * Kerberos：Kerberos是一种认证协议，也可以理解成MIT开发的一款实现该协议的认证软件。Kerberos认证协议在企业应用中有广泛的
 部署，比如微软的活动目录使用的就是Kerberos认证机制。该认证方式适合部署在以C/S为通讯架构的运行环境中。Kerberos协议是一种
@@ -16,7 +16,12 @@ rpc-frmwrk使用的是认证码的授权模式。实际上认证过程是在第�
 外两个是第三方的服务器。比如你使用github的OAuth2，就是github提供的认证服务器，和资源服务器。资源服务器简单的说就是存有你的姓名，
 头像，邮件地址等信息的服务器。rpc-frmwrk在认证成功后，通过检查授权的状态来确定是否提供RPC服务。
 
-下面我们分别介绍两种认证方式在rpc-frmwrk中的设置和使用方法。
+* SimpAuth: 简单认证协议。这是rpc-frmwrk的内建认证协议，不需要部署第三方软件或者服务器。SimpAuth的流程十分简单，在服务器端添加用户信息，
+口令等信息。在客户端，通过工具存储相应的用户名和口令。然后通过rpcfg.py设置系统的认证方式为SimpAuth，就完成了对SimpAuth的设置。认证过程为，
+连接建立后，客户端发出加密的token, 服务器解密并验证token后，返回加密的响应token, 客户端验证无误后，即可转入RPC服务。认证服务器是rpc-frmwrk
+提供的`appmonsvr`程序。对于简单和快速开发的小型应用，使用SimpAuth是一个兼顾效率和安全的选择。
+
+下面我们分别介绍三种认证方式在rpc-frmwrk中的设置和使用方法。
 
 ### Kerberos
 
@@ -141,3 +146,12 @@ django的OAuth2的客户端app使用的是标准的Authorization code认证流�
 * 使用https版本时，浏览器提示不安全证书。这是由于容器使用的是自签名证书，须选择信任该证书即可。
 * 务必在运行`django`或者`springboot`的容器里的`/etc/hosts`文件中， 添加'172.17.0.3  Server-0'。
 * JS版`HelloWorld`的输出在浏览器的调试器的控制台窗口中，firefox和chrome可以按F12，显示该窗口。
+
+### SimpAuth
+`rpc-frmwrk`的SimpAuth支持所有四种语言，C++，Python, Java和JavaScript.它的优点是设置部署简单快速。
+
+#### SimpAuth认证在客户端的使用方法
+如果使用Javascript, SimpAuth的用户界面是登陆对话框，输入用户名和口令后，若验证成功，则客户端可以开始rpc会话。
+如果是非Js的客户端，有两步
+* 通过命令`sinit`设置用户名和口令，口令被哈希后加密。如果已经设置过，可以跳过此步骤。
+* 启动C++，Python或者Java的客户端。

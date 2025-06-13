@@ -1728,7 +1728,7 @@ gint32 CDBusStreamBusDrv::Probe2(
         {
             CStdRMutex oDrvLock( GetLock() );
             auto itr =m_mapNameToBusId.find(
-                strMasterIf );
+                strMasterIf + "_p" );
             if( itr != m_mapNameToBusId.end() )
             {
                 guint32 dwBusId = itr->second;
@@ -1746,7 +1746,7 @@ gint32 CDBusStreamBusDrv::Probe2(
         {
             CStdRMutex oDrvLock( GetLock() );
             auto itr = m_mapNameToBusId.find(
-                strMasterIf );
+                strMasterIf + "_s" );
             if( itr != m_mapNameToBusId.end() )
             {
                 ret = -EEXIST;

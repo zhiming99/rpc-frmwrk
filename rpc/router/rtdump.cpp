@@ -719,7 +719,7 @@ gint32 DumpSessions(
             ret = oCfg.GetStrProp(
                 propAuthMech, strVal );
             if( SUCCEEDED( ret ) )
-                oVal[ "Mech" ] = strVal;
+                oVal[ "AuthMech" ] = strVal;
 
             oBridge[ "AuthInfo" ] = oVal;
             oArray.append( oBridge );

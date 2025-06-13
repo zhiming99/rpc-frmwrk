@@ -10,10 +10,9 @@
 gint32 GetSimpleAuthcli( InterfPtr& pCli );
 
 gint32 DestroySimpleAuthcli(
-    CIoManager* pMgr, IEventSink* pCallback );
-
-gint32 CreateSimpleAuthcli( CIoManager* pMgr,
-    IEventSink* pCallback, IConfigDb* pCfg );
+    CIoManager* pMgr,
+    IEventSink* pCallback,
+    bool bSeq = true );
 
 class CSimpleAuth_CliImpl;
 struct IAsyncSACallbacks
@@ -42,8 +41,15 @@ struct IAsyncSACallbacks
         gint32 iRet,
         const std::string& strSalt /*[ In ]*/ )
     { return 0; }
+
+    virtual gint32 CheckClientTokenCallback( 
+        IConfigDb* context, gint32 iRet,
+        ObjPtr& oInfo /*[ In ]*/ )
+    { return 0; }
+
     virtual void OnSvrOffline( IConfigDb* context,
-        CSimpleAuth_CliImpl* pIf );
+        CSimpleAuth_CliImpl* pIf )
+    { return; }
 };
 
 using PSAACBS=std::shared_ptr<IAsyncSACallbacks>;
@@ -101,8 +107,7 @@ class CSimpleAuth_CliImpl
         m_pContext = pcontext;
     };
 
-    inline void ClearCallbacks(
-        PSAACBS& pCbs, const CfgPtr& pcontext )
+    inline void ClearCallbacks()
     {
         CStdRMutex  oLock( GetLock() );
         m_pAsyncCbs.reset();
@@ -129,10 +134,18 @@ class CSimpleAuth_CliImpl
         IConfigDb* context, 
         gint32 iRet,
         const std::string& strSalt /*[ In ]*/ ) override;
+    // RPC Async Req Callback
+    gint32 CheckClientTokenCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        ObjPtr& oInfo /*[ In ]*/ ) override;
     gint32 CreateStmSkel(
         InterfPtr& pIf ) override;
     
     gint32 OnPreStart(
+        IEventSink* pCallback ) override;
+
+    gint32 OnPostStart(
         IEventSink* pCallback ) override;
 
     gint32 OnPostStop(
@@ -162,3 +175,6 @@ class CSimpleAuth_ChannelCli
         CSimpleAuth_ChannelCli ) ); }
 };
 
+gint32 CreateSimpleAuthcli( CIoManager* pMgr,
+    EnumClsid iClsid, IEventSink* pCallback,
+    IConfigDb* pCfg );

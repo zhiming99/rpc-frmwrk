@@ -28,6 +28,7 @@ usr/bin/rpcf/ifclismk
 usr/bin/rpcf/hwsvrsmk
 usr/bin/rpcf/hwclismk
 usr/bin/rpcf/apptimer
+usr/bin/rpcf/sinit
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libecho.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libhellowrd.so*
 usr/lib/@DEB_HOST_MULTIARCH@/rpcf/libbtinrt.so*
