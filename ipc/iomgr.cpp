@@ -2387,6 +2387,12 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
         if( ERROR( ret ) )
             break;
 
+        {
+            CStdRMutex oLock( GetLock() );
+            m_pLogCli = pLogCli;
+            Sem_Post( &m_semStart );
+        }
+
         CRpcServices* pSvc = pLogCli;
         ret = pSvc->Start();
         if( ERROR( ret ) )
@@ -2395,9 +2401,6 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
                 "Warning failed to start logger" );
             break;
         }
-
-        m_pLogCli = pLogCli;
-        Sem_Post( &m_semStart );
 
         while( !m_bExit )
         {
@@ -2447,6 +2450,7 @@ gint32 CLogger::Start()
     gint32 (*func)( IEventSink*, CIoManager* ) =
     ([]( IEventSink* pCb, CIoManager* pMgr )->gint32
     {
+        SetThreadName( "Loggercli" );
         pMgr->LoggerThread( pCb );
         return 0;
     });
@@ -2469,6 +2473,8 @@ gint32 CLogger::Stop()
         return 0;
     m_bExit = true;
     Sem_Post( &m_semMsgs );
+    if( m_pLogCli.IsEmpty() || m_bQuit )
+        return 0;
     oLock.Unlock();
     Sem_Wait( &m_semStop );
     return 0;

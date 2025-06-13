@@ -425,15 +425,6 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         if( ERROR( ret ) )
             break;
 
-        if( !bNoEnc )
-        {
-            oCtx.SetObjPtr(
-                propObjPtr, pAuthImpl );
-
-            oCtx.CopyProp(
-                propSignMsg, pAuthInfo );
-        }
-
         Variant oVar;
         ret = pAuthInfo->GetProperty(
             propAuthMech, oVar );
@@ -443,6 +434,15 @@ gint32 CRpcTcpBridgeAuth::SetSessHash(
         bool bKrb5 = false;
         if( ( stdstr& )oVar == "krb5" )
             bKrb5 = true;
+
+        if( !bNoEnc && bKrb5 )
+        {
+            oCtx.SetObjPtr(
+                propObjPtr, pAuthImpl );
+            oCtx.CopyProp(
+                propSignMsg, pAuthInfo );
+        }
+
 
         oCtx.SetBoolProp( propNoEnc, bNoEnc );
         oCtx.SetBoolProp( propIsServer, true );
