@@ -153,16 +153,18 @@ django的OAuth2的客户端app使用的是标准的Authorization code认证流�
 ### 如何配置使用SimpAuth
 * 通过rpcfg.py在安全页面选择使用SimpAuth认证。
 * 用户名一栏指定客户端登陆服务器时使用的用户名。它只对客户端的设置起作用。这个用户名你也可以通过`SimpAuth`的客户端工具`sinit`设置。
+
 ![SimpAuth 配置示例](../../pics/rpcfg-SimpAuth.png)
 
 ### 服务器端启动SimpAuth的认证服务器
 * SimpAuth的认证服务器是`appmonsvr`。启动`appmonsvr`, 只需在命令行输入`appmonsvr -d`即可。不过启动`appmonsvr`之前还需确保完成三件事。
     * 设置好密钥，在`rpcfg.py`的安全页中设置, 可以参考`rpcfg.py`的[使用手册](../../tools/README_cn.md#安全页security)。
-    * 建立用户账号。如果`appmonsvr`安装在/usr/local/bin中（安装在`/usr/bin`下可以依次类推），则使用命令`/usr/local/bin/rpcf/initusers.sh`,建立用户数据库，缺省账号是`admin`。然后通过`/usr/local/bin/rpcf/rpcfmodu.sh -p admin`, 设置`admin`的密码。没有密码的账号不能登陆。你可以通过命令`/usr/local/bin/rpcf/rpcfshow.sh -l`来查看建立的用户。
+    * 建立用户账号。如果`appmonsvr`安装在`/usr/local/bin`中（安装在`/usr/bin`下可以依次类推），则使用命令`/usr/local/bin/rpcf/initusers.sh`,建立用户数据库，缺省账号是`admin`。然后通过`/usr/local/bin/rpcf/rpcfmodu.sh -p admin`, 设置`admin`的密码。没有密码的账号不能登陆。你可以通过命令`/usr/local/bin/rpcf/rpcfshow.sh -l`来查看建立的用户。
     * 使用`/usr/local/bin/rpcf/initappreg.sh`, 建立`appmonsvr`的运行数据库。
 
 * `appmonsvr`启动后，在服务器端启动`rpcrouter -adr 2`,客户端启动`rpcrouter -adr 1`。
 * 如果你的业务服务器是[`hellowld`](../../examples/cpp/hellowld/), 就在服务器端启动`HelloWorldsvr`.
+* 我们将会提供一个简便易用的工具，进一步简化这个流程。
 
 #### SimpAuth认证在客户端的使用方法
 如果使用Javascript, SimpAuth的用户界面是登陆对话框，输入用户名和口令后，若验证成功，则客户端可以开始rpc会话。
