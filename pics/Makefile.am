@@ -26,4 +26,5 @@ rpcfg2-4.png \
 new.png \
 client-req-process.png \
 server-req-process.png \
-dumpobjs.png
+dumpobjs.png \
+rpcfg-SimpAuth.png
