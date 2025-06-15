@@ -26,12 +26,12 @@
 9. [`OpenSSL的支持`](./rpc/sslport/Readme.md)
 10. [`Websocket支持`](./rpc/wsport/Readme.md)
 11. [`基于multihop技术的Object访问`](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)
-12. [`基于Kerberos 5和OAuth2的认证功能`](./rpc/security/README_cn.md)
-13. [`节点冗余和负载均衡`](./Concept_cn.md#负载均衡)
-14. [`自动生成C++，Python，Java或者JavaScript的框架代码`](./ridl/README_cn.md)
-15. [`rpc-frmwrk的图形配置工具`](./tools/README_cn.md)
-16. [`RPC文件系统rpcfs`](./fuse/README.md)
-17.  [`支持国密TLS13(SM2+SM4+GCM)`](./rpc/gmsslport/README_cn.md)
+12. [`支持Kerberos, OAuth2和SimpAuth三种认证机制`](./rpc/security/README_cn.md)
+13. [`自动生成C++，Python，Java或者JavaScript的框架代码`](./ridl/README_cn.md)
+14. [`rpc-frmwrk的图形配置工具`](./tools/README_cn.md)
+15. [`RPC文件系统rpcfs`](./fuse/README.md)
+16.  [`支持国密TLS13(SM2+SM4+GCM)`](./rpc/gmsslport/README_cn.md)
+17. [`内建对各个业务模块的实时监控和日志`]
 
 ## 编译`rpc-frmwrk`   
 * 请参考[如何编译rpc-frmwrk](https://github.com/zhiming99/rpc-frmwrk/wiki/%E5%A6%82%E4%BD%95%E7%BC%96%E8%AF%91rpc%E2%80%90frmwrk)给出的详细的信息和步骤.   
