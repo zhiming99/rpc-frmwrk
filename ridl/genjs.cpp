@@ -1971,6 +1971,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
             BLOCK_OPEN;
             if( dwOutCount > 0 )
                 EmitRespList( m_pWriter, pOutArgs );
+            Wa( "var oReq = new CConfigDb2();" );
         }
         stdstr strIfName = m_pIf->GetName();
 
