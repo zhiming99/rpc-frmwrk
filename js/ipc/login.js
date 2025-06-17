@@ -26,27 +26,31 @@ function getCookie(name) {
 
 function LoginRequestCb_OAuth2( oContext, oResp )
 {
-    var oUserCb = oContext.m_oUserCb
     var ret = oResp.GetProperty(
         EnumPropId.propReturnValue)
     if( ret === null )
         ret = errno.ERROR_FAIL;
-    if( !oUserCb )
-        return
+    var strHash
     if( SUCCEEDED( ret ))
     {
-        var oEncrypted = oResp.GetProperty( 0 )
-
+        strHash = oResp.GetProperty(
+            EnumPropId.propSessHash )
+        if( strHash === null )
+            ret = errno.ERROR_FAIL
     }
-    oUserCb( ret )
-    if( ERROR( ret ))
-        return
 
-    var strHash = oResp.GetProperty(
-        EnumPropId.propSessHash )
-    if( !strHash )
-        return
-    UpdateSessHash.bind( this )( strHash )
+    if( SUCCEEDED( ret ) )
+    {
+        UpdateSessHash.bind( this )( strHash )
+        globalThis.g_strLoginResult = "success";
+    }
+    else
+    {
+        globalThis.g_strLoginResult = "failure";
+    }
+
+    if( oContext && oContext.m_oUserCb )
+        oContext.m_oUserCb( ret )
     return
 }
 
@@ -65,7 +69,10 @@ function bigintToUint8Array(bigInt) {
 
 function LoginRequestCb_SimpAuth( oContext, oResp )
 {
-    var oUserCb = oContext.m_oUserCb
+    globalThis.g_strLoginResult = "failure";
+    var oUserCb
+    if( oContext )
+        oUserCb = oContext.m_oUserCb
     var ret = oResp.GetProperty(
         EnumPropId.propReturnValue)
     if( ERROR( ret ) )
@@ -116,6 +123,7 @@ function LoginRequestCb_SimpAuth( oContext, oResp )
                     else
                     {
                         UpdateSessHash.bind( this )( strHash )
+                        globalThis.g_strLoginResult = "success";
                     }
                     for( var i = 0; i < this.m_strKey.length; i++ )
                         this.m_strKey[i] = ' '
@@ -195,7 +203,13 @@ function LoginRequest_OAuth2( oUserCallback )
         EnumPropId.propCallOptions, oCallOpts)
     var oContext = new Object()
     oContext.m_oUserCb = oUserCallback
-    return this.m_funcForwardRequest(
+
+    var oFunc
+    if( this.m_funcForwardRequestNonStream )
+        oFunc = this.m_funcForwardRequestNonStream
+    else
+        oFunc = this.m_funcForwardRequest
+    return oFunc.bind( this )(
         oReq, LoginRequestCb, oContext )
 }
 
@@ -257,7 +271,12 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo, oCred )
                     EnumPropId.propSessHash )
                 oContext.m_oToken = oToken
 
-                return this.m_funcForwardRequest(
+                var oFunc
+                if( this.m_funcForwardRequestNonStream )
+                    oFunc = this.m_funcForwardRequestNonStream
+                else
+                    oFunc = this.m_funcForwardRequest
+                return oFunc.bind( this )(
                     oReq, LoginRequestCb, oContext )
             }).catch((err) => {
                 console.error("Login failed:", err);
