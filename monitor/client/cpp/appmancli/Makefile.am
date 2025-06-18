@@ -25,7 +25,7 @@ $(headers):appmon.ridl
 appmon.ridl:
 	@bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
     if((bexit==0));then echo all files are ready;exit 0;fi; \
-    if ! which ridlc > /dev/null; then \
+    if true; then \
         if [ ! -f ./mktpl ];then \
             cp $(top_dir)/ridl/{mktpl,mktplsvr,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
         fi;\
