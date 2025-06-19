@@ -74,8 +74,6 @@ AC_ARG_ENABLE([js],
     [enable_js=no],
     [enable_js=yes])
 
-AC_CHECK_PROG([swig], [swig], yes)
-
 case $enable_gmssl in
     yes)
     AS_IF(
@@ -93,6 +91,11 @@ case $enable_python in
     AC_CHECK_PROG([python3], python3, yes)
     AC_CHECK_PROG([sipbuild], [sip-build], yes)
     AC_CHECK_PROG([sip4], [sip], yes)
+    AS_IF( [ test x$ac_cv_prog_python3 = xno ],
+        [ AC_MSG_ERROR(["******Feature 'python' requires python3, but not be found, configure will abort.******"]) ],
+        [ test x$ac_cv_prog_sip = xno -a  x$ac_cv_prog_sipbuild = xno ],
+        [ AC_MSG_ERROR(["******Feature 'python' requires sip, but not be found, configure will abort.******"]) ]
+        )
     ;;
     no)
     ;;
@@ -100,7 +103,11 @@ esac
 
 case $enable_js in
     yes)
-    AC_CHECK_PROG([npm], npm, yes)
+    AC_CHECK_PROG([npm], npm, yes, no)
+    AC_CHECK_PROG([node], node, yes, no)
+    AS_IF( [ test x$ac_cv_prog_npm = xno -a x$ac_cv_prog_node = xno ],
+        [ AC_MSG_ERROR(["******Feature 'js' requires npm and node, but not be found, configure will abort.******"]) ]
+        )
     ;;
     no)
     ;;
@@ -108,7 +115,11 @@ esac
 
 case $enable_java in
     yes)
-    AC_CHECK_PROG([javac],[javac],yes)
+    AC_CHECK_PROG([javac],javac,yes, no)
+    AC_CHECK_PROG([swig], swig, yes, no)
+    AS_IF( [ test x$ac_cv_prog_javac = xno -a x$ac_cv_prog_swig = xno ],
+        [ AC_MSG_ERROR(["******Feature 'java' requires Java JDK but not detected, configure will abort.******"]) ]
+        )
     ;;
     no)
     ;;
