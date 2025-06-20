@@ -3259,9 +3259,9 @@ EOF
         pkgBtn.editBox = pkgEditBox
 
         pkgEditBox.set_tooltip_text(
-            "Path to the rpc-frmwrk {} ".format( lblstr ) +
-            "and the installer will install the package " +
-            "on the target system. And leave it empty if " +
+            "The directory containing the rpc-frmwrk {} ".format( lblstr ) +
+            "which the installer will pickup to install " +
+            "to the target system. And leave it blank if " +
             "not necessary." )
         grid.attach(pkgBtn, startCol + 2, startRow + 4, 1, 1 )
         if not 'rpcfgopt' in confVals :
@@ -3290,11 +3290,12 @@ EOF
             for interf in self.ifctx :
                 if interf.IsEmpty() :
                     continue
+
                 if interf.sslCheck.props.active :
-                    if len( self.keyEdit.get_text().strip() ) == 0 :
-                        return "SSL enabled, key file is empty"
-                    if len( self.certEdit.get_text().strip() ) == 0 :
-                        return "SSL enabled, cert file is empty"
+                    if( len( self.keyEdit.get_text().strip() ) == 0 or
+                        len( self.certEdit.get_text().strip() ) == 0 ):
+                        self.DisplayError( "Warning: SSL enabled but key/cert file is empty." )
+
                 if interf.authCheck.props.active and self.IsKrb5Enabled():
                     if len( self.realmEdit.get_text().strip() ) == 0 :
                         return "Kerberos enabled, but realm is empty"
@@ -4026,6 +4027,14 @@ EOF
                         if oElem[ 'EnableSSL' ] == 'true' :
                             bSSL2 = True
                             break
+            if bSSL2:
+                try:
+                    if len( sslFiles[ 'KeyFile' ].strip() ) == 0:
+                        raise Exception( "Warning key file empty" )
+                    if len( sslFiles[ 'CertFile' ].strip() ) == 0:
+                        raise Exception( "Warning cert file empty" )
+                except:
+                    bSSL2 = False
 
             ret = self.CopyInstPkg( strKeyPath, curDir )
             if ret < 0:
