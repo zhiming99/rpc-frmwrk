@@ -201,8 +201,12 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 if( oAuth[ "AuthMech"] === "SimpAuth" ||
                     oAuth[ "AuthMech" ] === "OAuth2" )
                 {
-                    globalThis.g_bAuth = true
-                    globalThis.g_strAuthMech = oAuth[ "AuthMech" ]
+                    if( !globalThis.g_bAuth )
+                    {
+                        globalThis.g_bAuth = true
+                        globalThis.g_strAuthMech = oAuth[ "AuthMech" ]
+                        globalThis.g_strLoginResult = ""
+                    }
                 }
             }
 
@@ -376,7 +380,8 @@ exports.CInterfaceProxy = class CInterfaceProxy
             if(ERROR(retval))
                 return Promise.reject(retval)
             if( globalThis.g_bAuth &&
-                globalThis.g_strAuthMech === "SimpAuth" )
+                globalThis.g_strAuthMech === "SimpAuth" &&
+                globalThis.g_strLoginResult === "")
             {
                 return this.GetLoginCredentialFromInput().then((oCred)=>{
                     if( oCred === null )
@@ -425,8 +430,13 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 })
             }
 
+            if( g_bAuth &&globalThis.g_strLoginResult === "failure" )
+                return Promise.reject( -errno.EFAULT )
+
             return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
-                if( globalThis.g_bAuth )
+                if( globalThis.g_bAuth &&
+                    globalThis.g_strAuthMech === "OAuth2" &&
+                    globalThis.g_strLoginResult === "" )
                     return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
                         if( ERROR( retval ) )
                             return Promise.resolve( retval )
