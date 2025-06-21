@@ -58,11 +58,14 @@ DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
-if grep -i '\<NAME="Debian' /etc/os-release; then
-    force_inst='--break-system-packages'
-else
-    force_inst=''
-fi
+force_inst=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
 
 pushd ${DEBDIR}
 if [ "x$BUILD_PYTHON" == "xyes" ]; then
