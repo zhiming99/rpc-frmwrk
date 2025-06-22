@@ -33,13 +33,17 @@ else
 fi
 
 # Determine the pip3 install command
-pipoptions=
-if [[ "$PLATFORM" == "Ubuntu" || "$PLATFORM" == "Debian" ]]; then
-    pipoptions="--break-system-packages"
-fi
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
 
-PIP_INSTALL_CMD="pip3 install $pipoptions /usr/lib/rpcf/app*.whl"
-PIP_UNINST_CMD="pip3 uninstall -y $pipoptions appmancli"
+PIP_INSTALL_CMD="pip3 install $force_update --force-reinstall /usr/lib/rpcf/app*.whl"
+PIP_UNINST_CMD="pip3 uninstall -y $force_update appmancli"
 
 # Create the directory structure for the Debian package
 DEB_DIR="${PACKAGE_NAME}_${VERSION}"

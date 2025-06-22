@@ -58,7 +58,7 @@ DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
-force_inst=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
 if [ "x${os_name}" == "xDebian" ]; then \
     os_version=$(cat /etc/issue | awk '{print $3}');\
     echo $(if ((${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
@@ -72,10 +72,10 @@ if [ "x$BUILD_PYTHON" == "xyes" ]; then
 cat << EOF >> ./postinst1
 cd XXXX/${PACKAGE_NAME}
 pypkg=\$(compgen -G "rpcf*whl")
-pip3 install \$pypkg ${force_inst}
+pip3 install \$pypkg ${force_update} --force-reinstall
 EOF
 cat << EOF >> ./postrm1
-pip3 uninstall -y ${PACKAGE_NAME} ${force_inst}
+pip3 uninstall -y ${PACKAGE_NAME} ${force_update}
 EOF
 fi
 

@@ -3749,7 +3749,7 @@ EOF
         finally:
             os.chdir( curdir )
 
-    def AddInstallPackages( self, destPkg )->str :
+    def AddInstallPackages( self, destPkg, bServer : bool )->str :
         cmdline = "" 
         try:
             strPath = self.pkgEditBox.get_text()
@@ -3762,23 +3762,46 @@ EOF
             strCmd = "touch " + strDist + ";"
             strCmd += "tar rf " + destPkg + " " + strDist + ";"
             strCmd += "tar rf " + destPkg + " -C " + strPath + " "
+            appmoncli = ""
+            oinit = ""
             if strDist == 'debian' :
-                 mainPkg = self.GetNewerFile(
+                mainPkg = self.GetNewerFile(
                      strPath, 'rpcf_*.deb', False )
-                 devPkg = self.GetNewerFile(
+                devPkg = self.GetNewerFile(
                     strPath, 'rpcf-dev_*.deb', False )
+                if bServer :
+                    appmoncli = self.GetNewerFile(
+                        strPath, 'python3-appmoncli*.deb', False )
+                else:
+                    oinit = self.GetNewerFile(
+                        strPath, 'python3-oinit*.deb', False )
             elif strDist == 'fedora' :     
-                 devPkg = self.GetNewerFile(
+                devPkg = self.GetNewerFile(
                     strPath, 'rpcf-devel-[0-9]*.rpm', True )
-                 mainPkg = self.GetNewerFile(
+                mainPkg = self.GetNewerFile(
                     strPath, 'rpcf-[0-9]*.rpm', True )
+                if bServer :
+                    appmoncli = self.GetNewerFile(
+                        strPath, 'python3-appmoncli*.rpm', False )
+                else:
+                    oinit = self.GetNewerFile(
+                        strPath, 'python3-oinit*.rpm', False )
 
             if len( mainPkg ) == 0 or len( devPkg ) == 0:
                 return cmdline
 
-            strCmd += mainPkg + " " + devPkg + ";"
+            strCmd += mainPkg + " " + devPkg 
+            if len( appmoncli ) > 0 :
+                strCmd += " " + appmoncli
+            if len( oinit ) > 0:
+                strCmd += " " + oinit
+            strCmd += ";"
             strCmd += ( "md5sum " + strPath + "/" + mainPkg + " "
                 + strPath + "/" + devPkg + ";")
+            if len( appmoncli ) > 0:
+                strCmd += "md5sum " + strPath + "/" + appmoncli + ";"
+            if len( oinit ) > 0:
+                strCmd += "md5sum " + strPath + "/" + oinit + ";"
             strCmd += "rm " + strDist + ";"
             cmdline = strCmd
         except :
@@ -3887,7 +3910,7 @@ EOF
             cfgDir = os.path.dirname( cfgPath )
             cmdLine = 'tar rf ' + destPkg + " -C " + cfgDir + " initcfg.json;"
 
-            cmdLine += self.AddInstallPackages( destPkg )
+            cmdLine += self.AddInstallPackages( destPkg, bServer )
 
             bAuthFile = False
             ret = self.GenAuthInstFiles(
@@ -4110,7 +4133,7 @@ EOF
                 fp.close()
 
                 cmdline = "tar rf " + obj.pkgName + " -C " + curDir + " initcfg.json instcfg.sh;"
-                cmdline += self.AddInstallPackages( obj.pkgName )
+                cmdline += self.AddInstallPackages( obj.pkgName, obj.isServer )
                 bHasKey = False
                 if bSSL and bSSL2:
                     cmdline += "touch " + curDir + "/USESSL;"

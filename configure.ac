@@ -90,7 +90,7 @@ case $enable_python in
     yes)
     AC_CHECK_PROG([python3], python3, yes)
     AC_CHECK_PROG([sipbuild], [sip-build], yes)
-    AC_CHECK_PROG([sip4], [sip], yes)
+    AC_CHECK_PROG([sip], [sip], yes)
     AS_IF( [ test x$ac_cv_prog_python3 = xno ],
         [ AC_MSG_ERROR(["******Feature 'python' requires python3, but not be found, configure will abort.******"]) ],
         [ test x$ac_cv_prog_sip = xno -a  x$ac_cv_prog_sipbuild = xno ],
