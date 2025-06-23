@@ -33,7 +33,7 @@ function checkProxyState(){
         console.log( "Waiting RPC connection ready..." );
     }else if( globalThis.oProxy === null ){
         console.log( "RPC connection is shutdown abnormally..." );
-    }else if( globalThis.oProxy.m_iState === 5 ){
+    }else if( globalThis.oProxy.m_iState === 0 ){
         console.log( "RPC connection is down..." );
         globalThis.oProxy = null;
     }else{

@@ -3200,7 +3200,7 @@ gint32 CExportJsSampleHtml::Output()
         BLOCK_CLOSE;
         if( vecSvcs.size() == 1 )
         {
-            CCOUT << "else if( globalThis." << strVar << ".m_iState === 5 )";
+            CCOUT << "else if( globalThis." << strVar << ".m_iState === 0 )";
             BLOCK_OPEN;
             CCOUT << "console.log( \"RPC connection is down...\" );";
             NEW_LINE;
