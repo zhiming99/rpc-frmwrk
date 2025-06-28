@@ -52,7 +52,7 @@ mkdir -p %{buildroot}/usr/lib/rpcf
 cp %{_sourcedir}/app*.whl %{buildroot}/usr/lib/rpcf
 
 %post
-pip3 install /usr/lib/rpcf/app*.whl
+pip3 install /usr/lib/rpcf/app*.whl --force-reinstall
 
 %preun
 pip3 uninstall -y $PACKAGE_NAME

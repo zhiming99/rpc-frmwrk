@@ -24,7 +24,7 @@ all:
 	if [ "x$(SIPVER)" == "x5" ]; then \
         FUSE3="$(LINK_FUSE)" bash gentoml.sh $(libdir);\
 		sip-build --verbose --build-dir ./sipbuild; \
-        rm rpcf/$(PYTHON_EXT1)*;\
+        rm -f rpcf/rpcbase*.so*;\
 		sofile=$$(find ./sipbuild -name $(PYTHON_EXT1));\
         cp `pwd`/$${sofile} rpcf/$(PYTHON_EXT) ;\
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
@@ -39,7 +39,7 @@ all:
 		export SYSROOT=$(with_sysroot); export DBGBUILD=0;\
         if grep 'CPPFLAGS.*\-O0 \-ggdb \-DDEBUG' Makefile > /dev/null; then export DBGBUILD=1;fi;\
         python3 build-4.9.py $(libdir); \
-        rm rpcf/$(PYTHON_EXT1)*;\
+        rm -f rpcf/rpcbase*.so*;\
         cp `pwd`/sip4build/rpcbase.so rpcf/$(PYTHON_EXT); \
 		cd rpcf; ln -s $(PYTHON_EXT) $(PYTHON_EXT1);\
     fi

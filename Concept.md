@@ -36,9 +36,8 @@ same set of interfaces.
 #### Security over the Network
 
 RPC-frmwrk supports SSL connection or WSS connection between the peer over
-the internet. And RPC-frmwrk also supports the Kerberos authentication over
-SSL. Besides authentication, The auth module adds even more to security by
-signing or encrypting all the outbound messages. Also, the server can
+the internet. And RPC-frmwrk also supports the Kerberos, OAuth2, SimpAuth(password)
+authentication mechanisms over SSL. Besides authentication. Also, the server can
 filter the individual messages with the auth infomation for more precise
 access control.
 

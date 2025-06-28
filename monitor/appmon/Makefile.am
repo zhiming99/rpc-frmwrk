@@ -4,13 +4,14 @@ include_ipcdir=$(top_srcdir)/ipc
 appmon_PROGRAMS=appmonsvr
 appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h monconst.h \
 SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h \
-appmancli.cpp
+appmancli.cpp appmonsvr.1
 if ENABLE_FUSE3
 appmonsvr_SOURCES+=monfuse.cpp
 endif
 #appmoncli_SOURCES=maincli.cpp AppMonitorcli.cpp  monconst.h\
 #SimpleAuthcli.cpp AppManagercli.cpp 
 
+man_MANS=appmonsvr.1
 appmonsvr_LDADD= ./libappmon.a \
  $(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la \
 ../registry/libregfs.la ../../ipc/libipc.la $(COMMON_LINK_FUSE3) \
@@ -71,7 +72,7 @@ $(headers): appmon.ridl ../registry/regfsif.ridl
 appmon.ridl:
 	@bexit=0;for i in $(sources) $(headers);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
     if((bexit==0));then exit 0;fi; \
-    if ! which ridlc > /dev/null; then \
+    if true; then \
         if [ ! -f ./mktpl ];then \
             cp ../../ridl/{mktpl,mktplsvr,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
         fi;\
