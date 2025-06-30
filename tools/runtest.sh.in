@@ -73,7 +73,10 @@ elif [ "$1" == "1" ]; then
     kill -9 `pidof actcsvrtst`
     kill -9 `pidof prsvrtst`
     kill -9 `pidof stmsvrtst`
+    kill -SIGINT `pidof rpcf_logger`
     
+    echo restart logger...
+    ${bin_dir}/rpcf_logger -dO $logger;
     echo restart rpcrouters...
     cat ${etc_dir}/driver.json
     ${bin_dir}/rpcrouter -gr 2 $auth >> $logfile &
