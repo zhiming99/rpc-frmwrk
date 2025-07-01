@@ -81,7 +81,7 @@ elif [ "$1" == "1" ]; then
     cat ${etc_dir}/driver.json
     ${bin_dir}/rpcrouter -gr 2 $auth >> $logfile &
     if [ -d ./reqfwdr ]; then pushd ./reqfwdr; fi
-    ${bin_dir}/rpcrouter -r 1 $auth >> $logfile &
+    ${bin_dir}/rpcrouter -gr 1 $auth >> $logfile &
     cur_path=`basename $(pwd)`
     if [ $cur_path == "reqfwdr" ]; then popd; fi
     pwd
