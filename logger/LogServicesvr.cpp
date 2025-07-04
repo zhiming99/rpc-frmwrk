@@ -206,15 +206,17 @@ gint32 CAsyncLoggerAMCallbacks::GetPointValuesToInit(
     }
     do{
         okv.strKey = S_CMDLINE;
-        stdstr strModPath;
-        ret = GetModulePath( strModPath );
+        stdstr strCmdLine;
+        CRpcServices* pSvc = pIf;
+        CIoManager* pMgr = pSvc->GetIoMgr();
+        ret = pMgr->GetCmdLineOpt(
+            propCmdLine, strCmdLine );
         if( ERROR( ret ) )
             break;
-        strModPath += "/rpcf_logger -do";
         BufPtr pBuf( true );
         ret = pBuf->Append(
-            strModPath.c_str(),
-            strModPath.size() );
+            strCmdLine.c_str(),
+            strCmdLine.size() );
         if( ERROR( ret ) )
             break;
         okv.oValue = pBuf;
@@ -239,7 +241,6 @@ gint32 CAsyncLoggerAMCallbacks::GetPointValuesToInit(
         }
 
         okv.strKey = O_UPTIME;
-        CRpcServices* pSvc = pIf;
         timespec tv = pSvc->GetStartTime();
         okv.oValue = ( guint32 )tv.tv_sec;
         veckv.push_back( okv );
