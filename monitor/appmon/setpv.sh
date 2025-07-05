@@ -60,16 +60,22 @@ fi
 if ((bFile==1)); then
     if [ "$dt" != "blob" ] && [ "$dt" != "bytearray" ]; then
         echo Error '-f' is only valid for 'blob' or 'bytearray'
+        popd > /dev/null
+        undo_check_appreg_mount
         exit 22
     fi
     if [ ! -f $val ]; then
         echo Error "$val" is not a valid file
+        popd > /dev/null
+        undo_check_appreg_mount
         exit 22
     fi
 
     fileSize=`stat -c %s $val`
     if (( fileSize >= 8192 * 1024 ));then
         echo Error file is beyond 8MB, too big to store
+        popd > /dev/null
+        undo_check_appreg_mount
         exit 7
     fi
 fi
@@ -90,7 +96,4 @@ fi
 
 
 popd > /dev/null
-if (( $mt == 2 )); then
-    umount $rootdir
-fi
-
+undo_check_appreg_mount

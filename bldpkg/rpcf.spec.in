@@ -74,8 +74,10 @@ make install DESTDIR=$RPM_BUILD_ROOT
 @PYTHON_RPMFILES@
 %{_bindir}/rpcrouter
 %{_bindir}/rpcf_logger
+%{_bindir}/rpcf_sendlog
 %{_bindir}/regfsmnt
 %{_bindir}/appmon*
+%{_bindir}/rpcfctl
 %{_bindir}/rpcf/apptimer
 %{_bindir}/rpcf/sinit
 %{_sysconfdir}/rpcf/driver.json

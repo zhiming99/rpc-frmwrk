@@ -324,7 +324,13 @@ struct IAsyncAMCallbacks
 
 struct CAsyncStdAMCallbacks : public IAsyncAMCallbacks
 {
+    typedef IAsyncAMCallbacks super;
+
     gint32 GetPointValuesToUpdate(
+        InterfPtr& pIf,
+        std::vector< KeyValue >& veckv ) override;
+
+    gint32 GetPointValuesToInit(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override;
 

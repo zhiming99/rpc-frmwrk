@@ -1,9 +1,9 @@
 #!/bin/bash
 
 _script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
-_pubfuncs=${script_dir}/pubfuncs.sh
-rpcfshow=${script_dir}/rpcfshow.sh
-showapp=${script_dir}/showapp.sh
+_pubfuncs=${_script_dir}/pubfuncs.sh
+rpcfshow=${_script_dir}/rpcfshow.sh
+showapp=${_script_dir}/showapp.sh
 source $_pubfuncs
 
 function wait_mount()
@@ -24,6 +24,15 @@ function wait_mount()
         fi
     done
     return 0
+}
+
+function undo_check_appreg_mount()
+{
+    base=$HOME/.rpcf
+    if (( $mt==2 )); then
+        umount ${rootdir}
+        rmdir ${rootdir}
+    fi
 }
 
 function check_appreg_mount()
@@ -63,6 +72,7 @@ function check_appreg_mount()
             return 0
         fi
     elif (( $mt == 0 ));then
+        # there could be several mount point
         mp+=" invalidpath"
         for rootdir in $mp; do
             if [ -d "$rootdir/apps" ]; then
@@ -195,7 +205,7 @@ function jsonval()
         return 0
         ;;
     "blob" | "bytearray") _t=10
-        echo -n "{\"t\":$_t,\"v\":\"$_v\"}"
+        echo -n "$_v"
         return 0
         ;;
     *)
@@ -256,6 +266,7 @@ function add_point()
     python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_dt}" datatype > /dev/null
     touch unit
     touch ptype
+    touch point_flags
 
     if [ "$_pttype" == 'output' ]; then
         python3 $updattr -u 'user.regfs' "$(jsonval i 0 )" ptype > /dev/null
@@ -267,6 +278,7 @@ function add_point()
         python3 $updattr -u 'user.regfs' "$(jsonval i 2 )" ptype > /dev/null
         echo setpoint > ptype
     fi
+    python3 $updattr -u 'user.regfs' "$(jsonval i 0 )" point_flags > /dev/null
 
     if [ $_pttype != 'setpoint' ]; then
         mkdir ptrs || true
@@ -634,7 +646,8 @@ function rm_point()
     arrBasePts=( "rpt_timer" "obj_count" "max_qps" "cur_qps"
     "max_streams_per_session" "pending_tasks" "restart" "cmdline" "pid" "working_dir" "uptime" 
     "rx_bytes" "tx_bytes" "failure_count" "resp_count" "req_count" "vmsize_kb"
-    "cpu_load" "open_files" "conn_count" )
+    "cpu_load" "open_files" "conn_count" "offline_times" "rx_bytes_total"
+    "tx_bytes_total" "uptime_total" "online_notify" "offline_notify" )
 
     if [[ " ${arrBasePts[*]} " =~ [[:space:]]${__ptname}[[:space:]] ]]; then
         echo Error point "$__ptname" is baseline point, and cannot be removed
@@ -957,10 +970,15 @@ function add_stdapp()
     add_point $_instname rpt_timer input i
     set_attr_value $_instname rpt_timer unit "$(jsonval 'i' 0 )" i
     add_point $_instname obj_count output i
+    set_attr_value $_instname obj_count value "$(jsonval 'i' 0 )" i
     add_point $_instname max_qps setpoint i
+    set_attr_value $_instname max_qps value "$(jsonval 'i' 0 )" i
     add_point $_instname cur_qps output i
+    set_attr_value $_instname cur_qps value "$(jsonval 'i' 0 )" i
     add_point $_instname max_streams_per_session setpoint i
-    add_point $_instname pending_tasks  output i
+    set_attr_value $_instname max_streams_per_session value "$(jsonval 'i' 0 )" i
+    add_point $_instname pending_tasks output i
+    set_attr_value $_instname pending_tasks value "$(jsonval 'i' 0 )" i
     add_point $_instname restart input i
     set_attr_value $_instname restart pulse "$(jsonval 'i' 1 )" i
     add_point $_instname cmdline setpoint blob
@@ -968,23 +986,51 @@ function add_stdapp()
     add_point $_instname working_dir  setpoint blob
 
     add_point $_instname rx_bytes output qword
+    set_attr_value $_instname rx_bytes value "$(jsonval 'q' 0 )" q
     add_point $_instname tx_bytes output qword
+    set_attr_value $_instname tx_bytes value "$(jsonval 'q' 0 )" q
     add_point $_instname failure_count output i
+    set_attr_value $_instname failure_count value "$(jsonval 'i' 0 )" i
     add_point $_instname resp_count output i
+    set_attr_value $_instname resp_count value "$(jsonval 'i' 0 )" i
     add_point $_instname req_count output i
+    set_attr_value $_instname req_count value "$(jsonval 'i' 0 )" i
     add_point $_instname vmsize_kb  output q
     add_point $_instname cpu_load  output f
     add_point $_instname open_files  output i
+    set_attr_value $_instname open_files value "$(jsonval 'i' 0 )" i
     add_point $_instname conn_count  output i
+    set_attr_value $_instname conn_count value "$(jsonval 'i' 0 )" i
 
     add_point $_instname uptime output i
     set_attr_value $_instname uptime unit "$(jsonval 's' 'sec' )" s
+
+    #online_notify sends a json object
+    add_point $_instname online_notify output s
+    #flags 1 : no storaage for this point
+    set_attr_value $_instname online_notify point_flags "$(jsonval 'i' 1 )" i
+    #online_notify sends a json object
+    add_point $_instname offline_notify output s
+    set_attr_value $_instname offline_notify point_flags "$(jsonval 'i' 1 )" i
+
+    add_point $_instname offline_times setpoint i
+    set_attr_value $_instname offline_times value "$(jsonval 'i' 0 )" i
+    add_point $_instname uptime_total setpoint i
+    set_attr_value $_instname uptime_total value "$(jsonval 'i' 0 )" i
+    add_point $_instname rx_bytes_total setpoint qword
+    set_attr_value $_instname rx_bytes_total value "$(jsonval 'q' 0 )" q
+    add_point $_instname tx_bytes_total setpoint qword
+    set_attr_value $_instname tx_bytes_total value "$(jsonval 'q' 0 )" q
 
     chown $_uid:$_gid -R ./apps/$_instname
     find ./apps/$_instname -type f -exec chmod ug+rw,o+r '{}' ';'
     find ./apps/$_instname -type d -exec chmod ug+rwx,o+rx '{}' ';'
     chmod -R o-rwx ./apps/$_instname/points/restart
     chmod -R o+w ./apps/$_instname/notify_streams
+    if [[ "x$_instname" == "xtimer1" ]]; then
+        return 0
+    fi
     add_link timer1 clock1 $_instname rpt_timer
+    add_link $_instname offline_notify timer1 offline_action
     return 0
 }

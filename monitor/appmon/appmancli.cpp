@@ -39,6 +39,8 @@ static std::vector< InterfPtr > s_vecIfs;
 
 struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
 {
+    typedef CAsyncStdAMCallbacks super;
+
     gint32 GetPointValuesToUpdate(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override
@@ -165,10 +167,6 @@ struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
                 veckv.push_back( okv );
             }
 
-            okv.strKey = O_PID;
-            okv.oValue = ( guint32 )getpid();
-            veckv.push_back( okv );
-
             okv.strKey = S_MAX_QPS;
             ret = pSvr->GetProperty(
                 propQps, okv.oValue );
@@ -181,79 +179,9 @@ struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
             if( SUCCEEDED( ret ) )
                 veckv.push_back( okv );
 
-            okv.strKey = O_WORKING_DIR;
-            char szPath[PATH_MAX];
-            if( getcwd( szPath, sizeof(szPath)) != nullptr)
-            {        
-                BufPtr pBuf( true );
-                ret = pBuf->Append( szPath,
-                    strlen( szPath ) );
-                if( SUCCEEDED( ret ) )
-                {
-                    okv.oValue = pBuf;
-                    veckv.push_back( okv );
-                }
-            }
             ret = 0;
         }while( 0 );
         return ret;
-    }
-
-    gint32 GetPointValuesToInit(
-        InterfPtr& pIf,
-        std::vector< KeyValue >& veckv ) override
-    {
-        gint32 ret = 0;
-        KeyValue okv;
-        okv.strKey = O_WORKING_DIR;
-        char szPath[PATH_MAX];
-        if( getcwd( szPath, sizeof(szPath)) != nullptr)
-        {        
-            BufPtr pBuf( true );
-            ret = pBuf->Append( szPath,
-                strlen( szPath ) );
-            if( SUCCEEDED( ret ) )
-            {
-                okv.oValue = pBuf;
-                veckv.push_back( okv );
-            }
-        }
-        do{
-            okv.strKey = S_CMDLINE;
-            BufPtr pBuf( true );
-            ret = pBuf->Append( g_strCmd.c_str(),
-                g_strCmd.size() );
-            if( ERROR( ret ) )
-                break;
-            okv.oValue = pBuf;
-            veckv.push_back( okv );
-
-            okv.strKey = O_PID;
-            okv.oValue = ( guint32 )getpid();
-            veckv.push_back( okv );
-
-            okv.strKey = O_WORKING_DIR;
-            char szPath[PATH_MAX];
-            if( getcwd( szPath, sizeof(szPath)) != nullptr)
-            {        
-                BufPtr pBuf( true );
-                ret = pBuf->Append( szPath,
-                    strlen( szPath ) );
-                if( SUCCEEDED( ret ) )
-                {
-                    okv.oValue = pBuf;
-                    veckv.push_back( okv );
-                }
-            }
-
-            okv.strKey = O_UPTIME;
-            CRpcServices* pSvc = pIf;
-            timespec tv = pSvc->GetStartTime();
-            okv.oValue = ( guint32 )tv.tv_sec;
-            veckv.push_back( okv );
-
-        }while( 0 );
-        return 0;
     }
 };
 

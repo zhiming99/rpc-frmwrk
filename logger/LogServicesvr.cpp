@@ -181,72 +181,28 @@ gint32 CAsyncLoggerAMCallbacks::GetPointValuesToUpdate(
             okv.oValue = dwCount;
             veckv.push_back( okv );
         }
+
+        okv.strKey = O_UPTIME;
+        timespec ts = pSvr->GetStartTime();
+        timespec ts2;
+        ret = clock_gettime( CLOCK_REALTIME, &ts2 );
+        if( SUCCEEDED( ret ) )
+        {
+            guint32 dwUptime =
+                ts2.tv_sec - ts.tv_sec;
+            okv.oValue = dwUptime;
+            veckv.push_back( okv );
+        }
         ret = 0;
     }while( 0 );
     return ret;
 }
+
 gint32 CAsyncLoggerAMCallbacks::GetPointValuesToInit(
     InterfPtr& pIf,
     std::vector< KeyValue >& veckv )
 {
-    gint32 ret = 0;
-    KeyValue okv;
-    okv.strKey = O_WORKING_DIR;
-    char szPath[PATH_MAX];
-    if( getcwd( szPath, sizeof(szPath)) != nullptr)
-    {        
-        BufPtr pBuf( true );
-        ret = pBuf->Append( szPath,
-            strlen( szPath ) );
-        if( SUCCEEDED( ret ) )
-        {
-            okv.oValue = pBuf;
-            veckv.push_back( okv );
-        }
-    }
-    do{
-        okv.strKey = S_CMDLINE;
-        stdstr strCmdLine;
-        CRpcServices* pSvc = pIf;
-        CIoManager* pMgr = pSvc->GetIoMgr();
-        ret = pMgr->GetCmdLineOpt(
-            propCmdLine, strCmdLine );
-        if( ERROR( ret ) )
-            break;
-        BufPtr pBuf( true );
-        ret = pBuf->Append(
-            strCmdLine.c_str(),
-            strCmdLine.size() );
-        if( ERROR( ret ) )
-            break;
-        okv.oValue = pBuf;
-        veckv.push_back( okv );
-
-        okv.strKey = O_PID;
-        okv.oValue = ( guint32 )getpid();
-        veckv.push_back( okv );
-
-        okv.strKey = O_WORKING_DIR;
-        char szPath[PATH_MAX];
-        if( getcwd( szPath, sizeof(szPath)) != nullptr)
-        {        
-            BufPtr pBuf( true );
-            ret = pBuf->Append( szPath,
-                strlen( szPath ) );
-            if( SUCCEEDED( ret ) )
-            {
-                okv.oValue = pBuf;
-                veckv.push_back( okv );
-            }
-        }
-
-        okv.strKey = O_UPTIME;
-        timespec tv = pSvc->GetStartTime();
-        okv.oValue = ( guint32 )tv.tv_sec;
-        veckv.push_back( okv );
-
-    }while( 0 );
-    return 0;
+    return super::GetPointValuesToInit( pIf, veckv );
 }
 
 }

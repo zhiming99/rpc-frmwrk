@@ -7,7 +7,8 @@ if ENABLE_FUSE3
 rpcrouter_LDADD+=-L$(top_srcdir)/fuse ../../fuse/libfuseif.la
 endif
 
-rpcrouter_LDADD+=../librpc.la ../../ipc/libipc.la $(COMMON_LINK) \
+rpcrouter_LDADD+=$(top_srcdir)/monitor/client/cpp/appmancli/libappmancli.la \
+ ../librpc.la ../../ipc/libipc.la $(COMMON_LINK) \
  ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc -L$(top_srcdir)/rpc \
  -L$(top_srcdir)/3rd_party 

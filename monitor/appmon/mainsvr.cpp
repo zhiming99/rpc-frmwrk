@@ -423,10 +423,11 @@ static void Usage( const char* szName )
 {
     fprintf( stderr,
         "Usage: %s [OPTIONS] <mount point> \n"
-        "\t [ -d to run as a daemon ]\n"
-        "\t [ -g send logs to log server ]\n"
+        "\t [ -d Run as a daemon ]\n"
+        "\t [ -g Send logs to log server ]\n"
         "\t [ -i FORMAT the app-reg file]\n"
-        "\t [ -u to enable fuse to dump debug information ]\n"
+        "\t [ -u Enable fuse to dump debug information ]\n"
+        "\t [ -l Search first the current directory for configuration files ]\n"
         "\t [ -h this help ]\n", szName );
 }
 

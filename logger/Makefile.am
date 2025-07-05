@@ -33,3 +33,12 @@ liblogclidir=$(includedir)/rpcf/ipc
 
 rpcf_logger_LDFLAGS=-rdynamic
 
+rpcf_sendlog_PROGRAMS=rpcf_sendlog
+rpcf_sendlog_SOURCES=maincli.cpp
+rpcf_sendlog_LDADD=./liblogcli.la ../ipc/libipc.la $(COMMON_LINK) \
+ ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
+ -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \
+ -L$(top_srcdir)/3rd_party
+rpcf_sendlogdir=$(bindir)
+rpcf_sendlog_CPPFLAGS= -I$(top_srcdir)/include -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) -I$(top_srcdir)/monitor/client/cpp/appmancli
+rpcf_sendlog_LDFLAGS=-rdynamic

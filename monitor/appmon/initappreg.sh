@@ -73,8 +73,6 @@ if [ -f appreg.dat ]; then
        if [ "x$answer" == "xy" ] || [ "x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
            mv appreg.dat appreg.dat.bak
            regfsmnt -i ./appreg.dat || exit $?
-       else
-           exit 0
        fi
     else
        mv appreg.dat appreg.dat.bak
@@ -88,6 +86,7 @@ regfsmnt -d ./appreg.dat ./testmnt
 
 source $appfuncs
 if ! wait_mount ./testmnt 10;then
+    popd
     exit $?
 fi
 
@@ -96,90 +95,74 @@ pushd $approot > /dev/null
 
 mkdir -p apps
 
-echo adding application rpcrouter1
-add_application rpcrouter1
-
-add_point rpcrouter1 rpt_timer input i
-set_attr_value rpcrouter1 rpt_timer unit "$(jsonval 'i' 0 )" i
-
-#point contents are in json
-add_point rpcrouter1 sessions output blob
-add_point rpcrouter1 bdge_list output blob
-add_point rpcrouter1 bdge_proxy_list output blob
-add_point rpcrouter1 req_proxy_list output blob 
-
-add_point rpcrouter1 max_conn  setpoint i
-add_point rpcrouter1 conn_count  output i
-add_point rpcrouter1 max_recv_bps  setpoint i
-add_point rpcrouter1 max_send_bps  setpoint i
-add_point rpcrouter1 obj_count  output i
-add_point rpcrouter1 pending_tasks  output i
-add_point rpcrouter1 max_pending_tasks setpoint i
-add_point rpcrouter1 restart input i
-set_attr_value rpcrouter1 restart pulse "$(jsonval 'i' 1 )" i
-add_point rpcrouter1 cmdline setpoint blob
-add_point rpcrouter1 pid output i 
-add_point rpcrouter1 vmsize_kb output q
-add_point rpcrouter1 cpu_load output f
-add_point rpcrouter1 open_files  output i
-add_point rpcrouter1 working_dir  setpoint blob
-add_point rpcrouter1 rx_bytes output qword
-add_point rpcrouter1 tx_bytes output qword
-add_point rpcrouter1 uptime output i
-
-set_attr_value rpcrouter1 uptime unit "$(jsonval 's' 'sec' )" s
-set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -agor 2')" blob
-
-chown $uid:$gid -R ./apps/rpcrouter1
-find ./apps/rpcrouter1 -type f -exec chmod ug+rw,o+r '{}' ';'
-find ./apps/rpcrouter1 -type d -exec chmod ug+rwx,o+rx '{}' ';'
-chmod -R o-rwx ./apps/rpcrouter1/points/restart
-chmod -R o+w ./apps/rpcrouter1/notify_streams
-add_link timer1 clock1 rpcrouter1 rpt_timer
-
-echo adding application appmonsvr1
-add_stdapp appmonsvr1
-set_point_value appmonsvr1 cmdline "$(jsonval 'blob' 'appmonsvr -gd')" blob
-
-echo adding application loggersvr1
-add_stdapp loggersvr1
-set_point_value loggersvr1 cmdline "$(jsonval 'blob' 'rpcf_logger -od')" blob
-
 echo adding application timer1
 add_stdapp timer1
-set_point_value timer1 cmdline "$(jsonval 'blob' \"${script_dir}/apptimer -gd\")" blob
+set_point_value timer1 cmdline "$(jsonval 'blob' ${script_dir}/apptimer' -gd')" blob
+set_point_value timer1 working_dir  "$(jsonval 'blob' '/' )" blob
 add_point timer1 clock1 output i
 set_attr_value timer1 clock1 pulse "$(jsonval 'i' 1 )" i
 
 add_point timer1 interval1 setpoint i
-set_attr_value timer1 interval1 uint "$(jsonval 's' 'sec' )" s
+set_attr_value timer1 interval1 unit "$(jsonval 's' 'sec' )" s
 set_point_value timer1 interval1 "$(jsonval 'i' 10)" i
 
 add_point timer1 clock2 output i
 set_attr_value timer1 clock2 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval2 setpoint i
-set_attr_value timer1 interval2 uint "$(jsonval 's' 'sec' )" s
+set_attr_value timer1 interval2 unit "$(jsonval 's' 'sec' )" s
 set_point_value timer1 interval2 "$(jsonval 'i' 10)" i
 
 add_point timer1 clock3 output i
 set_attr_value timer1 clock3 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval3 setpoint i
-set_attr_value timer1 interval3 uint "$(jsonval 's' 'sec' )" s
+set_attr_value timer1 interval3 unit "$(jsonval 's' 'sec' )" s
 set_point_value timer1 interval3 "$(jsonval 'i' 10)" i
 
 add_point timer1 clock4 output i
 set_attr_value timer1 clock4 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval4 setpoint i
-set_attr_value timer1 interval4 uint "$(jsonval 's' 'sec' )" s
+set_attr_value timer1 interval4 unit "$(jsonval 's' 'sec' )" s
 set_point_value timer1 interval4 "$(jsonval 'i' 10)" i
+
+add_point timer1 offline_action input s
+set_attr_value timer1 offline_action point_flags "$(jsonval 'i' 1 )" i
 
 #add_point timer1 restart input i
 #set_attr_value timer1 restart pulse "$(jsonval 'i' 1 )" i
 #add_point timer1 cmdline setpoint s 
 #add_point timer1 pid output i 
 
+echo adding application rpcrouter1
+add_stdapp rpcrouter1
+
+#point contents are in json
+add_point rpcrouter1 sessions output blob
+add_point rpcrouter1 bdge_list output blob
+add_point rpcrouter1 bdge_proxy_list output blob
+add_point rpcrouter1 req_proxy_list output blob 
+add_point rpcrouter1 max_conn  setpoint i
+add_point rpcrouter1 max_recv_bps  setpoint i
+add_point rpcrouter1 max_send_bps  setpoint i
+add_point rpcrouter1 max_pending_tasks setpoint i
+
+set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -adgor 2')" blob
+set_point_value rpcrouter1 working_dir  "$(jsonval 'blob' '/' )" blob
+
+echo adding application appmonsvr1
+add_stdapp appmonsvr1
+set_point_value appmonsvr1 cmdline "$(jsonval 'blob' 'appmonsvr -gd '$HOME/.rpcf/appmonroot)" blob
+set_point_value appmonsvr1 working_dir  "$(jsonval 'blob' '/' )" blob
+
+echo adding application loggersvr1
+add_stdapp loggersvr1
+set_point_value loggersvr1 cmdline "$(jsonval 'blob' 'rpcf_logger -od')" blob
+set_point_value loggersvr1 working_dir  "$(jsonval 'blob' '/' )" blob
+
 #leaving approot
 popd > /dev/null
 fusermount3 -u ./testmnt
 rmdir ./testmnt
+if [ ! -d appmonroot ]; then
+    mkdir appmonroot
+fi
 popd > /dev/null

@@ -43,7 +43,10 @@ appmonsvr_CPPFLAGS+= -DFUSE3
 dist_appmonscr_SCRIPTS=initappreg.sh appfuncs.sh \
 addapp.sh addpoint.sh chmodapp.sh getpv.sh listapps.sh rmapp.sh rmlink.sh setpv.sh showpoint.sh addlink.sh chownapp.sh rmattr.sh rmpoint.sh setattr.sh showapp.sh
 
+dist_rpcfctl_SCRIPTS=rpcfctl
+
 appmonscrdir=$(bindir)/rpcf
+rpcfctldir=$(bindir)/
 endif
 
 #appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
