@@ -1,7 +1,7 @@
 mon_dir=$(top_srcdir)/monitor
 
 sinit_PROGRAMS=sinit
-sinit_SOURCES=sinit.cpp
+sinit_SOURCES=sinit.cpp sinit.1
 sinit_LDADD=librpcfenc.la $(mon_dir)/registry/libregfs.la $(top_srcdir)/ipc/libipc.la \
 $(top_srcdir)/combase/libcombase.la -lutils -lstdc++ -lpthread -ldl \
  -L$(top_srcdir)/3rd_party -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc
@@ -11,6 +11,7 @@ sinit_CPPFLAGS= -I. -I$(mon_dir)/registry -I$(top_srcdir)/include \
 sinit.cpp: $(lib_LTLIBRARIES)
 
 
+man_MANS=sinit.1
 sinit_LDFLAGS=-rdynamic -version-info @VERSION2@
 sinitdir=$(bindir)/rpcf
 

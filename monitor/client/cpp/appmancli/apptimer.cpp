@@ -9,6 +9,7 @@ using namespace rpcf;
 #include "fastrpc.h"
 #include "AppManagercli.h"
 #include "frmwrk.h"
+#include "monconst.h"
 
 ObjPtr g_pIoMgr;
 #include <signal.h>
@@ -17,6 +18,7 @@ ObjPtr g_pIoMgr;
 
 static std::atomic< bool > g_bExit( false );
 static bool g_bLogging = false;
+static stdstr g_strAppInst = "timer1";
 
 void SignalHandler( int signum )
 {
@@ -50,50 +52,173 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
         return ret;
    }
 
-    gint32 GetPointValuesToInit(
-        InterfPtr& pIf,
-        std::vector< KeyValue >& veckv ) override
+    gint32 SetPointValuesCallback( 
+        IConfigDb* context, gint32 iRet )
     {
+        if( context == nullptr )
+            return 0;
+        if( SUCCEEDED( iRet ) )
+            return 0;
+
         gint32 ret = 0;
         do{
-            KeyValue okv;
-            char szPath[PATH_MAX];
-            if( getcwd( szPath, sizeof(szPath)) != nullptr)
-            {        
-                okv.strKey = O_WORKING_DIR;
-                BufPtr pBuf( true );
-                ret = pBuf->Append( szPath,
-                    strlen( szPath ) );
-                if( SUCCEEDED( ret ) )
-                {
-                    okv.oValue = pBuf;
-                    veckv.push_back( okv );
-                }
+            InterfPtr pProxy;
+            ret = GetAppManagercli( pProxy );
+            if( ERROR( ret ) )
+                break;
+            CAppManager_CliImpl* pam = pProxy;
+            CCfgOpener oCtx( context );
+            stdstr strApp;
+            ret = oCtx.GetStrProp(
+                propObjName, strApp );
+            if( ERROR( ret ) )
+                break;
+            if( ERROR( iRet ) )
+            {
+                LOGWARN( pam->GetIoMgr(), iRet,
+                "Warning, failed to update '%s' "
+                "offline counters",
+                strApp.c_str() );
             }
-
-            okv.strKey = S_CMDLINE;
-            stdstr strModPath;
-            ret = GetModulePath( strModPath );
-            if( ERROR( ret ) )
-                break;
-            strModPath += "/apptimer -d";
-            BufPtr pBuf( true );
-            ret = pBuf->Append(
-                strModPath.c_str(),
-                strModPath.size() );
-            if( ERROR( ret ) )
-                break;
-            okv.oValue = pBuf;
-            veckv.push_back( okv );
-
         }while( 0 );
         return 0;
     }
 
-    gint32 SetPointValueCallback( 
-        IConfigDb* context, gint32 iRet )
-    { return 0; }
 
+    void CalOfflineCounters( 
+        const std::vector< KeyValue >& arrKvs,
+        std::vector< KeyValue >& vecKvs )
+    {
+        Variant rxb( ( guint64 )0 );
+        Variant txb( ( guint64 )0 );
+        Variant offl( ( guint32 )0 );
+        Variant uptime( ( guint32 )0 );
+        for( auto& elem : arrKvs )
+        {
+            if( elem.strKey == "rx_bytes" ||
+                elem.strKey == "rx_bytes_total" )
+            {
+                ( ( guint64& )rxb ) += ( guint64& )elem.oValue;
+                DebugPrint( 0, "rxb = %lx", ( guint64& )rxb );
+            }
+            else if( elem.strKey == "tx_bytes" ||
+                elem.strKey == "tx_bytes_total" )
+            {
+                ( ( guint64& )txb ) += ( guint64& )elem.oValue;
+                DebugPrint( 0, "txb = %lx", ( guint64& )txb );
+            }
+            else if( elem.strKey == "uptime_total" ||
+                elem.strKey == "uptime" )
+            {
+                ( ( guint32& )uptime ) += ( guint32& )elem.oValue;
+                DebugPrint( 0, "uptime = %x", ( guint32& )uptime );
+            }
+            else if( elem.strKey == "offline_times" )
+            {
+                ( ( guint32& )offl ) += ( guint32& )elem.oValue + 1;
+                DebugPrint( 0, "offline_times = %x", ( guint32& )uptime );
+            }
+        }
+        KeyValue okv;
+        okv.strKey = "rx_bytes_total";
+        okv.oValue = rxb;
+        vecKvs.emplace_back( okv );
+        okv.strKey = "tx_bytes_total";
+        okv.oValue = txb;
+        vecKvs.emplace_back( okv );
+        okv.strKey = "offline_times";
+        okv.oValue = offl;
+        vecKvs.emplace_back( okv );
+        okv.strKey = "uptime_total";
+        okv.oValue = uptime;
+        vecKvs.emplace_back( okv );
+    }
+
+    gint32 GetPointValuesCallback(
+        IConfigDb* context, gint32 iRet,
+        std::vector<KeyValue>& arrKeyVals /*[ In ]*/ )
+    {
+        if( ERROR( iRet ) )
+            return iRet;
+        gint32 ret = 0;
+        do{
+            InterfPtr pProxy;
+            ret = GetAppManagercli( pProxy );
+            if( ERROR( ret ) )
+                break;
+            CAppManager_CliImpl* pam = pProxy;
+
+            std::vector< KeyValue > vecKvs;
+            CalOfflineCounters(
+                arrKeyVals, vecKvs );
+            if( vecKvs.empty() )
+                break;
+
+            stdstr strApp;
+            CCfgOpener oCtx( context );
+            ret = oCtx.GetStrProp(
+                propObjName, strApp );
+            if( ERROR( ret ) )
+                break;
+
+            ret = pam->SetPointValues(
+                context, strApp, vecKvs );
+        }while( 0 );
+        return ret;
+    }
+
+
+    gint32 UpdateOfflineCounters(
+        const stdstr& strApp )
+    {
+        if( strApp.empty() )
+            return -EINVAL;
+        gint32 ret = 0;
+        do{
+            InterfPtr pProxy;
+            ret = GetAppManagercli( pProxy );
+            if( ERROR( ret ) )
+                break;
+            CAppManager_CliImpl* pam = pProxy;
+
+            std::vector< stdstr > vecPoints = {
+                "rx_bytes",
+                "rx_bytes_total",
+                "tx_bytes",
+                "tx_bytes_total",
+                "uptime",
+                "uptime_total",
+                "offline_times" };
+            std::vector< KeyValue > arrKvs, newKvs;
+            CCfgOpener oContext;
+            oContext.SetStrProp( propObjName, strApp );
+            ret = pam->GetPointValues(
+                oContext.GetCfg(),
+                strApp, vecPoints, arrKvs );
+            if( ret == STATUS_PENDING )
+                break;
+            if( ERROR( ret ) )
+                break;
+
+            if( arrKvs.empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+
+            CalOfflineCounters( arrKvs, newKvs );
+            if( newKvs.empty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            ret = pam->SetPointValues(
+                oContext.GetCfg(),
+                strApp, newKvs );
+
+        }while( 0 );
+        return ret;
+    }
     //RPC event handler 'OnPointChanged'
     gint32 OnPointChanged(
         IConfigDb* context, 
@@ -101,21 +226,29 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
         const Variant& value /*[ In ]*/ ) override
     {
         do{
-            if( strPtPath != "timer1/interval1" )
+            if( strPtPath ==
+                g_strAppInst + "/interval1" )
+            {
+                guint32 dwWaitSec = value;
+                if( dwWaitSec> 3600 )
+                    break;
+
+                g_dwInterval = dwWaitSec;
+                OutputMsg( 0,
+                    "interval changed to %d",
+                    dwWaitSec );
+            }
+            else if( strPtPath ==
+                g_strAppInst + "/offline_action" )
+            {
+                UpdateOfflineCounters( value );
+            }
+            else
             {
                 super::OnPointChanged(
                     context, strPtPath, value );
-                break;
             }
-            guint32 dwWaitSec = value;
-            if( dwWaitSec> 3600 )
-                break;
-
-            g_dwInterval = dwWaitSec;
-            OutputMsg( 0,
-                "interval changed to %d",
-                dwWaitSec );
-
+            break;
         }while( 0 );
         return 0;
     }
@@ -173,6 +306,7 @@ static void Usage( const char* szName )
     fprintf( stderr,
         "Usage: %s [OPTIONS] <mount point> \n"
         "\t [ -d to run as a daemon ]\n"
+        "\t [ -n <appinst name> specify an alternative apptimer instance, default 'timer1' ]\n"
         "\t [ -g send logs to log server ]\n"
         "\t [ -h this help ]\n", szName );
 }
@@ -185,7 +319,7 @@ int main( int argc, char** argv )
     do{
         bool bDaemon = false;
         int opt = 0;
-        while( ( opt = getopt( argc, argv, "hdg" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hdgn:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -193,6 +327,16 @@ int main( int argc, char** argv )
                     { bDaemon = true; break; }
                 case 'g':
                     { g_bLogging = true; break; }
+                case 'n':
+                    {
+                        g_strAppInst = optarg;
+                        if( !IsValidName( g_strAppInst ) )
+                        {
+                            printf( "Error, bad app instance name" );
+                            ret = -EINVAL;
+                        }
+                        break;
+                    }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
@@ -218,13 +362,18 @@ int main( int argc, char** argv )
         if( ERROR( ret ) )
             break;
 
+        stdstr strCmdLine(
+            SimpleCmdLine( argc, argv ) );
+        pMgr->SetCmdLineOpt(
+            propCmdLine, strCmdLine );
+
         InterfPtr pIf;
         PACBS pacbsIn( new CAsyncTimerCallbacks );
         InterfPtr pAppMan;
         // the pIf is just a placeholder, not for real.
         pIf = pMgr->GetSyncIf();
         ret = StartStdAppManCli(
-            pIf, "timer1", pAppMan, pacbsIn );
+            pIf, g_strAppInst, pAppMan, pacbsIn );
         if( ERROR( ret ) )
             break;
         
@@ -281,7 +430,7 @@ gint32 TimerLoop()
         oCfg.SetIntProp( propContext, 2 );
         Variant var( ( guint32 )1);
         pam->SetPointValue( oCfg.GetCfg(),
-            "timer1/clock1", var );
+            g_strAppInst + "/clock1", var );
         OutputMsg( 0, 
             "Info send clock1 %d",
             dwTicks );

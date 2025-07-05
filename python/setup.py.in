@@ -9,7 +9,7 @@ kwargs = {
       'name':'@PACKAGE_NAME@',
       'version':version,
       'description':'This package provides the interface library for Python script to interact with "rpc-frmwrk"',
-      'packages': find_packages(),
+      'packages': ["rpcf"],
       'author': 'zhiming',
       'author_email':'@PACKAGE_BUGREPORT@',
       'url':'@PACKAGE_URL@',

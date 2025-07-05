@@ -59,6 +59,7 @@ static std::string g_strMPoint;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
 static bool g_bMonitoring = false;
+static std::string g_strCmdLine;
 std::atomic< bool > g_bExit={false};
 std::atomic< bool > g_bMonOff ={false};
 
@@ -168,6 +169,9 @@ void CIfRouterTest::setUp()
                     break;
                 }
             }
+
+            pSvc->SetCmdLineOpt(
+                propCmdLine, g_strCmdLine );
 
             ret = pSvc->Start();
         }
@@ -435,6 +439,8 @@ int main( int argc, char** argv )
         {"monitor", no_argument, 0,  0 },
         {0, 0,  0,  0 } };
 
+    g_strCmdLine =
+        SimpleCmdLine( argc, argv );
     while( ( opt = getopt_long(
         argc, argv, "hr:adcfs:m:vglo",
         long_options, &option_index ) ) != -1 )

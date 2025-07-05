@@ -1,0 +1,261 @@
+#!/bin/bash
+
+script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
+if [ -f $script_dir/rpcf/showapp.sh ]; then
+    cmddir=$script_dir/rpcf 
+elif [ -f $script_dir/showapp.sh ]; then
+    cmddir=$script_dir
+else
+    echo Error cannot find rpc-frmwrk installation
+    exit 1
+fi
+
+#echo cmddir=$cmddir
+source ${cmddir}/appfuncs.sh
+
+# rpcfctl - rpc-frmwrk Control Utility
+# Usage: rpcfctl <start|stop|status|list> [appname]
+
+function usage() {
+    cat <<EOF
+Usage: $0 <command> [appname]
+
+Commands:
+    start <appname>      Start the application <appname>.
+                         Checks if the application is already running; if not, retrieves its command line and working directory from the registry and starts it in the background.
+
+    stop <appname>       Stop the application <appname>.
+                         Sends a SIGINT to the application's process for graceful shutdown.
+
+    kill <appname>       Forcefully stop the application <appname>.
+                         Sends a SIGKILL to the application's process, terminating it immediately.
+
+    restart <appname>    Restart the application <appname>.
+                         Stops the application if running, waits for it to exit, then starts it again.
+
+    status <appname>     Show status of the application <appname>.
+                         Displays whether the application is running and its current status.
+
+    list                 List all managed applications.
+                         Shows all applications registered in the app registry.
+
+    startall             Start all managed applications.
+                         Starts core services first, then all other registered applications.
+
+    stopall              Stop all managed applications.
+                         Stops all applications except core services first, then stops the core services.
+
+    restartall           Restart all managed applications.
+                         Stops all applications and then starts them again.
+
+    addapp <appname>     Add a new application <appname> to the app registry.
+
+    rmapp <appname>      Remove the application <appname> from the app registry.
+
+    init                 Initialize (clear) the app registry.
+                         WARNING: This will clear your app registry.
+
+    -h, --help           Show this help message and exit.
+
+EOF
+}
+
+if [[ $# -lt 1 ]]; then
+    usage
+    exit 1
+fi
+
+cmd="$1"
+shift
+
+function is_app_online()
+{
+    online=`bash $cmddir/showapp.sh $1 | grep 'status: online'`
+    if [[ "x$online" == "xstatus: online" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+case "$cmd" in
+    start)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'start'"
+            usage
+            exit 1
+        fi
+        appname="$1"
+        # TODO: Implement start logic
+        echo "Starting application: $appname"
+        if is_app_online $appname; then
+            echo "Error $appname is still running"
+            exit 1
+        fi
+        cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
+        working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
+        if [[ "x$cmdline" == "x" ]] || [[ "x$working_dir" == "x" ]]; then
+            echo "Error bad command line to start $appname"
+            exit 1
+        fi
+        if [ ! -d $working_dir ]; then
+            echo "Error bad working directory to start $appname"
+            exit 1
+        fi
+        cd $working_dir || exit 1
+        echo $cmdline
+        setsid -f $cmdline
+        ;;
+    stop)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'stop'"
+            usage
+            exit 1
+        fi
+        appname="$1"
+        # TODO: Implement stop logic
+        echo "Stopping application: $appname"
+        if ! is_app_online $appname; then
+            echo "Error $appname is already stopped"
+            exit 1
+        fi
+        if [[ "x$appname" == "xappmonsvr1" ]]; then
+            if check_appreg_mount; then
+                if [ -d ${rootdir}/../appreg ]; then
+                    rootdir=$(dirname $rootdir)
+                    fusermount3 -u ${rootdir}
+                    echo
+                    exit 0
+                fi
+                undo_check_appreg_mount
+            fi
+        fi
+        pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
+        if [[ "x$pid" != "x" ]]; then
+            kill -2 $pid
+        else
+            echo Error failed to stop $appname
+        fi
+        ;;
+    kill)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'stop'"
+            usage
+            exit 1
+        fi
+        appname="$1"
+        echo "Stopping application: $appname"
+        if ! is_app_online $appname; then
+            echo "Error $appname is already stopped"
+            exit 1
+        fi
+        pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
+        kill -9 $pid
+        ;;
+    restart)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'stop'"
+            usage
+            exit 1
+        fi
+        appname="$1"
+        if is_app_online $appname; then
+            pid=$(bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}')
+            if [[ "x$pid" != "x" ]]; then
+                kill -2 $pid
+            fi
+        fi
+        if [[ "x$pid" != "x" ]]; then
+            for ((i=0;i<10;i++)); do
+                if [[ -d /proc/$pid ]]; then
+                    echo waiting $appname to quit...
+                    sleep 1
+                    continue
+                fi
+                break
+            done
+            if [[ -d /proc/$pid ]];then
+                kill -9 $pid
+                sleep 1
+            fi
+        fi
+        bash $script_dir/rpcfctl start $appname
+        ;;
+    status)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'status'"
+            usage
+            exit 1
+        fi
+        appname="$1"
+        # TODO: Implement status logic
+        echo "Status of application: $appname"
+        bash $cmddir/showapp.sh $appname
+        ;;
+    list)
+        # TODO: Implement list logic
+        echo "Listing all managed applications"
+        bash $cmddir/listapps.sh
+        ;;
+    startall)
+        bash rpcfctl start appmonsvr1
+        bash rpcfctl start loggersvr1
+        bash rpcfctl start timer1
+        bash rpcfctl start rpcrouter1
+        if check_appreg_mount; then
+            pushd ${rootdir}/apps
+            arrApps=$(ls -d * )
+            for skip in appmonsvr1 timer1 loggersvr1 rpcrouter1; do
+                arrApps=$(echo "$arrApps" | tr ' ' '\n' | grep -vx "$skip" | tr '\n' ' ')
+            done
+            arrApps=$(echo "$arrApps") # Remove trailing spaces
+            for appName in $arrApps; do
+                if [ "x$appName" != "x" ]; then
+                    bash $script_dir/rpcfctl start $appName
+                fi
+            done
+            popd
+            undo_check_appreg_mount
+        fi
+        ;;
+    stopall)
+        if check_appreg_mount; then
+            pushd ${rootdir}/apps
+            arrApps=$(ls -d * )
+            for skip in appmonsvr1 timer1 loggersvr1 rpcrouter1; do
+                arrApps=$(echo "$arrApps" | tr ' ' '\n' | grep -vx "$skip" | tr '\n' ' ')
+            done
+            arrApps=$(echo "$arrApps") # Remove trailing spaces
+            for appName in $arrApps; do
+                if [ "x$appName" != "x" ]; then
+                    echo "Stopping application: $appName"
+                    bash $script_dir/rpcfctl stop $appName
+                fi
+            done
+            popd
+            undo_check_appreg_mount
+        fi
+        bash rpcfctl stop rpcrouter1
+        bash rpcfctl stop timer1
+        bash rpcfctl stop loggersvr1
+        bash rpcfctl stop appmonsvr1
+        ;;
+    restartall)
+        bash rpcfctl stopall
+        bash rpcfctl startall
+        ;;
+    addapp | add)
+        bash $cmddir/addapp.sh $1
+        ;;
+    rmapp | rm )
+        bash $cmddir/rmapp.sh $1
+        ;;
+    init)
+        echo Warning 'init' will clear your app registry
+        bash $cmddir/initappreg.sh
+        ;;
+    *)
+        echo "Unknown command: $cmd"
+        usage
+        exit 1
+        ;;
+esac

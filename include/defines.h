@@ -897,4 +897,6 @@ struct CProcessLock
     ~CProcessLock();
 };
 
+stdstr SimpleCmdLine(
+    int argc, char** argv );
 }

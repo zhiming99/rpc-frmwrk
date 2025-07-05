@@ -1430,4 +1430,18 @@ CProcessLock::~CProcessLock()
         unlink( m_strLockFile.c_str() ); 
 }
 
+stdstr SimpleCmdLine(
+    int argc, char** argv )
+{
+    stdstr strCmd;
+    for (int i = 0; i < argc; ++i)
+    {
+        strCmd += argv[i];
+        if (i < argc - 1)
+            strCmd += " ";
+    }
+    return strCmd;
 }
+
+}
+

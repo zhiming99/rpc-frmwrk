@@ -211,39 +211,7 @@ gint32 CAsyncAMCallbacks::GetPointValuesToInit(
     InterfPtr& pIf,
     std::vector< KeyValue >& veckv )
 {
-    gint32 ret = 0;
-    KeyValue okv;
-    okv.strKey = O_WORKING_DIR;
-    char szPath[PATH_MAX];
-    if( getcwd( szPath, sizeof(szPath)) != nullptr)
-    {        
-        BufPtr pBuf( true );
-        ret = pBuf->Append( szPath,
-            strlen( szPath ) );
-        if( SUCCEEDED( ret ) )
-        {
-            okv.oValue = pBuf;
-            veckv.push_back( okv );
-        }
-    }
-    do{
-        okv.strKey = S_CMDLINE;
-        stdstr strModPath;
-        ret = GetModulePath( strModPath );
-        if( ERROR( ret ) )
-            break;
-        strModPath += "/rpcrouter -agor 2";
-        BufPtr pBuf( true );
-        ret = pBuf->Append(
-            strModPath.c_str(),
-            strModPath.size() );
-        if( ERROR( ret ) )
-            break;
-        okv.oValue = pBuf;
-        veckv.push_back( okv );
-    }while( 0 );
-
-    return 0;
+    return super::GetPointValuesToInit( pIf, veckv );
 }
 
 gint32 StartAppManCli(

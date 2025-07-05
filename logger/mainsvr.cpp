@@ -170,6 +170,8 @@ int main( int argc, char** argv )
     int opt = 0;
     bool bRole = false;
     stdstr strLogFile;
+    stdstr strCmdLine(
+        SimpleCmdLine( argc, argv ) );
     while( ( opt = getopt( argc, argv, "O:hdov" ) ) != -1 )
     {
         switch (opt)
@@ -227,7 +229,8 @@ int main( int argc, char** argv )
      std::signal( SIGQUIT, SignalHandler );
 
     do{
-        std::string strDesc = "./loggerdesc.json";
+        std::string strDesc =
+            "invalidpath/loggerdesc.json";
         ret = InitContext();
         if( ERROR( ret ) )
             break;
@@ -237,6 +240,9 @@ int main( int argc, char** argv )
             if( ERROR( ret ) )
                 break;
         }
+        CIoManager* pMgr = g_pIoMgr;
+        pMgr->SetCmdLineOpt(
+            propCmdLine, strCmdLine );
         CRpcServices* pSvc = nullptr;
         InterfPtr pIf;
         do{
@@ -267,7 +273,6 @@ int main( int argc, char** argv )
 
             if( g_bMonitoring )
             {
-                CIoManager* pMgr = g_pIoMgr;
                 ret = pMgr->TryLoadClassFactory(
                     "invalidpath/libappmancli.so" );
                 if( ERROR( ret ) )
@@ -280,7 +285,6 @@ int main( int argc, char** argv )
 
         }while( 0 );
 
-        CIoManager* pMgr = g_pIoMgr;
         CLogService_SvrImpl* pLogSvc = pIf;
 
         if( SUCCEEDED( ret ) )

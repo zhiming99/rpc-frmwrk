@@ -50,6 +50,8 @@ ptname=$2
 if [ -z $appname ] || [ -z $ptname ]; then
    echo "Error app/point names are not specified"
     Usage
+    popd > /dev/null
+    undo_check_appreg_mount
     exit 22
 fi
 
@@ -58,6 +60,8 @@ dtnum=`python3 $updattr -v $ptpath/datatype`
 
 if [ ! -d $ptpath ]; then
     echo Error cannot find the point.
+    popd > /dev/null
+    undo_check_appreg_mount
     exit 22
 fi
 
@@ -70,7 +74,4 @@ fi
 
 
 popd > /dev/null
-if (( $mt == 2 )); then
-    umount $rootdir
-fi
-
+undo_check_appreg_mount

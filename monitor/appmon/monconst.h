@@ -38,4 +38,9 @@
 #define PID_FILE            "pid"
 #define KRB5_ASSOC_DIR       "krb5users"
 #define OA2_ASSOC_DIR       "oa2users"
+#define POINT_FLAGS         "point_flags"
 
+#define OFFLINE_NOTIFY      "offline_notify"
+#define ONLINE_NOTIFY       "online_notify"
+
+#define POINTFLAG_NOSTORE      0x01

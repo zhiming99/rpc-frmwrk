@@ -31,9 +31,9 @@
 #include "k5proxy.h"
 #include <regex>
 
-#ifdef OA2
 #include "blkalloc.h"
 using namespace rpcf;
+#ifdef OA2
 #include "oa2check/OA2proxycli.h"
 #define CLI_REG "clientreg.dat"
 #include "oa2proxy.h"
@@ -4062,6 +4062,7 @@ gint32 CAuthentServer::Login(
                     ret = pSvr->GetAuthImpl( pObj );
                     if( ERROR( ret ) )
                         return ret;
+#ifdef OA2
                     COA2proxy_CliImpl* pAuth1 = pObj;
                     CSimpleAuthCliWrapper* pAuth2 = pObj;
                     IAuthenticateServer* pAuth; 
@@ -4069,7 +4070,10 @@ gint32 CAuthentServer::Login(
                         pAuth = pAuth1;
                     else
                         pAuth = pAuth2;
-
+#else
+                    CSimpleAuthCliWrapper* pAuth2 = pObj;
+                    IAuthenticateServer* pAuth = pAuth2;
+#endif
                     ret = pAuth->Login(
                         pCb, pInfo, oResp.GetCfg() );
                     if( ret == STATUS_PENDING )

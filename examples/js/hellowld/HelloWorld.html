@@ -12,20 +12,30 @@
 <html><head><meta charset="utf-8" /></head></html>
 <body>
 <p id="log">Example: Hello World<br /></p>
+<div id="rpcf_status"></div>
 <script>
 // set a callback on RPC connection ready
 // this callback will be called from the
 // 'maincli.js' when the connection to server is
 // established.
+globalThis.OutputMsg = (strMsg)=>{
+    var oLog = document.getElementById( "rpcf_status" );
+    if( oLog === null )
+        return;
+    if( oLog.innerHTML.length > 10000 )
+        oLog.innerHTML = "";
+    oLog.innerHTML += strMsg + "<br />";
+    console.log( strMsg );
+}
 globalThis.onRpcReady=()=>{
-    console.log( "RPC connection ready " );
+    globalThis.OutputMsg( "RPC connection ready " );
     var oProxy = globalThis.oProxy;
     var oContext = new Object();
     oContext.m_oCallback = (oContext, ret, strResp)=>{
         if( ret & 0x80000000 )
-            console.log( "error returned")
+            globalThis.OutputMsg( "error returned")
         else
-            console.log( 'server response is ' + strResp );
+            globalThis.OutputMsg( 'server response is ' + strResp );
     }
     //make the call to the server
     return oProxy.Echo( oContext, "Hello, World!" );
@@ -38,20 +48,19 @@ globalThis.onRpcReady=()=>{
 <script>
 globalThis.g_bAuth = false
 globalThis.g_strAuthMech = ""
-console.log( "hello, HelloWorld!");
 var iChecks = 0;
 function checkProxyState(){
     if( globalThis.oProxy === undefined ){
         setTimeout( checkProxyState, 2000 );
         console.log( "Waiting RPC connection ready..." );
     }else if( globalThis.oProxy === null ){
-        console.log( "RPC connection is shutdown abnormally..." );
-    }else if( globalThis.oProxy.m_iState === 5 ){
-        console.log( "RPC connection is down..." );
+        globalThis.OutputMsg( "RPC connection is shutdown abnormally..." );
+    }else if( globalThis.oProxy.m_iState === 0 ){
+        globalThis.OutputMsg( "RPC connection is down..." );
         globalThis.oProxy = null;
     }else{
         if( iChecks++ === 0 )
-            console.log( "RPC connection ready " + globalThis.oProxy );
+            globalThis.OutputMsg( "RPC connection ready " + globalThis.oProxy );
         setTimeout( checkProxyState, 5000 );
     }
 }

@@ -1214,6 +1214,9 @@ class CFastRpcServerBase :
     gint32 OnPostStart(
         IEventSink* pCallback ) override;
 
+    gint32 StopBusPort(
+        IEventSink* pCallback );
+
     gint32 OnPostStop(
         IEventSink* pCallback ) override;
 

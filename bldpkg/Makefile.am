@@ -3,21 +3,21 @@ EXTRA_DIST=control.in blddpkg.sh rules bldrpm.sh rpcf.spec.in rpcf.install.in rp
 rev=0
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)
 if ENABLE_PYTHON
-    enable_python="yes"
+    ena_python="yes"
 else
-    enable_python="no"
+    ena_python="no"
 endif
 
 if ENABLE_JS
-    enable_js="yes"
+    ena_js="yes"
 else
-    enable_js="no"
+    ena_js="no"
 endif
 
 if ENABLE_JAVA
-    enable_java="yes"
+    ena_java="yes"
 else
-    enable_java="no"
+    ena_java="no"
 endif
 
 debdir:
@@ -25,7 +25,7 @@ debdir:
 		mkdir -p $(DISTDIR)/debian/$(PACKAGE_NAME);\
     fi;
 	arch=$$(dpkg --print-architecture);\
-	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix) $(enable_python) $(enable_js) $(enable_java); then \
+	if ! bash blddpkg.sh $(DISTDIR) $(DESTDIR) $(PACKAGE_NAME)_$(VERSION)-$(rev)_$${arch} $(prefix) $(ena_python) $(ena_js) $(ena_java); then \
         echo error occurs && false; \
     else \
         cd $(DISTDIR);\

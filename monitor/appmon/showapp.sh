@@ -66,8 +66,5 @@ for appname in "$@"; do
 done
 
 popd > /dev/null
-if (( $mt == 2 )); then
-    umount $rootdir
-fi
-
+undo_check_appreg_mount
 

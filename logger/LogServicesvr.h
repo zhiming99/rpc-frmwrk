@@ -23,6 +23,7 @@ namespace rpcf
 struct CAsyncLoggerAMCallbacks :
     public CAsyncStdAMCallbacks
 {
+    typedef CAsyncStdAMCallbacks super;
     gint32 GetPointValuesToUpdate(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override;

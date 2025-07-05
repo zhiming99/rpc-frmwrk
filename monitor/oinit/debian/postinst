@@ -1,14 +1,13 @@
 #!/bin/bash
-if grep 'debian' /etc/os-release; then
-    force="t"
-else
-    force="f"
-fi
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
+
 if [ -f /usr/lib/rpcf/oinit*.whl ]; then
-    if [[ "$force" == "t" ]]; then
-        option="--break-system-packages"
-    else
-        option=""
-    fi
-    pip3 install ${option} /usr/lib/rpcf/oinit*.whl 
+    pip3 install ${force_update} --force-reinstall /usr/lib/rpcf/oinit*.whl 
 fi
