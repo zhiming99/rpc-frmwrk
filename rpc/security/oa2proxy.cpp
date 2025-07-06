@@ -224,19 +224,23 @@ gint32 COAuth2LoginProxy::DecryptCookie(
             EVP_PKEY_CTX *dctx =
                 EVP_PKEY_CTX_new(pri_pkey, NULL);
             EVP_PKEY_decrypt_init(dctx);
-            ret = EVP_PKEY_CTX_set_rsa_padding(
-                dctx, RSA_PKCS1_OAEP_PADDING );
-            if( ret <= 0 )
+            int key_type = EVP_PKEY_id( pri_pkey );
+            if( key_type == EVP_PKEY_RSA )
             {
-                ret = -EFAULT;
-                continue;
-            }
-            ret = EVP_PKEY_CTX_set_rsa_oaep_md(
-                dctx, EVP_sha256() );
-            if( ret <= 0 )
-            {
-                ret = -EFAULT;
-                continue;
+                ret = EVP_PKEY_CTX_set_rsa_padding(
+                    dctx, RSA_PKCS1_OAEP_PADDING );
+                if( ret <= 0 )
+                {
+                    ret = -EFAULT;
+                    continue;
+                }
+                ret = EVP_PKEY_CTX_set_rsa_oaep_md(
+                    dctx, EVP_sha256() );
+                if( ret <= 0 )
+                {
+                    ret = -EFAULT;
+                    continue;
+                }
             }
 
             ret = EVP_PKEY_decrypt(dctx, NULL,
