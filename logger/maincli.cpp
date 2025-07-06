@@ -256,14 +256,23 @@ gint32 maincli( CLogService_CliImpl* pIf, int argc, char** argv )
             }
         case 't':
             {
-                for( int i = 0; i < sizeof( al ); i++ )
+                int i = 0;
+                size_t count =
+                    sizeof( al ) / sizeof( al[0] );
+                for( ; i < count; i++ )
                 {
                     ret = strcmp( optarg, al[ i ] );
                     if( ret != 0 )
-                    {
-                        ret = -EINVAL;
-                        break;
-                    }
+                        continue;
+                    break;
+                }
+                if( i == count )
+                {
+                    ret = -EINVAL;
+                    fprintf( stderr,
+                        "Invalid log type '%s'",
+                        optarg );
+                    break;
                 }
                 strType = optarg;
                 break;

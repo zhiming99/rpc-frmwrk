@@ -1,0 +1,95 @@
+.TH RPCFCTL 1 "July 2025" "rpc-frmwrk" "Application Control Utility Manual"
+
+.SH NAME
+rpcfctl \- rpc-frmwrk Application Control Utility
+
+.SH SYNOPSIS
+.B rpcfctl
+<command> [appname]
+
+.SH DESCRIPTION
+.B rpcfctl
+is a command-line utility for managing applications registered in the rpc-frmwrk application registry. It provides commands to start, stop, restart, check status, and list applications, as well as to add, remove, and initialize the application registry. It is similar in spirit to \fBsystemctl\fR but is tailored for rpc-frmwrk managed applications.
+
+.SH COMMANDS
+.TP
+.B start <appname>
+Start the application \fIappname\fR. Checks if the application is already running; if not, retrieves its command line and working directory from the registry and starts it in the background.
+.TP
+.B stop <appname>
+Stop the application \fIappname\fR. Sends a SIGINT to the application's process for graceful shutdown.
+.TP
+.B kill <appname>
+Forcefully stop the application \fIappname\fR. Sends a SIGKILL to the application's process, terminating it immediately.
+.TP
+.B restart <appname>
+Restart the application \fIappname\fR. Stops the application if running, waits for it to exit, then starts it again.
+.TP
+.B status <appname>
+Show status of the application \fIappname\fR. Displays whether the application is running and its current status.
+.TP
+.B list
+List all managed applications. Shows all applications registered in the app registry.
+.TP
+.B startall
+Start all managed applications. Starts core services first, then all other registered applications.
+.TP
+.B stopall
+Stop all managed applications. Stops all applications except core services first, then stops the core services.
+.TP
+.B restartall
+Restart all managed applications. Stops all applications and then starts them again.
+.TP
+.B addapp <appname>, add <appname>
+Add a new application \fIappname\fR to the app registry.
+.TP
+.B rmapp <appname>, rm <appname>
+Remove the application \fIappname\fR from the app registry.
+.TP
+.B init
+Initialize (clear) the app registry. \fBWARNING:\fR This will clear your app registry.
+.TP
+.B -h, --help
+Show help message and exit.
+
+.SH EXAMPLES
+.TP
+Start an application:
+.B
+rpcfctl start myapp
+.TP
+Stop an application:
+.B
+rpcfctl stop myapp
+.TP
+Show status:
+.B
+rpcfctl status myapp
+.TP
+List all applications:
+.B
+rpcfctl list
+.TP
+Start all applications:
+.B
+rpcfctl startall
+.TP
+Add a new application:
+.B
+rpcfctl addapp myapp
+
+.SH FILES
+.TP
+.B showapp.sh, getpv.sh, listapps.sh, addapp.sh, rmapp.sh, initappreg.sh
+Helper scripts used by rpcfctl, typically located in the same directory.
+
+.SH SEE ALSO
+.BR appmonsvr (1)
+.BR rpcrouter (1)
+.BR regfsmnt (1),
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-3.0.html

@@ -139,18 +139,23 @@ int EncryptWithPubKey_OpenSSL(
 
         if( EVP_PKEY_encrypt_init( pCtx ) <= 0 )
         {
-            std::cerr <<
-                "EVP_PKEY_encrypt_init failed.\n";
+            std::cerr << "EVP_PKEY_encrypt_init failed with error: '"
+                << ERR_error_string(ERR_get_error(), nullptr ) << "'.\n";
             ret = -1;
             break;
         }
-        if( EVP_PKEY_CTX_set_rsa_padding(
-            pCtx, RSA_PKCS1_OAEP_PADDING ) <= 0 )
+        int key_type = EVP_PKEY_id(pPubKey);
+        if( key_type == EVP_PKEY_RSA )
         {
-            std::cerr <<
-                "EVP_PKEY_CTX_set_rsa_padding failed.\n";
-            ret = -1;
-            break;
+            if( EVP_PKEY_CTX_set_rsa_padding(
+                pCtx, RSA_PKCS1_OAEP_PADDING ) <= 0 )
+            {
+                std::cerr <<
+                    "EVP_PKEY_CTX_set_rsa_padding failed with error: '"
+                    << ERR_error_string(ERR_get_error(), nullptr) << "'.\n";
+                ret = -1;
+                break;
+            }
         }
 
         size_t outlen = 0;
@@ -319,13 +324,28 @@ static gint32 DecryptWithPrivKey_OpenSSL(
 
             EVP_PKEY_CTX *dctx =
                 EVP_PKEY_CTX_new(pri_pkey, NULL);
-            EVP_PKEY_decrypt_init(dctx);
-            ret = EVP_PKEY_CTX_set_rsa_padding(
-                dctx, RSA_PKCS1_OAEP_PADDING );
-            if( ret <= 0 )
+            if( EVP_PKEY_decrypt_init(dctx) <= 0 )
             {
-                ret = -EFAULT;
+                // Failed to initialize decryption context
+                unsigned long error = ERR_get_error(); 
+                // Get a human-readable error string
+                char error_string[256];
+                ERR_error_string(error, error_string);
+                std::cerr << "EVP_PKEY_decrypt_init failed with error: '"
+                    << error_string << "'.\n";
+                ret = -1;
                 break;
+            }
+            int key_type = EVP_PKEY_id(pri_pkey);
+            if( key_type == EVP_PKEY_RSA ) 
+            {
+                ret = EVP_PKEY_CTX_set_rsa_padding(
+                    dctx, RSA_PKCS1_OAEP_PADDING );
+                if( ret <= 0 )
+                {
+                    ret = -EFAULT;
+                    break;
+                }
             }
 
             ret = EVP_PKEY_decrypt(dctx, NULL,

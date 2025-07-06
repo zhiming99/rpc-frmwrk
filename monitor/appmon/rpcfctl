@@ -85,7 +85,6 @@ case "$cmd" in
             exit 1
         fi
         appname="$1"
-        # TODO: Implement start logic
         echo "Starting application: $appname"
         if is_app_online $appname; then
             echo "Error $appname is still running"
@@ -112,7 +111,6 @@ case "$cmd" in
             exit 1
         fi
         appname="$1"
-        # TODO: Implement stop logic
         echo "Stopping application: $appname"
         if ! is_app_online $appname; then
             echo "Error $appname is already stopped"
@@ -187,12 +185,10 @@ case "$cmd" in
             exit 1
         fi
         appname="$1"
-        # TODO: Implement status logic
         echo "Status of application: $appname"
         bash $cmddir/showapp.sh $appname
         ;;
     list)
-        # TODO: Implement list logic
         echo "Listing all managed applications"
         bash $cmddir/listapps.sh
         ;;
@@ -244,10 +240,32 @@ case "$cmd" in
         bash rpcfctl startall
         ;;
     addapp | add)
-        bash $cmddir/addapp.sh $1
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'addapp/add'"
+            usage
+            exit 1
+        fi
+        if bash $cmddir/addapp.sh $1; then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "Added application $1 by rpcfctl"
+            fi
+        fi
         ;;
     rmapp | rm )
-        bash $cmddir/rmapp.sh $1
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'addapp/add'"
+            usage
+            exit 1
+        fi
+        if is_app_online $1; then
+            echo please stop the application before removal.
+            exit 1
+        fi
+        if bash $cmddir/rmapp.sh $1; then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application $1 by rpcfctl"
+            fi
+        fi
         ;;
     init)
         echo Warning 'init' will clear your app registry

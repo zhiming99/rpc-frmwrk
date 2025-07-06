@@ -931,7 +931,7 @@ function change_application_mode()
 function add_stdapp()
 {
     _instname=$1
-    if [ -f ./apps/$_instname ]; then
+    if [[ -d ./apps/$_instname ]]; then
         echo Error application $_instname already exist
         return 1
     fi
