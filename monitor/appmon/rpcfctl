@@ -251,14 +251,14 @@ case "$cmd" in
             fi
         fi
         ;;
-    rmapp | rm )
+    rmapp | rm)
         if [[ $# -lt 1 ]]; then
             echo "Error: appname required for 'addapp/add'"
             usage
             exit 1
         fi
         if is_app_online $1; then
-            echo please stop the application before removal.
+            echo Error: please stop the application before removal.
             exit 1
         fi
         if bash $cmddir/rmapp.sh $1; then
@@ -270,6 +270,63 @@ case "$cmd" in
     init)
         echo Warning 'init' will clear your app registry
         bash $cmddir/initappreg.sh
+        ;;
+    importkey | import)
+        cmdline="rpcfctl importkey <openssl|gmssl> <server|client> <private key file> <public cert file> [<cacert file>]"
+        if [[ $# -lt 4 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        if [[ "x$1" == "xopenssl" ]]; then
+            targetdir=$HOME/.rpcf/openssl
+        elif [[ "x$1" == "xgmssl" ]]; then
+            targetdir=$HOME/.rpcf/gmssl
+        else
+            echo Error: Unknown cryptography type
+            echo $cmdline
+            exit 1
+        fi
+
+        if [[ ! -d $targetdir ]]; then
+            mkdir -p $targetdir || exit 1
+        fi
+        if [[ "x$2" == "xserver" ]]; then
+            keyfiles=(signkey.pem signcert.pem certs.pem)
+        elif [[ "x$2" == "xclient" ]]; then
+            keyfiles=(clientkey.pem clientcert.pem certs.pem)
+        else
+            echo Error: Invalid argument
+            echo $cmdline
+            exit 1
+        fi
+        if [[ "x$3" != "x" ]]; then
+            cp "$3" "$targetdir/${keyfiles[0]}" || exit 1
+            chmod 600 "$targetdir/${keyfiles[0]}"
+        fi
+        if [[ "x$4" != "x" ]]; then
+            cp "$4" "$targetdir/${keyfiles[1]}" || exit 1
+            chmod 644 "$targetdir/${keyfiles[1]}"
+        fi
+        if [[ "x$5" != "x" ]]; then
+            cp "$5" "$targetdir/${keyfiles[2]}"
+            chmod 644 "$targetdir/${keyfiles[2]}"
+        else
+            touch "$targetdir/${keyfiles[2]}"
+        fi
+        if [[ -f ../../ipc/driver.json ]]; then
+            drvpath="../../ipc/driver.json"
+        elif [[ "$script_dir" == "/usr/bin" ]]; then
+            drvpath="/etc/rpcf/driver.json"
+        elif [[ "$script_dir" == "/usr/local/bin" ]]; then
+            drvpath="/usr/local/etc/rpcf/driver.json"
+        else
+            echo Error: unable to find driver.json to update
+            exit 1
+        fi
+        python3 $scriptdir/updatekeys.py $drvpath $1 $2
+        echo "Imported keys to $targetdir successfully."
+        echo "don't forget to update your web server's configuration if needed."
         ;;
     *)
         echo "Unknown command: $cmd"
