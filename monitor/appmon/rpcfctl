@@ -272,7 +272,7 @@ case "$cmd" in
         bash $cmddir/initappreg.sh
         ;;
     importkey | import)
-        cmdline="rpcfctl importkey <openssl|gmssl> <server|client> <private key file> <public cert file> [<cacert file>]"
+        cmdline="rpcfctl importkey <openssl|gmssl> <private key file> <public cert file> [<cacert file>]"
         if [[ $# -lt 4 ]]; then
             echo "Error: Missing argument" 
             echo $cmdline
@@ -291,28 +291,25 @@ case "$cmd" in
         if [[ ! -d $targetdir ]]; then
             mkdir -p $targetdir || exit 1
         fi
-        if [[ "x$2" == "xserver" ]]; then
-            keyfiles=(signkey.pem signcert.pem certs.pem)
-        elif [[ "x$2" == "xclient" ]]; then
-            keyfiles=(clientkey.pem clientcert.pem certs.pem)
+        if [[ "x$2" != "x" ]]; then
+            cp "$2" "$targetdir/" || exit 1
+            chmod 600 "$targetdir/$(basename "$2")"
         else
-            echo Error: Invalid argument
+            echo Error: private key file is required
             echo $cmdline
             exit 1
         fi
         if [[ "x$3" != "x" ]]; then
-            cp "$3" "$targetdir/${keyfiles[0]}" || exit 1
-            chmod 600 "$targetdir/${keyfiles[0]}"
+            cp "$3" "$targetdir/" || exit 1
+            chmod 644 "$targetdir/$(basename "$3")"
+        else
+            echo Error: public cert file is required
+            echo $cmdline
+            exit 1
         fi
         if [[ "x$4" != "x" ]]; then
-            cp "$4" "$targetdir/${keyfiles[1]}" || exit 1
-            chmod 644 "$targetdir/${keyfiles[1]}"
-        fi
-        if [[ "x$5" != "x" ]]; then
-            cp "$5" "$targetdir/${keyfiles[2]}"
-            chmod 644 "$targetdir/${keyfiles[2]}"
-        else
-            touch "$targetdir/${keyfiles[2]}"
+            cp "$4" "$targetdir/" || exit 1
+            chmod 644 "$targetdir/$(basename "$4")"
         fi
         if [[ -f ../../ipc/driver.json ]]; then
             drvpath="../../ipc/driver.json"
@@ -324,7 +321,7 @@ case "$cmd" in
             echo Error: unable to find driver.json to update
             exit 1
         fi
-        python3 $scriptdir/updatekeys.py $drvpath $1 $2
+        python3 $scriptdir/updatekeys.py $drvpath $1 $(basename $2) $(basename $3) $(basename $4 )
         echo "Imported keys to $targetdir successfully."
         echo "don't forget to update your web server's configuration if needed."
         ;;

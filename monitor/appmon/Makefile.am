@@ -52,7 +52,7 @@ endif
 #appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
 #appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 
-EXTRA_DIST=appmon.ridl upddesc.py
+EXTRA_DIST=appmon.ridl upddesc.py updatekeys.py
 
 noinst_LIBRARIES=libappmon.a
 libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp IAppMonitorsvr.cpp IDataProducersvr.cpp IUserManagersvr.cpp appmondesc.json IUserManagersvr.h IDataProducersvr.h IAppMonitorsvr.h IAppStoresvr.h appmon.h appmonstruct.h 
