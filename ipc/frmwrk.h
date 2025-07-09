@@ -719,4 +719,19 @@ gint32 CIoManager::GetCmdLineOpt< std::string >(
 
 typedef CAutoPtr< Clsid_CIoManager, CIoManager > IoMgrPtr;
 
+bool IsSSLEnabled(
+    const Json::Value& oValue,
+    bool& bOpenSSL,
+    const stdstr& strPortClass =
+        PORT_CLASS_TCP_STREAM_PDO2 );
+
+gint32 GetSSLKeyPath(
+    CIoManager* pMgr, stdstr& strPath );
+
+gint32 GetSSLCertPath(
+    CIoManager* pMgr, stdstr& strPath );
+
+gint32 GetSSLCACertPath(
+    CIoManager* pMgr, stdstr& strPath );
+
 }
