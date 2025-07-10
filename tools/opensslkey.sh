@@ -7,7 +7,7 @@
 
 bitwidth=2048
 if [ "x$1" != "x" -a ! -d $1 ]; then
-    echo Usage: bash opensslkey.sh [directory to store keys] [ number of client keys ] [number of server keys]
+    echo Usage: bash opensslkey.sh [directory to store keys] [ number of client keys ] [number of server keys] [ DNS name ]
     exit 1
 fi
 
@@ -31,6 +31,10 @@ if [ "x$3" == "x" ];then
     numsvr=1
 else
     numsvr=$3
+fi
+
+if [[ "x$4" != "x" ]]; then
+    dnsname=$4
 fi
 
 RPCF_BIN_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
@@ -114,7 +118,10 @@ let endidx=idx_base+numsvr
 for((i=idx_base;i<endidx;i++));do
     chmod 600 signcert.pem signkey.pem > /dev/null 2>&1 || true
     openssl genrsa -out signkey.pem ${bitwidth}
-    openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server-$i" -addext "subjectAltName=DNS:Server$i"
+    if [[ "x$dnsname" == "x" ]]; then 
+        dnsname="Server-$i"
+    fi
+    openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server-$i" -addext "subjectAltName=DNS:$dnsname"
     if which expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
     else
