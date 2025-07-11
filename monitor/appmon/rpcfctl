@@ -10,6 +10,13 @@ else
     exit 1
 fi
 
+if [[ -f ../../ipc/driver.json ]]; then
+    cfgPath="`pwd`/../../ipc"
+elif [[ "$script_dir" == "/usr/bin" ]]; then
+    cfgPath="/etc/rpcf"
+elif [[ "$script_dir" == "/usr/local/bin" ]]; then
+    cfgPath="/usr/local/etc/rpcf"
+fi
 #echo cmddir=$cmddir
 source ${cmddir}/appfuncs.sh
 
@@ -18,7 +25,7 @@ source ${cmddir}/appfuncs.sh
 
 function usage() {
     cat <<EOF
-Usage: $0 <command> [appname]
+Usage: $0 <command> [arguments]
 
 Commands:
     start <appname>      Start the application <appname>.
@@ -52,8 +59,25 @@ Commands:
 
     rmapp <appname>      Remove the application <appname> from the app registry.
 
-    init                 Initialize (clear) the app registry.
+    initapps             Initialize (clear) the app registry.
                          WARNING: This will clear your app registry.
+
+    inituser             Initialize (clear) the user registry.
+                         WARNING: This will clear your user registry.
+
+    initall              Initialize (clear) both the app registry and user registry
+                         
+    importkey            import SSL keys. 
+                         command line is "rpcfctl importkey <openssl|gmssl> <private key> <public cert> [<cacert file>]",
+                         If you don't know about openssl or gmssl, just use openssl. key/cert should be in PEM format to import.
+                         The key/cert is now the rpc-frmwrk's SSL connection key/cert.
+
+    genkey               Generate self-signed public key/cert pair from command line. The key/cert will not automatically be applied
+                         as the SSL connection key. You need to use either 'rpcfg.py' or the 'importkey' subcommand to get this done.
+                         And be aware that the SSL key/cert used by 'rpc-frmwrk' is not necessarily the one used by your webserver if
+                         WebSocket connection is enabled.
+                         command line is "rpcfctl genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
+                         example: rpcfctl genkey openssl 1 1
 
     -h, --help           Show this help message and exit.
 
@@ -236,7 +260,9 @@ case "$cmd" in
         bash rpcfctl stop appmonsvr1
         ;;
     restartall)
+        echo "stopping all the applications..."
         bash rpcfctl stopall
+        echo "starting all the applications..."
         bash rpcfctl startall
         ;;
     addapp | add)
@@ -267,13 +293,20 @@ case "$cmd" in
             fi
         fi
         ;;
-    init)
-        echo Warning 'init' will clear your app registry
+    initapps)
+        echo Warning 'initapps' will clear the app registry,
         bash $cmddir/initappreg.sh
+        ;;
+    inituser)
+        echo "Warning 'inituser' will clear the user registry"
+        bash $cmddir/inituser.sh
+        ;;
+    initall)
+        bash $cmddir/inituser.sh && bash $cmddir/initappreg.sh
         ;;
     importkey | import)
         cmdline="rpcfctl importkey <openssl|gmssl> <private key file> <public cert file> [<cacert file>]"
-        if [[ $# -lt 4 ]]; then
+        if [[ $# -lt 3 ]]; then
             echo "Error: Missing argument" 
             echo $cmdline
             exit 1
@@ -291,39 +324,201 @@ case "$cmd" in
         if [[ ! -d $targetdir ]]; then
             mkdir -p $targetdir || exit 1
         fi
-        if [[ "x$2" != "x" ]]; then
+        src=$(realpath $2)
+        dest=$(realpath $targetdir/$(basename $2))
+        if [[ "$src" != "$dest" ]]; then
             cp "$2" "$targetdir/" || exit 1
-            chmod 600 "$targetdir/$(basename "$2")"
-        else
-            echo Error: private key file is required
-            echo $cmdline
-            exit 1
+            chmod 600 "$targetdir/$(basename $2)"
         fi
-        if [[ "x$3" != "x" ]]; then
+        src=$(realpath $3)
+        dest=$(realpath $targetdir/$(basename $3))
+        if [[ "$dest" != "$src" ]]; then
             cp "$3" "$targetdir/" || exit 1
-            chmod 644 "$targetdir/$(basename "$3")"
-        else
-            echo Error: public cert file is required
-            echo $cmdline
-            exit 1
+            chmod 644 "$targetdir/$(basename $3)"
         fi
         if [[ "x$4" != "x" ]]; then
-            cp "$4" "$targetdir/" || exit 1
-            chmod 644 "$targetdir/$(basename "$4")"
+            src=$(realpath $4)
+            dest=$(realpath $targetdir/$(basename $4))
+            if [[ "$src" != "$dest" ]]; then
+                cp "$4" "$targetdir/" || exit 1
+                chmod 644 "$targetdir/$(basename $4)"
+            fi
+            caroot="$targetdir/$(basename $4)"
         fi
-        if [[ -f ../../ipc/driver.json ]]; then
-            drvpath="../../ipc/driver.json"
-        elif [[ "$script_dir" == "/usr/bin" ]]; then
-            drvpath="/etc/rpcf/driver.json"
-        elif [[ "$script_dir" == "/usr/local/bin" ]]; then
-            drvpath="/usr/local/etc/rpcf/driver.json"
+        bRoot="false"
+        drvpath=$cfgPath/drver.json
+        if [[ "$script_dir" == "/usr/bin" ]] || [[ "$script_dir" == "/usr/local/bin" ]]; then
+            bRoot="true"
         else
             echo Error: unable to find driver.json to update
             exit 1
         fi
-        python3 $scriptdir/updatekeys.py $drvpath $1 $(basename $2) $(basename $3) $(basename $4 )
-        echo "Imported keys to $targetdir successfully."
-        echo "don't forget to update your web server's configuration if needed."
+        if [[ "$bRoot" == "false" ]]; then
+            SUDOCMD=
+        else
+            if which sudo; then
+                SUDOCMD=sudo
+            fi
+        fi
+        if $SUDOCMD python3 $cmddir/updatekeys.py $drvpath $1 $targetdir/$(basename $2) $targetdir/$(basename $3) $caroot; then
+            echo "Imported keys to $targetdir successfully."
+            echo "rpc-frmwrk will use the newly imported key for SSL connection"
+            echo "And don't forget to update your web server configuration if necessary"
+        fi
+        ;;
+    genkey)
+        # generate self-signed openssl RSA key
+        cmdline="rpcfctl genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
+        if [[ $# -lt 3 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        if [[ "x$1" == "xopenssl" ]]; then
+            if bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
+                clidx=`cat $HOME/.rpcf/openssl/clidx`
+                svridx=`cat $HOME/.rpcf/openssl/svridx`
+                echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl
+                echo server key/cert package is serverkeys-$svridx.tar.gz
+                echo client key/cert package is clientkeys-$clidx.tar.gz
+            else
+                echo Error failed to generate OpenSSL key/cert
+            fi
+        elif [[ "x$1" == "xgmssl" ]]; then
+            if bash $cmddir/gmsslkey.sh $HOME/.rpcf/gmssl $2 $3; then
+                clidx=`cat $HOME/.rpcf/gmssl/clidx`
+                svridx=`cat $HOME/.rpcf/gmssl/svridx`
+                echo Successfully generated GmSSL key/cert to $HOME/.rpcf/gmssl
+                echo server key/cert package is serverkeys-$svridx.tar.gz
+                echo client key/cert package is clientkeys-$clidx.tar.gz
+            else
+                echo Error failed to generate GmSSL key/cert
+            fi
+        fi
+        ;;
+    printcert)
+        cmdline="rpcfctl printcert <openssl|gmssl> <cert file>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        if [[ "x$1" == "openssl" ]]; then
+            openssl x509 -inform pem -noout -text -in "$2"
+        elif [[ "x$1" == "gmssl" ]]; then
+            gmssl certparse < "$2"
+        fi
+        ;;
+    adduser)
+        cmdline="rpcfctl adduser <user name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfaddu.sh $1
+        ;;
+    rmuser)
+        cmdline="rpcfctl rmuser <user name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfrmu.sh $1
+        ;;
+    showuser)
+        cmdline="rpcfctl showuser <user name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfshow.sh -u $1
+        ;;
+    listuser)
+        cmdline="rpcfctl listuser"
+        bash $cmddir/rpcfshow.sh -l
+        ;;
+    joingroup)
+        cmdline="rpcfctl joingroup <group name> <user name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfmodu.sh -g $1 $2
+        ;;
+    leavegroup)
+        cmdline="rpcfctl leavegroup <group name> <user name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfmodu.sh -ig $1 $2
+        ;;
+    addgroup)
+        cmdline="rpcfctl addgroup <group name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfaddg.sh $1
+        ;;
+    rmgroup)
+        cmdline="rpcfctl rmgroup <group name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfrmg.sh $1
+        ;;
+    showgroup)
+        cmdline="rpcfctl showgroup <group name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfshow.sh -g $1
+        ;;
+    listgroup)
+        cmdline="rpcfctl listgroup"
+        bash $cmddir/rpcfshow.sh -r
+        ;;
+    authmech)
+        cmdline="rpcfctl authmech"
+        drvpath=$cfgPath/driver.json
+        mech=`grep 'AuthMech' $drvpath | awk -F: '{print $2}' | sed 's/[",]//g'`;
+        if [[ "x$mech" == "x" ]]; then
+            echo None
+            exit 1;
+        else
+            echo $mech
+        fi
+        ;;
+    clilogin)
+        mech=`rpcfctl authmech`
+        if [[ "xmech" == "xSimpAuth" ]]; then
+            cmdline="rpcfctl clilogin <username name>"
+            if [[ $# -lt 1 ]]; then
+                echo "Error: Missing argument" 
+                echo $cmdline
+                exit 1
+            fi
+            $cmddir/sinit -s $1
+        elif [[ "xmech" == "xOAuth2" ]]; then
+            cmdline="rpcfctl clilogin <auth url>"
+            if [[ $# -lt 1 ]]; then
+                echo "Error: Missing argument" 
+                echo $cmdline
+                exit 1
+            fi
+            python3 -m oinit $1
+        fi
         ;;
     *)
         echo "Unknown command: $cmd"

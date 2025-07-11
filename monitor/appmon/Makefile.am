@@ -41,7 +41,9 @@ appmonsvr_LDFLAGS=-rdynamic
 if ENABLE_FUSE3
 appmonsvr_CPPFLAGS+= -DFUSE3
 dist_appmonscr_SCRIPTS=initappreg.sh appfuncs.sh \
-addapp.sh addpoint.sh chmodapp.sh getpv.sh listapps.sh rmapp.sh rmlink.sh setpv.sh showpoint.sh addlink.sh chownapp.sh rmattr.sh rmpoint.sh setattr.sh showapp.sh
+addapp.sh addpoint.sh chmodapp.sh getpv.sh listapps.sh rmapp.sh rmlink.sh \
+setpv.sh showpoint.sh addlink.sh chownapp.sh rmattr.sh rmpoint.sh setattr.sh \
+showapp.sh updatekeys.py 
 
 dist_rpcfctl_SCRIPTS=rpcfctl
 
@@ -52,7 +54,7 @@ endif
 #appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
 #appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 
-EXTRA_DIST=appmon.ridl upddesc.py updatekeys.py
+EXTRA_DIST=appmon.ridl upddesc.py
 
 noinst_LIBRARIES=libappmon.a
 libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp IAppMonitorsvr.cpp IDataProducersvr.cpp IUserManagersvr.cpp appmondesc.json IUserManagersvr.h IDataProducersvr.h IAppMonitorsvr.h IAppStoresvr.h appmon.h appmonstruct.h 
