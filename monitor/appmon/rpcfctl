@@ -29,28 +29,36 @@ Usage: $0 <command> [arguments]
 
 Commands:
     start <appname>      Start the application <appname>.
-                         Checks if the application is already running; if not, retrieves its command line and working directory from the registry and starts it in the background.
+                         Checks if the application is already running; if not,
+                         retrieves its command line and working directory from
+                         the registry and starts it in the background.
 
     stop <appname>       Stop the application <appname>.
-                         Sends a SIGINT to the application's process for graceful shutdown.
+                         Sends a SIGINT to the application's process for
+                         graceful shutdown.
 
     kill <appname>       Forcefully stop the application <appname>.
-                         Sends a SIGKILL to the application's process, terminating it immediately.
+                         Sends a SIGKILL to the application's process,
+                         terminating it immediately.
 
     restart <appname>    Restart the application <appname>.
-                         Stops the application if running, waits for it to exit, then starts it again.
+                         Stops the application if running, waits for it to exit,
+                         then starts it again.
 
     status <appname>     Show status of the application <appname>.
-                         Displays whether the application is running and its current status.
+                         Displays whether the application is running and its
+                         current status.
 
     list                 List all managed applications.
                          Shows all applications registered in the app registry.
 
     startall             Start all managed applications.
-                         Starts core services first, then all other registered applications.
+                         Starts core services first, then all other registered
+                         applications.
 
     stopall              Stop all managed applications.
-                         Stops all applications except core services first, then stops the core services.
+                         Stops all applications except core services first, then
+                         stops the core services.
 
     restartall           Restart all managed applications.
                          Stops all applications and then starts them again.
@@ -65,19 +73,46 @@ Commands:
     inituser             Initialize (clear) the user registry.
                          WARNING: This will clear your user registry.
 
-    initall              Initialize (clear) both the app registry and user registry
+    initsvr              Initialize (clear) both the app registry and user
+                         registry on the server side.
+    initcli              Initialize (clear) both client registry on the client side
                          
-    importkey            import SSL keys. 
+    importkey            import SSL keys.
                          command line is "rpcfctl importkey <openssl|gmssl> <private key> <public cert> [<cacert file>]",
-                         If you don't know about openssl or gmssl, just use openssl. key/cert should be in PEM format to import.
-                         The key/cert is now the rpc-frmwrk's SSL connection key/cert.
 
-    genkey               Generate self-signed public key/cert pair from command line. The key/cert will not automatically be applied
-                         as the SSL connection key. You need to use either 'rpcfg.py' or the 'importkey' subcommand to get this done.
-                         And be aware that the SSL key/cert used by 'rpc-frmwrk' is not necessarily the one used by your webserver if
-                         WebSocket connection is enabled.
+                         If you don't know about openssl or gmssl, just use
+                         openssl. key/cert should be in PEM format to import.
+                         The key/cert is now the rpc-frmwrk's SSL connection
+                         key/cert. And be aware that the SSL key/cert used by
+                         'rpc-frmwrk' is not necessarily the one used by your
+                         webserver if WebSocket connection is enabled.
+
+
+    genkey               Generate self-signed public key/cert pair from command
+                         line. Note that, The newly generated key/cert will not
+                         automatically be applied to the SSL connection. You
+                         need to use either 'rpcfg.py' or the 'importkey'
+                         subcommand to get it done. 
+
                          command line is "rpcfctl genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
                          example: rpcfctl genkey openssl 1 1
+
+    login                Authenticate the user with the authentication mechanism
+                         specified in 'driver.json'
+
+                         For SimpAuth(Password), 'login' saves the credential in
+                         a secure way to allow non-js client to connect to
+                         rpc-frmwrk server. JS client will login from the
+                         browser.
+
+                         For Kerberos, 'login' preforms the preauth login with
+                         'kinit', to get the ticket-grant-ticket from KDC.  For
+                         OAuth2, 'login' will initiate the
+                         authorization-code-grant process to get a security
+                         token ( not the access token ) from the rpc-frmwrk.
+                         With which, the non-js client can connect to the
+                         rpc-frmwrk.
+
 
     -h, --help           Show this help message and exit.
 
@@ -279,7 +314,7 @@ case "$cmd" in
         ;;
     rmapp | rm)
         if [[ $# -lt 1 ]]; then
-            echo "Error: appname required for 'addapp/add'"
+            echo "Error: appname required for 'rmapp/rm' command"
             usage
             exit 1
         fi
@@ -293,6 +328,15 @@ case "$cmd" in
             fi
         fi
         ;;
+    showapp)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: appname required for 'showapp'"
+            usage
+            exit 1
+        fi
+        bash $cmddir/showapp.sh $1;
+        ;;
+
     initapps)
         echo Warning 'initapps' will clear the app registry,
         bash $cmddir/initappreg.sh
@@ -301,8 +345,17 @@ case "$cmd" in
         echo "Warning 'inituser' will clear the user registry"
         bash $cmddir/inituser.sh
         ;;
-    initall)
+    initsvr)
         bash $cmddir/inituser.sh && bash $cmddir/initappreg.sh
+        ;;
+    initcli)
+        authmech=`rpcfctl authmech`
+        if [[ "x$xauthmech" == "xSimpAuth" ]] ||
+            [[ "x$xauthmech" == "xOAuth2" ]]; then
+            regfsmnt -i $HOME/rpcf/clientreg.dat
+            rpcfctl genkey openssl 1 1
+            rpcfctl genkey gmssl 1 1
+        fi
         ;;
     importkey | import)
         cmdline="rpcfctl importkey <openssl|gmssl> <private key file> <public cert file> [<cacert file>]"
@@ -492,7 +545,13 @@ case "$cmd" in
     authmech)
         cmdline="rpcfctl authmech"
         drvpath=$cfgPath/driver.json
-        mech=`grep 'AuthMech' $drvpath | awk -F: '{print $2}' | sed 's/[",]//g'`;
+        context=`grep -A2 'HasAuth.*true' $drvpath`
+        if [[ -z $context ]]; then
+            echo None
+            exit 1;
+        fi
+        context=`echo $context | sed 's/,/\r\n/g'`
+        mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
         if [[ "x$mech" == "x" ]]; then
             echo None
             exit 1;
@@ -500,10 +559,10 @@ case "$cmd" in
             echo $mech
         fi
         ;;
-    clilogin)
+    login)
         mech=`rpcfctl authmech`
         if [[ "xmech" == "xSimpAuth" ]]; then
-            cmdline="rpcfctl clilogin <username name>"
+            cmdline="rpcfctl login <username name>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
                 echo $cmdline
@@ -511,13 +570,21 @@ case "$cmd" in
             fi
             $cmddir/sinit -s $1
         elif [[ "xmech" == "xOAuth2" ]]; then
-            cmdline="rpcfctl clilogin <auth url>"
+            cmdline="rpcfctl login <auth url>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
                 echo $cmdline
                 exit 1
             fi
             python3 -m oinit $1
+        elif [[ "xmech" == "xKerberos" ]]; then
+            cmdline="rpcfctl login <user name>"
+            if [[ $# -lt 1 ]]; then
+                echo "Error: Missing argument" 
+                echo $cmdline
+                exit 1
+            fi
+            kinit -kt $HOME/rpcf/krb5cli.keytab $1
         fi
         ;;
     *)
