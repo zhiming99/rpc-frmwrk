@@ -351,3 +351,15 @@ def ConfigWebServer( initFile : str ) -> int :
             ret = -errno.EFAULT
     return ret
 
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python3 updwscfg.py <initcfg path>")
+        sys.exit(1)
+
+    try:
+        ConfigWebServer( sys.argv[1] )
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)

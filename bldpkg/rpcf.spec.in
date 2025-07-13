@@ -55,15 +55,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %files
 %license ./LICENSE
 #%doc 
-%{_bindir}/rpcf/rpcfg.py
-%{_bindir}/rpcf/rpcfgnui.py
-%{_bindir}/rpcf/updcfg.py
-%{_bindir}/rpcf/updinitcfg.py
-%{_bindir}/rpcf/krbparse.py
-%{_bindir}/rpcf/updk5cfg.py
-%{_bindir}/rpcf/updwscfg.py
-%{_bindir}/rpcf/disablessl.py
-%{_bindir}/rpcf/updattr.py
+%{_bindir}/rpcf/*.py
 %{_bindir}/rpcf/*.sh
 @GMSSL_RPMFILES@
 @OPENSSL_RPMFILES@

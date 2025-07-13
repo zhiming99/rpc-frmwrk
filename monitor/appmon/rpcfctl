@@ -456,10 +456,12 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        if [[ "x$1" == "openssl" ]]; then
+        if [[ "x$1" == "xopenssl" ]]; then
             openssl x509 -inform pem -noout -text -in "$2"
-        elif [[ "x$1" == "gmssl" ]]; then
+        elif [[ "x$1" == "xgmssl" ]]; then
             gmssl certparse < "$2"
+        else
+            echo invalid cryptography type $1
         fi
         ;;
     adduser)
@@ -558,6 +560,35 @@ case "$cmd" in
         else
             echo $mech
         fi
+        ;;
+    geninitcfg)
+        cmdline="rpcfctl geninitcfg [<output file>]"
+        drvpath=$cfgPath/driver.json
+        if [[ $# -gt 0 ]]; then
+            python3 $cmddir/geninitcfg.py $drvpath $1
+        else
+            python3 $cmddir/geninitcfg.py $drvpath
+        fi
+        ;;
+
+    cfgweb)
+        #updating webserver config, nginx or apache
+        rpcfctl geninitcfg > /tmp/initcfg.json
+        python3 $cmddir/updwscfg.py /tmp/initcfg.json
+        #rm /tmp/initcfg.json
+        ;;
+    cfgkrb5)
+        #updating kerberos config
+        authMech=`rpcfctl authmech`
+        if [[ "x$authMech" != "xkrb5" ]]; then
+            echo "Kerberos is not current authentication mechanism"
+            exit 1
+        fi
+        pushd $cmddir
+        rpcfctl geninitcfg > /tmp/initcfg.json
+        python3 -c 'import sys; from updk5cfg import ConfigAuthServer; ConfigAuthServer(sys.argv[1]))' "/tmp/initcfg.json"
+        rm /tmp/initcfg.json
+        popd
         ;;
     login)
         mech=`rpcfctl authmech`
