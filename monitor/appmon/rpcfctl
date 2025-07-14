@@ -97,13 +97,13 @@ Commands:
                          command line is "rpcfctl genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
                          example: rpcfctl genkey openssl 1 1
 
-    login                Authenticate the user with the authentication mechanism
+    login                Authenticate the user using the authentication mechanism
                          specified in 'driver.json'
 
                          For SimpAuth(Password), 'login' saves the credential in
-                         a secure way to allow non-js client to connect to
-                         rpc-frmwrk server. JS client will login from the
-                         browser.
+                         a secure place, and enables non-js client to connect to
+                         rpc-frmwrk server from command line. JS client will
+                         login from the browser.
 
                          For Kerberos, 'login' preforms the preauth login with
                          'kinit', to get the ticket-grant-ticket from KDC.  For
