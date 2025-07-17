@@ -49,6 +49,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
     authMech = None
     drvCfg = cfgList[0]
     maxConns = 0
+    bWS = False
     for port in drvCfg.get( "Ports", [] ):
         if port.get( "PortClass" ) == "RpcTcpBusPort":
             params = port.get("Parameters", [])
@@ -70,6 +71,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 connElem[ "EnableWS" ] = param[ "EnableWS" ]
                 if connElem[ "EnableWS" ] == "true":
                     connElem[ "DestURL" ] = param[ "DestURL" ]
+                    bWS = True
                 connElem[ "RouterPath" ] = param[ "RouterPath" ]
                 connList.append( connElem )
             maxConns = port.get( "MaxConnections", "" )
@@ -144,9 +146,13 @@ def GenInitCfgFromDrv( cfgList : list )->object:
 
     oMisc = dict()
     oMisc[ "MaxConnections" ] = maxConns
-    oMisc[ "ConfigWebServer" ] = "true"
-    oMisc[ "ConfigKrb5" ] = "true"
-    oMisc[ "KinitProxy" ] = "true"
+    if bWS:
+        oMisc[ "ConfigWebServer" ] = "true"
+
+    if authMech == "krb5":
+        oMisc[ "ConfigKrb5" ] = "true"
+    oMisc[ "KinitProxy" ] = "false"
+
     elemSecs[ "misc" ] = oMisc
 
     rtauth = cfgList[ 2 ]
