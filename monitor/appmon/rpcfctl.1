@@ -115,6 +115,27 @@ Update web server configuration (nginx or apache) using current rpc-frmwrk confi
 .B cfgkrb5
 Update Kerberos configuration using current rpc-frmwrk configuration.
 .TP
+.B login [arguments]
+Authenticate the user using the authentication mechanism specified in 'driver.json'.
+.RS 4
+.TP
+ .SimpAuth(Password): 'login' saves the credential in a secure place, and enables non-js client to connect to rpc-frmwrk server from command line. JS client will login from the browser.
+
+.TP
+ .Kerberos: 'login' performs the preauth login with 'kinit', to get the ticket-grant-ticket from KDC.
+
+.TP
+ .OAuth2: 'login' will initiate the authorization-code-grant process to get a security token (not the access token) from rpc-frmwrk. With which, the non-js client can connect to the rpc-frmwrk.
+
+.RE
+
+.TP
+.B backup 
+Backup server-side settings. The output is a tarball named rpcf-backup-YYMMHH.tar.gz command line is 'rpcfctl backup'.
+.TP
+.B restore 
+Restore the server-side settings from a tarball. Command line is 'rpcfctl restore <backup file>'
+.TP
 .B -h, --help
 Show help message and exit.
 

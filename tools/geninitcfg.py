@@ -148,9 +148,13 @@ def GenInitCfgFromDrv( cfgList : list )->object:
     oMisc[ "MaxConnections" ] = maxConns
     if bWS:
         oMisc[ "ConfigWebServer" ] = "true"
+    else:
+        oMisc[ "ConfigWebServer" ] = "false"
 
     if authMech == "krb5":
         oMisc[ "ConfigKrb5" ] = "true"
+    else:
+        oMisc[ "ConfigKrb5" ] = "false"
     oMisc[ "KinitProxy" ] = "false"
 
     elemSecs[ "misc" ] = oMisc

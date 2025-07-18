@@ -88,14 +88,14 @@ Commands:
                          webserver if WebSocket connection is enabled.
 
 
-    genkey               Generate self-signed public key/cert pair from command
+    genkeys              Generate self-signed public key/cert pair from command
                          line. Note that, The newly generated key/cert will not
                          automatically be applied to the SSL connection. You
                          need to use either 'rpcfg.py' or the 'importkey'
                          subcommand to get it done. 
 
-                         command line is "rpcfctl genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
-                         example: rpcfctl genkey openssl 1 1
+                         command line is "rpcfctl genkeys <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
+                         example: rpcfctl genkeys openssl 1 1
 
     login                Authenticate the user using the authentication mechanism
                          specified in 'driver.json'
@@ -112,6 +112,13 @@ Commands:
                          token ( not the access token ) from the rpc-frmwrk.
                          With which, the non-js client can connect to the
                          rpc-frmwrk.
+
+    backup               Backup server-side settings. The output is a tarball
+                         named rpcf-backup-YYMMHH.tar.gz command line is
+                         'rpcfctl backup'.
+
+    restore              Restore the server-side settings from a tarball.
+                         command line is 'rpcfctl restore <backup file>'
 
 
     -h, --help           Show this help message and exit.
@@ -353,8 +360,8 @@ case "$cmd" in
         if [[ "x$xauthmech" == "xSimpAuth" ]] ||
             [[ "x$xauthmech" == "xOAuth2" ]]; then
             regfsmnt -i $HOME/rpcf/clientreg.dat
-            rpcfctl genkey openssl 1 1
-            rpcfctl genkey gmssl 1 1
+            rpcfctl genkeys openssl 1 1
+            rpcfctl genkeys gmssl 1 1
         fi
         ;;
     importkey | import)
@@ -419,9 +426,9 @@ case "$cmd" in
             echo "And don't forget to update your web server configuration if necessary"
         fi
         ;;
-    genkey)
+    genkeys)
         # generate self-signed openssl RSA key
-        cmdline="rpcfctl genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
+        cmdline="rpcfctl genkeys <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
         if [[ $# -lt 3 ]]; then
             echo "Error: Missing argument" 
             echo $cmdline
@@ -617,6 +624,70 @@ case "$cmd" in
             fi
             kinit -kt $HOME/rpcf/krb5cli.keytab $1
         fi
+        ;;
+    backup)
+        if rpcfctl list | grep online > /dev/null; then
+            echo Error some applications are still running.
+            exit 1
+        fi
+        rpcfctl geninitcfg > ~/.rpcf/cfgbk.json
+        tarfile=`realpath rpcf-backup-$(date +%Y%m%H).tar.gz`
+        pushd $HOME > /dev/null
+        if tar cf "$tarfile" .rpcf; then
+            ret=0
+        else
+            ret=1
+        fi
+        popd > /dev/null
+        if (( $ret == 0 )); then
+            echo Successfully generated the backup tarball $tarfile.
+        else
+            echo Error generating the backup tarball.
+        fi
+        ;;
+    restore)
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing the backup package to restore" 
+            echo $cmdline
+            exit 1
+        fi
+        tarfile=`realpath "$1"`
+        if [[ ! -f "$tarfile" ]]; then
+            echo "Error: invalid backup package"
+            exit 1
+        fi
+        pushd $HOME > /dev/null
+        if [[ -d .rpcf ]]; then
+            echo "Warning: directory .rpcf will be overritten, continue(y/N)?"
+            read answer
+            if [ "x$answer" == "x" ] || [ "x$answer" == "xno" ] || [[ "x$answer" == "xNo" ]]; then
+                popd > /dev/null
+                exit 0
+            fi
+        fi
+        if ! tar xf $tarfile; then
+            echo "Error: invalid backup package"
+            popd > /dev/null
+            exit 1
+        fi
+        if ! cd .rpcf; then
+            echo "Error, .rpcf directory does not exist"
+            popd > /dev/null
+            exit 1
+        fi
+        if [[ ! -f cfgbk.json ]]; then
+            echo "Error, did not find the config backup file"
+            popd > /dev/null
+            exit 1
+        fi
+        if [[ "x$(whoami)" == "xroot" ]];then
+            SUDOCMD=
+        elif which sudo > /dev/null; then
+            SUDOCMD=sudo
+        fi
+        $SUDOCMD python3 $cmddir/rpcfgnui.py ./cfgbk.json
+        echo Restore completed successfully
+        popd > /dev/null
         ;;
     *)
         echo "Unknown command: $cmd"
