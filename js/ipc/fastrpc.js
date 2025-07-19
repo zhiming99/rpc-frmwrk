@@ -185,6 +185,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
         this.OnDataReceived = this.OnDataReceivedImpl.bind(this);
         this.OnStreamClosed = this.OnStmClosedImpl.bind(this);
         this.m_mapPendingReqs = new Map();
+        this.m_funcForwardRequestNonStream = this.m_funcForwardRequest
         this.m_funcForwardRequest = this.ForwardRequest.bind( this );
         this.m_hStream = null;
 
@@ -407,7 +408,8 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 this.m_oParent.m_dwTimeoutSec * 1000;
         }
 
-        oContext.m_qwTaskId = dmsg.GetSerial();
+        if( oContext !== undefined )
+            oContext.m_qwTaskId = dmsg.GetSerial();
 
         ioReq.m_oReq = oReq;
         ioReq.m_iMsgId = oCallback.m_qwTaskId;

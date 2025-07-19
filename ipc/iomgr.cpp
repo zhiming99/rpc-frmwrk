@@ -3340,4 +3340,214 @@ gint32 UpdateDrvCfg(
     return ret;
 }
 
+bool IsSSLEnabled(
+    const Json::Value& oValue,
+    bool& bOpenSSL,
+    const stdstr& strPortClass )
+{
+    bool bRet = false;
+
+    do{
+        if( !oValue.isObject() ||
+            oValue.empty() )
+            break;
+
+        if( !oValue.isMember( JSON_ATTR_MATCH ) ||
+            !oValue[ JSON_ATTR_MATCH ].isArray() )
+            break;
+
+        const Json::Value& oMatchArray =
+            oValue[ JSON_ATTR_MATCH ];
+
+        if( oMatchArray == Json::Value::null )
+            break;
+
+        if( !oMatchArray.isArray() ||
+            oMatchArray.size() == 0 )
+            break;
+
+        guint32 i = 0;
+        for( ; i < oMatchArray.size(); i++ )
+        {
+            const Json::Value& elem = oMatchArray[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
+                continue;
+
+
+            if( !elem.isMember( JSON_ATTR_PROBESEQ ) )
+                break;
+
+            const Json::Value& oDrvArray =
+                elem[ JSON_ATTR_PROBESEQ ];
+
+            if( !oDrvArray.isArray() ||
+                oDrvArray.size() == 0 )
+                break;
+
+            const Json::Value& oDrvName =
+                oDrvArray[ 0 ];
+
+            if( oDrvName.empty() ||
+                !oDrvName.isString() )
+                break;
+
+            if( oDrvName.asString() ==
+                "RpcOpenSSLFidoDrv" )
+            {
+                bOpenSSL = true;
+                bRet = true;
+            }
+            else if( oDrvName.asString() ==
+                "RpcGmSSLFidoDrv" )
+            {
+                bOpenSSL = false;
+                bRet = true;
+            }
+            break;
+        }
+
+    }while( 0 );
+
+    return bRet;
+}
+
+static gint32 GetKeyPathInternal(
+    CIoManager* pMgr,
+    stdstr& strKeyPath,
+    gint32 iType )
+{
+    gint32 ret = 0;
+    bool bEnableSSL = false;
+    do{
+        CDriverManager& oDrv =
+            pMgr->GetDrvMgr();
+        auto& oValue = oDrv.GetJsonCfg();
+
+        if( !oValue.isObject() ||
+            oValue.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        bool bOpenSSL = false;
+        bEnableSSL = IsSSLEnabled(
+            oValue, bOpenSSL );
+
+        if( !bEnableSSL )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        stdstr strPortClass;
+        if( bOpenSSL )
+            strPortClass = PORT_CLASS_OPENSSL_FIDO;
+        else
+            strPortClass = PORT_CLASS_GMSSL_FIDO;
+
+        if( !oValue.isMember( JSON_ATTR_PORTS ) ||
+            !oValue[ JSON_ATTR_MATCH ].isArray() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        const Json::Value& oPortArray =
+            oValue[ JSON_ATTR_MATCH ];
+
+        if( oPortArray == Json::Value::null )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        if( !oPortArray.isArray() ||
+            oPortArray.size() == 0 )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        for( int i = 0; i < oPortArray.size(); i++ )
+        {
+            const Json::Value& elem = oPortArray[ i ];
+            if( elem == Json::Value::null )
+                continue;
+
+            if( strPortClass !=
+                elem[ JSON_ATTR_PORTCLASS ].asString() )
+                continue;
+
+            if( !elem.isMember( JSON_ATTR_PARAMETERS ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            auto& oParams = elem[ JSON_ATTR_PARAMETERS ];
+            if( oParams.empty() || !oParams.isObject() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            stdstr strAttr;
+            if( iType == 0 )
+                strAttr = JSON_ATTR_KEYFILE;
+            else if( iType == 1 )
+                strAttr = JSON_ATTR_CERTFILE;
+            else if( iType == 2 )
+                strAttr = JSON_ATTR_CACERT;
+            else
+            {
+                ret = -EINVAL;
+                break;
+            }
+            if( !oParams.isMember( strAttr ) )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            auto& oKey = oParams[ strAttr ];
+            if( oKey.empty() || ! oKey.isString() )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            strKeyPath = oKey.asString();
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 GetSSLKeyPath(
+    CIoManager* pMgr, stdstr& strKeyPath )
+{
+    if( pMgr == nullptr )
+        return -EINVAL;
+    return GetKeyPathInternal(
+        pMgr, strKeyPath, 0 );
+}
+
+gint32 GetSSLCertPath(
+    CIoManager* pMgr, stdstr& strKeyPath )
+{
+    if( pMgr == nullptr )
+        return -EINVAL;
+    return GetKeyPathInternal(
+        pMgr, strKeyPath, 1 );
+}
+
+gint32 GetSSLCACertPath(
+    CIoManager* pMgr, stdstr& strKeyPath )
+{
+    if( pMgr == nullptr )
+        return -EINVAL;
+    return GetKeyPathInternal(
+        pMgr, strKeyPath, 1 );
+}
+
 }

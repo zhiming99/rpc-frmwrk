@@ -1,0 +1,78 @@
+.TH OINIT 1 "June 2025" "rpc-frmwrk" "OAuth2 Login Tool Manual"
+
+.SH NAME
+oinit \- OAuth2 login tool for rpc-frmwrk
+
+.SH SYNOPSIS
+.B python3 oinit.py
+[\fIOPTIONS\fR] [<auth url>]
+
+.B python3 -m oinit
+[\fIOPTIONS\fR] [<auth url>]
+
+.SH DESCRIPTION
+.B oinit
+is an OAuth2 login tool for rpc-frmwrk, designed for non-JavaScript clients (such as C++, Python, or Java). It initiates the OAuth2 Authorization Code flow and obtain the cookie from the backend OAuth2 checker. 
+.B oinit
+then stores the cookie, so that when the non-JS client starts, it can provide the cookie with which the OAuth2 checker can verify the access token binding to the cookie. And
+.B oinit
+can also clear expired login information from the command line when the cookie is expired or invalid.
+
+.SH INSTALLATION
+.TP
+.B 1.
+Install via deb or rpm package. In the monitor/oinit directory, run \fBmake deb\fR or \fBmake rpm\fR to generate the package in the output directory, then use dpkg or rpm to install.
+.TP
+.B 2.
+Install via wheel package. In the monitor/oinit directory, run \fBmake wheel\fR to generate a wheel package in the output directory, then use pip to install.
+.TP
+.B 3.
+oinit is not integrated into the rpc-frmwrk one-click installation because of its unique dependencies and platform-specific installation requirements.
+
+.SH OPTIONS
+.TP
+.B -d <desc file>
+Find login information from the specified object description file.
+.TP
+.B -c 1
+Use the example container django_oa2check_https for OAuth2 login.
+.TP
+.B -c 2
+Use the example container springboot_oa2check_https for OAuth2 login.
+.TP
+.B -e
+Encrypt the credentials obtained from this login.
+.TP
+.B -r
+Remove stored login information from the list.
+.TP
+.B -f
+By default, oinit uses Chrome for login. If specified, oinit will use Firefox instead.
+.TP
+.B -h
+Show help message and exit.
+
+.SH ARGUMENTS
+.TP
+.B <auth url>
+The OAuth2 login link. If only this argument is provided (with no options), oinit will use it for OAuth2 login. The auth url should be a login link for a deployed rpc-frmwrk JS application, which will guide you through the OAuth2 login process and return to the application page upon success.
+
+If no options or arguments are given, oinit will attempt to use stored login information from the registry to perform OAuth2 login. In practice, you do not need to use this tool for every login, as many OAuth2 server credentials are valid for several days.
+
+.SH DEPENDENCIES
+oinit depends on \fBselenium\fR for UI-based pre-auth authentication. Selenium can use either Firefox or Chrome to authenticate via the OAuth2 provider's web page. Ensure your client machine has Firefox or Chrome installed, and the appropriate browser driver (geckodriver for Firefox, chromedriver for Chrome) is installed and available in your PATH.
+
+.SH FILES
+.TP
+.B ~/.rpcf/
+Default directory for registry and credential storage.
+
+.SH SEE ALSO
+.BR rpcrouter (1),
+.BR selenium (1)
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is licensed under the GNU GPLv3. See http://www.gnu.org/licenses/gpl-3.0.html for details.

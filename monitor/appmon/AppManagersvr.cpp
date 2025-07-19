@@ -158,7 +158,11 @@ gint32 GetCurStream(
         ret = oCfg.GetPointer(
             propEventSink, pCallback );
         if( ERROR( ret ) )
+        {
+            ret = oCfg.GetIntPtr( propStmHandle,
+                ( guint32*& )hstm );
             break;
+        }
         ret = pIf->GetStream( pCallback, hstm );
     }while( 0 );
     return ret;
@@ -370,7 +374,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
         gint32 iRet = 0;
         if( dwType == ptOutput )
         do{
-            // notify the app of the input point
+            // notify the subscribers of the input point
             std::vector< STM_POINT > vecStms;
             iRet = GetInputToNotify( this,
                 m_pAppRegfs, strPath, vecStms );
@@ -389,7 +393,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
             }
         }while( 0 );
         do{
-            // notify the owner app of the point
+            // notify the ower app this change
             HANDLE hstm = INVALID_HANDLE;
             iRet = GetOwnerStream(
                 this, m_pAppRegfs, strApp, hstm );
@@ -434,11 +438,6 @@ gint32 CAppManager_SvrImpl::SetPointValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
-        if( !IsAppOnline( strApp ) )
-        {
-            ret = -EACCES;
-            break;
-        }
         RFHANDLE hPtDir = INVALID_HANDLE;
         ret = pfs->OpenDir( strPath +
             strApp + "/" POINTS_DIR "/" + strPoint,
@@ -448,21 +447,30 @@ gint32 CAppManager_SvrImpl::SetPointValue(
 
         CFileHandle oHandle( pfs, hPtDir );
 
-        ret = pfs->Access(
-            hPtDir, OUTPUT_PULSE, F_OK );
-        if( ERROR( ret ) )
+        Variant oFlags( ( guint32 )0 );
+        guint32& dwFlags = oFlags;
+
+        pfs->GetValue(
+            hPtDir, POINT_FLAGS, oFlags );
+
+        if( ( dwFlags & POINTFLAG_NOSTORE ) == 0 )
         {
-            ret = pfs->GetValue( hPtDir,
-                VALUE_FILE, oOrigin );
-            if( SUCCEEDED( ret ) &&
-                oOrigin == value )
+            ret = pfs->Access(
+                hPtDir, OUTPUT_PULSE, F_OK );
+            if( ERROR( ret ) )
+            {
+                ret = pfs->GetValue( hPtDir,
+                    VALUE_FILE, oOrigin );
+                if( SUCCEEDED( ret ) &&
+                    oOrigin == value )
+                    break;
+                ret = 0;
+            }
+            ret = pfs->SetValue(
+                hPtDir, VALUE_FILE, value );
+            if( ERROR( ret ) )
                 break;
-            ret = 0;
         }
-        ret = pfs->SetValue(
-            hPtDir, VALUE_FILE, value );
-        if( ERROR( ret ) )
-            break;
 
         HANDLE hcurStm = INVALID_HANDLE;
         GetCurStream( this, pContext, hcurStm );
@@ -515,11 +523,6 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
         }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
-        if( !IsAppOnline( strApp ) )
-        {
-            ret = -EACCES;
-            break;
-        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" VALUE_FILE; 
@@ -556,11 +559,6 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
-        if( !IsAppOnline( strApp ) )
-        {
-            ret = -EACCES;
-            break;
-        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" VALUE_FILE; 
@@ -620,11 +618,7 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
-        if( !IsAppOnline( strApp ) )
-        {
-            ret = -EACCES;
-            break;
-        }
+
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" + strAttr; 
@@ -653,11 +647,6 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
-        if( !IsAppOnline( strApp ) )
-        {
-            ret = -EACCES;
-            break;
-        }
         stdstr strAttrVal =  strPath + strApp +
             "/" POINTS_DIR "/" +
             strPoint + "/" + strAttr; 
@@ -676,11 +665,6 @@ gint32 CAppManager_SvrImpl::SetPointValues(
     gint32 ret = 0;
     auto& pfs = m_pAppRegfs;
     do{
-        if( !IsAppOnline( strAppName ) )
-        {
-            ret = -EACCES;
-            break;
-        }
         stdstr strDir = "/" APPS_ROOT_DIR "/";
         strDir += strAppName + "/" POINTS_DIR "/";
 
@@ -756,11 +740,6 @@ gint32 CAppManager_SvrImpl::GetPointValues(
     gint32 ret = 0;
     auto& pfs = m_pAppRegfs;
     do{
-        if( !IsAppOnline( strAppName ) )
-        {
-            ret = -EACCES;
-            break;
-        }
         stdstr strDir = "/" APPS_ROOT_DIR "/";
         strDir += strAppName + "/" POINTS_DIR "/";
 
@@ -789,6 +768,7 @@ gint32 CAppManager_SvrImpl::GetPointValues(
                     "Error get data type %s/%s",
                     strAppName.c_str(),
                     elem.c_str() );
+                continue;
             }
             auto iType = ( guint32& )dt;
             if( iType < typeDMsg )
@@ -836,9 +816,10 @@ gint32 CAppManager_SvrImpl::GetPointValues(
             if( ERROR( ret ) )
             {
                 OutputMsg( ret,
-                    "Error SetPointValue %s/%s",
+                    "Error GetPointValue %s/%s",
                     strAppName.c_str(),
                     elem.c_str() );
+                continue;
             }
             arrKeyVals.push_back( kv );
         }
@@ -858,27 +839,15 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
     bool bOwnerSet = false;
     auto& pfs = m_pAppRegfs;
     do{
-        HANDLE hstm, hOwner;
+        HANDLE hstm;
         ret = GetCurStream( this, pContext, hstm );
         if( ERROR( ret ) )
             break;
-        ret = GetOwnerStream( this,
-            pfs, strAppName, hOwner );
-        if( ERROR( ret ) )
+        if( IsAppOnline( strAppName ) )
         {
-            ret = 0;
-        }
-        else
-        {
-            InterfPtr ptrIf;
-            gint32 iRet = GetStmSkel(
-                hOwner, ptrIf );
-            if( SUCCEEDED( iRet ) )
-            {
-                // already occupied
-                ret = -EEXIST;
-                break;
-            }
+            // already occupied
+            ret = -EEXIST;
+            break;
         }
 
         ret = SetOwnerStream(
@@ -941,6 +910,15 @@ gint32 CAppManager_SvrImpl::ClaimAppInst(
         ret = this->GetPointValues(
             pContext, strAppName,
             vecPoints, arrPtToGet );
+        if( ERROR( ret ) )
+            break;
+
+        // online notify
+        stdstr strPtName =
+            strAppName + "/" ONLINE_NOTIFY;
+        Variant oVar( strAppName );
+        this->SetPointValue(
+            pContext, strPtName, oVar );
 
     }while( 0 );
     if( ERROR( ret ) && bOwnerSet )
@@ -995,6 +973,19 @@ gint32 CAppManager_SvrImpl::FreeAppInstsInternal(
         if( oSet.empty() )
             m_mapAppOwners.erase( itr );
         oLock.Unlock();
+
+        CCfgOpener oContext;
+        oContext.SetIntPtr( propStmHandle,
+            ( guint32*& )hstm );
+        IConfigDb* pContext = oContext.GetCfg();
+        for( auto& elem : vecValidApps )
+        {
+            Variant oVar( elem );
+            stdstr strOffNotify =
+                elem + "/" OFFLINE_NOTIFY;
+            this->SetPointValue( pContext,
+                strOffNotify, oVar );
+        }
 
         for( auto& elem : vecValidApps )
         {

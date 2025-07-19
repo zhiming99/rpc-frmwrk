@@ -20,7 +20,7 @@ appmancli/__init__.py:
 	@pushd appmancli; \
 	bexit=0;if [ ! -f __init__.py ];then bexit=1;fi; \
     if(($$bexit==0));then echo all files are ready;exit 0;fi; \
-    if ! which ridlc > /dev/null; then \
+    if true; then \
         if [ ! -f ./mktpl ];then \
             cp $(top_dir)/ridl/{mktpl,mktplsvr,pymktpl,mktplcli,drvtpl.json,odesctpl2.json,synccfg.py} . ;\
         fi;\

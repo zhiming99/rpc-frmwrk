@@ -186,6 +186,49 @@ gint32 CRpcStmChanSvr::AcceptNewStream(
     return ret;
 }
 
+gint32 CFastRpcServerBase::StopBusPort(
+    IEventSink* pCallback )
+{
+    gint32 ret = 0;
+    do{
+        ObjPtr pDrv;
+        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
+        ret = oDrvMgr.GetDriver( true,
+            DBUS_STREAM_BUS_DRIVER, pDrv );
+        if( ERROR( ret ) )
+            break;
+
+        CDBusStreamBusDrv* pdrv = pDrv;
+        if( pdrv == nullptr )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        PortPtr pPort;
+        ret = pdrv->GetPortById(
+            GetBusId(), pPort );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oIfCfg( this );
+        stdstr strName;
+        ret = oIfCfg.GetStrProp(
+            propObjName, strName );
+        if( ERROR( ret ) )
+            break;
+
+        pdrv->RemoveBinding( strName + "_s" );
+
+        CDBusStreamBusPort* pBus = pPort;
+        ret = pdrv->DestroyPortSynced( 
+            pBus, pCallback );
+
+    }while( 0 );
+
+    return ret;
+}
+
 gint32 CFastRpcServerBase::OnPreStop(
     IEventSink* pCallback )
 {
@@ -228,6 +271,14 @@ gint32 CFastRpcServerBase::OnPreStop(
 
             pTaskGrp->AppendTask( pTask );
         }
+
+        TaskletPtr pStopBus;
+        ret = DEFER_IFCALLEX_NOSCHED2(
+            0, pStopBus, this,
+            &CFastRpcServerBase::StopBusPort,
+            nullptr );
+        if( SUCCEEDED( ret ) )
+            pTaskGrp->AppendTask( pStopBus );
 
         if( pTaskGrp->GetTaskCount() == 0 )
             break;
@@ -1463,46 +1514,7 @@ gint32 CFastRpcServerBase::OnPostStart(
 
 gint32 CFastRpcServerBase::OnPostStop(
     IEventSink* pCallback )
-{
-    gint32 ret = 0;
-    do{
-        ObjPtr pDrv;
-        auto oDrvMgr = GetIoMgr()->GetDrvMgr();
-        ret = oDrvMgr.GetDriver( true,
-            DBUS_STREAM_BUS_DRIVER, pDrv );
-        if( ERROR( ret ) )
-            break;
-
-        CDBusStreamBusDrv* pdrv = pDrv;
-        if( pdrv == nullptr )
-        {
-            ret = -EFAULT;
-            break;
-        }
-
-        PortPtr pPort;
-        ret = pdrv->GetPortById(
-            GetBusId(), pPort );
-        if( ERROR( ret ) )
-            break;
-
-        CCfgOpenerObj oIfCfg( this );
-        stdstr strName;
-        ret = oIfCfg.GetStrProp(
-            propObjName, strName );
-        if( ERROR( ret ) )
-            break;
-
-        pdrv->RemoveBinding( strName + "_s" );
-
-        CDBusStreamBusPort* pBus = pPort;
-        ret = pdrv->DestroyPortSynced( 
-            pBus, pCallback );
-
-    }while( 0 );
-
-    return ret;
-}
+{ return 0; }
 
 gint32 CFastRpcSkelProxyBase::BuildBufForIrp(
     BufPtr& pBuf, IConfigDb* pReqCall )

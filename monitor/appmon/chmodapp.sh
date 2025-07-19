@@ -10,7 +10,8 @@ function Usage()
 {
 cat << EOF
 Usage: $0 [-h] <ugo+-=perm> <app name>
-    This command change the owner and group of the application <app name>
+    This command change the access mode flags of the application <app name>.
+    'perm' can be one or combination of 'r', 'w', 'x'.
     -h: Print this help
 EOF
 }

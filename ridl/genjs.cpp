@@ -1971,6 +1971,7 @@ gint32 CImplJsMthdProxyBase::OutputSync()
             BLOCK_OPEN;
             if( dwOutCount > 0 )
                 EmitRespList( m_pWriter, pOutArgs );
+            Wa( "var oReq = new CConfigDb2();" );
         }
         stdstr strIfName = m_pIf->GetName();
 
@@ -2761,6 +2762,13 @@ gint32 CImplJsMainFunc::OutputCli(
             {
                 CCOUT << strReturn << ".push( " << strVar << " );";
             }
+
+            if( i == vecSvcs.size() - 1 )
+            {
+                NEW_LINE;
+                CCOUT << "globalThis." << strReturn
+                    << " = " << strReturn << ";";
+            }
             
             if( pSvc->IsStream() )
             {
@@ -2791,9 +2799,6 @@ gint32 CImplJsMainFunc::OutputCli(
                 CCOUT << "*/";
             }
             EmitProxySampleCode( vecSvcs[ i ] );
-            NEW_LINE;
-            CCOUT << "globalThis." << strReturn
-                << " = " << strReturn << ";";
             BLOCK_CLOSE;
             CCOUT << ").catch((e)=>";
             BLOCK_OPEN;
@@ -3195,7 +3200,7 @@ gint32 CExportJsSampleHtml::Output()
         BLOCK_CLOSE;
         if( vecSvcs.size() == 1 )
         {
-            CCOUT << "else if( globalThis." << strVar << ".m_iState === 5 )";
+            CCOUT << "else if( globalThis." << strVar << ".m_iState === 0 )";
             BLOCK_OPEN;
             CCOUT << "console.log( \"RPC connection is down...\" );";
             NEW_LINE;

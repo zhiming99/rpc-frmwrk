@@ -1116,6 +1116,8 @@ namespace cpp
     gint32 StopIoMgr( ObjPtr* pObj );
     %MethodCode
     sipRes = 0;
+    PyThreadState *_save;
+    Py_UNBLOCK_THREADS;
     do{
         if( !g_pRouter.IsEmpty() )
         {
@@ -1136,6 +1138,7 @@ namespace cpp
         dlclose( g_pLibHandle );
         g_pLibHandle = nullptr;
     }
+    Py_BLOCK_THREADS;
     %End
 
     cpp::ObjPtr* CreateObject(

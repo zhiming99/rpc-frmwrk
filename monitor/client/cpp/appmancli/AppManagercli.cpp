@@ -997,10 +997,6 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
             veckv.push_back( okv );
         }
 
-        okv.strKey = O_PID;
-        okv.oValue = ( guint32 )getpid();
-        veckv.push_back( okv );
-
         okv.strKey = S_MAX_QPS;
         ret = pSvr->GetProperty(
             propQps, okv.oValue );
@@ -1012,7 +1008,18 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
             propStmPerSess, okv.oValue );
         if( SUCCEEDED( ret ) )
             veckv.push_back( okv );
+        ret = 0;
+    }while( 0 );
+    return 0;
+}
 
+gint32 CAsyncStdAMCallbacks::GetPointValuesToInit(
+    InterfPtr& pIf,
+    std::vector< KeyValue >& veckv )
+{
+    gint32 ret = 0;
+    do{
+        KeyValue okv;
         okv.strKey = O_WORKING_DIR;
         char szPath[PATH_MAX];
         if( getcwd( szPath, sizeof(szPath)) != nullptr)
@@ -1026,7 +1033,30 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
                 veckv.push_back( okv );
             }
         }
+
+        okv.strKey = O_PID;
+        okv.oValue = ( guint32 )getpid();
+        veckv.push_back( okv );
+
+        okv.strKey = S_CMDLINE;
+        stdstr strCmdLine;
+        CRpcServices* pSvc = pIf;
+        CIoManager* pMgr = pSvc->GetIoMgr();
+        ret = pMgr->GetCmdLineOpt(
+            propCmdLine, strCmdLine );
+        if( SUCCEEDED( ret ) )
+        {
+            BufPtr pBuf( true );
+            ret = pBuf->Append(
+                strCmdLine.c_str(),
+                strCmdLine.size() );
+            if( ERROR( ret ) )
+                break;
+            okv.oValue = pBuf;
+            veckv.push_back( okv );
+        }
         ret = 0;
+
     }while( 0 );
     return ret;
 }

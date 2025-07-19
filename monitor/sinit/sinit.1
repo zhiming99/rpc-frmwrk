@@ -1,0 +1,95 @@
+.TH SINIT 1 "June 2025" "rpc-frmwrk" "SimpleAuth Credential Manager Manual"
+
+.SH NAME
+sinit \- Simple Authentication Credential Manager for rpc-frmwrk
+
+.SH SYNOPSIS
+.B sinit
+[\fIOPTIONS\fR]
+
+.SH DESCRIPTION
+.B sinit
+is a command-line tool for storing, listing, removing, and managing user credentials for the Simple Authentication (SimpAuth) mechanism in the rpc-frmwrk framework. Credentials are stored in a secure registry file, and can be encrypted using either standard cryptography or GmSSL.
+
+.SH OPTIONS
+.TP
+.BR -s " <userName>"
+Store a credential for \fIuserName\fR. If \fB-p\fR is not specified, the password will be prompted interactively (with confirmation).
+.TP
+.BR -p " <password>"
+Specify the password for storing a credential. If omitted with \fB-s\fR, you will be prompted to enter and confirm the password.
+.TP
+.BR -r " <userName>"
+Remove the credential for \fIuserName\fR.
+.TP
+.BR -d " <userName>"
+Set \fIuserName\fR as the default credential.
+.TP
+.BR -l
+List all stored credentials. The default user is marked with [*], and GmSSL credentials are marked with [g].
+.TP
+.BR -g
+Use GmSSL to encrypt the key hash (should be used with \fB-s\fR).
+.TP
+.BR -h
+Display this help message and exit.
+
+.SH USAGE
+.TP
+Store a credential (will prompt for password):
+.B
+sinit -s alice
+.TP
+Store a credential with password:
+.B
+sinit -s alice -p mypassword
+.TP
+Remove a credential:
+.B
+sinit -r alice
+.TP
+Set a default credential:
+.B
+sinit -d alice
+.TP
+List all credentials:
+.B
+sinit -l
+
+.SH NOTES
+.TP
+- The credential registry is stored at \fB~/.rpcf/clientreg.dat\fR.
+.TP
+- Credentials are stored under \fBclientreg.dat:/simpleauth/credentials/\fR.
+.TP
+- The default credential is tracked in \fB~clientreg.dat:/simpleauth/credentials/.default\fR.
+.TP
+- If only one credential is stored, it is automatically set as the default.
+.TP
+- When the default credential is removed, the first remaining credential (if any) becomes the new default.
+.TP
+- GmSSL encryption is optional and can be enabled with \fB-g\fR.
+
+.SH FILES
+.TP
+.B ~/.rpcf/clientreg.dat
+Credential registry file.
+.TP
+.B clientreg.dat:/simpleauth/credentials/
+Directory containing encrypted credential files.
+.TP
+.B clientreg.dat:/simpleauth/credentials/.default
+File containing the default user name.
+
+.SH EXIT STATUS
+Returns 0 on success, or a negative error code on failure.
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-3.0.html
+
+.SH SEE ALSO
+.BR appmonsvr (1),
+.BR regfsmnt (1),

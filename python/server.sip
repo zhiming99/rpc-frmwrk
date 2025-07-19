@@ -203,7 +203,7 @@ class CPythonServer:
         IEventSink* pCallback ) override
     { 
         StopQpsTask();
-        return 0;
+        return super::OnPreStop( pCallback );
     }
 
     gint32 InvokeUserMethod(

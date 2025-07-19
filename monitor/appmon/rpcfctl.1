@@ -1,0 +1,178 @@
+.TH RPCFCTL 1 "July 2025" "rpc-frmwrk" "Application Control Utility Manual"
+
+.SH NAME
+rpcfctl \- rpc-frmwrk Application Control Utility
+
+.SH SYNOPSIS
+.B rpcfctl
+<command> [arguments]
+
+.SH DESCRIPTION
+.B rpcfctl
+is a command-line utility for managing applications, users, groups, authentication, and security settings in the rpc-frmwrk framework. It provides commands to start, stop, restart, check status, and list applications, as well as to add, remove, and initialize the application and user registries. It also supports SSL key/cert management, authentication, and configuration for web and Kerberos integration.
+
+.SH COMMANDS
+.TP
+.B start <appname>
+Start the application \fIappname\fR.
+.TP
+.B stop <appname>
+Gracefully stop the application \fIappname\fR (SIGINT).
+.TP
+.B kill <appname>
+Forcefully stop the application \fIappname\fR (SIGKILL).
+.TP
+.B restart <appname>
+Restart the application \fIappname\fR.
+.TP
+.B status <appname>
+Show status of the application \fIappname\fR.
+.TP
+.B list
+List all the registered applications and their status.
+.TP
+.B startall
+Start all managed applications (core services first).
+.TP
+.B stopall
+Stop all managed applications (core services last).
+.TP
+.B restartall
+Restart all managed applications.
+.TP
+.B addapp <appname>, add <appname>
+Add a new application \fIappname\fR to the app registry.
+.TP
+.B rmapp <appname>, rm <appname>
+Remove the application \fIappname\fR from the app registry.
+.TP
+.B showapp <appname>
+Show detailed information for the application \fIappname\fR.
+.TP
+.B initapps
+Initialize (clear) the app registry. \fBWARNING:\fR This will clear your app registry.
+.TP
+.B inituser
+Initialize (clear) the user registry. \fBWARNING:\fR This will clear your user registry.
+.TP
+.B initsvr
+Initialize both the app and user registries on the server side.
+.TP
+.B initcli
+Initialize the client registry on the client side.
+.TP
+.B importkey <openssl|gmssl> <private key> <public cert> [<cacert file>]
+Import SSL keys and certificates for rpc-frmwrk.
+.TP
+.B genkey <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]
+Generate self-signed public/private key and certificate pairs.
+.TP
+.B printcert <openssl|gmssl> <cert file>
+Print details of a certificate file.
+.TP
+.B adduser <user name>
+Add a user to the user registry.
+.TP
+.B rmuser <user name>
+Remove a user from the user registry.
+.TP
+.B showuser <user name>
+Show details for a user.
+.TP
+.B listuser
+List all users in the user registry.
+.TP
+.B addgroup <group name>
+Add a group to the group registry.
+.TP
+.B rmgroup <group name>
+Remove a group from the group registry.
+.TP
+.B showgroup <group name>
+Show details for a group.
+.TP
+.B listgroup
+List all groups in the group registry.
+.TP
+.B joingroup <group name> <user name>
+Add a user to a group.
+.TP
+.B leavegroup <group name> <user name>
+Remove a user from a group.
+.TP
+.B authmech
+Show the current authentication mechanism in use.
+.TP
+.B login [arguments]
+Authenticate the user using the mechanism specified in driver.json.
+.TP
+.B geninitcfg [<output file>]
+Generate a config file for web or authentication configuration.
+.TP
+.B cfgweb
+Update web server configuration (nginx or apache) using current rpc-frmwrk configuration.
+.TP
+.B cfgkrb5
+Update Kerberos configuration using current rpc-frmwrk configuration.
+.TP
+.B login [arguments]
+Authenticate the user using the authentication mechanism specified in 'driver.json'.
+.RS 4
+.TP
+ .SimpAuth(Password): 'login' saves the credential in a secure place, and enables non-js client to connect to rpc-frmwrk server from command line. JS client will login from the browser.
+
+.TP
+ .Kerberos: 'login' performs the preauth login with 'kinit', to get the ticket-grant-ticket from KDC.
+
+.TP
+ .OAuth2: 'login' will initiate the authorization-code-grant process to get a security token (not the access token) from rpc-frmwrk. With which, the non-js client can connect to the rpc-frmwrk.
+
+.RE
+
+.TP
+.B backup 
+Backup server-side settings. The output is a tarball named rpcf-backup-YYMMHH.tar.gz command line is 'rpcfctl backup'.
+.TP
+.B restore 
+Restore the server-side settings from a tarball. Command line is 'rpcfctl restore <backup file>'
+.TP
+.B -h, --help
+Show help message and exit.
+
+.SH EXAMPLES
+.TP
+Start an application:
+.B
+rpcfctl start myapp
+.TP
+Add a user:
+.B
+rpcfctl adduser alice
+.TP
+Import SSL keys:
+.B
+rpcfctl importkey openssl /path/to/key.pem /path/to/cert.pem /path/to/cacert.pem
+.TP
+Generate initial web config:
+.B
+rpcfctl geninitcfg > /tmp/initcfg.json
+.TP
+Authenticate user:
+.B
+rpcfctl login alice
+
+.SH FILES
+.TP
+.B showapp.sh, getpv.sh, listapps.sh, addapp.sh, rmapp.sh, initappreg.sh, inituser.sh, updattr.py, updatekeys.py, rpcfaddu.sh, rpcfrmu.sh, rpcfshow.sh, rpcfaddg.sh, rpcfrmg.sh, rpcfmodu.sh, updwscfg.sh, updk5cfg.sh, sinit, oinit.py, rpcfg.py.
+Helper scripts used by rpcfctl, typically located in the same directory of rpcfctl or the 'rpcf' sub-directory .
+
+.SH SEE ALSO
+.BR appmonsvr (1),
+.BR rpcrouter (1),
+.BR regfsmnt (1)
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-3.0.html

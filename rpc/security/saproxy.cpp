@@ -30,7 +30,6 @@
 using namespace rpcf;
 #include "ifhelper.h"
 #include "security.h"
-#include "oa2proxy.h"
 #include "saproxy.h"
 #include "blkalloc.h"
 #include "encdec.h"

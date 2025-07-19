@@ -53,6 +53,10 @@ fi
 pushd $rootdir > /dev/null
 
 for appname in "$@"; do
+    if [[ ! -d ./apps/$appname ]]; then
+        echo $appname does not exist
+        continue
+    fi
     owner_stream=`python3 $updattr -v ./apps/$appname/owner_stream`
     if [[ -z "$owner_stream" ]] || (( $owner_stream == 0 )); then
         echo status: offline
@@ -66,8 +70,5 @@ for appname in "$@"; do
 done
 
 popd > /dev/null
-if (( $mt == 2 )); then
-    umount $rootdir
-fi
-
+undo_check_appreg_mount
 

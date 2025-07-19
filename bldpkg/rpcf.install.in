@@ -3,8 +3,10 @@ usr/lib/@DEB_HOST_MULTIARCH@/lib*.so*
 @JAVA_DEBFILES@
 usr/bin/rpcrouter
 usr/bin/rpcf_logger
+usr/bin/rpcf_sendlog
 usr/bin/regfsmnt
 usr/bin/appmon*
+usr/bin/rpcfctl
 @FUSE3_DEBFILES@
 usr/bin/rpcf/*.py
 @GMSSL_DEBFILES@
@@ -40,5 +42,8 @@ usr/share/man/man1/rpcfmodu.1
 usr/share/man/man1/rpcfshow.1
 usr/share/man/man1/updattr.1
 usr/share/man/man1/regfsmnt.1
+usr/share/man/man1/appmonsvr.1
+usr/share/man/man1/sinit.1
+usr/share/man/man1/rpcfctl.1
 @JS_DEBFILES@
 

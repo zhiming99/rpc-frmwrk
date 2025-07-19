@@ -3,6 +3,7 @@ script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 updattr=${script_dir}/updattr.py
 pubfuncs=${script_dir}/pubfuncs.sh
 addu=${script_dir}/rpcfaddu.sh
+modu=${script_dir}/rpcfmodu.sh
 
 if ! which regfsmnt; then
     echo cannot find program 'regfsmnt'. You may want \
@@ -71,3 +72,4 @@ popd > /dev/null
 
 echo adding user 'admin'
 bash $addu admin
+bash $modu -g admin admin

@@ -1,0 +1,87 @@
+.TH APPMONSVR 1 "June 2025" "rpc-frmwrk" "Application Monitor Server Manual"
+
+.SH NAME
+appmonsvr \- Application Monitor Server for rpc-frmwrk
+
+.SH SYNOPSIS
+.B appmonsvr
+[\fIOPTIONS\fR] [<mount point>]
+
+.SH DESCRIPTION
+.B appmonsvr
+is the application monitor server for the rpc-frmwrk framework. It manages application and user registries, dispatches point changes to registered applications, provides 'SimpAuth' authentication to rpcrouter, and also provides access control and monitoring to users from across internet.
+
+The server can run as a daemon, send logs to the log server 
+.B rpcf_logger
+, and optionally mount a FUSE filesystem for monitoring from non rpc-frmwrk programms.
+
+.SH OPTIONS
+.TP
+.B \-d
+Run as a daemon in the background.
+.TP
+.B \-g
+Send logs to the log server.
+.TP
+.B \-u
+Enable FUSE to dump debug information.
+.TP
+.B \-l
+Enable local search for services.
+.TP
+.B \-h
+Display this help message and exit.
+
+.SH ARGUMENTS
+.TP
+.B <mount point>
+The directory to be used as the FUSE mount point (required if FUSE is enabled).
+
+.SH FILES
+.TP
+.B ~/.rpcf/usereg.dat
+User registry file.
+.TP
+.B ~/.rpcf/appreg.dat
+Application registry file.
+.TP
+.B ~/.rpcf/
+Default directory for registry files.
+
+.SH USAGE
+Typical usage:
+
+.nf
+    appmonsvr -d
+    appmonsvr -g
+    appmonsvr -i
+    appmonsvr /mnt/appmon
+.fi
+
+To format the user registry, use the \fBinituser.sh\fR script.
+To format the application registry, use the \fBinitappreg.sh\fR script.
+
+.SH SIGNALS
+.TP
+.B SIGINT
+Gracefully stops the server.
+.TP
+.B SIGHUP
+Gracefully stops and restarts the server.
+.TP
+.B SIGQUIT
+Gracefully stops the server.
+
+.SH EXIT STATUS
+Returns 0 on success, or a negative error code on failure.
+
+.SH SEE ALSO
+.BR inituser.sh (1),
+.BR initappreg.sh (1),
+.BR regfsmnt (1)
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-3.0.html
