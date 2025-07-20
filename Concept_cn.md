@@ -86,11 +86,11 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 当`rpc-frmwrk`的级联(multihop)功能提供了透明访问不同节点上的服务的功能。当rpcrouter以树形级联(multihop)方式部署时，可以使客户端程序通过树根节点（注：可以把一个节点理解成一个主机），访问树上的所有节点，而不用重复建立连接。这时对某个节点的访问，就需要`路由器路径`来标识目的地。级联(Multihop)的配置可以使用`rpcfg.py`配置工具完成。有关级联功能的更多技术信息请参考这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support)。
 
 ## 安全和认证
-* `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](./rpc/sslport/Readme.md)，或者基于[WebSocket](./rpc/wsport/Readme.md)的SSL连接。
+* `rpc-frmwrk`通过OpenSSL或GmSSL支持[SSL连接](./rpc/sslport/Readme.md)，也支持基于SSL的[WebSocket](./rpc/wsport/Readme.md)的连接。
+* `rpc-frmwrk`的SimpAuth认证，是rpc-frmwrk内建的认证机制。这个模块提供用户管理，访问控制，登陆认证等服务。SimpAuth的配置和使用比较简单，并可应用于C++, Python, Java和Javascript客户端，详细介绍见此篇[文章](./rpc/security/README_cn.md)。
 * `rpc-frmwrk`支持[Kerberos 5认证](./rpc/security/README_cn.md#kerberos)。Krb5提供单点登陆支持，也提供AES的加密或者签名功能。就是说数据可以获得SSL之外的二重加密。出于性能方面的考虑，数据签名+SSL是更加合适的组合。
 * `rpc-frmwrk`也支持OAuth2的认证，这一认证方式可用于所有客户端，尤其是[JS客户端](./js/README_cn.md)的授权。
-* `rpc-frmwrk`也支持SimpAuth的认证，这是rpc-frmwrk内建的认证机制，这一认证方式可用于C++, Python, Java和Javascript客户端，详细介绍见此篇[文章](./rpc/security/README_cn.md)。
-* `rpc-frmwrk`的安全和认证功能封装在守护进程中，并通过图形配置工具进行设置。用户代码无需进行修改。
+* `rpc-frmwrk`的安全和认证功能封装在守护进程`rpcrouter`和`appmonsvr`中，并通过图形配置工具进行设置。用户代码只需修改配置文件既可完成认证机制的选择和切换。
 
 ## 负载均衡
 `rpc-frmwrk`在Multihop的基础上支持Round-Robin负载均衡。由于`rpc-frmwrk`的对话(Session)是有状态的长链接，负载均衡是以在连接建立时进行的，一旦连接建立起来，就不再进行负载均衡，也就不存在逐个Request负载均衡。这是和RESTful架构的RPC不同之处。关于负载均衡的详细介绍可以参考这篇[文章](https://github.com/zhiming99/rpc-frmwrk/wiki/Introduction-of-Multihop-support#node-redundancyload-balance)。
@@ -126,6 +126,9 @@ DBus是一个本地的消息总线，似乎和RPC关系不大。实际上，`rpc
 注意事项：
 * `driver.json`除了系统目录下的，也会由`ridlc`为生成的客户端和服务器端程序生成。这个版本的`driver.json`只包含一些该服务器端和客户端相关的配置，所以这个版本可以启动客户端和服务器端的程序，但是不能用来启动`rpc-frmwrk`系统的程序。
 * 如果当前目录下，如果没有`driver.json`,那么IoManager会使用系统的`driver.json`。需要注意的是，`rpcrouter`等系统程序应该一直使用系统的`driver.json`。如果启动`rpcrouter`的目录下有同名的`driver.json`，除非有意而为之，会导致`rpcrouter`不能启动。
+
+## 监视和控制
+* `rpc-frmwrk`的正在开发中的监视器子系统可以提供系统的实时运行状态，帮助用户合理配置资源和调节运行参数。监视器系统也可配置调度和日志功能，通过长期记录监控点位数据，调优系统匹配用户的运行环境。
 
 ## 性能
 `rpc-frmwrk`在一个i7的4核笔记本上的测试中，1000-5000个连接测试中，2000个连接时达到吞吐量峰值，单个`Request`的平均响应时间在1.1ms左右。大流量并发时服务器的吞吐量大概在每秒2500 Requests. 
