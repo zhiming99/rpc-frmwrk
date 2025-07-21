@@ -127,10 +127,9 @@ set_point_value timer1 interval4 "$(jsonval 'i' 10)" i
 add_point timer1 offline_action input s
 set_attr_value timer1 offline_action point_flags "$(jsonval 'i' 1 )" i
 
-#add_point timer1 restart input i
-#set_attr_value timer1 restart pulse "$(jsonval 'i' 1 )" i
-#add_point timer1 cmdline setpoint s 
-#add_point timer1 pid output i 
+add_point timer1 schedule1 setpoint blob
+add_point timer1 sched_task1 output i
+set_attr_value timer1 sched_task1 lastrun "$(jsonval 'i' 0)" i
 
 echo adding application rpcrouter1
 add_stdapp rpcrouter1
