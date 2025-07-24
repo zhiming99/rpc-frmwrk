@@ -110,24 +110,25 @@ add_point timer1 clock2 output i
 set_attr_value timer1 clock2 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval2 setpoint i
 set_attr_value timer1 interval2 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval2 "$(jsonval 'i' 10)" i
+set_point_value timer1 interval2 "$(jsonval 'i' 1 )" i
 
 add_point timer1 clock3 output i
 set_attr_value timer1 clock3 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval3 setpoint i
 set_attr_value timer1 interval3 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval3 "$(jsonval 'i' 10)" i
+set_point_value timer1 interval3 "$(jsonval 'i' 20)" i
 
 add_point timer1 clock4 output i
 set_attr_value timer1 clock4 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval4 setpoint i
 set_attr_value timer1 interval4 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval4 "$(jsonval 'i' 10)" i
+set_point_value timer1 interval4 "$(jsonval 'i' 40)" i
 
 add_point timer1 offline_action input s
 set_attr_value timer1 offline_action point_flags "$(jsonval 'i' 1 )" i
 
 add_point timer1 schedule1 setpoint blob
+set_point_value timer1 schedule1 "$(jsonval 'blob' '0/30 2 3 ? * 2 *')" blob
 add_point timer1 sched_task1 output i
 set_attr_value timer1 sched_task1 lastrun "$(jsonval 'i' 0)" i
 
@@ -151,6 +152,11 @@ echo adding application appmonsvr1
 add_stdapp appmonsvr1
 set_point_value appmonsvr1 cmdline "$(jsonval 'blob' 'appmonsvr -gd '$HOME/.rpcf/appmonroot)" blob
 set_point_value appmonsvr1 working_dir  "$(jsonval 'blob' '/' )" blob
+
+# point logger
+add_point appmonsvr1 ptlogger1 input i
+add_link timer1 clock2 appmonsvr1 ptlogger1
+set_attr_value appmonsvr1 ptlogger1 ptlist "$(jsonval 'blob' '[]' )" blob
 
 echo adding application loggersvr1
 add_stdapp loggersvr1

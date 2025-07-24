@@ -30,6 +30,7 @@
 #include <stdint.h>
 #include "time.h"
 #include <regex>
+#include <memory>
 #include "cronexpr.h"
 
 template< class T >
@@ -246,8 +247,8 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                     oEnd.iType = oStart.iType = tokMonthDay;
                     oStart.iValue = 1;
                     oEnd.iValue = maxval;
-                    token.pStart = std::make_unique<CronToken>( oStart );
-                    token.pEnd = std::make_unique<CronToken>(oEnd);
+                    token.pStart.reset( new CronToken( oStart ) );
+                    token.pEnd.reset( new CronToken(oEnd) );
                     if( matched.size() != strText.size() )
                     {
                         throw std::runtime_error(
@@ -278,15 +279,15 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                 iLen += matched.size();
                 if( cOp == 0 )
                 {
-                    pRoot = std::make_unique<CronToken>(token);
+                    pRoot.reset( new CronToken(token) );
                 }
                 else if( cOp == '-' )
                 {
                     CronToken oRange;
                     oRange.iType = tokRangeStep;
                     oRange.pStart = std::move( pRoot );
-                    oRange.pEnd = std::make_unique<CronToken>(token);
-                    pRoot = std::make_unique<CronToken>(oRange);
+                    oRange.pEnd.reset( new CronToken(token) );
+                    pRoot.reset( new CronToken(oRange));
                     if( token.iValue < pRoot->pStart->iValue )
                     {
                         throw std::runtime_error(
@@ -511,8 +512,8 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                     oEnd.iType = oStart.iType = tokDayOfWeek;
                     oStart.iValue = 0;
                     oEnd.iValue = 6;
-                    token.pStart = std::make_unique<CronToken>( oStart );
-                    token.pEnd = std::make_unique<CronToken>(oEnd);
+                    token.pStart.reset( new CronToken( oStart ) );
+                    token.pEnd.reset( new CronToken(oEnd) );
                     if( matched.size() != strText.size() )
                     {
                         throw std::runtime_error(
@@ -542,14 +543,14 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                 iLen += matched.size();
                 if( cOp == 0 )
                 {
-                    pRoot = std::make_unique<CronToken>(token);
+                    pRoot.reset( new CronToken(token) );
                 }
                 else if( cOp == '-' )
                 {
                     CronToken oRange;
                     oRange.iType = tokRangeStep;
                     oRange.pStart = std::move( pRoot );
-                    oRange.pEnd = std::make_unique<CronToken>(token);
+                    oRange.pEnd.reset( new CronToken(token) );
                     oRange.iStep = 1; // Default step for range
                     if( oRange.pStart->iType == tokDayOfWeek ||
                         oRange.pEnd->iType == tokDayOfWeek )
@@ -560,7 +561,7 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                                 "Error range-value out of bounds");
                         }
                     }
-                    pRoot = std::make_unique<CronToken>(oRange);
+                    pRoot.reset( new CronToken(oRange) );
                 }
                 else if( cOp == '/' )
                 {
