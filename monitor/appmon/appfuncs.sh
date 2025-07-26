@@ -982,9 +982,6 @@ function add_log_link()
         return 22
     fi
 
-    loglink="$_logapp/$_logpt"
-    userlink="$_userapp/$_userpt"
-
     if [[ ! -f $_logpath/logcount ]]; then
         touch $_logpath/logcount;
     fi
@@ -998,6 +995,9 @@ function add_log_link()
     if [[ ! -d $_logpath/logptrs ]]; then
         mkdir $_logpath/logptrs
     fi
+
+    loglink="$_logapp/$_logpt/ptr$logid"
+    userlink="$_userapp/$_userpt/ptr$userid"
 
     chmod o+w $_logpath/logptrs
     echo $userlink > $_logpath/logptrs/ptr$logid
@@ -1071,6 +1071,7 @@ function rm_log_link()
                     continue
                 fi
             fi
+            _peerlink=$(dirname $_peerlink)
             if [[ "$_peerlink" != "$link2" ]]; then
                 continue
             fi
@@ -1112,6 +1113,7 @@ function rm_log_link()
                     continue
                 fi
             fi
+            _peerlink=$(dirname $_peerlink)
             if [[ "$_peerlink" != "$link" ]]; then
                 continue
             fi
@@ -1139,7 +1141,7 @@ function show_log_links()
     pushd logptrs > /dev/null
     echo link:
     for i in *; do
-        echo -e '\t' $_appname/$_pt "${direction}" `python3 $updattr -v $i`
+        echo -e '\t' $_appname/$_pt "${direction}" $(dirname `python3 $updattr -v $i`)
     done
     popd > /dev/null
 }
