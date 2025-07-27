@@ -37,6 +37,11 @@ struct CronSchedule
     std::unordered_set<uint8_t> month;
     std::unordered_set<uint8_t> weekday;
     std::unordered_set<uint16_t> year;
+    bool bInit = false;
+    bool IsIntitialzed() const
+    { return bInit; }
+    void SetInitialized()
+    { bInit = true; }
 };
 
     /*
@@ -50,8 +55,8 @@ struct CronSchedule
     * - A step value (e.g. "1-10/2")
     * - A wildcard ("*")
     * - A question mark ("?") for "no specific value"
-    * - A last weekday (e.g., "5L" for last Friday)
-    * - An nth weekday (e.g., "3#2" for the second Wednesday)
+    * - A last weekday (e.g., "5L" for last Friday of a month)
+    * - An nth weekday (e.g., "3#2" for the second Wednesday within a month)
     * - A last day of the month (e.g., "L" for last day)
     * - A day n days before the last day of the month (e.g., "L-3" for 3 days before the last day)
     * - A nearest weekday of the day of the month (e.g., "12w" for the nearest weekday to the 12th)

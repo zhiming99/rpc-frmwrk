@@ -33,6 +33,16 @@
 #include <memory>
 #include "cronexpr.h"
 
+static int mystoi( const std::string& str )
+{
+    for( auto& elem : str )
+        if( elem >= '0' && elem <= '9' )
+            continue;
+        throw std::runtime_error(
+            "Error not a valid value" );
+    return std::stoi( str );
+}
+
 template< class T >
 std::unordered_set<T> ParseOneField(
     const std::string& field, T minval, T maxval)
@@ -47,23 +57,23 @@ std::unordered_set<T> ParseOneField(
         } else if (part.find('/') != std::string::npos) {
             size_t slash = part.find('/');
             std::string base = part.substr(0, slash);
-            int step = std::stoi(part.substr(slash + 1));
+            int step = mystoi(part.substr(slash + 1));
             int start = minval, end = maxval;
             if (base != "*") {
                 size_t dash = base.find('-');
                 if (dash != std::string::npos) {
-                    start = std::stoi(base.substr(0, dash));
-                    end = std::stoi(base.substr(dash + 1));
+                    start = mystoi(base.substr(0, dash));
+                    end = mystoi(base.substr(dash + 1));
                 } else {
-                    start = end = std::stoi(base);
+                    start = end = mystoi(base);
                 }
             }
             for( int i = start; i <= end; i+=step )
                 result.insert(i);
         } else if (part.find('-') != std::string::npos) {
             size_t dash = part.find('-');
-            int start = std::stoi(part.substr(0, dash));
-            int end = std::stoi(part.substr(dash + 1));
+            int start = mystoi(part.substr(0, dash));
+            int end = mystoi(part.substr(dash + 1));
             if( start < minval || end > maxval ||
                 start > end )
             {
@@ -73,7 +83,7 @@ std::unordered_set<T> ParseOneField(
             for (int i = start; i <= end; ++i)
                 result.insert(i);
         } else {
-            result.insert(std::stoi(part));
+            result.insert(mystoi(part));
         }
     }
     return result;
@@ -183,7 +193,7 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                     std::tm oTime = {0};
                     oTime.tm_year = now.tm_year;
                     oTime.tm_mon = now.tm_mon;
-                    oTime.tm_mday = std::stoi(s[1]);
+                    oTime.tm_mday = mystoi(s[1]);
                     if( mktime( &oTime ) == -1 )
                     {
                         throw std::runtime_error(
@@ -196,7 +206,7 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                         // adjust to the nearest
                         // weekday
                         if( oTime.tm_wday == 0 ) // Sunday
-                            oTime.tm_mday -= 2; // Move to Friday
+                            oTime.tm_mday += 1; // Move to next Monday
                         else // Saturday
                             oTime.tm_mday -= 1; // Move to Friday
                     }
@@ -219,7 +229,7 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                     token.iValue = maxval; // Last day of month
                     if( s.size() > 1 && !s[1].str().empty() )
                     {
-                        int offset = std::stoi(s[1].str().substr(1));
+                        int offset = mystoi(s[1].str().substr(1));
                         if( offset >= maxval )
                         {
                             throw std::runtime_error(
@@ -236,7 +246,7 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                             "Error range-step format");
                     }
                     token.iType = tokRangeStep;
-                    token.iStep = std::stoi(s[1]);
+                    token.iStep = mystoi(s[1]);
                     if( token.iStep < 1 ||
                         token.iStep > maxval )
                     {
@@ -262,7 +272,7 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                         throw std::runtime_error(
                             "Error month-day format");
                     }
-                    token.iValue = std::stoi(s[1]);
+                    token.iValue = mystoi(s[1]);
                     if( token.iValue < 1 ||
                         token.iValue > maxval )
                     {
@@ -429,7 +439,7 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                             "Error unexpected near-weekday value");
                     }
 
-                    int wday = std::stoi(s[1]);
+                    int wday = mystoi(s[1]);
                     if( maxmdays - 7 >= now.tm_mday )
                         token.iValue = -1;
                     else
@@ -442,8 +452,8 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                         throw std::runtime_error(
                             "Error unexpected last-month-day value");
                     }
-                    int wday = std::stoi(s[1]);
-                    int nth = std::stoi(s[2]);
+                    int wday = mystoi(s[1]);
+                    int nth = mystoi(s[2]);
 
                     std::tm oTime = {0};
                     oTime.tm_year = now.tm_year;
@@ -502,7 +512,7 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                             "Error range-step format");
                     }
                     token.iType = tokRangeStep;
-                    token.iStep = std::stoi(s[1]);
+                    token.iStep = mystoi(s[1]);
                     if( token.iStep < 1 || token.iStep > 6 )
                     {
                         throw std::runtime_error(
@@ -527,7 +537,7 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                         throw std::runtime_error(
                             "Error month-day format");
                     }
-                    token.iValue = std::stoi(s[1]);
+                    token.iValue = mystoi(s[1]);
                     if( token.iValue < 0 || token.iValue > 6 )
                     {
                         throw std::runtime_error(
@@ -756,6 +766,7 @@ CronSchedule ParseCron(const std::string& expr, std::tm& targetDate )
     if( fields.size() == 6 )
         fields.push_back( "*" );
     sched.year = ParseYear(fields[6], 1970, 2100);
+    sched.SetInitialized();
     return sched;
 }
 
@@ -763,6 +774,8 @@ bool Matches(
     const CronSchedule& sched,
     const std::tm& tm )
 {
+    if( !sched.IsIntitialzed() )
+        return false;
     return sched.second.count(tm.tm_sec) &&
            sched.minute.count(tm.tm_min) &&
            sched.hour.count(tm.tm_hour) &&
