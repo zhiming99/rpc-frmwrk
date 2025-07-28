@@ -36,11 +36,37 @@
 static int mystoi( const std::string& str )
 {
     for( auto& elem : str )
+    {
         if( elem >= '0' && elem <= '9' )
             continue;
         throw std::runtime_error(
             "Error not a valid value" );
+    }
     return std::stoi( str );
+}
+
+
+// Function to trim leading whitespace and newlines
+void TrimLeft(std::string &s)
+{
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }));
+}
+
+// Function to trim trailing whitespace and newlines
+void TrimRight(std::string &s)
+{
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
+// Function to trim both leading and trailing whitespace and newlines
+void TrimString(std::string& s)
+{
+    TrimLeft(s);
+    TrimRight(s);
 }
 
 template< class T >
@@ -739,8 +765,12 @@ std::unordered_set<uint8_t> ParseDayOfWeek(
     }
     return result;
 }
-CronSchedule ParseCron(const std::string& expr, std::tm& targetDate )
+CronSchedule ParseCron(const std::string& strCron, std::tm& targetDate )
 {
+    std::string expr = strCron;
+    TrimString( expr );
+    if( expr.empty() )
+        throw std::runtime_error("Error empty cron expression");
     std::stringstream ss(expr);
     std::string field;
     std::vector<std::string> fields;

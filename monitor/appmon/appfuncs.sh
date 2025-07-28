@@ -164,6 +164,32 @@ function type2str()
     esac
 }
 
+function type2size()
+{
+    if [ -z $1 ];then
+        echo Error missing parameters
+        return 22
+    fi
+    case "$1" in
+    1) echo 1
+        ;;
+    2) echo 2 
+        ;;
+    3) echo 4
+        ;;
+    4) echo 8
+        ;;
+    5) echo 4
+        ;;
+    6) echo 8
+        ;;
+    *)
+        echo Error type2str unknown data type $1>&2
+        return 22
+        ;;
+    esac
+}
+
 function jsonval()
 {
     _t=$1
@@ -298,7 +324,7 @@ function set_point_value()
 # $4 datatype
     _appname=$1
     _ptname=$2
-    _value=$3
+    _value="$3"
     _dt=$4
     if set_attr_value $_appname $_ptname value "$_value" $_dt; then
         _ptpath=./apps/$_appname/points/$_ptname
@@ -316,7 +342,7 @@ function set_large_point_value()
 # $4 datatype
     _appname=$1
     _ptname=$2
-    _value=$3
+    _value="$3"
     _dt=$4
     if set_attr_blob $_appname $_ptname value "$_value" $_dt; then
         _ptpath=./apps/$_appname/points/$_ptname
@@ -404,7 +430,7 @@ function set_attr_value()
     _appname=$1
     _ptname=$2
     _attr=$3
-    _value=$4
+    _value="$4"
     _dt=$5
 
     if [ -z $_appname ] || [ -z $_ptname ] || [ -z "$_value" ] || [ -z $_dt ] || [ -z $_attr ];then
@@ -427,7 +453,7 @@ function set_attr_value()
         fi
         python3 $updattr -u 'user.regfs' "$_value" $_ptpath/$_attr > /dev/null
     else
-        echo $_value > $_ptpath/$_attr
+        echo "$_value" > $_ptpath/$_attr
     fi
     return $?
 }
@@ -737,11 +763,11 @@ function show_point()
     _output+=" "$_mode
     _output+=" "$(cat $_pt/ptype)" "$_dtname" val="
     if (( $_dt <= 7 )); then
-        _output+=`python3 $updattr -v $_pt/value 2>/dev/null`
+        _output+="`python3 $updattr -v $_pt/value 2>/dev/null`"
     else
         _fileSize=`stat -c %s $i`
         if (( $_fileSize > 0 )); then
-            _output+=`cat $_pt/value`
+            _output+="`cat $_pt/value`"
         else
             _output+="None"
         fi
@@ -787,12 +813,13 @@ function show_point_detail()
     _output+=" "$_mode
     _output+=" "$(cat $_ptpath/ptype)" "$_dtname" val="
     if (( $_dt <= 7 )); then
-        _output+=`python3 $updattr -v $_ptpath/value 2>/dev/null`
+        _output+="`python3 $updattr -v $_ptpath/value 2>/dev/null`"
     else
-        _output+=`cat $_ptpath/value`
+        abc="$(cat $_ptpath/value)"
+        _output+="$abc"
     fi
     _ptype=$(python3 $updattr -v $_ptpath/ptype)
-    echo $_output
+    echo "$_output"
     pushd $_ptpath > /dev/null
     for i in *; do
         if [[ "$i" == "value" ]] || [[ "$i" == "datatype" ]]; then
@@ -801,16 +828,16 @@ function show_point_detail()
         if [ ! -f $i ]; then
             continue
         fi
-        _val=$(python3 $updattr -v $i)
+        _val="$(python3 $updattr -v $i)"
         if [ -z "$_val" ]; then
             fileSize=`stat -c %s $i`
             if (( $fileSize > 0 )); then
-                _val=`cat $i`
+                _val="`cat $i`"
             else
                 _val="None"
             fi
         fi
-        echo -e '\t' $i: $_val
+        echo -e '\t' $i: "$_val"
     done
     if [[ -d ptrs ]]; then
         show_links $1 $2
@@ -958,6 +985,24 @@ function change_application_mode()
     return $?
 }
 
+function init_log_file()
+{
+    if [[ "x$1" == "x" ]]; then
+        return 0
+    fi
+    typeid=3
+    if [[ "x$2" != "x" ]]; then
+        typeid=$(str2type $2)
+    fi
+    typesize=$(type2size $typeid)
+    output=$1
+    magic=0x706c6f67
+    counter=0
+    recsize=$(expr 4 + $typesize)
+
+    python3 -c "import sys; sys.stdout.buffer.write((${magic}).to_bytes(4, 'big')); sys.stdout.buffer.write((${counter}).to_bytes(4, 'big')); sys.stdout.buffer.write((${typeid}).to_bytes(2, 'big')); sys.stdout.buffer.write((${recsize}).to_bytes(2, 'big'))" > $output
+}
+
 function add_log_link()
 {
 # $1 user-app
@@ -982,13 +1027,18 @@ function add_log_link()
         return 22
     fi
 
+    chmod o+w $_logpath
+    chmod o+w $_userpath
+
     if [[ ! -f $_logpath/logcount ]]; then
         touch $_logpath/logcount;
+        python3 ${updattr} -u 'user.regfs' "$(jsonval i 0)" $_logpath/logcount > /dev/null
     fi
     logid=`python3 ${updattr} -a 'user.regfs' 1 $_logpath/logcount`
 
     if [[ ! -f $_userpath/logcount ]]; then
         touch $_userpath/logcount;
+        python3 ${updattr} -u 'user.regfs' "$(jsonval i 0)" $_userpath/logcount > /dev/null
     fi
     userid=`python3 ${updattr} -a 'user.regfs' 1 $_userpath/logcount`
 
@@ -1009,7 +1059,6 @@ function add_log_link()
     if (( len < 95 ));then
         python3 ${updattr} -u 'user.regfs' "$(jsonval s $userlink)" $_logpath/logptrs/ptr$logid > /dev/null
     fi
-    chmod o-w $_logpath/logptrs
 
     if [[ ! -d $_userpath/logptrs ]]; then
         mkdir $_userpath/logptrs
@@ -1026,15 +1075,22 @@ function add_log_link()
     fi
     if [[ ! -d $_userpath/logs ]]; then
         mkdir $_userpath/logs
+        dt=`python3 $updattr -v $_userpath/datatype`
+        typestr=$(type2str $dt)
         if [[ "x" == "x$_logfile" ]]; then
             touch $_userpath/logs/ptr$userid-0
+            init_log_file $_userpath/logs/ptr$userid-0 $typestr
         else
             touch $_userpath/logs/ptr$userid-extfile
+            init_log_file $_userpath/logs/ptr$userid-extfile $typestr
             echo $_logfile > $_userpath/logs/ptr$userid-extfile
         fi
     fi
+    chmod o-w $_logpath/logptrs
     chmod o-w $_userpath/logptrs
     chmod o-w $_userpath/logs
+    chmod o-w $_logpath
+    chmod o-w $_userpath
 }
 
 function rm_log_link()
@@ -1139,7 +1195,7 @@ function show_log_links()
         direction="<--"
     fi
     pushd logptrs > /dev/null
-    echo link:
+    echo logs:
     for i in *; do
         echo -e '\t' $_appname/$_pt "${direction}" $(dirname `python3 $updattr -v $i`)
     done
