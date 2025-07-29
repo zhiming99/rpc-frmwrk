@@ -569,7 +569,7 @@ gint32 TimerFunc( guint8 idx )
             break;
         CAppManager_CliImpl* pam = pProxy;
         stdstr strPtName = g_strAppInst + "/clock";
-        strPtName.append( 1, ( char )idx );
+        strPtName.append( 1, ( char )( idx + 0x31 ) );
         CCfgOpener oCfg;
         oCfg.SetIntProp( propContext, 2 );
         Variant var( ( guint32 )1);
