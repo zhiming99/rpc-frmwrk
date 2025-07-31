@@ -1082,7 +1082,7 @@ function add_log_link()
             init_log_file $_userpath/logs/ptr$userid-0 $typestr
         else
             touch $_userpath/logs/ptr$userid-extfile
-            init_log_file $_userpath/logs/ptr$userid-extfile $typestr
+            init_log_file $_logfile $typestr
             echo $_logfile > $_userpath/logs/ptr$userid-extfile
         fi
     fi
