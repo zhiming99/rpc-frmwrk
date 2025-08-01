@@ -38,6 +38,9 @@ extern stdstr g_strCmd;
 static std::vector< InterfPtr > s_vecIfs;
 stdstr g_strAppInst ="appmonsvr1";
 
+extern gint32 LogPoints(
+    IConfigDb* context, gint32 idx );
+
 struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
 {
     typedef CAsyncStdAMCallbacks super;
@@ -206,10 +209,6 @@ struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
         }while( 0 );
         return ret;
     }
-
-    protected:
-    gint32 LogPoints( IConfigDb* context, gint32 idx )
-    { return ERROR_NOT_IMPL;}
 };
 
 gint32 StartLocalAppMancli()

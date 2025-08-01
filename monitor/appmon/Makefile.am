@@ -4,7 +4,7 @@ include_ipcdir=$(top_srcdir)/ipc
 appmon_PROGRAMS=appmonsvr
 appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h monconst.h \
 SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h \
-appmancli.cpp appmonsvr.1 rpcfctl.1
+appmancli.cpp ptlogger.cpp appmonsvr.1 rpcfctl.1
 if ENABLE_FUSE3
 appmonsvr_SOURCES+=monfuse.cpp
 endif
