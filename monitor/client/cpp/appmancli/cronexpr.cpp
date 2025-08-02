@@ -23,7 +23,7 @@
  */
 #include <iostream>
 #include <vector>
-#include <unordered_set>
+#include <set>
 #include <sstream>
 #include <ctime>
 #include <algorithm>
@@ -32,6 +32,12 @@
 #include <regex>
 #include <memory>
 #include "cronexpr.h"
+
+PBFIELD CronSchedule::ignored =
+    PBFIELD( new std::ordered_set< uint8_t >() );
+
+PWFIELD CronSchedule::accepted =
+    PWFIELD( new std::ordered_set< uint16_t >() );
 
 static int mystoi( const std::string& str )
 {
@@ -70,10 +76,10 @@ void TrimString(std::string& s)
 }
 
 template< class T >
-std::unordered_set<T> ParseOneField(
+std::ordered_set<T> ParseOneField(
     const std::string& field, T minval, T maxval)
 {
-    std::unordered_set<T> result;
+    std::ordered_set<T> result;
     std::stringstream ss(field);
     std::string part;
     while (std::getline(ss, part, ',')) {
@@ -115,8 +121,23 @@ std::unordered_set<T> ParseOneField(
     return result;
 }
 
-#define ParseField ParseOneField<uint8_t>
-#define ParseYear ParseOneField<uint16_t>
+PBFIELD ParseField( const std::string& field,
+    uint8_t minval, uint8_t maxval)
+{
+    std::ordered_set< uint8_t > result = 
+        ParseOneField( field, minval, maxval );
+    return std::make_shared< std::ordered_set< uint8_t > >( result );
+}
+
+PWFIELD ParseYear( const std::string& field,
+    uint16_t minval, uint16_t maxval)
+{
+    if( field == "*" )
+        return CronSchedule::accepted;
+    std::ordered_set< uint16_t > result = 
+        ParseOneField( field, minval, maxval );
+    return std::make_shared< std::ordered_set< uint16_t > >( result );
+}
 
 // Function to check if a year is a leap year
 bool IsLeapYear(int year)
@@ -367,7 +388,7 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
 
 void FillMonthDaySet(
     std::unique_ptr<CronToken>& pRoot,
-    std::unordered_set< uint8_t > result )
+    std::ordered_set< uint8_t >& result )
 {
     if( !pRoot )
         return;
@@ -386,12 +407,12 @@ void FillMonthDaySet(
     return;
 }
 
-std::unordered_set<uint8_t> ParseDayOfMonth(
+PBFIELD ParseDayOfMonth(
     const std::string& field,
     uint8_t minval, uint8_t maxval,
     std::tm& now )
 {
-    std::unordered_set<uint8_t> result;
+    std::ordered_set<uint8_t> result;
     std::stringstream ss(field);
     std::string part;
     while (std::getline(ss, part, ','))
@@ -403,9 +424,7 @@ std::unordered_set<uint8_t> ParseDayOfMonth(
                 throw std::runtime_error(
                     "Error '?' can only be used alone");
             }
-            for( int i = minval; i <= maxval; ++i )
-                result.insert(i);
-            continue;
+            return CronSchedule::ignored;
         }
         else if( part == "*" )
         {
@@ -416,13 +435,13 @@ std::unordered_set<uint8_t> ParseDayOfMonth(
             }
             for (int i = minval; i <= maxval; ++i)
                 result.insert(i);
-            continue;
+            return std::make_shared< std::ordered_set<uint8_t> >( result );
         }
         std::unique_ptr<CronToken> pRoot =
             ParseMonthDayTokens( part, maxval, now );
         FillMonthDaySet( pRoot, result );
     }
-    return result;
+    return std::make_shared< std::ordered_set<uint8_t> >( result );
 }
 
 std::unique_ptr<CronToken> ParseWeekDayTokens(
@@ -635,7 +654,7 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
 
 void FillWeekDaySet(
     std::unique_ptr<CronToken>& pRoot,
-    std::unordered_set<uint8_t>& result,
+    std::ordered_set<uint8_t>& result,
     int startWday )
 {
     do{
@@ -728,12 +747,12 @@ void FillWeekDaySet(
     }while( 0 );
     return;
 }
-std::unordered_set<uint8_t> ParseDayOfWeek(
+PBFIELD ParseDayOfWeek(
     const std::string& field,
     uint8_t minval, uint8_t maxval,
     std::tm& now )
 {
-    std::unordered_set<uint8_t> result;
+    std::ordered_set<uint8_t> result;
     std::stringstream ss(field);
     std::string part;
     while (std::getline(ss, part, ','))
@@ -742,9 +761,7 @@ std::unordered_set<uint8_t> ParseDayOfWeek(
         {
             if( field.size() > 1 )
                 throw std::runtime_error("Error '?' can only be used alone");
-            for( int i = minval; i <= maxval; ++i )
-                result.insert(i);
-            continue;
+            return CronSchedule::ignored;
         }
         else if( part == "*" )
         {
@@ -752,7 +769,7 @@ std::unordered_set<uint8_t> ParseDayOfWeek(
                 throw std::runtime_error("Error ',' is unexpected after '*'");
             for (int i = minval; i <= maxval; ++i)
                 result.insert(i);
-            continue;
+            return std::make_shared< std::ordered_set<uint8_t> >( result );
         }
         uint8_t maxmdays = 0;
         int ret = GetDaysInMonth( maxmdays,
@@ -763,7 +780,7 @@ std::unordered_set<uint8_t> ParseDayOfWeek(
             ParseWeekDayTokens( part, maxmdays, now );
         FillWeekDaySet( pRoot, result, maxmdays );
     }
-    return result;
+    return std::make_shared< std::ordered_set<uint8_t> >( result );
 }
 CronSchedule ParseCron(const std::string& strCron, std::tm& targetDate )
 {
@@ -777,6 +794,7 @@ CronSchedule ParseCron(const std::string& strCron, std::tm& targetDate )
     while (ss >> field) fields.push_back(field);
     if (fields.size() < 6)
         throw std::runtime_error("Cron expression must have at least 6 fields");
+
     CronSchedule sched;
     sched.second = ParseField(fields[0], 0, 59);
     sched.minute = ParseField(fields[1], 0, 59);
@@ -800,17 +818,99 @@ CronSchedule ParseCron(const std::string& strCron, std::tm& targetDate )
     return sched;
 }
 
+int FindNextRun(
+    const CronSchedule& sched,
+    const std::tm& now,
+    time_t& tmRet )
+{
+    int ret = 0;
+    do{
+        std::tm tmNext = now;
+        auto itrSec = sched.second->
+            upper_bound( now.tm_sec );
+        if( itrSec != sched.second->end() )
+        {
+            tmNext.tm_sec = *itrSec;
+            tmRet = mktime( &tmNext );
+            break;
+        }
+        itrSec = sched.second->begin();
+        tmNext.tm_sec = *itrSec;
+
+        auto itrMin = sched.minute->
+            upper_bound( now.tm_min );
+        if( itrMin != sched.minute->end() )
+        {
+            tmNext.tm_min = *itrMin;
+            tmRet = mktime( &tmNext );
+            break;
+        }
+        itrMin = sched.minute->begin();
+        tmNext.tm_min = *itrMin;
+
+        auto itrHour = sched.hour->
+            upper_bound( now.tm_min );
+        if( itrHour != sched.hour->end() )
+        {
+            tmNext.tm_hour = *itrHour;
+            tmRet = mktime( &tmNext );
+            break;
+        }
+        itrHour = sched.hour->begin();
+        tmNext.tm_min = *itrHour;
+
+    }while( 0 );
+    return ret;
+}
+
 bool Matches(
     const CronSchedule& sched,
     const std::tm& tm )
 {
     if( !sched.IsIntitialzed() )
         return false;
-    return sched.second.count(tm.tm_sec) &&
-           sched.minute.count(tm.tm_min) &&
-           sched.hour.count(tm.tm_hour) &&
-           sched.day.count(tm.tm_mday) &&
-           sched.month.count(tm.tm_mon + 1) &&
-           sched.weekday.count(tm.tm_wday) &&
-           sched.year.count(tm.tm_year + 1900 );
+    
+    bool bRet = true;
+    do{
+        bRet = sched.second->count(tm.tm_sec) &&
+               sched.minute->count(tm.tm_min) &&
+               sched.hour->count(tm.tm_hour) &&
+               sched.month->count(tm.tm_mon + 1);
+        if( !bRet )
+            break;
+
+        if( sched.day != sched.ignored &&
+            sched.weekday != sched.ignored )
+        {
+            bRet = sched.day->count(tm.tm_mday)&&
+                sched.weekday->count(tm.tm_mday);
+            if( !bRet )
+                break;
+        }
+        else if( sched.day != sched.ignored )
+        {
+            bRet = ( sched.day->count(
+                tm.tm_mday) > 0 );
+            if( !bRet )
+                break;
+        }
+        else if( sched.weekday != sched.ignored )
+        {
+            bRet = ( sched.weekday->count(
+                tm.tm_wday) > 0 );
+            if( !bRet )
+                break;
+        }
+
+        if( sched.year != sched.accepted )
+        {
+            bRet = ( sched.year->count(
+                tm.tm_year + 1900 ) > 0 );
+            break;
+        }
+        bRet = true;
+
+    }while( 0 );
+
+    return bRet; 
 }

@@ -23,25 +23,35 @@
  */
 #pragma once
 #include <string>
-#include <unordered_set>
+#include <set>
 #include <memory>
 #include <regex>
 #include <ctime>
 
+#define ordered_set set
+
+typedef std::shared_ptr<std::ordered_set< uint8_t >> PBFIELD;
+typedef std::shared_ptr<std::ordered_set< uint16_t >> PWFIELD;
+
 struct CronSchedule
 {
-    std::unordered_set<uint8_t> second;
-    std::unordered_set<uint8_t> minute;
-    std::unordered_set<uint8_t> hour;
-    std::unordered_set<uint8_t> day;
-    std::unordered_set<uint8_t> month;
-    std::unordered_set<uint8_t> weekday;
-    std::unordered_set<uint16_t> year;
+    static PBFIELD ignored;
+    static PWFIELD accepted;
+
+    PBFIELD second={nullptr};
+    PBFIELD minute={nullptr};
+    PBFIELD hour={nullptr};
+    PBFIELD day={nullptr};
+    PBFIELD month={nullptr};
+    PBFIELD weekday={nullptr};
+    PWFIELD year;
     bool bInit = false;
     bool IsIntitialzed() const
     { return bInit; }
     void SetInitialized()
     { bInit = true; }
+    time_t tmLastRun = 0;
+    time_t tmNextRun = 0;
 };
 
     /*
