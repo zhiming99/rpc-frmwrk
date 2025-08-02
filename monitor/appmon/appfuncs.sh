@@ -164,6 +164,32 @@ function type2str()
     esac
 }
 
+function type2size()
+{
+    if [ -z $1 ];then
+        echo Error missing parameters
+        return 22
+    fi
+    case "$1" in
+    1) echo 1
+        ;;
+    2) echo 2 
+        ;;
+    3) echo 4
+        ;;
+    4) echo 8
+        ;;
+    5) echo 4
+        ;;
+    6) echo 8
+        ;;
+    *)
+        echo Error type2str unknown data type $1>&2
+        return 22
+        ;;
+    esac
+}
+
 function jsonval()
 {
     _t=$1
@@ -298,7 +324,7 @@ function set_point_value()
 # $4 datatype
     _appname=$1
     _ptname=$2
-    _value=$3
+    _value="$3"
     _dt=$4
     if set_attr_value $_appname $_ptname value "$_value" $_dt; then
         _ptpath=./apps/$_appname/points/$_ptname
@@ -316,7 +342,7 @@ function set_large_point_value()
 # $4 datatype
     _appname=$1
     _ptname=$2
-    _value=$3
+    _value="$3"
     _dt=$4
     if set_attr_blob $_appname $_ptname value "$_value" $_dt; then
         _ptpath=./apps/$_appname/points/$_ptname
@@ -387,7 +413,7 @@ function add_link()
     if (( $fileSize == 0 )); then
         echo failed to write to $_outpath/ptrs/ptr$outid
     fi
-    len=${#linkout}
+    len=${#linkin}
     if (( len < 95 ));then
         python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkin)" $_outpath/ptrs/ptr$outid > /dev/null
     fi
@@ -404,7 +430,7 @@ function set_attr_value()
     _appname=$1
     _ptname=$2
     _attr=$3
-    _value=$4
+    _value="$4"
     _dt=$5
 
     if [ -z $_appname ] || [ -z $_ptname ] || [ -z "$_value" ] || [ -z $_dt ] || [ -z $_attr ];then
@@ -427,7 +453,7 @@ function set_attr_value()
         fi
         python3 $updattr -u 'user.regfs' "$_value" $_ptpath/$_attr > /dev/null
     else
-        echo $_value > $_ptpath/$_attr
+        echo "$_value" > $_ptpath/$_attr
     fi
     return $?
 }
@@ -564,7 +590,8 @@ function rm_link()
                 continue
             fi
             rm $i
-            python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
+            #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
+            break
         done
         popd > /dev/null
         chmod o-w $_ptrpath
@@ -591,7 +618,8 @@ function rm_link()
                 continue
             fi
             rm $i
-            python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
+            #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
+            break
         done
         popd > /dev/null
         chmod o-w $_ptrpath2
@@ -626,6 +654,32 @@ function rm_point_nocheck()
                 __peerpt=`awk -F'/' '{print $2}' $i`
                 pushd $__curdir > /dev/null
                 rm_link $__appname $__ptname $__peerapp $__peerpt
+                popd > /dev/null
+            done
+            cd ..
+        fi
+    fi
+    if [[ -d logptrs ]]; then
+        if ! is_dir_empty logptrs; then
+            if [[ -d logs ]]; then
+                __user="true"
+            else
+                __user="false"
+            fi
+            cd logptrs
+            for i in *; do
+                __peerlink=`cat $i`
+                if [ -z $__peerlink ]; then
+                    continue
+                fi
+                __peerapp=`awk -F'/' '{print $1}' $i`
+                __peerpt=`awk -F'/' '{print $2}' $i`
+                pushd $__curdir > /dev/null
+                if [[ "$__user" == "true" ]]; then
+                    rm_log_link $__appname $__ptname $__peerapp $__peerpt
+                else
+                    rm_log_link $__peerapp $__peerpt $__appname $__ptname
+                fi
                 popd > /dev/null
             done
             cd ..
@@ -709,11 +763,11 @@ function show_point()
     _output+=" "$_mode
     _output+=" "$(cat $_pt/ptype)" "$_dtname" val="
     if (( $_dt <= 7 )); then
-        _output+=`python3 $updattr -v $_pt/value 2>/dev/null`
+        _output+="`python3 $updattr -v $_pt/value 2>/dev/null`"
     else
         _fileSize=`stat -c %s $i`
         if (( $_fileSize > 0 )); then
-            _output+=`cat $_pt/value`
+            _output+="`cat $_pt/value`"
         else
             _output+="None"
         fi
@@ -759,12 +813,13 @@ function show_point_detail()
     _output+=" "$_mode
     _output+=" "$(cat $_ptpath/ptype)" "$_dtname" val="
     if (( $_dt <= 7 )); then
-        _output+=`python3 $updattr -v $_ptpath/value 2>/dev/null`
+        _output+="`python3 $updattr -v $_ptpath/value 2>/dev/null`"
     else
-        _output+=`cat $_ptpath/value`
+        abc="$(cat $_ptpath/value)"
+        _output+="$abc"
     fi
     _ptype=$(python3 $updattr -v $_ptpath/ptype)
-    echo $_output
+    echo "$_output"
     pushd $_ptpath > /dev/null
     for i in *; do
         if [[ "$i" == "value" ]] || [[ "$i" == "datatype" ]]; then
@@ -773,19 +828,22 @@ function show_point_detail()
         if [ ! -f $i ]; then
             continue
         fi
-        _val=$(python3 $updattr -v $i)
+        _val="$(python3 $updattr -v $i)"
         if [ -z "$_val" ]; then
             fileSize=`stat -c %s $i`
             if (( $fileSize > 0 )); then
-                _val=`cat $i`
+                _val="`cat $i`"
             else
                 _val="None"
             fi
         fi
-        echo -e '\t' $i: $_val
+        echo -e '\t' $i: "$_val"
     done
-    if [ -d ptrs ]; then
+    if [[ -d ptrs ]]; then
         show_links $1 $2
+    fi
+    if [[ -d logptrs ]];then
+        show_log_links
     fi
 
     popd > /dev/null
@@ -927,6 +985,222 @@ function change_application_mode()
     return $?
 }
 
+function init_log_file()
+{
+    if [[ "x$1" == "x" ]]; then
+        return 0
+    fi
+    typeid=3
+    if [[ "x$2" != "x" ]]; then
+        typeid=$(str2type $2)
+    fi
+    typesize=$(type2size $typeid)
+    output=$1
+    magic=0x706c6f67
+    counter=0
+    recsize=$(expr 4 + $typesize)
+
+    python3 -c "import sys; sys.stdout.buffer.write((${magic}).to_bytes(4, 'big')); sys.stdout.buffer.write((${counter}).to_bytes(4, 'big')); sys.stdout.buffer.write((${typeid}).to_bytes(2, 'big')); sys.stdout.buffer.write((${recsize}).to_bytes(2, 'big'))" > $output
+}
+
+function add_log_link()
+{
+# $1 user-app
+# $2 user point to log
+# $3 logger-app
+# $4 logger point
+    _userapp=$1
+    _userpt=$2
+    _logapp=$3
+    _logpt=$4
+    _logfile=$5
+
+    if [ -z $_userapp ] || [ -z $_userpt ] || [ -z $_logapp ] || [ -z $_logpt ];then
+        echo Error missing parameters
+        return 22
+    fi
+    _logpath="./apps/$_logapp/points/$_logpt"
+    _userpath="./apps/$_userapp/points/$_userpt"
+    if [ ! -d $_userpath ] ||
+       [ ! -d $_logpath ]; then
+        echo Error 
+        return 22
+    fi
+
+    chmod o+w $_logpath
+    chmod o+w $_userpath
+
+    if [[ ! -f $_logpath/logcount ]]; then
+        touch $_logpath/logcount;
+        python3 ${updattr} -u 'user.regfs' "$(jsonval i 0)" $_logpath/logcount > /dev/null
+    fi
+    logid=`python3 ${updattr} -a 'user.regfs' 1 $_logpath/logcount`
+
+    if [[ ! -f $_userpath/logcount ]]; then
+        touch $_userpath/logcount;
+        python3 ${updattr} -u 'user.regfs' "$(jsonval i 0)" $_userpath/logcount > /dev/null
+    fi
+    userid=`python3 ${updattr} -a 'user.regfs' 1 $_userpath/logcount`
+
+    if [[ ! -d $_logpath/logptrs ]]; then
+        mkdir $_logpath/logptrs
+    fi
+
+    loglink="$_logapp/$_logpt/ptr$logid"
+    userlink="$_userapp/$_userpt/ptr$userid"
+
+    chmod o+w $_logpath/logptrs
+    echo $userlink > $_logpath/logptrs/ptr$logid
+    fileSize=`stat -c %s $_logpath/logptrs/ptr$logid`
+    if (( $fileSize == 0 )); then
+        echo failed to write to $_logpath/logptrs/ptr$logid
+    fi
+    len=${#userlink}
+    if (( len < 95 ));then
+        python3 ${updattr} -u 'user.regfs' "$(jsonval s $userlink)" $_logpath/logptrs/ptr$logid > /dev/null
+    fi
+
+    if [[ ! -d $_userpath/logptrs ]]; then
+        mkdir $_userpath/logptrs
+    fi
+    chmod o+w $_userpath/logptrs
+    echo $loglink > $_userpath/logptrs/ptr$userid
+    fileSize=`stat -c %s $_userpath/logptrs/ptr$userid`
+    if (( $fileSize == 0 )); then
+        echo failed to write to $_userpath/logptrs/ptr$userid
+    fi
+    len=${#loglink}
+    if (( len < 95 ));then
+        python3 ${updattr} -u 'user.regfs' "$(jsonval s $loglink)" $_userpath/logptrs/ptr$userid > /dev/null
+    fi
+    if [[ ! -d $_userpath/logs ]]; then
+        mkdir $_userpath/logs
+        dt=`python3 $updattr -v $_userpath/datatype`
+        typestr=$(type2str $dt)
+        if [[ "x" == "x$_logfile" ]]; then
+            touch $_userpath/logs/ptr$userid-0
+            init_log_file $_userpath/logs/ptr$userid-0 $typestr
+        else
+            touch $_userpath/logs/ptr$userid-extfile
+            init_log_file $_logfile $typestr
+            echo $_logfile > $_userpath/logs/ptr$userid-extfile
+        fi
+    fi
+    chmod o-w $_logpath/logptrs
+    chmod o-w $_userpath/logptrs
+    chmod o-w $_userpath/logs
+    chmod o-w $_logpath
+    chmod o-w $_userpath
+}
+
+function rm_log_link()
+{
+# $1 user app
+# $2 user point
+# $3 logger app
+# $4 logger point
+    _userapp=$1
+    _userpt=$2
+    _logapp=$3
+    _logpt=$4
+    if [ -z $_userapp ] || [ -z $_userpt ] 
+       [ -z $_logapp ] || [ -z $_logpt ] ;then
+        echo Error missing parameters
+        return 22
+    fi
+    _ptrpath="./apps/$_userapp/points/$_userpt/logptrs"
+    if [ ! -d $_ptrpath ]; then
+        echo Error internal error
+        return 2
+    fi
+    if is_dir_empty $_ptrpath; then 
+        echo there is no link to delete for "$_userapp:$_userpt"
+    else
+        link2="$_logapp/$_logpt"
+        chmod o+w $_ptrpath
+        pushd $_ptrpath > /dev/null
+        for i in *; do
+            _peerlink=`python3 $updattr -v $i`
+            if [[ -z $_peerlink ]]; then
+                _peerlink=`echo $i`
+                if [[ -z $_peerlink ]]; then
+                    continue
+                fi
+            fi
+            _peerlink=$(dirname $_peerlink)
+            if [[ "$_peerlink" != "$link2" ]]; then
+                continue
+            fi
+            rm $i
+
+            echo "you are going to remove the point logs $(dirname $ptrpath)/logs/$i-*, continue ( y/N )?(default: No)"
+            read answer
+            if [ "x$answer" == "xn" ] || [ "x$answer" == "xno" ] || [ "x$answer" == "x" ]; then
+                echo the logs is kept.
+                break;
+            fi
+            if [[ -f ../logs/$i-0 ]] || [[ -f ../logs/$i-extfile ]]; then
+                rm ../logs/$i-*
+            fi
+            break
+            #python3 ${updattr} -a 'user.regfs' -1 ../logcount > /dev/null
+        done
+        popd > /dev/null
+        chmod o-w $_ptrpath
+    fi
+
+    link="$_userapp/$_userpt"
+    _ptrpath2="./apps/$_logapp/points/$_logpt/logptrs"
+    if [ ! -d $_ptrpath2 ]; then
+        echo Error internal error
+        return 2
+    fi
+    if is_dir_empty $_ptrpath2; then 
+        echo there is no link to delete for "$_logapp:$_logpt"
+        return 0
+    else
+        chmod o+w $_ptrpath2
+        pushd $_ptrpath2 > /dev/null
+        for i in *; do
+            _peerlink=`python3 $updattr -v $i`
+            if [[ -z $_peerlink ]]; then
+                _peerlink=`echo $i`
+                if [[ -z $_peerlink ]]; then
+                    continue
+                fi
+            fi
+            _peerlink=$(dirname $_peerlink)
+            if [[ "$_peerlink" != "$link" ]]; then
+                continue
+            fi
+            rm $i
+            #python3 ${updattr} -a 'user.regfs' -1 ../logcount > /dev/null
+        done
+        popd > /dev/null
+        chmod o-w $_ptrpath2
+    fi
+    return 0
+}
+
+function show_log_links()
+{
+    if is_dir_empty logptrs; then
+        echo links: None
+        return 0
+    fi
+
+    if [[ -d logs ]]; then
+        direction="-->"
+    else
+        direction="<--"
+    fi
+    pushd logptrs > /dev/null
+    echo logs:
+    for i in *; do
+        echo -e '\t' $_appname/$_pt "${direction}" $(dirname `python3 $updattr -v $i`)
+    done
+    popd > /dev/null
+}
 # add a standard app : add_stdapp <app inst name> [<owner> <group>]
 function add_stdapp()
 {

@@ -150,25 +150,26 @@ case "$cmd" in
             usage
             exit 1
         fi
-        appname="$1"
-        echo "Starting application: $appname"
-        if is_app_online $appname; then
-            echo "Error $appname is still running"
-            exit 1
-        fi
-        cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
-        working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
-        if [[ "x$cmdline" == "x" ]] || [[ "x$working_dir" == "x" ]]; then
-            echo "Error bad command line to start $appname"
-            exit 1
-        fi
-        if [ ! -d $working_dir ]; then
-            echo "Error bad working directory to start $appname"
-            exit 1
-        fi
-        cd $working_dir || exit 1
-        echo $cmdline
-        setsid -f $cmdline
+        for appname in "$@"; do
+            echo "Starting application: $appname"
+            if is_app_online $appname; then
+                echo "Error $appname is still running"
+                exit 1
+            fi
+            cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
+            working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
+            if [[ "x$cmdline" == "x" ]] || [[ "x$working_dir" == "x" ]]; then
+                echo "Error bad command line to start $appname"
+                exit 1
+            fi
+            if [ ! -d $working_dir ]; then
+                echo "Error bad working directory to start $appname"
+                exit 1
+            fi
+            cd $working_dir || exit 1
+            echo $cmdline
+            setsid -f $cmdline
+        done
         ;;
     stop)
         if [[ $# -lt 1 ]]; then
@@ -176,29 +177,30 @@ case "$cmd" in
             usage
             exit 1
         fi
-        appname="$1"
-        echo "Stopping application: $appname"
-        if ! is_app_online $appname; then
-            echo "Error $appname is already stopped"
-            exit 1
-        fi
-        if [[ "x$appname" == "xappmonsvr1" ]]; then
-            if check_appreg_mount; then
-                if [ -d ${rootdir}/../appreg ]; then
-                    rootdir=$(dirname $rootdir)
-                    fusermount3 -u ${rootdir}
-                    echo
-                    exit 0
-                fi
-                undo_check_appreg_mount
+        for appname in "$@"; do
+            echo "Stopping application: $appname"
+            if ! is_app_online $appname; then
+                echo "Error $appname is already stopped"
+                exit 1
             fi
-        fi
-        pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
-        if [[ "x$pid" != "x" ]]; then
-            kill -2 $pid
-        else
-            echo Error failed to stop $appname
-        fi
+            if [[ "x$appname" == "xappmonsvr1" ]]; then
+                if check_appreg_mount; then
+                    if [ -d ${rootdir}/../appreg ]; then
+                        rootdir=$(dirname $rootdir)
+                        fusermount3 -u ${rootdir}
+                        echo
+                        exit 0
+                    fi
+                    undo_check_appreg_mount
+                fi
+            fi
+            pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
+            if [[ "x$pid" != "x" ]]; then
+                kill -2 $pid
+            else
+                echo Error failed to stop $appname
+            fi
+        done
         ;;
     kill)
         if [[ $# -lt 1 ]]; then
@@ -631,7 +633,7 @@ case "$cmd" in
             exit 1
         fi
         rpcfctl geninitcfg > ~/.rpcf/cfgbk.json
-        tarfile=`realpath rpcf-backup-$(date +%Y%m%H).tar.gz`
+        tarfile=`realpath rpcf-backup-$(date +%Y%m%d).tar.gz`
         pushd $HOME > /dev/null
         if tar cf "$tarfile" .rpcf; then
             ret=0
