@@ -9,7 +9,7 @@ appmonsvr \- Application Monitor Server for rpc-frmwrk
 
 .SH DESCRIPTION
 .B appmonsvr
-is the application monitor server for the rpc-frmwrk framework. It manages application and user registries, dispatches point changes to registered applications, provides 'SimpAuth' authentication to rpcrouter, and also provides access control and monitoring to users from across internet.
+is the application monitor server for the rpc-frmwrk. It manages application and user registries, dispatches point changes to registered applications, provides 'SimpAuth' authentication to rpcrouter, and also provides access control and monitoring to users from across internet. And appmonsvr will sample point value and add to point logs of each point with log link setup, and rotate the logs on a daily basis. By default, it accumulates10 days of point value logs, and discards older logs than 10 days.
 
 The server can run as a daemon, send logs to the log server 
 .B rpcf_logger
