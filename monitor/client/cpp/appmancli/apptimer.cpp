@@ -38,7 +38,7 @@ std::atomic< guint32 >& g_dwInterval = g_arrInterVals[ 0 ];
 std::string g_arrSchedule[ 4 ] =
     { "", "", "", "" };
 std::string& g_strSchedule = g_arrSchedule[ 0 ];
-CronSchedule g_arrCronSched[ 4 ];
+CronSchedules g_arrCronSched[ 4 ];
 TaskletPtr g_arrTimers[ 4 ];
 
 stdrmutex g_oTimerLock;
@@ -303,8 +303,9 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                 std::time_t t = std::time(nullptr);
                 std::tm now = *std::localtime(&t);
                 try{
-                    g_arrCronSched[ 0 ] =
-                        ParseCron(g_strSchedule, now);
+                    g_arrCronSched[ 0 ].SetExpression(
+                        g_strSchedule );
+                    g_arrCronSched[ 0 ].ParseCron( now );
                 }
                 catch( std::runtime_error& e )
                 {
@@ -372,8 +373,9 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                     std::time_t t = std::time(nullptr);
                     std::tm now = *std::localtime(&t);
                     try{
-                        g_arrCronSched[ 0 ] =
-                            ParseCron(g_strSchedule, now);
+                        g_arrCronSched[ 0 ].SetExpression(
+                            g_strSchedule );
+                        g_arrCronSched[ 0 ].ParseCron(now);
                     }
                     catch( std::runtime_error& e )
                     {
@@ -680,7 +682,7 @@ gint32 TimerLoop()
         CStdRMutex oLock( GetTmLock() );
         std::time_t t = std::time(nullptr);
         std::tm now = *std::localtime(&t);
-        if( Matches( g_arrCronSched[ 0 ], now ) )
+        if( g_arrCronSched[ 0 ].Matches( now ) )
         {
             oLock.Unlock();
             pam->SetPointValue( oCfg.GetCfg(),

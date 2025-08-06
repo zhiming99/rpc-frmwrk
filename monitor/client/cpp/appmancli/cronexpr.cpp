@@ -39,6 +39,16 @@ PBFIELD CronSchedule::ignored =
 PWFIELD CronSchedule::accepted =
     PWFIELD( new std::ordered_set< uint16_t >() );
 
+bool CronSchedule::IsEmpty()
+{
+    return second->empty() ||
+        minute->empty() ||
+        hour->empty() ||
+        day->empty() ||
+        month->empty() ||
+        year->empty();
+}
+
 static int mystoi( const std::string& str )
 {
     for( auto& elem : str )
@@ -181,8 +191,9 @@ enum EnumToken
 struct CronToken
 {
     EnumToken iType = tokMonthDay;
-    int iValue = 0;
-    int iStep = 1; // For range step
+    int32_t iValue = 0;
+    int8_t iStep = 1; // For range step
+    int8_t iNthWeek = 0;
     std::unique_ptr<CronToken> pStart;
     std::unique_ptr<CronToken> pEnd;
     CronToken()
@@ -194,6 +205,7 @@ struct CronToken
         iType = r.iType;
         iValue = r.iValue;
         iStep = r.iStep;
+        iNthWeek = r.iNthWeek;
         pStart = std::move( r.pStart );
         pEnd = std::move( r.pEnd );
     }
@@ -407,7 +419,7 @@ void FillMonthDaySet(
     return;
 }
 
-PBFIELD ParseDayOfMonth(
+ PBFIELD ParseDayOfMonth(
     const std::string& field,
     uint8_t minval, uint8_t maxval,
     std::tm& now )
@@ -446,7 +458,7 @@ PBFIELD ParseDayOfMonth(
 
 std::unique_ptr<CronToken> ParseWeekDayTokens(
     const std::string& strCronExpr,
-    int maxmdays, std::tm& now )
+    int maxmdays )
 {
     std::regex oLwd( "([0-6])[Ll]" );
     std::regex oNwd( "([0-6])#([1-5])" );
@@ -475,79 +487,29 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
             if( std::regex_search(strText, s, regex))
             {
                 std::string matched = s[0];
-                token.iType = tokDayOfWeek;
+                token.iType = type;
                 if( type == tokLastDayOfWeek )
                 {
                     if( cOp == '/' )
                     {
                         throw std::runtime_error(
-                            "Error unexpected near-weekday value");
+                            "Error unexpected last-weekday value");
                     }
 
-                    int wday = mystoi(s[1]);
-                    if( maxmdays - 7 >= now.tm_mday )
-                        token.iValue = -1;
-                    else
-                        token.iValue = wday;
+                    token.iValue = mystoi(s[1]);
                 }
                 else if( type == tokNthDayOfWeek )
                 {
                     if( cOp == '/' )
                     {
                         throw std::runtime_error(
-                            "Error unexpected last-month-day value");
+                            "Error unexpected nth-day-of-week value");
                     }
                     int wday = mystoi(s[1]);
                     int nth = mystoi(s[2]);
 
-                    std::tm oTime = {0};
-                    oTime.tm_year = now.tm_year;
-                    oTime.tm_mon = now.tm_mon;
-                    oTime.tm_mday = 1; // Start from the first day of the month
-                    if( mktime( &oTime ) == -1 )
-                    {
-                        throw std::runtime_error(
-                            "Error nth-day-of-week date out of range");
-                    }
-
-                    int startWday = oTime.tm_wday; // Get the weekday of the first day of the month
-
-                    int iLow = 1 + (nth - 1) * 7;
-                    int iHigh = iLow + 6;
-                    if( iLow > maxmdays )
-                    {
-                        throw std::runtime_error(
-                            "Error nth-day-of-week value out of range");
-                    }
-                    if( iHigh > maxmdays )
-                        iHigh = maxmdays;
-                    if( now.tm_mday < iLow || now.tm_mday > iHigh )
-                        token.iValue = -1;
-                    else if( nth < 5 )
-                        token.iValue = wday;
-                    else
-                    {
-                        // nth == 5
-                        int diff = iHigh - iLow;
-                        if( wday == startWday )
-                        {
-                            token.iValue = wday;
-                        }
-                        else if( wday > startWday && wday - startWday <= diff )
-                        {
-                            token.iValue = wday;
-                        }
-                        else if( wday < startWday && wday + 7 - startWday <= diff )
-                        {
-                            token.iValue = wday;
-                        }
-                        else
-                        {
-                            token.iValue = -1;
-                        }
-                    }
-                    token.iType = tokNthDayOfWeek;
-                    token.iStep = nth | ( startWday << 8 ) | ( maxmdays << 16 );
+                    token.iNthWeek = nth;
+                    token.iValue = wday;
                 }
                 else if( type == tokRangeStep )
                 {
@@ -556,7 +518,6 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
                         throw std::runtime_error(
                             "Error range-step format");
                     }
-                    token.iType = tokRangeStep;
                     token.iStep = mystoi(s[1]);
                     if( token.iStep < 1 || token.iStep > 6 )
                     {
@@ -637,7 +598,7 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
             strText = strText.substr(1);
             continue;
         }
-        if( strText[ 0 ] == '/' && cOp == '-' )
+        else if( strText[ 0 ] == '/' && cOp == '-' )
         {
             iLen++;
             cOp = '/';
@@ -646,25 +607,72 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
         }
 
         throw std::runtime_error(
-            "Error unexpected content in cron expression" );
+            "Error unexpected content in "
+            "cron expression" );
 
     }while( true );
     return pRoot;
 }
 
+inline int CalculateMday(
+    int iWday, int startWday, int iWeek )
+{
+    int mday;
+    if( iWday < startWday )
+        mday = iWday + 7 - startWday;
+    else
+        mday = iWday - startWday;
+    mday += 7 * iWeek;
+    return mday + 1;
+}
+
 void FillWeekDaySet(
     std::unique_ptr<CronToken>& pRoot,
     std::ordered_set<uint8_t>& result,
-    int startWday )
+    int maxmdays,
+    const std::tm& now )
 {
-    do{
-        if( !pRoot )
-            return;
+    if( !pRoot )
+        return;
 
+    int iWeeks = maxmdays / 7;
+    std::tm firstDay = now;
+    firstDay.tm_mday = 1;
+    mktime( &firstDay );
+    int startWday = firstDay.tm_wday;
+    for( int i = 0; i < iWeeks; i++ )
+    {
         if( pRoot->iType == tokDayOfWeek )
         {
-            if( pRoot->iValue >= 0 && pRoot->iValue <= 6 )
-                result.insert( pRoot->iValue );
+            int mday = CalculateMday(
+                pRoot->iValue, startWday, i );
+            if( mday > maxmdays )
+                continue;
+            result.insert( mday );
+        }
+        else if( pRoot->iType == tokNthDayOfWeek )
+        {
+            if( pRoot->iNthWeek != i + 1 )
+                continue;
+            if( pRoot->iValue < 0 )
+                continue;
+            int mday = CalculateMday(
+                pRoot->iValue, startWday, i );
+            if( mday <= maxmdays )
+                result.insert( mday );
+        }
+        else if( pRoot->iType == tokLastDayOfWeek)
+        {
+            if( i != 4 )
+                continue;
+            int mday = CalculateMday(
+                pRoot->iValue, startWday, i );
+            if( maxmdays < mday )
+            {
+                mday = CalculateMday(
+                    pRoot->iValue, startWday, i - 1 );
+                result.insert( mday );
+            }
         }
         else if( pRoot->iType == tokRangeStep )
         {
@@ -674,79 +682,91 @@ void FillWeekDaySet(
             if( pStart->iType == tokDayOfWeek &&
                 pEnd->iType == tokDayOfWeek )
             {
-                if( pStart->iValue > pEnd->iValue )
+                if( pStart->iValue >= pEnd->iValue )
                 {
                     throw std::runtime_error(
                          "Error day-of-week range is invalid");
                 }
-                for( int i = pStart->iValue;
-                    i <= pEnd->iValue; i += iStep )
-                    result.insert(i);
-            }
-            else if( pStart->iType != pEnd->iType ) 
-            {
-                throw std::runtime_error(
-                    "Error day-of-week range is invalid");
-            }
-            else if( pStart->iType == tokNthDayOfWeek )
-            {
-                // Handle nth day of week
-                int nth = ( pStart->iStep & 0xff );
-                int nth2 = ( pEnd->iStep & 0xff );
-                if( nth2 - nth > 1 )
+                for( int iValue = pStart->iValue;
+                    iValue <= pEnd->iValue;
+                    iValue += iStep )
                 {
-                    throw std::runtime_error(
-                         "Error range of two nth-day-of-week "
-                         "cannot exceed one week");
+                    int mday = CalculateMday(
+                        iValue, startWday, i );
+                    if( mday <= maxmdays )
+                        result.insert( mday );
                 }
-                if( nth == nth2 )
-                {
-                    if( pStart->iValue < 0 || pEnd->iValue < 0 )
-                        break;
-                    if( pStart->iValue >= pEnd->iValue )
-                    {
-                        throw std::runtime_error(
-                             "Error invalid range value");
-                    }
-                    for( int i = pStart->iValue; i <= pEnd->iValue; i += iStep )
-                        result.insert(i);
-                }
-                else if( pStart->iValue < 0 && pEnd->iValue < 0 )
-                {
-                    break;
-                }
-                else if( pStart->iValue < 0 )
-                {
-                    int startWday = ( ( pEnd->iStep >> 8 ) & 0xff );
-                    int upperBound = pEnd->iValue;
-                    if( startWday > upperBound )
-                        upperBound += 7;
-                    for( int i = startWday; i < upperBound; i += iStep )
-                        result.insert( i % 7 );
-                }
-                else if( pEnd->iValue < 0 )
-                {
-                    int upperBound = ( ( pStart->iStep >> 8 ) & 0xff );
-                    if( upperBound < pStart->iValue )
-                        upperBound += 7;
-                    for( int i = pStart->iValue; i < upperBound; i += iStep )
-                        result.insert( i % 7 );
-                }
+                continue;
             }
             else
             {
-                throw std::runtime_error(
-                    "Error unexpected token in cron expression");
+                // non-weekly range
+                int startMday = 0;
+                int endMday = 0;
+
+                if( pStart->iType == tokDayOfWeek )
+                {
+                    throw std::runtime_error(
+                        "Error invalid week-day range");
+                }
+
+                if( pStart->iType == tokNthDayOfWeek )
+                {
+                    int mday = CalculateMday(
+                        pStart->iValue, startWday,
+                        pStart->iNthWeek - 1 );
+
+                    if( mday > maxmdays )
+                        throw std::runtime_error(
+                            "Error invalid week-day range");
+                    startMday = mday;
+                }
+                else if( pStart->iType == tokLastDayOfWeek)
+                {
+                    int mday = CalculateMday(
+                        pStart->iValue, startWday, 4 );
+                    if( mday > maxmdays )
+                        mday = CalculateMday(
+                            pStart->iValue, startWday, 3 );
+                    startMday = mday;
+                }
+
+                if( pEnd->iType == tokDayOfWeek )
+                {
+                    throw std::runtime_error(
+                        "Error invalid week-day range");
+                }
+                if( pEnd->iType == tokNthDayOfWeek )
+                {
+                    int mday = CalculateMday(
+                        pEnd->iValue, startWday,
+                        pEnd->iNthWeek - 1 );
+                    if( mday > maxmdays )
+                        mday = maxmdays;
+                    endMday = mday;
+                }
+                else if( pEnd->iType == tokLastDayOfWeek)
+                {
+                    int mday = CalculateMday(
+                        pEnd->iValue, startWday, 4 );
+                    if( mday > maxmdays )
+                        mday = CalculateMday(
+                            pEnd->iValue, startWday, 3 );
+                    endMday = mday;
+                }
+                if( startMday <= endMday )
+                    throw std::runtime_error(
+                        "Error invalid week-day range");
+
+                for( i = startMday; i <= endMday; i += iStep ) 
+                    result.insert( i );
+                break;
             }
         }
-        else if( pRoot->iType == tokNthDayOfWeek)
-        {
-            if( pRoot->iValue >= 0 )
-                result.insert( pRoot->iValue );
-        }
-    }while( 0 );
+    }
     return;
 }
+
 PBFIELD ParseDayOfWeek(
     const std::string& field,
     uint8_t minval, uint8_t maxval,
@@ -760,13 +780,15 @@ PBFIELD ParseDayOfWeek(
         if( part == "?" )
         {
             if( field.size() > 1 )
-                throw std::runtime_error("Error '?' can only be used alone");
+                throw std::runtime_error(
+                    "Error '?' can only be used alone");
             return CronSchedule::ignored;
         }
         else if( part == "*" )
         {
             if( field.size() > 1 )
-                throw std::runtime_error("Error ',' is unexpected after '*'");
+                throw std::runtime_error(
+                    "Error ',' is unexpected after '*'");
             for (int i = minval; i <= maxval; ++i)
                 result.insert(i);
             return std::make_shared< std::ordered_set<uint8_t> >( result );
@@ -775,27 +797,35 @@ PBFIELD ParseDayOfWeek(
         int ret = GetDaysInMonth( maxmdays,
             now.tm_mon + 1, now.tm_year + 1900 );
         if( ret < 0 )
-            throw std::runtime_error("Error get days of current month" );
+            throw std::runtime_error(
+                "Error get days of current month" );
+
         std::unique_ptr<CronToken> pRoot =
-            ParseWeekDayTokens( part, maxmdays, now );
-        FillWeekDaySet( pRoot, result, maxmdays );
+            ParseWeekDayTokens( part, maxmdays );
+
+        FillWeekDaySet( pRoot, result, maxmdays, now );
     }
     return std::make_shared< std::ordered_set<uint8_t> >( result );
 }
-CronSchedule ParseCron(const std::string& strCron, std::tm& targetDate )
+
+CronSchedule CronSchedules::ParseCronInternal(
+    std::tm& targetDate ) const
 {
-    std::string expr = strCron;
+    std::string expr = m_strExpr;
     TrimString( expr );
     if( expr.empty() )
-        throw std::runtime_error("Error empty cron expression");
+        throw std::runtime_error(
+            "Error empty cron expression");
     std::stringstream ss(expr);
     std::string field;
     std::vector<std::string> fields;
     while (ss >> field) fields.push_back(field);
     if (fields.size() < 6)
-        throw std::runtime_error("Cron expression must have at least 6 fields");
+        throw std::runtime_error(
+            "Cron expression must have at least 6 fields");
 
     CronSchedule sched;
+
     sched.second = ParseField(fields[0], 0, 59);
     sched.minute = ParseField(fields[1], 0, 59);
     sched.hour = ParseField(fields[2], 0, 23);
@@ -806,24 +836,44 @@ CronSchedule ParseCron(const std::string& strCron, std::tm& targetDate )
         targetDate.tm_mon + 1,
         targetDate.tm_year + 1900 );
     if( ret < 0 )
-        throw std::runtime_error("Error get days of current month" );
-    sched.day = ParseDayOfMonth(
+        throw std::runtime_error(
+            "Error get days of current month" );
+    PBFIELD retSet = ParseDayOfMonth(
         fields[3], 1, maxdays, targetDate );
-    sched.weekday = ParseDayOfWeek(
+    sched.day = retSet;
+    retSet = ParseDayOfWeek(
         fields[5], 0, 6, targetDate); // 0=Sunday
+    if( sched.day == CronSchedule::ignored )
+        sched.day = retSet;
+    if( sched.day == CronSchedule::ignored )
+        throw std::runtime_error(
+            "Error both 'day' and 'week day' are ignored." );
+
     if( fields.size() == 6 )
         fields.push_back( "*" );
+
     sched.year = ParseYear(fields[6], 1970, 2100);
     sched.SetInitialized();
     return sched;
 }
 
-int FindNextRun(
-    const CronSchedule& sched,
+void CronSchedules::ParseCron( std::tm now )
+{
+    m_oCurrent = ParseCronInternal( now );
+    std::tm tmNext = {0};
+    tmNext.tm_mon = now.tm_mon + 1;
+    tmNext.tm_year = now.tm_year;
+    tmNext.tm_mday = 1;
+    tmNext.tm_hour = tmNext.tm_sec = tmNext.tm_min = 0;
+    m_oNext = ParseCronInternal( tmNext );
+}
+
+int CronSchedules::FindNextRun(
     const std::tm& now,
     time_t& tmRet )
 {
     int ret = 0;
+    CronSchedule& sched = m_oCurrent;
     do{
         std::tm tmNext = now;
         auto itrSec = sched.second->
@@ -849,7 +899,7 @@ int FindNextRun(
         tmNext.tm_min = *itrMin;
 
         auto itrHour = sched.hour->
-            upper_bound( now.tm_min );
+            upper_bound( now.tm_hour );
         if( itrHour != sched.hour->end() )
         {
             tmNext.tm_hour = *itrHour;
@@ -857,16 +907,59 @@ int FindNextRun(
             break;
         }
         itrHour = sched.hour->begin();
-        tmNext.tm_min = *itrHour;
+        tmNext.tm_hour = *itrHour;
+
+        auto itrDay = sched.day->
+            upper_bound( now.tm_mday );
+        if( itrDay != sched.day->end() )
+        {
+            tmNext.tm_mday = *itrDay;
+            tmRet = mktime( &tmNext );
+            break;
+        }
+        itrDay = sched.day->begin();
+        tmNext.tm_mday = *itrDay;
+
+        auto itrMon = sched.month->
+            upper_bound( now.tm_mon );
+        if( itrMon != sched.month->end() )
+        {
+            tmNext.tm_mon = *itrMon;
+            tmRet = mktime( &tmNext );
+            break;
+        }
+        itrMon = sched.month->begin();
+        tmNext.tm_mon = *itrMon;
+
+        if( sched.year == sched.accepted )
+        {
+            tmNext.tm_year += 1;
+            tmNext.tm_hour = tmNext.tm_sec = tmNext.tm_min = 0;
+            tmNext.tm_mday = 1;
+            tmNext.tm_mon = 0;
+            tmNext.tm_wday = 0;
+            tmRet = mktime( &tmNext );
+            break;
+        }
+
+        auto itrYear = sched.year->
+            upper_bound( now.tm_year );
+        if( itrYear != sched.year->end() )
+        {
+            tmNext.tm_year = *itrYear;
+            tmRet = mktime( &tmNext );
+        }
+        ret = -ENOENT;
 
     }while( 0 );
     return ret;
 }
 
-bool Matches(
-    const CronSchedule& sched,
+bool CronSchedules::Matches(
     const std::tm& tm )
 {
+    const CronSchedule& sched = m_oCurrent;
+
     if( !sched.IsIntitialzed() )
         return false;
     
@@ -879,33 +972,14 @@ bool Matches(
         if( !bRet )
             break;
 
-        if( sched.day != sched.ignored &&
-            sched.weekday != sched.ignored )
-        {
-            bRet = sched.day->count(tm.tm_mday)&&
-                sched.weekday->count(tm.tm_mday);
-            if( !bRet )
-                break;
-        }
-        else if( sched.day != sched.ignored )
-        {
-            bRet = ( sched.day->count(
-                tm.tm_mday) > 0 );
-            if( !bRet )
-                break;
-        }
-        else if( sched.weekday != sched.ignored )
-        {
-            bRet = ( sched.weekday->count(
-                tm.tm_wday) > 0 );
-            if( !bRet )
-                break;
-        }
+        bRet = sched.day->count(tm.tm_mday);
+        if( !bRet )
+            break;
 
         if( sched.year != sched.accepted )
         {
-            bRet = ( sched.year->count(
-                tm.tm_year + 1900 ) > 0 );
+            bRet = sched.year->count(
+                tm.tm_year + 1900 );
             break;
         }
         bRet = true;

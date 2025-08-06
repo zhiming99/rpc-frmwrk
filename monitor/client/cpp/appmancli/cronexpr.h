@@ -44,7 +44,8 @@ struct CronSchedule
     PBFIELD day={nullptr};
     PBFIELD month={nullptr};
     PBFIELD weekday={nullptr};
-    PWFIELD year;
+    PWFIELD year={nullptr};
+
     bool bInit = false;
     bool IsIntitialzed() const
     { return bInit; }
@@ -52,8 +53,94 @@ struct CronSchedule
     { bInit = true; }
     time_t tmLastRun = 0;
     time_t tmNextRun = 0;
+
+    bool IsEmpty();
+    CronSchedule()
+    {}
+
+    CronSchedule( const CronSchedule& rhs )
+    {
+        second = rhs.second;
+        minute = rhs.minute;
+        hour = rhs.hour;
+        if( rhs.day == ignored )
+            day = ignored;
+        else
+        {
+            day = rhs.day;
+        }
+        *month = *rhs.month;
+        if( rhs.weekday == ignored )
+            weekday = ignored;
+        else
+        {
+            weekday = rhs.weekday;
+        }
+        year = rhs.year;
+    }
+
+    void DeepCopy( const CronSchedule& rhs )
+    {
+        second = PBFIELD(
+            new std::ordered_set<uint8_t>() );
+        *second = *rhs.second;
+        minute = PBFIELD(
+            new std::ordered_set< uint8_t >() );
+        *minute = *rhs.minute;
+        hour = PBFIELD(
+            new std::ordered_set< uint8_t >() );
+        *hour = *rhs.hour;
+        if( rhs.day == ignored )
+            day = ignored;
+        else
+        {
+            day = PBFIELD(
+                new std::ordered_set< uint8_t >() );
+            *day = *rhs.day;
+        }
+        month = PBFIELD(
+            new std::ordered_set< uint8_t >() );
+        *month = *rhs.month;
+        if( rhs.weekday == ignored )
+            weekday = ignored;
+        else
+        {
+            weekday = PBFIELD(
+                new std::ordered_set< uint8_t >() );
+            *weekday = *rhs.weekday;
+        }
+        if( rhs.year == accepted )
+            year = accepted;
+        else
+        {
+            year = PWFIELD(
+                new std::ordered_set< uint16_t >() );
+            *year = *rhs.year;
+        }
+    }
 };
 
+struct CronSchedules
+{
+    std::string m_strExpr;
+    CronSchedule m_oCurrent;
+    CronSchedule m_oNext;
+    time_t  m_iLastRun = 0;
+    time_t m_iNextRun = 0;
+
+    CronSchedules( const std::string& strExpr ) :
+        m_strExpr( strExpr )
+    {}
+
+    CronSchedules()
+    {}
+
+    inline void SetExpression(
+        const std::string& strExpr )
+    { m_strExpr = strExpr; }
+
+    CronSchedule ParseCronInternal(
+        std::tm& targetDate ) const;
     /*
     * Parses a cron expression and returns a CronSchedule object.
     * The cron expression should be in the format:
@@ -73,7 +160,6 @@ struct CronSchedule
     * The function will throw std::runtime_error if the expression is invalid. 
     * The targetDate parameter is used to determine the current month and year for parsing.
     * If the year is not specified, it defaults to the current year.
-    * @param expr The cron expression to parse.
     * @param targetDate A std::tm structure representing the current date and time.
     * @return A CronSchedule object representing the parsed cron expression.
     * @throws std::runtime_error if the cron expression is invalid.
@@ -81,19 +167,17 @@ struct CronSchedule
     * CronSchedule sched = ParseCron("0 0-59/5 8-18 ? * 1-5", now);
     * This will create a schedule that runs every 5 minutes between 8 AM and 6 PM, Monday to Friday.   
     */
-CronSchedule ParseCron(
-    const std::string& expr,
-    std::tm& targetDate );
-
+    void ParseCron( std::tm targetDate );
    /*
     * Checks if the given time matches the cron schedule.
-    * @param sched The CronSchedule object to check against.
     * @param tm A std::tm structure representing the time to check.
     * @return true if the time matches the schedule, false otherwise.
     * Example:
     * bool isMatch = Matches(sched, now); 
     * This will return true if the current time matches the cron schedule.
     */
-bool Matches(
-    const CronSchedule& sched,
-    const std::tm& tm);
+    bool Matches( const std::tm& tm);
+
+    int FindNextRun(
+        const std::tm& now, time_t& tmRet );
+};
