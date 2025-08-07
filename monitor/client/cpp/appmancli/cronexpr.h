@@ -51,12 +51,15 @@ struct CronSchedule
     { return bInit; }
     void SetInitialized()
     { bInit = true; }
-    time_t tmLastRun = 0;
-    time_t tmNextRun = 0;
 
-    bool IsEmpty();
+    bool IsEmpty() const;
     CronSchedule()
     {}
+    uint8_t byCurMonth = 0;
+    uint16_t wCurYear = 0;
+
+    uint8_t GetCurMonth() const
+    { return byCurMonth; }
 
     CronSchedule( const CronSchedule& rhs )
     {
@@ -125,8 +128,9 @@ struct CronSchedules
     std::string m_strExpr;
     CronSchedule m_oCurrent;
     CronSchedule m_oNext;
-    time_t  m_iLastRun = 0;
-    time_t m_iNextRun = 0;
+    time_t  m_dwLastRun = 0;
+    time_t m_dwNextRun = 0;
+    time_t m_dwNextUpdate = 0;
 
     CronSchedules( const std::string& strExpr ) :
         m_strExpr( strExpr )
@@ -139,8 +143,6 @@ struct CronSchedules
         const std::string& strExpr )
     { m_strExpr = strExpr; }
 
-    CronSchedule ParseCronInternal(
-        std::tm& targetDate ) const;
     /*
     * Parses a cron expression and returns a CronSchedule object.
     * The cron expression should be in the format:
@@ -151,7 +153,9 @@ struct CronSchedules
     * - A list of values (e.g., "1,2,3")
     * - A step value (e.g. "1-10/2")
     * - A wildcard ("*")
-    * - A question mark ("?") for "no specific value"
+    * - A question mark ("?") for "ignored", as used in 'day' field and
+    * 'weekday' field, to skip parsing the field. It is invalid if both are
+    * ignored or neither is ignored.
     * - A last weekday (e.g., "5L" for last Friday of a month)
     * - An nth weekday (e.g., "3#2" for the second Wednesday within a month)
     * - A last day of the month (e.g., "L" for last day)
@@ -178,6 +182,18 @@ struct CronSchedules
     */
     bool Matches( const std::tm& tm);
 
+    int Start( std::tm now );
+
+    private:
     int FindNextRun(
         const std::tm& now, time_t& tmRet );
+
+    int DoFindNextRun(
+        const CronSchedule& sched,
+        const CronSchedule* pSchedNext,
+        const std::tm& now,
+        time_t& tmRet );
+
+    CronSchedule ParseCronInternal(
+        std::tm& targetDate ) const;
 };

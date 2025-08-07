@@ -305,7 +305,7 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                 try{
                     g_arrCronSched[ 0 ].SetExpression(
                         g_strSchedule );
-                    g_arrCronSched[ 0 ].ParseCron( now );
+                    g_arrCronSched[ 0 ].Start( now );
                 }
                 catch( std::runtime_error& e )
                 {
@@ -375,7 +375,7 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                     try{
                         g_arrCronSched[ 0 ].SetExpression(
                             g_strSchedule );
-                        g_arrCronSched[ 0 ].ParseCron(now);
+                        g_arrCronSched[ 0 ].Start(now);
                     }
                     catch( std::runtime_error& e )
                     {

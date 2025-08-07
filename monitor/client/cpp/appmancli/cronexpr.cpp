@@ -39,14 +39,14 @@ PBFIELD CronSchedule::ignored =
 PWFIELD CronSchedule::accepted =
     PWFIELD( new std::ordered_set< uint16_t >() );
 
-bool CronSchedule::IsEmpty()
+bool CronSchedule::IsEmpty() const
 {
-    return second->empty() ||
-        minute->empty() ||
-        hour->empty() ||
-        day->empty() ||
-        month->empty() ||
-        year->empty();
+    return !second || second->empty() ||
+        !minute || minute->empty() ||
+        !hour || hour->empty() ||
+        !day || day->empty() ||
+        !day || month->empty() ||
+        !year || ( year != CronSchedule::accepted && year->empty() );
 }
 
 static int mystoi( const std::string& str )
@@ -424,7 +424,7 @@ void FillMonthDaySet(
     uint8_t minval, uint8_t maxval,
     std::tm& now )
 {
-    std::ordered_set<uint8_t> result;
+    PBFIELD result( new std::ordered_set< uint8_t>() );
     std::stringstream ss(field);
     std::string part;
     while (std::getline(ss, part, ','))
@@ -446,14 +446,14 @@ void FillMonthDaySet(
                     "Error ',' is unexpected after '*'");
             }
             for (int i = minval; i <= maxval; ++i)
-                result.insert(i);
-            return std::make_shared< std::ordered_set<uint8_t> >( result );
+                result->insert(i);
+            return result;
         }
         std::unique_ptr<CronToken> pRoot =
             ParseMonthDayTokens( part, maxval, now );
-        FillMonthDaySet( pRoot, result );
+        FillMonthDaySet( pRoot, *result );
     }
-    return std::make_shared< std::ordered_set<uint8_t> >( result );
+    return result;
 }
 
 std::unique_ptr<CronToken> ParseWeekDayTokens(
@@ -772,7 +772,7 @@ PBFIELD ParseDayOfWeek(
     uint8_t minval, uint8_t maxval,
     std::tm& now )
 {
-    std::ordered_set<uint8_t> result;
+    PBFIELD result( new std::ordered_set<uint8_t>() );
     std::stringstream ss(field);
     std::string part;
     while (std::getline(ss, part, ','))
@@ -790,8 +790,8 @@ PBFIELD ParseDayOfWeek(
                 throw std::runtime_error(
                     "Error ',' is unexpected after '*'");
             for (int i = minval; i <= maxval; ++i)
-                result.insert(i);
-            return std::make_shared< std::ordered_set<uint8_t> >( result );
+                result->insert(i);
+            return result;
         }
         uint8_t maxmdays = 0;
         int ret = GetDaysInMonth( maxmdays,
@@ -803,9 +803,9 @@ PBFIELD ParseDayOfWeek(
         std::unique_ptr<CronToken> pRoot =
             ParseWeekDayTokens( part, maxmdays );
 
-        FillWeekDaySet( pRoot, result, maxmdays, now );
+        FillWeekDaySet( pRoot, *result, maxmdays, now );
     }
-    return std::make_shared< std::ordered_set<uint8_t> >( result );
+    return result;
 }
 
 CronSchedule CronSchedules::ParseCronInternal(
@@ -841,10 +841,12 @@ CronSchedule CronSchedules::ParseCronInternal(
     PBFIELD retSet = ParseDayOfMonth(
         fields[3], 1, maxdays, targetDate );
     sched.day = retSet;
-    retSet = ParseDayOfWeek(
-        fields[5], 0, 6, targetDate); // 0=Sunday
     if( sched.day == CronSchedule::ignored )
+    {
+        retSet = ParseDayOfWeek(
+            fields[5], 0, 6, targetDate); // 0=Sunday
         sched.day = retSet;
+    }
     if( sched.day == CronSchedule::ignored )
         throw std::runtime_error(
             "Error both 'day' and 'week day' are ignored." );
@@ -854,34 +856,50 @@ CronSchedule CronSchedules::ParseCronInternal(
 
     sched.year = ParseYear(fields[6], 1970, 2100);
     sched.SetInitialized();
+    sched.byCurMonth = targetDate.tm_mon;
+    sched.wCurYear = targetDate.tm_year;
     return sched;
 }
 
 void CronSchedules::ParseCron( std::tm now )
 {
-    m_oCurrent = ParseCronInternal( now );
+    if( !m_oNext.IsEmpty() )
+        m_oCurrent = m_oNext;
+    else
+        m_oCurrent = ParseCronInternal( now );
     std::tm tmNext = {0};
     tmNext.tm_mon = now.tm_mon + 1;
     tmNext.tm_year = now.tm_year;
     tmNext.tm_mday = 1;
     tmNext.tm_hour = tmNext.tm_sec = tmNext.tm_min = 0;
     m_oNext = ParseCronInternal( tmNext );
+    m_dwNextUpdate = mktime( &tmNext );
 }
 
-int CronSchedules::FindNextRun(
+int CronSchedules::Start( std::tm now )
+{
+    time_t tmRet = 0;
+    m_dwLastRun = 0;
+    m_dwNextRun = 0;
+    ParseCron( now );
+    FindNextRun( now, m_dwNextRun );
+    return 0;
+}
+
+int CronSchedules::DoFindNextRun(
+    const CronSchedule& sched,
+    const CronSchedule* pSchedNext,
     const std::tm& now,
     time_t& tmRet )
 {
     int ret = 0;
-    CronSchedule& sched = m_oCurrent;
+    std::tm tmNext = now;
     do{
-        std::tm tmNext = now;
         auto itrSec = sched.second->
             upper_bound( now.tm_sec );
         if( itrSec != sched.second->end() )
         {
             tmNext.tm_sec = *itrSec;
-            tmRet = mktime( &tmNext );
             break;
         }
         itrSec = sched.second->begin();
@@ -892,7 +910,6 @@ int CronSchedules::FindNextRun(
         if( itrMin != sched.minute->end() )
         {
             tmNext.tm_min = *itrMin;
-            tmRet = mktime( &tmNext );
             break;
         }
         itrMin = sched.minute->begin();
@@ -903,7 +920,6 @@ int CronSchedules::FindNextRun(
         if( itrHour != sched.hour->end() )
         {
             tmNext.tm_hour = *itrHour;
-            tmRet = mktime( &tmNext );
             break;
         }
         itrHour = sched.hour->begin();
@@ -914,77 +930,131 @@ int CronSchedules::FindNextRun(
         if( itrDay != sched.day->end() )
         {
             tmNext.tm_mday = *itrDay;
-            tmRet = mktime( &tmNext );
-            break;
-        }
-        itrDay = sched.day->begin();
-        tmNext.tm_mday = *itrDay;
-
-        auto itrMon = sched.month->
-            upper_bound( now.tm_mon );
-        if( itrMon != sched.month->end() )
-        {
-            tmNext.tm_mon = *itrMon;
-            tmRet = mktime( &tmNext );
-            break;
-        }
-        itrMon = sched.month->begin();
-        tmNext.tm_mon = *itrMon;
-
-        if( sched.year == sched.accepted )
-        {
-            tmNext.tm_year += 1;
-            tmNext.tm_hour = tmNext.tm_sec = tmNext.tm_min = 0;
-            tmNext.tm_mday = 1;
-            tmNext.tm_mon = 0;
-            tmNext.tm_wday = 0;
-            tmRet = mktime( &tmNext );
             break;
         }
 
-        auto itrYear = sched.year->
-            upper_bound( now.tm_year );
-        if( itrYear != sched.year->end() )
+        // current schedule is exhausted
+        if( pSchedNext == nullptr ||
+            pSchedNext->IsEmpty() )
         {
-            tmNext.tm_year = *itrYear;
-            tmRet = mktime( &tmNext );
+            ret = -ENOENT;
+            break;
+        }
+
+        itrDay = pSchedNext->day->begin();
+        if( itrDay != pSchedNext->day->end() )
+        {
+            tmNext.tm_mday = *itrDay;
+            tmNext.tm_mon =
+                pSchedNext->GetCurMonth();
+            break;
         }
         ret = -ENOENT;
 
+    }while( 0 );
+    if( ret == 0 )
+        tmRet = mktime( &tmNext );
+    return ret;
+}
+
+int CronSchedules::FindNextRun(
+    const std::tm& now,
+    time_t& tmRet )
+{
+    int ret = 0;
+    do{
+        std::tm tm = now;
+        ret = DoFindNextRun( m_oCurrent,
+            &m_oNext, tm,  tmRet );
+        if( ret == -ENOENT )
+        {
+            ret = DoFindNextRun( m_oNext,
+                nullptr, tm, tmRet );
+            if( ret == -ENOENT && tm.tm_year <= 2100 )
+            {
+                m_dwNextRun = 0xFFFFFFFF;
+                tm.tm_mday = 1;
+                tm.tm_mon += 1;
+                tm.tm_sec = tm.tm_min = tm.tm_hour = 0;
+                // correct the year if month is beyond
+                // 12.
+                mktime( &tm );
+            }
+            else if( ret == -ENOENT )
+            {
+                m_dwNextRun = 0xFFFFFFFF;
+                break;
+            }
+        }
     }while( 0 );
     return ret;
 }
 
 bool CronSchedules::Matches(
-    const std::tm& tm )
+    const std::tm& tmNow )
 {
     const CronSchedule& sched = m_oCurrent;
 
     if( !sched.IsIntitialzed() )
         return false;
     
-    bool bRet = true;
-    do{
-        bRet = sched.second->count(tm.tm_sec) &&
-               sched.minute->count(tm.tm_min) &&
-               sched.hour->count(tm.tm_hour) &&
-               sched.month->count(tm.tm_mon + 1);
-        if( !bRet )
-            break;
+    std::tm tm = tmNow;
+    time_t now = mktime( &tm );
+    if( m_dwNextRun > now  )
+        return false;
 
-        bRet = sched.day->count(tm.tm_mday);
-        if( !bRet )
-            break;
+    int ret = 0;
+    if( m_dwNextRun == 0 )
+    {
+        bool bRet = true;
+        do{
+            bRet = sched.second->count(tm.tm_sec) &&
+                   sched.minute->count(tm.tm_min) &&
+                   sched.hour->count(tm.tm_hour) &&
+                   sched.month->count(tm.tm_mon + 1);
+            if( !bRet )
+                break;
 
-        if( sched.year != sched.accepted )
+            bRet = sched.day->count(tm.tm_mday);
+            if( !bRet )
+                break;
+
+            if( sched.year != sched.accepted )
+            {
+                bRet = sched.year->count(
+                    tm.tm_year + 1900 );
+                break;
+            }
+            bRet = true;
+        }while( 0 );
+        if( bRet )
+            m_dwLastRun = mktime( &tm );
+
+        FindNextRun( tm, m_dwNextRun );
+        return bRet;
+    }
+    if( m_dwNextRun == 0xFFFFFFFF )
+    {
+        if( now >= m_dwNextUpdate )
         {
-            bRet = sched.year->count(
-                tm.tm_year + 1900 );
-            break;
+            std::tm tmNext;
+            localtime_r( &now, &tmNext );
+            ParseCron( tmNext );
+            FindNextRun( tmNext, m_dwNextRun );
         }
-        bRet = true;
+        return false;
+    }
+    else if( now >= m_dwNextRun )
+    {
+        m_dwLastRun = now;
+        if( now >= m_dwNextUpdate )
+            ParseCron( tm );
 
-    }while( 0 );
-
-    return bRet; 
+        FindNextRun( tm, m_dwNextRun );
+        return true;
+    }
+    // now < m_dwNextRun
+    if( now >= m_dwNextUpdate )
+        ParseCron( tm );
+    return false;
 }
