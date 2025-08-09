@@ -460,10 +460,10 @@ std::unique_ptr<CronToken> ParseWeekDayTokens(
     const std::string& strCronExpr,
     int maxmdays )
 {
-    std::regex oLwd( "([0-6])[Ll]" );
-    std::regex oNwd( "([0-6])#([1-5])" );
-    std::regex oRange( "[*]/([1-7])" );
-    std::regex oDayOfWeek( "([0-6])" );
+    std::regex oLwd( "^([0-6])[Ll]" );
+    std::regex oNwd( "^([0-6])#([1-5])" );
+    std::regex oRange( "^[*]/([1-7])" );
+    std::regex oDayOfWeek( "^([0-6])" );
 
     std::vector<std::pair<std::regex, EnumToken>> regexes =
     {
@@ -754,7 +754,7 @@ void FillWeekDaySet(
                             pEnd->iValue, startWday, 3 );
                     endMday = mday;
                 }
-                if( startMday <= endMday )
+                if( startMday > endMday )
                     throw std::runtime_error(
                         "Error invalid week-day range");
 
@@ -895,58 +895,129 @@ int CronSchedules::DoFindNextRun(
     int ret = 0;
     std::tm tmNext = now;
     do{
-        auto itrSec = sched.second->
+        const CronSchedule* pSched = &sched;
+        bool bCarry = false;
+        auto itrSec = pSched->second->
             upper_bound( now.tm_sec );
-        if( itrSec != sched.second->end() )
+        if( itrSec != pSched->second->end() )
         {
             tmNext.tm_sec = *itrSec;
-            break;
         }
-        itrSec = sched.second->begin();
-        tmNext.tm_sec = *itrSec;
-
-        auto itrMin = sched.minute->
-            upper_bound( now.tm_min );
-        if( itrMin != sched.minute->end() )
+        else
         {
-            tmNext.tm_min = *itrMin;
-            break;
+            bCarry = true;
+            itrSec = pSched->second->begin();
+            tmNext.tm_sec = *itrSec;
         }
-        itrMin = sched.minute->begin();
-        tmNext.tm_min = *itrMin;
 
-        auto itrHour = sched.hour->
-            upper_bound( now.tm_hour );
-        if( itrHour != sched.hour->end() )
+        if( !bCarry && !pSched->minute->count( now.tm_min ) )
+            bCarry = true;
+
+        if( bCarry )
         {
-            tmNext.tm_hour = *itrHour;
-            break;
+            bCarry = false;
+            auto itrMin = pSched->minute->
+                upper_bound( now.tm_min );
+            if( itrMin != pSched->minute->end() )
+            {
+                tmNext.tm_min = *itrMin;
+            }
+            else
+            {
+                bCarry = true;
+                itrMin = pSched->minute->begin();
+                tmNext.tm_min = *itrMin;
+            }
         }
-        itrHour = sched.hour->begin();
-        tmNext.tm_hour = *itrHour;
 
-        auto itrDay = sched.day->
-            upper_bound( now.tm_mday );
-        if( itrDay != sched.day->end() )
+        if( !bCarry && !pSched->hour->count( now.tm_hour ) )
+            bCarry = true;
+
+        if( bCarry )
         {
-            tmNext.tm_mday = *itrDay;
-            break;
+            bCarry = false;
+            auto itrHour = pSched->hour->
+                upper_bound( now.tm_hour );
+            if( itrHour != pSched->hour->end() )
+            {
+                tmNext.tm_hour = *itrHour;
+            }
+            else
+            {
+                bCarry = true;
+                itrHour = pSched->hour->begin();
+                tmNext.tm_hour = *itrHour;
+            }
         }
 
-        // current schedule is exhausted
-        if( pSchedNext == nullptr ||
-            pSchedNext->IsEmpty() )
+        if( !bCarry && !pSched->day->count( now.tm_mday ) )
+            bCarry = true;
+
+        if( bCarry )
+        {
+            bCarry = false;
+            auto itrDay = pSched->day->
+                upper_bound( now.tm_mday );
+            if( itrDay != pSched->day->end() )
+            {
+                tmNext.tm_mday = *itrDay;
+            }
+            else
+            {
+                bCarry = true;
+            }
+        }
+
+        if( !bCarry )
+        {
+            if( pSched->GetCurMonth() + 1 < now.tm_mon )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            if( !pSched->month->count( now.tm_mon ) )
+                bCarry = true;
+        }
+
+        if( bCarry )
+        {
+            bCarry = false;
+            // current schedule is exhausted
+            if( pSchedNext == nullptr ||
+                pSchedNext->IsEmpty() )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            pSched = pSchedNext;
+
+            auto itrDay = pSched->day->begin();
+            if( itrDay != pSched->day->end() )
+            {
+                tmNext.tm_mday = *itrDay;
+            }
+            else
+            {
+                ret = -ENOENT;
+                break;
+            }
+        }
+
+        // assuming calling Matches occur everyday.
+        uint8_t byMon =pSched->GetCurMonth();
+        uint16_t wYear = pSched->GetCurYear();
+
+        if( !pSched->month->count( byMon ) ) 
         {
             ret = -ENOENT;
             break;
         }
+        tmNext.tm_mon = byMon;
 
-        itrDay = pSchedNext->day->begin();
-        if( itrDay != pSchedNext->day->end() )
+        if( pSched->year == CronSchedule::accepted ||
+            pSched->year->count( wYear + 1900 ) )
         {
-            tmNext.tm_mday = *itrDay;
-            tmNext.tm_mon =
-                pSchedNext->GetCurMonth();
+            tmNext.tm_year = wYear;
             break;
         }
         ret = -ENOENT;
@@ -965,27 +1036,10 @@ int CronSchedules::FindNextRun(
     do{
         std::tm tm = now;
         ret = DoFindNextRun( m_oCurrent,
-            &m_oNext, tm,  tmRet );
+            &m_oNext, tm, tmRet );
         if( ret == -ENOENT )
-        {
-            ret = DoFindNextRun( m_oNext,
-                nullptr, tm, tmRet );
-            if( ret == -ENOENT && tm.tm_year <= 2100 )
-            {
-                m_dwNextRun = 0xFFFFFFFF;
-                tm.tm_mday = 1;
-                tm.tm_mon += 1;
-                tm.tm_sec = tm.tm_min = tm.tm_hour = 0;
-                // correct the year if month is beyond
-                // 12.
-                mktime( &tm );
-            }
-            else if( ret == -ENOENT )
-            {
-                m_dwNextRun = 0xFFFFFFFF;
-                break;
-            }
-        }
+            m_dwNextRun = 0xFFFFFFFF;
+
     }while( 0 );
     return ret;
 }
@@ -995,12 +1049,13 @@ bool CronSchedules::Matches(
 {
     const CronSchedule& sched = m_oCurrent;
 
-    if( !sched.IsIntitialzed() )
+    if( !sched.IsInitialized() )
         return false;
     
     std::tm tm = tmNow;
     time_t now = mktime( &tm );
-    if( m_dwNextRun > now  )
+    if( m_dwNextRun != 0xFFFFFFFF
+        && m_dwNextRun > now  )
         return false;
 
     int ret = 0;

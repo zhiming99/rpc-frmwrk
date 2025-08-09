@@ -48,6 +48,7 @@ jobs:
     - name: starting servers
       run: dbus-run-session bash tools/runtest.sh 2 & 
     - name: starting test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1
       
     - name: cleanup for ssl test
@@ -55,6 +56,7 @@ jobs:
     - name: starting ssl servers
       run: dbus-run-session bash tools/runtest.sh 2 & 
     - name: starting ssl test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1
     
     - name: configure kerberos
@@ -64,6 +66,7 @@ jobs:
     - name: starting kerberos servers
       run: dbus-run-session bash tools/runtest.sh 2 k & 
     - name: starting kerberos test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1 k
 
     - name: configure websocket
@@ -73,6 +76,7 @@ jobs:
     - name: starting websocket servers
       run: dbus-run-session bash tools/runtest.sh 2 k & 
     - name: starting websocket test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1 k
 
     - name: configure gmssl
@@ -80,6 +84,7 @@ jobs:
     - name: starting gmssl servers
       run: dbus-run-session bash tools/runtest.sh 2 & 
     - name: starting gmssl test
+      timeout-minutes: 100
       run: dbus-run-session bash tools/runtest.sh 1
     - name: cleanup gmssl files
       run: rm ./reqfwdr/driver.json && rmdir reqfwdr || true

@@ -682,11 +682,20 @@ gint32 TimerLoop()
         CStdRMutex oLock( GetTmLock() );
         std::time_t t = std::time(nullptr);
         std::tm now = *std::localtime(&t);
-        if( g_arrCronSched[ 0 ].Matches( now ) )
+        try{
+            if( g_arrCronSched[ 0 ].Matches( now ) )
+            {
+                oLock.Unlock();
+                pam->SetPointValue( oCfg.GetCfg(),
+                    g_strAppInst + "/sched_task1", var );
+            }
+        }
+        catch( std::runtime_error& e )
         {
-            oLock.Unlock();
-            pam->SetPointValue( oCfg.GetCfg(),
-                g_strAppInst + "/sched_task1", var );
+            DebugPrint( 0,
+                "%s in cron expression: %s",
+                e.what(),
+                g_strSchedule.c_str() );
         }
         oLock.Unlock();
         WaitForSeconds( 1 );

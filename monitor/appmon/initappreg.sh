@@ -141,6 +141,7 @@ set_point_value timer1 schedule1 "$(cat $tmpfile)" blob
 rm $tmpfile
 add_point timer1 sched_task1 output i
 set_attr_value timer1 sched_task1 lastrun "$(jsonval 'i' 0)" i
+set_attr_value timer1 sched_task1 nextrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 schedule1 load_on_start "$(jsonval 'i' 1)" i
 
 echo adding application appmonsvr1

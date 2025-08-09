@@ -45,6 +45,11 @@ int main()
         "0 */5 8-23 * * 1-5",
         //"* * 17-23 * * 3#4,5l",
         "0 * 17-23 ? * 5#1,5l",
+        // weekday's non-weekly range, from first Saturday 
+        // of a month to the last Tuesday of a month.
+        // "0 * * ? * 6#4-2l",
+        // month day file cloaked weekday if not ignored
+        "0 * * * * 6#3-2l",
         };
 
     std::string expr;

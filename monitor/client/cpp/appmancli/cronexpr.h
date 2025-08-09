@@ -47,8 +47,9 @@ struct CronSchedule
     PWFIELD year={nullptr};
 
     bool bInit = false;
-    bool IsIntitialzed() const
+    bool IsInitialized() const
     { return bInit; }
+
     void SetInitialized()
     { bInit = true; }
 
@@ -60,6 +61,9 @@ struct CronSchedule
 
     uint8_t GetCurMonth() const
     { return byCurMonth; }
+
+    uint16_t GetCurYear() const
+    { return wCurYear; }
 
     CronSchedule( const CronSchedule& rhs )
     {
