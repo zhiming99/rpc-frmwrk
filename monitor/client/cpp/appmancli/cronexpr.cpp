@@ -872,8 +872,8 @@ void CronSchedules::ParseCron( std::tm now )
     tmNext.tm_year = now.tm_year;
     tmNext.tm_mday = 1;
     tmNext.tm_hour = tmNext.tm_sec = tmNext.tm_min = 0;
-    m_oNext = ParseCronInternal( tmNext );
     m_dwNextUpdate = mktime( &tmNext );
+    m_oNext = ParseCronInternal( tmNext );
 }
 
 int CronSchedules::Start( std::tm now )
@@ -928,6 +928,7 @@ int CronSchedules::DoFindNextRun(
                 itrMin = pSched->minute->begin();
                 tmNext.tm_min = *itrMin;
             }
+            tmNext.tm_sec = *pSched->second->begin();
         }
 
         if( !bCarry && !pSched->hour->count( now.tm_hour ) )
@@ -948,6 +949,8 @@ int CronSchedules::DoFindNextRun(
                 itrHour = pSched->hour->begin();
                 tmNext.tm_hour = *itrHour;
             }
+            tmNext.tm_sec = *pSched->second->begin();
+            tmNext.tm_min = *pSched->minute->begin();
         }
 
         if( !bCarry && !pSched->day->count( now.tm_mday ) )
@@ -966,6 +969,9 @@ int CronSchedules::DoFindNextRun(
             {
                 bCarry = true;
             }
+            tmNext.tm_sec = *pSched->second->begin();
+            tmNext.tm_min = *pSched->minute->begin();
+            tmNext.tm_hour = *pSched->hour->begin();
         }
 
         if( !bCarry )
@@ -975,7 +981,7 @@ int CronSchedules::DoFindNextRun(
                 ret = -ENOENT;
                 break;
             }
-            if( !pSched->month->count( now.tm_mon ) )
+            if( !pSched->month->count( now.tm_mon + 1 ) )
                 bCarry = true;
         }
 
@@ -991,23 +997,24 @@ int CronSchedules::DoFindNextRun(
             }
             pSched = pSchedNext;
 
+
             auto itrDay = pSched->day->begin();
-            if( itrDay != pSched->day->end() )
-            {
-                tmNext.tm_mday = *itrDay;
-            }
-            else
+            if( itrDay == pSched->day->end() )
             {
                 ret = -ENOENT;
                 break;
             }
+            tmNext.tm_mday = *itrDay;
+            tmNext.tm_sec = *pSched->second->begin();
+            tmNext.tm_min = *pSched->minute->begin();
+            tmNext.tm_hour = *pSched->hour->begin();
         }
 
         // assuming calling Matches occur everyday.
         uint8_t byMon =pSched->GetCurMonth();
         uint16_t wYear = pSched->GetCurYear();
 
-        if( !pSched->month->count( byMon ) ) 
+        if( !pSched->month->count( byMon + 1 ) ) 
         {
             ret = -ENOENT;
             break;

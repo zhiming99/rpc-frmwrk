@@ -48,8 +48,9 @@ int main()
         // weekday's non-weekly range, from first Saturday 
         // of a month to the last Tuesday of a month.
         // "0 * * ? * 6#4-2l",
-        // month day file cloaked weekday if not ignored
+        // month day cloaked weekday if not ignored
         "0 * * * * 6#3-2l",
+        "0 * * 1 1 ? 2026",
         };
 
     std::string expr;
@@ -77,6 +78,18 @@ int main()
                     std::cout << "Now: " << std::asctime(&now);
                     std::cout << "Matches cron '" << expr << "': "
                       << (sched.Matches( now) ? "yes" : "no") << std::endl;
+                if( sched.m_dwNextRun != 0xFFFFFFFF )
+                {
+                    std::tm tm;
+                    localtime_r( &sched.m_dwNextRun, &tm );
+                    std::cout << "Next run: "
+                        << asctime( &tm ) << std::endl;
+                }
+                else
+                {
+                    std::cout << "Next run: unknown"
+                        << std::endl;
+                }
             }
             sleep( 3 );
         }

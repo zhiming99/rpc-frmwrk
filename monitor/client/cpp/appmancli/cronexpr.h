@@ -158,6 +158,8 @@ struct CronSchedules
     * - A step value (e.g. "1-10/2")
     * - A wildcard ("*")
     * - A question mark ("?") for "ignored", as used in 'day' field and
+    * - The valid value ranges are : 'day' 1-31, 'month' 1-12, 'hour' 0-23,
+    * 'min' 0-59, 'second' 0-59, year 1900-2100.
     * 'weekday' field, to skip parsing the field. It is invalid if both are
     * ignored or neither is ignored.
     * - A last weekday (e.g., "5L" for last Friday of a month)
