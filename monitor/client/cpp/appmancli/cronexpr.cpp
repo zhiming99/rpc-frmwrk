@@ -193,7 +193,10 @@ struct CronToken
     EnumToken iType = tokMonthDay;
     int32_t iValue = 0;
     int8_t iStep = 1; // For range step
-    int8_t iNthWeek = 0;
+    union{
+        int8_t iNthWeek = 0;
+        int8_t iMaxVal;
+    };
     std::unique_ptr<CronToken> pStart;
     std::unique_ptr<CronToken> pEnd;
     CronToken()
@@ -215,10 +218,10 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
     const std::string& strCronExpr,
     int maxval, std::tm& now )
 {
-    std::regex oNwd( "([0-9][0-9]?)[Ww]" );
-    std::regex oLmd( "[Ll](-[0-9][0-9]?)?" );
-    std::regex oRange( "[*]/([0-9][0-9]?)" );
-    std::regex oMonthDay( "([0-9][0-9]?)" );
+    std::regex oNwd( "^([0-9][0-9]?)[Ww]" );
+    std::regex oLmd( "^[Ll](-[0-9][0-9]?)?" );
+    std::regex oRange( "^[*]/([0-9][0-9]?)" );
+    std::regex oMonthDay( "^([0-9][0-9]?)" );
 
     std::vector<std::pair<std::regex, EnumToken>> regexes = {
         {oNwd, tokNearWeekday},
@@ -268,15 +271,16 @@ std::unique_ptr<CronToken> ParseMonthDayTokens(
                             oTime.tm_mday += 1; // Move to next Monday
                         else // Saturday
                             oTime.tm_mday -= 1; // Move to Friday
+                        mktime( &oTime );
+                        if( oTime.tm_mon + 1 == now.tm_mon )
+                            oTime.tm_mday = -oTime.tm_mday;
+                        else if( oTime.tm_mon - 1 == now.tm_mon )
+                            oTime.tm_mday = -oTime.tm_mday - 100;
                     }
 
                     token.iValue = oTime.tm_mday;
-                    if( token.iValue < 1 ||
-                        token.iValue > maxval )
-                    {
-                        throw std::runtime_error(
-                            "Error near-weekday value out of range");
-                    }
+                    token.iType = type;
+                    token.iMaxVal = maxval;
                 }
                 else if( type == tokLastMonthDay )
                 {
@@ -411,10 +415,43 @@ void FillMonthDaySet(
     }
     else if( pRoot->iType == tokRangeStep )
     {
-        for( int i = pRoot->pStart->iValue;
-            i <= pRoot->pEnd->iValue;
-            i += pRoot->iStep )
-            result.insert(i);
+        CronToken* pStart = pRoot->pStart.get();
+        CronToken* pEnd = pRoot->pEnd.get();
+        int iStart = 0;
+        int iEnd = 0;
+        if( pStart->iType == tokMonthDay )
+        {
+            iStart = pStart->iValue;
+        }
+        else if( pStart->iType == tokNearWeekday )
+        {
+            iStart = pStart->iValue;
+            if( iStart < 0 && iStart > -100 )
+                iStart = 1;
+            else if( iStart < -100 )
+                iStart = pStart->iMaxVal;
+        }
+
+        if( pEnd->iType == tokMonthDay )
+        {
+            iEnd = pEnd->iValue;
+        }
+        else if( pEnd->iType == tokNearWeekday )
+        {
+            iEnd = pEnd->iValue;
+            if( iEnd < 0 && iEnd > -100 )
+                iEnd = 1;
+            else if( iEnd < -100 )
+                iEnd = pEnd->iMaxVal;
+        }
+        for( int i = iStart;
+            i <= iEnd; i += pRoot->iStep )
+            result.insert( i );
+    }
+    else if( pRoot->iType = tokNearWeekday )
+    {
+        if( pRoot->iValue > 0 )
+            result.insert( pRoot->iValue );
     }
     return;
 }

@@ -42,28 +42,28 @@ int main()
     auto iOldSig = signal( SIGINT, SignalHandler );
     // Every 5 minutes, 8-18h, Mon-Fri
     std::vector< std::string > vecExpr = {
-        "0 */5 8-23 * * 1-5",
+        // "0 */5 8-23 * * 1-5",
         //"* * 17-23 * * 3#4,5l",
-        "0 * 17-23 ? * 5#1,5l",
+        // "0 * 17-23 ? * 5#1,5l",
         // weekday's non-weekly range, from first Saturday 
         // of a month to the last Tuesday of a month.
         // "0 * * ? * 6#4-2l",
         // month day cloaked weekday if not ignored
-        "0 * * * * 6#3-2l",
-        "0 * * 1 1 ? 2026",
+        // "0 * * * * 6#3-2l",
+        "0 * * 1w 1 ? 2026",
         };
 
     std::string expr;
 
     try{
         CronSchedules arrScheds[ vecExpr.size() ];
+        std::time_t t = std::time(nullptr);
+        std::tm now = *std::localtime(&t);
         for( int i = 0; i < vecExpr.size(); i++ )
         {
             CronSchedules& sched = arrScheds[ i ];
             expr = vecExpr[ i ];
             sched.SetExpression( expr );
-            std::time_t t = std::time(nullptr);
-            std::tm now = *std::localtime(&t);
             sched.Start( now );
         }
 
@@ -75,9 +75,9 @@ int main()
                 CronSchedules& sched = arrScheds[ i ];
                 std::time_t t = std::time(nullptr);
                 std::tm now = *std::localtime(&t);
-                    std::cout << "Now: " << std::asctime(&now);
-                    std::cout << "Matches cron '" << expr << "': "
-                      << (sched.Matches( now) ? "yes" : "no") << std::endl;
+                std::cout << "Now: " << std::asctime(&now);
+                std::cout << "Matches cron '" << expr << "': "
+                  << (sched.Matches( now) ? "yes" : "no") << std::endl;
                 if( sched.m_dwNextRun != 0xFFFFFFFF )
                 {
                     std::tm tm;
