@@ -1443,5 +1443,45 @@ stdstr SimpleCmdLine(
     return strCmd;
 }
 
+CNamedProcessLock::CNamedProcessLock(
+    const stdstr& strLockName )
+{
+    gint32 ret = 0;
+    do{
+        m_strName = strLockName;
+        std::replace( m_strName.begin(),
+            m_strName.end(), '/', '_' );
+        m_strSemName = "/";
+        m_strSemName += m_strName;
+        m_pSem = sem_open( m_strSemName.c_str(),
+            O_CREAT | O_EXCL, S_IRUSR | S_IWUSR, 1);
+        if( m_pSem == SEM_FAILED )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        sem_wait( m_pSem );
+        
+    }while( 0 );
+    if( ERROR( ret ) )
+    {
+        std::string strMsg = DebugMsg( ret,
+            "Error create named process lock %s",
+            strLockName.c_str() );
+        throw std::runtime_error( strMsg );
+    }
+}
+
+CNamedProcessLock::~CNamedProcessLock()
+{
+    if( m_pSem != nullptr )
+    {
+        sem_post( m_pSem );
+        sem_close( m_pSem );
+        sem_unlink( m_strSemName.c_str() );
+        m_pSem = nullptr;
+    }
+}
+
 }
 
