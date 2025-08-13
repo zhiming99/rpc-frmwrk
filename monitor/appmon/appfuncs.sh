@@ -772,7 +772,7 @@ function show_point()
             _output+="None"
         fi
     fi
-    echo $_output
+    echo "$_output"
 }
 
 function show_links()
@@ -999,8 +999,9 @@ function init_log_file()
     magic=0x706c6f67
     counter=0
     recsize=$(expr 4 + $typesize)
+    reserved=0
 
-    python3 -c "import sys; sys.stdout.buffer.write((${magic}).to_bytes(4, 'big')); sys.stdout.buffer.write((${counter}).to_bytes(4, 'big')); sys.stdout.buffer.write((${typeid}).to_bytes(2, 'big')); sys.stdout.buffer.write((${recsize}).to_bytes(2, 'big'))" > $output
+    python3 -c "import sys; sys.stdout.buffer.write((${magic}).to_bytes(4, 'big')); sys.stdout.buffer.write((${counter}).to_bytes(4, 'big')); sys.stdout.buffer.write((${typeid}).to_bytes(2, 'big')); sys.stdout.buffer.write((${recsize}).to_bytes(2, 'big')); sys.stdout.buffer.write((${reserved}).to_bytes(4, 'big')) " > $output
 }
 
 function add_log_link()
@@ -1085,6 +1086,9 @@ function add_log_link()
             init_log_file $_logfile $typestr
             echo $_logfile > $_userpath/logs/ptr$userid-extfile
         fi
+
+        touch $_userpath/average
+        python3 $updattr -u 'user.regfs' "$(jsonval d 0.0)" $_userpath/average > /dev/null
     fi
     chmod o-w $_logpath/logptrs
     chmod o-w $_userpath/logptrs

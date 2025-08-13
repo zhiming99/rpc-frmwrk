@@ -132,7 +132,7 @@ add_point timer1 offline_action input s
 set_attr_value timer1 offline_action point_flags "$(jsonval 'i' 1 )" i
 
 add_point timer1 schedule1 setpoint blob
-schedstr='0 1 0 * * ?'
+schedstr='0 1 9 * * ?'
 valstr=$(jsonval 'blob' "$schedstr")
 tmpfile=$(mktemp -u)
 echo "$valstr" > $tmpfile
@@ -153,6 +153,8 @@ set_point_value appmonsvr1 working_dir  "$(jsonval 'blob' '/' )" blob
 add_point appmonsvr1 ptlogger1 input i
 add_link timer1 clock2 appmonsvr1 ptlogger1
 set_attr_value appmonsvr1 ptlogger1 ptlist "$(jsonval 'blob' '[]' )" blob
+add_point appmonsvr1 logrotate1 input i
+add_link timer1 sched_task1 appmonsvr1 logrotate1
 
 echo adding application loggersvr1
 add_stdapp loggersvr1
