@@ -34,18 +34,26 @@ using namespace rpcf;
 #include "monconst.h"
 #include "blkalloc.h"
 
+#define MAX_LOG_FILES 9
 extern stdstr g_strAppInst;
 extern RegFsPtr GetRegFs( bool bUser );
 extern gint32 SplitPath( const stdstr& strPath,
     std::vector< stdstr >& vecComp );
+extern InterfPtr GetAppManager();
 
 #define LOG_MAGIC 0x706c6f67
+#define NPLock CNamedProcessLock
+
+#define ROTATE_LIMIT ( 1024 * 1024 )
+
 struct LOGHDR
 {
     guint32 dwMagic = LOG_MAGIC;
     guint32 dwCounter = 0;
     guint16 wTypeId = 0;
     guint16 wRecSize = 0;
+    guint8  byUnit = 0;
+    guint8  reserved[ 3 ] = {0};
     void hton()
     {
         dwMagic = htonl( dwMagic );
@@ -62,113 +70,11 @@ struct LOGHDR
     }
 };
 
-typedef std::unique_ptr<FILE, decltype(std::fclose)*> FPHandle;
-
-gint32 AppendLogExternal(
+typedef std::vector< std::pair< time_t, Variant > > LOGRECVEC;
+gint32 GetLatestLogs(
     const stdstr& strLogFile,
-    const Variant& oVar )
-{
-    gint32 ret = 0;
-    
-    do{
-        FPHandle fp( fopen(
-            strLogFile.c_str(), "r+b" ), fclose );
-        if( fp.get() == nullptr )
-        {
-            ret = -errno;
-            break;
-        }
-
-        LOGHDR oHeader;
-        ret = fread( &oHeader, sizeof( oHeader ), 1, fp.get() );
-        if( ERROR( ret ) )
-            break;
-        oHeader.hton();
-
-        if( oHeader.dwMagic != LOG_MAGIC )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( oVar.GetTypeId() !=
-            ( EnumTypeId )oHeader.wTypeId )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( oHeader.wRecSize > sizeof( Variant ) )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        timespec ts;
-        ret = clock_gettime( CLOCK_REALTIME, &ts );
-        if( ret == -1 )
-        {
-            ret = -errno;
-            break;
-        }
-
-        guint8 buf[ 32 ]; 
-        guint32 timestamp = ntohl( ts.tv_sec );
-        memcpy( buf, &timestamp, sizeof( timestamp ) );
-        switch( ( EnumTypeId )oHeader.wTypeId )
-        {
-        case typeByte:
-            buf[ sizeof( timestamp ) ] =
-                ( guint8& )oVar;
-            break;
-        case typeUInt16:
-            {
-                guint16 wVal =
-                    ntohs( ( guint16& )oVar );
-                memcpy( buf + sizeof( timestamp ),
-                    &wVal, sizeof( wVal ) );
-                break;
-            }
-        case typeUInt32:
-        case typeFloat:
-            {
-                guint32 dwVal =
-                    ntohl( ( guint32& )oVar );
-                memcpy( buf + sizeof( timestamp ),
-                    &dwVal, sizeof( dwVal ) );
-                break;
-            }
-        case typeUInt64:
-        case typeDouble:
-            {
-                guint64 qwVal =
-                    ntohll( ( guint64& )oVar );
-                memcpy( buf + sizeof( timestamp ),
-                    &qwVal, sizeof( qwVal ) );
-                break;
-            }
-        default:
-            ret = -ENOTSUP;
-            break;
-        }
-        if( ERROR( ret ) )
-            break;
-        fseek( fp.get(), 0, SEEK_END );
-        ret = fwrite( buf, 1, oHeader.wRecSize, fp.get() );
-        if( ret != oHeader.wRecSize )
-        {
-            ret = ERROR_FAIL;
-            break;
-        }
-        oHeader.dwCounter += 1;
-        oHeader.ntoh();
-        fseek( fp.get(), 0, SEEK_SET );
-        fwrite( &oHeader, 1, sizeof( oHeader ), fp.get() );
-    }while( 0 );
-    return ret;
-}
-
-gint32 AppendLog(
-    const stdstr& strLogFile,
-    const Variant& oVar )
+    guint32 dwNumRec,
+    LOGRECVEC& vecRecs )
 {
     gint32 ret = 0;
     do{
@@ -181,26 +87,21 @@ gint32 AppendLog(
 
         RFHANDLE hFile = INVALID_HANDLE;
         ret = pAppReg->OpenFile(
-            strLogFile, O_RDWR, hFile );
+            strLogFile, O_RDONLY, hFile );
         if( ERROR( ret ) )
             break;
 
-        LOGHDR oHeader;
         CFileHandle oHandle( pAppReg, hFile );
+
+        LOGHDR oHeader;
         guint32 dwSize = sizeof( oHeader );
         ret = pAppReg->ReadFile( hFile,
             ( char* )&oHeader, dwSize, 0 );
         if( ERROR( ret ) )
             break;
 
-        oHeader.hton();
+        oHeader.ntoh();
         if( oHeader.dwMagic != LOG_MAGIC )
-        {
-            ret = -EINVAL;
-            break;
-        }
-        if( oVar.GetTypeId() !=
-            ( EnumTypeId )oHeader.wTypeId )
         {
             ret = -EINVAL;
             break;
@@ -210,88 +111,113 @@ gint32 AppendLog(
             ret = -EINVAL;
             break;
         }
-
-        timespec ts;
-        ret = clock_gettime( CLOCK_REALTIME, &ts );
-        if( ret == -1 )
+        if( oHeader.dwCounter == 0 )
         {
-            ret = -errno;
+            ret = -ENOENT;
             break;
         }
+
         struct stat stBuf;
         ret = pAppReg->GetAttr( hFile, stBuf );
         if( ERROR( ret ) )
             break;
 
-        guint8 buf[ 32 ]; 
-        guint32 timestamp = ntohl( ts.tv_sec );
-        memcpy( buf, &timestamp, sizeof( timestamp ) );
-        switch( ( EnumTypeId )oHeader.wTypeId )
+        guint32 dwOffset = sizeof( oHeader );
+        guint32 dwActNum = dwNumRec;
+        if( oHeader.dwCounter < dwNumRec )
+            dwActNum = oHeader.dwCounter;
+
+        dwOffset += oHeader.wRecSize *
+            ( oHeader.dwCounter - dwActNum );
+        if( stBuf.st_size <= ( size_t )dwOffset ||
+            ( stBuf.st_size - dwOffset != oHeader.wRecSize * dwActNum ) )
         {
-        case typeByte:
-            buf[ sizeof( timestamp ) ] =
-                ( guint8& )oVar;
-            break;
-        case typeUInt16:
-            {
-                guint16 wVal =
-                    ntohs( ( guint16& )oVar );
-                memcpy( buf + sizeof( timestamp ),
-                    &wVal, sizeof( wVal ) );
-                break;
-            }
-        case typeUInt32:
-        case typeFloat:
-            {
-                guint32 dwVal =
-                    ntohl( ( guint32& )oVar );
-                memcpy( buf + sizeof( timestamp ),
-                    &dwVal, sizeof( dwVal ) );
-                break;
-            }
-        case typeUInt64:
-        case typeDouble:
-            {
-                guint64 qwVal =
-                    ntohll( ( guint64& )oVar );
-                memcpy( buf + sizeof( timestamp ),
-                    &qwVal, sizeof( qwVal ) );
-                break;
-            }
-        default:
-            ret = -ENOTSUP;
+            ret = -EBADMSG;
             break;
         }
+
+        BufPtr pBuf( true );
+        ret = pBuf->Resize(
+            dwActNum * oHeader.wRecSize );
         if( ERROR( ret ) )
             break;
 
-        dwSize = oHeader.wRecSize;
-        ret = pAppReg->WriteFile( hFile,
-            ( char* )buf, dwSize, stBuf.st_size );
+        dwSize = pBuf->size();
+        ret = pAppReg->ReadFile( hFile,
+            pBuf->ptr(), dwSize, dwOffset );
         if( ERROR( ret ) )
-        {
-            pAppReg->Truncate(
-                hFile, stBuf.st_size );
-        }
+            break;
 
-        oHeader.dwCounter+=1;
-        oHeader.ntoh();
-        dwSize = sizeof( oHeader );
-        ret = pAppReg->WriteFile( hFile,
-            ( char* )&oHeader, dwSize, 0 );
+        auto buf = pBuf->ptr(); 
+        for( int i = 0; i < dwActNum; i++ )
+        {
+            guint32 dwTimestamp;
+            memcpy( &dwTimestamp,
+                buf, sizeof( guint32 ) );
+            dwTimestamp = htonl( dwTimestamp );
+            Variant oVar;
+            guint8* pData = ( guint8* )
+                ( buf + sizeof( guint32 ) );
+            switch( ( EnumTypeId )oHeader.wTypeId )
+            {
+            case typeByte:
+                oVar = pData[0];
+                break;
+            case typeUInt16:
+                {
+                    guint32 wVal; 
+                    memcpy( &wVal, pData, sizeof( guint16 ) );
+                    wVal = ntohs( ( guint16& )pData );
+                    oVar = wVal;
+                    break;
+                }
+            case typeUInt32:
+            case typeFloat:
+                {
+                    guint32 dwVal; 
+                    memcpy( &dwVal, pData, sizeof( guint32 ) );
+                    dwVal = ntohl( dwVal );
+                    oVar = dwVal;
+                    break;
+                }
+            case typeUInt64:
+            case typeDouble:
+                {
+                    guint64 qwVal; 
+                    memcpy( &qwVal, pData, sizeof( guint64 ) );
+                    qwVal = ntohll( qwVal );
+                    oVar = qwVal;
+                    break;
+                }
+            default:
+                ret = -ENOTSUP;
+                break;
+            }
+            if( ERROR( ret ) )
+                break;
+
+            buf += oHeader.wRecSize;
+            vecRecs.push_back( { dwTimestamp, oVar } );
+        }
 
     }while( 0 );
     return ret;
 }
 
-gint32 LogPoints(
-    IConfigDb* context, gint32 idx )
+gint32 UpdateAverages( gint32 idx )
 {
     if( idx < 0 || idx > 3 )
         return -EINVAL;
 
     gint32 ret = 0;
     do{
+        InterfPtr pIf = GetAppManager();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CAppManager_SvrImpl* pam = pIf;
         RegFsPtr pAppReg = GetRegFs( false );
         if( pAppReg.IsEmpty() )
         {
@@ -347,6 +273,385 @@ gint32 LogPoints(
                     "Error log link is not valid" );
                 continue;
             }
+
+            stdstr strPt2Log = "/" APPS_ROOT_DIR "/";
+            strPt2Log += vecComps[ 0 ] +
+                "/points/" + vecComps[ 1 ];
+
+            stdstr strLogFile = strPt2Log +
+                "/logs/" + vecComps[ 2 ] + "-0";
+
+            LOGRECVEC vecRecs;
+            ret = GetLatestLogs(
+                strLogFile, 8, vecRecs );
+
+            if( SUCCEEDED( ret ) )
+            {
+                time_t& ts = vecRecs.back().first;
+                Variant& oLast = vecRecs.back().second;
+
+                time_t& ts1 = vecRecs.front().first;
+                Variant& oFirst = vecRecs.front().second;
+                if( ts1 >= ts )
+                    continue;
+                guint32 dwSecs = ts - ts1;
+                double dblAvg = .0;
+                switch( oLast.GetTypeId() )
+                {
+                case typeByte:
+                    {
+                        guint8 diff = 
+                        ( ( guint8& )oLast - ( guint8&) oFirst );
+                        dblAvg = ( double )diff / (double)( ts - ts1 );
+                        break;
+                    }
+                case typeUInt16:
+                    {
+                        guint16 diff = 
+                        ( ( guint16& )oLast - ( guint16&) oFirst );
+                        dblAvg = ( double )diff / (double)( ts - ts1 );
+                        break;
+                    }
+                case typeUInt32:
+                    {
+                        guint32 diff = 
+                        ( ( guint32& )oLast - ( guint32&) oFirst );
+                        dblAvg = ( double )diff / (double)( ts - ts1 );
+                        break;
+                    }
+                case typeFloat:
+                    {
+                        float diff = 
+                        ( ( float& )oLast - ( float&) oFirst );
+                        dblAvg = ( double )diff / (double)( ts - ts1 );
+                        break;
+                    }
+                case typeUInt64:
+                    {
+                        guint64 diff = 
+                        ( ( guint64& )oLast - ( guint64&) oFirst );
+                        dblAvg = ( double )diff / (double)( ts - ts1 );
+                        break;
+                    }
+                case typeDouble:
+                    {
+                        double diff = 
+                        ( ( double& )oLast - ( double&) oFirst );
+                        dblAvg = diff / (double)( ts - ts1 );
+                        break;
+                    }
+                default:
+                    ret = -ENOTSUP;
+                    break;
+                }
+                if( ERROR( ret ) )
+                    continue;
+
+                Variant oVar( dblAvg );
+                stdstr strAvg = strPt2Log + "/average";
+                pAppReg->SetValue( strAvg, dblAvg );
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+typedef std::unique_ptr<FILE, decltype(std::fclose)*> FPHandle;
+
+gint32 AppendLogExternal(
+    const stdstr& strLogFile,
+    const Variant& oVar )
+{
+    gint32 ret = 0;
+    
+    do{
+        FPHandle fp( fopen(
+            strLogFile.c_str(), "r+b" ), fclose );
+        if( fp.get() == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+
+        LOGHDR oHeader;
+        ret = fread( &oHeader, sizeof( oHeader ), 1, fp.get() );
+        if( ERROR( ret ) )
+            break;
+        oHeader.ntoh();
+
+        if( oHeader.dwMagic != LOG_MAGIC )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( oVar.GetTypeId() !=
+            ( EnumTypeId )oHeader.wTypeId )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( oHeader.wRecSize > sizeof( Variant ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        timespec ts;
+        ret = clock_gettime( CLOCK_REALTIME, &ts );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+
+        guint8 buf[ 32 ]; 
+        guint32 timestamp = htonl( ts.tv_sec );
+        memcpy( buf, &timestamp, sizeof( timestamp ) );
+        switch( ( EnumTypeId )oHeader.wTypeId )
+        {
+        case typeByte:
+            buf[ sizeof( timestamp ) ] =
+                ( guint8& )oVar;
+            break;
+        case typeUInt16:
+            {
+                guint16 wVal =
+                    htons( ( guint16& )oVar );
+                memcpy( buf + sizeof( timestamp ),
+                    &wVal, sizeof( wVal ) );
+                break;
+            }
+        case typeUInt32:
+        case typeFloat:
+            {
+                guint32 dwVal =
+                    htonl( ( guint32& )oVar );
+                memcpy( buf + sizeof( timestamp ),
+                    &dwVal, sizeof( dwVal ) );
+                break;
+            }
+        case typeUInt64:
+        case typeDouble:
+            {
+                guint64 qwVal =
+                    htonll( ( guint64& )oVar );
+                memcpy( buf + sizeof( timestamp ),
+                    &qwVal, sizeof( qwVal ) );
+                break;
+            }
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+        if( ERROR( ret ) )
+            break;
+        fseek( fp.get(), 0, SEEK_END );
+        ret = fwrite( buf, 1, oHeader.wRecSize, fp.get() );
+        if( ret != oHeader.wRecSize )
+        {
+            ret = ERROR_FAIL;
+            break;
+        }
+        oHeader.dwCounter += 1;
+        oHeader.hton();
+        fseek( fp.get(), 0, SEEK_SET );
+        fwrite( &oHeader, 1, sizeof( oHeader ), fp.get() );
+    }while( 0 );
+    return ret;
+}
+
+gint32 AppendLog(
+    const stdstr& strLogFile,
+    const Variant& oVar )
+{
+    gint32 ret = 0;
+    do{
+        RegFsPtr pAppReg = GetRegFs( false );
+        if( pAppReg.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        RFHANDLE hFile = INVALID_HANDLE;
+        ret = pAppReg->OpenFile(
+            strLogFile, O_RDWR, hFile );
+        if( ERROR( ret ) )
+            break;
+
+        LOGHDR oHeader;
+        CFileHandle oHandle( pAppReg, hFile );
+        guint32 dwSize = sizeof( oHeader );
+        ret = pAppReg->ReadFile( hFile,
+            ( char* )&oHeader, dwSize, 0 );
+        if( ERROR( ret ) )
+            break;
+
+        oHeader.ntoh();
+        if( oHeader.dwMagic != LOG_MAGIC )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( oVar.GetTypeId() !=
+            ( EnumTypeId )oHeader.wTypeId )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( oHeader.wRecSize > sizeof( Variant ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        timespec ts;
+        ret = clock_gettime( CLOCK_REALTIME, &ts );
+        if( ret == -1 )
+        {
+            ret = -errno;
+            break;
+        }
+        struct stat stBuf;
+        ret = pAppReg->GetAttr( hFile, stBuf );
+        if( ERROR( ret ) )
+            break;
+
+        guint8 buf[ 32 ]; 
+        guint32 timestamp = htonl( ts.tv_sec );
+        memcpy( buf, &timestamp, sizeof( timestamp ) );
+        switch( ( EnumTypeId )oHeader.wTypeId )
+        {
+        case typeByte:
+            buf[ sizeof( timestamp ) ] =
+                ( guint8& )oVar;
+            break;
+        case typeUInt16:
+            {
+                guint16 wVal =
+                    htons( ( guint16& )oVar );
+                memcpy( buf + sizeof( timestamp ),
+                    &wVal, sizeof( wVal ) );
+                break;
+            }
+        case typeUInt32:
+        case typeFloat:
+            {
+                guint32 dwVal =
+                    htonl( ( guint32& )oVar );
+                memcpy( buf + sizeof( timestamp ),
+                    &dwVal, sizeof( dwVal ) );
+                break;
+            }
+        case typeUInt64:
+        case typeDouble:
+            {
+                guint64 qwVal =
+                    htonll( ( guint64& )oVar );
+                memcpy( buf + sizeof( timestamp ),
+                    &qwVal, sizeof( qwVal ) );
+                break;
+            }
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+        if( ERROR( ret ) )
+            break;
+
+        dwSize = oHeader.wRecSize;
+        ret = pAppReg->WriteFile( hFile,
+            ( char* )buf, dwSize, stBuf.st_size );
+        if( ERROR( ret ) )
+        {
+            pAppReg->Truncate(
+                hFile, stBuf.st_size );
+        }
+
+        oHeader.dwCounter+=1;
+        oHeader.hton();
+        dwSize = sizeof( oHeader );
+        ret = pAppReg->WriteFile( hFile,
+            ( char* )&oHeader, dwSize, 0 );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 LogPoints(
+    IConfigDb* context, gint32 idx )
+{
+    if( idx < 0 || idx > 3 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf = GetAppManager();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CAppManager_SvrImpl* pam = pIf;
+        RegFsPtr pAppReg = GetRegFs( false );
+        if( pAppReg.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        stdstr strPtPath =
+            g_strAppInst + "/points/ptlogger";  
+        strPtPath.append( 1, ( char )idx + 0x31 );
+
+        RFHANDLE hDir = INVALID_HANDLE;
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strPtPath;
+        strPath += "/logptrs";
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = pAppReg->OpenDir(
+            strPath, O_RDONLY, hDir );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle( pAppReg, hDir );
+        ret = pAppReg->ReadDir( hDir, vecks );
+        if( ERROR( ret ) )
+            break;
+        if( vecks.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        for( auto& elem : vecks )
+        {
+            Variant oVar;
+            ret = pAppReg->GetValue( hDir,
+                elem.szKey, oVar );
+            if( ERROR( ret ) )
+                continue;
+
+            std::vector< stdstr > vecComps;
+            ret = SplitPath(
+                ( stdstr& )oVar, vecComps );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( -EINVAL,
+                    "Error log link is not valid" );
+                continue;
+            }
+
+            if( vecComps.size() < 3 )
+            {
+                DebugPrint( -EINVAL,
+                    "Error log link is not valid" );
+                continue;
+            }
+
+            if( !pam->IsAppOnline( vecComps[ 0 ] ) )
+                continue;
 
             stdstr strPt2Log = "/" APPS_ROOT_DIR "/";
             strPt2Log += vecComps[ 0 ] +
@@ -416,6 +721,8 @@ gint32 LogPoints(
                     ( ( stdstr& )oVar ).c_str() );
                continue; 
             }
+
+            NPLock( strLogFile + ".lock" );
             if( bExternal )
                 ret = AppendLogExternal(
                     strLogFile, oVar2 );
@@ -436,8 +743,195 @@ gint32 LogPoints(
     return ret;
 }
 
+gint32 ShiftFiles(
+    RegFsPtr& pAppReg,
+    const stdstr& strParentDir,
+    const stdstr& strPrefix )
+{
+    gint32 ret = 0;
+    do{
+        stdstr strCurPath =
+        strParentDir + "/" + strPrefix + "-";
+        int i = MAX_LOG_FILES;
+        ret = pAppReg->Access( strCurPath +
+            std::to_string( i ), F_OK );
+        if( SUCCEEDED( ret ) )
+        {
+            pAppReg->RemoveFile(
+                strCurPath + std::to_string( i ) );
+        }
+        for( i = MAX_LOG_FILES - 1; i > 0; i-- )
+        {
+            stdstr si = std::to_string( i );
+            stdstr sn = std::to_string( i + 1 );
+
+            ret = pAppReg->Access(
+                strCurPath + si, F_OK );
+            if( ERROR( ret ) )
+                continue;
+
+            ret = pAppReg->Rename(
+                strCurPath + si,
+                strCurPath + sn );
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "Error shift files %s->%s",
+                    ( strCurPath + si ).c_str(),
+                    ( strCurPath + sn ).c_str() );
+                break;
+            }
+        }
+
+        NPLock( strCurPath + "0.lock" );
+
+        RFHANDLE hFile = INVALID_HANDLE;
+        ret = pAppReg->OpenFile( strCurPath + "0",
+            O_RDWR, hFile );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle( pAppReg, hFile );
+        struct stat stBuf;
+        BufPtr pBuf( true );
+        ret = pAppReg->GetAttr( hFile, stBuf );
+        if( SUCCEEDED( ret ) )
+        {
+            guint32 dwSize = stBuf.st_size;
+            ret = pBuf->Resize( dwSize );
+            if( ERROR( ret ) )
+                break;
+            ret = pAppReg->ReadFile(
+                hFile, pBuf->ptr(), dwSize, 0 );
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret, "Error copy logfile %s",
+                    ( strCurPath + "0" ).c_str() );
+                break;
+            }
+            ret = pAppReg->Truncate(
+                hFile, sizeof( LOGHDR ) );
+            if( ERROR( ret ) )
+                break;
+            LOGHDR oHeader;
+            memcpy( &oHeader,
+                pBuf->ptr(), sizeof( LOGHDR ) );
+            oHeader.dwCounter = 0;
+            dwSize = sizeof( oHeader );
+            ret = pAppReg->WriteFile( hFile,
+                ( char* )&oHeader, dwSize, 0 );
+            if( ERROR( ret ) )
+                break;
+        }
+
+        if( pBuf->size() > sizeof( LOGHDR ) )
+        {
+            RFHANDLE hFile1;
+            ret = pAppReg->CreateFile( strCurPath + "1",
+                O_WRONLY | O_TRUNC, 0644, hFile1 );
+            CFileHandle oHandle( pAppReg, hFile1 );
+            if( SUCCEEDED( ret ) )
+            {
+                guint32 dwSize = pBuf->size();
+                ret = pAppReg->WriteFile( hFile,
+                    pBuf->ptr(), dwSize, 0 );
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 RotateLog( gint32 idx )
 {
-    return 0;
+    if( idx < 0 || idx > 3 )
+        return -EINVAL;
+
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf = GetAppManager();
+        if( pIf.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+        CAppManager_SvrImpl* pam = pIf;
+        RegFsPtr pAppReg = GetRegFs( false );
+        if( pAppReg.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        stdstr strPtPath =
+            g_strAppInst + "/points/ptlogger";  
+        strPtPath.append( 1, ( char )idx + 0x31 );
+
+        RFHANDLE hDir = INVALID_HANDLE;
+        stdstr strPath = "/" APPS_ROOT_DIR "/";
+        strPath += strPtPath;
+        strPath += "/logptrs";
+        std::vector< KEYPTR_SLOT > vecks;
+        ret = pAppReg->OpenDir(
+            strPath, O_RDONLY, hDir );
+        if( ERROR( ret ) )
+            break;
+
+        CFileHandle oHandle( pAppReg, hDir );
+        ret = pAppReg->ReadDir( hDir, vecks );
+        if( ERROR( ret ) )
+            break;
+        if( vecks.empty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        for( auto& elem : vecks )
+        {
+            Variant oVar;
+            ret = pAppReg->GetValue( hDir,
+                elem.szKey, oVar );
+            if( ERROR( ret ) )
+                continue;
+
+            std::vector< stdstr > vecComps;
+            ret = SplitPath(
+                ( stdstr& )oVar, vecComps );
+            if( ERROR( ret ) )
+            {
+                DebugPrint( -EINVAL,
+                    "Error log link is not valid" );
+                continue;
+            }
+
+            if( vecComps.size() < 3 )
+            {
+                DebugPrint( -EINVAL,
+                    "Error log link is not valid" );
+                continue;
+            }
+
+            stdstr strPt2Log = "/" APPS_ROOT_DIR "/";
+            strPt2Log += vecComps[ 0 ] +
+                "/points/" + vecComps[ 1 ];
+
+            stdstr strLogFile = strPt2Log +
+                "/logs/" + vecComps[ 2 ] + "-0";
+
+            struct stat stBuf;
+            ret = pAppReg->GetAttr( strLogFile, stBuf );
+            if( ERROR( ret ) )
+                continue;
+            if( stBuf.st_size <= ROTATE_LIMIT )
+                continue;
+
+            ret = ShiftFiles( pAppReg,
+                strPt2Log + "/logs/",
+                vecComps[ 2 ] );
+        }
+
+    }while( 0 );
+    return ret;
 }
 

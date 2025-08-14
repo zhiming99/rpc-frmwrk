@@ -74,6 +74,9 @@ static stdrmutex g_oRegLock;
 extern gint32 StartLocalAppMancli();
 extern gint32 StopLocalAppMancli();
 
+const stdstr& GetMountPoint()
+{ return g_strMPoint; }
+
 RegFsPtr GetRegFs( bool bUser )
 {
     CStdRMutex oLock( g_oRegLock );

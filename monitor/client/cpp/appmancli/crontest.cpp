@@ -21,6 +21,9 @@
  *
  * =====================================================================================
  */
+ /*
+ * compile: g++ -o crontest cronexpr.cpp crontest.cpp
+ */
 #include <iostream>
 #include <vector>
 #include "cronexpr.h"
