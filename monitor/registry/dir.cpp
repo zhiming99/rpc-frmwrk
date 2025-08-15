@@ -2443,9 +2443,6 @@ gint32 CDirImage::Rename(
                 break;
             pDstFile->FreeBlocks();
         }
-        ret = m_pRootNode->Insert( &oKey );
-        if( ERROR( ret ) )
-            break;
         pFile->SetName( oKey.szKey );
         ret = m_pRootNode->AddFileDirect(
             oKey.oLeaf.dwInodeIdx, pFile );

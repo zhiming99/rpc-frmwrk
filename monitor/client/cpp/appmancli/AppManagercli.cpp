@@ -781,7 +781,7 @@ static gint32 ReconnectTimerFunc(
     CAppManager_CliImpl* pOldIf )
 {
     gint32 ret = 0;
-    DebugPrint( ret, "Start reconnecting..." );
+    DebugPrint( ret, "Info: Start reconnecting..." );
     gint32 (*comp_func)( IEventSink*,
         IConfigDb*, CIoManager*,
         CAppManager_CliImpl* ) =
@@ -837,6 +837,7 @@ static gint32 ReconnectTimerFunc(
         }while( 0 );
         if( SUCCEEDED( ret ) )
         {
+            DebugPrint( ret, "Info: Reconnected successfully" );
             pOldIf->ClearCallbacks();
             return ret;
         }

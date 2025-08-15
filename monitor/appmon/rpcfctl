@@ -219,31 +219,12 @@ case "$cmd" in
         ;;
     restart)
         if [[ $# -lt 1 ]]; then
-            echo "Error: appname required for 'stop'"
+            echo "Error: appname required for 'restart'"
             usage
             exit 1
         fi
         appname="$1"
-        if is_app_online $appname; then
-            pid=$(bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}')
-            if [[ "x$pid" != "x" ]]; then
-                kill -2 $pid
-            fi
-        fi
-        if [[ "x$pid" != "x" ]]; then
-            for ((i=0;i<10;i++)); do
-                if [[ -d /proc/$pid ]]; then
-                    echo waiting $appname to quit...
-                    sleep 1
-                    continue
-                fi
-                break
-            done
-            if [[ -d /proc/$pid ]];then
-                kill -9 $pid
-                sleep 1
-            fi
-        fi
+        bash $script_dir/rpcfctl stop $appname
         bash $script_dir/rpcfctl start $appname
         ;;
     status)

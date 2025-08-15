@@ -827,13 +827,16 @@ gint32 ShiftFiles(
         if( pBuf->size() > sizeof( LOGHDR ) )
         {
             RFHANDLE hFile1;
+            CAccessContext oac;
+            oac.dwUid = UID_ADMIN;
+            oac.dwGid = GID_ADMIN;
             ret = pAppReg->CreateFile( strCurPath + "1",
-                O_WRONLY | O_TRUNC, 0644, hFile1 );
-            CFileHandle oHandle( pAppReg, hFile1 );
+                0644, O_WRONLY | O_TRUNC, hFile1, &oac );
             if( SUCCEEDED( ret ) )
             {
+                CFileHandle oHandle( pAppReg, hFile1 );
                 guint32 dwSize = pBuf->size();
-                ret = pAppReg->WriteFile( hFile,
+                ret = pAppReg->WriteFile( hFile1,
                     pBuf->ptr(), dwSize, 0 );
             }
         }

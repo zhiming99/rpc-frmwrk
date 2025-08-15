@@ -481,6 +481,7 @@ gint32 CRegistryFs::CreateFile(
     CAccessContext* pac )
 {
     gint32 ret = 0;
+    bool bCreated = false;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
@@ -506,6 +507,13 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
+        if( pac )
+        {
+            pFile->SetUid( pac->dwUid );
+            pFile->SetGid( pac->dwGid );
+        }
+
+        bCreated = true;
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
@@ -532,6 +540,10 @@ gint32 CRegistryFs::CreateFile(
         m_mapOpenFiles[ hFile ] = pOpenFile;
 
     }while( 0 );
+    if( ERROR( ret ) && bCreated )
+    {
+        this->RemoveFile( strPath, pac );
+    }
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error create file '%s'",
@@ -1995,6 +2007,7 @@ gint32 CRegistryFs::CreateFile(
     CAccessContext* pac )
 {
     gint32 ret = 0;
+    bool bCreated = false;
     do{
         READ_LOCK( this );
         FImgSPtr ptrDir;
@@ -2022,6 +2035,13 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
+        if( pac )
+        {
+            pFile->SetUid( pac->dwUid );
+            pFile->SetGid( pac->dwGid );
+        }
+
+        bCreated = true;
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
@@ -2048,6 +2068,10 @@ gint32 CRegistryFs::CreateFile(
         m_mapOpenFiles[ hFile ] = pOpenFile;
 
     }while( 0 );
+    if( ERROR( ret ) && bCreated )
+    {
+        this->RemoveFile( hDir, strFile, pac );
+    }
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error create file '%s'",

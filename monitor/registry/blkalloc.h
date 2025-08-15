@@ -205,6 +205,8 @@
 #define FLAG_FLUSH_DEFAULT \
     ( FLAG_FLUSH_DATA | FLAG_FLUSH_INODE )
 
+#define UID_ADMIN       10000
+
 #define GID_ADMIN       80000
 #define GID_DEFAULT     80001
 
