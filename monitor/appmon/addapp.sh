@@ -70,6 +70,7 @@ for appname in "$@"; do
     if ! add_stdapp $appname $username $groupname; then
         break
     fi
+    add_log_link $appname req_count appmonsvr1 ptlogger1
 done
 
 popd > /dev/null

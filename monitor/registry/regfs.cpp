@@ -627,22 +627,17 @@ gint32 CRegistryFs::CloseFileNoLock(
         FileSPtr pFile = itr->second;
         m_mapOpenFiles.erase( itr );
         oLock.Unlock();
-        ret = pFile->Close();
-        if( ret != STATUS_MORE_PROCESS_NEEDED )
-            break;
 
-        ret = 0;
         FImgSPtr dirPtr;
-        stdstr strNormPath;
         FImgSPtr pImg = pFile->GetImage();
         CDirImage* pDir = pImg->GetParentDir();
         if( pDir == nullptr )
-        {
-            ret = -EFAULT;
-            OutputMsg( ret, "Error ,Internal error " 
-                "occurs during closing file" ); 
             break;
-        }
+        dirPtr = pDir;
+
+        ret = pFile->Close();
+        if( ret != STATUS_MORE_PROCESS_NEEDED )
+            break;
 
         const stdstr& strPath = pFile->GetPath();
         std::string strFile =

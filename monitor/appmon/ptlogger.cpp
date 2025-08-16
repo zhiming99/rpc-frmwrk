@@ -122,6 +122,13 @@ gint32 GetLatestLogs(
         if( ERROR( ret ) )
             break;
 
+        if( stBuf.st_size - sizeof( oHeader ) <
+            ( size_t )oHeader.dwCounter * oHeader.wRecSize )
+        {
+            ret = -ERANGE;
+            break;
+        }
+
         guint32 dwOffset = sizeof( oHeader );
         guint32 dwActNum = dwNumRec;
         if( oHeader.dwCounter < dwNumRec )
@@ -130,7 +137,8 @@ gint32 GetLatestLogs(
         dwOffset += oHeader.wRecSize *
             ( oHeader.dwCounter - dwActNum );
         if( stBuf.st_size <= ( size_t )dwOffset ||
-            ( stBuf.st_size - dwOffset != oHeader.wRecSize * dwActNum ) )
+            ( stBuf.st_size - dwOffset !=
+                ( size_t )oHeader.wRecSize * dwActNum ) )
         {
             ret = -EBADMSG;
             break;
@@ -280,6 +288,9 @@ gint32 UpdateAverages( gint32 idx )
 
             stdstr strLogFile = strPt2Log +
                 "/logs/" + vecComps[ 2 ] + "-0";
+
+            if( !pam->IsAppOnline( vecComps[ 0 ] ) )
+                continue;
 
             LOGRECVEC vecRecs;
             ret = GetLatestLogs(

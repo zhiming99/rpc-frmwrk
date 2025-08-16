@@ -10,6 +10,8 @@ else
     exit 1
 fi
 
+updattr=${cmddir}/updattr.py
+
 if [[ -f ../../ipc/driver.json ]]; then
     cfgPath="`pwd`/../../ipc"
 elif [[ "$script_dir" == "/usr/bin" ]]; then
@@ -196,7 +198,12 @@ case "$cmd" in
             fi
             pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
             if [[ "x$pid" != "x" ]]; then
-                kill -2 $pid
+                if ! kill -2 $pid; then
+                    if check_appreg_mount; then
+                        python3 $updattr -u 'user.regfs' "$(jsonval i 0)" ${rootdir}/apps/$appname/owner_stream > /dev/null
+                        undo_check_appreg_mount
+                    fi
+                fi
             else
                 echo Error failed to stop $appname
             fi
