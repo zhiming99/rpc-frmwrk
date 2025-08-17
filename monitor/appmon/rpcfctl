@@ -170,7 +170,7 @@ case "$cmd" in
             fi
             cd $working_dir || exit 1
             echo $cmdline
-            setsid -f $cmdline
+            setsid -f $cmdline > /dev/null 2>&1
         done
         ;;
     stop)
