@@ -679,6 +679,36 @@ case "$cmd" in
         echo Restore completed successfully
         popd > /dev/null
         ;;
+    backuplog)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to do backup"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        python3 $cmddir/logtool.py -b "$appName/$ptName"
+        ;;
+    rotatelog)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to do rotation"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        python3 $cmddir/logtool.py -r "$appName/$ptName"
+        ;;
+    listlog)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to list"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        python3 $cmddir/logtool.py -l "$appName/$ptName"
+        ;;
     *)
         echo "Unknown command: $cmd"
         usage
