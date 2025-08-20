@@ -122,6 +122,26 @@ Commands:
     restore              Restore the server-side settings from a tarball.
                          command line is 'rpcfctl restore <backup file>'
 
+    backuplog <appname> <point name>
+                         Backup all the logs for the specified point.
+
+    rotatelog <appname> <point name>
+                         The log file is max 1MB in size. If it grows over this
+                         limit, a new empty log file is used as current log
+                         file. And all the full log files are shifted with its
+                         name one number bigger. Totally there are 9 log files.
+                         And the last one will be removed.
+
+    listlog <appname> < point name>
+                         List the log files belonging to the specified point.
+
+    enablelog <appname> <point name>
+                         Set up log links for the specified point. It must be
+                         done when the appmonsvr is offline. 
+
+    disablelog <appname> <point name>
+                         Remove the log links for the specified point. It must be
+                         done when the appmonsvr is offline. 
 
     -h, --help           Show this help message and exit.
 
@@ -616,8 +636,10 @@ case "$cmd" in
         fi
         ;;
     backup)
+        cmdline="rpcfctl backup"
         if rpcfctl list | grep online > /dev/null; then
             echo Error some applications are still running.
+            echo $cmdline
             exit 1
         fi
         rpcfctl geninitcfg > ~/.rpcf/cfgbk.json
@@ -636,6 +658,7 @@ case "$cmd" in
         fi
         ;;
     restore)
+        cmdline="rpcfctl restore <path to backup file>"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing the backup package to restore" 
             echo $cmdline
@@ -680,6 +703,7 @@ case "$cmd" in
         popd > /dev/null
         ;;
     backuplog)
+        cmdline="rpcfctl backuplog <appName> <point name>"
         if [[ $# -lt 2 ]]; then
             echo "Error: requiring 'appname' and 'point name' to do backup"
             echo $cmdline
@@ -690,6 +714,7 @@ case "$cmd" in
         python3 $cmddir/logtool.py -b "$appName/$ptName"
         ;;
     rotatelog)
+        cmdline="rpcfctl rotatelog <appName> <point name>"
         if [[ $# -lt 2 ]]; then
             echo "Error: requiring 'appname' and 'point name' to do rotation"
             echo $cmdline
@@ -700,6 +725,7 @@ case "$cmd" in
         python3 $cmddir/logtool.py -r "$appName/$ptName"
         ;;
     listlog)
+        cmdline="rpcfctl listlog <appName> <point name>"
         if [[ $# -lt 2 ]]; then
             echo "Error: requiring 'appname' and 'point name' to list"
             echo $cmdline
@@ -708,6 +734,36 @@ case "$cmd" in
         appName="$1"
         ptName="$2"
         python3 $cmddir/logtool.py -l "$appName/$ptName"
+        ;;
+    enablelog)
+        cmdline="rpcfctl enablelog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to enable log for"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        if is_app_online appmonsvr1; then
+            echo "Error appmonsvr1 is still onlne, please stop it first"
+            exit 1
+        fi
+        add_log_link $appName $ptName appmonsvr1 ptlogger1
+        ;;
+    disablelog)
+        cmdline="rpcfctl disablelog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to disable log for."
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        if is_app_online appmonsvr1; then
+            echo "Error appmonsvr1 is still onlne, please stop it first"
+            exit 1
+        fi
+        rm_log_link $appName $ptName appmonsvr1 ptlogger1
         ;;
     *)
         echo "Unknown command: $cmd"
