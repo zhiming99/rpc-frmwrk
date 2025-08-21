@@ -294,6 +294,7 @@ enum EnumPropId : gint32
     propGid,            // type: a integer as the group identifier from the registry fs
     propCmdLine,        // type: a string as the command line of current process
     propGmSSL,          // type: a boolean value to indicate the SimpAuth token is encrypted with GmSSL
+    propSessTimeLimit,  // type: a integer as the max time period a session can live
 
     // monitor related properties
     propObjCount = 0x4000,
