@@ -172,9 +172,16 @@ add_point rpcrouter1 max_conn  setpoint i
 add_point rpcrouter1 max_recv_bps  setpoint i
 add_point rpcrouter1 max_send_bps  setpoint i
 add_point rpcrouter1 max_pending_tasks setpoint i
+add_point rpcrouter1 sess_time_limit setpoint i
 
 set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -adgor 2')" blob
 set_point_value rpcrouter1 working_dir  "$(jsonval 'blob' '/' )" blob
+set_point_value rpcrouter1 sess_time_limit "$(jsonval 'i' 86400 )" i
+set_attr_value rpcrouter1 sess_time_limit unit "$(jsonval 's' 'sec' )" s
+set_attr_value rpcrouter1 sess_time_limit load_on_start "$(jsonval 'i' 1)" i
+set_attr_value rpcrouter1 max_conn load_on_start "$(jsonval 'i' 1)" i
+set_attr_value rpcrouter1 max_recv_bps load_on_start "$(jsonval 'i' 1)" i
+set_attr_value rpcrouter1 max_send_bps load_on_start "$(jsonval 'i' 1)" i
 
 add_log_link rpcrouter1 rx_bytes appmonsvr1 ptlogger1
 add_log_link rpcrouter1 tx_bytes appmonsvr1 ptlogger1

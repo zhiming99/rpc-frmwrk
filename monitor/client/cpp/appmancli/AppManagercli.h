@@ -32,6 +32,7 @@
 #define S_MAX_STM_PER_SESS  "max_streams_per_session"
 #define O_CPU_LOAD  "cpu_load"
 #define O_OPEN_FILES     "open_files"
+#define S_SESS_TIME_LIMIT     "sess_time_limit"
 
 #define PROP_TARGET_IF 0x1234
 #define PROP_APP_NAME 0x1235
