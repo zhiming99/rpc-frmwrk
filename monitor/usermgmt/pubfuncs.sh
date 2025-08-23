@@ -64,6 +64,9 @@ function is_dir_empty()
         echo Error missing path to test
         return 1
     fi
+    if [[ ! -d $1 ]]; then
+        return 1
+    fi
     if [ -z "$( ls -A $1 )" ]; then
         return 0
     else
