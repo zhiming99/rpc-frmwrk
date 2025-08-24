@@ -354,6 +354,15 @@ case "$cmd" in
         bash $cmddir/showapp.sh $1;
         ;;
 
+    showpoint)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: <appname> and <point name> required for 'showapp'"
+            usage
+            exit 1
+        fi
+        bash $cmddir/showpoint.sh $1 $2
+        ;;
+
     initapps)
         echo Warning 'initapps' will clear the app registry,
         bash $cmddir/initappreg.sh
@@ -711,7 +720,10 @@ case "$cmd" in
         fi
         appName="$1"
         ptName="$2"
-        python3 $cmddir/logtool.py -b "$appName/$ptName"
+        if check_appreg_mount; then
+            python3 $cmddir/logtool.py -b --root "${rootdir}" "$appName/$ptName"
+            undo_check_appreg_mount
+        fi
         ;;
     rotatelog)
         cmdline="rpcfctl rotatelog <appName> <point name>"
@@ -722,7 +734,10 @@ case "$cmd" in
         fi
         appName="$1"
         ptName="$2"
-        python3 $cmddir/logtool.py -r "$appName/$ptName"
+        if check_appreg_mount; then
+            python3 $cmddir/logtool.py -r --root "${rootdir}" "$appName/$ptName"
+            undo_check_appreg_mount
+        fi
         ;;
     listlog)
         cmdline="rpcfctl listlog <appName> <point name>"
@@ -731,9 +746,13 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
+
         appName="$1"
         ptName="$2"
-        python3 $cmddir/logtool.py -l "$appName/$ptName"
+        if check_appreg_mount; then
+            python3 $cmddir/logtool.py -l --root "${rootdir}" "$appName/$ptName"
+            undo_check_appreg_mount
+        fi
         ;;
     enablelog)
         cmdline="rpcfctl enablelog <appName> <point name>"
@@ -748,7 +767,12 @@ case "$cmd" in
             echo "Error appmonsvr1 is still onlne, please stop it first"
             exit 1
         fi
-        add_log_link $appName $ptName appmonsvr1 ptlogger1
+        if check_appreg_mount; then
+            pushd ${rootdir} > /dev/null
+            add_log_link $appName $ptName appmonsvr1 ptlogger1
+            popd > /dev/null
+            undo_check_appreg_mount
+        fi
         ;;
     disablelog)
         cmdline="rpcfctl disablelog <appName> <point name>"
@@ -763,7 +787,12 @@ case "$cmd" in
             echo "Error appmonsvr1 is still onlne, please stop it first"
             exit 1
         fi
-        rm_log_link $appName $ptName appmonsvr1 ptlogger1
+        if check_appreg_mount; then
+            pushd ${rootdir} > /dev/null
+            rm_log_link $appName $ptName appmonsvr1 ptlogger1
+            popd > /dev/null
+            undo_check_appreg_mount
+        fi
         ;;
     *)
         echo "Unknown command: $cmd"

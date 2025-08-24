@@ -144,6 +144,7 @@ set_attr_value timer1 sched_task1 pulse "$(jsonval 'i' 1 )" i
 set_attr_value timer1 sched_task1 lastrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 sched_task1 nextrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 schedule1 load_on_start "$(jsonval 'i' 1)" i
+change_application_owner timer1 $username $groupname
 
 echo adding application appmonsvr1
 add_stdapp appmonsvr1
@@ -156,11 +157,13 @@ add_link timer1 clock2 appmonsvr1 ptlogger1
 set_attr_value appmonsvr1 ptlogger1 ptlist "$(jsonval 'blob' '[]' )" blob
 add_point appmonsvr1 logrotate1 input i
 add_link timer1 sched_task1 appmonsvr1 logrotate1
+change_application_owner appmonsvr1 $username $groupname
 
 echo adding application loggersvr1
 add_stdapp loggersvr1
 set_point_value loggersvr1 cmdline "$(jsonval 'blob' 'rpcf_logger -od')" blob
 set_point_value loggersvr1 working_dir  "$(jsonval 'blob' '/' )" blob
+change_application_owner loggersvr1 $username $groupname
 
 echo adding application rpcrouter1
 add_stdapp rpcrouter1
@@ -185,6 +188,10 @@ set_attr_value rpcrouter1 max_send_bps load_on_start "$(jsonval 'i' 1)" i
 
 add_log_link rpcrouter1 rx_bytes appmonsvr1 ptlogger1
 add_log_link rpcrouter1 tx_bytes appmonsvr1 ptlogger1
+add_log_link rpcrouter1 vmsize_kb appmonsvr1 ptlogger1
+add_log_link rpcrouter1 obj_count appmonsvr1 ptlogger1
+
+change_application_owner rpcrouter1 $username $groupname
 
 #leaving approot
 popd > /dev/null

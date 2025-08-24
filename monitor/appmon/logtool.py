@@ -10,6 +10,7 @@ from namedlock import NamedProcessLock as npl
 import os
 import shutil
 from datetime import datetime
+from collections import defaultdict
 
 # EnumTypeId mapping (adjust as needed)
 TYPE_MAP = {
@@ -106,8 +107,19 @@ def InitializeLog( filename, iType ):
         f.write(struct.pack('>I I H H B 3s', dwMagic, dwCounter, wTypeId, wRecSize, byUnit, b'\x00\x00\x00'))
         f.truncate()
 
-def BackupLog( pointName ):
-    pass
+def GroupPtrFiles(logPath):
+    """
+    Groups files in logPath matching pattern 'ptrX-X' by their prefix 'ptrX'.
+    Returns a dict: { 'ptr0': ['ptr0-0', 'ptr0-1', ...], ... }
+    """
+    pattern = re.compile(r'^(ptr\d+)-\d{1,2}$')
+    groups = defaultdict(list)
+    for fname in os.listdir(logPath):
+        m = pattern.match(fname)
+        if m:
+            prefix = m.group(1)
+            groups[prefix].append(fname)
+    return dict(groups)
 
 if __name__ == "__main__":
 
@@ -123,6 +135,7 @@ if __name__ == "__main__":
     parser.add_argument( '-b', action='store_true', help="backup log files of the specified point")
     parser.add_argument( '-r', action='store_true', help="rotate log files of the specified point")
     parser.add_argument( '-l', action='store_true', help="list log files of the specified point")
+    parser.add_argument( '--root', nargs=1, help="specify the appmon root path, default is ~/.rpcf/appmonroot. It can be used with '-b','-r', or '-l' options" )
 
     args = parser.parse_args()
     if args.pretty:
@@ -140,7 +153,7 @@ if __name__ == "__main__":
 
     filePath = os.path.realpath(args.filePath)
     try:
-        if not args.b and not args.r:
+        if not args.b and not args.r and not args.l:
             result = re.search(r"^(.*/appreg/apps/.*/points/.*/logs/)(.*)$", filePath)
         else:
             result = None
@@ -178,55 +191,88 @@ if __name__ == "__main__":
             else:
                 InitializeLog(filePath, iType)
             quit(0)
+
         if args.b:
             appName,pointName=args.filePath.split("/")
-            homeDir = str( os.path.realpath( os.path.expanduser('~') )) 
+
             rootDir = f"/apps/{appName}/points/{pointName}/logs"
-            logPath = homeDir + f"/.rpcf/appmonroot/appreg" + rootDir
-            if not os.path.exists(logPath) or not os.path.exists( logPath + "/ptr0-0" ):
-                print(f"Error Log path {logPath} is not valid.")
-                quit(-1)
-            with npl( rootDir + "/ptr0-0" ) as locked:
-                print(f"Backup log files for {logPath}")
-                tarFile=f"{homeDir}/{appName}-{pointName}-{datetime.now().strftime('%m-%d')}.tar.gz"
-                cmdLine = f"cd {logPath} && tar zcf {tarFile} ptr*"
-                ret = os.system( cmdLine )
-                if ret != 0:
-                    print(f"Error creating backup tar file {tarFile}")
+            homeDir = str( os.path.realpath( os.path.expanduser('~') )) 
+
+            if args.root:
+                fsrootDir = os.path.realpath(args.root[0])
+                logPath = fsrootDir + rootDir
+            else:
+                logPath = homeDir + f"/.rpcf/appmonroot/appreg" + rootDir
+
+            logFileGrp = GroupPtrFiles(logPath)
+            count = 0
+
+            tarFile=f"{homeDir}/{appName}-{pointName}-{datetime.now().strftime('%m-%d')}.tar.gz"
+            for prefix, group in logFileGrp.items():
+                if not os.path.exists(logPath + f"/{prefix}-0"):
+                    continue
+
+                if count == 0:
+                    cmdLine = f"cd {logPath} && tar zcf {tarFile} " + ' '.join(group)
                 else:
-                    print(f"Logs are backed up to {tarFile} successfully.")
+                    cmdLine = f"cd {logPath} && tar zrf {tarFile} " + ' '.join(group)
+                count += 1
+
+                with npl( rootDir + f"/{prefix}-0" ) as locked:
+                    print(f"Backup log files for {logPath}")
+                    ret = os.system( cmdLine )
+                    if ret != 0:
+                        raise Exception(f"Error creating backup tar file {tarFile}")
+
+            print(f"Logs are backed up to {tarFile} successfully.")
+
             quit(0)
 
         if args.r:
             maxFiles = 9
             appName,pointName=args.filePath.split("/")
-            homeDir = str( os.path.realpath( os.path.expanduser('~') )) 
-            rootDir = f"/apps/{appName}/points/{pointName}/logs"
-            logPath = homeDir + f"/.rpcf/appmonroot/appreg" + rootDir
-            if os.path.exists( logPath + "/ptr0-extfile"):
-                print(f"Error {logPath}/ptr0-extfile is outside the registry and is not rotated.")
-                quit(-1)
 
-            if not os.path.exists( logPath + "/ptr0-0" ):
-                print(f"Error Log path {logPath} is not valid.")
-                quit(-1)
-            for i in range(maxFiles, 0, -1):
-                if os.path.exists( logPath + f"/ptr0-{i}" ):
-                    if i == maxFiles:
-                        os.remove( logPath + f"/ptr0-{i}" )
-                    else:
-                        os.rename( logPath + f"/ptr0-{i}", logPath + f"/ptr0-{i+1}" )
-            with npl( rootDir + "/ptr0-0" ) as locked:
-                shutil.copy( logPath + "/ptr0-0", logPath + "/ptr0-1" )
-                ClearLog( logPath + "/ptr0-0" )
-                print(f"Successfully rotated the logs in {logPath}")
+            rootDir = f"/apps/{appName}/points/{pointName}/logs"
+            if args.root:
+                fsrootDir = os.path.realpath(args.root[0])
+                logPath = fsrootDir + rootDir
+            else:
+                homeDir = str( os.path.realpath( os.path.expanduser('~') )) 
+                logPath = homeDir + f"/.rpcf/appmonroot/appreg" + rootDir
+
+            logFileGrp = GroupPtrFiles(logPath)
+
+            for prefix, group in logFileGrp.items():
+                if os.path.exists( logPath + f"/{prefix}-extfile"):
+                    continue
+
+                if not os.path.exists( logPath + f"/{prefix}-0" ):
+                    continue
+
+                for i in range(maxFiles, 0, -1):
+                    if os.path.exists( logPath + f"/{prefix}-{i}" ):
+                        if i == maxFiles:
+                            os.remove( logPath + f"/{prefix}-{i}" )
+                        else:
+                            os.rename( logPath + f"/{prefix}-{i}", logPath + f"/{prefix}-{i+1}" )
+                with npl( rootDir + f"/{prefix}-0" ) as locked:
+                    shutil.copy( logPath + f"/{prefix}-0", logPath + f"/{prefix}-1" )
+                    ClearLog( logPath + f"/{prefix}-0" )
+                    print(f"Successfully rotated the logs in {logPath}")
+
             quit(0)
 
         if args.l:
             appName,pointName=args.filePath.split("/")
-            homeDir = str( os.path.realpath( os.path.expanduser('~') )) 
+
             rootDir = f"/apps/{appName}/points/{pointName}/logs"
-            logPath = homeDir + f"/.rpcf/appmonroot/appreg" + rootDir
+            if args.root:
+                fsrootDir = os.path.realpath(args.root[0])
+                logPath = fsrootDir + rootDir
+            else:
+                homeDir = str( os.path.realpath( os.path.expanduser('~') )) 
+                logPath = homeDir + f"/.rpcf/appmonroot/appreg" + rootDir
+
             os.system( f"ls -ltr {logPath}" )
             quit( 0 )
 

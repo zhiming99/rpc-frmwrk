@@ -745,7 +745,7 @@ function list_applications()
     for i in *; do
         owner_stream=`python3 $updattr -v ./$i/owner_stream`
         if [[ -z "$owner_stream" ]] || (( $owner_stream == 0 )); then
-            echo $i: offline
+            echo "$i: offline"
         else
             echo "$i: online"
         fi
@@ -1016,6 +1016,20 @@ function add_log_link()
     _logpt=$4
     _logfile=$5
 
+    if [[ "x" == "x$username" ]]; then
+        username="admin"
+    fi
+    if [[ "x" == "x$groupname" ]] then
+        groupname="admin";
+    fi
+    _uid=`bash $rpcfshow -u $username | grep 'uid:' | awk '{print $2}'`
+    _gid=`bash $rpcfshow -g $groupname | grep 'gid:' | awk '{print $2}'`
+
+    if [[ "x$_uid" == "x" ]] || [[ "x$_gid" == "x" ]]; then
+        echo "Error cannot find the specified user/group"
+        return 22;
+    fi
+
     if [ -z $_userapp ] || [ -z $_userpt ] || [ -z $_logapp ] || [ -z $_logpt ];then
         echo Error missing parameters
         return 22
@@ -1024,12 +1038,14 @@ function add_log_link()
     _userpath="./apps/$_userapp/points/$_userpt"
     if [ ! -d $_userpath ] ||
        [ ! -d $_logpath ]; then
-        echo Error 
+        echo Error cannot find the pair of points to link
         return 22
     fi
 
     chmod o+w $_logpath
     chmod o+w $_userpath
+
+    # setup pointer on log point
 
     if [[ ! -f $_logpath/logcount ]]; then
         touch $_logpath/logcount;
@@ -1050,32 +1066,77 @@ function add_log_link()
     loglink="$_logapp/$_logpt/ptr$logid"
     userlink="$_userapp/$_userpt/ptr$userid"
 
+    bexist=0
     chmod o+w $_logpath/logptrs
-    echo $userlink > $_logpath/logptrs/ptr$logid
-    fileSize=`stat -c %s $_logpath/logptrs/ptr$logid`
-    if (( $fileSize == 0 )); then
-        echo failed to write to $_logpath/logptrs/ptr$logid
+    if ! is_dir_empty $_logpath/logptrs; then
+        #check if the ptr is already present
+        for i in $_logpath/logptrs/*; do
+            _peerlink=`python3 $updattr -v $i`
+            if [[ -z $_peerlink ]]; then
+                _peerlink=`cat $i`
+                if [[ -z $_peerlink ]]; then
+                    continue
+                fi
+            fi
+            if [[ "$(dirname $_peerlink)" == "$_userapp/$_userpt" ]]; then
+                bexist=1
+                echo found duplicated user pointer
+                echo pointer to $_userapp/$_userpt already exists
+                break
+            fi
+        done
     fi
-    len=${#userlink}
-    if (( len < 95 ));then
-        python3 ${updattr} -u 'user.regfs' "$(jsonval s $userlink)" $_logpath/logptrs/ptr$logid > /dev/null
+    if (($bexist==0)); then
+        echo create userlink $userlink
+        echo $userlink > $_logpath/logptrs/ptr$logid
+        fileSize=`stat -c %s $_logpath/logptrs/ptr$logid`
+        if (( $fileSize == 0 )); then
+            echo failed to write to $_logpath/logptrs/ptr$logid
+        fi
+        len=${#userlink}
+        if (( len < 95 ));then
+            python3 ${updattr} -u 'user.regfs' "$(jsonval s $userlink)" $_logpath/logptrs/ptr$logid > /dev/null
+        fi
     fi
+
+    # setup pointer on user point
 
     if [[ ! -d $_userpath/logptrs ]]; then
         mkdir $_userpath/logptrs
     fi
     chmod o+w $_userpath/logptrs
-    echo $loglink > $_userpath/logptrs/ptr$userid
-    fileSize=`stat -c %s $_userpath/logptrs/ptr$userid`
-    if (( $fileSize == 0 )); then
-        echo failed to write to $_userpath/logptrs/ptr$userid
+
+    if ! is_dir_empty $_userpath/logptrs; then
+        #check if the ptr is already present
+        for i in $_userpath/logptrs/*; do
+            _peerlink=`python3 $updattr -v $i`
+            if [[ -z $_peerlink ]]; then
+                _peerlink=`cat $i`
+                if [[ -z $_peerlink ]]; then
+                    continue
+                fi
+            fi
+            if [[ "$(dirname $_peerlink)" == "$_logapp/$_logpt" ]]; then
+                bexist=1
+                echo pointer to $_logapp/$_logpt already exists
+                break
+            fi
+        done
     fi
-    len=${#loglink}
-    if (( len < 95 ));then
-        python3 ${updattr} -u 'user.regfs' "$(jsonval s $loglink)" $_userpath/logptrs/ptr$userid > /dev/null
-    fi
-    if [[ ! -d $_userpath/logs ]]; then
-        mkdir $_userpath/logs
+    if (($bexist==0)); then
+        echo create loglink $loglink
+        echo $loglink > $_userpath/logptrs/ptr$userid
+        fileSize=`stat -c %s $_userpath/logptrs/ptr$userid`
+        if (( $fileSize == 0 )); then
+            echo failed to write to $_userpath/logptrs/ptr$userid
+        fi
+        len=${#loglink}
+        if (( len < 95 ));then
+            python3 ${updattr} -u 'user.regfs' "$(jsonval s $loglink)" $_userpath/logptrs/ptr$userid > /dev/null
+        fi
+        if [[ -d $_userpath/logs ]]; then
+            mkdir $_userpath/logs
+        fi
         dt=`python3 $updattr -v $_userpath/datatype`
         typestr=$(type2str $dt)
         if [[ "x" == "x$_logfile" ]]; then
@@ -1090,11 +1151,18 @@ function add_log_link()
         touch $_userpath/average
         python3 $updattr -u 'user.regfs' "$(jsonval d 0.0)" $_userpath/average > /dev/null
     fi
+
     chmod o-w $_logpath/logptrs
     chmod o-w $_userpath/logptrs
     chmod o-w $_userpath/logs
     chmod o-w $_logpath
     chmod o-w $_userpath
+
+    chown -R $_uid:$_gid $_logpath/logptrs 
+    chown -R $_uid:$_gid $_logpath/logcount
+    chown -R $_uid:$_gid $_userpath/logptrs
+    chown -R $_uid:$_gid $_userpath/logs
+    chown -R $_uid:$_gid $_userpath/logcount
 }
 
 function rm_log_link()
@@ -1114,10 +1182,8 @@ function rm_log_link()
     fi
     _ptrpath="./apps/$_userapp/points/$_userpt/logptrs"
     if [ ! -d $_ptrpath ]; then
-        echo Error internal error
-        return 2
-    fi
-    if is_dir_empty $_ptrpath; then 
+        echo $_ptrpath does not exist
+    elif is_dir_empty $_ptrpath; then 
         echo there is no link to delete for "$_userapp:$_userpt"
     else
         link2="$_logapp/$_logpt"
@@ -1126,7 +1192,7 @@ function rm_log_link()
         for i in *; do
             _peerlink=`python3 $updattr -v $i`
             if [[ -z $_peerlink ]]; then
-                _peerlink=`echo $i`
+                _peerlink=`cat $i`
                 if [[ -z $_peerlink ]]; then
                     continue
                 fi
@@ -1135,18 +1201,17 @@ function rm_log_link()
             if [[ "$_peerlink" != "$link2" ]]; then
                 continue
             fi
-            rm $i
+            rm -f $i
 
-            echo "you are going to remove the point logs $(dirname $ptrpath)/logs/$i-*, continue ( y/N )?(default: No)"
+            echo "you are going to remove the point logs $(dirname $_ptrpath)/logs/$i-*, continue ( y/N )?(default: No)"
             read answer
             if [ "x$answer" == "xn" ] || [ "x$answer" == "xno" ] || [ "x$answer" == "x" ]; then
                 echo the logs is kept.
                 break;
             fi
             if [[ -f ../logs/$i-0 ]] || [[ -f ../logs/$i-extfile ]]; then
-                rm ../logs/$i-*
+                rm -f ../logs/$i-*
             fi
-            break
             #python3 ${updattr} -a 'user.regfs' -1 ../logcount > /dev/null
         done
         popd > /dev/null
@@ -1168,7 +1233,7 @@ function rm_log_link()
         for i in *; do
             _peerlink=`python3 $updattr -v $i`
             if [[ -z $_peerlink ]]; then
-                _peerlink=`echo $i`
+                _peerlink=`cat $i`
                 if [[ -z $_peerlink ]]; then
                     continue
                 fi
@@ -1177,7 +1242,7 @@ function rm_log_link()
             if [[ "$_peerlink" != "$link" ]]; then
                 continue
             fi
-            rm $i
+            rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../logcount > /dev/null
         done
         popd > /dev/null
@@ -1189,7 +1254,7 @@ function rm_log_link()
 function show_log_links()
 {
     if is_dir_empty logptrs; then
-        echo links: None
+        echo logs: None
         return 0
     fi
 
