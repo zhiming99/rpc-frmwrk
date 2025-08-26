@@ -1134,7 +1134,7 @@ function add_log_link()
         if (( len < 95 ));then
             python3 ${updattr} -u 'user.regfs' "$(jsonval s $loglink)" $_userpath/logptrs/ptr$userid > /dev/null
         fi
-        if [[ -d $_userpath/logs ]]; then
+        if [[ ! -d $_userpath/logs ]]; then
             mkdir $_userpath/logs
         fi
         dt=`python3 $updattr -v $_userpath/datatype`
