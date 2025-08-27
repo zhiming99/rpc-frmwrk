@@ -43,69 +43,112 @@ NAME_TYPE_MAP = {
 bPretty = False
 
 def PrintLog(filename):
-    with open(filename, 'rb') as f:
-        # Read LOGHDR (16 bytes: 4+4+2+2+1+3)
-        hdr = f.read(16)
-        if len(hdr) < 16:
-            print("File too short for LOGHDR")
-            return
-        dwMagic, dwCounter, wTypeId, wRecSize, byUnit, *_ = struct.unpack('>I I H H B 3s', hdr)
-        if dwMagic != 0x706c6f67:
-            print("Invalid LOG_MAGIC")
-            return
-        # Determine type format and size
-        if wTypeId not in TYPE_MAP:
-            print(f"Unknown type id: {wTypeId}")
-            return
-        data_fmt, data_size = TYPE_MAP[wTypeId]
-        rec_fmt = '>I' + data_fmt  # timestamp (uint32) + data
-        rec_size = 4 + data_size
-        if wRecSize < rec_size:
-            print("Record size too small for type")
-            return
-        print(f"LOGHDR: Magic={dwMagic}" )
-        print(f"LOGHDR: Record Num={dwCounter}")
-        print(f"LOGHDR: RecSize={wRecSize}" )
-        print(f"LOGHDR: Unit={byUnit}")
-        print(f"LOGHDR: format=<timestamp, {TYPE_NAME_MAP[wTypeId]}>")
+    mode = GetFileMode(filename)
+    if mode and ( mode & 0o004 ) != 0o004:
+        os.chmod(filename, mode | 0o004)
+    try:
+        with open(filename, 'rb') as f:
+            # Read LOGHDR (16 bytes: 4+4+2+2+1+3)
+            hdr = f.read(16)
+            if len(hdr) < 16:
+                raise Exception("File too short for LOGHDR")
+            dwMagic, dwCounter, wTypeId, wRecSize, byUnit, *_ = struct.unpack('>I I H H B 3s', hdr)
+            if dwMagic != 0x706c6f67:
+                raise ValueError("Invalid LOG_MAGIC")
+            # Determine type format and size
+            if wTypeId not in TYPE_MAP:
+                raise ValueError(f"Unknown type id: {wTypeId}")
+            data_fmt, data_size = TYPE_MAP[wTypeId]
+            rec_fmt = '>I' + data_fmt  # timestamp (uint32) + data
+            rec_size = 4 + data_size
+            if wRecSize < rec_size:
+                raise Exception("Record size too small for type")
 
-        global bBrief
-        if bBrief:
-            return
-        # Read records
-        rec_num = dwCounter
-        for i in range(rec_num):
-            rec = f.read(wRecSize)
-            if len(rec) < rec_size:
-                break
-            ts, data = struct.unpack(rec_fmt, rec[:rec_size])
-            global bPretty
-            if bPretty:
-                print(f"{time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(ts))} {data}")
-            else:
-                print(f"{ts} {data}")
+            print(f"LOGHDR: Magic={dwMagic}" )
+            print(f"LOGHDR: Record Num={dwCounter}")
+            print(f"LOGHDR: RecSize={wRecSize}" )
+            print(f"LOGHDR: Unit={byUnit}")
+            print(f"LOGHDR: format=<timestamp, {TYPE_NAME_MAP[wTypeId]}>")
+
+            global bBrief
+            if not bBrief:
+                # Read records
+                rec_num = dwCounter
+                for i in range(rec_num):
+                    rec = f.read(wRecSize)
+                    if len(rec) < rec_size:
+                        break
+                    ts, data = struct.unpack(rec_fmt, rec[:rec_size])
+                    global bPretty
+                    if bPretty:
+                        print(f"{time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(ts))} {data}")
+                    else:
+                        print(f"{ts} {data}")
+    except Exception as e:
+        print(f"Error reading log: {e}")
+    if mode and ( mode & 0o004 ) != 0o004:
+        os.chmod(filename, mode )
 
 def ClearLog(filename):
-    with open(filename, 'r+b') as f:
-        hdr = f.read(16)
-        dwMagic, dwCounter, wTypeId, wRecSize, byUnit, *_ = struct.unpack('>I I H H B 3s', hdr)
-        if dwMagic != 0x706c6f67:
-            print("Invalid LOG_MAGIC")
-            return
-        f.seek(0)
-        f.write(struct.pack('>I I H H B 3s', dwMagic, 0, wTypeId, wRecSize, byUnit, b'\x00\x00\x00'))
-        f.truncate()
+    mode = GetFileMode(filename)
+    if mode and ( mode & 0o006 ) != 0o006:
+        os.chmod(filename, mode | 0o006)
+
+    try:
+        with open(filename, 'r+b') as f:
+            hdr = f.read(16)
+            dwMagic, dwCounter, wTypeId, wRecSize, byUnit, *_ = struct.unpack('>I I H H B 3s', hdr)
+            if dwMagic != 0x706c6f67:
+                raise Exception("Invalid LOG_MAGIC")
+            f.seek(0)
+            f.write(struct.pack('>I I H H B 3s', dwMagic, 0, wTypeId, wRecSize, byUnit, b'\x00\x00\x00'))
+            f.truncate()
+    except Exception as e:
+        print(f"Error clearing log: {e}")
+
+    if mode and ( mode & 0o006 ) != 0o006:
+        os.chmod(filename, mode )
+
+def GetFileMode( strPath ):
+    try:
+        # Get the stat_result object for the directory
+        stats = os.stat(strPath)
+        # Extract the mode from the stat_result object
+        mode = stats.st_mode
+        return mode
+    except FileNotFoundError:
+        print(f"Error: Directory not found at '{strPath}'")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
 def InitializeLog( filename, iType ):
-    with open(filename, 'wb') as f:
-        dwMagic = 0x706c6f67
-        dwCounter = 0
-        wTypeId = iType
-        wRecSize = TYPE_MAP[iType][1] + 4
-        byUnit = 0
-        f.seek(0)
-        f.write(struct.pack('>I I H H B 3s', dwMagic, dwCounter, wTypeId, wRecSize, byUnit, b'\x00\x00\x00'))
-        f.truncate()
+    if not os.path.exists(filename):
+        bSetMeta = True
+    else:
+        bSetMeta = False
+
+    try:
+        with open(filename, 'wb') as f:
+            dwMagic = 0x706c6f67
+            dwCounter = 0
+            wTypeId = iType
+            wRecSize = TYPE_MAP[iType][1] + 4
+            byUnit = 0
+            f.seek(0)
+            f.write(struct.pack('>I I H H B 3s', dwMagic, dwCounter, wTypeId, wRecSize, byUnit, b'\x00\x00\x00'))
+            f.truncate()
+
+        if bSetMeta:
+            dirname = os.path.dirname(filename)
+            st = os.stat(dirname)
+            os.chown(filename, st.st_uid, st.st_gid)
+            mode = GetFileMode(dirname)
+            if mode:
+                os.chmod(filename, GetFileMode(dirname) & 0o660)
+    except Exception as e:
+        print(f"Error initializing log: {e}")
 
 def GroupPtrFiles(logPath):
     """
@@ -120,6 +163,15 @@ def GroupPtrFiles(logPath):
             prefix = m.group(1)
             groups[prefix].append(fname)
     return dict(groups)
+
+def CopyWithOwner(src, dst):
+    shutil.copy2(src, dst)  # copy file and metadata (except owner/group)
+    st = os.stat(src)
+    try:
+        os.chown(dst, st.st_uid, st.st_gid)
+    except PermissionError:
+        # Only root can change owner/group; ignore if not permitted
+        pass
 
 if __name__ == "__main__":
 
@@ -223,9 +275,7 @@ if __name__ == "__main__":
                     ret = os.system( cmdLine )
                     if ret != 0:
                         raise Exception(f"Error creating backup tar file {tarFile}")
-
             print(f"Logs are backed up to {tarFile} successfully.")
-
             quit(0)
 
         if args.r:
@@ -249,17 +299,22 @@ if __name__ == "__main__":
                 if not os.path.exists( logPath + f"/{prefix}-0" ):
                     continue
 
+                st = os.stat( logPath + f"/{prefix}-0" )
+                if st.st_size < 1024 * 1024:
+                    print( f"{appName}/{pointName}'s log size {st.st_size} is less than 1MB, no need to rotate" )
+                    continue
+
                 for i in range(maxFiles, 0, -1):
                     if os.path.exists( logPath + f"/{prefix}-{i}" ):
                         if i == maxFiles:
                             os.remove( logPath + f"/{prefix}-{i}" )
                         else:
                             os.rename( logPath + f"/{prefix}-{i}", logPath + f"/{prefix}-{i+1}" )
+
                 with npl( rootDir + f"/{prefix}-0" ) as locked:
-                    shutil.copy( logPath + f"/{prefix}-0", logPath + f"/{prefix}-1" )
+                    CopyWithOwner( logPath + f"/{prefix}-0", logPath + f"/{prefix}-1" )
                     ClearLog( logPath + f"/{prefix}-0" )
                     print(f"Successfully rotated the logs in {logPath}")
-
             quit(0)
 
         if args.l:

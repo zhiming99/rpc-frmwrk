@@ -30,6 +30,8 @@ function usage() {
 Usage: $0 <command> [arguments]
 
 Commands:
+    config               config the rpc-frmwrk with rpcfg.py
+
     start <appname>      Start the application <appname>.
                          Checks if the application is already running; if not,
                          retrieves its command line and working directory from
@@ -99,6 +101,9 @@ Commands:
                          command line is "rpcfctl genkeys <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
                          example: rpcfctl genkeys openssl 1 1
 
+    authmech             Print current authentication mechanism in use, SimpAuth, krb5,
+                         or OAuth2.
+
     login                Authenticate the user using the authentication mechanism
                          specified in 'driver.json'
 
@@ -166,6 +171,15 @@ function is_app_online()
 }
 
 case "$cmd" in
+    config)
+        if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
+            python3 /usr/local/bin/rpcf/rpcfg.py
+        elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then
+            python3 /usr/bin/rpcf/rpcfg.py
+        else
+            echo "Error cannot find rpcfg.py"
+        fi
+        ;;
     start)
         if [[ $# -lt 1 ]]; then
             echo "Error: appname required for 'start'"
@@ -375,7 +389,7 @@ case "$cmd" in
         bash $cmddir/inituser.sh && bash $cmddir/initappreg.sh
         ;;
     initcli)
-        authmech=`rpcfctl authmech`
+        authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$xauthmech" == "xSimpAuth" ]] ||
             [[ "x$xauthmech" == "xOAuth2" ]]; then
             regfsmnt -i $HOME/rpcf/clientreg.dat
@@ -579,12 +593,12 @@ case "$cmd" in
             exit 1;
         fi
         context=`echo $context | sed 's/,/\r\n/g'`
-        mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
-        if [[ "x$mech" == "x" ]]; then
+        _mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
+        if [[ "x$_mech" == "x" ]]; then
             echo None
             exit 1;
         else
-            echo $mech
+            echo $_mech
         fi
         ;;
     geninitcfg)
@@ -605,7 +619,7 @@ case "$cmd" in
         ;;
     cfgkrb5)
         #updating kerberos config
-        authMech=`rpcfctl authmech`
+        authMech=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$authMech" != "xkrb5" ]]; then
             echo "Kerberos is not current authentication mechanism"
             exit 1
@@ -617,8 +631,8 @@ case "$cmd" in
         popd
         ;;
     login)
-        mech=`rpcfctl authmech`
-        if [[ "xmech" == "xSimpAuth" ]]; then
+        mech_=`rpcfctl authmech | tr -d ' \t\n\r'`
+        if [[ "x$mech_" == "xSimpAuth" ]]; then
             cmdline="rpcfctl login <username name>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
@@ -626,7 +640,7 @@ case "$cmd" in
                 exit 1
             fi
             $cmddir/sinit -s $1
-        elif [[ "xmech" == "xOAuth2" ]]; then
+        elif [[ "x$mech_" == "xOAuth2" ]]; then
             cmdline="rpcfctl login <auth url>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
@@ -634,7 +648,7 @@ case "$cmd" in
                 exit 1
             fi
             python3 -m oinit $1
-        elif [[ "xmech" == "xKerberos" ]]; then
+        elif [[ "x$mech_" == "xkrb5" ]]; then
             cmdline="rpcfctl login <user name>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
@@ -735,7 +749,9 @@ case "$cmd" in
         appName="$1"
         ptName="$2"
         if check_appreg_mount; then
+            chmod o+w ${rootdir}/apps/$appName/points/$ptName/logs
             python3 $cmddir/logtool.py -r --root "${rootdir}" "$appName/$ptName"
+            chmod o-w ${rootdir}/apps/$appName/points/$ptName/logs
             undo_check_appreg_mount
         fi
         ;;

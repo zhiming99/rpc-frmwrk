@@ -39,5 +39,16 @@ struct CAsyncAMCallbacks : public CAsyncStdAMCallbacks
     gint32 GetPointValuesToInit(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override;
+
+    gint32 OnPointChanged(
+        IConfigDb* context, 
+        const std::string& strPtPath /*[ In ]*/,
+        const Variant& value /*[ In ]*/ ) override;
+
+    // RPC Async Req Callback
+    gint32 ClaimAppInstCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        std::vector<KeyValue>& arrPtToGet /*[ In ]*/ ) override;
 };
 

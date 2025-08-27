@@ -46,6 +46,12 @@ extern InterfPtr GetAppManager();
 
 #define ROTATE_LIMIT ( 1024 * 1024 )
 
+enum EnumAvgAlgo : guint32
+{
+    algoDiff = 0,
+    algoAvg = 1,
+};
+
 struct LOGHDR
 {
     guint32 dwMagic = LOG_MAGIC;
@@ -292,6 +298,13 @@ gint32 UpdateAverages( gint32 idx )
             if( !pam->IsAppOnline( vecComps[ 0 ] ) )
                 continue;
 
+            guint32 dwAlgo = ( guint32 )algoDiff;
+            Variant varAlgo;
+            ret = pAppReg->GetValue(
+                strPt2Log + "/avgalgo", varAlgo );
+            if( SUCCEEDED( ret ) )
+               dwAlgo = varAlgo;
+
             LOGRECVEC vecRecs;
             ret = GetLatestLogs(
                 strLogFile, 8, vecRecs );
@@ -307,57 +320,112 @@ gint32 UpdateAverages( gint32 idx )
                     continue;
                 guint32 dwSecs = ts - ts1;
                 double dblAvg = .0;
-                switch( oLast.GetTypeId() )
+                if( dwAlgo == algoDiff )
                 {
-                case typeByte:
+                    switch( oLast.GetTypeId() )
                     {
-                        guint8 diff = 
-                        ( ( guint8& )oLast - ( guint8&) oFirst );
-                        dblAvg = ( double )diff / (double)( ts - ts1 );
+                    case typeByte:
+                        {
+                            guint8 diff = 
+                            ( ( guint8& )oLast - ( guint8&) oFirst );
+                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            break;
+                        }
+                    case typeUInt16:
+                        {
+                            guint16 diff = 
+                            ( ( guint16& )oLast - ( guint16&) oFirst );
+                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            break;
+                        }
+                    case typeUInt32:
+                        {
+                            guint32 diff = 
+                            ( ( guint32& )oLast - ( guint32&) oFirst );
+                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            break;
+                        }
+                    case typeFloat:
+                        {
+                            float diff = 
+                            ( ( float& )oLast - ( float&) oFirst );
+                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            break;
+                        }
+                    case typeUInt64:
+                        {
+                            guint64 diff = 
+                            ( ( guint64& )oLast - ( guint64&) oFirst );
+                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            break;
+                        }
+                    case typeDouble:
+                        {
+                            double diff = 
+                            ( ( double& )oLast - ( double&) oFirst );
+                            dblAvg = diff / (double)( ts - ts1 );
+                            break;
+                        }
+                    default:
+                        ret = -ENOTSUP;
                         break;
                     }
-                case typeUInt16:
-                    {
-                        guint16 diff = 
-                        ( ( guint16& )oLast - ( guint16&) oFirst );
-                        dblAvg = ( double )diff / (double)( ts - ts1 );
-                        break;
-                    }
-                case typeUInt32:
-                    {
-                        guint32 diff = 
-                        ( ( guint32& )oLast - ( guint32&) oFirst );
-                        dblAvg = ( double )diff / (double)( ts - ts1 );
-                        break;
-                    }
-                case typeFloat:
-                    {
-                        float diff = 
-                        ( ( float& )oLast - ( float&) oFirst );
-                        dblAvg = ( double )diff / (double)( ts - ts1 );
-                        break;
-                    }
-                case typeUInt64:
-                    {
-                        guint64 diff = 
-                        ( ( guint64& )oLast - ( guint64&) oFirst );
-                        dblAvg = ( double )diff / (double)( ts - ts1 );
-                        break;
-                    }
-                case typeDouble:
-                    {
-                        double diff = 
-                        ( ( double& )oLast - ( double&) oFirst );
-                        dblAvg = diff / (double)( ts - ts1 );
-                        break;
-                    }
-                default:
-                    ret = -ENOTSUP;
-                    break;
+                    if( ERROR( ret ) )
+                        continue;
                 }
-                if( ERROR( ret ) )
-                    continue;
-
+                else if( dwAlgo == algoAvg )
+                {
+                    switch( oLast.GetTypeId() )
+                    {
+                    case typeByte:
+                        {
+                            guint8 diff = 
+                            ( ( guint8& )oLast + ( guint8&) oFirst );
+                            dblAvg = ( double )diff / 2;
+                            break;
+                        }
+                    case typeUInt16:
+                        {
+                            guint16 diff = 
+                            ( ( guint16& )oLast + ( guint16&) oFirst );
+                            dblAvg = ( double )diff / 2;
+                            break;
+                        }
+                    case typeUInt32:
+                        {
+                            guint32 diff = 
+                            ( ( guint32& )oLast + ( guint32&) oFirst );
+                            dblAvg = ( double )diff / 2;
+                            break;
+                        }
+                    case typeFloat:
+                        {
+                            float diff = 
+                            ( ( float& )oLast + ( float&) oFirst );
+                            dblAvg = ( double )diff / 2;
+                            break;
+                        }
+                    case typeUInt64:
+                        {
+                            guint64 diff = 
+                            ( ( guint64& )oLast + ( guint64&) oFirst );
+                            dblAvg = ( double )diff / 2;
+                            break;
+                        }
+                    case typeDouble:
+                        {
+                            double diff = 
+                            ( ( double& )oLast + ( double&) oFirst );
+                            dblAvg = ( double )diff / 2;
+                            break;
+                        }
+                    default:
+                        ret = -ENOTSUP;
+                        break;
+                    }
+                    if( ERROR( ret ) )
+                        continue;
+                }
                 Variant oVar( dblAvg );
                 stdstr strAvg = strPt2Log + "/average";
                 pAppReg->SetValue( strAvg, dblAvg );

@@ -214,6 +214,91 @@ gint32 CAsyncAMCallbacks::GetPointValuesToInit(
     return super::GetPointValuesToInit( pIf, veckv );
 }
 
+// RPC Async Req Callback
+gint32 CAsyncAMCallbacks::ClaimAppInstCallback(
+    IConfigDb* context, 
+    gint32 iRet,
+    std::vector<KeyValue>& arrPtToGet /*[ In ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+        for( auto& kv : arrPtToGet )
+        {
+            if( kv.strKey == S_SESS_TIME_LIMIT )
+            {
+                m_pIf->SetProperty(
+                    propSessTimeLimit, kv.oValue );
+            }
+            else if( kv.strKey == S_MAX_CONN )
+            {
+                m_pIf->SetProperty(
+                    propMaxConns, kv.oValue );
+            }
+            else if( kv.strKey == S_MAX_RECVBPS )
+            {
+                m_pIf->SetProperty(
+                    propRecvBps, kv.oValue );
+            }
+            else if( kv.strKey == S_MAX_SENDBPS )
+            {
+                m_pIf->SetProperty(
+                    propSendBps, kv.oValue );
+            }
+        }
+        ret = super::ClaimAppInstCallback(
+            context, iRet, arrPtToGet );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAsyncAMCallbacks::OnPointChanged(
+    IConfigDb* context, 
+    const std::string& strPtPath /*[ In ]*/,
+    const Variant& value /*[ In ]*/ )
+{
+    do{
+        if( strPtPath ==
+            RTAPPNAME "/sess_time_limit" )
+        {
+            guint32 dwWaitSec = value;
+            if( dwWaitSec > 86400 * 31 )
+                break;
+            m_pIf->SetProperty(
+                propSessTimeLimit, value );
+        }
+        else if( strPtPath ==
+            RTAPPNAME "/max_recv_bps" )
+        {
+            m_pIf->SetProperty(
+                propRecvBps, value );
+        }
+        else if( strPtPath ==
+            RTAPPNAME "/max_send_bps" )
+        {
+            m_pIf->SetProperty(
+                propSendBps, value );
+        }
+        else if( strPtPath ==
+            RTAPPNAME "/max_conn" )
+        {
+            m_pIf->SetProperty(
+                propMaxConns, value );
+        }
+        else
+        {
+            super::OnPointChanged(
+                context, strPtPath, value );
+        }
+    }while( 0 );
+    return 0;
+}
+
 gint32 StartAppManCli(
     CRpcServices* pSvc, InterfPtr& pAppMan )
 {

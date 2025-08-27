@@ -285,6 +285,10 @@ function add_point()
     if ! mkdir -p $_ptpath; then
         return $?
     fi
+
+    _uname_=$(stat -c "%u" $_ptpath/..)
+    _gname_=$(stat -c "%g" $_ptpath/..)
+
     pushd $_ptpath > /dev/null
     touch value
     touch datatype
@@ -310,9 +314,11 @@ function add_point()
         mkdir ptrs || true
         touch ptrcount
         if ! setfattr -n 'user.regfs' -v '{ "t": 3, "v":0 }' ./ptrcount > /dev/null; then
+            popd > /dev/null
             return $?
         fi
     fi
+    chown $_uname_:$_gname_ -R .
     popd > /dev/null
 }
 
@@ -447,13 +453,27 @@ function set_attr_value()
         echo Error bad data type $_dt@$_appname/$_ptname
         return 22
     fi
+    perm=$(stat -c "%#a" $_ptpath)
+    if ! (( perm & 0002 )); then
+        chmod o+w $_ptpath
+    fi
+    created=0
     if (( $_dtnum <= 7 ));then
         if [ ! -f $_ptpath/$_attr ]; then
             touch $_ptpath/$_attr
+            created=1
         fi
         python3 $updattr -u 'user.regfs' "$_value" $_ptpath/$_attr > /dev/null
     else
         echo "$_value" > $_ptpath/$_attr
+    fi
+    if (( created == 1 )); then
+        _uname_=$(stat -c "%u" $_ptpath)
+        _gname_=$(stat -c "%g" $_ptpath)
+        chown $_uname_:$_gname_ $_ptpath/$_attr
+    fi
+    if ! (( perm & 0002 )); then
+        chmod o-w $_ptpath
     fi
     return $?
 }
@@ -477,15 +497,23 @@ function get_attr_value()
         echo Error set_attr_value point "$_ptpath" not exist
         return 2
     fi
+    
     _dtnum=$(str2type $_dt)
     if [ -z $_dtnum ]; then
         echo Error bad data type $_dt@$_appname/$_ptname
         return 22
     fi
+    perm=$(stat -c "%#a" $_ptpath)
+    if ! (( perm & 0004 )); then
+        chmod o+r $_ptpath
+    fi
     if (( $_dtnum <= 7 ));then
         python3 $updattr -v $_ptpath/$_attr > /dev/null
     else
         cat $_ptpath/$_attr
+    fi
+    if ! (( perm & 0004 )); then
+        chmod o-r $_ptpath
     fi
     return $?
 }
@@ -521,7 +549,14 @@ function set_attr_blob()
         echo Error set_attr_blob bad data type $_dt@$_appname/$_ptname
         return 22
     fi
+    perm=$(stat -c "%#a" $_ptpath)
+    if ! (( perm & 0002 )); then
+        chmod o+w $_ptpath
+    fi
     cat $_file > $_ptpath/$_attr
+    if ! (( perm & 0002 )); then
+        chmod o-w $_ptpath
+    fi
     return $?
 }
 
@@ -547,12 +582,27 @@ function rm_attribute()
         return 13
     fi
 
-    _ptpath=./apps/$_appname/points/$_ptname/$_attr 
-    if [ ! -f $_ptpath ]; then
-        return 0
+    _ptpath=./apps/$_appname/points/$_ptname
+    perm=$(stat -c "%#a" $_ptpath)
+    if ! (( perm & 0002 )); then
+        chmod o+w $_ptpath
+        permw=1
     fi
-    rm -f $_ptpath
-    return $?
+    if ! (( perm & 0004 )); then
+        chmod o+r $_ptpath
+        permr=1
+    fi
+    if [ -f $_ptpath/$_attr ]; then
+        rm -f $_ptpath/$_attr
+        ret=$?
+    fi
+    if (( permw == 1 )); then
+        chmod o-w $_ptpath
+    fi
+    if (( permr == 1 )); then
+        chmod o-r $_ptpath
+    fi
+    return $ret
 }
 
 function rm_link()
@@ -1124,7 +1174,6 @@ function add_log_link()
         done
     fi
     if (($bexist==0)); then
-        echo create loglink $loglink
         echo $loglink > $_userpath/logptrs/ptr$userid
         fileSize=`stat -c %s $_userpath/logptrs/ptr$userid`
         if (( $fileSize == 0 )); then

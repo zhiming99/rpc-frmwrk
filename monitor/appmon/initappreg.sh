@@ -185,6 +185,8 @@ set_attr_value rpcrouter1 sess_time_limit load_on_start "$(jsonval 'i' 1)" i
 set_attr_value rpcrouter1 max_conn load_on_start "$(jsonval 'i' 1)" i
 set_attr_value rpcrouter1 max_recv_bps load_on_start "$(jsonval 'i' 1)" i
 set_attr_value rpcrouter1 max_send_bps load_on_start "$(jsonval 'i' 1)" i
+set_attr_value rpcrouter1 vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+set_attr_value rpcrouter1 obj_count avgalgo  "$(jsonval 'i' 1)" i
 
 add_log_link rpcrouter1 rx_bytes appmonsvr1 ptlogger1
 add_log_link rpcrouter1 tx_bytes appmonsvr1 ptlogger1

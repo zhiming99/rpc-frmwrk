@@ -1793,7 +1793,8 @@ gint32 CBPlusNode::RemoveFile(
         {
             ret = -ENOENT;
             DebugPrint( ret,
-                "Error '%s' not found" );
+                "Error '%s' not found",
+                szKey );
             break;
         }
 
