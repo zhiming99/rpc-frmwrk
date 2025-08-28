@@ -663,6 +663,7 @@ case "$cmd" in
         if rpcfctl list | grep online > /dev/null; then
             echo Error some applications are still running.
             echo $cmdline
+            echo The backup file will be stored in the home directory.
             exit 1
         fi
         rpcfctl geninitcfg > ~/.rpcf/cfgbk.json

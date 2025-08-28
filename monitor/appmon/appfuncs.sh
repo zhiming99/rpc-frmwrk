@@ -6,6 +6,8 @@ rpcfshow=${_script_dir}/rpcfshow.sh
 showapp=${_script_dir}/showapp.sh
 source $_pubfuncs
 
+declare -gA permArray
+
 function wait_mount()
 {
     if [ -z $1 ] || [ -z $2 ]; then
@@ -831,6 +833,7 @@ function show_links()
         echo links: None
         return 0
     fi
+    grant_perm ptrs 0004 1
     pushd ptrs > /dev/null
     echo link:
     for i in *; do
@@ -840,6 +843,7 @@ function show_links()
             echo -e '\t' `python3 $updattr -v $i` '-->' $_appname/$_pt
         fi
     done
+    restore_perm 1
     popd > /dev/null
 }
 
@@ -852,8 +856,11 @@ function show_point_detail()
         return 22
     fi
     _ptpath=./apps/$_appname/points/$_pt
+    grant_perm $_ptpath 0004 0
     if is_dir_empty $_ptpath; then
         echo Error the point content is empty
+        restore_perm 0
+        clear_perm_array
         return 2
     fi
     _dt=$(python3 $updattr -v $_ptpath/datatype)
@@ -895,7 +902,8 @@ function show_point_detail()
     if [[ -d logptrs ]];then
         show_log_links
     fi
-
+    restore_perm 0
+    clear_perm_array
     popd > /dev/null
 }
 
@@ -1054,6 +1062,115 @@ function init_log_file()
     python3 -c "import sys; sys.stdout.buffer.write((${magic}).to_bytes(4, 'big')); sys.stdout.buffer.write((${counter}).to_bytes(4, 'big')); sys.stdout.buffer.write((${typeid}).to_bytes(2, 'big')); sys.stdout.buffer.write((${recsize}).to_bytes(2, 'big')); sys.stdout.buffer.write((${reserved}).to_bytes(4, 'big')) " > $output
 }
 
+function init_uid_gid()
+{
+    local path=$1
+    local idx=$2
+    if [[ -z "${_usrArray[0]}" ]]; then
+        _usrArray=()
+        _grpArray=()
+    fi
+    local _uid
+    local _gid
+    if [[ ! -f $path ]]; then
+        _uid=`bash $rpcfshow -u admin | grep 'uid:' | awk '{print $2}'`
+        _gid=`bash $rpcfshow -g admin | grep 'gid:' | awk '{print $2}'`
+    else
+        _uid=$(stat -c "%u" $path)
+        _gid=$(stat -c "%g" $path)
+    fi 
+    if [[ -z "$idx" ]]; then
+       _usrArray+=($_uid)
+       _grpArray+=($_gid)
+    else
+        _usrArray[$idx]=$_uid
+        _grpArray[$idx]=$_gid
+    fi
+}
+
+function get_uid_gid()
+{
+    local idx=$1
+    if [[ -z "$idx" ]];then
+        idx=0
+    fi
+    local uid="${_usrArray[$idx]}"
+    local gid="${_grpArray[$idx]}"
+    echo "$uid $gid"
+}
+
+function clear_uid_array()
+{
+    _userArray=()
+    _grpArray=()
+}
+
+function grant_perm()
+{
+    # $1 is a path as the permission template
+    # $2 is the permission to grant either 0002, 0004, or 0006
+    # $3 is the idx of the permission record
+
+    if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
+        return 1
+    fi
+
+    local idx=$3
+
+    local _path_=$(realpath $1)
+    local _permw_=0
+    local _permr_=0
+    local _permx_=0
+    local _permReq_=$2
+    local _perm_=$(stat -c "%#a" $_path_)
+    if ( ! (( _perm_ & 0004 )) ) && (( _permReq_ & 0004 )); then
+        chmod o+r $_path_
+        _permr_=1
+    fi
+    if ( ! (( _perm_ & 0002 )) ) && (( _permReq_ & 0002 )); then
+        chmod o+w $_path_
+        _permw_=1
+    fi
+    if ( ! (( _perm_ & 0001 )) ) && (( _permReq_ & 0001 )); then
+        chmod o+x $_path_
+        _permx_=1
+    fi
+    permArray[$idx,0]="$_path_"
+    permArray[$idx,1]="$_permr_"
+    permArray[$idx,2]="$_permw_"
+    permArray[$idx,3]="$_permx_"
+}
+
+function restore_perm()
+{
+    if [[ -z "$1" ]]; then
+        return 1
+    fi
+
+    idx=$1
+    local _path_="${permArray[$idx,0]}"
+    local _permr_="${permArray[$idx,1]}"
+    local _permw_="${permArray[$idx,2]}"
+    local _permx_="${permArray[$idx,3]}"
+
+    if (( _permw_ == 1 )); then
+        chmod o-w $_path_
+    fi
+    if (( _permr_ == 1 )); then
+        chmod o-r $_path_
+    fi
+    if (( _permx_ == 1 )); then
+        chmod o-x $_path_
+    fi
+    return 0
+}
+
+function clear_perm_array()
+{
+    permArray=
+    declare -gA permArray
+}
+
 function add_log_link()
 {
 # $1 user-app
@@ -1065,20 +1182,6 @@ function add_log_link()
     _logapp=$3
     _logpt=$4
     _logfile=$5
-
-    if [[ "x" == "x$username" ]]; then
-        username="admin"
-    fi
-    if [[ "x" == "x$groupname" ]] then
-        groupname="admin";
-    fi
-    _uid=`bash $rpcfshow -u $username | grep 'uid:' | awk '{print $2}'`
-    _gid=`bash $rpcfshow -g $groupname | grep 'gid:' | awk '{print $2}'`
-
-    if [[ "x$_uid" == "x" ]] || [[ "x$_gid" == "x" ]]; then
-        echo "Error cannot find the specified user/group"
-        return 22;
-    fi
 
     if [ -z $_userapp ] || [ -z $_userpt ] || [ -z $_logapp ] || [ -z $_logpt ];then
         echo Error missing parameters
@@ -1092,8 +1195,18 @@ function add_log_link()
         return 22
     fi
 
-    chmod o+w $_logpath
-    chmod o+w $_userpath
+    init_uid_gid $_logpath 0
+    init_uid_gid $_userpath 1
+
+    read -r _loguid _loggid <<< $(get_uid_gid 0)
+
+    if [[ "x$_loguid" == "x" ]] || [[ "x$_loggid" == "x" ]]; then
+        echo "Error cannot find the specified user/group"
+        return 22;
+    fi
+
+    grant_perm $_logpath 0006 0
+    grant_perm $_userpath 0006 1
 
     # setup pointer on log point
 
@@ -1117,7 +1230,7 @@ function add_log_link()
     userlink="$_userapp/$_userpt/ptr$userid"
 
     bexist=0
-    chmod o+w $_logpath/logptrs
+    grant_perm $_logpath/logptrs 0006 2
     if ! is_dir_empty $_logpath/logptrs; then
         #check if the ptr is already present
         for i in $_logpath/logptrs/*; do
@@ -1154,7 +1267,8 @@ function add_log_link()
     if [[ ! -d $_userpath/logptrs ]]; then
         mkdir $_userpath/logptrs
     fi
-    chmod o+w $_userpath/logptrs
+    grant_perm $_userpath/logptrs 0006 3
+    #chmod o+w $_userpath/logptrs
 
     if ! is_dir_empty $_userpath/logptrs; then
         #check if the ptr is already present
@@ -1188,6 +1302,7 @@ function add_log_link()
         fi
         dt=`python3 $updattr -v $_userpath/datatype`
         typestr=$(type2str $dt)
+        grant_perm $_userpath/logs 00006 4
         if [[ "x" == "x$_logfile" ]]; then
             touch $_userpath/logs/ptr$userid-0
             init_log_file $_userpath/logs/ptr$userid-0 $typestr
@@ -1196,22 +1311,27 @@ function add_log_link()
             init_log_file $_logfile $typestr
             echo $_logfile > $_userpath/logs/ptr$userid-extfile
         fi
+        restore_perm 4
 
         touch $_userpath/average
         python3 $updattr -u 'user.regfs' "$(jsonval d 0.0)" $_userpath/average > /dev/null
     fi
 
-    chmod o-w $_logpath/logptrs
-    chmod o-w $_userpath/logptrs
-    chmod o-w $_userpath/logs
-    chmod o-w $_logpath
-    chmod o-w $_userpath
+    restore_perm 3
+    restore_perm 2
+    restore_perm 1
+    restore_perm 0
 
-    chown -R $_uid:$_gid $_logpath/logptrs 
-    chown -R $_uid:$_gid $_logpath/logcount
+    chown -R $_loguid:$_loggid $_logpath/logptrs 
+    chown -R $_loguid:$_loggid $_logpath/logcount
+
+    read -r _uid _gid <<< "$(get_uid_gid 1)"
     chown -R $_uid:$_gid $_userpath/logptrs
     chown -R $_uid:$_gid $_userpath/logs
     chown -R $_uid:$_gid $_userpath/logcount
+
+    clear_perm_array
+    clear_uid_array
 }
 
 function rm_log_link()
@@ -1236,7 +1356,7 @@ function rm_log_link()
         echo there is no link to delete for "$_userapp:$_userpt"
     else
         link2="$_logapp/$_logpt"
-        chmod o+w $_ptrpath
+        grant_perm $_ptrpath 0006 0
         pushd $_ptrpath > /dev/null
         for i in *; do
             _peerlink=`python3 $updattr -v $i`
@@ -1264,7 +1384,7 @@ function rm_log_link()
             #python3 ${updattr} -a 'user.regfs' -1 ../logcount > /dev/null
         done
         popd > /dev/null
-        chmod o-w $_ptrpath
+        restore_perm 0
     fi
 
     link="$_userapp/$_userpt"
@@ -1277,7 +1397,7 @@ function rm_log_link()
         echo there is no link to delete for "$_logapp:$_logpt"
         return 0
     else
-        chmod o+w $_ptrpath2
+        grant_perm $_ptrpath2 0006 1
         pushd $_ptrpath2 > /dev/null
         for i in *; do
             _peerlink=`python3 $updattr -v $i`
@@ -1295,8 +1415,9 @@ function rm_log_link()
             #python3 ${updattr} -a 'user.regfs' -1 ../logcount > /dev/null
         done
         popd > /dev/null
-        chmod o-w $_ptrpath2
+        restore_perm 1
     fi
+    clear_perm_array
     return 0
 }
 
@@ -1312,12 +1433,14 @@ function show_log_links()
     else
         direction="<--"
     fi
+    grant_perm logptrs 0004 2
     pushd logptrs > /dev/null
     echo logs:
     for i in *; do
         echo -e '\t' $_appname/$_pt "${direction}" $(dirname `python3 $updattr -v $i`)
     done
     popd > /dev/null
+    restore_perm 2
 }
 # add a standard app : add_stdapp <app inst name> [<owner> <group>]
 function add_stdapp()

@@ -123,7 +123,7 @@ rpcfctl <子命令> [参数]
   启动rpc-frmwrk的配置工具rpcfg.py。
 
 - **geninitcfg [<输出文件>]**  
-  生成 Web 或认证配置文件。
+  生成`rpc-frmwrk`的配置导出文件。该文件用于在别的系统上，重建rpc-frmwrk的配置文件集合。此命令主要用于调试时，发现配置错误的用途，并不单一使用。一般用`rpcfctl backup`和`rpcfctl restore`来完成配置的导出和恢复。
 
 - **cfgweb**  
   使用当前 rpc-frmwrk 配置更新 Web 服务器（nginx 或 apache）配置。
@@ -162,7 +162,10 @@ rpcfctl login alice
   这些辅助脚本通常与 rpcfctl 位于同一目录或 `rpcf` 子目录下。
 
 ## 名词解释
-`应用`在本文中指支持rpc-frmwrk的monitor功能的服务器程序。它可以由`ridlc`生成，或者手写实现。一个支持monitor的程序还必须在注册表中注册，才能使`appmonsvr`(monitor的服务器程序)和该应用程序建立起通信和管理。
+`应用`在本文中指支持rpc-frmwrk的monitor功能的服务器程序。它可以由`ridlc`生成，或者手写实现。一个支持monitor的程序还必须在注册表中注册，才能使`appmonsvr`(monitor的服务器程序)和该应用程序建立起通信和管理。注册的过程如下：
+* 由`ridlc`生成一个程序框架，并通过选项`-m <appname>`来指定注册表中使用的名称。
+* 在终端运行命令`rpcfctl addapp <appname>`,就完成了99%的注册。
+* 最后一步，手动运行rpc服务器端的程序。这一过程将会向注册表添加启动信息。当下次启动该服务器时，就可以使用`rpcfctl startall` 或者`rpcfctl start <appname>`在启动该服务器程序了。
 
 ---
 
