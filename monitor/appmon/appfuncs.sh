@@ -7,6 +7,7 @@ showapp=${_script_dir}/showapp.sh
 source $_pubfuncs
 
 declare -gA permArray
+declare -gA userArray
 
 function wait_mount()
 {
@@ -288,8 +289,8 @@ function add_point()
         return $?
     fi
 
-    _uname_=$(stat -c "%u" $_ptpath/..)
-    _gname_=$(stat -c "%g" $_ptpath/..)
+    store_uid_gid $_ptpath/.. 100
+    grant_perm $_ptpath 0007 100
 
     pushd $_ptpath > /dev/null
     touch value
@@ -317,10 +318,13 @@ function add_point()
         touch ptrcount
         if ! setfattr -n 'user.regfs' -v '{ "t": 3, "v":0 }' ./ptrcount > /dev/null; then
             popd > /dev/null
+            restore_perm 100
             return $?
         fi
     fi
-    chown $_uname_:$_gname_ -R .
+    read -r _uid _gid <<< $(get_uid_gid 100)
+    chown $_uid:$_gid -R .
+    restore_perm 100
     popd > /dev/null
 }
 
@@ -374,21 +378,33 @@ function add_link()
         echo Error missing parameters
         return 22
     fi
+
+    grant_perm ./apps/$_inapp 0005 36
+    grant_perm ./apps/$_outapp 0005 37
+    grant_perm ./apps/$_inapp/points 0005 32
+    grant_perm ./apps/$_outapp/points 0005 33
     _inpath="./apps/$_inapp/points/$_inpt"
     _outpath="./apps/$_outapp/points/$_outpt"
     if [ ! -d $_outpath ] ||
        [ ! -d $_inpath ]; then
-        echo Error 
+        echo Error unable to find the point
+        restore_perm 32 33 36 37
         return 22
     fi
+
+    grant_perm $_inpath 0007 30
+    grant_perm $_outpath 0007 31
+
     _ptype=$(python3 $updattr -v $_outpath/ptype)
     if (($_ptype != 0 )); then
         echo Output point is not 'output' type
+        restore_perm 30 31 32 33 36 37
         return 22
     fi
     _ptype=$(python3 $updattr -v $_inpath/ptype)
     if (($_ptype != 1 )); then
         echo input point is not 'input' type
+        restore_perm 30 31 32 33 36 37
         return 22
     fi
 
@@ -400,7 +416,7 @@ function add_link()
     if [ ! -d $_inpath/ptrs ]; then
         mkdir $_inpath/ptrs
     fi
-    chmod o+w $_inpath/ptrs
+    grant_perm $_inpath/ptrs 0007 35
     echo $linkout > $_inpath/ptrs/ptr$inid
     fileSize=`stat -c %s $_inpath/ptrs/ptr$inid`
     if (( $fileSize == 0 )); then
@@ -410,12 +426,12 @@ function add_link()
     if (( len < 95 ));then
         python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkout)" $_inpath/ptrs/ptr$inid > /dev/null
     fi
-    chmod o-w $_inpath/ptrs
+    restore_perm 35
 
     if [ ! -d $_outpath/ptrs ]; then
         mkdir $_outpath/ptrs
     fi
-    chmod o+w $_outpath/ptrs
+    grant_perm $_outpath/ptrs 0007 35
     echo $linkin > $_outpath/ptrs/ptr$outid
     fileSize=`stat -c %s $_outpath/ptrs/ptr$outid`
     if (( $fileSize == 0 )); then
@@ -425,7 +441,7 @@ function add_link()
     if (( len < 95 ));then
         python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkin)" $_outpath/ptrs/ptr$outid > /dev/null
     fi
-    chmod o-w $_outpath/ptrs
+    restore_perm 30 31 32 33 35 36 37
 }
 
 function set_attr_value()
@@ -445,39 +461,43 @@ function set_attr_value()
         echo Error invalid set_attr_value parameters
         return 22
     fi
+
+    grant_perm ./apps/$_appname/points 0005 44
     _ptpath=./apps/$_appname/points/$_ptname 
     if [ ! -d $_ptpath ]; then
         echo Error set_attr_value point "$_ptpath" not exist
+        restore_perm 44
         return 2
     fi
     _dtnum=$(str2type $_dt)
     if [ -z $_dtnum ]; then
         echo Error bad data type $_dt@$_appname/$_ptname
+        restore_perm 44
         return 22
     fi
-    perm=$(stat -c "%#a" $_ptpath)
-    if ! (( perm & 0002 )); then
-        chmod o+w $_ptpath
-    fi
+    grant_perm $_ptpath 0007 40
     created=0
     if (( $_dtnum <= 7 ));then
         if [ ! -f $_ptpath/$_attr ]; then
             touch $_ptpath/$_attr
             created=1
         fi
+        grant_perm $_ptpath/$_attr 0007 41
         python3 $updattr -u 'user.regfs' "$_value" $_ptpath/$_attr > /dev/null
+        restore_perm 41
     else
         echo "$_value" > $_ptpath/$_attr
+        # not paired with grant_perm on purpose
+        restore_perm 40
     fi
     if (( created == 1 )); then
         _uname_=$(stat -c "%u" $_ptpath)
         _gname_=$(stat -c "%g" $_ptpath)
         chown $_uname_:$_gname_ $_ptpath/$_attr
     fi
-    if ! (( perm & 0002 )); then
-        chmod o-w $_ptpath
-    fi
-    return $?
+    ret=$?
+    restore_perm 40 44
+    return $ret
 }
 
 function get_attr_value()
@@ -494,29 +514,27 @@ function get_attr_value()
         echo Error invalid get_attr_value parameters
         return 22
     fi
+    grant_perm ./apps/$_appname/points 0005 44
     _ptpath=./apps/$_appname/points/$_ptname 
     if [ ! -d $_ptpath ]; then
         echo Error set_attr_value point "$_ptpath" not exist
+        restore_perm 44
         return 2
     fi
     
     _dtnum=$(str2type $_dt)
     if [ -z $_dtnum ]; then
         echo Error bad data type $_dt@$_appname/$_ptname
+        restore_perm 44
         return 22
     fi
-    perm=$(stat -c "%#a" $_ptpath)
-    if ! (( perm & 0004 )); then
-        chmod o+r $_ptpath
-    fi
+    grant_perm $_ptpath 0004 40
     if (( $_dtnum <= 7 ));then
         python3 $updattr -v $_ptpath/$_attr > /dev/null
     else
         cat $_ptpath/$_attr
     fi
-    if ! (( perm & 0004 )); then
-        chmod o-r $_ptpath
-    fi
+    restore_perm 40 44
     return $?
 }
 
@@ -585,25 +603,12 @@ function rm_attribute()
     fi
 
     _ptpath=./apps/$_appname/points/$_ptname
-    perm=$(stat -c "%#a" $_ptpath)
-    if ! (( perm & 0002 )); then
-        chmod o+w $_ptpath
-        permw=1
-    fi
-    if ! (( perm & 0004 )); then
-        chmod o+r $_ptpath
-        permr=1
-    fi
+    grant_perm $_ptpath 0007 20
     if [ -f $_ptpath/$_attr ]; then
         rm -f $_ptpath/$_attr
         ret=$?
     fi
-    if (( permw == 1 )); then
-        chmod o-w $_ptpath
-    fi
-    if (( permr == 1 )); then
-        chmod o-r $_ptpath
-    fi
+    restore_perm 20
     return $ret
 }
 
@@ -622,19 +627,22 @@ function rm_link()
         echo Error missing parameters
         return 22
     fi
+
     _ptrpath="./apps/$_appname/points/$_ptname/ptrs"
     if [ ! -d $_ptrpath ]; then
         echo Error internal error
         return 2
     fi
+    grant_perm $_ptrpath 0007 30
     if is_dir_empty $_ptrpath; then 
         echo there is no link to delete for "$_appname:$_ptname"
     else
         link2="$_appname2/$_ptname2"
-        chmod o+w $_ptrpath
         pushd $_ptrpath > /dev/null
         for i in *; do
+            grant_perm $i 0007 31
             _peerlink=`python3 $updattr -v $i`
+            restore_perm $i 31
             if [ -z $_peerlink ]; then
                 continue
             fi
@@ -646,8 +654,8 @@ function rm_link()
             break
         done
         popd > /dev/null
-        chmod o-w $_ptrpath
     fi
+    restore_perm 30
 
     link="$_appname/$_ptname"
     _ptrpath2="./apps/$_appname2/points/$_ptname2/ptrs"
@@ -655,14 +663,15 @@ function rm_link()
         echo Error internal error
         return 2
     fi
+    grant_perm $_ptrpath2 0007 30
     if is_dir_empty $_ptrpath2; then 
         echo there is no link to delete for "$_appname2:$_ptname2"
-        return 0
     else
-        chmod o+w $_ptrpath2
         pushd $_ptrpath2 > /dev/null
         for i in *; do
+            grant_perm $i 0007 31
             _peerlink=`python3 $updattr -v $i`
+            restore_perm 31
             if [ -z $_peerlink ]; then
                 continue
             fi
@@ -674,8 +683,8 @@ function rm_link()
             break
         done
         popd > /dev/null
-        chmod o-w $_ptrpath2
     fi
+    restore_perm 30
     return 0
 }
 
@@ -688,11 +697,14 @@ function rm_point_nocheck()
         echo Error missing parameters
         return 22
     fi
+    grant_perm ./apps/$__appname/points 0007 21
     __ptpath=./apps/$__appname/points/$__ptname 
     if [ ! -d $__ptpath ]; then
+        restore_perm 21
         echo Error point "$__ptpath" not exist
         return 2
     fi
+    chmod o+rw -R $__ptpath
     pushd $__ptpath > /dev/null
     if [ ! -f setpoint ] && [ -d ptrs ]; then
         if ! is_dir_empty ptrs; then
@@ -712,6 +724,7 @@ function rm_point_nocheck()
         fi
     fi
     if [[ -d logptrs ]]; then
+        chmod o+rw -R logptrs
         if ! is_dir_empty logptrs; then
             if [[ -d logs ]]; then
                 __user="true"
@@ -737,6 +750,7 @@ function rm_point_nocheck()
             cd ..
         fi
     fi
+    restore_perm 21
     cd ..
     rm -rf $__ptname
     popd > /dev/null
@@ -793,6 +807,7 @@ function list_applications()
         echo None
         return 0
     fi
+    grant_perm ./apps 0005 0
     pushd ./apps > /dev/null
     for i in *; do
         owner_stream=`python3 $updattr -v ./$i/owner_stream`
@@ -802,6 +817,7 @@ function list_applications()
             echo "$i: online"
         fi
     done
+    restore_perm 0
     popd > /dev/null
 }
 
@@ -855,11 +871,12 @@ function show_point_detail()
         echo Error show_point_detail missing application/point name
         return 22
     fi
+    grant_perm ./apps/$_appname/points 0005 1
     _ptpath=./apps/$_appname/points/$_pt
     grant_perm $_ptpath 0004 0
     if is_dir_empty $_ptpath; then
         echo Error the point content is empty
-        restore_perm 0
+        restore_perm 0 1
         clear_perm_array
         return 2
     fi
@@ -902,7 +919,7 @@ function show_point_detail()
     if [[ -d logptrs ]];then
         show_log_links
     fi
-    restore_perm 0
+    restore_perm 0 1
     clear_perm_array
     popd > /dev/null
 }
@@ -947,10 +964,13 @@ function list_points()
         echo None
         return 0
     fi
+    grant_perm $_appdir/points 0004 0
     pushd $_appdir/points > /dev/null
     for i in *; do
         show_point $i
     done
+    restore_perm 0
+    clear_perm_array
     popd > /dev/null
 }
 
@@ -1029,13 +1049,13 @@ function change_application_owner()
 function change_application_mode()
 {
     _instname=$2
-    if [ ! -d ./apps/$_instname ]; then
+    if [[ ! -d ./apps/$_instname ]]; then
         echo Error application $_instname does not exist
         return 1
     fi
 
     _mode=$1
-    if [ -z $_mode ]; then
+    if [[ -z "$_mode" ]]; then
         echo Error empty mode string
     fi
 
@@ -1062,14 +1082,14 @@ function init_log_file()
     python3 -c "import sys; sys.stdout.buffer.write((${magic}).to_bytes(4, 'big')); sys.stdout.buffer.write((${counter}).to_bytes(4, 'big')); sys.stdout.buffer.write((${typeid}).to_bytes(2, 'big')); sys.stdout.buffer.write((${recsize}).to_bytes(2, 'big')); sys.stdout.buffer.write((${reserved}).to_bytes(4, 'big')) " > $output
 }
 
-function init_uid_gid()
+function store_uid_gid()
 {
     local path=$1
     local idx=$2
-    if [[ -z "${_usrArray[0]}" ]]; then
-        _usrArray=()
-        _grpArray=()
+    if [[ -z "$idx" ]]; then
+        idx=0
     fi
+
     local _uid
     local _gid
     if [[ ! -f $path ]]; then
@@ -1079,12 +1099,10 @@ function init_uid_gid()
         _uid=$(stat -c "%u" $path)
         _gid=$(stat -c "%g" $path)
     fi 
-    if [[ -z "$idx" ]]; then
-       _usrArray+=($_uid)
-       _grpArray+=($_gid)
-    else
-        _usrArray[$idx]=$_uid
-        _grpArray[$idx]=$_gid
+    if [[ ! -z "$idx" ]]; then
+        userArray[$idx,0]="$_uid"
+        userArray[$idx,1]="$_gid"
+        userArray[$idx,2]="$path"
     fi
 }
 
@@ -1094,21 +1112,42 @@ function get_uid_gid()
     if [[ -z "$idx" ]];then
         idx=0
     fi
-    local uid="${_usrArray[$idx]}"
-    local gid="${_grpArray[$idx]}"
+    local uid="${userArray[$idx,0]}"
+    local gid="${userArray[$idx,1]}"
     echo "$uid $gid"
+}
+
+function restore_uid_gid()
+{
+    if [[ -z "$1" ]];then
+        return 1
+    fi
+    local idx
+    local uid gid path
+    for idx in "$@"; do
+        uid="${userArray[$idx,0]}"
+        gid="${userArray[$idx,1]}"
+        path="${userArray[$idx,2]}"
+        chown $uid:$gid $path
+    done
+    return 0
+}
+
+function current_id()
+{
+    echo $(id -u)
 }
 
 function clear_uid_array()
 {
-    _userArray=()
-    _grpArray=()
+    unset userArray
+    declare -gA userArray
 }
 
 function grant_perm()
 {
     # $1 is a path as the permission template
-    # $2 is the permission to grant either 0002, 0004, or 0006
+    # $2 is the permission to grant either 0001, 0002, 0004, or their combination
     # $3 is the idx of the permission record
 
     if [[ -z "$1" ]] || [[ -z "$2" ]] || [[ -z "$3" ]]; then
@@ -1147,27 +1186,32 @@ function restore_perm()
         return 1
     fi
 
-    idx=$1
-    local _path_="${permArray[$idx,0]}"
-    local _permr_="${permArray[$idx,1]}"
-    local _permw_="${permArray[$idx,2]}"
-    local _permx_="${permArray[$idx,3]}"
+    for idx in "$@"; do
+        local _path_="${permArray[$idx,0]}"
+        local _permr_="${permArray[$idx,1]}"
+        local _permw_="${permArray[$idx,2]}"
+        local _permx_="${permArray[$idx,3]}"
 
-    if (( _permw_ == 1 )); then
-        chmod o-w $_path_
-    fi
-    if (( _permr_ == 1 )); then
-        chmod o-r $_path_
-    fi
-    if (( _permx_ == 1 )); then
-        chmod o-x $_path_
-    fi
+        if [[ -z "$_path_" ]]; then
+            continue;
+        fi
+
+        if (( _permw_ == 1 )); then
+            chmod o-w $_path_
+        fi
+        if (( _permr_ == 1 )); then
+            chmod o-r $_path_
+        fi
+        if (( _permx_ == 1 )); then
+            chmod o-x $_path_
+        fi
+    done
     return 0
 }
 
 function clear_perm_array()
 {
-    permArray=
+    unset permArray
     declare -gA permArray
 }
 
@@ -1195,8 +1239,8 @@ function add_log_link()
         return 22
     fi
 
-    init_uid_gid $_logpath 0
-    init_uid_gid $_userpath 1
+    store_uid_gid $_logpath 0
+    store_uid_gid $_userpath 1
 
     read -r _loguid _loggid <<< $(get_uid_gid 0)
 
@@ -1205,8 +1249,8 @@ function add_log_link()
         return 22;
     fi
 
-    grant_perm $_logpath 0006 0
-    grant_perm $_userpath 0006 1
+    grant_perm $_logpath 0007 0
+    grant_perm $_userpath 0007 1
 
     # setup pointer on log point
 
@@ -1230,7 +1274,7 @@ function add_log_link()
     userlink="$_userapp/$_userpt/ptr$userid"
 
     bexist=0
-    grant_perm $_logpath/logptrs 0006 2
+    grant_perm $_logpath/logptrs 0007 2
     if ! is_dir_empty $_logpath/logptrs; then
         #check if the ptr is already present
         for i in $_logpath/logptrs/*; do
@@ -1267,7 +1311,7 @@ function add_log_link()
     if [[ ! -d $_userpath/logptrs ]]; then
         mkdir $_userpath/logptrs
     fi
-    grant_perm $_userpath/logptrs 0006 3
+    grant_perm $_userpath/logptrs 0007 3
     #chmod o+w $_userpath/logptrs
 
     if ! is_dir_empty $_userpath/logptrs; then
@@ -1302,7 +1346,7 @@ function add_log_link()
         fi
         dt=`python3 $updattr -v $_userpath/datatype`
         typestr=$(type2str $dt)
-        grant_perm $_userpath/logs 00006 4
+        grant_perm $_userpath/logs 0007 4
         if [[ "x" == "x$_logfile" ]]; then
             touch $_userpath/logs/ptr$userid-0
             init_log_file $_userpath/logs/ptr$userid-0 $typestr
@@ -1317,10 +1361,7 @@ function add_log_link()
         python3 $updattr -u 'user.regfs' "$(jsonval d 0.0)" $_userpath/average > /dev/null
     fi
 
-    restore_perm 3
-    restore_perm 2
-    restore_perm 1
-    restore_perm 0
+    restore_perm 3 2 1 0
 
     chown -R $_loguid:$_loggid $_logpath/logptrs 
     chown -R $_loguid:$_loggid $_logpath/logcount
@@ -1356,7 +1397,7 @@ function rm_log_link()
         echo there is no link to delete for "$_userapp:$_userpt"
     else
         link2="$_logapp/$_logpt"
-        grant_perm $_ptrpath 0006 0
+        grant_perm $_ptrpath 0007 0
         pushd $_ptrpath > /dev/null
         for i in *; do
             _peerlink=`python3 $updattr -v $i`
@@ -1397,7 +1438,7 @@ function rm_log_link()
         echo there is no link to delete for "$_logapp:$_logpt"
         return 0
     else
-        grant_perm $_ptrpath2 0006 1
+        grant_perm $_ptrpath2 0007 1
         pushd $_ptrpath2 > /dev/null
         for i in *; do
             _peerlink=`python3 $updattr -v $i`
@@ -1429,9 +1470,9 @@ function show_log_links()
     fi
 
     if [[ -d logs ]]; then
-        direction="-->"
-    else
         direction="<--"
+    else
+        direction="-->"
     fi
     grant_perm logptrs 0004 2
     pushd logptrs > /dev/null
@@ -1454,19 +1495,18 @@ function add_stdapp()
     _user="$2"
     _group="$3"
 
-    if [ -z $_user ]; then
-        _user='admin'
-    fi
-    if [ -z $_group ]; then
-        _group='admin'
+    store_uid_gid ./apps 0
+    if [ -z $_uid ]; then
+        read -r _uid _gid <<< $( get_uid_gid 0 )
     fi
 
-    _uid=`bash $rpcfshow -u $_user | grep 'uid:' | awk '{print $2}'`
-    _gid=`bash $rpcfshow -g $_group | grep 'gid:' | awk '{print $2}'`
-    if [ -z $_uid ] || [ -z $_gid ]; then
-        echo "Error the given user/group not valid"
-        return 22
+    if [[ ! -z "$_user" ]]  then
+        _uid=`bash $rpcfshow -u $_user | grep 'uid:' | awk '{print $2}'`
     fi
+    if [[ ! -z "$_group" ]]; then
+        _gid=`bash $rpcfshow -g $_group | grep 'gid:' | awk '{print $2}'`
+    fi
+
 
     mkdir -p ./apps/$_instname
     pushd ./apps/$_instname > /dev/null
