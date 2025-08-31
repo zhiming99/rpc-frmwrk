@@ -53,6 +53,7 @@ fi
 pushd $rootdir > /dev/null
 
 for appname in "$@"; do
+    echo removing $appname ...
     if ! remove_application $appname; then
         break
     fi
