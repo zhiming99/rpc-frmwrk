@@ -45,5 +45,8 @@ usr/share/man/man1/regfsmnt.1
 usr/share/man/man1/appmonsvr.1
 usr/share/man/man1/sinit.1
 usr/share/man/man1/rpcfctl.1
+usr/share/man/man1/rpcf_sendlog.1
+usr/share/man/man1/rpcf_logger.1
+usr/share/man/man1/apptimer.1
 @JS_DEBFILES@
 

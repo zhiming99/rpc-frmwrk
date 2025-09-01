@@ -353,9 +353,9 @@ case "$cmd" in
             echo Error: please stop the application before removal.
             exit 1
         fi
-        if bash $cmddir/rmapp.sh $1; then
+        if bash $cmddir/rmapp.sh $@; then
             if is_app_online loggersvr1; then
-                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application $1 by rpcfctl"
+                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application(s) $@ by rpcfctl"
             fi
         fi
         ;;
@@ -736,7 +736,26 @@ case "$cmd" in
         appName="$1"
         ptName="$2"
         if check_appreg_mount; then
-            python3 $cmddir/logtool.py -b --root "${rootdir}" "$appName/$ptName"
+            logdir=${rootdir}/apps/$appName/points/$ptName/logs
+            while true; do
+                if ! grant_perm ${rootdir}/apps/$appName 0005 300; then
+                    break
+                fi
+                if ! grant_perm ${rootdir}/apps/$appName/points 0005 301; then
+                    break
+                fi
+                if ! grant_perm $logdir/.. 0005 302; then
+                    break
+                fi
+                if ! grant_perm $logdir 0007 303; then
+                    break
+                fi
+                chmod o+r $logdir/*
+                python3 $cmddir/logtool.py -b --root "${rootdir}" "$appName/$ptName"
+                chmod o-r $logdir/*
+                break
+            done
+            restore_perm 303 302 301 300
             undo_check_appreg_mount
         fi
         ;;
@@ -750,9 +769,26 @@ case "$cmd" in
         appName="$1"
         ptName="$2"
         if check_appreg_mount; then
-            chmod o+w ${rootdir}/apps/$appName/points/$ptName/logs
-            python3 $cmddir/logtool.py -r --root "${rootdir}" "$appName/$ptName"
-            chmod o-w ${rootdir}/apps/$appName/points/$ptName/logs
+            logdir=${rootdir}/apps/$appName/points/$ptName/logs
+            while true; do
+                if ! grant_perm ${rootdir}/apps/$appName 0005 300; then
+                    break
+                fi
+                if ! grant_perm ${rootdir}/apps/$appName/points 0005 301; then
+                    break
+                fi
+                if ! grant_perm $logdir/.. 0005 302; then
+                    break
+                fi
+                if ! grant_perm $logdir 0007 303; then
+                    break
+                fi
+                chmod o+rw $logdir/*
+                python3 $cmddir/logtool.py -r --root "${rootdir}" "$appName/$ptName"
+                chmod o-rw $logdir/*
+                break
+            done
+            restore_perm 303 302 301 300
             undo_check_appreg_mount
         fi
         ;;
@@ -767,7 +803,24 @@ case "$cmd" in
         appName="$1"
         ptName="$2"
         if check_appreg_mount; then
-            python3 $cmddir/logtool.py -l --root "${rootdir}" "$appName/$ptName"
+            logdir=${rootdir}/apps/$appName/points/$ptName/logs
+            while true; do
+                if ! grant_perm ${rootdir}/apps/$appName 0005 300; then
+                    break
+                fi
+                if ! grant_perm ${rootdir}/apps/$appName/points 0005 301; then
+                    break
+                fi
+                if ! grant_perm $logdir/.. 0005 302; then
+                    break
+                fi
+                if ! grant_perm $logdir 0007 303; then
+                    break
+                fi
+                python3 $cmddir/logtool.py -l --root "${rootdir}" "$appName/$ptName"
+                break
+            done
+            restore_perm 303 302 301 300
             undo_check_appreg_mount
         fi
         ;;
@@ -784,11 +837,10 @@ case "$cmd" in
             echo "Error appmonsvr1 is still onlne, please stop it first"
             exit 1
         fi
-        if check_appreg_mount; then
-            pushd ${rootdir} > /dev/null
-            add_log_link $appName $ptName appmonsvr1 ptlogger1
-            popd > /dev/null
-            undo_check_appreg_mount
+        if bash $cmddir/addloglink.sh $@; then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "added loglink $1/$2 from rpcfctl"
+            fi
         fi
         ;;
     disablelog)
@@ -804,11 +856,10 @@ case "$cmd" in
             echo "Error appmonsvr1 is still onlne, please stop it first"
             exit 1
         fi
-        if check_appreg_mount; then
-            pushd ${rootdir} > /dev/null
-            rm_log_link $appName $ptName appmonsvr1 ptlogger1
-            popd > /dev/null
-            undo_check_appreg_mount
+        if bash $cmddir/rmloglink.sh $@; then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "removed loglink $1/$2 from rpcfctl"
+            fi
         fi
         ;;
     *)

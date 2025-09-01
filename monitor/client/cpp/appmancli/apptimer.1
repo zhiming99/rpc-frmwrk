@@ -1,0 +1,104 @@
+.TH APPTIMER 1 "July 2025" "rpc-frmwrk" "Application Timer Utility Manual"
+
+.SH NAME
+apptimer \- rpc-frmwrk application timer and scheduled task utility
+
+.SH SYNOPSIS
+.B apptimer
+[options]
+
+.SH DESCRIPTION
+.B apptimer
+is a timer and scheduler utility for the rpc-frmwrk framework. It is designed to periodically trigger and manage application tasks based on fixed intervals or cron-style schedules. The tool can be used to automate application management, health checks, or other scheduled operations within the rpc-frmwrk environment.
+
+.PP
+apptimer supports both fixed interval and advanced cron expression scheduling. Cron expressions allow you to specify complex schedules for task execution, similar to the standard UNIX cron format but with extended features.
+
+.SH FIXED INTERVAL SUPPORT
+apptimer support 4 set of fixed interval timers, with the point pair from
+<clock1, interval1> to <clock4, interval4>. And the intervals are 10sec, 2sec,
+20sec, and 40sec. And they are configurable at runtime via the monitor tool 'setpv.sh'
+if necessary.
+
+.SH CRON EXPRESSION SUPPORT
+
+A cron expression in apptimer can have the following format:
+
+.nf
+second minute hour day month weekday [year]
+.fi
+
+Each field can contain:
+ - A single value (e.g., "5")
+ - A range (e.g., "1-5")
+ - A list of values (e.g., "1,2,3")
+ - A step value (e.g., "1-10/2")
+ - A wildcard ("*")
+ - A question mark ("?") for "ignored" (used in 'day' or 'weekday' fields)
+ - The valid value ranges are:  
+  - second: 0-59  
+  - minute: 0-59  
+  - hour: 0-23  
+  - day: 1-31  
+  - month: 1-12  
+  - weekday: 0-6 (0=Sunday)  
+  - year: 1900-2100
+
+Special features:
+ - "L" for last day of the month (e.g., "L" or "L-3" for 3 days before the last day)
+ - "5L" for last Friday of the month
+ - "3#2" for the second Wednesday of the month
+ - "12w" for the nearest weekday to the 12th of the month
+
+It is invalid if both 'day' and 'weekday' fields are ignored or neither is ignored.
+
+Example:
+.B
+0 0-59/5 8-18 ? * 1-5
+will schedule a task every 5 minutes between 8 AM and 6 PM, Monday to Friday.
+You can set 'cron expression' by setting the timer's point 'schedule1'.
+Currently, apptimer support one cron timer.
+
+.SH OPTIONS
+.TP
+.B -h
+Show help message and exit.
+.TP
+.B -v
+Show version information and exit.
+.TP
+.B -d
+Enable debug or verbose logging.
+
+.SH FEATURES
+.TP
+- Supports both fixed interval and cron-style scheduling for tasks.
+- Handles signals such as SIGINT and SIGUSR1 for graceful shutdown and remote connection notifications.
+- Integrates with the rpc-frmwrk I/O manager and application management infrastructure.
+- Can be run as a background service or interactively.
+- Provides logging and status output for scheduled tasks.
+
+.SH USAGE
+.TP
+.B apptimer
+Start the timer utility with default settings.
+.TP
+.B apptimer -gd
+Start the timer as a daemon and report import information to log server.
+
+.SH SIGNALS
+.TP
+.B SIGINT
+Gracefully stops the timer and exits.
+.TP
+.B SIGUSR1
+Outputs a message indicating that the remote connection is down.
+
+.SH RETURN VALUE
+Returns 0 on success, non-zero on failure.
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-3.0.html

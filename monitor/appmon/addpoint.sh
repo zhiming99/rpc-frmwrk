@@ -53,7 +53,24 @@ fi
 
 pushd $rootdir > /dev/null
 
-add_point $1 $2 $3 $4
+while true; do
+    if ! grant_perm ./apps/$1 0005 201; then
+        ret = 1
+        break
+    fi
+    if ! grant_perm ./apps/$1/points 0007 202; then
+        ret = 2
+        break
+    fi
+    add_point $1 $2 $3 $4
+    break
+done
+if (( ret <= 1 )); then
+    restore_perm 201
+fi
+if (( ret <= 2 )); then
+    restore_perm 202
+fi
 
 popd > /dev/null
 if (( $mt == 2 )); then
