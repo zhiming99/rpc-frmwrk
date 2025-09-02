@@ -475,18 +475,16 @@ function set_attr_value()
     fi
     grant_perm $_ptpath 0007 40
     created=0
+    grant_perm $_ptpath/$_attr 0006 41
     if (( $_dtnum <= 7 ));then
         if [ ! -f $_ptpath/$_attr ]; then
             touch $_ptpath/$_attr
             created=1
         fi
-        grant_perm $_ptpath/$_attr 0007 41
         python3 $updattr -u 'user.regfs' "$_value" $_ptpath/$_attr > /dev/null
-        restore_perm 41
     else
         echo "$_value" > $_ptpath/$_attr
         # not paired with grant_perm on purpose
-        restore_perm 40
     fi
     if (( created == 1 )); then
         _uname_=$(stat -c "%u" $_ptpath)
@@ -494,7 +492,7 @@ function set_attr_value()
         chown $_uname_:$_gname_ $_ptpath/$_attr
     fi
     ret=$?
-    restore_perm 40 44 45
+    restore_perm 41 40 44 45
     return $ret
 }
 
@@ -528,12 +526,13 @@ function get_attr_value()
         return 22
     fi
     grant_perm $_ptpath 0005 40
+    grant_perm $_ptpath/$_attr 0004 41
     if (( $_dtnum <= 7 ));then
         python3 $updattr -v $_ptpath/$_attr > /dev/null
     else
         cat $_ptpath/$_attr
     fi
-    restore_perm 40 44 45
+    restore_perm 41 40 44 45
     return $?
 }
 
@@ -641,7 +640,7 @@ function rm_link()
         link2="$_appname2/$_ptname2"
         pushd $_ptrpath > /dev/null
         for i in *; do
-            grant_perm $i 0007 31
+            grant_perm $i 0004 31
             _peerlink=`python3 $updattr -v $i`
             restore_perm $i 31
             if [ -z $_peerlink ]; then
@@ -650,7 +649,7 @@ function rm_link()
             if [[ "$_peerlink" != "$link2" ]]; then
                 continue
             fi
-            rm $i
+            rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
             break
         done
@@ -670,7 +669,7 @@ function rm_link()
     else
         pushd $_ptrpath2 > /dev/null
         for i in *; do
-            grant_perm $i 0007 31
+            grant_perm $i 0004 31
             _peerlink=`python3 $updattr -v $i`
             restore_perm 31
             if [ -z $_peerlink ]; then
@@ -679,7 +678,7 @@ function rm_link()
             if [[ "$_peerlink" != "$link" ]]; then
                 continue
             fi
-            rm $i
+            rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
             break
         done

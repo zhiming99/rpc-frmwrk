@@ -26,135 +26,11 @@ source ${cmddir}/appfuncs.sh
 # Usage: rpcfctl <start|stop|status|list> [appname]
 
 function usage() {
-    cat <<EOF
-Usage: $0 <command> [arguments]
-
-Commands:
-    config               config the rpc-frmwrk with rpcfg.py
-
-    start <appname>      Start the application <appname>.
-                         Checks if the application is already running; if not,
-                         retrieves its command line and working directory from
-                         the registry and starts it in the background.
-
-    stop <appname>       Stop the application <appname>.
-                         Sends a SIGINT to the application's process for
-                         graceful shutdown.
-
-    kill <appname>       Forcefully stop the application <appname>.
-                         Sends a SIGKILL to the application's process,
-                         terminating it immediately.
-
-    restart <appname>    Restart the application <appname>.
-                         Stops the application if running, waits for it to exit,
-                         then starts it again.
-
-    status <appname>     Show status of the application <appname>.
-                         Displays whether the application is running and its
-                         current status.
-
-    list                 List all managed applications.
-                         Shows all applications registered in the app registry.
-
-    startall             Start all managed applications.
-                         Starts core services first, then all other registered
-                         applications.
-
-    stopall              Stop all managed applications.
-                         Stops all applications except core services first, then
-                         stops the core services.
-
-    restartall           Restart all managed applications.
-                         Stops all applications and then starts them again.
-
-    addapp <appname>     Add a new application <appname> to the app registry.
-
-    rmapp <appname>      Remove the application <appname> from the app registry.
-
-    initapps             Initialize (clear) the app registry.
-                         WARNING: This will clear your app registry.
-
-    inituser             Initialize (clear) the user registry.
-                         WARNING: This will clear your user registry.
-
-    initsvr              Initialize (clear) both the app registry and user
-                         registry on the server side.
-    initcli              Initialize (clear) both client registry on the client side
-                         
-    importkey            import SSL keys.
-                         command line is "rpcfctl importkey <openssl|gmssl> <private key> <public cert> [<cacert file>]",
-
-                         If you don't know about openssl or gmssl, just use
-                         openssl. key/cert should be in PEM format to import.
-                         The key/cert is now the rpc-frmwrk's SSL connection
-                         key/cert. And be aware that the SSL key/cert used by
-                         'rpc-frmwrk' is not necessarily the one used by your
-                         webserver if WebSocket connection is enabled.
-
-
-    genkeys              Generate self-signed public key/cert pair from command
-                         line. Note that, The newly generated key/cert will not
-                         automatically be applied to the SSL connection. You
-                         need to use either 'rpcfg.py' or the 'importkey'
-                         subcommand to get it done. 
-
-                         command line is "rpcfctl genkeys <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
-                         example: rpcfctl genkeys openssl 1 1
-
-    authmech             Print current authentication mechanism in use, SimpAuth, krb5,
-                         or OAuth2.
-
-    login                Authenticate the user using the authentication mechanism
-                         specified in 'driver.json'
-
-                         For SimpAuth(Password), 'login' saves the credential in
-                         a secure place, and enables non-js client to connect to
-                         rpc-frmwrk server from command line. JS client will
-                         login from the browser.
-
-                         For Kerberos, 'login' preforms the preauth login with
-                         'kinit', to get the ticket-grant-ticket from KDC.  For
-                         OAuth2, 'login' will initiate the
-                         authorization-code-grant process to get a security
-                         token ( not the access token ) from the rpc-frmwrk.
-                         With which, the non-js client can connect to the
-                         rpc-frmwrk.
-
-    backup               Backup server-side settings. The output is a tarball
-                         named rpcf-backup-YYMMHH.tar.gz command line is
-                         'rpcfctl backup'.
-
-    restore              Restore the server-side settings from a tarball.
-                         command line is 'rpcfctl restore <backup file>'
-
-    backuplog <appname> <point name>
-                         Backup all the logs for the specified point.
-
-    rotatelog <appname> <point name>
-                         The log file is max 1MB in size. If it grows over this
-                         limit, a new empty log file is used as current log
-                         file. And all the full log files are shifted with its
-                         name one number bigger. Totally there are 9 log files.
-                         And the last one will be removed.
-
-    listlog <appname> < point name>
-                         List the log files belonging to the specified point.
-
-    enablelog <appname> <point name>
-                         Set up log links for the specified point. It must be
-                         done when the appmonsvr is offline. 
-
-    disablelog <appname> <point name>
-                         Remove the log links for the specified point. It must be
-                         done when the appmonsvr is offline. 
-
-    -h, --help           Show this help message and exit.
-
-EOF
+    echo you can 'man rpcfctl' for detailed introduction.
 }
 
 if [[ $# -lt 1 ]]; then
-    usage
+    echo Error invalid parameters
     exit 1
 fi
 
@@ -376,7 +252,30 @@ case "$cmd" in
         fi
         bash $cmddir/showpoint.sh $1 $2
         ;;
-
+    addpoint)
+        bash $cmddir/addpoint.sh $@
+        ;;
+    rmpoint)
+        bash $cmddir/rmpoint.sh $@
+        ;;
+    setpv)
+        bash $cmddir/setpv.sh $@
+        ;;
+    getpv)
+        bash $cmddir/getpv.sh $@
+        ;;
+    setattr)
+        bash $cmddir/setattr.sh $@
+        ;;
+    getattr)
+        bash $cmddir/setattr.sh $@
+        ;;
+    addlink)
+        bash $cmddir/addlink.sh $@
+        ;;
+    rmlink)
+        bash $cmddir/rmlink.sh $@
+        ;;
     initapps)
         echo Warning 'initapps' will clear the app registry,
         bash $cmddir/initappreg.sh
