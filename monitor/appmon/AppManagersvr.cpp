@@ -784,10 +784,6 @@ gint32 CAppManager_SvrImpl::GetPointValues(
                 if( ERROR( ret ) )
                     break;
                 CFileHandle ofh( pfs, hFile );
-                {
-                    ret = -ENOTSUP;
-                    break;
-                }
                 BufPtr pBuf( true );
 
                 struct stat st;

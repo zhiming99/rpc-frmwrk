@@ -15,10 +15,12 @@ ObjPtr g_pIoMgr;
 #include <signal.h>
 #include <stdlib.h>
 #include <limits.h>
+#include "cronexpr.h"
 
 static std::atomic< bool > g_bExit( false );
 static bool g_bLogging = false;
 static stdstr g_strAppInst = "timer1";
+static TaskletPtr g_pSyncTask;
 
 void SignalHandler( int signum )
 {
@@ -29,7 +31,20 @@ void SignalHandler( int signum )
             "remote connection is down" );
 }
 
-std::atomic< guint32 > g_dwInterval( 10 );
+std::atomic< guint32 > g_arrInterVals[4]=
+    { {10}, {10}, {10}, {10} };
+
+std::atomic< guint32 >& g_dwInterval = g_arrInterVals[ 0 ];
+std::string g_arrSchedule[ 4 ] =
+    { "", "", "", "" };
+std::string& g_strSchedule = g_arrSchedule[ 0 ];
+CronSchedules g_arrCronSched[ 4 ];
+TaskletPtr g_arrTimers[ 4 ];
+
+stdrmutex g_oTimerLock;
+
+stdrmutex& GetTmLock()
+{ return g_oTimerLock; }
 
 struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
 {
@@ -230,13 +245,75 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                 g_strAppInst + "/interval1" )
             {
                 guint32 dwWaitSec = value;
-                if( dwWaitSec> 3600 )
+                if( dwWaitSec> 86400 )
                     break;
 
                 g_dwInterval = dwWaitSec;
                 OutputMsg( 0,
                     "interval changed to %d",
                     dwWaitSec );
+            }
+            else if( strPtPath ==
+                g_strAppInst + "/interval2" )
+            {
+                guint32 dwWaitSec = value;
+                if( dwWaitSec > 86400 )
+                    break;
+
+                g_arrInterVals[ 1 ] = dwWaitSec;
+                DebugPrint( 0,
+                    "interval2 changed to %d",
+                    dwWaitSec );
+            }
+            else if( strPtPath ==
+                g_strAppInst + "/interval3" )
+            {
+                guint32 dwWaitSec = value;
+                if( dwWaitSec > 86400 )
+                    break;
+
+                g_arrInterVals[ 2 ] = dwWaitSec;
+                DebugPrint( 0,
+                    "interval3 changed to %d",
+                    dwWaitSec );
+            }
+            else if( strPtPath ==
+                g_strAppInst + "/interval4" )
+            {
+                guint32 dwWaitSec = value;
+                if( dwWaitSec > 86400 )
+                    break;
+
+                g_arrInterVals[ 3 ] = dwWaitSec;
+                DebugPrint( 0,
+                    "interval3 changed to %d",
+                    dwWaitSec );
+            }
+            else if( strPtPath ==
+                g_strAppInst + "/schedule1" )
+            {
+                CStdRMutex oTimerLock( GetTmLock() );
+                g_strSchedule.clear();
+                BufPtr& pBuf = ( BufPtr& )value;
+                g_strSchedule.append(
+                    pBuf->ptr(), pBuf->size() );
+                DebugPrint( 0,
+                    "schedule1 changed to %d",
+                    g_strSchedule );
+                std::time_t t = std::time(nullptr);
+                std::tm now = *std::localtime(&t);
+                try{
+                    g_arrCronSched[ 0 ].SetExpression(
+                        g_strSchedule );
+                    g_arrCronSched[ 0 ].Start( now );
+                }
+                catch( std::runtime_error& e )
+                {
+                    DebugPrint( 0,
+                        "%s in cron expression: %s",
+                        e.what(),
+                        g_strSchedule.c_str() );
+                }
             }
             else if( strPtPath ==
                 g_strAppInst + "/offline_action" )
@@ -253,6 +330,71 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
         return 0;
     }
 
+    gint32 ClaimAppInstCallback(
+        IConfigDb* context, gint32 iRet,
+        std::vector<KeyValue>& arrPtToGet /*[ In ]*/ ) override
+    {
+        gint32 ret = 0;
+        bool bFirst = false;
+        {
+            CStdRMutex oLock( GetTmLock() );
+            if( g_strSchedule.empty() )
+                bFirst = true;
+        }
+        do{
+            if( ERROR( iRet ) )
+            {
+                ret = iRet;
+                break;
+            }
+            for( auto& kv : arrPtToGet )
+            {
+                if( kv.strKey == "interval1" )
+                {
+                    guint32 dwInterval = kv.oValue;
+                    if( dwInterval > 86400 )
+                        continue;
+                    g_dwInterval = dwInterval;
+                }
+                else if( kv.strKey == "interval2" )
+                {
+                    g_arrInterVals[ 1 ] = kv.oValue;
+                }
+                else if( kv.strKey == "schedule1" )
+                {
+                    BufPtr pBuf = ( BufPtr& )kv.oValue;
+                    if( pBuf.IsEmpty() || pBuf->empty() )
+                        continue;
+                    CStdRMutex oLock( GetTmLock() );
+                    g_strSchedule.clear();
+                    g_strSchedule.append(
+                        pBuf->ptr(), pBuf->size() );
+
+                    std::time_t t = std::time(nullptr);
+                    std::tm now = *std::localtime(&t);
+                    try{
+                        g_arrCronSched[ 0 ].SetExpression(
+                            g_strSchedule );
+                        g_arrCronSched[ 0 ].Start(now);
+                    }
+                    catch( std::runtime_error& e )
+                    {
+                        DebugPrint( 0,
+                            "%s in cron expression: %s",
+                            e.what(),
+                            g_strSchedule.c_str() );
+                    }
+                }
+            }
+
+        }while( 0 );
+        if( !g_pSyncTask.IsEmpty() && bFirst )
+        {
+            g_pSyncTask->SetError( ret );
+            ( *g_pSyncTask )( eventTaskComp );
+        }
+        return ret;
+    }
 };
 
 gint32 InitContext()
@@ -304,7 +446,7 @@ gint32 DestroyContext()
 static void Usage( const char* szName )
 {
     fprintf( stderr,
-        "Usage: %s [OPTIONS] <mount point> \n"
+        "Usage: %s [OPTIONS]\n"
         "\t [ -d to run as a daemon ]\n"
         "\t [ -n <appinst name> specify an alternative apptimer instance, default 'timer1' ]\n"
         "\t [ -g send logs to log server ]\n"
@@ -362,6 +504,11 @@ int main( int argc, char** argv )
         if( ERROR( ret ) )
             break;
 
+        ret = g_pSyncTask.NewObj(
+            clsid( CSyncCallback ) );
+        if( ERROR( ret ) )
+            break;
+
         stdstr strCmdLine(
             SimpleCmdLine( argc, argv ) );
         pMgr->SetCmdLineOpt(
@@ -383,6 +530,11 @@ int main( int argc, char** argv )
         StopStdAppManCli();
     }while( 0 );
 
+    if( !g_pSyncTask.IsEmpty() )
+    {
+        ( *g_pSyncTask )( eventCancelTask );
+        g_pSyncTask.Clear();
+    }
     DestroyContext();
     return ret;
 }
@@ -399,6 +551,83 @@ void WaitForSeconds(double seconds)
     select(0, nullptr, nullptr, nullptr, &tv);
 }
 
+inline bool IsValidInterval(
+    guint32 dwInterval )
+{
+    if( dwInterval == 0 || dwInterval > 86400 )
+        return false;
+    return true;
+}
+
+gint32 TimerFunc( guint8 idx )
+{
+    gint32 ret = 0;
+    do{
+        if( idx < 1 || idx > 3 )
+            return -EINVAL;
+        InterfPtr pProxy;
+        ret = GetAppManagercli( pProxy );
+        if( ERROR( ret ) )
+            break;
+        CAppManager_CliImpl* pam = pProxy;
+        stdstr strPtName = g_strAppInst + "/clock";
+        strPtName.append( 1, ( char )( idx + 0x31 ) );
+        CCfgOpener oCfg;
+        oCfg.SetIntProp( propContext, 2 );
+        Variant var( ( guint32 )1);
+        pam->SetPointValue( oCfg.GetCfg(),
+            strPtName, var );
+    }while( 0 );
+
+    TaskletPtr pTask; 
+    CStdRMutex oLock( GetTmLock() );
+    guint32 dwInterval = g_arrInterVals[ idx ];
+    if( !IsValidInterval( dwInterval ) )
+        dwInterval = 10;
+    ret = ADD_TIMER_FUNC( pTask,
+        dwInterval, g_pIoMgr, TimerFunc, idx );
+    if( SUCCEEDED( ret ) )
+        g_arrTimers[ idx ] = pTask;
+    return ret;
+}
+
+gint32 AddTimerForPointX( char idx )
+{
+    gint32 ret = 0;
+    do{
+        if( idx < 1 || idx > 3 )
+            return -EINVAL;
+        CStdRMutex oLock( GetTmLock() );
+        TaskletPtr pTask;
+        guint32 dwInterval = g_arrInterVals[ idx ];
+        if( !IsValidInterval( dwInterval ) )
+            dwInterval = 10;
+        ret = ADD_TIMER_FUNC( pTask,
+            dwInterval, g_pIoMgr,
+            TimerFunc, ( guint8 )idx );
+        if( ERROR( ret ) )
+            break;
+        g_arrTimers[ idx ] = pTask;
+    }while( 0 );
+    return ret;
+}
+
+gint32 CancelTimerPointX( char idx )
+{
+    gint32 ret = 0;
+    do{
+        if( idx < 1 || idx > 3 )
+            return -EINVAL;
+        CStdRMutex oLock( GetTmLock() );
+        TaskletPtr pTask = g_arrTimers[ idx ];
+        if( pTask.IsEmpty() )
+            break;
+        g_arrTimers[ idx ].Clear();
+        oLock.Unlock();
+        ( *pTask )( eventCancelTask );
+    }while( 0 );
+    return ret;
+}
 //-----Your code begins here---
 gint32 TimerLoop()
 {
@@ -408,6 +637,22 @@ gint32 TimerLoop()
     signal( SIGUSR1, SignalHandler );
 
     guint32 dwTicks = 0;
+
+    if( !g_pSyncTask.IsEmpty() )
+    {
+        CSyncCallback* pSync = g_pSyncTask;
+        pSync->WaitForComplete();
+        ret = pSync->GetError();
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret, "Error in ClaimAppInstCallback" );
+            return ret;
+        }
+    }
+
+    for( int i = 1; i < 2; i++ )
+        AddTimerForPointX( i );
+
     while( !g_bExit )
     {
         dwTicks++;
@@ -431,14 +676,34 @@ gint32 TimerLoop()
         Variant var( ( guint32 )1);
         pam->SetPointValue( oCfg.GetCfg(),
             g_strAppInst + "/clock1", var );
-        OutputMsg( 0, 
-            "Info send clock1 %d",
-            dwTicks );
+        DebugPrint( 0,
+            "Info send clock1 %d", dwTicks );
 
+        CStdRMutex oLock( GetTmLock() );
+        std::time_t t = std::time(nullptr);
+        std::tm now = *std::localtime(&t);
+        try{
+            if( g_arrCronSched[ 0 ].Matches( now ) )
+            {
+                oLock.Unlock();
+                pam->SetPointValue( oCfg.GetCfg(),
+                    g_strAppInst + "/sched_task1", var );
+            }
+        }
+        catch( std::runtime_error& e )
+        {
+            DebugPrint( 0,
+                "%s in cron expression: %s",
+                e.what(),
+                g_strSchedule.c_str() );
+        }
+        oLock.Unlock();
         WaitForSeconds( 1 );
     }
 
     ret = STATUS_SUCCESS;
+    for( int i = 1; i > 0; i-- )
+        CancelTimerPointX( i );
 
     signal( SIGINT, iOldSig );
     return ret;

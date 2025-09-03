@@ -31,6 +31,8 @@ using namespace rpcf;
 #include "security.h"
 #include "sacheck.h"
 
+#define SA_SESS_EXPIRE_TIME ( 3600 * 24 )
+
 namespace rpcf
 {
 
@@ -464,8 +466,14 @@ gint32 CSimpleAuthCliWrapper::IsSessExpired(
     CCfgOpener oCtx( pui );
     guint64 qwTs;
     oCtx.GetQwordProp( propTimestamp, qwTs );
+    Variant oVar;
+    guint32 dwTimeLimit = SA_SESS_EXPIRE_TIME;
+    gint32 ret = m_pRouter->GetProperty(
+        propSessTimeLimit, oVar );
+    if( SUCCEEDED( ret ) )
+        dwTimeLimit = oVar;
     if( tv.tv_sec >=
-        ( ( qwTs >> 32 ) + 3600 * 24 ) )
+        ( ( qwTs >> 32 ) + dwTimeLimit ) )
         return STATUS_SUCCESS;
     return ERROR_FALSE;
 }

@@ -6163,6 +6163,19 @@ gint32 CRpcRouterManager::GetProperty(
                 dwMaxConns );
             break;
         }
+    case propSessTimeLimit:
+        {
+            CStdRMutex oRouterLock( GetLock() );
+            if( m_vecRoutersBdge.size() == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            auto& pRt = m_vecRoutersBdge.front();
+            oRouterLock.Unlock();
+            ret = pRt->GetProperty( iProp, oBuf );
+            break;
+        }
     default:
         {
             ret = -ENOENT;
@@ -6204,6 +6217,20 @@ gint32 CRpcRouterManager::SetProperty(
     case propMaxConns:
         {
             ret = SetMaxConns( ( guint32& )oBuf );
+            break;
+        }
+    case propSessTimeLimit:
+        {
+            CStdRMutex oRouterLock( GetLock() );
+            if( m_vecRoutersBdge.size() == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            auto vecrb = m_vecRoutersBdge;
+            oRouterLock.Unlock();
+            for( auto& pRt : vecrb )
+                pRt->SetProperty( iProp, oBuf );
             break;
         }
     default:

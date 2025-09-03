@@ -36,6 +36,13 @@ extern void SignalHandler( int signum );
 extern std::vector< InterfPtr > g_vecIfs;
 extern stdstr g_strCmd;
 static std::vector< InterfPtr > s_vecIfs;
+stdstr g_strAppInst ="appmonsvr1";
+
+extern gint32 LogPoints(
+    IConfigDb* context, gint32 idx );
+
+extern gint32 RotateLog( gint32 idx );
+extern gint32 UpdateAverages( gint32 idx );
 
 struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
 {
@@ -183,6 +190,37 @@ struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
         }while( 0 );
         return ret;
     }
+
+    //RPC event handler 'OnPointChanged'
+    gint32 OnPointChanged(
+        IConfigDb* context, 
+        const std::string& strPtPath /*[ In ]*/,
+        const Variant& value /*[ In ]*/ ) override
+    {
+        gint32 ret = 0;
+        static std::atomic< guint32 > dwCount = {0};
+        do{
+            if( strPtPath ==
+                g_strAppInst + "/ptlogger1" )
+            {
+                LogPoints( context, 0 );
+                guint32 dwIdx = dwCount++;
+                if( ( dwIdx & 0x07 ) == 0 )
+                    UpdateAverages( 0 );
+            }
+            else if( strPtPath == 
+                g_strAppInst + "/logrotate1" )
+            {
+                RotateLog( 0 );
+            }
+            else
+            {
+                ret = super::OnPointChanged(
+                    context, strPtPath, value );
+            }
+        }while( 0 );
+        return ret;
+    }
 };
 
 gint32 StartLocalAppMancli()
@@ -198,7 +236,7 @@ gint32 StartLocalAppMancli()
     PACBS pacbsIn( new CAMonSvrCallbacks );
     InterfPtr pAppMan;
     return StartStdAppManCli( s_vecIfs[0],
-        "appmonsvr1", pAppMan, pacbsIn );
+        g_strAppInst, pAppMan, pacbsIn );
 }
 
 gint32 StopLocalAppMancli()

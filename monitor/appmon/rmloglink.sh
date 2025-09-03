@@ -10,8 +10,8 @@ OPTIONS="h"
 function Usage()
 {
 cat << EOF
-Usage: $0 [-h] <output app> <output point> <input app> <input point> 
-    This command create a link from an output point to an input point.
+Usage: $0 [-h] <app1> <app1 point> <app2> <app2 point> 
+    This command remove a log link between two points if exist
     -h: Print this help
 EOF
 }
@@ -32,7 +32,7 @@ done
 
 shift $((OPTIND-1))
 
-if [[  "x$@" == "x" ]]; then
+if [[ "x$@" == "x" ]]; then
    echo "Error invalid parameters"
    Usage
    exit 1
@@ -60,23 +60,23 @@ while true; do
         ret = 2
         break
     fi
-    if ! grant_perm ./apps/$1/points/$2 0005 203; then
+    if ! grant_perm ./apps/$1/points/$2 0007 203; then
         ret = 3
         break
     fi
-    if ! grant_perm ./apps/$3 0005 204; then
+    if ! grant_perm ./apps/appmonsvr1 0005 204; then
         ret = 4
         break
     fi
-    if ! grant_perm ./apps/$3/points 0005 205; then
+    if ! grant_perm ./apps/appmonsvr1/points 0005 205; then
         ret = 5
         break
     fi
-    if ! grant_perm ./apps/$3/points/$4 0005 206; then
+    if ! grant_perm ./apps/appmonsvr1/points/ptlogger1 0007 206; then
         ret = 6
         break
     fi
-    add_link $1 $2 $3 $4
+    rm_log_link $1 $2 appmonsvr1 ptlogger1
     break
 done
 if (( ret <= 1 )); then
@@ -102,4 +102,3 @@ popd > /dev/null
 if (( $mt == 2 )); then
     umount $rootdir
 fi
-

@@ -51,6 +51,8 @@ if ! which regfsmnt > /dev/null; then
     exit 1
 fi
 
+source $appfuncs
+
 if [ -z $username ]; then
     username='admin'
 fi
@@ -59,7 +61,6 @@ if [ -z $groupname ]; then
 fi
 
 
-source $appfuncs
 if ! check_appreg_mount; then
     exit $?
 fi
@@ -67,9 +68,11 @@ fi
 pushd $rootdir > /dev/null
 
 for appname in "$@"; do
+    echo adding $appname ...
     if ! add_stdapp $appname $username $groupname; then
         break
     fi
+    add_log_link $appname req_count appmonsvr1 ptlogger1
 done
 
 popd > /dev/null

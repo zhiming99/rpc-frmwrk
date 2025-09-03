@@ -7,7 +7,7 @@ lib_LTLIBRARIES=libappmancli.la
 libappmancli_la_SOURCES= maincli.cpp AppManagercli.cpp SimpleAuthcli.cpp appmon.cpp appmonstruct.cpp IAppStorecli.cpp IDataProducercli.cpp IUserManagercli.cpp AppManagercli.h SimpleAuthcli.h
 libappmancli_la_CPPFLAGS= -I. -I$(mon_dir)/appmon -I$(mon_dir)/registry -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO) 
 
-EXTRA_DIST=
+EXTRA_DIST=crontest.cpp
 
 appmancliincdir=$(includedir)/rpcf/appmancli
 appmancliinc_HEADERS=SimpleAuthcli.h AppManagercli.h IUserManagercli.h IDataProducercli.h IAppStorecli.h
@@ -40,11 +40,11 @@ appmon.ridl:
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
     ls -x
-
+man_MANS=apptimer.1
 apptimer.cpp: $(lib_LTLIBRARIES)
 
 apptimer_PROGRAMS=apptimer
-apptimer_SOURCES=apptimer.cpp
+apptimer_SOURCES=apptimer.cpp cronexpr.cpp cronexpr.h apptimer.1
 apptimer_LDADD=libappmancli.la $(top_srcdir)/ipc/libipc.la \
 $(top_srcdir)/combase/libcombase.la -lutils -lstdc++ -lpthread -ldl $(COMMON_LINK) -L$(top_srcdir)/3rd_party -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc
 apptimer_CPPFLAGS= -I. -I$(mon_dir)/appmon -I$(mon_dir)/registry -I$(top_srcdir)/include -I$(include_dir) -fPIC $(OFFSET_MACRO)

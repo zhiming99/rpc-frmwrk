@@ -10,6 +10,8 @@ else
     exit 1
 fi
 
+updattr=${cmddir}/updattr.py
+
 if [[ -f ../../ipc/driver.json ]]; then
     cfgPath="`pwd`/../../ipc"
 elif [[ "$script_dir" == "/usr/bin" ]]; then
@@ -24,110 +26,11 @@ source ${cmddir}/appfuncs.sh
 # Usage: rpcfctl <start|stop|status|list> [appname]
 
 function usage() {
-    cat <<EOF
-Usage: $0 <command> [arguments]
-
-Commands:
-    start <appname>      Start the application <appname>.
-                         Checks if the application is already running; if not,
-                         retrieves its command line and working directory from
-                         the registry and starts it in the background.
-
-    stop <appname>       Stop the application <appname>.
-                         Sends a SIGINT to the application's process for
-                         graceful shutdown.
-
-    kill <appname>       Forcefully stop the application <appname>.
-                         Sends a SIGKILL to the application's process,
-                         terminating it immediately.
-
-    restart <appname>    Restart the application <appname>.
-                         Stops the application if running, waits for it to exit,
-                         then starts it again.
-
-    status <appname>     Show status of the application <appname>.
-                         Displays whether the application is running and its
-                         current status.
-
-    list                 List all managed applications.
-                         Shows all applications registered in the app registry.
-
-    startall             Start all managed applications.
-                         Starts core services first, then all other registered
-                         applications.
-
-    stopall              Stop all managed applications.
-                         Stops all applications except core services first, then
-                         stops the core services.
-
-    restartall           Restart all managed applications.
-                         Stops all applications and then starts them again.
-
-    addapp <appname>     Add a new application <appname> to the app registry.
-
-    rmapp <appname>      Remove the application <appname> from the app registry.
-
-    initapps             Initialize (clear) the app registry.
-                         WARNING: This will clear your app registry.
-
-    inituser             Initialize (clear) the user registry.
-                         WARNING: This will clear your user registry.
-
-    initsvr              Initialize (clear) both the app registry and user
-                         registry on the server side.
-    initcli              Initialize (clear) both client registry on the client side
-                         
-    importkey            import SSL keys.
-                         command line is "rpcfctl importkey <openssl|gmssl> <private key> <public cert> [<cacert file>]",
-
-                         If you don't know about openssl or gmssl, just use
-                         openssl. key/cert should be in PEM format to import.
-                         The key/cert is now the rpc-frmwrk's SSL connection
-                         key/cert. And be aware that the SSL key/cert used by
-                         'rpc-frmwrk' is not necessarily the one used by your
-                         webserver if WebSocket connection is enabled.
-
-
-    genkeys              Generate self-signed public key/cert pair from command
-                         line. Note that, The newly generated key/cert will not
-                         automatically be applied to the SSL connection. You
-                         need to use either 'rpcfg.py' or the 'importkey'
-                         subcommand to get it done. 
-
-                         command line is "rpcfctl genkeys <openssl|gmssl> <#client keys> <#server keys> [<DNS name>]"
-                         example: rpcfctl genkeys openssl 1 1
-
-    login                Authenticate the user using the authentication mechanism
-                         specified in 'driver.json'
-
-                         For SimpAuth(Password), 'login' saves the credential in
-                         a secure place, and enables non-js client to connect to
-                         rpc-frmwrk server from command line. JS client will
-                         login from the browser.
-
-                         For Kerberos, 'login' preforms the preauth login with
-                         'kinit', to get the ticket-grant-ticket from KDC.  For
-                         OAuth2, 'login' will initiate the
-                         authorization-code-grant process to get a security
-                         token ( not the access token ) from the rpc-frmwrk.
-                         With which, the non-js client can connect to the
-                         rpc-frmwrk.
-
-    backup               Backup server-side settings. The output is a tarball
-                         named rpcf-backup-YYMMHH.tar.gz command line is
-                         'rpcfctl backup'.
-
-    restore              Restore the server-side settings from a tarball.
-                         command line is 'rpcfctl restore <backup file>'
-
-
-    -h, --help           Show this help message and exit.
-
-EOF
+    echo you can 'man rpcfctl' for detailed introduction.
 }
 
 if [[ $# -lt 1 ]]; then
-    usage
+    echo Error invalid parameters
     exit 1
 fi
 
@@ -144,31 +47,41 @@ function is_app_online()
 }
 
 case "$cmd" in
+    config)
+        if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
+            python3 /usr/local/bin/rpcf/rpcfg.py
+        elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then
+            python3 /usr/bin/rpcf/rpcfg.py
+        else
+            echo "Error cannot find rpcfg.py"
+        fi
+        ;;
     start)
         if [[ $# -lt 1 ]]; then
             echo "Error: appname required for 'start'"
             usage
             exit 1
         fi
-        appname="$1"
-        echo "Starting application: $appname"
-        if is_app_online $appname; then
-            echo "Error $appname is still running"
-            exit 1
-        fi
-        cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
-        working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
-        if [[ "x$cmdline" == "x" ]] || [[ "x$working_dir" == "x" ]]; then
-            echo "Error bad command line to start $appname"
-            exit 1
-        fi
-        if [ ! -d $working_dir ]; then
-            echo "Error bad working directory to start $appname"
-            exit 1
-        fi
-        cd $working_dir || exit 1
-        echo $cmdline
-        setsid -f $cmdline
+        for appname in "$@"; do
+            echo "Starting application: $appname"
+            if is_app_online $appname; then
+                echo "Error $appname is still running"
+                exit 1
+            fi
+            cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
+            working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
+            if [[ "x$cmdline" == "x" ]] || [[ "x$working_dir" == "x" ]]; then
+                echo "Error bad command line to start $appname"
+                exit 1
+            fi
+            if [ ! -d $working_dir ]; then
+                echo "Error bad working directory to start $appname"
+                exit 1
+            fi
+            cd $working_dir || exit 1
+            echo $cmdline
+            setsid -f $cmdline > /dev/null 2>&1
+        done
         ;;
     stop)
         if [[ $# -lt 1 ]]; then
@@ -176,29 +89,35 @@ case "$cmd" in
             usage
             exit 1
         fi
-        appname="$1"
-        echo "Stopping application: $appname"
-        if ! is_app_online $appname; then
-            echo "Error $appname is already stopped"
-            exit 1
-        fi
-        if [[ "x$appname" == "xappmonsvr1" ]]; then
-            if check_appreg_mount; then
-                if [ -d ${rootdir}/../appreg ]; then
-                    rootdir=$(dirname $rootdir)
-                    fusermount3 -u ${rootdir}
-                    echo
-                    exit 0
-                fi
-                undo_check_appreg_mount
+        for appname in "$@"; do
+            echo "Stopping application: $appname"
+            if ! is_app_online $appname; then
+                echo "Error $appname is already stopped"
+                exit 1
             fi
-        fi
-        pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
-        if [[ "x$pid" != "x" ]]; then
-            kill -2 $pid
-        else
-            echo Error failed to stop $appname
-        fi
+            if [[ "x$appname" == "xappmonsvr1" ]]; then
+                if check_appreg_mount; then
+                    if [ -d ${rootdir}/../appreg ]; then
+                        rootdir=$(dirname $rootdir)
+                        fusermount3 -u ${rootdir}
+                        echo
+                        exit 0
+                    fi
+                    undo_check_appreg_mount
+                fi
+            fi
+            pid=`bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}'`
+            if [[ "x$pid" != "x" ]]; then
+                if ! kill -2 $pid; then
+                    if check_appreg_mount; then
+                        python3 $updattr -u 'user.regfs' "$(jsonval i 0)" ${rootdir}/apps/$appname/owner_stream > /dev/null
+                        undo_check_appreg_mount
+                    fi
+                fi
+            else
+                echo Error failed to stop $appname
+            fi
+        done
         ;;
     kill)
         if [[ $# -lt 1 ]]; then
@@ -217,31 +136,12 @@ case "$cmd" in
         ;;
     restart)
         if [[ $# -lt 1 ]]; then
-            echo "Error: appname required for 'stop'"
+            echo "Error: appname required for 'restart'"
             usage
             exit 1
         fi
         appname="$1"
-        if is_app_online $appname; then
-            pid=$(bash $cmddir/getpv.sh $appname pid | awk -F: '{print $2}')
-            if [[ "x$pid" != "x" ]]; then
-                kill -2 $pid
-            fi
-        fi
-        if [[ "x$pid" != "x" ]]; then
-            for ((i=0;i<10;i++)); do
-                if [[ -d /proc/$pid ]]; then
-                    echo waiting $appname to quit...
-                    sleep 1
-                    continue
-                fi
-                break
-            done
-            if [[ -d /proc/$pid ]];then
-                kill -9 $pid
-                sleep 1
-            fi
-        fi
+        bash $script_dir/rpcfctl stop $appname
         bash $script_dir/rpcfctl start $appname
         ;;
     status)
@@ -329,9 +229,9 @@ case "$cmd" in
             echo Error: please stop the application before removal.
             exit 1
         fi
-        if bash $cmddir/rmapp.sh $1; then
+        if bash $cmddir/rmapp.sh $@; then
             if is_app_online loggersvr1; then
-                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application $1 by rpcfctl"
+                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application(s) $@ by rpcfctl"
             fi
         fi
         ;;
@@ -344,6 +244,38 @@ case "$cmd" in
         bash $cmddir/showapp.sh $1;
         ;;
 
+    showpoint)
+        if [[ $# -lt 2 ]]; then
+            echo "Error: <appname> and <point name> required for 'showapp'"
+            usage
+            exit 1
+        fi
+        bash $cmddir/showpoint.sh $1 $2
+        ;;
+    addpoint)
+        bash $cmddir/addpoint.sh $@
+        ;;
+    rmpoint)
+        bash $cmddir/rmpoint.sh $@
+        ;;
+    setpv)
+        bash $cmddir/setpv.sh $@
+        ;;
+    getpv)
+        bash $cmddir/getpv.sh $@
+        ;;
+    setattr)
+        bash $cmddir/setattr.sh $@
+        ;;
+    getattr)
+        bash $cmddir/setattr.sh $@
+        ;;
+    addlink)
+        bash $cmddir/addlink.sh $@
+        ;;
+    rmlink)
+        bash $cmddir/rmlink.sh $@
+        ;;
     initapps)
         echo Warning 'initapps' will clear the app registry,
         bash $cmddir/initappreg.sh
@@ -356,7 +288,7 @@ case "$cmd" in
         bash $cmddir/inituser.sh && bash $cmddir/initappreg.sh
         ;;
     initcli)
-        authmech=`rpcfctl authmech`
+        authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$xauthmech" == "xSimpAuth" ]] ||
             [[ "x$xauthmech" == "xOAuth2" ]]; then
             regfsmnt -i $HOME/rpcf/clientreg.dat
@@ -560,12 +492,12 @@ case "$cmd" in
             exit 1;
         fi
         context=`echo $context | sed 's/,/\r\n/g'`
-        mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
-        if [[ "x$mech" == "x" ]]; then
+        _mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
+        if [[ "x$_mech" == "x" ]]; then
             echo None
             exit 1;
         else
-            echo $mech
+            echo $_mech
         fi
         ;;
     geninitcfg)
@@ -586,7 +518,7 @@ case "$cmd" in
         ;;
     cfgkrb5)
         #updating kerberos config
-        authMech=`rpcfctl authmech`
+        authMech=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$authMech" != "xkrb5" ]]; then
             echo "Kerberos is not current authentication mechanism"
             exit 1
@@ -598,8 +530,8 @@ case "$cmd" in
         popd
         ;;
     login)
-        mech=`rpcfctl authmech`
-        if [[ "xmech" == "xSimpAuth" ]]; then
+        mech_=`rpcfctl authmech | tr -d ' \t\n\r'`
+        if [[ "x$mech_" == "xSimpAuth" ]]; then
             cmdline="rpcfctl login <username name>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
@@ -607,7 +539,7 @@ case "$cmd" in
                 exit 1
             fi
             $cmddir/sinit -s $1
-        elif [[ "xmech" == "xOAuth2" ]]; then
+        elif [[ "x$mech_" == "xOAuth2" ]]; then
             cmdline="rpcfctl login <auth url>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
@@ -615,7 +547,7 @@ case "$cmd" in
                 exit 1
             fi
             python3 -m oinit $1
-        elif [[ "xmech" == "xKerberos" ]]; then
+        elif [[ "x$mech_" == "xkrb5" ]]; then
             cmdline="rpcfctl login <user name>"
             if [[ $# -lt 1 ]]; then
                 echo "Error: Missing argument" 
@@ -626,12 +558,15 @@ case "$cmd" in
         fi
         ;;
     backup)
+        cmdline="rpcfctl backup"
         if rpcfctl list | grep online > /dev/null; then
             echo Error some applications are still running.
+            echo $cmdline
+            echo The backup file will be stored in the home directory.
             exit 1
         fi
         rpcfctl geninitcfg > ~/.rpcf/cfgbk.json
-        tarfile=`realpath rpcf-backup-$(date +%Y%m%H).tar.gz`
+        tarfile=`realpath rpcf-backup-$(date +%Y%m%d).tar.gz`
         pushd $HOME > /dev/null
         if tar cf "$tarfile" .rpcf; then
             ret=0
@@ -646,6 +581,7 @@ case "$cmd" in
         fi
         ;;
     restore)
+        cmdline="rpcfctl restore <path to backup file>"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing the backup package to restore" 
             echo $cmdline
@@ -688,6 +624,145 @@ case "$cmd" in
         $SUDOCMD python3 $cmddir/rpcfgnui.py ./cfgbk.json
         echo Restore completed successfully
         popd > /dev/null
+        ;;
+    backuplog)
+        cmdline="rpcfctl backuplog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to do backup"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        if check_appreg_mount; then
+            logdir=${rootdir}/apps/$appName/points/$ptName/logs
+            while true; do
+                if ! grant_perm ${rootdir}/apps/$appName 0005 300; then
+                    break
+                fi
+                if ! grant_perm ${rootdir}/apps/$appName/points 0005 301; then
+                    break
+                fi
+                if ! grant_perm $logdir/.. 0005 302; then
+                    break
+                fi
+                if ! grant_perm $logdir 0007 303; then
+                    break
+                fi
+                chmod o+r $logdir/*
+                python3 $cmddir/logtool.py -b --root "${rootdir}" "$appName/$ptName"
+                chmod o-r $logdir/*
+                break
+            done
+            restore_perm 303 302 301 300
+            undo_check_appreg_mount
+        fi
+        ;;
+    rotatelog)
+        cmdline="rpcfctl rotatelog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to do rotation"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        if check_appreg_mount; then
+            logdir=${rootdir}/apps/$appName/points/$ptName/logs
+            while true; do
+                if ! grant_perm ${rootdir}/apps/$appName 0005 300; then
+                    break
+                fi
+                if ! grant_perm ${rootdir}/apps/$appName/points 0005 301; then
+                    break
+                fi
+                if ! grant_perm $logdir/.. 0005 302; then
+                    break
+                fi
+                if ! grant_perm $logdir 0007 303; then
+                    break
+                fi
+                chmod o+rw $logdir/*
+                python3 $cmddir/logtool.py -r --root "${rootdir}" "$appName/$ptName"
+                chmod o-rw $logdir/*
+                break
+            done
+            restore_perm 303 302 301 300
+            undo_check_appreg_mount
+        fi
+        ;;
+    listlog)
+        cmdline="rpcfctl listlog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to list"
+            echo $cmdline
+            exit 1
+        fi
+
+        appName="$1"
+        ptName="$2"
+        if check_appreg_mount; then
+            logdir=${rootdir}/apps/$appName/points/$ptName/logs
+            while true; do
+                if ! grant_perm ${rootdir}/apps/$appName 0005 300; then
+                    break
+                fi
+                if ! grant_perm ${rootdir}/apps/$appName/points 0005 301; then
+                    break
+                fi
+                if ! grant_perm $logdir/.. 0005 302; then
+                    break
+                fi
+                if ! grant_perm $logdir 0007 303; then
+                    break
+                fi
+                python3 $cmddir/logtool.py -l --root "${rootdir}" "$appName/$ptName"
+                break
+            done
+            restore_perm 303 302 301 300
+            undo_check_appreg_mount
+        fi
+        ;;
+    enablelog)
+        cmdline="rpcfctl enablelog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to enable log for"
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        if is_app_online appmonsvr1; then
+            echo "Error appmonsvr1 is still onlne, please stop it first"
+            exit 1
+        fi
+        if bash $cmddir/addloglink.sh $@; then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "added loglink $1/$2 from rpcfctl"
+            fi
+        fi
+        ;;
+    disablelog)
+        cmdline="rpcfctl disablelog <appName> <point name>"
+        if [[ $# -lt 2 ]]; then
+            echo "Error: requiring 'appname' and 'point name' to disable log for."
+            echo $cmdline
+            exit 1
+        fi
+        appName="$1"
+        ptName="$2"
+        if is_app_online appmonsvr1; then
+            echo "Error appmonsvr1 is still onlne, please stop it first"
+            exit 1
+        fi
+        if bash $cmddir/rmloglink.sh $@; then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "removed loglink $1/$2 from rpcfctl"
+            fi
+        fi
+        ;;
+    clearmount)
+        clear_rpcf_mount
         ;;
     *)
         echo "Unknown command: $cmd"

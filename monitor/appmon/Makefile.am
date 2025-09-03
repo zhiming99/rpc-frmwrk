@@ -4,7 +4,7 @@ include_ipcdir=$(top_srcdir)/ipc
 appmon_PROGRAMS=appmonsvr
 appmonsvr_SOURCES=mainsvr.cpp AppMonitorsvr.cpp AppMonitorsvr.h monconst.h \
 SimpleAuthsvr.cpp SimpleAuthsvr.h AppManagersvr.cpp AppManagersvr.h \
-appmancli.cpp appmonsvr.1 rpcfctl.1
+appmancli.cpp ptlogger.cpp appmonsvr.1 rpcfctl.1
 if ENABLE_FUSE3
 appmonsvr_SOURCES+=monfuse.cpp
 endif
@@ -43,7 +43,7 @@ appmonsvr_CPPFLAGS+= -DFUSE3
 dist_appmonscr_SCRIPTS=initappreg.sh appfuncs.sh \
 addapp.sh addpoint.sh chmodapp.sh getpv.sh listapps.sh rmapp.sh rmlink.sh \
 setpv.sh showpoint.sh addlink.sh chownapp.sh rmattr.sh rmpoint.sh setattr.sh \
-showapp.sh updatekeys.py 
+showapp.sh updatekeys.py logtool.py namedlock.py rmloglink.sh addloglink.sh
 
 dist_rpcfctl_SCRIPTS=rpcfctl
 
@@ -54,7 +54,7 @@ endif
 #appmoncli_CPPFLAGS=$(appmonsvr_CPPFLAGS)
 #appmoncli_LDFLAGS=$(appmonsvr_LDFLAGS)
 
-EXTRA_DIST=appmon.ridl upddesc.py
+EXTRA_DIST=appmon.ridl upddesc.py rpcfctl_cn.md
 
 noinst_LIBRARIES=libappmon.a
 libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp IAppMonitorsvr.cpp IDataProducersvr.cpp IUserManagersvr.cpp appmondesc.json IUserManagersvr.h IDataProducersvr.h IAppMonitorsvr.h IAppStoresvr.h appmon.h appmonstruct.h 

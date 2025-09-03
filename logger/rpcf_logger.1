@@ -1,0 +1,54 @@
+.TH RPCF_LOGGER 1 "July 2025" "rpc-frmwrk" "Logger Server Utility Manual"
+
+.SH NAME
+rpcf_logger \- rpc-frmwrk log server daemon
+
+.SH SYNOPSIS
+.B rpcf_logger
+[options]
+
+.SH DESCRIPTION
+.B rpcf_logger
+is the log server daemon for the rpc-frmwrk framework. It receives, manages, and stores log messages from rpc-frmwrk clients and services. The logger can run in the foreground or as a daemon, supports monitoring mode, and allows output to a specified log file.
+
+.SH OPTIONS
+.TP
+.BI -O " <path>"
+Output log to the file at the given path. If not specified, the default log file is \fI~/.rpcf/log.txt\fR.
+.TP
+.B -o
+Enable monitoring mode. This will attempt to load the application manager client for advanced monitoring features.
+.TP
+.B -d
+Run as a daemon in the background.
+.TP
+.B -v
+Show version information and exit.
+.TP
+.B -h
+Show help message and exit.
+
+.SH USAGE
+.TP
+.B rpcf_logger -O /var/log/rpcf.log
+Start the logger and write logs to /var/log/rpcf.log.
+.TP
+.B rpcf_logger -d
+Run the logger as a background daemon.
+.TP
+.B rpcf_logger -o
+Enable monitoring mode for integration with the application manager.
+
+.SH DETAILS
+On startup, \fBrpcf_logger\fR initializes the rpc-frmwrk class factory and I/O manager, sets up the log file (creating \fI~/.rpcf\fR if necessary), and starts the log service. If monitoring mode is enabled, it attempts to load the application manager client and register callbacks for advanced monitoring.
+
+The logger handles SIGINT (Ctrl+C) and SIGUSR1 signals for graceful shutdown and remote connection notifications. When stopped, it logs a shutdown message and cleans up all resources.
+
+.SH RETURN VALUE
+Returns 0 on success, non-zero on failure.
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-3.0.html

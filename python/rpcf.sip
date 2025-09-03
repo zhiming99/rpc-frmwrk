@@ -48,6 +48,28 @@ extern std::set< guint32 > g_setMsgIds;
 gint32 CheckKeyPass();
 gint32 OpenThisLib();
 extern void* g_pLibHandle;
+
+namespace cpp {
+class PyNamedProcessLock
+{
+    public:
+    
+    stdstr m_strName;
+    std::unique_ptr<CNamedProcessLock> m_pNpl;
+
+    PyNamedProcessLock();
+    PyNamedProcessLock(
+        const PyNamedProcessLock& rhs );
+    PyNamedProcessLock( const stdstr& name );
+
+    PyNamedProcessLock& operator=(
+        const PyNamedProcessLock& rhs );
+    void SetLockName( const std::string& strName );
+    void Acquire();
+    void Release();
+};
+}
+
 %End
 
 %ModuleCode
@@ -152,6 +174,44 @@ gint32 OpenThisLib()
         }
     }while( 0 );
     return ret;
+}
+
+namespace cpp{
+
+PyNamedProcessLock::PyNamedProcessLock()
+{}
+
+PyNamedProcessLock::PyNamedProcessLock(
+    const PyNamedProcessLock& rhs )
+{ m_strName = rhs.m_strName; }
+
+PyNamedProcessLock::PyNamedProcessLock(
+    const stdstr& name )
+{ m_strName = name; }
+
+PyNamedProcessLock& PyNamedProcessLock::operator=(
+    const PyNamedProcessLock& rhs )
+{
+    m_strName = rhs.m_strName;
+    return *this;
+}
+
+void PyNamedProcessLock::SetLockName(
+    const std::string& strName )
+{
+    m_strName = strName;
+}
+
+void PyNamedProcessLock::Acquire()
+{
+    if( m_strName.empty() )
+        return;
+    m_pNpl.reset(
+        new CNamedProcessLock( m_strName ) );
+}
+
+void PyNamedProcessLock::Release()
+{ m_pNpl.reset(); }
 }
 
 %End
@@ -863,6 +923,21 @@ namespace cpp
             a0 = 0;
             sipRes = sipCpp->GetSize( a0 );
         %End
+    };
+
+    class PyNamedProcessLock
+    {
+        public:
+        PyNamedProcessLock(
+            const std::string& strName );
+
+        PyNamedProcessLock(
+            cpp::PyNamedProcessLock& rhs );
+
+        void SetLockName(
+            const std::string& strName );
+        void Acquire();
+        void Release();
     };
 
     cpp::ObjPtr* StartIoMgr(

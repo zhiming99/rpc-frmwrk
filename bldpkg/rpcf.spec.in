@@ -103,6 +103,9 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_mandir}/man1/appmonsvr.1.gz
 %{_mandir}/man1/sinit.1.gz
 %{_mandir}/man1/rpcfctl.1.gz
+%{_mandir}/man1/rpcf_sendlog.1.gz
+%{_mandir}/man1/rpcf_logger.1.gz
+%{_mandir}/man1/apptimer.1.gz
 
 %files devel
 %{_bindir}/ridlc

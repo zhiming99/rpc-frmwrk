@@ -394,7 +394,10 @@ gint32 StoreCredential(
         }
         else
         {
-            pfs->RemoveFile( strCred + ".gmssl" );
+            stdstr strTag = strCred + ".gmssl";
+            gint32 iRet = pfs->Access( strTag, F_OK );
+            if( SUCCEEDED( iRet ) )
+                pfs->RemoveFile( strCred + ".gmssl" );
         }
         // If this is the only credential, set as default
         std::vector<std::string> vecUsers;

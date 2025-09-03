@@ -57,7 +57,7 @@ if [ -z $appname ] || [ -z $ptname ] || [ -z $dt ] || [ -z "$val" ]; then
     Usage
     exit 22
 fi
-if ((bFile==1)); then
+if (( bFile == 1 )); then
     if [ "$dt" != "blob" ] && [ "$dt" != "bytearray" ]; then
         echo Error '-f' is only valid for 'blob' or 'bytearray'
         popd > /dev/null

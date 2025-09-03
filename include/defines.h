@@ -897,6 +897,16 @@ struct CProcessLock
     ~CProcessLock();
 };
 
+struct CNamedProcessLock
+{
+    sem_t* m_pSem = nullptr;
+    stdstr m_strName;
+    stdstr m_strSemName;
+
+    CNamedProcessLock(
+        const stdstr& strLockPath );
+    ~CNamedProcessLock();
+};
 stdstr SimpleCmdLine(
     int argc, char** argv );
 }

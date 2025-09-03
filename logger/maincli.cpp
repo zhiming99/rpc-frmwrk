@@ -195,6 +195,8 @@ void Usage( char* szName )
         "\t [ -t <msg type> one of the type [ EMERG | ALERT | CRITI | ERROR | "
         "WARN | NOTE | INFO ]\n"
         "\t [ -p <pid> logger's pid ]\n"
+        "\t [ -f <file name> specify the soruce file name ]\n"
+        "\t [ -l <line no> specify the line number in the soruce file ]\n"
         "\t [ -n <name> logger's name ]\n"
         "\t [ -v version information ]\n"
         "\t [ -h this help ]\n",

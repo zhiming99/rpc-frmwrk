@@ -311,7 +311,8 @@ class CMainIoLoopT : public T
     {
 
         gint32 ret = 0;
-        SetThreadName( m_strName );
+        if( m_bNewThread )
+            SetThreadName( m_strName );
         SetTid( rpcf::GetTid() );
         super::Start();
         SetTid( 0 );

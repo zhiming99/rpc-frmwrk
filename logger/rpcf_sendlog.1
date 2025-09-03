@@ -1,0 +1,67 @@
+.TH RPCF_SENDLOG 1 "July 2025" "rpc-frmwrk" "Logger Client Utility Manual"
+
+.SH NAME
+rpcf_sendlog \- rpc-frmwrk log sending command-line utility
+
+.SH SYNOPSIS
+.B rpcf_sendlog
+[options] <message>
+
+.SH DESCRIPTION
+.B rpcf_sendlog
+is a command-line tool for sending log messages to the rpc-frmwrk logging service. You can specify log type, module name, process ID, source file name, line number, etc., and send the log content to the remote log service.
+
+.SH OPTIONS
+.TP
+.BI -t " <msg type>"
+Specify the log type. Possible values are:
+.IR EMERG ,
+.IR ALERT ,
+.IR CRITI ,
+.IR ERROR ,
+.IR WARN ,
+.IR NOTE ,
+.IR INFO
+(Default: INFO).
+.TP
+.BI -p " <pid>"
+Specify the process ID for the log (default: current process ID).
+.TP
+.BI -f " <file name>"
+Specify the source file name for the log (default: this program's source file).
+.TP
+.BI -l " <line no>"
+Specify the line number in the source file (default: current line number).
+.TP
+.BI -n " <name>"
+Specify the module name for the log (default: rpcf_sendlog).
+.TP
+.B -v
+Show version information and exit.
+.TP
+.B -h
+Show help message and exit.
+
+.SH ARGUMENTS
+.TP
+.B <message>
+The log message to send (required).
+
+.SH EXAMPLES
+.TP
+Send an INFO log message:
+.B
+rpcf_sendlog "This is a log message"
+.TP
+Send an ERROR log message with a specific module name and process ID:
+.B
+rpcf_sendlog -t ERROR -n mymodule -p 12345 "Something went wrong"
+
+.SH RETURN VALUE
+Returns 0 on success, non-zero on failure.
+
+.SH AUTHOR
+Ming Zhi <woodhead99@gmail.com>
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License version 3.0 as published by the Free Software Foundation at http://www.gnu.org/licenses/gpl-

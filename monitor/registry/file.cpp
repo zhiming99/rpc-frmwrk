@@ -1688,14 +1688,15 @@ gint32 CFileImage::CheckAccess(
         guint32 dwReadFlag;
         guint32 dwWriteFlag;
         guint32 dwExeFlag;
-        if( dwCurUid == dwUid || dwCurUid == 0 )
+        if( dwCurUid == dwUid ||
+            dwCurUid == UID_ADMIN )
         {
             dwReadFlag = S_IRUSR;
             dwWriteFlag = S_IWUSR;
             dwExeFlag = S_IXUSR;
         }
         else if( dwCurGid == dwGid ||
-            dwCurGid == 0 )
+            dwCurGid == GID_ADMIN )
         {
             dwReadFlag = S_IRGRP;
             dwWriteFlag = S_IWGRP;

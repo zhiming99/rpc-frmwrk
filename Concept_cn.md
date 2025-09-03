@@ -116,6 +116,9 @@ RPC是英文Remote Procedure Call的简写。 `rpc-frmwrk`提供了一套运行�
 ## DBus的作用
 DBus是一个本地的消息总线，似乎和RPC关系不大。实际上，`rpc-frmwrk`的服务器预想的运行环境下，不仅会接受来自远程互联网的请求，也会接收到本地服务器的请求，以及转发一些请求到其他的服务器进程。虽然这些服务器也可以使用TCP进行传输，但是比起DBus这类轻量级的IPC传输，就显得笨拙低效了。因此DBus就充当了本地间的通信的通道。服务器端，DBus是必须的组件，而客户端则可以运行在没有DBus的环境中。
 
+## rpcfctl工具
+`rpcfctl`是rpc-frmwrk内建的命令行工具。它由二十多个子命令组成，可以快捷的访问各种rpc-frmwrk的管理，维护和监控工具。有关它的详细信息可以参考[`rpcfctl`](./monitor/appmon/rpcfctl_cn.md)
+
 ## driver.json
 [`driver.json`](./ipc/driver.json)文件是I/O子系统的配置文件。`rpc-frmwrk`会在系统目录安装一份缺省的`driver.json`。该文件主要包括四类配置：
 * 驱动程序数组(Drivers)：每一个数组元素是一个驱动程序的名称，类型，和支持的端口类。驱动程序可以动态或者静态的创建端口对象，并管理这些对象。

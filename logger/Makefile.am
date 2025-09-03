@@ -1,5 +1,6 @@
 rpcf_logger_PROGRAMS=rpcf_logger
-rpcf_logger_SOURCES=mainsvr.cpp logsvrbase.cpp LogServicesvr.cpp logger.h LogServicesvr.h logsvrbase.h
+rpcf_logger_SOURCES=mainsvr.cpp logsvrbase.cpp LogServicesvr.cpp logger.h \
+LogServicesvr.h logsvrbase.h rpcf_logger.1
 
 rpcf_logger_LDADD=../ipc/libipc.la $(COMMON_LINK) \
  ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
@@ -12,6 +13,7 @@ rpcf_loggerdir=$(bindir)
 
 include_ipcdir=$(top_srcdir)/ipc 
 
+man_MANS=rpcf_sendlog.1 rpcf_logger.1
 if BITWIDTH32
 OFFSET_MACRO=-D_FILE_OFFSET_BITS=64
 else
@@ -34,7 +36,7 @@ liblogclidir=$(includedir)/rpcf/ipc
 rpcf_logger_LDFLAGS=-rdynamic
 
 rpcf_sendlog_PROGRAMS=rpcf_sendlog
-rpcf_sendlog_SOURCES=maincli.cpp
+rpcf_sendlog_SOURCES=maincli.cpp rpcf_sendlog.1
 rpcf_sendlog_LDADD=./liblogcli.la ../ipc/libipc.la $(COMMON_LINK) \
  ../combase/libcombase.la -lutils -lstdc++ -lcppunit \
  -L$(top_srcdir)/combase -L$(top_srcdir)/ipc \

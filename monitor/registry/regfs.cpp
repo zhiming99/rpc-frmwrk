@@ -481,6 +481,7 @@ gint32 CRegistryFs::CreateFile(
     CAccessContext* pac )
 {
     gint32 ret = 0;
+    bool bCreated = false;
     do{
         READ_LOCK( this );
         FImgSPtr dirPtr;
@@ -506,6 +507,13 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
+        if( pac )
+        {
+            pFile->SetUid( pac->dwUid );
+            pFile->SetGid( pac->dwGid );
+        }
+
+        bCreated = true;
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
@@ -532,6 +540,10 @@ gint32 CRegistryFs::CreateFile(
         m_mapOpenFiles[ hFile ] = pOpenFile;
 
     }while( 0 );
+    if( ERROR( ret ) && bCreated )
+    {
+        this->RemoveFile( strPath, pac );
+    }
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error create file '%s'",
@@ -615,22 +627,17 @@ gint32 CRegistryFs::CloseFileNoLock(
         FileSPtr pFile = itr->second;
         m_mapOpenFiles.erase( itr );
         oLock.Unlock();
-        ret = pFile->Close();
-        if( ret != STATUS_MORE_PROCESS_NEEDED )
-            break;
 
-        ret = 0;
         FImgSPtr dirPtr;
-        stdstr strNormPath;
         FImgSPtr pImg = pFile->GetImage();
         CDirImage* pDir = pImg->GetParentDir();
         if( pDir == nullptr )
-        {
-            ret = -EFAULT;
-            OutputMsg( ret, "Error ,Internal error " 
-                "occurs during closing file" ); 
             break;
-        }
+        dirPtr = pDir;
+
+        ret = pFile->Close();
+        if( ret != STATUS_MORE_PROCESS_NEEDED )
+            break;
 
         const stdstr& strPath = pFile->GetPath();
         std::string strFile =
@@ -1995,6 +2002,7 @@ gint32 CRegistryFs::CreateFile(
     CAccessContext* pac )
 {
     gint32 ret = 0;
+    bool bCreated = false;
     do{
         READ_LOCK( this );
         FImgSPtr ptrDir;
@@ -2022,6 +2030,13 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
+        if( pac )
+        {
+            pFile->SetUid( pac->dwUid );
+            pFile->SetGid( pac->dwGid );
+        }
+
+        bCreated = true;
         FileSPtr pOpenFile;
         ret = COpenFileEntry::Create( 
             ftRegular, pOpenFile,
@@ -2048,6 +2063,10 @@ gint32 CRegistryFs::CreateFile(
         m_mapOpenFiles[ hFile ] = pOpenFile;
 
     }while( 0 );
+    if( ERROR( ret ) && bCreated )
+    {
+        this->RemoveFile( hDir, strFile, pac );
+    }
     if( ERROR( ret ) )
     {
         DebugPrint( ret, "Error create file '%s'",
