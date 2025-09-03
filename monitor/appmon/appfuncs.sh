@@ -101,6 +101,22 @@ function check_appreg_mount()
     return 0
 }
 
+function clear_rpcf_mount()
+{
+    mp=`mount | grep '^regfsmnt' | awk '{print $3}'`
+    if [ "x$mp" != "x" ];then
+        for i in $mp; do
+            umount $i
+        done
+    fi
+    mp=`mount | grep appmonsvr | awk '{print $3}'`
+    if [ "x$mp" != "x" ];then
+        for i in $mp; do
+            umount $i
+        done
+    fi
+}
+
 function str2type()
 {
     if [ -z $1 ];then

@@ -761,6 +761,9 @@ case "$cmd" in
             fi
         fi
         ;;
+    clearmount)
+        clear_rpcf_mount
+        ;;
     *)
         echo "Unknown command: $cmd"
         usage
