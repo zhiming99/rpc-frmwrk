@@ -43,6 +43,24 @@ rpcfctl <命令> [参数]
 - **restartall**  
   重启所有受管应用。
 
+---
+
+## 注册表的初始化
+
+- **initapps**  
+  初始化（清空）应用注册表。**警告：此操作会清空应用注册表。**
+
+- **inituser**  
+  初始化（清空）用户注册表。**警告：此操作会清空用户注册表。**
+
+- **initsvr**  
+  初始化服务器端的应用和用户注册表。等价于执行inituser和initapps.
+
+- **initcli**  
+  初始化客户端运行环境，用于需要安全认证的客户端。
+
+## 应用的注册和配置管理
+
 - **addapp <应用名>**  
   添加新应用到注册表。
 
@@ -51,10 +69,6 @@ rpcfctl <命令> [参数]
 
 - **showapp <应用名>**  
   显示指定应用的详细信息。
-
----
-
-## 设置点(setpoint)的管理
 
 - **addpoint <应用名> <点名> <点类型> <值类型>**  
   向应用添加新点。点类型为 input、output 或 setpoint，值类型为 b(byte)、w(word)、i(int)、q(int64)、d(double)、f(float)、s(string, 小于94字符)、blob。
@@ -74,10 +88,6 @@ rpcfctl <命令> [参数]
 - **getattr <应用名> <点名> <属性>**  
   获取指定应用点的属性值。
 
----
-
-## 链接管理
-
 - **addlink <输出应用> <输出点> <输入应用> <输入点>**  
   在注册表中添加一对输出点和输入点之间的链接。
 
@@ -86,21 +96,7 @@ rpcfctl <命令> [参数]
 
 ---
 
-## 注册表管理
-
-- **initapps**  
-  初始化（清空）应用注册表。**警告：此操作会清空应用注册表。**
-
-- **inituser**  
-  初始化（清空）用户注册表。**警告：此操作会清空用户注册表。**
-
-- **initsvr**  
-  初始化服务器端的应用和用户注册表。等价于执行inituser和initapps.
-
-- **initcli**  
-  初始化客户端运行环境，用于需要安全认证的客户端。
-
-## 用户管理
+## 用户和用户组的管理
 - **adduser <用户名>**  
   添加用户到用户注册表。
 
@@ -164,7 +160,7 @@ rpcfctl <命令> [参数]
   打印证书详细信息。
 
 - **authmech**  
-  显示当前使用的认证机制。
+  打印当前使用的认证机制。
 
 - **login [参数]**  
   使用 driver.json 中指定的认证机制进行用户认证。  
@@ -195,7 +191,6 @@ rpcfctl <命令> [参数]
 
 ## 其他
 - **clearmount**  
-  卸载所有的注册表文件系统，包括用户注册表和应用程序注册表。
 
 - **-h, --help**  
   显示帮助信息并退出。
@@ -218,7 +213,7 @@ rpcfctl login alice
 
 ## 相关文件
 
-- showapp.sh, getpv.sh, setpv.sh, listapps.sh, addapp.sh, rmapp.sh, initappreg.sh, inituser.sh, updattr.py, updatekeys.py, rpcfaddu.sh, rpcfrmu.sh, rpcfshow.sh, rpcfaddg.sh, rpcfrmg.sh, rpcfmodu.sh, updwscfg.sh, updk5cfg.sh, sinit, oinit.py, rpcfg.py  
+- showapp.sh, getpv.sh, setpv.sh, listapps.sh, addapp.sh, rmapp.sh, initappreg.sh, inituser.sh, updattr.py, updatekeys.py, rpcfaddu.sh, rpcfrmu.sh, rpcfshow.sh, rpcfaddg.sh, rpcfrmg.sh, rpcfmodu.sh, updwscfg.sh, updk5cfg.sh, sinit, oinit.py, rpcfg.py logtool.py 
   这些辅助脚本通常与 rpcfctl 位于同一目录或 `rpcf` 子目录下。
 
 ## 名词解释

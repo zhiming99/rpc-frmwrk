@@ -10,8 +10,9 @@ OPTIONS="afk:o:g:hp"
 function Usage()
 {
 cat << EOF
-Usage: $0 [-hpf][-k <kerberos user> ] [ -o <OAuth2 user> ] [ -g group ] <user name>
-    <user name> the user name to add, which must be a valid Linux user name.
+Usage: $0 [-hpf][-k <kerberos user> ] [ -o <OAuth2 user> ] [ -g group ] <user name> [<user id>]
+    <user name> the user name to add, which must be a valid user name.
+    <user id> is a integer number that associates with the user name.
     -h: print this help
     -f: force adding a user whether the user exists or not
     -p: ask for password
@@ -61,12 +62,31 @@ if [[  "x$@" == "x" ]]; then
    exit 1
 fi
 
+uname="$1"
+uidval=
+
 source $pubfuncs
 check_user_mount
 
+pushd $rootdir > /dev/null
+if [[ ! -z "$2" ]]; then
+    if [[ "$2" =~ ^-?[0-9]+$ ]] && (( $2 > 0 )) && (( $2 < 1000000 )); then
+        uidval="$2"
+    else
+        echo Error invalid user id
+        Usage
+        exit 1
+    fi
+
+    if [ -f ./uids/$uidval ]; then
+        echo "Error user id '$uidval' already exists"
+        exit 1
+    fi
+fi
+
 # check if group is valid if specified
 if [ "x$group" != "x" ]; then
-    if [ ! -d $rootdir/groups/$group ]; then
+    if [ ! -d ./groups/$group ]; then
         echo "Error the group specified does not exist."
         exit 1
     fi
@@ -74,53 +94,48 @@ else
     group="default"
 fi
 
-pushd $rootdir > /dev/null
-echo start adding user $@ ...
-for uname in "$@"; do
-    if [ -d ./users/$uname ] && [ "$force" == "false" ]; then
-        echo "Error user '$uname' already exists"
-        exit 1
-    fi
-    mkdir -p ./users/$uname || [ "$force" == "true" ]
-    udir=$rootdir/users/$uname
-    if [ ! -f $udir/uid ];then
-        touch $udir/uid
-        uidval=`python3 ${updattr} -a 'user.regfs' 1 ./uidcount`
-        python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid > /dev/null
-        echo $uidval > $udir/uid
-    else
-        uidval=`python3 ${updattr} -v $udir/uid`
-        if [ "$uidval" == "None" ]; then
-            #uid was not set due to last failure
-            uidval=`python3 ${updattr} -a 'user.regfs' 1 ./uidcount`
-            python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid > /dev/null
-            echo $uidval > $udir/uid
-        fi
-    fi
-    if (( $askPass == 1 )); then
-        set_password $uname
-    fi
+echo start adding user $uname ...
+if [ -d ./users/$uname ] && [ "$force" == "false" ]; then
+    echo "Error user '$uname' already exists"
+    exit 1
+fi
+mkdir -p ./users/$uname || [ "$force" == "true" ]
+udir=$rootdir/users/$uname
+if [ ! -f $udir/uid ];then
+    touch $udir/uid
+fi
 
-    if [ ! -d $udir/groups ]; then
-        mkdir $udir/groups
-    fi
+if [[ -z "$uidval" ]]; then
+    uidval=`python3 ${updattr} -a 'user.regfs' 1 ./uidcount`
+fi
 
-    # link the user to the group's users dir
-    # and link the group to the user's groups dir
-    join_group $group $uname
+python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$uidval}" $udir/uid > /dev/null
+echo $uidval > $udir/uid
 
-    if [ "x$krb5user" != "x" ]; then
-        assoc_krb5user $krb5user $uname
-    fi
+if (( $askPass == 1 )); then
+    set_password $uname
+fi
 
-    if [ "x$oa2user" != "x" ]; then
-        assoc_oa2user $oa2user $uname
-    fi
-    datestr=`date` 
-    touch $udir/date
-    python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" $udir/date > /dev/null 
-    echo $datestr > $udir/date
-done
+if [ ! -d $udir/groups ]; then
+    mkdir $udir/groups
+fi
+
+# link the user to the group's users dir
+# and link the group to the user's groups dir
+join_group $group $uname
+
+if [ "x$krb5user" != "x" ]; then
+    assoc_krb5user $krb5user $uname
+fi
+
+if [ "x$oa2user" != "x" ]; then
+    assoc_oa2user $oa2user $uname
+fi
+datestr=`date` 
+touch $udir/date
+python3 $updattr -u 'user.regfs' "{\"t\":7,\"v\":\"$datestr\"}" $udir/date > /dev/null 
+echo $datestr > $udir/date
+
 popd > /dev/null
 if (( $mt == 2 )); then
     if [ -d $rootdir ]; then
@@ -128,4 +143,4 @@ if (( $mt == 2 )); then
         rmdir $rootdir > /dev/null 2>&1
     fi
 fi
-echo "adding user(s) $@ done"
+echo "added user $uname done"

@@ -404,13 +404,13 @@ case "$cmd" in
         fi
         ;;
     adduser)
-        cmdline="rpcfctl adduser <user name>"
+        cmdline="rpcfctl adduser <user name> [<user id>]"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing argument" 
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfaddu.sh $1
+        bash $cmddir/rpcfaddu.sh $@
         ;;
     rmuser)
         cmdline="rpcfctl rmuser <user name>"
@@ -419,7 +419,7 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfrmu.sh $1
+        bash $cmddir/rpcfrmu.sh $@
         ;;
     showuser)
         cmdline="rpcfctl showuser <user name>"
@@ -459,7 +459,7 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfaddg.sh $1
+        bash $cmddir/rpcfaddg.sh $@
         ;;
     rmgroup)
         cmdline="rpcfctl rmgroup <group name>"
@@ -468,7 +468,7 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfrmg.sh $1
+        bash $cmddir/rpcfrmg.sh $@
         ;;
     showgroup)
         cmdline="rpcfctl showgroup <group name>"
