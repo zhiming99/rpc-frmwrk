@@ -240,7 +240,6 @@ function add_group()
 
     local _gidval=
     if [[ ! -z "$2" ]]; then
-        echo haha $2
         if [[ "$2" =~ ^-?[0-9]+$ ]] && (( $2 > 0 )) && (( $2 < 1000000 )); then
             _gidval="$2"
         else
@@ -260,7 +259,6 @@ function add_group()
         echo Error failed to create  groups/$_group/gid $?
     fi
 
-    echo bobo $_gidval
     if [[ -z "$_gidval" ]]; then
         _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
     fi
