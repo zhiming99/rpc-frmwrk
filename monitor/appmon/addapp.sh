@@ -67,15 +67,24 @@ fi
 
 pushd $rootdir > /dev/null
 
+ret=0
 for appname in "$@"; do
     echo adding $appname ...
-    if ! add_stdapp $appname $username $groupname; then
+    add_stdapp $appname $username $groupname
+    ret=$?
+    if (( ret != 0 )); then
         break
     fi
     add_log_link $appname req_count appmonsvr1 ptlogger1
+    ret=$?
+    if (( ret != 0 )); then
+        break
+    fi
 done
 
 popd > /dev/null
 if (( $mt == 2 )); then
     umount $rootdir
 fi
+
+exit $ret

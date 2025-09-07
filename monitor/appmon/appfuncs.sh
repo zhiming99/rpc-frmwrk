@@ -302,7 +302,6 @@ function add_point()
     fi
     _ptpath=./apps/$_appname/points/$_ptname
     if ! mkdir -p $_ptpath; then
-        echo haha
         return $?
     fi
 
@@ -484,14 +483,18 @@ function set_attr_value()
         return 2
     fi
     _dtnum=$(str2type $_dt)
-    if [ -z $_dtnum ]; then
+    if [[ -z "$_dtnum" ]]; then
         echo Error bad data type $_dt@$_appname/$_ptname
         restore_perm 44 45
         return 22
     fi
     grant_perm $_ptpath 0007 40
     created=0
-    grant_perm $_ptpath/$_attr 0006 41
+    local _idx=
+    if [[ -f $_ptpath/$_attr ]]; then
+        _idx=41
+        grant_perm $_ptpath/$_attr 0006 41
+    fi
     if (( $_dtnum <= 7 ));then
         if [ ! -f $_ptpath/$_attr ]; then
             touch $_ptpath/$_attr
@@ -508,7 +511,7 @@ function set_attr_value()
         chown $_uname_:$_gname_ $_ptpath/$_attr
     fi
     ret=$?
-    restore_perm 41 40 44 45
+    restore_perm $_idx 40 44 45
     return $ret
 }
 
@@ -588,9 +591,15 @@ function set_attr_blob()
         return 22
     fi
     grant_perm $_ptpath 0007 40
-    grant_perm $_ptpath/$_attr 0002 41
+
+    local _idx=
+    if [[ -f $_ptpath/$_attr ]]; then
+        _idx=41
+        grant_perm $_ptpath/$_attr 0002 41
+    fi
+
     cat $_file > $_ptpath/$_attr
-    restore_perm 41 40 44 45
+    restore_perm $_idx 40 44 45
     return $?
 }
 
@@ -1375,6 +1384,7 @@ function add_log_link()
     chown -R $_uid:$_gid $_userpath/logptrs
     chown -R $_uid:$_gid $_userpath/logs
     chown -R $_uid:$_gid $_userpath/logcount
+    return 0
 }
 
 function rm_log_link()
@@ -1488,13 +1498,13 @@ function add_stdapp()
         return 1
     fi
 
-    _user="$2"
-    _group="$3"
+    local _user="$2"
+    local _group="$3"
 
     store_uid_gid ./apps 70
     local _uid_ _gid_
     if [ -z "$_uid_" ]; then
-        read -r _uid_ _gid_ <<< $( get_uid_gid 0 )
+        read -r _uid_ _gid_ <<< $( get_uid_gid 70 )
     fi
 
     if [[ ! -z "$_user" ]]  then
