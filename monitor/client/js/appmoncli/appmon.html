@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RPC-Framework Monitor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    #status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    @media (max-width: 600px) {
+      .card { margin-bottom: 1rem; }
+      #config-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <span id="status-dot" class="bg-success"></span>
+      <span class="navbar-brand mb-0 h1">RPC-Framework Monitor</span>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><button id="config-btn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">Update Config</button></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-3">
+    <div class="row" id="metrics-row">
+      <!-- Example status cards -->
+      <div class="col-12 col-md-6 col-lg-3 mb-3">
+        <div class="card text-center">
+          <div class="card-body">
+            <h5 class="card-title">App Status</h5>
+            <p class="card-text" id="app-status">Loading...</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3 mb-3">
+        <div class="card text-center">
+          <div class="card-body">
+            <h5 class="card-title">CPU Usage</h5>
+            <p class="card-text" id="cpu-usage">--</p>
+          </div>
+        </div>
+      </div>
+      <!-- Add more cards as needed -->
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <div class="card mb-3">
+          <div class="card-header">Logs</div>
+          <div class="card-body" style="max-height:200px; overflow-y:auto;">
+            <pre id="logs-panel" class="mb-0">Loading logs...</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Config Modal -->
+  <div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="config-form">
+        <div class="modal-header">
+          <h5 class="modal-title" id="configModalLabel">Update Configuration</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="config-param" class="form-label">Parameter</label>
+            <input type="text" class="form-control" id="config-param" required>
+          </div>
+          <div class="mb-3">
+            <label for="config-value" class="form-label">Value</label>
+            <input type="text" class="form-control" id="config-value" required>
+          </div>
+          <div id="config-feedback" class="text-danger small"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Update</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="text-center text-muted py-3">
+    rpc-frmwrk &copy; 2025
+  </footer>
+  <!--p id="log">RPC-Framework Monitor<br /></p>-->
+  <script src="dist/appmon.js"></script>
+  <p id="rpcf_load_notify"><br /></p>
+  <script>
+    globalThis.g_bAuth = false
+    globalThis.g_strAuthMech = ""
+
+    var iChecks = 0;
+    function checkProxyState(){
+        if( globalThis.oProxy === undefined ){
+            setTimeout( checkProxyState, 2000 );
+            console.log( "Waiting RPC connection ready..." );
+        }else if( globalThis.oProxy === null ){
+            console.log( "RPC connection is shutdown abnormally..." );
+        }else if( globalThis.oProxy.m_iState === 0 ){
+            console.log( "RPC connection is down..." );
+            globalThis.oProxy = null;
+        }else{
+            if( iChecks++ === 0 )
+                console.log( "RPC connection ready " + globalThis.oProxy );
+            setTimeout( checkProxyState, 5000 );
+        }
+    }
+    setTimeout( checkProxyState, 2000 );
+    //# sourceURL=rpcf://htmlcode/checkstate.js
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Example: Simulate data fetching
+    function fetchStatus() {
+      // Replace with your JS API call
+      document.getElementById('app-status').textContent = 'Running';
+      document.getElementById('cpu-usage').textContent = '12%';
+      document.getElementById('status-dot').className = 'bg-success';
+    }
+    function fetchLogs() {
+      // Replace with your JS API call
+      document.getElementById('logs-panel').textContent = '[2025-07-01 10:00] App started\n[2025-07-01 10:05] Health check OK';
+    }
+    setInterval(fetchStatus, 5000);
+    setInterval(fetchLogs, 7000);
+    fetchStatus();
+    fetchLogs();
+
+    // Config update handler
+    document.getElementById('config-form').onsubmit = function(e) {
+      e.preventDefault();
+      const param = document.getElementById('config-param').value;
+      const value = document.getElementById('config-value').value;
+      // TODO: Replace with your JS API call to update config
+      // Example:
+      // oProxy.updateConfig(param, value).then(...);
+      document.getElementById('config-feedback').textContent = 'Config updated (simulated)';
+      setTimeout(() => {
+        document.getElementById('config-feedback').textContent = '';
+        bootstrap.Modal.getInstance(document.getElementById('configModal')).hide();
+      }, 1000);
+    };
+  </script>
+</body>
+</html>
