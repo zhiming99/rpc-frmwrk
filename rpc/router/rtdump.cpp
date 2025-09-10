@@ -226,8 +226,34 @@ gint32 DumpBdgeList(
                 propConnParams, pConn );
             if( SUCCEEDED( ret ) )
             {
-                oBridge[ "ConnParams" ] =
+                Json::Value oConnVal =
                     DumpConnParams( pConn );
+                ret = oIfCfg.GetPointer(
+                    propRmtConnParams, pConn );
+                if( SUCCEEDED( ret ) )
+                {
+                    CCfgOpener oRmtConn( pConn );
+                    stdstr strVal;
+                    guint32 dwPort;
+                    ret = oRmtConn.GetStrProp(
+                        propSrcIpAddr, strVal );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "SrcIpAddr" ] = strVal;
+                    ret = oRmtConn.GetIntProp(
+                        propSrcTcpPort, dwPort );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "SrcPortNum" ] = dwPort;
+                    ret = oRmtConn.GetStrProp(
+                        propDestIpAddr, strVal );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "DestIpAddr" ] = strVal;
+                    ret = oRmtConn.GetIntProp(
+                        propDestTcpPort, dwPort );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "DestPortNum" ] = dwPort;
+                }
+
+                oBridge[ "ConnParams" ] = oConnVal;
             }
 
             ret = oIfCfg.GetIntProp(
@@ -674,8 +700,34 @@ gint32 DumpSessions(
                 propConnParams, pConn );
             if( SUCCEEDED( ret ) )
             {
-                oBridge[ "ConnParams" ] =
+                Json::Value oConnVal =
                     DumpConnParams( pConn );
+                ret = oIfCfg.GetPointer(
+                    propRmtConnParams, pConn );
+                if( SUCCEEDED( ret ) )
+                {
+                    CCfgOpener oRmtConn( pConn );
+                    stdstr strVal;
+                    guint32 dwPort;
+                    ret = oRmtConn.GetStrProp(
+                        propSrcIpAddr, strVal );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "SrcIpAddr" ] = strVal;
+                    ret = oRmtConn.GetIntProp(
+                        propSrcTcpPort, dwPort );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "SrcPortNum" ] = dwPort;
+                    ret = oRmtConn.GetStrProp(
+                        propDestIpAddr, strVal );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "DestIpAddr" ] = strVal;
+                    ret = oRmtConn.GetIntProp(
+                        propDestTcpPort, dwPort );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "DestPortNum" ] = dwPort;
+                }
+
+                oBridge[ "ConnParams" ] = oConnVal;
             }
             if( pas == nullptr )
             {

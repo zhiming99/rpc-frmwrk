@@ -318,6 +318,25 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
             propTimestamp, tv.tv_sec );
         oParams.Push( BRIDGE_PROXY_GREETINGS );
 
+        CCfgOpenerObj oIfCfg( this );
+        IConfigDb* pConn;
+        ret = oIfCfg.GetPointer(
+            propConnParams, pConn );
+        if( ERROR( ret ) )
+            break;
+
+        oParams.CopyProp(
+            propSrcIpAddr, pConn );
+
+        oParams.CopyProp(
+            propSrcTcpPort, pConn );
+
+        oParams.CopyProp(
+            propDestTcpPort, pConn );
+
+        oParams.CopyProp(
+            propDestIpAddr, pConn );
+
         TaskletPtr pRespCb;
         NEW_PROXY_RESP_HANDLER2(
             pRespCb, ObjPtr( this ),
@@ -5294,6 +5313,20 @@ gint32 CRpcTcpBridge::Handshake(
                 oParams.CopyProp( 
                     propMaxPendings, this );
             }
+
+            CCfgOpener oRmtConn;
+            oRmtConn.CopyProp(
+                propSrcIpAddr, pInfo );
+            oRmtConn.CopyProp(
+                propSrcTcpPort, pInfo );
+            oRmtConn.CopyProp(
+                propDestIpAddr, pInfo );
+            oRmtConn.CopyProp(
+                propDestTcpPort, pInfo );
+
+            CCfgOpenerObj oIfCfg( this );
+            oIfCfg.SetObjPtr( propRmtConnParams,
+                ObjPtr( oRmtConn.GetCfg() ) );
         }
 
         if( IsRfcEnabled() )
