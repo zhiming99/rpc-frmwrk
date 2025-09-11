@@ -59,10 +59,24 @@ WebSocketFrameType WebSocket::parseHandshake(unsigned char* input_frame, int inp
 				string header_key(header, 0, pos);
 				string header_value(header, pos+1);
 				trim(header_value);
-				if(header_key == "Host") this->host = header_value;
-				else if(header_key == "Origin") this->origin = header_value, bValid = true;
-				else if(header_key == "Sec-WebSocket-Key") this->key = header_value, bValid = true;
-				else if(header_key == "Sec-WebSocket-Protocol") this->protocol = header_value, bValid = true;
+				if(header_key == "Host")
+                    this->host = header_value;
+				else if(header_key == "Origin")
+                    this->origin = header_value, bValid = true;
+				else if(header_key == "Sec-WebSocket-Key")
+                    this->key = header_value, bValid = true;
+				else if(header_key == "Sec-WebSocket-Protocol")
+                    this->protocol = header_value, bValid = true;
+				else if(header_key == "X-Forwarded-For")
+                {
+                    if( this->peer_address.empty() )
+                        this->peer_address= header_value;
+                    bValid = true;
+                }
+				else if(header_key == "X-Real-IP")
+                    this->peer_address= header_value, bValid = true;
+				else if(header_key == "X-Forwarded-Port")
+                    this->peer_port= strtol( header_value.c_str(), nullptr, 10 ), bValid = true;
 			}
 		}
 	}

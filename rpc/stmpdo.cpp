@@ -1272,6 +1272,13 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                         oParams[ JSON_ATTR_ENABLE_WEBSOCKET ].asString();
                     if( strVal == "true" )
                         oElemCfg.SetBoolProp( propEnableWebSock, true );
+                    if( oParams.isMember( JSON_ATTR_DEST_URL ) &&
+                        oParams[ JSON_ATTR_DEST_URL ].isString() )
+                    {
+                        string strVal =
+                            oParams[ JSON_ATTR_DEST_URL ].asString();
+                        oElemCfg.SetStrProp( propDestUrl, strVal );
+                    }
                 }
                 if( oParams.isMember( JSON_ATTR_ENABLE_COMPRESS ) &&
                     oParams[ JSON_ATTR_ENABLE_COMPRESS ].isString() )

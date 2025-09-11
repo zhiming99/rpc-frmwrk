@@ -34,21 +34,6 @@ function Handshake( oMsg, oPending )
     oParams.Push( new Pair(
         {t: EnumTypeId.typeObj, v: oInfo }) )
 
-    var oSocket = this.m_oSocket
-
-    var strUrl = this.m_oConnParams.GetProperty(
-        EnumPropId.propDestUrl )
-
-    const url = new URL(strUrl)
-
-    oInfo.SetString(
-        EnumPropId.propDestIpAddr,
-        url.hostname )
-
-    oInfo.SetUint32(
-        EnumPropId.propDestTcpPort,
-        url.port ? parseInt(url.port) : (url.protocol === 'wss:' ? 443 : 80) )
-
     var oCallOpts = new CConfigDb2()
     oCallOpts.SetUint32(
         EnumPropId.propCallFlags,

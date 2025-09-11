@@ -318,25 +318,6 @@ gint32 CRpcTcpBridgeProxy::DoStartHandshake(
             propTimestamp, tv.tv_sec );
         oParams.Push( BRIDGE_PROXY_GREETINGS );
 
-        CCfgOpenerObj oIfCfg( this );
-        IConfigDb* pConn;
-        ret = oIfCfg.GetPointer(
-            propConnParams, pConn );
-        if( ERROR( ret ) )
-            break;
-
-        oParams.CopyProp(
-            propSrcIpAddr, pConn );
-
-        oParams.CopyProp(
-            propSrcTcpPort, pConn );
-
-        oParams.CopyProp(
-            propDestTcpPort, pConn );
-
-        oParams.CopyProp(
-            propDestIpAddr, pConn );
-
         TaskletPtr pRespCb;
         NEW_PROXY_RESP_HANDLER2(
             pRespCb, ObjPtr( this ),
@@ -5261,6 +5242,71 @@ gint32 CRpcTcpBridge::DoStartHandshake(
     return ret;
 }
 
+gint32 CRpcTcpBridge::SetRmtConnParams()
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oIfCfg( this );
+        IConfigDb* pConn;
+        ret = oIfCfg.GetPointer(
+            propConnParams, pConn );
+        if( ERROR( ret ) )
+            break;
+
+        CConnParams oConn( pConn );
+        bool bWs = oConn.IsWebSocket();
+        if( !bWs )
+            break;
+
+        stdstr strUrl = oConn.GetUrl();
+        stdstr strHost;
+        guint32 dwPort;
+        ret = GetHostAndPortFromUrl(
+            strUrl, strHost, dwPort );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        CCfgOpener oRmtConn;
+        oRmtConn.SetStrProp(
+            propDestIpAddr, strHost );
+
+        oRmtConn.SetIntProp(
+            propDestTcpPort, dwPort );
+
+        PortPtr pPort;
+        pPort = this->GetPort();
+        if( pPort.IsEmpty() )
+        {
+            ret = -EFAULT;
+            break;
+        }
+
+        CPort* pcp = pPort;
+        PortPtr pPdo;
+        ret = pcp->GetPdoPort( pPdo );
+        if( ERROR( ret ) )
+            break;
+
+        CCfgOpenerObj oPortCfg( pcp );
+        IConfigDb* pRmtConn;
+        ret = oPortCfg.GetPointer(
+            propRmtConnParams, pRmtConn );
+        if( SUCCEEDED( ret ) )
+        {
+            oRmtConn.CopyProp(
+                propSrcIpAddr, pRmtConn );
+            oRmtConn.CopyProp(
+                propSrcTcpPort, pRmtConn );
+        }
+        oIfCfg.SetPointer( propRmtConnParams,
+            ( IConfigDb* )oRmtConn.GetCfg() );
+    }while( 0 );
+    return ret;
+}
+
 gint32 CRpcTcpBridge::Handshake(
     IEventSink* pCallback,
     IConfigDb* pInfo )
@@ -5313,20 +5359,7 @@ gint32 CRpcTcpBridge::Handshake(
                 oParams.CopyProp( 
                     propMaxPendings, this );
             }
-
-            CCfgOpener oRmtConn;
-            oRmtConn.CopyProp(
-                propSrcIpAddr, pInfo );
-            oRmtConn.CopyProp(
-                propSrcTcpPort, pInfo );
-            oRmtConn.CopyProp(
-                propDestIpAddr, pInfo );
-            oRmtConn.CopyProp(
-                propDestTcpPort, pInfo );
-
-            CCfgOpenerObj oIfCfg( this );
-            oIfCfg.SetObjPtr( propRmtConnParams,
-                ObjPtr( oRmtConn.GetCfg() ) );
+            SetRmtConnParams();
         }
 
         if( IsRfcEnabled() )

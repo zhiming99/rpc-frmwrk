@@ -1306,6 +1306,33 @@ gint32 CRpcWebSockFido::AllocIrpCtxExt(
     return ret;
 }
 
+gint32 CRpcWebSockFido::OnPortReady( IRP* pIrp )
+{
+    gint32 ret = 0;
+    do{
+        PortPtr pPort;
+        ret = this->GetPdoPort( pPort );
+        if( ERROR( ret ) )
+            break;
+        if( m_oWebSock.peer_address.empty() )
+            break;
+        CCfgOpener oRmtConn;
+        oRmtConn.SetStrProp( propSrcIpAddr,
+            m_oWebSock.peer_address );
+
+        if( m_oWebSock.peer_port != 0 )
+            oRmtConn.SetIntProp( propSrcTcpPort,
+                m_oWebSock.peer_port );
+        ObjPtr pObj = oRmtConn.GetCfg();
+        Variant oVar( pObj );
+        pPort->SetProperty(
+            propRmtConnParams, oVar );
+
+    }while( 0 );
+    ret = super::OnPortReady( pIrp );
+    return ret;
+}
+
 gint32 CRpcWebSockFidoDrv::Probe(
     IPort* pLowerPort,
     PortPtr& pNewPort,

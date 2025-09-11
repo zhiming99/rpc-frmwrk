@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <regex>
 #include "defines.h"
 #include "autoptr.h"
 #include "buffer.h"
@@ -1481,6 +1482,34 @@ CNamedProcessLock::~CNamedProcessLock()
         sem_unlink( m_strSemName.c_str() );
         m_pSem = nullptr;
     }
+}
+
+gint32 GetHostAndPortFromUrl(
+    const stdstr& strUrl,
+    stdstr& strHost, guint32& dwPort )
+{
+    gint32 ret = 0;
+
+    std::regex urlRegex(R"((https?://)?([^:/]+)(?::(\d+))?)");
+    std::smatch matches;
+
+    // Process url1
+    if( !std::regex_search( strUrl, matches, urlRegex ) )
+        return -ENOENT;
+
+    dwPort = 80;
+
+    if( matches[ 1 ].matched &&
+        matches[ 1 ].str() == "https://" )
+        dwPort = 443;
+
+    strHost = matches[ 2 ].str();
+    if( matches[3].matched )
+    {
+        dwPort = std::strtol(
+            matches[3].str().c_str(), nullptr, 10 );
+    }
+    return 0;
 }
 
 }

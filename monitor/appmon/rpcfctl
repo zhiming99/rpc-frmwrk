@@ -47,7 +47,7 @@ function is_app_online()
 }
 
 case "$cmd" in
-    config)
+    config | cfg)
         if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
             python3 /usr/local/bin/rpcf/rpcfg.py
         elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then

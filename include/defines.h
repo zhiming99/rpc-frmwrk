@@ -909,4 +909,9 @@ struct CNamedProcessLock
 };
 stdstr SimpleCmdLine(
     int argc, char** argv );
+
+gint32 GetHostAndPortFromUrl(
+    const stdstr& strUrl,
+    stdstr& strHost, guint32& dwPort );
+
 }
