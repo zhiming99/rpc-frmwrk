@@ -132,17 +132,17 @@ Remove a user from a group.
 .B backuplog [<output file>]
 Backup all application log files into a tarball. If <output file> is not specified, a default name (such as rpcf-logbackup-YYMMDD.tar.gz) will be used.
 .TP
-.B rotatelog <appname>
-Rotate the log file for the specified application.
+.B rotatelog <appname> <point name>
+Rotate the log file for the specified setpoint.
 .TP
-.B listlog [<appname>]
-List all log files for the specified application, or for all applications if no name is given.
+.B listlog <appname> <point name>
+List all log files for the specified setpoint
 .TP
-.B enablelog <appname>
-Enable logging for the specified application.
+.B enablelog <appname> <point name>
+Enable logging for the specified setpoint.
 .TP
-.B disablelog <appname>
-Disable logging for the specified application.
+.B disablelog <appname> <point name>
+Disable logging for the specified setpoint.
 .TP
 .B authmech
 Show the current authentication mechanism in use.

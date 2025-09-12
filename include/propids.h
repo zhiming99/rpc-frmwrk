@@ -296,6 +296,8 @@ enum EnumPropId : gint32
     propGmSSL,          // type: a boolean value to indicate the SimpAuth token is encrypted with GmSSL
     propSessTimeLimit,  // type: a integer as the max time period a session can live
     propRmtConnParams,  // type: a configdb holding connection parameters from peer
+    propUrlHost,        // type: a string as the host name from the destUrl
+    propUrlPort,        // type: a integer as the port number from the destUrl
 
     // monitor related properties
     propObjCount = 0x4000,

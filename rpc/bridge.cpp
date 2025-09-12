@@ -5258,23 +5258,12 @@ gint32 CRpcTcpBridge::SetRmtConnParams()
         if( !bWs )
             break;
 
-        stdstr strUrl = oConn.GetUrl();
-        stdstr strHost;
-        guint32 dwPort;
-        ret = GetHostAndPortFromUrl(
-            strUrl, strHost, dwPort );
-        if( ERROR( ret ) )
-        {
-            ret = 0;
-            break;
-        }
-
         CCfgOpener oRmtConn;
-        oRmtConn.SetStrProp(
-            propDestIpAddr, strHost );
+        oRmtConn.CopyProp( propDestIpAddr,
+            propUrlHost, pConn );
 
-        oRmtConn.SetIntProp(
-            propDestTcpPort, dwPort );
+        oRmtConn.CopyProp( propDestTcpPort,
+            propUrlPort, pConn );
 
         PortPtr pPort;
         pPort = this->GetPort();

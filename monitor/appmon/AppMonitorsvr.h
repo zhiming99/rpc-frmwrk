@@ -7,6 +7,7 @@
 #include "blkalloc.h"
 #include <unordered_set>
 #include "IAppStoresvr.h"
+#include "IAppStoreExsvr.h"
 #include "IAppMonitorsvr.h"
 
 struct CFlockHelper
@@ -32,6 +33,7 @@ DECLARE_AGGREGATED_SKEL_SERVER(
     CAppMonitor_SvrSkel_Base,
     CStatCountersServerSkel,
     IIAppStore_SImpl,
+    IIAppStoreEx_SImpl,
     IIAppMonitor_SImpl );
 
 class CAppMonitor_SvrSkel :
@@ -70,6 +72,7 @@ DECLARE_AGGREGATED_SERVER(
     CStatCounters_SvrBase,
     CStreamServerAsync,
     IIAppStore_SvrApi,
+    IIAppStoreEx_SvrApi,
     IIAppMonitor_SvrApi,
     CFastRpcServerBase );
 
@@ -328,6 +331,20 @@ class CAppMonitor_SvrImpl
     gint32 OnPointsChanged(
         std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override
     { return OnPointsChangedInternal( arrKVs ); }
+    //RPC Async Req Cancel Handler
+    gint32 OnIsAppOnlineCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        std::vector<std::string>& strApps /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'IsAppOnline' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 IsAppOnline(
+        IConfigDb* pReqCtx_,
+        std::vector<std::string>& strApps /*[ In ]*/,
+        std::vector<std::string>& strOnlineApps /*[ Out ]*/ ) override;
     //RPC Async Req Cancel Handler
     gint32 OnRegisterListenerCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,

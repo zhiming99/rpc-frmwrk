@@ -63,6 +63,13 @@ interface IAppStore
     returns();
 };
 
+interface IAppStoreEx
+{
+    [async_s]IsAppOnline(
+        array< string > strApps )
+    returns ( array< string > strOnlineApps );
+};
+
 interface IAppMonitor
 {
     [async_s]RegisterListener(
@@ -108,6 +115,7 @@ service AppManager [stream]
 service AppMonitor [stream]
 {
     interface IAppStore;
+    interface IAppStoreEx;
     interface IAppMonitor;
 };
 

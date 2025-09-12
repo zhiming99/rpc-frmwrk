@@ -30,24 +30,8 @@
   </nav>
 
   <main class="container my-3">
-    <div class="row" id="metrics-row">
-      <!-- Example status cards -->
-      <div class="col-12 col-md-6 col-lg-3 mb-3">
-        <div class="card text-center">
-          <div class="card-body">
-            <h5 class="card-title">App Status</h5>
-            <p class="card-text" id="app-status">Loading...</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-lg-3 mb-3">
-        <div class="card text-center">
-          <div class="card-body">
-            <h5 class="card-title">CPU Usage</h5>
-            <p class="card-text" id="cpu-usage">--</p>
-          </div>
-        </div>
-      </div>
+    <div class="row" id="sites-row">
+      <!-- sites cards -->
       <!-- Add more cards as needed -->
     </div>
 
@@ -90,6 +74,85 @@
     </div>
   </div>
 
+  <script>
+    const sites = [
+      {
+        name: "site1",
+        container: "container1",
+        status: "online",
+        apps: [
+          /*{ name: "AppA", status: "Running", cpu: "10%" },
+          { name: "AppB", status: "Stopped", cpu: "0%" } */
+        ]
+      },
+      {
+        name: "site2",
+        status: "offline",
+        container: "container2",
+        apps: [
+          { name: "AppC", status: "Running", cpu: "7%" }
+        ]
+      }
+    ];
+    globalThis.g_sites = sites;
+    function renderSites(sites) {
+      const sitesRow = document.getElementById('sites-row');
+      sitesRow.innerHTML = ''; // Clear previous content
+
+      sites.forEach(site => {
+        // Create site card
+        const siteCol = document.createElement('div');
+        siteCol.className = 'col-12 mb-4';
+
+        const siteCard = document.createElement('div');
+        siteCard.className = 'card';
+
+        const siteHeader = document.createElement('div');
+        siteHeader.className = 'card-header bg-info text-white';
+        siteHeader.textContent = `Site: ${site.name} (Container: ${site.container})`;
+
+        const siteBody = document.createElement('div');
+        siteBody.className = 'card-body';
+
+        const appRow = document.createElement('div');
+        appRow.className = 'row';
+
+        site.apps.forEach(app => {
+          const appCol = document.createElement('div');
+          appCol.className = 'col-12 col-md-6 col-lg-3 mb-3';
+
+          const appCard = document.createElement('div');
+          appCard.className = 'card text-center';
+
+          const appCardBody = document.createElement('div');
+          appCardBody.className = 'card-body';
+
+          const appTitle = document.createElement('h5');
+          appTitle.className = 'card-title';
+          appTitle.textContent = app.name;
+
+          const appStatus = document.createElement('p');
+          appStatus.className = 'card-text';
+          appStatus.innerHTML = `<b>Status:</b> ${app.status}<br><b>CPU:</b> ${app.cpu}`;
+
+          appCardBody.appendChild(appTitle);
+          appCardBody.appendChild(appStatus);
+          appCard.appendChild(appCardBody);
+          appCol.appendChild(appCard);
+          appRow.appendChild(appCol);
+        });
+
+        siteBody.appendChild(appRow);
+        siteCard.appendChild(siteHeader);
+        siteCard.appendChild(siteBody);
+        siteCol.appendChild(siteCard);
+        sitesRow.appendChild(siteCol);
+      });
+    }
+
+    // Example usage:
+  </script>
+
   <footer class="text-center text-muted py-3">
     rpc-frmwrk &copy; 2025
   </footer>
@@ -112,7 +175,10 @@
             globalThis.oProxy = null;
         }else{
             if( iChecks++ === 0 )
+            {
                 console.log( "RPC connection ready " + globalThis.oProxy );
+                renderSites(globalThis.g_sites);
+            }
             setTimeout( checkProxyState, 5000 );
         }
     }
@@ -132,9 +198,9 @@
       // Replace with your JS API call
       document.getElementById('logs-panel').textContent = '[2025-07-01 10:00] App started\n[2025-07-01 10:05] Health check OK';
     }
-    setInterval(fetchStatus, 5000);
+    // setInterval(fetchStatus, 5000);
     setInterval(fetchLogs, 7000);
-    fetchStatus();
+    // fetchStatus();
     fetchLogs();
 
     // Config update handler

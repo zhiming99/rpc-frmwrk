@@ -879,6 +879,34 @@ gint32 CAppMonitor_SvrImpl::OnPointsChangedInternal(
     return ret;
 }
 /* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::IsAppOnline( 
+    IConfigDb* pContext, 
+    std::vector<std::string>& strApps /*[ In ]*/, 
+    std::vector<std::string>& strOnlineApps /*[ Out ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        InterfPtr pIf = GetAppManager();
+        CAppManager_SvrImpl* pm = pIf;
+        if( pm == nullptr )
+        {
+            ret = ERROR_STATE;
+            break;
+        }
+        if( strApps.size() > 20 )
+        {
+            ret = -E2BIG;
+            break;
+        }
+        for( auto& elem : strApps )
+        {
+            if( pm->IsAppOnline( elem ) )
+                strOnlineApps.push_back( elem );
+        }
+    }while( 0 );
+    return ret;
+}
+/* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::RegisterListener( 
     IConfigDb* pContext, 
     std::vector<std::string>& arrApps /*[ In ]*/ )

@@ -57,7 +57,10 @@ endif
 EXTRA_DIST=appmon.ridl upddesc.py rpcfctl_cn.md
 
 noinst_LIBRARIES=libappmon.a
-libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp IAppMonitorsvr.cpp IDataProducersvr.cpp IUserManagersvr.cpp appmondesc.json IUserManagersvr.h IDataProducersvr.h IAppMonitorsvr.h IAppStoresvr.h appmon.h appmonstruct.h 
+libappmon_a_SOURCES = appmon.cpp appmonstruct.cpp IAppStoresvr.cpp \
+IAppMonitorsvr.cpp IDataProducersvr.cpp IUserManagersvr.cpp appmondesc.json \
+IUserManagersvr.h IDataProducersvr.h IAppMonitorsvr.h IAppStoresvr.h appmon.h \
+appmonstruct.h IAppStoreExsvr.cpp IAppStoreExsvr.h
 libappmon_a_CPPFLAGS= $(appmonsvr_CPPFLAGS)
 libappmon_a_HEADERS=
 
