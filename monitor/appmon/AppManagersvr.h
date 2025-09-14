@@ -74,6 +74,13 @@ class CAppManager_SvrImpl
     RegFsPtr m_pAppRegfs;
     std::hashmap< HANDLE, StrSetPtr > m_mapAppOwners;
 
+    gint32 GetPointValuesInternal ( 
+        IConfigDb* pContext, 
+        const std::string& strAppName /*[ In ]*/,
+        std::vector<std::string>& arrPtPaths /*[ In ]*/, 
+        std::vector<KeyValue>& arrKeyVals /*[ Out ]*/,
+        bool bShortKey );
+
     public:
     typedef CAppManager_SvrBase super;
     CAppManager_SvrImpl( const IConfigDb* pCfg ) :

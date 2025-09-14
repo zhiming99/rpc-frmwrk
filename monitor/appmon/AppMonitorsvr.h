@@ -109,6 +109,13 @@ class CAppMonitor_SvrImpl
 
     gint32 LoadUserGrpsMap();
 
+    gint32 GetPointValuesInternal ( 
+        IConfigDb* pContext, 
+        const std::string& strAppName /*[ In ]*/,
+        std::vector<std::string>& arrPtPaths /*[ In ]*/, 
+        std::vector<KeyValue>& arrKeyVals /*[ Out ]*/,
+        bool bShortKey );
+
     public:
     typedef CAppMonitor_SvrBase super;
     CAppMonitor_SvrImpl( const IConfigDb* pCfg ) :

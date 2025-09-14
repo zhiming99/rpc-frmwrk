@@ -76,6 +76,12 @@ for appname in "$@"; do
         break
     fi
     add_log_link $appname req_count appmonsvr1 ptlogger1
+    add_log_link $appname cpu_load appmonsvr1 ptlogger1
+    add_log_link $appname vmsize_kb appmonsvr1 ptlogger1
+    add_log_link $appname obj_count appmonsvr1 ptlogger1
+    set_attr_value $appname obj_count avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $appname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $appname cpu_load avgalgo  "$(jsonval 'i' 1)" i
     ret=$?
     if (( ret != 0 )); then
         break
