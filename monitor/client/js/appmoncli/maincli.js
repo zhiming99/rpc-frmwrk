@@ -36,23 +36,34 @@ var oAppMonitor_cli = new CAppMonitor_CliImpl( globalThis.g_oIoMgr,
     strObjDesc, strAppMonitorObjName, oParams0 );
 
  // start the client object
-oAppMonitor_cli.Start().then((retval)=>{
-    if( ERROR( retval ) )
-    {
-        globalThis.oProxy = null;
-        return Promise.resolve( retval );
-    }
-    oProxy = oAppMonitor_cli;
-    globalThis.oProxy = oProxy;
-
+function StartPullInfo()
+{
     return new Promise( ( resolve, reject )=>{
         var oContext = new Object();
         oContext.m_oResolve = resolve;
         oContext.m_oReject = reject;
-        return oAppMonitor_cli.ListApps( oContext ).then((ret)=>{
-            Promise.resolve( ret );
+        oContext.oListAppCb = (oContext, ret, arrApps ) => {
+            if( ERROR( ret ) )
+                return
+
+            globalThis.g_sites[0].apps = []
+            for ( var i = 0; i < arrApps.length; i++ )
+            {
+                if( this.m_setAppBaseLine.has( arrApps[i] ) )
+                    continue
+                globalThis.g_sites[0].apps.push(
+                    { name: arrApps[i], status: "unknown", cpu: "0%" } )
+            }
+            if( this.m_strRouterPath === "/")
+                globalThis.g_sites[0].name = "Root Node"
+            else
+                globalThis.g_sites[0].name = this.m_strRouterPath
         }
-        ).catch((e)=>{
+        oContext.oListAppCb.bind( this )
+
+        return this.ListApps( oContext ).then((ret)=>{
+            Promise.resolve( ret );
+        }).catch((e)=>{
             console.log( 'ListApps failed with error ' + e );
             Promise.reject( e );
         });
@@ -63,19 +74,87 @@ oAppMonitor_cli.Start().then((retval)=>{
         for( var i = 0; i < globalThis.g_sites[0].apps.length; i++ )
             appsAvail.push( globalThis.g_sites[0].apps[i].name );
 
+        oContext.oIsAppOnlineCb = (oContext, ret, arrOnlineApps ) => {
+            if( ERROR( ret ) )
+            {
+                console.log( 'IsAppOnline returned with error from server: ' + Int32Value(ret) );
+                return
+            }
+
+            for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
+                globalThis.g_sites[0].apps[j].status = "offline"
+
+            for ( var i = 0; i < arrOnlineApps.length; i++ )
+            {
+                if( this.m_setAppBaseLine.has( arrOnlineApps[i] ) )
+                    continue
+                for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
+                {
+                    if( globalThis.g_sites[0].apps[j].name === arrOnlineApps[i] )
+                    {
+                        globalThis.g_sites[0].apps[j].status = "online"
+                        break
+                    }
+                }
+            }
+            return
+        }
+        oContext.oIsAppOnlineCb.bind( oAppMonitor_cli )
+
         return oAppMonitor_cli.IsAppOnline( oContext, appsAvail ).then((ret)=>{
-            Promise.resolve( ret );
+            var arrPtPaths = []
+            for( var i = 0; i < globalThis.g_sites[0].apps.length; i++ )
+            {
+                if( globalThis.g_sites[0].apps[i].status === "online" )
+                    arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/cpu_load");
+            }
+            oContext.oGetPvsCb = (oContext, ret, arrKeyVals ) => {
+                if( ERROR(ret) ) 
+                {
+                    console.log( 'GetPointValues returned with error from server: ' + Int32Value(ret) );
+                    return Promise.reject( ret );
+                }
+                for( var i = 0; i < arrKeyVals.length; i++ )
+                {
+                    var [strApp, strPt] = arrKeyVals[i].strKey.split( '/' );
+                    if( strPt !== "cpu_load")
+                        continue
+                    for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
+                    {
+                        if( globalThis.g_sites[0].apps[j].name === strApp )
+                        {
+                            globalThis.g_sites[0].apps[j].cpu = arrKeyVals[i].oValue.m_val.toFixed(2) + "%";
+                            break;
+                        }
+                    }
+                }
+            }
+            return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
+                globalThis.oProxy = oAppMonitor_cli;
+                Promise.resolve( ret );
+            }).catch((e)=>{
+                console.log( 'GetPointValues failed with error ' + e );
+                Promise.reject( e );
+            })
         }).catch((e)=>{
             console.log( 'IsAppOnline failed with error ' + e );
             Promise.reject( e );
         })
     }).catch((e)=>{
-        console.log(e);
+        console.log( 'ListApps failed with error ' + e );
         return Promise.resolve(-errno.EFAULT);
     })
-    
+}
+oAppMonitor_cli.Start().then((retval)=>{
+    if( ERROR( retval ) )
+    {
+        globalThis.oProxy = null;
+        return Promise.resolve( retval );
+    }
+    globalThis.funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
+    return globalThis.funcStartPullInfo()
 }).catch((e)=>{
-    console.log( 'Start Proxy failed ' + e );
+    console.log( 'Start Proxy failed with error ' + e );
     return Promise.resolve(e);
 })
 

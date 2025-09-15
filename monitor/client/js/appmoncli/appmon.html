@@ -85,16 +85,47 @@
           { name: "AppB", status: "Stopped", cpu: "0%" } */
         ]
       },
-      {
+      /*{
         name: "site2",
         status: "offline",
         container: "container2",
         apps: [
           { name: "AppC", status: "Running", cpu: "7%" }
         ]
-      }
+      }*/
     ];
     globalThis.g_sites = sites;
+    function updateSites(sites) {
+      const sitesRow = document.getElementById('sites-row');
+
+      var siteCard = null;
+      sites.forEach(site => {
+        // find site card
+        for (const child of sitesRow.children) {
+          if (child.querySelector('.card-header').textContent === `Site: ${site.name} (Container: ${site.container})`) {
+            // Site card already exists, no need to create a new one
+            siteCard = child;
+            break;
+          }
+        }
+
+        if( !siteCard )
+            return;
+
+        var appCols = siteCard.children[0].children[1].children[0].children
+        for( const child of appCols ) {
+            for( const app of site.apps ) {
+              if( child.querySelector('.card-title').textContent === app.name ) {
+                // App card already exists, no need to create a new one
+                appText = child.querySelector('.card-text');
+                appText.innerHTML = `<b>Status:</b> ${app.status}<br><b>CPU:</b> ${app.cpu}`;
+                break;
+              }
+            }
+        }
+      });
+    }
+
     function renderSites(sites) {
       const sitesRow = document.getElementById('sites-row');
       sitesRow.innerHTML = ''; // Clear previous content
@@ -176,8 +207,12 @@
         }else{
             if( iChecks++ === 0 )
             {
-                console.log( "RPC connection ready " + globalThis.oProxy );
                 renderSites(globalThis.g_sites);
+                globalThis.fetchStatusInterval =
+                    setInterval(fetchStatus, 5000);
+                globalThis.fetchLogsInterval =
+                    setInterval(fetchLogs, 7000);
+                console.log( "RPC connection ready " + globalThis.oProxy );
             }
             setTimeout( checkProxyState, 5000 );
         }
@@ -189,18 +224,30 @@
   <script>
     // Example: Simulate data fetching
     function fetchStatus() {
-      // Replace with your JS API call
-      document.getElementById('app-status').textContent = 'Running';
-      document.getElementById('cpu-usage').textContent = '12%';
-      document.getElementById('status-dot').className = 'bg-success';
+      if( !globalThis.oProxy)
+      {
+         clearInterval(globalThis.fetchStatusInterval);
+         return
+      }
+
+      if( globalThis.funcStartPullInfo ){
+          console.log( "Start pulling info..." );
+          globalThis.funcStartPullInfo().then((ret) => {
+              updateSites(globalThis.g_sites);
+          }).catch((error) => {
+              console.log("Error fetching status:", error);
+          });
+        }
     }
     function fetchLogs() {
+      if( !globalThis.oProxy)
+      {
+         clearInterval(globalThis.fetchLogsInterval);
+         return
+      }
       // Replace with your JS API call
       document.getElementById('logs-panel').textContent = '[2025-07-01 10:00] App started\n[2025-07-01 10:05] Health check OK';
     }
-    // setInterval(fetchStatus, 5000);
-    setInterval(fetchLogs, 7000);
-    // fetchStatus();
     fetchLogs();
 
     // Config update handler

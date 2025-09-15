@@ -39,20 +39,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         // 'ret' is the status code of the request
         // if ret == errno.STATUS_SUCCESS, the following parameters are valid response from the server
         // if ret < 0, the following parameters are undefined
-        if( ret < 0 )
-            return
-
-        for ( var i = 0; i < arrApps.length; i++ )
-        {
-            if( this.m_setAppBaseLine.has( arrApps[i] ) )
-                continue
-            globalThis.g_sites[0].apps.push(
-                { name: arrApps[i], status: "unknown", cpu: "0%" } )
-        }
-        if( this.m_strRouterPath === "/")
-            globalThis.g_sites[0].name = "Root Node"
-        else
-            globalThis.g_sites[0].name = this.m_strRouterPath
+        if( oContext.oListAppCb )
+            oContext.oListAppCb( oContext, ret, arrApps );
     }
 
     // IAppStore::ListPointsCallback
@@ -181,11 +169,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         arrKeyVals // (KeyValue)
     )
     {
-        // add code here
-        // 'oContext' is the parameter passed to this.GetPointValues
-        // 'ret' is the status code of the request
-        // if ret == errno.STATUS_SUCCESS, the following parameters are valid response from the server
-        // if ret < 0, the following parameters are undefined
+        if( oContext.oGetPvsCb )
+            oContext.oGetPvsCb( oContext, ret, arrKeyVals );
     }
 
     // IAppStore::OnPointChanged
@@ -218,25 +203,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         // 'ret' is the status code of the request
         // if ret == errno.STATUS_SUCCESS, the following parameters are valid response from the server
         // if ret < 0, the following parameters are undefined
-        if( ret < 0 )
-            return
-
-        for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
-            globalThis.g_sites[0].apps[j].status = "offline"
-
-        for ( var i = 0; i < strOnlineApps.length; i++ )
-        {
-            if( this.m_setAppBaseLine.has( strOnlineApps[i] ) )
-                continue
-            for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
-            {
-                if( globalThis.g_sites[0].apps[j].name === strOnlineApps[i] )
-                {
-                    globalThis.g_sites[0].apps[j].status = "online"
-                    break
-                }
-            }
-        }
+        if( oContext.oIsAppOnlineCb )
+            oContext.oIsAppOnlineCb( oContext, ret, strOnlineApps )
     }
 
     // IAppMonitor::RegisterListenerCallback

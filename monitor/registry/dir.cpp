@@ -2350,6 +2350,7 @@ gint32 CDirImage::UnloadDirImage()
         auto itr = m_mapFiles.begin();
         while( itr != m_mapFiles.end() )
         {
+            FImgSPtr pImg = itr->second;
             CFileImage* pFile = itr->second;
             CDirImage* pDir = itr->second;
 
