@@ -211,7 +211,7 @@
                 globalThis.fetchStatusInterval =
                     setInterval(fetchStatus, 5000);
                 globalThis.fetchLogsInterval =
-                    setInterval(fetchLogs, 7000);
+                    setInterval(fetchLogs, 30000);
                 console.log( "RPC connection ready " + globalThis.oProxy );
             }
             setTimeout( checkProxyState, 5000 );
@@ -245,8 +245,21 @@
          clearInterval(globalThis.fetchLogsInterval);
          return
       }
-      // Replace with your JS API call
-      document.getElementById('logs-panel').textContent = '[2025-07-01 10:00] App started\n[2025-07-01 10:05] Health check OK';
+      var oContext = Object()
+      oContext.oGetLpvCb = (oContext, ret, value) => {
+          if (ret === 0) {
+              const decoder = new TextDecoder('utf-8')
+              document.getElementById('logs-panel').textContent = decoder.decode(value);
+          } else {
+              console.log("Error fetching logs:", ret);
+          }
+      };
+      return globalThis.oProxy.GetLargePointValue(
+          oContext, "loggersvr1/logcontent").then((ret) => {
+         Promise.resolve(ret); 
+      }).catch((error) => {
+          console.log("Error fetching logs:", error);
+      });
     }
     fetchLogs();
 

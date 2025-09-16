@@ -426,7 +426,7 @@ static gint32 EmitDeserialBySigJs(
         }
     case 'a':
         {
-            CCOUT << "ret = osb.DeserialBuf( buf, offset );";
+            CCOUT << "ret = osb.DeserialByteArray( buf, offset );";
             break;
         }
     case 'o':
@@ -1676,12 +1676,12 @@ gint32 GenJsProj(
         pRoot.IsEmpty() )
         return -EINVAL;
 
-    if( g_strWebPath.empty() )
+    /*if( g_strWebPath.empty() )
     {
         fprintf( stderr,
             "Error missing the URL to the object description file" );
         return -EINVAL;
-    }
+    }*/
 
     gint32 ret = 0;
 
@@ -2699,7 +2699,9 @@ gint32 CImplJsMainFunc::OutputCli(
         }
         NEW_LINE;
 
-        CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
+        // CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
+        // NEW_LINE;
+        CCOUT << "var strObjDesc = './" << g_strAppName<<"desc.json';";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;

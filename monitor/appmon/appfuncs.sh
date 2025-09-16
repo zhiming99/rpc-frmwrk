@@ -506,8 +506,8 @@ function set_attr_value()
         # not paired with grant_perm on purpose
     fi
     if (( created == 1 )); then
-        _uname_=$(stat -c "%u" $_ptpath)
-        _gname_=$(stat -c "%g" $_ptpath)
+        local _uname_=$(stat -c "%u" $_ptpath)
+        local _gname_=$(stat -c "%g" $_ptpath)
         chown $_uname_:$_gname_ $_ptpath/$_attr
     fi
     ret=$?

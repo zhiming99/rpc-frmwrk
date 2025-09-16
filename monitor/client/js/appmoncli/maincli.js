@@ -27,7 +27,7 @@ const { KeyValue, } = require( './appmonstructs' );
 const { CAppMonitor_CliImpl } = require( './AppMonitorcli' )
 
 var oProxy = null;
-var strObjDesc = 'https://192.168.1.3/rpcf/appmondesc.json';
+var strObjDesc = './appmondesc.json';
 var strAppName = 'appmon';
 var strAppMonitorObjName = 'AppMonitor';
 var oParams0 = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );
