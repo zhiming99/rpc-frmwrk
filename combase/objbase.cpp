@@ -81,12 +81,13 @@ std::string DebugMsgInternal(
         std::time_t t = std::time(nullptr);
         szTime = asctime( localtime( &t ) );
         gint32 i = strlen( szTime ) - 1;
-        for( ; i >= 0; i++ )
+        char* pch = szTime + i;
+        for( ; pch != szTime; pch-- )
         {
-            if( szTime[ i ] == 0 )
+            if( *pch == 0 )
                 continue;
-            if( szTime[ i ] == '\n' )
-                szTime[ i ] = 0;
+            if( *pch == '\n' )
+                *pch = 0;
             break;
         }
         snprintf( szBuf,
