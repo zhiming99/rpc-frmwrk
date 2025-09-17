@@ -55,23 +55,50 @@ EnumLogLvl g_dwLogLevel = logErr;
 
 std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
-    const char* szFunc, gint32 iLineNum )
+    const char* szFunc, gint32 iLineNum,
+    bool bTimestamp )
 {
-    timespec ts = { 0 };
-    clock_gettime( CLOCK_REALTIME, &ts );
-
     char szBuf[ MAX_DUMP_SIZE ];
     szBuf[ sizeof( szBuf ) - 1 ] = 0;
-    snprintf( szBuf,
-        sizeof( szBuf ) - 1,
-        "[%ld.%09ld-%d]%s(%d): %s(%d)",
-        ts.tv_sec,
-        ts.tv_nsec,
-        getpid(),
-        szFunc,
-        iLineNum,
-        strMsg.c_str(),
-        ret );
+    if( bTimestamp )
+    {
+        timespec ts = { 0 };
+        clock_gettime( CLOCK_REALTIME, &ts );
+        snprintf( szBuf,
+            sizeof( szBuf ) - 1,
+            "[%ld.%09ld-%d]%s(%d): %s(%d)",
+            ts.tv_sec,
+            ts.tv_nsec,
+            getpid(),
+            szFunc,
+            iLineNum,
+            strMsg.c_str(),
+            ret );
+    }
+    else
+    {
+        char* szTime = nullptr;
+        std::time_t t = std::time(nullptr);
+        szTime = asctime( localtime( &t ) );
+        gint32 i = strlen( szTime ) - 1;
+        for( ; i >= 0; i++ )
+        {
+            if( szTime[ i ] == 0 )
+                continue;
+            if( szTime[ i ] == '\n' )
+                szTime[ i ] = 0;
+            break;
+        }
+        snprintf( szBuf,
+            sizeof( szBuf ) - 1,
+            "[%s-%d]%s(%d): %s(%d)",
+            szTime,
+            getpid(),
+            szFunc,
+            iLineNum,
+            strMsg.c_str(),
+            ret );
+    }
     return std::string( szBuf );
 }
 

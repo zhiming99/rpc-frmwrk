@@ -1323,6 +1323,10 @@ gint32 CRpcWebSockFido::OnPortReady( IRP* pIrp )
         if( m_oWebSock.peer_port != 0 )
             oRmtConn.SetIntProp( propSrcTcpPort,
                 m_oWebSock.peer_port );
+        if( m_oWebSock.user_agent.size() )
+            oRmtConn.SetStrProp( propUserAgent,
+                m_oWebSock.user_agent );
+
         ObjPtr pObj = oRmtConn.GetCfg();
         Variant oVar( pObj );
         pPort->SetProperty(

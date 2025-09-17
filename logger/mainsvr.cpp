@@ -93,7 +93,7 @@ using namespace rpcf;
 gint32 mainsvr( CLogService_SvrImpl* pIf, int argc, char** argv );
 
 static bool g_bDaemon = false;
-static bool g_bMonitoring = false;
+bool g_bMonitoring = false;
 
 static std::atomic<bool> g_bExit={ false };
 stdstr g_strFile = "";
@@ -280,7 +280,7 @@ int main( int argc, char** argv )
                 PACBS pacbsIn( new CAsyncLoggerAMCallbacks() );
                 InterfPtr pAppMan;
                 ret = StartStdAppManCli( pSvc,
-                    "loggersvr1", pAppMan, pacbsIn );
+                    LOGGER_APPNAME, pAppMan, pacbsIn );
             }
 
         }while( 0 );

@@ -251,6 +251,10 @@ gint32 DumpBdgeList(
                         propDestTcpPort, dwPort );
                     if( SUCCEEDED( ret ) )
                         oConnVal[ "DestPortNum" ] = dwPort;
+                    ret = oRmtConn.GetStrProp(
+                        propUserAgent, strVal );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "UserAgent" ] = strVal;
                 }
 
                 oBridge[ "ConnParams" ] = oConnVal;
@@ -725,6 +729,10 @@ gint32 DumpSessions(
                         propDestTcpPort, dwPort );
                     if( SUCCEEDED( ret ) )
                         oConnVal[ "DestPortNum" ] = dwPort;
+                    ret = oRmtConn.GetStrProp(
+                        propUserAgent, strVal );
+                    if( SUCCEEDED( ret ) )
+                        oConnVal[ "UserAgent" ] = strVal;
                 }
 
                 oBridge[ "ConnParams" ] = oConnVal;

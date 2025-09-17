@@ -26,14 +26,7 @@ const { KeyValue, } = require( './appmonstructs' );
 // Start the client(s)
 const { CAppMonitor_CliImpl } = require( './AppMonitorcli' )
 
-var oProxy = null;
-var strObjDesc = './appmondesc.json';
-var strAppName = 'appmon';
-var strAppMonitorObjName = 'AppMonitor';
-var oParams0 = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );
-oParams0.SetString( EnumPropId.propObjInstName, 'AppMonitor' );
-var oAppMonitor_cli = new CAppMonitor_CliImpl( globalThis.g_oIoMgr,
-    strObjDesc, strAppMonitorObjName, oParams0 );
+var oAppMonitor_cli = null;
 
  // start the client object
 function StartPullInfo()
@@ -103,6 +96,7 @@ function StartPullInfo()
 
         return oAppMonitor_cli.IsAppOnline( oContext, appsAvail ).then((ret)=>{
             var arrPtPaths = []
+            console.log( 'request IsAppOnline is done with status ' + ret );
             for( var i = 0; i < globalThis.g_sites[0].apps.length; i++ )
             {
                 if( globalThis.g_sites[0].apps[i].status === "online" )
@@ -130,6 +124,7 @@ function StartPullInfo()
                 }
             }
             return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
+                console.log( 'request GetPointValues is done with status ' + ret );
                 globalThis.oProxy = oAppMonitor_cli;
                 Promise.resolve( ret );
             }).catch((e)=>{
@@ -145,16 +140,29 @@ function StartPullInfo()
         return Promise.resolve(-errno.EFAULT);
     })
 }
-oAppMonitor_cli.Start().then((retval)=>{
-    if( ERROR( retval ) )
-    {
-        globalThis.oProxy = null;
-        return Promise.resolve( retval );
-    }
-    globalThis.funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
-    return globalThis.funcStartPullInfo()
-}).catch((e)=>{
-    console.log( 'Start Proxy failed with error ' + e );
-    return Promise.resolve(e);
-})
+function StartClient()
+{
+    globalThis.g_strLoginResult = ""
+    var strObjDesc = './appmondesc.json';
+    var strAppName = 'appmon';
+    var strAppMonitorObjName = 'AppMonitor';
+    var oParams0 = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );
+    oParams0.SetString( EnumPropId.propObjInstName, 'AppMonitor' );
+    oAppMonitor_cli = new CAppMonitor_CliImpl( globalThis.g_oIoMgr,
+        strObjDesc, strAppMonitorObjName, oParams0 );
 
+    return oAppMonitor_cli.Start().then((retval)=>{
+        if( ERROR( retval ) )
+        {
+            globalThis.oProxy = null;
+            return Promise.resolve( retval );
+        }
+        globalThis.funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
+        return globalThis.funcStartPullInfo()
+    }).catch((e)=>{
+        console.log( 'Start Proxy failed with error ' + e );
+        return Promise.resolve(e);
+    })
+}
+globalThis.StartClient = StartClient;
+StartClient();

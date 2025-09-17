@@ -77,6 +77,8 @@ WebSocketFrameType WebSocket::parseHandshake(unsigned char* input_frame, int inp
                     this->peer_address= header_value, bValid = true;
 				else if(header_key == "X-Forwarded-Port")
                     this->peer_port= strtol( header_value.c_str(), nullptr, 10 ), bValid = true;
+				else if(header_key == "User-Agent")
+                    this->user_agent= header_value, bValid = true;
 			}
 		}
 	}

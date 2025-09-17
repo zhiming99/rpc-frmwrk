@@ -556,6 +556,11 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() > 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 

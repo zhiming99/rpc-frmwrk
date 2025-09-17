@@ -454,6 +454,7 @@ AC_CONFIG_FILES([Makefile
                  monitor/client/python/Makefile
                  monitor/client/python/appmancli/Makefile
                  monitor/client/java/appmancli/Makefile
+                 monitor/client/js/appmoncli/Makefile
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])

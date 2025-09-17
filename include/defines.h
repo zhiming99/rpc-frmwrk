@@ -271,7 +271,8 @@ extern EnumLogLvl g_dwLogLevel;
 
 extern std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
-    const char* szFunc, gint32 iLineNum );
+    const char* szFunc, gint32 iLineNum,
+    bool bTimestamp = true );
 
 extern std::string DebugMsgEx(
     const char* szFunc, gint32 iLineNum,

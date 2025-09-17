@@ -17,8 +17,18 @@ using namespace rpcf;
 
 #include "AppManagercli.h"
 
+#define  LOGPT_LINES_SHOW 100
+#define  LOGGER_APPNAME "loggersvr1"
+#define  LOGPT_LINES "lines"
+#define  LOGPT_LOGCONTENT "logcontent"
+
 namespace rpcf
 {
+
+enum EnumLogPropId : guint32
+{
+    propLinesToShow = propReservedEnd + 100,
+};
 
 struct CAsyncLoggerAMCallbacks :
     public CAsyncStdAMCallbacks
@@ -31,6 +41,17 @@ struct CAsyncLoggerAMCallbacks :
     gint32 GetPointValuesToInit(
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override;
+
+    // RPC Async Req Callback
+    gint32 ClaimAppInstCallback(
+        IConfigDb* context, 
+        gint32 iRet,
+        std::vector<KeyValue>& arrPtToGet /*[ In ]*/ ) override;
+
+    gint32 OnPointChanged( 
+        IConfigDb* context, 
+        const std::string& strPtPath /*[ In ]*/,
+        const Variant& value /*[ In ]*/ ) override;
 };
 
 typedef std::unique_ptr< std::ofstream > STMPTR;
@@ -43,6 +64,7 @@ class CLogService_SvrImpl
 
     STMPTR  m_pFile;
     TaskletPtr m_pTimer;
+    guint32 m_dwLines = LOGPT_LINES_SHOW;
 
     public:
     typedef CLogService_SvrSkel super;
@@ -108,6 +130,12 @@ class CLogService_SvrImpl
             "request 'LogCritMsg' is canceled." );
         return 0;
     }
+
+    gint32 SetProperty(
+        gint32 iProp, const Variant& oVar ) override;
+
+    gint32 GetProperty(
+        gint32 iProp, Variant& oVar ) const override;
 
     gint32 StartFlushTask();
     gint32 TimerCallback( IEventSink*, IConfigDb* );

@@ -512,6 +512,11 @@ gint32 CAppMonitor_SvrImpl::GetLargePointValue(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() > 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         HANDLE hcurStm = INVALID_HANDLE;
         GetCurStream( this, pContext, hcurStm );

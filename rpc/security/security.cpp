@@ -353,6 +353,21 @@ gint32 CRpcTcpBridgeAuth::EnableInterfaces()
 gint32 CRpcTcpBridgeAuth::OnPostStop(
     IEventSink* pCallback )
 {
+    gint32 ret = 0;
+    do{
+        std::string strHash1;
+        CCfgOpenerObj oIfCfg( this );
+        ret = oIfCfg.GetStrProp(
+            propSessHash, strHash1 );
+        if( SUCCEEDED( ret ) &&
+            strHash1.size() > 2 &&
+            strHash1.substr( 0, 2 ) == "AU" )
+        {
+            stdstr strMsg = "Session: ";
+            strMsg += strHash1 + " closed.";
+            LOGINFO( GetIoMgr(), 0, strMsg );
+        }
+    }while( 0 );
     SetSessHash( "", false );
     return super::OnPostStop( pCallback );
 }
@@ -622,26 +637,67 @@ gint32 CRpcTcpBridgeAuth::DumpConnParams(
     do{
         IConfigDb* pConnParams;
         CCfgOpenerObj oIfCfg( this );
+
         ret = oIfCfg.GetPointer(
             propConnParams, pConnParams );
         if( ERROR( ret ) )
             break;
         CConnParams oConn( pConnParams );
-        stdstr strVal = oConn.GetSrcIpAddr();
-        strMsg += stdstr( "SrcIp=" ) +
-            strVal + ",";
-        guint32 dwVal = oConn.GetSrcPortNum();
-        strMsg += stdstr( "SrcPort=" ) +
-                std::to_string( dwVal ) + ",";
-        strVal = oConn.GetDestIpAddr();
-        strMsg += stdstr( "DestIp=" ) +
-            strVal + ",";
-        dwVal = oConn.GetDestPortNum();
-        strMsg += stdstr( "DestPort=" ) +
-                std::to_string( dwVal ) + ",";
-        strVal = oConn.GetRouterPath();
-        strMsg += stdstr( "RouterPath=" ) +
-            strVal + ",";
+
+        IConfigDb* pRmtParams = nullptr;
+        ret = oIfCfg.GetPointer(
+            propRmtConnParams, pRmtParams );
+
+        stdstr strVal;
+        if( SUCCEEDED( ret ) )
+        {
+            CCfgOpener oRmtConn( pRmtParams );
+
+            ret = oRmtConn.GetStrProp(
+                propSrcIpAddr, strVal );
+            if( SUCCEEDED( ret ) )
+                strMsg += stdstr( "SrcIp=" ) +
+                    strVal + ",";
+            guint32 dwVal = 0;
+            ret = oRmtConn.GetIntProp(
+                propSrcTcpPort, dwVal );
+            if( SUCCEEDED( ret ) )
+                strMsg += stdstr( "SrcPort=" ) +
+                    std::to_string( dwVal ) + ",";
+
+            ret = oRmtConn.GetStrProp(
+                propDestIpAddr, strVal );
+            if( SUCCEEDED( ret ) )
+                strMsg += stdstr( "DestIp=" ) +
+                    strVal + ",";
+            ret = oRmtConn.GetIntProp(
+                propSrcTcpPort, dwVal );
+            if( SUCCEEDED( ret ) )
+                strMsg += stdstr( "DestPort=" ) +
+                    std::to_string( dwVal ) + ",";
+            ret = oRmtConn.GetStrProp(
+                propUserAgent, strVal );
+            if( SUCCEEDED( ret ) )
+                strMsg += stdstr( "UserAgent=" ) +
+                    strVal + ",";
+        }
+        else
+        {
+            strVal = oConn.GetSrcIpAddr();
+            strMsg += stdstr( "SrcIp=" ) +
+                strVal + ",";
+            guint32 dwVal = oConn.GetSrcPortNum();
+            strMsg += stdstr( "SrcPort=" ) +
+                    std::to_string( dwVal ) + ",";
+            strVal = oConn.GetDestIpAddr();
+            strMsg += stdstr( "DestIp=" ) +
+                strVal + ",";
+            dwVal = oConn.GetDestPortNum();
+            strMsg += stdstr( "DestPort=" ) +
+                    std::to_string( dwVal ) + ",";
+        }
+
+        strMsg += stdstr( "RouterPath=/," );
         bool bVal = oConn.IsSSL();
         if( bVal )
             strMsg += stdstr( "SSL=true," );

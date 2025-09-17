@@ -1586,8 +1586,9 @@ function add_stdapp()
 
     find ./apps/$_instname -type f -exec chmod ug+rw,o+r '{}' ';'
     find ./apps/$_instname -type d -exec chmod ug+rwx,o+rx '{}' ';'
-    chmod -R o-rwx ./apps/$_instname/points/restart
-    chmod -R o+w ./apps/$_instname/notify_streams
+    #chmod -R o-rwx ./apps/$_instname/points/restart
+    chmod -R o-rwx ./apps/$_instname
+    #chmod -R o+w ./apps/$_instname/notify_streams
     if [[ "x$_instname" == "xtimer1" ]]; then
         return 0
     fi

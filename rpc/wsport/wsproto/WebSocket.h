@@ -48,6 +48,7 @@ class WebSocket
 	string key;
 	string peer_address;
 	guint32 peer_port = 0;
+    stdstr user_agent;
 
 	WebSocket();
 

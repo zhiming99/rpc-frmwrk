@@ -298,6 +298,7 @@ enum EnumPropId : gint32
     propRmtConnParams,  // type: a configdb holding connection parameters from peer
     propUrlHost,        // type: a string as the host name from the destUrl
     propUrlPort,        // type: a integer as the port number from the destUrl
+    propUserAgent,      // type: a string containing the client browser information
 
     // monitor related properties
     propObjCount = 0x4000,

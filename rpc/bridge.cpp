@@ -5289,6 +5289,8 @@ gint32 CRpcTcpBridge::SetRmtConnParams()
                 propSrcIpAddr, pRmtConn );
             oRmtConn.CopyProp(
                 propSrcTcpPort, pRmtConn );
+            oRmtConn.CopyProp(
+                propUserAgent, pRmtConn );
         }
         oIfCfg.SetPointer( propRmtConnParams,
             ( IConfigDb* )oRmtConn.GetCfg() );
