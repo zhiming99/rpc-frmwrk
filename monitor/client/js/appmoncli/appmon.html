@@ -12,7 +12,7 @@
       #config-btn { width: 100%; }
     }
     #logs-panel {
-        max-height: 200px;
+        height: 100dvh;
         white-space: pre-wrap;       /* Since CSS 2.1 */
         white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
         white-space: -pre-wrap;      /* Opera 4-6 */
@@ -25,7 +25,7 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
       <span id="status-dot" class="bg-success"></span>
-      <span class="navbar-brand mb-0 h1">RPC-Framework Monitor</span>
+      <span class="navbar-brand mb-0 h1" id="APP_TITLE">RPC-Framework Monitor</span>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -49,8 +49,8 @@
     <div class="row">
       <div class="col-12">
         <div class="card mb-3">
-          <div class="card-header">Logs</div>
-          <div class="card-body" style="max-height:200px; overflow-y:auto;">
+          <div class="card-header" id="LogsTitle">Logs</div>
+          <div class="card-body" style="overflow-y:auto;">
             <pre id="logs-panel" class="mb-0">Loading logs...</pre>
           </div>
         </div>
@@ -85,8 +85,22 @@
     </div>
   </div>
 
+  <script src="./i18n-helper.js"></script>
   <script>
+    const i18nh = globalThis.i18nHelper; // Make it globally accessible
+    i18nh.load(navigator.language).then(() => {
+      console.log("Translations loaded");
+      document.getElementById('config-btn').textContent = i18nh.t("Update Config");
+      document.getElementById('reconnect-btn').textContent = i18nh.t("Connect");
+      document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
+      document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
+      document.getElementById('LogsTitle').textContent = i18nh.t("LOGS");
+    }).catch((error) => {
+      console.error("Error loading translations:", error);
+    });
+  </script>
 
+  <script>
     function setStatusDot(isOnline) {
       const dot = document.getElementById('status-dot');
       dot.classList.remove('bg-success', 'bg-danger');
@@ -102,7 +116,7 @@
       if (show) {
         btn.classList.remove('d-none');
         if (isConnected) {
-          btn.textContent = 'Disconnect';
+          btn.textContent = i18nh.t('Disconnect');
           btn.classList.remove('btn-warning');
           btn.classList.add('btn-danger');
           btn.onclick = function() {
@@ -116,7 +130,7 @@
             }
           };
         } else {
-          btn.textContent = 'Connect';
+          btn.textContent = i18nh.t('Connect');
           btn.classList.remove('btn-danger');
           btn.classList.add('btn-warning');
           btn.onclick = function() {
@@ -205,7 +219,7 @@
 
         const siteHeader = document.createElement('div');
         siteHeader.className = 'card-header bg-info text-white';
-        siteHeader.textContent = `Site: ${site.name} (Container: ${site.container})`;
+        siteHeader.textContent = `${i18nHelper.t("SITE_LABEL")}: ${site.name} (${i18nHelper.t("CONTAINER_LABEL")}: ${site.container})`;
 
         const siteBody = document.createElement('div');
         siteBody.className = 'card-body';
@@ -229,7 +243,7 @@
 
           const appStatus = document.createElement('p');
           appStatus.className = 'card-text';
-          appStatus.innerHTML = `<b>Status:</b> ${app.status}<br><b>CPU:</b> ${app.cpu}`;
+          appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> ${app.status}<br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
 
           appCardBody.appendChild(appTitle);
           appCardBody.appendChild(appStatus);
@@ -329,8 +343,30 @@
           if (ret === 0) {
               const decoder = new TextDecoder('utf-8')
               let text=decoder.decode(value);
+              lineArray = text.split('\n').reverse();
+              const regex = /^\[(\d+\.\d+)/;
+              for(let i = 0; i < lineArray.length; i++) {
+                  const match = lineArray[i].match(regex);
+                  if (match) {
+                      const timestamp = parseFloat(match[1]);
+                      const date = new Date(timestamp * 1000);
+                      let formattedDate = date.toLocaleString(
+                            navigator.language,
+                            { 
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false, // Ensures 24-hour format
+                            });
+                      formattedDate = formattedDate.replace(/, /, '-');
+                      lineArray[i] = lineArray[i].replace(regex, `[${formattedDate}`);
+                  }
+              }
               document.getElementById('logs-panel').innerHTML =
-                text.split('\n').reverse().join('\n').trim();
+                lineArray.join('\n').trim();
           } else {
               console.log("Error fetching logs:", ret);
           }

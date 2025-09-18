@@ -2345,7 +2345,7 @@ gint32 CIoManager::LogMessage(
     strFile += szFile;
 
     stdstr strFinalMsg = DebugMsgInternal(
-        ret, szBuf, strFile.c_str(), iLineNum, false );
+        ret, szBuf, strFile.c_str(), iLineNum );
     return m_oLogger.PushMessage( strFinalMsg );
 }
 

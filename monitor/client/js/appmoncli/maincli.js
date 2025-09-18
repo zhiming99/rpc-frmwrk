@@ -45,10 +45,10 @@ function StartPullInfo()
                 if( this.m_setAppBaseLine.has( arrApps[i] ) )
                     continue
                 globalThis.g_sites[0].apps.push(
-                    { name: arrApps[i], status: "unknown", cpu: "0%" } )
+                    { name: arrApps[i], status: globalThis.i18nHelper.t("APP_STATUS_UNKNOWN"), cpu: "0%" } )
             }
             if( this.m_strRouterPath === "/")
-                globalThis.g_sites[0].name = "Root Node"
+                globalThis.g_sites[0].name = globalThis.i18nHelper.t("Root Node");
             else
                 globalThis.g_sites[0].name = this.m_strRouterPath
         }
@@ -75,7 +75,7 @@ function StartPullInfo()
             }
 
             for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
-                globalThis.g_sites[0].apps[j].status = "offline"
+                globalThis.g_sites[0].apps[j].status = i18nHelper.t("APP_STATUS_OFFLINE");
 
             for ( var i = 0; i < arrOnlineApps.length; i++ )
             {
@@ -85,7 +85,7 @@ function StartPullInfo()
                 {
                     if( globalThis.g_sites[0].apps[j].name === arrOnlineApps[i] )
                     {
-                        globalThis.g_sites[0].apps[j].status = "online"
+                        globalThis.g_sites[0].apps[j].status = i18nHelper.t("APP_STATUS_RUNNING");
                         break
                     }
                 }
@@ -99,7 +99,7 @@ function StartPullInfo()
             console.log( 'request IsAppOnline is done with status ' + ret );
             for( var i = 0; i < globalThis.g_sites[0].apps.length; i++ )
             {
-                if( globalThis.g_sites[0].apps[i].status === "online" )
+                if( globalThis.g_sites[0].apps[i].status === i18nHelper.t("APP_STATUS_RUNNING") )
                     arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/cpu_load");
             }
             oContext.oGetPvsCb = (oContext, ret, arrKeyVals ) => {

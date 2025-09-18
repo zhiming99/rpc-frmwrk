@@ -197,6 +197,7 @@ add_log_link rpcrouter1 rx_bytes appmonsvr1 ptlogger1
 add_log_link rpcrouter1 tx_bytes appmonsvr1 ptlogger1
 add_log_link rpcrouter1 vmsize_kb appmonsvr1 ptlogger1
 add_log_link rpcrouter1 obj_count appmonsvr1 ptlogger1
+add_log_link rpcrouter1 cpu_load appmonsvr1 ptlogger1
 
 change_application_owner rpcrouter1 $uid $gid
 
