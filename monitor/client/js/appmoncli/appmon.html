@@ -18,6 +18,7 @@
         white-space: -pre-wrap;      /* Opera 4-6 */
         white-space: -o-pre-wrap;    /* Opera 7 */
         word-wrap: break-word;       /* Internet Explorer 5.5+ */
+        max-height: 600px;
     }
   </style>
 </head>
@@ -33,7 +34,7 @@
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
             <button id="config-btn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">Update Config</button>
-            <button id="reconnect-btn" class="btn btn-warning btn-sm ms-2 d-none">Connect</button>
+            <button id="reconnect-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
           </li>
         </ul>
       </div>
@@ -91,7 +92,7 @@
     i18nh.load(navigator.language).then(() => {
       console.log("Translations loaded");
       document.getElementById('config-btn').textContent = i18nh.t("Update Config");
-      document.getElementById('reconnect-btn').textContent = i18nh.t("Connect");
+      document.getElementById('reconnect-btn').textContent = i18nh.t("Login");
       document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
       document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
       document.getElementById('LogsTitle').textContent = i18nh.t("LOGS");
@@ -116,7 +117,7 @@
       if (show) {
         btn.classList.remove('d-none');
         if (isConnected) {
-          btn.textContent = i18nh.t('Disconnect');
+          btn.textContent = i18nh.t('Logout');
           btn.classList.remove('btn-warning');
           btn.classList.add('btn-danger');
           btn.onclick = function() {
@@ -130,7 +131,7 @@
             }
           };
         } else {
-          btn.textContent = i18nh.t('Connect');
+          btn.textContent = i18nh.t('Login');
           btn.classList.remove('btn-danger');
           btn.classList.add('btn-warning');
           btn.onclick = function() {
@@ -179,29 +180,11 @@
 
       var siteCard = null;
       sites.forEach(site => {
-        // find site card
-        for (const child of sitesRow.children) {
-          if (child.querySelector('.card-header').textContent === `Site: ${site.name} (Container: ${site.container})`) {
-            // Site card already exists, no need to create a new one
-            siteCard = child;
-            break;
+          for( const app of site.apps ) {
+              appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
+              if( appStatus )
+                  appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> ${app.status}<br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
           }
-        }
-
-        if( !siteCard )
-            return;
-
-        var appCols = siteCard.children[0].children[1].children[0].children
-        for( const child of appCols ) {
-            for( const app of site.apps ) {
-              if( child.querySelector('.card-title').textContent === app.name ) {
-                // App card already exists, no need to create a new one
-                appText = child.querySelector('.card-text');
-                appText.innerHTML = `<b>Status:</b> ${app.status}<br><b>CPU:</b> ${app.cpu}`;
-                break;
-              }
-            }
-        }
       });
     }
 
@@ -243,6 +226,7 @@
 
           const appStatus = document.createElement('p');
           appStatus.className = 'card-text';
+          appStatus.id = `app-status-${app.name}-${site.name}`;
           appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> ${app.status}<br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
 
           appCardBody.appendChild(appTitle);

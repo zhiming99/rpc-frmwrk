@@ -318,18 +318,29 @@ exports.CInterfaceProxy = class CInterfaceProxy
             modal.style.padding = '24px';
             modal.style.borderRadius = '8px';
             modal.style.boxShadow = '0 2px 12px rgba(0,0,0,0.2)';
+            var i18nh = globalThis.i18nHelper
+            if( !i18nh )
+            {
+                // using a fake helper
+                i18nh = {
+                     t(key, vars = {}, context = null)
+                     {
+                        return key;
+                     }
+                }
+            }
             modal.innerHTML = `
-                <h3>${globalThis.i18nHelper.t("Login")}</h3>
+                <h3>${i18nh.t("Login")}</h3>
                 <form id="loginForm" autocomplete="off">
                     <div style="margin-bottom:10px;">
-                        <input id="loginUser" type="text" placeholder="${globalThis.i18nHelper.t('Username')}" style="width:200px;padding:6px;" required />
+                        <input id="loginUser" type="text" placeholder="${i18nh.t('Username')}" style="width:200px;padding:6px;" required />
                     </div>
                     <div style="margin-bottom:10px;">
-                        <input id="loginPass" type="password" placeholder="${globalThis.i18nHelper.t('Password')}" style="width:200px;padding:6px;" required />
+                        <input id="loginPass" type="password" placeholder="${i18nh.t('Password')}" style="width:200px;padding:6px;" required />
                     </div>
                     <div style="text-align:right;">
-                        <button type="submit" style="margin-right:8px;">${globalThis.i18nHelper.t("OK")}</button>
-                        <button type="button" id="loginCancel">${globalThis.i18nHelper.t("Cancel")}</button>
+                        <button type="submit" style="margin-right:8px;">${i18nh.t("OK")}</button>
+                        <button type="button" id="loginCancel">${i18nh.t("Cancel")}</button>
                     </div>
                 </form>
             `;
