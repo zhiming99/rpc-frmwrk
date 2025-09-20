@@ -18,10 +18,11 @@
   "STATUS": "Status",
   "OK": "OK",
   "ERROR": "Error",
-  "NO_DATA": "No data available.",
+  "NO_DATA": "No data",
   "LAST_UPDATE": "Last update: {time}",
   "APP": "Application",
   "REFRESH": "Refresh",
   "SAVE": "Save",
-  "CLOSE": "Close"
+  "CLOSE": "Close",
+  "Setpoints": "Setpoints"
 }

@@ -10,7 +10,6 @@
   "LOADING": "加载中...",
   "UPDATE_CONFIG": "更新配置",
   "PARAMETER": "参数",
-  "VALUE": "值",
   "UPDATE": "更新",
   "Cancel": "取消",
   "CONFIG_UPDATED": "配置更新成功。",
@@ -32,5 +31,8 @@
   "Username": "用户名",
   "Password": "密码",
   "Login": "登录",
-  "Logout": "退出"
+  "Logout": "退出",
+  "Setpoints": "设置点",
+  "Name": "名称",
+  "Value": "值"
 }

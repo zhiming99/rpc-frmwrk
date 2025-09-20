@@ -75,7 +75,7 @@ function StartPullInfo()
             }
 
             for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
-                globalThis.g_sites[0].apps[j].status = i18nHelper.t("APP_STATUS_OFFLINE");
+                globalThis.g_sites[0].apps[j].status = i18nHelper.t("APP_STATUS_STOPPED");
 
             for ( var i = 0; i < arrOnlineApps.length; i++ )
             {
