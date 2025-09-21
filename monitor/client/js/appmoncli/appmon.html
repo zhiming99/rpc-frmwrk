@@ -239,7 +239,7 @@
                 appCard.className = 'card text-center';
                 appCard.style.cursor = 'pointer';
                 appCard.onclick = function() {
-                    showSetpointsModal(app, site);
+                    showAppDetailModal(app, site);
                 }
 
                 const appCardBody = document.createElement('div');
@@ -338,6 +338,7 @@
     //# sourceURL=rpcf://htmlcode/checkstate.js
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./appdetail.js"></script>
   <script>
     // Example: Simulate data fetching
     function clearLogs()
@@ -403,19 +404,19 @@
       };
       return globalThis.oProxy.GetLargePointValue(
           oContext, "loggersvr1/logcontent").then((ret) => {
-         Promise.resolve(ret); 
+          Promise.resolve(ret); 
       }).catch((error) => {
           console.log("Error fetching logs:", error);
       });
     }
 
-    function showSetpointsModal(app, site) {
+    function showAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
         document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
         // Example: app.setpoints = [{name: "SP1", value: 123}, ...]
-        const setpoints = app.setpoints || [];
+        const setpoints = app.setpoints || {}
         const tbody = document.getElementById('setpointsTableBody');
         tbody.innerHTML = '';
         if (setpoints.length === 0) {
@@ -429,8 +430,25 @@
         }
 
         // Show the modal
-        const modal = new bootstrap.Modal(document.getElementById('setpointsModal'));
+        var modal = new bootstrap.Modal(document.getElementById('setpointsModal'));
+        globalThis.curSpModal = modal;
+        modal.curretSite=site
+        modal.currentApp=app
+
+        modal.addEventListener('hidden.bs.modal', function (event) {
+            document.getElementById('setpointsTableBody').innerHTML = '';
+            globalThis.curSpModal = null;
+            if( globalThis.oProxy)
+            {
+                return globalThis.oProxy.RemoveListener( Object() ).then((ret)=>{
+                    console.log("Listener removed:", ret);
+                }).catch((error)=>{
+                    console.log("Error removing listener:", error);
+                });
+            }
+        });
         document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
+
         document.getElementById('setpoint-value-header').textContent = i18nHelper.t("Value");
         modal.show();
     }
