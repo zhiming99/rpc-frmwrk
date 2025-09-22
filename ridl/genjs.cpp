@@ -2055,6 +2055,7 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         CCOUT << "try";
         BLOCK_OPEN;
         Wa( "var ret = oResp.GetProperty( EnumPropId.propReturnValue );" );
+        Wa( "oContext.m_iRet = Int32Value( ret );" );
         Wa( "if( ERROR( ret ) )" );
         BLOCK_OPEN;
         Wa( "if( oContext.m_oCallback === undefined )" );
@@ -2115,7 +2116,6 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         }
         BLOCK_CLOSE;
         NEW_LINE;
-        Wa( "oContext.m_iRet = Int32Value( ret );" );
         Wa( "if( ERROR( ret ) && oContext.m_oReject )" );
         Wa( "    oContext.m_oReject( oContext );" );
         Wa( "else if( oContext.m_oResolve )" );

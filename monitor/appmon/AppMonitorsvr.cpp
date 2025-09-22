@@ -831,6 +831,7 @@ gint32 CAppMonitor_SvrImpl::GetPointValuesInternal (
                     "Error get data type %s/%s",
                     strAppName.c_str(),
                     elem.c_str() );
+                continue;
             }
             auto iType = ( guint32& )dt;
             if( iType < typeDMsg )
@@ -847,10 +848,6 @@ gint32 CAppMonitor_SvrImpl::GetPointValuesInternal (
                 if( ERROR( ret ) )
                     break;
                 CFileHandle ofh( pfs, hFile );
-                {
-                    ret = -ENOTSUP;
-                    break;
-                }
                 BufPtr pBuf( true );
 
                 struct stat st;
@@ -882,6 +879,7 @@ gint32 CAppMonitor_SvrImpl::GetPointValuesInternal (
                     "Error GetPointValue %s/%s",
                     strAppName.c_str(),
                     elem.c_str() );
+                continue;
             }
             arrKeyVals.push_back( kv );
         }
