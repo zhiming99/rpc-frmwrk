@@ -20,7 +20,7 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         this.OnDataReceived = this.OnDataReceivedImpl.bind( this );
         this.OnStmClosed = this.OnStmClosedImpl.bind( this );
         this.m_setAppBaseLine = new Set( );
-        this.m_setAppBaseLine.add( 'appmonsvr1' );
+        //this.m_setAppBaseLine.add( 'appmonsvr1' );
         this.m_setAppBaseLine.add( 'timer1' );
         this.m_setAppBaseLine.add( 'loggersvr1' );
     }
@@ -183,6 +183,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
     )
     {
         // add code here
+        if( globalThis.OnPointChanged )
+            globalThis.OnPointChanged( strPtPath, value );
     }
 
     // IAppStore::OnPointsChanged
@@ -192,6 +194,7 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
     )
     {
         // add code here
+        console.log("OnPointsChanged:", arrKVs);
     }
 
     // IAppStoreEx::IsAppOnlineCallback
@@ -218,6 +221,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         // 'ret' is the status code of the request
         // if ret == errno.STATUS_SUCCESS, the following parameters are valid response from the server
         // if ret < 0, the following parameters are undefined
+        if( oContext.oRegListenerCb )
+            oContext.oRegListenerCb( oContext, ret )
     }
 
     // IAppMonitor::RemoveListenerCallback

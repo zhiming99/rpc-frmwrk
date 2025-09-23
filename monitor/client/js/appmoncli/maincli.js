@@ -31,6 +31,15 @@ var oAppMonitor_cli = null;
  // start the client object
 function StartPullInfo()
 {
+    if( globalThis.curSpModal && globalThis.oProxy && globalThis.fetchAppDetails )
+    {
+        return globalThis.fetchAppDetails().then( (ret)=>{
+            console.log( 'fetchAppDetails is done with status ' + ret );
+        }).catch((e)=>{
+            console.log( 'fetchAppDetails failed with error ' + e );
+            return Promise.reject( e );
+        });
+    }
     return new Promise( ( resolve, reject )=>{
         var oContext = new Object();
         oContext.m_oResolve = resolve;
@@ -125,8 +134,9 @@ function StartPullInfo()
             }
             return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
                 console.log( 'request GetPointValues is done with status ' + ret );
-                globalThis.oProxy = oAppMonitor_cli;
-                Promise.resolve( ret );
+                if( !globalThis.oProxy )
+                    globalThis.oProxy = oAppMonitor_cli;
+
             }).catch((e)=>{
                 console.log( 'GetPointValues failed with error ' + e );
                 Promise.reject( e );
@@ -140,11 +150,11 @@ function StartPullInfo()
         return Promise.resolve(-errno.EFAULT);
     })
 }
+
 function StartClient()
 {
     globalThis.g_strLoginResult = ""
     var strObjDesc = './appmondesc.json';
-    var strAppName = 'appmon';
     var strAppMonitorObjName = 'AppMonitor';
     var oParams0 = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );
     oParams0.SetString( EnumPropId.propObjInstName, 'AppMonitor' );

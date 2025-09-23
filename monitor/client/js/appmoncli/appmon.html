@@ -20,8 +20,15 @@
         word-wrap: break-word;       /* Internet Explorer 5.5+ */
         max-height: 600px;
     }
+    .card.text-center:hover {
+      box-shadow: 0 0 10px 2px #0d6efd33; /* subtle blue shadow */
+      background-color: #c1c4c7;           /* light blue background */
+      transition: box-shadow 0.2s, background-color 0.2s;
+      cursor: pointer;
+    }
   </style>
 </head>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <body class="bg-light">
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
@@ -47,7 +54,7 @@
       <!-- Add more cards as needed -->
     </div>
 
-    <div class="row" id="logs-row">
+    <div class="row" id="logs-row" style="display:none;">
       <div class="col-12">
         <div class="card mb-3">
           <div class="card-header" id="LogsTitle">Logs</div>
@@ -154,6 +161,7 @@
         btn.classList.add('d-none');
       }
     }
+
     setStatusDot(false);
     showReconnectButton(true);
 
@@ -178,34 +186,41 @@
     ];
     globalThis.g_sites = sites;
     function updateSites(sites) {
-      const sitesRow = document.getElementById('sites-row');
-
-      var siteCard = null;
-      sites.forEach(site => {
-          appRow = document.getElementById(`app-row-${site.name}`);
-          if( appRow.children.length !== site.apps.length )
-          {
-              renderSites(sites);
-              return;
-          }
-      })
-      sites.forEach(site => {
-          for( const app of site.apps ) {
-              appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
-              if( appStatus )
+        if( globalThis.curSpModal )
+        {
+            updateAppDetailModal( globalThis.curSpModal.currentApp,
+                globalThis.curSpModal.currentSite );
+        }
+        if( !globalThis.curSpModal || !globalThis.oProxy || globalThis.oProxy.m_iState === 0 )
+        {
+            const sitesRow = document.getElementById('sites-row');
+            var siteCard = null;
+            sites.forEach(site => {
+              appRow = document.getElementById(`app-row-${site.name}`);
+              if( appRow.children.length !== site.apps.length )
               {
-                  let statusClass = '';
-                  if (app.status === i18nHelper.t("APP_STATUS_RUNNING")) {
-                        statusClass = 'bg-success text-white px-2 rounded';
-                  } else if (app.status === i18nHelper.t("APP_STATUS_STOPPED")) {
-                        statusClass = 'bg-danger text-white px-2 rounded';
-                  } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
-                        statusClass = 'bg-secondary text-white px-2 rounded';
-                  }
-                  appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+                  renderSites(sites);
+                  return;
               }
-          }
-      });
+            })
+            sites.forEach(site => {
+              for( const app of site.apps ) {
+                  appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
+                  if( appStatus )
+                  {
+                      let statusClass = '';
+                      if (app.status === i18nHelper.t("APP_STATUS_RUNNING")) {
+                            statusClass = 'bg-success text-white px-2 rounded';
+                      } else if (app.status === i18nHelper.t("APP_STATUS_STOPPED")) {
+                            statusClass = 'bg-danger text-white px-2 rounded';
+                      } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
+                            statusClass = 'bg-secondary text-white px-2 rounded';
+                      }
+                      appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+                  }
+              }
+            })
+        }
     }
 
     function renderSites(sites) {
@@ -239,7 +254,8 @@
                 appCard.className = 'card text-center';
                 appCard.style.cursor = 'pointer';
                 appCard.onclick = function() {
-                    showAppDetailModal(app, site);
+                    if( !globalThis.curSpModal && globalThis.oProxy )
+                        showAppDetailModal(app, site);
                 }
 
                 const appCardBody = document.createElement('div');
@@ -294,21 +310,13 @@
     globalThis.g_strAuthMech = ""
 
     var iChecks = 0;
-    function checkProxyState(){
-        if( globalThis.oProxy === undefined ){
-            setStatusDot(false);
-            showReconnectButton(true, false);
-            setTimeout( checkProxyState, 2000 );
-            console.log( "Waiting RPC connection ready..." );
-        }else if( globalThis.oProxy === null ){
-            setStatusDot(false);
-            showReconnectButton(true, false);
-            console.log( "RPC connection is shutdown abnormally..." );
-        }else if( globalThis.oProxy.m_iState === 0 ){
-            setStatusDot(false);
-            showReconnectButton(true, false);
-            console.log( "RPC connection is down..." );
-            clearLogs();
+    function DoCleanup()
+    {
+        setStatusDot(false);
+        showReconnectButton(true, false);
+        clearLogs();
+        if( g_sites && g_sites.length > 0 )
+        {
             g_sites.forEach(site => {
                 site.apps.forEach(app => {
                     app.status = i18nHelper.t("APP_STATUS_UNKNOWN");
@@ -316,13 +324,37 @@
                 });
             });
             updateSites(globalThis.g_sites);
-            globalThis.oProxy = null;
-            iChecks = 0;
+        }
+        globalThis.oProxy = null;
+        if( globalThis.curSpModal )
+        {
+            globalThis.curSpModal.hide();
+            globalThis.curSpModal = undefined;
+        }
+        const logsRow = document.getElementById('logs-row');
+        logsRow.style.display = "none"
+
+        iChecks = 0;
+    }
+
+    setStatusDot(false);
+    showReconnectButton(true, false);
+
+    function checkProxyState(){
+        if( globalThis.oProxy === undefined ){
+            setTimeout( checkProxyState, 2000 );
+            console.log( "Waiting RPC connection ready..." );
+        }else if( globalThis.oProxy === null ){
+            console.log( "RPC connection is shutdown abnormally..." );
+            DoCleanup();
+        }else if( globalThis.oProxy.m_iState === 0 ){
+            console.log( "RPC connection is down..." );
+            DoCleanup();
         }else{
-            setStatusDot(true);
-            showReconnectButton(true, true);
             if( iChecks++ === 0 )
             {
+                setStatusDot(true);
+                showReconnectButton(true, true);
                 renderSites(globalThis.g_sites);
                 fetchLogs();
                 globalThis.fetchStatusInterval =
@@ -337,7 +369,6 @@
     setTimeout( checkProxyState, 2000 );
     //# sourceURL=rpcf://htmlcode/checkstate.js
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="./appdetail.js"></script>
   <script>
     // Example: Simulate data fetching
@@ -410,16 +441,34 @@
       });
     }
 
+    function updateAppDetailModal(app, site) {
+        // Set modal title
+        document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+
+        const setpoints = app.setpoints 
+        const tbody = document.getElementById('setpointsTableBody');
+        tbody.innerHTML = '';
+        if (setpoints.size === 0) {
+            tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
+        } else {
+            setpoints.forEach((value, key) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${key}</td><td>${value}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+    }
     function showAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
         document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
         // Example: app.setpoints = [{name: "SP1", value: 123}, ...]
-        const setpoints = app.setpoints || {}
+        const setpoints = app.setpoints || new Map();
         const tbody = document.getElementById('setpointsTableBody');
         tbody.innerHTML = '';
-        if (setpoints.length === 0) {
+        if (setpoints.size === 0) {
           tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
           setpoints.forEach(sp => {
@@ -430,16 +479,27 @@
         }
 
         // Show the modal
-        var modal = new bootstrap.Modal(document.getElementById('setpointsModal'));
+        var modalEl = document.getElementById('setpointsModal');
+        var modal = new bootstrap.Modal(modalEl);
         globalThis.curSpModal = modal;
-        modal.curretSite=site
-        modal.currentApp=app
+        modal.currentSite = site;
+        modal.currentApp = app;
 
-        modal.addEventListener('hidden.bs.modal', function (event) {
+        globalThis.OnPointChanged = (strPtPath, value) => {
+            if (modal.currentApp && modal.currentApp.setpoints) {
+                var arrComps = strPtPath.split('/')
+                if( arrComps.length < 2 )
+                    return
+                modal.currentApp.setpoints.set(arrComps[1], value.m_val);
+            }
+        };
+        modalEl.addEventListener('hidden.bs.modal', function (event) {
             document.getElementById('setpointsTableBody').innerHTML = '';
             globalThis.curSpModal = null;
             if( globalThis.oProxy)
             {
+                if( modal.currentApp )
+                    modal.currentApp.setpoints = new Map();
                 return globalThis.oProxy.RemoveListener( Object() ).then((ret)=>{
                     console.log("Listener removed:", ret);
                 }).catch((error)=>{
@@ -447,10 +507,11 @@
                 });
             }
         });
-        document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
 
+        document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
         document.getElementById('setpoint-value-header').textContent = i18nHelper.t("Value");
         modal.show();
+
     }
   </script>
 </body>
