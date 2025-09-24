@@ -126,7 +126,7 @@ function StartPullInfo()
                     {
                         if( globalThis.g_sites[0].apps[j].name === strApp )
                         {
-                            globalThis.g_sites[0].apps[j].cpu = arrKeyVals[i].oValue.m_val.toFixed(2) + "%";
+                            globalThis.g_sites[0].apps[j].cpu = arrKeyVals[i].oValue.m_val.toFixed(3) + "%";
                             break;
                         }
                     }

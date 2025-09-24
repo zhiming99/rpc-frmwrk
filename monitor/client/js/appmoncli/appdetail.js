@@ -2,17 +2,51 @@ const arrBasePoints = ["cpu_load",
     "vmsize_kb", "obj_count", "req_count",
     "uptime", "offline_times", "cmdline",
     "open_files", "working_dir",
-    "rx_bytes", "tx_bytes",
+    "rx_bytes", "tx_bytes", "pid", "conn_count"
 ]
 
 const arrRouterPoints = arrBasePoints.concat( [
-    "max_conn", "sess_time_limit", "max_send_bps", "max_recv_bps",
+    "max_conn", "sess_time_limit", "max_send_bps", "max_recv_bps", "max_pending_tasks"
 ]);
 
 const arrAppPoints = arrBasePoints.concat( [
     "resp_count", "failure_count", "pending_tasks",
-    "max_streams_per_session"
+    "max_streams_per_session", "max_qps", "cur_qps"
 ])
+
+function type2str( iType )
+{
+    switch(iType)
+    {
+        case 1: return "byte";
+        case 2: return "word";
+        case 3: return "int";
+        case 4: return "qword";
+        case 5: return "float";
+        case 6: return "double";
+        case 7: return "string";
+        case 10: return 'blob'
+        default: break
+    }
+    return 'none'
+}
+
+function str2type( strType )
+{
+    switch(strType)
+    {
+        case "byte": return 1;
+        case "word": return 2;
+        case "int": return 3;
+        case "qword": return 4;
+        case "float": return 5;
+        case "double": return 6;
+        case "string": return 7;
+        case 'blob': return 10;
+        default: break;
+    }
+    return 0
+}
 
 function fetchAppDetails()
 {
@@ -39,7 +73,8 @@ function fetchAppDetails()
                 // Process the retrieved point values
                 for( var i = 0; i < arrKeyVals.length; i++ ){
                     const item = arrKeyVals[i];
-                    app.setpoints.set( item.strKey, item.oValue.m_val );
+                    app.setpoints.set( item.strKey,
+                        { v:item.oValue.m_val, t:type2str(item.oValue.m_iType) } );
                 }
                 return
             };

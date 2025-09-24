@@ -454,7 +454,11 @@
         } else {
             setpoints.forEach((value, key) => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${key}</td><td>${value}</td>`;
+                if( value.t === "float" || value.t === "double" )
+                    value = value.v.toFixed(3);
+                else
+                    value = value.v;
+                tr.innerHTML = `<td>${i18nHelper.t(key)}</td><td>${value}</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -464,18 +468,23 @@
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
         document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
-        // Example: app.setpoints = [{name: "SP1", value: 123}, ...]
+        // Example: app.setpoints = [{name: "SP1", value:{ v:123, t:"i" }, ...]
         const setpoints = app.setpoints || new Map();
         const tbody = document.getElementById('setpointsTableBody');
         tbody.innerHTML = '';
         if (setpoints.size === 0) {
-          tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
-          setpoints.forEach(sp => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${sp.name}</td><td>${sp.value}</td>`;
-            tbody.appendChild(tr);
-          });
+            setpoints.forEach(sp => {
+                const tr = document.createElement('tr');
+                var val = sp.value;
+                if( val.t === "float" || val.t === "double" )
+                    val = val.v.toFixed(3);
+                else
+                    val = val.v;
+                tr.innerHTML = `<td>${i18nHelper.t(sp.name)}</td><td>${val}</td>`;
+                tbody.appendChild(tr);
+            });
         }
 
         // Show the modal
@@ -490,7 +499,8 @@
                 var arrComps = strPtPath.split('/')
                 if( arrComps.length < 2 )
                     return
-                modal.currentApp.setpoints.set(arrComps[1], value.m_val);
+                modal.currentApp.setpoints.set(arrComps[1],
+                    {v: value.m_val, t: type2str(value.m_iType)});
             }
         };
         modalEl.addEventListener('hidden.bs.modal', function (event) {
@@ -511,6 +521,7 @@
         document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
         document.getElementById('setpoint-value-header').textContent = i18nHelper.t("Value");
         modal.show();
+        fetchStatus()
 
     }
   </script>
