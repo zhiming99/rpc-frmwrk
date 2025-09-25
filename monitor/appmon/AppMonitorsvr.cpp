@@ -976,6 +976,204 @@ gint32 CAppMonitor_SvrImpl::IsAppOnline(
     return ret;
 }
 /* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetPointDesc( 
+    IConfigDb* pContext, 
+    std::vector<std::string>& arrPtPaths /*[ In ]*/, 
+    std::map<std::string,ObjPtr>& mapPtDescs /*[ Out ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        std::hashmap< stdstr, std::vector< stdstr > > mapAppPts;
+        for( auto& elem : arrPtPaths )
+        {
+            std::vector< stdstr > vecComps;
+            ret = SplitPath( elem, vecComps );
+            if( ERROR( ret ) )
+            {
+                ret = -EINVAL;
+                break;
+            }
+            if( vecComps.size() < 2 )
+                continue;
+
+            const stdstr& strApp = vecComps[ 0 ];
+            const stdstr& strPoint = vecComps[ 1 ];
+
+            auto itr = mapAppPts.find( strApp );
+            if( itr == mapAppPts.end() )
+            {
+                std::vector< stdstr > vecPts;
+                vecPts.push_back( strPoint );
+                mapAppPts[ strApp ] = vecPts;
+            }
+            else
+            {
+                itr->second.push_back( strPoint );
+            }
+        }
+        if( mapAppPts.empty() )
+            break;
+
+        GETAC( pContext );
+        auto& pfs = m_pAppRegfs;
+        HANDLE hcurStm = INVALID_HANDLE;
+        GetCurStream( this, pContext, hcurStm );
+
+        for( auto& elem : mapAppPts )
+        {
+            const stdstr& strAppName = elem.first;
+            if( !IsAppSubscribed( hcurStm, strAppName ) )
+            {
+                ret = -EACCES;
+                break;
+            }
+            RFHANDLE hPtsDir = INVALID_HANDLE;
+            stdstr strDir = "/" APPS_ROOT_DIR "/";
+            strDir += elem.first + "/" POINTS_DIR "/";
+            const std::vector< stdstr >& arrPoints =
+                elem.second;
+
+            ret = pfs->OpenDir(
+                strDir, O_RDONLY, hPtsDir, pac );
+            if( ERROR( ret ) )
+                break;
+            CFileHandle oHandle( pfs, hPtsDir );
+            for( auto& elem : arrPoints )
+            {
+                CCfgOpener oParams;
+                Variant oVar;
+                stdstr strFile =
+                    elem + "/" VALUE_FILE;
+
+                stdstr strType =
+                    elem + "/" DATA_TYPE;
+                Variant dt;
+                ret = pfs->GetValue(
+                    hPtsDir, strType, dt );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error get data type %s/%s",
+                        strAppName.c_str(),
+                        elem.c_str() );
+                    continue;
+                }
+                auto iType = ( guint32& )dt;
+                if( iType < typeDMsg )
+                {
+                    ret = pfs->GetValue(
+                        hPtsDir, strFile, oVar );
+                    if( ERROR( ret ) )
+                        continue;
+                }
+                else if( iType == typeByteArr )
+                do{
+                    RFHANDLE hFile;
+                    ret = pfs->OpenFile( hPtsDir,
+                        strFile, O_RDONLY,
+                        hFile, pac );
+                    if( ERROR( ret ) )
+                        break;
+                    CFileHandle ofh( pfs, hFile );
+                    BufPtr pBuf( true );
+
+                    struct stat st;
+                    ret = pfs->GetAttr( hFile, st );
+                    if( ERROR( ret ) )
+                        break;
+                    guint32 dwSize = st.st_size;
+                    if( dwSize == 0 ||
+                        dwSize > MAX_BYTES_PER_TRANSFER )
+                    {
+                        oParams.SetIntProp(
+                            GETPTDESC_SIZE, dwSize );
+                        // return an empty buffer with size
+                        oVar = pBuf;
+                        break;
+                    }
+                    ret = pBuf->Resize( dwSize );
+                    if( ERROR( ret ) )
+                        break;
+                    ret = pfs->ReadFile( hFile,
+                        pBuf->ptr(), dwSize, 0 );
+                    if( ERROR( ret ) )
+                        break;
+                    oVar = pBuf;
+                }while( 0 );
+                else
+                {
+                    ret = -ENOTSUP;
+                }
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error GetPointValue %s/%s",
+                        strAppName.c_str(),
+                        elem.c_str() );
+                    continue;
+                }
+
+                oParams.SetProperty(
+                    GETPTDESC_VALUE, oVar );
+
+                guint32 dwFlags = 0;
+                do{
+                    RFHANDLE hPtDir = INVALID_HANDLE;
+                    ret = pfs->OpenDir( strDir + elem,
+                        O_RDONLY, hPtDir, pac );
+                    if( ERROR( ret ) )
+                        break;
+                    CFileHandle oHandle( pfs, hPtDir );
+                    Variant oVar;
+                    ret = pfs->GetValue(
+                        hPtDir, "ptype", oVar, pac );
+                    if( ERROR( ret ) )
+                        break;
+                    oParams.SetProperty(
+                        GETPTDESC_PTYPE, oVar );
+
+                    // average
+                    ret = pfs->GetValue( hPtDir,
+                        "average", oVar, pac );
+                    if( SUCCEEDED( ret ) )
+                        oParams.SetProperty(
+                            GETPTDESC_AVERAGE, oVar );
+
+                    // unit
+                    oVar = ( guint32 )0;
+                    ret = pfs->GetValue( hPtDir,
+                        "unit", oVar, pac );
+                    if( SUCCEEDED( ret ) )
+                        oParams.SetProperty(
+                            GETPTDESC_UNIT, oVar );
+
+                    // datatype
+                    oVar = ( guint32 )0;
+                    ret = pfs->GetValue( hPtDir,
+                        "datatype", oVar, pac );
+                    if( ERROR( ret ) )
+                        break;
+                    oParams.SetProperty( 5, oVar );
+
+                }while( 0 );
+                if( ERROR( ret ) )
+                    continue;
+                if( oParams.GetCfg()->size() )
+                {
+                    stdstr strPtPath =
+                        strAppName + "/" + elem;
+                    mapPtDescs[ strPtPath ] =
+                        ObjPtr( oParams.GetCfg() );
+                }
+            }
+        }
+    }while( 0 );
+    if( mapPtDescs.empty() )
+        return -ENODATA;
+    return ret;
+}
+
+/* Async Req Handler*/
 gint32 CAppMonitor_SvrImpl::RegisterListener( 
     IConfigDb* pContext, 
     std::vector<std::string>& arrApps /*[ In ]*/ )

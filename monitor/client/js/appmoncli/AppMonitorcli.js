@@ -212,6 +212,21 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
             oContext.oIsAppOnlineCb( oContext, ret, strOnlineApps )
     }
 
+    // IAppStoreEx::GetPointDescCallback
+    // request callback
+    GetPointDescCallback( oContext, ret,
+        mapPtDescs // [String,ObjPtr]
+    )
+    {
+        // add code here
+        // 'oContext' is the parameter passed to this.GetPointDesc
+        // 'ret' is the status code of the request
+        // if ret == errno.STATUS_SUCCESS, the following parameters are valid response from the server
+        // if ret < 0, the following parameters are undefined
+        if( oContext.oGetPtDescCb )
+            oContext.oGetPtDescCb( oContext, ret, mapPtDescs )
+    }
+
     // IAppMonitor::RegisterListenerCallback
     // request callback
     RegisterListenerCallback( oContext, ret )

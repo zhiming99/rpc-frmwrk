@@ -68,6 +68,10 @@ interface IAppStoreEx
     [async_s]IsAppOnline(
         array< string > strApps )
     returns ( array< string > strOnlineApps );
+
+    [async_s]GetPointDesc(
+        array< string > arrPtPath )
+    returns ( map< string, ObjPtr > mapPtDescs );
 };
 
 interface IAppMonitor

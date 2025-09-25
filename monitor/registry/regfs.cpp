@@ -770,6 +770,12 @@ gint32 CRegistryFs::Truncate(
             break;
         }
         pFile = itr->second;
+        guint32 dwFlags = pFile->GetFlags();
+        if( ( dwFlags & O_ACCMODE ) == 0 )
+        {
+            ret = -EACCES;
+            break;
+        }
         oLock.Unlock();
         ret = pFile->Truncate( dwOff );
     }while( 0 );
@@ -1856,8 +1862,7 @@ gint32 CRegistryFs::OpenFile(
 
         if( ( dwFlags & O_TRUNC ) &&
             ( ft == ftRegular ) &&
-            ( ( dwFlags & O_WRONLY ) ||
-                ( dwFlags & O_RDWR ) ) )
+            ( dwFlags & O_ACCMODE ) )
         {
             pFile->Truncate( 0 );
         }

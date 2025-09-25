@@ -353,6 +353,20 @@ class CAppMonitor_SvrImpl
         std::vector<std::string>& strApps /*[ In ]*/,
         std::vector<std::string>& strOnlineApps /*[ Out ]*/ ) override;
     //RPC Async Req Cancel Handler
+    gint32 OnGetPointDescCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        std::vector<std::string>& arrPtPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetPointDesc' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetPointDesc(
+        IConfigDb* pReqCtx_,
+        std::vector<std::string>& arrPtPath /*[ In ]*/,
+        std::map<std::string,ObjPtr>& mapPtDescs /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
     gint32 OnRegisterListenerCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         std::vector<std::string>& arrApps /*[ In ]*/ ) override

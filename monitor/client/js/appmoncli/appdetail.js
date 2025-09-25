@@ -14,6 +14,16 @@ const arrAppPoints = arrBasePoints.concat( [
     "max_streams_per_session", "max_qps", "cur_qps"
 ])
 
+const PtDescProps = {
+    value: 0,
+    ptype: 1,
+    ptflag: 2,
+    average: 3,
+    unit: 4,
+    datatype: 5,
+    size: 6
+}
+
 function type2str( iType )
 {
     switch(iType)
@@ -67,21 +77,49 @@ function fetchAppDetails()
                 console.log( "RegisterListener succeeded with status " + oContext.m_iRet );
         };
         return oProxy.RegisterListener( oContext, [app.name] ).then((ret) => {
-            oContext.oGetPvsCb = (oContext, ret, arrKeyVals) => {
+            oContext.oGetPtDescCb = (oContext, ret, mapPtDescs) => {
                 if( oContext.m_iRet < 0 )
-                    return 
-                // Process the retrieved point values
-                for( var i = 0; i < arrKeyVals.length; i++ ){
-                    const item = arrKeyVals[i];
-                    app.setpoints.set( item.strKey,
-                        { v:item.oValue.m_val, t:type2str(item.oValue.m_iType) } );
+                    return
+                // Process the point descriptions
+                for( const [key, oDesc] of mapPtDescs ) {
+
+                    var ptv = oDesc.GetProperty(PtDescProps.value);
+                    attrs = { v: ptv,
+                        t:type2str(oDesc.GetProperty(PtDescProps.datatype))
+                    }
+                    var oVal = oDesc.GetProperty(PtDescProps.ptype);
+                    if( typeof oVal === "number" )
+                    {
+                        if( oVal === 0 ) 
+                            attrs.ptype = "output"
+                        else if( oVal === 1 )
+                            attrs.ptype = "input"
+                        else if( oVal === 2 )
+                            attrs.ptype = "setpoint"
+                    }
+                    oVal = oDesc.GetProperty(PtDescProps.average);
+                    if( oVal )
+                        attrs.average = oVal;
+
+                    oVal = oDesc.GetProperty(PtDescProps.unit);
+                    if( oVal )
+                        attrs.unit = i18nHelper.t(oVal);
+
+                    oVal = oDesc.GetProperty(PtDescProps.size);
+                    if( oVal )
+                        attrs.size = oVal;
+                    var arrComps = key.split('/')
+                    if( arrComps.length < 2 )
+                        continue
+                    app.setpoints.set( arrComps[1], attrs );
                 }
                 return
             };
             var arrPts = arrAppPoints
             if( app.name === "rpcrouter1")
                 arrPts = arrRouterPoints
-            return oProxy.GetPointValues( oContext, app.name, arrPts ).then((ret)=>{
+            var arrPtPath = arrPts.map(pt => `${app.name}/${pt}`);
+            return oProxy.GetPointDesc( oContext, arrPtPath ).then((ret)=>{
                 if( oContext.m_iRet < 0 )
                     return Promise.reject( oContext.m_iRet );
                 return Promise.resolve( 0 );

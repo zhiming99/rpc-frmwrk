@@ -433,7 +433,7 @@ exports.CConfigDb2=class CConfigDb2 extends CObjBase
                     {
                         throw new Error( "Error buffer is too small" )
                     }
-                    srcBuf.readFloatBE( value.v, pos )
+                    value.v = srcBuf.readFloatBE( pos )
                     pos += 4
                     break
                 }

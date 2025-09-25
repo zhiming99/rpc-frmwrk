@@ -454,11 +454,10 @@
         } else {
             setpoints.forEach((value, key) => {
                 const tr = document.createElement('tr');
+                var valToShow = value.v;
                 if( value.t === "float" || value.t === "double" )
-                    value = value.v.toFixed(3);
-                else
-                    value = value.v;
-                tr.innerHTML = `<td>${i18nHelper.t(key)}</td><td>${value}</td>`;
+                    valToShow = valToShow.toFixed(3);
+                tr.innerHTML = `<td>${i18nHelper.t(key)}</td><td>${valToShow}</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -477,12 +476,10 @@
         } else {
             setpoints.forEach(sp => {
                 const tr = document.createElement('tr');
-                var val = sp.value;
-                if( val.t === "float" || val.t === "double" )
-                    val = val.v.toFixed(3);
-                else
-                    val = val.v;
-                tr.innerHTML = `<td>${i18nHelper.t(sp.name)}</td><td>${val}</td>`;
+                var valToShow = sp.value.v;
+                if( sp.value.t === "float" || sp.value.t === "double" )
+                    valToShow = valToShow.toFixed(3);
+                tr.innerHTML = `<td>${i18nHelper.t(sp.name)}</td><td>${valToShow}</td>`;
                 tbody.appendChild(tr);
             });
         }
@@ -499,15 +496,17 @@
                 var arrComps = strPtPath.split('/')
                 if( arrComps.length < 2 )
                     return
-                modal.currentApp.setpoints.set(arrComps[1],
-                    {v: value.m_val, t: type2str(value.m_iType)});
+                attr = modal.currentApp.setpoints.get(arrComps[1])
+                attr.v = value.m_val
+                attr.t = type2str(value.m_iType)
+                modal.currentApp.setpoints.set(arrComps[1], attr);
             }
         };
         modalEl.addEventListener('hidden.bs.modal', function (event) {
             document.getElementById('setpointsTableBody').innerHTML = '';
-            globalThis.curSpModal = null;
-            if( globalThis.oProxy)
+            if( globalThis.curSpModal && globalThis.oProxy)
             {
+                globalThis.curSpModal = null;
                 if( modal.currentApp )
                     modal.currentApp.setpoints = new Map();
                 return globalThis.oProxy.RemoveListener( Object() ).then((ret)=>{
@@ -515,6 +514,7 @@
                 }).catch((error)=>{
                     console.log("Error removing listener:", error);
                 });
+                modalEl.removeEventListener('hidden.bs.modal', this);
             }
         });
 
