@@ -474,12 +474,12 @@
         if (setpoints.size === 0) {
             tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
-            setpoints.forEach(sp => {
+            setpoints.forEach((value, key) => {
                 const tr = document.createElement('tr');
-                var valToShow = sp.value.v;
-                if( sp.value.t === "float" || sp.value.t === "double" )
+                var valToShow = value.v;
+                if( value.t === "float" || value.t === "double" )
                     valToShow = valToShow.toFixed(3);
-                tr.innerHTML = `<td>${i18nHelper.t(sp.name)}</td><td>${valToShow}</td>`;
+                tr.innerHTML = `<td>${i18nHelper.t(key)}</td><td>${valToShow}</td>`;
                 tbody.appendChild(tr);
             });
         }
