@@ -8,6 +8,7 @@
 #include "logger.h"
 #include "LogServicesvr.h"
 #include <limits.h>
+#include <sstream>
 using namespace rpcf;
 extern bool g_bMonitoring; 
 
