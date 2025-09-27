@@ -509,7 +509,15 @@ case "$cmd" in
             python3 $cmddir/geninitcfg.py $drvpath
         fi
         ;;
-
+    cfgnui)
+        cmdline="rpcfctl cfgnui <init config file>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        python3 $cmddir/rpcfgnui.py $@
+        ;;
     cfgweb)
         #updating webserver config, nginx or apache
         rpcfctl geninitcfg > /tmp/initcfg.json
