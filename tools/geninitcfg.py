@@ -29,7 +29,9 @@ import sys
 from pathlib import Path 
 import os
 import ipaddress
+import argparse
 
+bClient = False
 def GetIpVersion(ipAddress:str)->str:
     try:
         ip_obj = ipaddress.ip_address(ipAddress)
@@ -41,6 +43,7 @@ def GetIpVersion(ipAddress:str)->str:
         return ""
 
 def GenInitCfgFromDrv( cfgList : list )->object:
+    global bClient
     jsonVal = dict()
     connList = []
     jsonVal[ "Connections" ] = connList
@@ -57,7 +60,10 @@ def GenInitCfgFromDrv( cfgList : list )->object:
             for param in params:
                 ipAddr = param.get( "BindAddr" )
                 connElem[ "IpAddress" ] = ipAddr
-                connElem[ "BindTo" ] = param[ "BindTo" ]
+                if "BindTo" in param:
+                    connElem[ "BindTo" ] = param[ "BindTo" ]
+                else:
+                    connElem[ "BindTo" ] = "false"
                 connElem[ "PortNumber" ] = param[ "PortNumber" ]
                 connElem[ "Compression" ] = param[ "Compression" ]
                 connElem[ "EnableSSL" ] = param[ "EnableSSL" ]
@@ -72,7 +78,10 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 if connElem[ "EnableWS" ] == "true":
                     connElem[ "DestURL" ] = param[ "DestURL" ]
                     bWS = True
-                connElem[ "RouterPath" ] = param[ "RouterPath" ]
+                if "RouterPath" in param:
+                    connElem[ "RouterPath" ] = param[ "RouterPath" ]
+                else:
+                    connElem[ "RouterPath" ] = "/"
                 connList.append( connElem )
             maxConns = port.get( "MaxConnections", "" )
 
@@ -116,7 +125,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
             if elem.get( "ObjectName" ) == "CEchoServer":
                 authInfo[ "AuthMech" ] = authMech
                 ai = elem.get( "AuthInfo", {} )
-                if authMech == "krb5":
+                if authMech == "krb5" and bool( ai ):
                     authInfo[ "Realm" ] = ai[ "Realm" ]
                     authInfo[ "ServceName" ] = ai[ "ServceName" ]
                     authInfo[ "SignMessage" ] = ai[ "SignMessage" ]
@@ -189,15 +198,16 @@ def GenInitCfgFromDrv( cfgList : list )->object:
         if count >= 2:
             break
 
-    jsonVal[ 'IsServer' ] = "true"
+    jsonVal[ 'IsServer' ] = "false" if bClient else "true"
     return jsonVal
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: geninitcfg.py <driver.json>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Generate initcfg file from driver.json")
+    parser.add_argument("driver_json", help="Path to driver.json")
+    parser.add_argument("-c", "--client", action="store_true", help="Generate client-only configuration")
+    args = parser.parse_args()
 
-    json_path = sys.argv[1]
+    json_path = args.driver_json
     if not Path(json_path).is_file():
         print(f"File {json_path} does not exist.")
         sys.exit(1)
@@ -223,7 +233,11 @@ if __name__ == "__main__":
         with open(authprxy, 'r', encoding='utf-8') as f:
             cfgs.append(json.load(f))
 
-        initcfg = GenInitCfgFromDrv( cfgs )
+        # Add client-only flag if -c is specified
+        if args.client:
+            bClient = True
+        initcfg = GenInitCfgFromDrv(cfgs)
+
 
         print(json.dumps(initcfg, indent=4))
 
