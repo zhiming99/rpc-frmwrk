@@ -152,7 +152,6 @@ def Config_Nginx( initCfg : object ) -> int:
         proxy_set_header        X-Forwarded-Port $remote_port;
 
 
-      # Fix the “It appears that your reverse proxy set up is broken" error.
         proxy_pass          https://{AppName};
         proxy_ssl_certificate     {CertFile};
         proxy_ssl_certificate_key {KeyFile};
