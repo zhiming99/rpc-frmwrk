@@ -651,7 +651,7 @@ gint32 CStlStrVector::Serialize(
         guint32 dwBytes = htonl( i.size() );
         memcpy( pElem,
             &dwBytes, sizeof( dwBytes ) );
-        pElem + sizeof( dwBytes );
+        pElem += sizeof( dwBytes );
         memcpy( pElem, i.c_str(), i.size() );
         pElem += i.size(); 
     }
