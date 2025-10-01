@@ -21,7 +21,8 @@ const PtDescProps = {
     average: 3,
     unit: 4,
     datatype: 5,
-    size: 6
+    size: 6,
+    retval: 12329
 }
 
 function type2str( iType )
@@ -66,7 +67,7 @@ function fetchAppDetails()
         const app = globalThis.curSpModal.currentApp;
         // Fetch and display app details for the selected app
         const oProxy = globalThis.oProxy;
-        if( app.setpoints && app.setpoints.size > 0 )
+        if( app.bRegistered && app.bRegistered === true )
             return Promise.resolve(0);
         var oContext = {};
         app.setpoints = new Map();
@@ -77,12 +78,15 @@ function fetchAppDetails()
                 console.log( "RegisterListener succeeded with status " + oContext.m_iRet );
         };
         return oProxy.RegisterListener( oContext, [app.name] ).then((ret) => {
+            app.bRegistered = true;
             oContext.oGetPtDescCb = (oContext, ret, mapPtDescs) => {
                 if( oContext.m_iRet < 0 )
                     return
                 // Process the point descriptions
                 for( const [key, oDesc] of mapPtDescs ) {
-
+                    var ptv = oDesc.GetProperty(PtDescProps.retval);
+                    if( ptv & 0x80000000 )
+                        continue;
                     var ptv = oDesc.GetProperty(PtDescProps.value);
                     attrs = { v: ptv,
                         t:type2str(oDesc.GetProperty(PtDescProps.datatype))
@@ -116,7 +120,7 @@ function fetchAppDetails()
                 return
             };
             var arrPts = arrAppPoints
-            if( app.name === "rpcrouter1")
+            if( app.app_class === "rpcrouter")
                 arrPts = arrRouterPoints
             var arrPtPath = arrPts.map(pt => `${app.name}/${pt}`);
             return oProxy.GetPointDesc( oContext, arrPtPath ).then((ret)=>{
@@ -124,7 +128,7 @@ function fetchAppDetails()
                     return Promise.reject( oContext.m_iRet );
                 return Promise.resolve( 0 );
             }).catch((error) => {
-                console.log("Error GetPointValues:", error);
+                console.log("Error GetPointDesc:", error);
                 return Promise.resolve(error);
             });
         }).catch((error) => {

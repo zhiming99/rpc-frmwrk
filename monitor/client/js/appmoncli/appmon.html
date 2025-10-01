@@ -146,7 +146,7 @@
           btn.onclick = function() {
             // Your reconnect logic here
             if (typeof globalThis.StartClient === 'function') {
-              globalThis.StartClient().then(() => {
+              globalThis.StartClient( oStartCb ).then(() => {
                 console.log('Reconnected with status ');
                 checkProxyState()
               }).catch((error) => {
@@ -353,14 +353,7 @@
         }else{
             if( iChecks++ === 0 )
             {
-                setStatusDot(true);
-                showReconnectButton(true, true);
-                renderSites(globalThis.g_sites);
-                fetchLogs();
-                globalThis.fetchStatusInterval =
-                    setInterval(fetchStatus, 5000);
-                globalThis.fetchLogsInterval =
-                    setInterval(fetchLogs, 30000);
+                //fetchLogs();
                 console.log( "RPC connection ready " + globalThis.oProxy );
             }
             setTimeout( checkProxyState, 5000 );
@@ -379,23 +372,26 @@
       if( !globalThis.oProxy)
       {
           clearInterval(globalThis.fetchStatusInterval);
-          return
+          globalThis.fetchStatusInterval = undefined;
+          return Promise.resolve(0);
       }
 
       if( globalThis.funcStartPullInfo ){
           console.log( "Start pulling info..." );
-          globalThis.funcStartPullInfo().then((ret) => {
+          return globalThis.funcStartPullInfo().then((ret) => {
               updateSites(globalThis.g_sites);
           }).catch((error) => {
               console.log("Error fetching status:", error);
           });
         }
+        return Promise.resolve(0);
     }
     function fetchLogs() {
       if( !globalThis.oProxy)
       {
           clearInterval(globalThis.fetchLogsInterval);
-          return
+          globalThis.fetchLogsInterval = undefined;
+          return Promise.resolve(0);
       }
       var oContext = Object()
       oContext.oGetLpvCb = (oContext, ret, value) => {
@@ -467,7 +463,7 @@
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
         document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
-        // Example: app.setpoints = [{name: "SP1", value:{ v:123, t:"i" }, ...]
+        // Example: app.setpoints = [{name: "SP1", value:{ v:123, t:"i" }, ...}]
         const setpoints = app.setpoints || new Map();
         const tbody = document.getElementById('setpointsTableBody');
         tbody.innerHTML = '';
@@ -497,6 +493,8 @@
                 if( arrComps.length < 2 )
                     return
                 attr = modal.currentApp.setpoints.get(arrComps[1])
+                if (!attr)
+                    attr = { v: null, t: null }
                 attr.v = value.m_val
                 attr.t = type2str(value.m_iType)
                 modal.currentApp.setpoints.set(arrComps[1], attr);
@@ -506,13 +504,32 @@
             document.getElementById('setpointsTableBody').innerHTML = '';
             if( globalThis.curSpModal && globalThis.oProxy)
             {
-                globalThis.curSpModal = null;
-                if( modal.currentApp )
-                    modal.currentApp.setpoints = new Map();
                 return globalThis.oProxy.RemoveListener( Object() ).then((ret)=>{
+                    var modal = globalThis.curSpModal;
+                    if ( !modal )
+                        return;
+                    modal.currentApp.bRegistered = false;
+                    if( modal.currentApp )
+                        modal.currentApp.setpoints = new Map();
                     console.log("Listener removed:", ret);
+                    globalThis.curSpModal = null;
+                    globalThis.fetchStatusInterval =
+                        setInterval(fetchStatus, 5000);
+                    globalThis.fetchLogsInterval =
+                        setInterval(fetchLogs, 30000);
                 }).catch((error)=>{
+                    var modal = globalThis.curSpModal;
+                    if ( !modal )
+                        return;
+                    modal.currentApp.bRegistered = false;
+                    if( modal.currentApp )
+                        modal.currentApp.setpoints = new Map();
                     console.log("Error removing listener:", error);
+                    globalThis.curSpModal = null;
+                    globalThis.fetchStatusInterval =
+                        setInterval(fetchStatus, 5000);
+                    globalThis.fetchLogsInterval =
+                        setInterval(fetchLogs, 30000);
                 });
                 modalEl.removeEventListener('hidden.bs.modal', this);
             }
@@ -521,9 +538,28 @@
         document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
         document.getElementById('setpoint-value-header').textContent = i18nHelper.t("Value");
         modal.show();
-        fetchStatus()
-
+        clearInterval(globalThis.fetchStatusInterval);
+        globalThis.fetchStatusInterval = undefined;
+        clearInterval(globalThis.fetchLogsInterval);
+        globalThis.fetchLogsInterval = undefined;
+        fetchStatus();
     }
+
+    var oStartCb = ((context, ret)=>{
+      setStatusDot(true);
+      showReconnectButton(true, true);
+      renderSites(globalThis.g_sites);
+      return fetchStatus().then((ret)=>{
+          return fetchLogs().then((ret)=>{
+              globalThis.fetchStatusInterval =
+                  setInterval(fetchStatus, 5000);
+              globalThis.fetchLogsInterval =
+                  setInterval(fetchLogs, 30000);
+          })
+      })
+    })
+    globalThis.StartClient( oStartCb)
+
   </script>
 </body>
 </html>

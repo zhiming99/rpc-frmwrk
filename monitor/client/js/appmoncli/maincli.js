@@ -109,7 +109,10 @@ function StartPullInfo()
             for( var i = 0; i < globalThis.g_sites[0].apps.length; i++ )
             {
                 if( globalThis.g_sites[0].apps[i].status === i18nHelper.t("APP_STATUS_RUNNING") )
+                {
                     arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/cpu_load");
+                    arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/app_class");
+                }
             }
             oContext.oGetPvsCb = (oContext, ret, arrKeyVals ) => {
                 if( ERROR(ret) ) 
@@ -120,16 +123,18 @@ function StartPullInfo()
                 for( var i = 0; i < arrKeyVals.length; i++ )
                 {
                     var [strApp, strPt] = arrKeyVals[i].strKey.split( '/' );
-                    if( strPt !== "cpu_load")
-                        continue
                     for( var j = 0; j < globalThis.g_sites[0].apps.length; j++ )
                     {
                         if( globalThis.g_sites[0].apps[j].name === strApp )
                         {
-                            globalThis.g_sites[0].apps[j].cpu = arrKeyVals[i].oValue.m_val.toFixed(3) + "%";
+                            if( strPt === "cpu_load" )
+                                globalThis.g_sites[0].apps[j].cpu = arrKeyVals[i].oValue.m_val.toFixed(3) + "%";
+                            else if( strPt === "app_class" )
+                                globalThis.g_sites[0].apps[j].app_class = arrKeyVals[i].oValue.m_val
                             break;
                         }
                     }
+
                 }
             }
             return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
@@ -151,7 +156,7 @@ function StartPullInfo()
     })
 }
 
-function StartClient()
+function StartClient( oStartCb )
 {
     globalThis.g_strLoginResult = ""
     var strObjDesc = './appmondesc.json';
@@ -167,12 +172,23 @@ function StartClient()
             globalThis.oProxy = null;
             return Promise.resolve( retval );
         }
+        var oContext = new Object();
+        oContext.oStartCb = oStartCb
         globalThis.funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
-        return globalThis.funcStartPullInfo()
+        return globalThis.funcStartPullInfo().then((ret)=>{
+            if( oContext.oStartCb )
+                oContext.oStartCb( oContext, ret );
+            return Promise.resolve( ret );
+        }
+        ).catch((e)=>{
+            if( oContext.oStartCb )
+                oContext.oStartCb( oContext, -errno.EFAULT );
+            console.log( 'StartPullInfo failed with error ' + e );
+            return Promise.resolve(e);
+        });
     }).catch((e)=>{
         console.log( 'Start Proxy failed with error ' + e );
         return Promise.resolve(e);
     })
 }
 globalThis.StartClient = StartClient;
-StartClient();
