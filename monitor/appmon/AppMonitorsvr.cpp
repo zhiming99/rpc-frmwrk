@@ -173,6 +173,41 @@ gint32 CAppMonitor_SvrImpl::GetAccessContext(
     return ret;
 }
 
+gint32 CAppMonitor_SvrImpl::GetAccessContext(
+    HANDLE hstm, CAccessContext& oac ) const
+{
+    gint32 ret = 0;
+    do{
+        CfgPtr pInfo;
+        InterfPtr pIf;
+        ret = GetStmChanSvr( pIf );
+        if( ERROR( ret ) )
+            break;
+        CRpcStmChanSvr* pSvr = pIf;
+        SESS_INFO si;
+        ret = pSvr->GetSessInfo( hstm, si );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwUid = 0;
+        ret = GetUid( si.m_pLoginInfo, dwUid );
+        if( ERROR( ret ) )
+            break;
+
+        CStdRMutex oLock( this->GetLock() );
+        auto itr = m_mapUid2Gids.find( dwUid );
+        if( itr == m_mapUid2Gids.end() )
+        {
+            ret = -EACCES;
+            break;
+        }
+        oac.dwUid = dwUid;
+        oac.pGids = itr->second;
+
+    }while( 0 );
+    return ret;
+}
+
 #define GETAC( _pContext ) \
         CAccessContext oac, *pac; \
         ret = GetAccessContext( ( _pContext ), oac ); \
@@ -903,8 +938,14 @@ gint32 CAppMonitor_SvrImpl::OnPointChangedInternal(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPt = vecComps[ 1 ];
 
         // notify the other monitors
         std::vector< HANDLE > vecStms;
@@ -917,11 +958,26 @@ gint32 CAppMonitor_SvrImpl::OnPointChangedInternal(
         {
             if( hcurStm == elem )
                 continue;
+
+            CAccessContext oac;
+            ret = GetAccessContext( elem, oac );
+            if( ERROR( ret ) )
+                continue;
+            stdstr strValPath = "/" APPS_ROOT_DIR "/";
+            strValPath += strApp +
+                "/" POINTS_DIR "/" + strPt +
+                "/" VALUE_FILE;
+
+            ret = m_pAppRegfs->Access(
+                strValPath, R_OK, &oac );
+            if( ERROR( ret ) )
+                continue;
+
             InterfPtr ptrSkel;
             gint32 iRet =
                 GetStmSkel( elem, ptrSkel );
             if( ERROR( iRet ) )
-                break;
+                continue;
             CAppMonitor_SvrSkel* pSkel = ptrSkel;
             pSkel->IIAppStore_SImpl::OnPointChanged(
                 strPtPath, value );
@@ -1045,6 +1101,12 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                 stdstr strFile =
                     elem + "/" VALUE_FILE;
 
+                stdstr strPtPath =
+                    strAppName + "/" + elem;
+
+                oParams.SetIntProp(
+                    propReturnValue, 0 );
+
                 stdstr strType =
                     elem + "/" DATA_TYPE;
                 Variant dt;
@@ -1052,10 +1114,11 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     hPtsDir, strType, dt );
                 if( ERROR( ret ) )
                 {
-                    OutputMsg( ret,
-                        "Error get data type %s/%s",
-                        strAppName.c_str(),
-                        elem.c_str() );
+                    oParams.SetIntProp(
+                        propReturnValue, ret );
+                    mapPtDescs[ strPtPath ] =
+                        ObjPtr( oParams.GetCfg() );
+                    ret = 0;
                     continue;
                 }
                 auto iType = ( guint32& )dt;
@@ -1064,7 +1127,14 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     ret = pfs->GetValue(
                         hPtsDir, strFile, oVar );
                     if( ERROR( ret ) )
+                    {
+                        oParams.SetIntProp(
+                            propReturnValue, ret );
+                        mapPtDescs[ strPtPath ] =
+                            ObjPtr( oParams.GetCfg() );
+                        ret = 0;
                         continue;
+                    }
                 }
                 else if( iType == typeByteArr )
                 do{
@@ -1110,6 +1180,11 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                         "Error GetPointValue %s/%s",
                         strAppName.c_str(),
                         elem.c_str() );
+                    oParams.SetIntProp(
+                        propReturnValue, ret );
+                    mapPtDescs[ strPtPath ] =
+                        ObjPtr( oParams.GetCfg() );
+                    ret = 0;
                     continue;
                 }
 
@@ -1138,6 +1213,7 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     if( SUCCEEDED( ret ) )
                         oParams.SetProperty(
                             GETPTDESC_AVERAGE, oVar );
+                    ret = 0;
 
                     // unit
                     oVar = ( guint32 )0;
@@ -1146,6 +1222,7 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     if( SUCCEEDED( ret ) )
                         oParams.SetProperty(
                             GETPTDESC_UNIT, oVar );
+                    ret = 0;
 
                     // datatype
                     oVar = ( guint32 )0;
@@ -1157,19 +1234,25 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
 
                 }while( 0 );
                 if( ERROR( ret ) )
-                    continue;
-                if( oParams.GetCfg()->size() )
                 {
-                    stdstr strPtPath =
-                        strAppName + "/" + elem;
+                    oParams.SetIntProp(
+                        propReturnValue, ret );
                     mapPtDescs[ strPtPath ] =
                         ObjPtr( oParams.GetCfg() );
+                    ret = 0;
+                    continue;
                 }
+
+                if( oParams.GetCfg()->size() == 0 )
+                {
+                    oParams.SetIntProp(
+                        propReturnValue, -ENOENT );
+                }
+                mapPtDescs[ strPtPath ] =
+                    ObjPtr( oParams.GetCfg() );
             }
         }
     }while( 0 );
-    if( mapPtDescs.empty() )
-        return -ENODATA;
     return ret;
 }
 
@@ -1232,7 +1315,7 @@ gint32 CAppMonitor_SvrImpl::RegisterListener(
             RFHANDLE hFile = INVALID_HANDLE;
             ret = m_pAppRegfs->CreateFile(
                 strStmPath, 0640, O_RDWR,
-                hFile );
+                hFile, pac );
             if( ERROR( ret ) )
                 continue;
 
@@ -1373,6 +1456,10 @@ gint32 CAppMonitor_SvrImpl::OnPreStart(
 {
     gint32 ret = 0;
     do{
+        gint32 ret = LoadUserGrpsMap();
+        if( ERROR( ret ) )
+            break;
+
         CCfgOpener oCtx;
         CCfgOpenerObj oIfCfg( this );
         oCtx[ propClsid ] = clsid( 
@@ -1552,10 +1639,6 @@ gint32 CAppMonitor_SvrImpl::OnPostStart(
     StartQpsTask( pTask );
     if( !pTask.IsEmpty() )
         AllocReqToken();
-
-    gint32 ret = LoadUserGrpsMap();
-    if( ERROR( ret ) )
-        return ret;
 
     return super::OnPostStart( pCallback );
 }

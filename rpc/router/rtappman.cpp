@@ -35,6 +35,7 @@ using namespace rpcf;
 #include "routmain.h"
 #include "rtappman.h"
 
+static stdstr g_strMonName = RTAPPNAME;
 gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
@@ -264,7 +265,7 @@ gint32 CAsyncAMCallbacks::OnPointChanged(
 {
     do{
         if( strPtPath ==
-            RTAPPNAME "/sess_time_limit" )
+            g_strMonName + "/sess_time_limit" )
         {
             guint32 dwWaitSec = value;
             if( dwWaitSec > 86400 * 31 )
@@ -273,19 +274,19 @@ gint32 CAsyncAMCallbacks::OnPointChanged(
                 propSessTimeLimit, value );
         }
         else if( strPtPath ==
-            RTAPPNAME "/max_recv_bps" )
+            g_strMonName + "/max_recv_bps" )
         {
             m_pIf->SetProperty(
                 propRecvBps, value );
         }
         else if( strPtPath ==
-            RTAPPNAME "/max_send_bps" )
+            g_strMonName + "/max_send_bps" )
         {
             m_pIf->SetProperty(
                 propSendBps, value );
         }
         else if( strPtPath ==
-            RTAPPNAME "/max_conn" )
+            g_strMonName + "/max_conn" )
         {
             m_pIf->SetProperty(
                 propMaxConns, value );
@@ -332,12 +333,28 @@ gint32 StartAppManCli(
 
         PACBS pacbs( new CAsyncAMCallbacks );
         auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
+        Variant oVar;
+        ret = pSvc->GetProperty(
+            propMonAppInsts, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            StrVecPtr pvecStrs = oVar.m_pObj;
+            if( !pvecStrs.IsEmpty() )
+            {
+                if( ( *pvecStrs )().size() )
+                    g_strMonName = ( *pvecStrs )().front();
+            }
+        }
+        else
+        {
+            ret = 0;
+        }
 
         // ignore the return status
         // in order to allowing reconnection if the
         // appmonsvr is not online yet
         StartStdAppManCli(
-            pIf, RTAPPNAME, pAppMan, pacbs );
+            pIf, g_strMonName, pAppMan, pacbs );
         
     }while( 0 );
     return ret;

@@ -5007,6 +5007,29 @@ gint32 CRpcServices::LoadObjDesc(
             }
         }
 
+        // get the monitor names if any
+        Json::Value& oAppInsts =
+            valObjDesc[ JSON_ATTR_MONAPPINSTS ];
+
+        if( oAppInsts == Json::Value::null ||
+            !oAppInsts.isArray() ||
+            oAppInsts.empty() )
+            break;
+        
+        StrVecPtr pStrVecs( true );
+        for( i = 0; i < oAppInsts.size(); i++ )
+        {
+            if( oAppInsts[ i ].empty() ||
+                !oAppInsts[ i ].isString() )
+                continue;
+
+            ( *pStrVecs )().push_back(
+                oAppInsts[ i ].asString() );
+        }
+        if( ( *pStrVecs )().size() )
+            oCfg.SetObjPtr( propMonAppInsts,
+                ObjPtr( pStrVecs ) );
+
     }while( 0 );
 
     return ret;

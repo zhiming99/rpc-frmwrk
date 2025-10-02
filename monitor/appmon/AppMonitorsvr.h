@@ -396,8 +396,12 @@ class CAppMonitor_SvrImpl
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
     bool IsUserValid( guint32 dwUid ) const;
+
     gint32 GetAccessContext(
         IConfigDb* pReqCtx,
+        CAccessContext& oac ) const;
+
+    gint32 GetAccessContext( HANDLE hstm,
         CAccessContext& oac ) const;
 };
 
