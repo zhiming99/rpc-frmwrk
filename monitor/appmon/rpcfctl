@@ -51,7 +51,7 @@ case "$cmd" in
         if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
             python3 /usr/local/bin/rpcf/rpcfg.py
         elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then
-            python3 /usr/bin/rpcf/rpcfg.py
+            python3 /usr/bin/rpcf/rpcfg.py $@
         else
             echo "Error cannot find rpcfg.py"
         fi
