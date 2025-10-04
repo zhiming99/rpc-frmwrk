@@ -47,14 +47,14 @@ rpcfctl <命令> [参数]
 
 ## 注册表的初始化
 
-- **initapps**  
+- **initappreg**  
   初始化（清空）应用注册表。**警告：此操作会清空应用注册表。**
 
-- **inituser**  
+- **initusereg**  
   初始化（清空）用户注册表。**警告：此操作会清空用户注册表。**
 
 - **initsvr**  
-  初始化服务器端的应用和用户注册表。等价于执行inituser和initapps.
+  初始化服务器端的应用和用户注册表。等价于执行initusereg和initappreg.
 
 - **initcli**  
   初始化客户端运行环境，用于需要安全认证的客户端。

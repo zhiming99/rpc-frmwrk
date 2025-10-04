@@ -68,6 +68,11 @@ case "$cmd" in
                 echo "Error $appname is still running"
                 exit 1
             fi
+            if [[ "$appname" == "appmonsvr1" ]]; then
+                if ! rpcfctl clearmount; then
+                    exit 1
+                fi
+            fi
             cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
             working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
             if [[ "x$cmdline" == "x" ]] || [[ "x$working_dir" == "x" ]]; then
@@ -159,7 +164,10 @@ case "$cmd" in
         bash $cmddir/listapps.sh
         ;;
     startall)
-        bash rpcfctl start appmonsvr1
+        if ! bash rpcfctl start appmonsvr1; then
+            echo failed to start appmonsvr1, quit
+            exit 1
+        fi
         bash rpcfctl start loggersvr1
         bash rpcfctl start timer1
         bash rpcfctl start rpcrouter1
@@ -276,12 +284,16 @@ case "$cmd" in
     rmlink)
         bash $cmddir/rmlink.sh $@
         ;;
-    initapps)
-        echo Warning 'initapps' will clear the app registry,
-        bash $cmddir/initappreg.sh
+    initappreg)
+        echo Warning 'initappreg' will clear the app registry,
+        if ! bash rpcfctl clearmount; then
+            echo initappreg fails
+            exit $?
+        fi
+        bash $cmddir/initappreg.sh $@
         ;;
-    inituser)
-        echo "Warning 'inituser' will clear the user registry"
+    initusereg)
+        echo "Warning 'initusereg' will clear the user registry"
         bash $cmddir/inituser.sh
         ;;
     initsvr)
@@ -771,6 +783,7 @@ case "$cmd" in
         ;;
     clearmount)
         clear_rpcf_mount
+        exit $?
         ;;
     *)
         echo "Unknown command: $cmd"
