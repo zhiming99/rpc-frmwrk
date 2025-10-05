@@ -91,6 +91,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         // 'ret' is the status code of the request
         // if ret == errno.STATUS_SUCCESS, the following parameters are valid response from the server
         // if ret < 0, the following parameters are undefined
+        if( oContext.oGetPvCb )
+            oContext.oGetPvCb( oContext, ret, rvalue );
     }
 
     // IAppStore::SetLargePointValueCallback

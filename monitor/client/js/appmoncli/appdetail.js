@@ -1,18 +1,34 @@
-const arrBasePoints = ["cpu_load", 
-    "vmsize_kb", "obj_count", "req_count",
-    "uptime", "offline_times", "cmdline",
-    "open_files", "working_dir",
-    "rx_bytes", "tx_bytes", "pid", "conn_count"
+const arrBasePoints = [{ n:"cpu_load", o:0 }, 
+    {n:"vmsize_kb",o:10}, 
+    {n:"obj_count",o:20},
+    {n:"req_count",o:30},
+    {n:"uptime",o:240},
+    {n:"offline_times",o:250},
+    {n:"cmdline",o:260},
+    {n:"open_files", o:70},
+    {n:"working_dir",o:280},
+    {n:"rx_bytes",o:90},
+    {n:"tx_bytes",o:100},
+    {n:"pid",o:110},
+    {n:"conn_count", o:40}
 ]
 
 const arrRouterPoints = arrBasePoints.concat( [
-    "max_conn", "sess_time_limit", "max_send_bps", "max_recv_bps", "max_pending_tasks"
-]);
+    {n:"max_conn",o:200},
+    {n: "sess_time_limit",o:110},
+    {n:"max_send_bps",o:220},
+    {n:"max_recv_bps",o:230},
+    {n:"max_pending_tasks",o:241}
+]).sort( (a,b) => { return a.o - b.o } );
 
 const arrAppPoints = arrBasePoints.concat( [
-    "resp_count", "failure_count", "pending_tasks",
-    "max_streams_per_session", "max_qps", "cur_qps"
-])
+    {n:"resp_count",o:120},
+    {n:"failure_count",o:130},
+    {n:"pending_tasks",o:200},
+    {n:"max_streams_per_session",o:140},
+    {n:"max_qps",o:80},
+    {n:"cur_qps",o:81},
+]).sort( (a,b) => { return a.o - b.o } );
 
 const PtDescProps = {
     value: 0,
@@ -68,7 +84,20 @@ function fetchAppDetails()
         // Fetch and display app details for the selected app
         const oProxy = globalThis.oProxy;
         if( app.bRegistered && app.bRegistered === true )
-            return Promise.resolve(0);
+        {
+            // keep-alive request to prevent browser from being disconnected
+            var oContext = {};
+            oContext.oGetPvCb = (oContext, ret, rvalue) => {
+                if( oContext.m_iRet < 0 )
+                    console.log( "Error, GetPointValue failed with status " + oContext.m_iRet );
+            }
+            return oProxy.GetPointValue( oContext, "rpcrouter1/cpu_load" ).then((ret)=>{
+                    return Promise.resolve( oContext.m_iRet );
+                }).catch((error) => {
+                    console.log("Error GetPointValue:", error);
+                    return Promise.resolve(error)
+                });
+        }
         var oContext = {};
         app.setpoints = new Map();
         oContext.oRegListenerCb = (oContext, ret) => {
@@ -122,7 +151,8 @@ function fetchAppDetails()
             var arrPts = arrAppPoints
             if( app.app_class === "rpcrouter")
                 arrPts = arrRouterPoints
-            var arrPtPath = arrPts.map(pt => `${app.name}/${pt}`);
+            globalThis.curSpModal.arrPts = arrPts;
+            var arrPtPath = arrPts.map(pt => `${app.name}/${pt.n}`);
             return oProxy.GetPointDesc( oContext, arrPtPath ).then((ret)=>{
                 if( oContext.m_iRet < 0 )
                     return Promise.reject( oContext.m_iRet );

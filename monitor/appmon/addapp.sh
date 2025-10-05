@@ -69,7 +69,7 @@ pushd $rootdir > /dev/null
 
 ret=0
 for appname in "$@"; do
-    echo adding $appname ...
+    echo adding application $appname
     add_stdapp $appname $username $groupname
     ret=$?
     if (( ret != 0 )); then

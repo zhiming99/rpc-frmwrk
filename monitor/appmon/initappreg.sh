@@ -144,7 +144,6 @@ set_attr_value timer1 sched_task1 pulse "$(jsonval 'i' 1 )" i
 set_attr_value timer1 sched_task1 lastrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 sched_task1 nextrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 schedule1 load_on_start "$(jsonval 'i' 1)" i
-change_application_owner timer1 $uid $gid
 
 echo adding application appmonsvr1
 add_stdapp appmonsvr1
@@ -157,7 +156,6 @@ add_link timer1 clock2 appmonsvr1 ptlogger1
 set_attr_value appmonsvr1 ptlogger1 ptlist "$(jsonval 'blob' '[]' )" blob
 add_point appmonsvr1 logrotate1 input i
 add_link timer1 sched_task1 appmonsvr1 logrotate1
-change_application_owner appmonsvr1 $uid $gid
 
 echo adding application loggersvr1
 add_stdapp loggersvr1
@@ -167,39 +165,13 @@ add_point loggersvr1 logcontent output blob
 add_point loggersvr1 lines  setpoint i
 set_point_value loggersvr1 lines "$(jsonval 'i' 100 )" i
 set_attr_value loggersvr1 lines load_on_start "$(jsonval 'i' 1)" i
+
+change_application_owner timer1 $uid $gid
+change_application_owner appmonsvr1 $uid $gid
 change_application_owner loggersvr1 $uid $gid
 
-echo adding application rpcrouter1
-add_stdapp rpcrouter1
-add_point rpcrouter1 sessions output blob
-add_point rpcrouter1 bdge_list output blob
-add_point rpcrouter1 bdge_proxy_list output blob
-add_point rpcrouter1 req_proxy_list output blob 
-add_point rpcrouter1 max_conn  setpoint i
-add_point rpcrouter1 max_recv_bps  setpoint i
-add_point rpcrouter1 max_send_bps  setpoint i
-add_point rpcrouter1 max_pending_tasks setpoint i
-add_point rpcrouter1 sess_time_limit setpoint i
-
-set_point_value rpcrouter1 cmdline "$(jsonval 'blob' 'rpcrouter -adgor 2')" blob
-set_point_value rpcrouter1 working_dir  "$(jsonval 'blob' '/' )" blob
-set_point_value rpcrouter1 sess_time_limit "$(jsonval 'i' 86400 )" i
-set_attr_value rpcrouter1 sess_time_limit unit "$(jsonval 's' 'sec' )" s
-set_attr_value rpcrouter1 sess_time_limit load_on_start "$(jsonval 'i' 1)" i
-set_attr_value rpcrouter1 max_conn load_on_start "$(jsonval 'i' 1)" i
-set_attr_value rpcrouter1 max_recv_bps load_on_start "$(jsonval 'i' 1)" i
-set_attr_value rpcrouter1 max_send_bps load_on_start "$(jsonval 'i' 1)" i
-set_attr_value rpcrouter1 obj_count avgalgo  "$(jsonval 'i' 1)" i
-set_attr_value rpcrouter1 vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
-set_attr_value rpcrouter1 cpu_load avgalgo  "$(jsonval 'i' 1)" i
-
-add_log_link rpcrouter1 rx_bytes appmonsvr1 ptlogger1
-add_log_link rpcrouter1 tx_bytes appmonsvr1 ptlogger1
-add_log_link rpcrouter1 vmsize_kb appmonsvr1 ptlogger1
-add_log_link rpcrouter1 obj_count appmonsvr1 ptlogger1
-add_log_link rpcrouter1 cpu_load appmonsvr1 ptlogger1
-
-change_application_owner rpcrouter1 $uid $gid
+add_rpcrouter rpcrouter1
+chown $uid:$gid ./apps 
 
 #leaving approot
 popd > /dev/null

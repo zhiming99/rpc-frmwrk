@@ -448,14 +448,29 @@
         if (setpoints.size === 0) {
             tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
-            setpoints.forEach((value, key) => {
+            const arrPts = globalThis.curSpModal.arrPts;
+            for( elem in arrPts )
+            {
+                if( !setpoints.has(arrPts[elem].n) )
+                    continue
+                value = setpoints.get(arrPts[elem].n);
+                if( value === undefined )
+                    continue
                 const tr = document.createElement('tr');
                 var valToShow = value.v;
                 if( value.t === "float" || value.t === "double" )
                     valToShow = valToShow.toFixed(3);
-                tr.innerHTML = `<td>${i18nHelper.t(key)}</td><td>${valToShow}</td>`;
+                if( value.cnt > 0 )
+                {
+                    valColor = "text-danger";
+                    value.cnt--;
+                }
+                else
+                    valColor = "text-secondary";
+                valToShow = `<span class="${valColor}">${valToShow}</span>`;
+                tr.innerHTML = `<td>${i18nHelper.t(arrPts[elem].n)}</td><td>${valToShow}</td>`;
                 tbody.appendChild(tr);
-            });
+            }
         }
     }
     function showAppDetailModal(app, site) {
@@ -494,9 +509,10 @@
                     return
                 attr = modal.currentApp.setpoints.get(arrComps[1])
                 if (!attr)
-                    attr = { v: null, t: null }
+                    attr = { v: null, t: null };
                 attr.v = value.m_val
                 attr.t = type2str(value.m_iType)
+                attr.cnt = (attr.cnt?attr.cnt:0) + 1;
                 modal.currentApp.setpoints.set(arrComps[1], attr);
             }
         };
@@ -513,8 +529,8 @@
                         modal.currentApp.setpoints = new Map();
                     console.log("Listener removed:", ret);
                     globalThis.curSpModal = null;
-                    globalThis.fetchStatusInterval =
-                        setInterval(fetchStatus, 5000);
+                    // globalThis.fetchStatusInterval =
+                    //     setInterval(fetchStatus, 5000);
                     globalThis.fetchLogsInterval =
                         setInterval(fetchLogs, 30000);
                 }).catch((error)=>{
@@ -526,8 +542,8 @@
                         modal.currentApp.setpoints = new Map();
                     console.log("Error removing listener:", error);
                     globalThis.curSpModal = null;
-                    globalThis.fetchStatusInterval =
-                        setInterval(fetchStatus, 5000);
+                    // globalThis.fetchStatusInterval =
+                    //     setInterval(fetchStatus, 5000);
                     globalThis.fetchLogsInterval =
                         setInterval(fetchLogs, 30000);
                 });
@@ -538,8 +554,8 @@
         document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
         document.getElementById('setpoint-value-header').textContent = i18nHelper.t("Value");
         modal.show();
-        clearInterval(globalThis.fetchStatusInterval);
-        globalThis.fetchStatusInterval = undefined;
+        // clearInterval(globalThis.fetchStatusInterval);
+        // globalThis.fetchStatusInterval = undefined;
         clearInterval(globalThis.fetchLogsInterval);
         globalThis.fetchLogsInterval = undefined;
         fetchStatus();

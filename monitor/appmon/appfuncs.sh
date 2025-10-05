@@ -29,6 +29,19 @@ function wait_mount()
     return 0
 }
 
+set_stdmode_dir1="chmod ug+rwx,o-w"
+set_stdmode_file1="chmod ug+rw,o-rwx"
+
+function set_stdmode_dir()
+{
+    chmod ug+rwx,o-w $1
+}
+
+function set_stdmode_file()
+{
+    chmod ug+rw,o-rwx $1
+}
+
 function undo_check_appreg_mount()
 {
     base=$HOME/.rpcf
@@ -106,15 +119,20 @@ function clear_rpcf_mount()
     mp=`mount | grep '^regfsmnt' | awk '{print $3}'`
     if [ "x$mp" != "x" ];then
         for i in $mp; do
-            umount $i
+            if ! umount $i; then
+                return 1
+            fi
         done
     fi
     mp=`mount | grep appmonsvr | awk '{print $3}'`
     if [ "x$mp" != "x" ];then
         for i in $mp; do
-            umount $i
+            if ! umount $i; then
+                return 1
+            fi
         done
     fi
+    return 0
 }
 
 function str2type()
@@ -334,6 +352,8 @@ function add_point()
             return $?
         fi
     fi
+    find . -depth -type f -exec $set_stdmode_file1 '{}' ';'
+    find . -depth -type d -exec $set_stdmode_dir1 '{}' ';'
     read -r _uid _gid <<< $(get_uid_gid 100)
     find . -depth -exec chown $_uid:$_gid '{}' ';' 
     restore_perm 1
@@ -397,6 +417,12 @@ function add_link()
     grant_perm ./apps/$_outapp/points 0005 33
     _inpath="./apps/$_inapp/points/$_inpt"
     _outpath="./apps/$_outapp/points/$_outpt"
+
+    local _inuid_=$(stat -c "%u" ./apps/$_inapp)
+    local _ingid_=$(stat -c "%g" ./apps/$_inapp)
+    local _outuid_=$(stat -c "%u" ./apps/$_outapp)
+    local _outgid_=$(stat -c "%g" ./apps/$_outapp)
+
     if [ ! -d $_outpath ] ||
        [ ! -d $_inpath ]; then
         echo Error unable to find the point
@@ -427,6 +453,8 @@ function add_link()
 
     if [ ! -d $_inpath/ptrs ]; then
         mkdir $_inpath/ptrs
+        set_stdmode_dir $_inpath/ptrs
+        chown $_inuid_:$_ingid_ $_inpath/ptrs
     fi
     grant_perm $_inpath/ptrs 0007 35
     echo $linkout > $_inpath/ptrs/ptr$inid
@@ -438,10 +466,14 @@ function add_link()
     if (( len < 95 ));then
         python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkout)" $_inpath/ptrs/ptr$inid > /dev/null
     fi
+    set_stdmode_file $_inpath/ptrs/ptr$inid
+    chown $_inuid_:$_ingid_ $_inpath/ptrs/ptr$inid
     restore_perm 35
 
     if [ ! -d $_outpath/ptrs ]; then
         mkdir $_outpath/ptrs
+        set_stdmode_dir $_outpath/ptrs
+        chown $_outuid_:$_outgid_ $_outpath/ptrs
     fi
     grant_perm $_outpath/ptrs 0007 35
     echo $linkin > $_outpath/ptrs/ptr$outid
@@ -449,10 +481,13 @@ function add_link()
     if (( $fileSize == 0 )); then
         echo failed to write to $_outpath/ptrs/ptr$outid
     fi
+
     len=${#linkin}
     if (( len < 95 ));then
         python3 ${updattr} -u 'user.regfs' "$(jsonval s $linkin)" $_outpath/ptrs/ptr$outid > /dev/null
     fi
+    set_stdmode_file $_outpath/ptrs/ptr$outid
+    chown $_outuid_:$_outgid_ $_outpath/ptrs/ptr$outid
     restore_perm 30 31 32 33 35 36 37
 }
 
@@ -491,15 +526,11 @@ function set_attr_value()
     grant_perm $_ptpath 0007 40
     created=0
     local _idx=
-    if [[ -f $_ptpath/$_attr ]]; then
-        _idx=41
-        grant_perm $_ptpath/$_attr 0006 41
+    if [[ ! -f $_ptpath/$_attr ]]; then
+        created=1
+        touch $_ptpath/$_attr
     fi
     if (( $_dtnum <= 7 ));then
-        if [ ! -f $_ptpath/$_attr ]; then
-            touch $_ptpath/$_attr
-            created=1
-        fi
         python3 $updattr -u 'user.regfs' "$_value" $_ptpath/$_attr > /dev/null
     else
         echo "$_value" > $_ptpath/$_attr
@@ -508,6 +539,7 @@ function set_attr_value()
     if (( created == 1 )); then
         local _uname_=$(stat -c "%u" $_ptpath)
         local _gname_=$(stat -c "%g" $_ptpath)
+        set_stdmode_file $_ptpath/$_attr
         chown $_uname_:$_gname_ $_ptpath/$_attr
     fi
     ret=$?
@@ -1043,12 +1075,78 @@ function get_app_gid()
 function change_application_owner()
 {
     local _instname=$1
+    local _username=$2
+    if [[ -z "$_instname" ]] || [[ -z "$_username" ]]; then
+        echo Error missing parameters
+        return 1
+    fi
     if [ ! -d ./apps/$_instname ]; then
         echo Error application $_instname does not exist
         return 1
     fi
+    local ownerstr=$(bash $rpcfshow -u $2 | grep 'uid:' | awk '{print $2}')
+    if [[ ! -z "$3" ]]; then
+        ownerstr="$ownerstr:$(bash $rpcfshow -g $3 | grep 'gid:' | awk '{print $2}')"
+    fi
+    find ./apps/$_instname -depth -exec chown $ownerstr '{}' ';'
+    return $?
+}
 
-    find ./apps/$_instname -depth -exec chown $2:$3 '{}' ';'
+function change_application_group()
+{
+    local _instname=$1
+    local _grpname=$2
+    if [[ -z "$_instname" ]] || [[ -z "$_grpname" ]]; then
+        echo Error missing parameters
+        return 1
+    fi
+    if [ ! -d ./apps/$_instname ]; then
+        echo Error application $_instname does not exist
+        return 1
+    fi
+    local ownerstr=$(bash $rpcfshow -g $2 | grep 'gid:' | awk '{print $2}')
+    find ./apps/$_instname -depth -exec chgrp $ownerstr '{}' ';'
+    return $?
+}
+
+function change_point_owner()
+{
+    local _instname=$1
+    local _ptname=$2
+    local _username=$3
+    if [[ -z $_instname ]] || [[ -z $_ptname ]] || [[ -z "$_username" ]]; then
+        echo Error missing parameters
+        return 1
+    fi
+    if [ ! -d ./apps/$_instname/points/$_ptname ]; then
+        echo Error point $_instname/$_ptname does not exist
+        return 1
+    fi
+
+    local ownerstr=$(bash $rpcfshow -u $_username | grep 'uid:' | awk '{print $2}')
+    if [[ ! -z "$4" ]]; then
+        ownerstr="$ownerstr:$(bash $rpcfshow -g $4 | grep 'gid:' | awk '{print $2}')"
+    fi
+    find ./apps/$_instname/points/$_ptname -depth -exec chown $ownerstr '{}' ';'
+    return $?
+}
+
+function change_point_group()
+{
+    local _instname=$1
+    local _ptname=$2
+    local _grpname=$3
+    if [[ -z $_instname ]] || [[ -z $_ptname ]] || [[ -z "$_grpname" ]]; then
+        echo Error missing parameters
+        return 1
+    fi
+    if [ ! -d ./apps/$_instname/points/$_ptname ]; then
+        echo Error point $_instname/$_ptname does not exist
+        return 1
+    fi
+
+    local ownerstr=$(bash $rpcfshow -g $_grpname | grep 'gid:' | awk '{print $2}')
+    find ./apps/$_instname/points/$_ptname -depth -exec chgrp $ownerstr '{}' ';'
     return $?
 }
 
@@ -1065,7 +1163,8 @@ function change_application_mode()
         echo Error empty mode string
     fi
 
-    find ./apps/$_instname -depth -exec chmod -R $_mode '{}' ';'
+    find ./apps/$_instname -depth -type f -exec chmod $_mode '{}' ';'
+    find ./apps/$_instname -depth -type d -exec chmod $_mode '{}' ';'
     return $?
 }
 
@@ -1270,18 +1369,21 @@ function add_log_link()
 
     if [[ ! -f $_logpath/logcount ]]; then
         touch $_logpath/logcount;
+        set_stdmode_file $_logpath/logcount
         python3 ${updattr} -u 'user.regfs' "$(jsonval i 0)" $_logpath/logcount > /dev/null
     fi
     logid=`python3 ${updattr} -a 'user.regfs' 1 $_logpath/logcount`
 
     if [[ ! -f $_userpath/logcount ]]; then
         touch $_userpath/logcount;
+        set_stdmode_file $_userpath/logcount
         python3 ${updattr} -u 'user.regfs' "$(jsonval i 0)" $_userpath/logcount > /dev/null
     fi
     userid=`python3 ${updattr} -a 'user.regfs' 1 $_userpath/logcount`
 
     if [[ ! -d $_logpath/logptrs ]]; then
         mkdir $_logpath/logptrs
+        set_stdmode_dir $_logpath/logptrs
     fi
 
     loglink="$_logapp/$_logpt/ptr$logid"
@@ -1308,8 +1410,9 @@ function add_log_link()
         done
     fi
     if (($bexist==0)); then
-        echo create userlink $userlink
+        #echo create userlink $userlink
         echo $userlink > $_logpath/logptrs/ptr$logid
+        set_stdmode_file $_logpath/logptrs/ptr$logid
         fileSize=`stat -c %s $_logpath/logptrs/ptr$logid`
         if (( $fileSize == 0 )); then
             echo failed to write to $_logpath/logptrs/ptr$logid
@@ -1324,6 +1427,7 @@ function add_log_link()
 
     if [[ ! -d $_userpath/logptrs ]]; then
         mkdir $_userpath/logptrs
+        set_stdmode_dir $_userpath/logptrs
     fi
     grant_perm $_userpath/logptrs 0007 3
     #chmod o+w $_userpath/logptrs
@@ -1347,6 +1451,7 @@ function add_log_link()
     fi
     if (($bexist==0)); then
         echo $loglink > $_userpath/logptrs/ptr$userid
+        set_stdmode_file $_userpath/logptrs/ptr$userid
         fileSize=`stat -c %s $_userpath/logptrs/ptr$userid`
         if (( $fileSize == 0 )); then
             echo failed to write to $_userpath/logptrs/ptr$userid
@@ -1357,21 +1462,25 @@ function add_log_link()
         fi
         if [[ ! -d $_userpath/logs ]]; then
             mkdir $_userpath/logs
+            set_stdmode_dir $_userpath/logs
         fi
         dt=`python3 $updattr -v $_userpath/datatype`
         typestr=$(type2str $dt)
         grant_perm $_userpath/logs 0007 4
         if [[ "x" == "x$_logfile" ]]; then
             touch $_userpath/logs/ptr$userid-0
+            set_stdmode_file $_userpath/logs/ptr$userid-0
             init_log_file $_userpath/logs/ptr$userid-0 $typestr
         else
             touch $_userpath/logs/ptr$userid-extfile
+            #chmod ug+rw,o-rwx $_userpath/logs/ptr$userid-extfile
             init_log_file $_logfile $typestr
             echo $_logfile > $_userpath/logs/ptr$userid-extfile
         fi
         restore_perm 4
 
         touch $_userpath/average
+        set_stdmode_file $_userpath/average
         python3 $updattr -u 'user.regfs' "$(jsonval d 0.0)" $_userpath/average > /dev/null
     fi
 
@@ -1384,6 +1493,7 @@ function add_log_link()
     chown -R $_uid:$_gid $_userpath/logptrs
     chown -R $_uid:$_gid $_userpath/logs
     chown -R $_uid:$_gid $_userpath/logcount
+    chown $_uid:$_gid $_userpath/average
     return 0
 }
 
@@ -1503,11 +1613,9 @@ function add_stdapp()
 
     store_uid_gid ./apps 70
     local _uid_ _gid_
-    if [ -z "$_uid_" ]; then
-        read -r _uid_ _gid_ <<< $( get_uid_gid 70 )
-    fi
+    read -r _uid_ _gid_ <<< $( get_uid_gid 70 )
 
-    if [[ ! -z "$_user" ]]  then
+    if [[ ! -z "$_user" ]]; then
         _uid_=`bash $rpcfshow -u $_user | grep 'uid:' | awk '{print $2}'`
     fi
     if [[ ! -z "$_group" ]]; then
@@ -1528,6 +1636,9 @@ function add_stdapp()
     touch birth_time
     echo $(date) > birth_time
     popd > /dev/null
+
+    add_point $_instname app_class setpoint s
+    set_point_value $_instname app_class "$(jsonval 's' 'stdapp')" s
 
     add_point $_instname rpt_timer input i
     set_attr_value $_instname rpt_timer unit "$(jsonval 'i' 0 )" i
@@ -1584,16 +1695,58 @@ function add_stdapp()
     add_point $_instname tx_bytes_total setpoint qword
     set_attr_value $_instname tx_bytes_total value "$(jsonval 'q' 0 )" q
 
-    find ./apps/$_instname -type f -exec chmod ug+rw,o+r '{}' ';'
-    find ./apps/$_instname -type d -exec chmod ug+rwx,o+rx '{}' ';'
-    #chmod -R o-rwx ./apps/$_instname/points/restart
-    chmod -R o-rwx ./apps/$_instname
-    #chmod -R o+w ./apps/$_instname/notify_streams
     if [[ "x$_instname" == "xtimer1" ]]; then
+        find ./apps/$_instname -type f -exec $set_stdmode_file1 '{}' ';'
+        find ./apps/$_instname -depth -type d -exec $set_stdmode_dir1 '{}' ';'
         return 0
     fi
     add_link timer1 clock1 $_instname rpt_timer
     add_link $_instname offline_notify timer1 offline_action
+    find ./apps/$_instname -type f -exec $set_stdmode_file1 '{}' ';'
+    find ./apps/$_instname -depth -type d -exec $set_stdmode_dir1 '{}' ';'
     change_application_owner $_instname $_uid_ $_gid_
     return 0
+}
+
+function add_rpcrouter
+{
+    local _instname=$1
+    if [[ -z $1 ]]; then
+        return 22
+    fi
+
+    echo adding application $_instname
+    add_stdapp $_instname
+    store_uid_gid ./apps/timer1 101
+    add_point $_instname sessions output blob
+    add_point $_instname bdge_list output blob
+    add_point $_instname bdge_proxy_list output blob
+    add_point $_instname req_proxy_list output blob 
+    add_point $_instname max_conn  setpoint i
+    add_point $_instname max_recv_bps  setpoint i
+    add_point $_instname max_send_bps  setpoint i
+    add_point $_instname max_pending_tasks setpoint i
+    add_point $_instname sess_time_limit setpoint i
+
+    set_point_value $_instname app_class "$(jsonval 's' 'rpcrouter')" s
+    set_point_value $_instname cmdline "$(jsonval 'blob' 'rpcrouter -adgor 2')" blob
+    set_point_value $_instname working_dir  "$(jsonval 'blob' '/' )" blob
+    set_point_value $_instname sess_time_limit "$(jsonval 'i' 86400 )" i
+    set_attr_value $_instname sess_time_limit unit "$(jsonval 's' 'sec' )" s
+    set_attr_value $_instname sess_time_limit load_on_start "$(jsonval 'i' 1)" i
+    set_attr_value $_instname max_conn load_on_start "$(jsonval 'i' 1)" i
+    set_attr_value $_instname max_recv_bps load_on_start "$(jsonval 'i' 1)" i
+    set_attr_value $_instname max_send_bps load_on_start "$(jsonval 'i' 1)" i
+    set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
+
+    add_log_link $_instname rx_bytes appmonsvr1 ptlogger1
+    add_log_link $_instname tx_bytes appmonsvr1 ptlogger1
+    add_log_link $_instname vmsize_kb appmonsvr1 ptlogger1
+    add_log_link $_instname obj_count appmonsvr1 ptlogger1
+    add_log_link $_instname cpu_load appmonsvr1 ptlogger1
+
+    read -r _uid _gid <<< $(get_uid_gid 101)
+    change_application_owner $_instname $_uid $_gid
 }

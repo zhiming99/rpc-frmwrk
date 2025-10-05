@@ -785,6 +785,34 @@ case "$cmd" in
         clear_rpcf_mount
         exit $?
         ;;
+    chappowner)
+        cmdline="rpcfctl chown <appName> <owner> [<group>] "
+        if [[ $# -lt 2 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        if check_appreg_mount; then
+            pushd ${rootdir} > /dev/null
+            change_application_owner $@
+            popd > /dev/null
+            undo_check_appreg_mount
+        fi
+        ;;
+    chptowner)
+        cmdline="rpcfctl chown <appName> <pointname> <owner> [<group>]"
+        if [[ $# -lt 3 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        if check_appreg_mount; then
+            pushd ${rootdir} > /dev/null
+            change_point_owner $@
+            popd > /dev/null
+            undo_check_appreg_mount
+        fi
+        ;;
     *)
         echo "Unknown command: $cmd"
         usage
