@@ -467,6 +467,8 @@
                 }
                 else
                     valColor = "text-secondary";
+                if( value.unit && value.unit.length > 0 )
+                    valToShow = `${valToShow} ${i18nHelper.t(value.unit)}`;
                 valToShow = `<span class="${valColor}">${valToShow}</span>`;
                 tr.innerHTML = `<td>${i18nHelper.t(arrPts[elem].n)}</td><td>${valToShow}</td>`;
                 tbody.appendChild(tr);

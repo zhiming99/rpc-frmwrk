@@ -49,5 +49,9 @@
   "max_streams_per_session": "Max Streams per Session",
   "max_qps": "Max QPS",
   "cur_qps": "Current QPS",
-  "conn_count": "Connection Count"
+  "conn_count": "Connection Count",
+  "sec": "Seconds",
+  "msec": "Milliseconds",
+  "bps": "bps",
+  "bytes": "Bytes"
 }

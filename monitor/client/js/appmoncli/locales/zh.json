@@ -59,5 +59,9 @@
   "max_streams_per_session": "每会话最大流数",
   "max_qps": "最大QPS",
   "cur_qps": "当前QPS",
-  "conn_count": "当前连接数"
+  "conn_count": "当前连接数",
+  "sec": "秒",
+  "msec": "毫秒",
+  "bps": "bps",
+  "bytes": "字节"
 }

@@ -21,8 +21,8 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
         this.OnStmClosed = this.OnStmClosedImpl.bind( this );
         this.m_setAppBaseLine = new Set( );
         //this.m_setAppBaseLine.add( 'appmonsvr1' );
-        this.m_setAppBaseLine.add( 'timer1' );
-        this.m_setAppBaseLine.add( 'loggersvr1' );
+        //this.m_setAppBaseLine.add( 'timer1' );
+        //this.m_setAppBaseLine.add( 'loggersvr1' );
     }
 
     // The following are callbacks and event handlers
