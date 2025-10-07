@@ -144,6 +144,7 @@ set_attr_value timer1 sched_task1 pulse "$(jsonval 'i' 1 )" i
 set_attr_value timer1 sched_task1 lastrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 sched_task1 nextrun "$(jsonval 'i' 0)" i
 set_attr_value timer1 schedule1 load_on_start "$(jsonval 'i' 1)" i
+set_point_value timer1 app_class "$(jsonval 's' 'timer')" s
 
 echo adding application appmonsvr1
 add_stdapp appmonsvr1
@@ -165,6 +166,7 @@ add_point loggersvr1 logcontent output blob
 add_point loggersvr1 lines  setpoint i
 set_point_value loggersvr1 lines "$(jsonval 'i' 100 )" i
 set_attr_value loggersvr1 lines load_on_start "$(jsonval 'i' 1)" i
+set_point_value loggersvr1 app_class "$(jsonval 's' 'logger')" s
 
 change_application_owner timer1 $uid $gid
 change_application_owner appmonsvr1 $uid $gid

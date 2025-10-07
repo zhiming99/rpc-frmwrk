@@ -337,18 +337,22 @@ function add_point()
     elif [ "$_pttype" == 'input' ]; then
         python3 $updattr -u 'user.regfs' "$(jsonval i 1 )" ptype > /dev/null
         echo input > ptype
+        touch script
+        python3 $updattr -u 'user.regfs' "$(jsonval i 10 )" script > /dev/null
     else
         python3 $updattr -u 'user.regfs' "$(jsonval i 2 )" ptype > /dev/null
         echo setpoint > ptype
     fi
     python3 $updattr -u 'user.regfs' "$(jsonval i 0 )" point_flags > /dev/null
 
-    if [ $_pttype != 'setpoint' ]; then
+    if [[ $_pttype != 'setpoint' ]]; then
         mkdir ptrs || true
         touch ptrcount
         if ! setfattr -n 'user.regfs' -v '{ "t": 3, "v":0 }' ./ptrcount > /dev/null; then
+            echo Error failed to create ptr for point $_appname/$_ptname
+            rm -rf ptrs
             popd > /dev/null
-            restore_perm 100
+            restore_perm 1
             return $?
         fi
     fi
@@ -1660,8 +1664,10 @@ function add_stdapp()
 
     add_point $_instname rx_bytes output qword
     set_attr_value $_instname rx_bytes value "$(jsonval 'q' 0 )" q
+    set_attr_value $_instname rx_bytes unit "$(jsonval 's' 'bytes' )" s
     add_point $_instname tx_bytes output qword
     set_attr_value $_instname tx_bytes value "$(jsonval 'q' 0 )" q
+    set_attr_value $_instname tx_bytes unit "$(jsonval 's' 'bytes' )" s
     add_point $_instname failure_count output i
     set_attr_value $_instname failure_count value "$(jsonval 'i' 0 )" i
     add_point $_instname resp_count output i
@@ -1669,7 +1675,9 @@ function add_stdapp()
     add_point $_instname req_count output i
     set_attr_value $_instname req_count value "$(jsonval 'i' 0 )" i
     add_point $_instname vmsize_kb  output q
+    set_attr_value $_instname vmsize_kb unit "$(jsonval 's' 'kb' )" s
     add_point $_instname cpu_load  output f
+    set_attr_value $_instname cpu_load unit "$(jsonval 's' '%' )" s
     add_point $_instname open_files  output i
     set_attr_value $_instname open_files value "$(jsonval 'i' 0 )" i
     add_point $_instname conn_count  output i
@@ -1690,10 +1698,13 @@ function add_stdapp()
     set_attr_value $_instname offline_times value "$(jsonval 'i' 0 )" i
     add_point $_instname uptime_total setpoint i
     set_attr_value $_instname uptime_total value "$(jsonval 'i' 0 )" i
+    set_attr_value $_instname uptime_total unit "$(jsonval 's' 'sec' )" s
     add_point $_instname rx_bytes_total setpoint qword
     set_attr_value $_instname rx_bytes_total value "$(jsonval 'q' 0 )" q
+    set_attr_value $_instname rx_bytes_total unit "$(jsonval 's' 'bytes' )" s
     add_point $_instname tx_bytes_total setpoint qword
     set_attr_value $_instname tx_bytes_total value "$(jsonval 'q' 0 )" q
+    set_attr_value $_instname tx_bytes_total unit "$(jsonval 's' 'bytes' )" s
 
     if [[ "x$_instname" == "xtimer1" ]]; then
         find ./apps/$_instname -type f -exec $set_stdmode_file1 '{}' ';'
@@ -1724,7 +1735,9 @@ function add_rpcrouter
     add_point $_instname req_proxy_list output blob 
     add_point $_instname max_conn  setpoint i
     add_point $_instname max_recv_bps  setpoint i
+    set_attr_value $_instname max_recv_bps unit "$(jsonval 's' 'bps' )" s
     add_point $_instname max_send_bps  setpoint i
+    set_attr_value $_instname max_send_bps unit "$(jsonval 's' 'bps' )" s
     add_point $_instname max_pending_tasks setpoint i
     add_point $_instname sess_time_limit setpoint i
 
