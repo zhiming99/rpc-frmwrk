@@ -41,6 +41,7 @@
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
             <!--<button id="config-btn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">Update Config</button>-->
+            <span id="user-label" class="ms-2 text-white"></span>
             <button id="reconnect-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
           </li>
         </ul>
@@ -124,12 +125,24 @@
 
     function showReconnectButton(show, isConnected = false) {
       const btn = document.getElementById('reconnect-btn');
+      const userLabel = document.getElementById('user-label');
+
       if (show) {
         btn.classList.remove('d-none');
         if (isConnected) {
           btn.textContent = i18nh.t('Logout');
           btn.classList.remove('btn-warning');
           btn.classList.add('btn-danger');
+          var strUser; 
+          if( !globalThis.oProxy )
+              strUser = ""
+          else if( globalThis.oProxy && globalThis.oProxy.m_strUserName )
+              strUser = globalThis.oProxy.m_strUserName;
+          else if( globalThis.oProxy && globalThis.oProxy.m_oChanProxy &&
+              globalThis.oProxy.m_oChanProxy.m_strUserName )
+              strUser = globalThis.oProxy.m_oChanProxy.m_strUserName;
+
+          userLabel.textContent = strUser;
           btn.onclick = function() {
             // Your disconnect logic here
             if (globalThis.oProxy && typeof globalThis.oProxy.Stop === 'function') {
@@ -141,6 +154,7 @@
           };
         } else {
           btn.textContent = i18nh.t('Login');
+          userLabel.textContent = '';
           btn.classList.remove('btn-danger');
           btn.classList.add('btn-warning');
           btn.onclick = function() {
@@ -159,6 +173,7 @@
         }
       } else {
         btn.classList.add('d-none');
+        userLabel.textContent = '';
       }
     }
 
@@ -263,7 +278,7 @@
 
                 const appTitle = document.createElement('h5');
                 appTitle.className = 'card-title';
-                appTitle.textContent = app.name;
+                appTitle.textContent = i18nHelper.t(app.name);
 
                 const appStatus = document.createElement('p');
                 appStatus.className = 'card-text';
@@ -440,7 +455,7 @@
     function updateAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
-        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${i18nHelper.t(app.name)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
         const setpoints = app.setpoints 
         const tbody = document.getElementById('setpointsTableBody');
@@ -478,7 +493,7 @@
     function showAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
-        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${app.name} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${i18nHelper.t(app.name )} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
         // Example: app.setpoints = [{name: "SP1", value:{ v:123, t:"i" }, ...}]
         const setpoints = app.setpoints || new Map();

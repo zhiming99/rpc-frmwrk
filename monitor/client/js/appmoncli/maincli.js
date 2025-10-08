@@ -174,6 +174,7 @@ function StartClient( oStartCb )
         }
         var oContext = new Object();
         oContext.oStartCb = oStartCb
+        globalThis.oProxy = undefined
         globalThis.funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
         return globalThis.funcStartPullInfo().then((ret)=>{
             if( oContext.oStartCb )

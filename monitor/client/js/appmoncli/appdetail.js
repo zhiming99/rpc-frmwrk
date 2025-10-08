@@ -30,6 +30,18 @@ const arrAppPoints = arrBasePoints.concat( [
     {n:"cur_qps",o:81},
 ]).sort( (a,b) => { return a.o - b.o } );
 
+const arrTimerPoints = arrBasePoints.concat( [
+    {n:"interval1",o:51},
+    {n:"interval2",o:52},
+    {n:"interval3",o:53},
+    {n:"interval4",o:54},
+    {n:"schedule1",o:55},
+]).sort( (a,b) => { return a.o - b.o } );
+
+const arrLoggerPoints = arrBasePoints.concat( [
+    {n:"lines",o:31},
+]).sort( (a,b) => { return a.o - b.o } );
+
 const PtDescProps = {
     value: 0,
     ptype: 1,
@@ -148,9 +160,16 @@ function fetchAppDetails()
                 }
                 return
             };
-            var arrPts = arrAppPoints
+            var arrPts
             if( app.app_class === "rpcrouter")
                 arrPts = arrRouterPoints
+            else if( app.app_class === "timer")
+                arrPts = arrTimerPoints
+            else if( app.app_class === "logger")
+                arrPts = arrLoggerPoints
+            else
+                arrPts = arrAppPoints
+
             globalThis.curSpModal.arrPts = arrPts;
             var arrPtPath = arrPts.map(pt => `${app.name}/${pt.n}`);
             return oProxy.GetPointDesc( oContext, arrPtPath ).then((ret)=>{

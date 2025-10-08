@@ -60,8 +60,22 @@
   "max_qps": "最大QPS",
   "cur_qps": "当前QPS",
   "conn_count": "当前连接数",
+
+  "interval1": "定时器1",
+  "interval2": "定时器2",
+  "interval3": "定时器3",
+  "interval4": "定时器4",
+  "schedule1": "计划1",
+
+  "appmonsvr1": "应用监控服务器1",
+  "timer1": "定时器服务器1",
+  "loggersvr1": "日志服务器1", 
+  "rpcrouter1": "网关服务器1", 
+
+  
   "sec": "秒",
   "msec": "毫秒",
   "bps": "bps",
-  "bytes": "字节"
+  "bytes": "字节",
+  "logger|lines": "可显示日志行数"
 }

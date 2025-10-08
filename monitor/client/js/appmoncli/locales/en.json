@@ -50,8 +50,15 @@
   "max_qps": "Max QPS",
   "cur_qps": "Current QPS",
   "conn_count": "Connection Count",
+  "interval1": "",
+  "interval2": "",
+  "interval3": "",
+  "interval4": "",
+  "schedule1": "",
+
   "sec": "Seconds",
   "msec": "Milliseconds",
   "bps": "bps",
-  "bytes": "Bytes"
+  "bytes": "Bytes",
+  "logger|lines": "Log Lines to Show"
 }
