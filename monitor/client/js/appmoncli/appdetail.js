@@ -130,7 +130,8 @@ function fetchAppDetails()
                         continue;
                     var ptv = oDesc.GetProperty(PtDescProps.value);
                     attrs = { v: ptv,
-                        t:type2str(oDesc.GetProperty(PtDescProps.datatype))
+                        t:type2str(oDesc.GetProperty(PtDescProps.datatype)),
+                        cnt : 0
                     }
                     var oVal = oDesc.GetProperty(PtDescProps.ptype);
                     if( typeof oVal === "number" )

@@ -21,10 +21,16 @@
         max-height: 600px;
     }
     .card.text-center:hover {
-      box-shadow: 0 0 10px 2px #0d6efd33; /* subtle blue shadow */
-      background-color: #c1c4c7;           /* light blue background */
-      transition: box-shadow 0.2s, background-color 0.2s;
-      cursor: pointer;
+        box-shadow: 0 0 10px 2px #0d6efd33; /* subtle blue shadow */
+        background-color: #c1c4c7;           /* light blue background */
+        transition: box-shadow 0.2s, background-color 0.2s;
+        cursor: pointer;
+    }
+    #setpvModal {
+        z-index: 1060 !important;
+    }
+    #setpvModal-backdrop {
+        z-index: 1059 !important;
     }
   </style>
 </head>
@@ -67,6 +73,33 @@
     </div>
   </main>
 
+  <!-- Set Point Values Modal -->
+  <div class="modal fade" id="setpvModal" tabindex="-1" aria-labelledby="setpvModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="setpv-form">
+        <div class="modal-header">
+          <h5 class="modal-title" id="setpvModalLabel">Set Point Values</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="setpv-param" class="form-label">Point Name</label>
+            <input type="text" class="form-control" id="setpv-param" required>
+          </div>
+          <div class="mb-3">
+            <label for="setpv-value" class="form-label">Value</label>
+            <input type="text" class="form-control" id="setpv-value" required>
+          </div>
+          <div id="setpv-feedback" class="text-danger small"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Update</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Setpoints Modal -->
   <div class="modal fade" id="setpointsModal" tabindex="-1" aria-labelledby="setpointsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -82,6 +115,7 @@
               <tr>
                 <th scope="col" id="setpoint-name-header">Name</th>
                 <th scope="col" id="setpoint-value-header">Value</th>
+                <th scope="col" id="setpoint-type-header">Point Type</th>
               </tr>
             </thead>
             <tbody id="setpointsTableBody">
@@ -452,6 +486,151 @@
       });
     }
 
+    function showSetpvModal(app, pointName, currentValue) {
+        document.getElementById('setpvModalLabel').textContent = i18nHelper.t("Set Point Values");
+        document.getElementById('setpv-param').value = i18nHelper.t(pointName);
+        document.getElementById('setpv-param').readOnly = true;
+        document.querySelector('label[for="setpv-param"]').textContent = i18nHelper.t("Point Name");
+        document.getElementById('setpv-value').value = currentValue;
+        document.querySelector('label[for="setpv-value"]').textContent = i18nHelper.t("Value");
+        document.getElementById('setpv-feedback').textContent = '';
+
+        document.getElementById('setpv-form').onsubmit = function(e) {
+            e.preventDefault();
+            var newValue = document.getElementById('setpv-value').value;
+            const { app, pointName } = globalThis.setpvContext || {};
+
+            if( !app || !globalThis.oProxy )
+                return;
+            const fullPointPath = `${app.name}/${pointName}`;
+            var oContext = Object();
+            oContext.oSetPvCb = (oContext, ret) => { 
+                if( oContext.m_iRet < 0 )
+                {
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("CONFIG_UPDATE_FAILED");
+                    console.log("Error setting point value:", oContext.m_iRet);
+                }
+                else
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("CONFIG_UPDATED");
+            }
+            const setpointMap = globalThis.curSpModal.currentApp.setpoints
+            if ( !setpointMap || !setpointMap.has(pointName) )
+            {
+                document.getElementById('setpv-feedback').textContent = i18nHelper.t("CONFIG_UPDATE_FAILED");
+                console.log("Setpoint not found:", pointName);
+                return;
+            }
+            var iType = setpointMap.get(pointName).t;
+            switch( iType )
+            {
+            case "byte":
+            case "word":
+            case "int":
+            case "qword":
+                var val = parseInt(newValue)
+                if( isNaN( val ) )
+                {
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("INVALID_INTEGER");
+                    return;
+                }
+                newValue = val
+                break;
+            case "float":
+            case "double":
+                var val = parseFloat(newValue)
+                if( isNaN( val ) )
+                {
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("INVALID_FLOAT");
+                    return;
+                }
+                newValue = val
+                break;
+            case "string":
+                // keep as string
+                break;
+            case "blob":
+                newValue = new TextEncoder().encode(newValue);
+                break;
+            }
+            iType = str2type(iType);
+            var oVar = globalThis.NewVariant( iType, newValue );
+            return globalThis.oProxy.SetPointValue( oContext, fullPointPath, oVar ).then((ret)=>{
+                setpointMap.get(pointName).v = newValue;
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
+                }, 1000);
+                return Promise.resolve(0)
+            }).catch((error) => {
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
+                }, 1000);
+                return Promise.resolve(oContext.m_iRet )
+            });
+        };
+
+        // Store context for submit
+        globalThis.setpvContext = { app, pointName };
+
+        var modalEl = document.getElementById('setpvModal');
+        var modal = new bootstrap.Modal(modalEl, {backdrop: false});
+        modalEl.style.zIndex = 1060;
+
+        // Optionally, add a custom backdrop above the first modal's backdrop
+        let customBackdrop = document.createElement('div');
+        customBackdrop.className = 'modal-backdrop fade show';
+        customBackdrop.style.zIndex = 1059;
+        customBackdrop.id = 'setpvModal-backdrop';
+        document.body.appendChild(customBackdrop);
+
+        modal.show();
+
+        // When setpvModal is hidden, remove the custom backdrop and reset z-index
+        modalEl.addEventListener('hidden.bs.modal', function handler() {
+            modalEl.style.zIndex = '';
+            let bd = document.getElementById('setpvModal-backdrop');
+            if (bd) bd.remove();
+            modalEl.removeEventListener('hidden.bs.modal', handler);
+        });
+    }
+
+    function BuildSetpointCell( app, pointName, value )
+    {
+        const tr = document.createElement('tr');
+        const nameTd = document.createElement('td');
+        nameTd.textContent = i18nHelper.t(pointName);
+        tr.appendChild(nameTd);
+
+        var valToShow = value.v;
+        if( value.t === "float" || value.t === "double" )
+            valToShow = valToShow.toFixed(3);
+        if( value.cnt > 0 )
+        {
+            valColor = "text-danger";
+            value.cnt--;
+        }
+        else
+            valColor = "text-secondary";
+        if( value.unit && value.unit.length > 0 )
+            valToShow = `${valToShow} ${i18nHelper.t(value.unit)}`;
+        valToShow = `<span class="${valColor}">${valToShow}</span>`;
+        const valueTd = document.createElement('td');
+        valueTd.innerHTML = valToShow;
+        valueTd.style.cursor = "pointer";
+        if( value.ptype && value.ptype === "setpoint" )
+        {
+          valueTd.onclick = function() {
+              showSetpvModal(app, pointName, value.v);
+          };
+        }
+
+        tr.appendChild(valueTd);
+
+        const typeTd = document.createElement('td');
+        typeTd.textContent = i18nHelper.t(value.ptype, {},"setpoint");
+        tr.appendChild(typeTd);
+        return tr;
+    }
+
     function updateAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
@@ -471,21 +650,7 @@
                 value = setpoints.get(arrPts[elem].n);
                 if( value === undefined )
                     continue
-                const tr = document.createElement('tr');
-                var valToShow = value.v;
-                if( value.t === "float" || value.t === "double" )
-                    valToShow = valToShow.toFixed(3);
-                if( value.cnt > 0 )
-                {
-                    valColor = "text-danger";
-                    value.cnt--;
-                }
-                else
-                    valColor = "text-secondary";
-                if( value.unit && value.unit.length > 0 )
-                    valToShow = `${valToShow} ${i18nHelper.t(value.unit)}`;
-                valToShow = `<span class="${valColor}">${valToShow}</span>`;
-                tr.innerHTML = `<td>${i18nHelper.t(arrPts[elem].n)}</td><td>${valToShow}</td>`;
+                const tr = BuildSetpointCell( app, arrPts[elem].n, value );
                 tbody.appendChild(tr);
             }
         }
@@ -503,11 +668,7 @@
             tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
             setpoints.forEach((value, key) => {
-                const tr = document.createElement('tr');
-                var valToShow = value.v;
-                if( value.t === "float" || value.t === "double" )
-                    valToShow = valToShow.toFixed(3);
-                tr.innerHTML = `<td>${i18nHelper.t(key)}</td><td>${valToShow}</td>`;
+                const tr = BuildSetpointCell( app, key, value );
                 tbody.appendChild(tr);
             });
         }
@@ -526,10 +687,10 @@
                     return
                 attr = modal.currentApp.setpoints.get(arrComps[1])
                 if (!attr)
-                    attr = { v: null, t: null };
+                    attr = { v: null, t: null, unit: null, cnt: 0 };
                 attr.v = value.m_val
                 attr.t = type2str(value.m_iType)
-                attr.cnt = (attr.cnt?attr.cnt:0) + 1;
+                attr.cnt+=1 
                 modal.currentApp.setpoints.set(arrComps[1], attr);
             }
         };
@@ -568,8 +729,12 @@
             }
         });
 
-        document.getElementById('setpoint-name-header').textContent = i18nHelper.t("Name");
-        document.getElementById('setpoint-value-header').textContent = i18nHelper.t("Value");
+        document.getElementById('setpoint-name-header').textContent =
+            i18nHelper.t("Name");
+        document.getElementById('setpoint-value-header').textContent =
+            i18nHelper.t("Value");
+        document.getElementById('setpoint-type-header').textContent =
+            i18nHelper.t("Point Type", {}, "setpoint");
         modal.show();
         // clearInterval(globalThis.fetchStatusInterval);
         // globalThis.fetchStatusInterval = undefined;

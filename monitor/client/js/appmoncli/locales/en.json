@@ -60,5 +60,13 @@
   "msec": "Milliseconds",
   "bps": "bps",
   "bytes": "Bytes",
-  "logger|lines": "Log Lines to Show"
+  "logger|lines": "Log Lines to Show",
+
+  "setpoint|Point Type": "Point Type",
+  "setpoint|setpoint" : "setpoint",
+  "setpoint|output" : "output",
+  "setpoint|input" : "input",
+
+  "Set Point Values": "",
+  "Point Name": ""
 }

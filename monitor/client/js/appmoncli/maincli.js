@@ -193,3 +193,12 @@ function StartClient( oStartCb )
     })
 }
 globalThis.StartClient = StartClient;
+
+function NewVariant( iType, val )
+{
+    var oVar = new Variant();
+    oVar.m_iType = iType
+    oVar.m_val = val
+    return oVar
+}
+globalThis.NewVariant = NewVariant;
