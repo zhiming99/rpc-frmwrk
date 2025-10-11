@@ -551,11 +551,15 @@
             case "blob":
                 newValue = new TextEncoder().encode(newValue);
                 break;
+            case null:
+            case undefined:
+                return Promise.resolve(-22)
             }
             iType = str2type(iType);
             var oVar = globalThis.NewVariant( iType, newValue );
             return globalThis.oProxy.SetPointValue( oContext, fullPointPath, oVar ).then((ret)=>{
                 setpointMap.get(pointName).v = newValue;
+                setpointMap.get(pointName).cnt++;
                 setTimeout(() => {
                     bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
                 }, 1000);
@@ -601,7 +605,8 @@
         tr.appendChild(nameTd);
 
         var valToShow = value.v;
-        if( value.t === "float" || value.t === "double" )
+        if( ( valToShow != null && valToShow != undefined )&&
+            ( value.t === "float" || value.t === "double") )
             valToShow = valToShow.toFixed(3);
         if( value.cnt > 0 )
         {
@@ -610,7 +615,10 @@
         }
         else
             valColor = "text-secondary";
-        if( value.unit && value.unit.length > 0 )
+        if( value.v === null || value.v === undefined )
+            valToShow = "N/A";
+        if( value.v !== null && value.v !== undefined &&
+            value.unit && value.unit.length > 0 )
             valToShow = `${valToShow} ${i18nHelper.t(value.unit)}`;
         valToShow = `<span class="${valColor}">${valToShow}</span>`;
         const valueTd = document.createElement('td');

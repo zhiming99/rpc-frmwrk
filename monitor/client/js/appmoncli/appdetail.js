@@ -50,6 +50,7 @@ const PtDescProps = {
     unit: 4,
     datatype: 5,
     size: 6,
+    haslog:7,
     retval: 12329
 }
 
@@ -129,7 +130,7 @@ function fetchAppDetails()
                     if( ptv & 0x80000000 )
                         continue;
                     var ptv = oDesc.GetProperty(PtDescProps.value);
-                    attrs = { v: ptv,
+                    attrs = { v: ptv === undefined || ptv === null ? null : ptv,
                         t:type2str(oDesc.GetProperty(PtDescProps.datatype)),
                         cnt : 0
                     }
@@ -154,6 +155,13 @@ function fetchAppDetails()
                     oVal = oDesc.GetProperty(PtDescProps.size);
                     if( oVal )
                         attrs.size = oVal;
+
+                    oVal = oDesc.GetProperty(PtDescProps.haslog);
+                    if( oVal )
+                        attrs.haslog = true;
+                    else
+                        attrs.haslog = false;
+
                     var arrComps = key.split('/')
                     if( arrComps.length < 2 )
                         continue

@@ -353,7 +353,7 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
     do{
         std::vector< stdstr > vecComps;
         ret = SplitPath( strPtPath, vecComps );
-        if( ERROR( ret ) )
+        if( ERROR( ret ) || vecComps.size() > 2 )
         {
             ret = -EINVAL;
             break;

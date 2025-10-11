@@ -1694,15 +1694,15 @@ function add_stdapp()
     add_point $_instname offline_notify output s
     set_attr_value $_instname offline_notify point_flags "$(jsonval 'i' 1 )" i
 
-    add_point $_instname offline_times setpoint i
+    add_point $_instname offline_times output i
     set_attr_value $_instname offline_times value "$(jsonval 'i' 0 )" i
-    add_point $_instname uptime_total setpoint i
+    add_point $_instname uptime_total output i
     set_attr_value $_instname uptime_total value "$(jsonval 'i' 0 )" i
     set_attr_value $_instname uptime_total unit "$(jsonval 's' 'sec' )" s
-    add_point $_instname rx_bytes_total setpoint qword
+    add_point $_instname rx_bytes_total output qword
     set_attr_value $_instname rx_bytes_total value "$(jsonval 'q' 0 )" q
     set_attr_value $_instname rx_bytes_total unit "$(jsonval 's' 'bytes' )" s
-    add_point $_instname tx_bytes_total setpoint qword
+    add_point $_instname tx_bytes_total output qword
     set_attr_value $_instname tx_bytes_total value "$(jsonval 'q' 0 )" q
     set_attr_value $_instname tx_bytes_total unit "$(jsonval 's' 'bytes' )" s
 
@@ -1734,9 +1734,9 @@ function add_rpcrouter
     add_point $_instname bdge_proxy_list output blob
     add_point $_instname req_proxy_list output blob 
     add_point $_instname max_conn  setpoint i
-    add_point $_instname max_recv_bps  setpoint i
+    add_point $_instname max_recv_bps  setpoint q
     set_attr_value $_instname max_recv_bps unit "$(jsonval 's' 'bps' )" s
-    add_point $_instname max_send_bps  setpoint i
+    add_point $_instname max_send_bps  setpoint q
     set_attr_value $_instname max_send_bps unit "$(jsonval 's' 'bps' )" s
     add_point $_instname max_pending_tasks setpoint i
     add_point $_instname sess_time_limit setpoint i
@@ -1745,6 +1745,11 @@ function add_rpcrouter
     set_point_value $_instname cmdline "$(jsonval 'blob' 'rpcrouter -adgor 2')" blob
     set_point_value $_instname working_dir  "$(jsonval 'blob' '/' )" blob
     set_point_value $_instname sess_time_limit "$(jsonval 'i' 86400 )" i
+    set_point_value $_instname max_conn "$(jsonval 'i' 512 )" i
+    #Note: int64 is not supported by json completely. large integer should use a
+    # string as a workaround
+    set_point_value $_instname max_recv_bps "$(jsonval 'q' '0xffffffffffffffff')" q
+    set_point_value $_instname max_send_bps "$(jsonval 'q' '0xffffffffffffffff')" q
     set_attr_value $_instname sess_time_limit unit "$(jsonval 's' 'sec' )" s
     set_attr_value $_instname sess_time_limit load_on_start "$(jsonval 'i' 1)" i
     set_attr_value $_instname max_conn load_on_start "$(jsonval 'i' 1)" i

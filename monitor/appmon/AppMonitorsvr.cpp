@@ -1126,15 +1126,6 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                 {
                     ret = pfs->GetValue(
                         hPtsDir, strFile, oVar );
-                    if( ERROR( ret ) )
-                    {
-                        oParams.SetIntProp(
-                            propReturnValue, ret );
-                        mapPtDescs[ strPtPath ] =
-                            ObjPtr( oParams.GetCfg() );
-                        ret = 0;
-                        continue;
-                    }
                 }
                 else if( iType == typeByteArr )
                 do{
@@ -1173,9 +1164,6 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                 else
                 {
                     ret = -ENOTSUP;
-                }
-                if( ERROR( ret ) )
-                {
                     OutputMsg( ret,
                         "Error GetPointValue %s/%s",
                         strAppName.c_str(),
@@ -1188,8 +1176,10 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     continue;
                 }
 
-                oParams.SetProperty(
-                    GETPTDESC_VALUE, oVar );
+                // fine if failed to get value
+                if( SUCCEEDED( ret ) )
+                    oParams.SetProperty(
+                        GETPTDESC_VALUE, oVar );
 
                 guint32 dwFlags = 0;
                 do{
@@ -1230,8 +1220,22 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                         "datatype", oVar, pac );
                     if( ERROR( ret ) )
                         break;
-                    oParams.SetProperty( 5, oVar );
+                    oParams.SetProperty(
+                        GETPTDESC_DATATYPE, oVar );
 
+                    // has log
+                    ret = pfs->Access( hPtDir,
+                        "logs/ptr0-0", R_OK, pac );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        oVar = true;
+                        oParams.SetProperty(
+                            GETPTDESC_HASLOG, oVar );
+                    }
+                    else
+                    {
+                        ret = 0;
+                    }
                 }while( 0 );
                 if( ERROR( ret ) )
                 {

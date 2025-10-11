@@ -80,9 +80,9 @@
   "logger|lines": "可显示日志行数",
 
   "setpoint|Point Type": "点位类型",
-  "setpoint|setpoint" : "设置点位",
-  "setpoint|output" : "输出点位",
-  "setpoint|input" : "输入点位",
+  "setpoint|setpoint" : "设置",
+  "setpoint|output" : "输出",
+  "setpoint|input" : "输入",
 
   "Set Point Values": "设置点位值",
   "Point Name": "点位名称"

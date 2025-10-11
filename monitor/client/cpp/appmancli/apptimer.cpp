@@ -43,6 +43,10 @@ TaskletPtr g_arrTimers[ 4 ];
 
 stdrmutex g_oTimerLock;
 
+static timespec g_tsStartTime;
+static timespec GetStartTime()
+{ return g_tsStartTime; }
+
 stdrmutex& GetTmLock()
 { return g_oTimerLock; }
 
@@ -54,17 +58,21 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
         InterfPtr& pIf,
         std::vector< KeyValue >& veckv ) override
    {
-        gint32 ret = 0;
         KeyValue okv;
-        okv.strKey = O_PID;
-        okv.oValue = ( guint32 )getpid();
-        veckv.push_back( okv );
+        okv.strKey = O_UPTIME;
+        timespec tsStart = GetStartTime();
+        timespec tsNow;
+        gint32 ret = clock_gettime(
+            CLOCK_REALTIME, &tsNow );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.oValue = ( guint32)
+                ( tsNow.tv_sec - tsStart.tv_sec );
+            veckv.push_back( okv );
+        }
 
-        okv.strKey = O_OBJ_COUNT;
-        okv.oValue = ( guint32 )
-            CObjBase::GetActCount();
-        veckv.push_back( okv );
-        return ret;
+        return super::GetPointValuesToUpdate(
+            pIf, veckv );
    }
 
     gint32 SetPointValuesCallback( 
@@ -453,7 +461,7 @@ static void Usage( const char* szName )
         "\t [ -h this help ]\n", szName );
 }
 
-gint32 TimerLoop();
+gint32 TimerLoop( PACBS& pacbs );
 
 int main( int argc, char** argv )
 {
@@ -494,6 +502,14 @@ int main( int argc, char** argv )
             { ret = -errno; break; }
         }
 
+        ret = clock_gettime(
+            CLOCK_REALTIME, &g_tsStartTime );
+        if( ret < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+
         ret = InitContext();
         if( ERROR( ret ) )
             break;
@@ -525,7 +541,7 @@ int main( int argc, char** argv )
             break;
         
         if( SUCCEEDED( ret ) )
-            ret = TimerLoop();
+            ret = TimerLoop( pacbsIn );
             
         StopStdAppManCli();
     }while( 0 );
@@ -629,7 +645,7 @@ gint32 CancelTimerPointX( char idx )
     return ret;
 }
 //-----Your code begins here---
-gint32 TimerLoop()
+gint32 TimerLoop( PACBS& pacbs)
 {
     gint32 ret = 0;
     auto iOldSig = 
@@ -678,6 +694,16 @@ gint32 TimerLoop()
             g_strAppInst + "/clock1", var );
         DebugPrint( 0,
             "Info send clock1 %d", dwTicks );
+
+        CCfgOpener oCtx;
+        oCtx.SetObjPtr(
+            PROP_TARGET_IF, ObjPtr( pProxy ) );
+        oCtx.SetStrProp(
+            PROP_APP_NAME, g_strAppInst );
+
+        Variant oVar2 = ( guint32 )1;
+        pacbs->OnPointChanged( oCtx.GetCfg(),
+            g_strAppInst + "/rpt_timer", oVar2 );
 
         CStdRMutex oLock( GetTmLock() );
         std::time_t t = std::time(nullptr);
