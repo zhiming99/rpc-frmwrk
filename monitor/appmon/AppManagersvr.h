@@ -12,7 +12,40 @@ typedef enum : guint32
     ptOutput = 0,
     ptInput = 1,
     ptSetPoint = 2,
+    ptStreamIn = 3,
+    ptStreamOut = 4,
 } EnumPointType;
+
+enum EnumAvgAlgo : guint32
+{
+    algoDiff = 0,
+    algoAvg = 1,
+};
+
+#define LOG_MAGIC 0x706c6f67
+struct LOGHDR
+{
+    guint32 dwMagic = LOG_MAGIC;
+    guint32 dwCounter = 0;
+    guint16 wTypeId = 0;
+    guint16 wRecSize = 0;
+    guint8  byUnit = 0;
+    guint8  reserved[ 3 ] = {0};
+    void hton()
+    {
+        dwMagic = htonl( dwMagic );
+        dwCounter = htonl( dwCounter );
+        wTypeId = htons( wTypeId );
+        wRecSize = htons( wRecSize );
+    }
+    void ntoh()
+    {
+        dwMagic = ntohl( dwMagic );
+        dwCounter = ntohl( dwCounter );
+        wTypeId = ntohs( wTypeId );
+        wRecSize = ntohs( wRecSize );
+    }
+};
 
 #include "IAppStoresvr.h"
 #include "IDataProducersvr.h"

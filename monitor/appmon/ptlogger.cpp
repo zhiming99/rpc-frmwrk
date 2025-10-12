@@ -41,40 +41,9 @@ extern gint32 SplitPath( const stdstr& strPath,
     std::vector< stdstr >& vecComp );
 extern InterfPtr GetAppManager();
 
-#define LOG_MAGIC 0x706c6f67
 #define NPLock CNamedProcessLock
 
 #define ROTATE_LIMIT ( 1024 * 1024 )
-
-enum EnumAvgAlgo : guint32
-{
-    algoDiff = 0,
-    algoAvg = 1,
-};
-
-struct LOGHDR
-{
-    guint32 dwMagic = LOG_MAGIC;
-    guint32 dwCounter = 0;
-    guint16 wTypeId = 0;
-    guint16 wRecSize = 0;
-    guint8  byUnit = 0;
-    guint8  reserved[ 3 ] = {0};
-    void hton()
-    {
-        dwMagic = htonl( dwMagic );
-        dwCounter = htonl( dwCounter );
-        wTypeId = htons( wTypeId );
-        wRecSize = htons( wRecSize );
-    }
-    void ntoh()
-    {
-        dwMagic = ntohl( dwMagic );
-        dwCounter = ntohl( dwCounter );
-        wTypeId = ntohs( wTypeId );
-        wRecSize = ntohs( wRecSize );
-    }
-};
 
 typedef std::vector< std::pair< time_t, Variant > > LOGRECVEC;
 gint32 GetLatestLogs(
