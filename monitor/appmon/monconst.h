@@ -55,3 +55,4 @@
 #define GETPTDESC_DATATYPE  5
 #define GETPTDESC_SIZE      6
 #define GETPTDESC_HASLOG    7
+#define GETPTDESC_AVGALGO   8
