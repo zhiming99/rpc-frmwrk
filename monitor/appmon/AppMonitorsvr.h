@@ -367,6 +367,39 @@ class CAppMonitor_SvrImpl
         std::vector<std::string>& arrPtPath /*[ In ]*/,
         std::map<std::string,ObjPtr>& mapPtDescs /*[ Out ]*/ ) override;
     //RPC Async Req Cancel Handler
+    gint32 OnGetPtLogInfoCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetPtLogInfo' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetPtLogInfo(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        std::map<std::string,ObjPtr>& mapPtLogInfo /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnGetPtLogCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hChannel_h /*[ In ]*/,
+        const std::string& strLogName /*[ In ]*/,
+        ObjPtr& pInfo /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetPtLog' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetPtLog(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hChannel_h /*[ In ]*/,
+        const std::string& strLogName /*[ In ]*/,
+        ObjPtr& pInfo /*[ In ]*/ ) override;
+    //RPC Async Req Cancel Handler
     gint32 OnRegisterListenerCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         std::vector<std::string>& arrApps /*[ In ]*/ ) override

@@ -72,6 +72,16 @@ interface IAppStoreEx
     [async_s]GetPointDesc(
         array< string > arrPtPath )
     returns ( map< string, ObjPtr > mapPtDescs );
+
+    [async_s]GetPtLogInfo(
+        string strPtPath ) 
+    returns ( map< string, ObjPtr > mapPtLogInfo );
+
+    [async_s]GetPtLog( string strPtPath,
+        HSTREAM hChannel,
+        string strLogName,
+        ObjPtr pInfo )
+    returns ();
 };
 
 interface IAppMonitor

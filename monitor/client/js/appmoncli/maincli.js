@@ -203,5 +203,11 @@ function AllocBuffer( size )
 {
     return Buffer.alloc( size );
 }
+
+function ConcatBuffer( buf1, buf2 )
+{
+    return Buffer.concat( [buf1, buf2] );
+}
+globalThis.ConcatBuffer = ConcatBuffer;
 globalThis.AllocBuffer = AllocBuffer;
 globalThis.NewCfgDb = NewCfgDb;

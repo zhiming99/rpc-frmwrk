@@ -254,6 +254,8 @@ function jsonval()
     "i" | "int") _t=3
         ;;
     "q" | "qword") _t=4
+        echo -n "{\"t\":$_t,\"v\":\"$_v\"}"
+        return 0
         ;;
     "f" | "float") _t=5
         ;;
@@ -1748,8 +1750,8 @@ function add_rpcrouter
     set_point_value $_instname max_conn "$(jsonval 'i' 512 )" i
     #Note: int64 is not supported by json completely. large integer should use a
     # string as a workaround
-    set_point_value $_instname max_recv_bps "$(jsonval 'q' '0xffffffffffffffff')" q
-    set_point_value $_instname max_send_bps "$(jsonval 'q' '0xffffffffffffffff')" q
+    set_point_value $_instname max_recv_bps "$(jsonval 'q' 0xffffffffffffffff)" q
+    set_point_value $_instname max_send_bps "$(jsonval 'q' 0xffffffffffffffff)" q
     set_attr_value $_instname sess_time_limit unit "$(jsonval 's' 'sec' )" s
     set_attr_value $_instname sess_time_limit load_on_start "$(jsonval 'i' 1)" i
     set_attr_value $_instname max_conn load_on_start "$(jsonval 'i' 1)" i

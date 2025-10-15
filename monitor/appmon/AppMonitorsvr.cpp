@@ -1182,6 +1182,7 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                         GETPTDESC_VALUE, oVar );
 
                 guint32 dwFlags = 0;
+                guint32 ptype = 0;
                 do{
                     RFHANDLE hPtDir = INVALID_HANDLE;
                     ret = pfs->OpenDir( strDir + elem,
@@ -1196,6 +1197,7 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                         break;
                     oParams.SetProperty(
                         GETPTDESC_PTYPE, oVar );
+                    ptype = oVar;
 
                     // average
                     ret = pfs->GetValue( hPtDir,
@@ -1223,19 +1225,29 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     oParams.SetProperty(
                         GETPTDESC_DATATYPE, oVar );
 
-                    // has log
-                    ret = pfs->Access( hPtDir,
-                        "logs/ptr0-0", R_OK, pac );
-                    if( SUCCEEDED( ret ) )
+                    if( ptype == ptOutput )
                     {
-                        oVar = true;
-                        oParams.SetProperty(
-                            GETPTDESC_HASLOG, oVar );
+                        // haslog
+                        ret = pfs->Access( hPtDir,
+                            "logs/ptr0-0", R_OK, pac );
+                        if( SUCCEEDED( ret ) )
+                        {
+                            oVar = true;
+                            oParams.SetProperty(
+                                GETPTDESC_HASLOG, oVar );
+                        }
+
+                        //avgalgo
+                        ret = pfs->GetValue( hPtDir,
+                            "avgalgo", oVar );
+                        if( SUCCEEDED( ret ) )
+                        {
+                            oParams.SetProperty(
+                                GETPTDESC_AVGALGO, oVar );
+                        }
                     }
-                    else
-                    {
-                        ret = 0;
-                    }
+                    ret = 0;
+
                 }while( 0 );
                 if( ERROR( ret ) )
                 {
@@ -1254,6 +1266,177 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                 }
                 mapPtDescs[ strPtPath ] =
                     ObjPtr( oParams.GetCfg() );
+            }
+        }
+    }while( 0 );
+    return ret;
+}
+
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetPtLogInfo( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/, 
+    std::map<std::string,ObjPtr>& mapPtLogInfo /*[ Out ]*/ )
+{
+    // TODO: Either finish the operation before return or
+    // start an async operation by returning STATUS_PENDING.
+    // And make sure to call 'GetPtLogInfoComplete'
+    // when the async operation is done.
+    return ERROR_NOT_IMPL;
+}
+
+static gint32 SendBuffer(
+    IEventSink* pCallback,
+    CAppMonitor_SvrImpl* pSvr, 
+    guint64 hChannel, BufPtr& pBuf,
+    guint32 dwSize, guint32 dwOffset )
+{
+    gint32 ret = 0;
+    do{
+        CCfgOpenerObj oCfg( pCallback );
+        IConfigDb* pResp;
+        ret = oCfg.GetPointer( propRespPtr, pResp );
+        if( ERROR( ret ) )
+            break;
+        CCfgOpener oResp( pResp );
+        guint32 iRet = 0;
+        ret = oResp.GetIntProp(
+            propReturnValue, iRet );
+        if( ERROR( ret ) || ERROR( iRet ) )
+            break;
+        if( dwSize == 0 )
+            break;
+
+        guint32 dwBytes =
+            dwSize > MAX_BYTES_PER_BUFFER ?
+            MAX_BYTES_PER_BUFFER : dwSize;
+        dwOffset += dwBytes;
+        dwSize -= dwBytes;
+        TaskletPtr pTask;
+        ret = NEW_COMPLETE_FUNCALL( 0, pTask,
+            pSvr->GetIoMgr(), SendBuffer,
+            nullptr, pSvr, hChannel, pBuf,
+            dwSize, dwOffset );
+
+        if( ERROR( ret ) )
+            break;
+
+        ( *pTask )( eventZero );
+        ret = pSvr->WriteStreamAsync(
+            hChannel, pBuf, pTask );
+
+        if( ERROR( ret ) )
+            ( *pTask )( eventCancelTask );
+
+    }while( 0 );
+    return 0;
+}
+
+/* Async Req Handler*/
+gint32 CAppMonitor_SvrImpl::GetPtLog( 
+    IConfigDb* pContext, 
+    const std::string& strPtPath /*[ In ]*/,
+    HANDLE hChannel_h /*[ In ]*/,
+    const std::string& strLogName /*[ In ]*/,
+    ObjPtr& pInfo /*[ In ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< stdstr > vecComps;
+        ret = SplitPath( strPtPath, vecComps );
+        if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( hChannel_h == INVALID_HANDLE ||
+            strLogName.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
+        const stdstr& strApp = vecComps[ 0 ];
+        const stdstr& strPt = vecComps[ 1 ];
+
+        GETAC( pContext );
+        stdstr strLogPath = "/" APPS_ROOT_DIR "/";
+        strLogPath += strApp + "/" POINTS_DIR "/" +
+            strPt + "/logs/" + strLogName;
+
+        ret = m_pAppRegfs->Access(
+            strLogPath, R_OK, pac );
+        if( ERROR( ret ) )
+            break;
+
+        struct stat stbuf;
+        ret = m_pAppRegfs->GetAttr(
+            strLogPath, stbuf );
+        if( ERROR( ret ) )
+            break;
+
+        guint32 dwSize = stbuf.st_size;
+        if( dwSize <= sizeof( LOGHDR ) )
+        {
+            ret = -ENODATA;
+            break;
+        }
+        RFHANDLE hFile = INVALID_HANDLE;
+        ret = m_pAppRegfs->OpenFile(
+            strLogPath, O_RDONLY, hFile, pac );
+        if( ERROR( ret ) )
+            break;
+        
+        CFileHandle oHandle( m_pAppRegfs, hFile );
+        BufPtr pBuf( true );
+        ret = pBuf->Resize(
+            dwSize + sizeof( guint32 ) );
+        if( ERROR( ret ) )
+            break;
+
+        ret = m_pAppRegfs->ReadFile( hFile,
+            pBuf->ptr() + sizeof( guint32 ),
+            dwSize, 0 );
+
+        if( ERROR( ret ) )
+            break;
+
+        dwSize = htonl( dwSize );
+        memcpy( pBuf->ptr(), &dwSize,
+            sizeof( guint32 ) );
+
+        dwSize = ntohl( dwSize );
+        dwSize += sizeof( guint32 );
+ 
+        guint32 dwOffset = 0;
+        if( dwSize > 0 )
+        {
+            guint32 dwBytes =
+                dwSize > MAX_BYTES_PER_BUFFER ?
+                MAX_BYTES_PER_BUFFER : dwSize;
+            dwOffset += dwBytes;
+            dwSize -= dwBytes;
+            TaskletPtr pTask;
+            ret = NEW_COMPLETE_FUNCALL( 0, pTask,
+                this->GetIoMgr(), SendBuffer,
+                nullptr, this, hChannel_h, pBuf,
+                dwSize, dwOffset );
+
+            if( ERROR( ret ) )
+                break;
+
+            ( *pTask )( eventZero );
+            gint32 iRet = this->WriteStreamAsync(
+                hChannel_h, pBuf, pTask );
+            if( ERROR( iRet ) )
+            {
+                ( *pTask )( eventCancelTask );
+                ret = iRet;
             }
         }
     }while( 0 );
