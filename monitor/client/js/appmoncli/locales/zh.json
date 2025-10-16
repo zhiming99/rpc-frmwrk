@@ -85,5 +85,10 @@
   "setpoint|input" : "输入",
 
   "Set Point Values": "设置点位值",
-  "Point Name": "点位名称"
+  "Point Name": "点位名称",
+  "View Log Data": "查看日志数据",
+
+  "LAST_2000_SAMPLES": "最近2000条",
+  "LAST_4000_SAMPLES": "最近4000条",
+  "FULL_LOG": "全部日志"
 }

@@ -67,6 +67,11 @@
   "setpoint|output" : "output",
   "setpoint|input" : "input",
 
-  "Set Point Values": "",
-  "Point Name": ""
+  "Set Point Values": "Set Point Values",
+  "Point Name": "",
+  "View Log Data": "",
+
+  "LAST_2000_SAMPLES": "Last 2000 samples",
+  "LAST_4000_SAMPLES": "Last 4000 samples",
+  "FULL_LOG": "Full Log"
 }

@@ -1762,10 +1762,15 @@ function add_rpcrouter
     set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
 
     add_log_link $_instname rx_bytes appmonsvr1 ptlogger1
+    set_attr_value $_instname rx_bytes avgalgo  "$(jsonval 'i' 0)" i
     add_log_link $_instname tx_bytes appmonsvr1 ptlogger1
+    set_attr_value $_instname tx_bytes avgalgo  "$(jsonval 'i' 0)" i
     add_log_link $_instname vmsize_kb appmonsvr1 ptlogger1
+    set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
     add_log_link $_instname obj_count appmonsvr1 ptlogger1
+    set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
     add_log_link $_instname cpu_load appmonsvr1 ptlogger1
+    set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
 
     read -r _uid _gid <<< $(get_uid_gid 101)
     change_application_owner $_instname $_uid $_gid

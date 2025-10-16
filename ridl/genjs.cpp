@@ -84,13 +84,66 @@ gint32 GetArgsAndSigsJs( CArgList* pArgList,
     return ret;
 }
 
+gint32 SearchForDevTree( stdstr& strJsPath )
+{
+    gint32 ret = 0;
+    char szPath[ 1024 ];
+    do{
+        char* pcurDir = getcwd(
+            szPath, sizeof( szPath ) );
+        if( pcurDir == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        std::vector< stdstr > vecComps;
+        ret = CRegistry::Namei( pcurDir, vecComps );
+        if( ERROR( ret ) )
+            break;
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        stdstr strPath = ".";
+        for( int i = 0; i < vecComps.size() - 2; i++ )
+        {
+            stdstr arrFiles[ 3 ] = {
+                strPath + "/js/combase/enums.js",
+                strPath + "/js/ipc/proxy.js",
+                strPath + "/js/rpc/bridge.js" };
+            for( int j = 0; j < 3; j++ )
+            {
+                ret = access( arrFiles[ j ].c_str(), R_OK );
+                if( ret < 0 )
+                    break;
+            }
+            if( ret == 0 )
+                break;
+            strPath += "/..";
+        }
+        if( ERROR( ret ) )
+            break;
+        // using relative path
+        strJsPath = strPath + "/js";
+    }while( 0 );
+    return ret;
+}
+
 const stdstr& GetJsLibPath()
 {
     if( !g_strJsLibPath.empty() )
         return g_strJsLibPath;
 
     stdstr strPath;
-    gint32 ret = GetLibPath(
+    gint32 ret = SearchForDevTree( strPath );
+    if( SUCCEEDED( ret ) )
+    {
+        g_strJsLibPath = strPath;
+        return g_strJsLibPath;
+    }
+    strPath.clear();
+    ret = GetLibPath(
         strPath, "libcombase.so" );
     if( ERROR( ret ) )
         return g_strJsLibPath;

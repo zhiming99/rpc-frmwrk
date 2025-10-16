@@ -208,6 +208,15 @@ function ConcatBuffer( buf1, buf2 )
 {
     return Buffer.concat( [buf1, buf2] );
 }
+
+function NewVariant( t, v )
+{
+    var oVal = new Variant( null );
+    oVal.m_iType = t;
+    oVal.m_val = v;
+    return oVal;
+}
 globalThis.ConcatBuffer = ConcatBuffer;
 globalThis.AllocBuffer = AllocBuffer;
 globalThis.NewCfgDb = NewCfgDb;
+globalThis.NewVariant = NewVariant;

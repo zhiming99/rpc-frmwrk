@@ -6,6 +6,7 @@
   <title>RPC-Framework Monitor</title>
   <!--<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">-->
   <link href="./dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
     #status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
     @media (max-width: 600px) {
@@ -39,6 +40,9 @@
     }
     #timeSeriesModal-backdrop {
         z-index: 1069 !important;
+    }
+    #logContextMenu {
+        min-width: 120px;
     }
   </style>
 </head>
@@ -160,6 +164,12 @@
       </div>
     </div>
   </div>
+    <!-- Custom Context Menu for Log Time Range -->
+  <ul id="logContextMenu" class="dropdown-menu" style="position:absolute; display:none; z-index:2000;">
+    <li><a class="dropdown-item" href="#" data-range="1h">Last 2000 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="2h">Last 4000 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="full">Full Log</a></li>
+  </ul>
 
   <script src="./i18n-helper.js"></script>
 
@@ -178,6 +188,9 @@
       document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
       document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
       document.getElementById('LogsTitle').textContent = i18nh.t("LOGS");
+      document.querySelector('#logContextMenu [data-range="1h"]').textContent = i18nh.t("LAST_2000_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="2h"]').textContent = i18nh.t("LAST_4000_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="full"]').textContent = i18nh.t("FULL_LOG");
     }).catch((error) => {
       console.error("Error loading translations:", error);
     });
@@ -681,6 +694,61 @@
         });
     }
 
+    function showLogContextMenu(e, app, pointName, attr) {
+        const menu = document.getElementById('logContextMenu');
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+
+        // Remove any previous handlers
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.onclick = null;
+        });
+
+        // Add click handlers for each menu item
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.onclick = function(ev) {
+                ev.preventDefault();
+                menu.style.display = 'none';
+                let range = this.getAttribute('data-range');
+                // Call your log download and showTimeSeriesModal logic here
+                let timeRangeSec = 0;
+                if (range === '1h') timeRangeSec = 4000;
+                else if (range === '2h') timeRangeSec = 8000;
+                else timeRangeSec = 0; // 0 means full log
+
+                var oContext = {};
+                globalThis.downloadPointLog(
+                    oContext,
+                    `${app.name}/${pointName}`,
+                    "ptr0-0",
+                    attr.avgalgo,
+                    timeRangeSec // Pass time range in seconds if your backend supports it
+                ).then((ret) => {
+                    if (oContext.m_iRet < 0)
+                        return Promise.resolve(oContext.m_iRet);
+                    var arrTimeSeries = globalThis.parseLogLines(
+                        oContext.m_arrLogData, oContext.m_avgAlgo,
+                        oContext.m_timeRangeSec );
+                    if (arrTimeSeries.length)
+                        showTimeSeriesModal(
+                            arrTimeSeries,
+                            `${app.name}/${i18nHelper.t(pointName)}`
+                        );
+                    return Promise.resolve(0);
+                }).catch((error) => {
+                    console.log("Error downloading point log:", error);
+                    return Promise.resolve(-1);
+                });
+            };
+        });
+    }
+
+    // Hide menu on click elsewhere
+    document.addEventListener('click', function() {
+        document.getElementById('logContextMenu').style.display = 'none';
+    });
+
     function BuildSetpointCell( app, pointName, value )
     {
         const tr = document.createElement('tr');
@@ -695,7 +763,7 @@
         if( value.cnt > 0 )
         {
             valColor = "text-danger";
-            value.cnt--;
+            value.cnt=0;
         }
         else
             valColor = "text-secondary";
@@ -720,25 +788,16 @@
             var attr = setpoints.get(pointName)
             if( attr && attr.haslog )
             {
-                valueTd.onclick = function() {
-                    var oContext = {}
-                    return globalThis.downloadPointLog( oContext,
-                        `${app.name}/${pointName}`, "ptr0-0", attr.avgalgo).then((ret) => {
-                        if( oContext.m_iRet < 0 )
-                            return Promise.resolve( oContext.m_iRet )
-                        var arrTimeSeries = globalThis.parseLogLines(
-                            oContext.m_arrLogData, oContext.m_avgAlgo ) 
-                        if( arrTimeSeries.length)
-                            showTimeSeriesModal( arrTimeSeries,
-                                `${app.name}/${i18nHelper.t(pointName) }`)
-                        return Promise.resolve( 0 )
-                    }).then((ret)=>{
-                        return Promise.resolve(ret)
-                    }).catch((error)=>{
-                        console.log("Error downloading point log:", error);
-                        return Promise.resolve(-1)
-                    });
+                valueTd.oncontextmenu = function(e) {
+                    e.preventDefault();
+                    showLogContextMenu(e, app, pointName, attr);
                 };
+
+                // Add a small log icon to the right
+                const logIcon = document.createElement('i');
+                logIcon.className = "bi bi-clipboard-data ms-2 text-info"; // Bootstrap icon with margin and color
+                logIcon.title = i18nHelper.t("View Log Data");
+                valueTd.appendChild(logIcon);
             }
         }
 
@@ -809,7 +868,7 @@
                     attr = { v: null, t: null, unit: null, cnt: 0 };
                 attr.v = value.m_val
                 attr.t = type2str(value.m_iType)
-                attr.cnt+=1 
+                attr.cnt++ 
                 modal.currentApp.setpoints.set(arrComps[1], attr);
             }
         };

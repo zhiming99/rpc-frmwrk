@@ -152,24 +152,24 @@ globalThis.fetchAppDetails = () =>
                             attrs.ptype = "setpoint"
                     }
                     oVal = oDesc.GetProperty(PtDescProps.average);
-                    if( oVal )
+                    if( oVal !== undefined && oVal !== null )
                         attrs.average = oVal;
 
                     oVal = oDesc.GetProperty(PtDescProps.unit);
-                    if( oVal )
+                    if( oVal !== undefined && oVal !== null )
                         attrs.unit = i18nHelper.t(oVal);
 
                     oVal = oDesc.GetProperty(PtDescProps.size);
-                    if( oVal )
+                    if( oVal !== undefined && oVal !== null )
                         attrs.size = oVal;
 
                     oVal = oDesc.GetProperty(PtDescProps.haslog);
-                    if( oVal )
+                    if( oVal !== undefined && oVal !== null )
                         attrs.haslog = true;
                     else
                         attrs.haslog = false;
                     oVal = oDesc.GetProperty(PtDescProps.avgalgo);
-                    if( oVal )
+                    if( oVal !== undefined && oVal !== null )
                         attrs.avgalgo = oVal;
 
                     var arrComps = key.split('/')
@@ -210,7 +210,7 @@ globalThis.fetchAppDetails = () =>
     }
 }
 
-globalThis.parseLogLines = ( logData, avgalgo ) =>
+globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
 {
     try{
         if( !logData || logData.length === 0 )
@@ -229,12 +229,28 @@ globalThis.parseLogLines = ( logData, avgalgo ) =>
         dwOffset += 2;
         var wRecSize = logData.readUint16BE( dwOffset )
         dwOffset += 6;
-        var dwNumRec = ( logData.length - dwOffset ) / wRecSize 
+        var dwNumRec = Math.floor( ( logData.length - dwOffset ) / wRecSize );
+        if( dwNumRec < 10 )
+            return [];
+
         if( dwNumRec >= dwCounter )
             dwNumRec = dwCounter
 
         var dwTimeStamp, val = null, preval=0
-        for( var i = 0; i < dwNumRec; i++ )
+        var dwInterval =
+            logData.readUint32BE( dwOffset + wRecSize) -
+            logData.readUint32BE( dwOffset )
+        var dwMaxRec = dwNumRec
+        if( timeRangeSec > 0 && dwInterval > 0 )
+        {
+            dwMaxRec = Math.floor( timeRangeSec / dwInterval )
+            if( dwMaxRec < dwNumRec)
+                dwOffset += (dwNumRec - dwMaxRec) * wRecSize
+            else
+                dwMaxRec = dwNumRec
+        }
+
+        for( var i = 0; i < dwMaxRec; i++ )
         {
             dwTimeStamp = logData.readUint32BE( dwOffset )
             dataoff = dwOffset + 4
@@ -286,30 +302,36 @@ globalThis.parseLogLines = ( logData, avgalgo ) =>
     }
 }
 
-globalThis.downloadPointLog = ( oContext, ptPath, logName, avgalgo ) =>
+globalThis.downloadPointLog = ( oContext, ptPath, logName, avgalgo, timeRangeSec ) =>
 {
+    globalThis.oStmCtx = oContext
     return new Promise( ( resolve, reject ) =>{
         if( !globalThis.oProxy )
             return reject( new Error("No proxy available") );
         var oProxy = globalThis.oProxy
-        oContext.m_oResolve = resolve;
-        oContext.m_oReject = reject;
+        // oContext.m_oResolve is used by GetPtLog callbacks,
+        // so we use m_oResolve2 here
+        oContext.m_oResolve2 = resolve;
+        oContext.m_oReject2 = reject;
         oContext.m_ptPath = ptPath;
         oContext.m_logName = logName;
         oContext.m_dwSize = 0
         oContext.m_dwOffset = 0
         oContext.m_avgAlgo = avgalgo
+        oContext.m_timeRangeSec = timeRangeSec
+        oContext.m_hStream = 0
+        oContext.m_iRet = 0
         oContext.m_arrLogData = globalThis.AllocBuffer(0)
         return oProxy.m_funcOpenStream( oContext ).then((oContext)=>{
             if( oContext.m_iRet < 0 )
-                return oContext.m_oReject( new Error("OpenStreamLocal failed with status " + oContext.m_iRet) );
+                return oContext.m_oReject2( new Error("OpenStreamLocal failed with status " + oContext.m_iRet) );
             if( oContext.m_hStream === 0 )
-                return oContext.m_oReject( new Error("OpenStreamLocal failed: invalid stream handle") );
+                return oContext.m_oReject2( new Error("OpenStreamLocal failed: invalid stream handle") );
 
-            globalThis.oStmCtx = oContext
             oContext.oGetPtLogCb = (( oContext, ret ) => {
-                if( this.m_iRet < 0 )
-                    oProxy.m_funcCloseStream( this.m_hStream)
+                var This = globalThis.oStmCtx
+                if( This.m_iRet < 0 )
+                    oProxy.m_funcCloseStream( This.m_hStream)
                 return;
             })
 
@@ -333,13 +355,15 @@ globalThis.downloadPointLog = ( oContext, ptPath, logName, avgalgo ) =>
                 {
                     This.m_iRet = 0
                     oProxy.m_funcCloseStream( This.m_hStream )
-                    oProxy.m_oResolve(0)
+                    This.m_hStream = null
+                    This.m_oResolve2(0)
                 }
                 else if( This.m_dwOffset > This.m_dwSize )
                 {
                     This.m_iRet = -34
                     oProxy.m_funcCloseStream( This.m_hStream )
-                    oProxy.m_oReject( new Error("GetPtLog internal error " + (-34)))
+                    This.m_hStream = null
+                    This.m_oReject2( new Error("GetPtLog internal error " + (-34)))
                 }
                 return 0
             })
@@ -349,8 +373,8 @@ globalThis.downloadPointLog = ( oContext, ptPath, logName, avgalgo ) =>
                 if( hstream !== This.m_hStream )
                     return
                 if( This.m_dwSize > 0 )
-                    return This.m_oResolve( -110)
-                return This.m_oResolve(0)
+                    return This.m_oResolve2(-34)
+                return This.m_oResolve2(0)
             })
 
             var oInfo = globalThis.NewCfgDb()
@@ -358,17 +382,17 @@ globalThis.downloadPointLog = ( oContext, ptPath, logName, avgalgo ) =>
             oInfo.Push(oSize)
             return oProxy.GetPtLog( oContext, oContext.m_ptPath, oContext.m_hStream, oContext.m_logName, oInfo ).then((e)=>{
                 if( oContext.m_iRet < 0 ) 
-                    return oContext.m_oReject( new Error("GetPtLog failed with status " + oContext.m_iRet) );
+                    return oContext.m_oReject2( new Error("GetPtLog failed with status " + oContext.m_iRet) );
             }).catch((e)=>{
-                return oContext.m_oReject( new Error("GetPtLog failed with status " + oContext.m_iRet) );
+                return oContext.m_oReject2( new Error("GetPtLog failed with status " + oContext.m_iRet) );
             })
         }).catch((e)=>{
-            return oContext.m_oReject( new Error("OpenStreamLocal exception: " + e) );
+            return oContext.m_oReject2( new Error("OpenStreamLocal exception: " + e) );
         });
     }).then((ret)=>{
         return Promise.resolve(0);
     }).catch((e)=>{
         return Promise.reject(e);
-    });
+    })
 }
 

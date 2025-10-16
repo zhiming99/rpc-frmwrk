@@ -779,6 +779,7 @@ case "$cmd" in
             if is_app_online loggersvr1; then
                 rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "removed loglink $1/$2 from rpcfctl"
             fi
+            bash $cmddir/setattr.sh $appName $ptName logcount i 0
         fi
         ;;
     clearmount)

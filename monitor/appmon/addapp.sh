@@ -82,6 +82,7 @@ for appname in "$@"; do
     set_attr_value $appname obj_count avgalgo  "$(jsonval 'i' 1)" i
     set_attr_value $appname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
     set_attr_value $appname cpu_load avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $appname req_count avgalgo  "$(jsonval 'i' 0)" i
     ret=$?
     if (( ret != 0 )); then
         break
