@@ -71,5 +71,5 @@ rmdir ./testmnt
 popd > /dev/null
 
 echo adding user 'admin'
-bash $addu admin
+bash $addu -p admin
 bash $modu -g admin admin

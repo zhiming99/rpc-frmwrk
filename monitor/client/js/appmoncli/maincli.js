@@ -2,9 +2,9 @@
 // Copyright (C) 2025  zhiming <woodhead99@gmail.com>
 // This program can be distributed under the terms of the GNU GPLv3.
 // ../../../../ridl/.libs/ridlc --services=AppMonitor -sJO . ../../../../monitor/appmon/appmon.ridl 
-const { randomInt } = require( '/usr/local/lib/rpcf/jslib/combase/defines' );
-const {CoCreateInstance, RegisterFactory}=require( '/usr/local/lib/rpcf/jslib/combase/factory' );
-const {CIoManager} = require( '/usr/local/lib/rpcf/jslib/ipc/iomgr' );
+const { randomInt } = require( '../../../../js/combase/defines' );
+const {CoCreateInstance, RegisterFactory}=require( '../../../../js/combase/factory' );
+const {CIoManager} = require( '../../../../js/ipc/iomgr' );
 
 // Start the iomanager
 globalThis.g_iMsgIdx = randomInt( 0xffffffff );
@@ -14,14 +14,14 @@ globalThis.g_oIoMgr = new CIoManager();
 globalThis.g_oIoMgr.Start()
 
 
-const { CConfigDb2 } = require( '/usr/local/lib/rpcf/jslib/combase/configdb' );
-const { messageType } = require( '/usr/local/lib/rpcf/jslib/dbusmsg/constants' );
-const { ERROR, Int32Value, USER_METHOD } = require( '/usr/local/lib/rpcf/jslib/combase/defines' );
-const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require( '/usr/local/lib/rpcf/jslib/combase/enums' );
-const {CSerialBase, Variant} = require( '/usr/local/lib/rpcf/jslib/combase/seribase' );
-const {CFastRpcProxy} = require( '/usr/local/lib/rpcf/jslib/ipc/fastrpc' )
+const { CConfigDb2 } = require( '../../../../js/combase/configdb' );
+const { messageType } = require( '../../../../js/dbusmsg/constants' );
+const { ERROR, Int32Value, USER_METHOD } = require( '../../../../js/combase/defines' );
+const {EnumClsid, errno, EnumPropId, EnumCallFlags, EnumTypeId, EnumSeriProto} = require( '../../../../js/combase/enums' );
+const {CSerialBase, Variant} = require( '../../../../js/combase/seribase' );
+const {CFastRpcProxy} = require( '../../../../js/ipc/fastrpc' )
 const {Buffer} = require( 'buffer' );
-const { DBusIfName, DBusDestination2, DBusObjPath } = require( '/usr/local/lib/rpcf/jslib/rpc/dmsg' );
+const { DBusIfName, DBusDestination2, DBusObjPath } = require( '../../../../js/rpc/dmsg' );
 const { KeyValue, } = require( './appmonstructs' );
 // Start the client(s)
 const { CAppMonitor_CliImpl } = require( './AppMonitorcli' )
@@ -112,6 +112,7 @@ function StartPullInfo()
                 {
                     arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/cpu_load");
                     arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/app_class");
+                    arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/display_name");
                 }
             }
             oContext.oGetPvsCb = (oContext, ret, arrKeyVals ) => {
@@ -131,6 +132,8 @@ function StartPullInfo()
                                 globalThis.g_sites[0].apps[j].cpu = arrKeyVals[i].oValue.m_val.toFixed(3) + "%";
                             else if( strPt === "app_class" )
                                 globalThis.g_sites[0].apps[j].app_class = arrKeyVals[i].oValue.m_val
+                            else if( strPt === "display_name" )
+                                globalThis.g_sites[0].apps[j].display_name = arrKeyVals[i].oValue.m_val
                             break;
                         }
                     }

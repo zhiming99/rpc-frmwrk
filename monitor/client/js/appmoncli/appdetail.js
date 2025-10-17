@@ -10,7 +10,8 @@ const arrBasePoints = [{ n:"cpu_load", o:0 },
     {n:"rx_bytes",o:90},
     {n:"tx_bytes",o:100},
     {n:"pid",o:110},
-    {n:"conn_count", o:40}
+    {n:"conn_count", o:40},
+    {n:"display_name", o:1000}
 ]
 
 const arrRouterPoints = arrBasePoints.concat( [
@@ -233,24 +234,23 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
         if( dwNumRec < 10 )
             return [];
 
-        if( dwNumRec >= dwCounter )
-            dwNumRec = dwCounter
+        dwNumRec = Math.min( dwNumRec, dwCounter )
 
         var dwTimeStamp, val = null, preval=0
         var dwInterval =
             logData.readUint32BE( dwOffset + wRecSize) -
             logData.readUint32BE( dwOffset )
-        var dwMaxRec = dwNumRec
-        if( timeRangeSec > 0 && dwInterval > 0 )
+        var dwRecToRead = dwNumRec
+        if( timeRangeSec > 0 && dwInterval > 1 )
         {
-            dwMaxRec = Math.floor( timeRangeSec / dwInterval )
-            if( dwMaxRec < dwNumRec)
-                dwOffset += (dwNumRec - dwMaxRec) * wRecSize
+            dwRecToRead = Math.floor( timeRangeSec / dwInterval )
+            if( dwRecToRead < dwNumRec)
+                dwOffset += (dwNumRec - dwRecToRead) * wRecSize
             else
-                dwMaxRec = dwNumRec
+                dwRecToRead = dwNumRec
         }
 
-        for( var i = 0; i < dwMaxRec; i++ )
+        for( var i = 0; i < dwRecToRead; i++ )
         {
             dwTimeStamp = logData.readUint32BE( dwOffset )
             dataoff = dwOffset + 4
@@ -287,7 +287,8 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
                 throw new Error( `Error ${strType} not supported`)
             if( avgalgo == AvgAlgo.algoDiff)
             {
-                arrTimeSeries.push([dwTimeStamp,val - preval ])
+                if( i > 0 )
+                    arrTimeSeries.push([dwTimeStamp,val - preval ])
                 preval = val
             }
             else

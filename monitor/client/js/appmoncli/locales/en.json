@@ -71,7 +71,13 @@
   "Point Name": "",
   "View Log Data": "",
 
-  "LAST_2000_SAMPLES": "Last 2000 samples",
-  "LAST_4000_SAMPLES": "Last 4000 samples",
-  "FULL_LOG": "Full Log"
+  "LAST_200_SAMPLES": "View last 200 samples",
+  "LAST_2000_SAMPLES": "View last 2000 samples",
+  "LAST_20000_SAMPLES": "View last 20000 samples",
+  "FULL_LOG": "View Full Log",
+
+  "BUTTON_UPDATE": "Update",
+  "BUTTON_CANCEL": "Cancel",
+  "BUTTON_CLOSE": "Close",
+  "display_name": "Display Name"
 }

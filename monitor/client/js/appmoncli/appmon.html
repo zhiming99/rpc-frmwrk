@@ -100,7 +100,7 @@
         <canvas id="timeSeriesChart" height="200"></canvas>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="timeseries-dlg-close-btn">Close</button>
       </div>
     </div>
   </div>
@@ -126,8 +126,8 @@
           <div id="setpv-feedback" class="text-danger small"></div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary">Update</button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="setpv-dlg-btn-update">Update</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="setpv-dlg-btn-cancel">Cancel</button>
         </div>
       </form>
     </div>
@@ -143,7 +143,7 @@
         </div>
         <div class="modal-body">
           <h6 id="setpointsAppName" class="mb-3"></h6>
-          <table class="table">
+          <table class="table table-striped">
             <thead>
               <tr>
                 <th scope="col" id="setpoint-name-header">Name</th>
@@ -159,15 +159,16 @@
           </table>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="setpoints-dlg-close-btn">Close</button>
         </div>
       </div>
     </div>
   </div>
     <!-- Custom Context Menu for Log Time Range -->
   <ul id="logContextMenu" class="dropdown-menu" style="position:absolute; display:none; z-index:2000;">
-    <li><a class="dropdown-item" href="#" data-range="1h">Last 2000 samples</a></li>
-    <li><a class="dropdown-item" href="#" data-range="2h">Last 4000 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="1h">Last 200 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="2h">Last 2000 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="3h">Last 20000 samples</a></li>
     <li><a class="dropdown-item" href="#" data-range="full">Full Log</a></li>
   </ul>
 
@@ -188,8 +189,13 @@
       document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
       document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
       document.getElementById('LogsTitle').textContent = i18nh.t("LOGS");
-      document.querySelector('#logContextMenu [data-range="1h"]').textContent = i18nh.t("LAST_2000_SAMPLES");
-      document.querySelector('#logContextMenu [data-range="2h"]').textContent = i18nh.t("LAST_4000_SAMPLES");
+      document.getElementById('setpv-dlg-btn-update').textContent = i18nh.t("BUTTON_UPDATE");
+      document.getElementById('setpv-dlg-btn-cancel').textContent = i18nh.t("BUTTON_CANCEL");
+      document.getElementById("setpoints-dlg-close-btn").textContent = i18nh.t("BUTTON_CLOSE");
+      document.getElementById("timeseries-dlg-close-btn").textContent = i18nh.t("BUTTON_CLOSE");
+      document.querySelector('#logContextMenu [data-range="1h"]').textContent = i18nh.t("LAST_200_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="2h"]').textContent = i18nh.t("LAST_2000_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="3h"]').textContent = i18nh.t("LAST_20000_SAMPLES");
       document.querySelector('#logContextMenu [data-range="full"]').textContent = i18nh.t("FULL_LOG");
     }).catch((error) => {
       console.error("Error loading translations:", error);
@@ -282,6 +288,11 @@
       }*/
     ];
     globalThis.g_sites = sites;
+    function getDisplayName(app) {
+        if( app.display_name && app.display_name.length > 0 )
+            return i18nHelper.t(app.display_name);
+        return i18nHelper.t(app.name);
+    }
     function updateSites(sites) {
         if( globalThis.curSpModal )
         {
@@ -302,6 +313,8 @@
             })
             sites.forEach(site => {
               for( const app of site.apps ) {
+                  appTitle = document.getElementById(`app-title-${app.name}-${site.name}`);
+                  appTitle.textContent = getDisplayName(app);
                   appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
                   if( appStatus )
                   {
@@ -360,7 +373,8 @@
 
                 const appTitle = document.createElement('h5');
                 appTitle.className = 'card-title';
-                appTitle.textContent = i18nHelper.t(app.name);
+                appTitle.id = `app-title-${app.name}-${site.name}`;
+                appTitle.textContent = getDisplayName(app);
 
                 const appStatus = document.createElement('p');
                 appStatus.className = 'card-text';
@@ -657,6 +671,11 @@
             return globalThis.oProxy.SetPointValue( oContext, fullPointPath, oVar ).then((ret)=>{
                 setpointMap.get(pointName).v = newValue;
                 setpointMap.get(pointName).cnt++;
+                if( pointName === "display_name" )
+                {
+                    app.display_name = newValue;
+                    updateSites(globalThis.g_sites);
+                }
                 setTimeout(() => {
                     bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
                 }, 1000);
@@ -713,8 +732,9 @@
                 let range = this.getAttribute('data-range');
                 // Call your log download and showTimeSeriesModal logic here
                 let timeRangeSec = 0;
-                if (range === '1h') timeRangeSec = 4000;
-                else if (range === '2h') timeRangeSec = 8000;
+                if (range === '1h') timeRangeSec = 400;
+                else if (range === '2h') timeRangeSec = 4000;
+                else if (range === '3h') timeRangeSec = 40000;
                 else timeRangeSec = 0; // 0 means full log
 
                 var oContext = {};
@@ -733,7 +753,7 @@
                     if (arrTimeSeries.length)
                         showTimeSeriesModal(
                             arrTimeSeries,
-                            `${app.name}/${i18nHelper.t(pointName)}`
+                            `${getDisplayName(app)}/${i18nHelper.t(pointName)}`
                         );
                     return Promise.resolve(0);
                 }).catch((error) => {
@@ -749,9 +769,12 @@
         document.getElementById('logContextMenu').style.display = 'none';
     });
 
-    function BuildSetpointCell( app, pointName, value )
+    function BuildSetpointCell( app, pointName, value, rowIndex )
     {
         const tr = document.createElement('tr');
+        /*if (rowIndex % 2 === 1) {
+            tr.style.backgroundColor = "#2c2f33"; // dark gray, or any color you like
+        }*/
         const nameTd = document.createElement('td');
         nameTd.textContent = i18nHelper.t(pointName);
         tr.appendChild(nameTd);
@@ -812,7 +835,7 @@
     function updateAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
-        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${i18nHelper.t(app.name)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${getDisplayName(app)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
         const setpoints = app.setpoints 
         const tbody = document.getElementById('setpointsTableBody');
@@ -821,22 +844,22 @@
             tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
             const arrPts = globalThis.curSpModal.arrPts;
-            for( elem in arrPts )
+            arrPts.forEach((elem, idx) =>
             {
-                if( !setpoints.has(arrPts[elem].n) )
-                    continue
-                value = setpoints.get(arrPts[elem].n);
+                if( !setpoints.has(elem.n) )
+                    return
+                value = setpoints.get(elem.n);
                 if( value === undefined )
-                    continue
-                const tr = BuildSetpointCell( app, arrPts[elem].n, value );
+                    return
+                const tr = BuildSetpointCell( app, elem.n, value, idx );
                 tbody.appendChild(tr);
-            }
+            })
         }
     }
     function showAppDetailModal(app, site) {
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
-        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${i18nHelper.t(app.name )} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${getDisplayName(app)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
 
         // Example: app.setpoints = [{name: "SP1", value:{ v:123, t:"i" }, ...}]
         const setpoints = app.setpoints || new Map();
@@ -845,8 +868,9 @@
         if (setpoints.size === 0) {
             tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
         } else {
+            var idx = 0;
             setpoints.forEach((value, key) => {
-                const tr = BuildSetpointCell( app, key, value );
+                const tr = BuildSetpointCell( app, key, value, idx++ );
                 tbody.appendChild(tr);
             });
         }

@@ -88,7 +88,12 @@
   "Point Name": "点位名称",
   "View Log Data": "查看日志数据",
 
-  "LAST_2000_SAMPLES": "最近2000条",
-  "LAST_4000_SAMPLES": "最近4000条",
-  "FULL_LOG": "全部日志"
+  "LAST_200_SAMPLES": "查看最近200条日志",
+  "LAST_2000_SAMPLES": "查看最近2000条日志",
+  "LAST_20000_SAMPLES": "查看最近20000条日志",
+  "FULL_LOG": "查看全部日志",
+  "BUTTON_UPDATE": "更新",
+  "BUTTON_CANCEL": "取消",
+  "BUTTON_CLOSE": "关闭",
+  "display_name": "显示名称"
 }
