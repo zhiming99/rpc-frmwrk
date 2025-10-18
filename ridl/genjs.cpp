@@ -39,6 +39,7 @@ extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
+extern bool g_bReadme;
 
 extern stdstr GetTypeName( CAstNodeBase* pType );
 extern stdstr GetTypeSig( ObjPtr& pObj );
@@ -212,9 +213,12 @@ CJsFileSet::CJsFileSet(
         strOutPath, "mainsvr.js",
         true );*/
 
-    GEN_FILEPATH( m_strReadme, 
-        strOutPath, "README.md",
-        false );
+    if( g_bReadme )
+    {
+        GEN_FILEPATH( m_strReadme, 
+            strOutPath, "README.md",
+            false );
+    }
 
     GEN_FILEPATH( m_strWebCfg, 
         strOutPath, "webpack.config.js",
@@ -299,14 +303,17 @@ gint32 CJsFileSet::OpenFiles()
         { basename( m_strMainSvr.c_str() ),
         std::move( pstm ) } );*/
 
-    pstm = STMPTR( new std::ofstream(
-        m_strReadme,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( g_bReadme )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strReadme,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_mapSvcImp.insert(
-        { basename( m_strReadme.c_str() ),
-        std::move( pstm ) } );
+        m_mapSvcImp.insert(
+            { basename( m_strReadme.c_str() ),
+            std::move( pstm ) } );
+    }
 
     pstm = STMPTR( new std::ofstream(
         m_strWebCfg,
@@ -1811,11 +1818,14 @@ gint32 GenJsProj(
         if( ERROR( ret ) )
             break;
 
-        oWriter.SelectReadme();
-        CExportJsReadme ordme( &oWriter, pRoot );
-        ret = ordme.Output();
-        if( ERROR( ret ) )
-            break;
+        if( g_bReadme )
+        {
+            oWriter.SelectReadme();
+            CExportJsReadme ordme( &oWriter, pRoot );
+            ret = ordme.Output();
+            if( ERROR( ret ) )
+                break;
+        }
 
         oWriter.SelectWebCfg();
         CExportJsWebpack owp( &oWriter, pRoot );

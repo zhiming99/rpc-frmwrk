@@ -39,6 +39,7 @@ extern bool g_bBuiltinRt;
 extern guint32 g_dwFlags;
 extern bool g_bMonitoring;
 extern std::vector<stdstr> g_vecMonApps;
+extern bool g_bReadme;
 
 std::map< char, stdstr > g_mapSig2PyType =
 {
@@ -509,9 +510,12 @@ CPyFileSet::CPyFileSet(
         strOutPath, "mainsvr.py",
         true );
 
-    GEN_FILEPATH( m_strReadme, 
-        strOutPath, "README.md",
-        false );
+    if( g_bReadme )
+    {
+        GEN_FILEPATH( m_strReadme, 
+            strOutPath, "README.md",
+            false );
+    }
     m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
@@ -594,14 +598,17 @@ gint32 CPyFileSet::OpenFiles()
             std::move( pstm ) } );
     }
 
-    pstm = STMPTR( new std::ofstream(
-        m_strReadme,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( g_bReadme )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strReadme,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_mapSvcImp.insert(
-        { basename( m_strReadme.c_str() ),
-        std::move( pstm ) } );
+        m_mapSvcImp.insert(
+            { basename( m_strReadme.c_str() ),
+            std::move( pstm ) } );
+    }
 
     return STATUS_SUCCESS;
 }
@@ -1978,9 +1985,12 @@ gint32 GenPyProj(
         if( ERROR( ret ) )
             break;
 
-        oWriter.SelectReadme();
-        CExportPyReadme ordme( &oWriter, pRoot );
-        ret = ordme.Output();
+        if( g_bReadme )
+        {
+            oWriter.SelectReadme();
+            CExportPyReadme ordme( &oWriter, pRoot );
+            ret = ordme.Output();
+        }
 
     }while( 0 );
 
@@ -4214,6 +4224,8 @@ gint32 CImplPyMainFunc::Output()
 extern stdstr g_strLocale;
 gint32 CExportPyReadme::Output()
 {
+    if( !g_bReadme )
+        return 0;
     if( g_strLocale == "en" )
         return Output_en();
     if( g_strLocale == "cn" )

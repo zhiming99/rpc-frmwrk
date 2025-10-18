@@ -41,6 +41,7 @@ extern stdstr g_strLocale;
 extern stdstr g_strCmdLine;
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
+extern bool g_bReadme;
 
 std::map<stdstr, ObjPtr> g_mapMapTypeDecl;
 std::map<stdstr, ObjPtr> g_mapArrayTypeDecl;
@@ -1800,9 +1801,12 @@ CJavaFileSet::CJavaFileSet(
         strOutPath, "mainsvr.java",
         true );
 
-    GEN_FILEPATH( m_strReadme, 
-        strOutPath, "README.md",
-        false );
+    if( g_bReadme )
+    {
+        GEN_FILEPATH( m_strReadme, 
+            strOutPath, "README.md",
+            false );
+    }
 
     GEN_FILEPATH( m_strDeserialMap, 
         strOutPath, "DeserialMaps.java",
@@ -1951,7 +1955,8 @@ gint32 CJavaFileSet::OpenFiles()
         this->OpenFile( m_strMainCli );
     if( bGenServer )
         this->OpenFile( m_strMainSvr );
-    this->OpenFile( m_strReadme );
+    if( g_bReadme )
+        this->OpenFile( m_strReadme );
     this->OpenFile( m_strDeserialMap );
     this->OpenFile( m_strDeserialArray );
 
@@ -2443,14 +2448,17 @@ gint32 GenJavaProj(
             break;
         }
 
-        oWriter.SelectReadme();
-        CJavaExportReadme ordme( &oWriter, pRoot );
-        ret = ordme.Output();
-        if( ERROR( ret ) )
+        if( g_bReadme )
         {
-            OutputMsg( ret,
-                "error generating README.md" );
-            break;
+            oWriter.SelectReadme();
+            CJavaExportReadme ordme( &oWriter, pRoot );
+            ret = ordme.Output();
+            if( ERROR( ret ) )
+            {
+                OutputMsg( ret,
+                    "error generating README.md" );
+                break;
+            }
         }
 
         oWriter.SelectDeserialMap();

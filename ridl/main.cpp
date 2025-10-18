@@ -46,6 +46,7 @@ std::set< stdstr > g_setServices;
 extern std::vector<stdstr> g_vecMonApps;
 extern bool g_bMonitoring;
 extern std::string g_strPkgName;
+bool g_bReadme = true;
 
 // interface async mode to overrid
 using SYNC_ELEM=std::pair< stdstr, guint32 >;
@@ -143,6 +144,7 @@ void Usage()
     printf( "\tThis option is for CPP project only.\n" );
     printf( "\t--pkgname <package name> specify a full qualified java package name for the java project, otherwise, the default package name is used.\n" );
     printf( "\t-L<lang>:Output Readme in language <lang>, as can be 'cn' or 'en' for now.\n" );
+    printf( "\t--noreadme don't output readme files.\n" );
     printf( "\t-v:\tPrint the version information.\n" );
 }
 
@@ -230,6 +232,7 @@ int main( int argc, char** argv )
             {"services", required_argument, 0,  0 },
             {"sync_mode", required_argument, 0,  0 },
             {"pkgname", required_argument, 0,  0 },
+            {"noreadme", no_argument, 0,  0 },
             {0, 0,  0,  0 }
         };
 
@@ -417,6 +420,10 @@ int main( int argc, char** argv )
                     {
                         g_strPkgName = optarg;
                         break;
+                    }
+                    else if( option_index == 9 )
+                    {
+                        g_bReadme = false;
                     }
                     break;
                 }
