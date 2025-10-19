@@ -5,8 +5,8 @@
 * Use the command `rpcfctl cfg` to configure Rpc-frmwrk, enabling WebSocket, SSL, and SimpAuth options. You can import existing keys or generate self-signed keys in the configuration program. The configuration program can also set up `nginx`. Suppose your configured WebSocket URL is `https://127.0.0.1/rpcf`, and the nginx web root is `/var/www/html/rpcf`. The following instructions will use this configuration. For details on using `rpcfctl cfg`, refer to [this article](../../../../tools/README.md).
 * Run the command `rpcfctl initsvr` to set up the monitor runtime environment. This command will create the `user registry`, `application registry`, and an `admin` user.
 * In the command line, switch to the directory where this file is located.
-* Run the command `../../../../ridl/.libs/ridlc --noreadme --services=AppMonitor -sJO . ../../../../monitor/appmon/appmon.ridl` to generate the framework code.
-* Run the command `make -f Makefile.skel` to generate all deployment files, including everything under the `dist` directory, all files under `locales`, and the current directory's `appmon.html`, `appmondesc.json`, `appdetail.js`, `i18n-helper.js`. Copy all these files into `/var/www/html/rpcf/`, keeping the directory structure unchanged. For example, use the following script:
+* Run the command `../../../../ridl/.libs/ridlc --noreadme --services=AppMonitor -sJO . ../../../../monitor/appmon/appmon.ridl` to generate all the missing skeleton files.
+* Run the command `make -f Makefile.skel` to package the `rpc-frwmrk` support library to a few js files. And now the files to deploy include all files under the `dist` directory, all files under `locales`, and the current directory's `appmon.html`, `appmondesc.json`, `appdetail.js`, `i18n-helper.js`. Copy all these files into `/var/www/html/rpcf/`, keeping the directory structure unchanged. For example, use the following script:
    ```
     #!/bin/bash
     sudo cp appmon.html appmondesc.json i18n-helper.js appdetail.js /var/www/html/rpcf/

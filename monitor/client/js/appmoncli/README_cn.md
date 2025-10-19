@@ -1,12 +1,13 @@
-[英文](./README.md)
+[English](./README.md)
 ### 编译部署和使用网页版Rpc-Frmwrk监视器
    * 首先在本地机器上下载rpc-frmwrk的源代码，并成功编译和安装rpc-frmwrk到目标机器。目前监视器未打包进rpc-frmwrk的安装包，所以要在源码的目录下进行编译和打包。
    * 确保目标机器安装了`nginx`和`npm`。`apache`也可以使用，不过目前还没测试。
-   * 通过命令`rpcfctl cfg`配置Rpc-frmwrk，开启Websocket，SSL和SimpAuth选项。密钥可以导入已有的密钥，或者在配置程序里生成自签名密钥。配置程序也可以完成对`nginx`的设置。假设你配置的Websocket网址是`https://127.0.0.1/rpcf`，`nginx`的网站根目录为`/var/www/html/rpcf`。接下来，我们将以此配置讲解使用方法。如何使用`rpcfctl cfg`，可以参考[这篇文章](../../../../tools/README_cn.md)。
+   * 通过命令`rpcfctl cfg`配置Rpc-frmwrk，开启Websocket，SSL和SimpAuth选项。密钥可以导入已有的密钥，或者在配置程序里生成自签名密钥。配置程序也可以完成对`nginx`的设置。假设你配置的Websocket网址是`https://127.0.0.1/rpcf`，`nginx`的网站根目录为`/var/www/html/rpcf`。接下来，我们将以此配置讲解使用方法。如何使用`rpcfctl cfg`，可以参考[这篇文章](../../../../tools/README_cn.md#连接页connection)。
    * 通过命令`rpcfctl initsvr`建立监视器运行环境。该命令将建立`用户注册表`和`应用注册表`，和一个`admin`用户。
-   * 在命令行下，切换到本文件所在的目录。
-   * 运行命令`../../../../ridl/.libs/ridlc --noreadme --services=AppMonitor -sJO . ../../../../monitor/appmon/appmon.ridl`生成框架代码。
-   * 运行命令`make -f Makefile.skel`将生成所有待部署文件，包括`dist`目录下的所有文件，`locales`下的所有文件，和当前目录下的`appmon.html`, `appmondesc.json`, `appdetail.js`, `i18n-helper.js`。把这些内容全部拷入`/var/www/html/rpcf`下面，并保持目录结构不变。比如下面的脚本。
+   * 在命令行下，切换到本`readme`文件所在的目录。
+   * 运行命令`../../../../ridl/.libs/ridlc --noreadme --services=AppMonitor -sJO . ../../../../monitor/appmon/appmon.ridl`补全框架缺失的部分代码。
+   * 运行命令`make -f Makefile.skel`将在`dist`目录下生成打包好的rpc-frmwrk支持库。待部署的文件包括`dist`下的所有文件，
+   `locales`下的所有文件，和当前目录下的`appmon.html`, `appmondesc.json`, `appdetail.js`, `i18n-helper.js`。把这些内容全部拷入`/var/www/html/rpcf`下面，并保持目录结构不变。样例脚本如下：
    ```
     #!/bin/bash
     sudo cp appmon.html appmondesc.json i18n-helper.js appdetail.js /var/www/html/rpcf/
