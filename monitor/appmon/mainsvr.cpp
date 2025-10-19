@@ -214,30 +214,6 @@ gint32 RunSvcObj()
             oParams[ propIoMgr ] = g_pIoMgr;
             
             ret = CRpcServices::LoadObjDesc(
-                strDesc, "AppManager",
-                true, oParams.GetCfg() );
-            if( ERROR( ret ) )
-                break;
-            ret = pIf.NewObj(
-                clsid( CAppManager_SvrImpl ),
-                oParams.GetCfg() );
-            if( ERROR( ret ) )
-                break;
-            pSvc = pIf;
-            ret = pSvc->Start();
-            vecIfs.push_back( pIf );
-            if( ERROR( ret ) )
-                break;
-            if( pSvc->GetState()!= stateConnected )
-            {
-                ret = ERROR_STATE;
-                break;
-            }
-
-            oParams.Clear();
-            oParams[ propIoMgr ] = g_pIoMgr;
-            
-            ret = CRpcServices::LoadObjDesc(
                 strDesc, "AppMonitor",
                 true, oParams.GetCfg() );
             if( ERROR( ret ) )
@@ -268,6 +244,30 @@ gint32 RunSvcObj()
                 break;
             ret = pIf.NewObj(
                 clsid( CSimpleAuth_SvrImpl ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            pSvc = pIf;
+            ret = pSvc->Start();
+            vecIfs.push_back( pIf );
+            if( ERROR( ret ) )
+                break;
+            if( pSvc->GetState()!= stateConnected )
+            {
+                ret = ERROR_STATE;
+                break;
+            }
+
+            oParams.Clear();
+            oParams[ propIoMgr ] = g_pIoMgr;
+            
+            ret = CRpcServices::LoadObjDesc(
+                strDesc, "AppManager",
+                true, oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            ret = pIf.NewObj(
+                clsid( CAppManager_SvrImpl ),
                 oParams.GetCfg() );
             if( ERROR( ret ) )
                 break;

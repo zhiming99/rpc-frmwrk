@@ -1816,7 +1816,12 @@ gint32 CAppMonitor_SvrImpl::LoadUserGrpsMap()
             RFHANDLE hGrps = INVALID_HANDLE;
             ret = pfs->OpenDir( strPath, 0, hGrps );
             if( ERROR( ret ) )
-                break;
+            {
+                DebugPrint( ret,
+                    "Error open directory %s",
+                    strPath.c_str() );
+                continue;
+            }
             CFileHandle oHandle( pfs, hGrps );
             std::vector<KEYPTR_SLOT> vecGidEnt;
             ret = pfs->ReadDir( hGrps, vecGidEnt );

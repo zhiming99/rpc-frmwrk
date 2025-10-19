@@ -22,7 +22,7 @@ function StreamWrite( oMsg )
             ret = errno.STATUS_PENDING
             return ret
         }
-        if( oStm.length > 0 )
+        if( oStm.m_arrPendingWriteReqs.length > 0 )
         {
             ret = errno.ERROR_STATE
             return ret

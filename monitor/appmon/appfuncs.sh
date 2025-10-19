@@ -1646,7 +1646,7 @@ function add_stdapp()
     add_point $_instname app_class setpoint s
     set_point_value $_instname app_class "$(jsonval 's' 'stdapp')" s
     add_point $_instname display_name setpoint s
-    set_point_value $_instname display_name "$(jsonval 's' \'$_instname\')" s
+    set_point_value $_instname display_name "$(jsonval 's' $_instname)" s
 
     add_point $_instname rpt_timer input i
     set_attr_value $_instname rpt_timer unit "$(jsonval 'i' 0 )" i
