@@ -2202,13 +2202,6 @@ gint32 CDirImage::CreateFile(
 {
     gint32 ret = 0;
     do{
-        {
-            READ_LOCK( this );
-            ret = CheckAccess( W_OK | X_OK );
-            if( ERROR( ret ) )
-                break;
-        }
-
         ret = CreateFile(
             szName, ftRegular, pImg );
 
@@ -2350,6 +2343,7 @@ gint32 CDirImage::UnloadDirImage()
         auto itr = m_mapFiles.begin();
         while( itr != m_mapFiles.end() )
         {
+            FImgSPtr pImg = itr->second;
             CFileImage* pFile = itr->second;
             CDirImage* pDir = itr->second;
 

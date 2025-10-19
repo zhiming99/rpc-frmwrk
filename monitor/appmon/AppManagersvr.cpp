@@ -353,12 +353,17 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
     do{
         std::vector< stdstr > vecComps;
         ret = SplitPath( strPtPath, vecComps );
-        if( ERROR( ret ) )
+        if( ERROR( ret ) || vecComps.size() < 2 )
         {
             ret = -EINVAL;
             break;
         }
 
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
@@ -435,6 +440,11 @@ gint32 CAppManager_SvrImpl::SetPointValue(
             break;
         }
 
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
@@ -521,6 +531,11 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         stdstr strAttrVal =  strPath + strApp +
@@ -552,6 +567,11 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
         std::vector< stdstr > vecComps;
         ret = SplitPath( strPtPath, vecComps );
         if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( vecComps.size() < 2 )
         {
             ret = -EINVAL;
             break;
@@ -615,6 +635,11 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() < 3 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
@@ -640,6 +665,11 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         std::vector< stdstr > vecComps;
         ret = SplitPath( strAttrPath, vecComps );
         if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( vecComps.size() < 3 )
         {
             ret = -EINVAL;
             break;
@@ -740,6 +770,67 @@ gint32 CAppManager_SvrImpl::GetPointValues(
     gint32 ret = 0;
     auto& pfs = m_pAppRegfs;
     do{
+        if( strAppName.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( strAppName != "none" &&
+            strAppName != "None" )
+        {
+            GetPointValuesInternal(
+                pContext, strAppName,
+                arrPtPaths, arrKeyVals, true );
+            break;
+        }
+        std::hashmap< stdstr, std::vector< stdstr > > mapAppPts;
+        for( auto& elem : arrPtPaths )
+        {
+            std::vector< stdstr > vecComps;
+            ret = SplitPath( elem, vecComps );
+            if( ERROR( ret ) || vecComps.size() < 2 )
+                continue;
+
+            const stdstr& strApp = vecComps[ 0 ];
+            const stdstr& strPoint = vecComps[ 1 ];
+
+            auto itr = mapAppPts.find( strApp );
+            if( itr == mapAppPts.end() )
+            {
+                std::vector< stdstr > vecPts;
+                vecPts.push_back( strPoint );
+                mapAppPts[ strApp ] = vecPts;
+            }
+            else
+            {
+                itr->second.push_back( strPoint );
+            }
+        }
+
+        if( ERROR( ret ) && mapAppPts.empty() )
+            break;
+        ret = 0;
+        for( auto& elem : mapAppPts )
+        {
+            GetPointValuesInternal(
+                pContext, elem.first,
+                elem.second, arrKeyVals, false );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAppManager_SvrImpl::GetPointValuesInternal( 
+    IConfigDb* pContext, 
+    const std::string& strAppName /*[ In ]*/,
+    std::vector<std::string>& arrPtPaths /*[ In ]*/, 
+    std::vector<KeyValue>& arrKeyVals /*[ Out ]*/,
+    bool bShortKey )
+{
+    gint32 ret = 0;
+    auto& pfs = m_pAppRegfs;
+    do{
         stdstr strDir = "/" APPS_ROOT_DIR "/";
         strDir += strAppName + "/" POINTS_DIR "/";
 
@@ -755,7 +846,10 @@ gint32 CAppManager_SvrImpl::GetPointValues(
                 elem + "/" VALUE_FILE;
 
             KeyValue kv;
-            kv.strKey = elem;
+            if( bShortKey )
+                kv.strKey = elem;
+            else
+                kv.strKey = strAppName + "/" + elem;
 
             stdstr strType =
                 elem + "/" DATA_TYPE;

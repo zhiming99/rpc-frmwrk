@@ -35,6 +35,7 @@ using namespace rpcf;
 #include "routmain.h"
 #include "rtappman.h"
 
+static stdstr g_strMonName = RTAPPNAME;
 gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
@@ -142,14 +143,14 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
             veckv.push_back( okv );
         }
 
-        ret = prtmgr->GetProperty(
+        /*ret = prtmgr->GetProperty(
             propMaxConns, oVar );
         if( SUCCEEDED( ret ) )
         {
             okv.strKey = S_MAX_CONN;
             okv.oValue = oVar;
             veckv.push_back( okv );
-        }
+        }*/
 
         ret = prtmgr->GetProperty(
             propMaxPendings, oVar );
@@ -160,7 +161,7 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
             veckv.push_back( okv );
         }
 
-        ret = prtmgr->GetProperty(
+        /*ret = prtmgr->GetProperty(
             propSendBps, oVar );
         if( SUCCEEDED( ret ) )
         {
@@ -176,7 +177,7 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
             okv.strKey = S_MAX_RECVBPS;
             okv.oValue = oVar;
             veckv.push_back( okv );
-        }
+        }*/
 
         okv.strKey = O_CONNECTIONS;
         okv.oValue = ( guint32 )
@@ -227,26 +228,29 @@ gint32 CAsyncAMCallbacks::ClaimAppInstCallback(
             ret = iRet;
             break;
         }
+        CRpcRouter* pBdgeRt = ObjPtr( m_pIf );
+        CRpcRouterManager* prtmgr =
+            ObjPtr( pBdgeRt->GetParent() );
         for( auto& kv : arrPtToGet )
         {
             if( kv.strKey == S_SESS_TIME_LIMIT )
             {
-                m_pIf->SetProperty(
+                prtmgr->SetProperty(
                     propSessTimeLimit, kv.oValue );
             }
             else if( kv.strKey == S_MAX_CONN )
             {
-                m_pIf->SetProperty(
+                prtmgr->SetProperty(
                     propMaxConns, kv.oValue );
             }
             else if( kv.strKey == S_MAX_RECVBPS )
             {
-                m_pIf->SetProperty(
+                prtmgr->SetProperty(
                     propRecvBps, kv.oValue );
             }
             else if( kv.strKey == S_MAX_SENDBPS )
             {
-                m_pIf->SetProperty(
+                prtmgr->SetProperty(
                     propSendBps, kv.oValue );
             }
         }
@@ -263,31 +267,47 @@ gint32 CAsyncAMCallbacks::OnPointChanged(
     const Variant& value /*[ In ]*/ )
 {
     do{
+        CRpcRouter* pBdgeRt = ObjPtr( m_pIf );
+        CRpcRouterManager* prtmgr =
+            ObjPtr( pBdgeRt->GetParent() );
+        if( unlikely( prtmgr == nullptr ) )
+        {
+            super::OnPointChanged(
+                context, strPtPath, value );
+            break;
+        }
         if( strPtPath ==
-            RTAPPNAME "/sess_time_limit" )
+            g_strMonName + "/" S_SESS_TIME_LIMIT  )
         {
             guint32 dwWaitSec = value;
+            if( dwWaitSec == 0 )
+                break;
             if( dwWaitSec > 86400 * 31 )
                 break;
-            m_pIf->SetProperty(
+            prtmgr->SetProperty(
                 propSessTimeLimit, value );
         }
         else if( strPtPath ==
-            RTAPPNAME "/max_recv_bps" )
+            g_strMonName + "/" S_MAX_RECVBPS )
         {
-            m_pIf->SetProperty(
+            guint64 qwVal = value;
+            prtmgr->SetProperty(
                 propRecvBps, value );
         }
         else if( strPtPath ==
-            RTAPPNAME "/max_send_bps" )
+            g_strMonName + "/" S_MAX_SENDBPS )
         {
-            m_pIf->SetProperty(
+            guint64 qwVal = value;
+            prtmgr->SetProperty(
                 propSendBps, value );
         }
         else if( strPtPath ==
-            RTAPPNAME "/max_conn" )
+            g_strMonName + "/" S_MAX_CONN )
         {
-            m_pIf->SetProperty(
+            guint32 dwVal = value;
+            if( dwVal == 0 )
+                break;
+            prtmgr->SetProperty(
                 propMaxConns, value );
         }
         else
@@ -332,12 +352,28 @@ gint32 StartAppManCli(
 
         PACBS pacbs( new CAsyncAMCallbacks );
         auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
+        Variant oVar;
+        ret = pSvc->GetProperty(
+            propMonAppInsts, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            StrVecPtr pvecStrs = oVar.m_pObj;
+            if( !pvecStrs.IsEmpty() )
+            {
+                if( ( *pvecStrs )().size() )
+                    g_strMonName = ( *pvecStrs )().front();
+            }
+        }
+        else
+        {
+            ret = 0;
+        }
 
         // ignore the return status
         // in order to allowing reconnection if the
         // appmonsvr is not online yet
         StartStdAppManCli(
-            pIf, RTAPPNAME, pAppMan, pacbs );
+            pIf, g_strMonName, pAppMan, pacbs );
         
     }while( 0 );
     return ret;

@@ -210,6 +210,7 @@ class CRpcWebSockFido : public CPort
         IEventSink* pCallback,
         BufPtr& pBuf );
 
+    gint32 OnPortReady( IRP* pIrp ) override;
 };
 
 class CRpcWebSockFidoDrv :

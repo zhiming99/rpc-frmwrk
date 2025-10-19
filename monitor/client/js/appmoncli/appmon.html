@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RPC-Framework Monitor</title>
+  <!--<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">-->
+  <link href="./dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    #status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    @media (max-width: 600px) {
+      .card { margin-bottom: 1rem; }
+      #config-btn { width: 100%; }
+    }
+    #logs-panel {
+        height: 100dvh;
+        white-space: pre-wrap;       /* Since CSS 2.1 */
+        white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+        white-space: -pre-wrap;      /* Opera 4-6 */
+        white-space: -o-pre-wrap;    /* Opera 7 */
+        word-wrap: break-word;       /* Internet Explorer 5.5+ */
+        max-height: 600px;
+    }
+    .card.text-center:hover {
+        box-shadow: 0 0 10px 2px #0d6efd33; /* subtle blue shadow */
+        background-color: #c1c4c7;           /* light blue background */
+        transition: box-shadow 0.2s, background-color 0.2s;
+        cursor: pointer;
+    }
+    #setpvModal {
+        z-index: 1060 !important;
+    }
+    #setpvModal-backdrop {
+        z-index: 1059 !important;
+    }
+
+    #timeSeriesModal {
+        z-index: 1070 !important;
+    }
+    #timeSeriesModal-backdrop {
+        z-index: 1069 !important;
+    }
+    #logContextMenu {
+        min-width: 120px;
+    }
+  </style>
+</head>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<!--<script src="./dist/js/bootstrap.bundle.min.js"></script>-->
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container-fluid">
+      <span id="status-dot" class="bg-success"></span>
+      <span class="navbar-brand mb-0 h1" id="APP_TITLE">RPC-Framework Monitor</span>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <!--<button id="config-btn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">Update Config</button>-->
+            <span id="user-label" class="ms-2 text-white"></span>
+            <button id="reconnect-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container my-3">
+    <div class="row" id="sites-row">
+      <!-- sites cards -->
+      <!-- Add more cards as needed -->
+    </div>
+
+    <div class="row" id="logs-row" style="display:none;">
+      <div class="col-12">
+        <div class="card mb-3">
+          <div class="card-header" id="LogsTitle">Logs</div>
+          <div class="card-body" style="overflow-y:auto;">
+            <pre id="logs-panel" class="mb-0">Loading logs...</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!--<script src="./dist/js/chart.js"></script>-->
+  <!-- Time Series Modal -->
+<div class="modal fade" id="timeSeriesModal" tabindex="-1" aria-labelledby="timeSeriesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="timeSeriesModalLabel">Time Series</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="timeSeriesChart" height="200"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="timeseries-dlg-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Set Point Values Modal -->
+  <div class="modal fade" id="setpvModal" tabindex="-1" aria-labelledby="setpvModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="setpv-form">
+        <div class="modal-header">
+          <h5 class="modal-title" id="setpvModalLabel">Set Point Values</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="setpv-param" class="form-label">Point Name</label>
+            <input type="text" class="form-control" id="setpv-param" required>
+          </div>
+          <div class="mb-3">
+            <label for="setpv-value" class="form-label">Value</label>
+            <input type="text" class="form-control" id="setpv-value" required>
+          </div>
+          <div id="setpv-feedback" class="text-danger small"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" id="setpv-dlg-btn-update">Update</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="setpv-dlg-btn-cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Setpoints Modal -->
+  <div class="modal fade" id="setpointsModal" tabindex="-1" aria-labelledby="setpointsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="setpointsModalLabel">Setpoints</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <h6 id="setpointsAppName" class="mb-3"></h6>
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th scope="col" id="setpoint-name-header">Name</th>
+                <th scope="col" id="setpoint-value-header">Value</th>
+                <th scope="col" id="setpoint-type-header">Point Type</th>
+              </tr>
+            </thead>
+            <tbody id="setpointsTableBody">
+              <tr>
+                <td colspan="2">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="setpoints-dlg-close-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- Custom Context Menu for Log Time Range -->
+  <ul id="logContextMenu" class="dropdown-menu" style="position:absolute; display:none; z-index:2000;">
+    <li><a class="dropdown-item" href="#" data-range="1h">Last 200 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="2h">Last 2000 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="3h">Last 20000 samples</a></li>
+    <li><a class="dropdown-item" href="#" data-range="full">Full Log</a></li>
+  </ul>
+
+  <script src="./i18n-helper.js"></script>
+
+  <footer class="text-center text-muted py-3">
+    rpc-frmwrk &copy; 2025
+  </footer>
+  <script src="./appdetail.js"></script>
+  <!--p id="log">RPC-Framework Monitor<br /></p>-->
+  <script src="dist/appmon.js"></script>
+
+  <script>
+    const i18nh = globalThis.i18nHelper; // Make it globally accessible
+    i18nh.load(navigator.language).then(() => {
+      console.log("Translations loaded");
+      document.getElementById('reconnect-btn').textContent = i18nh.t("Login");
+      document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
+      document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
+      document.getElementById('LogsTitle').textContent = i18nh.t("LOGS");
+      document.getElementById('setpv-dlg-btn-update').textContent = i18nh.t("BUTTON_UPDATE");
+      document.getElementById('setpv-dlg-btn-cancel').textContent = i18nh.t("BUTTON_CANCEL");
+      document.getElementById("setpoints-dlg-close-btn").textContent = i18nh.t("BUTTON_CLOSE");
+      document.getElementById("timeseries-dlg-close-btn").textContent = i18nh.t("BUTTON_CLOSE");
+      document.querySelector('#logContextMenu [data-range="1h"]').textContent = i18nh.t("LAST_200_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="2h"]').textContent = i18nh.t("LAST_2000_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="3h"]').textContent = i18nh.t("LAST_20000_SAMPLES");
+      document.querySelector('#logContextMenu [data-range="full"]').textContent = i18nh.t("FULL_LOG");
+    }).catch((error) => {
+      console.error("Error loading translations:", error);
+    });
+
+    function setStatusDot(isOnline) {
+      const dot = document.getElementById('status-dot');
+      dot.classList.remove('bg-success', 'bg-danger');
+      if (isOnline === true) {
+        dot.classList.add('bg-success');
+      } else if (isOnline === false) {
+        dot.classList.add('bg-danger');
+      }
+    }
+
+    function showReconnectButton(show, isConnected = false) {
+      const btn = document.getElementById('reconnect-btn');
+      const userLabel = document.getElementById('user-label');
+
+      if (show) {
+        btn.classList.remove('d-none');
+        if (isConnected) {
+          btn.textContent = i18nh.t('Logout');
+          btn.classList.remove('btn-warning');
+          btn.classList.add('btn-danger');
+          var strUser; 
+          if( !globalThis.oProxy )
+              strUser = ""
+          else if( globalThis.oProxy && globalThis.oProxy.m_strUserName )
+              strUser = globalThis.oProxy.m_strUserName;
+          else if( globalThis.oProxy && globalThis.oProxy.m_oChanProxy &&
+              globalThis.oProxy.m_oChanProxy.m_strUserName )
+              strUser = globalThis.oProxy.m_oChanProxy.m_strUserName;
+
+          userLabel.textContent = strUser;
+          btn.onclick = function() {
+            // Your disconnect logic here
+            if (globalThis.oProxy && typeof globalThis.oProxy.Stop === 'function') {
+              globalThis.oProxy.Stop();
+            } else {
+              // fallback: reload or nullify
+              location.reload();
+            }
+          };
+        } else {
+          btn.textContent = i18nh.t('Login');
+          userLabel.textContent = '';
+          btn.classList.remove('btn-danger');
+          btn.classList.add('btn-warning');
+          btn.onclick = function() {
+            // Your reconnect logic here
+            if (typeof globalThis.StartClient === 'function') {
+              globalThis.StartClient( oStartCb ).then(() => {
+                console.log('Reconnected with status ');
+                checkProxyState()
+              }).catch((error) => {
+                console.log("Error reconnecting:", error);
+              });
+            } else {
+              location.reload();
+            }
+          };
+        }
+      } else {
+        btn.classList.add('d-none');
+        userLabel.textContent = '';
+      }
+    }
+
+    setStatusDot(false);
+    showReconnectButton(true);
+
+    const sites = [
+      {
+        name: "site1",
+        container: "container1",
+        status: "online",
+        apps: [
+          /*{ name: "AppA", status: "Running", cpu: "10%" },
+          { name: "AppB", status: "Stopped", cpu: "0%" } */
+        ]
+      },
+      /*{
+        name: "site2",
+        status: "offline",
+        container: "container2",
+        apps: [
+          { name: "AppC", status: "Running", cpu: "7%" }
+        ]
+      }*/
+    ];
+    globalThis.g_sites = sites;
+    function getDisplayName(app) {
+        if( app.display_name && app.display_name.length > 0 )
+            return i18nHelper.t(app.display_name);
+        return i18nHelper.t(app.name);
+    }
+    function updateSites(sites) {
+        if( globalThis.curSpModal )
+        {
+            updateAppDetailModal( globalThis.curSpModal.currentApp,
+                globalThis.curSpModal.currentSite );
+        }
+        if( !globalThis.curSpModal || !globalThis.oProxy || globalThis.oProxy.m_iState === 0 )
+        {
+            const sitesRow = document.getElementById('sites-row');
+            var siteCard = null;
+            sites.forEach(site => {
+              appRow = document.getElementById(`app-row-${site.name}`);
+              if( appRow.children.length !== site.apps.length )
+              {
+                  renderSites(sites);
+                  return;
+              }
+            })
+            sites.forEach(site => {
+              for( const app of site.apps ) {
+                  appTitle = document.getElementById(`app-title-${app.name}-${site.name}`);
+                  appTitle.textContent = getDisplayName(app);
+                  appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
+                  if( appStatus )
+                  {
+                      let statusClass = '';
+                      if (app.status === i18nHelper.t("APP_STATUS_RUNNING")) {
+                            statusClass = 'bg-success text-white px-2 rounded';
+                      } else if (app.status === i18nHelper.t("APP_STATUS_STOPPED")) {
+                            statusClass = 'bg-danger text-white px-2 rounded';
+                      } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
+                            statusClass = 'bg-secondary text-white px-2 rounded';
+                      }
+                      appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+                  }
+              }
+            })
+        }
+    }
+
+    function renderSites(sites) {
+        const sitesRow = document.getElementById('sites-row');
+        sitesRow.innerHTML = ''; // Clear previous content
+
+        sites.forEach(site => {
+            // Create site card
+            const siteCol = document.createElement('div');
+            siteCol.className = 'col-12 mb-4';
+
+            const siteCard = document.createElement('div');
+            siteCard.className = 'card';
+
+            const siteHeader = document.createElement('div');
+            siteHeader.className = 'card-header bg-info text-white';
+            siteHeader.textContent = `${i18nHelper.t("SITE_LABEL")}: ${site.name} (${i18nHelper.t("CONTAINER_LABEL")}: ${site.container})`;
+
+            const siteBody = document.createElement('div');
+            siteBody.className = 'card-body';
+
+            const appRow = document.createElement('div');
+            appRow.className = 'row';
+            appRow.id = `app-row-${site.name}`;
+
+            site.apps.forEach(app => {
+                const appCol = document.createElement('div');
+                appCol.className = 'col-12 col-md-6 col-lg-3 mb-3';
+
+                const appCard = document.createElement('div');
+                appCard.className = 'card text-center';
+                appCard.style.cursor = 'pointer';
+                appCard.onclick = function() {
+                    if( !globalThis.curSpModal && globalThis.oProxy )
+                        showAppDetailModal(app, site);
+                }
+
+                const appCardBody = document.createElement('div');
+                appCardBody.className = 'card-body';
+
+                const appTitle = document.createElement('h5');
+                appTitle.className = 'card-title';
+                appTitle.id = `app-title-${app.name}-${site.name}`;
+                appTitle.textContent = getDisplayName(app);
+
+                const appStatus = document.createElement('p');
+                appStatus.className = 'card-text';
+                appStatus.id = `app-status-${app.name}-${site.name}`;
+
+                let statusClass = '';
+                if (app.status === i18nHelper.t("APP_STATUS_RUNNING")) {
+                    statusClass = 'bg-success text-white px-2 rounded';
+                } else if (app.status === i18nHelper.t("APP_STATUS_STOPPED")) {
+                    statusClass = 'bg-danger text-white px-2 rounded';
+                } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
+                    statusClass = 'bg-secondary text-white px-2 rounded';
+                }
+                appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> \
+                    <span class="${statusClass}">${app.status}</span><br> \
+                    <b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+
+                appCardBody.appendChild(appTitle);
+                appCardBody.appendChild(appStatus);
+                appCard.appendChild(appCardBody);
+                appCol.appendChild(appCard);
+                appRow.appendChild(appCol);
+            });
+
+            siteBody.appendChild(appRow);
+            siteCard.appendChild(siteHeader);
+            siteCard.appendChild(siteBody);
+            siteCol.appendChild(siteCard);
+            sitesRow.appendChild(siteCol);
+        });
+    }
+
+    globalThis.g_bAuth = false
+    globalThis.g_strAuthMech = ""
+
+    var iChecks = 0;
+    function DoCleanup()
+    {
+        setStatusDot(false);
+        showReconnectButton(true, false);
+        clearLogs();
+        if( g_sites && g_sites.length > 0 )
+        {
+            g_sites.forEach(site => {
+                site.apps.forEach(app => {
+                    app.status = i18nHelper.t("APP_STATUS_UNKNOWN");
+                    app.cpu = "N/A";
+                });
+            });
+            updateSites(globalThis.g_sites);
+        }
+        globalThis.oProxy = null;
+        if( globalThis.curSpModal )
+        {
+            globalThis.curSpModal.hide();
+            globalThis.curSpModal = undefined;
+        }
+        const logsRow = document.getElementById('logs-row');
+        logsRow.style.display = "none"
+
+        iChecks = 0;
+    }
+
+    setStatusDot(false);
+    showReconnectButton(true, false);
+
+    function checkProxyState(){
+        if( globalThis.oProxy === undefined ){
+            setTimeout( checkProxyState, 2000 );
+            console.log( "Waiting RPC connection ready..." );
+        }else if( globalThis.oProxy === null ){
+            console.log( "RPC connection is shutdown abnormally..." );
+            DoCleanup();
+        }else if( globalThis.oProxy.m_iState === 0 ){
+            console.log( "RPC connection is down..." );
+            DoCleanup();
+        }else{
+            if( iChecks++ === 0 )
+            {
+                //fetchLogs();
+                console.log( "RPC connection ready " + globalThis.oProxy );
+            }
+            setTimeout( checkProxyState, 5000 );
+        }
+    }
+    setTimeout( checkProxyState, 2000 );
+
+    function clearLogs()
+    { document.getElementById('logs-panel').textContent = ""; }
+
+    function fetchStatus() {
+      if( !globalThis.oProxy)
+      {
+          clearInterval(globalThis.fetchStatusInterval);
+          globalThis.fetchStatusInterval = undefined;
+          return Promise.resolve(0);
+      }
+
+      if( globalThis.funcStartPullInfo ){
+          console.log( "Start pulling info..." );
+          return globalThis.funcStartPullInfo().then((ret) => {
+              updateSites(globalThis.g_sites);
+          }).catch((error) => {
+              console.log("Error fetching status:", error);
+          });
+        }
+        return Promise.resolve(0);
+    }
+    function fetchLogs() {
+      if( !globalThis.oProxy)
+      {
+          clearInterval(globalThis.fetchLogsInterval);
+          globalThis.fetchLogsInterval = undefined;
+          return Promise.resolve(0);
+      }
+      var oContext = Object()
+      oContext.oGetLpvCb = (oContext, ret, value) => {
+          const logsRow = document.getElementById('logs-row');
+          if (ret === 0) {
+              logsRow.style.display = ""
+              const decoder = new TextDecoder('utf-8')
+              let text=decoder.decode(value);
+              lineArray = text.split('\n').reverse();
+              const regex = /^\[(\d+\.\d+)/;
+              for(let i = 0; i < lineArray.length; i++) {
+                  const match = lineArray[i].match(regex);
+                  if (match) {
+                      const timestamp = parseFloat(match[1]);
+                      const date = new Date(timestamp * 1000);
+                      let formattedDate = date.toLocaleString(
+                            navigator.language,
+                            { 
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false, // Ensures 24-hour format
+                            });
+                      formattedDate = formattedDate.replace(/, /, '-');
+                      lineArray[i] = lineArray[i].replace(regex, `[${formattedDate}`);
+                  }
+              }
+              document.getElementById('logs-panel').innerHTML =
+                lineArray.join('\n').trim();
+          } else {
+              logsRow.style.display = "none"
+              console.log("Error fetching logs:", ret);
+          }
+      };
+      return globalThis.oProxy.GetLargePointValue(
+          oContext, "loggersvr1/logcontent").then((ret) => {
+          Promise.resolve(ret); 
+      }).catch((error) => {
+          console.log("Error fetching logs:", error);
+      });
+    }
+    function showTimeSeriesModal(data, title = "Time Series") {
+      // data: array of [timestamp, value]
+      const ctx = document.getElementById('timeSeriesChart').getContext('2d');
+      document.getElementById('timeSeriesModalLabel').textContent = title;
+
+      // Format data for Chart.js
+      const labels = data.map(pair => {
+        const date = new Date(pair[0] * 1000); // assuming timestamp is in seconds
+        return date.toLocaleString();
+      });
+      const values = data.map(pair => pair[1]);
+
+      // Destroy previous chart if exists
+      if( window.timeSeriesChart && window.timeSeriesChart.destroy)
+      {
+        window.timeSeriesChart.destroy();
+      }
+
+      window.timeSeriesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: title,
+            data: values,
+            borderColor: 'rgba(75,192,192,1)',
+            backgroundColor: 'rgba(75,192,192,0.2)',
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { display: true, title: { display: true, text: 'Time' } },
+            y: { display: true, title: { display: true, text: 'Value' } }
+          }
+        }
+      });
+
+      // Prepare modal and backdrop
+      var modalEl = document.getElementById('timeSeriesModal');
+      modalEl.style.zIndex = 1070;
+
+      // Add a custom backdrop above setpointsModal's backdrop
+      let customBackdrop = document.createElement('div');
+      customBackdrop.className = 'modal-backdrop fade show';
+      customBackdrop.style.zIndex = 1069;
+      customBackdrop.id = 'timeSeriesModal-backdrop';
+      document.body.appendChild(customBackdrop);
+
+      // Show the modal
+      const modal = new bootstrap.Modal(document.getElementById('timeSeriesModal'));
+      modal.show();
+
+      // Cleanup: remove custom backdrop and reset z-index when closed
+      modalEl.addEventListener('hidden.bs.modal', function handler() {
+          modalEl.style.zIndex = '';
+          let bd = document.getElementById('timeSeriesModal-backdrop');
+          if (bd) bd.remove();
+          globalThis.oStmCtx = null;
+          modalEl.removeEventListener('hidden.bs.modal', handler);
+      });
+    }
+
+    function showSetpvModal(app, pointName, currentValue) {
+        document.getElementById('setpvModalLabel').textContent = i18nHelper.t("Set Point Values");
+        document.getElementById('setpv-param').value = i18nHelper.t(pointName);
+        document.getElementById('setpv-param').readOnly = true;
+        document.querySelector('label[for="setpv-param"]').textContent = i18nHelper.t("Point Name");
+        document.getElementById('setpv-value').value = currentValue;
+        document.querySelector('label[for="setpv-value"]').textContent = i18nHelper.t("Value");
+        document.getElementById('setpv-feedback').textContent = '';
+
+        document.getElementById('setpv-form').onsubmit = function(e) {
+            e.preventDefault();
+            var newValue = document.getElementById('setpv-value').value;
+            const { app, pointName } = globalThis.setpvContext || {};
+
+            if( !app || !globalThis.oProxy )
+                return;
+            const fullPointPath = `${app.name}/${pointName}`;
+            var oContext = Object();
+            oContext.oSetPvCb = (oContext, ret) => { 
+                if( oContext.m_iRet < 0 )
+                {
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("CONFIG_UPDATE_FAILED");
+                    console.log("Error setting point value:", oContext.m_iRet);
+                }
+                else
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("CONFIG_UPDATED");
+            }
+            const setpointMap = globalThis.curSpModal.currentApp.setpoints
+            if ( !setpointMap || !setpointMap.has(pointName) )
+            {
+                document.getElementById('setpv-feedback').textContent = i18nHelper.t("CONFIG_UPDATE_FAILED");
+                console.log("Setpoint not found:", pointName);
+                return;
+            }
+            var iType = setpointMap.get(pointName).t;
+            switch( iType )
+            {
+            case "byte":
+            case "word":
+            case "int":
+            case "qword":
+                var val = parseInt(newValue)
+                if( isNaN( val ) )
+                {
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("INVALID_INTEGER");
+                    return;
+                }
+                newValue = val
+                break;
+            case "float":
+            case "double":
+                var val = parseFloat(newValue)
+                if( isNaN( val ) )
+                {
+                    document.getElementById('setpv-feedback').textContent = i18nHelper.t("INVALID_FLOAT");
+                    return;
+                }
+                newValue = val
+                break;
+            case "string":
+                // keep as string
+                break;
+            case "blob":
+                newValue = new TextEncoder().encode(newValue);
+                break;
+            case null:
+            case undefined:
+                return Promise.resolve(-22)
+            }
+            iType = str2type(iType);
+            var oVar = globalThis.NewVariant( iType, newValue );
+            return globalThis.oProxy.SetPointValue( oContext, fullPointPath, oVar ).then((ret)=>{
+                setpointMap.get(pointName).v = newValue;
+                setpointMap.get(pointName).cnt++;
+                if( pointName === "display_name" )
+                {
+                    app.display_name = newValue;
+                    updateSites(globalThis.g_sites);
+                }
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
+                }, 1000);
+                return Promise.resolve(0)
+            }).catch((error) => {
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
+                }, 1000);
+                return Promise.resolve(oContext.m_iRet )
+            });
+        };
+
+        // Store context for submit
+        globalThis.setpvContext = { app, pointName };
+
+        var modalEl = document.getElementById('setpvModal');
+        var modal = new bootstrap.Modal(modalEl, {backdrop: false});
+        modalEl.style.zIndex = 1060;
+
+        // Optionally, add a custom backdrop above the first modal's backdrop
+        let customBackdrop = document.createElement('div');
+        customBackdrop.className = 'modal-backdrop fade show';
+        customBackdrop.style.zIndex = 1059;
+        customBackdrop.id = 'setpvModal-backdrop';
+        document.body.appendChild(customBackdrop);
+
+        modal.show();
+
+        // When setpvModal is hidden, remove the custom backdrop and reset z-index
+        modalEl.addEventListener('hidden.bs.modal', function handler() {
+            modalEl.style.zIndex = '';
+            let bd = document.getElementById('setpvModal-backdrop');
+            if (bd) bd.remove();
+            modalEl.removeEventListener('hidden.bs.modal', handler);
+        });
+    }
+
+    function showLogContextMenu(e, app, pointName, attr) {
+        const menu = document.getElementById('logContextMenu');
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+
+        // Remove any previous handlers
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.onclick = null;
+        });
+
+        // Add click handlers for each menu item
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            item.onclick = function(ev) {
+                ev.preventDefault();
+                menu.style.display = 'none';
+                let range = this.getAttribute('data-range');
+                // Call your log download and showTimeSeriesModal logic here
+                let timeRangeSec = 0;
+                if (range === '1h') timeRangeSec = 400;
+                else if (range === '2h') timeRangeSec = 4000;
+                else if (range === '3h') timeRangeSec = 40000;
+                else timeRangeSec = 0; // 0 means full log
+
+                var oContext = {};
+                globalThis.downloadPointLog(
+                    oContext,
+                    `${app.name}/${pointName}`,
+                    "ptr0-0",
+                    attr.avgalgo,
+                    timeRangeSec // Pass time range in seconds if your backend supports it
+                ).then((ret) => {
+                    if (oContext.m_iRet < 0)
+                        return Promise.resolve(oContext.m_iRet);
+                    var arrTimeSeries = globalThis.parseLogLines(
+                        oContext.m_arrLogData, oContext.m_avgAlgo,
+                        oContext.m_timeRangeSec );
+                    if (arrTimeSeries.length)
+                        showTimeSeriesModal(
+                            arrTimeSeries,
+                            `${getDisplayName(app)}/${i18nHelper.t(pointName)}`
+                        );
+                    return Promise.resolve(0);
+                }).catch((error) => {
+                    console.log("Error downloading point log:", error);
+                    return Promise.resolve(-1);
+                });
+            };
+        });
+    }
+
+    // Hide menu on click elsewhere
+    document.addEventListener('click', function() {
+        document.getElementById('logContextMenu').style.display = 'none';
+    });
+
+    function BuildSetpointCell( app, pointName, value, rowIndex )
+    {
+        const tr = document.createElement('tr');
+        /*if (rowIndex % 2 === 1) {
+            tr.style.backgroundColor = "#2c2f33"; // dark gray, or any color you like
+        }*/
+        const nameTd = document.createElement('td');
+        nameTd.textContent = i18nHelper.t(pointName);
+        tr.appendChild(nameTd);
+
+        var valToShow = value.v;
+        if( ( valToShow != null && valToShow != undefined )&&
+            ( value.t === "float" || value.t === "double") )
+            valToShow = valToShow.toFixed(3);
+        if( value.cnt > 0 )
+        {
+            valColor = "text-danger";
+            value.cnt=0;
+        }
+        else
+            valColor = "text-secondary";
+        if( value.v === null || value.v === undefined )
+            valToShow = "N/A";
+        if( value.v !== null && value.v !== undefined &&
+            value.unit && value.unit.length > 0 )
+            valToShow = `${valToShow} ${i18nHelper.t(value.unit)}`;
+        valToShow = `<span class="${valColor}">${valToShow}</span>`;
+        const valueTd = document.createElement('td');
+        valueTd.innerHTML = valToShow;
+        valueTd.style.cursor = "pointer";
+        if( value.ptype && value.ptype === "setpoint" )
+        {
+          valueTd.onclick = function() {
+              showSetpvModal(app, pointName, value.v);
+          };
+        }
+        else if( value.ptype && value.ptype === "output" )
+        {
+            var setpoints = app.setpoints
+            var attr = setpoints.get(pointName)
+            if( attr && attr.haslog )
+            {
+                valueTd.oncontextmenu = function(e) {
+                    e.preventDefault();
+                    showLogContextMenu(e, app, pointName, attr);
+                };
+
+                // Add a small log icon to the right
+                const logIcon = document.createElement('i');
+                logIcon.className = "bi bi-clipboard-data ms-2 text-info"; // Bootstrap icon with margin and color
+                logIcon.title = i18nHelper.t("View Log Data");
+                valueTd.appendChild(logIcon);
+            }
+        }
+
+        tr.appendChild(valueTd);
+
+        const typeTd = document.createElement('td');
+        typeTd.textContent = i18nHelper.t(value.ptype, {},"setpoint");
+        tr.appendChild(typeTd);
+        return tr;
+    }
+
+    function updateAppDetailModal(app, site) {
+        // Set modal title
+        document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${getDisplayName(app)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+
+        const setpoints = app.setpoints 
+        const tbody = document.getElementById('setpointsTableBody');
+        tbody.innerHTML = '';
+        if (setpoints.size === 0) {
+            tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
+        } else {
+            const arrPts = globalThis.curSpModal.arrPts;
+            arrPts.forEach((elem, idx) =>
+            {
+                if( !setpoints.has(elem.n) )
+                    return
+                value = setpoints.get(elem.n);
+                if( value === undefined )
+                    return
+                const tr = BuildSetpointCell( app, elem.n, value, idx );
+                tbody.appendChild(tr);
+            })
+        }
+    }
+    function showAppDetailModal(app, site) {
+        // Set modal title
+        document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
+        document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${getDisplayName(app)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
+
+        // Example: app.setpoints = [{name: "SP1", value:{ v:123, t:"i" }, ...}]
+        const setpoints = app.setpoints || new Map();
+        const tbody = document.getElementById('setpointsTableBody');
+        tbody.innerHTML = '';
+        if (setpoints.size === 0) {
+            tbody.innerHTML = `<tr><td colspan="2">${i18nHelper.t("NO_DATA")}</td></tr>`;
+        } else {
+            var idx = 0;
+            setpoints.forEach((value, key) => {
+                const tr = BuildSetpointCell( app, key, value, idx++ );
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Show the modal
+        var modalEl = document.getElementById('setpointsModal');
+        var modal = new bootstrap.Modal(modalEl);
+        globalThis.curSpModal = modal;
+        modal.currentSite = site;
+        modal.currentApp = app;
+
+        globalThis.OnPointChanged = (strPtPath, value) => {
+            if (modal.currentApp && modal.currentApp.setpoints) {
+                var arrComps = strPtPath.split('/')
+                if( arrComps.length < 2 )
+                    return
+                attr = modal.currentApp.setpoints.get(arrComps[1])
+                if (!attr)
+                    attr = { v: null, t: null, unit: null, cnt: 0 };
+                attr.v = value.m_val
+                attr.t = type2str(value.m_iType)
+                attr.cnt++ 
+                modal.currentApp.setpoints.set(arrComps[1], attr);
+            }
+        };
+        modalEl.addEventListener('hidden.bs.modal', function spthandler(event) {
+            document.getElementById('setpointsTableBody').innerHTML = '';
+            modalEl.removeEventListener('hidden.bs.modal', spthandler);
+            if( globalThis.curSpModal && globalThis.oProxy)
+            {
+                return globalThis.oProxy.RemoveListener( Object() ).then((ret)=>{
+                    var modal = globalThis.curSpModal;
+                    if ( !modal )
+                        return;
+                    modal.currentApp.bRegistered = false;
+                    if( modal.currentApp )
+                        modal.currentApp.setpoints = new Map();
+                    console.log("Listener removed:", ret);
+                    globalThis.curSpModal = null;
+                    // globalThis.fetchStatusInterval =
+                    //     setInterval(fetchStatus, 5000);
+                    globalThis.fetchLogsInterval =
+                        setInterval(fetchLogs, 30000);
+                }).catch((error)=>{
+                    var modal = globalThis.curSpModal;
+                    if ( !modal )
+                        return;
+                    modal.currentApp.bRegistered = false;
+                    if( modal.currentApp )
+                        modal.currentApp.setpoints = new Map();
+                    console.log("Error removing listener:", error);
+                    globalThis.curSpModal = null;
+                    // globalThis.fetchStatusInterval =
+                    //     setInterval(fetchStatus, 5000);
+                    globalThis.fetchLogsInterval =
+                        setInterval(fetchLogs, 30000);
+                });
+            }
+        });
+
+        document.getElementById('setpoint-name-header').textContent =
+            i18nHelper.t("Name");
+        document.getElementById('setpoint-value-header').textContent =
+            i18nHelper.t("Value");
+        document.getElementById('setpoint-type-header').textContent =
+            i18nHelper.t("Point Type", {}, "setpoint");
+        modal.show();
+        // clearInterval(globalThis.fetchStatusInterval);
+        // globalThis.fetchStatusInterval = undefined;
+        clearInterval(globalThis.fetchLogsInterval);
+        globalThis.fetchLogsInterval = undefined;
+        fetchStatus();
+    }
+
+    var oStartCb = ((context, ret)=>{
+      setStatusDot(true);
+      showReconnectButton(true, true);
+      renderSites(globalThis.g_sites);
+      return fetchStatus().then((ret)=>{
+          return fetchLogs().then((ret)=>{
+              globalThis.fetchStatusInterval =
+                  setInterval(fetchStatus, 5000);
+              globalThis.fetchLogsInterval =
+                  setInterval(fetchLogs, 30000);
+          })
+      })
+    })
+    globalThis.StartClient( oStartCb)
+
+  ////# sourceURL=rpcf://htmlcode/appmonhtml.js
+  </script>
+  <p id="rpcf_load_notify"><br /></p>
+</body>
+</html>

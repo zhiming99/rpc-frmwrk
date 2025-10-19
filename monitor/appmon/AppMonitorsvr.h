@@ -7,6 +7,7 @@
 #include "blkalloc.h"
 #include <unordered_set>
 #include "IAppStoresvr.h"
+#include "IAppStoreExsvr.h"
 #include "IAppMonitorsvr.h"
 
 struct CFlockHelper
@@ -32,6 +33,7 @@ DECLARE_AGGREGATED_SKEL_SERVER(
     CAppMonitor_SvrSkel_Base,
     CStatCountersServerSkel,
     IIAppStore_SImpl,
+    IIAppStoreEx_SImpl,
     IIAppMonitor_SImpl );
 
 class CAppMonitor_SvrSkel :
@@ -70,6 +72,7 @@ DECLARE_AGGREGATED_SERVER(
     CStatCounters_SvrBase,
     CStreamServerAsync,
     IIAppStore_SvrApi,
+    IIAppStoreEx_SvrApi,
     IIAppMonitor_SvrApi,
     CFastRpcServerBase );
 
@@ -105,6 +108,13 @@ class CAppMonitor_SvrImpl
         RegFsPtr& pfs, int iAuthMech );
 
     gint32 LoadUserGrpsMap();
+
+    gint32 GetPointValuesInternal ( 
+        IConfigDb* pContext, 
+        const std::string& strAppName /*[ In ]*/,
+        std::vector<std::string>& arrPtPaths /*[ In ]*/, 
+        std::vector<KeyValue>& arrKeyVals /*[ Out ]*/,
+        bool bShortKey );
 
     public:
     typedef CAppMonitor_SvrBase super;
@@ -329,6 +339,67 @@ class CAppMonitor_SvrImpl
         std::vector<KeyValue>& arrKVs /*[ In ]*/ ) override
     { return OnPointsChangedInternal( arrKVs ); }
     //RPC Async Req Cancel Handler
+    gint32 OnIsAppOnlineCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        std::vector<std::string>& strApps /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'IsAppOnline' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 IsAppOnline(
+        IConfigDb* pReqCtx_,
+        std::vector<std::string>& strApps /*[ In ]*/,
+        std::vector<std::string>& strOnlineApps /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnGetPointDescCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        std::vector<std::string>& arrPtPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetPointDesc' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetPointDesc(
+        IConfigDb* pReqCtx_,
+        std::vector<std::string>& arrPtPath /*[ In ]*/,
+        std::map<std::string,ObjPtr>& mapPtDescs /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnGetPtLogInfoCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetPtLogInfo' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetPtLogInfo(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        std::map<std::string,ObjPtr>& mapPtLogInfo /*[ Out ]*/ ) override;
+    //RPC Async Req Cancel Handler
+    gint32 OnGetPtLogCanceled(
+        IConfigDb* pReqCtx_, gint32 iRet,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hChannel_h /*[ In ]*/,
+        const std::string& strLogName /*[ In ]*/,
+        ObjPtr& pInfo /*[ In ]*/ ) override
+    {
+        DebugPrintEx( logErr, iRet,
+            "request 'GetPtLog' is canceled." );
+        return STATUS_SUCCESS;
+    }
+    //RPC Async Req Handler
+    gint32 GetPtLog(
+        IConfigDb* pReqCtx_,
+        const std::string& strPtPath /*[ In ]*/,
+        HANDLE hChannel_h /*[ In ]*/,
+        const std::string& strLogName /*[ In ]*/,
+        ObjPtr& pInfo /*[ In ]*/ ) override;
+    //RPC Async Req Cancel Handler
     gint32 OnRegisterListenerCanceled(
         IConfigDb* pReqCtx_, gint32 iRet,
         std::vector<std::string>& arrApps /*[ In ]*/ ) override
@@ -358,8 +429,12 @@ class CAppMonitor_SvrImpl
     gint32 OnPreStart(
         IEventSink* pCallback ) override;
     bool IsUserValid( guint32 dwUid ) const;
+
     gint32 GetAccessContext(
         IConfigDb* pReqCtx,
+        CAccessContext& oac ) const;
+
+    gint32 GetAccessContext( HANDLE hstm,
         CAccessContext& oac ) const;
 };
 

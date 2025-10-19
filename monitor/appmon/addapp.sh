@@ -67,15 +67,31 @@ fi
 
 pushd $rootdir > /dev/null
 
+ret=0
 for appname in "$@"; do
-    echo adding $appname ...
-    if ! add_stdapp $appname $username $groupname; then
+    echo adding application $appname
+    add_stdapp $appname $username $groupname
+    ret=$?
+    if (( ret != 0 )); then
         break
     fi
     add_log_link $appname req_count appmonsvr1 ptlogger1
+    add_log_link $appname cpu_load appmonsvr1 ptlogger1
+    add_log_link $appname vmsize_kb appmonsvr1 ptlogger1
+    add_log_link $appname obj_count appmonsvr1 ptlogger1
+    set_attr_value $appname obj_count avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $appname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $appname cpu_load avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $appname req_count avgalgo  "$(jsonval 'i' 0)" i
+    ret=$?
+    if (( ret != 0 )); then
+        break
+    fi
 done
 
 popd > /dev/null
 if (( $mt == 2 )); then
     umount $rootdir
 fi
+
+exit $ret

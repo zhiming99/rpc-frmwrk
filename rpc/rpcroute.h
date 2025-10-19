@@ -1378,6 +1378,8 @@ class CRpcTcpBridge :
         return 0;
     }
 
+    gint32 SetRmtConnParams();
+
 }; // CRpcTcpBridge
 
 class CRpcTcpBridgeProxy :

@@ -533,8 +533,10 @@ class ConfigDlg(Gtk.Dialog):
                 authInfo = None
                 for svrObj in svrObjs :
                     if self.bServer:
-                        authInfo = svrObj['AuthInfo']
-                        authUser = authInfo[ 'UserName' ]
+                        if 'AuthInfo' in svrObj :
+                            authInfo = svrObj['AuthInfo']
+                            if 'UserName' in authInfo :
+                                authUser = authInfo[ 'UserName' ]
                         break
 
                     portClass = svrObj[ "ProxyPortClass"]
@@ -544,7 +546,8 @@ class ConfigDlg(Gtk.Dialog):
 
                         if 'AuthInfo' in svrObj :
                             authInfo = svrObj['AuthInfo']
-                            authUser = authInfo[ 'UserName' ]
+                            if 'UserName' in authInfo :
+                                authUser = authInfo[ 'UserName' ]
                             confVals[ 'AuthInfo' ] = authInfo
 
                         ifCfg0 = DefaultIfCfg()
@@ -566,7 +569,11 @@ class ConfigDlg(Gtk.Dialog):
                         break
 
             except Exception as err :
-                pass
+                text = "Error parsing echodesc.json" + str(err)
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                second_text = "@" + fname + ":" + str(exc_tb.tb_lineno)
+                self.DisplayError( text, second_text )
 
         if len( authUser ) > 0 and 'AuthInfo' in confVals :
             authInfo = confVals[ 'AuthInfo' ]

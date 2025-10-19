@@ -33,6 +33,8 @@ using namespace rpcf;
 
 using namespace std;
 
+#define MAX_SAFE_INTEGER 9007199254740991
+
 namespace rpcf
 {
 Variant::Variant()
@@ -854,9 +856,17 @@ gint32 Variant::SerializeToJson(
             oVal[ "v" ] = m_dwVal;
             break;
         case typeUInt64:
-            using JUInt64 = Json::Value::UInt64;
-            oVal[ "v" ] =
-                ( const JUInt64& )m_qwVal;
+            {
+                using JUInt64 = Json::Value::UInt64;
+                if( m_qwVal <= MAX_SAFE_INTEGER )
+                    oVal[ "v" ] =
+                        ( const JUInt64& )m_qwVal;
+                else
+                {
+                    oVal[ "v" ] =
+                        std::to_string( m_qwVal );
+                }
+            }
             break;
         case typeFloat:
             oVal[ "v" ] = m_fVal;
@@ -1008,7 +1018,30 @@ gint32 Variant::DeserializeFromJson(
             }
         case typeUInt64:
             {
-                m_qwVal = val[ "v" ].asUInt64();
+                const Json::Value& oVal = val[ "v" ];
+                if( oVal.isInt() )
+                    m_qwVal = oVal.asUInt64();
+                else if( oVal.isString() )
+                {
+                    // this is for bigger int than a json number
+                    const stdstr& strVal = oVal.asString();
+                    if( strVal.empty() )
+                    {
+                        ret = -EBADMSG;
+                        break;
+                    }
+                    char* endptr = nullptr;
+                    m_qwVal = strtoul(
+                        strVal.c_str(), &endptr, 10 );
+                    if( *endptr != 0 )
+                    {
+                        endptr = nullptr;
+                        m_qwVal = strtoul(
+                            strVal.c_str(), &endptr, 16 );
+                        if( *endptr != 0 )
+                            ret = -EBADMSG;
+                    }
+                }
                 break;
             } 
         case typeFloat:

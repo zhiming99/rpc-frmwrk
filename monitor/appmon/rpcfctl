@@ -47,11 +47,11 @@ function is_app_online()
 }
 
 case "$cmd" in
-    config)
+    config | cfg)
         if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
             python3 /usr/local/bin/rpcf/rpcfg.py
         elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then
-            python3 /usr/bin/rpcf/rpcfg.py
+            python3 /usr/bin/rpcf/rpcfg.py $@
         else
             echo "Error cannot find rpcfg.py"
         fi
@@ -67,6 +67,11 @@ case "$cmd" in
             if is_app_online $appname; then
                 echo "Error $appname is still running"
                 exit 1
+            fi
+            if [[ "$appname" == "appmonsvr1" ]]; then
+                if ! rpcfctl clearmount; then
+                    exit 1
+                fi
             fi
             cmdline=`bash $cmddir/getpv.sh $appname cmdline | awk -F: '{print $2}'`
             working_dir=`bash $cmddir/getpv.sh $appname working_dir | awk -F: '{print $2}'`
@@ -159,7 +164,10 @@ case "$cmd" in
         bash $cmddir/listapps.sh
         ;;
     startall)
-        bash rpcfctl start appmonsvr1
+        if ! bash rpcfctl start appmonsvr1; then
+            echo failed to start appmonsvr1, quit
+            exit 1
+        fi
         bash rpcfctl start loggersvr1
         bash rpcfctl start timer1
         bash rpcfctl start rpcrouter1
@@ -276,12 +284,16 @@ case "$cmd" in
     rmlink)
         bash $cmddir/rmlink.sh $@
         ;;
-    initapps)
-        echo Warning 'initapps' will clear the app registry,
-        bash $cmddir/initappreg.sh
+    initappreg)
+        echo Warning 'initappreg' will clear the app registry,
+        if ! bash rpcfctl clearmount; then
+            echo initappreg fails
+            exit $?
+        fi
+        bash $cmddir/initappreg.sh $@
         ;;
-    inituser)
-        echo "Warning 'inituser' will clear the user registry"
+    initusereg)
+        echo "Warning 'initusereg' will clear the user registry"
         bash $cmddir/inituser.sh
         ;;
     initsvr)
@@ -404,13 +416,13 @@ case "$cmd" in
         fi
         ;;
     adduser)
-        cmdline="rpcfctl adduser <user name>"
+        cmdline="rpcfctl adduser <user name> [<user id>]"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing argument" 
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfaddu.sh $1
+        bash $cmddir/rpcfaddu.sh $@
         ;;
     rmuser)
         cmdline="rpcfctl rmuser <user name>"
@@ -419,7 +431,7 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfrmu.sh $1
+        bash $cmddir/rpcfrmu.sh $@
         ;;
     showuser)
         cmdline="rpcfctl showuser <user name>"
@@ -459,7 +471,7 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfaddg.sh $1
+        bash $cmddir/rpcfaddg.sh $@
         ;;
     rmgroup)
         cmdline="rpcfctl rmgroup <group name>"
@@ -468,7 +480,7 @@ case "$cmd" in
             echo $cmdline
             exit 1
         fi
-        bash $cmddir/rpcfrmg.sh $1
+        bash $cmddir/rpcfrmg.sh $@
         ;;
     showgroup)
         cmdline="rpcfctl showgroup <group name>"
@@ -509,7 +521,15 @@ case "$cmd" in
             python3 $cmddir/geninitcfg.py $drvpath
         fi
         ;;
-
+    cfgnui)
+        cmdline="rpcfctl cfgnui <init config file>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        python3 $cmddir/rpcfgnui.py $@
+        ;;
     cfgweb)
         #updating webserver config, nginx or apache
         rpcfctl geninitcfg > /tmp/initcfg.json
@@ -759,10 +779,40 @@ case "$cmd" in
             if is_app_online loggersvr1; then
                 rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "removed loglink $1/$2 from rpcfctl"
             fi
+            bash $cmddir/setattr.sh $appName $ptName logcount i 0
         fi
         ;;
     clearmount)
         clear_rpcf_mount
+        exit $?
+        ;;
+    chappowner)
+        cmdline="rpcfctl chown <appName> <owner> [<group>] "
+        if [[ $# -lt 2 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        if check_appreg_mount; then
+            pushd ${rootdir} > /dev/null
+            change_application_owner $@
+            popd > /dev/null
+            undo_check_appreg_mount
+        fi
+        ;;
+    chptowner)
+        cmdline="rpcfctl chown <appName> <pointname> <owner> [<group>]"
+        if [[ $# -lt 3 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        if check_appreg_mount; then
+            pushd ${rootdir} > /dev/null
+            change_point_owner $@
+            popd > /dev/null
+            undo_check_appreg_mount
+        fi
         ;;
     *)
         echo "Unknown command: $cmd"

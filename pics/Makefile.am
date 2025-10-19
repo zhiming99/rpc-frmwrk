@@ -27,4 +27,9 @@ new.png \
 client-req-process.png \
 server-req-process.png \
 dumpobjs.png \
-rpcfg-SimpAuth.png
+rpcfg-SimpAuth.png \
+mon-login.png \
+mon-main.png \
+mon-rpcrouter.png \
+mon-setpv.png \
+mon-ptlog-chart.png

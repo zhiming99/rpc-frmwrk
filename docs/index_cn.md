@@ -41,6 +41,7 @@
 * [rpcfs文件系统介绍](../fuse/README.md)
 * [rpc模块的架构](../rpc/readme.md)
 * [注册表模块介绍](../monitor/registry/README_cn.md)
+* [rpc-frmwrk监视器的使用方法](../monitor/client/js/appmoncli/README_cn.md)![new](../pics/new.png)
 * [概念和名词解释](../Concept_cn.md)
   - [设计思想](../Concept_cn.md#设计思想)
   - [RPC参与方和传输的信息](../Concept_cn.md#rpc参与方和传输的信息)
@@ -67,7 +68,7 @@
   - [性能](../Concept_cn.md#性能)
   - [开发和调试](../Concept_cn.md#开发和调试)
   - [意见和建议](../Concept_cn.md#意见和建议)
-* rpc-frmwrk开发教程 ![new](../pics/new.png)
+* rpc-frmwrk开发教程 
   * [教程0-rpc-frmwrk编程概述](./Tut-Overview_cn-0.md)
   * [教程1-Hello, World!](./Tut-HelloWorld_cn-1.md)
   * [教程2-发送和接收'事件'](./Tut-SendEvent_cn-2.md)

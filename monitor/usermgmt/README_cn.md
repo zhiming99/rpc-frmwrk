@@ -47,7 +47,7 @@ usermgmt/
 使用 `rpcfaddu.sh` 脚本添加新用户：
 
 ```sh
-./rpcfaddu.sh -g <group> -k <kerberos_user> -o <oauth2_user> <username>
+./rpcfaddu.sh -g <group> -k <kerberos_user> -o <oauth2_user> <username> [<user id>]
 ```
 
 ### 添加新用户组

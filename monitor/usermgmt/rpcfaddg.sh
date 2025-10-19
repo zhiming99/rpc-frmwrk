@@ -9,12 +9,12 @@ OPTIONS="h"
 function Usage()
 {
 cat << EOF
-Usage: $0 [-h] <group name> 
+Usage: $0 [-h] <group name> [<group id>]
     this command adds a new group <group name>.
     -h: print this help
 EOF
 }
-     
+
 while getopts $OPTIONS opt; do
     case "$opt" in
     h)
@@ -28,7 +28,7 @@ while getopts $OPTIONS opt; do
         ;;
     esac
 done
-                                                                                                  
+
 shift $((OPTIND-1))
 
 if [[  "x$@" == "x" ]]; then
@@ -41,10 +41,7 @@ source $pubfuncs
 check_user_mount
 
 pushd $rootdir
-echo start adding user $@ ...
-for group in "$@"; do
-    add_group $group
-done
+add_group $@
 popd
 if (( $mt == 2 )); then
     if [ -d $rootdir ]; then

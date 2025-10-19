@@ -149,9 +149,9 @@ def Config_Nginx( initCfg : object ) -> int:
         proxy_set_header        X-Real-IP $remote_addr;
         proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header        X-Forwarded-Proto $scheme;
+        proxy_set_header        X-Forwarded-Port $remote_port;
 
 
-      # Fix the “It appears that your reverse proxy set up is broken" error.
         proxy_pass          https://{AppName};
         proxy_ssl_certificate     {CertFile};
         proxy_ssl_certificate_key {KeyFile};
@@ -252,6 +252,8 @@ def Config_Apache( initCfg : object )->int:
       ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyRequests off
       ProxyWebsocketIdleTimeout 300
+      RequestHeader set X-Forwarded-For %${{REMOTE_ADDR}}s
+      RequestHeader set X-Forwarded-Port %${{REMOTE_PORT}}s
 
       Alias /rpcf /var/www/rpcf
       <Directory /var/www/rpcf>

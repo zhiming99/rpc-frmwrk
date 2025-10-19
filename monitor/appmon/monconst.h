@@ -31,6 +31,8 @@
 #define OUTPUT_PULSE        "pulse"
 #define OUTPUT_LATCH        "latch"
 #define POINTS_DIR          "points"
+#define LOGPTR_DIR          "logptrs"
+#define LOGS_DIR            "logs"
 #define VALUE_FILE          "value"
 #define USER_ROOT_DIR       "users"
 #define LOAD_ON_START       "load_on_start"
@@ -44,3 +46,13 @@
 #define ONLINE_NOTIFY       "online_notify"
 
 #define POINTFLAG_NOSTORE      0x01
+
+#define GETPTDESC_VALUE     0
+#define GETPTDESC_PTYPE     1
+#define GETPTDESC_PTFLAG    2
+#define GETPTDESC_AVERAGE   3
+#define GETPTDESC_UNIT      4
+#define GETPTDESC_DATATYPE  5
+#define GETPTDESC_SIZE      6
+#define GETPTDESC_HASLOG    7
+#define GETPTDESC_AVGALGO   8

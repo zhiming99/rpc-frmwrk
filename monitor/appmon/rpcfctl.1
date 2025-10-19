@@ -78,10 +78,10 @@ Add a link between a pair of output and input points in the registry.
 .B rmlink <app1> <point1> <app2> <point 2>
 Remove a link between a pair of output and input points in the registry. There is no restriction whether the input or output point goes first.
 .TP
-.B initapps
+.B initappreg
 Initialize (clear) the app registry. \fBWARNING:\fR This will clear your app registry.
 .TP
-.B inituser
+.B initusereg
 Initialize (clear) the user registry. \fBWARNING:\fR This will clear your user registry.
 .TP
 .B initsvr
@@ -132,17 +132,17 @@ Remove a user from a group.
 .B backuplog [<output file>]
 Backup all application log files into a tarball. If <output file> is not specified, a default name (such as rpcf-logbackup-YYMMDD.tar.gz) will be used.
 .TP
-.B rotatelog <appname>
-Rotate the log file for the specified application.
+.B rotatelog <appname> <point name>
+Rotate the log file for the specified setpoint.
 .TP
-.B listlog [<appname>]
-List all log files for the specified application, or for all applications if no name is given.
+.B listlog <appname> <point name>
+List all log files for the specified setpoint
 .TP
-.B enablelog <appname>
-Enable logging for the specified application.
+.B enablelog <appname> <point name>
+Enable logging for the specified setpoint.
 .TP
-.B disablelog <appname>
-Disable logging for the specified application.
+.B disablelog <appname> <point name>
+Disable logging for the specified setpoint.
 .TP
 .B authmech
 Show the current authentication mechanism in use.

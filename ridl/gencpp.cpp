@@ -41,6 +41,7 @@ extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
 extern std::vector<stdstr> g_vecMonApps;
 extern bool g_bMonitoring;
+extern bool g_bReadme;
 
 std::map< gint32, char > g_mapTypeSig =
 {
@@ -806,9 +807,12 @@ CFileSet::CFileSet(
         strOutPath, "mainsvr.cpp",
         true );
 
-    GEN_FILEPATH( m_strReadme,
-        strOutPath, "README.md",
-        false );
+    if( g_bReadme )
+    {
+        GEN_FILEPATH( m_strReadme,
+            strOutPath, "README.md",
+            false );
+    }
 
     GEN_FILEPATH( m_strStruct,
         strOutPath,
@@ -894,13 +898,16 @@ gint32 CFileSet::OpenFiles()
         m_mapSvcImp[ szFile ] = std::move( pstm );
     }
 
-    pstm = STMPTR( new std::ofstream(
-        m_strReadme,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( g_bReadme )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strReadme,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    szFile = basename( m_strReadme.c_str() );
-    m_mapSvcImp[ szFile ] = std::move( pstm );
+        szFile = basename( m_strReadme.c_str() );
+        m_mapSvcImp[ szFile ] = std::move( pstm );
+    }
 
     pstm = STMPTR( new std::ofstream(
         m_strStruct,
@@ -1961,9 +1968,12 @@ gint32 GenCppProj(
         if( ERROR( ret ) )
             break;
         
-        oWriter.SelectReadme();
-        CExportReadme ordme( &oWriter, pRoot );
-        ret = ordme.Output();
+        if( g_bReadme )
+        {
+            oWriter.SelectReadme();
+            CExportReadme ordme( &oWriter, pRoot );
+            ret = ordme.Output();
+        }
 
     }while( 0 );
 

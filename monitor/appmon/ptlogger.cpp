@@ -41,40 +41,9 @@ extern gint32 SplitPath( const stdstr& strPath,
     std::vector< stdstr >& vecComp );
 extern InterfPtr GetAppManager();
 
-#define LOG_MAGIC 0x706c6f67
 #define NPLock CNamedProcessLock
 
 #define ROTATE_LIMIT ( 1024 * 1024 )
-
-enum EnumAvgAlgo : guint32
-{
-    algoDiff = 0,
-    algoAvg = 1,
-};
-
-struct LOGHDR
-{
-    guint32 dwMagic = LOG_MAGIC;
-    guint32 dwCounter = 0;
-    guint16 wTypeId = 0;
-    guint16 wRecSize = 0;
-    guint8  byUnit = 0;
-    guint8  reserved[ 3 ] = {0};
-    void hton()
-    {
-        dwMagic = htonl( dwMagic );
-        dwCounter = htonl( dwCounter );
-        wTypeId = htons( wTypeId );
-        wRecSize = htons( wRecSize );
-    }
-    void ntoh()
-    {
-        dwMagic = ntohl( dwMagic );
-        dwCounter = ntohl( dwCounter );
-        wTypeId = ntohs( wTypeId );
-        wRecSize = ntohs( wRecSize );
-    }
-};
 
 typedef std::vector< std::pair< time_t, Variant > > LOGRECVEC;
 gint32 GetLatestLogs(
@@ -186,7 +155,6 @@ gint32 GetLatestLogs(
                     break;
                 }
             case typeUInt32:
-            case typeFloat:
                 {
                     guint32 dwVal; 
                     memcpy( &dwVal, pData, sizeof( guint32 ) );
@@ -194,13 +162,28 @@ gint32 GetLatestLogs(
                     oVar = dwVal;
                     break;
                 }
+            case typeFloat:
+                {
+                    guint32 dwVal; 
+                    memcpy( &dwVal, pData, sizeof( guint32 ) );
+                    dwVal = ntohl( dwVal );
+                    oVar = *( ( float* )&dwVal );
+                    break;
+                }
             case typeUInt64:
-            case typeDouble:
                 {
                     guint64 qwVal; 
                     memcpy( &qwVal, pData, sizeof( guint64 ) );
                     qwVal = ntohll( qwVal );
                     oVar = qwVal;
+                    break;
+                }
+            case typeDouble:
+                {
+                    guint64 qwVal; 
+                    memcpy( &qwVal, pData, sizeof( guint64 ) );
+                    qwVal = ntohll( qwVal );
+                    oVar = *( ( double* )&qwVal );
                     break;
                 }
             default:
@@ -328,35 +311,35 @@ gint32 UpdateAverages( gint32 idx )
                         {
                             guint8 diff = 
                             ( ( guint8& )oLast - ( guint8&) oFirst );
-                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            dblAvg = ( ( double )diff ) / (double)( ts - ts1 );
                             break;
                         }
                     case typeUInt16:
                         {
                             guint16 diff = 
                             ( ( guint16& )oLast - ( guint16&) oFirst );
-                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            dblAvg = ( ( double )diff ) / (double)( ts - ts1 );
                             break;
                         }
                     case typeUInt32:
                         {
                             guint32 diff = 
                             ( ( guint32& )oLast - ( guint32&) oFirst );
-                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            dblAvg = ( ( double )diff ) / (double)( ts - ts1 );
                             break;
                         }
                     case typeFloat:
                         {
                             float diff = 
                             ( ( float& )oLast - ( float&) oFirst );
-                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            dblAvg = ( ( double )diff ) / (double)( ts - ts1 );
                             break;
                         }
                     case typeUInt64:
                         {
                             guint64 diff = 
                             ( ( guint64& )oLast - ( guint64&) oFirst );
-                            dblAvg = ( double )diff / (double)( ts - ts1 );
+                            dblAvg = ( ( double )diff ) / (double)( ts - ts1 );
                             break;
                         }
                     case typeDouble:
@@ -381,42 +364,42 @@ gint32 UpdateAverages( gint32 idx )
                         {
                             guint8 diff = 
                             ( ( guint8& )oLast + ( guint8&) oFirst );
-                            dblAvg = ( double )diff / 2;
+                            dblAvg = ( ( double )diff ) / 2;
                             break;
                         }
                     case typeUInt16:
                         {
                             guint16 diff = 
                             ( ( guint16& )oLast + ( guint16&) oFirst );
-                            dblAvg = ( double )diff / 2;
+                            dblAvg = ( ( double )diff ) / 2;
                             break;
                         }
                     case typeUInt32:
                         {
                             guint32 diff = 
                             ( ( guint32& )oLast + ( guint32&) oFirst );
-                            dblAvg = ( double )diff / 2;
+                            dblAvg = ( ( double )diff ) / 2;
                             break;
                         }
                     case typeFloat:
                         {
                             float diff = 
                             ( ( float& )oLast + ( float&) oFirst );
-                            dblAvg = ( double )diff / 2;
+                            dblAvg = ( ( double )diff ) / 2;
                             break;
                         }
                     case typeUInt64:
                         {
                             guint64 diff = 
                             ( ( guint64& )oLast + ( guint64&) oFirst );
-                            dblAvg = ( double )diff / 2;
+                            dblAvg = ( ( double )diff ) / 2;
                             break;
                         }
                     case typeDouble:
                         {
                             double diff = 
                             ( ( double& )oLast + ( double&) oFirst );
-                            dblAvg = ( double )diff / 2;
+                            dblAvg = ( ( double )diff ) / 2;
                             break;
                         }
                     default:

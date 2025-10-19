@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <regex>
 #include "defines.h"
 #include "autoptr.h"
 #include "buffer.h"
@@ -54,23 +55,51 @@ EnumLogLvl g_dwLogLevel = logErr;
 
 std::string DebugMsgInternal(
     gint32 ret, const std::string& strMsg,
-    const char* szFunc, gint32 iLineNum )
+    const char* szFunc, gint32 iLineNum,
+    bool bTimestamp )
 {
-    timespec ts = { 0 };
-    clock_gettime( CLOCK_REALTIME, &ts );
-
     char szBuf[ MAX_DUMP_SIZE ];
     szBuf[ sizeof( szBuf ) - 1 ] = 0;
-    snprintf( szBuf,
-        sizeof( szBuf ) - 1,
-        "[%ld.%09ld-%d]%s(%d): %s(%d)",
-        ts.tv_sec,
-        ts.tv_nsec,
-        getpid(),
-        szFunc,
-        iLineNum,
-        strMsg.c_str(),
-        ret );
+    if( bTimestamp )
+    {
+        timespec ts = { 0 };
+        clock_gettime( CLOCK_REALTIME, &ts );
+        snprintf( szBuf,
+            sizeof( szBuf ) - 1,
+            "[%ld.%09ld-%d]%s(%d): %s(%d)",
+            ts.tv_sec,
+            ts.tv_nsec,
+            getpid(),
+            szFunc,
+            iLineNum,
+            strMsg.c_str(),
+            ret );
+    }
+    else
+    {
+        char* szTime = nullptr;
+        std::time_t t = std::time(nullptr);
+        szTime = asctime( localtime( &t ) );
+        gint32 i = strlen( szTime ) - 1;
+        char* pch = szTime + i;
+        for( ; pch != szTime; pch-- )
+        {
+            if( *pch == 0 )
+                continue;
+            if( *pch == '\n' )
+                *pch = 0;
+            break;
+        }
+        snprintf( szBuf,
+            sizeof( szBuf ) - 1,
+            "[%s-%d]%s(%d): %s(%d)",
+            szTime,
+            getpid(),
+            szFunc,
+            iLineNum,
+            strMsg.c_str(),
+            ret );
+    }
     return std::string( szBuf );
 }
 
@@ -1481,6 +1510,34 @@ CNamedProcessLock::~CNamedProcessLock()
         sem_unlink( m_strSemName.c_str() );
         m_pSem = nullptr;
     }
+}
+
+gint32 GetHostAndPortFromUrl(
+    const stdstr& strUrl,
+    stdstr& strHost, guint32& dwPort )
+{
+    gint32 ret = 0;
+
+    std::regex urlRegex(R"((https?://)?([^:/]+)(?::(\d+))?)");
+    std::smatch matches;
+
+    // Process url1
+    if( !std::regex_search( strUrl, matches, urlRegex ) )
+        return -ENOENT;
+
+    dwPort = 80;
+
+    if( matches[ 1 ].matched &&
+        matches[ 1 ].str() == "https://" )
+        dwPort = 443;
+
+    strHost = matches[ 2 ].str();
+    if( matches[3].matched )
+    {
+        dwPort = std::strtol(
+            matches[3].str().c_str(), nullptr, 10 );
+    }
+    return 0;
 }
 
 }

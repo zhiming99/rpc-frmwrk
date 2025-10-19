@@ -530,7 +530,6 @@ gint32 ClaimApp( CRpcServices* pSvc,
             oParams.GetCfg() );
 
         std::vector< KeyValue > veckv;
-        std::vector< KeyValue > rveckv;
         ret = pacbs->GetPointValuesToUpdate(
             pIf, veckv);
         if( ERROR( ret ) )
@@ -542,6 +541,7 @@ gint32 ClaimApp( CRpcServices* pSvc,
 
         pacbs->GetPointValuesToInit( pIf, veckv);
 
+        std::vector< KeyValue > rveckv;
         ret = pamc->ClaimAppInst(
             oParams.GetCfg(),
             strAppInst, veckv, rveckv );
@@ -557,7 +557,7 @@ static gint32 ReconnectTimerFunc(
 
 gint32 StartStdAppManCli(
     CRpcServices* pSvc,
-    const std::string& strAppInst,
+    const std::string& strAppInst1,
     InterfPtr& pAppMan,
     PACBS& pacbsIn )
 {
@@ -571,6 +571,22 @@ gint32 StartStdAppManCli(
         CParamList oParams;
         oParams.SetPointer(
             PROP_TARGET_IF, pSvc );
+        stdstr strAppInst = strAppInst1;
+        Variant oVar;
+        ret = pSvc->GetProperty(
+            propMonAppInsts, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            StrVecPtr pAppNames = oVar.m_pObj;
+            if( ( *pAppNames )().size() )
+                strAppInst = ( *pAppNames )().front();
+        }
+        if( strAppInst.empty() )
+        {
+            ret = -EINVAL;
+            break;
+        }
+
         oParams.SetStrProp(
             PROP_APP_NAME, strAppInst );
         ret = CreateStdAppManSync(
@@ -682,6 +698,21 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
             kill( getpid(), SIGINT );
             break;
         }
+        else if( strPtPath ==
+            strApp + "/" S_MAX_QPS )
+        {
+            pTargetIf->SetProperty(
+                propQps, value );
+            break;
+        }
+        else if( strPtPath ==
+            strApp + "/" S_MAX_STM_PER_SESS )
+        {
+            pTargetIf->SetProperty(
+                propStmPerSess, value );
+            break;
+        }
+
         strExpPath = strApp + "/rpt_timer";
         if( strPtPath != strExpPath )
         {
@@ -916,6 +947,39 @@ gint32 CAsyncStdAMCallbacks::ScheduleReconnect(
     return ret;
 }
 
+static gint32 GetPointValuesToUpdateCli(
+    InterfPtr& pIf,
+    std::vector< KeyValue >& veckv )
+{
+    gint32 ret = 0;
+    do{
+        KeyValue okv;
+        okv.strKey = O_VMSIZE_KB;
+        okv.oValue = GetVmSize();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OBJ_COUNT;
+        okv.oValue = CObjBase::GetActCount();
+        veckv.push_back( okv );
+
+        okv.strKey = O_CPU_LOAD;
+        okv.oValue = GetCpuUsage();
+        veckv.push_back( okv );
+
+        okv.strKey = O_OPEN_FILES;
+        guint32 dwCount = 0;
+        ret = GetOpenFileCount(
+            getpid(), dwCount );
+        if( SUCCEEDED( ret ) )
+        {
+            okv.oValue = dwCount;
+            veckv.push_back( okv );
+        }
+        ret = 0;
+    }while( 0 );
+    return 0;
+}
+
 gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pIf,
     std::vector< KeyValue >& veckv )
@@ -925,7 +989,8 @@ gint32 CAsyncStdAMCallbacks::GetPointValuesToUpdate(
         CFastRpcServerBase* pSvr = pIf;
         if( pSvr == nullptr )
         {
-            ret = -EINVAL;
+            ret = GetPointValuesToUpdateCli(
+                pIf, veckv );
             break;
         }
         KeyValue okv;

@@ -8,6 +8,9 @@
 #include "logger.h"
 #include "LogServicesvr.h"
 #include <limits.h>
+#include <sstream>
+using namespace rpcf;
+extern bool g_bMonitoring; 
 
 namespace rpcf
 {
@@ -84,18 +87,64 @@ gint32 CLogService_SvrImpl::LogCritMsg(
     ( *m_pFile )<< strMsg << "\n";
     return 0;
 }
+
+#define READBLK_SIZE 8192
 gint32 CLogService_SvrImpl::TimerCallback(
     IEventSink* pCb, IConfigDb* pReqCtx )
 {
-
+    gint32 ret = 0;
     CStdRMutex oLock( this->GetLock() );
     m_pFile->flush();
     CParamList oReqCtx;
-    gint32 ret = 0;
     m_pTimer = ADD_TIMER( this,
         oReqCtx.GetCfg(), 30,
         &CLogService_SvrImpl::TimerCallback );
-    return ret;
+    oLock.Unlock();
+
+    if( !g_bMonitoring )
+        return 0;
+
+    InterfPtr pCli;
+    ret = GetAppManagercli( pCli );
+    if( ERROR( ret ) )
+        return 0;
+
+    std::ostringstream ss;
+    ss << "tail -n " << this->m_dwLines
+        << " " << this->m_strPath;
+    FILE* pipe = popen( ss.str().c_str(), "r" );
+    if( pipe == nullptr )
+        return 0;
+
+    BufPtr pBuf( true );
+    pBuf->Resize( READBLK_SIZE );
+    size_t dwOffset = 0;
+    do{
+        size_t ret = 0;
+        ret = fread( pBuf->ptr() + dwOffset,
+            1, READBLK_SIZE, pipe );
+        dwOffset += ret;
+        if( ret == READBLK_SIZE )
+        {
+            pBuf->Resize(
+                dwOffset + READBLK_SIZE );
+            continue;
+        }
+        pBuf->Resize( dwOffset );
+        break;
+    }while( true );
+    pclose( pipe );
+    if( pBuf->empty() )
+        return 0;
+
+    CAppManager_CliImpl* pam = pCli;
+    CCfgOpener oContext;
+
+    pam->SetLargePointValue( oContext.GetCfg(),
+        LOGGER_APPNAME "/" LOGPT_LOGCONTENT, 
+        pBuf );
+    
+    return 0;
 }
 
 gint32 CLogService_SvrImpl::StartFlushTask()
@@ -110,6 +159,29 @@ gint32 CLogService_SvrImpl::StartFlushTask()
     }while( 0 );
     return ret;
 }
+
+gint32 CLogService_SvrImpl::SetProperty(
+    gint32 iProp, const Variant& oVar )
+{
+    if( iProp == propLinesToShow )
+    {
+        m_dwLines = oVar;
+        return 0;
+    }
+    return super::SetProperty( iProp, oVar );
+}
+
+gint32 CLogService_SvrImpl::GetProperty(
+    gint32 iProp, Variant& oVar ) const
+{
+    if( iProp == propLinesToShow )
+    {
+        oVar = m_dwLines;
+        return 0;
+    }
+    return super::GetProperty( iProp, oVar );
+}
+
 
 gint32 CAsyncLoggerAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pIf,
@@ -203,6 +275,54 @@ gint32 CAsyncLoggerAMCallbacks::GetPointValuesToInit(
     std::vector< KeyValue >& veckv )
 {
     return super::GetPointValuesToInit( pIf, veckv );
+}
+
+gint32 CAsyncLoggerAMCallbacks::ClaimAppInstCallback(
+    IConfigDb* context, 
+    gint32 iRet,
+    std::vector<KeyValue>& arrPtToGet /*[ In ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        if( ERROR( iRet ) )
+        {
+            ret = iRet;
+            break;
+        }
+        for( auto& kv : arrPtToGet )
+        {
+            if( kv.strKey == LOGPT_LINES )
+            {
+                m_pIf->SetProperty(
+                    propLinesToShow, kv.oValue );
+                break;
+            }
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CAsyncLoggerAMCallbacks::OnPointChanged(
+    IConfigDb* context, 
+    const std::string& strPtPath /*[ In ]*/,
+    const Variant& value /*[ In ]*/ )
+{
+    gint32 ret = 0;
+    do{
+        if( strPtPath ==
+            LOGGER_APPNAME "/" LOGPT_LINES )
+        {
+            guint32 dwLines = value;
+            if( dwLines > 10000 )
+                break;
+            ret = m_pIf->SetProperty(
+                propLinesToShow, value );
+            break;
+        }
+        ret = super::OnPointChanged(
+            context, strPtPath, value );
+    }while( 0 );
+    return ret;
 }
 
 }

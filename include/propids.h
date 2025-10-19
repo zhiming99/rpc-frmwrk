@@ -295,6 +295,10 @@ enum EnumPropId : gint32
     propCmdLine,        // type: a string as the command line of current process
     propGmSSL,          // type: a boolean value to indicate the SimpAuth token is encrypted with GmSSL
     propSessTimeLimit,  // type: a integer as the max time period a session can live
+    propRmtConnParams,  // type: a configdb holding connection parameters from peer
+    propUrlHost,        // type: a string as the host name from the destUrl
+    propUrlPort,        // type: a integer as the port number from the destUrl
+    propUserAgent,      // type: a string containing the client browser information
 
     // monitor related properties
     propObjCount = 0x4000,
@@ -302,6 +306,7 @@ enum EnumPropId : gint32
     propStmPerSess,
     propCurQps,
     propUptime,
+    propMonAppInsts,     //type: an array of strings as the app instances present on monitor's registry
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

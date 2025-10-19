@@ -39,6 +39,7 @@ extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
+extern bool g_bReadme;
 
 extern stdstr GetTypeName( CAstNodeBase* pType );
 extern stdstr GetTypeSig( ObjPtr& pObj );
@@ -84,13 +85,66 @@ gint32 GetArgsAndSigsJs( CArgList* pArgList,
     return ret;
 }
 
+gint32 SearchForDevTree( stdstr& strJsPath )
+{
+    gint32 ret = 0;
+    char szPath[ 1024 ];
+    do{
+        char* pcurDir = getcwd(
+            szPath, sizeof( szPath ) );
+        if( pcurDir == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        std::vector< stdstr > vecComps;
+        ret = CRegistry::Namei( pcurDir, vecComps );
+        if( ERROR( ret ) )
+            break;
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        stdstr strPath = ".";
+        for( int i = 0; i < vecComps.size() - 2; i++ )
+        {
+            stdstr arrFiles[ 3 ] = {
+                strPath + "/js/combase/enums.js",
+                strPath + "/js/ipc/proxy.js",
+                strPath + "/js/rpc/bridge.js" };
+            for( int j = 0; j < 3; j++ )
+            {
+                ret = access( arrFiles[ j ].c_str(), R_OK );
+                if( ret < 0 )
+                    break;
+            }
+            if( ret == 0 )
+                break;
+            strPath += "/..";
+        }
+        if( ERROR( ret ) )
+            break;
+        // using relative path
+        strJsPath = strPath + "/js";
+    }while( 0 );
+    return ret;
+}
+
 const stdstr& GetJsLibPath()
 {
     if( !g_strJsLibPath.empty() )
         return g_strJsLibPath;
 
     stdstr strPath;
-    gint32 ret = GetLibPath(
+    gint32 ret = SearchForDevTree( strPath );
+    if( SUCCEEDED( ret ) )
+    {
+        g_strJsLibPath = strPath;
+        return g_strJsLibPath;
+    }
+    strPath.clear();
+    ret = GetLibPath(
         strPath, "libcombase.so" );
     if( ERROR( ret ) )
         return g_strJsLibPath;
@@ -159,9 +213,12 @@ CJsFileSet::CJsFileSet(
         strOutPath, "mainsvr.js",
         true );*/
 
-    GEN_FILEPATH( m_strReadme, 
-        strOutPath, "README.md",
-        false );
+    if( g_bReadme )
+    {
+        GEN_FILEPATH( m_strReadme, 
+            strOutPath, "README.md",
+            false );
+    }
 
     GEN_FILEPATH( m_strWebCfg, 
         strOutPath, "webpack.config.js",
@@ -246,14 +303,17 @@ gint32 CJsFileSet::OpenFiles()
         { basename( m_strMainSvr.c_str() ),
         std::move( pstm ) } );*/
 
-    pstm = STMPTR( new std::ofstream(
-        m_strReadme,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( g_bReadme )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strReadme,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_mapSvcImp.insert(
-        { basename( m_strReadme.c_str() ),
-        std::move( pstm ) } );
+        m_mapSvcImp.insert(
+            { basename( m_strReadme.c_str() ),
+            std::move( pstm ) } );
+    }
 
     pstm = STMPTR( new std::ofstream(
         m_strWebCfg,
@@ -426,7 +486,7 @@ static gint32 EmitDeserialBySigJs(
         }
     case 'a':
         {
-            CCOUT << "ret = osb.DeserialBuf( buf, offset );";
+            CCOUT << "ret = osb.DeserialByteArray( buf, offset );";
             break;
         }
     case 'o':
@@ -1676,12 +1736,12 @@ gint32 GenJsProj(
         pRoot.IsEmpty() )
         return -EINVAL;
 
-    if( g_strWebPath.empty() )
+    /*if( g_strWebPath.empty() )
     {
         fprintf( stderr,
             "Error missing the URL to the object description file" );
         return -EINVAL;
-    }
+    }*/
 
     gint32 ret = 0;
 
@@ -1758,11 +1818,14 @@ gint32 GenJsProj(
         if( ERROR( ret ) )
             break;
 
-        oWriter.SelectReadme();
-        CExportJsReadme ordme( &oWriter, pRoot );
-        ret = ordme.Output();
-        if( ERROR( ret ) )
-            break;
+        if( g_bReadme )
+        {
+            oWriter.SelectReadme();
+            CExportJsReadme ordme( &oWriter, pRoot );
+            ret = ordme.Output();
+            if( ERROR( ret ) )
+                break;
+        }
 
         oWriter.SelectWebCfg();
         CExportJsWebpack owp( &oWriter, pRoot );
@@ -2055,6 +2118,7 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         CCOUT << "try";
         BLOCK_OPEN;
         Wa( "var ret = oResp.GetProperty( EnumPropId.propReturnValue );" );
+        Wa( "oContext.m_iRet = Int32Value( ret );" );
         Wa( "if( ERROR( ret ) )" );
         BLOCK_OPEN;
         Wa( "if( oContext.m_oCallback === undefined )" );
@@ -2115,7 +2179,6 @@ gint32 CImplJsMthdProxyBase::OutputAsyncCbWrapper()
         }
         BLOCK_CLOSE;
         NEW_LINE;
-        Wa( "oContext.m_iRet = Int32Value( ret );" );
         Wa( "if( ERROR( ret ) && oContext.m_oReject )" );
         Wa( "    oContext.m_oReject( oContext );" );
         Wa( "else if( oContext.m_oResolve )" );
@@ -2699,7 +2762,9 @@ gint32 CImplJsMainFunc::OutputCli(
         }
         NEW_LINE;
 
-        CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
+        // CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
+        // NEW_LINE;
+        CCOUT << "var strObjDesc = './" << g_strAppName<<"desc.json';";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;

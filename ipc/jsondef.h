@@ -135,3 +135,5 @@
 #define JSON_ATTR_QPS_POLICY    "QPSPolicy"
 #define JSON_VALUE_QPOL_EQUAL    "CompleteEqual"
 
+#define JSON_ATTR_MONAPPINSTS    "MonAppInsts"
+

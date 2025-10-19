@@ -232,9 +232,26 @@ function add_group()
 #this function assume the current directory is the root dir of the user registry
 #and it requires one parameter: the group name
     echo adding group $1
-    _group=$1
+    local _group=$1
     if [ -d ./groups/$_group ]; then
+        echo Error $_group already exist
         return 1
+    fi
+
+    local _gidval=
+    if [[ ! -z "$2" ]]; then
+        if [[ "$2" =~ ^-?[0-9]+$ ]] && (( $2 > 0 )) && (( $2 < 1000000 )); then
+            _gidval="$2"
+        else
+            echo Error invalid user id
+            Usage
+            exit 1
+        fi
+        if [[ -d ./gids/$_gidval ]]; then
+            echo Error group $_gidval already exists
+            Usage
+            exit 1
+        fi
     fi
 
     mkdir -p ./groups/$_group/users
@@ -242,7 +259,9 @@ function add_group()
         echo Error failed to create  groups/$_group/gid $?
     fi
 
-    _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
+    if [[ -z "$_gidval" ]]; then
+        _gidval=`python3 ${updattr} -a 'user.regfs' 1 ./gidcount`
+    fi
     python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_gidval}" ./groups/$_group/gid > /dev/null
     echo $_gidval > ./groups/$_group/gid
     touch ./gids/$_gidval

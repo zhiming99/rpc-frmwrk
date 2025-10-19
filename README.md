@@ -41,6 +41,13 @@ This is an asynchronous and event-driven RPC implementation for embeded system w
 2. The single-app RPC. `ridlc` can also generate skeleton code in the form of the classic client/server program. The advantage is it has much better performance.
 3. Programming with [`rpcfs`](https://github.com/zhiming99/rpc-frmwrk/tree/master/fuse#the-introduction-to-fuse-integration-and-the-rpcfs-filesystem). The `ridlc` can generate a pair of filesystems for server and client respectively with the `ridl` file. And all the `rpc` traffic goes through file read/write and other file operations. And moreover `rpcfs` hosted by the `rpcrouter` provides information for runtime monitoring and management.
 
+#### Deployment
+The configuration tool `rpcfg.py` for rpc-frmwrk can automatically generate installation packages for the target machine. The installation package can install the runtime libraries of `rpc-frmwrk` and perform system configuration. The configuration includes setting the runtime parameters for rpc-frmwrk, configuring the `Apache` or `Nginx` web server, distributing `SSL` keys, and, when authentication is enabled, configuring the Kerberos server. For more details about the installation package, please refer to the [user guide](./tools/README.md#rpc-router-config-tool) for `rpcfg.py`.
+
+#### Monitoring
+`rpc-frmwrk` provides a web-based monitoring program, which allows you to easily monitor `rpc-frmwrk` servers and configure runtime parameters from various platforms. The monitoring program features access control, so different users can access different content. Access control can be easily customized from backed. The monitoring system can enable logging for specific setpoints at the backend, providing more detailed historical data for analysis and optimization. For information on setting up the monitoring functionality, please refer to [this article](./monitor/client/js/appmoncli/README.md).
+
+
 #### Runtime Dependency  
 This project depends on the following 3rd-party packags at runtime:  
 1. `dbus-1.0 (dbus-devel)`

@@ -860,7 +860,6 @@ def CheckIpAddr( addr ) :
 def Update_Drv( initCfg: dict, drvFile : list,
     bServer : bool, destDir : str ) -> int :
 
-    ret = 0
     drvVal = drvFile[ 1 ]
 
     if 'Ports' in drvVal :
@@ -943,8 +942,6 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 break
         break
 
-
-    defCfg = DefaultIfCfg()
 
     defConn = dict()
     defConn[ "AddrFormat" ]= "ipv4"
