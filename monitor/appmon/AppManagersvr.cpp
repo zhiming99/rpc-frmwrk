@@ -16,13 +16,13 @@ using namespace rpcf;
 extern std::vector< InterfPtr > g_vecIfs;
 
 InterfPtr GetAppMonitor()
-{ return g_vecIfs[ 1 ]; }
-
-InterfPtr GetAppManager()
 { return g_vecIfs[ 0 ]; }
 
-InterfPtr GetSimpAuth()
+InterfPtr GetAppManager()
 { return g_vecIfs[ 2 ]; }
+
+InterfPtr GetSimpAuth()
+{ return g_vecIfs[ 1 ]; }
 
 gint32 GetPointType(
     RegFsPtr pAppReg,

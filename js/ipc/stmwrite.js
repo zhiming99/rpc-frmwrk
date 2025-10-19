@@ -34,7 +34,7 @@ function StreamWrite( hStream, oBuf )
                 EnumPropId.propReturnValue, -errno.EINVAL )
             reject( oPending )
         }
-        if( oBuf.lenght > constval.MAX_BYTES_PER_TRANSFER )
+        if( oBuf.length > constval.MAX_BYTES_PER_TRANSFER )
         {
             oPending.m_oResp.SetUint32(
                 EnumPropId.propReturnValue, -errno.E2BIG )
