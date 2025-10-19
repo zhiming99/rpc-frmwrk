@@ -353,12 +353,17 @@ gint32 CAppManager_SvrImpl::NotifyValChange(
     do{
         std::vector< stdstr > vecComps;
         ret = SplitPath( strPtPath, vecComps );
-        if( ERROR( ret ) || vecComps.size() > 2 )
+        if( ERROR( ret ) || vecComps.size() < 2 )
         {
             ret = -EINVAL;
             break;
         }
 
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
@@ -435,6 +440,11 @@ gint32 CAppManager_SvrImpl::SetPointValue(
             break;
         }
 
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
@@ -521,6 +531,11 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         stdstr strAttrVal =  strPath + strApp +
@@ -556,7 +571,7 @@ gint32 CAppManager_SvrImpl::GetLargePointValue(
             ret = -EINVAL;
             break;
         }
-        if( vecComps.size() > 2 )
+        if( vecComps.size() < 2 )
         {
             ret = -EINVAL;
             break;
@@ -620,6 +635,11 @@ gint32 CAppManager_SvrImpl::SetAttrValue(
             ret = -EINVAL;
             break;
         }
+        if( vecComps.size() < 3 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
@@ -645,6 +665,11 @@ gint32 CAppManager_SvrImpl::GetAttrValue(
         std::vector< stdstr > vecComps;
         ret = SplitPath( strAttrPath, vecComps );
         if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( vecComps.size() < 3 )
         {
             ret = -EINVAL;
             break;
@@ -763,11 +788,8 @@ gint32 CAppManager_SvrImpl::GetPointValues(
         {
             std::vector< stdstr > vecComps;
             ret = SplitPath( elem, vecComps );
-            if( ERROR( ret ) )
-            {
-                ret = -EINVAL;
-                break;
-            }
+            if( ERROR( ret ) || vecComps.size() < 2 )
+                continue;
 
             const stdstr& strApp = vecComps[ 0 ];
             const stdstr& strPoint = vecComps[ 1 ];
@@ -785,6 +807,9 @@ gint32 CAppManager_SvrImpl::GetPointValues(
             }
         }
 
+        if( ERROR( ret ) && mapAppPts.empty() )
+            break;
+        ret = 0;
         for( auto& elem : mapAppPts )
         {
             GetPointValuesInternal(

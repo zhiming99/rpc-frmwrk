@@ -385,7 +385,11 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
             ret = -EINVAL;
             break;
         }
-
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         HANDLE hcurStm = INVALID_HANDLE;
         GetCurStream( this, pContext, hcurStm );
         const stdstr& strApp = vecComps[ 0 ];
@@ -494,6 +498,12 @@ gint32 CAppMonitor_SvrImpl::SetLargePointValue(
             ret = -EINVAL;
             break;
         }
+
+        if( vecComps.size() < 2 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
 
@@ -547,7 +557,7 @@ gint32 CAppMonitor_SvrImpl::GetLargePointValue(
             ret = -EINVAL;
             break;
         }
-        if( vecComps.size() > 2 )
+        if( vecComps.size() < 2 )
         {
             ret = -EINVAL;
             break;
@@ -622,6 +632,12 @@ gint32 CAppMonitor_SvrImpl::SetAttrValue(
             ret = -EINVAL;
             break;
         }
+
+        if( vecComps.size() < 3 )
+        {
+            ret = -EINVAL;
+            break;
+        }
         const stdstr& strApp = vecComps[ 0 ];
         const stdstr& strPoint = vecComps[ 1 ];
         const stdstr& strAttr = vecComps[ 2 ];
@@ -648,6 +664,11 @@ gint32 CAppMonitor_SvrImpl::GetAttrValue(
         std::vector< stdstr > vecComps;
         ret = SplitPath( strAttrPath, vecComps );
         if( ERROR( ret ) )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        if( vecComps.size() < 3 )
         {
             ret = -EINVAL;
             break;
@@ -789,6 +810,11 @@ gint32 CAppMonitor_SvrImpl::GetPointValues(
                 break;
             }
 
+            if( vecComps.size() < 2 )
+            {
+                ret = -EINVAL;
+                break;
+            }
             const stdstr& strApp = vecComps[ 0 ];
             const stdstr& strPoint = vecComps[ 1 ];
 
@@ -1148,7 +1174,10 @@ gint32 CAppMonitor_SvrImpl::GetPointDesc(
                     {
                         oParams.SetIntProp(
                             GETPTDESC_SIZE, dwSize );
-                        // return an empty buffer with size
+                        // return an empty buffer with
+                        // size,  Indicating to use
+                        // stream channel to do large
+                        // data transfer
                         oVar = pBuf;
                         break;
                     }
@@ -1308,8 +1337,8 @@ static gint32 SendBuffer(
             break;
 
         guint32 dwBytes =
-            dwSize > MAX_BYTES_PER_BUFFER ?
-            MAX_BYTES_PER_BUFFER : dwSize;
+            dwSize > MAX_BYTES_PER_TRANSFER ?
+            MAX_BYTES_PER_TRANSFER : dwSize;
         dwOffset += dwBytes;
         dwSize -= dwBytes;
         TaskletPtr pTask;
@@ -1417,8 +1446,8 @@ gint32 CAppMonitor_SvrImpl::GetPtLog(
         if( dwSize > 0 )
         {
             guint32 dwBytes =
-                dwSize > MAX_BYTES_PER_BUFFER ?
-                MAX_BYTES_PER_BUFFER : dwSize;
+                dwSize > MAX_BYTES_PER_TRANSFER ?
+                MAX_BYTES_PER_TRANSFER : dwSize;
             dwOffset += dwBytes;
             dwSize -= dwBytes;
             TaskletPtr pTask;
