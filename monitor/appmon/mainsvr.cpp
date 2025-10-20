@@ -303,8 +303,13 @@ gint32 RunSvcObj()
     if( ERROR( ret ) )
     {
         // Stopping the objects
-        for( auto& pInterf : g_vecIfs )
+        auto itr = g_vecIfs.rbegin();
+        while( itr != g_vecIfs.rend() )
+        {
+            auto& pInterf = *itr;
             pInterf->Stop();
+            itr++;
+        }
         g_vecIfs.clear();
     }
 
@@ -376,12 +381,18 @@ int _main( int argc, char** argv)
             if( ERROR( ret ) )
                 break;
             ret = FuseMain( argc, argv );
-            for( auto pIf : g_vecIfs )
-                pIf->Stop();
-            g_vecIfs.clear();
         }
 #endif
         StopLocalAppMancli();
+
+        auto itr = g_vecIfs.rbegin();
+        while( itr != g_vecIfs.rend() )
+        {
+            auto& pInterf = *itr;
+            pInterf->Stop();
+            itr++;
+        }
+        g_vecIfs.clear();
 
     }while( 0 );
     if( true )
