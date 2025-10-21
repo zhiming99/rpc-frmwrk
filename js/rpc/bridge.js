@@ -559,7 +559,9 @@ class CRpcRouter
         var dwPortId, oProxy
         for( [ dwPortId, oProxy ] of this.m_mapBdgeProxies )
         {
-            if( oProxy.m_oConnParams.IsEqual( oConnParams ) )
+            if( oProxy.m_oConnParams.IsEqual( oConnParams ) &&
+                oProxy.m_iState !== EnumIfState.stateStopped &&
+                oProxy.m_iState !== EnumIfState.stateStopping )
             {
                 bFound = true
                 break
