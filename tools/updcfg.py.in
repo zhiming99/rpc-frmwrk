@@ -11,8 +11,24 @@ from tempfile import mkstemp
 from updwscfg import IsSudoAvailable, rpcf_system
 import errno
 import socket
+import subprocess
 
 g_passDlg = None
+
+def IsRpcfSelfGenKey( bGmSSL:bool, strCert:str )->bool:
+    if bGmSSL:
+        cmdline = "gmssl certparse < " + strCert + " | grep 'Yanta'"
+    else:
+        cmdline = "openssl x509 -in " + strCert + "-noout -text | grep 'Yanta'"
+    try:
+        process = subprocess.Popen( cmdline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE )
+        output = process.stdout.readline().decode('utf-8')
+        if output == '' and process.poll() is not None:
+            return False
+        return True
+    finally:
+        process.stdout.close()
+
 def GetTestPaths( path : str= None ) :
     dir_path = os.path.dirname(os.path.realpath(__file__))
     paths = []

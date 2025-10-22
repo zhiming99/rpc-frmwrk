@@ -2,9 +2,13 @@
 
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 if [ -f $script_dir/rpcf/showapp.sh ]; then
+    # in the installation directory
     cmddir=$script_dir/rpcf 
+    tooldir=
 elif [ -f $script_dir/showapp.sh ]; then
+    # in the dev tree
     cmddir=$script_dir
+    tooldir=$script_dir/../../tools/
 else
     echo Error cannot find rpc-frmwrk installation
     exit 1
@@ -48,10 +52,10 @@ function is_app_online()
 
 case "$cmd" in
     config | cfg)
-        if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
-            python3 /usr/local/bin/rpcf/rpcfg.py
-        elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then
-            python3 /usr/bin/rpcf/rpcfg.py $@
+        if [[ -f $tooldir/rpcfg.py ]]; then
+            python3 $tooldir/rpcfg.py $@
+        elif [[ -f $cmddir/rpcfg.py ]]; then
+            python3 $cmddir/rpcfg.py $@
         else
             echo "Error cannot find rpcfg.py"
         fi
@@ -364,10 +368,11 @@ case "$cmd" in
                 SUDOCMD=sudo
             fi
         fi
+        echo Updating key setting requires root privilige.
         if $SUDOCMD python3 $cmddir/updatekeys.py $drvpath $1 $targetdir/$(basename $2) $targetdir/$(basename $3) $caroot; then
             echo "Imported keys to $targetdir successfully."
             echo "rpc-frmwrk will use the newly imported key for SSL connection"
-            echo "And don't forget to update your web server configuration if necessary"
+            echo "And don't forget to update your web server configuration if WebSocket is enabled "
         fi
         ;;
     genkeys)
