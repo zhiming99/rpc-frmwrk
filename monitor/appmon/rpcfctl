@@ -16,9 +16,7 @@ fi
 
 updattr=${cmddir}/updattr.py
 
-if [[ -f ../../ipc/driver.json ]]; then
-    cfgPath="`pwd`/../../ipc"
-elif [[ "$script_dir" == "/usr/bin" ]]; then
+if [[ "$script_dir" == "/usr/bin" ]]; then
     cfgPath="/etc/rpcf"
 elif [[ "$script_dir" == "/usr/local/bin" ]]; then
     cfgPath="/usr/local/etc/rpcf"
@@ -503,13 +501,7 @@ case "$cmd" in
     authmech)
         cmdline="rpcfctl authmech"
         drvpath=$cfgPath/driver.json
-        context=`grep -A2 'HasAuth.*true' $drvpath`
-        if [[ -z $context ]]; then
-            echo None
-            exit 1;
-        fi
-        context=`echo $context | sed 's/,/\r\n/g'`
-        _mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
+        _mech=`python3 $cmddir/authmech.py $drvpath`
         if [[ "x$_mech" == "x" ]]; then
             echo None
             exit 1;
