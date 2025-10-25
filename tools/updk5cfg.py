@@ -1,14 +1,119 @@
 #!/usr/bin/env python3
 import json
 import os
+import sys
 from typing import Dict
 from typing import Tuple
 import errno
 import socket
 import re
 from krbparse import *
-from updwscfg import IsSudoAvailable, rpcf_system
+from updwscfg import IsSudoAvailable, rpcf_system, GetDistName
 import traceback
+
+def GetKrb5ConfTempl():
+        return '''[logging]
+default = FILE:/var/log/krb5libs.log
+kdc = FILE:/var/log/krb5kdc.log
+admin_server = FILE:/var/log/kadmind.log
+
+[libdefaults]
+default_realm = {Realm}
+dns_lookup_realm = false
+dns_lookup_kdc = false
+ticket_lifetime = 24h
+renew_lifetime = 7d
+forwardable = true
+allow_weak_crypto = true
+default_keytab_name=FILE:{DefKeytab}
+default_client_keytab_name=FILE:{DefCliKeytab}
+rdns = false
+qualify_shortname = false
+
+[realms]
+{Realm} = {{
+kdc = {KdcServer}
+admin_server = {KdcServer}
+default_domain = {DomainName}
+}}
+
+[domain_realm]
+.{DomainName} = {Realm}
+{DomainName} = {Realm}
+
+'''
+
+def GetKrb5ConfFromInitCfg( initcfg : str ) -> str:
+    strKrb5Conf = GetKrb5ConfTempl()
+    try:
+        cfgVal = json.loads( initcfg )
+        updk5 = cfgVal[ 'Security' ]['AuthInfo' ]
+        authMech = updk5.get( 'AuthMech', '' )
+        if authMech != 'krb5':
+            raise Exception( "krb5 not configured as auth mech" )
+
+        kdcIp = cfgVal[ 'Security' ]['AuthInfo'].get( 'KdcIp', '' )
+        if len( kdcIp ) == 0:
+            raise Exception( "Unable to determine kdc address, " + \
+            "and at lease one interface should be auth enabled" )
+
+        strRealm = cfgVal[ 'Security' ]['AuthInfo'].get( 'Realm', '' )
+        if len( strRealm ) == 0:
+            raise Exception( "Unable to determine realm name" )
+        strKeytab = GetTestKeytabPath()
+        strCliKeytab = os.path.dirname( strKeytab ) + "/krb5cli.keytab"
+        strRet = strKrb5Conf.format(
+            KdcServer=kdcIp,
+            DomainName=strRealm.lower(),
+            Realm=strRealm,
+            DefKeytab=strKeytab,
+            DefCliKeytab=strCliKeytab
+        )
+        return strRet
+            
+    except Exception as err:
+        print( err )
+        return ""
+
+def GenKrb5InstFilesFromInitCfg(
+    initcfg : str,
+    bServer : bool ) -> int:
+    ret = 0
+    try:
+        krbConf = GetKrb5ConfFromInitCfg( initcfg )
+        if krbConf == "" :
+            print( "Warning 'krb5.conf' is not generated",
+                file=sys.stderr )
+            return 1
+
+        destPath = os.path.dirname( initcfg )
+        strSrcPath = os.path.dirname(
+            GetTestKeytabPath() )
+
+        if bServer :
+            krbConf = re.sub( "^default_client_.*$", "", krbConf, flags=re.MULTILINE )
+            destKeytab = destPath + "/krb5.keytab"
+            srcKeytab = strSrcPath + "/krb5adm.keytab"
+        else:
+            krbConf = re.sub( "^default_keytab_.*$", "", krbConf, flags=re.MULTILINE)
+            destKeytab = destPath + "/krb5cli.keytab"
+            srcKeytab = strSrcPath + "/krb5cli.keytab"
+
+        destConf = destPath + "/krb5.conf"
+        fp = open( destConf, "w" )
+        fp.write( krbConf )
+        fp.close()
+
+        cmdline = "rm -f " + destKeytab + " > /dev/null 2>&1"
+        cmdline += ";"
+        cmdline += 'cp ' + srcKeytab + ' ' + destKeytab
+        ret = rpcf_system( cmdline )
+
+    except Exception as err:
+        print( err )
+        if ret == 0:
+            ret = -errno.EFAULT
+    return ret
 
 def GetLocalIp( strIpAddr : str )->str:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -158,17 +263,6 @@ def DelFromKeytab(
     strAdmin = None ) -> str:
     return AddToKeytabInternal(
         strPrinc, strKeytab, False, bLocal, strAdmin )
-
-def GetDistName() -> str:
-    with open('/etc/os-release', 'r') as fp:
-        for line in fp:
-            if re.search( 'debian', line, flags=re.IGNORECASE ):
-                return 'debian'
-            elif re.search( 'ubuntu', line, flags=re.IGNORECASE ):
-                return 'debian'
-            elif re.search( 'fedora', line, flags=re.IGNORECASE ):
-                return 'fedora'
-    return ""
 
 def GetKadminSvcName() -> str:
     strDist = GetDistName()

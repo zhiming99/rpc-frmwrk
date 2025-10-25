@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+import getopt
 import os
+import shutil
 import tarfile
 import time
+import sys
 from updwscfg import *
-from updk5cfg import GenKrb5InstFilesFromInitCfg, IsRpcfSelfGenKey
-from updwscfg import rpcf_system
+from updk5cfg import GenKrb5InstFilesFromInitCfg
+from updwscfg import rpcf_system, IsRpcfSelfGenKey
 import errno
 
 def get_instcfg_content()->str :
@@ -284,7 +287,7 @@ def CreateInstaller( initCfg : object,
 
     return ret
 
-def BuildInstallers( initCfg : object,
+def BuildInstallersInternal( initCfg : object,
     cfgPath : str, debPath :str,
     bSSL : bool, bServer : bool )->int :
     ret = 0
@@ -326,7 +329,7 @@ def BuildInstallers( initCfg : object,
                 bSSL2 = False
 
         if( IsRpcfSelfGenKey( bGmSSL, sslFiles['CertFile'] ) ):
-            ret = CopyInstPkg( strKeyPath, curDir )
+            ret = CopyInstPkg( strKeyPath, curDir, bServer )
         else:
             ret = -1
         if ret < 0:
@@ -364,7 +367,7 @@ def BuildInstallers( initCfg : object,
                 cmdline += "for i in $keyfiles; do tar --delete -f " + cliPkg + " $i;done"
                 rpcf_system( cmdline )
 
-            if bSvrPkg:
+            if bSvrPkg and bServer:
                 cmdline = "keyfiles=`tar tf " + svrPkg + " | grep '.*keys.*tar' | tr '\n' ' '`;"
                 cmdline += "for i in $keyfiles; do tar --delete -f " + svrPkg + " $i;done"
                 rpcf_system( cmdline )
@@ -379,7 +382,8 @@ def BuildInstallers( initCfg : object,
             svrObj.startIdx = "svridx"
         svrObj.instName = "instsvr"
         svrObj.isServer = True
-        objs.append( svrObj )
+        if bServer:
+            objs.append( svrObj )
 
         cliObj = InstPkg()
         if bCliPkg:
@@ -400,8 +404,8 @@ def BuildInstallers( initCfg : object,
                         curDir + " with " + cfgPath )
                 continue
 
-            if not obj.isServer and not bServer:
-                continue
+            #if not obj.isServer and not bServer:
+            #    continue
 
             fp = open( curDir + '/instcfg.sh', 'w' )
             fp.write( get_instcfg_content() )
@@ -503,9 +507,77 @@ def BuildInstallers( initCfg : object,
     return ret
 
 def GenAuthInstFilesFromInitCfg(
-    initcfg : str,
-    destPath : str,
+    strInitCfg : str,
     bServer : bool ) -> int:
     ret = GenKrb5InstFilesFromInitCfg(
-        initcfg, destPath, bServer )
+        strInitCfg, bServer )
     return ret
+
+def BuildInstallers( strInitCfg : str,
+    destPath : str, debPath :str ) :
+
+    bSSL = False
+    bServer = True
+    initCfg = json.load( open( strInitCfg, 'r' ) )
+    if "IsServer" in initCfg:
+        if initCfg[ "IsServer" ] == "false":
+            bServer = False
+
+    if "Security" in initCfg and "SSLCred" in initCfg[ "Security" ]:
+        bSSL = True
+
+    ret = GenAuthInstFilesFromInitCfg(
+        strInitCfg, bServer )
+    if ret < 0:
+        return ret
+
+    bRemove = False
+    destPath = os.path.realpath( destPath )
+    if destPath != os.path.realpath( os.path.dirname( strInitCfg ) ):
+        shutil.copy2( strInitCfg, destPath + "/initcfg.json" )
+        strInitCfg = destPath + "/initcfg.json"
+        bRemove = True
+
+    ret = BuildInstallersInternal(
+        initCfg, strInitCfg, debPath,
+        bSSL, bServer )
+    if bRemove:
+        try:
+            os.unlink( strInitCfg )
+        except:
+            pass
+    return ret
+
+def usage():
+    print( "Usage: buildinst.py [-h] <initcfg.json> <dest path> [<deb/rpm path>]", file=sys.stderr )
+    print( "\t-h: to outupt this help.", file=sys.stderr )
+    print( "\t\tOtherwise it generates both installers for both server and client.", file=sys.stderr )
+
+if __name__ == "__main__":
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hc" )
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        usage()
+        sys.exit(-errno.EINVAL)
+
+    for o, a in opts:
+        if o == "-h" :
+            usage()
+            sys.exit( 0 )
+        else:
+            assert False, "unhandled option"
+
+    if len( args ) < 2 :
+        usage()
+        sys.exit( -errno.EINVAL )
+    strInitCfg = args[ 0 ]
+    destPath = args[ 1 ]
+    debPath = ""
+    if len( args ) >= 3:
+        debPath = args[ 2 ]
+
+    ret = BuildInstallers(
+        strInitCfg, destPath, debPath )
+    sys.exit( ret )

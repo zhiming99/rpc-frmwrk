@@ -329,7 +329,7 @@ function add_point()
     grant_perm $_ptpath 0007 1
 
     pushd $_ptpath > /dev/null
-    touch value datatype unit ptype point_flags
+    touch value datatype unit ptype point_flags description
     _dt=$(str2type $_datatype)
     python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_dt}" datatype > /dev/null
 
@@ -346,6 +346,7 @@ function add_point()
         echo setpoint > ptype
     fi
     python3 $updattr -u 'user.regfs' "$(jsonval i 0 )" point_flags > /dev/null
+    python3 $updattr -u 'user.regfs' "$(jsonval s \"\" )" description  > /dev/null
 
     if [[ $_pttype != 'setpoint' ]]; then
         mkdir ptrs || true
@@ -1764,14 +1765,14 @@ function add_rpcrouter
     set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
 
     add_log_link $_instname rx_bytes appmonsvr1 ptlogger1
-    set_attr_value $_instname rx_bytes avgalgo  "$(jsonval 'i' 0)" i
     add_log_link $_instname tx_bytes appmonsvr1 ptlogger1
-    set_attr_value $_instname tx_bytes avgalgo  "$(jsonval 'i' 0)" i
     add_log_link $_instname vmsize_kb appmonsvr1 ptlogger1
-    set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
     add_log_link $_instname obj_count appmonsvr1 ptlogger1
-    set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
     add_log_link $_instname cpu_load appmonsvr1 ptlogger1
+    set_attr_value $_instname rx_bytes avgalgo  "$(jsonval 'i' 0)" i
+    set_attr_value $_instname tx_bytes avgalgo  "$(jsonval 'i' 0)" i
+    set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
     set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
 
     read -r _uid _gid <<< $(get_uid_gid 101)

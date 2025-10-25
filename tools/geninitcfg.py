@@ -30,6 +30,7 @@ from pathlib import Path
 import os
 import ipaddress
 import argparse
+from updwscfg import IsRpcfSelfGenKey
 
 bClient = False
 def GetIpVersion(ipAddress:str)->str:
@@ -103,10 +104,29 @@ def GenInitCfgFromDrv( cfgList : list )->object:
         for port in drvCfg.get( "Ports", [] ):
             if port.get( "PortClass" ) == portClass:
                 params = port.get("Parameters", {})
-                sslFiles[ "CertFile" ] = params.get( "CertFile", "" )
-                sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
-                sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
-                sslFiles[ "SecretFile" ] = params.get( "SecretFile", "" )
+                certFile = params.get( "CertFile", "" )
+                if IsRpcfSelfGenKey( bUsingGmSSL, certFile ):
+                    if not bClient:
+                        sslFiles[ "CertFile" ] = params.get( "CertFile", "" )
+                        sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
+                        sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
+                    else:
+                        if certFile.endswith( "clientcert.pem" ):
+                            sslFiles[ "CertFile" ] = certFile
+                            sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
+                            if  "CACertFile" in params:
+                                sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
+                        else:
+                            sslFiles[ "CertFile" ] = os.path.join( os.path.dirname( certFile ), "clientcert.pem" )
+                            sslFiles[ "KeyFile" ] = os.path.join( os.path.dirname( certFile ), "clientkey.pem" )
+                            sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
+
+                else:
+                    sslFiles[ "CertFile" ] = params.get( "CertFile", "" )
+                    sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
+                    if "CACertFile" in params:
+                        sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
+
                 if bUsingGmSSL:
                     sslFiles[ "UsingGmSSL" ] = "true"
                 else:
@@ -127,7 +147,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 ai = elem.get( "AuthInfo", {} )
                 if authMech == "krb5" and bool( ai ):
                     authInfo[ "Realm" ] = ai[ "Realm" ]
-                    authInfo[ "ServceName" ] = ai[ "ServceName" ]
+                    authInfo[ "ServiceName" ] = ai[ "ServiceName" ]
                     authInfo[ "SignMessage" ] = ai[ "SignMessage" ]
                     authInfo[ "UserName" ] = ai[ "UserName" ]
                 elif authMech == "SimpAuth":

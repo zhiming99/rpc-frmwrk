@@ -2,11 +2,161 @@
 import json
 import os
 from urllib.parse import urlparse
-from typing import Dict
+from typing import List
 from typing import Tuple
 import errno
 import re
+import subprocess
+import glob
 
+class InstPkg :
+    def __init__( self ):
+        self.pkgName = ""
+        self.startIdx = ""
+        self.isServer = True
+        self.instName = ""
+
+def GetDistName() -> str:
+    with open('/etc/os-release', 'r') as fp:
+        for line in fp:
+            if re.search( 'debian', line, flags=re.IGNORECASE ):
+                return 'debian'
+            elif re.search( 'ubuntu', line, flags=re.IGNORECASE ):
+                return 'debian'
+            elif re.search( 'fedora', line, flags=re.IGNORECASE ):
+                return 'fedora'
+    return ""
+
+def GetNewerFile( strPath, pattern, bRPM )->str:
+    try:
+        curdir = os.getcwd()
+        os.chdir( strPath )
+        files = glob.glob( pattern )
+        if len( files ) == 0 :
+            return ""
+        if len( files ) == 1 :
+            return files[ 0 ]
+        if bRPM :
+            files = [s for s in files if not 'src.rpm' in s]
+        files.sort(key=lambda x: os.path.getmtime(os.path.join('', x)))
+        return files[-1]
+    finally:
+        os.chdir( curdir )
+
+def IsRpcfSelfGenKey( bGmSSL:bool, strCert:str )->bool:
+    if not os.path.exists( strCert ):
+        return False
+    if bGmSSL:
+        cmdline = "gmssl certparse < " + strCert + " | grep 'Yanta'"
+    else:
+        cmdline = "openssl x509 -in " + strCert + " -noout -text | grep 'Yanta'"
+    try:
+        process = subprocess.Popen( cmdline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE )
+        output = process.stdout.readline().decode('utf-8')
+        if output == '' and process.poll() is not None:
+            return False
+        return True
+    finally:
+        process.stdout.close()
+
+def AddInstallPackages( strPath, destPkg, bServer : bool )->str :
+    cmdline = "" 
+    try:
+        strDist = GetDistName()
+        strCmd = "touch " + strDist + ";"
+        strCmd += "tar rf " + destPkg + " " + strDist + ";"
+        strCmd += "tar rf " + destPkg + " -C " + strPath + " "
+        appmoncli = ""
+        oinit = ""
+        if strDist == 'debian' :
+            mainPkg = GetNewerFile(
+                 strPath, 'rpcf_*.deb', False )
+            devPkg = GetNewerFile(
+                strPath, 'rpcf-dev_*.deb', False )
+            if bServer :
+                appmoncli = GetNewerFile(
+                    strPath, 'python3-appmoncli*.deb', False )
+            else:
+                oinit = GetNewerFile(
+                    strPath, 'python3-oinit*.deb', False )
+        elif strDist == 'fedora' :     
+            devPkg = GetNewerFile(
+                strPath, 'rpcf-devel-[0-9]*.rpm', True )
+            mainPkg = GetNewerFile(
+                strPath, 'rpcf-[0-9]*.rpm', True )
+            if bServer :
+                appmoncli = GetNewerFile(
+                    strPath, 'python3-appmoncli*.rpm', False )
+            else:
+                oinit = GetNewerFile(
+                    strPath, 'python3-oinit*.rpm', False )
+
+        if len( mainPkg ) == 0 or len( devPkg ) == 0:
+            return cmdline
+
+        strCmd += mainPkg + " " + devPkg 
+        if len( appmoncli ) > 0 :
+            strCmd += " " + appmoncli
+        if len( oinit ) > 0:
+            strCmd += " " + oinit
+        strCmd += ";"
+        strCmd += ( "md5sum " + strPath + "/" + mainPkg + " "
+            + strPath + "/" + devPkg + ";")
+        if len( appmoncli ) > 0:
+            strCmd += "md5sum " + strPath + "/" + appmoncli + ";"
+        if len( oinit ) > 0:
+            strCmd += "md5sum " + strPath + "/" + oinit + ";"
+        strCmd += "rm " + strDist + ";"
+        cmdline = strCmd
+    except Exception as err:
+        print( err )
+
+    return cmdline
+
+def CopyInstPkg( keyPath : str, destPath: str, bServer : bool )->int:
+    ret = 0
+
+    sf = keyPath + "/rpcf_serial.old"
+    if bServer :
+        files = [ 'instsvr.tar', 'instcli.tar' ]
+        idxFiles = [ keyPath + "/svridx", keyPath + "/clidx" ]
+    else:
+        files = [ 'instcli.tar' ]
+        idxFiles = [ keyPath + "/clidx" ]
+
+    try:
+        if os.access( sf, os.R_OK ):
+            idxFiles.append( sf )
+
+        indexes = []
+        for i in idxFiles:
+            fp = open( i, "r" )
+            idx = int( fp.read( 4 ) )
+            fp.close()
+            indexes.append( idx )
+
+        if len( indexes ) == len( files ):
+            indexes.append( 0 )
+        
+        '''
+        if indexes[ 0 ] < indexes[ 2 ]:
+            files.remove('instsvr.tar')
+        if indexes[ 1 ] < indexes[ 0 ]:
+            files.remove('instcli.tar')
+        if len( files ) == 0 :                
+            raise Exception( "InstPkgs too old to copy" )
+        '''
+
+        for i in files:
+            cmdLine = "cp " + keyPath + "/" + i + " " + destPath
+            ret = rpcf_system( cmdLine )
+            if ret != 0:
+                raise Exception( "failed to copy " + i  )
+    except Exception as err:
+        if ret == 0:
+            ret = -errno.ENOENT
+    return ret
+    
 def IsValidPassword(
     password : str ) -> bool:
     if password is None:
@@ -50,7 +200,7 @@ def IsSudoAvailable()->bool:
         return False
     return True
 
-def InstallKeys( oResps : [] ) -> Tuple[ int, str ]:
+def InstallKeys( oResps : List ) -> Tuple[ int, str ]:
     srcKeys = {}
     try:
         cmdline = ''

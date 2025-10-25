@@ -510,13 +510,9 @@ case "$cmd" in
         fi
         ;;
     geninitcfg)
-        cmdline="rpcfctl geninitcfg [<output file>]"
+        cmdline="rpcfctl geninitcfg [-c] [<output file>]"
         drvpath=$cfgPath/driver.json
-        if [[ $# -gt 0 ]]; then
-            python3 $cmddir/geninitcfg.py $drvpath $1
-        else
-            python3 $cmddir/geninitcfg.py $drvpath
-        fi
+        python3 $cmddir/geninitcfg.py $drvpath $@
         ;;
     cfgnui)
         cmdline="rpcfctl cfgnui <init config file>"
@@ -810,6 +806,15 @@ case "$cmd" in
             popd > /dev/null
             undo_check_appreg_mount
         fi
+        ;;
+    geninstaller)
+        cmdline="rpcfctl geninstaller <initcfg path> <dest path> <directory of rpc-frmwrk deb/rpm>"
+        if [[ $# -lt 2 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        python3 $cmddir/buildinst.py $@
         ;;
     *)
         echo "Unknown command: $cmd"
