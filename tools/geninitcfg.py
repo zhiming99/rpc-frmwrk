@@ -106,21 +106,19 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 params = port.get("Parameters", {})
                 certFile = params.get( "CertFile", "" )
                 if IsRpcfSelfGenKey( bUsingGmSSL, certFile ):
-                    if not bClient:
-                        sslFiles[ "CertFile" ] = params.get( "CertFile", "" )
-                        sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
-                        sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
-                    else:
-                        if certFile.endswith( "clientcert.pem" ):
+                    if bClient:
+                        if certFile.endswith( "signcert.pem" ):
+                            sslFiles[ "CertFile" ] = os.path.join(
+                                os.path.dirname( certFile ), "clientcert.pem" )
+                            sslFiles[ "KeyFile" ] = os.path.join(
+                                os.path.dirname( certFile ), "clientkey.pem" )
+                        else:
                             sslFiles[ "CertFile" ] = certFile
                             sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
-                            if  "CACertFile" in params:
-                                sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
-                        else:
-                            sslFiles[ "CertFile" ] = os.path.join( os.path.dirname( certFile ), "clientcert.pem" )
-                            sslFiles[ "KeyFile" ] = os.path.join( os.path.dirname( certFile ), "clientkey.pem" )
-                            sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
-
+                    else:
+                        sslFiles[ "CertFile" ] = certFile
+                        sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
+                    sslFiles[ "CACertFile" ] = params.get( "CACertFile", "" )
                 else:
                     sslFiles[ "CertFile" ] = params.get( "CertFile", "" )
                     sslFiles[ "KeyFile" ] = params.get( "KeyFile", "" )
@@ -229,7 +227,7 @@ if __name__ == "__main__":
 
     json_path = args.driver_json
     if not Path(json_path).is_file():
-        print(f"File {json_path} does not exist.")
+        print(f"File {json_path} does not exist.", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -262,5 +260,5 @@ if __name__ == "__main__":
         print(json.dumps(initcfg, indent=4))
 
     except Exception as e:
-        print(f"Error processing file: {e}")
+        print(f"Error processing file: {e}", file=sys.stderr)
         sys.exit(1)

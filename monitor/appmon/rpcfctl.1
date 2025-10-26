@@ -152,17 +152,36 @@ Authenticate the user using the mechanism specified in driver.json.
 .RS 4
 .TP
 .B SimpAuth(Password)
-'login' saves the credential in a secure place, and enables non-js client to connect to rpc-frmwrk server from command line. JS client will login from the browser.
+ 'login' saves the credential in a secure place, and enables non-js client to
+ connect to rpc-frmwrk server from command line. JS client will login from the
+ browser.
 .TP
 .B Kerberos
-'login' performs the preauth login with 'kinit', to get the ticket-grant-ticket from KDC.
+ 'login' performs the preauth login with 'kinit', to get the ticket-grant-ticket
+ from KDC.
 .TP
 .B OAuth2
-'login' will initiate the authorization-code-grant process to get a security token (not the access token) from rpc-frmwrk. With which, the non-js client can connect to the rpc-frmwrk.
+ 'login' will initiate the authorization-code-grant process to get a security
+ token (not the access token) from rpc-frmwrk. With which, the non-js client can
+ connect to the rpc-frmwrk.
 .RE
 .TP
-.B geninitcfg [<output file>]
-Generate a config file for web or authentication configuration.
+.B geninitcfg [-c] [<output file>]
+Generate a config file 'initcfg.json' for current system settings. It is for
+debug purpose or as input for command 'geninstaller'.  If no <output file>
+specified, geninicfg will print 'initcfg.json' to the standard output. if '-c' is
+specified, the 'initcfg.json' is for client only.
+.TP
+.B geninstaller <path to initcfg> <path to put installer files> [<directory of rpc-frmwrk deb/rpm packages>]
+Generate installers for deployment using current
+system settings. Usually it will generate a pair of installers, one for server
+and one for client. If 'initcfg.json' is client only, a single client installer
+will be generated. If the target settings is quite different from the current
+settings, you can manually edit the 'initcfg.json', or using 'rpcfg.py' to
+generate the installer. When editing 'initcfg.json', please 
+.B DON'T
+make change to file paths, which is needed by geninstaller and will be corrected
+before installation.
 .TP
 .B cfgweb
 Update web server configuration (nginx or apache) using current rpc-frmwrk configuration.
