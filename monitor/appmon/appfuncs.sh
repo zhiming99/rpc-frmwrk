@@ -312,12 +312,12 @@ function add_point()
     _pttype=$3
     _datatype=$4
     if [ -z $_appname ] || [ -z $_pttype ] || [ -z $_ptname ] || [ -z $_datatype ];then
-        echo Error missing parameters
+        echo Error add_point missing parameters  >&2
         return 22
     fi
     if [ ! $_pttype == 'output' ] && [ ! $_pttype == 'input' ] &&
         [ ! $_pttype == 'setpoint' ]; then
-        echo Error invalid point type
+        echo Error add_point invalid point type >&2
         return 22
     fi
     _ptpath=./apps/$_appname/points/$_ptname
@@ -346,7 +346,7 @@ function add_point()
         echo setpoint > ptype
     fi
     python3 $updattr -u 'user.regfs' "$(jsonval i 0 )" point_flags > /dev/null
-    python3 $updattr -u 'user.regfs' "$(jsonval s \"\" )" description  > /dev/null
+    echo '{zh:"",en:""}' > description
 
     if [[ $_pttype != 'setpoint' ]]; then
         mkdir ptrs || true
@@ -565,28 +565,28 @@ function get_attr_value()
     _dt=$4
 
     if [ -z $_appname ] || [ -z $_ptname ] || [ -z $_attr ] || [ -z $_dt ];then
-        echo Error invalid get_attr_value parameters
+        echo Error invalid get_attr_value parameters >&2
         return 22
     fi
     grant_perm ./apps/$_appname 0005 45
     grant_perm ./apps/$_appname/points 0005 44
     _ptpath=./apps/$_appname/points/$_ptname 
     if [ ! -d $_ptpath ]; then
-        echo Error set_attr_value point "$_ptpath" not exist
+        echo Error get_attr_value point "$_ptpath" not exist >&2
         restore_perm 44 45
         return 2
     fi
     
     _dtnum=$(str2type $_dt)
     if [ -z $_dtnum ]; then
-        echo Error bad data type $_dt@$_appname/$_ptname
+        echo Error bad data type $_dt@$_appname/$_ptname >&2
         restore_perm 44 45
         return 22
     fi
     grant_perm $_ptpath 0005 40
     grant_perm $_ptpath/$_attr 0004 41
     if (( $_dtnum <= 7 ));then
-        python3 $updattr -v $_ptpath/$_attr > /dev/null
+        python3 $updattr -v $_ptpath/$_attr
     else
         cat $_ptpath/$_attr
     fi
