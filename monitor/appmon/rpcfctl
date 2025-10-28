@@ -223,9 +223,9 @@ case "$cmd" in
             usage
             exit 1
         fi
-        if bash $cmddir/addapp.sh $1; then
+        if bash $cmddir/addapp.sh $@; then
             if is_app_online loggersvr1; then
-                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "Added application $1 by rpcfctl"
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "Added application $@ by rpcfctl"
             fi
         fi
         ;;
@@ -242,6 +242,19 @@ case "$cmd" in
         if bash $cmddir/rmapp.sh $@; then
             if is_app_online loggersvr1; then
                 rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application(s) $@ by rpcfctl"
+            fi
+        fi
+        ;;
+    cloneapp)
+        cmdline="rpcfctl cloneapp <src app> <dest app>"
+        if [[ $# -lt 2 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        if bash $cmddir/cloneapp.sh $@;then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "cloned application(s) $2 from $1 by rpcfctl"
             fi
         fi
         ;;
@@ -278,7 +291,14 @@ case "$cmd" in
         bash $cmddir/setattr.sh $@
         ;;
     getattr)
-        bash $cmddir/setattr.sh $@
+        if check_appreg_mount; then
+            pushd $rootdir > /dev/null
+            get_attr_value $@
+            ret=$?
+            popd > /dev/null
+            undo_check_appreg_mount
+            exit $ret
+        fi
         ;;
     addlink)
         bash $cmddir/addlink.sh $@
@@ -514,7 +534,22 @@ case "$cmd" in
         drvpath=$cfgPath/driver.json
         python3 $cmddir/geninitcfg.py $drvpath $@
         ;;
+    updcfg)
+        # this commands update the rpc-frmwrk settings only
+        # it is convenient to update initcfg.json manually
+        # and then use this command to apply the settings 
+        # to rpc-frmwrk
+        cmdline="rpcfctl updcfg <path to initcfg>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        python3 $cmddir/updcfg.py $@
+        ;;
     cfgnui)
+        # this commands update not only rpc-frmwrk settings,
+        # but webserver and kerebros settings as well.
         cmdline="rpcfctl cfgnui <init config file>"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing argument" 

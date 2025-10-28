@@ -57,8 +57,8 @@ def GenInitCfgFromDrv( cfgList : list )->object:
     for port in drvCfg.get( "Ports", [] ):
         if port.get( "PortClass" ) == "RpcTcpBusPort":
             params = port.get("Parameters", [])
-            connElem = dict()
             for param in params:
+                connElem = dict()
                 ipAddr = param.get( "BindAddr" )
                 connElem[ "IpAddress" ] = ipAddr
                 if "BindTo" in param:

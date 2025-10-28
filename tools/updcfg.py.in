@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import os
 import sys 
@@ -1139,3 +1140,13 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         ret = -errno.EFAULT
 
     return ret
+
+
+if __name__ == "__main__" :
+    parser = argparse.ArgumentParser(description="Update rpc-frmwrk configuration files based on initcfg.json")
+    parser.add_argument("initcfg", help="Path to initcfg.json")
+    args = parser.parse_args()
+
+    # Call the update function with the parsed arguments
+    ret = Update_InitCfg(args.initcfg, None)
+    quit( -ret )

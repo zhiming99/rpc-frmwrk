@@ -47,6 +47,9 @@ Restart all managed applications.
 .B addapp <appname>, add <appname>
 Add a new application \fIappname\fR to the app registry.
 .TP
+.B cloneapp <appname> <new appname>
+Clone an existing app <appname> to <new appname>.
+.TP
 .B rmapp <appname>, rm <appname>
 Remove the application \fIappname\fR from the app registry.
 .TP
@@ -182,6 +185,11 @@ generate the installer. When editing 'initcfg.json', please
 .B DON'T
 make change to file paths, which is needed by geninstaller and will be corrected
 before installation.
+.TP
+.B updcfg <path to initcfg>
+Update the local rpc-frmwrk installation's configurations with the specified
+`initcfg.json'. It is convenitent to update the rpc-frmwrk's configurations
+after manually modified the initcfg.json, as output from command 'geninitcfg'.
 .TP
 .B cfgweb
 Update web server configuration (nginx or apache) using current rpc-frmwrk configuration.

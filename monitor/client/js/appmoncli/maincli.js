@@ -108,12 +108,10 @@ function StartPullInfo()
             console.log( 'request IsAppOnline is done with status ' + ret );
             for( var i = 0; i < globalThis.g_sites[0].apps.length; i++ )
             {
-                if( globalThis.g_sites[0].apps[i].status === i18nHelper.t("APP_STATUS_RUNNING") )
-                {
-                    arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/cpu_load");
-                    arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/app_class");
-                    arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/display_name");
-                }
+                //if( globalThis.g_sites[0].apps[i].status === i18nHelper.t("APP_STATUS_RUNNING") )
+                arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/cpu_load");
+                arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/app_class");
+                arrPtPaths.push( globalThis.g_sites[0].apps[i].name + "/display_name");
             }
             oContext.oGetPvsCb = (oContext, ret, arrKeyVals ) => {
                 if( ERROR(ret) ) 

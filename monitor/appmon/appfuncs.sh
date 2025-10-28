@@ -340,7 +340,7 @@ function add_point()
         python3 $updattr -u 'user.regfs' "$(jsonval i 1 )" ptype > /dev/null
         echo input > ptype
         touch script
-        python3 $updattr -u 'user.regfs' "$(jsonval i 10 )" script > /dev/null
+        python3 $updattr -u 'user.regfs' "$(jsonval s 'none' )" script > /dev/null
     else
         python3 $updattr -u 'user.regfs' "$(jsonval i 2 )" ptype > /dev/null
         echo setpoint > ptype
@@ -715,7 +715,7 @@ function rm_link()
             fi
             rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
-            break
+            #break
         done
         popd > /dev/null
     fi
@@ -744,7 +744,7 @@ function rm_link()
             fi
             rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
-            break
+            #break
         done
         popd > /dev/null
     fi
