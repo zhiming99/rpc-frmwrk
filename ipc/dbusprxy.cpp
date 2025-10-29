@@ -1616,12 +1616,6 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
-        // make connection before OnPortReady
-        // because the propConnHandle is yet to get
-        ret = Reconnect( pIrp );
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
-
     }while( 0 );
 
 
@@ -1645,7 +1639,15 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
  * @} */
 
 gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
-{ return 0; }
+{
+    // make connection before OnPortReady
+    // because the propConnHandle is yet to get
+    gint32 ret = Reconnect( pIrp );
+    if( SUCCEEDED( ret ) )
+        ret = STATUS_PENDING;
+    return ret;
+}
+
 
 void CDBusProxyPdo::OnPortStopped()
 {
@@ -1941,7 +1943,8 @@ gint32 CDBusProxyPdo::Reconnect( PIRP pIrp )
             break;
 
         guint32 dwPortState = GetPortState();
-        if( dwPortState != PORT_STATE_READY &&
+        if( pIrp == nullptr &&
+            dwPortState != PORT_STATE_READY &&
             dwPortState != PORT_STATE_BUSY_SHARED )
             break;
 
