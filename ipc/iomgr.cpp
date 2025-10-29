@@ -1169,8 +1169,9 @@ gint32 CIoManager::OpenPort(
                 // make sure the OpenPortByCfg
                 // won't return a port stopped or
                 // stopping
-                CPort* pNewPort =
-                    static_cast< CPort* >( pPort );
+                PortPtr ptrNewPort =
+                    pPort->GetTopmostPort();
+                CPort* pNewPort = ptrNewPort;
 
                 CStdRMutex oPortLock(
                     pNewPort->GetLock() );
@@ -1178,14 +1179,15 @@ gint32 CIoManager::OpenPort(
                 guint32 dwState =
                     pNewPort->GetPortState();
 
-                if( dwState == PORT_STATE_STARTING )
+                if( dwState == PORT_STATE_STARTING ||
+                    dwState == PORT_STATE_ATTACHED )
                 {
                     ret = -EAGAIN;
                     break;
                 }
-                if( dwState == PORT_STATE_STOPPING 
-                    || dwState == PORT_STATE_STOPPED
-                    || dwState == PORT_STATE_ATTACHED )
+
+                if( dwState == PORT_STATE_STOPPING ||
+                    dwState == PORT_STATE_STOPPED )
                 {
                     ret = ERROR_STATE;
                     break;
