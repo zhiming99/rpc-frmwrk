@@ -8991,6 +8991,10 @@ gint32 CExportDrivers::OutputBuiltinRt()
         oFactories.append(
             Json::Value( "./librpc.so" ) );
 
+        if( g_bMonitoring )
+            oFactories.append(
+            Json::Value( "./libappmancli.so" ) );
+
 #ifdef AUTH
         oFactories.append(
             Json::Value( "./libauth.so" ) );
@@ -9212,15 +9216,19 @@ gint32 CExportDrivers::Output()
             Json::Value oSvr;
             oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
             oSvr[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+            Json::Value oFactories =
+                Json::Value( Json::arrayValue );
             if( bFuseS )
             {
-                Json::Value oFactories =
-                    Json::Value( Json::arrayValue );
                 oFactories.append(
                     Json::Value( "./libfuseif.so" ) );
-                oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
-
             }
+            if( g_bMonitoring )
+            {
+                oFactories.append(
+                    Json::Value( "./libappmancli.so" ) );
+            }
+            oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
             oModuleArray.append( oSvr );
             oModuleArray.append( oCli );
         }

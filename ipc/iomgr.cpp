@@ -1178,10 +1178,14 @@ gint32 CIoManager::OpenPort(
                 guint32 dwState =
                     pNewPort->GetPortState();
 
+                if( dwState == PORT_STATE_STARTING )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
                 if( dwState == PORT_STATE_STOPPING 
                     || dwState == PORT_STATE_STOPPED
-                    || dwState == PORT_STATE_ATTACHED
-                    || dwState == PORT_STATE_STARTING )
+                    || dwState == PORT_STATE_ATTACHED )
                 {
                     ret = ERROR_STATE;
                     break;

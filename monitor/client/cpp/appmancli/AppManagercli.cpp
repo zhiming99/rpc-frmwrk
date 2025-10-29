@@ -655,6 +655,10 @@ gint32 StartStdAppManCli(
                 break;
             pamc->Stop();
             // for reconnection
+            oParams.SetPointer(
+                PROP_TARGET_IF, pSvc );
+            oParams.SetStrProp(
+                PROP_APP_NAME, strAppInst );
             g_oAmctx.SetAsyncCbs(
                 pacbsIn, oParams.GetCfg() );
             TaskletPtr pTimer;
