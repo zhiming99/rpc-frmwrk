@@ -18,9 +18,6 @@
                     "InterfaceName" : "IInterfaceServer"
                 },
                 {
-                    "InterfaceName" : "IUnknown"
-                },
-                {
                     "InterfaceName" : "LogSvc"
                 }
             ],
