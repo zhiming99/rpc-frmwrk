@@ -414,6 +414,7 @@ class CIoManager : public IService
 
     bool                        m_bLogging = false;
     CLogger                     m_oLogger;
+    std::string                 m_strLogModName;
 
     protected:
 
@@ -711,6 +712,11 @@ class CIoManager : public IService
         const std::string& szFunc, gint32 iLineNum,
         const std::string& strFmt, gint32 ret, ... );
     void LoggerThread( IEventSink* pCb );
+    inline const stdstr& GetLogModName() const
+    { return m_strLogModName; }
+
+    void SetLogModName( const stdstr& strModName )
+    { m_strLogModName = strModName; }
 };
 
 template<>
