@@ -976,6 +976,13 @@ namespace cpp
                 break;
 
             CIoManager* pMgr = *pObj;
+
+            stdstr strLogModName;
+            ret = oCfg.GetStrProp(
+                115, strLogModName );
+            if( SUCCEEDED( ret ) )
+                pMgr->SetLogModName( strLogModName );
+
             ret = pMgr->Start();
             if( ERROR( ret ) )
                 break;
@@ -1103,6 +1110,12 @@ namespace cpp
                     propNoDBusConn, true );
             }
 
+            stdstr strLogModName;
+            ret = oCfg.GetStrProp(
+                115, strLogModName );
+            if( SUCCEEDED( ret ) )
+                pMgr->SetLogModName( strLogModName );
+
             ret = pMgr->Start();
             if( ERROR( ret ) )
                 break;
@@ -1186,20 +1199,6 @@ namespace cpp
             g_pLibHandle = nullptr;
         }
     }
-    %End
-
-    void SetLogModName( ObjPtr* pObj,
-        const std::string& strLogModName );
-    %MethodCode
-    PyThreadState *_save;
-    Py_UNBLOCK_THREADS;
-    do{
-        cpp::CIoManager* pMgr = *a0;
-        if( pMgr == nullptr )
-            break;
-        pMgr->SetLogModName( *a1 );
-    }while( 0 );
-    Py_BLOCK_THREADS;
     %End
 
     gint32 StopIoMgr( ObjPtr* pObj );

@@ -2966,6 +2966,15 @@ stdstr InstIdFromDrv(
          <p>111: a boolean to tell if the router run as
          a kinit proxy</p>
 
+         <p>112: a boolean to tell if not to use dbus
+         along the connection channel</p>
+
+         <p>113: a boolean to tell if to enable logging
+         to the log server</p>
+
+         <p>115: a string as a name to identify this
+         module on the log server</p>
+
     @param strNewDesc an new desc file, or empty if
     nothing to update. and property 107 is set with new
     instance name if both 107 and 108 are not present.

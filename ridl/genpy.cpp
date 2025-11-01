@@ -3935,8 +3935,16 @@ gint32 CImplPyMainFunc::OutputSvr(
         stdstr strModName = g_strAppName + "svr";
         if( g_bRpcOverStm && !g_bBuiltinRt )
         {
-            CCOUT << "oContext = PyRpcContext( '" << strModName << "' )";
+            Wa( "params=dict()" );
+            CCOUT << "params[ 'ModName' ] = '"
+                << strModName << "'";
             NEW_LINE;
+            if( g_bMonitoring && g_vecMonApps.size() )
+            {
+                CCOUT << "params[ 'LogModName' ] = '"
+                    << g_vecMonApps[ 0 ] << "'";
+                NEW_LINE;
+            }
         }
         else if( g_bBuiltinRt )
         {
@@ -3981,13 +3989,21 @@ gint32 CImplPyMainFunc::OutputSvr(
             Wa( "if isinstance( strNewCfg, str ) and len( strNewCfg ):" );
             Wa( "    params[ 'driver' ] = strNewCfg" );
             INDENT_DOWNL;
-
-            Wa( "oContext = PyRpcContext( params )" );
         }
         else
         {
-            Wa( "oContext = PyRpcContext( 'PyRpcServer' )" );
+            Wa( "params=dict()" );
+            CCOUT << "params[ 'ModName' ] = 'PyRpcServer'";
+            NEW_LINE;
+            if( g_bMonitoring && g_vecMonApps.size() )
+            {
+                CCOUT << "params[ 'LogModName' ] = '"
+                    << g_vecMonApps[ 0 ] << "'";
+                NEW_LINE;
+            }
         }
+        Wa( "oContext = PyRpcContext( params )" );
+
         CCOUT << "with oContext as ctx:";
         INDENT_UPL;
         CCOUT << "if ctx.status < 0:";
@@ -4000,12 +4016,6 @@ gint32 CImplPyMainFunc::OutputSvr(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
-        if( g_bMonitoring && g_vecMonApps.size() )
-        {
-            CCOUT << "cpp.SetLogModName( ctx.pIoMgr, \""
-                << g_vecMonApps[ 0 ] << "\" );";
-            NEW_LINE;
-        }
         if( g_bBuiltinRt )
         {
             Wa( "if 'objdesc' in params:" );

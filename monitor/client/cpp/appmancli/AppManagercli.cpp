@@ -507,7 +507,7 @@ gint32 CAppManager_CliImpl::OnPostStop(
     gint32 ret = 0;
     do{
         ret = super::OnPostStop( pCallback );
-        LOGWARN( this->GetIoMgr(), ret, 
+        DebugPrintEx( logWarning, ret, 
             "Warning CAppManager_CliImpl stopped" );
         PACBS pCbs;
         CfgPtr pContext;
@@ -957,6 +957,15 @@ static gint32 ReconnectTimerFunc(
             if( ret == STATUS_PENDING )
                 return 0;
             ( *pStopCb)( eventCancelTask );
+        }
+        else
+        {
+            // schedule the next try
+            TaskletPtr pTimer;
+            ADD_TIMER_FUNC( pTimer,
+                RECONNECT_INTERVAL, pMgr,
+                ReconnectTimerFunc, pCtx,
+                pMgr, pOldIf );
         }
         return 0;
     });

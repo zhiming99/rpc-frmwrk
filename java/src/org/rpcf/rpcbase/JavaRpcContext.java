@@ -169,6 +169,13 @@ public class JavaRpcContext
                     bVal = ( Boolean )oInit.get( 113 );
                     oCfg.SetBoolProp( 113, bVal );
                 }
+
+                if( oInit.containsKey( 115 ) )
+                {
+                    // enable logging
+                    strVal = ( String )oInit.get( 115 );
+                    oCfg.SetStrProp( 115, strVal );
+                }
             }
 
             JRetVal jret =
