@@ -199,7 +199,6 @@ case "$cmd" in
             arrApps=$(echo "$arrApps") # Remove trailing spaces
             for appName in $arrApps; do
                 if [ "x$appName" != "x" ]; then
-                    echo "Stopping application: $appName"
                     bash $script_dir/rpcfctl stop $appName
                 fi
             done

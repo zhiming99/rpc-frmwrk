@@ -70,6 +70,7 @@ static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
 std::vector< InterfPtr > g_vecIfs;
 static stdrmutex g_oRegLock;
+extern stdstr g_strAppInst;
 
 extern gint32 StartLocalAppMancli();
 extern gint32 StopLocalAppMancli();
@@ -165,7 +166,8 @@ gint32 InitContext()
         if( ERROR( ret ) )
             break;
 
-        IService* pSvc = g_pIoMgr;
+        CIoManager* pSvc = g_pIoMgr;
+        pSvc->SetLogModName( g_strAppInst );
         ret = pSvc->Start();
 
     }while( 0 );

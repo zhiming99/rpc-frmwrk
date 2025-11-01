@@ -654,19 +654,6 @@ gint32 StartStdAppManCli(
             if( pamc == nullptr )
                 break;
             pamc->Stop();
-            // for reconnection
-            oParams.SetPointer(
-                PROP_TARGET_IF, pSvc );
-            oParams.SetStrProp(
-                PROP_APP_NAME, strAppInst );
-            g_oAmctx.SetAsyncCbs(
-                pacbsIn, oParams.GetCfg() );
-            TaskletPtr pTimer;
-            ret = ADD_TIMER_FUNC( pTimer,
-                RECONNECT_INTERVAL, pMgr,
-                ReconnectTimerFunc,
-                oParams.GetCfg(), pMgr,
-                pAppMan );
             break;
         }
         if( !pacbsIn )
@@ -874,7 +861,7 @@ gint32 CAsyncStdAMCallbacks::OnSvrOffline(
     IConfigDb* context,
     CAppManager_CliImpl* pIf )
 {
-    LOGERR( pIf->GetIoMgr(), -ENOTCONN,
+    DebugPrintEx( logErr, -ENOTCONN,
         "Error AppManager is offline, "
         "reconnect will be scheduled" );
     kill( getpid(), SIGUSR1 );
@@ -971,12 +958,6 @@ static gint32 ReconnectTimerFunc(
                 return 0;
             ( *pStopCb)( eventCancelTask );
         }
-        // schedule the next try
-        TaskletPtr pTimer;
-        ADD_TIMER_FUNC( pTimer,
-            RECONNECT_INTERVAL, pMgr,
-            ReconnectTimerFunc, pCtx,
-            pMgr, pOldIf );
         return 0;
     });
     do{
@@ -1006,7 +987,7 @@ gint32 CAsyncStdAMCallbacks::ScheduleReconnect(
 {
     gint32 ret = 0;
     CIoManager* pMgr = pOldIf->GetIoMgr();
-    LOGERR( pMgr, ret,
+    DebugPrintEx( logErr, ret,
         "Error scheduling reconnect to "
         "AppManager failed" );
     TaskletPtr pTimer;

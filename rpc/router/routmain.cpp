@@ -62,6 +62,7 @@ static bool g_bMonitoring = false;
 static std::string g_strCmdLine;
 std::atomic< bool > g_bExit={false};
 std::atomic< bool > g_bMonOff ={false};
+extern stdstr g_strMonName;
 
 // the following two globals must be present for
 // libfuseif.so
@@ -121,6 +122,7 @@ void CIfRouterTest::setUp()
         CPPUNIT_ASSERT( SUCCEEDED( ret ) );
 
         CIoManager* pSvc = m_pMgr;
+        pSvc->SetLogModName( g_strMonName );
 
         if( pSvc != nullptr )
         {
@@ -418,6 +420,7 @@ void Usage( char* szName )
         "\t [ -d Run as a daemon ]\n"
         "\t [ -g Enable logging when the rpcrouter run as a bridge, that is '-r 2' ]\n"
         "\t [ -o Enable monitoring when the rpcrouter run as a bridge, that is '-r 2' ]\n"
+        "\t [ --monitor=<app instname> similiar to '-o' option but specifying an app instance name, as different from the default 'rpcrouter1' ]\n"
         "\t [ -l Use the driver.json in current directory instead of the default one ]\n"
         "\t [ -v Version information ]\n"
         "\t [ -h This help ]\n",
@@ -436,7 +439,7 @@ int main( int argc, char** argv )
 
     int option_index = 0;
     struct option long_options[] = {
-        {"monitor", no_argument, 0,  0 },
+        {"monitor", required_argument, 0,  0 },
         {0, 0,  0,  0 } };
 
     g_strCmdLine =
@@ -450,7 +453,15 @@ int main( int argc, char** argv )
         case 0:
             {
                 if( option_index == 0 )
+                {
                     g_bMonitoring = true;
+                    if( !IsValidName( optarg ) )
+                    {
+                        ret = -EINVAL;
+                        break;
+                    }
+                    g_strMonName = optarg;
+                }
                 break;
             }
         case 'r':

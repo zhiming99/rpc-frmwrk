@@ -4000,6 +4000,12 @@ gint32 CImplPyMainFunc::OutputSvr(
         NEW_LINE;
 
         Wa( "print( \"start to work here...\" )" );
+        if( g_bMonitoring && g_vecMonApps.size() )
+        {
+            CCOUT << "cpp.SetLogModName( ctx.pIoMgr, \""
+                << g_vecMonApps[ 0 ] << "\" );";
+            NEW_LINE;
+        }
         if( g_bBuiltinRt )
         {
             Wa( "if 'objdesc' in params:" );

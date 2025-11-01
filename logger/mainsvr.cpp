@@ -61,6 +61,7 @@ gint32 InitContext()
             break;
 
         CIoManager* pSvc = g_pIoMgr;
+        pSvc->SetLogModName( LOGGER_APPNAME );
         ret = pSvc->Start();
         if( ERROR( ret ) )
             break;

@@ -35,7 +35,7 @@ using namespace rpcf;
 #include "routmain.h"
 #include "rtappman.h"
 
-static stdstr g_strMonName = RTAPPNAME;
+stdstr g_strMonName = RTAPPNAME;
 gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
@@ -350,25 +350,27 @@ gint32 StartAppManCli(
             break;
         }
 
+        Variant oVar;
         PACBS pacbs( new CAsyncAMCallbacks );
         auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
-        Variant oVar;
-        ret = pSvc->GetProperty(
-            propMonAppInsts, oVar );
-        if( SUCCEEDED( ret ) )
-        {
-            StrVecPtr pvecStrs = oVar.m_pObj;
-            if( !pvecStrs.IsEmpty() )
+        if( g_strMonName == RTAPPNAME )
+        { 
+            ret = pSvc->GetProperty(
+                propMonAppInsts, oVar );
+            if( SUCCEEDED( ret ) )
             {
-                if( ( *pvecStrs )().size() )
-                    g_strMonName = ( *pvecStrs )().front();
+                StrVecPtr pvecStrs = oVar.m_pObj;
+                if( !pvecStrs.IsEmpty() )
+                {
+                    if( ( *pvecStrs )().size() )
+                        g_strMonName = ( *pvecStrs )().front();
+                }
+            }
+            else
+            {
+                ret = 0;
             }
         }
-        else
-        {
-            ret = 0;
-        }
-
         // ignore the return status
         // in order to allowing reconnection if the
         // appmonsvr is not online yet

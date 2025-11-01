@@ -7931,6 +7931,12 @@ gint32 CImplMainFunc::EmitInitContext(
         NEW_LINES( 2 );
         CCOUT << "CIoManager* pSvc = g_pIoMgr;";
         NEW_LINE;
+        if( g_bMonitoring && g_vecMonApps.size() && !bProxy )
+        {
+            CCOUT << "pSvc->SetLogModName( \""
+                << g_vecMonApps[ 0 ] << "\" );";
+            NEW_LINE;
+        }
 
         if( g_bBuiltinRt )
         {
@@ -9284,6 +9290,21 @@ gint32 CExportObjDesc::Output()
             m_pNode->GetName();
 
         oVal[ JSON_ATTR_SVRNAME ] = strAppName;
+        if( g_bMonitoring )
+        {
+            Json::Value oLib( "libappmancli.so" );
+            oVal[ JSON_ATTR_CLSFACTORY ].append( oLib );
+        }
+        if( g_bMonitoring && g_vecMonApps.size() )
+        {
+            Json::Value arrVal(Json::arrayValue);
+            for( auto& elem : g_vecMonApps )
+            {
+                Json::Value oAppInst( elem );
+                arrVal.append( oAppInst );
+            }
+            oVal[ JSON_ATTR_MONAPPINSTS ] = arrVal;
+        }
 
         Json::Value oElemTmpl;
 

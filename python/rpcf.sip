@@ -1188,6 +1188,20 @@ namespace cpp
     }
     %End
 
+    void SetLogModName( ObjPtr* pObj,
+        const std::string& strLogModName );
+    %MethodCode
+    PyThreadState *_save;
+    Py_UNBLOCK_THREADS;
+    do{
+        cpp::CIoManager* pMgr = *a0;
+        if( pMgr == nullptr )
+            break;
+        pMgr->SetLogModName( *a1 );
+    }while( 0 );
+    Py_BLOCK_THREADS;
+    %End
+
     gint32 StopIoMgr( ObjPtr* pObj );
     %MethodCode
     sipRes = 0;
