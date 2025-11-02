@@ -5187,7 +5187,7 @@ gint32 CImplJavaMainSvr::Output()
             Wa( "// prepare the init parameters for iomgr" );
             Wa( "Map< Integer, Object > oInit =" );
             Wa( "    new HashMap< Integer, Object >();" );
-            CCOUT << "oInit.put( 0, \"" << strModName << "\" );";
+            CCOUT << "oInit.put( 0, \"JavaRpcServer\" );";
             NEW_LINE;
             if( g_bMonitoring && g_vecMonApps.size() )
             {

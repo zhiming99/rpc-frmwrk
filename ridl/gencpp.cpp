@@ -8984,7 +8984,7 @@ gint32 CExportDrivers::OutputBuiltinRt()
         oDrvToLoad.append( "RpcTcpBusDriver" );
         oDrvToLoad.append( "ProxyFdoDriver" );
         oDrvToLoad.append( "UnixSockBusDriver" );
-        if( g_bRpcOverStm )
+        if( g_bRpcOverStm || g_bMonitoring )
             oDrvToLoad.append( "DBusStreamBusDrv" );
         oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
@@ -9206,7 +9206,7 @@ gint32 CExportDrivers::Output()
             oDrvToLoad.append( "DBusBusDriver" );
             if( bStream || bFuse || g_bRpcOverStm )
                 oDrvToLoad.append( "UnixSockBusDriver" );
-            if( g_bRpcOverStm )
+            if( g_bRpcOverStm || g_bMonitoring )
                 oDrvToLoad.append( "DBusStreamBusDrv" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
