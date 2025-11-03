@@ -116,14 +116,18 @@ gint32 CreateAppManagercli(
                     ( guint32& ) iRet );
                 if( ERROR( ret ) )
                     break;
+                ObjPtr pIf;
+                ret = oResp.GetObjPtr( 0, pIf );
+                if( SUCCEEDED( ret ) )
+                {
+                    InterfPtr ptrIf = pIf;
+                    g_oAmctx.SetAppManagercli( ptrIf );
+                }
                 if( ERROR( iRet ) )
                 {
                     ret = iRet;
                     break;
                 }
-
-                ObjPtr pIf;
-                ret = oResp.GetObjPtr( 0, pIf );
             }while( 0 );
             if( ptrResp.IsEmpty() )
             {
@@ -153,11 +157,11 @@ gint32 CreateAppManagercli(
         pAppMan = pNewIf;
         if( ERROR( ret ) )
             ( *pStartCb )( eventCancelTask );
-        else
+        else if( SUCCEEDED( ret ) )
         {
+            g_oAmctx.SetAppManagercli( pNewIf );
             DebugPrint( 0, "AppManagerCli created @0x%llx",
                 ( guint64 )(CAppManager_CliImpl*)pNewIf );
-            g_oAmctx.SetAppManagercli( pNewIf );
         }
 
     }while( 0 );
@@ -172,7 +176,12 @@ gint32 DestroyAppManagercli(
         InterfPtr pCli;
         ret = GetAppManagercli( pCli );
         if( ERROR( ret ) )
+        {
+            DebugPrint( ret, "Warning, "
+            "AppMancli is not found, "
+            "DestroyAppManagercli can do nothing" );
             break;
+        }
 
         {
             CRpcServices* pSvc = pCli;
@@ -212,8 +221,8 @@ gint32 DestroyAppManagercli(
             if( ERROR( ret ) )
             {
                 ( *pStopTask )( eventCancelTask );
-                OutputMsg( ret,
-                    "Error stop CAppManager_CliImpl" );
+                DebugPrint( ret, "Error, "
+                    "about to stop CAppManager_CliImpl" );
             }
         }
         else
@@ -237,8 +246,8 @@ gint32 DestroyAppManagercli(
             if( ERROR( ret ) )
             {
                 ( *pWaitTask )( eventCancelTask );
-                OutputMsg( ret,
-                    "Error stop CAppManager_CliImpl" );
+                DebugPrint( ret, "Error, about "
+                    "to stop CAppManager_CliImpl" );
             }
         }
         if( SUCCEEDED( ret ) )
@@ -585,8 +594,9 @@ gint32 ClaimApp( CRpcServices* pSvc,
             PROP_TARGET_IF, pSvc );
         oParams.SetStrProp(
             PROP_APP_NAME, strAppInst );
-        CAppManager_CliImpl* pamc = pAppMan;
-        g_oAmctx.SetAsyncCbs( pacbs, oParams.GetCfg() );
+
+        g_oAmctx.SetAsyncCbs(
+            pacbs, oParams.GetCfg() );
 
         std::vector< KeyValue > veckv;
         ret = pacbs->GetPointValuesToUpdate(
@@ -601,6 +611,7 @@ gint32 ClaimApp( CRpcServices* pSvc,
         pacbs->GetPointValuesToInit( pIf, veckv);
 
         std::vector< KeyValue > rveckv;
+        CAppManager_CliImpl* pamc = pAppMan;
         ret = pamc->ClaimAppInst(
             oParams.GetCfg(),
             strAppInst, veckv, rveckv );
@@ -611,8 +622,7 @@ gint32 ClaimApp( CRpcServices* pSvc,
 }
 
 static gint32 ReconnectTimerFunc(   
-    IConfigDb* pCtx, CIoManager* pMgr,
-    CAppManager_CliImpl* pOldIf );
+    IConfigDb* pCtx, CIoManager* pMgr );
 
 gint32 StartStdAppManCli(
     CRpcServices* pSvc,
@@ -658,8 +668,8 @@ gint32 StartStdAppManCli(
         }
         if( !pacbsIn )
             pacbsIn.reset( new CAsyncStdAMCallbacks );
-        ret = ClaimApp( pSvc, strAppInst,
-            pAppMan, pacbsIn );
+        ret = ClaimApp( pSvc,
+            strAppInst, pAppMan, pacbsIn );
 
     }while( 0 );
     return ret;
@@ -707,7 +717,7 @@ gint32 StopStdAppManCli()
                 pSync->WaitForComplete();
                 ret = pSync->GetError();
                 if( ERROR( ret ) )
-                    OutputMsg( ret,
+                    DebugPrint( ret,
                     "Error FreeAppInsts" );
             }
         }
@@ -741,6 +751,8 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
         CfgPtr pContext;
         InterfPtr pIf;
         ret = GetAppManagercli( pIf );
+        if( ERROR( ret ) )
+            break;
         CAppManager_CliImpl* pamc = pIf;
         g_oAmctx.GetAsyncCbs( pCbs, pContext );
         CCfgOpener oCtx( ( IConfigDb* )pContext );
@@ -802,37 +814,104 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
     return ret;
 }
 
+static gint32 StopAndReconnect(
+    CIoManager* pMgr,
+    InterfPtr& pAppMan,
+    CfgPtr pCtx )
+{
+    gint32 ret = 0;
+    if( !pAppMan.IsEmpty() )
+    {
+        // stop the newly created pAppMan
+        DebugPrint( ret,
+            "Stopping the failed appmancli" );
+        gint32 (*stop_func)( IEventSink*,
+            IConfigDb*, CIoManager* ) =
+        ([]( IEventSink* pTask,
+            IConfigDb* pCtx,
+            CIoManager* pMgr )->gint32
+        {
+            return 0;
+        });
+        TaskletPtr pStopCb;
+        ret = NEW_COMPLETE_FUNCALL(
+            0, pStopCb, pMgr, stop_func,
+            nullptr, pCtx, pMgr );
+        if( ERROR( ret ) )
+            return ret;
+        ret = DestroyAppManagercli(
+            pMgr, pStopCb );
+        if( ret == STATUS_PENDING )
+            return 0;
+        ( *pStopCb)( eventCancelTask );
+    }
+    else
+    {
+        DebugPrint( ret,
+            "ReconnectTimerFunc: reconnect in 10 seconds" );
+        // schedule the next try
+        TaskletPtr pTimer;
+        ADD_TIMER_FUNC( pTimer,
+            RECONNECT_INTERVAL, pMgr,
+            ReconnectTimerFunc, pCtx,
+            pMgr );
+    }
+    return 0;
+}
+
 // RPC Async Req Callback
 gint32 CAsyncStdAMCallbacks::ClaimAppInstCallback(
-    IConfigDb* context, 
-    gint32 iRet,
+    IConfigDb* context, gint32 iRet,
     std::vector<KeyValue>& arrPtToGet /*[ In ]*/ )
 {
     gint32 ret = 0;
+    InterfPtr pIf;
+    CfgPtr pContext;
+    PACBS pCbs;
+    g_oAmctx.GetAsyncCbs( pCbs, pContext );
+
     do{
-        PACBS pCbs;
         stdstr strApp;
-        CfgPtr pContext;
-        InterfPtr pIf;
         ret = GetAppManagercli( pIf );
         if( ERROR( ret ) )
             break;
         CAppManager_CliImpl* pamc = pIf;
-        g_oAmctx.GetAsyncCbs( pCbs, pContext );
         CCfgOpener oCtx( ( IConfigDb* )pContext );
         ret = oCtx.GetStrProp(
             PROP_APP_NAME, strApp );
         if( ERROR( ret ) )
             break;
+        if( iRet == -EEXIST )
+        {
+            DebugPrint( iRet, "Error "
+                "ClaimAppInst, the target app "
+                "is already claimed" );
+        }
         if( ERROR( iRet ) )
         {
-            OutputMsg( iRet, "Error ClaimAppInst" );
-            kill( getpid(), SIGINT );
+            ret = iRet;
             break;
         }
         OutputMsg( iRet, "Successfully claimed "
             "application %s", strApp.c_str() );
     }while( 0 );
+    if( ERROR( ret ) )
+    {
+        CRpcServices* pSvc = pIf;
+        CIoManager* pMgr = nullptr;
+        if( pSvc )
+            pMgr = pSvc->GetIoMgr();
+        else if( !this->m_pIf.IsEmpty() )
+        {
+            pSvc = this->m_pIf;
+            pMgr = pSvc->GetIoMgr();
+        }
+        if( pMgr )
+        {
+            StopAndReconnect(
+                pMgr, pIf, pContext );
+        }
+    }
     return ret;
 }
 
@@ -870,18 +949,15 @@ gint32 CAsyncStdAMCallbacks::OnSvrOffline(
 }
 
 static gint32 ReconnectTimerFunc(   
-    IConfigDb* pCtx, CIoManager* pMgr,
-    CAppManager_CliImpl* pOldIf )
+    IConfigDb* pCtx, CIoManager* pMgr )
 {
     gint32 ret = 0;
     DebugPrint( ret, "Info: Start reconnecting..." );
     gint32 (*comp_func)( IEventSink*,
-        IConfigDb*, CIoManager*,
-        CAppManager_CliImpl* ) =
+        IConfigDb*, CIoManager* ) =
     ([]( IEventSink* pTask,
         IConfigDb* pCtx,
-        CIoManager* pMgr,
-        CAppManager_CliImpl* pOldIf )->gint32
+        CIoManager* pMgr )->gint32
     {
         gint32 ret = 0;
         ObjPtr ptrResp;
@@ -925,55 +1001,22 @@ static gint32 ReconnectTimerFunc(
                 pacbs, pOldCtx );
             if( ERROR( ret ) )
                 break;
-            ret = ClaimApp( pSvc, strApp,
-                pAppMan, pacbs );
+            ret = ClaimApp( pSvc,
+                strApp, pAppMan, pacbs );
         }while( 0 );
         if( SUCCEEDED( ret ) )
         {
-            DebugPrint( ret, "Info: Reconnected successfully" );
+            DebugPrint( ret, "Info: ClaimApp request is sent" );
             return ret;
         }
-        if( !pAppMan.IsEmpty() )
-        {
-            // stop the newly created pAppMan
-            gint32 (*stop_func)( IEventSink*,
-                IConfigDb*, CIoManager*,
-                CAppManager_CliImpl* ) =
-            ([]( IEventSink* pTask,
-                IConfigDb* pCtx,
-                CIoManager* pMgr,
-                CAppManager_CliImpl* pOldIf )->gint32
-            {
-                return 0;
-            });
-            TaskletPtr pStopCb;
-            ret = NEW_COMPLETE_FUNCALL(
-                0, pStopCb, pMgr, stop_func,
-                nullptr, pCtx, pMgr, pOldIf );
-            if( ERROR( ret ) )
-                return ret;
-            ret = DestroyAppManagercli(
-                pMgr, pStopCb );
-            if( ret == STATUS_PENDING )
-                return 0;
-            ( *pStopCb)( eventCancelTask );
-        }
-        else
-        {
-            // schedule the next try
-            TaskletPtr pTimer;
-            ADD_TIMER_FUNC( pTimer,
-                RECONNECT_INTERVAL, pMgr,
-                ReconnectTimerFunc, pCtx,
-                pMgr, pOldIf );
-        }
-        return 0;
+        return StopAndReconnect(
+            pMgr, pAppMan, pCtx );
     });
     do{
         TaskletPtr pStartCb;
         ret = NEW_COMPLETE_FUNCALL(
             0, pStartCb, pMgr, comp_func,
-            nullptr, pCtx, pMgr, pOldIf );
+            nullptr, pCtx, pMgr );
         if( ERROR( ret ) )
             break;
         InterfPtr pAppMan;
@@ -982,6 +1025,7 @@ static gint32 ReconnectTimerFunc(
         if( ERROR( ret ) )
         {
             ( *pStartCb )( eventCancelTask );
+            StopAndReconnect( pMgr, pAppMan, pCtx );
             break;
         }
         if( ret == STATUS_PENDING )
@@ -997,13 +1041,13 @@ gint32 CAsyncStdAMCallbacks::ScheduleReconnect(
     gint32 ret = 0;
     CIoManager* pMgr = pOldIf->GetIoMgr();
     DebugPrintEx( logErr, ret,
-        "Error scheduling reconnect to "
-        "AppManager failed" );
+        "Error occurs, scheduling reconnect to "
+        "AppManager" );
     TaskletPtr pTimer;
     ret = ADD_TIMER_FUNC( pTimer, 
         RECONNECT_INTERVAL, pMgr,
         ReconnectTimerFunc, pContext,
-        pMgr, pOldIf );
+        pMgr );
     return ret;
 }
 

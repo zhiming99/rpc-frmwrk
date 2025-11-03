@@ -2446,7 +2446,6 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
             else if( iState != stateConnected )
             {
                 oSvcLock.Unlock();
-                pSvc->Stop();
                 DebugPrintEx( logErr, ERROR_STATE,
                     "Warning logger is stopped, "
                     "and recreate a new instance" );
@@ -2459,7 +2458,10 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
 
         if( ret == STATUS_MORE_PROCESS_NEEDED &&
             !m_bExit )
+        {
+            pSvc->Stop();
             continue;
+        }
 
         this->SendLogMsg();
         pSvc->Stop();

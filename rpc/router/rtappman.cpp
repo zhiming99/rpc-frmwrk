@@ -254,11 +254,10 @@ gint32 CAsyncAMCallbacks::ClaimAppInstCallback(
                     propSendBps, kv.oValue );
             }
         }
-        ret = super::ClaimAppInstCallback(
-            context, iRet, arrPtToGet );
-
     }while( 0 );
-    return ret;
+
+    return super::ClaimAppInstCallback(
+        context, iRet, arrPtToGet );
 }
 
 gint32 CAsyncAMCallbacks::OnPointChanged(

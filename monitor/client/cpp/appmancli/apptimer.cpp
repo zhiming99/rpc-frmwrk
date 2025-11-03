@@ -401,6 +401,8 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
             g_pSyncTask->SetError( ret );
             ( *g_pSyncTask )( eventTaskComp );
         }
+        ret = super::ClaimAppInstCallback(
+            context, iRet, arrPtToGet );
         return ret;
     }
 };
