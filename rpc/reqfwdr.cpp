@@ -2516,9 +2516,18 @@ gint32 CRpcReqForwarder::EnableDisableEvent(
                 break;
 
             bool bOnline = false;
+            MatchPtr ptrMatch;
+            ptrMatch.NewObj(
+                clsid( CRouterLocalMatch ) );
+            CRouterLocalMatch* plm = ptrMatch;
+            ret = plm->CopyMatch( pMatch );
+            if( ERROR( ret ) )
+                DebugPrint( ret, "Warning, "
+                    "failed to copy local match '%s'",
+                    plm->ToString().c_str() );
 
             ret = pRouter->IsMatchOnline(
-                pMatch, bOnline );
+                ptrMatch, bOnline );
 
             if( ERROR( ret ) )
                 break;

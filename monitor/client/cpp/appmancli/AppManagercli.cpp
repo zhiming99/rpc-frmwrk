@@ -587,16 +587,11 @@ gint32 ClaimApp( CRpcServices* pSvc,
         }
 
         pacbs = pacbsIn;
-        pacbs->SetInterface( pIf );
-
         CParamList oParams;
         oParams.SetPointer(
             PROP_TARGET_IF, pSvc );
         oParams.SetStrProp(
             PROP_APP_NAME, strAppInst );
-
-        g_oAmctx.SetAsyncCbs(
-            pacbs, oParams.GetCfg() );
 
         std::vector< KeyValue > veckv;
         ret = pacbs->GetPointValuesToUpdate(
@@ -654,8 +649,24 @@ gint32 StartStdAppManCli(
             break;
         }
 
+        if( !pacbsIn )
+            pacbsIn.reset( new CAsyncStdAMCallbacks );
+
+        if( pSvc != nullptr )
+        {
+            InterfPtr pIf;
+            pIf = pSvc;
+            pacbsIn->SetInterface( pIf );
+
+        }
+
+        oParams.SetPointer(
+            PROP_TARGET_IF, pSvc );
         oParams.SetStrProp(
             PROP_APP_NAME, strAppInst );
+        g_oAmctx.SetAsyncCbs(
+            pacbsIn, oParams.GetCfg() );
+
         ret = CreateStdAppManSync(
             pMgr, oParams.GetCfg(), pAppMan );
         if( ERROR( ret ) )
@@ -666,8 +677,6 @@ gint32 StartStdAppManCli(
             pamc->Stop();
             break;
         }
-        if( !pacbsIn )
-            pacbsIn.reset( new CAsyncStdAMCallbacks );
         ret = ClaimApp( pSvc,
             strAppInst, pAppMan, pacbsIn );
 
@@ -881,15 +890,37 @@ gint32 CAsyncStdAMCallbacks::ClaimAppInstCallback(
             PROP_APP_NAME, strApp );
         if( ERROR( ret ) )
             break;
+        Variant oVar;
+        bool bProxyPdo = false;
+        ret = pIf->GetProperty(
+            propPortClass, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            const stdstr& strPortClass = ( const stdstr& )oVar;
+            if( strPortClass == PORT_CLASS_DBUS_PROXY_PDO ||
+                strPortClass == PORT_CLASS_DBUS_PROXY_PDO_LPBK ||
+                strPortClass == PORT_CLASS_DBUS_PROXY_PDO_LPBK2 )
+                bProxyPdo = true;
+        }
+        else
+        {
+            ret = 0;
+        }
         if( iRet == -EEXIST )
         {
             DebugPrint( iRet, "Error "
                 "ClaimAppInst, the target app "
                 "is already claimed" );
         }
-        if( ERROR( iRet ) )
+        if( ERROR( iRet ) && bProxyPdo )
         {
             ret = iRet;
+            break;
+        }
+        else if( ERROR( iRet ) )
+        {
+            DebugPrint( iRet, "Info "
+                "Waiting server to go online" );
             break;
         }
         OutputMsg( iRet, "Successfully claimed "
