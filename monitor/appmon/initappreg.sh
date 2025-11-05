@@ -158,16 +158,20 @@ set_attr_value appmonsvr1 ptlogger1 ptlist "$(jsonval 'blob' '[]' )" blob
 add_point appmonsvr1 logrotate1 input i
 add_link timer1 sched_task1 appmonsvr1 logrotate1
 
-add_log_link $_instname rx_bytes appmonsvr1 ptlogger1
-add_log_link $_instname tx_bytes appmonsvr1 ptlogger1
-add_log_link $_instname vmsize_kb appmonsvr1 ptlogger1
-add_log_link $_instname obj_count appmonsvr1 ptlogger1
-add_log_link $_instname cpu_load appmonsvr1 ptlogger1
-set_attr_value $_instname rx_bytes avgalgo  "$(jsonval 'i' 0)" i
-set_attr_value $_instname tx_bytes avgalgo  "$(jsonval 'i' 0)" i
-set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
-set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
-set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
+if [[ -z "$noptlog" ]] || [[ "$noptlog" == "false" ]]; then
+    add_log_link appmonsvr1 rx_bytes appmonsvr1 ptlogger1
+    add_log_link appmonsvr1 tx_bytes appmonsvr1 ptlogger1
+    add_log_link appmonsvr1 vmsize_kb appmonsvr1 ptlogger1
+    add_log_link appmonsvr1 obj_count appmonsvr1 ptlogger1
+    add_log_link appmonsvr1 cpu_load appmonsvr1 ptlogger1
+    add_log_link appmonsvr1 req_count appmonsvr1 ptlogger1
+    set_attr_value appmonsvr1 rx_bytes avgalgo  "$(jsonval 'i' 0)" i
+    set_attr_value appmonsvr1 tx_bytes avgalgo  "$(jsonval 'i' 0)" i
+    set_attr_value appmonsvr1 vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value appmonsvr1 obj_count avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value appmonsvr1 cpu_load avgalgo  "$(jsonval 'i' 1)" i
+    set_attr_value appmonsvr1 req_count avgalgo  "$(jsonval 'i' 0)" i
+fi
 
 echo adding application loggersvr1
 add_stdapp loggersvr1

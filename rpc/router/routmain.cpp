@@ -359,18 +359,12 @@ void CIfRouterTest::testSvrStartStop()
         CInterfaceServer* pSvr = pIf;
         if( g_strMPoint.empty() )
         {
-            auto oldh = signal(
-                SIGINT, SignalHandler );
-            auto oldh2 = signal(
-                SIGUSR1, SignalHandler );
             while( pSvr->IsConnected() )
             {
                 sleep( 1 );
                 if( g_bExit )
                     break;
             }
-            signal( SIGINT, oldh );
-            signal( SIGUSR1, oldh2 );
         }
         else
         {
@@ -621,11 +615,19 @@ int main( int argc, char** argv )
         return -ret;
 
 
+    auto oldh = signal(
+        SIGINT, SignalHandler );
+    auto oldh2 = signal(
+        SIGUSR1, SignalHandler );
+
     if( g_bDaemon )
         daemon( 1, 0 );
 
     runner.addTest( registry.makeTest() );
     bool wasSuccessful = runner.run( "", false );
+
+    signal( SIGINT, oldh );
+    signal( SIGUSR1, oldh2 );
 
     return !wasSuccessful;
 }
