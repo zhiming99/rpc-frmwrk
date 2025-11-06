@@ -46,7 +46,7 @@ function undo_check_appreg_mount()
 {
     base=$HOME/.rpcf
     if (( $mt==2 )); then
-        umount ${rootdir}
+        fusermount3 -u ${rootdir}
         rmdir ${rootdir}
     fi
 }
@@ -119,7 +119,7 @@ function clear_rpcf_mount()
     mp=`mount | grep '^regfsmnt' | awk '{print $3}'`
     if [ "x$mp" != "x" ];then
         for i in $mp; do
-            if ! umount $i; then
+            if ! fusermount3 -u $i; then
                 return 1
             fi
         done
@@ -127,7 +127,7 @@ function clear_rpcf_mount()
     mp=`mount | grep appmonsvr | awk '{print $3}'`
     if [ "x$mp" != "x" ];then
         for i in $mp; do
-            if ! umount $i; then
+            if ! fusermount3 -u $i; then
                 return 1
             fi
         done

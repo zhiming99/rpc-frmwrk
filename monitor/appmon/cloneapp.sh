@@ -36,7 +36,7 @@ if [[ $# -lt 2 ]]; then
     echo Error missing parameters
     echo $cmdline
     if (( $mt == 2 )); then
-        umount $rootdir
+        fusermount3 -u $rootdir
     fi
     exit 1
 fi
@@ -48,7 +48,7 @@ echo cloning application $srcapp to $dstapp
 if [[ "$srcapp" == "appmonsvr1" ]]; then
     echo cannot clone appmonsvr1
     if (( $mt == 2 )); then
-        umount $rootdir
+        fusermount3 -u $rootdir
     fi
     exit 1
 fi
@@ -124,7 +124,7 @@ fi
 
 popd > /dev/null
 if (( $mt == 2 )); then
-    umount $rootdir
+    fusermount3 -u $rootdir
 fi
 
 exit $ret
