@@ -109,7 +109,6 @@
                     "PortNumber": "4132",
                     "Compression": "false",
                     "EnableWS": "false",
-                    "EnableSSL": "false",
                     "ConnRecover": "false",
                     "EnalbeSSL": "false"
                 },
@@ -123,7 +122,6 @@
                     "PortNumber": "4132",
                     "Compression": "false",
                     "EnableWS": "false",
-                    "EnableSSL": "false",
                     "ConnRecover": "false",
                     "EnalbeSSL": "false"
                 }
