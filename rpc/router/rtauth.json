@@ -193,7 +193,7 @@
                     "Compression": "false",
                     "EnableWS": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false"
+                    "EnableSSL": "false"
                 },
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
@@ -206,7 +206,7 @@
                     "Compression": "false",
                     "EnableWS": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false"
+                    "EnableSSL": "false"
                 }
             ],
             "Comments-1": "The LBGroup is the list of mappings from pysudo-name to a group of physical nodes, which is used for node reduantancy or load balance purpose",
