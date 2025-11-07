@@ -306,7 +306,8 @@ enum EnumPropId : gint32
     propStmPerSess,
     propCurQps,
     propUptime,
-    propMonAppInsts,     //type: an array of strings as the app instances present on monitor's registry
+    propMonAppInsts,    // type: an array of strings as the app instances present on monitor's registry
+    propMmhNodeList,    // type: an array of strings as the set of nodes of the next hop
 
     propReservedEnd = 0x10000000,
     propInvalid = -1, 

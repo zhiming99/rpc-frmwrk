@@ -27,6 +27,7 @@
 #define O_BDGE_LIST "bdge_list"
 #define O_BPROXY_LIST "bdge_proxy_list"
 #define O_RPROXY_LIST "req_proxy_list"
+#define O_MMHNODE_LIST "mmh_node_list"
 
 struct CAsyncAMCallbacks : public CAsyncStdAMCallbacks
 {

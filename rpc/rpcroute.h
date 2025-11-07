@@ -2665,6 +2665,21 @@ class CRpcRouterBridge : public CRpcRouter
         return GetReqFwdrProxy( strDest, pIf );
     }
 
+    inline gint32 EnumMmhNodes(
+        std::vector< ObjPtr >& vecNodes ) const
+    {
+        CStdRMutex oRouterLock( GetLock() );
+        auto itr = m_mapNode2ConnParams.cbegin();
+        while( itr != m_mapNode2ConnParams.cend() )
+        {
+            vecNodes.push_back( itr->second );
+            itr++;
+        }
+        if( vecNodes.empty() )
+            return -ENOENT;
+        return 0;
+    }
+
     inline gint32 AddConnParamsByNodeName(
         const std::string& strNode,
         const CfgPtr& pConnParams )

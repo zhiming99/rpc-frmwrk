@@ -209,8 +209,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 nodeList.append( n )
             jsonVal[ "LBGroup" ] = elem.get( "LBGroup", [] )
             count += 1
-        elif ( objName == "RpcReqForwarderAuthImpl" or
-            objName == "RpcReqForwarderImpl" ):
+        elif objName == "RpcReqForwarderImpl":
             oMisc[ 'TaskScheduler' ] = elem[ 'TaskScheduler' ]
             count += 1
         if count >= 2:

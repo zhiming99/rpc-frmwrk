@@ -742,6 +742,7 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                 }
 
                 std::string strFormat = "ipv4";
+                oConnParams[ propNodeName ] = strNode;
                 oConnParams[ propAddrFormat ] = strFormat;
                 oConnParams[ propEnableSSL ] = false;
                 oConnParams[ propEnableWebSock ] = false;
@@ -6174,6 +6175,30 @@ gint32 CRpcRouterManager::GetProperty(
             auto& pRt = m_vecRoutersBdge.front();
             oRouterLock.Unlock();
             ret = pRt->GetProperty( iProp, oBuf );
+            break;
+        }
+    case propMmhNodeList:
+        {
+            CStdRMutex oRouterLock( GetLock() );
+            if( m_vecRoutersBdge.size() == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            auto& pRt = m_vecRoutersBdge.front();
+            oRouterLock.Unlock();
+            CRpcRouterBridge* prt = pRt;
+            if( prt == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ObjVecPtr pvecNodes( true );
+            ret = prt->EnumMmhNodes(
+                ( *pvecNodes )() );
+            if( ERROR( ret ) )
+                break;
+            oBuf = pvecNodes;
             break;
         }
     default:

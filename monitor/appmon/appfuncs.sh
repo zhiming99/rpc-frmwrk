@@ -1738,6 +1738,7 @@ function add_rpcrouter
     add_point $_instname bdge_list output blob
     add_point $_instname bdge_proxy_list output blob
     add_point $_instname req_proxy_list output blob 
+    add_point $_instname mmh_node_list  output blob
     add_point $_instname max_conn  setpoint i
     add_point $_instname max_recv_bps  setpoint q
     set_attr_value $_instname max_recv_bps unit "$(jsonval 's' 'bps' )" s
