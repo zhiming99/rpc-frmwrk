@@ -1450,7 +1450,7 @@ gint32 CStreamServerRelayMH::FetchData_Server(
 gint32 CStreamServerRelayMH::CreateUxStream(
     IConfigDb* pDataDesc,
     gint32 iPrxyStmId, EnumClsid iClsid,
-    bool bServer,
+    ObjPtr pProxy,
     InterfPtr& pIf )
 {
     if( pDataDesc == nullptr ||
@@ -1463,7 +1463,7 @@ gint32 CStreamServerRelayMH::CreateUxStream(
         CParamList oNewCfg;
 
         oNewCfg.SetBoolProp(
-            propIsServer, bServer );
+            propIsServer, false );
 
         // just to make the constructor happy.
         oNewCfg.SetIntProp( propFd, iPrxyStmId );
@@ -1501,7 +1501,7 @@ gint32 CStreamServerRelayMH::CreateUxStream(
         oNewCfg.Push( ObjPtr( pDataDesc ) );
 
         // pass the pointer to bridge proxy
-        oNewCfg[ propIfPtr ] = pIf;
+        oNewCfg[ propIfPtr ] = pProxy;
 
         // pass the proxy stream id
         oNewCfg.SetIntProp(
@@ -1619,7 +1619,7 @@ gint32 CStreamServerRelayMH::OnFetchDataComplete(
         InterfPtr pUxIf;
         ret = CreateUxStream( pDataDesc, iFd,
             clsid( CRpcTcpBridgeProxyStream ),
-            false, pUxIf );
+            pProxy, pUxIf );
 
         if( ERROR( ret ) )
             break;

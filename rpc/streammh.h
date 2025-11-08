@@ -102,7 +102,7 @@ class CStreamServerRelayMH :
     gint32 CreateUxStream(
         IConfigDb* pDataDesc,
         gint32 iFd, EnumClsid iClsid,
-        bool bServer,
+        ObjPtr pProxy,
         InterfPtr& pIf );
 
     inline gint32 GetUxStream(

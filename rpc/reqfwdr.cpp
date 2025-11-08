@@ -5531,8 +5531,9 @@ gint32 CReqFwdrFetchDataTask::OnServiceComplete(
             {
                 CCfgOpener oDesc( pDesc );
                 // make sure the iid is istream
-                if( oDesc.IsEqual( propIid,
-                    iid( IStreamMH ) )  )
+                gint32 iRet2 = oDesc.IsEqual(
+                    propIid, iid( IStreamMH ) );
+                if( SUCCEEDED( iRet2 ) )
                 {
                     oDesc[ propIid ] =
                         iid( IStream );

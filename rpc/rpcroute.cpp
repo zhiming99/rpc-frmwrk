@@ -864,14 +864,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
 
             }
 
-            Json::Value& oLBInfo =
-                oObjElem[ JSON_ATTR_LBGROUP ];
-
-            if( oLBInfo == Json::Value::null ||
-                !oLBInfo.isArray() ||
-                oLBInfo.empty() )
-                break;
-
             if( m_pLBGrp.IsEmpty() )
             {
                 CParamList oParams;
@@ -882,6 +874,14 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                 if( ERROR( ret ) )
                     break;
             }
+
+            Json::Value& oLBInfo =
+                oObjElem[ JSON_ATTR_LBGROUP ];
+
+            if( oLBInfo == Json::Value::null ||
+                !oLBInfo.isArray() ||
+                oLBInfo.empty() )
+                break;
 
             CRedudantNodes* pLBGrp =
                 ( CRedudantNodes* )m_pLBGrp;
