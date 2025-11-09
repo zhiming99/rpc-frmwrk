@@ -56,6 +56,7 @@ module.exports = {
       CClassFactory: 0x8a3,
       CStlQwordVector: 0x900,
       IStream:0x10000003,
+      IStreamMH:0x10000004,
     },
 
     EnumPropId: {

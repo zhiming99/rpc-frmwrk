@@ -13,6 +13,7 @@ const { OpenStreamLocal, CloseStreamLocal } = require("./openstm")
 const { OnDataReceivedLocal, OnStreamClosedLocal, NotifyDataConsumed} = require( "./stmevt")
 const { StreamWriteLocal } = require( "./stmwrite")
 const { LoginLocal } = require( "./login")
+const { CheckRouterPathLocal } = require("./chkrtpath")
 
 exports.CInterfaceProxy = class CInterfaceProxy
 {
@@ -67,6 +68,10 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 EnumPropId.propObjInstName )
             if( oVal !== null && oVal.length > 0 )
                 this.m_strObjInstName = oVal
+            oVal = oParams.GetProperty(
+                EnumPropId.propRouterPath )
+            if( oVal !== null && oVal.length > 0 )
+                this.m_strRouterPath = oVal
         }
         if( this.m_strObjInstName.length === 0)
             this.m_strObjInstName = strObjName
@@ -83,6 +88,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
         this.m_funcNotifyDataConsumed = NotifyDataConsumed.bind( this )
         this.m_funcStreamWrite = StreamWriteLocal.bind( this )
         this.m_funcLogin = LoginLocal.bind( this )
+        this.m_funcCheckRouterPath = CheckRouterPathLocal.bind( this )
 
         var oEvtTab = this.m_arrDispTable
         for( var i = 0; i< Object.keys(IoEvent).length;i++)
@@ -179,7 +185,10 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 throw new Error(
                         `Error 'RouterPath' not defined in objdesc file:${this.m_strObjDesc}.${this.m_strObjName}`)
             }
-            this.m_strRouterPath = elem[ "RouterPath" ]
+            if( !this.m_strRouterPath )
+            {
+                this.m_strRouterPath = elem[ "RouterPath" ]
+            }
             if( elem[ "RequestTimeoutSec"] === undefined )
                 this.m_dwTimeoutSec = constval.IFSTATE_DEFAULT_IOREQ_TIMEOUT
             else
@@ -294,6 +303,21 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 this.m_iState = EnumIfState.stateStartFailed
                 return Promise.resolve( ret)
             })
+    }
+
+    SetupConnection()
+    {
+        if( this.m_strRouterPath === "/")
+            return this.EnableEvents();
+        else
+        {
+            return this.m_funcCheckRouterPath().then((e)=>{
+                return this.EnableEvents();
+            }).catch((e)=>{
+                var ret = -errno.EFAULT
+                this.DebugPrint("Error, CheckRouterPath failed (" + ret + " )")
+            })
+        }
     }
 
     GetLoginCredentialFromInput()
@@ -412,7 +436,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
                                         return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
                                             if( ERROR( retval ) )
                                                 return Promise.resolve( retval )
-                                            return this.EnableEvents().then((e)=>{
+                                            return this.SetupConnection().then((e)=>{
                                                 return Promise.resolve(e)
                                             }).catch((e)=>{
                                                 return Promise.resolve( -errno.EFAULT )
@@ -422,10 +446,10 @@ exports.CInterfaceProxy = class CInterfaceProxy
                                             return Promise.resolve(-errno.EFAULT)
                                         })
                                     else
-                                        return this.EnableEvents().then((e)=>{
+                                        return this.SetupConnection().then((e)=>{
                                             return Promise.resolve(e)
                                         }).catch((e)=>{
-                                            this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
+                                            this.DebugPrint("Error, SetupConnection failed ( " + e + " )")
                                             return Promise.resolve( -errno.EFAULT )
                                         })
                                 }).catch((e)=>{
@@ -451,7 +475,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
                     return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
                         if( ERROR( retval ) )
                             return Promise.resolve( retval )
-                        return this.EnableEvents().then((e)=>{
+                        return this.SetupConnection().then((e)=>{
                             return Promise.resolve(e)
                         }).catch((e)=>{
                             return Promise.resolve( -errno.EFAULT )
@@ -461,10 +485,10 @@ exports.CInterfaceProxy = class CInterfaceProxy
                         return Promise.resolve(e)
                     })
                 else
-                    return this.EnableEvents().then((e)=>{
+                    return this.SetupConnection().then((e)=>{
                         return Promise.resolve(e)
                     }).catch((e)=>{
-                        this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
+                        this.DebugPrint("Error, SetupConnection failed ( " + e + " )")
                         return Promise.resolve( -errno.EFAULT )
                     })
                 })

@@ -47,10 +47,20 @@ function OpenStreamLocal( oContext )
             this.m_strObjPath )
         oReq.SetString( EnumPropId.propSrcDBusName,
             this.m_strSender )
-        oReq.SetString( EnumPropId.propIfName,
-            DBusIfName( "IStream") )
-        oReq.SetUint32( EnumPropId.propIid,
-            EnumClsid.IStream )
+        if( this.m_strRouterPath === "/" )
+        {
+            oReq.SetString( EnumPropId.propIfName,
+                DBusIfName( "IStream") )
+            oReq.SetUint32( EnumPropId.propIid,
+                EnumClsid.IStream )
+        }
+        else
+        {
+            oReq.SetString( EnumPropId.propIfName,
+                DBusIfName( "IStreamMH") )
+            oReq.SetUint32( EnumPropId.propIid,
+                EnumClsid.IStreamMH )
+        }
         var oTransctx = new CConfigDb2()
         oTransctx.SetString( EnumPropId.propRouterPath,
             this.m_strRouterPath )

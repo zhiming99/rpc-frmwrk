@@ -171,7 +171,7 @@ function StartClient( oStartCb )
         if( ERROR( retval ) )
         {
             globalThis.oProxy = null;
-            return Promise.resolve( retval );
+            return Promise.reject( retval );
         }
         var oContext = new Object();
         oContext.oStartCb = oStartCb

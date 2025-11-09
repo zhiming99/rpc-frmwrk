@@ -1,5 +1,5 @@
 const { CConfigDb2 } = require("../combase/configdb")
-const { ERROR } = require("../combase/defines")
+const { ERROR, SYS_METHOD } = require("../combase/defines")
 const { EnumPropId, errno, EnumCallFlags } = require("../combase/enums")
 const { IoCmd, CPendingRequest } = require("../combase/iomsg")
 const { messageType } = require( "../dbusmsg/constants")
@@ -41,8 +41,12 @@ exports.ForwardRequestLocal = function ForwardRequestLocal( oReq, oCallback, oCo
             oMsg.m_dwTimerLeftMs = this.m_dwTimeoutSec * 1000
         }
 
+        var strRouterPath = this.m_strRouterPath
+        if( oReq.GetProperty( EnumPropId.propMethodName ) ===
+            SYS_METHOD( "AuthReq_Login" ) )
+            strRouterPath = "/"
         oReq.SetString( EnumPropId.propRouterPath,
-            this.m_strRouterPath )
+            strRouterPath )
         oReq.SetUint32(
             EnumPropId.propSeqNo, oMsg.m_iMsgId)
         oReq.SetUint64(

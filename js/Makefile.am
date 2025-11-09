@@ -10,7 +10,7 @@ rpc/fwrdreqrmt.js ipc/fwrdreq.js combase/seribase.js rpc/fwrdevtrmt.js \
 ipc/fwrdevt.js ipc/cancelrq.js ipc/keepalive.js rpc/keepalivermt.js \
 ipc/openstm.js rpc/openstmrmt.js rpc/stream.js \
 ipc/stmwrite.js ipc/stmevt.js rpc/stmwritermt.js \
-rpc/lz4.js ipc/fastrpc.js ipc/login.js
+rpc/lz4.js ipc/fastrpc.js ipc/login.js ipc/chkrtpath.js rpc/chkrtpathrmt.js
 
 js_files=index.html index.js webpack.config.js test/evtest.js test/asynctst.js \
 test/actcancel.js test/katest.js test/stmtest.js $(jslib_files)
