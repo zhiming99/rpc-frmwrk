@@ -176,7 +176,7 @@ rpcfctl <命令> [参数]
 ## 配置与备份
 
 - **geninitcfg [-c] [<输出文件>]**  
-  用当前系统设置，生成用于部署的配置文件`initcfg.json`，此文件供检查和调试使用，或下面的`geninstaller`命令使用。`-c`选项要求生成用于客户端的`initcfg.json`文件。
+  用当前系统设置，生成用于部署的配置文件`initcfg.json`，此文件供检查和调试使用, 也可以用于调整本地的设置，或者作为下面的`geninstaller`命令的输入。`-c`选项要求生成用于客户端的`initcfg.json`文件。
 
 - **geninstaller <initcfg的路径名> <生成的installer的存放目录> [<rpc-frmwrk安装包所在目录>]**
   用当前系统设置，生成部署到目标服务器和客户端的部署包。`initcfg`即为前一个命令所说的`initcfg.json`。当你`make deb`或者`make rpm`成功后，会在`rpc-frmwrk/bldpkg`目录下存放所有的`rpc-frmwrk`的deb包或者rpm包。这个目录就是rpc-frmwrk安装包所在的目录。如果`initcfg`是client专用的，那么只生成客户端部署包，其他情况下，将生成一个服务器包和一个客户端包。如果待部署系统的设置和当前的系统设置不同时，可以手工编辑`initcfg.json`，或使用[`rpcfg.py`](../../tools/README_cn.md#rpc-frmwrk配置工具)生成。手工编辑`initcfg.json`需注意不要更改里面的文件路径，`geninstaller`需要这些信息，并且安装包会在安装前修正。另外，如果SSL的密钥和证书不是`rpc-frmwrk`生成的自签名密钥和证书，`geninstaller`一次只生成一个部署包，由`initcfg.json`标注的是客户端还是服务器端决定。由于安装包里含有密钥等关键安全信息，需要妥善保存，防止发生安全问题。
