@@ -73,23 +73,41 @@
     </div>
   </nav>
 
-  <main class="container my-3">
-    <div class="row" id="sites-row">
-      <!-- sites cards -->
-      <!-- Add more cards as needed -->
-    </div>
-
-    <div class="row" id="logs-row" style="display:none;">
-      <div class="col-12">
-        <div class="card mb-3">
-          <div class="card-header" id="LogsTitle">Logs</div>
-          <div class="card-body" style="overflow-y:auto;">
-            <pre id="logs-panel" class="mb-0">Loading logs...</pre>
-          </div>
+<main class="container my-3">
+  <!-- Banner with site-tree dropdown -->
+  <div class="d-flex align-items-center mb-3">
+    <div class="me-auto">
+      <div class="dropdown">
+        <button class="btn btn-outline-primary btn-sm dropdown-toggle" id="siteTreeDropdownBtn"
+                data-bs-toggle="dropdown" aria-expanded="false">
+          Sites
+        </button>
+        <div class="dropdown-menu p-2" aria-labelledby="siteTreeDropdownBtn" style="min-width:260px;">
+          <div id="siteTreeContainer" class="site-tree"></div>
         </div>
       </div>
     </div>
-  </main>
+    <div>
+      <button id="expandAllSitesBtn" class="btn btn-sm btn-light me-2">Expand All</button>
+      <button id="collapseAllSitesBtn" class="btn btn-sm btn-light">Collapse All</button>
+    </div>
+  </div>
+
+  <div class="row" id="sites-row">
+    <!-- one site card displayed at a time -->
+  </div>
+
+  <div class="row" id="logs-row" style="display:none;">
+    <div class="col-12">
+      <div class="card mb-3">
+        <div class="card-header" id="LogsTitle">Logs</div>
+        <div class="card-body" style="overflow-y:auto;">
+          <pre id="logs-panel" class="mb-0">Loading logs...</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
 
 <!--<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>-->
 <script src="./dist/js/chart.js"></script>
@@ -217,132 +235,136 @@
     }
 
     function showReconnectButton(show, isConnected = false) {
-      const btn = document.getElementById('reconnect-btn');
-      const userLabel = document.getElementById('user-label');
+        const btn = document.getElementById('reconnect-btn');
+        const userLabel = document.getElementById('user-label');
 
-      if (show) {
-        btn.classList.remove('d-none');
-        if (isConnected) {
-          btn.textContent = i18nh.t('Logout');
-          btn.classList.remove('btn-warning');
-          btn.classList.add('btn-danger');
-          var strUser; 
-          if( !globalThis.oProxy )
-              strUser = ""
-          else if( globalThis.oProxy && globalThis.oProxy.m_strUserName )
-              strUser = globalThis.oProxy.m_strUserName;
-          else if( globalThis.oProxy && globalThis.oProxy.m_oChanProxy &&
-              globalThis.oProxy.m_oChanProxy.m_strUserName )
-              strUser = globalThis.oProxy.m_oChanProxy.m_strUserName;
+        if (show) {
+            btn.classList.remove('d-none');
+            if (isConnected) {
+                btn.textContent = i18nh.t('Logout');
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-danger');
+                var strUser; 
+                var curProxy = globalThis.curProxy;
+                if( !curProxy )
+                    strUser = ""
+                else if( curProxy && curProxy.m_strUserName )
+                    strUser = curProxy.m_strUserName;
+                else if( curProxy && curProxy.m_oChanProxy &&
+                    curProxy.m_oChanProxy.m_strUserName )
+                    strUser = curProxy.m_oChanProxy.m_strUserName;
 
-          userLabel.textContent = strUser;
-          btn.onclick = function() {
-            // Your disconnect logic here
-            if (globalThis.oProxy && typeof globalThis.oProxy.Stop === 'function') {
-              globalThis.oProxy.Stop();
+                userLabel.textContent = strUser;
+                btn.onclick = function() {
+                    // Your disconnect logic here
+                    if (curProxy && typeof curProxy.Stop === 'function') {
+                        curProxy.Stop();
+                    } else {
+                      // fallback: reload or nullify
+                        location.reload();
+                    }
+                };
             } else {
-              // fallback: reload or nullify
-              location.reload();
+                btn.textContent = i18nh.t('Login');
+                userLabel.textContent = '';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-warning');
+                btn.onclick = function() {
+                  // Your reconnect logic here
+                if (typeof globalThis.StartClient === 'function') {
+                    globalThis.StartClient( oStartCb ).then(() => {
+                        console.log('Reconnected with status ');
+                        checkProxyState()
+                    }).catch((error) => {
+                        console.log("Error reconnecting:", error);
+                    });
+                    } else {
+                        location.reload();
+                    }
+                };
             }
-          };
         } else {
-          btn.textContent = i18nh.t('Login');
-          userLabel.textContent = '';
-          btn.classList.remove('btn-danger');
-          btn.classList.add('btn-warning');
-          btn.onclick = function() {
-            // Your reconnect logic here
-            if (typeof globalThis.StartClient === 'function') {
-              globalThis.StartClient( oStartCb ).then(() => {
-                console.log('Reconnected with status ');
-                checkProxyState()
-              }).catch((error) => {
-                console.log("Error reconnecting:", error);
-              });
-            } else {
-              location.reload();
-            }
-          };
+            btn.classList.add('d-none');
+            userLabel.textContent = '';
         }
-      } else {
-        btn.classList.add('d-none');
-        userLabel.textContent = '';
-      }
     }
 
     setStatusDot(false);
     showReconnectButton(true);
 
-    const sites = [
-      {
+    globalThis.g_rootSite = {
         name: "site1",
         container: "container1",
         status: "online",
+        routerPath: "/site1",
         apps: [
           /*{ name: "AppA", status: "Running", cpu: "10%" },
           { name: "AppB", status: "Stopped", cpu: "0%" } */
-        ]
-      },
-      /*{
-        name: "site2",
-        status: "offline",
-        container: "container2",
-        apps: [
-          { name: "AppC", status: "Running", cpu: "7%" }
-        ]
-      }*/
-    ];
-    globalThis.g_sites = sites;
+        ],
+        children:{
+          /*
+          "child1" : { site : {}, proxy : null, params : {}}
+          */
+        }
+    }
+
     function getDisplayName(app) {
         if( app.display_name && app.display_name.length > 0 )
             return i18nHelper.t(app.display_name);
         return i18nHelper.t(app.name);
     }
-    function updateSites(sites) {
+    function updateSite( site = null ) {
+        var curProxy = globalThis.curProxy;
+        if( curProxy === null )
+            return;
+        if( site === null )
+            site = globalThis.GetSite( curProxy.m_strRouterPath ); 
         if( globalThis.curSpModal )
         {
             updateAppDetailModal( globalThis.curSpModal.currentApp,
                 globalThis.curSpModal.currentSite );
         }
-        if( !globalThis.curSpModal || !globalThis.oProxy || globalThis.oProxy.m_iState === 0 )
+        if( !globalThis.curSpModal || !curProxy || curProxy.m_iState === 0 )
         {
             const sitesRow = document.getElementById('sites-row');
             var siteCard = null;
-            sites.forEach(site => {
-              appRow = document.getElementById(`app-row-${site.name}`);
-              if( appRow.children.length !== site.apps.length )
-              {
-                  renderSites(sites);
-                  return;
-              }
-            })
-            sites.forEach(site => {
-              for( const app of site.apps ) {
-                  appTitle = document.getElementById(`app-title-${app.name}-${site.name}`);
-                  appTitle.textContent = getDisplayName(app);
-                  appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
-                  if( appStatus )
-                  {
-                      let statusClass = '';
-                      if (app.status === i18nHelper.t("APP_STATUS_RUNNING")) {
-                            statusClass = 'bg-success text-white px-2 rounded';
-                      } else if (app.status === i18nHelper.t("APP_STATUS_STOPPED")) {
-                            statusClass = 'bg-danger text-white px-2 rounded';
-                      } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
-                            statusClass = 'bg-secondary text-white px-2 rounded';
-                      }
-                      appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
-                  }
-              }
-            })
+            {
+                appRow = document.getElementById(`app-row-${site.name}`);
+                if( !appRow )
+                    return;
+                
+                if( appRow.children.length !== site.apps.length )
+                {
+                    renderSite(site);
+                    return;
+                }
+                for( const app of site.apps ) {
+                    appTitle = document.getElementById(`app-title-${app.name}-${site.name}`);
+                    appTitle.textContent = getDisplayName(app);
+                    appStatus = document.getElementById(`app-status-${app.name}-${site.name}`)
+                    if( appStatus )
+                    {
+                        let statusClass = '';
+                        if (app.status === i18nHelper.t("APP_STATUS_RUNNING")) {
+                              statusClass = 'bg-success text-white px-2 rounded';
+                        } else if (app.status === i18nHelper.t("APP_STATUS_STOPPED")) {
+                              statusClass = 'bg-danger text-white px-2 rounded';
+                        } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
+                              statusClass = 'bg-secondary text-white px-2 rounded';
+                        }
+                        appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+                    }
+                }
+            }
         }
     }
 
-    function renderSites(sites) {
+    function renderSite(site) {
         const sitesRow = document.getElementById('sites-row');
         sitesRow.innerHTML = ''; // Clear previous content
 
-        sites.forEach(site => {
+        if( site )
+        {
             // Create site card
             const siteCol = document.createElement('div');
             siteCol.className = 'col-12 mb-4';
@@ -369,7 +391,7 @@
                 appCard.className = 'card text-center';
                 appCard.style.cursor = 'pointer';
                 appCard.onclick = function() {
-                    if( !globalThis.curSpModal && globalThis.oProxy )
+                    if( !globalThis.curSpModal && globalThis.curProxy )
                         showAppDetailModal(app, site);
                 }
 
@@ -409,29 +431,43 @@
             siteCard.appendChild(siteBody);
             siteCol.appendChild(siteCard);
             sitesRow.appendChild(siteCol);
-        });
+        };
     }
 
     globalThis.g_bAuth = false
     globalThis.g_strAuthMech = ""
 
     var iChecks = 0;
-    function DoCleanup()
+    function DoCleanup( siteToCleanup = null )
     {
+        let site = siteToCleanup;
+        if( siteToCleanup === null )
+            site = globalThis.g_rootSite;
+
         setStatusDot(false);
         showReconnectButton(true, false);
         clearLogs();
-        if( g_sites && g_sites.length > 0 )
+        if( site.apps )
         {
-            g_sites.forEach(site => {
-                site.apps.forEach(app => {
-                    app.status = i18nHelper.t("APP_STATUS_UNKNOWN");
-                    app.cpu = "N/A";
-                });
+            site.apps.forEach(app => {
+                app.status = i18nHelper.t("APP_STATUS_UNKNOWN");
+                app.cpu = "N/A";
             });
-            updateSites(globalThis.g_sites);
+            if( site.children )
+                site.children.forEach( ( oInfo, name ) => {
+                    if( oInfo.oProxy )
+                    {
+                      DoCleanup( oInfo.oProxy );
+                      oInfo.oProxy.Stop();
+                    }
+                });
+            site.children = {}
+            updateSite(site);
         }
-        globalThis.oProxy = null;
+        if( siteToCleanup !== null )
+            return;
+        globalThis.curProxy = null;
+        globalThis.rootProxy = null;
         if( globalThis.curSpModal )
         {
             globalThis.curSpModal.hide();
@@ -447,20 +483,20 @@
     showReconnectButton(true, false);
 
     function checkProxyState(){
-        if( globalThis.oProxy === undefined ){
+        if( globalThis.rootProxy === undefined ){
             setTimeout( checkProxyState, 2000 );
             console.log( "Waiting RPC connection ready..." );
-        }else if( globalThis.oProxy === null ){
+        }else if( globalThis.rootProxy === null ){
             console.log( "RPC connection is shutdown abnormally..." );
             DoCleanup();
-        }else if( globalThis.oProxy.m_iState === 0 ){
+        }else if( globalThis.rootProxy.m_iState === 0 ){
             console.log( "RPC connection is down..." );
             DoCleanup();
         }else{
             if( iChecks++ === 0 )
             {
                 //fetchLogs();
-                console.log( "RPC connection ready " + globalThis.oProxy );
+                console.log( "RPC connection ready " + globalThis.curProxy );
             }
             setTimeout( checkProxyState, 5000 );
         }
@@ -471,17 +507,18 @@
     { document.getElementById('logs-panel').textContent = ""; }
 
     function fetchStatus() {
-      if( !globalThis.oProxy)
+      if( !globalThis.curProxy)
       {
           clearInterval(globalThis.fetchStatusInterval);
           globalThis.fetchStatusInterval = undefined;
           return Promise.resolve(0);
       }
 
-      if( globalThis.funcStartPullInfo ){
+      if( globalThis.funcStartPullInfo && globalThis.curProxy ){
+          var startPullInfo = globalThis.funcStartPullInfo.bind( globalThis.curProxy );
           console.log( "Start pulling info..." );
-          return globalThis.funcStartPullInfo().then((ret) => {
-              updateSites(globalThis.g_sites);
+          return startPullInfo().then((ret) => {
+              updateSite();
           }).catch((error) => {
               console.log("Error fetching status:", error);
           });
@@ -489,7 +526,7 @@
         return Promise.resolve(0);
     }
     function fetchLogs() {
-      if( !globalThis.oProxy)
+      if( !globalThis.curProxy)
       {
           clearInterval(globalThis.fetchLogsInterval);
           globalThis.fetchLogsInterval = undefined;
@@ -531,7 +568,7 @@
               console.log("Error fetching logs:", ret);
           }
       };
-      return globalThis.oProxy.GetLargePointValue(
+      return globalThis.curProxy.GetLargePointValue(
           oContext, "loggersvr1/logcontent").then((ret) => {
           Promise.resolve(ret); 
       }).catch((error) => {
@@ -616,7 +653,7 @@
             var newValue = document.getElementById('setpv-value').value;
             const { app, pointName } = globalThis.setpvContext || {};
 
-            if( !app || !globalThis.oProxy )
+            if( !app || !globalThis.curProxy )
                 return;
             const fullPointPath = `${app.name}/${pointName}`;
             var oContext = Object();
@@ -673,13 +710,13 @@
             }
             iType = str2type(iType);
             var oVar = globalThis.NewVariant( iType, newValue );
-            return globalThis.oProxy.SetPointValue( oContext, fullPointPath, oVar ).then((ret)=>{
+            return globalThis.curProxy.SetPointValue( oContext, fullPointPath, oVar ).then((ret)=>{
                 setpointMap.get(pointName).v = newValue;
                 setpointMap.get(pointName).cnt++;
                 if( pointName === "display_name" )
                 {
                     app.display_name = newValue;
-                    updateSites(globalThis.g_sites);
+                    updateSite();
                 }
                 setTimeout(() => {
                     bootstrap.Modal.getInstance(document.getElementById('setpvModal')).hide();
@@ -904,9 +941,9 @@
         modalEl.addEventListener('hidden.bs.modal', function spthandler(event) {
             document.getElementById('setpointsTableBody').innerHTML = '';
             modalEl.removeEventListener('hidden.bs.modal', spthandler);
-            if( globalThis.curSpModal && globalThis.oProxy)
+            if( globalThis.curSpModal && globalThis.curProxy)
             {
-                return globalThis.oProxy.RemoveListener( Object() ).then((ret)=>{
+                return globalThis.curProxy.RemoveListener( Object() ).then((ret)=>{
                     var modal = globalThis.curSpModal;
                     if ( !modal )
                         return;
@@ -953,7 +990,10 @@
     var oStartCb = ((context, ret)=>{
       setStatusDot(true);
       showReconnectButton(true, true);
-      renderSites(globalThis.g_sites);
+      globalThis.curProxy = globalThis.rootProxy;
+      // renderSite( globalThis.GetSite(
+      //     globalThis.curProxy.m_strRouterPath ) );
+      initSiteTree()
       return fetchStatus().then((ret)=>{
           return fetchLogs().then((ret)=>{
               globalThis.fetchStatusInterval =
@@ -964,6 +1004,163 @@
       })
     })
     globalThis.StartClient( oStartCb)
+
+// ...existing code...
+/*
+  Render a dropdown tree from the hierarchical backend (g_rootSite or rootProxy).
+  Clicking a site node will switch the current view to that site's router path.
+*/
+function getChildrenArray(node) {
+  if (!node) return [];
+  if (typeof node.children === 'object' && node.children !== null)
+    return Object.keys(node.children).map(k => ({ key: k, node: node.children[k] }));
+  return [];
+}
+
+function renderSiteTree(rootNode) {
+  const container = document.getElementById('siteTreeContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  function buildNode(elem, path) {
+    const li = document.createElement('li');
+    li.style.listStyle = 'none';
+    li.style.padding = '2px 4px';
+
+    const label = document.createElement('div');
+    label.className = 'd-flex justify-content-between align-items-center';
+    label.style.cursor = 'pointer';
+    label.textContent = elem.name
+
+    // compute routerPath for this node
+    const routerPath = path
+
+    // If this element holds a site object, attach click handler to select it
+    const siteObj = elem;
+    if (siteObj ) {
+        label.onclick = function (e) {
+            e.stopPropagation();
+            const routerPath = computeRouterPathFromNode(elem)
+            if (routerPath) {
+                selectSiteByRouterPath(routerPath);
+                // close dropdown
+                const btn = document.getElementById('siteTreeDropdownBtn');
+                const dd = bootstrap.Dropdown.getInstance(btn);
+                if (dd) dd.hide();
+            }
+        };
+    } else {
+        // folder node: toggle children
+        label.onclick = function(e) {
+            e.stopPropagation();
+            li.classList.toggle('open');
+            const sub = li.querySelector('ul');
+            if (sub) sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
+        };
+    }
+    li.appendChild(label);
+
+    // children
+    const childUl = document.createElement('ul');
+    childUl.style.paddingLeft = '0.6rem';
+    childUl.style.margin = '0';
+    childUl.style.display = 'none';
+    li.appendChild(childUl);
+
+    const children = getChildrenArray(elem.node);
+    if (children.length) {
+      children.forEach((c, idx) => {
+        // normalize child element shape
+        let childElem = c;
+        if (c.key !== undefined && c.node !== undefined)
+          childElem = { key: c.key, node: c.node, name: c.key };
+        else if (c.name) childElem = c;
+        const delimiter = (path === '/' ) ? '' : '/';
+        childUl.appendChild(buildNode(childElem, path ? (path + delimiter + (childElem.name || childElem.key)) : (childElem.name || childElem.key)));
+      });
+    }
+    return li;
+  }
+
+  const rootUl = document.createElement('ul');
+  rootUl.style.paddingLeft = '0';
+  // If rootNode is an object with children mapping, convert to consistent element
+  let rootElem = { node: rootNode, name: rootNode.name || 'Root' };
+  rootUl.appendChild(buildNode(rootElem, rootNode.routerPath ));
+  container.appendChild(rootUl);
+}
+
+// Attempt to compute routerPath from node element by walking up from name strings.
+// This utility assumes the tree labels represent path components and returns a path string.
+function computeRouterPathFromNode(elem) {
+  // If the node already has a params object with router path, try to use it
+  return elem.node.routerPath;
+}
+/*
+ * Select site by routerPath WITHOUT starting clients.
+ * Assumes GetProxy/GetSite work against the pre-built hierarchy.
+ */
+function selectSiteByRouterPath(routerPath) {
+    if (!routerPath) return;
+
+    // if already selected, just re-render
+    if (globalThis.curProxy && globalThis.curProxy.m_strRouterPath === routerPath) {
+        const site = globalThis.GetSite(routerPath);
+        if (site) renderSite(site);
+        return;
+    }
+
+    // Try to get proxy and site directly from pre-built structures
+    const proxy = (typeof globalThis.GetProxy === 'function') ? globalThis.GetProxy(routerPath) : null;
+    const site = (typeof globalThis.GetSite === 'function') ? globalThis.GetSite(routerPath) : null;
+
+    // Update current proxy and render site (proxy may be null if not available)
+    globalThis.curProxy = proxy || null;
+    if (site) {
+        renderSite(site);
+    } else {
+        console.warn('selectSiteByRouterPath: site not found for', routerPath);
+    }
+
+    // refresh status/logs state for new curProxy
+    if (globalThis.curProxy) {
+        // ensure status/logs polling targets the new proxy
+        clearInterval(globalThis.fetchStatusInterval);
+        clearInterval(globalThis.fetchLogsInterval);
+        globalThis.fetchStatusInterval = setInterval(fetchStatus, 5000);
+        globalThis.fetchLogsInterval = setInterval(fetchLogs, 30000);
+        fetchStatus();
+        fetchLogs();
+    } else {
+        // no proxy: stop polling and clear display
+        clearInterval(globalThis.fetchStatusInterval);
+        clearInterval(globalThis.fetchLogsInterval);
+        setStatusDot(false);
+        showReconnectButton(true, false);
+        clearLogs();
+    }
+}
+function initSiteTreeButtons() {
+  document.getElementById('expandAllSitesBtn').onclick = () => {
+    document.querySelectorAll('#siteTreeContainer ul').forEach(u => u.style.display = 'block');
+  };
+  document.getElementById('collapseAllSitesBtn').onclick = () => {
+    document.querySelectorAll('#siteTreeContainer ul').forEach(u => u.style.display = 'none');
+  };
+}
+
+// initialize site tree when data ready
+function initSiteTree() {
+  const rootNode = globalThis.g_rootSite;
+  if (!rootNode) return;
+  renderSiteTree(rootNode);
+  initSiteTreeButtons();
+  renderSite(rootNode);
+}
+
+// call initSiteTree after StartClient / data loaded
+// setTimeout(() => { initSiteTree(); }, 500);
+// ...existing code...
 
   ////# sourceURL=rpcf://htmlcode/appmonhtml.js
   </script>

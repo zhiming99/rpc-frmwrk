@@ -478,7 +478,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
         var key, oPending;
         for( [key, oPending] of this.m_mapPendingReqs )
         {
-            if( oPending.m_oObject === oProxy )
+            if( oPending.m_oObject === this )
             {
                 oPending.m_oResp = oResp
                 oPending.m_oReject( oPending )

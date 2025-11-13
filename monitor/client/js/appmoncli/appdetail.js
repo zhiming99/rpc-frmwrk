@@ -98,12 +98,12 @@ function str2type( strType )
 
 globalThis.fetchAppDetails = () =>
 {
-    if( !globalThis.curSpModal || ! globalThis.oProxy )
+    if( !globalThis.curSpModal || ! globalThis.curProxy )
         return Promise.resolve(0)
     try{
         const app = globalThis.curSpModal.currentApp;
         // Fetch and display app details for the selected app
-        const oProxy = globalThis.oProxy;
+        const oProxy = globalThis.curProxy;
         if( app.bRegistered && app.bRegistered === true )
         {
             // keep-alive request to prevent browser from being disconnected
@@ -307,9 +307,9 @@ globalThis.downloadPointLog = ( oContext, ptPath, logName, avgalgo, timeRangeSec
 {
     globalThis.oStmCtx = oContext
     return new Promise( ( resolve, reject ) =>{
-        if( !globalThis.oProxy )
+        if( !globalThis.curProxy )
             return reject( new Error("No proxy available") );
-        var oProxy = globalThis.oProxy
+        var oProxy = globalThis.curProxy
         // oContext.m_oResolve is used by GetPtLog callbacks,
         // so we use m_oResolve2 here
         oContext.m_oResolve2 = resolve;
