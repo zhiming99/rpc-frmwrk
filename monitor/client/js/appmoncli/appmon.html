@@ -461,7 +461,7 @@
                       oInfo.oProxy.Stop();
                     }
                 });
-            site.children = {}
+            site.children = new Map()
             updateSite(site);
         }
         if( siteToCleanup !== null )
@@ -1012,9 +1012,12 @@
 */
 function getChildrenArray(node) {
   if (!node) return [];
+  var o=[]
   if (typeof node.children === 'object' && node.children !== null)
-    return Object.keys(node.children).map(k => ({ key: k, node: node.children[k] }));
-  return [];
+      node.children.forEach( ( value, strKey )=>{
+          o.push( { key: strKey, node : value } )
+      })
+  return o;
 }
 
 function renderSiteTree(rootNode) {
@@ -1064,7 +1067,7 @@ function renderSiteTree(rootNode) {
     const childUl = document.createElement('ul');
     childUl.style.paddingLeft = '0.6rem';
     childUl.style.margin = '0';
-    childUl.style.display = 'none';
+    // childUl.style.display = 'none';
     li.appendChild(childUl);
 
     const children = getChildrenArray(elem.node);
@@ -1085,7 +1088,8 @@ function renderSiteTree(rootNode) {
   const rootUl = document.createElement('ul');
   rootUl.style.paddingLeft = '0';
   // If rootNode is an object with children mapping, convert to consistent element
-  let rootElem = { node: rootNode, name: rootNode.name || 'Root' };
+  let rootElem = { node: rootNode,
+      name: rootNode.name === '/' ? 'Root' : rootNode.name };
   rootUl.appendChild(buildNode(rootElem, rootNode.routerPath ));
   container.appendChild(rootUl);
 }
@@ -1094,7 +1098,7 @@ function renderSiteTree(rootNode) {
 // This utility assumes the tree labels represent path components and returns a path string.
 function computeRouterPathFromNode(elem) {
   // If the node already has a params object with router path, try to use it
-  return elem.node.routerPath;
+  return elem.node.routerPath || elem.node.site.routerPath ;
 }
 /*
  * Select site by routerPath WITHOUT starting clients.

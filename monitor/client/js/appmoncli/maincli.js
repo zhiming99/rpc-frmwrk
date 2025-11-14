@@ -53,8 +53,8 @@ function SetProxy( oProxy, bClear = false )
 
     var parent = GetSite( routerPath.substring(
         0, routerPath.lastIndexOf( '/' ) ) );
-    var childObj = parent.children[ routerPath.substring(
-        routerPath.lastIndexOf( '/' ) + 1 ) ];
+    var childObj = parent.children.get( routerPath.substring(
+        routerPath.lastIndexOf( '/' ) + 1 ) );
     if( childObj === undefined )
         return;
     if( !bClear )
@@ -65,14 +65,17 @@ function SetProxy( oProxy, bClear = false )
 
 function GetProxy( routerPath )
 {
+    if( routerPath === "/" )
+        return globalThis.rootProxy
+
     var site = GetSite( routerPath );
     if( site === null )
         return null;
 
     var parent = GetSite( routerPath.substring(
         0, routerPath.lastIndexOf( '/' ) ) );
-    var childObj = parent.children[ routerPath.substring(
-        routerPath.lastIndexOf( '/' ) + 1 ) ];
+    var childObj = parent.children.get( routerPath.substring(
+        routerPath.lastIndexOf( '/' ) + 1 ) );
     if( childObj === undefined )
         return null;
     return childObj.oProxy;
@@ -101,13 +104,12 @@ function SetSite( routerPath1, oSite )
 
     childName = routerPath1.substring(
         routerPath1.lastIndexOf( '/' ) + 1 );
-    var childObj = parentSite.children[ childName ];
+    var childObj = parentSite.children.get( childName );
     if( childObj !== undefined )
     {
         childObj.site = oSite;
         childObj.site.routerPath = routerPath1; 
     }
-
 }
 
 function GetSite( routerPath = null )
@@ -121,17 +123,16 @@ function GetSite( routerPath = null )
     if( nodeList.length === 0 ||
         !globalThis.g_rootSite.children )
         return null
-    while( nodeList[ nodeList.length - 1 ] === '/' )
+    while( nodeList[ nodeList.length - 1 ] === "" )
         nodeList.pop();
     if( nodeList.length === 0 )
         return null
     var site = globalThis.g_rootSite;
-    for( var i = 1; i < nodeList.length; i++ )
-    {
-        if( site.children[ nodeList[i] ] === undefined )
-            return null;
-        site = site.children[ nodeList[i] ].site;
-    }
+    var oNode = site.children.get(
+        nodeList[ nodeList.length - 1 ] ) 
+    if( !oNode )
+        return null;
+    site = oNode.site;
     return site;
 }
 
@@ -156,7 +157,9 @@ function StartPullInfo()
             if( ERROR( ret ) )
                 return
 
-            var site= {}
+            var site= GetSite( this.m_strRouterPath )
+            if( site === null )
+                site = {}
             site.apps = []
             for ( var i = 0; i < arrApps.length; i++ )
             {
@@ -244,7 +247,12 @@ function StartPullInfo()
                 return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
                     console.log( 'request GetPointValues is done with status ' + ret );
                     if( globalThis.curProxy )
+                    {
+                        oContext.m_iRet = 0
+                        if( oContext.m_oResolve1 )
+                            oContext.m_oResolve1( oContext )
                         return Promise.resolve( ret );
+                    }
                     var routerName = null;
                     site.apps.forEach( ( app )=>{    
                         if( app.app_class === "rpcrouter" )
@@ -256,27 +264,33 @@ function StartPullInfo()
                     if( routerName !== null )
                     {
                         oContext.oGetLpvCb = ((oContext, ret, rvalue ) => {
+                            var site = GetSite( oAppMonitor_cli.m_strRouterPath )
                             if( ERROR(ret) ) 
                             {
                                 console.log( 'Info: no mmh_node_list found: ' + Int32Value(ret) );
                             }
                             else
                             {
-                                site = GetSite( oAppMonitor_cli.m_strRouterPath )
                                 const decoder = new TextDecoder('utf-8')
                                 let text=decoder.decode(rvalue);
                                 nodeList = JSON.parse(text);
                                 site.children = new Map();
                                 nodeList.forEach(element => {
-                                    site.children[element.NodeName] =
-                                        { site: { apps: [], name: element.NodeName, status: "online", routerPath: element.RouterPath}, oProxy: null, params: element };
+                                    site.children.set( element.NodeName, {
+                                        site: {
+                                            apps: [],
+                                            name: element.NodeName,
+                                            status: "online",
+                                        },
+                                        oProxy: null,
+                                        params: element });
                                 });
                             }
-                            SetSite( oAppMonitor_cli.m_strRouterPath, site );
+                            SetSite( oAppMonitor_cli.m_strRouterPath, site )
                         }).bind( oAppMonitor_cli )
                         return oAppMonitor_cli.GetLargePointValue(
                             oContext, routerName + "/mmh_node_list" ).then((ret)=>{
-                            console.log( 'request GetPointValue is done with status ' + ret );
+                            console.log( 'request GetLargePointValue is done with status ' + ret );
                             if( oAppMonitor_cli.m_strRouterPath === "/" )
                                 globalThis.rootProxy = oAppMonitor_cli;
                             else
@@ -291,10 +305,10 @@ function StartPullInfo()
                                     return Promise.resolve( oContext );
                                 }
                                 var promList = []
-                                for( var childName in site.children )
+                                for( var [ childName, value ] of site.children )
                                 {
                                     (function(childName){
-                                        var childObj = site.children[ childName ];
+                                        var childObj = value;
                                         if( childObj.oProxy === null )
                                         {
                                             var delimiter = (oAppMonitor_cli.m_strRouterPath === "/") ? "" : "/";
@@ -446,5 +460,5 @@ globalThis.AllocBuffer = AllocBuffer;
 globalThis.NewCfgDb = NewCfgDb;
 globalThis.NewVariant = NewVariant;
 globalThis.GetSite = GetSite;
-globalThis.SetProxy = SetProxy;
+globalThis.GetProxy = GetProxy;
 
