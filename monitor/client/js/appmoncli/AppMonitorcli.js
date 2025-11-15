@@ -186,7 +186,7 @@ class CAppMonitor_CliImpl extends CAppMonitorclibase
     {
         // add code here
         if( globalThis.OnPointChanged )
-            globalThis.OnPointChanged( strPtPath, value );
+            globalThis.OnPointChanged( this, strPtPath, value );
     }
 
     // IAppStore::OnPointsChanged

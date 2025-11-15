@@ -234,6 +234,48 @@
       }
     }
 
+    const oStartCb = ((context, ret)=>{
+      setStatusDot(true);
+      showReconnectButton(true, true);
+      globalThis.curProxy = globalThis.rootProxy;
+      // renderSite( globalThis.GetSite(
+      //     globalThis.curProxy.m_strRouterPath ) );
+      initSiteTree()
+      return fetchStatus().then((ret)=>{
+          return fetchLogs().then((ret)=>{
+              globalThis.fetchStatusInterval =
+                  setInterval(fetchStatus, 5000);
+              globalThis.fetchLogsInterval =
+                  setInterval(fetchLogs, 30000);
+          })
+      })
+    })
+
+
+    /**
+     * Clear site tree and related UI/state when user logs out.
+     */
+    function clearSiteTree() {
+        try {
+            // Clear DOM
+            const tree = document.getElementById('siteTreeContainer');
+            if (tree) tree.innerHTML = '';
+
+            const sitesRow = document.getElementById('sites-row');
+            if (sitesRow) sitesRow.innerHTML = '';
+
+            const logsRow = document.getElementById('logs-row');
+            if (logsRow) logsRow.style.display = "none";
+
+            const logsPanel = document.getElementById('logs-panel');
+            if (logsPanel) logsPanel.textContent = '';
+
+        } catch (e) {
+            console.error("clearSiteTree error:", e);
+        }
+    }
+
+
     function showReconnectButton(show, isConnected = false) {
         const btn = document.getElementById('reconnect-btn');
         const userLabel = document.getElementById('user-label');
@@ -257,8 +299,8 @@
                 userLabel.textContent = strUser;
                 btn.onclick = function() {
                     // Your disconnect logic here
-                    if (curProxy && typeof curProxy.Stop === 'function') {
-                        curProxy.Stop();
+                    if (globalThis.rootProxy ) {
+                        globalThis.rootProxy.Stop();
                     } else {
                       // fallback: reload or nullify
                         location.reload();
@@ -292,7 +334,7 @@
     setStatusDot(false);
     showReconnectButton(true);
 
-    globalThis.g_rootSite = {
+    const siteTempl = {
         name: "site1",
         container: "container1",
         status: "online",
@@ -307,6 +349,9 @@
           */
         }
     }
+
+    globalThis.g_rootSite = 
+        JSON.parse( JSON.stringify( siteTempl ) );
 
     function getDisplayName(app) {
         if( app.display_name && app.display_name.length > 0 )
@@ -444,9 +489,6 @@
         if( siteToCleanup === null )
             site = globalThis.g_rootSite;
 
-        setStatusDot(false);
-        showReconnectButton(true, false);
-        clearLogs();
         if( site.apps )
         {
             site.apps.forEach(app => {
@@ -454,29 +496,79 @@
                 app.cpu = "N/A";
             });
             if( site.children )
+            {
+                var taskGrp=[]
+                
                 site.children.forEach( ( oInfo, name ) => {
+                    if( oInfo.site )
+                        DoCleanup( oInfo.site );
                     if( oInfo.oProxy )
                     {
-                      DoCleanup( oInfo.oProxy );
-                      oInfo.oProxy.Stop();
+                        var oProxy = oInfo.oProxy
+                        taskGrp.push( ()=>{
+                        return oProxy.Stop( 0 ).then((e)=>{
+                            console.log( `proxy ${oProxy.m_strRouterPath} stopped`)
+                            return Promise.resolve(0);
+                            }).catch((e)=>{
+                                console.log( `proxy ${oProxy.m_strRouterPath} encountered error during stop ` + e)
+                                return Promise.resolve(e);
+                            })
+                        })
                     }
                 });
-            site.children = new Map()
-            updateSite(site);
-        }
-        if( siteToCleanup !== null )
-            return;
-        globalThis.curProxy = null;
-        globalThis.rootProxy = null;
-        if( globalThis.curSpModal )
-        {
-            globalThis.curSpModal.hide();
-            globalThis.curSpModal = undefined;
-        }
-        const logsRow = document.getElementById('logs-row');
-        logsRow.style.display = "none"
+                async function stopProxies()
+                {
+                    for( const task of taskGrp ){
+                        try{
+                            await task()
+                        }catch( e ){
+                            return Promise.resolve( e )
+                        }
+                    }
+                    return Promise.resolve( 0 )
+                }
+                stopProxies().then((e)=>{
+                    site.children = new Map()
+                    if( GetSite( globalThis.curProxy.m_strRouterPath ) === site )
+                        updateSite(site);
+                    if( site !== globalThis.g_rootSite )
+                        return;
 
-        iChecks = 0;
+                    setStatusDot(false);
+                    showReconnectButton(true, false);
+                    clearLogs();
+                    clearSiteTree();
+
+                    globalThis.curProxy = undefined;
+                    var rootProxy = globalThis.rootProxy
+                    globalThis.rootProxy = undefined;
+                    globalThis.g_strLoginResult = ""
+                    if( globalThis.curSpModal )
+                    {
+                        globalThis.curSpModal.hide();
+                        globalThis.curSpModal = undefined;
+                    }
+                    globalThis.g_rootSite =
+                        JSON.parse( JSON.stringify( siteTempl ) ); 
+                    const logsRow = document.getElementById('logs-row');
+                    logsRow.style.display = "none"
+                    iChecks = 0;
+
+                    if( rootProxy )
+                    {
+                        return rootProxy.Stop().then((e)=>
+                        {
+                            console.log( "rootProxy stopped" );
+                        }).catch( (e)=>{
+                            console.log( "Error stopping rootProxy" );
+                        })
+                    }
+                }).catch((e)=>{
+                    console.log( "Stop Child Client failed with " + e );
+                    return Promise.resolve(-1);
+                })
+            }
+        }
     }
 
     setStatusDot(false);
@@ -506,6 +598,21 @@
     function clearLogs()
     { document.getElementById('logs-panel').textContent = ""; }
 
+    function pollingBgSites()
+    {
+        if( !globalThis.rootProxy )
+        {
+          clearInterval(globalThis.pollingBgSitesInterval);
+          globalThis.pollingBgSitesInterval = undefined;
+          return Promise.resolve(0);
+        }
+        return globalThis.PollAllSites().then((e)=>{
+          return Promise.resolve( 0 )
+        }).catch(error=>{
+          console.log("Error polling sites:", error);
+          return Promise.resolve( error )
+        })
+    }
     function fetchStatus() {
       if( !globalThis.curProxy)
       {
@@ -924,7 +1031,9 @@
         modal.currentSite = site;
         modal.currentApp = app;
 
-        globalThis.OnPointChanged = (strPtPath, value) => {
+        globalThis.OnPointChanged = ( oProxy, strPtPath, value) => {
+            if( globalThis.curProxy !== oProxy )
+                return
             if (modal.currentApp && modal.currentApp.setpoints) {
                 var arrComps = strPtPath.split('/')
                 if( arrComps.length < 2 )
@@ -952,8 +1061,6 @@
                         modal.currentApp.setpoints = new Map();
                     console.log("Listener removed:", ret);
                     globalThis.curSpModal = null;
-                    // globalThis.fetchStatusInterval =
-                    //     setInterval(fetchStatus, 5000);
                     globalThis.fetchLogsInterval =
                         setInterval(fetchLogs, 30000);
                 }).catch((error)=>{
@@ -965,8 +1072,6 @@
                         modal.currentApp.setpoints = new Map();
                     console.log("Error removing listener:", error);
                     globalThis.curSpModal = null;
-                    // globalThis.fetchStatusInterval =
-                    //     setInterval(fetchStatus, 5000);
                     globalThis.fetchLogsInterval =
                         setInterval(fetchLogs, 30000);
                 });
@@ -980,29 +1085,11 @@
         document.getElementById('setpoint-type-header').textContent =
             i18nHelper.t("Point Type", {}, "setpoint");
         modal.show();
-        // clearInterval(globalThis.fetchStatusInterval);
-        // globalThis.fetchStatusInterval = undefined;
         clearInterval(globalThis.fetchLogsInterval);
         globalThis.fetchLogsInterval = undefined;
         fetchStatus();
     }
 
-    var oStartCb = ((context, ret)=>{
-      setStatusDot(true);
-      showReconnectButton(true, true);
-      globalThis.curProxy = globalThis.rootProxy;
-      // renderSite( globalThis.GetSite(
-      //     globalThis.curProxy.m_strRouterPath ) );
-      initSiteTree()
-      return fetchStatus().then((ret)=>{
-          return fetchLogs().then((ret)=>{
-              globalThis.fetchStatusInterval =
-                  setInterval(fetchStatus, 5000);
-              globalThis.fetchLogsInterval =
-                  setInterval(fetchLogs, 30000);
-          })
-      })
-    })
     globalThis.StartClient( oStartCb)
 
 // ...existing code...
@@ -1160,12 +1247,11 @@ function initSiteTree() {
   renderSiteTree(rootNode);
   initSiteTreeButtons();
   renderSite(rootNode);
+  globalThis.pollingBgSitesInterval = setInterval( pollingBgSites, 40000);
 }
 
 // call initSiteTree after StartClient / data loaded
 // setTimeout(() => { initSiteTree(); }, 500);
-// ...existing code...
-
   ////# sourceURL=rpcf://htmlcode/appmonhtml.js
   </script>
   <p id="rpcf_load_notify"><br /></p>

@@ -28,10 +28,10 @@ const { CAppMonitor_CliImpl } = require( './AppMonitorcli' );
 
 // var oAppMonitor_cli = null;
 
-function CountChar(str, char) {
+function CountChar(str, ch) {
     let count = 0;
     for (let i = 0; i < str.length; i++) {
-        if (str[i] === char) {
+        if (str[i] === ch) {
             count++;
         }
     }
@@ -42,7 +42,13 @@ function SetProxy( oProxy, bClear = false )
 {
     var routerPath = oProxy.m_strRouterPath;
     if( routerPath === "/" )
+    {
+        if( bClear )
+            globalThis.rootProxy = null
+        else
+            globalThis.rootProxy = oProxy
         return
+    }
     while( routerPath.endsWith( '/' ) )
         routerPath = routerPath.substring( 0, routerPath.length - 1 );
 
@@ -53,14 +59,13 @@ function SetProxy( oProxy, bClear = false )
 
     var parent = GetSite( routerPath.substring(
         0, routerPath.lastIndexOf( '/' ) ) );
-    var childObj = parent.children.get( routerPath.substring(
-        routerPath.lastIndexOf( '/' ) + 1 ) );
-    if( childObj === undefined )
-        return;
-    if( !bClear )
-        childObj.oProxy = oProxy;
-    else
-        childObj.oProxy = null;
+
+    var childObj = ( parent && parent.children ) ?
+        parent.children.get( routerPath.substring(
+            routerPath.lastIndexOf( '/' ) + 1 ) ) : null
+    if( !childObj )
+        return
+    childObj.oProxy = bClear ? null : oProxy;
 }
 
 function GetProxy( routerPath )
@@ -68,17 +73,38 @@ function GetProxy( routerPath )
     if( routerPath === "/" )
         return globalThis.rootProxy
 
-    var site = GetSite( routerPath );
-    if( site === null )
-        return null;
-
     var parent = GetSite( routerPath.substring(
         0, routerPath.lastIndexOf( '/' ) ) );
-    var childObj = parent.children.get( routerPath.substring(
-        routerPath.lastIndexOf( '/' ) + 1 ) );
-    if( childObj === undefined )
-        return null;
-    return childObj.oProxy;
+
+    return ( parent && parent.children ) ? 
+        parent.children.get( routerPath.substring(
+        routerPath.lastIndexOf( '/' ) + 1 ) ).oProxy : null;
+}
+
+function GetChildProxies( parentSite, vecProxies )
+{
+    if( !parentSite || !parentSite.children )
+        return
+
+    parentSite.children.forEach( ( oInfo, key )=>
+    {
+        var oProxy = oInfo.oProxy
+        if( !oProxy )
+            return
+        var site = GetSite( oProxy.m_strRouterPath )
+        if( site && site.children )
+            GetChildProxies( oProxy, vecProxies )
+        vecProxies.push( oProxy )
+    })
+}
+
+function GetAllProxies()
+{
+    var vecProxies = []
+    GetChildProxies( globalThis.g_rootSite, vecProxies )
+    if( globalThis.rootProxy )
+        vecProxies.push( globalThis.rootProxy )
+    return vecProxies
 }
 
 function ClearProxy( routerPath )
@@ -102,10 +128,11 @@ function SetSite( routerPath1, oSite )
         routerPath = "/"
     var parentSite = GetSite( routerPath );
 
-    childName = routerPath1.substring(
+    var childName = routerPath1.substring(
         routerPath1.lastIndexOf( '/' ) + 1 );
-    var childObj = parentSite.children.get( childName );
-    if( childObj !== undefined )
+    var childObj = ( parentSite && parentSite.children ) ?
+        parentSite.children.get( childName ) :null
+    if( childObj )
     {
         childObj.site = oSite;
         childObj.site.routerPath = routerPath1; 
@@ -114,26 +141,86 @@ function SetSite( routerPath1, oSite )
 
 function GetSite( routerPath = null )
 {
-    if( routerPath === null || routerPath === "" )
-        routerPath = globalThis.curProxy ? globalThis.curProxy.m_strRouterPath : "/";
+    if( !routerPath || routerPath == "/" )
+        return globalThis.g_rootSite
+
+    if( routerPath[ 0 ] !== '/' )
+        return null
+
     routerPath = routerPath.trim();
-    if( routerPath === "/" )
+    while( routerPath.endsWith( '/' ) )
+        routerPath = routerPath.substring( 0, routerPath.length - 1 );
+    if( routerPath.length === 0 )
         return globalThis.g_rootSite;
-    var nodeList = routerPath.split( '/' );
-    if( nodeList.length === 0 ||
-        !globalThis.g_rootSite.children )
-        return null
-    while( nodeList[ nodeList.length - 1 ] === "" )
-        nodeList.pop();
-    if( nodeList.length === 0 )
-        return null
-    var site = globalThis.g_rootSite;
-    var oNode = site.children.get(
-        nodeList[ nodeList.length - 1 ] ) 
-    if( !oNode )
-        return null;
-    site = oNode.site;
-    return site;
+
+    var idx = routerPath.lastIndexOf( '/' )
+    var parentPath = routerPath.substring( 0, idx ) 
+
+    if( parentPath === "" )
+        parentPath = "/"
+
+    var parentSite = GetSite( parentPath );
+    var childName = routerPath.substring( idx + 1 );
+    var oNode = ( parentSite && parentSite.children ) ?
+        parentSite.children.get( childName ) : null
+    return oNode ? oNode.site : null;
+}
+
+function PollAllSites()
+{
+    var vecProxies = GetAllProxies()
+    if( vecProxies.length === 0 )
+        return
+
+    if( globalThis.curProxy )
+    {
+        let index = vecProxies.findIndex(el => el === globalThis.curProxy);
+        if( index !== -1 )
+            vecProxies.splice(index, 1);
+    }
+
+    promList = []
+    vecProxies.forEach( (elem)=>{
+        if( !elem )
+            return
+        appsAvail = []
+        var site=GetSite(elem.m_strRouterPath)
+        appsAvail.push( site.apps[0].name );
+
+        promList.push(()=>{
+            var oContext = {}
+            oContext.oIsAppOnlineCb = ((oContext, ret, arrApps ) => {
+                if( ERROR( ret ) )
+                {
+                    console.log( `Error polling proxy ${elem.m_strRouterPath}` )
+                    return
+                }
+            })
+            return elem.IsAppOnline( oContext, appsAvail )
+                .then((ret) => Promise.resolve(ret))
+                .catch((e) =>{
+                    return Promise.resolve(e);
+                });
+        });
+    })
+
+    var nop ={};
+    async function RunTasks(){
+        let count = 0;
+        for (const task of promList) {
+            try {
+                await task();
+                count++;
+            } catch (e) {
+                // continue on error, already logged in task
+            }
+        }
+        return Promise.resolve( ret );
+    };
+    return RunTasks().catch((e)=>{
+        console.log( "Start Child Client failed with " + e );
+        return Promise.resolve(-1);
+    });
 }
 
  // start the client object
@@ -159,7 +246,7 @@ function StartPullInfo()
 
             var site= GetSite( this.m_strRouterPath )
             if( site === null )
-                site = {}
+                site = new Map()
             site.apps = []
             for ( var i = 0; i < arrApps.length; i++ )
             {
@@ -291,14 +378,11 @@ function StartPullInfo()
                         return oAppMonitor_cli.GetLargePointValue(
                             oContext, routerName + "/mmh_node_list" ).then((ret)=>{
                             console.log( 'request GetLargePointValue is done with status ' + ret );
-                            if( oAppMonitor_cli.m_strRouterPath === "/" )
-                                globalThis.rootProxy = oAppMonitor_cli;
-                            else
-                                SetProxy( oAppMonitor_cli )
+                            SetProxy( oAppMonitor_cli )
                             var site=GetSite(oAppMonitor_cli.m_strRouterPath)
                             if( site && site.children )
                             {
-                                if( CountChar( oAppMonitor_cli.m_strRouterPath, '/' ) > 3 )
+                                if( CountChar( oAppMonitor_cli.m_strRouterPath, '/' ) > 4 )
                                 {
                                     console.log( 'Router path too deep: ' +
                                         oAppMonitor_cli.m_strRouterPath );
@@ -349,7 +433,7 @@ function StartPullInfo()
                                 };
                                 StartChild().catch((e)=>{
                                     console.log( "Start Child Client failed with " + e );
-                                    return Promise.resolve(ret);
+                                    return Promise.resolve(-1);
                                 });
                             }
                             else
@@ -461,4 +545,4 @@ globalThis.NewCfgDb = NewCfgDb;
 globalThis.NewVariant = NewVariant;
 globalThis.GetSite = GetSite;
 globalThis.GetProxy = GetProxy;
-
+globalThis.PollAllSites = PollAllSites
