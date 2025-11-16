@@ -215,14 +215,41 @@ function PollAllSites()
                 // continue on error, already logged in task
             }
         }
-        return Promise.resolve( ret );
+        console.log( `polling ${count} background sites completed` );
+        return Promise.resolve( 0 );
     };
     return RunTasks().catch((e)=>{
-        console.log( "Start Child Client failed with " + e );
+        console.log( "polling background sites failed with " + e );
         return Promise.resolve(-1);
     });
 }
 
+function GetSiteParams( routerPath = null )
+{
+    if( !routerPath || routerPath == "/" )
+        return null
+
+    if( routerPath[ 0 ] !== '/' )
+        return null
+
+    routerPath = routerPath.trim();
+    while( routerPath.endsWith( '/' ) )
+        routerPath = routerPath.substring( 0, routerPath.length - 1 );
+    if( routerPath.length === 0 )
+        return globalThis.g_rootSite;
+
+    var idx = routerPath.lastIndexOf( '/' )
+    var parentPath = routerPath.substring( 0, idx ) 
+
+    if( parentPath === "" )
+        parentPath = "/"
+
+    var parentSite = GetSite( parentPath );
+    var childName = routerPath.substring( idx + 1 );
+    var oNode = ( parentSite && parentSite.children ) ?
+        parentSite.children.get( childName ) : null
+    return oNode ? oNode.params : null;
+}
  // start the client object
 function StartPullInfo()
 {
@@ -367,7 +394,8 @@ function StartPullInfo()
                                         site: {
                                             apps: [],
                                             name: element.NodeName,
-                                            status: "online",
+                                            status: element.online==="true" ?
+                                                "online" : "offline",
                                         },
                                         oProxy: null,
                                         params: element });
@@ -546,3 +574,4 @@ globalThis.NewVariant = NewVariant;
 globalThis.GetSite = GetSite;
 globalThis.GetProxy = GetProxy;
 globalThis.PollAllSites = PollAllSites
+globalThis.GetSiteParams = GetSiteParams

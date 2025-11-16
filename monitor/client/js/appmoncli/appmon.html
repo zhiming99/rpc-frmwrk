@@ -216,6 +216,7 @@
       document.getElementById('setpv-dlg-btn-cancel').textContent = i18nh.t("BUTTON_CANCEL");
       document.getElementById("setpoints-dlg-close-btn").textContent = i18nh.t("BUTTON_CLOSE");
       document.getElementById("timeseries-dlg-close-btn").textContent = i18nh.t("BUTTON_CLOSE");
+      document.getElementById("siteTreeDropdownBtn").textContent = i18nh.t("BUTTON_SITES");
       document.querySelector('#logContextMenu [data-range="1h"]').textContent = i18nh.t("LAST_200_SAMPLES");
       document.querySelector('#logContextMenu [data-range="2h"]').textContent = i18nh.t("LAST_2000_SAMPLES");
       document.querySelector('#logContextMenu [data-range="3h"]').textContent = i18nh.t("LAST_20000_SAMPLES");
@@ -334,24 +335,21 @@
     setStatusDot(false);
     showReconnectButton(true);
 
-    const siteTempl = {
-        name: "site1",
-        container: "container1",
-        status: "online",
-        routerPath: "/site1",
-        apps: [
-          /*{ name: "AppA", status: "Running", cpu: "10%" },
-          { name: "AppB", status: "Stopped", cpu: "0%" } */
-        ],
-        children:{
-          /*
-          "child1" : { site : {}, proxy : null, params : {}}
-          */
+    function initRootSite()
+    {
+        globalThis.g_rootSite = {
+            name: "site1",
+            container: "container1",
+            status: "online",
+            routerPath: "/site1",
+            apps: [
+            /*{ name: "AppA", status: "Running", cpu: "10%" },
+            { name: "AppB", status: "Stopped", cpu: "0%" } */
+            ]
         }
+        globalThis.g_rootSite.children = new Map();
     }
-
-    globalThis.g_rootSite = 
-        JSON.parse( JSON.stringify( siteTempl ) );
+    initRootSite();
 
     function getDisplayName(app) {
         if( app.display_name && app.display_name.length > 0 )
@@ -419,7 +417,22 @@
 
             const siteHeader = document.createElement('div');
             siteHeader.className = 'card-header bg-info text-white';
-            siteHeader.textContent = `${i18nHelper.t("SITE_LABEL")}: ${site.name} (${i18nHelper.t("CONTAINER_LABEL")}: ${site.container})`;
+            const oParams = globalThis.GetSiteParams( site.routerPath );
+            var loc;
+            if( oParams )
+                loc = oParams.IpAddress
+            else
+                loc = (new URL( globalThis.rootProxy.m_strUrl)).hostname
+            // Build header with italicized location
+            siteHeader.textContent = ''; // clear any previous value
+            const headerPrefix = document.createElement('span');
+            headerPrefix.textContent = `${i18nHelper.t("SITE_LABEL")}: ${site.name} (${i18nHelper.t("CONTAINER_LABEL")}: ${site.routerPath} `;
+            const locEm = document.createElement('em');
+            locEm.textContent = loc;
+            const closing = document.createTextNode(')');
+            siteHeader.appendChild(headerPrefix);
+            siteHeader.appendChild(locEm);
+            siteHeader.appendChild(closing);
 
             const siteBody = document.createElement('div');
             siteBody.className = 'card-body';
@@ -548,8 +561,7 @@
                         globalThis.curSpModal.hide();
                         globalThis.curSpModal = undefined;
                     }
-                    globalThis.g_rootSite =
-                        JSON.parse( JSON.stringify( siteTempl ) ); 
+                    initRootSite();
                     const logsRow = document.getElementById('logs-row');
                     logsRow.style.display = "none"
                     iChecks = 0;
@@ -985,7 +997,7 @@
         // Set modal title
         document.getElementById('setpointsModalLabel').textContent = i18nHelper.t("Setpoints");
         document.getElementById('setpointsAppName').textContent = `${i18nHelper.t("APP")}: ${getDisplayName(app)} (${i18nHelper.t("SITE_LABEL")}: ${site.name})`;
-
+        document.getElementById('setpointsAppName').style.fontStyle = "italic";
         const setpoints = app.setpoints 
         const tbody = document.getElementById('setpointsTableBody');
         tbody.innerHTML = '';
@@ -1092,7 +1104,6 @@
 
     globalThis.StartClient( oStartCb)
 
-// ...existing code...
 /*
   Render a dropdown tree from the hierarchical backend (g_rootSite or rootProxy).
   Clicking a site node will switch the current view to that site's router path.

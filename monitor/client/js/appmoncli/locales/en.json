@@ -1,7 +1,7 @@
 {
   "APP_TITLE": "RPC-Framework Monitor",
   "SITE_LABEL": "Site",
-  "CONTAINER_LABEL": "Container",
+  "CONTAINER_LABEL": "Location",
   "APP_STATUS_RUNNING": "Running",
   "APP_STATUS_STOPPED": "Stopped",
   "APP_STATUS_UNKNOWN": "Unknown",
@@ -79,5 +79,6 @@
   "BUTTON_UPDATE": "Update",
   "BUTTON_CANCEL": "Cancel",
   "BUTTON_CLOSE": "Close",
-  "display_name": "Display Name"
+  "display_name": "Display Name",
+  "BUTTON_SITES": "Sites"
 }
