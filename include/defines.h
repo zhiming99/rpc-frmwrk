@@ -329,7 +329,8 @@ gint32 Execve(
     const char* cmd,
     char* const args[],
     char* const env[],
-    const char* szOutput = nullptr );
+    const char* szOutput = nullptr,
+    bool bSync = true );
 
 using stdstr = std::string;
 
