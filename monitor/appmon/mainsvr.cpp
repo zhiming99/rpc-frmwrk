@@ -444,6 +444,7 @@ static void Usage( const char* szName )
         "\t [ -i FORMAT the app-reg file]\n"
         "\t [ -u Enable fuse to dump debug information ]\n"
         "\t [ -l Search first the current directory for configuration files ]\n"
+        "\t [ -m specify a name for monitoring ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -479,7 +480,7 @@ int main( int argc, char** argv)
         bool bDaemon = false;
         bool bDebug = false;
         int opt = 0;
-        while( ( opt = getopt( argc, argv, "hgdiul" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hgdiuln:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -493,6 +494,17 @@ int main( int argc, char** argv)
                     { bDebug = true; break; }
                 case 'l':
                     { g_bLocal = true; break; }
+                case 'm':
+                    {
+                        if( !IsValidName( optarg ) )
+                        {
+                            perror( "Error the monitoring name is not valid" );
+                            ret = -EINVAL;
+                            break;
+                        }
+                        g_strAppInst = optarg;
+                        break;
+                    }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
@@ -622,6 +634,7 @@ int main( int argc, char** argv)
         }
         if( g_bRestart )
         {
+            // restart myself
             system( g_strCmd.c_str() );
         }
         break;

@@ -1662,7 +1662,7 @@ function add_stdapp()
     add_point $_instname pending_tasks output i
     set_attr_value $_instname pending_tasks value "$(jsonval 'i' 0 )" i
     add_point $_instname restart input i
-    set_attr_value $_instname restart pulse "$(jsonval 'i' 1 )" i
+    set_attr_value $_instname restart pulse "$(jsonval 'i' 0 )" i
     add_point $_instname cmdline setpoint blob
     add_point $_instname pid output i 
     add_point $_instname working_dir  setpoint blob

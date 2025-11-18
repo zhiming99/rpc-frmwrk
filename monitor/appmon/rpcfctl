@@ -41,11 +41,20 @@ shift
 
 function is_app_online()
 {
-    online=`bash $cmddir/showapp.sh $1 | grep 'status: online'`
-    if [[ "x$online" == "xstatus: online" ]]; then
-        return 0
+    if check_appreg_mount; then
+        if [ -d ${rootdir} ]; then
+            owner_stream=`python3 $updattr -v ${rootdir}/apps/$1/owner_stream`
+            if [[ -z "$owner_stream" ]] || (( $owner_stream == 0 )); then
+                ret=1        
+            else
+                ret=0
+            fi
+        fi
+        undo_check_appreg_mount
+    else
+        ret=1
     fi
-    return 1
+    return $ret
 }
 
 case "$cmd" in

@@ -80,5 +80,9 @@
   "BUTTON_CANCEL": "Cancel",
   "BUTTON_CLOSE": "Close",
   "display_name": "Display Name",
-  "BUTTON_SITES": "Sites"
+  "BUTTON_SITES": "Sites",
+
+  "MENU_START": "Start",
+  "MENU_STOP": "Stop",
+  "MENU_RESTART": "Restart"
 }

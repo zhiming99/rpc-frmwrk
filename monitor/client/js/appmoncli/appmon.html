@@ -49,6 +49,10 @@
         --bs-table-accent-bg: #4a76a5; /* Light blue, or any color you like */
         background-color: var(--bs-table-accent-bg) !important;
     }
+    .dropdown-item.disabled {
+        pointer-events: none;
+        opacity: 0.6;
+    }
   </style>
 </head>
 <!--<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>-->
@@ -87,10 +91,10 @@
         </div>
       </div>
     </div>
-    <div>
+    <!--<div>
       <button id="expandAllSitesBtn" class="btn btn-sm btn-light me-2">Expand All</button>
       <button id="collapseAllSitesBtn" class="btn btn-sm btn-light">Collapse All</button>
-    </div>
+    </div>-->
   </div>
 
   <div class="row" id="sites-row">
@@ -195,6 +199,12 @@
     <li><a class="dropdown-item" href="#" data-range="full">Full Log</a></li>
   </ul>
 
+    <ul id="appContextMenu" class="dropdown-menu" style="position:absolute; display:none; z-index:2000;">
+      <li><a class="dropdown-item" href="#" data-action="start">Start</a></li>
+      <li><a class="dropdown-item" href="#" data-action="stop">Stop</a></li>
+      <li><a class="dropdown-item" href="#" data-action="restart">Restart</a></li>
+    </ul>
+
   <script src="./i18n-helper.js"></script>
 
   <footer class="text-center text-muted py-3">
@@ -221,6 +231,10 @@
       document.querySelector('#logContextMenu [data-range="2h"]').textContent = i18nh.t("LAST_2000_SAMPLES");
       document.querySelector('#logContextMenu [data-range="3h"]').textContent = i18nh.t("LAST_20000_SAMPLES");
       document.querySelector('#logContextMenu [data-range="full"]').textContent = i18nh.t("FULL_LOG");
+
+      document.querySelector('#appContextMenu [data-action="start"]').textContent = i18nh.t("MENU_START");
+      document.querySelector('#appContextMenu [data-action="stop"]').textContent = i18nh.t("MENU_STOP");
+      document.querySelector('#appContextMenu [data-action="restart"]').textContent = i18nh.t("MENU_RESTART");
     }).catch((error) => {
       console.error("Error loading translations:", error);
     });
@@ -448,6 +462,12 @@
                 const appCard = document.createElement('div');
                 appCard.className = 'card text-center';
                 appCard.style.cursor = 'pointer';
+
+                // Right-click to show app context menu
+                appCard.oncontextmenu = function(e) {
+                    e.preventDefault();
+                    showAppContextMenu(e, app, site);
+                };
                 appCard.onclick = function() {
                     if( !globalThis.curSpModal && globalThis.curProxy )
                         showAppDetailModal(app, site);
@@ -542,7 +562,9 @@
                 }
                 stopProxies().then((e)=>{
                     site.children = new Map()
-                    if( GetSite( globalThis.curProxy.m_strRouterPath ) === site )
+                    var curProxy = globalThis.curProxy
+                    if( curProxy &&
+                        GetSite( curProxy.m_strRouterPath ) === site )
                         updateSite(site);
                     if( site !== globalThis.g_rootSite )
                         return;
@@ -925,9 +947,92 @@
         });
     }
 
-    // Hide menu on click elsewhere
+    // Show app context menu and wire actions
+    function showAppContextMenu(e, app, site) {
+        const menu = document.getElementById('appContextMenu');
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+
+        // clear previous handlers
+        menu.querySelectorAll('.dropdown-item').forEach(item => item.onclick = null);
+        var appName = app.name
+        var routerPath = site.routePath
+
+        // Configure menu items: disable start when running, disable stop when stopped
+        menu.querySelectorAll('.dropdown-item').forEach(item => {
+            const action = item.getAttribute('data-action');
+
+            var curSite = GetSite( routerPath )
+            if( !curSite )
+                return
+            var curApp;
+            curSite.apps.forEach( elem => {
+                if( elem.name === appName )
+                    curApp = elem
+            })
+            if( !curApp )
+                return
+            // Determine app state using i18n strings (matches how statuses are set)
+            const isRunning = (curApp && curApp.status === i18nHelper.t("APP_STATUS_RUNNING"));
+            const isStopped = (curApp && curApp.status === i18nHelper.t("APP_STATUS_STOPPED"));
+
+            if ((action === 'start' && isRunning) || (action === 'stop' && isStopped)) {
+                item.classList.add('disabled');
+                item.setAttribute('aria-disabled', 'true');
+                item.tabIndex = -1;
+                item.onclick = null;
+            } else {
+                item.classList.remove('disabled');
+                item.removeAttribute('aria-disabled');
+                item.tabIndex = 0;
+                // attach handler
+                item.onclick = function(ev) {
+                    ev.preventDefault();
+                    menu.style.display = 'none';
+                    handleAppAction(action, curApp, curSite);
+                };
+            }
+        })
+    }
+
+    // Perform the selected action; adapt to your backend API
+    function handleAppAction(action, app) {
+
+        const oProxy = globalThis.curProxy;
+
+        // Try common method names; adjust to your actual API
+        if (!oProxy) {
+            console.warn('No proxy available for', routerPath);
+            return;
+        }
+
+        // Map actions to proxy methods
+        const actionMap = {
+            start: 1,
+            stop:  2,
+            restart: 3
+        };
+
+        const cmdId = actionMap[action] ;
+
+        if (cmdId) {
+            var oContext = {};
+            oProxy.SetPointValue( oContext,
+                `${app.name}/restart`, 
+                globalThis.NewVariant( str2type("int"), cmdId )
+            ).then((ret) => {
+                console.log(`App ${action} command sent for`, app.name);
+            }).catch((err) => console.error(`Error sending ${action} command for`, app.name, err));
+        }
+    }
+
+    // hide menus when clicking elsewhere (keep existing logContextMenu hide)
     document.addEventListener('click', function() {
-        document.getElementById('logContextMenu').style.display = 'none';
+        const m1 = document.getElementById('logContextMenu');
+        const m2 = document.getElementById('appContextMenu');
+        if (m1) m1.style.display = 'none';
+        if (m2) m2.style.display = 'none';
     });
 
     function BuildSetpointCell( app, pointName, value, rowIndex )
@@ -1256,7 +1361,7 @@ function initSiteTree() {
   const rootNode = globalThis.g_rootSite;
   if (!rootNode) return;
   renderSiteTree(rootNode);
-  initSiteTreeButtons();
+  // initSiteTreeButtons();
   renderSite(rootNode);
   globalThis.pollingBgSitesInterval = setInterval( pollingBgSites, 40000);
 }

@@ -417,6 +417,7 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
                 break;
             ret = 0;
         }
+
         EnumTypeId iType = value.GetTypeId();
         if( iType < typeDMsg )
         {
@@ -424,6 +425,70 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
                 hPtDir, VALUE_FILE, value, pac );
             if( ERROR( ret ) )
                 break;
+            while( strPoint == "restart" )
+            {
+                if( strApp == "appmonsvr1" )
+                    break;
+
+                stdstr strCmd;
+                guint32& dwCmd = ( guint32& )value;
+                if( dwCmd  == usrcmdStart )
+                    strCmd = "start";
+                else if( dwCmd  == usrcmdStop )
+                    strCmd = "stop";
+                else if( dwCmd  == usrcmdRestart )
+                    strCmd = "restart";
+
+                InterfPtr pIf = GetAppManager();
+                CAppManager_SvrImpl* pm = pIf;
+                if( pm == nullptr )
+                {
+                    ret = ERROR_STATE;
+                    break;
+                }
+                bool bOnline =
+                    pm->IsAppOnline( strApp );
+                if( ( bOnline && dwCmd == 1 )  )
+                    break;
+                if( ( !bOnline && dwCmd == 2 )  )
+                    break;
+                if( !bOnline )
+                {
+                    const char* args[4];
+                    stdstr strExec;
+                    ret = GetModulePath( strExec );
+                    if( ERROR( ret ) )
+                        break;
+                    strExec += "/rpcfctl";
+
+                    args[ 0 ] = strExec.c_str();
+                    args[ 1 ] = strCmd.c_str();
+                    args[ 2 ] = strApp.c_str();
+                    args[ 3 ] = nullptr;
+                    char* env[ 1 ] = { nullptr };
+                    Execve( strExec.c_str(),
+                        const_cast< char* const*>( args ),
+                        env, "", false );
+                }
+                CfgPtr pInfo;
+                stdstr strUser;
+                gint32 iRet = GetLoginInfo( pContext, pInfo );
+                if( SUCCEEDED( ret ) )
+                {
+                    CCfgOpener oInfo(
+                        ( const IConfigDb* )pInfo );
+                    ret = oInfo.GetStrProp(
+                        propUserName, strUser );
+                    if( SUCCEEDED( ret ) )
+                    {
+                        LOGINFO( this->GetIoMgr(), 0,
+                        "'%s' has sent command '%s' to app '%s'",
+                        strUser.c_str(), strCmd.c_str(), 
+                        strApp.c_str() );
+                    }
+                }
+                break;
+            }
         }
         else if( iType == typeByteArr )
         {

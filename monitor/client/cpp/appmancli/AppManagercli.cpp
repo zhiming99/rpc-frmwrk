@@ -775,10 +775,40 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
         if( ERROR( ret ) )
             break;
         stdstr strExpPath = strApp + "/restart";
-        if( strExpPath == strPtPath &&
-            ( ( guint32& )value  == 1 ) )
+        if( strExpPath == strPtPath )
         {
-            kill( getpid(), SIGINT );
+            stdstr strCmd;
+            if( ( guint32& )value  == usrcmdStart )
+                strCmd = "start";
+            else if( ( guint32& )value  == usrcmdStop )
+                strCmd = "stop";
+            else if( ( guint32& )value  == usrcmdRestart )
+                strCmd = "restart";
+            stdstr strExec = "/usr/bin/rpcfctl";
+            ret = access( strExec.c_str() , X_OK );
+            if( ERROR( ret ) )
+            {
+                strExec = "/usr/local/bin/rpcfctl";
+                ret = access( strExec.c_str() , X_OK );
+                if( ERROR( ret ) )
+                {
+                    stdstr strMsg = DebugMsg( ret,
+                        "Error cannot find rpcfctl" );
+                    perror( strMsg.c_str() );
+                    ret = -errno;
+                    break;
+                }
+            }
+                
+            const char* args[4];
+            args[ 0 ] = strExec.c_str();
+            args[ 1 ] = strCmd.c_str();
+            args[ 2 ] = strApp.c_str();
+            args[ 3 ] = nullptr;
+            char* env[ 1 ] = { nullptr };
+            Execve( strExec.c_str(),
+                const_cast< char* const*>( args ),
+                env, "", false );
             break;
         }
         else if( strPtPath ==

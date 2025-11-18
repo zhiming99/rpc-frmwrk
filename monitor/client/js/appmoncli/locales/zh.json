@@ -96,5 +96,9 @@
   "BUTTON_CANCEL": "取消",
   "BUTTON_CLOSE": "关闭",
   "display_name": "显示名称",
-  "BUTTON_SITES": "站点列表"
+  "BUTTON_SITES": "站点列表",
+
+  "MENU_START": "启动",
+  "MENU_STOP": "停止",
+  "MENU_RESTART": "重启"
 }
