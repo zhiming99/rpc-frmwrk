@@ -3892,7 +3892,10 @@ gint32 CImplPyMainFunc::EmitMainloopServer(
             }
         }
         Wa( "    time.sleep( 1 )" );
-        Wa( "    if bExit:" );
+        if( g_bMonitoring )
+            Wa( "    if bExit or amc.IsExit():" );
+        else
+            Wa( "    if bExit:" );
         CCOUT << "        break";
         NEW_LINE;
     }while( 0 );

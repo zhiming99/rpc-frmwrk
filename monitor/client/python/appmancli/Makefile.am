@@ -65,9 +65,9 @@ install:
     fi; \
 	if [[ "x$${SUDO_USER}" != "x" ]]; then \
         echo su -c 'pip3 install $${pipopt} dist/*.whl' $${SUDO_USER}; \
-        su -c "pip3 install $${pipopt} dist/*.whl" $${SUDO_USER} || true; \
+        su -c "pip3 install --force-reinstall $${pipopt} dist/*.whl" $${SUDO_USER} || true; \
     else \
-        pip3 install $${pipopt} dist/*.whl || true;\
+        pip3 install --force-reinstall $${pipopt} dist/*.whl || true;\
     fi
 
 # Uninstall the Python package

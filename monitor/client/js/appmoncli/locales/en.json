@@ -84,5 +84,8 @@
 
   "MENU_START": "Start",
   "MENU_STOP": "Stop",
-  "MENU_RESTART": "Restart"
+  "MENU_RESTART": "Restart",
+
+  "BUTTON_SHOW_LOGS" : "Show Logs",
+  "BUTTON_HIDE_LOGS" : "Hide Logs"
 }

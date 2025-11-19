@@ -4723,7 +4723,10 @@ do{ \
     Wa( "// replace the following code with your own" ); \
     Wa( "// logic if necessary. The requests" ); \
     Wa( "// handling is going on in the background" ); \
-    Wa( "while( true )" ); \
+    if( g_bMonitoring ) \
+        Wa( "while( !MainThread.isExit() )" ); \
+    else \
+        Wa( "while( true )" ); \
     BLOCK_OPEN;\
     CCOUT << "try"; \
     BLOCK_OPEN; \

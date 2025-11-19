@@ -124,7 +124,7 @@ public class AppManagercli extends AppManagerclibase
 
             if (!appName.equals(this.m_strAppInst)) return;
 
-            if (pointName.equals("restart") && value.val.equals(1)) {
+            if (pointName.equals("restart") && value.val.equals(2)) {
                 MainThread.setExit();
                 return;
             }
