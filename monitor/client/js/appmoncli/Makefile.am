@@ -40,7 +40,7 @@ appmonui$(EXEEXT): $(auto_files) maincli.js AppMonitorcli.js
 	tar zcf appmonui$(EXEEXT) $(files_to_package) dist/*
 
 install-exec-hook:
-	cd $(appmonuidir);chmod 0644 appmonui$(EXEEXT)
+	echo already installed
 
 package:
 	make -f Makefile.skel
