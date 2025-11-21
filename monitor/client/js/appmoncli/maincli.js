@@ -536,9 +536,10 @@ function StartClient( oStartCb, strRouterPath = null )
             if( oContext.oStartCb )
                 oContext.oStartCb( oContext, -errno.EFAULT );
             console.log( 'StartPullInfo failed with error ' + e );
-            return Promise.resolve(e);
+            return Promise.reject(e);
         });
     }).catch((e)=>{
+        oAppMonitor_cli.Stop( -errno.EFAULT )
         console.log( 'Start Proxy failed with error ' + e );
         return Promise.resolve(e);
     })

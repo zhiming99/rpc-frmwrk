@@ -328,7 +328,7 @@ def ExportTestCfgs( cfgList:list ):
             if IsSudoAvailable():
                 cmdLine += "cp $curdir/appmondesc.json ./;sudo tar -zcf $curdir/appmonui.tar.gz *; cd $curdir; rm -rf $tempdir;"
             else:
-                cmdLine += "cp $curdir/appmondesc.json ./;su -c 'tar -zcf $curdir/appmonui.tar.gz *'; cd $curdir; rm -rf $tempdir;"
+                cmdLine += "cp $curdir/appmondesc.json ./;su -c \"tar -zcf $curdir/appmonui.tar.gz *\"; cd $curdir; rm -rf $tempdir;"
             rpcf_system( cmdLine )
 
 
