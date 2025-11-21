@@ -1267,7 +1267,7 @@ function renderSiteTree(rootNode) {
   if (!container) return;
   container.innerHTML = '';
 
-  function buildNode(elem, path) {
+  function buildNode(elem, path, offline=false) {
     const li = document.createElement('li');
     li.style.listStyle = 'none';
     li.style.padding = '2px 4px';
@@ -1276,6 +1276,8 @@ function renderSiteTree(rootNode) {
     label.className = 'd-flex justify-content-between align-items-center';
     label.style.cursor = 'pointer';
     label.textContent = elem.name
+    if( offline )
+        label.style.color = 'gray';
 
     // compute routerPath for this node
     const routerPath = path
@@ -1321,7 +1323,10 @@ function renderSiteTree(rootNode) {
           childElem = { key: c.key, node: c.node, name: c.key };
         else if (c.name) childElem = c;
         const delimiter = (path === '/' ) ? '' : '/';
-        childUl.appendChild(buildNode(childElem, path ? (path + delimiter + (childElem.name || childElem.key)) : (childElem.name || childElem.key)));
+        var offline = false
+        if( !c.node.oProxy )
+            offline = true
+        childUl.appendChild(buildNode(childElem, path ? (path + delimiter + (childElem.name || childElem.key)) : (childElem.name || childElem.key), offline ));
       });
     }
     return li;

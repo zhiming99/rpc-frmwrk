@@ -316,6 +316,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
             }).catch((e)=>{
                 var ret = -errno.EFAULT
                 this.DebugPrint("Error, CheckRouterPath failed (" + ret + " )")
+                return Promise.resolve( ret )
             })
         }
     }
