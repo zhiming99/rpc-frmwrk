@@ -18,7 +18,7 @@
       * 手工运行一次该服务器，以便其注册启动信息和其他一些实例信息。
       * 此时该应用已经可以通过监视器网页进行监控了。zhiming99/django-oa2cli-cgi/general:SimpAuth-https-2
       * 关于如何定制监视的内容，不久将会有新的文章进行叙述，请耐心等待。
-   * `zhiming99/django-oa2cli-cgi/general:SimpAuth-https-2`是一个docker镜像，有最新的监视器的演示程序。使用`docker pull`可下载使用。
+   * `zhiming99/django-oa2cli-cgi:SimpAuth-https-2`是一个docker镜像，有最新的监视器的演示程序。使用`docker pull`可下载使用。
    * 下面是监视器程序的一些用户界面：
    * 登陆界面   
    ![login](../../../../pics/mon-login.png)
