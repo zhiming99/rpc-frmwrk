@@ -32,6 +32,7 @@ appmon.ridl:
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
     python3 ../../../appmon/upddesc.py; \
+    sed -i "s@\(sys.path.append(.*)\)@\1;sys.path.append( '../../../../tools' )@" synccfg.py
 	make -f Makefile.skel
 
 $(auto_files): appmon.ridl

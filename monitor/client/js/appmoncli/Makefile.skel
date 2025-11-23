@@ -3,7 +3,7 @@ all:
 	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
 	@sed -i "s@mode:[[:blank:]]*'development'@mode: 'production'@g" webpack.config.js
 	npx webpack
-	python3 synccfg.py || true
+	python3 synccfg.py
 	@echo please see 'README.md' for information about deployment.
 sync:
 	python3 synccfg.py
