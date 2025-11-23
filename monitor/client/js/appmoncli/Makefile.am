@@ -31,7 +31,7 @@ appmon.ridl:
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
-    python3 ../../../appmon/upddesc.py \
+    python3 ../../../appmon/upddesc.py; \
 	make -f Makefile.skel
 
 $(auto_files): appmon.ridl
