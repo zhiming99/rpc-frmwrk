@@ -2170,10 +2170,13 @@ gint32 CRouterOpenBdgePortTask::StopIfSafe(
             propPortId, dwPortId );
         if( ERROR( ret ) )
             break;
-        ret = pRouter->AddStopTask(
-            nullptr, dwPortId, pStopTask );
-        if( SUCCEEDED( ret ) )
-            break;
+        if( pSvc->IsServer() )
+        {
+            ret = pRouter->AddStopTask(
+                nullptr, dwPortId, pStopTask );
+            if( SUCCEEDED( ret ) )
+                break;
+        }
 
         // There is another stop task in the queue.
         // because we have not registered the bridge
