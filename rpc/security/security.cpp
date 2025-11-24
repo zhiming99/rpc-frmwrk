@@ -5208,6 +5208,19 @@ gint32 CRpcRouterBridgeAuth::FilterMatchBlockList(
     gint32 ret = 0;
     do{
         Variant oVar;
+        ret = pMatch->GetProperty( propPortId, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            InterfPtr pIf;
+            ret = this->GetBridge(
+                ( guint32& )oVar, pIf );
+            if( SUCCEEDED( ret ) )
+            {
+                EnumClsid iClsid = pIf->GetClsid();
+                if( iClsid == clsid( CRpcTcpBridgeImpl ) )
+                    break;
+            }
+        }
         ret = pMatch->GetProperty( propObjPath, oVar );
         if( ERROR( ret ) )
             break;

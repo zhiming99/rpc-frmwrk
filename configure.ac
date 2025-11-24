@@ -654,14 +654,14 @@ esac
 case $enable_js in
     yes)
         JS_RPMLIBS="npm," 
-        JS_RPMFILES="%{_libdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.jsonZZZZZ%{_mandir}/man1/oinit.1.gz"
+        JS_RPMFILES="%{_libdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.jsonZZZZZ%{_mandir}/man1/oinit.1.gzZZZZZ%{_sysconfdir}/rpcf/appmonui.tar.gz"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
         JS_RPMPOST="echo npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
         JS_RPMPOSTUN="echo npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         JS_DEBLIBS="npm,"
         JS_DEBDEVFILES="etc/rpcf/oa2check.ridlZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/jslib/*"
-        JS_DEBFILES="etc/rpcf/oa2checkdesc.jsonZZZZZusr/share/man/man1/oinit.1"
+        JS_DEBFILES="etc/rpcf/oa2checkdesc.jsonZZZZZusr/share/man/man1/oinit.1ZZZZZetc/rpcf/appmonui.tar.gz"
         JS_CFGOPT=
         FEATURES+="+js "
     ;;

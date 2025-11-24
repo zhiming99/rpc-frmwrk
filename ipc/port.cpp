@@ -2122,10 +2122,8 @@ gint32 CPort::CompleteStartIrp( IRP* pIrp )
             break;
         }
 
-        // FIXME: there is opportunity the port
-        // state could be changed away from the
-        // PORT_STATE_READY, indicating some other
-        // thing is going on.
+        // And we may land here if OnPortReady returns
+        // STATUS_PENNDING
         dwPortState = GetPortState();
         dwState = GetPnpState( pIrp );
         if( dwPortState == PORT_STATE_READY 

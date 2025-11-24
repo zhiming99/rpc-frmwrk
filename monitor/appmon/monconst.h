@@ -56,3 +56,12 @@
 #define GETPTDESC_SIZE      6
 #define GETPTDESC_HASLOG    7
 #define GETPTDESC_AVGALGO   8
+
+typedef enum : guint32
+{
+    usrcmdInvalid = 0,
+    usrcmdStart = 1,
+    usrcmdStop = 2,
+    usrcmdRestart = 3,
+}EnumUserCmd;
+

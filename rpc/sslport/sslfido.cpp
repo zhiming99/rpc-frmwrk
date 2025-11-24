@@ -806,6 +806,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
     STREAM_SOCK_EVENT* psse =
         ( STREAM_SOCK_EVENT* )pRespBuf->ptr();
 
+    bool bQuit = false;
     do{
         if( psse->m_iEvent == sseError )
         {
@@ -817,6 +818,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
                     "received error. caller=%d ",
                     dwCaller );
             }
+            bQuit = true;
             break;
         }
 
@@ -914,6 +916,7 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
             }
             if( SUCCEEDED( ret ) )
                 ret = iRet;
+            bQuit = true;
             break;
         }
 
@@ -1047,9 +1050,10 @@ gint32 CRpcOpenSSLFido::CompleteListeningIrp(
         pCtx->SetRespData( pRespBuf );
         DebugPrint( ret, "SSLFido, error detected "
             "in CompleteListeningIrp" );
-        ret = STATUS_SUCCESS;
+        if( !bQuit )
+            ret = STATUS_SUCCESS;
     }
-    pCtx->SetStatus( 0 );
+    pCtx->SetStatus( ret );
     pIrp->PopCtxStack();
 
     return ret;

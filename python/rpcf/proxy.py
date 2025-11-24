@@ -265,10 +265,6 @@ class PyRpcContext :
                 if 'Role' in oInitParams:
                     dwRole = oInitParams[ 'Role' ]
                     p1.SetIntProp( 101, dwRole )
-                else:
-                    ret = -errno.EINVAL
-                    raise Exception(
-                        "Error cannot find router role" )
                 if 'bAuth' in oInitParams:
                     p1.SetBoolProp( 102,
                         oInitParams[ 'bAuth' ] )
@@ -297,6 +293,9 @@ class PyRpcContext :
                     p1.SetBoolProp( 112, True )
                 if 'logging' in oInitParams:
                     p1.SetBoolProp( 113, True )
+                if 'LogModName' in oInitParams:
+                    p1.SetStrProp( 115,
+                        oInitParams[ 'LogModName' ] )
 
         except Exception as err:
             print( err )

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import os
 import sys 
@@ -318,6 +319,18 @@ def ExportTestCfgs( cfgList:list ):
         ret = WriteTestCfg( pathVal[ 0 ], pathVal[ 1 ] )
         if ret < 0 :
             break
+
+        # update the copy of appmondesc.json in appmonui.tar.gz
+        if testDesc == 'appmondesc.json':
+            cmdLine = f"path=$(dirname {pathVal[0]});"
+            cmdLine += "cd $path; if [ ! -f appmonui.tar.gz ]; then exit 1; fi;"
+            cmdLine += "tempdir=`mktemp -d`;curdir=$(pwd);cd $tempdir;tar -zxf $curdir/appmonui.tar.gz;"
+            if IsSudoAvailable():
+                cmdLine += "cp $curdir/appmondesc.json ./;sudo tar -zcf $curdir/appmonui.tar.gz *; cd $curdir; rm -rf $tempdir;"
+            else:
+                cmdLine += "cp $curdir/appmondesc.json ./;su -c \"tar -zcf $curdir/appmonui.tar.gz *\"; cd $curdir; rm -rf $tempdir;"
+            rpcf_system( cmdLine )
+
 
     if ret < 0 :
         return ret
@@ -1139,3 +1152,13 @@ def Update_InitCfg( cfgPath : str, destDir : str,
         ret = -errno.EFAULT
 
     return ret
+
+
+if __name__ == "__main__" :
+    parser = argparse.ArgumentParser(description="Update rpc-frmwrk configuration files based on initcfg.json")
+    parser.add_argument("initcfg", help="Path to initcfg.json")
+    args = parser.parse_args()
+
+    # Call the update function with the parsed arguments
+    ret = Update_InitCfg(args.initcfg, None)
+    quit( -ret )

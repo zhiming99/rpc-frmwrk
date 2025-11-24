@@ -14,6 +14,7 @@ const { Bdge_OnKeepAlive } = require("./keepalivermt")
 const { Bdge_OpenStream, Bdge_CloseStream } = require( "./openstmrmt")
 const { CRpcStreamBase, Bdge_DataConsumed } = require( "./stream")
 const { Bdge_StreamWrite } = require( "./stmwritermt")
+const { Bdge_CheckRouterPathRemote } = require("./chkrtpathrmt")
 
 class CRpcControlStream extends CRpcStreamBase
 {
@@ -170,6 +171,9 @@ class CRpcTcpBridgeProxy
 
         oIoTab[ IoCmd.DataConsumed[0]] =
             Bdge_DataConsumed.bind( this )
+
+        oIoTab[ IoCmd.CheckRouterPath[0]] =
+            Bdge_CheckRouterPathRemote.bind( this )
 
         var oIoEvent = this.m_arrDispEvtTable
         oIoEvent[ IoEvent.ForwardEvent[0]] =
@@ -559,7 +563,9 @@ class CRpcRouter
         var dwPortId, oProxy
         for( [ dwPortId, oProxy ] of this.m_mapBdgeProxies )
         {
-            if( oProxy.m_oConnParams.IsEqual( oConnParams ) )
+            if( oProxy.m_oConnParams.IsEqual( oConnParams ) &&
+                oProxy.m_iState !== EnumIfState.stateStopped &&
+                oProxy.m_iState !== EnumIfState.stateStopping )
             {
                 bFound = true
                 break

@@ -7931,6 +7931,12 @@ gint32 CImplMainFunc::EmitInitContext(
         NEW_LINES( 2 );
         CCOUT << "CIoManager* pSvc = g_pIoMgr;";
         NEW_LINE;
+        if( g_bMonitoring && g_vecMonApps.size() && !bProxy )
+        {
+            CCOUT << "pSvc->SetLogModName( \""
+                << g_vecMonApps[ 0 ] << "\" );";
+            NEW_LINE;
+        }
 
         if( g_bBuiltinRt )
         {
@@ -8978,7 +8984,7 @@ gint32 CExportDrivers::OutputBuiltinRt()
         oDrvToLoad.append( "RpcTcpBusDriver" );
         oDrvToLoad.append( "ProxyFdoDriver" );
         oDrvToLoad.append( "UnixSockBusDriver" );
-        if( g_bRpcOverStm )
+        if( g_bRpcOverStm || g_bMonitoring )
             oDrvToLoad.append( "DBusStreamBusDrv" );
         oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
@@ -8990,6 +8996,10 @@ gint32 CExportDrivers::OutputBuiltinRt()
             Json::Value( Json::arrayValue );
         oFactories.append(
             Json::Value( "./librpc.so" ) );
+
+        if( g_bMonitoring )
+            oFactories.append(
+            Json::Value( "./libappmancli.so" ) );
 
 #ifdef AUTH
         oFactories.append(
@@ -9196,7 +9206,7 @@ gint32 CExportDrivers::Output()
             oDrvToLoad.append( "DBusBusDriver" );
             if( bStream || bFuse || g_bRpcOverStm )
                 oDrvToLoad.append( "UnixSockBusDriver" );
-            if( g_bRpcOverStm )
+            if( g_bRpcOverStm || g_bMonitoring )
                 oDrvToLoad.append( "DBusStreamBusDrv" );
             oCli[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
 
@@ -9212,15 +9222,19 @@ gint32 CExportDrivers::Output()
             Json::Value oSvr;
             oSvr[ JSON_ATTR_MODNAME ] = strAppSvr;
             oSvr[ JSON_ATTR_DRVTOLOAD ] = oDrvToLoad;
+            Json::Value oFactories =
+                Json::Value( Json::arrayValue );
             if( bFuseS )
             {
-                Json::Value oFactories =
-                    Json::Value( Json::arrayValue );
                 oFactories.append(
                     Json::Value( "./libfuseif.so" ) );
-                oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
-
             }
+            if( g_bMonitoring )
+            {
+                oFactories.append(
+                    Json::Value( "./libappmancli.so" ) );
+            }
+            oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
             oModuleArray.append( oSvr );
             oModuleArray.append( oCli );
         }
@@ -9276,6 +9290,21 @@ gint32 CExportObjDesc::Output()
             m_pNode->GetName();
 
         oVal[ JSON_ATTR_SVRNAME ] = strAppName;
+        if( g_bMonitoring )
+        {
+            Json::Value oLib( "libappmancli.so" );
+            oVal[ JSON_ATTR_CLSFACTORY ].append( oLib );
+        }
+        if( g_bMonitoring && g_vecMonApps.size() )
+        {
+            Json::Value arrVal(Json::arrayValue);
+            for( auto& elem : g_vecMonApps )
+            {
+                Json::Value oAppInst( elem );
+                arrVal.append( oAppInst );
+            }
+            oVal[ JSON_ATTR_MONAPPINSTS ] = arrVal;
+        }
 
         Json::Value oElemTmpl;
 

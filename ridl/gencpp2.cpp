@@ -3813,6 +3813,16 @@ gint32 CExportObjDesc2::OutputROS()
             Json::Value oLib( "libappmancli.so" );
             oVal[ JSON_ATTR_CLSFACTORY ].append( oLib );
         }
+        if( g_bMonitoring && g_vecMonApps.size() )
+        {
+            Json::Value arrVal(Json::arrayValue);
+            for( auto& elem : g_vecMonApps )
+            {
+                Json::Value oAppInst( elem );
+                arrVal.append( oAppInst );
+            }
+            oVal[ JSON_ATTR_MONAPPINSTS ] = arrVal;
+        }
 
         Json::Value oElemTmpl;
 

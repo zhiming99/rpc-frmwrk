@@ -30,12 +30,128 @@
 #include "frmwrk.h"
 #include "rpcroute.h"
 #include "fastrpc.h"
+#include "jsondef.h"
 
 using namespace rpcf;
 #include "routmain.h"
 #include "rtappman.h"
 
-static stdstr g_strMonName = RTAPPNAME;
+static gint32 DumpMmhNode( InterfPtr& pRouter,
+    const Variant& oVar, BufPtr& pBuf )
+{
+    gint32 ret = 0;
+    if( pRouter.IsEmpty() )
+        return -EINVAL;
+    do{
+        Json::StreamWriterBuilder oBuilder;
+        oBuilder["commentStyle"] = "None";
+        oBuilder["indentation"] = "   ";
+        Json::Value oArray( Json::arrayValue);
+        const ObjVecPtr pvecNodes = ( const ObjPtr& )oVar;
+        if( pvecNodes.IsEmpty() )
+        {
+            ret = -ENOENT;
+            break;
+        }
+
+        const std::vector< ObjPtr >& vecNodes =
+            ( *pvecNodes )();
+        for( auto& elem : vecNodes )
+        {
+            CCfgOpener oConn( ( const IConfigDb* )elem );
+            Json::Value oJConn( Json::objectValue );
+            stdstr strVal;
+            guint32 dwVal;
+            bool bVal;
+            ret = oConn.GetStrProp(
+                propNodeName, strVal );
+            if( SUCCEEDED( ret ) )
+                oJConn[ JSON_ATTR_NODENAME ] = strVal;
+
+            CRpcRouterBridge* prbt = pRouter;
+            guint32 dwPortId;
+            ret = prbt->GetProxyIdByNodeName(
+                strVal, dwPortId );
+            bVal = true;
+            if( ERROR( ret ) )
+                bVal = false;
+
+            oJConn[ "online" ] = bVal ? "true" : "false";
+
+            ret = oConn.GetStrProp(
+                propAddrFormat, strVal );
+            if( SUCCEEDED( ret ) )
+                oJConn[ JSON_ATTR_ADDRFORMAT ] = strVal;
+
+            ret = oConn.GetStrProp(
+                propDestIpAddr, strVal );
+            if( SUCCEEDED( ret ) )
+                oJConn[ JSON_ATTR_IPADDR ] = strVal;
+
+            ret = oConn.GetIntProp(
+                propDestTcpPort, dwVal );
+            if( SUCCEEDED( ret ) )
+                oJConn[ JSON_ATTR_TCPPORT ] = dwVal;
+
+            ret = oConn.GetBoolProp(
+                propEnableSSL, bVal );
+            if( SUCCEEDED( ret ) )
+            {
+                if( bVal )
+                    oJConn[ JSON_ATTR_ENABLE_SSL ] = "true";
+                else
+                    oJConn[ JSON_ATTR_ENABLE_SSL ] = "false";
+            }
+
+            ret = oConn.GetBoolProp(
+                propEnableWebSock, bVal );
+            if( SUCCEEDED( ret ) )
+            {
+                if( bVal )
+                    oJConn[ JSON_ATTR_ENABLE_WEBSOCKET ] = "true";
+                else
+                    oJConn[ JSON_ATTR_ENABLE_WEBSOCKET ] = "false";
+            }
+
+            ret = oConn.GetBoolProp(
+                propCompress, bVal );
+            if( SUCCEEDED( ret ) )
+            {
+                if( bVal )
+                    oJConn[ JSON_ATTR_ENABLE_COMPRESS ] = "true";
+                else
+                    oJConn[ JSON_ATTR_ENABLE_COMPRESS ] = "false";
+            }
+
+            ret = oConn.GetBoolProp(
+                propConnRecover, bVal );
+            if( SUCCEEDED( ret ) )
+            {
+                if( bVal )
+                    oJConn[ JSON_ATTR_CONN_RECOVER ] = "true";
+                else
+                    oJConn[ JSON_ATTR_CONN_RECOVER ] = "false";
+            }
+            ret = oConn.GetStrProp(
+                propDestUrl, strVal );
+            if( SUCCEEDED( ret ) )
+                oJConn[ JSON_ATTR_DEST_URL ] = strVal;
+            oArray.append( oJConn );
+        }
+        
+        stdstr strOutput = Json::writeString(
+            oBuilder, oArray );
+        ret = pBuf.NewObj();
+        if( ERROR( ret ) )
+            break;
+        ret = pBuf->Append( strOutput.c_str(),
+            strOutput.size());
+
+    }while( 0 );
+    return ret;
+}
+
+stdstr g_strMonName = RTAPPNAME;
 gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
     InterfPtr& pRouter,
     std::vector< KeyValue >& veckv )
@@ -102,6 +218,25 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
             pBuf.Clear();
         }
 
+        CRpcRouterManager* prtmgr =
+            ObjPtr( prb->GetParent() );
+        if( prtmgr == nullptr )
+            break;
+
+        Variant oVar;
+        okv.strKey = O_MMHNODE_LIST;
+        ret = prtmgr->GetProperty(
+            propMmhNodeList, oVar );
+        if( SUCCEEDED( ret ) )
+        {
+            ret = DumpMmhNode( pRouter, oVar, pBuf );
+            if( SUCCEEDED( ret ) )
+            {
+                okv.oValue = pBuf;
+                veckv.push_back( okv );
+            }
+        }
+
         timespec ts = prt->GetStartTime();
         okv.strKey = O_UPTIME;
         timespec ts2;
@@ -120,11 +255,6 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
         okv.oValue = dwObjs;
         veckv.push_back( okv );
 
-        CRpcRouterManager* prtmgr =
-            ObjPtr( prb->GetParent() );
-        if( prtmgr == nullptr )
-            break;
-        Variant oVar;
         ret = prtmgr->GetProperty(
             propRxBytes, oVar );
         if( SUCCEEDED( ret ) )
@@ -254,11 +384,10 @@ gint32 CAsyncAMCallbacks::ClaimAppInstCallback(
                     propSendBps, kv.oValue );
             }
         }
-        ret = super::ClaimAppInstCallback(
-            context, iRet, arrPtToGet );
-
     }while( 0 );
-    return ret;
+
+    return super::ClaimAppInstCallback(
+        context, iRet, arrPtToGet );
 }
 
 gint32 CAsyncAMCallbacks::OnPointChanged(
@@ -350,25 +479,27 @@ gint32 StartAppManCli(
             break;
         }
 
+        Variant oVar;
         PACBS pacbs( new CAsyncAMCallbacks );
         auto pcacbs = ( CAsyncAMCallbacks* )pacbs.get();
-        Variant oVar;
-        ret = pSvc->GetProperty(
-            propMonAppInsts, oVar );
-        if( SUCCEEDED( ret ) )
-        {
-            StrVecPtr pvecStrs = oVar.m_pObj;
-            if( !pvecStrs.IsEmpty() )
+        if( g_strMonName == RTAPPNAME )
+        { 
+            ret = pSvc->GetProperty(
+                propMonAppInsts, oVar );
+            if( SUCCEEDED( ret ) )
             {
-                if( ( *pvecStrs )().size() )
-                    g_strMonName = ( *pvecStrs )().front();
+                StrVecPtr pvecStrs = oVar.m_pObj;
+                if( !pvecStrs.IsEmpty() )
+                {
+                    if( ( *pvecStrs )().size() )
+                        g_strMonName = ( *pvecStrs )().front();
+                }
+            }
+            else
+            {
+                ret = 0;
             }
         }
-        else
-        {
-            ret = 0;
-        }
-
         // ignore the return status
         // in order to allowing reconnection if the
         // appmonsvr is not online yet

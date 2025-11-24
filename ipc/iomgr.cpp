@@ -1169,8 +1169,9 @@ gint32 CIoManager::OpenPort(
                 // make sure the OpenPortByCfg
                 // won't return a port stopped or
                 // stopping
-                CPort* pNewPort =
-                    static_cast< CPort* >( pPort );
+                PortPtr ptrNewPort =
+                    pPort->GetTopmostPort();
+                CPort* pNewPort = ptrNewPort;
 
                 CStdRMutex oPortLock(
                     pNewPort->GetLock() );
@@ -1178,10 +1179,15 @@ gint32 CIoManager::OpenPort(
                 guint32 dwState =
                     pNewPort->GetPortState();
 
-                if( dwState == PORT_STATE_STOPPING 
-                    || dwState == PORT_STATE_STOPPED
-                    || dwState == PORT_STATE_ATTACHED
-                    || dwState == PORT_STATE_STARTING )
+                if( dwState == PORT_STATE_STARTING ||
+                    dwState == PORT_STATE_ATTACHED )
+                {
+                    ret = -EAGAIN;
+                    break;
+                }
+
+                if( dwState == PORT_STATE_STOPPING ||
+                    dwState == PORT_STATE_STOPPED )
                 {
                     ret = ERROR_STATE;
                     break;
@@ -1775,6 +1781,7 @@ CIoManager::CIoManager( const std::string& strModName ) :
 {
     gint32 ret = 0;
     SetClassId( clsid( CIoManager ) );
+    SetLogModName( strModName );
 
     do{
         CParamList a;
@@ -2340,7 +2347,7 @@ gint32 CIoManager::LogMessage(
     va_end(argptr);
 
     stdstr strFile = "[";
-    strFile += this->GetModName() + "][";
+    strFile += this->GetLogModName() + "][";
     strFile += s_vecLogLevel[ dwLogLevel ] + "] ";
     strFile += szFile;
 
@@ -2365,13 +2372,18 @@ CLogger::CLogger( CIoManager* pMgr )
 gint32 CLogger::ThreadProc( IEventSink* pCb )
 {
     gint32 ret = 0;
-    ObjPtr pLogCli;
-    do{
-        ret = m_pMgr->TryLoadClassFactory(
-            "liblogcli.so" );
-        if( ERROR( ret ) )
-            break;
+    ret = m_pMgr->TryLoadClassFactory(
+        "liblogcli.so" );
+    if( ERROR( ret ) )
+    {
+        DebugPrintEx( logErr, ret,
+            "Error failed to load liblogcli.so,"
+            "and logger thread cannot start" );
+        return ret;
+    }
 
+    do{
+        ObjPtr pLogCli;
         CParamList oParams;
         oParams.SetPointer( propIoMgr, m_pMgr );
 
@@ -2398,8 +2410,14 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
         if( ERROR( ret ) )
         {
             DebugPrintEx( logErr, ret,
-                "Warning failed to start logger" );
-            break;
+                "Warning failed to connect "
+                "to log server" );
+        }
+        else
+        {
+            LOGINFO( pSvc->GetIoMgr(), ret,
+                "Successfully connected "
+                "to log server" );
         }
 
         while( !m_bExit )
@@ -2417,21 +2435,39 @@ gint32 CLogger::ThreadProc( IEventSink* pCb )
             }
 
             CStdRMutex oSvcLock( pSvc->GetLock() );
-            if( pSvc->GetState() != stateConnected )
+            EnumIfState iState = pSvc->GetState();
+            if( iState == stateRecovery )
             {
                 DebugPrintEx( logErr, ERROR_STATE,
                     "Warning logger is offline, "
                     "and waiting for it online" );
                 continue;
             }
+            else if( iState != stateConnected )
+            {
+                oSvcLock.Unlock();
+                DebugPrintEx( logErr, ERROR_STATE,
+                    "Warning logger is stopped, "
+                    "and recreate a new instance" );
+                ret = STATUS_MORE_PROCESS_NEEDED;
+                break;
+            }
             oSvcLock.Unlock();
             this->SendLogMsg();
         }
 
+        if( ret == STATUS_MORE_PROCESS_NEEDED &&
+            !m_bExit )
+        {
+            pSvc->Stop();
+            continue;
+        }
+
         this->SendLogMsg();
         pSvc->Stop();
+        break;
 
-    }while( 0 );
+    }while( 1 );
 
     CStdRMutex oLock( GetLock() );
     m_pLogCli.Clear();
@@ -2483,15 +2519,18 @@ gint32 CLogger::Stop()
 gint32 CLogger::SendLogMsg()
 {
     gint32 ret = 0;
-    ILogSvc_PImpl* pSvc = m_pLogCli;
     do{
         bool bEmpty = true;
         CStdRMutex oLock( GetLock() );
+        ILogSvc_PImpl* pSvc = m_pLogCli;
+        if( pSvc == nullptr )
+            break;
         if( m_queMsgs.empty() )
             break;
         stdstr strMsg = std::move(
             m_queMsgs.front() );
         m_queMsgs.pop_front();
+        ObjPtr pBack = m_pLogCli;
         oLock.Unlock();
 
         ret = pSvc->LogMessage( strMsg );
@@ -2926,8 +2965,17 @@ stdstr InstIdFromDrv(
          <p>110: a string as the port numer to connect
          to or listen on [optional]</p>
 
-         <p>111: a boolean to tell if the router run as a 
-         kinit proxy</p>
+         <p>111: a boolean to tell if the router run as
+         a kinit proxy</p>
+
+         <p>112: a boolean to tell if not to use dbus
+         along the connection channel</p>
+
+         <p>113: a boolean to tell if to enable logging
+         to the log server</p>
+
+         <p>115: a string as a name to identify this
+         module on the log server</p>
 
     @param strNewDesc an new desc file, or empty if
     nothing to update. and property 107 is set with new

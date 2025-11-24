@@ -43,7 +43,8 @@ appmonsvr_CPPFLAGS+= -DFUSE3
 dist_appmonscr_SCRIPTS=initappreg.sh appfuncs.sh \
 addapp.sh addpoint.sh chmodapp.sh getpv.sh listapps.sh rmapp.sh rmlink.sh \
 setpv.sh showpoint.sh addlink.sh chownapp.sh rmattr.sh rmpoint.sh setattr.sh \
-showapp.sh updatekeys.py logtool.py namedlock.py rmloglink.sh addloglink.sh
+showapp.sh updatekeys.py logtool.py namedlock.py authmech.py rmloglink.sh \
+addloglink.sh cloneapp.sh
 
 dist_rpcfctl_SCRIPTS=rpcfctl
 

@@ -1,7 +1,7 @@
 {
   "APP_TITLE": "Rpc-Frmwrk监控",
   "SITE_LABEL": "站点",
-  "CONTAINER_LABEL": "容器",
+  "CONTAINER_LABEL": "位置",
   "APP_STATUS_RUNNING": "运行中",
   "APP_STATUS_STOPPED": "已停止",
   "APP_STATUS_UNKNOWN": "未知",
@@ -95,5 +95,13 @@
   "BUTTON_UPDATE": "更新",
   "BUTTON_CANCEL": "取消",
   "BUTTON_CLOSE": "关闭",
-  "display_name": "显示名称"
+  "display_name": "显示名称",
+  "BUTTON_SITES": "站点列表",
+
+  "MENU_START": "启动",
+  "MENU_STOP": "停止",
+  "MENU_RESTART": "重启",
+
+  "BUTTON_SHOW_LOGS" : "查看日志",
+  "BUTTON_HIDE_LOGS" : "隐藏日志"
 }

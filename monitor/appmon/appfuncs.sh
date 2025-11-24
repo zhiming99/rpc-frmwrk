@@ -46,7 +46,7 @@ function undo_check_appreg_mount()
 {
     base=$HOME/.rpcf
     if (( $mt==2 )); then
-        umount ${rootdir}
+        fusermount3 -u ${rootdir}
         rmdir ${rootdir}
     fi
 }
@@ -119,7 +119,7 @@ function clear_rpcf_mount()
     mp=`mount | grep '^regfsmnt' | awk '{print $3}'`
     if [ "x$mp" != "x" ];then
         for i in $mp; do
-            if ! umount $i; then
+            if ! fusermount3 -u $i; then
                 return 1
             fi
         done
@@ -127,7 +127,7 @@ function clear_rpcf_mount()
     mp=`mount | grep appmonsvr | awk '{print $3}'`
     if [ "x$mp" != "x" ];then
         for i in $mp; do
-            if ! umount $i; then
+            if ! fusermount3 -u $i; then
                 return 1
             fi
         done
@@ -312,12 +312,12 @@ function add_point()
     _pttype=$3
     _datatype=$4
     if [ -z $_appname ] || [ -z $_pttype ] || [ -z $_ptname ] || [ -z $_datatype ];then
-        echo Error missing parameters
+        echo Error add_point missing parameters  >&2
         return 22
     fi
     if [ ! $_pttype == 'output' ] && [ ! $_pttype == 'input' ] &&
         [ ! $_pttype == 'setpoint' ]; then
-        echo Error invalid point type
+        echo Error add_point invalid point type >&2
         return 22
     fi
     _ptpath=./apps/$_appname/points/$_ptname
@@ -329,7 +329,7 @@ function add_point()
     grant_perm $_ptpath 0007 1
 
     pushd $_ptpath > /dev/null
-    touch value datatype unit ptype point_flags
+    touch value datatype unit ptype point_flags description
     _dt=$(str2type $_datatype)
     python3 $updattr -u 'user.regfs' "{\"t\":3,\"v\":$_dt}" datatype > /dev/null
 
@@ -340,12 +340,13 @@ function add_point()
         python3 $updattr -u 'user.regfs' "$(jsonval i 1 )" ptype > /dev/null
         echo input > ptype
         touch script
-        python3 $updattr -u 'user.regfs' "$(jsonval i 10 )" script > /dev/null
+        python3 $updattr -u 'user.regfs' "$(jsonval s 'none' )" script > /dev/null
     else
         python3 $updattr -u 'user.regfs' "$(jsonval i 2 )" ptype > /dev/null
         echo setpoint > ptype
     fi
     python3 $updattr -u 'user.regfs' "$(jsonval i 0 )" point_flags > /dev/null
+    echo '{zh:"",en:""}' > description
 
     if [[ $_pttype != 'setpoint' ]]; then
         mkdir ptrs || true
@@ -564,28 +565,28 @@ function get_attr_value()
     _dt=$4
 
     if [ -z $_appname ] || [ -z $_ptname ] || [ -z $_attr ] || [ -z $_dt ];then
-        echo Error invalid get_attr_value parameters
+        echo Error invalid get_attr_value parameters >&2
         return 22
     fi
     grant_perm ./apps/$_appname 0005 45
     grant_perm ./apps/$_appname/points 0005 44
     _ptpath=./apps/$_appname/points/$_ptname 
     if [ ! -d $_ptpath ]; then
-        echo Error set_attr_value point "$_ptpath" not exist
+        echo Error get_attr_value point "$_ptpath" not exist >&2
         restore_perm 44 45
         return 2
     fi
     
     _dtnum=$(str2type $_dt)
     if [ -z $_dtnum ]; then
-        echo Error bad data type $_dt@$_appname/$_ptname
+        echo Error bad data type $_dt@$_appname/$_ptname >&2
         restore_perm 44 45
         return 22
     fi
     grant_perm $_ptpath 0005 40
     grant_perm $_ptpath/$_attr 0004 41
     if (( $_dtnum <= 7 ));then
-        python3 $updattr -v $_ptpath/$_attr > /dev/null
+        python3 $updattr -v $_ptpath/$_attr
     else
         cat $_ptpath/$_attr
     fi
@@ -714,7 +715,7 @@ function rm_link()
             fi
             rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
-            break
+            #break
         done
         popd > /dev/null
     fi
@@ -743,7 +744,7 @@ function rm_link()
             fi
             rm -f $i
             #python3 ${updattr} -a 'user.regfs' -1 ../ptrcount > /dev/null
-            break
+            #break
         done
         popd > /dev/null
     fi
@@ -1661,7 +1662,7 @@ function add_stdapp()
     add_point $_instname pending_tasks output i
     set_attr_value $_instname pending_tasks value "$(jsonval 'i' 0 )" i
     add_point $_instname restart input i
-    set_attr_value $_instname restart pulse "$(jsonval 'i' 1 )" i
+    set_attr_value $_instname restart pulse "$(jsonval 'i' 0 )" i
     add_point $_instname cmdline setpoint blob
     add_point $_instname pid output i 
     add_point $_instname working_dir  setpoint blob
@@ -1737,6 +1738,7 @@ function add_rpcrouter
     add_point $_instname bdge_list output blob
     add_point $_instname bdge_proxy_list output blob
     add_point $_instname req_proxy_list output blob 
+    add_point $_instname mmh_node_list  output blob
     add_point $_instname max_conn  setpoint i
     add_point $_instname max_recv_bps  setpoint q
     set_attr_value $_instname max_recv_bps unit "$(jsonval 's' 'bps' )" s
@@ -1763,16 +1765,18 @@ function add_rpcrouter
     set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
     set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
 
-    add_log_link $_instname rx_bytes appmonsvr1 ptlogger1
-    set_attr_value $_instname rx_bytes avgalgo  "$(jsonval 'i' 0)" i
-    add_log_link $_instname tx_bytes appmonsvr1 ptlogger1
-    set_attr_value $_instname tx_bytes avgalgo  "$(jsonval 'i' 0)" i
-    add_log_link $_instname vmsize_kb appmonsvr1 ptlogger1
-    set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
-    add_log_link $_instname obj_count appmonsvr1 ptlogger1
-    set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
-    add_log_link $_instname cpu_load appmonsvr1 ptlogger1
-    set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
+    if [[ -z "$noptlog" ]] || [[ "$noptlog" == "false" ]]; then
+        add_log_link $_instname rx_bytes appmonsvr1 ptlogger1
+        add_log_link $_instname tx_bytes appmonsvr1 ptlogger1
+        add_log_link $_instname vmsize_kb appmonsvr1 ptlogger1
+        add_log_link $_instname obj_count appmonsvr1 ptlogger1
+        add_log_link $_instname cpu_load appmonsvr1 ptlogger1
+        set_attr_value $_instname rx_bytes avgalgo  "$(jsonval 'i' 0)" i
+        set_attr_value $_instname tx_bytes avgalgo  "$(jsonval 'i' 0)" i
+        set_attr_value $_instname vmsize_kb avgalgo  "$(jsonval 'i' 1)" i
+        set_attr_value $_instname obj_count avgalgo  "$(jsonval 'i' 1)" i
+        set_attr_value $_instname cpu_load avgalgo  "$(jsonval 'i' 1)" i
+    fi
 
     read -r _uid _gid <<< $(get_uid_gid 101)
     change_application_owner $_instname $_uid $_gid

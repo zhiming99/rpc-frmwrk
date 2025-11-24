@@ -1,18 +1,18 @@
 all:
-	rm -r dist;mkdir dist
-	@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi
+	rm -rf dist;mkdir dist
+	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
 	@sed -i "s@mode:[[:blank:]]*'development'@mode: 'production'@g" webpack.config.js
-	npm exec webpack
-	python3 synccfg.py
+	npx webpack
+	python3 synccfg.py || true
 	@echo please see 'README.md' for information about deployment.
 sync:
 	python3 synccfg.py
 
 debug:
-	rm -r dist;mkdir dist
-	@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi
+	rm -rf dist;mkdir dist
+	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
 	@sed -i "s@mode:[[:blank:]]*'production'@mode: 'development'@g" webpack.config.js
-	npm exec webpack
+	npx webpack
 	python3 synccfg.py
 	@echo please see 'README.md' for information about deployment.
 

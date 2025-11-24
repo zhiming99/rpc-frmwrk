@@ -2,9 +2,13 @@
 
 script_dir=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 if [ -f $script_dir/rpcf/showapp.sh ]; then
+    # in the installation directory
     cmddir=$script_dir/rpcf 
+    tooldir=
 elif [ -f $script_dir/showapp.sh ]; then
+    # in the dev tree
     cmddir=$script_dir
+    tooldir=$script_dir/../../tools/
 else
     echo Error cannot find rpc-frmwrk installation
     exit 1
@@ -12,9 +16,7 @@ fi
 
 updattr=${cmddir}/updattr.py
 
-if [[ -f ../../ipc/driver.json ]]; then
-    cfgPath="`pwd`/../../ipc"
-elif [[ "$script_dir" == "/usr/bin" ]]; then
+if [[ "$script_dir" == "/usr/bin" ]]; then
     cfgPath="/etc/rpcf"
 elif [[ "$script_dir" == "/usr/local/bin" ]]; then
     cfgPath="/usr/local/etc/rpcf"
@@ -39,19 +41,28 @@ shift
 
 function is_app_online()
 {
-    online=`bash $cmddir/showapp.sh $1 | grep 'status: online'`
-    if [[ "x$online" == "xstatus: online" ]]; then
-        return 0
+    if check_appreg_mount; then
+        if [ -d ${rootdir} ]; then
+            owner_stream=`python3 $updattr -v ${rootdir}/apps/$1/owner_stream`
+            if [[ -z "$owner_stream" ]] || (( $owner_stream == 0 )); then
+                ret=1        
+            else
+                ret=0
+            fi
+        fi
+        undo_check_appreg_mount
+    else
+        ret=1
     fi
-    return 1
+    return $ret
 }
 
 case "$cmd" in
     config | cfg)
-        if [[ -f /usr/local/bin/rpcf/rpcfg.py ]]; then
-            python3 /usr/local/bin/rpcf/rpcfg.py
-        elif [[ -f /usr/bin/rpcf/rpcfg.py ]]; then
-            python3 /usr/bin/rpcf/rpcfg.py $@
+        if [[ -f $tooldir/rpcfg.py ]]; then
+            python3 $tooldir/rpcfg.py $@
+        elif [[ -f $cmddir/rpcfg.py ]]; then
+            python3 $cmddir/rpcfg.py $@
         else
             echo "Error cannot find rpcfg.py"
         fi
@@ -197,7 +208,6 @@ case "$cmd" in
             arrApps=$(echo "$arrApps") # Remove trailing spaces
             for appName in $arrApps; do
                 if [ "x$appName" != "x" ]; then
-                    echo "Stopping application: $appName"
                     bash $script_dir/rpcfctl stop $appName
                 fi
             done
@@ -221,9 +231,9 @@ case "$cmd" in
             usage
             exit 1
         fi
-        if bash $cmddir/addapp.sh $1; then
+        if bash $cmddir/addapp.sh $@; then
             if is_app_online loggersvr1; then
-                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "Added application $1 by rpcfctl"
+                rpcf_sendlog -f rpcfctl -l 254 -t INFO -n rpcfctl -p $$ "Added application $@ by rpcfctl"
             fi
         fi
         ;;
@@ -240,6 +250,19 @@ case "$cmd" in
         if bash $cmddir/rmapp.sh $@; then
             if is_app_online loggersvr1; then
                 rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "Removed application(s) $@ by rpcfctl"
+            fi
+        fi
+        ;;
+    cloneapp)
+        cmdline="rpcfctl cloneapp <src app> <dest app>"
+        if [[ $# -lt 2 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        if bash $cmddir/cloneapp.sh $@;then
+            if is_app_online loggersvr1; then
+                rpcf_sendlog -f rpcfctl -l 270 -t INFO -n rpcfctl -p $$ "cloned application(s) $2 from $1 by rpcfctl"
             fi
         fi
         ;;
@@ -276,7 +299,14 @@ case "$cmd" in
         bash $cmddir/setattr.sh $@
         ;;
     getattr)
-        bash $cmddir/setattr.sh $@
+        if check_appreg_mount; then
+            pushd $rootdir > /dev/null
+            get_attr_value $@
+            ret=$?
+            popd > /dev/null
+            undo_check_appreg_mount
+            exit $ret
+        fi
         ;;
     addlink)
         bash $cmddir/addlink.sh $@
@@ -364,10 +394,11 @@ case "$cmd" in
                 SUDOCMD=sudo
             fi
         fi
+        echo Updating key setting requires root privilige.
         if $SUDOCMD python3 $cmddir/updatekeys.py $drvpath $1 $targetdir/$(basename $2) $targetdir/$(basename $3) $caroot; then
             echo "Imported keys to $targetdir successfully."
             echo "rpc-frmwrk will use the newly imported key for SSL connection"
-            echo "And don't forget to update your web server configuration if necessary"
+            echo "And don't forget to update your web server configuration if WebSocket is enabled "
         fi
         ;;
     genkeys)
@@ -498,13 +529,7 @@ case "$cmd" in
     authmech)
         cmdline="rpcfctl authmech"
         drvpath=$cfgPath/driver.json
-        context=`grep -A2 'HasAuth.*true' $drvpath`
-        if [[ -z $context ]]; then
-            echo None
-            exit 1;
-        fi
-        context=`echo $context | sed 's/,/\r\n/g'`
-        _mech=`cat <<< $context | grep 'AuthMech' | awk -F: '{print $2}' | sed 's/[",]//g'`;
+        _mech=`python3 $cmddir/authmech.py $drvpath`
         if [[ "x$_mech" == "x" ]]; then
             echo None
             exit 1;
@@ -513,15 +538,26 @@ case "$cmd" in
         fi
         ;;
     geninitcfg)
-        cmdline="rpcfctl geninitcfg [<output file>]"
+        cmdline="rpcfctl geninitcfg [-c] [<output file>]"
         drvpath=$cfgPath/driver.json
-        if [[ $# -gt 0 ]]; then
-            python3 $cmddir/geninitcfg.py $drvpath $1
-        else
-            python3 $cmddir/geninitcfg.py $drvpath
+        python3 $cmddir/geninitcfg.py $drvpath $@
+        ;;
+    updcfg)
+        # this commands update the rpc-frmwrk settings only
+        # it is convenient to update initcfg.json manually
+        # and then use this command to apply the settings 
+        # to rpc-frmwrk
+        cmdline="rpcfctl updcfg <path to initcfg>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
         fi
+        python3 $cmddir/updcfg.py $@
         ;;
     cfgnui)
+        # this commands update not only rpc-frmwrk settings,
+        # but webserver and kerebros settings as well.
         cmdline="rpcfctl cfgnui <init config file>"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing argument" 
@@ -813,6 +849,15 @@ case "$cmd" in
             popd > /dev/null
             undo_check_appreg_mount
         fi
+        ;;
+    geninstaller)
+        cmdline="rpcfctl geninstaller <initcfg path> <dest path> <directory of rpc-frmwrk deb/rpm>"
+        if [[ $# -lt 2 ]]; then
+            echo Error missing parameters
+            echo $cmdline
+            exit 1
+        fi
+        python3 $cmddir/buildinst.py $@
         ;;
     *)
         echo "Unknown command: $cmd"

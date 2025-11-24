@@ -109,9 +109,8 @@
                     "PortNumber": "4132",
                     "Compression": "false",
                     "EnableWS": "false",
-                    "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false"
+                    "EnableSSL": "false"
                 },
                 {
                     "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
@@ -123,9 +122,8 @@
                     "PortNumber": "4132",
                     "Compression": "false",
                     "EnableWS": "false",
-                    "EnableSSL": "false",
                     "ConnRecover": "false",
-                    "EnalbeSSL": "false"
+                    "EnableSSL": "false"
                 }
             ],
             "LBGroup": [

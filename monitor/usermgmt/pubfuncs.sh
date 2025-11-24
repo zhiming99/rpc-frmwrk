@@ -38,7 +38,7 @@ function backup_registry()
     pushd backdir_0x123 > /dev/null
     tar cf ../bktar123.tar --xattrs .
     popd > /dev/null
-    umount backdir_0x123
+    fuser3mount -u backdir_0x123
     sleep 1
 
     regfsmnt -i $_backup
@@ -52,7 +52,7 @@ function backup_registry()
     pushd backdir_0x123 > /dev/null
     tar xf ../bktar123.tar
     popd > /dev/null
-    umount backdir_0x123
+    fusermount3 -u backdir_0x123
     rm bktar123.tar
     rm -rf backdir_0x123
     echo completed with backup file "$_backup"

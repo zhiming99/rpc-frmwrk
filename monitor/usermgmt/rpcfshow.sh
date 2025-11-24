@@ -87,7 +87,7 @@ popd > /dev/null
 
 if (( $mt == 2 )); then
     if [ -d $rootdir ]; then
-        umount $rootdir
+        fusermount3 -u $rootdir
         rmdir $rootdir > /dev/null 2>&1
     fi
 fi

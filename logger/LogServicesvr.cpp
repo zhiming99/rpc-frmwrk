@@ -299,6 +299,8 @@ gint32 CAsyncLoggerAMCallbacks::ClaimAppInstCallback(
             }
         }
     }while( 0 );
+    ret = super::ClaimAppInstCallback(
+        context, iRet, arrPtToGet );
     return ret;
 }
 

@@ -77,7 +77,7 @@ class CIAppStorecli( IIAppStore_CliImpl ):
             strAppName, strPtName = strPtPath.split( '/' )
             if strAppName != self.m_strAppInst:
                 return
-            if strPtName == 'restart' and value.val == 1:
+            if strPtName == 'restart' and value.val == 2:
                 global bExit
                 bExit = True
                 return

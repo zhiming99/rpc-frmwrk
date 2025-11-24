@@ -85,7 +85,7 @@ class CDBusProxyPdo : public CRpcPdoPort
     gint32 CompleteRmtRegMatch( IRP* pIrp );
 
     virtual gint32 HandleListening( IRP* pIrp );
-    gint32 Reconnect();
+    gint32 Reconnect( IRP* pIrp = nullptr );
 
     public:
 

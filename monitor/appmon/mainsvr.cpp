@@ -70,6 +70,7 @@ static std::atomic< bool > g_bExit = {false};
 static std::atomic< bool > g_bRestart = {false};
 std::vector< InterfPtr > g_vecIfs;
 static stdrmutex g_oRegLock;
+extern stdstr g_strAppInst;
 
 extern gint32 StartLocalAppMancli();
 extern gint32 StopLocalAppMancli();
@@ -165,7 +166,8 @@ gint32 InitContext()
         if( ERROR( ret ) )
             break;
 
-        IService* pSvc = g_pIoMgr;
+        CIoManager* pSvc = g_pIoMgr;
+        pSvc->SetLogModName( g_strAppInst );
         ret = pSvc->Start();
 
     }while( 0 );
@@ -303,8 +305,13 @@ gint32 RunSvcObj()
     if( ERROR( ret ) )
     {
         // Stopping the objects
-        for( auto& pInterf : g_vecIfs )
+        auto itr = g_vecIfs.rbegin();
+        while( itr != g_vecIfs.rend() )
+        {
+            auto& pInterf = *itr;
             pInterf->Stop();
+            itr++;
+        }
         g_vecIfs.clear();
     }
 
@@ -376,12 +383,18 @@ int _main( int argc, char** argv)
             if( ERROR( ret ) )
                 break;
             ret = FuseMain( argc, argv );
-            for( auto pIf : g_vecIfs )
-                pIf->Stop();
-            g_vecIfs.clear();
         }
 #endif
         StopLocalAppMancli();
+
+        auto itr = g_vecIfs.rbegin();
+        while( itr != g_vecIfs.rend() )
+        {
+            auto& pInterf = *itr;
+            pInterf->Stop();
+            itr++;
+        }
+        g_vecIfs.clear();
 
     }while( 0 );
     if( true )
@@ -431,6 +444,7 @@ static void Usage( const char* szName )
         "\t [ -i FORMAT the app-reg file]\n"
         "\t [ -u Enable fuse to dump debug information ]\n"
         "\t [ -l Search first the current directory for configuration files ]\n"
+        "\t [ -m specify a name for monitoring ]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -466,7 +480,7 @@ int main( int argc, char** argv)
         bool bDaemon = false;
         bool bDebug = false;
         int opt = 0;
-        while( ( opt = getopt( argc, argv, "hgdiul" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hgdiuln:" ) ) != -1 )
         {
             switch( opt )
             {
@@ -480,6 +494,17 @@ int main( int argc, char** argv)
                     { bDebug = true; break; }
                 case 'l':
                     { g_bLocal = true; break; }
+                case 'm':
+                    {
+                        if( !IsValidName( optarg ) )
+                        {
+                            perror( "Error the monitoring name is not valid" );
+                            ret = -EINVAL;
+                            break;
+                        }
+                        g_strAppInst = optarg;
+                        break;
+                    }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
@@ -609,6 +634,7 @@ int main( int argc, char** argv)
         }
         if( g_bRestart )
         {
+            // restart myself
             system( g_strCmd.c_str() );
         }
         break;

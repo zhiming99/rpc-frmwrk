@@ -401,6 +401,8 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
             g_pSyncTask->SetError( ret );
             ( *g_pSyncTask )( eventTaskComp );
         }
+        ret = super::ClaimAppInstCallback(
+            context, iRet, arrPtToGet );
         return ret;
     }
 };
@@ -427,6 +429,7 @@ gint32 InitContext()
             break;
 
         CIoManager* pSvc = g_pIoMgr;
+        pSvc->SetLogModName( g_strAppInst ); 
         ret = pSvc->Start();
         if( ERROR( ret ) )
             break;

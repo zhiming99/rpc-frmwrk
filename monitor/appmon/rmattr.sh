@@ -56,7 +56,7 @@ rm_attribute $1 $2 $3
 
 popd > /dev/null
 if (( $mt == 2 )); then
-    umount $rootdir
+    fusermount3 -u $rootdir
 fi
 
 

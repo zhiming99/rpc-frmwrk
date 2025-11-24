@@ -1087,6 +1087,47 @@ void CObjBase::Dump( std::string& strDump )
 }
 #endif
 
+static const char* arrEnvs[] = {
+    "SHELL", "PWD", "LOGNAME", "HOME", "USERNAME", "LANG", "TERM", "USER",
+    "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "_", "PATH", "CLASSPATH",
+    "LD_LIBRARY_PATH"
+};
+
+static char* arrEnvAddrs[ sizeof( arrEnvs) / sizeof( arrEnvs[0] ) ] = { nullptr };
+
+static void BuildEnvList()
+{
+    static char szBuf[ 8192 ] = {0,0};
+    static char szGap[ 128 ];
+
+    if( szBuf[ 0 ] != 0 )
+        return;
+
+    guint32 dwCount =
+        sizeof( arrEnvs ) / sizeof( arrEnvs[0] );
+    guint32 dwOffset = 0;
+    gint32 j = 0;
+    for( gint32 i = 0; i < dwCount; i++ )
+    {
+        char* szValue = getenv( arrEnvs[ i ] );
+        if( szValue == nullptr )
+            continue;
+        guint32 dwSize = strlen( szValue ) + 1;
+        if( dwSize >= sizeof( szBuf ) - dwOffset )
+        {
+            OutputMsg( -ERANGE,
+                "Error the environemnt is too big to hold" );
+            break;
+        }
+
+        char* pszEnvStr = szBuf + dwOffset;
+        sprintf( pszEnvStr, "%s=%s", arrEnvs[ i ], szValue );
+        dwSize += strlen( arrEnvs[ i ] ) + 1;
+        arrEnvAddrs[ j++ ] = szBuf + dwOffset;
+        dwOffset += dwSize;
+    }
+}
+
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -1095,29 +1136,37 @@ gint32 Execve(
     const char* cmd,
     char* const args[],
     char* const env[],
-    const char* szOutput )
+    const char* szOutput,
+    bool bSync )
 {
     int ret = 0;
+    BuildEnvList();
     pid_t pid = fork();
     if (pid == -1)
         return ERROR_FAIL;
-
-    else if (pid != 0)
+    else if( pid != 0 )
     {
-        int status = 0;
-        while( ( ret = waitpid( pid, &status, 0 ) ) == -1 )
+        if( bSync )
         {
-            if (errno != EINTR) {
-                /* Handle error */
-                ret = -errno;
-                break;
+            int status = 0;
+            while( ( ret = waitpid( pid, &status, 0 ) ) == -1 )
+            {
+                if (errno != EINTR) {
+                    /* Handle error */
+                    ret = -errno;
+                    break;
+                }
             }
-        }
-        if ((ret == 0) ||
-            !(WIFEXITED(status) && !WEXITSTATUS(status)))
-        {
-            /* Report unexpected child status */
-            ret = -ECHILD;
+            if( ( ret == 0 ) ||
+                !( WIFEXITED( status ) && !WEXITSTATUS( status ) ) )
+            {
+                /* Report unexpected child status */
+                ret = -ECHILD;
+            }
+            else
+            {
+                ret = 0;
+            }
         }
         else
         {
@@ -1126,23 +1175,30 @@ gint32 Execve(
     }
     else
     {
-        if( szOutput != nullptr )
+        if( szOutput && szOutput[ 0 ] != 0 )
         {
-           int fd = open( szOutput,
-               O_RDWR | O_CREAT | O_TRUNC,
-               S_IRUSR | S_IWUSR); 
+            int fd = open( szOutput,
+                O_RDWR | O_CREAT | O_TRUNC,
+                S_IRUSR | S_IWUSR); 
 
-           dup2( fd, 1 );
-           dup2( fd, 2 );
-           close( fd );
+            if( fd >= 0 )
+            {
+                dup2( fd, 1 );
+                dup2( fd, 2 );
+                close( fd );
+            }
         }
         /* ... Initialize env as a sanitized copy of
          * environ ... */
+        if( env == nullptr || env[ 0 ] == nullptr )
+            env = arrEnvAddrs;
         if( execve(cmd, args, env) == -1 )
         {
             /* Handle error */
-            printf( "error running %s(%d)", cmd, errno );
             ret = -errno;
+            stdstr str = DebugMsg(
+                ret, "error starting %s", cmd );
+            perror( str.c_str() );
         }
     }
     return ret;

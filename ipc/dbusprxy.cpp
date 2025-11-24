@@ -1267,8 +1267,7 @@ gint32 CProxyPdoConnectTask::ExtendIrpTimer(
         if( ERROR( ret ) )
             break;
 
-        if( pMasterIrp == nullptr
-            || pMasterIrp->GetStackSize() == 0 )
+        if( pMasterIrp == nullptr )
         {
             ret = -EINVAL;
             break;
@@ -1276,11 +1275,19 @@ gint32 CProxyPdoConnectTask::ExtendIrpTimer(
 
         // extend the timer for the connection request
         CStdRMutex oLock( pMasterIrp->GetLock() );
+        if( pMasterIrp->GetStackSize() == 0 )
+        {
+            ret = -EINVAL;
+            break;
+        }
 
         ret = pMasterIrp->CanContinue( IRP_STATE_READY );
 
-        if( ERROR( ret ) )
+        if( ret == ERROR_STATE )
+        {
+            ret = STATUS_MORE_PROCESS_NEEDED;
             break;
+        }
 
         pMasterIrp->ResetTimer();
 
@@ -1357,8 +1364,9 @@ gint32 CProxyPdoConnectTask::Process(
         ret = ExtendIrpTimer( pMasterIrp );
         // the master irp could canceled at this
         // point, anyway, let's move on
-        if( ret == -EPERM )
+        if( ERROR( ret ) )
             bExpired = true;
+        ret = 0;
     }
 
     bool bRetry = CanRetry();
@@ -1608,8 +1616,6 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
         if( ERROR( ret ) )
             break;
 
-        ret = super::PostStart( pIrp );
-
     }while( 0 );
 
 
@@ -1634,58 +1640,14 @@ gint32 CDBusProxyPdo::PostStart( IRP* pIrp )
 
 gint32 CDBusProxyPdo::OnPortReady( IRP* pIrp )
 {
-    gint32 ret = 0;
-
-    do{
-        if( pIrp == nullptr
-            || pIrp->GetStackSize() == 0 )
-        {
-            ret = -EINVAL;
-            break;
-        }
-
-        CIoManager* pMgr = GetIoMgr();
-        CParamList oParams;
-
-        // retry parameters
-        if( IS_AUTH_PROXY( this ) )
-        {
-            oParams.SetIntProp( propRetries, 2 );
-        }
-        else
-        {
-            oParams.SetIntProp( propRetries,
-                PROXYPDO_CONN_RETRIES );
-        }
-
-        oParams.SetIntProp(
-            propIntervalSec, PROXYPDO_CONN_INTERVAL );
-        
-        // context parameters
-        oParams.SetPointer( propIrpPtr, pIrp );
-        oParams.SetPointer( propPortPtr, this );
-        oParams.SetPointer( propIoMgr, pMgr );
-
-        ret = m_pConnTask.NewObj(
-            clsid( CProxyPdoConnectTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) ) 
-            break;
-
-        // to avoid the complexity, we schedule a
-        // task for reconnection, instead of
-        // immediately exec the task
-        ret = GetIoMgr()->RescheduleTask(
-            m_pConnTask );
-
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_PENDING;
-
-    }while( 0 );
-
+    // make connection before OnPortReady
+    // because the propConnHandle is yet to get
+    gint32 ret = Reconnect( pIrp );
+    if( SUCCEEDED( ret ) )
+        ret = STATUS_PENDING;
     return ret;
 }
+
 
 void CDBusProxyPdo::OnPortStopped()
 {
@@ -1964,7 +1926,7 @@ gint32 CDBusProxyPdo::OnRmtSvrOnOffline(
     return ret;
 }
 
-gint32 CDBusProxyPdo::Reconnect()
+gint32 CDBusProxyPdo::Reconnect( PIRP pIrp )
 {
     gint32 ret = 0;
 
@@ -1981,7 +1943,8 @@ gint32 CDBusProxyPdo::Reconnect()
             break;
 
         guint32 dwPortState = GetPortState();
-        if( dwPortState != PORT_STATE_READY &&
+        if( pIrp == nullptr &&
+            dwPortState != PORT_STATE_READY &&
             dwPortState != PORT_STATE_BUSY_SHARED )
             break;
 
@@ -2005,6 +1968,10 @@ gint32 CDBusProxyPdo::Reconnect()
         oParams[ propIoMgr ] =
             ObjPtr( pMgr );
 
+        if( pIrp != nullptr )
+            oParams.SetPointer(
+                propIrpPtr, pIrp );
+
         ret = m_pConnTask.NewObj(
             clsid( CProxyPdoConnectTask ),
             oParams.GetCfg() );
@@ -2016,7 +1983,7 @@ gint32 CDBusProxyPdo::Reconnect()
         // schedule a task for
         // reconnection, instead of
         // immediately exec the task
-        pMgr->RescheduleTask( m_pConnTask );
+        ret = pMgr->RescheduleTask( m_pConnTask );
 
     }while( 0 );
     

@@ -181,6 +181,17 @@ public class MainThread
                 .getBytes(StandardCharsets.UTF_8);
         arrKvs.add(okv);
 
+        /*okv = new KeyValue();
+        okv.strKey = "cmdline";
+        okv.oValue = new JVariant();
+        okv.oValue.iType = rpcbaseConstants.typeByteArr;
+        ProcessHandle currentProcess = ProcessHandle.current();
+        String commandLine = currentProcess.info().commandLine().orElse("No command line available");
+        okv.oValue.val = commandLine.getBytes(StandardCharsets.UTF_8);
+        arrKvs.add(okv);
+        */
+
+
         JRetVal jRetVal = oProxy.ClaimAppInst( strAppInst,
             arrKvs.toArray( new KeyValue[0]) );
         if( jRetVal.ERROR()) {

@@ -40,6 +40,7 @@ extern std::map< char, stdstr > g_mapSig2PyType;
 extern gint32 EmitFormalArgListPy(
     CWriterBase* pWriter, CArgList* pInArgs );
 extern guint32 g_dwFlags;
+extern bool g_bReadme;
 
 static gint32 EmitSerialBySig(
     CWriterBase* m_pWriter,
@@ -594,9 +595,10 @@ CPyFileSet2::CPyFileSet2(
         strOutPath, "ifimpl.py",
         false );
 
-    GEN_FILEPATH( m_strReadme, 
-        strOutPath, "README.md",
-        false );
+    if( g_bReadme )
+        GEN_FILEPATH( m_strReadme, 
+            strOutPath, "README.md",
+            false );
     m_strPath = strOutPath;
 
     gint32 ret = OpenFiles();
@@ -670,14 +672,17 @@ gint32 CPyFileSet2::OpenFiles()
         { basename( m_strIfImpl.c_str() ),
         std::move( pstm ) } );
 
-    pstm = STMPTR( new std::ofstream(
-        m_strReadme,
-        std::ofstream::out |
-        std::ofstream::trunc) );
+    if( g_bReadme )
+    {
+        pstm = STMPTR( new std::ofstream(
+            m_strReadme,
+            std::ofstream::out |
+            std::ofstream::trunc) );
 
-    m_mapSvcImp.insert(
-        { basename( m_strReadme.c_str() ),
-        std::move( pstm ) } );
+        m_mapSvcImp.insert(
+            { basename( m_strReadme.c_str() ),
+            std::move( pstm ) } );
+    }
 
     return STATUS_SUCCESS;
 }
@@ -1408,9 +1413,12 @@ gint32 GenPyProj2(
         if( ERROR( ret ) )
             break;
 
-        oWriter.SelectReadme();
-        CExportPyReadme2 ordme( &oWriter, pRoot );
-        ret = ordme.Output();
+        if( g_bReadme )
+        {
+            oWriter.SelectReadme();
+            CExportPyReadme2 ordme( &oWriter, pRoot );
+            ret = ordme.Output();
+        }
 
     }while( 0 );
     g_mapSig2PyType[ 'o' ] = "cpp.ObjPtr";

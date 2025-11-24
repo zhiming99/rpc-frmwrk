@@ -742,6 +742,7 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                 }
 
                 std::string strFormat = "ipv4";
+                oConnParams[ propNodeName ] = strNode;
                 oConnParams[ propAddrFormat ] = strFormat;
                 oConnParams[ propEnableSSL ] = false;
                 oConnParams[ propEnableWebSock ] = false;
@@ -863,14 +864,6 @@ gint32 CRpcRouterBridge::BuildNodeMap()
 
             }
 
-            Json::Value& oLBInfo =
-                oObjElem[ JSON_ATTR_LBGROUP ];
-
-            if( oLBInfo == Json::Value::null ||
-                !oLBInfo.isArray() ||
-                oLBInfo.empty() )
-                break;
-
             if( m_pLBGrp.IsEmpty() )
             {
                 CParamList oParams;
@@ -881,6 +874,14 @@ gint32 CRpcRouterBridge::BuildNodeMap()
                 if( ERROR( ret ) )
                     break;
             }
+
+            Json::Value& oLBInfo =
+                oObjElem[ JSON_ATTR_LBGROUP ];
+
+            if( oLBInfo == Json::Value::null ||
+                !oLBInfo.isArray() ||
+                oLBInfo.empty() )
+                break;
 
             CRedudantNodes* pLBGrp =
                 ( CRedudantNodes* )m_pLBGrp;
@@ -2169,10 +2170,13 @@ gint32 CRouterOpenBdgePortTask::StopIfSafe(
             propPortId, dwPortId );
         if( ERROR( ret ) )
             break;
-        ret = pRouter->AddStopTask(
-            nullptr, dwPortId, pStopTask );
-        if( SUCCEEDED( ret ) )
-            break;
+        if( pSvc->IsServer() )
+        {
+            ret = pRouter->AddStopTask(
+                nullptr, dwPortId, pStopTask );
+            if( SUCCEEDED( ret ) )
+                break;
+        }
 
         // There is another stop task in the queue.
         // because we have not registered the bridge
@@ -6174,6 +6178,30 @@ gint32 CRpcRouterManager::GetProperty(
             auto& pRt = m_vecRoutersBdge.front();
             oRouterLock.Unlock();
             ret = pRt->GetProperty( iProp, oBuf );
+            break;
+        }
+    case propMmhNodeList:
+        {
+            CStdRMutex oRouterLock( GetLock() );
+            if( m_vecRoutersBdge.size() == 0 )
+            {
+                ret = -ENOENT;
+                break;
+            }
+            auto& pRt = m_vecRoutersBdge.front();
+            oRouterLock.Unlock();
+            CRpcRouterBridge* prt = pRt;
+            if( prt == nullptr )
+            {
+                ret = -EFAULT;
+                break;
+            }
+            ObjVecPtr pvecNodes( true );
+            ret = prt->EnumMmhNodes(
+                ( *pvecNodes )() );
+            if( ERROR( ret ) )
+                break;
+            oBuf = pvecNodes;
             break;
         }
     default:

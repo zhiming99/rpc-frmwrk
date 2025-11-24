@@ -976,6 +976,13 @@ namespace cpp
                 break;
 
             CIoManager* pMgr = *pObj;
+
+            stdstr strLogModName;
+            ret = oCfg.GetStrProp(
+                115, strLogModName );
+            if( SUCCEEDED( ret ) )
+                pMgr->SetLogModName( strLogModName );
+
             ret = pMgr->Start();
             if( ERROR( ret ) )
                 break;
@@ -1102,6 +1109,12 @@ namespace cpp
                 pMgr->SetCmdLineOpt(
                     propNoDBusConn, true );
             }
+
+            stdstr strLogModName;
+            ret = oCfg.GetStrProp(
+                115, strLogModName );
+            if( SUCCEEDED( ret ) )
+                pMgr->SetLogModName( strLogModName );
 
             ret = pMgr->Start();
             if( ERROR( ret ) )

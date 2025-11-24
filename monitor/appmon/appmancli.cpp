@@ -213,7 +213,8 @@ struct CAMonSvrCallbacks : public CAsyncStdAMCallbacks
             {
                 RotateLog( 0 );
             }
-            else
+            else if( strPtPath != 
+                g_strAppInst + "/restart" )
             {
                 ret = super::OnPointChanged(
                     context, strPtPath, value );

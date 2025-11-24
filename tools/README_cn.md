@@ -95,6 +95,7 @@
   * 打开一个终端，下载[Dockerfile](./Dockerfile)
   * 在Dockerfile的下载目录，运行`docker build -t 'rpc-frmwrk' . `。
   * 你也可以对Dockerfile做一些修改，来时应自己的使用习惯和运行环境。
+  * 运行docker的命令行`sudo docker run -it --rm --device /dev/fuse --privileged image-tag '/bin/bash'`. 注意选项`--device /dev/fuse`。
 ## 使用shell脚本
   * 下载如下三个文件 [buildall-deb.sh](./buildall-deb.sh), [buildall-fed.sh](./buildall-fed.sh), 和[makerpcf.sh](./makerpcf.sh)到同一个目录下.
   * 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。

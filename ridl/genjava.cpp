@@ -4723,7 +4723,10 @@ do{ \
     Wa( "// replace the following code with your own" ); \
     Wa( "// logic if necessary. The requests" ); \
     Wa( "// handling is going on in the background" ); \
-    Wa( "while( true )" ); \
+    if( g_bMonitoring ) \
+        Wa( "while( !MainThread.isExit() )" ); \
+    else \
+        Wa( "while( true )" ); \
     BLOCK_OPEN;\
     CCOUT << "try"; \
     BLOCK_OPEN; \
@@ -5184,7 +5187,18 @@ gint32 CImplJavaMainSvr::Output()
 
         if( !g_bRpcOverStm && !g_bBuiltinRt )
         {
-            Wa( "m_oCtx = JavaRpcContext.createServer(); " );
+            Wa( "// prepare the init parameters for iomgr" );
+            Wa( "Map< Integer, Object > oInit =" );
+            Wa( "    new HashMap< Integer, Object >();" );
+            CCOUT << "oInit.put( 0, \"JavaRpcServer\" );";
+            NEW_LINE;
+            if( g_bMonitoring && g_vecMonApps.size() )
+            {
+                CCOUT << "oInit.put( 115, \""
+                    << g_vecMonApps[ 0 ] << "\" );";
+                NEW_LINE;
+            }
+            Wa( "m_oCtx = JavaRpcContext.createServer( oInit ); " );
         }
         else
         {
@@ -5195,6 +5209,12 @@ gint32 CImplJavaMainSvr::Output()
             Wa( "    new HashMap< Integer, Object >();" );
             CCOUT << "oInit.put( 0, \"" << strModName << "\" );";
             NEW_LINE;
+            if( g_bMonitoring && g_vecMonApps.size() )
+            {
+                CCOUT << "oInit.put( 115, \""
+                    << g_vecMonApps[ 0 ] << "\" );";
+                NEW_LINE;
+            }
             Wa( "String strCfgPath = getDescPath( \"driver.json\");" );
             Wa( "if( strCfgPath.length() > 0 )" );
             Wa( "    oInit.put( 105, strCfgPath );" );

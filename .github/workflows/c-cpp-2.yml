@@ -26,11 +26,14 @@ jobs:
     - name: install kerberos
       run: sudo apt-get install -qq krb5-kdc krb5-admin-server krb5-user nginx
     - name: install tools
-      run: sudo apt-get -o Acquire::Retries=3 install -y gcc g++ python3 python3-dev python3-build python3-pip flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev bash attr net-tools procps swig ccache libcommons-cli-java
+      run: sudo apt-get -o Acquire::Retries=3 install -y gcc g++ python3 python3-dev python3-build python3-pip flex bison libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 libdbus-1-dev libkrb5-3 libkrb5-dev liblz4-1 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev bash attr net-tools procps swig ccache libcommons-cli-java npm webpack
     - name: pip install
-      run: pip3 install numpy wheel
+      run:  pip3 install numpy wheel
     - name: install sip
       run: sudo apt-get -y install sip-tools python3-sipbuild || sudo apt-get -y install sip-dev python3-sip python3-sip-dev || true; sudo apt-get -y install fuse3 libfuse3-3 libfuse3-dev || true; sudo apt-get -y install libjsoncpp1 libjsoncpp-dev || sudo apt-get -y install libjsoncpp25 libjsoncpp-dev 
+
+    - name: npm install
+      run: npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhash minify xxhashjs webpack webpack-cli vm events crypto-browserify stream-browserify
 
     - name: build gmssl
       run: cd ./gmssl/;mkdir build;cd build;cmake ..;make;sudo make install
