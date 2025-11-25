@@ -99,7 +99,12 @@ gint32 CRpcTcpBridge::OnCheckRouterPathCompleteLB(
         ret = pRouter->GetProxyIdByNodeName(
             strNode, dwProxyId );
         if( ERROR( ret ) )
+        {
+            LOGINFO( this->GetIoMgr(), iRet,
+                "Error node '%s' is unreachable",
+                strPath.c_str() );
             break;
+        }
 
         ret = pRouter->AddRefCount(
             strNode, dwPortId, dwProxyId );

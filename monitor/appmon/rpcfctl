@@ -327,7 +327,7 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
-        bash $cmddir/inituser.sh && bash $cmddir/initappreg.sh
+        bash $cmddir/inituser.sh; bash $cmddir/initappreg.sh
         ;;
     initcli)
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
