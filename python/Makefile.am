@@ -23,7 +23,7 @@ all:
 	@if echo "$(COMMON_LINK)" | grep "latomic"; then export ARMBUILD="1"; else export ARMBUILD="0";fi;\
 	if [ "x$(SIPVER)" == "x5" ]; then \
         FUSE3="$(LINK_FUSE)" bash gentoml.sh $(libdir);\
-		sip-build --verbose --build-dir ./sipbuild; \
+		CXXFLAGS= sip-build --verbose --build-dir ./sipbuild; \
         rm -f rpcf/rpcbase*.so*;\
 		sofile=$$(find ./sipbuild -name $(PYTHON_EXT1));\
         cp `pwd`/$${sofile} rpcf/$(PYTHON_EXT) ;\
