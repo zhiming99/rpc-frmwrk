@@ -778,11 +778,11 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
         if( strExpPath == strPtPath )
         {
             stdstr strCmd;
-            if( ( guint32& )value  == usrcmdStart )
+            if( ( const guint32& )value  == usrcmdStart )
                 strCmd = "start";
-            else if( ( guint32& )value  == usrcmdStop )
+            else if( ( const guint32& )value  == usrcmdStop )
                 strCmd = "stop";
-            else if( ( guint32& )value  == usrcmdRestart )
+            else if( ( const guint32& )value  == usrcmdRestart )
                 strCmd = "restart";
             stdstr strExec = "/usr/bin/rpcfctl";
             ret = access( strExec.c_str() , X_OK );
@@ -832,7 +832,7 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
             ret = -ENOTSUP;
             break;
         }
-        if( ( ( guint32& )value ) != 1 )
+        if( ( ( const guint32& )value ) != 1 )
             break;
 
         std::vector< KeyValue > veckv;
