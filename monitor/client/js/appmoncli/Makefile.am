@@ -49,4 +49,8 @@ package:
 dbg-package:
 	make -f Makefile.skel debug
 	tar zcf appmonui.tar.gz $(files_to_package) dist/*
+
+clean:
+	rm -f $(auto_files) dist/* appmonui$(EXEEXT)
+
 .PHONY: package dbg-package appmon.ridl 
