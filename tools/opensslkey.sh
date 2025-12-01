@@ -1,25 +1,21 @@
 #!/bin/bash
 # parameters:
-# $1: path to store the keys and certs, ~/.rpcf/openssl if not specified
+# $1: path to store the keys and certs, if the path does not exist, it will be created
 # $2: number of client keys, 1 if not specified
 # $3: number of server keys, 1 if not specified
 # openssl demo key generator
+echo $@
 
 bitwidth=2048
 if [ "x$1" != "x" -a ! -d $1 ]; then
-    echo Usage: bash opensslkey.sh [directory to store keys] [ number of client keys ] [number of server keys] [ DNS name ]
-    exit 1
-fi
-
-if [ "x$1" == "x" ]; then
-    targetdir="$HOME/.rpcf/openssl"
-    if [ ! -d $targetdir ]; then
-        mkdir -p $targetdir
-        chmod 700 $targetdir
+    if ! mkdir -p $1; then
+        echo $1 is not a valid target directory
+        echo Usage: bash opensslkey.sh [directory to store keys] [ number of client keys ] [number of server keys] [ DNS name ]
+        exit 1
     fi
-else
-    targetdir=$1
+    chmod 700 $1
 fi
+targetdir=$1
 
 if [ "x$2" == "x" ];then
     numcli=1
@@ -92,8 +88,8 @@ if [ ! -f rootcakey.pem ]; then
     openssl req -new -sha256 -x509 -days 3650 -config ${SSLCNF} -extensions v3_ca -key rootcakey.pem -out rootcacert.pem -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=ROOTCA/emailAddress=woodhead99@gmail.com"
 fi
 
-echo generating certs.pem
 if [ ! -f cakey.pem ]; then
+    echo generating certs.pem
     mkdir backup
     mv -f rootca*.pem backup/
     rm -rf *.pem
@@ -115,20 +111,27 @@ fi
 
 echo generating server keys
 let endidx=idx_base+numsvr
-for((i=idx_base;i<endidx;i++));do
+for(( i=$idx_base; i<$endidx; i++ ));do
     chmod 600 signcert.pem signkey.pem > /dev/null 2>&1 || true
     openssl genrsa -out signkey.pem ${bitwidth}
     if [[ "x$dnsname" == "x" ]]; then 
         dnsname="Server-$i"
     fi
-    openssl req -new -sha256 -key signkey.pem -out signreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server-$i" -addext "subjectAltName=DNS:$dnsname"
+    if ! openssl req -new -sha256 -key signkey.pem -out signreq.pem -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Server-$i" -addext "subjectAltName=DNS:$dnsname"; then
+        echo Error openssl failed to generate request file.
+        exit 1
+    fi
+    if [ -f cacert.pem ]; then cacert="./cacert.pem"; fi
+    if [ -f ./private_keys/cacert.pem ]; then cacert="./private_keys/cacert.pem"; fi
+    if [ -f cakey.pem ]; then cakey="./cakey.pem"; fi
+    if [ -f ./private_keys/cakey.pem ]; then cakey="./private_keys/cakey.pem"; fi
     if which expect; then
-        openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
+        openssl ca -days 365 -cert $cacert -keyfile $cakey -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
     else
-        openssl x509 -req -in signreq.pem -CA cacert.pem -CAkey cakey.pem -days 365 -out signcert.pem -CAcreateserial
+        openssl x509 -req -in signreq.pem -CA $cacert -CAkey $cakey -days 365 -out signcert.pem -CAcreateserial
     fi
     tar zcf serverkeys-$i.tar.gz signkey.pem signcert.pem certs.pem
-    rm signreq.pem signkey.pem signcert.pem
+    #rm signreq.pem signkey.pem signcert.pem
 done
 
 function find_key_to_show()
@@ -170,10 +173,13 @@ svr_idx=$startkey
 
 let idx_base+=numsvr
 let endidx=idx_base+numcli
-for((i=idx_base;i<endidx;i++));do
+for ((i=$idx_base; i<$endidx; i++));do
     chmod 600 clientcert.pem clientkey.pem > /dev/null 2>&1 || true
     openssl genrsa -out clientkey.pem ${bitwidth}
-    openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -extensions usr_cert -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Client-$i"
+    if ! openssl req -new -sha256 -key clientkey.pem -out clientreq.pem -config ${SSLCNF} -subj "/C=CN/ST=Shaanxi/L=Xian/O=Yanta/OU=rpcf/CN=Client-$i"; then
+        echo Error openssl failed to generate request file;
+        exit 1
+    fi
     if which expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in clientreq.pem -out clientcert.pem
     else

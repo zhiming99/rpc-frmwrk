@@ -410,7 +410,31 @@ case "$cmd" in
             exit 1
         fi
         if [[ "x$1" == "xopenssl" ]]; then
-            if bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
+            if which expect; then
+                cat > ~/.rpcf/gencmd.sh << "EOF"
+#!/bin/bash
+if $1/opensslkey.sh $HOME/.rpcf/openssl $3 $4; then
+    clidx=`cat $HOME/.rpcf/openssl/clidx`;
+    svridx=`cat $HOME/.rpcf/openssl/svridx`;
+    echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl;
+    echo server key/cert package is serverkeys-$svridx.tar.gz;
+    echo client key/cert package is clientkeys-$clidx.tar.gz;
+else
+    echo Error generate OpenSSL key/cert;
+fi
+EOF
+                chmod u+x ~/.rpcf/gencmd.sh
+                expect - << EOF 
+#!/usr/bin/expect -f
+set timeout -1
+spawn ~/.rpcf/gencmd.sh $cmddir $2 $3 $4
+expect {
+    "Sign the certificate? " { send "y\r";exp_continue}
+    "requests certified, commit? " { send "y\r";exp_continue} 
+}
+EOF
+                rm -f ~/.rpcf/gencmd.sh
+            elif bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
                 clidx=`cat $HOME/.rpcf/openssl/clidx`
                 svridx=`cat $HOME/.rpcf/openssl/svridx`
                 echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl
@@ -420,6 +444,7 @@ case "$cmd" in
                 echo Error failed to generate OpenSSL key/cert
             fi
         elif [[ "x$1" == "xgmssl" ]]; then
+            if [ ! -d $HOME/.rpcf/gmssl ]; then mkdir $HOME/.rpcf/gmssl; fi
             if bash $cmddir/gmsslkey.sh $HOME/.rpcf/gmssl $2 $3; then
                 clidx=`cat $HOME/.rpcf/gmssl/clidx`
                 svridx=`cat $HOME/.rpcf/gmssl/svridx`
@@ -429,6 +454,8 @@ case "$cmd" in
             else
                 echo Error failed to generate GmSSL key/cert
             fi
+        else
+            echo "Error invalid SSL type '$1'"
         fi
         ;;
     printcert)

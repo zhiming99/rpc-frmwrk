@@ -189,6 +189,25 @@ def IsNginxInstalled()->bool:
         return True
     return False
 
+def GetNginxVersion() -> Tuple[int,int,int]:
+    """
+    Return (major, minor, patch) of installed nginx, or (0,0,0) on failure.
+    nginx prints version to stderr, e.g. "nginx version: nginx/1.26.1"
+    """
+    try:
+        proc = subprocess.Popen(['nginx', '-v'], stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        _, stderr = proc.communicate(timeout=2)
+        out = stderr.decode('utf-8', errors='ignore')
+        m = re.search(r'nginx\/(\d+)\.(\d+)(?:\.(\d+))?', out)
+        if m:
+            major = int(m.group(1))
+            minor = int(m.group(2))
+            patch = int(m.group(3) or 0)
+            return (major, minor, patch)
+    except Exception:
+        pass
+    return (0,0,0)
+
 def IsApacheInstalled()->bool:
     if os.access( '/usr/sbin/httpd', os.X_OK | os.R_OK ):
         return True
@@ -280,10 +299,27 @@ def ExtractParams( initCfg : object) ->Tuple[ dict ]:
         return ()
 
 def Config_Nginx( initCfg : object ) -> int:
-    cfgText = '''server {{
+    version = GetNginxVersion()
+    try:
+        if ( version[0], version[1] ) < ( 1, 26 ):
+            bOld = True
+        else:
+            bOld = False
+    except:
+        bOld = True
+    if bOld:
+        strListen = '''server {{
     listen {WsPortNum} http2 ssl;
     listen [::]:{WsPortNum} http2 ssl;
+    '''
+    else:
+        strListen = '''server {{
+    listen {WsPortNum} ssl;
+    listen [::]:{WsPortNum} ssl;
+    http2 on;
+    '''
 
+    cfgText = strListen + '''
     server_name {ServerName};
 
     ssl_certificate {CertFile};

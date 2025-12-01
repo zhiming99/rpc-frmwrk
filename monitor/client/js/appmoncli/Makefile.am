@@ -32,12 +32,12 @@ $(ridl_file):
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
-    python3 ../../../appmon/upddesc.py;\
-    if echo $(CXXFLAGS) | grep 'DDEBUG'; then make -f Makefile.skel debug; else make -f Makefile.skel release; fi
+    python3 ../../../appmon/upddesc.py
 
 $(auto_files): $(ridl_file)
 
 dist/appmon.js: $(auto_files) maincli.js AppMonitorcli.js
+	@if echo $(CPPFLAGS) | grep 'DDEBUG'; then make -f Makefile.skel debug; else make -f Makefile.skel release; fi
 
 appmonui$(EXEEXT): $(files_to_package) dist/appmon.js
 	tar zcf appmonui$(EXEEXT) $(files_to_package) dist/*
