@@ -35,7 +35,8 @@ def GetAppManagercli() -> amc.CAppManagerProxy:
 def StartAppManagercli( oTarget : PyRpcServer,
     oCtx: PyRpcContext, strAppInst: str,
     funcCreateProxy : callable = None,
-    bNewThread : bool = True ) -> int:
+    bNewThread : bool = True,
+    strAltDesc : str = None ) -> int:
     """
     oTarget: is the target server object to monitor
 
@@ -47,11 +48,11 @@ def StartAppManagercli( oTarget : PyRpcServer,
     if bNewThread:
         threading.Thread(
             target=AMThreadProc,
-            args=( oTarget, oCtx, strAppInst, funcCreateProxy ),
+            args=( oTarget, oCtx, strAppInst, funcCreateProxy, strAltDesc ),
             name='AppManagercli' ).start()
     else:
         ret = AMThreadProc( oTarget,
-            oCtx, strAppInst, funcCreateProxy )
+            oCtx, strAppInst, funcCreateProxy, strAltDesc )
         if ret < 0:
             print( "Error in AppManagercli thread" )
             return ret
@@ -71,17 +72,23 @@ def StopAppManagercli() -> int:
 
 def AMThreadProc( oTarget : PyRpcServer,
         oCtx: PyRpcContext, strAppInst: str,
-        funcCreateProxy : callable = None ) -> int:
+        funcCreateProxy : callable = None,
+        strAltDesc : str = None ) -> int:
     ret = 0
     while not amc.bExit:
         print( "start AppManangecli..." )
         # using a fake path to force using system default config
-        strPath_ = 'invalidpath/appmondesc.json'
+        if strAltDesc is None:
+            strPath_ = 'invalidpath/appmondesc.json'
+        else:
+            strPath_ = strAltDesc
+
         if funcCreateProxy is None:
             oProxy_AppManager = amc.CAppManagerProxy( oCtx.pIoMgr,
                 strPath_, 'AppManager' )
         else:
             oProxy_AppManager = funcCreateProxy() 
+
         ret = oProxy_AppManager.GetError()
         if ret < 0 :
             print( "monitor server is not online, reconnect scheduled..." )
@@ -143,28 +150,22 @@ def maincli(
     workdir.oValue.val = os.getcwd().encode()
     arrKvs.append( workdir )
 
-    cmdLine = "python3"
-    for i in sys.argv:
-        cmdLine += ' ' + i
-
-    kvCmdLine = KeyValue()
-    kvCmdLine.strKey = 'cmdline'
-    kvCmdLine.oValue = Variant()
-    kvCmdLine.oValue.iType = cpp.typeByteArr
-    kvCmdLine.oValue.val = cmdLine.encode()
-    arrKvs.append( kvCmdLine )
-
     ret = oProxy.ClaimAppInst( strAppInst, arrKvs )
     if ret[ 0 ] < 0:
         print( "Error failed to ClaimAppInst ", ret[ 0 ] )
         return ret[ 0 ]
 
-    if len( cmdLine ) >= 95:
-        buf = cmdLine.encode()
-        ret = oProxy.SetLargePointValue(
-            strAppInst + '/cmdline', buf )
-        if ret[ 0 ] < 0:
-            return ret[ 0 ]
+    print( f"Successfully claimed {strAppInst}" )
+
+    cmdLine = "python3"
+    for i in sys.argv:
+        cmdLine += ' ' + i
+
+    buf = cmdLine.encode()
+    ret = oProxy.SetLargePointValue(
+        strAppInst + '/cmdline', buf )
+    if ret[ 0 ] < 0:
+        return ret[ 0 ]
 
     while not amc.bExit:
         try:
