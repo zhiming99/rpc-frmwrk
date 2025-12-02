@@ -9021,7 +9021,13 @@ gint32 CExportDrivers::OutputBuiltinRt()
             Json::Value( "./libwspt.so" ) );
 #endif
 
-        oCli[ JSON_ATTR_FACTORIES ] = oFactories;
+        Json::Value oFactoriesCli;
+        oFactoriesCli.copy( oFactories );
+        if( g_bMonitoring )
+            oFactoriesCli.append(
+            Json::Value( "./libregfs.so" ) );
+
+        oCli[ JSON_ATTR_FACTORIES ] = oFactoriesCli;
         oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
 
 #ifdef FUSE3
