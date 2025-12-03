@@ -9044,7 +9044,7 @@ gint32 CExportDrivers::OutputBuiltinRt()
 
         oVal[ JSON_ATTR_MODULES ] = oModuleArray;
 
-        // pickout the fist listening port from the
+        // pickout the first listening port from the
         // base config file 'driver.json', because
         // builtin-rt supports just one listening port.
         stdstr strDrvPath;
@@ -9372,8 +9372,15 @@ gint32 CExportObjDesc::Output()
         ret = FindInstCfg( "synccfg.py", strSrcPy );
         if( ERROR( ret ) )
         {
-            ret = 0;
-            break;
+            // this is the case when the ridlc is
+            // not installed
+            strSrcPy = "./synccfg.py";
+            ret = access( strSrcPy.c_str(), F_OK );
+            if( ret < 0 )
+            {
+                ret = 0;
+                break;
+            }
         }
 
         stdstr strObjList;
