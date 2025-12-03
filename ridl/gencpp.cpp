@@ -9021,7 +9021,10 @@ gint32 CExportDrivers::OutputBuiltinRt()
             Json::Value( "./libwspt.so" ) );
 #endif
 
-        Json::Value oFactoriesCli;
+        Json::Value oFactoriesCli( Json::arrayValue );
+        for( gint32 i = 0; i < oFactories.size(); i++ )
+            oFactoriesCli.append( oFactories[ i ] );
+
         oFactoriesCli.copy( oFactories );
         if( g_bMonitoring )
             oFactoriesCli.append(
