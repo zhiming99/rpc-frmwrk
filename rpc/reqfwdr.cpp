@@ -1112,8 +1112,14 @@ gint32 CRpcReqForwarder::StopBridgeProxy(
         if( ERROR( ret ) )
             break;
 
-        ( *pTask )( eventZero );
-        ret = pTask->GetError();
+        ret = this->RunManagedTask2( pTask );
+        if( ERROR( ret ) )
+        {
+            ( *pTask )( eventCancelTask );
+            break;
+        }
+        if( ret == 0 )
+            ret = pTask->GetError();
 
     }while( 0 );
 
