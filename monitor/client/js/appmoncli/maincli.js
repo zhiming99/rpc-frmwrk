@@ -273,13 +273,42 @@ function StartPullInfo()
 
             var site= GetSite( this.m_strRouterPath )
             if( site === null )
+            {
                 site = new Map()
-            site.apps = []
+                site.apps = []
+            }
+            // update the app list by adding the newly added apps
             for ( var i = 0; i < arrApps.length; i++ )
             {
                 if( this.m_setAppBaseLine.has( arrApps[i] ) )
                     continue
-                site.apps.push( { name: arrApps[i], status: globalThis.i18nHelper.t("APP_STATUS_UNKNOWN"), cpu: "0%" } )
+                for( var j = 0; j < site.apps.length; j++ )
+                {
+                    if( site.apps[j].name === arrApps[i] )
+                        break;
+                }
+                if( j === site.apps.length )
+                    site.apps.push( { name: arrApps[i], status: globalThis.i18nHelper.t("APP_STATUS_UNKNOWN"), cpu: "0%" } )
+            }
+            // remove the apps that are no longer existing
+            appToRemove = []
+            for( var i = 0; i < site.apps.length; i++ )
+            {
+                var found = false
+                for ( var j = 0; j < arrApps.length; j++ )
+                {
+                    if( site.apps[i].name === arrApps[j] )
+                    {
+                        found = true
+                        break
+                    }
+                }
+                if( !found )
+                    appToRemove.push( i )
+            }
+            for( var i = appToRemove.length - 1; i >=0; i-- )
+            {
+                site.apps.splice( appToRemove[i], 1 )
             }
             if( this.m_strRouterPath === "/")
                 site.name = globalThis.i18nHelper.t("Root Node");
@@ -333,6 +362,15 @@ function StartPullInfo()
                     arrPtPaths.push( appName + "/cpu_load");
                     arrPtPaths.push( appName + "/app_class");
                     arrPtPaths.push( appName + "/display_name");
+                    if( !site.apps[i].display_points )
+                        arrPtPaths.push( appName + "/display_points");
+                    else
+                    {
+                        for( let [ pt, val ] of site.apps[i].display_points )
+                        {
+                            arrPtPaths.push( appName + "/" + pt );
+                        }
+                    }
                 }
                 oContext.oGetPvsCb = ((oContext, ret, arrKeyVals ) => {
                     if( ERROR(ret) ) 
@@ -353,6 +391,26 @@ function StartPullInfo()
                                     site.apps[j].app_class = arrKeyVals[i].oValue.m_val
                                 else if( strPt === "display_name" )
                                     site.apps[j].display_name = arrKeyVals[i].oValue.m_val
+                                else if( strPt === "display_points" )
+                                {
+                                    const decoder = new TextDecoder('utf-8')
+                                    let text=decoder.decode(arrKeyVals[i].oValue.m_val);
+                                    var ptList = JSON.parse(text);
+                                    if( ptList && ptList.length > 0 )
+                                    {
+                                        site.apps[j].display_points = new Map();
+                                        ptList.forEach( ( pt )=>{
+                                            site.apps[j].display_points.set( pt, { v:"N/A", unit:null});
+                                        });
+                                    }
+                                }
+                                else if( site.apps[j].display_points &&
+                                    site.apps[j].display_points.has( strPt ) )
+                                {
+                                    var value = site.apps[j].display_points.get( strPt );
+                                    value.v = arrKeyVals[i].oValue.m_val;
+                                    site.apps[j].display_points.set( strPt, value );
+                                }
                                 break;
                             }
                         }

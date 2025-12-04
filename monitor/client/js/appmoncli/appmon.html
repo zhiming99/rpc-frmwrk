@@ -266,6 +266,11 @@
                   setInterval(fetchStatus, 5000);
               globalThis.fetchLogsInterval =
                   setInterval(fetchLogs, 30000);
+              return fetchAppFeatures( globalThis.g_rootSite ).then((ret)=>{
+              }).catch( e=>{
+                  console.log( e );
+                  return Promise.resolve( -14 )
+              })
           })
       })
     })
@@ -413,7 +418,22 @@
                         } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
                               statusClass = 'bg-secondary text-white px-2 rounded';
                         }
-                        appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+                        appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span>`
+                        if( app.display_points )
+                        {
+                            var count = 0;
+                            app.display_points.forEach( (o, key) => {
+                                count++;
+                                if (count > 1)
+                                    return; // limit to first 1 points
+                                var val=o.v
+                                if( o.t === 'float' || o.t === 'double' || ( !o.t && typeof o.v === 'number' ) )
+                                    val = o.v.toFixed(3)
+                                appStatus.innerHTML += `<br><b>${i18nHelper.t(key)}:</b> ${val} ${o.unit ? i18nHelper.t(o.unit) : ''}`;
+                            });
+                        }
+                        else
+                            appStatus.innerHTML += `<br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
                     }
                 }
             }
@@ -564,7 +584,7 @@
                     }
                     return Promise.resolve( 0 )
                 }
-                stopProxies().then((e)=>{
+                return stopProxies().then((e)=>{
                     site.children = new Map()
                     var curProxy = globalThis.curProxy
                     if( curProxy &&
@@ -1407,6 +1427,134 @@ function initSiteTree() {
   // initSiteTreeButtons();
   renderSite(rootNode);
   globalThis.pollingBgSitesInterval = setInterval( pollingBgSites, 40000);
+}
+
+function startFetchChildrenFeatures( site )
+{
+    if( !site || !site.children || site.children.size === 0 )
+        return Promise.resolve(0);
+
+    var taskGrp=[]
+    site.children.forEach( ( oInfo, name ) => {
+        if( oInfo.oProxy )
+        {
+            var oChildProxy = oInfo.oProxy
+            taskGrp.push( ()=>{
+            return fetchAppFeatures( oInfo.site ) .then((e)=>{
+                console.log( `fetched features info for ${oChildProxy.m_strRouterPath} `)
+                return Promise.resolve(0);
+                }).catch((e)=>{
+                    console.log( `Error fetching feature ${oChildProxy.m_strRouterPath} encountered error during stop ` + e)
+                    return Promise.resolve(e);
+                })
+            })
+        }
+    });
+    async function fetchChildFeatures()
+    {
+        for( const task of taskGrp ){
+            try{
+                await task()
+            }catch( e ){
+                return Promise.resolve( e )
+            }
+        }
+        return Promise.resolve( 0 )
+    }
+    return fetchChildFeatures().then((e)=>{
+        }).catch((e)=>{
+            console.log( "fetchChild feature failed with " + e );
+            return Promise.resolve(-1);
+        })
+}
+
+function fetchAppFeatures( site )
+{
+    var arrPts = [];
+    var oProxy = globalThis.GetProxy( site.routerPath );
+    if( !oProxy || !site || !site.apps )
+        return Promise.resolve( -14 );
+
+    for( let i=0; i<site.apps.length; i++ )
+    {
+        let app = site.apps[i];
+        if( !app.display_points || app.display_points.length === 0 )
+            continue;
+        var count = 0;
+        app.display_points.forEach( (value, key) =>{
+            if( count >= 1 )
+                return;
+            arrPts.push( `${app.name}/${key}` );
+            count++;
+        })
+    }
+    var oContext = Object();
+    oContext.m_iRet = 0;
+    oContext.oGetPtDescCb = (oContext, ret, mapPtDescs) => {
+        if( oContext.m_iRet < 0 )
+            return;
+        for( let i=0; i<site.apps.length; i++ )
+        {
+            let app = site.apps[i];
+            if( !app.display_points || app.display_points.length === 0 )
+                continue;
+            app.display_points.forEach( (value, key) =>{
+                let fullPtPath = `${app.name}/${key}`;
+                if( mapPtDescs.has( fullPtPath ) )
+                {
+                    let oDesc = mapPtDescs.get( fullPtPath );
+                    var ptv = oDesc.GetProperty(PtDescProps.retval);
+                    if( ptv & 0x80000000 )
+                        return;
+                    var ptv = oDesc.GetProperty(PtDescProps.value);
+                    attrs = { v: ptv === undefined || ptv === null ? null : ptv,
+                        t:type2str(oDesc.GetProperty(PtDescProps.datatype)),
+                        cnt : 0
+                    }
+                    var oVal = oDesc.GetProperty(PtDescProps.ptype);
+                    if( typeof oVal === "number" )
+                    {
+                        if( oVal === 0 ) 
+                            attrs.ptype = "output"
+                        else if( oVal === 1 )
+                            attrs.ptype = "input"
+                        else if( oVal === 2 )
+                            attrs.ptype = "setpoint"
+                    }
+                    oVal = oDesc.GetProperty(PtDescProps.average);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.average = oVal;
+
+                    oVal = oDesc.GetProperty(PtDescProps.unit);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.unit = i18nHelper.t(oVal);
+
+                    oVal = oDesc.GetProperty(PtDescProps.size);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.size = oVal;
+
+                    oVal = oDesc.GetProperty(PtDescProps.haslog);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.haslog = true;
+                    else
+                        attrs.haslog = false;
+                    oVal = oDesc.GetProperty(PtDescProps.avgalgo);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.avgalgo = oVal;
+                    app.display_points.set( key, attrs );
+                    site.apps[i] = app;
+                }
+            })
+        }
+    };
+    if( arrPts.length === 0 )
+        return startFetchChildrenFeatures( site );
+    return oProxy.GetPointDesc( oContext, arrPts ).then((ret)=>{
+        return startFetchChildrenFeatures( site );
+    }).catch((error)=>{
+        console.log("Error fetching point descriptions:", error);
+        return Promise.resolve( error );
+    });
 }
 
 // call initSiteTree after StartClient / data loaded
