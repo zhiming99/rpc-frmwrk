@@ -696,172 +696,172 @@ gint32 CRpcRouterBridge::BuildNodeMap()
             Json::Value& oNodesArray =
                 oObjElem[ JSON_ATTR_NODES ];
 
-            if( oNodesArray == Json::Value::null ||
-                !oNodesArray.isArray() ||
-                oNodesArray.empty() )
-                break;
-
-            // set the default parameters
-            for( guint32 i = 0; i < oNodesArray.size(); i++ )
+            if( oNodesArray != Json::Value::null &&
+                oNodesArray.isArray() &&
+                ! oNodesArray.empty() )
             {
-                CCfgOpener oConnParams;
-
-                Json::Value& oNodeElem = oNodesArray[ i ];
-
-                std::string strNode;
-                bool bEnabled = false;
-
-                if( oNodeElem.isMember( JSON_ATTR_ENABLED ) &&
-                    oNodeElem[ JSON_ATTR_ENABLED ].isString() )
+                // set the default parameters
+                for( guint32 i = 0; i < oNodesArray.size(); i++ )
                 {
-                    strVal =
-                       oNodeElem[ JSON_ATTR_ENABLED ].asString(); 
-                    if( strVal == "true" )
-                        bEnabled = true;
-                    else if( strVal != "false" )
+                    CCfgOpener oConnParams;
+
+                    Json::Value& oNodeElem = oNodesArray[ i ];
+
+                    std::string strNode;
+                    bool bEnabled = false;
+
+                    if( oNodeElem.isMember( JSON_ATTR_ENABLED ) &&
+                        oNodeElem[ JSON_ATTR_ENABLED ].isString() )
+                    {
+                        strVal =
+                           oNodeElem[ JSON_ATTR_ENABLED ].asString(); 
+                        if( strVal == "true" )
+                            bEnabled = true;
+                        else if( strVal != "false" )
+                        {
+                            ret = -EINVAL;
+                            break;
+                        }
+                    }
+
+                    if( !bEnabled )
+                        continue;
+
+                    // mandatory attribute NodeName
+                    if( oNodeElem.isMember( JSON_ATTR_NODENAME ) &&
+                        oNodeElem[ JSON_ATTR_NODENAME ].isString() )
+                    {
+                        strNode =
+                           oNodeElem[ JSON_ATTR_NODENAME ].asString(); 
+                    }
+                    else
                     {
                         ret = -EINVAL;
                         break;
                     }
-                }
 
-                if( !bEnabled )
-                    continue;
-
-                // mandatory attribute NodeName
-                if( oNodeElem.isMember( JSON_ATTR_NODENAME ) &&
-                    oNodeElem[ JSON_ATTR_NODENAME ].isString() )
-                {
-                    strNode =
-                       oNodeElem[ JSON_ATTR_NODENAME ].asString(); 
-                }
-                else
-                {
-                    ret = -EINVAL;
-                    break;
-                }
-
-                std::string strFormat = "ipv4";
-                oConnParams[ propNodeName ] = strNode;
-                oConnParams[ propAddrFormat ] = strFormat;
-                oConnParams[ propEnableSSL ] = false;
-                oConnParams[ propEnableWebSock ] = false;
-                oConnParams[ propCompress ] = true;
-                oConnParams[ propConnRecover ] = false;
-
-                if( oNodeElem.isMember( JSON_ATTR_ADDRFORMAT ) &&
-                    oNodeElem[ JSON_ATTR_ADDRFORMAT ].isString() )
-                {
-                    strFormat =
-                       oNodeElem[ JSON_ATTR_ADDRFORMAT ].asString(); 
+                    std::string strFormat = "ipv4";
+                    oConnParams[ propNodeName ] = strNode;
                     oConnParams[ propAddrFormat ] = strFormat;
-                }
+                    oConnParams[ propEnableSSL ] = false;
+                    oConnParams[ propEnableWebSock ] = false;
+                    oConnParams[ propCompress ] = true;
+                    oConnParams[ propConnRecover ] = false;
 
-                // get ipaddr
-                if( oNodeElem.isMember( JSON_ATTR_IPADDR ) &&
-                    oNodeElem[ JSON_ATTR_IPADDR ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_IPADDR ].asString(); 
-                    string strNormVal;
-                    if( strFormat == "ipv4" )
-                        ret = NormalizeIpAddr(
-                            AF_INET, strVal, strNormVal );
-                    else
-                        ret = NormalizeIpAddr(
-                            AF_INET6, strVal, strNormVal );
-
-                    if( SUCCEEDED( ret ) )
+                    if( oNodeElem.isMember( JSON_ATTR_ADDRFORMAT ) &&
+                        oNodeElem[ JSON_ATTR_ADDRFORMAT ].isString() )
                     {
-                        oConnParams[ propDestIpAddr ] = strNormVal;
+                        strFormat =
+                           oNodeElem[ JSON_ATTR_ADDRFORMAT ].asString(); 
+                        oConnParams[ propAddrFormat ] = strFormat;
                     }
-                    else
+
+                    // get ipaddr
+                    if( oNodeElem.isMember( JSON_ATTR_IPADDR ) &&
+                        oNodeElem[ JSON_ATTR_IPADDR ].isString() )
                     {
-                        ret = -EINVAL;
+                        strVal = oNodeElem[ JSON_ATTR_IPADDR ].asString(); 
+                        string strNormVal;
+                        if( strFormat == "ipv4" )
+                            ret = NormalizeIpAddr(
+                                AF_INET, strVal, strNormVal );
+                        else
+                            ret = NormalizeIpAddr(
+                                AF_INET6, strVal, strNormVal );
+
+                        if( SUCCEEDED( ret ) )
+                        {
+                            oConnParams[ propDestIpAddr ] = strNormVal;
+                        }
+                        else
+                        {
+                            ret = -EINVAL;
+                            break;
+                        }
+                    }
+
+                    // tcp port number for router setting
+                    guint32 dwPortNum = 0xFFFFFFFF;
+                    if( oNodeElem.isMember( JSON_ATTR_TCPPORT ) &&
+                        oNodeElem[ JSON_ATTR_TCPPORT ].isString() )
+                    {
+                        strVal = oNodeElem[ JSON_ATTR_TCPPORT ].asString(); 
+                        guint32 dwVal = 0;
+                        if( !strVal.empty() )
+                        {
+                            dwVal = std::strtol(
+                                strVal.c_str(), nullptr, 10 );
+                        }
+                        if( dwVal > 0 && dwVal < 0x10000 )
+                        {
+                            dwPortNum = dwVal;
+                        }
+                        else
+                        {
+                            ret = -EINVAL;
+                            break;
+                        }
+                    }
+
+                    if( dwPortNum == 0xFFFFFFFF )
+                        dwPortNum = RPC_SVR_DEFAULT_PORTNUM;
+
+                    oConnParams[ propDestTcpPort ] = dwPortNum;
+
+                    if( oNodeElem.isMember( JSON_ATTR_ENABLE_SSL ) &&
+                        oNodeElem[ JSON_ATTR_ENABLE_SSL ].isString() )
+                    {
+                        strVal = oNodeElem[ JSON_ATTR_ENABLE_SSL  ].asString(); 
+                        if( strVal == "false" )
+                            oConnParams[ propEnableSSL ] = false;
+                        else if( strVal == "true" )
+                            oConnParams[ propEnableSSL ] = true;
+                    }
+
+                    if( oNodeElem.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
+                        oNodeElem[ JSON_ATTR_ENABLE_WEBSOCKET ].isString() )
+                    {
+                        strVal = oNodeElem[ JSON_ATTR_ENABLE_WEBSOCKET  ].asString(); 
+                        if( strVal == "false" )
+                            oConnParams[ propEnableWebSock ] = false;
+                        else if( strVal == "true" )
+                            oConnParams[ propEnableWebSock ] = true;
+                    }
+
+                    if( oNodeElem.isMember( JSON_ATTR_ENABLE_COMPRESS ) &&
+                        oNodeElem[ JSON_ATTR_ENABLE_COMPRESS ].isString() )
+                    {
+                        strVal = oNodeElem[ JSON_ATTR_ENABLE_COMPRESS  ].asString(); 
+                        if( strVal == "false" )
+                            oConnParams[ propCompress ] = false;
+                        else if( strVal == "true" )
+                            oConnParams[ propCompress ] = true;
+                    }
+
+                    if( oNodeElem.isMember( JSON_ATTR_CONN_RECOVER ) &&
+                        oNodeElem[ JSON_ATTR_CONN_RECOVER ].isString() )
+                    {
+                        strVal = oNodeElem[ JSON_ATTR_CONN_RECOVER  ].asString(); 
+                        if( strVal == "false" )
+                            oConnParams[ propConnRecover ] = false;
+                        else if( strVal == "true" )
+                            oConnParams[ propConnRecover ] = true;
+                    }
+
+                    if( oNodeElem.isMember( JSON_ATTR_DEST_URL ) &&
+                        oNodeElem[ JSON_ATTR_DEST_URL ].isString() )
+                    {
+                        strVal = oNodeElem[ JSON_ATTR_DEST_URL  ].asString(); 
+                        oConnParams[ propDestUrl ] = strVal;
+                    }
+
+                    ret = AddConnParamsByNodeName(
+                        strNode, oConnParams.GetCfg() );
+
+                    if( ERROR( ret ) )
                         break;
-                    }
+
                 }
-
-                // tcp port number for router setting
-                guint32 dwPortNum = 0xFFFFFFFF;
-                if( oNodeElem.isMember( JSON_ATTR_TCPPORT ) &&
-                    oNodeElem[ JSON_ATTR_TCPPORT ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_TCPPORT ].asString(); 
-                    guint32 dwVal = 0;
-                    if( !strVal.empty() )
-                    {
-                        dwVal = std::strtol(
-                            strVal.c_str(), nullptr, 10 );
-                    }
-                    if( dwVal > 0 && dwVal < 0x10000 )
-                    {
-                        dwPortNum = dwVal;
-                    }
-                    else
-                    {
-                        ret = -EINVAL;
-                        break;
-                    }
-                }
-
-                if( dwPortNum == 0xFFFFFFFF )
-                    dwPortNum = RPC_SVR_DEFAULT_PORTNUM;
-
-                oConnParams[ propDestTcpPort ] = dwPortNum;
-
-                if( oNodeElem.isMember( JSON_ATTR_ENABLE_SSL ) &&
-                    oNodeElem[ JSON_ATTR_ENABLE_SSL ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_ENABLE_SSL  ].asString(); 
-                    if( strVal == "false" )
-                        oConnParams[ propEnableSSL ] = false;
-                    else if( strVal == "true" )
-                        oConnParams[ propEnableSSL ] = true;
-                }
-
-                if( oNodeElem.isMember( JSON_ATTR_ENABLE_WEBSOCKET ) &&
-                    oNodeElem[ JSON_ATTR_ENABLE_WEBSOCKET ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_ENABLE_WEBSOCKET  ].asString(); 
-                    if( strVal == "false" )
-                        oConnParams[ propEnableWebSock ] = false;
-                    else if( strVal == "true" )
-                        oConnParams[ propEnableWebSock ] = true;
-                }
-
-                if( oNodeElem.isMember( JSON_ATTR_ENABLE_COMPRESS ) &&
-                    oNodeElem[ JSON_ATTR_ENABLE_COMPRESS ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_ENABLE_COMPRESS  ].asString(); 
-                    if( strVal == "false" )
-                        oConnParams[ propCompress ] = false;
-                    else if( strVal == "true" )
-                        oConnParams[ propCompress ] = true;
-                }
-
-                if( oNodeElem.isMember( JSON_ATTR_CONN_RECOVER ) &&
-                    oNodeElem[ JSON_ATTR_CONN_RECOVER ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_CONN_RECOVER  ].asString(); 
-                    if( strVal == "false" )
-                        oConnParams[ propConnRecover ] = false;
-                    else if( strVal == "true" )
-                        oConnParams[ propConnRecover ] = true;
-                }
-
-                if( oNodeElem.isMember( JSON_ATTR_DEST_URL ) &&
-                    oNodeElem[ JSON_ATTR_DEST_URL ].isString() )
-                {
-                    strVal = oNodeElem[ JSON_ATTR_DEST_URL  ].asString(); 
-                    oConnParams[ propDestUrl ] = strVal;
-                }
-
-                ret = AddConnParamsByNodeName(
-                    strNode, oConnParams.GetCfg() );
-
-                if( ERROR( ret ) )
-                    break;
-
             }
 
             if( m_pLBGrp.IsEmpty() )
@@ -6244,7 +6244,7 @@ gint32 CRpcRouterManager::SetProperty(
         }
     case propMaxConns:
         {
-            ret = SetMaxConns( ( guint32& )oBuf );
+            ret = SetMaxConns( ( const guint32& )oBuf );
             break;
         }
     case propSessTimeLimit:

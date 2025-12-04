@@ -1,5 +1,5 @@
-const arrBasePoints = [{ n:"cpu_load", o:0 }, 
-    {n:"vmsize_kb",o:10}, 
+const arrBasePoints = [{ n:"cpu_load", o:10 }, 
+    {n:"vmsize_kb",o:11}, 
     {n:"obj_count",o:20},
     {n:"req_count",o:30},
     {n:"uptime",o:240},
@@ -129,75 +129,100 @@ globalThis.fetchAppDetails = () =>
         };
         return oProxy.RegisterListener( oContext, [app.name] ).then((ret) => {
             app.bRegistered = true;
-            oContext.oGetPtDescCb = (oContext, ret, mapPtDescs) => {
+            var arrFeaturePts = [];
+            oContext.oGetLpvCb = (oContext, ret, rvalue) => {
                 if( oContext.m_iRet < 0 )
-                    return
-                // Process the point descriptions
-                for( const [key, oDesc] of mapPtDescs ) {
-                    var ptv = oDesc.GetProperty(PtDescProps.retval);
-                    if( ptv & 0x80000000 )
-                        continue;
-                    var ptv = oDesc.GetProperty(PtDescProps.value);
-                    attrs = { v: ptv === undefined || ptv === null ? null : ptv,
-                        t:type2str(oDesc.GetProperty(PtDescProps.datatype)),
-                        cnt : 0
-                    }
-                    var oVal = oDesc.GetProperty(PtDescProps.ptype);
-                    if( typeof oVal === "number" )
-                    {
-                        if( oVal === 0 ) 
-                            attrs.ptype = "output"
-                        else if( oVal === 1 )
-                            attrs.ptype = "input"
-                        else if( oVal === 2 )
-                            attrs.ptype = "setpoint"
-                    }
-                    oVal = oDesc.GetProperty(PtDescProps.average);
-                    if( oVal !== undefined && oVal !== null )
-                        attrs.average = oVal;
-
-                    oVal = oDesc.GetProperty(PtDescProps.unit);
-                    if( oVal !== undefined && oVal !== null )
-                        attrs.unit = i18nHelper.t(oVal);
-
-                    oVal = oDesc.GetProperty(PtDescProps.size);
-                    if( oVal !== undefined && oVal !== null )
-                        attrs.size = oVal;
-
-                    oVal = oDesc.GetProperty(PtDescProps.haslog);
-                    if( oVal !== undefined && oVal !== null )
-                        attrs.haslog = true;
-                    else
-                        attrs.haslog = false;
-                    oVal = oDesc.GetProperty(PtDescProps.avgalgo);
-                    if( oVal !== undefined && oVal !== null )
-                        attrs.avgalgo = oVal;
-
-                    var arrComps = key.split('/')
-                    if( arrComps.length < 2 )
-                        continue
-                    app.setpoints.set( arrComps[1], attrs );
+                    console.log( "Error, no display points available with status " + oContext.m_iRet );
+                else {
+                    const decoder = new TextDecoder('utf-8')
+                    let text=decoder.decode(rvalue);
+                    var ptList = JSON.parse(text);
+                    if( !ptList || ptList.length === 0 )
+                        return;
+                    var ordinal = 0
+                    ptList.forEach(element => {
+                        arrFeaturePts.push( { n: element, o: ordinal++ });
+                    });
                 }
-                return
-            };
-            var arrPts
-            if( app.app_class === "rpcrouter")
-                arrPts = arrRouterPoints
-            else if( app.app_class === "timer")
-                arrPts = arrTimerPoints
-            else if( app.app_class === "logger")
-                arrPts = arrLoggerPoints
-            else
-                arrPts = arrAppPoints
+            }
+            return oProxy.GetLargePointValue( oContext, `${app.name}/display_points` ).then((ret) => {
+                var arrPts = null
+                oContext.oGetPtDescCb = (oContext, ret, mapPtDescs) => {
+                    if( oContext.m_iRet < 0 )
+                        return
+                    // Process the point descriptions
+                    for( const [key, oDesc] of mapPtDescs ) {
+                        var ptv = oDesc.GetProperty(PtDescProps.retval);
+                        if( ptv & 0x80000000 )
+                            continue;
+                        var ptv = oDesc.GetProperty(PtDescProps.value);
+                        attrs = { v: ptv === undefined || ptv === null ? null : ptv,
+                            t:type2str(oDesc.GetProperty(PtDescProps.datatype)),
+                            cnt : 0
+                        }
+                        var oVal = oDesc.GetProperty(PtDescProps.ptype);
+                        if( typeof oVal === "number" )
+                        {
+                            if( oVal === 0 ) 
+                                attrs.ptype = "output"
+                            else if( oVal === 1 )
+                                attrs.ptype = "input"
+                            else if( oVal === 2 )
+                                attrs.ptype = "setpoint"
+                        }
+                        oVal = oDesc.GetProperty(PtDescProps.average);
+                        if( oVal !== undefined && oVal !== null )
+                            attrs.average = oVal;
 
-            globalThis.curSpModal.arrPts = arrPts;
-            var arrPtPath = arrPts.map(pt => `${app.name}/${pt.n}`);
-            return oProxy.GetPointDesc( oContext, arrPtPath ).then((ret)=>{
-                if( oContext.m_iRet < 0 )
-                    return Promise.reject( oContext.m_iRet );
-                return Promise.resolve( 0 );
+                        oVal = oDesc.GetProperty(PtDescProps.unit);
+                        if( oVal !== undefined && oVal !== null )
+                            attrs.unit = i18nHelper.t(oVal);
+
+                        oVal = oDesc.GetProperty(PtDescProps.size);
+                        if( oVal !== undefined && oVal !== null )
+                            attrs.size = oVal;
+
+                        oVal = oDesc.GetProperty(PtDescProps.haslog);
+                        if( oVal !== undefined && oVal !== null )
+                            attrs.haslog = true;
+                        else
+                            attrs.haslog = false;
+                        oVal = oDesc.GetProperty(PtDescProps.avgalgo);
+                        if( oVal !== undefined && oVal !== null )
+                            attrs.avgalgo = oVal;
+
+                        var arrComps = key.split('/')
+                        if( arrComps.length < 2 )
+                            continue
+                        app.setpoints.set( arrComps[1], attrs );
+                    }
+                    return
+                };
+                if( app.app_class === "rpcrouter")
+                    arrPts = arrRouterPoints
+                else if( app.app_class === "timer")
+                    arrPts = arrTimerPoints
+                else if( app.app_class === "logger")
+                    arrPts = arrLoggerPoints
+                else
+                    arrPts = arrAppPoints
+                if( arrFeaturePts.length > 0 )
+                {
+                    arrPts = [].concat( arrFeaturePts, arrPts ).sort( (a,b) => { return a.o - b.o } );
+                }
+
+                globalThis.curSpModal.arrPts = arrPts;
+                var arrPtPath = arrPts.map(pt => `${app.name}/${pt.n}`);
+                return oProxy.GetPointDesc( oContext, arrPtPath ).then((ret)=>{
+                    if( oContext.m_iRet < 0 )
+                        return Promise.reject( oContext.m_iRet );
+                    return Promise.resolve( 0 );
+                }).catch((error) => {
+                    console.log("Error GetPointDesc:", error);
+                    return Promise.resolve(error);
+                });
             }).catch((error) => {
-                console.log("Error GetPointDesc:", error);
+                console.log("Error GetDisplayPoints:", error);
                 return Promise.resolve(error);
             });
         }).catch((error) => {

@@ -197,6 +197,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 n = dict() 
                 n[ "NodeName" ] = node[ "NodeName" ]
                 n[ "IpAddress" ] = node[ "IpAddress" ]
+                n[ "PortNumber" ] = node[ "PortNumber" ]
                 n[ "Enabled" ] = node[ "Enabled" ]
                 n[ "Compression" ] = node[ "Compression" ]
                 n[ "EnableSSL" ] = node[ "EnableSSL" ]
