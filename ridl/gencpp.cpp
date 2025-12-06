@@ -9021,7 +9021,15 @@ gint32 CExportDrivers::OutputBuiltinRt()
             Json::Value( "./libwspt.so" ) );
 #endif
 
-        oCli[ JSON_ATTR_FACTORIES ] = oFactories;
+        Json::Value oFactoriesCli( Json::arrayValue );
+        for( gint32 i = 0; i < oFactories.size(); i++ )
+            oFactoriesCli.append( oFactories[ i ] );
+
+        if( g_bMonitoring )
+            oFactoriesCli.append(
+            Json::Value( "./libregfs.so" ) );
+
+        oCli[ JSON_ATTR_FACTORIES ] = oFactoriesCli;
         oSvr[ JSON_ATTR_FACTORIES ] = oFactories;
 
 #ifdef FUSE3
@@ -9038,7 +9046,7 @@ gint32 CExportDrivers::OutputBuiltinRt()
 
         oVal[ JSON_ATTR_MODULES ] = oModuleArray;
 
-        // pickout the fist listening port from the
+        // pickout the first listening port from the
         // base config file 'driver.json', because
         // builtin-rt supports just one listening port.
         stdstr strDrvPath;
@@ -9366,8 +9374,15 @@ gint32 CExportObjDesc::Output()
         ret = FindInstCfg( "synccfg.py", strSrcPy );
         if( ERROR( ret ) )
         {
-            ret = 0;
-            break;
+            // this is the case when the ridlc is
+            // not installed
+            strSrcPy = "./synccfg.py";
+            ret = access( strSrcPy.c_str(), F_OK );
+            if( ret < 0 )
+            {
+                ret = 0;
+                break;
+            }
         }
 
         stdstr strObjList;

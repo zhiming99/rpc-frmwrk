@@ -18,7 +18,7 @@ test/actcancel.js test/katest.js test/stmtest.js $(jslib_files)
 EXTRA_DIST=$(js_files) README_cn.md
 
 jslibdir=$(libdir)/rpcf
-dist_jslib_DATA=rpcbase.js.tar.gz
+#dist_jslib_DATA=rpcbase.js.tar.gz
 jslib_DATA=rpcbase.js.tar.gz
 BUILT_SOURCES=rpcbase.js.tar.gz
 

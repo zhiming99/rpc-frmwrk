@@ -2466,7 +2466,7 @@ class CFuseRootBase:
         if( SUCCEEDED( ret ) )
             pDir = static_cast
                 < CFuseSvcDir* >( pDir1 );
-        if( ret = ENOENT )
+        if( ret == ENOENT )
             ret = -ENOENT;
         return ret;
     }

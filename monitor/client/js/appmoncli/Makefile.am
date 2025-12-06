@@ -16,7 +16,8 @@ appmonuidir=$(sysconfdir)/rpcf
 
 auto_files=appmonstructs.js AppMonitorclibase.js driver.json appmondesc.json
 
-appmon.ridl:
+
+$(ridl_file):
 	@bexit=0;for i in $(auto_files);do if [ ! -f $${i} ];then bexit=1;break;fi;done; \
     if((bexit==0));then exit 0;fi; \
     if true; then \
@@ -31,16 +32,15 @@ appmon.ridl:
         echo ridlc not found. Please build the whole project from the root directory first; exit 1; fi; \
 	if [ -f Makefile_ ]; then mv Makefile_ Makefile; fi; \
 	if [ -f ./mktpl ];then rm -f mktpl mktplsvr mktplcli odesctpl2.json drvtpl.json;fi || true; \
-    python3 ../../../appmon/upddesc.py; \
-	make -f Makefile.skel
+    python3 ../../../appmon/upddesc.py
 
-$(auto_files): appmon.ridl
+$(auto_files): $(ridl_file)
 
-appmonui$(EXEEXT): $(auto_files) maincli.js AppMonitorcli.js
+dist/appmon.js: $(auto_files) maincli.js AppMonitorcli.js
+	@if echo $(CPPFLAGS) | grep 'DDEBUG'; then make -f Makefile.skel debug; else make -f Makefile.skel release; fi
+
+appmonui$(EXEEXT): $(files_to_package) dist/appmon.js
 	tar zcf appmonui$(EXEEXT) $(files_to_package) dist/*
-
-install-exec-hook:
-	echo already installed
 
 package:
 	make -f Makefile.skel
@@ -49,4 +49,8 @@ package:
 dbg-package:
 	make -f Makefile.skel debug
 	tar zcf appmonui.tar.gz $(files_to_package) dist/*
-.PHONY: package dbg-package appmon.ridl 
+
+clean:
+	rm -f $(auto_files) dist/* appmonui$(EXEEXT)
+
+.PHONY: package dbg-package ../../../appmon/appmon.ridl

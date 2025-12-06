@@ -65,9 +65,15 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                     connElem[ "BindTo" ] = param[ "BindTo" ]
                 else:
                     connElem[ "BindTo" ] = "false"
+                connElem[ "AddrFormat" ] = param[ "AddrFormat" ]
+                connElem[ "PdoClass" ] = param[ "PdoClass" ]
+                connElem[ "Protocol" ] = param[ "Protocol" ]
                 connElem[ "PortNumber" ] = param[ "PortNumber" ]
+                connElem[ "ConnRecover" ] = param[ "ConnRecover" ]
                 connElem[ "Compression" ] = param[ "Compression" ]
                 connElem[ "EnableSSL" ] = param[ "EnableSSL" ]
+                connElem[ "EnableBPS" ] = param[ "EnableBPS" ]
+                connElem[ "PdoClass" ] = param[ "PdoClass" ]
                 if connElem[ "EnableSSL" ] == "true":
                     bSSL = True
                 connElem[ "HasAuth" ] = param[ "HasAuth" ]
@@ -197,6 +203,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 n = dict() 
                 n[ "NodeName" ] = node[ "NodeName" ]
                 n[ "IpAddress" ] = node[ "IpAddress" ]
+                n[ "PortNumber" ] = node[ "PortNumber" ]
                 n[ "Enabled" ] = node[ "Enabled" ]
                 n[ "Compression" ] = node[ "Compression" ]
                 n[ "EnableSSL" ] = node[ "EnableSSL" ]

@@ -177,7 +177,7 @@ class CPythonInterfBase : public T
                         break;
                     }
                     PyObject* pView = PyMemoryView_FromMemory(
-                        pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                        pBuf->ptr(), pBuf->size(), GetBufFlags( true ) );
                     if( pView == nullptr )
                     {
                         ret = -EFAULT;
@@ -295,7 +295,7 @@ class CPythonInterfBase : public T
                         break;
                     }
                     PyObject* pView = PyMemoryView_FromMemory(
-                        pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                        pBuf->ptr(), pBuf->size(), GetBufFlags( true ) );
                     if( pView == nullptr )
                     {
                         ret = -EFAULT;
@@ -619,7 +619,7 @@ class CPythonInterfBase : public T
                             break;
                         }
                         PyObject* pView = PyMemoryView_FromMemory(
-                            pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                            pBuf->ptr(), pBuf->size(), GetBufFlags( true ) );
                         if( pView == nullptr )
                         {
                             ret = -EFAULT;
@@ -764,7 +764,7 @@ class CPythonInterfBase : public T
                 Py_buffer *view = (Py_buffer *)
                     malloc(sizeof(*view));
                 ret = PyObject_GetBuffer(
-                    pObject, view, PyBUF_READ );
+                    pObject, view, GetBufFlags( true ) );
                 if( ret < 0 )
                 {
                     ret = -ENOMEM;
@@ -870,7 +870,7 @@ class CPythonInterfBase : public T
                 Py_buffer *view = (Py_buffer *)
                     malloc(sizeof(*view));
                 ret = PyObject_GetBuffer(
-                    pObject, view, PyBUF_READ );
+                    pObject, view, GetBufFlags( true ) );
                 if( ret < 0 )
                 {
                     ret = -ENOMEM;

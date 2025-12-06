@@ -70,6 +70,19 @@ class PyNamedProcessLock
 };
 }
 
+inline guint32 GetBufFlags( bool bRead )
+{
+#if PY_MAJOR_VERSION >= 3
+    if( bRead )
+        return PyBUF_SIMPLE;
+    return PyBUF_WRITABLE;
+#else
+    if( bRead )
+        return PyBUF_READ;
+    return PyBUF_WRITE;
+#endif
+}
+
 %End
 
 %ModuleCode
@@ -451,7 +464,7 @@ namespace cpp
             PyObject* pView =
                 PyMemoryView_FromMemory(
                 pBuf->ptr(), pBuf->size(),
-                PyBUF_READ );
+                GetBufFlags( true ) );
 
             if( pView == nullptr )
                 sipRes = Py_None;
@@ -476,7 +489,7 @@ namespace cpp
             (Py_buffer *)calloc(1,sizeof(*view));
         do{
             ret = PyObject_GetBuffer(
-                a0, view, PyBUF_READ);
+                a0, view, GetBufFlags( true ));
             if( ret < 0 )
             {
                 break;
@@ -612,7 +625,7 @@ namespace cpp
         %MethodCode
             BufPtr& pBuf = *sipCpp;
             PyObject* pView = PyMemoryView_FromMemory(
-                pBuf->ptr(), pBuf->size(), PyBUF_READ );
+                pBuf->ptr(), pBuf->size(), GetBufFlags( true ) );
             if( pView == nullptr )
                 sipRes = Py_None;
             else
@@ -628,7 +641,7 @@ namespace cpp
             Py_buffer *view = (Py_buffer *)
                 malloc(sizeof(*view));
             ret = PyObject_GetBuffer(
-                a0, view, PyBUF_WRITE);
+                a0, view, GetBufFlags( false ));
             if( ret < 0 )
                 sipRes = -ENOMEM;
             else
@@ -650,7 +663,7 @@ namespace cpp
             Py_buffer *view = (Py_buffer *)
                 malloc(sizeof(*view));
             ret = PyObject_GetBuffer(
-                a0, view, PyBUF_READ);
+                a0, view, GetBufFlags( true ));
             if( ret < 0 )
                 sipRes = -ENOMEM;
             else
@@ -671,7 +684,7 @@ namespace cpp
             Py_buffer *view = (Py_buffer *)
                 malloc(sizeof(*view));
             ret = PyObject_GetBuffer(
-                a0, view, PyBUF_READ);
+                a0, view, GetBufFlags( true ));
             if( ret < 0 )
                 sipRes = -ENOMEM;
             else

@@ -1,6 +1,6 @@
 #!/bin/bash
 # parameters:
-# $1: path to store the keys and certs
+# $1: path to store the keys and certs, if the path does not exist, it will be created
 # $2: number of client keys, 1 if not specified
 # $3: number of server keys, 1 if not specified
 # gmssl demo key generator, adapted from GmSSL script
@@ -8,19 +8,14 @@
 
 PATH=/usr/local/bin:$PATH
 if [ "x$1" != "x" -a ! -d $1 ]; then
-    echo Usage: bash gmsslkey.sh [directory to store keys] [ number of client keys ] [number of server keys]
-    exit 1
-fi
-
-if [ "x$1" == "x" ]; then
-    targetdir="$HOME/.rpcf/gmssl"
-    if [ ! -d $targetdir ]; then
-        mkdir -p $targetdir
-        chmod 700 $targetdir
+    if ! mkdir -p $1; then
+        echo $1 is not a valid target directory
+        echo Usage: bash gmsslkey.sh [directory to store keys] [ number of client keys ] [number of server keys]
+        exit 1
     fi
-else
-    targetdir=$1
+    chmod 700 $1
 fi
+targetdir=$1
 
 if [ "x$2" == "x" ];then
     numcli=1

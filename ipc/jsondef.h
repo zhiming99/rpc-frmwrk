@@ -77,6 +77,7 @@
 #define JSON_ATTR_ROUTER_ROLE   "Role"
 #define JSON_ATTR_PARAMETERS    "Parameters"
 #define JSON_ATTR_BINDADDR      "BindAddr"
+#define JSON_ATTR_BINDTO      "BindTo"
 #define JSON_ATTR_PDOCLASS      "PdoClass"
 #define JSON_ATTR_PROTOCOL      "Protocol"
 #define JSON_ATTR_ADDRFORMAT    "AddrFormat"

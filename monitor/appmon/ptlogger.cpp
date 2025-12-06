@@ -474,12 +474,12 @@ gint32 AppendLogExternal(
         {
         case typeByte:
             buf[ sizeof( timestamp ) ] =
-                ( guint8& )oVar;
+                ( const guint8& )oVar;
             break;
         case typeUInt16:
             {
                 guint16 wVal =
-                    htons( ( guint16& )oVar );
+                    htons( ( const guint16& )oVar );
                 memcpy( buf + sizeof( timestamp ),
                     &wVal, sizeof( wVal ) );
                 break;
@@ -488,7 +488,7 @@ gint32 AppendLogExternal(
         case typeFloat:
             {
                 guint32 dwVal =
-                    htonl( ( guint32& )oVar );
+                    htonl( ( const guint32& )oVar );
                 memcpy( buf + sizeof( timestamp ),
                     &dwVal, sizeof( dwVal ) );
                 break;
@@ -497,7 +497,7 @@ gint32 AppendLogExternal(
         case typeDouble:
             {
                 guint64 qwVal =
-                    htonll( ( guint64& )oVar );
+                    htonll( ( const guint64& )oVar );
                 memcpy( buf + sizeof( timestamp ),
                     &qwVal, sizeof( qwVal ) );
                 break;
@@ -587,12 +587,12 @@ gint32 AppendLog(
         {
         case typeByte:
             buf[ sizeof( timestamp ) ] =
-                ( guint8& )oVar;
+                ( const guint8& )oVar;
             break;
         case typeUInt16:
             {
                 guint16 wVal =
-                    htons( ( guint16& )oVar );
+                    htons( ( const guint16& )oVar );
                 memcpy( buf + sizeof( timestamp ),
                     &wVal, sizeof( wVal ) );
                 break;
@@ -601,7 +601,7 @@ gint32 AppendLog(
         case typeFloat:
             {
                 guint32 dwVal =
-                    htonl( ( guint32& )oVar );
+                    htonl( ( const guint32& )oVar );
                 memcpy( buf + sizeof( timestamp ),
                     &dwVal, sizeof( dwVal ) );
                 break;
@@ -610,7 +610,7 @@ gint32 AppendLog(
         case typeDouble:
             {
                 guint64 qwVal =
-                    htonll( ( guint64& )oVar );
+                    htonll( ( const guint64& )oVar );
                 memcpy( buf + sizeof( timestamp ),
                     &qwVal, sizeof( qwVal ) );
                 break;

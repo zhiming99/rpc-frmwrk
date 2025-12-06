@@ -1214,12 +1214,41 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                     oElemCfg.SetIntProp( propDestTcpPort, dwPort );
                 }
 
+                stdstr strFormat = "ipv4";
+                // address format, for detail, refer to propAddrFormat
+                if( oParams.isMember( JSON_ATTR_ADDRFORMAT ) &&
+                    oParams[ JSON_ATTR_ADDRFORMAT ].isString() )
+                {
+                    strFormat =
+                        oParams[ JSON_ATTR_ADDRFORMAT ].asString();
+                    oElemCfg.SetStrProp( propAddrFormat, strFormat );
+                }
+
                 // address to listen on
                 if( oParams.isMember( JSON_ATTR_BINDADDR ) &&
                     oParams[ JSON_ATTR_BINDADDR ].isString() )
                 {
                     string strAddr =
                         oParams[ JSON_ATTR_BINDADDR ].asString();
+
+                    if( oParams.isMember( JSON_ATTR_BINDTO ) )
+                    {
+                        bool bBindTo;
+                        stdstr strBindTo =
+                            oParams[ JSON_ATTR_BINDTO ].asString();
+                        if( strBindTo == "false" )
+                            bBindTo = false;
+                        else
+                            bBindTo = true;
+
+                        if( !bBindTo )
+                        {
+                            if( strFormat == "ipv4" )
+                                strAddr = "0.0.0.0";
+                            else if( strFormat == "ipv6" )
+                                strAddr = "::/0";
+                        }
+                    }
 
                     string strNormVal;
                     ret = NormalizeIpAddrEx( strAddr, strNormVal );
@@ -1231,15 +1260,6 @@ gint32 CRpcTcpBusDriver::GetTcpSettings(
                     }
 
                     oElemCfg.SetStrProp( propDestIpAddr, strNormVal );
-                }
-
-                // address format, for detail, refer to propAddrFormat
-                if( oParams.isMember( JSON_ATTR_ADDRFORMAT ) &&
-                    oParams[ JSON_ATTR_ADDRFORMAT ].isString() )
-                {
-                    string strFormat =
-                        oParams[ JSON_ATTR_ADDRFORMAT ].asString();
-                    oElemCfg.SetStrProp( propAddrFormat, strFormat );
                 }
 
                 if( oParams.isMember( JSON_ATTR_PDOCLASS ) &&

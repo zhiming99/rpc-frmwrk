@@ -27,11 +27,7 @@ appmancli/__init__.py:
     fi || true; \
 	if [ -f Makefile ]; then cp Makefile Makefile_; fi; \
     if [ -f $(top_dir)/ridl/.libs/ridlc ]; then \
-        echo bobo $(ridlfile);\
-        echo LD_LIBRARY_PATH=$(top_dir)/combase/.libs$${LD_LIBRARY_PATH} \
-        $(top_dir)/ridl/.libs/ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync \
-        --services=AppManager --client -pslO . $(ridlfile); \
-        LD_LIBRARY_PATH=$(top_dir)/combase/.libs$${LD_LIBRARY_PATH} \
+        LD_LIBRARY_PATH=$(top_dir)/combase/.libs:$${LD_LIBRARY_PATH} \
         $(top_dir)/ridl/.libs/ridlc --sync_mode IAppStore=sync --sync_mode IDataProducer=sync \
         --services=AppManager --client -pslO . $(ridlfile); \
     else \

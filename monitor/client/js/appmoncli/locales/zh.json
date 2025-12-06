@@ -103,5 +103,7 @@
   "MENU_RESTART": "重启",
 
   "BUTTON_SHOW_LOGS" : "查看日志",
-  "BUTTON_HIDE_LOGS" : "隐藏日志"
+  "BUTTON_HIDE_LOGS" : "隐藏日志",
+  "temperature": "温度",
+  "humidity": "湿度"
 }
