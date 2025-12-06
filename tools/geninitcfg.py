@@ -66,6 +66,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 else:
                     connElem[ "BindTo" ] = "false"
                 connElem[ "AddrFormat" ] = param[ "AddrFormat" ]
+                connElem[ "PdoClass" ] = param[ "PdoClass" ]
                 connElem[ "Protocol" ] = param[ "Protocol" ]
                 connElem[ "PortNumber" ] = param[ "PortNumber" ]
                 connElem[ "ConnRecover" ] = param[ "ConnRecover" ]
