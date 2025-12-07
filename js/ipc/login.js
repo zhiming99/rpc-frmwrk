@@ -228,6 +228,9 @@ function LoginRequest_SimpAuth( oUserCallback, oHsInfo, oCred )
         SYS_METHOD("AuthReq_Login"))
 
     var strUser = this.m_strUserName
+    if( !strUser || strUser.length === 0 )
+        return Promise.reject( -errno.EACCES )
+
     var oInfo = new CConfigDb2()
     oInfo.SetBool( EnumPropId.propGmSSL, false )
     oInfo.SetString( EnumPropId.propUserName, strUser )
