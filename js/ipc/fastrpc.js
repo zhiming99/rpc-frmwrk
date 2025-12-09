@@ -254,7 +254,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 "Warning: the stream channel closed");
             this.m_oParent.Stop(
                 errno.ERROR_PORT_STOPPED );
-        }, 0 );
+        }, 1 );
     }
 
     OnRespReceived( oPending )
