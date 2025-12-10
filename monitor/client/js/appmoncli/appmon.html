@@ -42,6 +42,13 @@
     #timeSeriesModal-backdrop {
         z-index: 1069 !important;
     }
+
+    #reconnectionModal{
+        z-index: 1072 !important;
+    }
+    #reconnectionModal-backdrop {
+        z-index: 1071 !important;
+    }
     #logContextMenu {
         min-width: 120px;
     }
@@ -578,6 +585,7 @@
                 console.log( "Error stopping rootProxy" );
             })
         }
+        return Promise.resolve( 0 );
     }
 
     function DoCleanup( siteToCleanup = null )
@@ -652,53 +660,101 @@
         return CleanupUIAndRoot()
     }
 
+    function needReconnection()
+    {
+        if( !globalThis.rootProxy ||
+            [0,4,6].includes( globalThis.rootProxy.m_iState ) )
+            return true
+        return false
+    }
+
+    var showCount = 0;
+    function toggleReconnModal( bShow )
+    {
+        if( bShow && !globalThis.reconnModal )
+        {
+            const modalEl =
+                document.getElementById('reconnectionModal')
+            modalEl.style.zIndex = 1072;
+
+            let customBackdrop = document.createElement('div');
+            customBackdrop.className = 'modal-backdrop fade show';
+            customBackdrop.style.zIndex = 1071;
+            customBackdrop.id = 'reconnectionModal-backdrop';
+            document.body.appendChild(customBackdrop);
+
+            const reconnectionModal = new bootstrap.Modal(
+                modalEl, { backdrop: false} );
+            reconnectionModal.show();
+            globalThis.reconnModal = reconnectionModal;
+            showCount += 1
+
+            // Cleanup: remove custom backdrop and reset z-index when closed
+            modalEl.addEventListener('hidden.bs.modal', function handler() {
+                modalEl.style.zIndex = '';
+                let bd = document.getElementById(
+                    'reconnectionModal-backdrop');
+                if (bd) bd.remove();
+                modalEl.removeEventListener('hidden.bs.modal', handler);
+            });
+        }
+        else if( !bShow && globalThis.reconnModal )
+        {
+            var oModal = globalThis.reconnModal;
+            setTimeout(()=>{oModal.hide();}, 500 )
+            globalThis.oldReconnModal =
+                globalThis.reconnModal
+            globalThis.reconnModal = undefined
+            showCount -= 1
+        }
+    }
+
     function startReconnection()
     {
         if( globalThis.bReconnecting === true )
             return
 
-        if( globalThis.rootProxy &&
-            [1,2,3].includes( globalThis.rootProxy.m_iState ) )
+        if( !needReconnection() )
+        {
+            toggleReconnModal( false )
+            scheduleCheckProxyState( 1000 )
             return
+        }
 
         console.log( "RPC connection is shutdown abnormally..." );
 
-        // Show the reconnection modal
-        if( globalThis.reconnectionModal )
-            globalThis.reconnectionModal = undefined
-        if( !globalThis.reconnModal )
-        {
-            const reconnectionModal = new bootstrap.Modal(
-                document.getElementById('reconnectionModal'));
-            reconnectionModal.show();
-            globalThis.reconnModal = reconnectionModal;
-        }
+        toggleReconnModal( true )
 
         globalThis.bReconnecting = true
-        clearCheckState();
-        return DoCleanup().then( (e)=>{
+        try{
+            clearCheckState();
+            return DoCleanup().then( (e)=>{
 
-            // Attempt to reconnect
-            globalThis.StartClient( oStartCb ).then((e) => {
-                console.log("Reconnection successful!");
+                // Attempt to reconnect
+                globalThis.StartClient( oStartCb ).then((e) => {
+                    console.log("Reconnection successful!");
 
-                // Hide the reconnection modal
-                if( globalThis.reconnModal )
-                {
-                    globalThis.reconnModal.hide();
-                    globalThis.reconnModal = undefined
-                }
+                    // Hide the reconnection modal
+                    toggleReconnModal( false )
+                    globalThis.bReconnecting = false
+                    scheduleCheckProxyState( 1000 )
+                }).catch((error) => {
+                    console.log("Reconnection failed. Retrying...");
+                    globalThis.bReconnecting = false
+                    if( !needReconnection() )
+                        toggleReconnModal( false )
+                    scheduleCheckProxyState( 5000 )
+                });
+            }).catch((e)=>{
                 globalThis.bReconnecting = false
-                scheduleCheckProxyState( 1000 )
-            }).catch((error) => {
-                console.log("Reconnection failed. Retrying...");
-                globalThis.bReconnecting = false
+                if( !needReconnection() )
+                    toggleReconnModal( false )
                 scheduleCheckProxyState( 5000 )
-            });
-        }).catch((e)=>{
+            })
+        }catch(e){
             globalThis.bReconnecting = false
             scheduleCheckProxyState( 5000 )
-        })
+        }
     }
 
     function clearCheckState()
@@ -707,6 +763,7 @@
         globalThis.checkStateInterval = undefined
         globalThis.bCheckState = false
     }
+
     function scheduleCheckProxyState( ms = 1 )
     {
         if( globalThis.bCheckState === true )
@@ -728,8 +785,7 @@
             if( globalThis.bLoggedin == false )
                 break;
 
-            if( !globalThis.rootProxy ||
-                [0,4,6].includes( globalThis.rootProxy.m_iState ) ) {
+            if( needReconnection() ){
                 setTimeout( startReconnection, 1 )
                 return;
             }else{
@@ -805,7 +861,7 @@
 
       if( globalThis.funcStartPullInfo && globalThis.curProxy ){
           var startPullInfo = globalThis.funcStartPullInfo.bind( globalThis.curProxy );
-          console.log( "Start pulling info..." );
+          // console.log( "Start pulling info..." );
           return startPullInfo().then((ret) => {
               updateSite();
           }).catch((error) => {
@@ -922,7 +978,7 @@
       document.body.appendChild(customBackdrop);
 
       // Show the modal
-      const modal = new bootstrap.Modal(document.getElementById('timeSeriesModal'));
+      const modal = new bootstrap.Modal(modalEl);
       modal.show();
 
       // Cleanup: remove custom backdrop and reset z-index when closed
