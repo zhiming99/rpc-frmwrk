@@ -70,7 +70,7 @@
           <li class="nav-item">
             <!--<button id="config-btn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">Update Config</button>-->
             <span id="user-label" class="ms-2 text-white"></span>
-            <button id="reconnect-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
+            <button id="Login-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
           </li>
         </ul>
       </div>
@@ -222,7 +222,7 @@
     const i18nh = globalThis.i18nHelper; // Make it globally accessible
     i18nh.load(navigator.language).then(() => {
       console.log("Translations loaded");
-      document.getElementById('reconnect-btn').textContent = i18nh.t("Login");
+      document.getElementById('Login-btn').textContent = i18nh.t("Login");
       document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
       document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
       document.getElementById('LogsTitleText').textContent = i18nh.t("LOGS");
@@ -254,8 +254,9 @@
     }
 
     const oStartCb = ((context, ret)=>{
+      if( context && context.m_iRet < 0 )
+          return;
       setStatusDot(true);
-      showReconnectButton(true, true);
       globalThis.curProxy = globalThis.rootProxy;
       // renderSite( globalThis.GetSite(
       //     globalThis.curProxy.m_strRouterPath ) );
@@ -267,9 +268,10 @@
               globalThis.fetchLogsInterval =
                   setInterval(fetchLogs, 30000);
               return fetchAppFeatures( globalThis.g_rootSite ).then((ret)=>{
+                  return Promise.resolve( 0 );
               }).catch( e=>{
                   console.log( e );
-                  return Promise.resolve( -14 )
+                  return Promise.reject( e )
               })
           })
       })
@@ -294,8 +296,8 @@
     }
 
 
-    function showReconnectButton(show, isConnected = false) {
-        const btn = document.getElementById('reconnect-btn');
+    function showLoginButton(show, isConnected = false) {
+        const btn = document.getElementById('Login-btn');
         const userLabel = document.getElementById('user-label');
 
         if (show) {
@@ -316,9 +318,16 @@
 
                 userLabel.textContent = strUser;
                 btn.onclick = function() {
-                    // Your disconnect logic here
+                    // Your logout logic here
+                    globalThis.bLoggedin = false
+                    showLoginButton(
+                        true, globalThis.bLoggedin);
                     if (globalThis.rootProxy ) {
-                        globalThis.rootProxy.Stop();
+                        globalThis.rootProxy.Stop().then((e)=>{
+                            globalThis.ClearProxy( "/" )
+                        }).catch((e)=>{
+                            globalThis.ClearProxy( "/" )
+                        });
                     } else {
                       // fallback: reload or nullify
                         location.reload();
@@ -334,16 +343,19 @@
                 btn.classList.remove('btn-danger');
                 btn.classList.add('btn-warning');
                 btn.onclick = function() {
-                  // Your reconnect logic here
-                if (typeof globalThis.StartClient === 'function') {
-                    globalThis.StartClient( oStartCb ).then(() => {
-                        console.log('Reconnected with status ');
-                        checkProxyState()
-                    }).catch((error) => {
-                        console.log("Error reconnecting:", error);
-                    });
-                    } else {
-                        location.reload();
+                  // Your login logic here
+                    if (typeof globalThis.StartClient === 'function') {
+                        globalThis.StartClient( oStartCb ).then(() => {
+                            console.log('Logged in with status ');
+                            globalThis.bLoggedin = true
+                            showLoginButton(
+                                true, globalThis.bLoggedin);
+                            // scheduleCheckProxyState()
+                        }).catch((error) => {
+                            console.log("Error login:", error);
+                        });
+                        } else {
+                            location.reload();
                     }
                 };
                 const logsRow = document.getElementById('logs-row');
@@ -354,9 +366,6 @@
             userLabel.textContent = '';
         }
     }
-
-    setStatusDot(false);
-    showReconnectButton(true);
 
     function initRootSite()
     {
@@ -540,9 +549,40 @@
     globalThis.g_strAuthMech = ""
 
     var iChecks = 0;
+    function CleanupUIAndRoot( site )
+    {
+        setStatusDot(false);
+        clearSiteTree();
+
+        globalThis.curProxy = undefined;
+        var rootProxy = globalThis.rootProxy
+        if( rootProxy )
+            globalThis.ClearProxy( "/" )
+        globalThis.g_strLoginResult = ""
+        if( globalThis.curSpModal )
+        {
+            globalThis.curSpModal.hide();
+            globalThis.curSpModal = undefined;
+        }
+        initRootSite();
+        iChecks = 0;
+
+        if( rootProxy )
+        {
+            if( globalThis.bLoggedin === false )
+                globalThis.lastRoot = undefined;
+            return rootProxy.Stop().then((e)=>
+            {
+                console.log( "rootProxy stopped" );
+            }).catch( (e)=>{
+                console.log( "Error stopping rootProxy" );
+            })
+        }
+    }
+
     function DoCleanup( siteToCleanup = null )
     {
-        let site = siteToCleanup;
+        var site = siteToCleanup;
         if( siteToCleanup === null )
             site = globalThis.g_rootSite;
 
@@ -552,103 +592,159 @@
                 app.status = i18nHelper.t("APP_STATUS_UNKNOWN");
                 app.cpu = "N/A";
             });
-            if( site.children )
-            {
-                var taskGrp=[]
-                
-                site.children.forEach( ( oInfo, name ) => {
-                    if( oInfo.site )
-                        DoCleanup( oInfo.site );
-                    if( oInfo.oProxy )
-                    {
-                        var oProxy = oInfo.oProxy
-                        taskGrp.push( ()=>{
-                        return oProxy.Stop( 0 ).then((e)=>{
-                            console.log( `proxy ${oProxy.m_strRouterPath} stopped`)
-                            return Promise.resolve(0);
-                            }).catch((e)=>{
-                                console.log( `proxy ${oProxy.m_strRouterPath} encountered error during stop ` + e)
-                                return Promise.resolve(e);
-                            })
-                        })
-                    }
-                });
-                async function stopProxies()
-                {
-                    for( const task of taskGrp ){
-                        try{
-                            await task()
-                        }catch( e ){
-                            return Promise.resolve( e )
-                        }
-                    }
-                    return Promise.resolve( 0 )
-                }
-                return stopProxies().then((e)=>{
-                    site.children = new Map()
-                    var curProxy = globalThis.curProxy
-                    if( curProxy &&
-                        GetSite( curProxy.m_strRouterPath ) === site )
-                        updateSite(site);
-                    if( site !== globalThis.g_rootSite )
-                        return;
-
-                    setStatusDot(false);
-                    showReconnectButton(true, false);
-                    clearSiteTree();
-
-                    globalThis.curProxy = undefined;
-                    var rootProxy = globalThis.rootProxy
-                    globalThis.rootProxy = undefined;
-                    globalThis.g_strLoginResult = ""
-                    if( globalThis.curSpModal )
-                    {
-                        globalThis.curSpModal.hide();
-                        globalThis.curSpModal = undefined;
-                    }
-                    initRootSite();
-                    iChecks = 0;
-
-                    if( rootProxy )
-                    {
-                        return rootProxy.Stop().then((e)=>
-                        {
-                            console.log( "rootProxy stopped" );
-                        }).catch( (e)=>{
-                            console.log( "Error stopping rootProxy" );
-                        })
-                    }
-                }).catch((e)=>{
-                    console.log( "Stop Child Client failed with " + e );
-                    return Promise.resolve(-1);
-                })
-            }
         }
+        if( site.children )
+        {
+            var taskGrp=[]
+            
+            site.children.forEach( ( oInfo, name ) => {
+                if( oInfo.site )
+                    taskGrp.push( ()=>{
+                        return DoCleanup( oInfo.site ).then( (e)=>{
+                            return Promise.resolve( 0 );
+                        }).catch( (e)=>{
+                            console.log( `Error cleanup site {oInfo.site.routerPath} ` + e )
+                            return Promise.resolve(e);
+                        });
+                    })
+                if( oInfo.oProxy )
+                {
+                    var oProxy = oInfo.oProxy
+                    taskGrp.push( ()=>{
+                    return oProxy.Stop( 0 ).then((e)=>{
+                        console.log( `proxy ${oProxy.m_strRouterPath} stopped`)
+                        return Promise.resolve(0);
+                        }).catch((e)=>{
+                            console.log( `proxy ${oProxy.m_strRouterPath} encountered error during stop ` + e)
+                            return Promise.resolve(e);
+                        })
+                    })
+                }
+            });
+            async function stopSitesAndProxies()
+            {
+                for( const task of taskGrp ){
+                    try{
+                        await task()
+                    }catch( e ){
+                        return Promise.resolve( e )
+                    }
+                }
+                return Promise.resolve( 0 )
+            }
+            return stopSitesAndProxies().then((e)=>{
+                site.children = new Map()
+                var curProxy = globalThis.curProxy
+                if( curProxy &&
+                    GetSite( curProxy.m_strRouterPath ) === site )
+                    updateSite(site);
+
+                if( site !== globalThis.g_rootSite )
+                    return Promise.resolve( 0 );
+                return CleanupUIAndRoot()
+            }).catch((e)=>{
+                console.log( "Stop Child Client failed with " + e );
+                return Promise.resolve(-1);
+            })
+        }
+        if( site !== globalThis.g_rootSite )
+            return Promise.resolve( 0 )
+        return CleanupUIAndRoot()
     }
 
-    setStatusDot(false);
-    showReconnectButton(true, false);
+    function startReconnection()
+    {
+        if( globalThis.bReconnecting === true )
+            return
+
+        if( globalThis.rootProxy &&
+            [1,2,3].includes( globalThis.rootProxy.m_iState ) )
+            return
+
+        console.log( "RPC connection is shutdown abnormally..." );
+
+        // Show the reconnection modal
+        if( globalThis.reconnectionModal )
+            globalThis.reconnectionModal = undefined
+        if( !globalThis.reconnModal )
+        {
+            const reconnectionModal = new bootstrap.Modal(
+                document.getElementById('reconnectionModal'));
+            reconnectionModal.show();
+            globalThis.reconnModal = reconnectionModal;
+        }
+
+        globalThis.bReconnecting = true
+        clearCheckState();
+        return DoCleanup().then( (e)=>{
+
+            // Attempt to reconnect
+            globalThis.StartClient( oStartCb ).then((e) => {
+                console.log("Reconnection successful!");
+
+                // Hide the reconnection modal
+                if( globalThis.reconnModal )
+                {
+                    globalThis.reconnModal.hide();
+                    globalThis.reconnModal = undefined
+                }
+                globalThis.bReconnecting = false
+                scheduleCheckProxyState( 1000 )
+            }).catch((error) => {
+                console.log("Reconnection failed. Retrying...");
+                globalThis.bReconnecting = false
+                scheduleCheckProxyState( 5000 )
+            });
+        }).catch((e)=>{
+            globalThis.bReconnecting = false
+            scheduleCheckProxyState( 5000 )
+        })
+    }
+
+    function clearCheckState()
+    {
+        clearTimeout( globalThis.checkStateInterval )
+        globalThis.checkStateInterval = undefined
+        globalThis.bCheckState = false
+    }
+    function scheduleCheckProxyState( ms = 1 )
+    {
+        if( globalThis.bCheckState === true )
+            return
+        globalThis.checkStateInterval =
+            setTimeout( checkProxyState, ms );
+        globalThis.bCheckState = true;
+    }
 
     function checkProxyState(){
-        if( globalThis.rootProxy === undefined ){
-            setTimeout( checkProxyState, 2000 );
-            console.log( "Waiting RPC connection ready..." );
-        }else if( globalThis.rootProxy === null ){
-            console.log( "RPC connection is shutdown abnormally..." );
-            DoCleanup();
-        }else if( globalThis.rootProxy.m_iState === 0 ){
-            console.log( "RPC connection is down..." );
-            DoCleanup();
-        }else{
-            if( iChecks++ === 0 )
-            {
-                //fetchLogs();
-                console.log( "RPC connection ready " + globalThis.curProxy );
+        globalThis.bCheckState = false
+        do{
+            if( globalThis.bLoggedin === false &&
+                globalThis.lastRoot !== undefined ){
+                DoCleanup();
+                break;
             }
-            setTimeout( checkProxyState, 5000 );
-        }
+
+            if( globalThis.bLoggedin == false )
+                break;
+
+            if( !globalThis.rootProxy ||
+                [0,4,6].includes( globalThis.rootProxy.m_iState ) ) {
+                setTimeout( startReconnection, 1 )
+                return;
+            }else{
+                if( iChecks++ === 0 )
+                {
+                    //fetchLogs();
+                    console.log( "RPC connection ready " + globalThis.curProxy );
+                }
+            }
+            break
+        }while( true );
+        scheduleCheckProxyState( 1000 )
+        return
     }
-    setTimeout( checkProxyState, 2000 );
+    scheduleCheckProxyState(1000);
 
     function clearLogs()
     { document.getElementById('logs-panel').textContent = ""; }
@@ -1266,7 +1362,20 @@
         fetchStatus();
     }
 
-    globalThis.StartClient( oStartCb)
+    setStatusDot(false);
+    showLoginButton(true);
+
+    globalThis.bLoggedin = false;
+    globalThis.StartClient( oStartCb).then(() => {
+        console.log('Logged in with status ');
+        globalThis.bLoggedin = true
+        showLoginButton(
+            true, globalThis.bLoggedin);
+        // scheduleCheckProxyState()
+    }).catch((error) => {
+        console.log("Error login:", error);
+    });
+
 
 /*
   Render a dropdown tree from the hierarchical backend (g_rootSite or rootProxy).
@@ -1346,6 +1455,9 @@ function renderSiteTree(rootNode) {
         var offline = false
         if( !c.node.oProxy )
             offline = true
+        else if( c.node.oProxy &&
+            [ 0, 4, 6].includes(c.node.oProxy.m_iState ))
+            offline = true
         childUl.appendChild(buildNode(childElem, path ? (path + delimiter + (childElem.name || childElem.key)) : (childElem.name || childElem.key), offline ));
       });
     }
@@ -1407,7 +1519,6 @@ function selectSiteByRouterPath(routerPath) {
         clearInterval(globalThis.fetchStatusInterval);
         clearInterval(globalThis.fetchLogsInterval);
         setStatusDot(false);
-        showReconnectButton(true, false);
     }
 }
 function initSiteTreeButtons() {
@@ -1423,7 +1534,7 @@ function initSiteTreeButtons() {
 function initSiteTree() {
   const rootNode = globalThis.g_rootSite;
   if (!rootNode) return;
-  renderSiteTree(rootNode);
+    renderSiteTree(rootNode);
   // initSiteTreeButtons();
   renderSite(rootNode);
   globalThis.pollingBgSitesInterval = setInterval( pollingBgSites, 40000);
@@ -1562,5 +1673,22 @@ function fetchAppFeatures( site )
   ////# sourceURL=rpcf://htmlcode/appmonhtml.js
   </script>
   <p id="rpcf_load_notify"><br /></p>
+
+  <!-- Reconnection Modal -->
+<div class="modal fade" id="reconnectionModal" tabindex="-1" aria-labelledby="reconnectionModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reconnectionModalLabel">Reconnecting...</h5>
+      </div>
+      <div class="modal-body text-center">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-3">Please wait while the connection is being re-established.</p>
+</div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

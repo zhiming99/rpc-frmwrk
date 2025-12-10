@@ -46,7 +46,10 @@ function SetProxy( oProxy, bClear = false )
         if( bClear )
             globalThis.rootProxy = null
         else
+        {
             globalThis.rootProxy = oProxy
+            globalThis.lastRoot = oProxy
+        }
         return
     }
     while( routerPath.endsWith( '/' ) )
@@ -166,6 +169,22 @@ function GetSite( routerPath = null )
     return oNode ? oNode.site : null;
 }
 
+function StopProxy( oProxy )
+{
+    var bRoot = false;
+    var routerPath = oProxy.m_strRouterPath;
+    if( routerPath === "/" )
+        bRoot = true;
+    return oProxy.Stop( -errno.EFAULT ).then( e =>{
+        if( !bRoot )
+            SetProxy( oProxy, true );
+        return Promise.resolve(e);
+    }).catch( (e)=>{
+        if( !bRoot )
+            SetProxy( oProxy, true );
+        return Promise.resolve(e);
+    })
+}
 function PollAllSites()
 {
     var vecProxies = GetAllProxies()
@@ -199,7 +218,7 @@ function PollAllSites()
             return elem.IsAppOnline( oContext, appsAvail )
                 .then((ret) => Promise.resolve(ret))
                 .catch((e) =>{
-                    return Promise.resolve(e);
+                    StopProxy( elem );
                 });
         });
     })
@@ -487,8 +506,8 @@ function StartPullInfo()
                                             return StartClient( (context, ret)=>{}, strChildRouterPath )
                                                 .then((ret) => Promise.resolve(ret))
                                                 .catch((e) => {
-                                                    console.log('StartClient for ' + strChildRouterPath + ' failed with error ' + e);
-                                                    return Promise.reject(e);
+                                                    console.log('StartClient failed for ' + strChildRouterPath + ' with error ' + e);
+                                                    return Promise.resolve(e);
                                                 });
                                             });
                                         }
@@ -561,8 +580,13 @@ function StartPullInfo()
 
 function StartClient( oStartCb, strRouterPath = null )
 {
+    var bRoot = false
     if( strRouterPath === null )
         strRouterPath = "/";
+
+    if( strRouterPath === "/" )
+        bRoot = true
+
     //globalThis.g_strLoginResult = ""
     var strObjDesc = './appmondesc.json';
     var strAppMonitorObjName = 'AppMonitor';
@@ -571,8 +595,16 @@ function StartClient( oStartCb, strRouterPath = null )
     oParams0.SetString( EnumPropId.propRouterPath, strRouterPath );
     var oAppMonitor_cli = new CAppMonitor_CliImpl( globalThis.g_oIoMgr,
         strObjDesc, strAppMonitorObjName, oParams0 );
+    if( bRoot && globalThis.lastRoot && globalThis.lastRoot.m_oChanProxy )
+    {
+        oAppMonitor_cli.m_oChanProxy.m_strKey =
+            globalThis.lastRoot.m_oChanProxy.m_strKey;
+        oAppMonitor_cli.m_oChanProxy.m_strUserName =
+            globalThis.lastRoot.m_oChanProxy.m_strUserName;
+    }
 
     return oAppMonitor_cli.Start().then((retval)=>{
+        var oContext = new Object();
         if( ERROR( retval ) )
         {
             globalThis.curProxy = null;
@@ -580,26 +612,36 @@ function StartClient( oStartCb, strRouterPath = null )
                 globalThis.rootProxy = null;
             return Promise.reject( retval );
         }
-        var oContext = new Object();
         oContext.oStartCb = oStartCb
         globalThis.curProxy = undefined
         globalThis.funcStartPullInfo = StartPullInfo
         var funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
         return funcStartPullInfo().then((ret)=>{
             if( oContext.oStartCb )
+            {
+                oContext.m_iRet = 0;
                 oContext.oStartCb( oContext, ret );
+            }
             return Promise.resolve( ret );
         }
         ).catch((e)=>{
-            if( oContext.oStartCb )
-                oContext.oStartCb( oContext, -errno.EFAULT );
             console.log( 'StartPullInfo failed with error ' + e );
             return Promise.reject(e);
         });
     }).catch((e)=>{
-        oAppMonitor_cli.Stop( -errno.EFAULT )
         console.log( 'Start Proxy failed with error ' + e );
-        return Promise.resolve(e);
+        var oContext = new Object();
+        return oAppMonitor_cli.Stop( -errno.EFAULT ).then( e =>{
+            return Promise.reject(e);
+        }).catch( (e)=>{
+            if( oStartCb )
+            {
+                oContext.m_iRet = -errno.EFAULT;
+                oStartCb( oContext, -errno.EFAULT );
+            }
+            SetProxy( oAppMonitor_cli, true );
+            return Promise.reject(e);
+        })
     })
 }
 globalThis.StartClient = StartClient;
@@ -632,5 +674,6 @@ globalThis.NewCfgDb = NewCfgDb;
 globalThis.NewVariant = NewVariant;
 globalThis.GetSite = GetSite;
 globalThis.GetProxy = GetProxy;
+globalThis.ClearProxy = ClearProxy;
 globalThis.PollAllSites = PollAllSites
 globalThis.GetSiteParams = GetSiteParams

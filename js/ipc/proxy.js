@@ -419,6 +419,35 @@ exports.CInterfaceProxy = class CInterfaceProxy
                 globalThis.g_strAuthMech === "SimpAuth" &&
                 globalThis.g_strLoginResult === "")
             {
+                if( this.m_strKey && this.m_strKey.length > 0 )
+                {
+                    return this.OpenRemotePort( this.m_strUrl ).then((e)=>{
+                        if( globalThis.g_bAuth )
+                            return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
+                                if( ERROR( retval ) )
+                                    return Promise.reject( retval )
+                                return this.EnableEvents().then((e)=>{
+                                    return Promise.resolve(e)
+                                }).catch((e)=>{
+                                    return Promise.reject( -errno.EFAULT )
+                                })
+                            }).catch((e)=>{
+                                this.DebugPrint("Error, Login failed ( " + e + " )")
+                                return Promise.reject(-errno.EFAULT)
+                            })
+                        else
+                            return this.EnableEvents().then((e)=>{
+                                return Promise.resolve(e)
+                            }).catch((e)=>{
+                                this.DebugPrint("Error, EnableEvent failed ( " + e + " )")
+                                return Promise.reject( -errno.EFAULT )
+                            })
+                    }).catch((e)=>{
+                        this.DebugPrint("Error, OpenRemotePort failed ( " + e + " )")
+                        return Promise.reject(-errno.EFAULT)
+                    })
+
+                }
                 return this.GetLoginCredentialFromInput().then((oCred)=>{
                     if( oCred === null )
                     {
@@ -436,26 +465,26 @@ exports.CInterfaceProxy = class CInterfaceProxy
                                     if( globalThis.g_bAuth )
                                         return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
                                             if( ERROR( retval ) )
-                                                return Promise.resolve( retval )
+                                                return Promise.reject( retval )
                                             return this.SetupConnection().then((e)=>{
                                                 return Promise.resolve(e)
                                             }).catch((e)=>{
-                                                return Promise.resolve( -errno.EFAULT )
+                                                return Promise.reject( -errno.EFAULT )
                                             })
                                         }).catch((e)=>{
                                             this.DebugPrint("Error, Login failed ( " + e + " )")
-                                            return Promise.resolve(-errno.EFAULT)
+                                            return Promise.reject(-errno.EFAULT)
                                         })
                                     else
                                         return this.SetupConnection().then((e)=>{
                                             return Promise.resolve(e)
                                         }).catch((e)=>{
                                             this.DebugPrint("Error, SetupConnection failed ( " + e + " )")
-                                            return Promise.resolve( -errno.EFAULT )
+                                            return Promise.reject( -errno.EFAULT )
                                         })
                                 }).catch((e)=>{
                                     this.DebugPrint("Error, OpenRemotePort failed ( " + e + " )")
-                                    return Promise.resolve(-errno.EFAULT)
+                                    return Promise.reject(-errno.EFAULT)
                                 })
                             })
                         })
@@ -475,27 +504,27 @@ exports.CInterfaceProxy = class CInterfaceProxy
                     globalThis.g_strLoginResult === "" )
                     return this.m_funcLogin( undefined, e.m_oResp ).then((retval)=>{
                         if( ERROR( retval ) )
-                            return Promise.resolve( retval )
+                            return Promise.reject( retval )
                         return this.SetupConnection().then((e)=>{
                             return Promise.resolve(e)
                         }).catch((e)=>{
-                            return Promise.resolve( -errno.EFAULT )
+                            return Promise.reject( -errno.EFAULT )
                         })
                     }).catch((e)=>{
                         this.DebugPrint("Error, Login failed ( " + e + " )")
-                        return Promise.resolve(e)
+                        return Promise.reject(e)
                     })
                 else
                     return this.SetupConnection().then((e)=>{
                         return Promise.resolve(e)
                     }).catch((e)=>{
                         this.DebugPrint("Error, SetupConnection failed ( " + e + " )")
-                        return Promise.resolve( -errno.EFAULT )
+                        return Promise.reject( -errno.EFAULT )
                     })
                 })
         }).catch((e)=>{
             this.DebugPrint("Error, LoadObjDesc failed ( " + e + " )")
-            return Promise.resolve(e)
+            return Promise.reject(e)
         })
     }
 
@@ -513,6 +542,7 @@ exports.CInterfaceProxy = class CInterfaceProxy
             this.m_iState = EnumIfState.stateStopped
             return Promise.resolve(e);
         }).catch((e)=>{
+            this.m_iState = EnumIfState.stateStopped
             return Promise.reject(e);
         });
     }
