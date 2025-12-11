@@ -1874,7 +1874,8 @@ gint32 CTcpStreamPdo2::PreStop(
             EnumSockState iState =
                 m_pConnSock->GetState();
 
-            if( iState == sockStopped )
+            if( iState == sockStopped &&
+                m_pReadTb.IsEmpty() )
             {
                 SetPreStopStep( pIrp, 1 );
                 break;
