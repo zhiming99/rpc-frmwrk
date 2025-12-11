@@ -1914,7 +1914,7 @@ gint32 CTcpStreamPdo2::PreStop(
                 // we need to run on the mainloop
                 pTask->MarkPending();
                 pLoop->AddTask( pTask );
-                ret = STATUS_PENDING;
+                ret = STATUS_MORE_PROCESS_NEEDED;
             }
             break;
         }
