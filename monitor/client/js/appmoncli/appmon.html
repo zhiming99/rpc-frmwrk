@@ -260,6 +260,10 @@
       }
     }
 
+    globalThis.lastRoot = undefined
+    globalThis.rootProxy = undefined
+    globalThis.curProxy = undefined
+
     const oStartCb = ((context, ret)=>{
       if( context && context.m_iRet < 0 )
           return;
@@ -357,7 +361,7 @@
                             globalThis.bLoggedin = true
                             showLoginButton(
                                 true, globalThis.bLoggedin);
-                            // scheduleCheckProxyState()
+                            scheduleCheckProxyState()
                         }).catch((error) => {
                             console.log("Error login:", error);
                         });
@@ -565,7 +569,6 @@
         var rootProxy = globalThis.rootProxy
         if( rootProxy )
             globalThis.ClearProxy( "/" )
-        globalThis.g_strLoginResult = ""
         if( globalThis.curSpModal )
         {
             globalThis.curSpModal.hide();
@@ -574,10 +577,14 @@
         initRootSite();
         iChecks = 0;
 
+        globalThis.g_strLoginResult = ""
+        if( globalThis.bLoggedin === false )
+        {
+            globalThis.lastRoot = undefined;
+            clearCheckState();
+        }
         if( rootProxy )
         {
-            if( globalThis.bLoggedin === false )
-                globalThis.lastRoot = undefined;
             return rootProxy.Stop().then((e)=>
             {
                 console.log( "rootProxy stopped" );
@@ -800,7 +807,6 @@
         scheduleCheckProxyState( 1000 )
         return
     }
-    scheduleCheckProxyState(1000);
 
     function clearLogs()
     { document.getElementById('logs-panel').textContent = ""; }
@@ -1427,7 +1433,7 @@
         globalThis.bLoggedin = true
         showLoginButton(
             true, globalThis.bLoggedin);
-        // scheduleCheckProxyState()
+        scheduleCheckProxyState()
     }).catch((error) => {
         console.log("Error login:", error);
     });

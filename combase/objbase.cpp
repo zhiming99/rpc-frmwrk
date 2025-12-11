@@ -45,6 +45,7 @@
 #include <fstream>
 #include <sstream>
 #include <dirent.h>
+#include <fcntl.h>
 
 #define MAX_DUMP_SIZE 512
 
@@ -815,6 +816,25 @@ struct hash_obj
 
 stdmutex g_oObjListLock;
 std::unordered_set< CObjBase*, hash_obj > g_vecObjs;
+void RedirectTo( const char* szFile )
+{
+    if( szFile == nullptr )
+        return;
+    int fd = fileno( stdout );
+    int newfd = open( szFile,
+        O_WRONLY | O_CREAT | O_TRUNC,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH );
+    if( newfd == -1 )
+    {
+        stdstr strMsg = DebugMsg( -errno,
+            "%s", strerror( errno ) );
+        perror( strMsg.c_str() );
+        return;
+    }
+    dup2( newfd, fd );
+    close( newfd );
+}
+
 void DumpObjs( bool bAll = false)
 {
     std::set< CObjBase*, cmp_obj > setObjs;
@@ -836,6 +856,7 @@ void DumpObjs( bool bAll = false)
             printf( "%s\n", strObj.c_str() );
         }
     }
+    syncfs(1);
 }
 
 // find objects by class id
