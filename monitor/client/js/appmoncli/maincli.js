@@ -338,7 +338,7 @@ function StartPullInfo()
         }).bind( oAppMonitor_cli )
 
         return oAppMonitor_cli.ListApps( oContext ).then(( oPendings )=>{
-            console.log( 'request ListApps is done with status ' );
+            // console.log( 'request ListApps is done with status ' );
             appsAvail=[]
 
             var site=GetSite(this.m_strRouterPath)
@@ -374,7 +374,7 @@ function StartPullInfo()
             return oAppMonitor_cli.IsAppOnline( oContext, appsAvail ).then((ret)=>{
                 var arrPtPaths = []
                 var site=GetSite(this.m_strRouterPath)
-                console.log( 'request IsAppOnline is done with status ' + ret );
+                // console.log( 'request IsAppOnline is done with status ' + ret );
                 for( var i = 0; i < site.apps.length; i++ )
                 {
                     var appName = site.apps[i].name;
@@ -436,7 +436,7 @@ function StartPullInfo()
                     }
                 }).bind( oAppMonitor_cli )
                 return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
-                    console.log( 'request GetPointValues is done with status ' + ret );
+                    // console.log( 'request GetPointValues is done with status ' + ret );
                     if( globalThis.curProxy )
                     {
                         oContext.m_iRet = 0
