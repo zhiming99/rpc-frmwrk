@@ -853,7 +853,7 @@ def DefaultIfCfg() -> dict :
     defCfg[ "ConnRecover" ]= "false"
     defCfg[ "HasAuth" ]= "false"
     defCfg[ "DestURL" ]= "https://www.example.com"
-    defCfg[ "EnableBPS" ]= "false"
+    defCfg[ "EnableBPS" ]= "true"
     return defCfg
 
 def CheckIpAddr( addr ) :
@@ -968,7 +968,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
     defConn[ "ConnRecover" ]= "false"
     defConn[ "HasAuth" ]= "false"
     defConn[ "DestURL" ]= "https://www.example.com"
-    defConn[ "EnableBPS" ]= "false"
+    defConn[ "EnableBPS" ]= "true"
     defConn[ "BindTo" ]= "true"
 
     oConns = None
@@ -1015,7 +1015,7 @@ def Update_Drv( initCfg: dict, drvFile : list,
                 if 'ConnRecover' not in ifCfg :
                     ifCfg[ 'ConnRecover' ] = "false"
                 if 'EnableBPS' not in ifCfg :
-                    ifCfg[ 'EnableBPS' ] = "false"
+                    ifCfg[ 'EnableBPS' ] = "true"
                 if 'Protocol' not in ifCfg :
                     ifCfg[ "Protocol" ] = "native"
                 if 'AddrFormat' not in ifCfg:
