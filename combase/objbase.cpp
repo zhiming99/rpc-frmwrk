@@ -842,18 +842,18 @@ void DumpObjs( bool bAll = false)
         CStdMutex oLock( g_oObjListLock );
         for( auto pObj : g_vecObjs ) 
             setObjs.insert( pObj );
-    }
-    for( auto pObj : setObjs )
-    {
-        std::string strObj;
-        if( pObj != nullptr )
+        for( auto pObj : setObjs )
         {
-            if( pObj->GetClsid() == clsid( CBuffer ) ||
-                pObj->GetClsid() == clsid( CConfigDb2 ) )
-                if( !bAll )
-                    continue;
-            pObj->Dump( strObj );
-            printf( "%s\n", strObj.c_str() );
+            std::string strObj;
+            if( pObj != nullptr )
+            {
+                if( pObj->GetClsid() == clsid( CBuffer ) ||
+                    pObj->GetClsid() == clsid( CConfigDb2 ) )
+                    if( !bAll )
+                        continue;
+                pObj->Dump( strObj );
+                printf( "%s\n", strObj.c_str() );
+            }
         }
     }
     syncfs(1);
