@@ -230,12 +230,21 @@ gint32 CAsyncAMCallbacks::GetPointValuesToUpdate(
         if( SUCCEEDED( ret ) )
         {
             ret = DumpMmhNode( pRouter, oVar, pBuf );
-            if( SUCCEEDED( ret ) )
-            {
-                okv.oValue = pBuf;
-                veckv.push_back( okv );
-            }
         }
+        if( ERROR( ret ) )
+        {
+            stdstr strVal = "[]";
+            ret = pBuf.NewObj();
+            if( ERROR( ret ) )
+                break;
+            ret = pBuf->Append( strVal.c_str(),
+                strVal.size());
+            if( ERROR( ret ) )
+                break;
+        }
+
+        okv.oValue = pBuf;
+        veckv.push_back( okv );
 
         timespec ts = prt->GetStartTime();
         okv.strKey = O_UPTIME;

@@ -76,7 +76,11 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 connElem[ "PdoClass" ] = param[ "PdoClass" ]
                 if connElem[ "EnableSSL" ] == "true":
                     bSSL = True
-                connElem[ "HasAuth" ] = param[ "HasAuth" ]
+                if "HasAuth" in param:
+                    connElem[ "HasAuth" ] = param[ "HasAuth" ]
+                else:
+                    connElem[ "HasAuth" ] = "false"
+
                 if connElem[ "HasAuth" ] == "true":
                     connElem["AuthMech"] = param[ "AuthMech" ]
                     authMech = param[ "AuthMech" ]

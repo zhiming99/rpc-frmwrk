@@ -631,17 +631,14 @@ gint32 InitContext()
     if( ERROR( ret ) )
         return ret;
     do{
-        CParamList oParams;
-        oParams.Push( "regfsmnt" );
+        stdstr strPath;
+        ret = GetLibPath( strPath );
+        if( ERROR( ret ) )
+            break;
 
-        oParams[ propEnableLogging ] = g_bLogging;
-        oParams[ propSearchLocal ] = g_bLocal;
-        oParams[ propConfigPath ] =
-            "invalidpath/driver.json";
-
-        // adjust the thread number if necessary
-        oParams[ propMaxIrpThrd ] = 0;
-        oParams[ propMaxTaskThrd ] = 1;
+        strPath += "/libregfs.so";
+        ret = CoLoadClassFactory(
+            strPath.c_str() );
 
     }while( 0 );
 

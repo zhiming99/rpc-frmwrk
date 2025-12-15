@@ -295,9 +295,9 @@ gint32 RunSvcObj()
         if( !g_bFuse ) 
         {
             ret = ServiceMain(
+                vecIfs[2],
                 vecIfs[0],
-                vecIfs[1],
-                vecIfs[2]);
+                vecIfs[1]);
         }
 
     }while( 0 );
