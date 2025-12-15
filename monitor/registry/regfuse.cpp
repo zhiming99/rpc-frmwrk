@@ -62,7 +62,6 @@ static std::string g_strMPoint;
 static std::string g_strRegFsFile;
 static bool g_bFormat = false;
 
-ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
@@ -644,25 +643,10 @@ gint32 InitContext()
         oParams[ propMaxIrpThrd ] = 0;
         oParams[ propMaxTaskThrd ] = 1;
 
-        ret = g_pIoMgr.NewObj(
-            clsid( CIoManager ),
-            oParams.GetCfg() );
-        if( ERROR( ret ) )
-            break;
-
-        IService* pSvc = g_pIoMgr;
-        ret = pSvc->Start();
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "Error start io manager" );
-        }
-
     }while( 0 );
 
     if( ERROR( ret ) )
     {
-        g_pIoMgr.Clear();
         CoUninitialize();
     }
     return ret;
@@ -670,13 +654,6 @@ gint32 InitContext()
 
 gint32 DestroyContext()
 {
-    IService* pSvc = g_pIoMgr;
-    if( pSvc != nullptr )
-    {
-        pSvc->Stop();
-        g_pIoMgr.Clear();
-    }
-
     CoUninitialize();
     DebugPrintEx( logErr, 0,
         "#Leaked objects is %d",

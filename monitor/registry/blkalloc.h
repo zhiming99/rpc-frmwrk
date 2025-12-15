@@ -213,8 +213,6 @@
 #define MAX_FS_SIZE     \
     ( ( BLOCKS_PER_GROUP * BLKGRP_NUMBER ) + SUPER_BLOCK_SIZE + GRPBMP_BLKNUM  )
 
-extern rpcf::ObjPtr g_pIoMgr;
-
 namespace rpcf{
 
 struct ISynchronize
