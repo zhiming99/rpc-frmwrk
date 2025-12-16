@@ -198,14 +198,17 @@ function PollAllSites()
             vecProxies.splice(index, 1);
     }
 
-    promList = []
+    var promList = []
     vecProxies.forEach( (elem)=>{
         if( !elem )
             return
-        appsAvail = []
+        var appsAvail = []
         var site=GetSite(elem.m_strRouterPath)
-        appsAvail.push( site.apps[0].name );
+        if( site && site.apps && site.apps.length > 0 )
+            appsAvail.push( site.apps[0].name );
 
+        if( appsAvail.length === 0 )
+            return
         promList.push(()=>{
             var oContext = {}
             oContext.oIsAppOnlineCb = ((oContext, ret, arrApps ) => {
@@ -218,12 +221,16 @@ function PollAllSites()
             return elem.IsAppOnline( oContext, appsAvail )
                 .then((ret) => Promise.resolve(ret))
                 .catch((e) =>{
-                    StopProxy( elem );
+                    StopProxy( elem ).then(()=>{
+                        var strRouterPath = elem.m_strRouterPath;
+                        console.log( `Site at ${strRouterPath} is offline` )
+                        if( globalThis.OnSiteOffline )
+                            globalThis.OnSiteOffline( strRouterPath );
+                    });
                 });
         });
     })
 
-    var nop ={};
     async function RunTasks(){
         let count = 0;
         for (const task of promList) {
@@ -339,7 +346,7 @@ function StartPullInfo()
 
         return oAppMonitor_cli.ListApps( oContext ).then(( oPendings )=>{
             // console.log( 'request ListApps is done with status ' );
-            appsAvail=[]
+            var appsAvail=[]
 
             var site=GetSite(this.m_strRouterPath)
             for( var i = 0; i < site.apps.length; i++ )
