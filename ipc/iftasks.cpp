@@ -360,9 +360,6 @@ CIfRetryTask::CIfRetryTask(
         if( ERROR( ret ) )
             break;
 
-        if( !oCfg.exist( propIoMgr ) )
-            oCfg.SetPointer( propIoMgr, pMgr );
-
         if( !oCfg.exist( propRetries ) )
         {
             ret = oCfg.SetIntProp(

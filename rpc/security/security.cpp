@@ -671,7 +671,7 @@ gint32 CRpcTcpBridgeAuth::DumpConnParams(
                 strMsg += stdstr( "DestIp=" ) +
                     strVal + ",";
             ret = oRmtConn.GetIntProp(
-                propSrcTcpPort, dwVal );
+                propDestTcpPort, dwVal );
             if( SUCCEEDED( ret ) )
                 strMsg += stdstr( "DestPort=" ) +
                     std::to_string( dwVal ) + ",";

@@ -354,7 +354,9 @@
                 btn.classList.remove('btn-danger');
                 btn.classList.add('btn-warning');
                 btn.onclick = function() {
-                  // Your login logic here
+                    // Your login logic here, clear the loginResult in case
+                    // user has typed wrong username/password
+                    globalThis.g_strLoginResult = ""
                     if (typeof globalThis.StartClient === 'function') {
                         globalThis.StartClient( oStartCb ).then(() => {
                             console.log('Logged in with status ');
