@@ -1469,34 +1469,40 @@ function renderSiteTree(rootNode) {
     label.textContent = elem.name
     if( offline )
         label.style.color = 'gray';
+    label.id = "SiteTreeNode-" + getRouterPathFromNode( elem );
 
     // compute routerPath for this node
     const routerPath = path
 
     // If this element holds a site object, attach click handler to select it
     const siteObj = elem;
-    if (siteObj ) {
-        label.onclick = function (e) {
-            e.stopPropagation();
-            const routerPath = computeRouterPathFromNode(elem)
-            if (routerPath) {
-                selectSiteByRouterPath(routerPath);
-                // close dropdown
-                const btn = document.getElementById('siteTreeDropdownBtn');
-                const dd = bootstrap.Dropdown.getInstance(btn);
-                if (dd) dd.hide();
-            }
-        };
-    } else {
-        // folder node: toggle children
-        label.onclick = function(e) {
-            e.stopPropagation();
-            li.classList.toggle('open');
-            const sub = li.querySelector('ul');
-            if (sub) sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
-        };
+    if( !offline )
+    {
+        if( siteObj ){
+            label.onclick = function (e) {
+                e.stopPropagation();
+                const routerPath = getRouterPathFromNode(elem)
+                if (routerPath) {
+                    selectSiteByRouterPath(routerPath);
+                    // close dropdown
+                    const btn = document.getElementById('siteTreeDropdownBtn');
+                    const dd = bootstrap.Dropdown.getInstance(btn);
+                    if (dd) dd.hide();
+                }
+            };
+        } else {
+            // folder node: toggle children
+            label.onclick = function(e) {
+                e.stopPropagation();
+                li.classList.toggle('open');
+                const sub = li.querySelector('ul');
+                if (sub) sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
+            };
+        }
     }
     li.appendChild(label);
+    if( offline )
+        return li;
 
     // children
     const childUl = document.createElement('ul');
@@ -1537,8 +1543,7 @@ function renderSiteTree(rootNode) {
 
 // Attempt to compute routerPath from node element by walking up from name strings.
 // This utility assumes the tree labels represent path components and returns a path string.
-function computeRouterPathFromNode(elem) {
-  // If the node already has a params object with router path, try to use it
+function getRouterPathFromNode(elem) {
   return elem.node.routerPath || elem.node.site.routerPath ;
 }
 /*
@@ -1729,6 +1734,27 @@ function fetchAppFeatures( site )
         return Promise.resolve( error );
     });
 }
+
+function onSiteOffline( strRouterPath )
+{
+    var site = globalThis.GetSite( strRouterPath );
+    if( !site )
+        return
+    if( site && site.children && children.size )
+        site.children.forEach((elem, name) =>{
+            onSiteOffline( strRouterPath + '/' + name )
+        })
+    // gray the site in the site tree
+    var elem = document.getElementById(
+        "SiteTreeNode-" + strRouterPath )
+    if( elem )
+    {
+        elem.style.color = 'gray';
+        elem.onclick = null
+    }
+}
+
+globalThis.OnSiteOffline = onSiteOffline
 
 // call initSiteTree after StartClient / data loaded
 // setTimeout(() => { initSiteTree(); }, 500);
