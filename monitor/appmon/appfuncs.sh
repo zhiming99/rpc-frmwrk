@@ -9,6 +9,19 @@ source $_pubfuncs
 declare -gA permArray
 declare -gA userArray
 
+function detect_and_start_dbus()
+{
+    if [[ ! -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+        return 0
+    fi
+    export DBUS_SESSION_BUS_ADDRESS=`dbus-daemon --fork --print-address --session`
+    if [[ -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+        echo Error cannot start dbus session - $? 
+        return 1
+    fi
+    return 0
+}
+
 function wait_mount()
 {
     if [ -z $1 ] || [ -z $2 ]; then

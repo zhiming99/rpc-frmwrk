@@ -31,6 +31,10 @@ function usage() {
     echo you can 'man rpcfctl' for detailed introduction.
 }
 
+if ! detect_and_start_dbus; then
+    exit 1
+fi
+
 if [[ $# -lt 1 ]]; then
     echo Error invalid parameters
     exit 1
