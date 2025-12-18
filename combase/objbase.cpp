@@ -1641,7 +1641,7 @@ gint32 StartDBus()
         }
 
         stdstr strDBusAddr =
-            GetHomeDir() + "./rpcf/dbusaddr";
+            GetHomeDir() + "/.rpcf/dbusaddr";
         fp = fopen( strDBusAddr.c_str(), "r" );
         if( fp == nullptr )
         {
