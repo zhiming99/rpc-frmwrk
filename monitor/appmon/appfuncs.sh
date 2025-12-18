@@ -18,9 +18,13 @@ function dbus_test_send()
 }
 function detect_and_start_dbus()
 {
+    if [[ ! -d ${HOME}/.rpcf ]]; then
+        mkdir ${HOME}/.rpcf
+    fi
     local dbusAddr=${HOME}/.rpcf/dbusaddr
     if [[ ! -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
         if dbus_test_send; then
+            echo $DBUS_SESSION_BUS_ADDRESS > $dbusAddr
             return 0
         fi
     fi

@@ -726,9 +726,7 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
 
     do{
         // detecting and starting the dbus if needed
-        gint32 ret = StartDBus();
-        if( ERROR( ret ) )
-            break;
+        StartDBus();
         sleep( 1 );
 
         string strModName;

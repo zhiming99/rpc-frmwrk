@@ -69,10 +69,18 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 connElem[ "PdoClass" ] = param[ "PdoClass" ]
                 connElem[ "Protocol" ] = param[ "Protocol" ]
                 connElem[ "PortNumber" ] = param[ "PortNumber" ]
-                connElem[ "ConnRecover" ] = param[ "ConnRecover" ]
+                if "ConnRecover" in param:
+                    connElem[ "ConnRecover" ] = param[ "ConnRecover" ]
+                else:
+                    connElem[ "ConnRecover" ] = "false"
+
                 connElem[ "Compression" ] = param[ "Compression" ]
                 connElem[ "EnableSSL" ] = param[ "EnableSSL" ]
-                connElem[ "EnableBPS" ] = param[ "EnableBPS" ]
+                if "EnableBPS" in param:
+                    connElem[ "EnableBPS" ] = param[ "EnableBPS" ]
+                else:
+                    connElem[ "EnableBPS" ] = "true"
+
                 connElem[ "PdoClass" ] = param[ "PdoClass" ]
                 if connElem[ "EnableSSL" ] == "true":
                     bSSL = True
