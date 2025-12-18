@@ -9,7 +9,7 @@ fi
 echo installing development tools...
 ${SUDO} apt-get -y install tzdata
 ${SUDO} apt-get install -y gcc g++ python3 python3-dev python3-pip flex bison \
-libtool shtool automake autoconf autotools-dev make dbus libdbus-1-3 \
+libtool shtool automake autoconf autotools-dev make dbus dbus-bin libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev openssl libssl1.1 libssl-dev libcppunit-1.14-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev bash net-tools procps swig default-jdk-headless cmake \

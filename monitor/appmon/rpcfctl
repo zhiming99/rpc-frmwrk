@@ -31,10 +31,6 @@ function usage() {
     echo you can 'man rpcfctl' for detailed introduction.
 }
 
-if ! detect_and_start_dbus; then
-    exit 1
-fi
-
 if [[ $# -lt 1 ]]; then
     echo Error invalid parameters
     exit 1
@@ -889,6 +885,15 @@ EOF
             exit 1
         fi
         python3 $cmddir/buildinst.py $@
+        ;;
+    detect_dbus)
+        if ! detect_and_start_dbus; then
+            exit 1
+        fi
+        exit 0
+        ;;
+    version)
+        rpcrouter -v | grep Version
         ;;
     *)
         echo "Unknown command: $cmd"

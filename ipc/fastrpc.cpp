@@ -2346,7 +2346,7 @@ gint32 CFastRpcServerBase::SetProperty(
             ret = GetStmChanSvr( pChan );
             if( ERROR( ret ) )
                 break;
-            auto dwCount = ( guint32& )oVal;
+            auto dwCount = ( const guint32& )oVal;
             if( MAX_REQCHAN_PER_SESS < dwCount )
                 dwCount = MAX_REQCHAN_PER_SESS;
             Variant oVar( dwCount );
@@ -2368,7 +2368,7 @@ gint32 CFastRpcServerBase::SetProperty(
                 break;
             }
             super::SetProperty( propQps, oVal );
-            SetMaxTokens( ( guint64& )oVal );
+            SetMaxTokens( ( const guint64& )oVal );
             break;
         }
     default:

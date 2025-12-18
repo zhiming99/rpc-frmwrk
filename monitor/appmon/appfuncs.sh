@@ -14,11 +14,23 @@ function detect_and_start_dbus()
     if [[ ! -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
         return 0
     fi
+    local dbusAddr=${HOME}/.rpcf/dbusaddr
+    if [[ -f "$dbusAddr" ]]; then
+        if stat -c %s $dbusAddr > /dev/null; then
+            export DBUS_SESSION_BUS_ADDRESS=`cat $dbusAddr`
+            if dbus-send --session --dest=org.freedesktop.DBus --type=method_call --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames > /dev/null; then
+                return 0
+            else
+                > $dbusAddr
+            fi
+        fi
+    fi
     export DBUS_SESSION_BUS_ADDRESS=`dbus-daemon --fork --print-address --session`
     if [[ -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
         echo Error cannot start dbus session - $? 
         return 1
     fi
+    echo $DBUS_SESSION_BUS_ADDRESS > $dbusAddr
     return 0
 }
 
