@@ -185,7 +185,7 @@ gint32 GetCmdOutput( std::string& strResult,
             ret = -errno;
             break;
         }
-        std::unique_ptr< FILE, decltype(&pclose) >
+        std::unique_ptr< FILE, int(*)(FILE*) >
             pipe( fp, pclose );
 
         if (!pipe)
@@ -1615,6 +1615,62 @@ gint32 GetHostAndPortFromUrl(
             matches[3].str().c_str(), nullptr, 10 );
     }
     return 0;
+}
+
+gint32 StartDBus()
+{
+    FILE* fp = nullptr;
+    gint32 ret = 0;
+    do{
+        stdstr strPath = "/usr/bin/rpcfctl";
+        ret = access( strPath.c_str(), X_OK );
+        if( ERROR( ret ) )
+        {
+            strPath = "/usr/local/bin/rpcfctl";
+            ret = access( strPath.c_str(), X_OK );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = system(
+            (strPath + " detect_dbus").c_str() );
+        if( ERROR( ret ) )
+        {
+            DebugPrintEx( logErr,
+                ret, "Error detecting dbus" );
+            break;
+        }
+
+        stdstr strDBusAddr =
+            GetHomeDir() + "./rpcf/dbusaddr";
+        fp = fopen( strDBusAddr.c_str(), "r" );
+        if( fp == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        char line[ 1024 ] = {0,};
+        guint32 dwLen = sizeof( line );
+        char* pszAddr = fgets( line, dwLen, fp );
+        if( pszAddr == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        stdstr s = pszAddr;
+        // trim right
+        s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }).base(), s.end());
+
+        ret = setenv( "DBUS_SESSION_BUS_ADDRESS",
+            s.c_str(), 1 );
+        if( ret < 0 )
+            ret = -errno;
+
+    }while( 0 );
+    if( fp )
+        fclose( fp );
+    return ret;
 }
 
 }

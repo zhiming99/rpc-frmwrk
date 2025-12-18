@@ -916,4 +916,6 @@ gint32 GetHostAndPortFromUrl(
     const stdstr& strUrl,
     stdstr& strHost, guint32& dwPort );
 
+gint32 StartDBus();
+
 }

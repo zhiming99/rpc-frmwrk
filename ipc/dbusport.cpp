@@ -767,7 +767,21 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
                 // fatal error, we cannot run without
                 // the dbus-daemon.
                 ret = error.Errno();
-                break;
+                if( ret != -ENOTSUP )
+                    break;
+
+                // try start the dbus
+                gint32 iRet = StartDBus();
+                if( ERROR( iRet ) )
+                    break;
+                sleep( 1 );
+                m_pDBusConn = dbus_bus_get_private(
+                    DBUS_BUS_SESSION, error );
+                if( nullptr == m_pDBusConn )
+                {
+                    ret = error.Errno();
+                    break;
+                }
             }
         }
         
