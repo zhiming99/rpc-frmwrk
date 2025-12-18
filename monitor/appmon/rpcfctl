@@ -444,7 +444,7 @@ EOF
                 echo Error failed to generate OpenSSL key/cert
             fi
         elif [[ "x$1" == "xgmssl" ]]; then
-            if [ ! -d $HOME/.rpcf/gmssl ]; then mkdir $HOME/.rpcf/gmssl; fi
+            if [ ! -d $HOME/.rpcf/gmssl ]; then mkdir -p $HOME/.rpcf/gmssl; fi
             if bash $cmddir/gmsslkey.sh $HOME/.rpcf/gmssl $2 $3; then
                 clidx=`cat $HOME/.rpcf/gmssl/clidx`
                 svridx=`cat $HOME/.rpcf/gmssl/svridx`
