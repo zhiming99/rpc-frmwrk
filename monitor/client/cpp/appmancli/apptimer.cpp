@@ -376,6 +376,14 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                 {
                     g_arrInterVals[ 1 ] = kv.oValue;
                 }
+                else if( kv.strKey == "interval3" )
+                {
+                    g_arrInterVals[ 2 ] = kv.oValue;
+                }
+                else if( kv.strKey == "interval4" )
+                {
+                    g_arrInterVals[ 3 ] = kv.oValue;
+                }
                 else if( kv.strKey == "schedule1" )
                 {
                     BufPtr pBuf = ( BufPtr& )kv.oValue;

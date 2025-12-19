@@ -2777,7 +2777,7 @@ gint32 CImplJsMainFunc::OutputCli(
 
         // CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
         // NEW_LINE;
-        CCOUT << "var strObjDesc = './" << g_strAppName<<"desc.json';";
+        CCOUT << "var strObjDesc = new URL( './" << g_strAppName<<"desc.json', document.baseURI ).href;";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;
