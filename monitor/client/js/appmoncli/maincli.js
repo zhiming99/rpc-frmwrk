@@ -595,7 +595,7 @@ function StartClient( oStartCb, strRouterPath = null )
         bRoot = true
 
     //globalThis.g_strLoginResult = ""
-    var strObjDesc = './appmondesc.json';
+    var strObjDesc = new URL('./appmondesc.json', document.baseURI).href;
     var strAppMonitorObjName = 'AppMonitor';
     var oParams0 = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );
     oParams0.SetString( EnumPropId.propObjInstName, 'AppMonitor' );
