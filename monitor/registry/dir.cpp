@@ -88,19 +88,19 @@ gint32 RegFSBNode::ntoh(
         if( m_wNumPtrs > MAX_PTRS_PER_NODE ||
             m_wNumKeys > MAX_KEYS_PER_NODE )
         {
-            ret = -EINVAL;
+            ret = -ERANGE;
             break;
         }
         if( m_wParentBNode > MAX_BNODE_NUMBER &&
             m_wParentBNode != INVALID_BNODE_IDX ) 
         {
-            ret = -EINVAL;
+            ret = -ERANGE;
             break;
         }
         if( m_wNextLeaf > MAX_BNODE_NUMBER &&
             m_wNextLeaf != INVALID_BNODE_IDX )
         {
-            ret = -EINVAL;
+            ret = -ERANGE;
             break;
         }
 
@@ -848,7 +848,7 @@ gint32 FREE_BNODES::ntoh(
         return 0;
     m_wBNCount = ntohs( prhs->m_wBNCount );
     if( m_wBNCount > GetMaxCount() )
-        return -EINVAL;
+        return -ERANGE;
     m_bNextBNode = prhs->m_bNextBNode;
     guint32 i = 0;
     for( ; i < m_wBNCount; i++ )

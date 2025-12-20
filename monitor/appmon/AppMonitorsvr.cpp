@@ -52,18 +52,6 @@ CFlockHelper::~CFlockHelper()
     flock( m_iFd, LOCK_UN );
 }
 
-CFileHandle::~CFileHandle()
-{
-    if( m_hFile != INVALID_HANDLE &&
-        !m_pFs.IsEmpty() )
-    {
-        CRegistryFs* pfs = m_pFs;
-        pfs->CloseFile( m_hFile );
-        m_hFile = INVALID_HANDLE;
-    }
-    m_pFs.Clear();
-}
-
 gint32 CAppMonitor_SvrImpl::GetLoginInfo(
     IConfigDb* pCtx, CfgPtr& pInfo ) const
 {

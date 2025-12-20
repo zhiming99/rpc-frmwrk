@@ -2080,4 +2080,16 @@ gint32 CRegistryFs::CreateFile(
     return ret;
 }
 
+CFileHandle::~CFileHandle()
+{
+    if( m_hFile != INVALID_HANDLE &&
+        !m_pFs.IsEmpty() )
+    {
+        CRegistryFs* pfs = m_pFs;
+        pfs->CloseFile( m_hFile );
+        m_hFile = INVALID_HANDLE;
+    }
+    m_pFs.Clear();
+}
+
 }
