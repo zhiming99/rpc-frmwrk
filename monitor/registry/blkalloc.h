@@ -1867,4 +1867,14 @@ class CRegistryFs :
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;
 
+struct CFileHandle
+{
+    RFHANDLE m_hFile = INVALID_HANDLE;
+    ObjPtr m_pFs;
+    public:
+    CFileHandle( ObjPtr pFs, RFHANDLE hFile )
+    { m_hFile = hFile; m_pFs = pFs; }
+    ~CFileHandle();
+};
+
 }

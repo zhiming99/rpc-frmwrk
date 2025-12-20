@@ -18,15 +18,6 @@ struct CFlockHelper
     ~CFlockHelper();
 };
 
-struct CFileHandle
-{
-    RFHANDLE m_hFile = INVALID_HANDLE;
-    ObjPtr m_pFs;
-    public:
-    CFileHandle( ObjPtr pFs, RFHANDLE hFile )
-    { m_hFile = hFile; m_pFs = pFs; }
-    ~CFileHandle();
-};
 #define Clsid_CAppMonitor_SvrSkel_Base Clsid_Invalid
 
 DECLARE_AGGREGATED_SKEL_SERVER(
