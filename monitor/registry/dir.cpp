@@ -1670,7 +1670,9 @@ gint32 CBPlusNode::RebalanceChild(
 }
 
 gint32 CBPlusNode::RemoveFile(
-    const char* szKey, FImgSPtr& pFile )
+    const char* szKey,
+    FImgSPtr& pFile,
+    bool bForce )
 {
     gint32 ret = 0;
     if( szKey == nullptr || szKey[ 0 ] == 0 )
@@ -1721,7 +1723,7 @@ gint32 CBPlusNode::RemoveFile(
                 {
                     READ_LOCK( pSubDir );
                     ret = pSubDir->GetRootKeyCount();
-                    if( ret > 0 )
+                    if( ret > 0 && !bForce )
                     {
                         ret = -ENOTEMPTY;
                         DebugPrint( ret, "Error, "
@@ -1729,6 +1731,7 @@ gint32 CBPlusNode::RemoveFile(
                             "empty to remove" );
                         break;
                     }
+                    ret = 0;
                 }
 
                 {
@@ -1782,7 +1785,7 @@ gint32 CBPlusNode::RemoveFile(
             // replace with the key of its successor
             COPY_KEY( pChildKs->szKey, p );
             ret = pChildSuc->RemoveFile(
-                szKey, pFile );
+                szKey, pFile, bForce );
             break;
         }
         idx = -idx;
@@ -1802,13 +1805,12 @@ gint32 CBPlusNode::RemoveFile(
             this->GetChild( idx );
 
         ret = pChild->RemoveFile(
-            szKey, pFile );
+            szKey, pFile, bForce );
 
     }while( 0 );
     return ret;
 }
 
-#ifdef DEBUG
 gint32 CBPlusNode::PrintTree(
     std::vector< std::pair< guint32, stdstr > >& vecLines,
     guint32 dwLevel )
@@ -1872,7 +1874,6 @@ gint32 CBPlusNode::PrintTree()
     return ret;
 }
 
-#endif
 guint32 CDirImage::GetRootKeyCount() const 
 { 
     CStdRMutex oLock( GetExclLock() );
@@ -2293,13 +2294,15 @@ gint32 CDirImage::CreateLink( const char* szName,
 }
 
 gint32 CDirImage::RemoveFileNoFree(
-    const char* szKey, FImgSPtr& pFile )
+    const char* szKey,
+    FImgSPtr& pFile,
+    bool bForce )
 {
     gint32 ret = 0;
     do{
         WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
-            szKey, pFile );
+            szKey, pFile, bForce );
         if( ret == -EBUSY )
         {
             // the file is removed from the directory
@@ -2316,13 +2319,16 @@ gint32 CDirImage::RemoveFileNoFree(
     return ret;
 }
 
+// bForce to remove the file from the dir entry list
+// even if it is a non-empty directory.
 gint32 CDirImage::RemoveFile(
     const char* szKey )
 {
     gint32 ret = 0;
     do{
         FImgSPtr pFile;
-        ret = RemoveFileNoFree( szKey, pFile );
+        ret = RemoveFileNoFree(
+            szKey, pFile );
         if( ERROR( ret ) )
             break;
         UpdateMtime();
@@ -2450,7 +2456,6 @@ gint32 CDirImage::Rename(
     return ret;
 }
 
-#ifdef DEBUG
 gint32 CDirImage::PrintBNode()
 {
     gint32 ret = 0;
@@ -2482,7 +2487,6 @@ gint32 CDirImage::PrintBNodeNoLock()
     }while( 0 );
     return ret;
 }
-#endif
 
 gint32  CDirFileEntry::ListDir(
     std::vector< KEYPTR_SLOT >& vecDirEnt )

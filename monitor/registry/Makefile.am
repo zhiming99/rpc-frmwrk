@@ -43,3 +43,21 @@ libregfs_la_LDFLAGS= -version-info @VERSION2@
 libregfs_ladir=$(libdir)
 libregfsdir=$(includedir)/rpcf/ipc
 
+regfschk_PROGRAMS=regfschk
+regfschk_SOURCES=regfschk.cpp
+
+regfschk_LDADD=libregfs.la
+
+regfschk_LDADD+=../../ipc/libipc.la \
+ ../../combase/libcombase.la -lutils -lstdc++ -lcppunit \
+ -L$(abs_top_srcdir)/combase -L$(top_srcdir)/ipc \
+ -L$(top_srcdir)/3rd_party 
+
+regfschk_CPPFLAGS= -I$(include_ipcdir) -fPIC $(OFFSET_MACRO) 
+
+regfschkconfdir= $(sysconfdir)/rpcf
+regfschkdir=$(bindir)
+
+regfschk_LDADD+= $(COMMON_LINK)
+regfschk_LDFLAGS=-rdynamic
+
