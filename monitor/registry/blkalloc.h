@@ -1013,7 +1013,8 @@ struct CDirImage :
         const char* szLink, FImgSPtr& pImg );
 
     gint32 RemoveFileNoFree(
-        const char* szKey, FImgSPtr& pFile );
+        const char* szKey, FImgSPtr& pFile,
+        bool bForce = false );
 
     gint32 RemoveFile( const char* szName );
 
@@ -1030,10 +1031,8 @@ struct CDirImage :
     gint32 UnloadFile( const char* szName );
     gint32 UnloadDirImage();
 
-#ifdef DEBUG
     gint32 PrintBNode();
     gint32 PrintBNodeNoLock();
-#endif
 
     EnumFileType GetType() const override final
     { return ftDirectory; }
@@ -1211,7 +1210,8 @@ struct CBPlusNode :
     }
 
     gint32 RemoveFile(
-        const char* szKey, FImgSPtr& pFile );
+        const char* szKey, FImgSPtr& pFile,
+        bool bForce = false );
 
     gint32 AddFileDirect(
         guint32 dwInodeIdx, FImgSPtr& pFile )
@@ -1436,12 +1436,11 @@ struct CBPlusNode :
     gint32 Rebalance();
     gint32 RebalanceChild( guint32 idx );
     gint32 ShiftKeyPtr( guint32 dwIdx );
-#ifdef DEBUG
+
     gint32 PrintTree(
         std::vector< std::pair< guint32, stdstr > >& vecLines,
         guint32 dwLevel );
     gint32 PrintTree();
-#endif
 };
 
 struct FREE_BNODES
