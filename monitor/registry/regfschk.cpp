@@ -117,6 +117,7 @@ typedef enum {
     errLoad,
     errInode,
     errChild,
+    errBlkTbl,
 } EnumErrType;
 
 static stdstr GetErrorString( EnumErrType iErr )
@@ -133,6 +134,8 @@ static stdstr GetErrorString( EnumErrType iErr )
         return stdstr( "error load object" );
     case errInode:
         return stdstr( "error inode" );
+    case errBlkTbl:
+        return stdstr( "error block table" );
     case errChild:
         return stdstr( "error child" );
     }
@@ -140,18 +143,251 @@ static stdstr GetErrorString( EnumErrType iErr )
 }
 
 gint32 CheckInode( RegFsPtr& pFs,
-    FImgSPtr pFile )
+    FImgSPtr pFile,
+    std::unordered_set< guint32 >& setBlocks )
 {
+    gint32 ret = 0;
+    if( pFs.IsEmpty() || pFile.IsEmpty() )
+        return -EINVAL;
+
+    stdstr strPath;
+    GetPathFromImg( pFile, strPath );
+
+    RegFSInode& oInode = pFile->m_oInodeStore;
+    gint32 iSize = pFile->GetSize();
+    if( BEYOND_MAX_LIMIT( iSize ) )
+    {
+        OutputMsg( iSize, "Error file size is invalid %s",
+            strPath.c_str() );
+        return errSize;
+    }
+
+    if( g_bVerbose )
+        OutputMsg( iSize,
+            "Checking inode %s", strPath.c_str() );
+
+    // try to load all the block table
+    guint8 buf[ 1024 * 1024 ];
+    guint32 dwRead = 0;
+    while( iSize > 0 )
+    {
+        guint32 dwSize = sizeof( buf );
+        ret = pFile->ReadFile(
+            dwRead, dwSize, buf );
+        if( ret < 0 )
+        {
+            OutputMsg( iSize, "Error file block table is corrupted %s",
+                strPath.c_str() );
+            return errBlkTbl;
+        }
+        iSize -= ret;
+        dwRead += ret;
+    }
+
+    iSize = pFile->GetSize();
+
+    std::vector< guint32 > fileBlocks;
+    std::vector< guint32 > metaBlocks;
+
+    guint32 dwBlkCount = ( (
+        iSize + BLOCK_SIZE - 1 ) >> BLOCK_SHIFT );
+
+    if( dwBlkCount != 0 )
+    {
+        bool bAddInd = false, bAddSec = false;
+        for( guint32 i = 0;i < dwBlkCount; i++ )
+        {
+            guint32 dwOff = ( i << BLOCK_SHIFT );
+            if( WITHIN_DIRECT_BLOCK( dwOff ) )
+            {
+                guint32 dwIdx = oInode.m_arrBlocks[ i ];
+                auto itr = setBlocks.find( dwIdx );
+                if( itr != setBlocks.end() )
+                {
+                    OutputMsg( i, "Error block allocated "
+                        "more than once %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                fileBlocks.push_back( dwIdx );
+            }
+            else if( WITHIN_INDIRECT_BLOCK( dwOff ) )
+            {
+                if( pFile->m_pBitBlk.IsEmpty() )
+                {
+                    OutputMsg( dwOff,
+                        "Error indirect block "
+                        "bitmap is empty %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                if( !bAddInd )
+                {
+                    guint32 dwIdx = 
+                        oInode.m_arrBlocks[ BIT_IDX ];
+                    auto itr = setBlocks.find( dwIdx );
+                    if( itr != setBlocks.end() )
+                    {
+                        OutputMsg( i, "Error block allocated "
+                            "more than once %s",
+                            strPath.c_str() );
+                        return errBlkTbl;
+                    }
+                    metaBlocks.push_back( dwIdx );
+                    bAddInd = true;
+                }
+
+                guint32* pbis = ( guint32* )
+                    pFile->m_pBitBlk->ptr();
+
+                guint32 dwBlkIdx = ntohl(
+                    pbis[ INDIRECT_BLK_IDX( dwOff ) ] );
+                if( dwBlkIdx == 0 )
+                {
+                    OutputMsg( dwBlkIdx,
+                        "Error indirect block "
+                        "entry is empty %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                auto itr = setBlocks.find( dwBlkIdx );
+                if( itr != setBlocks.end() )
+                {
+                    OutputMsg( i, "Error block allocated "
+                        "more than once %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                fileBlocks.push_back( dwBlkIdx );
+            }
+            else if( WITHIN_SEC_INDIRECT_BLOCK( dwOff ) )
+            {
+                if( pFile->m_pBitdBlk.IsEmpty() )
+                {
+                    OutputMsg( dwOff,
+                        "Error secondary indirect "
+                        "block bitmap is empty %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                if( !bAddSec )
+                {
+                    guint32 dwIdx = 
+                        oInode.m_arrBlocks[ BITD_IDX ];
+                    auto itr = setBlocks.find( dwIdx );
+                    if( itr != setBlocks.end() )
+                    {
+                        OutputMsg( i, "Error block allocated "
+                            "more than once %s",
+                            strPath.c_str() );
+                        return errBlkTbl;
+                    }
+                    metaBlocks.push_back( dwIdx );
+                    guint32 dwMaxBd = BLKIDX_PER_TABLE;
+                    guint32* pBitd = ( guint32* )
+                        pFile->m_pBitdBlk->ptr();
+                    std::vector< guint32 > vecBitBlks;
+                    for( int j = 0; j < dwMaxBd; j++ ) 
+                    {
+                        guint32 dwBitBlkIdx =
+                            ntohl( pBitd[ j ] );
+                        if( dwBitBlkIdx == 0 )
+                            break;
+                        auto itr = setBlocks.find( dwIdx );
+                        if( itr != setBlocks.end() )
+                        {
+                            OutputMsg( i, "Error block allocated "
+                                "more than once %s",
+                                strPath.c_str() );
+                            return errBlkTbl;
+                        }
+                        vecBitBlks.push_back( dwBitBlkIdx );
+                    }
+                    metaBlocks.insert( metaBlocks.end(),
+                        vecBitBlks.begin(), vecBitBlks.end() );
+                    bAddSec = true;
+                }
+
+                guint32 dwBitIdx =
+                    SEC_BIT_IDX( dwOff );
+                auto p = ( guint32* )
+                    pFile->m_pBitdBlk->ptr();
+                guint32 dwBlkIdxIdx =
+                    ntohl( p[ dwBitIdx ] );
+                if( dwBlkIdxIdx == 0 )
+                {
+                    OutputMsg( i, "Error block table "
+                        "directory damaged %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                guint32 dwIdx2 =
+                    SEC_BLKIDX_IDX( dwOff );
+                auto itr = pFile->m_mapSecBitBlks.find(
+                    dwBitIdx );
+                if( itr == pFile->m_mapSecBitBlks.end() )
+                {
+                    OutputMsg( i, "Error secondary block "
+                        "table damaged %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                p = ( guint32* )itr->second->ptr();
+                if( p == nullptr )
+                {
+                    OutputMsg( i, "Error secondary block "
+                        "table not allocated %s",
+                        strPath.c_str() );
+                    return errBlkTbl;
+                }
+                guint32 dwPayloadBlk = ntohl( p[ dwIdx2 ]);
+                if( dwPayloadBlk == 0 )
+                {
+                    OutputMsg( dwBlkCount, "Error data block "
+                        "not allocated %s at block %d",
+                        strPath.c_str(), i );
+                    return errBlkTbl;
+                }
+                fileBlocks.push_back( dwPayloadBlk );
+            }
+        }
+        if( fileBlocks.size() * BLOCK_SIZE - iSize > BLOCK_SIZE )
+        {
+            OutputMsg( iSize, "Error data block "
+                "does not match the size %s",
+                strPath.c_str() );
+        }
+
+        if( metaBlocks.size() )
+            setBlocks.insert( metaBlocks.begin(),
+                metaBlocks.end() );
+
+        if( fileBlocks.size() )
+            setBlocks.insert( fileBlocks.begin(),
+                fileBlocks.end() );
+    }
+    setBlocks.insert(
+        pFile->GetInodeIdx() );
+
+    if( g_bVerbose )
+    {
+        OutputMsg( fileBlocks.size(),
+            "%s File Blocks", strPath.c_str() );
+        OutputMsg( metaBlocks.size(),
+            "%s Meta Blocks", strPath.c_str() );
+    }
+
     return 0;
 }
 
 using ELEM_BADFILE=std::tuple< stdstr, guint32, gint32 >;
-using ELEM_GOODFILE=std::pair< stdstr, guint32 >;
+using ELEM_GOODFILE=std::tuple< stdstr, guint32, size_t >;
 
 gint32 FindBadFilesDir( RegFsPtr& pFs,
     FImgSPtr ptrDir, RFHANDLE hDir,
     std::vector< ELEM_BADFILE >& vecBadFiles,
-    std::vector< ELEM_GOODFILE  >& vecGoodFiles )
+    std::vector< ELEM_GOODFILE  >& vecGoodFiles,
+    std::unordered_set< guint32 >& setBlocks )
 {
     gint32 ret = 0;
     if( ptrDir.IsEmpty() )
@@ -246,7 +482,8 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             }
             FindBadFilesDir( pFs,
                 pChildDir, hChildDir, vecBadFiles,
-                vecGoodFiles );
+                vecGoodFiles,
+                setBlocks );
         }
 
         for( auto& ks : vecDirEnt )
@@ -296,28 +533,63 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 continue;
             }
             struct stat stBuf;
-            pFile->GetAttr( stBuf );
+            ret = pFile->GetAttr( stBuf );
+            if( ERROR( ret ) )
+            {
+                vecBadFiles.push_back( { strFile,
+                    errInode, ks.oLeaf.byFileType} );
+                continue;
+            }
             if( stBuf.st_size >= MAX_FILE_SIZE )
             {
                 vecBadFiles.push_back( { strFile,
                     errSize, ks.oLeaf.byFileType} );
+                continue;
             }
+
+            ret = CheckInode( pFs, pFile, setBlocks );
+            if( ret != 0 )
+            {
+                vecBadFiles.push_back( { strFile,
+                    ret, ks.oLeaf.byFileType} );
+                continue;
+            }
+
+
             if( g_bVerbose )
                 OutputMsg( stBuf.st_size, "%s%s",
                     strIndent.c_str(), ks.szKey );
             vecGoodFiles.push_back( { strFile,
-                ks.oLeaf.byFileType } );
+                ks.oLeaf.byFileType, stBuf.st_size } );
         }
+
         if( bCorrupted )
         {
             vecBadFiles.push_back(
                 { strPath, errChild, ftDirectory } );
+            break;
         }
-        else
+
+        struct stat stBuf;
+        ret = pDir->GetAttr( stBuf );
+        if( ERROR( ret ) )
         {
-            vecGoodFiles.push_back(
-                { strPath, ftDirectory } );
+            bCorrupted = true;
+            vecBadFiles.push_back(
+                { strPath, errInode, ftDirectory } );
+            break;
         }
+
+        ret = CheckInode( pFs, pDir, setBlocks );
+        if( ret != 0 )
+        {
+            bCorrupted = true;
+            vecBadFiles.push_back(
+                { strPath, ret, ftDirectory } );
+            break;
+        }
+        vecGoodFiles.push_back( { strPath,
+            ftDirectory, stBuf.st_size } );
                 
     }while( 0 );
 
@@ -331,7 +603,8 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
 
 gint32 FindBadFiles( RegFsPtr& pFs,
     std::vector< ELEM_BADFILE >& vecBadFiles,
-    std::vector< ELEM_GOODFILE  >& vecGoodFiles )
+    std::vector< ELEM_GOODFILE  >& vecGoodFiles,
+    std::unordered_set< guint32 >& setBlocks )
 {
     gint32 ret = 0;
     if( pFs.IsEmpty() ) 
@@ -355,7 +628,8 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             break;
         ret = FindBadFilesDir( pFs,
             pRootDir, hRoot,
-            vecBadFiles, vecGoodFiles );
+            vecBadFiles, vecGoodFiles,
+            setBlocks );
         if( vecBadFiles.empty() )
         {
             OutputMsg( ret,
@@ -364,7 +638,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
         }
 
         OutputMsg( vecBadFiles.size(),
-            "Found bad files:" );
+            "Found corrupted files:" );
 
         for( auto& elem : vecBadFiles )
         {
@@ -389,13 +663,13 @@ gint32 FindBadFiles( RegFsPtr& pFs,
         }
 
         OutputMsg( 0,
-            "Good files: %d", vecGoodFiles.size() );
+            "Healthy files: %d", vecGoodFiles.size() );
         if( g_bVerbose )
         {
             for( auto& elem : vecGoodFiles )
             {
                 stdstr strType;
-                auto iType = elem.second;
+                auto iType = std::get<1>( elem );
                 if( iType == ftDirectory )
                     strType = "dir";
                 else if( iType == ftLink )
@@ -406,8 +680,8 @@ gint32 FindBadFiles( RegFsPtr& pFs,
                     strType = stdstr( "unk" ) +
                         std::to_string( iType );
 
-                auto& strPath = elem.first;
-                OutputMsg( 0, "%s: %s",
+                auto& strPath = std::get<0>( elem );
+                OutputMsg( std::get<2>(elem), "%s: %s",
                     strPath.c_str(), strType.c_str() );
             }
         }
@@ -471,7 +745,14 @@ int _main()
             break;
         std::vector< ELEM_BADFILE > vecBadFiles;
         std::vector< ELEM_GOODFILE > vecGoodFiles;
-        FindBadFiles( g_pRegfs, vecBadFiles, vecGoodFiles );
+        std::unordered_set< guint32 > setBlocks;
+        FindBadFiles( g_pRegfs,
+            vecBadFiles, vecGoodFiles, setBlocks );
+        OutputMsg( 0, "Summary:" );
+        OutputMsg( 0, "Corrupted Files: %d", vecBadFiles.size() );
+        OutputMsg( 0, "Healthy Files: %d", vecGoodFiles.size() );
+        OutputMsg( 0, "Valid Blocks: %d", setBlocks.size() );
+
         pFs->Stop();
         g_pRegfs.Clear();
 
