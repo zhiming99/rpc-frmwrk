@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <errno.h>
+#include <iostream>
 #ifdef __FreeBSD__
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -380,6 +381,121 @@ gint32 CheckInode( RegFsPtr& pFs,
     return 0;
 }
 
+template< typename T >
+guint32 CountBits( T n ) {
+    int count = 0;
+    while( n ) {
+        n &= (n - 1);
+        count++;
+    }
+    return count;
+}
+
+gint32 CheckGroupBitmap( RegFsPtr& pFs,
+    std::unordered_set< guint32 >& setBlocks )
+{
+    AllocPtr pAlloc = pFs->GetAllocator();
+    if( pAlloc.IsEmpty() )
+        return -EINVAL;
+    CGroupBitmap* pgbmp = pAlloc->GetGroupBitmap();
+    if( pgbmp == nullptr )
+        return -EFAULT;
+    gint32 ret = 0;
+    do{
+        OutputMsg( 0, "Checking group bitmap..." );
+        guint32 dwFree = pgbmp->GetFreeCount();
+        guint32 dwOffset =
+            GRPBMP_SIZE - sizeof( guint16 );
+        auto p =
+            ( pgbmp->m_arrBytes + dwOffset ) - 1;
+        auto a = *p;
+        auto pend = pgbmp->m_arrBytes;
+
+        while( a == 0 )
+        {
+            --p;
+            if( p < pend )
+                break;
+            a = *p;
+        }
+        if( a == 0 )
+        {
+            OutputMsg( 0,
+                "Error group bitmap is empty, "
+                "which should at least have "
+                "one block group allocated" );
+            ret = -ENODATA;
+            break;
+        }
+
+        guint32 dwLast = a;
+        gint32 iStep = sizeof( guint32 ) * BYTE_BITS;
+        gint32 iMaxAlloced =
+            iStep * ( p - pend ) +
+            ffs( dwLast );
+
+        struct stat stBuf;
+        fstat( pAlloc->GetFd(), &stBuf );
+        if( stBuf.st_size - iMaxAlloced * GROUP_SIZE >
+            ( SUPER_BLOCK_SIZE + GRPBMP_SIZE ) )
+        {
+            guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
+            OutputMsg( 0,
+                "Warning registry occupied more "
+                "space than needed, allocated bytes "
+                "%lld, reg size %lld, ",
+                qwGrps, stBuf.st_size );
+            
+            OutputMsg( 0, 
+                "Shrink the registry? (y/n)" );
+            stdstr strInput;
+            std::cin >> strInput;
+            if( strInput == "y" || strInput == "Y" )
+            {
+                ret = ftruncate( pAlloc->GetFd(),
+                    qwGrps + SUPER_BLOCK_SIZE +
+                    GRPBMP_SIZE );
+                if( SUCCEEDED( ret ) )
+                    OutputMsg( 0,
+                        "registry is shrinked successfully" );
+            }
+
+        }
+        else if( iMaxAlloced * GROUP_SIZE - stBuf.st_size >
+            GROUP_SIZE - SUPER_BLOCK_SIZE - GRPBMP_SIZE )
+        {
+            guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
+            OutputMsg( 0,
+                "Warning registry size is too "
+                "small to hold all the block "
+                "groups %lld, file size %lld",
+                qwGrps, stBuf.st_size );
+        }
+
+        // count the allocated groups
+        guint32 dwAlloced =
+            pgbmp->GetAllocCount();
+
+        auto pdw = ( guint32* )pgbmp->m_arrBytes;
+        auto pdwend = pdw +
+            GRPBMP_SIZE / sizeof( guint32 ) - 1;
+
+        guint32 dwCount = 0;
+        while( pdw < pdwend )
+            dwCount += CountBits( *pdw++ );
+        guint16* ps = ( guint16* )pdwend;
+        dwCount += CountBits( *ps );
+        if( dwCount != dwAlloced )
+            OutputMsg( 0,
+                "Error the actual number of allocated "
+                "groups is not aggree with the "
+                "group bitmap's counter" );
+        OutputMsg( 0, "Done Checking group bitmap" );
+
+    }while( 0 );
+    return ret;
+}
+
 using ELEM_BADFILE=std::tuple< stdstr, guint32, gint32 >;
 using ELEM_GOODFILE=std::tuple< stdstr, guint32, size_t >;
 
@@ -610,6 +726,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
     if( pFs.IsEmpty() ) 
         return -EINVAL;
     do{
+        CheckGroupBitmap( pFs, setBlocks );
         RFHANDLE hRoot = INVALID_HANDLE;
         ret = pFs->OpenDir(
             "/", O_RDONLY, hRoot, nullptr );
@@ -746,6 +863,7 @@ int _main()
         std::vector< ELEM_BADFILE > vecBadFiles;
         std::vector< ELEM_GOODFILE > vecGoodFiles;
         std::unordered_set< guint32 > setBlocks;
+
         FindBadFiles( g_pRegfs,
             vecBadFiles, vecGoodFiles, setBlocks );
         OutputMsg( 0, "Summary:" );

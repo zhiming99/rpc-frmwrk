@@ -59,7 +59,7 @@
 
 
 #define DEFAULT_BLOCK_SIZE  512
-#define DEFAULT_PAGE_SIZE   PAGE_SIZE
+#define DEFAULT_PAGE_SIZE   4096
 #define BLOCK_SIZE          ( GetBlockSize() )
 #define REGFS_PAGE_SIZE     ( GetPageSize() )
 
@@ -367,13 +367,7 @@ struct CGroupBitmap :
     inline guint32 GetAllocCount() const
     { return BLKGRP_NUMBER - m_wFreeCount; }
 
-    CGroupBitmap( CBlockAllocator* pAlloc ) :
-        m_pAlloc( pAlloc )
-    {
-        m_pBytes.NewObj();
-        m_pBytes->Resize( GRPBMP_SIZE );
-        m_arrBytes = ( guint8* )m_pBytes->ptr();
-    }
+    CGroupBitmap( CBlockAllocator* pAlloc );
 
     gint32 FreeGroup( guint32 dwGrpIdx );
     gint32 AllocGroup( guint32& dwGrpIdx );
@@ -487,6 +481,14 @@ class CBlockAllocator :
 
     gint32 GetFd() const
     { return m_iFd; }
+
+    CGroupBitmap* GetGroupBitmap() const
+    { return m_pGroupBitmap.get(); }
+
+    std::map< guint32, BlkGrpUPtr >& GetBlkGrps()
+    { return m_mapBlkGrps; }
+    const std::map< guint32, BlkGrpUPtr >& GetBlkGrps() const
+    { return m_mapBlkGrps; }
 };
 
 #define VALUE_SIZE 95
@@ -1862,6 +1864,9 @@ class CRegistryFs :
 
     gint32 GetPathFromHandle(
         RFHANDLE hFile, stdstr& strPath );
+
+    AllocPtr GetAllocator() const
+    { return m_pAlloc; }
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;
