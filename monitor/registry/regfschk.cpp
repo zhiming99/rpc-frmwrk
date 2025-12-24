@@ -515,6 +515,8 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
     std::vector< stdstr > vecNames;
     pFs->Namei( strPath, vecNames );
 
+    std::vector< ELEM_GOODFILE > vecGoodLocal;
+
     do{
         std::vector< KEYPTR_SLOT > vecDirEnt;
         ret = pDir->ListDir( vecDirEnt );
@@ -598,7 +600,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             }
             FindBadFilesDir( pFs,
                 pChildDir, hChildDir, vecBadFiles,
-                vecGoodFiles,
+                vecGoodLocal,
                 setBlocks );
         }
 
@@ -675,7 +677,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             if( g_bVerbose )
                 OutputMsg( stBuf.st_size, "%s%s",
                     strIndent.c_str(), ks.szKey );
-            vecGoodFiles.push_back( { strFile,
+            vecGoodLocal.push_back( { strFile,
                 ks.oLeaf.byFileType, stBuf.st_size } );
         }
 
@@ -704,11 +706,16 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 { strPath, ret, ftDirectory } );
             break;
         }
-        vecGoodFiles.push_back( { strPath,
-            ftDirectory, stBuf.st_size } );
-                
+
+        vecGoodFiles.insert( vecGoodFiles.end(), 
+            { strPath, ftDirectory, stBuf.st_size } );
+
     }while( 0 );
 
+    if( vecGoodLocal.size() )
+        vecGoodFiles.insert( vecGoodFiles.end(),
+            vecGoodLocal.begin(), vecGoodLocal.end() );
+                
     if( bCorrupted )
     {
         OutputMsg( 0, "Corrupted dir %s", strPath.c_str() );
