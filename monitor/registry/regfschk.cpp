@@ -496,8 +496,178 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
     return ret;
 }
 
-using ELEM_BADFILE=std::tuple< stdstr, guint32, gint32 >;
 using ELEM_GOODFILE=std::tuple< stdstr, guint32, size_t >;
+
+gint32 RebuildFs( RegFsPtr& pOldFs, 
+    std::vector< ELEM_GOODFILE >& vecGoodFiles )
+{
+    gint32 ret = 0;
+    RegFsPtr pNewFs;
+    do{
+        CParamList oParams;
+        // format a new registry
+        oParams.Push( true );
+        oParams.SetStrProp(
+            propConfigPath,
+            g_strRegFsFile + ".restore" );
+        ret = pNewFs.NewObj(
+            clsid( CRegistryFs ),
+            oParams.GetCfg() );
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error creating new registry" );
+            break;
+        }
+        ret = pNewFs->Start();
+        if( ERROR( ret ) )
+        {
+            OutputMsg( ret,
+                "Error starting the new registry" );
+            break;
+        }
+
+        guint8 buf[ 1024 * 128 ];
+        for( auto& elem : vecGoodFiles )
+        {
+            auto& strPath = std::get<0>( elem );
+            auto iType = std::get<1>( elem );
+            auto dwSize = std::get<2>( elem );
+            if( strPath == "/" )
+                continue;
+            if( iType == ftDirectory )
+            {
+                OutputMsg( 0, "creating %s...", strPath.c_str() );
+                ret = pNewFs->MakeDir( strPath, 0750 );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error create directory %s",
+                        strPath.c_str() );
+                }
+            }
+            else if( iType == ftRegular )
+            {
+                OutputMsg( 0, "creating %s...",
+                    strPath.c_str() );
+                RFHANDLE hOldFile, hFile;
+                ret = pOldFs->OpenFile( strPath,
+                    O_RDONLY, hOldFile, nullptr );
+                if( ERROR( ret ) )
+                    break;
+                CFileHandle oOld( pOldFs, hOldFile );
+                ret = pNewFs->CreateFile( strPath,
+                    0600, O_WRONLY | O_TRUNC | O_CREAT,
+                    hFile, nullptr );
+                if( ERROR( ret ) )
+                    break;
+                CFileHandle oNew( pNewFs, hFile );
+                guint32 dwCopied = 0;
+                if( dwSize > 0 )do
+                {
+                    guint32 dwToRead = sizeof( buf );
+                    ret = pOldFs->ReadFile(
+                        hOldFile, ( char* )buf,
+                        dwToRead, dwCopied );
+                    if( ERROR( ret ) )
+                        break;
+                    guint32& dwToWrite = dwToRead;
+                    ret = pNewFs->WriteFile( hFile,
+                        ( const char* )buf, dwToWrite,
+                        dwCopied );
+
+                    if( ERROR( ret ) )
+                        break;
+
+                    dwCopied += dwToWrite;
+                    if( dwToWrite < sizeof( buf ) )
+                        break;
+                }while( dwCopied < dwSize );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error copying file %s",
+                        strPath.c_str() );
+                    break;
+                }
+            }
+            else if( iType == ftLink )
+            {
+                OutputMsg( 0, "creating %s...",
+                    strPath.c_str() );
+                RFHANDLE hOldFile, hFile;
+                guint32 dwLinkSize = sizeof( buf ) - 1;
+                ret = pOldFs->ReadLink( strPath,
+                    ( char* )buf, dwLinkSize );
+                if( ERROR( ret ) )
+                    break;
+
+                buf[ dwLinkSize ] = 0;
+                ret = pNewFs->SymLink(
+                    ( const char* )buf, strPath );
+                if( ERROR( ret ) )
+                    break;
+
+                ret = pNewFs->OpenFile( strPath,
+                    O_WRONLY | O_TRUNC | O_CREAT,
+                    hFile, nullptr );
+                if( ERROR( ret ) )
+                    break;
+
+                CFileHandle oNew( pNewFs, hFile );
+                ret = pNewFs->WriteFile( hFile,
+                    ( const char* )buf,
+                    dwLinkSize, 0 );
+                if( ERROR( ret ) )
+                {
+                    OutputMsg( ret,
+                        "Error copying file %s",
+                        strPath.c_str() );
+                    break;
+                }
+            }
+            guint32 dwVal;
+            ret = pOldFs->GetUid( strPath, dwVal );
+            if( SUCCEEDED( ret ) )
+                pNewFs->SetUid( strPath, dwVal );
+            ret = pOldFs->GetGid( strPath, dwVal );
+            if( SUCCEEDED( ret ) )
+                pNewFs->SetGid( strPath, dwVal );
+            Variant oVar;
+            ret = pOldFs->GetValue( strPath, oVar );
+            if( SUCCEEDED(ret ) )
+                pNewFs->SetValue( strPath, oVar );
+            struct stat stBuf;
+            ret = pOldFs->GetAttr( strPath, stBuf );
+            if( SUCCEEDED( ret ) )
+            {
+                pNewFs->Chmod( strPath, stBuf.st_mode );
+                RFHANDLE hFile = INVALID_HANDLE;
+                ret = pNewFs->OpenFile( strPath,
+                    O_RDONLY, hFile, nullptr );
+                if( ERROR( ret ) )
+                    break;
+                CFileHandle oNew( pNewFs, hFile );
+                FileSPtr pOpen;
+                ret = pNewFs->GetOpenFile( hFile, pOpen );
+                if( SUCCEEDED( ret ) )
+                {
+                    struct timespec tv[ 2 ] =
+                        {{0,0},{0,0}};
+                    tv[ 0 ].tv_sec = stBuf.st_atime;
+                    tv[ 1 ].tv_sec = stBuf.st_mtime;
+                    pOpen->SetTimes( tv );
+                }
+            }
+        }
+
+    }while( 0 );
+    if( !pNewFs.IsEmpty() )
+        pNewFs->Stop();
+    return ret;
+}
+
+using ELEM_BADFILE=std::tuple< stdstr, guint32, gint32 >;
 
 gint32 FindBadFilesDir( RegFsPtr& pFs,
     FImgSPtr ptrDir, RFHANDLE hDir,
@@ -516,6 +686,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
     pFs->Namei( strPath, vecNames );
 
     std::vector< ELEM_GOODFILE > vecGoodLocal;
+    struct stat stBuf;
 
     do{
         std::vector< KEYPTR_SLOT > vecDirEnt;
@@ -688,7 +859,6 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             break;
         }
 
-        struct stat stBuf;
         ret = pDir->GetAttr( stBuf );
         if( ERROR( ret ) )
         {
@@ -707,14 +877,23 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             break;
         }
 
-        vecGoodFiles.insert( vecGoodFiles.end(), 
+        vecGoodFiles.push_back(
             { strPath, ftDirectory, stBuf.st_size } );
 
     }while( 0 );
 
     if( vecGoodLocal.size() )
+    {
+        if( bCorrupted )
+        {
+            // though the directory is corrupted,
+            // the good ones under it requires its presence.
+            vecGoodFiles.push_back(
+                { strPath, ftDirectory, stBuf.st_size } );
+        }
         vecGoodFiles.insert( vecGoodFiles.end(),
             vecGoodLocal.begin(), vecGoodLocal.end() );
+    }
                 
     if( bCorrupted )
     {
@@ -874,10 +1053,23 @@ int _main()
         FindBadFiles( g_pRegfs,
             vecBadFiles, vecGoodFiles, setBlocks );
         OutputMsg( 0, "Summary:" );
-        OutputMsg( 0, "Corrupted Files: %d", vecBadFiles.size() );
-        OutputMsg( 0, "Healthy Files: %d", vecGoodFiles.size() );
-        OutputMsg( 0, "Valid Blocks: %d", setBlocks.size() );
+        OutputMsg( 0, "Corrupted Files: %d",
+            vecBadFiles.size() );
+        OutputMsg( 0, "Healthy Files: %d",
+            vecGoodFiles.size() );
+        OutputMsg( 0, "Valid Blocks: %d",
+            setBlocks.size() );
 
+        if( vecBadFiles.size() )
+        {            
+            OutputMsg( 0, "Do you want to remove "
+                "the corrupted files and "
+                "directories? (y/n)" );
+            stdstr strInput;
+            std::cin >> strInput;
+            if( strInput == "y" || strInput == "Y" )
+                ret = RebuildFs( g_pRegfs, vecGoodFiles );
+        }
         pFs->Stop();
         g_pRegfs.Clear();
 
@@ -887,7 +1079,6 @@ int _main()
         OutputMsg( ret, "Warning, regfs "
             "quitting with error" );
     }
-
     return ret;
 }
 

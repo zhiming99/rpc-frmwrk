@@ -493,16 +493,47 @@ class CBlockAllocator :
 
 #define VALUE_SIZE 95
 
+#if BUILD_64==1
+struct timespec32
+{
+    guint32 tv_sec;
+    guint32 tv_nsec;
+    operator timespec() const
+    {
+        timespec a;
+        a.tv_sec = tv_sec;
+        a.tv_nsec = tv_nsec;
+        return a;
+    }
+    timespec32 operator=( const timespec& tv )
+    {
+        tv_sec = tv.tv_sec;
+        tv_nsec = tv.tv_nsec;
+        return *this;
+    }
+};
+#endif
+
 struct RegFSInode
 {
     // file size in bytes
     guint32     m_dwSize;
+#if BUILD_64==0
     // time of last modification.
     timespec    m_mtime;
     // time of last access.
     timespec    m_atime;
     // time of creation
     timespec    m_ctime;
+#else
+    // time of last modification.
+    timespec32    m_mtime;
+    // time of last access.
+    timespec32    m_atime;
+    // time of creation
+    timespec32    m_ctime;
+#endif
+
     // file type
     mode_t     m_dwMode;
     // uid
@@ -524,7 +555,7 @@ struct RegFSInode
     guint8      m_iValType;
     guint32     m_dwRootBNode;
 
-} __attribute__((aligned (8)));
+} __attribute__((aligned (4)));
 
 #define BNODE_SIZE ( REGFS_PAGE_SIZE )
 #define BNODE_BLKNUM ( BNODE_SIZE / BLOCK_SIZE )
