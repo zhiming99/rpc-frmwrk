@@ -24,6 +24,8 @@
  */
 #include "blkalloc.h"
 #include <fcntl.h>
+#define BLKIDX_BEYOND_MAX( _size_ ) \
+    ( ( _size_ ) >= BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
 
 namespace rpcf
 {
@@ -535,8 +537,14 @@ gint32 CFileImage::CollectBlocksForRead(
             {
                 // if the block is not allocated, push
                 // a zero
-                vecBlocks.push_back(
-                    m_oInodeStore.m_arrBlocks[ i ] );
+                guint32 dwLogicIdx = 
+                    m_oInodeStore.m_arrBlocks[ i ];
+                if( BLKIDX_BEYOND_MAX( dwLogicIdx ) )
+                {
+                    ret = -ERANGE;
+                    break;
+                }
+                vecBlocks.push_back( dwLogicIdx );
             }
             else if( bFirst )
             {
@@ -562,7 +570,11 @@ gint32 CFileImage::CollectBlocksForRead(
 
                 guint32 dwBlkIdx = ntohl(
                 pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] );
-
+                if( BLKIDX_BEYOND_MAX( dwBlkIdx ) )
+                {
+                    ret = -ERANGE;
+                    break;
+                }
                 vecBlocks.push_back( dwBlkIdx );
             }
             else if( bSec )
@@ -589,8 +601,14 @@ gint32 CFileImage::CollectBlocksForRead(
                 {
                     auto pblk = ( guint32* )
                         itr->second->ptr();
-                    vecBlocks.push_back( 
-                        ntohl( pblk[ dwIdx2 ] ) );
+                    guint32 dwLogicIdx = 
+                        ntohl( pblk[ dwIdx2 ] );
+                    if( BLKIDX_BEYOND_MAX( dwLogicIdx ) )
+                    {
+                        ret = -ERANGE;
+                        break;
+                    }
+                    vecBlocks.push_back( dwLogicIdx );
                 }
                 else
                 {
@@ -603,8 +621,14 @@ gint32 CFileImage::CollectBlocksForRead(
                     if( ERROR( ret ) )
                         break;
                     auto pblk = ( guint32* )p->ptr();
-                    vecBlocks.push_back(
-                        ntohl( pblk[ dwIdx2 ] ) );
+                    guint32 dwLogicIdx = 
+                        ntohl( pblk[ dwIdx2 ] );
+                    if( BLKIDX_BEYOND_MAX( dwLogicIdx ) )
+                    {
+                        ret = -ERANGE;
+                        break;
+                    }
+                    vecBlocks.push_back( dwLogicIdx );
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, p } );
                 }
@@ -638,7 +662,6 @@ gint32 CFileImage::CollectBlocksForWrite(
             ( ( dwOff + dwSize + BLOCK_MASK ) >>
             BLOCK_SHIFT );
 
-
         guint32 dwIndirectIdx =
             m_oInodeStore.m_arrBlocks[ BIT_IDX ];
 
@@ -669,6 +692,11 @@ gint32 CFileImage::CollectBlocksForWrite(
                     guint32* arrBlks =
                         m_oInodeStore.m_arrBlocks;
                     arrBlks[ i ] = dwDirectIdx;
+                }
+                else if( BLKIDX_BEYOND_MAX( dwDirectIdx ) )
+                {
+                    ret = -ERANGE;
+                    break;
                 }
                 vecBlocks.push_back( dwDirectIdx );
             }
@@ -714,6 +742,11 @@ gint32 CFileImage::CollectBlocksForWrite(
                         break;
                     pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] =
                         htonl( dwBlkIdx );
+                }
+                else if( BLKIDX_BEYOND_MAX( dwBlkIdx ) )
+                {
+                    ret = -ERANGE;
+                    break;
                 }
 
                 vecBlocks.push_back( dwBlkIdx );
@@ -785,6 +818,11 @@ gint32 CFileImage::CollectBlocksForWrite(
 
                     if( dwBlkIdx != 0 )
                     {
+                        if( BLKIDX_BEYOND_MAX( dwBlkIdx ) )
+                        {
+                            ret = -ERANGE;
+                            break;
+                        }
                         vecBlocks.push_back( dwBlkIdx );
                         continue;
                     }
@@ -822,6 +860,11 @@ gint32 CFileImage::CollectBlocksForWrite(
                             break;
                         pblk[ dwIdx2 ] =
                             htonl( dwBlkIdx );
+                    }
+                    else if( BLKIDX_BEYOND_MAX( dwBlkIdx ) )
+                    {
+                        ret = -ERANGE;
+                        break;
                     }
                     vecBlocks.push_back( dwBlkIdx );
                     m_mapSecBitBlks.insert(
