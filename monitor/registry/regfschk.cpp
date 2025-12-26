@@ -48,6 +48,13 @@ static RegFsPtr g_pRegfs;
 static stdstr g_strRegFsFile;
 static bool g_bVerbose = false;
 
+#define OutputMsg2( ret, strFmt, ... ) \
+do{ \
+    printf( strFmt, ##__VA_ARGS__ ); \
+    printf( "(%d)\n", ret ); \
+}while( 0 )
+
+
 gint32 InitContext()
 {
     gint32 ret = CoInitialize( 0 );
@@ -158,13 +165,13 @@ gint32 CheckInode( RegFsPtr& pFs,
     gint32 iSize = pFile->GetSize();
     if( BEYOND_MAX_LIMIT( iSize ) )
     {
-        OutputMsg( iSize, "Error file size is invalid %s",
+        OutputMsg2( iSize, "Error file size is invalid %s",
             strPath.c_str() );
         return errSize;
     }
 
     if( g_bVerbose )
-        OutputMsg( iSize,
+        OutputMsg2( iSize,
             "Checking inode %s", strPath.c_str() );
 
     // try to load all the block table
@@ -177,7 +184,7 @@ gint32 CheckInode( RegFsPtr& pFs,
             dwRead, dwSize, buf );
         if( ret < 0 )
         {
-            OutputMsg( iSize, "Error file block table is corrupted %s",
+            OutputMsg2( iSize, "Error file block table is corrupted %s",
                 strPath.c_str() );
             return errBlkTbl;
         }
@@ -205,7 +212,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                 auto itr = setBlocks.find( dwIdx );
                 if( itr != setBlocks.end() )
                 {
-                    OutputMsg( i, "Error block allocated "
+                    OutputMsg2( i, "Error block allocated "
                         "more than once %s",
                         strPath.c_str() );
                     return errBlkTbl;
@@ -216,7 +223,7 @@ gint32 CheckInode( RegFsPtr& pFs,
             {
                 if( pFile->m_pBitBlk.IsEmpty() )
                 {
-                    OutputMsg( dwOff,
+                    OutputMsg2( dwOff,
                         "Error indirect block "
                         "bitmap is empty %s",
                         strPath.c_str() );
@@ -229,7 +236,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                     auto itr = setBlocks.find( dwIdx );
                     if( itr != setBlocks.end() )
                     {
-                        OutputMsg( i, "Error block allocated "
+                        OutputMsg2( i, "Error block allocated "
                             "more than once %s",
                             strPath.c_str() );
                         return errBlkTbl;
@@ -245,7 +252,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                     pbis[ INDIRECT_BLK_IDX( dwOff ) ] );
                 if( dwBlkIdx == 0 )
                 {
-                    OutputMsg( dwBlkIdx,
+                    OutputMsg2( dwBlkIdx,
                         "Error indirect block "
                         "entry is empty %s",
                         strPath.c_str() );
@@ -254,7 +261,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                 auto itr = setBlocks.find( dwBlkIdx );
                 if( itr != setBlocks.end() )
                 {
-                    OutputMsg( i, "Error block allocated "
+                    OutputMsg2( i, "Error block allocated "
                         "more than once %s",
                         strPath.c_str() );
                     return errBlkTbl;
@@ -265,7 +272,7 @@ gint32 CheckInode( RegFsPtr& pFs,
             {
                 if( pFile->m_pBitdBlk.IsEmpty() )
                 {
-                    OutputMsg( dwOff,
+                    OutputMsg2( dwOff,
                         "Error secondary indirect "
                         "block bitmap is empty %s",
                         strPath.c_str() );
@@ -278,7 +285,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                     auto itr = setBlocks.find( dwIdx );
                     if( itr != setBlocks.end() )
                     {
-                        OutputMsg( i, "Error block allocated "
+                        OutputMsg2( i, "Error block allocated "
                             "more than once %s",
                             strPath.c_str() );
                         return errBlkTbl;
@@ -297,7 +304,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                         auto itr = setBlocks.find( dwIdx );
                         if( itr != setBlocks.end() )
                         {
-                            OutputMsg( i, "Error block allocated "
+                            OutputMsg2( i, "Error block allocated "
                                 "more than once %s",
                                 strPath.c_str() );
                             return errBlkTbl;
@@ -317,7 +324,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                     ntohl( p[ dwBitIdx ] );
                 if( dwBlkIdxIdx == 0 )
                 {
-                    OutputMsg( i, "Error block table "
+                    OutputMsg2( i, "Error block table "
                         "directory damaged %s",
                         strPath.c_str() );
                     return errBlkTbl;
@@ -328,7 +335,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                     dwBitIdx );
                 if( itr == pFile->m_mapSecBitBlks.end() )
                 {
-                    OutputMsg( i, "Error secondary block "
+                    OutputMsg2( i, "Error secondary block "
                         "table damaged %s",
                         strPath.c_str() );
                     return errBlkTbl;
@@ -336,7 +343,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                 p = ( guint32* )itr->second->ptr();
                 if( p == nullptr )
                 {
-                    OutputMsg( i, "Error secondary block "
+                    OutputMsg2( i, "Error secondary block "
                         "table not allocated %s",
                         strPath.c_str() );
                     return errBlkTbl;
@@ -344,7 +351,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                 guint32 dwPayloadBlk = ntohl( p[ dwIdx2 ]);
                 if( dwPayloadBlk == 0 )
                 {
-                    OutputMsg( dwBlkCount, "Error data block "
+                    OutputMsg2( dwBlkCount, "Error data block "
                         "not allocated %s at block %d",
                         strPath.c_str(), i );
                     return errBlkTbl;
@@ -354,7 +361,7 @@ gint32 CheckInode( RegFsPtr& pFs,
         }
         if( fileBlocks.size() * BLOCK_SIZE - iSize > BLOCK_SIZE )
         {
-            OutputMsg( iSize, "Error data block "
+            OutputMsg2( iSize, "Error data block "
                 "does not match the size %s",
                 strPath.c_str() );
         }
@@ -372,9 +379,9 @@ gint32 CheckInode( RegFsPtr& pFs,
 
     if( g_bVerbose )
     {
-        OutputMsg( fileBlocks.size(),
+        OutputMsg2( fileBlocks.size(),
             "%s File Blocks", strPath.c_str() );
-        OutputMsg( metaBlocks.size(),
+        OutputMsg2( metaBlocks.size(),
             "%s Meta Blocks", strPath.c_str() );
     }
 
@@ -402,7 +409,7 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
         return -EFAULT;
     gint32 ret = 0;
     do{
-        OutputMsg( 0, "Checking group bitmap..." );
+        OutputMsg2( 0, "Checking group bitmap..." );
         guint32 dwFree = pgbmp->GetFreeCount();
         guint32 dwOffset =
             GRPBMP_SIZE - sizeof( guint16 );
@@ -420,7 +427,7 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
         }
         if( a == 0 )
         {
-            OutputMsg( 0,
+            OutputMsg2( 0,
                 "Error group bitmap is empty, "
                 "which should at least have "
                 "one block group allocated" );
@@ -435,28 +442,30 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
             ffs( dwLast );
 
         struct stat stBuf;
-        fstat( pAlloc->GetFd(), &stBuf );
+        gint32 iFd = pAlloc->GetFd();
+        fstat( iFd, &stBuf );
         if( stBuf.st_size - iMaxAlloced * GROUP_SIZE >
             ( SUPER_BLOCK_SIZE + GRPBMP_SIZE ) )
         {
             guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
-            OutputMsg( 0,
+            OutputMsg2( 0,
                 "Warning registry occupied more "
                 "space than needed, allocated bytes "
                 "%lld, reg size %lld, ",
                 qwGrps, stBuf.st_size );
             
-            OutputMsg( 0, 
+            OutputMsg2( 0, 
                 "Shrink the registry? (y/n)" );
             stdstr strInput;
             std::cin >> strInput;
             if( strInput == "y" || strInput == "Y" )
             {
-                ret = ftruncate( pAlloc->GetFd(),
-                    qwGrps + SUPER_BLOCK_SIZE +
-                    GRPBMP_SIZE );
+                guint64 qwTail = qwGrps +
+                    SUPER_BLOCK_SIZE + GRPBMP_SIZE;
+                lseek( iFd, qwTail, SEEK_SET );
+                ret = ftruncate( iFd, qwTail );
                 if( SUCCEEDED( ret ) )
-                    OutputMsg( 0,
+                    OutputMsg2( 0,
                         "registry is shrinked successfully" );
             }
 
@@ -465,7 +474,7 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
             GROUP_SIZE - SUPER_BLOCK_SIZE - GRPBMP_SIZE )
         {
             guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
-            OutputMsg( 0,
+            OutputMsg2( 0,
                 "Warning registry size is too "
                 "small to hold all the block "
                 "groups %lld, file size %lld",
@@ -486,11 +495,11 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
         guint16* ps = ( guint16* )pdwend;
         dwCount += CountBits( *ps );
         if( dwCount != dwAlloced )
-            OutputMsg( 0,
+            OutputMsg2( 0,
                 "Error the actual number of allocated "
                 "groups is not aggree with the "
                 "group bitmap's counter" );
-        OutputMsg( 0, "Done Checking group bitmap" );
+        OutputMsg2( 0, "Done Checking group bitmap" );
 
     }while( 0 );
     return ret;
@@ -515,14 +524,14 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
             oParams.GetCfg() );
         if( ERROR( ret ) )
         {
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Error creating new registry" );
             break;
         }
         ret = pNewFs->Start();
         if( ERROR( ret ) )
         {
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Error starting the new registry" );
             break;
         }
@@ -537,18 +546,18 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
                 continue;
             if( iType == ftDirectory )
             {
-                OutputMsg( 0, "creating %s...", strPath.c_str() );
+                OutputMsg2( 0, "creating %s...", strPath.c_str() );
                 ret = pNewFs->MakeDir( strPath, 0750 );
                 if( ERROR( ret ) )
                 {
-                    OutputMsg( ret,
+                    OutputMsg2( ret,
                         "Error create directory %s",
                         strPath.c_str() );
                 }
             }
             else if( iType == ftRegular )
             {
-                OutputMsg( 0, "creating %s...",
+                OutputMsg2( 0, "creating %s...",
                     strPath.c_str() );
                 RFHANDLE hOldFile, hFile;
                 ret = pOldFs->OpenFile( strPath,
@@ -585,7 +594,7 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
                 }while( dwCopied < dwSize );
                 if( ERROR( ret ) )
                 {
-                    OutputMsg( ret,
+                    OutputMsg2( ret,
                         "Error copying file %s",
                         strPath.c_str() );
                     break;
@@ -593,7 +602,7 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
             }
             else if( iType == ftLink )
             {
-                OutputMsg( 0, "creating %s...",
+                OutputMsg2( 0, "creating %s...",
                     strPath.c_str() );
                 RFHANDLE hOldFile, hFile;
                 guint32 dwLinkSize = sizeof( buf ) - 1;
@@ -620,7 +629,7 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
                     dwLinkSize, 0 );
                 if( ERROR( ret ) )
                 {
-                    OutputMsg( ret,
+                    OutputMsg2( ret,
                         "Error copying file %s",
                         strPath.c_str() );
                     break;
@@ -697,11 +706,11 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
         if( bCorrupted && vecDirEnt.empty() )
         {
             if( strPath.size() )
-                OutputMsg( ret,
+                OutputMsg2( ret,
                     "Error list directory %s",
                     strPath.c_str() );
             else
-                OutputMsg( ret,
+                OutputMsg2( ret,
                     "Error list directory" );
             vecBadFiles.push_back(
                 { strPath, errDirEnt, ftDirectory} );
@@ -715,7 +724,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             if( ks.oLeaf.byFileType != ftDirectory )
                 continue;
             if( g_bVerbose )
-                OutputMsg( 0, "%s%s",
+                OutputMsg2( 0, "%s%s",
                     strIndent.c_str(), ks.szKey );
             if( strnlen( ks.szKey, REGFS_NAME_LENGTH ) == 0 )
             {
@@ -846,7 +855,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
 
 
             if( g_bVerbose )
-                OutputMsg( stBuf.st_size, "%s%s",
+                OutputMsg2( stBuf.st_size, "%s%s",
                     strIndent.c_str(), ks.szKey );
             vecGoodLocal.push_back( { strFile,
                 ks.oLeaf.byFileType, stBuf.st_size } );
@@ -897,7 +906,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 
     if( bCorrupted )
     {
-        OutputMsg( 0, "Corrupted dir %s", strPath.c_str() );
+        OutputMsg2( 0, "Corrupted dir %s", strPath.c_str() );
         pDir->PrintBNode();
     }
     return ret;
@@ -918,7 +927,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             "/", O_RDONLY, hRoot, nullptr );
         if( ERROR( ret ) )
         {
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Error unable to open "
                 "root directory" );
             break;
@@ -935,12 +944,12 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             setBlocks );
         if( vecBadFiles.empty() )
         {
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Nothing bad found" );
             break;
         }
 
-        OutputMsg( vecBadFiles.size(),
+        OutputMsg2( vecBadFiles.size(),
             "Found corrupted files:" );
 
         for( auto& elem : vecBadFiles )
@@ -960,12 +969,12 @@ gint32 FindBadFiles( RegFsPtr& pFs,
                     std::to_string( iType );
             stdstr strPath =
                 std::get<0>(elem).c_str();
-            OutputMsg( 0, "%s: (%s)%s",
+            OutputMsg2( 0, "%s: (%s)%s",
                 strPath.c_str(),
                 strType.c_str(), strError.c_str() );
         }
 
-        OutputMsg( 0,
+        OutputMsg2( 0,
             "Healthy files: %d", vecGoodFiles.size() );
         if( g_bVerbose )
         {
@@ -984,7 +993,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
                         std::to_string( iType );
 
                 auto& strPath = std::get<0>( elem );
-                OutputMsg( std::get<2>(elem), "%s: %s",
+                OutputMsg2( std::get<2>(elem), "%s: %s",
                     strPath.c_str(), strType.c_str() );
             }
         }
@@ -1028,7 +1037,7 @@ int _main()
         if( g_strRegFsFile.empty() )
         {
             ret = -EINVAL;
-            OutputMsg( ret, "Error no "
+            OutputMsg2( ret, "Error no "
                 "registry path specified" );
             Usage( "regfsmnt" );
             break;
@@ -1052,17 +1061,17 @@ int _main()
 
         FindBadFiles( g_pRegfs,
             vecBadFiles, vecGoodFiles, setBlocks );
-        OutputMsg( 0, "Summary:" );
-        OutputMsg( 0, "Corrupted Files: %d",
+        OutputMsg2( 0, "Summary:" );
+        OutputMsg2( 0, "Corrupted Files: %d",
             vecBadFiles.size() );
-        OutputMsg( 0, "Healthy Files: %d",
+        OutputMsg2( 0, "Healthy Files: %d",
             vecGoodFiles.size() );
-        OutputMsg( 0, "Valid Blocks: %d",
+        OutputMsg2( 0, "Valid Blocks: %d",
             setBlocks.size() );
 
         if( vecBadFiles.size() )
         {            
-            OutputMsg( 0, "Do you want to remove "
+            OutputMsg2( 0, "Do you want to remove "
                 "the corrupted files and "
                 "directories? (y/n)" );
             stdstr strInput;
@@ -1076,7 +1085,7 @@ int _main()
     }while( 0 );
     if( ERROR( ret ) )
     {
-        OutputMsg( ret, "Warning, regfs "
+        OutputMsg2( ret, "Warning, regfs "
             "quitting with error" );
     }
     return ret;
@@ -1108,15 +1117,15 @@ int main( int argc, char** argv)
         if( optind >= argc )
         {
             ret = -EINVAL;
-            OutputMsg( ret, "Error missing "
-                "'regfs path' and 'mount point'" );
+            OutputMsg2( ret, "Error missing "
+                "'registry file to check'" );
             break;
         }
 
         g_strRegFsFile = argv[ optind ];
         if( g_strRegFsFile.size() > REG_MAX_PATH - 1 )
         {
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Error file name too long" );
             ret = -ENAMETOOLONG;
             break;
@@ -1127,7 +1136,7 @@ int main( int argc, char** argv)
         if( ret == -1 )
         {
             ret = -errno;
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Error invalid registry file" );
             break;
         }
@@ -1141,7 +1150,7 @@ int main( int argc, char** argv)
         g_qwSize = st.st_size;
         if( g_qwSize > MAX_FS_SIZE ) 
         {
-            OutputMsg( -ERANGE,
+            OutputMsg2( -ERANGE,
                 "Warning, found invalid filesystem size" );
         }
 
@@ -1149,7 +1158,7 @@ int main( int argc, char** argv)
         if( ERROR( ret ) ) 
         {
             DestroyContext();
-            OutputMsg( ret,
+            OutputMsg2( ret,
                 "Error failed to start regfschk, "
                 "abort..." );
             break;

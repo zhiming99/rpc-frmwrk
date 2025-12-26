@@ -331,11 +331,15 @@ case "$cmd" in
         ;;
     initcli)
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
-        if [[ "x$xauthmech" == "xSimpAuth" ]] ||
-            [[ "x$xauthmech" == "xOAuth2" ]]; then
-            regfsmnt -i $HOME/rpcf/clientreg.dat
-            rpcfctl genkeys openssl 1 1
-            rpcfctl genkeys gmssl 1 1
+        if [[ "x$authmech" == "xSimpAuth" ]] ||
+            [[ "x$authmech" == "xOAuth2" ]]; then
+            regfsmnt -i $HOME/.rpcf/clientreg.dat
+            if [[ ! -f $HOME/.rpcf/openssl/clientkey.pem ]]; then
+                rpcfctl genkeys openssl 1 1
+            fi
+            if [[ ! -f $HOME/.rpcf/gmssl/clientkey.pem ]]; then
+                rpcfctl genkeys gmssl 1 1
+            fi
         fi
         ;;
     importkey | import)
@@ -411,7 +415,7 @@ case "$cmd" in
         fi
         if [[ "x$1" == "xopenssl" ]]; then
             if which expect; then
-                cat > ~/.rpcf/gencmd.sh << "EOF"
+                cat > $HOME/.rpcf/gencmd.sh << "EOF"
 #!/bin/bash
 if $1/opensslkey.sh $HOME/.rpcf/openssl $3 $4; then
     clidx=`cat $HOME/.rpcf/openssl/clidx`;
@@ -637,7 +641,7 @@ EOF
                 echo $cmdline
                 exit 1
             fi
-            kinit -kt $HOME/rpcf/krb5cli.keytab $1
+            kinit -kt $HOME/.rpcf/krb5cli.keytab $1
         fi
         ;;
     backup)
@@ -648,7 +652,7 @@ EOF
             echo The backup file will be stored in the home directory.
             exit 1
         fi
-        rpcfctl geninitcfg > ~/.rpcf/cfgbk.json
+        rpcfctl geninitcfg > $HOME/.rpcf/cfgbk.json
         tarfile=`realpath rpcf-backup-$(date +%Y%m%d).tar.gz`
         pushd $HOME > /dev/null
         if tar cf "$tarfile" .rpcf; then
