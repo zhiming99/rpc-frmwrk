@@ -9,7 +9,9 @@ def swap_proxy_port_classes(file_path):
     # Iterate through the "Objects" list and swap the values
     for obj in data.get("Objects", []):
         # Skip the swap if the ObjectName is "AppMonitor"
-        if obj.get("ObjectName") == "AppMonitor":
+        strName = obj.get( "ObjectName" )
+        if( strName == "AppMonitor" or
+            strName == "AppMonitor_ChannelSvr" ):
             continue
 
         if "ProxyPortClass" in obj and "ProxyPortClass-1" in obj:

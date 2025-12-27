@@ -577,9 +577,9 @@ esac
 
 case $enable_java in
     yes)
-        JAVA_RPMLIBS="java-1.8.0-openjdk-devel, java-1.8.0-openjdk-headless, java-1.8.0-openjdk, swig, apache-commons-cli, " 
+        JAVA_RPMLIBS="java >= 1.8.0, swig, apache-commons-cli, " 
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/*.jar"
-        JAVA_RPMPKGS="java-1.8.0-openjdk-headless apache-commons-cli " 
+        JAVA_RPMPKGS="java >= 1.8.0 apache-commons-cli " 
         JAVA_RPMPOST="pushd %{_libdir}/rpcf;if [[[ -f rpcbase-${VERSION}.jar ]]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION}.jar rpcbase.jar;fi;if [[[ -f appmancli-${VERSION}.jar ]]];then rm -f appmancli.jar; ln -s appmancli-${VERSION}.jar appmancli.jar;fi;popd;"
         JAVA_RPMPOSTUN="pushd %{_libdir}/rpcf;rm -f rpcbase.jar appmancli.jar;popd;"
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "

@@ -262,32 +262,33 @@ class CRpcTcpBridgeProxy
     async Connect( strUrl, oPending )
     {
         try {
+            var oProxy = this
             const res = await new Promise((resolve, reject) => {
                 var socket = new WebSocket(strUrl)
                 socket.binaryType = 'arraybuffer'
                 socket.onopen = (event) => {
-                    this.m_oSocket = socket
-                    this.m_iState = EnumIfState.stateStarted
-                    resolve(this)
+                    oProxy.m_oSocket = socket
+                    oProxy.m_iState = EnumIfState.stateStarted
+                    resolve(oProxy)
                 }
 
                 socket.onmessage = (event_1) => {
-                    this.ReceiveMessage(event_1.data)
+                    oProxy.ReceiveMessage(event_1.data)
                 }
 
                 socket.onclose = (e) => {
-                    console.log(`${this.m_oSocket} closed`)
-                    if( this.m_iState !== EnumIfState.stateStopping &&
-                        this.m_iState !== EnumIfState.stateStopped )
+                    console.log(`${oProxy.m_oSocket} closed`)
+                    if( oProxy.m_iState !== EnumIfState.stateStopping &&
+                        oProxy.m_iState !== EnumIfState.stateStopped )
                     {
-                        var oFunc = this.m_oParent.OnRmtSvrOffline.bind(
-                            this.m_oParent, this.m_dwPortId, "/")
+                        var oFunc = oProxy.m_oParent.OnRmtSvrOffline.bind(
+                            oProxy.m_oParent, oProxy.m_dwPortId, "/")
                         setTimeout( oFunc, 0 )
                     }
                 }
 
                 socket.onerror = (event_2) => {
-                    reject(this)
+                    reject(oProxy)
                     console.log(event_2)
                 }
             })

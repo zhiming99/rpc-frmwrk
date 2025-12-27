@@ -45,7 +45,7 @@ class CStreamServerRelayMH :
 
     gint32 SendCloseToAll( IEventSink* pCallback );
     gint32 ResumePreStop( IEventSink* pCallback )
-    {   return super::OnPreStop( pCallback ); }
+    { return OnPreStopShared( pCallback ); }
 
     public:
     typedef CStreamRelayBase< CStreamServer > super;

@@ -9,6 +9,44 @@ source $_pubfuncs
 declare -gA permArray
 declare -gA userArray
 
+function dbus_test_send()
+{
+    if dbus-send --session --dest=org.freedesktop.DBus --type=method_call --print-reply /org/freedesktop/DBus org.freedesktop.DBus.ListNames > /dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+function detect_and_start_dbus()
+{
+    if [[ ! -d ${HOME}/.rpcf ]]; then
+        mkdir ${HOME}/.rpcf
+    fi
+    local dbusAddr=${HOME}/.rpcf/dbusaddr
+    if [[ ! -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+        if dbus_test_send; then
+            echo $DBUS_SESSION_BUS_ADDRESS > $dbusAddr
+            return 0
+        fi
+    fi
+    if [[ -f "$dbusAddr" ]]; then
+        if stat -c %s $dbusAddr > /dev/null; then
+            export DBUS_SESSION_BUS_ADDRESS="`cat $dbusAddr`"
+            if dbus_test_send; then
+                return 0
+            else
+                > $dbusAddr
+            fi
+        fi
+    fi
+    export DBUS_SESSION_BUS_ADDRESS="`dbus-daemon --fork --print-address --session`"
+    if [[ -z "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+        echo Error cannot start dbus session - $? 
+        return 1
+    fi
+    echo $DBUS_SESSION_BUS_ADDRESS > $dbusAddr
+    return 0
+}
+
 function wait_mount()
 {
     if [ -z $1 ] || [ -z $2 ]; then

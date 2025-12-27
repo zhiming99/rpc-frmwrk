@@ -671,7 +671,7 @@ gint32 CRpcTcpBridgeAuth::DumpConnParams(
                 strMsg += stdstr( "DestIp=" ) +
                     strVal + ",";
             ret = oRmtConn.GetIntProp(
-                propSrcTcpPort, dwVal );
+                propDestTcpPort, dwVal );
             if( SUCCEEDED( ret ) )
                 strMsg += stdstr( "DestPort=" ) +
                     std::to_string( dwVal ) + ",";
@@ -3438,8 +3438,7 @@ gint32 CRpcReqForwarderAuth::CreateBridgeProxyAuth(
         CIfRetryTask* pTask = pApTask;
         pTask->SetClientNotify( pSeqTask );
 
-        CIoManager* pMgr = GetIoMgr();
-        ret = pMgr->RescheduleTask( pApTask );
+        ret = this->RunManagedTask2( pApTask );
         if( SUCCEEDED( ret ) )
             ret = STATUS_PENDING;
 

@@ -524,7 +524,7 @@ int DMsgPtr::GetTypeBytes( int typecode ) const
     }
 }
 
-gint32 DMsgPtr::Serialize( CBuffer* pBuf )
+gint32 DMsgPtr::Serialize( CBuffer* pBuf ) const
 {
     if( IsEmpty() || pBuf == nullptr )
         return -EINVAL;

@@ -853,7 +853,7 @@ def DefaultIfCfg() -> dict :
     defCfg[ "ConnRecover" ]= "false"
     defCfg[ "HasAuth" ]= "false"
     defCfg[ "DestURL" ]= "https://www.example.com"
-    defCfg[ "EnableBPS" ]= "false"
+    defCfg[ "EnableBPS" ]= "true"
     return defCfg
 
 def CheckIpAddr( addr ) :
@@ -968,7 +968,8 @@ def Update_Drv( initCfg: dict, drvFile : list,
     defConn[ "ConnRecover" ]= "false"
     defConn[ "HasAuth" ]= "false"
     defConn[ "DestURL" ]= "https://www.example.com"
-    defConn[ "EnableBPS" ]= "false"
+    defConn[ "EnableBPS" ]= "true"
+    defConn[ "BindTo" ]= "true"
 
     oConns = None
     if bServer and 'Connections' not in initCfg:
@@ -986,7 +987,6 @@ def Update_Drv( initCfg: dict, drvFile : list,
             for i in range( len( oConns ) ) :
                 ifCfg = dict()
                 oConn = oConns[ i ]
-                bBindAddr = True
                 for key, val in oConn.items() :
                     if key == 'IpAddress' :
                         ifCfg[ 'BindAddr' ] = val
@@ -996,8 +996,6 @@ def Update_Drv( initCfg: dict, drvFile : list,
                         ifCfg[ 'AuthMech' ] = strMech
                     elif key == 'AuthMech' :
                         pass
-                    elif key == 'BindTo' and val == 'false':
-                        bBindAddr = False
                     else :
                         ifCfg[ key ] = val
                 if oConn[ 'EnableWS' ] == "false" :
@@ -1005,17 +1003,19 @@ def Update_Drv( initCfg: dict, drvFile : list,
 
                 if strFormat is None :
                     strFormat = 'invalid'
-                if not bBindAddr :
-                    if strFormat != 'ipv6':
-                        ifCfg[ 'BindAddr' ] = '0.0.0.0'
-                    else:
-                        ifCfg[ 'BindAddr' ] = '::/0'
+
+                #if not bBindAddr :
+                #    if strFormat != 'ipv6':
+                #        ifCfg[ 'BindAddr' ] = '0.0.0.0'
+                #    else:
+                #        ifCfg[ 'BindAddr' ] = '::/0'
+
                 if 'PdoClass' not in ifCfg :
                     ifCfg[ 'PdoClass' ] = "TcpStreamPdo2"
                 if 'ConnRecover' not in ifCfg :
                     ifCfg[ 'ConnRecover' ] = "false"
                 if 'EnableBPS' not in ifCfg :
-                    ifCfg[ 'EnableBPS' ] = "false"
+                    ifCfg[ 'EnableBPS' ] = "true"
                 if 'Protocol' not in ifCfg :
                     ifCfg[ "Protocol" ] = "native"
                 if 'AddrFormat' not in ifCfg:

@@ -725,6 +725,10 @@ gint32 CDBusBusPort::Start( IRP *pIrp )
     CDBusError error;
 
     do{
+        // detecting and starting the dbus if needed
+        StartDBus();
+        sleep( 1 );
+
         string strModName;
         string strPortName;
 

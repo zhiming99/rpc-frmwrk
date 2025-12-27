@@ -42,6 +42,13 @@
     #timeSeriesModal-backdrop {
         z-index: 1069 !important;
     }
+
+    #reconnectionModal{
+        z-index: 1072 !important;
+    }
+    #reconnectionModal-backdrop {
+        z-index: 1071 !important;
+    }
     #logContextMenu {
         min-width: 120px;
     }
@@ -70,7 +77,7 @@
           <li class="nav-item">
             <!--<button id="config-btn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#configModal">Update Config</button>-->
             <span id="user-label" class="ms-2 text-white"></span>
-            <button id="reconnect-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
+            <button id="Login-btn" class="btn btn-warning btn-sm ms-2 d-none">Login</button>
           </li>
         </ul>
       </div>
@@ -222,7 +229,7 @@
     const i18nh = globalThis.i18nHelper; // Make it globally accessible
     i18nh.load(navigator.language).then(() => {
       console.log("Translations loaded");
-      document.getElementById('reconnect-btn').textContent = i18nh.t("Login");
+      document.getElementById('Login-btn').textContent = i18nh.t("Login");
       document.getElementById('APP_TITLE').textContent = i18nh.t("APP_TITLE");
       document.getElementById('logs-panel').textContent = i18nh.t("Loading logs...");
       document.getElementById('LogsTitleText').textContent = i18nh.t("LOGS");
@@ -253,9 +260,14 @@
       }
     }
 
+    globalThis.lastRoot = undefined
+    globalThis.rootProxy = undefined
+    globalThis.curProxy = undefined
+
     const oStartCb = ((context, ret)=>{
+      if( context && context.m_iRet < 0 )
+          return;
       setStatusDot(true);
-      showReconnectButton(true, true);
       globalThis.curProxy = globalThis.rootProxy;
       // renderSite( globalThis.GetSite(
       //     globalThis.curProxy.m_strRouterPath ) );
@@ -266,6 +278,12 @@
                   setInterval(fetchStatus, 5000);
               globalThis.fetchLogsInterval =
                   setInterval(fetchLogs, 30000);
+              return fetchAppFeatures( globalThis.g_rootSite ).then((ret)=>{
+                  return Promise.resolve( 0 );
+              }).catch( e=>{
+                  console.log( e );
+                  return Promise.reject( e )
+              })
           })
       })
     })
@@ -289,8 +307,8 @@
     }
 
 
-    function showReconnectButton(show, isConnected = false) {
-        const btn = document.getElementById('reconnect-btn');
+    function showLoginButton(show, isConnected = false) {
+        const btn = document.getElementById('Login-btn');
         const userLabel = document.getElementById('user-label');
 
         if (show) {
@@ -311,9 +329,16 @@
 
                 userLabel.textContent = strUser;
                 btn.onclick = function() {
-                    // Your disconnect logic here
+                    // Your logout logic here
+                    globalThis.bLoggedin = false
+                    showLoginButton(
+                        true, globalThis.bLoggedin);
                     if (globalThis.rootProxy ) {
-                        globalThis.rootProxy.Stop();
+                        globalThis.rootProxy.Stop().then((e)=>{
+                            globalThis.ClearProxy( "/" )
+                        }).catch((e)=>{
+                            globalThis.ClearProxy( "/" )
+                        });
                     } else {
                       // fallback: reload or nullify
                         location.reload();
@@ -329,16 +354,21 @@
                 btn.classList.remove('btn-danger');
                 btn.classList.add('btn-warning');
                 btn.onclick = function() {
-                  // Your reconnect logic here
-                if (typeof globalThis.StartClient === 'function') {
-                    globalThis.StartClient( oStartCb ).then(() => {
-                        console.log('Reconnected with status ');
-                        checkProxyState()
-                    }).catch((error) => {
-                        console.log("Error reconnecting:", error);
-                    });
-                    } else {
-                        location.reload();
+                    // Your login logic here, clear the loginResult in case
+                    // user has typed wrong username/password
+                    globalThis.g_strLoginResult = ""
+                    if (typeof globalThis.StartClient === 'function') {
+                        globalThis.StartClient( oStartCb ).then(() => {
+                            console.log('Logged in with status ');
+                            globalThis.bLoggedin = true
+                            showLoginButton(
+                                true, globalThis.bLoggedin);
+                            scheduleCheckProxyState()
+                        }).catch((error) => {
+                            console.log("Error login:", error);
+                        });
+                        } else {
+                            location.reload();
                     }
                 };
                 const logsRow = document.getElementById('logs-row');
@@ -349,9 +379,6 @@
             userLabel.textContent = '';
         }
     }
-
-    setStatusDot(false);
-    showReconnectButton(true);
 
     function initRootSite()
     {
@@ -413,7 +440,22 @@
                         } else if (app.status === i18nHelper.t("APP_STATUS_UNKNOWN")) {
                               statusClass = 'bg-secondary text-white px-2 rounded';
                         }
-                        appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span><br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
+                        appStatus.innerHTML = `<b>${i18nHelper.t("STATUS")}:</b> <span class="${statusClass}">${app.status}</span>`
+                        if( app.display_points )
+                        {
+                            var count = 0;
+                            app.display_points.forEach( (o, key) => {
+                                count++;
+                                if (count > 1)
+                                    return; // limit to first 1 points
+                                var val=o.v
+                                if( o.t === 'float' || o.t === 'double' || ( !o.t && typeof o.v === 'number' ) )
+                                    val = o.v.toFixed(3)
+                                appStatus.innerHTML += `<br><b>${i18nHelper.t(key)}:</b> ${val} ${o.unit ? i18nHelper.t(o.unit) : ''}`;
+                            });
+                        }
+                        else
+                            appStatus.innerHTML += `<br><b>${i18nHelper.t("CPU_USAGE")}:</b> ${app.cpu}`;
                     }
                 }
             }
@@ -520,9 +562,44 @@
     globalThis.g_strAuthMech = ""
 
     var iChecks = 0;
+    function CleanupUIAndRoot( site )
+    {
+        setStatusDot(false);
+        clearSiteTree();
+
+        globalThis.curProxy = undefined;
+        var rootProxy = globalThis.rootProxy
+        if( rootProxy )
+            globalThis.ClearProxy( "/" )
+        if( globalThis.curSpModal )
+        {
+            globalThis.curSpModal.hide();
+            globalThis.curSpModal = undefined;
+        }
+        initRootSite();
+        iChecks = 0;
+
+        globalThis.g_strLoginResult = ""
+        if( globalThis.bLoggedin === false )
+        {
+            globalThis.lastRoot = undefined;
+            clearCheckState();
+        }
+        if( rootProxy )
+        {
+            return rootProxy.Stop().then((e)=>
+            {
+                console.log( "rootProxy stopped" );
+            }).catch( (e)=>{
+                console.log( "Error stopping rootProxy" );
+            })
+        }
+        return Promise.resolve( 0 );
+    }
+
     function DoCleanup( siteToCleanup = null )
     {
-        let site = siteToCleanup;
+        var site = siteToCleanup;
         if( siteToCleanup === null )
             site = globalThis.g_rootSite;
 
@@ -532,103 +609,206 @@
                 app.status = i18nHelper.t("APP_STATUS_UNKNOWN");
                 app.cpu = "N/A";
             });
-            if( site.children )
-            {
-                var taskGrp=[]
-                
-                site.children.forEach( ( oInfo, name ) => {
-                    if( oInfo.site )
-                        DoCleanup( oInfo.site );
-                    if( oInfo.oProxy )
-                    {
-                        var oProxy = oInfo.oProxy
-                        taskGrp.push( ()=>{
-                        return oProxy.Stop( 0 ).then((e)=>{
-                            console.log( `proxy ${oProxy.m_strRouterPath} stopped`)
-                            return Promise.resolve(0);
-                            }).catch((e)=>{
-                                console.log( `proxy ${oProxy.m_strRouterPath} encountered error during stop ` + e)
-                                return Promise.resolve(e);
-                            })
-                        })
-                    }
-                });
-                async function stopProxies()
-                {
-                    for( const task of taskGrp ){
-                        try{
-                            await task()
-                        }catch( e ){
-                            return Promise.resolve( e )
-                        }
-                    }
-                    return Promise.resolve( 0 )
-                }
-                stopProxies().then((e)=>{
-                    site.children = new Map()
-                    var curProxy = globalThis.curProxy
-                    if( curProxy &&
-                        GetSite( curProxy.m_strRouterPath ) === site )
-                        updateSite(site);
-                    if( site !== globalThis.g_rootSite )
-                        return;
-
-                    setStatusDot(false);
-                    showReconnectButton(true, false);
-                    clearSiteTree();
-
-                    globalThis.curProxy = undefined;
-                    var rootProxy = globalThis.rootProxy
-                    globalThis.rootProxy = undefined;
-                    globalThis.g_strLoginResult = ""
-                    if( globalThis.curSpModal )
-                    {
-                        globalThis.curSpModal.hide();
-                        globalThis.curSpModal = undefined;
-                    }
-                    initRootSite();
-                    iChecks = 0;
-
-                    if( rootProxy )
-                    {
-                        return rootProxy.Stop().then((e)=>
-                        {
-                            console.log( "rootProxy stopped" );
+        }
+        if( site.children )
+        {
+            var taskGrp=[]
+            
+            site.children.forEach( ( oInfo, name ) => {
+                if( oInfo.site )
+                    taskGrp.push( ()=>{
+                        return DoCleanup( oInfo.site ).then( (e)=>{
+                            return Promise.resolve( 0 );
                         }).catch( (e)=>{
-                            console.log( "Error stopping rootProxy" );
+                            console.log( `Error cleanup site {oInfo.site.routerPath} ` + e )
+                            return Promise.resolve(e);
+                        });
+                    })
+                if( oInfo.oProxy )
+                {
+                    var oProxy = oInfo.oProxy
+                    taskGrp.push( ()=>{
+                    return oProxy.Stop( 0 ).then((e)=>{
+                        console.log( `proxy ${oProxy.m_strRouterPath} stopped`)
+                        return Promise.resolve(0);
+                        }).catch((e)=>{
+                            console.log( `proxy ${oProxy.m_strRouterPath} encountered error during stop ` + e)
+                            return Promise.resolve(e);
                         })
+                    })
+                }
+            });
+            async function stopSitesAndProxies()
+            {
+                for( const task of taskGrp ){
+                    try{
+                        await task()
+                    }catch( e ){
+                        return Promise.resolve( e )
                     }
-                }).catch((e)=>{
-                    console.log( "Stop Child Client failed with " + e );
-                    return Promise.resolve(-1);
-                })
+                }
+                return Promise.resolve( 0 )
             }
+            return stopSitesAndProxies().then((e)=>{
+                site.children = new Map()
+                var curProxy = globalThis.curProxy
+                if( curProxy &&
+                    GetSite( curProxy.m_strRouterPath ) === site )
+                    updateSite(site);
+
+                if( site !== globalThis.g_rootSite )
+                    return Promise.resolve( 0 );
+                return CleanupUIAndRoot()
+            }).catch((e)=>{
+                console.log( "Stop Child Client failed with " + e );
+                return Promise.resolve(-1);
+            })
+        }
+        if( site !== globalThis.g_rootSite )
+            return Promise.resolve( 0 )
+        return CleanupUIAndRoot()
+    }
+
+    function needReconnection()
+    {
+        if( !globalThis.rootProxy ||
+            [0,4,6].includes( globalThis.rootProxy.m_iState ) )
+            return true
+        return false
+    }
+
+    var showCount = 0;
+    function toggleReconnModal( bShow )
+    {
+        if( bShow && !globalThis.reconnModal )
+        {
+            const modalEl =
+                document.getElementById('reconnectionModal')
+            modalEl.style.zIndex = 1072;
+
+            let customBackdrop = document.createElement('div');
+            customBackdrop.className = 'modal-backdrop fade show';
+            customBackdrop.style.zIndex = 1071;
+            customBackdrop.id = 'reconnectionModal-backdrop';
+            document.body.appendChild(customBackdrop);
+
+            const reconnectionModal = new bootstrap.Modal(
+                modalEl, { backdrop: false} );
+            reconnectionModal.show();
+            globalThis.reconnModal = reconnectionModal;
+            showCount += 1
+
+            // Cleanup: remove custom backdrop and reset z-index when closed
+            modalEl.addEventListener('hidden.bs.modal', function handler() {
+                modalEl.style.zIndex = '';
+                let bd = document.getElementById(
+                    'reconnectionModal-backdrop');
+                if (bd) bd.remove();
+                modalEl.removeEventListener('hidden.bs.modal', handler);
+            });
+        }
+        else if( !bShow && globalThis.reconnModal )
+        {
+            var oModal = globalThis.reconnModal;
+            setTimeout(()=>{oModal.hide();}, 500 )
+            globalThis.oldReconnModal =
+                globalThis.reconnModal
+            globalThis.reconnModal = undefined
+            showCount -= 1
         }
     }
 
-    setStatusDot(false);
-    showReconnectButton(true, false);
+    function startReconnection()
+    {
+        if( globalThis.bReconnecting === true )
+            return
+
+        if( !needReconnection() )
+        {
+            toggleReconnModal( false )
+            scheduleCheckProxyState( 1000 )
+            return
+        }
+
+        console.log( "RPC connection is shutdown abnormally..." );
+
+        toggleReconnModal( true )
+
+        globalThis.bReconnecting = true
+        try{
+            clearCheckState();
+            return DoCleanup().then( (e)=>{
+
+                // Attempt to reconnect
+                globalThis.StartClient( oStartCb ).then((e) => {
+                    console.log("Reconnection successful!");
+
+                    // Hide the reconnection modal
+                    toggleReconnModal( false )
+                    globalThis.bReconnecting = false
+                    scheduleCheckProxyState( 1000 )
+                }).catch((error) => {
+                    console.log("Reconnection failed. Retrying...");
+                    globalThis.bReconnecting = false
+                    if( !needReconnection() )
+                        toggleReconnModal( false )
+                    scheduleCheckProxyState( 5000 )
+                });
+            }).catch((e)=>{
+                globalThis.bReconnecting = false
+                if( !needReconnection() )
+                    toggleReconnModal( false )
+                scheduleCheckProxyState( 5000 )
+            })
+        }catch(e){
+            globalThis.bReconnecting = false
+            scheduleCheckProxyState( 5000 )
+        }
+    }
+
+    function clearCheckState()
+    {
+        clearTimeout( globalThis.checkStateInterval )
+        globalThis.checkStateInterval = undefined
+        globalThis.bCheckState = false
+    }
+
+    function scheduleCheckProxyState( ms = 1 )
+    {
+        if( globalThis.bCheckState === true )
+            return
+        globalThis.checkStateInterval =
+            setTimeout( checkProxyState, ms );
+        globalThis.bCheckState = true;
+    }
 
     function checkProxyState(){
-        if( globalThis.rootProxy === undefined ){
-            setTimeout( checkProxyState, 2000 );
-            console.log( "Waiting RPC connection ready..." );
-        }else if( globalThis.rootProxy === null ){
-            console.log( "RPC connection is shutdown abnormally..." );
-            DoCleanup();
-        }else if( globalThis.rootProxy.m_iState === 0 ){
-            console.log( "RPC connection is down..." );
-            DoCleanup();
-        }else{
-            if( iChecks++ === 0 )
-            {
-                //fetchLogs();
-                console.log( "RPC connection ready " + globalThis.curProxy );
+        globalThis.bCheckState = false
+        do{
+            if( globalThis.bLoggedin === false &&
+                globalThis.lastRoot !== undefined ){
+                DoCleanup();
+                break;
             }
-            setTimeout( checkProxyState, 5000 );
-        }
+
+            if( globalThis.bLoggedin == false )
+                break;
+
+            if( needReconnection() ){
+                setTimeout( startReconnection, 1 )
+                return;
+            }else{
+                if( iChecks++ === 0 )
+                {
+                    //fetchLogs();
+                    console.log( "RPC connection ready " + globalThis.curProxy );
+                }
+            }
+            break
+        }while( true );
+        scheduleCheckProxyState( 1000 )
+        return
     }
-    setTimeout( checkProxyState, 2000 );
 
     function clearLogs()
     { document.getElementById('logs-panel').textContent = ""; }
@@ -689,7 +869,7 @@
 
       if( globalThis.funcStartPullInfo && globalThis.curProxy ){
           var startPullInfo = globalThis.funcStartPullInfo.bind( globalThis.curProxy );
-          console.log( "Start pulling info..." );
+          // console.log( "Start pulling info..." );
           return startPullInfo().then((ret) => {
               updateSite();
           }).catch((error) => {
@@ -806,7 +986,7 @@
       document.body.appendChild(customBackdrop);
 
       // Show the modal
-      const modal = new bootstrap.Modal(document.getElementById('timeSeriesModal'));
+      const modal = new bootstrap.Modal(modalEl);
       modal.show();
 
       // Cleanup: remove custom backdrop and reset z-index when closed
@@ -1246,7 +1426,20 @@
         fetchStatus();
     }
 
-    globalThis.StartClient( oStartCb)
+    setStatusDot(false);
+    showLoginButton(true);
+
+    globalThis.bLoggedin = false;
+    globalThis.StartClient( oStartCb).then(() => {
+        console.log('Logged in with status ');
+        globalThis.bLoggedin = true
+        showLoginButton(
+            true, globalThis.bLoggedin);
+        scheduleCheckProxyState()
+    }).catch((error) => {
+        console.log("Error login:", error);
+    });
+
 
 /*
   Render a dropdown tree from the hierarchical backend (g_rootSite or rootProxy).
@@ -1278,34 +1471,40 @@ function renderSiteTree(rootNode) {
     label.textContent = elem.name
     if( offline )
         label.style.color = 'gray';
+    label.id = "SiteTreeNode-" + getRouterPathFromNode( elem );
 
     // compute routerPath for this node
     const routerPath = path
 
     // If this element holds a site object, attach click handler to select it
     const siteObj = elem;
-    if (siteObj ) {
-        label.onclick = function (e) {
-            e.stopPropagation();
-            const routerPath = computeRouterPathFromNode(elem)
-            if (routerPath) {
-                selectSiteByRouterPath(routerPath);
-                // close dropdown
-                const btn = document.getElementById('siteTreeDropdownBtn');
-                const dd = bootstrap.Dropdown.getInstance(btn);
-                if (dd) dd.hide();
-            }
-        };
-    } else {
-        // folder node: toggle children
-        label.onclick = function(e) {
-            e.stopPropagation();
-            li.classList.toggle('open');
-            const sub = li.querySelector('ul');
-            if (sub) sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
-        };
+    if( !offline )
+    {
+        if( siteObj ){
+            label.onclick = function (e) {
+                e.stopPropagation();
+                const routerPath = getRouterPathFromNode(elem)
+                if (routerPath) {
+                    selectSiteByRouterPath(routerPath);
+                    // close dropdown
+                    const btn = document.getElementById('siteTreeDropdownBtn');
+                    const dd = bootstrap.Dropdown.getInstance(btn);
+                    if (dd) dd.hide();
+                }
+            };
+        } else {
+            // folder node: toggle children
+            label.onclick = function(e) {
+                e.stopPropagation();
+                li.classList.toggle('open');
+                const sub = li.querySelector('ul');
+                if (sub) sub.style.display = sub.style.display === 'none' ? 'block' : 'none';
+            };
+        }
     }
     li.appendChild(label);
+    if( offline )
+        return li;
 
     // children
     const childUl = document.createElement('ul');
@@ -1326,6 +1525,9 @@ function renderSiteTree(rootNode) {
         var offline = false
         if( !c.node.oProxy )
             offline = true
+        else if( c.node.oProxy &&
+            [ 0, 4, 6].includes(c.node.oProxy.m_iState ))
+            offline = true
         childUl.appendChild(buildNode(childElem, path ? (path + delimiter + (childElem.name || childElem.key)) : (childElem.name || childElem.key), offline ));
       });
     }
@@ -1343,8 +1545,7 @@ function renderSiteTree(rootNode) {
 
 // Attempt to compute routerPath from node element by walking up from name strings.
 // This utility assumes the tree labels represent path components and returns a path string.
-function computeRouterPathFromNode(elem) {
-  // If the node already has a params object with router path, try to use it
+function getRouterPathFromNode(elem) {
   return elem.node.routerPath || elem.node.site.routerPath ;
 }
 /*
@@ -1387,7 +1588,6 @@ function selectSiteByRouterPath(routerPath) {
         clearInterval(globalThis.fetchStatusInterval);
         clearInterval(globalThis.fetchLogsInterval);
         setStatusDot(false);
-        showReconnectButton(true, false);
     }
 }
 function initSiteTreeButtons() {
@@ -1403,16 +1603,182 @@ function initSiteTreeButtons() {
 function initSiteTree() {
   const rootNode = globalThis.g_rootSite;
   if (!rootNode) return;
-  renderSiteTree(rootNode);
+    renderSiteTree(rootNode);
   // initSiteTreeButtons();
   renderSite(rootNode);
   globalThis.pollingBgSitesInterval = setInterval( pollingBgSites, 40000);
 }
+
+function startFetchChildrenFeatures( site )
+{
+    if( !site || !site.children || site.children.size === 0 )
+        return Promise.resolve(0);
+
+    var taskGrp=[]
+    site.children.forEach( ( oInfo, name ) => {
+        if( oInfo.oProxy )
+        {
+            var oChildProxy = oInfo.oProxy
+            taskGrp.push( ()=>{
+            return fetchAppFeatures( oInfo.site ) .then((e)=>{
+                console.log( `fetched features info for ${oChildProxy.m_strRouterPath} `)
+                return Promise.resolve(0);
+                }).catch((e)=>{
+                    console.log( `Error fetching feature ${oChildProxy.m_strRouterPath} encountered error during stop ` + e)
+                    return Promise.resolve(e);
+                })
+            })
+        }
+    });
+    async function fetchChildFeatures()
+    {
+        for( const task of taskGrp ){
+            try{
+                await task()
+            }catch( e ){
+                return Promise.resolve( e )
+            }
+        }
+        return Promise.resolve( 0 )
+    }
+    return fetchChildFeatures().then((e)=>{
+        }).catch((e)=>{
+            console.log( "fetchChild feature failed with " + e );
+            return Promise.resolve(-1);
+        })
+}
+
+function fetchAppFeatures( site )
+{
+    var arrPts = [];
+    var oProxy = globalThis.GetProxy( site.routerPath );
+    if( !oProxy || !site || !site.apps )
+        return Promise.resolve( -14 );
+
+    for( let i=0; i<site.apps.length; i++ )
+    {
+        let app = site.apps[i];
+        if( !app.display_points || app.display_points.length === 0 )
+            continue;
+        var count = 0;
+        app.display_points.forEach( (value, key) =>{
+            if( count >= 1 )
+                return;
+            arrPts.push( `${app.name}/${key}` );
+            count++;
+        })
+    }
+    var oContext = Object();
+    oContext.m_iRet = 0;
+    oContext.oGetPtDescCb = (oContext, ret, mapPtDescs) => {
+        if( oContext.m_iRet < 0 )
+            return;
+        for( let i=0; i<site.apps.length; i++ )
+        {
+            let app = site.apps[i];
+            if( !app.display_points || app.display_points.length === 0 )
+                continue;
+            app.display_points.forEach( (value, key) =>{
+                let fullPtPath = `${app.name}/${key}`;
+                if( mapPtDescs.has( fullPtPath ) )
+                {
+                    let oDesc = mapPtDescs.get( fullPtPath );
+                    var ptv = oDesc.GetProperty(PtDescProps.retval);
+                    if( ptv & 0x80000000 )
+                        return;
+                    var ptv = oDesc.GetProperty(PtDescProps.value);
+                    attrs = { v: ptv === undefined || ptv === null ? null : ptv,
+                        t:type2str(oDesc.GetProperty(PtDescProps.datatype)),
+                        cnt : 0
+                    }
+                    var oVal = oDesc.GetProperty(PtDescProps.ptype);
+                    if( typeof oVal === "number" )
+                    {
+                        if( oVal === 0 ) 
+                            attrs.ptype = "output"
+                        else if( oVal === 1 )
+                            attrs.ptype = "input"
+                        else if( oVal === 2 )
+                            attrs.ptype = "setpoint"
+                    }
+                    oVal = oDesc.GetProperty(PtDescProps.average);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.average = oVal;
+
+                    oVal = oDesc.GetProperty(PtDescProps.unit);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.unit = i18nHelper.t(oVal);
+
+                    oVal = oDesc.GetProperty(PtDescProps.size);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.size = oVal;
+
+                    oVal = oDesc.GetProperty(PtDescProps.haslog);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.haslog = true;
+                    else
+                        attrs.haslog = false;
+                    oVal = oDesc.GetProperty(PtDescProps.avgalgo);
+                    if( oVal !== undefined && oVal !== null )
+                        attrs.avgalgo = oVal;
+                    app.display_points.set( key, attrs );
+                    site.apps[i] = app;
+                }
+            })
+        }
+    };
+    if( arrPts.length === 0 )
+        return startFetchChildrenFeatures( site );
+    return oProxy.GetPointDesc( oContext, arrPts ).then((ret)=>{
+        return startFetchChildrenFeatures( site );
+    }).catch((error)=>{
+        console.log("Error fetching point descriptions:", error);
+        return Promise.resolve( error );
+    });
+}
+
+function onSiteOffline( strRouterPath )
+{
+    var site = globalThis.GetSite( strRouterPath );
+    if( !site )
+        return
+    if( site && site.children && children.size )
+        site.children.forEach((elem, name) =>{
+            onSiteOffline( strRouterPath + '/' + name )
+        })
+    // gray the site in the site tree
+    var elem = document.getElementById(
+        "SiteTreeNode-" + strRouterPath )
+    if( elem )
+    {
+        elem.style.color = 'gray';
+        elem.onclick = null
+    }
+}
+
+globalThis.OnSiteOffline = onSiteOffline
 
 // call initSiteTree after StartClient / data loaded
 // setTimeout(() => { initSiteTree(); }, 500);
   ////# sourceURL=rpcf://htmlcode/appmonhtml.js
   </script>
   <p id="rpcf_load_notify"><br /></p>
+
+  <!-- Reconnection Modal -->
+<div class="modal fade" id="reconnectionModal" tabindex="-1" aria-labelledby="reconnectionModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reconnectionModalLabel">Reconnecting...</h5>
+      </div>
+      <div class="modal-body text-center">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-3">Please wait while the connection is being re-established.</p>
+</div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

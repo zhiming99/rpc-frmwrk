@@ -35,7 +35,6 @@ stdstr g_strWebPath = "";
 extern stdstr g_strCmdLine;
 extern stdstr g_strAppName;
 extern gint32 SetStructRefs( ObjPtr& pRoot );
-extern gint32 SyncCfg( const stdstr& strPath );
 extern guint32 GenClsid( const std::string& strName );
 extern bool g_bRpcOverStm;
 extern bool g_bBuiltinRt;
@@ -1267,8 +1266,9 @@ gint32 CJsExportMakefile::Output()
         Wa( "all:" );
         Wa( "\trm -r dist;mkdir dist" );
         Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
+	    Wa( "\t@if [ ! -d node-modules/stream-browserify ]; then echo nodejs liberies are not installed properly;exit 1;fi" );
         Wa( "\t@sed -i \"s@mode:[[:blank:]]*'development'@mode: 'production'@g\" webpack.config.js" );
-        Wa( "\tnpm exec webpack" );
+        Wa( "\tnpx webpack" );
         Wa( "\tpython3 synccfg.py" );
         Wa( "\t@echo please see 'README.md' for information about deployment." );
 
@@ -1279,8 +1279,9 @@ gint32 CJsExportMakefile::Output()
         Wa( "debug:" );
         Wa( "\trm -r dist;mkdir dist" );
         Wa( "\t@if [ ! -d node_modules ]; then ln -s `npm -g root`;fi" );
+	    Wa( "\t@if [ ! -d node-modules/stream-browserify ]; then echo nodejs liberies are not installed properly;exit 1;fi" );
         Wa( "\t@sed -i \"s@mode:[[:blank:]]*'production'@mode: 'development'@g\" webpack.config.js" );
-        Wa( "\tnpm exec webpack" );
+        Wa( "\tnpx webpack" );
         Wa( "\tpython3 synccfg.py" );
         Wa( "\t@echo please see 'README.md' for information about deployment." );
         NEW_LINE;
@@ -1726,6 +1727,18 @@ static gint32 GenSvcFiles(
 
     return ret;
 }
+
+static gint32 SyncCfgJs( const stdstr& strPath )
+{
+    sync();
+    stdstr strCmd = "make -sC ";
+    strCmd += strPath + " sync";
+    gint32 ret = system( strCmd.c_str() );
+    if( ret < 0 )
+        ret = -errno;
+    return ret;
+}
+
 gint32 GenJsProj(
     const std::string& strOutPath,
     const std::string& strAppName,
@@ -1842,7 +1855,7 @@ gint32 GenJsProj(
     }while( 0 );
 
     if( SUCCEEDED( ret ) )
-        SyncCfg( strOutPath );
+        SyncCfgJs( strOutPath );
 
     return ret;
 }
@@ -2764,7 +2777,7 @@ gint32 CImplJsMainFunc::OutputCli(
 
         // CCOUT << "var strObjDesc = '" << g_strWebPath << "/" << g_strAppName<<"desc.json';";
         // NEW_LINE;
-        CCOUT << "var strObjDesc = './" << g_strAppName<<"desc.json';";
+        CCOUT << "var strObjDesc = new URL( './" << g_strAppName<<"desc.json', document.baseURI ).href;";
         NEW_LINE;
         CCOUT << "var strAppName = '" << g_strAppName << "';";
         NEW_LINE;

@@ -68,6 +68,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_bindir}/rpcf_logger
 %{_bindir}/rpcf_sendlog
 %{_bindir}/regfsmnt
+%{_bindir}/regfschk
 %{_bindir}/appmon*
 %{_bindir}/rpcfctl
 %{_bindir}/rpcf/apptimer

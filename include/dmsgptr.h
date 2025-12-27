@@ -207,7 +207,7 @@ class DMsgPtr : public IAutoPtr
     const DBusMessage* ptr() const
     { return m_pObj; }
 
-    gint32 Serialize( CBuffer* pBuf );
+    gint32 Serialize( CBuffer* pBuf ) const;
     gint32 Deserialize( CBuffer* pBuf );
     gint32 Deserialize(
         const char* pBuf, guint32 dwSize );

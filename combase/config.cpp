@@ -283,13 +283,13 @@ gint32 CConfigDb2::Serialize(
                     if( ERROR( ret ) )
                         break;
                 }
-                *pLoc++ = ( guint8& )oVar;
+                *pLoc++ = ( const guint8& )oVar;
                 break;
             }
         case typeUInt16:
             {
                 guint16 val =
-                    htons( ( guint16& )oVar );
+                    htons( ( const guint16& )oVar );
                 if( pEnd - pLoc < sizeof( guint16 ) )
                 {
                     RESIZE_BUF( oBuf.size() + QPAGE, ret );
@@ -304,7 +304,7 @@ gint32 CConfigDb2::Serialize(
         case typeFloat:
             {
                 guint32 val =
-                    htonl( ( guint32& )oVar );
+                    htonl( ( const guint32& )oVar );
                 if( pEnd - pLoc < sizeof( guint32 ) )
                 {
                     RESIZE_BUF( oBuf.size() + QPAGE, ret );
@@ -319,7 +319,7 @@ gint32 CConfigDb2::Serialize(
         case typeDouble:
             {
                 guint64 val =
-                    htonll( ( guint64& )oVar );
+                    htonll( ( const guint64& )oVar );
 
                 if( pEnd - pLoc < sizeof( guint64 ) )
                 {
@@ -361,7 +361,7 @@ gint32 CConfigDb2::Serialize(
         case typeDMsg:
             {
                 BufPtr pBuf( true );
-                DMsgPtr& pMsg = ( DMsgPtr& )oVar;
+                auto& pMsg = ( const DMsgPtr& )oVar;
                 ret = pMsg.Serialize( *pBuf );
                 if( ERROR( ret ) )
                     break;
@@ -390,7 +390,7 @@ gint32 CConfigDb2::Serialize(
         case typeObj:
             {
                 BufPtr pBuf( true );
-                ObjPtr& pObj = ( ObjPtr& )oVar;
+                auto& pObj = ( const ObjPtr& )oVar;
                 if( pObj.IsEmpty() )
                 {
                     SERI_HEADER_BASE oBase;
@@ -418,7 +418,7 @@ gint32 CConfigDb2::Serialize(
             }
         case typeByteArr:
             {
-                BufPtr& pBufVal = ( BufPtr& )oVar;
+                auto& pBufVal = ( const BufPtr& )oVar;
                 guint32 len = 0;
                 if( !pBufVal.IsEmpty() && !pBufVal->empty() )
                     len = pBufVal->size();

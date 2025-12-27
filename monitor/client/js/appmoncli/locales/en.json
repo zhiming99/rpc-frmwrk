@@ -87,5 +87,8 @@
   "MENU_RESTART": "Restart",
 
   "BUTTON_SHOW_LOGS" : "Show Logs",
-  "BUTTON_HIDE_LOGS" : "Hide Logs"
+  "BUTTON_HIDE_LOGS" : "Hide Logs",
+
+  "temperature": "Temperature",
+  "humidity": "Humidity"
 }

@@ -52,18 +52,6 @@ CFlockHelper::~CFlockHelper()
     flock( m_iFd, LOCK_UN );
 }
 
-CFileHandle::~CFileHandle()
-{
-    if( m_hFile != INVALID_HANDLE &&
-        !m_pFs.IsEmpty() )
-    {
-        CRegistryFs* pfs = m_pFs;
-        pfs->CloseFile( m_hFile );
-        m_hFile = INVALID_HANDLE;
-    }
-    m_pFs.Clear();
-}
-
 gint32 CAppMonitor_SvrImpl::GetLoginInfo(
     IConfigDb* pCtx, CfgPtr& pInfo ) const
 {
@@ -431,7 +419,8 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
                     break;
 
                 stdstr strCmd;
-                guint32& dwCmd = ( guint32& )value;
+                auto& dwCmd =
+                    ( const guint32& )value;
                 if( dwCmd  == usrcmdStart )
                     strCmd = "start";
                 else if( dwCmd  == usrcmdStop )
@@ -499,7 +488,7 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
             if( ERROR( ret ) )
                 break;
             CFileHandle oh2( m_pAppRegfs, hFile );
-            BufPtr pBuf = ( BufPtr& )value;
+            auto pBuf = ( const BufPtr& )value;
             if( pBuf.IsEmpty() || pBuf->empty() )
                 break;
             guint32 dwSize = pBuf->size();

@@ -121,25 +121,33 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
             if( elem.strKey == "rx_bytes" ||
                 elem.strKey == "rx_bytes_total" )
             {
-                ( ( guint64& )rxb ) += ( guint64& )elem.oValue;
-                DebugPrint( 0, "rxb = %lx", ( guint64& )rxb );
+                ( ( guint64& )rxb ) +=
+                    ( const guint64& )elem.oValue;
+                DebugPrint( 0, "rxb = %lx",
+                    ( const guint64& )rxb );
             }
             else if( elem.strKey == "tx_bytes" ||
                 elem.strKey == "tx_bytes_total" )
             {
-                ( ( guint64& )txb ) += ( guint64& )elem.oValue;
-                DebugPrint( 0, "txb = %lx", ( guint64& )txb );
+                ( ( guint64& )txb ) +=
+                    ( const guint64& )elem.oValue;
+                DebugPrint( 0, "txb = %lx",
+                    ( const guint64& )txb );
             }
             else if( elem.strKey == "uptime_total" ||
                 elem.strKey == "uptime" )
             {
-                ( ( guint32& )uptime ) += ( guint32& )elem.oValue;
-                DebugPrint( 0, "uptime = %x", ( guint32& )uptime );
+                ( ( guint32& )uptime ) +=
+                    ( const guint32& )elem.oValue;
+                DebugPrint( 0, "uptime = %x",
+                    ( const guint32& )uptime );
             }
             else if( elem.strKey == "offline_times" )
             {
-                ( ( guint32& )offl ) += ( guint32& )elem.oValue + 1;
-                DebugPrint( 0, "offline_times = %x", ( guint32& )uptime );
+                ( ( guint32& )offl ) +=
+                    ( const guint32& )elem.oValue + 1;
+                DebugPrint( 0, "offline_times = %x",
+                    ( const guint32& )uptime );
             }
         }
         KeyValue okv;
@@ -302,7 +310,7 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
             {
                 CStdRMutex oTimerLock( GetTmLock() );
                 g_strSchedule.clear();
-                BufPtr& pBuf = ( BufPtr& )value;
+                auto& pBuf = ( const BufPtr& )value;
                 g_strSchedule.append(
                     pBuf->ptr(), pBuf->size() );
                 DebugPrint( 0,
@@ -367,6 +375,14 @@ struct CAsyncTimerCallbacks : public CAsyncStdAMCallbacks
                 else if( kv.strKey == "interval2" )
                 {
                     g_arrInterVals[ 1 ] = kv.oValue;
+                }
+                else if( kv.strKey == "interval3" )
+                {
+                    g_arrInterVals[ 2 ] = kv.oValue;
+                }
+                else if( kv.strKey == "interval4" )
+                {
+                    g_arrInterVals[ 3 ] = kv.oValue;
                 }
                 else if( kv.strKey == "schedule1" )
                 {

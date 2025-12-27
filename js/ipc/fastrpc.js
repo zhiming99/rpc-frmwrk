@@ -254,7 +254,7 @@ class CFastRpcChanProxy extends CInterfaceProxy
                 "Warning: the stream channel closed");
             this.m_oParent.Stop(
                 errno.ERROR_PORT_STOPPED );
-        }, 0 );
+        }, 1 );
     }
 
     OnRespReceived( oPending )
@@ -611,7 +611,7 @@ class CFastRpcProxy extends CInterfaceProxy
             }).catch( (retVal)=>{
                 this.m_iState = EnumIfState.stateStartFailed;
                 console.log( "Error, Channel setup failed" );
-                return Promise.resolve( retVal );
+                return Promise.reject( retVal );
             })
     }
 

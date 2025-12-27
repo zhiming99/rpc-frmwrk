@@ -59,7 +59,7 @@
 
 
 #define DEFAULT_BLOCK_SIZE  512
-#define DEFAULT_PAGE_SIZE   PAGE_SIZE
+#define DEFAULT_PAGE_SIZE   4096
 #define BLOCK_SIZE          ( GetBlockSize() )
 #define REGFS_PAGE_SIZE     ( GetPageSize() )
 
@@ -212,8 +212,6 @@
 
 #define MAX_FS_SIZE     \
     ( ( BLOCKS_PER_GROUP * BLKGRP_NUMBER ) + SUPER_BLOCK_SIZE + GRPBMP_BLKNUM  )
-
-extern rpcf::ObjPtr g_pIoMgr;
 
 namespace rpcf{
 
@@ -369,13 +367,7 @@ struct CGroupBitmap :
     inline guint32 GetAllocCount() const
     { return BLKGRP_NUMBER - m_wFreeCount; }
 
-    CGroupBitmap( CBlockAllocator* pAlloc ) :
-        m_pAlloc( pAlloc )
-    {
-        m_pBytes.NewObj();
-        m_pBytes->Resize( GRPBMP_SIZE );
-        m_arrBytes = ( guint8* )m_pBytes->ptr();
-    }
+    CGroupBitmap( CBlockAllocator* pAlloc );
 
     gint32 FreeGroup( guint32 dwGrpIdx );
     gint32 AllocGroup( guint32& dwGrpIdx );
@@ -489,20 +481,59 @@ class CBlockAllocator :
 
     gint32 GetFd() const
     { return m_iFd; }
+
+    CGroupBitmap* GetGroupBitmap() const
+    { return m_pGroupBitmap.get(); }
+
+    std::map< guint32, BlkGrpUPtr >& GetBlkGrps()
+    { return m_mapBlkGrps; }
+    const std::map< guint32, BlkGrpUPtr >& GetBlkGrps() const
+    { return m_mapBlkGrps; }
 };
 
 #define VALUE_SIZE 95
+
+#if BUILD_64==1
+struct timespec32
+{
+    guint32 tv_sec;
+    guint32 tv_nsec;
+    operator timespec() const
+    {
+        timespec a;
+        a.tv_sec = tv_sec;
+        a.tv_nsec = tv_nsec;
+        return a;
+    }
+    timespec32 operator=( const timespec& tv )
+    {
+        tv_sec = tv.tv_sec;
+        tv_nsec = tv.tv_nsec;
+        return *this;
+    }
+};
+#endif
 
 struct RegFSInode
 {
     // file size in bytes
     guint32     m_dwSize;
+#if BUILD_64==0
     // time of last modification.
     timespec    m_mtime;
     // time of last access.
     timespec    m_atime;
     // time of creation
     timespec    m_ctime;
+#else
+    // time of last modification.
+    timespec32    m_mtime;
+    // time of last access.
+    timespec32    m_atime;
+    // time of creation
+    timespec32    m_ctime;
+#endif
+
     // file type
     mode_t     m_dwMode;
     // uid
@@ -524,7 +555,7 @@ struct RegFSInode
     guint8      m_iValType;
     guint32     m_dwRootBNode;
 
-} __attribute__((aligned (8)));
+} __attribute__((aligned (4)));
 
 #define BNODE_SIZE ( REGFS_PAGE_SIZE )
 #define BNODE_BLKNUM ( BNODE_SIZE / BLOCK_SIZE )
@@ -1015,7 +1046,8 @@ struct CDirImage :
         const char* szLink, FImgSPtr& pImg );
 
     gint32 RemoveFileNoFree(
-        const char* szKey, FImgSPtr& pFile );
+        const char* szKey, FImgSPtr& pFile,
+        bool bForce = false );
 
     gint32 RemoveFile( const char* szName );
 
@@ -1032,10 +1064,8 @@ struct CDirImage :
     gint32 UnloadFile( const char* szName );
     gint32 UnloadDirImage();
 
-#ifdef DEBUG
     gint32 PrintBNode();
     gint32 PrintBNodeNoLock();
-#endif
 
     EnumFileType GetType() const override final
     { return ftDirectory; }
@@ -1213,7 +1243,8 @@ struct CBPlusNode :
     }
 
     gint32 RemoveFile(
-        const char* szKey, FImgSPtr& pFile );
+        const char* szKey, FImgSPtr& pFile,
+        bool bForce = false );
 
     gint32 AddFileDirect(
         guint32 dwInodeIdx, FImgSPtr& pFile )
@@ -1438,12 +1469,11 @@ struct CBPlusNode :
     gint32 Rebalance();
     gint32 RebalanceChild( guint32 idx );
     gint32 ShiftKeyPtr( guint32 dwIdx );
-#ifdef DEBUG
+
     gint32 PrintTree(
         std::vector< std::pair< guint32, stdstr > >& vecLines,
         guint32 dwLevel );
     gint32 PrintTree();
-#endif
 };
 
 struct FREE_BNODES
@@ -1865,8 +1895,21 @@ class CRegistryFs :
 
     gint32 GetPathFromHandle(
         RFHANDLE hFile, stdstr& strPath );
+
+    AllocPtr GetAllocator() const
+    { return m_pAlloc; }
 };
 
 typedef CAutoPtr< clsid( CRegistryFs ), CRegistryFs > RegFsPtr;
+
+struct CFileHandle
+{
+    RFHANDLE m_hFile = INVALID_HANDLE;
+    ObjPtr m_pFs;
+    public:
+    CFileHandle( ObjPtr pFs, RFHANDLE hFile )
+    { m_hFile = hFile; m_pFs = pFs; }
+    ~CFileHandle();
+};
 
 }

@@ -18,7 +18,7 @@ test/actcancel.js test/katest.js test/stmtest.js $(jslib_files)
 EXTRA_DIST=$(js_files) README_cn.md
 
 jslibdir=$(libdir)/rpcf
-dist_jslib_DATA=rpcbase.js.tar.gz
+#dist_jslib_DATA=rpcbase.js.tar.gz
 jslib_DATA=rpcbase.js.tar.gz
 BUILT_SOURCES=rpcbase.js.tar.gz
 
@@ -27,7 +27,8 @@ rpcbase.js.tar.gz: $(jslib_files)
 
 install-data-hook:
 	if [ ! -d $(DESTDIR)$(jslibdir)/jslib ]; then mkdir -p $(DESTDIR)$(jslibdir)/jslib; fi;
-	tar xf $(DESTDIR)$(jslibdir)/rpcbase.js.tar.gz -C $(DESTDIR)$(jslibdir)/jslib
+	tar -zxf $(DESTDIR)$(jslibdir)/rpcbase.js.tar.gz -C $(DESTDIR)$(jslibdir)/jslib
+	chown `id -u`:`id -g` -R $(DESTDIR)$(jslibdir)/jslib
 	rm $(DESTDIR)$(jslibdir)/rpcbase.js.tar.gz
 
 uninstall-hook:

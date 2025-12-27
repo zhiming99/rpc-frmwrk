@@ -560,6 +560,8 @@ gint32 CRpcWebSockFido::SchedulePongTask(
 
         oParams.SetPointer( propPortPtr, this );
         oParams.SetIntProp( propTimeoutSec, 30 );
+        oParams.SetPointer(
+            propIoMgr, GetIoMgr() );
 
         ret = GetIoMgr()->ScheduleTask(
             clsid( CWsPingPongTask ),

@@ -46,7 +46,10 @@ function SetProxy( oProxy, bClear = false )
         if( bClear )
             globalThis.rootProxy = null
         else
+        {
             globalThis.rootProxy = oProxy
+            globalThis.lastRoot = oProxy
+        }
         return
     }
     while( routerPath.endsWith( '/' ) )
@@ -166,6 +169,22 @@ function GetSite( routerPath = null )
     return oNode ? oNode.site : null;
 }
 
+function StopProxy( oProxy )
+{
+    var bRoot = false;
+    var routerPath = oProxy.m_strRouterPath;
+    if( routerPath === "/" )
+        bRoot = true;
+    return oProxy.Stop( -errno.EFAULT ).then( e =>{
+        if( !bRoot )
+            SetProxy( oProxy, true );
+        return Promise.resolve(e);
+    }).catch( (e)=>{
+        if( !bRoot )
+            SetProxy( oProxy, true );
+        return Promise.resolve(e);
+    })
+}
 function PollAllSites()
 {
     var vecProxies = GetAllProxies()
@@ -179,14 +198,17 @@ function PollAllSites()
             vecProxies.splice(index, 1);
     }
 
-    promList = []
+    var promList = []
     vecProxies.forEach( (elem)=>{
         if( !elem )
             return
-        appsAvail = []
+        var appsAvail = []
         var site=GetSite(elem.m_strRouterPath)
-        appsAvail.push( site.apps[0].name );
+        if( site && site.apps && site.apps.length > 0 )
+            appsAvail.push( site.apps[0].name );
 
+        if( appsAvail.length === 0 )
+            return
         promList.push(()=>{
             var oContext = {}
             oContext.oIsAppOnlineCb = ((oContext, ret, arrApps ) => {
@@ -199,12 +221,16 @@ function PollAllSites()
             return elem.IsAppOnline( oContext, appsAvail )
                 .then((ret) => Promise.resolve(ret))
                 .catch((e) =>{
-                    return Promise.resolve(e);
+                    StopProxy( elem ).then(()=>{
+                        var strRouterPath = elem.m_strRouterPath;
+                        console.log( `Site at ${strRouterPath} is offline` )
+                        if( globalThis.OnSiteOffline )
+                            globalThis.OnSiteOffline( strRouterPath );
+                    });
                 });
         });
     })
 
-    var nop ={};
     async function RunTasks(){
         let count = 0;
         for (const task of promList) {
@@ -273,13 +299,42 @@ function StartPullInfo()
 
             var site= GetSite( this.m_strRouterPath )
             if( site === null )
+            {
                 site = new Map()
-            site.apps = []
+                site.apps = []
+            }
+            // update the app list by adding the newly added apps
             for ( var i = 0; i < arrApps.length; i++ )
             {
                 if( this.m_setAppBaseLine.has( arrApps[i] ) )
                     continue
-                site.apps.push( { name: arrApps[i], status: globalThis.i18nHelper.t("APP_STATUS_UNKNOWN"), cpu: "0%" } )
+                for( var j = 0; j < site.apps.length; j++ )
+                {
+                    if( site.apps[j].name === arrApps[i] )
+                        break;
+                }
+                if( j === site.apps.length )
+                    site.apps.push( { name: arrApps[i], status: globalThis.i18nHelper.t("APP_STATUS_UNKNOWN"), cpu: "0%" } )
+            }
+            // remove the apps that are no longer existing
+            appToRemove = []
+            for( var i = 0; i < site.apps.length; i++ )
+            {
+                var found = false
+                for ( var j = 0; j < arrApps.length; j++ )
+                {
+                    if( site.apps[i].name === arrApps[j] )
+                    {
+                        found = true
+                        break
+                    }
+                }
+                if( !found )
+                    appToRemove.push( i )
+            }
+            for( var i = appToRemove.length - 1; i >=0; i-- )
+            {
+                site.apps.splice( appToRemove[i], 1 )
             }
             if( this.m_strRouterPath === "/")
                 site.name = globalThis.i18nHelper.t("Root Node");
@@ -290,8 +345,8 @@ function StartPullInfo()
         }).bind( oAppMonitor_cli )
 
         return oAppMonitor_cli.ListApps( oContext ).then(( oPendings )=>{
-            console.log( 'request ListApps is done with status ' );
-            appsAvail=[]
+            // console.log( 'request ListApps is done with status ' );
+            var appsAvail=[]
 
             var site=GetSite(this.m_strRouterPath)
             for( var i = 0; i < site.apps.length; i++ )
@@ -326,13 +381,22 @@ function StartPullInfo()
             return oAppMonitor_cli.IsAppOnline( oContext, appsAvail ).then((ret)=>{
                 var arrPtPaths = []
                 var site=GetSite(this.m_strRouterPath)
-                console.log( 'request IsAppOnline is done with status ' + ret );
+                // console.log( 'request IsAppOnline is done with status ' + ret );
                 for( var i = 0; i < site.apps.length; i++ )
                 {
                     var appName = site.apps[i].name;
                     arrPtPaths.push( appName + "/cpu_load");
                     arrPtPaths.push( appName + "/app_class");
                     arrPtPaths.push( appName + "/display_name");
+                    if( !site.apps[i].display_points )
+                        arrPtPaths.push( appName + "/display_points");
+                    else
+                    {
+                        for( let [ pt, val ] of site.apps[i].display_points )
+                        {
+                            arrPtPaths.push( appName + "/" + pt );
+                        }
+                    }
                 }
                 oContext.oGetPvsCb = ((oContext, ret, arrKeyVals ) => {
                     if( ERROR(ret) ) 
@@ -353,13 +417,33 @@ function StartPullInfo()
                                     site.apps[j].app_class = arrKeyVals[i].oValue.m_val
                                 else if( strPt === "display_name" )
                                     site.apps[j].display_name = arrKeyVals[i].oValue.m_val
+                                else if( strPt === "display_points" )
+                                {
+                                    const decoder = new TextDecoder('utf-8')
+                                    let text=decoder.decode(arrKeyVals[i].oValue.m_val);
+                                    var ptList = JSON.parse(text);
+                                    if( ptList && ptList.length > 0 )
+                                    {
+                                        site.apps[j].display_points = new Map();
+                                        ptList.forEach( ( pt )=>{
+                                            site.apps[j].display_points.set( pt, { v:"N/A", unit:null});
+                                        });
+                                    }
+                                }
+                                else if( site.apps[j].display_points &&
+                                    site.apps[j].display_points.has( strPt ) )
+                                {
+                                    var value = site.apps[j].display_points.get( strPt );
+                                    value.v = arrKeyVals[i].oValue.m_val;
+                                    site.apps[j].display_points.set( strPt, value );
+                                }
                                 break;
                             }
                         }
                     }
                 }).bind( oAppMonitor_cli )
                 return oAppMonitor_cli.GetPointValues( oContext, "none", arrPtPaths ).then((ret)=>{
-                    console.log( 'request GetPointValues is done with status ' + ret );
+                    // console.log( 'request GetPointValues is done with status ' + ret );
                     if( globalThis.curProxy )
                     {
                         oContext.m_iRet = 0
@@ -429,8 +513,8 @@ function StartPullInfo()
                                             return StartClient( (context, ret)=>{}, strChildRouterPath )
                                                 .then((ret) => Promise.resolve(ret))
                                                 .catch((e) => {
-                                                    console.log('StartClient for ' + strChildRouterPath + ' failed with error ' + e);
-                                                    return Promise.reject(e);
+                                                    console.log('StartClient failed for ' + strChildRouterPath + ' with error ' + e);
+                                                    return Promise.resolve(e);
                                                 });
                                             });
                                         }
@@ -503,18 +587,31 @@ function StartPullInfo()
 
 function StartClient( oStartCb, strRouterPath = null )
 {
+    var bRoot = false
     if( strRouterPath === null )
         strRouterPath = "/";
+
+    if( strRouterPath === "/" )
+        bRoot = true
+
     //globalThis.g_strLoginResult = ""
-    var strObjDesc = './appmondesc.json';
+    var strObjDesc = new URL('./appmondesc.json', document.baseURI).href;
     var strAppMonitorObjName = 'AppMonitor';
     var oParams0 = globalThis.CoCreateInstance( EnumClsid.CConfigDb2 );
     oParams0.SetString( EnumPropId.propObjInstName, 'AppMonitor' );
     oParams0.SetString( EnumPropId.propRouterPath, strRouterPath );
     var oAppMonitor_cli = new CAppMonitor_CliImpl( globalThis.g_oIoMgr,
         strObjDesc, strAppMonitorObjName, oParams0 );
+    if( bRoot && globalThis.lastRoot && globalThis.lastRoot.m_oChanProxy )
+    {
+        oAppMonitor_cli.m_oChanProxy.m_strKey =
+            globalThis.lastRoot.m_oChanProxy.m_strKey;
+        oAppMonitor_cli.m_oChanProxy.m_strUserName =
+            globalThis.lastRoot.m_oChanProxy.m_strUserName;
+    }
 
     return oAppMonitor_cli.Start().then((retval)=>{
+        var oContext = new Object();
         if( ERROR( retval ) )
         {
             globalThis.curProxy = null;
@@ -522,26 +619,36 @@ function StartClient( oStartCb, strRouterPath = null )
                 globalThis.rootProxy = null;
             return Promise.reject( retval );
         }
-        var oContext = new Object();
         oContext.oStartCb = oStartCb
         globalThis.curProxy = undefined
         globalThis.funcStartPullInfo = StartPullInfo
         var funcStartPullInfo = StartPullInfo.bind( oAppMonitor_cli )
         return funcStartPullInfo().then((ret)=>{
             if( oContext.oStartCb )
+            {
+                oContext.m_iRet = 0;
                 oContext.oStartCb( oContext, ret );
+            }
             return Promise.resolve( ret );
         }
         ).catch((e)=>{
-            if( oContext.oStartCb )
-                oContext.oStartCb( oContext, -errno.EFAULT );
             console.log( 'StartPullInfo failed with error ' + e );
             return Promise.reject(e);
         });
     }).catch((e)=>{
-        oAppMonitor_cli.Stop( -errno.EFAULT )
         console.log( 'Start Proxy failed with error ' + e );
-        return Promise.resolve(e);
+        var oContext = new Object();
+        return oAppMonitor_cli.Stop( -errno.EFAULT ).then( e =>{
+            return Promise.reject(e);
+        }).catch( (e)=>{
+            if( oStartCb )
+            {
+                oContext.m_iRet = -errno.EFAULT;
+                oStartCb( oContext, -errno.EFAULT );
+            }
+            SetProxy( oAppMonitor_cli, true );
+            return Promise.reject(e);
+        })
     })
 }
 globalThis.StartClient = StartClient;
@@ -574,5 +681,6 @@ globalThis.NewCfgDb = NewCfgDb;
 globalThis.NewVariant = NewVariant;
 globalThis.GetSite = GetSite;
 globalThis.GetProxy = GetProxy;
+globalThis.ClearProxy = ClearProxy;
 globalThis.PollAllSites = PollAllSites
 globalThis.GetSiteParams = GetSiteParams

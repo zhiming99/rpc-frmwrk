@@ -327,15 +327,19 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
-        bash $cmddir/inituser.sh && bash $cmddir/initappreg.sh
+        bash $cmddir/inituser.sh; bash $cmddir/initappreg.sh
         ;;
     initcli)
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
-        if [[ "x$xauthmech" == "xSimpAuth" ]] ||
-            [[ "x$xauthmech" == "xOAuth2" ]]; then
-            regfsmnt -i $HOME/rpcf/clientreg.dat
-            rpcfctl genkeys openssl 1 1
-            rpcfctl genkeys gmssl 1 1
+        if [[ "x$authmech" == "xSimpAuth" ]] ||
+            [[ "x$authmech" == "xOAuth2" ]]; then
+            regfsmnt -i $HOME/.rpcf/clientreg.dat
+            if [[ ! -f $HOME/.rpcf/openssl/clientkey.pem ]]; then
+                rpcfctl genkeys openssl 1 1
+            fi
+            if [[ ! -f $HOME/.rpcf/gmssl/clientkey.pem ]]; then
+                rpcfctl genkeys gmssl 1 1
+            fi
         fi
         ;;
     importkey | import)
@@ -410,7 +414,31 @@ case "$cmd" in
             exit 1
         fi
         if [[ "x$1" == "xopenssl" ]]; then
-            if bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
+            if which expect; then
+                cat > $HOME/.rpcf/gencmd.sh << "EOF"
+#!/bin/bash
+if $1/opensslkey.sh $HOME/.rpcf/openssl $3 $4; then
+    clidx=`cat $HOME/.rpcf/openssl/clidx`;
+    svridx=`cat $HOME/.rpcf/openssl/svridx`;
+    echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl;
+    echo server key/cert package is serverkeys-$svridx.tar.gz;
+    echo client key/cert package is clientkeys-$clidx.tar.gz;
+else
+    echo Error generate OpenSSL key/cert;
+fi
+EOF
+                chmod u+x ~/.rpcf/gencmd.sh
+                expect - << EOF 
+#!/usr/bin/expect -f
+set timeout -1
+spawn ~/.rpcf/gencmd.sh $cmddir $2 $3 $4
+expect {
+    "Sign the certificate? " { send "y\r";exp_continue}
+    "requests certified, commit? " { send "y\r";exp_continue} 
+}
+EOF
+                rm -f ~/.rpcf/gencmd.sh
+            elif bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
                 clidx=`cat $HOME/.rpcf/openssl/clidx`
                 svridx=`cat $HOME/.rpcf/openssl/svridx`
                 echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl
@@ -420,6 +448,7 @@ case "$cmd" in
                 echo Error failed to generate OpenSSL key/cert
             fi
         elif [[ "x$1" == "xgmssl" ]]; then
+            if [ ! -d $HOME/.rpcf/gmssl ]; then mkdir -p $HOME/.rpcf/gmssl; fi
             if bash $cmddir/gmsslkey.sh $HOME/.rpcf/gmssl $2 $3; then
                 clidx=`cat $HOME/.rpcf/gmssl/clidx`
                 svridx=`cat $HOME/.rpcf/gmssl/svridx`
@@ -429,6 +458,8 @@ case "$cmd" in
             else
                 echo Error failed to generate GmSSL key/cert
             fi
+        else
+            echo "Error invalid SSL type '$1'"
         fi
         ;;
     printcert)
@@ -610,7 +641,7 @@ case "$cmd" in
                 echo $cmdline
                 exit 1
             fi
-            kinit -kt $HOME/rpcf/krb5cli.keytab $1
+            kinit -kt $HOME/.rpcf/krb5cli.keytab $1
         fi
         ;;
     backup)
@@ -621,7 +652,7 @@ case "$cmd" in
             echo The backup file will be stored in the home directory.
             exit 1
         fi
-        rpcfctl geninitcfg > ~/.rpcf/cfgbk.json
+        rpcfctl geninitcfg > $HOME/.rpcf/cfgbk.json
         tarfile=`realpath rpcf-backup-$(date +%Y%m%d).tar.gz`
         pushd $HOME > /dev/null
         if tar cf "$tarfile" .rpcf; then
@@ -858,6 +889,15 @@ case "$cmd" in
             exit 1
         fi
         python3 $cmddir/buildinst.py $@
+        ;;
+    detect_dbus)
+        if ! detect_and_start_dbus; then
+            exit 1
+        fi
+        exit 0
+        ;;
+    version)
+        rpcrouter -v | grep Version
         ;;
     *)
         echo "Unknown command: $cmd"

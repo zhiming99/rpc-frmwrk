@@ -1144,16 +1144,19 @@ class ConfigDlg(Gtk.Dialog):
 
         ipEditBox = Gtk.Entry()
         ipAddr = ''
+        bBindTo = True
         try:
             if confVals[ 'connParams'] is not None :
                 param0 = confVals[ 'connParams'][ ifNo ]
                 if param0 is not None :
                     ipAddr = param0[ 'BindAddr']
+                    if param0[ 'BindTo' ] == 'false':
+                        bBindTo = False
         except Exception as err :
             pass
         ipEditBox.set_text(ipAddr)
         ipEditBox.set_tooltip_text( "Enter an IP address or a domain name " +
-            "the client will connect to." )
+            "the client connects to." )
         grid.attach(ipEditBox, startCol + 1, startRow + 0, 2, 1 )
         self.ifctx[ ifNo ].ipAddr = ipEditBox
 
@@ -1161,12 +1164,12 @@ class ConfigDlg(Gtk.Dialog):
             checkBindTo = Gtk.CheckButton(label="Bind to")
             grid.attach( checkBindTo, startCol + 3, startRow + 0, 1, 1)
             self.ifctx[ ifNo ].bindTo = checkBindTo
-            toolTip = "Uncheck this box will force server to listen to 0.0.0.0 instead of this address. "
+            toolTip = "Uncheck this box and the server will listens to 0.0.0.0"
             checkBindTo.set_tooltip_text( toolTip )
             checkBindTo.connect(
                 "toggled", self.on_button_toggled, "bindTo")
             checkBindTo.iNo = ifNo
-            checkBindTo.props.active = True
+            checkBindTo.props.active = bBindTo
             if ipAddr == '0.0.0.0' or ipAddr == '::/0' or (
                 ipAddr == '0000:0000:0000:0000:0000:0000:0000:0000/0' ) :
                 checkBindTo.props.active = False
@@ -1301,6 +1304,7 @@ class ConfigDlg(Gtk.Dialog):
         urlEdit = Gtk.Entry()
         urlEdit.set_text( strUrl )
         urlEdit.set_sensitive( bActive )
+        urlEdit.set_tooltip_text( "This is the URL where the WebServer exposes rpc-frmwrk service" )
         grid.attach(urlEdit, startCol + 1, startRow + 1, 2, 1 )
         self.ifctx[ ifNo ].urlEdit = urlEdit
         urlEdit.ifNo = ifNo
@@ -3307,7 +3311,7 @@ EOF
         try:
             strVal = nodeCtx.ipAddr.get_text().strip() 
             if len( strVal ) == 0 :
-                raise Exception("'IP address' cannot be empty") 
+                raise Exception("'IP address' is the address the client to connect, and cannot be empty") 
             nodeCfg[ 'IpAddress' ] = strVal
 
             strVal = nodeCtx.port.get_text().strip()

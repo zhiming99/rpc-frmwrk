@@ -45,6 +45,7 @@
 #include <fstream>
 #include <sstream>
 #include <dirent.h>
+#include <fcntl.h>
 
 #define MAX_DUMP_SIZE 512
 
@@ -184,7 +185,7 @@ gint32 GetCmdOutput( std::string& strResult,
             ret = -errno;
             break;
         }
-        std::unique_ptr< FILE, decltype(&pclose) >
+        std::unique_ptr< FILE, int(*)(FILE*) >
             pipe( fp, pclose );
 
         if (!pipe)
@@ -815,6 +816,25 @@ struct hash_obj
 
 stdmutex g_oObjListLock;
 std::unordered_set< CObjBase*, hash_obj > g_vecObjs;
+void RedirectTo( const char* szFile )
+{
+    if( szFile == nullptr )
+        return;
+    int fd = fileno( stdout );
+    int newfd = open( szFile,
+        O_WRONLY | O_CREAT | O_TRUNC,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH );
+    if( newfd == -1 )
+    {
+        stdstr strMsg = DebugMsg( -errno,
+            "%s", strerror( errno ) );
+        perror( strMsg.c_str() );
+        return;
+    }
+    dup2( newfd, fd );
+    close( newfd );
+}
+
 void DumpObjs( bool bAll = false)
 {
     std::set< CObjBase*, cmp_obj > setObjs;
@@ -822,20 +842,21 @@ void DumpObjs( bool bAll = false)
         CStdMutex oLock( g_oObjListLock );
         for( auto pObj : g_vecObjs ) 
             setObjs.insert( pObj );
-    }
-    for( auto pObj : setObjs )
-    {
-        std::string strObj;
-        if( pObj != nullptr )
+        for( auto pObj : setObjs )
         {
-            if( pObj->GetClsid() == clsid( CBuffer ) ||
-                pObj->GetClsid() == clsid( CConfigDb2 ) )
-                if( !bAll )
-                    continue;
-            pObj->Dump( strObj );
-            printf( "%s\n", strObj.c_str() );
+            std::string strObj;
+            if( pObj != nullptr )
+            {
+                if( pObj->GetClsid() == clsid( CBuffer ) ||
+                    pObj->GetClsid() == clsid( CConfigDb2 ) )
+                    if( !bAll )
+                        continue;
+                pObj->Dump( strObj );
+                printf( "%s\n", strObj.c_str() );
+            }
         }
     }
+    syncfs(1);
 }
 
 // find objects by class id
@@ -1594,6 +1615,62 @@ gint32 GetHostAndPortFromUrl(
             matches[3].str().c_str(), nullptr, 10 );
     }
     return 0;
+}
+
+gint32 StartDBus()
+{
+    FILE* fp = nullptr;
+    gint32 ret = 0;
+    do{
+        stdstr strPath = "/usr/bin/rpcfctl";
+        ret = access( strPath.c_str(), X_OK );
+        if( ERROR( ret ) )
+        {
+            strPath = "/usr/local/bin/rpcfctl";
+            ret = access( strPath.c_str(), X_OK );
+            if( ERROR( ret ) )
+                break;
+        }
+        ret = system(
+            (strPath + " detect_dbus").c_str() );
+        if( ERROR( ret ) )
+        {
+            DebugPrintEx( logErr,
+                ret, "Error detecting dbus" );
+            break;
+        }
+
+        stdstr strDBusAddr =
+            GetHomeDir() + "/.rpcf/dbusaddr";
+        fp = fopen( strDBusAddr.c_str(), "r" );
+        if( fp == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        char line[ 1024 ] = {0,};
+        guint32 dwLen = sizeof( line );
+        char* pszAddr = fgets( line, dwLen, fp );
+        if( pszAddr == nullptr )
+        {
+            ret = -errno;
+            break;
+        }
+        stdstr s = pszAddr;
+        // trim right
+        s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }).base(), s.end());
+
+        ret = setenv( "DBUS_SESSION_BUS_ADDRESS",
+            s.c_str(), 1 );
+        if( ret < 0 )
+            ret = -errno;
+
+    }while( 0 );
+    if( fp )
+        fclose( fp );
+    return ret;
 }
 
 }

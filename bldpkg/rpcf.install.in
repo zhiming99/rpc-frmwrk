@@ -5,6 +5,7 @@ usr/bin/rpcrouter
 usr/bin/rpcf_logger
 usr/bin/rpcf_sendlog
 usr/bin/regfsmnt
+usr/bin/regfschk
 usr/bin/appmon*
 usr/bin/rpcfctl
 @FUSE3_DEBFILES@

@@ -62,7 +62,6 @@ static std::string g_strMPoint;
 static std::string g_strRegFsFile;
 static bool g_bFormat = false;
 
-ObjPtr g_pIoMgr;
 std::set< guint32 > g_setMsgIds;
 static bool g_bLogging = false;
 static bool g_bLocal = false;
@@ -632,37 +631,19 @@ gint32 InitContext()
     if( ERROR( ret ) )
         return ret;
     do{
-        CParamList oParams;
-        oParams.Push( "regfsmnt" );
-
-        oParams[ propEnableLogging ] = g_bLogging;
-        oParams[ propSearchLocal ] = g_bLocal;
-        oParams[ propConfigPath ] =
-            "invalidpath/driver.json";
-
-        // adjust the thread number if necessary
-        oParams[ propMaxIrpThrd ] = 0;
-        oParams[ propMaxTaskThrd ] = 1;
-
-        ret = g_pIoMgr.NewObj(
-            clsid( CIoManager ),
-            oParams.GetCfg() );
+        stdstr strPath;
+        ret = GetLibPath( strPath );
         if( ERROR( ret ) )
             break;
 
-        IService* pSvc = g_pIoMgr;
-        ret = pSvc->Start();
-        if( ERROR( ret ) )
-        {
-            OutputMsg( ret,
-                "Error start io manager" );
-        }
+        strPath += "/libregfs.so";
+        ret = CoLoadClassFactory(
+            strPath.c_str() );
 
     }while( 0 );
 
     if( ERROR( ret ) )
     {
-        g_pIoMgr.Clear();
         CoUninitialize();
     }
     return ret;
@@ -670,13 +651,6 @@ gint32 InitContext()
 
 gint32 DestroyContext()
 {
-    IService* pSvc = g_pIoMgr;
-    if( pSvc != nullptr )
-    {
-        pSvc->Stop();
-        g_pIoMgr.Clear();
-    }
-
     CoUninitialize();
     DebugPrintEx( logErr, 0,
         "#Leaked objects is %d",

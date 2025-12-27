@@ -1874,7 +1874,8 @@ gint32 CTcpStreamPdo2::PreStop(
             EnumSockState iState =
                 m_pConnSock->GetState();
 
-            if( iState == sockStopped )
+            if( iState == sockStopped &&
+                m_pReadTb.IsEmpty() )
             {
                 SetPreStopStep( pIrp, 1 );
                 break;
@@ -1914,7 +1915,7 @@ gint32 CTcpStreamPdo2::PreStop(
                 // we need to run on the mainloop
                 pTask->MarkPending();
                 pLoop->AddTask( pTask );
-                ret = STATUS_PENDING;
+                ret = STATUS_MORE_PROCESS_NEEDED;
             }
             break;
         }

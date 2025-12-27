@@ -150,6 +150,15 @@ gint32 CSuperBlock::Reload()
     return ret;
 }
 
+CGroupBitmap::CGroupBitmap(
+    CBlockAllocator* pAlloc ) :
+    m_pAlloc( pAlloc )
+{
+    m_pBytes.NewObj();
+    m_pBytes->Resize( GRPBMP_SIZE );
+    m_arrBytes = ( guint8* )m_pBytes->ptr();
+}
+
 gint32 CGroupBitmap::FreeGroup( guint32 dwGrpIdx )
 {
     gint32 ret = 0;

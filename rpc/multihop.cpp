@@ -92,7 +92,12 @@ gint32 CRpcTcpBridge::OnCheckRouterPathComplete(
         ret = pRouter->GetProxyIdByNodeName(
             strNode, dwProxyId );
         if( ERROR( ret ) )
+        {
+            LOGINFO( this->GetIoMgr(), iRet,
+                "Error node '%s' is unreachable",
+                strPath.c_str() );
             break;
+        }
 
         ret = pRouter->AddRefCount(
             strNode, dwPortId, dwProxyId );
@@ -202,6 +207,9 @@ gint32 CRpcTcpBridge::CheckRouterPathAgain(
         if( ERROR( ret ) )
         {
             // open port failed
+            LOGINFO( this->GetIoMgr(), iRet,
+                "Error node '%s' is unreachable",
+                strPath.c_str() );
             ret = ERROR_FAIL;
             break;
         }

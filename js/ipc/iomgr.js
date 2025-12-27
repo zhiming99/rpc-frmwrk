@@ -13,6 +13,40 @@ exports.CIoManager = class CIoManager
         this.m_mapPendingReqs = new Map()
         this.m_mapProxies = new Map()
         this.m_mapStreams = new Map()
+        this.m_iTimerId = 0
+
+        this.m_oScanReqs = ()=>{
+            var dwIntervalMs = 5 * 1000
+            var expired = []
+            var key, oPending
+            for( [ key, oPending ] of this.m_mapPendingReqs )
+            {
+                if( !oPending.m_iTimeoutSec )
+                    continue;
+                if( ! typeof oPending.m_iTimeoutSec === "number" )
+                    continue
+                oPending.m_iTimeoutSec -= 5
+                if( oPending.m_iTimeoutSec > 0 )
+                    continue
+                if( oPending.m_oReject )
+                {
+                    var oResp = new CConfigDb2()
+                    oResp.SetUint32(
+                        EnumPropId.propReturnValue, 
+                        -errno.ETIMEDOUT )
+                    oPending.m_oResp = oResp
+                }
+                expired.push( [ key, oPending ] )
+            }
+            for( [ key, oPending ] of expired )
+            {
+                this.m_mapPendingReqs.delete( key )
+                oPending.m_oReject( oPending  )
+            }
+
+            this.m_iTimerId = setTimeout(
+                this.m_oScanReqs, dwIntervalMs )
+        }
     }
 
     Start()
@@ -29,10 +63,16 @@ exports.CIoManager = class CIoManager
             console.log(e)
         }
         this.m_oWorker = oWorker
+
+        this.m_iTimerId = setTimeout(
+            this.m_oScanReqs, 10 * 1000 )
     }
 
     Stop()
     {
+        this.m_oScanReqs()
+        clearTimeout(this.m_iTimerId)
+        this.m_iTimerId = 0
         this.m_oWorker.terminate()
     }
 
@@ -221,9 +261,12 @@ exports.CIoManager = class CIoManager
                 oPending.m_oObject = this
                 oPending.m_oResolve = resolve
                 oPending.m_oReject = reject
+                oPending.m_iTimeoutSec = 5
                 oProxy.PostMessage( oPending )
             }).then((e)=>{
                 return Promise.resolve(0)
+            }).catch((e)=>{
+                return Promise.reject( e )
             })
         }catch( e ) {
             console.log( "Unregister proxy failed")
