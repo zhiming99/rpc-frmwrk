@@ -213,6 +213,9 @@
 #define MAX_FS_SIZE     \
     ( ( BLOCKS_PER_GROUP * BLKGRP_NUMBER ) + SUPER_BLOCK_SIZE + GRPBMP_BLKNUM  )
 
+#define BLKIDX_BEYOND_MAX( _blkidx_  ) \
+    ( ( _blkidx_ ) >= BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
+
 namespace rpcf{
 
 struct ISynchronize

@@ -187,7 +187,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                     authInfo[ "OA2ChkIp" ] = elem[ "IpAddress" ]
                     authInfo[ "OA2ChkPort" ] = elem[ "PortNumber" ]
                     authInfo[ "OA2SSL" ] = elem[ "EnableSSL" ]
-    elemSecs[ "AuthInfo" ] = authInfo
+        elemSecs[ "AuthInfo" ] = authInfo
 
     oMisc = dict()
     oMisc[ "MaxConnections" ] = maxConns

@@ -1069,6 +1069,13 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
         for( auto& elem : vecBlocks )
         {
             guint32 dwBlkIdx = elem.first;
+
+            if( BLKIDX_BEYOND_MAX( dwBlkIdx ) )
+            {
+                ret = -ERANGE;
+                break;
+            }
+
             guint32 dwIdx =
                 ( dwBlkIdx & BLOCK_IDX_MASK );
             guint64 off = ABS_ADDR(
