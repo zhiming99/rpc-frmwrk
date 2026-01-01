@@ -41,5 +41,5 @@ driver.json
 
 #### 命令手册
 ```
-regfsmnt(1)
+regfsmnt(1), regfschk(1)
 ```
