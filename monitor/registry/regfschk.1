@@ -1,0 +1,43 @@
+.TH regfschk 1 "January 2, 2026" "rpc-frmwrk" "User Commands"
+.SH NAME
+regfschk \- Registry Filesystem Checker
+
+.SH SYNOPSIS
+.B regfschk
+[\fIOPTIONS\fR] [\fIFILE\fR]
+
+.SH DESCRIPTION
+.B regfschk
+is a command-line utility for checking and validating the integrity of the registry filesystem used by 'appmonsvr' or other registry host program. It is used when the host process suffers unexpected crashes. 'regfschk' scans the registry, tries to fix all the errors encountered in the registry, and removes the files and directories unable to recover. The restored registry is saved to a file `FILE.restore'.
+
+.SH OPTIONS
+.TP
+\fB\-h, \--help\fR
+Display this help message and exit.
+.TP
+\fB\-v, \--verbose\fR
+Enable verbose output, providing detailed information about the checks being performed.
+
+.SH ARGUMENTS
+.TP
+\fIFILE\fR
+The registry file to check.
+
+.SH EXAMPLES
+.TP
+Check a registry file:
+.B regfschk file1.reg
+
+.SH EXIT STATUS
+.TP
+0
+All checks passed successfully.
+.TP
+>0
+Some fatal internal error occurs and the scan stops.
+
+.SH SEE ALSO
+rpc-frmwrk(1), regfsmnt(1)
+
+.SH AUTHOR
+Written by Zhiming.
