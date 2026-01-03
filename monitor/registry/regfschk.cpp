@@ -1166,5 +1166,5 @@ int main( int argc, char** argv)
         ret = _main();
         DestroyContext();
     }while( 0 );
-    return ret;
+    return -ret;
 }
