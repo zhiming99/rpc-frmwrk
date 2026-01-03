@@ -777,7 +777,6 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
                 pNewRoot, pOld );
             CBPlusNode* pRoot =
                 m_pDir->GetRootNode();
-            auto& oMap = this->GetChildMap();
             ret = pRoot->AddChildDirect(
                 pOld->GetBNodeIndex(), pOld );
             if( ERROR( ret ) )
@@ -792,7 +791,6 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
             ret = this->InsertOnly( pSlot );
             if( ERROR( ret ) )
                 break;
-
             guint32 i;
             i = GetParentSlotIdx();
             if( i == UINT_MAX )
@@ -2098,8 +2096,15 @@ gint32 CDirImage::GetFreeBNode(
             dwBNodeIdx );
         if( ERROR( ret ) )
         {
-            dwBNodeIdx =
-                ( m_oInodeStore.m_dwSize +
+            guint32 dwOff = 
+                m_oInodeStore.m_dwSize;
+            if( dwOff + REGFS_PAGE_SIZE >
+                MAX_FILE_SIZE )
+            {
+                ret = -EFBIG;
+                break;
+            }
+            dwBNodeIdx = ( dwOff +
                     REGFS_PAGE_SIZE - 1 ) /
                     REGFS_PAGE_SIZE;
         }
