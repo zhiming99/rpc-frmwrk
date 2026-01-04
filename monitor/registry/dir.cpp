@@ -196,19 +196,19 @@ gint32 CBPlusNode::Reload()
             dwSize, arrBytes );
         if( ERROR( ret ) )
             break;
-        auto pBPNode = &m_oBNodeStore;
-        ret = pBPNode->ntoh( arrBytes, dwSize );
+        auto& oBNode = m_oBNodeStore;
+        ret = oBNode.ntoh( arrBytes, dwSize );
         if( ERROR( ret ) )
             break;
 
-        if( pBPNode->m_bLeaf )
+        if( IsLeaf() )
             break;
         
         for( int i = 0; i <
-            pBPNode->m_wNumPtrs; i++ )
+            oBNode.m_wNumPtrs; i++ )
         {
             KEYPTR_SLOT* p =
-               pBPNode->m_vecSlots[ i ];
+               oBNode.m_vecSlots[ i ];
             guint32 dwIdx = p->dwBNodeIdx;
             BNodeUPtr pNode;
             pNode.reset(
