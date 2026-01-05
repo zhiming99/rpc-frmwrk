@@ -496,7 +496,7 @@ int main( int argc, char** argv)
                 case 'l':
                     { g_bLocal = true; break; }
                 case 's':
-                    { SetSafeMode( true ); break; }
+                    { /*SetSafeMode( true )*/; break; }
                 case 'm':
                     {
                         if( !IsValidName( optarg ) )
