@@ -48,11 +48,15 @@ static RegFsPtr g_pRegfs;
 static stdstr g_strRegFsFile;
 static bool g_bVerbose = false;
 
+#ifdef RELEASE
 #define OutputMsg2( ret, strFmt, ... ) \
 do{ \
     printf( strFmt, ##__VA_ARGS__ ); \
     printf( "(%d)\n", ret ); \
 }while( 0 )
+#else
+#define OutputMsg2 OutputMsg
+#endif
 
 
 gint32 InitContext()
@@ -91,31 +95,6 @@ gint32 DestroyContext()
 gint32 ScanBlocks( RegFsPtr& pFs )
 {
     return 0;
-}
-
-gint32 GetPathFromImg( FImgSPtr& pFile,
-    stdstr& strPath )
-{
-    if( pFile.IsEmpty() )
-        return -EINVAL;
-    gint32 ret = 0;
-    CFileImage* pNode = pFile;
-    do{
-        stdstr strName = pNode->GetName();
-        if( strName == "/" )
-        {
-            strPath = strName + strPath;
-            break;
-        }
-        else if( strPath.size() )
-            strPath = strName + "/" + strPath;
-        else
-            strPath = strName;
-        pNode = pNode->GetParentDir();
-        if( pNode == nullptr )
-            break;
-    }while( 1 );
-    return ret;
 }
 
 typedef enum {

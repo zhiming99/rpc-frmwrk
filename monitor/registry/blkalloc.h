@@ -140,13 +140,13 @@
 #define GROUP_INDEX( _blk_idx ) \
     ( ( _blk_idx >> GROUP_INDEX_SHIFT ) & GROUP_IDX_MASK ) 
 
-// get the logical address of a group from a with a
-// block index from inode
+// get the logical address of a group with a block
+// index from inode
 #define GROUP_START( _blk_idx ) \
     ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE )
 
 // get the logical address of a group's data section
-// from a with a block index from inode
+// with a block index from inode
 #define GROUP_DATA_START( _blk_idx ) \
     ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE + \
     BLKBMP_BLKNUM * BLOCK_SIZE )
@@ -201,7 +201,7 @@
 #define FLAG_FLUSH_CHILD 0x01
 #define FLAG_FLUSH_DATA 0x02
 #define FLAG_FLUSH_INODE 0x04
-#define FLAG_FLUSH_FREEIMG 0x08
+#define FLAG_FLUSH_SINGLE_BNODE 0x8
 #define FLAG_FLUSH_DEFAULT \
     ( FLAG_FLUSH_DATA | FLAG_FLUSH_INODE )
 
@@ -217,6 +217,14 @@
     ( ( _blkidx_ ) >= BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
 
 namespace rpcf{
+
+extern bool g_bSafeMode;
+
+inline bool IsSafeMode()
+{ return g_bSafeMode; }
+
+inline void SetSafeMode( bool bSafe )
+{ g_bSafeMode = bSafe; }
 
 struct ISynchronize
 {
@@ -386,6 +394,7 @@ struct CGroupBitmap :
 typedef std::unique_ptr< CGroupBitmap > GrpBmpUPtr;
 
 typedef std::pair< guint32, guint32 > CONTBLKS;
+using DirtyBlks = typename std::map< guint32, BufPtr >;
 
 class CBlockAllocator :
     public CObjBase,
@@ -397,6 +406,7 @@ class CBlockAllocator :
     SblkUPtr            m_pSuperBlock;
     GrpBmpUPtr          m_pGroupBitmap;
     std::map< guint32, BlkGrpUPtr > m_mapBlkGrps;
+    DirtyBlks           m_mapDirtyBlks;
 
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
@@ -406,6 +416,15 @@ class CBlockAllocator :
     gint32 ReadWriteFile(
         char* pBuf, guint32 dwSize,
         guint32 dwOff, bool bRead );
+
+    gint32 CacheBlocks(
+        const guint32* pBlocks,
+        guint32 dwNumBlocks, guint8* pBuf,
+        bool bContigous = false );
+
+    gint32 ReadCache( const guint32* pBlocks,
+        guint32 dwNumBlocks, guint8* pBuf,
+        bool bContigous = false );
 
     public:
     CBlockAllocator( const IConfigDb* pCfg );
@@ -557,6 +576,9 @@ struct RegFSInode
     guint8      m_arrBuf[ VALUE_SIZE ];
     guint8      m_iValType;
     guint32     m_dwRootBNode;
+
+    gint32 Serialize( BufPtr& pBuf,
+        const Variant& oVar ) const;
 
 } __attribute__((aligned (4)));
 
@@ -970,6 +992,7 @@ struct CFreeBNodePool :
 
     gint32 Reload() override;
     gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 FlushSingleBNode( guint32 dwBNodeIdx );
 };
 
 struct CDirImage : 
@@ -980,6 +1003,7 @@ struct CDirImage :
     std::unique_ptr< CFreeBNodePool > m_pFreePool;
     ChildMap m_mapChilds;
     FileMap m_mapFiles;
+    std::set< guint32 > m_setDirtyNodes;
 
     CDirImage( const IConfigDb* pCfg );
 
@@ -1030,7 +1054,7 @@ struct CDirImage :
         BNodeUPtr& pNew, BNodeUPtr& pOld );
 
     gint32 ReleaseFreeBNode( guint32 dwBNodeIdx );
-    guint32 GetHeadFreeBNode();
+    guint32 GetHeadFreeBNode() const;
     void SetHeadFreeBNode( guint32 dwBNodeIdx );
 
     gint32 InsertFile(
@@ -1059,11 +1083,6 @@ struct CDirImage :
     gint32 ListDir(
         std::vector< KEYPTR_SLOT >& vecDirEnt );
 
-    guint32 GetFreeBNodeIdx() const;
-
-    void SetFreeBNodeIdx(
-        guint32 dwBNodeIdx );
-
     gint32 UnloadFile( const char* szName );
     gint32 UnloadDirImage();
 
@@ -1073,6 +1092,8 @@ struct CDirImage :
     EnumFileType GetType() const override final
     { return ftDirectory; }
 
+    void SetDirty( guint32 dwBNodeIdx );
+    gint32 CommitDirtyNodes();
 };
 
 struct CBPlusNode :
@@ -1173,7 +1194,7 @@ struct CBPlusNode :
     inline guint32 GetBNodeIndex() const
     { return m_oBNodeStore.GetBNodeIndex(); }
 
-    guint32 GetChildCount() const
+    inline guint32 GetChildCount() const
     { return m_oBNodeStore.m_wNumPtrs; }
 
     void SetChildCount( guint32 dwBNode )
@@ -1430,9 +1451,6 @@ struct CBPlusNode :
     const char* GetSuccKey(
         guint32 dwIdx = 0 ) const;
 
-    inline guint32 GetChildCount()
-    { return m_oBNodeStore.m_wNumPtrs; };
-    
     inline guint32 GetFreeBNodeIdx() const
     {
         auto& o = m_oBNodeStore;
@@ -1914,5 +1932,13 @@ struct CFileHandle
     { m_hFile = hFile; m_pFs = pFs; }
     ~CFileHandle();
 };
+
+gint32 GetPathFromImg(
+    CFileImage* pFile,
+    stdstr& strPath );
+
+gint32 GetPathFromImg(
+    FImgSPtr& pFile,
+    stdstr& strPath );
 
 }

@@ -27,9 +27,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
-
 namespace rpcf{
 
+bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
 
@@ -186,6 +186,7 @@ gint32 CGroupBitmap::FreeGroup( guint32 dwGrpIdx )
         guint8 bit = ( 1 << dwOffset );
         a &= ( ~bit );
         m_wFreeCount++;
+        Flush( 0 );
 
     }while( 0 );
 
@@ -268,6 +269,7 @@ gint32 CGroupBitmap::AllocGroup( guint32& dwGrpIdx )
     if( bFound )
     {
         m_wFreeCount--;
+        Flush( 0 );
         return STATUS_SUCCESS;
     }
     return -ENOMEM;
@@ -434,10 +436,11 @@ gint32 CBlockBitmap::AllocBlocks(
     gint32 ret = 0;
     guint32 dwBlocks = 0;
     bool bFull = false;
+    guint8 arrDirtyBlk[ BLKBMP_BLKNUM ] = {0};
+    guint32 dwGrpIdx =
+        ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
     do{
         LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
-        guint32 dwGrpIdx =
-            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
 
         guint32 dwCount =
             BLKBMP_SIZE/sizeof( LONGWORD );
@@ -481,6 +484,11 @@ gint32 CBlockBitmap::AllocBlocks(
                             ( dwGrpIdx | dwBlkIdx );
                         dwBlocks++;
                         a |= bit;
+                        if( IsSafeMode() )
+                        {
+                            arrDirtyBlk[ dwBlkIdx /
+                                ( BLOCK_SIZE * BYTE_BITS ) ] = 1;
+                        }
                         if( dwBlocks == dwNumBlocks )
                         {
                             bFull = true;
@@ -516,6 +524,11 @@ gint32 CBlockBitmap::AllocBlocks(
                         ( dwGrpIdx | dwBlkIdx );
                     dwBlocks++;
                     a |= bit;
+                    if( IsSafeMode() )
+                    {
+                        arrDirtyBlk[ dwBlkIdx /
+                            ( BLOCK_SIZE * BYTE_BITS ) ] = 1;
+                    }
                     if( dwBlocks == dwNumBlocks )
                     {
                         bFull = true;
@@ -529,6 +542,21 @@ gint32 CBlockBitmap::AllocBlocks(
 
     dwNumBlocks = dwBlocks;
     m_wFreeCount -= dwBlocks;
+    if( dwNumBlocks && IsSafeMode() )
+    {
+        guint16* p = ( guint16* )
+            ( m_arrBytes + BLKBMP_BLKNUM * BLOCK_SIZE );
+        p[ -1 ] = htons( m_wFreeCount );
+        arrDirtyBlk[ BLKBMP_BLKNUM - 1 ] = 1;
+        for( int i = 0; i < BLKBMP_BLKNUM; i++ )
+        {
+            if( arrDirtyBlk[ i ] == 0 )
+                continue;
+            guint32 dwBlkIdx = ( dwGrpIdx | i );
+            m_pAlloc->WriteBlock( dwBlkIdx,
+                m_arrBytes + i * BLOCK_SIZE  );
+        }
+    }
     if( bFull )
     {
         return STATUS_SUCCESS;
@@ -562,7 +590,10 @@ gint32 CBlockBitmap::FreeBlocks(
 
         LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
         constexpr guint32 dwNumBits = BYTE_BITS;
+        guint8 arrDirtyBlk[ BLKBMP_BLKNUM ] = {0};
+        guint32 dwCount = 0;
 
+        guint32 shift = find_shift( dwNumBits );
         for( guint32 i = 0; i < dwNumBlocks; i++ )
         {
             guint32 dwBlkIdx =
@@ -570,7 +601,6 @@ gint32 CBlockBitmap::FreeBlocks(
             if( dwBlkIdx == 0 )
                 continue;
 
-            guint32 shift = find_shift( dwNumBits );
             guint32 dwByteIdx =
                 ( dwBlkIdx >> shift );
 
@@ -584,8 +614,31 @@ gint32 CBlockBitmap::FreeBlocks(
             guint8 bit = ( 1 << offset );
             a &= ( ~bit );
             m_wFreeCount++;
+            if( IsSafeMode() )
+            {
+                arrDirtyBlk[ dwBlkIdx /
+                    ( BLOCK_SIZE * BYTE_BITS ) ] = 1;
+                dwCount++;
+            }
         }
-
+        if( dwCount && IsSafeMode() )
+        {
+            guint32 dwGrpIdx =
+                ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
+            guint16* p = ( guint16* )
+                ( m_arrBytes + BLKBMP_BLKNUM * BLOCK_SIZE );
+            p[ -1 ] = htons( m_wFreeCount );
+            arrDirtyBlk[ BLKBMP_BLKNUM - 1 ] = 1;
+            for( int i = 0; i < BLKBMP_BLKNUM && dwCount; i++ )
+            {
+                if( arrDirtyBlk[ i ] == 0 )
+                    continue;
+                guint32 dwBlkIdx = ( dwGrpIdx | i );
+                m_pAlloc->WriteBlock( dwBlkIdx,
+                    m_arrBytes + i * BLOCK_SIZE  );
+                dwCount--;
+            }
+        }
     }while( 0 );
 
     return ret;
@@ -743,13 +796,22 @@ gint32 CBlockAllocator::SaveSuperBlock(
     gint32 ret = 0;
     if( dwSize < SUPER_BLOCK_SIZE )
         return -EINVAL;
-    ret = ReadWriteFile(
-        const_cast< char* >( pSb ),
-        SUPER_BLOCK_SIZE, 0, false );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-2;
+        ret = CacheBlocks(
+            &dwBlkIdx, 1, ( guint8* )pSb ); 
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            const_cast< char* >( pSb ),
+            SUPER_BLOCK_SIZE, 0, false );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -759,12 +821,21 @@ gint32 CBlockAllocator::LoadSuperBlock(
     gint32 ret = 0;
     if( dwSize < SUPER_BLOCK_SIZE )
         return -EINVAL;
-    ret = ReadWriteFile(
-        pSb, SUPER_BLOCK_SIZE, 0, true );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-2;
+        ret = ReadCache( &dwBlkIdx,
+            1, ( guint8* )pSb );
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            pSb, SUPER_BLOCK_SIZE, 0, true );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -773,14 +844,24 @@ gint32 CBlockAllocator::SaveGroupBitmap(
 {
     if( dwSize < GRPBMP_SIZE )
         return -EINVAL;
-
-    gint32 ret = ReadWriteFile(
-        const_cast< char* >( pbmp ), 
-        GRPBMP_SIZE, GRPBMP_START, false );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    gint32 ret = 0;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-3;
+        ret = CacheBlocks(
+            &dwBlkIdx, GRPBMP_BLKNUM,
+            ( guint8* )pbmp ); 
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            const_cast< char* >( pbmp ), 
+            GRPBMP_SIZE, GRPBMP_START, false );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -790,13 +871,23 @@ gint32 CBlockAllocator::LoadGroupBitmap(
     if( dwSize < GRPBMP_SIZE )
         return -EINVAL;
 
-    gint32 ret = ReadWriteFile(
-        pbmp, GRPBMP_SIZE,
-        GRPBMP_START, true );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    gint32 ret = 0;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-3;
+        ret = ReadCache( &dwBlkIdx, 1, 
+           ( guint8* )pbmp );
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            pbmp, GRPBMP_SIZE,
+            GRPBMP_START, true );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -1096,7 +1187,7 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             }
             else if( dwBlkIdx == 0 && !bRead )
             {
-                ret = -ENOSPC;
+                ret = -ENODATA;
                 break;
             }
             ret = ReadWriteFile(
@@ -1127,6 +1218,17 @@ gint32 CBlockAllocator::ReadWriteBlocks(
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
+        if( IsSafeMode() )
+        {
+            if( bRead )
+                ret = ReadCache( pBlocks,
+                    dwNumBlocks, pBuf, bContigous );
+            else
+                ret = CacheBlocks( pBlocks,
+                    dwNumBlocks, pBuf, bContigous );
+            break;
+        }
+
         if( bContigous )
         {
             guint32 dwDist =
@@ -1299,6 +1401,98 @@ gint32 CBlockAllocator::Reload()
         }
     }while( 0 );
     return ret;
+}
+
+
+#include <algorithm>
+
+using INTERVAL=std::pair< guint32, guint32 >;
+using INTERVALS=std::vector< INTERVAL >;
+
+INTERVALS MergeIntervals(
+    const INTERVALS& intervals1,
+    const INTERVALS& intervals2 )
+{
+    INTERVALS merged;
+    guint32 i = 0, j = 0;
+    guint32 n1 = intervals1.size(), n2 = intervals2.size();
+
+    while (i < n1 && j < n2)
+    {
+        if (intervals1[i].first < intervals2[j].first)
+            merged.push_back(intervals1[i++]);
+        else
+            merged.push_back(intervals2[j++]);
+    }
+
+    while (i < n1) merged.push_back(intervals1[i++]);
+    while (j < n2) merged.push_back(intervals2[j++]);
+
+    // merge the neighbors
+    INTERVALS result;
+    for (const auto& interval : merged) {
+        if (result.empty() || result.back().second < interval.first) {
+            result.push_back(interval);
+        } else {
+            result.back().second =
+                std::max( result.back().second, interval.second );
+        }
+    }
+    return result;
+}
+
+INTERVALS IntersectIntervals(
+    const INTERVALS& intervals1,
+    const INTERVALS& intervals2)
+{
+    INTERVALS result;
+    int i = 0, j = 0;
+    int n1 = intervals1.size(), n2 = intervals2.size();
+
+    while (i < n1 && j < n2) {
+        int start = std::max(intervals1[i].first, intervals2[j].first);
+        int end = std::min(intervals1[i].second, intervals2[j].second);
+        if (start <= end) {
+            result.emplace_back(start, end);
+        }
+        if (intervals1[i].second < intervals2[j].second) {
+            ++i;
+        } else {
+            ++j;
+        }
+    }
+    return result;
+}
+
+gint32 CBlockAllocator::CacheBlocks(
+    const guint32* pBlocks,
+    guint32 dwNumBlocks, guint8* pBuf,
+    bool bContigous )
+{
+    gint32 ret = 0;
+    do{
+        std::vector< CONTBLKS > vecBlks;
+        if( !bContigous )
+        {
+            FindContigousBlocks( pBlocks,
+                dwNumBlocks, vecBlks );
+        }
+        else
+        {
+            vecBlks.push_back(
+                { *pBlocks, dwNumBlocks } );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::ReadCache(
+    const guint32* pBlocks,
+    guint32 dwNumBlocks, guint8* pBuf,
+    bool bContigous )
+{
+    return ERROR_NOT_IMPL;
 }
 
 }

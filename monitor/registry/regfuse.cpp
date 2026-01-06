@@ -729,6 +729,7 @@ static void Usage( const char* szName )
         "\t [ -g send logs to log server ]\n"
         "\t [ -i FORMAT the regfs ]\n"
         "\t [ -u to enable fuse to dump debug information ]\n"
+        "\t [ -s Run the registry in safe mode, to guarantee the registry integrity through unexpected shutdown or crash]\n"
         "\t [ -h this help ]\n", szName );
 }
 
@@ -740,7 +741,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "chgdiul" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "chgdiuls" ) ) != -1 )
         {
             switch( opt )
             {
@@ -756,6 +757,8 @@ int main( int argc, char** argv)
                     { bDebug = true; break; }
                 case 'l':
                     { g_bLocal = true; break; }
+                case 's':
+                    { SetSafeMode( true ); break; }
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
