@@ -393,7 +393,28 @@ struct CGroupBitmap :
 
 typedef std::unique_ptr< CGroupBitmap > GrpBmpUPtr;
 
-typedef std::pair< guint32, guint32 > CONTBLKS;
+struct CONTBLKS
+{
+    union{
+        guint32 first;
+        guint32 dwBlkIdx;
+    };
+    union{
+        guint32 second;
+        guint32 dwCount;
+        guint32 dwBlkIdxEnd;
+    };
+    union{
+        guint32 third;
+        guint32 dwOff; // buffer offset in block index
+    };
+    guint32 dwKey = ( guint32 )-1;
+
+    CONTBLKS( guint32 a1, guint32 a2,
+        guint32 a3 = 0, guint32 a4 = 0 )
+    { first = a1, second = a2, third = a3, dwKey = a4; }
+};
+
 using DirtyBlks = typename std::map< guint32, BufPtr >;
 
 class CBlockAllocator :

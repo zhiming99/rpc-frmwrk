@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
+
 namespace rpcf{
 
 bool    g_bSafeMode = false;
@@ -847,7 +848,7 @@ gint32 CBlockAllocator::SaveGroupBitmap(
     gint32 ret = 0;
     if( IsSafeMode() )
     {
-        guint32 dwBlkIdx = ( guint32 )-3;
+        guint32 dwBlkIdx = ( guint32 )-4;
         ret = CacheBlocks(
             &dwBlkIdx, GRPBMP_BLKNUM,
             ( guint8* )pbmp ); 
@@ -874,7 +875,7 @@ gint32 CBlockAllocator::LoadGroupBitmap(
     gint32 ret = 0;
     if( IsSafeMode() )
     {
-        guint32 dwBlkIdx = ( guint32 )-3;
+        guint32 dwBlkIdx = ( guint32 )-4;
         ret = ReadCache( &dwBlkIdx, 1, 
            ( guint8* )pbmp );
     }
@@ -1407,59 +1408,93 @@ gint32 CBlockAllocator::Reload()
 #include <algorithm>
 
 using INTERVAL=std::pair< guint32, guint32 >;
-using INTERVALS=std::vector< INTERVAL >;
+using INTERVALS=std::vector< CONTBLKS >;
 
-INTERVALS MergeIntervals(
+// every interval is right-open [first, second)
+// intervals1 is sorted and non-overlapping
+// intervals2 is an ordered map and non-overlapping
+
+INTERVALS IntersectIntervals(
     const INTERVALS& intervals1,
-    const INTERVALS& intervals2 )
+    const DirtyBlks& intervals2)
 {
-    INTERVALS merged;
-    guint32 i = 0, j = 0;
-    guint32 n1 = intervals1.size(), n2 = intervals2.size();
-
-    while (i < n1 && j < n2)
-    {
-        if (intervals1[i].first < intervals2[j].first)
-            merged.push_back(intervals1[i++]);
-        else
-            merged.push_back(intervals2[j++]);
-    }
-
-    while (i < n1) merged.push_back(intervals1[i++]);
-    while (j < n2) merged.push_back(intervals2[j++]);
-
-    // merge the neighbors
     INTERVALS result;
-    for (const auto& interval : merged) {
-        if (result.empty() || result.back().second < interval.first) {
-            result.push_back(interval);
+    guint32 i = 0, j = 0;
+    guint32 n1 = intervals1.size();
+    guint32 n2 = intervals2.size();
+    auto jter = intervals2.lower_bound(
+        intervals1[i].first );
+    if( jter == intervals2.end() )
+    {
+        result.insert( result.end(),
+            intervals1.begin(), intervals1.end() );
+        return result;
+    }
+    if( jter != intervals2.begin() )
+        jter--;
+
+    while (i < n1 && jter != intervals2.end()) {
+        guint32 start = std::max(
+            intervals1[i].first, jter->first);
+
+        guint32 end2 = jter->first +
+            jter->second->size() / BLOCK_SIZE;
+
+        guint32 end = std::min(
+            intervals1[i].second, end2 );
+
+        if (start < end) {
+            guint32 dwBufOff = intervals1[i].dwOff;
+            guint32 dwOff = (
+                start == ( intervals1[i].first
+                ?  dwBufOff : dwBufOff + 
+                start - intervals1[i].first ) );
+            result.emplace_back(
+                start, end, dwOff, jter->first );
+        }
+        if (intervals1[i].second < end2 ) {
+            ++i;
         } else {
-            result.back().second =
-                std::max( result.back().second, interval.second );
+            ++jter;
         }
     }
     return result;
 }
 
-INTERVALS IntersectIntervals(
+INTERVALS SubtractIntervals(
     const INTERVALS& intervals1,
     const INTERVALS& intervals2)
 {
     INTERVALS result;
-    int i = 0, j = 0;
-    int n1 = intervals1.size(), n2 = intervals2.size();
+    guint32 i = 0, j = 0;
+    guint32 n1 = intervals1.size();
+    guint32 n2 = intervals2.size();
 
-    while (i < n1 && j < n2) {
-        int start = std::max(intervals1[i].first, intervals2[j].first);
-        int end = std::min(intervals1[i].second, intervals2[j].second);
-        if (start <= end) {
-            result.emplace_back(start, end);
-        }
-        if (intervals1[i].second < intervals2[j].second) {
-            ++i;
-        } else {
+    while (i < n1) {
+        guint32 start1 = intervals1[i].first;
+        guint32 end1 = intervals1[i].second;
+
+        while (j < n2 && intervals2[j].second <= start1) {
             ++j;
         }
+
+        guint32 currentStart = start1;
+
+        while (j < n2 && intervals2[j].first < end1) {
+            if (intervals2[j].first > currentStart) {
+                result.emplace_back(
+                    currentStart, intervals2[j].first );
+            }
+            currentStart = std::max(
+                currentStart, intervals2[j].second);
+            ++j;
+        }
+
+        if (currentStart < end1) {
+            result.emplace_back(currentStart, end1);
+        }
+
+        ++i;
     }
     return result;
 }
@@ -1471,17 +1506,56 @@ gint32 CBlockAllocator::CacheBlocks(
 {
     gint32 ret = 0;
     do{
+        // handle the special cases
+        if( *pBlocks == ( guint32 )-2 )
+        {
+            BufPtr pBufCopy( true );
+            ret = pBufCopy->Append(
+                pBuf, SUPER_BLOCK_SIZE );
+            if( ERROR( ret ) )
+                break;
+            m_mapDirtyBlks[ *pBlocks ] = pBufCopy;
+            continue;
+        }
+        else if( *pBlocks == ( guint32 )-4 )
+        {
+            BufPtr pBufCopy( true );
+            ret = pBufCopy->Append(
+                pBuf, GRPBMP_SIZE );
+            if( ERROR( ret ) )
+                break;
+            m_mapDirtyBlks[ *pBlocks ] = pBufCopy;
+            continue;
+        }
+
         std::vector< CONTBLKS > vecBlks;
         if( !bContigous )
         {
             FindContigousBlocks( pBlocks,
                 dwNumBlocks, vecBlks );
+            guint32 dwOff = 0;
+            for( auto& elem : vecBlks )
+            {
+                elem.third = dwOff;
+                dwOff += elem.second;
+                elem.second += elem.first;
+                // block offset in the pBuf
+            }
+            std::sort( vecBlks.begin(), vecBlks.end(),
+                ( []( const CONTBLKS& a1, const CONTBLKS& a2 )
+                { return a1.dwBlkIdx <= a2.dwBlkIdx; } ) );
         }
         else
         {
             vecBlks.push_back(
-                { *pBlocks, dwNumBlocks } );
+                { *pBlocks, *pBlocks + dwNumBlocks } );
         }
+
+
+        INTERVALS oCommonBlks = IntersectIntervals(
+            vecBlks, this->m_mapDirtyBlks );
+        INTERVALS oNewBlks = SubtractIntervals(
+            vecBlks, oCommonBlks );
 
     }while( 0 );
     return ret;
