@@ -428,6 +428,7 @@ class CBlockAllocator :
     GrpBmpUPtr          m_pGroupBitmap;
     std::map< guint32, BlkGrpUPtr > m_mapBlkGrps;
     DirtyBlks           m_mapDirtyBlks;
+    guint32             m_dwDirtyBlkCount = 0;
 
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
@@ -446,6 +447,8 @@ class CBlockAllocator :
     gint32 ReadCache( const guint32* pBlocks,
         guint32 dwNumBlocks, guint8* pBuf,
         bool bContigous = false );
+
+    gint32 CommitCache();
 
     public:
     CBlockAllocator( const IConfigDb* pCfg );
