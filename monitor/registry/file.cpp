@@ -2123,10 +2123,15 @@ gint32 COpenFileEntry::Close()
         if( dwState == stateStopped )
             break;
         oLock.Unlock();
-        ret = this->Flush();
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_MORE_PROCESS_NEEDED;
 
+        if( IsSafeMode() )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+        else
+        {
+            ret = this->Flush();
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_MORE_PROCESS_NEEDED;
+        }
     }while( 0 );
     return ret;
 }
