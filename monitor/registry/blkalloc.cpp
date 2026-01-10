@@ -27,11 +27,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sys/uio.h>
+#include <stdlib.h>
 
 namespace rpcf{
 
+bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
+guint32 g_dwCacheLife = CACHE_LIFE_CYCLE;
 
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
@@ -186,6 +190,7 @@ gint32 CGroupBitmap::FreeGroup( guint32 dwGrpIdx )
         guint8 bit = ( 1 << dwOffset );
         a &= ( ~bit );
         m_wFreeCount++;
+        Flush( 0 );
 
     }while( 0 );
 
@@ -268,6 +273,7 @@ gint32 CGroupBitmap::AllocGroup( guint32& dwGrpIdx )
     if( bFound )
     {
         m_wFreeCount--;
+        Flush( 0 );
         return STATUS_SUCCESS;
     }
     return -ENOMEM;
@@ -434,10 +440,11 @@ gint32 CBlockBitmap::AllocBlocks(
     gint32 ret = 0;
     guint32 dwBlocks = 0;
     bool bFull = false;
+    guint8 arrDirtyBlk[ BLKBMP_BLKNUM ] = {0};
+    guint32 dwGrpIdx =
+        ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
     do{
         LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
-        guint32 dwGrpIdx =
-            ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
 
         guint32 dwCount =
             BLKBMP_SIZE/sizeof( LONGWORD );
@@ -481,6 +488,11 @@ gint32 CBlockBitmap::AllocBlocks(
                             ( dwGrpIdx | dwBlkIdx );
                         dwBlocks++;
                         a |= bit;
+                        if( IsSafeMode() )
+                        {
+                            arrDirtyBlk[ dwBlkIdx /
+                                ( BLOCK_SIZE * BYTE_BITS ) ] = 1;
+                        }
                         if( dwBlocks == dwNumBlocks )
                         {
                             bFull = true;
@@ -516,6 +528,11 @@ gint32 CBlockBitmap::AllocBlocks(
                         ( dwGrpIdx | dwBlkIdx );
                     dwBlocks++;
                     a |= bit;
+                    if( IsSafeMode() )
+                    {
+                        arrDirtyBlk[ dwBlkIdx /
+                            ( BLOCK_SIZE * BYTE_BITS ) ] = 1;
+                    }
                     if( dwBlocks == dwNumBlocks )
                     {
                         bFull = true;
@@ -529,6 +546,21 @@ gint32 CBlockBitmap::AllocBlocks(
 
     dwNumBlocks = dwBlocks;
     m_wFreeCount -= dwBlocks;
+    if( dwNumBlocks && IsSafeMode() )
+    {
+        guint16* p = ( guint16* )
+            ( m_arrBytes + BLKBMP_BLKNUM * BLOCK_SIZE );
+        p[ -1 ] = htons( m_wFreeCount );
+        arrDirtyBlk[ BLKBMP_BLKNUM - 1 ] = 1;
+        for( int i = 0; i < BLKBMP_BLKNUM; i++ )
+        {
+            if( arrDirtyBlk[ i ] == 0 )
+                continue;
+            guint32 dwBlkIdx = ( dwGrpIdx | i );
+            m_pAlloc->WriteBlock( dwBlkIdx,
+                m_arrBytes + i * BLOCK_SIZE  );
+        }
+    }
     if( bFull )
     {
         return STATUS_SUCCESS;
@@ -562,7 +594,10 @@ gint32 CBlockBitmap::FreeBlocks(
 
         LONGWORD* pbmp = ( LONGWORD* )m_arrBytes;
         constexpr guint32 dwNumBits = BYTE_BITS;
+        guint8 arrDirtyBlk[ BLKBMP_BLKNUM ] = {0};
+        guint32 dwCount = 0;
 
+        guint32 shift = find_shift( dwNumBits );
         for( guint32 i = 0; i < dwNumBlocks; i++ )
         {
             guint32 dwBlkIdx =
@@ -570,7 +605,6 @@ gint32 CBlockBitmap::FreeBlocks(
             if( dwBlkIdx == 0 )
                 continue;
 
-            guint32 shift = find_shift( dwNumBits );
             guint32 dwByteIdx =
                 ( dwBlkIdx >> shift );
 
@@ -584,8 +618,31 @@ gint32 CBlockBitmap::FreeBlocks(
             guint8 bit = ( 1 << offset );
             a &= ( ~bit );
             m_wFreeCount++;
+            if( IsSafeMode() )
+            {
+                arrDirtyBlk[ dwBlkIdx /
+                    ( BLOCK_SIZE * BYTE_BITS ) ] = 1;
+                dwCount++;
+            }
         }
-
+        if( dwCount && IsSafeMode() )
+        {
+            guint32 dwGrpIdx =
+                ( m_dwGroupIdx << GROUP_INDEX_SHIFT );
+            guint16* p = ( guint16* )
+                ( m_arrBytes + BLKBMP_BLKNUM * BLOCK_SIZE );
+            p[ -1 ] = htons( m_wFreeCount );
+            arrDirtyBlk[ BLKBMP_BLKNUM - 1 ] = 1;
+            for( int i = 0; i < BLKBMP_BLKNUM && dwCount; i++ )
+            {
+                if( arrDirtyBlk[ i ] == 0 )
+                    continue;
+                guint32 dwBlkIdx = ( dwGrpIdx | i );
+                m_pAlloc->WriteBlock( dwBlkIdx,
+                    m_arrBytes + i * BLOCK_SIZE  );
+                dwCount--;
+            }
+        }
     }while( 0 );
 
     return ret;
@@ -743,13 +800,22 @@ gint32 CBlockAllocator::SaveSuperBlock(
     gint32 ret = 0;
     if( dwSize < SUPER_BLOCK_SIZE )
         return -EINVAL;
-    ret = ReadWriteFile(
-        const_cast< char* >( pSb ),
-        SUPER_BLOCK_SIZE, 0, false );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-2;
+        ret = CacheBlocks(
+            &dwBlkIdx, 1, ( guint8* )pSb ); 
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            const_cast< char* >( pSb ),
+            SUPER_BLOCK_SIZE, 0, false );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -759,12 +825,21 @@ gint32 CBlockAllocator::LoadSuperBlock(
     gint32 ret = 0;
     if( dwSize < SUPER_BLOCK_SIZE )
         return -EINVAL;
-    ret = ReadWriteFile(
-        pSb, SUPER_BLOCK_SIZE, 0, true );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-2;
+        ret = ReadCache( &dwBlkIdx,
+            1, ( guint8* )pSb );
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            pSb, SUPER_BLOCK_SIZE, 0, true );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -773,14 +848,24 @@ gint32 CBlockAllocator::SaveGroupBitmap(
 {
     if( dwSize < GRPBMP_SIZE )
         return -EINVAL;
-
-    gint32 ret = ReadWriteFile(
-        const_cast< char* >( pbmp ), 
-        GRPBMP_SIZE, GRPBMP_START, false );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    gint32 ret = 0;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-4;
+        ret = CacheBlocks(
+            &dwBlkIdx, GRPBMP_BLKNUM,
+            ( guint8* )pbmp ); 
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            const_cast< char* >( pbmp ), 
+            GRPBMP_SIZE, GRPBMP_START, false );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -790,13 +875,23 @@ gint32 CBlockAllocator::LoadGroupBitmap(
     if( dwSize < GRPBMP_SIZE )
         return -EINVAL;
 
-    gint32 ret = ReadWriteFile(
-        pbmp, GRPBMP_SIZE,
-        GRPBMP_START, true );
-    if( ERROR( ret ) )
-        return ret;
-    if( ret == 0 )
-        ret = -ENODATA;
+    gint32 ret = 0;
+    if( IsSafeMode() )
+    {
+        guint32 dwBlkIdx = ( guint32 )-4;
+        ret = ReadCache( &dwBlkIdx, 1, 
+           ( guint8* )pbmp );
+    }
+    else
+    {
+        ret = ReadWriteFile(
+            pbmp, GRPBMP_SIZE,
+            GRPBMP_START, true );
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
+    }
     return ret;
 }
 
@@ -1096,7 +1191,7 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             }
             else if( dwBlkIdx == 0 && !bRead )
             {
-                ret = -ENOSPC;
+                ret = -ENODATA;
                 break;
             }
             ret = ReadWriteFile(
@@ -1127,6 +1222,17 @@ gint32 CBlockAllocator::ReadWriteBlocks(
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
+        if( IsSafeMode() )
+        {
+            if( bRead )
+                ret = ReadCache( pBlocks,
+                    dwNumBlocks, pBuf, bContigous );
+            else
+                ret = CacheBlocks( pBlocks,
+                    dwNumBlocks, pBuf, bContigous );
+            break;
+        }
+
         if( bContigous )
         {
             guint32 dwDist =
@@ -1297,6 +1403,429 @@ gint32 CBlockAllocator::Reload()
             m_mapBlkGrps.insert(
                 { i, std::move( pbg ) } );
         }
+    }while( 0 );
+    return ret;
+}
+
+
+#include <algorithm>
+
+using INTERVAL=std::pair< guint32, guint32 >;
+using INTERVALS=std::vector< CONTBLKS >;
+
+// every interval is right-open [first, second)
+// intervals1 is sorted and non-overlapping
+// intervals2 is an ordered map and non-overlapping
+
+INTERVALS IntersectIntervals(
+    const INTERVALS& intervals1,
+    const DirtyBlks& intervals2)
+{
+    INTERVALS result;
+    guint32 i = 0, j = 0;
+    guint32 n1 = intervals1.size();
+    guint32 n2 = intervals2.size();
+    auto jter = intervals2.lower_bound(
+        intervals1[i].first );
+    if( jter == intervals2.end() )
+    {
+        result.insert( result.end(),
+            intervals1.begin(), intervals1.end() );
+        return result;
+    }
+    if( jter != intervals2.begin() )
+        jter--;
+
+    while (i < n1 && jter != intervals2.end()) {
+        guint32 start = std::max(
+            intervals1[i].first, jter->first);
+
+        guint32 end2 = jter->first +
+            jter->second->size() / BLOCK_SIZE;
+
+        guint32 end = std::min(
+            intervals1[i].second, end2 );
+
+        if (start < end) {
+            guint32 dwBufOff = intervals1[i].dwOff;
+            guint32 dwOff = (
+                start == ( intervals1[i].first
+                ?  dwBufOff : dwBufOff + 
+                start - intervals1[i].first ) );
+            result.emplace_back(
+                start, end, dwOff, jter->first );
+        }
+        if (intervals1[i].second < end2 ) {
+            ++i;
+        } else {
+            auto jterOld = jter;
+            ++jter;
+            auto jter2 = intervals2.lower_bound(
+                intervals1[ i ].first );
+            if( jter2 != intervals2.end() &&
+                jter2 != intervals2.begin() )
+                jter2--;
+            if( jter->first < jter2->first )
+                jter = jter2;
+
+        }
+    }
+    return result;
+}
+
+INTERVALS SubtractIntervals(
+    const INTERVALS& intervals1,
+    const INTERVALS& intervals2)
+{
+    INTERVALS result;
+    guint32 i = 0, j = 0;
+    guint32 n1 = intervals1.size();
+    guint32 n2 = intervals2.size();
+
+    while (i < n1) {
+        guint32 start1 = intervals1[i].first;
+        guint32 end1 = intervals1[i].second;
+
+        while (j < n2 && intervals2[j].second <= start1) {
+            ++j;
+        }
+
+        guint32 currentStart = start1;
+
+        while (j < n2 && intervals2[j].first < end1) {
+            if (intervals2[j].first > currentStart) {
+                result.emplace_back( currentStart,
+                    intervals2[j].first,
+                    intervals1[i].dwOff + intervals2[j].first -
+                        currentStart,
+                    intervals2[j].dwKey );
+            }
+            currentStart = std::max(
+                currentStart, intervals2[j].second);
+            ++j;
+        }
+
+        if (currentStart < end1) {
+            guint32 dwKey = 0;
+            if( j < n2 )
+                dwKey = intervals2[j-1].dwKey;
+            result.emplace_back( currentStart, end1,
+            intervals1[i].dwOff + currentStart -
+                intervals1[i].first );
+        }
+
+        ++i;
+    }
+    return result;
+}
+
+gint32 CBlockAllocator::CacheBlocks(
+    const guint32* pBlocks,
+    guint32 dwNumBlocks, guint8* pBuf,
+    bool bContigous )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        if( m_mapDirtyBlks.empty() )
+        {
+            ret = clock_gettime(
+                CLOCK_REALTIME, &m_oStartTime );
+            if( ret < 0 )
+            {
+                ret = -errno;
+                break;
+            }
+        }
+
+        // handle the special cases
+        if( *pBlocks == ( guint32 )-2 )
+        {
+            BufPtr pBufCopy( true );
+            ret = pBufCopy->Append(
+                pBuf, SUPER_BLOCK_SIZE );
+            if( ERROR( ret ) )
+                break;
+            m_mapDirtyBlks[ *pBlocks ] = pBufCopy;
+            continue;
+        }
+        else if( *pBlocks == ( guint32 )-4 )
+        {
+            BufPtr pBufCopy( true );
+            ret = pBufCopy->Append(
+                pBuf, GRPBMP_SIZE );
+            if( ERROR( ret ) )
+                break;
+            m_mapDirtyBlks[ *pBlocks ] = pBufCopy;
+            continue;
+        }
+
+        std::vector< CONTBLKS > vecBlks;
+        if( !bContigous )
+        {
+            FindContigousBlocks( pBlocks,
+                dwNumBlocks, vecBlks );
+            guint32 dwOff = 0;
+            for( auto& elem : vecBlks )
+            {
+                elem.third = dwOff;
+                dwOff += elem.second;
+                elem.second += elem.first;
+                // block offset in the pBuf
+            }
+            std::sort( vecBlks.begin(), vecBlks.end(),
+                ( []( const CONTBLKS& a1, const CONTBLKS& a2 )
+                { return a1.dwBlkIdx <= a2.dwBlkIdx; } ) );
+        }
+        else
+        {
+            vecBlks.push_back(
+                { *pBlocks, *pBlocks + dwNumBlocks } );
+        }
+
+        INTERVALS oCommonBlks = IntersectIntervals(
+            vecBlks, this->m_mapDirtyBlks );
+        INTERVALS oNewBlks = SubtractIntervals(
+            vecBlks, oCommonBlks );
+        for( auto& elem : oCommonBlks )
+        {
+            if( elem.first == 0 )
+            {
+                OutputMsg(ret, "Cache internal error, "
+                "aborting to avoid data corruption.");
+                abort();
+            };
+            if( elem.first == ( guint32 )-2 ||
+                elem.first == ( guint32 )-4 )
+            {
+                auto iter = m_mapDirtyBlks.find(
+                    elem.first );
+                if( iter == m_mapDirtyBlks.end() )
+                    continue;
+                memcpy( iter->second->ptr(),
+                    pBuf + elem.dwOff * BLOCK_SIZE,
+                    BLOCK_SIZE *
+                        ( elem.second - elem.first ) );
+                continue;
+            }
+            auto iter = m_mapDirtyBlks.find(
+                elem.dwKey );
+            if( iter == m_mapDirtyBlks.end() )
+                continue;
+            guint32 dwOff = ( elem.first -
+                iter->first ) * BLOCK_SIZE;
+            if( dwOff > iter->second->size() )
+                continue;
+            memcpy( iter->second->ptr() + dwOff,
+                pBuf + elem.dwOff * BLOCK_SIZE,
+                BLOCK_SIZE *
+                    ( elem.second - elem.first ) );
+        }
+
+        for( auto& elem : oNewBlks )
+        {
+            BufPtr pBufNew( true );
+            ret = pBufNew->Resize( (
+                elem.second - elem.first ) * BLOCK_SIZE );
+            if( ERROR( ret ) )
+                break;
+            memcpy( pBufNew->ptr(),
+                pBuf + elem.dwOff * BLOCK_SIZE,
+                pBufNew->size() );
+            m_mapDirtyBlks.emplace(
+                elem.first, pBufNew );
+            m_dwDirtyBlkCount +=
+                elem.second - elem.first;
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::ReadCache(
+    const guint32* pBlocks,
+    guint32 dwNumBlocks, guint8* pBuf,
+    bool bContigous )
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+
+        // handle the special cases
+        if( *pBlocks == ( guint32 )-2 ||
+            *pBlocks == ( guint32 )-4 )
+        {
+            BufPtr pBufCopy( true );
+            ret = pBufCopy->Resize(
+                BLOCK_SIZE * dwNumBlocks );
+            if( ERROR( ret ) )
+                break;
+            auto iter = m_mapDirtyBlks.find( *pBlocks );
+            if( iter != m_mapDirtyBlks.end() )
+            {
+                memcpy( pBufCopy->ptr(),
+                    iter->second->ptr(),
+                    std::min( pBufCopy->size(),
+                        iter->second->size() ) );
+                continue;
+            }
+            else
+            {
+                size_t dwOff = 0;
+                if( *pBlocks == -4 )
+                    dwOff = SUPER_BLOCK_SIZE;
+                ret = ReadWriteFile(
+                    pBufCopy->ptr(),
+                    BLOCK_SIZE * dwNumBlocks,
+                    dwOff, true );
+                if( ERROR( ret ) )
+                    break;
+            }
+        }
+
+        std::vector< CONTBLKS > vecBlks;
+        if( !bContigous )
+        {
+            FindContigousBlocks( pBlocks,
+                dwNumBlocks, vecBlks );
+            guint32 dwOff = 0;
+            for( auto& elem : vecBlks )
+            {
+                elem.third = dwOff;
+                dwOff += elem.second;
+                elem.second += elem.first;
+                // block offset in the pBuf
+            }
+            std::sort( vecBlks.begin(), vecBlks.end(),
+                ( []( const CONTBLKS& a1, const CONTBLKS& a2 )
+                { return a1.dwBlkIdx <= a2.dwBlkIdx; } ) );
+        }
+        else
+        {
+            vecBlks.push_back( { *pBlocks,
+                *pBlocks + dwNumBlocks } );
+        }
+
+        auto itr = vecBlks.begin();
+        while( itr != vecBlks.end() )
+        {
+            if( itr->first == 0 )
+            {
+                memset( pBuf + itr->dwOff * BLOCK_SIZE,
+                    0, itr->second * BLOCK_SIZE );
+                itr = vecBlks.erase( itr );
+                continue;
+            }
+            break;
+        }
+
+        INTERVALS oCommonBlks = IntersectIntervals(
+            vecBlks, this->m_mapDirtyBlks );
+        INTERVALS oNewBlks = SubtractIntervals(
+            vecBlks, oCommonBlks );
+
+        //cache hit
+        for( auto& elem : oCommonBlks )
+        {
+            auto iter = m_mapDirtyBlks.find(
+                elem.dwKey );
+            if( iter == m_mapDirtyBlks.end() )
+                continue;
+            guint32 dwOff = ( elem.first -
+                iter->first ) * BLOCK_SIZE;
+            if( dwOff > iter->second->size() )
+                continue;
+            memcpy( pBuf + elem.dwOff * BLOCK_SIZE,
+                iter->second->ptr() + dwOff,
+                BLOCK_SIZE *
+                    ( elem.second - elem.first ) );
+        }
+
+        //cache missed
+        for( auto& elem : oNewBlks )
+        {
+            guint32 dwSize =
+                ( elem.second - elem.first ) * BLOCK_SIZE;
+            guint32 dwOff = BLOCK_ABS( elem.first );
+            ret = ReadWriteFile(
+                (char* )pBuf + elem.dwOff * BLOCK_SIZE,
+                dwSize, dwOff, true );
+            if( ERROR( ret ) )
+                break;
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::CommitCache()
+{
+    gint32 ret = 0;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        for( auto& elem : m_mapDirtyBlks )
+        {
+            guint32 dwOff;
+            if( elem.first == -2 )
+                dwOff = 0;
+            else if( elem.first == -4 )
+                dwOff = SUPER_BLOCK_SIZE;
+            else
+                dwOff = BLOCK_ABS( elem.first );
+            ret = ReadWriteFile( elem.second->ptr(),
+                elem.second->size(), dwOff, false );
+            if( ERROR( ret ) )
+                break;
+        }
+        if( SUCCEEDED( ret ) )
+        {
+            m_mapDirtyBlks.clear();
+            m_dwDirtyBlkCount = 0;
+            m_dwCacheAge = 0;
+        }
+        else
+        {
+            OutputMsg(ret, "Error committing block "
+                "cache, aborting to avoid data "
+                "corruption.");
+            abort();
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::CheckAndCommit( bool bEntering )
+{
+    gint32 ret = 0;
+    do{
+        // already locked here
+        if( m_dwTransCount != 0 )
+            break;
+        if( m_mapDirtyBlks.empty() )
+            break;
+
+        bool bCommit = false;
+        timespec oNow;
+        ret = clock_gettime(
+            CLOCK_REALTIME, &oNow );
+        if( ret < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        if( oNow.tv_nsec - m_oStartTime.tv_nsec >=
+            GetCacheLifeCycle() && bEntering )
+            bCommit = true;
+
+        else if( m_dwDirtyBlkCount >=
+            CACHE_MAX_BLOCKS )
+            bCommit = true;
+
+        if( !bCommit )
+            break;
+
+        ret = CommitCache();
+
     }while( 0 );
     return ret;
 }

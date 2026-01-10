@@ -196,19 +196,19 @@ gint32 CBPlusNode::Reload()
             dwSize, arrBytes );
         if( ERROR( ret ) )
             break;
-        auto pBPNode = &m_oBNodeStore;
-        ret = pBPNode->ntoh( arrBytes, dwSize );
+        auto& oBNode = m_oBNodeStore;
+        ret = oBNode.ntoh( arrBytes, dwSize );
         if( ERROR( ret ) )
             break;
 
-        if( pBPNode->m_bLeaf )
+        if( IsLeaf() )
             break;
         
         for( int i = 0; i <
-            pBPNode->m_wNumPtrs; i++ )
+            oBNode.m_wNumPtrs; i++ )
         {
             KEYPTR_SLOT* p =
-               pBPNode->m_vecSlots[ i ];
+               oBNode.m_vecSlots[ i ];
             guint32 dwIdx = p->dwBNodeIdx;
             BNodeUPtr pNode;
             pNode.reset(
@@ -245,6 +245,9 @@ gint32 CBPlusNode::Flush( guint32 dwFlags )
         if( IsLeaf() )
             break;
 
+        if( dwFlags & FLAG_FLUSH_SINGLE_BNODE )
+            break;
+
         guint32 dwCount = this->GetChildCount();
         for( gint32 i = 0; i < dwCount; i++ ) 
         {
@@ -276,13 +279,20 @@ gint32 CBPlusNode::Format()
         // it is necessary to write something
         // to the file so that the file size is
         // set
-        guint32 dwSize = BNODE_SIZE;
-        ret = m_pDir->WriteFileNoLock(
-            BNODE_IDX_TO_POS( GetBNodeIndex() ),
-            dwSize, arrBytes );
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty( GetBNodeIndex() );
+        }
+        else
+        {
+            guint32 dwSize = BNODE_SIZE;
+            ret = m_pDir->WriteFileNoLock(
+                BNODE_IDX_TO_POS( GetBNodeIndex() ),
+                dwSize, arrBytes );
 
-        if( ERROR( ret ) )
-            break;
+            if( ERROR( ret ) )
+                break;
+        }
         ret = 0;
 
     }while( 0 );
@@ -329,7 +339,11 @@ gint32 CBPlusNode::RemoveSlotAt(
         this->DecKeyCount();
         if( !IsLeaf() )
             this->DecChildCount();
-
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty(
+                GetBNodeIndex() );
+        }
     }while( 0 );
     return ret;
 }
@@ -555,6 +569,11 @@ gint32 CBPlusNode::InsertOnly(
         ret = InsertSlotAt( dwIdx, pKey );
         break;
     }while( 0 );
+    if( SUCCEEDED( ret ) )
+    {
+        m_pDir->SetDirty(
+            GetBNodeIndex() );
+    }
     return ret;
 }
 
@@ -723,6 +742,13 @@ gint32 CBPlusNode::Split( guint32 dwSlotIdx )
             if( ERROR( ret ) )
                 break;
         }
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty(
+                pParent->GetBNodeIndex() );
+            m_pDir->SetDirty(
+                pNewSibling->GetBNodeIndex() );
+        }
     }while( 0 );
     return ret;
 }
@@ -777,7 +803,6 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
                 pNewRoot, pOld );
             CBPlusNode* pRoot =
                 m_pDir->GetRootNode();
-            auto& oMap = this->GetChildMap();
             ret = pRoot->AddChildDirect(
                 pOld->GetBNodeIndex(), pOld );
             if( ERROR( ret ) )
@@ -792,7 +817,6 @@ gint32 CBPlusNode::Insert( KEYPTR_SLOT* pSlot )
             ret = this->InsertOnly( pSlot );
             if( ERROR( ret ) )
                 break;
-
             guint32 i;
             i = GetParentSlotIdx();
             if( i == UINT_MAX )
@@ -866,7 +890,7 @@ gint32 CFreeBNodePool::Reload()
     gint32 ret = 0;
 
     guint32 dwBNodeIdx =
-        m_pDir->GetFreeBNodeIdx();
+        m_pDir->GetHeadFreeBNode();
 
     if( dwBNodeIdx == INVALID_BNODE_IDX )
         return 0;
@@ -905,10 +929,10 @@ gint32 CFreeBNodePool::Reload()
 gint32 CFreeBNodePool::InitPoolStore(
     guint32 dwBNodeIdx )
 {
+    if( dwBNodeIdx == INVALID_BNODE_IDX )
+        return -EINVAL;
     gint32 ret = 0;
     do{
-        if( dwBNodeIdx == INVALID_BNODE_IDX )
-            break;
         BufPtr pBuf( true );
         pBuf->Resize( BNODE_SIZE );
         auto pfb = ( FREE_BNODES* )pBuf->ptr();
@@ -920,20 +944,27 @@ gint32 CFreeBNodePool::InitPoolStore(
             INVALID_BNODE_IDX, 
             dwCount * sizeof( guint16 ) );
 
-        __attribute__((aligned (8)))
-        guint8 arrBytes[ BNODE_SIZE ];
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty( dwBNodeIdx );
+        }
+        else
+        {
+            __attribute__((aligned (8)))
+            guint8 arrBytes[ BNODE_SIZE ];
 
-        ret = pfb->hton(
-            arrBytes, BNODE_SIZE );
-        if( ERROR( ret ) )
-            break;
+            ret = pfb->hton(
+                arrBytes, BNODE_SIZE );
+            if( ERROR( ret ) )
+                break;
 
-        guint32 dwSize = BNODE_SIZE;
-        ret = m_pDir->WriteFileNoLock(
-            BNODE_IDX_TO_POS( dwBNodeIdx ),
-            dwSize, arrBytes );
-        if( ERROR( ret ) )
-            break;
+            guint32 dwSize = BNODE_SIZE;
+            ret = m_pDir->WriteFileNoLock(
+                BNODE_IDX_TO_POS( dwBNodeIdx ),
+                dwSize, arrBytes );
+            if( ERROR( ret ) )
+                break;
+        }
         if( m_vecFreeBNodes.empty() )
             m_pDir->SetHeadFreeBNode(
                 dwBNodeIdx );
@@ -943,11 +974,40 @@ gint32 CFreeBNodePool::InitPoolStore(
     return ret;
 }
 
+gint32 CFreeBNodePool::FlushSingleBNode(
+    guint32 dwBNodeIdx )
+{
+    gint32 ret = 0;
+    bool bFound = false;
+    __attribute__((aligned (8)))
+    guint8 arrBytes[ BNODE_SIZE ];
+    for( auto& elem : m_vecFreeBNodes )
+    {
+        if( elem.first != dwBNodeIdx )
+            continue;
+        bFound = true;
+        auto pfb = ( FREE_BNODES* )
+            elem.second->ptr();
+        ret = pfb->hton(
+            arrBytes, BNODE_SIZE );
+        if( ERROR( ret ) )
+            break;
+        guint32 dwSize = BNODE_SIZE;
+        ret = m_pDir->WriteFileNoLock(
+            BNODE_IDX_TO_POS( elem.first ),
+            dwSize, arrBytes );
+        break;
+    }
+    if( !bFound )
+        ret = -ENOENT;
+    return ret;
+}
+
 gint32 CFreeBNodePool::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     guint32 dwBNodeIdx =
-        m_pDir->GetFreeBNodeIdx();
+        m_pDir->GetHeadFreeBNode();
     if( dwBNodeIdx == INVALID_BNODE_IDX )
         return 0;
 
@@ -963,9 +1023,16 @@ gint32 CFreeBNodePool::Flush( guint32 dwFlags )
         if( ERROR( ret ) )
             break;
         guint32 dwSize = BNODE_SIZE;
-        ret = m_pDir->WriteFileNoLock(
-            BNODE_IDX_TO_POS( elem.first ),
-            dwSize, arrBytes );
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty( elem.first );
+        }
+        else
+        {
+            ret = m_pDir->WriteFileNoLock(
+                BNODE_IDX_TO_POS( elem.first ),
+                dwSize, arrBytes );
+        }
     }
     return 0;
 }
@@ -1002,10 +1069,15 @@ gint32 CFreeBNodePool::PutFreeBNode(
                 ret = InitPoolStore( dwNewPool );
                 if( ERROR( ret ) )
                     break;
+                m_pDir->SetDirty( elem.first );
                 continue;
             }
             ret = pfb->PushFreeBNode(
                 dwBNodeIdx );
+            if( IsSafeMode() )
+            {
+                m_pDir->SetDirty( elem.first );
+            }
             break;
         }while( 1 );
     }while( 0 );
@@ -1051,6 +1123,12 @@ gint32 CFreeBNodePool::GetFreeBNode(
                     INVALID_BNODE_IDX );
                 // return the last one
                 dwBNodeIdx = dwFirstFree;
+                auto p = m_pDir->GetRootNode();
+                if( p && IsSafeMode() )
+                {
+                    m_pDir->SetDirty(
+                        p->GetBNodeIndex() );
+                }
                 break;
             }
             auto& elem = m_vecFreeBNodes.back();
@@ -1075,6 +1153,8 @@ gint32 CFreeBNodePool::GetFreeBNode(
             if( ERROR( ret ) )
                 break;
             dwBNodeIdx = wBNodeIdx;
+            if( IsSafeMode() )
+                m_pDir->SetDirty( elem.first );
             break;
         }while( 1 );
     }while( 0 );
@@ -1096,9 +1176,12 @@ gint32 CDirImage::Flush( guint32 dwFlags )
         ret = super::Flush( dwFlags );
         if( ERROR( ret ) )
             break;
-        ret = m_pRootNode->Flush( dwFlags );
-        if( ERROR( ret ) )
-            break;
+        if( !IsSafeMode() )
+        {
+            ret = m_pRootNode->Flush( dwFlags );
+            if( ERROR( ret ) )
+                break;
+        }
         ret = m_pFreePool->Flush( dwFlags );
         if( ERROR( ret ) )
             break;
@@ -1129,8 +1212,15 @@ gint32 CDirImage::Format()
         if( ERROR( ret ) )
             break;
 
+        m_pRootNode->AddChildDirect(
+            0, m_pRootNode );
         m_pRootNode->SetLeaf( true );
         m_oInodeStore.m_dwRootBNode = 0;
+        if( IsSafeMode() )
+        {
+            SetDirty( -2 );
+            SetDirty( 0 );
+        }
 
     }while( 0 );
 
@@ -1157,6 +1247,9 @@ gint32 CDirImage::Reload()
         ret = m_pRootNode->Reload();
         if( ERROR( ret ) )
             break;
+        m_pRootNode->AddChildDirect(
+            m_oInodeStore.m_dwRootBNode,
+            m_pRootNode );
         ret = m_pFreePool->Reload();
     }while( 0 );
     return ret;
@@ -1204,11 +1297,12 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
             if( ERROR( ret ) )
                 break;
 
-            FImgSPtr pFile;
             oSteal.oLeaf = oKey.oLeaf;
+            pLeft->AppendSlot( &oSteal );
+
+            /*FImgSPtr pFile;
             ret = pRight->RemoveFileDirect(
                 oSteal.oLeaf.dwInodeIdx, pFile );
-            pLeft->AppendSlot( &oSteal );
             if( SUCCEEDED( ret ) )
             {
                 pLeft->AddFileDirect(
@@ -1217,14 +1311,14 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
             else
             {
                 ret = 0;
-            }
+            }*/
         }
         else
         {
             COPY_KEY( pParentKs->szKey,
                 pRightKs->szKey );
-            BNodeUPtr pNode;
             oSteal.dwBNodeIdx = pRightKs->dwBNodeIdx;
+            /*BNodeUPtr pNode;
             ret = pRight->RemoveChildDirect(
                 oSteal.dwBNodeIdx, pNode );
             if( ERROR( ret ) )
@@ -1233,13 +1327,19 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
                     "with empty child pointer" );
                 break;
             }
+            pLeft->AddChildDirect(
+                oSteal.dwBNodeIdx, pNode );*/
             KEYPTR_SLOT oKey;
             ret = pRight->RemoveSlotAt( 0, oKey );
             if( ERROR( ret ) )
                 break;
-            pLeft->AddChildDirect(
-                oSteal.dwBNodeIdx, pNode );
             pLeft->AppendSlot( &oSteal );
+        }
+
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty(
+                pRight->GetBNodeIndex());
         }
 
     }while( 0 );
@@ -1283,18 +1383,19 @@ gint32 CBPlusNode::StealFromLeft( gint32 i )
 
             FImgSPtr pFile;
             oSteal.oLeaf = pLeftKs->oLeaf;
-            ret = pLeft->RemoveFileDirect(
-                oSteal.oLeaf.dwInodeIdx, pFile );
             pLeft->DecKeyCount();
             pRight->InsertSlotAt( 0, &oSteal );
+            pRight->IncKeyCount();
+
+            /*ret = pLeft->RemoveFileDirect(
+                oSteal.oLeaf.dwInodeIdx, pFile );
             if( SUCCEEDED( ret ) )
                 pRight->AddFileDirect(
                     oSteal.oLeaf.dwInodeIdx, pFile );
             else
             {
                 ret = 0;
-            }
-            pRight->IncKeyCount();
+            }*/
         }
         else
         {
@@ -1309,7 +1410,7 @@ gint32 CBPlusNode::StealFromLeft( gint32 i )
 
             BNodeUPtr pNode;
             oSteal.dwBNodeIdx = pLeftKs0->dwBNodeIdx;
-            ret = pLeft->RemoveChildDirect(
+            /*ret = pLeft->RemoveChildDirect(
                 oSteal.dwBNodeIdx, pNode );
             if( ERROR( ret ) )
             {
@@ -1317,19 +1418,24 @@ gint32 CBPlusNode::StealFromLeft( gint32 i )
                     "with empty child pointer" );
                 break;
             }
+            pRight->AddChildDirect(
+                oSteal.dwBNodeIdx, pNode );*/
 
             CLEAR_KEY( pLeftKs->szKey );
             KEYPTR_SLOT oKey;
             pLeft->RemoveSlotAt(
                 pLeft->GetKeyCount(), oKey );
-            pRight->AddChildDirect(
-                oSteal.dwBNodeIdx, pNode );
             pRight->InsertSlotAt( 0, &oSteal );
         }
-
+        if( IsSafeMode() )
+        {
+            m_pDir->SetDirty(
+                pLeft->GetBNodeIndex());
+        }
     }while( 0 );
     return ret;
 }
+
 gint32 CBPlusNode::BinSearch(
     const char* szKey,
     gint32 iOrigLower,
@@ -1584,8 +1690,8 @@ gint32 CBPlusNode::Rebalance()
             {
                 ret = ERROR_FAIL;
                 DebugPrint( ret, "Error, not "
-                    "an expected state to "
-                    "rebalance the root node" );
+                    "an expected state while "
+                    "rebalancing the root node" );
                 break;
             }
             BNodeUPtr pNewRoot;
@@ -1634,6 +1740,7 @@ gint32 CBPlusNode::RebalanceChild(
             ret = ERROR_FAIL;
             DebugPrint( ret, "Error we should "
                 "not be here" );
+            break;
         }
         if( idx >= 0 && idx < dwCount )
         {
@@ -1646,6 +1753,11 @@ gint32 CBPlusNode::RebalanceChild(
                 break;
             }
             ret = MergeChilds( idx, idx + 1 );
+            if( SUCCEEDED( ret ) && IsSafeMode() )
+            {
+                m_pDir->SetDirty(
+                    pChild->GetBNodeIndex() );
+            }
             break;
         }
 
@@ -1664,8 +1776,17 @@ gint32 CBPlusNode::RebalanceChild(
             break;
         }
         ret = MergeChilds( idx - 1, idx );
-        
+        if( SUCCEEDED( ret ) && IsSafeMode() )
+        {
+            m_pDir->SetDirty(
+                pLeft->GetBNodeIndex() );
+        }
     }while( 0 );
+    if( SUCCEEDED( ret ) && IsSafeMode() )
+    {
+        m_pDir->SetDirty(
+            this->GetBNodeIndex() );
+    }
     return ret;
 }
 
@@ -1760,8 +1881,14 @@ gint32 CBPlusNode::RemoveFile(
                     dwInodeIdx, pFile );
 
                 KEYPTR_SLOT oKey;
-                this->RemoveSlotAt( idx, oKey );
+                ret = this->RemoveSlotAt( idx, oKey );
+                if( SUCCEEDED( ret ) && IsSafeMode() )
+                {
+                    m_pDir->SetDirty(
+                        this->GetBNodeIndex() );
+                }
 
+                ret = 0;
                 if( GetKeyCount() >= 
                     MIN_KEYS( false ) )
                     break;
@@ -1784,6 +1911,11 @@ gint32 CBPlusNode::RemoveFile(
 
             // replace with the key of its successor
             COPY_KEY( pChildKs->szKey, p );
+            if( IsSafeMode() )
+            {
+                m_pDir->SetDirty(
+                    GetBNodeIndex() );
+            }
             ret = pChildSuc->RemoveFile(
                 szKey, pFile, bForce );
             break;
@@ -1886,24 +2018,19 @@ gint32 CDirImage::ReleaseFreeBNode(
     return m_pFreePool->ReleaseFreeBNode(
         dwBNodeIdx );
 }
-guint32 CDirImage::GetHeadFreeBNode()
+guint32 CDirImage::GetHeadFreeBNode() const
 { return m_pRootNode->GetFreeBNodeIdx(); }
 
 void CDirImage::SetHeadFreeBNode(
         guint32 dwBNodeIdx )
 {
-    return m_pRootNode->SetFreeBNodeIdx(
-        dwBNodeIdx);
-}
-
-guint32 CDirImage::GetFreeBNodeIdx() const
-{ return m_pRootNode->GetFreeBNodeIdx(); }
-
-void CDirImage::SetFreeBNodeIdx(
-    guint32 dwBNodeIdx )
-{
-    m_pRootNode->SetFreeBNodeIdx(
-        dwBNodeIdx );
+    m_pRootNode->
+        SetFreeBNodeIdx( dwBNodeIdx );
+    if( IsSafeMode() )
+    {
+        this->SetDirty(
+            m_pRootNode->GetBNodeIndex() );
+    }
 }
 
 gint32 CDirImage::SearchNoLock( const char* szKey,
@@ -1918,6 +2045,9 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
         while( !pCurNode->IsLeaf() )
         {
             dwCount = pCurNode->GetKeyCount();
+            if( dwCount == 0 )
+                break;
+
             gint32 i = pCurNode->BinSearch(
                 szKey, 0, dwCount - 1 );
             if( i >= 0 )
@@ -2017,8 +2147,17 @@ gint32 CDirImage::SearchNoLock( const char* szKey,
 
     if( ERROR( ret ) )
     {
-        DebugPrint( ret,
-            "Error occurs during Search" );
+        stdstr strPath;
+        gint32 ret2 = GetPathFromImg(
+            this, strPath );
+        if( SUCCEEDED( ret2 ) )
+            DebugPrint( ret,
+                "Error occurs during Search %s",
+                strPath.c_str() );
+        else
+            DebugPrint( ret,
+                "Error occurs during Search" );
+
         iRet = ret;
     }
     return iRet;
@@ -2043,12 +2182,23 @@ gint32 CDirImage::Search( const char* szKey,
 gint32 CDirImage::ReplaceRootBNode(
     BNodeUPtr& pNew, BNodeUPtr& pOld )
 {
-    pOld = std::move( m_pRootNode );
-    m_pRootNode = std::move( pNew );
+    pOld = m_pRootNode;
+    m_pRootNode = pNew;
     m_oInodeStore.m_dwRootBNode =
         m_pRootNode->GetBNodeIndex();
     m_pRootNode->SetFreeBNodeIdx(
         pOld->GetFreeBNodeIdx() );
+    m_pRootNode->AddChildDirect(
+        m_oInodeStore.m_dwRootBNode,
+        m_pRootNode );
+    BNodeUPtr pTemp;
+    m_pRootNode->RemoveChildDirect(
+        pOld->GetBNodeIndex(), pTemp );
+
+    if( IsSafeMode() )
+    {
+        SetDirty( ( guint32 )-2 );
+    }
     return 0;
 }
 
@@ -2057,9 +2207,10 @@ gint32 CDirImage::FreeRootBNode(
 {
     gint32 ret = 0;
     do{
-        pRoot = std::move( m_pRootNode );
-        PutFreeBNode( pRoot.get() );
-        ret = this->TruncateNoLock( 0 );
+        pRoot = m_pRootNode;
+        // PutFreeBNode( pRoot.get() );
+        ret = this->TruncateNoLock(
+            REGFS_PAGE_SIZE );
         if( ERROR( ret ) )
             break;
 
@@ -2072,7 +2223,14 @@ gint32 CDirImage::FreeRootBNode(
         m_oInodeStore.m_dwRootBNode = 0;
         m_pFreePool.reset(
             new CFreeBNodePool( this ) );
-        this->Flush();
+        m_mapChilds.clear();
+        if( !IsSafeMode() )
+            this->Flush();
+        else
+        {
+            SetDirty( ( guint32 )-2 );
+            SetDirty( ( guint32 )0 );
+        }
 
     }while( 0 );
     return ret;
@@ -2098,8 +2256,15 @@ gint32 CDirImage::GetFreeBNode(
             dwBNodeIdx );
         if( ERROR( ret ) )
         {
-            dwBNodeIdx =
-                ( m_oInodeStore.m_dwSize +
+            guint32 dwOff = 
+                m_oInodeStore.m_dwSize;
+            if( dwOff + REGFS_PAGE_SIZE >
+                MAX_FILE_SIZE )
+            {
+                ret = -EFBIG;
+                break;
+            }
+            dwBNodeIdx = ( dwOff +
                     REGFS_PAGE_SIZE - 1 ) /
                     REGFS_PAGE_SIZE;
         }
@@ -2123,7 +2288,7 @@ gint32 CDirImage::InsertFile(
 
     gint32 ret = 0;
     do{
-        WRITE_LOCK( this );
+        DIR_WRITE_LOCK( this );
         CBPlusNode* pNode = nullptr;
         gint32 iRet = this->SearchNoLock(
             szName, pImg, pNode );
@@ -2155,7 +2320,7 @@ gint32 CDirImage::CreateFile(
 {
     gint32 ret = 0;
     do{
-        WRITE_LOCK( this );
+        DIR_WRITE_LOCK( this );
         CBPlusNode* pNode = nullptr;
         gint32 iRet = this->SearchNoLock(
             szName, pImg, pNode );
@@ -2177,9 +2342,12 @@ gint32 CDirImage::CreateFile(
             break;
 
         pImg->Format();
-        ret = pImg->Flush();
-        if( ERROR( ret ) )
-            break;
+        if( !IsSafeMode() )
+        {
+            ret = pImg->Flush();
+            if( ERROR( ret ) )
+                break;
+        }
         KEYPTR_SLOT oKey;
         COPY_KEY( oKey.szKey, szName );
         oKey.oLeaf.byFileType = iType;
@@ -2226,7 +2394,7 @@ gint32 CDirImage::ListDir(
         READ_LOCK( this );
         guint32 dwCount = 0;
         CBPlusNode* pCurNode = m_pRootNode.get(); 
-        while( !pCurNode->IsLeaf() )
+        while( pCurNode && !pCurNode->IsLeaf() )
             pCurNode = pCurNode->GetChild( 0 );
 
         while( pCurNode != nullptr )
@@ -2286,7 +2454,8 @@ gint32 CDirImage::CreateLink( const char* szName,
             0, dwSize, ( guint8* )szLink );
         if( ERROR( ret ) )
             break;
-        ret = pImg->Flush();
+        if( !IsSafeMode() )
+            ret = pImg->Flush();
         if( ret > 0 )
             ret = 0;
     }while( 0 );
@@ -2300,7 +2469,7 @@ gint32 CDirImage::RemoveFileNoFree(
 {
     gint32 ret = 0;
     do{
-        WRITE_LOCK( this );
+        DIR_WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szKey, pFile, bForce );
         if( ret == -EBUSY )
@@ -2345,7 +2514,7 @@ gint32 CDirImage::UnloadDirImage()
 {
     gint32 ret = 0;
     do{
-        WRITE_LOCK( this );
+        DIR_WRITE_LOCK( this );
         auto itr = m_mapFiles.begin();
         while( itr != m_mapFiles.end() )
         {
@@ -2366,7 +2535,8 @@ gint32 CDirImage::UnloadDirImage()
             else if( pDir == nullptr )
             {
                 // file or link
-                pFile->Flush();
+                if( !IsSafeMode() )
+                    pFile->Flush();
                 itr = m_mapFiles.erase( itr );
             }
             else
@@ -2376,7 +2546,8 @@ gint32 CDirImage::UnloadDirImage()
                 itr++;
             }
         }
-        this->Flush();
+        if( !IsSafeMode() )
+            this->Flush();
 
     }while( 0 );
     return ret;
@@ -2388,7 +2559,7 @@ gint32 CDirImage::UnloadFile(
     gint32 ret = 0;
     do{
         FImgSPtr pFile;
-        WRITE_LOCK( this );
+        DIR_WRITE_LOCK( this );
         CBPlusNode* pNode;
         ret = this->SearchNoLock(
             szName, pFile, pNode );
@@ -2422,7 +2593,7 @@ gint32 CDirImage::Rename(
     do{
         FImgSPtr pFile;
         FImgSPtr pDstFile;
-        WRITE_LOCK( this );
+        DIR_WRITE_LOCK( this );
         ret = m_pRootNode->RemoveFile(
             szFrom, pFile );
         if( ERROR( ret ) )
@@ -2469,8 +2640,9 @@ gint32 CDirImage::PrintBNode()
 gint32 CDirImage::PrintBNodeNoLock()
 {
     gint32 ret = 0;
+    using LINE = std::pair< guint32, stdstr >;
     do{
-        std::vector< std::pair< guint32, stdstr > > vecLines;
+        std::vector< LINE > vecLines;
         vecLines.resize( 100 );
         for( auto elem : vecLines )
             elem.first = 0;
@@ -2484,6 +2656,94 @@ gint32 CDirImage::PrintBNodeNoLock()
             printf( "%s\n",
                 elem.second.c_str() );
         }
+    }while( 0 );
+    return ret;
+}
+
+void CDirImage::SetDirty( guint32 dwBNodeIdx )
+{
+    m_setDirtyNodes.insert( dwBNodeIdx );
+}
+
+gint32 GetPathFromImg(
+    CFileImage* pNode, stdstr& strPath )
+{
+    if( pNode == nullptr  )
+        return -EINVAL;
+    gint32 ret = 0;
+    do{
+        stdstr strName = pNode->GetName();
+        if( strName == "/" )
+        {
+            strPath = strName + strPath;
+            break;
+        }
+        else if( strPath.size() )
+            strPath = strName + "/" + strPath;
+        else
+            strPath = strName;
+        pNode = pNode->GetParentDir();
+        if( pNode == nullptr )
+            break;
+    }while( 1 );
+    return ret;
+}
+
+gint32 GetPathFromImg(
+    FImgSPtr& pFile, stdstr& strPath )
+{
+    if( pFile.IsEmpty()  )
+        return -EINVAL;
+    CFileImage* pNode = pFile;
+    return GetPathFromImg( pNode, strPath );
+}
+
+gint32 CDirImage::CommitDirtyNodes()
+{
+    if( !IsSafeMode() )
+        return ERROR_STATE;
+
+    if( m_setDirtyNodes.empty() )
+        return 0;
+
+    gint32 ret = 0;
+    do{
+        for( auto dwIdx : m_setDirtyNodes )
+        {
+            if( dwIdx == ( guint32 )-2 )
+            {
+                this->Flush( FLAG_FLUSH_INODE );
+                continue;
+            }
+            auto itr = m_mapChilds.find( dwIdx );
+            if( itr != m_mapChilds.end() )
+            {
+                auto pNode = itr->second.get();
+                ret = pNode->Flush(
+                    FLAG_FLUSH_SINGLE_BNODE );
+                if( ERROR( ret ) )
+                {
+                    stdstr strPath;
+                    GetPathFromImg( this, strPath );
+                    DebugPrint( ret, "Error flush "
+                        "bnode for %s", strPath.c_str() );
+                }
+                continue;
+            }
+            auto p = m_pFreePool.get();
+            ret = p->FlushSingleBNode( dwIdx );
+            if( SUCCEEDED( ret ) || ret == -ENOENT )
+                continue;
+            if( ret != -ENOENT )
+            {
+                stdstr strPath;
+                GetPathFromImg( this, strPath );
+                DebugPrint( ret, "Error flush free "
+                    "bnode for %s", strPath.c_str() );
+            }
+            // does nothing to the removed nodes
+        }
+        m_setDirtyNodes.clear();
     }while( 0 );
     return ret;
 }
