@@ -85,7 +85,6 @@ gint32 CRegistryFs::CreateRootDir()
         ret = m_pRootImg->Format();
         if( ERROR( ret ) )
             break;
-        // ret = m_pRootImg->Flush();
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
             m_pRootImg, m_pAlloc,
@@ -192,6 +191,7 @@ gint32 CRegistryFs::Stop()
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         WRITE_LOCK( this );
         if( m_mapOpenFiles.size() )
             DebugPrint( m_mapOpenFiles.size(),
@@ -560,6 +560,7 @@ gint32 CRegistryFs::OpenFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -653,6 +654,7 @@ gint32 CRegistryFs::CloseFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         ret = CloseFileNoLock( hFile );
     }while( 0 );
@@ -665,6 +667,7 @@ gint32 CRegistryFs::RemoveFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -760,6 +763,7 @@ gint32 CRegistryFs::Truncate(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FileSPtr pFile;
         CStdRMutex oLock( GetExclLock() );
@@ -788,6 +792,7 @@ gint32 CRegistryFs::RemoveDir(
 {
     gint32 ret = 0; 
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -826,6 +831,7 @@ gint32 CRegistryFs::SetGid(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         if( strPath == "/" )
         {
@@ -873,6 +879,7 @@ gint32 CRegistryFs::SetUid(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         if( strPath == "/" )
         {
@@ -1109,6 +1116,7 @@ gint32 CRegistryFs::SetValue(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -1145,6 +1153,7 @@ gint32 CRegistryFs::SymLink(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -1334,6 +1343,7 @@ gint32 CRegistryFs::Chown(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         if( strPath == "/" )
         {
@@ -1390,6 +1400,7 @@ gint32 CRegistryFs::Rename(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -1733,6 +1744,7 @@ gint32 CRegistryFs::SetValue(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr pFile;
         ret = GetFileImage( hDir, strFile,
@@ -1813,6 +1825,7 @@ gint32 CRegistryFs::RemoveFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr ptrDir;
         stdstr strNormPath;
@@ -1840,6 +1853,7 @@ gint32 CRegistryFs::OpenFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr pFile;
 
@@ -2009,6 +2023,7 @@ gint32 CRegistryFs::CreateFile(
     gint32 ret = 0;
     bool bCreated = false;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr ptrDir;
         stdstr strNormPath;

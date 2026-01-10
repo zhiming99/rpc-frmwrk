@@ -194,6 +194,11 @@
     if( (_p_)->IsStoppedNoLock() ) \
     { ret = ERROR_STATE; break; }
 
+#define DIR_WRITE_LOCK( _p_ ) \
+    CDirWriteLock _oLock_( _p_ ); \
+    if( (_p_)->IsStoppedNoLock() ) \
+    { ret = ERROR_STATE; break; }
+
 #define UNLOCK( _p_ ) \
     _oLock_.Unlock()
 
@@ -216,6 +221,9 @@
 #define BLKIDX_BEYOND_MAX( _blkidx_  ) \
     ( ( _blkidx_ ) >= BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
 
+#define CACHE_LIFE_CYCLE 60
+#define CACHE_MAX_BLOCKS BLOCKS_PER_GROUP_FULL 
+
 namespace rpcf{
 
 extern bool g_bSafeMode;
@@ -225,6 +233,14 @@ inline bool IsSafeMode()
 
 inline void SetSafeMode( bool bSafe )
 { g_bSafeMode = bSafe; }
+
+extern guint32 g_dwCacheLife;
+
+inline guint32 GetCacheLifeCycle()
+{ return g_dwCacheLife; }
+
+inline void SetCacheLifeCycle( guint32 dwTimeSec )
+{ g_dwCacheLife = dwTimeSec; }
 
 struct ISynchronize
 {
@@ -427,8 +443,13 @@ class CBlockAllocator :
     SblkUPtr            m_pSuperBlock;
     GrpBmpUPtr          m_pGroupBitmap;
     std::map< guint32, BlkGrpUPtr > m_mapBlkGrps;
+
+    // cache related members
     DirtyBlks           m_mapDirtyBlks;
     guint32             m_dwDirtyBlkCount = 0;
+    guint32             m_dwCacheAge = 0;
+    guint32             m_dwTransCount = 0;
+    timespec            m_oStartTime = {0};
 
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
@@ -456,6 +477,13 @@ class CBlockAllocator :
 
     inline stdrmutex& GetLock() const
     { return m_oLock; }
+
+    gint32 CheckAndCommit( bool bEntering = true );
+    inline gint32 IncTransactCount()
+    { return ++m_dwTransCount; }
+
+    inline gint32 DecTransactCount()
+    { return --m_dwTransCount; }
 
     gint32 Format() override;
     gint32 Flush( guint32 dwFlags = 0 ) override;
@@ -536,6 +564,29 @@ class CBlockAllocator :
     const std::map< guint32, BlkGrpUPtr >& GetBlkGrps() const
     { return m_mapBlkGrps; }
 };
+
+struct BATransact
+{
+    AllocPtr m_pAlloc;
+    BATransact( AllocPtr& pAlloc )
+    {
+        if( !IsSafeMode() )
+            return;
+        m_pAlloc = pAlloc;
+        CStdRMutex oLock( pAlloc->GetLock() );
+        pAlloc->CheckAndCommit();
+        pAlloc->IncTransactCount();
+    }
+    ~BATransact()
+    {
+        if( !IsSafeMode() || m_pAlloc.IsEmpty() )
+            return;
+        CStdRMutex oLock( m_pAlloc->GetLock() );
+        m_pAlloc->DecTransactCount();
+        m_pAlloc->CheckAndCommit( false );
+    }
+};
+
 
 #define VALUE_SIZE 95
 
@@ -990,7 +1041,7 @@ struct RegFSBNode
 
 class CBPlusNode;
 class CDirImage;
-using BNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
+using BNodeUPtr = typename std::shared_ptr< CBPlusNode >; 
 using ChildMap = typename std::hashmap< guint32, BNodeUPtr >;
 using FileMap = typename std::hashmap< guint32, FImgSPtr >;
 
@@ -1351,7 +1402,7 @@ struct CBPlusNode :
         if( itr == oMap.end() )
             return -ENOENT;
         itr->second->SetParent( nullptr );
-        pChild = std::move( itr->second );
+        pChild = itr->second;
         oMap.erase( itr );
         return STATUS_SUCCESS;
     }
@@ -1376,8 +1427,9 @@ struct CBPlusNode :
         auto itr = oMap.find( dwBNodeIdx );
         if( itr != oMap.end() )
             return -EEXIST;
-        pChild->SetParent( this );
-        oMap[ dwBNodeIdx ] = std::move( pChild );
+        if( this != pChild.get() )
+            pChild->SetParent( this );
+        oMap[ dwBNodeIdx ] = pChild;
         return STATUS_SUCCESS;
     }
 
@@ -1571,6 +1623,24 @@ struct FREE_BNODES
     gint32 ntoh( guint8* pSrc, guint32 dwSize );
 
 }__attribute__((aligned (8)));
+
+class CDirWriteLock : public CWriteLock
+{
+    CDirImage* m_pDir; 
+    public:
+    typedef CWriteLock super;
+    CDirWriteLock( CDirImage* pDir ) :
+        super( pDir->GetLock() ),
+        m_pDir( pDir )
+    {}
+
+    ~CDirWriteLock()
+    {
+        CWriteLock::~CWriteLock();
+        if( m_pDir )
+            m_pDir->CommitDirtyNodes();
+    }
+};
 
 class COpenFileEntry;
 typedef CAutoPtr< clsid( Invalid ), COpenFileEntry > FileSPtr;

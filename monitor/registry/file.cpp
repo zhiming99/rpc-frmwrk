@@ -331,7 +331,6 @@ gint32 CFileImage::Reload()
         case typeNone:
             break;
         default:
-            ret = -ENOTSUP;
             break;
         }
         guint32 dwSize = GetSize();

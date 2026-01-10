@@ -35,6 +35,7 @@ namespace rpcf{
 bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
+guint32 g_dwCacheLife = CACHE_LIFE_CYCLE;
 
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
@@ -1525,6 +1526,18 @@ gint32 CBlockAllocator::CacheBlocks(
 {
     gint32 ret = 0;
     do{
+        CStdRMutex oLock( this->GetLock() );
+        if( m_mapDirtyBlks.empty() )
+        {
+            ret = clock_gettime(
+                CLOCK_REALTIME, &m_oStartTime );
+            if( ret < 0 )
+            {
+                ret = -errno;
+                break;
+            }
+        }
+
         // handle the special cases
         if( *pBlocks == ( guint32 )-2 )
         {
@@ -1570,7 +1583,6 @@ gint32 CBlockAllocator::CacheBlocks(
                 { *pBlocks, *pBlocks + dwNumBlocks } );
         }
 
-
         INTERVALS oCommonBlks = IntersectIntervals(
             vecBlks, this->m_mapDirtyBlks );
         INTERVALS oNewBlks = SubtractIntervals(
@@ -1578,7 +1590,11 @@ gint32 CBlockAllocator::CacheBlocks(
         for( auto& elem : oCommonBlks )
         {
             if( elem.first == 0 )
-                continue;
+            {
+                OutputMsg(ret, "Cache internal error, "
+                "aborting to avoid data corruption.");
+                abort();
+            };
             if( elem.first == ( guint32 )-2 ||
                 elem.first == ( guint32 )-4 )
             {
@@ -1633,6 +1649,8 @@ gint32 CBlockAllocator::ReadCache(
 {
     gint32 ret = 0;
     do{
+        CStdRMutex oLock( this->GetLock() );
+
         // handle the special cases
         if( *pBlocks == ( guint32 )-2 ||
             *pBlocks == ( guint32 )-4 )
@@ -1743,31 +1761,72 @@ gint32 CBlockAllocator::ReadCache(
 gint32 CBlockAllocator::CommitCache()
 {
     gint32 ret = 0;
-    for( auto& elem : m_mapDirtyBlks )
-    {
-        guint32 dwOff;
-        if( elem.first == -2 )
-            dwOff = 0;
-        else if( elem.first == -4 )
-            dwOff = SUPER_BLOCK_SIZE;
+    do{
+        CStdRMutex oLock( this->GetLock() );
+        for( auto& elem : m_mapDirtyBlks )
+        {
+            guint32 dwOff;
+            if( elem.first == -2 )
+                dwOff = 0;
+            else if( elem.first == -4 )
+                dwOff = SUPER_BLOCK_SIZE;
+            else
+                dwOff = BLOCK_ABS( elem.first );
+            ret = ReadWriteFile( elem.second->ptr(),
+                elem.second->size(), dwOff, false );
+            if( ERROR( ret ) )
+                break;
+        }
+        if( SUCCEEDED( ret ) )
+        {
+            m_mapDirtyBlks.clear();
+            m_dwDirtyBlkCount = 0;
+            m_dwCacheAge = 0;
+        }
         else
-            dwOff = BLOCK_ABS( elem.first );
-        ret = ReadWriteFile( elem.second->ptr(),
-            elem.second->size(), dwOff, false );
-        if( ERROR( ret ) )
+        {
+            OutputMsg(ret, "Error committing block "
+                "cache, aborting to avoid data "
+                "corruption.");
+            abort();
+        }
+    }while( 0 );
+    return ret;
+}
+
+gint32 CBlockAllocator::CheckAndCommit( bool bEntering )
+{
+    gint32 ret = 0;
+    do{
+        // already locked here
+        if( m_dwTransCount != 0 )
             break;
-    }
-    if( SUCCEEDED( ret ) )
-    {
-        m_mapDirtyBlks.clear();
-        m_dwDirtyBlkCount = 0;
-    }
-    else
-    {
-        OutputMsg(ret, "Error committing block cache, "
-            "aborting to avoid data corruption.");
-        abort();
-    }
+        if( m_mapDirtyBlks.empty() )
+            break;
+
+        bool bCommit = false;
+        timespec oNow;
+        ret = clock_gettime(
+            CLOCK_REALTIME, &oNow );
+        if( ret < 0 )
+        {
+            ret = -errno;
+            break;
+        }
+        if( oNow.tv_nsec - m_oStartTime.tv_nsec >=
+            GetCacheLifeCycle() && bEntering )
+            bCommit = true;
+
+        else if( m_dwDirtyBlkCount >=
+            CACHE_MAX_BLOCKS )
+            bCommit = true;
+
+        if( !bCommit )
+            break;
+
+        ret = CommitCache();
+
+    }while( 0 );
     return ret;
 }
 
