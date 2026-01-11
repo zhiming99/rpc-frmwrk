@@ -321,6 +321,13 @@ struct CBlockBitmap :
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
+
+    inline bool IsEmpty() const
+    {
+        return BLOCKS_PER_GROUP - BLKBMP_BLKNUM ==
+            GetFreeCount();
+    }
+
 };
 
 using BlkBmpUPtr = typename std::unique_ptr< CBlockBitmap >;
@@ -371,11 +378,18 @@ struct CBlockGroup : public ISynchronize
             pvecBlocks, dwNumBlocks );
     }
 
-    gint32 IsBlockFree( guint32 dwBlkIdx )
+    gint32 IsBlockFree( guint32 dwBlkIdx ) const
     {
         return m_pBlockBitmap->IsBlockFree(
             dwBlkIdx );
     }
+
+    CBlockBitmap* GetBlkBmp()
+    { return m_pBlockBitmap.get(); };
+
+    const CBlockBitmap* GetBlkBmp() const
+    { return m_pBlockBitmap.get(); };
+
 };
 
 typedef CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator > AllocPtr;

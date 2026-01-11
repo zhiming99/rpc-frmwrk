@@ -1425,6 +1425,9 @@ INTERVALS IntersectIntervals(
     guint32 i = 0, j = 0;
     guint32 n1 = intervals1.size();
     guint32 n2 = intervals2.size();
+    if( n2 == 0 || n1 == 0 )
+        return result;
+
     auto jter = intervals2.lower_bound(
         intervals1[i].first );
     if( jter == intervals2.end() )
@@ -1481,6 +1484,13 @@ INTERVALS SubtractIntervals(
     guint32 i = 0, j = 0;
     guint32 n1 = intervals1.size();
     guint32 n2 = intervals2.size();
+    if( n2 == 0 )
+    {
+        result = intervals1;
+        return result;
+    }
+    if( n1 == 0 )
+        return result;
 
     while (i < n1) {
         guint32 start1 = intervals1[i].first;
@@ -1655,32 +1665,22 @@ gint32 CBlockAllocator::ReadCache(
         if( *pBlocks == ( guint32 )-2 ||
             *pBlocks == ( guint32 )-4 )
         {
-            BufPtr pBufCopy( true );
-            ret = pBufCopy->Resize(
-                BLOCK_SIZE * dwNumBlocks );
-            if( ERROR( ret ) )
-                break;
             auto iter = m_mapDirtyBlks.find( *pBlocks );
             if( iter != m_mapDirtyBlks.end() )
             {
-                memcpy( pBufCopy->ptr(),
+                memcpy( pBuf,
                     iter->second->ptr(),
-                    std::min( pBufCopy->size(),
+                    std::min( dwNumBlocks * BLOCK_SIZE,
                         iter->second->size() ) );
-                continue;
+                break;
             }
-            else
-            {
-                size_t dwOff = 0;
-                if( *pBlocks == -4 )
-                    dwOff = SUPER_BLOCK_SIZE;
-                ret = ReadWriteFile(
-                    pBufCopy->ptr(),
-                    BLOCK_SIZE * dwNumBlocks,
-                    dwOff, true );
-                if( ERROR( ret ) )
-                    break;
-            }
+            size_t dwOff = 0;
+            if( *pBlocks == -4 )
+                dwOff = SUPER_BLOCK_SIZE;
+            ret = ReadWriteFile( ( char* )pBuf,
+                BLOCK_SIZE * dwNumBlocks,
+                dwOff, true );
+            break;
         }
 
         std::vector< CONTBLKS > vecBlks;
@@ -1752,6 +1752,7 @@ gint32 CBlockAllocator::ReadCache(
                 dwSize, dwOff, true );
             if( ERROR( ret ) )
                 break;
+            ret = 0;
         }
 
     }while( 0 );
@@ -1776,6 +1777,7 @@ gint32 CBlockAllocator::CommitCache()
                 elem.second->size(), dwOff, false );
             if( ERROR( ret ) )
                 break;
+            ret = 0;
         }
         if( SUCCEEDED( ret ) )
         {

@@ -47,6 +47,7 @@ static guint64 g_qwSize = 0;
 static RegFsPtr g_pRegfs;
 static stdstr g_strRegFsFile;
 static bool g_bVerbose = false;
+static bool g_bRebuild = false;
 
 #ifdef RELEASE
 #define OutputMsg2( ret, strFmt, ... ) \
@@ -90,11 +91,6 @@ gint32 DestroyContext()
         "#Leaked objects is %d",
         CObjBase::GetActCount() );
     return STATUS_SUCCESS;
-}
-
-gint32 ScanBlocks( RegFsPtr& pFs )
-{
-    return 0;
 }
 
 typedef enum {
@@ -377,6 +373,25 @@ guint32 CountBits( T n ) {
     return count;
 }
 
+gint32 CollectBlockGroups( CGroupBitmap* pgbmp,
+    std::vector< guint32 >& vecGrps )
+{
+    if( pgbmp == nullptr )
+        return -EINVAL;
+
+    guint32 dwOffset =
+        GRPBMP_SIZE - sizeof( guint16 );
+    for( guint32 i = 0; i < dwOffset; i++ )
+    {
+        gint32 ret =
+            pgbmp->IsBlockGroupFree( i );
+        if( SUCCEEDED( ret ) )
+            continue;
+        vecGrps.push_back( i );
+    }
+    return 0;
+}
+
 gint32 CheckGroupBitmap( RegFsPtr& pFs,
     std::unordered_set< guint32 >& setBlocks )
 {
@@ -384,75 +399,32 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
     if( pAlloc.IsEmpty() )
         return -EINVAL;
     CGroupBitmap* pgbmp = pAlloc->GetGroupBitmap();
-    if( pgbmp == nullptr )
-        return -EFAULT;
     gint32 ret = 0;
     do{
         OutputMsg2( 0, "Checking group bitmap..." );
         guint32 dwFree = pgbmp->GetFreeCount();
-        guint32 dwOffset =
-            GRPBMP_SIZE - sizeof( guint16 );
-        auto p =
-            ( pgbmp->m_arrBytes + dwOffset ) - 1;
-        auto a = *p;
-        auto pend = pgbmp->m_arrBytes;
 
-        while( a == 0 )
-        {
-            --p;
-            if( p < pend )
-                break;
-            a = *p;
-        }
-        if( a == 0 )
-        {
-            OutputMsg2( 0,
-                "Error group bitmap is empty, "
-                "which should at least have "
-                "one block group allocated" );
-            ret = -ENODATA;
-            break;
-        }
-
-        guint32 dwLast = a;
-        gint32 iStep = sizeof( guint32 ) * BYTE_BITS;
-        gint32 iMaxAlloced =
-            iStep * ( p - pend ) +
-            ffs( dwLast );
+        std::vector< guint32 > vecGrps;
+        CollectBlockGroups( pgbmp, vecGrps );
+        guint32 dwMaxAlloced = vecGrps.back() + 1;
 
         struct stat stBuf;
         gint32 iFd = pAlloc->GetFd();
         fstat( iFd, &stBuf );
-        if( stBuf.st_size - iMaxAlloced * GROUP_SIZE >
+        if( stBuf.st_size - dwMaxAlloced * GROUP_SIZE >
             ( SUPER_BLOCK_SIZE + GRPBMP_SIZE ) )
         {
-            guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
+            guint64 qwGrps = dwMaxAlloced * GROUP_SIZE;
             OutputMsg2( 0,
                 "Warning registry occupied more "
                 "space than needed, allocated bytes "
                 "%lld, reg size %lld, ",
                 qwGrps, stBuf.st_size );
-            
-            OutputMsg2( 0, 
-                "Shrink the registry? (y/n)" );
-            stdstr strInput;
-            std::cin >> strInput;
-            if( strInput == "y" || strInput == "Y" )
-            {
-                guint64 qwTail = qwGrps +
-                    SUPER_BLOCK_SIZE + GRPBMP_SIZE;
-                lseek( iFd, qwTail, SEEK_SET );
-                ret = ftruncate( iFd, qwTail );
-                if( SUCCEEDED( ret ) )
-                    OutputMsg2( 0,
-                        "registry is shrinked successfully" );
-            }
-
         }
-        else if( iMaxAlloced * GROUP_SIZE - stBuf.st_size >
+        else if( dwMaxAlloced * GROUP_SIZE - stBuf.st_size >
             GROUP_SIZE - SUPER_BLOCK_SIZE - GRPBMP_SIZE )
         {
-            guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
+            guint64 qwGrps = dwMaxAlloced * GROUP_SIZE;
             OutputMsg2( 0,
                 "Warning registry size is too "
                 "small to hold all the block "
@@ -463,6 +435,13 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
         // count the allocated groups
         guint32 dwAlloced =
             pgbmp->GetAllocCount();
+        if( dwAlloced != vecGrps.size() )
+        {
+            OutputMsg2( 0,
+                "Warning counter of allocated groups ( %d ) does not "
+                "agree with the number of allocated groups found (%d )",
+                dwAlloced, vecGrps.size() );
+        }
 
         auto pdw = ( guint32* )pgbmp->m_arrBytes;
         auto pdwend = pdw +
@@ -478,6 +457,9 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
                 "Error the actual number of allocated "
                 "groups is not aggree with the "
                 "group bitmap's counter" );
+        else
+            OutputMsg2( 0,
+                "groups allocated: %d", dwCount );
         OutputMsg2( 0, "Done Checking group bitmap" );
 
     }while( 0 );
@@ -994,17 +976,81 @@ gint32 RemoveBadDir( RegFsPtr& pFs,
     return 0;    
 }
 
-gint32 ClaimOrphanBlocks( RegFsPtr& pFs )
+gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
+    const std::unordered_set< guint32 >& setBlocks )
 {
-    return 0;
+    gint32 ret = 0;
+    do{
+        AllocPtr pAlloc = pFs->GetAllocator();
+        auto& mapBlkGrps = pAlloc->GetBlkGrps();    
+        guint32 dwCount = 0;
+        std::vector< guint32 > vecFreeGrps;
+        for( auto& elem : mapBlkGrps )
+        {
+            CBlockGroup* pbg = elem.second.get();
+            CBlockBitmap* pbit = pbg->GetBlkBmp();
+            guint32 dwGrpIdx = pbit->GetGroupIndex();
+            for( guint32 i = BLKBMP_BLKNUM;
+                i < BLOCKS_PER_GROUP; i++ )
+            {
+                ret = pbit->IsBlockFree( i );
+                if( SUCCEEDED( ret ) )
+                    continue;
+                guint32 dwBlkIdx = i |
+                    dwGrpIdx << GROUP_INDEX_SHIFT;
+                if( setBlocks.find( dwBlkIdx ) ==
+                    setBlocks.end() )
+                {
+                    pbit->FreeBlock( i );
+                    dwCount++;
+                    continue;
+                }
+            }
+            if( pbit->IsEmpty() )
+                vecFreeGrps.push_back( dwGrpIdx );
+        }
+        OutputMsg2( 0,
+            "Orphan blocks claimed: %d", dwCount );
+        CGroupBitmap* pgbmp = pAlloc->GetGroupBitmap();
+        for( auto elem : vecFreeGrps )
+        {
+            pgbmp->FreeGroup( elem );
+            mapBlkGrps.erase( elem );
+        }
+
+        OutputMsg2( 0,
+            "Freed empty block groups: %d",
+            vecFreeGrps.size() );
+
+        std::vector< guint32 > vecGrps;
+        CollectBlockGroups( pgbmp, vecGrps );
+        guint32 dwMaxAlloced = vecGrps.back() + 1;
+        guint64 qwTail = dwMaxAlloced * GROUP_SIZE +
+            SUPER_BLOCK_SIZE + GRPBMP_SIZE;
+        gint32 iFd = pAlloc->GetFd();
+        struct stat stBuf;
+        fstat( iFd, &stBuf );
+
+        if( stBuf.st_size > qwTail )
+        {
+            ftruncate( iFd , qwTail );
+            OutputMsg2( 0,
+                "Shrinked the registry size from %lld to %lld bytes",
+                stBuf.st_size, qwTail );
+        }
+    }while( 0 );
+    return ret;
 }
 
 static void Usage( const char* szName )
 {
     fprintf( stderr,
-        "Usage: %s [OPTIONS] <regfs path> [<mount point>]\n"
+        "Usage: %s [OPTIONS] <regfs path>\n"
         "\t [ <regfs path> the path to the file containing regfs  ]\n"
-        "\t [ -h this help ]\n", szName );
+        "\t [ -r rebuild and defregrement the registry in a new registry "
+            "file with the suffix '.restore' ]\n"
+        "\t [ -h this help ]\n"
+        "\t [ -v output verbose information  ]\n", szName );
 }
 
 int _main()
@@ -1041,22 +1087,24 @@ int _main()
         FindBadFiles( g_pRegfs,
             vecBadFiles, vecGoodFiles, setBlocks );
         OutputMsg2( 0, "Summary:" );
-        OutputMsg2( 0, "Corrupted Files: %d",
+        OutputMsg2( 0, "Corrupted Files and Directories: %d",
             vecBadFiles.size() );
-        OutputMsg2( 0, "Healthy Files: %d",
+        OutputMsg2( 0, "Healthy Files and Directories: %d",
             vecGoodFiles.size() );
         OutputMsg2( 0, "Valid Blocks: %d",
             setBlocks.size() );
 
-        if( vecBadFiles.size() )
+        OutputMsg2( 0, "Claiming orphan blocks..." );
+        ClaimOrphanBlocks( g_pRegfs, setBlocks );
+        if( g_bRebuild )
         {            
-            OutputMsg2( 0, "Do you want to remove "
-                "the corrupted files and "
-                "directories? (y/n)" );
-            stdstr strInput;
-            std::cin >> strInput;
-            if( strInput == "y" || strInput == "Y" )
-                ret = RebuildFs( g_pRegfs, vecGoodFiles );
+            // OutputMsg2( 0, "Do you want to remove "
+            //     "the corrupted files and "
+            //     "directories? (y/n)" );
+            // stdstr strInput;
+            // std::cin >> strInput;
+            // if( strInput == "y" || strInput == "Y" )
+            ret = RebuildFs( g_pRegfs, vecGoodFiles );
         }
         pFs->Stop();
         g_pRegfs.Clear();
@@ -1078,12 +1126,15 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hv" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "hrv" ) ) != -1 )
         {
             switch( opt )
             {
                 case 'v':
                     g_bVerbose = true;
+                    break;
+                case 'r':
+                    g_bRebuild = true;
                     break;
                 case 'h':
                 default:
@@ -1091,13 +1142,17 @@ int main( int argc, char** argv)
             }
         }
         if( ERROR( ret ) )
+        {
+            Usage( argv[ 0 ] );
             break;
+        }
 
         if( optind >= argc )
         {
             ret = -EINVAL;
             OutputMsg2( ret, "Error missing "
                 "'registry file to check'" );
+            Usage( argv[ 0 ] );
             break;
         }
 
