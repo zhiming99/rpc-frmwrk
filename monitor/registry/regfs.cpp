@@ -191,6 +191,7 @@ gint32 CRegistryFs::Stop()
 {
     gint32 ret = 0;
     do{
+        m_pAlloc->SetStopped();
         BATransact oTransact( m_pAlloc );
         WRITE_LOCK( this );
         if( m_mapOpenFiles.size() )

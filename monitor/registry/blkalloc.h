@@ -170,6 +170,7 @@
     ( _idx_ << find_shift( BNODE_SIZE ) )
 
 #define INVALID_BNODE_IDX  ( USHRT_MAX )
+#define INVALID_BLOCK_IDX  ( USHRT_MAX )
 
 #define MAX_BNODE_NUMBER \
     ( MAX_FILE_SIZE / BNODE_SIZE )
@@ -464,6 +465,7 @@ class CBlockAllocator :
     guint32             m_dwCacheAge = 0;
     guint32             m_dwTransCount = 0;
     timespec            m_oStartTime = {0};
+    bool                m_bStopped = false;
 
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
@@ -577,6 +579,19 @@ class CBlockAllocator :
     { return m_mapBlkGrps; }
     const std::map< guint32, BlkGrpUPtr >& GetBlkGrps() const
     { return m_mapBlkGrps; }
+
+    inline void SetStopped()
+    {
+        CStdRMutex oLock( GetLock() );
+        m_bStopped = true;
+    }
+
+    inline bool IsStopped() 
+    {
+        CStdRMutex oLock( GetLock() );
+        return m_bStopped;
+    }
+
 };
 
 struct BATransact
