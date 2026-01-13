@@ -35,7 +35,7 @@ namespace rpcf{
 bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
-guint32 g_dwCacheLife = CACHE_LIFE_CYCLE;
+guint32 g_dwCacheLife = 5;
 
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
@@ -1068,7 +1068,8 @@ gint32 CBlockAllocator::AllocBlocks(
 gint32 CBlockAllocator::ReadBlock(
     guint32 dwBlockIdx, guint8* pBuf )
 {
-    if( dwBlockIdx == 0 || pBuf == nullptr )
+    if( dwBlockIdx == INVALID_BLOCK_IDX ||
+        pBuf == nullptr )
         return -EINVAL;
 
     guint32 arrBlks[ 1 ] = { dwBlockIdx };
@@ -1079,7 +1080,8 @@ gint32 CBlockAllocator::ReadBlock(
 gint32 CBlockAllocator::WriteBlock(
     guint32 dwBlockIdx, const guint8* pBuf )
 {
-    if( dwBlockIdx == 0 || pBuf == nullptr )
+    if( dwBlockIdx == INVALID_BLOCK_IDX ||
+        pBuf == nullptr )
         return -EINVAL;
 
     guint32 arrBlks[ 1 ] = { dwBlockIdx };
@@ -1136,7 +1138,8 @@ gint32 CBlockAllocator::FindContigousBlocks(
             dwCount++;
             dwPrev += 1;
         }
-        else if( dwBlkIdx == 0 && dwBase == 0 )
+        else if( dwBlkIdx == INVALID_BLOCK_IDX &&
+            dwBase == INVALID_BLOCK_IDX )
         {
             // a hole
             dwCount++;
@@ -1176,20 +1179,21 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             guint64 off = ABS_ADDR(
                 GROUP_START( dwBlkIdx ) +
                 dwIdx * BLOCK_SIZE );
-            size_t qs = ( ( size_t )
-                BLOCK_SIZE ) * elem.second;
+            size_t qs = BLOCK_SIZE * elem.second;
             if( qs > MAX_FILE_SIZE )
             {
                 ret = -ERANGE;
                 break;
             }
-            if( dwBlkIdx == 0 && bRead )
+            if( dwBlkIdx == INVALID_BLOCK_IDX &&
+                bRead )
             {
                 memset( pBuf + dwOff, 0, qs );
                 dwOff += qs;
                 continue;
             }
-            else if( dwBlkIdx == 0 && !bRead )
+            else if( dwBlkIdx == INVALID_BLOCK_IDX &&
+                !bRead )
             {
                 ret = -ENODATA;
                 break;
@@ -1431,11 +1435,8 @@ INTERVALS IntersectIntervals(
     auto jter = intervals2.lower_bound(
         intervals1[i].first );
     if( jter == intervals2.end() )
-    {
-        result.insert( result.end(),
-            intervals1.begin(), intervals1.end() );
         return result;
-    }
+
     if( jter != intervals2.begin() )
         jter--;
 
@@ -1452,9 +1453,9 @@ INTERVALS IntersectIntervals(
         if (start < end) {
             guint32 dwBufOff = intervals1[i].dwOff;
             guint32 dwOff = (
-                start == ( intervals1[i].first
+                start == intervals1[i].first
                 ?  dwBufOff : dwBufOff + 
-                start - intervals1[i].first ) );
+                start - intervals1[i].first );
             result.emplace_back(
                 start, end, dwOff, jter->first );
         }
@@ -1463,6 +1464,8 @@ INTERVALS IntersectIntervals(
         } else {
             auto jterOld = jter;
             ++jter;
+            if( jter == intervals2.end() )
+                break;
             auto jter2 = intervals2.lower_bound(
                 intervals1[ i ].first );
             if( jter2 != intervals2.end() &&
@@ -1486,7 +1489,9 @@ INTERVALS SubtractIntervals(
     guint32 n2 = intervals2.size();
     if( n2 == 0 )
     {
-        result = intervals1;
+        result.insert( result.end(),
+            intervals1.begin(),
+            intervals1.end());
         return result;
     }
     if( n1 == 0 )
@@ -1599,12 +1604,14 @@ gint32 CBlockAllocator::CacheBlocks(
             vecBlks, oCommonBlks );
         for( auto& elem : oCommonBlks )
         {
-            if( elem.first == 0 )
+            if( elem.first == INVALID_BLOCK_IDX )
             {
                 OutputMsg(ret, "Cache internal error, "
                 "aborting to avoid data corruption.");
                 abort();
             };
+            guint32 dwBlkCount =
+                elem.second - elem.first;
             if( elem.first == ( guint32 )-2 ||
                 elem.first == ( guint32 )-4 )
             {
@@ -1614,29 +1621,34 @@ gint32 CBlockAllocator::CacheBlocks(
                     continue;
                 memcpy( iter->second->ptr(),
                     pBuf + elem.dwOff * BLOCK_SIZE,
-                    BLOCK_SIZE *
-                        ( elem.second - elem.first ) );
+                    BLOCK_SIZE * dwBlkCount );
                 continue;
             }
             auto iter = m_mapDirtyBlks.find(
                 elem.dwKey );
             if( iter == m_mapDirtyBlks.end() )
                 continue;
+
             guint32 dwOff = ( elem.first -
                 iter->first ) * BLOCK_SIZE;
             if( dwOff > iter->second->size() )
                 continue;
-            memcpy( iter->second->ptr() + dwOff,
-                pBuf + elem.dwOff * BLOCK_SIZE,
-                BLOCK_SIZE *
-                    ( elem.second - elem.first ) );
+
+            char* pDst =
+                iter->second->ptr() + dwOff;
+            auto pSrc =
+                pBuf + elem.dwOff * BLOCK_SIZE;
+            memcpy( pDst, pSrc,
+                BLOCK_SIZE * dwBlkCount );
         }
 
         for( auto& elem : oNewBlks )
         {
+            guint32 dwBlkCount =
+                elem.second - elem.first;
             BufPtr pBufNew( true );
-            ret = pBufNew->Resize( (
-                elem.second - elem.first ) * BLOCK_SIZE );
+            ret = pBufNew->Resize(
+                dwBlkCount * BLOCK_SIZE );
             if( ERROR( ret ) )
                 break;
             memcpy( pBufNew->ptr(),
@@ -1644,8 +1656,7 @@ gint32 CBlockAllocator::CacheBlocks(
                 pBufNew->size() );
             m_mapDirtyBlks.emplace(
                 elem.first, pBufNew );
-            m_dwDirtyBlkCount +=
-                elem.second - elem.first;
+            m_dwDirtyBlkCount += dwBlkCount;
         }
 
     }while( 0 );
@@ -1691,32 +1702,57 @@ gint32 CBlockAllocator::ReadCache(
             guint32 dwOff = 0;
             for( auto& elem : vecBlks )
             {
+                // convert 'second' from block count
+                // to 'tail block idx'
                 elem.third = dwOff;
                 dwOff += elem.second;
                 elem.second += elem.first;
                 // block offset in the pBuf
             }
             std::sort( vecBlks.begin(), vecBlks.end(),
-                ( []( const CONTBLKS& a1, const CONTBLKS& a2 )
-                { return a1.dwBlkIdx <= a2.dwBlkIdx; } ) );
+                ( []( const CONTBLKS& a1,
+                    const CONTBLKS& a2 )
+                {
+                    if( a1.first < a2.first )
+                        return true;
+                    else if( a1.first == a2.first )
+                    {
+                        if( a1.second < a2.second )
+                            return true;
+                        else if( a1.second == a2.second )
+                        {
+                            if( a1.third <= a2.third )
+                                return true;
+                            return false;
+                        }
+                        return false;
+                    }
+                    return false;
+                } ) );
+
+            auto itr = vecBlks.begin();
+            while( itr != vecBlks.end() )
+            {
+                if( itr->first < INVALID_BLOCK_IDX )
+                {
+                    itr++;
+                    continue;
+                }
+                if( itr->first == INVALID_BLOCK_IDX )
+                {
+                    // fill the holes with zero
+                    memset( pBuf + itr->dwOff * BLOCK_SIZE,
+                        0, itr->second * BLOCK_SIZE );
+                    itr = vecBlks.erase( itr );
+                    continue;
+                }
+                break;
+            }
         }
         else
         {
             vecBlks.push_back( { *pBlocks,
                 *pBlocks + dwNumBlocks } );
-        }
-
-        auto itr = vecBlks.begin();
-        while( itr != vecBlks.end() )
-        {
-            if( itr->first == 0 )
-            {
-                memset( pBuf + itr->dwOff * BLOCK_SIZE,
-                    0, itr->second * BLOCK_SIZE );
-                itr = vecBlks.erase( itr );
-                continue;
-            }
-            break;
         }
 
         INTERVALS oCommonBlks = IntersectIntervals(
@@ -1764,6 +1800,8 @@ gint32 CBlockAllocator::CommitCache()
     gint32 ret = 0;
     do{
         CStdRMutex oLock( this->GetLock() );
+        DebugPrint( 0, "Committing %d dirty blocks...",
+            m_dwDirtyBlkCount );
         for( auto& elem : m_mapDirtyBlks )
         {
             guint32 dwOff;
@@ -1815,12 +1853,15 @@ gint32 CBlockAllocator::CheckAndCommit( bool bEntering )
             ret = -errno;
             break;
         }
-        if( oNow.tv_nsec - m_oStartTime.tv_nsec >=
+        if( oNow.tv_sec - m_oStartTime.tv_sec >=
             GetCacheLifeCycle() && bEntering )
             bCommit = true;
 
         else if( m_dwDirtyBlkCount >=
             CACHE_MAX_BLOCKS )
+            bCommit = true;
+
+        else if( IsStopped() )
             bCommit = true;
 
         if( !bCommit )

@@ -135,7 +135,9 @@ gint32 RegFSInode::Serialize(
                 break;
             }
         case typeNone:
+            break;
         default:
+            ret = -ENOTSUP;
             break;
         }
 
@@ -331,6 +333,7 @@ gint32 CFileImage::Reload()
         case typeNone:
             break;
         default:
+            ret = -ENOTSUP;
             break;
         }
         guint32 dwSize = GetSize();
@@ -545,14 +548,19 @@ gint32 CFileImage::CollectBlocksForRead(
             {
                 // if the block is not allocated, push
                 // a zero
+
+                guint32& dwBlkIdx = 
+                    m_oInodeStore.m_arrBlocks[ i ];
                 vecBlocks.push_back(
-                    m_oInodeStore.m_arrBlocks[ i ] );
+                    dwBlkIdx ? dwBlkIdx :
+                    INVALID_BLOCK_IDX );
             }
             else if( bFirst )
             {
                 if( dwIndirectIdx == 0 )   
                 {
-                    vecBlocks.push_back( 0 );
+                    vecBlocks.push_back(
+                        INVALID_BLOCK_IDX );
                     continue;
                 }
                 CStdRMutex oExclLock( GetExclLock() );
@@ -573,7 +581,9 @@ gint32 CFileImage::CollectBlocksForRead(
                 guint32 dwBlkIdx = ntohl(
                 pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] );
 
-                vecBlocks.push_back( dwBlkIdx );
+                vecBlocks.push_back(
+                    dwBlkIdx ? dwBlkIdx :
+                    INVALID_BLOCK_IDX );
             }
             else if( bSec )
             {
@@ -587,7 +597,8 @@ gint32 CFileImage::CollectBlocksForRead(
                     ntohl( p[ dwBitIdx ] );
                 if( dwBlkIdxIdx == 0 )
                 {
-                    vecBlocks.push_back( 0 );
+                    vecBlocks.push_back(
+                        INVALID_BLOCK_IDX );
                     continue;
                 }
                 CStdRMutex oExclLock( GetExclLock() );
@@ -599,8 +610,11 @@ gint32 CFileImage::CollectBlocksForRead(
                 {
                     auto pblk = ( guint32* )
                         itr->second->ptr();
+                    guint32 dwBlkIdx =
+                        ntohl( pblk[ dwIdx2 ] );
                     vecBlocks.push_back( 
-                        ntohl( pblk[ dwIdx2 ] ) );
+                        dwBlkIdx ? dwBlkIdx :
+                        INVALID_BLOCK_IDX );
                 }
                 else
                 {
@@ -613,8 +627,11 @@ gint32 CFileImage::CollectBlocksForRead(
                     if( ERROR( ret ) )
                         break;
                     auto pblk = ( guint32* )p->ptr();
+                    guint32 dwBlkIdx = 
+                        ntohl( pblk[ dwIdx2 ] );
                     vecBlocks.push_back(
-                        ntohl( pblk[ dwIdx2 ] ) );
+                        dwBlkIdx ? dwBlkIdx :
+                        INVALID_BLOCK_IDX );
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, p } );
                 }
@@ -655,6 +672,11 @@ gint32 CFileImage::CollectBlocksForWrite(
         guint32 dw2IndIdx =
             m_oInodeStore.m_arrBlocks[ BITD_IDX ];
 
+        std::map< guint32, guint32 > mapDirtyBlks2;
+        bool bDirtyInode = false;
+        bool bDirtyBitd = false;
+        bool bDirtyBit = false;
+
         for( int i = dwLead; i < dwTail; i++ )
         {
             guint32 dwCurPos = i * BLOCK_SIZE;
@@ -673,20 +695,13 @@ gint32 CFileImage::CollectBlocksForWrite(
                         &dwDirectIdx, 1 );
                     if( ERROR( ret ) )
                         break;
-                    BufPtr p( true ); 
-                    p->Resize( BLOCK_SIZE );
-                    memset( p->ptr(), 0, BLOCK_SIZE );
                     guint32* arrBlks =
                         m_oInodeStore.m_arrBlocks;
                     arrBlks[ i ] = dwDirectIdx;
                 }
                 vecBlocks.push_back( dwDirectIdx );
                 if( IsSafeMode() )
-                {
-                    ret = this->Flush( FLAG_FLUSH_INODE );
-                    if( ERROR( ret ) )
-                        break;
-                }
+                    bDirtyInode = true;
             }
             else if( bFirst )
             {
@@ -705,11 +720,7 @@ gint32 CFileImage::CollectBlocksForWrite(
                     arrBlks[ BIT_IDX ] =
                         dwIndirectIdx;
                     if( IsSafeMode() )
-                    {
-                        ret = this->Flush( FLAG_FLUSH_INODE );
-                        if( ERROR( ret ) )
-                            break;
-                    }
+                        bDirtyInode = true;
                 }
                 BufPtr& p = m_pBitBlk;
                 if( p.IsEmpty() )
@@ -737,12 +748,7 @@ gint32 CFileImage::CollectBlocksForWrite(
                     pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] =
                         htonl( dwBlkIdx );
                     if( IsSafeMode() )
-                    {
-                        ret = m_pAlloc->WriteBlock(
-                            dwIndirectIdx, ( guint8* )pbis );
-                        if( ERROR( ret ) )
-                            break;
-                    }
+                        bDirtyBit = true;
                 }
 
                 vecBlocks.push_back( dwBlkIdx );
@@ -769,11 +775,7 @@ gint32 CFileImage::CollectBlocksForWrite(
                         0, m_pBitdBlk->size() );
 
                     if( IsSafeMode() )
-                    {
-                        ret = this->Flush( FLAG_FLUSH_INODE );
-                        if( ERROR( ret ) )
-                            break;
-                    }
+                        bDirtyInode = true;
                 }
                 guint32 dwBitIdx =
                     SEC_BIT_IDX( dwCurPos );
@@ -806,12 +808,7 @@ gint32 CFileImage::CollectBlocksForWrite(
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, pBuf } );
                     if( IsSafeMode() )
-                    {
-                        ret = m_pAlloc->WriteBlock(
-                            dw2IndIdx, ( guint8* )p );
-                        if( ERROR( ret ) )
-                            break;
-                    }
+                        bDirtyBitd = true;
                 }
                 guint32 dwIdx2 =
                     SEC_BLKIDX_IDX( dwCurPos );
@@ -841,10 +838,9 @@ gint32 CFileImage::CollectBlocksForWrite(
 
                     if( IsSafeMode() )
                     {
-                        ret = m_pAlloc->WriteBlock(
-                            dwBitIdx, ( guint8* )pblk );
-                        if( ERROR( ret ) )
-                            break;
+                        bDirtyBitd = true;
+                        mapDirtyBlks2.emplace(
+                            dwBitBlkIdx, dwBitIdx );
                     }
                     continue;
                 }
@@ -876,11 +872,8 @@ gint32 CFileImage::CollectBlocksForWrite(
 
                         if( IsSafeMode() )
                         {
-                            ret = m_pAlloc->WriteBlock(
-                                dwBitBlkIdx,
-                                ( guint8* )pblk );
-                            if( ERROR( ret ) )
-                                break;
+                            mapDirtyBlks2.emplace(
+                                dwBitBlkIdx, dwBitIdx );
                         }
                     }
                     vecBlocks.push_back( dwBlkIdx );
@@ -892,6 +885,50 @@ gint32 CFileImage::CollectBlocksForWrite(
             {
                 ret = -ERANGE;
                 break;
+            }
+        }
+        if( IsSafeMode() )
+        {
+            for( auto& elem : mapDirtyBlks2 )
+            {
+                auto itr = m_mapSecBitBlks.find(
+                    elem.second );
+                if( itr == m_mapSecBitBlks.end() )
+                {
+                    ret = ERROR_FAIL;
+                    DebugPrint( ret,
+                        "Error flush sec bit blocks %d",
+                        elem.second );
+                    break;
+                }
+                auto p = itr->second->ptr();
+                ret = m_pAlloc->WriteBlock(
+                    elem.first, ( guint8* )p );
+                if( ERROR( ret ) )
+                    break;
+            }
+            if( bDirtyBitd )
+            {
+                auto pbitd = m_pBitdBlk->ptr();
+                ret = m_pAlloc->WriteBlock(
+                    dw2IndIdx, ( guint8* )pbitd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            if( bDirtyBit )
+            {
+                auto pbis = m_pBitBlk->ptr();
+                ret = m_pAlloc->WriteBlock(
+                    dwIndirectIdx, ( guint8* )pbis );
+                if( ERROR( ret ) )
+                    break;
+            }
+            if( bDirtyInode )
+            {
+                ret = this->Flush(
+                    FLAG_FLUSH_INODE );
+                if( ERROR( ret ) )
+                    break;
             }
         }
 
