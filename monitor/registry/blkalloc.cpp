@@ -35,7 +35,7 @@ namespace rpcf{
 bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
-guint32 g_dwCacheLife = 5;
+guint32 g_dwCacheLife = 60;
 
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
@@ -805,6 +805,10 @@ gint32 CBlockAllocator::SaveSuperBlock(
         guint32 dwBlkIdx = ( guint32 )-2;
         ret = CacheBlocks(
             &dwBlkIdx, 1, ( guint8* )pSb ); 
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
     }
     else
     {
@@ -855,6 +859,10 @@ gint32 CBlockAllocator::SaveGroupBitmap(
         ret = CacheBlocks(
             &dwBlkIdx, GRPBMP_BLKNUM,
             ( guint8* )pbmp ); 
+        if( ERROR( ret ) )
+            return ret;
+        if( ret == 0 )
+            ret = -ENODATA;
     }
     else
     {
@@ -1602,6 +1610,7 @@ gint32 CBlockAllocator::CacheBlocks(
             vecBlks, this->m_mapDirtyBlks );
         INTERVALS oNewBlks = SubtractIntervals(
             vecBlks, oCommonBlks );
+        guint32 dwBytesWritten = 0;
         for( auto& elem : oCommonBlks )
         {
             if( elem.first == INVALID_BLOCK_IDX )
@@ -1610,8 +1619,8 @@ gint32 CBlockAllocator::CacheBlocks(
                 "aborting to avoid data corruption.");
                 abort();
             };
-            guint32 dwBlkCount =
-                elem.second - elem.first;
+            guint32 dwSize = BLOCK_SIZE *
+                ( elem.second - elem.first );
             if( elem.first == ( guint32 )-2 ||
                 elem.first == ( guint32 )-4 )
             {
@@ -1621,7 +1630,8 @@ gint32 CBlockAllocator::CacheBlocks(
                     continue;
                 memcpy( iter->second->ptr(),
                     pBuf + elem.dwOff * BLOCK_SIZE,
-                    BLOCK_SIZE * dwBlkCount );
+                    dwSize );
+                dwBytesWritten += dwSize;
                 continue;
             }
             auto iter = m_mapDirtyBlks.find(
@@ -1638,17 +1648,16 @@ gint32 CBlockAllocator::CacheBlocks(
                 iter->second->ptr() + dwOff;
             auto pSrc =
                 pBuf + elem.dwOff * BLOCK_SIZE;
-            memcpy( pDst, pSrc,
-                BLOCK_SIZE * dwBlkCount );
+            memcpy( pDst, pSrc, dwSize );
+            dwBytesWritten += dwSize;
         }
 
         for( auto& elem : oNewBlks )
         {
-            guint32 dwBlkCount =
-                elem.second - elem.first;
+            guint32 dwSize = BLOCK_SIZE *
+                ( elem.second - elem.first );
             BufPtr pBufNew( true );
-            ret = pBufNew->Resize(
-                dwBlkCount * BLOCK_SIZE );
+            ret = pBufNew->Resize( dwSize );
             if( ERROR( ret ) )
                 break;
             memcpy( pBufNew->ptr(),
@@ -1656,8 +1665,13 @@ gint32 CBlockAllocator::CacheBlocks(
                 pBufNew->size() );
             m_mapDirtyBlks.emplace(
                 elem.first, pBufNew );
-            m_dwDirtyBlkCount += dwBlkCount;
+            m_dwDirtyBlkCount +=
+                ( dwSize >> BLOCK_SHIFT );
+            dwBytesWritten += dwSize;
         }
+
+        if( SUCCEEDED( ret ) )
+            ret = dwBytesWritten;
 
     }while( 0 );
     return ret;
@@ -1761,6 +1775,7 @@ gint32 CBlockAllocator::ReadCache(
             vecBlks, oCommonBlks );
 
         //cache hit
+        guint32 dwBytesRead = 0;
         for( auto& elem : oCommonBlks )
         {
             auto iter = m_mapDirtyBlks.find(
@@ -1771,25 +1786,33 @@ gint32 CBlockAllocator::ReadCache(
                 iter->first ) * BLOCK_SIZE;
             if( dwOff > iter->second->size() )
                 continue;
+            guint32 dwSize = BLOCK_SIZE *
+                ( elem.second - elem.first );
             memcpy( pBuf + elem.dwOff * BLOCK_SIZE,
                 iter->second->ptr() + dwOff,
-                BLOCK_SIZE *
-                    ( elem.second - elem.first ) );
+                dwSize );
+            dwBytesRead += dwSize;
         }
 
         //cache missed
         for( auto& elem : oNewBlks )
         {
-            guint32 dwSize =
-                ( elem.second - elem.first ) * BLOCK_SIZE;
-            guint32 dwOff = BLOCK_ABS( elem.first );
-            ret = ReadWriteFile(
-                (char* )pBuf + elem.dwOff * BLOCK_SIZE,
+            guint32 dwSize = BLOCK_SIZE *
+                ( elem.second - elem.first );
+
+            guint32 dwOff =
+                BLOCK_ABS( elem.first );
+
+            ret = ReadWriteFile( (char* )pBuf +
+                elem.dwOff * BLOCK_SIZE,
                 dwSize, dwOff, true );
             if( ERROR( ret ) )
                 break;
-            ret = 0;
+            dwBytesRead += dwSize;
         }
+
+        if( SUCCEEDED( ret ) )
+            ret = dwBytesRead;
 
     }while( 0 );
     return ret;

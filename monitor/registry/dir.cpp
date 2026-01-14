@@ -279,20 +279,13 @@ gint32 CBPlusNode::Format()
         // it is necessary to write something
         // to the file so that the file size is
         // set
-        if( IsSafeMode() )
-        {
-            m_pDir->SetDirty( GetBNodeIndex() );
-        }
-        else
-        {
-            guint32 dwSize = BNODE_SIZE;
-            ret = m_pDir->WriteFileNoLock(
-                BNODE_IDX_TO_POS( GetBNodeIndex() ),
-                dwSize, arrBytes );
+        guint32 dwSize = BNODE_SIZE;
+        ret = m_pDir->WriteFileNoLock(
+            BNODE_IDX_TO_POS( GetBNodeIndex() ),
+            dwSize, arrBytes );
 
-            if( ERROR( ret ) )
-                break;
-        }
+        if( ERROR( ret ) )
+            break;
         ret = 0;
 
     }while( 0 );
@@ -1726,6 +1719,11 @@ gint32 CBPlusNode::RebalanceChild(
     guint32 idx )
 {
     gint32 ret = 0;
+    // keep a copy of pDir and dwBNodeIdx
+    // possibly this node could be removed
+    // during rebalancing
+    CDirImage* pDir = m_pDir;
+    guint32 dwBNodeIdx = GetBNodeIndex();
     do{
         KEYPTR_SLOT* pChildKs =
             this->GetSlot( idx );
@@ -1755,7 +1753,7 @@ gint32 CBPlusNode::RebalanceChild(
             ret = MergeChilds( idx, idx + 1 );
             if( SUCCEEDED( ret ) && IsSafeMode() )
             {
-                m_pDir->SetDirty(
+                pDir->SetDirty(
                     pChild->GetBNodeIndex() );
             }
             break;
@@ -1778,15 +1776,13 @@ gint32 CBPlusNode::RebalanceChild(
         ret = MergeChilds( idx - 1, idx );
         if( SUCCEEDED( ret ) && IsSafeMode() )
         {
-            m_pDir->SetDirty(
+            pDir->SetDirty(
                 pLeft->GetBNodeIndex() );
         }
     }while( 0 );
     if( SUCCEEDED( ret ) && IsSafeMode() )
-    {
-        m_pDir->SetDirty(
-            this->GetBNodeIndex() );
-    }
+        pDir->SetDirty( dwBNodeIdx );
+
     return ret;
 }
 
@@ -2256,8 +2252,7 @@ gint32 CDirImage::GetFreeBNode(
             dwBNodeIdx );
         if( ERROR( ret ) )
         {
-            guint32 dwOff = 
-                m_oInodeStore.m_dwSize;
+            guint32 dwOff = GetSize();
             if( dwOff + REGFS_PAGE_SIZE >
                 MAX_FILE_SIZE )
             {
@@ -2732,7 +2727,7 @@ gint32 CDirImage::CommitDirtyNodes()
             }
             auto p = m_pFreePool.get();
             ret = p->FlushSingleBNode( dwIdx );
-            if( SUCCEEDED( ret ) || ret == -ENOENT )
+            if( ret >= 0 || ret == -ENOENT )
                 continue;
             if( ret != -ENOENT )
             {

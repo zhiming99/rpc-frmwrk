@@ -1665,9 +1665,9 @@ class CDirWriteLock : public CWriteLock
 
     ~CDirWriteLock()
     {
-        CWriteLock::~CWriteLock();
         if( m_pDir )
             m_pDir->CommitDirtyNodes();
+        CWriteLock::~CWriteLock();
     }
 };
 

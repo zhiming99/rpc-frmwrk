@@ -271,6 +271,8 @@ gint32 CFileImage::Reload()
             m_oInodeStore.m_arrMetaFork[ i ] =
               ntohl( pInode->m_arrMetaFork[ i ] );
 
+        m_oInodeStore.m_iValType =
+            pInode->m_iValType;
         switch( pInode->m_iValType )
         {
         case typeByte:
@@ -1126,11 +1128,6 @@ gint32 CFileImage::WriteFileNoLock(
                 ( guint8* )arrBytes );
             if( ERROR( ret ) )
                 break;
-            if( ret < BLOCK_SIZE )
-            {
-                DebugPrint( ret, "read block "
-                    "returned less bytes" );
-            }
             memcpy( arrBytes,
                 pBuf + BLOCK_SIZE * ( dwBlocks - 1 ),
                 dwTail );
@@ -1217,8 +1214,11 @@ gint32 CFileImage::WriteFileNoLock(
             break;
 
         if( dwSize + dwOff > GetSize() )
+        {
             SetSize( dwSize + dwOff );
-
+            if( IsSafeMode() )
+                Flush( FLAG_FLUSH_INODE );
+        }
     }while( 0 );
     return ret;
 }
@@ -1247,10 +1247,6 @@ gint32 CFileImage::TruncBlkDirect( guint32 lablkidx )
         for( int i = lablkidx; i < lablkidx + dwCount; i++ )
             arrBlks[ i ] = 0;
 
-        if( IsSafeMode() )
-        {
-            ret = Flush( FLAG_FLUSH_INODE );
-        }
     }while( 0 );
 
     return ret;
@@ -1303,14 +1299,6 @@ gint32 CFileImage::TruncBlkIndirect(
                 &dwBitBlkIdx, 1 );
             m_pBitBlk.Clear();
             dwBitBlkIdx = 0;
-
-            if( IsSafeMode() )
-            {
-                
-                ret = this->Flush( FLAG_FLUSH_INODE );
-                if( ERROR( ret ) )
-                    break;
-            }
         }
         else if( IsSafeMode() )
         {
@@ -1520,12 +1508,6 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 &dwBitdBlkIdx, 1 );
             m_pBitdBlk.Clear();
             dwBitdBlkIdx = 0;
-            if( IsSafeMode() )
-            {
-                ret = this->Flush( FLAG_FLUSH_INODE );
-                if( ERROR( ret ) )
-                    break;
-            }
         }
         else if( bBitdDirty && IsSafeMode() )
         {
@@ -1644,8 +1626,11 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
 
     }while( 0 );
     if( SUCCEEDED( ret ) )
+    {
         UpdateMtime();
-
+        if( IsSafeMode() )
+            Flush( FLAG_FLUSH_INODE );
+    }
     return ret;
 }
 
@@ -1928,7 +1913,7 @@ gint32 CFileImage::FreeBlocks()
 {
     gint32 ret = 0;
     do{
-        CWriteLock oLock( GetLock() );
+        WRITE_LOCK( this );
         ret = FreeBlocksNoLock();
     }while( 0 );
     return ret;
@@ -2146,7 +2131,7 @@ gint32 COpenFileEntry::Close()
     gint32 ret = 0;
     do{
         FImgSPtr& p = m_pFileImage;
-        CWriteLock oLock( p->GetLock() );
+        WRITE_LOCK( p );
         guint32 dwCount = --p->m_dwOpenCount;
         if( dwCount > 0 )
             break;
@@ -2158,7 +2143,7 @@ gint32 COpenFileEntry::Close()
         }
         if( dwState == stateStopped )
             break;
-        oLock.Unlock();
+        UNLOCK( p );
 
         if( IsSafeMode() )
             ret = STATUS_MORE_PROCESS_NEEDED;
