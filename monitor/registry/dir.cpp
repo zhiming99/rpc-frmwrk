@@ -861,20 +861,17 @@ gint32 FREE_BNODES::ntoh(
 {
     gint32 ret = 0;
     auto prhs = ( FREE_BNODES* )pSrc;
-    if( prhs->m_wBNCount == 0 )
-        return 0;
     m_wBNCount = ntohs( prhs->m_wBNCount );
     if( m_wBNCount > GetMaxCount() )
         return -ERANGE;
     m_bNextBNode = prhs->m_bNextBNode;
-    guint32 i = 0;
-    for( ; i < m_wBNCount; i++ )
+    for( guint32 i = 0; i < m_wBNCount; i++ )
     {
         m_arrFreeBNIdx[ i ] =
             ntohs( prhs->m_arrFreeBNIdx[ i ] );
     }
-    memset( m_arrFreeBNIdx + m_wBNCount, 0xff, 
-        ( ( GetMaxCount() - m_wBNCount ) * 2 ) );
+    /*memset( m_arrFreeBNIdx + m_wBNCount, 0xff, 
+        ( ( GetMaxCount() - m_wBNCount ) * 2 ) );*/
     return 0;
 }
 
@@ -2368,7 +2365,8 @@ gint32 CDirImage::CreateFile(
     do{
         ret = CreateFile(
             szName, ftRegular, pImg );
-
+        if( ERROR( ret ) )
+            break;
         UpdateMtime();
 
         guint32 dwActMode = pImg->GetMode();

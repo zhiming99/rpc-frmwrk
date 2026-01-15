@@ -1490,7 +1490,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 if( itr != m_mapSecBitBlks.end() )
                 {
                     ret = m_pAlloc->WriteBlock(
-                        dwBlkIdxIdx, 
+                        dwBitBlkIdx, 
                         ( guint8* )itr->second->ptr() );
                     if( ERROR( ret ) )
                         break;

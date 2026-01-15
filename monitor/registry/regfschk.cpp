@@ -985,6 +985,7 @@ gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
         auto& mapBlkGrps = pAlloc->GetBlkGrps();    
         guint32 dwCount = 0;
         std::vector< guint32 > vecFreeGrps;
+        std::vector< std::pair< guint32, guint32 > > vecBlks;
         for( auto& elem : mapBlkGrps )
         {
             CBlockGroup* pbg = elem.second.get();
@@ -1002,6 +1003,8 @@ gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
                     setBlocks.end() )
                 {
                     pbit->FreeBlock( i );
+                    vecBlks.push_back( { dwBlkIdx,
+                        BLOCK_ABS( dwBlkIdx ) } );
                     dwCount++;
                     continue;
                 }
@@ -1011,6 +1014,23 @@ gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
         }
         OutputMsg2( 0,
             "Orphan blocks claimed: %d", dwCount );
+        for( guint32 i = 0; i < dwCount; i+=4 )
+        {
+            OutputMsg2( 0, "{ %d, %d }, { %d, %d }, { %d, %d }, { %d, %d }",
+                vecBlks[ i ].first, vecBlks[ i ].second, 
+                i + 1 >= dwCount ? 0 : vecBlks[ i + 1 ].first,
+                i + 1 >= dwCount ? 0 : vecBlks[ i + 1 ].second, 
+                i + 2 >= dwCount ? 0 : vecBlks[ i + 2 ].first,
+                i + 2 >= dwCount ? 0 : vecBlks[ i + 2 ].second, 
+                i + 3 >= dwCount ? 0 : vecBlks[ i + 3 ].first,
+                i + 3 >= dwCount ? 0 : vecBlks[ i + 3 ].second );
+            if( i >= 20 )
+            {
+                OutputMsg2( 0, "..." );
+                break;
+            }
+        }
+        
         CGroupBitmap* pgbmp = pAlloc->GetGroupBitmap();
         for( auto elem : vecFreeGrps )
         {
@@ -1024,6 +1044,8 @@ gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
 
         std::vector< guint32 > vecGrps;
         CollectBlockGroups( pgbmp, vecGrps );
+        if( vecGrps.empty() )
+            break;
         guint32 dwMaxAlloced = vecGrps.back() + 1;
         guint64 qwTail = dwMaxAlloced * GROUP_SIZE +
             SUPER_BLOCK_SIZE + GRPBMP_SIZE;

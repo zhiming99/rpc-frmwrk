@@ -183,12 +183,12 @@ gint32 CGroupBitmap::FreeGroup( guint32 dwGrpIdx )
         guint32 dwOffset =
             dwGrpIdx & ( dwNumBits - 1 );
 
-        guint8& a = pbmp[ dwByteIdx ];
-        if( a == 0 )
+        guint8* a = pbmp + dwByteIdx;
+        if( *a == 0 )
             break;
 
         guint8 bit = ( 1 << dwOffset );
-        a &= ( ~bit );
+        *a &= ( ~bit );
         m_wFreeCount++;
         Flush( 0 );
 
@@ -310,9 +310,9 @@ gint32 CGroupBitmap::IsBlockGroupFree(
         guint32 dwByteIdx = ( dwGrpIdx >> shift );
         int offset = dwGrpIdx & ( iNumBits - 1 );
 
-        guint8& a = pbmp[ dwByteIdx ];
+        guint8* a = pbmp + dwByteIdx;
         guint8 bit = ( 1 << offset );
-        if( a & bit )
+        if( *a & bit )
             ret = ERROR_FALSE;
 
     }while( 0 );
@@ -388,9 +388,9 @@ gint32 CBlockBitmap::IsBlockFree(
         guint32 dwOffset =
             dwBlkIdx & ( dwNumBits - 1 );
 
-        guint8& a = pbmp[ dwByteIdx ];
+        guint8* a = pbmp + dwByteIdx;
         guint8 bit = ( 1 << dwOffset );
-        if( a & bit )
+        if( *a & bit )
             ret = ERROR_FALSE;
 
     }while( 0 );
@@ -411,10 +411,10 @@ gint32 CBlockBitmap::InitBitmap()
     if( dwCount )
     {
         guint8 bit = 1;
-        guint8& byTail = m_arrBytes[ dwBytes ];
+        guint8* byTail = m_arrBytes + dwBytes;
         while( dwCount-- )
         {
-            byTail |= bit;
+            *byTail |= bit;
             bit <<= 1;
         }
     }
@@ -611,12 +611,12 @@ gint32 CBlockBitmap::FreeBlocks(
             guint32 offset =
                 dwBlkIdx & ( dwNumBits - 1 );
 
-            guint8& a = m_arrBytes[ dwByteIdx ];
-            if( a == 0 )
+            guint8* a = m_arrBytes + dwByteIdx;
+            if( *a == 0 )
                 continue;
 
             guint8 bit = ( 1 << offset );
-            a &= ( ~bit );
+            *a &= ( ~bit );
             m_wFreeCount++;
             if( IsSafeMode() )
             {
@@ -633,14 +633,13 @@ gint32 CBlockBitmap::FreeBlocks(
                 ( m_arrBytes + BLKBMP_BLKNUM * BLOCK_SIZE );
             p[ -1 ] = htons( m_wFreeCount );
             arrDirtyBlk[ BLKBMP_BLKNUM - 1 ] = 1;
-            for( int i = 0; i < BLKBMP_BLKNUM && dwCount; i++ )
+            for( int i = 0; i < BLKBMP_BLKNUM; i++ )
             {
                 if( arrDirtyBlk[ i ] == 0 )
                     continue;
                 guint32 dwBlkIdx = ( dwGrpIdx | i );
                 m_pAlloc->WriteBlock( dwBlkIdx,
                     m_arrBytes + i * BLOCK_SIZE  );
-                dwCount--;
             }
         }
     }while( 0 );
