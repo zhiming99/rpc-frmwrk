@@ -599,7 +599,7 @@ struct BATransact
     AllocPtr m_pAlloc;
     BATransact( AllocPtr& pAlloc )
     {
-        if( !IsSafeMode() )
+        if( !IsSafeMode() || pAlloc.IsEmpty() )
             return;
         m_pAlloc = pAlloc;
         CStdRMutex oLock( pAlloc->GetLock() );
@@ -1667,7 +1667,6 @@ class CDirWriteLock : public CWriteLock
     {
         if( m_pDir )
             m_pDir->CommitDirtyNodes();
-        CWriteLock::~CWriteLock();
     }
 };
 

@@ -99,7 +99,7 @@ mkdir -p apps
 
 echo adding application timer1
 add_stdapp timer1
-set_point_value timer1 cmdline "$(jsonval 'blob' ${script_dir}/apptimer' -gd')" blob
+set_point_value timer1 cmdline "$(jsonval 'blob' ${script_dir}/apptimer' -g')" blob
 set_point_value timer1 working_dir  "$(jsonval 'blob' '/' )" blob
 add_point timer1 clock1 output i
 set_attr_value timer1 clock1 pulse "$(jsonval 'i' 1 )" i
@@ -148,7 +148,7 @@ set_point_value timer1 app_class "$(jsonval 's' 'timer')" s
 
 echo adding application appmonsvr1
 add_stdapp appmonsvr1
-set_point_value appmonsvr1 cmdline "$(jsonval 'blob' 'appmonsvr -gd '$HOME/.rpcf/appmonroot)" blob
+set_point_value appmonsvr1 cmdline "$(jsonval 'blob' 'appmonsvr -sg '$HOME/.rpcf/appmonroot)" blob
 set_point_value appmonsvr1 working_dir  "$(jsonval 'blob' '/' )" blob
 
 # point logger
@@ -175,7 +175,7 @@ fi
 
 echo adding application loggersvr1
 add_stdapp loggersvr1
-set_point_value loggersvr1 cmdline "$(jsonval 'blob' 'rpcf_logger -od')" blob
+set_point_value loggersvr1 cmdline "$(jsonval 'blob' 'rpcf_logger -o')" blob
 set_point_value loggersvr1 working_dir  "$(jsonval 'blob' '/' )" blob
 add_point loggersvr1 logcontent output blob
 add_point loggersvr1 lines  setpoint i

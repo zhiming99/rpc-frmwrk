@@ -94,7 +94,8 @@ gint32 RegFSInode::Serialize(
             pInode->m_arrMetaFork[ i ] =
               htonl( this->m_arrMetaFork[ i ] );
  
-        pInode->m_iValType = this->m_iValType;
+        pInode->m_iValType = oVal.GetTypeId();
+
         switch( oVal.GetTypeId() )
         {
         case typeByte:

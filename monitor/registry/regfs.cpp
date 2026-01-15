@@ -632,19 +632,34 @@ gint32 CRegistryFs::CloseFileNoLock(
 
         FImgSPtr dirPtr;
         FImgSPtr pImg = pFile->GetImage();
-        CDirImage* pDir = pImg->GetParentDir();
-        if( pDir == nullptr )
-            break;
-        dirPtr = pDir;
+        CDirImage* pDir = nullptr;
+        if( !pImg.IsEmpty() )
+        {
+            READ_LOCK( pImg );
+            CStdRMutex oLock( pImg->GetExclLock() );
+            guint32 dwState = pImg->GetState();
+            if( dwState != stateStopped &&
+                dwState != stateStopping )
+            {
+                pDir = pImg->GetParentDir();
+                dirPtr = pDir;
+            }
+            // don't copy the pDir if the file has
+            // been removed.
+        }
 
         ret = pFile->Close();
         if( ret != STATUS_MORE_PROCESS_NEEDED )
             break;
 
+        if( dirPtr.IsEmpty() )
+            break;
+
+        ret = 0;
         const stdstr& strPath = pFile->GetPath();
         std::string strFile =
             basename( strPath.c_str() );
-        pDir->UnloadFile( strFile.c_str() );
+        ret = pDir->UnloadFile( strFile.c_str() );
 
     }while( 0 );
     return ret;

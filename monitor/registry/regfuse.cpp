@@ -446,6 +446,9 @@ static int regfs_fsync(const char *path, int isdatasync,
         }
         guint32 dwFlags = FLAG_FLUSH_DATA;
         CRegistryFs* pfs = g_pRegfs;
+        AllocPtr pAlloc =
+            pfs->GetAllocator();
+        BATransact oTransact( pAlloc );
         READ_LOCK( pfs );
         FileSPtr pOpen;
         ret = pfs->GetOpenFile( hFile, pOpen );
@@ -483,6 +486,9 @@ static int regfs_utimens( const char * path,
         {
             hFile = fi->fh;
         }
+        AllocPtr pAlloc =
+            pfs->GetAllocator();
+        BATransact oTransact( pAlloc);
         READ_LOCK( pfs );
         FileSPtr pOpen;
         ret = pfs->GetOpenFile( hFile, pOpen );
