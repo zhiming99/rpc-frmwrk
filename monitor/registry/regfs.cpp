@@ -26,6 +26,11 @@
 #include "blkalloc.h"
 #include <fcntl.h>
 #include <deque>
+#include <thread>
+#include <atomic>
+#include <chrono>
+#include <fstream>
+#include <ctime>
 
 #define VALIDATE_NAME( _strName_ ) \
     ( _strName_.size() <= REGFS_NAME_LENGTH - 1 )
@@ -183,6 +188,14 @@ gint32 CRegistryFs::Start()
         if( ERROR( ret ) )
             break;
         SetState( stateStarted );
+
+        if( IsSafeMode() )
+        {
+            // Start the worker thread
+            m_threadRunning.store(true);
+            m_workerThread = std::thread(
+                &CRegistryFs::ThreadFunction, this);
+        }
     }while( 0 );
     return ret;
 }
@@ -191,6 +204,14 @@ gint32 CRegistryFs::Stop()
 {
     gint32 ret = 0;
     do{
+        if( IsSafeMode() )
+        {
+            // Stop the worker thread
+            m_threadRunning.store(false);
+            if (m_workerThread.joinable())
+                m_workerThread.join();
+        }
+
         m_pAlloc->SetStopped();
         BATransact oTransact( m_pAlloc );
         WRITE_LOCK( this );
@@ -211,6 +232,53 @@ gint32 CRegistryFs::Stop()
         SetState( stateStopped );
     }while( 0 );
     return ret;
+}
+
+void CRegistryFs::ThreadFunction()
+{
+    SetThreadName("RegfsCommit");
+    while (m_threadRunning.load())
+    {
+        std::this_thread::sleep_for(
+            std::chrono::seconds(g_dwCacheLife));
+
+        if (!m_threadRunning.load())
+            break;
+
+        RFHANDLE hFile = INVALID_HANDLE;
+        gint32 ret = Access(
+            "/commit_time", F_OK, nullptr );
+        if (ERROR( ret ))
+        {
+            ret = CreateFile( "/commit_time",
+                S_IRUSR | S_IWUSR,
+                O_RDWR | O_CREAT,
+                hFile,
+                nullptr );
+            if (ERROR(ret))
+            {
+                DebugPrintEx( logErr, ret,
+                    "Failed to create file "
+                    "'/commit_time'");
+            }
+            CloseFile(hFile);
+        }
+
+        auto t = std::time(nullptr);
+        auto tm = *std::localtime(&t);
+        char buffer[100];
+        std::strftime(buffer,
+            sizeof(buffer),
+            "%Y-%m-%d %H:%M:%S", &tm);
+
+        Variant oVar(buffer);
+        ret = SetValue(
+            "/commit_time", oVar, nullptr );
+        if (ERROR(ret))
+            DebugPrint(ret,
+                "Failed to write to file "
+                "'/commit_time'");
+    }
 }
 
 gint32 CRegistryFs::Namei(

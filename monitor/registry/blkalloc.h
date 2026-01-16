@@ -1796,8 +1796,12 @@ class CRegistryFs :
     EnumIfState m_dwState = stateStarted;
     bool        m_bFormat = false;
 
+    std::thread m_workerThread;
+    std::atomic<bool> m_threadRunning{false};
+
     gint32 CreateRootDir();
     gint32 OpenRootDir();
+    void ThreadFunction();
 
     mutable CSharedLock m_oLock;
 

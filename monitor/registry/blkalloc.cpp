@@ -35,7 +35,7 @@ namespace rpcf{
 bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
-guint32 g_dwCacheLife = 60;
+guint32 g_dwCacheLife = 180;
 
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
