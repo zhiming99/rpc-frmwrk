@@ -1786,7 +1786,7 @@ function add_rpcrouter
     add_point $_instname sess_time_limit setpoint i
 
     set_point_value $_instname app_class "$(jsonval 's' 'rpcrouter')" s
-    set_point_value $_instname cmdline "$(jsonval 'blob' 'rpcrouter -adgor 2')" blob
+    set_point_value $_instname cmdline "$(jsonval 'blob' 'rpcrouter -agor 2')" blob
     set_point_value $_instname working_dir  "$(jsonval 'blob' '/' )" blob
     set_point_value $_instname sess_time_limit "$(jsonval 'i' 86400 )" i
     set_point_value $_instname max_conn "$(jsonval 'i' 512 )" i

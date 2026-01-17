@@ -60,7 +60,6 @@ done
 
 popd > /dev/null
 if (( $mt == 2 )); then
-    umount $rootdir
+    fusermount3 -u $rootdir
 fi
-
 

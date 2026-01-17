@@ -32,6 +32,10 @@ Formats the regfs.
 .B \-u
 Enables FUSE to dump debug information.
 
+.TP
+.B \-s
+Run the registry in safe mode, to guarantee the registry integrity through unexpected shutdown or crash
+
 .SH USAGE
 To mount and manage the registry file system, run the command with the appropriate options and arguments:
 
@@ -49,7 +53,7 @@ $ regfsmnt regfs.dat /mnt/regfs
 .TP
 Run the command as a daemon and mount the registry file system:
 .EX
-$ regfsmnt -d regfs.dat /mnt/regfs
+$ regfsmnt -sd regfs.dat /mnt/regfs
 .EE
 
 .TP
