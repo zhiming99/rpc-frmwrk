@@ -32,6 +32,11 @@ Enable local search for services.
 .B \-h
 Display this help message and exit.
 
+.TP
+.B \-s
+Host the app registry and user registry in safe mode, to guarantee the registry
+integrity through unexpected shutdown or crash.
+
 .SH ARGUMENTS
 .TP
 .B <mount point>
@@ -55,7 +60,7 @@ Typical usage:
     appmonsvr -d
     appmonsvr -g
     appmonsvr -i
-    appmonsvr /mnt/appmon
+    appmonsvr -s /mnt/appmon
 .fi
 
 To format the user registry, use the \fBinituser.sh\fR script.
