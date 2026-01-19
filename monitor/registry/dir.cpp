@@ -2747,12 +2747,24 @@ gint32  CDirFileEntry::ListDir(
     gint32 ret = 0;
     do{
         CDirImage* pImg = m_pFileImage;
+        if( pImg )
         {
             READ_LOCK( pImg );
             ret = pImg->CheckAccess(
                 R_OK, &m_oUserAc );
             if( ERROR( ret ) )
                 break;
+        }
+        else
+        {
+            stdstr strPath;
+            GetPathFromImg( m_pFileImage, strPath );
+            DebugPrint( ret,
+                "Error the dir image is "
+                "empty for %s",
+                strPath.c_str() );
+            ret = -EFAULT;
+            break;
         }
         ret = pImg->ListDir( vecDirEnt );
     }while( 0 );
