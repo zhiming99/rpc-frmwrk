@@ -210,10 +210,14 @@ gint32 CRegistryFs::Stop()
             m_threadRunning.store(false);
             if (m_workerThread.joinable())
                 m_workerThread.join();
+
+            CStdRMutex oLock( m_pAlloc->GetLock() );
+            m_pAlloc->SetStopped();
+            ret = m_pAlloc->CheckAndCommit();
+            if( ret == -EAGAIN )
+                continue;
         }
 
-        m_pAlloc->SetStopped();
-        BATransact oTransact( m_pAlloc );
         WRITE_LOCK( this );
         if( m_mapOpenFiles.size() )
             DebugPrint( m_mapOpenFiles.size(),
@@ -230,20 +234,29 @@ gint32 CRegistryFs::Stop()
         if( ERROR( ret ) )
             break;
         SetState( stateStopped );
-    }while( 0 );
+        break;
+    }while( 1 );
     return ret;
 }
 
 void CRegistryFs::ThreadFunction()
 {
     SetThreadName("RegfsCommit");
+    guint32 dwCount = 0; // seconds
     while (m_threadRunning.load())
     {
         std::this_thread::sleep_for(
-            std::chrono::seconds(g_dwCacheLife));
+            std::chrono::seconds(10) );
 
         if (!m_threadRunning.load())
             break;
+
+        dwCount += 10;
+        if( dwCount % 20 == 0 )
+            m_pAlloc->MergeBlocks();
+
+        if( dwCount % g_dwCacheLife != 0 )
+            continue;
 
         RFHANDLE hFile = INVALID_HANDLE;
         gint32 ret = Access(

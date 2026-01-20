@@ -35,7 +35,7 @@ namespace rpcf{
 bool    g_bSafeMode = false;
 guint32 g_dwBlockSize = DEFAULT_BLOCK_SIZE;
 guint32 g_dwRegFsPageSize = DEFAULT_PAGE_SIZE;
-guint32 g_dwCacheLife = 180;
+guint32 g_dwCacheLife = 60;
 
 static gint32 IsValidBlockSize( guint32 dwSize )
 {
@@ -759,7 +759,7 @@ CBlockAllocator::~CBlockAllocator()
 
 gint32 CBlockAllocator::ReadWriteFile(
     char* pBuf, guint32 dwSize,
-    guint32 dwOff, bool bRead )
+    guint64 qwOff, bool bRead )
 {
     gint32 ret = 0;
     do{
@@ -769,7 +769,7 @@ gint32 CBlockAllocator::ReadWriteFile(
             break;
         }
         CStdRMutex oLock( this->GetLock() );
-        ret = lseek( m_iFd, dwOff, SEEK_SET );
+        ret = lseek( m_iFd, qwOff, SEEK_SET );
         if( ERROR( ret ) )
         {
             ret = -errno;
@@ -1469,7 +1469,6 @@ INTERVALS IntersectIntervals(
         if (intervals1[i].second < end2 ) {
             ++i;
         } else {
-            auto jterOld = jter;
             ++jter;
             if( jter == intervals2.end() )
                 break;
@@ -1478,9 +1477,9 @@ INTERVALS IntersectIntervals(
             if( jter2 != intervals2.end() &&
                 jter2 != intervals2.begin() )
                 jter2--;
-            if( jter->first < jter2->first )
+            if( jter2 != intervals2.end() &&
+                jter->first < jter2->first )
                 jter = jter2;
-
         }
     }
     return result;
@@ -1504,18 +1503,20 @@ INTERVALS SubtractIntervals(
     if( n1 == 0 )
         return result;
 
-    while (i < n1) {
+    while( i < n1 )
+    {
         guint32 start1 = intervals1[i].first;
         guint32 end1 = intervals1[i].second;
 
-        while (j < n2 && intervals2[j].second <= start1) {
+        while( j < n2 && intervals2[j].second <= start1 )
             ++j;
-        }
 
         guint32 currentStart = start1;
 
-        while (j < n2 && intervals2[j].first < end1) {
-            if (intervals2[j].first > currentStart) {
+        while( j < n2 && intervals2[j].first < end1 )
+        {
+            if( intervals2[j].first > currentStart )
+            {
                 result.emplace_back( currentStart,
                     intervals2[j].first,
                     intervals1[i].dwOff + intervals2[j].first -
@@ -1527,15 +1528,12 @@ INTERVALS SubtractIntervals(
             ++j;
         }
 
-        if (currentStart < end1) {
-            guint32 dwKey = 0;
-            if( j < n2 )
-                dwKey = intervals2[j-1].dwKey;
+        if( currentStart < end1 )
+        {
             result.emplace_back( currentStart, end1,
             intervals1[i].dwOff + currentStart -
                 intervals1[i].first );
         }
-
         ++i;
     }
     return result;
@@ -1638,8 +1636,8 @@ gint32 CBlockAllocator::CacheBlocks(
             if( iter == m_mapDirtyBlks.end() )
                 continue;
 
-            guint32 dwOff = ( elem.first -
-                iter->first ) * BLOCK_SIZE;
+            guint32 dwOff = BLOCK_SIZE *
+                ( elem.first - iter->first );
             if( dwOff > iter->second->size() )
                 continue;
 
@@ -1799,12 +1797,12 @@ gint32 CBlockAllocator::ReadCache(
             guint32 dwSize = BLOCK_SIZE *
                 ( elem.second - elem.first );
 
-            guint32 dwOff =
+            guint64 qwOff =
                 BLOCK_ABS( elem.first );
 
             ret = ReadWriteFile( (char* )pBuf +
                 elem.dwOff * BLOCK_SIZE,
-                dwSize, dwOff, true );
+                dwSize, qwOff, true );
             if( ERROR( ret ) )
                 break;
             dwBytesRead += dwSize;
@@ -1817,6 +1815,187 @@ gint32 CBlockAllocator::ReadCache(
     return ret;
 }
 
+gint32 MergeBlocks(
+    const DirtyBlks& mapBlocks,
+    DirtyBlks& mergedBlocks )
+{
+    if (mapBlocks.empty())
+        return 0;
+
+    gint32 ret = 0;
+    auto itr = mapBlocks.begin();
+    guint32 currentBlockIndex = itr->first;
+
+    // Copy the first buffer
+    BufPtr currentBuffer = itr->second;
+    for( ++itr; itr != mapBlocks.end(); ++itr )
+    {
+        guint32 nextBlockIndex = itr->first;
+        guint32 currentBlockCount =
+            currentBuffer->size() / BLOCK_SIZE;
+
+        if( nextBlockIndex ==
+            currentBlockIndex + currentBlockCount )
+        {
+            // Merge the buffers
+            if( currentBuffer->size() +
+                itr->second->size() <=
+                MAX_BYTES_PER_BUFFER )
+            {
+                ret = currentBuffer->Append(
+                    itr->second->ptr(),
+                    itr->second->size());
+                if( ERROR( ret ) )
+                {
+                    DebugPrint( ret,
+                        "Error cannot append "
+                        "buffer during merge" );
+                    return ret;
+                }
+            }
+            else
+            {
+                DebugPrint( ret,
+                    "Warning appending "
+                    "buffer exceeds the limit "
+                    "during merge" );
+                // CBuffer supports only 16MB
+                mergedBlocks.emplace(
+                    currentBlockIndex,
+                    currentBuffer );
+
+                // Start a new block
+                currentBlockIndex = nextBlockIndex;
+                currentBuffer = itr->second;
+            }
+        }
+        else
+        {
+            // Add the current merged block to the
+            // result
+            mergedBlocks.emplace(
+                currentBlockIndex,
+                currentBuffer );
+
+            // Start a new block
+            currentBlockIndex = nextBlockIndex;
+            currentBuffer = itr->second;
+        }
+    }
+
+    // Add the last merged block to the result
+    mergedBlocks.emplace(
+        currentBlockIndex, currentBuffer );
+
+    DebugPrint( 0, "Merged blocks %d: ",
+        mapBlocks.size() - mergedBlocks.size() );
+    return ret;
+}
+
+#if __linux__ && (__KERNEL__ >= 501)
+#include <liburing.h>
+static gint32 WriteBlocksWithIoUring(
+    int fd, const DirtyBlks& mapBlocks )
+{
+    struct io_uring ring;
+    const int QUEUE_DEPTH = 64;
+    gint32 ret = io_uring_queue_init(
+        QUEUE_DEPTH, &ring, 0);
+    if (ret < 0) {
+        DebugPrint( -errno, "io_uring_queue_init");
+        return -errno;
+    }
+
+    gint32 iTotalBytes = 0;
+    auto itr = mapBlocks.begin();
+    do{
+        guint32 dwQueued = 0;
+        for( int i = 0; i < QUEUE_DEPTH &&
+            itr != mapBlocks.end(); ++i, ++itr )
+        {
+            guint32 dwBlkIdx = itr->first;
+            guint64 offset;
+            if( unlikely( dwBlkIdx == -2 ) )
+                offset = 0;
+            else if( unlikely( dwBlkIdx == -4 ) )
+                offset = SUPER_BLOCK_SIZE;
+            else
+                offset = BLOCK_ABS(dwBlkIdx);
+
+            auto dwSize = itr->second->size();
+
+            struct io_uring_sqe* sqe =
+                io_uring_get_sqe(&ring);
+            if (!sqe) {
+                io_uring_queue_exit(&ring);
+                return -EAGAIN;
+            }
+
+            ++dwQueued;
+            io_uring_prep_write(sqe, fd,
+                itr->second->ptr(), dwSize, offset);
+            iTotalBytes += dwSize;
+        }
+
+        if( dwQueued == 0 )
+            break;
+
+        ret = io_uring_submit(&ring);
+        if (ret < 0) {
+            DebugPrint(
+                -errno, "io_uring_submit");
+            io_uring_queue_exit(&ring);
+            return -errno;
+        }
+
+        struct io_uring_cqe* cqe;
+        for (size_t i = 0; i < dwQueued; ++i) {
+            ret = io_uring_wait_cqe(&ring, &cqe);
+            if (ret < 0) {
+                DebugPrint( -errno,
+                    "io_uring_wait_cqe");
+                io_uring_queue_exit(&ring);
+                return -errno;
+            }
+
+            if (cqe->res < 0) {
+                DebugPrint( cqe->res,
+                    "I/O error: %s\n",
+                    strerror(-cqe->res));
+                io_uring_cqe_seen(&ring, cqe);
+                io_uring_queue_exit(&ring);
+                return cqe->res;
+            }
+            io_uring_cqe_seen(&ring, cqe);
+        }
+    }while( itr != mapBlocks.end() );
+
+    io_uring_queue_exit(&ring);
+    return iTotalBytes; // Return total bytes processed
+}
+#endif
+
+gint32 CBlockAllocator::MergeBlocks()
+{
+    gint32 ret = 0;
+    do{
+        break;
+        CStdRMutex oLock( this->GetLock() );
+        DirtyBlks mergedBlocks;
+        ret = rpcf::MergeBlocks(
+            m_mapDirtyBlks, mergedBlocks );
+        if( ERROR( ret ) )
+        {
+            DebugPrint( ret,
+                "Error merging blocks" );
+            break;
+        }
+        this->m_mapDirtyBlks =
+            std::move( mergedBlocks );
+    } while (0);
+    return ret; 
+}
+
 gint32 CBlockAllocator::CommitCache()
 {
     gint32 ret = 0;
@@ -1824,21 +2003,28 @@ gint32 CBlockAllocator::CommitCache()
         CStdRMutex oLock( this->GetLock() );
         DebugPrint( 0, "Committing %d dirty blocks...",
             m_dwDirtyBlkCount );
+#if __linux__ && (__KERNEL__ >= 501)
+        ret = WriteBlocksWithIoUring(
+            m_iFd, m_mapDirtyBlks );
+        if( ERROR( ret ) )
+            break;
+#else
         for( auto& elem : m_mapDirtyBlks )
         {
-            guint32 dwOff;
+            guint64 qwOff;
             if( elem.first == -2 )
-                dwOff = 0;
+                qwOff = 0;
             else if( elem.first == -4 )
-                dwOff = SUPER_BLOCK_SIZE;
+                qwOff = SUPER_BLOCK_SIZE;
             else
-                dwOff = BLOCK_ABS( elem.first );
+                qwOff = BLOCK_ABS( elem.first );
             ret = ReadWriteFile( elem.second->ptr(),
-                elem.second->size(), dwOff, false );
+                elem.second->size(), qwOff, false );
             if( ERROR( ret ) )
                 break;
             ret = 0;
         }
+#endif
         if( SUCCEEDED( ret ) )
         {
             m_mapDirtyBlks.clear();
@@ -1862,32 +2048,39 @@ gint32 CBlockAllocator::CheckAndCommit( bool bEntering )
     do{
         // already locked here
         if( m_dwTransCount != 0 )
+        {
+            ret = -EAGAIN;
             break;
+        }
         if( m_mapDirtyBlks.empty() )
             break;
 
         bool bCommit = false;
-        timespec oNow;
-        ret = clock_gettime(
-            CLOCK_REALTIME, &oNow );
-        if( ret < 0 )
-        {
-            ret = -errno;
-            break;
-        }
-        if( oNow.tv_sec - m_oStartTime.tv_sec >=
-            GetCacheLifeCycle() && bEntering )
+        if( unlikely( IsStopped() ) )
             bCommit = true;
-
         else if( m_dwDirtyBlkCount >=
             CACHE_MAX_BLOCKS )
             bCommit = true;
-
-        else if( IsStopped() )
-            bCommit = true;
+        else
+        {
+            timespec oNow;
+            ret = clock_gettime(
+                CLOCK_REALTIME, &oNow );
+            if( ret < 0 )
+            {
+                ret = -errno;
+                break;
+            }
+            if( oNow.tv_sec - m_oStartTime.tv_sec >=
+                GetCacheLifeCycle() && bEntering )
+                bCommit = true;
+        }
 
         if( !bCommit )
+        {
+            ret = -EAGAIN;
             break;
+        }
 
         ret = CommitCache();
 

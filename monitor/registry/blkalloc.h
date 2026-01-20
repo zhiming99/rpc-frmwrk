@@ -474,7 +474,7 @@ class CBlockAllocator :
 
     gint32 ReadWriteFile(
         char* pBuf, guint32 dwSize,
-        guint32 dwOff, bool bRead );
+        guint64 dwOff, bool bRead );
 
     gint32 CacheBlocks(
         const guint32* pBlocks,
@@ -591,7 +591,7 @@ class CBlockAllocator :
         CStdRMutex oLock( GetLock() );
         return m_bStopped;
     }
-
+    gint32 MergeBlocks();
 };
 
 struct BATransact
