@@ -138,7 +138,7 @@ gint32 CheckInode( RegFsPtr& pFs,
 
     RegFSInode& oInode = pFile->m_oInodeStore;
     gint32 iSize = pFile->GetSize();
-    if( BEYOND_MAX_LIMIT( iSize ) )
+    if( iSize > MAX_FILE_SIZE )
     {
         OutputMsg2( iSize, "Error file size is invalid %s",
             strPath.c_str() );
@@ -799,7 +799,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                     errInode, ks.oLeaf.byFileType} );
                 continue;
             }
-            if( stBuf.st_size >= MAX_FILE_SIZE )
+            if( stBuf.st_size > MAX_FILE_SIZE )
             {
                 vecBadFiles.push_back( { strFile,
                     errSize, ks.oLeaf.byFileType} );
@@ -1207,7 +1207,10 @@ int main( int argc, char** argv)
         if( g_qwSize > MAX_FS_SIZE ) 
         {
             OutputMsg2( -ERANGE,
-                "Warning, found invalid filesystem size" );
+                "Warning, found invalid filesystem "
+                "size %lld, max is %lld",
+                g_qwSize,
+                MAX_FS_SIZE );
         }
 
         ret = InitContext();

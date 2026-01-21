@@ -246,13 +246,13 @@ void CRegistryFs::ThreadFunction()
     while (m_threadRunning.load())
     {
         std::this_thread::sleep_for(
-            std::chrono::seconds(10) );
+            std::chrono::seconds(5) );
 
         if (!m_threadRunning.load())
             break;
 
-        dwCount += 10;
-        if( dwCount % 20 == 0 )
+        dwCount += 5;
+        if( dwCount % 5 == 0 )
             m_pAlloc->MergeBlocks();
 
         if( dwCount % g_dwCacheLife != 0 )

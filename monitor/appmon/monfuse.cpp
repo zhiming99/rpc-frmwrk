@@ -180,7 +180,8 @@ static int monfs_getattr(const char *path,
             break;
 
         if( ifs == 2 )
-            stbuf->st_ino += MAX_FS_SIZE;
+            stbuf->st_ino +=
+                ( MAX_FS_SIZE / BLOCK_SIZE );
     }while( 0 );
 
     return ret;

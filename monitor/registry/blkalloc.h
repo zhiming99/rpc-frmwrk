@@ -217,7 +217,7 @@
 #define GID_DEFAULT     80001
 
 #define MAX_FS_SIZE     \
-    ( ( ( BLOCKS_PER_GROUP_FULL * BLKGRP_NUMBER_FULL ) + 1 + 1 ) * BLOCK_SIZE )
+    ( ( ( ( guint64 )BLOCKS_PER_GROUP_FULL * BLKGRP_NUMBER_FULL ) + 1 + 1 ) * BLOCK_SIZE )
 
 #define BLKIDX_BEYOND_MAX( _blkidx_  ) \
     ( ( _blkidx_ ) >= BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
