@@ -1642,8 +1642,8 @@ struct FREE_BNODES
         if( IsEmpty() )
             return -ENOENT;
         guint16* p = m_arrFreeBNIdx;
-        wBNodeIdx = p[ m_wBNCount ];
-        p[ m_wBNCount ] = INVALID_BNODE_IDX;
+        wBNodeIdx = p[ m_wBNCount - 1 ];
+        p[ m_wBNCount - 1 ] = INVALID_BNODE_IDX;
         --m_wBNCount;
         return 0;
     }

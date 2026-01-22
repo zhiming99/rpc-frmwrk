@@ -1767,7 +1767,7 @@ gint32 CBPlusNode::RebalanceChild(
         if( pLeft != nullptr &&
             pLeft->GetKeyCount() > dwLimit )
         {
-            ret = this->StealFromLeft( idx + 1 );
+            ret = this->StealFromLeft( idx );
             break;
         }
         ret = MergeChilds( idx - 1, idx );

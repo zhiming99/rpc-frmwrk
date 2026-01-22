@@ -603,14 +603,14 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
-        CAccessContext oac;
+        /*CAccessContext oac;
         if( pac == nullptr )
         {
             // to check conflict between dwMode and dwFlags
             oac.dwUid = pFile->GetUid();
             oac.dwGid = pFile->GetGid();
             pac = &oac;
-        }
+        }*/
 
         ret = pOpenFile->Open( dwFlags, pac );
         if( ERROR( ret ) )
