@@ -1419,7 +1419,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 if( dwBlksToFree )
                     m_pAlloc->FreeBlocks(
                         pblkidx, dwBlksToFree, true );
-                guint32 i = dwBlkIdxIdx;
+                guint32 i = 0;
                 for( ; i < dwBlksToFree; i++ )
                     pblkidx[ i ] = 0;
                 if( dwBlkIdxIdx > 0 )
@@ -1448,9 +1448,10 @@ gint32 CFileImage::TruncBlkSecIndirect(
 
                 if( dwBlkIdxIdx > 0 )
                 {
-                    guint32 j = dwBlkIdxIdx;
+                    auto pblkidx = pbit + dwBlkIdxIdx;
+                    guint32 j = 0;
                     for(; j < dwBlksToFree; j++ )
-                        pbit[ j ] = 0;
+                        pblkidx[ j ] = 0;
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, p } );
                     dwDirtyBitIdx = dwBitIdx ;
@@ -1488,7 +1489,8 @@ gint32 CFileImage::TruncBlkSecIndirect(
             {
                 auto itr = m_mapSecBitBlks.find(
                     dwDirtyBitIdx );
-                if( itr != m_mapSecBitBlks.end() )
+                if( itr != m_mapSecBitBlks.end() &&
+                    dwBitBlkIdx != 0 )
                 {
                     ret = m_pAlloc->WriteBlock(
                         dwBitBlkIdx, 
