@@ -1207,6 +1207,7 @@ struct CBPlusNode :
     RegFSBNode m_oBNodeStore;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
     CBPlusNode* m_pParent = nullptr;
+    bool    m_bFreed = false;
 
     CBPlusNode( CDirImage* pFile,
         guint32 dwBNodeIdx ) :
@@ -1214,6 +1215,12 @@ struct CBPlusNode :
     {
         m_oBNodeStore.SetBNodeIndex( dwBNodeIdx );
     }
+
+    inline bool IsFreed()
+    { return m_bFreed; }
+
+    inline void SetFreed()
+    { m_bFreed = true; }
 
     ChildMap& GetChildMap()
     { return m_pDir->GetChildMap(); }
@@ -1229,6 +1236,10 @@ struct CBPlusNode :
 
     AllocPtr GetAlloc() const
     { return m_pDir->GetAlloc(); }
+
+    gint32 ReplaceNonLeafKey(
+        const char* szKey,
+        const char* szNewKey );
 
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
@@ -1402,6 +1413,24 @@ struct CBPlusNode :
             m_oBNodeStore.m_vecSlots[ idx ];
         return AddFileDirect(
             ps->oLeaf.dwInodeIdx, pFile );
+    }
+
+    BNodeUPtr GetChildDirect2( gint32 idx )
+    {
+        auto& oMap = GetChildMap();
+        auto itr = oMap.find( idx );
+        if( itr == oMap.end() )
+            return nullptr;
+        return itr->second;
+    }
+    BNodeUPtr GetChild2( gint32 idx )
+    {
+        if( idx >= ( gint32 )GetChildCount() ||
+            idx < 0 )
+            return nullptr;
+        KEYPTR_SLOT* ps = 
+            m_oBNodeStore.m_vecSlots[ idx ];
+        return GetChildDirect2( ps->dwBNodeIdx );
     }
 
     CBPlusNode* GetChildDirect( gint32 idx ) const
