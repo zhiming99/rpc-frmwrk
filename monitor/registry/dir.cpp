@@ -551,6 +551,9 @@ gint32 CBPlusNode::ReplaceNonLeafKey(
             }
             auto pSlot = pParent->GetSlot( iRet );
             COPY_KEY( pSlot->szKey, szNewKey);
+            if( IsSafeMode() )
+                m_pDir->SetDirty(
+                    pParent->GetBNodeIndex() );
             break;
         }
     }while( 0 );
@@ -1326,8 +1329,8 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
             pRight->ReplaceNonLeafKey(
                 oKey.szKey, pRightKs->szKey );
 
-            // DebugPrint( 0, "Steal from leaf right %s",
-            //     oKey.szKey );
+            DebugPrint( 0, "Steal from leaf right %s",
+                 oKey.szKey );
         }
         else
         {
@@ -1355,8 +1358,8 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
                  strLeadingKey.c_str() );
 
             pLeft->AppendSlot( &oKey );
-            // DebugPrint( 0, "Steal from non-leaf right %s",
-            //     oKey.szKey );
+            DebugPrint( 0, "Steal from non-leaf right %s",
+                oKey.szKey );
         }
 
         if( IsSafeMode() )
@@ -1659,9 +1662,9 @@ gint32 CBPlusNode::MergeChilds(
                 break;
             pPred->SetNextLeaf(
                 pSucc->GetNextLeaf() );
-            // DebugPrint( 0, "Merged leaf children and "
-            //     "removed key %s",
-            //     strDelKey.c_str() );
+            DebugPrint( 0, "Merged leaf children and "
+                "removed key %s",
+                strDelKey.c_str() );
         }
         else
         {
@@ -1677,9 +1680,9 @@ gint32 CBPlusNode::MergeChilds(
                 pPred->GetKeyCount() );
             if( ERROR( ret ) )
                 break;
-            // DebugPrint( 0, "Merged non-leaf children and "
-            //     "descended key %s",
-            //     pPredKs->szKey );
+            DebugPrint( 0, "Merged non-leaf children and "
+                "descended key %s",
+                pPredKs->szKey );
         }
 
         KEYPTR_SLOT* pSuccKs =
@@ -1851,6 +1854,7 @@ gint32 CBPlusNode::RemoveFile(
         BNodeUPtr pThis =
             GetChildDirect2( dwBNodeIdx );
 
+        FImgSPtr dirPtr = m_pDir;
         gint32 idx = BinSearch(
             szKey, 0, dwCount - 1 );
         if( idx >= 0 )
@@ -1964,7 +1968,46 @@ gint32 CBPlusNode::RemoveFile(
             if( pThis->IsFreed() )
             {
                 DebugPrint( 0, "The BNode is freed "
-                    "before we return" );
+                    "during removal of %s",
+                    szKey );
+                CDirImage* pDir = dirPtr;
+                CBPlusNode* pCurNode =
+                    pDir->GetRootNode();
+                while( pCurNode != nullptr &&
+                    !pCurNode-> IsLeaf() )
+                {
+                    guint32 dwKeys =
+                        pCurNode->GetKeyCount();
+                    gint32 iRet = pCurNode->BinSearch(
+                        szKey, 0, dwKeys - 1 );
+                    if( iRet >= 0 )
+                    {
+                        pChildKs =
+                            pCurNode->GetSlot( iRet );
+
+                        if( pChildSuc->IsFreed() )
+                        {
+                            pChildSuc = pCurNode->GetChild2(
+                                idx + 1 );
+                        }
+                        if( !pChildSuc )
+                            break;
+
+                        auto pKey =
+                            pChildSuc->GetSuccKey( 0 );
+
+                        if( pKey )
+                            COPY_KEY( pChildKs->szKey, pKey );
+                        break;
+                    }
+                    idx = -idx;
+                    if( idx >= 0x10000 )
+                        idx -= 0x10000;
+                    pCurNode =
+                        pCurNode->GetChild( idx );
+                }
+                if( IsSafeMode() )
+                    m_pDir->SetDirty( dwBNodeIdx );
                 break;
             }
 
