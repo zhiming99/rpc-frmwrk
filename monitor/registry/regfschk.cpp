@@ -715,10 +715,6 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             break;
         }
 
-        if( !g_bVerbose )
-            std::cout<<  "\033[2KChecking "
-                << strPath << "\r";
-
         stdstr strIndent;
         strIndent.insert( 0, vecNames.size() * 4, ' ' );
         for( auto& ks : vecDirEnt )
@@ -786,10 +782,23 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 setBlocks );
         }
 
+        if( !g_bVerbose )
+        {
+            std::cout<<  "\033[2KChecking "
+                << strPath << "\r"
+                << std::flush;
+        }
+
         for( auto& ks : vecDirEnt )
         {
             if( ks.oLeaf.byFileType == ftDirectory )
                 continue;
+            if( !g_bVerbose )
+            {
+                std::cout<<  "\033[2KChecking "
+                    << strPath << "/" << ks.szKey << "\r"
+                    << std::flush;
+            }
             if( strnlen( ks.szKey, REGFS_NAME_LENGTH ) == 0 )
             {
                 stdstr strName = strPath + "/unkfile_";
@@ -1120,10 +1129,11 @@ static void Usage( const char* szName )
     fprintf( stderr,
         "Usage: %s [OPTIONS] <regfs path>\n"
         "\t [ <regfs path> the path to the file containing regfs  ]\n"
-        "\t [ -r rebuild and defregrement the registry in a new registry "
+        "\t [ -c Claim the orphan blocks during checking ]\n"
+        "\t [ -r Rebuild and defregrement the registry in a new registry "
             "file with the suffix '.restore' ]\n"
-        "\t [ -h this help ]\n"
-        "\t [ -v output verbose information  ]\n", szName );
+        "\t [ -h Display this help ]\n"
+        "\t [ -v Output verbose information  ]\n", szName );
 }
 
 int _main()
@@ -1199,18 +1209,19 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "chrv" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "crvh" ) ) != -1 )
         {
             switch( opt )
             {
-                case 'v':
-                    g_bVerbose = true;
+                case 'c':
+                    g_bClaimOrphans = true;
                     break;
                 case 'r':
                     g_bRebuild = true;
                     break;
-                case 'c':
-                    g_bClaimOrphans = true;
+                case 'v':
+                    g_bVerbose = true;
+                    break;
                 case 'h':
                 default:
                     { Usage( argv[ 0 ] ); exit( 0 ); }
