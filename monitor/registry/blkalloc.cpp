@@ -1295,10 +1295,14 @@ gint32 CBlockAllocator::IsBlockFree(
         gint32 iRet = this->IsBlockGroupFree(
             dwGrpIdx );
         if( SUCCEEDED( iRet ) )
+            break;
+        if( iRet != ERROR_FALSE )
         {
             ret = -ERANGE;
             break;
         }
+        guint32 dwIdx =
+            ( dwBlkIdx & BLOCK_IDX_MASK );
         auto itr = m_mapBlkGrps.find( dwGrpIdx );
         if( itr != m_mapBlkGrps.end() )
         {
@@ -1308,7 +1312,7 @@ gint32 CBlockAllocator::IsBlockFree(
                 ret = -EFAULT;
                 break;
             }
-            ret = pGrp->IsBlockFree( dwBlkIdx );
+            ret = pGrp->IsBlockFree( dwIdx );
         }
         else
         {
@@ -1317,7 +1321,7 @@ gint32 CBlockAllocator::IsBlockFree(
             ret = pbg->Reload();
             if( ERROR( ret ) )
                 break;
-            ret = pbg->IsBlockFree( dwBlkIdx );
+            ret = pbg->IsBlockFree( dwIdx );
             m_mapBlkGrps.insert(
                 { dwGrpIdx, std::move( pbg ) } );
         }
@@ -1870,8 +1874,8 @@ gint32 MergeBlocks(
     mergedBlocks.emplace(
         currentBlockIndex, currentBuffer );
 
-    DebugPrint( 0, "Merged blocks %d: ",
-        mapBlocks.size() - mergedBlocks.size() );
+    // DebugPrint( 0, "Merged blocks %d: ",
+    //     mapBlocks.size() - mergedBlocks.size() );
     return ret;
 }
 

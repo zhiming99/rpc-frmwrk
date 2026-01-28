@@ -26,23 +26,12 @@
 #include "blkalloc.h"
 #include <fcntl.h>
 
-#define MIN_PTRS( _root_ ) \
-( (_root_) ? 2 : ( ( MAX_PTRS_PER_NODE + 1 ) / 2 ) )
-
-#define MIN_KEYS( _root_ ) ( (_root_) ? 1 : \
-    ( ( MAX_PTRS_PER_NODE + 1 ) / 2 - 1  ) )
-
 #define SPLIT_POS( _leaf_ ) \
 ( (_leaf_) ? ( MAX_PTRS_PER_NODE / 2 ) : \
     ( ( MAX_PTRS_PER_NODE + 1 ) / 2 - 1 ) )
 
 #define COMPARE_KEY( _key1_, _key2_ ) \
     ( strncmp( (_key1_), (_key2_), REGFS_NAME_LENGTH - 1 ) )
-
-#define COPY_KEY( _dst_, _src_ ) \
-do{ strncpy( (_dst_), (_src_), REGFS_NAME_LENGTH - 1 ); \
-    (_dst_)[ REGFS_NAME_LENGTH - 1 ] = 0; \
-}while( 0 )
 
 #define CLEAR_KEY( _key_ ) \
 ( (_key_)[ 0 ] = 0, (_key_)[ REGFS_NAME_LENGTH - 1 ] = 0 )
@@ -1329,8 +1318,8 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
             pRight->ReplaceNonLeafKey(
                 oKey.szKey, pRightKs->szKey );
 
-            DebugPrint( 0, "Steal from leaf right %s",
-                 oKey.szKey );
+            // DebugPrint( 0, "Steal from leaf right %s",
+            //      oKey.szKey );
         }
         else
         {
@@ -1358,8 +1347,8 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
                  strLeadingKey.c_str() );
 
             pLeft->AppendSlot( &oKey );
-            DebugPrint( 0, "Steal from non-leaf right %s",
-                oKey.szKey );
+            // DebugPrint( 0, "Steal from non-leaf right %s",
+            //     oKey.szKey );
         }
 
         if( IsSafeMode() )
@@ -1662,9 +1651,9 @@ gint32 CBPlusNode::MergeChilds(
                 break;
             pPred->SetNextLeaf(
                 pSucc->GetNextLeaf() );
-            DebugPrint( 0, "Merged leaf children and "
-                "removed key %s",
-                strDelKey.c_str() );
+            // DebugPrint( 0, "Merged leaf children and "
+            //     "removed key %s",
+            //     strDelKey.c_str() );
         }
         else
         {
@@ -1680,9 +1669,9 @@ gint32 CBPlusNode::MergeChilds(
                 pPred->GetKeyCount() );
             if( ERROR( ret ) )
                 break;
-            DebugPrint( 0, "Merged non-leaf children and "
-                "descended key %s",
-                pPredKs->szKey );
+            // DebugPrint( 0, "Merged non-leaf children and "
+            //     "descended key %s",
+            //     pPredKs->szKey );
         }
 
         KEYPTR_SLOT* pSuccKs =

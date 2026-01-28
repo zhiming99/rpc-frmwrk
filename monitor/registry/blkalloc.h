@@ -225,6 +225,17 @@
 #define CACHE_LIFE_CYCLE 60
 #define CACHE_MAX_BLOCKS BLOCKS_PER_GROUP_FULL 
 
+#define MIN_PTRS( _root_ ) \
+( (_root_) ? 2 : ( ( MAX_PTRS_PER_NODE + 1 ) / 2 ) )
+
+#define MIN_KEYS( _root_ ) ( (_root_) ? 1 : \
+    ( ( MAX_PTRS_PER_NODE + 1 ) / 2 - 1  ) )
+
+#define COPY_KEY( _dst_, _src_ ) \
+do{ strncpy( (_dst_), (_src_), REGFS_NAME_LENGTH - 1 ); \
+    (_dst_)[ REGFS_NAME_LENGTH - 1 ] = 0; \
+}while( 0 )
+
 namespace rpcf{
 
 extern bool g_bSafeMode;
@@ -1131,6 +1142,9 @@ struct CDirImage :
     guint32 GetRootKeyCount() const;
     inline CBPlusNode* GetRootNode() const
     { return m_pRootNode.get(); }
+
+    inline BNodeUPtr GetRootNode2() const
+    { return m_pRootNode; }
 
     gint32 SearchNoLock( const char* szKey,
         FImgSPtr& pFile, CBPlusNode*& pNode );

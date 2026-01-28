@@ -674,6 +674,172 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
     return ret;
 }
 
+#include <codecvt>
+#include <locale>
+
+bool IsValidUTF8(const std::string& str) {
+    try {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+        std::wstring widestr = conv.from_bytes(str);
+        return true;
+    } catch (const std::range_error&) {
+        return false;
+    }
+}
+
+gint32 CheckLeaf(
+    CDirImage* pDir, BNodeUPtr pLeaf )
+{
+    gint32 ret = 0;
+    if( pDir == nullptr || !pLeaf )
+        return -EINVAL;
+    do{
+        stdstr strPath;
+        GetPathFromImg( pDir, strPath );
+        guint32 dwCount = pLeaf->GetKeyCount();
+        guint32 dwLimit = MIN_KEYS( pLeaf->IsRoot() );
+        if( dwCount == 0 && pLeaf->IsRoot() )
+            break;
+        if( dwCount < dwLimit )
+            OutputMsg2( dwCount,
+                "Warning BNode keys is less than "
+                "lower limit of %d, rebalancing "
+                "needed for %s", dwLimit,
+                strPath.c_str() );
+        if( dwCount > MAX_KEYS_PER_NODE )
+            OutputMsg2( dwCount,
+                "Error BNode keys is has exceeded "
+                "upper limit of %d, split "
+                "needed for %s",
+                MAX_KEYS_PER_NODE,
+                strPath.c_str() );
+
+        AllocPtr pAlloc = pDir->GetAlloc();
+        for( int i = 0; i < dwCount; i++ )
+        {
+            auto pks = pLeaf->GetSlot( i );
+            if( !IsValidUTF8( pks->szKey ) )
+            {
+                OutputMsg2( -EINVAL, "Error file entry "
+                    "is not a valid UTF8 string @%d of "
+                    "directory %s", i,
+                    strPath.c_str() );
+            }
+            ret = pAlloc->IsBlockFree(
+                pks->oLeaf.dwInodeIdx );
+            if( ret != ERROR_FALSE )
+               OutputMsg2( ret, "Error the "
+               "file inode is not allocated a valid block@%d of "
+               "directory %s", i,
+               ( strPath + "/" + pks->szKey ).c_str() );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CheckNonLeaf(
+    CDirImage* pDir, BNodeUPtr pNode )
+{
+    gint32 ret = 0;
+    if( pDir == nullptr || !pNode )
+        return -EINVAL;
+    do{
+        stdstr strPath;
+        GetPathFromImg( pDir, strPath );
+        guint32 dwCount = pNode->GetKeyCount();
+        guint32 dwLimit = MIN_KEYS( pNode->IsRoot() );
+        if( dwCount < dwLimit )
+            OutputMsg2( dwCount,
+                "Warning BNode keys is less than "
+                "lower limit of %d, rebalancing "
+                "needed for %s", dwLimit,
+                strPath.c_str() );
+        if( dwCount > MAX_KEYS_PER_NODE )
+            OutputMsg2( dwCount,
+                "Error BNode keys is has exceeded "
+                "upper limit of %d, split "
+                "needed for %s",
+                MAX_KEYS_PER_NODE,
+                strPath.c_str() );
+
+        // OutputMsg2( dwCount,
+        //     "Info BNode %d contains %d keys "
+        //     "in directory %s",
+        //     pNode->GetBNodeIndex(),
+        //     dwCount, strPath.c_str() );
+        AllocPtr pAlloc = pDir->GetAlloc();
+        bool bDirty = false;
+        for( int i = 0; i < dwCount + 1; i++ )
+        {
+            auto pks = pNode->GetSlot( i );
+            if( pks->szKey[0] != 0 &&
+                !IsValidUTF8( pks->szKey ) )
+            {
+                OutputMsg2( -EINVAL, "Error file entry "
+                    "is not a valid UTF8 string @%d of "
+                    "directory %s", i,
+                    strPath.c_str() );
+            }
+            auto pChild = pNode->GetChild2( i );
+            if( pChild )
+                CheckNonLeaf( pDir, pChild );
+            if( i < dwCount && !pNode->IsLeaf() )
+            {
+                auto pSucc = pNode->GetChild2( i + 1 );
+                if( !pSucc )
+                {
+                    OutputMsg2( -EFAULT, "Error the child node"
+                        "@%d is not available in directory %s",
+                        i, strPath.c_str() );
+                    continue;
+                }
+                auto pSuccKey = pSucc->GetSuccKey( 0 );
+                if( pSuccKey &&
+                    strcmp( pSuccKey, pks->szKey ) != 0 )
+                {
+                    OutputMsg2( -EINVAL, "Error the key "
+                        "of non-leaf node@%d is an orphan key, "
+                        "without a file object associated, "
+                        "in directory %s, replaced with %s",
+                        i, strPath.c_str(), pSuccKey );
+                    COPY_KEY( pks->szKey, pSuccKey );
+                    bDirty = true;
+                }
+            }
+        }
+        if( bDirty )
+            pNode->Flush( FLAG_FLUSH_SINGLE_BNODE );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CheckBNode( FImgSPtr ptrDir )
+{
+    gint32 ret = 0;
+    do{
+        CDirImage* pDir = ptrDir;
+        if( pDir == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        BNodeUPtr pNode =
+            pDir->GetRootNode2();
+
+        if( pNode )
+        {
+            if( pNode->IsLeaf() )
+                CheckLeaf( pDir, pNode );
+            else
+                CheckNonLeaf( pDir, pNode );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 using ELEM_BADFILE=std::tuple< stdstr, guint32, gint32 >;
 
 gint32 FindBadFilesDir( RegFsPtr& pFs,
@@ -714,6 +880,8 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 { strPath, errDirEnt, ftDirectory} );
             break;
         }
+
+        CheckBNode( ptrDir );
 
         stdstr strIndent;
         strIndent.insert( 0, vecNames.size() * 4, ' ' );
