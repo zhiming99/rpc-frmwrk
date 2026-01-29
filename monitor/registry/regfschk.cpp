@@ -798,7 +798,7 @@ gint32 CheckNonLeaf(
                 if( pSuccKey &&
                     strcmp( pSuccKey, pks->szKey ) != 0 )
                 {
-                    OutputMsg2( -EINVAL, "Error the key "
+                    OutputMsg2( -EINVAL, "Warning the key "
                         "of non-leaf node@%d is an orphan key, "
                         "without a file object associated, "
                         "in directory %s, replaced with %s",
