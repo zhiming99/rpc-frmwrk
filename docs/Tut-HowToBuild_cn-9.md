@@ -20,20 +20,18 @@
 8. 从`https://github.com/zhiming99/rpc-frmwrk.git`下载`rpc-frmwrk`的代码树。
 9. 在代码的根目录下，运行如下命令初始化编译环境。
     * `libtoolize` 
-    * 运行`autoreconf --force --install`生成`config.h.in`.
-    * 运行`automake --add-missing`生成主`Makefile.in`.
-    * 运行`autoconf`生成脚本`configure`.
-### 根据需求裁减所需的功能模块
+    * 运行`autoreconf -vfi`生成`config.h.in`.
+### 根据需求裁剪功能模块
 `rpc-frmwrk`目前支持四种语言，两种安全认证方式，两种SSL连接。所以对于不在需求范围的语言和功能，可以进行一些裁减。可裁减的模块有一定的依赖关系，因此在裁减时需要注意。  
-| 序号 | 功能模块 | 描述 | 示例|依赖关系|
-| -------- | --------- | --------- |------------------|---|
-|1|Python|Python模块提供对Python的运行时支持|`bash cfgsel -r --disable-python`将裁掉Python的支持|Python模块将用于未来的`monitor`模块的开发|
-|2|Java|Java模块提供对Java的运行时支持|`bash cfgsel -r --disable-java`将裁掉Java的支持。||
-|3|JS|JS模块提供对JS的运行时支持|`bash cfgsel -r --disable-js`将裁掉JS的支持。JS模块和上面两个语言不一样，是纯客户端的语言，服务器端的语言还需要在C++，Python，和Java里选一个|依赖于openssl和auth模块|
-|4|testcases|testcases模块有一些测试用例可以用来测试rpc-frmwrk是否正常工作，通常用于测试|`bash cfgsel -r --disable-testcases`将关闭此功能。||
-|5|fuse3|fuse3是用来安装`rpcfs`提供系统状态的模块，该功能主要用于服务器端。|`bash cfgsel -r --disable-fuse3`将关闭此功能||
-|6|auth|安全认证模块|auth是用来支持Kerberos和OAuth2认证的框架，因此关闭此模块，所有的认证功能都被关闭.`bash cfgsel -r --disable-auth`将关闭此功能.|依赖于openssl或gmssl|
-|7|openssl和gmssl|安全连接模块|这两个模块都是提供安全连接的功能，根据需要，关闭其中的一个，不影响另一个的工作, GmSSL是国产的安全连接软件，使用SM2+SM4的安全连接。如`bash cfgsel -r disable-openssl`将关闭openssl的支持|
+| 序号 | 功能模块 | 描述 | 示例|依赖关系|能否禁用|
+| -------- | --------- | --------- |------------------|---|---|
+|1|Python|Python模块提供对Python的运行时支持|`bash cfgsel -r --disable-python`将禁用Python的支持||**不能**禁用|
+|2|Java|Java模块提供对Java的运行时支持|`bash cfgsel -r --disable-java`将裁掉Java的支持。||可以禁用|
+|3|JS|JS模块提供对JS的运行时支持|`bash cfgsel -r --disable-js`将裁掉JS的支持。JS模块和上面两个语言不一样，是纯客户端的语言，服务器端的语言还需要在C++，Python，和Java里选一个|依赖于openssl和auth模块|可以禁用|
+|4|testcases|testcases模块有一些测试用例可以用来测试rpc-frmwrk是否正常工作，通常用于测试|`bash cfgsel -r --disable-testcases`将关闭此功能。||可以禁用|
+|5|fuse3|fuse3是用来安装`rpcfs`提供系统状态的模块，该功能主要用于服务器端。|`bash cfgsel -r --disable-fuse3`将关闭此功能||**不能**禁用|
+|6|krb5|安全认证模块|krb5是用来支持Kerberos认证的框架，因此关闭此模块，所有的认证功能都被关闭.`bash cfgsel -r --disable-krb5`将关闭此功能.|依赖于openssl或gmssl|可以禁用|
+|7|openssl和gmssl|安全连接模块|这两个模块都是提供安全连接的功能，根据需要，关闭其中的一个，不影响另一个的工作, GmSSL是国产的安全连接软件，使用SM2+SM4的安全连接。如`bash cfgsel -r disable-openssl`将关闭openssl的支持|可以禁用其中一个|
 ### 在X86平台上编译`rpc-frmwrk`:
 1. 运行`bash cfgsel -r`或者`bash cfgsel -d`生成release版或debug版的Makefile树. release版是编译器优化过的版本，而debug版是没有优化并带有debug symbol的代码，适合调试用。这里[`cfgsel`](https://github.com/zhiming99/rpc-frmwrk/blob/master/cfgsel)是脚本`configure`的wrapper, 并增加了debug/release的命令选项，同时它会转发其他命令选项给`configure`. 比如`rpc-frmwrk`有许多可配置特性, 包括 `gmssl`, `openssl`, `fuse3`, `auth`, `python`, `java`, `js` `testcases`等. 缺省时, 这些特性将全部编译. 但是如果目标系统有资源限制或者额外考虑，可以用`bash cfgsel -[rd] --disable-xxx`关闭一些特性. 比如 `bash cfgsel -r --disable-fuse3 --disable-openssl --disable-js`.
 3. 运行 `make && make install`编译并安装.
@@ -42,10 +40,15 @@
 6. 如果你的机器十分强大，可以考虑在make命令后加`-j n`(n is number of parallel tasks)，可以加快编译速度. 
 
 ### 在树梅派上编译`rpc-frmwrk`:
-* 过程同X86上的编译。树梅派一般资源有限，所以Java, JS的支持都会关闭。配置上采用`bash cfgsel -r  --disable-js --disable-java`。树莓派上，编译时执行`make`即可，使用`make -j4`，有时会死机。
+* 过程同X86上的编译。树莓派上，编译时执行`make`即可，使用`make -j4`，有时会死机。
 
 ### 交叉编译
-* 目前还未成功过。
+* 建议使用docker，方法如下
+    * 国内的用户需要先配置docker使用国内的docker加速镜像，如腾讯云。
+    * 先拉取QEMU虚拟机`sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes`
+    * 然后在[`tools`](../tools)目录下运行`sudo docker buildx build --platform linux/armhf -t armhf/rpc-frmwrk:latest -f Dockerfile.arm .`
+    * `Dokerfile`会自动构建armhf的rpc-frmwrk镜像。
+    * 这个方法可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
 
 ### 已知问题
 * 由于各个linux的发行版繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈，我们会尽快修复。

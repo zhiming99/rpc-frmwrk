@@ -402,10 +402,18 @@ upstream {AppName} {{
             )
         fp.write( cfg )
     fp.close()
+    strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
+    if not os.access( strMonCliPkg, os.R_OK ):
+        strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
+        if not os.access( strMonCliPkg, os.R_OK ):
+            strMonCliPkg = ""
     cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
     cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf;"
     cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf ) && "
     cmdline += "rm " + cfgFile + " && echo nginx setup complete ;"
+    if len( strMonCliPkg ) > 0:
+        strRpcfPath = strRootPath +"/rpcf"
+        cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
     cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
@@ -470,7 +478,17 @@ def Config_Apache( initCfg : object )->int:
             )
         fp.write( cfg )
     fp.close()
+
+    strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
+    if not os.access( strMonCliPkg, os.R_OK ):
+        strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
+        if not os.access( strMonCliPkg, os.R_OK ):
+            strMonCliPkg = ""
+
     cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile + ";"
+    if len( strMonCliPkg ) > 0:
+        strRpcfPath = "/var/www/html/rpcf"
+        cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
     cmdline += "{sudo} systemctl restart httpd"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )

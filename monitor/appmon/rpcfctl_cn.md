@@ -112,6 +112,9 @@ rpcfctl <命令> [参数]
 - **listuser**  
   列出所有用户。
 
+- **password <用户名>**  
+  修改`SimpAuth`用户的密码。
+
 - **addgroup <组名>**  
   添加组到组注册表。
 

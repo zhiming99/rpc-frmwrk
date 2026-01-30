@@ -1,4 +1,5 @@
-FROM ubuntu:latest
+#FROM --platform=linux/armhf dtcooper/raspberrypi-os:bookworm as armhf_build
+FROM --platform=linux/armhf debian:bookworm as armhf_build
 MAINTAINER woodhead99@gmail.com
 RUN apt-get update
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
@@ -23,8 +24,8 @@ RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
 # ubuntu 22.04's version of nodejs is outdated, lets install node 20 from nodejs'
 # site instead.
 
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
- && source .bashrc && nvm install 20 && node -v
+#RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
+# && source .bashrc && nvm install 20 && node -v
 
 RUN apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24

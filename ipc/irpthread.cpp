@@ -27,7 +27,6 @@
 #include <algorithm>
 #include <vector>
 #include <deque>
-#include <sys/prctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -70,37 +69,6 @@ void DumpTask( TaskletPtr& pTask )
             strTaskName + " failed" ); 
     }
 #endif
-}
-
-// set the name of the current thread
-string GetThreadName()
-{
-    gint32 ret = 0;
-    char szBuf[ 32 ] = { 0 };
-
-    ret = prctl( PR_GET_NAME, szBuf, 0, 0, 0 );
-
-    if( ret == -1 )
-        return string( "Unknown" );
-
-    return string( szBuf );
-}
-
-// set the name of the current thread
-gint32 SetThreadName(
-    const string& strName )
-{
-    gint32 ret = 0;
-    if( strName.size() == 0 )
-        return -EINVAL;
-
-    ret = prctl( PR_SET_NAME,
-        strName.c_str(), 0, 0, 0 );
-
-    if( ret == -1 )
-        ret = -errno;
-
-    return ret;
 }
 
 gint32 IThread::SetThreadName(
