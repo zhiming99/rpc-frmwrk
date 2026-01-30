@@ -508,7 +508,7 @@ EOF
         cmdline="rpcfctl listuser"
         bash $cmddir/rpcfshow.sh -l
         ;;
-    passwd)
+    password)
         cmdline="rpcfctl passwd <user name>"
         if [[ $# -lt 1 ]]; then
             echo "Error: Missing argument" 
