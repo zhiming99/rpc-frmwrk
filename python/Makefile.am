@@ -46,7 +46,7 @@ all:
 
 genpipopt:
 	$(eval pipopt=$(shell os_name=$$(cat /etc/issue | awk '{print $$1}');\
-    if [ "x$${os_name}" == "xDebian" ]; then \
+    if [[ "x$${os_name}" == "xDebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
         os_version=$$(cat /etc/issue | awk '{print $$3}');\
         echo $$(if (($${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
     elif [ "x$${os_name}" == "xUbuntu" ]; then \

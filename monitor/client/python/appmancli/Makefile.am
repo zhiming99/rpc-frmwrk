@@ -38,55 +38,36 @@ appmancli/__init__.py:
     popd
 
 # Install the Python package using pip
-install:
-	if command -v lsb_release >/dev/null 2>&1; then \
-        PLATFORM=$$(lsb_release -is 2>/dev/null || echo "Unknown"); \
-        if [[ " $${PLATFORM[@]} " =~ " Ubuntu " ]]; then \
-            PLATFORM="Ubuntu"; \
-        elif [[ " $${PLATFORM[@]} " =~ " Debian " ]]; then  \
-            PLATFORM="Debian"; \
-        else \
-            PLATFORM="Unknown"; \
-        fi; \
-    else \
-        PLATFORM=$$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"'); \
-    fi; \
-    if [[ "$${PLATFORM}" == "Ubuntu" ]] || [[ "$${PLATFORM}" == "Debian" ]]; then \
-        pipopt='--break-system-packages'; \
-    else \
-        pipopt='';\
-    fi; \
-    if [[ "$$LD_LIBRARY_PATH" == *libfakeroot* ]]; then \
+genpipopt:
+	$(eval pipopt=$(shell os_name=$$(cat /etc/issue | awk '{print $$1}');\
+    if [[ "x$${os_name}" == "xDebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
+        os_version=$$(cat /etc/issue | awk '{print $$3}');\
+        echo $$(if (($${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
+    elif [ "x$${os_name}" == "xUbuntu" ]; then \
+        os_version=$$(cat /etc/issue | awk '{print $$2}' | awk -F'.' '{print $$1}');\
+        echo $$(if (($${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
+    fi))
+	@if [ "x${pipopt}" != "x" ]; then \
+        echo Warning: break-system-packages enabled; \
+    fi;
+
+install: genpipopt
+	if [[ "$$LD_LIBRARY_PATH" == *libfakeroot* ]]; then \
         exit 0; \
     fi; \
 	if [[ "x$${SUDO_USER}" != "x" ]]; then \
-        echo su -c 'pip3 install $${pipopt} dist/*.whl' $${SUDO_USER}; \
-        su -c "pip3 install --force-reinstall $${pipopt} dist/*.whl" $${SUDO_USER} || true; \
+        echo su -c 'pip3 install ${pipopt} dist/*.whl' $${SUDO_USER}; \
+        su -c "pip3 install --force-reinstall ${pipopt} dist/*.whl" $${SUDO_USER} || true; \
     else \
-        pip3 install --force-reinstall $${pipopt} dist/*.whl || true;\
+        pip3 install --force-reinstall ${pipopt} dist/*.whl || true;\
     fi
 
 # Uninstall the Python package
-uninstall:
-	if command -v lsb_release >/dev/null 2>&1; then \
-        PLATFORM=$$(lsb_release -is 2>/dev/null || echo "Unknown"); \
-        if [[ " $${PLATFORM[@]} " =~ " Ubuntu " ]]; then \
-            PLATFORM= "Ubuntu"; \
-        elif [[ " $${PLATFORM[@]} " =~ " Debian " ]]; then  \
-            PLATFORM="Debian"; \
-        else \
-            PLATFORM="Unknown"; \
-        fi; \
-    else \
-        PLATFORM=$$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"'); \
-    fi; \
-    if [[ "$${PLATFORM}" == "Ubuntu" ]] || [[ "$${PLATFORM}" == "Debian" ]]; then \
-        pipopt="--break-system-packages"; \
-    fi; \
+uninstall: genpipopt
 	if [[ "x$${SUDO_USER}" != "x" ]]; then \
-        su -c "pip3 uninstall -y $${pipopt} appmancli" $${SUDO_USER}; \
+        su -c "pip3 uninstall -y ${pipopt} appmancli" $${SUDO_USER}; \
     else \
-        pip3 uninstall -y $${pipopt} appmancli;\
+        pip3 uninstall -y ${pipopt} appmancli;\
     fi
 
 # Clean up build artifacts
