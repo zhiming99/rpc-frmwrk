@@ -23,7 +23,7 @@ echo creating files and directories test...
 tar Jxf linux-6.12.10.tar.xz -C $mntdir
 umount $mntdir
 echo checking registry
-/usr/local/bin/regfschk registry.dat > regout 2>&1
+/usr/local/bin/regfschk -s registry.dat > regout 2>&1
 grep -i Error regout 
 
 echo deleting files and directories test...
@@ -41,7 +41,7 @@ tar Jxf linux-6.12.10.tar.xz -C $mntdir
 ls -l $mntdir/
 umount $mntdir
 echo checking registry again...
-/usr/local/bin/regfschk registry.dat > regout 2>&1
+/usr/local/bin/regfschk -s registry.dat > regout 2>&1
 rm registry.dat linux-6.12.10.tar.xz
 if grep -i Error regout > /dev/null; then
     echo Error deleting files...

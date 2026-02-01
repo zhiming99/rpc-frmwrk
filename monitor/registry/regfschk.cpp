@@ -47,6 +47,7 @@ static guint64 g_qwSize = 0;
 static RegFsPtr g_pRegfs;
 static stdstr g_strRegFsFile;
 static bool g_bVerbose = false;
+static bool g_bSilent = false;
 static bool g_bRebuild = false;
 static bool g_bClaimOrphans = false;
 
@@ -174,7 +175,7 @@ gint32 CheckInode( RegFsPtr& pFs,
         return errSize;
     }
 
-    if( g_bVerbose )
+    if( g_bVerbose && !g_bSilent )
         OutputMsg2( iSize,
             "Checking inode %s", strPath.c_str() );
 
@@ -389,7 +390,7 @@ gint32 CheckInode( RegFsPtr& pFs,
     setBlocks.emplace(
         pFile->GetInodeIdx(), dwFileId );
 
-    if( g_bVerbose )
+    if( g_bVerbose && !g_bSilent )
     {
         OutputMsg2( fileBlocks.size(),
             "%s File Blocks", strPath.c_str() );
@@ -889,7 +890,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
         {
             if( ks.oLeaf.byFileType != ftDirectory )
                 continue;
-            if( g_bVerbose )
+            if( g_bVerbose && !g_bSilent )
                 OutputMsg2( 0, "%s%s",
                     strIndent.c_str(), ks.szKey );
             if( strnlen( ks.szKey, REGFS_NAME_LENGTH ) == 0 )
@@ -950,7 +951,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 setBlocks );
         }
 
-        if( !g_bVerbose )
+        if( !g_bVerbose && !g_bSilent )
         {
             std::cout<<  "\033[2KChecking "
                 << strPath << "\r"
@@ -961,7 +962,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
         {
             if( ks.oLeaf.byFileType == ftDirectory )
                 continue;
-            if( !g_bVerbose )
+            if( !g_bVerbose && !g_bSilent )
             {
                 std::cout<<  "\033[2KChecking "
                     << strPath << "/" << ks.szKey << "\r"
@@ -1033,7 +1034,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             }
 
 
-            if( g_bVerbose )
+            if( g_bVerbose && !g_bSilent )
                 OutputMsg2( stBuf.st_size, "%s%s",
                     strIndent.c_str(), ks.szKey );
             vecGoodLocal.push_back( { strFile,
@@ -1086,7 +1087,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
     if( bCorrupted )
     {
         OutputMsg2( 0, "Corrupted dir %s", strPath.c_str() );
-        if( g_bVerbose )
+        if( g_bVerbose && !g_bSilent )
             pDir->PrintBNode();
     }
     return ret;
@@ -1159,7 +1160,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
 
         OutputMsg2( 0,
             "Healthy files: %d", vecGoodFiles.size() );
-        if( g_bVerbose )
+        if( g_bVerbose && !g_bSilent )
         {
             for( auto& elem : vecGoodFiles )
             {
@@ -1295,11 +1296,12 @@ gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
 static void Usage( const char* szName )
 {
     fprintf( stderr,
-        "Usage: %s [OPTIONS] <regfs path>\n"
+        "Usage: %s [-chrsv] <regfs path>\n"
         "\t [ <regfs path> the path to the file containing regfs  ]\n"
         "\t [ -c Claim the orphan blocks during checking ]\n"
         "\t [ -r Rebuild and defregrement the registry in a new registry "
             "file with the suffix '.restore' ]\n"
+        "\t [ -s Don't output progress information ]\n"
         "\t [ -h Display this help ]\n"
         "\t [ -v Output verbose information  ]\n", szName );
 }
@@ -1377,7 +1379,7 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "crvh" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "crvsh" ) ) != -1 )
         {
             switch( opt )
             {
@@ -1389,6 +1391,9 @@ int main( int argc, char** argv)
                     break;
                 case 'v':
                     g_bVerbose = true;
+                    break;
+                case 's':
+                    g_bSilent = true;
                     break;
                 case 'h':
                 default:

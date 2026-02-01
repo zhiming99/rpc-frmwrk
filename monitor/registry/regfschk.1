@@ -4,7 +4,7 @@ regfschk \- Registry Filesystem Checker
 
 .SH SYNOPSIS
 .B regfschk
-[\fIOPTIONS\fR] [\fIFILE\fR]
+[\fI-crshv\fR] [\fIFILE\fR]
 
 .SH DESCRIPTION
 .B regfschk
@@ -17,6 +17,9 @@ Claim the orphan blocks during checking.
 .TP
 \fB\-r\fR
 Rebuild and defregrement the registry in a new registry file with the suffix '.restore'
+.TP
+\fB\-s\fR
+Don't output progress information.
 .TP
 \fB\-h, \--help\fR
 Display this help message and exit.
