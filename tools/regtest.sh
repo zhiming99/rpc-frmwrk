@@ -21,10 +21,21 @@ while ! mountpoint -q $mntdir; do
 done
 echo creating files and directories test...
 tar Jxf linux-6.12.10.tar.xz -C $mntdir
-umount $mntdir
+fusermount3 -u $mntdir
+cnt=0
+while mountpoint -q $mntdir; do
+    sleep 1
+    ((cnt++))
+    if [ $cnt -gt 100 ]; then
+        echo "Failed to umount registry.dat at $mntdir"
+        exit 1
+    fi
+done
 echo checking registry
-/usr/local/bin/regfschk -s registry.dat > regout 2>&1
-grep -i Error regout 
+/usr/local/bin/regfschk -s registry.dat | tee regout
+if grep -i Error regout > /dev/null; then
+    exit 1
+fi
 
 echo deleting files and directories test...
 /usr/local/bin/regfsmnt -sd registry.dat $mntdir
@@ -39,9 +50,18 @@ while ! mountpoint -q $mntdir; do
 done
 tar Jxf linux-6.12.10.tar.xz -C $mntdir
 ls -l $mntdir/
-umount $mntdir
+fusermount3 -u $mntdir
+cnt=0
+while mountpoint -q $mntdir; do
+    sleep 1
+    ((cnt++))
+    if [ $cnt -gt 100 ]; then
+        echo "Failed to umount registry.dat at $mntdir"
+        exit 1
+    fi
+done
 echo checking registry again...
-/usr/local/bin/regfschk -s registry.dat > regout 2>&1
+/usr/local/bin/regfschk -s registry.dat | tee regout
 rm registry.dat linux-6.12.10.tar.xz
 if grep -i Error regout > /dev/null; then
     echo Error deleting files...
