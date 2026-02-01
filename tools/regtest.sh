@@ -3,6 +3,9 @@ if ! wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.10.tar.xz; the
     exit 1
 fi
 
+lib_dir=/usr/local/lib
+export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
+
 mkdir ./regtest
 mntdir=./regtest
 /usr/local/bin/regfsmnt -i registry.dat
