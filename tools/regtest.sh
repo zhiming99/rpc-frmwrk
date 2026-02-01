@@ -1,5 +1,5 @@
 #!/bin/bash
-if ! wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.10.tar.xz > /dev/null; then
+if ! wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.10.tar.xz > /dev/null 2>&1; then
     exit 1
 fi
 
