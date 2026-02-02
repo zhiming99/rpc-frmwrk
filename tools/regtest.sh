@@ -20,7 +20,7 @@ while ! mountpoint -q $mntdir; do
     fi
 done
 echo creating files and directories test...
-tar Jxf linux-6.12.10.tar.xz -C $mntdir
+tar Jxf linux-6.12.10.tar.xz -C $mntdir linux-6.12.10/Documentation
 fusermount3 -u $mntdir
 cnt=0
 while mountpoint -q $mntdir; do
@@ -48,7 +48,7 @@ while ! mountpoint -q $mntdir; do
         exit 1
     fi
 done
-tar Jxf linux-6.12.10.tar.xz -C $mntdir
+tar Jxf linux-6.12.10.tar.xz -C $mntdir linux-6.12.10/Documentation
 ls -l $mntdir/
 fusermount3 -u $mntdir
 cnt=0
