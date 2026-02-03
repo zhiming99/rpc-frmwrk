@@ -1355,6 +1355,8 @@ gint32 CBPlusNode::StealFromRight( gint32 i )
         {
             m_pDir->SetDirty(
                 pRight->GetBNodeIndex());
+            m_pDir->SetDirty(
+                pLeft->GetBNodeIndex());
         }
 
     }while( 0 );
@@ -1444,6 +1446,8 @@ gint32 CBPlusNode::StealFromLeft( gint32 i )
         }
         if( IsSafeMode() )
         {
+            m_pDir->SetDirty(
+                pRight->GetBNodeIndex());
             m_pDir->SetDirty(
                 pLeft->GetBNodeIndex());
         }
