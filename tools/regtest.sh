@@ -21,7 +21,7 @@ while ! mountpoint -q $mntdir; do
 done
 echo creating files and directories test...
 tar Jxf linux-6.12.10.tar.xz -C $mntdir linux-6.12.10/Documentation
-fusermount3 -u $mntdir
+/usr/local/bin/rpcfctl clearmount
 cnt=0
 while mountpoint -q $mntdir; do
     sleep 1
@@ -50,7 +50,7 @@ while ! mountpoint -q $mntdir; do
 done
 tar Jxf linux-6.12.10.tar.xz -C $mntdir linux-6.12.10/Documentation
 ls -l $mntdir/
-fusermount3 -u $mntdir
+/usr/local/bin/rpcfctl clearmount
 cnt=0
 while mountpoint -q $mntdir; do
     sleep 1
