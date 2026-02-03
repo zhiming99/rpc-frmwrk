@@ -9,7 +9,7 @@ export LD_LIBRARY_PATH=${lib_dir}:${lib_dir}/rpcf
 mkdir ./regtest
 mntdir=./regtest
 /usr/local/bin/regfsmnt -i registry.dat
-/usr/local/bin/regfsmnt -sd registry.dat $mntdir
+/usr/local/bin/regfsmnt -s registry.dat $mntdir > regdump1 &
 cnt=0
 while ! mountpoint -q $mntdir; do
     sleep 1
@@ -37,8 +37,10 @@ if grep -i Error regout > /dev/null; then
     exit 1
 fi
 
+cat regdump1
+
 echo deleting files and directories test...
-/usr/local/bin/regfsmnt -sd registry.dat $mntdir
+/usr/local/bin/regfsmnt -s registry.dat $mntdir > regdump1 &
 cnt=0
 while ! mountpoint -q $mntdir; do
     sleep 1
@@ -65,6 +67,7 @@ echo checking registry again...
 rm registry.dat linux-6.12.10.tar.xz
 if grep -i Error regout > /dev/null; then
     echo Error deleting files...
+    cat regdump1
     exit 1
 fi
 exit 0
