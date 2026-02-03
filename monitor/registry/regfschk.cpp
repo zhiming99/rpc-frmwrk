@@ -730,8 +730,9 @@ gint32 CheckLeaf(
                 pks->oLeaf.dwInodeIdx );
             if( ret != ERROR_FALSE )
                OutputMsg2( ret, "Error the "
-               "file inode is not allocated a valid block@%d of "
-               "directory %s", i,
+               "file inode %d is not allocated a "
+               "valid block@%d of directory %s",
+               pks->oLeaf.dwInodeIdx, i,
                ( strPath + "/" + pks->szKey ).c_str() );
         }
 
