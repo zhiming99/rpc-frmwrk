@@ -2025,7 +2025,7 @@ gint32 CBlockAllocator::CommitCache()
             if( IsStopped() )
             {
                 OutputMsg(m_mapDirtyBlks.size(),
-                    "Info successfully committed %d"
+                    "Info successfully committed %d "
                     "blocks ", m_dwDirtyBlkCount );
             }
             m_mapDirtyBlks.clear();

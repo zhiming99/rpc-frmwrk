@@ -23,7 +23,7 @@ echo creating files and directories test...
 tar Jxf linux-6.12.10.tar.xz -C $mntdir linux-6.12.10/Documentation
 /usr/local/bin/rpcfctl clearmount
 cnt=0
-while mountpoint -q $mntdir; do
+while pidof regfsmnt; do
     sleep 1
     ((cnt++))
     if [ $cnt -gt 100 ]; then
@@ -54,7 +54,7 @@ tar Jxf linux-6.12.10.tar.xz -C $mntdir linux-6.12.10/Documentation
 ls -l $mntdir/
 /usr/local/bin/rpcfctl clearmount
 cnt=0
-while mountpoint -q $mntdir; do
+while pidof regfsmnt; do
     sleep 1
     ((cnt++))
     if [ $cnt -gt 100 ]; then
