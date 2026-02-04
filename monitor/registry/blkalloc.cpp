@@ -1531,6 +1531,7 @@ gint32 CBlockAllocator::CacheBlocks(
 {
     gint32 ret = 0;
     do{
+        guint32 dwBytesWritten = 0;
         CStdRMutex oLock( this->GetLock() );
         if( m_mapDirtyBlks.empty() )
         {
@@ -1552,6 +1553,8 @@ gint32 CBlockAllocator::CacheBlocks(
             if( ERROR( ret ) )
                 break;
             m_mapDirtyBlks[ *pBlocks ] = pBufCopy;
+            dwBytesWritten += 512;
+            ret = dwBytesWritten;
             continue;
         }
         else if( *pBlocks == ( guint32 )-4 )
@@ -1562,6 +1565,8 @@ gint32 CBlockAllocator::CacheBlocks(
             if( ERROR( ret ) )
                 break;
             m_mapDirtyBlks[ *pBlocks ] = pBufCopy;
+            dwBytesWritten += 512;
+            ret = dwBytesWritten;
             continue;
         }
 
@@ -1592,7 +1597,6 @@ gint32 CBlockAllocator::CacheBlocks(
             vecBlks, this->m_mapDirtyBlks );
         INTERVALS oNewBlks = SubtractIntervals(
             vecBlks, oCommonBlks );
-        guint32 dwBytesWritten = 0;
         for( auto& elem : oCommonBlks )
         {
             if( elem.first == INVALID_BLOCK_IDX )
@@ -2018,6 +2022,12 @@ gint32 CBlockAllocator::CommitCache()
 #endif
         if( SUCCEEDED( ret ) )
         {
+            if( IsStopped() )
+            {
+                OutputMsg(m_mapDirtyBlks.size(),
+                    "Info successfully committed %d"
+                    "blocks ", m_dwDirtyBlkCount );
+            }
             m_mapDirtyBlks.clear();
             m_dwDirtyBlkCount = 0;
             m_dwCacheAge = 0;
