@@ -50,6 +50,7 @@ static bool g_bVerbose = false;
 static bool g_bSilent = false;
 static bool g_bRebuild = false;
 static bool g_bClaimOrphans = false;
+static bool g_bErrorFound = false;
 
 #ifdef RELEASE
 #define OutputMsg2( ret, strFmt, ... ) \
@@ -702,18 +703,24 @@ gint32 CheckLeaf(
         if( dwCount == 0 && pLeaf->IsRoot() )
             break;
         if( dwCount < dwLimit )
+        {
             OutputMsg2( dwCount,
                 "Warning BNode keys is less than "
                 "lower limit of %d, rebalancing "
                 "needed for %s", dwLimit,
                 strPath.c_str() );
+            g_bErrorFound = true;
+        }
         if( dwCount > MAX_KEYS_PER_NODE )
+        {
             OutputMsg2( dwCount,
                 "Error BNode keys is has exceeded "
                 "upper limit of %d, split "
                 "needed for %s",
                 MAX_KEYS_PER_NODE,
                 strPath.c_str() );
+            g_bErrorFound = true;
+        }
 
         AllocPtr pAlloc = pDir->GetAlloc();
         for( int i = 0; i < dwCount; i++ )
@@ -725,15 +732,19 @@ gint32 CheckLeaf(
                     "is not a valid UTF8 string @%d of "
                     "directory %s", i,
                     strPath.c_str() );
+                g_bErrorFound = true;
             }
             ret = pAlloc->IsBlockFree(
                 pks->oLeaf.dwInodeIdx );
             if( ret != ERROR_FALSE )
+            {
                OutputMsg2( ret, "Error the "
                "file inode %d is not allocated a "
                "valid block@%d of directory %s",
                pks->oLeaf.dwInodeIdx, i,
                ( strPath + "/" + pks->szKey ).c_str() );
+               g_bErrorFound = true;
+            }
         }
 
     }while( 0 );
@@ -752,18 +763,24 @@ gint32 CheckNonLeaf(
         guint32 dwCount = pNode->GetKeyCount();
         guint32 dwLimit = MIN_KEYS( pNode->IsRoot() );
         if( dwCount < dwLimit )
+        {
             OutputMsg2( dwCount,
                 "Warning BNode keys is less than "
                 "lower limit of %d, rebalancing "
                 "needed for %s", dwLimit,
                 strPath.c_str() );
+            g_bErrorFound = true;
+        }
         if( dwCount > MAX_KEYS_PER_NODE )
+        {
             OutputMsg2( dwCount,
                 "Error BNode keys is has exceeded "
                 "upper limit of %d, split "
                 "needed for %s",
                 MAX_KEYS_PER_NODE,
                 strPath.c_str() );
+            g_bErrorFound = true;
+        }
 
         // OutputMsg2( dwCount,
         //     "Info BNode %d contains %d keys "
@@ -782,6 +799,7 @@ gint32 CheckNonLeaf(
                     "is not a valid UTF8 string @%d of "
                     "directory %s", i,
                     strPath.c_str() );
+                g_bErrorFound = true;
             }
             auto pChild = pNode->GetChild2( i );
             if( pChild )
@@ -794,6 +812,7 @@ gint32 CheckNonLeaf(
                     OutputMsg2( -EFAULT, "Error the child node"
                         "@%d is not available in directory %s",
                         i, strPath.c_str() );
+                    g_bErrorFound = true;
                     continue;
                 }
                 auto pSuccKey = pSucc->GetSuccKey( 0 );
@@ -1112,6 +1131,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             OutputMsg2( ret,
                 "Error unable to open "
                 "root directory" );
+            g_bErrorFound = true;
             break;
         }
 
@@ -1127,7 +1147,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             pRootDir, hRoot,
             vecBadFiles, vecGoodFiles,
             setBlocks );
-        if( vecBadFiles.empty() )
+        if( vecBadFiles.empty() && !g_bErrorFound )
         {
             OutputMsg2( ret,
                 "Nothing bad found" );

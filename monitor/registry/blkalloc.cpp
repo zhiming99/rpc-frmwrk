@@ -544,9 +544,10 @@ gint32 CBlockBitmap::AllocBlocks(
         }
     }while( 0 );
 
-    dwNumBlocks = dwBlocks;
+    if( m_wFreeCount < dwBlocks )
+        return ERROR_FAIL;
     m_wFreeCount -= dwBlocks;
-    if( dwNumBlocks && IsSafeMode() )
+    if( dwBlocks && IsSafeMode() )
     {
         guint16* p = ( guint16* )
             ( m_arrBytes + BLKBMP_BLKNUM * BLOCK_SIZE );
@@ -562,14 +563,9 @@ gint32 CBlockBitmap::AllocBlocks(
         }
     }
     if( bFull )
-    {
         return STATUS_SUCCESS;
-    }
-    else if( dwBlocks < dwNumBlocks )
-    {
-        return STATUS_MORE_PROCESS_NEEDED;
-    }
-    return -ENOMEM;
+    dwNumBlocks = dwBlocks;
+    return STATUS_MORE_PROCESS_NEEDED;
 }
 
 gint32 CBlockBitmap::FreeBlock(

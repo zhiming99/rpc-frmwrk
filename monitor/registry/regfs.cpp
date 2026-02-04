@@ -204,20 +204,6 @@ gint32 CRegistryFs::Stop()
 {
     gint32 ret = 0;
     do{
-        if( IsSafeMode() )
-        {
-            // Stop the worker thread
-            m_threadRunning.store(false);
-            if (m_workerThread.joinable())
-                m_workerThread.join();
-
-            CStdRMutex oLock( m_pAlloc->GetLock() );
-            m_pAlloc->SetStopped();
-            ret = m_pAlloc->CheckAndCommit();
-            if( ret == -EAGAIN )
-                continue;
-        }
-
         WRITE_LOCK( this );
         if( m_mapOpenFiles.size() )
             DebugPrint( m_mapOpenFiles.size(),
@@ -234,6 +220,22 @@ gint32 CRegistryFs::Stop()
         if( ERROR( ret ) )
             break;
         SetState( stateStopped );
+        UNLOCK( this );
+
+        if( IsSafeMode() )
+        {
+            // Stop the worker thread
+            m_threadRunning.store(false);
+            if (m_workerThread.joinable())
+                m_workerThread.join();
+
+            CStdRMutex oLock( m_pAlloc->GetLock() );
+            m_pAlloc->SetStopped();
+            ret = m_pAlloc->CheckAndCommit();
+            if( ret == -EAGAIN )
+                continue;
+        }
+
         break;
     }while( 1 );
     return ret;
