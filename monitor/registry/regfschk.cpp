@@ -47,12 +47,20 @@ static guint64 g_qwSize = 0;
 static RegFsPtr g_pRegfs;
 static stdstr g_strRegFsFile;
 static bool g_bVerbose = false;
+static bool g_bSilent = false;
+static bool g_bRebuild = false;
+static bool g_bClaimOrphans = false;
+static bool g_bErrorFound = false;
 
+#ifdef RELEASE
 #define OutputMsg2( ret, strFmt, ... ) \
 do{ \
     printf( strFmt, ##__VA_ARGS__ ); \
     printf( "(%d)\n", ret ); \
 }while( 0 )
+#else
+#define OutputMsg2 OutputMsg
+#endif
 
 
 gint32 InitContext()
@@ -88,36 +96,6 @@ gint32 DestroyContext()
     return STATUS_SUCCESS;
 }
 
-gint32 ScanBlocks( RegFsPtr& pFs )
-{
-    return 0;
-}
-
-gint32 GetPathFromImg( FImgSPtr& pFile,
-    stdstr& strPath )
-{
-    if( pFile.IsEmpty() )
-        return -EINVAL;
-    gint32 ret = 0;
-    CFileImage* pNode = pFile;
-    do{
-        stdstr strName = pNode->GetName();
-        if( strName == "/" )
-        {
-            strPath = strName + strPath;
-            break;
-        }
-        else if( strPath.size() )
-            strPath = strName + "/" + strPath;
-        else
-            strPath = strName;
-        pNode = pNode->GetParentDir();
-        if( pNode == nullptr )
-            break;
-    }while( 1 );
-    return ret;
-}
-
 typedef enum {
     errOpen = 1,
     errSize,
@@ -150,9 +128,35 @@ static stdstr GetErrorString( EnumErrType iErr )
     return stdstr( "none" );
 }
 
+std::unordered_map< stdstr, guint32> g_mapPath2Id;
+std::unordered_map< guint32, stdstr > g_mapId2Path;
+guint32 g_dwFileCount = 0;
+gint32 GetFileId( const stdstr& strPath )
+{
+    auto itr = g_mapPath2Id.find( strPath );
+    if( itr == g_mapPath2Id.end() )
+        return -1;
+    return itr->second;
+}
+
+stdstr GetFilePath( guint32 dwId )
+{
+    auto itr = g_mapId2Path.find( dwId );
+    if( itr == g_mapId2Path.end() )
+        return "";
+    return itr->second;
+}
+
+void AddPath( const stdstr& strPath )
+{
+    g_mapPath2Id.emplace( strPath, g_dwFileCount );
+    g_mapId2Path.emplace( g_dwFileCount, strPath );
+    g_dwFileCount++;
+}
+
 gint32 CheckInode( RegFsPtr& pFs,
     FImgSPtr pFile,
-    std::unordered_set< guint32 >& setBlocks )
+    std::unordered_map< guint32, guint32 >& setBlocks )
 {
     gint32 ret = 0;
     if( pFs.IsEmpty() || pFile.IsEmpty() )
@@ -160,17 +164,19 @@ gint32 CheckInode( RegFsPtr& pFs,
 
     stdstr strPath;
     GetPathFromImg( pFile, strPath );
+    AddPath( strPath );
 
+    guint32 dwFileId = GetFileId( strPath );
     RegFSInode& oInode = pFile->m_oInodeStore;
     gint32 iSize = pFile->GetSize();
-    if( BEYOND_MAX_LIMIT( iSize ) )
+    if( iSize > MAX_FILE_SIZE )
     {
         OutputMsg2( iSize, "Error file size is invalid %s",
             strPath.c_str() );
         return errSize;
     }
 
-    if( g_bVerbose )
+    if( g_bVerbose && !g_bSilent )
         OutputMsg2( iSize,
             "Checking inode %s", strPath.c_str() );
 
@@ -194,8 +200,8 @@ gint32 CheckInode( RegFsPtr& pFs,
 
     iSize = pFile->GetSize();
 
-    std::vector< guint32 > fileBlocks;
-    std::vector< guint32 > metaBlocks;
+    std::vector< std::pair< guint32, guint32 >> fileBlocks;
+    std::vector< std::pair<guint32, guint32 >> metaBlocks;
 
     guint32 dwBlkCount = ( (
         iSize + BLOCK_SIZE - 1 ) >> BLOCK_SHIFT );
@@ -212,12 +218,17 @@ gint32 CheckInode( RegFsPtr& pFs,
                 auto itr = setBlocks.find( dwIdx );
                 if( itr != setBlocks.end() )
                 {
-                    OutputMsg2( i, "Error block allocated "
-                        "more than once %s",
-                        strPath.c_str() );
+                    stdstr strOrig = GetFilePath(
+                        itr->second );
+
+                    OutputMsg2( i, "Error block %d "
+                        "allocated to both %s and %s",
+                        dwIdx,
+                        strPath.c_str(),
+                        strOrig.c_str() );
                     return errBlkTbl;
                 }
-                fileBlocks.push_back( dwIdx );
+                fileBlocks.emplace_back( dwIdx, dwFileId );
             }
             else if( WITHIN_INDIRECT_BLOCK( dwOff ) )
             {
@@ -241,7 +252,8 @@ gint32 CheckInode( RegFsPtr& pFs,
                             strPath.c_str() );
                         return errBlkTbl;
                     }
-                    metaBlocks.push_back( dwIdx );
+                    metaBlocks.emplace_back(
+                        dwIdx, dwFileId );
                     bAddInd = true;
                 }
 
@@ -266,7 +278,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                         strPath.c_str() );
                     return errBlkTbl;
                 }
-                fileBlocks.push_back( dwBlkIdx );
+                fileBlocks.emplace_back( dwBlkIdx, dwFileId );
             }
             else if( WITHIN_SEC_INDIRECT_BLOCK( dwOff ) )
             {
@@ -290,11 +302,12 @@ gint32 CheckInode( RegFsPtr& pFs,
                             strPath.c_str() );
                         return errBlkTbl;
                     }
-                    metaBlocks.push_back( dwIdx );
+                    metaBlocks.emplace_back(
+                        dwIdx, dwFileId );
                     guint32 dwMaxBd = BLKIDX_PER_TABLE;
                     guint32* pBitd = ( guint32* )
                         pFile->m_pBitdBlk->ptr();
-                    std::vector< guint32 > vecBitBlks;
+                    decltype( metaBlocks ) vecBitBlks;
                     for( int j = 0; j < dwMaxBd; j++ ) 
                     {
                         guint32 dwBitBlkIdx =
@@ -309,7 +322,8 @@ gint32 CheckInode( RegFsPtr& pFs,
                                 strPath.c_str() );
                             return errBlkTbl;
                         }
-                        vecBitBlks.push_back( dwBitBlkIdx );
+                        vecBitBlks.emplace_back(
+                            dwBitBlkIdx, dwFileId );
                     }
                     metaBlocks.insert( metaBlocks.end(),
                         vecBitBlks.begin(), vecBitBlks.end() );
@@ -356,7 +370,7 @@ gint32 CheckInode( RegFsPtr& pFs,
                         strPath.c_str(), i );
                     return errBlkTbl;
                 }
-                fileBlocks.push_back( dwPayloadBlk );
+                fileBlocks.emplace_back( dwPayloadBlk, dwFileId );
             }
         }
         if( fileBlocks.size() * BLOCK_SIZE - iSize > BLOCK_SIZE )
@@ -374,10 +388,10 @@ gint32 CheckInode( RegFsPtr& pFs,
             setBlocks.insert( fileBlocks.begin(),
                 fileBlocks.end() );
     }
-    setBlocks.insert(
-        pFile->GetInodeIdx() );
+    setBlocks.emplace(
+        pFile->GetInodeIdx(), dwFileId );
 
-    if( g_bVerbose )
+    if( g_bVerbose && !g_bSilent )
     {
         OutputMsg2( fileBlocks.size(),
             "%s File Blocks", strPath.c_str() );
@@ -398,82 +412,58 @@ guint32 CountBits( T n ) {
     return count;
 }
 
+gint32 CollectBlockGroups( CGroupBitmap* pgbmp,
+    std::vector< guint32 >& vecGrps )
+{
+    if( pgbmp == nullptr )
+        return -EINVAL;
+
+    guint32 dwOffset =
+        GRPBMP_SIZE - sizeof( guint16 );
+    for( guint32 i = 0; i < dwOffset; i++ )
+    {
+        gint32 ret =
+            pgbmp->IsBlockGroupFree( i );
+        if( SUCCEEDED( ret ) )
+            continue;
+        vecGrps.push_back( i );
+    }
+    return 0;
+}
+
 gint32 CheckGroupBitmap( RegFsPtr& pFs,
-    std::unordered_set< guint32 >& setBlocks )
+    std::unordered_map< guint32, guint32 >& setBlocks )
 {
     AllocPtr pAlloc = pFs->GetAllocator();
     if( pAlloc.IsEmpty() )
         return -EINVAL;
     CGroupBitmap* pgbmp = pAlloc->GetGroupBitmap();
-    if( pgbmp == nullptr )
-        return -EFAULT;
     gint32 ret = 0;
     do{
         OutputMsg2( 0, "Checking group bitmap..." );
         guint32 dwFree = pgbmp->GetFreeCount();
-        guint32 dwOffset =
-            GRPBMP_SIZE - sizeof( guint16 );
-        auto p =
-            ( pgbmp->m_arrBytes + dwOffset ) - 1;
-        auto a = *p;
-        auto pend = pgbmp->m_arrBytes;
 
-        while( a == 0 )
-        {
-            --p;
-            if( p < pend )
-                break;
-            a = *p;
-        }
-        if( a == 0 )
-        {
-            OutputMsg2( 0,
-                "Error group bitmap is empty, "
-                "which should at least have "
-                "one block group allocated" );
-            ret = -ENODATA;
-            break;
-        }
-
-        guint32 dwLast = a;
-        gint32 iStep = sizeof( guint32 ) * BYTE_BITS;
-        gint32 iMaxAlloced =
-            iStep * ( p - pend ) +
-            ffs( dwLast );
+        std::vector< guint32 > vecGrps;
+        CollectBlockGroups( pgbmp, vecGrps );
+        guint32 dwMaxAlloced = vecGrps.back() + 1;
 
         struct stat stBuf;
         gint32 iFd = pAlloc->GetFd();
         fstat( iFd, &stBuf );
-        if( stBuf.st_size - iMaxAlloced * GROUP_SIZE >
+        if( stBuf.st_size - dwMaxAlloced * GROUP_SIZE >
             ( SUPER_BLOCK_SIZE + GRPBMP_SIZE ) )
         {
-            guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
+            guint64 qwGrps = dwMaxAlloced * GROUP_SIZE;
             OutputMsg2( 0,
                 "Warning registry occupied more "
                 "space than needed, allocated bytes "
                 "%lld, reg size %lld, ",
                 qwGrps, stBuf.st_size );
-            
-            OutputMsg2( 0, 
-                "Shrink the registry? (y/n)" );
-            stdstr strInput;
-            std::cin >> strInput;
-            if( strInput == "y" || strInput == "Y" )
-            {
-                guint64 qwTail = qwGrps +
-                    SUPER_BLOCK_SIZE + GRPBMP_SIZE;
-                lseek( iFd, qwTail, SEEK_SET );
-                ret = ftruncate( iFd, qwTail );
-                if( SUCCEEDED( ret ) )
-                    OutputMsg2( 0,
-                        "registry is shrinked successfully" );
-            }
-
         }
-        else if( iMaxAlloced * GROUP_SIZE - stBuf.st_size >
+        else if( dwMaxAlloced * GROUP_SIZE - stBuf.st_size >
             GROUP_SIZE - SUPER_BLOCK_SIZE - GRPBMP_SIZE )
         {
-            guint64 qwGrps = iMaxAlloced * GROUP_SIZE;
+            guint64 qwGrps = dwMaxAlloced * GROUP_SIZE;
             OutputMsg2( 0,
                 "Warning registry size is too "
                 "small to hold all the block "
@@ -484,6 +474,13 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
         // count the allocated groups
         guint32 dwAlloced =
             pgbmp->GetAllocCount();
+        if( dwAlloced != vecGrps.size() )
+        {
+            OutputMsg2( 0,
+                "Warning counter of allocated groups ( %d ) does not "
+                "agree with the number of allocated groups found (%d )",
+                dwAlloced, vecGrps.size() );
+        }
 
         auto pdw = ( guint32* )pgbmp->m_arrBytes;
         auto pdwend = pdw +
@@ -499,6 +496,9 @@ gint32 CheckGroupBitmap( RegFsPtr& pFs,
                 "Error the actual number of allocated "
                 "groups is not aggree with the "
                 "group bitmap's counter" );
+        else
+            OutputMsg2( 0,
+                "groups allocated: %d", dwCount );
         OutputMsg2( 0, "Done Checking group bitmap" );
 
     }while( 0 );
@@ -676,13 +676,198 @@ gint32 RebuildFs( RegFsPtr& pOldFs,
     return ret;
 }
 
+#include <codecvt>
+#include <locale>
+
+bool IsValidUTF8(const std::string& str) {
+    try {
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+        std::wstring widestr = conv.from_bytes(str);
+        return true;
+    } catch (const std::range_error&) {
+        return false;
+    }
+}
+
+gint32 CheckLeaf(
+    CDirImage* pDir, BNodeUPtr pLeaf )
+{
+    gint32 ret = 0;
+    if( pDir == nullptr || !pLeaf )
+        return -EINVAL;
+    do{
+        stdstr strPath;
+        GetPathFromImg( pDir, strPath );
+        guint32 dwCount = pLeaf->GetKeyCount();
+        guint32 dwLimit = MIN_KEYS( pLeaf->IsRoot() );
+        if( dwCount == 0 && pLeaf->IsRoot() )
+            break;
+        if( dwCount < dwLimit )
+        {
+            OutputMsg2( dwCount,
+                "Warning BNode keys is less than "
+                "lower limit of %d, rebalancing "
+                "needed for %s", dwLimit,
+                strPath.c_str() );
+            g_bErrorFound = true;
+        }
+        if( dwCount > MAX_KEYS_PER_NODE )
+        {
+            OutputMsg2( dwCount,
+                "Error BNode keys is has exceeded "
+                "upper limit of %d, split "
+                "needed for %s",
+                MAX_KEYS_PER_NODE,
+                strPath.c_str() );
+            g_bErrorFound = true;
+        }
+
+        AllocPtr pAlloc = pDir->GetAlloc();
+        for( int i = 0; i < dwCount; i++ )
+        {
+            auto pks = pLeaf->GetSlot( i );
+            if( !IsValidUTF8( pks->szKey ) )
+            {
+                OutputMsg2( -EINVAL, "Error file entry "
+                    "is not a valid UTF8 string @%d of "
+                    "directory %s", i,
+                    strPath.c_str() );
+                g_bErrorFound = true;
+            }
+            ret = pAlloc->IsBlockFree(
+                pks->oLeaf.dwInodeIdx );
+            if( ret != ERROR_FALSE )
+            {
+               OutputMsg2( ret, "Error the "
+               "file inode %d is not allocated a "
+               "valid block@%d of directory %s",
+               pks->oLeaf.dwInodeIdx, i,
+               ( strPath + "/" + pks->szKey ).c_str() );
+               g_bErrorFound = true;
+            }
+        }
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CheckNonLeaf(
+    CDirImage* pDir, BNodeUPtr pNode )
+{
+    gint32 ret = 0;
+    if( pDir == nullptr || !pNode )
+        return -EINVAL;
+    do{
+        stdstr strPath;
+        GetPathFromImg( pDir, strPath );
+        guint32 dwCount = pNode->GetKeyCount();
+        guint32 dwLimit = MIN_KEYS( pNode->IsRoot() );
+        if( dwCount < dwLimit )
+        {
+            OutputMsg2( dwCount,
+                "Warning BNode keys is less than "
+                "lower limit of %d, rebalancing "
+                "needed for %s", dwLimit,
+                strPath.c_str() );
+            g_bErrorFound = true;
+        }
+        if( dwCount > MAX_KEYS_PER_NODE )
+        {
+            OutputMsg2( dwCount,
+                "Error BNode keys is has exceeded "
+                "upper limit of %d, split "
+                "needed for %s",
+                MAX_KEYS_PER_NODE,
+                strPath.c_str() );
+            g_bErrorFound = true;
+        }
+
+        // OutputMsg2( dwCount,
+        //     "Info BNode %d contains %d keys "
+        //     "in directory %s",
+        //     pNode->GetBNodeIndex(),
+        //     dwCount, strPath.c_str() );
+        AllocPtr pAlloc = pDir->GetAlloc();
+        bool bDirty = false;
+        for( int i = 0; i < dwCount + 1; i++ )
+        {
+            auto pks = pNode->GetSlot( i );
+            if( pks->szKey[0] != 0 &&
+                !IsValidUTF8( pks->szKey ) )
+            {
+                OutputMsg2( -EINVAL, "Error file entry "
+                    "is not a valid UTF8 string @%d of "
+                    "directory %s", i,
+                    strPath.c_str() );
+                g_bErrorFound = true;
+            }
+            auto pChild = pNode->GetChild2( i );
+            if( pChild )
+                CheckNonLeaf( pDir, pChild );
+            if( i < dwCount && !pNode->IsLeaf() )
+            {
+                auto pSucc = pNode->GetChild2( i + 1 );
+                if( !pSucc )
+                {
+                    OutputMsg2( -EFAULT, "Error the child node"
+                        "@%d is not available in directory %s",
+                        i, strPath.c_str() );
+                    g_bErrorFound = true;
+                    continue;
+                }
+                auto pSuccKey = pSucc->GetSuccKey( 0 );
+                if( pSuccKey &&
+                    strcmp( pSuccKey, pks->szKey ) != 0 )
+                {
+                    OutputMsg2( -EINVAL, "Warning the key "
+                        "of non-leaf node@%d is an orphan key, "
+                        "without a file object associated, "
+                        "in directory %s, replaced with %s",
+                        i, strPath.c_str(), pSuccKey );
+                    COPY_KEY( pks->szKey, pSuccKey );
+                    bDirty = true;
+                }
+            }
+        }
+        if( bDirty )
+            pNode->Flush( FLAG_FLUSH_SINGLE_BNODE );
+
+    }while( 0 );
+    return ret;
+}
+
+gint32 CheckBNode( FImgSPtr ptrDir )
+{
+    gint32 ret = 0;
+    do{
+        CDirImage* pDir = ptrDir;
+        if( pDir == nullptr )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        BNodeUPtr pNode =
+            pDir->GetRootNode2();
+
+        if( pNode )
+        {
+            if( pNode->IsLeaf() )
+                CheckLeaf( pDir, pNode );
+            else
+                CheckNonLeaf( pDir, pNode );
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 using ELEM_BADFILE=std::tuple< stdstr, guint32, gint32 >;
 
 gint32 FindBadFilesDir( RegFsPtr& pFs,
     FImgSPtr ptrDir, RFHANDLE hDir,
     std::vector< ELEM_BADFILE >& vecBadFiles,
     std::vector< ELEM_GOODFILE  >& vecGoodFiles,
-    std::unordered_set< guint32 >& setBlocks )
+    std::unordered_map< guint32, guint32 >& setBlocks )
 {
     gint32 ret = 0;
     if( ptrDir.IsEmpty() )
@@ -717,13 +902,15 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             break;
         }
 
+        CheckBNode( ptrDir );
+
         stdstr strIndent;
         strIndent.insert( 0, vecNames.size() * 4, ' ' );
         for( auto& ks : vecDirEnt )
         {
             if( ks.oLeaf.byFileType != ftDirectory )
                 continue;
-            if( g_bVerbose )
+            if( g_bVerbose && !g_bSilent )
                 OutputMsg2( 0, "%s%s",
                     strIndent.c_str(), ks.szKey );
             if( strnlen( ks.szKey, REGFS_NAME_LENGTH ) == 0 )
@@ -784,10 +971,23 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                 setBlocks );
         }
 
+        if( !g_bVerbose && !g_bSilent )
+        {
+            std::cout<<  "\033[2KChecking "
+                << strPath << "\r"
+                << std::flush;
+        }
+
         for( auto& ks : vecDirEnt )
         {
             if( ks.oLeaf.byFileType == ftDirectory )
                 continue;
+            if( !g_bVerbose && !g_bSilent )
+            {
+                std::cout<<  "\033[2KChecking "
+                    << strPath << "/" << ks.szKey << "\r"
+                    << std::flush;
+            }
             if( strnlen( ks.szKey, REGFS_NAME_LENGTH ) == 0 )
             {
                 stdstr strName = strPath + "/unkfile_";
@@ -838,7 +1038,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
                     errInode, ks.oLeaf.byFileType} );
                 continue;
             }
-            if( stBuf.st_size >= MAX_FILE_SIZE )
+            if( stBuf.st_size > MAX_FILE_SIZE )
             {
                 vecBadFiles.push_back( { strFile,
                     errSize, ks.oLeaf.byFileType} );
@@ -854,7 +1054,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
             }
 
 
-            if( g_bVerbose )
+            if( g_bVerbose && !g_bSilent )
                 OutputMsg2( stBuf.st_size, "%s%s",
                     strIndent.c_str(), ks.szKey );
             vecGoodLocal.push_back( { strFile,
@@ -907,7 +1107,8 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
     if( bCorrupted )
     {
         OutputMsg2( 0, "Corrupted dir %s", strPath.c_str() );
-        pDir->PrintBNode();
+        if( g_bVerbose && !g_bSilent )
+            pDir->PrintBNode();
     }
     return ret;
 }
@@ -915,7 +1116,7 @@ gint32 FindBadFilesDir( RegFsPtr& pFs,
 gint32 FindBadFiles( RegFsPtr& pFs,
     std::vector< ELEM_BADFILE >& vecBadFiles,
     std::vector< ELEM_GOODFILE  >& vecGoodFiles,
-    std::unordered_set< guint32 >& setBlocks )
+    std::unordered_map< guint32, guint32 >& setBlocks )
 {
     gint32 ret = 0;
     if( pFs.IsEmpty() ) 
@@ -930,8 +1131,12 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             OutputMsg2( ret,
                 "Error unable to open "
                 "root directory" );
+            g_bErrorFound = true;
             break;
         }
+
+        AddPath( "/" );
+
         CFileHandle orh( pFs, hRoot );
         FImgSPtr pRootDir;
         ret = pFs->GetDirImage(
@@ -942,7 +1147,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
             pRootDir, hRoot,
             vecBadFiles, vecGoodFiles,
             setBlocks );
-        if( vecBadFiles.empty() )
+        if( vecBadFiles.empty() && !g_bErrorFound )
         {
             OutputMsg2( ret,
                 "Nothing bad found" );
@@ -976,7 +1181,7 @@ gint32 FindBadFiles( RegFsPtr& pFs,
 
         OutputMsg2( 0,
             "Healthy files: %d", vecGoodFiles.size() );
-        if( g_bVerbose )
+        if( g_bVerbose && !g_bSilent )
         {
             for( auto& elem : vecGoodFiles )
             {
@@ -1015,17 +1220,111 @@ gint32 RemoveBadDir( RegFsPtr& pFs,
     return 0;    
 }
 
-gint32 ClaimOrphanBlocks( RegFsPtr& pFs )
+gint32 ClaimOrphanBlocks( RegFsPtr& pFs,
+    const std::unordered_map< guint32, guint32 >& setBlocks )
 {
-    return 0;
+    gint32 ret = 0;
+    do{
+        AllocPtr pAlloc = pFs->GetAllocator();
+        auto& mapBlkGrps = pAlloc->GetBlkGrps();    
+        guint32 dwCount = 0;
+        std::vector< guint32 > vecFreeGrps;
+        std::vector< std::pair< guint32, guint32 > > vecBlks;
+        for( auto& elem : mapBlkGrps )
+        {
+            CBlockGroup* pbg = elem.second.get();
+            CBlockBitmap* pbit = pbg->GetBlkBmp();
+            guint32 dwGrpIdx = pbit->GetGroupIndex();
+            for( guint32 i = BLKBMP_BLKNUM;
+                i < BLOCKS_PER_GROUP; i++ )
+            {
+                ret = pbit->IsBlockFree( i );
+                if( SUCCEEDED( ret ) )
+                    continue;
+                guint32 dwBlkIdx = i |
+                    dwGrpIdx << GROUP_INDEX_SHIFT;
+                if( setBlocks.find( dwBlkIdx ) ==
+                    setBlocks.end() )
+                {
+                    if( g_bClaimOrphans )
+                        pbit->FreeBlock( i );
+                    vecBlks.push_back( { dwBlkIdx,
+                        BLOCK_ABS( dwBlkIdx ) } );
+                    dwCount++;
+                    continue;
+                }
+            }
+            if( pbit->IsEmpty() )
+                vecFreeGrps.push_back( dwGrpIdx );
+        }
+        if( g_bClaimOrphans )
+            OutputMsg2( 0,
+                "Orphan blocks claimed: %d", dwCount );
+        else
+            OutputMsg2( 0,
+                "Orphan blocks: %d", dwCount );
+
+        for( guint32 i = 0; i < dwCount; i+=4 )
+        {
+            OutputMsg2( 0, "{ %d, %d }, { %d, %d }, { %d, %d }, { %d, %d }",
+                vecBlks[ i ].first, vecBlks[ i ].second, 
+                i + 1 >= dwCount ? 0 : vecBlks[ i + 1 ].first,
+                i + 1 >= dwCount ? 0 : vecBlks[ i + 1 ].second, 
+                i + 2 >= dwCount ? 0 : vecBlks[ i + 2 ].first,
+                i + 2 >= dwCount ? 0 : vecBlks[ i + 2 ].second, 
+                i + 3 >= dwCount ? 0 : vecBlks[ i + 3 ].first,
+                i + 3 >= dwCount ? 0 : vecBlks[ i + 3 ].second );
+            if( i >= 20 )
+            {
+                OutputMsg2( 0, "..." );
+                break;
+            }
+        }
+        
+        CGroupBitmap* pgbmp = pAlloc->GetGroupBitmap();
+        for( auto elem : vecFreeGrps )
+        {
+            pgbmp->FreeGroup( elem );
+            mapBlkGrps.erase( elem );
+        }
+
+        OutputMsg2( 0,
+            "Freed empty block groups: %d",
+            vecFreeGrps.size() );
+
+        std::vector< guint32 > vecGrps;
+        CollectBlockGroups( pgbmp, vecGrps );
+        if( vecGrps.empty() )
+            break;
+        guint32 dwMaxAlloced = vecGrps.back() + 1;
+        guint64 qwTail = dwMaxAlloced * GROUP_SIZE +
+            SUPER_BLOCK_SIZE + GRPBMP_SIZE;
+        gint32 iFd = pAlloc->GetFd();
+        struct stat stBuf;
+        fstat( iFd, &stBuf );
+
+        if( stBuf.st_size > qwTail )
+        {
+            ftruncate( iFd , qwTail );
+            OutputMsg2( 0,
+                "Shrinked the registry size from %lld to %lld bytes",
+                stBuf.st_size, qwTail );
+        }
+    }while( 0 );
+    return ret;
 }
 
 static void Usage( const char* szName )
 {
     fprintf( stderr,
-        "Usage: %s [OPTIONS] <regfs path> [<mount point>]\n"
+        "Usage: %s [-chrsv] <regfs path>\n"
         "\t [ <regfs path> the path to the file containing regfs  ]\n"
-        "\t [ -h this help ]\n", szName );
+        "\t [ -c Claim the orphan blocks during checking ]\n"
+        "\t [ -r Rebuild and defregrement the registry in a new registry "
+            "file with the suffix '.restore' ]\n"
+        "\t [ -s Don't output progress information ]\n"
+        "\t [ -h Display this help ]\n"
+        "\t [ -v Output verbose information  ]\n", szName );
 }
 
 int _main()
@@ -1057,27 +1356,29 @@ int _main()
             break;
         std::vector< ELEM_BADFILE > vecBadFiles;
         std::vector< ELEM_GOODFILE > vecGoodFiles;
-        std::unordered_set< guint32 > setBlocks;
+        std::unordered_map< guint32, guint32 > setBlocks;
 
         FindBadFiles( g_pRegfs,
             vecBadFiles, vecGoodFiles, setBlocks );
         OutputMsg2( 0, "Summary:" );
-        OutputMsg2( 0, "Corrupted Files: %d",
+        OutputMsg2( 0, "Corrupted Files and Directories: %d",
             vecBadFiles.size() );
-        OutputMsg2( 0, "Healthy Files: %d",
+        OutputMsg2( 0, "Healthy Files and Directories: %d",
             vecGoodFiles.size() );
         OutputMsg2( 0, "Valid Blocks: %d",
             setBlocks.size() );
 
-        if( vecBadFiles.size() )
+        OutputMsg2( 0, "Claiming orphan blocks..." );
+        ClaimOrphanBlocks( g_pRegfs, setBlocks );
+        if( g_bRebuild )
         {            
-            OutputMsg2( 0, "Do you want to remove "
-                "the corrupted files and "
-                "directories? (y/n)" );
-            stdstr strInput;
-            std::cin >> strInput;
-            if( strInput == "y" || strInput == "Y" )
-                ret = RebuildFs( g_pRegfs, vecGoodFiles );
+            // OutputMsg2( 0, "Do you want to remove "
+            //     "the corrupted files and "
+            //     "directories? (y/n)" );
+            // stdstr strInput;
+            // std::cin >> strInput;
+            // if( strInput == "y" || strInput == "Y" )
+            ret = RebuildFs( g_pRegfs, vecGoodFiles );
         }
         pFs->Stop();
         g_pRegfs.Clear();
@@ -1099,12 +1400,21 @@ int main( int argc, char** argv)
     int opt = 0;
     int ret = 0;
     do{
-        while( ( opt = getopt( argc, argv, "hv" ) ) != -1 )
+        while( ( opt = getopt( argc, argv, "crvsh" ) ) != -1 )
         {
             switch( opt )
             {
+                case 'c':
+                    g_bClaimOrphans = true;
+                    break;
+                case 'r':
+                    g_bRebuild = true;
+                    break;
                 case 'v':
                     g_bVerbose = true;
+                    break;
+                case 's':
+                    g_bSilent = true;
                     break;
                 case 'h':
                 default:
@@ -1112,13 +1422,17 @@ int main( int argc, char** argv)
             }
         }
         if( ERROR( ret ) )
+        {
+            Usage( argv[ 0 ] );
             break;
+        }
 
         if( optind >= argc )
         {
             ret = -EINVAL;
             OutputMsg2( ret, "Error missing "
                 "'registry file to check'" );
+            Usage( argv[ 0 ] );
             break;
         }
 
@@ -1151,7 +1465,10 @@ int main( int argc, char** argv)
         if( g_qwSize > MAX_FS_SIZE ) 
         {
             OutputMsg2( -ERANGE,
-                "Warning, found invalid filesystem size" );
+                "Warning, found invalid filesystem "
+                "size %lld, max is %lld",
+                g_qwSize,
+                MAX_FS_SIZE );
         }
 
         ret = InitContext();
@@ -1166,5 +1483,5 @@ int main( int argc, char** argv)
         ret = _main();
         DestroyContext();
     }while( 0 );
-    return ret;
+    return -ret;
 }

@@ -28,6 +28,124 @@
 namespace rpcf
 {
 
+gint32 RegFSInode::Serialize(
+    BufPtr& pBuf, const Variant& oVal ) const
+{
+    gint32 ret = 0;
+    if( pBuf.IsEmpty() )
+    {
+        ret = pBuf.NewObj();
+        if( ERROR( ret ) )
+            return ret;
+    }
+    if( pBuf->size() < BLOCK_SIZE )
+    {
+        ret = pBuf->Resize( BLOCK_SIZE );
+        if( ERROR( ret ) )
+            return ret;
+    }
+
+    do{
+        auto pInode = ( RegFSInode* ) pBuf->ptr(); 
+        // file size in bytes
+        pInode->m_dwSize = htonl( this->m_dwSize );
+
+        // time of last modification.
+        pInode->m_mtime.tv_sec =
+            htonl( this->m_mtime.tv_sec );
+        pInode->m_mtime.tv_nsec =
+            htonl( this->m_mtime.tv_nsec );
+
+        pInode->m_ctime.tv_sec =
+            htonl( this->m_ctime.tv_sec );
+        pInode->m_ctime.tv_nsec =
+            htonl( this->m_ctime.tv_nsec );
+
+        pInode->m_atime.tv_sec =
+            htonl( this->m_atime.tv_sec );
+        pInode->m_atime.tv_nsec =
+            htonl( this->m_atime.tv_nsec );
+
+        // file type
+        pInode->m_dwMode =
+            htonl( this->m_dwMode );
+        // uid
+        pInode->m_wuid =
+            htonl( this->m_wuid );
+        // gid
+        pInode->m_wgid =
+            htonl( this->m_wgid );
+        // type of file content
+        pInode->m_dwFlags =
+            htonl( this->m_dwFlags );
+        pInode->m_dwRootBNode =
+            htonl( this->m_dwRootBNode );
+        // blocks for data section.
+        int count =
+            sizeof( pInode->m_arrBlocks ) >> 2;
+        for( int i = 0; i < count; i++ )
+            pInode->m_arrBlocks[ i ] = 
+                htonl( this->m_arrBlocks[ i ] );
+
+        // blocks for extended inode
+        count =
+            sizeof( pInode->m_arrMetaFork ) >> 2;
+        for( int i = 0; i < count; i++ )
+            pInode->m_arrMetaFork[ i ] =
+              htonl( this->m_arrMetaFork[ i ] );
+ 
+        pInode->m_iValType = oVal.GetTypeId();
+
+        switch( oVal.GetTypeId() )
+        {
+        case typeByte:
+            {
+                pInode->m_arrBuf[ 0 ] =
+                    oVal.m_byVal;
+                break;
+            }
+        case typeUInt16:
+            {
+                auto p =
+                    ( guint16* )pInode->m_arrBuf;
+                *p = htons( oVal.m_wVal );
+                break;
+            }
+        case typeUInt32:
+        case typeFloat:
+            {
+                auto p =
+                    ( guint32* )pInode->m_arrBuf;
+                *p = htonl( oVal.m_dwVal );
+                break;
+            }
+        case typeUInt64:
+        case typeDouble:
+            {
+                auto p =
+                    ( guint64* )pInode->m_arrBuf;
+                *p = htonll( oVal.m_qwVal );
+                break;
+            }
+        case typeString:
+            {
+                guint32 dwMax = VALUE_SIZE - 1;
+                strcpy( ( char* )pInode->m_arrBuf, 
+                    oVal.m_strVal.substr(
+                        0, dwMax ).c_str() );
+                break;
+            }
+        case typeNone:
+            break;
+        default:
+            ret = -ENOTSUP;
+            break;
+        }
+
+    }while( 0 );
+    return ret;
+}
+
 gint32 CFileImage::Create(
     EnumFileType byType, FImgSPtr& pFile,
     AllocPtr& pAlloc, guint32 dwInodeIdx,
@@ -154,6 +272,8 @@ gint32 CFileImage::Reload()
             m_oInodeStore.m_arrMetaFork[ i ] =
               ntohl( pInode->m_arrMetaFork[ i ] );
 
+        m_oInodeStore.m_iValType =
+            pInode->m_iValType;
         switch( pInode->m_iValType )
         {
         case typeByte:
@@ -232,23 +352,18 @@ gint32 CFileImage::Reload()
         if( bSec )
         {
             // load the block index table directory
-            m_pBitdBlk.NewObj();
-            BufPtr& p = m_pBitdBlk;
-            p->Resize( BLOCK_SIZE );
             guint32* arrBlks =
                 m_oInodeStore.m_arrBlocks;
-            guint32 dwBlkIdx =
-                arrBlks[ BITD_IDX ];
+            guint32 dwBlkIdx = arrBlks[ BITD_IDX ];
             if( dwBlkIdx == 0 )
-            {
-                ret = m_pAlloc->AllocBlocks(
-                    &dwBlkIdx, 1 );
-                if( ERROR( ret ) )
-                    break;
-                arrBlks[ BITD_IDX ] = dwBlkIdx;
-                memset( p->ptr(), 0, p->size() );
                 break;
-            }
+
+            m_pBitdBlk.NewObj();
+            BufPtr& p = m_pBitdBlk;
+            ret = p->Resize( BLOCK_SIZE );
+            if( ERROR( ret ) )
+                break;
+
             ret = m_pAlloc->ReadBlock(
                 dwBlkIdx, ( guint8* )p->ptr() );
             if( ERROR( ret ) )
@@ -256,26 +371,18 @@ gint32 CFileImage::Reload()
         }
         if( bFirst || bSec )
         {
+            guint32* arrBlks =
+                m_oInodeStore.m_arrBlocks;
+            guint32 dwBlkIdx = arrBlks[ BIT_IDX ];
+            if( dwBlkIdx == 0 )
+                break; 
+
             // load the block index table
             m_pBitBlk.NewObj();
             BufPtr& p = m_pBitBlk;
             p->Resize( BLOCK_SIZE );
-            guint32* arrBlks =
-                m_oInodeStore.m_arrBlocks;
-            guint32 dwBlkIdx =
-                arrBlks[ BIT_IDX ];
-            if( dwBlkIdx == 0 )
-            {
-                ret = m_pAlloc->AllocBlocks(
-                    &dwBlkIdx, 1 );
-                if( ERROR( ret ) )
-                    break;
-                arrBlks[ BIT_IDX ] = dwBlkIdx;
-                memset( p->ptr(), 0, p->size() );
-                break;
-            }
-            ret = m_pAlloc->ReadBlock(
-                dwBlkIdx, ( guint8* )p->ptr() );
+            ret = m_pAlloc->ReadBlock( dwBlkIdx,
+                ( guint8* )p->ptr() );
             if( ERROR( ret ) )
                 break;
         }
@@ -337,8 +444,6 @@ gint32 CFileImage::Flush( guint32 dwFlags )
 {
     gint32 ret = 0;
     do{
-        DECL_ARRAY( arrBytes, BLOCK_SIZE );
-        memset( arrBytes, 0, BLOCK_SIZE );
         bool bInode, bData;
         if( ( dwFlags & FLAG_FLUSH_INODE ) )
             bInode = true;
@@ -352,101 +457,12 @@ gint32 CFileImage::Flush( guint32 dwFlags )
 
         if( bInode )
         {
-            auto pInode = ( RegFSInode* ) arrBytes; 
-            // file size in bytes
-            pInode->m_dwSize = htonl( GetSize() );
-
-            // time of last modification.
-            pInode->m_mtime.tv_sec =
-                htonl( m_oInodeStore.m_mtime.tv_sec );
-            pInode->m_mtime.tv_nsec =
-                htonl( m_oInodeStore.m_mtime.tv_nsec );
-
-            pInode->m_ctime.tv_sec =
-                htonl( m_oInodeStore.m_ctime.tv_sec );
-            pInode->m_ctime.tv_nsec =
-                htonl( m_oInodeStore.m_ctime.tv_nsec );
-
-            pInode->m_atime.tv_sec =
-                htonl( m_oInodeStore.m_atime.tv_sec );
-            pInode->m_atime.tv_nsec =
-                htonl( m_oInodeStore.m_atime.tv_nsec );
-
-            // file type
-            pInode->m_dwMode =
-                htonl( m_oInodeStore.m_dwMode );
-            // uid
-            pInode->m_wuid =
-                htonl( m_oInodeStore.m_wuid );
-            // gid
-            pInode->m_wgid =
-                htonl( m_oInodeStore.m_wgid );
-            // type of file content
-            pInode->m_dwFlags =
-                htonl( m_oInodeStore.m_dwFlags );
-            pInode->m_dwRootBNode =
-                htonl( m_oInodeStore.m_dwRootBNode );
-            // blocks for data section.
-            int count =
-                sizeof( pInode->m_arrBlocks ) >> 2;
-            for( int i = 0; i < count; i++ )
-                pInode->m_arrBlocks[ i ] = 
-                    htonl( m_oInodeStore.m_arrBlocks[ i ] );
-
-            // blocks for extended inode
-            count =
-                sizeof( pInode->m_arrMetaFork ) >> 2;
-            for( int i = 0; i < count; i++ )
-                pInode->m_arrMetaFork[ i ] =
-                  htonl( m_oInodeStore.m_arrMetaFork[ i ] );
-     
-            pInode->m_iValType = m_oValue.GetTypeId();
-            switch( m_oValue.GetTypeId() )
-            {
-            case typeByte:
-                {
-                    pInode->m_arrBuf[ 0 ] =
-                        m_oValue.m_byVal;
-                    break;
-                }
-            case typeUInt16:
-                {
-                    auto p =
-                        ( guint16* )pInode->m_arrBuf;
-                    *p = htons( m_oValue.m_wVal );
-                    break;
-                }
-            case typeUInt32:
-            case typeFloat:
-                {
-                    auto p =
-                        ( guint32* )pInode->m_arrBuf;
-                    *p = htonl( m_oValue.m_dwVal );
-                    break;
-                }
-            case typeUInt64:
-            case typeDouble:
-                {
-                    auto p =
-                        ( guint64* )pInode->m_arrBuf;
-                    *p = htonll( m_oValue.m_qwVal );
-                    break;
-                }
-            case typeString:
-                {
-                    guint32 dwMax = VALUE_SIZE - 1;
-                    strcpy( ( char* )pInode->m_arrBuf, 
-                        m_oValue.m_strVal.substr(
-                            0, dwMax ).c_str() );
-                    break;
-                }
-            case typeNone:
-            default:
-                break;
-            }
-
+            BufPtr pBuf;
+            m_oInodeStore.Serialize(
+                pBuf, m_oValue );
             ret = m_pAlloc->WriteBlock(
-                m_dwInodeIdx, ( guint8* )arrBytes );
+                m_dwInodeIdx,
+                ( guint8* )pBuf->ptr() );
             if( ERROR( ret ) )
                 break;
             ret = 0;
@@ -535,14 +551,19 @@ gint32 CFileImage::CollectBlocksForRead(
             {
                 // if the block is not allocated, push
                 // a zero
+
+                guint32& dwBlkIdx = 
+                    m_oInodeStore.m_arrBlocks[ i ];
                 vecBlocks.push_back(
-                    m_oInodeStore.m_arrBlocks[ i ] );
+                    dwBlkIdx ? dwBlkIdx :
+                    INVALID_BLOCK_IDX );
             }
             else if( bFirst )
             {
                 if( dwIndirectIdx == 0 )   
                 {
-                    vecBlocks.push_back( 0 );
+                    vecBlocks.push_back(
+                        INVALID_BLOCK_IDX );
                     continue;
                 }
                 CStdRMutex oExclLock( GetExclLock() );
@@ -563,7 +584,9 @@ gint32 CFileImage::CollectBlocksForRead(
                 guint32 dwBlkIdx = ntohl(
                 pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] );
 
-                vecBlocks.push_back( dwBlkIdx );
+                vecBlocks.push_back(
+                    dwBlkIdx ? dwBlkIdx :
+                    INVALID_BLOCK_IDX );
             }
             else if( bSec )
             {
@@ -577,7 +600,8 @@ gint32 CFileImage::CollectBlocksForRead(
                     ntohl( p[ dwBitIdx ] );
                 if( dwBlkIdxIdx == 0 )
                 {
-                    vecBlocks.push_back( 0 );
+                    vecBlocks.push_back(
+                        INVALID_BLOCK_IDX );
                     continue;
                 }
                 CStdRMutex oExclLock( GetExclLock() );
@@ -589,8 +613,11 @@ gint32 CFileImage::CollectBlocksForRead(
                 {
                     auto pblk = ( guint32* )
                         itr->second->ptr();
+                    guint32 dwBlkIdx =
+                        ntohl( pblk[ dwIdx2 ] );
                     vecBlocks.push_back( 
-                        ntohl( pblk[ dwIdx2 ] ) );
+                        dwBlkIdx ? dwBlkIdx :
+                        INVALID_BLOCK_IDX );
                 }
                 else
                 {
@@ -603,8 +630,11 @@ gint32 CFileImage::CollectBlocksForRead(
                     if( ERROR( ret ) )
                         break;
                     auto pblk = ( guint32* )p->ptr();
+                    guint32 dwBlkIdx = 
+                        ntohl( pblk[ dwIdx2 ] );
                     vecBlocks.push_back(
-                        ntohl( pblk[ dwIdx2 ] ) );
+                        dwBlkIdx ? dwBlkIdx :
+                        INVALID_BLOCK_IDX );
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, p } );
                 }
@@ -645,6 +675,11 @@ gint32 CFileImage::CollectBlocksForWrite(
         guint32 dw2IndIdx =
             m_oInodeStore.m_arrBlocks[ BITD_IDX ];
 
+        std::map< guint32, guint32 > mapDirtyBlks2;
+        bool bDirtyInode = false;
+        bool bDirtyBitd = false;
+        bool bDirtyBit = false;
+
         for( int i = dwLead; i < dwTail; i++ )
         {
             guint32 dwCurPos = i * BLOCK_SIZE;
@@ -663,14 +698,13 @@ gint32 CFileImage::CollectBlocksForWrite(
                         &dwDirectIdx, 1 );
                     if( ERROR( ret ) )
                         break;
-                    BufPtr p( true ); 
-                    p->Resize( BLOCK_SIZE );
-                    memset( p->ptr(), 0, BLOCK_SIZE );
                     guint32* arrBlks =
                         m_oInodeStore.m_arrBlocks;
                     arrBlks[ i ] = dwDirectIdx;
                 }
                 vecBlocks.push_back( dwDirectIdx );
+                if( IsSafeMode() )
+                    bDirtyInode = true;
             }
             else if( bFirst )
             {
@@ -688,6 +722,8 @@ gint32 CFileImage::CollectBlocksForWrite(
                         m_oInodeStore.m_arrBlocks;
                     arrBlks[ BIT_IDX ] =
                         dwIndirectIdx;
+                    if( IsSafeMode() )
+                        bDirtyInode = true;
                 }
                 BufPtr& p = m_pBitBlk;
                 if( p.IsEmpty() )
@@ -714,6 +750,8 @@ gint32 CFileImage::CollectBlocksForWrite(
                         break;
                     pbis[ INDIRECT_BLK_IDX( dwCurPos ) ] =
                         htonl( dwBlkIdx );
+                    if( IsSafeMode() )
+                        bDirtyBit = true;
                 }
 
                 vecBlocks.push_back( dwBlkIdx );
@@ -738,6 +776,9 @@ gint32 CFileImage::CollectBlocksForWrite(
                         break;
                     memset( m_pBitdBlk->ptr(),
                         0, m_pBitdBlk->size() );
+
+                    if( IsSafeMode() )
+                        bDirtyInode = true;
                 }
                 guint32 dwBitIdx =
                     SEC_BIT_IDX( dwCurPos );
@@ -769,6 +810,8 @@ gint32 CFileImage::CollectBlocksForWrite(
                     p[ dwBitIdx ] = htonl( dwBitBlkIdx );
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, pBuf } );
+                    if( IsSafeMode() )
+                        bDirtyBitd = true;
                 }
                 guint32 dwIdx2 =
                     SEC_BLKIDX_IDX( dwCurPos );
@@ -795,6 +838,13 @@ gint32 CFileImage::CollectBlocksForWrite(
                     pblk[ dwIdx2 ] =
                         htonl( dwBlkIdx );
                     vecBlocks.push_back( dwBlkIdx );
+
+                    if( IsSafeMode() )
+                    {
+                        bDirtyBitd = true;
+                        mapDirtyBlks2.emplace(
+                            dwBitBlkIdx, dwBitIdx );
+                    }
                     continue;
                 }
                 else
@@ -822,6 +872,12 @@ gint32 CFileImage::CollectBlocksForWrite(
                             break;
                         pblk[ dwIdx2 ] =
                             htonl( dwBlkIdx );
+
+                        if( IsSafeMode() )
+                        {
+                            mapDirtyBlks2.emplace(
+                                dwBitBlkIdx, dwBitIdx );
+                        }
                     }
                     vecBlocks.push_back( dwBlkIdx );
                     m_mapSecBitBlks.insert(
@@ -832,6 +888,50 @@ gint32 CFileImage::CollectBlocksForWrite(
             {
                 ret = -ERANGE;
                 break;
+            }
+        }
+        if( IsSafeMode() )
+        {
+            for( auto& elem : mapDirtyBlks2 )
+            {
+                auto itr = m_mapSecBitBlks.find(
+                    elem.second );
+                if( itr == m_mapSecBitBlks.end() )
+                {
+                    ret = ERROR_FAIL;
+                    DebugPrint( ret,
+                        "Error flush sec bit blocks %d",
+                        elem.second );
+                    break;
+                }
+                auto p = itr->second->ptr();
+                ret = m_pAlloc->WriteBlock(
+                    elem.first, ( guint8* )p );
+                if( ERROR( ret ) )
+                    break;
+            }
+            if( bDirtyBitd )
+            {
+                auto pbitd = m_pBitdBlk->ptr();
+                ret = m_pAlloc->WriteBlock(
+                    dw2IndIdx, ( guint8* )pbitd );
+                if( ERROR( ret ) )
+                    break;
+            }
+            if( bDirtyBit )
+            {
+                auto pbis = m_pBitBlk->ptr();
+                ret = m_pAlloc->WriteBlock(
+                    dwIndirectIdx, ( guint8* )pbis );
+                if( ERROR( ret ) )
+                    break;
+            }
+            if( bDirtyInode )
+            {
+                ret = this->Flush(
+                    FLAG_FLUSH_INODE );
+                if( ERROR( ret ) )
+                    break;
             }
         }
 
@@ -1029,11 +1129,6 @@ gint32 CFileImage::WriteFileNoLock(
                 ( guint8* )arrBytes );
             if( ERROR( ret ) )
                 break;
-            if( ret < BLOCK_SIZE )
-            {
-                DebugPrint( ret, "read block "
-                    "returned less bytes" );
-            }
             memcpy( arrBytes,
                 pBuf + BLOCK_SIZE * ( dwBlocks - 1 ),
                 dwTail );
@@ -1120,8 +1215,11 @@ gint32 CFileImage::WriteFileNoLock(
             break;
 
         if( dwSize + dwOff > GetSize() )
+        {
             SetSize( dwSize + dwOff );
-
+            if( IsSafeMode() )
+                Flush( FLAG_FLUSH_INODE );
+        }
     }while( 0 );
     return ret;
 }
@@ -1187,7 +1285,6 @@ gint32 CFileImage::TruncBlkIndirect(
 
         ret = m_pAlloc->FreeBlocks(
             pbit + i, dwCount, true );
-
         if( ERROR( ret ) )
             break;
 
@@ -1195,14 +1292,22 @@ gint32 CFileImage::TruncBlkIndirect(
         for( ; j < i + dwCount; j++ )
             pbit[ j ] = 0;
 
+        guint32& dwBitBlkIdx =
+            m_oInodeStore.m_arrBlocks[ BIT_IDX ];
         if( i == 0 )
         {
-            guint32& dwBitBlkIdx =
-                m_oInodeStore.m_arrBlocks[ BIT_IDX ];
             ret = m_pAlloc->FreeBlocks(
                 &dwBitBlkIdx, 1 );
             m_pBitBlk.Clear();
             dwBitBlkIdx = 0;
+        }
+        else if( IsSafeMode() )
+        {
+            ret = m_pAlloc->WriteBlock(
+                dwBitBlkIdx, ( guint8* )pbit );
+            if( ERROR( ret ) )
+                break;
+            ret = 0;
         }
     }while( 0 );
     return ret;
@@ -1242,13 +1347,16 @@ gint32 CFileImage::TruncBlkSecIndirect(
             dwBitEndIdx - dwBitIdx + 1,
             BLKIDX_PER_TABLE - dwBitIdx );
 
-        guint32 dwLastBlkIdxCount =
+        guint32 dwIdxCountLastBit =
             dwBitEndIdx > dwBitIdx ? dwBlkEndIdxIdx + 1: 
             dwBlkEndIdxIdx - dwBlkIdxIdx + 1;
 
         auto pbitd = ( guint32* ) m_pBitdBlk->ptr();
 
         guint32 i = dwBitIdx + 1;
+        bool bBitdDirty = false;
+        guint32 dwDirtyBitIdx = 0;
+
         for( ; i < dwBitCount; i++ )
         {
             guint32 dwBitBlkIdx = ntohl( pbitd[ i ] );
@@ -1256,7 +1364,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
             if( i < dwBitCount - 1 )
                 dwBlksToFree = BLKIDX_PER_TABLE;
             else
-                dwBlksToFree = dwLastBlkIdxCount;
+                dwBlksToFree = dwIdxCountLastBit;
 
             auto itr = m_mapSecBitBlks.find( i );
             if( itr != m_mapSecBitBlks.end() )
@@ -1269,15 +1377,14 @@ gint32 CFileImage::TruncBlkSecIndirect(
             }
             else if( dwBitBlkIdx != 0 )
             {
-                guint32 arrIdx[
-                    BLOCK_SIZE / sizeof( guint32 ) ];
-                auto p = ( guint8* )arrIdx;
+                guint8 arrIdx[ BLOCK_SIZE ];
                 ret = m_pAlloc->ReadBlock(
-                    dwBitBlkIdx, p );
+                    dwBitBlkIdx, arrIdx );
                 if( ERROR( ret ) )
                     break;
                 ret = m_pAlloc->FreeBlocks(
-                    arrIdx, dwBlksToFree, true );
+                    ( guint32* )arrIdx,
+                    dwBlksToFree, true );
                 if( ERROR( ret ) )
                     break;
             }
@@ -1286,6 +1393,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 m_pAlloc->FreeBlocks(
                     &dwBitBlkIdx, 1 );
                 pbitd[ i ] = 0;
+                bBitdDirty = true;
             }
         }
         if( true )
@@ -1293,7 +1401,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
             // the first block-index-table
             guint32 dwBlksToFree;
             if( dwBitCount == 1 )
-                dwBlksToFree = dwLastBlkIdxCount;
+                dwBlksToFree = dwIdxCountLastBit;
             else
             {
                 dwBlksToFree =
@@ -1309,11 +1417,14 @@ gint32 CFileImage::TruncBlkSecIndirect(
                     itr->second->ptr();
 
                 guint32* pblkidx = p + dwBlkIdxIdx;
-                m_pAlloc->FreeBlocks(
-                    pblkidx, dwBlksToFree, true );
-                guint32 i = dwBlkIdxIdx;
+                if( dwBlksToFree )
+                    m_pAlloc->FreeBlocks(
+                        pblkidx, dwBlksToFree, true );
+                guint32 i = 0;
                 for( ; i < dwBlksToFree; i++ )
                     pblkidx[ i ] = 0;
+                if( dwBlkIdxIdx > 0 )
+                    dwDirtyBitIdx = dwBitIdx;
             }
             else if( dwBitBlkIdx != 0 )
             {
@@ -1326,39 +1437,91 @@ gint32 CFileImage::TruncBlkSecIndirect(
                     break;
 
                 guint32* pbit = ( guint32* )p->ptr();
-
-                ret = m_pAlloc->FreeBlocks(
-                    pbit + dwBlkIdxIdx,
-                    dwBlksToFree, true );
-                if( ERROR( ret ) )
-                    break;
+   
+                if( dwBlksToFree )
+                {
+                    ret = m_pAlloc->FreeBlocks(
+                        pbit + dwBlkIdxIdx,
+                        dwBlksToFree, true );
+                    if( ERROR( ret ) )
+                        break;
+                }
 
                 if( dwBlkIdxIdx > 0 )
                 {
-                    guint32 j = dwBlkIdxIdx;
+                    auto pblkidx = pbit + dwBlkIdxIdx;
+                    guint32 j = 0;
                     for(; j < dwBlksToFree; j++ )
-                        pbit[ j ] = 0;
+                        pblkidx[ j ] = 0;
                     m_mapSecBitBlks.insert(
                         { dwBitIdx, p } );
+                    dwDirtyBitIdx = dwBitIdx ;
                 }
             }
+            else if( dwBlkIdxIdx > 0 )
+            {
+                // truncate into a hole
+                ret = m_pAlloc->AllocBlocks(
+                    &dwBitBlkIdx, 1 );
+                if( SUCCEEDED( ret ) )
+                {
+                    pbitd[ dwBitIdx ] =
+                        htonl( dwBitBlkIdx );
+                    BufPtr p( true );
+                    p->Resize( BLOCK_SIZE );
+                    memset( p->ptr(),
+                        0, BLOCK_SIZE );
+                    m_mapSecBitBlks.insert(
+                        { dwBitIdx, p } );
+                    bBitdDirty = true;
+                    dwDirtyBitIdx = dwBitIdx ;
+                }
+            }
+
             if( dwBitBlkIdx != 0 &&
                 dwBlkIdxIdx == 0 )
             {
                 m_pAlloc->FreeBlocks(
                     &dwBitBlkIdx, 1 );
                 pbitd[ dwBitIdx ] = 0;
+                bBitdDirty = true;
+            }
+            if( dwDirtyBitIdx && IsSafeMode() )
+            {
+                auto itr = m_mapSecBitBlks.find(
+                    dwDirtyBitIdx );
+                if( itr != m_mapSecBitBlks.end() &&
+                    dwBitBlkIdx != 0 )
+                {
+                    ret = m_pAlloc->WriteBlock(
+                        dwBitBlkIdx, 
+                        ( guint8* )itr->second->ptr() );
+                    if( ERROR( ret ) )
+                        break;
+                    ret = 0;
+                }
             }
         }
+
+        guint32& dwBitdBlkIdx =
+            m_oInodeStore.m_arrBlocks[ BITD_IDX ];
+
         if( dwByteStart ==
             SEC_INDIRECT_BLOCK_START )
         {
-            guint32& dwBitdBlkIdx =
-            m_oInodeStore.m_arrBlocks[ BITD_IDX ];
             ret = m_pAlloc->FreeBlocks(
                 &dwBitdBlkIdx, 1 );
             m_pBitdBlk.Clear();
             dwBitdBlkIdx = 0;
+        }
+        else if( bBitdDirty && IsSafeMode() )
+        {
+            ret = m_pAlloc->WriteBlock(
+                dwBitdBlkIdx,
+                ( guint8* )pbitd );
+            if( ERROR( ret ) )
+                break;
+            ret = 0;
         }
     }while( 0 );
     return ret;
@@ -1469,8 +1632,11 @@ gint32 CFileImage::TruncateNoLock( guint32 dwOff )
 
     }while( 0 );
     if( SUCCEEDED( ret ) )
+    {
         UpdateMtime();
-
+        if( IsSafeMode() )
+            Flush( FLAG_FLUSH_INODE );
+    }
     return ret;
 }
 
@@ -1482,10 +1648,10 @@ gint32 CFileImage::Extend( guint32 dwOff )
             ( dwOff & ~BLOCK_MASK );
         DECL_ARRAY( arrBytes, BLOCK_SIZE );
         memset( arrBytes, 0, BLOCK_SIZE );
-        guint32 dwBlkOff =
+        guint32 dwOffInBlk =
             ( dwOff & BLOCK_MASK );
-        ret = WriteFileNoLock( laddr, dwBlkOff,
-            ( guint8* )arrBytes );
+        ret = WriteFileNoLock( laddr,
+            dwOffInBlk, ( guint8* )arrBytes );
     }while( 0 );
     return ret;
 }
@@ -1753,7 +1919,7 @@ gint32 CFileImage::FreeBlocks()
 {
     gint32 ret = 0;
     do{
-        CWriteLock oLock( GetLock() );
+        WRITE_LOCK( this );
         ret = FreeBlocksNoLock();
     }while( 0 );
     return ret;
@@ -1971,7 +2137,7 @@ gint32 COpenFileEntry::Close()
     gint32 ret = 0;
     do{
         FImgSPtr& p = m_pFileImage;
-        CWriteLock oLock( p->GetLock() );
+        WRITE_LOCK( p );
         guint32 dwCount = --p->m_dwOpenCount;
         if( dwCount > 0 )
             break;
@@ -1983,11 +2149,16 @@ gint32 COpenFileEntry::Close()
         }
         if( dwState == stateStopped )
             break;
-        oLock.Unlock();
-        ret = this->Flush();
-        if( SUCCEEDED( ret ) )
-            ret = STATUS_MORE_PROCESS_NEEDED;
+        UNLOCK( p );
 
+        if( IsSafeMode() )
+            ret = STATUS_MORE_PROCESS_NEEDED;
+        else
+        {
+            ret = this->Flush();
+            if( SUCCEEDED( ret ) )
+                ret = STATUS_MORE_PROCESS_NEEDED;
+        }
     }while( 0 );
     return ret;
 }

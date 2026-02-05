@@ -26,6 +26,11 @@
 #include "blkalloc.h"
 #include <fcntl.h>
 #include <deque>
+#include <thread>
+#include <atomic>
+#include <chrono>
+#include <fstream>
+#include <ctime>
 
 #define VALIDATE_NAME( _strName_ ) \
     ( _strName_.size() <= REGFS_NAME_LENGTH - 1 )
@@ -85,7 +90,6 @@ gint32 CRegistryFs::CreateRootDir()
         ret = m_pRootImg->Format();
         if( ERROR( ret ) )
             break;
-        // ret = m_pRootImg->Flush();
         ret = COpenFileEntry::Create( 
             ftDirectory, m_pRootDir,
             m_pRootImg, m_pAlloc,
@@ -184,6 +188,14 @@ gint32 CRegistryFs::Start()
         if( ERROR( ret ) )
             break;
         SetState( stateStarted );
+
+        if( IsSafeMode() )
+        {
+            // Start the worker thread
+            m_threadRunning.store(true);
+            m_workerThread = std::thread(
+                &CRegistryFs::ThreadFunction, this);
+        }
     }while( 0 );
     return ret;
 }
@@ -208,8 +220,80 @@ gint32 CRegistryFs::Stop()
         if( ERROR( ret ) )
             break;
         SetState( stateStopped );
-    }while( 0 );
+        UNLOCK( this );
+
+        if( IsSafeMode() )
+        {
+            // Stop the worker thread
+            m_threadRunning.store(false);
+            if (m_workerThread.joinable())
+                m_workerThread.join();
+
+            CStdRMutex oLock( m_pAlloc->GetLock() );
+            m_pAlloc->SetStopped();
+            ret = m_pAlloc->CheckAndCommit();
+            if( ret == -EAGAIN )
+                continue;
+        }
+
+        break;
+    }while( 1 );
     return ret;
+}
+
+void CRegistryFs::ThreadFunction()
+{
+    SetThreadName("RegfsCommit");
+    guint32 dwCount = 0; // seconds
+    while (m_threadRunning.load())
+    {
+        std::this_thread::sleep_for(
+            std::chrono::seconds(5) );
+
+        if (!m_threadRunning.load())
+            break;
+
+        dwCount += 5;
+        if( dwCount % 5 == 0 )
+            m_pAlloc->MergeBlocks();
+
+        if( dwCount % g_dwCacheLife != 0 )
+            continue;
+
+        RFHANDLE hFile = INVALID_HANDLE;
+        gint32 ret = Access(
+            "/commit_time", F_OK, nullptr );
+        if (ERROR( ret ))
+        {
+            ret = CreateFile( "/commit_time",
+                S_IRUSR | S_IWUSR,
+                O_RDWR | O_CREAT,
+                hFile,
+                nullptr );
+            if (ERROR(ret))
+            {
+                DebugPrintEx( logErr, ret,
+                    "Failed to create file "
+                    "'/commit_time'");
+            }
+            CloseFile(hFile);
+        }
+
+        auto t = std::time(nullptr);
+        auto tm = *std::localtime(&t);
+        char buffer[100];
+        std::strftime(buffer,
+            sizeof(buffer),
+            "%Y-%m-%d %H:%M:%S", &tm);
+
+        Variant oVar(buffer);
+        ret = SetValue(
+            "/commit_time", oVar, nullptr );
+        if (ERROR(ret))
+            DebugPrint(ret,
+                "Failed to write to file "
+                "'/commit_time'");
+    }
 }
 
 gint32 CRegistryFs::Namei(
@@ -521,14 +605,14 @@ gint32 CRegistryFs::CreateFile(
         if( ERROR( ret ) )
             break;
 
-        CAccessContext oac;
+        /*CAccessContext oac;
         if( pac == nullptr )
         {
             // to check conflict between dwMode and dwFlags
             oac.dwUid = pFile->GetUid();
             oac.dwGid = pFile->GetGid();
             pac = &oac;
-        }
+        }*/
 
         ret = pOpenFile->Open( dwFlags, pac );
         if( ERROR( ret ) )
@@ -560,6 +644,7 @@ gint32 CRegistryFs::OpenFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -630,19 +715,34 @@ gint32 CRegistryFs::CloseFileNoLock(
 
         FImgSPtr dirPtr;
         FImgSPtr pImg = pFile->GetImage();
-        CDirImage* pDir = pImg->GetParentDir();
-        if( pDir == nullptr )
-            break;
-        dirPtr = pDir;
+        CDirImage* pDir = nullptr;
+        if( !pImg.IsEmpty() )
+        {
+            READ_LOCK( pImg );
+            CStdRMutex oLock( pImg->GetExclLock() );
+            guint32 dwState = pImg->GetState();
+            if( dwState != stateStopped &&
+                dwState != stateStopping )
+            {
+                pDir = pImg->GetParentDir();
+                dirPtr = pDir;
+            }
+            // don't copy the pDir if the file has
+            // been removed.
+        }
 
         ret = pFile->Close();
         if( ret != STATUS_MORE_PROCESS_NEEDED )
             break;
 
+        if( dirPtr.IsEmpty() )
+            break;
+
+        ret = 0;
         const stdstr& strPath = pFile->GetPath();
         std::string strFile =
             basename( strPath.c_str() );
-        pDir->UnloadFile( strFile.c_str() );
+        ret = pDir->UnloadFile( strFile.c_str() );
 
     }while( 0 );
     return ret;
@@ -653,6 +753,7 @@ gint32 CRegistryFs::CloseFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         ret = CloseFileNoLock( hFile );
     }while( 0 );
@@ -665,6 +766,7 @@ gint32 CRegistryFs::RemoveFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -760,6 +862,7 @@ gint32 CRegistryFs::Truncate(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FileSPtr pFile;
         CStdRMutex oLock( GetExclLock() );
@@ -788,6 +891,7 @@ gint32 CRegistryFs::RemoveDir(
 {
     gint32 ret = 0; 
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -826,6 +930,7 @@ gint32 CRegistryFs::SetGid(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         if( strPath == "/" )
         {
@@ -873,6 +978,7 @@ gint32 CRegistryFs::SetUid(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         if( strPath == "/" )
         {
@@ -1109,6 +1215,7 @@ gint32 CRegistryFs::SetValue(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -1145,6 +1252,7 @@ gint32 CRegistryFs::SymLink(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -1334,6 +1442,7 @@ gint32 CRegistryFs::Chown(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         if( strPath == "/" )
         {
@@ -1390,6 +1499,7 @@ gint32 CRegistryFs::Rename(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr dirPtr;
         stdstr strNormPath;
@@ -1733,6 +1843,7 @@ gint32 CRegistryFs::SetValue(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr pFile;
         ret = GetFileImage( hDir, strFile,
@@ -1813,6 +1924,7 @@ gint32 CRegistryFs::RemoveFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr ptrDir;
         stdstr strNormPath;
@@ -1840,6 +1952,7 @@ gint32 CRegistryFs::OpenFile(
 {
     gint32 ret = 0;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr pFile;
 
@@ -2009,6 +2122,7 @@ gint32 CRegistryFs::CreateFile(
     gint32 ret = 0;
     bool bCreated = false;
     do{
+        BATransact oTransact( m_pAlloc );
         READ_LOCK( this );
         FImgSPtr ptrDir;
         stdstr strNormPath;

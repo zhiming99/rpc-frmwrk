@@ -180,7 +180,8 @@ static int monfs_getattr(const char *path,
             break;
 
         if( ifs == 2 )
-            stbuf->st_ino += MAX_FS_SIZE;
+            stbuf->st_ino +=
+                ( MAX_FS_SIZE / BLOCK_SIZE );
     }while( 0 );
 
     return ret;
@@ -671,6 +672,9 @@ static int monfs_fsync(const char *path, int isdatasync,
             break;
         }
         guint32 dwFlags = FLAG_FLUSH_DATA;
+        AllocPtr pAlloc =
+            pfs->GetAllocator();
+        BATransact oTransact( pAlloc );
         READ_LOCK( pfs );
         FileSPtr pOpen;
         ret = pfs->GetOpenFile( hFile, pOpen );
@@ -721,6 +725,9 @@ static int monfs_utimens( const char * path,
             GETFS_HANDLE( hFile );
             pfs1 = pfs; 
         }
+        AllocPtr pAlloc =
+            pfs1->GetAllocator();
+        BATransact oTransact( pAlloc );
         READ_LOCK( pfs1 );
         FileSPtr pOpen;
         ret = pfs1->GetOpenFile( hFile, pOpen );

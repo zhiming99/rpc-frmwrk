@@ -1,4 +1,5 @@
-FROM ubuntu:latest
+#FROM --platform=linux/armhf dtcooper/raspberrypi-os:bookworm as armhf_build
+FROM --platform=linux/armhf debian:bookworm as armhf_build
 MAINTAINER woodhead99@gmail.com
 RUN apt-get update
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata

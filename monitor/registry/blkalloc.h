@@ -140,13 +140,13 @@
 #define GROUP_INDEX( _blk_idx ) \
     ( ( _blk_idx >> GROUP_INDEX_SHIFT ) & GROUP_IDX_MASK ) 
 
-// get the logical address of a group from a with a
-// block index from inode
+// get the logical address of a group with a block
+// index from inode
 #define GROUP_START( _blk_idx ) \
     ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE )
 
 // get the logical address of a group's data section
-// from a with a block index from inode
+// with a block index from inode
 #define GROUP_DATA_START( _blk_idx ) \
     ( GROUP_INDEX( _blk_idx )  * GROUP_SIZE + \
     BLKBMP_BLKNUM * BLOCK_SIZE )
@@ -170,6 +170,7 @@
     ( _idx_ << find_shift( BNODE_SIZE ) )
 
 #define INVALID_BNODE_IDX  ( USHRT_MAX )
+#define INVALID_BLOCK_IDX  ( USHRT_MAX )
 
 #define MAX_BNODE_NUMBER \
     ( MAX_FILE_SIZE / BNODE_SIZE )
@@ -194,6 +195,11 @@
     if( (_p_)->IsStoppedNoLock() ) \
     { ret = ERROR_STATE; break; }
 
+#define DIR_WRITE_LOCK( _p_ ) \
+    CDirWriteLock _oLock_( _p_ ); \
+    if( (_p_)->IsStoppedNoLock() ) \
+    { ret = ERROR_STATE; break; }
+
 #define UNLOCK( _p_ ) \
     _oLock_.Unlock()
 
@@ -201,7 +207,7 @@
 #define FLAG_FLUSH_CHILD 0x01
 #define FLAG_FLUSH_DATA 0x02
 #define FLAG_FLUSH_INODE 0x04
-#define FLAG_FLUSH_FREEIMG 0x08
+#define FLAG_FLUSH_SINGLE_BNODE 0x8
 #define FLAG_FLUSH_DEFAULT \
     ( FLAG_FLUSH_DATA | FLAG_FLUSH_INODE )
 
@@ -211,12 +217,42 @@
 #define GID_DEFAULT     80001
 
 #define MAX_FS_SIZE     \
-    ( ( BLOCKS_PER_GROUP * BLKGRP_NUMBER ) + SUPER_BLOCK_SIZE + GRPBMP_BLKNUM  )
+    ( ( ( ( guint64 )BLOCKS_PER_GROUP_FULL * BLKGRP_NUMBER_FULL ) + 1 + 1 ) * BLOCK_SIZE )
 
 #define BLKIDX_BEYOND_MAX( _blkidx_  ) \
     ( ( _blkidx_ ) >= BLKGRP_NUMBER_FULL * BLOCKS_PER_GROUP_FULL )
 
+#define CACHE_LIFE_CYCLE 60
+#define CACHE_MAX_BLOCKS BLOCKS_PER_GROUP_FULL 
+
+#define MIN_PTRS( _root_ ) \
+( (_root_) ? 2 : ( ( MAX_PTRS_PER_NODE + 1 ) / 2 ) )
+
+#define MIN_KEYS( _root_ ) ( (_root_) ? 1 : \
+    ( ( MAX_PTRS_PER_NODE + 1 ) / 2 - 1  ) )
+
+#define COPY_KEY( _dst_, _src_ ) \
+do{ strncpy( (_dst_), (_src_), REGFS_NAME_LENGTH - 1 ); \
+    (_dst_)[ REGFS_NAME_LENGTH - 1 ] = 0; \
+}while( 0 )
+
 namespace rpcf{
+
+extern bool g_bSafeMode;
+
+inline bool IsSafeMode()
+{ return g_bSafeMode; }
+
+inline void SetSafeMode( bool bSafe )
+{ g_bSafeMode = bSafe; }
+
+extern guint32 g_dwCacheLife;
+
+inline guint32 GetCacheLifeCycle()
+{ return g_dwCacheLife; }
+
+inline void SetCacheLifeCycle( guint32 dwTimeSec )
+{ g_dwCacheLife = dwTimeSec; }
 
 struct ISynchronize
 {
@@ -297,6 +333,13 @@ struct CBlockBitmap :
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
     gint32 Reload() override;
+
+    inline bool IsEmpty() const
+    {
+        return BLOCKS_PER_GROUP - BLKBMP_BLKNUM ==
+            GetFreeCount();
+    }
+
 };
 
 using BlkBmpUPtr = typename std::unique_ptr< CBlockBitmap >;
@@ -347,11 +390,18 @@ struct CBlockGroup : public ISynchronize
             pvecBlocks, dwNumBlocks );
     }
 
-    gint32 IsBlockFree( guint32 dwBlkIdx )
+    gint32 IsBlockFree( guint32 dwBlkIdx ) const
     {
         return m_pBlockBitmap->IsBlockFree(
             dwBlkIdx );
     }
+
+    CBlockBitmap* GetBlkBmp()
+    { return m_pBlockBitmap.get(); };
+
+    const CBlockBitmap* GetBlkBmp() const
+    { return m_pBlockBitmap.get(); };
+
 };
 
 typedef CAutoPtr< clsid( CBlockAllocator ), CBlockAllocator > AllocPtr;
@@ -385,7 +435,29 @@ struct CGroupBitmap :
 
 typedef std::unique_ptr< CGroupBitmap > GrpBmpUPtr;
 
-typedef std::pair< guint32, guint32 > CONTBLKS;
+struct CONTBLKS
+{
+    union{
+        guint32 first;
+        guint32 dwBlkIdx;
+    };
+    union{
+        guint32 second;
+        guint32 dwCount;
+        guint32 dwBlkIdxEnd;
+    };
+    union{
+        guint32 third;
+        guint32 dwOff; // buffer offset in block index
+    };
+    guint32 dwKey = ( guint32 )-1;
+
+    CONTBLKS( guint32 a1, guint32 a2,
+        guint32 a3 = 0, guint32 a4 = 0 )
+    { first = a1, second = a2, third = a3, dwKey = a4; }
+};
+
+using DirtyBlks = typename std::map< guint32, BufPtr >;
 
 class CBlockAllocator :
     public CObjBase,
@@ -398,6 +470,14 @@ class CBlockAllocator :
     GrpBmpUPtr          m_pGroupBitmap;
     std::map< guint32, BlkGrpUPtr > m_mapBlkGrps;
 
+    // cache related members
+    DirtyBlks           m_mapDirtyBlks;
+    guint32             m_dwDirtyBlkCount = 0;
+    guint32             m_dwCacheAge = 0;
+    guint32             m_dwTransCount = 0;
+    timespec            m_oStartTime = {0};
+    bool                m_bStopped = false;
+
     gint32 ReadWriteBlocks(
         bool bRead, const guint32* pBlocks,
         guint32 dwNumBlocks, guint8* pBuf,
@@ -405,7 +485,18 @@ class CBlockAllocator :
 
     gint32 ReadWriteFile(
         char* pBuf, guint32 dwSize,
-        guint32 dwOff, bool bRead );
+        guint64 dwOff, bool bRead );
+
+    gint32 CacheBlocks(
+        const guint32* pBlocks,
+        guint32 dwNumBlocks, guint8* pBuf,
+        bool bContigous = false );
+
+    gint32 ReadCache( const guint32* pBlocks,
+        guint32 dwNumBlocks, guint8* pBuf,
+        bool bContigous = false );
+
+    gint32 CommitCache();
 
     public:
     CBlockAllocator( const IConfigDb* pCfg );
@@ -413,6 +504,13 @@ class CBlockAllocator :
 
     inline stdrmutex& GetLock() const
     { return m_oLock; }
+
+    gint32 CheckAndCommit( bool bEntering = true );
+    inline gint32 IncTransactCount()
+    { return ++m_dwTransCount; }
+
+    inline gint32 DecTransactCount()
+    { return --m_dwTransCount; }
 
     gint32 Format() override;
     gint32 Flush( guint32 dwFlags = 0 ) override;
@@ -492,7 +590,43 @@ class CBlockAllocator :
     { return m_mapBlkGrps; }
     const std::map< guint32, BlkGrpUPtr >& GetBlkGrps() const
     { return m_mapBlkGrps; }
+
+    inline void SetStopped()
+    {
+        CStdRMutex oLock( GetLock() );
+        m_bStopped = true;
+    }
+
+    inline bool IsStopped() 
+    {
+        CStdRMutex oLock( GetLock() );
+        return m_bStopped;
+    }
+    gint32 MergeBlocks();
 };
+
+struct BATransact
+{
+    AllocPtr m_pAlloc;
+    BATransact( AllocPtr& pAlloc )
+    {
+        if( !IsSafeMode() || pAlloc.IsEmpty() )
+            return;
+        m_pAlloc = pAlloc;
+        CStdRMutex oLock( pAlloc->GetLock() );
+        pAlloc->CheckAndCommit();
+        pAlloc->IncTransactCount();
+    }
+    ~BATransact()
+    {
+        if( !IsSafeMode() || m_pAlloc.IsEmpty() )
+            return;
+        CStdRMutex oLock( m_pAlloc->GetLock() );
+        m_pAlloc->DecTransactCount();
+        m_pAlloc->CheckAndCommit( false );
+    }
+};
+
 
 #define VALUE_SIZE 95
 
@@ -557,6 +691,9 @@ struct RegFSInode
     guint8      m_arrBuf[ VALUE_SIZE ];
     guint8      m_iValType;
     guint32     m_dwRootBNode;
+
+    gint32 Serialize( BufPtr& pBuf,
+        const Variant& oVar ) const;
 
 } __attribute__((aligned (4)));
 
@@ -944,7 +1081,7 @@ struct RegFSBNode
 
 class CBPlusNode;
 class CDirImage;
-using BNodeUPtr = typename std::unique_ptr< CBPlusNode >; 
+using BNodeUPtr = typename std::shared_ptr< CBPlusNode >; 
 using ChildMap = typename std::hashmap< guint32, BNodeUPtr >;
 using FileMap = typename std::hashmap< guint32, FImgSPtr >;
 
@@ -970,6 +1107,7 @@ struct CFreeBNodePool :
 
     gint32 Reload() override;
     gint32 Flush( guint32 dwFlags = 0 ) override;
+    gint32 FlushSingleBNode( guint32 dwBNodeIdx );
 };
 
 struct CDirImage : 
@@ -980,6 +1118,7 @@ struct CDirImage :
     std::unique_ptr< CFreeBNodePool > m_pFreePool;
     ChildMap m_mapChilds;
     FileMap m_mapFiles;
+    std::set< guint32 > m_setDirtyNodes;
 
     CDirImage( const IConfigDb* pCfg );
 
@@ -1003,6 +1142,9 @@ struct CDirImage :
     guint32 GetRootKeyCount() const;
     inline CBPlusNode* GetRootNode() const
     { return m_pRootNode.get(); }
+
+    inline BNodeUPtr GetRootNode2() const
+    { return m_pRootNode; }
 
     gint32 SearchNoLock( const char* szKey,
         FImgSPtr& pFile, CBPlusNode*& pNode );
@@ -1030,7 +1172,7 @@ struct CDirImage :
         BNodeUPtr& pNew, BNodeUPtr& pOld );
 
     gint32 ReleaseFreeBNode( guint32 dwBNodeIdx );
-    guint32 GetHeadFreeBNode();
+    guint32 GetHeadFreeBNode() const;
     void SetHeadFreeBNode( guint32 dwBNodeIdx );
 
     gint32 InsertFile(
@@ -1059,11 +1201,6 @@ struct CDirImage :
     gint32 ListDir(
         std::vector< KEYPTR_SLOT >& vecDirEnt );
 
-    guint32 GetFreeBNodeIdx() const;
-
-    void SetFreeBNodeIdx(
-        guint32 dwBNodeIdx );
-
     gint32 UnloadFile( const char* szName );
     gint32 UnloadDirImage();
 
@@ -1073,6 +1210,8 @@ struct CDirImage :
     EnumFileType GetType() const override final
     { return ftDirectory; }
 
+    void SetDirty( guint32 dwBNodeIdx );
+    gint32 CommitDirtyNodes();
 };
 
 struct CBPlusNode :
@@ -1082,6 +1221,7 @@ struct CBPlusNode :
     RegFSBNode m_oBNodeStore;
     guint32  m_dwMaxSlots = MAX_PTRS_PER_NODE;
     CBPlusNode* m_pParent = nullptr;
+    bool    m_bFreed = false;
 
     CBPlusNode( CDirImage* pFile,
         guint32 dwBNodeIdx ) :
@@ -1089,6 +1229,12 @@ struct CBPlusNode :
     {
         m_oBNodeStore.SetBNodeIndex( dwBNodeIdx );
     }
+
+    inline bool IsFreed()
+    { return m_bFreed; }
+
+    inline void SetFreed()
+    { m_bFreed = true; }
 
     ChildMap& GetChildMap()
     { return m_pDir->GetChildMap(); }
@@ -1104,6 +1250,10 @@ struct CBPlusNode :
 
     AllocPtr GetAlloc() const
     { return m_pDir->GetAlloc(); }
+
+    gint32 ReplaceNonLeafKey(
+        const char* szKey,
+        const char* szNewKey );
 
     gint32 Flush( guint32 dwFlags = 0 ) override;
     gint32 Format() override;
@@ -1173,7 +1323,7 @@ struct CBPlusNode :
     inline guint32 GetBNodeIndex() const
     { return m_oBNodeStore.GetBNodeIndex(); }
 
-    guint32 GetChildCount() const
+    inline guint32 GetChildCount() const
     { return m_oBNodeStore.m_wNumPtrs; }
 
     void SetChildCount( guint32 dwBNode )
@@ -1279,6 +1429,24 @@ struct CBPlusNode :
             ps->oLeaf.dwInodeIdx, pFile );
     }
 
+    BNodeUPtr GetChildDirect2( gint32 idx )
+    {
+        auto& oMap = GetChildMap();
+        auto itr = oMap.find( idx );
+        if( itr == oMap.end() )
+            return nullptr;
+        return itr->second;
+    }
+    BNodeUPtr GetChild2( gint32 idx )
+    {
+        if( idx >= ( gint32 )GetChildCount() ||
+            idx < 0 )
+            return nullptr;
+        KEYPTR_SLOT* ps = 
+            m_oBNodeStore.m_vecSlots[ idx ];
+        return GetChildDirect2( ps->dwBNodeIdx );
+    }
+
     CBPlusNode* GetChildDirect( gint32 idx ) const
     {
         auto& oMap = GetChildMap();
@@ -1306,7 +1474,7 @@ struct CBPlusNode :
         if( itr == oMap.end() )
             return -ENOENT;
         itr->second->SetParent( nullptr );
-        pChild = std::move( itr->second );
+        pChild = itr->second;
         oMap.erase( itr );
         return STATUS_SUCCESS;
     }
@@ -1331,8 +1499,9 @@ struct CBPlusNode :
         auto itr = oMap.find( dwBNodeIdx );
         if( itr != oMap.end() )
             return -EEXIST;
-        pChild->SetParent( this );
-        oMap[ dwBNodeIdx ] = std::move( pChild );
+        if( this != pChild.get() )
+            pChild->SetParent( this );
+        oMap[ dwBNodeIdx ] = pChild;
         return STATUS_SUCCESS;
     }
 
@@ -1430,9 +1599,6 @@ struct CBPlusNode :
     const char* GetSuccKey(
         guint32 dwIdx = 0 ) const;
 
-    inline guint32 GetChildCount()
-    { return m_oBNodeStore.m_wNumPtrs; };
-    
     inline guint32 GetFreeBNodeIdx() const
     {
         auto& o = m_oBNodeStore;
@@ -1519,8 +1685,8 @@ struct FREE_BNODES
         if( IsEmpty() )
             return -ENOENT;
         guint16* p = m_arrFreeBNIdx;
-        wBNodeIdx = p[ m_wBNCount ];
-        p[ m_wBNCount ] = INVALID_BNODE_IDX;
+        wBNodeIdx = p[ m_wBNCount - 1 ];
+        p[ m_wBNCount - 1 ] = INVALID_BNODE_IDX;
         --m_wBNCount;
         return 0;
     }
@@ -1529,6 +1695,23 @@ struct FREE_BNODES
     gint32 ntoh( guint8* pSrc, guint32 dwSize );
 
 }__attribute__((aligned (8)));
+
+class CDirWriteLock : public CWriteLock
+{
+    CDirImage* m_pDir; 
+    public:
+    typedef CWriteLock super;
+    CDirWriteLock( CDirImage* pDir ) :
+        super( pDir->GetLock() ),
+        m_pDir( pDir )
+    {}
+
+    ~CDirWriteLock()
+    {
+        if( m_pDir )
+            m_pDir->CommitDirtyNodes();
+    }
+};
 
 class COpenFileEntry;
 typedef CAutoPtr< clsid( Invalid ), COpenFileEntry > FileSPtr;
@@ -1656,8 +1839,12 @@ class CRegistryFs :
     EnumIfState m_dwState = stateStarted;
     bool        m_bFormat = false;
 
+    std::thread m_workerThread;
+    std::atomic<bool> m_threadRunning{false};
+
     gint32 CreateRootDir();
     gint32 OpenRootDir();
+    void ThreadFunction();
 
     mutable CSharedLock m_oLock;
 
@@ -1914,5 +2101,13 @@ struct CFileHandle
     { m_hFile = hFile; m_pFs = pFs; }
     ~CFileHandle();
 };
+
+gint32 GetPathFromImg(
+    CFileImage* pFile,
+    stdstr& strPath );
+
+gint32 GetPathFromImg(
+    FImgSPtr& pFile,
+    stdstr& strPath );
 
 }

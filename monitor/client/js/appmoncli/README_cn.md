@@ -6,11 +6,11 @@
 
 ### 部署和使用网页版Rpc-Frmwrk监视器
    * 首先确保目标机器安装了`nginx`。`apache`也可以使用，不过目前还没测试。
-   * 成功安装和配置好rpc-frmwrk后，在`/usr/local/etc/rpcf/`或`/etc/rpcf`下的`appmonui.tar.gz`是打包好的文件。如何配置rpc-frmwrk可参考这篇[文章](../../../../tools/README_cn.md#rpc-frmwrk配置工具).
-   * 通过命令`rpcfctl initsvr`建立监视器运行环境。该命令将建立`用户注册表`和`应用注册表`，和一个`admin`用户。
-   * 把`appmonui.tar.gz`解压到`nginx`配置好的目录中。
+   * 通过[`rpcfctl cfg`](../../../appmon/rpcfctl_cn.md#主要命令)配置rpc-frmwrk，并启用`websocket`，`SSL`和`Auth`(认证登陆)
+   * 通过命令`rpcfctl initsvr`建立监视器运行环境。该命令将建立`用户注册表`和`应用注册表`，和一个`admin`用户。初始的密码为`123`。可以通过`rpcfctl passwd admin`修改。
+   * 运行`rpcfctl cfgweb`将部署monitor的网页到web服务器。
    * 然后通过命令`rpcfctl startall`启动`rpc-frwmrk`的所有程序。
-   * 最后打开浏览器，在地址栏输入`https://127.0.0.1/rpcf/appmon.html`即可。 对于自签名的证书，需无视浏览器发出的警告。
+   * 最后打开浏览器，在地址栏输入`https://weburl/rpcf/appmon.html`即可。 对于自签名的证书，需无视浏览器发出的警告。
    * 提示输入用户名和密码时，可以输入`admin`和账号的密码。
    * 如果你希望业务服务器也可以被监控程序管理，可以通过一下步骤实现：
       * 可以在生成业务服务器框架代码的`ridlc`的命令行加上 `-m <应用名称>`，更新相关的代码。该选项只影响服务器端代码。

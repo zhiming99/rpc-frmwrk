@@ -508,6 +508,15 @@ EOF
         cmdline="rpcfctl listuser"
         bash $cmddir/rpcfshow.sh -l
         ;;
+    password)
+        cmdline="rpcfctl passwd <user name>"
+        if [[ $# -lt 1 ]]; then
+            echo "Error: Missing argument" 
+            echo $cmdline
+            exit 1
+        fi
+        bash $cmddir/rpcfmodu.sh -p $@
+        ;;
     joingroup)
         cmdline="rpcfctl joingroup <group name> <user name>"
         if [[ $# -lt 2 ]]; then

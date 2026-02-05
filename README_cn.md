@@ -50,10 +50,10 @@
 4. 对于新用户，可以运行系统自带的`HelloWorld`来验证配置. 先在服务器端启动`helloworld`的服务器程序`hwsvrsmk`, 然后在客户端启动`hwclismk`.这篇[wiki](https://github.com/zhiming99/rpc-frmwrk/wiki/How-to-get-Helloworld-run%3F)有更详细的介绍.
 
 ## 部署
-`rpc-frmwrk`的配置工具`rpcfg.py`可以自动生成目标机器的安装包。安装包可以安装`rpc-frwmwrk`的运行库及系统设置。设置内容包括`rpc-frmwrk`的运行参数设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用认证功能时，`Kerberos`的服务器设置. 详细信息请参考`rpcfg.py`的[使用说明](./tools/README_cn.md)有关安装包的部分. 
-
+* `rpc-frmwrk`的配置工具`rpcfg.py`可以自动生成目标机器的安装包。安装包可以安装`rpc-frwmwrk`的运行库及系统设置。设置内容包括`rpc-frmwrk`的运行参数设置，`Apache`或者`Nginx`web服务器的设置，SSL密钥分发，以及使用认证功能时，三种认证方式`Kerberos/OAuth2/SimpAuth`的设置. 详细信息请参考`rpcfg.py`的[使用说明](./tools/README_cn.md)有关安装包的部分. 
+* 对于没有图形界面的用户，和习惯使用命令行的客户，`rpcfctl`是必不可少的配置工具。有关`rpcfctl`的详细信息请参考这篇[文章](./monitor/appmon/rpcfctl_cn.md)。
 ## 监控
-`rpc-frmwrk`提供一个网页版的监控程序，可以方便的从各种平台对`rpc-frmwrk`服务器进行监视并设置运行参数。监控程序具有访问控制功能，对于不同的用户，所能访问到的内容会有区别。访问控制可以方便的进行定制。监控系统可以在后台对感兴趣的设置点开启日志功能，从而可以提供更详细的历史数据以供分析和优化。有关监控功能的搭建可参考[这篇文章](./monitor/client/js/appmoncli/README_cn.md)。
+`rpc-frmwrk`提供一个网页版的监控程序，可以方便的从各种平台对`rpc-frmwrk`服务器进行监视并设置运行参数。监控程序具有访问控制功能，对于不同的用户，所能访问到的内容会有区别。访问控制可以方便的进行定制。监控系统可以在后台对感兴趣的设置点开启日志功能，从而可以提供更详细的历史数据以供分析和优化。有关监控功能的搭建可参考这篇[文章](./monitor/client/js/appmoncli/README_cn.md)。
 
 ## 第三方依赖  
 1. `dbus-1.0 (dbus-devel)`

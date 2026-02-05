@@ -36,6 +36,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <byteswap.h>
+#include <sys/prctl.h>
 
 #include <memory>
 #include <iostream>
@@ -1671,6 +1672,37 @@ gint32 StartDBus()
     if( fp )
         fclose( fp );
     return ret;
+}
+
+// set the name of the current thread
+gint32 SetThreadName(
+    const stdstr& strName )
+{
+    gint32 ret = 0;
+    if( strName.size() == 0 )
+        return -EINVAL;
+
+    ret = prctl( PR_SET_NAME,
+        strName.c_str(), 0, 0, 0 );
+
+    if( ret == -1 )
+        ret = -errno;
+
+    return ret;
+}
+
+// set the name of the current thread
+stdstr GetThreadName()
+{
+    gint32 ret = 0;
+    char szBuf[ 32 ] = { 0 };
+
+    ret = prctl( PR_GET_NAME, szBuf, 0, 0, 0 );
+
+    if( ret == -1 )
+        return stdstr( "Unknown" );
+
+    return stdstr( szBuf );
 }
 
 }
