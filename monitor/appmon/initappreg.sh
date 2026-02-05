@@ -106,27 +106,29 @@ set_attr_value timer1 clock1 pulse "$(jsonval 'i' 1 )" i
 
 add_point timer1 interval1 setpoint i
 set_attr_value timer1 interval1 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval1 "$(jsonval 'i' 10)" i
+set_point_value timer1 interval1 "$(jsonval 'i' 40)" i
 set_attr_value timer1 interval1 load_on_start "$(jsonval 'i' 1)" i
 
 add_point timer1 clock2 output i
 set_attr_value timer1 clock2 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval2 setpoint i
 set_attr_value timer1 interval2 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval2 "$(jsonval 'i' 2 )" i
+set_point_value timer1 interval2 "$(jsonval 'i' 60 )" i
 set_attr_value timer1 interval2 load_on_start "$(jsonval 'i' 1)" i
 
 add_point timer1 clock3 output i
 set_attr_value timer1 clock3 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval3 setpoint i
 set_attr_value timer1 interval3 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval3 "$(jsonval 'i' 20)" i
+set_point_value timer1 interval3 "$(jsonval 'i' 2)" i
+set_attr_value timer1 interval3 load_on_start "$(jsonval 'i' 1)" i
 
 add_point timer1 clock4 output i
 set_attr_value timer1 clock4 pulse "$(jsonval 'i' 1 )" i
 add_point timer1 interval4 setpoint i
 set_attr_value timer1 interval4 unit "$(jsonval 's' 'sec' )" s
-set_point_value timer1 interval4 "$(jsonval 'i' 40)" i
+set_point_value timer1 interval4 "$(jsonval 'i' 20)" i
+set_attr_value timer1 interval4 load_on_start "$(jsonval 'i' 1)" i
 
 add_point timer1 offline_action input s
 set_attr_value timer1 offline_action point_flags "$(jsonval 'i' 1 )" i
