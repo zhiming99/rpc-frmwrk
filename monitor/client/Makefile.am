@@ -8,4 +8,6 @@ if ENABLE_JAVA
 SUBDIRS += java/appmancli
 endif
 
+if ENABLE_JS
 SUBDIRS += js/appmoncli
+endif

@@ -1307,6 +1307,7 @@ gint32 CFileImage::TruncBlkIndirect(
                 dwBitBlkIdx, ( guint8* )pbit );
             if( ERROR( ret ) )
                 break;
+            ret = 0;
         }
     }while( 0 );
     return ret;
@@ -1497,6 +1498,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
                         ( guint8* )itr->second->ptr() );
                     if( ERROR( ret ) )
                         break;
+                    ret = 0;
                 }
             }
         }
@@ -1519,6 +1521,7 @@ gint32 CFileImage::TruncBlkSecIndirect(
                 ( guint8* )pbitd );
             if( ERROR( ret ) )
                 break;
+            ret = 0;
         }
     }while( 0 );
     return ret;
