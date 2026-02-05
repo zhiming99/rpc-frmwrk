@@ -6,7 +6,7 @@
 ## 另一种快速编译`rpc-frmwrk`的途径
 1. 下载如下三个文件 [buildall-deb.sh](../tools/buildall-deb.sh), [buildall-fed.sh](../tools/buildall-fed.sh), 和[makerpcf.sh](../tools/makerpcf.sh)到同一个目录下.
 2. 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。
-3. 我们还提供一个树莓派的的编译脚本[buildall-rasp.sh](../tools/buildall-rasp.sh)，和[makerpcf-rasp.sh](../tools/makerpcf-rasp.sh)。它主要是裁减了几个比较占资源的功能模块，以降低下载失败的概率，和加快编译速度。
+3. 我们还提供一个树莓派的的编译脚本[buildall-rasp.sh](../tools/buildall-rasp.sh)，和[makerpcf-rasp.sh](../tools/makerpcf-rasp.sh)。它主要是裁减了几个比较占资源的功能模块，以降低下载失败的概率，和加快编译速度。下面的`交叉编译`一节还提供了使用Docker生成树莓派代码的方法。
 
 ## 硬核编译`rpc-frmwrk`的方法
 ### 搭建编译环境
@@ -33,14 +33,20 @@
 |6|krb5|安全认证模块|krb5是用来支持Kerberos认证的框架，因此关闭此模块，所有的认证功能都被关闭.`bash cfgsel -r --disable-krb5`将关闭此功能.|依赖于openssl或gmssl|可以禁用|
 |7|openssl和gmssl|安全连接模块|这两个模块都是提供安全连接的功能，根据需要，关闭其中的一个，不影响另一个的工作, GmSSL是国产的安全连接软件，使用SM2+SM4的安全连接。如`bash cfgsel -r disable-openssl`将关闭openssl的支持|可以禁用其中一个|
 ### 在X86平台上编译`rpc-frmwrk`:
-1. 运行`bash cfgsel -r`或者`bash cfgsel -d`生成release版或debug版的Makefile树. release版是编译器优化过的版本，而debug版是没有优化并带有debug symbol的代码，适合调试用。这里[`cfgsel`](https://github.com/zhiming99/rpc-frmwrk/blob/master/cfgsel)是脚本`configure`的wrapper, 并增加了debug/release的命令选项，同时它会转发其他命令选项给`configure`. 比如`rpc-frmwrk`有许多可配置特性, 包括 `gmssl`, `openssl`, `fuse3`, `auth`, `python`, `java`, `js` `testcases`等. 缺省时, 这些特性将全部编译. 但是如果目标系统有资源限制或者额外考虑，可以用`bash cfgsel -[rd] --disable-xxx`关闭一些特性. 比如 `bash cfgsel -r --disable-fuse3 --disable-openssl --disable-js`.
-3. 运行 `make && make install`编译并安装.
+1. 运行`bash cfgsel -r`或者`bash cfgsel -d`生成release版或debug版的Makefile树. release版是编译器优化过的版本，而debug版是没有优化并带有debug symbol的代码，适合调试用。这里[`cfgsel`](https://github.com/zhiming99/rpc-frmwrk/blob/master/cfgsel)是脚本`configure`的wrapper, 并增加了debug/release的命令选项，同时它会转发其他命令选项给`configure`. 比如`rpc-frmwrk`有许多可配置特性, 包括 `gmssl`, `openssl`, `fuse3`, `auth`, `python`, `java`, `js` `testcases`等. 缺省时, 这些特性将全部编译. 但是如果目标系统有资源限制或者额外考虑，可以用`bash cfgsel -[rd] --disable-xxx`关闭一些特性. 下面是一些配置的例子 
+    * `bash cfgsel -r`
+    * `bash cfgsel -r --disable-java --disable-krb5 --disable-js --disable-testcases`.    
+       禁用Java和JS的框架生成功能，禁用kerberos认证，禁用测试用例。安装的开发工具较少，编译时间短（副作用是没有网页版监视器）。
+    * `bash cfgsel -d`    
+       构建调试版，会产生更多的调试信息，并适合gdb调试。
+3. 运行 `make && make install`编译并安装.   
+   如果你的机器强大，可以考虑`make -j4`(4是可并行编译的进程数，可以更多)，以加快编译速度. 
 4. 运行 `make deb` 可以生成一个deb包.
 5. 运行 `make rpm` 可以生成一个rpm包.
-6. 如果你的机器十分强大，可以考虑在make命令后加`-j n`(n is number of parallel tasks)，可以加快编译速度. 
+ 
 
 ### 在树梅派上编译`rpc-frmwrk`:
-* 过程同X86上的编译。树莓派上，编译时执行`make`即可，使用`make -j4`，有时会死机。
+* 过程同X86上的编译。树莓派上，编译时使用`make`即可，使用`make -j4`，有时会死机。
 
 ### 交叉编译
 * 建议使用docker，方法如下
