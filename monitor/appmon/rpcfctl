@@ -175,13 +175,13 @@ case "$cmd" in
         bash $cmddir/listapps.sh
         ;;
     startall)
-        if ! bash rpcfctl start appmonsvr1; then
+        if ! rpcfctl start appmonsvr1; then
             echo failed to start appmonsvr1, quit
             exit 1
         fi
-        bash rpcfctl start loggersvr1
-        bash rpcfctl start timer1
-        bash rpcfctl start rpcrouter1
+        rpcfctl start loggersvr1
+        rpcfctl start timer1
+        rpcfctl start rpcrouter1
         if check_appreg_mount; then
             pushd ${rootdir}/apps
             arrApps=$(ls -d * )
@@ -214,16 +214,16 @@ case "$cmd" in
             popd
             undo_check_appreg_mount
         fi
-        bash rpcfctl stop rpcrouter1
-        bash rpcfctl stop timer1
-        bash rpcfctl stop loggersvr1
-        bash rpcfctl stop appmonsvr1
+        rpcfctl stop rpcrouter1
+        rpcfctl stop timer1
+        rpcfctl stop loggersvr1
+        rpcfctl stop appmonsvr1
         ;;
     restartall)
         echo "stopping all the applications..."
-        bash rpcfctl stopall
+        rpcfctl stopall
         echo "starting all the applications..."
-        bash rpcfctl startall
+        rpcfctl startall
         ;;
     addapp | add)
         if [[ $# -lt 1 ]]; then
@@ -316,7 +316,7 @@ case "$cmd" in
         ;;
     initappreg)
         echo Warning 'initappreg' will clear the app registry,
-        if ! bash rpcfctl clearmount; then
+        if ! rpcfctl clearmount; then
             echo initappreg fails
             exit $?
         fi
@@ -327,7 +327,16 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
-        bash $cmddir/inituser.sh; bash $cmddir/initappreg.sh
+        if [[ ! -f $HOME/.rpcf/openssl/signkey.pem ]]; then
+            echo "generate openssl keys"
+            rpcfctl genkeys openssl 1 1
+        fi
+        if [[ ! -f $HOME/.rpcf/gmssl/signkey.pem ]]; then
+            rpcfctl genkeys gmssl 1 1
+        fi
+        bash $cmddir/inituser.sh -s
+        bash $cmddir/initappreg.sh -s
+        rpcfctl clearmount;
         ;;
     initcli)
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`

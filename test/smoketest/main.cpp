@@ -68,6 +68,7 @@ class CSmokeTest :
 
             ret = pSvc->Stop();
             CPPUNIT_ASSERT( SUCCEEDED( ret ) );
+            pMgr.Clear();
 
             ret = CoUninitialize();
             CPPUNIT_ASSERT( SUCCEEDED( ret ) );
