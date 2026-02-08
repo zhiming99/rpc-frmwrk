@@ -100,10 +100,6 @@ fi
 popd > /dev/null
 
 echo adding user 'admin'
-if (( $bSilent==0 )); then
-    bash $addu -p admin
-else
-    bash $addu -p admin <<< "123"
-    echo -e "\033[0;33madmin's password is set to '123', and don't forget to change the weak password.\033[0m"
-fi
+bash $addu -p admin
+
 bash $modu -g admin admin

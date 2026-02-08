@@ -209,8 +209,13 @@ def GetNginxVersion() -> Tuple[int,int,int]:
     return (0,0,0)
 
 def IsApacheInstalled()->bool:
-    if os.access( '/usr/sbin/httpd', os.X_OK | os.R_OK ):
-        return True
+    strDist = GetDistName();
+    if strDist == "debian" or strDist == "ubuntu" :
+        if os.access( '/usr/sbin/apache2', os.X_OK | os.R_OK ):
+            return True
+    elif strDist == "fedora":
+        if os.access( '/usr/sbin/httpd', os.X_OK | os.R_OK ):
+            return True
     return False
 
 def IsSudoAvailable()->bool:
@@ -442,15 +447,16 @@ def Config_Apache( initCfg : object )->int:
       SSLProxyCheckPeerCN off
       SSLProxyCheckPeerExpire off
 
-      ProxyPass /{AppName} wss://{IpAddress}:{PortNum}/
-      ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyRequests off
-      ProxyWebsocketIdleTimeout 300
-      RequestHeader set X-Forwarded-For %${{REMOTE_ADDR}}s
-      RequestHeader set X-Forwarded-Port %${{REMOTE_PORT}}s
+      <location "/{AppName}">
+          ProxyPass wss://{IpAddress}:{PortNum}/ keepalive=on timeout=300
+          ProxyPassReverse wss://{IpAddress}:{PortNum}/
+          RequestHeader set X-Forwarded-For {IpAddress}
+          RequestHeader set X-Forwarded-Port {PortNum}
+      </location>
 
-      Alias /rpcf /var/www/rpcf
-      <Directory /var/www/rpcf>
+      Alias /rpcf /var/www/html/rpcf
+      <Directory /var/www/html/rpcf>
           Options Indexes FollowSymLinks
           AllowOverride None
           Require all granted
@@ -465,7 +471,8 @@ def Config_Apache( initCfg : object )->int:
     if ret < 0:
         return ret
     cmdline += keyCmds
-    cfgFile = "/tmp/rpcf_apache.conf"
+    cfgName = "rpcf_apache.conf"
+    cfgFile = "/tmp/" + cfgName
     fp = open( cfgFile, "w" )
     for o in oResps :
         cfg = cfgText.format( IpAddress = o['IpAddress'],
@@ -485,11 +492,21 @@ def Config_Apache( initCfg : object )->int:
         if not os.access( strMonCliPkg, os.R_OK ):
             strMonCliPkg = ""
 
-    cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile + ";"
+    strDist = GetDistName();
+
+    if strDist == "debian" or strDist == "ubuntu" :
+        cmdline += "{sudo} a2enmod headers request ssl remoteip rewrite proxy proxy_wstunnel;"
+        cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/apache2/sites-available && rm " + cfgFile + ";"
+        cmdline += "cd /etc/apache2/sites-enabled && ( {sudo} rm ./rpcf_apache.conf;"
+        cmdline += "{sudo} ln -s /etc/apache2/sites-available/rpcf_apache.conf ) && "
+    elif strDist == "fedora":
+        cmdline += "{sudo} a2enmod headers request ssl remoteip rewrite proxy proxy_wstunnel;"
+        cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile + ";"
+
     if len( strMonCliPkg ) > 0:
         strRpcfPath = "/var/www/html/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "{sudo} systemctl restart httpd"
+    cmdline += "{sudo} apachectl restart"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
     else:
@@ -536,8 +553,7 @@ def ConfigWebServer2( initCfg : object )->int:
         elif IsApacheInstalled():
             ret = Config_Apache( initCfg )
             if ret == 0:
-                print( "Apache httpd is configured. And " +
-                    "make sure mod_ssl is installed" )
+                print( "Apache httpd is configured successfully" )
     except Exception as err:
         print( err )
         if ret == 0:

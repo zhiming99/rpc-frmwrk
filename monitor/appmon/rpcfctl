@@ -327,6 +327,7 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
+        rpcfctl clearmount
         if [[ ! -f $HOME/.rpcf/openssl/signkey.pem ]]; then
             echo "generate openssl keys"
             rpcfctl genkeys openssl 1 1
@@ -334,11 +335,27 @@ case "$cmd" in
         if [[ ! -f $HOME/.rpcf/gmssl/signkey.pem ]]; then
             rpcfctl genkeys gmssl 1 1
         fi
-        bash $cmddir/inituser.sh -s
+
+        if command -v expect > /dev/null; then
+            expect - << EOF > /dev/null
+#!/usr/bin/expect -f
+set timeout -1
+spawn $cmddir/inituser.sh -s 
+expect {
+    "Password:" { send "123\n";exp_continue}
+    "Enter again:" { send "123\n";exp_continue} 
+}
+EOF
+            echo -e "\033[0;33madmin's password is set to '123'\033[0m"
+            echo -e "\033[0;33mand you can change it with 'rpcfctl password admin'\033[0m"
+        else
+            bash $cmddir/inituser.sh -s
+        fi
         bash $cmddir/initappreg.sh -s
         rpcfctl clearmount;
         ;;
     initcli)
+        rpcfctl clearmount
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$authmech" == "xSimpAuth" ]] ||
             [[ "x$authmech" == "xOAuth2" ]]; then
