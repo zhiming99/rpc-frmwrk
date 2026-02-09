@@ -3,6 +3,7 @@
   - [连接页(Connection)](#连接页connection)
   - [安全页(Security)](#安全页security)
   - [级联页(Multihop)](#级联页multihop)
+- [命令行工具rpcfctl](#命令行工具rpcfctl)
 - [快速构建rpc-frmwrk的方法](#快速构建rpc-frmwrk的方法)
   - [Docker容器](#docker容器)
   - [使用shell脚本](#使用shell脚本)

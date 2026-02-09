@@ -430,8 +430,43 @@ upstream {AppName} {{
     ret = rpcf_system( actCmd )
     return ret
 
-def Config_Apache( initCfg : object )->int:
-    cfgText = '''<VirtualHost *:{WsPortNum}>
+def GetCfgTextFedora()->str:
+    return '''<VirtualHost *:{WsPortNum}>
+      ServerName "{ServerName}"
+      SSLEngine on
+      SSLCertificateFile "{CertFile}"
+      SSLCertificateKeyFile "{KeyFile}"
+
+      RewriteEngine on
+      RewriteCond ${{HTTP:Upgrade}} websocket [NC]
+      RewriteCond ${{HTTP:Connection}} upgrade [NC]
+      RewriteRule .* "wss://{IpAddress}:{PortNum}/$1" [P,L]
+
+      SSLProxyEngine on
+      SSLProxyVerify none
+      SSLProxyCheckPeerCN off
+      SSLProxyCheckPeerExpire off
+
+      ProxyPass /{AppName} wss://{IpAddress}:{PortNum}/
+      ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
+      ProxyRequests off
+      ProxyWebsocketIdleTimeout 300
+      RequestHeader set X-Forwarded-For {IpAddress}
+      RequestHeader set X-Forwarded-Port {PortNum}
+
+      Alias /rpcf /var/www/rpcf
+      <Directory /var/www/rpcf>
+          Options Indexes FollowSymLinks
+          AllowOverride None
+          Require all granted
+      </Directory>
+
+</VirtualHost>
+
+'''
+
+def GetCfgTextDebian()->str:
+    return '''<VirtualHost *:{WsPortNum}>
       ServerName "{ServerName}"
       SSLEngine on
       SSLCertificateFile "{CertFile}"
@@ -465,6 +500,18 @@ def Config_Apache( initCfg : object )->int:
 </VirtualHost>
 
 '''
+
+def Config_Apache( initCfg : object )->int:
+    strDist = GetDistName()
+
+    if strDist == "debian" or strDist == "ubuntu" :
+        cfgText = GetCfgTextDebian()
+    elif strDist == "fedora":
+        cfgText = GetCfgTextFedora()
+    else:
+         print( "Unsupported distribution for Apache httpd configuration" )
+         return -errno.ENOTSUP
+
     oResps = ExtractParams( initCfg )
     cmdline = ""
     ret, keyCmds = InstallKeys( oResps )
@@ -492,15 +539,12 @@ def Config_Apache( initCfg : object )->int:
         if not os.access( strMonCliPkg, os.R_OK ):
             strMonCliPkg = ""
 
-    strDist = GetDistName();
-
     if strDist == "debian" or strDist == "ubuntu" :
         cmdline += "{sudo} a2enmod headers request ssl remoteip rewrite proxy proxy_wstunnel;"
         cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/apache2/sites-available && rm " + cfgFile + ";"
         cmdline += "cd /etc/apache2/sites-enabled && ( {sudo} rm ./rpcf_apache.conf;"
         cmdline += "{sudo} ln -s /etc/apache2/sites-available/rpcf_apache.conf ) && "
     elif strDist == "fedora":
-        cmdline += "{sudo} a2enmod headers request ssl remoteip rewrite proxy proxy_wstunnel;"
         cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/httpd/conf.d && rm " + cfgFile + ";"
 
     if len( strMonCliPkg ) > 0:
