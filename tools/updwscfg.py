@@ -430,7 +430,7 @@ upstream {AppName} {{
     ret = rpcf_system( actCmd )
     return ret
 
-def GetCfgTextFedora()->str:
+def GetApacheCfgTextFedora()->str:
     return '''<VirtualHost *:{WsPortNum}>
       ServerName "{ServerName}"
       SSLEngine on
@@ -447,15 +447,14 @@ def GetCfgTextFedora()->str:
       SSLProxyCheckPeerCN off
       SSLProxyCheckPeerExpire off
 
-      ProxyPass /{AppName} wss://{IpAddress}:{PortNum}/
+      ProxyPass /{AppName} wss://{IpAddress}:{PortNum}/ keepalive=on timeout=300
       ProxyPassReverse /{AppName} wss://{IpAddress}:{PortNum}/
       ProxyRequests off
-      ProxyWebsocketIdleTimeout 300
       RequestHeader set X-Forwarded-For {IpAddress}
       RequestHeader set X-Forwarded-Port {PortNum}
 
-      Alias /rpcf /var/www/rpcf
-      <Directory /var/www/rpcf>
+      Alias /rpcf /var/www/html/rpcf
+      <Directory /var/www/html/rpcf>
           Options Indexes FollowSymLinks
           AllowOverride None
           Require all granted
@@ -465,7 +464,7 @@ def GetCfgTextFedora()->str:
 
 '''
 
-def GetCfgTextDebian()->str:
+def GetApacheCfgTextDebian()->str:
     return '''<VirtualHost *:{WsPortNum}>
       ServerName "{ServerName}"
       SSLEngine on
@@ -505,9 +504,9 @@ def Config_Apache( initCfg : object )->int:
     strDist = GetDistName()
 
     if strDist == "debian" or strDist == "ubuntu" :
-        cfgText = GetCfgTextDebian()
+        cfgText = GetApacheCfgTextDebian()
     elif strDist == "fedora":
-        cfgText = GetCfgTextFedora()
+        cfgText = GetApacheCfgTextFedora()
     else:
          print( "Unsupported distribution for Apache httpd configuration" )
          return -errno.ENOTSUP

@@ -211,6 +211,8 @@ class CRpcWebSockFido : public CPort
         BufPtr& pBuf );
 
     gint32 OnPortReady( IRP* pIrp ) override;
+    void OnPortStartFailed(
+        IRP* pIrp, gint32 iRet ) override;
 };
 
 class CRpcWebSockFidoDrv :
