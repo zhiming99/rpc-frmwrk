@@ -5,7 +5,7 @@
    * 本监视器使用`用户名+密码`的方式登陆，后端可以接内建的`SimpAuth`认证，或者第三方的`OAuth2`认证。
 
 ### 部署和使用网页版Rpc-Frmwrk监视器
-   * 首先确保目标机器安装了`nginx`。`apache`也可以使用，不过目前还没测试。
+   * 首先确保目标机器安装了`nginx`。`apache`也可以使用。
    * 通过[`rpcfctl cfg`](../../../appmon/rpcfctl_cn.md#主要命令)配置rpc-frmwrk，并启用`websocket`，`SSL`和`Auth`(认证登陆)
    * 通过命令`rpcfctl initsvr`建立监视器运行环境。该命令将建立`用户注册表`和`应用注册表`，和一个`admin`用户。初始的密码为`123`。管理员可以通过命令`rpcfctl password <用户名>`修改。
    * 运行`rpcfctl cfgweb`将部署monitor的网页到web服务器。
