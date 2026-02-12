@@ -33,7 +33,7 @@
 17. [`rpc-frwmrk监控器`](./monitor/client/js/appmoncli/README_cn.md)
 
 ## 开发RPC应用程序
-通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, hwclismkPython, Java, JavaScript)的两种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
+通过`rpc-frmwrk`的接口描述语言(`ridl`)和编译器(`ridlc`), `rpc-frmwrk`提供四种语言(C++, Python, Java, JavaScript)的两种模式的`RPC`应用程序的开发.关于`ridl`详细信息请参考这篇[文章](./ridl/README_cn.md)
 1. `微服务模式`： `rpc-frmwrk`最早支持的的架构，用户通过运用`rpc-frmwrk`运行库提供的接口，和各种内建的工具类，执行同步，异步，超时，取消，以及`流`传输等功能，从而实现高性能的业务逻辑。`微服务模式`的可以动态的启停各个微服务，不需要中断其他的线上服务。
 2. `紧凑模式`：如果对性能要求较高，你也可以使用`ridlc`生成传统的C/S架构，服务器和客户端，是两个单独的程序，特点是延迟小，吞吐量大，扩展性灵活性稍弱。
 3. 对于`rpc-frmwrk`的开发和技术细节感兴趣的读者，可以更进一步阅读[rpc-frmwrk的开发教程](./docs/Tut-Index.md)。
