@@ -16,7 +16,7 @@ RUN apt-get install -y --fix-missing gcc g++ python3 python3-dev python3-pip pyt
 libtool shtool automake autoconf autotools-dev make dbus dbus-bin libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev lz4 openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
-libfuse3-3 libfuse3-dev krb5-kdc krb5-admin-server krb5-user \
+libfuse3-3 libfuse3-dev fuse3 krb5-kdc krb5-admin-server krb5-user \
 bash net-tools procps swig cmake attr \
 libcommons-cli-java curl figlet
 RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
@@ -25,7 +25,7 @@ RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
 # site instead.
 
 RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
- && source ${HOME}/.bashrc && nvm install 20 && node -v
+ && . ${HOME}/.bashrc && nvm install 20 && node -v
 
 RUN apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24

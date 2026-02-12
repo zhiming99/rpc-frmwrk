@@ -195,7 +195,9 @@ chown $uid:$gid ./apps
 #leaving approot
 popd > /dev/null
 fusermount3 -u ./testmnt
-rmdir ./testmnt
+if ! mountpoint ./testmnt > /dev/null; then
+    rmdir ./testmnt
+fi
 if [ ! -d appmonroot ]; then
     mkdir appmonroot
 fi

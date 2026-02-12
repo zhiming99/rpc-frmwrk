@@ -754,6 +754,7 @@ function set_password()
         echo you can change the password later with rpcfmodu
         return 1
     fi
+    password=$(echo -e "$password" | tr -d '\r\n' )
     #salt=`tr -dc A-Za-z0-9 </dev/urandom | head -c 13; echo`
     salt=`echo -n $_uname | sha256sum | awk '{print $1}' | tr '[:lower:]' '[:upper:]'`
     firsthash=`echo -n $password | sha256sum | awk '{print $1}' | tr '[:lower:]' '[:upper:]'`

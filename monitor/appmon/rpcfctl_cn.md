@@ -212,13 +212,14 @@ rpcfctl <命令> [参数]
 ## 示例
 
 ```bash
-rpcfctl start myapp
-rpcfctl setpv abcapp mypoint i 0
-rpcfctl getattr abcapp mypoint ptype
-rpcfctl addlink abcapp1 algout abcapp2 algin
-rpcfctl importkey openssl /path/to/key.pem /path/to/cert.pem /path/to/cacert.pem
-rpcfctl geninitcfg > /tmp/initcfg.json
-rpcfctl login alice
+rpcfctl startall                              # 启动所有已注册的应用程序。
+rpcfctl setpv abcapp mypoint i 0              # 设置应用abcapp的一个名为mypoint的设置点的值为0
+rpcfctl getattr abcapp mypoint ptype          # 获取应用abcapp的一个名为mypoint的设置点的‘点类型’属性
+rpcfctl addlink abcapp1 algout abcapp2 algin  # 连接abcapp1的输出点algout和abcapp2的输入点algin，这样algout有变化时，将推送给algin
+rpcfctl importkey openssl /path/to/key.pem /path/to/cert.pem /path/to/cacert.pem # 导入一个用户提供的openssl的证书和密钥
+rpcfctl geninitcfg > /tmp/initcfg.json        # 打印当前rpc-frmwrk的配置信息到/tmp/initcfg.json
+rpcfctl login alice                           # 客户端以‘alice'登陆，时用于'SimpAuth'或’OAuth2‘认证方式.
+rpcfctl password alice                        # 修改用户'alice'的密码
 ```
 
 ---
@@ -226,13 +227,14 @@ rpcfctl login alice
 ## 相关文件
 
 - showapp.sh, getpv.sh, setpv.sh, listapps.sh, addapp.sh, rmapp.sh, initappreg.sh, inituser.sh, updattr.py, updatekeys.py, rpcfaddu.sh, rpcfrmu.sh, rpcfshow.sh, rpcfaddg.sh, rpcfrmg.sh, rpcfmodu.sh, updwscfg.sh, updk5cfg.sh, sinit, oinit.py, rpcfg.py logtool.py 
-  这些辅助脚本通常与 rpcfctl 位于同一目录或 `rpcf` 子目录下。
+- 这些辅助脚本通常与 rpcfctl 位于同一目录或 `rpcf` 子目录下，并且可以独立运行。
 
-## 名词解释
-`应用`在本文中指支持rpc-frmwrk的monitor功能的服务器程序。它可以由`ridlc`生成，或者手写实现。一个支持monitor的程序还必须在注册表中注册，才能使`appmonsvr`(monitor的服务器程序)和该应用程序建立起通信和管理。注册的过程如下：
-* 由`ridlc`生成一个程序框架，并通过选项`-m <appname>`来指定注册表中使用的名称。
+## 应用程序启用监控功能的方法
+`rpcfctl`的一个重要功能是管理注册的应用程序。`应用程序`在本文中指支持rpc-frmwrk的监控功能的服务器程序。它可以由`ridlc`生成，也可以手写实现。一个支持监控的程序还必须在注册表中注册，才能使`appmonsvr`(监控功能的服务器程序)和该应用程序建立起通信和管理。注册的过程如下：
+* 由`ridlc`生成一个服务器端框架, C++, Python, 或者Java都可以，并使用选项`-m <appname>`通知ridlc该应用需要监控功能，注册的应用名称为'appname'。
 * 在终端运行命令`rpcfctl addapp <appname>`,就完成了99%的注册。
 * 最后一步，手动运行rpc服务器端的程序。这一过程将会向注册表添加启动信息。当下次启动该服务器时，就可以使用`rpcfctl startall` 或者`rpcfctl start <appname>`在启动该服务器程序了。
+* 对于需要定制化的点位，可以通过命令`rpcfctl addpoint`自行添加。也可以通过`rpcfctl rmpoint`删除不必要的点位。
 
 ---
 

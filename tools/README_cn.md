@@ -3,6 +3,7 @@
   - [连接页(Connection)](#连接页connection)
   - [安全页(Security)](#安全页security)
   - [级联页(Multihop)](#级联页multihop)
+- [命令行工具rpcfctl](#命令行工具rpcfctl)
 - [快速构建rpc-frmwrk的方法](#快速构建rpc-frmwrk的方法)
   - [Docker容器](#docker容器)
   - [使用shell脚本](#使用shell脚本)
@@ -89,6 +90,9 @@
    * 启用安全连接(SSL)。
    * 删除本节点(Remove Node X)。
 
+# 命令行工具`rpcfctl`
+`rpcfctl`是rpc-frmwrk的命令行工具集，通过`rpcfctl`可以调用rpc-frmwrk的各种配置，管理和监控功能。其中`rpcfctl cfg`即是打开`rpcfg.py`。对于没有图形界面的控制台用户，`rpcfctl`更是必不可少的配置和管理工具。有关`rpcfctl`的详细信息可以参看[`rpc-frmwrk应用控制工具`](../monitor/appmon/rpcfctl_cn.md)。
+
 # 快速构建rpc-frmwrk的方法
 ## Docker容器
   rpc-frmwrk提供了Dockerfile，可以快速的建立编译和运行环境。
@@ -97,9 +101,6 @@
   * 你也可以对Dockerfile做一些修改，来时应自己的使用习惯和运行环境。
   * 运行docker的命令行`sudo docker run -it --rm --device /dev/fuse --privileged image-tag '/bin/bash'`. 注意选项`--device /dev/fuse`。
   * 对于国内的用户，建议使用国内的docker加速镜像，体验会非常好。
-## 使用shell脚本
-  * 下载如下三个文件 [buildall-deb.sh](./buildall-deb.sh), [buildall-fed.sh](./buildall-fed.sh), 和[makerpcf.sh](./makerpcf.sh)到同一个目录下.
-  * 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。
   * 你还可以在命令行下载docker镜像 `docker pull zhiming99/rpc-frmwrk:server` 和 `docker pull zhiming99/rpc-frmwrk:client`。注意运行时把服务器端容器ip地址设为`172.17.0.2`,客户端容器ip地址设成`172.17.0.3`。两个镜像里面的`/root`目录下都有`readme.md`，提供简单的提示。这两个容器设置的是使用websoket，所以在容器里需要启动nginx。
   * 更详细的构建rpc-frmwrk的方法请参考这篇[文章](../docs/Tut-HowToBuild_cn-9.md)。
 

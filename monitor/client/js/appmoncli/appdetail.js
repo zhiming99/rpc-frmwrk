@@ -266,7 +266,7 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
             logData.readUint32BE( dwOffset + wRecSize) -
             logData.readUint32BE( dwOffset )
         var dwRecToRead = dwNumRec
-        if( timeRangeSec > 0 && dwInterval > 1 )
+        if( timeRangeSec > 0 && dwInterval >= 1 )
         {
             dwRecToRead = Math.floor( timeRangeSec / dwInterval )
             if( dwRecToRead < dwNumRec)
@@ -275,6 +275,7 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
                 dwRecToRead = dwNumRec
         }
 
+        var valMax = 0, valMin = 0, distArr = []
         for( var i = 0; i < dwRecToRead; i++ )
         {
             dwTimeStamp = logData.readUint32BE( dwOffset )
@@ -310,6 +311,13 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
             }
             if( val === null )
                 throw new Error( `Error ${strType} not supported`)
+
+            if( val > valMax )
+                valMax = val
+
+            if( val < valMin )
+                valMin = val
+
             if( avgalgo == AvgAlgo.algoDiff)
             {
                 if( i > 0 )
@@ -320,6 +328,48 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
                 arrTimeSeries.push([dwTimeStamp,val ])
             dwOffset += wRecSize
         }
+
+        for( var i = -10; i < 10; i++ )
+            distArr.push( {val: valMin + ( valMax - valMin ) * i / 20, count: 0 } )
+        distArr.push( {val: valMax, count: 0 } )
+
+        for( var i = 0; i < arrTimeSeries.length; i++ )
+        {
+            var val = arrTimeSeries[i][1]
+            for( var j = 0; j < distArr.length; j++ )
+            {
+                if( val <= distArr[j].val )
+                {
+                    distArr[j].count++
+                    break;
+                }
+            }
+        }
+        var countMin = 0
+        var countMax = 0
+
+        var lowIdx = 0;
+        for( var i = 0; i <= 10; i++ )
+        {
+            if( countMin / arrTimeSeries.length > 0.02 )
+                break
+            lowIdx = i
+            countMin += distArr[i].count
+        }
+        var lowThreshold = distArr[lowIdx].val
+
+        var highIdx = distArr.length - 1
+        for( var i = distArr.length - 1; i > 10; i-- )
+        {
+            if( countMax / arrTimeSeries.length > 0.02 )
+                break
+            highIdx = i
+            countMax += distArr[i].count
+        }
+        var highThreshold = distArr[highIdx].val
+
+        arrTimeSeries = arrTimeSeries.filter(
+            item => item[1] >= lowThreshold && item[1] <= highThreshold )
         return arrTimeSeries
     }
     catch(e){

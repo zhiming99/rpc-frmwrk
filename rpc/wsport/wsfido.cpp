@@ -498,10 +498,10 @@ gint32 CRpcWebSockFido::PreStop(
 
     gint32 ret = 0;
     bool bExpected = false;
+    ClearTask( enumHsTask );
     if( m_bCloseSent.compare_exchange_strong(
         bExpected, true ) )
     {
-        ClearTask( enumHsTask );
         ret = ScheduleCloseTask( pIrp,
             ERROR_PORT_STOPPED, true );
         if( SUCCEEDED( ret ) )
@@ -535,15 +535,16 @@ gint32 CRpcWebSockFido::ScheduleCloseTask(
         oParams.SetIntProp( propTimeoutSec, 20 );
         oParams.SetPointer( propIoMgr, GetIoMgr() );
 
-        ret = m_vecTasks[ enumCloseTask ].NewObj(
-            clsid( CWsCloseTask ),
-            oParams.GetCfg() );
-
-        if( ERROR( ret ) )
-            break;
-
-        ret = GetIoMgr()->RescheduleTask(
-            m_vecTasks[ enumCloseTask ] );
+        {
+            CStdRMutex oPortLock( GetLock() );
+            ret = m_vecTasks[ enumCloseTask ].NewObj(
+                clsid( CWsCloseTask ),
+                oParams.GetCfg() );
+            if( ERROR( ret ) )
+                break;
+            ret = GetIoMgr()->RescheduleTask(
+                m_vecTasks[ enumCloseTask ] );
+        }
 
     }while( 0 );
 
@@ -1337,6 +1338,26 @@ gint32 CRpcWebSockFido::OnPortReady( IRP* pIrp )
     }while( 0 );
     ret = super::OnPortReady( pIrp );
     return ret;
+}
+
+void CRpcWebSockFido::OnPortStartFailed(
+    IRP* pIrp, gint32 ret )
+{
+    gint32 (*func)( CRpcWebSockFido* ,
+        IRP* , gint32 ) =
+        ( []( CRpcWebSockFido* pPort,
+            PIRP pIrp, gint32 iRet )->gint32
+        {
+            pPort->ClearTask( enumHsTask );  
+            return 0;
+        });
+    TaskletPtr pTask;
+    gint32 iRet = NEW_FUNCCALL_TASK(
+        pTask, this->GetIoMgr(), func,
+        this, pIrp, ret );
+    if( ERROR( iRet ) )
+        return;
+    this->AddSeqTask( pTask );
 }
 
 gint32 CRpcWebSockFidoDrv::Probe(

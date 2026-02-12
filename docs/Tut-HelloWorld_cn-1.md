@@ -9,6 +9,8 @@
 ### 项目需求
 客户端发送字符串`Hello, World!`到服务器，接受服务器的响应，并打印。
 
+### 仅参考命令的读者请跳到文章结尾
+
 ### 生成HelloWorld的C++项目框架
 我们使用[hellowld.ridl](../examples/hellowld.ridl)来生成该[项目框架](../examples/cpp/hellowld/)。
 #### 首先，先看看该ridl里的内容：
@@ -147,5 +149,16 @@
   * 当出现`Echo request succeeded with resp 'Hello, World!'(0)`时，表示项目需求已完成。
   * 我们之所以使用同一机器为的是简单。更理想的方式是在两台机器上作实验，或者在虚拟机，Docker容器里也可以。就留给大家自行练习吧。
 
+### 总结本节用到的命令：
+  * 所有操作均在`rpc-frmwrk`的源代码树下
+  * `rpcrouter -dr 2;rpcrouter -dr 1`
+  * `mkdir -p examples/cpp/hellowld;cd examples/cpp`   
+  * `ridlc -Lcn -O ./hellowld  ../hellowld.ridl`
+  * 修改和添加业务代码
+  * `cd hellowld;make`
+  * `release/HelloWorldsvr &`
+  * `release/HelloWorldcli`
+
 [下一讲](./Tut-SendEvent_cn-2.md)   
 [上一讲](./Tut-Overview_cn-0.md)   
+[目录](./Tut-Index.md)   

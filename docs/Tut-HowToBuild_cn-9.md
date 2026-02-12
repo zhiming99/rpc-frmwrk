@@ -2,11 +2,7 @@
 
 # rpc-frmwrk开发教程
 ## 第九节 如何编译rpc-frmwrk
-首先，熟悉docker的用户，或者急性子的用户可以参考[这篇文章](../tools/README_cn.md#docker容器)用docker快速搭建一个`rpc-frmwrk`的运行环境。
-## 另一种快速编译`rpc-frmwrk`的途径
-1. 下载如下三个文件 [buildall-deb.sh](../tools/buildall-deb.sh), [buildall-fed.sh](../tools/buildall-fed.sh), 和[makerpcf.sh](../tools/makerpcf.sh)到同一个目录下.
-2. 在debian或者ubuntu类的平台上执行命令`bash buildall-deb.sh`, 或者在fedora上执行命令`bash buildall-fed.sh`。
-3. 我们还提供一个树莓派的的编译脚本[buildall-rasp.sh](../tools/buildall-rasp.sh)，和[makerpcf-rasp.sh](../tools/makerpcf-rasp.sh)。它主要是裁减了几个比较占资源的功能模块，以降低下载失败的概率，和加快编译速度。下面的`交叉编译`一节还提供了使用Docker生成树莓派代码的方法。
+首先，熟悉docker的用户，或者急性子的用户可以参考[这篇文章](../tools/README_cn.md#Docker容器)用docker快速搭建一个`rpc-frmwrk`的运行环境。
 
 ## 硬核编译`rpc-frmwrk`的方法
 ### 搭建编译环境
@@ -15,12 +11,12 @@
 3. 生成Python框架用到的软件包, ubuntu上是`python3-dev`和`sip-dev`，fedora上，名字略有不同，`python3-devel`和`sip`。还包括`pip`, `numpy` `wheel`这几个重要的python包.
 4. 生成Java框架用到的软件包, 有`openjdk-8`，`swig`和命令行工具`libcommons-cli-java`
 5. 生成JS框架用到的软件包有`npm`. 
-6. 安装其他开发工具包. 在上边提到的`buildall-deb.sh`或者`buildall-fed.sh`文件中有完整的安装包列表供参考。
+6. 安装其他开发工具包. Debian/Ubuntu的用户可参考文件[tools/Dockerfile](../tools/Dockerfile)。Fedora或Centos的用户可以参考文件[tools/buildall-fed.sh](../tools/buildall-fed.sh)。
 7. 从`https://github.com/zhiming99/GmSSL.git`下载GMSSL并按照[说明书](https://github.com/zhiming99/GmSSL/blob/master/README.md)，编译安装GMSSL. 如果不打算使用GmSSL, 可以不用下载，在后面运行`cfgsel`命令时，追加`--disable-gmssl`。
 8. 从`https://github.com/zhiming99/rpc-frmwrk.git`下载`rpc-frmwrk`的代码树。
 9. 在代码的根目录下，运行如下命令初始化编译环境。
     * `libtoolize` 
-    * 运行`autoreconf -vfi`生成`config.h.in`.
+    * 运行`autoreconf -vfi`.
 ### 根据需求裁剪功能模块
 `rpc-frmwrk`目前支持四种语言，两种安全认证方式，两种SSL连接。所以对于不在需求范围的语言和功能，可以进行一些裁减。可裁减的模块有一定的依赖关系，因此在裁减时需要注意。  
 | 序号 | 功能模块 | 描述 | 示例|依赖关系|能否禁用|
@@ -53,10 +49,11 @@
     * 国内的用户需要先配置docker使用国内的docker加速镜像，如腾讯云。
     * 先拉取QEMU虚拟机`sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes`
     * 然后在[`tools`](../tools)目录下运行`sudo docker buildx build --platform linux/armhf -t armhf/rpc-frmwrk:latest -f Dockerfile.arm .`
-    * `Dokerfile`会自动构建armhf的rpc-frmwrk镜像。
+    * `Dokerfile.arm`会自动构建armhf的rpc-frmwrk镜像。这是一个32bit的代码，可以更改`armhf`为`aarch64`，以生成64bit的代码。
     * 这个方法可以在x86的机器上完美生成arm架构的代码。缺点是速度稍微慢一些。
 
 ### 已知问题
-* 由于各个linux的发行版繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈，我们会尽快修复。
+* 由于Linux发行版十分繁杂，不能一一测试，可能会由于软件包的名字错误或者版本过期，导致编译或者连接错误。如有发生，请及时反馈，我们会尽快修复。
 
 [上一讲](./Tut-Debug_cn-8.md)   
+[目录](./Tut-Index.md)   

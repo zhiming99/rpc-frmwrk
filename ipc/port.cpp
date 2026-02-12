@@ -1495,7 +1495,7 @@ gint32 CPort::SubmitPortStackIrp( IRP* pIrp )
             }
             else if( dwMinorCmd == IRP_MN_PNP_STACK_READY )
             {
-                // IRP_MN_PNP_STACK_DESTROY
+                // IRP_MN_PNP_STACK_READY
                 PopState( dwOldState );
                 ret = OnPortStackReady( pIrp );
             }
@@ -2749,23 +2749,21 @@ gint32 CPort::CancelStartStopIrp(
         // set the port to state 'attached'
         if( bStart )
         {
-            ret = SetPortStateWake(
+            if( SetPortStateWake(
                 PORT_STATE_STARTING,
                 PORT_STATE_ATTACHED,
-                true );
+                true ) )
+                OnPortStartFailed( pIrp, ret );
         }
         else
         {
             // FIXME: it is problemic to set the port
             // state to indicate the port has completed
             // the stop command?
-            ret = SetPortStateWake(
+            if( SetPortStateWake(
                 PORT_STATE_STOPPING,
-                PORT_STATE_STOPPED );
-            if( SUCCEEDED( ret ) )
-            {
+                PORT_STATE_STOPPED ) )
                 OnPortStopped();
-            }
         }
 
     }while( 0 );

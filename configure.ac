@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rpcf],[0.8.0],[woodhead99@gmail.com],[rpcf],[https://github.com/zhiming99/rpc-frmwrk])
+AC_INIT([rpcf],[0.9.0],[woodhead99@gmail.com],[rpcf],[https://github.com/zhiming99/rpc-frmwrk])
 AC_CONFIG_SRCDIR([ipc/rpcif.cpp]) AC_CONFIG_HEADERS([config.h])
 AC_CANONICAL_TARGET
 

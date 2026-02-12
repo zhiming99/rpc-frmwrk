@@ -70,13 +70,33 @@ WebSocketFrameType WebSocket::parseHandshake(unsigned char* input_frame, int inp
 				else if(header_key == "X-Forwarded-For")
                 {
                     if( this->peer_address.empty() )
-                        this->peer_address= header_value;
+                    {
+                        auto pos = header_value.find_last_of(',');
+                        // in case there are multiple addresses, we take the
+                        // last one which is the closest to the client
+                        if( pos != std::string::npos )
+                            this->peer_address =
+                                header_value.substr( pos + 1 );
+                        else
+                            this->peer_address= header_value;
+                    }
                     bValid = true;
                 }
-				else if(header_key == "X-Real-IP")
-                    this->peer_address= header_value, bValid = true;
 				else if(header_key == "X-Forwarded-Port")
-                    this->peer_port= strtol( header_value.c_str(), nullptr, 10 ), bValid = true;
+                {
+                    if( peer_port == 0 )
+                    {
+                        auto pos = header_value.find_last_of(',');
+                        if( pos != std::string::npos )
+                            this->peer_port = strtol(
+                                header_value.substr( pos + 1 ).c_str(),
+                                nullptr, 10 );
+                        else
+                            this->peer_port= strtol(
+                                header_value.c_str(), nullptr, 10 );
+                    }
+                    bValid = true;
+                }
 				else if(header_key == "User-Agent")
                     this->user_agent= header_value, bValid = true;
 			}

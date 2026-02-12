@@ -10,12 +10,39 @@ if ! which regfsmnt; then
         to install rpc-frmwrk first
     exit 1
 fi
+OPTIONS="sh" 
+function Usage()
+{
+cat << EOF
+Usage: $0 [-sh]
+    This command initialize the application registry.
+    -h: Print this help
+    -s: format the user registry silently
+EOF
+}
+
+bSilent=0
+while getopts $OPTIONS opt; do
+    case "$opt" in
+    s)  bSilent=1
+        ;;
+    h)
+        Usage
+        exit 0
+        ;;
+    \?)
+        echo $OPTARG >&2
+        Usage
+        exit 1
+        ;;
+    esac
+done
 
 pushd ${HOME} > /dev/null
 if [ ! -d .rpcf ]; then mkdir .rpcf; fi
 cd .rpcf
 if [ ! -d ./testmnt ]; then mkdir ./testmnt; fi
-if [ -f usereg.dat ]; then
+if [[ -f usereg.dat ]] && (( $bSilent == 0 )); then
    echo "you are going to format the user registry, continue ( y/n )?(default: yes)"
    read answer
    if [ "x$answer" == "xy" ] || [ "x$answer" == "xyes" ] || [ "x$answer" == "x" ]; then
@@ -67,9 +94,12 @@ fi
 echo initialization completed.
 cd ..
 fusermount3 -u ./testmnt
-rmdir ./testmnt
+if ! mountpoint ./testmnt > /dev/null;then
+    rmdir ./testmnt
+fi
 popd > /dev/null
 
 echo adding user 'admin'
 bash $addu -p admin
+
 bash $modu -g admin admin
