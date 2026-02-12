@@ -12,7 +12,7 @@
   * 当运行在集中式服务架构下，服务端和客户端分别为两个独立的进程，此时`rpc-frmwrk`拥有更好的性能。服务端和客户端都可在`运行时`加载和启停用户开发的服务插件。
   * 在任何一种架构下，`rpc-frmwrk`提供配置工具和`运行时接口`完成对传输功能的配置，包括加密，认证，压缩，WebSocket，Multihop等功能，和运行时参数。
 * `rpc-frmwrk`在安全传输方面，支持国密(GmSSL)和OpenSSL两种安全传输协议. 在身份认证和访问控制方面，`rpc-frmwrk`支持简单的`SimpAuth`密码认证，亦可通过`Kerberos`或者`OAuth2`提供单点登陆(SSO)服务。
-* 更详细的概念和名词解释请参考[rpc-frmwrk的概念和技术介绍](./Concept_cn.md)。hwclismk
+* 更详细的概念和名词解释请参考[rpc-frmwrk的概念和技术介绍](./Concept_cn.md)。
 
 ## 功能列表   
 1. `同步异步请求的发送和处理`   
