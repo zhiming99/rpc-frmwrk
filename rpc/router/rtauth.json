@@ -181,43 +181,9 @@
                     "Pausable": "false"
                 }
             ],
-            "Nodes": [
-                {
-                    "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
-                    "NodeName": "rasp2",
-                    "Enabled": "true",
-                    "Protocol": "native",
-                    "AddrFormat": "ipv4",
-                    "IpAddress": "192.168.3.8",
-                    "PortNumber": "4132",
-                    "Compression": "false",
-                    "EnableWS": "false",
-                    "ConnRecover": "false",
-                    "EnableSSL": "false"
-                },
-                {
-                    "Comments-0": "here, we define the nodes this bridge allows to relay requests to",
-                    "NodeName": "vrasp",
-                    "Enabled": "false",
-                    "Protocol": "native",
-                    "AddrFormat": "ipv4",
-                    "IpAddress": "192.168.3.3",
-                    "PortNumber": "4132",
-                    "Compression": "false",
-                    "EnableWS": "false",
-                    "ConnRecover": "false",
-                    "EnableSSL": "false"
-                }
-            ],
+            "Nodes": [],
             "Comments-1": "The LBGroup is the list of mappings from pysudo-name to a group of physical nodes, which is used for node reduantancy or load balance purpose",
-            "LBGroup": [
-                {
-                    "rasps": [
-                        "rasp2",
-                        "vrasp"
-                    ]
-                }
-            ]
+            "LBGroup": []
         },
         {
             "ObjectName": "RpcRouterManagerImpl",
