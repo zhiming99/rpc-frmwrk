@@ -327,6 +327,9 @@ case "$cmd" in
         bash $cmddir/inituser.sh
         ;;
     initsvr)
+        if [[ ! -d $HOME/.rpcf ]]; then
+            mkdir -p $HOME/.rpcf
+        fi
         rpcfctl clearmount
         if [[ ! -f $HOME/.rpcf/openssl/signkey.pem ]]; then
             echo "generate openssl keys"
@@ -355,6 +358,9 @@ EOF
         rpcfctl clearmount;
         ;;
     initcli)
+        if [[ ! -d $HOME/.rpcf ]]; then
+            mkdir -p $HOME/.rpcf
+        fi
         rpcfctl clearmount
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$authmech" == "xSimpAuth" ]] ||

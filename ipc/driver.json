@@ -181,10 +181,11 @@
             "PortDriver": "RpcOpenSSLFidoDrv",
             "Parameters": {
                 "comments": "Certificate and private key file paths",
-                "CertFile": "./server.crt",
-                "KeyFile": "./server.key",
-                "CACertFile": "",
-                "SecretFile": ""
+                "CertFile": "/home/zhiming/.rpcf/openssl/signcert.pem",
+                "KeyFile": "/home/zhiming/.rpcf/openssl/signkey.pem",
+                "CACertFile": "/home/zhiming/.rpcf/openssl/certs.pem",
+                "SecretFile": "",
+                "VerifyPeer": "false"
             },
             "VerifyPeer": "false"
         },
@@ -251,33 +252,20 @@
             "InternalClass": "CTcpRpcBusPort",
             "Parameters": [
                 {
-                    "comment-1": "remove it or change it according to your environment",
-                    "AddrFormat": "ipv4",
-                    "Protocol": "native",
-                    "comment-2": "port 4132 will accept native non-websocket connection",
+                    "BindAddr": "192.168.3.3",
+                    "BindTo": "false",
                     "PortNumber": "4132",
-                    "BindAddr": "0.0.0.0",
-                    "comment": "inter-changable with 'TcpStreamPdo' when in a trusted and stable environment",
-                    "PdoClass": "TcpStreamPdo2",
                     "Compression": "true",
-                    "EnableWS": "false",
-                    "EnableSSL": "false",
-                    "HasAuth": "false",
-                    "RouterPath": "/"
-                },
-                {
-                    "AddrFormat": "ipv4",
-                    "Protocol": "native",
-                    "comment-2": "port 4133 will accept websocket connection from httpd",
-                    "PortNumber": "4133",
-                    "BindAddr": "127.0.0.1",
-                    "PdoClass": "TcpStreamPdo2",
-                    "Compression": "true",
-                    "EnableWS": "false",
-                    "EnableSSL": "false",
-                    "ConnRecover": "false",
+                    "EnableSSL": "true",
                     "HasAuth": "true",
-                    "AuthMech" : "krb5"
+                    "AuthMech": "SimpAuth",
+                    "EnableWS": "false",
+                    "RouterPath": "/",
+                    "PdoClass": "TcpStreamPdo2",
+                    "ConnRecover": "false",
+                    "EnableBPS": "true",
+                    "Protocol": "native",
+                    "AddrFormat": "ipv4"
                 }
             ],
             "MaxConnections": "512"
@@ -453,7 +441,10 @@
             ],
             "ClassFactories": [
                 "./libfuseif.so",
-                "./libauth.so"
+                "./libauth.so",
+                "./libregfs.so",
+                "./libsslpt.so",
+                "./libwspt.so"
             ]
         },
         {
@@ -547,24 +538,32 @@
             ]
         },
         {
-            "ClassFactories" : [ "./libregfs.so" ],
-            "DriversToLoad" : [ "DBusBusDriver" ],
-            "ModName" : "regfsmnt"
+            "ClassFactories": [
+                "./libregfs.so"
+            ],
+            "DriversToLoad": [
+                "DBusBusDriver"
+            ],
+            "ModName": "regfsmnt"
         },
         {
-            "ClassFactories" : [ "./libregfs.so" ],
-            "DriversToLoad" : [
+            "ClassFactories": [
+                "./libregfs.so"
+            ],
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver",
-                "DBusStreamBusDrv" ],
-            "ModName" : "appmonsvr"
+                "DBusStreamBusDrv"
+            ],
+            "ModName": "appmonsvr"
         },
         {
-            "DriversToLoad" : [
+            "DriversToLoad": [
                 "DBusBusDriver",
                 "UnixSockBusDriver",
-                "DBusStreamBusDrv" ],
-            "ModName" : "appmoncli"
+                "DBusStreamBusDrv"
+            ],
+            "ModName": "appmoncli"
         }
     ],
     "Match": [
@@ -604,7 +603,8 @@
             "PortClass": "TcpStreamPdo2",
             "comment": "ProbeSequence specify the order of the drivers' Probe to call to build the port stack",
             "ProbeSequence": [
-                "RpcSecFidoDrv",
+                "RpcOpenSSLFidoDrv",
+                "RpcWebSockFidoDrv",
                 "RpcNatProtoFdoDrv",
                 "RpcTcpFidoDrv"
             ],
@@ -624,7 +624,7 @@
         }
     ],
     "Arch": {
-        "comment-1": "giving a non-zero value to limit the number of cores to use, otherwise assuming all the cores will be utilized", 
+        "comment-1": "giving a non-zero value to limit the number of cores to use, otherwise assuming all the cores will be utilized",
         "Processors": "0"
     }
 }

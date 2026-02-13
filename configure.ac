@@ -537,7 +537,7 @@ case $enable_fuse3 in
         FUSE3_DEBFILES="usr/bin/hostsvrZZZZZusr/bin/hostcliZZZZZusr/lib/*/rpcf/librtfiles.so*"
         FUSE3_DEBLIBS=" libfuse3-dev,"
         FUSE3_DEBHEADERS=
-        FUSE3_DEBPKGS="fuse3,libfuse3-3,"
+        FUSE3_DEBPKGS="fuse3,libfuse3-3 | libfuse3-4,"
         FUSE3_CFGOPT=
         FEATURES+="+fuse3 "
     ;;

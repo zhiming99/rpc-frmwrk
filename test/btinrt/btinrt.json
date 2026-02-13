@@ -12,8 +12,8 @@
             "ProxyPortClass": "DBusProxyPdo",
             "ProxyPortClass-1": "DBusLocalPdo",
             "comment-1": "IpAddress is the ip address of the server",
-            "IpAddress": "127.0.0.1",
-            "Compression": "false",
+            "IpAddress": "192.168.3.3",
+            "Compression": "true",
             "EnableSSL": "true",
             "EnableWS": "false",
             "RouterPath": "/",
@@ -28,14 +28,17 @@
                     "InterfaceName": "IInterfaceServer"
                 }
             ],
-            "PortNumber": "4132"
+            "PortNumber": "4132",
+            "AuthInfo": {
+                "AuthMech": "SimpAuth"
+            }
         }
     ],
     "ClassFactories": [
         "./libbtinrt.so",
         "./libauth.so",
+        "./libregfs.so",
         "./libsslpt.so",
-        "./libgmsslpt.so",
         "./libwspt.so"
     ]
 }

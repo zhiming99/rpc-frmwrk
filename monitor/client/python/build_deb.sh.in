@@ -8,7 +8,7 @@ ARCHITECTURE="all"
 MAINTAINER="@PACKAGE_BUGREPORT@"
 DESCRIPTION="Python client libriaries for AppMonitor."
 HOMEPAGE="@PACKAGE_URL@"
-WHEEL_FILE=$(ls dist/*.whl)
+WHEEL_FILE=$(ls dist/appmancli-${VERSION}*.whl)
 
 # Check if the wheel file exists
 if [ ! -f "$WHEEL_FILE" ]; then

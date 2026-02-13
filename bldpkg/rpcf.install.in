@@ -52,3 +52,15 @@ usr/share/man/man1/rpcf_logger.1
 usr/share/man/man1/apptimer.1
 @JS_DEBFILES@
 
+usr/include/rpcf/*.h
+usr/include/rpcf/ipc/*.h
+usr/include/rpcf/appmancli/*.h
+usr/bin/ridlc
+etc/rpcf/drvtpl.json
+etc/rpcf/odesctpl.json
+etc/rpcf/odesctpl2.json
+etc/rpcf/*.java
+etc/rpcf/*.py
+etc/rpcf/mktpl*
+etc/rpcf/pymktpl
+etc/rpcf/*ridl
