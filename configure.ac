@@ -660,7 +660,7 @@ case $enable_js in
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
         JS_RPMPOSTUN="echo npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
         JS_DEBLIBS="npm,"
-        JS_DEBDEVFILES="etc/rpcf/oa2check.ridlZZZZZusr/lib/@DEB_HOST_MULTIARCH@/rpcf/jslib/*"
+        JS_DEBDEVFILES="usr/lib/@DEB_HOST_MULTIARCH@/rpcf/jslib/*"
         JS_DEBFILES="etc/rpcf/oa2checkdesc.jsonZZZZZusr/share/man/man1/oinit.1ZZZZZetc/rpcf/appmonui.tar.gz"
         JS_CFGOPT=
         FEATURES+="+js "
