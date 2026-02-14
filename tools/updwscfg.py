@@ -91,17 +91,16 @@ def AddInstallPackages( strPath, destPkg, bServer : bool )->str :
                 oinit = GetNewerFile(
                     strPath, 'python3-oinit*.rpm', False )
 
-        if len( mainPkg ) == 0 or len( devPkg ) == 0:
+        if len( mainPkg ) == 0:
             return cmdline
 
-        strCmd += mainPkg + " " + devPkg 
+        strCmd += mainPkg
         if len( appmoncli ) > 0 :
             strCmd += " " + appmoncli
         if len( oinit ) > 0:
             strCmd += " " + oinit
         strCmd += ";"
-        strCmd += ( "md5sum " + strPath + "/" + mainPkg + " "
-            + strPath + "/" + devPkg + ";")
+        strCmd += ( "md5sum " + strPath + "/" + mainPkg + ";" )
         if len( appmoncli ) > 0:
             strCmd += "md5sum " + strPath + "/" + appmoncli + ";"
         if len( oinit ) > 0:

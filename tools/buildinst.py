@@ -572,8 +572,8 @@ if __name__ == "__main__":
     if len( args ) < 2 :
         usage()
         sys.exit( -errno.EINVAL )
-    strInitCfg = args[ 0 ]
-    destPath = args[ 1 ]
+    strInitCfg = os.path.realpath( args[0] )
+    destPath = os.path.realpath( args[ 1 ] )
     debPath = ""
     if len( args ) >= 3:
         debPath = args[ 2 ]

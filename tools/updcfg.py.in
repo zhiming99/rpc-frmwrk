@@ -813,7 +813,7 @@ def Update_Rtauth( initCfg: dict, drvFile: list,
                         nodes = nodes[ :len( mhNodes ) ]
                         svrObj[ 'Nodes' ] = nodes
                     elif len( mhNodes ) > len( nodes ) :
-                        nodes += ( [ nodes[ 0 ] ] *
+                        nodes += ( [ dict() ] *
                             ( len( mhNodes ) - len( nodes ) ) )
                     for i in range( len( nodes ) ):
                         mhNode = mhNodes[ i ]
