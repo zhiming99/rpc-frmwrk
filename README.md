@@ -63,6 +63,3 @@ This project depends on the following 3rd-party packags at runtime:
 11. `FUSE-3 for rpcfs support`(optional)
 12. `GmSSL 3.0`(optional)
 
-#### Todo
-1. Please refer to [`issues`](https://github.com/zhiming99/rpc-frmwrk/issues).
-

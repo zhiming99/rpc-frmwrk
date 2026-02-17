@@ -72,5 +72,3 @@
 12. `GmSSL 3.0`（可选）
 ## 文档和教程
   文档索引见[Index](./docs/index_cn.md) ![new](./pics/new.png)
-## TODO
-1. 请参考[`问题`](https://github.com/zhiming99/rpc-frmwrk/issues)
