@@ -145,8 +145,14 @@ function check_appreg_mount()
         return 1
     fi
 
+    cnt=0
     while ! mountpoint $rootdir > /dev/null ; do
         sleep 1
+        (( cnt++ ))
+        if (( cnt > 5 )); then
+            echo "Error, mounting $base/appreg.dat failed"
+            return 1
+        fi
     done
     #echo mounted appreg.dat...
     return 0
