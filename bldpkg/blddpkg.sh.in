@@ -81,10 +81,10 @@ fi
 
 if [ "x$BUILD_JS" == "xyes" ]; then
 cat << EOF >> ./postinst2
-echo "\e[33mnpm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify\e[0m"
+echo "\e[33mnpm -g install @JS_NODE_PACKAGES@\e[0m"
 EOF
 cat << EOF >> ./postrm2
-echo  "\e[33mnpm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify\e[0m"
+echo  "\e[33mnpm -g remove @JS_NODE_PACKAGES@\e[0m"
 EOF
 fi
 

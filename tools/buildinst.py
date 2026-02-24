@@ -41,9 +41,11 @@ if [ "x$rpcfgnui" == "x" ]; then
 fi
 if [ -f USESSL ]; then
     if [ "x$1" == "x" ]; then
-        echo "Error key index is not specified"
-        echo "Usage: $0 <key index>"
-        exit 1
+        echo Warning: no key index provided, using 0 as default.
+        echo key index is the index of the key file to be installed, and start from 0
+        keyidx=0
+    else
+        keyidx=$1
     fi
     if grep -q 'UsingGmSSL":."true"' ./initcfg.json; then
         keydir=$HOME/.rpcf/gmssl
@@ -56,10 +58,10 @@ if [ -f USESSL ]; then
     updinitcfg=`dirname $rpcfgnui`/updinitcfg.py
     if [ -f clidx ]; then
         clikeyidx=`cat clidx`
-        clikeyidx=`expr $clikeyidx + $1`
+        clikeyidx=`expr $clikeyidx + $keyidx`
     elif [ -f svridx ]; then
         svrkeyidx=`cat svridx`
-        svrkeyidx=`expr $svrkeyidx + $1`
+        svrkeyidx=`expr $svrkeyidx + $keyidx`
     else
         echo Error bad installer
     fi
