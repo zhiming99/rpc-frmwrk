@@ -7,7 +7,6 @@ import time
 import sys
 from updwscfg import *
 from updk5cfg import GenKrb5InstFilesFromInitCfg
-from updwscfg import rpcf_system, IsRpcfSelfGenKey
 import errno
 
 def get_instcfg_content()->str :
@@ -323,10 +322,22 @@ def BuildInstallersInternal( initCfg : object,
                         break
         if bSSL2:
             try:
-                if len( sslFiles[ 'KeyFile' ].strip() ) == 0:
-                    raise Exception( "Warning key file empty" )
-                if len( sslFiles[ 'CertFile' ].strip() ) == 0:
-                    raise Exception( "Warning cert file empty" )
+                strKeyFile = sslFiles[ 'KeyFile' ]
+                strCertFile = sslFiles[ 'CertFile' ]
+                if( len( strKeyFile.strip() ) == 0 or
+                    len( strCertFile.strip() ) == 0 or
+                    not os.path.exists( strCertFile ) or
+                    not os.path.exists( strKeyFile ) or
+                    not os.access( strCertFile, os.R_OK ) or
+                    not os.access( strKeyFile, os.R_OK ) ):
+                    print( "Warning key file or cert file not accessible, trying to use self-signed keys" )
+                    if bServer:
+                        sslFiles[ 'KeyFile' ] = strKeyPath + "/signkey.pem"
+                        sslFiles[ 'CertFile' ] = strKeyPath + "/signcert.pem"
+                    else:
+                        sslFiles[ 'KeyFile' ] = strKeyPath + "/clientkey.pem"
+                        sslFiles[ 'CertFile' ] = strKeyPath + "/clientcert.pem"
+                    sslFiles[ 'CaCertFile' ] = strKeyPath + "/certs.pem"
             except:
                 bSSL2 = False
 
@@ -534,10 +545,10 @@ def BuildInstallers( strInitCfg : str,
         return ret
 
     bRemove = False
-    destPath = os.path.realpath( destPath )
-    if destPath != os.path.realpath( os.path.dirname( strInitCfg ) ):
-        shutil.copy2( strInitCfg, destPath + "/initcfg.json" )
-        strInitCfg = destPath + "/initcfg.json"
+    destPath = os.path.realpath( destPath ) + "/initcfg.json"
+    if destPath != os.path.realpath( strInitCfg ):
+        shutil.copy2( strInitCfg, destPath )
+        strInitCfg = destPath
         bRemove = True
 
     ret = BuildInstallersInternal(
@@ -578,7 +589,7 @@ if __name__ == "__main__":
     destPath = os.path.realpath( args[ 1 ] )
     debPath = ""
     if len( args ) >= 3:
-        debPath = args[ 2 ]
+        debPath = os.path.realpath( args[ 2 ] )
 
     ret = BuildInstallers(
         strInitCfg, destPath, debPath )

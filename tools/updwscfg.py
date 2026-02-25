@@ -152,6 +152,7 @@ def CopyInstPkg( keyPath : str, destPath: str, bServer : bool )->int:
             if ret != 0:
                 raise Exception( "failed to copy " + i  )
     except Exception as err:
+        print( err )
         if ret == 0:
             ret = -errno.ENOENT
     return ret
