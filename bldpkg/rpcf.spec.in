@@ -8,7 +8,11 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, flex, bison, libtool, shtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @KRB5_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ @JS_RPMLIBS@ cppunit-devel
+BuildRequires:  gcc, g++, python3, flex, bison, libtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @KRB5_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ @JS_RPMLIBS@ cppunit-devel
+
+%if 0%{?fedora} && 0%{?fedora} <= 42
+BuildRequires:  shtool
+%endif
 
 Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect attr
 

@@ -929,6 +929,10 @@ EOF
             echo $cmdline
             exit 1
         fi
+        if [[ ! -d ~/.rpcf ]]; then
+            echo Error cannot find ~/.rpcf
+            exit 1
+        fi
         python3 $cmddir/buildinst.py $@
         ;;
     detect_dbus)
