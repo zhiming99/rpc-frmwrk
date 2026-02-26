@@ -163,10 +163,7 @@
             "QueuedRequests": "false",
             "ProxyPortClass": "DBusLocalPdo",
             "AuthInfo": {
-                "Realm": "rpcf.org",
-                "ServiceName": "rasp1@rpcf.org",
-                "AuthMech": "krb5",
-                "SignMessage": "true"
+                "AuthMech": "SimpAuth"
             },
             "Interfaces": [
                 {

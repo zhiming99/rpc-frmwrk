@@ -11,7 +11,7 @@ cppunit-devel dbus dbus-tools dbus-libs dbus-daemon jsoncpp bash krb5-devel krb5
 python3-devel python3-pip python3-setuptools python3-build \
 openssl-devel openssl openssl-libs expect \
 fuse3-devel fuse3 fuse3-libs npm vim screen git attr \
-swig apache-commons-cli httpd modssl ifconfig
+swig apache-commons-cli httpd mod_ssl ifconfig
 
 ${SUDO} dnf -y install java-latest-openjdk-devel java-latest-openjdk-headless java-latest-openjdk || \
  ${SUDO} dnf -y install java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk   
