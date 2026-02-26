@@ -419,7 +419,7 @@ upstream {AppName} {{
     if len( strMonCliPkg ) > 0:
         strRpcfPath = strRootPath +"/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload"
+    cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload || pidof nginx || nginx"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
     else:

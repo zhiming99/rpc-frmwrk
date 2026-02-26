@@ -81,10 +81,10 @@ fi
 
 if [ "x$BUILD_JS" == "xyes" ]; then
 cat << EOF >> ./postinst2
-echo "\e[33mnpm -g install @JS_NODE_PACKAGES@\e[0m"
+echo -e "\e[33mnpm -g install @JS_NODE_PACKAGES@\e[0m"
 EOF
 cat << EOF >> ./postrm2
-echo  "\e[33mnpm -g remove @JS_NODE_PACKAGES@\e[0m"
+echo -e "\e[33mnpm -g remove @JS_NODE_PACKAGES@\e[0m"
 EOF
 fi
 
