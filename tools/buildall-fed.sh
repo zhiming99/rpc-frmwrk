@@ -7,11 +7,11 @@ else
 fi
 ${SUDO} dnf -y install which gcc g++ python3 flex bison libtool automake autoconf \
 make dbus-devel jsoncpp-devel lz4-devel cmake ccache lz4-libs cppunit \
-cppunit-devel dbus dbus-tools dbus-libs jsoncpp bash krb5-devel krb5-libs \
+cppunit-devel dbus dbus-tools dbus-libs dbus-daemon jsoncpp bash krb5-devel krb5-libs \
 python3-devel python3-pip python3-setuptools python3-build \
 openssl-devel openssl openssl-libs expect \
 fuse3-devel fuse3 fuse3-libs npm vim screen git attr \
-swig apache-commons-cli
+swig apache-commons-cli httpd mod_ssl ifconfig procps-ng
 
 ${SUDO} dnf -y install java-latest-openjdk-devel java-latest-openjdk-headless java-latest-openjdk || \
  ${SUDO} dnf -y install java-1.8.0-openjdk-devel java-1.8.0-openjdk-headless java-1.8.0-openjdk   
