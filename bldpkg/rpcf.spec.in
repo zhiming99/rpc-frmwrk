@@ -14,7 +14,7 @@ BuildRequires:  gcc, g++, python3, flex, bison, libtool, automake, autoconf, mak
 BuildRequires:  shtool
 %endif
 
-Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect attr
+Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect attr procps-ng
 
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
@@ -131,9 +131,9 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/rpcf/libecho.so*
 %{_libdir}/rpcf/libhellowrd.so*
 %{_libdir}/rpcf/libbtinrt.so*
+@JS_RPMFILES@
 
 %files devel
-@JS_RPMFILES@
 %{_libdir}/pkgconfig/rpcf.pc
 %{_bindir}/rpcf/btinrtcli
 %{_bindir}/rpcf/btinrtsvr

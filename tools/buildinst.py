@@ -17,9 +17,9 @@ if [ -f debian ]; then
     apt-get -y --fix-broken install
 elif [ -f fedora ]; then
     md5sum *.rpm
-    if which dnf; then 
+    if command -v dnf; then 
         dnf -y install ./*.rpm
-    elif which yum; then
+    elif command -v yum; then
         yum -y install ./*.rpm
     fi
 fi
@@ -102,12 +102,14 @@ else
     echo unzip failed;
     exit 1;
 fi
-pushd $unzipdir > /dev/null; bash ./instcfg.sh $1;popd > /dev/null
+pushd $unzipdir > /dev/null;
+bash ./instcfg.sh $1;
 if (($?==0)); then
     echo install complete;
 else
     echo install failed;
 fi
+popd > /dev/null
 rm -rf $unzipdir
 exit 0
 __GZFILE__

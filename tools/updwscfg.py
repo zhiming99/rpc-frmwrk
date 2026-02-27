@@ -209,7 +209,7 @@ def GetNginxVersion() -> Tuple[int,int,int]:
     return (0,0,0)
 
 def IsApacheInstalled()->bool:
-    strDist = GetDistName();
+    strDist = GetDistName()
     if strDist == "debian" or strDist == "ubuntu" :
         if os.access( '/usr/sbin/apache2', os.X_OK | os.R_OK ):
             return True
@@ -219,7 +219,13 @@ def IsApacheInstalled()->bool:
     return False
 
 def IsSudoAvailable()->bool:
-    ret = rpcf_system( "which sudo > /dev/null" )
+    ret = rpcf_system( "command -v sudo > /dev/null" )
+    if ret != 0:
+        return False
+    return True
+
+def IsSuAvailable()->bool:
+    ret = rpcf_system( "command -v su > /dev/null" )
     if ret != 0:
         return False
     return True
@@ -422,11 +428,14 @@ upstream {AppName} {{
     cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload || pidof nginx || nginx"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
-    else:
+    elif IsSuAvailable():
         if os.geteuid() != 0:
             actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
         else:
             actCmd = cmdline.format( sudo='' )
+    else:
+        actCmd = cmdline.format( sudo='' )
+
     ret = rpcf_system( actCmd )
     return ret
 
@@ -604,11 +613,13 @@ def Config_Apache( initCfg : object )->int:
     cmdline += "{sudo} apachectl restart || {sudo} httpd"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
-    else:
+    elif IsSuAvailable():
         if os.geteuid() != 0:
             actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
         else:
             actCmd = cmdline.format( sudo='' )
+    else:
+        actCmd = cmdline.format( sudo='' )
     ret = rpcf_system( actCmd )
     return ret
 
