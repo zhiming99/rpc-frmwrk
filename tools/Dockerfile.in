@@ -28,16 +28,15 @@ RUN for i in $(seq 1 100);do if curl -o- https://raw.githubusercontent.com/nvm-s
 
 RUN apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
-RUN apt-get -y install git devscripts debhelper expect vim screen tmux npm iputils-ping;
+RUN apt-get -y install git devscripts debhelper expect vim screen tmux iputils-ping;
 RUN cd ${HOME};for i in $(seq 1 100);do if git clone 'https://github.com/zhiming99/GmSSL.git'; then break; fi;done
 RUN cd ${HOME};cd ./GmSSL;mkdir build;cd build;cmake ..;make;make install
 RUN apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
-RUN npm -g install @JS_NODE_PACKAGES@
+RUN . ${HOME}/.bashrc && npm -g install @JS_NODE_PACKAGES@
 RUN cd ${HOME};for i in $(seq 1 100);do if git clone 'https://github.com/zhiming99/rpc-frmwrk.git';then break;fi;done
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
-RUN cd ${HOME}/rpc-frmwrk && bash cfgsel -r && make -j4 && make install;\
-echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
+RUN . ${HOME}/.bashrc && cd ${HOME}/rpc-frmwrk && bash cfgsel -r && make -j4 && make install; echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
 ADD ./testcfgs/mincfg.json /root
 RUN python3 /usr/local/bin/rpcf/rpcfgnui.py ${HOME}/mincfg.json
 RUN cd ${HOME}/rpc-frmwrk; figlet -cm 60 'RPC-FRMWRK ROCKS !'
