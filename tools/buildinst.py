@@ -7,7 +7,6 @@ import time
 import sys
 from updwscfg import *
 from updk5cfg import GenKrb5InstFilesFromInitCfg
-from updwscfg import rpcf_system, IsRpcfSelfGenKey
 import errno
 
 def get_instcfg_content()->str :
@@ -18,9 +17,9 @@ if [ -f debian ]; then
     apt-get -y --fix-broken install
 elif [ -f fedora ]; then
     md5sum *.rpm
-    if which dnf; then 
+    if command -v dnf; then 
         dnf -y install ./*.rpm
-    elif which yum; then
+    elif command -v yum; then
         yum -y install ./*.rpm
     fi
 fi
@@ -41,9 +40,11 @@ if [ "x$rpcfgnui" == "x" ]; then
 fi
 if [ -f USESSL ]; then
     if [ "x$1" == "x" ]; then
-        echo "Error key index is not specified"
-        echo "Usage: $0 <key index>"
-        exit 1
+        echo Warning: no key index provided, using 0 as default.
+        echo key index is the index of the key file to be installed, and start from 0
+        keyidx=0
+    else
+        keyidx=$1
     fi
     if grep -q 'UsingGmSSL":."true"' ./initcfg.json; then
         keydir=$HOME/.rpcf/gmssl
@@ -56,10 +57,10 @@ if [ -f USESSL ]; then
     updinitcfg=`dirname $rpcfgnui`/updinitcfg.py
     if [ -f clidx ]; then
         clikeyidx=`cat clidx`
-        clikeyidx=`expr $clikeyidx + $1`
+        clikeyidx=`expr $clikeyidx + $keyidx`
     elif [ -f svridx ]; then
         svrkeyidx=`cat svridx`
-        svrkeyidx=`expr $svrkeyidx + $1`
+        svrkeyidx=`expr $svrkeyidx + $keyidx`
     else
         echo Error bad installer
     fi
@@ -101,12 +102,14 @@ else
     echo unzip failed;
     exit 1;
 fi
-pushd $unzipdir > /dev/null; bash ./instcfg.sh $1;popd > /dev/null
+pushd $unzipdir > /dev/null;
+bash ./instcfg.sh $1;
 if (($?==0)); then
     echo install complete;
 else
     echo install failed;
 fi
+popd > /dev/null
 rm -rf $unzipdir
 exit 0
 __GZFILE__
@@ -321,10 +324,22 @@ def BuildInstallersInternal( initCfg : object,
                         break
         if bSSL2:
             try:
-                if len( sslFiles[ 'KeyFile' ].strip() ) == 0:
-                    raise Exception( "Warning key file empty" )
-                if len( sslFiles[ 'CertFile' ].strip() ) == 0:
-                    raise Exception( "Warning cert file empty" )
+                strKeyFile = sslFiles[ 'KeyFile' ]
+                strCertFile = sslFiles[ 'CertFile' ]
+                if( len( strKeyFile.strip() ) == 0 or
+                    len( strCertFile.strip() ) == 0 or
+                    not os.path.exists( strCertFile ) or
+                    not os.path.exists( strKeyFile ) or
+                    not os.access( strCertFile, os.R_OK ) or
+                    not os.access( strKeyFile, os.R_OK ) ):
+                    print( "Warning key file or cert file not accessible, trying to use self-signed keys" )
+                    if bServer:
+                        sslFiles[ 'KeyFile' ] = strKeyPath + "/signkey.pem"
+                        sslFiles[ 'CertFile' ] = strKeyPath + "/signcert.pem"
+                    else:
+                        sslFiles[ 'KeyFile' ] = strKeyPath + "/clientkey.pem"
+                        sslFiles[ 'CertFile' ] = strKeyPath + "/clientcert.pem"
+                    sslFiles[ 'CaCertFile' ] = strKeyPath + "/certs.pem"
             except:
                 bSSL2 = False
 
@@ -532,10 +547,10 @@ def BuildInstallers( strInitCfg : str,
         return ret
 
     bRemove = False
-    destPath = os.path.realpath( destPath )
-    if destPath != os.path.realpath( os.path.dirname( strInitCfg ) ):
-        shutil.copy2( strInitCfg, destPath + "/initcfg.json" )
-        strInitCfg = destPath + "/initcfg.json"
+    destPath = os.path.realpath( destPath ) + "/initcfg.json"
+    if destPath != os.path.realpath( strInitCfg ):
+        shutil.copy2( strInitCfg, destPath )
+        strInitCfg = destPath
         bRemove = True
 
     ret = BuildInstallersInternal(
@@ -576,7 +591,7 @@ if __name__ == "__main__":
     destPath = os.path.realpath( args[ 1 ] )
     debPath = ""
     if len( args ) >= 3:
-        debPath = args[ 2 ]
+        debPath = os.path.realpath( args[ 2 ] )
 
     ret = BuildInstallers(
         strInitCfg, destPath, debPath )

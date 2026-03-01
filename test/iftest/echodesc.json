@@ -13,7 +13,7 @@
             "ProxyPortClass": "DBusProxyPdo",
             "ProxyPortClass-1": "DBusLocalPdo",
             "comment-1": "IpAddress is the ip address of the server",
-            "IpAddress": "192.168.3.3",
+            "IpAddress": "127.0.0.1",
             "PortNumber": "4132",
             "Compression": "true",
             "EnableSSL": "true",

@@ -8,10 +8,13 @@ URL:            https://github.com/zhiming99/rpc-frmwrk
 
 Source0:        SSSSS/@PACKAGE_NAME@-@VERSION@.tar.gz
 
-BuildRequires:  gcc, g++, python3, flex, bison, libtool, shtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @KRB5_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ @JS_RPMLIBS@ cppunit-devel
+BuildRequires:  gcc, g++, python3, flex, bison, libtool, automake, autoconf, make, dbus-devel, jsoncpp-devel, lz4-devel, @KRB5_RPMLIBS@ @PYTHON_RPMLIBS@ @OPENSSL_RPMLIBS@ @FUSE3_RPMLIBS@ @JAVA_RPMLIBS@ @JS_RPMLIBS@ cppunit-devel
 
-Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect attr
+%if 0%{?fedora} && 0%{?fedora} <= 42
+BuildRequires:  shtool
+%endif
 
+Requires:       dbus dbus-daemon dbus-tools dbus-libs jsoncpp @KRB5_RPMPKGS@ lz4-libs @OPENSSL_RPMPKGS@ cppunit @FUSE3_RPMPKGS@ @PYTHON_RPMPKGS@ @JAVA_RPMPKGS@ bash expect attr procps-ng which
 %description
 RPC-frmwrk is a small event-driven, asynchronous RPC framework with high performance and high flexibility, suitable for embedded environment.
 
@@ -127,9 +130,9 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/rpcf/libecho.so*
 %{_libdir}/rpcf/libhellowrd.so*
 %{_libdir}/rpcf/libbtinrt.so*
+@JS_RPMFILES@
 
 %files devel
-@JS_RPMFILES@
 %{_libdir}/pkgconfig/rpcf.pc
 %{_bindir}/rpcf/btinrtcli
 %{_bindir}/rpcf/btinrtsvr
