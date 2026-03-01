@@ -4,12 +4,12 @@ RUN apt-get update
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
 
 #install the kerberos servers and client
-ADD ./initkrb5.sh /root
-RUN apt-get install -qq krb5-kdc krb5-admin-server krb5-user 
+#ADD ./initkrb5.sh /root
+#RUN apt-get install -qq krb5-kdc krb5-admin-server krb5-user 
 #setup the kdc and kadmind and start the servers
-CMD bash /root/initkrb5.sh || exit 1
+#CMD bash /root/initkrb5.sh || exit 1
 #login with principal zhiming
-CMD kinit -k -t /etc/krb5.keytab zhiming || exit 2
+#CMD kinit -k -t /etc/krb5.keytab zhiming || exit 2
 
 RUN apt-get install -y --fix-missing gcc g++ python3 python3-dev python3-pip python3-build flex bison \
 libtool shtool automake autoconf autotools-dev make dbus dbus-bin libdbus-1-3 \
@@ -25,6 +25,7 @@ RUN apt-get install -y openjdk-8-jdk-headless || apt-get install -y \
 
 RUN for i in $(seq 1 100);do if curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash \
  && . ${HOME}/.bashrc && nvm install 20 && node -v && nvm list; then break;fi;done
+RUN  if ! ( . ${HOME}/.bashrc && nvm list ); then echo -e "\e[33mcannot download nvm and nodejs..., disable JS support\e[0m"; touch ${HOME}/nojs; fi
 
 RUN apt-get -y install sip-tools python3-sipbuild || apt-get -y install sip-dev python3-sip python3-sip-dev || true
 RUN apt-get -y install libjsoncpp1 || apt-get -y install libjsoncpp25 || apt-get -y install libjsoncpp24
@@ -36,10 +37,10 @@ RUN . ${HOME}/.bashrc && npm -g install @JS_NODE_PACKAGES@
 RUN cd ${HOME};for i in $(seq 1 100);do if git clone 'https://github.com/zhiming99/rpc-frmwrk.git';then break;fi;done
 RUN cd ${HOME}/rpc-frmwrk && libtoolize && aclocal && autoreconf -vfi && \
 automake --add-missing && autoconf; echo `pwd`;ls -l `pwd`
-RUN . ${HOME}/.bashrc && cd ${HOME}/rpc-frmwrk && bash cfgsel -r && make -j4 && make install; echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf'>>${HOME}/.bashrc
+RUN if [ -f ${HOME}/nojs ]; then opt='--disable-js'; fi;. ${HOME}/.bashrc && cd ${HOME}/rpc-frmwrk && bash cfgsel -r $opt && make -j4 && make install; echo 'export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib/rpcf' >> ${HOME}/.bashrc
 ADD ./testcfgs/mincfg.json /root
 RUN python3 /usr/local/bin/rpcf/rpcfgnui.py ${HOME}/mincfg.json
-RUN cd ${HOME}/rpc-frmwrk; figlet -cm 60 'RPC-FRMWRK ROCKS !'
+RUN if [ -f ${HOME}/nojs ]; then echo -e "\e[33mrpc-frmwrk is built without JS support \e[0m"; rm -f ${HOME}/nojs; else cd ${HOME}/rpc-frmwrk; figlet -cm 60 'RPC-FRMWRK ROCKS !';fi
 # uncomment the following to start the tests
 #dbus-run-session bash tools/runtest.sh 2 & \
 #dbus-run-session bash tools/runtest.sh 1
