@@ -84,7 +84,9 @@ if [ -f USESSL ]; then
         cat /dev/null > $keyfile
     fi
 fi
-
+if [ -f gmssl ]; then
+    install -m 755 gmssl /usr/bin/
+fi
 echo setup rpc-frmwrk configurations...
 initcfg=$(pwd)/initcfg.json
 python3 $rpcfgnui $initcfg
@@ -430,6 +432,10 @@ def BuildInstallersInternal( initCfg : object,
             if len( debPath ) > 0:
                 cmdline += AddInstallPackages(
                     debPath, obj.pkgName, obj.isServer )
+
+            if os.access( "/usr/local/bin/gmssl", os.X_OK ):
+                cmdline += 'tar rf ' + obj.pkgName + " -C /usr/local/bin gmssl;"
+
             bHasKey = False
             if bSSL and bSSL2:
                 cmdline += "touch " + curDir + "/USESSL;"
