@@ -51,7 +51,7 @@ genpipopt:
         echo $$(if (($${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
     elif [ "x$${os_name}" == "xUbuntu" ]; then \
         os_version=$$(cat /etc/issue | awk '{print $$2}' | awk -F'.' '{print $$1}');\
-        echo $$(if (($${os_version} >= 24 ));then echo '--break-system-packages';else echo ''; fi); \
+        echo $$(if (($${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
     fi))
 	@if [ "x${pipopt}" != "x" ]; then \
         echo Warning: break-system-packages enabled; \

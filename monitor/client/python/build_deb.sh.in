@@ -32,19 +32,6 @@ else
     PLATFORM=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
 fi
 
-# Determine the pip3 install command
-force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
-if [ "x${os_name}" == "xDebian" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $3}');\
-    echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
-elif [ "x${os_name}" == "xUbuntu" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
-    echo $(if ((${os_version} >= 24 ));then echo '--break-system-packages';else echo ''; fi); \
-fi)
-
-PIP_INSTALL_CMD="pip3 install $force_update --force-reinstall /usr/lib/rpcf/app*.whl"
-PIP_UNINST_CMD="pip3 uninstall -y $force_update appmancli"
-
 # Create the directory structure for the Debian package
 DEB_DIR="${PACKAGE_NAME}_${VERSION}"
 mkdir -p "$DEB_DIR/DEBIAN"
@@ -63,18 +50,35 @@ Depends: python3, python3-pip
 EOF
 
 # Create the postinst script to install the wheel
-cat <<EOF > "$DEB_DIR/DEBIAN/postinst"
+cat <<'EOF' > $DEB_DIR/DEBIAN/postinst
 #!/bin/bash
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} >= 24 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
 set -e
-$PIP_INSTALL_CMD
+pip3 install $force_update --force-reinstall /usr/lib/rpcf/app*.whl
 EOF
+
 chmod 755 "$DEB_DIR/DEBIAN/postinst"
 
 # Create the prerm script to uninstall the Python module
-cat <<EOF > "$DEB_DIR/DEBIAN/prerm"
+cat <<'EOF' > $DEB_DIR/DEBIAN/prerm
 #!/bin/bash
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
 set -e
-$PIP_UNINST_CMD
+pip3 uninstall -y $force_update appmancli
 EOF
 chmod 755 "$DEB_DIR/DEBIAN/prerm"
 
