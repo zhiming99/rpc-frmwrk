@@ -137,9 +137,9 @@ OAuth2设计上是在浏览器运行的，所以大家对JS下OAuth2的认证界
 django的OAuth2的客户端app使用的是标准的Authorization code认证流程，springboot的OAuth2的客户端app使用的是OAuth2结合OpenID Connect扩展协议，以提供标准化的身份信息和更安全的身份验证。
 
 ##### 容器的使用方法：
-* 首先要运行容器`OAuth2-Server`，作为OAuth2的认证服务器。
-* 然后如果要跑django和rpc-frmwrk整合的服务器，就启动标有`django-oa2check`的容器。
-* 如果要跑springboot的rpc-frmwrk整合的服务器，就启动标有`springboot-oa2check`的容器。
+* 首先要运行容器`OAuth2-Server-https-2`，作为OAuth2的认证服务器。
+* 然后如果要跑django和rpc-frmwrk整合的服务器，就启动标有`django-oa2check-https-2`的容器。
+* 如果要跑springboot的rpc-frmwrk整合的服务器，就启动标有`springboot-oa2check-https-2`的容器。
 
 ##### 使用中的常见问题：
 * 忘记设置ip地址。`OAuth2-Server`的地址被指定为172.17.0.3，而另两个运行rpc-frmwrk的服务器应该为172.17.0.2.
