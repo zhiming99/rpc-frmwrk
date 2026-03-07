@@ -1,14 +1,50 @@
 import json
+import re
 
 import urwid
 import gettext
 import os
 import errno
 
+from updcfg import CheckIpAddr 
+
 # Initialize gettext
 gettext.bindtextdomain('rpcfgtui', '/usr/share/locale')
 gettext.textdomain('rpcfgtui')
 _ = gettext.gettext
+
+def is_valid_domain(domain):
+    # check if the domain matches the pattern for valid domain names (e.g., example.com, sub.example.co.uk)
+    pattern = re.compile(
+        r'^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,6}$'
+    )
+    ret = pattern.match(domain)
+    return ret is not None
+
+class ComboBox(urwid.WidgetWrap):
+    def __init__(self, options, idx=0):
+        self.options = options
+        self.selected_index = idx
+        self.button = urwid.Button(self.options[self.selected_index])
+        self.popup = urwid.AttrMap(urwid.ListBox(urwid.SimpleFocusListWalker(self.options)), 'body')
+        self.overlay = urwid.Overlay(self.popup, None, 'center', ('relative', 5), 'middle', ('relative', 50) )
+        self._wrapped_widget = self.button
+        self._update_button_label()
+        #self.button.set_focus()
+        self.button_press = self.button.when_activated = self._select_option
+        self._ignore_next_key = False
+
+    def _update_button_label(self):
+        self.button.set_label(self.options[self.selected_index])
+
+    def _select_option(self, button):
+        if not self._ignore_next_key:
+            self._ignore_next_key = True
+            self.selected_index = self.options.index(button.get_label())
+            self._update_button_label()
+            raise urwid.ExitMainLoop()  # 关闭弹出窗口
+        else:
+            self._ignore_next_key = False
 
 class MenuDialog:
     def __init__(self):
@@ -24,8 +60,8 @@ class MenuDialog:
             urwid.Text(_("System Configuration"), align='center'),
             urwid.Divider('-'),
             urwid.Button(_("Network Settings"), on_press=self.network_settings),
-            urwid.Button(_("Configuration List"), on_press=self.system_info),
-            urwid.Button(_("Device Management"), on_press=self.device_management),
+            urwid.Button(_("Security Settings"), on_press=self.security_settings),
+            urwid.Button(_("Configuration List"), on_press=self.config_list),
             urwid.Button(_("Exit"), on_press=self.exit_program)
         ]
         
@@ -78,34 +114,41 @@ class MenuDialog:
 
     def update_network_config(self, button):
         # walk through the widgets in oConns and update the initCfg with the new values
-        oConnParams = self.initCfg.get('Connections', [])
-        for idx, conn_widgets in enumerate(self.oConns):
-            if idx < len(oConnParams):
-                conn_params = oConnParams[idx]
-                for widget in conn_widgets:
-                    if isinstance(widget, urwid.Edit):
-                        label = widget.caption.strip()
-                        if label == _("IP Address:"):
-                            conn_params['IpAddress'] = widget.edit_text
-                        elif label == _("Port Number:"):
-                            conn_params['PortNumber'] = widget.edit_text
-                        elif label == _("Router Path:"):
-                            conn_params['RouterPath'] = widget.edit_text
-                    elif isinstance(widget, urwid.CheckBox):
-                        label = widget.get_label().strip()
-                        state = 'true' if widget.get_state() else 'false'
-                        if label == _("Server bind to this Interface"):
-                            conn_params['BindTo'] = state
-                        elif label == _("Enable Compression"):
-                            conn_params['Compression'] = state
-                        elif label == _("Enable SSL"):
-                            conn_params['EnableSSL'] = state
-                        elif label == _("Enable WebSockets"):
-                            conn_params['EnableWS'] = state
-                        elif label == _("Enable Authentication"):
-                            conn_params['HasAuth'] = state
-                        elif label == _("Enable Flow Control"):
-                            conn_params['EnableBPS'] = state
+        try:
+            oConnParams = self.initCfg.get('Connections', [])
+            for idx, conn_widgets in enumerate(self.oConns):
+                if idx < len(oConnParams):
+                    conn_params = oConnParams[idx]
+                    for widget in conn_widgets:
+                        if isinstance(widget, urwid.Edit):
+                            label = widget.caption.strip()
+                            if label == _("IP Address:"):
+                                ipAddr = widget.edit_text.strip()
+                                if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
+                                    raise ValueError(_("Invalid IP address: {}").format(ipAddr))
+                                conn_params['IpAddress'] = widget.edit_text
+                            elif label == _("Port Number:"):
+                                conn_params['PortNumber'] = widget.edit_text
+                            elif label == _("Router Path:"):
+                                conn_params['RouterPath'] = widget.edit_text
+                        elif isinstance(widget, urwid.CheckBox):
+                            label = widget.get_label().strip()
+                            state = 'true' if widget.get_state() else 'false'
+                            if label == _("Server bind to this Interface"):
+                                conn_params['BindTo'] = state
+                            elif label == _("Enable Compression"):
+                                conn_params['Compression'] = state
+                            elif label == _("Enable SSL"):
+                                conn_params['EnableSSL'] = state
+                            elif label == _("Enable WebSockets"):
+                                conn_params['EnableWS'] = state
+                            elif label == _("Enable Authentication"):
+                                conn_params['HasAuth'] = state
+                            elif label == _("Enable Flow Control"):
+                                conn_params['EnableBPS'] = state
+        except Exception as e:
+            self.show_message(_("Failed to update network configuration: {}").format(str(e)))
+            return
         self.go_back( None )  # return to previous menu after updating config
 
     def revert_to_network_settings(self, network_widgets):
@@ -206,7 +249,11 @@ class MenuDialog:
     def show_message(self, message):
         # 显示消息对话框
         text = urwid.Text(message, align='center')
-        ok_button = urwid.Button(_("OK"), on_press=self.close_message)
+        ok_button = urwid.Padding(
+            urwid.AttrMap(urwid.Button(_("OK"), align='center', on_press=self.close_message), 'button normal', focus_map='button focus'),
+            align='center',
+            width=15  # Set the width of the button
+        )
         pile = urwid.Pile([text, urwid.Divider(), ok_button])
 
         # 保存当前状态并显示消息
@@ -217,15 +264,15 @@ class MenuDialog:
             
     def ask_file_path(self):
         # Create input field and buttons
-        input_edit = urwid.Edit("Enter file path: ", edit_text="initcfg_exported.json")
-        ok_button = urwid.Button("OK", on_press=self.confirm_file_path, user_data=input_edit)
+        input_edit = urwid.Edit("Enter file path: ", edit_text="initcfg_exported.json", align='center')
+        ok_button = urwid.Button("OK", align='center', on_press=self.confirm_file_path, user_data=input_edit)
         cancel_button = urwid.Button("Cancel", on_press=self.close_message)
 
         # Arrange buttons horizontally
         buttons = urwid.GridFlow(
             [
-                urwid.AttrMap(ok_button, None, focus_map='reversed'),
-                urwid.AttrMap(cancel_button, None, focus_map='reversed')
+                urwid.AttrMap(ok_button, 'button normal', focus_map='button focus'),
+                urwid.AttrMap(cancel_button, 'button normal', focus_map='button focus')
             ],
             cell_width=10,  # Adjust button width
             h_sep=2,        # Horizontal space between buttons
@@ -248,6 +295,7 @@ class MenuDialog:
         try:
             with open(file_path, 'w') as f:
                 json.dump(self.initCfg, f, indent=4)
+            self.go_back( None ) 
             self.show_message(_("successfully export configuration to {}").format(file_path))
         except Exception as e:
             self.show_message(_("Failed to export configuration: {}").format(str(e)))
@@ -256,41 +304,115 @@ class MenuDialog:
         # export to a JSON file for external use, such as debugging or manual editing; save current menu state to stack before showing message
         self.ask_file_path()
 
-    def system_info(self, button):
-        # 保存当前菜单状态到堆栈
+    def config_list(self, button):
         self.menu_stack.append(self.main_widget.body)
         
-        # 系统信息对话框
         initcfg = json.dumps(self.initCfg, indent=4)
         info_text = urwid.Text( initcfg , align='left')
-        export_button = urwid.Button(_("Export Configuration"), on_press=self.export_config)
-        back_button = urwid.Button(_("Return to Previous Level"), on_press=self.go_back)
-        list_walker = urwid.SimpleFocusListWalker([info_text, urwid.Filler(urwid.Divider()), export_button, back_button])
+        export_button1 = urwid.Button(_("Export Configuration"), align='center', on_press=self.export_config )
+        export_button = urwid.Padding(
+            urwid.AttrMap(export_button1, 'button normal', focus_map='button focus'),
+            align='left',
+            width='pack',
+        )
+        back_button1 = urwid.Button(_("Return to Previous Level"), align='center', on_press=self.go_back)
+        back_button = urwid.Padding(
+            urwid.AttrMap(back_button1, 'button normal', focus_map='button focus'),
+            align='left',
+            width='pack',
+        )
+        buttons = urwid.GridFlow(
+            [export_button, back_button],
+            cell_width=max(len( export_button1.get_label() ), len( back_button1.get_label() )),  # Adjust the width of each button
+            h_sep=2,        # Horizontal space between buttons
+            v_sep=0,        # Vertical space between rows (not needed here)
+            align='left'  # Left-align the buttons
+        )
+        list_walker = urwid.SimpleFocusListWalker([info_text, urwid.Filler(urwid.Divider()), buttons])
         list_box = urwid.ListBox(list_walker)
         pile = urwid.Pile([urwid.AttrWrap(list_box, 'body')])
         self.main_widget.body = pile
+
+    def generate_self_signed_cert(self, button):
+        pass
+
         
+    def on_choice_changed(self, button, new_state):
+        pass
+
+    def build_security_settings(self):
         
-    def device_management(self, button):
-        # 保存当前菜单状态到堆栈
-        self.menu_stack.append(self.main_widget.body)
+        oSecurity = self.initCfg.get('Security', [])
+        sslFiles = oSecurity.get('SSLCred', {})
+        authInfo = oSecurity.get('AuthInfo', {})
         
-        # 设备管理对话框
-        device_items = [
-            urwid.Text(_("Device Management"), align='center'),
+        noAuth = urwid.RadioButton([], _("No Auth"), state=(authInfo.get('AuthMech', '') == '' ))
+        simpleAuth = urwid.RadioButton(noAuth.group, _("SimpAuth"),
+            state=(authInfo.get('AuthMech', '') == 'SimpAuth'), on_state_change=self.on_choice_changed )
+        krb5 = urwid.RadioButton(noAuth.group, _("Kerberos"),
+            state=(authInfo.get('AuthMech', '') == 'krb5'), on_state_change=self.on_choice_changed )
+        OAuth2 = urwid.RadioButton(noAuth.group, _("OAuth2"),
+            state=(authInfo.get('AuthMech', '') == 'OAuth2'), on_state_change=self.on_choice_changed )
+        radioButtons = urwid.GridFlow(
+            [
+                urwid.AttrMap(noAuth, "radio normal", focus_map='radio select'),
+                urwid.AttrMap(simpleAuth, "radio normal", focus_map='radio select'),
+                urwid.AttrMap(krb5, "radio normal", focus_map='radio select'),
+                urwid.AttrMap(OAuth2, "radio normal", focus_map='radio select')
+            ],
+            cell_width=20,  # Adjust the width of each button
+            h_sep=2,        # Horizontal space between buttons
+            v_sep=0,        # Vertical space between rows (not needed here)
+            align='center'  # Center-align the buttons
+        )
+        authMech = authInfo.get('AuthMech', '')
+        widgetPile = []
+        if authMech == 'SimpAuth':
+            widgetPile.append(urwid.Edit(_("User Name"), edit_text=authInfo.get('UserName', '')))
+        elif authMech == 'OAuth2':
+            widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
+            widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
+            widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
+            widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
+        elif authMech == 'krb5':
+            widgetPile.append(urwid.Edit(_("Service Name"), edit_text=authInfo.get('ServiceName', '')))
+            widgetPile.append(urwid.Edit(_("Realm"), edit_text=authInfo.get('Realm', '')))
+            widgetPile.append(urwid.Edit(_("User Name"), edit_text=authInfo.get('UserName', '')))
+            widgetPile.append(urwid.Edit(_("KDC IpAddress"), edit_text=authInfo.get('KdcIp', '')))
+            widgetPile.append(urwid.CheckBox(_("Sign Messages"), state=(authInfo.get('SignMessages', False) == 'true')))
+            
+
+        security_items = [
+            urwid.Text(_("SSL Settings"), align='center'),
             urwid.Divider('-'),
-            urwid.Button(_("Return to Previous Level"), on_press=self.go_back)  # 修改为通用返回方法
+            urwid.Edit(_("    Key File : "), edit_text=sslFiles.get('KeyFile', '')),
+            urwid.Edit(_("   Cert File : "), edit_text=sslFiles.get('CertFile', '')),
+            urwid.Edit(_(" CACert File : "), edit_text=sslFiles.get('CACertFile', '')),
+            urwid.CheckBox(_("Using GmSSL"), state=(sslFiles.get('UsingGmSSL', False) == 'true')),
+            urwid.CheckBox(_("Verify Peer"), state=(sslFiles.get('VerifyPeer', False) == 'true')),
+            urwid.AttrWrap( urwid.Button(_("Generate Self-Signed Certificate"),
+                on_press=self.generate_self_signed_cert), 'button normal', 'button focus'),
+            urwid.Divider('-'),
+            urwid.Text(_("Authentication Settings"), align='center'),
+            urwid.Divider('-'),
+            radioButtons,
+            *widgetPile,
+            urwid.AttrWrap( urwid.Button(_("Return to Previous Level"),
+                on_press=self.go_back), 'button normal', 'button focus')
         ]
         
-        list_walker = urwid.SimpleFocusListWalker(device_items)
+        list_walker = urwid.SimpleFocusListWalker(security_items)
         list_box = urwid.ListBox(list_walker)
-        
         self.main_widget.body = urwid.AttrWrap(list_box, 'body')
 
+    def security_settings(self, button):
+        # Save the current menu state to the stack before showing security settings
+        self.menu_stack.append(self.main_widget.body)
+        self.build_security_settings()
+
     def go_back(self, button=None):                                                                                                                                                                              
-        # return to the previous menu state from the stack, if available; otherwise exit
         if self.main_widget.body and hasattr(self.main_widget.body, 'revert_func'):
-            self.main_widget.body.revert_func()  # call revert_func to restore previous state if it exists
+            self.main_widget.body.revert_func()
         if self.menu_stack:                                                                                                                                                                                      
             previous_menu = self.menu_stack.pop()                                                                                                                                                                
             self.main_widget.body = previous_menu                                                                                                                                                                
@@ -314,18 +436,15 @@ class MenuDialog:
     def show_confirmation(self, message):
         # 显示确认对话框
         text = urwid.Text(message, align='center')
-        yes_button = urwid.Button(_("Save Changes"), align='center', on_press=self.confirm_save_and_exit)
+        yes_button = urwid.Button(_("Apply Changes"), align='center', on_press=self.confirm_save_and_exit)
         no_button = urwid.Button(_("Discard Changes"), align='center', on_press=self.confirm_discard_and_exit)
         cancel_button = urwid.Button(_("Cancel"), align='center', on_press=self.confirm_cancel)
-        width, height = os.get_terminal_size()
 
-        spaces = str( ' ' * ((width - 27 ) // 2) )
-        placeholder = urwid.Text(spaces, align='center')
         buttons = urwid.GridFlow(
             [
-                urwid.AttrMap(yes_button, None, focus_map='reversed'),
-                urwid.AttrMap(no_button, None, focus_map='reversed'),
-                urwid.AttrMap(cancel_button, None, focus_map='reversed')
+                urwid.AttrMap(yes_button, "button normal", focus_map='button focus'),
+                urwid.AttrMap(no_button, "button normal", focus_map='button focus'),
+                urwid.AttrMap(cancel_button, "button normal", focus_map='button focus')
             ],
             cell_width=20,  # Adjust the width of each button
             h_sep=2,        # Horizontal space between buttons
@@ -344,7 +463,7 @@ class MenuDialog:
         # 退出程序
         if not button or button.get_label() != _("Exit"):
             raise urwid.ExitMainLoop()
-        self.show_confirmation(_("Save and Exit?") )
+        self.show_confirmation(_("Apply Changes and Exit?") )
         
     def run(self):
         # 定义颜色方案
@@ -353,7 +472,10 @@ class MenuDialog:
             ('header', 'white', 'dark blue', 'bold'),    # White text on blue background
             ('button normal', 'light gray', 'dark blue', 'standout'),  # Light gray text on blue background
             ('button select', 'yellow', 'dark red'),    # Yellow text on red background
-            ('divider', 'light gray', 'dark blue'),      # Divider color
+            ('button focus', 'yellow', 'dark red', 'standout'),    # Yellow text on red background
+            ('divider', 'light gray', 'light gray'),      # Divider color
+            ('radio normal', 'light gray', 'dark blue'),  # Light gray text on blue background
+            ('radio select', 'light gray', 'dark green'),      # Yellow text on blue background
         ]
         
         # 创建主循环
@@ -370,7 +492,7 @@ class MenuDialog:
         if key in ('q', 'Q'):
             raise urwid.ExitMainLoop()
         elif key == 'esc':
-            # ESC键也可以返回上一级
+            # ESC key also returns to the previous menu
             self.go_back()
 
 def main():

@@ -183,7 +183,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
         if authMech == "OAuth2":
             oa2check = cfgList[ 4 ]
             for elem in oa2check.get( "Objects", [] ):
-                if elem.get( "ObjectName" ) == "OA2Proxy":
+                if elem.get( "ObjectName" ) == "OA2proxy":
                     authInfo[ "OA2ChkIp" ] = elem[ "IpAddress" ]
                     authInfo[ "OA2ChkPort" ] = elem[ "PortNumber" ]
                     authInfo[ "OA2SSL" ] = elem[ "EnableSSL" ]
@@ -266,7 +266,7 @@ if __name__ == "__main__":
             cfgs.append(json.load(f))
 
         oa2check =os.path.dirname(json_path) + "/oa2checkdesc.json"
-        with open(authprxy, 'r', encoding='utf-8') as f:
+        with open(oa2check, 'r', encoding='utf-8') as f:
             cfgs.append(json.load(f))
 
         # Add client-only flag if -c is specified
