@@ -86,8 +86,6 @@ def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
         strFile = strPath + "/signcert.pem"
         dlg.certEdit.set_text( strFile )
 
-        strFile = strPath + "/certs.pem"
-        dlg.cacertEdit.set_text( strFile )
     else:
         strFile = strPath + "/clientkey.pem"
         dlg.keyEdit.set_text( strFile )
@@ -95,8 +93,8 @@ def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
         strFile = strPath + "/clientcert.pem"
         dlg.certEdit.set_text( strFile )
 
-        strFile = strPath + "/certs.pem"
-        dlg.cacertEdit.set_text( strFile )
+    strFile = strPath + "/certs.pem"
+    dlg.cacertEdit.set_text( strFile )
 
     dlg.secretEdit.set_text( "" )
 

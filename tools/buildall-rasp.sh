@@ -1,7 +1,7 @@
 #/bin/bash
 # This is a script to automate the environment setup, build rpc-frmwrk, config
 # rpc-frmwrk and install rpc-frmwrk for Debian and Ubuntu.
-if ! which sudo; then
+if ! command -v sudo > /dev/null; then
     SUDO=""
 else
     SUDO="sudo"
@@ -34,8 +34,6 @@ fi
 ${SUDO} apt-get -y install git devscripts debhelper expect screen vim
 ${SUDO} apt-get -y install python3-wheel python3-numpy || pip3 install wheel numpy
 
-npm -g install assert browserify buffer exports long lz4 process put safe-buffer \
- stream xxhash xxhashjs minify webpack webpack-cli vm events crypto-browserify \
- stream-browserify
+npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify
 
 bash ./makerpcf-rasp.sh

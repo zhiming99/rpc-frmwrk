@@ -46,7 +46,10 @@ default_domain = {DomainName}
 def GetKrb5ConfFromInitCfg( initcfg : str ) -> str:
     strKrb5Conf = GetKrb5ConfTempl()
     try:
-        cfgVal = json.loads( initcfg )
+        fp = open( initcfg, 'r' )
+        if fp is None:
+            raise Exception( "Unable to open init config file" )
+        cfgVal = json.load( fp )
         updk5 = cfgVal[ 'Security' ]['AuthInfo' ]
         authMech = updk5.get( 'AuthMech', '' )
         if authMech != 'krb5':
@@ -74,6 +77,9 @@ def GetKrb5ConfFromInitCfg( initcfg : str ) -> str:
     except Exception as err:
         print( err )
         return ""
+    finally:
+        if fp is not None:
+            fp.close()
 
 def GenKrb5InstFilesFromInitCfg(
     initcfg : str,

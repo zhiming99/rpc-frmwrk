@@ -152,6 +152,7 @@ def CopyInstPkg( keyPath : str, destPath: str, bServer : bool )->int:
             if ret != 0:
                 raise Exception( "failed to copy " + i  )
     except Exception as err:
+        print( err )
         if ret == 0:
             ret = -errno.ENOENT
     return ret
@@ -208,7 +209,7 @@ def GetNginxVersion() -> Tuple[int,int,int]:
     return (0,0,0)
 
 def IsApacheInstalled()->bool:
-    strDist = GetDistName();
+    strDist = GetDistName()
     if strDist == "debian" or strDist == "ubuntu" :
         if os.access( '/usr/sbin/apache2', os.X_OK | os.R_OK ):
             return True
@@ -218,7 +219,13 @@ def IsApacheInstalled()->bool:
     return False
 
 def IsSudoAvailable()->bool:
-    ret = rpcf_system( "which sudo > /dev/null" )
+    ret = rpcf_system( "command -v sudo > /dev/null" )
+    if ret != 0:
+        return False
+    return True
+
+def IsSuAvailable()->bool:
+    ret = rpcf_system( "command -v su > /dev/null" )
     if ret != 0:
         return False
     return True
@@ -418,14 +425,17 @@ upstream {AppName} {{
     if len( strMonCliPkg ) > 0:
         strRpcfPath = strRootPath +"/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload"
+    cmdline += "{sudo} systemctl restart nginx || {sudo} nginx -s reload || pidof nginx || nginx"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
-    else:
+    elif IsSuAvailable():
         if os.geteuid() != 0:
             actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
         else:
             actCmd = cmdline.format( sudo='' )
+    else:
+        actCmd = cmdline.format( sudo='' )
+
     ret = rpcf_system( actCmd )
     return ret
 
@@ -433,8 +443,8 @@ def GetApacheCfgTextFedora()->str:
     return '''<VirtualHost *:{WsPortNum}>
       ServerName "{ServerName}"
       SSLEngine on
-      SSLCertificateFile "{CertFile}"
-      SSLCertificateKeyFile "{KeyFile}"
+      SSLCertificateFile {CertFile}
+      SSLCertificateKeyFile {KeyFile}
 
       RewriteEngine on
       RewriteCond ${{HTTP:Upgrade}} websocket [NC]
@@ -467,8 +477,8 @@ def GetApacheCfgTextDebian()->str:
     return '''<VirtualHost *:{WsPortNum}>
       ServerName "{ServerName}"
       SSLEngine on
-      SSLCertificateFile "{CertFile}"
-      SSLCertificateKeyFile "{KeyFile}"
+      SSLCertificateFile {CertFile}
+      SSLCertificateKeyFile {KeyFile}
 
       RewriteEngine on
       RewriteCond ${{HTTP:Upgrade}} websocket [NC]
@@ -498,6 +508,53 @@ def GetApacheCfgTextDebian()->str:
 </VirtualHost>
 
 '''
+
+def UpdateApacheSSLConfigFedora(cfgFile: str,
+    sslConfPath: str = "/etc/httpd/conf.d/ssl.conf") -> int:
+    """
+    Update the SSLCertificateFile and SSLCertificateKeyFile in ssl.conf with values from cfgFile
+    if the current values in ssl.conf point to non-existing files.
+
+    :param cfgFile: Path to the Apache VirtualHost configuration file.
+    :param sslConfPath: Path to the Apache ssl.conf file.
+    """
+    # Read the values from cfgFile
+    cert_file = None
+    key_file = None
+    try:
+        with open(cfgFile, 'r') as cfg:
+            for line in cfg:
+                if line.strip().startswith("SSLCertificateFile"):
+                    cert_file = line.split(None, 1)[1].strip()
+                elif line.strip().startswith("SSLCertificateKeyFile"):
+                    key_file = line.split(None, 1)[1].strip()
+
+        # Read and update ssl.conf
+        updated_lines = []
+        with open(sslConfPath, 'r') as ssl_conf:
+            for line in ssl_conf:
+                if line.strip().startswith("SSLCertificateFile"):
+                    current_cert_file = line.split(None, 1)[1].strip()
+                    if not cert_file or not os.path.exists(current_cert_file):
+                        updated_lines.append(f"SSLCertificateFile {cert_file}\n")
+                    else:
+                        updated_lines.append(line)
+                elif line.strip().startswith("SSLCertificateKeyFile"):
+                    current_key_file = line.split(None, 1)[1].strip()
+                    if not key_file or not os.path.exists(current_key_file):
+                        updated_lines.append(f"SSLCertificateKeyFile {key_file}\n")
+                    else:
+                        updated_lines.append(line)
+                else:
+                    updated_lines.append(line)
+
+        # Write the updated content back to ssl.conf
+        with open(sslConfPath, 'w') as ssl_conf:
+            ssl_conf.writelines(updated_lines)
+    except Exception as e:
+        print(f"Error updating SSL configuration: {e}")
+        return -errno.EFAULT
+    return 0
 
 def Config_Apache( initCfg : object )->int:
     strDist = GetDistName()
@@ -531,6 +588,11 @@ def Config_Apache( initCfg : object )->int:
         fp.write( cfg )
     fp.close()
 
+    if strDist == "fedora":
+        ret = UpdateApacheSSLConfigFedora( cfgFile )
+        if ret < 0:
+            print( "Warning: Failed to update ssl.conf with new cert and key paths" )
+
     strMonCliPkg = "/usr/local/etc/rpcf/appmonui.tar.gz"
     if not os.access( strMonCliPkg, os.R_OK ):
         strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
@@ -548,14 +610,16 @@ def Config_Apache( initCfg : object )->int:
     if len( strMonCliPkg ) > 0:
         strRpcfPath = "/var/www/html/rpcf"
         cmdline += "{sudo} mkdir -p " + strRpcfPath + ";cd " + strRpcfPath + ";{sudo} tar -zxf " + strMonCliPkg + ";"
-    cmdline += "{sudo} apachectl restart"
+    cmdline += "{sudo} apachectl restart || {sudo} httpd"
     if IsSudoAvailable() :
         actCmd = cmdline.format( sudo='sudo' )
-    else:
+    elif IsSuAvailable():
         if os.geteuid() != 0:
             actCmd = "su -c '" + cmdline.format( sudo='' ) + "'"
         else:
             actCmd = cmdline.format( sudo='' )
+    else:
+        actCmd = cmdline.format( sudo='' )
     ret = rpcf_system( actCmd )
     return ret
 

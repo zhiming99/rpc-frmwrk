@@ -97,9 +97,9 @@
 ## Docker容器
   rpc-frmwrk提供了Dockerfile，可以快速的建立编译和运行环境。
   * 打开一个终端，下载[Dockerfile](./Dockerfile)
-  * 在Dockerfile的下载目录，运行`docker build -t 'rpc-frmwrk' . `。
+  * 在Dockerfile的下载目录，运行`docker build -t 'rpcf:latest' . `。
   * 你也可以对Dockerfile做一些修改，来时应自己的使用习惯和运行环境。
-  * 运行docker的命令行`sudo docker run -it --rm --device /dev/fuse --privileged image-tag '/bin/bash'`. 注意选项`--device /dev/fuse`。
+  * 运行docker的命令行`sudo docker run -it --rm --device /dev/fuse --privileged rpcf:latest '/bin/bash'`. 注意选项`--device /dev/fuse`。
   * 对于国内的用户，建议使用国内的docker加速镜像，体验会非常好。
   * 你还可以在命令行下载docker镜像 `docker pull zhiming99/rpc-frmwrk:server` 和 `docker pull zhiming99/rpc-frmwrk:client`。注意运行时把服务器端容器ip地址设为`172.17.0.2`,客户端容器ip地址设成`172.17.0.3`。两个镜像里面的`/root`目录下都有`readme.md`，提供简单的提示。这两个容器设置的是使用websoket，所以在容器里需要启动nginx。
   * 更详细的构建rpc-frmwrk的方法请参考这篇[文章](../docs/Tut-HowToBuild_cn-9.md)。
