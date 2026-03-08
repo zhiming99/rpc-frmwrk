@@ -5,8 +5,10 @@ import urwid
 import gettext
 import os
 import errno
+import getopt
+import sys
 
-from updcfg import CheckIpAddr 
+from updcfg import CheckIpAddr, IsFeatureEnabled 
 
 # Initialize gettext
 gettext.bindtextdomain('rpcfgtui', '/usr/share/locale')
@@ -21,46 +23,24 @@ def is_valid_domain(domain):
     ret = pattern.match(domain)
     return ret is not None
 
-class ComboBox(urwid.WidgetWrap):
-    def __init__(self, options, idx=0):
-        self.options = options
-        self.selected_index = idx
-        self.button = urwid.Button(self.options[self.selected_index])
-        self.popup = urwid.AttrMap(urwid.ListBox(urwid.SimpleFocusListWalker(self.options)), 'body')
-        self.overlay = urwid.Overlay(self.popup, None, 'center', ('relative', 5), 'middle', ('relative', 50) )
-        self._wrapped_widget = self.button
-        self._update_button_label()
-        #self.button.set_focus()
-        self.button_press = self.button.when_activated = self._select_option
-        self._ignore_next_key = False
-
-    def _update_button_label(self):
-        self.button.set_label(self.options[self.selected_index])
-
-    def _select_option(self, button):
-        if not self._ignore_next_key:
-            self._ignore_next_key = True
-            self.selected_index = self.options.index(button.get_label())
-            self._update_button_label()
-            raise urwid.ExitMainLoop()  # 关闭弹出窗口
-        else:
-            self._ignore_next_key = False
-
 class MenuDialog:
     def __init__(self):
         self.main_loop = None
-        self.menu_stack = []  # 用于保存菜单历史记录
+        self.menu_stack = []  # stack to track widget z-order
         self.setup_ui()
         self.initCfg = json.loads(os.popen('rpcfctl geninitcfg').read())   
-        self.oConns = []  # 用于保存网络配置的widgets
+        self.oConns = []  # widgets for each connection configuration, used for updating config and reverting changes if user cancels
+        self.oSecWidgets = []  # widgets on security settings page, used for reverting changes if user cancels
+        self.authMechs = []
+        self.bServer = True
 
     def setup_ui(self):
         # 创建主菜单选项
         menu_items = [
             urwid.Text(_("System Configuration"), align='center'),
             urwid.Divider('-'),
-            urwid.Button(_("Network Settings"), on_press=self.network_settings),
-            urwid.Button(_("Security Settings"), on_press=self.security_settings),
+            urwid.Button(_("Network Settings"), on_press=self.showNetworkSettings),
+            urwid.Button(_("Security Settings"), on_press=self.showSecuritySettings),
             urwid.Button(_("Configuration List"), on_press=self.config_list),
             urwid.Button(_("Exit"), on_press=self.exit_program)
         ]
@@ -88,7 +68,7 @@ class MenuDialog:
             oConn = oConnParams[idx] if idx < len(oConnParams) else None
             if oConn:
                 oConn["deleted"] = True  # Mark the connection as deleted in the config
-            self.network_settings(button)
+            self.showNetworkSettings(button)
 
     def add_connection(self, button):
         # add a new connection configuration (default values)
@@ -110,12 +90,18 @@ class MenuDialog:
             'added': True  # Mark the connection as newly added in the config
         })
         # refresh the network settings page to show the new connection
-        self.network_settings(button)
+        self.showNetworkSettings(button)
 
     def update_network_config(self, button):
         # walk through the widgets in oConns and update the initCfg with the new values
         try:
             oConnParams = self.initCfg.get('Connections', [])
+            for conn in oConnParams[:]:
+                if conn.get( 'deleted', False):
+                    oConnParams.remove(conn)  # remove the newly added connection from config
+            for conn in oConnParams[:]:
+                if conn.get( 'added', False):
+                    conn.pop('added')  # remove the added mark for display purposes
             for idx, conn_widgets in enumerate(self.oConns):
                 if idx < len(oConnParams):
                     conn_params = oConnParams[idx]
@@ -149,9 +135,10 @@ class MenuDialog:
         except Exception as e:
             self.show_message(_("Failed to update network configuration: {}").format(str(e)))
             return
+        self.oConns.clear()  # clear current widgets
         self.go_back( None )  # return to previous menu after updating config
 
-    def revert_to_network_settings(self, network_widgets):
+    def revertToNetworkSettings(self, network_widgets):
         # revert the network settings page to the previous state (before changes)
         oConnParams = self.initCfg.get('Connections', [])
         self.oConns.clear()  # clear current widgets
@@ -178,7 +165,7 @@ class MenuDialog:
             ]
             oConns.append(conn_widgets)
 
-    def network_settings(self, button):
+    def showNetworkSettings(self, button):
         # Save the current menu state to the stack
         action = button.get_label() 
         if button and action == _("Network Settings") : 
@@ -241,7 +228,7 @@ class MenuDialog:
         network_widgets.append(urwid.AttrWrap(list_box, 'body'))
         # Create the Pile with the correct focus_item
         combined_pile = urwid.Pile(network_widgets)
-        combined_pile.revert_func = lambda: self.revert_to_network_settings(network_widgets)  # Store the current state for reverting
+        combined_pile.revert_func = lambda: self.revertToNetworkSettings(network_widgets)  # Store the current state for reverting
 
         # Set the combined pile as the body of the main widget
         self.main_widget.body = combined_pile
@@ -338,77 +325,311 @@ class MenuDialog:
 
         
     def on_choice_changed(self, button, new_state):
+        if new_state:  # Only update the security settings when a radio button is selected
+            label = button.get_label()  # Get the label of the selected radio button
+            oSec = self.initCfg.get('Security', {})
+            authMech = None
+            if label == _("SimpAuth"):
+                oSec['AuthInfo'] = dict(AuthMech='SimpAuth')
+                authMech = 'SimpAuth'
+            elif label == _("Kerberos"):
+                oSec['AuthInfo'] = dict(AuthMech='krb5')
+                authMech = 'krb5'
+            elif label == _("OAuth2"):
+                oSec['AuthInfo'] = dict(AuthMech='OAuth2')
+                authMech = 'OAuth2'
+
+            divCount = 0
+            insPos = 0
+            endPos = 0
+            for idx, widget in enumerate(self.oSecWidgets):
+                if isinstance(widget, urwid.Divider ):
+                    divCount += 1
+                    if divCount == 3:  # the new widgets should be inserted before the second divider
+                        insPos = idx + 2
+                        focus_pos = idx + 1
+                        continue
+                    if divCount == 4:
+                        endPos = idx
+                        break
+            authInfo = oSec.get('AuthInfo', {})
+            widgetPile = []
+            if authMech == 'SimpAuth':
+                widgetPile.append(urwid.Edit(_("User Name : "), edit_text=authInfo.get('UserName', '')))
+            elif authMech == 'OAuth2':
+                widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
+                widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
+                widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
+                widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
+            elif authMech == 'krb5' and IsFeatureEnabled('krb5'):
+                widgetPile.append(urwid.Edit(_(" Service Name : "), edit_text=authInfo.get('ServiceName', '')))
+                widgetPile.append(urwid.Edit(_("        Realm : "), edit_text=authInfo.get('Realm', '')))
+                widgetPile.append(urwid.Edit(_("    User Name : "), edit_text=authInfo.get('UserName', '')))
+                widgetPile.append(urwid.Edit(_("KDC IpAddress : "), edit_text=authInfo.get('KdcIp', '')))
+                widgetPile.append(urwid.CheckBox(_("Sign Messages"), state=(authInfo.get('SignMessages', False) == 'true')))
+
+                kinitProxy = urwid.Button(_("Enable kinit proxy"), align='center', on_press=self.enableKinitProxy )
+                oKinitButton = urwid.Padding(
+                    urwid.AttrMap(kinitProxy, 'button normal', focus_map='button focus'),
+                    align='left',
+                    width='pack',
+                )
+                initKdc = urwid.Button(_("Initialize KDC"), align='center', on_press=self.initKdc )
+                oInitKdcButton = urwid.Padding(
+                    urwid.AttrMap(initKdc, 'button normal', focus_map='button focus'),
+                    align='left',
+                    width='pack',
+                )
+
+                updateAuthSettings = urwid.Button(_("Update Auth Settings"), align='center', on_press=self.updateAuthSettngsKrb5 )
+                oUpdAuthSettings = urwid.Padding(
+                    urwid.AttrMap(updateAuthSettings, 'button normal', focus_map='button focus'),
+                    align='left',
+                    width='pack',
+                )
+                buttons = urwid.GridFlow(
+                    [oKinitButton, oInitKdcButton, oUpdAuthSettings],
+                    cell_width=max(len( kinitProxy.get_label() ),
+                        len( initKdc.get_label() ),
+                        len( updateAuthSettings.get_label() )),  # Adjust the width of each button
+                    h_sep=2,        # Horizontal space between buttons
+                    v_sep=0,        # Vertical space between rows (not needed here)
+                    align='left'  # Left-align the buttons
+                )
+                widgetPile.append(buttons)
+
+            elif authMech is None:
+                pass
+
+            del self.oSecWidgets[insPos:endPos]  # remove the old widgets between the two dividers
+            for widget in widgetPile:
+                self.oSecWidgets.insert(insPos, widget)  # insert the new widgets between the two dividers
+                insPos += 1
+
+            list_walker = urwid.SimpleFocusListWalker(self.oSecWidgets)
+            list_box = urwid.ListBox(list_walker)
+            if 'focus_pos' in locals():
+                list_walker.set_focus(focus_pos)  # restore the focus position after updating the widgets
+            self.main_widget.body = urwid.AttrWrap(list_box, 'body')
+            self.main_widget.body.revert_func = lambda: self.revert_to_security_settings()  # Store the current state for reverting
+
+    def revert_to_security_settings(self):
+        self.oSecWidgets.clear()  # clear current widgets
+        self.authMechs.clear()
+
+    def update_security_config(self, button):
+        if button.get_label() != _("Return to Previous Level"):
+            self.revert_to_security_settings()
+            self.go_back( button )  # return to previous menu after updating config
+            return
+        secItems = self.oSecWidgets
+        try:
+            oSecurity = self.initCfg.get('Security', {})
+            sslFiles = oSecurity.get('SSLCred', {})
+            authInfo = oSecurity.get('AuthInfo', {})
+            for widget in secItems:
+                if isinstance(widget, urwid.Edit):
+                    label = widget.caption.strip()
+                    if label == _("Key File :"):
+                        sslFiles['KeyFile'] = widget.edit_text.strip()
+                    elif label == _("Cert File :"):
+                        sslFiles['CertFile'] = widget.edit_text.strip()
+                    elif label == _("CACert File :"):
+                        sslFiles['CACertFile'] = widget.edit_text.strip()
+                    elif label == _("OA2Checker Ip :"):
+                        authInfo['OA2ChkIp'] = widget.edit_text.strip()
+                    elif label == _("OA2Checker Port :"):
+                        authInfo['OA2ChkPort'] = widget.edit_text.strip()
+                    elif label == _("Auth URL :"):
+                        authInfo['AuthUrl'] = widget.edit_text.strip()
+                    elif label == _("Service Name :"):
+                        authInfo['ServiceName'] = widget.edit_text.strip()
+                    elif label == _("Realm :"):
+                        authInfo['Realm'] = widget.edit_text.strip()
+                    elif label == _("KDC IpAddress :"):
+                        authInfo['KdcIp'] = widget.edit_text.strip()
+                    elif label == _("User Name :"):
+                        authInfo['UserName'] = widget.edit_text.strip()
+                elif isinstance(widget, urwid.CheckBox):
+                    label = widget.get_label().strip()
+                    state = 'true' if widget.get_state() else 'false'
+                    if label == _("Using GmSSL"):
+                        sslFiles['UsingGmSSL'] = state
+                    elif label == _("Verify Peer"):
+                        sslFiles['VerifyPeer'] = state
+                    elif label == _("Enable SSL") and "OA2ChkIp" in authInfo:
+                        authInfo['OA2SSL'] = state
+                    elif label == _("Sign Messages") and "ServiceName" in authInfo:
+                        authInfo['SignMessages'] = state
+            # Determine AuthMech based on which fields are filled or which checkboxes are checked
+            for authMech in self.authMechs:
+                if authMech.base_widget.get_state():
+                    label = authMech.base_widget.get_label().strip()
+                    if label == _("SimpAuth"):
+                        authInfo['AuthMech'] = 'SimpAuth'
+                    elif label == _("Kerberos"):
+                        authInfo['AuthMech'] = 'krb5'
+                    elif label == _("OAuth2"): 
+                        authInfo['AuthMech'] = 'OAuth2'
+                    break
+        except Exception as err:
+            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            return
+        self.oSecWidgets.clear()  # clear current widgets
+        self.authMechs.clear()
+        self.go_back( button )  # return to previous menu after updating config
+        
+    def HasAuth( self ):
+        oConns = self.oConns
+        if len(oConns) == 0:
+            oConnParams = self.initCfg.get('Connections', [])
+            for conn in oConnParams:
+                if conn.get('HasAuth', 'false') == 'true':
+                    return True
+            return False
+        for oWidgets in oConns:
+            for widget in oWidgets:
+                if isinstance(widget, urwid.CheckBox):
+                    label = widget.get_label().strip()
+                    if label == _("Enable Authentication") and widget.get_state():
+                        return True
+        return False
+        return False
+
+    def HasSSL( self ):
+        if not ( IsFeatureEnabled('openssl') or IsFeatureEnabled('gmssl') ):
+            return False
+        oConns = self.oConns
+        if len(oConns) == 0:
+            oConnParams = self.initCfg.get('Connections', [])
+            for conn in oConnParams:
+                if conn.get('EnableSSL', 'false') == 'true':
+                    return True
+            return False
+        for oWidgets in oConns:
+            for widget in oWidgets:
+                if isinstance(widget, urwid.CheckBox):
+                    label = widget.get_label().strip()
+                    if label == _("Enable SSL") and widget.get_state():
+                        return True
+        return False
+
+    def enableKinitProxy(self, button):    
         pass
 
-    def build_security_settings(self):
-        
-        oSecurity = self.initCfg.get('Security', [])
-        sslFiles = oSecurity.get('SSLCred', {})
-        authInfo = oSecurity.get('AuthInfo', {})
-        
-        noAuth = urwid.RadioButton([], _("No Auth"), state=(authInfo.get('AuthMech', '') == '' ))
-        simpleAuth = urwid.RadioButton(noAuth.group, _("SimpAuth"),
-            state=(authInfo.get('AuthMech', '') == 'SimpAuth'), on_state_change=self.on_choice_changed )
-        krb5 = urwid.RadioButton(noAuth.group, _("Kerberos"),
-            state=(authInfo.get('AuthMech', '') == 'krb5'), on_state_change=self.on_choice_changed )
-        OAuth2 = urwid.RadioButton(noAuth.group, _("OAuth2"),
-            state=(authInfo.get('AuthMech', '') == 'OAuth2'), on_state_change=self.on_choice_changed )
-        radioButtons = urwid.GridFlow(
-            [
-                urwid.AttrMap(noAuth, "radio normal", focus_map='radio select'),
-                urwid.AttrMap(simpleAuth, "radio normal", focus_map='radio select'),
-                urwid.AttrMap(krb5, "radio normal", focus_map='radio select'),
-                urwid.AttrMap(OAuth2, "radio normal", focus_map='radio select')
-            ],
-            cell_width=20,  # Adjust the width of each button
-            h_sep=2,        # Horizontal space between buttons
-            v_sep=0,        # Vertical space between rows (not needed here)
-            align='center'  # Center-align the buttons
-        )
-        authMech = authInfo.get('AuthMech', '')
-        widgetPile = []
-        if authMech == 'SimpAuth':
-            widgetPile.append(urwid.Edit(_("User Name"), edit_text=authInfo.get('UserName', '')))
-        elif authMech == 'OAuth2':
-            widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
-            widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
-            widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
-            widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
-        elif authMech == 'krb5':
-            widgetPile.append(urwid.Edit(_("Service Name"), edit_text=authInfo.get('ServiceName', '')))
-            widgetPile.append(urwid.Edit(_("Realm"), edit_text=authInfo.get('Realm', '')))
-            widgetPile.append(urwid.Edit(_("User Name"), edit_text=authInfo.get('UserName', '')))
-            widgetPile.append(urwid.Edit(_("KDC IpAddress"), edit_text=authInfo.get('KdcIp', '')))
-            widgetPile.append(urwid.CheckBox(_("Sign Messages"), state=(authInfo.get('SignMessages', False) == 'true')))
-            
+    def initKdc(self, button):    
+        pass
 
-        security_items = [
-            urwid.Text(_("SSL Settings"), align='center'),
-            urwid.Divider('-'),
-            urwid.Edit(_("    Key File : "), edit_text=sslFiles.get('KeyFile', '')),
-            urwid.Edit(_("   Cert File : "), edit_text=sslFiles.get('CertFile', '')),
-            urwid.Edit(_(" CACert File : "), edit_text=sslFiles.get('CACertFile', '')),
-            urwid.CheckBox(_("Using GmSSL"), state=(sslFiles.get('UsingGmSSL', False) == 'true')),
-            urwid.CheckBox(_("Verify Peer"), state=(sslFiles.get('VerifyPeer', False) == 'true')),
-            urwid.AttrWrap( urwid.Button(_("Generate Self-Signed Certificate"),
-                on_press=self.generate_self_signed_cert), 'button normal', 'button focus'),
-            urwid.Divider('-'),
-            urwid.Text(_("Authentication Settings"), align='center'),
-            urwid.Divider('-'),
-            radioButtons,
-            *widgetPile,
-            urwid.AttrWrap( urwid.Button(_("Return to Previous Level"),
-                on_press=self.go_back), 'button normal', 'button focus')
-        ]
+    def updateAuthSettngsKrb5(self, button):    
+        pass
+
+    def buildSecuritySettings(self):
+            
+        if len( self.oSecWidgets ) == 0:
+            oSecurity = self.initCfg.get('Security', [])
+            sslFiles = oSecurity.get('SSLCred', {})
+
+            self.oSecWidgets = [
+                urwid.Text(_("SSL Settings"), align='center'),
+                urwid.Divider('-'),
+                urwid.Edit(_("    Key File : "), edit_text=sslFiles.get('KeyFile', '')),
+                urwid.Edit(_("   Cert File : "), edit_text=sslFiles.get('CertFile', '')),
+                urwid.Edit(_(" CACert File : "), edit_text=sslFiles.get('CACertFile', '')),
+                urwid.CheckBox(_("Using GmSSL"), state=(sslFiles.get('UsingGmSSL', False) == 'true')),
+                urwid.CheckBox(_("Verify Peer"), state=(sslFiles.get('VerifyPeer', False) == 'true')),
+                urwid.AttrWrap( urwid.Button(_("Generate Self-Signed Certificate"),
+                    on_press=self.generate_self_signed_cert), 'button normal', 'button focus'),
+                urwid.Divider('-'),
+                urwid.Text(_("Authentication Settings"), align='center'),
+                urwid.Divider('-'),
+            ]
+
+            if self.HasAuth():
+                authInfo = oSecurity.get('AuthInfo', dict(AuthMech='SimpAuth'))
+                simpleAuth = urwid.RadioButton([], _("SimpAuth"),
+                    state=(authInfo.get('AuthMech', '') == 'SimpAuth'), on_state_change=self.on_choice_changed )
+                krb5 = urwid.RadioButton(simpleAuth.group, _("Kerberos"),
+                    state=(authInfo.get('AuthMech', '') == 'krb5'), on_state_change=self.on_choice_changed )
+                OAuth2 = urwid.RadioButton(simpleAuth.group, _("OAuth2"),
+                    state=(authInfo.get('AuthMech', '') == 'OAuth2'), on_state_change=self.on_choice_changed )
+                self.authMechs = [
+                        urwid.AttrMap(simpleAuth, "radio normal", focus_map='radio select'),
+                        urwid.AttrMap(OAuth2, "radio normal", focus_map='radio select'),
+                    ]
+                if IsFeatureEnabled('krb5'):
+                    self.authMechs.append( urwid.AttrMap(krb5, "radio normal", focus_map='radio select') )
+                radioButtons = urwid.GridFlow(
+                    self.authMechs,
+                    cell_width=20,  # Adjust the width of each button
+                    h_sep=2,        # Horizontal space between buttons
+                    v_sep=0,        # Vertical space between rows (not needed here)
+                    align='center'  # Center-align the buttons
+                )
+                authMech = authInfo.get('AuthMech', '')
+                widgetPile = []
+                if authMech == 'SimpAuth':
+                    widgetPile.append(urwid.Edit(_("User Name : "), edit_text=authInfo.get('UserName', '')))
+                elif authMech == 'OAuth2':
+                    widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
+                    widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
+                    widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
+                    widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
+                elif authMech == 'krb5' and IsFeatureEnabled('krb5'):
+                    widgetPile.append(urwid.Edit(_(" Service Name : "), edit_text=authInfo.get('ServiceName', '')))
+                    widgetPile.append(urwid.Edit(_("        Realm : "), edit_text=authInfo.get('Realm', '')))
+                    widgetPile.append(urwid.Edit(_("    User Name : "), edit_text=authInfo.get('UserName', '')))
+                    widgetPile.append(urwid.Edit(_("KDC IpAddress : "), edit_text=authInfo.get('KdcIp', '')))
+                    widgetPile.append(urwid.CheckBox(_("Sign Messages"), state=(authInfo.get('SignMessages', False) == 'true')))
+
+                    kinitProxy = urwid.Button(_("Enable kinit proxy"), align='center', on_press=self.enableKinitProxy )
+                    oKinitButton = urwid.Padding(
+                        urwid.AttrMap(kinitProxy, 'button normal', focus_map='button focus'),
+                        align='left',
+                        width='pack',
+                    )
+                    initKdc = urwid.Button(_("Initialize KDC"), align='center', on_press=self.initKdc )
+                    oInitKdcButton = urwid.Padding(
+                        urwid.AttrMap(initKdc, 'button normal', focus_map='button focus'),
+                        align='left',
+                        width='pack',
+                    )
+
+                    updateAuthSettings = urwid.Button(_("Update Auth Settings"), align='center', on_press=self.updateAuthSettngsKrb5 )
+                    oUpdAuthSettings = urwid.Padding(
+                        urwid.AttrMap(updateAuthSettings, 'button normal', focus_map='button focus'),
+                        align='left',
+                        width='pack',
+                    )
+                    buttons = urwid.GridFlow(
+                        [oKinitButton, oInitKdcButton, oUpdAuthSettings],
+                        cell_width=max(len( kinitProxy.get_label() ),
+                            len( initKdc.get_label() ),
+                            len( updateAuthSettings.get_label() )),  # Adjust the width of each button
+                        h_sep=2,        # Horizontal space between buttons
+                        v_sep=0,        # Vertical space between rows (not needed here)
+                        align='left'  # Left-align the buttons
+                    )
+                    widgetPile.append(buttons)
+
+                self.oSecWidgets.extend([
+                radioButtons,
+                *widgetPile,])
+
+            self.oSecWidgets.extend([
+                urwid.Divider('-'),
+                urwid.AttrWrap( urwid.Button(_("Return to Previous Level"),
+                    on_press=self.update_security_config), 'button normal', 'button focus')
+            ])
         
-        list_walker = urwid.SimpleFocusListWalker(security_items)
+        list_walker = urwid.SimpleFocusListWalker(self.oSecWidgets)
         list_box = urwid.ListBox(list_walker)
         self.main_widget.body = urwid.AttrWrap(list_box, 'body')
+        self.main_widget.body.revert_func = lambda: self.revert_to_security_settings()  # Store the current state for reverting
 
-    def security_settings(self, button):
+    def showSecuritySettings(self, button):
         # Save the current menu state to the stack before showing security settings
         self.menu_stack.append(self.main_widget.body)
-        self.build_security_settings()
+        self.buildSecuritySettings()
 
     def go_back(self, button=None):                                                                                                                                                                              
         if self.main_widget.body and hasattr(self.main_widget.body, 'revert_func'):
@@ -495,8 +716,31 @@ class MenuDialog:
             # ESC key also returns to the previous menu
             self.go_back()
 
+def usage():
+    print( "Usage: python3 rpcfgtui.py [-hc]" )
+    print( "\t-c: to config a client host." )
+    print( "\t\tOtherwise it is for a server host" )
+
 def main():
+    bServer = True
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hc" )
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        usage()
+        sys.exit(-errno.EINVAL)
+
+    for o, a in opts:
+        if o == "-h" :
+            usage()
+            sys.exit( 0 )
+        elif o == "-c":
+            bServer = False
+        else:
+            assert False, "unhandled option"
     app = MenuDialog()
+    app.bServer = bServer
     app.run()
 
 if __name__ == "__main__":
