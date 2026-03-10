@@ -7,8 +7,9 @@ import os
 import errno
 import getopt
 import sys
-
+from urwid.widget.constants import BOX_SYMBOLS
 from updcfg import CheckIpAddr, IsFeatureEnabled 
+from updwscfg import rpcf_system
 
 # Initialize gettext
 gettext.bindtextdomain('rpcfgtui', '/usr/share/locale')
@@ -22,7 +23,124 @@ def is_valid_domain(domain):
     )
     ret = pattern.match(domain)
     return ret is not None
+import urwid
 
+palette = [
+    ('body', 'yellow', 'dark blue', 'standout'),  # Yellow text on blue background
+    ('header', 'white', 'dark blue', 'bold'),    # White text on blue background
+    ('button normal', 'light gray', 'dark blue', 'standout'),  # Light gray text on blue background
+    ('button select', 'yellow', 'dark red'),    # Yellow text on red background
+    ('button focus', 'yellow', 'dark red', 'standout'),    # Yellow text on red background
+    ('divider', 'light gray', 'light gray'),      # Divider color
+    ('radio normal', 'light gray', 'dark blue'),  # Light gray text on blue background
+    ('radio select', 'light gray', 'dark green'),      # Yellow text on blue background
+
+    ('screen edge', 'light blue', 'brown'),
+    ('main shadow', 'dark gray', 'black'),
+    ('line', 'black', 'light gray', 'standout'),
+    ('bg background', 'light gray', 'black'),
+    ('bg 1', 'black', 'dark blue', 'standout'),
+    ('bg 1 smooth', 'dark blue', 'black'),
+    ('button disabled', 'dark gray', 'dark blue'),
+    ('edit', 'yellow', 'dark blue'),
+    ('edit focused', 'white', 'dark blue'),
+    ('focus', 'light gray', 'dark blue', 'standout'),
+    ('important', 'dark red', 'light gray', 'standout'),
+    ('key', 'light cyan', 'dark blue', 'underline'),
+    ('title', 'white', 'black', 'bold'),
+    ('flag', 'dark gray', 'light gray'),
+    ('flagged', 'black', 'dark green', 'bold'),
+    ('flagged 2', 'dark green', 'light gray', 'underline'),
+    ('marked', 'white', 'dark cyan', 'bold'),
+    ('marked 2', 'dark cyan', 'light gray', 'underline'),
+    ('neutral', 'light gray', 'dark blue'),
+    ('reversed', 'black', 'light gray'),
+    ('text', 'light gray', 'black'),
+    ('highlight', 'white', 'dark blue', 'bold'),
+    ('error', 'dark red', 'light gray'),
+]
+
+class PasswordDialog:
+    def __init__(self, parent ):
+        self.password = None
+        self.create_dialog()
+        self.parent = parent 
+        self.menu_stack = []
+        self.main_loop = None
+    
+    def create_dialog(self):
+        self.password_edit = urwid.Edit(caption=_("Password: "), mask='*')
+        
+        ok_button = urwid.Button(_("OK"), align='center', on_press=self.on_ok)
+        cancel_button = urwid.Button(_("Cancel"), align='center', on_press=self.on_cancel)
+        
+        pile = urwid.Pile([
+            urwid.Divider(),
+            urwid.GridFlow( 
+                [ self.password_edit, ],
+                cell_width=50,  # Adjust button width
+                h_sep=2,        # Horizontal space between buttons
+                v_sep=0,        # No vertical space
+                align='center'  # Center-align buttons
+            ),
+            urwid.Divider(),
+            urwid.GridFlow(
+                [ urwid.AttrMap(ok_button, 'button normal',  focus_map='button focus'),
+                  urwid.AttrMap(cancel_button, 'button normal',  focus_map='button focus')
+                ],
+                cell_width=10,  # Adjust button width
+                h_sep=2,        # Horizontal space between buttons
+                v_sep=0,        # No vertical space
+                align='center'  # Center-align buttons
+            )
+        ])
+        
+        lineBox = createDoubleLineBox( pile, _("Input Password"))
+        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 50))
+        dlg = urwid.AttrMap( lineBox, 'body')
+ 
+        self.dialog = urwid.Padding(
+            urwid.AttrMap( urwid.Filler(dlg, valign='middle', ), 'body' ),
+            align='center',
+            ) 
+        
+    def on_ok(self, button):
+        self.password = self.password_edit.get_edit_text()
+        if self.password == "":
+            self.password = None
+        if self.main_loop:
+            raise urwid.ExitMainLoop()
+    
+    def on_cancel(self, button):
+        self.password = None
+        if self.main_loop:
+            raise urwid.ExitMainLoop()
+
+    def runDlg(self):
+
+        global palette
+        pal1 = palette
+        self.main_loop = urwid.MainLoop(self.dialog, pal1 )
+        self.main_loop.run()
+
+    def unhandled_input(self, key):
+        if key == 'esc' or key == 'q':
+            self.on_cancel(None)  # Treat ESC as cancel
+        elif key == 'enter':
+            self.on_ok(None)  # Treat Enter as OK
+    
+def createDoubleLineBox( widget, strTitle ):
+    return urwid.LineBox(widget,
+        title=strTitle,
+        tline=BOX_SYMBOLS.DOUBLE.HORIZONTAL,
+        tlcorner=BOX_SYMBOLS.DOUBLE.TOP_LEFT,
+        trcorner=BOX_SYMBOLS.DOUBLE.TOP_RIGHT,
+        lline= BOX_SYMBOLS.DOUBLE.VERTICAL,
+        blcorner=BOX_SYMBOLS.DOUBLE.BOTTOM_LEFT,
+        rline= BOX_SYMBOLS.DOUBLE.VERTICAL,
+        bline=BOX_SYMBOLS.DOUBLE.HORIZONTAL,
+        brcorner=BOX_SYMBOLS.DOUBLE.BOTTOM_RIGHT,
+        )
 class MenuDialog:
     def __init__(self):
         self.main_loop = None
@@ -37,26 +155,30 @@ class MenuDialog:
     def setup_ui(self):
         # 创建主菜单选项
         menu_items = [
-            urwid.Text(_("System Configuration"), align='center'),
-            urwid.Divider('-'),
+            urwid.Divider(' '),
             urwid.Button(_("Network Settings"), on_press=self.showNetworkSettings),
+            urwid.Divider(' '),
             urwid.Button(_("Security Settings"), on_press=self.showSecuritySettings),
+            urwid.Divider(' '),
             urwid.Button(_("Configuration List"), on_press=self.config_list),
+            urwid.Divider(' '),
             urwid.Button(_("Exit"), on_press=self.exit_program)
         ]
         
         # 创建列表框
         list_walker = urwid.SimpleFocusListWalker(menu_items)
         list_box = urwid.ListBox(list_walker)
+        line_box = createDoubleLineBox(list_box,
+            _("Configure Rpc-Framework") )
         
         # 创建标题和边框
-        header = urwid.Text(_("Configure Rpc-Framework"), align='center')
-        header = urwid.AttrWrap(header, 'header')
+        #header = urwid.Text(_("Configure Rpc-Framework"), align='center')
+        #header = urwid.AttrWrap(header, 'header')
         
         # 创建主界面
         self.main_widget = urwid.Frame(
-            urwid.AttrWrap(list_box, 'body'),
-            header=header,
+            urwid.AttrWrap(line_box, 'body'),
+            #header=header,
             footer=urwid.Text(_("Use arrow keys to navigate, Enter to confirm"), align='center')
         )
     def remove_connection(self, button, idx):    
@@ -251,9 +373,9 @@ class MenuDialog:
             
     def ask_file_path(self):
         # Create input field and buttons
-        input_edit = urwid.Edit("Enter file path: ", edit_text="initcfg_exported.json", align='center')
-        ok_button = urwid.Button("OK", align='center', on_press=self.confirm_file_path, user_data=input_edit)
-        cancel_button = urwid.Button("Cancel", on_press=self.close_message)
+        input_edit = urwid.Edit(_("Enter file path: "), edit_text="initcfg_exported.json", align='center')
+        ok_button = urwid.Button(_("OK"), align='center', on_press=self.confirm_file_path, user_data=input_edit)
+        cancel_button = urwid.Button(_("Cancel"), on_press=self.close_message)
 
         # Arrange buttons horizontally
         buttons = urwid.GridFlow(
@@ -652,7 +774,9 @@ class MenuDialog:
         raise urwid.ExitMainLoop()
 
     def confirm_cancel(self, button):
-        self.go_back()
+        pdlg = PasswordDialog( self )
+        pdlg.runDlg()
+        self.go_back(button)
 
     def show_confirmation(self, message):
         # 显示确认对话框
@@ -688,17 +812,8 @@ class MenuDialog:
         
     def run(self):
         # 定义颜色方案
-        palette = [
-            ('body', 'yellow', 'dark blue', 'standout'),  # Yellow text on blue background
-            ('header', 'white', 'dark blue', 'bold'),    # White text on blue background
-            ('button normal', 'light gray', 'dark blue', 'standout'),  # Light gray text on blue background
-            ('button select', 'yellow', 'dark red'),    # Yellow text on red background
-            ('button focus', 'yellow', 'dark red', 'standout'),    # Yellow text on red background
-            ('divider', 'light gray', 'light gray'),      # Divider color
-            ('radio normal', 'light gray', 'dark blue'),  # Light gray text on blue background
-            ('radio select', 'light gray', 'dark green'),      # Yellow text on blue background
-        ]
         
+        global palette
         # 创建主循环
         self.main_loop = urwid.MainLoop(
             self.main_widget,
@@ -715,6 +830,18 @@ class MenuDialog:
         elif key == 'esc':
             # ESC key also returns to the previous menu
             self.go_back()
+
+    def ElevatePrivilege( self ) -> int:
+        ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
+        if ret == 0 :
+            return ret
+        passDlg = PasswordDialog( self )
+        passDlg.runDlg()
+
+        # Run a blocking loop until the password is entered
+        ret = rpcf_system( "echo '" + passwd + "'| sudo -S echo updating..." )
+        passwd = None
+        return ret
 
 def usage():
     print( "Usage: python3 rpcfgtui.py [-hc]" )
@@ -745,3 +872,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    print("\033[0m", end='', flush=True)
