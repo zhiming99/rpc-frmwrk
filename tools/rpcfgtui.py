@@ -25,6 +25,17 @@ def is_valid_domain(domain):
     return ret is not None
 import urwid
 
+bw_pallete = [
+    ('body', 'light gray', 'black', 'standout'),  # Yellow text on blue background
+    ('header', 'white', 'black', 'bold'),    # White text on blue background
+    ('button normal', 'light gray', 'black', 'standout'),  # Light gray text on blue background
+    ('button select', 'black', 'light gray'),    # Yellow text on red background
+    ('button focus', 'black', 'light gray', 'standout'),    # Yellow text on red background
+    ('divider', 'light gray', 'light gray'),      # Divider color
+    ('radio normal', 'light gray', 'black'),  # Light gray text on blue background
+    ('radio select', 'light gray', 'dark gray'),      # Yellow text on blue background
+]
+
 palette = [
     ('body', 'yellow', 'dark blue', 'standout'),  # Yellow text on blue background
     ('header', 'white', 'dark blue', 'bold'),    # White text on blue background
@@ -34,30 +45,6 @@ palette = [
     ('divider', 'light gray', 'light gray'),      # Divider color
     ('radio normal', 'light gray', 'dark blue'),  # Light gray text on blue background
     ('radio select', 'light gray', 'dark green'),      # Yellow text on blue background
-
-    ('screen edge', 'light blue', 'brown'),
-    ('main shadow', 'dark gray', 'black'),
-    ('line', 'black', 'light gray', 'standout'),
-    ('bg background', 'light gray', 'black'),
-    ('bg 1', 'black', 'dark blue', 'standout'),
-    ('bg 1 smooth', 'dark blue', 'black'),
-    ('button disabled', 'dark gray', 'dark blue'),
-    ('edit', 'yellow', 'dark blue'),
-    ('edit focused', 'white', 'dark blue'),
-    ('focus', 'light gray', 'dark blue', 'standout'),
-    ('important', 'dark red', 'light gray', 'standout'),
-    ('key', 'light cyan', 'dark blue', 'underline'),
-    ('title', 'white', 'black', 'bold'),
-    ('flag', 'dark gray', 'light gray'),
-    ('flagged', 'black', 'dark green', 'bold'),
-    ('flagged 2', 'dark green', 'light gray', 'underline'),
-    ('marked', 'white', 'dark cyan', 'bold'),
-    ('marked 2', 'dark cyan', 'light gray', 'underline'),
-    ('neutral', 'light gray', 'dark blue'),
-    ('reversed', 'black', 'light gray'),
-    ('text', 'light gray', 'black'),
-    ('highlight', 'white', 'dark blue', 'bold'),
-    ('error', 'dark red', 'light gray'),
 ]
 
 class PasswordDialog:
@@ -65,8 +52,7 @@ class PasswordDialog:
         self.password = None
         self.create_dialog()
         self.parent = parent 
-        self.menu_stack = []
-        self.main_loop = None
+        self.callback = None
     
     def create_dialog(self):
         self.password_edit = urwid.Edit(caption=_("Password: "), mask='*')
@@ -108,20 +94,24 @@ class PasswordDialog:
         self.password = self.password_edit.get_edit_text()
         if self.password == "":
             self.password = None
-        if self.main_loop:
-            raise urwid.ExitMainLoop()
+        elif self.parent:
+            self.parent.main_loop.set_alarm_in(0, lambda loop, data: self.callback(self.password))
+        if self.parent:
+            self.parent.go_back(button)
+            self.parent.main_loop.unhandled_input = self.parent.unhandled_input
     
     def on_cancel(self, button):
         self.password = None
-        if self.main_loop:
-            raise urwid.ExitMainLoop()
+        if self.parent:
+            self.parent.go_back(button)
+            self.parent.main_loop.unhandled_input = self.parent.unhandled_input
 
     def runDlg(self):
-
-        global palette
-        pal1 = palette
-        self.main_loop = urwid.MainLoop(self.dialog, pal1 )
-        self.main_loop.run()
+        if self.parent:
+            self.parent.menu_stack.append(
+                self.parent.main_widget.body)
+            self.parent.main_widget.body = self.dialog
+            self.parent.main_loop.unhandled_input = self.unhandled_input
 
     def unhandled_input(self, key):
         if key == 'esc' or key == 'q':
@@ -151,6 +141,7 @@ class MenuDialog:
         self.oSecWidgets = []  # widgets on security settings page, used for reverting changes if user cancels
         self.authMechs = []
         self.bServer = True
+        self.key_dialog = None
 
     def setup_ui(self):
         # 创建主菜单选项
@@ -356,7 +347,7 @@ class MenuDialog:
         self.main_widget.body = combined_pile
 
     def show_message(self, message):
-        # 显示消息对话框
+        # display message dialog
         text = urwid.Text(message, align='center')
         ok_button = urwid.Padding(
             urwid.AttrMap(urwid.Button(_("OK"), align='center', on_press=self.close_message), 'button normal', focus_map='button focus'),
@@ -365,12 +356,14 @@ class MenuDialog:
         )
         pile = urwid.Pile([text, urwid.Divider(), ok_button])
 
-        # 保存当前状态并显示消息
         self.menu_stack.append(self.main_widget.body)
         self.main_widget.body = urwid.AttrWrap(
             urwid.Filler(pile, valign='middle'), 'body'
         )
-            
+
+    def show_output( self, strCmd ):
+        pass
+
     def ask_file_path(self):
         # Create input field and buttons
         input_edit = urwid.Edit(_("Enter file path: "), edit_text="initcfg_exported.json", align='center')
@@ -442,8 +435,59 @@ class MenuDialog:
         pile = urwid.Pile([urwid.AttrWrap(list_box, 'body')])
         self.main_widget.body = pile
 
+    def ask_for_key_numbers( self ):
+        server_key_edit = urwid.Edit(caption=_("#Server Keys: "))
+        client_key_edit = urwid.Edit(caption=_("#Client Keys: "))
+
+        def on_ok(dlg, button):
+            if dlg:
+                strsnum = server_key_edit.edit_text.strip()
+                strcnum = client_key_edit.edit_text.strip()
+                if strsnum:
+                    dlg.sknum = int( strsnum )
+                else:
+                    dlg.sknum = 0
+                if strcnum:
+                    dlg.cknum = int( strcnum )
+                else:
+                    dlg.cknum = 0
+            self.go_back( button )
+
+        def on_cancel( dlg, button):
+            self.go_back( button )
+
+        ok_button = urwid.Button(_("OK"), align='center', on_press=lambda button: on_ok( self.key_dialog, button))
+        cancel_button = urwid.Button(_("Cancel"), align='center', on_press=lambda button: on_cancel(self.key_dialog, button))
+        
+        pile = urwid.Pile([
+            urwid.Divider(),
+            server_key_edit,
+            client_key_edit,
+            urwid.Divider(),
+            urwid.GridFlow(
+                [ urwid.AttrMap(ok_button, 'button normal',  focus_map='button focus'),
+                  urwid.AttrMap(cancel_button, 'button normal',  focus_map='button focus')
+                ],
+                cell_width=10,  # Adjust button width
+                h_sep=2,        # Horizontal space between buttons
+                v_sep=0,        # No vertical space
+                align='center'  # Center-align buttons
+            )
+        ])
+        
+        lineBox = createDoubleLineBox( pile, _("Input Password"))
+        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 50))
+        dlg = urwid.AttrMap( lineBox, 'body')
+ 
+        self.key_dialog = urwid.Padding(
+            urwid.AttrMap( urwid.Filler(dlg, valign='middle', ), 'body' ),
+            align='center',
+            )
+        self.menu_stack.append( self.main_widget.body )
+        self.main_widget.body = self.key_dialog
+
     def generate_self_signed_cert(self, button):
-        pass
+        self.ask_for_key_numbers()
 
         
     def on_choice_changed(self, button, new_state):
@@ -774,8 +818,9 @@ class MenuDialog:
         raise urwid.ExitMainLoop()
 
     def confirm_cancel(self, button):
-        pdlg = PasswordDialog( self )
-        pdlg.runDlg()
+        #pdlg = PasswordDialog( self )
+        #pdlg.callback = lambda password: self.show_message(f"{password}")
+        #pdlg.runDlg()
         self.go_back(button)
 
     def show_confirmation(self, message):
@@ -831,7 +876,14 @@ class MenuDialog:
             # ESC key also returns to the previous menu
             self.go_back()
 
-    def ElevatePrivilege( self ) -> int:
+    def ElevatePrivilege( self, callback ) -> int:
+        ret = rpcf_system( "command -v sudo > /dev/null" )
+        if ret == 0:
+            sudo = "sudo"
+        else:
+            sudo = ""
+        if sudo == "":
+            return 0
         ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
         if ret == 0 :
             return ret
@@ -839,7 +891,7 @@ class MenuDialog:
         passDlg.runDlg()
 
         # Run a blocking loop until the password is entered
-        ret = rpcf_system( "echo '" + passwd + "'| sudo -S echo updating..." )
+        ret = rpcf_system( "echo '" + passwd + f"'| sudo -S echo updating..." )
         passwd = None
         return ret
 
