@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import getopt
+import errno
 
 def GetAuthMech( drvPath:str )->str:
     authMech = ""
