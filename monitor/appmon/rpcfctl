@@ -666,29 +666,6 @@ EOF
         python3 $cmddir/updwscfg.py /tmp/initcfg.json
         #rm /tmp/initcfg.json
         ;;
-    cfgkrb5)
-        #updating kerberos config
-        bRemove=0
-        if [[ ! -z "$1" ]]; then
-            initcfg="$1"
-            authMech=`rpcfctl authmech -i "$1" | tr -d ' \t\n\r'`
-        else
-            rpcfctl geninitcfg > /tmp/initcfg.json
-            initcfg="/tmp/initcfg.json"
-            bRemove=1
-            authMech=`rpcfctl authmech | tr -d ' \t\n\r'`
-        fi
-        if [[ "x$authMech" != "xkrb5" ]]; then
-            echo "Kerberos is not current authentication mechanism"
-            exit 1
-        fi
-        pushd $cmddir
-        python3 -c 'import sys; from updk5cfg import ConfigAuthServer; ConfigAuthServer(sys.argv[1])' "$initcfg"
-        if (($bRemove == 1));then
-            rm /tmp/initcfg.json
-        fi
-        popd
-        ;;
     login)
         mech_=`rpcfctl authmech | tr -d ' \t\n\r'`
         if [[ "x$mech_" == "xSimpAuth" ]]; then
