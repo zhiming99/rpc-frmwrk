@@ -58,33 +58,46 @@ DEB_HOST_MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH)
 echo '13' > ${DEBDIR}/compat
 echo '3.0 (quilt)' > ${DEBDIR}/source/format
 
-force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
-if [ "x${os_name}" == "xDebian" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $3}');\
-    echo $(if ((${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
-elif [ "x${os_name}" == "xUbuntu" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
-    echo $(if ((${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
-fi)
-
 pushd ${DEBDIR}
 if [ "x$BUILD_PYTHON" == "xyes" ]; then
 cat << EOF >> ./postinst1
 cd XXXX/${PACKAGE_NAME}
-pypkg=\$(compgen -G "rpcf*whl")
-pip3 install \$pypkg ${force_update} --force-reinstall
+EOF
+
+cat << 'EOF' >> ./postinst1
+pypkg=$(compgen -G "rpcf*whl")
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
+pip3 install $pypkg ${force_update} --force-reinstall
+EOF
+
+cat << 'EOF' >> ./postrm1
+force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
+if [ "x${os_name}" == "xDebian" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $3}');\
+    echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
+elif [ "x${os_name}" == "xUbuntu" ]; then \
+    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+    echo $(if ((${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
+fi)
 EOF
 cat << EOF >> ./postrm1
-pip3 uninstall -y ${PACKAGE_NAME} ${force_update}
+pip3 uninstall -y ${PACKAGE_NAME} \${force_update}
 EOF
 fi
 
 if [ "x$BUILD_JS" == "xyes" ]; then
 cat << EOF >> ./postinst2
-echo "\e[33mnpm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify\e[0m"
+echo -e "\e[33mnpm -g install @JS_NODE_PACKAGES@\e[0m"
 EOF
 cat << EOF >> ./postrm2
-echo  "\e[33mnpm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack minify webpack-cli vm events crypto-browserify stream-browserify\e[0m"
+echo -e "\e[33mnpm -g remove @JS_NODE_PACKAGES@\e[0m"
 EOF
 fi
 

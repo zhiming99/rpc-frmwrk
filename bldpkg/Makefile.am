@@ -1,4 +1,4 @@
-EXTRA_DIST=control.in blddpkg.sh rules bldrpm.sh rpcf.spec.in rpcf.install.in rpcf-dev.install.in rpcf-static.install.in README.md
+EXTRA_DIST=control.in blddpkg.sh.in rules bldrpm.sh rpcf.spec.in rpcf.install.in rpcf-dev.install.in rpcf-static.install.in README.md
 
 rev=0
 DISTDIR=$$(pwd)/$(PACKAGE_NAME)-$(VERSION)-$(rev)
@@ -60,10 +60,10 @@ deb:
     fi;
 if ENABLE_JS
 	make -C ../monitor/oinit deb
-	cp ../monitor/oinit/output/python3-oinit*.deb .
+	cp ../monitor/oinit/output/python3-oinit_$(VERSION)*.deb .
 endif
 	make -C ../monitor/client/python deb
-	cp ../monitor/client/python/python3-appmoncli*.deb .
+	cp ../monitor/client/python/python3-appmoncli_$(VERSION)*.deb .
 
 rpm:
 	rm -rf $${HOME}/rpmbuild && rpmdev-setuptree
@@ -72,7 +72,7 @@ rpm:
 	bash ./bldrpm.sh $$(pwd)/../ $(PACKAGE_NAME) $(host_cpu)
 if ENABLE_JS
 	make -C ../monitor/oinit rpm
-	cp ../monitor/oinit/output/python3-oinit*.rpm .
+	cp ../monitor/oinit/output/python3-oinit-$(VERSION)*.rpm .
 endif
 	make -C ../monitor/client/python rpm
-	cp ../monitor/client/python/python3-appmoncli*.rpm .
+	cp ../monitor/client/python/python3-appmoncli-$(VERSION)*.rpm .

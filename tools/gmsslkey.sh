@@ -41,7 +41,7 @@ if [ ! -f rpcf_serial ]; then
     fi
 fi
 
-if which gmssl; then
+if command -v gmssl; then
 if [ -d private_keys ]; then 
     mv private_keys/* ./
 fi
@@ -185,6 +185,6 @@ fi
 
 else
     echo "GmSSL is not installed, and please install GmSSL first."
-fi #which gmssl
+fi #command -v gmssl
 
 popd

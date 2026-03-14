@@ -252,7 +252,7 @@
             "InternalClass": "CTcpRpcBusPort",
             "Parameters": [
                 {
-                    "BindAddr": "192.168.3.3",
+                    "BindAddr": "127.0.0.1",
                     "BindTo": "false",
                     "PortNumber": "4132",
                     "Compression": "true",

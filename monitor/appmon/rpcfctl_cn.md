@@ -190,9 +190,6 @@ rpcfctl <命令> [参数]
 - **cfgweb**  
   使用当前 rpc-frmwrk 配置更新 Web 服务器（nginx 或 apache）配置。
 
-- **cfgkrb5**  
-  使用当前 rpc-frmwrk 配置更新 Kerberos 配置。
-
 - **backup**  
   备份服务器端设置，输出为 tar 包（rpcf-backup-YYMMHH.tar.gz）。
 
