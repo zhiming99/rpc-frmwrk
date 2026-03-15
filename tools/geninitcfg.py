@@ -162,16 +162,16 @@ def GenInitCfgFromDrv( cfgList : list )->object:
                 authInfo[ "AuthMech" ] = authMech
                 ai = elem.get( "AuthInfo", {} )
                 if authMech == "krb5" and bool( ai ):
-                    authInfo[ "Realm" ] = ai[ "Realm" ]
-                    authInfo[ "ServiceName" ] = ai[ "ServiceName" ]
-                    authInfo[ "SignMessage" ] = ai[ "SignMessage" ]
-                    authInfo[ "UserName" ] = ai[ "UserName" ]
+                    authInfo[ "Realm" ] = ai.get( "Realm", "" )
+                    authInfo[ "ServiceName" ] = ai.get( "ServiceName", "" )
+                    authInfo[ "SignMessage" ] = ai.get( "SignMessage", "false" )
+                    authInfo[ "UserName" ] = ai.get( "UserName", "" )
                 elif authMech == "SimpAuth":
                     if "UserName" in ai:
-                        authInfo[ "UserName" ] = ai[ "UserName" ]
+                        authInfo[ "UserName" ] = ai.get( "UserName", "" )
                 elif authMech == "OAuth2":
                     if "AuthUrl" in ai:
-                        authInfo[ "AuthUrl" ] = ai[ "AuthUrl" ]
+                        authInfo[ "AuthUrl" ] = ai.get( "AuthUrl", "" )
                 break
 
         if authMech == "krb5":
@@ -213,15 +213,15 @@ def GenInitCfgFromDrv( cfgList : list )->object:
             jsonVal[ "Multihop" ] = nodeList
             for node in elem.get( "Nodes", [] ):
                 n = dict() 
-                n[ "NodeName" ] = node[ "NodeName" ]
-                n[ "IpAddress" ] = node[ "IpAddress" ]
-                n[ "PortNumber" ] = node[ "PortNumber" ]
-                n[ "Enabled" ] = node[ "Enabled" ]
-                n[ "Compression" ] = node[ "Compression" ]
-                n[ "EnableSSL" ] = node[ "EnableSSL" ]
-                n[ "EnableWS" ] = node[ "EnableWS" ]
+                n[ "NodeName" ] = node.get( "NodeName", "" )
+                n[ "IpAddress" ] = node.get( "IpAddress", "127.0.0.1" )
+                n[ "PortNumber" ] = node.get( "PortNumber", "" )
+                n[ "Enabled" ] = node.get( "Enabled", "false" )
+                n[ "Compression" ] = node.get( "Compression", "true" )
+                n[ "EnableSSL" ] = node.get( "EnableSSL", "true" )
+                n[ "EnableWS" ] = node.get( "EnableWS", "false" )
                 if n[ "EnableWS" ] == "true":
-                    n[ "DestURL" ] = node[ "DestURL" ]
+                    n[ "DestURL" ] = node.get( "DestURL", "" )
                 n[ "Protocol" ] = "native"
                 n[ "ConnRecover" ] = "false"
                 n[ "AddrFormat" ] = GetIpVersion( n[ "IpAddress" ] )
@@ -229,7 +229,7 @@ def GenInitCfgFromDrv( cfgList : list )->object:
             jsonVal[ "LBGroup" ] = elem.get( "LBGroup", [] )
             count += 1
         elif objName == "RpcReqForwarderImpl":
-            oMisc[ 'TaskScheduler' ] = elem[ 'TaskScheduler' ]
+            oMisc[ 'TaskScheduler' ] = elem.get( 'TaskScheduler', "RR" )
             count += 1
         if count >= 2:
             break

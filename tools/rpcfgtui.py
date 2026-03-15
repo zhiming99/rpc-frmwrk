@@ -8,8 +8,12 @@ import errno
 import getopt
 import sys
 from urwid.widget.constants import BOX_SYMBOLS
-from updcfg import CheckIpAddr, IsFeatureEnabled 
-from updwscfg import rpcf_system
+from updcfg import CheckIpAddr, IsFeatureEnabled, tempname
+from updwscfg import rpcf_system, GetDistName
+from updk5cfg import *
+from functools import partial
+import subprocess
+import platform
 
 # Initialize gettext
 gettext.bindtextdomain('rpcfgtui', '/usr/share/locale')
@@ -82,7 +86,7 @@ class PasswordDialog:
         ])
         
         lineBox = createDoubleLineBox( pile, _("Input Password"))
-        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 50))
+        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 61.8))
         dlg = urwid.AttrMap( lineBox, 'body')
  
         self.dialog = urwid.Padding(
@@ -144,29 +148,29 @@ class MenuDialog:
         self.key_dialog = None
 
     def setup_ui(self):
-        # 创建主菜单选项
+        # main menu
         menu_items = [
             urwid.Divider(' '),
             urwid.Button(_("Network Settings"), on_press=self.showNetworkSettings),
             urwid.Divider(' '),
             urwid.Button(_("Security Settings"), on_press=self.showSecuritySettings),
             urwid.Divider(' '),
+            urwid.Button(_("Multihop Settings"), ),
+            urwid.Divider(' '),
             urwid.Button(_("Configuration List"), on_press=self.config_list),
             urwid.Divider(' '),
             urwid.Button(_("Exit"), on_press=self.exit_program)
         ]
         
-        # 创建列表框
+        # create the boarder frame
         list_walker = urwid.SimpleFocusListWalker(menu_items)
         list_box = urwid.ListBox(list_walker)
         line_box = createDoubleLineBox(list_box,
             _("Configure Rpc-Framework") )
         
-        # 创建标题和边框
         #header = urwid.Text(_("Configure Rpc-Framework"), align='center')
         #header = urwid.AttrWrap(header, 'header')
         
-        # 创建主界面
         self.main_widget = urwid.Frame(
             urwid.AttrWrap(line_box, 'body'),
             #header=header,
@@ -435,7 +439,43 @@ class MenuDialog:
         pile = urwid.Pile([urwid.AttrWrap(list_box, 'body')])
         self.main_widget.body = pile
 
-    def ask_for_key_numbers( self ):
+    def showOutputDlg(self, strCommand, callback = None ):
+        process = subprocess.Popen( [ "bash", "-c", strCommand ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
+        stdout, stderr = process.communicate()
+        ret = process.returncode
+        message = stdout.decode().replace( "\r", "")
+        if len( message ) == 0:
+            if ret == 0:
+                message = "Successfully completed the command"
+            else:
+                message = f"The command failed with {ret}"
+        text = urwid.Text(message, align='left')
+        if callback:
+            close_dlg = callback
+        else:
+            close_dlg = self.close_message
+        okBtn = urwid.Button(_("OK"), align='center', on_press=close_dlg)
+        okBtn.returncode = ret
+        ok_button = urwid.Padding(
+            urwid.AttrMap( okBtn, 'button normal', focus_map='button focus'),
+            align='center',
+            width=15  # Set the width of the button
+        )
+        pile = urwid.Pile([urwid.Divider(), text, ok_button])
+
+        list_walker = urwid.SimpleFocusListWalker([pile])
+        list_box = urwid.ListBox(list_walker)
+
+        lineBox = createDoubleLineBox( list_box, _("Output"))
+        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 61.8))
+        dlg = urwid.AttrMap( lineBox, 'body')
+        #dlg = urwid.AttrMap( urwid.Filler(dlg, valign='middle', ), 'body' )
+        #dlg = urwid.Filler(dlg, valign='middle', height="pack" )
+
+        self.menu_stack.append(self.main_widget.body)
+        self.main_widget.body = urwid.AttrWrap( dlg, 'body')
+
+    def askForKeyNumbers( self, bGmSSL ):
         server_key_edit = urwid.Edit(caption=_("#Server Keys: "))
         client_key_edit = urwid.Edit(caption=_("#Client Keys: "))
 
@@ -452,6 +492,34 @@ class MenuDialog:
                 else:
                     dlg.cknum = 0
             self.go_back( button )
+            sslType =  "gmssl" if bGmSSL else 'openssl'
+            taskToRun =  f"rpcfctl genkeys {sslType} {dlg.cknum} {dlg.sknum}"
+            def updateKeyCb( self, button ):
+                self.close_message( button )
+                for widget in self.oSecWidgets:
+                    if not isinstance( widget, urwid.Edit ):
+                        continue
+                    homeDir = os.path.expanduser("~") + "/.rpcf"
+                    if bGmSSL:
+                        homeDir += "/gmssl/"
+                    else:
+                        homeDir += "/openssl/"
+                    label = widget.caption.strip()
+                    if label == _("Key File :"):
+                        if self.bServer: 
+                            widget.edit_text = homeDir + "signkey.pem"
+                        else:
+                            widget.edit_text = homeDir + "clientkey.pem"
+                    elif label == _("Cert File :"):
+                        if self.bServer: 
+                            widget.edit_text = homeDir + "signcert.pem"
+                        else:
+                            widget.edit_text = homeDir + "clientcert.pem"
+                    elif label == _("CACert File :"):
+                            widget.edit_text = homeDir + "certs.pem"
+
+            callback = partial( updateKeyCb, self )
+            self.main_loop.set_alarm_in(0, lambda loop, data: self.showOutputDlg( taskToRun, callback ) )
 
         def on_cancel( dlg, button):
             self.go_back( button )
@@ -476,7 +544,7 @@ class MenuDialog:
         ])
         
         lineBox = createDoubleLineBox( pile, _("Input Password"))
-        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 50))
+        lineBox = urwid.Padding( lineBox, align='center', width=("relative", 61.8))
         dlg = urwid.AttrMap( lineBox, 'body')
  
         self.key_dialog = urwid.Padding(
@@ -486,10 +554,79 @@ class MenuDialog:
         self.menu_stack.append( self.main_widget.body )
         self.main_widget.body = self.key_dialog
 
-    def generate_self_signed_cert(self, button):
-        self.ask_for_key_numbers()
+    def genSelfSignedCerts(self, button):
+        bGmSSL = False
+        for widget in self.oSecWidgets:
+            if isinstance(widget, urwid.CheckBox ):
+                if widget.get_label().strip() == _("Using GmSSL"):
+                    bGmSSL = widget.get_state()
+                    break
+        self.askForKeyNumbers( bGmSSL )
 
-        
+    def buildAuthWidgets( self, authInfo )->list:
+        widgetPile = []
+        authMech = authInfo.get( "AuthMech", None )
+        if authMech == 'SimpAuth':
+            widgetPile.append(urwid.Edit(_("User Name : "), edit_text=authInfo.get('UserName', '')))
+        elif authMech == 'OAuth2':
+            widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
+            widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
+            widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
+            widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
+        elif authMech == 'krb5' and IsFeatureEnabled('krb5'):
+            widgetPile.append(urwid.Edit(_(" Service Name : "), edit_text=authInfo.get('ServiceName', '')))
+            widgetPile.append(urwid.Edit(_("        Realm : "), edit_text=authInfo.get('Realm', '')))
+            widgetPile.append(urwid.Edit(_("    User Name : "), edit_text=authInfo.get('UserName', '')))
+            widgetPile.append(urwid.Edit(_("KDC IpAddress : "), edit_text=authInfo.get('KdcIp', '')))
+            widgetPile.append(urwid.CheckBox(_("Sign Message"), state=(authInfo.get('SignMessage', False) == 'true')))
+
+            checkBoxes = []
+            if not self.bServer:
+                if IsKinitProxyEnabled(): 
+                    btnLabel = _("Disable kinit proxy")
+                else:
+                    btnLabel = _("Enable kinit proxy")
+                kinitProxy = urwid.Button(btnLabel, align='center', on_press=self.enableKinitProxy )
+                oKinitButton = urwid.Padding(
+                    urwid.AttrMap(kinitProxy, 'button normal', focus_map='button focus'),
+                    align='left',
+                    width='pack',
+                )
+                checkBoxes.append( oKinitButton )
+
+            if self.bServer:
+                initKdc = urwid.Button(_("Initialize KDC"), align='center', on_press=self.initKdc )
+                oInitKdcButton = urwid.Padding(
+                    urwid.AttrMap(initKdc, 'button normal', focus_map='button focus'),
+                    align='left',
+                    width='pack',
+                )
+                checkBoxes.append( oInitKdcButton )
+
+            updateAuthSettings = urwid.Button(_("Update Auth Settings"),
+                align='center', on_press=self.updateAuthSettngsKrb5 )
+            oUpdAuthSettings = urwid.Padding(
+                urwid.AttrMap(updateAuthSettings, 'button normal', focus_map='button focus'),
+                align='left',
+                width='pack',
+            )
+            checkBoxes.append( oUpdAuthSettings )
+            if self.bServer:
+                cellWidth = max( 
+                    len( initKdc.get_label() ),
+                    len( updateAuthSettings.get_label() ))  # Adjust the width of each button
+            else:
+                cellWidth = len( kinitProxy.get_label() )
+            buttons = urwid.GridFlow(
+                checkBoxes,
+                cellWidth,
+                h_sep=2,        # Horizontal space between buttons
+                v_sep=0,        # Vertical space between rows (not needed here)
+                align='left'  # Left-align the buttons
+            )
+            widgetPile.append(buttons)
+        return widgetPile
+
     def on_choice_changed(self, button, new_state):
         if new_state:  # Only update the security settings when a radio button is selected
             label = button.get_label()  # Get the label of the selected radio button
@@ -519,54 +656,7 @@ class MenuDialog:
                         endPos = idx
                         break
             authInfo = oSec.get('AuthInfo', {})
-            widgetPile = []
-            if authMech == 'SimpAuth':
-                widgetPile.append(urwid.Edit(_("User Name : "), edit_text=authInfo.get('UserName', '')))
-            elif authMech == 'OAuth2':
-                widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
-                widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
-                widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
-                widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
-            elif authMech == 'krb5' and IsFeatureEnabled('krb5'):
-                widgetPile.append(urwid.Edit(_(" Service Name : "), edit_text=authInfo.get('ServiceName', '')))
-                widgetPile.append(urwid.Edit(_("        Realm : "), edit_text=authInfo.get('Realm', '')))
-                widgetPile.append(urwid.Edit(_("    User Name : "), edit_text=authInfo.get('UserName', '')))
-                widgetPile.append(urwid.Edit(_("KDC IpAddress : "), edit_text=authInfo.get('KdcIp', '')))
-                widgetPile.append(urwid.CheckBox(_("Sign Messages"), state=(authInfo.get('SignMessages', False) == 'true')))
-
-                kinitProxy = urwid.Button(_("Enable kinit proxy"), align='center', on_press=self.enableKinitProxy )
-                oKinitButton = urwid.Padding(
-                    urwid.AttrMap(kinitProxy, 'button normal', focus_map='button focus'),
-                    align='left',
-                    width='pack',
-                )
-                initKdc = urwid.Button(_("Initialize KDC"), align='center', on_press=self.initKdc )
-                oInitKdcButton = urwid.Padding(
-                    urwid.AttrMap(initKdc, 'button normal', focus_map='button focus'),
-                    align='left',
-                    width='pack',
-                )
-
-                updateAuthSettings = urwid.Button(_("Update Auth Settings"), align='center', on_press=self.updateAuthSettngsKrb5 )
-                oUpdAuthSettings = urwid.Padding(
-                    urwid.AttrMap(updateAuthSettings, 'button normal', focus_map='button focus'),
-                    align='left',
-                    width='pack',
-                )
-                buttons = urwid.GridFlow(
-                    [oKinitButton, oInitKdcButton, oUpdAuthSettings],
-                    cell_width=max(len( kinitProxy.get_label() ),
-                        len( initKdc.get_label() ),
-                        len( updateAuthSettings.get_label() )),  # Adjust the width of each button
-                    h_sep=2,        # Horizontal space between buttons
-                    v_sep=0,        # Vertical space between rows (not needed here)
-                    align='left'  # Left-align the buttons
-                )
-                widgetPile.append(buttons)
-
-            elif authMech is None:
-                pass
-
+            widgetPile = self.buildAuthWidgets( authInfo )
             del self.oSecWidgets[insPos:endPos]  # remove the old widgets between the two dividers
             for widget in widgetPile:
                 self.oSecWidgets.insert(insPos, widget)  # insert the new widgets between the two dividers
@@ -583,61 +673,73 @@ class MenuDialog:
         self.oSecWidgets.clear()  # clear current widgets
         self.authMechs.clear()
 
+    def updateSecCfg( self ):
+        oSecurity = self.initCfg.get('Security', {})
+        sslFiles = oSecurity.get('SSLCred', {})
+        authInfo = oSecurity.get('AuthInfo', {})
+        secItems = self.oSecWidgets
+        for widget in secItems:
+            if isinstance(widget, urwid.Edit):
+                label = widget.caption.strip()
+                if label == _("Key File :"):
+                    keyFile = widget.edit_text.strip()
+                    if not os.access( keyFile, os.R_OK ):
+                        raise Exception( "Error key file is not accessible" )
+                    sslFiles['KeyFile'] = keyFile
+                elif label == _("Cert File :"):
+                    certFile = widget.edit_text.strip()
+                    if not os.access( certFile, os.R_OK ):
+                        raise Exception( "Error cert file is not accessible" )
+                    sslFiles['CertFile'] = certFile
+                elif label == _("CACert File :"):
+                    certsFile = widget.edit_text.strip()
+                    if len( certsFile ) > 0 and not os.access( certsFile, os.R_OK ):
+                        raise Exception( "Error CA Cert file is not accessible" )
+                    sslFiles['CACertFile'] = certsFile
+                elif label == _("OA2Checker Ip :"):
+                    authInfo['OA2ChkIp'] = widget.edit_text.strip()
+                elif label == _("OA2Checker Port :"):
+                    authInfo['OA2ChkPort'] = widget.edit_text.strip()
+                elif label == _("Auth URL :"):
+                    authInfo['AuthUrl'] = widget.edit_text.strip()
+                elif label == _("Service Name :"):
+                    authInfo['ServiceName'] = widget.edit_text.strip()
+                elif label == _("Realm :"):
+                    authInfo['Realm'] = widget.edit_text.strip()
+                elif label == _("KDC IpAddress :"):
+                    authInfo['KdcIp'] = widget.edit_text.strip()
+                elif label == _("User Name :"):
+                    authInfo['UserName'] = widget.edit_text.strip()
+            elif isinstance(widget, urwid.CheckBox):
+                label = widget.get_label().strip()
+                state = 'true' if widget.get_state() else 'false'
+                if label == _("Using GmSSL"):
+                    sslFiles['UsingGmSSL'] = state
+                elif label == _("Verify Peer"):
+                    sslFiles['VerifyPeer'] = state
+                elif label == _("Enable SSL") and "OA2ChkIp" in authInfo:
+                    authInfo['OA2SSL'] = state
+                elif label == _("Sign Message") and "ServiceName" in authInfo:
+                    authInfo['SignMessage'] = state
+        # Determine AuthMech based on which fields are filled or which checkboxes are checked
+        for authMech in self.authMechs:
+            if authMech.base_widget.get_state():
+                label = authMech.base_widget.get_label().strip()
+                if label == _("SimpAuth"):
+                    authInfo['AuthMech'] = 'SimpAuth'
+                elif label == _("Kerberos"):
+                    authInfo['AuthMech'] = 'krb5'
+                elif label == _("OAuth2"): 
+                    authInfo['AuthMech'] = 'OAuth2'
+                break
+
     def update_security_config(self, button):
         if button.get_label() != _("Return to Previous Level"):
             self.revert_to_security_settings()
             self.go_back( button )  # return to previous menu after updating config
             return
-        secItems = self.oSecWidgets
         try:
-            oSecurity = self.initCfg.get('Security', {})
-            sslFiles = oSecurity.get('SSLCred', {})
-            authInfo = oSecurity.get('AuthInfo', {})
-            for widget in secItems:
-                if isinstance(widget, urwid.Edit):
-                    label = widget.caption.strip()
-                    if label == _("Key File :"):
-                        sslFiles['KeyFile'] = widget.edit_text.strip()
-                    elif label == _("Cert File :"):
-                        sslFiles['CertFile'] = widget.edit_text.strip()
-                    elif label == _("CACert File :"):
-                        sslFiles['CACertFile'] = widget.edit_text.strip()
-                    elif label == _("OA2Checker Ip :"):
-                        authInfo['OA2ChkIp'] = widget.edit_text.strip()
-                    elif label == _("OA2Checker Port :"):
-                        authInfo['OA2ChkPort'] = widget.edit_text.strip()
-                    elif label == _("Auth URL :"):
-                        authInfo['AuthUrl'] = widget.edit_text.strip()
-                    elif label == _("Service Name :"):
-                        authInfo['ServiceName'] = widget.edit_text.strip()
-                    elif label == _("Realm :"):
-                        authInfo['Realm'] = widget.edit_text.strip()
-                    elif label == _("KDC IpAddress :"):
-                        authInfo['KdcIp'] = widget.edit_text.strip()
-                    elif label == _("User Name :"):
-                        authInfo['UserName'] = widget.edit_text.strip()
-                elif isinstance(widget, urwid.CheckBox):
-                    label = widget.get_label().strip()
-                    state = 'true' if widget.get_state() else 'false'
-                    if label == _("Using GmSSL"):
-                        sslFiles['UsingGmSSL'] = state
-                    elif label == _("Verify Peer"):
-                        sslFiles['VerifyPeer'] = state
-                    elif label == _("Enable SSL") and "OA2ChkIp" in authInfo:
-                        authInfo['OA2SSL'] = state
-                    elif label == _("Sign Messages") and "ServiceName" in authInfo:
-                        authInfo['SignMessages'] = state
-            # Determine AuthMech based on which fields are filled or which checkboxes are checked
-            for authMech in self.authMechs:
-                if authMech.base_widget.get_state():
-                    label = authMech.base_widget.get_label().strip()
-                    if label == _("SimpAuth"):
-                        authInfo['AuthMech'] = 'SimpAuth'
-                    elif label == _("Kerberos"):
-                        authInfo['AuthMech'] = 'krb5'
-                    elif label == _("OAuth2"): 
-                        authInfo['AuthMech'] = 'OAuth2'
-                    break
+            self.updateSecCfg()
         except Exception as err:
             self.show_message(_("Failed to update security configuration: {}").format(str(err)))
             return
@@ -681,12 +783,597 @@ class MenuDialog:
         return False
 
     def enableKinitProxy(self, button):    
-        pass
+        def doEnableKinitProxy( self, button ):
+            bEnable = not IsKinitProxyEnabled()
+            strCmd = GetEnableKinitProxyCmd( bEnable )
+            def toggleKinitButton( self, button, button2 ):
+                ret = 0
+                if button2.returncode is not None:
+                    ret = button2.returncode
+                if ret == 0 and button:
+                    if bEnable:
+                        button.set_label( _("Disable kinit proxy" ) )
+                    else:
+                        button.set_label( _("Enable kinit proxy" ) )
+                self.close_message( button2 )
+            self.showOutputDlg( strCmd, partial( toggleKinitButton, self, button ) )
+        self.ElevatePrivilege2( lambda : doEnableKinitProxy( self, button ) )
 
     def initKdc(self, button):    
-        pass
+        try:
+            self.updateSecCfg()
+            self.ElevatePrivilege2( self.SetupTestKdc )
+        except Exception as err:
+            self.show_message(_("Failed to setup test KDC: {}").format(str(err)))
+            return
+
+    def GetKadmAcl( self ) -> str:
+        strAcl = '''{ServiceAdm} aic
+{User}  i
+'''
+        strSvc = self.GetTestKdcAdminSvcPrinc()
+        strUser = self.GetTestKdcUser()
+        return strAcl.format(
+            ServiceAdm=strSvc,
+            User=strUser )
+
+    def GetKdcConf( self ) -> str:
+        strKdcConf='''[realms]
+{Realm} = {{
+    acl_file = {KdcConfPath}/kadm5.acl
+    max_renewable_life = 7d 0h 0m 0s
+    supported_enctypes = aes256-cts:normal aes128-cts:normal
+    default_principal_flags = +preauth
+    key_stash_file = {KdcConfPath}/stash
+}}
+'''
+        try:
+            strRealm = self.GetTestRealm()
+            strRet = strKdcConf.format(
+                Realm=strRealm,
+                KdcConfPath=GetKdcConfPath() )
+            return strRet
+                
+        except Exception as err:
+            print( err )
+            return ""
+
+    def GenKrb5InstFiles( self,
+        destPath : str,
+        bServer : bool ) -> int:
+        ret = 0
+        try:
+            if not IsFeatureEnabled( "krb5" ): 
+                print( "Warning 'krb5' is not selected and no need " + \
+                    "to generate krb5 files for installer",
+                    file=sys.stderr )
+                return 1
+
+            if not IsTestKdcSet():
+                print( "Warning local KDC is not setup " )
+                return 2
+
+            krbConf = self.GetKrb5Conf()
+            if krbConf == "" :
+                print( "Warning 'krb5.conf' is not generated",
+                    file=sys.stderr )
+                return 3
+
+            if not self.checkCfgKrb5.props.active:
+                print( "Warning configuring krb5 is not selected",
+                    file=sys.stderr )
+                return 4
+
+            strSrcPath = os.path.dirname(
+                GetTestKeytabPath() )
+
+            if bServer :
+                krbConf = re.sub( "^default_client_.*$", "", krbConf, flags=re.MULTILINE )
+                destKeytab = destPath + "/krb5.keytab"
+                srcKeytab = strSrcPath + "/krb5adm.keytab"
+            else:
+                krbConf = re.sub( "^default_keytab_.*$", "", krbConf, flags=re.MULTILINE)
+                destKeytab = destPath + "/krb5cli.keytab"
+                srcKeytab = strSrcPath + "/krb5cli.keytab"
+
+            destConf = destPath + "/krb5.conf"
+            fp = open( destConf, "w" )
+            fp.write( krbConf )
+            fp.close()
+
+            cmdline = "rm -f " + destKeytab + " > /dev/null 2>&1"
+            cmdline += ";"
+            cmdline += 'cp ' + srcKeytab + ' ' + destKeytab
+
+            #print( cmdline )
+            ret = rpcf_system( cmdline )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+        return ret
+
+    def GenAuthInstFiles( self,
+        destPath : str,
+        bServer : bool ) -> int:
+        ret = self.GenKrb5InstFiles(
+            destPath, bServer )
+        return ret
+
+    def GetKrb5Conf( self ) -> str:
+        strKrb5Conf = GetKrb5ConfTempl()
+        try:
+            if not IsFeatureEnabled( "krb5" ): 
+                raise Exception( "krb5 not enabled" )
+
+            kdcIp = self.GetTestKdcIp()
+            if len( kdcIp ) == 0:
+                raise Exception( "Unable to determine kdc address, " + \
+                "and at lease one interface should be auth enabled" )
+
+            strRealm = self.GetTestRealm()
+            strKeytab = GetTestKeytabPath()
+            strCliKeytab = os.path.dirname( strKeytab ) + "/krb5cli.keytab"
+            strRet = strKrb5Conf.format(
+                KdcServer=kdcIp,
+                DomainName=strRealm.lower(),
+                Realm=strRealm,
+                DefKeytab=strKeytab,
+                DefCliKeytab=strCliKeytab
+            )
+            return strRet
+                
+        except Exception as err:
+            print( err )
+            return ""
+
+    def GetTestKdcIp( self ) -> str:
+        kdcIp = ""
+        try:
+            for widget in self.oSecWidgets:
+                if isinstance(widget, urwid.Edit):
+                    label = widget.caption.strip()
+                    if label == _("KdcIp :"):
+                        kdcIp = widget.edit_text.strip()
+                        break
+            if kdcIp != '' and IsLocalIpAddr( kdcIp ) :
+                return kdcIp
+
+            oConns = self.initCfg.get( "Connections", None ) 
+            if oConns is None:
+                raise Exception( "Error no connections in initcfg.json" )
+            if not self.bServer:
+                return ''
+            for oConn in oConns :
+                if oConn.get( "HasAuth", False ) == 'true' and \
+                    oConn.get( "AuthMech", None ) == 'krb5': 
+                    kdcIp = oConn.get( "IpAddress", "" )
+                    if kdcIp != "":
+                        break
+        except:
+            kdcIp = ''
+        return kdcIp
+
+    def GetTestRealm( self ) -> str:
+        for widget in self.oSecWidgets:
+            if isinstance(widget, urwid.Edit):
+                label = widget.caption.strip()
+                if label == _("Realm :"):
+                    strRealm = widget.edit_text.strip()
+                    break
+        if len( strRealm ) == 0:
+            strRealm = 'RPCF.ORG'
+        return strRealm
+
+    def GetTestKdcUser( self ) -> str:
+        for widget in self.oSecWidgets:
+            if isinstance(widget, urwid.Edit):
+                label = widget.caption.strip()
+                if label == _("User Name :"):
+                    strUser = widget.edit_text.strip()
+                    break
+        if len( strUser ) == 0:
+            strUser = os.getlogin()
+
+        if strUser.find( '@' ) == -1:
+            strRealm = self.GetTestRealm()
+            strUser += '@' + strRealm 
+        return strUser
+
+    # GSSAPI form of the ServiceName
+    def GetTestKdcSvcHostName( self ) -> str:
+        for widget in self.oSecWidgets:
+            if isinstance(widget, urwid.Edit):
+                label = widget.caption.strip()
+                if label == _("Service Name :"):
+                    strSvc = widget.edit_text.strip()
+                    break
+        if len( strSvc ) > 0:
+            components = strSvc.split( '@' )
+            if len( components ) == 1:
+                strSvc += '@' + platform.node()
+            elif len( components ) > 2:
+                raise Exception( "Error service name '%s' is valid" % strSvc )
+        else:
+            strSvc = 'rpcrouter' + "@" + platform.node()
+        return strSvc
+
+    # principal for server usage
+    def GetTestKdcHostSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcHostName()
+        components = strSvc.split( '@' )
+        return components[ 0 ] + "/" + components[ 1 ].lower() + \
+            '@' + self.GetTestRealm()
+
+    # principal for admin usage
+    def GetTestKdcAdminSvcPrinc( self ) -> str:
+        strSvc = self.GetTestKdcSvcHostName()
+        components = strSvc.split( '@' )
+        return components[ 0 ] + "/admin@" + self.GetTestRealm()
+
+    def UpdateAuthSettingsKrb5( self ) -> int:
+        ret = 0
+        strTmpConf = None
+        tempInit = None
+        try:
+            bServer = self.bServer
+
+            bChangeUser = False
+            bChangeSvc = False
+            bChangeKdc = False
+            bChangeRealm = False
+
+            oSec = self.initCfg.get( "Security", None )
+            if oSec is None:
+                raise Exception( "Error unable to find 'Security' in initcfg.json" )
+            authInfo = oSec.get( 'AuthInfo', None )
+            if authInfo is None:
+                raise Exception( "Error unable to find 'AuthInfo' in initcfg.json" )
+
+            strNewKdcIp = strNewRealm = strNewSvc = strNewUser = ""
+            for widget in self.oSecWidgets:
+                if isinstance(widget, urwid.Edit):
+                    label = widget.caption.strip()
+                    if label == _("Service Name :"):
+                        strNewSvc = widget.edit_text.strip()
+                    elif label == _("Realm :"):
+                        strNewRealm = widget.edit_text.strip()
+                    elif label == _("KDC IpAddress :"):
+                        strNewKdcIp = widget.edit_text.strip()
+                    elif label == _("User Name :"):
+                        strNewUser = widget.edit_text.strip()
+
+            if strNewRealm == "" :
+                raise Exception( "Error Realm is empty" )
+            if strNewSvc == "":
+                raise Exception( "Error Service is empty" )
+            if strNewUser == "":
+                raise Exception( "Error User is empty" )
+            if strNewKdcIp == "":
+                raise Exception( "Error KDC address is empty" )
+
+            if not CheckPrincipal( strNewUser, strNewRealm ):
+                raise Exception( "bad principal '%s'" % strNewUser )
+
+            if bServer and IsLocalIpAddr( strNewKdcIp ):
+                bChangeSvc = True
+                bChangeUser = True
+            else:
+                ## change through installer
+                bChangeSvc = False
+                bChangeUser = False
+
+            if authInfo.get( 'Realm', None ) !=  strNewRealm :
+                bChangeRealm = True
+
+            if authInfo.get( 'KdcIp', None ) != strNewKdcIp :
+                bChangeKdc = True
+
+            if not bChangeKdc and not bChangeUser and \
+                not bChangeSvc and not bChangeRealm :
+                return ret
+            
+            cmdline = ""
+            cmdline += '{sudo} systemctl stop {KdcSvc}'
+            if bChangeSvc :
+                cmdline += ";"
+
+                strHostPrinc = self.GetTestKdcHostSvcPrinc()
+                cmdline += DeletePrincipal( strHostPrinc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strHostPrinc, "" )
+                cmdline += ";"
+
+                strAdminPrinc = self.GetTestKdcAdminSvcPrinc()
+                cmdline += DeletePrincipal( strAdminPrinc )
+                cmdline += ";"
+                cmdline += AddPrincipal( strAdminPrinc, "" )
+                cmdline += ";"
+
+                strKeytab = GetTestKeytabPath()
+                cmdline += "rm -rf " + strKeytab + ">/dev/null 2>&1;"
+                strAdmKt = GetTestAdminKeytabPath()
+                cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
+                cmdline += AddToKeytab(
+                    strHostPrinc, strKeytab )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strKeytab )
+                cmdline += ";"
+                cmdline += AddToKeytab(
+                    strAdminPrinc, strAdmKt )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strAdmKt )
+                cmdline += ";"
+
+            #add user to client keytable
+            if bChangeUser :
+                if strKeytab is None:
+                    strKeytab = GetTestKeytabPath()
+                strCliKeytab = os.path.dirname( strKeytab ) + \
+                    "/krb5cli.keytab"
+                cmdline += "rm -rf " + strCliKeytab + ">/dev/null 2>&1"
+                cmdline += ";"
+                cmdline += DeletePrincipal( strNewUser )
+                cmdline += ";"
+                cmdline += AddPrincipal( strNewUser, "" )
+                cmdline += ";"
+                cmdline += AddToKeytab(
+                    strNewUser, strCliKeytab )
+                cmdline += ";"
+                cmdline += ChangeKeytabOwner( strCliKeytab )
+                cmdline += ";"
+                aclFile = "{KdcConfPath}/kadm5.acl"
+                cmdline += "if ! {sudo} grep '" + strNewUser + "' " + aclFile + "; then "
+                cmdline += "{sudo} echo >> " + aclFile + ";"
+                cmdline += "{sudo} echo '" + strNewUser + " i' >> "
+                cmdline += aclFile + "; fi"
+
+            #update krb5.conf
+            strTmpConf =tempname()
+            if bChangeKdc or bChangeRealm:
+                ret, node = ParseKrb5Conf( '/etc/krb5.conf' )
+                if ret == 0:
+                    ret = UpdateKrb5Cfg( node, strNewRealm,
+                        strNewKdcIp, strTmpConf, False )
+                    node.RemoveChildren()
+                    if ret == 0:
+                        cmdline += ";"
+                        cmdline += "{sudo} install -bm 644 " + strTmpConf + \
+                            " /etc/krb5.conf"
+
+                strSvcHost = self.GetTestKdcSvcHostName()
+                comps = strSvcHost.split( "@" )
+                strNames = comps[ 1 ] + " " + \
+                    strNewRealm.lower()+ " kdc." + \
+                    strNewRealm.lower()
+
+                if not IsNameRegistered( strNewKdcIp, comps[ 1 ] ):
+                    strCmd = AddEntryToHosts(
+                        strNewKdcIp, strNames )
+                    if strCmd != "" :
+                        cmdline += ";" + strCmd
+
+            if len( cmdline ) == 0:
+                raise Exception( "Error building update commands" )
+
+            cmdline += ";"
+            cmdline += '{sudo} systemctl restart {KdcSvc};'
+
+            tempInit = tempname()
+            with open(tempInit, 'w') as f:
+                json.dump(self.initCfg, f, indent=4)
+
+            cmdline += f'rpcfctl updcfg {tempInit};'
+            cmdline += f'rm {tempInit} {strTmpConf};'
+            if os.geteuid() == 0:
+                actCmd = cmdline.format( sudo = '',
+                    KdcConfPath=GetKdcConfPath(),
+                    KdcSvc = GetKdcSvcName() )
+            elif IsSudoAvailable():
+                actCmd = cmdline.format(
+                    sudo = 'sudo',
+                    KdcConfPath=GetKdcConfPath(),
+                    KdcSvc = GetKdcSvcName() )
+            else:
+                actCmd = "su -c '" + cmdline.format(
+                    sudo = "",
+                    KdcConfPath=GetKdcConfPath(),
+                    KdcSvc = GetKdcSvcName() ) + "'"
+
+            #print( actCmd )
+            self.showOutputDlg( actCmd )
+
+        except Exception as err:
+            print( err )
+            if ret == 0:
+                ret = -errno.EFAULT
+
+        return ret
 
     def updateAuthSettngsKrb5(self, button):    
+        try:
+            self.updateSecCfg()
+            self.ElevatePrivilege2( self.UpdateAuthSettingsKrb5  )
+
+        except Exception as err:
+            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            return
+
+    def SetupTestKdc( self )->int:
+        tempKrb = None
+        tempKdc = None
+        tempAcl = None
+        tempNewRealm = None
+        tempInit = None
+        ret = 0
+        try:
+            strConf = self.GetKrb5Conf()
+            if len( strConf ) == 0:
+                return -errno.EFAULT
+
+            tempKrb = tempname()
+            if len(tempKrb) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempKrb, "w" )
+            fp.write( strConf )
+            fp.close()
+
+            tempKdc = tempname()
+            strKdc = self.GetKdcConf()
+            if len(tempKdc) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempKdc, "w" )
+            fp.write( strKdc )
+            fp.close()
+
+            tempAcl = tempname()
+            strAcl = self.GetKadmAcl()
+            if len(tempAcl) == 0:
+                ret = -errno.EEXIST
+                return ret
+            fp = open( tempAcl, "w" )
+            fp.write( strAcl )
+            fp.close()
+
+            tempNewRealm = tempname()
+            fp = open( tempNewRealm, "w" )
+            fp.write( '''
+krb5_newrealm <<EOF
+123456
+123456
+EOF
+''' )
+            fp.close()
+
+            cmdline = '{sudo} systemctl stop {KdcSvc};'
+            cmdline += '{sudo} systemctl stop ' + GetKadminSvcName() + ";"
+            cmdline += "{sudo} install -bm 644 " + tempKrb
+            cmdline += " /etc/krb5.conf;"
+            cmdline += "{sudo} install -bm 644 " + tempKdc
+            cmdline += " {KdcConfPath}/kdc.conf;"
+            cmdline += "{sudo} install -bm 644 " + tempAcl
+            cmdline += " {KdcConfPath}/kadm5.acl;"
+
+            strDomain = self.GetTestRealm()
+            strIpAddr = self.GetTestKdcIp()
+
+            strSvcHost = self.GetTestKdcSvcHostName()
+            comps = strSvcHost.split( "@" )
+            strNames = comps[ 1 ] + " " + \
+                strDomain + " kdc." + strDomain
+
+            if not IsNameRegistered( strIpAddr, comps[ 1 ] ):
+                strHostEntry = AddEntryToHosts(
+                    strIpAddr, strNames )
+                if strHostEntry != "":
+                    cmdline += strHostEntry + ";"
+
+            cmdline += "{sudo} bash " + tempNewRealm
+
+            #add principal for the client user
+            strUser = self.GetTestKdcUser()
+            if not CheckPrincipal( strUser, strDomain ):
+                ret = -errno.EINVAL 
+                return ret
+
+            cmdline += ";"
+            cmdline += DeletePrincipal( strUser )
+            cmdline += ";"
+            cmdline += AddPrincipal( strUser, "" )
+
+            #add principal for the server service
+            strSvc = self.GetTestKdcSvcHostName()
+            cmdline += ";"
+
+            strHostPrinc = self.GetTestKdcHostSvcPrinc()
+            cmdline += DeletePrincipal( strHostPrinc )
+            cmdline += ";"
+            cmdline += AddPrincipal( strHostPrinc, "" )
+            cmdline += ";"
+
+            strAdminPrinc = self.GetTestKdcAdminSvcPrinc()
+            cmdline += DeletePrincipal( strAdminPrinc )
+            cmdline += ";"
+            cmdline += AddPrincipal( strAdminPrinc, "" )
+            cmdline += ";"
+
+
+            #add svc to keytable
+            strKeytab = GetTestKeytabPath()
+            cmdline += "rm -rf " + strKeytab + ">/dev/null 2>&1;"
+            strAdmKt = GetTestAdminKeytabPath()
+            cmdline += "rm -rf " + strAdmKt + ">/dev/null 2>&1;"
+
+            cmdline += AddToKeytab(
+                strHostPrinc, strKeytab )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strKeytab )
+            cmdline += ";"
+            cmdline += AddToKeytab(
+                strAdminPrinc, strAdmKt )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strAdmKt )
+
+            #add user to client keytable
+            strCliKeytab = os.path.dirname( strKeytab ) + \
+                "/krb5cli.keytab"
+            cmdline += ";"
+            cmdline += "rm -rf " + strCliKeytab + ">/dev/null 2>&1"
+            cmdline += ";"
+            cmdline += AddToKeytab(
+                strUser, strCliKeytab )
+            cmdline += ";"
+            cmdline += ChangeKeytabOwner( strCliKeytab )
+
+            cmdline += ";"
+
+            #add a tag file
+            cmdline += "touch " + os.path.dirname( strKeytab ) + "/kdcinited;"
+
+            cmdline += '{sudo} systemctl restart {KdcSvc};'
+            cmdline += '{sudo} systemctl restart ' + GetKadminSvcName() + ";"
+
+            tempInit = tempname()
+            with open(tempInit, 'w') as f:
+                json.dump(self.initCfg, f, indent=4)
+
+            cmdline += f'rpcfctl updcfg {tempInit};'
+            cmdline += f'rm -f {tempInit} {tempKrb} {tempKdc} {tempAcl} {tempNewRealm};'
+
+            if os.geteuid() == 0:
+                actCmd = cmdline.format( sudo = '',
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() )
+            elif IsSudoAvailable():
+                actCmd = cmdline.format(
+                    sudo = 'sudo',
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() )
+            else:
+                actCmd = "su -c '" + cmdline.format(
+                    sudo = "",
+                    KdcSvc = GetKdcSvcName(),
+                    KdcConfPath = GetKdcConfPath() ) + "'"
+
+            #print( actCmd )
+            self.showOutputDlg( actCmd )
+
+            #if self.realmEdit is not None:
+            #    self.realmEdit.set_text( strDomain )
+            #    self.svcEdit.set_text( strSvc )
+            #    self.userEdit.set_text( strUser )
+            #    self.kdcEdit.set_text( strIpAddr ) 
+                
+        except Exception as err:
+            print( err )
+
+    def configWebServer( self, button ):
+        pass
+
+    def genInstaller( self, button ):
         pass
 
     def buildSecuritySettings(self):
@@ -704,7 +1391,7 @@ class MenuDialog:
                 urwid.CheckBox(_("Using GmSSL"), state=(sslFiles.get('UsingGmSSL', False) == 'true')),
                 urwid.CheckBox(_("Verify Peer"), state=(sslFiles.get('VerifyPeer', False) == 'true')),
                 urwid.AttrWrap( urwid.Button(_("Generate Self-Signed Certificate"),
-                    on_press=self.generate_self_signed_cert), 'button normal', 'button focus'),
+                    on_press=self.genSelfSignedCerts), 'button normal', 'button focus'),
                 urwid.Divider('-'),
                 urwid.Text(_("Authentication Settings"), align='center'),
                 urwid.Divider('-'),
@@ -731,55 +1418,49 @@ class MenuDialog:
                     v_sep=0,        # Vertical space between rows (not needed here)
                     align='center'  # Center-align the buttons
                 )
-                authMech = authInfo.get('AuthMech', '')
-                widgetPile = []
-                if authMech == 'SimpAuth':
-                    widgetPile.append(urwid.Edit(_("User Name : "), edit_text=authInfo.get('UserName', '')))
-                elif authMech == 'OAuth2':
-                    widgetPile.append(urwid.Edit(_("  OA2Checker Ip : "), edit_text=authInfo.get('OA2ChkIp', '')))
-                    widgetPile.append(urwid.Edit(_("OA2Checker Port : "), edit_text=authInfo.get('OA2ChkPort', '')))
-                    widgetPile.append(urwid.Edit(_("       Auth URL : "), edit_text=authInfo.get('AuthUrl', '')))
-                    widgetPile.append(urwid.CheckBox(_("Enable SSL"), state=(authInfo.get('OA2SSL', False) == 'true')))
-                elif authMech == 'krb5' and IsFeatureEnabled('krb5'):
-                    widgetPile.append(urwid.Edit(_(" Service Name : "), edit_text=authInfo.get('ServiceName', '')))
-                    widgetPile.append(urwid.Edit(_("        Realm : "), edit_text=authInfo.get('Realm', '')))
-                    widgetPile.append(urwid.Edit(_("    User Name : "), edit_text=authInfo.get('UserName', '')))
-                    widgetPile.append(urwid.Edit(_("KDC IpAddress : "), edit_text=authInfo.get('KdcIp', '')))
-                    widgetPile.append(urwid.CheckBox(_("Sign Messages"), state=(authInfo.get('SignMessages', False) == 'true')))
-
-                    kinitProxy = urwid.Button(_("Enable kinit proxy"), align='center', on_press=self.enableKinitProxy )
-                    oKinitButton = urwid.Padding(
-                        urwid.AttrMap(kinitProxy, 'button normal', focus_map='button focus'),
-                        align='left',
-                        width='pack',
-                    )
-                    initKdc = urwid.Button(_("Initialize KDC"), align='center', on_press=self.initKdc )
-                    oInitKdcButton = urwid.Padding(
-                        urwid.AttrMap(initKdc, 'button normal', focus_map='button focus'),
-                        align='left',
-                        width='pack',
-                    )
-
-                    updateAuthSettings = urwid.Button(_("Update Auth Settings"), align='center', on_press=self.updateAuthSettngsKrb5 )
-                    oUpdAuthSettings = urwid.Padding(
-                        urwid.AttrMap(updateAuthSettings, 'button normal', focus_map='button focus'),
-                        align='left',
-                        width='pack',
-                    )
-                    buttons = urwid.GridFlow(
-                        [oKinitButton, oInitKdcButton, oUpdAuthSettings],
-                        cell_width=max(len( kinitProxy.get_label() ),
-                            len( initKdc.get_label() ),
-                            len( updateAuthSettings.get_label() )),  # Adjust the width of each button
-                        h_sep=2,        # Horizontal space between buttons
-                        v_sep=0,        # Vertical space between rows (not needed here)
-                        align='left'  # Left-align the buttons
-                    )
-                    widgetPile.append(buttons)
+                widgetPile = self.buildAuthWidgets( authInfo )
 
                 self.oSecWidgets.extend([
                 radioButtons,
                 *widgetPile,])
+
+            oMisc = self.initCfg.get('misc', {})
+            bWebSocket = False
+
+            oConnParams = self.initCfg.get('Connections', [])
+            for conn in oConnParams[:]:
+                if conn.get( 'EnableWS', False) == 'true':
+                    bWebSocket = True
+                    break
+            oMiscWidgets = [urwid.Divider('-'),
+                urwid.Text(_("Misc Options"), align='center'),
+                urwid.Edit(_("Max Connections: "), edit_text=oMisc.get('MaxConnections', '512')),
+            ]
+
+            if bWebSocket:
+                oMiscWidgets.append(
+                    urwid.Button( _( "Configure WebServer" ), on_press=self.configWebServer ) )
+
+            self.oSecWidgets.extend( oMiscWidgets )
+            if self.bServer:
+                distName = GetDistName()
+                if distName in ( "debian", "ubuntu" ):
+                    destPathCap = _("DEB Package Path : " )
+                elif distName in ( "fedora" ):
+                    destPathCap = _("RPM Package Path : " )
+
+                oInstWidgets = [urwid.Divider('-'),
+                    urwid.Text(_("Installer Options"), align='center'),
+                    urwid.Edit( destPathCap, edit_text=""),
+                    urwid.Edit( _("  Dest Directory : "), edit_text="./"),
+                    urwid.CheckBox(_("Configure WebSever at installation"), state=False),
+                ]
+                if self.HasAuth() and authInfo.get( "AuthMech", "" ) == "krb5":
+                    oInstWidgets.append( urwid.CheckBox(_("Configure Kerberos at installation "), state=False) )
+                    oInstWidgets.append( urwid.CheckBox(_("Enable kinit proxy at installation "), state=False) )
+
+                oInstWidgets.append( urwid.Button( _( "Generate Rpc-Frmwrk Installer" ), on_press=self.genInstaller ) )
+                self.oSecWidgets.extend( oInstWidgets )
 
             self.oSecWidgets.extend([
                 urwid.Divider('-'),
@@ -797,18 +1478,17 @@ class MenuDialog:
         self.menu_stack.append(self.main_widget.body)
         self.buildSecuritySettings()
 
-    def go_back(self, button=None):                                                                                                                                                                              
+    def go_back(self, button=None):
         if self.main_widget.body and hasattr(self.main_widget.body, 'revert_func'):
             self.main_widget.body.revert_func()
-        if self.menu_stack:                                                                                                                                                                                      
-            previous_menu = self.menu_stack.pop()                                                                                                                                                                
-            self.main_widget.body = previous_menu                                                                                                                                                                
-        else:                                                                                                                                                                                                    
+        if self.menu_stack:
+            previous_menu = self.menu_stack.pop()
+            self.main_widget.body = previous_menu
+        else:
             # return to main menu if stack is empty, or exit if already at main menu
             self.exit_program( button )                                             
 
     def close_message(self, button):
-        # 关闭消息框，返回之前的状态
         self.go_back( button )
 
     def confirm_save_and_exit(self, button):
@@ -824,7 +1504,6 @@ class MenuDialog:
         self.go_back(button)
 
     def show_confirmation(self, message):
-        # 显示确认对话框
         text = urwid.Text(message, align='center')
         yes_button = urwid.Button(_("Apply Changes"), align='center', on_press=self.confirm_save_and_exit)
         no_button = urwid.Button(_("Discard Changes"), align='center', on_press=self.confirm_discard_and_exit)
@@ -843,23 +1522,19 @@ class MenuDialog:
         )
         pile = urwid.Pile([text, urwid.Divider(), buttons])
 
-        # 保存当前状态并显示确认框
         self.menu_stack.append(self.main_widget.body)
         self.main_widget.body = urwid.AttrWrap(
             urwid.Filler(pile, valign='middle'), 'body'
         ) 
         
     def exit_program(self, button):
-        # 退出程序
         if not button or button.get_label() != _("Exit"):
             raise urwid.ExitMainLoop()
         self.show_confirmation(_("Apply Changes and Exit?") )
         
     def run(self):
-        # 定义颜色方案
         
         global palette
-        # 创建主循环
         self.main_loop = urwid.MainLoop(
             self.main_widget,
             palette,
@@ -869,31 +1544,91 @@ class MenuDialog:
         self.main_loop.run()
         
     def unhandled_input(self, key):
-        # 处理未绑定的按键输入
         if key in ('q', 'Q'):
             raise urwid.ExitMainLoop()
         elif key == 'esc':
             # ESC key also returns to the previous menu
             self.go_back()
 
-    def ElevatePrivilege( self, callback ) -> int:
-        ret = rpcf_system( "command -v sudo > /dev/null" )
-        if ret == 0:
-            sudo = "sudo"
-        else:
-            sudo = ""
-        if sudo == "":
+    def ElevatePrivilege2( self, callback ) -> int:
+        userid = os.getuid()
+        if userid == 0 and callback:
+            callback()
             return 0
-        ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
-        if ret == 0 :
-            return ret
-        passDlg = PasswordDialog( self )
-        passDlg.runDlg()
+        try:
+            ret = rpcf_system( "command -v sudo > /dev/null" )
+            if ret == 0:
+                sudo = "sudo"
+            else:
+                sudo = ""
+            if sudo == "":
+                return -errno.EACCES 
 
-        # Run a blocking loop until the password is entered
-        ret = rpcf_system( "echo '" + passwd + f"'| sudo -S echo updating..." )
-        passwd = None
-        return ret
+            ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
+            if ret == 0 :
+                callback()
+                return 0
+
+            # prompt a password dialog for priviledged task userCb
+            passDlg = PasswordDialog( self )
+            def ElevatePrivilegeCb2( password ):
+                if password is None:
+                    return
+                process = subprocess.Popen( [ 'bash', '-c', f"echo {password} | sudo -S echo updating..." ],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
+                process.communicate()
+                ret = process.returncode
+                if ret == 0 and callback:
+                    callback()
+                else:
+                    self.show_message("Error password" )
+                return
+
+            passDlg.callback = ElevatePrivilegeCb2
+            passDlg.runDlg()
+            # informational status
+            return errno.EAGAIN
+
+        except Exception as err:
+            print( err )
+        return -errno.EACCES
+
+    def ElevatePrivilege( self, strCommand ) -> int:
+        userid = os.getuid()
+        if userid == 0:
+            self.showOutputDlg( f"{strCommand}")
+            return errno.EAGAIN
+        try:
+            ret = rpcf_system( "command -v sudo > /dev/null" )
+            if ret == 0:
+                sudo = "sudo"
+            else:
+                sudo = ""
+            if sudo == "":
+                return -errno.EACCES 
+
+            ret = rpcf_system( "sudo -n echo updating... 2>/dev/null" )
+            if ret == 0 :
+                self.showOutputDlg( f"sudo {strCommand}")
+                return errno.EAGAIN
+
+            # prompt a password dialog for priviledged task userCb
+            passDlg = PasswordDialog( self )
+            def ElevatePrivilegeCb( password ):
+                if password is None:
+                    return
+                ret = rpcf_system( f"echo {password} | sudo -S echo updating..." )
+                if ret < 0:
+                    return
+                self.showOutputDlg( f"{strCommand}" )
+
+            passDlg.callback = ElevatePrivilegeCb
+            passDlg.runDlg()
+            # informational status
+            return errno.EAGAIN
+        except Exception as err:
+            print( err )
+        return -errno.EACCES
 
 def usage():
     print( "Usage: python3 rpcfgtui.py [-hc]" )
