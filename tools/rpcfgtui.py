@@ -146,6 +146,8 @@ class MenuDialog:
         self.authMechs = []
         self.bServer = True
         self.key_dialog = None
+        self.pkgPath = None  # package path where to find the DEB package or RPM package
+        self.destPath = None # destination path to store the installer
 
     def setup_ui(self):
         # main menu
@@ -678,6 +680,7 @@ class MenuDialog:
         sslFiles = oSecurity.get('SSLCred', {})
         authInfo = oSecurity.get('AuthInfo', {})
         secItems = self.oSecWidgets
+        oMisc = oSecurity.get( 'misc', {} )
         for widget in secItems:
             if isinstance(widget, urwid.Edit):
                 label = widget.caption.strip()
@@ -710,6 +713,37 @@ class MenuDialog:
                     authInfo['KdcIp'] = widget.edit_text.strip()
                 elif label == _("User Name :"):
                     authInfo['UserName'] = widget.edit_text.strip()
+                elif label == _("Max Connections :"):
+                    strNum = widget.edit_text.strip()
+                    connNum = 512 if len( strNum ) == 0 else int(strNum)
+                    if connNum < 0 :
+                        raise Exception( "Invalid 'Max Connections'")
+                    oMisc['MaxConnections'] = connNum
+                elif label == _("DEB Package Path :") or label == _("RPM Package Path :"):
+                    self.pkgPath = widget.edit_text.strip() 
+                    if len( self.pkgPath ) == 0:
+                        self.pkgPath = None
+                    else:
+                        strPath = self.pkgPath
+                        process = subprocess.Popen(["bash", "-c", f"ls {strPath} > /dev/null"])
+                        process.communicate()
+                        ret = process.returncode
+                        if ret != 0:
+                            self.pkgPath = None
+                            raise Exception( f"Error cannot access the package path '{strPath}'")
+                elif label == _("Destination Directory :"):
+                    self.destPath = widget.edit_text.strip()
+                    if len( self.destPath ) == 0:
+                        self.destPath = None
+                    else:
+                        strPath = self.destPath
+                        process = subprocess.Popen(["bash", "-c", f"ls {strPath} > /dev/null"])
+                        process.communicate()
+                        ret = process.returncode
+                        if ret != 0:
+                            self.destPath = None
+                            raise Exception( f"Error cannot access the destPath path '{strPath}'")
+
             elif isinstance(widget, urwid.CheckBox):
                 label = widget.get_label().strip()
                 state = 'true' if widget.get_state() else 'false'
@@ -721,6 +755,15 @@ class MenuDialog:
                     authInfo['OA2SSL'] = state
                 elif label == _("Sign Message") and "ServiceName" in authInfo:
                     authInfo['SignMessage'] = state
+                elif label == _("Task Scheduler") :
+                    oMisc['TaskScheduler'] = "RR" if widget.get_state() else None
+                elif label == _("Configure WebSever on installation"):
+                    oMisc['ConfigWebServer' ] = "true" if widget.get_state() else "false"
+                elif label == _("Configure Kerberos on installation"):
+                    oMisc['ConfigKrb5' ] = "true" if widget.get_state() else "false"
+                elif label == _("Enable kinit proxy on installation (client)"):
+                    oMisc['KinitProxy' ] = "true" if widget.get_state() else "false"
+
         # Determine AuthMech based on which fields are filled or which checkboxes are checked
         for authMech in self.authMechs:
             if authMech.base_widget.get_state():
@@ -1371,10 +1414,25 @@ EOF
             print( err )
 
     def configWebServer( self, button ):
-        pass
+        try:
+            self.updateSecCfg()
+        except Exception as err:
+            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            return
+        self.showOutputDlg( f"rpcfctl cfgweb" )
 
     def genInstaller( self, button ):
-        pass
+        try:
+            self.updateSecCfg()
+            initFile = tempname()
+            with open(initFile, 'w') as f:
+                json.dump( self.initCfg, f, indent=4 )
+            strCmd = f"rpcfctl geninstaller {initFile} {self.destPath} {self.pkgPath}"
+            self.showOutputDlg( strCmd )
+            os.unlink( initFile )
+        except Exception as err:
+            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            return
 
     def buildSecuritySettings(self):
             
@@ -1424,7 +1482,7 @@ EOF
                 radioButtons,
                 *widgetPile,])
 
-            oMisc = self.initCfg.get('misc', {})
+            oMisc = oSecurity.get('misc', {})
             bWebSocket = False
 
             oConnParams = self.initCfg.get('Connections', [])
@@ -1434,7 +1492,8 @@ EOF
                     break
             oMiscWidgets = [urwid.Divider('-'),
                 urwid.Text(_("Misc Options"), align='center'),
-                urwid.Edit(_("Max Connections: "), edit_text=oMisc.get('MaxConnections', '512')),
+                urwid.Edit(_("Max Connections : "), edit_text=str(oMisc.get('MaxConnections', '512'))),
+                urwid.CheckBox(_("Task Scheduler"), state=( oMisc.get("TaskScheduler", True ) == "RR") ),
             ]
 
             if bWebSocket:
@@ -1451,15 +1510,20 @@ EOF
 
                 oInstWidgets = [urwid.Divider('-'),
                     urwid.Text(_("Installer Options"), align='center'),
-                    urwid.Edit( destPathCap, edit_text=""),
-                    urwid.Edit( _("  Dest Directory : "), edit_text="./"),
-                    urwid.CheckBox(_("Configure WebSever at installation"), state=False),
+                    urwid.Edit( destPathCap, edit_text="" if self.pkgPath == None else self.pkgPath ),
+                    urwid.Edit( _("  Destination Directory : "), edit_text="./" if self.destPath == None else self.destPath ),
+                    urwid.CheckBox(_("Configure WebSever on installation"),
+                        state=(oMisc.get("ConfigWebServer", False) == "true")),
                 ]
                 if self.HasAuth() and authInfo.get( "AuthMech", "" ) == "krb5":
-                    oInstWidgets.append( urwid.CheckBox(_("Configure Kerberos at installation "), state=False) )
-                    oInstWidgets.append( urwid.CheckBox(_("Enable kinit proxy at installation "), state=False) )
+                    oInstWidgets.append( urwid.CheckBox(_("Configure Kerberos on installation "),
+                        state=(oMisc.get("ConfigKrb5", False) == "true") ) )
+                    oInstWidgets.append( urwid.CheckBox(_("Enable kinit proxy on installation (client)"),
+                        state=(oMisc.get("KinitProxy", False) == "true") ) )
 
-                oInstWidgets.append( urwid.Button( _( "Generate Rpc-Frmwrk Installer" ), on_press=self.genInstaller ) )
+                oInstWidgets.append( urwid.AttrWrap(
+                    urwid.Button( _( "Generate Rpc-Frmwrk Installer" ), on_press=self.genInstaller ),
+                    "button normal", "button focus" ) )
                 self.oSecWidgets.extend( oInstWidgets )
 
             self.oSecWidgets.extend([
