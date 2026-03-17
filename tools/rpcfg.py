@@ -3689,18 +3689,6 @@ EOF
             fp = open( initFile, 'r' )
             cfgVal = json.load( fp )
             fp.close()
-            ret = self.GenAuthInstFiles(
-                destPath, bServer )
-            if ret != 0:
-                filesToRemove = [ '/krb5.conf', '/krb5cli.keytab', '/krb5.keytab' ]
-                for f in filesToRemove:
-                    try:
-                        os.remove( destPath + f )
-                    except:
-                        pass
-            if ret < 0:
-                raise Exception( "Error generating auth files " + \
-                    "when creating install package" )
 
             debPath = self.GetInstPkgPath()
             ret = BuildInstallersInternal( cfgVal,

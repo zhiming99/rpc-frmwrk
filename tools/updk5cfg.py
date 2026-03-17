@@ -614,7 +614,7 @@ def ConfigKrb5( initCfg : dict, curDir : str )-> int:
     bServer = False
     strSvcHost = None
     try:
-        if initCfg[ 'InstToSvr' ] == 'true':
+        if initCfg.get( 'InstToSvr', False ) == 'true':
             bServer = True
 
         oMisc = initCfg[ 'Security' ]['misc']

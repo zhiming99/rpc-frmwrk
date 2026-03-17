@@ -307,7 +307,7 @@ class MenuDialog:
                     urwid.CheckBox(_("Enable WebSockets"), state=(conn.get('EnableWS', False) == 'true')),
                     urwid.CheckBox(_("Enable Authentication"), state=(conn.get('HasAuth', False) == 'true')),
                     urwid.CheckBox(_("Enable Flow Control"), state=(conn.get('EnableBPS', False) == 'true')),
-                    urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),
+                    urwid.AttrWrap( urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),  "button normal", "button focus", )
                 ]
                 oConns.append(conn_widgets)
         elif action == _("Add New Connection"):
@@ -326,7 +326,7 @@ class MenuDialog:
                 urwid.CheckBox(_("Enable WebSockets"), state=(conn.get('EnableWS', False) == 'true')),
                 urwid.CheckBox(_("Enable Authentication"), state=(conn.get('HasAuth', False) == 'true')),
                 urwid.CheckBox(_("Enable Flow Control"), state=(conn.get('EnableBPS', False) == 'true')),
-                urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),
+                urwid.AttrWrap( urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),  "button normal", "button focus", )
             ]
             oConns.append(conn_widgets)
         elif action == _("Remove This Connection"):
@@ -340,8 +340,8 @@ class MenuDialog:
             network_widgets.append(urwid.Filler(urwid.Divider('-')))  # Add a divider between sets
 
         #network_widgets.append(urwid.Button(_("Add New Connection"), on_press=self.add_connection))
-        addConnButton = urwid.Button(_("Add New Connection"), on_press=self.add_connection)
-        returnButton = urwid.Button(_("Return to Previous Level"), on_press=self.update_network_config)  # 修改为通用返回方法
+        addConnButton = urwid.AttrWrap( urwid.Button(_("Add New Connection"), on_press=self.add_connection),  "button normal", "button focus", )
+        returnButton = urwid.AttrWrap( urwid.Button(_("Return to Previous Level"), on_press=self.update_network_config) ,  "button normal", "button focus", ) # 修改为通用返回方法
         list_walker = urwid.SimpleFocusListWalker([addConnButton, returnButton])
         list_box = urwid.ListBox(list_walker)
         network_widgets.append(urwid.AttrWrap(list_box, 'body'))
@@ -687,17 +687,17 @@ class MenuDialog:
                 if label == _("Key File :"):
                     keyFile = widget.edit_text.strip()
                     if not os.access( keyFile, os.R_OK ):
-                        raise Exception( "Error key file is not accessible" )
+                        raise Exception( _("Error key file is not accessible") )
                     sslFiles['KeyFile'] = keyFile
                 elif label == _("Cert File :"):
                     certFile = widget.edit_text.strip()
                     if not os.access( certFile, os.R_OK ):
-                        raise Exception( "Error cert file is not accessible" )
+                        raise Exception( _("Error cert file is not accessible") )
                     sslFiles['CertFile'] = certFile
                 elif label == _("CACert File :"):
                     certsFile = widget.edit_text.strip()
                     if len( certsFile ) > 0 and not os.access( certsFile, os.R_OK ):
-                        raise Exception( "Error CA Cert file is not accessible" )
+                        raise Exception( _("Error CA Cert file is not accessible") )
                     sslFiles['CACertFile'] = certsFile
                 elif label == _("OA2Checker Ip :"):
                     authInfo['OA2ChkIp'] = widget.edit_text.strip()
@@ -717,7 +717,7 @@ class MenuDialog:
                     strNum = widget.edit_text.strip()
                     connNum = 512 if len( strNum ) == 0 else int(strNum)
                     if connNum < 0 :
-                        raise Exception( "Invalid 'Max Connections'")
+                        raise Exception( _("Invalid 'Max Connections'"))
                     oMisc['MaxConnections'] = connNum
                 elif label == _("DEB Package Path :") or label == _("RPM Package Path :"):
                     self.pkgPath = widget.edit_text.strip() 
@@ -730,11 +730,11 @@ class MenuDialog:
                         ret = process.returncode
                         if ret != 0:
                             self.pkgPath = None
-                            raise Exception( f"Error cannot access the package path '{strPath}'")
+                            raise Exception(_("Error cannot access the package path ") + f"'{strPath}'")
                 elif label == _("Destination Directory :"):
                     self.destPath = widget.edit_text.strip()
                     if len( self.destPath ) == 0:
-                        self.destPath = None
+                        raise Exception( _("Error the destion path is empty"))
                     else:
                         strPath = self.destPath
                         process = subprocess.Popen(["bash", "-c", f"ls {strPath} > /dev/null"])
@@ -742,7 +742,7 @@ class MenuDialog:
                         ret = process.returncode
                         if ret != 0:
                             self.destPath = None
-                            raise Exception( f"Error cannot access the destPath path '{strPath}'")
+                            raise Exception( _("Error cannot access the destPath path ") + f"'{strPath}'")
 
             elif isinstance(widget, urwid.CheckBox):
                 label = widget.get_label().strip()
@@ -948,12 +948,11 @@ class MenuDialog:
         strKrb5Conf = GetKrb5ConfTempl()
         try:
             if not IsFeatureEnabled( "krb5" ): 
-                raise Exception( "krb5 not enabled" )
+                raise Exception( _("krb5 not enabled" ))
 
             kdcIp = self.GetTestKdcIp()
             if len( kdcIp ) == 0:
-                raise Exception( "Unable to determine kdc address, " + \
-                "and at lease one interface should be auth enabled" )
+                raise Exception( _("Unable to determine kdc address, and at lease one interface should be auth enabled") )
 
             strRealm = self.GetTestRealm()
             strKeytab = GetTestKeytabPath()
@@ -985,7 +984,7 @@ class MenuDialog:
 
             oConns = self.initCfg.get( "Connections", None ) 
             if oConns is None:
-                raise Exception( "Error no connections in initcfg.json" )
+                raise Exception( _("Error no connection defined in initcfg.json") )
             if not self.bServer:
                 return ''
             for oConn in oConns :
@@ -1037,7 +1036,7 @@ class MenuDialog:
             if len( components ) == 1:
                 strSvc += '@' + platform.node()
             elif len( components ) > 2:
-                raise Exception( "Error service name '%s' is valid" % strSvc )
+                raise Exception( _("Error bad service name ") + f"'{strSvc}'" )
         else:
             strSvc = 'rpcrouter' + "@" + platform.node()
         return strSvc
@@ -1069,10 +1068,10 @@ class MenuDialog:
 
             oSec = self.initCfg.get( "Security", None )
             if oSec is None:
-                raise Exception( "Error unable to find 'Security' in initcfg.json" )
+                raise Exception( _("Error unable to find 'Security' in initcfg.json") )
             authInfo = oSec.get( 'AuthInfo', None )
             if authInfo is None:
-                raise Exception( "Error unable to find 'AuthInfo' in initcfg.json" )
+                raise Exception( _("Error unable to find 'AuthInfo' in initcfg.json") )
 
             strNewKdcIp = strNewRealm = strNewSvc = strNewUser = ""
             for widget in self.oSecWidgets:
@@ -1088,16 +1087,16 @@ class MenuDialog:
                         strNewUser = widget.edit_text.strip()
 
             if strNewRealm == "" :
-                raise Exception( "Error Realm is empty" )
+                raise Exception( _("Error Realm is empty") )
             if strNewSvc == "":
-                raise Exception( "Error Service is empty" )
+                raise Exception( _("Error Service is empty") )
             if strNewUser == "":
-                raise Exception( "Error User is empty" )
+                raise Exception( _("Error User is empty") )
             if strNewKdcIp == "":
-                raise Exception( "Error KDC address is empty" )
+                raise Exception( _("Error KDC address is empty") )
 
             if not CheckPrincipal( strNewUser, strNewRealm ):
-                raise Exception( "bad principal '%s'" % strNewUser )
+                raise Exception( _("Bad principal ") + f"'{strNewUser}'" )
 
             if bServer and IsLocalIpAddr( strNewKdcIp ):
                 bChangeSvc = True
@@ -1198,7 +1197,7 @@ class MenuDialog:
                         cmdline += ";" + strCmd
 
             if len( cmdline ) == 0:
-                raise Exception( "Error building update commands" )
+                raise Exception( _("Error building update commands") )
 
             cmdline += ";"
             cmdline += '{sudo} systemctl restart {KdcSvc};'
@@ -1427,7 +1426,8 @@ EOF
             initFile = tempname()
             with open(initFile, 'w') as f:
                 json.dump( self.initCfg, f, indent=4 )
-            strCmd = f"rpcfctl geninstaller {initFile} {self.destPath} {self.pkgPath}"
+            pkgPath = self.pkgPath if self.pkgPath is not None else ""
+            strCmd = f"rpcfctl geninstaller {initFile} {self.destPath} {pkgPath}"
             self.showOutputDlg( strCmd )
             os.unlink( initFile )
         except Exception as err:
@@ -1498,7 +1498,7 @@ EOF
 
             if bWebSocket:
                 oMiscWidgets.append(
-                    urwid.Button( _( "Configure WebServer" ), on_press=self.configWebServer ) )
+                    urwid.AttrWrap( urwid.Button( _( "Configure WebServer" ), on_press=self.configWebServer ),  "button normal", "button focus", ) )
 
             self.oSecWidgets.extend( oMiscWidgets )
             if self.bServer:

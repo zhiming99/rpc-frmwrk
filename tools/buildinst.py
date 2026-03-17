@@ -7,6 +7,7 @@ import time
 import sys
 from updwscfg import *
 from updk5cfg import GenKrb5InstFilesFromInitCfg
+from updcfg import IsFeatureEnabled
 import errno
 
 def get_instcfg_content()->str :
@@ -119,6 +120,35 @@ __GZFILE__
 '''
     return content
 
+
+def AddKrb5Files( cfgPath, bServer, destPkg ):
+    cmdLine = ""
+    destPath = os.path.dirname( cfgPath )
+    ret = GenAuthInstFilesFromInitCfg(
+        cfgPath, bServer )
+    if ret < 0:
+        strSide= "server" if bServer else "client"
+        raise Exception( f"Error unable to generate auth files for {strSide}" )
+    # add krb5 files to the package
+    filesToAdd = [ "/krb5.conf" ]
+    if bServer:
+        filesToAdd.append( "/krb5.keytab" )
+    else:
+        filesToAdd.append( "/krb5cli.keytab" )
+
+    if len( [ f for f in filesToAdd if os.path.exists( destPath + f ) ] ) == len( filesToAdd ):
+        ret = True
+    else:
+        ret = False
+
+    if ret :
+        cmdLine += 'tar rf ' + destPkg + " -C " + destPath + " krb5.conf "
+        if bServer:
+            cmdLine += 'krb5.keytab;'
+        else:
+            cmdLine += 'krb5cli.keytab;'
+    return cmdLine
+
 # create installer for keys generated outside rpcfg.py
 def CreateInstaller( initCfg : object,
     cfgPath : str, destPath : str,
@@ -128,6 +158,14 @@ def CreateInstaller( initCfg : object,
     keyPkg = None
     destPkg = None
     try:
+        oSecurity = initCfg.get("Security", None )
+        authMech = None
+        if oSecurity is not None:
+            oAuthInfo = oSecurity.get( "AuthInfo", None )
+            if oAuthInfo :
+                authMech = oAuthInfo.get( "AuthMech", None )
+        bKrb5 = True if authMech == "krb5" and IsFeatureEnabled( "krb5" ) else False
+
         if bServer :
             destPkg = destPath + "/instsvr.tar"
             installer = destPath + "/instsvr"
@@ -225,27 +263,9 @@ def CreateInstaller( initCfg : object,
             cmdLine += AddInstallPackages(
                 debPath, destPkg, bServer )
 
-        bAuthFile = False
-        # add krb5 files to the package
-        filesToAdd = [ "/krb5.conf" ]
-        if bServer:
-            filesToAdd.append( "/krb5.keytab" )
-        else:
-            filesToAdd.append( "/krb5cli.keytab" )
-
-        if len( [ f for f in filesToAdd if os.path.exists( destPath + f ) ] ) == len( filesToAdd ):
-            ret = True
-        else:
-            ret = False
-
-        if ret :
-            bAuthFile = True
-            cmdLine += 'tar rf ' + destPkg + " -C " + destPath + \
-                " krb5.conf "
-            if bServer:
-                cmdLine += 'krb5.keytab;'
-            else:
-                cmdLine += 'krb5cli.keytab;'
+        if bKrb5:
+            strCmd = AddKrb5Files( cfgPath, bServer, destPkg )
+            cmdLine += strCmd
 
         cmdLine += "gzip " + destPkg
         ret = rpcf_system( cmdLine )
@@ -275,7 +295,7 @@ def CreateInstaller( initCfg : object,
                 cmdLine += "svridx"
             else:
                 cmdLine += "clidx"
-        if bAuthFile :
+        if bKrb5 :
             cmdline += " krb5.conf krb5.keytab krb5cli.keytab"
         rpcf_system( cmdLine )
 
@@ -300,13 +320,22 @@ def BuildInstallersInternal( initCfg : object,
     try:
         strKeyPath = os.path.expanduser( "~" ) + "/.rpcf"
         bGmSSL = False
+        oSecurity = initCfg.get( "Security", {} )
         try:
-            sslFiles = initCfg[ 'Security' ][ 'SSLCred' ]
+
+            sslFiles = oSecurity.get( 'SSLCred', {} )
             if 'UsingGmSSL' in sslFiles: 
                 if sslFiles[ 'UsingGmSSL' ] == 'true':
                     bGmSSL = True
         except Exception as err:
             bSSL = False
+
+        oAuthInfo = oSecurity.get( "AuthInfo", None )
+        authMech = None
+        if oAuthInfo :
+            authMech = oAuthInfo.get( "AuthMech", None )
+
+        bKrb5 = True if authMech == "krb5" and IsFeatureEnabled( "krb5" ) else False
 
         if bGmSSL:
             strKeyPath += "/gmssl"
@@ -316,6 +345,7 @@ def BuildInstallersInternal( initCfg : object,
         curDir = os.path.dirname( cfgPath )
         svrPkg = curDir + "/instsvr.tar"
         cliPkg = curDir + "/instcli.tar"
+
 
         bSSL2 = False
         if 'Connections' in initCfg:
@@ -443,25 +473,9 @@ def BuildInstallersInternal( initCfg : object,
                 cmdline += "tar rf " + obj.pkgName + " -C " + curDir + " USESSL;"
                 bHasKey = True
 
-            # add krb5 files to the package
-            filesToAdd = [ "/krb5.conf" ]
-            if bServer:
-                filesToAdd.append( "/krb5.keytab" )
-            else:
-                filesToAdd.append( "/krb5cli.keytab" )
-
-            if len( [ f for f in filesToAdd if os.path.exists( curDir + f ) ] ) == len( filesToAdd ):
-                ret = True
-            else:
-                ret = False
-
-            if ret:
-                cmdline += 'tar rf ' + obj.pkgName + " -C " + curDir + \
-                    " krb5.conf "
-                if obj.isServer:
-                    cmdline += 'krb5.keytab;'
-                else:
-                    cmdline += 'krb5cli.keytab;'
+            if bKrb5:
+                strCmd = AddKrb5Files( cfgPath, obj.isServer, obj.pkgName )
+                cmdline += strCmd
 
             cmdline += "rm -f " + obj.pkgName + ".gz || true;"
             cmdline += "gzip " + obj.pkgName + ";"
@@ -517,7 +531,7 @@ def BuildInstallersInternal( initCfg : object,
             rpcf_system( "mv " + installer + " " + newName )
 
         cmdline = "cd " + curDir + " && ( rm -f ./USESSL > /dev/null 2>&1;" + \
-            "rm -f *inst*.gz krb5.conf krb5.keytab krb5cli.keytab instcfg.sh > /dev/null 2>&1);"
+            f"rm -f *inst*.gz instcfg.sh > /dev/null 2>&1);"
         #cmdline += "rm " + curDir + "/initcfg.json || true;"
         rpcf_system( cmdline )
 
@@ -526,6 +540,14 @@ def BuildInstallersInternal( initCfg : object,
         if ret == 0:
             ret = -errno.EFAULT
 
+    finally:
+        if bKrb5:
+            krb5Files = [ '/krb5.conf', '/krb5cli.keytab', '/krb5.keytab' ]
+            for f in krb5Files:
+                try:
+                    os.remove( curDir + f )
+                except:
+                    pass
     return ret
 
 def GenAuthInstFilesFromInitCfg(
@@ -547,11 +569,6 @@ def BuildInstallers( strInitCfg : str,
 
     if "Security" in initCfg and "SSLCred" in initCfg[ "Security" ]:
         bSSL = True
-
-    ret = GenAuthInstFilesFromInitCfg(
-        strInitCfg, bServer )
-    if ret < 0:
-        return ret
 
     bRemove = False
     destPath = os.path.realpath( destPath ) + "/initcfg.json"
