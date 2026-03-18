@@ -180,10 +180,12 @@ class MenuDialog:
         )
     def remove_connection(self, button, idx):    
         # remove the connection configuration at the specified index
-        if 0 <= idx < len(self.oConns):
-            del self.oConns[idx]
-            # refresh the network settings page to reflect the removed connection
-            oConnParams = self.initCfg.get('Connections', [])
+        oConnParams = self.initCfg.get('Connections', [])
+        if 0 <= idx < len(oConnParams):
+            for idx2, oConn in enumerate(self.oConns):
+                if self.getConnWidgetIndex( oConn ) == idx:
+                    del self.oConns[idx2]
+                # refresh the network settings page to reflect the removed connection
             oConn = oConnParams[idx] if idx < len(oConnParams) else None
             if oConn:
                 oConn["deleted"] = True  # Mark the connection as deleted in the config
@@ -211,46 +213,62 @@ class MenuDialog:
         # refresh the network settings page to show the new connection
         self.showNetworkSettings(button)
 
+    def getConnWidgetIndex( self, oConn ):
+        for widget in oConn:
+            if isinstance( widget, urwid.Text ):
+                label, style = widget.get_text()
+                words = label.split()
+                if words[0] + " " + words[1] != 'Network Connection':
+                    continue
+                return int(words[2]) - 1
+        return None 
+
     def update_network_config(self, button):
         # walk through the widgets in oConns and update the initCfg with the new values
         try:
             oConnParams = self.initCfg.get('Connections', [])
+            for conn_widgets in self.oConns:
+                idx = self.getConnWidgetIndex( conn_widgets )
+                if idx is None:
+                    raise Exception(_("Error internal error"))
+                if idx < 0 or idx >= len(oConnParams):
+                    continue
+                conn_params = oConnParams[idx]
+                if conn_params.get("deleted", False):
+                    continue
+                for widget in conn_widgets:
+                    if isinstance(widget, urwid.Edit):
+                        label = widget.caption.strip()
+                        if label == _("IP Address:"):
+                            ipAddr = widget.edit_text.strip()
+                            if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
+                                raise ValueError(_("Invalid IP address: {}").format(ipAddr))
+                            conn_params['IpAddress'] = widget.edit_text.strip()
+                        elif label == _("Port Number:"):
+                            conn_params['PortNumber'] = widget.edit_text.strip()
+                        elif label == _("Router Path:"):
+                            conn_params['RouterPath'] = widget.edit_text.strip()
+                    elif isinstance(widget, urwid.CheckBox):
+                        label = widget.get_label().strip()
+                        state = 'true' if widget.get_state() else 'false'
+                        if label == _("Server bind to this Interface"):
+                            conn_params['BindTo'] = state
+                        elif label == _("Enable Compression"):
+                            conn_params['Compression'] = state
+                        elif label == _("Enable SSL"):
+                            conn_params['EnableSSL'] = state
+                        elif label == _("Enable WebSockets"):
+                            conn_params['EnableWS'] = state
+                        elif label == _("Enable Authentication"):
+                            conn_params['HasAuth'] = state
+                        elif label == _("Enable Flow Control"):
+                            conn_params['EnableBPS'] = state
             for conn in oConnParams[:]:
                 if conn.get( 'deleted', False):
                     oConnParams.remove(conn)  # remove the newly added connection from config
             for conn in oConnParams[:]:
                 if conn.get( 'added', False):
                     conn.pop('added')  # remove the added mark for display purposes
-            for idx, conn_widgets in enumerate(self.oConns):
-                if idx < len(oConnParams):
-                    conn_params = oConnParams[idx]
-                    for widget in conn_widgets:
-                        if isinstance(widget, urwid.Edit):
-                            label = widget.caption.strip()
-                            if label == _("IP Address:"):
-                                ipAddr = widget.edit_text.strip()
-                                if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
-                                    raise ValueError(_("Invalid IP address: {}").format(ipAddr))
-                                conn_params['IpAddress'] = widget.edit_text
-                            elif label == _("Port Number:"):
-                                conn_params['PortNumber'] = widget.edit_text
-                            elif label == _("Router Path:"):
-                                conn_params['RouterPath'] = widget.edit_text
-                        elif isinstance(widget, urwid.CheckBox):
-                            label = widget.get_label().strip()
-                            state = 'true' if widget.get_state() else 'false'
-                            if label == _("Server bind to this Interface"):
-                                conn_params['BindTo'] = state
-                            elif label == _("Enable Compression"):
-                                conn_params['Compression'] = state
-                            elif label == _("Enable SSL"):
-                                conn_params['EnableSSL'] = state
-                            elif label == _("Enable WebSockets"):
-                                conn_params['EnableWS'] = state
-                            elif label == _("Enable Authentication"):
-                                conn_params['HasAuth'] = state
-                            elif label == _("Enable Flow Control"):
-                                conn_params['EnableBPS'] = state
         except Exception as e:
             self.show_message(_("Failed to update network configuration: {}").format(str(e)))
             return
@@ -269,7 +287,7 @@ class MenuDialog:
             if conn.get('deleted', False):
                del conn['deleted']  # remove the deleted mark for display purposes
             conn_widgets = [
-                urwid.Text(_("Network Configuraselftion {}").format(idx + 1), align='center'),
+                urwid.Text(_("Network Connection") + " {}".format(idx + 1), align='center'),
                 urwid.Divider('-'),
                 urwid.Edit(_("IP Address: "), edit_text=conn.get('IpAddress', '')),
                 urwid.CheckBox(_("Server bind to this Interface"), state=(conn.get('BindTo', False) == 'true')),
@@ -280,7 +298,7 @@ class MenuDialog:
                 urwid.CheckBox(_("Enable WebSockets"), state=(conn.get('EnableWS', False) == 'true')),
                 urwid.CheckBox(_("Enable Authentication"), state=(conn.get('HasAuth', False) == 'true')),
                 urwid.CheckBox(_("Enable Flow Control"), state=(conn.get('EnableBPS', False) == 'true')),
-                urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),
+                urwid.AttrWrap( urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ), "button normal", "button focus" )
             ]
             oConns.append(conn_widgets)
 
@@ -296,7 +314,7 @@ class MenuDialog:
         if action == _("Network Settings") and not oConns:
             for idx, conn in enumerate(oConnParams):
                 conn_widgets = [
-                    urwid.Text(_("Network Configuration {}").format(idx + 1), align='center'),
+                    urwid.Text((_("Network Connection") + " {}".format(idx + 1)), align='center'),
                     urwid.Divider('-'),
                     urwid.Edit(_("IP Address: "), edit_text=conn.get('IpAddress', '')),
                     urwid.CheckBox(_("Server bind to this Interface"), state=(conn.get('BindTo', False) == 'true')),
@@ -315,7 +333,7 @@ class MenuDialog:
             conn = oConnParams[-1]
             idx = len(oConns)  # index of the new connection
             conn_widgets = [
-                urwid.Text(_("Network Configuration {}").format(idx + 1), align='center'),
+                urwid.Text(_("Network Connection") + " {}".format(idx + 1), align='center'),
                 urwid.Divider('-'),
                 urwid.Edit(_("IP Address: "), edit_text=conn.get('IpAddress', '')),
                 urwid.CheckBox(_("Server bind to this Interface"), state=(conn.get('BindTo', False) == 'true')),
@@ -332,17 +350,23 @@ class MenuDialog:
         elif action == _("Remove This Connection"):
             pass
 
+        # Create a list walker for the current set of network items
+        widgetList = []
         for conn in oConns:
-            # Create a list walker for the current set of network items
-            list_walker = urwid.SimpleFocusListWalker(conn)
-            list_box = urwid.ListBox(list_walker)
-            network_widgets.append(urwid.AttrWrap(list_box, 'body'))
-            network_widgets.append(urwid.Filler(urwid.Divider('-')))  # Add a divider between sets
+            widgetList.extend( conn )
+        
+        #list_walker = urwid.SimpleFocusListWalker(widgetList)
+        #list_box = urwid.ListBox(list_walker)
+        #network_widgets.append(urwid.AttrWrap(list_box, 'body'))
+        #network_widgets.append(urwid.Filler(urwid.Divider('-')))  # Add a divider between sets
+        widgetList.append(urwid.Divider('-'))  # Add a divider between sets
 
         #network_widgets.append(urwid.Button(_("Add New Connection"), on_press=self.add_connection))
         addConnButton = urwid.AttrWrap( urwid.Button(_("Add New Connection"), on_press=self.add_connection),  "button normal", "button focus", )
         returnButton = urwid.AttrWrap( urwid.Button(_("Return to Previous Level"), on_press=self.update_network_config) ,  "button normal", "button focus", ) # 修改为通用返回方法
-        list_walker = urwid.SimpleFocusListWalker([addConnButton, returnButton])
+        widgetList.extend( [ addConnButton, returnButton ] )
+        #list_walker = urwid.SimpleFocusListWalker([addConnButton, returnButton])
+        list_walker = urwid.SimpleFocusListWalker( widgetList )
         list_box = urwid.ListBox(list_walker)
         network_widgets.append(urwid.AttrWrap(list_box, 'body'))
         # Create the Pile with the correct focus_item
