@@ -15,9 +15,15 @@ from functools import partial
 import subprocess
 import platform
 
+from pathlib import Path
+localDir = Path(__file__).resolve()
+localDir = os.path.dirname( localDir ) + '/locale'
 # Initialize gettext
-gettext.bindtextdomain('rpcfgtui', '/usr/share/locale')
+gettext.bindtextdomain('rpcfgtui', localDir)
 gettext.textdomain('rpcfgtui')
+lang = gettext.translation('rpcfgtui', localedir=localDir, languages=['zh_CN'])
+lang.install()
+
 _ = gettext.gettext
 
 def is_valid_domain(domain):
@@ -148,20 +154,22 @@ class MenuDialog:
         self.key_dialog = None
         self.pkgPath = None  # package path where to find the DEB package or RPM package
         self.destPath = None # destination path to store the installer
+        self.oNodes = [] # widgets for each node configuration, used for updating config and reverting changes if user cancels
+        self.iNodeIdx = len( self.initCfg.get("Multihop", 0))
 
     def setup_ui(self):
         # main menu
         menu_items = [
             urwid.Divider(' '),
-            urwid.Button(_("Network Settings"), on_press=self.showNetworkSettings),
+            urwid.AttrWrap( urwid.Button(_("Network Settings"), on_press=self.showNetworkSettings), "button normal", "button focus" ),
             urwid.Divider(' '),
-            urwid.Button(_("Security Settings"), on_press=self.showSecuritySettings),
+            urwid.AttrWrap( urwid.Button(_("Security Settings"), on_press=self.showSecuritySettings), "button normal", "button focus" ),
             urwid.Divider(' '),
-            urwid.Button(_("Multihop Settings"), ),
+            urwid.AttrWrap( urwid.Button(_("Multihop Settings"), on_press=self.showMultihopSettings), "button normal", "button focus" ),
             urwid.Divider(' '),
-            urwid.Button(_("Configuration List"), on_press=self.config_list),
+            urwid.AttrWrap( urwid.Button(_("Configuration List"), on_press=self.config_list), "button normal", "button focus" ),
             urwid.Divider(' '),
-            urwid.Button(_("Exit"), on_press=self.exit_program)
+            urwid.AttrWrap( urwid.Button(_("Exit"), on_press=self.exit_program), "button normal", "button focus" )
         ]
         
         # create the boarder frame
@@ -218,9 +226,7 @@ class MenuDialog:
             if isinstance( widget, urwid.Text ):
                 label, style = widget.get_text()
                 words = label.split()
-                if words[0] + " " + words[1] != 'Network Connection':
-                    continue
-                return int(words[2]) - 1
+                return int(words[-1]) - 1
         return None 
 
     def update_network_config(self, button):
@@ -248,6 +254,8 @@ class MenuDialog:
                             conn_params['PortNumber'] = widget.edit_text.strip()
                         elif label == _("Router Path:"):
                             conn_params['RouterPath'] = widget.edit_text.strip()
+                        elif label == _("WebSocket URL:"):
+                            conn_params['DestURL'] = widget.edit_text.strip()
                     elif isinstance(widget, urwid.CheckBox):
                         label = widget.get_label().strip()
                         state = 'true' if widget.get_state() else 'false'
@@ -273,7 +281,7 @@ class MenuDialog:
             self.show_message(_("Failed to update network configuration: {}").format(str(e)))
             return
         self.oConns.clear()  # clear current widgets
-        self.go_back( None )  # return to previous menu after updating config
+        self.go_back( button )  # return to previous menu after updating config
 
     def revertToNetworkSettings(self, network_widgets):
         # revert the network settings page to the previous state (before changes)
@@ -296,6 +304,7 @@ class MenuDialog:
                 urwid.CheckBox(_("Enable Compression"), state=(conn.get('Compression', False) == 'true')),
                 urwid.CheckBox(_("Enable SSL"), state=(conn.get('EnableSSL', False) == 'true')),
                 urwid.CheckBox(_("Enable WebSockets"), state=(conn.get('EnableWS', False) == 'true')),
+                urwid.Edit(_("WebSocket URL: "), edit_text=conn.get('DestURL', '')),
                 urwid.CheckBox(_("Enable Authentication"), state=(conn.get('HasAuth', False) == 'true')),
                 urwid.CheckBox(_("Enable Flow Control"), state=(conn.get('EnableBPS', False) == 'true')),
                 urwid.AttrWrap( urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ), "button normal", "button focus" )
@@ -323,6 +332,7 @@ class MenuDialog:
                     urwid.CheckBox(_("Enable Compression"), state=(conn.get('Compression', False) == 'true')),
                     urwid.CheckBox(_("Enable SSL"), state=(conn.get('EnableSSL', False) == 'true')),
                     urwid.CheckBox(_("Enable WebSockets"), state=(conn.get('EnableWS', False) == 'true')),
+                    urwid.Edit(_("WebSocket URL: "), edit_text=conn.get('DestURL', '')),
                     urwid.CheckBox(_("Enable Authentication"), state=(conn.get('HasAuth', False) == 'true')),
                     urwid.CheckBox(_("Enable Flow Control"), state=(conn.get('EnableBPS', False) == 'true')),
                     urwid.AttrWrap( urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),  "button normal", "button focus", )
@@ -342,6 +352,7 @@ class MenuDialog:
                 urwid.CheckBox(_("Enable Compression"), state=(conn.get('Compression', False) == 'true')),
                 urwid.CheckBox(_("Enable SSL"), state=(conn.get('EnableSSL', False) == 'true')),
                 urwid.CheckBox(_("Enable WebSockets"), state=(conn.get('EnableWS', False) == 'true')),
+                urwid.Edit(_("WebSocket URL: "), edit_text=conn.get('DestURL', '')),
                 urwid.CheckBox(_("Enable Authentication"), state=(conn.get('HasAuth', False) == 'true')),
                 urwid.CheckBox(_("Enable Flow Control"), state=(conn.get('EnableBPS', False) == 'true')),
                 urwid.AttrWrap( urwid.Button( _("Remove This Connection"), on_press=self.remove_connection, user_data=idx ),  "button normal", "button focus", )
@@ -355,17 +366,11 @@ class MenuDialog:
         for conn in oConns:
             widgetList.extend( conn )
         
-        #list_walker = urwid.SimpleFocusListWalker(widgetList)
-        #list_box = urwid.ListBox(list_walker)
-        #network_widgets.append(urwid.AttrWrap(list_box, 'body'))
-        #network_widgets.append(urwid.Filler(urwid.Divider('-')))  # Add a divider between sets
         widgetList.append(urwid.Divider('-'))  # Add a divider between sets
 
-        #network_widgets.append(urwid.Button(_("Add New Connection"), on_press=self.add_connection))
         addConnButton = urwid.AttrWrap( urwid.Button(_("Add New Connection"), on_press=self.add_connection),  "button normal", "button focus", )
         returnButton = urwid.AttrWrap( urwid.Button(_("Return to Previous Level"), on_press=self.update_network_config) ,  "button normal", "button focus", ) # 修改为通用返回方法
         widgetList.extend( [ addConnButton, returnButton ] )
-        #list_walker = urwid.SimpleFocusListWalker([addConnButton, returnButton])
         list_walker = urwid.SimpleFocusListWalker( widgetList )
         list_box = urwid.ListBox(list_walker)
         network_widgets.append(urwid.AttrWrap(list_box, 'body'))
@@ -455,7 +460,7 @@ class MenuDialog:
         )
         buttons = urwid.GridFlow(
             [export_button, back_button],
-            cell_width=max(len( export_button1.get_label() ), len( back_button1.get_label() )),  # Adjust the width of each button
+            cell_width=max(len( export_button1.get_label().encode() ), len( back_button1.get_label().encode() )),  # Adjust the width of each button
             h_sep=2,        # Horizontal space between buttons
             v_sep=0,        # Vertical space between rows (not needed here)
             align='left'  # Left-align the buttons
@@ -1567,7 +1572,7 @@ EOF
         self.buildSecuritySettings()
 
     def go_back(self, button=None):
-        if self.main_widget.body and hasattr(self.main_widget.body, 'revert_func'):
+        if not button and self.main_widget.body and hasattr(self.main_widget.body, 'revert_func'):
             self.main_widget.body.revert_func()
         if self.menu_stack:
             previous_menu = self.menu_stack.pop()
@@ -1717,6 +1722,195 @@ EOF
         except Exception as err:
             print( err )
         return -errno.EACCES
+
+    def getNodeWidgetIndex( self, oNode ):
+        for widget in oNode:
+            if isinstance( widget, urwid.Text ):
+                label, style = widget.get_text()
+                words = label.split()
+                if words[0] != _('Node'):
+                    continue
+                return int(words[1]) - 1
+        return None 
+
+    def remove_node(self, button, idx):    
+        # remove the connection configuration at the specified index
+        oNodeParams = self.initCfg.get('Multihop', [])
+        if 0 <= idx < len(oNodeParams):
+            for idx2, oNode in enumerate(self.oNodes):
+                if self.getNodeWidgetIndex( oNode ) == idx:
+                    del self.oNodes[idx2]
+                # refresh the network settings page to reflect the removed connection
+            oNode = oNodeParams[idx] if idx < len(oNodeParams) else None
+            if oNode:
+                oNode["deleted"] = True  # Mark the connection as deleted in the config
+            self.showMultihopSettings(button)
+
+    def add_node(self, button):
+        # add a new connection configuration (default values)
+        oNodeParams = self.initCfg.get('Multihop', [])
+        newIdx = self.iNodeIdx
+        self.iNodeIdx+=1
+        oNodeParams.append({
+            'NodeName' : f"node{newIdx}",
+            'IpAddress': '127.0.0.1',
+            'PortNumber': f'{4132+newIdx}',
+            'Enabled' : 'true',
+            'Compression': 'false',
+            'EnableSSL': 'false',
+            'EnableWS': 'false',
+            'DestURL': "",
+            'AddrFormat': 'ipv4',
+            'Protocol': 'native',
+            'ConnRecover': 'true',
+            'added': True  # Mark the connection as newly added in the config
+        })
+        # refresh the network settings page to show the new connection
+        self.showMultihopSettings(button)
+
+    def update_multihop_config(self, button):
+        # walk through the widgets in oConns and update the initCfg with the new values
+        try:
+            oNodeParams = self.initCfg.get('Multihop', [])
+            for oNode in self.oNodes:
+                idx = self.getNodeWidgetIndex( oNode )
+                if idx is None:
+                    raise Exception(_("Error internal error"))
+                if idx < 0 or idx >= len(oNodeParams):
+                    continue
+                node_params = oNodeParams[idx]
+                if node_params.get("deleted", False):
+                    continue
+                for widget in oNode:
+                    if isinstance(widget, urwid.Edit):
+                        label = widget.caption.strip()
+                        if label == _("IP Address:"):
+                            ipAddr = widget.edit_text.strip()
+                            if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
+                                raise ValueError(_("Invalid IP address: {}").format(ipAddr))
+                            node_params['IpAddress'] = widget.edit_text.strip()
+                        elif label == _("Port Number:"):
+                            node_params['PortNumber'] = widget.edit_text.strip()
+                        elif label == _("Node Name:"):
+                            node_params['NodeName'] = widget.edit_text.strip()
+                        elif label == _("WebSocket URL:"):
+                            node_params['DestURL'] = widget.edit_text.strip()
+                    elif isinstance(widget, urwid.CheckBox):
+                        label = widget.get_label().strip()
+                        state = 'true' if widget.get_state() else 'false'
+                        if label == _("Enable this Interface"):
+                            node_params['Enabled'] = state
+                        elif label == _("Enable Compression"):
+                            node_params['Compression'] = state
+                        elif label == _("Enable SSL"):
+                            node_params['EnableSSL'] = state
+                        elif label == _("Enable WebSockets"):
+                            node_params['EnableWS'] = state
+            for oNode in oNodeParams[:]:
+                if oNode.get( 'deleted', False):
+                    oNodeParams.remove(oNode)  # remove the newly added connection from config
+            for oNode in oNodeParams[:]:
+                if oNode.get( 'added', False):
+                    oNode.pop('added')  # remove the added mark for display purposes
+        except Exception as e:
+            self.show_message(_("Failed to update network configuration: {}").format(str(e)))
+            return
+        self.oNodes.clear()  # clear current widgets
+        self.go_back( button )  # return to previous menu after updating config
+
+    def revertToMultihopSettings(self, multihop_widgets):
+        # revert the network settings page to the previous state (before changes)
+        oNodeParams = self.initCfg.get('Multihop', [])
+        self.oNodes.clear()  # clear current widgets
+        oNodes = self.oNodes
+        for oNode in oNodeParams[:]:
+            if oNode.get( 'added', False):
+                oNodeParams.remove(oNode)  # remove the newly added connection from config
+        for idx, oNode in enumerate(oNodeParams):
+            if oNode.get('deleted', False):
+               del oNode['deleted']  # remove the deleted mark for display purposes
+            oNode = [
+                urwid.Text(_("Node") + " {}".format(idx + 1), align='center'),
+                urwid.Divider('-'),
+                urwid.Edit(_("Node Name: "), edit_text=oNode.get('NodeName', '')),
+                urwid.Edit(_("IP Address: "), edit_text=oNode.get('IpAddress', '')),
+                urwid.Edit(_("Port Number: "), edit_text=oNode.get('PortNumber', '')),
+                urwid.CheckBox(_("Enable this Node"), state=(oNode.get('Enabled', False) == 'true')),
+                urwid.CheckBox(_("Enable Compression"), state=(oNode.get('Compression', False) == 'true')),
+                urwid.CheckBox(_("Enable SSL"), state=(oNode.get('EnableSSL', False) == 'true')),
+                urwid.CheckBox(_("Enable WebSockets"), state=(oNode.get('EnableWS', False) == 'true')),
+                urwid.Edit(_("WebSocket URL: "), edit_text=oNode.get('DestURL', '')),
+                urwid.AttrWrap( urwid.Button( _("Remove This Node"), on_press=self.remove_node, user_data=idx ), "button normal", "button focus" )
+            ]
+            oNodes.append(oNode)
+
+    def showMultihopSettings(self, button):
+        # Save the current menu state to the stack
+        action = button.get_label() 
+        if button and action == _("Multihop Settings") : 
+            self.menu_stack.append(self.main_widget.body)
+        # Create widgets for each set of network_items in oConns
+        oNodeParams = self.initCfg.get('Multihop', [])
+        oNodes = self.oNodes
+        if action == _("Multihop Settings") and not oNodes:
+            for idx, oNode in enumerate(oNodeParams):
+                oNodeWidgets = [
+                    urwid.Text((_("Node") + " {}".format(idx + 1)), align='center'),
+                    urwid.Divider('-'),
+                    urwid.Edit(_("Node Name: "), edit_text=oNode.get('NodeName', '')),
+                    urwid.Edit(_("IP Address: "), edit_text=oNode.get('IpAddress', '')),
+                    urwid.Edit(_("Port Number: "), edit_text=oNode.get('PortNumber', '')),
+                    urwid.CheckBox(_("Enable this Node"), state=(oNode.get('Enabled', False) == 'true')),
+                    urwid.CheckBox(_("Enable Compression"), state=(oNode.get('Compression', False) == 'true')),
+                    urwid.CheckBox(_("Enable SSL"), state=(oNode.get('EnableSSL', False) == 'true')),
+                    urwid.CheckBox(_("Enable WebSockets"), state=(oNode.get('EnableWS', False) == 'true')),
+                    urwid.Edit(_("WebSocket URL: "), edit_text=oNode.get('DestURL', '/')),
+                    urwid.AttrWrap( urwid.Button( _("Remove This Node"), on_press=self.remove_node, user_data=idx ),  "button normal", "button focus", )
+                ]
+                oNodes.append(oNodeWidgets)
+        elif action == _("Add New Node"):
+            # Create a widget for the new connection
+            oNode = oNodeParams[-1]
+            idx = len(oNodes)  # index of the new node
+            oNodeWidgets = [
+                urwid.Text(_("Node") + " {}".format(idx + 1), align='center'),
+                urwid.Divider('-'),
+                urwid.Edit(_("Node Name: "), edit_text=oNode.get('NodeName', '')),
+                urwid.Edit(_("IP Address: "), edit_text=oNode.get('IpAddress', '')),
+                urwid.Edit(_("Port Number: "), edit_text=oNode.get('PortNumber', '')),
+                urwid.CheckBox(_("Enable this Node"), state=(oNode.get('Enabled', False) == 'true')),
+                urwid.CheckBox(_("Enable Compression"), state=(oNode.get('Compression', False) == 'true')),
+                urwid.CheckBox(_("Enable SSL"), state=(oNode.get('EnableSSL', False) == 'true')),
+                urwid.CheckBox(_("Enable WebSockets"), state=(oNode.get('EnableWS', False) == 'true')),
+                urwid.Edit(_("WebSocket URL: "), edit_text=oNode.get('DestURL', '/')),
+                urwid.AttrWrap( urwid.Button( _("Remove This Node"), on_press=self.remove_node, user_data=idx ),  "button normal", "button focus", )
+            ]
+            oNodes.append(oNodeWidgets)
+        elif action == _("Remove This Connection"):
+            pass
+
+        # Create a list walker for the current set of network items
+        widgetList = []
+        for oNode in oNodes:
+            widgetList.extend( oNode )
+        
+        widgetList.append(urwid.Divider('-'))  # Add a divider between sets
+
+        addConnButton = urwid.AttrWrap( urwid.Button(_("Add New Node"), on_press=self.add_node),  "button normal", "button focus", )
+        returnButton = urwid.AttrWrap( urwid.Button(_("Return to Previous Level"), on_press=self.update_multihop_config) ,  "button normal", "button focus", ) # 修改为通用返回方法
+        widgetList.extend( [ addConnButton, returnButton ] )
+        #list_walker = urwid.SimpleFocusListWalker([addConnButton, returnButton])
+        list_walker = urwid.SimpleFocusListWalker( widgetList )
+        list_box = urwid.ListBox(list_walker)
+
+        multihop_widgets = []
+        multihop_widgets.append(urwid.AttrWrap(list_box, 'body'))
+        # Create the Pile with the correct focus_item
+        combined_pile = urwid.Pile(multihop_widgets)
+        combined_pile.revert_func = lambda: self.revertToMultihopSettings(multihop_widgets)  # Store the current state for reverting
+
+        # Set the combined pile as the body of the main widget
+        self.main_widget.body = combined_pile
 
 def usage():
     print( "Usage: python3 rpcfgtui.py [-hc]" )
