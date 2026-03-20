@@ -46,7 +46,7 @@ bw_pallete = [
     ('radio select', 'light gray', 'dark gray'),      # Yellow text on blue background
 ]
 
-palette = [
+bolland_palette = [
     ('body', 'yellow', 'dark blue', 'standout'),  # Yellow text on blue background
     ('header', 'white', 'dark blue', 'bold'),    # White text on blue background
     ('button normal', 'light gray', 'dark blue', 'standout'),  # Light gray text on blue background
@@ -56,6 +56,7 @@ palette = [
     ('radio normal', 'light gray', 'dark blue'),  # Light gray text on blue background
     ('radio select', 'light gray', 'dark green'),      # Yellow text on blue background
 ]
+palette = bw_pallete
 
 class PasswordDialog:
     def __init__(self, parent ):
@@ -245,10 +246,10 @@ class MenuDialog:
                 for widget in conn_widgets:
                     if isinstance(widget, urwid.Edit):
                         label = widget.caption.strip()
-                        if label == _("IP Address:"):
+                        if label == _("IP Address: "):
                             ipAddr = widget.edit_text.strip()
                             if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
-                                raise ValueError(_("Invalid IP address: {}").format(ipAddr))
+                                raise ValueError(_("Invalid IP address")+": {}".format(ipAddr))
                             conn_params['IpAddress'] = widget.edit_text.strip()
                         elif label == _("Port Number:"):
                             conn_params['PortNumber'] = widget.edit_text.strip()
@@ -278,7 +279,7 @@ class MenuDialog:
                 if conn.get( 'added', False):
                     conn.pop('added')  # remove the added mark for display purposes
         except Exception as e:
-            self.show_message(_("Failed to update network configuration: {}").format(str(e)))
+            self.show_message(_("Failed to update network configuration") + ": {}".format(str(e)))
             return
         self.oConns.clear()  # clear current widgets
         self.go_back( button )  # return to previous menu after updating config
@@ -433,9 +434,9 @@ class MenuDialog:
             with open(file_path, 'w') as f:
                 json.dump(self.initCfg, f, indent=4)
             self.go_back( None ) 
-            self.show_message(_("successfully export configuration to {}").format(file_path))
+            self.show_message(_("Successfully export configuration to" ) + " {}".format(file_path))
         except Exception as e:
-            self.show_message(_("Failed to export configuration: {}").format(str(e)))
+            self.show_message(_("Failed to export configuration" ) + ": {}".format(str(e)))
 
     def export_config(self, button): 
         # export to a JSON file for external use, such as debugging or manual editing; save current menu state to stack before showing message
@@ -644,8 +645,8 @@ class MenuDialog:
             checkBoxes.append( oUpdAuthSettings )
             if self.bServer:
                 cellWidth = max( 
-                    len( initKdc.get_label() ),
-                    len( updateAuthSettings.get_label() ))  # Adjust the width of each button
+                    len( initKdc.get_label().encode() ),
+                    len( updateAuthSettings.get_label().encode() ))  # Adjust the width of each button
             else:
                 cellWidth = len( kinitProxy.get_label() )
             buttons = urwid.GridFlow(
@@ -664,13 +665,10 @@ class MenuDialog:
             oSec = self.initCfg.get('Security', {})
             authMech = None
             if label == _("SimpAuth"):
-                oSec['AuthInfo'] = dict(AuthMech='SimpAuth')
                 authMech = 'SimpAuth'
             elif label == _("Kerberos"):
-                oSec['AuthInfo'] = dict(AuthMech='krb5')
                 authMech = 'krb5'
             elif label == _("OAuth2"):
-                oSec['AuthInfo'] = dict(AuthMech='OAuth2')
                 authMech = 'OAuth2'
 
             divCount = 0
@@ -687,7 +685,10 @@ class MenuDialog:
                         endPos = idx
                         break
             authInfo = oSec.get('AuthInfo', {})
-            widgetPile = self.buildAuthWidgets( authInfo )
+            newAuthInfo = {"AuthMech": authMech}
+            if authInfo.get('AuthMech', "") == authMech:
+                newAuthInfo = authInfo
+            widgetPile = self.buildAuthWidgets( newAuthInfo )
             del self.oSecWidgets[insPos:endPos]  # remove the old widgets between the two dividers
             for widget in widgetPile:
                 self.oSecWidgets.insert(insPos, widget)  # insert the new widgets between the two dividers
@@ -813,7 +814,7 @@ class MenuDialog:
         try:
             self.updateSecCfg()
         except Exception as err:
-            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            self.show_message(_("Failed to update security configuration") +": {}".format(str(err)))
             return
         self.oSecWidgets.clear()  # clear current widgets
         self.authMechs.clear()
@@ -876,7 +877,7 @@ class MenuDialog:
             self.updateSecCfg()
             self.ElevatePrivilege2( self.SetupTestKdc )
         except Exception as err:
-            self.show_message(_("Failed to setup test KDC: {}").format(str(err)))
+            self.show_message(_("Failed to setup test KDC") + ": {}".format(str(err)))
             return
 
     def GetKadmAcl( self ) -> str:
@@ -1268,7 +1269,7 @@ class MenuDialog:
             self.ElevatePrivilege2( self.UpdateAuthSettingsKrb5  )
 
         except Exception as err:
-            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            self.show_message(_("Failed to update security configuration" ) + ": {}".format(str(err)))
             return
 
     def SetupTestKdc( self )->int:
@@ -1445,7 +1446,7 @@ EOF
         try:
             self.updateSecCfg()
         except Exception as err:
-            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            self.show_message(_("Failed to update security configuration") + ": {}".format(str(err)))
             return
         self.showOutputDlg( f"rpcfctl cfgweb" )
 
@@ -1460,7 +1461,7 @@ EOF
             self.showOutputDlg( strCmd )
             os.unlink( initFile )
         except Exception as err:
-            self.show_message(_("Failed to update security configuration: {}").format(str(err)))
+            self.show_message(_("Failed to update security configuration")+": {}".format(str(err)))
             return
 
     def buildSecuritySettings(self):
@@ -1585,7 +1586,13 @@ EOF
         self.go_back( button )
 
     def confirm_save_and_exit(self, button):
-        raise urwid.ExitMainLoop()
+        tempInit = tempname()
+        with open(tempInit, 'w') as f:
+            json.dump(self.initCfg, f, indent=4)
+        def updateRpcfCfg():
+            self.showOutputDlg(f"rpcfctl updcfg {tempInit};rm -f {tempInit}>/dev/null",
+                callback = lambda button : self.exit_program(button) )
+        self.ElevatePrivilege2( updateRpcfCfg )
 
     def confirm_discard_and_exit(self, button):
         raise urwid.ExitMainLoop()
@@ -1784,10 +1791,10 @@ EOF
                 for widget in oNode:
                     if isinstance(widget, urwid.Edit):
                         label = widget.caption.strip()
-                        if label == _("IP Address:"):
+                        if label == _("IP Address: "):
                             ipAddr = widget.edit_text.strip()
                             if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
-                                raise ValueError(_("Invalid IP address: {}").format(ipAddr))
+                                raise ValueError(_("Invalid IP address")+": {}".format(ipAddr))
                             node_params['IpAddress'] = widget.edit_text.strip()
                         elif label == _("Port Number:"):
                             node_params['PortNumber'] = widget.edit_text.strip()
@@ -1813,7 +1820,7 @@ EOF
                 if oNode.get( 'added', False):
                     oNode.pop('added')  # remove the added mark for display purposes
         except Exception as e:
-            self.show_message(_("Failed to update network configuration: {}").format(str(e)))
+            self.show_message(_("Failed to update network configuration")+": {}".format(str(e)))
             return
         self.oNodes.clear()  # clear current widgets
         self.go_back( button )  # return to previous menu after updating config
@@ -1914,13 +1921,13 @@ EOF
 
 def usage():
     print( "Usage: python3 rpcfgtui.py [-hc]" )
-    print( "\t-c: to config a client host." )
-    print( "\t\tOtherwise it is for a server host" )
+    print( "\t-c: to config a client host, otherwise a server host" )
+    print( "\t-b: using 'Bolland' colorscheme." )
 
 def main():
     bServer = True
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hc" )
+        opts, args = getopt.getopt(sys.argv[1:], "hbc" )
     except getopt.GetoptError as err:
         # print help information and exit:
         print(err)  # will print something like "option -a not recognized"
@@ -1933,6 +1940,9 @@ def main():
             sys.exit( 0 )
         elif o == "-c":
             bServer = False
+        elif o == "-b":
+            global palette
+            palette = bolland_palette
         else:
             assert False, "unhandled option"
     app = MenuDialog()

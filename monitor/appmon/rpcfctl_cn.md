@@ -196,6 +196,11 @@ rpcfctl <命令> [参数]
 - **restore <备份文件>**  
   从 tar 包恢复服务器端设置。
 
+- **cfg**   
+  启动`rpcfg.py`,rpc-frmwrk的图形配置工具
+
+- **tui**   
+  启动`rpcfgtui.py`,rpc-frmwrk的字符终端配置工具，适用于无图形界面的字符终端。
 ---
 
 ## 其他

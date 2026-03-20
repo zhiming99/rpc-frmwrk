@@ -1,0 +1,516 @@
+# rpcfgtui's Chinese Translation
+# Copyright (C) 2026
+# This file is a part of free software, and distributed under GPLv3
+# Ming Zhi<woodhead99@gmail.com>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-05 10:18+0800\n"
+"PO-Revision-Date: 2026-03-05 20:21+Beijing\n"
+"Last-Translator: Ming Zhi<woodhead99@gmail.com>\n"
+"Language-Team: zhiming <zhiming@rpcf.org>\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: rpcfgtui.py:68
+msgid "Password: "
+msgstr "密码："
+
+#: rpcfgtui.py:70 rpcfgtui.py:388 rpcfgtui.py:405 rpcfgtui.py:488
+#: rpcfgtui.py:558
+msgid "OK"
+msgstr "确认"
+
+#: rpcfgtui.py:71 rpcfgtui.py:406 rpcfgtui.py:559 rpcfgtui.py:1603
+msgid "Cancel"
+msgstr "取消"
+
+#: rpcfgtui.py:94 rpcfgtui.py:577
+msgid "Input Password"
+msgstr "输入密码"
+
+#: rpcfgtui.py:164 rpcfgtui.py:317 rpcfgtui.py:323
+msgid "Network Settings"
+msgstr "网络设置"
+
+#: rpcfgtui.py:166
+msgid "Security Settings"
+msgstr "安全设置"
+
+#: rpcfgtui.py:168 rpcfgtui.py:1850 rpcfgtui.py:1855
+msgid "Multihop Settings"
+msgstr "级联设置"
+
+#: rpcfgtui.py:170
+msgid "Configuration List"
+msgstr "设置清单"
+
+#: rpcfgtui.py:172 rpcfgtui.py:1624
+msgid "Exit"
+msgstr "退出"
+
+#: rpcfgtui.py:179
+msgid "Configure Rpc-Framework"
+msgstr "配置Rpc-Framework"
+
+#: rpcfgtui.py:187
+msgid "Use arrow keys to navigate, Enter to confirm"
+msgstr "移动用上下左右键，确认用回车键"
+
+#: rpcfgtui.py:239 rpcfgtui.py:1778
+msgid "Error internal error"
+msgstr "内部错误"
+
+#: rpcfgtui.py:251 rpcfgtui.py:1790
+msgid "Invalid IP address"
+msgstr "无效IP地址"
+
+#: rpcfgtui.py:253 rpcfgtui.py:1792
+msgid "Port Number:"
+msgstr "端口号："
+
+#: rpcfgtui.py:255
+msgid "Router Path:"
+msgstr "路由路径："
+
+#: rpcfgtui.py:257 rpcfgtui.py:1796
+msgid "WebSocket URL:"
+msgstr "WebSocket网址："
+
+#: rpcfgtui.py:262 rpcfgtui.py:301 rpcfgtui.py:329 rpcfgtui.py:349
+msgid "Server bind to this Interface"
+msgstr "服务器绑定到此IP地址"
+
+#: rpcfgtui.py:264 rpcfgtui.py:304 rpcfgtui.py:332 rpcfgtui.py:352
+#: rpcfgtui.py:1803 rpcfgtui.py:1839 rpcfgtui.py:1864 rpcfgtui.py:1882
+msgid "Enable Compression"
+msgstr "启用压缩传输"
+
+#: rpcfgtui.py:266 rpcfgtui.py:305 rpcfgtui.py:333 rpcfgtui.py:353
+#: rpcfgtui.py:606 rpcfgtui.py:783 rpcfgtui.py:853 rpcfgtui.py:1805
+#: rpcfgtui.py:1840 rpcfgtui.py:1865 rpcfgtui.py:1883
+msgid "Enable SSL"
+msgstr "启用SSL"
+
+#: rpcfgtui.py:268 rpcfgtui.py:306 rpcfgtui.py:334 rpcfgtui.py:354
+#: rpcfgtui.py:1807 rpcfgtui.py:1841 rpcfgtui.py:1866 rpcfgtui.py:1884
+msgid "Enable WebSockets"
+msgstr "启用WebSocket"
+
+#: rpcfgtui.py:270 rpcfgtui.py:308 rpcfgtui.py:336 rpcfgtui.py:356
+#: rpcfgtui.py:834
+msgid "Enable Authentication"
+msgstr "启用身份认证"
+
+#: rpcfgtui.py:272 rpcfgtui.py:309 rpcfgtui.py:337 rpcfgtui.py:357
+msgid "Enable Flow Control"
+msgstr "启用流量控制"
+
+#: rpcfgtui.py:281 rpcfgtui.py:1816
+msgid "Failed to update network configuration"
+msgstr "更新网络设置失败"
+
+#: rpcfgtui.py:298 rpcfgtui.py:326 rpcfgtui.py:346
+msgid "Network Connection"
+msgstr "网络连接"
+
+#: rpcfgtui.py:248 rpcfgtui.py:1787
+#: rpcfgtui.py:300 rpcfgtui.py:328 rpcfgtui.py:348 rpcfgtui.py:1836
+#: rpcfgtui.py:1861 rpcfgtui.py:1879
+msgid "IP Address: "
+msgstr "IP 地址："
+
+#: rpcfgtui.py:302 rpcfgtui.py:330 rpcfgtui.py:350 rpcfgtui.py:1837
+#: rpcfgtui.py:1862 rpcfgtui.py:1880
+msgid "Port Number: "
+msgstr "端口号："
+
+#: rpcfgtui.py:303 rpcfgtui.py:331 rpcfgtui.py:351
+msgid "Router Path: "
+msgstr "路由路径："
+
+#: rpcfgtui.py:307 rpcfgtui.py:335 rpcfgtui.py:355 rpcfgtui.py:1842
+#: rpcfgtui.py:1867 rpcfgtui.py:1885
+msgid "WebSocket URL: "
+msgstr "WebSocket网址："
+
+#: rpcfgtui.py:310 rpcfgtui.py:338 rpcfgtui.py:358 rpcfgtui.py:361
+#: rpcfgtui.py:1889
+msgid "Remove This Connection"
+msgstr "删除此连接"
+
+#: rpcfgtui.py:341 rpcfgtui.py:371
+msgid "Add New Connection"
+msgstr "添加新连接"
+
+#: rpcfgtui.py:372 rpcfgtui.py:455 rpcfgtui.py:809 rpcfgtui.py:1560
+#: rpcfgtui.py:1900
+msgid "Return to Previous Level"
+msgstr "返回上一级"
+
+#: rpcfgtui.py:404
+msgid "Enter file path: "
+msgstr "输入文件路径："
+
+#: rpcfgtui.py:436
+msgid "Successfully export configuration to"
+msgstr "已成功导出设置到"
+
+#: rpcfgtui.py:438
+msgid "Failed to export configuration"
+msgstr "导出设置以失败"
+
+#: rpcfgtui.py:449
+msgid "Export Configuration"
+msgstr "导出设置"
+
+#: rpcfgtui.py:500
+msgid "Output"
+msgstr "输出"
+
+#: rpcfgtui.py:510
+msgid "#Server Keys: "
+msgstr "服务器密钥个数："
+
+#: rpcfgtui.py:511
+msgid "#Client Keys: "
+msgstr "客户端密钥个数："
+
+#: rpcfgtui.py:539 rpcfgtui.py:716
+msgid "Key File :"
+msgstr "密钥文件路径："
+
+#: rpcfgtui.py:544 rpcfgtui.py:721
+msgid "Cert File :"
+msgstr "证书文件路径："
+
+#: rpcfgtui.py:549 rpcfgtui.py:726
+msgid "CACert File :"
+msgstr "CA证书文件路径："
+
+#: rpcfgtui.py:592 rpcfgtui.py:779 rpcfgtui.py:1478
+msgid "Using GmSSL"
+msgstr "启用GmSSL"
+
+#: rpcfgtui.py:601
+msgid "User Name : "
+msgstr "用户名："
+
+#: rpcfgtui.py:603
+msgid "  OA2Checker Ip : "
+msgstr "OA2Checker IP地址："
+
+#: rpcfgtui.py:604
+msgid "OA2Checker Port : "
+msgstr "OA2Checker 端口号："
+
+#: rpcfgtui.py:605
+msgid "       Auth URL : "
+msgstr "OAuth2服务器URL："
+
+#: rpcfgtui.py:608
+msgid " Service Name : "
+msgstr "服务名："
+
+#: rpcfgtui.py:609
+msgid "        Realm : "
+msgstr "域名(Realm)："
+
+#: rpcfgtui.py:610
+msgid "    User Name : "
+msgstr "用户名："
+
+#: rpcfgtui.py:611
+msgid "KDC IpAddress : "
+msgstr "KDC IP地址："
+
+#: rpcfgtui.py:612 rpcfgtui.py:785
+msgid "Sign Message"
+msgstr "签名每条传输数据"
+
+#: rpcfgtui.py:617 rpcfgtui.py:867
+msgid "Disable kinit proxy"
+msgstr "禁用kinit代理"
+
+#: rpcfgtui.py:619 rpcfgtui.py:869
+msgid "Enable kinit proxy"
+msgstr "启用kinit代理"
+
+#: rpcfgtui.py:629
+msgid "Initialize KDC"
+msgstr "初始化本地KDC"
+
+#: rpcfgtui.py:637
+msgid "Update Auth Settings"
+msgstr "更新认证设置"
+
+#: rpcfgtui.py:666 rpcfgtui.py:800 rpcfgtui.py:1489
+msgid "SimpAuth"
+msgstr "简单认证"
+
+#: rpcfgtui.py:669 rpcfgtui.py:802 rpcfgtui.py:1491
+msgid "Kerberos"
+msgstr ""
+
+#: rpcfgtui.py:672 rpcfgtui.py:804 rpcfgtui.py:1493
+msgid "OAuth2"
+msgstr ""
+
+#: rpcfgtui.py:719
+msgid "Error key file is not accessible"
+msgstr "错误，密钥文件不能访问"
+
+#: rpcfgtui.py:724
+msgid "Error cert file is not accessible"
+msgstr "错误，证书文件不能访问"
+
+#: rpcfgtui.py:729
+msgid "Error CA Cert file is not accessible"
+msgstr "错误，CA证书文件不能访问"
+
+#: rpcfgtui.py:731
+msgid "OA2Checker Ip :"
+msgstr "OA2Checker IP地址："
+
+#: rpcfgtui.py:733
+msgid "OA2Checker Port :"
+msgstr "OA2Checker 端口号："
+
+#: rpcfgtui.py:735
+msgid "Auth URL :"
+msgstr "OAuth2服务器URL："
+
+#: rpcfgtui.py:737 rpcfgtui.py:1060 rpcfgtui.py:1109
+msgid "Service Name :"
+msgstr "服务名称："
+
+#: rpcfgtui.py:739 rpcfgtui.py:1033 rpcfgtui.py:1111
+msgid "Realm :"
+msgstr "域名(Realm)："
+
+#: rpcfgtui.py:741 rpcfgtui.py:1113
+msgid "KDC IpAddress :"
+msgstr "KDC IP地址："
+
+#: rpcfgtui.py:743 rpcfgtui.py:1044 rpcfgtui.py:1115
+msgid "User Name :"
+msgstr "用户名："
+
+#: rpcfgtui.py:745
+msgid "Max Connections :"
+msgstr "服务器最大允许连接数："
+
+#: rpcfgtui.py:749
+msgid "Invalid 'Max Connections'"
+msgstr "无效'最大连接数'"
+
+#: rpcfgtui.py:751
+msgid "DEB Package Path :"
+msgstr "Deb包路径："
+
+#: rpcfgtui.py:751
+msgid "RPM Package Path :"
+msgstr "RPM包路径："
+
+#: rpcfgtui.py:762
+msgid "Error cannot access the package path "
+msgstr "错误，指定的包路径不能访问"
+
+#: rpcfgtui.py:763
+msgid "Destination Directory :"
+msgstr "安装包存放目录："
+
+#: rpcfgtui.py:766
+msgid "Error the destion path is empty"
+msgstr "错误，安装包存放路径不能为空"
+
+#: rpcfgtui.py:774
+msgid "Error cannot access the destPath path "
+msgstr "错误，安装包存放路径不可访问"
+
+#: rpcfgtui.py:781 rpcfgtui.py:1479
+msgid "Verify Peer"
+msgstr "验证对方证书"
+
+#: rpcfgtui.py:787 rpcfgtui.py:1525
+msgid "Task Scheduler"
+msgstr "任务调度器"
+
+#: rpcfgtui.py:789 rpcfgtui.py:1544
+msgid "Configure WebSever on installation"
+msgstr "安装时配置WebServer"
+
+#: rpcfgtui.py:791
+msgid "Configure Kerberos on installation"
+msgstr "安装时配置Kerberos"
+
+#: rpcfgtui.py:793 rpcfgtui.py:1550
+msgid "Enable kinit proxy on installation (client)"
+msgstr "安装时启用kinit代理"
+
+#: rpcfgtui.py:816 rpcfgtui.py:1271 rpcfgtui.py:1448 rpcfgtui.py:1463
+msgid "Failed to update security configuration"
+msgstr "更新安全设置失败"
+
+#: rpcfgtui.py:879
+msgid "Failed to setup test KDC"
+msgstr "设置KDC失败"
+
+#: rpcfgtui.py:980
+msgid "krb5 not enabled"
+msgstr "krb5未被启用"
+
+#: rpcfgtui.py:984
+msgid ""
+"Unable to determine kdc address, and at lease one interface should be auth "
+"enabled"
+msgstr "不能确定KDC IP地址，并且至少有一连接需开启身份认证"
+
+#: rpcfgtui.py:1008
+msgid "KdcIp :"
+msgstr "KDC IP地址"
+
+#: rpcfgtui.py:1016
+msgid "Error no connection defined in initcfg.json"
+msgstr "错误，initcfg.json中没有'connection'字段"
+
+#: rpcfgtui.py:1068
+msgid "Error bad service name "
+msgstr "错误，服务名格式错误"
+
+#: rpcfgtui.py:1100
+msgid "Error unable to find 'Security' in initcfg.json"
+msgstr "错误，initcfg.json中未能找到'Security'字段"
+
+#: rpcfgtui.py:1103
+msgid "Error unable to find 'AuthInfo' in initcfg.json"
+msgstr "错误，initcfg.json不存在'AuthInfo'字段"
+
+#: rpcfgtui.py:1119
+msgid "Error Realm is empty"
+msgstr "错误，域名(Realm)不能为空"
+
+#: rpcfgtui.py:1121
+msgid "Error Service is empty"
+msgstr "错误，服务名不能为空"
+
+#: rpcfgtui.py:1123
+msgid "Error User is empty"
+msgstr "错误，用户名不能为空"
+
+#: rpcfgtui.py:1125
+msgid "Error KDC address is empty"
+msgstr "错误，KDC IP地址不能为空"
+
+#: rpcfgtui.py:1128
+msgid "Bad principal "
+msgstr "无效的用户名"
+
+#: rpcfgtui.py:1229
+msgid "Error building update commands"
+msgstr "生成更新命令时出错"
+
+#: rpcfgtui.py:1473
+msgid "SSL Settings"
+msgstr "SSL设置"
+
+#: rpcfgtui.py:1475
+msgid "    Key File : "
+msgstr "密钥文件路径："
+
+#: rpcfgtui.py:1476
+msgid "   Cert File : "
+msgstr "证书文件路径："
+
+#: rpcfgtui.py:1477
+msgid " CACert File : "
+msgstr "CA证书文件路径："
+
+#: rpcfgtui.py:1480
+msgid "Generate Self-Signed Certificate"
+msgstr "生成自签名证书"
+
+#: rpcfgtui.py:1483
+msgid "Authentication Settings"
+msgstr "认证设置"
+
+#: rpcfgtui.py:1523
+msgid "Misc Options"
+msgstr "其他选项"
+
+#: rpcfgtui.py:1524
+msgid "Max Connections : "
+msgstr "服务器最大允许连接数："
+
+#: rpcfgtui.py:1530
+msgid "Configure WebServer"
+msgstr "配置WebServer"
+
+#: rpcfgtui.py:1536
+msgid "DEB Package Path : "
+msgstr "DEB包路径："
+
+#: rpcfgtui.py:1538
+msgid "RPM Package Path : "
+msgstr "RPM包路径："
+
+#: rpcfgtui.py:1541
+msgid "Installer Options"
+msgstr "安装包选项"
+
+#: rpcfgtui.py:1543
+msgid "  Destination Directory : "
+msgstr "安装包存放目录："
+
+#: rpcfgtui.py:1548
+msgid "Configure Kerberos on installation "
+msgstr "安装时配置Kerberos"
+
+#: rpcfgtui.py:1554
+msgid "Generate Rpc-Frmwrk Installer"
+msgstr "生成安装包"
+
+#: rpcfgtui.py:1601
+msgid "Apply Changes"
+msgstr "提交修改"
+
+#: rpcfgtui.py:1602
+msgid "Discard Changes"
+msgstr "放弃修改"
+
+#: rpcfgtui.py:1626
+msgid "Apply Changes and Exit?"
+msgstr "更新系统设置并退出？"
+
+#: rpcfgtui.py:1731 rpcfgtui.py:1833 rpcfgtui.py:1858 rpcfgtui.py:1876
+msgid "Node"
+msgstr "节点"
+
+#: rpcfgtui.py:1794
+msgid "Node Name:"
+msgstr "节点名："
+
+#: rpcfgtui.py:1801
+msgid "Enable this Interface"
+msgstr "启用此连接"
+
+#: rpcfgtui.py:1835 rpcfgtui.py:1860 rpcfgtui.py:1878
+msgid "Node Name: "
+msgstr "节点名："
+
+#: rpcfgtui.py:1838 rpcfgtui.py:1863 rpcfgtui.py:1881
+msgid "Enable this Node"
+msgstr "启用此节点"
+
+#: rpcfgtui.py:1843 rpcfgtui.py:1868 rpcfgtui.py:1886
+msgid "Remove This Node"
+msgstr "删除此节点"
+
+#: rpcfgtui.py:1871 rpcfgtui.py:1899
+msgid "Add New Node"
+msgstr "添加新节点"

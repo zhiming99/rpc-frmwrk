@@ -67,6 +67,15 @@ case "$cmd" in
             echo "Error cannot find rpcfg.py"
         fi
         ;;
+    cfgtui | tui)
+        if [[ -f $tooldir/rpcfgtui.py ]]; then
+            python3 $tooldir/rpcfgtui.py $@
+        elif [[ -f $cmddir/rpcfgtui.py ]]; then
+            python3 $cmddir/rpcfgtui.py $@
+        else
+            echo "Error cannot find rpcfg.py"
+        fi
+        ;;
     start)
         if [[ $# -lt 1 ]]; then
             echo "Error: appname required for 'start'"

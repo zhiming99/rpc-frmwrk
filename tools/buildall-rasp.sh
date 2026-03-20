@@ -13,7 +13,7 @@ libtool shtool automake autoconf autotools-dev make dbus dbus-bin libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev openssl libssl1.1 libssl-dev libcppunit-1.14-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev bash net-tools procps swig default-jdk-headless cmake \
-libcommons-cli-java ccache curl fuse3
+libcommons-cli-java ccache curl fuse3 python3-urwid
 
 echo install nodejs 18
 if ! curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash; then exit 1; fi

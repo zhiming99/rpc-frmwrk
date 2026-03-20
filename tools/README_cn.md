@@ -91,7 +91,7 @@
    * 删除本节点(Remove Node X)。
 
 # 命令行工具`rpcfctl`
-`rpcfctl`是rpc-frmwrk的命令行工具集，通过`rpcfctl`可以调用rpc-frmwrk的各种配置，管理和监控功能。其中`rpcfctl cfg`即是打开`rpcfg.py`。对于没有图形界面的控制台用户，`rpcfctl`更是必不可少的配置和管理工具。有关`rpcfctl`的详细信息可以参看[`rpc-frmwrk应用控制工具`](../monitor/appmon/rpcfctl_cn.md)。
+`rpcfctl`是rpc-frmwrk的命令行工具集，通过`rpcfctl`可以调用rpc-frmwrk的各种配置，管理和监控功能。其中`rpcfctl cfg`即是打开`rpcfg.py`。对于没有图形界面的控制台用户，`rpcfctl tui`提供`rpcfg.py`的字符界面版本，其功能和`rpcfg.py`一一对应。因此`rpcfctl`是`rpcfg.py`的超集工具集。有关`rpcfctl`的详细信息可以参看[`rpc-frmwrk应用控制工具`](../monitor/appmon/rpcfctl_cn.md)。
 
 # 快速构建rpc-frmwrk的方法
 ## Docker容器
