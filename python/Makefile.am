@@ -45,12 +45,11 @@ all:
     fi
 
 genpipopt:
-	$(eval pipopt=$(shell os_name=$$(cat /etc/issue | awk '{print $$1}');\
-    if [[ "x$${os_name}" == "xDebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
-        os_version=$$(cat /etc/issue | awk '{print $$3}');\
+	$(eval pipopt=$(shell os_name=$$(grep '^ID=' /etc/os-release | awk -F'=' '{print $$2}');\
+    os_version=$$(grep '^VERSION_ID=' /etc/os-release | awk -F'=' '{print $$2}' | tr -d '"');\
+    if [[ "x$${os_name}" == "xdebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
         echo $$(if (($${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
-    elif [ "x$${os_name}" == "xUbuntu" ]; then \
-        os_version=$$(cat /etc/issue | awk '{print $$2}' | awk -F'.' '{print $$1}');\
+    elif [ "x$${os_name}" == "xubuntu" ]; then \
         echo $$(if (($${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
     fi))
 	@if [ "x${pipopt}" != "x" ]; then \

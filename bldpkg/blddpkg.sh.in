@@ -66,24 +66,22 @@ EOF
 
 cat << 'EOF' >> ./postinst1
 pypkg=$(compgen -G "rpcf*whl")
-force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
-if [ "x${os_name}" == "xDebian" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $3}');\
+force_update=$(os_name=$(grep '^ID=' /etc/os-release | awk -F'=' '{print $2}');\
+os_version=$(grep '^VERSION_ID=' /etc/os-release | awk -F'=' '{print $2}' | tr -d '"');\
+if [ "x${os_name}" == "xdebian" ]; then \
     echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
-elif [ "x${os_name}" == "xUbuntu" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+elif [ "x${os_name}" == "xubuntu" ]; then \
     echo $(if ((${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
 fi)
 pip3 install $pypkg ${force_update} --force-reinstall
 EOF
 
 cat << 'EOF' >> ./postrm1
-force_update=$(os_name=$(cat /etc/issue | awk '{print $1}');\
-if [ "x${os_name}" == "xDebian" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $3}');\
+force_update=$(os_name=$(grep '^ID=' /etc/os-release | awk -F'=' '{print $2}');\
+os_version=$(grep '^VERSION_ID=' /etc/os-release | awk -F'=' '{print $2}' | tr -d '"');\
+if [ "x${os_name}" == "xdebian" ]; then \
     echo $(if ((${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
-elif [ "x${os_name}" == "xUbuntu" ]; then \
-    os_version=$(cat /etc/issue | awk '{print $2}' | awk -F'.' '{print $1}');\
+elif [ "x${os_name}" == "xubuntu" ]; then \
     echo $(if ((${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
 fi)
 EOF
