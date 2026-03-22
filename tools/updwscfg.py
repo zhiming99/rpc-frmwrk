@@ -388,7 +388,15 @@ upstream {AppName} {{
     if ret < 0:
         pass
 
-    with open('/etc/nginx/sites-available/default') as f:
+    strDist = GetDistName()
+    if strDist == "debian" or strDist == "ubuntu" :
+        defaultFile = '/etc/nginx/sites-available/default'
+    elif strDist == "fedora":
+        defaultFile = '/etc/nginx/nginx.conf'
+    else:
+        raise Exception( "Error the linux distribution is not supported by updwscfg.py yet" )
+
+    with open(defaultFile) as f:
         for line in f:
             m = re.search(r'root\s+([^\s;]*html)', line)
             if m:
@@ -418,9 +426,15 @@ upstream {AppName} {{
         strMonCliPkg = "/etc/rpcf/appmonui.tar.gz"
         if not os.access( strMonCliPkg, os.R_OK ):
             strMonCliPkg = ""
-    cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
-    cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf;"
-    cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf ) && "
+    if strDist == "debian" or strDist == "ubuntu" :
+        cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/sites-available/ &&"
+        cmdline += "cd /etc/nginx/sites-enabled && ( {sudo} rm ./rpcf_nginx.conf;"
+        cmdline += "{sudo} ln -s /etc/nginx/sites-available/rpcf_nginx.conf ) && "
+    elif strDist == 'fedora':
+        cmdline += "{sudo} install -m 644 " + cfgFile + " /etc/nginx/conf.d/ &&"
+    else:
+        raise Exception( "Error the linux distribution is not supported by updwscfg.py yet" )
+
     cmdline += "rm " + cfgFile + " && echo nginx setup complete ;"
     if len( strMonCliPkg ) > 0:
         strRpcfPath = strRootPath +"/rpcf"
