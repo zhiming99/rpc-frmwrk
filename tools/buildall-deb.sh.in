@@ -13,7 +13,7 @@ libtool shtool automake autoconf autotools-dev make dbus dbus-bin libdbus-1-3 \
 libdbus-1-dev libjsoncpp-dev libkrb5-3 libkrb5-dev liblz4-1 \
 liblz4-dev openssl libssl3 libssl-dev libcppunit-1.15-0 libcppunit-dev \
 libfuse3-3 libfuse3-dev fuse3 python3-urwid \
-bash net-tools procps swig default-jdk-headless cmake libcommons-cli-java ccache attr
+bash net-tools procps swig default-jdk-headless cmake libcommons-cli-java ccache attr gettext
 
 ${SUDO} apt-get -y install sip-tools python3-sipbuild || ${SUDO} apt-get -y install sip-dev python3-sip python3-sip-dev || true
 for i in 1 4 5 6; do
