@@ -125,6 +125,9 @@ msgstr "网络连接"
 msgid "IP Address: "
 msgstr "IP 地址："
 
+msgid "IP Address:"
+msgstr "IP 地址："
+
 #: rpcfgtui.py:302 rpcfgtui.py:330 rpcfgtui.py:350 rpcfgtui.py:1837
 #: rpcfgtui.py:1862 rpcfgtui.py:1880
 msgid "Port Number: "

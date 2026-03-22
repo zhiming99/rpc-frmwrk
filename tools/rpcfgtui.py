@@ -16,13 +16,16 @@ import subprocess
 import platform
 
 from pathlib import Path
-localDir = Path(__file__).resolve()
-localDir = os.path.dirname( localDir ) + '/locale'
+#localDir = Path(__file__).resolve()
+#localDir = os.path.dirname( localDir ) + '/locale'
 # Initialize gettext
-gettext.bindtextdomain('rpcfgtui', localDir)
-gettext.textdomain('rpcfgtui')
-lang = gettext.translation('rpcfgtui', localedir=localDir, languages=['zh_CN'])
-lang.install()
+try:
+    gettext.bindtextdomain('rpcfgtui', "/usr/local/share/locale",)
+    gettext.textdomain('rpcfgtui')
+    lang = gettext.translation('rpcfgtui', "/usr/local/share/locale", languages=['zh_CN'])
+    lang.install()
+except Exception as err:
+    pass
 
 _ = gettext.gettext
 
@@ -246,7 +249,7 @@ class MenuDialog:
                 for widget in conn_widgets:
                     if isinstance(widget, urwid.Edit):
                         label = widget.caption.strip()
-                        if label == _("IP Address: "):
+                        if label == _("IP Address:"):
                             ipAddr = widget.edit_text.strip()
                             if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
                                 raise ValueError(_("Invalid IP address")+": {}".format(ipAddr))
@@ -1791,7 +1794,7 @@ EOF
                 for widget in oNode:
                     if isinstance(widget, urwid.Edit):
                         label = widget.caption.strip()
-                        if label == _("IP Address: "):
+                        if label == _("IP Address:"):
                             ipAddr = widget.edit_text.strip()
                             if CheckIpAddr(ipAddr) is None and not is_valid_domain(ipAddr):
                                 raise ValueError(_("Invalid IP address")+": {}".format(ipAddr))

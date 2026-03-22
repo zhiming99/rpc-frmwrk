@@ -131,6 +131,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/rpcf/libhellowrd.so*
 %{_libdir}/rpcf/libbtinrt.so*
 @JS_RPMFILES@
+%{_datadir}/locale/zh_CN/LC_MESSAGES/*.mo
 
 %files devel
 %{_libdir}/pkgconfig/rpcf.pc

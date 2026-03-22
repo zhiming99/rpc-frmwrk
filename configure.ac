@@ -591,7 +591,7 @@ case $enable_java in
         JAVA_RPMPOST="pushd %{_libdir}/rpcf;if [[[ -f rpcbase-${VERSION}.jar ]]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION}.jar rpcbase.jar;fi;if [[[ -f appmancli-${VERSION}.jar ]]];then rm -f appmancli.jar; ln -s appmancli-${VERSION}.jar appmancli.jar;fi;popd;"
         JAVA_RPMPOSTUN="pushd %{_libdir}/rpcf;rm -f rpcbase.jar appmancli.jar;popd;"
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
-        JAVA_DEBPKGS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "
+        JAVA_DEBPKGS="openjdk-8-jre-headless |  openjdk-11-jre-headless | default-jre-headless, libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
         JAVA_CFGOPT=
         FEATURES+="+java "
@@ -618,7 +618,7 @@ case $enable_python in
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
         PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,"
-        PYTHON_DEBPKGS="python3-numpy, python3-pip, sip5-tools | sip-tools, " 
+        PYTHON_DEBPKGS="python3-numpy, python3-pip, " 
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=
         FEATURES+="+python "
