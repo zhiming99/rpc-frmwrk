@@ -14,17 +14,32 @@ from updk5cfg import *
 from functools import partial
 import subprocess
 import platform
+import locale
 
 from pathlib import Path
-#localDir = Path(__file__).resolve()
-#localDir = os.path.dirname( localDir ) + '/locale'
+
 # Initialize gettext
 try:
-    gettext.bindtextdomain('rpcfgtui', "/usr/local/share/locale",)
-    gettext.textdomain('rpcfgtui')
-    lang = gettext.translation('rpcfgtui', "/usr/local/share/locale", languages=['zh_CN'])
-    lang.install()
+    domain = 'rpcfgtui'
+    paths = [ "/usr/local/share/locale", "/usr/share/locale" ]
+    bFound = False
+    curLang, codeset=locale.getlocale()
+    if codeset.upper() != 'UTF-8':
+        raise Exception( f"Warnig '{codeset}' is not supported yet" )
+
+    for path in paths:
+        if os.access( f"{path}/{curLang}/LC_MESSAGES/{domain}.mo", os.R_OK ):
+            bFound = True
+            break
+    if bFound:
+        gettext.bindtextdomain(domain, path,)
+        gettext.textdomain(domain)
+        lang = gettext.translation(domain, path, languages=['zh_CN'], fallback=True, )
+        lang.install()
+    else:
+        raise Exception( f"Warnig cannot find locale file '{domain}.mo' for {curLang}.{codeset}" )
 except Exception as err:
+    print(err)
     pass
 
 _ = gettext.gettext
