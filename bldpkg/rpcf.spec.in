@@ -130,17 +130,17 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %{_libdir}/rpcf/libecho.so*
 %{_libdir}/rpcf/libhellowrd.so*
 %{_libdir}/rpcf/libbtinrt.so*
-@JS_RPMFILES@
-%{_datadir}/locale/zh_CN/LC_MESSAGES/*.mo
-
-%files devel
-%{_libdir}/pkgconfig/rpcf.pc
 %{_bindir}/rpcf/btinrtcli
 %{_bindir}/rpcf/btinrtsvr
 %{_bindir}/rpcf/ifclismk
 %{_bindir}/rpcf/ifsvrsmk
 %{_bindir}/rpcf/hwclismk
 %{_bindir}/rpcf/hwsvrsmk
+@JS_RPMFILES@
+%{_datadir}/locale/zh_CN/LC_MESSAGES/*.mo
+
+%files devel
+%{_libdir}/pkgconfig/rpcf.pc
 @TEST_RPMBINS@
 @FUSE3_RPMHEADERS@
 %{_libdir}/rpcf/lib*.so*
