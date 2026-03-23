@@ -52,10 +52,11 @@ def IsRpcfSelfGenKey( bGmSSL:bool, strCert:str )->bool:
         cmdline = "openssl x509 -in " + strCert + " -noout -text | grep 'Yanta'"
     try:
         process = subprocess.Popen( cmdline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE )
-        output = process.stdout.readline().decode('utf-8')
-        if output == '' and process.poll() is not None:
-            return False
-        return True
+        process.communicate()
+        ret = process.returncode
+        if ret == 0 :
+            return True
+        return False
     finally:
         process.stdout.close()
 

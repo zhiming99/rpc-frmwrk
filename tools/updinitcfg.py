@@ -31,7 +31,7 @@ def upd_initcfg( strKeyDir : str, cfgPath : str, bServer : bool ):
             if usingGmSSL == "true" :
                 bGmSSL = True
 
-        if True:
+        if bServer == bCfgSvr :
             strVal = sslFiles[ "KeyFile"]
             if len( strVal ) > 0:
                 sslFiles[ "KeyFile"] = \
@@ -53,6 +53,46 @@ def upd_initcfg( strKeyDir : str, cfgPath : str, bServer : bool ):
                     strVal != "console" and strVal != "1234":
                     sslFiles[ "SecretFile"] = \
                         strKeyDir + "/" + os.path.basename( strVal )
+
+        elif not bServer :
+            strVal = sslFiles.get( "CertFile", "" )
+            if len( strVal ) == 0:
+                raise Exception( "error bad cert file" )
+            baseName = os.path.basename( strVal )
+            strNewVal = strKeyDir + "/" + baseName
+            if os.access( strNewVal, os.R_OK ):
+                sslFiles[ "CertFile"] = strNewVal
+            elif baseName == "signcert.pem":
+                baseName = "clientcert.pem"
+                strNewVal = strKeyDir + "/" + baseName
+                if not os.access( strNewVal, os.R_OK ):
+                    raise Exception( "error bad cert file" )
+                sslFiles[ "CertFile"] = strNewVal
+            else:
+                raise Exception( "error bad cert file" )
+
+            strVal = sslFiles.get( "KeyFile", "" )
+            if len( strVal ) == 0:
+                raise Exception( "error bad key file" )
+            baseName = os.path.basename( strVal )
+            strNewVal = strKeyDir + "/" + baseName
+            if os.access( strNewVal, os.R_OK ):
+                sslFiles[ "KeyFile"] = strNewVal
+            elif baseName == "signkey.pem":
+                baseName = "clientkey.pem"
+                strNewVal = strKeyDir + "/" + baseName
+                if not os.access( strNewVal, os.R_OK ):
+                    raise Exception( "error bad key file" )
+                sslFiles[ "KeyFile"] = strNewVal
+            else:
+                raise Exception( "error bad key file" )
+
+            strVal = sslFiles.get( "CACertFile", "" )
+            if len( strVal ) > 0:
+                baseName = os.path.basename( strVal )
+                strNewVal = strKeyDir + "/" + baseName
+                if os.access( strNewVal, os.R_OK ):
+                    sslFiles[ "CACertFile"] = strNewVal
         else:
             raise Exception( "error bad initcfg.json" )
 
