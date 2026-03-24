@@ -197,14 +197,17 @@ after manually modified the initcfg.json, as output from command 'geninitcfg'.
 .B cfgweb
 Update web server configuration (nginx or apache) using current rpc-frmwrk configuration.
 .TP
-.B cfgkrb5
-Update Kerberos configuration using current rpc-frmwrk configuration.
-.TP
 .B backup 
 Backup server-side settings. The output is a tarball named rpcf-backup-YYMMHH.tar.gz command line is 'rpcfctl backup'.
 .TP
 .B restore 
 Restore the server-side settings from a tarball. Command line is 'rpcfctl restore <backup file>'
+.TP
+.B cfg 
+Start the rpcfg.py, rpc-frmwrk's GUI config tool 
+.TP
+.B tui 
+Start the rpcfgtui.py, rpc-frmwrk's terminal config tool, suitable for users without graphical user interface.
 .TP
 .B -h, --help
 Show help message and exit.

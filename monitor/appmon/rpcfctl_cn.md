@@ -190,15 +190,17 @@ rpcfctl <命令> [参数]
 - **cfgweb**  
   使用当前 rpc-frmwrk 配置更新 Web 服务器（nginx 或 apache）配置。
 
-- **cfgkrb5**  
-  使用当前 rpc-frmwrk 配置更新 Kerberos 配置。
-
 - **backup**  
   备份服务器端设置，输出为 tar 包（rpcf-backup-YYMMHH.tar.gz）。
 
 - **restore <备份文件>**  
   从 tar 包恢复服务器端设置。
 
+- **cfg**   
+  启动`rpcfg.py`,rpc-frmwrk的图形配置工具
+
+- **tui**   
+  启动`rpcfgtui.py`,rpc-frmwrk的字符终端配置工具，适用于无图形界面的字符终端。
 ---
 
 ## 其他

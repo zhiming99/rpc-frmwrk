@@ -39,13 +39,12 @@ appmancli/__init__.py:
 
 # Install the Python package using pip
 genpipopt:
-	$(eval pipopt=$(shell os_name=$$(cat /etc/issue | awk '{print $$1}');\
-    if [[ "x$${os_name}" == "xDebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
-        os_version=$$(cat /etc/issue | awk '{print $$3}');\
-        echo $$(if (($${os_version} > 11 ));then echo '--break-system-packages';else echo ''; fi); \
-    elif [ "x$${os_name}" == "xUbuntu" ]; then \
-        os_version=$$(cat /etc/issue | awk '{print $$2}' | awk -F'.' '{print $$1}');\
-        echo $$(if (($${os_version} > 22 ));then echo '--break-system-packages';else echo ''; fi); \
+	$(eval pipopt=$(shell os_name=$$(grep '^ID=' /etc/os-release | awk -F'=' '{print $$2}');\
+    os_version=$$(grep '^VERSION_ID=' /etc/os-release | awk -F'=' '{print $$2}' | tr -d '"');\
+    if [[ "x$${os_name}" == "xdebian" ]] || [[ "x$${os_name}" == "xraspbian" ]]; then \
+        echo $$(if (($${os_version} >= 12 ));then echo '--break-system-packages';else echo ''; fi); \
+    elif [ "x$${os_name}" == "xubuntu" ]; then \
+        echo $$(if (($${os_version} >= 23 ));then echo '--break-system-packages';else echo ''; fi); \
     fi))
 	@if [ "x${pipopt}" != "x" ]; then \
         echo Warning: break-system-packages enabled; \
@@ -57,9 +56,9 @@ install: genpipopt
     fi; \
 	if [[ "x$${SUDO_USER}" != "x" ]]; then \
         echo su -c 'pip3 install ${pipopt} dist/*.whl' $${SUDO_USER}; \
-        su -c "pip3 install --force-reinstall ${pipopt} dist/*.whl" $${SUDO_USER} || true; \
+        su -c "pip3 install --force-reinstall --no-deps ${pipopt} dist/appmancli*.whl" $${SUDO_USER} || true; \
     else \
-        pip3 install --force-reinstall ${pipopt} dist/*.whl || true;\
+        pip3 install --force-reinstall --no-deps ${pipopt} dist/appmancli*.whl || true;\
     fi
 
 # Uninstall the Python package

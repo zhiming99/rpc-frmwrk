@@ -46,7 +46,10 @@ default_domain = {DomainName}
 def GetKrb5ConfFromInitCfg( initcfg : str ) -> str:
     strKrb5Conf = GetKrb5ConfTempl()
     try:
-        cfgVal = json.loads( initcfg )
+        fp = open( initcfg, 'r' )
+        if fp is None:
+            raise Exception( "Unable to open init config file" )
+        cfgVal = json.load( fp )
         updk5 = cfgVal[ 'Security' ]['AuthInfo' ]
         authMech = updk5.get( 'AuthMech', '' )
         if authMech != 'krb5':
@@ -74,6 +77,9 @@ def GetKrb5ConfFromInitCfg( initcfg : str ) -> str:
     except Exception as err:
         print( err )
         return ""
+    finally:
+        if fp is not None:
+            fp.close()
 
 def GenKrb5InstFilesFromInitCfg(
     initcfg : str,
@@ -286,14 +292,14 @@ def IsKinitProxyEnabled()->bool:
         return True
     return False
 
-def EnableKinitProxy( bEnable : bool ) -> bool:
+def GetEnableKinitProxyCmd( bEnable : bool )->str:
     strDist = GetDistName()
     if strDist == "debian":
         cmdline = "destPath=`dpkg -L libkrb5-3 | grep 'plugins/libkrb5'| head -n 1`"
     elif strDist == 'fedora':
         cmdline = "destPath=`rpm -ql krb5-libs | grep 'plugins/libkrb5' | head -n 1`"
     else:
-        return False
+        return ""
     if bEnable:
         cmdline += ";srcPath=`echo $destPath | sed 's:krb5/plugins/libkrb5::'`libauth.so;"
         cmdline += "if [ ! -f $srcPath ]; then srcPath='/usr/local/lib/libauth.so';fi;"
@@ -309,6 +315,10 @@ def EnableKinitProxy( bEnable : bool ) -> bool:
     else:
         actCmd = "su -c '" + cmdline.format(
             sudo = "" ) + "'"
+    return actCmd
+
+def EnableKinitProxy( bEnable : bool ) -> bool:
+    actCmd = GetEnableKinitProxyCmd( bEnable )
     print( actCmd )
     ret = rpcf_system( actCmd )
     if ret == 0:
@@ -598,12 +608,13 @@ def GenNewKeytabSvr(
         strAdminPrinc, strKeytab, False, strAdminPrinc )
     return cmdline
 
+# this function is used by installer
 def ConfigKrb5( initCfg : dict, curDir : str )-> int:
     ret = 0
     bServer = False
     strSvcHost = None
     try:
-        if initCfg[ 'InstToSvr' ] == 'true':
+        if initCfg.get( 'InstToSvr', False ) == 'true':
             bServer = True
 
         oMisc = initCfg[ 'Security' ]['misc']

@@ -2,7 +2,10 @@ SHELL:=/bin/bash
 release:
 	rm -rf dist;mkdir dist
 	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
-	@if [ ! -d node_modules/stream-browserify ]; then echo nodejs liberies are not installed properly;exit 1;fi
+	@if [ ! -d node_modules/stream-browserify ]; then \
+        echo nodejs liberies are not installed properly; \
+        echo please install @JS_NODE_PACKAGES@ to `npm root -g`;\
+        exit 1;fi
 	@sed -i "s@mode:[[:blank:]]*'development'@mode: 'production'@g" webpack.config.js
 	npx webpack
 	@echo please see 'README.md' for information about deployment.
@@ -16,7 +19,10 @@ sync:
 debug:
 	rm -rf dist;mkdir dist
 	@if [ ! -d node_modules ]; then ln -s `npm root -g`;fi
-	@if [ ! -d node_modules/stream-browserify ]; then echo nodejs liberies are not installed properly;exit 1;fi
+	@if [ ! -d node_modules/stream-browserify ]; then \
+    echo nodejs liberies are not installed properly; \
+    echo please install @JS_NODE_PACKAGES@ to `npm root -g`;\
+    exit 1;fi
 	@sed -i "s@mode:[[:blank:]]*'production'@mode: 'development'@g" webpack.config.js
 	npx webpack
 	@echo please see 'README.md' for information about deployment.

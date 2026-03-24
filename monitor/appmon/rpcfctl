@@ -67,6 +67,15 @@ case "$cmd" in
             echo "Error cannot find rpcfg.py"
         fi
         ;;
+    cfgtui | tui)
+        if [[ -f $tooldir/rpcfgtui.py ]]; then
+            python3 $tooldir/rpcfgtui.py $@
+        elif [[ -f $cmddir/rpcfgtui.py ]]; then
+            python3 $cmddir/rpcfgtui.py $@
+        else
+            echo "Error cannot find rpcfg.py"
+        fi
+        ;;
     start)
         if [[ $# -lt 1 ]]; then
             echo "Error: appname required for 'start'"
@@ -328,7 +337,8 @@ case "$cmd" in
         ;;
     initsvr)
         if [[ ! -d $HOME/.rpcf ]]; then
-            mkdir -p $HOME/.rpcf
+            mkdir -p $HOME/.rpcf/openssl
+            mkdir -p $HOME/.rpcf/gmssl
         fi
         rpcfctl clearmount
         if [[ ! -f $HOME/.rpcf/openssl/signkey.pem ]]; then
@@ -359,7 +369,8 @@ EOF
         ;;
     initcli)
         if [[ ! -d $HOME/.rpcf ]]; then
-            mkdir -p $HOME/.rpcf
+            mkdir -p $HOME/.rpcf/openssl
+            mkdir -p $HOME/.rpcf/gmssl
         fi
         rpcfctl clearmount
         authmech=`rpcfctl authmech | tr -d ' \t\n\r'`
@@ -449,12 +460,17 @@ EOF
             if which expect; then
                 cat > $HOME/.rpcf/gencmd.sh << "EOF"
 #!/bin/bash
-if $1/opensslkey.sh $HOME/.rpcf/openssl $3 $4; then
+if $1/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
     clidx=`cat $HOME/.rpcf/openssl/clidx`;
     svridx=`cat $HOME/.rpcf/openssl/svridx`;
+    endidx=`cat $HOME/.rpcf/openssl/rpcf_serial`;
     echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl;
-    echo server key/cert package is serverkeys-$svridx.tar.gz;
-    echo client key/cert package is clientkeys-$clidx.tar.gz;
+    for ((i=$svridx;i<$clidx;i++));do
+        echo server key/cert package serverkeys-$i.tar.gz;
+    done
+    for ((i=$clidx;i<$endidx;i++));do
+        echo client key/cert package clientkeys-$i.tar.gz;
+    done
 else
     echo Error generate OpenSSL key/cert;
 fi
@@ -473,9 +489,14 @@ EOF
             elif bash $cmddir/opensslkey.sh $HOME/.rpcf/openssl $2 $3 $4; then
                 clidx=`cat $HOME/.rpcf/openssl/clidx`
                 svridx=`cat $HOME/.rpcf/openssl/svridx`
+                endidx=`cat $HOME/.rpcf/openssl/rpcf_serial`;
                 echo Successfully generated OpenSSL key/cert to $HOME/.rpcf/openssl
-                echo server key/cert package is serverkeys-$svridx.tar.gz
-                echo client key/cert package is clientkeys-$clidx.tar.gz
+                for ((i=$svridx;i<$clidx;i++));do
+                    echo server key/cert package serverkeys-$i.tar.gz
+                done
+                for ((i=$clidx;i<$endidx;i++));do
+                    echo client key/cert package clientkeys-$i.tar.gz
+                done
             else
                 echo Error failed to generate OpenSSL key/cert
             fi
@@ -484,9 +505,14 @@ EOF
             if bash $cmddir/gmsslkey.sh $HOME/.rpcf/gmssl $2 $3; then
                 clidx=`cat $HOME/.rpcf/gmssl/clidx`
                 svridx=`cat $HOME/.rpcf/gmssl/svridx`
+                endidx=`cat $HOME/.rpcf/gmssl/rpcf_serial`;
                 echo Successfully generated GmSSL key/cert to $HOME/.rpcf/gmssl
-                echo server key/cert package is serverkeys-$svridx.tar.gz
-                echo client key/cert package is clientkeys-$clidx.tar.gz
+                for ((i=$svridx;i<$clidx;i++));do
+                    echo server key/cert package is serverkeys-$i.tar.gz
+                done
+                for ((i=$clidx;i<$endidx;i++));do
+                    echo client key/cert package is clientkeys-$i.tar.gz
+                done
             else
                 echo Error failed to generate GmSSL key/cert
             fi
@@ -600,8 +626,13 @@ EOF
         ;;
     authmech)
         cmdline="rpcfctl authmech"
-        drvpath=$cfgPath/driver.json
-        _mech=`python3 $cmddir/authmech.py $drvpath`
+        if [[ $# -lt 1 ]]; then
+            drvpath=$cfgPath/driver.json
+            _mech=`python3 $cmddir/authmech.py $drvpath`
+        else
+            _mech=`python3 $cmddir/authmech.py $@`
+        fi
+
         if [[ "x$_mech" == "x" ]]; then
             echo None
             exit 1;
@@ -643,19 +674,6 @@ EOF
         rpcfctl geninitcfg > /tmp/initcfg.json
         python3 $cmddir/updwscfg.py /tmp/initcfg.json
         #rm /tmp/initcfg.json
-        ;;
-    cfgkrb5)
-        #updating kerberos config
-        authMech=`rpcfctl authmech | tr -d ' \t\n\r'`
-        if [[ "x$authMech" != "xkrb5" ]]; then
-            echo "Kerberos is not current authentication mechanism"
-            exit 1
-        fi
-        pushd $cmddir
-        rpcfctl geninitcfg > /tmp/initcfg.json
-        python3 -c 'import sys; from updk5cfg import ConfigAuthServer; ConfigAuthServer(sys.argv[1]))' "/tmp/initcfg.json"
-        rm /tmp/initcfg.json
-        popd
         ;;
     login)
         mech_=`rpcfctl authmech | tr -d ' \t\n\r'`
@@ -927,6 +945,10 @@ EOF
         if [[ $# -lt 2 ]]; then
             echo Error missing parameters
             echo $cmdline
+            exit 1
+        fi
+        if [[ ! -d ~/.rpcf ]]; then
+            echo Error cannot find ~/.rpcf
             exit 1
         fi
         python3 $cmddir/buildinst.py $@

@@ -63,7 +63,7 @@ if [ ! -f rpcf_serial ]; then
     fi
 fi
 
-if which openssl; then
+if command -v openssl; then
 
 if [ -d private_keys ]; then 
     mv -f private_keys/* ./
@@ -125,7 +125,7 @@ for(( i=$idx_base; i<$endidx; i++ ));do
     if [ -f ./private_keys/cacert.pem ]; then cacert="./private_keys/cacert.pem"; fi
     if [ -f cakey.pem ]; then cakey="./cakey.pem"; fi
     if [ -f ./private_keys/cakey.pem ]; then cakey="./private_keys/cakey.pem"; fi
-    if which expect; then
+    if command -v expect; then
         openssl ca -days 365 -cert $cacert -keyfile $cakey -md sha256 -extensions usr_cert -config ${SSLCNF} -in signreq.pem -out signcert.pem
     else
         openssl x509 -req -in signreq.pem -CA $cacert -CAkey $cakey -days 365 -out signcert.pem -CAcreateserial
@@ -180,7 +180,7 @@ for ((i=$idx_base; i<$endidx; i++));do
         echo Error openssl failed to generate request file;
         exit 1
     fi
-    if which expect; then
+    if command -v expect; then
         openssl ca -days 365 -cert cacert.pem -keyfile cakey.pem -md sha256 -extensions usr_cert -config ${SSLCNF} -in clientreq.pem -out clientcert.pem
     else
         openssl x509 -req -in clientreq.pem -CA cacert.pem -CAkey cakey.pem -days 365 -out clientcert.pem -CAcreateserial
@@ -241,5 +241,5 @@ fi
 
 else
     echo openssl is not installed, and please install openssl first.
-fi #which openssl
+fi #command -v openssl
 popd

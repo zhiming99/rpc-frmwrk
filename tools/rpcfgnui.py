@@ -63,19 +63,21 @@ def main():
         json.dump( initCfg, fp, indent=4 )
         fp.close()
 
+        ret = Update_InitCfg( initFile, None )
+        if ret < 0:
+            print( "Error failed to update config %d" % ret )
+            return ret
+
         if IsFeatureEnabled( "krb5" ):
             ret = ConfigAuthServer( initFile )
             if ret < 0:
                 print( "Error failed to config auth server %d" % ret )
-                return ret
 
         if IsFeatureEnabled( "openssl" ):
             ret = ConfigWebServer( initFile )
             if ret < 0:
                 print( "Error failed to config web server %d" % ret )
                 return ret  
-
-        ret = Update_InitCfg( initFile, None )
 
     except Exception as err:
         text = "Failed to update the config files:" + str( err )

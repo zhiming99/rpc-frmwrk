@@ -1,5 +1,5 @@
 pysources = rpcfg.py rpcfgnui.py updinitcfg.py updwscfg.py krbparse.py \
-updk5cfg.py disablessl.py geninitcfg.py buildinst.py unzipinst.sh
+updk5cfg.py disablessl.py geninitcfg.py buildinst.py unzipinst.sh rpcfgtui.py
 
 testcfgfiles=testcfgs/mincfg.json \
 testcfgs/sslcfg.json.in testcfgs/server.key testcfgs/server.crt cfg4ssl.sh
@@ -33,7 +33,15 @@ else
     openssl_cmd=true;
 endif
 
-EXTRA_DIST= $(pysources) README.md README_cn.md runtest.sh.in regtest.sh ridlctst.sh updcfg.py.in Dockerfile Dockerfile.arm buildall-deb.sh buildall-fed.sh makerpcf.sh buildall-rasp.sh makerpcf-rasp.sh btinrtst.sh $(testcfgfiles) $(runtime_files)
+EXTRA_DIST= $(pysources) README.md README_cn.md runtest.sh.in regtest.sh \
+ridlctst.sh updcfg.py.in Dockerfile.in Dockerfile.arm.in buildall-deb.sh.in \
+buildall-fed.sh.in makerpcf.sh buildall-rasp.sh.in makerpcf-rasp.sh \
+btinrtst.sh $(testcfgfiles) $(runtime_files) rpcfgtui-zh_CN.po 
+
+locale_rpcfgtui_DATA=rpcfgtui.mo
+locale_rpcfgtuidir=$(localedir)/zh_CN/LC_MESSAGES
+rpcfgtui.mo: rpcfgtui-zh_CN.po
+	msgfmt $< -o $@
 
 docker:
 	docker build -t rpcf .
@@ -43,7 +51,7 @@ install-exec-local:
 	if [ "x$(DESTDIR)" == "x" ];then BinDir=$(bindir);\
 	else BinDir=$(DESTDIR)$(bindir); fi;\
 	if [ ! -e $${BinDir}/rpcf ]; then mkdir -p $${BinDir}/rpcf;fi; \
-	install rpcfg.py updcfg.py rpcfgnui.py updinitcfg.py updwscfg.py krbparse.py updk5cfg.py disablessl.py geninitcfg.py buildinst.py unzipinst.sh $${BinDir}/rpcf/;\
+	install rpcfg.py updcfg.py rpcfgnui.py rpcfgtui.py updinitcfg.py updwscfg.py krbparse.py updk5cfg.py disablessl.py geninitcfg.py buildinst.py unzipinst.sh $${BinDir}/rpcf/;\
     chmod +x $${BinDir}/rpcf/{rpcfg,updcfg,rpcfgnui}.py;\
     eval ${gmssl_cmd}\
     eval ${openssl_cmd}

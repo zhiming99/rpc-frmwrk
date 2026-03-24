@@ -86,8 +86,6 @@ def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
         strFile = strPath + "/signcert.pem"
         dlg.certEdit.set_text( strFile )
 
-        strFile = strPath + "/certs.pem"
-        dlg.cacertEdit.set_text( strFile )
     else:
         strFile = strPath + "/clientkey.pem"
         dlg.keyEdit.set_text( strFile )
@@ -95,8 +93,8 @@ def GenOpenSSLkey( dlg, strPath : str, bServer:bool, cnum : str, snum:str ) :
         strFile = strPath + "/clientcert.pem"
         dlg.certEdit.set_text( strFile )
 
-        strFile = strPath + "/certs.pem"
-        dlg.cacertEdit.set_text( strFile )
+    strFile = strPath + "/certs.pem"
+    dlg.cacertEdit.set_text( strFile )
 
     dlg.secretEdit.set_text( "" )
 
@@ -3691,18 +3689,6 @@ EOF
             fp = open( initFile, 'r' )
             cfgVal = json.load( fp )
             fp.close()
-            ret = self.GenAuthInstFiles(
-                destPath, bServer )
-            if ret != 0:
-                filesToRemove = [ '/krb5.conf', '/krb5cli.keytab', '/krb5.keytab' ]
-                for f in filesToRemove:
-                    try:
-                        os.remove( destPath + f )
-                    except:
-                        pass
-            if ret < 0:
-                raise Exception( "Error generating auth files " + \
-                    "when creating install package" )
 
             debPath = self.GetInstPkgPath()
             ret = BuildInstallersInternal( cfgVal,

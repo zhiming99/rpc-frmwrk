@@ -404,7 +404,12 @@ AC_CONFIG_FILES([Makefile
                  ridl/Makefile
                  ridl/rpcfs/Makefile
                  tools/Makefile
+                 tools/Dockerfile
+                 tools/Dockerfile.arm
                  tools/updcfg.py
+                 tools/buildall-fed.sh
+                 tools/buildall-deb.sh
+                 tools/buildall-rasp.sh
                  3rd_party/Makefile
                  pics/Makefile
                  bldpkg/Makefile
@@ -413,6 +418,7 @@ AC_CONFIG_FILES([Makefile
                  bldpkg/rpcf.spec
                  bldpkg/rpcf.install
                  bldpkg/rpcf-dev.install
+                 bldpkg/blddpkg.sh
                  examples/Makefile
                  test/Makefile
                  test/iftest/Makefile
@@ -450,11 +456,13 @@ AC_CONFIG_FILES([Makefile
                  monitor/client/cpp/appmancli/Makefile
                  monitor/client/python/build_deb.sh
                  monitor/client/python/build_rpm.sh
-                 monitor/client/python/appmancli/setup.py
                  monitor/client/python/Makefile
+                 monitor/client/python/appmancli/setup.py
                  monitor/client/python/appmancli/Makefile
+                 monitor/client/python/appmancli/pyproject.toml
                  monitor/client/java/appmancli/Makefile
                  monitor/client/js/appmoncli/Makefile
+                 monitor/client/js/appmoncli/Makefile.skel
                  monitor/Makefile
                  docs/Makefile
                  rpcf.pc ])
@@ -577,13 +585,13 @@ esac
 
 case $enable_java in
     yes)
-        JAVA_RPMLIBS="java >= 1.8.0, swig, apache-commons-cli, " 
+        JAVA_RPMLIBS="(java >= 1.8.0 or java-latest-openjdk-devel), swig, apache-commons-cli, "
         JAVA_RPMFILES="%{_libdir}/librpcbaseJNI.so*ZZZZZ%{_libdir}/rpcf/*.jar"
-        JAVA_RPMPKGS="java >= 1.8.0 apache-commons-cli " 
+        JAVA_RPMPKGS="(java >= 1.8.0 or java-latest-openjdk) apache-commons-cli "
         JAVA_RPMPOST="pushd %{_libdir}/rpcf;if [[[ -f rpcbase-${VERSION}.jar ]]];then rm -f rpcbase.jar; ln -s rpcbase-${VERSION}.jar rpcbase.jar;fi;if [[[ -f appmancli-${VERSION}.jar ]]];then rm -f appmancli.jar; ln -s appmancli-${VERSION}.jar appmancli.jar;fi;popd;"
         JAVA_RPMPOSTUN="pushd %{_libdir}/rpcf;rm -f rpcbase.jar appmancli.jar;popd;"
         JAVA_DEBLIBS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, swig, libcommons-cli-java, "
-        JAVA_DEBPKGS="openjdk-8-jdk-headless | openjdk-8-jdk | openjdk-11-jdk-headless | openjdk-11-jdk | default-jdk, libcommons-cli-java, "
+        JAVA_DEBPKGS="openjdk-8-jre-headless |  openjdk-11-jre-headless | default-jre-headless, libcommons-cli-java, "
         JAVA_DEBFILES="usr/lib/*/rpcf/*.jar"
         JAVA_CFGOPT=
         FEATURES+="+java "
@@ -605,12 +613,12 @@ esac
 case $enable_python in
     yes)
         PYTHON_RPMLIBS="python3-devel, python3-pip, python3-build, python3-numpy, ( sip5 or sip6 )," 
-        PYTHON_RPMPKGS="python3-pip python3-numpy (sip5 or sip6) " 
+        PYTHON_RPMPKGS="python3-pip python3-numpy " 
         PYTHON_RPMFILES="%{_libdir}/rpcf/*.whl"
         PYTHON_RPMPOST="for i in %{_libdir}/rpcf/*.whl; do pip3 install \$i; done"
         PYTHON_RPMPOSTUN="pip3 uninstall -y"
         PYTHON_DEBLIBS="python3-setuptools, python3-dev, python3-build, python3-pip, sip5-tools | sip-tools | sip-dev,"
-        PYTHON_DEBPKGS="python3-numpy, python3-pip, sip5-tools | sip-tools, " 
+        PYTHON_DEBPKGS="python3-numpy, python3-pip, " 
         PYTHON_DEBFILES="usr/lib/*/rpcf/*.whl"
         PYTHON_CFGOPT=
         FEATURES+="+python "
@@ -651,14 +659,16 @@ case $enable_testcases in
     ;;
 esac
 
+JS_NODE_PACKAGES="assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
+
 case $enable_js in
     yes)
         JS_RPMLIBS="npm," 
         JS_RPMFILES="%{_libdir}/rpcf/jslib/*ZZZZZ%{_sysconfdir}/rpcf/oa2checkdesc.jsonZZZZZ%{_mandir}/man1/oinit.1.gzZZZZZ%{_sysconfdir}/rpcf/appmonui.tar.gz"
         #JS_RPMPOST="mkdir -p %{_sysconfdir}/rpcf/jslib && cd %{_sysconfdir}/rpcf/jslib && tar xf ../rpcbase.js.tar.gz;"
-        JS_RPMPOST="echo npm -g install assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
+        JS_RPMPOST="echo npm -g install ${JS_NODE_PACKAGES}"
         #JS_RPMPOSTUN="cd %{_sysconfdir}/rpcf && rm -rf ./jslib"
-        JS_RPMPOSTUN="echo npm -g remove assert browserify buffer exports long lz4 process put safe-buffer stream xxhashjs xxhash webpack webpack-cli minify vm events crypto-browserify stream-browserify"
+        JS_RPMPOSTUN="echo npm -g remove ${JS_NODE_PACKAGES}"
         JS_DEBLIBS="npm,"
         JS_DEBDEVFILES="usr/lib/@DEB_HOST_MULTIARCH@/rpcf/jslib/*"
         JS_DEBFILES="etc/rpcf/oa2checkdesc.jsonZZZZZusr/share/man/man1/oinit.1ZZZZZetc/rpcf/appmonui.tar.gz"
@@ -746,6 +756,7 @@ AC_SUBST(JS_DEBDEVFILES)
 AC_SUBST(JS_RPMPOSTUN)
 AC_SUBST(JS_DEBFILES)
 AC_SUBST(JS_CFGOPT)
+AC_SUBST(JS_NODE_PACKAGES)
 
 AC_CANONICAL_HOST
 
