@@ -367,10 +367,24 @@ def ChangeKeytabOwner(
         return "true"
     return cmdline
 
+import ipaddress
+def IsZeroIpAddr( strIpAddr ):
+    try:
+        ip = ipaddress.ip_address(strIpAddr)
+        if( ip == ipaddress.IPv6Address('::') ):
+            return True
+        if ip == ipaddress.IPv4Address("0.0.0.0"):
+            return True
+    except ValueError:
+        pass
+    return False
+    
 def IsLocalIpAddr(
     strIpAddr : str ) -> bool:
     bRet = True
     try:
+        if IsZeroIpAddr( strIpAddr ):
+            return False
         s = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM )
         s.bind( ( strIpAddr, 54312 ) )
