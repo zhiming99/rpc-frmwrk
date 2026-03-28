@@ -24,6 +24,8 @@ try:
     paths = [ "/usr/local/share/locale", "/usr/share/locale" ]
     bFound = False
     curLang, codeset=locale.getlocale()
+    if curLang is None or codeset is None:
+        raise Exception( f"Warnig LANG or codeset is not specified" )
     if codeset.upper() != 'UTF-8':
         raise Exception( f"Warnig '{codeset}' is not supported yet" )
 
