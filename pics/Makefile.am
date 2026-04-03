@@ -32,4 +32,7 @@ mon-login.png \
 mon-main.png \
 mon-rpcrouter.png \
 mon-setpv.png \
-mon-ptlog-chart.png
+mon-ptlog-chart.png \
+rpcfgtui-main-menu.png \
+rpcfgtui-connection-page.png \
+rpcfgtui-config-list.png

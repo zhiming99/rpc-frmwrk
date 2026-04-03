@@ -1940,9 +1940,10 @@ EOF
         self.main_widget.body = combined_pile
 
 def usage():
-    print( "Usage: python3 rpcfgtui.py [-hc]" )
+    print( "Usage: python3 rpcfgtui.py [-hbc]" )
     print( "\t-c: to config a client host, otherwise a server host" )
     print( "\t-b: using 'Bolland' colorscheme." )
+    print( "\t-h: print this help." )
 
 def main():
     bServer = True
