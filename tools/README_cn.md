@@ -97,9 +97,14 @@
       ![`rpcfgtui` main menu](../pics/rpcfgtui-main-menu.png)
     * 下图是连接页   
       ![`rpcfgtui` connection page](../pics/rpcfgtui-connection-page.png)
-    * 由于安全页面和级联页面的输入项和rpcfg.py的一一对应，因此这里就不赘述了，参考上面的文档即可。
+    * 下图是安全页   
+      ![`rpcfgtui` security page](../pics/rpcfgtui-security-page.png)
+    * 下图是级联页   
+      ![`rpcfgtui` connection page](../pics/rpcfgtui-multihop-page.png)
+    * 以上各图中的选项说明可参考`rpcfg.py`。
     * 下图是配置清单页，它给出当前修改后的缓存的设置。只有在最后选择`提交修改`按钮后才能变成系统设置。  
       ![`rpcfgtui` config list](../pics/rpcfgtui-config-list.png)
+    
 
 # 快速构建rpc-frmwrk的方法
 ## Docker容器
