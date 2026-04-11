@@ -369,19 +369,16 @@ def ChangeKeytabOwner(
 
 import ipaddress
 def IsZeroIpAddr( strIpAddr ):
-    try:
-        ip = ipaddress.ip_address(strIpAddr)
-        if( ip == ipaddress.IPv6Address('::') ):
-            return True
-        if ip == ipaddress.IPv4Address("0.0.0.0"):
-            return True
-    except ValueError:
-        pass
+    ip = ipaddress.ip_address(strIpAddr)
+    if( ip == ipaddress.IPv6Address('::') ):
+        return True
+    if ip == ipaddress.IPv4Address("0.0.0.0"):
+        return True
+    # Note invalid ip address will cause exception
     return False
     
 def IsLocalIpAddr(
     strIpAddr : str ) -> bool:
-    bRet = True
     try:
         if IsZeroIpAddr( strIpAddr ):
             return False
@@ -390,11 +387,13 @@ def IsLocalIpAddr(
         s.bind( ( strIpAddr, 54312 ) )
         s.listen()
         return True
+    except ValueError as err:
+        raise Exception( f"Error, {str(err)}" )
     except Exception as err:
-        #print(err)
         return False
     finally:
-        s.close()
+        if s is not None:
+            s.close()
 
 def ReplaceKdcAddr( astRoot : AstNode, strAddr : str ) -> int:
     ret = 0

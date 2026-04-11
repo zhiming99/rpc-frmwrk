@@ -91,7 +91,20 @@
    * 删除本节点(Remove Node X)。
 
 # 命令行工具`rpcfctl`
-`rpcfctl`是rpc-frmwrk的命令行工具集，通过`rpcfctl`可以调用rpc-frmwrk的各种配置，管理和监控功能。其中`rpcfctl cfg`即是打开`rpcfg.py`。对于没有图形界面的控制台用户，`rpcfctl tui`提供`rpcfg.py`的字符界面版本，其功能和`rpcfg.py`一一对应。因此`rpcfctl`是`rpcfg.py`的超集工具集。有关`rpcfctl`的详细信息可以参看[`rpc-frmwrk应用控制工具`](../monitor/appmon/rpcfctl_cn.md)。
+* `rpcfctl`是rpc-frmwrk的命令行工具集，通过`rpcfctl`可以调用rpc-frmwrk的各种配置，管理和监控功能。其中`rpcfctl cfg`即是打开`rpcfg.py`。
+* 对于没有图形界面的控制台用户，`rpcfctl tui`提供`rpcfg.py`的字符界面版本，其功能和`rpcfg.py`一一对应。因此`rpcfctl`是`rpcfg.py`的超集工具集。有关`rpcfctl`的详细信息可以参看[`rpc-frmwrk应用控制工具`](../monitor/appmon/rpcfctl_cn.md)。
+    * 下图是主菜单   
+      ![`rpcfgtui` main menu](../pics/rpcfgtui-main-menu.png)
+    * 下图是连接页   
+      ![`rpcfgtui` connection page](../pics/rpcfgtui-connection-page.png)
+    * 下图是安全页   
+      ![`rpcfgtui` security page](../pics/rpcfgtui-security-page.png)
+    * 下图是级联页   
+      ![`rpcfgtui` connection page](../pics/rpcfgtui-multihop-page.png)
+    * 以上各图中的选项说明可参考`rpcfg.py`。
+    * 下图是配置清单页，它给出当前修改后的缓存的设置。只有在最后选择`提交修改`按钮后才能变成系统设置。  
+      ![`rpcfgtui` config list](../pics/rpcfgtui-config-list.png)
+    
 
 # 快速构建rpc-frmwrk的方法
 ## Docker容器

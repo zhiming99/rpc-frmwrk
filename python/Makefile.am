@@ -47,7 +47,7 @@ all:
 genpipopt:
 	$(eval pipopt=$(shell os_name=$$(grep '^ID=' /etc/os-release | awk -F'=' '{print $$2}');\
     os_version=$$(grep '^VERSION_ID=' /etc/os-release | awk -F'=' '{print $$2}' | tr -d '"');\
-    if [[ "x$${os_name}" == "xdebian" ]] || [[ "x$${os_name}" == "xRaspbian" ]]; then \
+    if [[ "x$${os_name}" == "xdebian" ]] || [[ "x$${os_name}" == "xraspbian" ]]; then \
         echo $$(if awk "BEGIN{ exit $${os_version} >= 12?0:1}";then echo '--break-system-packages';else echo ''; fi); \
     elif [ "x$${os_name}" == "xubuntu" ]; then \
         echo $$(if awk "BEGIN{ exit $${os_version} >= 23?0:1}";then echo '--break-system-packages';else echo ''; fi); \

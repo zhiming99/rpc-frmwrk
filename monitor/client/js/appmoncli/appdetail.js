@@ -256,23 +256,18 @@ globalThis.parseLogLines = ( logData, avgalgo, timeRangeSec ) =>
         var wRecSize = logData.readUint16BE( dwOffset )
         dwOffset += 6;
         var dwNumRec = Math.floor( ( logData.length - dwOffset ) / wRecSize );
-        if( dwNumRec < 10 )
+        if( dwNumRec < 1 )
             return [];
 
         dwNumRec = Math.min( dwNumRec, dwCounter )
 
         var dwTimeStamp, val = null, preval=0
-        var dwInterval =
-            logData.readUint32BE( dwOffset + wRecSize) -
-            logData.readUint32BE( dwOffset )
         var dwRecToRead = dwNumRec
-        if( timeRangeSec > 0 && dwInterval >= 1 )
+        if( timeRangeSec > 0 )
         {
-            dwRecToRead = Math.floor( timeRangeSec / dwInterval )
+            dwRecToRead = Math.min( timeRangeSec, dwRecToRead )
             if( dwRecToRead < dwNumRec)
                 dwOffset += (dwNumRec - dwRecToRead) * wRecSize
-            else
-                dwRecToRead = dwNumRec
         }
 
         var valMax = 0, valMin = 0, distArr = []
