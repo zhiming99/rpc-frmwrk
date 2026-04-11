@@ -35,4 +35,6 @@ mon-setpv.png \
 mon-ptlog-chart.png \
 rpcfgtui-main-menu.png \
 rpcfgtui-connection-page.png \
-rpcfgtui-config-list.png
+rpcfgtui-config-list.png \
+rpcfgtui-multihop-page.png \
+rpcfgtui-security-page.png
