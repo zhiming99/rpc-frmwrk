@@ -36,10 +36,6 @@ DT_PREFIX   (date_and_time|dt)#
 (?i:DWORD)          return TOK_DWORD;
 (?i:REAL)           return TOK_REAL;
 (?i:LREAL)          return TOK_LREAL;
-(?i:TIME)           return TOK_TIME;
-(?i:DATE)           return TOK_DATE;
-(?i:TIME_OF_DAY)    return TOK_TIME_OF_DAY
-(?i:DATE_AND_TIME)  return TOK_DATE_AND_TIME
 (?i:PROGRAM)        return TOK_PROGRAM;
 (?i:VAR)            return TOK_VAR;
 (?i:END_VAR)        return TOK_END_VAR;
@@ -61,6 +57,11 @@ DT_PREFIX   (date_and_time|dt)#
 (?i:UNTIL)          return TOK_UNTIL;
 (?i:END_REPEAT)     return TOK_END_REPEAT;
 (?i:TON)            return TOK_TON;
+(?i:MOD)            return TOK_MOD;
+(?i:AND)            return TOK_AND;
+(?i:OR)             return TOK_OR;
+(?i:XOR)            return TOK_XOR;
+(?i:NOT)            return TOK_NOT;
 
 (TIME|T)#-?([0-9]+(\.[0-9]+)?(_?[0-9]+)*(d|h|m|s|ms|us|ns))+ {
     /* Copy the matched text to pass to Bison */
@@ -114,17 +115,31 @@ DT_PREFIX   (date_and_time|dt)#
     return TOK_TYPED_LITERAL;
 }
 
+
 [0-9]+          { yylval = atoi(yytext); return NUMBER; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval = strdup(yytext); return TOK_ID; }
-"="                 return TOK_ASSIGN;
+":="                return TOK_ASSIGN;
+"="                 return TOK_EQUAL;
 ";"                 return TOK_SEMICOLON;
 ":"                 return TOK_COLON;
 ","                 return TOK_COMMA;
 "+"                 return TOK_PLUS;
 "-"                 return TOK_MINUS;
-"**"                return TOK_EXPONENT;
+"**"                return TOK_POWER;
 "*"                 return TOK_MULTIPLY;
 "/"                 return TOK_DIVIDE;
+"["                 return TOK_LBRACKET;
+"]"                 return TOK_RBRACKET;
+"{"                 return TOK_LBRACE; 
+"}"                 return TOK_RBRACE;
+"("                 return TOK_LPAREN;
+")"                 return TOK_RPAREN;
+"<"                 return TOK_LE;
+">"                 return TOK_GT;
+"<>"                return TOK_NEQU;
+"=>"                return TOK_NLE;
+"<="                return TOK_NGT;
+
 [ \t\n]+        ; /* Ignore whitespace */
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }
 
