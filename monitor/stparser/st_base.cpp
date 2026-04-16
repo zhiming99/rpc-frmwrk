@@ -28,6 +28,8 @@
 #include <cstdlib>
 #include <string>
 #include <stdint.h>
+#include <sstream>
+#include <iomanip>
 
 struct timespec st_time_to_timespec(const char* text) {
     struct timespec ts = {0, 0};
@@ -83,57 +85,8 @@ struct timespec st_time_to_timespec(const char* text) {
     return ts;
 }
 
-std::string process_st_string(const char* input)
-{
-    if (!input) return "";
-
-    std::string result;
-    size_t len = std::strlen(input);
-
-    // Skip the opening and closing single quotes (assuming '...' format)
-    for (size_t i = 1; i < len - 1; ++i) {
-        // 1. Handle escaped single quotes ('')
-        if (input[i] == '\'' && input[i + 1] == '\'') {
-            result += '\'';
-            i++; // Skip the second quote
-        } 
-        // 2. Handle dollar sign escape sequences ($)
-        else if (input[i] == '$') {
-            i++;
-            if (i >= len - 1) break; // Safety check
-
-            char next = std::tolower(input[i]);
-            switch (next) {
-                case 'l': result += '\n'; break; // Line feed
-                case 'n': result += "\r\n"; break; // New line
-                case 'p': result += '\f'; break; // Page break
-                case 'r': result += '\r'; break; // Carriage return
-                case 't': result += '\t'; break; // Tab
-                case '$': result += '$';  break; // Literal dollar
-                case '\'': result += '\''; break; // Literal single quote
-                default:
-                    // 3. Handle hex escapes ($hh)
-                    if (std::isxdigit(input[i]) && i + 1 < len - 1 && std::isxdigit(input[i + 1])) {
-                        char hex[3] = { input[i], input[i + 1], '\0' };
-                        result += static_cast<char>(std::strtol(hex, nullptr, 16));
-                        i++; 
-                    } else {
-                        // If invalid escape, keep the character
-                        result += input[i];
-                    }
-                    break;
-            }
-        } 
-        // 4. Handle regular characters
-        else {
-            result += input[i];
-        }
-    }
-    return result;
-}
-
 // Helper to convert ST literals to Unix Epoch
-uint64_t parse_st_literal_to_unix(const char* input) {
+uint64_t ParseStTimeToUnix(const char* input) {
     struct tm tm_info = {0};
     std::string s(input);
 
@@ -169,3 +122,108 @@ uint64_t parse_st_literal_to_unix(const char* input) {
     return 0;
 }
 
+
+std::string TranslateSTString(const std::string& input) {
+    // 1. Remove the surrounding single quotes
+    if (input.size() < 2) return "";
+    std::string st = input.substr(1, input.size() - 2);
+
+    std::string result;
+    result.reserve(st.size()); // Optimization
+
+    for (size_t i = 0; i < st.size(); ++i) {
+        if (st[i] == '$') {
+            i++; // Move to character after $
+            if (i >= st.size()) break;
+
+            char escape = st[i];
+            switch (escape) {
+                case 'L': case 'l': result += '\n'; break; // Line feed
+                case 'N': case 'n': result += '\n'; break; // New line
+                case 'P': case 'p': result += '\f'; break; // Page (form feed)
+                case 'R': case 'r': result += '\r'; break; // Carriage return
+                case 'T': case 't': result += '\t'; break; // Tab
+                case '$': result += '$';  break;           // Literal $
+                case '\'': result += '\''; break;          // Literal '
+                default:
+                    // Handle Hex: $0A
+                    if (isxdigit(escape) && i + 1 < st.size() && isxdigit(st[i+1])) {
+                        std::string hexStr = st.substr(i, 2);
+                        char c = (char)std::stoi(hexStr, nullptr, 16);
+                        result += c;
+                        i++; // Skip second hex digit
+                    } else {
+                        // Fallback for unknown escape
+                        result += '$';
+                        result += escape;
+                    }
+                    break;
+            }
+        } else if (st[i] == '\'' && i + 1 < st.size() && st[i+1] == '\'') {
+            // Handle ST's '' (double single quote)
+            result += '\'';
+            i++;
+        } else {
+            result += st[i];
+        }
+    }
+    return result;
+}
+
+#include <cwctype>
+
+std::wstring TranslateSTWString(const std::string& input) {
+    // 1. Remove surrounding double quotes
+    if (input.size() < 2) return L"";
+    std::string st = input.substr(1, input.size() - 2);
+
+    std::wstring result;
+    result.reserve(st.size());
+
+    for (size_t i = 0; i < st.size(); ++i) {
+        if (st[i] == '$') {
+            i++;
+            if (i >= st.size()) break;
+
+            char escape = st[i];
+            switch (escape) {
+                case 'L': case 'l': result += L'\n'; break;
+                case 'N': case 'n': result += L'\n'; break;
+                case 'P': case 'p': result += L'\f'; break;
+                case 'R': case 'r': result += L'\r'; break;
+                case 'T': case 't': result += L'\t'; break;
+                case '$': result += L'$';  break;
+                case '\"': result += L'\"'; break; // Double quote escape
+                default:
+                    // Check for 4-digit hex: $000A
+                    if (i + 3 < st.size() &&
+                        isxdigit(st[i]) && isxdigit(st[i+1]) &&
+                        isxdigit(st[i+2]) && isxdigit(st[i+3])) {
+
+                        std::string hexStr = st.substr(i, 4);
+                        wchar_t wc = (wchar_t)std::stoi(hexStr, nullptr, 16);
+                        result += wc;
+                        i += 3; // Skip the rest of the hex digits
+                    }
+                    // Fallback for 2-digit hex: $0A
+                    else if (i + 1 < st.size() && isxdigit(st[i]) && isxdigit(st[i+1])) {
+                        std::string hexStr = st.substr(i, 2);
+                        wchar_t wc = (wchar_t)std::stoi(hexStr, nullptr, 16);
+                        result += wc;
+                        i += 1;
+                    }
+                    else {
+                        result += (wchar_t)escape;
+                    }
+                    break;
+            }
+        } else if (st[i] == '\"' && i + 1 < st.size() && st[i+1] == '\"') {
+            // Handle ST's "" (double double-quote)
+            result += L'\"';
+            i++;
+        } else {
+            result += (wchar_t)st[i];
+        }
+    }
+    return result;
+}
