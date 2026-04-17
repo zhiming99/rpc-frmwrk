@@ -47,7 +47,13 @@ DT_PREFIX   (date_and_time|dt)#
 ADDR_AREA   [IQM]
 ADDR_SIZE   [XBWDL]
 
+int comment_depth = 0;
+/* Define Exclusive States */
+%x ST_COMM C_COMM SINGLE_COMM
+
+
 %%
+(?i:INCLUDE)                return TOK_INCLUDE;
 (?i:STRUCT)                 return TOK_STRUCT;
 (?i:END_STRUCT)             return TOK_END_STRUCT;
 (?i:ARRAY)                  return TOK_ARRAY;
@@ -65,6 +71,8 @@ ADDR_SIZE   [XBWDL]
 (?i:LREAL)                  return TOK_LREAL;
 (?i:PROGRAM)                return TOK_PROGRAM;
 (?i:VAR)                    return TOK_VAR;
+(?i:VAR_GLOBAL)             return TOK_VAR_GLOBAL;
+(?i:CONSTANT)               return TOK_CONSTANT;
 (?i:END_VAR)                return TOK_END_VAR;
 (?i:IF)                     return TOK_IF;
 (?i:THEN)                   return TOK_THEN;
@@ -208,8 +216,51 @@ ADDR_SIZE   [XBWDL]
 }
 
 
-[0-9]+          { yylval = atoi(yytext); return NUMBER; }
 [a-zA-Z_][a-zA-Z0-9_]* { yylval = strdup(yytext); return TOK_ID; }
+
+    /* Entry into Native ST Comment (* ... *) */
+"(*"            { comment_depth = 1; BEGIN(ST_COMM); }
+
+    /* Entry into C-Style Comment /* ... */ */
+"/*"            { comment_depth = 1; BEGIN(C_COMM); }
+
+"//"            { BEGIN(SINGLE_COMM); }
+
+    /* Native ST Comment Logic */
+<ST_COMM>{
+    "(*"        { comment_depth++; }
+    "*)"        { 
+                  comment_depth--; 
+                  if (comment_depth == 0) BEGIN(INITIAL); 
+                }
+    "/*"        { /* Optional: handle C-style nested inside ST */ }
+    "*/"        { /* Optional: handle C-style nested inside ST */ }
+    .|\n        { /* Ignore all other characters */ }
+}
+
+    /* C-Style Comment Logic */
+<C_COMM>{
+    "/*"        { comment_depth++; }
+    "*/"        { 
+                  comment_depth--; 
+                  if (comment_depth == 0) BEGIN(INITIAL); 
+                }
+    "(*"        { /* Optional: handle ST nested inside C-style */ }
+    "*)"        { /* Optional: handle ST nested inside C-style */ }
+    .|\n        { /* Ignore all other characters */ }
+}
+
+    /* --- Single Line Comment // ... --- */
+<SINGLE_COMM>{
+    \n          { BEGIN(INITIAL); }
+    .           { /* Ignore until end of line */ }
+}
+
+    /* --- Error Handling for Unclosed Comments --- */
+<ST_COMM,C_COMM,SINGLE_COMM><<EOF>> {
+    fprintf(stderr, "Error: Unclosed comment before end of file\n");
+    yyterminate();
+}
 
 "<>"                return TOK_NEQU;
 "=>"                return TOK_NLE;
@@ -234,6 +285,7 @@ ADDR_SIZE   [XBWDL]
 ">"                 return TOK_GT;
 ".."                return TOK_RANGE;
 "."                 return TOK_DOT;
+"#"                 return TOK_PUNC;
 
 [ \t\n]+        ; /* Ignore whitespace */
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }

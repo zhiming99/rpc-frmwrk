@@ -35,17 +35,40 @@
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
                
-%token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM
-%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL
+%token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
+%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT
 
 
 %%
 
-program:
-    TOK_PROGRAM TOK_ID program_unit TOK_END_PROGRAM
+source_file:
+    pou_list
     ;
+
+pou_list:
+    pou_declaration
+    | pou_list pou_declaration
+    ;
+
+pou_declaration:
+    include_files
+    | program
+    | function_block
+    | function
+    | TOK_VAR_GLOBAL var_list TOK_END_VAR 
+    | TOK_VAR_GLOBAL TOK_CONSTANT var_list TOK_END_VAR 
+    | type_definition_block
+    ;
+
+program:
+    | TOK_PROGRAM TOK_ID program_unit TOK_END_PROGRAM
+    ;
+
+include_files:
+    TOK_INCLUDE TOK_STRING TOK_SEMICOLON
+    | include_files TOK_INCLUDE TOK_STRING TOK_SEMICOLON
 
 program_unit:
     declarations body 
@@ -62,6 +85,36 @@ type_assignments:
     | type_assignments type_assignment
     ;
 
+enum_value_list:
+    TOK_ID
+    | enum_value_list TOK_COMMA TOK_ID
+
+assign_enum_val:
+    | TOK_ID
+    | TOK_ID TOK_PUNC TOK_ID
+
+enum_type_head:
+    TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
+
+enum_type_definition:
+    enum_type_head TOK_SEMICOLON
+    | enum_type_head TOK_ASSIGN assign_enum_val TOK_SEMICOLON
+
+subrange_type_definition:
+    TOK_ID TOK_COLON type TOK_LPAREN subrange TOK_RPAREN TOK_SEMICOLON
+    |TOK_ID TOK_COLON type TOK_LPAREN subrange TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
+    ;
+
+subrange:
+    signed_integer TOK_RANGE signed_integer
+    ;
+
+signed_integer:
+    TOK_NUMBER
+    | TOK_MINUS TOK_NUMBER
+    | TOK_PLUS TOK_NUMBER
+    ;
+
 type_assignment:
       TOK_ID TOK_COLON type TOK_SEMICOLON {
         /* Alias: TYPE MyInt : INT; */
@@ -72,6 +125,8 @@ type_assignment:
         /* Struct: TYPE Motor : STRUCT... */
         add_struct_to_symtab($1, $3);
     }
+    | enum_type_definition
+    | subrange_type_definition
     ;
 
 struct_definition:
@@ -106,7 +161,6 @@ declarations:
     | TOK_VAR_INPUT var_list  TOK_END_VAR       
     | TOK_VAR_OUTPUT var_list TOK_END_VAR      
     | TOK_VAR_IN_OUT var_list TOK_END_VAR      
-    | TOK_VAR_GLOBAL var_list TOK_END_VAR      { process_vars($2, SCOPE_GLOBAL); }
     ;
 
 var_list:
@@ -139,7 +193,7 @@ var_declaration:
 
 identifier_list:
       TOK_ID                    { $$ = create_id_list($1); }
-    | identifier_list TOK_COMMA TOK_ID { $$ = add_to_id_list($1, $3); }
+    | TOK_ID TOK_COMMA identifier_list { $$ = add_to_id_list($1, $3); }
     ;
 
 
@@ -200,8 +254,6 @@ statement:
     | for_statement TOK_SEMICOLON
     | while_statement TOK_SEMICOLON
     | repeat_statement TOK_SEMICOLON
-    | function_block TOK_SEMICOLON
-    | function TOK_SEMICOLON
     | function_call_statement TOK_SEMICOLON
     ;
 
@@ -338,11 +390,11 @@ param_assignment:
     ;
 
 function_block:
-    TOK_FUNCTION_BLOCK TOK_ID declarations statements TOK_END_FUNCTION_BLOCK
+    TOK_FUNCTION_BLOCK TOK_ID declarations statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
     ;
 
 function:
-    TOK_FUNCTION TOK_ID declarations statements TOK_END_FUNCTION
+    TOK_FUNCTION TOK_ID declarations statements TOK_END_FUNCTION TOK_SEMICOLON
     ;
 
 %%
