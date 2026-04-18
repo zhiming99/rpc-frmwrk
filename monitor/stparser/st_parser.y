@@ -36,15 +36,18 @@
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
-%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC
+%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF
 
 
 %%
 
 source_file:
-    pou_list
+    include_files
+    | pou_list
+    | type_definition_block
+    | global_var
     ;
 
 pou_list:
@@ -52,14 +55,14 @@ pou_list:
     | pou_list pou_declaration
     ;
 
+global_var:
+    TOK_VAR_GLOBAL var_list TOK_END_VAR 
+    | TOK_VAR_GLOBAL TOK_CONSTANT var_list TOK_END_VAR 
+
 pou_declaration:
-    include_files
-    | program
+    program
     | function_block
     | function
-    | TOK_VAR_GLOBAL var_list TOK_END_VAR 
-    | TOK_VAR_GLOBAL TOK_CONSTANT var_list TOK_END_VAR 
-    | type_definition_block
     ;
 
 program:
@@ -71,7 +74,7 @@ include_files:
     | include_files TOK_INCLUDE TOK_STRING TOK_SEMICOLON
 
 program_unit:
-    declarations body 
+    var_declarations body 
 
 body:
     statements
@@ -142,9 +145,10 @@ member_declaration:
       TOK_ID TOK_COLON type               { $$ = create_member($1, $3); }
     ;
 
-declarations:
-    type_definition_block
-    |TOK_VAR declaration_list TOK_END_VAR
+var_declarations:
+    /* empty */
+    | var_declarations TOK_VAR declaration_list TOK_END_VAR
+    | var_declarations include_files
     ;
 
 declaration_list:
@@ -152,15 +156,20 @@ declaration_list:
     | declaration
     ;
 
-declaration:
-    TOK_ID TOK_COLON type TOK_SEMICOLON
+opt_qualifier:
+    /* empty */
+    | TOK_RETAIN
+    | TOK_PERSISTENT
+    | TOK_RETAIN TOK_PERSISTENT
+    | TOK_PERSISTENT TOK_RETAIN
     ;
 
-declarations:
+declaration:
       TOK_VAR var_list TOK_END_VAR             
-    | TOK_VAR_INPUT var_list  TOK_END_VAR       
-    | TOK_VAR_OUTPUT var_list TOK_END_VAR      
+    | TOK_VAR_INPUT var_list  opt_qualifier TOK_END_VAR       
+    | TOK_VAR_OUTPUT var_list opt_qualifier TOK_END_VAR      
     | TOK_VAR_IN_OUT var_list TOK_END_VAR      
+    | TOK_VAR_EXTERNAL var_list TOK_END_VAR
     ;
 
 var_list:
@@ -189,13 +198,19 @@ struct_init_list:
 var_declaration:
       identifier_list TOK_COLON type                  { $$ = create_decl($1, $3, NULL); }
     | identifier_list TOK_COLON type TOK_ASSIGN initial_value  { $$ = create_decl($1, $3, $5); }
+    | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
+    ;
+
+direct_address:
+    TOK_ABS_ADDR_BLOCK
+    | TOK_ABS_ADDR_BIT
+    | TOK_ABS_ADDR_PERIPHERAL
     ;
 
 identifier_list:
       TOK_ID                    { $$ = create_id_list($1); }
-    | TOK_ID TOK_COMMA identifier_list { $$ = add_to_id_list($1, $3); }
+    | identifier_list TOK_COMMA TOK_ID { $$ = add_to_id_list($1, $3); }
     ;
-
 
 elementry_type:
     TOK_INT
@@ -255,6 +270,7 @@ statement:
     | while_statement TOK_SEMICOLON
     | repeat_statement TOK_SEMICOLON
     | function_call_statement TOK_SEMICOLON
+    | case_statement TOK_SEMICOLON
     ;
 
 /* Rule for Assignments: Only allows memory locations on the LHS */
@@ -276,6 +292,12 @@ function_call_statement:
 
 /* L-Value rule: Strictly limited to writable memory locations */
 l_value:
+    l_value_var
+    /* %Q and %M can be l_value */
+    | direct_address
+    ;
+
+l_value_var:
       TOK_ID { /* simple variable */ }
 
     | l_value TOK_LBRACKET full_expression TOK_RBRACKET { /* array element */ }
@@ -348,8 +370,7 @@ factor:
     | TOK_TIME_OF_DAY    /* TOD#2024-01-01 */
     | TOK_TRUE
     | TOK_FALSE
-    /* INT#10, WORD#16#FF */
-    | TOK_TYPED_LITERAL   
+    /* function call */
     | TOK_ID TOK_LPAREN arg_list TOK_RPAREN {
           /* 
              1. Identify if it's a standard function or DCS utility.
@@ -357,7 +378,7 @@ factor:
              3. Generate the Wasm 'call' instruction.
           */
           printf("function call $%s\n", $1);
-    }
+        }
     | l_value
     | '(' full_expression ')'
     ;
@@ -366,8 +387,12 @@ if_statement:
     TOK_IF full_expression TOK_THEN statements TOK_ELSE statements TOK_END_IF
     ;
 
+opt_by_step:
+    /* empty */
+    | TOK_BY full_expression
+
 for_statement:
-    TOK_FOR TOK_ID TOK_ASSIGN full_expression TOK_TO full_expression TOK_DO statements TOK_END_FOR
+    TOK_FOR TOK_ID TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO statements TOK_END_FOR
     ;
 
 while_statement:
@@ -390,11 +415,48 @@ param_assignment:
     ;
 
 function_block:
-    TOK_FUNCTION_BLOCK TOK_ID declarations statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+    TOK_FUNCTION_BLOCK TOK_ID var_declarations statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
     ;
 
 function:
-    TOK_FUNCTION TOK_ID declarations statements TOK_END_FUNCTION TOK_SEMICOLON
+    TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION TOK_SEMICOLON
+    ;
+
+case_statement:
+    TOK_CASE full_expression TOK_OF
+        case_element_list
+        opt_else_statement
+    TOK_END_CASE TOK_SEMICOLON
+    ;
+
+opt_else_statement:
+    /* empty */
+    | TOK_ELSE statements
+    ;
+
+case_element_list:
+    case_element
+
+    | case_element_list case_element
+    ;
+
+case_element:
+    case_list_selector TOK_COLON statements
+    ;
+
+case_list_selector:
+    case_selector
+    | case_list_selector TOK_COMMA case_selector
+    ;
+
+case_selector:
+    case_constant_expression
+
+    | case_constant_expression TOK_RANGE case_constant_expression
+    ;
+
+case_constant_expression:
+    full_expression { /* evaluate the full_expression to get a constant value */ }
     ;
 
 %%

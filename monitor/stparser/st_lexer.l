@@ -35,17 +35,17 @@ typedef Variant YYSTYPE;
 %}
 
  /* Definitions */
-ST_TYPE     (BOOL|BYTE|WORD|DWORD|LWORD|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT|REAL|LREAL)
+ST_TYPE     (?i:BOOL|BYTE|WORD|DWORD|LWORD|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT|REAL|LREAL)
 DIGIT       [0-9]
 HEX_DIGIT   [0-9a-fA-F]
 
  /* Short and Long prefixes */
-D_PREFIX    (date|d)#
-TOD_PREFIX  (time_of_day|tod)#
-DT_PREFIX   (date_and_time|dt)#
+D_PREFIX    (?i:date|d)#
+TOD_PREFIX  (?i:time_of_day|tod)#
+DT_PREFIX   (?i:date_and_time|dt)#
 
-ADDR_AREA   [IQM]
-ADDR_SIZE   [XBWDL]
+ADDR_AREA   (?i:[IQM])
+ADDR_SIZE   (?i:[XBWDL])
 
 int comment_depth = 0;
 /* Define Exclusive States */
@@ -53,6 +53,14 @@ int comment_depth = 0;
 
 
 %%
+
+ // (?i:TIME|T|TO)#-?([0-9]+(\.[0-9]+)?(_?[0-9]+)*(d|h|m|s|ms|us|ns))+ {
+(?i:T|TIME|TO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)? {
+    /* Copy the matched text to pass to Bison */
+    yylval.strval = strdup(yytext); 
+    return TOK_TIME;
+}
+
 (?i:INCLUDE)                return TOK_INCLUDE;
 (?i:STRUCT)                 return TOK_STRUCT;
 (?i:END_STRUCT)             return TOK_END_STRUCT;
@@ -72,8 +80,13 @@ int comment_depth = 0;
 (?i:PROGRAM)                return TOK_PROGRAM;
 (?i:VAR)                    return TOK_VAR;
 (?i:VAR_GLOBAL)             return TOK_VAR_GLOBAL;
+(?i:VAR_INPUT)              return TOK_VAR_INPUT;
+(?i:VAR_OUTPUT)             return TOK_VAR_OUTPUT;
+(?i:VAR_IN_OUT)             return TOK_VAR_IN_OUT;
+(?i:VAR_TEMP)               return TOK_VAR_TEMP;
 (?i:CONSTANT)               return TOK_CONSTANT;
 (?i:END_VAR)                return TOK_END_VAR;
+(?i:VAR_EXTERNAL)           return TOK_VAR_EXTERNAL;
 (?i:IF)                     return TOK_IF;
 (?i:THEN)                   return TOK_THEN;
 (?i:ELSE)                   return TOK_ELSE;
@@ -111,13 +124,11 @@ int comment_depth = 0;
 (?i:TIME)                   return TOK_TIME_TYPE;
 (?i:STRING)                 return TOK_STRING_TYPE;
 (?i:WSTRING)                return TOK_WSTRING_TYPE;
+(?i:AT)                     return TOK_AT;
+(?i:BY)                     return TOK_BY;
+(?i:RETAIN)                 return TOK_RETAIN;
+(?i:PERSISTANT)             return TOK_PERSISTANT;
 
-
-(TIME|T)#-?([0-9]+(\.[0-9]+)?(_?[0-9]+)*(d|h|m|s|ms|us|ns))+ {
-    /* Copy the matched text to pass to Bison */
-    yylval.strval = strdup(yytext); 
-    return TOK_TIME;
-}
 
  /* Matches D#2024-12-25 */
 {D_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2} {
@@ -169,7 +180,6 @@ int comment_depth = 0;
 
     if (type == "REAL" || type == "LREAL") {
         printf("f32.const %s\n", valStr.c_str());
-        $$.type = TYPE_REAL;
     } else {
         // Handle hex if 16# is present
         int32_t finalVal;
@@ -179,10 +189,29 @@ int comment_depth = 0;
             finalVal = std::stol(valStr);
         }
         printf("i32.const %d\n", finalVal);
-        $$.type = TYPE_INT;
     }
     return TOK_NUMBER;
 }
+
+ /* Matches Bit addresses: %IX0.0, %Q0.1, %M10.5 */
+"%"{ADDR_AREA}X?({DIGIT}+"."{DIGIT}+|\*) {
+    //yylval.addr_val = parse_absolute_address(yytext);
+    return TOK_ABS_ADDR_BIT;
+}
+
+ /* Matches Byte/Word/DWord: %IB4, %QW10, %MD20 */
+"%"{ADDR_AREA}{ADDR_SIZE}({DIGIT}+|\*) {
+    //yylval.addr_val = parse_absolute_address(yytext);
+    return TOK_ABS_ADDR_BLOCK;
+}
+
+ /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
+"%P"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+ |
+"%"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+":P" {
+    //yylval.addr_val = parse_absolute_address(yytext);
+    return TOK_ABS_ADDR_PERIPHERAL;
+}
+
 
  /* 2. Based Literals (e.g., 16#FF) */
  /* This wins if it sees digits followed by "#" */
@@ -196,32 +225,12 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
- /* Matches Bit addresses: %IX0.0, %Q0.1, %M10.5 */
-"%"{ADDR_AREA}X?{DIGIT}+"."{DIGIT}+ {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_BIT;
-}
-
- /* Matches Byte/Word/DWord: %IB4, %QW10, %MD20 */
-"%"{ADDR_AREA}{ADDR_SIZE}{DIGIT}+ {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_BLOCK;
-}
-
- /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
-"%P"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+ |
-"%"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+":P" {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_PERIPHERAL;
-}
-
-
 [a-zA-Z_][a-zA-Z0-9_]* { yylval = strdup(yytext); return TOK_ID; }
 
     /* Entry into Native ST Comment (* ... *) */
 "(*"            { comment_depth = 1; BEGIN(ST_COMM); }
 
-    /* Entry into C-Style Comment /* ... */ */
+    /* Entry into C-Style Comment */
 "/*"            { comment_depth = 1; BEGIN(C_COMM); }
 
 "//"            { BEGIN(SINGLE_COMM); }
