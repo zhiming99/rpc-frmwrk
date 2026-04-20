@@ -87,6 +87,7 @@ int comment_depth = 0;
 (?i:CONSTANT)               return TOK_CONSTANT;
 (?i:END_VAR)                return TOK_END_VAR;
 (?i:VAR_EXTERNAL)           return TOK_VAR_EXTERNAL;
+(?i:VAR_CONFIG)             return TOK_VAR_CONFIG;
 (?i:IF)                     return TOK_IF;
 (?i:THEN)                   return TOK_THEN;
 (?i:ELSE)                   return TOK_ELSE;
@@ -117,8 +118,8 @@ int comment_depth = 0;
 (?i:END_PROGRAM)            return TOK_END_PROGRAM;
 (?i:INTERFACE)              return TOK_INTERFACE;
 (?i:END_INTERFACE)          return TOK_END_INTERFACE;
-(?i:IMPLEMENTATION)         return TOK_IMPLEMENTATION;
-(?i:END_IMPLEMENTATION)     return TOK_END_IMPLEMENTATION;
+(?i:IMPLEMENTS)             return TOK_IMPLEMENTS;
+(?i:EXTENDS)                return TOK_EXTENDS;
 (?i:TYPE)                   return TOK_TYPE;
 (?i:END_TYPE)               return TOK_END_TYPE;
 (?i:TIME)                   return TOK_TIME_TYPE;
@@ -128,6 +129,15 @@ int comment_depth = 0;
 (?i:BY)                     return TOK_BY;
 (?i:RETAIN)                 return TOK_RETAIN;
 (?i:PERSISTANT)             return TOK_PERSISTANT;
+(?i:ABSTRACT)               return TOK_ABSTRACT;
+(?i:FINAL)                  return TOK_FINAL;
+(?i:SUPER)                  return TOK_SUPER;
+(?i:THIS)                   return TOK_THIS;
+(?i:PRIVATE)                return TOK_PRIVATE;
+(?i:PUBLIC)                 return TOK_PUBLIC;
+(?i:INTERNAL)               return TOK_INTERNAL;
+(?i:PROTECTED)              return TOK_PROTECTED;
+(?i:REFERENCE)              return TOK_REFERENCE;
 
 
  /* Matches D#2024-12-25 */
@@ -295,6 +305,7 @@ int comment_depth = 0;
 ".."                return TOK_RANGE;
 "."                 return TOK_DOT;
 "#"                 return TOK_PUNC;
+"^"                 return TOK_CARET;
 
 [ \t\n]+        ; /* Ignore whitespace */
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }

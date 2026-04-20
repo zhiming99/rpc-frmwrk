@@ -36,10 +36,9 @@
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
-%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT
+%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF
-
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE
 
 %%
 
@@ -48,6 +47,7 @@ source_file:
     | pou_list
     | type_definition_block
     | global_var
+    | var_config_declaration
     ;
 
 pou_list:
@@ -104,8 +104,8 @@ enum_type_definition:
     | enum_type_head TOK_ASSIGN assign_enum_val TOK_SEMICOLON
 
 subrange_type_definition:
-    TOK_ID TOK_COLON type TOK_LPAREN subrange TOK_RPAREN TOK_SEMICOLON
-    |TOK_ID TOK_COLON type TOK_LPAREN subrange TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
+    TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_SEMICOLON
+    |TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
     ;
 
 subrange:
@@ -119,7 +119,7 @@ signed_integer:
     ;
 
 type_assignment:
-      TOK_ID TOK_COLON type TOK_SEMICOLON {
+      TOK_ID TOK_COLON type_spec TOK_SEMICOLON {
         /* Alias: TYPE MyInt : INT; */
         add_alias_to_symtab($1, $3);
       }
@@ -142,7 +142,7 @@ member_list:
     ;
 
 member_declaration:
-      TOK_ID TOK_COLON type               { $$ = create_member($1, $3); }
+      TOK_ID TOK_COLON type_spec               { $$ = create_member($1, $3); }
     ;
 
 var_declarations:
@@ -196,8 +196,9 @@ struct_init_list:
     ;
 
 var_declaration:
-      identifier_list TOK_COLON type                  { $$ = create_decl($1, $3, NULL); }
-    | identifier_list TOK_COLON type TOK_ASSIGN initial_value  { $$ = create_decl($1, $3, $5); }
+      identifier_list TOK_COLON type_spec                  { $$ = create_decl($1, $3, NULL); }
+    | identifier_list TOK_COLON type_spec TOK_ASSIGN initial_value  { $$ = create_decl($1, $3, $5); }
+    | TOK_ID TOK_AT direct_address 
     | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
     ;
 
@@ -230,7 +231,7 @@ elementry_type:
     | TOK_DATE_TYPE
 
 array_type:
-    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET OF type
+    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET OF type_spec
     ;
 
 range_list:
@@ -249,11 +250,20 @@ string_type:
     | TOK_WSTRING_TYPE                   { $$ = create_wstring_node(80); } /* Wide string (UTF-16) */
     ;
 
-type:
+pointer_type:
+    TOK_CARET type_spec
+    TOK_POINTER TOK_TO type_spec
+
+reference_type:
+    TOK_REFERENCE TOK_TO type_spec
+
+type_spec:
     elementry_type
     | array_type
     | derived_type
     | string_type
+    | pointer_type
+    | reference_type
     ;
 
 derived_type: TOK_ID
@@ -293,16 +303,26 @@ function_call_statement:
 /* L-Value rule: Strictly limited to writable memory locations */
 l_value:
     l_value_var
+    | TOK_SUPER pointer l_value_var
+    | TOK_THIS pointer l_value_var
     /* %Q and %M can be l_value */
     | direct_address
     ;
 
-l_value_var:
-      TOK_ID { /* simple variable */ }
+pointer:
+    TOK_CARET TOK_DOT
 
-    | l_value TOK_LBRACKET full_expression TOK_RBRACKET { /* array element */ }
-    | l_value TOK_DOT TOK_ID { /* struct field */ }
-    | l_value TOK_DOT TOK_NUMBER { /* bit access */ }
+l_value_var:
+    /* simple variable or struct field*/
+    instance_path {  }
+    /* array element */
+    | l_value_var TOK_LBRACKET full_expression TOK_RBRACKET {  }
+    /* bit access */
+    | l_value_var TOK_DOT TOK_NUMBER {  }
+    /* access data member via a pointer */
+    | l_value_var pointer l_value_var {  }
+    /* dereference a pointer */
+    | l_value_var TOK_CARET {  }
     ; 
 
 full_expression:
@@ -415,8 +435,33 @@ param_assignment:
     ;
 
 function_block:
-    TOK_FUNCTION_BLOCK TOK_ID var_declarations statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+    function_block_header var_declaration statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+
+function_block_header:
+    TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID
+    | TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID extends_clause
+    | TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID implements_clause
     ;
+
+/* Handles ABSTRACT or FINAL keywords */
+opt_fb_modifier:
+    | TOK_ABSTRACT
+    | TOK_FINAL
+    ;
+
+/* Handles EXTENDS <Parent> */
+extends_clause: TOK_EXTENDS TOK_ID
+    ;
+
+/* Handles IMPLEMENTS <Interface1, Interface2...> */
+implements_clause:
+    TOK_IMPLEMENTS interface_list
+    ;
+
+interface_list:
+    identifier_list
+    ;
+
 
 function:
     TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION TOK_SEMICOLON
@@ -457,6 +502,28 @@ case_selector:
 
 case_constant_expression:
     full_expression { /* evaluate the full_expression to get a constant value */ }
+    ;
+
+var_config_declaration:
+    TOK_VAR_CONFIG
+        instance_specific_init_list
+    TOK_END_VAR
+    ;
+
+instance_specific_init_list:
+    /* empty */
+    | instance_specific_init_list instance_specific_init
+    | instance_specific_init_list include_files
+    ;
+
+instance_specific_init:
+    instance_path TOK_AT direct_address TOK_COLON type_spec TOK_SEMICOLON
+    instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value TOK_SEMICOLON
+    ;
+
+instance_path:
+    TOK_ID
+    | TOK_ID TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
     ;
 
 %%
