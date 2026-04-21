@@ -38,7 +38,7 @@
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_METHOD TOK_END_METHOD
 
 %%
 
@@ -89,19 +89,29 @@ type_assignments:
     ;
 
 enum_value_list:
-    TOK_ID
-    | enum_value_list TOK_COMMA TOK_ID
+    enum_value
+    | enum_value_list TOK_COMMA enum_value
 
-assign_enum_val:
-    | TOK_ID
-    | TOK_ID TOK_PUNC TOK_ID
+enum_value:
+    TOK_ID
+    | TOK_ID TOK_ASSIGN full_expression
+
+opt_base_type:
+    /* empty */ 
+    | elementry_type
+
+ /* the default initialization for variables of this enum */
+opt_assign_enum_val:
+    /* empty */ 
+    | TOK_ID /* one of the enum value */
+    | TOK_ID TOK_DOT TOK_ID /* enum_type_name.member */
 
 enum_type_head:
     TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
 
 enum_type_definition:
     enum_type_head TOK_SEMICOLON
-    | enum_type_head TOK_ASSIGN assign_enum_val TOK_SEMICOLON
+    | enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
 
 subrange_type_definition:
     TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_SEMICOLON
@@ -226,6 +236,9 @@ elementry_type:
     | TOK_USINT
     | TOK_BYTE
     | TOK_DWORD
+    | TOK_ULINT
+    | TOK_LINT
+    | TOK_LWORD
     | TOK_TIME_TYPE
     | TOK_TIME_OF_DAY_TYPE
     | TOK_DATE_TYPE
@@ -384,7 +397,7 @@ factor:
     | TOK_STRING
     | TOK_WSTRING
 
-    | TOK_TIME    /* T#5s */
+    | TOK_TIME      /* T#5s */
     | TOK_DATE      /* D#2024-01-01 */
     | TOK_DATE_TIME      /* DT#2024-01-01 */
     | TOK_TIME_OF_DAY    /* TOD#2024-01-01 */
@@ -434,28 +447,52 @@ param_assignment:
     | TOK_ID TOK_NLE l_value           /* Formal Output: Q => MyLamp */
     ;
 
+method_declaration_list:
+    method_declaration
+    | method_declaration_list method_declaration
+    ;
+
+method_declaration:
+    /* empty */
+    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON type_spec
+        var_declarations
+        statements
+    TOK_END_METHOD
+    ;
+
+opt_access_modifier:
+    /* empty - defaults to PUBLIC in most ST dialects */
+
+    | TOK_PUBLIC
+    | TOK_PROTECTED
+    | TOK_PRIVATE
+    | TOK_INTERNAL
+    ;
+
 function_block:
-    function_block_header var_declaration statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+    function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
 
 function_block_header:
-    TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID
-    | TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID extends_clause
-    | TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID implements_clause
+    TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
     ;
 
 /* Handles ABSTRACT or FINAL keywords */
 opt_fb_modifier:
+    /* empty */
     | TOK_ABSTRACT
     | TOK_FINAL
     ;
 
 /* Handles EXTENDS <Parent> */
-extends_clause: TOK_EXTENDS TOK_ID
+opt_extends_clause:
+    /* empty */
+    | TOK_EXTENDS TOK_ID
     ;
 
 /* Handles IMPLEMENTS <Interface1, Interface2...> */
-implements_clause:
-    TOK_IMPLEMENTS interface_list
+opt_implements_clause:
+    /* empty */
+    | TOK_IMPLEMENTS interface_list
     ;
 
 interface_list:
