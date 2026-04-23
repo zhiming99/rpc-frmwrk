@@ -28,7 +28,7 @@
 
 %token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_END_IF CASE OF END_CASE TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
-%token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD
+%token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
 
 %token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT
 %token TOK_PLUS TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
@@ -38,7 +38,7 @@
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_METHOD TOK_END_METHOD
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION
 
 %%
 
@@ -59,9 +59,21 @@ global_var:
     TOK_VAR_GLOBAL var_list TOK_END_VAR 
     | TOK_VAR_GLOBAL TOK_CONSTANT var_list TOK_END_VAR 
 
+/* Attributes are collected before the object they modify */
+opt_attributes:
+    /* empty */
+    | opt_attributes attribute_entry
+    ;
+
+attribute_entry:
+    TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE {
+        // Semantic Action: Store attribute (e.g., "strict") in a temp list
+        add_attribute_to_current_scope($3);
+    }
+    ;
 pou_declaration:
     program
-    | function_block
+    | opt_attributes function_block
     | function
     ;
 
@@ -104,7 +116,7 @@ opt_base_type:
 opt_assign_enum_val:
     /* empty */ 
     | TOK_ID /* one of the enum value */
-    | TOK_ID TOK_DOT TOK_ID /* enum_type_name.member */
+    | TOK_ID TOK_PUNC TOK_ID /* enum_type_name#member */
 
 enum_type_head:
     TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
@@ -269,6 +281,7 @@ pointer_type:
 
 reference_type:
     TOK_REFERENCE TOK_TO type_spec
+    | TOK_REF_TO type_spec
 
 type_spec:
     elementry_type
@@ -294,8 +307,17 @@ statement:
     | repeat_statement TOK_SEMICOLON
     | function_call_statement TOK_SEMICOLON
     | case_statement TOK_SEMICOLON
+    | pragma_statement
     ;
 
+pragma_statement:
+    TOK_LBRACE TOK_INFO TOK_STRING TOK_RBRACE {
+        printf("Compiler Info: %s\n", $3);
+    }
+
+    | TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
+    | TOK_LBRACE TOK_END_REGION TOK_RBRACE
+    ;
 /* Rule for Assignments: Only allows memory locations on the LHS */
 assignment_statement:
       l_value TOK_ASSIGN full_expression {
@@ -472,8 +494,9 @@ opt_access_modifier:
 function_block:
     function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
 
+
 function_block_header:
-    TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
+    opt_attributes TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
     ;
 
 /* Handles ABSTRACT or FINAL keywords */

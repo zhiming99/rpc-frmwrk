@@ -140,6 +140,11 @@ int comment_depth = 0;
 (?i:INTERNAL)               return TOK_INTERNAL;
 (?i:PROTECTED)              return TOK_PROTECTED;
 (?i:REFERENCE)              return TOK_REFERENCE;
+(?i:REF_TO)                 return TOK_REF_TO;
+(?i:ATTRIBUTE)              return TOK_ATTRIBUTE;
+(?i:INFO)                   return TOK_INFO;
+(?i:REGION)                 return TOK_REGION;
+(?i:END_REGION)             return TOK_END_REGION;
 
 
  /* Matches D#2024-12-25 */
