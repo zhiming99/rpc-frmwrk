@@ -313,6 +313,7 @@ int comment_depth = 0;
 "."                 return TOK_DOT;
 "#"                 return TOK_PUNC;
 "^"                 return TOK_CARET;
+"@"                 return TOK_RPCF_ADDR;
 
 [ \t\n]+        ; /* Ignore whitespace */
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }
