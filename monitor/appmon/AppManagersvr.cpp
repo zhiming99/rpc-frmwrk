@@ -550,6 +550,30 @@ gint32 CAppManager_SvrImpl::SetLargePointValue(
         guint32 dwSize = value->size();
         ret = m_pAppRegfs->WriteFile( hFile,
             value->ptr(), dwSize, 0 );
+        if( ERROR( ret ) )
+            break;
+
+        stdstr strNotify =  strPath + strApp +
+            "/" POINTS_DIR "/" +
+            strPoint + "/change_notify"; 
+        ret = m_pAppRegfs->Access( strNotify, F_OK );
+        if( ERROR( ret ) )
+        {
+            ret = 0;
+            break;
+        }
+
+        HANDLE hcurStm = INVALID_HANDLE;
+        GetCurStream( this, pContext, hcurStm );
+
+        NotifyValChange(
+            strPtPath, value, hcurStm );
+        // notify the monitors
+        InterfPtr pIf = GetAppMonitor();
+        CAppMonitor_SvrImpl* pAppMon = pIf;
+        pAppMon->OnPointChangedInternal(
+            strPtPath, value, hcurStm );
+
     }while( 0 );
     return ret;
 }
