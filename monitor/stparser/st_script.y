@@ -96,18 +96,8 @@ enum_type_definition:
     | enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
 
 subrange_type_definition:
-    TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_SEMICOLON
-    |TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
-    ;
-
-subrange:
-    signed_integer TOK_RANGE signed_integer
-    ;
-
-signed_integer:
-    TOK_NUMBER
-    | TOK_MINUS TOK_NUMBER
-    | TOK_PLUS TOK_NUMBER
+    TOK_ID TOK_COLON type_spec TOK_LPAREN range TOK_RPAREN TOK_SEMICOLON
+    |TOK_ID TOK_COLON type_spec TOK_LPAREN range TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
     ;
 
 type_assignment:
@@ -140,7 +130,6 @@ member_declaration:
 var_declarations:
     /* empty */
     | var_declarations TOK_VAR declaration_list TOK_END_VAR
-    | var_declarations include_files
     ;
 
 declaration_list:
@@ -154,6 +143,7 @@ opt_qualifier:
     | TOK_PERSISTENT
     | TOK_RETAIN TOK_PERSISTENT
     | TOK_PERSISTENT TOK_RETAIN
+    | TOK_CONSTANT
     ;
 
 declaration:
@@ -239,7 +229,7 @@ range_list:
     ;
 
 range:
-    TOK_ID TOK_RANGE TOK_ID    /* e.g., 1..10 */
+    TOK_NUMBER TOK_RANGE TOK_NUMBER    /* e.g., 1..10 */
     ;
 
 string_type:
@@ -306,7 +296,7 @@ assignment_statement:
 
 /* Rule for Standalone Calls: Used for functions/methods that return void or whose return is ignored */
 function_call_statement:
-      TOK_ID TOK_LPAREN arg_list TOK_RPAREN {
+      instance_path TOK_LPAREN arg_list TOK_RPAREN {
           // Wasm logic to call the function
           // If it's a DCS Utility, we push the g_pUtils handle first
           printf("%s",$1);
@@ -330,12 +320,12 @@ l_value_var:
     instance_path {  }
     /* array element */
     | l_value_var TOK_LBRACKET full_expression TOK_RBRACKET {  }
-    /* bit access */
-    | l_value_var TOK_DOT TOK_NUMBER {  }
     /* access data member via a pointer */
     | l_value_var pointer l_value_var {  }
     /* dereference a pointer */
     | l_value_var TOK_CARET {  }
+    /* bit access */
+    | instance_path TOK_DOT TOK_NUMBER {  }
     ; 
 
 full_expression:
@@ -404,7 +394,7 @@ factor:
     | TOK_TRUE
     | TOK_FALSE
     /* function call */
-    | TOK_ID TOK_LPAREN arg_list TOK_RPAREN {
+    | instance_path TOK_LPAREN arg_list TOK_RPAREN {
           /* 
              1. Identify if it's a standard function or DCS utility.
              2. For utilities, push the g_pUtils handle first.
@@ -425,7 +415,7 @@ opt_by_step:
     | TOK_BY full_expression
 
 for_statement:
-    TOK_FOR TOK_ID TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO statements TOK_END_FOR
+    TOK_FOR instance_path TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO statements TOK_END_FOR
     ;
 
 while_statement:
@@ -494,7 +484,6 @@ var_config_declaration:
 instance_specific_init_list:
     /* empty */
     | instance_specific_init_list instance_specific_init
-    | instance_specific_init_list include_files
     ;
 
 instance_specific_init:
@@ -504,7 +493,7 @@ instance_specific_init:
 
 instance_path:
     TOK_ID
-    | TOK_ID TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
+    | instance_path TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
     ;
 
 %%

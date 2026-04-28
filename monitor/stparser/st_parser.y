@@ -57,7 +57,7 @@ pou_list:
 
 global_var:
     TOK_VAR_GLOBAL var_list TOK_END_VAR 
-    | TOK_VAR_GLOBAL TOK_CONSTANT var_list TOK_END_VAR 
+    | TOK_VAR_GLOBAL opt_qualifier var_list TOK_END_VAR 
 
 /* Attributes are collected before the object they modify */
 opt_attributes:
@@ -184,6 +184,7 @@ opt_qualifier:
     | TOK_PERSISTENT
     | TOK_RETAIN TOK_PERSISTENT
     | TOK_PERSISTENT TOK_RETAIN
+    | TOK_CONSTANT
     ;
 
 declaration:
