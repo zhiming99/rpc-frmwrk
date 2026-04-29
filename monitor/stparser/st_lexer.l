@@ -289,7 +289,8 @@ int comment_depth = 0;
 }
 
 "<>"                return TOK_NEQU;
-"=>"                return TOK_NLE;
+">="                return TOK_NLE;
+"=>"                return TOK_OUTPUT_ASSIGN;
 "<="                return TOK_NGT;
 ":="                return TOK_ASSIGN;
 "="                 return TOK_EQUAL;

@@ -38,7 +38,7 @@
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 
 %%
 
@@ -95,7 +95,7 @@ enum_type_definition:
     enum_type_head TOK_SEMICOLON
     | enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
 
-subrange_type_definition:
+type_with_subrange:
     TOK_ID TOK_COLON type_spec TOK_LPAREN range TOK_RPAREN TOK_SEMICOLON
     |TOK_ID TOK_COLON type_spec TOK_LPAREN range TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
     ;
@@ -111,7 +111,7 @@ type_assignment:
         add_struct_to_symtab($1, $3);
     }
     | enum_type_definition
-    | subrange_type_definition
+    | type_with_subrange
     ;
 
 struct_definition:
@@ -160,16 +160,16 @@ var_list:
     ;
 
 initial_value:
-      full_expression                    /* Simple: := 10; */
-    | TOK_LBRACKET init_list TOK_RBRACKET             /* Array: := [1, 2, 3]; */
-    | TOK_LPAREN struct_init_list TOK_LPAREN      /* Struct: := (Speed := 10, Run := TRUE); */
+      full_expression                    /* Simple: int := 10; */
+    | TOK_LBRACKET init_list TOK_RBRACKET             /* Array:int := [1, 2, 3]; */
+    | TOK_LPAREN struct_init_list TOK_RPAREN      /* Struct: := (Speed := 10, Run := TRUE); */
     ;
 
 init_list:
       initial_value                    { $$ = create_init_list($1); }
     | init_list TOK_COMMA initial_value      { $$ = add_to_init_list($1, $3); }
     /* ST also supports 'n(value)' for repeating array elements */
-    | TOK_NUMBER '(' initial_value ')'    { $$ = create_repeated_init($1, $3); }
+    | init_list TOK_COMMA TOK_NUMBER TOK_LPAREN initial_value TOK_RPAREN    { $$ = create_repeated_init($1, $3); }
     ;
 
 struct_init_list:
@@ -184,11 +184,14 @@ var_declaration:
     | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
     ;
 
-direct_address:
-    /* full point addr: node_name.app_name.point_name */
+rpcf_addr:
     TOK_RPCF_ADDR instance_path
-    /* full attribute addr: node_name.app_name.point_name:attr_name */
-    | TOK_RPCF_ADDR instance_path TOK_COLON TOK_ID
+    /* full attribute addr: node_name.app_name.point_name[attr_name] */
+    | TOK_RPCF_ADDR instance_path TOK_LBRACKET TOK_ID TOK_RBRACKET
+
+direct_address:
+    rpcf_addr
+    /* full point addr: node_name.app_name.point_name */
     | TOK_ABS_ADDR_BLOCK
     | TOK_ABS_ADDR_BIT
     | TOK_ABS_ADDR_PERIPHERAL
@@ -321,7 +324,7 @@ l_value_var:
     /* array element */
     | l_value_var TOK_LBRACKET full_expression TOK_RBRACKET {  }
     /* access data member via a pointer */
-    | l_value_var pointer l_value_var {  }
+    | l_value_var TOK_CARET TOK_DOT l_value_var {  }
     /* dereference a pointer */
     | l_value_var TOK_CARET {  }
     /* bit access */
@@ -403,7 +406,7 @@ factor:
           printf("function call $%s\n", $1);
         }
     | l_value
-    | '(' full_expression ')'
+    | TOK_LPAREN full_expression TOK_RPAREN
     ;
 
 if_statement:
@@ -426,17 +429,23 @@ repeat_statement:
     TOK_REPEAT statements TOK_UNTIL full_expression TOK_END_REPEAT
     ;
 
+positional_args:
+    full_expression
+    | positional_args TOK_COMMA full_expression
+
 arg_list:
-      param_assignment
-    | arg_list ',' param_assignment
+      positional_args
+    | param_assignments
     ;
+
+param_assignments:
+    param_assignment
+    | param_assignments TOK_COMMA param_assignment
 
 param_assignment:
-      full_expression             /* Positional: MyFunc(10) */
-    | TOK_ID TOK_ASSIGN full_expression  /* Formal Input: IN := True */
-    | TOK_ID TOK_NLE l_value           /* Formal Output: Q => MyLamp */
+    TOK_ID TOK_ASSIGN full_expression  /* Formal Input: IN := True */
+    | TOK_ID TOK_OUTPUT_ASSIGN l_value           /* Formal Output: Q => MyLamp */
     ;
-
 
 case_statement:
     TOK_CASE full_expression TOK_OF
