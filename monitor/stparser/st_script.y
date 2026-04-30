@@ -40,6 +40,8 @@
 
 %token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 
+%glr-parser
+
 %%
 
 script_file:
@@ -80,7 +82,7 @@ enum_value:
 
 opt_base_type:
     /* empty */ 
-    | elementry_type
+    | int_type
 
  /* the default initialization for variables of this enum */
 opt_assign_enum_val:
@@ -92,13 +94,7 @@ enum_type_head:
     TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
 
 enum_type_definition:
-    enum_type_head TOK_SEMICOLON
-    | enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
-
-type_with_subrange:
-    TOK_ID TOK_COLON type_spec TOK_LPAREN range TOK_RPAREN TOK_SEMICOLON
-    |TOK_ID TOK_COLON type_spec TOK_LPAREN range TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
-    ;
+    enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
 
 type_assignment:
       TOK_ID TOK_COLON type_spec TOK_SEMICOLON {
@@ -111,7 +107,6 @@ type_assignment:
         add_struct_to_symtab($1, $3);
     }
     | enum_type_definition
-    | type_with_subrange
     ;
 
 struct_definition:
@@ -184,14 +179,9 @@ var_declaration:
     | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
     ;
 
-rpcf_addr:
-    TOK_RPCF_ADDR instance_path
-    /* full attribute addr: node_name.app_name.point_name[attr_name] */
-    | TOK_RPCF_ADDR instance_path TOK_LBRACKET TOK_ID TOK_RBRACKET
 
 direct_address:
-    rpcf_addr
-    /* full point addr: node_name.app_name.point_name */
+    TOK_RPCF_ADDR
     | TOK_ABS_ADDR_BLOCK
     | TOK_ABS_ADDR_BIT
     | TOK_ABS_ADDR_PERIPHERAL
@@ -202,10 +192,8 @@ identifier_list:
     | identifier_list TOK_COMMA TOK_ID { $$ = add_to_id_list($1, $3); }
     ;
 
-elementry_type:
+int_type:
     TOK_INT
-    | TOK_REAL
-    | TOK_LREAL
     | TOK_BOOL
     | TOK_WORD
     | TOK_UINT
@@ -218,9 +206,12 @@ elementry_type:
     | TOK_ULINT
     | TOK_LINT
     | TOK_LWORD
-    | TOK_TIME_TYPE
+
+time_type:
+    TOK_TIME_TYPE
     | TOK_TIME_OF_DAY_TYPE
     | TOK_DATE_TYPE
+
 
 array_type:
     TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET OF type_spec
@@ -249,14 +240,25 @@ pointer_type:
 reference_type:
     TOK_REFERENCE TOK_TO type_spec
     | TOK_REF_TO type_spec
+    ;
 
+other_elementry_type:
+    time_type
+    | TOK_REAL
+    | TOK_LREAL
+    ;
+    
 type_spec:
-    elementry_type
+    int_type
+    | int_type TOK_LPAREN range TOK_RPAREN
+    | other_elementry_type
     | array_type
     | derived_type
     | string_type
     | pointer_type
     | reference_type
+    /* implicit enum */
+    | TOK_LPAREN enum_value_list TOK_RPAREN
     ;
 
 derived_type: TOK_ID
@@ -324,7 +326,7 @@ l_value_var:
     /* array element */
     | l_value_var TOK_LBRACKET full_expression TOK_RBRACKET {  }
     /* access data member via a pointer */
-    | l_value_var TOK_CARET TOK_DOT l_value_var {  }
+    | l_value_var TOK_CARET TOK_DOT instance_path {  }
     /* dereference a pointer */
     | l_value_var TOK_CARET {  }
     /* bit access */
@@ -456,22 +458,36 @@ case_statement:
 
 opt_else_statement:
     /* empty */
-    | TOK_ELSE statements
+    |TOK_ELSE statements
     ;
 
 case_element_list:
     case_element
+    | case_element_list case_element 
+    ;
 
-    | case_element_list case_element
+cinner_statements:
+    case_body
+    | case_body TOK_SEMICOLON cinner_statements
+    ;
+
+case_body:
+    assignment_statement 
+    | if_statement 
+    | for_statement 
+    | while_statement 
+    | repeat_statement
+    | function_call_statement
+    | case_statement
     ;
 
 case_element:
-    case_list_selector TOK_COLON statements
+    case_list_selector cinner_statements TOK_SEMICOLON
     ;
 
 case_list_selector:
-    case_selector
-    | case_list_selector TOK_COMMA case_selector
+    case_selector TOK_COLON 
+    | case_list_selector TOK_COMMA case_selector TOK_COLON
     ;
 
 case_selector:

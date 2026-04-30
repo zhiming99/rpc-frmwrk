@@ -46,7 +46,7 @@ DT_PREFIX   (?i:date_and_time|dt)#
 
 ADDR_AREA   (?i:[IQM])
 ADDR_SIZE   (?i:[XBWDL])
-
+IDENTIFIER  [a-zA-Z_][a-zA-Z0-9_]*
 int comment_depth = 0;
 /* Define Exclusive States */
 %x ST_COMM C_COMM SINGLE_COMM
@@ -242,7 +242,9 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
-[a-zA-Z_][a-zA-Z0-9_]* { yylval = strdup(yytext); return TOK_ID; }
+"@"{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = * strdup(yytext); return TOK_RPCF_ADDR; }
+
+{IDENTIFIER} { yylval = strdup(yytext); return TOK_ID; }
 
     /* Entry into Native ST Comment (* ... *) */
 "(*"            { comment_depth = 1; BEGIN(ST_COMM); }
@@ -314,7 +316,6 @@ int comment_depth = 0;
 "."                 return TOK_DOT;
 "#"                 return TOK_PUNC;
 "^"                 return TOK_CARET;
-"@"                 return TOK_RPCF_ADDR;
 
 [ \t\n]+        ; /* Ignore whitespace */
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }
