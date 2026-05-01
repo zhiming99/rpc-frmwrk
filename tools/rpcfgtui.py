@@ -24,6 +24,8 @@ try:
     paths = [ "/usr/local/share/locale", "/usr/share/locale" ]
     bFound = False
     curLang, codeset=locale.getlocale()
+    if curLang is None or codeset is None:
+        raise Exception( f"Warnig LANG or codeset is not specified" )
     if codeset.upper() != 'UTF-8':
         raise Exception( f"Warnig '{codeset}' is not supported yet" )
 
@@ -1938,9 +1940,10 @@ EOF
         self.main_widget.body = combined_pile
 
 def usage():
-    print( "Usage: python3 rpcfgtui.py [-hc]" )
+    print( "Usage: python3 rpcfgtui.py [-hbc]" )
     print( "\t-c: to config a client host, otherwise a server host" )
     print( "\t-b: using 'Bolland' colorscheme." )
+    print( "\t-h: print this help." )
 
 def main():
     bServer = True

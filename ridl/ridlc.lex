@@ -8,7 +8,7 @@
  *        Version:  1.0
  *        Created:  02/10/2021 05:01:32 PM
  *       Revision:  none
- *       Compiler:  gcc
+ *       Compiler:  Flex
  *
  *         Author:  Ming Zhi( woodhead99@gmail.com )
  *   Organization:
