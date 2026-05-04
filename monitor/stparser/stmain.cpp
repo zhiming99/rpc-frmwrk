@@ -36,12 +36,13 @@ int start_parse(  )
 
     yypstate *main_ps = yypstate_new();
     yypstate *pragma_ps = yypstate_new();
+    yypush_parse(main_ps, TOK_START_MAIN, NULL, NULL);
 
     // Initialization: Get the first token
     current_tok = yylex(
         &current_lval, &current_lloc );
 
-    yypstate* current_ps = ps;
+    yypstate* current_ps = main_ps;
     int parsing_preproc = 0
     while (status == YYPUSH_MORE)
     {
@@ -58,7 +59,10 @@ int start_parse(  )
         if( ( current_tok == TOK_LBRACE &&
             next_tok == TOK_IF ) ||
             parsing_preproc > 0 )
+        {
+            current_tok = TOK_START_CONDITIONAL;
             current_ps = pragma_ps;
+        }
 
         // 3. Push: Send the current token to the parser
         status = yypush_parse( current_ps, current_tok,
