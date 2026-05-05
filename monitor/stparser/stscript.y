@@ -25,17 +25,66 @@
 %locations
 %define api.pure full
 %define api.push-pull push
+%require "3.0"
 
 %{
 #include <stdio.h>
 #include <stdlib.h>
 
-#define CONFLICT_STATE 291
+using namespace rpcf;
 
 %}
 
+%code requires {
 
-%token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF CASE OF END_CASE TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
+#include "rpc.h"
+using namespace rpcf;
+
+#define CONFLICT_STATE 291
+#define GetParserState(ps) ( ps->yystate )
+gint32 EvalConstExpr( ObjPtr& pCtx );
+
+typedef enum
+{
+    scanning,
+    building,
+    leaving,
+} enumCPProgress;
+
+typedef enum
+{
+    firstBlock,
+    elsifBlock,
+    elseBlock,
+} enumCPPos;
+
+struct YYLTYPE2 :
+    public YYLTYPE
+{
+    void initialize(
+        const char* szFileName ) 
+    {
+        first_line = 1;
+        first_column = 1;
+        last_line = 1;
+        last_column = 1;
+    }
+};
+
+struct CondPragmaState
+{
+    enumCPProgress m_iProgress = scanning;
+    enumCPPos m_iCurCond = firstBlock;
+    std::vector< YYLTYPE2 > m_vecBlockPos;
+};
+
+std::vector< CondPragmaState > g_vecCondStack;
+
+}
+
+
+
+%token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
 
@@ -224,7 +273,7 @@ time_type:
 
 
 array_type:
-    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET OF type_spec
+    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF type_spec
     ;
 
 range_list:
@@ -237,12 +286,12 @@ range:
     ;
 
 string_type:
-    TOK_STRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN    { $$ = create_string_node($3); }  /* Specific length */
-    | TOK_STRING_TYPE TOK_LBRACKET TOK_NUMBER TOK_RBRACKET    { $$ = create_string_node($3); }  /* Specific length */
-    | TOK_STRING_TYPE                    { $$ = create_string_node(80); }  /* Default length is 80 */
-    | TOK_WSTRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN   { $$ = create_wstring_node($3); }
-    | TOK_WSTRING_TYPE TOK_LBRACKET TOK_NUMBER TOK_RBRACKET    { $$ = create_string_node($3); }  /* Specific length */
-    | TOK_WSTRING_TYPE                   { $$ = create_wstring_node(80); } /* Wide string (UTF-16) */
+    TOK_STRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN    {  }  /* Specific length */
+    | TOK_STRING_TYPE TOK_LBRACKET TOK_NUMBER TOK_RBRACKET    {  }  /* Specific length */
+    | TOK_STRING_TYPE                    {  }  /* Default length is 80 */
+    | TOK_WSTRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN   {  }
+    | TOK_WSTRING_TYPE TOK_LBRACKET TOK_NUMBER TOK_RBRACKET    {  }  /* Specific length */
+    | TOK_WSTRING_TYPE                   {  } /* Wide string (UTF-16) */
     ;
 
 pointer_type:

@@ -35,7 +35,7 @@ int start_parse(  )
     YYLTYPE current_lloc;
 
     yypstate *main_ps = yypstate_new();
-    yypstate *pragma_ps = yypstate_new();
+    yypstate *pragma_ps = nullptr;
     yypush_parse(main_ps, TOK_START_MAIN, NULL, NULL);
 
     // Initialization: Get the first token
@@ -43,7 +43,6 @@ int start_parse(  )
         &current_lval, &current_lloc );
 
     yypstate* current_ps = main_ps;
-    int parsing_preproc = 0
     while (status == YYPUSH_MORE)
     {
         // 1. Peek: Get the next token from the lexer
@@ -52,16 +51,17 @@ int start_parse(  )
         int next_tok = yylex( &next_lval, &next_lloc );
 
         // 2. Logic: Now you have both current and next!
-        if( current_tok == TOK_SEMICOLON &&
+        if( GetParserState( ps ) == CONFLICT_STATE &&
+            current_ps == main_ps &&
+            current_tok == TOK_SEMICOLON &&
             next_tok == TOK_ELSE )
             current_tok = TOK_CASE_SEP;
-
-        if( ( current_tok == TOK_LBRACE &&
+        else if( ( current_tok == TOK_LBRACE &&
             next_tok == TOK_IF ) ||
-            parsing_preproc > 0 )
+            current_ps == main_ps )
         {
             current_tok = TOK_START_CONDITIONAL;
-            current_ps = pragma_ps;
+            current_ps = pragma_ps = yypstate_new();
         }
 
         // 3. Push: Send the current token to the parser
@@ -72,6 +72,11 @@ int start_parse(  )
         current_tok = next_tok;
         current_lval = next_lval;
         current_lloc = next_lloc;
+        if( status == 0 && current_ps == pragma_ps )
+        {
+            yypush_delete( pragma_ps );
+            pragma_ps = nullptr;
+        }
     }
 
 }

@@ -1678,16 +1678,12 @@ gint32 CFileImage::WriteValue(
     gint32 ret = 0;
     do{
         EnumTypeId iType = oVar.GetTypeId();
-        if( iType == typeNone )
-        {
-            ret = -EINVAL;
-            break;
-        }
         if( iType >= typeDMsg )
         {
             ret = -ENOTSUP;
             break;
         }
+        // if( iType == typeNone ) clear the value.
         WRITE_LOCK( this );
         m_oValue = oVar;
         UpdateCtime();

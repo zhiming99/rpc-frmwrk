@@ -47,6 +47,8 @@ DT_PREFIX   (?i:date_and_time|dt)#
 ADDR_AREA   (?i:[IQM])
 ADDR_SIZE   (?i:[XBWDL])
 IDENTIFIER  [a-zA-Z_][a-zA-Z0-9_]*
+
+DATA_TYPE   (?i:[BWDQSOF])
 int comment_depth = 0;
 /* Define Exclusive States */
 %x ST_COMM C_COMM SINGLE_COMM
@@ -242,7 +244,7 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
-"@"{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = * strdup(yytext); return TOK_RPCF_ADDR; }
+"@"{DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = * strdup(yytext); return TOK_RPCF_ADDR; }
 
 {IDENTIFIER} { yylval = strdup(yytext); return TOK_ID; }
 
