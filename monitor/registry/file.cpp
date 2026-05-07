@@ -1683,9 +1683,11 @@ gint32 CFileImage::WriteValue(
             ret = -ENOTSUP;
             break;
         }
-        // if( iType == typeNone ) clear the value.
         WRITE_LOCK( this );
-        m_oValue = oVar;
+        if( iType != typeNone )
+            m_oValue = oVar;
+        else
+            m_oValue.Clear();
         UpdateCtime();
         ret = this->Flush( FLAG_FLUSH_INODE );
         if( ERROR( ret ) )

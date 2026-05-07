@@ -25,6 +25,7 @@
 %locations
 %define api.pure full
 %define api.push-pull push
+%define api.value.type {Variant}
 %require "3.0"
 
 %{
@@ -33,20 +34,38 @@
 
 using namespace rpcf;
 
+std::shared_ptr< CSTParserContext > g_pParserCtx( new CSTParserContext );
+
 %}
 
 %code requires {
 
+#include <vector>
+#include <string>
+#include <memory>
+
+#define CLEAR_RSYMBS \
+for( int i = 0; i < ( yylen ); i++ ) \
+    { yyvsp[ -i ].Clear(); }
+
+#define DEFAULT_ACTION \
+    yyval = yyvsp[ 1 - yylen ]; CLEAR_RSYMBS;
+
 #include "rpc.h"
 using namespace rpcf;
 
-#define CONFLICT_STATE 291
-#define GetParserState(ps) ( ps->yystate )
-gint32 EvalConstExpr( ObjPtr& pCtx );
+#define YYPUSH_ACCEPT       0 // Success / Input Accepted
+#define YYPUSH_ABORT        1 // Need more tokens
+#define YYPUSH_NOMEM        2 // Syntax Error
+
+#define CONFLICT_STATE 297
+
+#define GetParserState( ps ) ( ps->yystate )
 
 typedef enum
 {
-    scanning,
+    invalidProgress = -1;
+    scanning = 0,
     building,
     leaving,
 } enumCPProgress;
@@ -56,7 +75,8 @@ typedef enum
     firstBlock,
     elsifBlock,
     elseBlock,
-} enumCPPos;
+    endifBlock,
+} enumBlkType;
 
 struct YYLTYPE2 :
     public YYLTYPE
@@ -74,15 +94,64 @@ struct YYLTYPE2 :
 struct CondPragmaState
 {
     enumCPProgress m_iProgress = scanning;
-    enumCPPos m_iCurCond = firstBlock;
+    enumBlkType m_iBlkType = firstBlock;
+    gint32 m_iBlkIdx = 0;
     std::vector< YYLTYPE2 > m_vecBlockPos;
+
+    // const expr value of m_iBlkIdx if m_iProgress is scanning
+    bool m_bExprValue = false; 
+
+    // conditional depth in the block m_iBlkIdx
+    gint32 m_iCondDepth = 0;
 };
 
-std::vector< CondPragmaState > g_vecCondStack;
+struct CSTParserContext
+{
+    std::vector< CondPragmaState > m_vecCondStack;
+    // the last pragma representing current non-main ps is parsing.
+    gint32 m_iLastPragma = nt_invalid;
+    gint32 IsCondStackEmpty() const
+    { return m_vecCondStack.empty(); }
 
+    inline const CondPragmaState& GetTopState() const
+    {
+        static const CondPragmaState oInvalidState =
+            { invalidProgress, 0, 0 };
+        if( m_vecCondStack.empty() )
+            return oInvalidState;
+        return m_vecCondStack.back();
+    }
+
+    inline CondPragmaState& GetTopState()
+    {
+        static CondPragmaState oInvalidState =
+            { invalidProgress, 0, 0 };
+        if( m_vecCondStack.empty() )
+            return oInvalidState;
+        return m_vecCondStack.back();
+    }
+
+    inline void PushState(
+        const CondPragmaState& cps )
+    { m_vecCondStack.push_back( cps ); }
+
+    inline void PopState()
+    { m_vecCondStack.pop_back(); }
+
+    inline gint32 GetLastPragma() const
+    { return m_iLastPragma; }
+
+    inline void SetLastPragma( gint32 iPragma )
+    { m_iLastPragma = iPragma; }
 }
 
+extern std::shared_ptr< CSTParserContext > g_pParserCtx;
+CSTParserContext* GetParserCtx()
+{ return g_pParserCtx.get(); }
 
+gint32 EvalConstExpr( CSTParserContext* pCtx );
+
+}
 
 %token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
@@ -92,7 +161,7 @@ std::vector< CondPragmaState > g_vecCondStack;
 %token TOK_PLUS TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
-%token TOK_CASE_SEP TOK_START_CONDITIONAL TOK_START_MAIN
+%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
@@ -102,6 +171,7 @@ std::vector< CondPragmaState > g_vecCondStack;
  /*%glr-parser*/
 
 %start start_point
+%parse-param { CSTParserContext *pCtx }
 
 %%
 
@@ -344,15 +414,16 @@ pragma_statement:
         printf("Compiler Info: %s\n", $3);
     }
 
+    | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE
     | TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
     | TOK_LBRACE TOK_END_REGION TOK_RBRACE
-    | TOK_LBRACE TOK_INCLUDE TOK_STRING TOK_RBRACE
 
 conditional_pragma:
-    TOK_START_CONDITIONAL TOK_IF full_expression TOK_RBRACE
-    | TOK_START_CONDITIONAL TOK_ELSIF full_expression TOK_RBRACE
-    | TOK_START_CONDITIONAL TOK_ELSE TOK_RBRACE
-    | TOK_START_CONDITIONAL TOK_END_IF TOK_RBRACE
+    TOK_START_PRAGMA TOK_IF full_expression TOK_RBRACE
+    | TOK_START_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
+    | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
+    | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
+    | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE
     ;
 
 /* Rule for Assignments: Only allows memory locations on the LHS */

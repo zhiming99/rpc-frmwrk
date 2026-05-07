@@ -48,7 +48,7 @@ ADDR_AREA   (?i:[IQM])
 ADDR_SIZE   (?i:[XBWDL])
 IDENTIFIER  [a-zA-Z_][a-zA-Z0-9_]*
 
-DATA_TYPE   (?i:[BWDQSOF])
+ATTR_DATA_TYPE   (?i:[BWDQSOF])
 int comment_depth = 0;
 /* Define Exclusive States */
 %x ST_COMM C_COMM SINGLE_COMM
@@ -59,7 +59,7 @@ int comment_depth = 0;
  // (?i:TIME|T|TO)#-?([0-9]+(\.[0-9]+)?(_?[0-9]+)*(d|h|m|s|ms|us|ns))+ {
 (?i:T|TIME|TO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)? {
     /* Copy the matched text to pass to Bison */
-    yylval.strval = strdup(yytext); 
+    yylval = yytext; 
     return TOK_TIME;
 }
 
@@ -151,33 +151,32 @@ int comment_depth = 0;
 
  /* Matches D#2024-12-25 */
 {D_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2} {
-    yylval.qwVal = ParseStTimeToUnix( yytext );
+    yylval = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_DATE;
 }
 
  /* Matches TOD#14:30:05.123 */
 {TOD_PREFIX}[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval.qwVal = ParseStTimeToUnix( yytext );
+    yylval.qwVal = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_TIME_OF_DAY;
 }
 
  /* Matches DT#2024-12-25-14:30:05 */
 {DT_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval.qwVal = ParseStTimeToUnix( yytext );
+    yylval.qwVal = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_DATE_TIME
 }
 
  /* Standard STRING literal */
 '(''|[^'\n]|(\$[0-9a-fA-F]{2})|\$[LlPpRrTtQ$])*' {
     // Action: process string (strip quotes, resolve escapes)
-    yylval.strVal = TranslateSTString( yytext );
+    yylval = TranslateSTString( yytext );
     return TOK_STRING;
 }
 
  /* WSTRING literal */
 \"(\"\"|[^\"\n]|(\$[0-9a-fA-F]{4})|\$[LlPpRrTtQ$])*\" {
-    yylval.strVal = TranslateSTString( yytext );
-    return TOK_WSTRING;
+    yyerror( "wide character string are not supported, yet" );
 }
 
  /* Error handling for unterminated strings */
@@ -244,9 +243,9 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
-"@"{DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = * strdup(yytext); return TOK_RPCF_ADDR; }
+"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = yytext; return TOK_RPCF_ADDR; }
 
-{IDENTIFIER} { yylval = strdup(yytext); return TOK_ID; }
+{IDENTIFIER} { yylval = yytext; return TOK_ID; }
 
     /* Entry into Native ST Comment (* ... *) */
 "(*"            { comment_depth = 1; BEGIN(ST_COMM); }
