@@ -40,116 +40,14 @@ std::shared_ptr< CSTParserContext > g_pParserCtx( new CSTParserContext );
 
 %code requires {
 
-#include <vector>
-#include <string>
-#include <memory>
+#include "parsrctx.h"
 
-#define CLEAR_RSYMBS \
-for( int i = 0; i < ( yylen ); i++ ) \
-    { yyvsp[ -i ].Clear(); }
+extern gint32 EvalConstExpr( CSTParserContext* pCtx );
 
-#define DEFAULT_ACTION \
-    yyval = yyvsp[ 1 - yylen ]; CLEAR_RSYMBS;
-
-#include "rpc.h"
-using namespace rpcf;
-
-#define YYPUSH_ACCEPT       0 // Success / Input Accepted
-#define YYPUSH_ABORT        1 // Need more tokens
-#define YYPUSH_NOMEM        2 // Syntax Error
-
-#define CONFLICT_STATE 297
-
-#define GetParserState( ps ) ( ps->yystate )
-
-typedef enum
-{
-    invalidProgress = -1;
-    scanning = 0,
-    building,
-    leaving,
-} enumCPProgress;
-
-typedef enum
-{
-    firstBlock,
-    elsifBlock,
-    elseBlock,
-    endifBlock,
-} enumBlkType;
-
-struct YYLTYPE2 :
-    public YYLTYPE
-{
-    void initialize(
-        const char* szFileName ) 
-    {
-        first_line = 1;
-        first_column = 1;
-        last_line = 1;
-        last_column = 1;
-    }
-};
-
-struct CondPragmaState
-{
-    enumCPProgress m_iProgress = scanning;
-    enumBlkType m_iBlkType = firstBlock;
-    gint32 m_iBlkIdx = 0;
-    std::vector< YYLTYPE2 > m_vecBlockPos;
-
-    // const expr value of m_iBlkIdx if m_iProgress is scanning
-    bool m_bExprValue = false; 
-
-    // conditional depth in the block m_iBlkIdx
-    gint32 m_iCondDepth = 0;
-};
-
-struct CSTParserContext
-{
-    std::vector< CondPragmaState > m_vecCondStack;
-    // the last pragma representing current non-main ps is parsing.
-    gint32 m_iLastPragma = nt_invalid;
-    gint32 IsCondStackEmpty() const
-    { return m_vecCondStack.empty(); }
-
-    inline const CondPragmaState& GetTopState() const
-    {
-        static const CondPragmaState oInvalidState =
-            { invalidProgress, 0, 0 };
-        if( m_vecCondStack.empty() )
-            return oInvalidState;
-        return m_vecCondStack.back();
-    }
-
-    inline CondPragmaState& GetTopState()
-    {
-        static CondPragmaState oInvalidState =
-            { invalidProgress, 0, 0 };
-        if( m_vecCondStack.empty() )
-            return oInvalidState;
-        return m_vecCondStack.back();
-    }
-
-    inline void PushState(
-        const CondPragmaState& cps )
-    { m_vecCondStack.push_back( cps ); }
-
-    inline void PopState()
-    { m_vecCondStack.pop_back(); }
-
-    inline gint32 GetLastPragma() const
-    { return m_iLastPragma; }
-
-    inline void SetLastPragma( gint32 iPragma )
-    { m_iLastPragma = iPragma; }
-}
-
-extern std::shared_ptr< CSTParserContext > g_pParserCtx;
-CSTParserContext* GetParserCtx()
-{ return g_pParserCtx.get(); }
-
-gint32 EvalConstExpr( CSTParserContext* pCtx );
+extern void ParserPrint(
+    const char* szFile,
+    gint32 iLineNo,
+    const char* strMsg );
 
 }
 
@@ -410,12 +308,7 @@ statement:
     ;
 
 pragma_statement:
-    TOK_LBRACE TOK_INFO TOK_STRING TOK_RBRACE {
-        printf("Compiler Info: %s\n", $3);
-    }
-
-    | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE
-    | TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
+    TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
     | TOK_LBRACE TOK_END_REGION TOK_RBRACE
 
 conditional_pragma:
@@ -424,6 +317,11 @@ conditional_pragma:
     | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
     | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
     | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE
+    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
+        printf("Compiler Info: %s\n", $3);
+    }
+    | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE
+
     ;
 
 /* Rule for Assignments: Only allows memory locations on the LHS */
@@ -662,5 +560,80 @@ instance_path:
 
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
+}
+
+void ParserPrint( const char* szFile,
+    gint32 iLineNo,
+    const char* strMsg )
+{
+    char szBuf[ 512 ];
+    sprintf( szBuf,
+        "%s(%d): Fatal error, too many "
+        "nested conditional pragmas.",
+        szFile, iLineNo );
+    fprintf( stderr, szBuf );
+}
+
+FILECTX2::FILECTX2()
+{
+    m_oVal.Clear(); 
+    m_oLocation.first_line =
+    m_oLocation.first_column =  
+    m_oLocation.last_line =
+    m_oLocation.last_column = 1;
+}
+
+FILECTX2::FILECTX2( const std::string& strPath )
+    : FILECTX2()
+{
+    m_fp = fopen( strPath.c_str(), "r");
+    if( m_fp != nullptr )
+    {
+        m_strPath = strPath;
+    }
+    else
+    {
+        std::string strMsg = "error cannot open file '";
+        strMsg += strPath + "'";
+        throw std::invalid_argument( strMsg );
+    }
+}
+
+FILECTX2::~FILECTX2()
+{
+    if( m_fp != nullptr )
+    {
+        fclose( m_fp );
+        m_fp = nullptr;
+    }
+}
+
+FILECTX2::FILECTX2( const FILECTX2& rhs )
+{
+    m_fp = rhs.m_fp;
+    m_oVal = rhs.m_oVal;
+    m_strPath = rhs.m_strPath;
+    m_strLastVal = rhs.m_strLastVal;
+    memcpy( &m_oLocation,
+        &rhs.m_oLocation,
+        sizeof( m_oLocation ) );
+}
+
+FILE* CSTParserContext::TryOpenFile(
+    const std::string& strFile )
+{
+    FILE* fp = fopen( strFile.c_str(), "r");
+    if ( fp != nullptr )
+        return fp;
+
+    for( auto elem : m_vecInclPaths )
+    {
+        std::string strPath =
+            elem + "/" + strFile;
+        fp = fopen( strPath.c_str(), "r" );
+        if( fp != nullptr )
+            break;
+    }
+    return fp;
 }
 

@@ -28,6 +28,12 @@
 
 std::shared_ptr< CStParserContext > g_pParserCtx;
 
+#define IsCondPragma( _iPragma_ ) \
+    ( _iPragma_ == TOK_IF || \
+        _iPragma_ == TOK_ELSIF || \
+        _iPragma_ == TOK_ELSE || \
+        _iPragma_ == TOK_END_IF )
+
 gint32 start_parse( CSTParserContext* pCtx )
 {
     gint32 current_tok;
@@ -51,25 +57,18 @@ gint32 start_parse( CSTParserContext* pCtx )
         YYSTYPE next_lval;
         YYLTYPE next_lloc;
         gint32 next_tok = yylex( &next_lval, &next_lloc );
+        bool bUpdate = true;
 
         // 2. Logic: Now you have both current and next!
 
         // swallow tokens in false branch
-        bool bCond = false;
-        gint32 iPragma = pCtx->GetLastPragma();
-        if( iPragma == TOK_IF ||
-            iPragma == TOK_ELSIF ||
-            iPragma == TOK_ELSE ||
-            iPragma == TOK_END_IF )
-            bCond = true;
-
         bool bSwallow = false;
-        if( bCond && current_ps == main_ps &&
+        if( current_ps == main_ps &&
             !pCtx->IsCondStackEmpty() &&
             pCtx->GetTopState().m_iProgress != building )
             bSwallow = true;
 
-        while( !bSwallow )
+        while( current_ps == main_ps && !bSwallow )
         {
             if( GetParserState( ps ) == CONFLICT_STATE &&
                 current_tok == TOK_SEMICOLON &&
@@ -82,6 +81,16 @@ gint32 start_parse( CSTParserContext* pCtx )
             if( current_tok == TOK_LBRACE &&
                 next_tok == TOK_IF )
             {
+                if( pCtx->GetCondStackSize() > 256 )
+                {
+                    status = YYPUSH_ABORT;
+                    ParserPrint( 
+                        current_lloc->name, 
+                        current_lloc->first_line,
+                        "Fatal error, too many "
+                        "nested conditional pragmas." );
+                    break;
+                }
                 current_tok = TOK_START_PRAGMA;
                 current_ps = pragma_ps = yypstate_new();
                 CondPragmaState cps;
@@ -98,11 +107,11 @@ gint32 start_parse( CSTParserContext* pCtx )
                 if( cstat.m_iProgress == invalidProgress )
                 {
                     status = YYPUSH_ABORT;
-                    char szBuf[ 512 ];
-                    sprintf( szBuf,
-                        "%s(%d): Fatal error, unexpected elsif or endif.",
-                        current_lloc->name, current_lloc->first_line );
-                    yyerror( szBuf );
+                    ParserPrint( 
+                        current_lloc->name, 
+                        current_lloc->first_line,
+                        "Fatal error, "
+                        "unexpected elsif or endif." );
                     break;
                 }
                 current_tok = TOK_START_PRAGMA;
@@ -119,9 +128,12 @@ gint32 start_parse( CSTParserContext* pCtx )
                 pCtx->SetLastPragma( next_tok );
             }
             else if( current_tok == TOK_LBRACE &&
-                next_tok == TOK_INCLUDE )
+                ( next_tok == TOK_INCLUDE ||
+                next_tok == TOK_INFO ||
+                next_tok == TOK_ATTRIBUTE ) )
             {
                 current_tok = TOK_START_PRAGMA;
+                current_ps = pragma_ps = yypstate_new();
                 pCtx->SetLastPragma( next_tok );
             }
             break;
@@ -129,8 +141,8 @@ gint32 start_parse( CSTParserContext* pCtx )
 
         // 3. Push: Send the current token to the parser
         bool bParse = false;
-        if( pCtx->IsCondStackEmpty() ||
-            current_ps != main_ps ||
+        if( current_ps != main_ps ||
+            pCtx->IsCondStackEmpty() ||
             pCtx->GetTopState().m_iProgress == building )
             bParse = true;
 
@@ -147,17 +159,16 @@ gint32 start_parse( CSTParserContext* pCtx )
                 current_ps = main_ps;
 
                 gint32 iPragma = pCtx->GetLastPragma();
-                if( iPragma == TOK_INCLUDE )
+                if( iPragma == TOK_INCLUDE ||
+                    iPragma == TOK_INFO ||
+                    iPragma == TOK_ATTRIBUTE )
                 {
                     pCtx->SetLastPragma( nt_invalid );
                     // TODO: switch to new buffer
                     break;
                 }
 
-                if( iPragma != TOK_IF &&
-                    iPragma != TOK_ELSIF &&
-                    iPragma != TOK_ELSE &&
-                    iPragma != TOK_END_IF )
+                if( !IsCondPragma( iPragma ) )
                     break;
 
                 auto& cstat = pCtx->GetTopState();
@@ -166,24 +177,17 @@ gint32 start_parse( CSTParserContext* pCtx )
                     case endifBlock:
                     {
                         status = YYPUSH_MORE;
-                        if( cstat.m_iCondDepth )
-                            cstat.m_iCondDepth--;
-                        else
-                            pCtx->PopState();
+                        pCtx->PopState();
                         break;
                     }
                     case firstBlock:
                     {
-                        if( cstat.m_iCondDepth )
-                            break;
                         if( cstat.m_bExprValue )
                             cstat.m_iProgress = building;
                         break;
                     }
                     case elsifBlock:
                     {
-                        if( cstat.m_iCondDepth )
-                            break;
                         if( cstat.m_bExprValue &&
                             cstat.m_iProgress == scanning )
                             cstat.m_iProgress = building;
@@ -193,10 +197,7 @@ gint32 start_parse( CSTParserContext* pCtx )
                     }
                     case elseBlock:
                     {
-                        if( cstat.m_iCondDepth )
-                            break;
-                        if( cstat.m_bExprValue &&
-                            cstat.m_iProgress == scanning )
+                        if( cstat.m_iProgress == scanning )
                             cstat.m_iProgress = building;
                         else if( cstat.m_iProgress == building )
                             cstat.m_iProgress = leaving;
@@ -217,31 +218,50 @@ gint32 start_parse( CSTParserContext* pCtx )
         else 
         {
             // swallow the token on the false branch
+            CondPragmaState cps = pCtx->GetTopState();
             if( current_tok == TOK_LBRACE &&
                 next_tok == TOK_IF )
             {
-                current_tok = TOK_START_PRAGMA;
-                current_ps = pragma_ps = yypstate_new();
-                CondPragmaState cps = pCtx->GetTopState();
                 cps.m_iCondDepth++;
-                pCtx->SetLastPragma( next_tok );
             }
             else if( current_tok == TOK_LBRACE &&
                 ( next_tok == TOK_ELSIF ||
                   next_tok == TOK_ELSE  ||
                   next_tok == TOK_END_IF ) )
             {
-                auto& cstat = pCtx->GetTopState();
-                current_tok = TOK_START_PRAGMA;
-                current_ps = pragma_ps = yypstate_new();
-                pCtx->SetLastPragma( next_tok );
+                if( cps.m_iCondDepth == 0 )
+                {
+                    auto& cstat = pCtx->GetTopState();
+                    current_tok = TOK_START_PRAGMA;
+                    current_ps = pragma_ps = yypstate_new();
+                    pCtx->SetLastPragma( next_tok );
+                    bUpdate = false;
+                }
+                else if( next_tok == TOK_END_IF )
+                {
+                    cps.m_iCondDepth--;
+                    gint32 iLastLine = next_lloc->last_line;
+                    stdstr strName = next_lloc->name;
+                    next_tok = yylex( &next_lval, &next_lloc );
+                    if( next_tok != TOK_RBRACE )
+                    {
+                        ParserPrint( 
+                            strName.c_str(), iLastLine,
+                            "Fatal error, expecting "
+                            "'}' after 'end_if'" );
+                    }
+                    next_tok = yylex( &next_lval, &next_lloc );
+                }
             }
         }
 
         // 4. Advance: The 'next' becomes the 'current'
-        current_tok = next_tok;
-        current_lval = next_lval;
-        current_lloc = next_lloc;
+        if( bUpdate )
+        {
+            current_tok = next_tok;
+            current_lval = next_lval;
+            current_lloc = next_lloc;
+        }
     }
     return status;
 }

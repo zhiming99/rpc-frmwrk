@@ -1,1 +1,1 @@
-EXTRA_DIST= st_parser.y st_lexer.l st_base.cpp st_script.y
+EXTRA_DIST= stparser.y stlexer.l stbase.cpp stscript.y parsrctx.cpp parsrctx.h
