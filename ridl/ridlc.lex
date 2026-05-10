@@ -206,16 +206,7 @@ HexDig [0-9a-fA-F]
             PrintAndQuit( ret, "Expect \"" );
         }
 
-        if( strFile[ 0 ] == '/' )
-        {
-            yyin = TryOpenFile( strFile );
-            if ( !yyin )
-            {
-                PrintAndQuit(
-                    -errno, strerror( errno ) );
-            }
-        }
-        else
+        if( strFile[ 0 ] != '/' )
         {
             //relative path
             char* pPath = realpath(

@@ -41,7 +41,7 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #define YYPUSH_ABORT        1 // Need more tokens
 #define YYPUSH_NOMEM        2 // Syntax Error
 
-#define CONFLICT_STATE 297
+#define CONFLICT_STATE 295
 
 #define GetParserState( ps ) ( ps->yystate )
 
@@ -112,6 +112,7 @@ struct CSTParserContext
 
     std::vector< stdstr > m_vecInclPaths;
     std::vector< std::unique_ptr< FILECTX2 > > m_vecInclStack;
+    yyscan_t yyscanner = nullptr;
 
     gint32 GetCondStackSize() const
     { return m_vecCondStack.size(); }

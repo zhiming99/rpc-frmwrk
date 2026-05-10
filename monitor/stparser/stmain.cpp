@@ -42,13 +42,17 @@ gint32 start_parse( CSTParserContext* pCtx )
     YYSTYPE current_lval;
     YYLTYPE current_lloc;
 
+    yyscan_t yyscanner;
+    yylex_init( &yyscanner );
+
+    pCtx->yyscanner = yyscanner;
     yypstate *main_ps = yypstate_new();
     yypstate *pragma_ps = nullptr;
     yypush_parse(main_ps, TOK_START_MAIN, NULL, NULL);
 
     // Initialization: Get the first token
-    current_tok = yylex(
-        &current_lval, &current_lloc );
+    current_tok = yylex( &current_lval,
+        &current_lloc, yyscanner, pCtx );
 
     yypstate* current_ps = main_ps;
     while (status == YYPUSH_MORE)
@@ -56,7 +60,8 @@ gint32 start_parse( CSTParserContext* pCtx )
         // 1. Peek: Get the next token from the lexer
         YYSTYPE next_lval;
         YYLTYPE next_lloc;
-        gint32 next_tok = yylex( &next_lval, &next_lloc );
+        gint32 next_tok = yylex( &next_lval,
+            &next_lloc, yyscanner, pCtx );
         bool bUpdate = true;
 
         // 2. Logic: Now you have both current and next!
@@ -242,7 +247,9 @@ gint32 start_parse( CSTParserContext* pCtx )
                     cps.m_iCondDepth--;
                     gint32 iLastLine = next_lloc->last_line;
                     stdstr strName = next_lloc->name;
-                    next_tok = yylex( &next_lval, &next_lloc );
+                    next_tok = yylex(
+                        &next_lval, &next_lloc,
+                        yyscanner, pCtx );
                     if( next_tok != TOK_RBRACE )
                     {
                         ParserPrint( 
@@ -250,7 +257,9 @@ gint32 start_parse( CSTParserContext* pCtx )
                             "Fatal error, expecting "
                             "'}' after 'end_if'" );
                     }
-                    next_tok = yylex( &next_lval, &next_lloc );
+                    next_tok = yylex(
+                        &next_lval, &next_lloc,
+                        yyscanner, pCtx );
                 }
             }
         }
@@ -263,6 +272,9 @@ gint32 start_parse( CSTParserContext* pCtx )
             current_lloc = next_lloc;
         }
     }
+
+    yylex_destroy( yyscanner );
+    pCtx->yyscanner = nullptr;
     return status;
 }
 

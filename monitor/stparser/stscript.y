@@ -318,7 +318,53 @@ conditional_pragma:
     | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
     | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE
     | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
-        printf("Compiler Info: %s\n", $3);
+        std::string& strFile = $3;
+        if( strFile.empty() )
+        {
+            gint32 ret = -EINVAL;
+            PrintAndQuit( ret, "Expect \"" );
+        }
+
+        if( strFile[ 0 ] != '/' )
+        {
+            //relative path
+            char* pPath = realpath(
+                strFile.c_str(), nullptr );
+
+            if( pPath == nullptr )
+            {
+                stdstr& strTop =
+                    pCtx->m_vecInclStack.back()->m_strPath;
+                strFile = GetDirName(
+                    strTop ) + "/" + strFile;
+            }
+            else
+            {
+                strFile = pPath;
+                free( pPath );
+            }
+        }
+        yyscan_t yyscanner = pCtx->yyscanner;
+        yyin = TryOpenFile( strFile.c_str() );
+        if ( !yyin )
+        {
+            YYLTYPE *curloc = yyget_lloc( yyscanner );
+            ParserPrint( curloc->file->name,
+                yyget_lineno( yyscanner ),
+                strerror( errno ) );
+            break;
+        }
+
+        FILECTX2* pfc = new FILECTX2();
+        pfc->m_strPath = strFile;
+        pfc->m_fp = yyin;
+        pfc->m_oLocation = yyget_lloc( pCtx->yyscanner );
+        pCtx->m_vecInclStack.push_back(
+            std::unique_ptr< FILECTX2 >( pfc ) );
+        yypush_buffer_state(
+            yy_create_buffer( yyin, YY_BUF_SIZE ), yyscanner );
+        yyset_lineno(1, yyscanner);
+        yyset_column(1, yyscanner);
     }
     | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE
 
@@ -562,15 +608,14 @@ void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
 }
 
-void ParserPrint( const char* szFile,
+void ParserPrint(
+    const char* szFile,
     gint32 iLineNo,
     const char* strMsg )
 {
     char szBuf[ 512 ];
-    sprintf( szBuf,
-        "%s(%d): Fatal error, too many "
-        "nested conditional pragmas.",
-        szFile, iLineNo );
+    sprintf( szBuf, "%s(%d): %s",
+        szFile, iLineNo, strMsg );
     fprintf( stderr, szBuf );
 }
 

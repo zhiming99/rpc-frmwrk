@@ -23,16 +23,31 @@
  */
 %top{
 #include <stdio.h>
-#include "y.tab.h"
 #include <string>
 #include <vector>
 #include <cstdlib>
 #include <cctype>
+#include "parsrctx.h"
 
 std::string ProcessSTString(const char* input);
 typedef Variant YYSTYPE;
+#define YY_DECL int yylex(YYSTYPE * yylval_param, \
+    YYLTYPE * yylloc_param, CSTParserContext* pCtx );
+
+#define YY_USER_ACTION \
+    yylloc->first_line = yylloc->last_line = yyget_lineno(yyscanner); \
+    yylloc->first_column = yyget_column(yyscanner); \
+    yylloc->last_column = yyget_column(yyscanner) + yyleng - 1; \
+    yyset_column(yyget_column(yyscanner) + yyleng, yyscanner);
 
 %}
+
+%option     8bit bison-bridge
+%option     bison-locations
+%option     warn
+%option     reentrant
+%option     yylineno
+
 
  /* Definitions */
 ST_TYPE     (?i:BOOL|BYTE|WORD|DWORD|LWORD|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT|REAL|LREAL)
@@ -264,7 +279,8 @@ int comment_depth = 0;
                 }
     "/*"        { /* Optional: handle C-style nested inside ST */ }
     "*/"        { /* Optional: handle C-style nested inside ST */ }
-    .|\n        { /* Ignore all other characters */ }
+    .           {}
+    "\n"        { yyset_column( 1, yyscanner ); }
 }
 
     /* C-Style Comment Logic */
@@ -276,13 +292,17 @@ int comment_depth = 0;
                 }
     "(*"        { /* Optional: handle ST nested inside C-style */ }
     "*)"        { /* Optional: handle ST nested inside C-style */ }
-    .|\n        { /* Ignore all other characters */ }
+    .           { /* Ignore all other characters */ }
+    "\n"        { yyset_column( 1, yyscanner ); }
 }
 
     /* --- Single Line Comment // ... --- */
 <SINGLE_COMM>{
-    \n          { BEGIN(INITIAL); }
-    .           { /* Ignore until end of line */ }
+    "\n"          {
+          BEGIN(INITIAL);
+          yyset_column( 1, yyscanner );
+    }
+    .     { /* Ignore until end of line */ }
 }
 
     /* --- Error Handling for Unclosed Comments --- */
@@ -318,9 +338,25 @@ int comment_depth = 0;
 "#"                 return TOK_PUNC;
 "^"                 return TOK_CARET;
 
-[ \t\n]+        ; /* Ignore whitespace */
+[ \t]+        ; /* Ignore whitespace */
+[\n]           { yyset_column( 1, yyscanner ); }
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }
 
+<<EOF>> {
+        
+        yypop_buffer_state();
+        if ( !YY_CURRENT_BUFFER)
+            return YY_EOF;
+
+        if( pCtx->m_vecInclStack.empty() )
+            return YY_EOF;
+
+        YYLTYPE2* ploc = pCtx->m_vecInclStack.back().get();
+        yyloc = *ploc;
+        yyset_lineno( ploc->last_line, yyscanner );
+        yyset_column( ploc->last_column, yyscanner );
+        pCtx->m_vecInclStack.pop_back();
+}
 %%
 
 int yywrap() {
