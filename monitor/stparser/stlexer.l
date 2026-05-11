@@ -343,7 +343,6 @@ int comment_depth = 0;
 .               { fprintf(stderr, "Unknown character: %s\n", yytext); }
 
 <<EOF>> {
-        
         yypop_buffer_state();
         if ( !YY_CURRENT_BUFFER)
             return YY_EOF;
@@ -351,7 +350,8 @@ int comment_depth = 0;
         if( pCtx->m_vecInclStack.empty() )
             return YY_EOF;
 
-        YYLTYPE2* ploc = pCtx->m_vecInclStack.back().get();
+        YYLTYPE2* ploc =
+            pCtx->m_vecInclStack.back().get();
         yyloc = *ploc;
         yyset_lineno( ploc->last_line, yyscanner );
         yyset_column( ploc->last_column, yyscanner );

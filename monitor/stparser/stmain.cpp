@@ -25,6 +25,7 @@
 
 #include "stlexer.h"
 #include "stscript.h"
+#include "getopt.h"
 
 std::shared_ptr< CStParserContext > g_pParserCtx;
 
@@ -34,7 +35,7 @@ std::shared_ptr< CStParserContext > g_pParserCtx;
         _iPragma_ == TOK_ELSE || \
         _iPragma_ == TOK_END_IF )
 
-gint32 start_parse( CSTParserContext* pCtx )
+gint32 StartParse( CSTParserContext* pCtx )
 {
     gint32 current_tok;
     gint32 status = YYPUSH_MORE;
@@ -278,8 +279,145 @@ gint32 start_parse( CSTParserContext* pCtx )
     return status;
 }
 
+void Usage()
+{
+    printf( "Usage:" );
+    printf( "rpcfstc [options] <st file> \n" );
+
+    printf( "\t compile the `ST file'"
+        "and output the RPC skeleton files.\n" );
+
+    printf( "Options -h:\tprint this help.\n");
+
+    printf( "\t-I:\tSpecify the path to"
+        " search for the included `ST files'.\n"
+        "\t\tAnd this option can repeat many"
+        "times.\n" );
+}
+
 int main( int argc, char** argv[] )
 {
+    gint32 ret = 0;
     g_pParserCtx.reset( new CSTParserContext );
+    auto pCtx = g_pParserCtx.get();
+    do{
+        ret = CoInitialize( COINIT_NORPC );
+        if( ERROR( ret ) )
+            break;
+
+        FactoryPtr pFactory = InitClassFactory();
+        ret = CoAddClassFactory( pFactory );
+        if( ERROR( ret ) )
+            break;
+
+        int opt = 0;
+        bool bQuit = false;
+
+        int option_index = 0;
+        static struct option long_options[] = {
+            {"version", no_argument, 0,  0 },
+            {0, 0,  0,  0 }
+        };
+
+        while( true ) 
+        {
+
+            opt = getopt_long( argc, argv,
+                "hI:",
+                long_options, &option_index );
+
+            if( opt == -1 )
+                break;
+
+            switch( opt )
+            {
+            case 0:
+                {
+                    if( option_index == 0 )
+                    {
+                        printf( "%s", Version() );
+                        bQuit = true;
+                    }
+                    break;
+                }
+                case 'I' :
+                {
+                    ret = IsValidDir( optarg );
+                    if( ret == -ENOTDIR )
+                    {
+                        std::string strMsg =
+                            "Error '";
+
+                        strMsg += optarg;
+                        strMsg +=
+                           "' is not a directory";
+                        printf( "%s\n",
+                            strMsg.c_str() );
+                        bQuit = true;
+                        break;
+                    }
+                    else if( ERROR( ret ) )
+                    {
+                        printf( "%s : %s\n", optarg,
+                            strerror( -ret ) );
+                        bQuit = true;
+                        break;
+                    }
+
+                    char szBuf[ 512 ];
+                    int iSize = strnlen(
+                        optarg, sizeof( szBuf ) + 1 );
+                    stdstr strMsg;
+                    if( iSize > sizeof( szBuf ) )
+                    {
+                        strMsg +=
+                           "path is too long";
+                        ret = -ERANGE;
+                        bQuit = true;
+                        break;
+                    }
+                    stdstr strFullPath;
+                    if( optarg[ 0 ] == '/' )
+                    {
+                        strFullPath = optarg;
+                    }
+                    else
+                    {
+                        char* szPath = getcwd(
+                            szBuf, sizeof( szBuf ) );
+                        if( szPath == nullptr )
+                        {
+                            strMsg +=
+                               "path is too long";
+                            ret = -errno;
+                            bQuit = true;
+                            break;
+                        }
+                        strFullPath = szPath;
+                        strFullPath += "/";
+                        strFullPath += optarg;
+                        if( strFullPath.size() >
+                            sizeof( szBuf ) )
+                        {
+                            strMsg +=
+                               "path is too long";
+                            ret = -ERANGE;
+                            bQuit = true;
+                            break;
+                        }
+                    }
+                    pCtx->m_vecInclPaths.push_back(
+                        strFullPath );
+                    break;
+                }
+            }
+            break;
+        }
+        if( ERROR( ret ) )
+            break;
+
+        ret = StartParse( pCtx );
+
+    }while( 0 );
 }
 

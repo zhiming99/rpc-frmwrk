@@ -316,8 +316,8 @@ conditional_pragma:
     | TOK_START_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
     | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
     | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
-    | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE
-    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
+    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE
+    | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
         std::string& strFile = $3;
         if( strFile.empty() )
         {
@@ -335,8 +335,8 @@ conditional_pragma:
             {
                 stdstr& strTop =
                     pCtx->m_vecInclStack.back()->m_strPath;
-                strFile = GetDirName(
-                    strTop ) + "/" + strFile;
+                strFile = GetDirName( strTop ) +
+                    "/" + strFile;
             }
             else
             {
@@ -345,8 +345,8 @@ conditional_pragma:
             }
         }
         yyscan_t yyscanner = pCtx->yyscanner;
-        yyin = TryOpenFile( strFile.c_str() );
-        if ( !yyin )
+        FILE* pIncl = TryOpenFile( strFile.c_str() );
+        if ( !pIncl )
         {
             YYLTYPE *curloc = yyget_lloc( yyscanner );
             ParserPrint( curloc->file->name,
@@ -357,14 +357,14 @@ conditional_pragma:
 
         FILECTX2* pfc = new FILECTX2();
         pfc->m_strPath = strFile;
-        pfc->m_fp = yyin;
+        pfc->m_fp = pIncl;
         pfc->m_oLocation = yyget_lloc( pCtx->yyscanner );
         pCtx->m_vecInclStack.push_back(
             std::unique_ptr< FILECTX2 >( pfc ) );
         yypush_buffer_state(
-            yy_create_buffer( yyin, YY_BUF_SIZE ), yyscanner );
-        yyset_lineno(1, yyscanner);
-        yyset_column(1, yyscanner);
+            yy_create_buffer( pIncl, YY_BUF_SIZE ), yyscanner );
+        yyset_lineno( 1, yyscanner );
+        yyset_column( 1, yyscanner );
     }
     | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE
 
