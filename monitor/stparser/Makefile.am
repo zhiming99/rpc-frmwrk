@@ -1,4 +1,4 @@
-EXTRA_DIST= stparser.y stlexer.l stbase.cpp stscript.y parsrctx.cpp parsrctx.h stast.h nonterm.h
+EXTRA_DIST= stparser.y stlexer.l stbase.cpp stscript.y parsrctx.cpp parsrctx.h stast.h nonterm.h stmain.cpp
 
 stlexer.cpp stlexer.h: stlexer.l
 	flex --header-file=stlexer.h -o stlexer.cpp stlexer.l

@@ -35,6 +35,27 @@ std::shared_ptr< CStParserContext > g_pParserCtx;
         _iPragma_ == TOK_ELSE || \
         _iPragma_ == TOK_END_IF )
 
+static gint32 IsValidDir( const char* szDir )
+{
+    gint32 ret = 0;
+    do{
+        struct stat sb;
+        if (lstat( szDir, &sb) == -1)
+        {
+            ret = -errno;
+            break;
+        }
+        mode_t iFlags =
+            ( sb.st_mode & S_IFMT );
+        if( iFlags != S_IFDIR )
+        {
+            ret = -ENOTDIR;
+            break;
+        }
+    }while( 0 );
+    return ret;
+}
+
 gint32 StartParse( CSTParserContext* pCtx )
 {
     gint32 current_tok;
