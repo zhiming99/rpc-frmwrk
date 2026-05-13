@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include "stscript.h"
 namespace rpcf
 {
 
@@ -34,6 +35,8 @@ struct CSTAstNodeBase :
     typedef CObjBase super;
     CSTAstNodeBase():super() {} 
     CSTAstNodeBase* m_pParent;
+    gint32 m_iToken = YYUNDEF;
+    YYLTYPE2  m_oLocation;
 
     std::vector< CSTAstNodeBase > m_vecChildren;
 
@@ -52,6 +55,9 @@ struct CSTAstNodeBase :
 
     virtual std::string GetSignature() const
     { return std::string( "" ); }
+
+    inline void SetLocation( YYLTYPE& oLoc )
+    { m_oLocation = oLoc; }
 };
 
 

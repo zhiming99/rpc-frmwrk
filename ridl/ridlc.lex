@@ -203,7 +203,7 @@ HexDig [0-9a-fA-F]
         if( strFile.empty() )
         {
             gint32 ret = -EINVAL;
-            PrintAndQuit( ret, "Expect \"" );
+            PrintAndQuit( ret, "Expecting file name" );
         }
 
         if( strFile[ 0 ] != '/' )

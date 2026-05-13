@@ -38,7 +38,7 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #include "rpc.h"
 
 #define YYPUSH_ACCEPT       0 // Success / Input Accepted
-#define YYPUSH_ABORT        1 // Need more tokens
+#define YYPUSH_ABORT        1 // Parsing aborted
 #define YYPUSH_NOMEM        2 // Syntax Error
 
 #define CONFLICT_STATE 295
@@ -150,6 +150,20 @@ struct CSTParserContext
 
     FILE* TryOpenFile(
         const std::string& strFile );
+
+    gint32 m_iError = 0;
+    inline void IncError()
+    { m_iError++; }
+
+    inline gint32 GetErrorCount() const
+    { return m_iError; }
+
+    gint32 m_iSemErr = 0;
+    inline void IncSemError()
+    { m_iSemError++; }
+
+    inline gint32 GetSemErrorCount() const
+    { return m_iSemError; }
 }
 
 extern std::shared_ptr< CSTParserContext > g_pParserCtx;

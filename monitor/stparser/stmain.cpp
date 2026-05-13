@@ -70,14 +70,15 @@ gint32 StartParse( CSTParserContext* pCtx )
     pCtx->yyscanner = yyscanner;
     yypstate *main_ps = yypstate_new();
     yypstate *pragma_ps = nullptr;
-    yypush_parse(main_ps, TOK_START_MAIN, NULL, NULL);
+    status = yypush_parse(
+        main_ps, TOK_START_MAIN, NULL, NULL);
 
     // Initialization: Get the first token
     current_tok = yylex( &current_lval,
         &current_lloc, yyscanner, pCtx );
 
     yypstate* current_ps = main_ps;
-    while (status == YYPUSH_MORE)
+    while( status == YYPUSH_MORE )
     {
         // 1. Peek: Get the next token from the lexer
         YYSTYPE next_lval;

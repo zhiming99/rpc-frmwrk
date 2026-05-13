@@ -316,13 +316,27 @@ conditional_pragma:
     | TOK_START_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
     | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
     | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
-    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE
+    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
+        std::string& strMsg = $3;
+        ParserPrint( 
+            curloc->file->name,
+            yyget_lineno( yyscanner ),
+            "Info: %s ", strMsg.c_str() );
+    }
     | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
+
+        yyscan_t yyscanner = pCtx->yyscanner;
+        YYLTYPE *curloc = yyget_lloc( yyscanner );
+
         std::string& strFile = $3;
         if( strFile.empty() )
         {
-            gint32 ret = -EINVAL;
-            PrintAndQuit( ret, "Expect \"" );
+            ParserPrint( 
+                curloc->file->name,
+                yyget_lineno( yyscanner ),
+                "Error, expecting file name" );
+            pCtx->IncSemError();
+            YYERROR;
         }
 
         if( strFile[ 0 ] != '/' )
@@ -344,15 +358,15 @@ conditional_pragma:
                 free( pPath );
             }
         }
-        yyscan_t yyscanner = pCtx->yyscanner;
         FILE* pIncl = TryOpenFile( strFile.c_str() );
         if ( !pIncl )
         {
-            YYLTYPE *curloc = yyget_lloc( yyscanner );
-            ParserPrint( curloc->file->name,
+            ParserPrint(
+                curloc->file->name,
                 yyget_lineno( yyscanner ),
                 strerror( errno ) );
-            break;
+            pCtx->IncSemError();
+            YYERROR;
         }
 
         FILECTX2* pfc = new FILECTX2();
