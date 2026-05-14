@@ -209,7 +209,8 @@ int comment_depth = 0;
     std::string valStr = s.substr(hashPos + 1);
 
     // Remove underscores from value string
-    valStr.erase(std::remove(valStr.begin(), valStr.end(), '_'), valStr.end());
+    valStr.erase(std::remove(
+        valStr.begin(), valStr.end(), '_'), valStr.end());
 
     if (type == "REAL" || type == "LREAL") {
         printf("f32.const %s\n", valStr.c_str());

@@ -41,7 +41,7 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #define YYPUSH_ABORT        1 // Parsing aborted
 #define YYPUSH_NOMEM        2 // Syntax Error
 
-#define CONFLICT_STATE 295
+#define CONFLICT_STATE 411
 
 #define GetParserState( ps ) ( ps->yystate )
 
