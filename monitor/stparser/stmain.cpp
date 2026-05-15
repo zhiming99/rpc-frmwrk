@@ -23,9 +23,11 @@
  * =====================================================================================
  */
 
+#include <rpc.h>
 #include "stlexer.h"
 #include "stscript.h"
 #include "getopt.h"
+using namespace rpcf;
 
 std::shared_ptr< CStParserContext > g_pParserCtx;
 
@@ -56,8 +58,43 @@ static gint32 IsValidDir( const char* szDir )
     return ret;
 }
 
+// mandatory part, just copy/paste'd from clsids.cpp
+static FactoryPtr InitClassFactory()
+{
+    BEGIN_FACTORY_MAPS;
+
+    INIT_MAP_ENTRY( CStructDecl );
+    INIT_MAP_ENTRY( CFuncDecl );
+    INIT_MAP_ENTRY( CFuncBlockDecl );
+
+    END_FACTORY_MAPS;
+};
+
+gint32 ReadToken( YYLTYPE* current_lval,
+    YYSTYPE* current_loc,
+    yyscan_t yyscanner,
+    CSTParserContext* pCtx )
+{
+    gint32 ret = YYEOF;
+    do{
+        ret = yylex( current_lval,
+            current_loc, yyscanner, pCtx );
+        if( ret == YYEMPTY )
+            continue;
+        break;
+    }while( 1 );
+    return ret;
+}
+
+#define READTOK( _val, _loc, _scanner, _ctx ) ( do{ \
+        ret = ReadToken( _val, _loc, _scanner, _ctx ); \
+        if( ret == YYEOF ) \
+            ret = TOK_EOF; \
+    }while( 0 ), ret )
+
 gint32 StartParse( CSTParserContext* pCtx )
 {
+    gint32 ret = 0;
     gint32 current_tok;
     gint32 status = YYPUSH_MORE;
 
@@ -74,7 +111,7 @@ gint32 StartParse( CSTParserContext* pCtx )
         main_ps, TOK_START_MAIN, NULL, NULL);
 
     // Initialization: Get the first token
-    current_tok = yylex( &current_lval,
+    current_tok = READTOK( &current_lval,
         &current_lloc, yyscanner, pCtx );
 
     yypstate* current_ps = main_ps;
@@ -83,7 +120,7 @@ gint32 StartParse( CSTParserContext* pCtx )
         // 1. Peek: Get the next token from the lexer
         YYSTYPE next_lval;
         YYLTYPE next_lloc;
-        gint32 next_tok = yylex( &next_lval,
+        gint32 next_tok = READTOK( &next_lval,
             &next_lloc, yyscanner, pCtx );
         bool bUpdate = true;
 
@@ -270,7 +307,7 @@ gint32 StartParse( CSTParserContext* pCtx )
                     cps.m_iCondDepth--;
                     gint32 iLastLine = next_lloc->last_line;
                     stdstr strName = next_lloc->name;
-                    next_tok = yylex(
+                    next_tok = READTOK(
                         &next_lval, &next_lloc,
                         yyscanner, pCtx );
                     if( next_tok != TOK_RBRACE )
@@ -280,7 +317,7 @@ gint32 StartParse( CSTParserContext* pCtx )
                             "Fatal error, expecting "
                             "'}' after 'end_if'" );
                     }
-                    next_tok = yylex(
+                    next_tok = READTOK(
                         &next_lval, &next_lloc,
                         yyscanner, pCtx );
                 }
@@ -298,7 +335,7 @@ gint32 StartParse( CSTParserContext* pCtx )
 
     yylex_destroy( yyscanner );
     pCtx->yyscanner = nullptr;
-    return status;
+    return ret;
 }
 
 void Usage()
@@ -320,12 +357,15 @@ void Usage()
 int main( int argc, char** argv[] )
 {
     gint32 ret = 0;
-    g_pParserCtx.reset( new CSTParserContext );
-    auto pCtx = g_pParserCtx.get();
+    bool bUninit = false;
     do{
         ret = CoInitialize( COINIT_NORPC );
         if( ERROR( ret ) )
             break;
+        bUninit = true;
+
+        g_pParserCtx.reset( new CSTParserContext );
+        auto pCtx = g_pParserCtx.get();
 
         FactoryPtr pFactory = InitClassFactory();
         ret = CoAddClassFactory( pFactory );
@@ -441,5 +481,9 @@ int main( int argc, char** argv[] )
         ret = StartParse( pCtx );
 
     }while( 0 );
+    if( bUninit )
+        CoUninitialize();
+
+    return ret;
 }
 

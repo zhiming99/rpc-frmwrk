@@ -59,7 +59,7 @@ extern void ParserPrint(
 %token TOK_PLUS TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
-%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN
+%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN TOK_EOF
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
@@ -76,6 +76,7 @@ extern void ParserPrint(
 start_point:
     TOK_START_MAIN source_file
     | conditional_pragma
+    ;
 
 source_file:
     pou_list
@@ -83,6 +84,7 @@ source_file:
     | global_var
     | var_config_declaration
     | pragma_statement
+    | TOK_EOF
     ;
 
 pou_list:
@@ -400,9 +402,18 @@ conditional_pragma:
         yyset_lineno( 1, yyscanner );
         yyset_column( 1, yyscanner );
     }
-
+    | TOK_START_PRAGMA TOK_ATTRIBUTE TOK_STRING  opt_attr_values TOK_RBRACE {}
     ;
 
+string_list:
+    TOK_STRING
+    | string_list TOK_COMMA TOK_STRING
+
+opt_attr_values :
+    /* empty */
+    | TOK_ASSIGN string_list
+
+    
 /* Rule for Assignments: Only allows memory locations on the LHS */
 assignment_statement:
       l_value TOK_ASSIGN full_expression {
@@ -586,19 +597,6 @@ opt_access_modifier:
 function_block:
     function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
 
-/* Attributes are collected before the object they modify */
-opt_attributes:
-    /* empty */
-    | attribute_entry opt_attributes 
-    ;
-
-attribute_entry:
-    TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE {
-        // Semantic Action: Store attribute (e.g., "strict") in a temp list
-        add_attribute_to_current_scope($3);
-    }
-    ;
-
 function_block_header:
     TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
     ;
@@ -700,7 +698,7 @@ instance_specific_init:
     ;
 
 instance_path:
-    TOK_ID
+    TOK_ID{ }
     | instance_path TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
     ;
 
@@ -708,79 +706,5 @@ instance_path:
 
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
-}
-
-void ParserPrint(
-    const char* szFile,
-    gint32 iLineNo,
-    const char* strMsg )
-{
-    char szBuf[ 512 ];
-    sprintf( szBuf, "%s(%d): %s",
-        szFile, iLineNo, strMsg );
-    fprintf( stderr, szBuf );
-}
-
-FILECTX2::FILECTX2()
-{
-    m_oVal.Clear(); 
-    m_oLocation.first_line =
-    m_oLocation.first_column =  
-    m_oLocation.last_line =
-    m_oLocation.last_column = 1;
-}
-
-FILECTX2::FILECTX2( const std::string& strPath )
-    : FILECTX2()
-{
-    m_fp = fopen( strPath.c_str(), "r");
-    if( m_fp != nullptr )
-    {
-        m_strPath = strPath;
-    }
-    else
-    {
-        std::string strMsg = "error cannot open file '";
-        strMsg += strPath + "'";
-        throw std::invalid_argument( strMsg );
-    }
-}
-
-FILECTX2::~FILECTX2()
-{
-    if( m_fp != nullptr )
-    {
-        fclose( m_fp );
-        m_fp = nullptr;
-    }
-}
-
-FILECTX2::FILECTX2( const FILECTX2& rhs )
-{
-    m_fp = rhs.m_fp;
-    m_oVal = rhs.m_oVal;
-    m_strPath = rhs.m_strPath;
-    m_strLastVal = rhs.m_strLastVal;
-    memcpy( &m_oLocation,
-        &rhs.m_oLocation,
-        sizeof( m_oLocation ) );
-}
-
-FILE* CSTParserContext::TryOpenFile(
-    const std::string& strFile )
-{
-    FILE* fp = fopen( strFile.c_str(), "r");
-    if ( fp != nullptr )
-        return fp;
-
-    for( auto elem : m_vecInclPaths )
-    {
-        std::string strPath =
-            elem + "/" + strFile;
-        fp = fopen( strPath.c_str(), "r" );
-        if( fp != nullptr )
-            break;
-    }
-    return fp;
 }
 

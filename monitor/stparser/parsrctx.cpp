@@ -25,12 +25,15 @@
 #include "parsrctx.h"
 using namespace rpcf;
 
+namespace rpcf
+{
+    
 FILECTX2::FILECTX2()
 {
     m_oVal.Clear(); 
-    m_oLocation.first_line =
-    m_oLocation.first_column =  
-    m_oLocation.last_line =
+    m_oLocation.first_line = 1;
+    m_oLocation.first_column =  1; 
+    m_oLocation.last_line = 1;
     m_oLocation.last_column = 1;
 }
 
@@ -88,3 +91,15 @@ FILE* CSTParserContext::TryOpenFile(
     return fp;
 }
 
+void ParserPrint(
+    const char* szFile,
+    gint32 iLineNo,
+    const char* strMsg )
+{
+    char szBuf[ 512 ];
+    sprintf( szBuf, "%s(%d): %s",
+        szFile, iLineNo, strMsg );
+    fprintf( stderr, szBuf );
+}
+
+}

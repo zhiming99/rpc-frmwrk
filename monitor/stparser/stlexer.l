@@ -341,15 +341,19 @@ int comment_depth = 0;
 
 [ \t]+        ; /* Ignore whitespace */
 [\n]           { yyset_column( 1, yyscanner ); }
-.               { fprintf(stderr, "Unknown character: %s\n", yytext); }
+.              {
+        fprintf(stderr, "Unknown character: %s\n", yytext);
+        yyterminate();
+        }
 
 <<EOF>> {
+    do{
         yypop_buffer_state();
         if ( !YY_CURRENT_BUFFER)
-            return YY_EOF;
+            break;
 
         if( pCtx->m_vecInclStack.empty() )
-            return YY_EOF;
+            break;
 
         YYLTYPE2* ploc =
             pCtx->m_vecInclStack.back().get();
@@ -357,6 +361,10 @@ int comment_depth = 0;
         yyset_lineno( ploc->last_line, yyscanner );
         yyset_column( ploc->last_column, yyscanner );
         pCtx->m_vecInclStack.pop_back();
+        // tell the caller to retry
+        return YYEMPTY;
+    }while( 0 );
+    yyterminate();
 }
 %%
 

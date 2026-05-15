@@ -23,6 +23,11 @@
  * =====================================================================================
  */
 #pragma once
+#include "rpc.h"
+
+namespace rpcf
+{
+  
 
 typedef enum {
   nt_invalid = -10,
@@ -104,3 +109,5 @@ typedef enum {
   nt_instance_path = 213,            /* instance_path  */
 
 } EnumNonTerm;
+
+}

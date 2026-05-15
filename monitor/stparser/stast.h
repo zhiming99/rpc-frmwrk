@@ -25,6 +25,10 @@
 #pragma once
 
 #include "stscript.h"
+
+#define NODE_FLAG_CONST     0x1
+#define NODE_FLAG_POINTER   0x2
+#define NODE_FLAG_REF       0x4
 namespace rpcf
 {
 
@@ -37,7 +41,10 @@ struct CSTAstNodeBase :
     CSTAstNodeBase* m_pParent;
     gint32 m_iToken = YYUNDEF;
     YYLTYPE2  m_oLocation;
-
+    // the file index in the included file stack. -1 means the main file.
+    gint32 m_iFileIdx = -1;
+    YYSTYPE m_oValue;
+    
     std::vector< CSTAstNodeBase > m_vecChildren;
 
     inline void SetParent(
