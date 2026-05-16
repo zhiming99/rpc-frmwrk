@@ -172,13 +172,13 @@ int comment_depth = 0;
 
  /* Matches TOD#14:30:05.123 */
 {TOD_PREFIX}[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval.qwVal = ( guint64 )ParseStTimeToUnix( yytext );
+    yylval = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_TIME_OF_DAY;
 }
 
  /* Matches DT#2024-12-25-14:30:05 */
 {DT_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval.qwVal = ( guint64 )ParseStTimeToUnix( yytext );
+    yylval = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_DATE_TIME
 }
 
@@ -242,7 +242,12 @@ int comment_depth = 0;
  /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
 "%P"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+ |
 "%"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+":P" {
-    //yylval.addr_val = parse_absolute_address(yytext);
+    ObjPtr pAddr = ParsePeriAddr( yytext );
+    if( pAddr.IsEmpty() )
+    {
+        return YYerror;
+    }
+    yylval = pAddr;
     return TOK_ABS_ADDR_PERIPHERAL;
 }
 

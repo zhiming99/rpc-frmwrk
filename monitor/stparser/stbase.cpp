@@ -30,6 +30,9 @@
 #include <stdint.h>
 #include <sstream>
 #include <iomanip>
+#include "rpc.h"
+
+using namespace rpcf
 
 struct timespec st_time_to_timespec(const char* text) {
     struct timespec ts = {0, 0};
@@ -227,3 +230,43 @@ std::wstring TranslateSTWString(const std::string& input) {
     }
     return result;
 }
+
+ObjPtr ParsePeriAddr( const char* yytext )
+{
+    // 1. Convert the Flex C-string match to a C++ string object
+    std::string raw_match(yytext);
+
+    // 2. Define the matching C++ pattern using capture groups ().
+    // Group 1: Area ([IQMiqm])
+    // Group 2: Size ([XBWDLxbwdl]?) -> Optional capture group
+    // Group 3: Digits ([0-9]+)
+    std::regex extract_pattern("^%([IQMiqm])([XBWDLxbwdl]?)([0-9]+):P$");
+    std::regex extract_pattern2("^%P([IQMiqm])([XBWDLxbwdl]?)([0-9]+)$");
+    std::smatch matches;
+    bool bRet = false;
+    if( yytext[1] != 'P' )
+        bRet = std::regex_match(raw_match, matches, extract_pattern);
+    else
+        bRet = std::regex_match(raw_match, matches, extract_pattern2);
+
+    // 3. Execute regex_match to isolate the capture blocks
+    if ( bRet )
+    {
+        IntVecPtr pvecInt;
+        pvecInt.NewObj();
+        // Extract using sub-match indexing (Index 0 is the full string)
+        (*pvecInt)().push_back( matches[1].str()[0] );
+        stdstr strSize = matches[2].str();
+
+        // Auto-resolves to "" if missing
+        (*pvecInt)().push_back( strSize.empty() ? 'X' : strSize[0] ); 
+        (*pvecInt)().push_back( std::stoi(matches[3].str()) );
+
+        // the last one as a flag of peripherial address
+        (*pvecInt)().push_back( 1 );
+        return ObjPtr( pvecInt );
+    }
+    return ObjPtr();
+}
+
+
