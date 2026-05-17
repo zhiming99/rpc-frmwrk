@@ -362,6 +362,7 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
 {
     gint32 ret = 0;
     do{
+        bool bNotify = true;
         GETAC( pContext );
         stdstr strPath = "/" APPS_ROOT_DIR "/";
         Variant oOrigin;
@@ -421,6 +422,7 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
                 stdstr strCmd;
                 auto& dwCmd =
                     ( const guint32& )value;
+                bNotify = false;
                 if( dwCmd  == usrcmdStart )
                     strCmd = "start";
                 else if( dwCmd  == usrcmdStop )
@@ -437,11 +439,11 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
                 }
                 bool bOnline =
                     pm->IsAppOnline( strApp );
-                if( ( bOnline && dwCmd == 1 )  )
+                if( ( bOnline && dwCmd == usrcmdStart )  )
                     break;
-                if( ( !bOnline && dwCmd == 2 )  )
+                if( ( !bOnline && dwCmd == usrcmdStop )  )
                     break;
-                if( !bOnline )
+                if( true )
                 {
                     const char* args[4];
                     stdstr strExec;
@@ -455,23 +457,32 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
                     args[ 2 ] = strApp.c_str();
                     args[ 3 ] = nullptr;
                     char* env[ 1 ] = { nullptr };
-                    Execve( strExec.c_str(),
+                    ret = Execve( strExec.c_str(),
                         const_cast< char* const*>( args ),
                         env, "", false );
                 }
                 CfgPtr pInfo;
                 stdstr strUser;
                 gint32 iRet = GetLoginInfo( pContext, pInfo );
-                if( SUCCEEDED( ret ) )
+                if( SUCCEEDED( iRet ) )
                 {
                     CCfgOpener oInfo(
                         ( const IConfigDb* )pInfo );
-                    ret = oInfo.GetStrProp(
+                    iRet = oInfo.GetStrProp(
                         propUserName, strUser );
+                    if( ERROR( iRet ) )
+                        strUser = "Unknown";
                     if( SUCCEEDED( ret ) )
                     {
                         LOGINFO( this->GetIoMgr(), 0,
                         "'%s' has sent command '%s' to app '%s'",
+                        strUser.c_str(), strCmd.c_str(), 
+                        strApp.c_str() );
+                    }
+                    else
+                    {
+                        LOGERR( this->GetIoMgr(), ret,
+                        "'%s' failed to sent command '%s' to app '%s'",
                         strUser.c_str(), strCmd.c_str(), 
                         strApp.c_str() );
                     }
@@ -506,12 +517,15 @@ gint32 CAppMonitor_SvrImpl::SetPointValue(
             break;
         }
 
-        CAppManager_SvrImpl* pm = GetAppManager();
-        pm->NotifyValChange(
-            strPtPath, value, hcurStm );
+        if( bNotify )
+        {
+            CAppManager_SvrImpl* pm = GetAppManager();
+            pm->NotifyValChange(
+                strPtPath, value, hcurStm );
 
-        this->OnPointChangedInternal(
-            strPtPath, value, hcurStm );
+            this->OnPointChangedInternal(
+                strPtPath, value, hcurStm );
+        }
 
     }while( 0 );
     return ret;

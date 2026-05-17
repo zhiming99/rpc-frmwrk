@@ -1,12 +1,12 @@
 /*
  * =====================================================================================
  *
- *       Filename:  st_parser.y
+ *       Filename:  stscript.y
  *
- *    Description:  The grammar parser for Structured Text Language
+ *    Description:  The grammar parser for a subset of Structured Text Language
  *
  *        Version:  1.0
- *        Created:  04/10/2026 12:00:00 PM
+ *        Created:  04/24/2026 11:18:30 PM
  *       Revision:  none
  *       Compiler:  Bison
  *
@@ -21,12 +21,37 @@
  *
  * =====================================================================================
  */
+
+%locations
+%define api.pure full
+%define api.push-pull push
+%define api.value.type {Variant}
+%require "3.0"
+
 %{
 #include <stdio.h>
 #include <stdlib.h>
+
+using namespace rpcf;
+
+std::shared_ptr< CSTParserContext > g_pParserCtx( new CSTParserContext );
+
 %}
 
-%token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_END_IF CASE OF END_CASE TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
+%code requires {
+
+#include "parsrctx.h"
+
+extern gint32 EvalConstExpr( CSTParserContext* pCtx );
+
+extern void ParserPrint(
+    const char* szFile,
+    gint32 iLineNo,
+    const char* strMsg );
+
+}
+
+%token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
 
@@ -34,62 +59,36 @@
 %token TOK_PLUS TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
+%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
+
+ /*%glr-parser*/
+
+%start start_point
+%parse-param { CSTParserContext *pCtx }
 
 %%
 
-source_file:
-    include_files
-    | pou_list
-    | type_definition_block
-    | global_var
-    | var_config_declaration
-    ;
+start_point:
+    TOK_START_MAIN script_file
+    | conditional_pragma
 
-pou_list:
-    pou_declaration
-    | pou_list pou_declaration
-    ;
-
-global_var:
-    TOK_VAR_GLOBAL var_list TOK_END_VAR 
-    | TOK_VAR_GLOBAL opt_qualifier var_list TOK_END_VAR 
-
-/* Attributes are collected before the object they modify */
-opt_attributes:
-    /* empty */
-    | opt_attributes attribute_entry
-    ;
-
-attribute_entry:
-    TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE {
-        // Semantic Action: Store attribute (e.g., "strict") in a temp list
-        add_attribute_to_current_scope($3);
-    }
-    ;
-pou_declaration:
-    program
-    | opt_attributes function_block
+script_file:
+    type_definition_block
+    | var_declarations
+    | statements
     | function
+    | var_config_declaration
+    | pragma_statement
     ;
 
-program:
-    | TOK_PROGRAM TOK_ID program_unit TOK_END_PROGRAM
+function:
+    TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION TOK_SEMICOLON
     ;
-
-include_files:
-    TOK_INCLUDE TOK_STRING TOK_SEMICOLON
-    | include_files TOK_INCLUDE TOK_STRING TOK_SEMICOLON
-
-program_unit:
-    var_declarations body 
-
-body:
-    statements
 
 type_definition_block:
       TOK_TYPE type_assignments TOK_END_TYPE
@@ -110,7 +109,7 @@ enum_value:
 
 opt_base_type:
     /* empty */ 
-    | elementry_type
+    | int_type
 
  /* the default initialization for variables of this enum */
 opt_assign_enum_val:
@@ -122,23 +121,7 @@ enum_type_head:
     TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
 
 enum_type_definition:
-    enum_type_head TOK_SEMICOLON
-    | enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
-
-subrange_type_definition:
-    TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_SEMICOLON
-    |TOK_ID TOK_COLON type_spec TOK_LPAREN subrange TOK_RPAREN TOK_ASSIGN initial_value TOK_SEMICOLON
-    ;
-
-subrange:
-    signed_integer TOK_RANGE signed_integer
-    ;
-
-signed_integer:
-    TOK_NUMBER
-    | TOK_MINUS TOK_NUMBER
-    | TOK_PLUS TOK_NUMBER
-    ;
+    enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
 
 type_assignment:
       TOK_ID TOK_COLON type_spec TOK_SEMICOLON {
@@ -151,7 +134,6 @@ type_assignment:
         add_struct_to_symtab($1, $3);
     }
     | enum_type_definition
-    | subrange_type_definition
     ;
 
 struct_definition:
@@ -170,7 +152,6 @@ member_declaration:
 var_declarations:
     /* empty */
     | var_declarations TOK_VAR declaration_list TOK_END_VAR
-    | var_declarations include_files
     ;
 
 declaration_list:
@@ -201,16 +182,16 @@ var_list:
     ;
 
 initial_value:
-      full_expression                    /* Simple: := 10; */
-    | TOK_LBRACKET init_list TOK_RBRACKET             /* Array: := [1, 2, 3]; */
-    | TOK_LPAREN struct_init_list TOK_LPAREN      /* Struct: := (Speed := 10, Run := TRUE); */
+      full_expression                    /* Simple: int := 10; */
+    | TOK_LBRACKET init_list TOK_RBRACKET             /* Array:int := [1, 2, 3]; */
+    | TOK_LPAREN struct_init_list TOK_RPAREN      /* Struct: := (Speed := 10, Run := TRUE); */
     ;
 
 init_list:
       initial_value                    { $$ = create_init_list($1); }
     | init_list TOK_COMMA initial_value      { $$ = add_to_init_list($1, $3); }
     /* ST also supports 'n(value)' for repeating array elements */
-    | TOK_NUMBER '(' initial_value ')'    { $$ = create_repeated_init($1, $3); }
+    | init_list TOK_COMMA TOK_NUMBER TOK_LPAREN initial_value TOK_RPAREN    { $$ = create_repeated_init($1, $3); }
     ;
 
 struct_init_list:
@@ -225,11 +206,9 @@ var_declaration:
     | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
     ;
 
+
 direct_address:
-    /* full rpcf addr: node_name.app_name.point_name */
-    TOK_RPCF_ADDR instance_path
-    /* full attribute addr: node_name.app_name.point_name:attr_name */
-    | TOK_RPCF_ADDR instance_path TOK_COLON TOK_ID
+    TOK_RPCF_ADDR
     | TOK_ABS_ADDR_BLOCK
     | TOK_ABS_ADDR_BIT
     | TOK_ABS_ADDR_PERIPHERAL
@@ -240,10 +219,8 @@ identifier_list:
     | identifier_list TOK_COMMA TOK_ID { $$ = add_to_id_list($1, $3); }
     ;
 
-elementry_type:
+int_type:
     TOK_INT
-    | TOK_REAL
-    | TOK_LREAL
     | TOK_BOOL
     | TOK_WORD
     | TOK_UINT
@@ -256,12 +233,15 @@ elementry_type:
     | TOK_ULINT
     | TOK_LINT
     | TOK_LWORD
-    | TOK_TIME_TYPE
+
+time_type:
+    TOK_TIME_TYPE
     | TOK_TIME_OF_DAY_TYPE
     | TOK_DATE_TYPE
 
+
 array_type:
-    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET OF type_spec
+    TOK_ARRAY TOK_LBRACKET range_list TOK_RBRACKET TOK_OF type_spec
     ;
 
 range_list:
@@ -270,14 +250,16 @@ range_list:
     ;
 
 range:
-    TOK_ID TOK_RANGE TOK_ID    /* e.g., 1..10 */
+    TOK_NUMBER TOK_RANGE TOK_NUMBER    /* e.g., 1..10 */
     ;
 
 string_type:
-    TOK_STRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN    { $$ = create_string_node($3); }  /* Specific length */
-    | TOK_STRING_TYPE                    { $$ = create_string_node(80); }  /* Default length is 80 */
-    | TOK_WSTRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN   { $$ = create_wstring_node($3); }
-    | TOK_WSTRING_TYPE                   { $$ = create_wstring_node(80); } /* Wide string (UTF-16) */
+    TOK_STRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN    {  }  /* Specific length */
+    | TOK_STRING_TYPE TOK_LBRACKET TOK_NUMBER TOK_RBRACKET    {  }  /* Specific length */
+    | TOK_STRING_TYPE                    {  }  /* Default length is 80 */
+    | TOK_WSTRING_TYPE TOK_LPAREN TOK_NUMBER TOK_RPAREN   {  }
+    | TOK_WSTRING_TYPE TOK_LBRACKET TOK_NUMBER TOK_RBRACKET    {  }  /* Specific length */
+    | TOK_WSTRING_TYPE                   {  } /* Wide string (UTF-16) */
     ;
 
 pointer_type:
@@ -287,14 +269,25 @@ pointer_type:
 reference_type:
     TOK_REFERENCE TOK_TO type_spec
     | TOK_REF_TO type_spec
+    ;
 
+other_elementry_type:
+    time_type
+    | TOK_REAL
+    | TOK_LREAL
+    ;
+    
 type_spec:
-    elementry_type
+    int_type
+    | int_type TOK_LPAREN range TOK_RPAREN
+    | other_elementry_type
     | array_type
     | derived_type
     | string_type
     | pointer_type
     | reference_type
+    /* implicit enum */
+    | TOK_LPAREN enum_value_list TOK_RPAREN
     ;
 
 derived_type: TOK_ID
@@ -312,17 +305,85 @@ statement:
     | repeat_statement TOK_SEMICOLON
     | function_call_statement TOK_SEMICOLON
     | case_statement TOK_SEMICOLON
-    | pragma_statement
     ;
 
 pragma_statement:
-    TOK_LBRACE TOK_INFO TOK_STRING TOK_RBRACE {
-        printf("Compiler Info: %s\n", $3);
-    }
-
-    | TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
+    TOK_LBRACE TOK_REGION TOK_STRING TOK_RBRACE
     | TOK_LBRACE TOK_END_REGION TOK_RBRACE
+
+conditional_pragma:
+    TOK_START_PRAGMA TOK_IF full_expression TOK_RBRACE
+    | TOK_START_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
+    | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
+    | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
+    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
+        std::string& strMsg = $3;
+        ParserPrint( 
+            curloc->file->name,
+            yyget_lineno( yyscanner ),
+            "Info: %s ", strMsg.c_str() );
+    }
+    | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
+
+        yyscan_t yyscanner = pCtx->yyscanner;
+        YYLTYPE *curloc = yyget_lloc( yyscanner );
+
+        std::string& strFile = $3;
+        if( strFile.empty() )
+        {
+            ParserPrint( 
+                curloc->file->name,
+                yyget_lineno( yyscanner ),
+                "Error, expecting file name" );
+            pCtx->IncSemError();
+            YYERROR;
+        }
+
+        if( strFile[ 0 ] != '/' )
+        {
+            //relative path
+            char* pPath = realpath(
+                strFile.c_str(), nullptr );
+
+            if( pPath == nullptr )
+            {
+                stdstr& strTop =
+                    pCtx->m_vecInclStack.back()->m_strPath;
+                strFile = GetDirName( strTop ) +
+                    "/" + strFile;
+            }
+            else
+            {
+                strFile = pPath;
+                free( pPath );
+            }
+        }
+        FILE* pIncl = TryOpenFile( strFile.c_str() );
+        if ( !pIncl )
+        {
+            ParserPrint(
+                curloc->file->name,
+                yyget_lineno( yyscanner ),
+                strerror( errno ) );
+            pCtx->IncSemError();
+            YYERROR;
+        }
+
+        FILECTX2* pfc = new FILECTX2();
+        pfc->m_strPath = strFile;
+        pfc->m_fp = pIncl;
+        pfc->m_oLocation = yyget_lloc( pCtx->yyscanner );
+        pCtx->m_vecInclStack.push_back(
+            std::unique_ptr< FILECTX2 >( pfc ) );
+        yypush_buffer_state(
+            yy_create_buffer( pIncl, YY_BUF_SIZE ), yyscanner );
+        yyset_lineno( 1, yyscanner );
+        yyset_column( 1, yyscanner );
+    }
+    | TOK_LBRACE TOK_ATTRIBUTE TOK_STRING TOK_RBRACE
+
     ;
+
 /* Rule for Assignments: Only allows memory locations on the LHS */
 assignment_statement:
       l_value TOK_ASSIGN full_expression {
@@ -333,7 +394,7 @@ assignment_statement:
 
 /* Rule for Standalone Calls: Used for functions/methods that return void or whose return is ignored */
 function_call_statement:
-      TOK_ID TOK_LPAREN arg_list TOK_RPAREN {
+      instance_path TOK_LPAREN arg_list TOK_RPAREN {
           // Wasm logic to call the function
           // If it's a DCS Utility, we push the g_pUtils handle first
           printf("%s",$1);
@@ -357,12 +418,12 @@ l_value_var:
     instance_path {  }
     /* array element */
     | l_value_var TOK_LBRACKET full_expression TOK_RBRACKET {  }
-    /* bit access */
-    | l_value_var TOK_DOT TOK_NUMBER {  }
     /* access data member via a pointer */
-    | l_value_var pointer l_value_var {  }
+    | l_value_var TOK_CARET TOK_DOT instance_path {  }
     /* dereference a pointer */
     | l_value_var TOK_CARET {  }
+    /* bit access */
+    | instance_path TOK_DOT TOK_NUMBER {  }
     ; 
 
 full_expression:
@@ -431,7 +492,7 @@ factor:
     | TOK_TRUE
     | TOK_FALSE
     /* function call */
-    | TOK_ID TOK_LPAREN arg_list TOK_RPAREN {
+    | instance_path TOK_LPAREN arg_list TOK_RPAREN {
           /* 
              1. Identify if it's a standard function or DCS utility.
              2. For utilities, push the g_pUtils handle first.
@@ -440,7 +501,7 @@ factor:
           printf("function call $%s\n", $1);
         }
     | l_value
-    | '(' full_expression ')'
+    | TOK_LPAREN full_expression TOK_RPAREN
     ;
 
 if_statement:
@@ -452,7 +513,7 @@ opt_by_step:
     | TOK_BY full_expression
 
 for_statement:
-    TOK_FOR TOK_ID TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO statements TOK_END_FOR
+    TOK_FOR instance_path TOK_ASSIGN full_expression TOK_TO full_expression opt_by_step TOK_DO statements TOK_END_FOR
     ;
 
 while_statement:
@@ -463,72 +524,22 @@ repeat_statement:
     TOK_REPEAT statements TOK_UNTIL full_expression TOK_END_REPEAT
     ;
 
+positional_args:
+    full_expression
+    | positional_args TOK_COMMA full_expression
+
 arg_list:
-      param_assignment
-    | arg_list ',' param_assignment
+      positional_args
+    | param_assignments
     ;
+
+param_assignments:
+    param_assignment
+    | param_assignments TOK_COMMA param_assignment
 
 param_assignment:
-      full_expression             /* Positional: MyFunc(10) */
-    | TOK_ID TOK_ASSIGN full_expression  /* Formal Input: IN := True */
-    | TOK_ID TOK_NLE l_value           /* Formal Output: Q => MyLamp */
-    ;
-
-method_declaration_list:
-    method_declaration
-    | method_declaration_list method_declaration
-    ;
-
-method_declaration:
-    /* empty */
-    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON type_spec
-        var_declarations
-        statements
-    TOK_END_METHOD
-    ;
-
-opt_access_modifier:
-    /* empty - defaults to PUBLIC in most ST dialects */
-
-    | TOK_PUBLIC
-    | TOK_PROTECTED
-    | TOK_PRIVATE
-    | TOK_INTERNAL
-    ;
-
-function_block:
-    function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
-
-
-function_block_header:
-    opt_attributes TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
-    ;
-
-/* Handles ABSTRACT or FINAL keywords */
-opt_fb_modifier:
-    /* empty */
-    | TOK_ABSTRACT
-    | TOK_FINAL
-    ;
-
-/* Handles EXTENDS <Parent> */
-opt_extends_clause:
-    /* empty */
-    | TOK_EXTENDS TOK_ID
-    ;
-
-/* Handles IMPLEMENTS <Interface1, Interface2...> */
-opt_implements_clause:
-    /* empty */
-    | TOK_IMPLEMENTS interface_list
-    ;
-
-interface_list:
-    identifier_list
-    ;
-
-function:
-    TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION TOK_SEMICOLON
+    TOK_ID TOK_ASSIGN full_expression  /* Formal Input: IN := True */
+    | TOK_ID TOK_OUTPUT_ASSIGN l_value           /* Formal Output: Q => MyLamp */
     ;
 
 case_statement:
@@ -540,22 +551,38 @@ case_statement:
 
 opt_else_statement:
     /* empty */
-    | TOK_ELSE statements
+    |TOK_ELSE statements
     ;
 
 case_element_list:
     case_element
+    | case_element_list case_element 
+    ;
 
-    | case_element_list case_element
+cinner_statements:
+    case_body
+    | case_body TOK_SEMICOLON cinner_statements
+    ;
+
+case_body:
+    assignment_statement 
+    | if_statement 
+    | for_statement 
+    | while_statement 
+    | repeat_statement
+    | function_call_statement
+    | case_statement
     ;
 
 case_element:
-    case_list_selector TOK_COLON statements
+    case_list_selector cinner_statements TOK_SEMICOLON
+      /* TOK_CASE_SEP does not come from source, it is used to resolve the shift/reduce conflict */
+    | case_list_selector cinner_statements TOK_CASE_SEP
     ;
 
 case_list_selector:
-    case_selector
-    | case_list_selector TOK_COMMA case_selector
+    case_selector TOK_COLON 
+    | case_list_selector TOK_COMMA case_selector TOK_COLON
     ;
 
 case_selector:
@@ -577,7 +604,6 @@ var_config_declaration:
 instance_specific_init_list:
     /* empty */
     | instance_specific_init_list instance_specific_init
-    | instance_specific_init_list include_files
     ;
 
 instance_specific_init:
@@ -587,16 +613,12 @@ instance_specific_init:
 
 instance_path:
     TOK_ID
-    | TOK_ID TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
+    | instance_path TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
     ;
 
 %%
 
-int main() {
-    yyparse();
-    return 0;
-}
-
 void yyerror(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
 }
+

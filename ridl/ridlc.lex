@@ -203,19 +203,10 @@ HexDig [0-9a-fA-F]
         if( strFile.empty() )
         {
             gint32 ret = -EINVAL;
-            PrintAndQuit( ret, "Expect \"" );
+            PrintAndQuit( ret, "Expecting file name" );
         }
 
-        if( strFile[ 0 ] == '/' )
-        {
-            yyin = TryOpenFile( strFile );
-            if ( !yyin )
-            {
-                PrintAndQuit(
-                    -errno, strerror( errno ) );
-            }
-        }
-        else
+        if( strFile[ 0 ] != '/' )
         {
             //relative path
             char* pPath = realpath(

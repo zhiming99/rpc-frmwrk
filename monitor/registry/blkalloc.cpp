@@ -1182,7 +1182,9 @@ gint32 CBlockAllocator::ReadWriteBlocks2(
             guint64 off = ABS_ADDR(
                 GROUP_START( dwBlkIdx ) +
                 dwIdx * BLOCK_SIZE );
-            size_t qs = BLOCK_SIZE * elem.second;
+            size_t qs = ( ( size_t ) 
+                ( BLOCK_SIZE ) ) * elem.second;
+
             if( qs > MAX_FILE_SIZE )
             {
                 ret = -ERANGE;
@@ -1743,8 +1745,9 @@ gint32 CBlockAllocator::ReadCache(
                     // fill the holes with zero
                     guint32 dwBlocks = 
                         itr->second - itr->first;
-                    memset( pBuf + itr->dwOff * BLOCK_SIZE,
-                        0,  dwBlocks * BLOCK_SIZE );
+                    memset( pBuf +
+                        ( ( size_t )itr->dwOff ) * BLOCK_SIZE, 0,
+                        ( ( size_t )dwBlocks ) * BLOCK_SIZE );
                     itr = vecBlks.erase( itr );
                     continue;
                 }
