@@ -231,10 +231,9 @@ var_declaration:
 
 direct_address:
     TOK_RPCF_ADDR
-    | TOK_ABS_ADDR_BLOCK
-    | TOK_ABS_ADDR_BIT
     | TOK_ABS_ADDR_PERIPHERAL
-    ;
+    | TOK_ABS_ADDR_PERIPHERAL TOK_LBRACKET full_expression TOK_RBRACKET
+  
 
 identifier_list:
       TOK_ID                    { $$ = create_id_list($1); }

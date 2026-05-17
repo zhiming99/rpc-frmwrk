@@ -779,7 +779,10 @@ gint32 CAsyncStdAMCallbacks::OnPointChanged(
         {
             stdstr strCmd;
             if( ( const guint32& )value  == usrcmdStart )
-                strCmd = "start";
+            {
+                // this app is already started
+                break;
+            }
             else if( ( const guint32& )value  == usrcmdStop )
                 strCmd = "stop";
             else if( ( const guint32& )value  == usrcmdRestart )

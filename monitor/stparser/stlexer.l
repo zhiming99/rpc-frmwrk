@@ -227,22 +227,9 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
- /* Matches Bit addresses: %IX0.0, %Q0.1, %M10.5 */
-"%"{ADDR_AREA}X?({DIGIT}+"."{DIGIT}+|\*) {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_BIT;
-}
-
- /* Matches Byte/Word/DWord: %IB4, %QW10, %MD20 */
-"%"{ADDR_AREA}{ADDR_SIZE}({DIGIT}+|\*) {
-    //yylval.addr_val = parse_absolute_address(yytext);
-    return TOK_ABS_ADDR_BLOCK;
-}
-
  /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
-"%P"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+ |
-"%"{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+":P" {
-    ObjPtr pAddr = ParsePeriAddr( yytext );
+"%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+)?(":P"|":p")?  {
+    ObjPtr pAddr = ParsePeriAddr( yytext, yyscanner );
     if( pAddr.IsEmpty() )
     {
         return YYerror;

@@ -231,42 +231,94 @@ std::wstring TranslateSTWString(const std::string& input) {
     return result;
 }
 
-ObjPtr ParsePeriAddr( const char* yytext )
+ObjPtr ParsePeriAddr( const char* yytext, yyscan_t scanner )
 {
-    // 1. Convert the Flex C-string match to a C++ string object
-    std::string raw_match(yytext);
+    IntVecPtr pvecInt;
+    pvecInt.NewObj();
 
-    // 2. Define the matching C++ pattern using capture groups ().
-    // Group 1: Area ([IQMiqm])
-    // Group 2: Size ([XBWDLxbwdl]?) -> Optional capture group
-    // Group 3: Digits ([0-9]+)
-    std::regex extract_pattern("^%([IQMiqm])([XBWDLxbwdl]?)([0-9]+):P$");
-    std::regex extract_pattern2("^%P([IQMiqm])([XBWDLxbwdl]?)([0-9]+)$");
-    std::smatch matches;
-    bool bRet = false;
-    if( yytext[1] != 'P' )
-        bRet = std::regex_match(raw_match, matches, extract_pattern);
-    else
-        bRet = std::regex_match(raw_match, matches, extract_pattern2);
+    // "%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+)?(":P"|":p")? 
+    // 1. Dynamically find where the ADDR_AREA begins
+    // Skip '%' (index 0). If index 1 is 'P' or 'p', skip that too.
+    int area_idx = (yytext[1] == 'P' || yytext[1] == 'p') ? 2 : 1;
+    int size_idx = area_idx + 1;
+    int is_periphrial = ( area_idx == 2 );
 
-    // 3. Execute regex_match to isolate the capture blocks
-    if ( bRet )
-    {
-        IntVecPtr pvecInt;
-        pvecInt.NewObj();
-        // Extract using sub-match indexing (Index 0 is the full string)
-        (*pvecInt)().push_back( matches[1].str()[0] );
-        stdstr strSize = matches[2].str();
+    int addr_size, addr_idx = 0, addr_bidx = -1;
 
-        // Auto-resolves to "" if missing
-        (*pvecInt)().push_back( strSize.empty() ? 'X' : strSize[0] ); 
-        (*pvecInt)().push_back( std::stoi(matches[3].str()) );
+    // 2. Extract Area ('I', 'Q', 'M')
+    int text_len = yyget_leng( scanner );
+    if( !is_periphrial &&
+        (  yytext[ text_len - 1 ] == 'P' ||
+        yytext[ text_len - 1 ] == 'p' ) )
+        is_periphrial = true;
 
-        // the last one as a flag of peripherial address
-        (*pvecInt)().push_back( 1 );
-        return ObjPtr( pvecInt );
+    ( *pvecInt )().push_back( is_periphrial );
+    ( *pvecInt )().push_back( yytext[ area_idx ] );
+
+    // 3. Determine if Size is explicit, or if we hit a number immediately
+    int digit_start_idx = size_idx;
+    bool size_is_explicit = !(yytext[size_idx] >= '0' && yytext[size_idx] <= '9');
+
+    if (size_is_explicit) {
+        addr_size = std::toupper(yytext[size_idx]); // Normalize to uppercase
+        digit_start_idx = size_idx + 1;
+    } else {
+        addr_size = 'X'; // Default fallback under IEC 61131-3
     }
-    return ObjPtr();
-}
+    ( *pvecInt )().push_back( addr_size );
 
+    // 4. Extract the primary index (Byte/Word offset)
+    char* current_ptr = yytext + digit_start_idx;
+    addr_idx = std::atoi(current_ptr);
+
+    // 5. Look for the dot '.' separating the sub-bit index
+    char* dot_ptr = std::strchr(current_ptr, '.');
+    gint32 ret = 0;
+    if (dot_ptr != nullptr)
+    {
+        addr_bidx = std::atoi(dot_ptr + 1);
+
+        // Compute maximum allowable bit boundary based on the token context
+        int max_bit_limit = 7;
+        switch (addr.size) {
+            case 'W': max_bit_limit = 15; break;
+            case 'D': max_bit_limit = 31; break;
+            case 'L': max_bit_limit = 63; break;
+            default:  max_bit_limit = 7;  break;
+        }
+
+        // Strict Range Validation
+        if (addr_bidx < 0 || addr_bidx > max_bit_limit) {
+            ret = -EINVAL;
+        }
+    }
+    else if( addr_size == 'X' )
+    {
+        addr_bidx = addr_bidx;
+        addr_idx = 0;
+        if( addr_bidx > 7 )
+            ret = -EINVAL;
+    }
+    else
+    {
+        addr_bidx = -1;
+    }
+
+    if( ERROR( ret ) )
+    {
+        std::cerr << "Lexical Error at line " << yylineno
+                  << ": Bit index '" << addr_bidx
+                  << "' exceeds maximum capacity of " << max_bit_limit
+                  << " bits for Size modifier '" << addr.size << "'\n";
+
+        yyerror("Bit index out of bounds");
+        return ObjPtr();
+    }
+
+    // direct address type: 0 for peripheral access
+    ( *pvecInt )().push_back( addr_idx );
+    ( *pvecInt )().push_back( addr_bidx );
+
+    return ObjPtr( pvecInt );
+}
 
