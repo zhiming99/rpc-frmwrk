@@ -63,7 +63,8 @@ ADDR_AREA   (?i:[IQM])
 ADDR_SIZE   (?i:[XBWDL])
 IDENTIFIER  [a-zA-Z_][a-zA-Z0-9_]*
 
-ATTR_DATA_TYPE   (?i:[BWDQSOF])
+ /* point type: I=input, O=output, S=setpoint */
+ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 int comment_depth = 0;
 /* Define Exclusive States */
 %x ST_COMM C_COMM SINGLE_COMM
@@ -231,9 +232,7 @@ int comment_depth = 0;
 "%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+)?(":P"|":p")?  {
     ObjPtr pAddr = ParsePeriAddr( yytext, yyscanner );
     if( pAddr.IsEmpty() )
-    {
         return YYerror;
-    }
     yylval = pAddr;
     return TOK_ABS_ADDR_PERIPHERAL;
 }
@@ -251,7 +250,13 @@ int comment_depth = 0;
     return TOK_NUMBER;
 }
 
-"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? { yylval = yytext; return TOK_RPCF_ADDR; }
+"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? {
+     ObjPtr pAddr = ParseRpcfAddr( yytext, pCtx );
+     if( pAddr.IsEmpty() )
+         return YYerror;
+     yylval = pAddr;
+     return TOK_RPCF_ADDR;
+ }
 
 {IDENTIFIER} { yylval = yytext; return TOK_ID; }
 
@@ -344,15 +349,16 @@ int comment_depth = 0;
         if ( !YY_CURRENT_BUFFER)
             break;
 
-        if( pCtx->m_vecInclStack.empty() )
+        if( pCtx->m_vecFileStack.empty() )
             break;
 
-        YYLTYPE2* ploc =
-            pCtx->m_vecInclStack.back().get();
-        yyloc = *ploc;
-        yyset_lineno( ploc->last_line, yyscanner );
-        yyset_column( ploc->last_column, yyscanner );
-        pCtx->m_vecInclStack.pop_back();
+        FILECTX2* pFileCtx =
+            pCtx->m_vecFileStack.back().get();
+        YYLTYPE oloc = pFileCtx->m_oLocation;
+        yyset_lineno( oloc.last_line, yyscanner );
+        yyset_column( oloc.last_column, yyscanner );
+        pCtx->m_strCurFile = pFileCtx->m_strPath;
+        pCtx->m_vecFileStack.pop_back();
         // tell the caller to retry
         return YYEMPTY;
     }while( 0 );

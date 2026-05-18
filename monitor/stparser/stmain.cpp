@@ -468,7 +468,7 @@ int main( int argc, char** argv[] )
                             break;
                         }
                     }
-                    pCtx->m_vecInclPaths.push_back(
+                    pCtx->m_vecFilePaths.push_back(
                         strFullPath );
                     break;
                 }

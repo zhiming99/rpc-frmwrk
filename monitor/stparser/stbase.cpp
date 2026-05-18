@@ -322,3 +322,69 @@ ObjPtr ParsePeriAddr( const char* yytext, yyscan_t scanner )
     return ObjPtr( pvecInt );
 }
 
+ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
+{
+    StrVecPtr pvecStr;
+    pvecStr.NewObj();
+
+    //"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? {
+    // 1. Dynamically find where the ADDR_AREA begins
+    // Skip '%' (index 0). If index 1 is 'P' or 'p', skip that too.
+    do{
+        int ptype_idx = 1;
+        int size_idx = ptype_idx + 1;
+        int attr_idx = -1;
+
+        int addr_size, addr_idx = 0, addr_bidx = -1;
+        yyscan_t scanner = pCtx->yyscanner;
+
+
+        ( *pvecStr )().push_back( stdstr( yytext + ptype_idx, 1 ) );
+        ( *pvecStr )().push_back( stdstr( yytext + size_idx, 1 ) );
+
+        const char* pend = nullptr;
+        char* colon_ptr = std::strchr(current_ptr, ':');
+        stdstr strAttr = "value";
+        if( colon_ptr != nullptr )
+        {
+            pend = colon_ptr;
+            strAttr = colon_ptr + 1;
+        }
+        else
+        {
+            int text_len = yyget_leng( scanner );
+            pend = yytext + text_len;
+        }
+
+        ( *pvecStr )().push_back( strAttr );
+
+        stdstr strPath( yytext + 3, pend - colon_ptr );
+        std::replace( strPath.begin(), strPath.end(), '.', '/' );
+        std::vector< stdstr > comps;
+        ret = CRegistry::Namei( strPath, comps );
+        if( ERROR( ret ) )
+            break;
+
+        if( comps.empty() )
+        {
+            gint32 iLineNo = yyget_lineno( scanner );
+            ParserPrint( 
+                pCtx->m_strCurFile.c_str(), 
+                iLineNo,
+                "Error, Invalid rpcf address" );
+            ret = -EINVAL;
+            break;
+        }
+        // reversely push the component
+        auto iter = comps.rbegin();
+        while( iter != comps.rend() )
+            ( *pvecStr )().push_back( *iter );
+        // the layout is
+        // <point type> <data size> <attr name > <point name> [<app name> [<node name>]]
+
+    }while( 0 );
+    if( ERROR( ret ) )
+        return ObjPtr();
+
+    return ObjPtr( pvecStr );
+}

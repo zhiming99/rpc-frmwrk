@@ -29,6 +29,10 @@
 #define NODE_FLAG_CONST     0x1
 #define NODE_FLAG_POINTER   0x2
 #define NODE_FLAG_REF       0x4
+#define NODE_FLAG_INPUT     0x8
+#define NODE_FLAG_OUTPUT    0x10
+#define NODE_FLAG_MEM       0x20
+
 namespace rpcf
 {
 

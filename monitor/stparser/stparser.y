@@ -192,6 +192,7 @@ opt_qualifier:
 
 declaration:
       TOK_VAR var_list TOK_END_VAR             
+    | TOK_VAR_TEMP var_list  opt_qualifier TOK_END_VAR       
     | TOK_VAR_INPUT var_list  opt_qualifier TOK_END_VAR       
     | TOK_VAR_OUTPUT var_list opt_qualifier TOK_END_VAR      
     | TOK_VAR_IN_OUT var_list TOK_END_VAR      
@@ -369,7 +370,7 @@ conditional_pragma:
             if( pPath == nullptr )
             {
                 stdstr& strTop =
-                    pCtx->m_vecInclStack.back()->m_strPath;
+                    pCtx->m_vecFileStack.back()->m_strPath;
                 strFile = GetDirName( strTop ) +
                     "/" + strFile;
             }
@@ -391,13 +392,14 @@ conditional_pragma:
         }
 
         FILECTX2* pfc = new FILECTX2();
-        pfc->m_strPath = strFile;
-        pfc->m_fp = pIncl;
+        pfc->m_strPath = pCtx->m_strCurFile;
+        pfc->m_fp = yyin;
         pfc->m_oLocation = yyget_lloc( pCtx->yyscanner );
-        pCtx->m_vecInclStack.push_back(
+        pCtx->m_vecFileStack.push_back(
             std::unique_ptr< FILECTX2 >( pfc ) );
         yypush_buffer_state(
             yy_create_buffer( pIncl, YY_BUF_SIZE ), yyscanner );
+        pCtx->m_strCurFile = strFile;
         yyset_lineno( 1, yyscanner );
         yyset_column( 1, yyscanner );
     }
@@ -433,6 +435,7 @@ function_call_statement:
 /* L-Value rule: Strictly limited to writable memory locations */
 l_value:
     l_value_var
+    | TOK_DOT l_value_var
     | TOK_SUPER pointer l_value_var
     | TOK_THIS pointer l_value_var
     /* %Q and %M can be l_value */
