@@ -229,8 +229,8 @@ int comment_depth = 0;
 }
 
  /* Matches Peripheral Access (PI): %IW0:P or %PIW0 */
-"%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+)?(":P"|":p")?  {
-    ObjPtr pAddr = ParsePeriAddr( yytext, yyscanner );
+"%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+|"*")?(":P"|":p")?  {
+    ObjPtr pAddr = ParsePeriAddr( yytext, pCtx );
     if( pAddr.IsEmpty() )
         return YYerror;
     yylval = pAddr;
