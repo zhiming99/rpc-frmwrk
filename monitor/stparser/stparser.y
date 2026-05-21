@@ -351,40 +351,25 @@ conditional_pragma:
         YYLTYPE *curloc = yyget_lloc( yyscanner );
 
         std::string& strFile = $3;
+        stdstr strCurFile =
+            basename( pCtx->m_strCurFile.c_str() );
         if( strFile.empty() )
         {
             ParserPrint( 
-                curloc->file->name,
+                strCurFile,
                 yyget_lineno( yyscanner ),
                 "Error, expecting file name" );
             pCtx->IncSemError();
             YYERROR;
         }
 
-        if( strFile[ 0 ] != '/' )
-        {
-            //relative path
-            char* pPath = realpath(
-                strFile.c_str(), nullptr );
-
-            if( pPath == nullptr )
-            {
-                stdstr& strTop =
-                    pCtx->m_vecFileStack.back()->m_strPath;
-                strFile = GetDirName( strTop ) +
-                    "/" + strFile;
-            }
-            else
-            {
-                strFile = pPath;
-                free( pPath );
-            }
-        }
-        FILE* pIncl = TryOpenFile( strFile.c_str() );
+        stdstr strFullPath;
+        FILE* pIncl = pCtx->TryOpenFile(
+            strFile.c_str(), strFullPath );
         if ( !pIncl )
         {
             ParserPrint(
-                curloc->file->name,
+                strCurFile,
                 yyget_lineno( yyscanner ),
                 strerror( errno ) );
             pCtx->IncSemError();
@@ -399,11 +384,11 @@ conditional_pragma:
             std::unique_ptr< FILECTX2 >( pfc ) );
         yypush_buffer_state(
             yy_create_buffer( pIncl, YY_BUF_SIZE ), yyscanner );
-        pCtx->m_strCurFile = strFile;
+        pCtx->m_strCurFile = strFullPath;
         yyset_lineno( 1, yyscanner );
         yyset_column( 1, yyscanner );
     }
-    | TOK_START_PRAGMA TOK_ATTRIBUTE TOK_STRING  opt_attr_values TOK_RBRACE {}
+    | TOK_START_PRAGMA TOK_ATTRIBUTE TOK_STRING opt_attr_values TOK_RBRACE {}
     ;
 
 string_list:
@@ -470,15 +455,17 @@ and_expression:
     ;
 
 /* 3. COMPARISON (=, <>, <, >, <=, >=) */
+comp_op:
+    TOK_EQUAL
+    | TOK_NEQU
+    | TOK_LE
+    | TOK_GT
+    | TOK_NLE
+    | TOK_NGT
+
 comparison_expression:
       arithmetic_expr
-    | arithmetic_expr TOK_EQUAL  arithmetic_expr { printf($1.type == TYPE_INT ? "i32.eq\n" : "f32.eq\n"); $$.type = TYPE_BOOL; }
-    | arithmetic_expr TOK_NEQU arithmetic_expr { printf($1.type == TYPE_INT ? "i32.ne\n" : "f32.ne\n"); $$.type = TYPE_BOOL; }
-
-    | arithmetic_expr TOK_LE   arithmetic_expr 
-    | arithmetic_expr TOK_GT   arithmetic_expr
-    | arithmetic_expr TOK_NLE  arithmetic_expr
-    | arithmetic_expr TOK_NGT  arithmetic_expr
+    | arithmetic_expr comp_op  arithmetic_expr {  }
     ;
 
 /* 4. ADDITIVE (+, -) */

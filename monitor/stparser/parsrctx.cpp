@@ -73,20 +73,87 @@ FILECTX2::FILECTX2( const FILECTX2& rhs )
         sizeof( m_oLocation ) );
 }
 
-FILE* CSTParserContext::TryOpenFile(
-    const std::string& strFile )
+gint32 CSTParserContext::GetFileIdx(
+    const stdstr strFile ) const
 {
-    FILE* fp = fopen( strFile.c_str(), "r");
-    if ( fp != nullptr )
-        return fp;
+    for( int i = 0; i < m_vecFiles.size(); i++ )
+        if( m_vecFiles[ i ] == strFile )
+            return i;
+    return -1; 
+}
 
-    for( auto elem : m_vecInclPaths )
-    {
-        std::string strPath =
-            elem + "/" + strFile;
-        fp = fopen( strPath.c_str(), "r" );
-        if( fp != nullptr )
+FILE* CSTParserContext::TryOpenFile(
+    const std::string& strFile,
+    stdstr& strFullPath )
+{
+    FILE* fp = nullptr;
+    stdstr strCurPath;
+    do{
+        if( strFile.empty() )
             break;
+
+        if( m_strCurFile.size() && strFile[ 0 ] != '/' )
+        {
+            strCurPath =
+                GetDirName( m_strCurFile );
+
+            char* pPath = realpath(
+                strCurPath.c_str(), nullptr );
+            if( pPath == nullptr )
+                break;
+
+            strCurPath = pPath;
+            free( pPath );
+            strCurPath += "/";
+            strCurPath += strFile;
+        }
+        else if( m_strCurFile.empty() )
+        {
+            // find in the working dir
+            char* pPath = realpath( "./", nullptr );
+            if( pPath == nullptr )
+                break;
+            strCurPath = pPath;
+            free( pPath );
+            strCurPath += "/";
+            strCurPath += strFile;
+        }
+        else
+        {
+            strCurPath = strFile;
+        }
+
+        fp = fopen( strCurPath.c_str(), "r");
+        if ( fp != nullptr )
+            break;
+
+        if( strFile[ 0 ] == '/' )
+            break;
+
+        for( auto elem : m_vecInclPaths )
+        {
+            strCurPath =
+                elem + "/" + strFile;
+            fp = fopen( strCurPath.c_str(), "r" );
+            if( fp != nullptr )
+                break;
+        }
+
+    }while( 0 );
+    if( fp )
+    {
+        bool bExist = false;
+        for( auto& i : m_vecFiles )
+        {
+            if( i == strFile )
+            {
+                bExist = true;
+                break;
+            }
+        }
+        if( !bExist )
+            m_vecFiles.push_back( strCurPath );
+        strFullPath = strCurPath;
     }
     return fp;
 }

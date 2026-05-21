@@ -39,7 +39,7 @@ struct timespec st_time_to_timespec(const char* text) {
     if (!text) return ts;
 
     // Skip the "T#" or "TIME#" prefix
-    const char* ptr = std::strchr(text, '#');
+    const char* ptr = strchr(text, '#');
     if (!ptr) return ts;
     ptr++; 
 
@@ -293,7 +293,7 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
         addr_idx = std::atoi(current_ptr);
 
         // 5. Look for the dot '.' separating the sub-bit index
-        char* dot_ptr = std::strchr(current_ptr, '.');
+        char* dot_ptr = strchr(current_ptr, '.');
         gint32 ret = 0;
         int max_bit_limit = 7;
         if (dot_ptr != nullptr)
@@ -364,11 +364,16 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
         yyscan_t scanner = pCtx->yyscanner;
 
 
-        ( *pvecStr )().push_back( stdstr( yytext + ptype_idx, 1 ) );
-        ( *pvecStr )().push_back( stdstr( yytext + size_idx, 1 ) );
+        ( *pvecStr )().push_back(
+            stdstr( yytext + ptype_idx, 1 ) );
+
+        ( *pvecStr )().push_back(
+            stdstr( yytext + size_idx, 1 ) );
 
         const char* pend = nullptr;
-        char* colon_ptr = std::strchr(current_ptr, ':');
+        char* colon_ptr = strchr(
+            yytext + size_idx + 1, ':');
+
         stdstr strAttr = "value";
         if( colon_ptr != nullptr )
         {
@@ -383,7 +388,7 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
 
         ( *pvecStr )().push_back( strAttr );
 
-        stdstr strPath( yytext + 3, pend - colon_ptr );
+        stdstr strPath( yytext + 3, pend - yytext - 3 );
         std::replace( strPath.begin(), strPath.end(), '.', '/' );
         std::vector< stdstr > comps;
         ret = CRegistry::Namei( strPath, comps );

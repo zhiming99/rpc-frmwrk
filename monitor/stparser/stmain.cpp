@@ -70,8 +70,8 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
-gint32 ReadToken( YYLTYPE* current_lval,
-    YYSTYPE* current_loc,
+gint32 ReadToken( YYSTYPE* current_lval,
+    YYLTYPE2* current_loc,
     yyscan_t yyscanner,
     CSTParserContext* pCtx )
 {
@@ -92,14 +92,14 @@ gint32 ReadToken( YYLTYPE* current_lval,
             ret = TOK_EOF; \
     }while( 0 ), ret )
 
-gint32 StartParse( CSTParserContext* pCtx )
+gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 {
     gint32 ret = 0;
     gint32 current_tok;
     gint32 status = YYPUSH_MORE;
 
     YYSTYPE current_lval;
-    YYLTYPE current_lloc;
+    YYLTYPE2 current_lloc;
 
     yyscan_t yyscanner;
     yylex_init( &yyscanner );
@@ -110,6 +110,22 @@ gint32 StartParse( CSTParserContext* pCtx )
     status = yypush_parse(
         main_ps, TOK_START_MAIN, NULL, NULL);
 
+    stdstr strFullPath;
+    auto pFile = pCtx->TryOpenFile(
+        strFile, strFullPath );
+    if ( !pFile )
+    {
+        ParserPrint( 1, 1,
+            "Error, cannot open file '%s'",
+            strFile.c_str() );
+        return -EINVAL;
+    }
+
+    pCtx->m_strCurFile = strFullPath;
+    yyset_in( pFile, yyscanner );
+    yyset_column( 1, yyscanner );
+    yyset_lineno( 1, yyscanner );
+
     // Initialization: Get the first token
     current_tok = READTOK( &current_lval,
         &current_lloc, yyscanner, pCtx );
@@ -119,7 +135,7 @@ gint32 StartParse( CSTParserContext* pCtx )
     {
         // 1. Peek: Get the next token from the lexer
         YYSTYPE next_lval;
-        YYLTYPE next_lloc;
+        YYLTYPE2 next_lloc;
         gint32 next_tok = READTOK( &next_lval,
             &next_lloc, yyscanner, pCtx );
         bool bUpdate = true;
@@ -152,7 +168,7 @@ gint32 StartParse( CSTParserContext* pCtx )
                     ParserPrint( 
                         current_lloc->name, 
                         current_lloc->first_line,
-                        "Fatal error, too many "
+                        "Error, too many "
                         "nested conditional pragmas." );
                     break;
                 }
@@ -359,6 +375,7 @@ int main( int argc, char** argv[] )
     gint32 ret = 0;
     bool bUninit = false;
     do{
+        stdstr strFile;
         ret = CoInitialize( COINIT_NORPC );
         if( ERROR( ret ) )
             break;
@@ -381,6 +398,7 @@ int main( int argc, char** argv[] )
             {0, 0,  0,  0 }
         };
 
+        stdstr strMsg;
         while( true ) 
         {
 
@@ -407,14 +425,11 @@ int main( int argc, char** argv[] )
                     ret = IsValidDir( optarg );
                     if( ret == -ENOTDIR )
                     {
-                        std::string strMsg =
-                            "Error '";
+                        strMsg = "Error '";
 
                         strMsg += optarg;
                         strMsg +=
                            "' is not a directory";
-                        printf( "%s\n",
-                            strMsg.c_str() );
                         bQuit = true;
                         break;
                     }
@@ -429,11 +444,10 @@ int main( int argc, char** argv[] )
                     char szBuf[ 512 ];
                     int iSize = strnlen(
                         optarg, sizeof( szBuf ) + 1 );
-                    stdstr strMsg;
                     if( iSize > sizeof( szBuf ) )
                     {
-                        strMsg +=
-                           "path is too long";
+                        strMsg =
+                           "Error path is too long";
                         ret = -ERANGE;
                         bQuit = true;
                         break;
@@ -449,8 +463,8 @@ int main( int argc, char** argv[] )
                             szBuf, sizeof( szBuf ) );
                         if( szPath == nullptr )
                         {
-                            strMsg +=
-                               "path is too long";
+                            strMsg =
+                               "Error path is too long";
                             ret = -errno;
                             bQuit = true;
                             break;
@@ -461,8 +475,8 @@ int main( int argc, char** argv[] )
                         if( strFullPath.size() >
                             sizeof( szBuf ) )
                         {
-                            strMsg +=
-                               "path is too long";
+                            strMsg =
+                               "Error path is too long";
                             ret = -ERANGE;
                             bQuit = true;
                             break;
@@ -473,12 +487,28 @@ int main( int argc, char** argv[] )
                     break;
                 }
             }
+
+            if( argv[ optind ] == nullptr )
+            {
+                printf( "Missing file to compile\n" );
+                Usage();
+                ret = -ENOENT;
+                break;
+            }
+
+            strFile = argv[ optind ];
+            if( strFile.size() > REG_MAX_PATH )
+            {
+                printf( "File name too long\n" );
+                ret = -ENAMETOOLONG;
+                break;
+            }
             break;
         }
         if( ERROR( ret ) )
             break;
 
-        ret = StartParse( pCtx );
+        ret = StartParse( pCtx, strFile );
 
     }while( 0 );
     if( bUninit )
