@@ -59,10 +59,10 @@ extern void ParserPrint(
 %token TOK_PLUS TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
-%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN TOK_EOF
+%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
-%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER
+%token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT
 
 %token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 
@@ -76,25 +76,44 @@ extern void ParserPrint(
 start_point:
     TOK_START_MAIN source_file
     | conditional_pragma
-    ;
-
-source_file:
-    pou_list
-    | type_definition_block
-    | global_var
-    | var_config_declaration
-    | pragma_statement
     | TOK_EOF
     ;
 
-pou_list:
+source_file:
+    /* empty */
+    | namespace_elements
+    ;
+
+namespace_name : TOK_ID 
+    ;
+
+namespace_elements : namespace_element
+      { $$ = create_empty_element_list(); }
+
+    | namespace_elements namespace_element
+      { $$ = append_to_element_list($1, $2); }
+    ;
+
+namespace_element :
     pou_declaration
-    | pou_declaration pou_list
+    | type_definition_block
+    | var_config_declaration
+    | pragma_statement
+    | namespace_declaration
+    | global_var
+    ;
+
+namespace_declaration
+    : TOK_NAMESPACE namespace_name namespace_elements TOK_END_NAMESPACE
+      {
+          /* AST logic: Wrap nested components in a Namespace AST Node */
+          $$ = create_namespace_node($2, $3);
+      }
     ;
 
 global_var:
     TOK_VAR_GLOBAL opt_qualifier var_list TOK_END_VAR 
-
+    ;
 
 pou_declaration:
     program
@@ -107,10 +126,11 @@ program:
     ;
 
 program_unit:
-    var_declarations body 
+    var_declarations body
 
 body:
-    statements
+    /* empty */
+    | statements
 
 type_definition_block:
       TOK_TYPE type_assignments TOK_END_TYPE
@@ -191,16 +211,17 @@ opt_qualifier:
     ;
 
 declaration:
-      TOK_VAR var_list TOK_END_VAR             
-    | TOK_VAR_TEMP var_list  opt_qualifier TOK_END_VAR       
-    | TOK_VAR_INPUT var_list  opt_qualifier TOK_END_VAR       
-    | TOK_VAR_OUTPUT var_list opt_qualifier TOK_END_VAR      
-    | TOK_VAR_IN_OUT var_list TOK_END_VAR      
+      TOK_VAR opt_qualifier var_list TOK_END_VAR             
+    | TOK_VAR_TEMP opt_qualifier var_list  TOK_END_VAR       
+    | TOK_VAR_INPUT opt_qualifier var_list  TOK_END_VAR       
+    | TOK_VAR_OUTPUT opt_qualifier var_list TOK_END_VAR      
+    | TOK_VAR_IN_OUT opt_qualifier var_list TOK_END_VAR      
+    | TOK_VAR_STAT  opt_qualifier var_list TOK_END_VAR      
     | TOK_VAR_EXTERNAL var_list TOK_END_VAR
     ;
 
 var_list:
-      var_declaration TOK_SEMICOLON           { $$ = create_list($1); }
+    var_declaration TOK_SEMICOLON           { $$ = create_list($1); }
     | var_list var_declaration TOK_SEMICOLON  { $$ = add_to_list($1, $2); }
     ;
 
@@ -372,6 +393,15 @@ conditional_pragma:
                 strCurFile,
                 yyget_lineno( yyscanner ),
                 strerror( errno ) );
+            pCtx->IncSemError();
+            YYERROR;
+        }
+        if( pCtx->IsFileOnStack( strFullPath ) )
+        {
+            ParserPrint(
+                strCurFile,
+                yyget_lineno( yyscanner ),
+                "cyclic inclusion of files %s", strFile );
             pCtx->IncSemError();
             YYERROR;
         }

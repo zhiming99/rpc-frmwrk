@@ -82,6 +82,16 @@ gint32 CSTParserContext::GetFileIdx(
     return -1; 
 }
 
+bool CSTParserContext::IsFileOnStack(
+    const stdstr& strFile ) const
+{
+    bool ret = false;
+    for( int i = 0; i < m_vecFileStack.size(); i++ )
+        if( m_vecFileStack[ i ] == strFile )
+            return true;
+    return false; 
+}
+
 FILE* CSTParserContext::TryOpenFile(
     const std::string& strFile,
     stdstr& strFullPath )

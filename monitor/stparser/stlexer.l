@@ -171,6 +171,10 @@ int comment_depth = 0;
 (?i:INFO)                   return TOK_INFO;
 (?i:REGION)                 return TOK_REGION;
 (?i:END_REGION)             return TOK_END_REGION;
+(?i:NAMESPACE)              return TOK_NAMESPACE;
+(?i:END_NAMESPACE)          return TOK_END_NAMESPACE;
+(?i:USING)                  return TOK_USING;
+(?i:VAR_STAT)               return TOK_VAR_STAT;
 
 
  /* Matches D#2024-12-25 */

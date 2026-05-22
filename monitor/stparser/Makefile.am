@@ -7,7 +7,7 @@ stparser.cpp stparser.h: stparser.y
 	bison --defines=stparser.h -Wcounterexamples --output=stparser.cpp -r all stparser.y
 	@lines=`grep 'State [[:digit:]]\+ conflicts' stparser.output | wc -l`;\
 	if(( lines != 1 )); then \
-        echo "one conflict and only one conflict expected, but there are $$lines conflicts in the rules";\
+        echo "one and only one conflict state is expected, but there are $$lines conflict states found";\
         exit 1;\
     fi; \
     stateNo=`grep 'State [[:digit:]]\+ conflicts' stparser.output|awk '{print $$2}'`;\

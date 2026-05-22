@@ -366,7 +366,7 @@ void Usage()
 
     printf( "\t-I:\tSpecify the path to"
         " search for the included `ST files'.\n"
-        "\t\tAnd this option can repeat many"
+        "\t\tAnd this option can repeat multiple "
         "times.\n" );
 }
 

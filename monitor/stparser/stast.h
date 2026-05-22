@@ -26,12 +26,20 @@
 
 #include "stscript.h"
 
-#define NODE_FLAG_CONST     0x1
-#define NODE_FLAG_POINTER   0x2
-#define NODE_FLAG_REF       0x4
-#define NODE_FLAG_INPUT     0x8
-#define NODE_FLAG_OUTPUT    0x10
-#define NODE_FLAG_MEM       0x20
+/* the node is a constant value */
+#define NODE_FLAG_CONST         0x1
+/* the node is a pointer variable */
+#define NODE_FLAG_POINTER       0x2
+/* the node is a reference variable */
+#define NODE_FLAG_REF           0x4
+/* the node is for input parameter, read-only*/
+#define NODE_FLAG_INPUT         0x8
+/* the node is for output parameter, write-only*/
+#define NODE_FLAG_OUTPUT        0x10
+/* the node is for a block of memory */
+#define NODE_FLAG_MEM           0x20
+/* target code is generated */
+#define NODE_FLAG_GENERATED     0x40
 
 namespace rpcf
 {
