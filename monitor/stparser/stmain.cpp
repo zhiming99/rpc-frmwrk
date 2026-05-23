@@ -155,7 +155,18 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                 current_tok == TOK_SEMICOLON &&
                 next_tok == TOK_ELSE )
             {
+                // lookahead one more token to resolve the
+                // shift/reduce conflict
                 current_tok = TOK_CASE_SEP;
+                break;
+            }
+            else if( GetParserState( ps ) == SUBEXPR_STATE &&
+                current_tok == TOK_MINUS )
+            {
+                // before bison can see this token,
+                // replace TOK_MINUS with TOK_SUB, so
+                // that bison can shift without error.
+                current_tok = TOK_SUB;
                 break;
             }
 

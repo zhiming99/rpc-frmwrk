@@ -86,6 +86,11 @@ int comment_depth = 0;
     yylval->first = yytext; 
     return TOK_TIME;
 }
+(?i:LT|LTIME|LTO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)?([0-9]+(\.[0-9]+)?us)?([0-9]+(\.[0-9]+)?ns)? {
+    /* Copy the matched text to pass to Bison */
+    yylval->first = yytext; 
+    return TOK_LTIME;
+}
 
 (?i:INCLUDE)                return TOK_INCLUDE;
 (?i:STRUCT)                 return TOK_STRUCT;
@@ -330,7 +335,7 @@ int comment_depth = 0;
 ";"                 return TOK_SEMICOLON;
 ":"                 return TOK_COLON;
 ","                 return TOK_COMMA;
-"+"                 return TOK_PLUS;
+"+"                 return TOK_ADD;
 "-"                 return TOK_MINUS;
 "**"                return TOK_POWER;
 "*"                 return TOK_MULTIPLY;

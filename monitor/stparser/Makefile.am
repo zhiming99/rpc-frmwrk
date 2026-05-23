@@ -13,4 +13,6 @@ stparser.cpp stparser.h: stparser.y
     stateNo=`grep 'State [[:digit:]]\+ conflicts' stparser.output|awk '{print $$2}'`;\
     if (( stateNo > 0 )); then \
         sed -i "s/define CONFLICT_STATE .*/define CONFLICT_STATE $$stateNo/" parsrctx.h; \
-    fi; echo conflict state is $$stateNo, an expected conflict.
+    fi; echo "conflict state is $$stateNo, an expected conflict"; \
+    stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $$2; } /arithmetic_expr: arithmetic_expr \xE2\x80\xA2 TOK_ADD/ { print last_match; exit }' stparser.output`;\
+    sed -i "s/define SUBEXPR_STATE .*/define SUBEXPR_STATE $$stateNo/" parsrctx.h;

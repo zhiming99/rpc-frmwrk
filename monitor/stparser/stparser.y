@@ -31,6 +31,7 @@
 %{
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 using namespace rpcf;
 
@@ -52,11 +53,11 @@ extern void ParserPrint(
 }
 
 %token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
-%token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
+%token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
 
 %token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT
-%token TOK_PLUS TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
+%token TOK_ADD TOK_SUB TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
 %token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
@@ -70,6 +71,16 @@ extern void ParserPrint(
 
 %start start_point
 %parse-param { CSTParserContext *pCtx }
+
+%define parse.error verbose
+
+%left TOK_OR
+%left TOK_XOR
+%left TOK_AND
+%left TOK_EQUAL TOK_NEQU TOK_LT TOK_LE TOK_GT TOK_NLE TOK_NGT
+%left TOK_ADD TOK_SUB
+%left TOK_MULTIPLY TOK_DIVIDE TOK_MOD
+%right TOK_NOT
 
 %%
 
@@ -101,6 +112,7 @@ namespace_element :
     | pragma_statement
     | namespace_declaration
     | global_var
+    | using_directive
     ;
 
 namespace_declaration
@@ -126,7 +138,8 @@ program:
     ;
 
 program_unit:
-    var_declarations body
+    using_directive_list var_declarations body
+    | var_declarations body
 
 body:
     /* empty */
@@ -289,7 +302,7 @@ array_type:
 
 range_list:
       range
-    | range_list TOK_COMMA range  /* Supports multi-dimensional arrays */
+    | full_expression TOK_COMMA range  /* Supports multi-dimensional arrays */
     ;
 
 range:
@@ -441,8 +454,6 @@ assignment_statement:
 /* Rule for Standalone Calls: Used for functions/methods that return void or whose return is ignored */
 function_call_statement:
       instance_path TOK_LPAREN arg_list TOK_RPAREN {
-          // Wasm logic to call the function
-          // If it's a DCS Utility, we push the g_pUtils handle first
           printf("%s",$1);
       }
     ;
@@ -501,8 +512,9 @@ comparison_expression:
 /* 4. ADDITIVE (+, -) */
 arithmetic_expr:
       term
-    | arithmetic_expr TOK_PLUS term { printf($1.type == TYPE_INT ? "i32.add\n" : "f32.add\n"); }
-    | arithmetic_expr TOK_MINUS term { printf($1.type == TYPE_INT ? "i32.sub\n" : "f32.sub\n"); }
+    | arithmetic_expr TOK_ADD term { printf($1.type == TYPE_INT ? "i32.add\n" : "f32.add\n"); }
+    | arithmetic_expr TOK_SUB term { printf($1.type == TYPE_INT ? "i32.sub\n" : "f32.sub\n"); }
+    // | arithmetic_expr TOK_MINUS term { printf($1.type == TYPE_INT ? "i32.sub\n" : "f32.sub\n"); }
     ;
 
 /* 5. MULTIPLICATIVE (*, /, MOD) */
@@ -518,7 +530,7 @@ term:
 unary_expr:
       power_expr
 
-    | TOK_MINUS   power_expr { printf($2.type == TYPE_INT ? "i32.const 0\ni32.sub\n" : "f32.neg\n"); }
+    | TOK_MINUS power_expr { printf($2.type == TYPE_INT ? "i32.const 0\ni32.sub\n" : "f32.neg\n"); }
     | TOK_NOT power_expr { printf("i32.eqz\n"); }
     ;
 
@@ -533,20 +545,15 @@ factor:
       TOK_NUMBER
     | TOK_STRING
     | TOK_WSTRING
-
     | TOK_TIME      /* T#5s */
+    | TOK_LTIME     /* LT#05s */
     | TOK_DATE      /* D#2024-01-01 */
     | TOK_DATE_TIME      /* DT#2024-01-01 */
     | TOK_TIME_OF_DAY    /* TOD#2024-01-01 */
     | TOK_TRUE
     | TOK_FALSE
-    /* function call */
+    /* function call or an array element*/
     | instance_path TOK_LPAREN arg_list TOK_RPAREN {
-          /* 
-             1. Identify if it's a standard function or DCS utility.
-             2. For utilities, push the g_pUtils handle first.
-             3. Generate the Wasm 'call' instruction.
-          */
           printf("function call $%s\n", $1);
         }
     | l_value
@@ -614,7 +621,8 @@ opt_access_modifier:
     ;
 
 function_block:
-    function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+    function_block_header using_directive_list var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+    | function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
 
 function_block_header:
     TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
@@ -719,6 +727,21 @@ instance_specific_init:
 instance_path:
     TOK_ID{ }
     | instance_path TOK_DOT TOK_ID  /* e.g., MainProg.Motor1.SensorIn */
+    ;
+
+using_directive_list : using_directive
+      { $$ = create_empty_node_list(); }
+
+    | using_directive_list using_directive
+      {
+          $1->push_back($2);
+          $$ = $1;
+      }
+    ;
+using_directive : TOK_USING instance_path TOK_SEMICOLON
+      {
+          $$ = create_using_node($2);
+      }
     ;
 
 %%
