@@ -56,8 +56,8 @@ extern void ParserPrint(
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
 
-%token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT
-%token TOK_ADD TOK_SUB TOK_MINUS TOK_MULTIPLY TOK_DIVIDE TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
+%token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT TOK_VSEMICOLON
+%token TOK_ADD TOK_SUB TOK_MINUS TOK_MUL TOK_DIV TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
 %token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
@@ -65,7 +65,7 @@ extern void ParserPrint(
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN TOK_VPUNC
 
  /*%glr-parser*/
 
@@ -79,7 +79,7 @@ extern void ParserPrint(
 %left TOK_AND
 %left TOK_EQUAL TOK_NEQU TOK_LT TOK_LE TOK_GT TOK_NLE TOK_NGT
 %left TOK_ADD TOK_SUB
-%left TOK_MULTIPLY TOK_DIVIDE TOK_MOD
+%left TOK_MUL TOK_DIV TOK_MOD
 %right TOK_NOT
 
 %%
@@ -333,20 +333,25 @@ other_elementry_type:
     | TOK_LREAL
     ;
     
-type_spec:
+data_type_spec:
     int_type
     | int_type TOK_LPAREN range TOK_RPAREN
     | other_elementry_type
-    | array_type
-    | derived_type
     | string_type
-    | pointer_type
-    | reference_type
     /* implicit enum */
     | TOK_LPAREN enum_value_list TOK_RPAREN
     ;
 
-derived_type: TOK_ID
+type_spec: 
+    data_type_spec
+    | array_type
+    | reference_type
+    | pointer_type
+    | derived_type
+    ;
+
+derived_type: instance_path
+    | TOK_DOT instance_path
     ;
 
 statements:
@@ -445,7 +450,7 @@ opt_attr_values :
     
 /* Rule for Assignments: Only allows memory locations on the LHS */
 assignment_statement:
-      l_value TOK_ASSIGN full_expression {
+      l_value_ext TOK_ASSIGN full_expression {
           // Wasm logic to store the result of full_expression into l_value
           // emit_assignment($1, $3);
       }
@@ -453,7 +458,7 @@ assignment_statement:
 
 /* Rule for Standalone Calls: Used for functions/methods that return void or whose return is ignored */
 function_call_statement:
-      instance_path TOK_LPAREN arg_list TOK_RPAREN {
+      l_value TOK_LPAREN arg_list TOK_RPAREN {
           printf("%s",$1);
       }
     ;
@@ -464,8 +469,15 @@ l_value:
     | TOK_DOT l_value_var
     | TOK_SUPER pointer l_value_var
     | TOK_THIS pointer l_value_var
+    ;
+
+l_value_ext:
+    l_value
     /* %Q and %M can be l_value */
     | direct_address
+    // actually waht the lexer sees is a TOK_DOT 
+    // and stmain will replaced it with TOK_VPUNC
+    | l_value TOK_VPUNC TOK_NUMBER
     ;
 
 pointer:
@@ -480,8 +492,6 @@ l_value_var:
     | l_value_var TOK_CARET TOK_DOT instance_path {  }
     /* dereference a pointer */
     | l_value_var TOK_CARET {  }
-    /* bit access */
-    | instance_path TOK_DOT TOK_NUMBER {  }
     ; 
 
 full_expression:
@@ -514,15 +524,14 @@ arithmetic_expr:
       term
     | arithmetic_expr TOK_ADD term { printf($1.type == TYPE_INT ? "i32.add\n" : "f32.add\n"); }
     | arithmetic_expr TOK_SUB term { printf($1.type == TYPE_INT ? "i32.sub\n" : "f32.sub\n"); }
-    // | arithmetic_expr TOK_MINUS term { printf($1.type == TYPE_INT ? "i32.sub\n" : "f32.sub\n"); }
     ;
 
 /* 5. MULTIPLICATIVE (*, /, MOD) */
 term:
       unary_expr
 
-    | term TOK_MULTIPLY   unary_expr { printf($1.type == TYPE_INT ? "i32.mul\n" : "f32.mul\n"); }
-    | term TOK_DIVIDE   unary_expr { printf($1.type == TYPE_INT ? "i32.div_s\n" : "f32.div\n"); }
+    | term TOK_MUL   unary_expr { printf($1.type == TYPE_INT ? "i32.mul\n" : "f32.mul\n"); }
+    | term TOK_DIV   unary_expr { printf($1.type == TYPE_INT ? "i32.div_s\n" : "f32.div\n"); }
     | term TOK_MOD unary_expr { printf("i32.rem_s\n"); }
     ;
 
@@ -553,10 +562,10 @@ factor:
     | TOK_TRUE
     | TOK_FALSE
     /* function call or an array element*/
-    | instance_path TOK_LPAREN arg_list TOK_RPAREN {
+    | l_value TOK_LPAREN arg_list TOK_RPAREN {
           printf("function call $%s\n", $1);
         }
-    | l_value
+    | l_value_ext
     | TOK_LPAREN full_expression TOK_RPAREN
     ;
 
@@ -595,7 +604,7 @@ param_assignments:
 
 param_assignment:
     TOK_ID TOK_ASSIGN full_expression  /* Formal Input: IN := True */
-    | TOK_ID TOK_OUTPUT_ASSIGN l_value           /* Formal Output: Q => MyLamp */
+    | TOK_ID TOK_OUTPUT_ASSIGN l_value_ext           /* Formal Output: Q => MyLamp */
     ;
     ;
 
@@ -605,7 +614,16 @@ method_declaration_list:
     ;
 
 method_declaration:
-    TOK_METHOD opt_access_modifier TOK_ID TOK_COLON type_spec
+    TOK_METHOD opt_access_modifier TOK_ID TOK_COLON data_type_spec
+        var_declarations
+        statements
+    TOK_END_METHOD
+    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type
+        var_declarations
+        statements
+    TOK_END_METHOD
+    /* TOK_VSEMICOLON is a virtual token*/
+    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type TOK_VSEMICOLON
         var_declarations
         statements
     TOK_END_METHOD

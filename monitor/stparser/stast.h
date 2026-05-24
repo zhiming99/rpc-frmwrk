@@ -47,6 +47,7 @@ namespace rpcf
 struct CSTAstNodeBase :
     public CObjBase
 {
+    typedef CObjBase super;
     guint32 m_dwFlags = 0;
     typedef CObjBase super;
     CSTAstNodeBase():super() {} 
@@ -79,5 +80,53 @@ struct CSTAstNodeBase :
     { m_oLocation = oLoc; }
 };
 
+struct CLValueVariable:
+    public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+};
+
+struct CInstancePath:
+    public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+    std::vector< CAstNodeBase* > m_vecIds;
+};
+
+struct CLValueVariableInstPath
+    public CLValueVariable
+{
+    typedef CLValueVariable super;
+    CInstancePath* m_pInstPath = nullptr;
+};
+
+struct CLValueVariableDataMember
+    public CLValueVariable
+{
+    typedef CLValueVariable super;
+    CLValueVariable* m_pLValue;
+    CInstancePath* m_pInstPath
+};
+
+struct CLValueVariableDefPtr
+    public CLValueVariable
+{
+    typedef CLValueVariable super;
+    CLValueVariable* m_pLValue;
+};
+
+struct CExpressionBase:
+    public CSTAstNodeBase
+{
+    typedef CSTAstNodeBase super;
+};
+
+struct CLValueVariableArrayAccess
+    public CLValueVariable
+{
+    typedef CLValueVariable super;
+    CLValueVariable* m_pLValue;
+    CExpressionBase* m_pExpr;
+};
 
 }

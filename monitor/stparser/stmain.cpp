@@ -151,23 +151,60 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 
         while( current_ps == main_ps && !bSwallow )
         {
-            if( GetParserState( ps ) == CONFLICT_STATE &&
-                current_tok == TOK_SEMICOLON &&
-                next_tok == TOK_ELSE )
+            gint32 iState = GetParserState( ps );
+            switch( iState )
             {
-                // lookahead one more token to resolve the
-                // shift/reduce conflict
-                current_tok = TOK_CASE_SEP;
-                break;
-            }
-            else if( GetParserState( ps ) == SUBEXPR_STATE &&
-                current_tok == TOK_MINUS )
-            {
-                // before bison can see this token,
-                // replace TOK_MINUS with TOK_SUB, so
-                // that bison can shift without error.
-                current_tok = TOK_SUB;
-                break;
+            case CONFLICT_STATE:
+                {
+                    if( current_tok == TOK_SEMICOLON &&
+                    ( next_tok == TOK_ELSE ||
+                      next_tok == TOK_END_CASE ) )
+                    {
+                        // lookahead one more token to
+                        // resolve the shift/reduce
+                        // conflict
+                        current_tok = TOK_CASE_SEP;
+                        break;
+                    }
+                }
+            case SUBEXPR_STATE:
+                {
+                    if( current_tok == TOK_MINUS )
+                    {
+                        // before bison can see this
+                        // token, replace TOK_MINUS
+                        // with TOK_SUB, so that bison
+                        // can shift without error.
+                        current_tok = TOK_SUB;
+                        break;
+                    }
+                }
+            case METHOD_RET_STATE: 
+                {
+                    // insert an virtual token to let
+                    // bison get over the ambiguios syntax
+                    YYLTYPE2 temploc = current_lloc;
+                    temploc.last_line = temploc.first_line;
+                    temploc.last_column = temploc.first_column;
+                    status = yypush_parse( current_ps,
+                        TOK_VSEMICOLON,
+                        nullptr, &temploc, pCtx );
+                    break;
+                }
+            default:
+                {
+                    auto states =
+                        std::move( LVALUE_BIT_STATES );
+                    auto itr = std::find( states.begin(),
+                        states.end(), iState );
+                    if( itr != state.end() &&
+                        current_tok == TOK_DOT &&
+                        next_tok == TOK_NUMBER )
+                    {
+                        current_tok = TOK_VPUNC;
+                        break;
+                    }
+                }
             }
 
             if( current_tok == TOK_LBRACE &&
