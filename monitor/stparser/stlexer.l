@@ -27,10 +27,14 @@
 #include <vector>
 #include <cstdlib>
 #include <cctype>
+#include <rpc.h>
 #include "parsrctx.h"
 
+using namespace rpcf;
+
 std::string ProcessSTString(const char* input);
-typedef std::pair< Variant, YYLTYPE2 > YYSTYPE;
+typedef std::pair< Variant, YYLTYPE2 > YYSPAIR;
+typedef std::shared_ptr< YYSPAIR > YYSTYPE;
 #define YY_DECL int yylex(YYSTYPE * yylval_param, \
     YYLTYPE * yylloc_param, CSTParserContext* pCtx );
 
@@ -44,7 +48,7 @@ typedef std::pair< Variant, YYLTYPE2 > YYSTYPE;
         yylloc2->text = yyget_text( yyscanner );\
         yylloc2->fidx = pCtx->GetFileIdx( pCtx->m_strCurFile ); \
         yyset_column(yyget_column(yyscanner) + yyleng, yyscanner); \
-        if( yylval != nullptr ) yylval->second = *yyloc2; \
+        if( yylval != nullptr ) yylval->get()->second = *yyloc2; \
     }while( 0 );
 
 %}
@@ -83,12 +87,12 @@ int comment_depth = 0;
  // (?i:TIME|T|TO)#-?([0-9]+(\.[0-9]+)?(_?[0-9]+)*(d|h|m|s|ms|us|ns))+ {
 (?i:T|TIME|TO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)? {
     /* Copy the matched text to pass to Bison */
-    yylval->first = yytext; 
+    yylval->get()->first = yytext; 
     return TOK_TIME;
 }
 (?i:LT|LTIME|LTO)#-?([0-9]+(\.[0-9]+)?d)?([0-9]+(\.[0-9]+)?h)?([0-9]+(\.[0-9]+)?m)?([0-9]+(\.[0-9]+)?s)?([0-9]+(\.[0-9]+)?ms)?([0-9]+(\.[0-9]+)?us)?([0-9]+(\.[0-9]+)?ns)? {
     /* Copy the matched text to pass to Bison */
-    yylval->first = yytext; 
+    yylval->get()->first = yytext; 
     return TOK_LTIME;
 }
 
@@ -184,26 +188,26 @@ int comment_depth = 0;
 
  /* Matches D#2024-12-25 */
 {D_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2} {
-    yylval->first = ( guint64 )ParseStTimeToUnix( yytext );
+    yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_DATE;
 }
 
  /* Matches TOD#14:30:05.123 */
 {TOD_PREFIX}[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval->first = ( guint64 )ParseStTimeToUnix( yytext );
+    yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_TIME_OF_DAY;
 }
 
  /* Matches DT#2024-12-25-14:30:05 */
 {DT_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
-    yylval->first = ( guint64 )ParseStTimeToUnix( yytext );
+    yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
     return TOK_DATE_TIME
 }
 
  /* Standard STRING literal */
 '(''|[^'\n]|(\$[0-9a-fA-F]{2})|\$[LlPpRrTtQ$])*' {
     // Action: process string (strip quotes, resolve escapes)
-    yylval->first = TranslateSTString( yytext );
+    yylval->get()->first = TranslateSTString( yytext );
     return TOK_STRING;
 }
 
@@ -250,7 +254,7 @@ int comment_depth = 0;
     ObjPtr pAddr = ParsePeriAddr( yytext, pCtx );
     if( pAddr.IsEmpty() )
         return YYerror;
-    yylval->first = pAddr;
+    yylval->get()->first = pAddr;
     return TOK_ABS_ADDR_PERIPHERAL;
 }
 
@@ -271,11 +275,11 @@ int comment_depth = 0;
      ObjPtr pAddr = ParseRpcfAddr( yytext, pCtx );
      if( pAddr.IsEmpty() )
          return YYerror;
-     yylval->first = pAddr;
+     yylval->get()->first = pAddr;
      return TOK_RPCF_ADDR;
  }
 
-{IDENTIFIER} { yylval->first = yytext; return TOK_ID; }
+{IDENTIFIER} { yylval->get()->first = yytext; return TOK_ID; }
 
     /* Entry into Native ST Comment (* ... *) */
 "(*"            { comment_depth = 1; BEGIN(ST_COMM); }

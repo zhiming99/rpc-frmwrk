@@ -54,7 +54,9 @@ struct CSTAstNodeBase :
     CSTAstNodeBase* m_pParent;
     gint32 m_iToken = YYUNDEF;
     YYLTYPE2  m_oLocation;
-    // the file index in the included file stack. -1 means the main file.
+
+    // the file index in the include file stack.
+    // -1 means the file to parse.
     gint32 m_iFileIdx = -1;
     YYSTYPE m_oValue;
     
@@ -78,55 +80,14 @@ struct CSTAstNodeBase :
 
     inline void SetLocation( YYLTYPE& oLoc )
     { m_oLocation = oLoc; }
+
+    const YYLTYPE2& GetLocation() const
+    { return m_oLocation; }
+
+    YYLTYPE2& GetLocation()
+    { return m_oLocation; }
+
 };
 
-struct CLValueVariable:
-    public CSTAstNodeBase
-{
-    typedef CSTAstNodeBase super;
-};
-
-struct CInstancePath:
-    public CSTAstNodeBase
-{
-    typedef CSTAstNodeBase super;
-    std::vector< CAstNodeBase* > m_vecIds;
-};
-
-struct CLValueVariableInstPath
-    public CLValueVariable
-{
-    typedef CLValueVariable super;
-    CInstancePath* m_pInstPath = nullptr;
-};
-
-struct CLValueVariableDataMember
-    public CLValueVariable
-{
-    typedef CLValueVariable super;
-    CLValueVariable* m_pLValue;
-    CInstancePath* m_pInstPath
-};
-
-struct CLValueVariableDefPtr
-    public CLValueVariable
-{
-    typedef CLValueVariable super;
-    CLValueVariable* m_pLValue;
-};
-
-struct CExpressionBase:
-    public CSTAstNodeBase
-{
-    typedef CSTAstNodeBase super;
-};
-
-struct CLValueVariableArrayAccess
-    public CLValueVariable
-{
-    typedef CLValueVariable super;
-    CLValueVariable* m_pLValue;
-    CExpressionBase* m_pExpr;
-};
 
 }

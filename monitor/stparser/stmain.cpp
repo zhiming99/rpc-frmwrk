@@ -70,15 +70,15 @@ static FactoryPtr InitClassFactory()
     END_FACTORY_MAPS;
 };
 
-gint32 ReadToken( YYSTYPE* current_lval,
-    YYLTYPE2* current_loc,
+gint32 ReadToken( YYSTYPE* cur_lval,
+    YYLTYPE2* cur_loc,
     yyscan_t yyscanner,
     CSTParserContext* pCtx )
 {
     gint32 ret = YYEOF;
     do{
-        ret = yylex( current_lval,
-            current_loc, yyscanner, pCtx );
+        ret = yylex( cur_lval,
+            cur_loc, yyscanner, pCtx );
         if( ret == YYEMPTY )
             continue;
         break;
@@ -97,8 +97,9 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
     gint32 ret = 0;
     gint32 current_tok;
     gint32 status = YYPUSH_MORE;
+    gint32 prev_tok;
 
-    YYSTYPE current_lval;
+    YYSTYPE current_lval( new YYSPAIR() );
     YYLTYPE2 current_lloc;
 
     yyscan_t yyscanner;
@@ -127,15 +128,19 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
     yyset_lineno( 1, yyscanner );
 
     // Initialization: Get the first token
-    current_tok = READTOK( &current_lval,
+    current_tok = READTOK( current_lval,
         &current_lloc, yyscanner, pCtx );
 
     yypstate* current_ps = main_ps;
     while( status == YYPUSH_MORE )
     {
         // 1. Peek: Get the next token from the lexer
-        YYSTYPE next_lval;
+        YYSTYPE next_lval( new YYSPAIR() );
         YYLTYPE2 next_lloc;
+
+        YYSTYPE prev_lval( new YYSPAIR() );
+        YYLTYPE2 prev_lloc;
+
         gint32 next_tok = READTOK( &next_lval,
             &next_lloc, yyscanner, pCtx );
         bool bUpdate = true;
@@ -163,7 +168,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         // lookahead one more token to
                         // resolve the shift/reduce
                         // conflict
-                        current_tok = TOK_CASE_SEP;
+                        current_tok = TOK_VCASE_SEP;
                         break;
                     }
                 }
@@ -175,14 +180,24 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         // token, replace TOK_MINUS
                         // with TOK_SUB, so that bison
                         // can shift without error.
-                        current_tok = TOK_SUB;
+                        current_tok = TOK_VSUB;
                         break;
                     }
                 }
             case METHOD_RET_STATE: 
                 {
-                    // insert an virtual token to let
-                    // bison get over the ambiguios syntax
+                    // insert an virtual token 
+                    bool bInsert = true;
+                    if( current_tok == TOK_DOT &&
+                        next_tok == TOK_ID )
+                    {
+                        // assuming instance_path not span lines.
+                        if( current_lloc.first_line ==
+                            prev_lloc.first_line )
+                            bInsert = false;
+                    }
+                    if( !bInsert )
+                        break;
                     YYLTYPE2 temploc = current_lloc;
                     temploc.last_line = temploc.first_line;
                     temploc.last_column = temploc.first_column;
@@ -391,6 +406,10 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
         // 4. Advance: The 'next' becomes the 'current'
         if( bUpdate )
         {
+            prev_tok = current_tok;
+            prev_lval = current_lval;
+            prev_llok = current_lloc;
+
             current_tok = next_tok;
             current_lval = next_lval;
             current_lloc = next_lloc;

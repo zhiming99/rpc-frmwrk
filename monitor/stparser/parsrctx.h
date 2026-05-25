@@ -27,6 +27,9 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include "stlexer.h"
+#include "stparser.h"
+#include "nonterm.h"
 
 #define CLEAR_RSYMBS \
 for( int i = 0; i < ( yylen ); i++ ) \
@@ -45,8 +48,8 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #define CONFLICT_STATE     460
 // the state to replace TOK_MINUS with TOK_SUB
 #define SUBEXPR_STATE     63
-#define LVALUE_BIT_STATES     std::set({ 57, 204, 341 })
-#define METHOD_RET_STATE     std::set({  })
+#define LVALUE_BIT_STATES     std::vector({ 57, 204, 341 })
+#define METHOD_RET_STATE     475
 
 #define GetParserState( ps ) ( ps->yystate )
 
@@ -54,7 +57,7 @@ namespace rpcf
 {
 typedef enum
 {
-    invalidProgress = -1;
+    invalidProgress = -1,
     scanning = 0,
     building,
     leaving,
@@ -67,20 +70,6 @@ typedef enum
     elseBlock,
     endifBlock,
 } enumBlkType;
-
-struct FILECTX2
-{
-    FILE*       m_fp = nullptr;
-    rpcf::Variant     m_oVal;
-    std::string m_strPath;
-    std::string m_strLastVal;
-    YYLTYPE2    m_oLocation;
-
-    FILECTX2();
-    FILECTX2( const std::string& strPath );
-    FILECTX2( const FILECTX2& fc );
-    ~FILECTX2();
-};
 
 struct YYLTYPE2 :
     public YYLTYPE
@@ -106,6 +95,20 @@ struct YYLTYPE2 :
     }
 };
 
+struct FILECTX2
+{
+    FILE*       m_fp = nullptr;
+    rpcf::Variant     m_oVal;
+    std::string m_strPath;
+    std::string m_strLastVal;
+    YYLTYPE2    m_oLocation;
+
+    FILECTX2();
+    FILECTX2( const std::string& strPath );
+    FILECTX2( const FILECTX2& fc );
+    ~FILECTX2();
+};
+
 struct CondPragmaState
 {
     enumCPProgress m_iProgress = scanning;
@@ -119,6 +122,12 @@ struct CondPragmaState
 
     // conditional depth in the block m_iBlkIdx
     gint32 m_iCondDepth = 0;
+    CondPragmaState( int iProgress,
+        int iBlkType, int iBlkIdx ) :
+        m_iProgress( ( enumCPProgress )iProgress ),
+        m_iBlkType( ( enumBlkType ) iBlkType ),
+        m_iBlkIdx( iBlkIdx )
+    {}
 };
 
 struct CSTParserContext
@@ -137,7 +146,7 @@ struct CSTParserContext
     // are searched in order.
     std::vector< stdstr > m_vecInclPaths;
     std::vector< std::shared_ptr< FILECTX2 > > m_vecFileStack;
-    yyscan_t yyscanner = nullptr;
+    void* yyscanner = nullptr;
     stdstr m_strCurFile;
     std::vector< stdstr > m_vecFiles;
 
@@ -188,10 +197,10 @@ struct CSTParserContext
 
     gint32 m_iSemErr = 0;
     inline void IncSemError()
-    { m_iSemError++; }
+    { m_iSemErr++; }
 
     inline gint32 GetSemErrorCount() const
-    { return m_iSemError; }
+    { return m_iSemErr; }
 
     gint32 GetFileIdx( const stdstr& strFile ) const;
 

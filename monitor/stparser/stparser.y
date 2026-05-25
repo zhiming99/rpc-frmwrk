@@ -25,13 +25,15 @@
 %locations
 %define api.pure full
 %define api.push-pull push
-%define api.value.type {Variant}
 %require "3.0"
 
 %{
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include "stlexer.h"
+#include <rpc.h>
+#include "parsrctx.h"
 
 using namespace rpcf;
 
@@ -41,14 +43,16 @@ std::shared_ptr< CSTParserContext > g_pParserCtx( new CSTParserContext );
 
 %code requires {
 
+#include <rpc.h>
 #include "parsrctx.h"
-
-extern gint32 EvalConstExpr( CSTParserContext* pCtx );
+using namespace rpcf;
 
 extern void ParserPrint(
     const char* szFile,
     gint32 iLineNo,
     const char* strMsg );
+
+class CSTParserContext;
 
 }
 
@@ -56,16 +60,18 @@ extern void ParserPrint(
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
 %token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
 
-%token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT TOK_VSEMICOLON
-%token TOK_ADD TOK_SUB TOK_MINUS TOK_MUL TOK_DIV TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
+%token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT
+%token TOK_ADD TOK_MINUS TOK_MUL TOK_DIV TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
-%token TOK_CASE_SEP TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
+%token TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT
 
-%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN TOK_VPUNC
+%token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
+// virtual tokens
+%token TOK_VCASE_SEP TOK_VPUNC TOK_VSEMICOLON TOK_VSUB 
 
  /*%glr-parser*/
 
@@ -78,7 +84,7 @@ extern void ParserPrint(
 %left TOK_XOR
 %left TOK_AND
 %left TOK_EQUAL TOK_NEQU TOK_LT TOK_LE TOK_GT TOK_NLE TOK_NGT
-%left TOK_ADD TOK_SUB
+%left TOK_ADD TOK_VSUB
 %left TOK_MUL TOK_DIV TOK_MOD
 %right TOK_NOT
 
@@ -99,10 +105,10 @@ namespace_name : TOK_ID
     ;
 
 namespace_elements : namespace_element
-      { $$ = create_empty_element_list(); }
+      {  }
 
     | namespace_elements namespace_element
-      { $$ = append_to_element_list($1, $2); }
+      {  }
     ;
 
 namespace_element :
@@ -119,7 +125,7 @@ namespace_declaration
     : TOK_NAMESPACE namespace_name namespace_elements TOK_END_NAMESPACE
       {
           /* AST logic: Wrap nested components in a Namespace AST Node */
-          $$ = create_namespace_node($2, $3);
+          
       }
     ;
 
@@ -181,12 +187,12 @@ enum_type_definition:
 type_assignment:
       TOK_ID TOK_COLON type_spec TOK_SEMICOLON {
         /* Alias: TYPE MyInt : INT; */
-        add_alias_to_symtab($1, $3);
+        // add_alias_to_symtab($1, $3);
       }
 
     | TOK_ID TOK_COLON struct_definition TOK_SEMICOLON   {
         /* Struct: TYPE Motor : STRUCT... */
-        add_struct_to_symtab($1, $3);
+        // add_struct_to_symtab($1, $3);
     }
     | enum_type_definition
     ;
@@ -196,12 +202,12 @@ struct_definition:
     ;
 
 member_list:
-      member_declaration TOK_SEMICOLON               { $$ = create_member_list($1); }
-    | member_list member_declaration TOK_SEMICOLON   { $$ = add_to_member_list($1, $2); }
+      member_declaration TOK_SEMICOLON               {  }
+    | member_list member_declaration TOK_SEMICOLON   {  }
     ;
 
 member_declaration:
-      TOK_ID TOK_COLON type_spec               { $$ = create_member($1, $3); }
+      TOK_ID TOK_COLON type_spec               {  }
     ;
 
 var_declarations:
@@ -234,8 +240,8 @@ declaration:
     ;
 
 var_list:
-    var_declaration TOK_SEMICOLON           { $$ = create_list($1); }
-    | var_list var_declaration TOK_SEMICOLON  { $$ = add_to_list($1, $2); }
+    var_declaration TOK_SEMICOLON           {  }
+    | var_list var_declaration TOK_SEMICOLON  {  }
     ;
 
 initial_value:
@@ -245,20 +251,20 @@ initial_value:
     ;
 
 init_list:
-      initial_value                    { $$ = create_init_list($1); }
-    | init_list TOK_COMMA initial_value      { $$ = add_to_init_list($1, $3); }
+      initial_value                    {  }
+    | init_list TOK_COMMA initial_value      {  }
     /* ST also supports 'n(value)' for repeating array elements */
-    | init_list TOK_COMMA TOK_NUMBER TOK_LPAREN initial_value TOK_RPAREN    { $$ = create_repeated_init($1, $3); }
+    | init_list TOK_COMMA TOK_NUMBER TOK_LPAREN initial_value TOK_RPAREN    {  }
     ;
 
 struct_init_list:
-      TOK_ID TOK_ASSIGN initial_value    { $$ = create_struct_init($1, $3); }
-    | struct_init_list TOK_COMMA TOK_ID TOK_ASSIGN initial_value { $$ = add_to_struct_init($1, $3, $5); }
+      TOK_ID TOK_ASSIGN initial_value    {  }
+    | struct_init_list TOK_COMMA TOK_ID TOK_ASSIGN initial_value {  }
     ;
 
 var_declaration:
-      identifier_list TOK_COLON type_spec                  { $$ = create_decl($1, $3, NULL); }
-    | identifier_list TOK_COLON type_spec TOK_ASSIGN initial_value  { $$ = create_decl($1, $3, $5); }
+      identifier_list TOK_COLON type_spec                  {  }
+    | identifier_list TOK_COLON type_spec TOK_ASSIGN initial_value  {  }
     | TOK_ID TOK_AT direct_address 
     | TOK_ID TOK_AT direct_address TOK_ASSIGN initial_value
     ;
@@ -271,8 +277,8 @@ direct_address:
   
 
 identifier_list:
-      TOK_ID                    { $$ = create_id_list($1); }
-    | identifier_list TOK_COMMA TOK_ID { $$ = add_to_id_list($1, $3); }
+      TOK_ID                    {  }
+    | identifier_list TOK_COMMA TOK_ID {  }
     ;
 
 int_type:
@@ -459,7 +465,6 @@ assignment_statement:
 /* Rule for Standalone Calls: Used for functions/methods that return void or whose return is ignored */
 function_call_statement:
       l_value TOK_LPAREN arg_list TOK_RPAREN {
-          printf("%s",$1);
       }
     ;
 
@@ -522,31 +527,31 @@ comparison_expression:
 /* 4. ADDITIVE (+, -) */
 arithmetic_expr:
       term
-    | arithmetic_expr TOK_ADD term { printf($1.type == TYPE_INT ? "i32.add\n" : "f32.add\n"); }
-    | arithmetic_expr TOK_SUB term { printf($1.type == TYPE_INT ? "i32.sub\n" : "f32.sub\n"); }
+    | arithmetic_expr TOK_ADD term {  }
+    | arithmetic_expr TOK_VSUB term {  }
     ;
 
 /* 5. MULTIPLICATIVE (*, /, MOD) */
 term:
       unary_expr
 
-    | term TOK_MUL   unary_expr { printf($1.type == TYPE_INT ? "i32.mul\n" : "f32.mul\n"); }
-    | term TOK_DIV   unary_expr { printf($1.type == TYPE_INT ? "i32.div_s\n" : "f32.div\n"); }
-    | term TOK_MOD unary_expr { printf("i32.rem_s\n"); }
+    | term TOK_MUL   unary_expr {  }
+    | term TOK_DIV   unary_expr {  }
+    | term TOK_MOD unary_expr {  }
     ;
 
 /* 6. UNARY (NOT, -) */
 unary_expr:
       power_expr
 
-    | TOK_MINUS power_expr { printf($2.type == TYPE_INT ? "i32.const 0\ni32.sub\n" : "f32.neg\n"); }
-    | TOK_NOT power_expr { printf("i32.eqz\n"); }
+    | TOK_MINUS power_expr {  }
+    | TOK_NOT power_expr {  }
     ;
 
 /* 7. POWER (**) */
 power_expr:
       factor
-    | factor TOK_POWER factor { printf("call $math_pow\n"); }
+    | factor TOK_POWER factor {  }
     ;
 
 /* 8. PRIMARY (Highest Precedence) */
@@ -563,7 +568,7 @@ factor:
     | TOK_FALSE
     /* function call or an array element*/
     | l_value TOK_LPAREN arg_list TOK_RPAREN {
-          printf("function call $%s\n", $1);
+
         }
     | l_value_ext
     | TOK_LPAREN full_expression TOK_RPAREN
@@ -613,17 +618,22 @@ method_declaration_list:
     | method_declaration_list method_declaration
     ;
 
+opt_global_namespace:
+    /* empty */
+    | TOK_DOT
+    ;
+
 method_declaration:
     TOK_METHOD opt_access_modifier TOK_ID TOK_COLON data_type_spec
         var_declarations
         statements
     TOK_END_METHOD
-    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type
+    /*| TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type
         var_declarations
         statements
-    TOK_END_METHOD
+    TOK_END_METHOD*/
     /* TOK_VSEMICOLON is a virtual token*/
-    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON derived_type TOK_VSEMICOLON
+    | TOK_METHOD opt_access_modifier TOK_ID TOK_COLON opt_global_namespace instance_path TOK_VSEMICOLON
         var_declarations
         statements
     TOK_END_METHOD
@@ -706,9 +716,10 @@ case_body:
     ;
 
 case_element:
-    case_list_selector cinner_statements TOK_SEMICOLON
-      /* TOK_CASE_SEP does not come from source, it is used to resolve the shift/reduce conflict */
-    | case_list_selector cinner_statements TOK_CASE_SEP
+    // case_list_selector cinner_statements TOK_SEMICOLON
+    // TOK_VCASE_SEP does not come from source, it is used to resolve the
+    // shift/reduce conflict
+    case_list_selector cinner_statements TOK_VCASE_SEP
     ;
 
 case_list_selector:
@@ -748,17 +759,17 @@ instance_path:
     ;
 
 using_directive_list : using_directive
-      { $$ = create_empty_node_list(); }
+      {  }
 
     | using_directive_list using_directive
       {
-          $1->push_back($2);
+          
           $$ = $1;
       }
     ;
 using_directive : TOK_USING instance_path TOK_SEMICOLON
       {
-          $$ = create_using_node($2);
+          
       }
     ;
 
