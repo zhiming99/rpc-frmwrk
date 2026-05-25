@@ -14,7 +14,7 @@ stparser.cpp stparser.h: stparser.y
     stateNo=`awk '/State ([0-9]{3}|[0-9]{2}|[0-9])/ { last_match = $$2; } /TOK_METHOD .*instance_path \xE2\x80\xA2 TOK_VSEMICOLON/ { printf( "%d, ",last_match ); }' stparser.output`;\
     stateNo="$${stateNo%, }";sed -i "s/define METHOD_RET_STATE.*/define METHOD_RET_STATE     $$stateNo/" parsrctx.h;echo METHOD_RET_STATE=$$stateNo;
  
-rpcfstc_PROGRAMS=rpcfstc
+#rpcfstc_PROGRAMS=rpcfstc
 rpcfstc_SOURCES=stlexer.cpp stlexer.h stparser.cpp stparser.h stbase.cpp stmain.cpp stast.h nonterm.h 
 rpcfstcdir=$(bindir)
 
