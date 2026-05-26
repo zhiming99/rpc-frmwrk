@@ -37,29 +37,29 @@ struct CInstancePath:
     public CSTAstNodeBase
 {
     typedef CSTAstNodeBase super;
-    std::vector< CAstNodeBase* > m_vecIds;
+    std::vector< ObjPtr > m_vecIds;
 };
 
-struct CLValueVariableInstPath
+struct CLValueVariableInstPath:
     public CLValueVariable
 {
     typedef CLValueVariable super;
     CInstancePath* m_pInstPath = nullptr;
 };
 
-struct CLValueVariableDataMember
+struct CLValueVariableDataMember:
     public CLValueVariable
 {
     typedef CLValueVariable super;
-    CLValueVariable* m_pLValue;
-    CInstancePath* m_pInstPath
+    CLValueVariable* m_pLValue = nullptr;
+    CInstancePath* m_pInstPath = nullptr;
 };
 
-struct CLValueVariableDefPtr
+struct CLValueVariableDefPtr:
     public CLValueVariable
 {
     typedef CLValueVariable super;
-    CLValueVariable* m_pLValue;
+    CLValueVariable* m_pLValue = nullptr;
 };
 
 struct CExpressionBase:
@@ -68,10 +68,10 @@ struct CExpressionBase:
     typedef CSTAstNodeBase super;
 };
 
-struct CLValueVariableArrayAccess
+struct CLValueVariableArrayAccess:
     public CLValueVariable
 {
     typedef CLValueVariable super;
-    CLValueVariable* m_pLValue;
-    CExpressionBase* m_pExpr;
+    CLValueVariable* m_pLValue = nullptr;
+    CExpressionBase* m_pExpr = nullptr;
 };

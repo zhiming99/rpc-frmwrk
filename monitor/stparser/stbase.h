@@ -1,12 +1,12 @@
 /*
  * =====================================================================================
  *
- *       Filename:  stclsids.h
+ *       Filename:  stbase.h
  *
- *    Description:  declarations of classids for ST parser classes 
+ *    Description:  declarations of utilities functions for lexer.
  *
  *        Version:  1.0
- *        Created:  05/15/2026 11:11:38 AM
+ *        Created:  05/26/2026 07:07:26 PM
  *       Revision:  none
  *       Compiler:  gcc
  *
@@ -21,18 +21,21 @@
  *
  * =====================================================================================
  */
+
 #pragma once
+#include <cstring>
+#include <strings.h>
+#include <ctime>
+#include <cctype>
+#include <cstdlib>
+#include <string>
+#include <stdint.h>
+#include <sstream>
+#include <iomanip>
 #include "rpc.h"
-#include "objfctry.h"
-namespace rpcf
-{ 
 
-typedef enum 
-{
-    DECL_CLSID( CLValueVariableInstPath ) = clsid( ClassFactoryStart ) + 100,
-    DECL_CLSID( CLValueVariableDataMember ),
-    DECL_CLSID( CLValueVariableDefPtr ),
-    DECL_CLSID( CLValueVariableArrayAccess ),
-}EnumSTParserClsid;
-
-}
+timespec st_time_to_timespec(const char* text);
+uint64_t ParseStTimeToUnix(const char* input);
+std::string TranslateSTString(const std::string& input);
+ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx );
+ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx );

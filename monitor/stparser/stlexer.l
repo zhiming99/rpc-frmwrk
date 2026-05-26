@@ -28,15 +28,19 @@
 #include <cstdlib>
 #include <cctype>
 #include <rpc.h>
-#include "parsrctx.h"
+#include "stparser.h"
+#include "stbase.h"
 
-using namespace rpcf;
-
-std::string ProcessSTString(const char* input);
-typedef std::pair< Variant, YYLTYPE2 > YYSPAIR;
-typedef std::shared_ptr< YYSPAIR > YYSTYPE;
 #define YY_DECL int yylex(YYSTYPE * yylval_param, \
-    YYLTYPE * yylloc_param, CSTParserContext* pCtx );
+    YYLTYPE * yylloc_param, yyscan_t yyscanner, \
+    rpcf::CSTParserContext* pCtx )
+
+}
+
+%{
+
+#include "parsrctx.h"
+using namespace rpcf;
 
 #define YY_USER_ACTION \
     do {  \
@@ -44,12 +48,17 @@ typedef std::shared_ptr< YYSPAIR > YYSTYPE;
         yylloc->first_line = yylloc->last_line = yyget_lineno(yyscanner); \
         yylloc->first_column = yyget_column(yyscanner); \
         yylloc->last_column = yyget_column(yyscanner) + yyleng - 1; \
-        auto yylloc2 = static_cast< YYLTYPE2 >( yylloc ); \
+        auto yylloc2 = static_cast< YYLTYPE2* >( yylloc ); \
         yylloc2->text = yyget_text( yyscanner );\
         yylloc2->fidx = pCtx->GetFileIdx( pCtx->m_strCurFile ); \
         yyset_column(yyget_column(yyscanner) + yyleng, yyscanner); \
-        if( yylval != nullptr ) yylval->get()->second = *yyloc2; \
+        if( yylval != nullptr ) yylval->get()->second = *yylloc2; \
     }while( 0 );
+
+int comment_depth = 0;
+void lexerr(const char *s) {
+    fprintf(stderr, "Error: %s\n", s);
+}
 
 %}
 
@@ -77,7 +86,6 @@ IDENTIFIER  ({LETTER}|("_"({LETTER}|{DIGIT})))("_"?({LETTER}|{DIGIT}))*
 
  /* point type: I=input, O=output, S=setpoint */
 ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
-int comment_depth = 0;
 /* Define Exclusive States */
 %x ST_COMM C_COMM SINGLE_COMM
 
@@ -129,7 +137,7 @@ int comment_depth = 0;
 (?i:IF)                     return TOK_IF;
 (?i:THEN)                   return TOK_THEN;
 (?i:ELSE)                   return TOK_ELSE;
-(?i:ELSIF)                  return TOK_ELSEIF;
+(?i:ELSIF)                  return TOK_ELSIF;
 (?i:END_IF)                 return TOK_END_IF;
 (?i:CASE)                   return TOK_CASE;
 (?i:OF)                     return TOK_OF;
@@ -165,7 +173,7 @@ int comment_depth = 0;
 (?i:AT)                     return TOK_AT;
 (?i:BY)                     return TOK_BY;
 (?i:RETAIN)                 return TOK_RETAIN;
-(?i:PERSISTANT)             return TOK_PERSISTANT;
+(?i:PERSISTENT)             return TOK_PERSISTENT;
 (?i:ABSTRACT)               return TOK_ABSTRACT;
 (?i:FINAL)                  return TOK_FINAL;
 (?i:SUPER)                  return TOK_SUPER;
@@ -201,7 +209,7 @@ int comment_depth = 0;
  /* Matches DT#2024-12-25-14:30:05 */
 {DT_PREFIX}[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{1,2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)? {
     yylval->get()->first = ( guint64 )ParseStTimeToUnix( yytext );
-    return TOK_DATE_TIME
+    return TOK_DATE_TIME;
 }
 
  /* Standard STRING literal */
@@ -213,12 +221,12 @@ int comment_depth = 0;
 
  /* WSTRING literal */
 \"(\"\"|[^\"\n]|(\$[0-9a-fA-F]{4})|\$[LlPpRrTtQ$])*\" {
-    yyerror( "wide character string are not supported, yet" );
+    lexerr( "wide character string are not supported, yet" );
 }
 
  /* Error handling for unterminated strings */
-'[^'\n]* { yyerror("Unterminated string literal"); }
-\"[^\"\n]* { yyerror("Unterminated wide string literal"); }
+'[^'\n]* { lexerr("Unterminated string literal"); }
+\"[^\"\n]* { lexerr("Unterminated wide string literal"); }
 
 
  /* Match Typed Literals like INT#10, DWORD#16#FFFF, REAL#10.5 */
@@ -366,8 +374,8 @@ int comment_depth = 0;
 
 <<EOF>> {
     do{
-        yypop_buffer_state();
-        if ( !YY_CURRENT_BUFFER)
+        yypop_buffer_state( yyscanner );
+        if ( !YY_CURRENT_BUFFER )
             break;
 
         if( pCtx->m_vecFileStack.empty() )

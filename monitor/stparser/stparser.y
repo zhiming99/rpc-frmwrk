@@ -31,14 +31,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include "stlexer.h"
 #include <rpc.h>
+#include "stlexer.h"
 #include "parsrctx.h"
 
 using namespace rpcf;
 
-std::shared_ptr< CSTParserContext > g_pParserCtx( new CSTParserContext );
+std::shared_ptr< rpcf::CSTParserContext > g_pParserCtx( new rpcf::CSTParserContext );
 
+void yyerror (YYLTYPE* yyloc,
+    rpcf::CSTParserContext* pCtx,
+    const char* yymsgp);
+  
 %}
 
 %code requires {
@@ -52,13 +56,11 @@ extern void ParserPrint(
     gint32 iLineNo,
     const char* strMsg );
 
-class CSTParserContext;
-
 }
 
 %token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
 %token TOK_TON TOK_TON_VALUE TOK_STRING TOK_WSTRING TOK_INT TOK_REAL TOK_LREAL TOK_BOOL TOK_TRUE TOK_FALSE TOK_TIME TOK_LTIME TOK_TYPED_LITERAL TOK_TYPE TOK_END_TYPE TOK_STRUCT TOK_END_STRUCT
-%token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD
+%token TOK_UINT TOK_DINT TOK_UDINT TOK_SINT TOK_USINT TOK_BYTE TOK_WORD TOK_DWORD TOK_ULINT TOK_LINT TOK_LWORD TOK_LDWORD
 
 %token TOK_ID TOK_NUMBER TOK_ASSIGN TOK_SEMICOLON TOK_COLON TOK_COMMA TOK_ARRAY TOK_RANGE TOK_DOT
 %token TOK_ADD TOK_MINUS TOK_MUL TOK_DIV TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
@@ -66,7 +68,7 @@ class CSTParserContext;
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
 %token TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
                
-%token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE
+%token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE TOK_INTERFACE TOK_END_INTERFACE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT
 
 %token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
@@ -76,7 +78,7 @@ class CSTParserContext;
  /*%glr-parser*/
 
 %start start_point
-%parse-param { CSTParserContext *pCtx }
+%parse-param { rpcf::CSTParserContext *pCtx }
 
 %define parse.error verbose
 
@@ -384,26 +386,27 @@ conditional_pragma:
     | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
     | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
     | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
-        std::string& strMsg = $3;
-        ParserPrint( 
-            curloc->file->name,
-            yyget_lineno( yyscanner ),
-            "Info: %s ", strMsg.c_str() );
+        stdstr strMsg = $3.get()->first;
+        YYLTYPE2& curloc = $1.get()->second;
+        strMsg.insert( 0, "Info: " );
+        yyerror( &curloc, pCtx, strMsg.c_str() );
     }
     | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
 
         yyscan_t yyscanner = pCtx->yyscanner;
-        YYLTYPE *curloc = yyget_lloc( yyscanner );
+        YYLTYPE2& curloc = $1.get()->second;
 
-        std::string& strFile = $3;
-        stdstr strCurFile =
-            basename( pCtx->m_strCurFile.c_str() );
+        std::string& strFile = $3.get()->first;
+        stdstr strCurFile = basename(
+            pCtx->GetFileName(
+                curloc.fidx).c_str() );
         if( strFile.empty() )
         {
-            ParserPrint( 
-                strCurFile,
-                yyget_lineno( yyscanner ),
-                "Error, expecting file name" );
+            if( strCurFile.size() )
+                ParserPrint( 
+                    strCurFile.c_str(),
+                    curloc.first_line,
+                    "Error, expecting file name" );
             pCtx->IncSemError();
             YYERROR;
         }
@@ -414,31 +417,36 @@ conditional_pragma:
         if ( !pIncl )
         {
             ParserPrint(
-                strCurFile,
-                yyget_lineno( yyscanner ),
+                strCurFile.c_str(),
+                curloc.first_line,
                 strerror( errno ) );
             pCtx->IncSemError();
             YYERROR;
         }
         if( pCtx->IsFileOnStack( strFullPath ) )
         {
+            stdstr strMsg =
+                "cyclic inclusion of files ";
+            strMsg += strFile;
             ParserPrint(
-                strCurFile,
-                yyget_lineno( yyscanner ),
-                "cyclic inclusion of files %s", strFile );
+                strCurFile.c_str(),
+                curloc.first_line,
+                strMsg.c_str() );
             pCtx->IncSemError();
             YYERROR;
         }
 
         FILECTX2* pfc = new FILECTX2();
-        pfc->m_strPath = pCtx->m_strCurFile;
-        pfc->m_fp = yyin;
-        pfc->m_oLocation = yyget_lloc( pCtx->yyscanner );
+        pfc->m_strPath = pCtx->GetCurFileName();
+        pfc->m_fp = yyget_in( yyscanner );
+        ( ( YYLTYPE& ) pfc->m_oLocation ) =
+            *yyget_lloc( pCtx->yyscanner );
         pCtx->m_vecFileStack.push_back(
             std::unique_ptr< FILECTX2 >( pfc ) );
         yypush_buffer_state(
-            yy_create_buffer( pIncl, YY_BUF_SIZE ), yyscanner );
-        pCtx->m_strCurFile = strFullPath;
+            yy_create_buffer( pIncl, YY_BUF_SIZE, yyscanner ),
+            yyscanner );
+        pCtx->GetCurFileName() = strFullPath;
         yyset_lineno( 1, yyscanner );
         yyset_column( 1, yyscanner );
     }
@@ -775,7 +783,21 @@ using_directive : TOK_USING instance_path TOK_SEMICOLON
 
 %%
 
-void yyerror(const char *s) {
-    fprintf(stderr, "Error: %s\n", s);
+void yyerror (YYLTYPE* yyloc,
+    rpcf::CSTParserContext* pCtx,
+    const char* yymsgp)
+{
+    YYLTYPE2* yloc2 = static_cast< YYLTYPE2* >( yyloc );
+
+    stdstr strCurFile =
+        basename( pCtx->GetFileName(
+            yloc2->fidx).c_str() );
+    if( strCurFile.size() )
+    {
+        ParserPrint( 
+            strCurFile.c_str(),
+            yloc2->first_line,
+            yymsgp );
+    }
 }
 

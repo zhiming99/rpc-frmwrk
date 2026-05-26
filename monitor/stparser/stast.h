@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "stscript.h"
+#include "stparser.h"
 
 /* the node is a constant value */
 #define NODE_FLAG_CONST         0x1
@@ -49,8 +49,8 @@ struct CSTAstNodeBase :
 {
     typedef CObjBase super;
     guint32 m_dwFlags = 0;
-    typedef CObjBase super;
-    CSTAstNodeBase():super() {} 
+    CSTAstNodeBase():super()
+    {} 
     CSTAstNodeBase* m_pParent;
     gint32 m_iToken = YYUNDEF;
     YYLTYPE2  m_oLocation;
@@ -78,7 +78,7 @@ struct CSTAstNodeBase :
     virtual std::string GetSignature() const
     { return std::string( "" ); }
 
-    inline void SetLocation( YYLTYPE& oLoc )
+    inline void SetLocation( YYLTYPE2& oLoc )
     { m_oLocation = oLoc; }
 
     const YYLTYPE2& GetLocation() const

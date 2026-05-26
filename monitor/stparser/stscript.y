@@ -41,6 +41,7 @@ std::shared_ptr< CSTParserContext > g_pParserCtx( new CSTParserContext );
 %code requires {
 
 #include "parsrctx.h"
+using namespace rpcf;
 
 extern gint32 EvalConstExpr( CSTParserContext* pCtx );
 

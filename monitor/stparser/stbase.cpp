@@ -21,20 +21,13 @@
  *
  * =====================================================================================
  */
-#include <cstring>
-#include <strings.h>
-#include <ctime>
-#include <cctype>
-#include <cstdlib>
-#include <string>
-#include <stdint.h>
-#include <sstream>
-#include <iomanip>
 #include "rpc.h"
+#include "parsrctx.h"
+#include "stlexer.h"
 
-using namespace rpcf
+using namespace rpcf;
 
-struct timespec st_time_to_timespec(const char* text) {
+timespec st_time_to_timespec(const char* text) {
     struct timespec ts = {0, 0};
     if (!text) return ts;
 
@@ -270,14 +263,14 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
         }
         ( *pvecInt )().push_back( addr_size );
 
-        char* current_ptr = yytext + digit_start_idx;
+        gint32 iLineNo = yyget_lineno( scanner );
+        auto current_ptr = yytext + digit_start_idx;
         if( *current_ptr == '*' )
         {
             if( is_periphrial )
             {
-                gint32 iLineNo = yyget_lineno( scanner );
                 ParserPrint( 
-                    pCtx->m_strCurFile.c_str(), 
+                    pCtx->GetCurFileName().c_str(), 
                     iLineNo,
                     "Error, 'incomplete address' cannot specify 'P' flag" );
                 ret = -EINVAL;
@@ -293,7 +286,7 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
         addr_idx = std::atoi(current_ptr);
 
         // 5. Look for the dot '.' separating the sub-bit index
-        char* dot_ptr = strchr(current_ptr, '.');
+        auto dot_ptr = strchr(current_ptr, '.');
         gint32 ret = 0;
         int max_bit_limit = 7;
         if (dot_ptr != nullptr)
@@ -301,7 +294,7 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
             addr_bidx = std::atoi(dot_ptr + 1);
 
             // Compute maximum allowable bit boundary based on the token context
-            switch (addr.size) {
+            switch (addr_size) {
                 case 'W': max_bit_limit = 15; break;
                 case 'D': max_bit_limit = 31; break;
                 case 'L': max_bit_limit = 63; break;
@@ -327,12 +320,15 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
 
         if( ERROR( ret ) )
         {
-            ParserPrint( 
-                pCtx->m_strCurFile.c_str(), 
-                iLineNo,
+            char szBuf[ 512 ];
+            sprintf( szBuf, 
                 "Error, Bit index %d exceeds the limit of %d bits "
                 "for size modifier '%c'",
                 addr_bidx, max_bit_limit, addr_size );
+            ParserPrint( 
+                pCtx->GetCurFileName().c_str(), 
+                iLineNo,
+                szBuf );
             break;
         }
 
@@ -351,8 +347,9 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
 {
     StrVecPtr pvecStr;
     pvecStr.NewObj();
+    gint32 ret = 0;
 
-    //"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? {
+    //"@"{ATTR_DATA_TYPE}{IDENTIFIER}(\.{IDENTIFIER}){0,2}(:{IDENTIFIER})? 
     // 1. Dynamically find where the ADDR_AREA begins
     // Skip '%' (index 0). If index 1 is 'P' or 'p', skip that too.
     do{
@@ -371,7 +368,7 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
             stdstr( yytext + size_idx, 1 ) );
 
         const char* pend = nullptr;
-        char* colon_ptr = strchr(
+        const char* colon_ptr = strchr(
             yytext + size_idx + 1, ':');
 
         stdstr strAttr = "value";
@@ -399,7 +396,7 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
         {
             gint32 iLineNo = yyget_lineno( scanner );
             ParserPrint( 
-                pCtx->m_strCurFile.c_str(), 
+                pCtx->GetCurFileName().c_str(), 
                 iLineNo,
                 "Error, Invalid rpcf address" );
             ret = -EINVAL;

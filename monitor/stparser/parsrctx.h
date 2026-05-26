@@ -27,8 +27,6 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include "stlexer.h"
-#include "stparser.h"
 #include "nonterm.h"
 
 #define CLEAR_RSYMBS \
@@ -51,7 +49,46 @@ for( int i = 0; i < ( yylen ); i++ ) \
 #define LVALUE_BIT_STATES     std::vector({ 57, 204, 341 })
 #define METHOD_RET_STATE     475
 
+#define YYSTYPE std::shared_ptr< YYSPAIR >
 #define GetParserState( ps ) ( ps->yystate )
+
+struct YYLTYPE1
+{
+  int first_line;
+  int first_column;
+  int last_line;
+  int last_column;
+};
+
+#define YYLTYPE YYLTYPE1
+
+struct YYLTYPE2 :
+    public YYLTYPE
+{
+    stdstr text;
+    gint32 fidx; // file name index into the m_vecFiles.
+    void initialize()
+    {
+        first_line = 1;
+        first_column = 1;
+        last_line = 1;
+        last_column = 1;
+    }
+
+    YYLTYPE2( const YYLTYPE2& rhs )
+    {
+        first_line = rhs.first_line;
+        first_column = rhs.first_column;
+        last_line = rhs.last_line;
+        last_column = rhs.last_column;
+        text = rhs.text;
+    }
+    YYLTYPE2()
+    {
+        initialize();
+        fidx = -1;
+    }
+};
 
 namespace rpcf
 {
@@ -71,29 +108,7 @@ typedef enum
     endifBlock,
 } enumBlkType;
 
-struct YYLTYPE2 :
-    public YYLTYPE
-{
-    stdstr text;
-    gint32 fidx; // file name index into the m_vecFiles.
-    void initialize(
-        const char* szFileName ) 
-    {
-        first_line = 1;
-        first_column = 1;
-        last_line = 1;
-        last_column = 1;
-    }
-
-    YYLTYPE2( const YYLTYPE2& rhs )
-    {
-        first_line = rhs.first_line;
-        first_column = rhs.first_column;
-        last_line = rhs.last_line;
-        last_column = rhs.last_column;
-        text = rhs.text;
-    }
-};
+typedef std::pair< Variant, YYLTYPE2 > YYSPAIR;
 
 struct FILECTX2
 {
@@ -203,13 +218,25 @@ struct CSTParserContext
     { return m_iSemErr; }
 
     gint32 GetFileIdx( const stdstr& strFile ) const;
+    inline stdstr GetFileName( gint32 idx ) const
+    {
+        if( idx < 0 || idx >= m_vecFiles.size() )
+            return stdstr( "" );
+        return m_vecFiles[ idx ];
+    }
+    inline const stdstr& GetCurFileName() const
+    { return m_strCurFile; }
+
+    inline stdstr& GetCurFileName()
+    { return m_strCurFile; }
 
     bool IsFileOnStack( const stdstr& strFile ) const;
 };
 
-extern std::shared_ptr< CSTParserContext > g_pParserCtx;
-
-inline CSTParserContext* GetParserCtx()
-{ return g_pParserCtx.get(); }
 
 }
+
+extern std::shared_ptr< rpcf::CSTParserContext > g_pParserCtx;
+inline rpcf::CSTParserContext* GetParserCtx()
+{ return g_pParserCtx.get(); }
+

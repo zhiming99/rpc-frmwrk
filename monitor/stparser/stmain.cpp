@@ -24,12 +24,16 @@
  */
 
 #include <rpc.h>
+#include <getopt.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include "lvalvar.h"
+#include "stclsids.h"
+#include "parsrctx.h"
 #include "stlexer.h"
-#include "stscript.h"
-#include "getopt.h"
 using namespace rpcf;
 
-std::shared_ptr< CStParserContext > g_pParserCtx;
+std::shared_ptr< CSTParserContext > g_pParserCtx;
 
 #define IsCondPragma( _iPragma_ ) \
     ( _iPragma_ == TOK_IF || \
@@ -63,9 +67,10 @@ static FactoryPtr InitClassFactory()
 {
     BEGIN_FACTORY_MAPS;
 
-    INIT_MAP_ENTRY( CStructDecl );
-    INIT_MAP_ENTRY( CFuncDecl );
-    INIT_MAP_ENTRY( CFuncBlockDecl );
+    INIT_MAP_ENTRY( CLValueVariableInstPath );
+    INIT_MAP_ENTRY( CLValueVariableDataMember  );
+    INIT_MAP_ENTRY( CLValueVariableDefPtr  );
+    INIT_MAP_ENTRY( CLValueVariableArrayAccess );
 
     END_FACTORY_MAPS;
 };
