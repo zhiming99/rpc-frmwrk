@@ -31,6 +31,7 @@
 #include "stclsids.h"
 #include "parsrctx.h"
 #include "stlexer.h"
+#include "stparser.h"
 using namespace rpcf;
 
 std::shared_ptr< CSTParserContext > g_pParserCtx;
@@ -91,11 +92,11 @@ gint32 ReadToken( YYSTYPE* cur_lval,
     return ret;
 }
 
-#define READTOK( _val, _loc, _scanner, _ctx ) ( do{ \
+#define READTOK( _val, _loc, _scanner, _ctx ) ({ do{ \
         ret = ReadToken( _val, _loc, _scanner, _ctx ); \
         if( ret == YYEOF ) \
             ret = TOK_EOF; \
-    }while( 0 ), ret )
+    }while( 0 ); ret;})
 
 gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 {
@@ -113,15 +114,15 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
     pCtx->yyscanner = yyscanner;
     yypstate *main_ps = yypstate_new();
     yypstate *pragma_ps = nullptr;
-    status = yypush_parse(
-        main_ps, TOK_START_MAIN, NULL, NULL);
+    status = yypush_parse( main_ps,
+        TOK_START_MAIN, &current_lval, &current_lloc, pCtx );
 
     stdstr strFullPath;
     auto pFile = pCtx->TryOpenFile(
         strFile, strFullPath );
     if ( !pFile )
     {
-        ParserPrint( 1, 1,
+        fprintf( stderr,
             "Error, cannot open file '%s'",
             strFile.c_str() );
         return -EINVAL;
@@ -129,22 +130,22 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 
     pCtx->m_strCurFile = strFullPath;
     yyset_in( pFile, yyscanner );
-    yyset_column( 1, yyscanner );
-    yyset_lineno( 1, yyscanner );
 
     // Initialization: Get the first token
-    current_tok = READTOK( current_lval,
+    current_tok = READTOK( &current_lval,
         &current_lloc, yyscanner, pCtx );
 
     yypstate* current_ps = main_ps;
+
+    YYSTYPE next_lval( new YYSPAIR() );
+    YYLTYPE2 next_lloc;
+
+    YYSTYPE prev_lval( new YYSPAIR() );
+    YYLTYPE2 prev_lloc;
+
     while( status == YYPUSH_MORE )
     {
         // 1. Peek: Get the next token from the lexer
-        YYSTYPE next_lval( new YYSPAIR() );
-        YYLTYPE2 next_lloc;
-
-        YYSTYPE prev_lval( new YYSPAIR() );
-        YYLTYPE2 prev_lloc;
 
         gint32 next_tok = READTOK( &next_lval,
             &next_lloc, yyscanner, pCtx );
@@ -161,7 +162,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 
         while( current_ps == main_ps && !bSwallow )
         {
-            gint32 iState = GetParserState( ps );
+            gint32 iState = GetParserState( current_ps );
             switch( iState )
             {
             case CONFLICT_STATE:
@@ -174,8 +175,8 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         // resolve the shift/reduce
                         // conflict
                         current_tok = TOK_VCASE_SEP;
-                        break;
                     }
+                    break;
                 }
             case SUBEXPR_STATE:
                 {
@@ -186,8 +187,8 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         // with TOK_SUB, so that bison
                         // can shift without error.
                         current_tok = TOK_VSUB;
-                        break;
                     }
+                    break;
                 }
             case METHOD_RET_STATE: 
                 {
@@ -217,7 +218,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         std::move( LVALUE_BIT_STATES );
                     auto itr = std::find( states.begin(),
                         states.end(), iState );
-                    if( itr != state.end() &&
+                    if( itr != states.end() &&
                         current_tok == TOK_DOT &&
                         next_tok == TOK_NUMBER )
                     {
@@ -233,9 +234,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                 if( pCtx->GetCondStackSize() > 256 )
                 {
                     status = YYPUSH_ABORT;
-                    ParserPrint( 
-                        current_lloc->name, 
-                        current_lloc->first_line,
+                    yyerror( &current_lloc, pCtx,
                         "Error, too many "
                         "nested conditional pragmas." );
                     break;
@@ -256,9 +255,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                 if( cstat.m_iProgress == invalidProgress )
                 {
                     status = YYPUSH_ABORT;
-                    ParserPrint( 
-                        current_lloc->name, 
-                        current_lloc->first_line,
+                    yyerror( &current_lloc, pCtx,
                         "Fatal error, "
                         "unexpected elsif or endif." );
                     break;
@@ -303,7 +300,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
             while( current_ps != main_ps &&
                 status == YYPUSH_ACCEPT )
             {
-                yypush_delete( pragma_ps );
+                yypstate_delete( pragma_ps );
                 pragma_ps = nullptr;
                 current_ps = main_ps;
 
@@ -389,17 +386,17 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                 else if( next_tok == TOK_END_IF )
                 {
                     cps.m_iCondDepth--;
-                    gint32 iLastLine = next_lloc->last_line;
-                    stdstr strName = next_lloc->name;
+                    YYLTYPE2 temploc = next_lloc;
                     next_tok = READTOK(
                         &next_lval, &next_lloc,
                         yyscanner, pCtx );
                     if( next_tok != TOK_RBRACE )
                     {
-                        ParserPrint( 
-                            strName.c_str(), iLastLine,
+                        yyerror( &temploc, pCtx,
                             "Fatal error, expecting "
                             "'}' after 'end_if'" );
+                        status = YYPUSH_ABORT;
+                        break;
                     }
                     next_tok = READTOK(
                         &next_lval, &next_lloc,
@@ -413,7 +410,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
         {
             prev_tok = current_tok;
             prev_lval = current_lval;
-            prev_llok = current_lloc;
+            prev_lloc = current_lloc;
 
             current_tok = next_tok;
             current_lval = next_lval;
@@ -423,6 +420,8 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 
     yylex_destroy( yyscanner );
     pCtx->yyscanner = nullptr;
+    if( pFile )
+        fclose( pFile );
     return ret;
 }
 
@@ -442,7 +441,7 @@ void Usage()
         "times.\n" );
 }
 
-int main( int argc, char** argv[] )
+int main( int argc, char* argv[] )
 {
     gint32 ret = 0;
     bool bUninit = false;
@@ -478,9 +477,6 @@ int main( int argc, char** argv[] )
                 "hI:",
                 long_options, &option_index );
 
-            if( opt == -1 )
-                break;
-
             switch( opt )
             {
             case 0:
@@ -492,7 +488,7 @@ int main( int argc, char** argv[] )
                     }
                     break;
                 }
-                case 'I' :
+            case 'I' :
                 {
                     ret = IsValidDir( optarg );
                     if( ret == -ENOTDIR )
@@ -554,10 +550,13 @@ int main( int argc, char** argv[] )
                             break;
                         }
                     }
-                    pCtx->m_vecFilePaths.push_back(
+                    pCtx->m_vecInclPaths.push_back(
                         strFullPath );
                     break;
                 }
+            case -1:
+            default:
+                break;
             }
 
             if( argv[ optind ] == nullptr )

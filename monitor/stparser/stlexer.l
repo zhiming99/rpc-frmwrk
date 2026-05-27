@@ -35,6 +35,9 @@
     YYLTYPE * yylloc_param, yyscan_t yyscanner, \
     rpcf::CSTParserContext* pCtx )
 
+extern int yylex(YYSTYPE * yylval_param,
+    YYLTYPE * yylloc_param, void* yyscanner,
+    rpcf::CSTParserContext* pCtx );
 }
 
 %{
@@ -58,6 +61,7 @@ using namespace rpcf;
 int comment_depth = 0;
 void lexerr(const char *s) {
     fprintf(stderr, "Error: %s\n", s);
+
 }
 
 %}
@@ -67,6 +71,8 @@ void lexerr(const char *s) {
 %option     warn
 %option     reentrant
 %option     yylineno
+%option     stack 
+%option     noyywrap
 
 
  /* Definitions */
@@ -275,7 +281,7 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 
  /* 3. Simple Decimal (e.g., 123) */
  /* This is the fallback for any sequence of digits without a "#" */
-[1-9][0-9_]* {
+[0-9][0-9_]* {
     return TOK_NUMBER;
 }
 
@@ -395,6 +401,3 @@ ATTR_DATA_TYPE   (?i:[IOS][BWDQSOF])
 }
 %%
 
-int yywrap() {
-    return 1;
-}

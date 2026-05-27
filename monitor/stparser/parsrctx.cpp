@@ -74,7 +74,7 @@ FILECTX2::FILECTX2( const FILECTX2& rhs )
 }
 
 gint32 CSTParserContext::GetFileIdx(
-    const stdstr strFile ) const
+    const stdstr& strFile ) const
 {
     for( int i = 0; i < m_vecFiles.size(); i++ )
         if( m_vecFiles[ i ] == strFile )
@@ -87,7 +87,7 @@ bool CSTParserContext::IsFileOnStack(
 {
     bool ret = false;
     for( int i = 0; i < m_vecFileStack.size(); i++ )
-        if( m_vecFileStack[ i ] == strFile )
+        if( m_vecFileStack[ i ]->m_strPath == strFile )
             return true;
     return false; 
 }
@@ -168,6 +168,8 @@ FILE* CSTParserContext::TryOpenFile(
     return fp;
 }
 
+}
+
 void ParserPrint(
     const char* szFile,
     gint32 iLineNo,
@@ -179,4 +181,3 @@ void ParserPrint(
     fprintf( stderr, szBuf );
 }
 
-}

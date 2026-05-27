@@ -37,12 +37,8 @@
 
 using namespace rpcf;
 
-std::shared_ptr< rpcf::CSTParserContext > g_pParserCtx( new rpcf::CSTParserContext );
+extern std::shared_ptr< rpcf::CSTParserContext > g_pParserCtx;
 
-void yyerror (YYLTYPE* yyloc,
-    rpcf::CSTParserContext* pCtx,
-    const char* yymsgp);
-  
 %}
 
 %code requires {
@@ -56,6 +52,12 @@ extern void ParserPrint(
     gint32 iLineNo,
     const char* strMsg );
 
+struct yypstate;
+extern int GetParserState( yypstate* ps );
+
+void yyerror (YYLTYPE* yyloc,
+    rpcf::CSTParserContext* pCtx,
+    const char* yymsgp);
 }
 
 %token TOK_PROGRAM TOK_VAR TOK_END_VAR TOK_IF TOK_THEN TOK_ELSE TOK_ELSIF TOK_END_IF TOK_FOR TOK_TO TOK_DO TOK_END_FOR TOK_WHILE TOK_END_WHILE TOK_REPEAT TOK_UNTIL TOK_END_REPEAT
@@ -212,14 +214,18 @@ member_declaration:
       TOK_ID TOK_COLON type_spec               {  }
     ;
 
+var_decl_type: TOK_VAR
+    | TOK_VAR_TEMP
+    | TOK_VAR_INPUT
+    | TOK_VAR_OUTPUT
+    | TOK_VAR_IN_OUT
+    | TOK_VAR_STAT
+    | TOK_VAR_EXTERNAL
+    ;
+    
 var_declarations:
     /* empty */
-    | var_declarations TOK_VAR declaration_list TOK_END_VAR
-    ;
-
-declaration_list:
-    declaration_list declaration
-    | declaration
+    | var_declarations var_decl_type declaration TOK_END_VAR
     ;
 
 opt_qualifier:
@@ -232,18 +238,12 @@ opt_qualifier:
     ;
 
 declaration:
-      TOK_VAR opt_qualifier var_list TOK_END_VAR             
-    | TOK_VAR_TEMP opt_qualifier var_list  TOK_END_VAR       
-    | TOK_VAR_INPUT opt_qualifier var_list  TOK_END_VAR       
-    | TOK_VAR_OUTPUT opt_qualifier var_list TOK_END_VAR      
-    | TOK_VAR_IN_OUT opt_qualifier var_list TOK_END_VAR      
-    | TOK_VAR_STAT  opt_qualifier var_list TOK_END_VAR      
-    | TOK_VAR_EXTERNAL var_list TOK_END_VAR
+      opt_qualifier var_list TOK_SEMICOLON
     ;
 
 var_list:
-    var_declaration TOK_SEMICOLON           {  }
-    | var_list var_declaration TOK_SEMICOLON  {  }
+    var_declaration 
+    | var_list TOK_SEMICOLON  var_declaration {  }
     ;
 
 initial_value:
@@ -366,14 +366,20 @@ statements:
     statements statement
     | statement
     ;
+
+statement_end:
+    /* empty */
+    | statement_end TOK_SEMICOLON
+    ;
+
 statement:
     assignment_statement TOK_SEMICOLON
-    | if_statement TOK_SEMICOLON
-    | for_statement TOK_SEMICOLON
-    | while_statement TOK_SEMICOLON
-    | repeat_statement TOK_SEMICOLON
+    | if_statement statement_end
+    | for_statement statement_end
+    | while_statement statement_end
+    | repeat_statement statement_end
     | function_call_statement TOK_SEMICOLON
-    | case_statement TOK_SEMICOLON
+    | case_statement statement_end
     ;
 
 pragma_statement:
@@ -582,8 +588,16 @@ factor:
     | TOK_LPAREN full_expression TOK_RPAREN
     ;
 
+elseif_branch:
+    /* empty */
+    | elseif_branch TOK_ELSIF full_expression TOK_THEN statements
+
+else_branch:
+    /* empty */
+    | TOK_ELSE statements
+
 if_statement:
-    TOK_IF full_expression TOK_THEN statements TOK_ELSE statements TOK_END_IF
+    TOK_IF full_expression TOK_THEN statements elseif_branch else_branch TOK_END_IF
     ;
 
 opt_by_step:
@@ -710,16 +724,16 @@ case_element_list:
 
 cinner_statements:
     case_body
-    | case_body TOK_SEMICOLON cinner_statements
+    | cinner_statements case_body
     ;
 
 case_body:
-    assignment_statement 
+    assignment_statement TOK_SEMICOLON
     | if_statement 
     | for_statement 
     | while_statement 
     | repeat_statement
-    | function_call_statement
+    | function_call_statement TOK_SEMICOLON
     | case_statement
     ;
 
@@ -801,3 +815,5 @@ void yyerror (YYLTYPE* yyloc,
     }
 }
 
+int GetParserState( yypstate* ps )
+{ return ps->yystate; }
