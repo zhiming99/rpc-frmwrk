@@ -229,7 +229,7 @@ ObjPtr ParsePeriAddr( const char* yytext, CSTParserContext* pCtx )
     gint32 ret = 0;
     IntVecPtr pvecInt;
     pvecInt.NewObj();
-    yyscan_t scanner = pCtx->yyscanner;
+    yyscan_t scanner = pCtx->GetScanner();
 
     do{
         // "%"[Pp]?{ADDR_AREA}{ADDR_SIZE}?{DIGIT}+("."{DIGIT}+|"*")?(":P"|":p")? 
@@ -358,7 +358,7 @@ ObjPtr ParseRpcfAddr( const char* yytext, CSTParserContext* pCtx )
         int attr_idx = -1;
 
         int addr_size, addr_idx = 0, addr_bidx = -1;
-        yyscan_t scanner = pCtx->yyscanner;
+        yyscan_t scanner = pCtx->GetScanner();
 
 
         ( *pvecStr )().push_back(

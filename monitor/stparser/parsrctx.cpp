@@ -176,7 +176,7 @@ void ParserPrint(
     const char* strMsg )
 {
     char szBuf[ 512 ];
-    sprintf( szBuf, "%s(%d): %s",
+    sprintf( szBuf, "%s(%d): %s\n",
         szFile, iLineNo, strMsg );
     fprintf( stderr, szBuf );
 }

@@ -68,14 +68,14 @@ void yyerror (YYLTYPE* yyloc,
 %token TOK_ADD TOK_MINUS TOK_MUL TOK_DIV TOK_MOD TOK_NOT TOK_AND TOK_OR TOK_XOR TOK_DATE TOK_TIME_OF_DAY TOK_DATE_TIME TOK_ABS_ADDR_PERIPHERAL TOK_ABS_ADDR_BIT TOK_ABS_ADDR_BLOCK
 
 %token TOK_EQUAL TOK_POWER TOK_LBRACKET TOK_RBRACKET TOK_LBRACE TOK_RBRACE TOK_LPAREN TOK_RPAREN TOK_LE TOK_GT TOK_NEQU TOK_NLE TOK_NGT
-%token TOK_START_PRAGMA TOK_START_MAIN TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
+%token TOK_EOF TOK_NAMESPACE TOK_END_NAMESPACE TOK_USING
                
 %token TOK_FUNCTION_BLOCK TOK_FUNCTION TOK_END_FUNCTION_BLOCK TOK_END_FUNCTION TOK_END_PROGRAM TOK_INCLUDE TOK_INTERFACE TOK_END_INTERFACE
 %token TOK_VAR_INPUT TOK_VAR_OUTPUT TOK_VAR_IN_OUT TOK_VAR_GLOBAL TOK_CONSTANT TOK_PUNC TOK_VAR_TEMP TOK_AT TOK_VAR_EXTERNAL TOK_RETAIN TOK_PERSISTENT TOK_VAR_CONFIG TOK_CARET TOK_POINTER TOK_VAR_STAT
 
 %token TOK_TIME_TYPE TOK_TIME_OF_DAY_TYPE TOK_DATE_TYPE TOK_STRING_TYPE TOK_WSTRING_TYPE TOK_COMMENT TOK_BY TOK_CASE TOK_END_CASE TOK_OF TOK_ABSTRACT TOK_FINAL TOK_EXTENDS TOK_IMPLEMENTS TOK_SUPER TOK_THIS TOK_PRIVATE TOK_PUBLIC TOK_INTERNAL TOK_PROTECTED TOK_REFERENCE TOK_REF_TO TOK_METHOD TOK_END_METHOD TOK_ATTRIBUTE TOK_INFO TOK_REGION TOK_END_REGION TOK_RPCF_ADDR TOK_OUTPUT_ASSIGN
 // virtual tokens
-%token TOK_VCASE_SEP TOK_VPUNC TOK_VSEMICOLON TOK_VSUB 
+%token TOK_VSTART_MAIN TOK_VSTART_PRAGMA TOK_VCASE_SEP TOK_VPUNC TOK_VSEMICOLON TOK_VSUB TOK_VSTART_CASESEL
 
  /*%glr-parser*/
 
@@ -95,9 +95,10 @@ void yyerror (YYLTYPE* yyloc,
 %%
 
 start_point:
-    TOK_START_MAIN source_file
+    TOK_VSTART_MAIN source_file
     | conditional_pragma
     | TOK_EOF
+    | case_selector_check
     ;
 
 source_file:
@@ -186,15 +187,15 @@ enum_type_head:
     TOK_ID TOK_COLON TOK_LPAREN enum_value_list TOK_RPAREN
 
 enum_type_definition:
-    enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val TOK_SEMICOLON
+    enum_type_head TOK_ASSIGN opt_base_type opt_assign_enum_val semicolons
 
 type_assignment:
-      TOK_ID TOK_COLON type_spec TOK_SEMICOLON {
+      TOK_ID TOK_COLON type_spec semicolons {
         /* Alias: TYPE MyInt : INT; */
         // add_alias_to_symtab($1, $3);
       }
 
-    | TOK_ID TOK_COLON struct_definition TOK_SEMICOLON   {
+    | TOK_ID TOK_COLON struct_definition semicolons   {
         /* Struct: TYPE Motor : STRUCT... */
         // add_struct_to_symtab($1, $3);
     }
@@ -206,8 +207,8 @@ struct_definition:
     ;
 
 member_list:
-      member_declaration TOK_SEMICOLON               {  }
-    | member_list member_declaration TOK_SEMICOLON   {  }
+      member_declaration semicolons               {  }
+    | member_list member_declaration semicolons   {  }
     ;
 
 member_declaration:
@@ -238,12 +239,12 @@ opt_qualifier:
     ;
 
 declaration:
-      opt_qualifier var_list TOK_SEMICOLON
+      opt_qualifier var_list semicolons
     ;
 
 var_list:
     var_declaration 
-    | var_list TOK_SEMICOLON  var_declaration {  }
+    | var_list semicolons  var_declaration {  }
     ;
 
 initial_value:
@@ -363,23 +364,19 @@ derived_type: instance_path
     ;
 
 statements:
-    statements statement
-    | statement
+    statement
+    | statements semicolons statement
     ;
 
-statement_end:
-    /* empty */
-    | statement_end TOK_SEMICOLON
-    ;
 
 statement:
-    assignment_statement TOK_SEMICOLON
-    | if_statement statement_end
-    | for_statement statement_end
-    | while_statement statement_end
-    | repeat_statement statement_end
-    | function_call_statement TOK_SEMICOLON
-    | case_statement statement_end
+    assignment_statement 
+    | if_statement
+    | for_statement
+    | while_statement
+    | repeat_statement
+    | function_call_statement
+    | case_statement
     ;
 
 pragma_statement:
@@ -387,19 +384,19 @@ pragma_statement:
     | TOK_LBRACE TOK_END_REGION TOK_RBRACE
 
 conditional_pragma:
-    TOK_START_PRAGMA TOK_IF full_expression TOK_RBRACE
-    | TOK_START_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
-    | TOK_START_PRAGMA TOK_ELSE TOK_RBRACE
-    | TOK_START_PRAGMA TOK_END_IF TOK_RBRACE
-    | TOK_START_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
+    TOK_VSTART_PRAGMA TOK_IF full_expression TOK_RBRACE
+    | TOK_VSTART_PRAGMA TOK_ELSIF full_expression TOK_RBRACE
+    | TOK_VSTART_PRAGMA TOK_ELSE TOK_RBRACE
+    | TOK_VSTART_PRAGMA TOK_END_IF TOK_RBRACE
+    | TOK_VSTART_PRAGMA TOK_INFO TOK_STRING TOK_RBRACE {
         stdstr strMsg = $3.get()->first;
         YYLTYPE2& curloc = $1.get()->second;
         strMsg.insert( 0, "Info: " );
         yyerror( &curloc, pCtx, strMsg.c_str() );
     }
-    | TOK_START_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
+    | TOK_VSTART_PRAGMA TOK_INCLUDE TOK_STRING TOK_RBRACE {
 
-        yyscan_t yyscanner = pCtx->yyscanner;
+        yyscan_t yyscanner = pCtx->GetScanner();
         YYLTYPE2& curloc = $1.get()->second;
 
         std::string& strFile = $3.get()->first;
@@ -446,7 +443,7 @@ conditional_pragma:
         pfc->m_strPath = pCtx->GetCurFileName();
         pfc->m_fp = yyget_in( yyscanner );
         ( ( YYLTYPE& ) pfc->m_oLocation ) =
-            *yyget_lloc( pCtx->yyscanner );
+            *yyget_lloc( pCtx->GetScanner() );
         pCtx->m_vecFileStack.push_back(
             std::unique_ptr< FILECTX2 >( pfc ) );
         yypush_buffer_state(
@@ -456,7 +453,7 @@ conditional_pragma:
         yyset_lineno( 1, yyscanner );
         yyset_column( 1, yyscanner );
     }
-    | TOK_START_PRAGMA TOK_ATTRIBUTE TOK_STRING opt_attr_values TOK_RBRACE {}
+    | TOK_VSTART_PRAGMA TOK_ATTRIBUTE TOK_STRING opt_attr_values TOK_RBRACE {}
     ;
 
 string_list:
@@ -596,8 +593,12 @@ else_branch:
     /* empty */
     | TOK_ELSE statements
 
+opt_semicolons:
+    /* empty */
+    | semicolons
+
 if_statement:
-    TOK_IF full_expression TOK_THEN statements elseif_branch else_branch TOK_END_IF
+    TOK_IF full_expression TOK_THEN statements opt_semicolons elseif_branch else_branch TOK_END_IF
     ;
 
 opt_by_step:
@@ -671,8 +672,8 @@ opt_access_modifier:
     ;
 
 function_block:
-    function_block_header using_directive_list var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
-    | function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK TOK_SEMICOLON
+    function_block_header using_directive_list var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK 
+    | function_block_header var_declaration method_declaration_list statements TOK_END_FUNCTION_BLOCK 
 
 function_block_header:
     TOK_FUNCTION_BLOCK opt_fb_modifier TOK_ID opt_extends_clause opt_implements_clause
@@ -702,14 +703,14 @@ interface_list:
     ;
 
 function:
-    TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION TOK_SEMICOLON
+    TOK_FUNCTION TOK_ID var_declarations statements TOK_END_FUNCTION
     ;
 
 case_statement:
     TOK_CASE full_expression TOK_OF
         case_element_list
         opt_else_statement
-    TOK_END_CASE TOK_SEMICOLON
+    TOK_END_CASE
     ;
 
 opt_else_statement:
@@ -722,27 +723,28 @@ case_element_list:
     | case_element_list case_element 
     ;
 
-cinner_statements:
-    case_body
-    | cinner_statements case_body
-    ;
+semicolons:
+    TOK_SEMICOLON
+    | TOK_SEMICOLON semicolons
 
-case_body:
-    assignment_statement TOK_SEMICOLON
-    | if_statement 
-    | for_statement 
-    | while_statement 
-    | repeat_statement
-    | function_call_statement TOK_SEMICOLON
-    | case_statement
+cinner_statements:
+    statement
+    | cinner_statements TOK_SEMICOLON statement
     ;
 
 case_element:
     // case_list_selector cinner_statements TOK_SEMICOLON
     // TOK_VCASE_SEP does not come from source, it is used to resolve the
     // shift/reduce conflict
-    case_list_selector cinner_statements TOK_VCASE_SEP
+    case_list_selector cinner_statements semicolons TOK_VCASE_SEP 
+    | case_list_selector cinner_statements TOK_VCASE_SEP 
     ;
+
+case_selector_check:
+    TOK_VSTART_CASESEL case_list_selector
+    { pCtx->m_iLastCaseChk = 0; }
+    | TOK_VSTART_CASESEL statement
+    { pCtx->m_iLastCaseChk = 1; }
 
 case_list_selector:
     case_selector TOK_COLON 
@@ -771,8 +773,8 @@ instance_specific_init_list:
     ;
 
 instance_specific_init:
-    instance_path TOK_AT direct_address TOK_COLON type_spec TOK_SEMICOLON
-    instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value TOK_SEMICOLON
+    instance_path TOK_AT direct_address TOK_COLON type_spec semicolons
+    instance_path TOK_AT direct_address TOK_COLON type_spec TOK_ASSIGN initial_value semicolons
     ;
 
 instance_path:
@@ -789,7 +791,7 @@ using_directive_list : using_directive
           $$ = $1;
       }
     ;
-using_directive : TOK_USING instance_path TOK_SEMICOLON
+using_directive : TOK_USING instance_path TOK_VSEMICOLON
       {
           
       }

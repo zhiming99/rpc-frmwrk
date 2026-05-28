@@ -93,17 +93,128 @@ gint32 ReadToken( YYSTYPE* cur_lval,
 }
 
 #define READTOK( _val, _loc, _scanner, _ctx ) ({ do{ \
-        ret = ReadToken( _val, _loc, _scanner, _ctx ); \
-        if( ret == YYEOF ) \
-            ret = TOK_EOF; \
+        if( bUseQueuedToken && _ctx->GetTokenCount() ) \
+        { \
+            CTokenInfo oToken = _ctx->GetCurTok(); \
+            *_val = oToken.pVal; *_loc = oToken.lloc; \
+            ret = oToken.token;\
+            _ctx->DequeToken();\
+            break; \
+        } \
+        else if( bUseQueuedToken ) \
+            bUseQueuedToken = false; \
+        if( !bEOF ) { \
+            ret = ReadToken( _val, _loc, _scanner, _ctx ); \
+            if( ret == YYEOF ) bEOF = true; \
+        }else{ ret = YYEOF; } \
     }while( 0 ); ret;})
+
+gint32 StartCaseSelectorCheck(
+    CSTParserContext* pCtx,
+    yypstate* main_ps )
+{
+
+    gint32 ret = 0;
+    bool bUseQueuedToken = false;
+    bool bEOF = false;
+
+    yypstate* case_ps = yypstate_new();
+
+    pCtx->m_iLastCaseChk = -1;
+
+    YYSTYPE current_lval( new YYSPAIR() );
+    YYLTYPE2 current_lloc;
+    gint32 current_tok;
+
+    YYSTYPE next_lval( new YYSPAIR() );
+    YYLTYPE2 next_lloc;
+    gint32 next_tok;
+    gint32 iState = -1;
+
+    yypush_parse( case_ps,
+        TOK_VSTART_CASESEL, &current_lval,
+        &current_lloc, pCtx );
+
+    bool bEnd = false;
+    auto states = CASESEL_CHECK_STATES;
+    for( int i = 0; i < pCtx->GetTokenCount(); i++ )
+    {
+        CTokenInfo oti = pCtx->GetCurTok( i );
+        current_tok = oti.token;
+        current_lloc = oti.lloc;
+        ret = yypush_parse( case_ps,
+            oti.token, &oti.pVal, &oti.lloc, pCtx );
+        if( ret != YYPUSH_MORE )
+            break;
+        iState = GetParserState( case_ps );
+        for( int i = 0; i < states.size(); i++ )
+        {
+            if( iState == states[ i ] )
+            {
+                bEnd = true;
+                break;
+            }
+        }
+    }
+
+    do{
+        if( ret != YYPUSH_MORE )
+            break;
+        if( bEnd )
+        {
+            current_tok = YYEOF;
+            ret = yypush_parse( case_ps,
+                current_tok, &current_lval,
+                &current_lloc, pCtx );
+            break;
+        }
+
+        while( ret == YYPUSH_MORE )
+        {
+            if( bEnd )
+            {
+                current_tok = YYEOF;
+            }
+            else
+            {
+                current_tok = READTOK(
+                    &current_lval, &current_lloc,
+                    pCtx->GetScanner(), pCtx );
+            }
+            ret = yypush_parse( case_ps,
+                current_tok, &current_lval,
+                &current_lloc, pCtx );
+
+            if( ret != YYPUSH_MORE )
+                break;
+
+            pCtx->PushToken(
+                { current_lloc, current_tok, current_lval } );
+            iState = GetParserState( case_ps );
+            for( int i = 0; i < states.size(); i++ )
+            {
+                if( iState == states[ i ] )
+                {
+                    bEnd = true;
+                    break;
+                }
+            }
+        }
+
+    }while( 0 );
+
+    yypstate_delete( case_ps );
+    return ret;
+}
 
 gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 {
     gint32 ret = 0;
     gint32 current_tok;
     gint32 status = YYPUSH_MORE;
+    bool bEOF = false;
     gint32 prev_tok;
+    bool bUseQueuedToken = false;
 
     YYSTYPE current_lval( new YYSPAIR() );
     YYLTYPE2 current_lloc;
@@ -111,11 +222,11 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
     yyscan_t yyscanner;
     yylex_init( &yyscanner );
 
-    pCtx->yyscanner = yyscanner;
+    pCtx->SetScanner( yyscanner );
     yypstate *main_ps = yypstate_new();
     yypstate *pragma_ps = nullptr;
     status = yypush_parse( main_ps,
-        TOK_START_MAIN, &current_lval, &current_lloc, pCtx );
+        TOK_VSTART_MAIN, &current_lval, &current_lloc, pCtx );
 
     stdstr strFullPath;
     auto pFile = pCtx->TryOpenFile(
@@ -143,6 +254,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
     YYSTYPE prev_lval( new YYSPAIR() );
     YYLTYPE2 prev_lloc;
 
+    gint32 iState = 0;
     while( status == YYPUSH_MORE )
     {
         // 1. Peek: Get the next token from the lexer
@@ -159,22 +271,74 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
             !pCtx->IsCondStackEmpty() &&
             pCtx->GetTopState().m_iProgress != building )
             bSwallow = true;
-
         while( current_ps == main_ps && !bSwallow )
         {
-            gint32 iState = GetParserState( current_ps );
+            iState = GetParserState( current_ps );
             switch( iState )
             {
             case CONFLICT_STATE:
                 {
-                    if( current_tok == TOK_SEMICOLON &&
-                    ( next_tok == TOK_ELSE ||
-                      next_tok == TOK_END_CASE ) )
+                    if( ( current_tok == TOK_ELSE || current_tok == TOK_END_CASE ) )
                     {
                         // lookahead one more token to
                         // resolve the shift/reduce
                         // conflict
+                        YYLTYPE2 new_lloc = current_lloc;
+                        new_lloc.last_line = new_lloc.first_line;
+                        new_lloc.last_column = new_lloc.first_column;
+                        new_lloc.text.clear();
+
+                        YYSTYPE newVal( new YYSPAIR() );
+                        CTokenInfo otok = {
+                            new_lloc, TOK_VCASE_SEP, newVal };
+
+                        pCtx->PushToken(
+                            { next_lloc, next_tok, next_lval } );
+
+                        bUseQueuedToken = true;
+
+                        next_lloc = current_lloc;
+                        next_lval = current_lval;
+                        next_tok = current_tok;
+
+                        current_lloc = new_lloc;
+                        current_lval = newVal;
                         current_tok = TOK_VCASE_SEP;
+                    }
+                    else if( current_tok == TOK_SEMICOLON &
+                        ( next_tok == TOK_ELSE || next_tok == TOK_END_CASE ) )
+                    {
+                        current_tok = TOK_VCASE_SEP;
+                    }
+                    else if( current_tok != TOK_SEMICOLON )
+                    {
+                        // read in more tokens to decide if
+                        // this is a case selector or something else.
+                        pCtx->PushToken(
+                            { current_lloc, current_tok, current_lval } );
+
+                        pCtx->PushToken(
+                            { next_lloc, next_tok, next_lval } );
+
+                        ret = StartCaseSelectorCheck(
+                            pCtx, main_ps );
+                        if( ret != YYPUSH_ACCEPT )
+                            break;
+                        if( pCtx->m_iLastCaseChk == 0 )
+                        {
+                            next_lloc = current_lloc;
+                            next_lval = current_lval;
+                            next_tok = current_tok;
+
+                            current_tok = TOK_VCASE_SEP;
+                            pCtx->DequeToken();
+                        }
+                        else
+                        {
+                            pCtx->DequeToken();
+                            pCtx->DequeToken();
+                        }
+                        bUseQueuedToken = true;
                     }
                     break;
                 }
@@ -212,20 +376,21 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         nullptr, &temploc, pCtx );
                     break;
                 }
-            default:
+            case USING_SEP_STATE:
                 {
-                    auto states =
-                        std::move( LVALUE_BIT_STATES );
-                    auto itr = std::find( states.begin(),
-                        states.end(), iState );
-                    if( itr != states.end() &&
-                        current_tok == TOK_DOT &&
-                        next_tok == TOK_NUMBER )
-                    {
-                        current_tok = TOK_VPUNC;
-                        break;
-                    }
+                    if( current_tok == TOK_SEMICOLON )
+                        current_tok = TOK_VSEMICOLON;
+                    break;
                 }
+            case LVALUE_BIT_STATES:
+                {
+                    if( current_tok == TOK_DOT &&
+                        next_tok == TOK_NUMBER )
+                        current_tok = TOK_VPUNC;
+                    break;
+                }
+            default:
+                break;
             }
 
             if( current_tok == TOK_LBRACE &&
@@ -239,7 +404,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         "nested conditional pragmas." );
                     break;
                 }
-                current_tok = TOK_START_PRAGMA;
+                current_tok = TOK_VSTART_PRAGMA;
                 current_ps = pragma_ps = yypstate_new();
                 CondPragmaState cps;
                 YYLTYPE2 loc( current_lloc );
@@ -260,7 +425,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                         "unexpected elsif or endif." );
                     break;
                 }
-                current_tok = TOK_START_PRAGMA;
+                current_tok = TOK_VSTART_PRAGMA;
                 current_ps = pragma_ps = yypstate_new();
                 cstat.m_iBlkIdx++;
                 if( next_tok == TOK_ELSIF )
@@ -278,7 +443,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                 next_tok == TOK_INFO ||
                 next_tok == TOK_ATTRIBUTE ) )
             {
-                current_tok = TOK_START_PRAGMA;
+                current_tok = TOK_VSTART_PRAGMA;
                 current_ps = pragma_ps = yypstate_new();
                 pCtx->SetLastPragma( next_tok );
             }
@@ -359,7 +524,11 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
 
             if( status == YYPUSH_ABORT ||
                 status == YYPUSH_NOMEM )
+            {
+                yyerror( &current_lloc, pCtx,
+                    "syntax error occurs" );
                 break;
+            }
         }
         else 
         {
@@ -378,7 +547,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
                 if( cps.m_iCondDepth == 0 )
                 {
                     auto& cstat = pCtx->GetTopState();
-                    current_tok = TOK_START_PRAGMA;
+                    current_tok = TOK_VSTART_PRAGMA;
                     current_ps = pragma_ps = yypstate_new();
                     pCtx->SetLastPragma( next_tok );
                     bUpdate = false;
@@ -419,7 +588,7 @@ gint32 StartParse( CSTParserContext* pCtx, const stdstr& strFile )
     }
 
     yylex_destroy( yyscanner );
-    pCtx->yyscanner = nullptr;
+    pCtx->SetScanner( nullptr );
     if( pFile )
         fclose( pFile );
     return ret;
