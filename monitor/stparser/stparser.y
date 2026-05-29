@@ -727,17 +727,18 @@ semicolons:
     TOK_SEMICOLON
     | TOK_SEMICOLON semicolons
 
-cinner_statements:
+cinner_statements_1:
     statement
-    | cinner_statements TOK_SEMICOLON statement
+    | cinner_statements_1 semicolons statement
     ;
+cinner_statements:
+    cinner_statements_1 opt_semicolons
 
 case_element:
     // case_list_selector cinner_statements TOK_SEMICOLON
     // TOK_VCASE_SEP does not come from source, it is used to resolve the
     // shift/reduce conflict
-    case_list_selector cinner_statements semicolons TOK_VCASE_SEP 
-    | case_list_selector cinner_statements TOK_VCASE_SEP 
+    case_list_selector cinner_statements TOK_VCASE_SEP
     ;
 
 case_selector_check:
@@ -819,3 +820,4 @@ void yyerror (YYLTYPE* yyloc,
 
 int GetParserState( yypstate* ps )
 { return ps->yystate; }
+
